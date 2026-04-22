@@ -14,6 +14,7 @@ use crate::{
     },
 };
 use anyhow::ensure;
+use aptos_channels::aptos_channel;
 use aptos_config::config::BatchTransactionFilterConfig;
 use aptos_consensus_types::{
     common::verify_batch_info_limits,
@@ -22,11 +23,15 @@ use aptos_consensus_types::{
 use aptos_logger::prelude::*;
 use aptos_short_hex_str::AsShortHexStr;
 use aptos_types::PeerId;
+use futures::StreamExt;
 use std::sync::Arc;
-use tokio::sync::{
-    mpsc::{Receiver, Sender},
-    oneshot,
-};
+use tokio::sync::{mpsc::Sender, oneshot};
+
+#[derive(Clone, Debug, Eq, Hash, PartialEq)]
+pub enum BatchCoordinatorQueueKey {
+    Author(PeerId),
+    Control,
+}
 
 #[derive(Debug)]
 pub enum BatchCoordinatorCommand {
@@ -263,8 +268,11 @@ impl BatchCoordinator {
         self.persist_and_send_digests(persist_requests, approx_created_ts_usecs);
     }
 
-    pub(crate) async fn start(mut self, mut command_rx: Receiver<BatchCoordinatorCommand>) {
-        while let Some(command) = command_rx.recv().await {
+    pub(crate) async fn start(
+        mut self,
+        mut command_rx: aptos_channel::Receiver<BatchCoordinatorQueueKey, BatchCoordinatorCommand>,
+    ) {
+        while let Some(command) = command_rx.next().await {
             match command {
                 BatchCoordinatorCommand::Shutdown(ack_tx) => {
                     ack_tx

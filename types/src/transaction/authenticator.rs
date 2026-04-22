@@ -821,6 +821,36 @@ impl AccountAuthenticator {
         }
     }
 
+    /// Return the authentication key derived from `self`'s public key and scheme id,
+    /// or `None` for authenticator types that don't support stateless key derivation
+    /// (V1 Abstract, NoAccountAuthenticator).
+    pub fn authentication_key(&self) -> Option<AuthenticationKey> {
+        match self {
+            Self::Ed25519 { .. }
+            | Self::MultiEd25519 { .. }
+            | Self::SingleKey { .. }
+            | Self::MultiKey { .. } => Some(AuthenticationKey::from_preimage(
+                self.public_key_bytes(),
+                self.scheme(),
+            )),
+            Self::Abstract { authenticator } => {
+                match authenticator.auth_data().abstract_public_key() {
+                    Some(abstract_public_key) => {
+                        // DerivableV1: derive auth key from function_info + abstract_public_key
+                        let func_info_bytes = bcs::to_bytes(authenticator.function_info())
+                            .expect("FunctionInfo serialization should not fail");
+                        Some(AuthenticationKey::domain_abstraction_address(
+                            func_info_bytes,
+                            abstract_public_key,
+                        ))
+                    },
+                    None => None, // V1 Abstract: no public key available
+                }
+            },
+            Self::NoAccountAuthenticator => None,
+        }
+    }
+
     /// Return an authentication proof derived from `self`'s public key and scheme id
     pub fn authentication_proof(&self) -> AuthenticationProof {
         match self {
@@ -1607,8 +1637,9 @@ mod tests {
         },
         secret_sharing::{Ciphertext, EvalProof},
         transaction::{
-            encrypted_payload::EncryptedPayload, webauthn::AssertionSignature, SignedTransaction,
-            TransactionExecutable, TransactionExtraConfig, TransactionPayload,
+            encrypted_payload::{DecryptedPlaintext, EncryptedInner, EncryptedPayload},
+            webauthn::AssertionSignature,
+            SignedTransaction, TransactionExecutable, TransactionExtraConfig, TransactionPayload,
         },
     };
     use aptos_crypto::{
@@ -1622,6 +1653,46 @@ mod tests {
     #[test]
     fn test_from_str_should_not_panic_by_given_empty_string() {
         assert!(AuthenticationKey::from_str("").is_err());
+    }
+
+    #[test]
+    fn authentication_key_derivation_matches_supported_authenticators() {
+        let sender = Ed25519PrivateKey::generate_for_testing();
+        let sender_pub = sender.public_key();
+        let ed25519_auth =
+            AccountAuthenticator::ed25519(sender_pub.clone(), Ed25519Signature::dummy_signature());
+        assert_eq!(
+            ed25519_auth.authentication_key(),
+            Some(AuthenticationKey::ed25519(&sender_pub)),
+        );
+
+        let function_info = FunctionInfo::new(
+            AccountAddress::ONE,
+            "test_module".to_owned(),
+            "test_function".to_owned(),
+        );
+        let abstract_public_key = b"derivable-auth-key".to_vec();
+        let derivable_auth = AccountAuthenticator::derivable_abstraction(
+            function_info.clone(),
+            vec![1, 2, 3],
+            vec![4, 5, 6],
+            abstract_public_key.clone(),
+        );
+        assert_eq!(
+            derivable_auth.authentication_key(),
+            Some(AuthenticationKey::domain_abstraction_address(
+                bcs::to_bytes(&function_info).unwrap(),
+                &abstract_public_key,
+            )),
+        );
+
+        let v1_abstract_auth =
+            AccountAuthenticator::abstraction(function_info, vec![7, 8, 9], vec![10, 11, 12]);
+        assert_eq!(v1_abstract_auth.authentication_key(), None);
+        assert_eq!(
+            AccountAuthenticator::NoAccountAuthenticator.authentication_key(),
+            None
+        );
     }
 
     #[test]
@@ -2261,6 +2332,7 @@ mod tests {
         Ciphertext,
         TransactionExtraConfig,
         HashValue,
+        u64,
     ) {
         let ciphertext = Ciphertext::random();
         let extra_config = TransactionExtraConfig::V1 {
@@ -2268,13 +2340,22 @@ mod tests {
             replay_protection_nonce: None,
         };
         let payload_hash = HashValue::random();
-        let payload = TransactionPayload::EncryptedPayload(EncryptedPayload::Encrypted {
-            ciphertext: ciphertext.clone(),
-            extra_config: extra_config.clone(),
+        let encryption_epoch = 7;
+        let payload =
+            TransactionPayload::EncryptedPayload(EncryptedPayload::Encrypted(EncryptedInner {
+                ciphertext: ciphertext.clone(),
+                extra_config: extra_config.clone(),
+                payload_hash,
+                encryption_epoch,
+                claimed_entry_fun: None,
+            }));
+        (
+            payload,
+            ciphertext,
+            extra_config,
             payload_hash,
-            claimed_entry_fun: None,
-        });
-        (payload, ciphertext, extra_config, payload_hash)
+            encryption_epoch,
+        )
     }
 
     /// Simulate decryption by mutating the signed transaction's payload
@@ -2284,16 +2365,19 @@ mod tests {
         ciphertext: Ciphertext,
         extra_config: TransactionExtraConfig,
         payload_hash: HashValue,
+        encryption_epoch: u64,
     ) {
         *signed_txn.payload_mut() =
             TransactionPayload::EncryptedPayload(EncryptedPayload::Decrypted {
-                ciphertext,
-                extra_config,
-                payload_hash,
-                claimed_entry_fun: None,
+                original: EncryptedInner {
+                    ciphertext,
+                    extra_config,
+                    payload_hash,
+                    encryption_epoch,
+                    claimed_entry_fun: None,
+                },
                 eval_proof: EvalProof::random(),
-                executable: TransactionExecutable::Empty,
-                decryption_nonce: 42,
+                decrypted: DecryptedPlaintext::new(TransactionExecutable::Empty, [42; 16]),
             });
     }
 
@@ -2303,7 +2387,8 @@ mod tests {
         let sender_pub = sender_key.public_key();
         let sender_addr = AuthenticationKey::ed25519(&sender_pub).account_address();
 
-        let (payload, ciphertext, extra_config, payload_hash) = make_encrypted_payload();
+        let (payload, ciphertext, extra_config, payload_hash, encryption_epoch) =
+            make_encrypted_payload();
         let raw_txn = RawTransaction::new(
             sender_addr,
             0,
@@ -2320,7 +2405,13 @@ mod tests {
         signed_txn.verify_signature().unwrap();
 
         // Simulate decryption (Encrypted -> Decrypted).
-        simulate_decryption(&mut signed_txn, ciphertext, extra_config, payload_hash);
+        simulate_decryption(
+            &mut signed_txn,
+            ciphertext,
+            extra_config,
+            payload_hash,
+            encryption_epoch,
+        );
 
         // Signature should still verify because as_encrypted_variant() converts back.
         signed_txn.verify_signature().unwrap();
@@ -2336,7 +2427,8 @@ mod tests {
         let fee_payer_pub = fee_payer_key.public_key();
         let fee_payer_addr = AuthenticationKey::ed25519(&fee_payer_pub).account_address();
 
-        let (payload, ciphertext, extra_config, payload_hash) = make_encrypted_payload();
+        let (payload, ciphertext, extra_config, payload_hash, encryption_epoch) =
+            make_encrypted_payload();
         let raw_txn = RawTransaction::new(
             sender_addr,
             0,
@@ -2369,7 +2461,13 @@ mod tests {
         signed_txn.verify_signature().unwrap();
 
         // Simulate decryption.
-        simulate_decryption(&mut signed_txn, ciphertext, extra_config, payload_hash);
+        simulate_decryption(
+            &mut signed_txn,
+            ciphertext,
+            extra_config,
+            payload_hash,
+            encryption_epoch,
+        );
 
         // Signature should still verify.
         signed_txn.verify_signature().unwrap();
@@ -2385,7 +2483,8 @@ mod tests {
         let secondary_pub = secondary_key.public_key();
         let secondary_addr = AuthenticationKey::ed25519(&secondary_pub).account_address();
 
-        let (payload, ciphertext, extra_config, payload_hash) = make_encrypted_payload();
+        let (payload, ciphertext, extra_config, payload_hash, encryption_epoch) =
+            make_encrypted_payload();
         let raw_txn = RawTransaction::new(
             sender_addr,
             0,
@@ -2411,7 +2510,13 @@ mod tests {
 
         signed_txn.verify_signature().unwrap();
 
-        simulate_decryption(&mut signed_txn, ciphertext, extra_config, payload_hash);
+        simulate_decryption(
+            &mut signed_txn,
+            ciphertext,
+            extra_config,
+            payload_hash,
+            encryption_epoch,
+        );
 
         signed_txn.verify_signature().unwrap();
     }
@@ -2423,7 +2528,8 @@ mod tests {
         let sender_addr =
             AuthenticationKey::any_key(AnyPublicKey::ed25519(sender_pub.clone())).account_address();
 
-        let (payload, ciphertext, extra_config, payload_hash) = make_encrypted_payload();
+        let (payload, ciphertext, extra_config, payload_hash, encryption_epoch) =
+            make_encrypted_payload();
         let raw_txn = RawTransaction::new(
             sender_addr,
             0,
@@ -2444,7 +2550,13 @@ mod tests {
 
         signed_txn.verify_signature().unwrap();
 
-        simulate_decryption(&mut signed_txn, ciphertext, extra_config, payload_hash);
+        simulate_decryption(
+            &mut signed_txn,
+            ciphertext,
+            extra_config,
+            payload_hash,
+            encryption_epoch,
+        );
 
         signed_txn.verify_signature().unwrap();
     }

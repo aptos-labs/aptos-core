@@ -295,7 +295,7 @@ dependencies = [
 
 [[package]]
 name = "aptos"
-version = "9.1.0"
+version = "9.2.0"
 dependencies = [
  "anyhow",
  "aptos-api-types",
@@ -444,6 +444,7 @@ dependencies = [
  "anyhow",
  "aptos-api-test-context",
  "aptos-api-types",
+ "aptos-batch-encryption",
  "aptos-bcs-utils",
  "aptos-build-info",
  "aptos-cached-packages",

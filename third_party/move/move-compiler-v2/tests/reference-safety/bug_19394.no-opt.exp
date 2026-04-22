@@ -1,0 +1,19 @@
+
+Diagnostics:
+warning: This assignment/binding to the left-hand-side variable `x` is unused. Consider removing this assignment/binding, or prefixing the left-hand-side variable with an underscore (e.g., `_x`), or renaming to `_`
+   ┌─ tests/reference-safety/bug_19394.move:10:18
+   │
+10 │         (x, _) = foo();
+   │                  ^^^^^
+
+
+Diagnostics:
+error: cannot drop local `x` which is still borrowed
+   ┌─ tests/reference-safety/bug_19394.move:10:18
+   │
+ 9 │         let r = &x;
+   │                 -- local `x` previously borrowed here
+10 │         (x, _) = foo();
+   │                  ^^^^^ dropped here
+11 │         *r
+   │         -- conflicting reference `r` used here

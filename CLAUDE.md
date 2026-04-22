@@ -2,6 +2,8 @@
 
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
+**Aptos CLI releases:** See `.cursor/skills/aptos-cli-release/SKILL.md` for version bumps and `crates/aptos/CHANGELOG.md` updates.
+
 ## Project Overview
 
 Aptos Core is a layer 1 blockchain written primarily in Rust with Move smart contracts. It's a production-grade system with 200+ workspace crates organized into major subsystems: consensus, execution, storage, network, mempool, API, and Move VM.

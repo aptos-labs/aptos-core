@@ -33,6 +33,7 @@ pub const VECTOR_BORROW_MUT: &str = "vector::borrow_mut";
 pub const BORROW_GLOBAL: &str = "borrow_global";
 pub const BORROW_GLOBAL_MUT: &str = "borrow_global_mut";
 pub const EVENT_EMIT_EVENT: &str = "event::emit_event";
+pub const EVENT_EMIT: &str = "event::emit";
 /// Functions in the std::vector module that are implemented as bytecode instructions.
 pub const VECTOR_FUNCS_WITH_BYTECODE_INSTRS: &[&str] = &[
     "empty",

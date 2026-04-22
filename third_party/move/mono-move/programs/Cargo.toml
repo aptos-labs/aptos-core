@@ -51,3 +51,7 @@ harness = false
 [[bench]]
 name = "bst"
 harness = false
+
+[[bench]]
+name = "match_sum"
+harness = false

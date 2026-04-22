@@ -362,10 +362,6 @@ pub struct Flags {
     #[clap(long = cli::WARN_UNUSED_FLAG, default_value="false")]
     warn_unused: bool,
 
-    /// Support Move 2 language features (up to expansion phase)
-    #[clap(long = cli::LANG_V2_FLAG)]
-    lang_v2: bool,
-
     /// Language version
     #[clap(long = cli::LANGUAGE_VERSION)]
     language_version: LanguageVersion,
@@ -381,8 +377,7 @@ impl Flags {
             skip_attribute_checks: false,
             debug: debug_compiler_env_var(),
             warn_unused: false,
-            lang_v2: false,
-            language_version: LanguageVersion::V1,
+            language_version: LanguageVersion::V2_0,
         }
     }
 
@@ -416,7 +411,6 @@ impl Flags {
             verify: true,
             shadow: true, // allows overlapping between sources and deps
             keep_testing_functions: true,
-            lang_v2: true,
             ..Self::empty()
         }
     }
@@ -488,10 +482,6 @@ impl Flags {
         self.debug
     }
 
-    pub fn lang_v2(&self) -> bool {
-        self.lang_v2
-    }
-
     pub fn language_version(&self) -> LanguageVersion {
         self.language_version
     }
@@ -499,7 +489,6 @@ impl Flags {
     pub fn set_language_version(self, language_version: LanguageVersion) -> Self {
         Self {
             language_version,
-            lang_v2: language_version >= LanguageVersion::V2_0,
             ..self
         }
     }
@@ -507,8 +496,6 @@ impl Flags {
 
 #[derive(Clone, Copy, Debug, ValueEnum)]
 pub enum LanguageVersion {
-    #[value(name = "1")]
-    V1,
     #[value(name = "2")]
     V2, /* V2 is the same as V2_1, here for the parser */
     #[value(name = "2.0")]
@@ -529,7 +516,6 @@ impl LanguageVersion {
     fn to_ordinal(self) -> usize {
         use LanguageVersion::*;
         match self {
-            V1 => 0,
             V2_0 => 1,
             V2 | V2_1 => 2,
             V2_2 => 3,
@@ -563,7 +549,6 @@ impl Ord for LanguageVersion {
 impl std::fmt::Display for LanguageVersion {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(f, "{}", match self {
-            LanguageVersion::V1 => "1",
             LanguageVersion::V2 => "2",
             LanguageVersion::V2_0 => "2.0",
             LanguageVersion::V2_1 => "2.1",

@@ -25,7 +25,7 @@ use aptos_types::{
         SecretSharedKey,
     },
     transaction::{
-        encrypted_payload::{DecryptedPayload, DecryptionFailureReason, EncryptedPayload},
+        encrypted_payload::{DecryptedPlaintext, DecryptionFailureReason, EncryptedPayload},
         SignedTransaction,
     },
 };
@@ -385,29 +385,44 @@ async fn decrypt_validator_path(
             .zip(prepared_cts.into_par_iter())
             .map(|(mut txn, (id, prepared_ciphertext_or_error))| {
                 let eval_proof = proofs.get(&id).expect("must exist");
+                let payload_encryption_epoch = txn
+                    .payload()
+                    .as_encrypted_payload()
+                    .expect("must happen")
+                    .encryption_epoch();
+
+                if payload_encryption_epoch != decryption_key.metadata.epoch {
+                    warn!(
+                        "transaction with ciphertext id {:?} has encryption epoch {} but decryption key epoch {}",
+                        id,
+                        payload_encryption_epoch,
+                        decryption_key.metadata.epoch,
+                    );
+                    num_failed_decryptions.fetch_add(1, Ordering::Relaxed);
+                    return mark_txn_failed_decryption(
+                        txn,
+                        Some(eval_proof),
+                        DecryptionFailureReason::EpochMismatch,
+                    );
+                }
 
                 match do_final_decryption(&decryption_key.key, prepared_ciphertext_or_error) {
                     Ok(payload) => {
                         let encrypted_payload = txn.payload_mut()
                             .as_encrypted_payload_mut()
                             .expect("must happen");
-                        if !encrypted_payload.entry_fun_matches(&payload)
-                            .expect("must be encrypted") {
-                            warn!(
-                                "transaction with ciphertext id {:?} has mismatching entry function",
-                                id
-                            );
-                            num_failed_decryptions.fetch_add(1, Ordering::Relaxed);
-                            mark_txn_failed_decryption(
-                                txn,
-                                Some(eval_proof),
-                                DecryptionFailureReason::ClaimedEntryFunctionMismatch,
-                            )
-                        } else {
-                            let (executable, nonce) = payload.unwrap();
-                            encrypted_payload.into_decrypted(eval_proof, executable, nonce)
-                                .expect("must happen");
-                            txn
+                        match encrypted_payload
+                            .try_into_decrypted(eval_proof.clone(), payload)
+                        {
+                            Ok(()) => txn,
+                            Err(reason) => {
+                                warn!(
+                                    "transaction with ciphertext id {:?} rejected post-decryption: {:?}",
+                                    id, reason
+                                );
+                                num_failed_decryptions.fetch_add(1, Ordering::Relaxed);
+                                mark_txn_failed_decryption(txn, Some(eval_proof), reason)
+                            },
                         }
                     },
                     Err(e) => {
@@ -457,6 +472,8 @@ fn record_decryption_metrics(result: &DecryptionResult) {
     let mut config_unavailable = 0u64;
     let mut key_unavailable = 0u64;
     let mut batch_limit_exceeded = 0u64;
+    let mut payload_hash_mismatch = 0u64;
+    let mut epoch_mismatch = 0u64;
     let mut entry_fun_mismatch = 0u64;
 
     for txn in &result.decrypted_txns {
@@ -470,9 +487,11 @@ fn record_decryption_metrics(result: &DecryptionResult) {
                 DecryptionFailureReason::BatchLimitReached => batch_limit_exceeded += 1,
                 DecryptionFailureReason::ConfigUnavailable => config_unavailable += 1,
                 DecryptionFailureReason::DecryptionKeyUnavailable => key_unavailable += 1,
+                DecryptionFailureReason::PayloadHashMismatch => payload_hash_mismatch += 1,
+                DecryptionFailureReason::EpochMismatch => epoch_mismatch += 1,
                 DecryptionFailureReason::ClaimedEntryFunctionMismatch => entry_fun_mismatch += 1,
             },
-            EncryptedPayload::Encrypted { .. } => {
+            EncryptedPayload::Encrypted(_) => {
                 // Still in encrypted state — shouldn't happen after decryption pipeline
                 failed_decryption += 1;
             },
@@ -487,6 +506,8 @@ fn record_decryption_metrics(result: &DecryptionResult) {
         ("config_unavailable", config_unavailable),
         ("key_unavailable", key_unavailable),
         ("batch_limit_exceeded", batch_limit_exceeded),
+        ("payload_hash_mismatch", payload_hash_mismatch),
+        ("epoch_mismatch", epoch_mismatch),
         ("entry_fun_mismatch", entry_fun_mismatch),
         ("unencrypted", unencrypted),
     ];
@@ -524,6 +545,6 @@ fn mark_txn_failed_decryption(
 fn do_final_decryption(
     decryption_key: &DecryptionKey,
     prepared_ciphertext_or_error: Result<PreparedCiphertext, MissingEvalProofError>,
-) -> anyhow::Result<DecryptedPayload> {
+) -> anyhow::Result<DecryptedPlaintext> {
     FPTXWeighted::decrypt(decryption_key, &prepared_ciphertext_or_error?)
 }

@@ -19,7 +19,7 @@ use crate::{
             },
             view_with_change_set::ExecutorViewWithChangeSet,
         },
-        AptosMoveResolver, AsExecutorView, AsResourceGroupView, MoveVmExt, SessionExt, SessionId,
+        AptosMoveResolver, AsExecutorView, AsResourceGroupView, SessionExt, SessionId,
         UserTransactionContext,
     },
     sharded_block_executor::{executor_client::ExecutorClient, ShardedBlockExecutor},
@@ -68,10 +68,7 @@ use aptos_types::{
     fee_statement::FeeStatement,
     function_info::FunctionInfo,
     move_utils::as_move_value::AsMoveValue,
-    on_chain_config::{
-        ApprovedExecutionHashes, ConfigStorage, FeatureFlag, Features, OnChainConfig,
-        TimedFeatureFlag, TimedFeatures,
-    },
+    on_chain_config::{FeatureFlag, Features, TimedFeatureFlag, TimedFeatures},
     randomness::{PerBlockRandomness, Randomness},
     state_store::{state_key::StateKey, StateView, TStateView},
     transaction::{
@@ -82,8 +79,8 @@ use aptos_types::{
         AuxiliaryInfo, BlockOutput, EntryFunction, ExecutionError, ExecutionStatus, ModuleBundle,
         MultisigTransactionPayload, ReplayProtector, Script, SignedTransaction, Transaction,
         TransactionArgument, TransactionExecutableRef, TransactionExtraConfig, TransactionOutput,
-        TransactionPayload, TransactionStatus, VMValidatorResult, ViewFunctionOutput,
-        WriteSetPayload,
+        TransactionPayload, TransactionStatus, TxnLimitsRequest, VMValidatorResult,
+        ViewFunctionOutput, WriteSetPayload,
     },
     vm::module_metadata::{
         get_compilation_metadata, get_metadata, get_randomness_annotation_for_entry_function,
@@ -285,27 +282,10 @@ pub(crate) fn get_or_vm_startup_failure<'a, T>(
 
 /// Checks if a given transaction is a governance proposal by checking if it has one of the
 /// approved execution hashes.
-fn is_approved_gov_script(
-    resolver: &impl ConfigStorage,
-    txn: &SignedTransaction,
-    txn_metadata: &TransactionMetadata,
-) -> bool {
-    if let Ok(TransactionExecutableRef::Script(_script)) = txn.payload().executable_ref() {
-        match ApprovedExecutionHashes::fetch_config(resolver) {
-            Some(approved_execution_hashes) => approved_execution_hashes
-                .entries
-                .iter()
-                .any(|(_, hash)| hash == &txn_metadata.script_hash),
-            None => false,
-        }
-    } else {
-        false
-    }
-}
 
 pub struct AptosVM {
     is_simulation: bool,
-    move_vm: MoveVmExt,
+    env: AptosEnvironment,
     /// If true, user payloads are allowed not to run extra checks and instead trace execution. If
     /// so, Block-STM replays the trace and performs these checks at post-commit time once. Note
     /// that checks might still be performed in-place based on a heuristic such as payload type.
@@ -319,7 +299,7 @@ impl AptosVM {
     pub fn new(env: &AptosEnvironment) -> Self {
         Self {
             is_simulation: false,
-            move_vm: MoveVmExt::new(env),
+            env: env.clone(),
             // There is no tracing by default because it can only be done if there is access to
             // Block-STM.
             async_runtime_checks_enabled: false,
@@ -342,33 +322,39 @@ impl AptosVM {
         session_id: SessionId,
         user_transaction_context_opt: Option<UserTransactionContext>,
     ) -> SessionExt<'r, R> {
-        self.move_vm
-            .new_session(resolver, session_id, user_transaction_context_opt)
+        SessionExt::new(
+            session_id,
+            self.env.chain_id(),
+            self.env.features(),
+            self.env.vm_config(),
+            user_transaction_context_opt,
+            resolver,
+        )
     }
 
     #[inline(always)]
-    fn features(&self) -> &Features {
-        self.move_vm.env.features()
+    pub(crate) fn features(&self) -> &Features {
+        self.env.features()
     }
 
     #[inline(always)]
     pub(crate) fn timed_features(&self) -> &TimedFeatures {
-        self.move_vm.env.timed_features()
+        self.env.timed_features()
     }
 
     #[inline(always)]
     fn deserializer_config(&self) -> &DeserializerConfig {
-        &self.move_vm.env.vm_config().deserializer_config
+        &self.env.vm_config().deserializer_config
     }
 
     #[inline(always)]
     fn chain_id(&self) -> ChainId {
-        self.move_vm.env.chain_id()
+        self.env.chain_id()
     }
 
     #[inline(always)]
     pub(crate) fn gas_feature_version(&self) -> u64 {
-        self.move_vm.env.gas_feature_version()
+        self.env.gas_feature_version()
     }
 
     #[inline(always)]
@@ -376,7 +362,7 @@ impl AptosVM {
         &self,
         log_context: &AdapterLogSchema,
     ) -> Result<&AptosGasParameters, VMStatus> {
-        get_or_vm_startup_failure(self.move_vm.env.gas_params(), log_context)
+        get_or_vm_startup_failure(self.env.gas_params(), log_context)
     }
 
     #[inline(always)]
@@ -384,17 +370,17 @@ impl AptosVM {
         &self,
         log_context: &AdapterLogSchema,
     ) -> Result<&StorageGasParameters, VMStatus> {
-        get_or_vm_startup_failure(self.move_vm.env.storage_gas_params(), log_context)
+        get_or_vm_startup_failure(self.env.storage_gas_params(), log_context)
     }
 
     #[inline(always)]
     pub fn runtime_environment(&self) -> &RuntimeEnvironment {
-        self.move_vm.env.runtime_environment()
+        self.env.runtime_environment()
     }
 
     #[inline(always)]
     pub fn environment(&self) -> AptosEnvironment {
-        self.move_vm.env.clone()
+        self.env.clone()
     }
 
     /// Returns true if runtime checks for this transaction should be performed asynchronously,
@@ -1050,6 +1036,25 @@ impl AptosVM {
         })
     }
 
+    /// Charge intrinsic gas and any authentication/encryption surcharges for the transaction.
+    /// Called at the start of each execution path (regular and multisig).
+    fn charge_intrinsic_and_surcharges(
+        gas_meter: &mut impl AptosGasMeter,
+        txn_data: &TransactionMetadata,
+    ) -> Result<(), VMStatus> {
+        gas_meter.charge_intrinsic_gas_for_transaction(txn_data.transaction_size())?;
+        if txn_data.is_keyless() {
+            gas_meter.charge_keyless()?;
+        }
+        if txn_data.is_slh_dsa_sha2_128s() {
+            gas_meter.charge_slh_dsa_sha2_128s()?;
+        }
+        if txn_data.is_encrypted_txn() {
+            gas_meter.charge_encrypted_txn_decryption()?;
+        }
+        Ok(())
+    }
+
     fn execute_script_or_entry_function<'a, 'r>(
         &self,
         resolver: &'r impl AptosMoveResolver,
@@ -1067,18 +1072,12 @@ impl AptosVM {
         fail_point!("aptos_vm::execute_script_or_entry_function", |_| {
             Err(VMStatus::Error {
                 status_code: StatusCode::UNKNOWN_INVARIANT_VIOLATION_ERROR,
-                sub_status: Some(move_core_types::vm_status::sub_status::unknown_invariant_violation::EPARANOID_FAILURE),
+                sub_status: Some(unknown_invariant_violation::EPARANOID_FAILURE),
                 message: None,
             })
         });
 
-        gas_meter.charge_intrinsic_gas_for_transaction(txn_data.transaction_size())?;
-        if txn_data.is_keyless() {
-            gas_meter.charge_keyless()?;
-        }
-        if txn_data.is_slh_dsa_sha2_128s() {
-            gas_meter.charge_slh_dsa_sha2_128s()?;
-        }
+        Self::charge_intrinsic_and_surcharges(gas_meter, txn_data)?;
 
         match executable {
             TransactionExecutableRef::Script(script) => {
@@ -1241,13 +1240,7 @@ impl AptosVM {
             ))
         });
 
-        gas_meter.charge_intrinsic_gas_for_transaction(txn_data.transaction_size())?;
-        if txn_data.is_keyless() {
-            gas_meter.charge_keyless()?;
-        }
-        if txn_data.is_slh_dsa_sha2_128s() {
-            gas_meter.charge_slh_dsa_sha2_128s()?;
-        }
+        Self::charge_intrinsic_and_surcharges(gas_meter, txn_data)?;
 
         // Step 1: Obtain the payload. If any errors happen here, the entire transaction should fail
         let invariant_violation_error = || {
@@ -1854,7 +1847,6 @@ impl AptosVM {
         transaction: &SignedTransaction,
         transaction_data: &TransactionMetadata,
         log_context: &AdapterLogSchema,
-        is_approved_gov_script: bool,
         traversal_context: &mut TraversalContext,
         gas_meter: &mut impl AptosGasMeter,
     ) -> Result<SerializedSigners, VMStatus> {
@@ -2024,7 +2016,6 @@ impl AptosVM {
             extra_config,
             transaction_data,
             log_context,
-            is_approved_gov_script,
             traversal_context,
         )?;
         Ok(serialized_signers)
@@ -2065,7 +2056,6 @@ impl AptosVM {
         code_storage: &impl AptosCodeStorage,
         txn: &SignedTransaction,
         txn_data: TransactionMetadata,
-        is_approved_gov_script: bool,
         log_context: &AdapterLogSchema,
         gas_meter: &mut impl AptosGasMeter,
         mut trace_recorder: impl TraceRecorder,
@@ -2085,7 +2075,6 @@ impl AptosVM {
                 txn,
                 &txn_data,
                 log_context,
-                is_approved_gov_script,
                 &mut traversal_context,
                 gas_meter,
             )
@@ -2255,11 +2244,16 @@ impl AptosVM {
     where
         C: AptosCodeStorage + BlockSynchronizationKillSwitch,
         G: AptosGasMeter,
-        F: FnOnce(u64, VMGasParameters, StorageGasParameters, bool, Gas, &'a C) -> G,
+        F: FnOnce(
+            u64,
+            VMGasParameters,
+            StorageGasParameters,
+            Option<&TxnLimitsRequest>,
+            Gas,
+            &'a C,
+        ) -> G,
     {
-        let txn_metadata = TransactionMetadata::new(txn, auxiliary_info, self.timed_features());
-
-        let is_approved_gov_script = is_approved_gov_script(resolver, txn, &txn_metadata);
+        let txn_metadata = TransactionMetadata::new(self, resolver, txn, auxiliary_info)?;
 
         let vm_params = self.gas_params(log_context)?.vm.clone();
 
@@ -2275,7 +2269,7 @@ impl AptosVM {
             self.gas_feature_version(),
             vm_params,
             self.storage_gas_params(log_context)?.clone(),
-            is_approved_gov_script,
+            txn_metadata.txn_limits.as_ref(),
             initial_balance,
             code_storage,
         );
@@ -2286,7 +2280,6 @@ impl AptosVM {
                 code_storage,
                 txn,
                 txn_metadata,
-                is_approved_gov_script,
                 log_context,
                 &mut gas_meter,
                 FullTraceRecorder::new(),
@@ -2297,7 +2290,6 @@ impl AptosVM {
                 code_storage,
                 txn,
                 txn_metadata,
-                is_approved_gov_script,
                 log_context,
                 &mut gas_meter,
                 NoOpTraceRecorder,
@@ -2339,14 +2331,14 @@ impl AptosVM {
             |gas_feature_version,
              vm_gas_params,
              storage_gas_params,
-             is_approved_gov_script,
+             txn_limits_request,
              meter_balance,
              _maybe_block_synchronization_kill_switch| {
                 modify_gas_meter(make_prod_gas_meter_impl::<_, M>(
                     gas_feature_version,
                     vm_gas_params,
                     storage_gas_params,
-                    is_approved_gov_script,
+                    txn_limits_request,
                     meter_balance,
                     &NoopBlockSynchronizationKillSwitch {},
                 ))
@@ -2778,7 +2770,7 @@ impl AptosVM {
                     gas_feature_version,
                     vm_gas_params,
                     storage_gas_params,
-                    /* is_approved_gov_script */ false,
+                    None,
                     max_gas_amount.into(),
                     &NoopBlockSynchronizationKillSwitch {},
                 )
@@ -2824,7 +2816,7 @@ impl AptosVM {
                     gas_feature_version,
                     vm_gas_params,
                     storage_gas_params,
-                    /* is_approved_gov_script */ false,
+                    None,
                     max_gas_amount.into(),
                     &NoopBlockSynchronizationKillSwitch {},
                 );
@@ -3018,7 +3010,6 @@ impl AptosVM {
         extra_config: TransactionExtraConfig,
         txn_data: &TransactionMetadata,
         log_context: &AdapterLogSchema,
-        is_approved_gov_script: bool,
         traversal_context: &mut TraversalContext,
     ) -> Result<(), VMStatus> {
         check_gas(
@@ -3028,7 +3019,6 @@ impl AptosVM {
             module_storage,
             txn_data,
             self.features(),
-            is_approved_gov_script,
             log_context,
         )?;
         if executable.is_empty() && !extra_config.is_multisig() {
@@ -3462,10 +3452,13 @@ impl VMValidator for AptosVM {
             },
         };
         let auxiliary_info = AuxiliaryInfo::new_timestamp_not_yet_assigned(0);
-        let txn_data = TransactionMetadata::new(&txn, &auxiliary_info, self.timed_features());
-
         let resolver = self.as_move_resolver(&state_view);
-        let is_approved_gov_script = is_approved_gov_script(&resolver, &txn, &txn_data);
+        let txn_data = match TransactionMetadata::new(self, &resolver, &txn, &auxiliary_info) {
+            Ok(data) => data,
+            Err(err) => {
+                return VMValidatorResult::new(Some(err.status_code()), 0);
+            },
+        };
 
         let mut session = self.new_session(
             &resolver,
@@ -3479,6 +3472,7 @@ impl VMValidator for AptosVM {
                 return VMValidatorResult::new(Some(err.status_code()), 0);
             },
         };
+
         let storage_gas_params = match self.storage_gas_params(&log_context) {
             Ok(storage_params) => storage_params.clone(),
             Err(err) => {
@@ -3498,7 +3492,7 @@ impl VMValidator for AptosVM {
             self.gas_feature_version(),
             vm_params,
             storage_gas_params,
-            is_approved_gov_script,
+            txn_data.txn_limits.as_ref(),
             initial_balance,
             &NoopBlockSynchronizationKillSwitch {},
         );
@@ -3511,7 +3505,6 @@ impl VMValidator for AptosVM {
             &txn,
             &txn_data,
             &log_context,
-            is_approved_gov_script,
             &mut TraversalContext::new(&storage),
             &mut gas_meter,
         ) {
@@ -3720,7 +3713,7 @@ pub(crate) fn should_create_account_resource(
 
 #[cfg(test)]
 mod tests {
-    use crate::{move_vm_ext::MoveVmExt, AptosVM};
+    use crate::AptosVM;
     use aptos_types::{
         account_address::AccountAddress,
         account_config::{NEW_EPOCH_EVENT_MOVE_TYPE_TAG, NEW_EPOCH_EVENT_V2_MOVE_TYPE_TAG},
@@ -3735,8 +3728,6 @@ mod tests {
 
         assert_send::<AptosVM>();
         assert_sync::<AptosVM>();
-        assert_send::<MoveVmExt>();
-        assert_sync::<MoveVmExt>();
     }
 
     #[test]

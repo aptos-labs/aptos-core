@@ -100,6 +100,7 @@ This is the reference documentation of the Aptos framework.
 -  [`0x1::timestamp`](timestamp.md#0x1_timestamp)
 -  [`0x1::transaction_context`](transaction_context.md#0x1_transaction_context)
 -  [`0x1::transaction_fee`](transaction_fee.md#0x1_transaction_fee)
+-  [`0x1::transaction_limits`](transaction_limits.md#0x1_transaction_limits)
 -  [`0x1::transaction_validation`](transaction_validation.md#0x1_transaction_validation)
 -  [`0x1::util`](util.md#0x1_util)
 -  [`0x1::validator_consensus_info`](validator_consensus_info.md#0x1_validator_consensus_info)

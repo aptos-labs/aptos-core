@@ -46,10 +46,13 @@ pub fn has_users(func: &FunctionEnv) -> bool {
 
 /// Returns true if the function has at least one non-self caller, and all
 /// callers are within the same module.
+///
+/// Direct callers that are inline functions are replaced by their (transitive)
+/// callers, because inline bodies are expanded at call sites during compilation:
+/// after inlining, this function is effectively called from wherever the inline
+/// caller is called.
 pub fn has_same_module_users_only(func: &FunctionEnv) -> bool {
-    let Some(using_funs) = func.get_using_functions() else {
-        return false;
-    };
+    let using_funs = func.get_using_functions_with_transitive_inline();
     let func_qfid = func.get_qualified_id();
     let func_module_id = func.module_env.get_id();
 

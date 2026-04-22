@@ -18,7 +18,9 @@ use aptos_types::{
     fee_statement::FeeStatement,
     move_utils::as_move_value::AsMoveValue,
     on_chain_config::Features,
-    transaction::{MultisigTransactionPayload, ReplayProtector, TransactionExecutableRef},
+    transaction::{
+        MultisigTransactionPayload, ReplayProtector, TransactionExecutableRef, TxnLimitsRequest,
+    },
 };
 use aptos_vm_logging::log_schema::AdapterLogSchema;
 use fail::fail_point;
@@ -62,6 +64,11 @@ pub static APTOS_TRANSACTION_VALIDATION: Lazy<TransactionValidation> =
         unified_prologue_fee_payer_v2_name: Identifier::new("unified_prologue_fee_payer_v2")
             .unwrap(),
         unified_epilogue_v2_name: Identifier::new("unified_epilogue_v2").unwrap(),
+
+        // V3 prologues support voting-power-based high-txn-limits.
+        unified_prologue_v3_name: Identifier::new("unified_prologue_v3").unwrap(),
+        unified_prologue_fee_payer_v3_name: Identifier::new("unified_prologue_fee_payer_v3")
+            .unwrap(),
     });
 
 /// On-chain functions used to validate transactions
@@ -87,6 +94,10 @@ pub struct TransactionValidation {
     pub unified_prologue_v2_name: Identifier,
     pub unified_prologue_fee_payer_v2_name: Identifier,
     pub unified_epilogue_v2_name: Identifier,
+
+    // V3 prologues support voting-power-based high-txn-limits.
+    pub unified_prologue_v3_name: Identifier,
+    pub unified_prologue_fee_payer_v3_name: Identifier,
 }
 
 impl TransactionValidation {
@@ -101,6 +112,14 @@ impl TransactionValidation {
                     CORE_CODE_ADDRESS,
                     ident_str!("transaction_validation").to_owned(),
                 ))
+    }
+
+    pub fn is_transaction_limits_module_abort(&self, location: &AbortLocation) -> bool {
+        location
+            == &AbortLocation::Module(ModuleId::new(
+                CORE_CODE_ADDRESS,
+                ident_str!("transaction_limits").to_owned(),
+            ))
     }
 }
 
@@ -147,9 +166,9 @@ pub(crate) fn run_script_prologue(
             }
         };
 
-        let (prologue_function_name, serialized_args) =
-            if let (Some(_fee_payer), Some(fee_payer_auth_key)) = (
-                txn_data.fee_payer(),
+        let (prologue_function_name, mut serialized_args) =
+            if let (true, Some(fee_payer_auth_key)) = (
+                txn_data.fee_payer().is_some(),
                 txn_data
                     .fee_payer_authentication_proof
                     .as_ref()
@@ -188,7 +207,9 @@ pub(crate) fn run_script_prologue(
                     MoveValue::Bool(is_simulation).simple_serialize().unwrap(),
                 ];
                 (
-                    if features.is_transaction_payload_v2_enabled() {
+                    if features.is_transaction_limits_enabled() {
+                        &APTOS_TRANSACTION_VALIDATION.unified_prologue_fee_payer_v3_name
+                    } else if features.is_transaction_payload_v2_enabled() {
                         &APTOS_TRANSACTION_VALIDATION.unified_prologue_fee_payer_v2_name
                     } else {
                         &APTOS_TRANSACTION_VALIDATION.unified_prologue_fee_payer_name
@@ -222,7 +243,9 @@ pub(crate) fn run_script_prologue(
                     MoveValue::Bool(is_simulation).simple_serialize().unwrap(),
                 ];
                 (
-                    if features.is_transaction_payload_v2_enabled() {
+                    if features.is_transaction_limits_enabled() {
+                        &APTOS_TRANSACTION_VALIDATION.unified_prologue_v3_name
+                    } else if features.is_transaction_payload_v2_enabled() {
                         &APTOS_TRANSACTION_VALIDATION.unified_prologue_v2_name
                     } else {
                         &APTOS_TRANSACTION_VALIDATION.unified_prologue_name
@@ -230,6 +253,17 @@ pub(crate) fn run_script_prologue(
                     serialized_args,
                 )
             };
+
+        // Append the user's staking-backed request when dispatching to v3 prologue.
+        // Governance scripts pass None (they don't need Move-side validation).
+        if features.is_transaction_limits_enabled() {
+            let user_request = txn_data.txn_limits.as_ref().and_then(|v| match v {
+                TxnLimitsRequest::Staking(req) => Some(req),
+                TxnLimitsRequest::ApprovedGovernanceScript => None,
+            });
+            serialized_args.push(bcs::to_bytes(&user_request).unwrap());
+        }
+
         session
             .execute_function_bypass_visibility(
                 &APTOS_TRANSACTION_VALIDATION.module_id(),
@@ -244,8 +278,9 @@ pub(crate) fn run_script_prologue(
             .map_err(expect_no_verification_errors)
             .or_else(|err| convert_prologue_error(err, log_context))
     } else {
-        // Txn payload v2 format and orderless transactions are only supported with unified_prologue methods.
-        // Old prologue functions do not support these features.
+        // Txn payload v2 format, orderless transactions, and any other new features
+        // are only supported with unified_prologue methods. Old prologue functions
+        // do not support these features.
         let txn_sequence_number = match txn_replay_protector {
             ReplayProtector::SequenceNumber(seq_num) => seq_num,
             ReplayProtector::Nonce(_) => {

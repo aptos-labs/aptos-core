@@ -55,7 +55,9 @@ impl<T: Transcript> GenericWeighting<T> {
 
         for (player_id, ek) in eks.iter().enumerate() {
             let player = sc.get_player(player_id);
-            let num_shares = sc.get_player_weight(&player);
+            let num_shares = sc
+                .get_player_weight(&player)
+                .expect("player id from sc.get_player is in bounds");
             for _ in 0..num_shares {
                 duplicated_eks.push(ek.clone());
             }
@@ -84,12 +86,16 @@ impl<T: Transcript + TranscriptCore<SecretSharingConfig = ThresholdConfigBlstrs>
         sc: &Self::SecretSharingConfig,
         player: &Player,
     ) -> Self::DealtPubKeyShare {
-        let weight = sc.get_player_weight(player);
+        let weight = sc
+            .get_player_weight(player)
+            .expect("player id is in bounds");
 
         let mut dpk_share = Vec::with_capacity(weight);
 
         for i in 0..weight {
-            let virtual_player = sc.get_virtual_player(player, i);
+            let virtual_player = sc
+                .get_virtual_player(player, i)
+                .expect("i < weight holds by construction");
             dpk_share.push(T::get_public_key_share(
                 &self.trx,
                 sc.get_threshold_config(),
@@ -111,13 +117,17 @@ impl<T: Transcript + TranscriptCore<SecretSharingConfig = ThresholdConfigBlstrs>
         dk: &Self::DecryptPrivKey,
         pp: &Self::PublicParameters,
     ) -> (Self::DealtSecretKeyShare, Self::DealtPubKeyShare) {
-        let weight = sc.get_player_weight(player);
+        let weight = sc
+            .get_player_weight(player)
+            .expect("player id is in bounds");
 
         let mut weighted_dsk_share = Vec::with_capacity(weight);
         let mut weighted_dpk_share = Vec::with_capacity(weight);
 
         for i in 0..weight {
-            let virtual_player = sc.get_virtual_player(player, i);
+            let virtual_player = sc
+                .get_virtual_player(player, i)
+                .expect("i < weight holds by construction");
             let (dsk_share, dpk_share) = T::decrypt_own_share(
                 &self.trx,
                 sc.get_threshold_config(),

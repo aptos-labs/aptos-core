@@ -121,4 +121,9 @@ module aptos_framework::chunky_dkg {
     public fun session_dealer_epoch(session: &ChunkyDKGSessionState): u64 {
         session.metadata.dealer_epoch
     }
+
+    /// Return the start time in microseconds of a `ChunkyDKGSessionState`.
+    public fun session_start_time(session: &ChunkyDKGSessionState): u64 {
+        session.start_time_us
+    }
 }

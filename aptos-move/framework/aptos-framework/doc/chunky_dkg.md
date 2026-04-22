@@ -17,6 +17,7 @@ Chunky DKG on-chain states and helper functions.
 -  [Function `try_clear_incomplete_session`](#0x1_chunky_dkg_try_clear_incomplete_session)
 -  [Function `incomplete_session`](#0x1_chunky_dkg_incomplete_session)
 -  [Function `session_dealer_epoch`](#0x1_chunky_dkg_session_dealer_epoch)
+-  [Function `session_start_time`](#0x1_chunky_dkg_session_start_time)
 -  [Specification](#@Specification_1)
     -  [Function `initialize`](#@Specification_1_initialize)
     -  [Function `start`](#@Specification_1_start)
@@ -407,6 +408,31 @@ Return the dealer epoch of a <code><a href="chunky_dkg.md#0x1_chunky_dkg_ChunkyD
 
 <pre><code><b>public</b> <b>fun</b> <a href="chunky_dkg.md#0x1_chunky_dkg_session_dealer_epoch">session_dealer_epoch</a>(session: &<a href="chunky_dkg.md#0x1_chunky_dkg_ChunkyDKGSessionState">ChunkyDKGSessionState</a>): u64 {
     session.metadata.dealer_epoch
+}
+</code></pre>
+
+
+
+</details>
+
+<a id="0x1_chunky_dkg_session_start_time"></a>
+
+## Function `session_start_time`
+
+Return the start time in microseconds of a <code><a href="chunky_dkg.md#0x1_chunky_dkg_ChunkyDKGSessionState">ChunkyDKGSessionState</a></code>.
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="chunky_dkg.md#0x1_chunky_dkg_session_start_time">session_start_time</a>(session: &<a href="chunky_dkg.md#0x1_chunky_dkg_ChunkyDKGSessionState">chunky_dkg::ChunkyDKGSessionState</a>): u64
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="chunky_dkg.md#0x1_chunky_dkg_session_start_time">session_start_time</a>(session: &<a href="chunky_dkg.md#0x1_chunky_dkg_ChunkyDKGSessionState">ChunkyDKGSessionState</a>): u64 {
+    session.start_time_us
 }
 </code></pre>
 

@@ -141,10 +141,13 @@ pub fn verify_batch_kind_transactions(
                         txn.is_encrypted_txn(),
                         "Encrypted batch contains non-encrypted transaction"
                     );
+                    let auth_key = txn.authenticator().sender().authentication_key().context(
+                        "Encrypted transactions are not supported with this authenticator type",
+                    )?;
                     txn.payload()
                         .as_encrypted_payload()
                         .expect("already verified is_encrypted_txn")
-                        .verify(txn.sender())
+                        .verify(txn.sender(), auth_key)
                         .context("Encrypted transaction ciphertext verification failed")
                 })?;
         },
@@ -650,8 +653,8 @@ mod tests {
         chain_id::ChainId,
         secret_sharing::Ciphertext,
         transaction::{
-            encrypted_payload::EncryptedPayload, RawTransaction, Script, TransactionExtraConfig,
-            TransactionPayload,
+            encrypted_payload::{EncryptedInner, EncryptedPayload},
+            RawTransaction, Script, TransactionExtraConfig, TransactionPayload,
         },
         validator_verifier::random_validator_verifier,
     };
@@ -800,15 +803,16 @@ mod tests {
     fn create_encrypted_signed_transaction() -> SignedTransaction {
         let private_key = Ed25519PrivateKey::generate_for_testing();
         let public_key = private_key.public_key();
-        let encrypted_payload = EncryptedPayload::Encrypted {
+        let encrypted_payload = EncryptedPayload::Encrypted(EncryptedInner {
             ciphertext: Ciphertext::random(),
             extra_config: TransactionExtraConfig::V1 {
                 multisig_address: None,
                 replay_protection_nonce: None,
             },
             payload_hash: HashValue::random(),
+            encryption_epoch: 0,
             claimed_entry_fun: None,
-        };
+        });
         let raw_transaction = RawTransaction::new(
             AccountAddress::random(),
             0,

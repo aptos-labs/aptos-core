@@ -250,6 +250,7 @@ fn compute_call_sites_to_inline_and_new_function_size(
                 || has_privileged_operations(caller_mid, &callee_env)
                 || has_invisible_calls(caller_module, &callee_env, across_package)
                 || has_module_lock_attribute(&callee_env)
+                || has_cross_module_event_emit(caller_mid, &callee_env)
                 || has_access_controls(&callee_env)
             {
                 // won't inline if:
@@ -262,6 +263,8 @@ fn compute_call_sites_to_inline_and_new_function_size(
                 //   perform directly
                 // - callee has calls to functions that are not visible from the caller module
                 // - callee has the `#[module_lock]` attribute
+                // - callee emits an event whose struct is defined in a module other than the
+                //   caller's (0x1::event::emit<T> must be called from T's defining module)
                 // - callee has runtime access control checks
                 // - callee has an abort expression
                 None
@@ -575,6 +578,39 @@ fn has_module_lock_attribute(function: &FunctionEnv) -> bool {
     let env = function.env();
     function.has_attribute(|attr| {
         env.symbol_pool().string(attr.name()).as_str() == well_known::MODULE_LOCK_ATTRIBUTE
+    })
+}
+
+/// Returns true when inlining `callee` would move an `event::emit<T>` call
+/// out of `T`'s module.
+///
+/// `event::emit<T>` is only valid when it runs in `T`'s defining module, and
+/// the extended checker enforces this per call-site. Inlining copies the
+/// callee's bytecode into the caller, so any emit inside the callee lands in
+/// the caller's module. That only works when `T` is a struct defined in the
+/// caller's own module.
+fn has_cross_module_event_emit(caller_mid: ModuleId, callee: &FunctionEnv) -> bool {
+    let env = callee.env();
+    let Some(body) = callee.get_def() else {
+        return false;
+    };
+    let stdlib_address = env.get_stdlib_address();
+    body.any(&mut |exp: &ExpData| {
+        let ExpData::Call(node_id, Operation::MoveFunction(mid, fid), _) = exp else {
+            return false;
+        };
+        let call = env.get_function(mid.qualified(*fid));
+        if call.module_env.get_name().addr() != &stdlib_address
+            || call.get_full_name_str() != well_known::EVENT_EMIT
+        {
+            return false;
+        }
+
+        // We can only inline if struct is in the same module as caller.
+        !matches!(
+            env.get_node_instantiation(*node_id).first(),
+            Some(Type::Struct(struct_mid, _, _)) if *struct_mid == caller_mid
+        )
     })
 }
 

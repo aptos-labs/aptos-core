@@ -166,7 +166,7 @@ pub static BATCH_NUM_PER_BLOCK: Lazy<HistogramVec> = Lazy::new(|| {
         "quorum_store_batch_num_per_block",
         "Histogram for the number of batches per (committed) blocks.",
         &["type"],
-        TRANSACTION_COUNT_BUCKETS.clone(),
+        PROOF_COUNT_BUCKETS.clone(),
     )
     .unwrap()
 });
@@ -389,7 +389,7 @@ pub static NUM_BATCHES_WITHOUT_PROOF_OF_STORE: Lazy<Histogram> = Lazy::new(|| {
     register_histogram!(
         "num_batches_without_proof_of_store",
         "Histogram for the number of batches without proof of store in proof manager",
-        TRANSACTION_COUNT_BUCKETS.clone(),
+        PROOF_COUNT_BUCKETS.clone(),
     )
     .unwrap()
 });
@@ -418,7 +418,7 @@ pub static PROOF_SIZE_WHEN_PULL: Lazy<Histogram> = Lazy::new(|| {
     register_histogram!(
         "quorum_store_proof_size_when_pull",
         "Histogram for the number of proof-of-store per block when pulled for consensus.",
-        TRANSACTION_COUNT_BUCKETS.clone(),
+        PROOF_COUNT_BUCKETS.clone(),
     )
     .unwrap()
 });
@@ -1112,6 +1112,14 @@ pub static BATCH_COORDINATOR_NUM_BATCH_REQS: Lazy<IntCounterVec> = Lazy::new(|| 
         "quorum_store_batch_coord_requests",
         "Number of requests to batch coordinator.",
         &["bucket"]
+    )
+    .unwrap()
+});
+
+pub static REMOTE_BATCH_COORDINATOR_DROPPED_MSGS: Lazy<IntCounter> = Lazy::new(|| {
+    register_int_counter!(
+        "quorum_store_remote_batch_coordinator_dropped_msgs",
+        "Dropped messages at remote batch coordinator ingress."
     )
     .unwrap()
 });

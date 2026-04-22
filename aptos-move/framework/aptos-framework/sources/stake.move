@@ -484,6 +484,19 @@ module aptos_framework::stake {
     }
 
     #[view]
+    /// Return true if `owner` has an `OwnerCapability` resource.
+    public fun owner_cap_exists(owner: address): bool {
+        exists<OwnerCapability>(owner)
+    }
+
+    #[view]
+    /// Return the pool address controlled by the `OwnerCapability` at `owner`.
+    public fun get_pool_address_for_owner(owner: address): address acquires OwnerCapability {
+        assert_owner_cap_exists(owner);
+        OwnerCapability[owner].pool_address
+    }
+
+    #[view]
     /// Return the validator index for `pool_address`.
     public fun get_validator_index(pool_address: address): u64 acquires ValidatorConfig {
         assert_stake_pool_exists(pool_address);

@@ -113,8 +113,15 @@ impl WeightedVUF for BlsWUF {
         let mut sub_player_ids = Vec::with_capacity(wc.get_total_weight());
 
         for (player, _, _) in apks_and_proofs {
-            for j in 0..wc.get_player_weight(player) {
-                sub_player_ids.push(wc.get_virtual_player(player, j).id);
+            let weight = wc
+                .get_player_weight(player)
+                .expect("player id is in bounds");
+            for j in 0..weight {
+                sub_player_ids.push(
+                    wc.get_virtual_player(player, j)
+                        .expect("j < weight holds by construction")
+                        .id,
+                );
             }
         }
 

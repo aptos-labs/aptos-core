@@ -146,7 +146,7 @@ async fn test_encryption_key_rotation_and_encrypted_txns() {
         &mut swarm,
         &all_validators,
         Duration::from_secs(20),
-        100,
+        200,
         vec![vec![(TransactionType::default(), 1)]],
         true,
         Some(EmitJobMode::MaxLoad {
@@ -244,7 +244,7 @@ async fn test_fee_payer_encrypted_transaction() {
     // Build a TransactionFactory with the encryption key and non-zero gas price
     // (GAS_UNIT_PRICE is 0 in test builds).
     let txn_factory = TransactionFactory::new(swarm.chain_id())
-        .with_gas_unit_price(100)
+        .with_gas_unit_price(200)
         .with_max_gas_amount(10_000);
     txn_factory
         .update_encryption_key_state(state.epoch, Some(&key_bytes))
@@ -275,6 +275,15 @@ async fn test_fee_payer_encrypted_transaction() {
         .into_inner()
         .version;
 
+    // Re-fetch the encryption key right before building the transaction, in case
+    // the epoch has changed while we were funding accounts.
+    let state = client.get_ledger_information().await.unwrap().into_inner();
+    if let Some(fresh_key) = &state.encryption_key {
+        txn_factory
+            .update_encryption_key_state(state.epoch, Some(fresh_key))
+            .expect("failed to update encryption key");
+    }
+
     // Build and sign an encrypted fee-payer transaction (simple coin transfer to self).
     let payload = aptos_cached_packages::aptos_stdlib::aptos_coin_transfer(sender.address(), 1);
     let builder = txn_factory.payload(payload);
@@ -301,6 +310,17 @@ async fn test_fee_payer_encrypted_transaction() {
     assert!(
         committed_txn.success(),
         "Fee-payer encrypted transaction should succeed"
+    );
+
+    // Verify the encrypted transaction was charged the decryption surcharge.
+    let encrypted_gas_used = committed_txn.transaction_info().unwrap().gas_used.0;
+    info!("Encrypted transfer gas_used: {}", encrypted_gas_used);
+    // The decryption surcharge is 375 external gas units (375_000_000 internal / 1_000_000).
+    // The encrypted txn gas should be well above a plain transfer due to this surcharge.
+    assert!(
+        encrypted_gas_used > 375,
+        "Encrypted txn gas_used ({}) should include the decryption surcharge (375)",
+        encrypted_gas_used
     );
 
     // Verify the committed transaction was decrypted.

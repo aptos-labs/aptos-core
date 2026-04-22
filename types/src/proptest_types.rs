@@ -529,9 +529,10 @@ impl Arbitrary for TransactionExtraConfig {
     fn arbitrary_with(_args: ()) -> Self::Strategy {
         (any::<Option<AccountAddress>>(), any::<Option<u64>>())
             .prop_map(
-                |(multisig_address, replay_protection_nonce)| TransactionExtraConfig::V1 {
+                |(multisig_address, replay_protection_nonce)| TransactionExtraConfig::V2 {
                     multisig_address,
                     replay_protection_nonce,
+                    txn_limits_request: None,
                 },
             )
             .boxed()

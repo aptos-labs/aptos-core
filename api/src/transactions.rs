@@ -1248,6 +1248,10 @@ impl TransactionsApi {
                         AptosErrorCode::InvalidInput,
                         ledger_info,
                     )
+                })
+                .and_then(|signed_transaction| {
+                    self.validate_signed_transaction_payload(ledger_info, &signed_transaction)?;
+                    Ok(signed_transaction)
                 }),
         }
     }
@@ -1340,7 +1344,19 @@ impl TransactionsApi {
                     ));
                 }
 
-                if let Err(e) = payload.verify(signed_transaction.sender()) {
+                let auth_key = signed_transaction
+                    .authenticator()
+                    .sender()
+                    .authentication_key()
+                    .ok_or_else(|| {
+                        SubmitTransactionError::bad_request_with_code(
+                            "Encrypted transactions are not supported with this authenticator type",
+                            AptosErrorCode::InvalidInput,
+                            ledger_info,
+                        )
+                    })?;
+
+                if let Err(e) = payload.verify(signed_transaction.sender(), auth_key) {
                     return Err(SubmitTransactionError::bad_request_with_code(
                         e.context("Encrypted transaction payload could not be verified"),
                         AptosErrorCode::InvalidInput,
@@ -1431,6 +1447,10 @@ impl TransactionsApi {
                                 AptosErrorCode::InvalidInput,
                                 ledger_info,
                             )
+                        })
+                        .and_then(|signed_transaction| {
+                            self.validate_signed_transaction_payload(ledger_info, &signed_transaction)?;
+                            Ok(signed_transaction)
                         })
                 })
                 .collect(),
