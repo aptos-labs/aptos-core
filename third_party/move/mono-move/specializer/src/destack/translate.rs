@@ -41,7 +41,7 @@ use move_binary_format::{access::ModuleAccess, file_format::SignatureToken, Comp
 pub fn translate_module(
     module: CompiledModule,
     guard: &ExecutionGuard<'_>,
-    struct_types: &[InternedType],
+    struct_types: &[Option<InternedType>],
 ) -> Result<ModuleIR> {
     let functions = module
         .function_defs
@@ -103,7 +103,7 @@ pub fn translate_module(
 fn collect_handle_signatures(
     module: &CompiledModule,
     guard: &ExecutionGuard<'_>,
-    struct_types: &[InternedType],
+    struct_types: &[Option<InternedType>],
 ) -> Result<Vec<FuncSignature>> {
     module
         .function_handles
@@ -131,7 +131,7 @@ fn collect_handle_signatures(
 fn collect_instantiation_signatures(
     module: &CompiledModule,
     guard: &ExecutionGuard<'_>,
-    struct_types: &[InternedType],
+    struct_types: &[Option<InternedType>],
 ) -> Result<Vec<FuncSignature>> {
     module
         .function_instantiations

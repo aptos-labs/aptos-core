@@ -108,12 +108,15 @@ impl<'a, 'guard, 'ctx> ExecutableBuilder<'a, 'guard, 'ctx> {
     /// Returns a struct type table mapping `StructHandleIndex` ordinals to
     /// interned type pointers. Call after `resolve_types()`.
     ///
-    /// For struct handles that were resolved (non-generic, local), the table
-    /// contains their interned type pointer. For unresolved handles
-    /// (generic, non-local), the entry may be missing or use a placeholder.
-    pub fn struct_type_table(&self) -> Vec<InternedType> {
+    /// Locally-defined, non-generic struct/enum handles resolve to `Some(ty)`.
+    /// Every other handle — imported from another module, or generic —
+    /// remains `None`. Downstream consumers must treat `None` as an
+    /// unresolved reference rather than a usable type; any attempt to lower
+    /// code that touches such a handle should fail loudly. See the TODO in
+    /// `specializer::destack::type_conversion::TableResolver`.
+    pub fn struct_type_table(&self) -> Vec<Option<InternedType>> {
         let num_handles = self.module.struct_handles.len();
-        let mut table = vec![mono_move_core::types::BOOL_TY; num_handles];
+        let mut table = vec![None; num_handles];
         for struct_def in &self.module.struct_defs {
             let handle = self.module.struct_handle_at(struct_def.struct_handle);
             let name = self
@@ -121,9 +124,9 @@ impl<'a, 'guard, 'ctx> ExecutableBuilder<'a, 'guard, 'ctx> {
                 .intern_identifier(self.module.identifier_at(handle.name))
                 .into_global_arena_ptr();
             if let Some(st) = self.structs.get(&name) {
-                table[struct_def.struct_handle.0 as usize] = st.ty();
+                table[struct_def.struct_handle.0 as usize] = Some(st.ty());
             } else if let Some(et) = self.enums.get(&name) {
-                table[struct_def.struct_handle.0 as usize] = et.ty();
+                table[struct_def.struct_handle.0 as usize] = Some(et.ty());
             }
         }
         table

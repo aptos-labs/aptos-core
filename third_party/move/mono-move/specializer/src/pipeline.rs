@@ -18,7 +18,7 @@ use move_binary_format::CompiledModule;
 pub fn destack_and_lower_module(
     module: CompiledModule,
     guard: &ExecutionGuard<'_>,
-    struct_types: &[InternedType],
+    struct_types: &[Option<InternedType>],
 ) -> Result<LoweredModule> {
     let module_ir = destack(module, guard, struct_types)?;
 

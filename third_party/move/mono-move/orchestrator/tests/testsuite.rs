@@ -17,6 +17,7 @@
 
 use codespan_reporting::term::termcolor::Buffer;
 use legacy_move_compiler::shared::known_attributes::KnownAttribute;
+use mono_move_core::types::InternedType;
 use mono_move_global_context::{ExecutionGuard, GlobalContext};
 use mono_move_orchestrator::ExecutableBuilder;
 use move_asm::assembler::{self, Options as AsmOptions};
@@ -83,7 +84,7 @@ fn format_micro_ops(module_ir: &ModuleIR) -> String {
 fn resolve_struct_types(
     guard: &ExecutionGuard<'_>,
     module: &CompiledModule,
-) -> Result<Vec<mono_move_core::types::InternedType>, String> {
+) -> Result<Vec<Option<InternedType>>, String> {
     let mut builder = ExecutableBuilder::new(guard, module);
     builder.resolve_types().map_err(|e| format!("{:#}", e))?;
     Ok(builder.struct_type_table())

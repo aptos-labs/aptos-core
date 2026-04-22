@@ -22,11 +22,13 @@ use move_binary_format::CompiledModule;
 ///
 /// `struct_types` maps `StructHandleIndex` ordinals to pre-resolved interned
 /// type pointers, used to convert bytecode-level struct references into
-/// interned `Type` representations.
+/// interned `Type` representations. `None` entries denote handles the
+/// orchestrator could not resolve; touching one during conversion is an
+/// error.
 pub fn destack(
     module: CompiledModule,
     guard: &ExecutionGuard<'_>,
-    struct_types: &[InternedType],
+    struct_types: &[Option<InternedType>],
 ) -> Result<ModuleIR> {
     if let Err(e) = move_bytecode_verifier::verify_module(&module) {
         bail!("bytecode verification failed: {:#}", e);

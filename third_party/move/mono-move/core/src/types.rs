@@ -56,7 +56,6 @@
 use crate::ExecutableId;
 use mono_move_alloc::GlobalArenaPtr;
 use move_core_types::ability::AbilitySet;
-use std::marker::PhantomData;
 
 // ================================================================================================
 // Layout types
@@ -374,70 +373,6 @@ pub const SIGNER_TY: InternedType = GlobalArenaPtr::from_static(&SIGNER);
 pub const EMPTY_TYPE_LIST: InternedTypeList = GlobalArenaPtr::from_static(&EMPTY_LIST);
 
 // ================================================================================================
-// TypeRef: lifetime-scoped type handle
-// ================================================================================================
-
-/// A lifetime-scoped handle to an interned [`Type`] in the global arena.
-///
-/// `TypeRef` wraps an [`InternedType`] with a phantom lifetime tied to
-/// the execution session. This provides compile-time safety: the Rust borrow
-/// checker prevents using a `TypeRef` after the session (and its arena) has
-/// been dropped.
-///
-/// Because types are interned, pointer equality on the underlying
-/// [`GlobalArenaPtr`] implies structural equality. `TypeRef` delegates `Hash`
-/// and `Eq` to pointer identity.
-#[derive(Clone, Copy)]
-pub struct TypeRef<'sess> {
-    ptr: InternedType,
-    _session: PhantomData<&'sess ()>,
-}
-
-impl<'sess> TypeRef<'sess> {
-    /// Creates a `TypeRef` from a raw [`InternedType`].
-    ///
-    /// # Safety
-    ///
-    /// The caller must ensure that the pointer is valid for the `'sess`
-    /// lifetime (i.e., the arena backing the pointer will not be reset or
-    /// dropped while this `TypeRef` is alive).
-    pub unsafe fn from_ptr(ptr: InternedType) -> Self {
-        Self {
-            ptr,
-            _session: PhantomData,
-        }
-    }
-
-    /// Returns the underlying [`InternedType`].
-    pub fn into_ptr(self) -> InternedType {
-        self.ptr
-    }
-
-    /// Creates a `TypeRef` from a static primitive type reference.
-    /// Safe because statics have `'static` lifetime which outlives any session.
-    pub fn from_static(ty: &'static Type) -> Self {
-        Self {
-            ptr: GlobalArenaPtr::from_static(ty),
-            _session: PhantomData,
-        }
-    }
-}
-
-impl<'sess> std::hash::Hash for TypeRef<'sess> {
-    fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
-        self.ptr.hash(state);
-    }
-}
-
-impl<'sess> PartialEq for TypeRef<'sess> {
-    fn eq(&self, other: &Self) -> bool {
-        self.ptr == other.ptr
-    }
-}
-
-impl<'sess> Eq for TypeRef<'sess> {}
-
-// ================================================================================================
 // Alignment utility
 // ================================================================================================
 
@@ -447,10 +382,4 @@ impl<'sess> Eq for TypeRef<'sess> {}
 pub fn align_up(offset: u32, align: u32) -> u32 {
     debug_assert!(align > 0 && align.is_power_of_two());
     (offset + align - 1) & !(align - 1)
-}
-
-impl<'sess> std::fmt::Debug for TypeRef<'sess> {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        f.debug_struct("TypeRef").finish_non_exhaustive()
-    }
 }

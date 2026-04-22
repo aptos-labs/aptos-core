@@ -12,7 +12,7 @@ use super::{
     type_conversion::{convert_sig_token, convert_sig_tokens},
 };
 use crate::stackless_exec_ir::{BasicBlock, BinaryOp, CmpOp, Instr, Label, Slot, UnaryOp};
-use anyhow::{anyhow, bail, ensure, Context, Result};
+use anyhow::{bail, ensure, Context, Result};
 use mono_move_core::types::{self as ty, InternedType, InternedTypeList};
 use mono_move_global_context::ExecutionGuard;
 use move_binary_format::{
@@ -83,7 +83,10 @@ pub(crate) struct SsaConverter<'a> {
     /// Execution guard for interning types.
     guard: &'a ExecutionGuard<'a>,
     /// Pre-resolved struct types, indexed by StructHandleIndex ordinal.
-    struct_types: &'a [InternedType],
+    /// `None` entries denote handles the orchestrator could not resolve
+    /// (imported or generic); the converter must reject any code that
+    /// references them.
+    struct_types: &'a [Option<InternedType>],
     /// Completed basic blocks.
     blocks: Vec<BasicBlock>,
     /// Instructions for the current block being built.
@@ -100,7 +103,7 @@ impl<'a> SsaConverter<'a> {
     pub(crate) fn new(
         local_types: Vec<InternedType>,
         guard: &'a ExecutionGuard<'a>,
-        struct_types: &'a [InternedType],
+        struct_types: &'a [Option<InternedType>],
     ) -> Self {
         Self {
             next_vid: 0,
@@ -191,10 +194,15 @@ impl<'a> SsaConverter<'a> {
         idx: StructDefinitionIndex,
     ) -> Result<InternedType> {
         let handle = module.struct_defs[idx.0 as usize].struct_handle;
-        self.struct_types
-            .get(handle.0 as usize)
-            .copied()
-            .ok_or_else(|| anyhow!("struct handle index {} out of bounds", handle.0))
+        match self.struct_types.get(handle.0 as usize) {
+            Some(Some(ty)) => Ok(*ty),
+            Some(None) => bail!(
+                "unresolved struct handle {} for local struct definition {}",
+                handle.0,
+                idx.0
+            ),
+            None => bail!("struct handle index {} out of bounds", handle.0),
+        }
     }
 
     fn struct_inst_type(
