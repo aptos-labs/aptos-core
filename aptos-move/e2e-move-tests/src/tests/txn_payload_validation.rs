@@ -125,14 +125,14 @@ fn test_txn_payload_validation_discards_bad_inputs() {
     let status = h.run_entry_function(
         &account,
         MemberId::from_str("0x1::a::b").unwrap(),
-        vec![struct_with_u8_args(7)],
+        vec![struct_with_u8_args(15)],
         vec![],
     );
     assert!(status.is_kept());
     let status = h.run_entry_function(
         &account,
         MemberId::from_str("0x1::a::b").unwrap(),
-        vec![struct_with_u8_args(8)],
+        vec![struct_with_u8_args(16)],
         vec![],
     );
     assert!(status.is_discarded());
