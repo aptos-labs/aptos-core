@@ -3599,9 +3599,31 @@ impl AptosSimulationVM {
             &log_context,
             &AuxiliaryInfo::new_timestamp_not_yet_assigned(0),
         );
-        let txn_output = vm_output
-            .try_materialize_into_transaction_output(&resolver)
-            .expect("Materializing aggregator V1 deltas should never fail");
+
+        // Simulation runs outside the normal block-executor finalization pipeline. If the
+        // transaction output contains non-materialized delayed field changes (e.g. delayed fields
+        // / aggregator v2) or v1 delta materialization errors, output conversion can fail.
+        // This must never crash the node: simulation endpoints are attacker-reachable.
+        let gas_used = vm_output.gas_used();
+        let txn_output = match vm_output.try_materialize_into_transaction_output(&resolver) {
+            Ok(out) => out,
+            Err(materialization_status) => {
+                let txn_status = TransactionStatus::from_vm_status(
+                    materialization_status,
+                    vm.features(),
+                    vm.gas_feature_version() >= RELEASE_V1_38,
+                );
+                TransactionOutput::new(
+                    aptos_types::write_set::WriteSetMut::default()
+                        .freeze()
+                        .expect("Freezing an empty WriteSet must succeed"),
+                    vec![],
+                    gas_used,
+                    txn_status,
+                    aptos_types::transaction::TransactionAuxiliaryData::default(),
+                )
+            },
+        };
         (vm_status, txn_output)
     }
 }
