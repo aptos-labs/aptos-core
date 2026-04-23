@@ -152,7 +152,7 @@ pub fn aptos_prod_deserializer_config(
             max_binary_format_version: features.get_max_binary_format_version(),
             max_identifier_size: 128,
             max_entry_type_args_count: 32,
-            max_entry_type_tag_nodes: 16,
+            max_entry_type_tag_nodes: 8,
         }
     } else {
         DeserializerConfig {

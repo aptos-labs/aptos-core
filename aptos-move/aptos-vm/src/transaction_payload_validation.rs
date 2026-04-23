@@ -160,5 +160,14 @@ fn validate_identifier(identifier: &IdentStr, config: &DeserializerConfig) -> Re
             )),
         ));
     }
+    if !IdentStr::is_valid(identifier.as_str()) {
+        return Err(VMStatus::error(
+            StatusCode::MALFORMED_TRANSACTION_PAYLOAD,
+            Some(format!(
+                "Identifier '{}' contains invalid characters",
+                identifier.as_str()
+            )),
+        ));
+    }
     Ok(())
 }

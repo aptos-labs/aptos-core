@@ -5,7 +5,8 @@ use crate::MoveHarness;
 use aptos_types::{account_address::AccountAddress, move_utils::MemberId};
 use move_core_types::{
     ability::AbilitySet,
-    language_storage::{FunctionTag, TypeTag},
+    identifier::Identifier,
+    language_storage::{FunctionTag, ModuleId, StructTag, TypeTag},
 };
 use std::str::FromStr;
 
@@ -111,26 +112,27 @@ fn test_txn_payload_validation_discards_bad_inputs() {
     );
     assert!(status.is_discarded());
 
-    // Type tag nesting depth.
-    let nested_vector = |depth: usize| {
-        let mut ty = TypeTag::U8;
-        for _ in 0..depth {
-            ty = TypeTag::Vector(Box::new(ty));
-        }
-        ty
+    // Type tag node count.
+    let struct_with_u8_args = |n: usize| {
+        TypeTag::Struct(Box::new(StructTag {
+            address: AccountAddress::ONE,
+            module: Identifier::new_unchecked("a"),
+            name: Identifier::new_unchecked("B"),
+            type_args: vec![TypeTag::U8; n],
+        }))
     };
     let account = h.new_account_at(AccountAddress::from_hex_literal("0x106").unwrap());
     let status = h.run_entry_function(
         &account,
         MemberId::from_str("0x1::a::b").unwrap(),
-        vec![nested_vector(15)],
+        vec![struct_with_u8_args(7)],
         vec![],
     );
     assert!(status.is_kept());
     let status = h.run_entry_function(
         &account,
         MemberId::from_str("0x1::a::b").unwrap(),
-        vec![nested_vector(16)],
+        vec![struct_with_u8_args(8)],
         vec![],
     );
     assert!(status.is_discarded());
@@ -146,6 +148,48 @@ fn test_txn_payload_validation_discards_bad_inputs() {
         &account,
         MemberId::from_str("0x1::a::b").unwrap(),
         vec![tag],
+        vec![],
+    );
+    assert!(status.is_discarded());
+
+    // Invalid identifier charset in module name.
+    let account = h.new_account_at(AccountAddress::from_hex_literal("0x108").unwrap());
+    let status = h.run_entry_function(
+        &account,
+        MemberId {
+            module_id: ModuleId::new(AccountAddress::ONE, Identifier::new_unchecked("bad name")),
+            member_id: Identifier::new_unchecked("b"),
+        },
+        vec![],
+        vec![],
+    );
+    assert!(status.is_discarded());
+
+    // Invalid identifier charset in function name.
+    let account = h.new_account_at(AccountAddress::from_hex_literal("0x109").unwrap());
+    let status = h.run_entry_function(
+        &account,
+        MemberId {
+            module_id: ModuleId::new(AccountAddress::ONE, Identifier::new_unchecked("a")),
+            member_id: Identifier::new_unchecked("bad name"),
+        },
+        vec![],
+        vec![],
+    );
+    assert!(status.is_discarded());
+
+    // Invalid identifier charset inside a type tag.
+    let account = h.new_account_at(AccountAddress::from_hex_literal("0x10a").unwrap());
+    let bad_struct = TypeTag::Struct(Box::new(StructTag {
+        address: AccountAddress::ONE,
+        module: Identifier::new_unchecked("bad name"),
+        name: Identifier::new_unchecked("B"),
+        type_args: vec![],
+    }));
+    let status = h.run_entry_function(
+        &account,
+        MemberId::from_str("0x1::a::b").unwrap(),
+        vec![bad_struct],
         vec![],
     );
     assert!(status.is_discarded());
