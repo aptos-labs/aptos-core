@@ -17,21 +17,33 @@ use std::{collections::BTreeMap, ops::Deref, sync::Arc};
 pub const PEER_INFO_DISABLED_MESSAGE: &str =
     "This endpoint is disabled! Enable it in the node config at inspection_service.expose_peer_information: true";
 
-/// Handles a new peer information request
+// The message to display while the node is still initializing
+pub const PEER_INFO_INITIALIZING_MESSAGE: &str =
+    "Node is still initializing — peer information is not yet available";
+
+/// Handles a new peer information request.
+///
+/// `aptos_data_client` and `peers_and_metadata` are `None` during early startup
+/// (before the rest of the node has initialised). In that case the endpoint
+/// returns 503 so callers know to retry rather than treating it as a hard error.
 pub fn handle_peer_information_request(
     node_config: &NodeConfig,
-    aptos_data_client: AptosDataClient,
-    peers_and_metadata: Arc<PeersAndMetadata>,
+    aptos_data_client: Option<AptosDataClient>,
+    peers_and_metadata: Option<Arc<PeersAndMetadata>>,
 ) -> (StatusCode, Body, String) {
-    // Only return peer information if the endpoint is enabled
-    let (status_code, body) = if node_config.inspection_service.expose_peer_information {
-        let peer_information = get_peer_information(aptos_data_client, peers_and_metadata);
-        (StatusCode::OK, Body::from(peer_information))
-    } else {
-        (
+    let (status_code, body) = match (aptos_data_client, peers_and_metadata) {
+        _ if !node_config.inspection_service.expose_peer_information => (
             StatusCode::FORBIDDEN,
             Body::from(PEER_INFO_DISABLED_MESSAGE),
-        )
+        ),
+        (Some(data_client), Some(pam)) => {
+            let peer_information = get_peer_information(data_client, pam);
+            (StatusCode::OK, Body::from(peer_information))
+        },
+        _ => (
+            StatusCode::SERVICE_UNAVAILABLE,
+            Body::from(PEER_INFO_INITIALIZING_MESSAGE),
+        ),
     };
 
     (status_code, body, CONTENT_TYPE_TEXT.into())
