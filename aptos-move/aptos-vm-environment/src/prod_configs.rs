@@ -148,6 +148,10 @@ pub fn aptos_prod_deserializer_config(
     features: &Features,
 ) -> DeserializerConfig {
     if gas_feature_version >= RELEASE_V1_46 {
+        // Note: prod tightens `max_identifier_size` to 128, below the binary
+        // format maximum of `IDENTIFIER_SIZE_MAX = 255` returned by
+        // `Features::get_max_identifier_size()`. The feature-gated getter is
+        // no longer consulted for v1.46+ and is effectively superseded here.
         DeserializerConfig {
             max_binary_format_version: features.get_max_binary_format_version(),
             max_identifier_size: 128,

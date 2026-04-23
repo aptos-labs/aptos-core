@@ -117,7 +117,7 @@ impl Default for DeserializerConfig {
             max_binary_format_version: VERSION_MAX,
             max_identifier_size: IDENTIFIER_SIZE_MAX,
             max_entry_type_args_count: 32,
-            max_entry_type_tag_nodes: 8,
+            max_entry_type_tag_nodes: 16,
         }
     }
 }

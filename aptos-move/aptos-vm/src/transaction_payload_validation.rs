@@ -58,7 +58,7 @@ pub fn validate_transaction_payload(
     Ok(())
 }
 
-pub fn validate_executable(
+fn validate_executable(
     executable: &TransactionExecutableRef,
     config: &DeserializerConfig,
 ) -> Result<(), VMStatus> {
@@ -104,6 +104,9 @@ fn validate_type_args(ty_args: &[TypeTag], config: &DeserializerConfig) -> Resul
 fn validate_type_tag(ty: &TypeTag, config: &DeserializerConfig) -> Result<(), VMStatus> {
     let mut node_count: u64 = 0;
     for tag in ty.preorder_traversal_iter() {
+        // Node count check precedes the match below, so an oversized tag
+        // containing a function type reports the node-count error rather
+        // than the function-type error. Both are rejections.
         node_count += 1;
         if node_count > config.max_entry_type_tag_nodes {
             return Err(VMStatus::error(
