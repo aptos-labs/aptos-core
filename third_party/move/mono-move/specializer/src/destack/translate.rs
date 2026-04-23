@@ -3,12 +3,15 @@
 
 //! Conversion pipeline: Bytecode → SSA → instruction fusion → slot allocation.
 
-use super::{ssa_conversion::SsaConverter, type_conversion::convert_sig_tokens};
+use super::{
+    ssa_conversion::SsaConverter,
+    type_conversion::{convert_sig_token, convert_sig_tokens},
+};
 use crate::stackless_exec_ir::{FuncSignature, FunctionIR, ModuleIR};
 use anyhow::Result;
 use mono_move_core::types::InternedType;
 use mono_move_global_context::ExecutionGuard;
-use move_binary_format::{access::ModuleAccess, file_format::SignatureToken, CompiledModule};
+use move_binary_format::{access::ModuleAccess, CompiledModule};
 
 /// Convert an entire compiled module to stackless IR.
 ///
@@ -57,12 +60,11 @@ pub fn translate_module(
             let local_sig_toks = &module.signature_at(code.locals).0;
             let num_params = param_sig_toks.len() as u16;
             let num_locals = local_sig_toks.len() as u16;
-            let all_sig_toks: Vec<SignatureToken> = param_sig_toks
+            let local_types: Vec<InternedType> = param_sig_toks
                 .iter()
                 .chain(local_sig_toks.iter())
-                .cloned()
-                .collect();
-            let local_types = convert_sig_tokens(&all_sig_toks, guard, struct_types)?;
+                .map(|tok| convert_sig_token(tok, guard, struct_types))
+                .collect::<Result<_>>()?;
 
             // Pass: Bytecode -> Intra-Block SSA -> Fusion
             let converter = SsaConverter::new(local_types, guard, struct_types);
@@ -100,6 +102,12 @@ pub fn translate_module(
 }
 
 /// Pre-computes `FuncSignature` for every function handle in the module.
+///
+/// TODO: convert the module's signature pool once and look up signatures by
+/// index here instead of re-walking the same `SignatureToken` slices per
+/// handle/instantiation. Handles that share a signature index currently hit the
+/// interner repeatedly, which is both wasted work; a one-pass pool conversion
+/// collapses this to a single interning per unique signature.
 fn collect_handle_signatures(
     module: &CompiledModule,
     guard: &ExecutionGuard<'_>,

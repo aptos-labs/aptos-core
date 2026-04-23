@@ -55,6 +55,14 @@ impl StructResolver for TableResolver<'_> {
         // else is `None`. We also return the base struct type for both
         // `SignatureToken::Struct` and `SignatureToken::StructInstantiation`
         // because instantiation interning is not yet implemented.
+        //
+        // Root cause: the orchestrator's struct-type table is built by the
+        // layout pass, which can only handle fully-concrete, locally-defined
+        // structs. Splitting *interning* from *layout computation* into two
+        // phases would let us intern every type (local, cross-module, and
+        // generic) up front and compute layouts lazily when the type becomes
+        // fully concrete. That would also remove the `Option<InternedType>`
+        // shape of `struct_types` and simplify this resolver.
         match self.struct_types.get(struct_handle.0 as usize) {
             Some(Some(ty)) => Ok(*ty),
             Some(None) => bail!(

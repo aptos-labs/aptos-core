@@ -28,20 +28,7 @@ pub fn build_executable(
     let lowered = specializer::destack_and_lower_module(module.clone(), guard, &struct_types)?;
 
     for lowered_fn in lowered.functions {
-        match lowered_fn {
-            Some(lf) => {
-                builder.add_function(
-                    lf.name_idx,
-                    lf.code,
-                    lf.args_size,
-                    lf.args_and_locals_size,
-                    lf.extended_frame_size,
-                );
-            },
-            None => {
-                builder.skip_function();
-            },
-        }
+        builder.add_function(lowered_fn);
     }
 
     builder.finish()

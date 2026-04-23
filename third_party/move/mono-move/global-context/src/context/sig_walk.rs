@@ -28,6 +28,24 @@ pub trait StructResolver {
 ///
 /// TODO: non-recursive implementation. Coordinate with the similar TODO on
 /// `TypeInternerKey`'s `Hash` impl in `types.rs`.
+///
+/// TODO (perf): probe-before-allocate for composite tokens.
+///
+/// Right now, every composite variant (Vector, Reference, MutableReference,
+/// Function, and the StructInstantiation path through the resolver) allocates a
+/// fresh `Type` node in the arena and then hands it to
+/// `insert_allocated_type_pointer_internal`, which discards the new allocation
+/// whenever an equivalent entry already exists. For modules with shared
+/// signatures (common: many handles reference the same `SignatureIndex`, and
+/// `vector<T>` / `&T` appear repeatedly), this means the fast path pays one
+/// arena allocation + a dedup probe per occurrence instead of a single probe.
+///
+/// The dedup map already supports a cheaper key: `SignatureTokenKey` implements
+/// `Equivalent<TypeInternerKey>`, so we can look up by `(token, module)`
+/// without allocating. To take advantage, thread a `&CompiledModule` through
+/// this walker and, for each composite token, call
+/// `get_interned_type_pointer_internal` first; only recurse into children and
+/// allocate on a miss.
 pub fn walk_sig_token<R: StructResolver>(
     token: &SignatureToken,
     guard: &ExecutionGuard<'_>,

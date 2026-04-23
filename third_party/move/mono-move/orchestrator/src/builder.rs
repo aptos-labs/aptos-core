@@ -12,7 +12,7 @@ use anyhow::{anyhow, bail};
 use mono_move_alloc::{ExecutableArena, ExecutableArenaPtr, GlobalArenaPtr};
 use mono_move_core::{
     types::{align_up, EMPTY_TYPE_LIST},
-    EnumType, Executable, ExecutableId, FrameLayoutInfo, Function, SortedSafePointEntries,
+    EnumType, Executable, ExecutableId, FrameLayoutInfo, Function, MicroOp, SortedSafePointEntries,
     StructType, VariantFields,
 };
 use mono_move_global_context::{
@@ -21,12 +21,13 @@ use mono_move_global_context::{
 use move_binary_format::{
     access::ModuleAccess,
     file_format::{
-        IdentifierIndex, SignatureToken, StructDefinition, StructFieldInformation,
+        FunctionHandleIndex, SignatureToken, StructDefinition, StructFieldInformation,
         StructHandleIndex,
     },
     CompiledModule,
 };
 use shared_dsa::UnorderedMap;
+use specializer::LoweredFunction;
 
 // TODO: this is likely to change. Placeholder.
 // TODO: refactor to own CompiledModule instead of borrowing it (needed for ModuleIR cache).
@@ -132,27 +133,26 @@ impl<'a, 'guard, 'ctx> ExecutableBuilder<'a, 'guard, 'ctx> {
         table
     }
 
-    /// Adds a lowered function to the executable being built.
-    /// Returns the definition index for call patching.
-    pub fn add_function(
-        &mut self,
-        name_idx: IdentifierIndex,
-        code: Vec<mono_move_core::MicroOp>,
-        args_size: usize,
-        args_and_locals_size: usize,
-        extended_frame_size: usize,
-    ) -> usize {
+    /// Records a definition slot for the next function. Pass `Some(..)` to
+    /// add a lowered function, or `None` to skip (e.g., for generic or native
+    /// functions).
+    pub fn add_function(&mut self, lowered: Option<LoweredFunction>) {
+        let def_idx = self.next_def_idx;
+        self.next_def_idx += 1;
+        let Some(lf) = lowered else {
+            return;
+        };
         let name = self
             .guard
-            .intern_identifier(self.module.identifier_at(name_idx))
+            .intern_identifier(self.module.identifier_at(lf.name_idx))
             .into_global_arena_ptr();
-        let code = self.arena.alloc_slice_fill_iter(code);
+        let code = self.arena.alloc_slice_fill_iter(lf.code);
         let func = Function {
             name,
             code,
-            args_size,
-            args_and_locals_size,
-            extended_frame_size,
+            args_size: lf.args_size,
+            args_and_locals_size: lf.args_and_locals_size,
+            extended_frame_size: lf.extended_frame_size,
             // TODO: hardcoded for now.
             zero_frame: false,
             frame_layout: FrameLayoutInfo::empty(&self.arena),
@@ -160,26 +160,14 @@ impl<'a, 'guard, 'ctx> ExecutableBuilder<'a, 'guard, 'ctx> {
         };
         let ptr = self.arena.alloc(func);
         self.functions.insert(name, ptr);
-        let def_idx = self.next_def_idx;
         let handle_idx = self.module.function_defs[def_idx].function.0 as usize;
         self.func_ptrs[handle_idx] = Some(ptr);
-        self.next_def_idx += 1;
-        def_idx
     }
 
-    /// Records a definition slot with no lowered function (e.g., generic or
-    /// native function).
-    pub fn skip_function(&mut self) {
-        self.next_def_idx += 1;
-    }
-
-    /// Finishes building the executable. Call after all functions have been
-    /// added via `add_function` / `skip_function`.
+    /// Finishes building the executable. Call after every function definition
+    /// has been recorded via `add_function`.
     pub fn finish(self) -> anyhow::Result<Box<Executable>> {
-        // Patch CallFunc to CallLocalFunc using definition-indexed func_ptrs.
-        // SAFETY: We have exclusive access — the executable is being built
-        // and no concurrent readers exist. The arena outlives the executable.
-        unsafe { Function::resolve_calls(&self.func_ptrs) };
+        self.resolve_all_calls()?;
 
         Ok(Executable::new(
             self.id,
@@ -188,6 +176,58 @@ impl<'a, 'guard, 'ctx> ExecutableBuilder<'a, 'guard, 'ctx> {
             self.functions,
             self.arena,
         ))
+    }
+
+    /// Rewrites every `CallFunc` in every local function's code:
+    /// - Handles that resolve to a local `Function` pointer become
+    ///   `CallDirect`.
+    /// - Cross-module handles become `CallIndirect` keyed by the callee's
+    ///   interned `(executable_id, func_name)` pair, to be dispatched at
+    ///   runtime.
+    fn resolve_all_calls(&self) -> anyhow::Result<()> {
+        let self_module_handle_idx = self.module.self_module_handle_idx;
+        for func_ptr in &self.func_ptrs {
+            let Some(mut func_ptr) = *func_ptr else {
+                continue;
+            };
+            // SAFETY: We have exclusive access during build — no concurrent
+            // readers exist yet. The arena is alive because `self` still owns
+            // it until `Executable::new` is called below.
+            let func = unsafe { func_ptr.as_mut_unchecked() };
+            let code = unsafe { func.code.as_mut_unchecked() };
+            for op in code.iter_mut() {
+                let MicroOp::CallFunc { func_id } = *op else {
+                    continue;
+                };
+                if let Some(ptr) = self.func_ptrs[func_id as usize] {
+                    *op = MicroOp::CallDirect { ptr };
+                    continue;
+                }
+                let callee_handle = self
+                    .module
+                    .function_handle_at(FunctionHandleIndex(func_id as u16));
+                if callee_handle.module == self_module_handle_idx {
+                    bail!("unresolved local function handle {}", func_id);
+                }
+                let callee_module = self.module.module_handle_at(callee_handle.module);
+                let executable_id = self
+                    .guard
+                    .intern_address_name(
+                        self.module.address_identifier_at(callee_module.address),
+                        self.module.identifier_at(callee_module.name),
+                    )
+                    .into_global_arena_ptr();
+                let func_name = self
+                    .guard
+                    .intern_identifier(self.module.identifier_at(callee_handle.name))
+                    .into_global_arena_ptr();
+                *op = MicroOp::CallIndirect {
+                    executable_id,
+                    func_name,
+                };
+            }
+        }
+        Ok(())
     }
 }
 
@@ -208,7 +248,7 @@ impl<'a, 'guard, 'ctx> ExecutableBuilder<'a, 'guard, 'ctx> {
     ) -> anyhow::Result<InternedType> {
         let handle = self.module.struct_handle_at(struct_def.struct_handle);
         if !handle.type_parameters.is_empty() {
-            todo!("Generic structs / enums not yet supported");
+            bail!("Generic structs / enums not yet supported");
         }
 
         let name = self

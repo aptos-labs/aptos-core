@@ -139,6 +139,9 @@ pub enum ImmValue {
 }
 
 /// A stackless IR instruction with explicit named-slot operands.
+///
+/// TODO: convert variants to struct-style (named fields) so call sites read
+/// `Instr::Pack { dst, ty, args }` rather than positional tuples.
 #[derive(Clone)]
 pub enum Instr {
     // --- Loads ---
@@ -174,6 +177,9 @@ pub enum Instr {
 
     // --- Struct (second field is the interned struct `Type`; generic
     // variants additionally carry an interned type-argument list) ---
+    //
+    // TODO: depending on how we pre-intern types, we may be able to unify
+    // some of instructions here.
     Pack(Slot, InternedType, Vec<Slot>),
     PackGeneric(Slot, InternedType, InternedTypeList, Vec<Slot>),
     Unpack(Vec<Slot>, InternedType, Slot),

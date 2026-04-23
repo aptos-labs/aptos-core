@@ -5,8 +5,7 @@
 //!
 //! Each `.masm` / `.move` input goes through the full pipeline:
 //!
-//!   assemble/compile → [`ExecutableBuilder::resolve_types`] → struct_type_table
-//!     → [`specializer::destack`] → format stackless IR → per-function micro-op lowering
+//!   assemble/compile → format stackless IR → per-function micro-op lowering
 //!
 //! The resulting output is compared against a matching `.exp` baseline.
 //! Running with `UPBL=1` refreshes baselines in place.
@@ -14,6 +13,9 @@
 //! Tests live here (rather than in the specializer crate) so that struct
 //! references render with real names — resolved via the orchestrator's
 //! [`ExecutableBuilder`] rather than a placeholder table.
+//!
+//! TODO: consider consolidating various kinds of tests into
+//! `mono-move/testsuite` for reusability across components.
 
 use codespan_reporting::term::termcolor::Buffer;
 use legacy_move_compiler::shared::known_attributes::KnownAttribute;

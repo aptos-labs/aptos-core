@@ -343,19 +343,19 @@ impl<'ctx> ExecutionGuard<'ctx> {
     /// Converts `&mut T` to `&T` by interning the immutable counterpart.
     /// Errors if `mut_ref` is not a mutable reference type.
     pub fn convert_mut_to_immut_ref(&self, mut_ref: InternedType) -> Result<InternedType> {
-        match self.type_data(mut_ref) {
-            Type::MutRef { inner } => Ok(self.intern_immut_ref(*inner)),
-            _ => bail!("convert_mut_to_immut_ref: expected MutRef"),
-        }
+        let Type::MutRef { inner } = self.type_data(mut_ref) else {
+            bail!("convert_mut_to_immut_ref: expected MutRef");
+        };
+        Ok(self.intern_immut_ref(*inner))
     }
 
     /// Strips the reference from `&T` or `&mut T`, returning `T`.
     /// Errors if `ref_ty` is not a reference type.
     pub fn strip_ref(&self, ref_ty: InternedType) -> Result<InternedType> {
-        match self.type_data(ref_ty) {
-            Type::ImmutRef { inner } | Type::MutRef { inner } => Ok(*inner),
-            _ => bail!("strip_ref: expected reference type"),
-        }
+        let (Type::ImmutRef { inner } | Type::MutRef { inner }) = self.type_data(ref_ty) else {
+            bail!("strip_ref: expected reference type");
+        };
+        Ok(*inner)
     }
 
     /// Interns a vector type with element type `elem`.

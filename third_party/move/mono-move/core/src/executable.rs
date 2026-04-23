@@ -127,6 +127,13 @@ struct ExecutableData {
 
 impl Executable {
     /// Creates a new executable.
+    // TODO: the current constructor accepts pre-populated maps whose values
+    // are pointers into `arena` (and into the global arena), but there is
+    // nothing at the type level tying each pointer to the arena it came
+    // from. Consider replacing this with a builder API that owns the
+    // `ExecutableArena` internally and exposes `add_struct`/`add_enum`/
+    // `add_function` entry points, so external callers cannot smuggle in
+    // pointers backed by a different arena.
     pub fn new(
         id: GlobalArenaPtr<ExecutableId>,
         structs: UnorderedMap<GlobalArenaPtr<str>, StructType>,

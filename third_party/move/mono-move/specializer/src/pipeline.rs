@@ -33,10 +33,12 @@ pub fn destack_and_lower_module(
                 let micro_ops = lower_function(func_ir, &ctx)?;
                 let code = GasInstrumentor::new(MicroOpGasSchedule).run(micro_ops);
 
+                // End offset of the last param slot, including any inter-slot
+                // alignment padding.
                 let args_size = ctx.home_slots[..func_ir.num_params as usize]
-                    .iter()
-                    .map(|s| s.size as usize)
-                    .sum::<usize>();
+                    .last()
+                    .map(|s| (s.offset + s.size) as usize)
+                    .unwrap_or(0);
                 let args_and_locals_size = ctx.frame_data_size as usize;
                 let extended_frame_size = ctx
                     .call_sites

@@ -25,6 +25,13 @@ use move_binary_format::CompiledModule;
 /// interned `Type` representations. `None` entries denote handles the
 /// orchestrator could not resolve; touching one during conversion is an
 /// error.
+///
+/// TODO: consider wrapping the `(CompiledModule, struct_types)` pair in a
+/// `CompiledModuleWithContext` that owns the module and the resolved
+/// per-handle interned types (and, later, the full signature pool interned
+/// up front). That would let every downstream pass take one argument instead
+/// of threading the slice through, and keep the invariant that `struct_types`
+/// indexes the module's own handle table encoded in the type.
 pub fn destack(
     module: CompiledModule,
     guard: &ExecutionGuard<'_>,

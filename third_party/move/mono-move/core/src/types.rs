@@ -104,6 +104,20 @@ pub type InternedTypeList = GlobalArenaPtr<[InternedType]>;
 // widening: the *real* lifetime is "until the next maintenance phase," but
 // Rust has no way to spell that. Callers must not store these references
 // beyond the scope where the above invariants hold.
+//
+// TODO (design follow-up): the `&'static` widening makes these references
+// effectively raw pointers at the type level — the "arena is alive" proof is
+// carried only in docs, not in the types. Consider tying the returned
+// reference to a witness value instead:
+//
+//   - Parameterize these helpers by a borrow of an `ExecutionGuard` (or a
+//     lightweight `&ArenaLive<'a>` token) so the returned reference gets
+//     lifetime `'a` instead of `'static`. That statically prevents callers
+//     from stashing the reference across a maintenance phase.
+//   - Alternatively, make `InternedType` / `GlobalArenaPtr<T>` carry a
+//     phantom lifetime and remove the free `view_*` functions in favor of
+//     `InternedType::view(&guard)`-style methods, so the compiler enforces
+//     that every deref is witnessed by a live guard.
 
 /// Returns a reference to the arena-interned [`Type`] behind `ptr`.
 pub fn view_type(ptr: InternedType) -> &'static Type {

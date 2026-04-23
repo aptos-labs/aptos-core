@@ -43,10 +43,9 @@ struct SlotTable {
 }
 
 impl SlotTable {
-    fn new(num_pinned: u16, local_types: &[InternedType]) -> Self {
-        debug_assert_eq!(num_pinned as usize, local_types.len());
+    fn new(local_types: &[InternedType]) -> Self {
         Self {
-            num_pinned,
+            num_pinned: local_types.len() as u16,
             real_slot_types: local_types.to_vec(),
             vid_to_real: Vec::new(),
         }
@@ -131,8 +130,7 @@ impl SlotTable {
 ///      to its type at index `i`.
 /// Post: all `Vid`s replaced with real `Home`/`Xfer` slots.
 pub(crate) fn allocate_slots(ssa: SSAFunction) -> Result<AllocatedFunction> {
-    let num_pinned = ssa.local_types.len() as u16;
-    let mut table = SlotTable::new(num_pinned, &ssa.local_types);
+    let mut table = SlotTable::new(&ssa.local_types);
     let mut result_blocks = Vec::with_capacity(ssa.blocks.len());
     let mut global_num_xfer_slots: u16 = 0;
     let mut free_pool: UnorderedMap<InternedType, Vec<Slot>> = UnorderedMap::new();
