@@ -7,7 +7,10 @@ use crate::{
     ast::{Address, Operation, PropertyBag, PropertyValue, QualifiedSymbol},
     builder::module_builder::SpecBlockContext,
     model::{IntrinsicId, QualifiedId, SpecFunId},
-    pragmas::{INTRINSIC_PRAGMA, INTRINSIC_TYPE_MAP, INTRINSIC_TYPE_MAP_ASSOC_FUNCTIONS},
+    pragmas::{
+        INTRINSIC_PRAGMA, INTRINSIC_TYPE_MAP, INTRINSIC_TYPE_MAP_ASSOC_FUNCTIONS,
+        INTRINSIC_TYPE_MAP_MOVE_TO_ABORT_SPEC_FUN, INTRINSIC_TYPE_MAP_MOVE_TO_SPEC_FUN,
+    },
     symbol::{Symbol, SymbolPool},
     FunId, GlobalEnv, Loc, ModuleBuilder, StructId,
 };
@@ -57,6 +60,38 @@ impl IntrinsicDecl {
         let symbol_pool = env.symbol_pool();
         let sym = symbol_pool.make(name);
         self.intrinsic_to_spec_fun.get(&sym).cloned()
+    }
+
+    /// Given a Move intrinsic function's qualified ID, return the qualified ID of the
+    /// corresponding spec function (if one exists in the Move-to-spec pairing table).
+    /// This is used by spec inference to replace intrinsic Move calls with their
+    /// axiomatized spec counterparts as pure spec calls rather than behavior predicates.
+    pub fn get_spec_fun_for_move_fun(
+        &self,
+        env: &GlobalEnv,
+        move_qid: &QualifiedId<FunId>,
+    ) -> Option<QualifiedId<SpecFunId>> {
+        let intrinsic_name_sym = self.move_fun_to_intrinsic.get(move_qid)?;
+        let intrinsic_name = env.symbol_pool().string(*intrinsic_name_sym);
+        let spec_intrinsic_name =
+            INTRINSIC_TYPE_MAP_MOVE_TO_SPEC_FUN.get(intrinsic_name.as_str())?;
+        self.lookup_spec_fun(env, spec_intrinsic_name)
+    }
+
+    /// Given a Move intrinsic function's qualified ID, return the qualified ID of the
+    /// corresponding abort-condition spec function (if one exists in the abort-spec pairing table).
+    /// Used by the Boogie backend to emit correct `$bp_AbortsOf` bodies for intrinsic functions
+    /// whose abort conditions are defined in the Boogie template rather than Move `aborts_if` specs.
+    pub fn get_abort_spec_fun_for_move_fun(
+        &self,
+        env: &GlobalEnv,
+        move_qid: &QualifiedId<FunId>,
+    ) -> Option<QualifiedId<SpecFunId>> {
+        let intrinsic_name_sym = self.move_fun_to_intrinsic.get(move_qid)?;
+        let intrinsic_name = env.symbol_pool().string(*intrinsic_name_sym);
+        let abort_spec_intrinsic_name =
+            INTRINSIC_TYPE_MAP_MOVE_TO_ABORT_SPEC_FUN.get(intrinsic_name.as_str())?;
+        self.lookup_spec_fun(env, abort_spec_intrinsic_name)
     }
 }
 
@@ -292,6 +327,28 @@ impl IntrinsicsAnnotation {
         self.intrinsic_move_funs
             .get(qid)
             .map(|id| self.decls.get(id).unwrap())
+    }
+
+    /// Given a Move function qualified ID, return the spec function qualified ID that
+    /// corresponds to it via the intrinsic map pairing table.
+    pub fn get_spec_fun_for_move_fun(
+        &self,
+        env: &GlobalEnv,
+        move_qid: &QualifiedId<FunId>,
+    ) -> Option<QualifiedId<SpecFunId>> {
+        self.get_decl_for_move_fun(move_qid)?
+            .get_spec_fun_for_move_fun(env, move_qid)
+    }
+
+    /// Given a Move function qualified ID, return the abort-condition spec function qualified ID
+    /// that corresponds to it via the intrinsic abort-spec pairing table.
+    pub fn get_abort_spec_fun_for_move_fun(
+        &self,
+        env: &GlobalEnv,
+        move_qid: &QualifiedId<FunId>,
+    ) -> Option<QualifiedId<SpecFunId>> {
+        self.get_decl_for_move_fun(move_qid)?
+            .get_abort_spec_fun_for_move_fun(env, move_qid)
     }
 
     /// Get the intrinsic decl for a spec function

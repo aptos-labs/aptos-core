@@ -14,15 +14,15 @@ use crate::{
         boogie_debug_track_local, boogie_debug_track_return, boogie_equality_for_type,
         boogie_field_sel, boogie_field_update, boogie_fun_apply_name, boogie_fun_param_name,
         boogie_function_name, boogie_make_vec_from_strings, boogie_modifies_memory_name,
-        boogie_num_literal, boogie_num_type_base, boogie_num_type_string_capital,
-        boogie_reflection_type_info, boogie_reflection_type_name, boogie_resource_memory_name,
-        boogie_spec_fun_name, boogie_struct_field_name, boogie_struct_field_result_fun_name,
-        boogie_struct_field_spec_fun_name, boogie_struct_name, boogie_struct_variant_name,
-        boogie_temp, boogie_temp_from_suffix, boogie_type, boogie_type_for_struct_field,
-        boogie_type_param, boogie_type_suffix, boogie_type_suffix_for_struct,
-        boogie_type_suffix_for_struct_variant, boogie_variant_field_update,
-        boogie_well_formed_check, boogie_well_formed_expr, compute_evaluator_memory_union,
-        field_bv_flag_global_state, TypeIdentToken,
+        boogie_native_spec_fun_name, boogie_num_literal, boogie_num_type_base,
+        boogie_num_type_string_capital, boogie_reflection_type_info, boogie_reflection_type_name,
+        boogie_resource_memory_name, boogie_spec_fun_name, boogie_struct_field_name,
+        boogie_struct_field_result_fun_name, boogie_struct_field_spec_fun_name, boogie_struct_name,
+        boogie_struct_variant_name, boogie_temp, boogie_temp_from_suffix, boogie_type,
+        boogie_type_for_struct_field, boogie_type_param, boogie_type_suffix,
+        boogie_type_suffix_for_struct, boogie_type_suffix_for_struct_variant,
+        boogie_variant_field_update, boogie_well_formed_check, boogie_well_formed_expr,
+        compute_evaluator_memory_union, field_bv_flag_global_state, TypeIdentToken,
     },
     options::BoogieOptions,
     spec_translator::{LabelInfo, SpecTranslator},
@@ -1925,14 +1925,21 @@ impl<'env> BoogieTranslator<'env> {
             .collect();
         let eval_call = format!("{}({})", eval_fun_name, eval_call_args.join(", "));
 
-        emitln!(
-            self.writer,
-            "axiom (forall {} :: {{{}}} {} <==> {});",
-            quantifier.join(", "),
-            eval_call,
-            eval_call,
-            rhs
-        );
+        if quantifier.is_empty() {
+            // No bound variables (e.g. zero-argument function like `create()`):
+            // emit a plain axiom without `forall`, since Boogie requires at least
+            // one bound variable in a quantifier.
+            emitln!(self.writer, "axiom {} <==> {};", eval_call, rhs);
+        } else {
+            emitln!(
+                self.writer,
+                "axiom (forall {} :: {{{}}} {} <==> {});",
+                quantifier.join(", "),
+                eval_call,
+                eval_call,
+                rhs
+            );
+        }
     }
 
     /// Emit a specialized evaluator axiom for a function-parameter variant.
@@ -2306,13 +2313,47 @@ impl<'env> BoogieTranslator<'env> {
 
             if all_result_types.len() == 1 {
                 let result_fun_name = boogie_behavioral_fun_result_name(self.env, &info.fun, false);
-                emitln!(
-                    self.writer,
-                    "function {}({}): {};",
-                    result_fun_name,
-                    input_param_decls.join(", "),
-                    all_result_types[0]
-                );
+
+                // For native functions with no Move spec, use the Boogie "$-spec" inline
+                // function (e.g. `$1_vector_$empty'T'`) as a concrete, deterministic body
+                // instead of leaving the result function uninterpreted.  This ensures that
+                // `result_of<native_fun>(args)` in inferred specs is fully constrained.
+                // Only applies when there are no memory parameters — $-spec functions in
+                // native.bpl are pure and do not take memory arguments.
+                let is_native_no_spec = fun_env.is_native()
+                    && closure_spec.conditions.is_empty()
+                    && mem_param_decls.is_empty();
+                let native_spec_call = if is_native_no_spec {
+                    let spec_name = boogie_native_spec_fun_name(&fun_env, &info.fun.inst);
+                    let call = if input_args.is_empty() {
+                        format!("{}()", spec_name)
+                    } else {
+                        format!("{}({})", spec_name, input_args.join(", "))
+                    };
+                    Some(call)
+                } else {
+                    None
+                };
+
+                if let Some(ref native_call) = native_spec_call {
+                    // Inline result function delegating to the $-spec Boogie function
+                    emitln!(
+                        self.writer,
+                        "function {{:inline}} {}({}): {} {{ {} }}",
+                        result_fun_name,
+                        input_param_decls.join(", "),
+                        all_result_types[0],
+                        native_call
+                    );
+                } else {
+                    emitln!(
+                        self.writer,
+                        "function {}({}): {};",
+                        result_fun_name,
+                        input_param_decls.join(", "),
+                        all_result_types[0]
+                    );
+                }
 
                 let result_fun_app = format!("{}({})", result_fun_name, input_args_str);
                 self.emit_result_validity_axiom(
@@ -2322,18 +2363,30 @@ impl<'env> BoogieTranslator<'env> {
                     &precond,
                 );
 
-                let ensures_body = self.translate_fun_spec_conditions(
-                    &fun_env,
-                    &closure_spec,
-                    BehaviorKind::EnsuresOf,
-                    &info.fun.inst,
-                    &inst_old,
-                );
+                // Build ensures_of body
+                let ensures_body = if let Some(ref native_call) = native_spec_call {
+                    // ensures_of(params, r) := r == $-spec(params)
+                    format!("r0 == {}", native_call)
+                } else {
+                    self.translate_fun_spec_conditions(
+                        &fun_env,
+                        &closure_spec,
+                        BehaviorKind::EnsuresOf,
+                        &info.fun.inst,
+                        &inst_old,
+                    )
+                };
+
+                // ensures_of uses "r0" as the result variable name
+                let mut ensures_param_decls = input_param_decls.clone();
+                ensures_param_decls.push(format!("r0: {}", all_result_types[0]));
+
+                // Define ensures_of as inline function
                 emitln!(
                     self.writer,
                     "function {{:inline}} {}({}): bool {{ {} }}",
                     ensures_fun_name,
-                    full_param_decls.join(", "),
+                    ensures_param_decls.join(", "),
                     ensures_body
                 );
 
@@ -2458,6 +2511,22 @@ impl<'env> BoogieTranslator<'env> {
             .collect();
 
         if conditions.is_empty() {
+            // For intrinsic functions with abort-condition spec functions registered,
+            // emit a call to the abort spec function instead of the default "false".
+            if matches!(kind, BehaviorKind::AbortsOf) {
+                if let Some(abort_spec_qid) = self
+                    .env
+                    .get_intrinsics()
+                    .get_abort_spec_fun_for_move_fun(self.env, &fun_env.get_qualified_id())
+                {
+                    let spec_mod_env = self.env.get_module(abort_spec_qid.module_id);
+                    let boogie_name =
+                        boogie_spec_fun_name(&spec_mod_env, abort_spec_qid.id, type_inst, false);
+                    let param_count = fun_env.get_parameter_count();
+                    let params: Vec<String> = (0..param_count).map(|i| format!("p{}", i)).collect();
+                    return format!("{}({})", boogie_name, params.join(", "));
+                }
+            }
             return match kind {
                 BehaviorKind::RequiresOf | BehaviorKind::EnsuresOf => "true".to_string(),
                 BehaviorKind::AbortsOf => "false".to_string(),

@@ -24,7 +24,9 @@ use move_model::{
         INTRINSIC_FUN_MAP_BORROW_MUT_WITH_DEFAULT, INTRINSIC_FUN_MAP_BORROW_WITH_DEFAULT,
         INTRINSIC_FUN_MAP_DEL_MUST_EXIST, INTRINSIC_FUN_MAP_DEL_RETURN_KEY,
         INTRINSIC_FUN_MAP_DESTROY_EMPTY, INTRINSIC_FUN_MAP_HAS_KEY, INTRINSIC_FUN_MAP_IS_EMPTY,
-        INTRINSIC_FUN_MAP_LEN, INTRINSIC_FUN_MAP_NEW, INTRINSIC_FUN_MAP_SPEC_DEL,
+        INTRINSIC_FUN_MAP_LEN, INTRINSIC_FUN_MAP_NEW, INTRINSIC_FUN_MAP_SPEC_ABORTS_ADD,
+        INTRINSIC_FUN_MAP_SPEC_ABORTS_BORROW, INTRINSIC_FUN_MAP_SPEC_ABORTS_DEL,
+        INTRINSIC_FUN_MAP_SPEC_ABORTS_DESTROY_EMPTY, INTRINSIC_FUN_MAP_SPEC_DEL,
         INTRINSIC_FUN_MAP_SPEC_GET, INTRINSIC_FUN_MAP_SPEC_HAS_KEY,
         INTRINSIC_FUN_MAP_SPEC_IS_EMPTY, INTRINSIC_FUN_MAP_SPEC_LEN, INTRINSIC_FUN_MAP_SPEC_NEW,
         INTRINSIC_FUN_MAP_SPEC_SET,
@@ -109,6 +111,11 @@ struct MapImpl {
     fun_spec_len: String,
     fun_spec_is_empty: String,
     fun_spec_has_key: String,
+    // abort-condition spec functions
+    fun_spec_aborts_destroy_empty: String,
+    fun_spec_aborts_add: String,
+    fun_spec_aborts_del: String,
+    fun_spec_aborts_borrow: String,
 }
 
 /// Help generating vector functions for bv types
@@ -563,6 +570,22 @@ impl MapImpl {
             fun_spec_has_key: Self::triple_opt_to_name(
                 env,
                 decl.get_fun_triple(env, INTRINSIC_FUN_MAP_SPEC_HAS_KEY),
+            ),
+            fun_spec_aborts_destroy_empty: Self::triple_opt_to_name(
+                env,
+                decl.get_fun_triple(env, INTRINSIC_FUN_MAP_SPEC_ABORTS_DESTROY_EMPTY),
+            ),
+            fun_spec_aborts_add: Self::triple_opt_to_name(
+                env,
+                decl.get_fun_triple(env, INTRINSIC_FUN_MAP_SPEC_ABORTS_ADD),
+            ),
+            fun_spec_aborts_del: Self::triple_opt_to_name(
+                env,
+                decl.get_fun_triple(env, INTRINSIC_FUN_MAP_SPEC_ABORTS_DEL),
+            ),
+            fun_spec_aborts_borrow: Self::triple_opt_to_name(
+                env,
+                decl.get_fun_triple(env, INTRINSIC_FUN_MAP_SPEC_ABORTS_BORROW),
             ),
         }
     }

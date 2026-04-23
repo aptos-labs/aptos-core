@@ -27,7 +27,7 @@ use move_stackless_bytecode::{
 };
 use std::collections::{BTreeMap, BTreeSet};
 
-const GLOBAL_INVARIANT_FAILS_MESSAGE: &str = "global memory invariant does not hold";
+pub const GLOBAL_INVARIANT_FAILS_MESSAGE: &str = "global memory invariant does not hold";
 
 /// A transposed view of `PerFunctionRelevance` from the point of per function instantiations
 #[derive(Default)]

@@ -173,6 +173,77 @@ pub const INTRINSIC_FUN_MAP_BORROW_MUT_WITH_DEFAULT: &str = "map_borrow_mut_with
 /// `[move] fun map_borrow_with_default<K, V>(m: &Map<K, V>, k: K, default: V): &V`
 pub const INTRINSIC_FUN_MAP_BORROW_WITH_DEFAULT: &str = "map_borrow_with_default";
 
+/// Abort condition for map_destroy_empty: true when the map is non-empty
+/// `[spec] fun map_spec_aborts_destroy_empty<K, V>(m: Map<K, V>): bool`
+pub const INTRINSIC_FUN_MAP_SPEC_ABORTS_DESTROY_EMPTY: &str = "map_spec_aborts_destroy_empty";
+
+/// Abort condition for map_add_no_override: true when the key already exists
+/// `[spec] fun map_spec_aborts_add<K, V>(m: Map<K, V>, k: K, v: V): bool`
+pub const INTRINSIC_FUN_MAP_SPEC_ABORTS_ADD: &str = "map_spec_aborts_add";
+
+/// Abort condition for map_del_must_exist / map_del_return_key: true when key not found
+/// `[spec] fun map_spec_aborts_del<K, V>(m: Map<K, V>, k: K): bool`
+pub const INTRINSIC_FUN_MAP_SPEC_ABORTS_DEL: &str = "map_spec_aborts_del";
+
+/// Abort condition for map_borrow / map_borrow_mut: true when key not found
+/// `[spec] fun map_spec_aborts_borrow<K, V>(m: Map<K, V>, k: K): bool`
+pub const INTRINSIC_FUN_MAP_SPEC_ABORTS_BORROW: &str = "map_spec_aborts_borrow";
+
+/// Maps Move intrinsic function names to their corresponding spec intrinsic function names
+/// for intrinsic map types. Used by spec inference to substitute intrinsic Move function
+/// calls with their axiomatized spec equivalents as pure spec calls.
+///
+/// Only read-only functions are listed:
+/// - Mutating functions (e.g. map_add_no_override) are excluded because their &mut params
+///   already cause try_as_pure_spec_call to return None at check 1.
+pub static INTRINSIC_TYPE_MAP_MOVE_TO_SPEC_FUN: Lazy<BTreeMap<&'static str, &'static str>> =
+    Lazy::new(|| {
+        BTreeMap::from([
+            (INTRINSIC_FUN_MAP_NEW, INTRINSIC_FUN_MAP_SPEC_NEW),
+            (INTRINSIC_FUN_MAP_HAS_KEY, INTRINSIC_FUN_MAP_SPEC_HAS_KEY),
+            (INTRINSIC_FUN_MAP_LEN, INTRINSIC_FUN_MAP_SPEC_LEN),
+            (INTRINSIC_FUN_MAP_IS_EMPTY, INTRINSIC_FUN_MAP_SPEC_IS_EMPTY),
+            (INTRINSIC_FUN_MAP_BORROW, INTRINSIC_FUN_MAP_SPEC_GET),
+            (
+                INTRINSIC_FUN_MAP_BORROW_WITH_DEFAULT,
+                INTRINSIC_FUN_MAP_SPEC_GET,
+            ),
+        ])
+    });
+
+/// Maps Move intrinsic function names to their corresponding abort-condition spec function names.
+/// Used by the Boogie backend to generate correct `$bp_AbortsOf` bodies for intrinsic functions
+/// that have abort conditions defined in the Boogie template but no Move-level `aborts_if` spec.
+pub static INTRINSIC_TYPE_MAP_MOVE_TO_ABORT_SPEC_FUN: Lazy<BTreeMap<&'static str, &'static str>> =
+    Lazy::new(|| {
+        BTreeMap::from([
+            (
+                INTRINSIC_FUN_MAP_DESTROY_EMPTY,
+                INTRINSIC_FUN_MAP_SPEC_ABORTS_DESTROY_EMPTY,
+            ),
+            (
+                INTRINSIC_FUN_MAP_ADD_NO_OVERRIDE,
+                INTRINSIC_FUN_MAP_SPEC_ABORTS_ADD,
+            ),
+            (
+                INTRINSIC_FUN_MAP_DEL_MUST_EXIST,
+                INTRINSIC_FUN_MAP_SPEC_ABORTS_DEL,
+            ),
+            (
+                INTRINSIC_FUN_MAP_DEL_RETURN_KEY,
+                INTRINSIC_FUN_MAP_SPEC_ABORTS_DEL,
+            ),
+            (
+                INTRINSIC_FUN_MAP_BORROW,
+                INTRINSIC_FUN_MAP_SPEC_ABORTS_BORROW,
+            ),
+            (
+                INTRINSIC_FUN_MAP_BORROW_MUT,
+                INTRINSIC_FUN_MAP_SPEC_ABORTS_BORROW,
+            ),
+        ])
+    });
+
 /// All intrinsic functions associated with the map type
 pub static INTRINSIC_TYPE_MAP_ASSOC_FUNCTIONS: Lazy<BTreeMap<&'static str, bool>> =
     Lazy::new(|| {
@@ -197,6 +268,10 @@ pub static INTRINSIC_TYPE_MAP_ASSOC_FUNCTIONS: Lazy<BTreeMap<&'static str, bool>
             (INTRINSIC_FUN_MAP_BORROW_MUT, true),
             (INTRINSIC_FUN_MAP_BORROW_MUT_WITH_DEFAULT, true),
             (INTRINSIC_FUN_MAP_BORROW_WITH_DEFAULT, true),
+            (INTRINSIC_FUN_MAP_SPEC_ABORTS_DESTROY_EMPTY, false),
+            (INTRINSIC_FUN_MAP_SPEC_ABORTS_ADD, false),
+            (INTRINSIC_FUN_MAP_SPEC_ABORTS_DEL, false),
+            (INTRINSIC_FUN_MAP_SPEC_ABORTS_BORROW, false),
         ])
     });
 
