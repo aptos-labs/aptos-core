@@ -6,7 +6,7 @@
 use mono_move_gas::{GasMeter, SimpleGasMeter};
 use mono_move_global_context::GlobalContext;
 use mono_move_loader::{ExecutableReadSet, Loader, LoadingPolicy, LoweringPolicy};
-use mono_move_testsuite::InMemoryHooks;
+use mono_move_testsuite::InMemoryModuleProvider;
 use move_core_types::{account_address::AccountAddress, ident_str, language_storage::ModuleId};
 
 const TEST_SOURCE: &str = r#"
@@ -18,12 +18,16 @@ module 0x1::test {
 #[test]
 fn load_lazy_cache_miss_and_hit() {
     let modules = mono_move_testsuite::compile_move_modules(TEST_SOURCE);
-    let mut hooks = InMemoryHooks::new();
-    hooks.add_modules(&modules);
+    let mut module_provider = InMemoryModuleProvider::new();
+    module_provider.add_modules(&modules);
 
     let ctx = GlobalContext::with_num_execution_workers(1);
     let guard = ctx.try_execution_context(0).unwrap();
-    let loader = Loader::new_with_policy(&guard, &hooks, LoadingPolicy::Lazy(LoweringPolicy::Lazy));
+    let loader = Loader::new_with_policy(
+        &guard,
+        &module_provider,
+        LoadingPolicy::Lazy(LoweringPolicy::Lazy),
+    );
 
     let id_module = ModuleId::new(AccountAddress::ONE, ident_str!("test").to_owned());
     let id = guard.intern_module_id(&id_module);

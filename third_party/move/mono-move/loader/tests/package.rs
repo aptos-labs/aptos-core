@@ -6,7 +6,7 @@
 use mono_move_gas::{GasMeter, SimpleGasMeter};
 use mono_move_global_context::GlobalContext;
 use mono_move_loader::{ExecutableReadSet, Loader, LoadingPolicy};
-use mono_move_testsuite::InMemoryHooks;
+use mono_move_testsuite::InMemoryModuleProvider;
 use move_core_types::{account_address::AccountAddress, ident_str, language_storage::ModuleId};
 
 const TEST_SOURCE: &str = r#"
@@ -21,15 +21,15 @@ module 0x1::b {
 #[test]
 fn load_package_cache_miss_loads_all_members() {
     let modules = mono_move_testsuite::compile_move_modules(TEST_SOURCE);
-    let mut hooks = InMemoryHooks::new();
-    hooks.add_modules(&modules);
-    hooks.declare_package(AccountAddress::ONE, ident_str!("a").to_owned(), vec![
+    let mut module_provider = InMemoryModuleProvider::new();
+    module_provider.add_modules(&modules);
+    module_provider.declare_package(AccountAddress::ONE, ident_str!("a").to_owned(), vec![
         ident_str!("b").to_owned(),
     ]);
 
     let ctx = GlobalContext::with_num_execution_workers(1);
     let guard = ctx.try_execution_context(0).unwrap();
-    let loader = Loader::new_with_policy(&guard, &hooks, LoadingPolicy::Package);
+    let loader = Loader::new_with_policy(&guard, &module_provider, LoadingPolicy::Package);
 
     let id_a_module = ModuleId::new(AccountAddress::ONE, ident_str!("a").to_owned());
     let id_a = guard.intern_module_id(&id_a_module);
@@ -54,15 +54,15 @@ fn load_package_cache_miss_loads_all_members() {
 #[test]
 fn load_package_cache_hit_walks_dependencies() {
     let modules = mono_move_testsuite::compile_move_modules(TEST_SOURCE);
-    let mut hooks = InMemoryHooks::new();
-    hooks.add_modules(&modules);
-    hooks.declare_package(AccountAddress::ONE, ident_str!("a").to_owned(), vec![
+    let mut module_provider = InMemoryModuleProvider::new();
+    module_provider.add_modules(&modules);
+    module_provider.declare_package(AccountAddress::ONE, ident_str!("a").to_owned(), vec![
         ident_str!("b").to_owned(),
     ]);
 
     let ctx = GlobalContext::with_num_execution_workers(1);
     let guard = ctx.try_execution_context(0).unwrap();
-    let loader = Loader::new_with_policy(&guard, &hooks, LoadingPolicy::Package);
+    let loader = Loader::new_with_policy(&guard, &module_provider, LoadingPolicy::Package);
 
     let id_a_module = ModuleId::new(AccountAddress::ONE, ident_str!("a").to_owned());
     let id_a = guard.intern_module_id(&id_a_module);

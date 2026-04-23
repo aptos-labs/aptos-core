@@ -13,14 +13,14 @@
 //!      any function that needs external information is deferred to the first
 //!      call.
 //!
-//! - [`LoweringPolicy::Package`] loads every module in the requested module's
+//! - [`LoadingPolicy::Package`] loads every module in the requested module's
 //!   package atomically. Lowering is lazy: any function that needs information
 //!   outside the package is lowered during the first call.
 
-mod hooks;
 mod loader;
+mod module_provider;
 mod read_set;
 
-pub use hooks::LoaderHooks;
 pub use loader::{Loader, LoadingPolicy, LoweringPolicy};
+pub use module_provider::ModuleProvider;
 pub use read_set::ExecutableReadSet;

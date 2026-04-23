@@ -3,23 +3,24 @@
 
 //! Shared helpers for loader integration tests.
 //!
-//! Provides an in-memory [`LoaderHooks`] backed by a `HashMap` of module
+//! Provides an in-memory [`ModuleProvider`] backed by a `HashMap` of module
 //! bytes plus a per-package sibling index. Tests compile Move sources via
 //! [`crate::compile_move_modules`], serialize the resulting
-//! [`CompiledModule`]s, and populate the hooks.
+//! [`CompiledModule`]s, and populate the provider.
 
+use anyhow::{anyhow, Result};
 use bytes::Bytes;
-use mono_move_loader::LoaderHooks;
+use mono_move_loader::ModuleProvider;
 use move_binary_format::CompiledModule;
 use move_core_types::{account_address::AccountAddress, identifier::Identifier};
 use std::collections::HashMap;
 
-pub struct InMemoryHooks {
+pub struct InMemoryModuleProvider {
     module_bytes: HashMap<(AccountAddress, Identifier), Bytes>,
     packages: HashMap<(AccountAddress, Identifier), Vec<Identifier>>,
 }
 
-impl InMemoryHooks {
+impl InMemoryModuleProvider {
     pub fn new() -> Self {
         Self {
             module_bytes: HashMap::new(),
@@ -27,8 +28,8 @@ impl InMemoryHooks {
         }
     }
 
-    /// Adds a module to the hooks. The module's bytes are obtained by
-    /// serializing the provided [`CompiledModule`].
+    /// Adds a module. The module's bytes are obtained by serializing the
+    /// provided [`CompiledModule`].
     pub fn add_module(&mut self, module: &CompiledModule) {
         let id = module.self_id();
         let mut bytes = Vec::new();
@@ -39,7 +40,7 @@ impl InMemoryHooks {
             .insert((id.address, id.name), Bytes::from(bytes));
     }
 
-    /// Adds every module from a compiled source to the hooks.
+    /// Adds every module from a compiled source.
     pub fn add_modules(&mut self, modules: &[CompiledModule]) {
         for m in modules {
             self.add_module(m);
@@ -65,29 +66,25 @@ impl InMemoryHooks {
     }
 }
 
-impl Default for InMemoryHooks {
+impl Default for InMemoryModuleProvider {
     fn default() -> Self {
         Self::new()
     }
 }
 
-impl LoaderHooks for InMemoryHooks {
-    fn get_module_bytes(
-        &self,
-        address: &AccountAddress,
-        name: &str,
-    ) -> anyhow::Result<Option<Bytes>> {
+impl ModuleProvider for InMemoryModuleProvider {
+    fn get_module_bytes(&self, address: &AccountAddress, name: &str) -> Result<Option<Bytes>> {
         let Ok(ident) = Identifier::new(name) else {
             return Ok(None);
         };
         Ok(self.module_bytes.get(&(*address, ident)).cloned())
     }
 
-    fn deserialize_module(&self, bytes: &[u8]) -> anyhow::Result<CompiledModule> {
-        CompiledModule::deserialize(bytes).map_err(|e| anyhow::anyhow!("deserialize failed: {e:?}"))
+    fn deserialize_module(&self, bytes: &[u8]) -> Result<CompiledModule> {
+        CompiledModule::deserialize(bytes).map_err(|e| anyhow!("deserialize failed: {e:?}"))
     }
 
-    fn verify_module(&self, _module: &CompiledModule) -> anyhow::Result<()> {
+    fn verify_module(&self, _module: &CompiledModule) -> Result<()> {
         // Tests assume the compiled modules are already valid.
         Ok(())
     }
@@ -96,12 +93,12 @@ impl LoaderHooks for InMemoryHooks {
         &self,
         address: &AccountAddress,
         module_name: &str,
-    ) -> anyhow::Result<Vec<Identifier>> {
+    ) -> Result<Vec<Identifier>> {
         let ident = Identifier::new(module_name)
-            .map_err(|e| anyhow::anyhow!("invalid module name {module_name:?}: {e}"))?;
+            .map_err(|e| anyhow!("invalid module name {module_name:?}: {e}"))?;
         self.packages
             .get(&(*address, ident))
             .cloned()
-            .ok_or_else(|| anyhow::anyhow!("no package declared for {address}::{module_name}"))
+            .ok_or_else(|| anyhow!("no package declared for {address}::{module_name}"))
     }
 }

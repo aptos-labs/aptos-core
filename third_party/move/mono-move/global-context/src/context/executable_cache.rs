@@ -12,10 +12,11 @@
 //! Because of upgrades, slot can contain more than 1 version of executable at
 //! a time.
 //!
-//! Other executables my point to their dependency slots. Hence, it is crucial
+//! Other executables may point to their dependency slots. Hence, it is crucial
 //! that the eviction from the cache never removes the slots themselves, unless
 //! the whole cache is cleared.
 
+use anyhow::{anyhow, Result};
 use dashmap::DashMap;
 use mono_move_alloc::{GlobalArenaPtr, LeakedBoxPtr, VersionedLeakedBoxPtr};
 use mono_move_core::{Executable, ExecutableId, ExecutableSlot};
@@ -56,7 +57,7 @@ impl ExecutableCache {
         &self,
         key: GlobalArenaPtr<ExecutableId>,
         executable: Box<Executable>,
-    ) -> anyhow::Result<LeakedBoxPtr<Executable>> {
+    ) -> Result<LeakedBoxPtr<Executable>> {
         if let Some(existing) = self.get(key) {
             return Ok(existing);
         }
@@ -72,9 +73,8 @@ impl ExecutableCache {
             Err(loser) => {
                 // SAFETY: `loser` is exclusive to this call and has no aliases.
                 unsafe { loser.free_unchecked() };
-                slot.load().ok_or_else(|| {
-                    anyhow::anyhow!("cache invariant violated: slot null after CAS failure")
-                })
+                slot.load()
+                    .ok_or_else(|| anyhow!("cache invariant violated: slot null after CAS failure"))
             },
         }
     }

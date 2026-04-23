@@ -5,7 +5,7 @@
 //! cache and per-transaction read-set with deterministic gas charging.
 
 use crate::{
-    hooks::LoaderHooks,
+    module_provider::ModuleProvider,
     read_set::{ExecutableRead, ExecutableReadSet},
 };
 use anyhow::{anyhow, bail};
@@ -66,22 +66,22 @@ pub enum LoadingPolicy {
 /// transaction's read-set.
 pub struct Loader<'guard, 'ctx> {
     guard: &'guard ExecutionGuard<'ctx>,
-    hooks: &'guard dyn LoaderHooks,
+    module_provider: &'guard dyn ModuleProvider,
     policy: LoadingPolicy,
 }
 
 impl<'guard, 'ctx> Loader<'guard, 'ctx> {
-    /// Creates a new loader. Provided hooks are used to process cache misses:
-    /// fetch code from storage, deserialize and verify. Policy dictates how
-    /// the code is loaded.
+    /// Creates a new loader. The provided [`ModuleProvider`] processes cache
+    /// misses: fetch code from storage, deserialize and verify. Policy
+    /// dictates how the code is loaded.
     pub fn new_with_policy(
         guard: &'guard ExecutionGuard<'ctx>,
-        hooks: &'guard dyn LoaderHooks,
+        module_provider: &'guard dyn ModuleProvider,
         policy: LoadingPolicy,
     ) -> Self {
         Self {
             guard,
-            hooks,
+            module_provider,
             policy,
         }
     }
@@ -171,7 +171,7 @@ impl<'guard, 'ctx> Loader<'guard, 'ctx> {
                 for member in members {
                     let member_id = self.guard.arena_ref_for_executable_id(member.id());
                     total = total.saturating_add(member.cost());
-                    read_set.record(member_id, ExecutableRead::Loaded(member));
+                    read_set.record(member_id, ExecutableRead::Loaded(member))?;
                 }
                 gas_meter.charge(total)?;
                 return Ok(executable);
@@ -180,7 +180,7 @@ impl<'guard, 'ctx> Loader<'guard, 'ctx> {
         }
 
         let names = self
-            .hooks
+            .module_provider
             .get_same_package_modules(id.address(), id.name())?;
 
         let mut pending = Vec::with_capacity(names.len());
@@ -201,7 +201,7 @@ impl<'guard, 'ctx> Loader<'guard, 'ctx> {
         for (_, module, cost) in &pending {
             let executable = self.build_and_insert(module, *cost, mandatory_deps.clone())?;
             let id = self.guard.arena_ref_for_executable_id(executable.id());
-            read_set.record(id, ExecutableRead::Loaded(executable));
+            read_set.record(id, ExecutableRead::Loaded(executable))?;
             total = total.saturating_add(executable.cost());
         }
 
@@ -215,6 +215,12 @@ impl<'guard, 'ctx> Loader<'guard, 'ctx> {
     /// Orders modules leaves-first by inter-member import dependencies,
     /// so that building in sequence finds each referenced sibling already
     /// interned. Edges into modules outside the given modules are ignored.
+    ///
+    /// # Note
+    ///
+    /// Move publish guarantees that packages contain no dependency cycles, so
+    /// the result is always topological.
+    // TODO: double-check that publish rejects packages with cycles.
     fn topological_ordering(
         &self,
         modules: Vec<(ExecutableSlot, CompiledModule, u64)>,
@@ -222,7 +228,12 @@ impl<'guard, 'ctx> Loader<'guard, 'ctx> {
         let id_to_idx = modules
             .iter()
             .enumerate()
-            .map(|(i, (_, m, _))| (self.guard.intern_module_id(&m.self_id()), i))
+            .map(|(i, (_, m, _))| {
+                (
+                    self.guard.intern_address_name(m.self_addr(), m.self_name()),
+                    i,
+                )
+            })
             .collect::<FxHashMap<_, _>>();
 
         let deps = modules
@@ -292,12 +303,14 @@ impl<'guard, 'ctx> Loader<'guard, 'ctx> {
         id: ArenaRef<'guard, ExecutableId>,
     ) -> anyhow::Result<(CompiledModule, u64)> {
         let bytes = self
-            .hooks
+            .module_provider
             .get_module_bytes(id.address(), id.name())?
             .ok_or_else(|| anyhow!("Linker error"))?;
+        // TODO: placeholder cost model — byte length of the module. Replace
+        // with a proper cost function (bucketed by size, verifier cost, etc.).
         let cost = bytes.len() as u64;
-        let compiled = self.hooks.deserialize_module(&bytes)?;
-        self.hooks.verify_module(&compiled)?;
+        let compiled = self.module_provider.deserialize_module(&bytes)?;
+        self.module_provider.verify_module(&compiled)?;
         Ok((compiled, cost))
     }
 
@@ -311,7 +324,7 @@ impl<'guard, 'ctx> Loader<'guard, 'ctx> {
         let id = self.guard.arena_ref_for_executable_id(executable.id());
         // Always record the read before charging, so that if charging fails,
         // the read is part of the set for later Block-STM validation.
-        read_set.record(id, ExecutableRead::Loaded(executable));
+        read_set.record(id, ExecutableRead::Loaded(executable))?;
         gas_meter.charge(executable.cost())?;
         Ok(())
     }

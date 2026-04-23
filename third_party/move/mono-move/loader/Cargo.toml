@@ -21,6 +21,7 @@ mono-move-global-context = { workspace = true }
 mono-move-orchestrator = { workspace = true }
 move-binary-format = { workspace = true }
 move-core-types = { workspace = true }
+shared-dsa = { workspace = true }
 
 [dev-dependencies]
 mono-move-testsuite = { workspace = true }

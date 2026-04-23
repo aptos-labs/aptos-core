@@ -4,9 +4,10 @@
 //! Per-transaction set of executables recorded by the loader, pinning one
 //! version per module for the duration of the transaction.
 
-use fxhash::FxHashMap;
+use anyhow::{bail, Result};
 use mono_move_core::ExecutableId;
 use mono_move_global_context::{ArenaRef, Executable};
+use shared_dsa::UnorderedMap;
 use std::collections::hash_map::Entry;
 
 /// Tracks how this read depends on a particular executable.
@@ -19,14 +20,14 @@ pub enum ExecutableRead<'guard> {
 /// duration of this transaction.
 #[derive(Default)]
 pub struct ExecutableReadSet<'guard> {
-    inner: FxHashMap<ArenaRef<'guard, ExecutableId>, ExecutableRead<'guard>>,
+    inner: UnorderedMap<ArenaRef<'guard, ExecutableId>, ExecutableRead<'guard>>,
 }
 
 impl<'guard> ExecutableReadSet<'guard> {
     /// Creates an empty read-set.
     pub fn new() -> Self {
         Self {
-            inner: FxHashMap::default(),
+            inner: UnorderedMap::new(),
         }
     }
 
@@ -37,19 +38,20 @@ impl<'guard> ExecutableReadSet<'guard> {
         }
     }
 
-    /// Records executable version this transaction will use. Panics if the
-    /// executable was already recorded.
+    /// Records executable version this transaction will use. Returns an error
+    /// if the executable was already recorded.
     pub(crate) fn record(
         &mut self,
         key: ArenaRef<'guard, ExecutableId>,
         read: ExecutableRead<'guard>,
-    ) {
+    ) -> Result<()> {
         match self.inner.entry(key) {
             Entry::Vacant(e) => {
                 e.insert(read);
+                Ok(())
             },
             Entry::Occupied(_) => {
-                panic!("Read is already recorded")
+                bail!("Read is already recorded")
             },
         }
     }

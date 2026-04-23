@@ -12720,6 +12720,7 @@ dependencies = [
  "mono-move-testsuite",
  "move-binary-format",
  "move-core-types",
+ "shared-dsa",
 ]
 
 [[package]]
