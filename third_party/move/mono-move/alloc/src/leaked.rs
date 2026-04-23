@@ -73,40 +73,43 @@ impl<T> Clone for LeakedBoxPtr<T> {
     }
 }
 
-/// Atomic slot holding an optional [`LeakedBoxPtr<T>`].
-///
-/// Content is installed via [`VersionedLeakedBoxPtr::init`] and removed via
-/// [`VersionedLeakedBoxPtr::clear`], which returns the previous pointer so
-/// the caller can free it once no readers remain.
+/// Versioned slot holding [`LeakedBoxPtr<T>`]s.
 pub struct VersionedLeakedBoxPtr<T> {
     base: AtomicPtr<T>,
+    // TODO:
+    //   In the future, other versions will be place here.
+    //   Right now, only one base (storage) version exists.
 }
 
 impl<T> VersionedLeakedBoxPtr<T> {
-    /// Creates an empty slot (null base).
+    /// Creates an empty slot.
     pub fn new() -> Self {
         Self {
             base: AtomicPtr::new(ptr::null_mut()),
         }
     }
 
-    /// Returns the current content if any. `Acquire` ordering.
+    /// Returns the current pointer if set, or [`None`] otherwise.
     pub fn load(&self) -> Option<LeakedBoxPtr<T>> {
+        // TODO:
+        //   In the future, the algorithm will be more involved: we need to
+        //   find the right version to return based on the version specified
+        //   by the user.
         let raw = self.base.load(Ordering::Acquire);
         NonNull::new(raw).map(LeakedBoxPtr)
     }
 
-    /// Atomically installs `ptr` iff the slot is empty.
+    /// Sets the slot if it was empty before.
     ///
-    /// On race, returns the input pointer back in `Err` so the caller can
-    /// either free it or adopt the winning version via
-    /// [`VersionedLeakedBoxPtr::load`].
+    /// On race, if slot is already occupied, returns the input pointer back
+    /// in `Err` so the caller can either free it or adopt the winning version
+    /// via [`VersionedLeakedBoxPtr::load`].
     pub fn init(&self, ptr: LeakedBoxPtr<T>) -> Result<(), LeakedBoxPtr<T>> {
         let raw = ptr.0.as_ptr();
         // On success: Release publishes the pointee's initialization to
         // subsequent `load` readers (Acquire).
-        // On failure: the caller only observes that some other install
-        // happened; any subsequent `load` performs its own Acquire, so
+        // On failure: the caller only observes that some other initialization
+        // happened; any subsequent `load` performs its own Acquire, so using
         // Relaxed is sufficient for the failure ordering.
         match self
             .base
@@ -118,8 +121,8 @@ impl<T> VersionedLeakedBoxPtr<T> {
     }
 
     /// Atomically swaps null in and returns the previous content if any.
-    /// The caller is responsible for freeing the returned pointer.
     pub fn clear(&self) -> Option<LeakedBoxPtr<T>> {
+        // TODO: Revisit GC storey with Zaptos.
         let raw = self.base.swap(ptr::null_mut(), Ordering::AcqRel);
         NonNull::new(raw).map(LeakedBoxPtr)
     }
