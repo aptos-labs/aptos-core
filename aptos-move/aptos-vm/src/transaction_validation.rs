@@ -128,7 +128,6 @@ pub(crate) fn run_script_prologue(
             module_storage,
             serialized_signers,
             txn_data,
-            features,
             log_context,
             traversal_context,
             is_simulation,
@@ -498,7 +497,6 @@ fn run_epilogue(
             gas_remaining,
             fee_statement,
             txn_data,
-            features,
             traversal_context,
             is_simulation,
         );

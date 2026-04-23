@@ -14,7 +14,6 @@ use crate::{
 use aptos_gas_algebra::Gas;
 use aptos_types::{
     fee_statement::FeeStatement,
-    on_chain_config::Features,
     transaction::{ReplayProtector, TxnLimitsRequest, UserTxnLimitsRequest},
 };
 use aptos_vm_logging::log_schema::AdapterLogSchema;
@@ -90,7 +89,7 @@ impl PrologueBuilder {
 
     /// Selects the highest supported variant based on feature flags and BCS-serializes it.
     /// Currently only V1 exists.
-    pub fn build(self, _features: &Features) -> Vec<u8> {
+    pub fn build(self) -> Vec<u8> {
         let args = PrologueArgs::V1 {
             txn_sender_public_key: self.txn_sender_public_key,
             fee_payer_public_key_hash: self.fee_payer_public_key_hash,
@@ -113,7 +112,6 @@ pub(crate) fn run_prologue(
     module_storage: &impl ModuleStorage,
     serialized_signers: &SerializedSigners,
     txn_data: &TransactionMetadata,
-    features: &Features,
     log_context: &AdapterLogSchema,
     traversal_context: &mut TraversalContext,
     is_simulation: bool,
@@ -124,7 +122,7 @@ pub(crate) fn run_prologue(
         serialized_signers
             .fee_payer()
             .unwrap_or(serialized_signers.sender()),
-        builder.build(features),
+        builder.build(),
     ];
     session
         .execute_function_bypass_visibility(
@@ -185,7 +183,7 @@ impl EpilogueBuilder {
 
     /// Selects the highest supported variant based on feature flags and BCS-serializes it.
     /// Currently only V1 exists.
-    pub fn build(self, _features: &Features) -> Vec<u8> {
+    pub fn build(self) -> Vec<u8> {
         let args = EpilogueArgs::V1 {
             fee_statement: self.fee_statement,
             txn_gas_price: self.txn_gas_price,
@@ -205,7 +203,6 @@ pub(crate) fn run_epilogue(
     gas_remaining: Gas,
     fee_statement: FeeStatement,
     txn_data: &TransactionMetadata,
-    features: &Features,
     traversal_context: &mut TraversalContext,
     is_simulation: bool,
 ) -> VMResult<()> {
@@ -215,7 +212,7 @@ pub(crate) fn run_epilogue(
         serialized_signers
             .fee_payer()
             .unwrap_or(serialized_signers.sender()),
-        builder.build(features),
+        builder.build(),
     ];
 
     session
