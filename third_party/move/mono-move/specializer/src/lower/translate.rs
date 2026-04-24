@@ -91,7 +91,7 @@ impl<'a> LoweringState<'a> {
             Slot::Xfer(j) => {
                 let cs = &self.ctx.call_sites[self.call_site_cursor];
                 let slot = cs.arg_write_slots[j as usize];
-                let ty = cs.param_types[j as usize].clone();
+                let ty = cs.param_types[j as usize];
                 self.active_xfer_slots[j as usize] = slot;
                 self.active_xfer_types[j as usize] = ty;
                 slot
@@ -435,13 +435,13 @@ impl<'a> LoweringState<'a> {
                     let next_cs = &self.ctx.call_sites[self.call_site_cursor];
                     if j < next_cs.arg_write_slots.len() {
                         self.active_xfer_slots[j] = next_cs.arg_write_slots[j];
-                        self.active_xfer_types[j] = next_cs.param_types[j].clone();
+                        self.active_xfer_types[j] = next_cs.param_types[j];
                         resolved = true;
                     }
                 }
                 if !resolved && k < prev_cs.ret_read_slots.len() {
                     self.active_xfer_slots[j] = prev_cs.ret_read_slots[k];
-                    self.active_xfer_types[j] = prev_cs.ret_types[k].clone();
+                    self.active_xfer_types[j] = prev_cs.ret_types[k];
                 }
             }
         }
