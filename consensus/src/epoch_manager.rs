@@ -14,8 +14,8 @@ use crate::{
     liveness::{
         cached_proposer_election::CachedProposerElection,
         leader_reputation::{
-            extract_epoch_to_proposers, AptosDBBackend, LatencyWeightedHeuristic,
-            LeaderReputation, ProposerAndVoterHeuristic, ReputationHeuristic,
+            extract_epoch_to_proposers, AptosDBBackend, LatencyWeightedHeuristic, LeaderReputation,
+            ProposerAndVoterHeuristic, ReputationHeuristic,
         },
         proposal_generator::{
             ChainHealthBackoffConfig, PipelineBackpressureConfig, ProposalGenerator,

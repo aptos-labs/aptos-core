@@ -557,18 +557,31 @@ impl ReputationHeuristic for ProposerAndVoterHeuristic {
 /// fast rounds (i.e. collected quorum quickly) get a proportionally higher chance of being
 /// selected as leader, while validators with slow round times get a lower chance.
 ///
-/// Concretely, for every active validator we compute the median interval between consecutive
-/// committed blocks in the history window.  The weight is then:
+/// Concretely, for every active validator we compute the mean interval between consecutive
+/// committed blocks in the history window, splitting each successful pair 50/50 between the
+/// two adjacent proposers and attributing timeout-spanning gaps in full to the failed
+/// proposers (using `failed_proposer_indices`). The weight is then:
 ///
-///   active_weight * (max_median_round_time_us / validator_median_round_time_us)^multiplier
+///   active_weight * (max_mean_round_time_us / validator_mean_round_time_us)^multiplier
 ///
 /// Inactive / failed validators keep their base weights unchanged.
-/// If there is not enough history to compute a median the base active weight is used.
+/// If a validator has fewer than `MIN_OBSERVATIONS` entries the base active weight is used
+/// for that validator. The scaling ratio is clamped at `MAX_LATENCY_RATIO` to prevent one
+/// anomalously-fast validator from monopolizing leader selection.
 pub struct LatencyWeightedHeuristic {
     inner: ProposerAndVoterHeuristic,
     active_weight: u64,
     multiplier: f64,
 }
+
+/// Minimum number of round-time observations needed before a validator is scaled by the
+/// latency-weighted heuristic; below this we fall back to the base active weight.
+const MIN_OBSERVATIONS: usize = 2;
+
+/// Hard ceiling on the per-validator scaling ratio (`max_mean / val_mean`) to bound the
+/// boost a fast validator can receive over the slowest one. Prevents over-concentration
+/// when one validator's mean is anomalously low.
+const MAX_LATENCY_RATIO: f64 = 10.0;
 
 impl LatencyWeightedHeuristic {
     pub fn new(inner: ProposerAndVoterHeuristic, active_weight: u64, multiplier: f64) -> Self {
@@ -579,11 +592,23 @@ impl LatencyWeightedHeuristic {
         }
     }
 
-    /// Compute per-proposer round times from the history.
+    /// Compute per-proposer round-time observations from the history.
     ///
     /// History is ordered newest-first: `history[0]` is the latest block.
-    /// The round time for block `i` is `history[i].proposed_time() - history[i+1].proposed_time()`.
-    fn compute_round_times(history: &[NewBlockEvent]) -> HashMap<Author, Vec<u64>> {
+    /// For each consecutive pair `(newer, older)` within the same epoch we compute
+    /// `interval = newer.proposed_time() - older.proposed_time()` and attribute it as follows:
+    /// * If `newer.failed_proposer_indices()` is empty the pair represents a clean
+    ///   consecutive-round commit: split the interval 50/50 between `newer.proposer()` and
+    ///   `older.proposer()`. Both contributed to closing the round (the older proposed it,
+    ///   the newer aggregated votes and built the next proposal), so each absorbs half.
+    /// * If `newer.failed_proposer_indices()` is non-empty the gap absorbed one or more
+    ///   timeouts: divide the full interval equally among the failed proposers (resolved via
+    ///   `epoch_to_candidates`) and attribute none of it to `newer`/`older`. The healthy
+    ///   adjacent proposers should not be penalized for absorbing someone else's timeout.
+    fn compute_round_times(
+        history: &[NewBlockEvent],
+        epoch_to_candidates: &HashMap<u64, Vec<Author>>,
+    ) -> HashMap<Author, Vec<u64>> {
         let mut round_times: HashMap<Author, Vec<u64>> = HashMap::new();
         for i in 0..history.len().saturating_sub(1) {
             let newer = &history[i];
@@ -593,24 +618,35 @@ impl LatencyWeightedHeuristic {
                 continue;
             }
             let interval = newer.proposed_time().saturating_sub(older.proposed_time());
-            if interval > 0 {
-                round_times.entry(newer.proposer()).or_default().push(interval);
+            if interval == 0 {
+                continue;
+            }
+
+            let failed = newer.failed_proposer_indices();
+            if failed.is_empty() {
+                // Successful pair: 50/50 split between the two adjacent proposers.
+                let half = interval / 2;
+                if half > 0 {
+                    round_times.entry(newer.proposer()).or_default().push(half);
+                    round_times.entry(older.proposer()).or_default().push(half);
+                }
+            } else {
+                // Timeout-spanning pair: attribute the full gap to the failed proposer(s).
+                let candidates = match epoch_to_candidates.get(&newer.epoch()) {
+                    Some(c) => c,
+                    None => continue,
+                };
+                let per_failure = interval / failed.len() as u64;
+                if per_failure > 0 {
+                    for &idx in failed {
+                        if let Some(author) = candidates.get(idx as usize) {
+                            round_times.entry(*author).or_default().push(per_failure);
+                        }
+                    }
+                }
             }
         }
         round_times
-    }
-
-    fn median(values: &mut Vec<u64>) -> u64 {
-        if values.is_empty() {
-            return 0;
-        }
-        values.sort_unstable();
-        let mid = values.len() / 2;
-        if values.len() % 2 == 0 {
-            (values[mid - 1] + values[mid]) / 2
-        } else {
-            values[mid]
-        }
     }
 }
 
@@ -623,35 +659,25 @@ impl ReputationHeuristic for LatencyWeightedHeuristic {
     ) -> Vec<u64> {
         let base_weights = self.inner.get_weights(epoch, epoch_to_candidates, history);
 
-        let mut round_times = Self::compute_round_times(history);
+        let round_times = Self::compute_round_times(history, epoch_to_candidates);
 
-        // Compute per-validator median round time.
-        let mut medians: HashMap<Author, u64> = HashMap::new();
-        for (author, times) in round_times.iter_mut() {
-            let m = Self::median(times);
-            if m > 0 {
-                medians.insert(*author, m);
-            }
-        }
+        // Per-validator mean round time, computed only for validators with enough data.
+        let means: HashMap<Author, u64> = round_times
+            .iter()
+            .filter(|(_, v)| v.len() >= MIN_OBSERVATIONS)
+            .map(|(a, v)| (*a, v.iter().sum::<u64>() / v.len() as u64))
+            .collect();
 
-        // We need at least a handful of data points to trust the medians.
-        // Require each candidate to have at least 2 observations; otherwise fall back to base.
-        let min_observations = 2usize;
-        let candidates = &epoch_to_candidates[&epoch];
-        let enough_data = candidates.iter().all(|author| {
-            round_times
-                .get(author)
-                .map_or(false, |v| v.len() >= min_observations)
-        });
-
-        if !enough_data || medians.is_empty() {
+        // No validator has enough data — fall back to base weights.
+        if means.is_empty() {
             return base_weights;
         }
 
-        // The slowest (highest) median round time is the reference — we scale all others
-        // relative to it so that the fastest proposer keeps `active_weight` and slower
-        // ones get a proportionally smaller share.
-        let max_median = *medians.values().max().expect("medians is non-empty");
+        let max_mean = *means.values().max().expect("means is non-empty");
+        // Degenerate case: every observed mean is zero. Fall back to base weights.
+        if max_mean == 0 {
+            return base_weights;
+        }
 
         epoch_to_candidates[&epoch]
             .iter()
@@ -661,12 +687,15 @@ impl ReputationHeuristic for LatencyWeightedHeuristic {
                 if base != self.active_weight {
                     return base;
                 }
-                match medians.get(author) {
-                    Some(&median_rt) if median_rt > 0 => {
-                        // Scale by (max_median / median_rt)^multiplier.
-                        let ratio = (max_median as f64 / median_rt as f64).powf(self.multiplier);
+                match means.get(author) {
+                    Some(&val_mean) if val_mean > 0 => {
+                        // Scale by (max_mean / val_mean)^multiplier, clamped.
+                        let ratio = (max_mean as f64 / val_mean as f64)
+                            .min(MAX_LATENCY_RATIO)
+                            .powf(self.multiplier);
                         (self.active_weight as f64 * ratio) as u64
                     },
+                    // Per-validator fallback: insufficient observations → keep base weight.
                     _ => base,
                 }
             })

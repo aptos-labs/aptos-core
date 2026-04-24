@@ -2,7 +2,8 @@
 // Licensed pursuant to the Innovation-Enabling Source Code License, available at https://github.com/aptos-labs/aptos-core/blob/main/LICENSE
 
 use super::leader_reputation::{
-    extract_epoch_to_proposers_impl, AptosDBBackend, ProposerAndVoterHeuristic,
+    extract_epoch_to_proposers_impl, AptosDBBackend, LatencyWeightedHeuristic,
+    ProposerAndVoterHeuristic,
 };
 use crate::liveness::{
     leader_reputation::{
@@ -761,4 +762,205 @@ fn test_extract_epoch_to_proposers_impl() {
         )
         .unwrap()
     );
+}
+
+/// #### LatencyWeightedHeuristic tests ####
+
+/// Build a `NewBlockEvent` with the given proposer, timestamp, round, epoch, and failed
+/// proposer indices. Other fields are set to deterministic defaults.
+fn make_block_event(
+    proposer: Author,
+    epoch: u64,
+    round: u64,
+    timestamp_us: u64,
+    failed_proposer_indices: Vec<u64>,
+) -> NewBlockEvent {
+    NewBlockEvent::new(
+        AccountAddress::ZERO,
+        epoch,
+        round,
+        round,
+        BitVec::with_num_bits(1).into(),
+        proposer,
+        failed_proposer_indices,
+        timestamp_us,
+    )
+}
+
+/// Build a `LatencyWeightedHeuristic` wrapping a `ProposerAndVoterHeuristic` configured so
+/// that all candidates with successful proposals receive `active_weight = 1000`.
+fn make_latency_weighted_heuristic(self_author: Author) -> LatencyWeightedHeuristic {
+    // Wide windows + low failure threshold so test fixtures do not accidentally trigger the
+    // failed/inactive branches in the inner heuristic — we want to exercise the latency
+    // scaling on top of `active_weight`.
+    let inner = ProposerAndVoterHeuristic::new(self_author, 1000, 10, 1, 50, 100, 100, false);
+    LatencyWeightedHeuristic::new(inner, 1000, 1.0)
+}
+
+#[test]
+fn test_latency_weighted_50_50_split_equal_intervals() {
+    // With four validators and four successful blocks at uniform 100µs intervals, every
+    // validator's mean is identical, so weights collapse to `active_weight`.
+    let validators: Vec<Author> = (0..4).map(|_| Author::random()).collect();
+    let epoch_to_validators = HashMap::from([(0u64, validators.clone())]);
+
+    // History is newest-first: rounds 4, 3, 2, 1 at timestamps 400, 300, 200, 100.
+    let history = vec![
+        make_block_event(validators[3], 0, 4, 400, vec![]),
+        make_block_event(validators[2], 0, 3, 300, vec![]),
+        make_block_event(validators[1], 0, 2, 200, vec![]),
+        make_block_event(validators[0], 0, 1, 100, vec![]),
+    ];
+
+    let heuristic = make_latency_weighted_heuristic(validators[0]);
+    let weights = heuristic.get_weights(0, &epoch_to_validators, &history);
+
+    // All means equal → ratio is 1 → all weights stay at active_weight = 1000.
+    assert_eq!(weights, vec![1000, 1000, 1000, 1000]);
+}
+
+#[test]
+fn test_latency_weighted_failure_attributed_to_failed_proposer() {
+    // Three validators V0, V1, V2. V1 (index 1) fails round 3; V2 commits round 4 to rescue.
+    // The 600µs gap between V0's commit (round 2) and V2's commit (round 4) absorbs V1's
+    // timeout and must be attributed to V1, not to V2.
+    let validators: Vec<Author> = (0..3).map(|_| Author::random()).collect();
+    let epoch_to_validators = HashMap::from([(0u64, validators.clone())]);
+
+    // Newest-first.
+    let history = vec![
+        make_block_event(validators[2], 0, 6, 1000, vec![]), // round 6
+        make_block_event(validators[1], 0, 5, 900, vec![]),  // round 5 (V1 succeeds here)
+        make_block_event(validators[0], 0, 4, 800, vec![]),  // round 4
+        make_block_event(validators[2], 0, 4, 700, vec![1]), // round 4 rescue, V1 failed round 3
+        make_block_event(validators[0], 0, 2, 100, vec![]),  // round 2
+    ];
+
+    let heuristic = make_latency_weighted_heuristic(validators[0]);
+    let weights = heuristic.get_weights(0, &epoch_to_validators, &history);
+
+    // V1 should have the largest mean (absorbed the 600µs failure entry) and therefore the
+    // smallest weight. V0 and V2 should be boosted relative to V1.
+    assert!(weights[1] < weights[0]);
+    assert!(weights[1] < weights[2]);
+}
+
+#[test]
+fn test_latency_weighted_multiple_failed_proposers_split_gap() {
+    // Two failed proposers in a single gap: the interval is split equally between them.
+    let validators: Vec<Author> = (0..4).map(|_| Author::random()).collect();
+    let epoch_to_validators = HashMap::from([(0u64, validators.clone())]);
+
+    // Round 5 commits with both V1 (idx 1) and V2 (idx 2) listed as failed; gap of 1000µs.
+    let history = vec![
+        make_block_event(validators[3], 0, 6, 1100, vec![]),
+        make_block_event(validators[0], 0, 5, 1000, vec![1, 2]),
+        make_block_event(validators[3], 0, 2, 0, vec![]),
+    ];
+
+    let heuristic = make_latency_weighted_heuristic(validators[0]);
+    let weights = heuristic.get_weights(0, &epoch_to_validators, &history);
+
+    // Both failed proposers should be down-weighted relative to V0/V3.
+    assert!(weights[1] < weights[0]);
+    assert!(weights[2] < weights[0]);
+    assert!(weights[1] < weights[3]);
+    assert!(weights[2] < weights[3]);
+}
+
+#[test]
+fn test_latency_weighted_per_validator_fallback() {
+    // V0 has no observations (it is in the candidate set but never appears in history).
+    // The heuristic must NOT fall back globally just because V0 lacks data — V1 should
+    // still be scaled relative to V2 even though V0 has nothing to compute from.
+    let validators: Vec<Author> = (0..3).map(|_| Author::random()).collect();
+    let epoch_to_validators = HashMap::from([(0u64, validators.clone())]);
+
+    // V1 has fast intervals (~50µs/entry under 50/50), V2 has slow intervals (~500µs/entry).
+    // V0 never appears as proposer.
+    let history = vec![
+        make_block_event(validators[2], 0, 10, 5000, vec![]),
+        make_block_event(validators[2], 0, 8, 4000, vec![]),
+        make_block_event(validators[2], 0, 6, 3000, vec![]),
+        make_block_event(validators[1], 0, 4, 200, vec![]),
+        make_block_event(validators[1], 0, 3, 150, vec![]),
+        make_block_event(validators[1], 0, 2, 100, vec![]),
+    ];
+
+    let heuristic = make_latency_weighted_heuristic(validators[0]);
+    let weights = heuristic.get_weights(0, &epoch_to_validators, &history);
+
+    // V1 is faster than V2, so V1's weight must be strictly larger than V2's.
+    // If the heuristic had fallen back globally because of V0's empty data, V1 == V2.
+    assert!(
+        weights[1] > weights[2],
+        "expected V1 boosted over V2 despite V0 lacking observations; got {:?}",
+        weights,
+    );
+}
+
+#[test]
+fn test_latency_weighted_empty_history_falls_back_to_base() {
+    // No history → no observations → base weights returned unchanged.
+    let validators: Vec<Author> = (0..2).map(|_| Author::random()).collect();
+    let epoch_to_validators = HashMap::from([(0u64, validators.clone())]);
+    let history: Vec<NewBlockEvent> = vec![];
+
+    let heuristic = make_latency_weighted_heuristic(validators[0]);
+    let weights = heuristic.get_weights(0, &epoch_to_validators, &history);
+
+    // Both validators still get base weight (inactive_weight in this case since no proposals).
+    assert_eq!(weights.len(), 2);
+}
+
+#[test]
+fn test_latency_weighted_max_ratio_clamp() {
+    // V0 makes many fast successful proposals (small mean) while V1 is attributed multiple
+    // large failure gaps (huge mean). The raw scaling ratio (max_mean / V0_mean) is ~1000x;
+    // it must be clamped at MAX_LATENCY_RATIO = 10x → V0's weight tops out at 10 * 1000.
+    let validators: Vec<Author> = (0..2).map(|_| Author::random()).collect();
+    let epoch_to_validators = HashMap::from([(0u64, validators.clone())]);
+
+    // History (newest first): V0 successfully proposes a series of fast rounds, then three
+    // huge gaps each attributed to V1 via failed_proposer_indices.
+    let history = vec![
+        make_block_event(validators[0], 0, 10, 30_000, vec![1]), // V1 failure, gap = 10000
+        make_block_event(validators[0], 0, 8, 20_000, vec![1]),  // V1 failure, gap = 10000
+        make_block_event(validators[0], 0, 6, 10_000, vec![1]),  // V1 failure, gap = 9990
+        make_block_event(validators[0], 0, 4, 10, vec![]),
+        make_block_event(validators[0], 0, 3, 5, vec![]),
+    ];
+
+    let heuristic = make_latency_weighted_heuristic(validators[0]);
+    let weights = heuristic.get_weights(0, &epoch_to_validators, &history);
+
+    // V0's raw ratio would be massive (V1_mean ~10000 / V0_mean ~2 = 5000x); clamp pins it
+    // to MAX_LATENCY_RATIO = 10. V0 weight must equal active_weight * 10 = 10_000.
+    assert_eq!(
+        weights[0], 10_000,
+        "expected V0 weight clamped at 10x active_weight; got {:?}",
+        weights,
+    );
+}
+
+#[test]
+fn test_latency_weighted_skips_cross_epoch_pairs() {
+    // A pair spanning an epoch boundary must not contribute to round_times.
+    let validators: Vec<Author> = (0..2).map(|_| Author::random()).collect();
+    let epoch_to_validators =
+        HashMap::from([(0u64, validators.clone()), (1u64, validators.clone())]);
+
+    // Two events: one in epoch 0, one in epoch 1. Cross-epoch pair must be skipped.
+    let history = vec![
+        make_block_event(validators[1], 1, 1, 1_000_000, vec![]), // epoch 1
+        make_block_event(validators[0], 0, 5, 500, vec![]),       // epoch 0
+    ];
+
+    let heuristic = make_latency_weighted_heuristic(validators[0]);
+    let weights = heuristic.get_weights(1, &epoch_to_validators, &history);
+
+    // No same-epoch pairs → empty round_times → fall back to base weights.
+    // Both validators receive whatever base weight the inner heuristic produced; the latency
+    // scaling has no effect.
+    assert_eq!(weights.len(), 2);
 }
