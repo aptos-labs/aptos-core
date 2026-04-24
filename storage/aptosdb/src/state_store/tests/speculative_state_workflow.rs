@@ -65,7 +65,7 @@ const TEST_CONFIG: HotStateConfig = HotStateConfig {
     persist_hotness_in_write_set: true,
 };
 
-#[derive(Debug)]
+#[derive(Clone, Debug)]
 struct UserTxn {
     reads: BTreeSet<StateKey>,
     writes: BTreeMap<StateKey, Option<StateValue>>,
@@ -126,47 +126,46 @@ prop_compose! {
 }
 
 prop_compose! {
+    fn arb_user_txn(
+        keys: Vec<StateKey>,
+        max_read_only_set_size: usize,
+        max_write_set_size: usize,
+    )(
+        reads in vec(any::<Index>(), 0..=max_read_only_set_size),
+        writes in vec(any::<(Index, Option<StateValue>)>(), 1..=max_write_set_size),
+    ) -> UserTxn {
+        let write_set: BTreeMap<_, _> = writes
+            .into_iter()
+            .map(|(idx, value)| (idx.get(&keys).clone(), value))
+            .collect();
+
+        // The read set is a super set of the write set.
+        let read_set: BTreeSet<_> = write_set
+            .keys()
+            .cloned()
+            .chain(reads.iter().map(|idx| idx.get(&keys)).cloned())
+            .collect();
+
+        UserTxn {
+            reads: read_set,
+            writes: write_set,
+        }
+    }
+}
+
+prop_compose! {
     fn arb_user_block(
         keys: Vec<StateKey>,
         max_read_only_set_size: usize,
         max_write_set_size: usize,
         max_block_size: usize,
     )(
-        input in vec(
-            (
-                vec(
-                    any::<Index>(),
-                    0..=max_read_only_set_size,
-                ),
-                vec(
-                    any::<(Index, Option<StateValue>)>(),
-                    1..=max_write_set_size,
-                ),
-            ),
-            1..=max_block_size
+        txns in vec(
+            arb_user_txn(keys, max_read_only_set_size, max_write_set_size),
+            1..=max_block_size,
         ),
     ) -> Vec<UserTxn> {
-        input
-            .into_iter()
-            .map(|(reads, writes)| {
-                let write_set: BTreeMap<_, _> = writes
-                    .into_iter()
-                    .map(|(idx, value)| (idx.get(&keys).clone(), value))
-                    .collect();
-
-                // The read set is a super set of the write set.
-                let read_set: BTreeSet<_> = write_set
-                    .keys()
-                    .cloned()
-                    .chain(reads.iter().map(|idx| idx.get(&keys)).cloned())
-                    .collect();
-
-                UserTxn {
-                    reads: read_set,
-                    writes: write_set,
-                }
-            })
-            .collect_vec()
+        txns
     }
 }
 
@@ -199,6 +198,11 @@ impl VersionState {
         promotions: impl IntoIterator<Item = &'a StateKey>,
         is_checkpoint: bool,
     ) -> Self {
+        enum Op<'a> {
+            Write(Option<&'a StateValue>),
+            Promote,
+        }
+
         assert_eq!(version, self.next_version);
 
         let mut hot_state = self.hot_state.clone();
@@ -206,10 +210,19 @@ impl VersionState {
         let mut hot_smt_updates = vec![];
         let mut smt_updates = vec![];
 
-        for (k, v_opt) in writes {
+        // Sort writes and promotions together by key hash to match `State::update`'s per-shard
+        // `(version, key_hash)` ordering.
+        let mut all_ops: Vec<(&StateKey, Op<'a>)> = writes
+            .into_iter()
+            .map(|(k, v)| (k, Op::Write(v)))
+            .chain(promotions.into_iter().map(|k| (k, Op::Promote)))
+            .collect();
+        all_ops.sort_by_key(|(k, _)| *k.crypto_hash_ref());
+
+        for (k, op) in all_ops {
             let shard_id = k.get_shard_id();
-            match v_opt {
-                None => {
+            match op {
+                Op::Write(None) => {
                     let slot = StateSlot::new(k.clone(), StateSlotKind::HotVacant {
                         hot_since_version: version,
                         lru_info: LRUEntry::uninitialized(),
@@ -220,7 +233,7 @@ impl VersionState {
                     smt_updates.push((k.hash(), None));
                     state.remove(k);
                 },
-                Some(v) => {
+                Op::Write(Some(v)) => {
                     let slot = StateSlot::new(k.clone(), StateSlotKind::HotOccupied {
                         value_version: version,
                         value: v.clone(),
@@ -233,42 +246,40 @@ impl VersionState {
                     smt_updates.push((k.hash(), Some(v.hash())));
                     state.insert(k.clone(), (version, v.clone()));
                 },
-            }
-        }
+                Op::Promote => {
+                    assert!(is_checkpoint, "No promotions unless in checkpoints");
 
-        for k in promotions {
-            assert!(is_checkpoint, "No promotions unless in checkpoints");
-            let shard_id = k.get_shard_id();
-
-            let hot_value_hash;
-            if let Some(slot) = hot_state[shard_id].peek_mut(k) {
-                if slot.expect_hot_since_version() + REFRESH_INTERVAL_VERSIONS <= version {
-                    slot.refresh(version);
-                    hot_value_hash = Some(HotStateValueRef::from_slot(slot).hash());
-                } else {
-                    hot_value_hash = None;
-                }
-            } else {
-                let slot = match state.get(k) {
-                    Some((value_version, value)) => {
-                        StateSlot::new(k.clone(), StateSlotKind::HotOccupied {
-                            value_version: *value_version,
-                            value: value.clone(),
-                            hot_since_version: version,
-                            lru_info: LRUEntry::uninitialized(),
-                        })
-                    },
-                    None => StateSlot::new(k.clone(), StateSlotKind::HotVacant {
-                        hot_since_version: version,
-                        lru_info: LRUEntry::uninitialized(),
-                    }),
-                };
-                hot_value_hash = Some(HotStateValueRef::from_slot(&slot).hash());
-                hot_state[shard_id].put(k.clone(), slot);
-            }
-            if hot_value_hash.is_some() {
-                assert!(hot_state[shard_id].promote(k));
-                hot_smt_updates.push((k.hash(), hot_value_hash));
+                    let hot_value_hash;
+                    if let Some(slot) = hot_state[shard_id].peek_mut(k) {
+                        if slot.expect_hot_since_version() + REFRESH_INTERVAL_VERSIONS <= version {
+                            slot.refresh(version);
+                            hot_value_hash = Some(HotStateValueRef::from_slot(slot).hash());
+                        } else {
+                            hot_value_hash = None;
+                        }
+                    } else {
+                        let slot = match state.get(k) {
+                            Some((value_version, value)) => {
+                                StateSlot::new(k.clone(), StateSlotKind::HotOccupied {
+                                    value_version: *value_version,
+                                    value: value.clone(),
+                                    hot_since_version: version,
+                                    lru_info: LRUEntry::uninitialized(),
+                                })
+                            },
+                            None => StateSlot::new(k.clone(), StateSlotKind::HotVacant {
+                                hot_since_version: version,
+                                lru_info: LRUEntry::uninitialized(),
+                            }),
+                        };
+                        hot_value_hash = Some(HotStateValueRef::from_slot(&slot).hash());
+                        hot_state[shard_id].put(k.clone(), slot);
+                    }
+                    if hot_value_hash.is_some() {
+                        assert!(hot_state[shard_id].promote(k));
+                        hot_smt_updates.push((k.hash(), hot_value_hash));
+                    }
+                },
             }
         }
 
@@ -815,17 +826,17 @@ fn commit_state_buffer(
     }
 }
 
-fn naive_run_blocks(blocks: Vec<(Vec<UserTxn>, bool)>) -> (Vec<Txn>, StateByVersion) {
+fn naive_run_blocks(blocks: Vec<(Vec<UserTxn>, Option<UserTxn>)>) -> (Vec<Txn>, StateByVersion) {
     let mut all_txns = vec![];
     let mut state_by_version = StateByVersion::new_empty();
-    for (block_txns, append_epilogue) in blocks {
+    for (block_txns, epilogue) in blocks {
         let mut op_accu =
             BlockHotStateOpAccumulator::<StateKey>::new_with_config(MAX_PROMOTIONS_PER_BLOCK);
         let num_txns = block_txns.len();
         for (idx, txn) in block_txns.into_iter().enumerate() {
             // No promotions except for block epilogue. Also note that in case of reconfig, there's
             // no epilogue, but we still have a checkpoint and will run eviction on hot state.
-            let is_checkpoint = !append_epilogue && idx + 1 == num_txns;
+            let is_checkpoint = epilogue.is_none() && idx + 1 == num_txns;
             state_by_version.append_version(
                 txn.writes.iter().map(|(k, v)| (k, v.as_ref())),
                 vec![],
@@ -845,16 +856,32 @@ fn naive_run_blocks(blocks: Vec<(Vec<UserTxn>, bool)>) -> (Vec<Txn>, StateByVers
                 is_checkpoint,
             });
         }
-        if append_epilogue {
+        if let Some(epi_txn) = epilogue {
             let to_make_hot = op_accu.get_keys_to_make_hot();
-            let is_checkpoint = true;
-            state_by_version.append_version(vec![], to_make_hot.iter(), is_checkpoint);
 
-            let reads = to_make_hot.clone();
-            let write_set = to_make_hot
-                .into_iter()
-                .map(|k| (k, HotStateOp::make_hot().into_base_op()))
+            state_by_version.append_version(
+                epi_txn.writes.iter().map(|(k, v)| (k, v.as_ref())),
+                to_make_hot
+                    .iter()
+                    .filter(|k| !epi_txn.writes.contains_key(*k)),
+                /* is_checkpoint */ true,
+            );
+
+            let mut reads = to_make_hot.clone();
+            reads.extend(epi_txn.reads.iter().cloned());
+            // On key collision between value writes and `to_make_hot`, the value op wins.
+            // So we insert value ops after.
+            let mut write_set: BTreeMap<StateKey, BaseStateOp> = to_make_hot
+                .iter()
+                .map(|k| (k.clone(), HotStateOp::make_hot().into_base_op()))
                 .collect();
+            for (k, v_opt) in epi_txn.writes {
+                let op = match v_opt {
+                    None => WriteOp::legacy_deletion().into_base_op(),
+                    Some(v) => WriteOp::modification_to_value(v).into_base_op(),
+                };
+                write_set.insert(k, op);
+            }
             all_txns.push(Txn {
                 reads,
                 write_set,
@@ -946,21 +973,25 @@ proptest! {
 
     #[test]
     fn test_speculative_state_workflow(
-        (mut blocks, last_block) in arb_keys(NUM_KEYS)
+        (mut blocks, last_block, last_epilogue) in arb_keys(NUM_KEYS)
             .prop_flat_map(move |keys| {
                 (
                     vec(
                         (
                             arb_user_block(keys.clone(), NUM_KEYS, NUM_KEYS, NUM_KEYS),
-                            prop_oneof![1=>Just(false), 9=>Just(true)]
+                            prop_oneof![
+                                1 => Just(None),
+                                9 => arb_user_txn(keys.clone(), NUM_KEYS, NUM_KEYS).prop_map(Some),
+                            ],
                         ),
                         1..100
                     ),
-                    arb_user_block(keys, NUM_KEYS, NUM_KEYS, NUM_KEYS)
+                    arb_user_block(keys.clone(), NUM_KEYS, NUM_KEYS, NUM_KEYS),
+                    arb_user_txn(keys, NUM_KEYS, NUM_KEYS),
                 )
             })
     ) {
-        blocks.push((last_block, /* is_checkpoint */ true));
+        blocks.push((last_block, Some(last_epilogue)));
 
         let (all_txns, state_by_version) = naive_run_blocks(blocks);
 
