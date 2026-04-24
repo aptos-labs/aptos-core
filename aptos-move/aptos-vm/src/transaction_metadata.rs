@@ -308,6 +308,7 @@ impl TransactionMetadata {
             self.multisig_payload()
                 .map(|multisig| multisig.as_multisig_payload()),
             self.transaction_index_kind,
+            self.is_encrypted_txn,
         )
     }
 

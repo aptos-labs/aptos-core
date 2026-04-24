@@ -24,6 +24,7 @@ module admin::transaction_context_test {
         type_arg_names: vector<String>,
         args: vector<vector<u8>>,
         multisig_address: address,
+        is_encrypted_txn: bool,
         // Fields for monotonically increasing counter tests
         counter_values: vector<u128>,
         counter_timestamps: vector<u64>,
@@ -48,6 +49,7 @@ module admin::transaction_context_test {
                 args: vector[],
                 type_arg_names: vector[],
                 multisig_address: @0x0,
+                is_encrypted_txn: false,
                 counter_values: vector[],
                 counter_timestamps: vector[],
                 counter_call_count: 0,
@@ -154,6 +156,11 @@ module admin::transaction_context_test {
         multisig_account::create_transaction(s, multisig_account, payload);
 
         store.multisig_address = multisig_account;
+    }
+
+    public entry fun store_is_encrypted_txn(_s: &signer) acquires TransactionContextStore {
+        let store = borrow_global_mut<TransactionContextStore>(@admin);
+        store.is_encrypted_txn = transaction_context::is_encrypted_txn();
     }
 
     // ===== Monotonically Increasing Counter Tests =====
