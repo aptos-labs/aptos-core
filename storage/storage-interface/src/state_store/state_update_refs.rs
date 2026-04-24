@@ -64,7 +64,9 @@ impl<'kv> PerVersionStateUpdateRefs<'kv> {
         Self {
             first_version,
             shards: shards.map(|mut shard| {
-                // Release over-allocated memory during construction.
+                // Sort by `(version, key_hash)` — the canonical order for hot state LRU insertions.
+                shard.sort_by_key(|(k, u)| (u.version, *k.crypto_hash_ref()));
+                // Release the over-allocation from `Vec::with_capacity` above.
                 shard.shrink_to_fit();
                 shard
             }),
@@ -412,5 +414,44 @@ mod tests {
         verify_batching(for_latest, "A", 11, "A1");
         verify_batching(for_latest, "B", 10, "B0");
         verify_batching(for_latest, "C", 12, "C2");
+    }
+
+    /// Each shard's per-version vec must be ordered by `(version, key_hash)`.
+    /// This is the order in which `State::update` inserts keys into
+    /// `HotStateLRU`, and must match `assemble_lru_chain` in
+    /// `storage/aptosdb/src/state_kv_db.rs`, which rebuilds the LRU on restart
+    /// by sorting loaded entries on the same tuple. Otherwise the chain
+    /// produced for same-version keys at runtime would not survive a restart.
+    #[test]
+    fn test_per_version_shards_ordered_by_version_then_hash() {
+        // Use many byte-pattern keys so that (a) every shard receives multiple
+        // entries per version, and (b) `StateKey` byte order (which is what
+        // `WriteSet`'s `BTreeMap` iterates in) is essentially independent of
+        // `HashValue` order within each shard.
+        let k0: Vec<_> = (0..=255u8).map(|b| format!("k0_{:02x}", b)).collect();
+        let k1: Vec<_> = (0..=255u8).map(|b| format!("k1_{:02x}", b)).collect();
+        let v0_pairs: Vec<_> = k0.iter().map(|k| (k.as_str(), "v0")).collect();
+        let v1_pairs: Vec<_> = k1.iter().map(|k| (k.as_str(), "v1")).collect();
+
+        let ws0 = write_set(&v0_pairs);
+        let ws1 = write_set(&v1_pairs);
+        let ret = StateUpdateRefs::index_write_sets(0, vec![&ws0, &ws1], 2, vec![]);
+        let per_version = ret.for_latest_per_version().unwrap();
+
+        for (shard_id, shard) in per_version.shards.iter().enumerate() {
+            for pair in shard.windows(2) {
+                let a = (pair[0].1.version, *pair[0].0.crypto_hash_ref());
+                let b = (pair[1].1.version, *pair[1].0.crypto_hash_ref());
+                assert!(
+                    a < b,
+                    "shard {shard_id}: per-version entries not in (version, key_hash) \
+                     order: {:?} (version={}) followed by {:?} (version={})",
+                    pair[0].0,
+                    pair[0].1.version,
+                    pair[1].0,
+                    pair[1].1.version,
+                );
+            }
+        }
     }
 }
