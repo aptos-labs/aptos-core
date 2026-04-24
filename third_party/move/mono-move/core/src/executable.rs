@@ -119,6 +119,7 @@ struct ExecutableData {
     /// Non-generic struct definitions.
     structs: UnorderedMap<GlobalArenaPtr<str>, StructType>,
     /// Non-generic enum definitions.
+    #[allow(dead_code)]
     enums: UnorderedMap<GlobalArenaPtr<str>, EnumType>,
     /// Non-generic functions.
     functions: UnorderedMap<GlobalArenaPtr<str>, ExecutableArenaPtr<Function>>,
