@@ -2,7 +2,9 @@
 // Licensed pursuant to the Innovation-Enabling Source Code License, available at https://github.com/aptos-labs/aptos-core/blob/main/LICENSE
 
 use anyhow::anyhow;
-use aptos_config::config::{NodeConfig, DEFAULT_EXECUTION_CONCURRENCY_LEVEL};
+use aptos_config::config::{
+    NodeConfig, DEFAULT_EXECUTION_CONCURRENCY_LEVEL, DEFAULT_NATIVE_RAYON_CONCURRENCY_LEVEL,
+};
 #[cfg(unix)]
 use aptos_logger::prelude::*;
 use aptos_storage_interface::{
@@ -60,6 +62,14 @@ pub fn set_aptos_vm_configurations(node_config: &NodeConfig) {
         node_config.execution.concurrency_level
     };
     AptosVM::set_concurrency_level_once(effective_concurrency_level as usize);
+
+    let native_rayon_threads = if node_config.execution.native_rayon_concurrency_level == 0 {
+        DEFAULT_NATIVE_RAYON_CONCURRENCY_LEVEL
+    } else {
+        node_config.execution.native_rayon_concurrency_level
+    };
+    AptosVM::init_native_rayon_pool_once(native_rayon_threads as usize);
+
     AptosVM::set_discard_failed_blocks(node_config.execution.discard_failed_blocks);
     AptosVM::set_num_proof_reading_threads_once(
         node_config.execution.num_proof_reading_threads as usize,

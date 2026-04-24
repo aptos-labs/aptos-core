@@ -19,6 +19,10 @@ use std::{
 // Default execution concurrency level
 pub const DEFAULT_EXECUTION_CONCURRENCY_LEVEL: u16 = 16;
 
+// Default native rayon pool concurrency level. This pool is isolation-oriented
+// rather than performance-oriented, so the default is conservative.
+pub const DEFAULT_NATIVE_RAYON_CONCURRENCY_LEVEL: u16 = 1;
+
 // Genesis constants
 const GENESIS_BLOB_FILENAME: &str = "genesis.blob";
 const GENESIS_VERSION: u64 = 0;
@@ -38,6 +42,12 @@ pub struct ExecutionConfig {
     /// Number of threads to run execution.
     /// If 0, we use min of (num of cores/2, DEFAULT_CONCURRENCY_LEVEL) as default concurrency level
     pub concurrency_level: u16,
+    /// Number of threads in the dedicated rayon pool used by Move native
+    /// functions that spawn rayon work (e.g. multi-scalar-mul, pairings).
+    /// This pool is isolated from the block-executor's `par_exec` pool to
+    /// prevent nested-rayon reentrancy deadlocks.
+    /// If 0, defaults to `DEFAULT_NATIVE_RAYON_CONCURRENCY_LEVEL`.
+    pub native_rayon_concurrency_level: u16,
     /// Number of threads to read proofs
     pub num_proof_reading_threads: u16,
     /// Enables paranoid mode for types, which adds extra runtime VM checks
@@ -84,6 +94,7 @@ impl Default for ExecutionConfig {
             genesis_file_location: PathBuf::new(),
             // use min of (num of cores/2, DEFAULT_CONCURRENCY_LEVEL) as default concurrency level
             concurrency_level: 0,
+            native_rayon_concurrency_level: 0,
             num_proof_reading_threads: 32,
             paranoid_type_verification: true,
             paranoid_hot_potato_verification: true,
