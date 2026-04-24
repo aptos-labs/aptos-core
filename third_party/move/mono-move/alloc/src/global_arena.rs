@@ -29,7 +29,12 @@ impl<T: ?Sized> GlobalArenaPtr<T> {
     /// `const fn` so that wrappers (e.g. interned primitive-type constants)
     /// can be declared as compile-time constants without a runtime init.
     pub const fn from_static(data: &'static T) -> Self {
-        GlobalArenaPtr(NonNull::from_ref(data))
+        // SAFETY: A `&'static T` is always non-null and well-aligned, so
+        // converting it to `NonNull<T>` is sound.
+        //
+        // TODO: once the workspace MSRV is bumped to 1.89+, replace this
+        // with `NonNull::from_ref(data)` and drop the `unsafe` block.
+        GlobalArenaPtr(unsafe { NonNull::new_unchecked(data as *const T as *mut T) })
     }
 
     /// Unsafely casts this arena pointer to a reference with the specified
