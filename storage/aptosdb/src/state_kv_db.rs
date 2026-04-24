@@ -531,12 +531,14 @@ impl StateKvDb {
         Ok(entries)
     }
 
-    /// Sorts entries by `(hot_since_version, key_hash)`, assembles LRU doubly-linked list
-    /// pointers, and builds the `DashMap`. Validates the chain before returning.
+    /// Sorts entries by `(hot_since_version, key_hash)` ascending, assembles the LRU
+    /// doubly-linked list, and builds the `DashMap`. Validates the chain before returning.
+    ///
+    /// That tuple is the canonical LRU order for hot state — runtime insertions into
+    /// `HotStateLRU` must follow it, so the chain rebuilt here must match as well.
     fn assemble_lru_chain(
         mut entries: Vec<(HashValue, Version, StateSlotKind)>,
     ) -> LoadedHotStateShard {
-        // Sort by (hot_since_version, key_hash) ascending.
         // Index 0 = oldest (LRU tail), last = newest (MRU head).
         entries.sort_by(|a, b| (a.1, a.0).cmp(&(b.1, b.0)));
 
