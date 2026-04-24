@@ -16,15 +16,19 @@ Chunky DKG on-chain states and helper functions.
 -  [Function `finish`](#0x1_chunky_dkg_finish)
 -  [Function `try_clear_incomplete_session`](#0x1_chunky_dkg_try_clear_incomplete_session)
 -  [Function `incomplete_session`](#0x1_chunky_dkg_incomplete_session)
+-  [Function `last_completed_session`](#0x1_chunky_dkg_last_completed_session)
 -  [Function `session_dealer_epoch`](#0x1_chunky_dkg_session_dealer_epoch)
 -  [Function `session_start_time`](#0x1_chunky_dkg_session_start_time)
+-  [Function `is_session_started`](#0x1_chunky_dkg_is_session_started)
 -  [Specification](#@Specification_1)
     -  [Function `initialize`](#@Specification_1_initialize)
     -  [Function `start`](#@Specification_1_start)
     -  [Function `finish`](#@Specification_1_finish)
     -  [Function `try_clear_incomplete_session`](#@Specification_1_try_clear_incomplete_session)
     -  [Function `incomplete_session`](#@Specification_1_incomplete_session)
+    -  [Function `last_completed_session`](#@Specification_1_last_completed_session)
     -  [Function `session_dealer_epoch`](#@Specification_1_session_dealer_epoch)
+    -  [Function `is_session_started`](#@Specification_1_is_session_started)
 
 
 <pre><code><b>use</b> <a href="chunky_dkg_config.md#0x1_chunky_dkg_config">0x1::chunky_dkg_config</a>;
@@ -254,6 +258,10 @@ Called in genesis to initialize on-chain states.
 ## Function `start`
 
 Mark on-chain Chunky DKG state as in-progress. Notify validators to start Chunky DKG.
+Idempotent for <code>dealer_epoch</code>: if a session for this epoch has already
+been started (in_progress or last_completed), returns without
+overwriting state or re-emitting an event. This enforces the
+invariant "at most one ChunkyDKGStartEvent per epoch."
 
 
 <pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="chunky_dkg.md#0x1_chunky_dkg_start">start</a>(dealer_epoch: u64, <a href="chunky_dkg_config.md#0x1_chunky_dkg_config">chunky_dkg_config</a>: <a href="chunky_dkg_config.md#0x1_chunky_dkg_config_ChunkyDKGConfig">chunky_dkg_config::ChunkyDKGConfig</a>, dealer_validator_set: <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;<a href="validator_consensus_info.md#0x1_validator_consensus_info_ValidatorConsensusInfo">validator_consensus_info::ValidatorConsensusInfo</a>&gt;, target_validator_set: <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;<a href="validator_consensus_info.md#0x1_validator_consensus_info_ValidatorConsensusInfo">validator_consensus_info::ValidatorConsensusInfo</a>&gt;)
@@ -271,6 +279,7 @@ Mark on-chain Chunky DKG state as in-progress. Notify validators to start Chunky
     dealer_validator_set: <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;ValidatorConsensusInfo&gt;,
     target_validator_set: <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;ValidatorConsensusInfo&gt;
 ) <b>acquires</b> <a href="chunky_dkg.md#0x1_chunky_dkg_ChunkyDKGState">ChunkyDKGState</a> {
+    <b>if</b> (<a href="chunky_dkg.md#0x1_chunky_dkg_is_session_started">is_session_started</a>(dealer_epoch)) { <b>return</b> };
     <b>let</b> chunky_dkg_state = <b>borrow_global_mut</b>&lt;<a href="chunky_dkg.md#0x1_chunky_dkg_ChunkyDKGState">ChunkyDKGState</a>&gt;(@aptos_framework);
     <b>let</b> new_session_metadata = <a href="chunky_dkg.md#0x1_chunky_dkg_ChunkyDKGSessionMetadata">ChunkyDKGSessionMetadata</a> {
         dealer_epoch,
@@ -390,6 +399,35 @@ Return the incomplete Chunky DKG session state, if it exists.
 
 </details>
 
+<a id="0x1_chunky_dkg_last_completed_session"></a>
+
+## Function `last_completed_session`
+
+Return the last completed Chunky DKG session state, if any.
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="chunky_dkg.md#0x1_chunky_dkg_last_completed_session">last_completed_session</a>(): <a href="../../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_Option">option::Option</a>&lt;<a href="chunky_dkg.md#0x1_chunky_dkg_ChunkyDKGSessionState">chunky_dkg::ChunkyDKGSessionState</a>&gt;
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="chunky_dkg.md#0x1_chunky_dkg_last_completed_session">last_completed_session</a>(): Option&lt;<a href="chunky_dkg.md#0x1_chunky_dkg_ChunkyDKGSessionState">ChunkyDKGSessionState</a>&gt; <b>acquires</b> <a href="chunky_dkg.md#0x1_chunky_dkg_ChunkyDKGState">ChunkyDKGState</a> {
+    <b>if</b> (<b>exists</b>&lt;<a href="chunky_dkg.md#0x1_chunky_dkg_ChunkyDKGState">ChunkyDKGState</a>&gt;(@aptos_framework)) {
+        <b>borrow_global</b>&lt;<a href="chunky_dkg.md#0x1_chunky_dkg_ChunkyDKGState">ChunkyDKGState</a>&gt;(@aptos_framework).last_completed
+    } <b>else</b> {
+        <a href="../../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_none">option::none</a>()
+    }
+}
+</code></pre>
+
+
+
+</details>
+
 <a id="0x1_chunky_dkg_session_dealer_epoch"></a>
 
 ## Function `session_dealer_epoch`
@@ -440,6 +478,42 @@ Return the start time in microseconds of a <code><a href="chunky_dkg.md#0x1_chun
 
 </details>
 
+<a id="0x1_chunky_dkg_is_session_started"></a>
+
+## Function `is_session_started`
+
+True iff a Chunky DKG session has ever been started for <code>epoch</code>
+(in_progress for <code>epoch</code> OR last_completed for <code>epoch</code>). Used by
+<code><a href="chunky_dkg.md#0x1_chunky_dkg_start">chunky_dkg::start</a></code> to enforce "at most one ChunkyDKGStartEvent per
+epoch".
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="chunky_dkg.md#0x1_chunky_dkg_is_session_started">is_session_started</a>(epoch: u64): bool
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="chunky_dkg.md#0x1_chunky_dkg_is_session_started">is_session_started</a>(epoch: u64): bool <b>acquires</b> <a href="chunky_dkg.md#0x1_chunky_dkg_ChunkyDKGState">ChunkyDKGState</a> {
+    <b>let</b> in_prog = <a href="chunky_dkg.md#0x1_chunky_dkg_incomplete_session">incomplete_session</a>();
+    <b>if</b> (in_prog.is_some() && <a href="chunky_dkg.md#0x1_chunky_dkg_session_dealer_epoch">session_dealer_epoch</a>(in_prog.borrow()) == epoch) {
+        <b>return</b> <b>true</b>
+    };
+    <b>let</b> last = <a href="chunky_dkg.md#0x1_chunky_dkg_last_completed_session">last_completed_session</a>();
+    <b>if</b> (last.is_some() && <a href="chunky_dkg.md#0x1_chunky_dkg_session_dealer_epoch">session_dealer_epoch</a>(last.borrow()) == epoch) {
+        <b>return</b> <b>true</b>
+    };
+    <b>false</b>
+}
+</code></pre>
+
+
+
+</details>
+
 <a id="@Specification_1"></a>
 
 ## Specification
@@ -474,7 +548,12 @@ Return the start time in microseconds of a <code><a href="chunky_dkg.md#0x1_chun
 
 
 <pre><code><b>aborts_if</b> !<b>exists</b>&lt;<a href="chunky_dkg.md#0x1_chunky_dkg_ChunkyDKGState">ChunkyDKGState</a>&gt;(@aptos_framework);
-<b>aborts_if</b> !<b>exists</b>&lt;<a href="timestamp.md#0x1_timestamp_CurrentTimeMicroseconds">timestamp::CurrentTimeMicroseconds</a>&gt;(@aptos_framework);
+<b>aborts_if</b> !<a href="chunky_dkg.md#0x1_chunky_dkg_spec_is_session_started">spec_is_session_started</a>(dealer_epoch)
+    && !<b>exists</b>&lt;<a href="timestamp.md#0x1_timestamp_CurrentTimeMicroseconds">timestamp::CurrentTimeMicroseconds</a>&gt;(@aptos_framework);
+<b>ensures</b> <a href="chunky_dkg.md#0x1_chunky_dkg_spec_is_session_started">spec_is_session_started</a>(dealer_epoch);
+<b>ensures</b> <b>old</b>(<a href="chunky_dkg.md#0x1_chunky_dkg_spec_is_session_started">spec_is_session_started</a>(dealer_epoch))
+    ==&gt; <b>global</b>&lt;<a href="chunky_dkg.md#0x1_chunky_dkg_ChunkyDKGState">ChunkyDKGState</a>&gt;(@aptos_framework)
+        == <b>old</b>(<b>global</b>&lt;<a href="chunky_dkg.md#0x1_chunky_dkg_ChunkyDKGState">ChunkyDKGState</a>&gt;(@aptos_framework));
 </code></pre>
 
 
@@ -530,6 +609,27 @@ Return the start time in microseconds of a <code><a href="chunky_dkg.md#0x1_chun
 
 
 
+<a id="@Specification_1_last_completed_session"></a>
+
+### Function `last_completed_session`
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="chunky_dkg.md#0x1_chunky_dkg_last_completed_session">last_completed_session</a>(): <a href="../../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_Option">option::Option</a>&lt;<a href="chunky_dkg.md#0x1_chunky_dkg_ChunkyDKGSessionState">chunky_dkg::ChunkyDKGSessionState</a>&gt;
+</code></pre>
+
+
+
+
+<pre><code><b>aborts_if</b> <b>false</b>;
+<b>ensures</b> result == <b>if</b> (<b>exists</b>&lt;<a href="chunky_dkg.md#0x1_chunky_dkg_ChunkyDKGState">ChunkyDKGState</a>&gt;(@aptos_framework)) {
+    <b>global</b>&lt;<a href="chunky_dkg.md#0x1_chunky_dkg_ChunkyDKGState">ChunkyDKGState</a>&gt;(@aptos_framework).last_completed
+} <b>else</b> {
+    <a href="../../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_spec_none">option::spec_none</a>()
+};
+</code></pre>
+
+
+
 <a id="@Specification_1_session_dealer_epoch"></a>
 
 ### Function `session_dealer_epoch`
@@ -542,6 +642,43 @@ Return the start time in microseconds of a <code><a href="chunky_dkg.md#0x1_chun
 
 
 <pre><code><b>aborts_if</b> <b>false</b>;
+</code></pre>
+
+
+
+<a id="@Specification_1_is_session_started"></a>
+
+### Function `is_session_started`
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="chunky_dkg.md#0x1_chunky_dkg_is_session_started">is_session_started</a>(epoch: u64): bool
+</code></pre>
+
+
+
+
+<pre><code><b>aborts_if</b> <b>false</b>;
+<b>ensures</b> result == <a href="chunky_dkg.md#0x1_chunky_dkg_spec_is_session_started">spec_is_session_started</a>(epoch);
+</code></pre>
+
+
+A session has been started for <code>epoch</code> iff either the in-progress or
+the last-completed session on chain has <code>dealer_epoch == epoch</code>.
+
+
+<a id="0x1_chunky_dkg_spec_is_session_started"></a>
+
+
+<pre><code><b>fun</b> <a href="chunky_dkg.md#0x1_chunky_dkg_spec_is_session_started">spec_is_session_started</a>(epoch: u64): bool {
+   <b>exists</b>&lt;<a href="chunky_dkg.md#0x1_chunky_dkg_ChunkyDKGState">ChunkyDKGState</a>&gt;(@aptos_framework) && (
+       (<a href="../../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_is_some">option::is_some</a>(<b>global</b>&lt;<a href="chunky_dkg.md#0x1_chunky_dkg_ChunkyDKGState">ChunkyDKGState</a>&gt;(@aptos_framework).in_progress)
+        && <a href="../../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_borrow">option::borrow</a>(<b>global</b>&lt;<a href="chunky_dkg.md#0x1_chunky_dkg_ChunkyDKGState">ChunkyDKGState</a>&gt;(@aptos_framework).in_progress)
+               .metadata.dealer_epoch == epoch)
+       || (<a href="../../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_is_some">option::is_some</a>(<b>global</b>&lt;<a href="chunky_dkg.md#0x1_chunky_dkg_ChunkyDKGState">ChunkyDKGState</a>&gt;(@aptos_framework).last_completed)
+           && <a href="../../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_borrow">option::borrow</a>(<b>global</b>&lt;<a href="chunky_dkg.md#0x1_chunky_dkg_ChunkyDKGState">ChunkyDKGState</a>&gt;(@aptos_framework).last_completed)
+                  .metadata.dealer_epoch == epoch)
+   )
+}
 </code></pre>
 
 
