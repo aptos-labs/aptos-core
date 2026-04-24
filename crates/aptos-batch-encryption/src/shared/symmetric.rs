@@ -5,15 +5,13 @@
 // Licensed pursuant to the Innovation-Enabling Source Code License, available at https://github.com/aptos-labs/aptos-core/blob/main/LICENSE
 use crate::{
     errors::BatchEncryptionError,
-    group::{G1Affine, G1Config, G1Projective, G2Affine, Fq},
+    group::{G1Affine, G2Affine, Fq},
     traits::Plaintext,
 };
 use ark_std::Zero;
 use aes_gcm::{aead::Aead as _, aes::Aes128, AeadCore, Aes128Gcm, AesGcm, Key, KeySizeUser, Nonce};
 use anyhow::Result;
-use ark_ec::{hashing::{
-    curve_maps::wb::WBMap, map_to_curve_hasher::MapToCurveBasedHasher,
-}, short_weierstrass::SWCurveConfig as _, AffineRepr as _};
+use ark_ec::{short_weierstrass::SWCurveConfig as _, AffineRepr as _};
 use ark_ff::{field_hashers::{DefaultFieldHasher, HashToField}, Field as _};
 use ark_serialize::CanonicalSerialize as _;
 use ark_std::rand::{CryptoRng, RngCore};
@@ -44,6 +42,7 @@ pub struct OneTimePaddedKey(GenericArray<u8, KeySize>);
 
 impl OneTimePaddedKey {
     #[cfg(test)]
+    #[allow(dead_code)]
     pub(crate) fn blank_for_testing() -> Self {
         let blank = vec![0; 16];
         Self(GenericArray::clone_from_slice(blank.as_slice()))
@@ -59,6 +58,7 @@ pub struct SymmetricCiphertext {
 
 impl SymmetricCiphertext {
     #[cfg(test)]
+    #[allow(dead_code)]
     pub(crate) fn blank_for_testing() -> Self {
         Self {
             nonce: SymmetricNonce::default(),
@@ -168,13 +168,6 @@ pub fn hmac_kdf(
     expand_mac.update(&[0x01]);
     expand_mac.finalize().into_bytes()
 }
-
-/// Domain separation tag for hash-to-curve.
-/// This must be identical between Rust and TypeScript implementations.
-const HASH_G2_ELEMENT_DST: &[u8] = b"APTOS_BATCH_ENCRYPTION_HASH_G2_ELEMENT";
-
-/// Type alias for the hash-to-curve hasher for BLS12-381 G1.
-type G1Hasher = MapToCurveBasedHasher<G1Projective, DefaultFieldHasher<Sha256>, WBMap<G1Config>>;
 
 /// Hash a G2 element to a G1 element using the standard hash-to-curve algorithm (RFC 9380).
 /// This uses the WB (Wahby-Boneh) map.

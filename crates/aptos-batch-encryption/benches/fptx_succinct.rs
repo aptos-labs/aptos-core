@@ -43,7 +43,7 @@ pub fn encrypt(c: &mut Criterion) {
     for batch_size in [32, 128, 512, 2048] {
         let mut rng = thread_rng();
         let tc = ShamirThresholdConfig::new(1, 1);
-        let (ek, dk, _, _, _, _) =
+        let (ek, _dk, _, _, _, _) =
             FPTXSuccinct::setup_for_testing(rng.r#gen(), batch_size, 1, &tc, &tc).unwrap();
 
         let msg: String = rng
@@ -69,7 +69,7 @@ pub fn verify_ct(c: &mut Criterion) {
     for batch_size in [32, 128, 512, 2048] {
         let mut rng = thread_rng();
         let tc = ShamirThresholdConfig::new(1, 1);
-        let (ek, dk, _, _, _, _) =
+        let (ek, _dk, _, _, _, _) =
             FPTXSuccinct::setup_for_testing(rng.r#gen(), batch_size, 1, &tc, &tc).unwrap();
 
         let msg: String = String::from("hi");

@@ -1,4 +1,7 @@
 // Copyright (c) Aptos Foundation
+// SPDX-License-Identifier: Apache-2.0
+
+// Copyright (c) Aptos Foundation
 // Licensed pursuant to the Innovation-Enabling Source Code License, available at https://github.com/aptos-labs/aptos-core/blob/main/LICENSE
 use crate::{
     errors::BatchEncryptionError,
@@ -26,6 +29,7 @@ impl EncryptionKey {
     }
 
     #[cfg(test)]
+    #[allow(dead_code)]
     pub(crate) fn new_for_testing() -> Self {
         use ark_ec::AffineRepr as _;
 

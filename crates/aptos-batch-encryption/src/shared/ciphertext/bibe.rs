@@ -181,6 +181,7 @@ impl<P: Plaintext> BIBECTDecrypt<P> for BIBEDecryptionKey {
 
 #[cfg(test)]
 impl BIBECiphertext {
+    #[allow(dead_code)]
     pub(crate) fn blank_for_testing() -> Self {
         use ark_std::Zero;
 
