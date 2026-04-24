@@ -57,6 +57,8 @@ impl<T: ?Sized> Clone for ExecutableArenaPtr<T> {
     }
 }
 
+// TODO: Only needed because MicroOp derives Debug. Remove once MicroOp
+// uses a manual Debug impl or no longer stores ExecutableArenaPtr fields.
 impl<T: ?Sized> fmt::Debug for ExecutableArenaPtr<T> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(f, "ExecutableArenaPtr({:p})", self.0)

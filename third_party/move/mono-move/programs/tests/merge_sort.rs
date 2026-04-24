@@ -15,6 +15,7 @@ fn native() {
 
 #[cfg(feature = "micro-op")]
 mod micro_op {
+    use mono_move_core::NoopTransactionContext;
     use mono_move_gas::SimpleGasMeter;
     use mono_move_programs::merge_sort::{micro_op_merge_sort, shuffled_range};
     use mono_move_runtime::{read_u64, InterpreterContext, VEC_DATA_OFFSET};
@@ -24,8 +25,9 @@ mod micro_op {
         let (functions, descriptors, _arena) = micro_op_merge_sort();
         // SAFETY: Exclusive access during test setup; arena is alive.
         unsafe { mono_move_core::Function::resolve_calls(&functions) };
+        let txn_ctx = NoopTransactionContext;
         let gas_meter = SimpleGasMeter::new(u64::MAX);
-        let mut ctx = InterpreterContext::new(&descriptors, gas_meter, unsafe {
+        let mut ctx = InterpreterContext::new(&txn_ctx, &descriptors, gas_meter, unsafe {
             functions[0].unwrap().as_ref_unchecked()
         });
         let vec_ptr = ctx

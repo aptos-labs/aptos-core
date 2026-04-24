@@ -13,10 +13,13 @@ use crate::{
 use anyhow::{anyhow, bail};
 use fxhash::FxBuildHasher;
 use mono_move_alloc::{ExecutableArena, ExecutableArenaPtr, GlobalArenaPtr};
-use mono_move_core::{ExecutableId, FrameLayoutInfo, Function, SortedSafePointEntries};
+use mono_move_core::{ExecutableId, FrameLayoutInfo, Function, MicroOp, SortedSafePointEntries};
 use move_binary_format::{
     access::ModuleAccess,
-    file_format::{SignatureToken, StructDefinition, StructFieldInformation, StructHandleIndex},
+    file_format::{
+        FunctionHandleIndex, SignatureToken, StructDefinition, StructFieldInformation,
+        StructHandleIndex,
+    },
     CompiledModule,
 };
 use parking_lot::Mutex;
@@ -158,9 +161,9 @@ impl<'a, 'guard, 'ctx> ExecutableBuilder<'a, 'guard, 'ctx> {
 
         let lowered = specializer::destack_and_lower_module(self.module.clone())?;
 
-        // Indexed by definition index. Generic functions that are not
-        // lowered leave their slot as None.
-        let mut func_ptrs = vec![None; lowered.functions.len()];
+        // Handle-indexed function pointer table. Local definitions get
+        // Some(ptr); cross-module and generic handles remain None.
+        let mut func_ptrs = vec![None; self.module.function_handles.len()];
         for (def_idx, lowered_fn) in lowered.functions.into_iter().enumerate() {
             if let Some(lf) = lowered_fn {
                 let name = self
@@ -180,14 +183,50 @@ impl<'a, 'guard, 'ctx> ExecutableBuilder<'a, 'guard, 'ctx> {
                 };
                 let ptr = self.arena.alloc(func);
                 self.data.functions.insert(name, ptr);
-                func_ptrs[def_idx] = Some(ptr);
+                let handle_idx = self.module.function_defs[def_idx].function.0 as usize;
+                func_ptrs[handle_idx] = Some(ptr);
             }
         }
 
-        // Patch CallFunc to CallLocalFunc using definition-indexed func_ptrs.
-        // SAFETY: We have exclusive access — the executable is being built
-        // and no concurrent readers exist. The arena outlives the executable.
-        unsafe { Function::resolve_calls(&func_ptrs) };
+        // Resolve all CallFunc instructions in a single pass:
+        // - Local calls (entry in func_ptrs) → CallDirect
+        // - Cross-module calls (no entry in func_ptrs) → CallIndirect
+        let self_module_handle_idx = self.module.self_module_handle_idx;
+        for func_ptr in &func_ptrs {
+            let Some(mut func_ptr) = *func_ptr else {
+                continue;
+            };
+            // SAFETY: We have exclusive access — the executable is being built
+            // and no concurrent readers exist. The arena outlives the executable.
+            let func = unsafe { func_ptr.as_mut_unchecked() };
+            let code = unsafe { func.code.as_mut_unchecked() };
+            for op in code.iter_mut() {
+                if let MicroOp::CallFunc { func_id } = *op {
+                    if let Some(ptr) = func_ptrs[func_id as usize] {
+                        *op = MicroOp::CallDirect { ptr };
+                    } else {
+                        let function = self
+                            .module
+                            .function_handle_at(FunctionHandleIndex(func_id as u16));
+                        if function.module == self_module_handle_idx {
+                            bail!("unresolved local function handle {}", func_id);
+                        }
+                        let module = self.module.module_handle_at(function.module);
+                        let executable_id = self.guard.intern_address_name_internal(
+                            *self.module.address_identifier_at(module.address),
+                            self.module.identifier_at(module.name),
+                        );
+                        let func_name = self
+                            .guard
+                            .intern_identifier_internal(self.module.identifier_at(function.name));
+                        *op = MicroOp::CallIndirect {
+                            executable_id,
+                            func_name,
+                        };
+                    }
+                }
+            }
+        }
 
         Ok(Box::new(Executable {
             data: self.data,

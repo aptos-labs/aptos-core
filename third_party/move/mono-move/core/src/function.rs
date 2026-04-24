@@ -1,7 +1,10 @@
 // Copyright (c) Aptos Foundation
 // Licensed pursuant to the Innovation-Enabling Source Code License, available at https://github.com/aptos-labs/aptos-core/blob/main/LICENSE
 
-use crate::instruction::{CodeOffset, FrameOffset, MicroOp, FRAME_METADATA_SIZE};
+use crate::{
+    instruction::{CodeOffset, FrameOffset, MicroOp, FRAME_METADATA_SIZE},
+    transaction_context::FunctionResolver,
+};
 use mono_move_alloc::{ExecutableArena, ExecutableArenaPtr, GlobalArenaPtr};
 
 /// ---------------------------------------------------------------------------
@@ -223,10 +226,10 @@ impl Function {
     }
 
     /// Replaces every [`MicroOp::CallFunc`] (index-based dispatch) with
-    /// [`MicroOp::CallLocalFunc`] (direct pointer dispatch).
+    /// [`MicroOp::CallDirect`] (direct pointer dispatch).
     ///
-    /// `func_ptrs` is indexed by definition index and may contain `None`
-    /// for functions that were not lowered (e.g. generic functions).
+    /// Only used by hand-built test programs. The executable builder uses
+    /// its own rewrite pass that handles both local and cross-module calls.
     ///
     /// # Safety
     ///
@@ -244,12 +247,132 @@ impl Function {
             let code = unsafe { func.code.as_mut_unchecked() };
             for op in code.iter_mut() {
                 if let MicroOp::CallFunc { func_id } = *op {
-                    *op = MicroOp::CallLocalFunc {
-                        ptr: func_ptrs[func_id as usize]
-                            .expect("CallFunc target must be a lowered function"),
-                    };
+                    if let Some(ptr) = func_ptrs[func_id as usize] {
+                        *op = MicroOp::CallDirect { ptr };
+                    }
                 }
             }
         }
+    }
+
+    /// Replaces every [`MicroOp::CallIndirect`] (name-based dispatch) with
+    /// [`MicroOp::CallDirect`] (direct pointer dispatch) using the
+    /// provided function resolver.
+    ///
+    /// `func_ptrs` yields the functions whose code should be patched.
+    ///
+    /// # Safety
+    ///
+    /// The caller must have exclusive access to the functions and their
+    /// arena-allocated code.
+    pub unsafe fn resolve_module_calls(
+        func_ptrs: impl IntoIterator<Item = ExecutableArenaPtr<Function>>,
+        resolver: &impl FunctionResolver,
+    ) {
+        for mut func_ptr in func_ptrs {
+            // SAFETY: We have exclusive access during build — no concurrent
+            // readers exist yet. The arena is alive because the caller owns it.
+            let func = unsafe { func_ptr.as_mut_unchecked() };
+            let code = unsafe { func.code.as_mut_unchecked() };
+            for op in code.iter_mut() {
+                if let MicroOp::CallIndirect {
+                    executable_id,
+                    func_name,
+                } = *op
+                {
+                    if let Some(ptr) = resolver.resolve_function(executable_id, func_name) {
+                        *op = MicroOp::CallDirect { ptr };
+                    }
+                }
+            }
+        }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::{transaction_context::FunctionResolver, ExecutableId};
+    use mono_move_alloc::{ExecutableArena, GlobalArenaPool, GlobalArenaShard};
+    use move_core_types::account_address::AccountAddress;
+
+    /// Minimal helper: build a [`Function`] with the given code into `arena`.
+    fn make_function(
+        arena: &ExecutableArena,
+        global: &GlobalArenaShard<'_>,
+        name: &str,
+        code: Vec<MicroOp>,
+    ) -> ExecutableArenaPtr<Function> {
+        let name_ptr = global.alloc_str(name);
+        let code_ptr = arena.alloc_slice_fill_iter(code);
+        let empty_layout = FrameLayoutInfo::new(arena, std::iter::empty::<FrameOffset>());
+        let empty_safe_points =
+            SortedSafePointEntries::new(arena, std::iter::empty::<SafePointEntry>());
+        arena.alloc(Function {
+            name: name_ptr,
+            code: code_ptr,
+            args_size: 0,
+            args_and_locals_size: 8,
+            extended_frame_size: 8 + FRAME_METADATA_SIZE,
+            zero_frame: false,
+            frame_layout: empty_layout,
+            safe_point_layouts: empty_safe_points,
+        })
+    }
+
+    /// A test [`FunctionResolver`] that resolves everything to a fixed target.
+    struct FixedResolver {
+        target: ExecutableArenaPtr<Function>,
+    }
+
+    impl FunctionResolver for FixedResolver {
+        fn resolve_function(
+            &self,
+            _executable_id: GlobalArenaPtr<ExecutableId>,
+            _name: GlobalArenaPtr<str>,
+        ) -> Option<ExecutableArenaPtr<Function>> {
+            Some(self.target)
+        }
+    }
+
+    #[test]
+    fn resolve_module_calls_patches_to_call_local_func() {
+        let arena = ExecutableArena::new();
+        let global_pool = GlobalArenaPool::with_num_arenas(1);
+        let global = global_pool.lock_arena(0);
+
+        // Build the target function (just a Return).
+        let target = make_function(&arena, &global, "target", vec![MicroOp::Return]);
+
+        // Build interned pointers for the cross-module call.
+        let addr = AccountAddress::ONE;
+        let exe_name = global.alloc_str("mod_b");
+        let exe_id_ptr = global.alloc(unsafe { ExecutableId::new(addr, exe_name) });
+        let func_name = global.alloc_str("target");
+
+        // Build the caller with one CallIndirect → Return.
+        let caller = make_function(&arena, &global, "caller", vec![
+            MicroOp::CallIndirect {
+                executable_id: exe_id_ptr,
+                func_name,
+            },
+            MicroOp::Return,
+        ]);
+
+        let func_ptrs = [caller];
+        let resolver = FixedResolver { target };
+
+        unsafe {
+            Function::resolve_module_calls(func_ptrs.iter().copied(), &resolver);
+        }
+
+        // Should now be a CallDirect pointing at target.
+        let resolved_code = unsafe { func_ptrs[0].as_ref_unchecked().code.as_ref_unchecked() };
+        assert!(
+            matches!(resolved_code[0], MicroOp::CallDirect { ptr } if ptr.as_non_null() == target.as_non_null()),
+            "expected CallDirect pointing to target, got {:?}",
+            resolved_code[0]
+        );
+        assert!(matches!(resolved_code[1], MicroOp::Return));
     }
 }

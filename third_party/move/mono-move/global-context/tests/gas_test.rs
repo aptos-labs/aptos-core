@@ -3,6 +3,7 @@
 
 //! Integration tests for gas metering through the full pipeline.
 
+use mono_move_core::NoopTransactionContext;
 use mono_move_gas::SimpleGasMeter;
 use mono_move_global_context::{ExecutionGuard, GlobalContext};
 use mono_move_runtime::{ExecutionError, InterpreterContext};
@@ -44,8 +45,9 @@ module 0x1::test {
         .and_then(|e| e.get_function(fib_name))
         .expect("fib should exist");
 
+    let txn_ctx = NoopTransactionContext;
     let gas_meter = SimpleGasMeter::new(10);
-    let mut interpreter = InterpreterContext::new(&[], gas_meter, fib);
+    let mut interpreter = InterpreterContext::new(&txn_ctx, &[], gas_meter, fib);
     interpreter.set_root_arg(0, &10u64.to_le_bytes());
     let err = interpreter.run().unwrap_err();
     assert!(matches!(err, ExecutionError::GasExhausted(_)));

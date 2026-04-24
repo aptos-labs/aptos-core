@@ -15,7 +15,7 @@ use crate::{
         VEC_LENGTH_OFFSET,
     },
 };
-use mono_move_core::{DescriptorId, Function, MicroOp, FRAME_METADATA_SIZE};
+use mono_move_core::{DescriptorId, Function, MicroOp, TransactionContext, FRAME_METADATA_SIZE};
 use mono_move_gas::GasMeter;
 use rand::{rngs::StdRng, Rng, SeedableRng};
 use std::ptr::{null, NonNull};
@@ -26,6 +26,8 @@ use std::ptr::{null, NonNull};
 
 /// Interpreter context with a unified call stack and a GC-managed heap.
 pub struct InterpreterContext<'a, G: GasMeter> {
+    /// Per-transaction context (function resolution, gas counters, etc.).
+    pub(crate) txn_ctx: &'a dyn TransactionContext,
     /// Externally-provided object layout descriptors (will be replaced by execution context).
     pub(crate) descriptors: &'a [ObjectDescriptor],
     /// Externally-provided gas meter (will be replaced by execution context).
@@ -44,12 +46,18 @@ pub struct InterpreterContext<'a, G: GasMeter> {
 }
 
 impl<'a, G: GasMeter> InterpreterContext<'a, G> {
-    pub fn new(descriptors: &'a [ObjectDescriptor], gas_meter: G, entry: &Function) -> Self {
-        Self::with_heap_size(descriptors, gas_meter, entry, DEFAULT_HEAP_SIZE)
+    pub fn new(
+        txn_ctx: &'a dyn TransactionContext,
+        descriptors: &'a [ObjectDescriptor],
+        gas_meter: G,
+        entry: &Function,
+    ) -> Self {
+        Self::with_heap_size(txn_ctx, descriptors, gas_meter, entry, DEFAULT_HEAP_SIZE)
     }
 
     /// Create a new context with a custom heap size (for testing GC pressure).
     pub fn with_heap_size(
+        txn_ctx: &'a dyn TransactionContext,
         descriptors: &'a [ObjectDescriptor],
         gas_meter: G,
         entry: &Function,
@@ -77,6 +85,7 @@ impl<'a, G: GasMeter> InterpreterContext<'a, G> {
         }
 
         Self {
+            txn_ctx,
             descriptors,
             gas_meter,
             pc: 0,
@@ -210,10 +219,22 @@ impl<G: GasMeter> InterpreterContext<'_, G> {
             match *instr {
                 // ----- Control flow (set pc explicitly, return early) -----
                 MicroOp::CallFunc { .. } => {
-                    // TODO: Support cross module calls here.
-                    bail!("CallFunc must be resolved to CallLocalFunc before execution");
+                    bail!("CallFunc must be resolved before execution");
                 },
-                MicroOp::CallLocalFunc { ptr } => {
+                MicroOp::CallIndirect {
+                    executable_id,
+                    func_name,
+                } => {
+                    // Cross-module slow path, may trigger lazy module loading here.
+                    let Some(target) = self.txn_ctx.resolve_function(executable_id, func_name)
+                    else {
+                        // TODO: Once loader is in place, this should load the module
+                        // and retry resolution instead of bailing immediately.
+                        bail!("CallIndirect: function not found");
+                    };
+                    return self.call(func, fp, target.as_ref_unchecked());
+                },
+                MicroOp::CallDirect { ptr } => {
                     return self.call(func, fp, ptr.as_ref_unchecked());
                 },
 

@@ -6,8 +6,8 @@
 
 use mono_move_alloc::{ExecutableArena, GlobalArenaPtr};
 use mono_move_core::{
-    DescriptorId, FrameLayoutInfo, FrameOffset as FO, Function, MicroOp, SortedSafePointEntries,
-    FRAME_METADATA_SIZE, STRUCT_DATA_OFFSET,
+    DescriptorId, FrameLayoutInfo, FrameOffset as FO, Function, MicroOp, NoopTransactionContext,
+    SortedSafePointEntries, FRAME_METADATA_SIZE, STRUCT_DATA_OFFSET,
 };
 use mono_move_gas::SimpleGasMeter;
 use mono_move_runtime::{
@@ -61,8 +61,9 @@ fn ref_basic() {
         safe_point_layouts: SortedSafePointEntries::empty(&arena),
     })];
     let descriptors = vec![ObjectDescriptor::Trivial];
+    let txn_ctx = NoopTransactionContext;
     let gas_meter = SimpleGasMeter::new(u64::MAX);
-    let mut ctx = InterpreterContext::new(&descriptors, gas_meter, unsafe {
+    let mut ctx = InterpreterContext::new(&txn_ctx, &descriptors, gas_meter, unsafe {
         functions[0].as_ref_unchecked()
     });
     ctx.run().unwrap();
@@ -125,8 +126,9 @@ fn ref_survives_gc() {
         safe_point_layouts: SortedSafePointEntries::empty(&arena),
     })];
     let descriptors = vec![ObjectDescriptor::Trivial];
+    let txn_ctx = NoopTransactionContext;
     let gas_meter = SimpleGasMeter::new(u64::MAX);
-    let mut ctx = InterpreterContext::new(&descriptors, gas_meter, unsafe {
+    let mut ctx = InterpreterContext::new(&txn_ctx, &descriptors, gas_meter, unsafe {
         functions[0].as_ref_unchecked()
     });
     ctx.run().unwrap();
@@ -222,8 +224,9 @@ fn ref_cross_frame() {
     let functions = [Some(main_func), Some(callee_func)];
     // SAFETY: Exclusive access during test setup; arena is alive.
     unsafe { Function::resolve_calls(&functions) };
+    let txn_ctx = NoopTransactionContext;
     let gas_meter = SimpleGasMeter::new(u64::MAX);
-    let mut ctx = InterpreterContext::new(&descriptors, gas_meter, unsafe {
+    let mut ctx = InterpreterContext::new(&txn_ctx, &descriptors, gas_meter, unsafe {
         functions[0].unwrap().as_ref_unchecked()
     });
     ctx.run().unwrap();
@@ -304,8 +307,9 @@ fn ref_multiple_borrows() {
         safe_point_layouts: SortedSafePointEntries::empty(&arena),
     })];
     let descriptors = vec![ObjectDescriptor::Trivial];
+    let txn_ctx = NoopTransactionContext;
     let gas_meter = SimpleGasMeter::new(u64::MAX);
-    let mut ctx = InterpreterContext::new(&descriptors, gas_meter, unsafe {
+    let mut ctx = InterpreterContext::new(&txn_ctx, &descriptors, gas_meter, unsafe {
         functions[0].as_ref_unchecked()
     });
     ctx.run().unwrap();
@@ -371,8 +375,9 @@ fn ref_borrow_local() {
         safe_point_layouts: SortedSafePointEntries::empty(&arena),
     })];
     let descriptors = vec![ObjectDescriptor::Trivial];
+    let txn_ctx = NoopTransactionContext;
     let gas_meter = SimpleGasMeter::new(u64::MAX);
-    let mut ctx = InterpreterContext::new(&descriptors, gas_meter, unsafe {
+    let mut ctx = InterpreterContext::new(&txn_ctx, &descriptors, gas_meter, unsafe {
         functions[0].as_ref_unchecked()
     });
     ctx.run().unwrap();
@@ -461,8 +466,9 @@ fn ref_nested_vectors() {
         elem_size: 8,
         elem_pointer_offsets: vec![0],
     }];
+    let txn_ctx = NoopTransactionContext;
     let gas_meter = SimpleGasMeter::new(u64::MAX);
-    let mut ctx = InterpreterContext::new(&descriptors, gas_meter, unsafe {
+    let mut ctx = InterpreterContext::new(&txn_ctx, &descriptors, gas_meter, unsafe {
         functions[0].as_ref_unchecked()
     });
     ctx.run().unwrap();
@@ -546,8 +552,9 @@ fn ref_survives_double_gc() {
         safe_point_layouts: SortedSafePointEntries::empty(&arena),
     })];
     let descriptors = vec![ObjectDescriptor::Trivial];
+    let txn_ctx = NoopTransactionContext;
     let gas_meter = SimpleGasMeter::new(u64::MAX);
-    let mut ctx = InterpreterContext::new(&descriptors, gas_meter, unsafe {
+    let mut ctx = InterpreterContext::new(&txn_ctx, &descriptors, gas_meter, unsafe {
         functions[0].as_ref_unchecked()
     });
     ctx.run().unwrap();
@@ -610,8 +617,9 @@ fn ref_struct_field_borrow() {
         size: 16,
         pointer_offsets: vec![],
     }];
+    let txn_ctx = NoopTransactionContext;
     let gas_meter = SimpleGasMeter::new(u64::MAX);
-    let mut ctx = InterpreterContext::new(&descriptors, gas_meter, unsafe {
+    let mut ctx = InterpreterContext::new(&txn_ctx, &descriptors, gas_meter, unsafe {
         functions[0].as_ref_unchecked()
     });
     ctx.run().unwrap();
@@ -669,8 +677,9 @@ fn ref_struct_field_survives_gc() {
         size: 16,
         pointer_offsets: vec![],
     }];
+    let txn_ctx = NoopTransactionContext;
     let gas_meter = SimpleGasMeter::new(u64::MAX);
-    let mut ctx = InterpreterContext::new(&descriptors, gas_meter, unsafe {
+    let mut ctx = InterpreterContext::new(&txn_ctx, &descriptors, gas_meter, unsafe {
         functions[0].as_ref_unchecked()
     });
     ctx.run().unwrap();

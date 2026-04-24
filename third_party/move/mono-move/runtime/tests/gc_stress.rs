@@ -24,7 +24,7 @@
 use mono_move_alloc::{ExecutableArena, ExecutableArenaPtr, GlobalArenaPtr};
 use mono_move_core::{
     CodeOffset as CO, DescriptorId, FrameLayoutInfo, FrameOffset as FO, Function, MicroOp,
-    SortedSafePointEntries, STRUCT_DATA_OFFSET,
+    NoopTransactionContext, SortedSafePointEntries, STRUCT_DATA_OFFSET,
 };
 use mono_move_gas::SimpleGasMeter;
 use mono_move_runtime::{
@@ -306,8 +306,10 @@ fn gc_stress() {
     let (functions, descriptors) = make_gc_stress_program(&arena, n, max_len);
     // SAFETY: Exclusive access during test setup; arena is alive.
     unsafe { Function::resolve_calls(&functions) };
+    let txn_ctx = NoopTransactionContext;
     let gas_meter = SimpleGasMeter::new(u64::MAX);
     let mut ctx = InterpreterContext::with_heap_size(
+        &txn_ctx,
         &descriptors,
         gas_meter,
         unsafe { functions[0].unwrap().as_ref_unchecked() },

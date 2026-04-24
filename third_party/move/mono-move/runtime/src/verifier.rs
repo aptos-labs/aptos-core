@@ -272,11 +272,11 @@ impl FunctionVerifier<'_> {
             MicroOp::Return | MicroOp::ForceGC => {},
 
             MicroOp::CallFunc { .. } => {
-                // TODO: Verify that func_id is a valid function definition
+                // TODO: Verify that func_id is a valid function handle
                 // index. Requires passing the function table (or its length)
                 // into the verifier so we can bounds-check the callee index.
             },
-            MicroOp::CallLocalFunc { .. } => {},
+            MicroOp::CallIndirect { .. } | MicroOp::CallDirect { .. } => {},
 
             // ----- VecNew -----
             MicroOp::VecNew { dst } => {

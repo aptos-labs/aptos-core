@@ -9,6 +9,7 @@ mod helpers;
 const N: u64 = 1_000_000;
 
 fn bench_match_sum(c: &mut Criterion) {
+    use mono_move_core::NoopTransactionContext;
     use mono_move_gas::{NoOpGasMeter, SimpleGasMeter};
     use mono_move_programs::{
         match_sum::{micro_op_match_sum, move_bytecode_match_sum, native_match_sum},
@@ -29,12 +30,14 @@ fn bench_match_sum(c: &mut Criterion) {
 
         // plain (no gas instrumentation)
         let (functions, descriptors, _arena) = micro_op_match_sum();
+        let txn_ctx = NoopTransactionContext;
         group.bench_function("micro_op", |b| {
             b.iter_batched(
                 || {
-                    let mut ctx = InterpreterContext::new(&descriptors, NoOpGasMeter, unsafe {
-                        functions[0].as_ref_unchecked()
-                    });
+                    let mut ctx =
+                        InterpreterContext::new(&txn_ctx, &descriptors, NoOpGasMeter, unsafe {
+                            functions[0].as_ref_unchecked()
+                        });
                     ctx.set_root_arg(0, &N.to_le_bytes());
                     ctx
                 },
@@ -55,9 +58,10 @@ fn bench_match_sum(c: &mut Criterion) {
             b.iter_batched(
                 || {
                     let gas_meter = SimpleGasMeter::new(u64::MAX);
-                    let mut ctx = InterpreterContext::new(&descriptors, gas_meter, unsafe {
-                        functions_gas[0].unwrap().as_ref_unchecked()
-                    });
+                    let mut ctx =
+                        InterpreterContext::new(&txn_ctx, &descriptors, gas_meter, unsafe {
+                            functions_gas[0].unwrap().as_ref_unchecked()
+                        });
                     ctx.set_root_arg(0, &N.to_le_bytes());
                     ctx
                 },

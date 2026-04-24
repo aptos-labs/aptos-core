@@ -46,7 +46,7 @@
 //!   ```
 //!
 //!   **Call**: the compiler emits explicit micro-ops to place arguments
-//!   into the callee's frame slots. The `CallFunc`/`CallLocalFunc`
+//!   into the callee's frame slots. The `CallFunc`/`CallIndirect`/`CallDirect`
 //!   instruction itself implicitly writes the metadata `(pc, fp,
 //!   func_ptr)` at the end of the caller frame and sets `fp` to the
 //!   callee frame.
@@ -115,8 +115,8 @@
 //!   `elem_ptr_offsets` lists byte offsets *within each element* that hold
 //!   heap pointers.
 
-use crate::Function;
-use mono_move_alloc::ExecutableArenaPtr;
+use crate::{ExecutableId, Function};
+use mono_move_alloc::{ExecutableArenaPtr, GlobalArenaPtr};
 use std::fmt;
 
 // Submodules for instruction.
@@ -284,9 +284,16 @@ pub enum MicroOp {
     /// `current_fp + args_and_locals_size + FRAME_METADATA_SIZE`.
     CallFunc { func_id: u32 },
 
+    /// Call a function by module identity and name. Same calling convention
+    /// as `CallFunc`.
+    CallIndirect {
+        executable_id: GlobalArenaPtr<ExecutableId>,
+        func_name: GlobalArenaPtr<str>,
+    },
+
     /// Call a function via direct pointer. Same calling convention as
     /// `CallFunc`.
-    CallLocalFunc { ptr: ExecutableArenaPtr<Function> },
+    CallDirect { ptr: ExecutableArenaPtr<Function> },
 
     /// Return from the current function call. The compiler has already
     /// emitted micro-ops to write return values at the start of the
@@ -628,8 +635,11 @@ impl fmt::Display for MicroOp {
             MicroOp::CallFunc { func_id } => {
                 write!(f, "CallFunc #{}", func_id)
             },
-            MicroOp::CallLocalFunc { .. } => {
-                write!(f, "CallLocalFunc")
+            MicroOp::CallIndirect { .. } => {
+                write!(f, "CallIndirect")
+            },
+            MicroOp::CallDirect { .. } => {
+                write!(f, "CallDirect")
             },
             MicroOp::Return => {
                 write!(f, "Return")
@@ -981,8 +991,8 @@ mod tests {
 
     #[test]
     fn micro_op_size() {
-        // Current size is 24 bytes due to large variants (e.g.
-        // JumpGreaterEqualU64Imm). We should aim to bring this down to 16.
-        assert_eq!(std::mem::size_of::<MicroOp>(), 24);
+        // Size is 32 bytes due to CallIndirect which carries two
+        // GlobalArenaPtr fields (8 + 16 bytes). TODO: bring this down.
+        assert_eq!(std::mem::size_of::<MicroOp>(), 32);
     }
 }

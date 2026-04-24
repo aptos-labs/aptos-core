@@ -120,7 +120,7 @@ fn native_insert_remove_sequence() {
 
 #[cfg(feature = "micro-op")]
 mod micro_op {
-    use mono_move_core::Function;
+    use mono_move_core::{Function, NoopTransactionContext};
     use mono_move_gas::{GasMeter, SimpleGasMeter};
     use mono_move_programs::bst::{
         generate_ops, micro_op_bst, native_run_ops_with_results, FN_GET, FN_INSERT, FN_NEW,
@@ -186,8 +186,9 @@ mod micro_op {
         let fn_insert = unsafe { functions[FN_INSERT].unwrap().as_ref_unchecked() };
         let fn_get = unsafe { functions[FN_GET].unwrap().as_ref_unchecked() };
         let fn_remove = unsafe { functions[FN_REMOVE].unwrap().as_ref_unchecked() };
+        let txn_ctx = NoopTransactionContext;
         let gas_meter = SimpleGasMeter::new(u64::MAX);
-        let mut ctx = InterpreterContext::new(&descriptors, gas_meter, fn_new);
+        let mut ctx = InterpreterContext::new(&txn_ctx, &descriptors, gas_meter, fn_new);
         let bst = bst_new(&mut ctx, fn_new);
         let mut results = Vec::new();
         let mut i = 0;
