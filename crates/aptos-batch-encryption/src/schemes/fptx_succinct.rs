@@ -113,7 +113,7 @@ impl BatchThresholdEncryption for FPTXSuccinct {
         proofs: &Self::EvalProofsPromise,
         digest_key: &DigestKey,
     ) -> Self::EvalProofs {
-        if proofs.num_pfs() <= 1024 {
+        if digest_key.capacity() <= 1024 {
             FPTX::eval_proofs_compute_all(proofs, digest_key)
         } else {
             FPTX::eval_proofs_compute_all_vzgg_multi_point_eval(proofs, digest_key)
