@@ -1,4 +1,7 @@
 // Copyright (c) Aptos Foundation
+// SPDX-License-Identifier: Apache-2.0
+
+// Copyright (c) Aptos Foundation
 // Licensed pursuant to the Innovation-Enabling Source Code License, available at https://github.com/aptos-labs/aptos-core/blob/main/LICENSE
 use super::super::{
     digest::{Digest, EvalProofs},
@@ -196,22 +199,10 @@ impl BIBECiphertext {
 
 #[cfg(test)]
 pub mod tests {
-    use super::{BIBECTDecrypt, BIBECTEncrypt};
-    use crate::{
-        group::*,
-        schemes::fptx::FPTX,
-        shared::{
-            ciphertext::bibe::InnerCiphertext as _,
-            ids::{Id, IdSet},
-            key_derivation::BIBEDecryptionKey,
-        },
-        traits::BatchThresholdEncryption as _,
-    };
-    use aptos_crypto::arkworks::shamir::ShamirThresholdConfig;
-    use aptos_crypto::arkworks::shamir::Reconstructable;
-    use ark_std::{
-        rand::{thread_rng, Rng},
-        One, Zero,
-    };
+
+
+
+
+
 
 }
