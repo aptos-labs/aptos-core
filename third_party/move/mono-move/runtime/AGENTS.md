@@ -15,7 +15,8 @@ The runtime is at proof-of-concept stage. See `TODO.md` for the backlog of missi
 | Module | Purpose |
 |---|---|
 | `interpreter.rs` | Core interpreter loop (`step`/`run`), `InterpreterContext` (owns stack + heap + pc state), call/return protocol |
-| `heap.rs` | Bump allocator, vector/struct/enum allocation, vector growth, Cheney's copying GC |
+| `heap/mod.rs` | Bump allocator, vector/struct/enum allocation, vector growth, Cheney's copying GC |
+| `heap/pinned_roots.rs` | Auxiliary GC root set for pointers that must survive across allocations (used by `PackClosure`, native functions) |
 | `memory.rs` | `MemoryRegion` (owned 8-byte-aligned allocation), raw pointer helpers (`read_u64`, `write_ptr`, etc.) |
 | `types.rs` | `ObjectDescriptor` (GC tracing layouts), `StepResult`, layout constants (header offsets, frame metadata offsets) |
 | `verifier.rs` | Static verification of `Function` bodies before execution (frame bounds, jump targets, descriptor validity) |

@@ -22,10 +22,13 @@ pub struct LoweredFunction {
     pub handle_idx: FunctionHandleIndex,
     /// Gas-instrumented micro-ops.
     pub code: Vec<MicroOp>,
+    /// Byte size of each parameter, in declaration order. `param_sizes_sum`
+    /// is the sum of these.
+    pub param_sizes: Vec<u32>,
     /// Size of the argument region at the start of the frame.
-    pub args_size: usize,
+    pub param_sizes_sum: usize,
     /// Size of the arguments + locals region.
-    pub args_and_locals_size: usize,
+    pub param_and_local_sizes_sum: usize,
     /// Total frame footprint (args + locals + metadata + callee slots).
     pub extended_frame_size: usize,
 }

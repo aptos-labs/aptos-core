@@ -37,7 +37,7 @@
 //!                 caller frame                           callee frame
 //!     ┌──────────────────────────────────┐   ┌──────────────────────────────┐
 //!     │                        │ saved  ││   │                              │
-//!     │  caller slots          │  pc    ││   │  arg slots  │  other slots   │
+//!     │  caller slots          │  pc    ││   │  params     │  other slots   │
 //!     │                        │  fp    ││   │                              │
 //!     │                        │func_ptr││   │                              │
 //!     └──────────────────────────────────┘   └──────────────────────────────┘
@@ -46,13 +46,13 @@
 //!   ```
 //!
 //!   **Call**: the compiler emits explicit micro-ops to place arguments
-//!   into the callee's frame slots. The `CallFunc`/`CallIndirect`/`CallDirect`
+//!   into the callee's parameter region. The `CallFunc`/`CallIndirect`/`CallDirect`
 //!   instruction itself implicitly writes the metadata `(pc, fp,
 //!   func_ptr)` at the end of the caller frame and sets `fp` to the
 //!   callee frame.
 //!   **Return**: the compiler emits explicit micro-ops to write return
 //!   values at the start of the callee's frame (potentially overwriting
-//!   arg slots). The `Return` instruction itself implicitly restores
+//!   parameter slots). The `Return` instruction itself implicitly restores
 //!   `pc`/`fp` from the metadata at `fp - FRAME_METADATA_SIZE`.
 //!
 //! ## Design decisions to revisit
@@ -176,7 +176,66 @@ impl std::fmt::Display for DescriptorId {
     }
 }
 
-#[derive(Copy, Clone, Debug)]
+/// A sized view into a frame slot: its byte offset and width.
+//
+// TODO: reconcile with `SlotInfo` (same shape, different provenance).
+// Also: add alignment information once the layout admits non-8-byte
+// fields, otherwise callers that pack `SizedSlot`s back-to-back (e.g.
+// captured data) will produce mis-aligned fields.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct SizedSlot {
+    pub offset: FrameOffset,
+    pub size: u32,
+}
+
+/// Reference to the target function of a closure.
+///
+/// Conceptually an enum. The concrete in-memory representation of this enum
+/// (tag size, padding, payload layout) inside closure heap objects is given
+/// by [`CLOSURE_FUNC_REF_SIZE`] and associated constants.
+#[derive(Clone, Debug)]
+pub enum ClosureFuncRef {
+    /// Local function, already monomorphized and materialized.
+    Resolved(ExecutableArenaPtr<Function>),
+    // `Unresolved { ... }` — cross-module form, TBD. Resolved lazily at call
+    // time. Its payload will mirror whatever representation cross-module
+    // calls end up using.
+}
+
+/// Operand data for [`MicroOp::PackClosure`].
+///
+/// Boxed so the micro-op enum stays small despite the variable-length
+/// `captured` list.
+#[derive(Clone, Debug)]
+pub struct PackClosureOp {
+    /// Frame slot that receives the heap pointer to the closure object.
+    pub dst: FrameOffset,
+    /// Target function.
+    pub func_ref: ClosureFuncRef,
+    /// Bitmask of which function parameters are captured vs provided.
+    pub mask: u64,
+    /// Descriptor for the allocated closure object.
+    pub closure_descriptor_id: DescriptorId,
+    /// Descriptor for the allocated `ClosureCapturedData` (Materialized) object.
+    pub captured_data_descriptor_id: DescriptorId,
+    /// Sources (in caller's frame) of the captured values, in the order that
+    /// `mask.is_captured(i)` is true — i.e. ascending `i` through the
+    /// function's parameter list.
+    pub captured: Vec<SizedSlot>,
+}
+
+/// Operand data for [`MicroOp::CallClosure`].
+#[derive(Clone, Debug)]
+pub struct CallClosureOp {
+    /// Frame slot holding the closure heap pointer.
+    pub closure_src: FrameOffset,
+    /// Sources (in caller's frame) of the provided (non-captured) arguments,
+    /// in the order that `mask.is_captured(i)` is false — i.e. ascending `i`
+    /// through the function's parameter list.
+    pub provided_args: Vec<SizedSlot>,
+}
+
+#[derive(Clone, Debug)]
 pub enum MicroOp {
     //======================================================================
     // Data movement
@@ -278,10 +337,10 @@ pub enum MicroOp {
     // - something for enum dispatch (jump table)?
     //======================================================================
     /// Call function `func_id`. The compiler has already emitted micro-ops
-    /// to place arguments into the callee's frame. This instruction
+    /// to place arguments into the callee's parameter region. This instruction
     /// implicitly writes the metadata `(pc, fp, func_ptr)` at
-    /// `current_fp + args_and_locals_size` and sets `fp` to
-    /// `current_fp + args_and_locals_size + FRAME_METADATA_SIZE`.
+    /// `current_fp + param_and_local_sizes_sum` and sets `fp` to
+    /// `current_fp + param_and_local_sizes_sum + FRAME_METADATA_SIZE`.
     CallFunc { func_id: u32 },
 
     /// Call a function by module identity and name. Same calling convention
@@ -597,9 +656,32 @@ pub enum MicroOp {
     //   including signed casts.
     // - **Boolean**: logical Not, And, Or (distinct from bitwise).
     // - **Global storage**: MoveTo, MoveFrom, BorrowGlobal, Exists.
-    // - **Closures / function values**
     // - **Runtime instrumentation**: tracing, profiling, coverage hooks.
     //======================================================================
+
+    //======================================================================
+    // Closures / function values
+    //======================================================================
+    // Two fused super-instructions. Both carry variable-length data and are
+    // boxed so the base `MicroOp` enum stays small. The closure runtime
+    // representation is a two-level heap object: a closure object that
+    // points to a separate `ClosureCapturedData` object.
+    //======================================================================
+    /// Pack a closure. Allocates the closure object and a fresh
+    /// `ClosureCapturedData` (Materialized) object, copies captured values
+    /// into the latter, and writes the closure heap pointer to `dst`.
+    /// **MAY TRIGGER GC** (two allocations).
+    PackClosure(Box<PackClosureOp>),
+
+    /// Call a closure. Reads the closure at `closure_src`, interleaves its
+    /// captured values with the provided arguments into the callee's
+    /// parameter region (using the mask and the callee's `param_sizes`),
+    /// then performs the standard call protocol.
+    ///
+    /// For v0 this only supports `ClosureFuncRef::Resolved` closures whose
+    /// captured data is `Materialized`. A raw-captured-data path (for
+    /// closures loaded from storage) is future work.
+    CallClosure(Box<CallClosureOp>),
 }
 
 impl fmt::Display for MicroOp {
@@ -836,6 +918,34 @@ impl fmt::Display for MicroOp {
             MicroOp::Charge { cost } => {
                 write!(f, "Charge #{}", cost)
             },
+            MicroOp::PackClosure(op) => {
+                write!(
+                    f,
+                    "PackClosure [{}] <- func_ref={:?}, mask={:b}, closure_desc={}, captured_desc={}, captured=[",
+                    op.dst.0, op.func_ref, op.mask, op.closure_descriptor_id, op.captured_data_descriptor_id
+                )?;
+                for (i, slot) in op.captured.iter().enumerate() {
+                    if i > 0 {
+                        write!(f, ", ")?;
+                    }
+                    write!(f, "[{}]({})", slot.offset.0, slot.size)?;
+                }
+                write!(f, "]")
+            },
+            MicroOp::CallClosure(op) => {
+                write!(
+                    f,
+                    "CallClosure closure=[{}], provided_args=[",
+                    op.closure_src.0
+                )?;
+                for (i, slot) in op.provided_args.iter().enumerate() {
+                    if i > 0 {
+                        write!(f, ", ")?;
+                    }
+                    write!(f, "[{}]({})", slot.offset.0, slot.size)?;
+                }
+                write!(f, "]")
+            },
         }
     }
 }
@@ -858,6 +968,71 @@ pub const ENUM_TAG_OFFSET: usize = OBJECT_HEADER_SIZE; // 8
 
 /// Offset where enum variant field data begins (after header + tag).
 pub const ENUM_DATA_OFFSET: usize = OBJECT_HEADER_SIZE + 8; // 16
+
+// ---------------------------------------------------------------------------
+// Closure object layout
+// ---------------------------------------------------------------------------
+//
+// Closure object (heap-allocated, fixed size):
+//
+//   [header(8)] [func_ref(16)] [mask(8)] [captured_data_ptr(8)]  = 40 bytes
+//
+// `func_ref` is an inline `ClosureFuncRef` enum. Reserved as 16 bytes to
+// leave room for a future `Unresolved` variant; v0 uses only `Resolved`:
+//
+//   within func_ref:
+//     offset 0:  tag (u8)   — FUNC_REF_TAG_RESOLVED = 0
+//     offset 1:  padding (7 bytes)
+//     offset 8:  payload (8-byte pointer)
+
+/// Reserved size for an inline `ClosureFuncRef` inside a closure heap object.
+/// Sized to accommodate a future `Unresolved` variant without on-disk layout
+/// changes.
+pub const CLOSURE_FUNC_REF_SIZE: usize = 16;
+
+/// Offset of the `func_ref` field within a closure heap object (after header).
+pub const CLOSURE_FUNC_REF_OFFSET: usize = OBJECT_HEADER_SIZE; // 8
+
+/// Offset of the `mask` field within a closure heap object.
+pub const CLOSURE_MASK_OFFSET: usize = CLOSURE_FUNC_REF_OFFSET + CLOSURE_FUNC_REF_SIZE; // 24
+
+/// Offset of the `captured_data_ptr` field within a closure heap object.
+/// The GC traces this slot (heap pointer to the `ClosureCapturedData` object).
+pub const CLOSURE_CAPTURED_DATA_PTR_OFFSET: usize = CLOSURE_MASK_OFFSET + 8; // 32
+
+/// Total size of a closure heap object (header + payload).
+pub const CLOSURE_OBJECT_SIZE: usize = CLOSURE_CAPTURED_DATA_PTR_OFFSET + 8; // 40
+
+// Offsets within the `func_ref` region.
+/// Byte offset of the tag within `func_ref`.
+pub const FUNC_REF_TAG_OFFSET: usize = 0;
+/// Byte offset of the payload within `func_ref`.
+pub const FUNC_REF_PAYLOAD_OFFSET: usize = 8;
+
+/// `ClosureFuncRef::Resolved` tag value.
+pub const FUNC_REF_TAG_RESOLVED: u8 = 0;
+// Future: `FUNC_REF_TAG_UNRESOLVED: u8 = 1`
+
+// ---------------------------------------------------------------------------
+// ClosureCapturedData object layout (Materialized)
+// ---------------------------------------------------------------------------
+//
+//   [header(8)] [tag(1)] [padding(7)] [captured values packed in param order]
+//
+// Captured values are packed tightly, in the order of their parameter
+// positions (i.e. ascending `i` where `mask.is_captured(i)` is true).
+// Total count is implied by `mask.captured_count()`. Individual sizes are
+// read from the target function's `param_sizes` at call time.
+
+/// Byte offset of the tag (u8) within a `ClosureCapturedData` heap object.
+pub const CAPTURED_DATA_TAG_OFFSET: usize = OBJECT_HEADER_SIZE; // 8
+
+/// Byte offset where captured values begin (after header + tag + padding).
+pub const CAPTURED_DATA_VALUES_OFFSET: usize = OBJECT_HEADER_SIZE + 8; // 16
+
+/// `ClosureCapturedData::Materialized` tag value.
+pub const CAPTURED_DATA_TAG_MATERIALIZED: u8 = 0;
+// Future: `CAPTURED_DATA_TAG_RAW: u8 = 1`
 
 impl MicroOp {
     // ----- Struct helpers (offsets relative to STRUCT_DATA_OFFSET) -----

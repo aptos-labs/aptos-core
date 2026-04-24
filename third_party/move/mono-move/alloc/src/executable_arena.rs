@@ -48,6 +48,15 @@ impl<T: ?Sized> ExecutableArenaPtr<T> {
     }
 }
 
+impl<T> ExecutableArenaPtr<[T]> {
+    /// Returns a pointer to an empty slice. No arena allocation occurs —
+    /// this is backed by a static empty slice, so `as_ref_unchecked`
+    /// always yields a valid `&[T]` with zero elements.
+    pub fn empty_slice() -> Self {
+        Self(NonNull::from(&[] as &[T]))
+    }
+}
+
 // This type can be duplicated using bitwise copy.
 impl<T: ?Sized> Copy for ExecutableArenaPtr<T> {}
 
@@ -120,6 +129,11 @@ impl ExecutableArena {
     }
 
     /// Allocates a slice in the arena from an exact-size iterator.
+    ///
+    /// Accepts any `IntoIterator` with an exact-size iterator, including
+    /// `Vec<T>`, arrays, and `std::iter::empty()`. Use [`Self::alloc_slice_copy`]
+    /// instead when you have a `&[T]` of `Copy` values — that path can use a
+    /// `memcpy` rather than walking the iterator element-by-element.
     ///
     /// ## Panics
     ///

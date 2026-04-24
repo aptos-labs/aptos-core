@@ -30,7 +30,7 @@ pub struct FrameLayoutInfo {
     /// offset and is not listed.
     ///
     /// Offsets must not fall in the metadata segment
-    /// (`args_and_locals_size..args_and_locals_size + FRAME_METADATA_SIZE`).
+    /// (`param_and_local_sizes_sum..param_and_local_sizes_sum + FRAME_METADATA_SIZE`).
     pub heap_ptr_offsets: ExecutableArenaPtr<[FrameOffset]>,
 }
 
@@ -47,9 +47,12 @@ impl FrameLayoutInfo {
         }
     }
 
-    /// Create an empty `FrameLayoutInfo` (no pointer offsets).
-    pub fn empty(arena: &ExecutableArena) -> Self {
-        Self::new(arena, std::iter::empty::<FrameOffset>())
+    /// Create an empty `FrameLayoutInfo` (no pointer offsets). Does not
+    /// require an arena: backed by a static empty slice.
+    pub fn empty() -> Self {
+        Self {
+            heap_ptr_offsets: ExecutableArenaPtr::empty_slice(),
+        }
     }
 }
 
@@ -63,7 +66,7 @@ impl FrameLayoutInfo {
 /// - **Call return sites**: when a callee triggers GC, the caller's
 ///   saved PC is `call_pc + 1`. The safe point for a caller frame is
 ///   the instruction *after* the call — at that point, the shared
-///   arg/return region holds return values, not args.
+///   arg/return region holds return values, not arguments.
 pub struct SafePointEntry {
     pub code_offset: CodeOffset,
     pub layout: FrameLayoutInfo,
@@ -94,9 +97,12 @@ impl SortedSafePointEntries {
         }
     }
 
-    /// Create an empty `SortedSafePointEntries`.
-    pub fn empty(arena: &ExecutableArena) -> Self {
-        Self::new(arena, std::iter::empty::<SafePointEntry>())
+    /// Create an empty `SortedSafePointEntries`. Does not require an arena:
+    /// backed by a static empty slice.
+    pub fn empty() -> Self {
+        Self {
+            entries: ExecutableArenaPtr::empty_slice(),
+        }
     }
 
     /// Look up the safe-point layout for a given code offset, if one exists.
@@ -129,53 +135,70 @@ impl SortedSafePointEntries {
 /// Frame layout (fp-relative):
 ///
 /// ```text
-///   [0 .. args_size)                    arguments (written by caller)
-///   [args_size .. args_and_locals_size)          locals
-///   [args_and_locals_size .. args_and_locals_size+24)     metadata (saved_pc, saved_fp, saved_func_id)
-///   [args_and_locals_size+24 .. extended_frame_size)  callee arg/return slots
+///   [0 .. param_sizes_sum)                    parameters (written by caller as arguments)
+///   [param_sizes_sum .. param_and_local_sizes_sum)          locals
+///   [param_and_local_sizes_sum .. param_and_local_sizes_sum+24)     metadata (saved_pc, saved_fp, saved_func_id)
+///   [param_and_local_sizes_sum+24 .. extended_frame_size)  callee arg/return slots
 /// ```
 ///
-/// `extended_frame_size` == `args_and_locals_size + FRAME_METADATA_SIZE` for leaf
+/// `extended_frame_size` == `param_and_local_sizes_sum + FRAME_METADATA_SIZE` for leaf
 /// functions (no callee region).
 pub struct Function {
     pub name: GlobalArenaPtr<str>,
     pub code: ExecutableArenaPtr<[MicroOp]>,
-    /// Size of the argument region at the start of the frame.
-    /// Arguments are placed by the caller before `CallFunc`; when
-    /// `zero_frame` is true, the runtime zeroes everything beyond args
-    /// (`args_size..extended_frame_size`) at frame creation to ensure
-    /// pointer slots start as null.
-    pub args_size: usize,
-    /// Size of the arguments + locals region. Frame metadata is stored
-    /// immediately after this region at offset `args_and_locals_size`.
-    pub args_and_locals_size: usize,
+    /// Byte size of each parameter, in declaration order.
+    ///
+    /// Used by `CallClosure` (together with the closure's `ClosureMask`) to
+    /// compute each parameter's offset in the callee's parameter region and
+    /// to advance through the packed captured values. The sum of these sizes
+    /// must equal `param_sizes_sum`.
+    //
+    // TODO: this only captures sizes, not alignment. Once the layout admits
+    // non-8-byte fields, the closure-call interleaver will need per-param
+    // alignment (either encoded alongside `size` here, or as a sibling
+    // `param_alignments` slice).
+    pub param_sizes: ExecutableArenaPtr<[u32]>,
+    /// Size of the parameter region at the start of the frame.
+    /// The caller writes the corresponding arguments into this region
+    /// before `CallFunc`; when `zero_frame` is true, the runtime zeroes
+    /// everything beyond the parameter region
+    /// (`param_sizes_sum..extended_frame_size`) at frame creation to
+    /// ensure pointer slots start as null.
+    pub param_sizes_sum: usize,
+    /// Size of the parameters + locals region. Frame metadata is stored
+    /// immediately after this region at offset `param_and_local_sizes_sum`.
+    pub param_and_local_sizes_sum: usize,
     /// Total frame footprint including metadata and callee slots.
-    /// Must be >= `frame_size()` (i.e., `args_and_locals_size + FRAME_METADATA_SIZE`).
+    /// Must be >= `frame_size()` (i.e., `param_and_local_sizes_sum + FRAME_METADATA_SIZE`).
     /// For leaf functions this equals `frame_size()`; for calling functions
     /// it additionally includes callee argument / return value slots
-    /// (sized to fit the largest callee's args or return values).
+    /// (sized to fit the largest callee's arguments or return values).
     pub extended_frame_size: usize,
-    /// Whether the runtime must zero-initialize the region beyond args
-    /// (`args_size..extended_frame_size`) when a new frame is created.
-    /// This is required when `frame_layout` has pointer slots so the GC
-    /// sees null instead of garbage. Functions with no heap pointer slots
-    /// in `frame_layout` (beyond args) can set this to `false` to skip
-    /// the memset. Not needed if the function uses only per-PC layouts
-    /// and the specializer ensures slots are written before becoming
-    /// visible as pointers.
+    /// Whether the runtime must zero-initialize the region beyond
+    /// parameters (`param_sizes_sum..extended_frame_size`) when a new
+    /// frame is created. This is required when `frame_layout` has
+    /// pointer slots so the GC sees null instead of garbage. Functions
+    /// with no heap pointer slots in `frame_layout` (beyond parameters)
+    /// can set this to `false` to skip the memset. Not needed if the
+    /// function uses only per-PC layouts and the specializer ensures
+    /// slots are written before becoming visible as pointers.
+    //
+    // TODO: derive from `frame_layout` instead of taking as input.
+    // `safe_point_layouts` doesn't need zeroing — each entry already
+    // pins which slots hold valid pointers at that PC.
     pub zero_frame: bool,
     /// Base frame layout — pointer offsets that are valid at every point
     /// in the function's execution. The GC always scans these.
     ///
     /// Offsets span `[0..extended_frame_size)` — they may reference the
-    /// data segment AND the callee argument/return region beyond the
+    /// data segment AND the callee arg/return region beyond the
     /// metadata, but must NOT fall in the metadata segment itself.
     ///
     /// Invariants:
     ///
     /// - **Zeroed at frame creation**: when `zero_frame` is true, the
-    ///   runtime zeroes `args_size..extended_frame_size` when a frame
-    ///   is created, so all non-argument pointer slots (including the
+    ///   runtime zeroes `param_sizes_sum..extended_frame_size` when a frame
+    ///   is created, so all non-parameter pointer slots (including the
     ///   callee arg/return region) start as null.
     /// - **Pointer-only writes**: a pointer slot may only be
     ///   overwritten with another valid heap pointer (or null). The
@@ -208,10 +231,10 @@ pub struct Function {
 }
 
 impl Function {
-    /// The frame size including metadata: `args_and_locals_size + FRAME_METADATA_SIZE`.
-    /// This is the offset where callee arguments begin.
+    /// The frame size including metadata: `param_and_local_sizes_sum + FRAME_METADATA_SIZE`.
+    /// This is the offset where the callee arg region begins.
     pub fn frame_size(&self) -> usize {
-        self.args_and_locals_size + FRAME_METADATA_SIZE
+        self.param_and_local_sizes_sum + FRAME_METADATA_SIZE
     }
 
     /// Look up the safe-point layout for a given code offset, if one exists.
@@ -311,8 +334,9 @@ mod tests {
         arena.alloc(Function {
             name: name_ptr,
             code: code_ptr,
-            args_size: 0,
-            args_and_locals_size: 8,
+            param_sizes: ExecutableArenaPtr::empty_slice(),
+            param_sizes_sum: 0,
+            param_and_local_sizes_sum: 8,
             extended_frame_size: 8 + FRAME_METADATA_SIZE,
             zero_frame: false,
             frame_layout: empty_layout,

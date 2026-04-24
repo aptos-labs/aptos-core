@@ -37,16 +37,17 @@ pub unsafe fn gas_instrument(
             let func = unsafe { fp.as_ref_unchecked() };
             let raw = unsafe { func.code.as_ref_unchecked() };
             let instrumented = instrumentor.run(raw.to_vec());
-            let code = arena.alloc_slice_copy(&instrumented);
+            let code = arena.alloc_slice_fill_iter(instrumented);
             Some(arena.alloc(Function {
                 name: func.name,
                 code,
-                args_size: func.args_size,
-                args_and_locals_size: func.args_and_locals_size,
+                param_sizes: func.param_sizes,
+                param_sizes_sum: func.param_sizes_sum,
+                param_and_local_sizes_sum: func.param_and_local_sizes_sum,
                 extended_frame_size: func.extended_frame_size,
                 zero_frame: func.zero_frame,
-                frame_layout: FrameLayoutInfo::empty(&arena),
-                safe_point_layouts: SortedSafePointEntries::empty(&arena),
+                frame_layout: FrameLayoutInfo::empty(),
+                safe_point_layouts: SortedSafePointEntries::empty(),
             }))
         })
         .collect();

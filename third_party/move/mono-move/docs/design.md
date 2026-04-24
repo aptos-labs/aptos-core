@@ -311,13 +311,13 @@ A non-generic or monomorphized function is represented via `Function` struct. Th
 pub struct Function {
    pub name: GlobalArenaPtr<str>,
    pub code: Vec<MicroOp>,
-   /// Size of the argument region at the start of the frame.
-   pub args_size: usize,
-   /// Size of the arguments + locals region.
-   pub args_and_locals_size: usize,
+   /// Size of the parameter region at the start of the frame.
+   pub param_sizes_sum: usize,
+   /// Size of the parameters + locals region.
+   pub param_and_local_sizes_sum: usize,
    /// Total frame footprint including metadata and callee slots.
    pub extended_frame_size: usize,
-   /// Whether the runtime must zero-init the region beyond args on frame creation.
+   /// Whether the runtime must zero-init the region beyond parameters on frame creation.
    pub zero_frame: bool,
    /// Frame byte-offsets of slots that may hold heap pointers (GC roots).
    pub pointer_offsets: Vec<FrameOffset>,
@@ -327,8 +327,8 @@ pub struct Function {
 Key points:
 
 - **Type-erased**: After monomorphization, type signatures (`param_types`, `return_types`) are no longer needed at runtime. All type information is baked into concrete micro-op operand sizes and offsets.
-- **`pointer_offsets` for GC**: Each function declares which frame offsets may hold heap pointers. The GC uses these as root sets when scanning the call stack — no per-PC stack maps are needed (see `docs/heap_and_gc.md`). When `zero_frame` is true, the runtime zeroes non-argument slots on frame creation so pointer slots start as null.
-- **Frame sizing**: `args_size`, `args_and_locals_size`, and `extended_frame_size` define the frame layout precisely, including a callee arg/return region at the end for non-leaf functions.
+- **`pointer_offsets` for GC**: Each function declares which frame offsets may hold heap pointers. The GC uses these as root sets when scanning the call stack — no per-PC stack maps are needed (see `docs/heap_and_gc.md`). When `zero_frame` is true, the runtime zeroes non-parameter slots on frame creation so pointer slots start as null.
+- **Frame sizing**: `param_sizes_sum`, `param_and_local_sizes_sum`, and `extended_frame_size` define the frame layout precisely, including a callee arg/return region at the end for non-leaf functions.
 
 The full `Function` struct will eventually also include:
 
@@ -445,7 +445,7 @@ The instruction set design (principles, addressing modes, naming conventions, op
 
 ## 4.2 Stack Memory Model & Calling Convention
 
-The VM uses a unified linear stack where frame data and frame metadata coexist in one contiguous buffer. Each frame contains: arguments (written by caller), locals, 24-byte metadata (`saved_pc`, `saved_fp`, `saved_func_ptr`), and callee arg/return slots. The frame pointer (`fp`) points past the metadata, so operand access is a single `fp + offset`.
+The VM uses a unified linear stack where frame data and frame metadata coexist in one contiguous buffer. Each frame contains: parameters (written by the caller as arguments), locals, 24-byte metadata (`saved_pc`, `saved_fp`, `saved_func_ptr`), and callee arg/return slots. The frame pointer (`fp`) points past the metadata, so operand access is a single `fp + offset`.
 
 Call dispatch writes the 24-byte metadata at the end of the caller’s frame, places arguments for the callee, and advances `fp`. Return reads the metadata at `fp - 24` to restore the caller’s state. Local access uses compile-time byte offsets — no index lookups.
 

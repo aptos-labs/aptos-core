@@ -41,8 +41,8 @@ This restriction could be relaxed in the future. From the runtime's perspective,
 
 A function that is captured into a closure is the same function that can be called directly. There is no "closure-specific" variant — the same compiled micro-op sequence executes for both direct calls and closure calls. This means:
 
-1. **The caller reconstructs the full argument list.** Before calling the function (whether directly or via closure), all arguments must be placed in the callee's argument slots in the standard layout. For a direct call, the caller writes all arguments. For a closure call, the caller interleaves captured values (read from the closure heap object) with provided arguments using the mask, so that the callee's frame looks identical in both cases.
-2. **The callee is oblivious.** It executes the same code regardless of how it was invoked. It doesn't know whether its arguments came from a direct call or were partially supplied by a closure.
+1. **The caller reconstructs the full argument list.** Before calling the function (whether directly or via closure), all arguments must be placed in the callee's parameter region in the standard layout. For a direct call, the caller writes all arguments. For a closure call, the caller interleaves captured values (read from the closure heap object) with provided arguments using the mask, so that the callee's frame looks identical in both cases.
+2. **The callee is oblivious.** It executes the same code regardless of how it was invoked. It doesn't know whether its parameters were filled by a direct call or partially supplied by a closure.
 3. **No special calling convention.** This avoids duplicating function bodies or introducing closure-specific entry points.
 
 ## Runtime Design
@@ -178,22 +178,22 @@ Semantics:
 1. Read `func_ref` and `mask` from the closure heap object.
 2. If `func_ref` is unresolved, resolve it (load module, specialize, cache the result).
 3. Look up parameter sizes from the resolved `Function` to determine captured value layout.
-4. Interleave captured values (from the captured data object) and provided arguments (from the caller's frame) into the callee's argument slots, using the mask.
+4. Interleave captured values (from the captured data object) and provided arguments (from the caller's frame) into the callee's parameter region, using the mask.
 5. Perform the call (save metadata, set new fp, jump to callee).
 
 The runtime interprets the mask at call time because the caller doesn't statically know which function the closure wraps (the closure may have been passed to the caller as an argument with type `|u64| -> u64`).
 
 *TODO*: There may be additional runtime consistency checks needed at `CallClosure` time (e.g., verifying that the resolved function's signature is compatible with the provided arguments). The exact set of checks is to be determined.
 
-**Reconstructing captured value layout.** The mask tells *which* parameters are captured, but not their sizes or byte offsets within the captured data object. The runtime derives this from the resolved `Function` + `mask`: it looks up parameter sizes from the `Function` struct and combines with the mask to compute both the captured value offsets and the target argument slot positions. Alternatives considered: storing a `(offset, size)` list per captured value in the closure body (self-describing but adds overhead), or storing a pointer to a compile-time-generated layout descriptor (extra pointer per closure).
+**Reconstructing captured value layout.** The mask tells *which* parameters are captured, but not their sizes or byte offsets within the captured data object. The runtime derives this from the resolved `Function` + `mask`: it looks up parameter sizes from the `Function` struct and combines with the mask to compute both the captured value offsets and the corresponding parameter offsets in the callee. Alternatives considered: storing a `(offset, size)` list per captured value in the closure body (self-describing but adds overhead), or storing a pointer to a compile-time-generated layout descriptor (extra pointer per closure).
 
 #### Why `CallClosure` must be a fused instruction
 
 A closure is opaque at the call site — the caller only knows the closure's type signature (e.g., `|u64| -> u64`), not which function it wraps. Different closures with the same type can have different underlying functions, different masks, different numbers and sizes of captured values, and different callee frame sizes. The specializer at the `CallClosure` site cannot generate a static sequence of smaller instructions because it doesn't know:
 
 - How many bytes to read from the captured data object, or at what offsets
-- Which callee argument slots the captured values map to
-- The callee's total argument region size
+- Which callee parameter slots the captured values map to
+- The callee's total parameter region size
 
 This information is only available at runtime via `func_ref` → `Function` + `mask`. Decomposition into smaller instructions is not possible for the general case.
 

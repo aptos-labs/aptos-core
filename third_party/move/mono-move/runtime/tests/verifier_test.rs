@@ -3,7 +3,7 @@
 
 //! Tests for the static verifier (`verify_function`).
 
-use mono_move_alloc::{ExecutableArena, GlobalArenaPtr};
+use mono_move_alloc::{ExecutableArena, ExecutableArenaPtr, GlobalArenaPtr};
 use mono_move_core::{
     CodeOffset as CO, DescriptorId, FrameLayoutInfo, FrameOffset as FO, Function, MicroOp,
     SortedSafePointEntries,
@@ -14,20 +14,21 @@ fn trivial_descriptors() -> Vec<ObjectDescriptor> {
     vec![ObjectDescriptor::Trivial]
 }
 
-/// A minimal well-formed function: one `Return`, args_and_locals_size 8.
+/// A minimal well-formed function: one `Return`, param_and_local_sizes_sum 8.
 fn minimal_func(arena: &ExecutableArena) -> &Function {
     // SAFETY: Arena is alive for the duration of the test.
     unsafe {
         arena
             .alloc(Function {
                 name: GlobalArenaPtr::from_static("test"),
-                code: arena.alloc_slice_fill_iter(vec![MicroOp::Return]),
-                args_size: 0,
-                args_and_locals_size: 8,
+                code: arena.alloc_slice_fill_iter([MicroOp::Return]),
+                param_sizes: ExecutableArenaPtr::empty_slice(),
+                param_sizes_sum: 0,
+                param_and_local_sizes_sum: 8,
                 extended_frame_size: 32,
                 zero_frame: false,
-                frame_layout: FrameLayoutInfo::empty(arena),
-                safe_point_layouts: SortedSafePointEntries::empty(arena),
+                frame_layout: FrameLayoutInfo::empty(),
+                safe_point_layouts: SortedSafePointEntries::empty(),
             })
             .as_ref_unchecked()
     }
@@ -51,7 +52,7 @@ fn valid_with_arithmetic_and_jumps() {
     let arena = ExecutableArena::new();
 
     #[rustfmt::skip]
-    let code = arena.alloc_slice_fill_iter(vec![
+    let code = arena.alloc_slice_fill_iter([
         StoreImm8 { dst: FO(0), imm: 10 },
         StoreImm8 { dst: FO(8), imm: 1 },
         SubU64Imm { dst: FO(0), src: FO(0), imm: 1 },
@@ -64,12 +65,13 @@ fn valid_with_arithmetic_and_jumps() {
             .alloc(Function {
                 name: GlobalArenaPtr::from_static("test"),
                 code,
-                args_size: 0,
-                args_and_locals_size: 16,
+                param_sizes: ExecutableArenaPtr::empty_slice(),
+                param_sizes_sum: 0,
+                param_and_local_sizes_sum: 16,
                 extended_frame_size: 40,
                 zero_frame: false,
-                frame_layout: FrameLayoutInfo::empty(&arena),
-                safe_point_layouts: SortedSafePointEntries::empty(&arena),
+                frame_layout: FrameLayoutInfo::empty(),
+                safe_point_layouts: SortedSafePointEntries::empty(),
             })
             .as_ref_unchecked()
     };
@@ -84,7 +86,7 @@ fn valid_with_vec_and_pointer_slots() {
     let arena = ExecutableArena::new();
 
     #[rustfmt::skip]
-    let code = arena.alloc_slice_fill_iter(vec![
+    let code = arena.alloc_slice_fill_iter([
         VecNew { dst: FO(0) },
         SlotBorrow { dst: FO(16), local: FO(0) },
         StoreImm8 { dst: FO(8), imm: 42 },
@@ -97,12 +99,13 @@ fn valid_with_vec_and_pointer_slots() {
             .alloc(Function {
                 name: GlobalArenaPtr::from_static("test"),
                 code,
-                args_size: 0,
-                args_and_locals_size: 32,
+                param_sizes: ExecutableArenaPtr::empty_slice(),
+                param_sizes_sum: 0,
+                param_and_local_sizes_sum: 32,
                 extended_frame_size: 56,
                 zero_frame: true,
-                frame_layout: FrameLayoutInfo::new(&arena, vec![FO(0)]),
-                safe_point_layouts: SortedSafePointEntries::empty(&arena),
+                frame_layout: FrameLayoutInfo::new(&arena, [FO(0)]),
+                safe_point_layouts: SortedSafePointEntries::empty(),
             })
             .as_ref_unchecked()
     };
@@ -123,13 +126,14 @@ fn frame_bounds_store_u64() {
         arena
             .alloc(Function {
                 name: GlobalArenaPtr::from_static("test"),
-                code: arena.alloc_slice_fill_iter(vec![StoreImm8 { dst: FO(8), imm: 0 }, Return]),
-                args_and_locals_size: 8,
+                code: arena.alloc_slice_fill_iter([StoreImm8 { dst: FO(8), imm: 0 }, Return]),
+                param_sizes: ExecutableArenaPtr::empty_slice(),
+                param_and_local_sizes_sum: 8,
                 extended_frame_size: 32, // offset 8 lands in metadata [8, 32)
-                args_size: 0,
+                param_sizes_sum: 0,
                 zero_frame: false,
-                frame_layout: FrameLayoutInfo::empty(&arena),
-                safe_point_layouts: SortedSafePointEntries::empty(&arena),
+                frame_layout: FrameLayoutInfo::empty(),
+                safe_point_layouts: SortedSafePointEntries::empty(),
             })
             .as_ref_unchecked()
     };
@@ -151,7 +155,7 @@ fn frame_bounds_mov() {
         arena
             .alloc(Function {
                 name: GlobalArenaPtr::from_static("test"),
-                code: arena.alloc_slice_fill_iter(vec![
+                code: arena.alloc_slice_fill_iter([
                     Move {
                         dst: FO(8),
                         src: FO(0),
@@ -159,12 +163,13 @@ fn frame_bounds_mov() {
                     },
                     Return,
                 ]),
-                args_and_locals_size: 16,
+                param_and_local_sizes_sum: 16,
                 extended_frame_size: 40, // dst [8, 24) overlaps metadata [16, 40)
-                args_size: 0,
+                param_sizes: ExecutableArenaPtr::empty_slice(),
+                param_sizes_sum: 0,
                 zero_frame: false,
-                frame_layout: FrameLayoutInfo::empty(&arena),
-                safe_point_layouts: SortedSafePointEntries::empty(&arena),
+                frame_layout: FrameLayoutInfo::empty(),
+                safe_point_layouts: SortedSafePointEntries::empty(),
             })
             .as_ref_unchecked()
     };
@@ -184,7 +189,7 @@ fn frame_bounds_fat_ptr_write() {
         arena
             .alloc(Function {
                 name: GlobalArenaPtr::from_static("test"),
-                code: arena.alloc_slice_fill_iter(vec![
+                code: arena.alloc_slice_fill_iter([
                     StoreImm8 { dst: FO(0), imm: 0 },
                     SlotBorrow {
                         dst: FO(8),
@@ -192,12 +197,13 @@ fn frame_bounds_fat_ptr_write() {
                     },
                     Return,
                 ]),
-                args_and_locals_size: 16,
+                param_and_local_sizes_sum: 16,
                 extended_frame_size: 40, // dst [8, 24) overlaps metadata [16, 40)
-                args_size: 0,
+                param_sizes: ExecutableArenaPtr::empty_slice(),
+                param_sizes_sum: 0,
                 zero_frame: false,
-                frame_layout: FrameLayoutInfo::empty(&arena),
-                safe_point_layouts: SortedSafePointEntries::empty(&arena),
+                frame_layout: FrameLayoutInfo::empty(),
+                safe_point_layouts: SortedSafePointEntries::empty(),
             })
             .as_ref_unchecked()
     };
@@ -217,13 +223,14 @@ fn frame_bounds_callfunc_metadata() {
         arena
             .alloc(Function {
                 name: GlobalArenaPtr::from_static("test"),
-                code: arena.alloc_slice_fill_iter(vec![CallFunc { func_id: 1 }, Return]),
-                args_and_locals_size: 8,
-                extended_frame_size: 16, // args_and_locals_size 8 + 24 = 32 > 16
-                args_size: 0,
+                code: arena.alloc_slice_fill_iter([CallFunc { func_id: 1 }, Return]),
+                param_sizes: ExecutableArenaPtr::empty_slice(),
+                param_and_local_sizes_sum: 8,
+                extended_frame_size: 16, // param_and_local_sizes_sum 8 + 24 = 32 > 16
+                param_sizes_sum: 0,
                 zero_frame: false,
-                frame_layout: FrameLayoutInfo::empty(&arena),
-                safe_point_layouts: SortedSafePointEntries::empty(&arena),
+                frame_layout: FrameLayoutInfo::empty(),
+                safe_point_layouts: SortedSafePointEntries::empty(),
             })
             .as_ref_unchecked()
     };
@@ -246,13 +253,14 @@ fn pointer_slots_offset_out_of_bounds() {
         arena
             .alloc(Function {
                 name: GlobalArenaPtr::from_static("test"),
-                code: arena.alloc_slice_fill_iter(vec![MicroOp::Return]),
-                args_size: 0,
-                args_and_locals_size: 8,
+                code: arena.alloc_slice_fill_iter([MicroOp::Return]),
+                param_sizes: ExecutableArenaPtr::empty_slice(),
+                param_sizes_sum: 0,
+                param_and_local_sizes_sum: 8,
                 extended_frame_size: 32,
                 zero_frame: true,
-                frame_layout: FrameLayoutInfo::new(&arena, vec![FO(100)]), // offset 100 + 8 > extended_frame_size 32
-                safe_point_layouts: SortedSafePointEntries::empty(&arena),
+                frame_layout: FrameLayoutInfo::new(&arena, [FO(100)]), // offset 100 + 8 > extended_frame_size 32
+                safe_point_layouts: SortedSafePointEntries::empty(),
             })
             .as_ref_unchecked()
     };
@@ -271,13 +279,14 @@ fn pointer_slots_overlaps_metadata() {
         arena
             .alloc(Function {
                 name: GlobalArenaPtr::from_static("test"),
-                code: arena.alloc_slice_fill_iter(vec![MicroOp::Return]),
-                args_size: 0,
-                args_and_locals_size: 8,
+                code: arena.alloc_slice_fill_iter([MicroOp::Return]),
+                param_sizes: ExecutableArenaPtr::empty_slice(),
+                param_sizes_sum: 0,
+                param_and_local_sizes_sum: 8,
                 extended_frame_size: 40,
                 zero_frame: true,
-                frame_layout: FrameLayoutInfo::new(&arena, vec![FO(8)]), // offset 8 overlaps metadata [8, 32) since args_and_locals_size = 8
-                safe_point_layouts: SortedSafePointEntries::empty(&arena),
+                frame_layout: FrameLayoutInfo::new(&arena, [FO(8)]), // offset 8 overlaps metadata [8, 32) since param_and_local_sizes_sum = 8
+                safe_point_layouts: SortedSafePointEntries::empty(),
             })
             .as_ref_unchecked()
     };
@@ -296,19 +305,20 @@ fn args_size_exceeds_data_size() {
         arena
             .alloc(Function {
                 name: GlobalArenaPtr::from_static("test"),
-                code: arena.alloc_slice_fill_iter(vec![MicroOp::Return]),
-                args_and_locals_size: 8,
+                code: arena.alloc_slice_fill_iter([MicroOp::Return]),
+                param_sizes: ExecutableArenaPtr::empty_slice(),
+                param_and_local_sizes_sum: 8,
                 extended_frame_size: 32,
-                args_size: 16, // > args_and_locals_size 8
+                param_sizes_sum: 16, // > param_and_local_sizes_sum 8
                 zero_frame: false,
-                frame_layout: FrameLayoutInfo::empty(&arena),
-                safe_point_layouts: SortedSafePointEntries::empty(&arena),
+                frame_layout: FrameLayoutInfo::empty(),
+                safe_point_layouts: SortedSafePointEntries::empty(),
             })
             .as_ref_unchecked()
     };
     let errors = verify_function(func, &trivial_descriptors());
     assert!(!errors.is_empty());
-    assert!(errors.iter().any(|e| e.message.contains("args_size")));
+    assert!(errors.iter().any(|e| e.message.contains("param_sizes_sum")));
 }
 
 // ---------------------------------------------------------------------------
@@ -324,16 +334,17 @@ fn invalid_jump_target() {
         arena
             .alloc(Function {
                 name: GlobalArenaPtr::from_static("test"),
-                code: arena.alloc_slice_fill_iter(vec![
+                code: arena.alloc_slice_fill_iter([
                     Jump { target: CO(5) }, // only 2 instructions -> 5 >= 2
                     Return,
                 ]),
-                args_size: 0,
-                args_and_locals_size: 8,
+                param_sizes: ExecutableArenaPtr::empty_slice(),
+                param_sizes_sum: 0,
+                param_and_local_sizes_sum: 8,
                 extended_frame_size: 32,
                 zero_frame: false,
-                frame_layout: FrameLayoutInfo::empty(&arena),
-                safe_point_layouts: SortedSafePointEntries::empty(&arena),
+                frame_layout: FrameLayoutInfo::empty(),
+                safe_point_layouts: SortedSafePointEntries::empty(),
             })
             .as_ref_unchecked()
     };
@@ -351,7 +362,7 @@ fn invalid_conditional_jump_target() {
         arena
             .alloc(Function {
                 name: GlobalArenaPtr::from_static("test"),
-                code: arena.alloc_slice_fill_iter(vec![
+                code: arena.alloc_slice_fill_iter([
                     StoreImm8 { dst: FO(0), imm: 0 },
                     JumpNotZeroU64 {
                         target: CO(99),
@@ -359,12 +370,13 @@ fn invalid_conditional_jump_target() {
                     },
                     Return,
                 ]),
-                args_size: 0,
-                args_and_locals_size: 8,
+                param_sizes: ExecutableArenaPtr::empty_slice(),
+                param_sizes_sum: 0,
+                param_and_local_sizes_sum: 8,
                 extended_frame_size: 32,
                 zero_frame: false,
-                frame_layout: FrameLayoutInfo::empty(&arena),
-                safe_point_layouts: SortedSafePointEntries::empty(&arena),
+                frame_layout: FrameLayoutInfo::empty(),
+                safe_point_layouts: SortedSafePointEntries::empty(),
             })
             .as_ref_unchecked()
     };
@@ -387,13 +399,14 @@ fn invalid_callfunc_func_id() {
         arena
             .alloc(Function {
                 name: GlobalArenaPtr::from_static("test"),
-                code: arena.alloc_slice_fill_iter(vec![CallFunc { func_id: 42 }, Return]),
-                args_size: 0,
-                args_and_locals_size: 0,
+                code: arena.alloc_slice_fill_iter([CallFunc { func_id: 42 }, Return]),
+                param_sizes: ExecutableArenaPtr::empty_slice(),
+                param_sizes_sum: 0,
+                param_and_local_sizes_sum: 0,
                 extended_frame_size: 32,
                 zero_frame: false,
-                frame_layout: FrameLayoutInfo::empty(&arena),
-                safe_point_layouts: SortedSafePointEntries::empty(&arena),
+                frame_layout: FrameLayoutInfo::empty(),
+                safe_point_layouts: SortedSafePointEntries::empty(),
             })
             .as_ref_unchecked()
     };
@@ -416,7 +429,7 @@ fn invalid_descriptor_id() {
         arena
             .alloc(Function {
                 name: GlobalArenaPtr::from_static("test"),
-                code: arena.alloc_slice_fill_iter(vec![
+                code: arena.alloc_slice_fill_iter([
                     VecNew { dst: FO(0) },
                     SlotBorrow {
                         dst: FO(8),
@@ -434,12 +447,13 @@ fn invalid_descriptor_id() {
                     },
                     Return,
                 ]),
-                args_size: 0,
-                args_and_locals_size: 32,
+                param_sizes: ExecutableArenaPtr::empty_slice(),
+                param_sizes_sum: 0,
+                param_and_local_sizes_sum: 32,
                 extended_frame_size: 56,
                 zero_frame: true,
-                frame_layout: FrameLayoutInfo::new(&arena, vec![FO(0)]),
-                safe_point_layouts: SortedSafePointEntries::empty(&arena),
+                frame_layout: FrameLayoutInfo::new(&arena, [FO(0)]),
+                safe_point_layouts: SortedSafePointEntries::empty(),
             })
             .as_ref_unchecked()
     };
@@ -461,7 +475,7 @@ fn zero_size_mov() {
         arena
             .alloc(Function {
                 name: GlobalArenaPtr::from_static("test"),
-                code: arena.alloc_slice_fill_iter(vec![
+                code: arena.alloc_slice_fill_iter([
                     Move {
                         dst: FO(0),
                         src: FO(0),
@@ -469,12 +483,13 @@ fn zero_size_mov() {
                     },
                     Return,
                 ]),
-                args_size: 0,
-                args_and_locals_size: 8,
+                param_sizes: ExecutableArenaPtr::empty_slice(),
+                param_sizes_sum: 0,
+                param_and_local_sizes_sum: 8,
                 extended_frame_size: 32,
                 zero_frame: false,
-                frame_layout: FrameLayoutInfo::empty(&arena),
-                safe_point_layouts: SortedSafePointEntries::empty(&arena),
+                frame_layout: FrameLayoutInfo::empty(),
+                safe_point_layouts: SortedSafePointEntries::empty(),
             })
             .as_ref_unchecked()
     };
@@ -493,7 +508,7 @@ fn zero_elem_size_vec_push() {
         arena
             .alloc(Function {
                 name: GlobalArenaPtr::from_static("test"),
-                code: arena.alloc_slice_fill_iter(vec![
+                code: arena.alloc_slice_fill_iter([
                     VecNew { dst: FO(0) },
                     SlotBorrow {
                         dst: FO(8),
@@ -511,12 +526,13 @@ fn zero_elem_size_vec_push() {
                     },
                     Return,
                 ]),
-                args_size: 0,
-                args_and_locals_size: 32,
+                param_sizes: ExecutableArenaPtr::empty_slice(),
+                param_sizes_sum: 0,
+                param_and_local_sizes_sum: 32,
                 extended_frame_size: 56,
                 zero_frame: true,
-                frame_layout: FrameLayoutInfo::new(&arena, vec![FO(0)]),
-                safe_point_layouts: SortedSafePointEntries::empty(&arena),
+                frame_layout: FrameLayoutInfo::new(&arena, [FO(0)]),
+                safe_point_layouts: SortedSafePointEntries::empty(),
             })
             .as_ref_unchecked()
     };
@@ -537,13 +553,14 @@ fn empty_code() {
         arena
             .alloc(Function {
                 name: GlobalArenaPtr::from_static("test"),
-                code: arena.alloc_slice_fill_iter(std::iter::empty::<MicroOp>()),
-                args_size: 0,
-                args_and_locals_size: 8,
+                code: ExecutableArenaPtr::empty_slice(),
+                param_sizes: ExecutableArenaPtr::empty_slice(),
+                param_sizes_sum: 0,
+                param_and_local_sizes_sum: 8,
                 extended_frame_size: 32,
                 zero_frame: false,
-                frame_layout: FrameLayoutInfo::empty(&arena),
-                safe_point_layouts: SortedSafePointEntries::empty(&arena),
+                frame_layout: FrameLayoutInfo::empty(),
+                safe_point_layouts: SortedSafePointEntries::empty(),
             })
             .as_ref_unchecked()
     };
@@ -560,13 +577,14 @@ fn zero_frame_size() {
         arena
             .alloc(Function {
                 name: GlobalArenaPtr::from_static("test"),
-                code: arena.alloc_slice_fill_iter(vec![MicroOp::Return]),
-                args_size: 0,
-                args_and_locals_size: 0,
+                code: arena.alloc_slice_fill_iter([MicroOp::Return]),
+                param_sizes: ExecutableArenaPtr::empty_slice(),
+                param_sizes_sum: 0,
+                param_and_local_sizes_sum: 0,
                 extended_frame_size: 0,
                 zero_frame: false,
-                frame_layout: FrameLayoutInfo::empty(&arena),
-                safe_point_layouts: SortedSafePointEntries::empty(&arena),
+                frame_layout: FrameLayoutInfo::empty(),
+                safe_point_layouts: SortedSafePointEntries::empty(),
             })
             .as_ref_unchecked()
     };
@@ -588,7 +606,7 @@ fn multiple_errors_collected() {
         arena
             .alloc(Function {
                 name: GlobalArenaPtr::from_static("test"),
-                code: arena.alloc_slice_fill_iter(vec![
+                code: arena.alloc_slice_fill_iter([
                     StoreImm8 {
                         dst: FO(100),
                         imm: 0,
@@ -596,12 +614,13 @@ fn multiple_errors_collected() {
                     Jump { target: CO(99) }, // invalid target
                     Return,
                 ]),
-                args_size: 0,
-                args_and_locals_size: 8,
+                param_sizes: ExecutableArenaPtr::empty_slice(),
+                param_sizes_sum: 0,
+                param_and_local_sizes_sum: 8,
                 extended_frame_size: 32,
                 zero_frame: false,
-                frame_layout: FrameLayoutInfo::empty(&arena),
-                safe_point_layouts: SortedSafePointEntries::empty(&arena),
+                frame_layout: FrameLayoutInfo::empty(),
+                safe_point_layouts: SortedSafePointEntries::empty(),
             })
             .as_ref_unchecked()
     };

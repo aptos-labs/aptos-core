@@ -3,7 +3,7 @@
 
 //! Tests for Move enum support (heap-allocated tagged unions).
 
-use mono_move_alloc::{ExecutableArena, GlobalArenaPtr};
+use mono_move_alloc::{ExecutableArena, ExecutableArenaPtr, GlobalArenaPtr};
 use mono_move_core::{
     CodeOffset as CO, DescriptorId, FrameLayoutInfo, FrameOffset as FO, Function, MicroOp,
     NoopTransactionContext, SortedSafePointEntries, ENUM_DATA_OFFSET, ENUM_TAG_OFFSET,
@@ -28,7 +28,7 @@ fn enum_basic() {
     let arena = ExecutableArena::new();
 
     #[rustfmt::skip]
-    let code = arena.alloc_slice_fill_iter(vec![
+    let code = arena.alloc_slice_fill_iter([
         HeapNew { dst: FO(shape), descriptor_id: DescriptorId(0) },
         MicroOp::enum_set_tag(FO(shape), 1),
         StoreImm8 { dst: FO(tmp), imm: 3 },
@@ -45,14 +45,15 @@ fn enum_basic() {
     let functions = [arena.alloc(Function {
         name: GlobalArenaPtr::from_static("test"),
         code,
-        args_size: 0,
-        args_and_locals_size: 24,
+        param_sizes: ExecutableArenaPtr::empty_slice(),
+        param_sizes_sum: 0,
+        param_and_local_sizes_sum: 24,
         extended_frame_size: 48,
         zero_frame: true,
-        frame_layout: FrameLayoutInfo::new(&arena, vec![FO(shape)]),
-        safe_point_layouts: SortedSafePointEntries::empty(&arena),
+        frame_layout: FrameLayoutInfo::new(&arena, [FO(shape)]),
+        safe_point_layouts: SortedSafePointEntries::empty(),
     })];
-    let descriptors = vec![ObjectDescriptor::Enum {
+    let descriptors = [ObjectDescriptor::Enum {
         size: 24,
         variant_pointer_offsets: vec![vec![], vec![]],
     }];
@@ -89,7 +90,7 @@ fn enum_survives_gc() {
     let arena = ExecutableArena::new();
 
     #[rustfmt::skip]
-    let code = arena.alloc_slice_fill_iter(vec![
+    let code = arena.alloc_slice_fill_iter([
         HeapNew { dst: FO(shape), descriptor_id: DescriptorId(0) },
         MicroOp::enum_set_tag(FO(shape), 0),
         StoreImm8 { dst: FO(tmp), imm: 42 },
@@ -103,14 +104,15 @@ fn enum_survives_gc() {
     let functions = [arena.alloc(Function {
         name: GlobalArenaPtr::from_static("test"),
         code,
-        args_size: 0,
-        args_and_locals_size: 24,
+        param_sizes: ExecutableArenaPtr::empty_slice(),
+        param_sizes_sum: 0,
+        param_and_local_sizes_sum: 24,
         extended_frame_size: 48,
         zero_frame: true,
-        frame_layout: FrameLayoutInfo::new(&arena, vec![FO(shape)]),
-        safe_point_layouts: SortedSafePointEntries::empty(&arena),
+        frame_layout: FrameLayoutInfo::new(&arena, [FO(shape)]),
+        safe_point_layouts: SortedSafePointEntries::empty(),
     })];
-    let descriptors = vec![ObjectDescriptor::Enum {
+    let descriptors = [ObjectDescriptor::Enum {
         size: 24,
         variant_pointer_offsets: vec![vec![], vec![]],
     }];
@@ -146,7 +148,7 @@ fn enum_gc_traces_refs() {
     let arena = ExecutableArena::new();
 
     #[rustfmt::skip]
-    let code = arena.alloc_slice_fill_iter(vec![
+    let code = arena.alloc_slice_fill_iter([
         VecNew { dst: FO(vec) },
         SlotBorrow { dst: FO(vec_ref), local: FO(vec) },
         StoreImm8 { dst: FO(tmp), imm: 10 },
@@ -168,14 +170,15 @@ fn enum_gc_traces_refs() {
     let functions = [arena.alloc(Function {
         name: GlobalArenaPtr::from_static("test"),
         code,
-        args_size: 0,
-        args_and_locals_size: 48,
+        param_sizes: ExecutableArenaPtr::empty_slice(),
+        param_sizes_sum: 0,
+        param_and_local_sizes_sum: 48,
         extended_frame_size: 72,
         zero_frame: true,
-        frame_layout: FrameLayoutInfo::new(&arena, vec![FO(val), FO(vec), FO(vec_ref)]),
-        safe_point_layouts: SortedSafePointEntries::empty(&arena),
+        frame_layout: FrameLayoutInfo::new(&arena, [FO(val), FO(vec), FO(vec_ref)]),
+        safe_point_layouts: SortedSafePointEntries::empty(),
     })];
-    let descriptors = vec![
+    let descriptors = [
         ObjectDescriptor::Enum {
             size: 16,
             variant_pointer_offsets: vec![vec![], vec![0]],
@@ -221,7 +224,7 @@ fn enum_pattern_match() {
     let arena = ExecutableArena::new();
 
     #[rustfmt::skip]
-    let code = arena.alloc_slice_fill_iter(vec![
+    let code = arena.alloc_slice_fill_iter([
         HeapNew { dst: FO(op), descriptor_id: DescriptorId(0) },
         MicroOp::enum_set_tag(FO(op), 0),
         StoreImm8 { dst: FO(tmp), imm: 10 },
@@ -240,14 +243,15 @@ fn enum_pattern_match() {
     let functions = [arena.alloc(Function {
         name: GlobalArenaPtr::from_static("test"),
         code,
-        args_size: 0,
-        args_and_locals_size: 24,
+        param_sizes: ExecutableArenaPtr::empty_slice(),
+        param_sizes_sum: 0,
+        param_and_local_sizes_sum: 24,
         extended_frame_size: 48,
         zero_frame: true,
-        frame_layout: FrameLayoutInfo::new(&arena, vec![FO(op)]),
-        safe_point_layouts: SortedSafePointEntries::empty(&arena),
+        frame_layout: FrameLayoutInfo::new(&arena, [FO(op)]),
+        safe_point_layouts: SortedSafePointEntries::empty(),
     })];
-    let descriptors = vec![ObjectDescriptor::Enum {
+    let descriptors = [ObjectDescriptor::Enum {
         size: 24,
         variant_pointer_offsets: vec![vec![], vec![]],
     }];
@@ -276,7 +280,7 @@ fn enum_variant_switch() {
     let arena = ExecutableArena::new();
 
     #[rustfmt::skip]
-    let code = arena.alloc_slice_fill_iter(vec![
+    let code = arena.alloc_slice_fill_iter([
         HeapNew { dst: FO(e), descriptor_id: DescriptorId(0) },
         MicroOp::enum_set_tag(FO(e), 0),
         StoreImm8 { dst: FO(tmp), imm: 111 },
@@ -293,14 +297,15 @@ fn enum_variant_switch() {
     let functions = [arena.alloc(Function {
         name: GlobalArenaPtr::from_static("test"),
         code,
-        args_size: 0,
-        args_and_locals_size: 24,
+        param_sizes: ExecutableArenaPtr::empty_slice(),
+        param_sizes_sum: 0,
+        param_and_local_sizes_sum: 24,
         extended_frame_size: 48,
         zero_frame: true,
-        frame_layout: FrameLayoutInfo::new(&arena, vec![FO(e)]),
-        safe_point_layouts: SortedSafePointEntries::empty(&arena),
+        frame_layout: FrameLayoutInfo::new(&arena, [FO(e)]),
+        safe_point_layouts: SortedSafePointEntries::empty(),
     })];
-    let descriptors = vec![ObjectDescriptor::Enum {
+    let descriptors = [ObjectDescriptor::Enum {
         size: 16,
         variant_pointer_offsets: vec![vec![], vec![]],
     }];
@@ -330,7 +335,7 @@ fn enum_borrow_field() {
     let arena = ExecutableArena::new();
 
     #[rustfmt::skip]
-    let code = arena.alloc_slice_fill_iter(vec![
+    let code = arena.alloc_slice_fill_iter([
         HeapNew { dst: FO(e), descriptor_id: DescriptorId(0) },
         MicroOp::enum_set_tag(FO(e), 0),
         StoreImm8 { dst: FO(result), imm: 10 },
@@ -348,14 +353,15 @@ fn enum_borrow_field() {
     let functions = [arena.alloc(Function {
         name: GlobalArenaPtr::from_static("test"),
         code,
-        args_size: 0,
-        args_and_locals_size: 48,
+        param_sizes: ExecutableArenaPtr::empty_slice(),
+        param_sizes_sum: 0,
+        param_and_local_sizes_sum: 48,
         extended_frame_size: 72,
         zero_frame: true,
-        frame_layout: FrameLayoutInfo::new(&arena, vec![FO(e), FO(r#ref), FO(e_ref)]),
-        safe_point_layouts: SortedSafePointEntries::empty(&arena),
+        frame_layout: FrameLayoutInfo::new(&arena, [FO(e), FO(r#ref), FO(e_ref)]),
+        safe_point_layouts: SortedSafePointEntries::empty(),
     })];
-    let descriptors = vec![ObjectDescriptor::Enum {
+    let descriptors = [ObjectDescriptor::Enum {
         size: 24,
         variant_pointer_offsets: vec![vec![], vec![]],
     }];
@@ -386,7 +392,7 @@ fn enum_gc_variant_switching() {
     let arena = ExecutableArena::new();
 
     #[rustfmt::skip]
-    let code = arena.alloc_slice_fill_iter(vec![
+    let code = arena.alloc_slice_fill_iter([
         VecNew { dst: FO(vec) },
         SlotBorrow { dst: FO(vec_ref), local: FO(vec) },
         StoreImm8 { dst: FO(tmp), imm: 100 },
@@ -408,14 +414,15 @@ fn enum_gc_variant_switching() {
     let functions = [arena.alloc(Function {
         name: GlobalArenaPtr::from_static("test"),
         code,
-        args_size: 0,
-        args_and_locals_size: 48,
+        param_sizes: ExecutableArenaPtr::empty_slice(),
+        param_sizes_sum: 0,
+        param_and_local_sizes_sum: 48,
         extended_frame_size: 72,
         zero_frame: true,
-        frame_layout: FrameLayoutInfo::new(&arena, vec![FO(ctr), FO(vec), FO(vec_ref)]),
-        safe_point_layouts: SortedSafePointEntries::empty(&arena),
+        frame_layout: FrameLayoutInfo::new(&arena, [FO(ctr), FO(vec), FO(vec_ref)]),
+        safe_point_layouts: SortedSafePointEntries::empty(),
     })];
-    let descriptors = vec![
+    let descriptors = [
         ObjectDescriptor::Enum {
             size: 16,
             variant_pointer_offsets: vec![vec![], vec![0]],
@@ -453,7 +460,7 @@ fn enum_in_struct() {
     let arena = ExecutableArena::new();
 
     #[rustfmt::skip]
-    let code = arena.alloc_slice_fill_iter(vec![
+    let code = arena.alloc_slice_fill_iter([
         HeapNew { dst: FO(payload), descriptor_id: DescriptorId(1) },
         MicroOp::enum_set_tag(FO(payload), 1),
         StoreImm8 { dst: FO(tmp), imm: 42 },
@@ -473,14 +480,15 @@ fn enum_in_struct() {
     let functions = [arena.alloc(Function {
         name: GlobalArenaPtr::from_static("test"),
         code,
-        args_size: 0,
-        args_and_locals_size: 32,
+        param_sizes: ExecutableArenaPtr::empty_slice(),
+        param_sizes_sum: 0,
+        param_and_local_sizes_sum: 32,
         extended_frame_size: 56,
         zero_frame: true,
-        frame_layout: FrameLayoutInfo::new(&arena, vec![FO(wrapper), FO(payload)]),
-        safe_point_layouts: SortedSafePointEntries::empty(&arena),
+        frame_layout: FrameLayoutInfo::new(&arena, [FO(wrapper), FO(payload)]),
+        safe_point_layouts: SortedSafePointEntries::empty(),
     })];
-    let descriptors = vec![
+    let descriptors = [
         ObjectDescriptor::Struct {
             size: 16,
             pointer_offsets: vec![8],
@@ -522,7 +530,7 @@ fn enum_in_vector() {
     let arena = ExecutableArena::new();
 
     #[rustfmt::skip]
-    let code = arena.alloc_slice_fill_iter(vec![
+    let code = arena.alloc_slice_fill_iter([
         VecNew { dst: FO(vec) },
         SlotBorrow { dst: FO(vec_ref), local: FO(vec) },
         HeapNew { dst: FO(e), descriptor_id: DescriptorId(0) },
@@ -552,14 +560,15 @@ fn enum_in_vector() {
     let functions = [arena.alloc(Function {
         name: GlobalArenaPtr::from_static("test"),
         code,
-        args_size: 0,
-        args_and_locals_size: 48,
+        param_sizes: ExecutableArenaPtr::empty_slice(),
+        param_sizes_sum: 0,
+        param_and_local_sizes_sum: 48,
         extended_frame_size: 72,
         zero_frame: true,
-        frame_layout: FrameLayoutInfo::new(&arena, vec![FO(vec), FO(e), FO(vec_ref)]),
-        safe_point_layouts: SortedSafePointEntries::empty(&arena),
+        frame_layout: FrameLayoutInfo::new(&arena, [FO(vec), FO(e), FO(vec_ref)]),
+        safe_point_layouts: SortedSafePointEntries::empty(),
     })];
-    let descriptors = vec![
+    let descriptors = [
         ObjectDescriptor::Enum {
             size: 24,
             variant_pointer_offsets: vec![vec![], vec![]],

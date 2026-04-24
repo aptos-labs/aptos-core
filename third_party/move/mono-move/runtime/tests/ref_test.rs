@@ -4,7 +4,7 @@
 //! Tests for fat-pointer references (VecBorrow, SlotBorrow, ReadRef, WriteRef,
 //! HeapBorrow).
 
-use mono_move_alloc::{ExecutableArena, GlobalArenaPtr};
+use mono_move_alloc::{ExecutableArena, ExecutableArenaPtr, GlobalArenaPtr};
 use mono_move_core::{
     DescriptorId, FrameLayoutInfo, FrameOffset as FO, Function, MicroOp, NoopTransactionContext,
     SortedSafePointEntries, FRAME_METADATA_SIZE, STRUCT_DATA_OFFSET,
@@ -33,7 +33,7 @@ fn ref_basic() {
     let arena = ExecutableArena::new();
 
     #[rustfmt::skip]
-    let code = arena.alloc_slice_fill_iter(vec![
+    let code = arena.alloc_slice_fill_iter([
         VecNew { dst: FO(vec) },
         SlotBorrow { dst: FO(vec_ref), local: FO(vec) },
         StoreImm8 { dst: FO(tmp), imm: 10 },
@@ -53,14 +53,15 @@ fn ref_basic() {
     let functions = [arena.alloc(Function {
         name: GlobalArenaPtr::from_static("test"),
         code,
-        args_size: 0,
-        args_and_locals_size: 72,
+        param_sizes: ExecutableArenaPtr::empty_slice(),
+        param_sizes_sum: 0,
+        param_and_local_sizes_sum: 72,
         extended_frame_size: 96,
         zero_frame: true,
-        frame_layout: FrameLayoutInfo::new(&arena, vec![FO(vec), FO(r#ref), FO(vec_ref)]),
-        safe_point_layouts: SortedSafePointEntries::empty(&arena),
+        frame_layout: FrameLayoutInfo::new(&arena, [FO(vec), FO(r#ref), FO(vec_ref)]),
+        safe_point_layouts: SortedSafePointEntries::empty(),
     })];
-    let descriptors = vec![ObjectDescriptor::Trivial];
+    let descriptors = [ObjectDescriptor::Trivial];
     let txn_ctx = NoopTransactionContext;
     let gas_meter = SimpleGasMeter::new(u64::MAX);
     let mut ctx = InterpreterContext::new(&txn_ctx, &descriptors, gas_meter, unsafe {
@@ -97,7 +98,7 @@ fn ref_survives_gc() {
     let arena = ExecutableArena::new();
 
     #[rustfmt::skip]
-    let code = arena.alloc_slice_fill_iter(vec![
+    let code = arena.alloc_slice_fill_iter([
         VecNew { dst: FO(vec) },
         SlotBorrow { dst: FO(vec_ref), local: FO(vec) },
         StoreImm8 { dst: FO(tmp), imm: 100 },
@@ -118,14 +119,15 @@ fn ref_survives_gc() {
     let functions = [arena.alloc(Function {
         name: GlobalArenaPtr::from_static("test"),
         code,
-        args_size: 0,
-        args_and_locals_size: 64,
+        param_sizes: ExecutableArenaPtr::empty_slice(),
+        param_sizes_sum: 0,
+        param_and_local_sizes_sum: 64,
         extended_frame_size: 88,
         zero_frame: true,
-        frame_layout: FrameLayoutInfo::new(&arena, vec![FO(vec), FO(ref_base), FO(vec_ref)]),
-        safe_point_layouts: SortedSafePointEntries::empty(&arena),
+        frame_layout: FrameLayoutInfo::new(&arena, [FO(vec), FO(ref_base), FO(vec_ref)]),
+        safe_point_layouts: SortedSafePointEntries::empty(),
     })];
-    let descriptors = vec![ObjectDescriptor::Trivial];
+    let descriptors = [ObjectDescriptor::Trivial];
     let txn_ctx = NoopTransactionContext;
     let gas_meter = SimpleGasMeter::new(u64::MAX);
     let mut ctx = InterpreterContext::new(&txn_ctx, &descriptors, gas_meter, unsafe {
@@ -163,7 +165,7 @@ fn ref_cross_frame() {
     let arena = ExecutableArena::new();
 
     #[rustfmt::skip]
-    let callee_code = arena.alloc_slice_fill_iter(vec![
+    let callee_code = arena.alloc_slice_fill_iter([
         ForceGC,
         StoreImm8 { dst: FO(c_val), imm: 77 },
         WriteRef { ref_ptr: FO(c_ref), src: FO(c_val), size: 8 },
@@ -172,12 +174,13 @@ fn ref_cross_frame() {
     let callee_func = arena.alloc(Function {
         name: GlobalArenaPtr::from_static("test"),
         code: callee_code,
-        args_size: 16,
-        args_and_locals_size: 24,
+        param_sizes: ExecutableArenaPtr::empty_slice(),
+        param_sizes_sum: 16,
+        param_and_local_sizes_sum: 24,
         extended_frame_size: 48,
         zero_frame: true,
-        frame_layout: FrameLayoutInfo::new(&arena, vec![FO(c_ref_base)]),
-        safe_point_layouts: SortedSafePointEntries::empty(&arena),
+        frame_layout: FrameLayoutInfo::new(&arena, [FO(c_ref_base)]),
+        safe_point_layouts: SortedSafePointEntries::empty(),
     });
 
     // -- Function 0: main --
@@ -190,7 +193,7 @@ fn ref_cross_frame() {
     let m_callee_ref: u32 = m_call_site + FRAME_METADATA_SIZE as u32; // 72
 
     #[rustfmt::skip]
-    let main_code = arena.alloc_slice_fill_iter(vec![
+    let main_code = arena.alloc_slice_fill_iter([
         VecNew { dst: FO(m_vec) },
         SlotBorrow { dst: FO(m_vec_ref), local: FO(m_vec) },
         StoreImm8 { dst: FO(m_tmp), imm: 10 },
@@ -208,19 +211,16 @@ fn ref_cross_frame() {
     let main_func = arena.alloc(Function {
         name: GlobalArenaPtr::from_static("test"),
         code: main_code,
-        args_size: 0,
-        args_and_locals_size: 48,
+        param_sizes: ExecutableArenaPtr::empty_slice(),
+        param_sizes_sum: 0,
+        param_and_local_sizes_sum: 48,
         extended_frame_size: 88,
         zero_frame: true,
-        frame_layout: FrameLayoutInfo::new(&arena, vec![
-            FO(m_vec),
-            FO(m_vec_ref),
-            FO(m_callee_ref),
-        ]),
-        safe_point_layouts: SortedSafePointEntries::empty(&arena),
+        frame_layout: FrameLayoutInfo::new(&arena, [FO(m_vec), FO(m_vec_ref), FO(m_callee_ref)]),
+        safe_point_layouts: SortedSafePointEntries::empty(),
     });
 
-    let descriptors = vec![ObjectDescriptor::Trivial];
+    let descriptors = [ObjectDescriptor::Trivial];
     let functions = [Some(main_func), Some(callee_func)];
     // SAFETY: Exclusive access during test setup; arena is alive.
     unsafe { Function::resolve_calls(&functions) };
@@ -268,7 +268,7 @@ fn ref_multiple_borrows() {
     let arena = ExecutableArena::new();
 
     #[rustfmt::skip]
-    let code = arena.alloc_slice_fill_iter(vec![
+    let code = arena.alloc_slice_fill_iter([
         VecNew { dst: FO(vec) },
         SlotBorrow { dst: FO(vec_ref), local: FO(vec) },
         StoreImm8 { dst: FO(tmp), imm: 10 },
@@ -294,19 +294,20 @@ fn ref_multiple_borrows() {
     let functions = [arena.alloc(Function {
         name: GlobalArenaPtr::from_static("test"),
         code,
-        args_size: 0,
-        args_and_locals_size: 88,
+        param_sizes: ExecutableArenaPtr::empty_slice(),
+        param_sizes_sum: 0,
+        param_and_local_sizes_sum: 88,
         extended_frame_size: 112,
         zero_frame: true,
-        frame_layout: FrameLayoutInfo::new(&arena, vec![
+        frame_layout: FrameLayoutInfo::new(&arena, [
             FO(vec),
             FO(ref_a_base),
             FO(ref_b_base),
             FO(vec_ref),
         ]),
-        safe_point_layouts: SortedSafePointEntries::empty(&arena),
+        safe_point_layouts: SortedSafePointEntries::empty(),
     })];
-    let descriptors = vec![ObjectDescriptor::Trivial];
+    let descriptors = [ObjectDescriptor::Trivial];
     let txn_ctx = NoopTransactionContext;
     let gas_meter = SimpleGasMeter::new(u64::MAX);
     let mut ctx = InterpreterContext::new(&txn_ctx, &descriptors, gas_meter, unsafe {
@@ -350,7 +351,7 @@ fn ref_borrow_local() {
     let arena = ExecutableArena::new();
 
     #[rustfmt::skip]
-    let code = arena.alloc_slice_fill_iter(vec![
+    let code = arena.alloc_slice_fill_iter([
         StoreImm8 { dst: FO(local_val), imm: 42 },
         SlotBorrow { dst: FO(r#ref), local: FO(local_val) },
         VecNew { dst: FO(vec) },
@@ -365,16 +366,17 @@ fn ref_borrow_local() {
     let functions = [arena.alloc(Function {
         name: GlobalArenaPtr::from_static("test"),
         code,
-        args_size: 0,
-        args_and_locals_size: 64,
+        param_sizes: ExecutableArenaPtr::empty_slice(),
+        param_sizes_sum: 0,
+        param_and_local_sizes_sum: 64,
         extended_frame_size: 88,
         // ref_base holds a stack address → is_heap_ptr returns false, GC skips it.
         // vec is a genuine heap root.
         zero_frame: true,
-        frame_layout: FrameLayoutInfo::new(&arena, vec![FO(ref_base), FO(vec), FO(vec_ref)]),
-        safe_point_layouts: SortedSafePointEntries::empty(&arena),
+        frame_layout: FrameLayoutInfo::new(&arena, [FO(ref_base), FO(vec), FO(vec_ref)]),
+        safe_point_layouts: SortedSafePointEntries::empty(),
     })];
-    let descriptors = vec![ObjectDescriptor::Trivial];
+    let descriptors = [ObjectDescriptor::Trivial];
     let txn_ctx = NoopTransactionContext;
     let gas_meter = SimpleGasMeter::new(u64::MAX);
     let mut ctx = InterpreterContext::new(&txn_ctx, &descriptors, gas_meter, unsafe {
@@ -412,7 +414,7 @@ fn ref_nested_vectors() {
     let arena = ExecutableArena::new();
 
     #[rustfmt::skip]
-    let code = arena.alloc_slice_fill_iter(vec![
+    let code = arena.alloc_slice_fill_iter([
         // -- Build inner0 = [100, 200] --
         VecNew { dst: FO(inner_ptr) },
         SlotBorrow { dst: FO(inner_ref), local: FO(inner_ptr) },
@@ -449,20 +451,21 @@ fn ref_nested_vectors() {
     let functions = [arena.alloc(Function {
         name: GlobalArenaPtr::from_static("test"),
         code,
-        args_size: 0,
-        args_and_locals_size: 96,
+        param_sizes: ExecutableArenaPtr::empty_slice(),
+        param_sizes_sum: 0,
+        param_and_local_sizes_sum: 96,
         extended_frame_size: 120,
         zero_frame: true,
-        frame_layout: FrameLayoutInfo::new(&arena, vec![
+        frame_layout: FrameLayoutInfo::new(&arena, [
             FO(outer),
             FO(inner_ptr),
             FO(ref_base),
             FO(outer_ref),
             FO(inner_ref),
         ]),
-        safe_point_layouts: SortedSafePointEntries::empty(&arena),
+        safe_point_layouts: SortedSafePointEntries::empty(),
     })];
-    let descriptors = vec![ObjectDescriptor::Trivial, ObjectDescriptor::Vector {
+    let descriptors = [ObjectDescriptor::Trivial, ObjectDescriptor::Vector {
         elem_size: 8,
         elem_pointer_offsets: vec![0],
     }];
@@ -523,7 +526,7 @@ fn ref_survives_double_gc() {
     let arena = ExecutableArena::new();
 
     #[rustfmt::skip]
-    let code = arena.alloc_slice_fill_iter(vec![
+    let code = arena.alloc_slice_fill_iter([
         VecNew { dst: FO(vec) },
         SlotBorrow { dst: FO(vec_ref), local: FO(vec) },
         StoreImm8 { dst: FO(tmp), imm: 10 },
@@ -544,14 +547,15 @@ fn ref_survives_double_gc() {
     let functions = [arena.alloc(Function {
         name: GlobalArenaPtr::from_static("test"),
         code,
-        args_size: 0,
-        args_and_locals_size: 64,
+        param_sizes: ExecutableArenaPtr::empty_slice(),
+        param_sizes_sum: 0,
+        param_and_local_sizes_sum: 64,
         extended_frame_size: 88,
         zero_frame: true,
-        frame_layout: FrameLayoutInfo::new(&arena, vec![FO(vec), FO(ref_base), FO(vec_ref)]),
-        safe_point_layouts: SortedSafePointEntries::empty(&arena),
+        frame_layout: FrameLayoutInfo::new(&arena, [FO(vec), FO(ref_base), FO(vec_ref)]),
+        safe_point_layouts: SortedSafePointEntries::empty(),
     })];
-    let descriptors = vec![ObjectDescriptor::Trivial];
+    let descriptors = [ObjectDescriptor::Trivial];
     let txn_ctx = NoopTransactionContext;
     let gas_meter = SimpleGasMeter::new(u64::MAX);
     let mut ctx = InterpreterContext::new(&txn_ctx, &descriptors, gas_meter, unsafe {
@@ -589,7 +593,7 @@ fn ref_struct_field_borrow() {
     let arena = ExecutableArena::new();
 
     #[rustfmt::skip]
-    let code = arena.alloc_slice_fill_iter(vec![
+    let code = arena.alloc_slice_fill_iter([
         HeapNew { dst: FO(entry), descriptor_id: DescriptorId(0) },
         StoreImm8 { dst: FO(result), imm: 42 },
         MicroOp::struct_store8(FO(entry), 0, FO(result)),
@@ -606,14 +610,15 @@ fn ref_struct_field_borrow() {
     let functions = [arena.alloc(Function {
         name: GlobalArenaPtr::from_static("test"),
         code,
-        args_size: 0,
-        args_and_locals_size: 48,
+        param_sizes: ExecutableArenaPtr::empty_slice(),
+        param_sizes_sum: 0,
+        param_and_local_sizes_sum: 48,
         extended_frame_size: 72,
         zero_frame: true,
-        frame_layout: FrameLayoutInfo::new(&arena, vec![FO(entry), FO(r#ref), FO(entry_ref)]),
-        safe_point_layouts: SortedSafePointEntries::empty(&arena),
+        frame_layout: FrameLayoutInfo::new(&arena, [FO(entry), FO(r#ref), FO(entry_ref)]),
+        safe_point_layouts: SortedSafePointEntries::empty(),
     })];
-    let descriptors = vec![ObjectDescriptor::Struct {
+    let descriptors = [ObjectDescriptor::Struct {
         size: 16,
         pointer_offsets: vec![],
     }];
@@ -651,7 +656,7 @@ fn ref_struct_field_survives_gc() {
     let arena = ExecutableArena::new();
 
     #[rustfmt::skip]
-    let code = arena.alloc_slice_fill_iter(vec![
+    let code = arena.alloc_slice_fill_iter([
         HeapNew { dst: FO(entry), descriptor_id: DescriptorId(0) },
         StoreImm8 { dst: FO(result), imm: 7 },
         MicroOp::struct_store8(FO(entry), 0, FO(result)),
@@ -666,14 +671,15 @@ fn ref_struct_field_survives_gc() {
     let functions = [arena.alloc(Function {
         name: GlobalArenaPtr::from_static("test"),
         code,
-        args_size: 0,
-        args_and_locals_size: 48,
+        param_sizes: ExecutableArenaPtr::empty_slice(),
+        param_sizes_sum: 0,
+        param_and_local_sizes_sum: 48,
         extended_frame_size: 72,
         zero_frame: true,
-        frame_layout: FrameLayoutInfo::new(&arena, vec![FO(entry), FO(ref_base), FO(entry_ref)]),
-        safe_point_layouts: SortedSafePointEntries::empty(&arena),
+        frame_layout: FrameLayoutInfo::new(&arena, [FO(entry), FO(ref_base), FO(entry_ref)]),
+        safe_point_layouts: SortedSafePointEntries::empty(),
     })];
-    let descriptors = vec![ObjectDescriptor::Struct {
+    let descriptors = [ObjectDescriptor::Struct {
         size: 16,
         pointer_offsets: vec![],
     }];
