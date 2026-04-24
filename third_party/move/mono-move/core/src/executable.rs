@@ -116,8 +116,7 @@ pub struct Executable {
 struct ExecutableData {
     /// Executable ID which uniquely identifies this executable.
     id: GlobalArenaPtr<ExecutableId>,
-    /// Non-generic struct definitions. Invariant: stored type is always
-    /// [`Type::Struct`].
+    /// Non-generic struct definitions.
     structs: UnorderedMap<GlobalArenaPtr<str>, StructType>,
     /// Non-generic enum definitions.
     enums: UnorderedMap<GlobalArenaPtr<str>, EnumType>,

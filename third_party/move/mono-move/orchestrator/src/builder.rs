@@ -51,10 +51,6 @@ pub struct ExecutableBuilder<'a, 'guard, 'ctx> {
     /// patching. Local definitions fill entries; cross-module handles stay
     /// `None`.
     func_ptrs: Vec<Option<ExecutableArenaPtr<Function>>>,
-    /// Next `FunctionDefinitionIndex` to fill. Advances on every
-    /// `add_function` / `skip_function` call so we can map def → handle via
-    /// `module.function_defs[..]`.
-    next_def_idx: usize,
     /// Stores all allocations for this executable.
     arena: ExecutableArena,
     /// Context for interning.
@@ -86,7 +82,6 @@ impl<'a, 'guard, 'ctx> ExecutableBuilder<'a, 'guard, 'ctx> {
             enums: UnorderedMap::new(),
             functions: UnorderedMap::new(),
             func_ptrs: vec![None; module.function_handles.len()],
-            next_def_idx: 0,
             arena: ExecutableArena::new(),
             guard,
         }
@@ -133,26 +128,21 @@ impl<'a, 'guard, 'ctx> ExecutableBuilder<'a, 'guard, 'ctx> {
         table
     }
 
-    /// Records a definition slot for the next function. Pass `Some(..)` to
-    /// add a lowered function, or `None` to skip (e.g., for generic or native
-    /// functions).
-    pub fn add_function(&mut self, lowered: Option<LoweredFunction>) {
-        let def_idx = self.next_def_idx;
-        self.next_def_idx += 1;
-        let Some(lf) = lowered else {
-            return;
-        };
+    /// Records a lowered function. Functions can be added in any order; the
+    /// handle index carried by `lowered` determines where it lands in the
+    /// call-patching table.
+    pub fn add_function(&mut self, lowered: LoweredFunction) {
         let name = self
             .guard
-            .intern_identifier(self.module.identifier_at(lf.name_idx))
+            .intern_identifier(self.module.identifier_at(lowered.name_idx))
             .into_global_arena_ptr();
-        let code = self.arena.alloc_slice_fill_iter(lf.code);
+        let code = self.arena.alloc_slice_fill_iter(lowered.code);
         let func = Function {
             name,
             code,
-            args_size: lf.args_size,
-            args_and_locals_size: lf.args_and_locals_size,
-            extended_frame_size: lf.extended_frame_size,
+            args_size: lowered.args_size,
+            args_and_locals_size: lowered.args_and_locals_size,
+            extended_frame_size: lowered.extended_frame_size,
             // TODO: hardcoded for now.
             zero_frame: false,
             frame_layout: FrameLayoutInfo::empty(&self.arena),
@@ -160,8 +150,7 @@ impl<'a, 'guard, 'ctx> ExecutableBuilder<'a, 'guard, 'ctx> {
         };
         let ptr = self.arena.alloc(func);
         self.functions.insert(name, ptr);
-        let handle_idx = self.module.function_defs[def_idx].function.0 as usize;
-        self.func_ptrs[handle_idx] = Some(ptr);
+        self.func_ptrs[lowered.handle_idx.0 as usize] = Some(ptr);
     }
 
     /// Finishes building the executable. Call after every function definition

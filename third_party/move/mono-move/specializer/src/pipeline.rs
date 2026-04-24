@@ -25,41 +25,38 @@ pub fn destack_and_lower_module(
     let mut functions = Vec::with_capacity(module_ir.functions.len());
     for func_ir in &module_ir.functions {
         let Some(func_ir) = func_ir else {
-            functions.push(None);
             continue;
         };
-        let lowered = match try_build_context(&module_ir, func_ir)? {
-            Some(ctx) => {
-                let micro_ops = lower_function(func_ir, &ctx)?;
-                let code = GasInstrumentor::new(MicroOpGasSchedule).run(micro_ops);
-
-                // End offset of the last param slot, including any inter-slot
-                // alignment padding.
-                let args_size = ctx.home_slots[..func_ir.num_params as usize]
-                    .last()
-                    .map(|s| (s.offset + s.size) as usize)
-                    .unwrap_or(0);
-                let args_and_locals_size = ctx.frame_data_size as usize;
-                let extended_frame_size = ctx
-                    .call_sites
-                    .iter()
-                    .flat_map(|cs| cs.arg_write_slots.iter().chain(cs.ret_read_slots.iter()))
-                    .map(|s| (s.offset + s.size) as usize)
-                    .max()
-                    // Leaf function: no callee slots needed beyond metadata.
-                    .unwrap_or(args_and_locals_size + FRAME_METADATA_SIZE);
-
-                Some(LoweredFunction {
-                    name_idx: func_ir.name_idx,
-                    code,
-                    args_size,
-                    args_and_locals_size,
-                    extended_frame_size,
-                })
-            },
-            None => None,
+        let Some(ctx) = try_build_context(&module_ir, func_ir)? else {
+            continue;
         };
-        functions.push(lowered);
+        let micro_ops = lower_function(func_ir, &ctx)?;
+        let code = GasInstrumentor::new(MicroOpGasSchedule).run(micro_ops);
+
+        // End offset of the last param slot, including any inter-slot
+        // alignment padding.
+        let args_size = ctx.home_slots[..func_ir.num_params as usize]
+            .last()
+            .map(|s| (s.offset + s.size) as usize)
+            .unwrap_or(0);
+        let args_and_locals_size = ctx.frame_data_size as usize;
+        let extended_frame_size = ctx
+            .call_sites
+            .iter()
+            .flat_map(|cs| cs.arg_write_slots.iter().chain(cs.ret_read_slots.iter()))
+            .map(|s| (s.offset + s.size) as usize)
+            .max()
+            // Leaf function: no callee slots needed beyond metadata.
+            .unwrap_or(args_and_locals_size + FRAME_METADATA_SIZE);
+
+        functions.push(LoweredFunction {
+            name_idx: func_ir.name_idx,
+            handle_idx: func_ir.handle_idx,
+            code,
+            args_size,
+            args_and_locals_size,
+            extended_frame_size,
+        });
     }
 
     Ok(LoweredModule { functions })

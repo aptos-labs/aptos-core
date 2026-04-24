@@ -10,7 +10,7 @@ mod translate;
 pub use context::{try_build_context, LoweringContext, SlotInfo};
 pub use display::MicroOpsFunctionDisplay;
 use mono_move_core::MicroOp;
-use move_binary_format::file_format::IdentifierIndex;
+use move_binary_format::file_format::{FunctionHandleIndex, IdentifierIndex};
 pub use translate::lower_function;
 
 /// Result of lowering a single non-generic function.
@@ -18,6 +18,8 @@ pub use translate::lower_function;
 pub struct LoweredFunction {
     /// Function name, as an index into the module's identifier pool.
     pub name_idx: IdentifierIndex,
+    /// Handle index of this function in the defining module.
+    pub handle_idx: FunctionHandleIndex,
     /// Gas-instrumented micro-ops.
     pub code: Vec<MicroOp>,
     /// Size of the argument region at the start of the frame.
@@ -28,9 +30,10 @@ pub struct LoweredFunction {
     pub extended_frame_size: usize,
 }
 
-/// Result of lowering an entire module.
+/// Result of lowering an entire module. Only successfully lowered
+/// functions appear; functions that were skipped (e.g., generic or
+/// native) are omitted. Each entry carries its own `handle_idx`, so the
+/// vector order is not meaningful.
 pub struct LoweredModule {
-    /// Per-definition-index results. `None` for functions that were
-    /// not lowered (e.g., generic functions).
-    pub functions: Vec<Option<LoweredFunction>>,
+    pub functions: Vec<LoweredFunction>,
 }
