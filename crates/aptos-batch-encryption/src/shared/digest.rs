@@ -1,4 +1,7 @@
 // Copyright (c) Aptos Foundation
+// SPDX-License-Identifier: Apache-2.0
+
+// Copyright (c) Aptos Foundation
 // Licensed pursuant to the Innovation-Enabling Source Code License, available at https://github.com/aptos-labs/aptos-core/blob/main/LICENSE
 //! This module deals with computing and generating opening proofs for "digests",
 //! which are KZG polynomial commitments which commit to a set of IDs.
@@ -177,6 +180,10 @@ pub struct EvalProofsPromise {
 impl EvalProofsPromise {
     pub fn new(digest: Digest, ids: IdSet<ComputedCoeffs>) -> Self {
         Self { digest, ids }
+    }
+
+    pub fn num_pfs(&self) -> usize {
+        self.ids.poly_roots.len()
     }
 
     pub fn compute_all(&self, digest_key: &DigestKey) -> EvalProofs {

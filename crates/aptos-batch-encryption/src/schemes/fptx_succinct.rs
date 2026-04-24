@@ -1,4 +1,7 @@
 // Copyright (c) Aptos Foundation
+// SPDX-License-Identifier: Apache-2.0
+
+// Copyright (c) Aptos Foundation
 // Licensed pursuant to the Innovation-Enabling Source Code License, available at https://github.com/aptos-labs/aptos-core/blob/main/LICENSE
 use crate::{
     errors::MissingEvalProofError,
@@ -110,7 +113,11 @@ impl BatchThresholdEncryption for FPTXSuccinct {
         proofs: &Self::EvalProofsPromise,
         digest_key: &DigestKey,
     ) -> Self::EvalProofs {
-        FPTX::eval_proofs_compute_all(proofs, digest_key)
+        if proofs.num_pfs() <= 1024 {
+            FPTX::eval_proofs_compute_all(proofs, digest_key)
+        } else {
+            FPTX::eval_proofs_compute_all_vzgg_multi_point_eval(proofs, digest_key)
+        }
     }
 
     fn eval_proofs_compute_all_vzgg_multi_point_eval(
