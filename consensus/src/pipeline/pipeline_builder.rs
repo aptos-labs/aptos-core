@@ -45,7 +45,7 @@ use std::{
     time::{Duration, Instant},
 };
 use tokio::{select, sync::oneshot, task::AbortHandle};
-use aptos_batch_encryption::{errors::MissingEvalProofError, schemes::fptx_succinct::{self, FPTXSuccinct}, shared::{ciphertext::PreparedCiphertext, digest}, traits::BatchThresholdEncryption};
+use batch_encryption::{errors::MissingEvalProofError, schemes::trx_succinct::{self, TRXSuccinct}, shared::{ciphertext::PreparedCiphertext, digest}, traits::BatchThresholdEncryption};
 
 /// Status to help synchornize the pipeline and sync_manager
 /// It is used to track the round of the block that could be pre-committed and sync manager decides
@@ -665,7 +665,7 @@ impl PipelineBuilder {
         // daniel todo: skip verifying encrypted txns for now
         let mut sig_verified_decrypted_txns: Vec<SignatureVerifiedTransaction> = decrypted_txns.as_ref().clone().into_iter().map(|t| SignatureVerifiedTransaction::Valid(Transaction::UserTransaction(t))).collect();
 
-        let mut sig_verified_txns: Vec<SignatureVerifiedTransaction> = SIG_VERIFY_POOL.install(|| 
+        let mut sig_verified_txns: Vec<SignatureVerifiedTransaction> = SIG_VERIFY_POOL.install(||
             non_encrypted_txns
                 .into_par_iter()
                 .with_min_len(optimal_min_len(non_encrypted_txns_len, 32))
@@ -720,7 +720,7 @@ impl PipelineBuilder {
         if !cts.is_empty() {
             let (send, recv) = tokio::sync::oneshot::channel();
             DECRYPTION_POOL.spawn(move || {
-                send.send(<FPTXSuccinct as BatchThresholdEncryption>::digest(&digest_key, &cts, encryption_round));
+                send.send(<TRXSuccinct as BatchThresholdEncryption>::digest(&digest_key, &cts, encryption_round));
             });
             let (digest, proofs_promise) = recv.await.map_err(anyhow::Error::new)??;
             Ok(Some((digest, proofs_promise)))
@@ -738,8 +738,8 @@ impl PipelineBuilder {
         if let Some((digest, _)) = digest_result {
             let dec_metadata = DecMetadata::new(block.epoch(), block.round(), block.timestamp_usecs(), block.id(), digest.clone());
 
-            let share = <FPTXSuccinct as BatchThresholdEncryption>::derive_decryption_key_share(&msk_share, &digest)?;
-            let fast_share = <FPTXSuccinct as BatchThresholdEncryption>::derive_decryption_key_share(&fast_msk_share, &digest)?;
+            let share = <TRXSuccinct as BatchThresholdEncryption>::derive_decryption_key_share(&msk_share, &digest)?;
+            let fast_share = <TRXSuccinct as BatchThresholdEncryption>::derive_decryption_key_share(&fast_msk_share, &digest)?;
 
             let dec_share = DecShare::new(author, dec_metadata.clone(), share);
             let fast_dec_share = FastDecShare::new(DecShare::new(author, dec_metadata, fast_share));
@@ -762,7 +762,7 @@ impl PipelineBuilder {
         if let Some((_, proofs_promise)) = digest_result {
             let (send, recv) = tokio::sync::oneshot::channel();
             DECRYPTION_POOL.spawn(move || {
-                send.send(<FPTXSuccinct as BatchThresholdEncryption>::eval_proofs_compute_all(&proofs_promise, &digest_key));
+                send.send(<TRXSuccinct as BatchThresholdEncryption>::eval_proofs_compute_all(&proofs_promise, &digest_key));
             });
             let proofs = recv.await.map_err(anyhow::Error::new)?;
             Ok(Some(proofs))
@@ -841,7 +841,7 @@ async fn prepare_cts(prepare_fut: TaskFuture<PrepareResult>, digest_fut: TaskFut
             DECRYPTION_POOL.spawn(move || {
                 send.send(ciphertexts.into_par_iter().map(
                     |ct|
-                    <FPTXSuccinct as BatchThresholdEncryption>::prepare_ct(&ct, &digest, &proofs)
+                    <TRXSuccinct as BatchThresholdEncryption>::prepare_ct(&ct, &digest, &proofs)
                 )
                     .collect::<Result<Vec<PreparedCiphertext>, MissingEvalProofError>>());
             });
@@ -895,8 +895,8 @@ async fn prepare_cts(prepare_fut: TaskFuture<PrepareResult>, digest_fut: TaskFut
             let (send, recv) = tokio::sync::oneshot::channel();
             rayon::spawn(move || {
                 send.send(prepared_ciphertexts.into_par_iter()
-                    .map(|prepared_ciphertext| 
-                        <FPTXSuccinct as BatchThresholdEncryption>::decrypt(&decryption_key.key, &prepared_ciphertext)
+                    .map(|prepared_ciphertext|
+                        <TRXSuccinct as BatchThresholdEncryption>::decrypt(&decryption_key.key, &prepared_ciphertext)
                     )
                         .collect::<anyhow::Result<Vec<Vec<u8>>>>());
             });

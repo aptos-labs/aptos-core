@@ -680,42 +680,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "aptos-batch-encryption"
-version = "0.1.0"
-dependencies = [
- "aes-gcm",
- "anyhow",
- "aptos-crypto",
- "aptos-dkg",
- "ark-bls12-381 0.5.0",
- "ark-bn254",
- "ark-ec 0.5.0",
- "ark-ff 0.5.0",
- "ark-ff-asm 0.5.0",
- "ark-ff-macros 0.5.0",
- "ark-groth16",
- "ark-poly 0.5.0",
- "ark-relations",
- "ark-serialize 0.5.0",
- "ark-snark",
- "ark-std 0.5.0",
- "bcs 0.1.4",
- "criterion",
- "ed25519-dalek 2.1.1",
- "generic-array",
- "hmac 0.12.1",
- "itertools 0.13.0",
- "num-traits",
- "rand 0.7.3",
- "rayon",
- "serde",
- "serde_bytes",
- "serde_json",
- "sha2 0.10.8",
- "thiserror",
-]
-
-[[package]]
 name = "aptos-bcs-utils"
 version = "0.1.0"
 dependencies = [
@@ -955,7 +919,6 @@ name = "aptos-consensus"
 version = "0.1.0"
 dependencies = [
  "anyhow",
- "aptos-batch-encryption",
  "aptos-bitvec",
  "aptos-bounded-executor",
  "aptos-cached-packages",
@@ -996,6 +959,7 @@ dependencies = [
  "aptos-vm",
  "aptos-vm-validator",
  "async-trait",
+ "batch-encryption",
  "bcs 0.1.4",
  "byteorder",
  "bytes",
@@ -1059,7 +1023,6 @@ name = "aptos-consensus-types"
 version = "0.1.0"
 dependencies = [
  "anyhow",
- "aptos-batch-encryption",
  "aptos-bitvec",
  "aptos-crypto",
  "aptos-crypto-derive",
@@ -1069,6 +1032,7 @@ dependencies = [
  "aptos-logger",
  "aptos-short-hex-str",
  "aptos-types",
+ "batch-encryption",
  "bcs 0.1.4",
  "derivative",
  "fail",
@@ -4569,7 +4533,6 @@ name = "aptos-transaction-generator-lib"
 version = "0.0.0"
 dependencies = [
  "anyhow",
- "aptos-batch-encryption",
  "aptos-crypto",
  "aptos-framework",
  "aptos-infallible",
@@ -4578,6 +4541,7 @@ dependencies = [
  "aptos-types",
  "ark-std 0.5.0",
  "async-trait",
+ "batch-encryption",
  "clap 4.5.21",
  "log",
  "move-binary-format",
@@ -4667,7 +4631,6 @@ version = "0.0.3"
 dependencies = [
  "ahash 0.8.11",
  "anyhow",
- "aptos-batch-encryption",
  "aptos-bitvec",
  "aptos-crypto",
  "aptos-crypto-derive",
@@ -4684,6 +4647,7 @@ dependencies = [
  "ark-std 0.5.0",
  "async-trait",
  "base64 0.13.1",
+ "batch-encryption",
  "bcs 0.1.4",
  "bytes",
  "chrono",
@@ -5991,6 +5955,42 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "2db21524cad41c5591204d22d75e1970a2d1f71060214ca931dc7d5afe2c14e5"
 dependencies = [
  "serde",
+]
+
+[[package]]
+name = "batch-encryption"
+version = "0.1.0"
+dependencies = [
+ "aes-gcm",
+ "anyhow",
+ "aptos-crypto",
+ "aptos-dkg",
+ "ark-bls12-381 0.5.0",
+ "ark-bn254",
+ "ark-ec 0.5.0",
+ "ark-ff 0.5.0",
+ "ark-ff-asm 0.5.0",
+ "ark-ff-macros 0.5.0",
+ "ark-groth16",
+ "ark-poly 0.5.0",
+ "ark-relations",
+ "ark-serialize 0.5.0",
+ "ark-snark",
+ "ark-std 0.5.0",
+ "bcs 0.1.4",
+ "criterion",
+ "ed25519-dalek 2.1.1",
+ "generic-array",
+ "hmac 0.12.1",
+ "itertools 0.13.0",
+ "num-traits",
+ "rand 0.7.3",
+ "rayon",
+ "serde",
+ "serde_bytes",
+ "serde_json",
+ "sha2 0.10.8",
+ "thiserror",
 ]
 
 [[package]]

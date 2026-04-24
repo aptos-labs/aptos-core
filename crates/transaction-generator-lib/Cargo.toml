@@ -28,5 +28,5 @@ move-package = { workspace = true }
 once_cell = { workspace = true }
 rand = { workspace = true }
 serde = { workspace = true }
-aptos-batch-encryption = { workspace = true }
+batch-encryption = { workspace = true }
 aptos-types = { workspace = true }

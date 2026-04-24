@@ -1,0 +1,59 @@
+[package]
+name = "batch-encryption"
+version = "0.1.0"
+
+# Workspace inherited keys
+authors = { workspace = true }
+edition = { workspace = true }
+homepage = { workspace = true }
+license = { workspace = true }
+publish = { workspace = true }
+repository = { workspace = true }
+rust-version = { workspace = true }
+
+[lib]
+name = "batch_encryption"
+doctest = false
+
+[dependencies]
+aes-gcm = { workspace = true }
+anyhow = { workspace = true }
+aptos-crypto = { workspace = true }
+aptos-dkg = { workspace = true }
+ark-bls12-381 = { version = "0.5.0", features = ["curve"] }
+ark-bn254 = { version = "0.5.0", features = ["curve"] }
+ark-ec = { version = "0.5.0", features = ["parallel", "rayon"] }
+ark-ff = { version = "0.5.0", features = ["asm"] }
+ark-ff-asm = { version = "0.5.0" }
+ark-ff-macros = "0.5.0"
+ark-groth16 = "0.5.0"
+ark-poly = { version = "0.5.0", features = ["parallel"] }
+ark-relations = "0.5.0"
+ark-serialize = { version = "0.5.0", features = ["derive"] }
+ark-snark = { version = "0.5.0" }
+ark-std = { version = "0.5.0", features = ["getrandom"] }
+bcs = { workspace = true }
+# TODO: Fix compiler errors so we can use `workspace = true` here
+ed25519-dalek = { version = "2.1.1", features = ["serde"] }
+generic-array = { version = "0.14.7", features = ["serde"] }
+hmac = { workspace = true }
+num-traits = { workspace = true }
+rand = { workspace = true }
+rayon = { workspace = true }
+serde = { workspace = true }
+serde_bytes = { workspace = true }
+serde_json = { workspace = true }
+# TODO: Fix compiler errors so we can use `workspace = true` here
+sha2 = { version = "0.10.6" }
+thiserror = { workspace = true }
+
+[dev-dependencies]
+criterion = { workspace = true }
+itertools = { workspace = true }
+
+[package.metadata.cargo-machete]
+ignored = ["ark-bn254", "ark-ff-asm", "ark-ff-macros", "serde_bytes"]
+
+[[bench]]
+name = "trx_succinct"
+harness = false

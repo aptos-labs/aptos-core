@@ -57,7 +57,7 @@ members = [
     "crates/aptos-api-tester",
     "crates/aptos-bcs-utils",
     "crates/aptos-bitvec",
-    "crates/aptos-batch-encryption",
+    "crates/batch-encryption",
     "crates/aptos-build-info",
     "crates/aptos-collections",
     "crates/aptos-compression",
@@ -300,7 +300,7 @@ aptos-api-test-context = { path = "api/test-context" }
 aptos-api-types = { path = "api/types" }
 aptos-backup-cli = { path = "storage/backup/backup-cli" }
 aptos-backup-service = { path = "storage/backup/backup-service" }
-aptos-batch-encryption = { path = "crates/aptos-batch-encryption" }
+batch-encryption = { path = "crates/batch-encryption" }
 aptos-bcs-utils = { path = "crates/aptos-bcs-utils" }
 aptos-bounded-executor = { path = "crates/bounded-executor" }
 aptos-block-executor = { path = "aptos-move/block-executor" }

@@ -114,10 +114,10 @@ use std::{
     sync::Arc,
     time::Duration,
 };
-use aptos_batch_encryption::{schemes::fptx_succinct::FPTXSuccinct, traits::BatchThresholdEncryption};
+use batch_encryption::{schemes::trx_succinct::TRXSuccinct, traits::BatchThresholdEncryption};
 use aptos_types::decryption::{PROTOTYPE_SETUP_SEED, PROTOTYPE_BATCH_SIZE, PROTOTYPE_NUMBER_OF_ROUNDS, PROTOTYPE_THRESHOLD_SLOW_PATH, PROTOTYPE_THRESHOLD_FAST_PATH, PROTOTYPE_NUMBER_OF_VALIDATORS};
 use aptos_crypto::arkworks::shamir::ShamirThresholdConfig;
-use aptos_batch_encryption::group::Fr;
+use batch_encryption::group::Fr;
 
 type ThresholdConfig = ShamirThresholdConfig<Fr>;
 
@@ -1262,7 +1262,7 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
         let tc_slow_path = ThresholdConfig::new(PROTOTYPE_THRESHOLD_SLOW_PATH, PROTOTYPE_NUMBER_OF_VALIDATORS);
         let tc_fast_path = ThresholdConfig::new(PROTOTYPE_THRESHOLD_FAST_PATH, PROTOTYPE_NUMBER_OF_VALIDATORS);
 
-        let (encryption_key, digest_key, verification_keys_fast_path, msk_shares_fast_path, verification_keys_slow_path, msk_shares_slow_path) = <FPTXSuccinct as BatchThresholdEncryption>::setup_for_testing(PROTOTYPE_SETUP_SEED, PROTOTYPE_BATCH_SIZE, PROTOTYPE_NUMBER_OF_ROUNDS, &tc_fast_path, &tc_slow_path).unwrap();
+        let (encryption_key, digest_key, verification_keys_fast_path, msk_shares_fast_path, verification_keys_slow_path, msk_shares_slow_path) = <TRXSuccinct as BatchThresholdEncryption>::setup_for_testing(PROTOTYPE_SETUP_SEED, PROTOTYPE_BATCH_SIZE, PROTOTYPE_NUMBER_OF_ROUNDS, &tc_fast_path, &tc_slow_path).unwrap();
 
         let self_index = epoch_state.verifier.address_to_validator_index().get(&self.author).expect("self should be in the index");
         let self_msk_share_slow_path = msk_shares_slow_path[*self_index].clone();

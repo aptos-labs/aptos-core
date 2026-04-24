@@ -11,27 +11,27 @@ use aptos_crypto::hash::HashValue;
 use serde::{Deserialize, Serialize};
 use crate::{account_address::AccountAddress, validator_verifier::ValidatorVerifier};
 use std::sync::Arc;
-use aptos_batch_encryption::traits::BatchThresholdEncryption;
-use aptos_batch_encryption::schemes::fptx_succinct::FPTXSuccinct;
-use aptos_batch_encryption::group::Fr;
+use batch_encryption::traits::BatchThresholdEncryption;
+use batch_encryption::schemes::trx_succinct::TRXSuccinct;
+use batch_encryption::group::Fr;
 use aptos_crypto::arkworks::shamir::ShamirThresholdConfig;
 use once_cell::sync::Lazy;
 
 
 pub type ThresholdConfig = ShamirThresholdConfig<Fr>;
 
-pub type EncryptionKey = <FPTXSuccinct as BatchThresholdEncryption>::EncryptionKey;
-pub type DigestKey = <FPTXSuccinct as BatchThresholdEncryption>::DigestKey;
-pub type Ciphertext = <FPTXSuccinct as BatchThresholdEncryption>::Ciphertext;
-pub type Id = <FPTXSuccinct as BatchThresholdEncryption>::Id;
-pub type Round = <FPTXSuccinct as BatchThresholdEncryption>::Round;
-pub type Digest = <FPTXSuccinct as BatchThresholdEncryption>::Digest;
-pub type EvalProofsPromise = <FPTXSuccinct as BatchThresholdEncryption>::EvalProofsPromise;
-pub type EvalProofs = <FPTXSuccinct as BatchThresholdEncryption>::EvalProofs;
-pub type MasterSecretKeyShare = <FPTXSuccinct as BatchThresholdEncryption>::MasterSecretKeyShare;
-pub type VerificationKey = <FPTXSuccinct as BatchThresholdEncryption>::VerificationKey;
-pub type DecryptionKeyShare = <FPTXSuccinct as BatchThresholdEncryption>::DecryptionKeyShare;
-pub type DecryptionKey = <FPTXSuccinct as BatchThresholdEncryption>::DecryptionKey;
+pub type EncryptionKey = <TRXSuccinct as BatchThresholdEncryption>::EncryptionKey;
+pub type DigestKey = <TRXSuccinct as BatchThresholdEncryption>::DigestKey;
+pub type Ciphertext = <TRXSuccinct as BatchThresholdEncryption>::Ciphertext;
+pub type Id = <TRXSuccinct as BatchThresholdEncryption>::Id;
+pub type Round = <TRXSuccinct as BatchThresholdEncryption>::Round;
+pub type Digest = <TRXSuccinct as BatchThresholdEncryption>::Digest;
+pub type EvalProofsPromise = <TRXSuccinct as BatchThresholdEncryption>::EvalProofsPromise;
+pub type EvalProofs = <TRXSuccinct as BatchThresholdEncryption>::EvalProofs;
+pub type MasterSecretKeyShare = <TRXSuccinct as BatchThresholdEncryption>::MasterSecretKeyShare;
+pub type VerificationKey = <TRXSuccinct as BatchThresholdEncryption>::VerificationKey;
+pub type DecryptionKeyShare = <TRXSuccinct as BatchThresholdEncryption>::DecryptionKeyShare;
+pub type DecryptionKey = <TRXSuccinct as BatchThresholdEncryption>::DecryptionKey;
 
 pub type Author = AccountAddress;
 
@@ -102,8 +102,8 @@ impl DecShare {
             .map(|dec_share| dec_share.share.clone())
             .take(threshold as usize)
             .collect();
-        
-        let decryption_key = <FPTXSuccinct as BatchThresholdEncryption>::reconstruct_decryption_key(&shares, &config.config)?;
+
+        let decryption_key = <TRXSuccinct as BatchThresholdEncryption>::reconstruct_decryption_key(&shares, &config.config)?;
         Ok(decryption_key)
     }
 
