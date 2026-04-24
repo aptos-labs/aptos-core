@@ -34,6 +34,14 @@ module aptos_framework::reconfiguration_with_dkg {
                 return
             }
         };
+        // V1 prologue dispatch means chunky DKG is not running this attempt;
+        // drop any stale chunky session so finish_with_dkg_result can proceed
+        // (e.g., recovery from a stall via local chunky_dkg_override_seq_num).
+        if (chunky_dkg::incomplete_session().is_some()) {
+            let framework = create_signer::create_signer(@aptos_framework);
+            chunky_dkg::try_clear_incomplete_session(&framework);
+        };
+
         reconfiguration_state::on_reconfig_start();
         let cur_epoch = reconfiguration::current_epoch();
         dkg::start(
@@ -91,37 +99,46 @@ module aptos_framework::reconfiguration_with_dkg {
         reconfiguration::reconfigure();
     }
 
-    /// Call finish(account) only when (1) reconfiguration is in progress, and
-    /// (2) both DKG and Chunky DKG have no in-progress session.
-    /// Guard (1) ensures we never run reconfiguration twice (after the first
-    /// finish(account), reconfig is no longer in progress).
-    fun maybe_finish_reconfig_with_chunky_dkg(account: &signer) {
+    /// Single decision point for completing the in-progress reconfig.
+    /// Calls finish(account) iff:
+    /// - reconfiguration is in progress, AND
+    /// - DKG has no in-progress session, AND
+    /// - Chunky DKG has no in-progress session, OR the configured grace period
+    ///   (shadow mode) has elapsed since the chunky session started.
+    /// No-op otherwise. Callers (finish_with_dkg_result,
+    /// finish_with_chunky_dkg_result, try_complete_after_grace_period) just
+    /// signal "something may have changed" and let this function decide.
+    fun try_finalize_reconfig(account: &signer) {
         if (!reconfiguration_state::is_in_progress()) { return };
-        let dkg_incomplete = dkg::incomplete_session();
-        let chunky_incomplete = chunky_dkg::incomplete_session();
-        if (dkg_incomplete.is_none() && chunky_incomplete.is_none()) {
-            finish(account);
-        }
+
+        // DKG must be done.
+        if (dkg::incomplete_session().is_some()) { return };
+
+        // Chunky DKG must be done OR its grace period (shadow mode) must have elapsed.
+        let chunky_session = chunky_dkg::incomplete_session();
+        if (chunky_session.is_some()) {
+            let grace_period = chunky_dkg_config::grace_period_secs();
+            if (grace_period.is_none()) { return };
+            let start_time_us = chunky_dkg::session_start_time(chunky_session.borrow());
+            let grace_period_us = (*grace_period.borrow()) * 1_000_000;
+            if (timestamp::now_microseconds() - start_time_us < grace_period_us) {
+                return
+            };
+        };
+
+        finish(account);
     }
 
     /// Complete the current DKG session with the given result.
     /// Aborts if no DKG session is in progress.
-    /// If Chunky DKG is enabled, finish(account) is invoked only once both DKG and Chunky DKG
-    /// have no in-progress session; otherwise finish(account) is invoked immediately.
     fun finish_with_dkg_result(account: &signer, dkg_result: vector<u8>) {
         dkg::finish(dkg_result);
-        if (chunky_dkg_config::enabled()) {
-            maybe_finish_reconfig_with_chunky_dkg(account);
-        } else {
-            finish(account);
-        }
+        try_finalize_reconfig(account);
     }
 
     /// Complete the current Chunky DKG session with the given result.
     /// No-op if Chunky DKG is not enabled.
     /// Buffers the derived encryption key for the next epoch.
-    /// finish(account) is invoked only when both DKG and Chunky DKG have no in-progress session
-    /// (via maybe_finish_reconfig_with_chunky_dkg).
     fun finish_with_chunky_dkg_result(
         account: &signer, chunky_dkg_result: vector<u8>, encryption_key: vector<u8>
     ) {
@@ -132,32 +149,17 @@ module aptos_framework::reconfiguration_with_dkg {
         chunky_dkg::finish(chunky_dkg_result);
         let next_epoch = reconfiguration::current_epoch() + 1;
         decryption::set_for_next_epoch(next_epoch, encryption_key);
-        maybe_finish_reconfig_with_chunky_dkg(account);
+        try_finalize_reconfig(account);
     }
 
-    /// Safety net for shadow mode: if DKG is done but chunky DKG exceeds its grace period,
-    /// force epoch change. Called from block_prologue_ext_v2 every block after the epoch
-    /// interval has elapsed. No-op unless all conditions are met.
-    public(friend) fun try_complete_after_grace_period() {
-        if (!reconfiguration_state::is_in_progress()) { return };
-
-        // DKG must be done.
-        if (dkg::incomplete_session().is_some()) { return };
-
-        // Chunky DKG must still be in progress.
-        let chunky_session = chunky_dkg::incomplete_session();
-        if (chunky_session.is_none()) { return };
-
-        // Grace period must be configured (ConfigShadowV1).
-        let grace_period = chunky_dkg_config::grace_period_secs();
-        if (grace_period.is_none()) { return };
-
-        // Check if grace period has elapsed.
-        let start_time_us = chunky_dkg::session_start_time(chunky_session.borrow());
-        let grace_period_us = (*grace_period.borrow()) * 1_000_000;
-        if (timestamp::now_microseconds() - start_time_us >= grace_period_us) {
-            let framework = create_signer::create_signer(@aptos_framework);
-            finish(&framework);
-        };
+    /// Periodic finalization tick: try to advance the in-progress reconfig.
+    /// Called from block_prologue_ext / block_prologue_ext_v2 every block
+    /// after the epoch interval has elapsed. In V2 mode, also gives the
+    /// grace-period (shadow-mode) escape a chance to fire. In V1 mode after
+    /// a chunky-only override recovery, lets the reconfig finalize without
+    /// re-dealing DKG (dkg::start is idempotent per epoch).
+    public(friend) fun try_advance_reconfig() {
+        let framework = create_signer::create_signer(@aptos_framework);
+        try_finalize_reconfig(&framework);
     }
 }

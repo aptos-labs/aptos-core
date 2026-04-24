@@ -13,7 +13,41 @@ spec aptos_framework::chunky_dkg {
         target_validator_set: vector<ValidatorConsensusInfo>,
     ) {
         aborts_if !exists<ChunkyDKGState>(@aptos_framework);
-        aborts_if !exists<timestamp::CurrentTimeMicroseconds>(@aptos_framework);
+        aborts_if !spec_is_session_started(dealer_epoch)
+            && !exists<timestamp::CurrentTimeMicroseconds>(@aptos_framework);
+        ensures spec_is_session_started(dealer_epoch);
+        // Invariant "at most one ChunkyDKGStartEvent per epoch": if a session
+        // was already started for `dealer_epoch`, state is unchanged.
+        ensures old(spec_is_session_started(dealer_epoch))
+            ==> global<ChunkyDKGState>(@aptos_framework)
+                == old(global<ChunkyDKGState>(@aptos_framework));
+    }
+
+    spec last_completed_session(): Option<ChunkyDKGSessionState> {
+        aborts_if false;
+        ensures result == if (exists<ChunkyDKGState>(@aptos_framework)) {
+            global<ChunkyDKGState>(@aptos_framework).last_completed
+        } else {
+            option::spec_none()
+        };
+    }
+
+    spec is_session_started(epoch: u64): bool {
+        aborts_if false;
+        ensures result == spec_is_session_started(epoch);
+    }
+
+    /// A session has been started for `epoch` iff either the in-progress or
+    /// the last-completed session on chain has `dealer_epoch == epoch`.
+    spec fun spec_is_session_started(epoch: u64): bool {
+        exists<ChunkyDKGState>(@aptos_framework) && (
+            (option::is_some(global<ChunkyDKGState>(@aptos_framework).in_progress)
+             && option::borrow(global<ChunkyDKGState>(@aptos_framework).in_progress)
+                    .metadata.dealer_epoch == epoch)
+            || (option::is_some(global<ChunkyDKGState>(@aptos_framework).last_completed)
+                && option::borrow(global<ChunkyDKGState>(@aptos_framework).last_completed)
+                       .metadata.dealer_epoch == epoch)
+        )
     }
 
     spec finish(aggregated_subtranscript: vector<u8>) {

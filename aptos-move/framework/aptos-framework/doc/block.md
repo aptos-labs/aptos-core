@@ -714,6 +714,7 @@ The runtime always runs this before executing the transactions in a block.
 
     <b>if</b> (<a href="timestamp.md#0x1_timestamp">timestamp</a> - <a href="reconfiguration.md#0x1_reconfiguration_last_reconfiguration_time">reconfiguration::last_reconfiguration_time</a>() &gt;= epoch_interval) {
         <a href="reconfiguration_with_dkg.md#0x1_reconfiguration_with_dkg_try_start">reconfiguration_with_dkg::try_start</a>();
+        <a href="reconfiguration_with_dkg.md#0x1_reconfiguration_with_dkg_try_advance_reconfig">reconfiguration_with_dkg::try_advance_reconfig</a>();
     };
 }
 </code></pre>
@@ -767,7 +768,7 @@ reconfiguration with DKG and Chunky DKG after epoch timed out.
 
     <b>if</b> (<a href="timestamp.md#0x1_timestamp">timestamp</a> - <a href="reconfiguration.md#0x1_reconfiguration_last_reconfiguration_time">reconfiguration::last_reconfiguration_time</a>() &gt;= epoch_interval) {
         <a href="reconfiguration_with_dkg.md#0x1_reconfiguration_with_dkg_try_start_with_chunky_dkg">reconfiguration_with_dkg::try_start_with_chunky_dkg</a>();
-        <a href="reconfiguration_with_dkg.md#0x1_reconfiguration_with_dkg_try_complete_after_grace_period">reconfiguration_with_dkg::try_complete_after_grace_period</a>();
+        <a href="reconfiguration_with_dkg.md#0x1_reconfiguration_with_dkg_try_advance_reconfig">reconfiguration_with_dkg::try_advance_reconfig</a>();
     };
 }
 </code></pre>
