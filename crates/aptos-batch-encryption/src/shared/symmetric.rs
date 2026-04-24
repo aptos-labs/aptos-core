@@ -1,4 +1,7 @@
 // Copyright (c) Aptos Foundation
+// SPDX-License-Identifier: Apache-2.0
+
+// Copyright (c) Aptos Foundation
 // Licensed pursuant to the Innovation-Enabling Source Code License, available at https://github.com/aptos-labs/aptos-core/blob/main/LICENSE
 use crate::{
     errors::BatchEncryptionError,
@@ -9,7 +12,7 @@ use ark_std::Zero;
 use aes_gcm::{aead::Aead as _, aes::Aes128, AeadCore, Aes128Gcm, AesGcm, Key, KeySizeUser, Nonce};
 use anyhow::Result;
 use ark_ec::{hashing::{
-    curve_maps::wb::WBMap, map_to_curve_hasher::MapToCurveBasedHasher, 
+    curve_maps::wb::WBMap, map_to_curve_hasher::MapToCurveBasedHasher,
 }, short_weierstrass::SWCurveConfig as _, AffineRepr as _};
 use ark_ff::{field_hashers::{DefaultFieldHasher, HashToField}, Field as _};
 use ark_serialize::CanonicalSerialize as _;
@@ -183,10 +186,8 @@ pub fn hash_g2_element(g2_element: G2Affine) -> Result<G1Affine> {
             .unwrap();
         let mut ctr_bytes = Vec::from([ctr]);
         hash_source_bytes.append(&mut ctr_bytes);
-        println!("{:?}", hash_source_bytes);
         let field_hasher = <DefaultFieldHasher<Sha256> as HashToField<Fq>>::new(&[]);
         let [x]: [Fq; 1] = field_hasher.hash_to_field::<1>(&hash_source_bytes);
-        println!("{:?}", x);
 
         // Rust does not optimise away addition with zero
         use crate::group::G1Config;
@@ -195,12 +196,9 @@ pub fn hash_g2_element(g2_element: G2Affine) -> Result<G1Affine> {
             x3b += G1Config::mul_by_a(x);
         };
 
-        // TODO vary the sign of y??
         if let Some(x3b_sqrt) = x3b.sqrt() {
-            println!("{:?}", x3b_sqrt);
             let p = G1Affine::new_unchecked(x, x3b_sqrt).clear_cofactor();
             assert!(p.is_in_correct_subgroup_assuming_on_curve());
-            println!("{:?}", p);
             return Ok(p);
         }
     }

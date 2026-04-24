@@ -17,8 +17,8 @@ pub fn digest(c: &mut Criterion) {
     for batch_size in [32, 128, 512, 2048] {
         let mut rng = thread_rng();
         let tc = ShamirThresholdConfig::new(1, 1);
-        let (ek, dk, _, _) =
-            FPTXSuccinct::setup_for_testing(rng.r#gen(), batch_size, 1, &tc).unwrap();
+        let (ek, dk, _, _, _, _) =
+            FPTXSuccinct::setup_for_testing(rng.r#gen(), batch_size, 1, &tc, &tc).unwrap();
 
         let msg: String = String::from("hi");
         let associated_data: String = String::from("");
@@ -43,8 +43,8 @@ pub fn encrypt(c: &mut Criterion) {
     for batch_size in [32, 128, 512, 2048] {
         let mut rng = thread_rng();
         let tc = ShamirThresholdConfig::new(1, 1);
-        let (ek, _dk, _, _) =
-            FPTXSuccinct::setup_for_testing(rng.r#gen(), batch_size, 1, &tc).unwrap();
+        let (ek, dk, _, _, _, _) =
+            FPTXSuccinct::setup_for_testing(rng.r#gen(), batch_size, 1, &tc, &tc).unwrap();
 
         let msg: String = rng
             .sample_iter(&Alphanumeric)
@@ -69,8 +69,8 @@ pub fn verify_ct(c: &mut Criterion) {
     for batch_size in [32, 128, 512, 2048] {
         let mut rng = thread_rng();
         let tc = ShamirThresholdConfig::new(1, 1);
-        let (ek, _dk, _, _) =
-            FPTXSuccinct::setup_for_testing(rng.r#gen(), batch_size, 1, &tc).unwrap();
+        let (ek, dk, _, _, _, _) =
+            FPTXSuccinct::setup_for_testing(rng.r#gen(), batch_size, 1, &tc, &tc).unwrap();
 
         let msg: String = String::from("hi");
         let associated_data = String::from("");
@@ -90,8 +90,8 @@ pub fn eval_proofs_compute_all(c: &mut Criterion) {
     for batch_size in [32, 128, 256, 512, 2048] {
         let mut rng = thread_rng();
         let tc = ShamirThresholdConfig::new(1, 1);
-        let (ek, dk, _, _) =
-            FPTXSuccinct::setup_for_testing(rng.r#gen(), batch_size, 1, &tc).unwrap();
+        let (ek, dk, _, _, _, _) =
+            FPTXSuccinct::setup_for_testing(rng.r#gen(), batch_size, 1, &tc, &tc).unwrap();
 
         let msg: String = String::from("hi");
         let associated_data = String::from("");
@@ -119,8 +119,8 @@ pub fn eval_proofs_compute_all_2(c: &mut Criterion) {
     for batch_size in [32, 128, 256, 512, 2048] {
         let mut rng = thread_rng();
         let tc = ShamirThresholdConfig::new(1, 1);
-        let (ek, dk, _, _) =
-            FPTXSuccinct::setup_for_testing(rng.r#gen(), batch_size, 1, &tc).unwrap();
+        let (ek, dk, _, _, _, _) =
+            FPTXSuccinct::setup_for_testing(rng.r#gen(), batch_size, 1, &tc, &tc).unwrap();
 
         let msg: String = String::from("hi");
         let associated_data = String::from("");
@@ -151,8 +151,8 @@ pub fn derive_decryption_key_share(c: &mut Criterion) {
         let t = n * 2 / 3 + 1;
         let mut rng = thread_rng();
         let tc = ShamirThresholdConfig::new(t, n);
-        let (ek, dk, _, msk_shares) =
-            FPTXSuccinct::setup_for_testing(rng.r#gen(), batch_size, 1, &tc).unwrap();
+        let (ek, dk, _, msk_shares, _, _) =
+            FPTXSuccinct::setup_for_testing(rng.r#gen(), batch_size, 1, &tc, &tc).unwrap();
 
         let msg: String = String::from("hi");
         let associated_data = String::from("");
@@ -181,8 +181,8 @@ pub fn verify_decryption_key_share(c: &mut Criterion) {
     for batch_size in [32, 128, 512, 2048] {
         let mut rng = thread_rng();
         let tc = ShamirThresholdConfig::new(1, 1);
-        let (ek, dk, vks, msk_shares) =
-            FPTXSuccinct::setup_for_testing(rng.r#gen(), batch_size, 1, &tc).unwrap();
+        let (ek, dk, vks, msk_shares, _, _) =
+            FPTXSuccinct::setup_for_testing(rng.r#gen(), batch_size, 1, &tc, &tc).unwrap();
 
         let msg: String = String::from("hi");
         let associated_data = String::from("");
@@ -214,8 +214,8 @@ pub fn reconstruct_decryption_key(c: &mut Criterion) {
         let t = n * 2 / 3 + 1;
         let mut rng = thread_rng();
         let tc = ShamirThresholdConfig::new(t, n);
-        let (ek, dk, _, msk_shares) =
-            FPTXSuccinct::setup_for_testing(rng.r#gen(), batch_size, 1, &tc).unwrap();
+        let (ek, dk, _, msk_shares, _, _) =
+            FPTXSuccinct::setup_for_testing(rng.r#gen(), batch_size, 1, &tc, &tc).unwrap();
 
         let msg: String = String::from("hi");
         let associated_data = String::from("");
@@ -248,8 +248,8 @@ pub fn prepare(c: &mut Criterion) {
     for batch_size in [32, 128, 512, 2048] {
         let mut rng = thread_rng();
         let tc = ShamirThresholdConfig::new(1, 1);
-        let (ek, dk, _, _) =
-            FPTXSuccinct::setup_for_testing(rng.r#gen(), batch_size, 1, &tc).unwrap();
+        let (ek, dk, _, _, _, _) =
+            FPTXSuccinct::setup_for_testing(rng.r#gen(), batch_size, 1, &tc, &tc).unwrap();
 
         let msg: String = String::from("hi");
         let associated_data = String::from("");
@@ -279,8 +279,8 @@ pub fn decrypt(c: &mut Criterion) {
     for batch_size in [32, 128, 512, 2048] {
         let mut rng = thread_rng();
         let tc = ShamirThresholdConfig::new(1, 1);
-        let (ek, dk, _, msk_shares) =
-            FPTXSuccinct::setup_for_testing(rng.r#gen(), batch_size, 1, &tc).unwrap();
+        let (ek, dk, _, msk_shares, _, _) =
+            FPTXSuccinct::setup_for_testing(rng.r#gen(), batch_size, 1, &tc, &tc).unwrap();
 
         let msg: String = String::from("hi");
         let associated_data = String::from("");
