@@ -427,6 +427,13 @@ impl AptosVM {
         EXECUTION_CONCURRENCY_LEVEL.set(concurrency_level).ok();
     }
 
+    /// Initialize the dedicated rayon pool used by Move natives that spawn
+    /// rayon work (e.g. multi-scalar-mul, pairings). Only the first call
+    /// succeeds; subsequent calls are ignored.
+    pub fn init_native_rayon_pool_once(num_threads: usize) {
+        aptos_native_interface::init_native_rayon_pool(num_threads).ok();
+    }
+
     /// Get the concurrency level if already set, otherwise return default 1
     /// (sequential execution).
     ///

@@ -3396,6 +3396,7 @@ dependencies = [
 name = "aptos-native-interface"
 version = "0.1.0"
 dependencies = [
+ "anyhow",
  "aptos-gas-algebra",
  "aptos-gas-schedule",
  "aptos-types",
@@ -3403,6 +3404,8 @@ dependencies = [
  "move-core-types",
  "move-vm-runtime",
  "move-vm-types",
+ "once_cell",
+ "rayon",
  "smallvec",
 ]
 
