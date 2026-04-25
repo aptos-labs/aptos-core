@@ -19,7 +19,7 @@ use crate::{
 };
 use anyhow::{anyhow, bail, ensure, Context, Result};
 use aptos_channels::{aptos_channel, message_queues::QueueStyle};
-use aptos_crypto::{hash::CryptoHash, HashValue, SigningKey, Uniform};
+use aptos_crypto::{bls12381, hash::CryptoHash, HashValue, SigningKey, Uniform};
 use aptos_dkg::pvss::{traits::transcript::Aggregatable, Player};
 use aptos_infallible::{duration_since_epoch, RwLock};
 use aptos_logger::{debug, error, info, warn};
@@ -86,6 +86,8 @@ enum InnerState {
         vtxn_guard: TxnGuard,
         start_time: Duration,
         my_transcript: Arc<ChunkyDKGTranscript>,
+        aggregated_subtranscript: Arc<AggregatedSubtranscript>,
+        dkg_config: Arc<ChunkyDKGSession>,
         proposed: bool,
     },
 }
@@ -542,6 +544,8 @@ impl ChunkyDKGManager {
         let InnerState::AwaitAggregatedSubtranscriptCertification {
             start_time,
             my_transcript,
+            aggregated_subtranscript: local_agg_subtrx,
+            dkg_config,
             ..
         } = mem::take(&mut self.state)
         else {
@@ -558,12 +562,13 @@ impl ChunkyDKGManager {
         info!("[ChunkyDKG] deriving encryption key");
         // Derive encryption key from subtranscript + DigestKey.
         // Heavy pairing-based crypto — run off the main loop.
+        let agg_subtrx_for_blocking = Arc::clone(&aggregated_subtranscript);
         let (encryption_key_bytes, transcript_bytes) = tokio::task::spawn_blocking(move || {
             let digest_key = DIGEST_KEY
                 .as_ref()
                 .ok_or_else(|| anyhow!("DigestKey not available; cannot derive encryption key"))?;
-            let key = aggregated_subtranscript.derive_encryption_key_bytes(digest_key.tau_g2)?;
-            let bytes = bcs::to_bytes(&aggregated_subtranscript)
+            let key = agg_subtrx_for_blocking.derive_encryption_key_bytes(digest_key.tau_g2)?;
+            let bytes = bcs::to_bytes(agg_subtrx_for_blocking.as_ref())
                 .map_err(|e| anyhow!("transcript serialization error: {e}"))?;
             counters::CHUNKY_DKG_OBJECT_SIZE_BYTES
                 .with_label_values(&["aggregated_subtranscript"])
@@ -604,10 +609,13 @@ impl ChunkyDKGManager {
             my_addr = self.my_addr,
             "[ChunkyDKG] aggregated transcript put into vtxn pool."
         );
+        let _ = local_agg_subtrx;
         self.state = InnerState::Finished {
             vtxn_guard,
             start_time,
             my_transcript,
+            aggregated_subtranscript,
+            dkg_config,
             proposed: false,
         };
         Ok(())
@@ -756,14 +764,16 @@ impl ChunkyDKGManager {
     ) -> Result<()> {
         let (aggregated_transcript, dkg_config) = match &self.state {
             InnerState::AwaitAggregatedSubtranscriptCertification {
-                aggregated_subtranscript: aggregated_transcript,
+                aggregated_subtranscript,
                 dkg_config,
                 ..
-            } => (Arc::clone(aggregated_transcript), Arc::clone(dkg_config)),
+            }
+            | InnerState::Finished {
+                aggregated_subtranscript,
+                dkg_config,
+                ..
+            } => (Arc::clone(aggregated_subtranscript), Arc::clone(dkg_config)),
             _ => {
-                // Send error response instead of dropping response_sender.
-                // Drop = timeout = exponential backoff blowup on the requester side.
-                // Error = quick retry.
                 response_sender.send(Err(anyhow!(
                     "[ChunkyDKG] not ready for signature requests in state {:?}",
                     self.state.variant_name()
@@ -774,13 +784,11 @@ impl ChunkyDKGManager {
 
         let req_subtranscript_hash = req.subtranscript_hash;
 
-        // Skip-if-running: if a handler for this sender with the same subtranscript_hash
-        // is still running, skip spawning a new one. This prevents ReliableBroadcast retries
-        // from aborting a handler that is sleeping (delay+poll) or fetching.
-        // Two-level if: keeps pattern binding separate from boolean guard for readability.
-        #[allow(clippy::collapsible_if)]
-        if let Some((existing_hash, handle)) = self.rpc_handler_guards.get(&sender) {
-            if *existing_hash == req.subtranscript_hash && !handle.is_finished() {
+        // Rate limit: at most one concurrent handler per sender. This prevents
+        // a malicious validator from spawning many expensive handlers by varying
+        // the subtranscript hash. Also deduplicates ReliableBroadcast retries.
+        if let Some((_existing_hash, handle)) = self.rpc_handler_guards.get(&sender) {
+            if !handle.is_finished() {
                 counters::CHUNKY_DKG_SIGNATURE_REQUEST_SKIPPED.inc();
                 response_sender.send(Err(anyhow!(
                     "handler already in-flight for sender {}",
@@ -837,90 +845,63 @@ impl ChunkyDKGManager {
         Ok(())
     }
 
-    /// Detect mismatched or missing dealers by comparing per-dealer hashes against
-    /// the received transcripts map. Uses precomputed transcript hashes.
-    fn detect_mismatches(
-        dealer_addresses: &[AccountAddress],
-        expected_hashes: &[HashValue],
-        received_transcripts: &RwLock<HashMap<AccountAddress, ChunkyTranscriptWithHash>>,
-    ) -> Result<(Vec<ChunkySubtranscript>, Vec<AccountAddress>)> {
-        let map = received_transcripts.read();
-        let mut subtranscripts = Vec::new();
-        let mut mismatched = Vec::new();
-        for (i, addr) in dealer_addresses.iter().enumerate() {
-            match map.get(addr) {
-                Some(twh) => {
-                    if twh.hash() == expected_hashes[i] {
-                        subtranscripts.push(twh.get_subtranscript());
-                    } else {
-                        mismatched.push(*addr);
-                    }
-                },
-                None => mismatched.push(*addr),
-            }
-        }
-        Ok((subtranscripts, mismatched))
-    }
-
-    /// Handle subtranscript validation computation.
-    async fn handle_subtranscript_signature_request(
+    /// Resolve all subtranscripts required by a signature request: validate the bitmask,
+    /// check local storage, poll for late arrivals, and fetch any still-missing transcripts.
+    async fn resolve_subtranscripts(
         sender: AccountAddress,
-        req: ChunkyDKGSubtranscriptSignatureRequest,
-        local_aggregated_transcript: Arc<AggregatedSubtranscript>,
-        dkg_config: Arc<ChunkyDKGSession>,
-        ssk: Arc<DealerPrivateKey>,
-        _my_addr: AccountAddress,
-        received_transcripts: Arc<RwLock<HashMap<AccountAddress, ChunkyTranscriptWithHash>>>,
-        epoch_state: Arc<EpochState>,
+        req: &ChunkyDKGSubtranscriptSignatureRequest,
+        received_transcripts: &Arc<RwLock<HashMap<AccountAddress, ChunkyTranscriptWithHash>>>,
+        epoch_state: &Arc<EpochState>,
+        dkg_config: &Arc<ChunkyDKGSession>,
         network_sender: Arc<NetworkSender>,
-    ) -> Result<DKGMessage> {
-        // In the miniscule chance that the locally aggregated subtranscript is the same as the
-        // remote transcript, we can just sign and return immediately.
-        if local_aggregated_transcript.hash() == req.subtranscript_hash {
-            let signature = ssk
-                .sign(local_aggregated_transcript.as_ref())
-                .map_err(|e| anyhow!("failed to sign subtranscript validation: {:?}", e))?;
-
-            let response = DKGMessage::SubtranscriptSignatureResponse(
-                ChunkyDKGSubtranscriptSignatureResponse::new(
-                    req.dealer_epoch,
-                    req.subtranscript_hash,
-                    signature,
-                ),
-            );
-
-            return Ok(response);
-        }
-
-        // Validate bitmask dimensions.
+    ) -> Result<Vec<ChunkySubtranscript>> {
         let num_validators = epoch_state.verifier.len();
         let ordered_addrs = epoch_state.verifier.get_ordered_account_addresses();
-        ensure!(
-            req.dealer_bitmask.last_set_bit().map_or(true, |b| (b as usize) < num_validators),
-            "dealer_bitmask contains out-of-range bits"
-        );
         let num_dealers = req.dealer_bitmask.count_ones() as usize;
         ensure!(num_dealers > 0, "dealer_bitmask is empty");
+        ensure!(
+            req.dealer_bitmask
+                .last_set_bit()
+                .expect("bitmask cannot be empty")
+                < num_validators as u16,
+            "dealer_bitmask contains out-of-range bits"
+        );
         ensure!(
             req.dealer_transcript_hashes.len() == num_dealers,
             "dealer_transcript_hashes length mismatch with dealer_bitmask popcount"
         );
 
-        // Convert bitmask to dealer addresses (ascending validator index order).
-        let dealer_addresses: Vec<AccountAddress> = req
+        // Safety: last_set_bit check above guarantees all indices are < num_validators.
+        let dealers: Vec<(AccountAddress, HashValue)> = req
             .dealer_bitmask
             .iter_ones()
             .map(|idx| ordered_addrs[idx])
+            .zip(req.dealer_transcript_hashes.iter().copied())
             .collect();
 
-        // First check for mismatches.
-        let (mut subtranscripts, mismatched_dealers) = Self::detect_mismatches(
-            &dealer_addresses,
-            &req.dealer_transcript_hashes,
-            &received_transcripts,
-        )?;
+        epoch_state
+            .verifier
+            .check_voting_power(dealers.iter().map(|(addr, _)| addr), true)
+            .map_err(|e| anyhow!("dealer set does not meet quorum: {:?}", e))?;
 
-        if !mismatched_dealers.is_empty() {
+        let check_local = || {
+            let map = received_transcripts.read();
+            let mut subtranscripts = Vec::new();
+            let mut missing = Vec::new();
+            for &(addr, expected_hash) in &dealers {
+                match map.get(&addr) {
+                    Some(twh) if twh.hash() == expected_hash => {
+                        subtranscripts.push(twh.get_subtranscript())
+                    },
+                    _ => missing.push(addr),
+                }
+            }
+            (subtranscripts, missing)
+        };
+
+        let (mut subtranscripts, missing_dealers) = check_local();
+
+        if !missing_dealers.is_empty() {
             // Poll received_transcripts to let the aggregator resolve mismatches.
             // Most of the time, the aggregator collects all needed transcripts
             // within this window, eliminating the need to fetch entirely.
@@ -934,43 +915,35 @@ impl ChunkyDKGManager {
             );
             let deadline = tokio::time::Instant::now() + MAX_WAIT + jitter;
 
-            let (mut fresh_subtranscripts, mut still_missing) =
-                (subtranscripts.clone(), mismatched_dealers.clone());
+            let mut still_missing = missing_dealers.clone();
             while tokio::time::Instant::now() < deadline {
                 tokio::time::sleep(POLL_INTERVAL).await;
-                let (s, m) = Self::detect_mismatches(
-                    &dealer_addresses,
-                    &req.dealer_transcript_hashes,
-                    &received_transcripts,
-                )?;
-                fresh_subtranscripts = s;
+                let (s, m) = check_local();
+                subtranscripts = s;
                 still_missing = m;
                 if still_missing.is_empty() {
                     break;
                 }
             }
-            subtranscripts = fresh_subtranscripts;
 
-            // Log how many mismatches the delay resolved.
-            let resolved = mismatched_dealers.len().saturating_sub(still_missing.len());
+            let resolved = missing_dealers.len().saturating_sub(still_missing.len());
             info!(
                 sender = sender,
-                initial_mismatches = mismatched_dealers.len(),
+                initial_mismatches = missing_dealers.len(),
                 resolved_by_delay = resolved,
                 still_missing = still_missing.len(),
                 "[ChunkyDKG] Post-delay recheck: {}/{} mismatches resolved by aggregator",
                 resolved,
-                mismatched_dealers.len(),
+                missing_dealers.len(),
             );
 
-            // Fetch only if still needed.
             if !still_missing.is_empty() {
                 let fetcher = TranscriptFetcher::new(
                     sender,
                     req.dealer_epoch,
                     still_missing,
                     Duration::from_secs(10),
-                    Arc::clone(&dkg_config),
+                    Arc::clone(dkg_config),
                     epoch_state.clone(),
                 );
                 let fetched = monitor!(
@@ -1005,37 +978,90 @@ impl ChunkyDKGManager {
             "Not enough subtranscripts"
         );
 
-        // Aggregate subtranscripts in projective form, then normalize (same logic as chunky_agg_trx_producer)
-        let recomputed_subtranscript =
-            ChunkySubtranscript::aggregate(&dkg_config.threshold_config, subtranscripts)
-                .context("failed to aggregate subtranscripts")?;
-        let recomputed_aggsubtranscript = AggregatedSubtranscript {
-            dealer_epoch: req.dealer_epoch,
-            subtranscript: recomputed_subtranscript,
-            dealer_bitmask: req.dealer_bitmask.clone(),
-        };
+        Ok(subtranscripts)
+    }
 
-        // Verify the hash matches
-        ensure!(
-            recomputed_aggsubtranscript.hash() == req.subtranscript_hash,
-            "subtranscript hash mismatch in validation request"
-        );
+    /// Aggregate resolved subtranscripts, verify the hash matches the request, and sign.
+    /// CPU-heavy work runs inside `spawn_blocking`.
+    async fn aggregate_and_sign(
+        subtranscripts: Vec<ChunkySubtranscript>,
+        req: &ChunkyDKGSubtranscriptSignatureRequest,
+        dkg_config: &ChunkyDKGSession,
+        ssk: &Arc<DealerPrivateKey>,
+    ) -> Result<(AggregatedSubtranscript, bls12381::Signature)> {
+        let dealer_epoch = req.dealer_epoch;
+        let dealer_bitmask = req.dealer_bitmask.clone();
+        let subtranscript_hash = req.subtranscript_hash;
+        let threshold_config = dkg_config.threshold_config.clone();
+        let ssk = Arc::clone(ssk);
+        tokio::task::spawn_blocking(move || {
+            let recomputed_subtranscript =
+                ChunkySubtranscript::aggregate(&threshold_config, subtranscripts)
+                    .context("failed to aggregate subtranscripts")?;
+            let recomputed = AggregatedSubtranscript {
+                dealer_epoch,
+                subtranscript: recomputed_subtranscript,
+                dealer_bitmask,
+            };
+            ensure!(
+                recomputed.hash() == subtranscript_hash,
+                "subtranscript hash mismatch in validation request"
+            );
+            let sig = ssk
+                .sign(&recomputed)
+                .map_err(|e| anyhow!("failed to sign subtranscript validation: {:?}", e))?;
+            Ok((recomputed, sig))
+        })
+        .await
+        .map_err(|e| anyhow!("spawn_blocking join error: {e}"))?
+    }
 
-        // Sign over the subtranscript hash
-        let signature = ssk
-            .sign(&recomputed_aggsubtranscript)
-            .map_err(|e| anyhow!("failed to sign subtranscript validation: {:?}", e))?;
+    /// Handle subtranscript validation computation.
+    async fn handle_subtranscript_signature_request(
+        sender: AccountAddress,
+        req: ChunkyDKGSubtranscriptSignatureRequest,
+        local_aggregated_transcript: Arc<AggregatedSubtranscript>,
+        dkg_config: Arc<ChunkyDKGSession>,
+        ssk: Arc<DealerPrivateKey>,
+        _my_addr: AccountAddress,
+        received_transcripts: Arc<RwLock<HashMap<AccountAddress, ChunkyTranscriptWithHash>>>,
+        epoch_state: Arc<EpochState>,
+        network_sender: Arc<NetworkSender>,
+    ) -> Result<DKGMessage> {
+        // Fast path: local aggregated transcript matches — sign and return immediately.
+        if local_aggregated_transcript.hash() == req.subtranscript_hash {
+            let signature = ssk
+                .sign(local_aggregated_transcript.as_ref())
+                .map_err(|e| anyhow!("failed to sign subtranscript validation: {:?}", e))?;
+            return Ok(DKGMessage::SubtranscriptSignatureResponse(
+                ChunkyDKGSubtranscriptSignatureResponse::new(
+                    req.dealer_epoch,
+                    req.subtranscript_hash,
+                    signature,
+                ),
+            ));
+        }
 
-        // Build and send a response message
-        let response = DKGMessage::SubtranscriptSignatureResponse(
+        let subtranscripts = Self::resolve_subtranscripts(
+            sender,
+            &req,
+            &received_transcripts,
+            &epoch_state,
+            &dkg_config,
+            network_sender,
+        )
+        .await?;
+
+        let (_recomputed, signature) =
+            Self::aggregate_and_sign(subtranscripts, &req, &dkg_config, &ssk).await?;
+
+        Ok(DKGMessage::SubtranscriptSignatureResponse(
             ChunkyDKGSubtranscriptSignatureResponse::new(
                 req.dealer_epoch,
                 req.subtranscript_hash,
                 signature,
             ),
-        );
-
-        Ok(response)
+        ))
     }
 
     #[cfg(test)]
