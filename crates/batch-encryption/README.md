@@ -12,14 +12,10 @@
   `src/shared/ciphertext/mod.rs`, which generically turns a batch IBE ciphertext
   into a non-malleable (non-IBE) ciphertext. To do this, it uses various
   symmetric crypto primitives defined in `src/shared/symmetric.rs`.
-  - **Note: `src/shared/ciphertext/bibe_succinct.rs` is part of
-    `FPTXSuccinct`, and is not used in production.**
 - Block-specific decryption key reconstruction and verification are in
   `src/shared/key_derivation.rs`.
 - Types/code related to digest computation are in `src/shared/digest.rs`
   and `src/shared/ids.rs`.
 - Various required algebraic operations are implemented in
   `src/shared/algebra`. Most notably of these, two implementations of the
-  generalized FK algorithm are in `src/shared/algebra/fk_algorithm.rs`. We
-  currently only use the more naive of these two implementations, as it is
-  faster for our batch size.
+  generalized FK algorithm are in `src/shared/algebra/fk_algorithm.rs`. 
