@@ -41,6 +41,15 @@ impl BlockEpiloguePayload {
             Self::V1 { block_end_info, .. } => Some(&block_end_info.to_make_hot),
         }
     }
+
+    /// Replace the in-memory `to_make_hot` set on a V1 payload. No-op for V0.
+    /// `to_make_hot` is not serialized (see Serialize/Deserialize impls below), so this
+    /// can be called after the epilogue has executed without affecting on-wire identity.
+    pub fn try_set_keys_to_make_hot(&mut self, to_make_hot: BTreeSet<StateKey>) {
+        if let Self::V1 { block_end_info, .. } = self {
+            block_end_info.set_keys_to_make_hot(to_make_hot);
+        }
+    }
 }
 
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
@@ -127,6 +136,10 @@ impl<Key: Debug + Ord> TBlockEndInfoExt<Key> {
 
     pub fn to_persistent(&self) -> BlockEndInfo {
         self.inner.clone()
+    }
+
+    pub fn set_keys_to_make_hot(&mut self, to_make_hot: BTreeSet<Key>) {
+        self.to_make_hot = to_make_hot;
     }
 }
 

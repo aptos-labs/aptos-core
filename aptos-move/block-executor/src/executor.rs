@@ -25,7 +25,7 @@ use crate::{
     txn_commit_hook::TransactionCommitHook,
     txn_last_input_output::TxnLastInputOutput,
     txn_provider::TxnProvider,
-    types::ReadWriteSummary,
+    types::{InputOutputKey, ReadWriteSummary},
     view::{LatestView, ParallelState, SequentialState, ViewState},
 };
 use aptos_aggregator::{
@@ -1749,6 +1749,13 @@ where
                     runtime_environment,
                     &self.config,
                 )?;
+
+                // Snapshot the epilogue's write summary before materialization
+                // consumes the underlying VMOutput. The matching read set stays in
+                // last_input_output and is grabbed inside the helper.
+                let epilogue_write_summary =
+                    last_input_output.write_summary_pre_materialization(epilogue_txn_idx)?;
+
                 self.materialize_txn_commit(
                     epilogue_txn_idx,
                     scheduler,
@@ -1759,6 +1766,21 @@ where
                     epilogue_txn_idx,
                     num_txns as TxnIndex,
                     shared_sync_params,
+                )?;
+
+                // Fold the epilogue's own reads/writes into the hot-state accumulator,
+                // then re-snapshot and stamp the augmented `to_make_hot` back onto the
+                // in-memory epilogue payload. The payload's `to_make_hot` is non-serialized
+                // (see TBlockEndInfoExt), so this mutation is safe post-execution and only
+                // affects what `do_get_execution_output` later writes into the epilogue's
+                // hotness write set.
+                let mut epilogue_txn = epilogue_txn;
+                Self::fold_epilogue_into_hot_state(
+                    &mut epilogue_txn,
+                    epilogue_txn_idx,
+                    last_input_output,
+                    epilogue_write_summary,
+                    block_limit_processor,
                 )?;
 
                 maybe_block_epilogue_txn = Some(epilogue_txn);
@@ -2105,6 +2127,35 @@ where
             final_results.into_inner(),
             maybe_block_epilogue_txn,
         ))
+    }
+
+    /// After the block epilogue has executed, fold its captured reads/writes into the
+    /// hot-state accumulator and replace the in-memory `to_make_hot` on the epilogue
+    /// payload with the augmented snapshot. See the call site for rationale.
+    fn fold_epilogue_into_hot_state(
+        epilogue_txn: &mut T,
+        epilogue_txn_idx: TxnIndex,
+        last_input_output: &TxnLastInputOutput<T, E::Output>,
+        write_summary: HashSet<InputOutputKey<T::Key, T::Tag>>,
+        block_limit_processor: &ExplicitSyncWrapper<BlockGasLimitProcessor<T>>,
+    ) -> Result<(), PanicError> {
+        let Some((reads, _speculative_failure)) = last_input_output.read_set(epilogue_txn_idx)
+        else {
+            // Nothing to fold in if no read set was captured (e.g. epilogue was skipped).
+            return Ok(());
+        };
+        let read_summary = reads.get_read_summary();
+
+        let rw_summary = ReadWriteSummary::<T>::new(read_summary, write_summary);
+
+        let augmented = {
+            let mut processor = block_limit_processor.acquire();
+            processor.add_epilogue_to_hot_state_accumulator(rw_summary);
+            processor.get_keys_to_make_hot()
+        };
+
+        epilogue_txn.try_set_block_epilogue_keys_to_make_hot(augmented);
+        Ok(())
     }
 
     fn gen_block_epilogue<'a>(
@@ -2629,6 +2680,19 @@ where
                 }
                 idx = num_txns;
             }
+        }
+
+        // Sequential path runs the epilogue through the same loop that feeds
+        // user-txn reads/writes into the accumulator (see accumulate_fee_statement
+        // call above), so the accumulator already reflects user + epilogue. The
+        // payload was, however, constructed before the epilogue executed, with the
+        // user-only snapshot. Re-snapshot now and stamp the augmented set onto the
+        // in-memory epilogue payload (`to_make_hot` is non-serialized — see
+        // TBlockEndInfoExt — so this is safe post-execution).
+        if let Some(epilogue_txn) = block_epilogue_txn.as_mut() {
+            epilogue_txn.try_set_block_epilogue_keys_to_make_hot(
+                block_limit_processor.get_keys_to_make_hot(),
+            );
         }
 
         block_limit_processor.finish_sequential_update_counters_and_log_info(

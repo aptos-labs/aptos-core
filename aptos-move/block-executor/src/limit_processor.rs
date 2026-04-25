@@ -255,6 +255,31 @@ impl<T: Transaction> BlockGasLimitProcessor<T> {
         self.finish_update_counters_and_log_info(false, num_committed, num_total, 1)
     }
 
+    /// After the block epilogue has executed, fold its own reads/writes into the
+    /// hot-state accumulator so that keys it read but did not write get promoted as
+    /// well. The caller should subsequently re-snapshot via `get_keys_to_make_hot`
+    /// and stamp the result back onto the in-memory epilogue payload.
+    ///
+    /// Mirrors the user-txn aggregation path in `accumulate_fee_statement`: groups
+    /// are collapsed to their parent resource key unless granular conflicts are
+    /// configured.
+    pub(crate) fn add_epilogue_to_hot_state_accumulator(
+        &mut self,
+        rw_summary: ReadWriteSummary<T>,
+    ) {
+        let rw_summary = if self
+            .block_gas_limit_type
+            .use_granular_resource_group_conflicts()
+        {
+            rw_summary
+        } else {
+            rw_summary.collapse_resource_group_conflicts()
+        };
+        if let Some(x) = &mut self.hot_state_op_accumulator {
+            x.add_transaction(rw_summary.keys_written(), rw_summary.keys_read());
+        }
+    }
+
     pub(crate) fn get_block_end_info(&self) -> TBlockEndInfoExt<T::Key> {
         let inner = BlockEndInfo::V0 {
             block_gas_limit_reached: self
@@ -278,7 +303,7 @@ impl<T: Transaction> BlockGasLimitProcessor<T> {
         TBlockEndInfoExt::new(inner, to_make_hot)
     }
 
-    fn get_keys_to_make_hot(&self) -> BTreeSet<T::Key> {
+    pub(crate) fn get_keys_to_make_hot(&self) -> BTreeSet<T::Key> {
         if self.hot_state_op_accumulator.is_none() {
             warn!("BlockHotStateOpAccumulator is not set.");
         }
