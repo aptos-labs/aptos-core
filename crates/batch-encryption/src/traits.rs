@@ -114,8 +114,6 @@ pub trait BatchThresholdEncryption {
     /// passed into the encrypt fn.
     fn verify_ct(ct: &Self::Ciphertext, associated_data: &impl AssociatedData) -> Result<()>;
 
-    /// Although I'd like to expose as little of the identities as possible, Daniel told me that
-    /// knowing the ID of a ciphertext will potentially help with deduplication.
     fn ct_id(ct: &Self::Ciphertext) -> Self::Id;
 
     /// Compute KZG eval proofs. This will be the most expensive operation in the scheme.
