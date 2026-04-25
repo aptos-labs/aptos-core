@@ -1,6 +1,7 @@
 // Copyright (c) Aptos Foundation
 // Licensed pursuant to the Innovation-Enabling Source Code License, available at https://github.com/aptos-labs/aptos-core/blob/main/LICENSE
 
+use aptos_logger::prelude::{sample, SampleRate};
 use axum::{
     body::Body,
     extract::MatchedPath,
@@ -9,7 +10,6 @@ use axum::{
     response::Response,
     Router,
 };
-use aptos_logger::prelude::{sample, SampleRate};
 use std::time::{Duration, Instant};
 
 pub fn logger<S>(router: Router<S>) -> Router<S>

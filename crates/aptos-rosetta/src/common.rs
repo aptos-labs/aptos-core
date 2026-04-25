@@ -9,12 +9,6 @@ use crate::{
     },
     RosettaContext,
 };
-use axum::{
-    extract::State,
-    http::StatusCode,
-    response::{IntoResponse, Response},
-    Json,
-};
 use aptos_crypto::{ValidCryptoMaterial, ValidCryptoMaterialStringExt};
 use aptos_logger::debug;
 use aptos_rest_client::{Account, Response as RestResponse};
@@ -23,6 +17,12 @@ use aptos_sdk::move_types::{
     language_storage::{StructTag, TypeTag},
 };
 use aptos_types::{account_address::AccountAddress, chain_id::ChainId};
+use axum::{
+    extract::State,
+    http::StatusCode,
+    response::{IntoResponse, Response},
+    Json,
+};
 use serde::{de::DeserializeOwned, Serialize};
 use std::{collections::HashSet, fmt::LowerHex, str::FromStr};
 

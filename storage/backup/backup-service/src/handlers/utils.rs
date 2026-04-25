@@ -2,17 +2,17 @@
 // Licensed pursuant to the Innovation-Enabling Source Code License, available at https://github.com/aptos-labs/aptos-core/blob/main/LICENSE
 
 use crate::handlers::bytes_sender;
-use axum::{
-    body::Body,
-    http::StatusCode,
-    response::{IntoResponse, Response},
-};
 use aptos_db::{backup::backup_handler::BackupHandler, metrics::BACKUP_TIMER};
 use aptos_logger::prelude::*;
 use aptos_metrics_core::{
     register_histogram_vec, register_int_counter_vec, HistogramVec, IntCounterVec, TimerHelper,
 };
 use aptos_storage_interface::Result as DbResult;
+use axum::{
+    body::Body,
+    http::StatusCode,
+    response::{IntoResponse, Response},
+};
 use once_cell::sync::Lazy;
 use serde::Serialize;
 
@@ -34,10 +34,7 @@ pub(super) static THROUGHPUT_COUNTER: Lazy<IntCounterVec> = Lazy::new(|| {
     .unwrap()
 });
 
-pub(super) fn reply_with_bcs_bytes<R: Serialize>(
-    endpoint: &str,
-    record: &R,
-) -> DbResult<Response> {
+pub(super) fn reply_with_bcs_bytes<R: Serialize>(endpoint: &str, record: &R) -> DbResult<Response> {
     let bytes = bcs::to_bytes(record)?;
     THROUGHPUT_COUNTER
         .with_label_values(&[endpoint])

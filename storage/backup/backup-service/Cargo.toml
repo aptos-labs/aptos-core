@@ -23,7 +23,6 @@ aptos-types = { workspace = true }
 axum = { workspace = true }
 bcs = { workspace = true }
 bytes = { workspace = true }
-hyper = { workspace = true }
 once_cell = { workspace = true }
 serde = { workspace = true }
 tokio = { workspace = true }

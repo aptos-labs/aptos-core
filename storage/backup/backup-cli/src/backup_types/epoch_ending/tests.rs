@@ -20,13 +20,13 @@ use aptos_config::utils::get_available_port;
 use aptos_db::AptosDB;
 use aptos_storage_interface::DbReader;
 use aptos_temppath::TempPath;
-use axum::{extract::Path, response::IntoResponse, routing::get, Router};
 use aptos_types::{
     aggregate_signature::AggregateSignature,
     ledger_info::LedgerInfoWithSignatures,
     proptest_types::{AccountInfoUniverse, LedgerInfoWithSignaturesGen},
     waypoint::Waypoint,
 };
+use axum::{extract::Path, response::IntoResponse, routing::get, Router};
 use proptest::{collection::vec, prelude::*};
 use std::{
     convert::TryInto,
@@ -177,9 +177,10 @@ async fn mock_backup_service_get_epoch_ending_lis(lis: Vec<LedgerInfoWithSignatu
         }),
     );
 
-    let listener = tokio::net::TcpListener::bind(SocketAddr::new(IpAddr::V4(Ipv4Addr::LOCALHOST), 0))
-        .await
-        .unwrap();
+    let listener =
+        tokio::net::TcpListener::bind(SocketAddr::new(IpAddr::V4(Ipv4Addr::LOCALHOST), 0))
+            .await
+            .unwrap();
     let addr = listener.local_addr().unwrap();
     tokio::spawn(async move {
         axum::serve(listener, app).await.unwrap();

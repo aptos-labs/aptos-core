@@ -31,7 +31,10 @@ pub fn json_rejection_to_service_error(err: JsonRejection) -> ServiceError {
 
 /// Maps axum [`BytesRejection`] to a [`ServiceError`] with the same JSON error envelope as other API errors.
 pub fn bytes_rejection_to_service_error(err: BytesRejection) -> ServiceError {
-    ServiceError::new(err.status(), ServiceErrorCode::RequestParseError(err.body_text()))
+    ServiceError::new(
+        err.status(),
+        ServiceErrorCode::RequestParseError(err.body_text()),
+    )
 }
 
 #[derive(Debug, ThisError)]

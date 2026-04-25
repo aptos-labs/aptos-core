@@ -11,24 +11,21 @@ use crate::{
     error::{ApiError, ApiResult},
     types::Currency,
 };
+use aptos_config::config::ApiConfig;
+use aptos_logger::debug;
+pub use aptos_types::account_address::AccountAddress;
+use aptos_types::chain_id::ChainId;
+use aptos_warp_webserver::{logger, WebServer};
 use axum::{
     extract::Query,
     http::{header::CONTENT_TYPE, Method},
-    response::IntoResponse,
-    response::Response,
+    response::{IntoResponse, Response},
     routing::{get, post},
-    Json,
-    Router,
+    Json, Router,
 };
-use aptos_config::config::ApiConfig;
-use aptos_logger::debug;
-use aptos_types::chain_id::ChainId;
-use aptos_warp_webserver::{logger, WebServer};
 use std::{collections::HashSet, sync::Arc};
 use tokio::task::JoinHandle;
 use tower_http::cors::{Any, CorsLayer};
-
-pub use aptos_types::account_address::AccountAddress;
 
 mod account;
 mod block;
@@ -174,36 +171,30 @@ pub async fn bootstrap_async(
 pub fn routes(context: RosettaContext) -> Router {
     logger(
         Router::new()
-        .route("/account/balance", post(account::account_balance_route))
-        .route("/block", post(block::block_route))
-        .route("/construction/combine", post(construction::combine_route))
-        .route("/construction/derive", post(construction::derive_route))
-        .route("/construction/hash", post(construction::hash_route))
-        .route(
-            "/construction/metadata",
-            post(construction::metadata_route),
-        )
-        .route("/construction/parse", post(construction::parse_route))
-        .route(
-            "/construction/payloads",
-            post(construction::payloads_route),
-        )
-        .route(
-            "/construction/preprocess",
-            post(construction::preprocess_route),
-        )
-        .route("/construction/submit", post(construction::submit_route))
-        .route("/network/list", post(network::network_list_route))
-        .route("/network/options", post(network::network_options_route))
-        .route("/network/status", post(network::network_status_route))
-        .route("/-/healthy", get(health_check_route))
-        .layer(
-            CorsLayer::new()
-                .allow_origin(Any)
-                .allow_methods([Method::GET, Method::POST])
-                .allow_headers([CONTENT_TYPE]),
-        )
-        .with_state(context)
+            .route("/account/balance", post(account::account_balance_route))
+            .route("/block", post(block::block_route))
+            .route("/construction/combine", post(construction::combine_route))
+            .route("/construction/derive", post(construction::derive_route))
+            .route("/construction/hash", post(construction::hash_route))
+            .route("/construction/metadata", post(construction::metadata_route))
+            .route("/construction/parse", post(construction::parse_route))
+            .route("/construction/payloads", post(construction::payloads_route))
+            .route(
+                "/construction/preprocess",
+                post(construction::preprocess_route),
+            )
+            .route("/construction/submit", post(construction::submit_route))
+            .route("/network/list", post(network::network_list_route))
+            .route("/network/options", post(network::network_options_route))
+            .route("/network/status", post(network::network_status_route))
+            .route("/-/healthy", get(health_check_route))
+            .layer(
+                CorsLayer::new()
+                    .allow_origin(Any)
+                    .allow_methods([Method::GET, Method::POST])
+                    .allow_headers([CONTENT_TYPE]),
+            )
+            .with_state(context),
     )
 }
 

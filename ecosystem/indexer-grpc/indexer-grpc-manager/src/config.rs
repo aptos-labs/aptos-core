@@ -5,9 +5,9 @@ use crate::grpc_manager::GrpcManager;
 use anyhow::Result;
 use aptos_indexer_grpc_server_framework::RunnableConfig;
 use aptos_indexer_grpc_utils::config::IndexerGrpcFileStoreConfig;
+use axum::response::Response;
 use serde::{Deserialize, Serialize};
 use std::net::SocketAddr;
-use axum::response::Response;
 use tokio::sync::OnceCell;
 
 pub(crate) static GRPC_MANAGER: OnceCell<GrpcManager> = OnceCell::const_new();

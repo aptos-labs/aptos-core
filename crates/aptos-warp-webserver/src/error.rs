@@ -2,12 +2,12 @@
 // Licensed pursuant to the Innovation-Enabling Source Code License, available at https://github.com/aptos-labs/aptos-core/blob/main/LICENSE
 
 use aptos_api_types::U64;
+use axum::http::StatusCode;
 use serde::{Deserialize, Serialize};
 use std::{
     convert::From,
     fmt::{self, Display},
 };
-use axum::http::StatusCode;
 
 #[derive(Clone, Debug, Deserialize, Serialize, PartialEq, Eq)]
 pub struct Error {

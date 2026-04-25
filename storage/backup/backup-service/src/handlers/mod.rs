@@ -7,19 +7,18 @@ mod utils;
 use crate::handlers::utils::{
     reply_with_bcs_bytes, reply_with_bytes_sender, unwrap_or_500, LATENCY_HISTOGRAM,
 };
+use aptos_crypto::hash::HashValue;
+use aptos_db::backup::backup_handler::BackupHandler;
+use aptos_metrics_core::TimerHelper;
+use aptos_types::transaction::Version;
 use axum::{
     extract::{Path, State},
-    http::Uri,
-    http::StatusCode,
+    http::{StatusCode, Uri},
     middleware,
     response::{IntoResponse, Response},
     routing::get,
     Router,
 };
-use aptos_crypto::hash::HashValue;
-use aptos_db::backup::backup_handler::BackupHandler;
-use aptos_metrics_core::TimerHelper;
-use aptos_types::transaction::Version;
 use std::time::Instant;
 
 static DB_STATE: &str = "db_state";
@@ -57,7 +56,10 @@ pub(crate) fn get_routes(backup_handler: BackupHandler) -> Router {
             &format!("/{STATE_RANGE_PROOF}/:version/:end_key"),
             get(get_state_range_proof),
         )
-        .route(&format!("/{STATE_SNAPSHOT}/:version"), get(get_state_snapshot))
+        .route(
+            &format!("/{STATE_SNAPSHOT}/:version"),
+            get(get_state_snapshot),
+        )
         .route(
             &format!("/{STATE_ITEM_COUNT}/:version"),
             get(get_state_item_count),
@@ -96,10 +98,7 @@ async fn fallback_handler(uri: Uri) -> StatusCode {
     }
 }
 
-async fn track_latency(
-    request: axum::extract::Request,
-    next: middleware::Next,
-) -> Response {
+async fn track_latency(request: axum::extract::Request, next: middleware::Next) -> Response {
     let path = request.uri().path().to_owned();
     let endpoint = path.split('/').nth(1).unwrap_or("-").to_owned();
     let start = Instant::now();

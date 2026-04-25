@@ -14,9 +14,9 @@ use crate::{
     rate_limiter::ContractRateLimiters,
     validator_cache::PeerSetCacheUpdater,
 };
+use anyhow::Context as _;
 use aptos_crypto::{x25519, ValidCryptoMaterialStringExt};
 use aptos_types::{chain_id::ChainId, PeerId};
-use anyhow::Context as _;
 use clap::Parser;
 use context::GroupedMetricsClients;
 use gcp_bigquery_client::Client as BigQueryClient;
@@ -337,11 +337,12 @@ impl AptosTelemetryServiceArgs {
     async fn serve(config: &TelemetryServiceConfig, app: axum::Router) -> anyhow::Result<()> {
         match &config.tls_cert_path {
             None => {
-                let listener = TcpListener::bind(config.address)
-                    .await
-                    .with_context(|| {
-                        format!("Failed to bind telemetry service listener on {}", config.address)
-                    })?;
+                let listener = TcpListener::bind(config.address).await.with_context(|| {
+                    format!(
+                        "Failed to bind telemetry service listener on {}",
+                        config.address
+                    )
+                })?;
                 axum::serve(listener, app)
                     .await
                     .context("Telemetry service server error")?;

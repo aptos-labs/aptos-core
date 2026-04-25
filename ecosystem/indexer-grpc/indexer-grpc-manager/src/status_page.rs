@@ -3,11 +3,11 @@
 
 use crate::{config::GRPC_MANAGER, data_manager::DataManager};
 use aptos_indexer_grpc_utils::status_page::{get_throughput_from_samples, render_status_page, Tab};
-use axum::response::Response;
 use aptos_protos::{
     indexer::v1::{FullnodeInfo, HistoricalDataServiceInfo, LiveDataServiceInfo, StreamInfo},
     util::timestamp::Timestamp,
 };
+use axum::response::Response;
 use build_html::{
     Container, ContainerType, HtmlContainer, HtmlElement, HtmlTag, Table, TableCell, TableCellType,
     TableRow,

@@ -10,9 +10,9 @@ use crate::{
     types::{Block, BlockIdentifier, BlockRequest, BlockResponse, Transaction},
     RosettaContext,
 };
-use axum::{extract::State, Json};
 use aptos_logger::{debug, trace};
 use aptos_types::chain_id::ChainId;
+use axum::{extract::State, Json};
 use std::sync::Arc;
 
 pub async fn block_route(

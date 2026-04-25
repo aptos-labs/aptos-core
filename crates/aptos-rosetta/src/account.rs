@@ -7,17 +7,10 @@
 //!
 
 use crate::{
-    common::{
-        check_network, get_block_index_from_request, into_rosetta_response, native_coin,
-    },
+    common::{check_network, get_block_index_from_request, into_rosetta_response, native_coin},
     error::{ApiError, ApiResult},
     types::{AccountBalanceRequest, AccountBalanceResponse, Amount, Currency, *},
     RosettaContext,
-};
-use axum::{
-    extract::State,
-    response::Response,
-    Json,
 };
 use aptos_logger::{debug, trace, warn};
 use aptos_rest_client::{
@@ -26,6 +19,7 @@ use aptos_rest_client::{
     Client,
 };
 use aptos_types::{account_address::AccountAddress, account_config::AccountResource};
+use axum::{extract::State, response::Response, Json};
 use move_core_types::{
     ident_str,
     identifier::IdentStr,
