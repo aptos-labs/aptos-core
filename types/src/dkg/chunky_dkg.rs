@@ -273,6 +273,7 @@ pub fn initialize_digest_key(chain_id: ChainId, is_validator: bool) -> DigestKey
 /// An aggregated transcript with the list of dealers who contributed to it.
 #[derive(Clone, Debug, Serialize, Deserialize, CryptoHasher, BCSCryptoHash)]
 pub struct AggregatedSubtranscript {
+    pub dealer_epoch: u64,
     pub subtranscript: ChunkySubtranscript,
     pub dealers: Vec<Player>,
 }

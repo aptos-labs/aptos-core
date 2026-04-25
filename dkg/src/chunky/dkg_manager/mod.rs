@@ -1007,6 +1007,7 @@ impl ChunkyDKGManager {
             ChunkySubtranscript::aggregate(&dkg_config.threshold_config, subtranscripts)
                 .context("failed to aggregate subtranscripts")?;
         let recomputed_aggsubtranscript = AggregatedSubtranscript {
+            dealer_epoch: req.dealer_epoch,
             subtranscript: recomputed_subtranscript,
             dealers: req.aggregated_subtrx_dealers.clone(),
         };

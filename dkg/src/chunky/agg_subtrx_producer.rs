@@ -294,6 +294,7 @@ impl BroadcastStatus<DKGMessage> for Arc<ChunkyTranscriptAggregationState> {
                         .collect()
                 };
                 let agg_subtrx = AggregatedSubtranscript {
+                    dealer_epoch: self.dkg_config.session_metadata.dealer_epoch,
                     subtranscript: agg_trx,
                     dealers,
                 };

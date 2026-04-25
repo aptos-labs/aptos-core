@@ -339,6 +339,37 @@ mod tests {
     }
 
     #[tokio::test]
+    async fn test_certification_rejects_wrong_epoch_signature() {
+        let setup = ChunkyTestSetup::new_uniform(4);
+        let agg_subtrx = setup.aggregate_subtranscripts(&[0, 1, 2]);
+        let state = make_cert_state(&setup, agg_subtrx);
+
+        // Sign a different AggregatedSubtranscript with a wrong epoch.
+        let mut wrong_epoch_agg = setup.aggregate_subtranscripts(&[0, 1, 2]);
+        wrong_epoch_agg.dealer_epoch = 998;
+        let stale_sig = setup.private_keys[0].sign(&wrong_epoch_agg).unwrap();
+        let stale_resp = ChunkyDKGSubtranscriptSignatureResponse::new(
+            998,
+            wrong_epoch_agg.hash(),
+            stale_sig,
+        );
+        // Epoch mismatch is caught in metadata checks.
+        let result = BroadcastStatus::add(&state, setup.addrs[0], stale_resp);
+        assert!(result.is_err());
+
+        // Even if the response claims the right epoch, the signature is over the wrong data
+        // (different epoch in AggregatedSubtranscript changes the hash).
+        let stale_sig2 = setup.private_keys[0].sign(&wrong_epoch_agg).unwrap();
+        let spoofed_resp = ChunkyDKGSubtranscriptSignatureResponse::new(
+            999,
+            state.aggregated_subtranscript().hash(),
+            stale_sig2,
+        );
+        let result = BroadcastStatus::add(&state, setup.addrs[0], spoofed_resp);
+        assert!(result.is_err());
+    }
+
+    #[tokio::test]
     async fn test_certification_ignores_duplicate() {
         let setup = ChunkyTestSetup::new_uniform(4);
         let agg_subtrx = setup.aggregate_subtranscripts(&[0, 1, 2]);

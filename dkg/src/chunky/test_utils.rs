@@ -154,6 +154,7 @@ impl ChunkyTestSetup {
             .collect();
 
         AggregatedSubtranscript {
+            dealer_epoch: 999,
             subtranscript: agg,
             dealers,
         }
@@ -210,6 +211,7 @@ impl ChunkyTestSetup {
 
         AggregatedSubtranscriptWithHashes {
             aggregated_subtranscript: AggregatedSubtranscript {
+                dealer_epoch: 999,
                 subtranscript: agg,
                 dealers,
             },
