@@ -14,11 +14,9 @@ use crate::{
 use anyhow::{ensure, Context};
 use aptos_channels::aptos_channel;
 use aptos_consensus_types::common::Author;
+use aptos_bitvec::BitVec;
 use aptos_crypto::HashValue;
-use aptos_dkg::pvss::{
-    traits::transcript::{Aggregatable, Aggregated},
-    Player,
-};
+use aptos_dkg::pvss::traits::transcript::{Aggregatable, Aggregated};
 use aptos_infallible::RwLock;
 use aptos_logger::info;
 use aptos_reliable_broadcast::{BroadcastStatus, ReliableBroadcast};
@@ -261,31 +259,22 @@ impl BroadcastStatus<DKGMessage> for Arc<ChunkyTranscriptAggregationState> {
         if quorum_met {
             if let Some(tx) = inner_state.agg_subtrx_tx.take() {
                 let agg_trx = inner_state.subtrx.take().unwrap().normalize();
-                // Convert AccountAddress contributors to Player by getting their validator indices.
-                // Sort by AccountAddress so dealers order is deterministic (HashSet iteration is
-                // non-deterministic); AggregatedSubtranscript is BCSCryptoHash'd for certification.
-                let mut contributors: Vec<_> = inner_state.contributors.iter().copied().collect();
-                contributors.sort();
-                let dealers: Vec<Player> = contributors
-                    .iter()
-                    .map(|addr| {
-                        self.epoch_state
-                            .verifier
-                            .address_to_validator_index()
-                            .get(addr)
-                            .map(|&index| Player { id: index })
-                            .expect("Request must be sent to validators in current set only")
-                    })
-                    .collect();
-                // Compute per-dealer transcript hashes in the same order as dealers.
-                // These are included in the signature request so the responder can detect
-                // equivocated transcripts (where a dealer sent different transcripts to
-                // different validators), not just missing ones.
+                let num_validators = self.epoch_state.verifier.len();
+                let addr_to_index = self.epoch_state.verifier.address_to_validator_index();
+                let ordered_addrs = self.epoch_state.verifier.get_ordered_account_addresses();
+                // Build dealer bitmask from contributors.
+                let mut dealer_bitmask = BitVec::with_num_bits(num_validators as u16);
+                for addr in inner_state.contributors.iter() {
+                    let index = *addr_to_index.get(addr)
+                        .expect("contributor must be in current validator set");
+                    dealer_bitmask.set(index as u16);
+                }
+                // Per-dealer transcript hashes ordered by set-bit position (ascending validator index).
                 let dealer_transcript_hashes: Vec<HashValue> = {
                     let received = self.received_transcripts.read();
-                    contributors
-                        .iter()
-                        .map(|addr| {
+                    dealer_bitmask.iter_ones()
+                        .map(|idx| {
+                            let addr = &ordered_addrs[idx];
                             let twh = received
                                 .get(addr)
                                 .expect("contributor must have a stored transcript");
@@ -296,7 +285,7 @@ impl BroadcastStatus<DKGMessage> for Arc<ChunkyTranscriptAggregationState> {
                 let agg_subtrx = AggregatedSubtranscript {
                     dealer_epoch: self.dkg_config.session_metadata.dealer_epoch,
                     subtranscript: agg_trx,
-                    dealers,
+                    dealer_bitmask,
                 };
                 let with_hashes = AggregatedSubtranscriptWithHashes {
                     aggregated_subtranscript: agg_subtrx,
@@ -404,8 +393,7 @@ mod tests {
         let agg = rx.select_next_some().now_or_never();
         assert!(agg.is_some());
         let agg_with_hashes = agg.unwrap();
-        // Dealers should be sorted by AccountAddress, then mapped to validator indices.
-        assert_eq!(agg_with_hashes.aggregated_subtranscript.dealers.len(), 3);
+        assert_eq!(agg_with_hashes.aggregated_subtranscript.dealer_bitmask.count_ones(), 3);
         assert_eq!(agg_with_hashes.dealer_transcript_hashes.len(), 3);
 
         // Fourth transcript — all received, returns Some(()).
@@ -481,7 +469,7 @@ mod tests {
         let agg = rx.select_next_some().now_or_never();
         assert!(agg.is_some());
         let agg_with_hashes = agg.unwrap();
-        assert_eq!(agg_with_hashes.aggregated_subtranscript.dealers.len(), 1);
+        assert_eq!(agg_with_hashes.aggregated_subtranscript.dealer_bitmask.count_ones(), 1);
         assert_eq!(agg_with_hashes.dealer_transcript_hashes.len(), 1);
     }
 }

@@ -65,7 +65,7 @@ fn verify_chunky_dkg_transcript(session: &ChunkyDKGSessionState) -> AggregatedSu
         bcs::from_bytes(&session.transcript).expect("Failed to deserialize transcript bytes");
 
     assert!(
-        !subtranscript.dealers.is_empty(),
+        subtranscript.dealer_bitmask.count_ones() > 0,
         "Transcript should have at least one dealer"
     );
 

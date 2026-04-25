@@ -18,6 +18,7 @@ use aptos_batch_encryption::{
     group::{Fr, G2Affine, Pairing},
     shared::{digest::DigestKey, digest_key_file, encryption_key::EncryptionKey},
 };
+use aptos_bitvec::BitVec;
 use aptos_crypto::{bls12381, weighted_config::WeightedConfigArkworks};
 use aptos_crypto_derive::{BCSCryptoHash, CryptoHasher};
 use aptos_dkg::pvss::{
@@ -270,12 +271,15 @@ pub fn initialize_digest_key(chain_id: ChainId, is_validator: bool) -> DigestKey
     }
 }
 
-/// An aggregated transcript with the list of dealers who contributed to it.
+/// An aggregated transcript with the set of dealers who contributed to it.
+///
+/// Dealers are represented as a `BitVec` bitmask over validator indices,
+/// which inherently prevents duplicates and ensures canonical ordering.
 #[derive(Clone, Debug, Serialize, Deserialize, CryptoHasher, BCSCryptoHash)]
 pub struct AggregatedSubtranscript {
     pub dealer_epoch: u64,
     pub subtranscript: ChunkySubtranscript,
-    pub dealers: Vec<Player>,
+    pub dealer_bitmask: BitVec,
 }
 
 impl AggregatedSubtranscript {

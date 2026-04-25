@@ -40,7 +40,7 @@ pub fn start_chunky_subtranscript_certification(
     let req = ChunkyDKGSubtranscriptSignatureRequest::new(
         epoch,
         aggregated_subtranscript.hash(),
-        aggregated_subtranscript.dealers.clone(),
+        aggregated_subtranscript.dealer_bitmask.clone(),
         dealer_transcript_hashes,
     );
     let validation_state = Arc::new(ChunkySubtranscriptCertificationState::new(

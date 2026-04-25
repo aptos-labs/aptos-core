@@ -892,23 +892,26 @@ impl ChunkyDKGManager {
             return Ok(response);
         }
 
-        // Convert Player dealers to AccountAddress using validator indices
-        let dealer_addresses: Vec<AccountAddress> = req
-            .aggregated_subtrx_dealers
-            .iter()
-            .filter_map(|player| {
-                epoch_state
-                    .verifier
-                    .get_ordered_account_addresses()
-                    .get(player.id)
-                    .copied()
-            })
-            .collect();
-        ensure!(dealer_addresses.len() == req.aggregated_subtrx_dealers.len());
+        // Validate bitmask dimensions.
+        let num_validators = epoch_state.verifier.len();
+        let ordered_addrs = epoch_state.verifier.get_ordered_account_addresses();
         ensure!(
-            req.dealer_transcript_hashes.len() == dealer_addresses.len(),
-            "dealer_transcript_hashes length mismatch with dealers"
+            req.dealer_bitmask.last_set_bit().map_or(true, |b| (b as usize) < num_validators),
+            "dealer_bitmask contains out-of-range bits"
         );
+        let num_dealers = req.dealer_bitmask.count_ones() as usize;
+        ensure!(num_dealers > 0, "dealer_bitmask is empty");
+        ensure!(
+            req.dealer_transcript_hashes.len() == num_dealers,
+            "dealer_transcript_hashes length mismatch with dealer_bitmask popcount"
+        );
+
+        // Convert bitmask to dealer addresses (ascending validator index order).
+        let dealer_addresses: Vec<AccountAddress> = req
+            .dealer_bitmask
+            .iter_ones()
+            .map(|idx| ordered_addrs[idx])
+            .collect();
 
         // First check for mismatches.
         let (mut subtranscripts, mismatched_dealers) = Self::detect_mismatches(
@@ -998,7 +1001,7 @@ impl ChunkyDKGManager {
             "No transcripts found for required dealers"
         );
         ensure!(
-            subtranscripts.len() == dealer_addresses.len(),
+            subtranscripts.len() == num_dealers,
             "Not enough subtranscripts"
         );
 
@@ -1009,7 +1012,7 @@ impl ChunkyDKGManager {
         let recomputed_aggsubtranscript = AggregatedSubtranscript {
             dealer_epoch: req.dealer_epoch,
             subtranscript: recomputed_subtranscript,
-            dealers: req.aggregated_subtrx_dealers.clone(),
+            dealer_bitmask: req.dealer_bitmask.clone(),
         };
 
         // Verify the hash matches
