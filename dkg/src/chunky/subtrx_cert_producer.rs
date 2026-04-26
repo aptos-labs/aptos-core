@@ -96,6 +96,7 @@ pub struct ChunkySubtranscriptCertificationState {
     sig_aggregator: Mutex<ChunkySubtranscriptSignatureAggregator>,
     epoch_state: Arc<EpochState>,
     aggregated_subtranscript: Arc<AggregatedSubtranscript>,
+    expected_subtranscript_hash: HashValue,
 }
 
 impl ChunkySubtranscriptCertificationState {
@@ -105,12 +106,14 @@ impl ChunkySubtranscriptCertificationState {
         epoch_state: Arc<EpochState>,
         aggregated_subtranscript: Arc<AggregatedSubtranscript>,
     ) -> Self {
+        let expected_subtranscript_hash = aggregated_subtranscript.hash();
         Self {
             start_time,
             my_addr,
             sig_aggregator: Mutex::new(ChunkySubtranscriptSignatureAggregator::default()),
             epoch_state,
             aggregated_subtranscript,
+            expected_subtranscript_hash,
         }
     }
 }
@@ -148,7 +151,7 @@ impl BroadcastStatus<DKGMessage> for Arc<ChunkySubtranscriptCertificationState> 
             self.epoch_state.epoch,
         );
         ensure!(
-            subtranscript_hash == self.aggregated_subtranscript.hash(),
+            subtranscript_hash == self.expected_subtranscript_hash,
             "[ChunkyDKG] signature response hash does not match local aggregated subtranscript hash",
         );
 
