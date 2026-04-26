@@ -3,18 +3,18 @@
 
 use crate::{
     chunky::{
+        common::deserialize_chunky_transcript_and_verify,
         types::{
             AggregatedSubtranscriptWithHashes, ChunkyDKGTranscriptRequest, ChunkyTranscriptWithHash,
         },
-        common::deserialize_chunky_transcript_and_verify,
     },
     counters,
     types::DKGMessage,
 };
-use anyhow::{ensure, Context};
+use anyhow::{anyhow, ensure, Context};
+use aptos_bitvec::BitVec;
 use aptos_channels::aptos_channel;
 use aptos_consensus_types::common::Author;
-use aptos_bitvec::BitVec;
 use aptos_crypto::HashValue;
 use aptos_dkg::pvss::traits::transcript::{Aggregatable, Aggregated};
 use aptos_infallible::RwLock;
@@ -154,12 +154,13 @@ impl ChunkyTranscriptAggregationState {
             "[ChunkyDKG] adding peer chunky transcript failed with node author mismatch"
         );
 
-        let peer_power = self.epoch_state.verifier.get_voting_power(&sender);
-        ensure!(
-            peer_power.is_some(),
-            "[ChunkyDKG] adding peer chunky transcript failed with illegal dealer"
-        );
-        let peer_power = peer_power.expect("Peer must be valid");
+        let peer_power = self
+            .epoch_state
+            .verifier
+            .get_voting_power(&sender)
+            .ok_or_else(|| {
+                anyhow!("[ChunkyDKG] adding peer chunky transcript failed with illegal dealer")
+            })?;
 
         // Shared validation: deserialize, verify, check dealer ID.
         let transcript = deserialize_chunky_transcript_and_verify(
@@ -198,7 +199,6 @@ impl BroadcastStatus<DKGMessage> for Arc<ChunkyTranscriptAggregationState> {
             }
         }
 
-        // RwLock allows concurrent validation of multiple transcripts
         let (transcript, peer_power) =
             self.validate_and_deserialize_transcript(sender, metadata, transcript_bytes)?;
 
@@ -229,8 +229,17 @@ impl BroadcastStatus<DKGMessage> for Arc<ChunkyTranscriptAggregationState> {
             received_transcripts.insert(metadata.author, transcript);
         }
 
-        // Aggregate the transcript (projective accumulator; normalize when quorum is met)
-        // TODO(ibalajiarun): Should the transcript be aggregated if quorum is already met?
+        // Quorum already reached — transcript is stored for the fetcher but no further
+        // aggregation is needed.
+        if inner_state.agg_subtrx_tx.is_none() {
+            info!(
+                epoch = epoch,
+                peer = sender,
+                "[ChunkyDKG] transcript received after quorum, skipping aggregation"
+            );
+            return Ok(None);
+        }
+
         inner_state.contributors.insert(metadata.author);
         if let Some(agg_subtrx) = inner_state.subtrx.as_mut() {
             agg_subtrx
@@ -255,51 +264,55 @@ impl BroadcastStatus<DKGMessage> for Arc<ChunkyTranscriptAggregationState> {
 
         // Send to agg_subtrx_tx when quorum is met (only once)
         if quorum_met {
-            if let Some(tx) = inner_state.agg_subtrx_tx.take() {
-                let agg_trx = inner_state.subtrx.take().unwrap().normalize();
-                let num_validators = self.epoch_state.verifier.len();
-                let addr_to_index = self.epoch_state.verifier.address_to_validator_index();
-                let ordered_addrs = self.epoch_state.verifier.get_ordered_account_addresses();
-                // Build dealer bitmask from contributors.
-                let mut dealer_bitmask = BitVec::with_num_bits(num_validators as u16);
-                for addr in inner_state.contributors.iter() {
-                    let index = *addr_to_index.get(addr)
-                        .expect("contributor must be in current validator set");
-                    dealer_bitmask.set(index as u16);
-                }
-                // Per-dealer transcript hashes ordered by set-bit position (ascending validator index).
-                let dealer_transcript_hashes: Vec<HashValue> = {
-                    let received = self.received_transcripts.read();
-                    dealer_bitmask.iter_ones()
-                        .map(|idx| {
-                            let addr = &ordered_addrs[idx];
-                            let twh = received
-                                .get(addr)
-                                .expect("contributor must have a stored transcript");
-                            twh.hash()
-                        })
-                        .collect()
-                };
-                let agg_subtrx = AggregatedSubtranscript {
+            let tx = inner_state
+                .agg_subtrx_tx
+                .take()
+                .expect("agg_subtrx_tx must be Some due to above check");
+            let agg_trx = inner_state
+                .subtrx
+                .take()
+                .expect("subtrx must be Some due to above check")
+                .normalize();
+            let num_validators = self.epoch_state.verifier.len();
+            let addr_to_index = self.epoch_state.verifier.address_to_validator_index();
+            let received = self.received_transcripts.read();
+
+            let mut dealer_bitmask = BitVec::with_num_bits(num_validators as u16);
+            let mut indexed_hashes: Vec<(usize, HashValue)> = Vec::new();
+            for addr in inner_state.contributors.iter() {
+                let index = *addr_to_index
+                    .get(addr)
+                    .ok_or_else(|| anyhow!("contributor {} not in validator set", addr))?;
+                dealer_bitmask.set(index as u16);
+                let hash = received
+                    .get(addr)
+                    .ok_or_else(|| anyhow!("contributor {} missing stored transcript", addr))?
+                    .hash();
+                indexed_hashes.push((index, hash));
+            }
+            indexed_hashes.sort_by_key(|(idx, _)| *idx);
+            let dealer_transcript_hashes: Vec<HashValue> =
+                indexed_hashes.into_iter().map(|(_, h)| h).collect();
+            drop(received);
+
+            let with_hashes = AggregatedSubtranscriptWithHashes {
+                aggregated_subtranscript: AggregatedSubtranscript {
                     dealer_epoch: self.dkg_config.session_metadata.dealer_epoch,
                     subtranscript: agg_trx,
                     dealer_bitmask,
-                };
-                let with_hashes = AggregatedSubtranscriptWithHashes {
-                    aggregated_subtranscript: agg_subtrx,
-                    dealer_transcript_hashes,
-                };
-                if let Err(e) = tx.push((), with_hashes) {
-                    info!(
+                },
+                dealer_transcript_hashes,
+            };
+            if let Err(e) = tx.push((), with_hashes) {
+                info!(
                         epoch = epoch,
                         "[ChunkyDKG] Failed to send aggregated chunky transcript to ChunkyDKGManager when quorum met: {:?}", e
                     );
-                } else {
-                    info!(
+            } else {
+                info!(
                         epoch = epoch,
                         "[ChunkyDKG] sent aggregated chunky transcript to ChunkyDKGManager (quorum met)"
                     );
-                }
             }
         }
 
@@ -391,7 +404,13 @@ mod tests {
         let agg = rx.select_next_some().now_or_never();
         assert!(agg.is_some());
         let agg_with_hashes = agg.unwrap();
-        assert_eq!(agg_with_hashes.aggregated_subtranscript.dealer_bitmask.count_ones(), 3);
+        assert_eq!(
+            agg_with_hashes
+                .aggregated_subtranscript
+                .dealer_bitmask
+                .count_ones(),
+            3
+        );
         assert_eq!(agg_with_hashes.dealer_transcript_hashes.len(), 3);
 
         // Fourth transcript — all received, returns Some(()).
@@ -467,7 +486,13 @@ mod tests {
         let agg = rx.select_next_some().now_or_never();
         assert!(agg.is_some());
         let agg_with_hashes = agg.unwrap();
-        assert_eq!(agg_with_hashes.aggregated_subtranscript.dealer_bitmask.count_ones(), 1);
+        assert_eq!(
+            agg_with_hashes
+                .aggregated_subtranscript
+                .dealer_bitmask
+                .count_ones(),
+            1
+        );
         assert_eq!(agg_with_hashes.dealer_transcript_hashes.len(), 1);
     }
 }
