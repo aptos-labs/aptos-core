@@ -20,7 +20,10 @@ use crate::{
 use anyhow::{anyhow, bail, ensure, Context, Result};
 use aptos_channels::{aptos_channel, message_queues::QueueStyle};
 use aptos_crypto::{bls12381, hash::CryptoHash, HashValue, SigningKey, Uniform};
-use aptos_dkg::pvss::{traits::transcript::Aggregatable, Player};
+use aptos_dkg::pvss::{
+    traits::{transcript::Aggregatable, Transcript},
+    Player,
+};
 use aptos_infallible::{duration_since_epoch, RwLock};
 use aptos_logger::{debug, error, info, warn};
 use aptos_reliable_broadcast::{DropGuard, ReliableBroadcast};
@@ -30,7 +33,7 @@ use aptos_types::{
             AggregatedSubtranscript, CertifiedAggregatedChunkySubtranscript,
             CertifiedChunkyDKGOutput, ChunkyDKGSession, ChunkyDKGSessionMetadata,
             ChunkyDKGSessionState, ChunkyDKGStartEvent, ChunkyDKGTranscript, ChunkyInputSecret,
-            ChunkySubtranscript, DealerPrivateKey, DealerPublicKey,
+            ChunkySubtranscript, ChunkyTranscript, DealerPrivateKey, DealerPublicKey,
         },
         DKGTranscriptMetadata,
     },
@@ -393,27 +396,31 @@ impl ChunkyDKGManager {
             "[ChunkyDKG] Deal transcript started.",
         );
 
-        let dkg_config = ChunkyDKGSession::new(dkg_session_metadata);
-        let dkg_config_clone = dkg_config.clone();
+        let session = ChunkyDKGSession::new(dkg_session_metadata);
+
+        let session_clone = session.clone();
         let ssk_clone = self.ssk.clone();
         let spk_clone = self.spk.clone();
         let my_index = self.my_index;
-        let dkg_session_metadata_clone = dkg_session_metadata.clone();
 
         let trx = tokio::task::spawn_blocking(move || {
             let mut rng = StdRng::from_rng(thread_rng()).unwrap();
             let input_secret = ChunkyInputSecret::generate(&mut rng);
-
             let dealer = Player { id: my_index };
-            let session_id = dkg_session_metadata_clone;
 
-            dkg_config_clone.deal(
-                &ssk_clone,
-                &spk_clone,
-                &input_secret,
-                &session_id,
-                &dealer,
-                &mut rng,
+            monitor!(
+                "chunky_dkg_deal_transcript",
+                ChunkyTranscript::deal(
+                    &session_clone.threshold_config,
+                    &session_clone.public_parameters,
+                    &ssk_clone,
+                    &spk_clone,
+                    &session_clone.eks,
+                    &input_secret,
+                    &session_clone.session_metadata,
+                    &dealer,
+                    &mut rng,
+                )
             )
         })
         .await?;
@@ -423,6 +430,7 @@ impl ChunkyDKGManager {
         counters::CHUNKY_DKG_OBJECT_SIZE_BYTES
             .with_label_values(&["dealer_transcript"])
             .observe(transcript_bytes.len() as f64);
+
         let my_transcript = Arc::new(ChunkyDKGTranscript::new(
             self.epoch_state.epoch,
             self.my_addr,
@@ -451,7 +459,7 @@ impl ChunkyDKGManager {
             self.reliable_broadcast.clone(),
             self.epoch_state.clone(),
             self.my_addr,
-            dkg_config.clone(),
+            session.clone(),
             spks,
             dkg_start_time,
             self.agg_subtrx_tx.as_ref().cloned(),
@@ -463,7 +471,7 @@ impl ChunkyDKGManager {
             start_time: dkg_start_time,
             my_transcript,
             _abort_guard: DropGuard::new(abort_handle),
-            dkg_config,
+            dkg_config: session,
         };
 
         Ok(())

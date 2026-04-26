@@ -6,7 +6,7 @@ use crate::{
         types::{
             AggregatedSubtranscriptWithHashes, ChunkyDKGTranscriptRequest, ChunkyTranscriptWithHash,
         },
-        validation::validate_chunky_transcript,
+        common::deserialize_chunky_transcript_and_verify,
     },
     counters,
     types::DKGMessage,
@@ -162,14 +162,12 @@ impl ChunkyTranscriptAggregationState {
         let peer_power = peer_power.expect("Peer must be valid");
 
         // Shared validation: deserialize, verify, check dealer ID.
-        let mut rng = rand::thread_rng();
-        let transcript = validate_chunky_transcript(
+        let transcript = deserialize_chunky_transcript_and_verify(
             sender,
             transcript_bytes,
             &self.dkg_config,
             &self.signing_pubkeys,
             &self.epoch_state,
-            &mut rng,
         )?;
 
         Ok((transcript, peer_power))

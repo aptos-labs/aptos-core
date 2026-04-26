@@ -10,21 +10,19 @@ use aptos_types::{
     epoch_state::EpochState,
 };
 use move_core_types::account_address::AccountAddress;
-use rand::{CryptoRng, RngCore};
 
 /// Shared transcript validation pipeline used by both the aggregation producer and the
 /// transcript fetcher. Deserializes, cryptographically verifies, and checks dealer ID.
 ///
-/// The transcript is cryptographically verified via `transcript.verify()` which checks the
-/// dealer's key pair; the dealer-ID check ensures it belongs to the expected dealer; envelope
-/// metadata (epoch, author) is validated by the caller as belt-and-suspenders.
-pub fn validate_chunky_transcript<R: RngCore + CryptoRng>(
+/// `transcript.verify()` checks the PVSS proof and dealer signature against the full session
+/// parameters; the dealer-ID check ensures the transcript belongs to the expected sender;
+/// envelope metadata (epoch, author) is validated by the caller.
+pub fn deserialize_chunky_transcript_and_verify(
     sender: AccountAddress,
     transcript_bytes: &[u8],
     dkg_config: &ChunkyDKGSession,
     signing_pubkeys: &[DealerPublicKey],
     epoch_state: &EpochState,
-    rng: &mut R,
 ) -> anyhow::Result<ChunkyTranscriptWithHash> {
     // Hash the canonical BCS wire bytes once up front to avoid repeated re-serialization.
     // Safe because BCS is strictly canonical: deserialize(serialize(x)) == x byte-for-byte.
@@ -40,6 +38,7 @@ pub fn validate_chunky_transcript<R: RngCore + CryptoRng>(
     let transcript: ChunkyTranscript = bcs::from_bytes(transcript_bytes)
         .map_err(|e| anyhow!("[ChunkyDKG] Unable to deserialize chunky transcript: {e}"))?;
 
+    let mut rng = rand::thread_rng();
     // Verify the transcript cryptographically.
     monitor!(
         "chunky_validate_transcript_verify",
@@ -49,7 +48,7 @@ pub fn validate_chunky_transcript<R: RngCore + CryptoRng>(
             signing_pubkeys,
             &dkg_config.eks,
             &dkg_config.session_metadata,
-            rng,
+            &mut rng,
         )
     )
     .context("chunky transcript verification failed")?;

@@ -26,8 +26,7 @@ use aptos_dkg::pvss::{
         DecryptPrivKey, EncryptPubKey, InputSecret, PublicParameters, SignedWeightedTranscript,
         WeightedSubtranscript,
     },
-    traits::{transcript::Transcript, TranscriptCore},
-    Player,
+    traits::TranscriptCore,
 };
 use ark_ec::AffineRepr;
 use fixed::types::U64F64;
@@ -36,7 +35,7 @@ use move_core_types::{
     move_resource::MoveStructType,
 };
 use once_cell::sync::Lazy;
-use rand::{rngs::StdRng, CryptoRng, RngCore, SeedableRng};
+use rand::{rngs::StdRng, SeedableRng};
 use serde::{Deserialize, Serialize};
 use std::{
     cmp::max,
@@ -338,28 +337,6 @@ pub struct ChunkyDKGSession {
 }
 
 impl ChunkyDKGSession {
-    pub fn deal<A: Serialize + Clone, R: RngCore + CryptoRng>(
-        &self,
-        ssk: &DealerPrivateKey,
-        spk: &DealerPublicKey,
-        s: &ChunkyInputSecret,
-        sid: &A,
-        dealer: &Player,
-        rng: &mut R,
-    ) -> ChunkyTranscript {
-        ChunkyTranscript::deal(
-            &self.threshold_config,
-            &self.public_parameters,
-            ssk,
-            spk,
-            &self.eks,
-            s,
-            sid,
-            dealer,
-            rng,
-        )
-    }
-
     /// Create a new DKG session from on-chain session metadata.
     pub fn new(dkg_session_metadata: &ChunkyDKGSessionMetadata) -> Arc<ChunkyDKGSession> {
         let onchain_config = dkg_session_metadata

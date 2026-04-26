@@ -7,7 +7,10 @@ use aptos_crypto::{
     bls12381::{PrivateKey, PublicKey},
     HashValue, Uniform,
 };
-use aptos_dkg::pvss::{traits::transcript::HasAggregatableSubtranscript, Player};
+use aptos_dkg::pvss::{
+    traits::{transcript::HasAggregatableSubtranscript, Transcript},
+    Player,
+};
 use aptos_reliable_broadcast::RBNetworkSender;
 use aptos_types::{
     chain_id::ChainId,
@@ -101,9 +104,12 @@ impl ChunkyTestSetup {
             id: validator_index,
         };
 
-        let trx = self.dkg_config.deal(
+        let trx = ChunkyTranscript::deal(
+            &self.dkg_config.threshold_config,
+            &self.dkg_config.public_parameters,
             &self.private_keys[validator_index],
             &self.public_keys[validator_index],
+            &self.dkg_config.eks,
             &input_secret,
             &self.session_metadata,
             &dealer,
