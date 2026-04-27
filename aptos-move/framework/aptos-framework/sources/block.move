@@ -3,6 +3,7 @@ module aptos_framework::block {
     use std::error;
     use std::vector;
     use std::option;
+    use aptos_std::bcs_stream::{Self, BCSStream};
     use aptos_std::table_with_length::{Self, TableWithLength};
     use std::option::Option;
     use aptos_framework::randomness;
@@ -20,6 +21,8 @@ module aptos_framework::block {
     friend aptos_framework::genesis;
 
     const MAX_U64: u64 = 18446744073709551615;
+
+    const EUNKNOWN_FEATURE_VARIANT: u64 = 10;
 
     /// Should be in-sync with BlockResource rust struct in new_block.rs
     struct BlockResource has key {
@@ -307,45 +310,27 @@ module aptos_framework::block {
         EncryptedMempool { decryption_key: Option<vector<u8>> },
     }
 
-    /// Deserialize the binary encoding produced by the Rust VM into a typed list.
-    ///
-    /// Wire format (written by aptos_vm.rs):
-    ///   byte 0       : feature count (u8)
-    ///   per feature  : [variant: u8] [has_payload: u8] [payload_len: u32 LE]? [payload_bytes]?
-    ///
-    /// Unknown variant indices are silently skipped so that an older framework version
-    /// can safely execute blocks proposed by nodes running newer software.
-    fun decode_feature_metas(bytes: &vector<u8>): vector<FeatureSpecificMetadata> {
-        let result = vector[];
-        let count = (*vector::borrow(bytes, 0) as u64);
-        let pos = 1u64;
-        let i = 0u64;
-        while (i < count) {
-            let variant = *vector::borrow(bytes, pos);
-            pos = pos + 1;
-            let has_payload = *vector::borrow(bytes, pos) == 1u8;
-            pos = pos + 1;
-            let payload_opt = if (has_payload) {
-                let len = (*vector::borrow(bytes, pos) as u64)
-                    | ((*vector::borrow(bytes, pos + 1) as u64) << 8)
-                    | ((*vector::borrow(bytes, pos + 2) as u64) << 16)
-                    | ((*vector::borrow(bytes, pos + 3) as u64) << 24);
-                pos = pos + 4;
-                let payload = vector::slice(bytes, pos, pos + len);
-                pos = pos + len;
-                option::some(payload)
+    /// Deserialize BCS-encoded feature metadata bytes into a typed list.
+    /// The bytes are BCS-serialized `Vec<FlatFeatureMeta>` produced by the Rust VM, where
+    /// each element is a BCS enum: u32 LE variant index followed by an Option<vector<u8>> field.
+    /// Variant indices: 0 = Randomness, 1 = EncryptedMempool.
+    fun decode_feature_metas(bytes: vector<u8>): vector<FeatureSpecificMetadata> {
+        let stream = bcs_stream::new(bytes);
+        bcs_stream::deserialize_vector(&mut stream, |s: &mut BCSStream| {
+            let variant = bcs_stream::deserialize_u32(s);
+            if (variant == 0u32) {
+                let per_block_seed = bcs_stream::deserialize_option(s, |s2: &mut BCSStream|
+                    bcs_stream::deserialize_vector(s2, |s3: &mut BCSStream| bcs_stream::deserialize_u8(s3))
+                );
+                FeatureSpecificMetadata::Randomness { per_block_seed }
             } else {
-                option::none()
-            };
-            if (variant == 0) {
-                result.push_back(FeatureSpecificMetadata::Randomness { per_block_seed: payload_opt });
-            } else if (variant == 1) {
-                result.push_back(FeatureSpecificMetadata::EncryptedMempool { decryption_key: payload_opt });
-            };
-            // Unknown variants are ignored — forward compatibility when old Move runs new Rust.
-            i = i + 1;
-        };
-        result
+                assert!(variant == 1u32, error::invalid_argument(EUNKNOWN_FEATURE_VARIANT));
+                let decryption_key = bcs_stream::deserialize_option(s, |s2: &mut BCSStream|
+                    bcs_stream::deserialize_vector(s2, |s3: &mut BCSStream| bcs_stream::deserialize_u8(s3))
+                );
+                FeatureSpecificMetadata::EncryptedMempool { decryption_key }
+            }
+        })
     }
 
     /// `block_prologue()` with an extensible per-feature metadata list.
@@ -377,7 +362,7 @@ module aptos_framework::block {
 
         let has_randomness = false;
         let has_encrypted_mempool = false;
-        decode_feature_metas(&feature_metas).for_each(|meta| {
+        decode_feature_metas(feature_metas).for_each(|meta| {
             match (meta) {
                 FeatureSpecificMetadata::Randomness { per_block_seed } => {
                     has_randomness = true;

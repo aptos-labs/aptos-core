@@ -2646,33 +2646,33 @@ impl AptosVM {
                 (BLOCK_PROLOGUE_EXT_V2, args)
             },
             BlockMetadataExt::V3(v3) => {
-                // Encode feature_metas into the wire format consumed by block.move's
-                // decode_feature_metas(). Format:
-                //   byte 0       : feature count (u8)
-                //   per feature  : [variant: u8] [has_payload: u8]
-                //                  [payload_len: u32 LE]? [payload_bytes]?
-                // Variant indices must match Move enum declaration order in block.move:
+                // BCS-serialize feature_metas as Vec<FlatFeatureMeta>, which maps 1:1 to
+                // the Move `FeatureSpecificMetadata` enum. bcs_stream in Move then
+                // deserializes this. Variant indices must match the Move enum order:
                 //   0 → Randomness, 1 → EncryptedMempool
-                let mut encoded = vec![v3.feature_metas.len() as u8];
-                for m in &v3.feature_metas {
-                    let (variant, payload) = match m {
+                #[derive(serde::Serialize)]
+                enum FlatFeatureMeta {
+                    Randomness { per_block_seed: Option<Vec<u8>> },
+                    EncryptedMempool { decryption_key: Option<Vec<u8>> },
+                }
+                let flat: Vec<FlatFeatureMeta> = v3
+                    .feature_metas
+                    .iter()
+                    .map(|m| match m {
                         FeatureSpecificMetadata::Randomness(RandomnessMetadata::V0 {
                             per_block_seed,
-                        }) => (0u8, per_block_seed.as_deref()),
+                        }) => FlatFeatureMeta::Randomness {
+                            per_block_seed: per_block_seed.clone(),
+                        },
                         FeatureSpecificMetadata::EncryptedMempool(
                             EncryptedMempoolMetadata::V0 { decryption_key },
-                        ) => (1u8, decryption_key.as_deref()),
-                    };
-                    encoded.push(variant);
-                    match payload {
-                        None => encoded.push(0u8),
-                        Some(bytes) => {
-                            encoded.push(1u8);
-                            encoded.extend_from_slice(&(bytes.len() as u32).to_le_bytes());
-                            encoded.extend_from_slice(bytes);
+                        ) => FlatFeatureMeta::EncryptedMempool {
+                            decryption_key: decryption_key.clone(),
                         },
-                    }
-                }
+                    })
+                    .collect();
+                let encoded =
+                    bcs::to_bytes(&flat).expect("BCS serialization of feature_metas failed");
                 let args = vec![
                     MoveValue::Signer(AccountAddress::ZERO), // Run as 0x0
                     MoveValue::Address(AccountAddress::from_bytes(v3.id.to_vec()).unwrap()),
