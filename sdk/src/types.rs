@@ -374,7 +374,7 @@ impl LocalAccount {
         secondary_signers: Vec<&Self>,
         builder: TransactionBuilder,
     ) -> SignedTransaction {
-        let secondary_signer_addresses = secondary_signers
+        let secondary_signer_addresses: Vec<_> = secondary_signers
             .iter()
             .map(|signer| signer.address())
             .collect();
@@ -382,7 +382,15 @@ impl LocalAccount {
             .iter()
             .map(|signer| signer.private_key())
             .collect();
-        let raw_txn = self.build_raw_transaction(builder);
+        let additional_auth_keys = secondary_signers
+            .iter()
+            .filter_map(|s| {
+                s.optional_authentication_key()
+                    .map(|key| (s.address(), key))
+            })
+            .collect();
+        let raw_txn =
+            self.build_raw_transaction(builder.additional_signer_auth_keys(additional_auth_keys));
         raw_txn
             .sign_multi_agent(
                 self.private_key(),
@@ -399,7 +407,7 @@ impl LocalAccount {
         fee_payer_signer: &Self,
         builder: TransactionBuilder,
     ) -> SignedTransaction {
-        let secondary_signer_addresses = secondary_signers
+        let secondary_signer_addresses: Vec<_> = secondary_signers
             .iter()
             .map(|signer| signer.address())
             .collect();
@@ -407,7 +415,18 @@ impl LocalAccount {
             .iter()
             .map(|signer| signer.private_key())
             .collect();
-        let raw_txn = self.build_raw_transaction(builder);
+        let mut additional_auth_keys: Vec<_> = secondary_signers
+            .iter()
+            .filter_map(|s| {
+                s.optional_authentication_key()
+                    .map(|key| (s.address(), key))
+            })
+            .collect();
+        if let Some(key) = fee_payer_signer.optional_authentication_key() {
+            additional_auth_keys.push((fee_payer_signer.address(), key));
+        }
+        let raw_txn =
+            self.build_raw_transaction(builder.additional_signer_auth_keys(additional_auth_keys));
         raw_txn
             .sign_fee_payer(
                 self.private_key(),

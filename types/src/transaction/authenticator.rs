@@ -348,6 +348,9 @@ impl TransactionAuthenticator {
 
         let secondary_addresses = self.secondary_signer_addresses();
         let secondary_auths = self.secondary_signers();
+        if secondary_addresses.len() != secondary_auths.len() {
+            return None;
+        }
         for (addr, auth) in secondary_addresses.into_iter().zip(secondary_auths.iter()) {
             if !auth.supports_encrypted_txn() {
                 return None;
@@ -1273,7 +1276,9 @@ impl MultiKey {
     }
 
     pub fn supports_encrypted_txn(&self) -> bool {
-        self.public_keys.iter().all(|pk| pk.supports_encrypted_txn())
+        self.public_keys
+            .iter()
+            .all(|pk| pk.supports_encrypted_txn())
     }
 
     pub fn signatures_required(&self) -> u8 {
@@ -1493,7 +1498,13 @@ impl AnyPublicKey {
     }
 
     pub fn supports_encrypted_txn(&self) -> bool {
-        !matches!(self, Self::Keyless { .. } | Self::FederatedKeyless { .. })
+        match self {
+            Self::Ed25519 { .. }
+            | Self::Secp256k1Ecdsa { .. }
+            | Self::Secp256r1Ecdsa { .. }
+            | Self::SlhDsa_Sha2_128s { .. } => true,
+            Self::Keyless { .. } | Self::FederatedKeyless { .. } => false,
+        }
     }
 
     pub fn to_bytes(&self) -> Vec<u8> {

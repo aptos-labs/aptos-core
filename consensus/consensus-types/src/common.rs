@@ -141,13 +141,22 @@ pub fn verify_batch_kind_transactions(
                         txn.is_encrypted_txn(),
                         "Encrypted batch contains non-encrypted transaction"
                     );
-                    let auth_key = txn.authenticator().sender().authentication_key().context(
-                        "Encrypted transactions are not supported with this authenticator type",
-                    )?;
-                    txn.payload()
+                    let encrypted_payload = txn
+                        .payload()
                         .as_encrypted_payload()
-                        .expect("already verified is_encrypted_txn")
-                        .verify(txn.sender(), auth_key)
+                        .expect("already verified is_encrypted_txn");
+                    ensure!(
+                        !encrypted_payload.extra_config().is_multisig(),
+                        "Encrypted transactions do not support multisig"
+                    );
+                    let signer_auth_keys = txn
+                        .authenticator()
+                        .all_signer_auth_keys(txn.sender())
+                        .context(
+                            "Encrypted transactions are not supported with this authenticator type",
+                        )?;
+                    encrypted_payload
+                        .verify(txn.sender(), signer_auth_keys)
                         .context("Encrypted transaction ciphertext verification failed")
                 })?;
         },

@@ -46,6 +46,7 @@ pub struct TransactionBuilder {
     chain_id: ChainId,
     encryption_key: Arc<RwLock<EncryptionKeyState>>,
     auth_key: Option<AuthenticationKey>,
+    additional_signer_auth_keys: Vec<(AccountAddress, AuthenticationKey)>,
 }
 
 impl TransactionBuilder {
@@ -65,6 +66,7 @@ impl TransactionBuilder {
             sequence_number: None,
             encryption_key: Arc::new(RwLock::new(EncryptionKeyState::default())),
             auth_key: None,
+            additional_signer_auth_keys: Vec::new(),
         }
     }
 
@@ -103,6 +105,14 @@ impl TransactionBuilder {
         self
     }
 
+    pub fn additional_signer_auth_keys(
+        mut self,
+        keys: Vec<(AccountAddress, AuthenticationKey)>,
+    ) -> Self {
+        self.additional_signer_auth_keys = keys;
+        self
+    }
+
     pub fn has_nonce(&self) -> bool {
         self.payload.replay_protection_nonce().is_some()
     }
@@ -133,11 +143,16 @@ impl TransactionBuilder {
         drop(encryption_key_state);
         if let Some(ref encryption_key) = encryption_key {
             assert!(!self.payload.is_encrypted_variant());
+            let sender = self.sender.expect("sender must have been set");
+            let auth_key = self
+                .auth_key
+                .expect("auth_key must be set for encrypted payloads");
+            let mut signer_auth_keys = vec![(sender, auth_key)];
+            signer_auth_keys.extend(std::mem::take(&mut self.additional_signer_auth_keys));
             let encrypted_payload = TransactionFactory::encrypt_payload(
                 self.payload.clone(),
-                self.sender.expect("sender must have been set"),
-                self.auth_key
-                    .expect("auth_key must be set for encrypted payloads"),
+                sender,
+                signer_auth_keys,
                 encryption_key,
                 encryption_epoch,
             )
@@ -462,6 +477,7 @@ impl TransactionFactory {
             chain_id: self.chain_id,
             encryption_key: self.encryption_key.clone(),
             auth_key: None,
+            additional_signer_auth_keys: Vec::new(),
         }
     }
 
@@ -470,7 +486,7 @@ impl TransactionFactory {
     fn encrypt_payload(
         payload: TransactionPayload,
         sender: AccountAddress,
-        auth_key: AuthenticationKey,
+        signer_auth_keys: Vec<(AccountAddress, AuthenticationKey)>,
         encryption_key: &EncryptionKey,
         encryption_epoch: u64,
     ) -> Result<EncryptedPayload> {
@@ -484,9 +500,7 @@ impl TransactionFactory {
         // Create DecryptedPayload for encryption
         let decrypted_payload = DecryptedPlaintext::new(executable, decryption_nonce);
 
-        // Create associated data with sender and auth_key to bind the ciphertext
-        // to both the sender address and the authenticator's identity.
-        let associated_data = PayloadAssociatedData::new(sender, auth_key);
+        let associated_data = PayloadAssociatedData::new(sender, signer_auth_keys);
 
         // Encrypt the payload
         // Note: FPTXWeighted::encrypt requires CryptoRng from ark_std::rand, so we use StdRng
@@ -613,18 +627,23 @@ mod tests {
         let encrypted_payload = TransactionFactory::encrypt_payload(
             test_payload(),
             sender,
-            sender_auth_key,
+            vec![(sender, sender_auth_key)],
             &encryption_key,
             0,
         )
         .unwrap();
 
         encrypted_payload
-            .verify(sender, sender_auth_key)
+            .verify(sender, vec![(sender, sender_auth_key)])
             .expect("sender and auth_key used for encryption should verify");
-        assert!(encrypted_payload.verify(sender, wrong_auth_key).is_err());
         assert!(encrypted_payload
-            .verify(wrong_sender, AuthenticationKey::ed25519(&sender_public_key))
+            .verify(sender, vec![(sender, wrong_auth_key)])
+            .is_err());
+        assert!(encrypted_payload
+            .verify(wrong_sender, vec![(
+                wrong_sender,
+                AuthenticationKey::ed25519(&sender_public_key)
+            )])
             .is_err());
     }
 }
