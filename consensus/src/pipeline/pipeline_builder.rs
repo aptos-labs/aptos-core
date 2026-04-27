@@ -40,7 +40,6 @@ use aptos_storage_interface::state_store::state_view::cached_state_view::CachedS
 use aptos_types::{
     account_config::randomness_event::RANDOMNESS_GENERATED_EVENT_MOVE_TYPE_TAG,
     block_executor::config::BlockExecutorConfigFromOnchain,
-    block_metadata_ext::PerFeatureBlockPayload,
     decryption::BlockTxnDecryptionKey,
     ledger_info::{LedgerInfo, LedgerInfoWithSignatures},
     on_chain_config::OnChainConsensusConfig,
@@ -918,33 +917,42 @@ impl PipelineBuilder {
 
         tracker.start_working();
         let metadata_txn = if use_extensible_block_metadata {
-            let mut payloads: Vec<PerFeatureBlockPayload> = vec![];
+            // feature_payloads encodes Vec<Option<Vec<u8>>> positionally.
+            // None = feature disabled; Some(bytes) = enabled, bytes is the feature's own BCS payload.
+            // Trailing None entries are trimmed; a missing index in Move means disabled.
+            let mut items: Vec<Option<Vec<u8>>> = vec![];
             let mut dkg_needed_full = vec![];
-            if is_randomness_enabled {
-                payloads.push(PerFeatureBlockPayload::Randomness {
-                    per_block_seed: rand_result
-                        .flatten()
-                        .map(|r: Randomness| r.randomness_cloned()),
-                });
-                dkg_needed_full.push(true);
+
+            // Index 0: randomness — payload is BCS of Option<Vec<u8>> (per_block_seed)
+            let rand_seed: Option<Vec<u8>> = rand_result
+                .flatten()
+                .map(|r: Randomness| r.randomness_cloned());
+            items.push(if is_randomness_enabled {
+                Some(bcs::to_bytes(&rand_seed).expect("BCS serialization of randomness payload failed"))
             } else {
-                dkg_needed_full.push(false);
-            }
-            if is_decryption_enabled {
-                payloads.push(PerFeatureBlockPayload::EncryptedMempool {
-                    decryption_key: decryption_result
-                        .flatten()
-                        .map(|dk: BlockTxnDecryptionKey| dk.decryption_key_cloned()),
-                });
-                dkg_needed_full.push(true);
+                None
+            });
+            dkg_needed_full.push(is_randomness_enabled);
+
+            // Index 1: encrypted mempool — payload is BCS of Option<Vec<u8>> (decryption_key)
+            let dec_key: Option<Vec<u8>> = decryption_result
+                .flatten()
+                .map(|dk: BlockTxnDecryptionKey| dk.decryption_key_cloned());
+            items.push(if is_decryption_enabled {
+                Some(bcs::to_bytes(&dec_key).expect("BCS serialization of encrypted mempool payload failed"))
             } else {
-                dkg_needed_full.push(false);
+                None
+            });
+            dkg_needed_full.push(is_decryption_enabled);
+
+            while items.last() == Some(&None) {
+                items.pop();
             }
             while dkg_needed_full.last() == Some(&false) {
                 dkg_needed_full.pop();
             }
             let feature_payloads =
-                bcs::to_bytes(&payloads).expect("BCS serialization of feature_payloads failed");
+                bcs::to_bytes(&items).expect("BCS serialization of feature_payloads failed");
             block.new_metadata_v3(&validator, feature_payloads, dkg_needed_full)
         } else {
             match (rand_result, decryption_result) {

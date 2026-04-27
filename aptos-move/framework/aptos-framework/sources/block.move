@@ -22,9 +22,8 @@ module aptos_framework::block {
 
     const MAX_U64: u64 = 18446744073709551615;
 
-    const EUNKNOWN_FEATURE_VARIANT: u64 = 10;
-
-    /// BCS variant indices for FeatureBlockPayload, matching the Rust FlatBlockMeta enum.
+    /// Positional indices into the feature_payloads vector in block_prologue_ext_v3.
+    /// Index i holds Some(feature-specific BCS bytes) if the feature is enabled, None if disabled.
     const RANDOMNESS_PAYLOAD_IDX: u64 = 0;
     const ENCRYPTED_MEMPOOL_PAYLOAD_IDX: u64 = 1;
 
@@ -303,45 +302,40 @@ module aptos_framework::block {
         };
     }
 
-    /// Per-feature block metadata decoded from the V3 block prologue bytes.
-    /// Carries per-block payloads consumed in this module (on_new_block calls).
-    /// Variant indices are defined by the BLOCK_META_IDX constants above and must stay
-    /// in sync with the Rust FlatBlockMeta enum written by the VM.
-    enum FeatureBlockPayload has drop {
-        Randomness { per_block_seed: Option<vector<u8>> },
-        EncryptedMempool { decryption_key: Option<vector<u8>> },
-    }
-
-    fun deserialize_feature_payload(s: &mut BCSStream): FeatureBlockPayload {
-        let variant = bcs_stream::deserialize_uleb128(s);
-        if (variant == RANDOMNESS_PAYLOAD_IDX) {
-            let per_block_seed = bcs_stream::deserialize_option(s, |s2: &mut BCSStream|
-                bcs_stream::deserialize_vector(s2, |s3: &mut BCSStream| bcs_stream::deserialize_u8(s3))
-            );
-            FeatureBlockPayload::Randomness { per_block_seed }
-        } else {
-            assert!(variant == ENCRYPTED_MEMPOOL_PAYLOAD_IDX, error::invalid_argument(EUNKNOWN_FEATURE_VARIANT));
-            let decryption_key = bcs_stream::deserialize_option(s, |s2: &mut BCSStream|
-                bcs_stream::deserialize_vector(s2, |s3: &mut BCSStream| bcs_stream::deserialize_u8(s3))
-            );
-            FeatureBlockPayload::EncryptedMempool { decryption_key }
-        }
-    }
-
-    fun decode_feature_payloads(bytes: vector<u8>): vector<FeatureBlockPayload> {
+    /// Decodes feature_payloads bytes as vector<Option<vector<u8>>>.
+    /// Each element is None (feature disabled) or Some(inner_bytes) where inner_bytes is the
+    /// feature's own BCS-encoded payload. A missing index means disabled.
+    fun decode_feature_payloads(bytes: vector<u8>): vector<Option<vector<u8>>> {
         let stream = bcs_stream::new(bytes);
         bcs_stream::deserialize_vector(&mut stream, |s: &mut BCSStream|
-            deserialize_feature_payload(s)
+            bcs_stream::deserialize_option(s, |s2: &mut BCSStream|
+                bcs_stream::deserialize_vector(s2, |s3: &mut BCSStream| bcs_stream::deserialize_u8(s3))
+            )
         )
     }
 
-    /// `block_prologue()` with an extensible per-feature metadata list.
-    /// `feature_payloads` is the BCS-encoded `vector<FeatureBlockPayload>` carrying
-    /// per-block payloads for enabled features. `dkg_needed` is a minimal positional
-    /// `vector<bool>` supplied by the Rust caller indicating which features need an async
-    /// DKG session for epoch transition; a missing index means false.
-    /// Both parameters are permanently stable: adding new features only requires new enum
-    /// variants and dispatch arms inside this module and in reconfiguration_with_dkg.
+    /// Extracts and deserializes a feature's Option<vector<u8>> payload from the items vector.
+    /// Returns none() if the feature is absent or disabled. Used by features whose payload
+    /// type is Option<vector<u8>> (e.g. randomness seed, decryption key).
+    /// Features with richer payloads define their own extraction function.
+    inline fun extract_optional_bytes_payload(
+        items: &vector<Option<vector<u8>>>, idx: u64
+    ): Option<vector<u8>> {
+        if (idx >= items.length()) { return option::none() };
+        let entry = *items.borrow(idx);
+        if (entry.is_none()) { return option::none() };
+        let inner = bcs_stream::new(entry.destroy_some());
+        bcs_stream::deserialize_option(&mut inner, |s: &mut BCSStream|
+            bcs_stream::deserialize_vector(s, |s2: &mut BCSStream| bcs_stream::deserialize_u8(s2))
+        )
+    }
+
+    /// `block_prologue()` with an extensible per-feature payload list.
+    /// `feature_payloads` is BCS-encoded `vector<Option<vector<u8>>>`: positional, each feature
+    /// owns its inner bytes format, no shared enum. `dkg_needed` is a minimal positional
+    /// `vector<bool>` indicating which features need an async DKG session; missing index = false.
+    /// Adding a new feature: add an index constant, add extraction + on_new_block call below,
+    /// add an arm in reconfiguration_with_dkg::tick. No signature changes needed.
     fun block_prologue_ext_v3(
         vm: signer,
         hash: address,
@@ -366,28 +360,9 @@ module aptos_framework::block {
                 timestamp
             );
 
-        let has_randomness = false;
-        let has_encrypted_mempool = false;
-        decode_feature_payloads(feature_payloads).for_each(|meta| {
-            match (meta) {
-                FeatureBlockPayload::Randomness { per_block_seed } => {
-                    has_randomness = true;
-                    randomness::on_new_block(&vm, epoch, round, per_block_seed);
-                },
-                FeatureBlockPayload::EncryptedMempool { decryption_key } => {
-                    has_encrypted_mempool = true;
-                    decryption::on_new_block(&vm, epoch, round, decryption_key);
-                },
-            }
-        });
-
-        // Features absent from feature_payloads are disabled for this block.
-        if (!has_randomness) {
-            randomness::on_new_block(&vm, epoch, round, option::none());
-        };
-        if (!has_encrypted_mempool) {
-            decryption::on_new_block(&vm, epoch, round, option::none());
-        };
+        let items = decode_feature_payloads(feature_payloads);
+        randomness::on_new_block(&vm, epoch, round, extract_optional_bytes_payload(&items, RANDOMNESS_PAYLOAD_IDX));
+        decryption::on_new_block(&vm, epoch, round, extract_optional_bytes_payload(&items, ENCRYPTED_MEMPOOL_PAYLOAD_IDX));
 
         let epoch_is_too_old = timestamp - reconfiguration::last_reconfiguration_time() >= epoch_interval;
         reconfiguration_with_dkg::tick(epoch_is_too_old, dkg_needed);

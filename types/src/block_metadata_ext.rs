@@ -24,23 +24,6 @@ pub enum BlockMetadataExt {
     V3(BlockMetadataWithFeatures),
 }
 
-/// Flat BCS payload for a single feature's per-block data, as encoded in
-/// `BlockMetadataWithFeatures::feature_payloads`.
-///
-/// This type exists only for encoding (pipeline_builder) and decoding (API layer).
-/// It is NOT used as a struct field in any transaction type — the wire format stores
-/// `feature_payloads` as raw `Vec<u8>` so the transaction definition is permanently stable.
-///
-/// Variant indices are ULEB128-encoded by BCS and must match the Move
-/// `FeatureBlockPayload` enum in `block.move`:
-///   0 → Randomness
-///   1 → EncryptedMempool
-#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
-pub enum PerFeatureBlockPayload {
-    Randomness { per_block_seed: Option<Vec<u8>> },
-    EncryptedMempool { decryption_key: Option<Vec<u8>> },
-}
-
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 pub struct BlockMetadataWithFeatures {
     pub id: HashValue,
@@ -51,7 +34,9 @@ pub struct BlockMetadataWithFeatures {
     pub previous_block_votes_bitvec: Vec<u8>,
     pub failed_proposer_indices: Vec<u32>,
     pub timestamp_usecs: u64,
-    /// BCS-encoded `Vec<PerFeatureBlockPayload>`: per-block payloads for enabled features.
+    /// BCS-encoded `Vec<Option<Vec<u8>>>`: positional per-feature payloads.
+    /// `None` at index i = feature i disabled; `Some(bytes)` = enabled, `bytes` is the
+    /// feature's own BCS-encoded payload. Trailing `None` entries are trimmed.
     /// Stored as raw bytes so this struct never changes when new features are added.
     #[serde(with = "serde_bytes")]
     pub feature_payloads: Vec<u8>,
