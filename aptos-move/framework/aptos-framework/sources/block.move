@@ -310,27 +310,27 @@ module aptos_framework::block {
         EncryptedMempool { decryption_key: Option<vector<u8>> },
     }
 
-    /// Deserialize BCS-encoded feature metadata bytes into a typed list.
-    /// The bytes are BCS-serialized `Vec<FlatFeatureMeta>` produced by the Rust VM, where
-    /// each element is a BCS enum: u32 LE variant index followed by an Option<vector<u8>> field.
-    /// Variant indices: 0 = Randomness, 1 = EncryptedMempool.
+    fun deserialize_feature_specific_metadata(s: &mut BCSStream): FeatureSpecificMetadata {
+        let variant = bcs_stream::deserialize_u32(s);
+        if (variant == 0u32) {
+            let per_block_seed = bcs_stream::deserialize_option(s, |s2: &mut BCSStream|
+                bcs_stream::deserialize_vector(s2, |s3: &mut BCSStream| bcs_stream::deserialize_u8(s3))
+            );
+            FeatureSpecificMetadata::Randomness { per_block_seed }
+        } else {
+            assert!(variant == 1u32, error::invalid_argument(EUNKNOWN_FEATURE_VARIANT));
+            let decryption_key = bcs_stream::deserialize_option(s, |s2: &mut BCSStream|
+                bcs_stream::deserialize_vector(s2, |s3: &mut BCSStream| bcs_stream::deserialize_u8(s3))
+            );
+            FeatureSpecificMetadata::EncryptedMempool { decryption_key }
+        }
+    }
+
     fun decode_feature_metas(bytes: vector<u8>): vector<FeatureSpecificMetadata> {
         let stream = bcs_stream::new(bytes);
-        bcs_stream::deserialize_vector(&mut stream, |s: &mut BCSStream| {
-            let variant = bcs_stream::deserialize_u32(s);
-            if (variant == 0u32) {
-                let per_block_seed = bcs_stream::deserialize_option(s, |s2: &mut BCSStream|
-                    bcs_stream::deserialize_vector(s2, |s3: &mut BCSStream| bcs_stream::deserialize_u8(s3))
-                );
-                FeatureSpecificMetadata::Randomness { per_block_seed }
-            } else {
-                assert!(variant == 1u32, error::invalid_argument(EUNKNOWN_FEATURE_VARIANT));
-                let decryption_key = bcs_stream::deserialize_option(s, |s2: &mut BCSStream|
-                    bcs_stream::deserialize_vector(s2, |s3: &mut BCSStream| bcs_stream::deserialize_u8(s3))
-                );
-                FeatureSpecificMetadata::EncryptedMempool { decryption_key }
-            }
-        })
+        bcs_stream::deserialize_vector(&mut stream, |s: &mut BCSStream|
+            deserialize_feature_specific_metadata(s)
+        )
     }
 
     /// `block_prologue()` with an extensible per-feature metadata list.
