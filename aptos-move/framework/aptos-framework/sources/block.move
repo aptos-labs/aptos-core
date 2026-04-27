@@ -24,6 +24,10 @@ module aptos_framework::block {
 
     const EUNKNOWN_FEATURE_VARIANT: u64 = 10;
 
+    /// BCS variant indices for FeatureSpecificBlockMetadata, matching the Rust FlatBlockMeta enum.
+    const RANDOMNESS_BLOCK_META_IDX: u64 = 0;
+    const ENCRYPTED_MEMPOOL_BLOCK_META_IDX: u64 = 1;
+
     /// Should be in-sync with BlockResource rust struct in new_block.rs
     struct BlockResource has key {
         /// Height of the current block
@@ -301,11 +305,8 @@ module aptos_framework::block {
 
     /// Per-feature block metadata decoded from the V3 block prologue bytes.
     /// Carries per-block payloads consumed in this module (on_new_block calls).
-    /// Variant indices must stay in sync with the encoding written by the Rust VM:
-    ///   0 → Randomness
-    ///   1 → EncryptedMempool
-    /// Adding a new feature appends a new variant and a new match arm — no change to
-    /// `block_prologue_ext_v3`'s signature and no new transaction type needed.
+    /// Variant indices are defined by the BLOCK_META_IDX constants above and must stay
+    /// in sync with the Rust FlatBlockMeta enum written by the VM.
     enum FeatureSpecificBlockMetadata has drop {
         Randomness { per_block_seed: Option<vector<u8>> },
         EncryptedMempool { decryption_key: Option<vector<u8>> },
@@ -313,13 +314,13 @@ module aptos_framework::block {
 
     fun deserialize_feature_specific_metadata(s: &mut BCSStream): FeatureSpecificBlockMetadata {
         let variant = bcs_stream::deserialize_uleb128(s);
-        if (variant == 0) {
+        if (variant == RANDOMNESS_BLOCK_META_IDX) {
             let per_block_seed = bcs_stream::deserialize_option(s, |s2: &mut BCSStream|
                 bcs_stream::deserialize_vector(s2, |s3: &mut BCSStream| bcs_stream::deserialize_u8(s3))
             );
             FeatureSpecificBlockMetadata::Randomness { per_block_seed }
         } else {
-            assert!(variant == 1, error::invalid_argument(EUNKNOWN_FEATURE_VARIANT));
+            assert!(variant == ENCRYPTED_MEMPOOL_BLOCK_META_IDX, error::invalid_argument(EUNKNOWN_FEATURE_VARIANT));
             let decryption_key = bcs_stream::deserialize_option(s, |s2: &mut BCSStream|
                 bcs_stream::deserialize_vector(s2, |s3: &mut BCSStream| bcs_stream::deserialize_u8(s3))
             );
