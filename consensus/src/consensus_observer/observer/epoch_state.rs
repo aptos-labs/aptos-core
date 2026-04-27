@@ -18,7 +18,7 @@ use aptos_logger::{error, info, warn};
 use aptos_types::{
     epoch_state::EpochState,
     on_chain_config::{
-        ChunkyDKGConfigMoveStruct, ChunkyDKGConfigSeqNum, OnChainChunkyDKGConfig,
+        ChunkyDKGConfigMoveStruct, ChunkyDKGConfigSeqNum, Features, OnChainChunkyDKGConfig,
         OnChainConsensusConfig, OnChainExecutionConfig, OnChainRandomnessConfig,
         RandomnessConfigMoveStruct, RandomnessConfigSeqNum, ValidatorSet,
     },
@@ -93,10 +93,17 @@ impl ObserverEpochState {
         OnChainExecutionConfig,
         OnChainRandomnessConfig,
         OnChainChunkyDKGConfig,
+        bool,
     ) {
         // Extract the epoch state and on-chain configs
-        let (epoch_state, consensus_config, execution_config, randomness_config, chunky_dkg_config) =
-            extract_on_chain_configs(&self.node_config, &mut self.reconfig_events).await;
+        let (
+            epoch_state,
+            consensus_config,
+            execution_config,
+            randomness_config,
+            chunky_dkg_config,
+            use_extensible_block_metadata,
+        ) = extract_on_chain_configs(&self.node_config, &mut self.reconfig_events).await;
 
         // Update the local epoch state and quorum store config
         self.epoch_state = Some(epoch_state.clone());
@@ -126,6 +133,7 @@ impl ObserverEpochState {
             execution_config,
             randomness_config,
             chunky_dkg_config,
+            use_extensible_block_metadata,
         )
     }
 }
@@ -140,6 +148,7 @@ async fn extract_on_chain_configs(
     OnChainExecutionConfig,
     OnChainRandomnessConfig,
     OnChainChunkyDKGConfig,
+    bool,
 ) {
     // Fetch the next reconfiguration notification
     let reconfig_notification = reconfig_events
@@ -244,6 +253,10 @@ async fn extract_on_chain_configs(
         onchain_chunky_dkg_config.ok(),
     );
 
+    // Extract the features config
+    let features: Features = on_chain_configs.get().unwrap_or_default();
+    let use_extensible_block_metadata = features.is_extensible_block_metadata_enabled();
+
     // Return the extracted epoch state and on-chain configs
     (
         epoch_state,
@@ -251,6 +264,7 @@ async fn extract_on_chain_configs(
         execution_config,
         onchain_randomness_config,
         chunky_dkg_config,
+        use_extensible_block_metadata,
     )
 }
 

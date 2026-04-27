@@ -86,6 +86,7 @@ pub trait TExecutionClient: Send + Sync {
         rand_msg_rx: aptos_channel::Receiver<AccountAddress, IncomingRandGenRequest>,
         secret_sharing_msg_rx: aptos_channel::Receiver<AccountAddress, IncomingSecretShareRequest>,
         highest_committed_round: Round,
+        use_extensible_block_metadata: bool,
     );
 
     /// This is needed for some DAG tests. Clean this up as a TODO.
@@ -541,6 +542,7 @@ impl TExecutionClient for ExecutionProxyClient {
         rand_msg_rx: aptos_channel::Receiver<AccountAddress, IncomingRandGenRequest>,
         secret_sharing_msg_rx: aptos_channel::Receiver<AccountAddress, IncomingSecretShareRequest>,
         highest_committed_round: Round,
+        use_extensible_block_metadata: bool,
     ) {
         let network_sender = Arc::new(NetworkSender::new(
             self.author,
@@ -585,6 +587,7 @@ impl TExecutionClient for ExecutionProxyClient {
             transaction_deduper,
             randomness_enabled,
             decryption_enabled,
+            use_extensible_block_metadata,
             onchain_consensus_config.clone(),
             aux_version,
             network_sender,
@@ -813,6 +816,7 @@ impl TExecutionClient for DummyExecutionClient {
         _rand_msg_rx: aptos_channel::Receiver<AccountAddress, IncomingRandGenRequest>,
         _secret_sharing_msg_rx: aptos_channel::Receiver<AccountAddress, IncomingSecretShareRequest>,
         _highest_committed_round: Round,
+        _use_extensible_block_metadata: bool,
     ) {
     }
 

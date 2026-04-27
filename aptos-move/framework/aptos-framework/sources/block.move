@@ -3,6 +3,7 @@ module aptos_framework::block {
     use std::error;
     use std::vector;
     use std::option;
+    use aptos_std::bcs_stream::{Self, BCSStream};
     use aptos_std::table_with_length::{Self, TableWithLength};
     use std::option::Option;
     use aptos_framework::randomness;
@@ -20,6 +21,11 @@ module aptos_framework::block {
     friend aptos_framework::genesis;
 
     const MAX_U64: u64 = 18446744073709551615;
+
+    /// Positional indices into the feature_payloads vector in block_prologue_ext_v3.
+    /// Index i holds Some(feature-specific BCS bytes) if the feature is enabled, None if disabled.
+    const RANDOMNESS_PAYLOAD_IDX: u64 = 0;
+    const ENCRYPTED_MEMPOOL_PAYLOAD_IDX: u64 = 1;
 
     /// Should be in-sync with BlockResource rust struct in new_block.rs
     struct BlockResource has key {
@@ -294,6 +300,107 @@ module aptos_framework::block {
             reconfiguration_with_dkg::try_start_with_chunky_dkg();
             reconfiguration_with_dkg::try_advance_reconfig();
         };
+    }
+
+    // -------------------------------------------------------------------------
+    // Per-feature payload types and deserializers
+    //
+    // Each feature defines its own payload struct and a fun deserialize_X_payload
+    // that reads from a BCSStream of that feature's inner bytes.
+    // block_prologue_ext_v3 extracts the raw bytes at each feature's index and
+    // dispatches to the appropriate deserializer before calling on_new_block.
+    // Adding feature F: add struct FPayload, fun deserialize_F_payload, and a
+    // call to F::on_new_block at F_PAYLOAD_IDX below.
+    // -------------------------------------------------------------------------
+
+    struct RandomnessPayload has drop {
+        per_block_seed: Option<vector<u8>>,
+    }
+
+    fun deserialize_randomness_payload(bytes: vector<u8>): RandomnessPayload {
+        let s = bcs_stream::new(bytes);
+        RandomnessPayload {
+            per_block_seed: bcs_stream::deserialize_option(&mut s, |s2: &mut BCSStream|
+                bcs_stream::deserialize_vector(s2, |s3: &mut BCSStream| bcs_stream::deserialize_u8(s3))
+            ),
+        }
+    }
+
+    struct EncryptedMempoolPayload has drop {
+        decryption_key: Option<vector<u8>>,
+    }
+
+    fun deserialize_encrypted_mempool_payload(bytes: vector<u8>): EncryptedMempoolPayload {
+        let s = bcs_stream::new(bytes);
+        EncryptedMempoolPayload {
+            decryption_key: bcs_stream::deserialize_option(&mut s, |s2: &mut BCSStream|
+                bcs_stream::deserialize_vector(s2, |s3: &mut BCSStream| bcs_stream::deserialize_u8(s3))
+            ),
+        }
+    }
+
+    /// Decodes feature_payloads bytes as vector<Option<vector<u8>>>.
+    /// None at index i = feature i disabled; Some(bytes) = enabled with feature-owned inner bytes.
+    fun decode_feature_payloads(bytes: vector<u8>): vector<Option<vector<u8>>> {
+        let stream = bcs_stream::new(bytes);
+        bcs_stream::deserialize_vector(&mut stream, |s: &mut BCSStream|
+            bcs_stream::deserialize_option(s, |s2: &mut BCSStream|
+                bcs_stream::deserialize_vector(s2, |s3: &mut BCSStream| bcs_stream::deserialize_u8(s3))
+            )
+        )
+    }
+
+    /// Returns the raw inner bytes for feature at idx, or none() if absent/disabled.
+    inline fun feature_payload_bytes(items: &vector<Option<vector<u8>>>, idx: u64): Option<vector<u8>> {
+        if (idx < items.length()) { *items.borrow(idx) } else { option::none() }
+    }
+
+    /// `block_prologue()` with an extensible per-feature payload list.
+    /// `feature_payloads` is BCS-encoded `vector<Option<vector<u8>>>`: positional, each feature
+    /// owns its inner bytes format. `dkg_needed` is a minimal positional `vector<bool>` indicating
+    /// which features need an async DKG session; missing index = false.
+    /// Adding a new feature requires no signature changes — add a payload type, deserializer,
+    /// on_new_block call below, and an arm in reconfiguration_with_dkg::tick.
+    fun block_prologue_ext_v3(
+        vm: signer,
+        hash: address,
+        epoch: u64,
+        round: u64,
+        proposer: address,
+        failed_proposer_indices: vector<u64>,
+        previous_block_votes_bitvec: vector<u8>,
+        timestamp: u64,
+        feature_payloads: vector<u8>,
+        dkg_needed: vector<bool>
+    ) acquires BlockResource, CommitHistory {
+        let epoch_interval =
+            block_prologue_common(
+                &vm,
+                hash,
+                epoch,
+                round,
+                proposer,
+                failed_proposer_indices,
+                previous_block_votes_bitvec,
+                timestamp
+            );
+
+        let items = decode_feature_payloads(feature_payloads);
+
+        let rand_bytes = feature_payload_bytes(&items, RANDOMNESS_PAYLOAD_IDX);
+        let rand_seed = if (rand_bytes.is_some()) {
+            deserialize_randomness_payload(rand_bytes.destroy_some()).per_block_seed
+        } else { option::none() };
+        randomness::on_new_block(&vm, epoch, round, rand_seed);
+
+        let enc_bytes = feature_payload_bytes(&items, ENCRYPTED_MEMPOOL_PAYLOAD_IDX);
+        let dec_key = if (enc_bytes.is_some()) {
+            deserialize_encrypted_mempool_payload(enc_bytes.destroy_some()).decryption_key
+        } else { option::none() };
+        decryption::on_new_block(&vm, epoch, round, dec_key);
+
+        let epoch_is_too_old = timestamp - reconfiguration::last_reconfiguration_time() >= epoch_interval;
+        reconfiguration_with_dkg::tick(epoch_is_too_old, dkg_needed);
     }
 
     fun block_epilogue(

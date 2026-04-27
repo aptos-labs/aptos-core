@@ -24,6 +24,17 @@ module aptos_framework::reconfiguration_with_dkg {
     friend aptos_framework::block;
     friend aptos_framework::aptos_governance;
 
+    /// Positional indices into the `dkg_needed` vector passed to `tick`.
+    /// Index N corresponds to a feature whose DKG session occupies slot N.
+    /// Trailing `false` entries are omitted by the caller; missing = false.
+    const RANDOMNESS_DKG_IDX: u64 = 0;
+    const ENCRYPTED_MEMPOOL_DKG_IDX: u64 = 1;
+
+    /// Returns `dkg_needed[idx]`, or `false` if `idx` is out of bounds.
+    inline fun dkg_needed_for(dkg_needed: &vector<bool>, idx: u64): bool {
+        if (idx < dkg_needed.length()) { *dkg_needed.borrow(idx) } else { false }
+    }
+
     /// Trigger a reconfiguration with DKG.
     /// Do nothing if one is already in progress.
     public(friend) fun try_start() {
@@ -154,12 +165,56 @@ module aptos_framework::reconfiguration_with_dkg {
 
     /// Periodic finalization tick: try to advance the in-progress reconfig.
     /// Called from block_prologue_ext / block_prologue_ext_v2 every block
-    /// after the epoch interval has elapsed. In V2 mode, also gives the
-    /// grace-period (shadow-mode) escape a chance to fire. In V1 mode after
-    /// a chunky-only override recovery, lets the reconfig finalize without
-    /// re-dealing DKG (dkg::start is idempotent per epoch).
+    /// after the epoch interval has elapsed.
     public(friend) fun try_advance_reconfig() {
         let framework = create_signer::create_signer(@aptos_framework);
         try_finalize_reconfig(&framework);
+    }
+
+    /// V3 per-block tick called from `block_prologue_ext_v3`.
+    ///
+    /// `dkg_needed` is a minimal positional vector of bools indicating which features
+    /// require an async DKG session this epoch. A missing index (vector too short) means
+    /// false. Indices are defined by the `*_DKG_IDX` constants above.
+    ///
+    /// Two cases:
+    ///
+    /// 1. Reconfig already in progress: the only mid-epoch flip allowed is
+    ///    enabled → disabled (operator bumps local seqnum). For each feature
+    ///    that is now disabled, clear its pending DKG session so that
+    ///    try_finalize_reconfig is no longer blocked on it.
+    ///
+    /// 2. No reconfig in progress and epoch is old enough: start a fresh
+    ///    reconfig and kick off the DKG (or equivalent task) for each enabled
+    ///    feature. If no feature needs async work, finalize immediately.
+    public(friend) fun tick(epoch_is_too_old: bool, dkg_needed: vector<bool>) {
+        let framework = create_signer::create_signer(@aptos_framework);
+        let has_randomness = dkg_needed_for(&dkg_needed, RANDOMNESS_DKG_IDX);
+        let has_encrypted_mempool = dkg_needed_for(&dkg_needed, ENCRYPTED_MEMPOOL_DKG_IDX);
+        if (reconfiguration_state::is_in_progress()) {
+            if (!has_randomness) { dkg::try_clear_incomplete_session(&framework) };
+            if (!has_encrypted_mempool) { chunky_dkg::try_clear_incomplete_session(&framework) };
+            try_finalize_reconfig(&framework);
+        } else if (epoch_is_too_old) {
+            reconfiguration_state::on_reconfig_start();
+            let cur_epoch = reconfiguration::current_epoch();
+            if (has_randomness) {
+                dkg::start(
+                    cur_epoch,
+                    randomness_config::current(),
+                    stake::cur_validator_consensus_infos(),
+                    stake::next_validator_consensus_infos()
+                );
+            };
+            if (has_encrypted_mempool) {
+                chunky_dkg::start(
+                    cur_epoch,
+                    chunky_dkg_config::current(),
+                    stake::cur_validator_consensus_infos(),
+                    stake::next_validator_consensus_infos()
+                );
+            };
+            try_finalize_reconfig(&framework);
+        };
     }
 }

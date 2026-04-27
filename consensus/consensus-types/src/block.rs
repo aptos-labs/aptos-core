@@ -615,6 +615,29 @@ impl Block {
         )
     }
 
+    pub fn new_metadata_v3(
+        &self,
+        validators: &[AccountAddress],
+        feature_payloads: Vec<u8>,
+        dkg_needed: Vec<bool>,
+    ) -> BlockMetadataExt {
+        BlockMetadataExt::new_v3(
+            self.id(),
+            self.epoch(),
+            self.round(),
+            self.author().unwrap_or(AccountAddress::ZERO),
+            self.previous_bitvec().into(),
+            self.block_data()
+                .failed_authors()
+                .map_or(vec![], |failed_authors| {
+                    Self::failed_authors_to_indices(validators, failed_authors)
+                }),
+            self.timestamp_usecs(),
+            feature_payloads,
+            dkg_needed,
+        )
+    }
+
     fn failed_authors_to_indices(
         validators: &[AccountAddress],
         failed_authors: &[(Round, Author)],

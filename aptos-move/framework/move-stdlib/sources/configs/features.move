@@ -858,6 +858,19 @@ module std::features {
         is_enabled(TRANSACTION_LIMITS)
     }
 
+    /// Whether the extensible block metadata feature is enabled.
+    /// When enabled, block_prologue_ext_v3 is used, which supports an extensible
+    /// list of per-feature metadata (randomness seed, encrypted mempool decryption key, etc.).
+    const EXTENSIBLE_BLOCK_METADATA: u64 = 112;
+
+    public fun get_extensible_block_metadata_feature(): u64 {
+        EXTENSIBLE_BLOCK_METADATA
+    }
+
+    public fun is_extensible_block_metadata_enabled(): bool {
+        is_enabled(EXTENSIBLE_BLOCK_METADATA)
+    }
+
     // ============================================================================================
     // Feature Flag Implementation
 

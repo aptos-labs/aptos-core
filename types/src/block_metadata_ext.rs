@@ -21,6 +21,44 @@ pub enum BlockMetadataExt {
     V0(BlockMetadata),
     V1(BlockMetadataWithRandomness),
     V2(BlockMetadataWithRandAndDecKey),
+    V3(BlockMetadataWithFeatures),
+}
+
+/// BCS payload for the randomness feature, encoded as inner bytes at RANDOMNESS_PAYLOAD_IDX
+/// within `BlockMetadataWithFeatures::feature_payloads`. Mirrors `RandomnessPayload` in Move.
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+pub struct RandomnessBlockPayload {
+    pub per_block_seed: Option<Vec<u8>>,
+}
+
+/// BCS payload for the encrypted mempool feature, encoded as inner bytes at
+/// ENCRYPTED_MEMPOOL_PAYLOAD_IDX within `BlockMetadataWithFeatures::feature_payloads`.
+/// Mirrors `EncryptedMempoolPayload` in Move.
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+pub struct EncryptedMempoolBlockPayload {
+    pub decryption_key: Option<Vec<u8>>,
+}
+
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+pub struct BlockMetadataWithFeatures {
+    pub id: HashValue,
+    pub epoch: u64,
+    pub round: u64,
+    pub proposer: AccountAddress,
+    #[serde(with = "serde_bytes")]
+    pub previous_block_votes_bitvec: Vec<u8>,
+    pub failed_proposer_indices: Vec<u32>,
+    pub timestamp_usecs: u64,
+    /// BCS-encoded `Vec<Option<Vec<u8>>>`: positional per-feature payloads.
+    /// `None` at index i = feature i disabled; `Some(bytes)` = enabled, `bytes` is the
+    /// feature's own BCS-encoded payload. Trailing `None` entries are trimmed.
+    /// Stored as raw bytes so this struct never changes when new features are added.
+    #[serde(with = "serde_bytes")]
+    pub feature_payloads: Vec<u8>,
+    /// Minimal positional DKG flags: `dkg_needed[i] = true` means feature i needs an async DKG
+    /// session for the next epoch. Trailing `false` entries are omitted; missing index means false.
+    /// Index assignments are defined by `*_DKG_IDX` constants in `reconfiguration_with_dkg`.
+    pub dkg_needed: Vec<bool>,
 }
 
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
@@ -97,11 +135,36 @@ impl BlockMetadataExt {
         })
     }
 
+    pub fn new_v3(
+        id: HashValue,
+        epoch: u64,
+        round: u64,
+        proposer: AccountAddress,
+        previous_block_votes_bitvec: Vec<u8>,
+        failed_proposer_indices: Vec<u32>,
+        timestamp_usecs: u64,
+        feature_payloads: Vec<u8>,
+        dkg_needed: Vec<bool>,
+    ) -> Self {
+        Self::V3(BlockMetadataWithFeatures {
+            id,
+            epoch,
+            round,
+            proposer,
+            previous_block_votes_bitvec,
+            failed_proposer_indices,
+            timestamp_usecs,
+            feature_payloads,
+            dkg_needed,
+        })
+    }
+
     pub fn id(&self) -> HashValue {
         match self {
             BlockMetadataExt::V0(obj) => obj.id(),
             BlockMetadataExt::V1(obj) => obj.id,
             BlockMetadataExt::V2(obj) => obj.id,
+            BlockMetadataExt::V3(obj) => obj.id,
         }
     }
 
@@ -110,6 +173,7 @@ impl BlockMetadataExt {
             BlockMetadataExt::V0(obj) => obj.timestamp_usecs(),
             BlockMetadataExt::V1(obj) => obj.timestamp_usecs,
             BlockMetadataExt::V2(obj) => obj.timestamp_usecs,
+            BlockMetadataExt::V3(obj) => obj.timestamp_usecs,
         }
     }
 
@@ -118,6 +182,7 @@ impl BlockMetadataExt {
             BlockMetadataExt::V0(obj) => obj.proposer(),
             BlockMetadataExt::V1(obj) => obj.proposer,
             BlockMetadataExt::V2(obj) => obj.proposer,
+            BlockMetadataExt::V3(obj) => obj.proposer,
         }
     }
 
@@ -126,6 +191,7 @@ impl BlockMetadataExt {
             BlockMetadataExt::V0(obj) => obj.previous_block_votes_bitvec(),
             BlockMetadataExt::V1(obj) => &obj.previous_block_votes_bitvec,
             BlockMetadataExt::V2(obj) => &obj.previous_block_votes_bitvec,
+            BlockMetadataExt::V3(obj) => &obj.previous_block_votes_bitvec,
         }
     }
 
@@ -134,6 +200,7 @@ impl BlockMetadataExt {
             BlockMetadataExt::V0(obj) => obj.failed_proposer_indices(),
             BlockMetadataExt::V1(obj) => &obj.failed_proposer_indices,
             BlockMetadataExt::V2(obj) => &obj.failed_proposer_indices,
+            BlockMetadataExt::V3(obj) => &obj.failed_proposer_indices,
         }
     }
 
@@ -142,6 +209,7 @@ impl BlockMetadataExt {
             BlockMetadataExt::V0(obj) => obj.epoch(),
             BlockMetadataExt::V1(obj) => obj.epoch,
             BlockMetadataExt::V2(obj) => obj.epoch,
+            BlockMetadataExt::V3(obj) => obj.epoch,
         }
     }
 
@@ -150,6 +218,7 @@ impl BlockMetadataExt {
             BlockMetadataExt::V0(obj) => obj.round(),
             BlockMetadataExt::V1(obj) => obj.round,
             BlockMetadataExt::V2(obj) => obj.round,
+            BlockMetadataExt::V3(obj) => obj.round,
         }
     }
 
@@ -158,6 +227,7 @@ impl BlockMetadataExt {
             BlockMetadataExt::V0(_) => "block_metadata_ext_transaction__v0",
             BlockMetadataExt::V1(_) => "block_metadata_ext_transaction__v1",
             BlockMetadataExt::V2(_) => "block_metadata_ext_transaction__v2",
+            BlockMetadataExt::V3(_) => "block_metadata_ext_transaction__v3",
         }
     }
 }
