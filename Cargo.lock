@@ -3394,7 +3394,6 @@ dependencies = [
  "move-core-types",
  "move-vm-runtime",
  "move-vm-types",
- "once_cell",
  "rayon",
  "smallvec",
 ]

@@ -3,7 +3,7 @@
 
 use anyhow::anyhow;
 use aptos_config::config::{
-    NodeConfig, DEFAULT_EXECUTION_CONCURRENCY_LEVEL, DEFAULT_NATIVE_RAYON_CONCURRENCY_LEVEL,
+    NodeConfig, DEFAULT_EXECUTION_CONCURRENCY_LEVEL, DEFAULT_NATIVE_RAYON_THREAD_PER_EXEC_THREAD,
 };
 #[cfg(unix)]
 use aptos_logger::prelude::*;
@@ -63,10 +63,10 @@ pub fn set_aptos_vm_configurations(node_config: &NodeConfig) {
     };
     AptosVM::set_concurrency_level_once(effective_concurrency_level as usize);
 
-    let native_rayon_threads = if node_config.execution.native_rayon_concurrency_level == 0 {
-        DEFAULT_NATIVE_RAYON_CONCURRENCY_LEVEL
+    let native_rayon_threads = if node_config.execution.native_rayon_thread_per_exec_thread == 0 {
+        DEFAULT_NATIVE_RAYON_THREAD_PER_EXEC_THREAD
     } else {
-        node_config.execution.native_rayon_concurrency_level
+        node_config.execution.native_rayon_thread_per_exec_thread
     };
     AptosVM::init_native_rayon_pool_once(native_rayon_threads as usize);
 
