@@ -20,7 +20,8 @@ module 0x1::b {
 
 #[test]
 fn load_package_cache_miss_loads_all_members() {
-    let modules = mono_move_testsuite::compile_move_modules(TEST_SOURCE);
+    let modules =
+        mono_move_testsuite::compile_move_source(TEST_SOURCE).expect("compilation failed");
     let mut module_provider = InMemoryModuleProvider::new();
     module_provider.add_modules(&modules);
     module_provider.declare_package(AccountAddress::ONE, ident_str!("a").to_owned(), vec![
@@ -53,7 +54,8 @@ fn load_package_cache_miss_loads_all_members() {
 
 #[test]
 fn load_package_cache_hit_walks_dependencies() {
-    let modules = mono_move_testsuite::compile_move_modules(TEST_SOURCE);
+    let modules =
+        mono_move_testsuite::compile_move_source(TEST_SOURCE).expect("compilation failed");
     let mut module_provider = InMemoryModuleProvider::new();
     module_provider.add_modules(&modules);
     module_provider.declare_package(AccountAddress::ONE, ident_str!("a").to_owned(), vec![
