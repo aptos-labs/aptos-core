@@ -516,6 +516,12 @@ pub enum LeaderReputationType {
     // * use reputation window from recent end
     // * unpredictable seed, based on root hash
     ProposerAndVoterV2(ProposerAndVoterConfig),
+    // Version 3: extends V2 with on-chain gating for the latency-weighted heuristic.
+    // Adds `use_latency_weighted` and `latency_weight_multiplier_milli` so all validators
+    // deterministically agree on whether to apply latency weighting and with what exponent.
+    // Without on-chain gating, validators on different node-local config values would
+    // compute different leader schedules and fork.
+    ProposerAndVoterV3(ProposerAndVoterConfigV3),
 }
 
 impl LeaderReputationType {
@@ -528,6 +534,35 @@ impl LeaderReputationType {
         // all versions after V1 shouldn't use from stale end
         matches!(self, Self::ProposerAndVoter(_))
     }
+
+    /// Borrow the inner `ProposerAndVoter*` parameters in a version-agnostic way. Returns
+    /// the latency-weighted toggle and milli-multiplier alongside; both are zero/false for
+    /// V1/V2 since those versions predate the latency-weighted feature.
+    pub fn proposer_and_voter_params(&self) -> ProposerAndVoterParams<'_> {
+        match self {
+            Self::ProposerAndVoter(c) | Self::ProposerAndVoterV2(c) => ProposerAndVoterParams {
+                base: c,
+                use_latency_weighted: false,
+                latency_weight_multiplier_milli: 0,
+            },
+            Self::ProposerAndVoterV3(c) => ProposerAndVoterParams {
+                base: &c.base,
+                use_latency_weighted: c.use_latency_weighted,
+                latency_weight_multiplier_milli: c.latency_weight_multiplier_milli,
+            },
+        }
+    }
+}
+
+/// Borrowed view over the parameters needed to construct a `LeaderReputation` heuristic,
+/// abstracting over `LeaderReputationType` versions. See `proposer_and_voter_params`.
+pub struct ProposerAndVoterParams<'a> {
+    pub base: &'a ProposerAndVoterConfig,
+    pub use_latency_weighted: bool,
+    /// Multiplier expressed in milli-units (1000 = 1.0×). Stored as integer for
+    /// deterministic BCS serialization across implementations. Ignored when
+    /// `use_latency_weighted` is false.
+    pub latency_weight_multiplier_milli: u32,
 }
 
 #[derive(Clone, Copy, Debug, Deserialize, Eq, PartialEq, Serialize)]
@@ -553,6 +588,22 @@ pub struct ProposerAndVoterConfig {
     // representing a number of historical epochs (beyond the current one)
     // to consider.
     pub use_history_from_previous_epoch_max_count: u32,
+}
+
+/// V3 leader-reputation parameters: V2's `ProposerAndVoterConfig` plus the on-chain gate
+/// for the latency-weighted heuristic. New fields live on a new struct so existing on-chain
+/// V1/V2 payloads continue to deserialize unchanged.
+#[derive(Clone, Copy, Debug, Deserialize, Eq, PartialEq, Serialize)]
+pub struct ProposerAndVoterConfigV3 {
+    /// V2 parameters (selection weights, windows, etc.).
+    pub base: ProposerAndVoterConfig,
+    /// On-chain toggle for the latency-weighted heuristic that scales active validators by
+    /// per-validator mean round time. When false the heuristic behaves like V2.
+    pub use_latency_weighted: bool,
+    /// Exponent applied to the latency ratio, expressed in milli-units (1000 = 1.0×).
+    /// Integer-encoded for BCS determinism. Decoded as `value as f64 / 1000.0` at runtime.
+    /// Ignored when `use_latency_weighted` is false.
+    pub latency_weight_multiplier_milli: u32,
 }
 
 #[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
