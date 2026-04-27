@@ -173,6 +173,11 @@ pub enum FeatureFlag {
     MULTISIG_SCRIPT = 110,
     /// Enables higher transaction execution/IO limits backed by staking voting power.
     TRANSACTION_LIMITS = 111,
+    /// Enables `BlockMetadataExt::V3` with extensible per-feature metadata, allowing individual
+    /// features (randomness, encrypted mempool) to be enabled/disabled independently via a single
+    /// block metadata transaction variant. DKG result transactions become responsible only for
+    /// saving transcripts on-chain; epoch advancement is driven by block metadata.
+    EXTENSIBLE_BLOCK_METADATA = 112,
 }
 
 impl FeatureFlag {
@@ -495,6 +500,10 @@ impl Features {
 
     pub fn is_transaction_limits_enabled(&self) -> bool {
         self.is_enabled(FeatureFlag::TRANSACTION_LIMITS)
+    }
+
+    pub fn is_extensible_block_metadata_enabled(&self) -> bool {
+        self.is_enabled(FeatureFlag::EXTENSIBLE_BLOCK_METADATA)
     }
 
     pub fn get_max_identifier_size(&self) -> u64 {

@@ -126,6 +126,7 @@ impl TExecutionClient for MockExecutionClient {
         _rand_msg_rx: aptos_channel::Receiver<AccountAddress, IncomingRandGenRequest>,
         _secret_sharing_msg_rx: aptos_channel::Receiver<AccountAddress, IncomingSecretShareRequest>,
         _highest_committed_round: Round,
+        _use_extensible_block_metadata: bool,
     ) {
     }
 

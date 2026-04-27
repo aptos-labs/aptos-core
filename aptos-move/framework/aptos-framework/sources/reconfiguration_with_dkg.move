@@ -152,6 +152,42 @@ module aptos_framework::reconfiguration_with_dkg {
         try_finalize_reconfig(account);
     }
 
+    /// Trigger reconfiguration using the extensible block metadata V3 path.
+    /// `has_randomness` and `has_encrypted_mempool` reflect which features are
+    /// active this epoch (agreed upon by all validators via on-chain state +
+    /// local seqnum overrides). Starts the relevant DKG sessions and clears
+    /// any stale sessions for features that are no longer active.
+    public(friend) fun try_start_v3(has_randomness: bool, has_encrypted_mempool: bool) {
+        if (reconfiguration_state::is_in_progress()) { return };
+
+        reconfiguration_state::on_reconfig_start();
+
+        let cur_epoch = reconfiguration::current_epoch();
+        let framework = create_signer::create_signer(@aptos_framework);
+
+        if (has_randomness) {
+            dkg::start(
+                cur_epoch,
+                randomness_config::current(),
+                stake::cur_validator_consensus_infos(),
+                stake::next_validator_consensus_infos()
+            );
+        } else {
+            dkg::try_clear_incomplete_session(&framework);
+        };
+
+        if (has_encrypted_mempool) {
+            chunky_dkg::start(
+                cur_epoch,
+                chunky_dkg_config::current(),
+                stake::cur_validator_consensus_infos(),
+                stake::next_validator_consensus_infos()
+            );
+        } else {
+            chunky_dkg::try_clear_incomplete_session(&framework);
+        };
+    }
+
     /// Periodic finalization tick: try to advance the in-progress reconfig.
     /// Called from block_prologue_ext / block_prologue_ext_v2 every block
     /// after the epoch interval has elapsed. In V2 mode, also gives the

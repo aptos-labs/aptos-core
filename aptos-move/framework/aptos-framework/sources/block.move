@@ -296,6 +296,52 @@ module aptos_framework::block {
         };
     }
 
+    /// `block_prologue()` with extensible per-feature metadata.
+    /// `has_randomness` and `randomness_seed` carry randomness metadata when randomness is enabled.
+    /// `has_encrypted_mempool` and `decryption_key` carry encrypted-mempool metadata when
+    /// encrypted mempool is enabled.
+    fun block_prologue_ext_v3(
+        vm: signer,
+        hash: address,
+        epoch: u64,
+        round: u64,
+        proposer: address,
+        failed_proposer_indices: vector<u64>,
+        previous_block_votes_bitvec: vector<u8>,
+        timestamp: u64,
+        has_randomness: bool,
+        randomness_seed: Option<vector<u8>>,
+        has_encrypted_mempool: bool,
+        decryption_key: Option<vector<u8>>
+    ) acquires BlockResource, CommitHistory {
+        let epoch_interval =
+            block_prologue_common(
+                &vm,
+                hash,
+                epoch,
+                round,
+                proposer,
+                failed_proposer_indices,
+                previous_block_votes_bitvec,
+                timestamp
+            );
+        if (has_randomness) {
+            randomness::on_new_block(&vm, epoch, round, randomness_seed);
+        } else {
+            randomness::on_new_block(&vm, epoch, round, option::none());
+        };
+        if (has_encrypted_mempool) {
+            decryption::on_new_block(&vm, epoch, round, decryption_key);
+        } else {
+            decryption::on_new_block(&vm, epoch, round, option::none());
+        };
+
+        if (timestamp - reconfiguration::last_reconfiguration_time() >= epoch_interval) {
+            reconfiguration_with_dkg::try_start_v3(has_randomness, has_encrypted_mempool);
+            reconfiguration_with_dkg::try_advance_reconfig();
+        };
+    }
+
     fun block_epilogue(
         vm: &signer,
         fee_distribution_validator_indices: vector<u64>,

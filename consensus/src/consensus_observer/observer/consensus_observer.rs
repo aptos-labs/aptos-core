@@ -1129,6 +1129,7 @@ impl ConsensusObserver {
                 rand_msg_rx,
                 secret_share_msg_rx,
                 0,
+                false,
             )
             .await;
         self.pipeline_builder = Some(self.execution_client.pipeline_builder(signer));

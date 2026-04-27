@@ -61,7 +61,7 @@ use aptos_types::{
         transaction_slice_metadata::TransactionSliceMetadata,
     },
     block_metadata::BlockMetadata,
-    block_metadata_ext::BlockMetadataExt,
+    block_metadata_ext::{BlockMetadataExt, EncryptedMempoolMetadata, FeatureSpecificMetadata, RandomnessMetadata},
     chain_id::ChainId,
     contract_event::ContractEvent,
     decryption::BlockTxnDecryptionKey,
@@ -2644,6 +2644,43 @@ impl AptosVM {
                         .as_move_value(),
                 ];
                 (BLOCK_PROLOGUE_EXT_V2, args)
+            },
+            BlockMetadataExt::V3(v3) => {
+                let rand_meta = v3.feature_metas.iter().find_map(|m| match m {
+                    FeatureSpecificMetadata::Randomness(r) => Some(r),
+                    _ => None,
+                });
+                let em_meta = v3.feature_metas.iter().find_map(|m| match m {
+                    FeatureSpecificMetadata::EncryptedMempool(e) => Some(e),
+                    _ => None,
+                });
+                let has_randomness = rand_meta.is_some();
+                let randomness_seed: Option<Vec<u8>> = rand_meta.and_then(|r| match r {
+                    RandomnessMetadata::V0 { per_block_seed } => per_block_seed.clone(),
+                });
+                let has_encrypted_mempool = em_meta.is_some();
+                let decryption_key: Option<Vec<u8>> = em_meta.and_then(|e| match e {
+                    EncryptedMempoolMetadata::V0 { decryption_key } => decryption_key.clone(),
+                });
+                let args = vec![
+                    MoveValue::Signer(AccountAddress::ZERO), // Run as 0x0
+                    MoveValue::Address(AccountAddress::from_bytes(v3.id.to_vec()).unwrap()),
+                    MoveValue::U64(v3.epoch),
+                    MoveValue::U64(v3.round),
+                    MoveValue::Address(v3.proposer),
+                    v3.failed_proposer_indices
+                        .into_iter()
+                        .map(|i| i as u64)
+                        .collect::<Vec<_>>()
+                        .as_move_value(),
+                    v3.previous_block_votes_bitvec.as_move_value(),
+                    MoveValue::U64(v3.timestamp_usecs),
+                    MoveValue::Bool(has_randomness),
+                    randomness_seed.as_move_value(),
+                    MoveValue::Bool(has_encrypted_mempool),
+                    decryption_key.as_move_value(),
+                ];
+                (BLOCK_PROLOGUE_EXT_V3, args)
             },
         };
 

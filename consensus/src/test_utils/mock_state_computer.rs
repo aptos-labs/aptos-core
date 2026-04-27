@@ -59,6 +59,7 @@ impl StateComputer for RandomComputeResultStateComputer {
         _: Arc<dyn TransactionDeduper>,
         _: bool,
         _: bool,
+        _: bool,
         _: OnChainConsensusConfig,
         _: u8,
         _: Arc<crate::network::NetworkSender>,

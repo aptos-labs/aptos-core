@@ -16,7 +16,7 @@ use aptos_types::{
     account_address::AccountAddress,
     block_info::BlockInfo,
     block_metadata::BlockMetadata,
-    block_metadata_ext::BlockMetadataExt,
+    block_metadata_ext::{BlockMetadataExt, FeatureSpecificMetadata},
     decryption::BlockTxnDecryptionKey,
     epoch_state::EpochState,
     ledger_info::LedgerInfo,
@@ -612,6 +612,27 @@ impl Block {
             self.timestamp_usecs(),
             randomness,
             decryption_key,
+        )
+    }
+
+    pub fn new_metadata_v3(
+        &self,
+        validators: &[AccountAddress],
+        feature_metas: Vec<FeatureSpecificMetadata>,
+    ) -> BlockMetadataExt {
+        BlockMetadataExt::new_v3(
+            self.id(),
+            self.epoch(),
+            self.round(),
+            self.author().unwrap_or(AccountAddress::ZERO),
+            self.previous_bitvec().into(),
+            self.block_data()
+                .failed_authors()
+                .map_or(vec![], |failed_authors| {
+                    Self::failed_authors_to_indices(validators, failed_authors)
+                }),
+            self.timestamp_usecs(),
+            feature_metas,
         )
     }
 

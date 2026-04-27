@@ -18,7 +18,9 @@ use aptos_types::{
     account_address::AccountAddress,
     aggregate_signature::AggregateSignature,
     block_metadata::BlockMetadata,
-    block_metadata_ext::BlockMetadataExt,
+    block_metadata_ext::{
+        BlockMetadataExt, EncryptedMempoolMetadata, FeatureSpecificMetadata, RandomnessMetadata,
+    },
     contract_event::{ContractEvent, EventWithVersion},
     dkg::{
         chunky_dkg::CertifiedAggregatedChunkySubtranscript, DKGTranscript, DKGTranscriptMetadata,
@@ -610,6 +612,12 @@ pub struct BlockMetadataExtensionRandomnessAndDecKey {
     decryption_key: Option<HexEncodedBytes>,
 }
 
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, Object)]
+pub struct BlockMetadataExtensionFeatureMetas {
+    randomness: Option<HexEncodedBytes>,
+    decryption_key: Option<HexEncodedBytes>,
+}
+
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, Union)]
 #[serde(tag = "type", rename_all = "snake_case")]
 #[oai(one_of, discriminator_name = "type", rename_all = "snake_case")]
@@ -617,6 +625,7 @@ pub enum BlockMetadataExtension {
     V0(BlockMetadataExtensionEmpty),
     V1(BlockMetadataExtensionRandomness),
     V2(BlockMetadataExtensionRandomnessAndDecKey),
+    V3(BlockMetadataExtensionFeatureMetas),
 }
 
 impl BlockMetadataExtension {
@@ -639,6 +648,28 @@ impl BlockMetadataExtension {
                     .as_ref()
                     .map(|dk| HexEncodedBytes::from(dk.decryption_key_cloned())),
             }),
+            BlockMetadataExt::V3(payload) => {
+                let randomness = payload.feature_metas.iter().find_map(|m| match m {
+                    FeatureSpecificMetadata::Randomness(RandomnessMetadata::V0 {
+                        per_block_seed,
+                    }) => per_block_seed
+                        .as_ref()
+                        .map(|seed| HexEncodedBytes::from(seed.clone())),
+                    FeatureSpecificMetadata::EncryptedMempool(_) => None,
+                });
+                let decryption_key = payload.feature_metas.iter().find_map(|m| match m {
+                    FeatureSpecificMetadata::EncryptedMempool(EncryptedMempoolMetadata::V0 {
+                        decryption_key,
+                    }) => decryption_key
+                        .as_ref()
+                        .map(|dk| HexEncodedBytes::from(dk.clone())),
+                    FeatureSpecificMetadata::Randomness(_) => None,
+                });
+                Self::V3(BlockMetadataExtensionFeatureMetas {
+                    randomness,
+                    decryption_key,
+                })
+            },
         }
     }
 }
@@ -688,6 +719,7 @@ impl BlockMetadataTransaction {
             Some(BlockMetadataExtension::V0(_)) => "block_metadata_ext_transaction__v0",
             Some(BlockMetadataExtension::V1(_)) => "block_metadata_ext_transaction__v1",
             Some(BlockMetadataExtension::V2(_)) => "block_metadata_ext_transaction__v2",
+            Some(BlockMetadataExtension::V3(_)) => "block_metadata_ext_transaction__v3",
         }
     }
 }

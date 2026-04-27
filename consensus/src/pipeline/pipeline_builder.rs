@@ -40,6 +40,8 @@ use aptos_storage_interface::state_store::state_view::cached_state_view::CachedS
 use aptos_types::{
     account_config::randomness_event::RANDOMNESS_GENERATED_EVENT_MOVE_TYPE_TAG,
     block_executor::config::BlockExecutorConfigFromOnchain,
+    block_metadata_ext::{EncryptedMempoolMetadata, FeatureSpecificMetadata, RandomnessMetadata},
+    decryption::BlockTxnDecryptionKey,
     ledger_info::{LedgerInfo, LedgerInfoWithSignatures},
     on_chain_config::OnChainConsensusConfig,
     randomness::Randomness,
@@ -147,6 +149,7 @@ pub struct PipelineBuilder {
     block_executor_onchain_config: BlockExecutorConfigFromOnchain,
     is_randomness_enabled: bool,
     is_decryption_enabled: bool,
+    use_extensible_block_metadata: bool,
     signer: Arc<ValidatorSigner>,
     state_sync_notifier: Arc<dyn ConsensusNotificationSender>,
     payload_manager: Arc<dyn TPayloadManager>,
@@ -277,6 +280,7 @@ impl PipelineBuilder {
         block_executor_onchain_config: BlockExecutorConfigFromOnchain,
         is_randomness_enabled: bool,
         is_decryption_enabled: bool,
+        use_extensible_block_metadata: bool,
         signer: Arc<ValidatorSigner>,
         state_sync_notifier: Arc<dyn ConsensusNotificationSender>,
         payload_manager: Arc<dyn TPayloadManager>,
@@ -297,6 +301,7 @@ impl PipelineBuilder {
             block_executor_onchain_config,
             is_randomness_enabled,
             is_decryption_enabled,
+            use_extensible_block_metadata,
             signer,
             state_sync_notifier,
             payload_manager,
@@ -558,6 +563,9 @@ impl PipelineBuilder {
                 self.validators.clone(),
                 self.block_executor_onchain_config.clone(),
                 self.persisted_auxiliary_info_version,
+                self.is_randomness_enabled,
+                self.is_decryption_enabled,
+                self.use_extensible_block_metadata,
             ),
             None,
         );
@@ -896,6 +904,9 @@ impl PipelineBuilder {
         validator: Arc<[AccountAddress]>,
         onchain_execution_config: BlockExecutorConfigFromOnchain,
         persisted_auxiliary_info_version: u8,
+        is_randomness_enabled: bool,
+        is_decryption_enabled: bool,
+        use_extensible_block_metadata: bool,
     ) -> TaskResult<ExecuteResult> {
         let mut tracker = Tracker::start_waiting("execute", &block);
         parent_block_execute_fut.await?;
@@ -906,18 +917,41 @@ impl PipelineBuilder {
         let (rand_result, _need_randomness) = rand_check.await?;
 
         tracker.start_working();
-        let metadata_txn = match (rand_result, decryption_result) {
-            (Some(maybe_rand), Some(maybe_dec_key)) => {
-                block.new_metadata_with_rand_and_dec_key(&validator, maybe_rand, maybe_dec_key)
-            },
-            (Some(maybe_rand), None) => block.new_metadata_with_randomness(&validator, maybe_rand),
-            (None, Some(_decryption_key)) => {
-                Err(anyhow!("Disabling only randomness is not supported yet"))?
-            },
-            (None, None) => {
-                // if randomness is disabled, the metadata skips DKG and triggers immediate reconfiguration
-                block.new_block_metadata(&validator).into()
-            },
+        let metadata_txn = if use_extensible_block_metadata {
+            let mut feature_metas = vec![];
+            if is_randomness_enabled {
+                feature_metas.push(FeatureSpecificMetadata::Randomness(RandomnessMetadata::V0 {
+                    per_block_seed: rand_result
+                        .flatten()
+                        .map(|r: Randomness| r.randomness_cloned()),
+                }));
+            }
+            if is_decryption_enabled {
+                feature_metas.push(FeatureSpecificMetadata::EncryptedMempool(
+                    EncryptedMempoolMetadata::V0 {
+                        decryption_key: decryption_result
+                            .flatten()
+                            .map(|dk: BlockTxnDecryptionKey| dk.decryption_key_cloned()),
+                    },
+                ));
+            }
+            block.new_metadata_v3(&validator, feature_metas)
+        } else {
+            match (rand_result, decryption_result) {
+                (Some(maybe_rand), Some(maybe_dec_key)) => {
+                    block.new_metadata_with_rand_and_dec_key(&validator, maybe_rand, maybe_dec_key)
+                },
+                (Some(maybe_rand), None) => {
+                    block.new_metadata_with_randomness(&validator, maybe_rand)
+                },
+                (None, Some(_decryption_key)) => {
+                    Err(anyhow!("Disabling only randomness is not supported yet"))?
+                },
+                (None, None) => {
+                    // if randomness is disabled, the metadata skips DKG and triggers immediate reconfiguration
+                    block.new_block_metadata(&validator).into()
+                },
+            }
         };
         let txns = [
             vec![SignatureVerifiedTransaction::from(Transaction::from(

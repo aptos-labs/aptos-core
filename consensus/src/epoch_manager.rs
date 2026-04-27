@@ -832,6 +832,7 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
         secret_share_verifier: Option<Arc<SecretShareVerifier>>,
         rand_msg_rx: aptos_channel::Receiver<AccountAddress, IncomingRandGenRequest>,
         secret_sharing_msg_rx: aptos_channel::Receiver<AccountAddress, IncomingSecretShareRequest>,
+        use_extensible_block_metadata: bool,
     ) {
         let epoch = epoch_state.epoch;
         info!(
@@ -894,6 +895,7 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
                 rand_msg_rx,
                 secret_sharing_msg_rx,
                 recovery_data.commit_root_block().round(),
+                use_extensible_block_metadata,
             )
             .await;
         let consensus_sk = consensus_key;
@@ -1252,6 +1254,8 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
             payload.get();
         let onchain_chunky_dkg_config_seq_num: anyhow::Result<ChunkyDKGConfigSeqNum> =
             payload.get();
+        let features: Features = payload.get::<Features>().unwrap_or_default();
+        let use_extensible_block_metadata = features.is_extensible_block_metadata_enabled();
 
         if let Err(error) = &onchain_consensus_config {
             warn!("Failed to read on-chain consensus config {}", error);
@@ -1416,6 +1420,7 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
                 rand_config,
                 rand_msg_rx,
                 secret_share_manager_rx,
+                use_extensible_block_metadata,
             )
             .await
         } else {
@@ -1434,6 +1439,7 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
                 secret_share_verifier,
                 rand_msg_rx,
                 secret_share_manager_rx,
+                use_extensible_block_metadata,
             )
             .await
         }
@@ -1492,6 +1498,7 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
         secret_share_verifier: Option<Arc<SecretShareVerifier>>,
         rand_msg_rx: aptos_channel::Receiver<AccountAddress, IncomingRandGenRequest>,
         secret_share_msg_rx: aptos_channel::Receiver<AccountAddress, IncomingSecretShareRequest>,
+        use_extensible_block_metadata: bool,
     ) {
         match self.storage.start(
             consensus_config.order_vote_enabled(),
@@ -1515,6 +1522,7 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
                     secret_share_verifier,
                     rand_msg_rx,
                     secret_share_msg_rx,
+                    use_extensible_block_metadata,
                 )
                 .await
             },
@@ -1547,6 +1555,7 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
         rand_config: Option<RandConfig>,
         rand_msg_rx: aptos_channel::Receiver<AccountAddress, IncomingRandGenRequest>,
         secret_share_msg_rx: aptos_channel::Receiver<AccountAddress, IncomingSecretShareRequest>,
+        use_extensible_block_metadata: bool,
     ) {
         let epoch = epoch_state.epoch;
         let signer = Arc::new(ValidatorSigner::new(
@@ -1582,6 +1591,7 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
                 rand_msg_rx,
                 secret_share_msg_rx,
                 highest_committed_round,
+                use_extensible_block_metadata,
             )
             .await;
 
