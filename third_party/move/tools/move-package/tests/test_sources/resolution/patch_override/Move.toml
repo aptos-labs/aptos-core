@@ -1,0 +1,9 @@
+[package]
+name = "Root"
+version = "0.0.0"
+
+[dependencies]
+OtherDep = { local = "./deps_only/missing_dep" }
+
+[patch]
+OtherDep = { local = "./deps_only/replacement" }

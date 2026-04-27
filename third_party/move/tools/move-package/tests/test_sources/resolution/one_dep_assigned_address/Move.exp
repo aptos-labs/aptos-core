@@ -66,6 +66,7 @@ ResolutionGraph {
             },
         },
         dev_dependencies: {},
+        patches: {},
     },
     graph: {
         "Root": [
@@ -107,6 +108,7 @@ ResolutionGraph {
                 build: None,
                 dependencies: {},
                 dev_dependencies: {},
+                patches: {},
             },
             package_path: "ELIDED_FOR_TEST",
             resolution_table: {
@@ -142,6 +144,7 @@ ResolutionGraph {
                     },
                 },
                 dev_dependencies: {},
+                patches: {},
             },
             package_path: "ELIDED_FOR_TEST",
             resolution_table: {
@@ -160,4 +163,5 @@ ResolutionGraph {
             forced: false,
         },
     },
+    patches: {},
 }

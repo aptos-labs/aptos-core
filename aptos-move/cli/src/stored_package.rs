@@ -3,7 +3,7 @@
 
 use anyhow::bail;
 use aptos_framework::{
-    natives::code::{ModuleMetadata, PackageMetadata, PackageRegistry, UpgradePolicy},
+    natives::code::{ModuleMetadata, PackageDep, PackageMetadata, PackageRegistry, UpgradePolicy},
     unzip_metadata_str,
 };
 use aptos_rest_client::Client;
@@ -11,6 +11,7 @@ use aptos_types::account_address::AccountAddress;
 use move_package::compilation::package_layout::CompiledPackageLayout;
 use reqwest::Url;
 use std::{collections::BTreeMap, fmt, fs, path::Path};
+use toml::Value as TV;
 
 // TODO: this is a first naive implementation of the package registry. Before mainnet
 // we need to use tables for the package registry.
@@ -159,11 +160,33 @@ impl CachedPackageMetadata<'_> {
     }
 
     pub fn save_package_to_disk(&self, path: &Path) -> anyhow::Result<()> {
+        self.save_package_to_disk_with_node(path, None)
+    }
+
+    /// Same as [`save_package_to_disk`], but if `node_url` is provided, the
+    /// package's `Move.toml` is rewritten so that any dependency that the
+    /// on-chain `PackageMetadata.deps` list identifies (i.e. another
+    /// already-published Aptos package) is expressed as an `aptos = "<node>"`
+    /// + `address = "<account>"` dependency.
+    ///
+    /// This lets transitive on-chain dependencies (e.g. `Pyth` referenced by
+    /// `LiquidSwap`) be fetched recursively from the same node instead of
+    /// failing to resolve as a stale local or git path on disk.
+    pub fn save_package_to_disk_with_node(
+        &self,
+        path: &Path,
+        node_url: Option<&str>,
+    ) -> anyhow::Result<()> {
         fs::create_dir_all(path)?;
-        fs::write(
-            path.join("Move.toml"),
-            unzip_metadata_str(&self.metadata.manifest)?,
-        )?;
+        let manifest_text = unzip_metadata_str(&self.metadata.manifest)?;
+        let final_manifest = match node_url {
+            Some(url) => {
+                rewrite_manifest_with_onchain_deps(&manifest_text, &self.metadata.deps, url)
+                    .unwrap_or(manifest_text)
+            },
+            None => manifest_text,
+        };
+        fs::write(path.join("Move.toml"), final_manifest)?;
         let sources_dir = path.join(CompiledPackageLayout::Sources.path());
         fs::create_dir_all(&sources_dir)?;
         for module in &self.metadata.modules {
@@ -254,5 +277,100 @@ impl CachedModuleMetadata<'_> {
 
     pub fn zipped_source_map_raw(&self) -> &[u8] {
         &self.metadata.source_map
+    }
+}
+
+/// Rewrite the `[dependencies]` (and `[dev-dependencies]`) sections of the
+/// given manifest string so any dep whose name matches a `PackageDep` from
+/// the on-chain `PackageMetadata.deps` list is expressed as a node-backed
+/// (`aptos = "<node_url>", address = "<account>"`) dependency. Other deps
+/// and the rest of the manifest are left untouched.
+///
+/// Returns `Some(rewritten)` on success and `None` if anything goes wrong
+/// while parsing/serializing (callers fall back to the raw on-chain
+/// manifest in that case so existing behavior is preserved).
+pub fn rewrite_manifest_with_onchain_deps(
+    manifest: &str,
+    onchain_deps: &[PackageDep],
+    node_url: &str,
+) -> Option<String> {
+    if onchain_deps.is_empty() {
+        return None;
+    }
+    let mut value: TV = toml::from_str(manifest).ok()?;
+    let table = value.as_table_mut()?;
+    let mut changed = false;
+    for section in ["dependencies", "dev-dependencies"] {
+        let Some(deps) = table.get_mut(section).and_then(|v| v.as_table_mut()) else {
+            continue;
+        };
+        let dep_names: Vec<String> = deps.keys().cloned().collect();
+        for name in dep_names {
+            if let Some(onchain) = onchain_deps.iter().find(|d| d.package_name == name) {
+                let mut new_dep = toml::value::Table::new();
+                new_dep.insert("aptos".to_string(), TV::String(node_url.to_string()));
+                new_dep.insert(
+                    "address".to_string(),
+                    TV::String(format!("0x{}", onchain.account.short_str_lossless())),
+                );
+                deps.insert(name, TV::Table(new_dep));
+                changed = true;
+            }
+        }
+    }
+    if !changed {
+        return None;
+    }
+    toml::to_string(&value).ok()
+}
+
+#[cfg(test)]
+mod manifest_rewrite_tests {
+    use super::*;
+    use aptos_framework::natives::code::PackageDep;
+    use aptos_types::account_address::AccountAddress;
+
+    #[test]
+    fn rewrites_local_dep_to_aptos_dep() {
+        let manifest = r#"
+[package]
+name = "LiquidSwap"
+version = "0.0.1"
+
+[dependencies]
+Pyth = { local = "../pyth" }
+AptosFramework = { git = "https://github.com/aptos-labs/aptos-core.git", subdir = "aptos-move/framework/aptos-framework", rev = "main" }
+"#;
+        let onchain = vec![PackageDep {
+            account: AccountAddress::from_hex_literal(
+                "0x7e783b349d3e89cf5931af376ebeadbfab855b3fa239b7ada8f5a92fbea6b387",
+            )
+            .unwrap(),
+            package_name: "Pyth".to_string(),
+        }];
+        let rewritten =
+            rewrite_manifest_with_onchain_deps(manifest, &onchain, "https://node/v1").unwrap();
+        assert!(
+            rewritten.contains("aptos = \"https://node/v1\""),
+            "expected on-chain dep, got:\n{}",
+            rewritten,
+        );
+        assert!(
+            rewritten
+                .contains("0x7e783b349d3e89cf5931af376ebeadbfab855b3fa239b7ada8f5a92fbea6b387"),
+            "expected dep address, got:\n{}",
+            rewritten,
+        );
+        assert!(
+            rewritten.contains("https://github.com/aptos-labs/aptos-core.git"),
+            "untouched git dep should remain, got:\n{}",
+            rewritten,
+        );
+    }
+
+    #[test]
+    fn no_rewrite_when_no_onchain_deps() {
+        let manifest = "[package]\nname = \"X\"\nversion = \"0.0.0\"\n";
+        assert!(rewrite_manifest_with_onchain_deps(manifest, &[], "https://node/v1").is_none());
     }
 }

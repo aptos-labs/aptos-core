@@ -1,0 +1,6 @@
+[package]
+name = "Middle"
+version = "0.0.0"
+
+[dependencies]
+Leaf = { local = "./does_not_exist" }

@@ -49,7 +49,15 @@ async fn maybe_download_package(info: &CustomDepInfo) -> anyhow::Result<()> {
         )
         .await?;
         let package = registry.get_package(info.package_name).await?;
-        package.save_package_to_disk(info.download_to.as_path())
+        // Pass through the node URL so the on-chain `PackageMetadata.deps`
+        // list can be used to rewrite the package's `[dependencies]` into
+        // `aptos = ..., address = ...` form. This lets transitive on-chain
+        // dependencies (e.g. `Pyth` referenced from `LiquidSwap`) resolve
+        // automatically against the same node.
+        package.save_package_to_disk_with_node(
+            info.download_to.as_path(),
+            Some(info.node_url.as_str()),
+        )
     } else {
         Ok(())
     }

@@ -80,6 +80,13 @@ pub struct ResolutionGraph<T> {
     /// It is required that identical named addresses share the same Rc instance.
     /// Otherwise, address overrides/unification will be incorrect.
     pub global_named_address_pool: BTreeMap<NamedAddress, ResolvingNamedAddress>,
+    /// Dependency overrides from the root manifest's `[patch]` section. Any
+    /// dep edge encountered in the graph (direct *or* transitive) whose name
+    /// matches a key in this map is replaced with the corresponding
+    /// [`Dependency`]. Local paths in the override are absolutized against
+    /// the root manifest directory so they resolve correctly even when
+    /// patching a transitive edge.
+    pub patches: BTreeMap<PackageName, Dependency>,
 }
 
 #[derive(Debug, Clone)]
@@ -124,6 +131,12 @@ impl ResolvingGraph {
             );
         }
 
+        // Snapshot the [patch] table from the root manifest. The entries are
+        // applied below in `build_resolution_graph`; local paths inside a
+        // patched dep are resolved against `root_package_path` at apply time,
+        // *not* against the transitive parent doing the referring.
+        let patches: BTreeMap<PackageName, Dependency> = root_package.patches.clone();
+
         let mut resolution_graph = Self {
             root_package_path: root_package_path.clone(),
             build_options: build_options.clone(),
@@ -131,6 +144,7 @@ impl ResolvingGraph {
             graph: DiGraphMap::new(),
             package_table: BTreeMap::new(),
             global_named_address_pool,
+            patches,
         };
 
         let override_std = &build_options.override_std;
@@ -160,6 +174,7 @@ impl ResolvingGraph {
             graph,
             package_table,
             global_named_address_pool,
+            patches,
         } = self;
 
         let mut unresolved_addresses = Vec::new();
@@ -219,6 +234,7 @@ impl ResolvingGraph {
             graph,
             package_table: resolved_package_table,
             global_named_address_pool,
+            patches,
         })
     }
 
@@ -283,6 +299,25 @@ impl ResolvingGraph {
             if let Some(std_version) = &override_std {
                 if let Some(std_lib) = StdLib::from_package_name(dep_name) {
                     dep = std_lib.dependency(std_version);
+                }
+            }
+            // Root-level [patch] overrides win against any other dep source.
+            // Applied here, before download/parse, so transitive deps fetched
+            // from git or on-chain are rewritten too. Local paths are
+            // re-anchored to the root package's directory so they resolve
+            // independently of which (possibly cached / off-tree) parent
+            // edge happens to be referencing the patched dep.
+            if let Some(patched) = self.patches.get(&dep_name) {
+                dep = patched.clone();
+                if dep.git_info.is_none() && dep.node_info.is_none() && dep.local.is_relative() {
+                    let joined = self.root_package_path.join(&dep.local);
+                    dep.local = match joined.canonicalize() {
+                        Ok(abs) => abs,
+                        Err(_) => match std::env::current_dir() {
+                            Ok(cwd) => cwd.join(joined),
+                            Err(_) => joined,
+                        },
+                    };
                 }
             }
             let dep_node_id = self.get_or_add_node(dep_name).with_context(|| {
