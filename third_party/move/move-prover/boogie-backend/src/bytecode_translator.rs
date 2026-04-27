@@ -3603,19 +3603,17 @@ impl<'env> BoogieTranslator<'env> {
 
     /// Recursively collect the input arguments of every `Behavior(kind, _)` call
     /// in the expression (excluding the function expression at index 0). Each
-    /// occurrence is recorded independently.
+    /// occurrence is recorded independently. Traverses all subexpressions
+    /// (calls, quantifiers, blocks, conditionals, lambdas, etc.).
     fn collect_behavior_calls(exp: &Exp, kind: BehaviorKind, out: &mut Vec<Vec<Exp>>) {
-        match exp.as_ref() {
-            ExpData::Call(_, AstOperation::Behavior(k, _), args) if *k == kind => {
-                out.push(args[1..].to_vec());
-            },
-            ExpData::Call(_, _, args) => {
-                for a in args {
-                    Self::collect_behavior_calls(a, kind, out);
+        exp.visit_pre_order(&mut |e| {
+            if let ExpData::Call(_, AstOperation::Behavior(k, _), args) = e {
+                if *k == kind {
+                    out.push(args[1..].to_vec());
                 }
-            },
-            _ => {},
-        }
+            }
+            true
+        });
     }
 
     /// Translate a data invariant body expression to Boogie, mapping quantified

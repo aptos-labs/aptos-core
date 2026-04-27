@@ -542,17 +542,39 @@ fn output_unified(env: &GlobalEnv, inferred_sym: Symbol, options: &Options) -> a
                 // just before the line containing the closing `}`.
                 let block_end = spec_info.loc.span().end().to_usize();
                 let block_start = spec_info.loc.span().start().to_usize();
-                // Find the closing `}`, then find the start of its line
-                // so we insert before the line with `}`.
-                let brace_pos = source[..block_end]
-                    .rfind('}')
-                    .expect("spec block should have closing brace");
 
                 // Find the opening `{` to detect single-line blocks like `spec foo {}`.
                 let open_brace_pos = source[block_start..block_end]
                     .find('{')
                     .map(|p| block_start + p)
                     .expect("spec block should have opening brace");
+
+                // Find the spec block's matching closing `}` by scanning forward
+                // from the opening `{` and balancing braces. Without this, when
+                // the spec is followed by a trailing `proof { ... }` block
+                // (which is parsed as part of the same `SpecBlockInfo` loc), an
+                // `rfind('}')` would land on the proof block's closing brace
+                // and inferred conditions would be inserted into the proof
+                // block instead of the spec block.
+                let brace_pos = {
+                    let bytes = source.as_bytes();
+                    let mut depth: i32 = 0;
+                    let scan = bytes[open_brace_pos..block_end]
+                        .iter()
+                        .enumerate()
+                        .find_map(|(offset, b)| match b {
+                            b'{' => {
+                                depth += 1;
+                                None
+                            },
+                            b'}' => {
+                                depth -= 1;
+                                (depth == 0).then_some(open_brace_pos + offset)
+                            },
+                            _ => None,
+                        });
+                    scan.expect("spec block should have matching closing brace")
+                };
                 let is_single_line = !source[open_brace_pos..brace_pos].contains('\n');
 
                 let insert_pos = if is_single_line {
@@ -727,7 +749,10 @@ fn generate_inferred_conditions(
     let sourcifier = Sourcifier::new(env, true);
 
     // Filter to only inferred conditions, properties, and frame_spec; print; then restore.
-    let (original_conditions, original_properties) = {
+    // The user-written `proof { ... }` block is also temporarily cleared so it
+    // is not re-emitted alongside the inferred conditions (it already lives in
+    // the source we are merging into).
+    let (original_conditions, original_properties, original_proof) = {
         let mut spec = fun.get_mut_spec();
         let orig_conds = std::mem::take(&mut spec.conditions);
         spec.conditions = orig_conds
@@ -742,16 +767,18 @@ fn generate_inferred_conditions(
             .filter(|(k, _)| !original_property_keys.contains(k))
             .map(|(k, v)| (*k, v.clone()))
             .collect();
-        (orig_conds, orig_props)
+        let orig_proof = spec.proof.take();
+        (orig_conds, orig_props, orig_proof)
     };
 
     sourcifier.print_fun_spec(fun);
 
-    // Restore original conditions and properties.
+    // Restore original conditions, properties, and proof block.
     {
         let mut spec = fun.get_mut_spec();
         spec.conditions = original_conditions;
         spec.properties = original_properties;
+        spec.proof = original_proof;
     }
 
     let raw = sourcifier.result();

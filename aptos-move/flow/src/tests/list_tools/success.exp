@@ -188,6 +188,18 @@
           "format": "uint",
           "minimum": 0,
           "nullable": true
+        },
+        "split_vcs_by_assert": {
+          "description": "If set, generate an independent verification condition for each\nassertion in a function instead of a single combined condition. Can\nhelp when a function mixes provable-but-hard asserts with asserts\nthat produce counterexamples; useful for diagnosing per-function\ntimeouts.",
+          "type": "boolean",
+          "nullable": true
+        },
+        "error_limit": {
+          "description": "Maximum number of counterexamples reported per verification\ncondition.",
+          "type": "integer",
+          "format": "uint",
+          "minimum": 0,
+          "nullable": true
         }
       },
       "required": [

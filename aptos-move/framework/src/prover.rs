@@ -316,17 +316,6 @@ impl ProverOptions {
     }
 }
 
-/// Configures Aptos-specific native function specifications on the given
-/// prover options. This loads `aptos-natives.bpl` and the module instance
-/// names needed for types like `object` and `aggregator_v2`.
-pub fn set_aptos_custom_natives(options: &mut Options) {
-    options.backend.custom_natives =
-        Some(move_prover_boogie_backend::options::CustomNativeOptions {
-            template_bytes: include_bytes!("aptos-natives.bpl").to_vec(),
-            module_instance_names: move_prover_boogie_backend::options::custom_native_options(),
-        });
-}
-
 fn run_prover_benchmark(
     package_path: &Path,
     env: &mut GlobalEnv,
