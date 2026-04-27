@@ -17,4 +17,4 @@ fun pack_and_unpack(): u64 {
 === micro-ops ===
 // module 0x66::test
 
-fun pack_and_unpack(): skipped (lowering: instruction Pack not yet lowered)
+fun pack_and_unpack(): skipped (not all types are concrete)

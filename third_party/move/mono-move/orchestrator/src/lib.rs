@@ -19,7 +19,7 @@ use move_binary_format::CompiledModule;
 /// 3. Assemble the loaded module (IR + executable + dependencies)
 pub fn build_executable(
     guard: &ExecutionGuard<'_>,
-    module: &CompiledModule,
+    module: CompiledModule,
 ) -> Result<Box<LoadedModule>> {
-    ExecutableBuilder::new(guard, module).build()
+    ExecutableBuilder::new(guard, module)?.build()
 }

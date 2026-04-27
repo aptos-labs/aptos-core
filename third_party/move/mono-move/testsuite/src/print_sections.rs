@@ -12,9 +12,7 @@
 
 use crate::parser::PrintSection;
 use anyhow::{anyhow, Result};
-use mono_move_core::types::InternedType;
 use mono_move_global_context::ExecutionGuard;
-use mono_move_orchestrator::ExecutableBuilder;
 use move_binary_format::{access::ModuleAccess, CompiledModule};
 use specializer::{
     destack,
@@ -38,9 +36,8 @@ pub fn render(
             push_section(&mut out, "=== bytecode ===\n", &format_bytecode(module)?);
         }
         if want_stackless || want_micro_ops {
-            let struct_types = resolve_struct_types(guard, module)?;
-            let module_ir = destack(module.clone(), guard, &struct_types)
-                .map_err(|e| anyhow!("destack failed: {:#}", e))?;
+            let module_ir =
+                destack(module.clone(), guard).map_err(|e| anyhow!("destack failed: {:#}", e))?;
             if want_stackless {
                 push_section(&mut out, "=== stackless ===\n", &module_ir.to_string());
             }
@@ -67,19 +64,6 @@ fn push_section(out: &mut String, header: &str, content: &str) {
 fn format_bytecode(module: &CompiledModule) -> Result<String> {
     move_asm::disassembler::disassemble_module(String::new(), module)
         .map_err(|e| anyhow!("bytecode disassembly failed: {:#}", e))
-}
-
-/// Resolve struct types via the orchestrator's builder and return the
-/// `struct_type_table` that the specializer expects.
-pub fn resolve_struct_types(
-    guard: &ExecutionGuard<'_>,
-    module: &CompiledModule,
-) -> Result<Vec<Option<InternedType>>> {
-    let mut builder = ExecutableBuilder::new(guard, module);
-    builder
-        .resolve_types()
-        .map_err(|e| anyhow!("type resolution failed: {:#}", e))?;
-    Ok(builder.struct_type_table())
 }
 
 /// Format the micro-ops for every function in `module_ir`, with a

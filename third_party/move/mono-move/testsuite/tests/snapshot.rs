@@ -6,14 +6,10 @@
 //! Each `.masm` / `.move` input runs: assemble/compile → stackless IR →
 //! micro-op lowering. Output is diffed against a `.exp` snapshot; `UPBL=1`
 //! refreshes snapshots in place.
-//!
-//! Struct references render with real names via the orchestrator's
-//! [`ExecutableBuilder`] rather than a placeholder table.
 
 use mono_move_global_context::GlobalContext;
 use mono_move_testsuite::{
-    assemble_masm_source, compile_move_path,
-    print_sections::{format_micro_ops, resolve_struct_types},
+    assemble_masm_source, compile_move_path, print_sections::format_micro_ops,
 };
 use specializer::destack;
 use std::path::Path;
@@ -35,10 +31,9 @@ fn masm_runner(path: &Path) -> datatest_stable::Result<()> {
 
     let ctx = GlobalContext::with_num_execution_workers(1);
     let guard = ctx.try_execution_context(0).unwrap();
-    let struct_types = resolve_struct_types(&guard, &module).map_err(|e| format!("{:#}", e))?;
 
-    let ir = destack(module, &guard, &struct_types).map_err(|e| format!("{:#}", e))?;
-    let mut output = ir.to_string();
+    let ir = destack(module, &guard).map_err(|e| format!("{:#}", e))?;
+    let mut output = format!("{}", ir);
     output.push_str("\n=== micro-ops ===\n");
     output.push_str(&format_micro_ops(&ir));
 
@@ -57,12 +52,10 @@ fn move_runner(path: &Path) -> datatest_stable::Result<()> {
     let guard = ctx.try_execution_context(0).unwrap();
 
     let mut output = String::new();
-    for module in &modules {
-        let struct_types = resolve_struct_types(&guard, module).map_err(|e| format!("{:#}", e))?;
-        let masm_output = move_asm::disassembler::disassemble_module(String::new(), module)
+    for module in modules {
+        let masm_output = move_asm::disassembler::disassemble_module(String::new(), &module)
             .map_err(|e| format!("disassembly failed: {:#}", e))?;
-        let module_ir =
-            destack(module.clone(), &guard, &struct_types).map_err(|e| format!("{:#}", e))?;
+        let module_ir = destack(module, &guard).map_err(|e| format!("{:#}", e))?;
         output.push_str("=== masm ===\n");
         output.push_str(&masm_output);
         output.push_str("\n=== specializer ===\n");

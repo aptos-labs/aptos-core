@@ -64,8 +64,9 @@ pub fn run_test(steps: Vec<Step>, kind: SourceKind, test_path: &Path) -> anyhow:
                     storage.add_module_bytes(module.self_addr(), module.self_name(), blob.into());
 
                     // V2 path.
-                    let loaded = mono_move_orchestrator::build_executable(&guard, module)
-                        .map_err(|err| anyhow!("Failed to build loaded module: {}", err))?;
+                    let loaded =
+                        mono_move_orchestrator::build_executable(&guard, module.clone())
+                            .map_err(|err| anyhow!("Failed to build loaded module: {}", err))?;
                     guard
                         .insert_loaded_module(loaded)
                         .map_err(|err| anyhow!("Failed to insert loaded module: {}", err))?;

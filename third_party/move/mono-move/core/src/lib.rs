@@ -5,6 +5,7 @@ mod executable;
 mod function;
 mod instruction;
 pub mod interner;
+mod resolved_module;
 mod transaction_context;
 pub mod types;
 
@@ -18,6 +19,7 @@ pub use instruction::{
     ENUM_DATA_OFFSET, ENUM_TAG_OFFSET, FRAME_METADATA_SIZE, FUNC_REF_PAYLOAD_OFFSET,
     FUNC_REF_TAG_OFFSET, FUNC_REF_TAG_RESOLVED, OBJECT_HEADER_SIZE, STRUCT_DATA_OFFSET,
 };
-pub use interner::{walk_sig_token, Interner, StructResolver};
+pub use interner::Interner;
+pub use resolved_module::ResolvedModule;
 pub use transaction_context::{FunctionResolver, NoopTransactionContext, TransactionContext};
 pub use types::{convert_mut_to_immut_ref, strip_ref};

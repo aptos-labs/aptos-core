@@ -12,6 +12,7 @@ use mono_move_core::{
     types::{align_up, view_type, Alignment, InternedType, Size},
     FRAME_METADATA_SIZE,
 };
+use move_binary_format::access::ModuleAccess;
 
 /// Returns the (size, alignment) of a concrete interned type, or None if the
 /// type is not concrete (e.g., contains type parameters or unresolved structs).
@@ -78,8 +79,9 @@ fn try_build_context_inner(
     let frame_data_size = home_slots.last().map(|s| s.offset + s.size).unwrap_or(0);
 
     // 2. Build return_slots from this function's own signature.
-    let own_sig = &module_ir.handle_signatures[func_ir.handle_idx.0 as usize];
-    let return_slots = layout_slots(0, &own_sig.ret_types)?;
+    let own_handle = module_ir.module.function_handle_at(func_ir.handle_idx);
+    let own_ret_types = module_ir.module.interned_types_at(own_handle.return_);
+    let return_slots = layout_slots(0, own_ret_types)?;
 
     // 3. Walk Call/CallGeneric instructions, looking up each callee's sig
     //    in the module-level tables.
@@ -87,31 +89,30 @@ fn try_build_context_inner(
     let mut call_sites = Vec::new();
 
     for instr in func_ir.instrs() {
-        let (handle_idx, sig) = match instr {
-            Instr::Call(_, idx, _) => {
-                let sig = &module_ir.handle_signatures[idx.0 as usize];
-                (*idx, sig)
-            },
+        let handle_idx = match instr {
+            Instr::Call(_, idx, _) => *idx,
             Instr::CallGeneric(_, idx, _) => {
-                let inst = &module_ir.module.function_instantiations[idx.0 as usize];
-                let sig = &module_ir.instantiation_signatures[idx.0 as usize];
-                (inst.handle, sig)
+                module_ir.module.function_instantiation_at(*idx).handle
             },
             _ => continue,
         };
 
+        let callee_handle = module_ir.module.function_handle_at(handle_idx);
+        let param_types = module_ir.module.interned_types_at(callee_handle.parameters);
+        let ret_types = module_ir.module.interned_types_at(callee_handle.return_);
+
         let callee_func_id = handle_idx.0 as u32;
 
         // Param and return areas share `callee_base` (callee's frame start).
-        let arg_write_slots = layout_slots(callee_base, &sig.param_types)?;
-        let ret_read_slots = layout_slots(callee_base, &sig.ret_types)?;
+        let arg_write_slots = layout_slots(callee_base, param_types)?;
+        let ret_read_slots = layout_slots(callee_base, ret_types)?;
 
         call_sites.push(CallSiteInfo {
             callee_func_id,
             arg_write_slots,
             ret_read_slots,
-            param_types: sig.param_types.clone(),
-            ret_types: sig.ret_types.clone(),
+            param_types: param_types.to_vec(),
+            ret_types: ret_types.to_vec(),
         });
     }
 

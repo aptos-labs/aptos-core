@@ -16,7 +16,7 @@ fn add_executable<'guard>(guard: &'guard ExecutionGuard<'_>, source: &str) -> &'
         .left()
         .expect("Only modules are expected");
 
-    let loaded = mono_move_orchestrator::build_executable(guard, &module)
+    let loaded = mono_move_orchestrator::build_executable(guard, module)
         .expect("Building a loaded module should always succeed");
 
     guard

@@ -7,8 +7,7 @@
 use anyhow::{Context, Result};
 use clap::Parser;
 use mono_move_global_context::GlobalContext;
-use mono_move_orchestrator::ExecutableBuilder;
-use move_binary_format::{access::ModuleAccess, file_format::CompiledModule};
+use move_binary_format::{access::ModuleAccess, CompiledModule};
 use specializer::destack;
 use std::path::PathBuf;
 
@@ -39,13 +38,7 @@ fn main() -> Result<()> {
     let ctx = GlobalContext::with_num_execution_workers(1);
     let guard = ctx.try_execution_context(0).unwrap();
 
-    let struct_types = {
-        let mut builder = ExecutableBuilder::new(&guard, &module);
-        builder.resolve_types()?;
-        builder.struct_type_table()
-    };
-
-    let module_ir = destack(module, &guard, &struct_types)?;
+    let module_ir = destack(module, &guard)?;
 
     if args.verbose {
         print_stats(&module_ir);
