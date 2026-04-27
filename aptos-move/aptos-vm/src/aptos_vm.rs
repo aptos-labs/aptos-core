@@ -2646,22 +2646,43 @@ impl AptosVM {
                 (BLOCK_PROLOGUE_EXT_V2, args)
             },
             BlockMetadataExt::V3(v3) => {
-                let rand_meta = v3.feature_metas.iter().find_map(|m| match m {
-                    FeatureSpecificMetadata::Randomness(r) => Some(r),
-                    _ => None,
-                });
-                let em_meta = v3.feature_metas.iter().find_map(|m| match m {
-                    FeatureSpecificMetadata::EncryptedMempool(e) => Some(e),
-                    _ => None,
-                });
-                let has_randomness = rand_meta.is_some();
-                let randomness_seed: Option<Vec<u8>> = rand_meta.and_then(|r| match r {
-                    RandomnessMetadata::V0 { per_block_seed } => per_block_seed.clone(),
-                });
-                let has_encrypted_mempool = em_meta.is_some();
-                let decryption_key: Option<Vec<u8>> = em_meta.and_then(|e| match e {
-                    EncryptedMempoolMetadata::V0 { decryption_key } => decryption_key.clone(),
-                });
+                // Encode each feature as [tag: u8, has_payload: u8, payload_bytes...]
+                // Tag constants must match FEATURE_* constants in block.move.
+                let feature_metas_encoded: Vec<MoveValue> = v3
+                    .feature_metas
+                    .iter()
+                    .map(|m| {
+                        let bytes: Vec<u8> = match m {
+                            FeatureSpecificMetadata::Randomness(RandomnessMetadata::V0 {
+                                per_block_seed,
+                            }) => {
+                                let mut b = vec![0u8]; // FEATURE_RANDOMNESS = 0
+                                match per_block_seed {
+                                    None => b.push(0u8),
+                                    Some(seed) => {
+                                        b.push(1u8);
+                                        b.extend_from_slice(seed);
+                                    },
+                                }
+                                b
+                            },
+                            FeatureSpecificMetadata::EncryptedMempool(
+                                EncryptedMempoolMetadata::V0 { decryption_key },
+                            ) => {
+                                let mut b = vec![1u8]; // FEATURE_ENCRYPTED_MEMPOOL = 1
+                                match decryption_key {
+                                    None => b.push(0u8),
+                                    Some(key) => {
+                                        b.push(1u8);
+                                        b.extend_from_slice(key);
+                                    },
+                                }
+                                b
+                            },
+                        };
+                        MoveValue::Vector(bytes.into_iter().map(MoveValue::U8).collect())
+                    })
+                    .collect();
                 let args = vec![
                     MoveValue::Signer(AccountAddress::ZERO), // Run as 0x0
                     MoveValue::Address(AccountAddress::from_bytes(v3.id.to_vec()).unwrap()),
@@ -2675,10 +2696,7 @@ impl AptosVM {
                         .as_move_value(),
                     v3.previous_block_votes_bitvec.as_move_value(),
                     MoveValue::U64(v3.timestamp_usecs),
-                    MoveValue::Bool(has_randomness),
-                    randomness_seed.as_move_value(),
-                    MoveValue::Bool(has_encrypted_mempool),
-                    decryption_key.as_move_value(),
+                    MoveValue::Vector(feature_metas_encoded),
                 ];
                 (BLOCK_PROLOGUE_EXT_V3, args)
             },

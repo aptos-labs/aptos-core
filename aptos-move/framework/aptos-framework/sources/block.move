@@ -296,10 +296,18 @@ module aptos_framework::block {
         };
     }
 
-    /// `block_prologue()` with extensible per-feature metadata.
-    /// `has_randomness` and `randomness_seed` carry randomness metadata when randomness is enabled.
-    /// `has_encrypted_mempool` and `decryption_key` carry encrypted-mempool metadata when
-    /// encrypted mempool is enabled.
+    /// Feature tag constants — must stay in sync with tag bytes emitted by the Rust VM.
+    const FEATURE_RANDOMNESS: u8 = 0;
+    const FEATURE_ENCRYPTED_MEMPOOL: u8 = 1;
+
+    /// `block_prologue()` with an extensible feature metadata list.
+    /// Each element of `feature_metas` encodes one active feature as:
+    ///   byte 0   : feature tag (FEATURE_* constant above)
+    ///   byte 1   : 0 = no payload, 1 = payload follows
+    ///   bytes 2+ : raw payload bytes (present only when byte 1 == 1)
+    /// Adding a new feature in the future requires only a new FEATURE_* constant and a
+    /// new branch inside this function — no change to the function signature or a new
+    /// transaction variant.
     fun block_prologue_ext_v3(
         vm: signer,
         hash: address,
@@ -309,10 +317,7 @@ module aptos_framework::block {
         failed_proposer_indices: vector<u64>,
         previous_block_votes_bitvec: vector<u8>,
         timestamp: u64,
-        has_randomness: bool,
-        randomness_seed: Option<vector<u8>>,
-        has_encrypted_mempool: bool,
-        decryption_key: Option<vector<u8>>
+        feature_metas: vector<vector<u8>>
     ) acquires BlockResource, CommitHistory {
         let epoch_interval =
             block_prologue_common(
@@ -325,14 +330,35 @@ module aptos_framework::block {
                 previous_block_votes_bitvec,
                 timestamp
             );
-        if (has_randomness) {
-            randomness::on_new_block(&vm, epoch, round, randomness_seed);
-        } else {
+
+        let has_randomness = false;
+        let has_encrypted_mempool = false;
+        let n = vector::length(&feature_metas);
+        let i = 0;
+        while (i < n) {
+            let meta = vector::borrow(&feature_metas, i);
+            let tag = *vector::borrow(meta, 0);
+            let payload_opt =
+                if (*vector::borrow(meta, 1) == 1u8) {
+                    option::some(vector::slice(meta, 2, vector::length(meta)))
+                } else {
+                    option::none()
+                };
+            if (tag == FEATURE_RANDOMNESS) {
+                has_randomness = true;
+                randomness::on_new_block(&vm, epoch, round, payload_opt);
+            } else if (tag == FEATURE_ENCRYPTED_MEMPOOL) {
+                has_encrypted_mempool = true;
+                decryption::on_new_block(&vm, epoch, round, payload_opt);
+            };
+            i = i + 1;
+        };
+
+        // Features absent from the list are treated as disabled.
+        if (!has_randomness) {
             randomness::on_new_block(&vm, epoch, round, option::none());
         };
-        if (has_encrypted_mempool) {
-            decryption::on_new_block(&vm, epoch, round, decryption_key);
-        } else {
+        if (!has_encrypted_mempool) {
             decryption::on_new_block(&vm, epoch, round, option::none());
         };
 
