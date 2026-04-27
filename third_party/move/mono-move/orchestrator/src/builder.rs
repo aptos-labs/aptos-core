@@ -335,14 +335,10 @@ impl<'a, 'guard, 'ctx> ExecutableBuilder<'a, 'guard, 'ctx> {
                 }
 
                 let size = align_up(offset, align);
-                let ptr = self.guard.intern_struct_type(
-                    self.id,
-                    name,
-                    EMPTY_TYPE_LIST,
-                    size,
-                    align,
-                    &fields,
-                );
+                let ptr = self
+                    .guard
+                    .intern_struct_identity(self.id, name, EMPTY_TYPE_LIST);
+                self.guard.set_struct_layout(ptr, size, align, &fields)?;
 
                 self.structs.insert(name, StructType::new(ptr));
                 Ok(ptr)
