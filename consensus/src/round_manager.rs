@@ -2308,3 +2308,77 @@ fn extract_batch_digests(
     }
     out
 }
+
+#[cfg(test)]
+mod reject_encrypted_tests {
+    use super::*;
+    use crate::quorum_store::types::BatchMsg;
+    use aptos_consensus_types::proof_of_store::{
+        BatchInfoExt, BatchKind, SignedBatchInfo, SignedBatchInfoMsg,
+    };
+    use aptos_types::quorum_store::BatchId;
+    use move_core_types::account_address::AccountAddress;
+
+    fn make_encrypted_batch_msg_v2() -> BatchMsg<BatchInfoExt> {
+        let author = AccountAddress::random();
+        let batch = crate::quorum_store::types::Batch::new_v2(
+            BatchId::new_for_test(1),
+            vec![],
+            1,
+            1,
+            author,
+            0,
+            BatchKind::Encrypted,
+        );
+        BatchMsg::new(vec![batch])
+    }
+
+    fn make_normal_batch_msg_v2() -> BatchMsg<BatchInfoExt> {
+        let author = AccountAddress::random();
+        let batch = crate::quorum_store::types::Batch::new_v2(
+            BatchId::new_for_test(1),
+            vec![],
+            1,
+            1,
+            author,
+            0,
+            BatchKind::Normal,
+        );
+        BatchMsg::new(vec![batch])
+    }
+
+    fn make_encrypted_signed_batch_info_v2() -> SignedBatchInfoMsg<BatchInfoExt> {
+        let author = AccountAddress::random();
+        let info = BatchInfoExt::new_v2(
+            author,
+            BatchId::new_for_test(1),
+            1,
+            1,
+            aptos_crypto::HashValue::random(),
+            0,
+            0,
+            0,
+            BatchKind::Encrypted,
+        );
+        SignedBatchInfoMsg::new(vec![SignedBatchInfo::dummy(info, author)])
+    }
+
+    #[test]
+    fn test_reject_encrypted_batch_msg_v2() {
+        let event = UnverifiedEvent::BatchMsgV2(Box::new(make_encrypted_batch_msg_v2()));
+        assert!(event.reject_encrypted().is_err());
+    }
+
+    #[test]
+    fn test_allow_normal_batch_msg_v2() {
+        let event = UnverifiedEvent::BatchMsgV2(Box::new(make_normal_batch_msg_v2()));
+        assert!(event.reject_encrypted().is_ok());
+    }
+
+    #[test]
+    fn test_reject_encrypted_signed_batch_info_v2() {
+        let event =
+            UnverifiedEvent::SignedBatchInfoMsgV2(Box::new(make_encrypted_signed_batch_info_v2()));
+        assert!(event.reject_encrypted().is_err());
+    }
+}
