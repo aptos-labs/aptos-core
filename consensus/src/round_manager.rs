@@ -261,6 +261,8 @@ impl UnverifiedEvent {
             UnverifiedEvent::OptProposalMsg(p) => p.block_data().payload().has_encrypted_batches(),
             UnverifiedEvent::BatchMsg(b) => b.has_encrypted_batches(),
             UnverifiedEvent::BatchMsgV2(b) => b.has_encrypted_batches(),
+            UnverifiedEvent::SignedBatchInfo(sd) => sd.has_encrypted_batches(),
+            UnverifiedEvent::SignedBatchInfoMsgV2(sd) => sd.has_encrypted_batches(),
             UnverifiedEvent::ProofOfStoreMsg(p) => p.has_encrypted_batches(),
             UnverifiedEvent::ProofOfStoreMsgV2(p) => p.has_encrypted_batches(),
             _ => false,
