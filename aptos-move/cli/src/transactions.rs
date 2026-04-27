@@ -81,7 +81,7 @@ fn local_write_set_to_json(
     write_set: &WriteSet,
 ) -> CliTypedResult<serde_json::Value> {
     let annotator = AptosValueAnnotator::new(state_view);
-    let mut changes = Vec::new();
+    let mut changes = Vec::with_capacity(write_set.write_op_iter().size_hint().0);
 
     for (state_key, op) in write_set.write_op_iter() {
         let state_key_hash = state_key.hash().to_hex_literal();
@@ -89,6 +89,8 @@ fn local_write_set_to_json(
             StateKeyInner::AccessPath(access_path) => match op.bytes() {
                 None => match access_path.get_path() {
                     Path::Code(module_id) => {
+                        // User-submitted transactions usually do not delete modules, but we keep
+                        // this branch for output completeness and consistency with API conversion.
                         changes.push(aptos_api_types::WriteSetChange::DeleteModule(
                             aptos_api_types::DeleteModule {
                                 address: access_path.address.into(),
@@ -190,11 +192,10 @@ fn local_write_set_to_json(
 
 fn local_materialize_output(
     state_view: &impl aptos_types::state_store::StateView,
-    vm_output: &VMOutput,
+    vm_output: VMOutput,
 ) -> CliTypedResult<TransactionOutput> {
     let resolver = state_view.as_move_resolver();
     vm_output
-        .clone()
         .try_materialize_into_transaction_output(&resolver)
         .map_err(|err| CliError::UnexpectedError(err.to_string()))
 }
@@ -445,7 +446,7 @@ impl TxnOptions {
         };
         if show_details {
             let state_view = debugger.state_view_at_version(version);
-            let transaction_output = local_materialize_output(&state_view, &vm_output)?;
+            let transaction_output = local_materialize_output(&state_view, vm_output)?;
             summary.events = Some(local_contract_events_to_json(
                 &state_view,
                 transaction_output.events(),
@@ -491,7 +492,7 @@ mod tests {
         state_store::{state_key::StateKey, table::TableHandle},
         write_set::{WriteOp, WriteSet},
     };
-    use move_core_types::language_storage::TypeTag;
+    use move_core_types::{ident_str, language_storage::TypeTag};
 
     #[test]
     fn simulation_summary_omits_optional_fields_by_default() {
@@ -605,5 +606,24 @@ mod tests {
             Some("0x010203")
         );
         assert!(first.get("state_key_hash").is_some());
+    }
+
+    #[test]
+    fn local_changes_preserve_delete_module_entries() {
+        let state_view = EmptyStateView;
+        let address = AccountAddress::from_hex_literal("0x1").unwrap();
+        let state_key = StateKey::module(&address, ident_str!("test_module"));
+        let write_set = WriteSet::new([(state_key, WriteOp::legacy_deletion())]).unwrap();
+
+        let json = local_write_set_to_json(&state_view, &write_set).unwrap();
+        let first = json.as_array().unwrap().first().unwrap();
+        assert_eq!(
+            first.get("type").and_then(|v| v.as_str()),
+            Some("delete_module")
+        );
+        assert_eq!(
+            first.get("address").and_then(|v| v.as_str()),
+            Some("0x1")
+        );
     }
 }
