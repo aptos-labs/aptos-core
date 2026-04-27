@@ -18,7 +18,7 @@ use aptos_types::{
     account_address::AccountAddress,
     aggregate_signature::AggregateSignature,
     block_metadata::BlockMetadata,
-    block_metadata_ext::{BlockMetaPayload, BlockMetadataExt},
+    block_metadata_ext::{PerFeatureBlockPayload, BlockMetadataExt},
     contract_event::{ContractEvent, EventWithVersion},
     dkg::{
         chunky_dkg::CertifiedAggregatedChunkySubtranscript, DKGTranscript, DKGTranscriptMetadata,
@@ -647,16 +647,16 @@ impl BlockMetadataExtension {
                     .map(|dk| HexEncodedBytes::from(dk.decryption_key_cloned())),
             }),
             BlockMetadataExt::V3(payload) => {
-                let decoded: Vec<BlockMetaPayload> =
-                    bcs::from_bytes(&payload.block_metas).unwrap_or_default();
+                let decoded: Vec<PerFeatureBlockPayload> =
+                    bcs::from_bytes(&payload.feature_payloads).unwrap_or_default();
                 let randomness = decoded.iter().find_map(|m| match m {
-                    BlockMetaPayload::Randomness { per_block_seed } => per_block_seed
+                    PerFeatureBlockPayload::Randomness { per_block_seed } => per_block_seed
                         .as_ref()
                         .map(|seed| HexEncodedBytes::from(seed.clone())),
                     _ => None,
                 });
                 let decryption_key = decoded.iter().find_map(|m| match m {
-                    BlockMetaPayload::EncryptedMempool { decryption_key } => decryption_key
+                    PerFeatureBlockPayload::EncryptedMempool { decryption_key } => decryption_key
                         .as_ref()
                         .map(|dk| HexEncodedBytes::from(dk.clone())),
                     _ => None,

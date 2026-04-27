@@ -24,9 +24,9 @@ module aptos_framework::block {
 
     const EUNKNOWN_FEATURE_VARIANT: u64 = 10;
 
-    /// BCS variant indices for FeatureSpecificBlockMetadata, matching the Rust FlatBlockMeta enum.
-    const RANDOMNESS_BLOCK_META_IDX: u64 = 0;
-    const ENCRYPTED_MEMPOOL_BLOCK_META_IDX: u64 = 1;
+    /// BCS variant indices for FeatureBlockPayload, matching the Rust FlatBlockMeta enum.
+    const RANDOMNESS_PAYLOAD_IDX: u64 = 0;
+    const ENCRYPTED_MEMPOOL_PAYLOAD_IDX: u64 = 1;
 
     /// Should be in-sync with BlockResource rust struct in new_block.rs
     struct BlockResource has key {
@@ -307,36 +307,36 @@ module aptos_framework::block {
     /// Carries per-block payloads consumed in this module (on_new_block calls).
     /// Variant indices are defined by the BLOCK_META_IDX constants above and must stay
     /// in sync with the Rust FlatBlockMeta enum written by the VM.
-    enum FeatureSpecificBlockMetadata has drop {
+    enum FeatureBlockPayload has drop {
         Randomness { per_block_seed: Option<vector<u8>> },
         EncryptedMempool { decryption_key: Option<vector<u8>> },
     }
 
-    fun deserialize_feature_specific_metadata(s: &mut BCSStream): FeatureSpecificBlockMetadata {
+    fun deserialize_feature_payload(s: &mut BCSStream): FeatureBlockPayload {
         let variant = bcs_stream::deserialize_uleb128(s);
-        if (variant == RANDOMNESS_BLOCK_META_IDX) {
+        if (variant == RANDOMNESS_PAYLOAD_IDX) {
             let per_block_seed = bcs_stream::deserialize_option(s, |s2: &mut BCSStream|
                 bcs_stream::deserialize_vector(s2, |s3: &mut BCSStream| bcs_stream::deserialize_u8(s3))
             );
-            FeatureSpecificBlockMetadata::Randomness { per_block_seed }
+            FeatureBlockPayload::Randomness { per_block_seed }
         } else {
-            assert!(variant == ENCRYPTED_MEMPOOL_BLOCK_META_IDX, error::invalid_argument(EUNKNOWN_FEATURE_VARIANT));
+            assert!(variant == ENCRYPTED_MEMPOOL_PAYLOAD_IDX, error::invalid_argument(EUNKNOWN_FEATURE_VARIANT));
             let decryption_key = bcs_stream::deserialize_option(s, |s2: &mut BCSStream|
                 bcs_stream::deserialize_vector(s2, |s3: &mut BCSStream| bcs_stream::deserialize_u8(s3))
             );
-            FeatureSpecificBlockMetadata::EncryptedMempool { decryption_key }
+            FeatureBlockPayload::EncryptedMempool { decryption_key }
         }
     }
 
-    fun decode_feature_metas(bytes: vector<u8>): vector<FeatureSpecificBlockMetadata> {
+    fun decode_feature_payloads(bytes: vector<u8>): vector<FeatureBlockPayload> {
         let stream = bcs_stream::new(bytes);
         bcs_stream::deserialize_vector(&mut stream, |s: &mut BCSStream|
-            deserialize_feature_specific_metadata(s)
+            deserialize_feature_payload(s)
         )
     }
 
     /// `block_prologue()` with an extensible per-feature metadata list.
-    /// `block_metas` is the BCS-encoded `vector<FeatureSpecificBlockMetadata>` carrying
+    /// `feature_payloads` is the BCS-encoded `vector<FeatureBlockPayload>` carrying
     /// per-block payloads for enabled features. `dkg_needed` is a minimal positional
     /// `vector<bool>` supplied by the Rust caller indicating which features need an async
     /// DKG session for epoch transition; a missing index means false.
@@ -351,7 +351,7 @@ module aptos_framework::block {
         failed_proposer_indices: vector<u64>,
         previous_block_votes_bitvec: vector<u8>,
         timestamp: u64,
-        block_metas: vector<u8>,
+        feature_payloads: vector<u8>,
         dkg_needed: vector<bool>
     ) acquires BlockResource, CommitHistory {
         let epoch_interval =
@@ -368,20 +368,20 @@ module aptos_framework::block {
 
         let has_randomness = false;
         let has_encrypted_mempool = false;
-        decode_feature_metas(block_metas).for_each(|meta| {
+        decode_feature_payloads(feature_payloads).for_each(|meta| {
             match (meta) {
-                FeatureSpecificBlockMetadata::Randomness { per_block_seed } => {
+                FeatureBlockPayload::Randomness { per_block_seed } => {
                     has_randomness = true;
                     randomness::on_new_block(&vm, epoch, round, per_block_seed);
                 },
-                FeatureSpecificBlockMetadata::EncryptedMempool { decryption_key } => {
+                FeatureBlockPayload::EncryptedMempool { decryption_key } => {
                     has_encrypted_mempool = true;
                     decryption::on_new_block(&vm, epoch, round, decryption_key);
                 },
             }
         });
 
-        // Features absent from block_metas are disabled for this block.
+        // Features absent from feature_payloads are disabled for this block.
         if (!has_randomness) {
             randomness::on_new_block(&vm, epoch, round, option::none());
         };

@@ -21,28 +21,28 @@ pub enum BlockMetadataExt {
     V0(BlockMetadata),
     V1(BlockMetadataWithRandomness),
     V2(BlockMetadataWithRandAndDecKey),
-    V3(BlockMetadataWithFeatureMetas),
+    V3(BlockMetadataWithFeatures),
 }
 
 /// Flat BCS payload for a single feature's per-block data, as encoded in
-/// `BlockMetadataWithFeatureMetas::block_metas`.
+/// `BlockMetadataWithFeatures::feature_payloads`.
 ///
 /// This type exists only for encoding (pipeline_builder) and decoding (API layer).
 /// It is NOT used as a struct field in any transaction type — the wire format stores
-/// `block_metas` as raw `Vec<u8>` so the transaction definition is permanently stable.
+/// `feature_payloads` as raw `Vec<u8>` so the transaction definition is permanently stable.
 ///
 /// Variant indices are ULEB128-encoded by BCS and must match the Move
-/// `FeatureSpecificBlockMetadata` enum in `block.move`:
+/// `FeatureBlockPayload` enum in `block.move`:
 ///   0 → Randomness
 ///   1 → EncryptedMempool
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
-pub enum BlockMetaPayload {
+pub enum PerFeatureBlockPayload {
     Randomness { per_block_seed: Option<Vec<u8>> },
     EncryptedMempool { decryption_key: Option<Vec<u8>> },
 }
 
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
-pub struct BlockMetadataWithFeatureMetas {
+pub struct BlockMetadataWithFeatures {
     pub id: HashValue,
     pub epoch: u64,
     pub round: u64,
@@ -51,10 +51,10 @@ pub struct BlockMetadataWithFeatureMetas {
     pub previous_block_votes_bitvec: Vec<u8>,
     pub failed_proposer_indices: Vec<u32>,
     pub timestamp_usecs: u64,
-    /// BCS-encoded `Vec<BlockMetaPayload>`: per-block payloads for enabled features.
+    /// BCS-encoded `Vec<PerFeatureBlockPayload>`: per-block payloads for enabled features.
     /// Stored as raw bytes so this struct never changes when new features are added.
     #[serde(with = "serde_bytes")]
-    pub block_metas: Vec<u8>,
+    pub feature_payloads: Vec<u8>,
     /// Minimal positional DKG flags: `dkg_needed[i] = true` means feature i needs an async DKG
     /// session for the next epoch. Trailing `false` entries are omitted; missing index means false.
     /// Index assignments are defined by `*_DKG_IDX` constants in `reconfiguration_with_dkg`.
@@ -143,10 +143,10 @@ impl BlockMetadataExt {
         previous_block_votes_bitvec: Vec<u8>,
         failed_proposer_indices: Vec<u32>,
         timestamp_usecs: u64,
-        block_metas: Vec<u8>,
+        feature_payloads: Vec<u8>,
         dkg_needed: Vec<bool>,
     ) -> Self {
-        Self::V3(BlockMetadataWithFeatureMetas {
+        Self::V3(BlockMetadataWithFeatures {
             id,
             epoch,
             round,
@@ -154,7 +154,7 @@ impl BlockMetadataExt {
             previous_block_votes_bitvec,
             failed_proposer_indices,
             timestamp_usecs,
-            block_metas,
+            feature_payloads,
             dkg_needed,
         })
     }

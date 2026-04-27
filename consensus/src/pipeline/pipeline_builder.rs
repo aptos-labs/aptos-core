@@ -40,7 +40,7 @@ use aptos_storage_interface::state_store::state_view::cached_state_view::CachedS
 use aptos_types::{
     account_config::randomness_event::RANDOMNESS_GENERATED_EVENT_MOVE_TYPE_TAG,
     block_executor::config::BlockExecutorConfigFromOnchain,
-    block_metadata_ext::BlockMetaPayload,
+    block_metadata_ext::PerFeatureBlockPayload,
     decryption::BlockTxnDecryptionKey,
     ledger_info::{LedgerInfo, LedgerInfoWithSignatures},
     on_chain_config::OnChainConsensusConfig,
@@ -918,10 +918,10 @@ impl PipelineBuilder {
 
         tracker.start_working();
         let metadata_txn = if use_extensible_block_metadata {
-            let mut payloads: Vec<BlockMetaPayload> = vec![];
+            let mut payloads: Vec<PerFeatureBlockPayload> = vec![];
             let mut dkg_needed_full = vec![];
             if is_randomness_enabled {
-                payloads.push(BlockMetaPayload::Randomness {
+                payloads.push(PerFeatureBlockPayload::Randomness {
                     per_block_seed: rand_result
                         .flatten()
                         .map(|r: Randomness| r.randomness_cloned()),
@@ -931,7 +931,7 @@ impl PipelineBuilder {
                 dkg_needed_full.push(false);
             }
             if is_decryption_enabled {
-                payloads.push(BlockMetaPayload::EncryptedMempool {
+                payloads.push(PerFeatureBlockPayload::EncryptedMempool {
                     decryption_key: decryption_result
                         .flatten()
                         .map(|dk: BlockTxnDecryptionKey| dk.decryption_key_cloned()),
@@ -943,9 +943,9 @@ impl PipelineBuilder {
             while dkg_needed_full.last() == Some(&false) {
                 dkg_needed_full.pop();
             }
-            let block_metas =
-                bcs::to_bytes(&payloads).expect("BCS serialization of block_metas failed");
-            block.new_metadata_v3(&validator, block_metas, dkg_needed_full)
+            let feature_payloads =
+                bcs::to_bytes(&payloads).expect("BCS serialization of feature_payloads failed");
+            block.new_metadata_v3(&validator, feature_payloads, dkg_needed_full)
         } else {
             match (rand_result, decryption_result) {
                 (Some(maybe_rand), Some(maybe_dec_key)) => {

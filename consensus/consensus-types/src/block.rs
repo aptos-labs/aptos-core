@@ -618,7 +618,7 @@ impl Block {
     pub fn new_metadata_v3(
         &self,
         validators: &[AccountAddress],
-        block_metas: Vec<u8>,
+        feature_payloads: Vec<u8>,
         dkg_needed: Vec<bool>,
     ) -> BlockMetadataExt {
         BlockMetadataExt::new_v3(
@@ -633,7 +633,7 @@ impl Block {
                     Self::failed_authors_to_indices(validators, failed_authors)
                 }),
             self.timestamp_usecs(),
-            block_metas,
+            feature_payloads,
             dkg_needed,
         )
     }

@@ -2659,7 +2659,7 @@ impl AptosVM {
                         .as_move_value(),
                     v3.previous_block_votes_bitvec.as_move_value(),
                     MoveValue::U64(v3.timestamp_usecs),
-                    v3.block_metas.as_move_value(),
+                    v3.feature_payloads.as_move_value(),
                     v3.dkg_needed.as_move_value(),
                 ];
                 (BLOCK_PROLOGUE_EXT_V3, args)
