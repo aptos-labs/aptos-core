@@ -155,16 +155,27 @@ module aptos_framework::reconfiguration_with_dkg {
     /// Trigger reconfiguration using the extensible block metadata V3 path.
     /// `has_randomness` and `has_encrypted_mempool` reflect which features are
     /// active this epoch (agreed upon by all validators via on-chain state +
-    /// local seqnum overrides). Starts the relevant DKG sessions and clears
-    /// any stale sessions for features that are no longer active.
+    /// local seqnum overrides).
+    ///
+    /// Clearing disabled sessions is intentionally done BEFORE the is_in_progress()
+    /// guard: if an operator disables a feature mid-reconfig (e.g. bumps seqnum to
+    /// escape a stuck DKG), the stale session must be cleared on every block so that
+    /// try_finalize_reconfig can proceed without waiting for it.
     public(friend) fun try_start_v3(has_randomness: bool, has_encrypted_mempool: bool) {
+        let framework = create_signer::create_signer(@aptos_framework);
+
+        if (!has_randomness) {
+            dkg::try_clear_incomplete_session(&framework);
+        };
+        if (!has_encrypted_mempool) {
+            chunky_dkg::try_clear_incomplete_session(&framework);
+        };
+
         if (reconfiguration_state::is_in_progress()) { return };
 
         reconfiguration_state::on_reconfig_start();
 
         let cur_epoch = reconfiguration::current_epoch();
-        let framework = create_signer::create_signer(@aptos_framework);
-
         if (has_randomness) {
             dkg::start(
                 cur_epoch,
@@ -172,10 +183,7 @@ module aptos_framework::reconfiguration_with_dkg {
                 stake::cur_validator_consensus_infos(),
                 stake::next_validator_consensus_infos()
             );
-        } else {
-            dkg::try_clear_incomplete_session(&framework);
         };
-
         if (has_encrypted_mempool) {
             chunky_dkg::start(
                 cur_epoch,
@@ -183,8 +191,6 @@ module aptos_framework::reconfiguration_with_dkg {
                 stake::cur_validator_consensus_infos(),
                 stake::next_validator_consensus_infos()
             );
-        } else {
-            chunky_dkg::try_clear_incomplete_session(&framework);
         };
     }
 
