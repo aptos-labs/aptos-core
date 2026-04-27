@@ -71,6 +71,9 @@ impl TimedFeatureOverride {
 
 const BEGINNING_OF_TIME: DateTime<Utc> = DateTime::UNIX_EPOCH;
 
+#[allow(dead_code)]
+const END_OF_TIME: DateTime<Utc> = DateTime::<Utc>::MAX_UTC;
+
 impl TimedFeatureFlag {
     /// Returns the activation time of the feature on the given chain.
     pub fn activation_time_on(&self, chain_id: &NamedChain) -> DateTime<Utc> {
@@ -78,6 +81,10 @@ impl TimedFeatureFlag {
         use TimedFeatureFlag::*;
 
         match (self, chain_id) {
+            (UseFullTransactionSizeForTransactionMetadata, MOVEMAINNET | MOVETESTNET) => Los_Angeles
+                .with_ymd_and_hms(2026, 5, 4, 9, 45, 0)
+                .unwrap()
+                .with_timezone(&Utc),
             (_, MOVEMAINNET | MOVETESTNET) => Los_Angeles
                 .with_ymd_and_hms(2025, 8, 11, 17, 0, 0)
                 .unwrap()
