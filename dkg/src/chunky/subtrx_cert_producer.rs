@@ -351,11 +351,8 @@ mod tests {
         let mut wrong_epoch_agg = setup.aggregate_subtranscripts(&[0, 1, 2]);
         wrong_epoch_agg.dealer_epoch = 998;
         let stale_sig = setup.private_keys[0].sign(&wrong_epoch_agg).unwrap();
-        let stale_resp = ChunkyDKGSubtranscriptSignatureResponse::new(
-            998,
-            wrong_epoch_agg.hash(),
-            stale_sig,
-        );
+        let stale_resp =
+            ChunkyDKGSubtranscriptSignatureResponse::new(998, wrong_epoch_agg.hash(), stale_sig);
         // Epoch mismatch is caught in metadata checks.
         let result = BroadcastStatus::add(&state, setup.addrs[0], stale_resp);
         assert!(result.is_err());

@@ -865,15 +865,15 @@ impl ChunkyDKGManager {
     ) -> Result<Vec<ChunkySubtranscript>> {
         let num_validators = epoch_state.verifier.len();
         let ordered_addrs = epoch_state.verifier.get_ordered_account_addresses();
-        let num_dealers = req.dealer_bitmask.count_ones() as usize;
-        ensure!(num_dealers > 0, "dealer_bitmask is empty");
+        let max_bit = req
+            .dealer_bitmask
+            .last_set_bit()
+            .ok_or_else(|| anyhow!("dealer_bitmask is empty"))?;
         ensure!(
-            req.dealer_bitmask
-                .last_set_bit()
-                .expect("bitmask cannot be empty")
-                < num_validators as u16,
+            (max_bit as usize) < num_validators,
             "dealer_bitmask contains out-of-range bits"
         );
+        let num_dealers = req.dealer_bitmask.count_ones() as usize;
         ensure!(
             req.dealer_transcript_hashes.len() == num_dealers,
             "dealer_transcript_hashes length mismatch with dealer_bitmask popcount"

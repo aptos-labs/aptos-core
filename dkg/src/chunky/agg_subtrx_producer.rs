@@ -229,18 +229,14 @@ impl BroadcastStatus<DKGMessage> for Arc<ChunkyTranscriptAggregationState> {
             received_transcripts.insert(metadata.author, transcript);
         }
 
-        // Quorum already reached — transcript is stored for the fetcher but no further
-        // aggregation is needed.
-        if inner_state.agg_subtrx_tx.is_none() {
-            info!(
-                epoch = epoch,
-                peer = sender,
-                "[ChunkyDKG] transcript received after quorum, skipping aggregation"
-            );
-            return Ok(None);
-        }
-
         inner_state.contributors.insert(metadata.author);
+
+        // Quorum already reached — transcript is stored for the fetcher but no
+        // further aggregation is needed.
+        if inner_state.agg_subtrx_tx.is_none() {
+            let all_received = inner_state.contributors.len() >= self.epoch_state.verifier.len();
+            return Ok(all_received.then_some(()));
+        }
         if let Some(agg_subtrx) = inner_state.subtrx.as_mut() {
             agg_subtrx
                 .aggregate_with(&self.dkg_config.threshold_config, &subtranscript)
@@ -267,12 +263,8 @@ impl BroadcastStatus<DKGMessage> for Arc<ChunkyTranscriptAggregationState> {
             let tx = inner_state
                 .agg_subtrx_tx
                 .take()
-                .expect("agg_subtrx_tx must be Some due to above check");
-            let agg_trx = inner_state
-                .subtrx
-                .take()
-                .expect("subtrx must be Some due to above check")
-                .normalize();
+                .expect("agg_subtrx_tx must be Some due to early return above");
+            let agg_trx = inner_state.subtrx.take().unwrap().normalize();
             let num_validators = self.epoch_state.verifier.len();
             let addr_to_index = self.epoch_state.verifier.address_to_validator_index();
             let received = self.received_transcripts.read();
@@ -305,14 +297,14 @@ impl BroadcastStatus<DKGMessage> for Arc<ChunkyTranscriptAggregationState> {
             };
             if let Err(e) = tx.push((), with_hashes) {
                 info!(
-                        epoch = epoch,
-                        "[ChunkyDKG] Failed to send aggregated chunky transcript to ChunkyDKGManager when quorum met: {:?}", e
-                    );
+                    epoch = epoch,
+                    "[ChunkyDKG] Failed to send aggregated chunky transcript to ChunkyDKGManager when quorum met: {:?}", e
+                );
             } else {
                 info!(
-                        epoch = epoch,
-                        "[ChunkyDKG] sent aggregated chunky transcript to ChunkyDKGManager (quorum met)"
-                    );
+                    epoch = epoch,
+                    "[ChunkyDKG] sent aggregated chunky transcript to ChunkyDKGManager (quorum met)"
+                );
             }
         }
 

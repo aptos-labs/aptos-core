@@ -6,7 +6,7 @@ use crate::{
     chunky::{
         test_utils::{ChunkyTestSetup, DummyNetworkSender},
         types::{
-            ChunkyDKGSubtranscriptSignatureRequest, CertifiedAggregatedSubtranscript,
+            CertifiedAggregatedSubtranscript, ChunkyDKGSubtranscriptSignatureRequest,
             MissingTranscriptRequest,
         },
     },
@@ -15,7 +15,7 @@ use crate::{
 };
 use aptos_bitvec::BitVec;
 use aptos_bounded_executor::BoundedExecutor;
-use aptos_crypto::{hash::CryptoHash, HashValue, SigningKey};
+use aptos_crypto::{HashValue, SigningKey};
 use aptos_infallible::RwLock;
 use aptos_network::{
     application::{interface::NetworkClient, storage::PeersAndMetadata},
@@ -318,10 +318,7 @@ fn new_signature_request_rpc(
 }
 
 /// Helper: advance a manager through the full DKG lifecycle to Finished.
-async fn advance_to_finished(
-    manager: &mut ChunkyDKGManager,
-    setup: &ChunkyTestSetup,
-) {
+async fn advance_to_finished(manager: &mut ChunkyDKGManager, setup: &ChunkyTestSetup) {
     let event = ChunkyDKGStartEvent {
         session_metadata: setup.session_metadata.clone(),
         start_time_us: Duration::from_secs(1700000000).as_micros() as u64,
@@ -486,7 +483,7 @@ async fn test_signature_request_rate_limited_per_sender() {
     let has_rate_limited = last_responses.iter().any(|r| {
         r.as_ref()
             .err()
-            .map_or(false, |e| e.to_string().contains("already in-flight"))
+            .is_some_and(|e| e.to_string().contains("already in-flight"))
     });
     assert!(
         has_rate_limited,
