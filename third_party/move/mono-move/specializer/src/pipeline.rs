@@ -8,19 +8,18 @@ use crate::{
     lower::{lower_function, try_build_context, LoweredFunction, LoweredModule},
 };
 use anyhow::Result;
-use mono_move_core::{types::InternedType, MicroOpGasSchedule, FRAME_METADATA_SIZE};
+use mono_move_core::{types::InternedType, Interner, MicroOpGasSchedule, FRAME_METADATA_SIZE};
 use mono_move_gas::GasInstrumentor;
-use mono_move_global_context::ExecutionGuard;
 use move_binary_format::CompiledModule;
 
 /// Run the full specializer pipeline: destack → lower → gas instrument → frame layout.
 // TODO: extend with additional passes (e.g., monomorphization, GC safe-point layout).
 pub fn destack_and_lower_module(
     module: CompiledModule,
-    guard: &ExecutionGuard<'_>,
+    interner: &impl Interner,
     struct_types: &[Option<InternedType>],
 ) -> Result<LoweredModule> {
-    let module_ir = destack(module, guard, struct_types)?;
+    let module_ir = destack(module, interner, struct_types)?;
 
     let mut functions = Vec::with_capacity(module_ir.functions.len());
     for func_ir in &module_ir.functions {

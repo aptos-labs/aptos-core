@@ -12677,8 +12677,10 @@ dependencies = [
 name = "mono-move-core"
 version = "0.1.0"
 dependencies = [
+ "anyhow",
  "mono-move-alloc",
  "mono-move-gas",
+ "move-binary-format",
  "move-core-types",
  "parking_lot 0.12.5",
  "shared-dsa",
@@ -18282,7 +18284,6 @@ dependencies = [
  "anyhow",
  "mono-move-core",
  "mono-move-gas",
- "mono-move-global-context",
  "move-binary-format",
  "move-bytecode-verifier",
  "move-core-types",

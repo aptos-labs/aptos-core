@@ -5,9 +5,9 @@ mod context;
 mod transaction_context;
 
 pub use context::{
-    struct_info_at, try_as_primitive_type, view_name, view_type, view_type_list, walk_sig_token,
-    ArenaRef, Executable, ExecutionGuard, FieldLayout, GlobalContext, InternedType,
-    InternedTypeList, MaintenanceGuard, StructResolver, Type,
+    struct_info_at, try_as_primitive_type, view_name, view_type, view_type_list, ArenaRef,
+    Executable, ExecutionGuard, FieldLayout, GlobalContext, InternedType, InternedTypeList,
+    MaintenanceGuard, Type,
 };
 pub mod maintenance_config;
 pub use transaction_context::PlaceholderContext;

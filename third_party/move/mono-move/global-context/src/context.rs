@@ -33,10 +33,10 @@
 //!   - Trade-off: minor memory waste for lower lock contention.
 
 use crate::maintenance_config::MaintenanceConfig;
-use anyhow::{bail, Result};
+use anyhow::Result;
 use dashmap::DashMap;
 use mono_move_alloc::{GlobalArenaPool, GlobalArenaPtr, GlobalArenaShard};
-use mono_move_core::{types::StructLayout, ExecutableId, ExecutableSlot};
+use mono_move_core::{types::StructLayout, ExecutableId, ExecutableSlot, Interner};
 use move_binary_format::{file_format::SignatureToken, CompiledModule};
 use parking_lot::{RwLock, RwLockReadGuard, RwLockWriteGuard};
 use std::{
@@ -52,8 +52,6 @@ use executable_ids::ExecutableIdInternerKey;
 pub use mono_move_core::Executable;
 mod executable_cache;
 use executable_cache::ExecutableCache;
-mod sig_walk;
-pub use sig_walk::{walk_sig_token, StructResolver};
 mod types;
 pub use types::{
     struct_info_at, try_as_primitive_type, view_name, view_type, view_type_list, FieldLayout,
@@ -349,72 +347,6 @@ impl<'ctx> ExecutionGuard<'ctx> {
     // Public type construction helpers
     // ====================================================================
 
-    /// Interns an immutable reference type wrapping `inner`.
-    pub fn intern_immut_ref(&self, inner: InternedType) -> InternedType {
-        let ty = self.global_arena.alloc(Type::ImmutRef { inner });
-        self.insert_allocated_type_pointer_internal(ty)
-    }
-
-    /// Interns a mutable reference type wrapping `inner`.
-    pub fn intern_mut_ref(&self, inner: InternedType) -> InternedType {
-        let ty = self.global_arena.alloc(Type::MutRef { inner });
-        self.insert_allocated_type_pointer_internal(ty)
-    }
-
-    /// Converts `&mut T` to `&T` by interning the immutable counterpart.
-    /// Errors if `mut_ref` is not a mutable reference type.
-    pub fn convert_mut_to_immut_ref(&self, mut_ref: InternedType) -> Result<InternedType> {
-        let Type::MutRef { inner } = self.type_data(mut_ref) else {
-            bail!("convert_mut_to_immut_ref: expected MutRef");
-        };
-        Ok(self.intern_immut_ref(*inner))
-    }
-
-    /// Strips the reference from `&T` or `&mut T`, returning `T`.
-    /// Errors if `ref_ty` is not a reference type.
-    pub fn strip_ref(&self, ref_ty: InternedType) -> Result<InternedType> {
-        let (Type::ImmutRef { inner } | Type::MutRef { inner }) = self.type_data(ref_ty) else {
-            bail!("strip_ref: expected reference type");
-        };
-        Ok(*inner)
-    }
-
-    /// Interns a vector type with element type `elem`.
-    pub fn intern_vector(&self, elem: InternedType) -> InternedType {
-        let ty = self.global_arena.alloc(Type::Vector { elem });
-        self.insert_allocated_type_pointer_internal(ty)
-    }
-
-    /// Interns a type parameter with the given index.
-    pub fn intern_type_param(&self, idx: u16) -> InternedType {
-        let ty = self.global_arena.alloc(Type::TypeParam { idx });
-        self.insert_allocated_type_pointer_internal(ty)
-    }
-
-    /// Interns a function type.
-    pub fn intern_function_type(
-        &self,
-        args: InternedTypeList,
-        results: InternedTypeList,
-        abilities: move_core_types::ability::AbilitySet,
-    ) -> InternedType {
-        let ty = self.global_arena.alloc(Type::Function {
-            args,
-            results,
-            abilities,
-        });
-        self.insert_allocated_type_pointer_internal(ty)
-    }
-
-    /// Interns a list of type pointers. Empty lists return a static pointer.
-    pub fn intern_type_list(&self, types: &[InternedType]) -> InternedTypeList {
-        if types.is_empty() {
-            return types::EMPTY_TYPE_LIST;
-        }
-        let ptr = self.global_arena.alloc_slice_copy(types);
-        self.insert_allocated_type_list_internal(ptr)
-    }
-
     /// Safely dereferences a type pointer. Returns a reference to the
     /// underlying [`Type`] data. The reference is valid for the guard's
     /// lifetime.
@@ -473,6 +405,50 @@ impl<'ctx> ExecutionGuard<'ctx> {
         module: &CompiledModule,
     ) -> Option<InternedType> {
         self.get_interned_type_pointer_internal(token, module)
+    }
+}
+
+impl<'ctx> Interner for ExecutionGuard<'ctx> {
+    fn intern_type_param(&self, idx: u16) -> InternedType {
+        let ty = self.global_arena.alloc(Type::TypeParam { idx });
+        self.insert_allocated_type_pointer_internal(ty)
+    }
+
+    fn intern_vec(&self, elem: InternedType) -> InternedType {
+        let ty = self.global_arena.alloc(Type::Vector { elem });
+        self.insert_allocated_type_pointer_internal(ty)
+    }
+
+    fn intern_immut_ref(&self, inner: InternedType) -> InternedType {
+        let ty = self.global_arena.alloc(Type::ImmutRef { inner });
+        self.insert_allocated_type_pointer_internal(ty)
+    }
+
+    fn intern_mut_ref(&self, inner: InternedType) -> InternedType {
+        let ty = self.global_arena.alloc(Type::MutRef { inner });
+        self.insert_allocated_type_pointer_internal(ty)
+    }
+
+    fn intern_func(
+        &self,
+        args: InternedTypeList,
+        results: InternedTypeList,
+        abilities: move_core_types::ability::AbilitySet,
+    ) -> InternedType {
+        let ty = self.global_arena.alloc(Type::Function {
+            args,
+            results,
+            abilities,
+        });
+        self.insert_allocated_type_pointer_internal(ty)
+    }
+
+    fn intern_type_list(&self, types: &[InternedType]) -> InternedTypeList {
+        if types.is_empty() {
+            return types::EMPTY_TYPE_LIST;
+        }
+        let ptr = self.global_arena.alloc_slice_copy(types);
+        self.insert_allocated_type_list_internal(ptr)
     }
 }
 

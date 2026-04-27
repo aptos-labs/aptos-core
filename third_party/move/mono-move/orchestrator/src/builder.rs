@@ -12,12 +12,11 @@ use anyhow::{anyhow, bail};
 use mono_move_alloc::{ExecutableArena, ExecutableArenaPtr, GlobalArenaPtr};
 use mono_move_core::{
     types::{align_up, EMPTY_TYPE_LIST},
-    EnumType, Executable, ExecutableId, FrameLayoutInfo, Function, MandatoryDependencies, MicroOp,
-    SortedSafePointEntries, StructType, VariantFields,
+    walk_sig_token, EnumType, Executable, ExecutableId, FrameLayoutInfo, Function,
+    MandatoryDependencies, MicroOp, SortedSafePointEntries, StructResolver, StructType,
+    VariantFields,
 };
-use mono_move_global_context::{
-    struct_info_at, walk_sig_token, ExecutionGuard, FieldLayout, InternedType, StructResolver,
-};
+use mono_move_global_context::{struct_info_at, ExecutionGuard, FieldLayout, InternedType};
 use move_binary_format::{
     access::ModuleAccess,
     file_format::{
