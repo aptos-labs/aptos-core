@@ -17,8 +17,7 @@ modules from constructing/destructuring enum variants).
     -  [Function `verify_batch_range_proof_internal`](#@Specification_1_verify_batch_range_proof_internal)
 
 
-<pre><code><b>use</b> <a href="../../aptos-stdlib/../move-stdlib/doc/features.md#0x1_features">0x1::features</a>;
-<b>use</b> <a href="../../aptos-stdlib/doc/ristretto255.md#0x1_ristretto255">0x1::ristretto255</a>;
+<pre><code><b>use</b> <a href="../../aptos-stdlib/doc/ristretto255.md#0x1_ristretto255">0x1::ristretto255</a>;
 <b>use</b> <a href="../../aptos-stdlib/doc/ristretto255_bulletproofs.md#0x1_ristretto255_bulletproofs">0x1::ristretto255_bulletproofs</a>;
 </code></pre>
 
@@ -126,7 +125,6 @@ Verifies a batch range proof for commitments, ensuring all committed values are 
     val_base: &RistrettoPoint, rand_base: &RistrettoPoint,
     proof: &RangeProof, num_bits: u64, dst: <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;): bool
 {
-    <b>assert</b>!(<a href="../../aptos-stdlib/../move-stdlib/doc/features.md#0x1_features_bulletproofs_batch_enabled">features::bulletproofs_batch_enabled</a>(), <a href="../../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error_invalid_state">error::invalid_state</a>(<a href="confidential_range_proofs.md#0x1_confidential_range_proofs_E_NATIVE_FUN_NOT_AVAILABLE">E_NATIVE_FUN_NOT_AVAILABLE</a>));
     <b>assert</b>!(dst.length() &lt;= 256, <a href="../../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error_invalid_argument">error::invalid_argument</a>(<a href="confidential_range_proofs.md#0x1_confidential_range_proofs_E_DST_TOO_LONG">E_DST_TOO_LONG</a>));
 
     <b>let</b> comms = comms.map_ref(|com| com.point_to_bytes());
