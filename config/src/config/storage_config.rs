@@ -253,6 +253,11 @@ pub struct HotStateConfig {
     pub compute_root_hash: bool,
     /// Whether to persist hotness data alongside write sets in write set DB.
     pub persist_hotness_in_write_set: bool,
+    /// Whether to embed the per-block hot-state promotion set into the block epilogue transaction
+    /// itself, so it survives BCS serialization and is reproducible across re-execution and
+    /// apply-output state sync. All validators in a network MUST share the same value, otherwise
+    /// they will produce different block epilogue transactions for the same block and diverge.
+    pub persist_hotness_in_epilogue: bool,
 }
 
 impl Default for HotStateConfig {
@@ -263,6 +268,7 @@ impl Default for HotStateConfig {
             delete_on_restart: true,
             compute_root_hash: true,
             persist_hotness_in_write_set: true,
+            persist_hotness_in_epilogue: true,
         }
     }
 }
@@ -688,6 +694,16 @@ impl ConfigOptimizer for StorageConfig {
                     != Some(true)
             {
                 config.hot_state_config.persist_hotness_in_write_set = false;
+                modified_config = true;
+            }
+            // TODO(HotState): Hotness persistence in the block epilogue is disabled on mainnet
+            // and testnet unless explicitly enabled. Flipping this on changes the canonical
+            // block epilogue transaction format, so it must be coordinated across all validators.
+            if (chain_id.is_mainnet() || chain_id.is_testnet())
+                && config_yaml["hot_state_config"]["persist_hotness_in_epilogue"].as_bool()
+                    != Some(true)
+            {
+                config.hot_state_config.persist_hotness_in_epilogue = false;
                 modified_config = true;
             }
         }
