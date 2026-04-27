@@ -18,7 +18,7 @@ use aptos_types::{
     account_address::AccountAddress,
     aggregate_signature::AggregateSignature,
     block_metadata::BlockMetadata,
-    block_metadata_ext::{PerFeatureBlockPayload, BlockMetadataExt},
+    block_metadata_ext::BlockMetadataExt,
     contract_event::{ContractEvent, EventWithVersion},
     dkg::{
         chunky_dkg::CertifiedAggregatedChunkySubtranscript, DKGTranscript, DKGTranscriptMetadata,
@@ -612,8 +612,8 @@ pub struct BlockMetadataExtensionRandomnessAndDecKey {
 
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, Object)]
 pub struct BlockMetadataExtensionV3 {
-    randomness: Option<HexEncodedBytes>,
-    decryption_key: Option<HexEncodedBytes>,
+    feature_payloads: HexEncodedBytes,
+    dkg_needed: Vec<bool>,
 }
 
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, Union)]
@@ -646,26 +646,10 @@ impl BlockMetadataExtension {
                     .as_ref()
                     .map(|dk| HexEncodedBytes::from(dk.decryption_key_cloned())),
             }),
-            BlockMetadataExt::V3(payload) => {
-                let decoded: Vec<PerFeatureBlockPayload> =
-                    bcs::from_bytes(&payload.feature_payloads).unwrap_or_default();
-                let randomness = decoded.iter().find_map(|m| match m {
-                    PerFeatureBlockPayload::Randomness { per_block_seed } => per_block_seed
-                        .as_ref()
-                        .map(|seed| HexEncodedBytes::from(seed.clone())),
-                    _ => None,
-                });
-                let decryption_key = decoded.iter().find_map(|m| match m {
-                    PerFeatureBlockPayload::EncryptedMempool { decryption_key } => decryption_key
-                        .as_ref()
-                        .map(|dk| HexEncodedBytes::from(dk.clone())),
-                    _ => None,
-                });
-                Self::V3(BlockMetadataExtensionV3 {
-                    randomness,
-                    decryption_key,
-                })
-            },
+            BlockMetadataExt::V3(payload) => Self::V3(BlockMetadataExtensionV3 {
+                feature_payloads: HexEncodedBytes::from(payload.feature_payloads.clone()),
+                dkg_needed: payload.dkg_needed.clone(),
+            }),
         }
     }
 }
