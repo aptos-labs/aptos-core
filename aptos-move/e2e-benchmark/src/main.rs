@@ -395,9 +395,7 @@ fn main() {
             &package,
             publisher.address(),
             &mut executor,
-            if expected_time_micros > 10000.0 {
-                100
-            } else if expected_time_micros > 1000.0 {
+            if expected_time_micros > 1000.0 {
                 100
             } else {
                 500
