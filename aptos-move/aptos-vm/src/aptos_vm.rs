@@ -127,7 +127,7 @@ use move_core_types::{
     language_storage::{ModuleId, StructTag, TypeTag},
     move_resource::MoveStructType,
     transaction_argument::convert_txn_args,
-    value::{serialize_values, MoveTypeLayout, MoveValue},
+    value::{serialize_values, MoveStruct, MoveTypeLayout, MoveValue},
     vm_status::{
         sub_status::unknown_invariant_violation,
         StatusCode::{ACCOUNT_AUTHENTICATION_GAS_LIMIT_EXCEEDED, OUT_OF_GAS},
@@ -2646,41 +2646,26 @@ impl AptosVM {
                 (BLOCK_PROLOGUE_EXT_V2, args)
             },
             BlockMetadataExt::V3(v3) => {
-                // Encode each feature as [tag: u8, has_payload: u8, payload_bytes...]
-                // Tag constants must match FEATURE_* constants in block.move.
-                let feature_metas_encoded: Vec<MoveValue> = v3
+                // Mirror the Move `FeatureSpecificMetadata` enum via RuntimeVariant.
+                // Variant indices must match the Move enum declaration order in block.move:
+                //   0 → Randomness { per_block_seed: Option<vector<u8>> }
+                //   1 → EncryptedMempool { decryption_key: Option<vector<u8>> }
+                let feature_metas: Vec<MoveValue> = v3
                     .feature_metas
                     .iter()
-                    .map(|m| {
-                        let bytes: Vec<u8> = match m {
-                            FeatureSpecificMetadata::Randomness(RandomnessMetadata::V0 {
-                                per_block_seed,
-                            }) => {
-                                let mut b = vec![0u8]; // FEATURE_RANDOMNESS = 0
-                                match per_block_seed {
-                                    None => b.push(0u8),
-                                    Some(seed) => {
-                                        b.push(1u8);
-                                        b.extend_from_slice(seed);
-                                    },
-                                }
-                                b
-                            },
-                            FeatureSpecificMetadata::EncryptedMempool(
-                                EncryptedMempoolMetadata::V0 { decryption_key },
-                            ) => {
-                                let mut b = vec![1u8]; // FEATURE_ENCRYPTED_MEMPOOL = 1
-                                match decryption_key {
-                                    None => b.push(0u8),
-                                    Some(key) => {
-                                        b.push(1u8);
-                                        b.extend_from_slice(key);
-                                    },
-                                }
-                                b
-                            },
-                        };
-                        MoveValue::Vector(bytes.into_iter().map(MoveValue::U8).collect())
+                    .map(|m| match m {
+                        FeatureSpecificMetadata::Randomness(RandomnessMetadata::V0 {
+                            per_block_seed,
+                        }) => MoveValue::Struct(MoveStruct::RuntimeVariant(
+                            0,
+                            vec![per_block_seed.clone().as_move_value()],
+                        )),
+                        FeatureSpecificMetadata::EncryptedMempool(
+                            EncryptedMempoolMetadata::V0 { decryption_key },
+                        ) => MoveValue::Struct(MoveStruct::RuntimeVariant(
+                            1,
+                            vec![decryption_key.clone().as_move_value()],
+                        )),
                     })
                     .collect();
                 let args = vec![
@@ -2696,7 +2681,7 @@ impl AptosVM {
                         .as_move_value(),
                     v3.previous_block_votes_bitvec.as_move_value(),
                     MoveValue::U64(v3.timestamp_usecs),
-                    MoveValue::Vector(feature_metas_encoded),
+                    MoveValue::Vector(feature_metas),
                 ];
                 (BLOCK_PROLOGUE_EXT_V3, args)
             },

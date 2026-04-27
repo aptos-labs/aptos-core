@@ -296,18 +296,21 @@ module aptos_framework::block {
         };
     }
 
-    /// Feature tag constants — must stay in sync with tag bytes emitted by the Rust VM.
-    const FEATURE_RANDOMNESS: u8 = 0;
-    const FEATURE_ENCRYPTED_MEMPOOL: u8 = 1;
+    /// Per-feature metadata carried inside a V3 block prologue.
+    /// Variant index must stay in sync with the Rust `FeatureSpecificMetadata` enum order.
+    ///   0 → Randomness   (variant index 0 in Rust)
+    ///   1 → EncryptedMempool (variant index 1 in Rust)
+    /// Adding a new feature appends a new variant — no change to `block_prologue_ext_v3`'s
+    /// signature and no new transaction type needed.
+    enum FeatureSpecificMetadata has drop {
+        Randomness { per_block_seed: Option<vector<u8>> },
+        EncryptedMempool { decryption_key: Option<vector<u8>> },
+    }
 
-    /// `block_prologue()` with an extensible feature metadata list.
-    /// Each element of `feature_metas` encodes one active feature as:
-    ///   byte 0   : feature tag (FEATURE_* constant above)
-    ///   byte 1   : 0 = no payload, 1 = payload follows
-    ///   bytes 2+ : raw payload bytes (present only when byte 1 == 1)
-    /// Adding a new feature in the future requires only a new FEATURE_* constant and a
-    /// new branch inside this function — no change to the function signature or a new
-    /// transaction variant.
+    /// `block_prologue()` with an extensible per-feature metadata list.
+    /// The VM constructs each `FeatureSpecificMetadata` value via `RuntimeVariant` and
+    /// passes the vector directly. Adding a new feature only requires a new enum variant
+    /// and a new match arm below — the function signature is stable.
     fun block_prologue_ext_v3(
         vm: signer,
         hash: address,
@@ -317,7 +320,7 @@ module aptos_framework::block {
         failed_proposer_indices: vector<u64>,
         previous_block_votes_bitvec: vector<u8>,
         timestamp: u64,
-        feature_metas: vector<vector<u8>>
+        feature_metas: vector<FeatureSpecificMetadata>
     ) acquires BlockResource, CommitHistory {
         let epoch_interval =
             block_prologue_common(
@@ -333,28 +336,20 @@ module aptos_framework::block {
 
         let has_randomness = false;
         let has_encrypted_mempool = false;
-        let n = vector::length(&feature_metas);
-        let i = 0;
-        while (i < n) {
-            let meta = vector::borrow(&feature_metas, i);
-            let tag = *vector::borrow(meta, 0);
-            let payload_opt =
-                if (*vector::borrow(meta, 1) == 1u8) {
-                    option::some(vector::slice(meta, 2, vector::length(meta)))
-                } else {
-                    option::none()
-                };
-            if (tag == FEATURE_RANDOMNESS) {
-                has_randomness = true;
-                randomness::on_new_block(&vm, epoch, round, payload_opt);
-            } else if (tag == FEATURE_ENCRYPTED_MEMPOOL) {
-                has_encrypted_mempool = true;
-                decryption::on_new_block(&vm, epoch, round, payload_opt);
-            };
-            i = i + 1;
-        };
+        feature_metas.for_each(|meta| {
+            match (meta) {
+                FeatureSpecificMetadata::Randomness { per_block_seed } => {
+                    has_randomness = true;
+                    randomness::on_new_block(&vm, epoch, round, per_block_seed);
+                },
+                FeatureSpecificMetadata::EncryptedMempool { decryption_key } => {
+                    has_encrypted_mempool = true;
+                    decryption::on_new_block(&vm, epoch, round, decryption_key);
+                },
+            }
+        });
 
-        // Features absent from the list are treated as disabled.
+        // Features absent from the list are treated as disabled for this block.
         if (!has_randomness) {
             randomness::on_new_block(&vm, epoch, round, option::none());
         };
