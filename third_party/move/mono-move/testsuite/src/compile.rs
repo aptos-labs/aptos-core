@@ -40,6 +40,8 @@ pub fn compile(source: &str, kind: SourceKind) -> Result<Vec<CompiledModule>> {
 }
 
 /// Compile a Move source file at `path` into all contained modules.
+///
+/// The full Move stdlib is injected as dependencies.
 pub fn compile_move_path(path: &Path) -> Result<Vec<CompiledModule>> {
     let options = Options {
         sources: vec![path.to_string_lossy().into_owned()],
@@ -73,6 +75,8 @@ pub fn compile_move_path(path: &Path) -> Result<Vec<CompiledModule>> {
 }
 
 /// Compile Move source text into all contained modules.
+///
+/// Inherits the stdlib-injecting behavior of [`compile_move_path`].
 pub fn compile_move_source(source: &str) -> Result<Vec<CompiledModule>> {
     let tmp_dir = tempfile::tempdir().context("failed to create temp dir")?;
     let path = tmp_dir.path().join("sources.move");
