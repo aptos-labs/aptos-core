@@ -152,70 +152,56 @@ module aptos_framework::reconfiguration_with_dkg {
         try_finalize_reconfig(account);
     }
 
-    /// Trigger reconfiguration using the extensible block metadata V3 path.
-    /// `has_randomness` and `has_encrypted_mempool` reflect which features are
-    /// active this epoch (agreed upon by all validators via on-chain state +
-    /// local seqnum overrides).
-    ///
-    /// Clearing disabled sessions is intentionally done BEFORE the is_in_progress()
-    /// guard: if an operator disables a feature mid-reconfig (e.g. bumps seqnum to
-    /// escape a stuck DKG), the stale session must be cleared on every block so that
-    /// try_finalize_reconfig can proceed without waiting for it.
-    public(friend) fun try_start_v3(has_randomness: bool, has_encrypted_mempool: bool) {
-        let framework = create_signer::create_signer(@aptos_framework);
-
-        if (!has_randomness) {
-            dkg::try_clear_incomplete_session(&framework);
-        };
-        if (!has_encrypted_mempool) {
-            chunky_dkg::try_clear_incomplete_session(&framework);
-        };
-
-        if (reconfiguration_state::is_in_progress()) { return };
-
-        reconfiguration_state::on_reconfig_start();
-
-        let cur_epoch = reconfiguration::current_epoch();
-        if (has_randomness) {
-            dkg::start(
-                cur_epoch,
-                randomness_config::current(),
-                stake::cur_validator_consensus_infos(),
-                stake::next_validator_consensus_infos()
-            );
-        };
-        if (has_encrypted_mempool) {
-            chunky_dkg::start(
-                cur_epoch,
-                chunky_dkg_config::current(),
-                stake::cur_validator_consensus_infos(),
-                stake::next_validator_consensus_infos()
-            );
-        };
-    }
-
     /// Periodic finalization tick: try to advance the in-progress reconfig.
     /// Called from block_prologue_ext / block_prologue_ext_v2 every block
-    /// after the epoch interval has elapsed. In V2 mode, also gives the
-    /// grace-period (shadow-mode) escape a chance to fire. In V1 mode after
-    /// a chunky-only override recovery, lets the reconfig finalize without
-    /// re-dealing DKG (dkg::start is idempotent per epoch).
+    /// after the epoch interval has elapsed.
     public(friend) fun try_advance_reconfig() {
         let framework = create_signer::create_signer(@aptos_framework);
         try_finalize_reconfig(&framework);
     }
 
-    /// V3 per-block tick. If `epoch_is_too_old`, starts (or clears) DKG sessions
-    /// as required by the active feature set, then tries to finalize any in-progress
-    /// reconfig. Called from `block_prologue_ext_v3` every block.
+    /// V3 per-block tick called from `block_prologue_ext_v3`.
+    ///
+    /// Two cases:
+    ///
+    /// 1. Reconfig already in progress: the only mid-epoch flip allowed is
+    ///    enabled → disabled (operator bumps local seqnum). For each feature
+    ///    that is now disabled, clear its pending DKG session so that
+    ///    try_finalize_reconfig is no longer blocked on it.
+    ///
+    /// 2. No reconfig in progress and epoch is old enough: start a fresh
+    ///    reconfig and kick off the DKG (or equivalent task) for each enabled
+    ///    feature. If no feature needs async work, finalize immediately.
     public(friend) fun tick(
         epoch_is_too_old: bool,
         has_randomness: bool,
         has_encrypted_mempool: bool
     ) {
-        if (epoch_is_too_old) {
-            try_start_v3(has_randomness, has_encrypted_mempool);
+        let framework = create_signer::create_signer(@aptos_framework);
+        if (reconfiguration_state::is_in_progress()) {
+            if (!has_randomness) { dkg::try_clear_incomplete_session(&framework) };
+            if (!has_encrypted_mempool) { chunky_dkg::try_clear_incomplete_session(&framework) };
+            try_finalize_reconfig(&framework);
+        } else if (epoch_is_too_old) {
+            reconfiguration_state::on_reconfig_start();
+            let cur_epoch = reconfiguration::current_epoch();
+            if (has_randomness) {
+                dkg::start(
+                    cur_epoch,
+                    randomness_config::current(),
+                    stake::cur_validator_consensus_infos(),
+                    stake::next_validator_consensus_infos()
+                );
+            };
+            if (has_encrypted_mempool) {
+                chunky_dkg::start(
+                    cur_epoch,
+                    chunky_dkg_config::current(),
+                    stake::cur_validator_consensus_infos(),
+                    stake::next_validator_consensus_infos()
+                );
+            };
+            try_finalize_reconfig(&framework);
         };
-        try_advance_reconfig();
     }
 }
