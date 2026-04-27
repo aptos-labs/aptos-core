@@ -296,21 +296,62 @@ module aptos_framework::block {
         };
     }
 
-    /// Per-feature metadata carried inside a V3 block prologue.
-    /// Variant index must stay in sync with the Rust `FeatureSpecificMetadata` enum order.
-    ///   0 → Randomness   (variant index 0 in Rust)
-    ///   1 → EncryptedMempool (variant index 1 in Rust)
-    /// Adding a new feature appends a new variant — no change to `block_prologue_ext_v3`'s
-    /// signature and no new transaction type needed.
+    /// Per-feature metadata decoded from the V3 block prologue bytes.
+    /// Variant indices must stay in sync with the encoding written by the Rust VM:
+    ///   0 → Randomness
+    ///   1 → EncryptedMempool
+    /// Adding a new feature appends a new variant and a new match arm — no change to
+    /// `block_prologue_ext_v3`'s signature and no new transaction type needed.
     enum FeatureSpecificMetadata has drop {
         Randomness { per_block_seed: Option<vector<u8>> },
         EncryptedMempool { decryption_key: Option<vector<u8>> },
     }
 
+    /// Deserialize the binary encoding produced by the Rust VM into a typed list.
+    ///
+    /// Wire format (written by aptos_vm.rs):
+    ///   byte 0       : feature count (u8)
+    ///   per feature  : [variant: u8] [has_payload: u8] [payload_len: u32 LE]? [payload_bytes]?
+    ///
+    /// Unknown variant indices are silently skipped so that an older framework version
+    /// can safely execute blocks proposed by nodes running newer software.
+    fun decode_feature_metas(bytes: &vector<u8>): vector<FeatureSpecificMetadata> {
+        let result = vector[];
+        let count = (*vector::borrow(bytes, 0) as u64);
+        let pos = 1u64;
+        let i = 0u64;
+        while (i < count) {
+            let variant = *vector::borrow(bytes, pos);
+            pos = pos + 1;
+            let has_payload = *vector::borrow(bytes, pos) == 1u8;
+            pos = pos + 1;
+            let payload_opt = if (has_payload) {
+                let len = (*vector::borrow(bytes, pos) as u64)
+                    | ((*vector::borrow(bytes, pos + 1) as u64) << 8)
+                    | ((*vector::borrow(bytes, pos + 2) as u64) << 16)
+                    | ((*vector::borrow(bytes, pos + 3) as u64) << 24);
+                pos = pos + 4;
+                let payload = vector::slice(bytes, pos, pos + len);
+                pos = pos + len;
+                option::some(payload)
+            } else {
+                option::none()
+            };
+            if (variant == 0) {
+                result.push_back(FeatureSpecificMetadata::Randomness { per_block_seed: payload_opt });
+            } else if (variant == 1) {
+                result.push_back(FeatureSpecificMetadata::EncryptedMempool { decryption_key: payload_opt });
+            };
+            // Unknown variants are ignored — forward compatibility when old Move runs new Rust.
+            i = i + 1;
+        };
+        result
+    }
+
     /// `block_prologue()` with an extensible per-feature metadata list.
-    /// The VM constructs each `FeatureSpecificMetadata` value via `RuntimeVariant` and
-    /// passes the vector directly. Adding a new feature only requires a new enum variant
-    /// and a new match arm below — the function signature is stable.
+    /// `feature_metas` is the binary encoding described in `decode_feature_metas`.
+    /// The function signature is permanently stable: adding new features only requires
+    /// new enum variants and dispatch arms inside this module.
     fun block_prologue_ext_v3(
         vm: signer,
         hash: address,
@@ -320,7 +361,7 @@ module aptos_framework::block {
         failed_proposer_indices: vector<u64>,
         previous_block_votes_bitvec: vector<u8>,
         timestamp: u64,
-        feature_metas: vector<FeatureSpecificMetadata>
+        feature_metas: vector<u8>
     ) acquires BlockResource, CommitHistory {
         let epoch_interval =
             block_prologue_common(
@@ -336,7 +377,7 @@ module aptos_framework::block {
 
         let has_randomness = false;
         let has_encrypted_mempool = false;
-        feature_metas.for_each(|meta| {
+        decode_feature_metas(&feature_metas).for_each(|meta| {
             match (meta) {
                 FeatureSpecificMetadata::Randomness { per_block_seed } => {
                     has_randomness = true;

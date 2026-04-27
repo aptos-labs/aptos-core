@@ -127,7 +127,7 @@ use move_core_types::{
     language_storage::{ModuleId, StructTag, TypeTag},
     move_resource::MoveStructType,
     transaction_argument::convert_txn_args,
-    value::{serialize_values, MoveStruct, MoveTypeLayout, MoveValue},
+    value::{serialize_values, MoveTypeLayout, MoveValue},
     vm_status::{
         sub_status::unknown_invariant_violation,
         StatusCode::{ACCOUNT_AUTHENTICATION_GAS_LIMIT_EXCEEDED, OUT_OF_GAS},
@@ -2646,28 +2646,33 @@ impl AptosVM {
                 (BLOCK_PROLOGUE_EXT_V2, args)
             },
             BlockMetadataExt::V3(v3) => {
-                // Mirror the Move `FeatureSpecificMetadata` enum via RuntimeVariant.
-                // Variant indices must match the Move enum declaration order in block.move:
-                //   0 → Randomness { per_block_seed: Option<vector<u8>> }
-                //   1 → EncryptedMempool { decryption_key: Option<vector<u8>> }
-                let feature_metas: Vec<MoveValue> = v3
-                    .feature_metas
-                    .iter()
-                    .map(|m| match m {
+                // Encode feature_metas into the wire format consumed by block.move's
+                // decode_feature_metas(). Format:
+                //   byte 0       : feature count (u8)
+                //   per feature  : [variant: u8] [has_payload: u8]
+                //                  [payload_len: u32 LE]? [payload_bytes]?
+                // Variant indices must match Move enum declaration order in block.move:
+                //   0 → Randomness, 1 → EncryptedMempool
+                let mut encoded = vec![v3.feature_metas.len() as u8];
+                for m in &v3.feature_metas {
+                    let (variant, payload) = match m {
                         FeatureSpecificMetadata::Randomness(RandomnessMetadata::V0 {
                             per_block_seed,
-                        }) => MoveValue::Struct(MoveStruct::RuntimeVariant(
-                            0,
-                            vec![per_block_seed.clone().as_move_value()],
-                        )),
+                        }) => (0u8, per_block_seed.as_deref()),
                         FeatureSpecificMetadata::EncryptedMempool(
                             EncryptedMempoolMetadata::V0 { decryption_key },
-                        ) => MoveValue::Struct(MoveStruct::RuntimeVariant(
-                            1,
-                            vec![decryption_key.clone().as_move_value()],
-                        )),
-                    })
-                    .collect();
+                        ) => (1u8, decryption_key.as_deref()),
+                    };
+                    encoded.push(variant);
+                    match payload {
+                        None => encoded.push(0u8),
+                        Some(bytes) => {
+                            encoded.push(1u8);
+                            encoded.extend_from_slice(&(bytes.len() as u32).to_le_bytes());
+                            encoded.extend_from_slice(bytes);
+                        },
+                    }
+                }
                 let args = vec![
                     MoveValue::Signer(AccountAddress::ZERO), // Run as 0x0
                     MoveValue::Address(AccountAddress::from_bytes(v3.id.to_vec()).unwrap()),
@@ -2681,7 +2686,7 @@ impl AptosVM {
                         .as_move_value(),
                     v3.previous_block_votes_bitvec.as_move_value(),
                     MoveValue::U64(v3.timestamp_usecs),
-                    MoveValue::Vector(feature_metas),
+                    encoded.as_move_value(),
                 ];
                 (BLOCK_PROLOGUE_EXT_V3, args)
             },
