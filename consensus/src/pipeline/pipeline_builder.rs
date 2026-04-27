@@ -40,6 +40,7 @@ use aptos_storage_interface::state_store::state_view::cached_state_view::CachedS
 use aptos_types::{
     account_config::randomness_event::RANDOMNESS_GENERATED_EVENT_MOVE_TYPE_TAG,
     block_executor::config::BlockExecutorConfigFromOnchain,
+    block_metadata_ext::{EncryptedMempoolBlockPayload, RandomnessBlockPayload},
     decryption::BlockTxnDecryptionKey,
     ledger_info::{LedgerInfo, LedgerInfoWithSignatures},
     on_chain_config::OnChainConsensusConfig,
@@ -923,23 +924,23 @@ impl PipelineBuilder {
             let mut items: Vec<Option<Vec<u8>>> = vec![];
             let mut dkg_needed_full = vec![];
 
-            // Index 0: randomness — payload is BCS of Option<Vec<u8>> (per_block_seed)
-            let rand_seed: Option<Vec<u8>> = rand_result
-                .flatten()
-                .map(|r: Randomness| r.randomness_cloned());
+            // Index 0: randomness
             items.push(if is_randomness_enabled {
-                Some(bcs::to_bytes(&rand_seed).expect("BCS serialization of randomness payload failed"))
+                Some(bcs::to_bytes(&RandomnessBlockPayload {
+                    per_block_seed: rand_result.flatten().map(|r: Randomness| r.randomness_cloned()),
+                }).expect("BCS serialization of RandomnessBlockPayload failed"))
             } else {
                 None
             });
             dkg_needed_full.push(is_randomness_enabled);
 
-            // Index 1: encrypted mempool — payload is BCS of Option<Vec<u8>> (decryption_key)
-            let dec_key: Option<Vec<u8>> = decryption_result
-                .flatten()
-                .map(|dk: BlockTxnDecryptionKey| dk.decryption_key_cloned());
+            // Index 1: encrypted mempool
             items.push(if is_decryption_enabled {
-                Some(bcs::to_bytes(&dec_key).expect("BCS serialization of encrypted mempool payload failed"))
+                Some(bcs::to_bytes(&EncryptedMempoolBlockPayload {
+                    decryption_key: decryption_result
+                        .flatten()
+                        .map(|dk: BlockTxnDecryptionKey| dk.decryption_key_cloned()),
+                }).expect("BCS serialization of EncryptedMempoolBlockPayload failed"))
             } else {
                 None
             });

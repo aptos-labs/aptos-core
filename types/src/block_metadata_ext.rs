@@ -24,6 +24,21 @@ pub enum BlockMetadataExt {
     V3(BlockMetadataWithFeatures),
 }
 
+/// BCS payload for the randomness feature, encoded as inner bytes at RANDOMNESS_PAYLOAD_IDX
+/// within `BlockMetadataWithFeatures::feature_payloads`. Mirrors `RandomnessPayload` in Move.
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+pub struct RandomnessBlockPayload {
+    pub per_block_seed: Option<Vec<u8>>,
+}
+
+/// BCS payload for the encrypted mempool feature, encoded as inner bytes at
+/// ENCRYPTED_MEMPOOL_PAYLOAD_IDX within `BlockMetadataWithFeatures::feature_payloads`.
+/// Mirrors `EncryptedMempoolPayload` in Move.
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+pub struct EncryptedMempoolBlockPayload {
+    pub decryption_key: Option<Vec<u8>>,
+}
+
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 pub struct BlockMetadataWithFeatures {
     pub id: HashValue,
