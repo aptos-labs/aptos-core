@@ -61,7 +61,7 @@ use aptos_types::{
         transaction_slice_metadata::TransactionSliceMetadata,
     },
     block_metadata::BlockMetadata,
-    block_metadata_ext::{BlockMetadataExt, EncryptedMempoolMetadata, FeatureSpecificMetadata, RandomnessMetadata},
+    block_metadata_ext::{BlockMetadataExt, EncryptedMempoolMetadata, FeatureSpecificBlockMetadata, RandomnessMetadata},
     chain_id::ChainId,
     contract_event::ContractEvent,
     decryption::BlockTxnDecryptionKey,
@@ -2646,33 +2646,33 @@ impl AptosVM {
                 (BLOCK_PROLOGUE_EXT_V2, args)
             },
             BlockMetadataExt::V3(v3) => {
-                // BCS-serialize feature_metas as Vec<FlatFeatureMeta>, which maps 1:1 to
-                // the Move `FeatureSpecificMetadata` enum. bcs_stream in Move then
+                // BCS-serialize block_metas as Vec<FlatBlockMeta>, which maps 1:1 to
+                // the Move `FeatureSpecificBlockMetadata` enum. bcs_stream in Move then
                 // deserializes this. Variant indices must match the Move enum order:
                 //   0 → Randomness, 1 → EncryptedMempool
                 #[derive(serde::Serialize)]
-                enum FlatFeatureMeta {
+                enum FlatBlockMeta {
                     Randomness { per_block_seed: Option<Vec<u8>> },
                     EncryptedMempool { decryption_key: Option<Vec<u8>> },
                 }
-                let flat: Vec<FlatFeatureMeta> = v3
-                    .feature_metas
+                let flat: Vec<FlatBlockMeta> = v3
+                    .block_metas
                     .iter()
                     .map(|m| match m {
-                        FeatureSpecificMetadata::Randomness(RandomnessMetadata::V0 {
+                        FeatureSpecificBlockMetadata::Randomness(RandomnessMetadata::V0 {
                             per_block_seed,
-                        }) => FlatFeatureMeta::Randomness {
+                        }) => FlatBlockMeta::Randomness {
                             per_block_seed: per_block_seed.clone(),
                         },
-                        FeatureSpecificMetadata::EncryptedMempool(
+                        FeatureSpecificBlockMetadata::EncryptedMempool(
                             EncryptedMempoolMetadata::V0 { decryption_key },
-                        ) => FlatFeatureMeta::EncryptedMempool {
+                        ) => FlatBlockMeta::EncryptedMempool {
                             decryption_key: decryption_key.clone(),
                         },
                     })
                     .collect();
                 let encoded =
-                    bcs::to_bytes(&flat).expect("BCS serialization of feature_metas failed");
+                    bcs::to_bytes(&flat).expect("BCS serialization of block_metas failed");
                 let args = vec![
                     MoveValue::Signer(AccountAddress::ZERO), // Run as 0x0
                     MoveValue::Address(AccountAddress::from_bytes(v3.id.to_vec()).unwrap()),
@@ -2687,6 +2687,7 @@ impl AptosVM {
                     v3.previous_block_votes_bitvec.as_move_value(),
                     MoveValue::U64(v3.timestamp_usecs),
                     encoded.as_move_value(),
+                    v3.dkg_needed.as_move_value(),
                 ];
                 (BLOCK_PROLOGUE_EXT_V3, args)
             },

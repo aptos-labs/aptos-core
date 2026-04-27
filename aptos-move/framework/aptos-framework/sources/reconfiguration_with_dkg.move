@@ -24,6 +24,17 @@ module aptos_framework::reconfiguration_with_dkg {
     friend aptos_framework::block;
     friend aptos_framework::aptos_governance;
 
+    /// Positional indices into the `dkg_needed` vector passed to `tick`.
+    /// Index N corresponds to a feature whose DKG session occupies slot N.
+    /// Trailing `false` entries are omitted by the caller; missing = false.
+    const RANDOMNESS_DKG_IDX: u64 = 0;
+    const ENCRYPTED_MEMPOOL_DKG_IDX: u64 = 1;
+
+    /// Returns `dkg_needed[idx]`, or `false` if `idx` is out of bounds.
+    inline fun dkg_needed_for(dkg_needed: &vector<bool>, idx: u64): bool {
+        if (idx < dkg_needed.length()) { *dkg_needed.borrow(idx) } else { false }
+    }
+
     /// Trigger a reconfiguration with DKG.
     /// Do nothing if one is already in progress.
     public(friend) fun try_start() {
@@ -162,6 +173,10 @@ module aptos_framework::reconfiguration_with_dkg {
 
     /// V3 per-block tick called from `block_prologue_ext_v3`.
     ///
+    /// `dkg_needed` is a minimal positional vector of bools indicating which features
+    /// require an async DKG session this epoch. A missing index (vector too short) means
+    /// false. Indices are defined by the `*_DKG_IDX` constants above.
+    ///
     /// Two cases:
     ///
     /// 1. Reconfig already in progress: the only mid-epoch flip allowed is
@@ -172,12 +187,10 @@ module aptos_framework::reconfiguration_with_dkg {
     /// 2. No reconfig in progress and epoch is old enough: start a fresh
     ///    reconfig and kick off the DKG (or equivalent task) for each enabled
     ///    feature. If no feature needs async work, finalize immediately.
-    public(friend) fun tick(
-        epoch_is_too_old: bool,
-        has_randomness: bool,
-        has_encrypted_mempool: bool
-    ) {
+    public(friend) fun tick(epoch_is_too_old: bool, dkg_needed: vector<bool>) {
         let framework = create_signer::create_signer(@aptos_framework);
+        let has_randomness = dkg_needed_for(&dkg_needed, RANDOMNESS_DKG_IDX);
+        let has_encrypted_mempool = dkg_needed_for(&dkg_needed, ENCRYPTED_MEMPOOL_DKG_IDX);
         if (reconfiguration_state::is_in_progress()) {
             if (!has_randomness) { dkg::try_clear_incomplete_session(&framework) };
             if (!has_encrypted_mempool) { chunky_dkg::try_clear_incomplete_session(&framework) };

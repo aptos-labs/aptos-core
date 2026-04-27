@@ -21,16 +21,14 @@ pub enum BlockMetadataExt {
     V0(BlockMetadata),
     V1(BlockMetadataWithRandomness),
     V2(BlockMetadataWithRandAndDecKey),
-    /// Extensible block metadata: feature-specific metadata is expressed as an ordered list of
-    /// `FeatureSpecificMetadata` entries, one per enabled feature. The order is deterministic and
-    /// agreed upon by all validators: randomness first, encrypted mempool second, future features
-    /// appended. A feature absent from the list means it is disabled for this epoch.
     V3(BlockMetadataWithFeatureMetas),
 }
 
-/// Per-feature metadata entry in `BlockMetadataExt::V3`.
+/// Per-feature per-block payload in `BlockMetadataExt::V3`.
+/// Carries the data consumed by each feature's `on_new_block` handler.
+/// Only enabled features appear in the list; disabled features receive `None` payloads.
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
-pub enum FeatureSpecificMetadata {
+pub enum FeatureSpecificBlockMetadata {
     Randomness(RandomnessMetadata),
     EncryptedMempool(EncryptedMempoolMetadata),
 }
@@ -62,8 +60,12 @@ pub struct BlockMetadataWithFeatureMetas {
     pub previous_block_votes_bitvec: Vec<u8>,
     pub failed_proposer_indices: Vec<u32>,
     pub timestamp_usecs: u64,
-    /// Ordered list of per-feature metadata for every feature enabled this epoch.
-    pub feature_metas: Vec<FeatureSpecificMetadata>,
+    /// Per-block payloads for enabled features, consumed by each feature's `on_new_block` handler.
+    pub block_metas: Vec<FeatureSpecificBlockMetadata>,
+    /// Minimal positional DKG flags: `dkg_needed[i] = true` means feature i needs an async DKG
+    /// session for the next epoch. Trailing `false` entries are omitted; missing index means false.
+    /// Index assignments are defined by `*_DKG_IDX` constants in `reconfiguration_with_dkg`.
+    pub dkg_needed: Vec<bool>,
 }
 
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
@@ -148,7 +150,8 @@ impl BlockMetadataExt {
         previous_block_votes_bitvec: Vec<u8>,
         failed_proposer_indices: Vec<u32>,
         timestamp_usecs: u64,
-        feature_metas: Vec<FeatureSpecificMetadata>,
+        block_metas: Vec<FeatureSpecificBlockMetadata>,
+        dkg_needed: Vec<bool>,
     ) -> Self {
         Self::V3(BlockMetadataWithFeatureMetas {
             id,
@@ -158,7 +161,8 @@ impl BlockMetadataExt {
             previous_block_votes_bitvec,
             failed_proposer_indices,
             timestamp_usecs,
-            feature_metas,
+            block_metas,
+            dkg_needed,
         })
     }
 

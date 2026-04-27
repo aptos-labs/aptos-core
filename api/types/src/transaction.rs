@@ -19,7 +19,7 @@ use aptos_types::{
     aggregate_signature::AggregateSignature,
     block_metadata::BlockMetadata,
     block_metadata_ext::{
-        BlockMetadataExt, EncryptedMempoolMetadata, FeatureSpecificMetadata, RandomnessMetadata,
+        BlockMetadataExt, EncryptedMempoolMetadata, FeatureSpecificBlockMetadata, RandomnessMetadata,
     },
     contract_event::{ContractEvent, EventWithVersion},
     dkg::{
@@ -649,21 +649,21 @@ impl BlockMetadataExtension {
                     .map(|dk| HexEncodedBytes::from(dk.decryption_key_cloned())),
             }),
             BlockMetadataExt::V3(payload) => {
-                let randomness = payload.feature_metas.iter().find_map(|m| match m {
-                    FeatureSpecificMetadata::Randomness(RandomnessMetadata::V0 {
+                let randomness = payload.block_metas.iter().find_map(|m| match m {
+                    FeatureSpecificBlockMetadata::Randomness(RandomnessMetadata::V0 {
                         per_block_seed,
                     }) => per_block_seed
                         .as_ref()
                         .map(|seed| HexEncodedBytes::from(seed.clone())),
-                    FeatureSpecificMetadata::EncryptedMempool(_) => None,
+                    FeatureSpecificBlockMetadata::EncryptedMempool(_) => None,
                 });
-                let decryption_key = payload.feature_metas.iter().find_map(|m| match m {
-                    FeatureSpecificMetadata::EncryptedMempool(EncryptedMempoolMetadata::V0 {
-                        decryption_key,
-                    }) => decryption_key
+                let decryption_key = payload.block_metas.iter().find_map(|m| match m {
+                    FeatureSpecificBlockMetadata::EncryptedMempool(
+                        EncryptedMempoolMetadata::V0 { decryption_key },
+                    ) => decryption_key
                         .as_ref()
                         .map(|dk| HexEncodedBytes::from(dk.clone())),
-                    FeatureSpecificMetadata::Randomness(_) => None,
+                    FeatureSpecificBlockMetadata::Randomness(_) => None,
                 });
                 Self::V3(BlockMetadataExtensionFeatureMetas {
                     randomness,
