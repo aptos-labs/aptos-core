@@ -611,7 +611,7 @@ pub struct BlockMetadataExtensionRandomnessAndDecKey {
 }
 
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, Object)]
-pub struct BlockMetadataExtensionFeatureMetas {
+pub struct BlockMetadataExtensionV3 {
     randomness: Option<HexEncodedBytes>,
     decryption_key: Option<HexEncodedBytes>,
 }
@@ -623,7 +623,7 @@ pub enum BlockMetadataExtension {
     V0(BlockMetadataExtensionEmpty),
     V1(BlockMetadataExtensionRandomness),
     V2(BlockMetadataExtensionRandomnessAndDecKey),
-    V3(BlockMetadataExtensionFeatureMetas),
+    V3(BlockMetadataExtensionV3),
 }
 
 impl BlockMetadataExtension {
@@ -661,7 +661,7 @@ impl BlockMetadataExtension {
                         .map(|dk| HexEncodedBytes::from(dk.clone())),
                     _ => None,
                 });
-                Self::V3(BlockMetadataExtensionFeatureMetas {
+                Self::V3(BlockMetadataExtensionV3 {
                     randomness,
                     decryption_key,
                 })
