@@ -19,3 +19,4 @@ pub use instruction::{
 };
 pub use interner::{walk_sig_token, Interner, StructResolver};
 pub use transaction_context::{FunctionResolver, NoopTransactionContext, TransactionContext};
+pub use types::{convert_mut_to_immut_ref, strip_ref};

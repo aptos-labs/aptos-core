@@ -1,59 +1,53 @@
 // Copyright (c) Aptos Foundation
 // Licensed pursuant to the Innovation-Enabling Source Code License, available at https://github.com/aptos-labs/aptos-core/blob/main/LICENSE
 
-//! Type-interning APIs.
+//! Interning APIs.
+//!
+//! Today this module exposes the interning leaves needed to canonicalize
+//! composite [`Type`](crate::types::Type) nodes into the global type arena.
+//! Other interning concerns — interning of address/name pairs into
+//! [`ExecutableId`](crate::executable::ExecutableId)s and of identifier
+//! strings are expected to migrate here as the abstract interning interface
+//! grows.
 
-use crate::types::{self as ty, view_type, InternedType, InternedTypeList, Type};
+use crate::types::{InternedType, InternedTypeList};
 use move_binary_format::file_format::{SignatureToken, StructHandleIndex};
 use move_core_types::ability::AbilitySet;
 
 /// Intern composite [`Type`](crate::types::Type) leaves into the global type
 /// arena. Implementations deduplicate so that pointer equality implies
 /// structural equality.
-///
-/// The trait covers exactly the leaves [`walk_sig_token`] and the SSA
-/// conversion pass need; struct/enum interning is intentionally not here (it
-/// carries layout state that only the executable builder owns).
 pub trait Interner {
-    fn intern_type_param(&self, idx: u16) -> InternedType;
+    /// Returns a type parameter with the specified index. Note that pointer
+    /// equality of any two interned type parameters is structural only. Two
+    /// parameters with index 0 but at different scope may represent different
+    /// types (but intern to the same pointer).
+    fn type_param_of(&self, idx: u16) -> InternedType;
 
-    fn intern_vec(&self, elem: InternedType) -> InternedType;
+    /// Returns a vector of the specified type.
+    fn vector_of(&self, elem: InternedType) -> InternedType;
 
-    fn intern_immut_ref(&self, inner: InternedType) -> InternedType;
+    /// Returns an immutable reference to the specified type.
+    fn immut_ref_of(&self, inner: InternedType) -> InternedType;
 
-    fn intern_mut_ref(&self, inner: InternedType) -> InternedType;
+    /// Returns a mutable reference to the specified type.
+    fn mut_ref_of(&self, inner: InternedType) -> InternedType;
 
-    fn intern_func(
+    /// Returns a function type with the given argument and result type lists
+    /// and ability set.
+    fn function_of(
         &self,
         args: InternedTypeList,
         results: InternedTypeList,
         abilities: AbilitySet,
     ) -> InternedType;
 
-    fn intern_type_list(&self, types: &[InternedType]) -> InternedTypeList;
-
-    /// Converts `&mut T` to `&T` by interning the immutable counterpart.
-    /// Errors if `mut_ref` is not a mutable reference type.
-    fn convert_mut_to_immut_ref(&self, mut_ref: InternedType) -> anyhow::Result<InternedType> {
-        let Type::MutRef { inner } = view_type(mut_ref) else {
-            anyhow::bail!("convert_mut_to_immut_ref: expected MutRef");
-        };
-        Ok(self.intern_immut_ref(*inner))
-    }
-
-    /// Strips the reference from `&T` or `&mut T`, returning `T`.
-    /// Errors if `ref_ty` is not a reference type.
-    fn strip_ref(&self, ref_ty: InternedType) -> anyhow::Result<InternedType> {
-        let (Type::ImmutRef { inner } | Type::MutRef { inner }) = view_type(ref_ty) else {
-            anyhow::bail!("strip_ref: expected reference type");
-        };
-        Ok(*inner)
-    }
+    /// Returns an interned list of types.
+    fn type_list_of(&self, types: &[InternedType]) -> InternedTypeList;
 }
 
 /// Resolves a struct handle (with its type arguments) to an interned type
-/// pointer. Implementations may pre-build a table (specializer) or resolve
-/// on demand (executable builder).
+/// pointer.
 pub trait StructResolver {
     fn resolve_struct(
         &mut self,
@@ -83,6 +77,7 @@ pub fn walk_sig_token<I: Interner, R: StructResolver>(
     interner: &I,
     resolver: &mut R,
 ) -> anyhow::Result<InternedType> {
+    use crate::types as ty;
     Ok(match token {
         SignatureToken::Bool => ty::BOOL_TY,
         SignatureToken::U8 => ty::U8_TY,
@@ -99,31 +94,31 @@ pub fn walk_sig_token<I: Interner, R: StructResolver>(
         SignatureToken::I256 => ty::I256_TY,
         SignatureToken::Address => ty::ADDRESS_TY,
         SignatureToken::Signer => ty::SIGNER_TY,
-        SignatureToken::TypeParameter(idx) => interner.intern_type_param(*idx),
+        SignatureToken::TypeParameter(idx) => interner.type_param_of(*idx),
         SignatureToken::Vector(inner) => {
             let elem = walk_sig_token(inner, interner, resolver)?;
-            interner.intern_vec(elem)
+            interner.vector_of(elem)
         },
         SignatureToken::Reference(inner) => {
             let inner = walk_sig_token(inner, interner, resolver)?;
-            interner.intern_immut_ref(inner)
+            interner.immut_ref_of(inner)
         },
         SignatureToken::MutableReference(inner) => {
             let inner = walk_sig_token(inner, interner, resolver)?;
-            interner.intern_mut_ref(inner)
+            interner.mut_ref_of(inner)
         },
         SignatureToken::Function(args, results, abilities) => {
-            let arg_ptrs: Vec<InternedType> = args
+            let arg_ptrs = args
                 .iter()
                 .map(|t| walk_sig_token(t, interner, resolver))
-                .collect::<anyhow::Result<_>>()?;
-            let result_ptrs: Vec<InternedType> = results
+                .collect::<anyhow::Result<Vec<_>>>()?;
+            let result_ptrs = results
                 .iter()
                 .map(|t| walk_sig_token(t, interner, resolver))
-                .collect::<anyhow::Result<_>>()?;
-            let args = interner.intern_type_list(&arg_ptrs);
-            let results = interner.intern_type_list(&result_ptrs);
-            interner.intern_func(args, results, *abilities)
+                .collect::<anyhow::Result<Vec<_>>>()?;
+            let args = interner.type_list_of(&arg_ptrs);
+            let results = interner.type_list_of(&result_ptrs);
+            interner.function_of(args, results, *abilities)
         },
         SignatureToken::Struct(sh_idx) => resolver.resolve_struct(*sh_idx, &[])?,
         SignatureToken::StructInstantiation(sh_idx, tys) => {

@@ -4,9 +4,12 @@
 //! Builds an [`Executable`] from a [`CompiledModule`] by resolving its
 //! struct/enum types and accumulating lowered functions.
 //!
-//! Type interning primitives live in `mono-move-global-context`; this module
-//! orchestrates the module-level walk (struct defs, enum defs, layout
-//! computation) and the final assembly into an `Executable`.
+//! The abstract interning interface (`Interner`, `StructResolver`,
+//! `walk_sig_token`) lives in `mono-move-core`; the concrete implementation
+//! that owns the global tables is provided by `ExecutionGuard` in
+//! `mono-move-global-context`. This module drives the module-level walk
+//! (struct defs, enum defs, layout computation), delegates leaf type
+//! interning to the guard, and assembles the final `Executable`.
 
 use anyhow::{anyhow, bail};
 use mono_move_alloc::{ExecutableArena, ExecutableArenaPtr, GlobalArenaPtr};

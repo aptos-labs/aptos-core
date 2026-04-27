@@ -235,7 +235,7 @@ impl<'a, I: Interner> SsaConverter<'a, I> {
         let base_ty = self.struct_type(module, inst.def)?;
         let ty_args_toks = &module.signature_at(inst.type_parameters).0;
         let ty_args = convert_sig_tokens(ty_args_toks, self.interner, self.struct_types)?;
-        let ty_args_ptr = self.interner.intern_type_list(&ty_args);
+        let ty_args_ptr = self.interner.type_list_of(&ty_args);
         Ok((base_ty, ty_args_ptr))
     }
 
@@ -251,7 +251,7 @@ impl<'a, I: Interner> SsaConverter<'a, I> {
         let enum_ty = self.struct_type(module, handle.struct_index)?;
         let ty_args_toks = &module.signature_at(inst.type_parameters).0;
         let ty_args = convert_sig_tokens(ty_args_toks, self.interner, self.struct_types)?;
-        let ty_args_ptr = self.interner.intern_type_list(&ty_args);
+        let ty_args_ptr = self.interner.type_list_of(&ty_args);
         Ok((enum_ty, handle.variant, ty_args_ptr))
     }
 
@@ -546,7 +546,7 @@ impl<'a, I: Interner> SsaConverter<'a, I> {
             B::FreezeRef => {
                 let src_ty = self.vid_type(*self.stack.last().context("stack underflow")?)?;
                 // The bytecode verifier guarantees the operand is &mut T.
-                let result_ty = self.interner.convert_mut_to_immut_ref(src_ty)?;
+                let result_ty = ty::convert_mut_to_immut_ref(self.interner, src_ty)?;
                 self.convert_unop(UnaryOp::FreezeRef, result_ty)?;
             },
 
@@ -737,7 +737,7 @@ impl<'a, I: Interner> SsaConverter<'a, I> {
             B::ImmBorrowLoc(idx) => {
                 let src = Slot::Home(*idx as u16);
                 let inner = self.local_types[*idx as usize];
-                let ty = self.interner.intern_immut_ref(inner);
+                let ty = self.interner.immut_ref_of(inner);
                 let dst = self.alloc_vid(ty)?;
                 self.current_block_instrs
                     .push(Instr::ImmBorrowLoc(dst, src));
@@ -746,7 +746,7 @@ impl<'a, I: Interner> SsaConverter<'a, I> {
             B::MutBorrowLoc(idx) => {
                 let src = Slot::Home(*idx as u16);
                 let inner = self.local_types[*idx as usize];
-                let ty = self.interner.intern_mut_ref(inner);
+                let ty = self.interner.mut_ref_of(inner);
                 let dst = self.alloc_vid(ty)?;
                 self.current_block_instrs
                     .push(Instr::MutBorrowLoc(dst, src));
@@ -755,7 +755,7 @@ impl<'a, I: Interner> SsaConverter<'a, I> {
             B::ImmBorrowField(idx) => {
                 let src = self.pop_slot()?;
                 let fty = self.field_type(module, *idx)?;
-                let ty = self.interner.intern_immut_ref(fty);
+                let ty = self.interner.immut_ref_of(fty);
                 let dst = self.alloc_vid(ty)?;
                 self.current_block_instrs
                     .push(Instr::ImmBorrowField(dst, *idx, src));
@@ -764,7 +764,7 @@ impl<'a, I: Interner> SsaConverter<'a, I> {
             B::MutBorrowField(idx) => {
                 let src = self.pop_slot()?;
                 let fty = self.field_type(module, *idx)?;
-                let ty = self.interner.intern_mut_ref(fty);
+                let ty = self.interner.mut_ref_of(fty);
                 let dst = self.alloc_vid(ty)?;
                 self.current_block_instrs
                     .push(Instr::MutBorrowField(dst, *idx, src));
@@ -773,7 +773,7 @@ impl<'a, I: Interner> SsaConverter<'a, I> {
             B::ImmBorrowFieldGeneric(idx) => {
                 let src = self.pop_slot()?;
                 let fty = self.field_inst_type(module, *idx)?;
-                let ty = self.interner.intern_immut_ref(fty);
+                let ty = self.interner.immut_ref_of(fty);
                 let dst = self.alloc_vid(ty)?;
                 self.current_block_instrs
                     .push(Instr::ImmBorrowFieldGeneric(dst, *idx, src));
@@ -782,7 +782,7 @@ impl<'a, I: Interner> SsaConverter<'a, I> {
             B::MutBorrowFieldGeneric(idx) => {
                 let src = self.pop_slot()?;
                 let fty = self.field_inst_type(module, *idx)?;
-                let ty = self.interner.intern_mut_ref(fty);
+                let ty = self.interner.mut_ref_of(fty);
                 let dst = self.alloc_vid(ty)?;
                 self.current_block_instrs
                     .push(Instr::MutBorrowFieldGeneric(dst, *idx, src));
@@ -791,7 +791,7 @@ impl<'a, I: Interner> SsaConverter<'a, I> {
             B::ImmBorrowVariantField(idx) => {
                 let src = self.pop_slot()?;
                 let fty = self.variant_field_handle_type(module, *idx)?;
-                let ty = self.interner.intern_immut_ref(fty);
+                let ty = self.interner.immut_ref_of(fty);
                 let dst = self.alloc_vid(ty)?;
                 self.current_block_instrs
                     .push(Instr::ImmBorrowVariantField(dst, *idx, src));
@@ -800,7 +800,7 @@ impl<'a, I: Interner> SsaConverter<'a, I> {
             B::MutBorrowVariantField(idx) => {
                 let src = self.pop_slot()?;
                 let fty = self.variant_field_handle_type(module, *idx)?;
-                let ty = self.interner.intern_mut_ref(fty);
+                let ty = self.interner.mut_ref_of(fty);
                 let dst = self.alloc_vid(ty)?;
                 self.current_block_instrs
                     .push(Instr::MutBorrowVariantField(dst, *idx, src));
@@ -809,7 +809,7 @@ impl<'a, I: Interner> SsaConverter<'a, I> {
             B::ImmBorrowVariantFieldGeneric(idx) => {
                 let src = self.pop_slot()?;
                 let fty = self.variant_field_inst_type(module, *idx)?;
-                let ty = self.interner.intern_immut_ref(fty);
+                let ty = self.interner.immut_ref_of(fty);
                 let dst = self.alloc_vid(ty)?;
                 self.current_block_instrs
                     .push(Instr::ImmBorrowVariantFieldGeneric(dst, *idx, src));
@@ -818,7 +818,7 @@ impl<'a, I: Interner> SsaConverter<'a, I> {
             B::MutBorrowVariantFieldGeneric(idx) => {
                 let src = self.pop_slot()?;
                 let fty = self.variant_field_inst_type(module, *idx)?;
-                let ty = self.interner.intern_mut_ref(fty);
+                let ty = self.interner.mut_ref_of(fty);
                 let dst = self.alloc_vid(ty)?;
                 self.current_block_instrs
                     .push(Instr::MutBorrowVariantFieldGeneric(dst, *idx, src));
@@ -828,7 +828,7 @@ impl<'a, I: Interner> SsaConverter<'a, I> {
                 let src = self.pop_slot()?;
                 let src_ty = self.vid_type(src)?;
                 // The bytecode verifier guarantees the operand is `&T` or `&mut T`.
-                let ty = self.interner.strip_ref(src_ty)?;
+                let ty = ty::strip_ref(src_ty)?;
                 let dst = self.alloc_vid(ty)?;
                 self.current_block_instrs.push(Instr::ReadRef(dst, src));
                 self.push_slot(dst);
@@ -890,7 +890,7 @@ impl<'a, I: Interner> SsaConverter<'a, I> {
             B::ImmBorrowGlobal(idx) => {
                 let addr = self.pop_slot()?;
                 let inner = self.struct_type(module, *idx)?;
-                let ty = self.interner.intern_immut_ref(inner);
+                let ty = self.interner.immut_ref_of(inner);
                 let dst = self.alloc_vid(ty)?;
                 self.current_block_instrs
                     .push(Instr::ImmBorrowGlobal(dst, inner, addr));
@@ -899,7 +899,7 @@ impl<'a, I: Interner> SsaConverter<'a, I> {
             B::ImmBorrowGlobalGeneric(idx) => {
                 let addr = self.pop_slot()?;
                 let inner = self.struct_inst_type(module, *idx)?;
-                let ty = self.interner.intern_immut_ref(inner);
+                let ty = self.interner.immut_ref_of(inner);
                 let (base_ty, ty_args) = self.struct_inst_parts(module, *idx)?;
                 let dst = self.alloc_vid(ty)?;
                 self.current_block_instrs
@@ -909,7 +909,7 @@ impl<'a, I: Interner> SsaConverter<'a, I> {
             B::MutBorrowGlobal(idx) => {
                 let addr = self.pop_slot()?;
                 let inner = self.struct_type(module, *idx)?;
-                let ty = self.interner.intern_mut_ref(inner);
+                let ty = self.interner.mut_ref_of(inner);
                 let dst = self.alloc_vid(ty)?;
                 self.current_block_instrs
                     .push(Instr::MutBorrowGlobal(dst, inner, addr));
@@ -918,7 +918,7 @@ impl<'a, I: Interner> SsaConverter<'a, I> {
             B::MutBorrowGlobalGeneric(idx) => {
                 let addr = self.pop_slot()?;
                 let inner = self.struct_inst_type(module, *idx)?;
-                let ty = self.interner.intern_mut_ref(inner);
+                let ty = self.interner.mut_ref_of(inner);
                 let (base_ty, ty_args) = self.struct_inst_parts(module, *idx)?;
                 let dst = self.alloc_vid(ty)?;
                 self.current_block_instrs
@@ -1019,7 +1019,7 @@ impl<'a, I: Interner> SsaConverter<'a, I> {
                     rets.push(self.alloc_vid(*rty)?);
                 }
                 let sig_types_vec = convert_sig_tokens(&sig.0, self.interner, self.struct_types)?;
-                let signature_types = self.interner.intern_type_list(&sig_types_vec);
+                let signature_types = self.interner.type_list_of(&sig_types_vec);
                 self.current_block_instrs.push(Instr::CallClosure(
                     rets.clone(),
                     signature_types,
@@ -1036,7 +1036,7 @@ impl<'a, I: Interner> SsaConverter<'a, I> {
                 let elems = self.pop_n_reverse(count as usize)?;
                 let elem_tok = &module.signature_at(*sig_idx).0[0];
                 let elem_ty = convert_sig_token(elem_tok, self.interner, self.struct_types)?;
-                let ty = self.interner.intern_vec(elem_ty);
+                let ty = self.interner.vector_of(elem_ty);
                 let dst = self.alloc_vid(ty)?;
                 self.current_block_instrs
                     .push(Instr::VecPack(dst, elem_ty, count, elems));
@@ -1056,7 +1056,7 @@ impl<'a, I: Interner> SsaConverter<'a, I> {
                 let vec_ref = self.pop_slot()?;
                 let elem_tok = &module.signature_at(*sig_idx).0[0];
                 let elem_ty = convert_sig_token(elem_tok, self.interner, self.struct_types)?;
-                let ty = self.interner.intern_immut_ref(elem_ty);
+                let ty = self.interner.immut_ref_of(elem_ty);
                 let dst = self.alloc_vid(ty)?;
                 self.current_block_instrs
                     .push(Instr::VecImmBorrow(dst, elem_ty, vec_ref, idx_r));
@@ -1067,7 +1067,7 @@ impl<'a, I: Interner> SsaConverter<'a, I> {
                 let vec_ref = self.pop_slot()?;
                 let elem_tok = &module.signature_at(*sig_idx).0[0];
                 let elem_ty = convert_sig_token(elem_tok, self.interner, self.struct_types)?;
-                let ty = self.interner.intern_mut_ref(elem_ty);
+                let ty = self.interner.mut_ref_of(elem_ty);
                 let dst = self.alloc_vid(ty)?;
                 self.current_block_instrs
                     .push(Instr::VecMutBorrow(dst, elem_ty, vec_ref, idx_r));

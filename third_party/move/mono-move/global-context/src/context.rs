@@ -409,27 +409,27 @@ impl<'ctx> ExecutionGuard<'ctx> {
 }
 
 impl<'ctx> Interner for ExecutionGuard<'ctx> {
-    fn intern_type_param(&self, idx: u16) -> InternedType {
+    fn type_param_of(&self, idx: u16) -> InternedType {
         let ty = self.global_arena.alloc(Type::TypeParam { idx });
         self.insert_allocated_type_pointer_internal(ty)
     }
 
-    fn intern_vec(&self, elem: InternedType) -> InternedType {
+    fn vector_of(&self, elem: InternedType) -> InternedType {
         let ty = self.global_arena.alloc(Type::Vector { elem });
         self.insert_allocated_type_pointer_internal(ty)
     }
 
-    fn intern_immut_ref(&self, inner: InternedType) -> InternedType {
+    fn immut_ref_of(&self, inner: InternedType) -> InternedType {
         let ty = self.global_arena.alloc(Type::ImmutRef { inner });
         self.insert_allocated_type_pointer_internal(ty)
     }
 
-    fn intern_mut_ref(&self, inner: InternedType) -> InternedType {
+    fn mut_ref_of(&self, inner: InternedType) -> InternedType {
         let ty = self.global_arena.alloc(Type::MutRef { inner });
         self.insert_allocated_type_pointer_internal(ty)
     }
 
-    fn intern_func(
+    fn function_of(
         &self,
         args: InternedTypeList,
         results: InternedTypeList,
@@ -443,7 +443,7 @@ impl<'ctx> Interner for ExecutionGuard<'ctx> {
         self.insert_allocated_type_pointer_internal(ty)
     }
 
-    fn intern_type_list(&self, types: &[InternedType]) -> InternedTypeList {
+    fn type_list_of(&self, types: &[InternedType]) -> InternedTypeList {
         if types.is_empty() {
             return types::EMPTY_TYPE_LIST;
         }

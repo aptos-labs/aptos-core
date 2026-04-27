@@ -53,7 +53,7 @@
 //!
 //! TODO: support substitution
 
-use crate::ExecutableId;
+use crate::{ExecutableId, Interner};
 use mono_move_alloc::GlobalArenaPtr;
 use move_core_types::ability::AbilitySet;
 
@@ -136,6 +136,31 @@ pub fn view_type_list(ptr: InternedTypeList) -> &'static [InternedType] {
 pub fn view_name(ptr: GlobalArenaPtr<str>) -> &'static str {
     // SAFETY: see module-level contract above.
     unsafe { ptr.as_ref_unchecked() }
+}
+
+/// Converts `&mut T` to `&T` by interning the immutable counterpart. Errors
+/// if `mut_ref` is not a [`Type::MutRef`].
+///
+/// Reads through `view_type` and therefore inherits its safety contract.
+pub fn convert_mut_to_immut_ref(
+    interner: &impl Interner,
+    mut_ref: InternedType,
+) -> anyhow::Result<InternedType> {
+    let Type::MutRef { inner } = view_type(mut_ref) else {
+        anyhow::bail!("convert_mut_to_immut_ref: expected MutRef");
+    };
+    Ok(interner.immut_ref_of(*inner))
+}
+
+/// Strips the reference from `&T` or `&mut T`, returning `T`. Errors if
+/// `ref_ty` is not a reference type.
+///
+/// Reads through `view_type` and therefore inherits its safety contract.
+pub fn strip_ref(ref_ty: InternedType) -> anyhow::Result<InternedType> {
+    let (Type::ImmutRef { inner } | Type::MutRef { inner }) = view_type(ref_ty) else {
+        anyhow::bail!("strip_ref: expected reference type");
+    };
+    Ok(*inner)
 }
 
 /// Layout for struct fields:
