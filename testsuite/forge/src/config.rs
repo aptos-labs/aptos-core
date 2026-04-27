@@ -10,7 +10,7 @@ use aptos_config::config::{
     OverrideNodeConfig,
 };
 use aptos_framework::ReleaseBundle;
-use std::{num::NonZeroUsize, sync::Arc};
+use std::{num::NonZeroUsize, sync::Arc, time::Duration};
 
 /// A PFN deployment configuration. Each entry maps to one helm release via the PFN deployer.
 pub struct PfnDeployment {
@@ -77,6 +77,9 @@ pub struct ForgeConfig {
 
     /// URL to download the chunky DKG public parameters blob into the validator init-container
     pub public_parameters_blob_url: Option<String>,
+
+    /// Override the CLI-specified test duration
+    pub duration_override: Option<Duration>,
 }
 
 impl ForgeConfig {
@@ -204,6 +207,11 @@ impl ForgeConfig {
 
     pub fn with_public_parameters_blob_url(mut self, url: impl Into<String>) -> Self {
         self.public_parameters_blob_url = Some(url.into());
+        self
+    }
+
+    pub fn with_duration_override(mut self, duration: Duration) -> Self {
+        self.duration_override = Some(duration);
         self
     }
 
@@ -448,6 +456,7 @@ impl Default for ForgeConfig {
             retain_debug_logs: false,
             digest_key_blob_url: None,
             public_parameters_blob_url: None,
+            duration_override: None,
         }
     }
 }

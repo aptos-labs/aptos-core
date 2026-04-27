@@ -488,6 +488,26 @@ impl RoundManager {
                 .expect("Sending to a self loopback unbounded channel cannot fail");
         }
 
+        // HACK: Simulate slow proposer. The last validator (by ordered index)
+        // delays their proposal by 1s 10% of the time (round % 10 == 0).
+        let proposal_delay = {
+            let author = self.proposal_generator.author();
+            let ordered = self.epoch_state.verifier.get_ordered_account_addresses();
+            let n = ordered.len();
+            let idx = ordered.iter().position(|a| *a == author);
+            if matches!(idx, Some(i) if i >= n - 1) && new_round_event.round.is_multiple_of(10) {
+                Some(std::time::Duration::from_millis(1000))
+            } else {
+                None
+            }
+        };
+        if let Some(delay) = proposal_delay {
+            warn!(
+                self.new_log(LogEvent::NewRound),
+                "HACK: delaying proposal for round {} by {:?}", new_round_event.round, delay
+            );
+        }
+
         // If the current proposer is the leading, try to propose a regular block if not opt proposed already
         if is_current_proposer
             && self
@@ -501,6 +521,9 @@ impl RoundManager {
             let safety_rules = self.safety_rules.clone();
             let proposer_election = self.proposer_election.clone();
             tokio::spawn(async move {
+                if let Some(delay) = proposal_delay {
+                    tokio::time::sleep(delay).await;
+                }
                 if let Err(e) = monitor!(
                     "generate_and_send_proposal",
                     Self::generate_and_send_proposal(
@@ -1453,6 +1476,19 @@ impl RoundManager {
 
         let parent = parent_vote.vote_data().proposed().clone();
         let opt_proposal_round = parent.round() + 1;
+        // HACK: Simulate slow opt proposer too.
+        let opt_proposal_delay = {
+            let author = self.proposal_generator.author();
+            let ordered = self.epoch_state.verifier.get_ordered_account_addresses();
+            let n = ordered.len();
+            let idx = ordered.iter().position(|a| *a == author);
+            if matches!(idx, Some(i) if i >= n - 1) && opt_proposal_round.is_multiple_of(10) {
+                Some(std::time::Duration::from_millis(1000))
+            } else {
+                None
+            }
+        };
+
         if self
             .proposer_election
             .is_valid_proposer(self.proposal_generator.author(), opt_proposal_round)
@@ -1474,6 +1510,9 @@ impl RoundManager {
             let proposal_generator = self.proposal_generator.clone();
             let proposer_election = self.proposer_election.clone();
             tokio::spawn(async move {
+                if let Some(delay) = opt_proposal_delay {
+                    tokio::time::sleep(delay).await;
+                }
                 if let Err(e) = monitor!(
                     "generate_and_send_opt_proposal",
                     Self::generate_and_send_opt_proposal(
