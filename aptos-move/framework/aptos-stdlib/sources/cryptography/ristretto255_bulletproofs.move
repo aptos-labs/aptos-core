@@ -130,16 +130,21 @@ module aptos_std::ristretto255_bulletproofs {
         abort error::unavailable(E_NATIVE_FUN_NOT_AVAILABLE)
     }
 
+    #[test_only]
+    /// Note: Only used in tests.
     fun verify_batch_range_proof_pedersen_helper(
         comms: &vector<pedersen::Commitment>, proof: &RangeProof,
         num_bits: u64, dst: vector<u8>): bool
     {
-        verify_batch_range_proof_helper(
-            &comms.map_ref(|com| ristretto255::point_clone(pedersen::commitment_as_point(com))),
+        assert!(features::bulletproofs_batch_enabled(), error::invalid_state(E_NATIVE_FUN_NOT_AVAILABLE));
+        assert!(dst.length() <= 256, error::invalid_argument(E_DST_TOO_LONG));
+
+        let comms = comms.map_ref(|com| com.commitment_to_bytes());
+
+        verify_batch_range_proof_internal(
+            comms,
             &ristretto255::basepoint(), &ristretto255::hash_to_point_base(),
-            proof,
-            num_bits,
-            dst
+            proof.bytes, num_bits, dst
         )
     }
 
@@ -155,23 +160,6 @@ module aptos_std::ristretto255_bulletproofs {
         _proof: &RangeProof, _num_bits: u64, _dst: vector<u8>): bool
     {
         abort error::unavailable(E_NATIVE_FUN_NOT_AVAILABLE)
-    }
-
-    fun verify_batch_range_proof_helper(
-        comms: &vector<RistrettoPoint>,
-        val_base: &RistrettoPoint, rand_base: &RistrettoPoint,
-        proof: &RangeProof, num_bits: u64, dst: vector<u8>): bool
-    {
-        assert!(features::bulletproofs_batch_enabled(), error::invalid_state(E_NATIVE_FUN_NOT_AVAILABLE));
-        assert!(dst.length() <= 256, error::invalid_argument(E_DST_TOO_LONG));
-
-        let comms = comms.map_ref(|com| ristretto255::point_to_bytes(&ristretto255::point_compress(com)));
-
-        verify_batch_range_proof_internal(
-            comms,
-            val_base, rand_base,
-            proof.bytes, num_bits, dst
-        )
     }
 
     #[test_only]

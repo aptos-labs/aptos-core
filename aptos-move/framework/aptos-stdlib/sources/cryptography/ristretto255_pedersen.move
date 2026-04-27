@@ -42,8 +42,8 @@ module aptos_std::ristretto255_pedersen {
     }
 
     /// Returns a commitment as a serialized byte array
-    public fun commitment_to_bytes(comm: &Commitment): vector<u8> {
-        ristretto255::point_to_bytes(&ristretto255::point_compress(&comm.point))
+    public fun commitment_to_bytes(self: &Commitment): vector<u8> {
+        self.point.point_compress().point_to_bytes()
     }
 
     /// Moves a Ristretto point into a Pedersen commitment.

@@ -56,6 +56,9 @@ module aptos_framework::confidential_range_proofs {
         val_base: &RistrettoPoint, rand_base: &RistrettoPoint,
         proof: &RangeProof, num_bits: u64, dst: vector<u8>): bool
     {
+        // Note: Keeping this for now, in case the emergency pause functionality has trouble, we can always disable
+        // the batched Bulletproof natives as a "poor man's" (partial) emergency pause, since it will not prevent
+        // deposits.
         assert!(features::bulletproofs_batch_enabled(), error::invalid_state(E_NATIVE_FUN_NOT_AVAILABLE));
         assert!(dst.length() <= 256, error::invalid_argument(E_DST_TOO_LONG));
 
