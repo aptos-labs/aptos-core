@@ -20,8 +20,9 @@ use aptos_forge::{
     TransactionType,
 };
 use aptos_sdk::types::on_chain_config::{
-    BlockGasLimitType, FeatureFlag, Features, OnChainChunkyDKGConfig, OnChainConsensusConfig,
-    OnChainExecutionConfig, OnChainRandomnessConfig, TransactionShufflerType,
+    BlockGasLimitType, ConsensusAlgorithmConfig, FeatureFlag, Features, LeaderReputationType,
+    OnChainChunkyDKGConfig, OnChainConsensusConfig, OnChainExecutionConfig, OnChainRandomnessConfig,
+    ProposerAndVoterConfig, ProposerAndVoterConfigV3, ProposerElectionType, TransactionShufflerType,
 };
 use aptos_testcases::{
     load_vs_perf_benchmark::{LoadVsPerfBenchmark, TransactionWorkload, Workloads},
@@ -452,9 +453,38 @@ pub(crate) fn realistic_env_max_load_test(
         .with_genesis_helm_config_fn(Arc::new(move |helm_values| {
             // No epoch change so measurements are stable.
             helm_values["chain"]["epoch_duration_secs"] = (24 * 3600).into();
+            // Use ProposerAndVoterV3 to enable the latency-weighted heuristic via on-chain
+            // config (so all validators deterministically agree on the leader schedule —
+            // node-local toggles would fork during partial rollout).
+            //
+            // Bump proposer_window_num_validators_multiplier from 10 to 50 so the heuristic
+            // has enough observations to estimate per-validator mean round time stably
+            // (more failure samples per window for the faulty leader).
+            let mut consensus_config = OnChainConsensusConfig::default_for_genesis();
+            if let OnChainConsensusConfig::V5 {
+                alg: ConsensusAlgorithmConfig::JolteonV2 { ref mut main, .. },
+                ..
+            } = consensus_config
+            {
+                main.proposer_election_type = ProposerElectionType::LeaderReputation(
+                    LeaderReputationType::ProposerAndVoterV3(ProposerAndVoterConfigV3 {
+                        base: ProposerAndVoterConfig {
+                            active_weight: 1000,
+                            inactive_weight: 10,
+                            failed_weight: 1,
+                            failure_threshold_percent: 10,
+                            proposer_window_num_validators_multiplier: 50,
+                            voter_window_num_validators_multiplier: 1,
+                            weight_by_voting_power: true,
+                            use_history_from_previous_epoch_max_count: 5,
+                        },
+                        use_latency_weighted: true,
+                        latency_weight_multiplier_milli: 4000, // 4.0× — aggressively suppress slow leaders
+                    }),
+                );
+            }
             helm_values["chain"]["on_chain_consensus_config"] =
-                serde_yaml::to_value(OnChainConsensusConfig::default_for_genesis())
-                    .expect("must serialize");
+                serde_yaml::to_value(consensus_config).expect("must serialize");
             helm_values["chain"]["on_chain_execution_config"] =
                 serde_yaml::to_value(OnChainExecutionConfig::default_for_genesis())
                     .expect("must serialize");
