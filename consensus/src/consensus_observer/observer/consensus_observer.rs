@@ -1096,6 +1096,7 @@ impl ConsensusObserver {
             execution_config,
             randomness_config,
             chunky_dkg_config,
+            use_extensible_block_metadata,
         ) = self
             .observer_epoch_state
             .wait_for_epoch_start(block_payloads)
@@ -1129,7 +1130,7 @@ impl ConsensusObserver {
                 rand_msg_rx,
                 secret_share_msg_rx,
                 0,
-                false,
+                use_extensible_block_metadata,
             )
             .await;
         self.pipeline_builder = Some(self.execution_client.pipeline_builder(signer));
