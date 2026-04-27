@@ -383,10 +383,8 @@ module aptos_framework::block {
             decryption::on_new_block(&vm, epoch, round, option::none());
         };
 
-        if (timestamp - reconfiguration::last_reconfiguration_time() >= epoch_interval) {
-            reconfiguration_with_dkg::try_start_v3(has_randomness, has_encrypted_mempool);
-            reconfiguration_with_dkg::try_advance_reconfig();
-        };
+        let epoch_is_too_old = timestamp - reconfiguration::last_reconfiguration_time() >= epoch_interval;
+        reconfiguration_with_dkg::tick(epoch_is_too_old, has_randomness, has_encrypted_mempool);
     }
 
     fun block_epilogue(

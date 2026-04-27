@@ -204,4 +204,18 @@ module aptos_framework::reconfiguration_with_dkg {
         let framework = create_signer::create_signer(@aptos_framework);
         try_finalize_reconfig(&framework);
     }
+
+    /// V3 per-block tick. If `epoch_is_too_old`, starts (or clears) DKG sessions
+    /// as required by the active feature set, then tries to finalize any in-progress
+    /// reconfig. Called from `block_prologue_ext_v3` every block.
+    public(friend) fun tick(
+        epoch_is_too_old: bool,
+        has_randomness: bool,
+        has_encrypted_mempool: bool
+    ) {
+        if (epoch_is_too_old) {
+            try_start_v3(has_randomness, has_encrypted_mempool);
+        };
+        try_advance_reconfig();
+    }
 }
