@@ -2181,11 +2181,22 @@ where
                 }
             }
         }
-        Ok(T::block_epilogue_v1(
-            block_id,
-            block_end_info,
-            FeeDistribution::new(amount),
-        ))
+        let fee_distribution = FeeDistribution::new(amount);
+        if self.config.local.persist_hotness_in_epilogue {
+            let (inner, to_make_hot) = block_end_info.into_parts();
+            Ok(T::block_epilogue_v2(
+                block_id,
+                inner,
+                fee_distribution,
+                to_make_hot,
+            ))
+        } else {
+            Ok(T::block_epilogue_v1(
+                block_id,
+                block_end_info,
+                fee_distribution,
+            ))
+        }
     }
 
     fn apply_output_sequential(
