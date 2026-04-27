@@ -4,15 +4,16 @@
 //! Executes parsed test steps against both MoveVM and mono-move, producing
 //! normalized output for comparison.
 
-use crate::{matcher::check_output, parser::Step};
+use crate::{
+    compile::{compile, SourceKind},
+    matcher::check_output,
+    parser::Step,
+};
 use anyhow::anyhow;
-use legacy_move_compiler::{compiled_unit::CompiledUnit, shared::known_attributes::KnownAttribute};
 use mono_move_core::NoopTransactionContext;
 use mono_move_gas::SimpleGasMeter;
 use mono_move_global_context::{ExecutionGuard, GlobalContext};
 use mono_move_runtime::InterpreterContext;
-use move_binary_format::CompiledModule;
-use move_compiler_v2::{run_move_compiler_to_stderr, Options};
 use move_core_types::{
     account_address::AccountAddress, identifier::IdentStr, language_storage::ModuleId,
     value::MoveValue,
@@ -26,7 +27,6 @@ use move_vm_runtime::{
 };
 use move_vm_test_utils::InMemoryStorage;
 use move_vm_types::{gas::UnmeteredGasMeter, loaded_data::runtime_types::Type};
-use std::path::Path;
 
 /// Execution output from a VM, carrying both the display string and the
 /// number of return values so that mono-move can avoid reparsing.
@@ -36,7 +36,7 @@ struct Output {
 }
 
 /// Run all steps in a differential test, checking both VMs produce matching output.
-pub fn run_test(steps: Vec<Step>) -> anyhow::Result<()> {
+pub fn run_test(steps: Vec<Step>, kind: SourceKind) -> anyhow::Result<()> {
     let ctx = GlobalContext::with_num_execution_workers(1);
     let guard = ctx.try_execution_context(0).unwrap();
 
@@ -45,7 +45,7 @@ pub fn run_test(steps: Vec<Step>) -> anyhow::Result<()> {
     for step in steps {
         match step {
             Step::Publish { sources } => {
-                let modules = compile_move_modules(&sources);
+                let modules = compile(&sources, kind)?;
                 for module in &modules {
                     // V1 path.
                     let mut blob = vec![];
@@ -88,39 +88,6 @@ pub fn run_test(steps: Vec<Step>) -> anyhow::Result<()> {
     }
 
     Ok(())
-}
-
-/// Compile Move sources into binary format.
-pub fn compile_move_modules(sources: &str) -> Vec<CompiledModule> {
-    use std::io::Write;
-
-    let tmp_dir = tempfile::tempdir().expect("Should always be able to create temporary directory");
-    let path = tmp_dir.path().join("sources.move");
-    std::fs::File::create(&path)
-        .and_then(|mut f| f.write_all(sources.as_bytes()))
-        .expect("failed to write temp source file");
-
-    let options = compiler_options(&path);
-    run_move_compiler_to_stderr(options)
-        .unwrap_or_else(|err| panic!("Move compilation failed: {}", err))
-        .1
-        .into_iter()
-        .map(|unit| match unit.into_compiled_unit() {
-            CompiledUnit::Module(m) => m.module,
-            CompiledUnit::Script(_) => unreachable!("Only modules can be published"),
-        })
-        .collect()
-}
-
-/// Returns default compiler options used in the test.
-fn compiler_options(sources_path: &Path) -> Options {
-    Options {
-        sources: vec![sources_path.to_string_lossy().into_owned()],
-        dependencies: vec![],
-        named_address_mapping: vec![],
-        known_attributes: KnownAttribute::get_all_attribute_names().clone(),
-        ..Options::default()
-    }
 }
 
 /// Execute a function via legacy MoveVM and returns normalized output.

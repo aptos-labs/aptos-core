@@ -11,7 +11,7 @@ use move_core_types::{account_address::AccountAddress, ident_str};
 
 /// Compiles a Move module and adds it to the executable cache.
 fn add_executable(guard: &ExecutionGuard<'_>, source: &str) {
-    let modules = mono_move_testsuite::compile_move_modules(source);
+    let modules = mono_move_testsuite::compile_move_source(source).expect("compilation failed");
     for module in &modules {
         let executable = mono_move_orchestrator::build_executable(guard, module)
             .expect("Building an executable should always succeed");

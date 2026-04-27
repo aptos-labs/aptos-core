@@ -1,0 +1,17 @@
+// Copyright (c) Aptos Foundation
+// Licensed pursuant to the Innovation-Enabling Source Code License, available at https://github.com/aptos-labs/aptos-core/blob/main/LICENSE
+
+// RUN: publish
+module 0x66::test
+
+fun add_values(a: u64, b: u64): u64
+    copy_loc a
+    copy_loc b
+    add
+    ret
+
+// RUN: execute 0x66::test::add_values --args 1, 2
+// CHECK: results: 3
+
+// RUN: execute 0x66::test::add_values --args 100, 200
+// CHECK: results: 300

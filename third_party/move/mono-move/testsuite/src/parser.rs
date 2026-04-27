@@ -76,8 +76,8 @@ pub fn parse(content: &str) -> anyhow::Result<Vec<Step>> {
     let mut sources = vec![];
     let mut in_publish = false;
 
-    for line in content.lines() {
-        let line = line.trim();
+    for raw_line in content.lines() {
+        let line = raw_line.trim();
 
         if let Some(directive) = line.strip_prefix("// RUN:") {
             let directive = directive.trim();
@@ -109,7 +109,7 @@ pub fn parse(content: &str) -> anyhow::Result<Vec<Step>> {
             attach_check(&mut steps, Check::V1(pattern.clone()))?;
             attach_check(&mut steps, Check::V2(pattern))?;
         } else if in_publish {
-            sources.push(line);
+            sources.push(raw_line);
         }
     }
 
