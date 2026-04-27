@@ -299,6 +299,13 @@ impl Payload {
         }
     }
 
+    pub fn has_encrypted_batches(&self) -> bool {
+        match self {
+            Payload::OptQuorumStore(opt_qs) => opt_qs.has_encrypted_batches(),
+            _ => false,
+        }
+    }
+
     pub fn is_direct(&self) -> bool {
         matches!(self, Payload::DirectMempool(_))
     }

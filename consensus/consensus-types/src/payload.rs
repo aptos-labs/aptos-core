@@ -1,7 +1,7 @@
 // Copyright (c) Aptos Foundation
 // Licensed pursuant to the Innovation-Enabling Source Code License, available at https://github.com/aptos-labs/aptos-core/blob/main/LICENSE
 
-use crate::proof_of_store::{BatchInfo, BatchInfoExt, ProofOfStore, TBatchInfo};
+use crate::proof_of_store::{BatchInfo, BatchInfoExt, BatchKind, ProofOfStore, TBatchInfo};
 use anyhow::ensure;
 use aptos_types::{transaction::SignedTransaction, PeerId};
 use core::fmt;
@@ -352,6 +352,22 @@ where
         self
     }
 
+    pub fn has_encrypted_batches(&self) -> bool {
+        let in_inline = self
+            .inline_batches
+            .iter()
+            .any(|b| b.info().batch_kind() == Some(BatchKind::Encrypted));
+        let in_opt = self
+            .opt_batches
+            .iter()
+            .any(|b| b.batch_kind() == Some(BatchKind::Encrypted));
+        let in_proofs = self
+            .proofs
+            .iter()
+            .any(|p| p.info().batch_kind() == Some(BatchKind::Encrypted));
+        in_inline || in_opt || in_proofs
+    }
+
     pub fn inline_batches(&self) -> &InlineBatches<T> {
         &self.inline_batches
     }
@@ -495,6 +511,13 @@ impl OptQuorumStorePayload {
         match self {
             OptQuorumStorePayload::V1(p) => p.max_txns_to_execute(),
             OptQuorumStorePayload::V2(p) => p.max_txns_to_execute(),
+        }
+    }
+
+    pub fn has_encrypted_batches(&self) -> bool {
+        match self {
+            OptQuorumStorePayload::V1(p) => p.has_encrypted_batches(),
+            OptQuorumStorePayload::V2(p) => p.has_encrypted_batches(),
         }
     }
 

@@ -31,7 +31,7 @@ use crate::{
     quorum_store::types::BatchMsg,
     util::is_vtxn_expected,
 };
-use anyhow::{bail, ensure, Context};
+use anyhow::{anyhow, bail, ensure, Context};
 use aptos_channels::aptos_channel;
 use aptos_config::config::{BlockTransactionFilterConfig, ConsensusConfig};
 use aptos_consensus_types::{
@@ -113,7 +113,14 @@ impl UnverifiedEvent {
         max_batch_expiry_gap_usecs: u64,
         max_batch_txns: u64,
         max_batch_bytes: u64,
+        encrypted_enabled: bool,
     ) -> Result<VerifiedEvent, VerifyError> {
+        // Temporary: reject encrypted batches/PoS at the entry point until the
+        // feature is fully rolled out, after which these checks can be removed.
+        if !encrypted_enabled {
+            self.reject_encrypted()?;
+        }
+
         let start_time = Instant::now();
         Ok(match self {
             UnverifiedEvent::ProposalMsg(p) => {
@@ -243,6 +250,27 @@ impl UnverifiedEvent {
                 VerifiedEvent::ProofOfStoreMsg(p)
             },
         })
+    }
+
+    fn reject_encrypted(&self) -> Result<(), VerifyError> {
+        let has_encrypted = match self {
+            UnverifiedEvent::ProposalMsg(p) => p
+                .proposal()
+                .payload()
+                .is_some_and(|payload| payload.has_encrypted_batches()),
+            UnverifiedEvent::OptProposalMsg(p) => p.block_data().payload().has_encrypted_batches(),
+            UnverifiedEvent::BatchMsg(b) => b.has_encrypted_batches(),
+            UnverifiedEvent::BatchMsgV2(b) => b.has_encrypted_batches(),
+            UnverifiedEvent::ProofOfStoreMsg(p) => p.has_encrypted_batches(),
+            UnverifiedEvent::ProofOfStoreMsgV2(p) => p.has_encrypted_batches(),
+            _ => false,
+        };
+        if has_encrypted {
+            return Err(VerifyError::from(anyhow!(
+                "Encrypted batches not allowed: feature disabled in this epoch"
+            )));
+        }
+        Ok(())
     }
 
     pub fn epoch(&self) -> anyhow::Result<u64> {

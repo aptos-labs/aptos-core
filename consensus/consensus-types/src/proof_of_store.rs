@@ -595,6 +595,12 @@ where
         Ok(())
     }
 
+    pub fn has_encrypted_batches(&self) -> bool {
+        self.proofs
+            .iter()
+            .any(|p| p.info().batch_kind() == Some(BatchKind::Encrypted))
+    }
+
     pub fn epoch(&self) -> anyhow::Result<u64> {
         ensure!(!self.proofs.is_empty(), "Empty message");
         let epoch = self.proofs[0].epoch();
