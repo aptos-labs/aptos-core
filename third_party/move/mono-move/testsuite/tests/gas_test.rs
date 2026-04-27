@@ -9,14 +9,14 @@ use mono_move_global_context::{ExecutionGuard, GlobalContext};
 use mono_move_runtime::{ExecutionError, InterpreterContext};
 use move_core_types::{account_address::AccountAddress, ident_str};
 
-/// Compiles a Move module and adds it to the executable cache.
+/// Compiles a Move module and adds it to the cache.
 fn add_executable(guard: &ExecutionGuard<'_>, source: &str) {
     let modules = mono_move_testsuite::compile_move_source(source).expect("compilation failed");
     for module in &modules {
-        let executable = mono_move_orchestrator::build_executable(guard, module)
-            .expect("Building an executable should always succeed");
+        let loaded = mono_move_orchestrator::build_executable(guard, module)
+            .expect("Building a loaded module should always succeed");
         guard
-            .insert_executable(executable)
+            .insert_loaded_module(loaded)
             .expect("insert should succeed");
     }
 }
@@ -40,8 +40,12 @@ module 0x1::test {
     let id = guard.intern_address_name(&AccountAddress::ONE, ident_str!("test"));
     let fib_name = guard.intern_identifier(ident_str!("fib"));
     let fib = guard
-        .get_executable(id)
-        .and_then(|e| e.get_function(fib_name.into_global_arena_ptr()))
+        .get_loaded_module(id)
+        .and_then(|loaded| {
+            loaded
+                .executable()
+                .get_function(fib_name.into_global_arena_ptr())
+        })
         .expect("fib should exist");
 
     let txn_ctx = NoopTransactionContext;

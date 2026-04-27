@@ -12709,6 +12709,7 @@ dependencies = [
  "move-binary-format",
  "move-core-types",
  "parking_lot 0.12.5",
+ "specializer",
 ]
 
 [[package]]

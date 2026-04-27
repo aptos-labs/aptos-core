@@ -8,10 +8,7 @@ pub mod interner;
 mod transaction_context;
 pub mod types;
 
-pub use executable::{
-    EnumType, Executable, ExecutableId, ExecutableSlot, MandatoryDependencies, StructType,
-    VariantFields,
-};
+pub use executable::{EnumType, Executable, ExecutableId, StructType, VariantFields};
 pub use function::{FrameLayoutInfo, Function, SafePointEntry, SortedSafePointEntries};
 pub use instruction::{
     CodeOffset, DescriptorId, FrameOffset, MicroOp, MicroOpGasSchedule, ENUM_DATA_OFFSET,

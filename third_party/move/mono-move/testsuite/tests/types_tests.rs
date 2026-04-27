@@ -7,7 +7,8 @@ use mono_move_global_context::{Executable, ExecutionGuard, GlobalContext};
 use move_asm::assembler;
 use move_core_types::ident_str;
 
-/// Assembles a compiled module and adds it to the executable cache.
+/// Assembles a compiled module and adds it to the cache, returning the
+/// monomorphic executable view.
 fn add_executable<'guard>(guard: &'guard ExecutionGuard<'_>, source: &str) -> &'guard Executable {
     let options = assembler::Options::default();
     let module = assembler::assemble(&options, source, std::iter::empty())
@@ -15,12 +16,13 @@ fn add_executable<'guard>(guard: &'guard ExecutionGuard<'_>, source: &str) -> &'
         .left()
         .expect("Only modules are expected");
 
-    let executable = mono_move_orchestrator::build_executable(guard, &module)
-        .expect("Building an executable should always succeed");
+    let loaded = mono_move_orchestrator::build_executable(guard, &module)
+        .expect("Building a loaded module should always succeed");
 
     guard
-        .insert_executable(executable)
+        .insert_loaded_module(loaded)
         .expect("insert should succeed")
+        .executable()
 }
 
 #[test]

@@ -6,27 +6,27 @@
 use crate::{
     destack,
     lower::{lower_function, try_build_context, LoweredFunction, LoweredModule},
+    stackless_exec_ir::ModuleIR,
 };
 use anyhow::Result;
 use mono_move_core::{types::InternedType, Interner, MicroOpGasSchedule, FRAME_METADATA_SIZE};
 use mono_move_gas::GasInstrumentor;
 use move_binary_format::CompiledModule;
 
-/// Run the full specializer pipeline: destack → lower → gas instrument → frame layout.
+/// Lower an already-destacked [`ModuleIR`] into a [`LoweredModule`].
+///
+/// Callers that need to keep the [`ModuleIR`] alive (e.g. the executable
+/// builder, which stores it on the `LoadedModule`) should call [`destack`] and
+/// this function separately. Callers that don't can use the
+/// [`destack_and_lower_module`] wrapper.
 // TODO: extend with additional passes (e.g., monomorphization, GC safe-point layout).
-pub fn destack_and_lower_module(
-    module: CompiledModule,
-    interner: &impl Interner,
-    struct_types: &[Option<InternedType>],
-) -> Result<LoweredModule> {
-    let module_ir = destack(module, interner, struct_types)?;
-
+pub fn lower_module(module_ir: &ModuleIR) -> Result<LoweredModule> {
     let mut functions = Vec::with_capacity(module_ir.functions.len());
     for func_ir in &module_ir.functions {
         let Some(func_ir) = func_ir else {
             continue;
         };
-        let Some(ctx) = try_build_context(&module_ir, func_ir)? else {
+        let Some(ctx) = try_build_context(module_ir, func_ir)? else {
             continue;
         };
         let micro_ops = lower_function(func_ir, &ctx)?;
@@ -59,4 +59,17 @@ pub fn destack_and_lower_module(
     }
 
     Ok(LoweredModule { functions })
+}
+
+/// Run the full specializer pipeline: destack → lower → gas instrument → frame layout.
+///
+/// Drops the intermediate [`ModuleIR`]. Callers that need to keep it should
+/// call [`destack`] and [`lower_module`] directly.
+pub fn destack_and_lower_module(
+    module: CompiledModule,
+    interner: &impl Interner,
+    struct_types: &[Option<InternedType>],
+) -> Result<LoweredModule> {
+    let module_ir = destack(module, interner, struct_types)?;
+    lower_module(&module_ir)
 }

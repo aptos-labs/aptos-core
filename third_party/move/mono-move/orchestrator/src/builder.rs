@@ -1,25 +1,27 @@
 // Copyright (c) Aptos Foundation
 // Licensed pursuant to the Innovation-Enabling Source Code License, available at https://github.com/aptos-labs/aptos-core/blob/main/LICENSE
 
-//! Builds an [`Executable`] from a [`CompiledModule`] by resolving its
-//! struct/enum types and accumulating lowered functions.
+//! Builds a [`LoadedModule`] from a [`CompiledModule`] by resolving its
+//! struct/enum types, running the specializer, and packaging the result
+//! alongside the polymorphic IR.
 //!
 //! The abstract interning interface (`Interner`, `StructResolver`,
 //! `walk_sig_token`) lives in `mono-move-core`; the concrete implementation
 //! that owns the global tables is provided by `ExecutionGuard` in
 //! `mono-move-global-context`. This module drives the module-level walk
 //! (struct defs, enum defs, layout computation), delegates leaf type
-//! interning to the guard, and assembles the final `Executable`.
+//! interning to the guard, and assembles the final `LoadedModule`.
 
 use anyhow::{anyhow, bail};
 use mono_move_alloc::{ExecutableArena, ExecutableArenaPtr, GlobalArenaPtr};
 use mono_move_core::{
     types::{align_up, EMPTY_TYPE_LIST},
-    walk_sig_token, EnumType, Executable, ExecutableId, FrameLayoutInfo, Function,
-    MandatoryDependencies, MicroOp, SortedSafePointEntries, StructResolver, StructType,
-    VariantFields,
+    walk_sig_token, EnumType, Executable, ExecutableId, FrameLayoutInfo, Function, MicroOp,
+    SortedSafePointEntries, StructResolver, StructType, VariantFields,
 };
-use mono_move_global_context::{struct_info_at, ExecutionGuard, FieldLayout, InternedType};
+use mono_move_global_context::{
+    struct_info_at, ExecutionGuard, FieldLayout, InternedType, LoadedModule, MandatoryDependencies,
+};
 use move_binary_format::{
     access::ModuleAccess,
     file_format::{
@@ -29,7 +31,7 @@ use move_binary_format::{
     CompiledModule,
 };
 use shared_dsa::UnorderedMap;
-use specializer::LoweredFunction;
+use specializer::{lower_module, LoweredFunction, ModuleIR};
 
 // TODO: this is likely to change. Placeholder.
 // TODO: refactor to own CompiledModule instead of borrowing it (needed for ModuleIR cache).
@@ -174,33 +176,39 @@ impl<'a, 'guard, 'ctx> ExecutableBuilder<'a, 'guard, 'ctx> {
         self.func_ptrs[lowered.handle_idx.0 as usize] = Some(ptr);
     }
 
-    /// Runs the full build pipeline (resolve types → run specializer → add
-    /// every lowered function → finish). Use this when callers don't need to
+    /// Runs the full build pipeline (resolve types → destack → lower every
+    /// function → add it → finish). Use this when callers don't need to
     /// interleave additional work between stages.
-    pub fn build(mut self) -> anyhow::Result<Box<Executable>> {
+    pub fn build(mut self) -> anyhow::Result<Box<LoadedModule>> {
         self.resolve_types()?;
         let struct_types = self.struct_type_table();
-        let lowered =
-            specializer::destack_and_lower_module(self.module.clone(), self.guard, &struct_types)?;
+        let module_ir = specializer::destack(self.module.clone(), self.guard, &struct_types)?;
+        let lowered = lower_module(&module_ir)?;
         for lowered_fn in lowered.functions {
             self.add_function(lowered_fn);
         }
-        self.finish()
+        self.finish(module_ir)
     }
 
-    /// Finishes building the executable. Call after every function definition
-    /// has been recorded via `add_function`.
-    pub fn finish(self) -> anyhow::Result<Box<Executable>> {
+    /// Finishes building the loaded module. Call after every function
+    /// definition has been recorded via `add_function`. `module_ir` is the
+    /// polymorphic IR produced earlier in the pipeline; it is preserved on
+    /// the resulting `LoadedModule`.
+    pub fn finish(self, module_ir: ModuleIR) -> anyhow::Result<Box<LoadedModule>> {
         self.resolve_all_calls()?;
 
-        Ok(Executable::new(
+        let executable = Executable::new(
             self.id,
             self.cost,
-            self.mandatory_dependencies,
             self.structs,
             self.enums,
             self.functions,
             self.arena,
+        );
+        Ok(LoadedModule::new(
+            module_ir,
+            executable,
+            self.mandatory_dependencies,
         ))
     }
 

@@ -8,19 +8,18 @@ mod builder;
 
 use anyhow::Result;
 pub use builder::ExecutableBuilder;
-use mono_move_core::Executable;
-use mono_move_global_context::ExecutionGuard;
+use mono_move_global_context::{ExecutionGuard, LoadedModule};
 use move_binary_format::CompiledModule;
 
-/// Build an executable from a compiled module.
+/// Build a loaded module from a compiled module.
 ///
 /// Orchestrates the full pipeline:
 /// 1. Resolve struct/enum types via the execution guard's interner
 /// 2. Run the specializer (destack → lower → gas instrument)
-/// 3. Assemble the executable from lowered output
+/// 3. Assemble the loaded module (IR + executable + dependencies)
 pub fn build_executable(
     guard: &ExecutionGuard<'_>,
     module: &CompiledModule,
-) -> Result<Box<Executable>> {
+) -> Result<Box<LoadedModule>> {
     ExecutableBuilder::new(guard, module).build()
 }

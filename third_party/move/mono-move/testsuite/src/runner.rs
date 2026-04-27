@@ -58,11 +58,11 @@ pub fn run_test(steps: Vec<Step>, kind: SourceKind) -> anyhow::Result<()> {
                     storage.add_module_bytes(module.self_addr(), module.self_name(), blob.into());
 
                     // V2 path.
-                    let executable = mono_move_orchestrator::build_executable(&guard, module)
-                        .map_err(|err| anyhow!("Failed to build executable: {}", err))?;
+                    let loaded = mono_move_orchestrator::build_executable(&guard, module)
+                        .map_err(|err| anyhow!("Failed to build loaded module: {}", err))?;
                     guard
-                        .insert_executable(executable)
-                        .map_err(|err| anyhow!("Failed to insert executable: {}", err))?;
+                        .insert_loaded_module(loaded)
+                        .map_err(|err| anyhow!("Failed to insert loaded module: {}", err))?;
                 }
             },
             Step::Execute {
@@ -184,9 +184,13 @@ fn execute_function_v2(
     let id = guard.intern_address_name(address, module_name);
     let function_name = guard.intern_identifier(function_name);
     let function = guard
-        .get_executable(id)
-        .and_then(|executable| executable.get_function(function_name.into_global_arena_ptr()))
-        .unwrap_or_else(|| panic!("Failed to load function or find executable"));
+        .get_loaded_module(id)
+        .and_then(|loaded| {
+            loaded
+                .executable()
+                .get_function(function_name.into_global_arena_ptr())
+        })
+        .unwrap_or_else(|| panic!("Failed to load function or find loaded module"));
 
     let txn_ctx = NoopTransactionContext;
     let gas_meter = SimpleGasMeter::new(u64::MAX);

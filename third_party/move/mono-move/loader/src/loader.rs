@@ -10,9 +10,11 @@ use crate::{
 };
 use anyhow::{anyhow, bail};
 use fxhash::FxHashMap;
-use mono_move_core::{Executable, ExecutableId, ExecutableSlot, MandatoryDependencies};
+use mono_move_core::ExecutableId;
 use mono_move_gas::GasMeter;
-use mono_move_global_context::{ArenaRef, ExecutionGuard};
+use mono_move_global_context::{
+    ArenaRef, ExecutionGuard, LoadedModule, LoadedModuleSlot, MandatoryDependencies,
+};
 use mono_move_orchestrator::ExecutableBuilder;
 use move_binary_format::{access::ModuleAccess, CompiledModule};
 
@@ -98,7 +100,7 @@ impl<'guard, 'ctx> Loader<'guard, 'ctx> {
         read_set: &mut ExecutableReadSet<'guard>,
         gas_meter: &mut impl GasMeter,
         id: ArenaRef<'guard, ExecutableId>,
-    ) -> anyhow::Result<&'guard Executable> {
+    ) -> anyhow::Result<&'guard LoadedModule> {
         match &self.policy {
             LoadingPolicy::Lazy(lowering) => {
                 use LoweringPolicy::*;
@@ -124,16 +126,16 @@ impl<'guard, 'ctx> Loader<'guard, 'ctx> {
         read_set: &mut ExecutableReadSet<'guard>,
         gas_meter: &mut impl GasMeter,
         id: ArenaRef<'guard, ExecutableId>,
-    ) -> anyhow::Result<&'guard Executable> {
-        if let Some(executable) = self.guard.get_executable(id) {
-            self.record_loaded_and_charge(read_set, gas_meter, executable)?;
-            return Ok(executable);
+    ) -> anyhow::Result<&'guard LoadedModule> {
+        if let Some(loaded) = self.guard.get_loaded_module(id) {
+            self.record_loaded_and_charge(read_set, gas_meter, loaded)?;
+            return Ok(loaded);
         }
 
         let (module, cost) = self.get_verified_module_from_storage(id)?;
-        let executable = self.build_and_insert(&module, cost, MandatoryDependencies::empty())?;
-        self.record_loaded_and_charge(read_set, gas_meter, executable)?;
-        Ok(executable)
+        let loaded = self.build_and_insert(&module, cost, MandatoryDependencies::empty())?;
+        self.record_loaded_and_charge(read_set, gas_meter, loaded)?;
+        Ok(loaded)
     }
 
     /// Loads the code corresponding to the specified ID and all other
@@ -144,16 +146,16 @@ impl<'guard, 'ctx> Loader<'guard, 'ctx> {
         read_set: &mut ExecutableReadSet<'guard>,
         gas_meter: &mut impl GasMeter,
         id: ArenaRef<'guard, ExecutableId>,
-    ) -> anyhow::Result<&'guard Executable> {
-        if let Some(executable) = self.guard.get_executable(id) {
+    ) -> anyhow::Result<&'guard LoadedModule> {
+        if let Some(loaded) = self.guard.get_loaded_module(id) {
             // `slots` covers all package members, including self. Probe
             // every slot before touching the read-set: a concurrent
             // miss-path worker may have populated `id`'s slot but not yet
             // all sibling slots. In that window we fall through to the
             // miss path, which re-verifies and re-inserts.
-            // `insert_executable` returns the canonical winner on CAS
+            // `insert_loaded_module` returns the canonical winner on CAS
             // loss, so already-cached members are not duplicated.
-            let slots = executable.mandatory_dependencies().slots();
+            let slots = loaded.mandatory_dependencies().slots();
             let mut members = Vec::with_capacity(slots.len());
             let mut all_present = true;
             for slot in slots {
@@ -174,7 +176,7 @@ impl<'guard, 'ctx> Loader<'guard, 'ctx> {
                     read_set.record(member_id, ExecutableRead::Loaded(member))?;
                 }
                 gas_meter.charge(total)?;
-                return Ok(executable);
+                return Ok(loaded);
             }
             // Fall through to the miss path.
         }
@@ -199,17 +201,17 @@ impl<'guard, 'ctx> Loader<'guard, 'ctx> {
 
         let mut total = 0u64;
         for (_, module, cost) in &pending {
-            let executable = self.build_and_insert(module, *cost, mandatory_deps.clone())?;
-            let id = self.guard.arena_ref_for_executable_id(executable.id());
-            read_set.record(id, ExecutableRead::Loaded(executable))?;
-            total = total.saturating_add(executable.cost());
+            let loaded = self.build_and_insert(module, *cost, mandatory_deps.clone())?;
+            let id = self.guard.arena_ref_for_executable_id(loaded.id());
+            read_set.record(id, ExecutableRead::Loaded(loaded))?;
+            total = total.saturating_add(loaded.cost());
         }
 
         gas_meter.charge(total)?;
 
         Ok(read_set
             .get(id)
-            .expect("Every executable was recorded in read-set"))
+            .expect("Every loaded module was recorded in read-set"))
     }
 
     /// Orders modules leaves-first by inter-member import dependencies,
@@ -223,8 +225,8 @@ impl<'guard, 'ctx> Loader<'guard, 'ctx> {
     // TODO: double-check that publish rejects packages with cycles.
     fn topological_ordering(
         &self,
-        modules: Vec<(ExecutableSlot, CompiledModule, u64)>,
-    ) -> Vec<(ExecutableSlot, CompiledModule, u64)> {
+        modules: Vec<(LoadedModuleSlot, CompiledModule, u64)>,
+    ) -> Vec<(LoadedModuleSlot, CompiledModule, u64)> {
         let id_to_idx = modules
             .iter()
             .enumerate()
@@ -281,19 +283,19 @@ impl<'guard, 'ctx> Loader<'guard, 'ctx> {
             .collect()
     }
 
-    /// Builds an executable for the compiled module and inserts it into the
-    /// cache, returning the canonical pointer.
+    /// Builds a loaded module from the compiled module and inserts it into
+    /// the cache, returning the canonical pointer.
     fn build_and_insert(
         &self,
         module: &CompiledModule,
         cost: u64,
         deps: MandatoryDependencies,
-    ) -> anyhow::Result<&'guard Executable> {
-        let executable = ExecutableBuilder::new(self.guard, module)
+    ) -> anyhow::Result<&'guard LoadedModule> {
+        let loaded = ExecutableBuilder::new(self.guard, module)
             .with_cost(cost)
             .with_mandatory_dependencies(deps)
             .build()?;
-        self.guard.insert_executable(executable)
+        self.guard.insert_loaded_module(loaded)
     }
 
     /// Fetches, deserializes, and verifies the module from storage, returning
@@ -314,29 +316,29 @@ impl<'guard, 'ctx> Loader<'guard, 'ctx> {
         Ok((compiled, cost))
     }
 
-    /// Records a single executable in the read-set and charges its cost.
+    /// Records a single loaded module in the read-set and charges its cost.
     fn record_loaded_and_charge(
         &self,
         read_set: &mut ExecutableReadSet<'guard>,
         gas_meter: &mut impl GasMeter,
-        executable: &'guard Executable,
+        loaded: &'guard LoadedModule,
     ) -> anyhow::Result<()> {
-        let id = self.guard.arena_ref_for_executable_id(executable.id());
+        let id = self.guard.arena_ref_for_executable_id(loaded.id());
         // Always record the read before charging, so that if charging fails,
         // the read is part of the set for later Block-STM validation.
-        read_set.record(id, ExecutableRead::Loaded(executable))?;
-        gas_meter.charge(executable.cost())?;
+        read_set.record(id, ExecutableRead::Loaded(loaded))?;
+        gas_meter.charge(loaded.cost())?;
         Ok(())
     }
 }
 
-/// Loads the current executable content behind `slot`, or `None` if the
-/// slot is empty. Safe while an execution guard is held: slot and content
-/// are freed only under maintenance, which execution excludes. The guard
-/// reference anchors `'guard` so the returned reference cannot outlive it.
+/// Loads the current loaded module behind `slot`, or `None` if the slot is
+/// empty. Safe while an execution guard is held: slot and content are freed
+/// only under maintenance, which execution excludes. The guard reference
+/// anchors `'guard` so the returned reference cannot outlive it.
 fn load_content<'guard, 'ctx>(
     _guard: &'guard ExecutionGuard<'ctx>,
-    slot: ExecutableSlot,
-) -> Option<&'guard Executable> {
+    slot: LoadedModuleSlot,
+) -> Option<&'guard LoadedModule> {
     unsafe { slot.as_ref_unchecked().load().map(|p| p.as_ref_unchecked()) }
 }

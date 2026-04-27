@@ -36,7 +36,7 @@ use crate::maintenance_config::MaintenanceConfig;
 use anyhow::Result;
 use dashmap::DashMap;
 use mono_move_alloc::{GlobalArenaPool, GlobalArenaPtr, GlobalArenaShard};
-use mono_move_core::{types::StructLayout, ExecutableId, ExecutableSlot, Interner};
+use mono_move_core::{types::StructLayout, ExecutableId, Interner};
 use move_binary_format::{file_format::SignatureToken, CompiledModule};
 use parking_lot::{RwLock, RwLockReadGuard, RwLockWriteGuard};
 use std::{
@@ -50,6 +50,8 @@ use identifiers::IdentifierInternerKey;
 mod executable_ids;
 use executable_ids::ExecutableIdInternerKey;
 pub use mono_move_core::Executable;
+mod loaded_module;
+pub use loaded_module::{LoadedModule, LoadedModuleSlot, MandatoryDependencies};
 mod executable_cache;
 use executable_cache::ExecutableCache;
 mod types;
@@ -286,30 +288,28 @@ impl<'ctx> MaintenanceGuard<'ctx> {
 }
 
 impl<'ctx> ExecutionGuard<'ctx> {
-    /// Inserts a loaded executable into the cache, keyed by its interned ID.
+    /// Inserts a loaded module into the cache, keyed by its interned ID.
     ///
     /// Returns an error only if the cache detects an invariant violation
     /// during install. Under normal operation this method always returns
     /// `Ok`.
-    pub fn insert_executable(&self, executable: Box<Executable>) -> Result<&Executable> {
-        let ptr = self
-            .ctx
-            .executable_cache
-            .insert(executable.id(), executable)?;
+    pub fn insert_loaded_module(&self, loaded: Box<LoadedModule>) -> Result<&LoadedModule> {
+        let ptr = self.ctx.executable_cache.insert(loaded.id(), loaded)?;
 
         // SAFETY: The pointer is valid since it was created by leaking a box,
         // and can only be freed during the maintenance phase, while we are in
-        // the execution phase (guard is alive). If the executable was already
-        // in the cache, it is also alive (maintenance has not reset caches).
+        // the execution phase (guard is alive). If the loaded module was
+        // already in the cache, it is also alive (maintenance has not reset
+        // caches).
         Ok(unsafe { ptr.as_ref_unchecked() })
     }
 
-    /// Looks up a cached executable by its interned ID and returns a reference
-    /// tied to the guard's lifetime, if found.
-    pub fn get_executable<'guard>(
+    /// Looks up a cached loaded module by its interned ID and returns a
+    /// reference tied to the guard's lifetime, if found.
+    pub fn get_loaded_module<'guard>(
         &'guard self,
         key: ArenaRef<'guard, ExecutableId>,
-    ) -> Option<&'guard Executable> {
+    ) -> Option<&'guard LoadedModule> {
         let ptr = self.ctx.executable_cache.get(key.into_global_arena_ptr())?;
 
         // SAFETY: The pointer is valid since it was created by leaking a box,
@@ -324,7 +324,7 @@ impl<'ctx> ExecutionGuard<'ctx> {
     pub fn get_or_create_slot<'guard>(
         &'guard self,
         key: ArenaRef<'guard, ExecutableId>,
-    ) -> ExecutableSlot {
+    ) -> LoadedModuleSlot {
         self.ctx
             .executable_cache
             .get_or_create_slot(key.into_global_arena_ptr())
