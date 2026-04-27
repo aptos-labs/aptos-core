@@ -3,7 +3,6 @@
 /// modules from constructing/destructuring enum variants).
 module aptos_framework::confidential_range_proofs {
     use std::error;
-    use std::features;
     use aptos_std::ristretto255::{Self, RistrettoPoint, CompressedRistretto};
     use aptos_std::ristretto255_bulletproofs::{Self as bulletproofs, RangeProof};
     use aptos_framework::confidential_balance;
@@ -56,7 +55,6 @@ module aptos_framework::confidential_range_proofs {
         val_base: &RistrettoPoint, rand_base: &RistrettoPoint,
         proof: &RangeProof, num_bits: u64, dst: vector<u8>): bool
     {
-        assert!(features::bulletproofs_batch_enabled(), error::invalid_state(E_NATIVE_FUN_NOT_AVAILABLE));
         assert!(dst.length() <= 256, error::invalid_argument(E_DST_TOO_LONG));
 
         let comms = comms.map_ref(|com| com.point_to_bytes());
