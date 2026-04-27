@@ -47,14 +47,22 @@ impl DecryptedPlaintext {
 impl Plaintext for DecryptedPlaintext {}
 
 #[derive(Clone, Debug, Hash, Eq, PartialEq, Serialize, Deserialize)]
-pub struct PayloadAssociatedData {
-    sender: AccountAddress,
-    auth_key: AuthenticationKey,
+pub enum PayloadAssociatedData {
+    V1 {
+        sender: AccountAddress,
+        signer_auth_keys: Vec<(AccountAddress, AuthenticationKey)>,
+    },
 }
 
 impl PayloadAssociatedData {
-    pub fn new(sender: AccountAddress, auth_key: AuthenticationKey) -> Self {
-        Self { sender, auth_key }
+    pub fn new(
+        sender: AccountAddress,
+        signer_auth_keys: Vec<(AccountAddress, AuthenticationKey)>,
+    ) -> Self {
+        Self::V1 {
+            sender,
+            signer_auth_keys,
+        }
     }
 }
 
@@ -224,9 +232,9 @@ impl EncryptedPayload {
     pub fn verify(
         &self,
         sender: AccountAddress,
-        auth_key: AuthenticationKey,
+        signer_auth_keys: Vec<(AccountAddress, AuthenticationKey)>,
     ) -> anyhow::Result<()> {
-        let associated_data = PayloadAssociatedData::new(sender, auth_key);
+        let associated_data = PayloadAssociatedData::new(sender, signer_auth_keys);
         self.ciphertext().verify(&associated_data)
     }
 }
