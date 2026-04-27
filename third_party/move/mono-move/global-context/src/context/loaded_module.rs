@@ -3,19 +3,10 @@
 
 //! Loaded module — what the executable cache stores.
 //!
-//! `LoadedModule` wraps the polymorphic `ModuleIR` (specializer) with the
-//! monomorphic `Executable` (core) and the mandatory-dependency descriptor
-//! recorded by the loader.
-//!
-//! TODO (placement): the natural home for this type is `mono-move-orchestrator`
-//! (where the builder is) or even `mono-move-loader`. It lives here because IR
-//! is in `specializer` and the cache is in this crate; putting `LoadedModule` in
-//! orchestrator would require `global-context` to depend on something that
-//! already depends on `global-context`. Resolve by moving `ModuleIR` out of
-//! `specializer` (e.g. into `mono-move-core` or a new `ir` crate) so this
-//! crate no longer needs the `specializer` dep — then `LoadedModule` can move.
+//! [`LoadedModule`] wraps the polymorphic [`ModuleIR`] with the monomorphic
+//! [`Executable`] and a [`MandatoryDependencies`] descriptor.
 
-use mono_move_alloc::{LeakedBoxPtr, VersionedLeakedBoxPtr};
+use mono_move_alloc::{GlobalArenaPtr, LeakedBoxPtr, VersionedLeakedBoxPtr};
 use mono_move_core::{Executable, ExecutableId};
 use specializer::ModuleIR;
 use std::sync::Arc;
@@ -25,7 +16,8 @@ use std::sync::Arc;
 pub type LoadedModuleSlot = LeakedBoxPtr<VersionedLeakedBoxPtr<LoadedModule>>;
 
 /// What a loaded module says about its mandatory dependencies, keyed by the
-/// loading policy that built it. Always excludes self.
+/// loading policy that built it. Covers every package member including self
+/// for package loads, and is empty for lazy loads.
 #[derive(Clone)]
 pub struct MandatoryDependencies {
     inner: Option<Arc<[LoadedModuleSlot]>>,
@@ -85,7 +77,7 @@ impl LoadedModule {
     }
 
     /// Convenience: the executable's ID. Same as `self.executable().id()`.
-    pub fn id(&self) -> mono_move_alloc::GlobalArenaPtr<ExecutableId> {
+    pub fn id(&self) -> GlobalArenaPtr<ExecutableId> {
         self.executable.id()
     }
 
