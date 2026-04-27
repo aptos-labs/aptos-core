@@ -312,14 +312,14 @@ module aptos_framework::block {
     }
 
     fun deserialize_feature_specific_metadata(s: &mut BCSStream): FeatureSpecificBlockMetadata {
-        let variant = bcs_stream::deserialize_u32(s);
-        if (variant == 0u32) {
+        let variant = bcs_stream::deserialize_uleb128(s);
+        if (variant == 0) {
             let per_block_seed = bcs_stream::deserialize_option(s, |s2: &mut BCSStream|
                 bcs_stream::deserialize_vector(s2, |s3: &mut BCSStream| bcs_stream::deserialize_u8(s3))
             );
             FeatureSpecificBlockMetadata::Randomness { per_block_seed }
         } else {
-            assert!(variant == 1u32, error::invalid_argument(EUNKNOWN_FEATURE_VARIANT));
+            assert!(variant == 1, error::invalid_argument(EUNKNOWN_FEATURE_VARIANT));
             let decryption_key = bcs_stream::deserialize_option(s, |s2: &mut BCSStream|
                 bcs_stream::deserialize_vector(s2, |s3: &mut BCSStream| bcs_stream::deserialize_u8(s3))
             );
