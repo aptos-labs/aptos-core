@@ -40,7 +40,7 @@ use aptos_storage_interface::state_store::state_view::cached_state_view::CachedS
 use aptos_types::{
     account_config::randomness_event::RANDOMNESS_GENERATED_EVENT_MOVE_TYPE_TAG,
     block_executor::config::BlockExecutorConfigFromOnchain,
-    block_metadata_ext::{EncryptedMempoolMetadata, FeatureSpecificBlockMetadata, RandomnessMetadata},
+    block_metadata_ext::BlockMetaPayload,
     decryption::BlockTxnDecryptionKey,
     ledger_info::{LedgerInfo, LedgerInfoWithSignatures},
     on_chain_config::OnChainConsensusConfig,
@@ -918,28 +918,24 @@ impl PipelineBuilder {
 
         tracker.start_working();
         let metadata_txn = if use_extensible_block_metadata {
-            let mut block_metas = vec![];
+            let mut payloads: Vec<BlockMetaPayload> = vec![];
             let mut dkg_needed_full = vec![];
             if is_randomness_enabled {
-                block_metas.push(FeatureSpecificBlockMetadata::Randomness(
-                    RandomnessMetadata::V0 {
-                        per_block_seed: rand_result
-                            .flatten()
-                            .map(|r: Randomness| r.randomness_cloned()),
-                    },
-                ));
+                payloads.push(BlockMetaPayload::Randomness {
+                    per_block_seed: rand_result
+                        .flatten()
+                        .map(|r: Randomness| r.randomness_cloned()),
+                });
                 dkg_needed_full.push(true);
             } else {
                 dkg_needed_full.push(false);
             }
             if is_decryption_enabled {
-                block_metas.push(FeatureSpecificBlockMetadata::EncryptedMempool(
-                    EncryptedMempoolMetadata::V0 {
-                        decryption_key: decryption_result
-                            .flatten()
-                            .map(|dk: BlockTxnDecryptionKey| dk.decryption_key_cloned()),
-                    },
-                ));
+                payloads.push(BlockMetaPayload::EncryptedMempool {
+                    decryption_key: decryption_result
+                        .flatten()
+                        .map(|dk: BlockTxnDecryptionKey| dk.decryption_key_cloned()),
+                });
                 dkg_needed_full.push(true);
             } else {
                 dkg_needed_full.push(false);
@@ -947,6 +943,8 @@ impl PipelineBuilder {
             while dkg_needed_full.last() == Some(&false) {
                 dkg_needed_full.pop();
             }
+            let block_metas =
+                bcs::to_bytes(&payloads).expect("BCS serialization of block_metas failed");
             block.new_metadata_v3(&validator, block_metas, dkg_needed_full)
         } else {
             match (rand_result, decryption_result) {

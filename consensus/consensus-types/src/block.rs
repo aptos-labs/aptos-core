@@ -16,7 +16,7 @@ use aptos_types::{
     account_address::AccountAddress,
     block_info::BlockInfo,
     block_metadata::BlockMetadata,
-    block_metadata_ext::{BlockMetadataExt, FeatureSpecificBlockMetadata},
+    block_metadata_ext::BlockMetadataExt,
     decryption::BlockTxnDecryptionKey,
     epoch_state::EpochState,
     ledger_info::LedgerInfo,
@@ -618,7 +618,7 @@ impl Block {
     pub fn new_metadata_v3(
         &self,
         validators: &[AccountAddress],
-        block_metas: Vec<FeatureSpecificBlockMetadata>,
+        block_metas: Vec<u8>,
         dkg_needed: Vec<bool>,
     ) -> BlockMetadataExt {
         BlockMetadataExt::new_v3(
