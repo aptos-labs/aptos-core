@@ -177,17 +177,25 @@ impl FieldLayout {
     }
 }
 
-/// Layout information shared by structs and enums: total size, alignment,
-/// and an optional pointer to per-field offsets (unset for enums).
-pub struct StructOrEnumLayout {
-    /// Total size of the struct. Includes necessary padding based on the
+/// Layout information for a [`Type::Nominal`]: total size, alignment, and an
+/// optional pointer to per-field offsets.
+///
+/// `fields` is `Some(_)` when per-field offsets are cached (today: structs)
+/// and `None` when they are not (today: enums, whose layout can change on
+/// module upgrade). `Some(_)` is therefore not a "this is a struct" marker —
+/// once `#[frozen]` enums land, frozen enums will also carry `Some(_)` since
+/// their variants cannot change. TODO: replace this side-channel with a
+/// more explicit shape (e.g., a dedicated enum) once frozen enums are wired
+/// in.
+pub struct NominalLayout {
+    /// Total size of the type. Includes necessary padding based on the
     /// alignment requirements.
     pub size: Size,
     pub align: Alignment,
     fields: Option<GlobalArenaPtr<[FieldLayout]>>,
 }
 
-impl StructOrEnumLayout {
+impl NominalLayout {
     /// Creates a struct layout entry with per-field offsets.
     pub fn new_struct(size: Size, align: Alignment, fields: GlobalArenaPtr<[FieldLayout]>) -> Self {
         Self {
@@ -217,7 +225,7 @@ impl StructOrEnumLayout {
 // drop only as long as it owns no non-arena memory. If a future field
 // introduces a heap owner (`Vec`, `String`, `Box`, etc.), this assertion turns
 // the silent leak / double-free into a compile error.
-const _: () = assert!(!std::mem::needs_drop::<StructOrEnumLayout>());
+const _: () = assert!(!std::mem::needs_drop::<NominalLayout>());
 
 // ================================================================================================
 // Type enum
@@ -256,23 +264,29 @@ pub enum Type {
     Vector {
         elem: InternedType,
     },
-    /// Named struct or enum with its layout. The layout slot is empty for generic
-    /// structs and for cross-module references whose layout has not yet been
-    /// populated by the loader; it is filled once via [`OnceLock::set`] when
-    /// all constituent layouts become available. For structs, layout stores field
-    /// offsets as well. This is not the case for enums. Enums are always pointer-sized
-    /// today, because new variants may be added on module upgrade.
+    /// Nominal type — a struct or enum identified by name. The layout slot is
+    /// empty for generic instances and for cross-module references whose
+    /// layout has not yet been populated by the loader; it is filled once via
+    /// [`OnceLock::set`] when all constituent layouts become available. For
+    /// structs, layout stores field offsets as well. This is not the case for
+    /// enums. Enums are always pointer-sized today, because new variants may
+    /// be added on module upgrade.
+    ///
+    /// TODO: `#[frozen]` enums (e.g., `Option`) cannot gain new variants on
+    /// upgrade, so they should cache per-variant field offsets in the layout
+    /// slot rather than indirecting through a pointer. This will need to be
+    /// wired in once the frozen-enum attribute is supported end-to-end.
     ///
     /// The slot is `OnceLock`-gated so layout can be filled after interning.
     /// Drop on arena reset is skipped (bumpalo bulk-rewinds without calling
     /// `Drop`), which is harmless only as long as layout owns no non-arena
     /// memory - keep it that way.
-    StructOrEnum {
+    Nominal {
         // TODO: Make this a pointer to a named-type struct holding these pointers.
         executable_id: GlobalArenaPtr<ExecutableId>,
         name: GlobalArenaPtr<str>,
         ty_args: InternedTypeList,
-        layout: OnceLock<StructOrEnumLayout>,
+        layout: OnceLock<NominalLayout>,
     },
     /// Function type with argument types, result types and abilities.
     Function {
@@ -325,10 +339,10 @@ impl Type {
             // Function values - TODO: for now use heap pointer values.
             Type::Function { .. } => (8, 8),
 
-            // Structs and enums: the layout slot may be empty for generic
-            // types or for cross-module references awaiting layout
-            // population.
-            Type::StructOrEnum { layout, .. } => match layout.get() {
+            // Nominal types (struct/enum): the layout slot may be empty for
+            // generic instances or for cross-module references awaiting
+            // layout population.
+            Type::Nominal { layout, .. } => match layout.get() {
                 Some(layout) => (layout.size, layout.align),
                 None => return None,
             },
@@ -340,12 +354,12 @@ impl Type {
         })
     }
 
-    /// Returns layout for a struct or enum type, or [`None`] for other
-    /// types or for struct/enum types whose layout slot has not yet been
+    /// Returns layout for a nominal (struct or enum) type, or [`None`] for
+    /// other types or for nominal types whose layout slot has not yet been
     /// populated.
-    pub fn layout(&self) -> Option<&StructOrEnumLayout> {
+    pub fn layout(&self) -> Option<&NominalLayout> {
         match self {
-            Type::StructOrEnum { layout, .. } => layout.get(),
+            Type::Nominal { layout, .. } => layout.get(),
             Type::Bool
             | Type::U8
             | Type::U16
