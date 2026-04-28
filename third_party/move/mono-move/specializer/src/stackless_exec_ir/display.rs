@@ -825,7 +825,7 @@ fn display_type(f: &mut fmt::Formatter<'_>, ty: InternedType) -> fmt::Result {
             write!(f, "&mut ")?;
             display_type(f, *inner)
         },
-        Type::Struct { name, .. } | Type::Enum { name, .. } => {
+        Type::Nominal { name, .. } => {
             write!(f, "{}", view_name(*name))
         },
         Type::Function { args, results, .. } => {

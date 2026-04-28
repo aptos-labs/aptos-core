@@ -3,7 +3,7 @@
 
 //! Type interning infrastructure.
 //!
-//! The pure type model ([`Type`], [`FieldLayout`], [`StructLayout`], etc.)
+//! The pure type model ([`Type`], [`FieldLayout`], [`NominalLayout`], etc.)
 //! lives in `mono_move_core::types`. This module provides the interning
 //! machinery that deduplicates types in the global arena, plus cross-format
 //! hashing/equality between [`SignatureToken`]s and interned [`Type`]s.
@@ -134,7 +134,7 @@ mod type_discriminant {
     pub(super) const REFERENCE: u8 = 15;
     pub(super) const REFERENCE_MUT: u8 = 16;
     pub(super) const VECTOR: u8 = 17;
-    pub(super) const STRUCT: u8 = 18;
+    pub(super) const NOMINAL: u8 = 18;
     pub(super) const FUNCTION: u8 = 19;
     pub(super) const TYPE_PARAM: u8 = 20;
 }
@@ -214,16 +214,11 @@ impl Hash for TypeInternerKey {
                 type_discriminant::VECTOR.hash(state);
                 Self(*elem).hash(state);
             },
-            Struct {
+            Nominal {
                 executable_id,
                 name,
                 ty_args,
                 layout: _,
-            }
-            | Enum {
-                executable_id,
-                name,
-                ty_args,
             } => {
                 // SAFETY: It is safe to dereference pointers because the
                 // caller ensures they remain valid during the lifetime of
@@ -234,10 +229,10 @@ impl Hash for TypeInternerKey {
                 let ty_args = unsafe { ty_args.as_ref_unchecked() };
 
                 // Must use structural hash because it is compared against the
-                // hash of lookup key (e.g., signature token). Enums reuse the
-                // same discriminant as structs because type identity is based
-                // on address, executable name, name and type arguments.
-                type_discriminant::STRUCT.hash(state);
+                // hash of lookup key (e.g., signature token). Type identity
+                // is based on address, executable name, name and type
+                // arguments.
+                type_discriminant::NOMINAL.hash(state);
                 executable_id.address().hash(state);
                 executable_name.hash(state);
                 name.hash(state);
@@ -329,35 +324,17 @@ impl PartialEq for TypeInternerKey {
                     false
                 }
             },
-            Struct {
+            Nominal {
                 executable_id,
                 name,
                 ty_args,
                 ..
             } => {
-                if let Struct {
+                if let Nominal {
                     executable_id: other_executable_id,
                     name: other_name,
                     ty_args: other_ty_args,
                     ..
-                } = other
-                {
-                    executable_id == other_executable_id
-                        && name == other_name
-                        && ty_args == other_ty_args
-                } else {
-                    false
-                }
-            },
-            Enum {
-                executable_id,
-                name,
-                ty_args,
-            } => {
-                if let Enum {
-                    executable_id: other_executable_id,
-                    name: other_name,
-                    ty_args: other_ty_args,
                 } = other
                 {
                     executable_id == other_executable_id
@@ -497,7 +474,7 @@ fn hash_struct_signature_token<H: Hasher>(
     ty_args: &[SignatureToken],
     module: &CompiledModule,
 ) {
-    type_discriminant::STRUCT.hash(state);
+    type_discriminant::NOMINAL.hash(state);
     let (address, module_name, struct_name) = struct_info_at(module, idx);
     address.hash(state);
     module_name.as_str().hash(state);
@@ -508,29 +485,24 @@ fn hash_struct_signature_token<H: Hasher>(
     }
 }
 
-/// Returns true if [`Type`] is equivalent to a [`SignatureToken`] struct or
-/// an enum (identified by handle index and type arguments).
+/// Returns true if [`Type`] is equivalent to a [`SignatureToken`] nominal
+/// type (struct or enum, identified by handle index and type arguments).
 ///
 /// # Safety
 ///
 /// All pointers inside the interned type must be safe to dereference.
-fn equivalent_struct_types(
+fn equivalent_nominal_types(
     ty: &Type,
     idx: StructHandleIndex,
     ty_args: &[SignatureToken],
     module: &CompiledModule,
 ) -> bool {
     let (other_executable_id, other_name, other_ty_args) = match ty {
-        Type::Struct {
+        Type::Nominal {
             executable_id,
             name,
             ty_args,
             ..
-        }
-        | Type::Enum {
-            executable_id,
-            name,
-            ty_args,
         } => (executable_id, name, ty_args),
         Type::Bool
         | Type::U8
@@ -623,8 +595,10 @@ impl Equivalent<TypeInternerKey> for SignatureTokenKey<'_> {
                     false
                 }
             },
-            Struct(idx) => equivalent_struct_types(ty, *idx, &[], self.1),
-            StructInstantiation(idx, ty_args) => equivalent_struct_types(ty, *idx, ty_args, self.1),
+            Struct(idx) => equivalent_nominal_types(ty, *idx, &[], self.1),
+            StructInstantiation(idx, ty_args) => {
+                equivalent_nominal_types(ty, *idx, ty_args, self.1)
+            },
             Function(args, results, abilities) => {
                 if let Type::Function {
                     args: other_args,

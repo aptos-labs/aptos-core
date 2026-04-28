@@ -1,0 +1,291 @@
+\usepackage{xcolor}
+\usepackage{listings}
+\usepackage{inconsolata}
+\usepackage{relsize}
+\usepackage{amsmath,amssymb,array}
+\usepackage{esz}
+\usepackage{mathpartir}
+\usepackage{graphicx}
+\usepackage{xspace}
+\usepackage{xurl}
+\usepackage{caption}
+\usepackage{bbding}
+\usepackage{tabularx}
+
+\hypersetup{colorlinks=true,linkcolor=blue,citecolor=blue,urlcolor=blue}
+\def\UrlFont{\rmfamily}
+
+
+
+\newcommand{\Section}[1]{\section{#1}}
+\newcommand{\SubSection}[1]{\subsection{#1}}
+\newcommand{\Paragraph}[1]{\vspace{0.5ex}\noindent\textbf{#1.}\xspace}
+
+\newcommand{\TODO}[2]{%
+    \noindent\textcolor{gray}{%
+            {\scriptsize\textbf{TODO(#1)}: #2}
+    }
+}
+
+\setlength{\belowcaptionskip}{-1ex}
+\setlength{\textfloatsep}{0.2ex}
+\newenvironment{Figure}{
+    \begin{figure}[tb]
+} {
+    \end{figure}
+}
+
+% Full-width variant (spans both columns in the 2-column layout).
+\newenvironment{WideFigure}{
+    \begin{figure*}[!t]
+} {
+    \end{figure*}
+}
+
+% Full-width table variant (spans both columns in the 2-column layout).
+\newenvironment{WideTable}{
+    \begin{table*}[!t]
+} {
+    \end{table*}
+}
+
+% Abbreviations
+
+\newcommand{\MVP}[0]{\textsf{MVP}\xspace}
+\newcommand{\MSL}[0]{\textsf{MSL}\xspace}
+\newcommand{\WP}[0]{\textsf{WP}\xspace}
+\newcommand{\solidity}[0]{\textsf{Solidity}\xspace}
+\newcommand{\kay}[0]{\textsf{K}\xspace}
+\newcommand{\fstar}[0]{\textsf{F*}\xspace}
+\newcommand{\verus}[0]{\textsf{Verus}\xspace}
+\newcommand{\certora}[0]{\textsf{Certora}\xspace}
+
+
+% IVL
+
+% Based on esz.sty -- see CLAUDE.md
+
+\newenvironment{ivl}{\zedindent=2ex\begin{zed}}{\end{zed}}
+
+\newcommand{\requiresof}[2]{\Zpreop{requires\_of}\langle#1\rangle(#2)}
+\newcommand{\abortsof}[2]{\Zpreop{aborts\_of}\langle#1\rangle(#2)}
+\newcommand{\ensuresof}[2]{\Zpreop{ensures\_of}\langle#1\rangle(#2)}
+\newcommand{\resultof}[2]{\Zpreop{result\_of}\langle#1\rangle(#2)}
+\newcommand{\modifiesof}[1]{\Zpreop{modifies\_of}\langle#1\rangle}
+
+% Variant-set names used in the implementation section.
+\newcommand{\Clo}{\mathcal{C}}
+\newcommand{\Par}{\mathcal{P}}
+\newcommand{\Fld}{\mathcal{F}}
+
+\newcommand{\Addr}{\Zpreop{address}}
+
+\newcommand{\Mem}{\mathcal{M}}
+\newcommand{\Mod}{\Delta}
+\newcommand{\Type}{\mathcal{T}}
+\newcommand{\Expr}{\mathcal{E}}
+
+% Keywords for  IVL pseudocode
+% ... esz already has \LET \IF \THEN \ELSE
+\newcommand{\PROC}{\Zkeyword{proc}}
+\newcommand{\FUN}{\Zkeyword{fun}}
+\newcommand{\AXIOM}{\Zkeyword{axiom}}
+\newcommand{\TRIGGER}{\Zinrel{trigger}}
+\newcommand{\RETURNS}{\Zinrel{returns}}
+\newcommand{\HAVOC}{\Zkeyword{havoc}}
+\newcommand{\ASSUME}{\Zkeyword{assume}}
+\newcommand{\ASSERT}{\Zkeyword{assert}}
+\newcommand{\DATATYPE}{\Zkeyword{datatype}}
+\newcommand{\IS}{\Zinrel{is}}
+\newcommand{\TRUE}{\Zkeyword{true}}
+\newcommand{\OLD}{\Zpreop{old}}
+\newcommand{\BOOL}{\Zpreop{bool}}
+\newcommand{\READ}{\Zpreop{read}}
+\newcommand{\CALL}{\Zpreop{call}}
+\newcommand{\VAR}{\Zkeyword{var}}
+\newcommand{\FOREACH}{\Zkeyword{foreach}}
+
+% State-labeled expression: \slabeled{S}{e} renders as S \sat e.
+% \sat is a bar-then-tilde composite that reads like the literal |~.
+% No standard single-glyph relation in amssymb / stmaryrd matches
+% (closest is \vDash, which is |=). We therefore compose: \scriptstyle
+% shrinks both glyphs; -1mu tightens the tilde against the bar while
+% keeping a small visible gap.
+% Kept in sync with the Move listings literate mapping below.
+\newcommand{\sat}{\mathrel{{\scriptstyle\vert}\mkern-1mu{\scriptstyle\sim}}}
+\newcommand{\slabeled}[2]{#1 \sat #2}
+
+\newcommand{\sq}[1]{\overline{#1}}
+
+
+% Source Transformation
+
+\newcommand{\transform}[0]{\Large{$\leadsto$}}
+
+
+%%%% Code
+
+% Keep IEEEtran's default Times font; do not override with charter.
+%\usepackage[charter]{mathdesign}
+%\def\rmdefault{bch}
+%\def\ttdefault{blg}
+
+\lstdefinestyle{MoveStyle}{
+    basicstyle=\ttfamily,
+    keywordstyle=\color{black}, % don't bold keywords which is the default
+    commentstyle=\color{gray}\normalfont\itshape,
+    escapechar=@, % use to embed LaTeX into code
+    breaklines=true,
+    % \sat is set in \scriptstyle and followed by tight kerning, so its
+    % right side-bearing is small; tail the replacement with \, so the
+    % symbol doesn't abut the next token visually.
+    literate={|~}{{$\sat$\,}}1
+        {<=}{{$\leq$}}2
+        {>=}{{$\geq$}}2
+        {==}{{$=$}}2
+        {!=}{{$\neq$}}2
+        {==>}{{$\Longrightarrow$}}3
+        {forall}{{$\forall$}}1
+        {exists}{{$\exists$}}1,
+}
+
+
+\lstdefinelanguage{Move}{
+    morekeywords={
+        abort,
+        aborts_if,
+        aborts_of,
+        acquires,
+        address,
+        as,
+        assert,
+        assume,
+        borrow_global,
+        borrow_global_mut,
+        break,
+        const,
+        continue,
+        copy,
+        copyable,
+        define,
+        drop,
+        else,
+        ensures,
+        ensures_of,
+        exists,
+        false,
+        forall,
+        friend,
+        fun,
+        global,
+        has,
+        havoc,
+        if,
+        in,
+        include,
+        invariant,
+        key,
+        let,
+        loop,
+        match,
+        modifies,
+        modifies_of,
+        module,
+        move,
+        move_from,
+        move_to,
+        mut,
+        native,
+        num,
+        old,
+        onabort,
+        pragma,
+        proof,
+        public,
+        requires,
+        requires_of,
+        resource,
+        result_of,
+        return,
+        schema,
+        script,
+        signer,
+        spec,
+        split,
+        store,
+        struct,
+        true,
+        u8,
+        u64,
+        u128,
+        u256,
+        update,
+        use,
+        with,
+        where,
+        while},
+    sensitive=true,
+    morecomment=[l]{//},
+    morecomment=[s]{/*}{*/},
+}
+
+% Short inline delimiters for Move code: both |...| and !...! work.
+% The ! alternative is useful when the snippet itself contains |,
+% e.g. function-type syntax !|T1,...,Tn| -> T!.
+\lstMakeShortInline[language=Move,style=MoveStyle]|
+\lstMakeShortInline[language=Move,style=MoveStyle]!
+
+
+% This defines a new environment for Move code.
+\lstnewenvironment{Move}{
+    \lstset{
+        language=Move,
+        style=MoveStyle,
+        basicstyle=\relsize{-1}\ttfamily,
+        keywordstyle=\color{blue},
+    }
+}{
+}
+
+% This defines a new environment for Move code in a box, without line numbers.
+\lstnewenvironment{MoveBox}{
+    \lstset{
+        language=Move,
+        style=MoveStyle,
+        basicstyle=\relsize{-1}\ttfamily,
+        keywordstyle=\color{blue},
+    %numbers=left,
+    %numberstyle=\scriptsize\color{gray},
+    %frame=single,
+    }
+}{
+}
+
+% This defines a new environment for Move code in a box, with line numbers.
+\lstnewenvironment{MoveBoxNumbered}{
+    \lstset{
+        language=Move,
+        style=MoveStyle,
+        basicstyle=\relsize{-1}\ttfamily,
+        keywordstyle=\color{blue},
+        numbers=left,
+        numberstyle=\scriptsize\color{gray},
+    %frame=single,
+    }
+}{
+}
+
+% This defines a new environment for diagnostics as produced by the prover.
+\lstnewenvironment{MoveDiag}{
+    \lstset{
+        style=MoveStyle,
+        basicstyle=\relsize{-2}\ttfamily,
+    }
+}{
+}
+
+
+%%% Local Variables:
+%%% mode: latex
+%%% TeX-master: "main"
+%%% End:

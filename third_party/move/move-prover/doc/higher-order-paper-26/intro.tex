@@ -1,0 +1,45 @@
+\Section{Introduction}
+\label{sec:intro}
+
+The Move Prover (\MVP)~\cite{DillGPQXZ22} is a formal verification tool for Move smart contracts that is designed to be used routinely during code development, with a finish time comparable to type checkers and linters.
+\MVP is deployed at Aptos~\cite{ParkZGXGCLC24} for formal verification of core protocol logic such as staking, metering, code deployment, and auxiliary data structures that underpin the framework.
+It has been originally developed for the Libra project at Meta, where it was used to specify the Diem payment network.
+
+Recently, the Move language was extended with \emph{higher-order functions} (HO)~\cite{grieskamp2025movehigherorder}.
+In \emph{Move 2}, functions are first-class values: they can be passed as arguments, returned from functions, stored in struct fields, and persisted in global storage.
+Combined with Move's resource model, persisted function values give the developer a principled account of \emph{dynamic dispatch}.
+Typical use cases on Aptos include callback-based asset flows, extensible asset managers, dispatchable permissions and metering, and generic data structure operations parameterized by a caller-provided function (e.g.\ fold, map, filter, custom comparators).
+
+Higher-order functions are a known challenge for formal verification.
+They break the modular, static-dispatch specification style on which \MVP was built.
+When a function is dispatched dynamically, its pre- and post-conditions cannot in general be looked up at the call site.
+Instead, the caller's specification must refer \emph{abstractly} to the behavior of its function-value arguments, and the verifier must reconcile this abstract specification with whichever concrete function happens to reach the call site.
+For a production-oriented prover, this reconciliation must be fast, complete in the relevant cases, and free of the trigger instability that higher-order quantification easily introduces~\cite{BUTTERFLY}.
+
+\Paragraph{Contributions}
+This paper describes the extension of \MVP to support higher-order Move, and the underlying extension of the Move specification language:
+Specifically:
+
+\begin{itemize}
+    \item We extend Move specifications with \emph{behavioral predicates}: $\requiresof{f}{\bar{x}}$, $\abortsof{f}{\bar{x}}$, and $\ensuresof{f}{\bar{x}}$, which characterize the pre-/abort-/post-behavior of a function value $f$ on arguments $\bar{x}$, enabling reasoning about function specifications as first-class citizens.
+
+    \item We introduce \emph{state labels} into Move specifications, which name intermediate memory states along a function's execution and connect them to the pre- and post-state via two-state predicates, as in $(\slabeled{..S}{\phi}) \land (\slabeled{S..}{\psi})$.
+    This enables reasoning about sequential evolution of global state in predicates.
+
+    \item We describe how \MVP implements invocation of function values on top of SMT~\cite{SMTLib2010,z3}, by discriminating over the possible types of function values flowing into the call site: if $f$ is known (a ground constructor), the invocation is replaced by the effect of the concrete function; if $f$ is not known (for example, a function-typed parameter or a closure loaded from storage), the behavioral predicates of $f$ describe its effect.
+
+    \item We validate the design by extending \MVP's \emph{specification inference} tool to function-valued code.
+    With behavioral predicates as the abstraction, the tool computes weakest-preconditions over Move bytecode that contains closures and dynamic dispatch.
+    Feeding those generated specs back into the verifier validates completeness and correctness of the solution.
+\end{itemize}
+
+The remainder of the paper is organized as follows.
+Sec.~\ref{sec:move-hof} reviews Move on Aptos, introduces the running automated-market-maker (AMM) example, and illustrates common specification patterns using function values.
+Sec.~\ref{sec:enc} describes the encoding of behavioral predicates and state labels, and describes the Boogie encoding of dynamic dispatch in \MVP.
+Sec.~\ref{sec:validation} reports on validating the encoding via the specification inference tool.
+Sec.~\ref{sec:conclusion} discusses related work and concludes.
+
+%%% Local Variables:
+%%% mode: latex
+%%% TeX-master: "main"
+%%% End:

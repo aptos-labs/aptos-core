@@ -49,8 +49,10 @@ impl ExecutableId {
 
 /// Struct type metadata in an executable.
 pub struct StructType {
-    /// Struct type signature. Invariant: stored type is always
-    /// [`Type::Struct`].
+    /// Struct type signature. Invariants:
+    ///   - Stored type is always [`Type::Nominal`].
+    ///   - When the layout slot is populated, `layout.fields == Some(_)`
+    ///     (structs cache per-field offsets).
     ty: InternedType,
 }
 
@@ -68,8 +70,11 @@ impl StructType {
 
 /// Enum type metadata in an executable.
 pub struct EnumType {
-    /// Enum type signature. Invariant: stored type is always
-    /// [`Type::Enum`].
+    /// Enum type signature. Invariants:
+    ///   - Stored type is always [`Type::Nominal`].
+    ///   - When the layout slot is populated, `layout.fields == None`
+    ///     (enums do not cache per-field offsets at the type level, since
+    ///     new variants may be added on module upgrade).
     ty: InternedType,
     /// Per-variant field types, indexed by variant tag.
     #[allow(dead_code)]

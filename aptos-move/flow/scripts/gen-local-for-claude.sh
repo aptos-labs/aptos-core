@@ -32,11 +32,11 @@ done
 
 # Install move-flow
 echo "Installing move-flow ..."
-cargo install --path "$CRATE_DIR" --locked "${PROFILE_ARGS[@]}"
+cargo install --path "$CRATE_DIR" --locked ${PROFILE_ARGS[@]+"${PROFILE_ARGS[@]}"}
 
 # Generate plugin output
 echo "Generating plugin files in $OUTPUT_DIR..."
-move-flow plugin "$OUTPUT_DIR" "${LOG_ARGS[@]}"
+move-flow plugin "$OUTPUT_DIR" ${LOG_ARGS[@]+"${LOG_ARGS[@]}"}
 
 echo "Done. Run Claude with:"
 echo "  claude --plugin-dir $OUTPUT_DIR"

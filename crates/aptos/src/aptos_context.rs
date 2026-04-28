@@ -8,8 +8,8 @@
 //! gas profiling, benchmarking, and session-based execution.
 
 use aptos_cli_common::{
-    explorer_transaction_link, get_account_with_state, prompt_yes_with_override, AccountType,
-    CliError, CliTypedResult, Network, ReplayProtectionType, TransactionOptions,
+    explorer_transaction_link, format_txn_status, get_account_with_state, prompt_yes_with_override,
+    AccountType, CliError, CliTypedResult, Network, ReplayProtectionType, TransactionOptions,
     TransactionSummary, ACCEPTED_CLOCK_SKEW_US, US_IN_SECS,
 };
 use aptos_crypto::ed25519::Ed25519Signature;
@@ -230,7 +230,7 @@ where
         success,
         timestamp_us: None,
         version: Some(version),
-        vm_status: Some(vm_status.to_string()),
+        vm_status: Some(format_txn_status(vm_output.status(), &vm_status)),
         deployed_object_address: None,
     })
 }
@@ -296,7 +296,7 @@ async fn simulate_using_session(
         success,
         timestamp_us: None,
         version: None,
-        vm_status: Some(vm_status.to_string()),
+        vm_status: Some(format_txn_status(txn_output.status(), &vm_status)),
         deployed_object_address: None,
     })
 }

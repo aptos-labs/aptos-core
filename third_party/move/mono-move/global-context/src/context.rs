@@ -36,7 +36,7 @@ use crate::maintenance_config::MaintenanceConfig;
 use anyhow::{bail, Result};
 use dashmap::DashMap;
 use mono_move_alloc::{GlobalArenaPool, GlobalArenaPtr, GlobalArenaShard};
-use mono_move_core::{types::StructLayout, ExecutableId, Interner};
+use mono_move_core::{types::NominalLayout, ExecutableId, Interner};
 use move_binary_format::{file_format::SignatureToken, CompiledModule};
 use parking_lot::{RwLock, RwLockReadGuard, RwLockWriteGuard};
 use std::{
@@ -359,18 +359,19 @@ impl<'ctx> ExecutionGuard<'ctx> {
         unsafe { ptr.as_ref_unchecked() }
     }
 
-    /// Interns a struct identity without populating its layout. The returned
-    /// pointer can be used immediately in IR, but [`Type::size_and_align`] and
-    /// [`Type::struct_layout`] will return [`None`] until [`Self::set_struct_layout`]
-    /// is called for this type. Callers using this in cross-module contexts
-    /// must tolerate the missing layout until a layout-population pass runs.
-    pub fn intern_struct_identity(
+    /// Interns a nominal (struct or enum) identity without populating its
+    /// layout. The returned pointer can be used immediately in IR, but
+    /// [`Type::size_and_align`] and [`Type::layout`] will return [`None`]
+    /// until [`Self::set_nominal_layout`] is called for this type. Callers
+    /// using this in cross-module contexts must tolerate the missing layout
+    /// until a layout-population pass runs.
+    pub fn intern_nominal(
         &self,
         executable_id: GlobalArenaPtr<ExecutableId>,
         name: GlobalArenaPtr<str>,
         ty_args: InternedTypeList,
     ) -> InternedType {
-        let ty = self.global_arena.alloc(Type::Struct {
+        let ty = self.global_arena.alloc(Type::Nominal {
             executable_id,
             name,
             ty_args,
@@ -379,21 +380,22 @@ impl<'ctx> ExecutionGuard<'ctx> {
         self.insert_allocated_type_pointer_internal(ty)
     }
 
-    /// Allocates the field-layout slice in the arena, builds a [`StructLayout`]
-    /// and installs it into struct type's layout slot. Returns an error if the
-    /// type was not a struct type.
+    /// Allocates the field-layout slice in the arena (when `fields` is
+    /// `Some`), builds a [`NominalLayout`] and installs it into the type's
+    /// layout slot. Pass `Some(&fields)` for structs and `None` for enums.
+    /// Returns an error if `ty` is not a nominal type.
     ///
-    /// Setting layouts concurrently is safe. Layout already stores canonical
-    /// field type pointers so is structurally identical for both threads.
-    pub fn set_struct_layout(
+    /// Setting layouts concurrently is safe: the layout stores canonical
+    /// field type pointers and so is structurally identical across threads.
+    pub fn set_nominal_layout(
         &self,
         ty: InternedType,
         size: u32,
         align: u32,
-        fields: &[FieldLayout],
+        fields: Option<&[FieldLayout]>,
     ) -> Result<()> {
         let slot = match view_type(ty) {
-            Type::Struct { layout: slot, .. } => slot,
+            Type::Nominal { layout: slot, .. } => slot,
             Type::Bool
             | Type::U8
             | Type::U16
@@ -412,9 +414,10 @@ impl<'ctx> ExecutionGuard<'ctx> {
             | Type::ImmutRef { .. }
             | Type::MutRef { .. }
             | Type::Vector { .. }
-            | Type::Enum { .. }
             | Type::Function { .. }
-            | Type::TypeParam { .. } => bail!("set_struct_layout called on a non-struct type"),
+            | Type::TypeParam { .. } => {
+                bail!("set_nominal_layout called on a non-nominal type")
+            },
         };
 
         // Fast path: if the layout is already installed, skip the field-slice
@@ -425,54 +428,46 @@ impl<'ctx> ExecutionGuard<'ctx> {
             return Ok(());
         }
 
-        let fields_ptr = self.global_arena.alloc_slice_copy(fields);
-        let layout = StructLayout::new(size, align, fields_ptr);
+        let layout = match fields {
+            Some(fields) => {
+                let fields_ptr = self.global_arena.alloc_slice_copy(fields);
+                NominalLayout::new_struct(size, align, fields_ptr)
+            },
+            None => NominalLayout::new_enum(size, align),
+        };
         if let Err(other_layout) = slot.set(layout) {
             let installed_layout = slot.get().expect("Layout was just installed");
             debug_assert_eq!(installed_layout.size, other_layout.size);
             debug_assert_eq!(installed_layout.align, other_layout.align);
             debug_assert_eq!(
-                installed_layout.field_layouts().len(),
-                other_layout.field_layouts().len()
+                installed_layout.field_layouts().is_some(),
+                other_layout.field_layouts().is_some()
             );
-            // Layout computation is deterministic given the struct identity,
+            // Layout computation is deterministic given the type identity,
             // so per-field offsets must match too.
-            for (installed, other) in installed_layout
-                .field_layouts()
-                .iter()
-                .zip(other_layout.field_layouts().iter())
-            {
-                debug_assert_eq!(installed.offset, other.offset);
+            if let (Some(installed), Some(other)) = (
+                installed_layout.field_layouts(),
+                other_layout.field_layouts(),
+            ) {
+                debug_assert_eq!(installed.len(), other.len());
+                for (installed, other) in installed.iter().zip(other.iter()) {
+                    debug_assert_eq!(installed.offset, other.offset);
+                }
             }
         }
         Ok(())
-    }
-
-    /// Interns an enum type. Enum size/align is fixed metadata, so no
-    /// field-layout slice is carried on the type.
-    pub fn intern_enum_type(
-        &self,
-        executable_id: GlobalArenaPtr<ExecutableId>,
-        name: GlobalArenaPtr<str>,
-        ty_args: InternedTypeList,
-    ) -> InternedType {
-        let ty = self.global_arena.alloc(Type::Enum {
-            executable_id,
-            name,
-            ty_args,
-        });
-        self.insert_allocated_type_pointer_internal(ty)
     }
 
     /// Looks up a type previously interned from a signature token of `module`.
     /// Returns `None` if the token has not yet been interned in this module's
     /// context.
     ///
-    /// For struct types, the returned pointer carries identity but its layout
-    /// slot may still be empty — `set_struct_layout` runs in a separate pass
-    /// after all field types are interned. Callers consuming this in cross-
-    /// module contexts must tolerate `None` from [`Type::size_and_align`] and
-    /// [`Type::struct_layout`] until the layout-population pass completes.
+    /// For nominal types, the returned pointer carries identity but its
+    /// layout slot may still be empty — `set_nominal_layout` runs in a
+    /// separate pass after all field types are interned. Callers consuming
+    /// this in cross-module contexts must tolerate `None` from
+    /// [`Type::size_and_align`] and [`Type::layout`] until the layout-
+    /// population pass completes.
     pub fn try_intern_for_module(
         &self,
         token: &SignatureToken,

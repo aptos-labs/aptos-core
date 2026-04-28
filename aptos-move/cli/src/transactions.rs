@@ -7,9 +7,9 @@ use crate::{local_simulation, MoveDebugger, MoveEnv};
 // Re-export from aptos-cli-common to eliminate the duplicate definition.
 pub use aptos_cli_common::ReplayProtectionType;
 use aptos_cli_common::{
-    get_account_with_state, CliError, CliTypedResult, EncodingOptions, GasOptions,
-    PrivateKeyInputOptions, ProfileOptions, PromptOptions, RestOptions, TransactionSummary,
-    ACCEPTED_CLOCK_SKEW_US, US_IN_SECS,
+    format_txn_status, get_account_with_state, CliError, CliTypedResult, EncodingOptions,
+    GasOptions, PrivateKeyInputOptions, ProfileOptions, PromptOptions, RestOptions,
+    TransactionSummary, ACCEPTED_CLOCK_SKEW_US, US_IN_SECS,
 };
 use aptos_crypto::{ed25519::Ed25519PrivateKey, hash::CryptoHash};
 use aptos_rest_client::Client;
@@ -250,7 +250,7 @@ impl TxnOptions {
             success,
             timestamp_us: None,
             version: Some(version), // The transaction is not committed so there is no new version.
-            vm_status: Some(vm_status.to_string()),
+            vm_status: Some(format_txn_status(vm_output.status(), &vm_status)),
             deployed_object_address: None,
         })
     }

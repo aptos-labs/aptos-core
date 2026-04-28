@@ -335,10 +335,9 @@ impl<'a, 'guard, 'ctx> ExecutableBuilder<'a, 'guard, 'ctx> {
                 }
 
                 let size = align_up(offset, align);
-                let ptr = self
-                    .guard
-                    .intern_struct_identity(self.id, name, EMPTY_TYPE_LIST);
-                self.guard.set_struct_layout(ptr, size, align, &fields)?;
+                let ptr = self.guard.intern_nominal(self.id, name, EMPTY_TYPE_LIST);
+                self.guard
+                    .set_nominal_layout(ptr, size, align, Some(&fields))?;
 
                 self.structs.insert(name, StructType::new(ptr));
                 Ok(ptr)
@@ -354,7 +353,10 @@ impl<'a, 'guard, 'ctx> ExecutableBuilder<'a, 'guard, 'ctx> {
                 let ty = self
                     .guard
                     .try_intern_for_module(&tok, self.module)
-                    .unwrap_or_else(|| self.guard.intern_enum_type(self.id, name, EMPTY_TYPE_LIST));
+                    .unwrap_or_else(|| self.guard.intern_nominal(self.id, name, EMPTY_TYPE_LIST));
+                // Enum size/align is fixed today (heap pointer); the layout
+                // slot stores no per-field offsets.
+                self.guard.set_nominal_layout(ty, 8, 8, None)?;
 
                 let mut variants = Vec::with_capacity(variant_defs.len());
                 for variant_def in variant_defs {
