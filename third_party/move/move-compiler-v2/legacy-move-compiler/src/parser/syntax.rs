@@ -3738,7 +3738,7 @@ fn parse_constant_decl(
             .loc()
             .expect("parsed visibility always has a source location");
         if !require_move_version(
-            LanguageVersion::V2_5,
+            LanguageVersion::V2_4,
             context,
             vis_loc,
             "visibility modifier on constants",

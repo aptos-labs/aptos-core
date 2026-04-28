@@ -4,4 +4,4 @@ error: unsupported language construct
   ┌─ tests/folding/constant_public.move:3:5
   │
 3 │     public const Foo: u64 = 0;
-  │     ^^^^^^ Move 2.5 language construct is not enabled: visibility modifier on constants
+  │     ^^^^^^ Move 2.4 language construct is not enabled: visibility modifier on constants
