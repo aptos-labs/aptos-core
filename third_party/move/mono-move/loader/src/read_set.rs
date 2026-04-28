@@ -6,14 +6,14 @@
 
 use anyhow::{bail, Result};
 use mono_move_core::ExecutableId;
-use mono_move_global_context::{ArenaRef, Executable};
+use mono_move_global_context::{ArenaRef, LoadedModule};
 use shared_dsa::UnorderedMap;
 use std::collections::hash_map::Entry;
 
-/// Tracks how this read depends on a particular executable.
+/// Tracks how this read depends on a particular loaded module.
 #[derive(Copy, Clone)]
 pub enum ExecutableRead<'guard> {
-    Loaded(&'guard Executable),
+    Loaded(&'guard LoadedModule),
 }
 
 /// Maps from executable ID to the version the transaction is using for the
@@ -31,10 +31,10 @@ impl<'guard> ExecutableReadSet<'guard> {
         }
     }
 
-    /// Returns the recorded executable or [`None`] otherwise.
-    pub fn get(&self, key: ArenaRef<'guard, ExecutableId>) -> Option<&'guard Executable> {
+    /// Returns the recorded loaded module or [`None`] otherwise.
+    pub fn get(&self, key: ArenaRef<'guard, ExecutableId>) -> Option<&'guard LoadedModule> {
         match self.inner.get(&key)? {
-            ExecutableRead::Loaded(executable) => Some(*executable),
+            ExecutableRead::Loaded(loaded) => Some(*loaded),
         }
     }
 

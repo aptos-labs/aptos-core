@@ -32,6 +32,7 @@ than or equal to the requested multiplier is chosen.
 -  [Function `update_config`](#0x1_transaction_limits_update_config)
 -  [Function `validate_enough_stake`](#0x1_transaction_limits_validate_enough_stake)
 -  [Function `validate_high_txn_limits`](#0x1_transaction_limits_validate_high_txn_limits)
+-  [Specification](#@Specification_1)
 
 
 <pre><code><b>use</b> <a href="delegation_pool.md#0x1_delegation_pool">0x1::delegation_pool</a>;
@@ -736,6 +737,15 @@ for the requested limit multipliers.
 
 
 </details>
+
+<a id="@Specification_1"></a>
+
+## Specification
+
+
+
+<pre><code><b>pragma</b> verify = <b>false</b>;
+</code></pre>
 
 
 [move-book]: https://aptos.dev/move/book/SUMMARY

@@ -446,7 +446,7 @@ impl ModuleGenerator {
                     *abilities,
                 )
             },
-            TypeDomain(_) | ResourceDomain(_, _, _) | Error | Var(_) => {
+            TypeDomain(_) | ResourceDomain(_, _, _) | StateDomain | Error | Var(_) => {
                 ctx.internal_error(
                     loc,
                     format!(

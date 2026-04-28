@@ -193,13 +193,13 @@ async fn chunky_dkg_shadow_mode() {
     // Verify transcript.
     let subtranscript = verify_chunky_dkg_transcript(&session);
     assert!(
-        !subtranscript.dealers.is_empty(),
+        subtranscript.dealer_bitmask.count_ones() > 0,
         "Shadow DKG should produce a transcript with dealers"
     );
     info!(
         "Shadow chunky DKG completed for epoch {} with {} dealers",
         session.target_epoch(),
-        subtranscript.dealers.len()
+        subtranscript.dealer_bitmask.count_ones()
     );
 }
 

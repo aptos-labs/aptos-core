@@ -1201,23 +1201,45 @@ impl<'a, T: ExpGenerator<'a>> ExpRewriterFunctions for SpecTranslator<'a, '_, T>
             Behavior(_, range) if !range.is_default() => None,
             // Behavior that needs pre-state label
             Behavior(kind, range) if needs_pre_label(kind, self.in_old) => {
+                let env = self.builder.global_env();
                 if let Some(ExpData::Call(closure_id, Operation::Closure(mid, fid, _), _)) =
                     args.first().map(|a| a.as_ref())
                 {
-                    let fun_env = self.builder.global_env().get_function(mid.qualified(*fid));
+                    let fun_env = env.get_function(mid.qualified(*fid));
                     let used_memory = fun_env.get_spec_used_memory().clone();
-                    let inst = self
-                        .builder
-                        .global_env()
-                        .get_node_instantiation(*closure_id);
+                    let inst = env.get_node_instantiation(*closure_id);
                     let label = self.save_memory_shared(&used_memory, &inst);
                     let new_range = MemoryRange {
                         pre: Some(label),
                         post: range.post,
                     };
                     Some(Call(id, Behavior(*kind, new_range), args.to_owned()).into_exp())
+                } else if let Some(ExpData::Call(_, Operation::Select(smid, sid, field_id), _)) =
+                    args.first().map(|a| a.as_ref())
+                {
+                    // Struct-field function value (e.g. `pool.pricing.0`):
+                    // the closure's memory footprint is declared by the
+                    // struct's field spec (`reads_of<f> …` / `modifies_of<f> …`).
+                    // Using `self.fun_env.get_spec_used_memory()` here would miss
+                    // these resources, leaving the pre-state label unsaved at
+                    // procedure entry.
+                    let struct_env = env.get_module(*smid).into_struct(*sid);
+                    let field_sym = field_id.symbol();
+                    let memory = collect_field_access_memory(env, &struct_env, field_sym);
+                    let label = self.save_memory_shared(&memory, self.type_args);
+                    let new_range = MemoryRange {
+                        pre: Some(label),
+                        post: range.post,
+                    };
+                    Some(Call(id, Behavior(*kind, new_range), args.to_owned()).into_exp())
                 } else {
-                    // Temporary/LocalVar: use enclosing function's spec_used_memory
+                    // Temporary (function parameter), let-bound local, etc.:
+                    // fall back to the enclosing function's spec_used_memory.
+                    // For function-typed parameters with `modifies_of` /
+                    // `reads_of` declarations, the env_pipeline spec rewriter
+                    // already propagates the parameter's access_of memory into
+                    // the function's spec_used_memory / spec_old_memory, so
+                    // this fallback covers the fun-param case too.
                     let used_memory = self.fun_env.get_spec_used_memory().clone();
                     let label = self.save_memory_shared(&used_memory, self.type_args);
                     let new_range = MemoryRange {
@@ -1272,4 +1294,42 @@ impl<'a, T: ExpGenerator<'a>> ExpRewriterFunctions for SpecTranslator<'a, '_, T>
 /// `aborts_of` and `requires_of` only need pre-state if inside `old()`.
 fn needs_pre_label(kind: &BehaviorKind, in_old: bool) -> bool {
     in_old || matches!(kind, BehaviorKind::EnsuresOf | BehaviorKind::ResultOf)
+}
+
+/// Memory accessed by a struct field's function value, as declared by the
+/// struct's `reads_of<f> …` / `modifies_of<f> …` specs. Used to populate
+/// `saved_memory` when a behavioral predicate like `result_of<s.f>(…)` needs
+/// a pre-state label: without this the Boogie evaluator's `old_*` memory
+/// slot would reference an unsaved snapshot variable.
+///
+/// Wildcard (`*`) is approximated by all `key` structs reachable from the
+/// current `GlobalEnv`. Mono-based exact expansion isn't available here
+/// (the spec translator runs before `mono_analysis`), so over-saving is
+/// acceptable: extra saved memory only adds a cheap `SaveMem` at procedure
+/// entry without affecting verification soundness.
+fn collect_field_access_memory(
+    env: &crate::model::GlobalEnv,
+    struct_env: &crate::model::StructEnv,
+    field_sym: Symbol,
+) -> BTreeSet<QualifiedInstId<StructId>> {
+    let mut memory: BTreeSet<QualifiedInstId<StructId>> = BTreeSet::new();
+    for access in struct_env.get_field_access_of() {
+        if access.fun_param != field_sym {
+            continue;
+        }
+        if access.frame_spec.modifies_all || access.frame_spec.reads_all {
+            for module in env.get_modules() {
+                for s in module.get_structs() {
+                    if s.get_abilities().has_key() {
+                        memory.insert(s.get_qualified_id().instantiate(vec![]));
+                    }
+                }
+            }
+        } else {
+            memory.extend(access.used_memory.iter().cloned());
+            memory.extend(access.old_memory.iter().cloned());
+        }
+        break;
+    }
+    memory
 }

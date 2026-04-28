@@ -49,6 +49,15 @@ for example:
 -  [Function `add_link`](#0x1_storage_slots_allocator_add_link)
 -  [Function `remove_link`](#0x1_storage_slots_allocator_remove_link)
 -  [Specification](#@Specification_1)
+    -  [Function `allocate_spare_slots`](#@Specification_1_allocate_spare_slots)
+    -  [Function `add`](#@Specification_1_add)
+    -  [Function `remove`](#@Specification_1_remove)
+    -  [Function `borrow`](#@Specification_1_borrow)
+    -  [Function `borrow_mut`](#@Specification_1_borrow_mut)
+    -  [Function `reserve_slot`](#@Specification_1_reserve_slot)
+    -  [Function `fill_reserved_slot`](#@Specification_1_fill_reserved_slot)
+    -  [Function `remove_and_reserve`](#@Specification_1_remove_and_reserve)
+    -  [Function `free_reserved_slot`](#@Specification_1_free_reserved_slot)
 
 
 <pre><code><b>use</b> <a href="../../move-stdlib/doc/option.md#0x1_option">0x1::option</a>;
@@ -867,8 +876,183 @@ Remove storage slot, but reserve it for later.
 ## Specification
 
 
+<a id="@Specification_1_allocate_spare_slots"></a>
 
-<pre><code><b>pragma</b> verify = <b>false</b>;
+### Function `allocate_spare_slots`
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="storage_slots_allocator.md#0x1_storage_slots_allocator_allocate_spare_slots">allocate_spare_slots</a>&lt;T: store&gt;(self: &<b>mut</b> <a href="storage_slots_allocator.md#0x1_storage_slots_allocator_StorageSlotsAllocator">storage_slots_allocator::StorageSlotsAllocator</a>&lt;T&gt;, num_to_allocate: u64)
+</code></pre>
+
+
+
+
+<pre><code><b>aborts_if</b> !self.should_reuse;
+<b>pragma</b> aborts_if_is_partial;
+</code></pre>
+
+
+
+<a id="@Specification_1_add"></a>
+
+### Function `add`
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="storage_slots_allocator.md#0x1_storage_slots_allocator_add">add</a>&lt;T: store&gt;(self: &<b>mut</b> <a href="storage_slots_allocator.md#0x1_storage_slots_allocator_StorageSlotsAllocator">storage_slots_allocator::StorageSlotsAllocator</a>&lt;T&gt;, val: T): <a href="storage_slots_allocator.md#0x1_storage_slots_allocator_StoredSlot">storage_slots_allocator::StoredSlot</a>
+</code></pre>
+
+
+
+
+<pre><code><b>pragma</b> opaque;
+<b>aborts_if</b> self.reuse_head_index == 0 && self.new_slot_index + 1 &gt; MAX_U64;
+<b>pragma</b> aborts_if_is_partial;
+<b>ensures</b> self.slots.is_some();
+<b>ensures</b> <a href="table_with_length.md#0x1_table_with_length_spec_contains">table_with_length::spec_contains</a>(<a href="../../move-stdlib/doc/option.md#0x1_option_borrow">option::borrow</a>(self.slots), result.slot_index);
+<b>ensures</b> <a href="table_with_length.md#0x1_table_with_length_spec_get">table_with_length::spec_get</a>(<a href="../../move-stdlib/doc/option.md#0x1_option_borrow">option::borrow</a>(self.slots), result.slot_index) is Link::Occupied;
+<b>ensures</b> <a href="table_with_length.md#0x1_table_with_length_spec_get">table_with_length::spec_get</a>(<a href="../../move-stdlib/doc/option.md#0x1_option_borrow">option::borrow</a>(self.slots), result.slot_index).value == val;
+</code></pre>
+
+
+
+<a id="@Specification_1_remove"></a>
+
+### Function `remove`
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="storage_slots_allocator.md#0x1_storage_slots_allocator_remove">remove</a>&lt;T: store&gt;(self: &<b>mut</b> <a href="storage_slots_allocator.md#0x1_storage_slots_allocator_StorageSlotsAllocator">storage_slots_allocator::StorageSlotsAllocator</a>&lt;T&gt;, slot: <a href="storage_slots_allocator.md#0x1_storage_slots_allocator_StoredSlot">storage_slots_allocator::StoredSlot</a>): T
+</code></pre>
+
+
+
+
+<pre><code><b>pragma</b> opaque;
+<b>aborts_if</b> self.slots.is_none();
+<b>aborts_if</b> !<a href="table_with_length.md#0x1_table_with_length_spec_contains">table_with_length::spec_contains</a>(<a href="../../move-stdlib/doc/option.md#0x1_option_borrow">option::borrow</a>(self.slots), slot.slot_index);
+<b>aborts_if</b> !(<a href="table_with_length.md#0x1_table_with_length_spec_get">table_with_length::spec_get</a>(<a href="../../move-stdlib/doc/option.md#0x1_option_borrow">option::borrow</a>(self.slots), slot.slot_index) is Link::Occupied);
+<b>pragma</b> aborts_if_is_partial;
+<b>ensures</b> result == <b>old</b>(<a href="table_with_length.md#0x1_table_with_length_spec_get">table_with_length::spec_get</a>(<a href="../../move-stdlib/doc/option.md#0x1_option_borrow">option::borrow</a>(self.slots), slot.slot_index)).value;
+<b>ensures</b> self.slots.is_some();
+</code></pre>
+
+
+
+<a id="@Specification_1_borrow"></a>
+
+### Function `borrow`
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="storage_slots_allocator.md#0x1_storage_slots_allocator_borrow">borrow</a>&lt;T: store&gt;(self: &<a href="storage_slots_allocator.md#0x1_storage_slots_allocator_StorageSlotsAllocator">storage_slots_allocator::StorageSlotsAllocator</a>&lt;T&gt;, slot_index: u64): &T
+</code></pre>
+
+
+
+
+<pre><code><b>pragma</b> opaque;
+<b>aborts_if</b> self.slots.is_none();
+<b>aborts_if</b> !<a href="table_with_length.md#0x1_table_with_length_spec_contains">table_with_length::spec_contains</a>(<a href="../../move-stdlib/doc/option.md#0x1_option_borrow">option::borrow</a>(self.slots), slot_index);
+<b>aborts_if</b> !(<a href="table_with_length.md#0x1_table_with_length_spec_get">table_with_length::spec_get</a>(<a href="../../move-stdlib/doc/option.md#0x1_option_borrow">option::borrow</a>(self.slots), slot_index) is Link::Occupied);
+<b>ensures</b> result == <a href="table_with_length.md#0x1_table_with_length_spec_get">table_with_length::spec_get</a>(<a href="../../move-stdlib/doc/option.md#0x1_option_borrow">option::borrow</a>(self.slots), slot_index).value;
+</code></pre>
+
+
+
+<a id="@Specification_1_borrow_mut"></a>
+
+### Function `borrow_mut`
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="storage_slots_allocator.md#0x1_storage_slots_allocator_borrow_mut">borrow_mut</a>&lt;T: store&gt;(self: &<b>mut</b> <a href="storage_slots_allocator.md#0x1_storage_slots_allocator_StorageSlotsAllocator">storage_slots_allocator::StorageSlotsAllocator</a>&lt;T&gt;, slot_index: u64): &<b>mut</b> T
+</code></pre>
+
+
+
+
+<pre><code><b>pragma</b> opaque;
+<b>aborts_if</b> self.slots.is_none();
+<b>aborts_if</b> !<a href="table_with_length.md#0x1_table_with_length_spec_contains">table_with_length::spec_contains</a>(<a href="../../move-stdlib/doc/option.md#0x1_option_borrow">option::borrow</a>(self.slots), slot_index);
+<b>aborts_if</b> !(<a href="table_with_length.md#0x1_table_with_length_spec_get">table_with_length::spec_get</a>(<a href="../../move-stdlib/doc/option.md#0x1_option_borrow">option::borrow</a>(self.slots), slot_index) is Link::Occupied);
+<b>ensures</b> result == <a href="table_with_length.md#0x1_table_with_length_spec_get">table_with_length::spec_get</a>(<a href="../../move-stdlib/doc/option.md#0x1_option_borrow">option::borrow</a>(self.slots), slot_index).value;
+</code></pre>
+
+
+
+<a id="@Specification_1_reserve_slot"></a>
+
+### Function `reserve_slot`
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="storage_slots_allocator.md#0x1_storage_slots_allocator_reserve_slot">reserve_slot</a>&lt;T: store&gt;(self: &<b>mut</b> <a href="storage_slots_allocator.md#0x1_storage_slots_allocator_StorageSlotsAllocator">storage_slots_allocator::StorageSlotsAllocator</a>&lt;T&gt;): (<a href="storage_slots_allocator.md#0x1_storage_slots_allocator_StoredSlot">storage_slots_allocator::StoredSlot</a>, <a href="storage_slots_allocator.md#0x1_storage_slots_allocator_ReservedSlot">storage_slots_allocator::ReservedSlot</a>)
+</code></pre>
+
+
+
+
+<pre><code><b>aborts_if</b> self.reuse_head_index == 0 && self.new_slot_index + 1 &gt; MAX_U64;
+<b>pragma</b> aborts_if_is_partial;
+<b>ensures</b> result_1.slot_index == result_2.slot_index;
+</code></pre>
+
+
+
+<a id="@Specification_1_fill_reserved_slot"></a>
+
+### Function `fill_reserved_slot`
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="storage_slots_allocator.md#0x1_storage_slots_allocator_fill_reserved_slot">fill_reserved_slot</a>&lt;T: store&gt;(self: &<b>mut</b> <a href="storage_slots_allocator.md#0x1_storage_slots_allocator_StorageSlotsAllocator">storage_slots_allocator::StorageSlotsAllocator</a>&lt;T&gt;, slot: <a href="storage_slots_allocator.md#0x1_storage_slots_allocator_ReservedSlot">storage_slots_allocator::ReservedSlot</a>, val: T)
+</code></pre>
+
+
+
+
+<pre><code><b>pragma</b> opaque;
+<b>aborts_if</b> self.slots.is_none();
+<b>aborts_if</b> <a href="table_with_length.md#0x1_table_with_length_spec_contains">table_with_length::spec_contains</a>(<a href="../../move-stdlib/doc/option.md#0x1_option_borrow">option::borrow</a>(self.slots), slot.slot_index);
+<b>ensures</b> <a href="table_with_length.md#0x1_table_with_length_spec_contains">table_with_length::spec_contains</a>(<a href="../../move-stdlib/doc/option.md#0x1_option_borrow">option::borrow</a>(self.slots), slot.slot_index);
+<b>ensures</b> <a href="table_with_length.md#0x1_table_with_length_spec_get">table_with_length::spec_get</a>(<a href="../../move-stdlib/doc/option.md#0x1_option_borrow">option::borrow</a>(self.slots), slot.slot_index) is Link::Occupied;
+<b>ensures</b> <a href="table_with_length.md#0x1_table_with_length_spec_get">table_with_length::spec_get</a>(<a href="../../move-stdlib/doc/option.md#0x1_option_borrow">option::borrow</a>(self.slots), slot.slot_index).value == val;
+<b>ensures</b> self.slots.is_some();
+</code></pre>
+
+
+
+<a id="@Specification_1_remove_and_reserve"></a>
+
+### Function `remove_and_reserve`
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="storage_slots_allocator.md#0x1_storage_slots_allocator_remove_and_reserve">remove_and_reserve</a>&lt;T: store&gt;(self: &<b>mut</b> <a href="storage_slots_allocator.md#0x1_storage_slots_allocator_StorageSlotsAllocator">storage_slots_allocator::StorageSlotsAllocator</a>&lt;T&gt;, slot_index: u64): (<a href="storage_slots_allocator.md#0x1_storage_slots_allocator_ReservedSlot">storage_slots_allocator::ReservedSlot</a>, T)
+</code></pre>
+
+
+
+
+<pre><code><b>pragma</b> opaque;
+<b>aborts_if</b> self.slots.is_none();
+<b>aborts_if</b> !<a href="table_with_length.md#0x1_table_with_length_spec_contains">table_with_length::spec_contains</a>(<a href="../../move-stdlib/doc/option.md#0x1_option_borrow">option::borrow</a>(self.slots), slot_index);
+<b>aborts_if</b> !(<a href="table_with_length.md#0x1_table_with_length_spec_get">table_with_length::spec_get</a>(<a href="../../move-stdlib/doc/option.md#0x1_option_borrow">option::borrow</a>(self.slots), slot_index) is Link::Occupied);
+<b>ensures</b> result_1.slot_index == slot_index;
+<b>ensures</b> result_2 == <b>old</b>(<a href="table_with_length.md#0x1_table_with_length_spec_get">table_with_length::spec_get</a>(<a href="../../move-stdlib/doc/option.md#0x1_option_borrow">option::borrow</a>(self.slots), slot_index)).value;
+<b>ensures</b> self.slots.is_some();
+</code></pre>
+
+
+
+<a id="@Specification_1_free_reserved_slot"></a>
+
+### Function `free_reserved_slot`
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="storage_slots_allocator.md#0x1_storage_slots_allocator_free_reserved_slot">free_reserved_slot</a>&lt;T: store&gt;(self: &<b>mut</b> <a href="storage_slots_allocator.md#0x1_storage_slots_allocator_StorageSlotsAllocator">storage_slots_allocator::StorageSlotsAllocator</a>&lt;T&gt;, reserved_slot: <a href="storage_slots_allocator.md#0x1_storage_slots_allocator_ReservedSlot">storage_slots_allocator::ReservedSlot</a>, stored_slot: <a href="storage_slots_allocator.md#0x1_storage_slots_allocator_StoredSlot">storage_slots_allocator::StoredSlot</a>)
+</code></pre>
+
+
+
+
+<pre><code><b>aborts_if</b> reserved_slot.slot_index != stored_slot.slot_index;
+<b>aborts_if</b> self.should_reuse && self.slots.is_none();
+<b>pragma</b> aborts_if_is_partial;
 </code></pre>
 
 

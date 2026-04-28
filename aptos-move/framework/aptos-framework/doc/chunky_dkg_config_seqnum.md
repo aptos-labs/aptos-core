@@ -5,13 +5,30 @@
 
 ChunkyDKG stall recovery utils.
 
-When ChunkyDKG or SecretShareManager is stuck due to a bug, the chain may be stuck. Below is the recovery procedure.
+The right recovery procedure depends on what is broken:
+
+- Common case: ChunkyDKG output is stuck but consensus is still alive
+(the chain keeps producing blocks; only the epoch transition is wedged).
+Submit a governance proposal calling <code><a href="aptos_governance.md#0x1_aptos_governance_force_end_epoch">aptos_governance::force_end_epoch</a></code>.
+This invokes <code><a href="reconfiguration_with_dkg.md#0x1_reconfiguration_with_dkg_finish">reconfiguration_with_dkg::finish</a></code> directly, atomically
+clearing the lingering ChunkyDKG (and DKG) sessions and advancing the
+epoch in a single Move transaction. No restarts, no local override, no
+operator-managed halt.
+
+- Rare case: a ChunkyDKG-related bug breaks consensus itself, so the chain
+cannot make any progress (no governance txn can be committed). Recover
+by per-validator local override:
 1. Ensure more than 2/3 stakes are stuck at the same version.
-1. Every validator restarts with <code>chunky_dkg_override_seq_num</code> set to <code>X+1</code> in the node config file,
-where <code>X</code> is the current <code><a href="chunky_dkg_config_seqnum.md#0x1_chunky_dkg_config_seqnum_ChunkyDKGConfigSeqNum">ChunkyDKGConfigSeqNum</a></code> on chain.
-1. The chain should then be unblocked.
-1. Once the bug is fixed and the binary + framework have been patched,
-a governance proposal is needed to set <code><a href="chunky_dkg_config_seqnum.md#0x1_chunky_dkg_config_seqnum_ChunkyDKGConfigSeqNum">ChunkyDKGConfigSeqNum</a></code> to be <code>X+2</code>.
+2. On every validator, set <code>consensus.sync_only = <b>true</b></code> and restart so
+the chain is uniformly halted (avoids execution divergence during the
+staggered application of the override in the next step).
+3. On every validator, set <code>chunky_dkg_override_seq_num</code> to <code>X+1</code> in the
+node config file (where <code>X</code> is the current <code><a href="chunky_dkg_config_seqnum.md#0x1_chunky_dkg_config_seqnum_ChunkyDKGConfigSeqNum">ChunkyDKGConfigSeqNum</a></code> on
+chain), set <code>consensus.sync_only = <b>false</b></code>, and restart. The chain
+should then be unblocked.
+4. Once the bug is fixed and the binary + framework have been patched,
+a governance proposal is needed to set <code><a href="chunky_dkg_config_seqnum.md#0x1_chunky_dkg_config_seqnum_ChunkyDKGConfigSeqNum">ChunkyDKGConfigSeqNum</a></code> to
+<code>X+2</code>.
 
 
 -  [Resource `ChunkyDKGConfigSeqNum`](#0x1_chunky_dkg_config_seqnum_ChunkyDKGConfigSeqNum)

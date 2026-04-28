@@ -13,8 +13,10 @@ use super::{
 };
 use crate::stackless_exec_ir::{BasicBlock, BinaryOp, CmpOp, Instr, Label, Slot, UnaryOp};
 use anyhow::{bail, ensure, Context, Result};
-use mono_move_core::types::{self as ty, InternedType, InternedTypeList};
-use mono_move_global_context::ExecutionGuard;
+use mono_move_core::{
+    types::{self as ty, InternedType, InternedTypeList},
+    Interner,
+};
 use move_binary_format::{
     access::ModuleAccess,
     file_format::{
@@ -71,7 +73,7 @@ fn split_bytecode_into_blocks(
     Ok(blocks)
 }
 
-pub(crate) struct SsaConverter<'a> {
+pub(crate) struct SsaConverter<'a, I: Interner> {
     /// Next value ID number (0-based, monotonically increasing across blocks).
     next_vid: u16,
     /// Simulated operand stack.
@@ -80,8 +82,8 @@ pub(crate) struct SsaConverter<'a> {
     local_types: Vec<InternedType>,
     /// Types of value IDs, indexed directly by value ID number.
     vid_types: Vec<InternedType>,
-    /// Execution guard for interning types.
-    guard: &'a ExecutionGuard<'a>,
+    /// Interner for composite type construction.
+    interner: &'a I,
     /// Pre-resolved struct types, indexed by StructHandleIndex ordinal.
     /// `None` entries denote handles the orchestrator could not resolve
     /// (imported or generic); the converter must reject any code that
@@ -99,10 +101,10 @@ pub(crate) struct SsaConverter<'a> {
     next_label: u16,
 }
 
-impl<'a> SsaConverter<'a> {
+impl<'a, I: Interner> SsaConverter<'a, I> {
     pub(crate) fn new(
         local_types: Vec<InternedType>,
-        guard: &'a ExecutionGuard<'a>,
+        interner: &'a I,
         struct_types: &'a [Option<InternedType>],
     ) -> Self {
         Self {
@@ -110,7 +112,7 @@ impl<'a> SsaConverter<'a> {
             stack: Vec::new(),
             local_types,
             vid_types: Vec::new(),
-            guard,
+            interner,
             struct_types,
             blocks: Vec::new(),
             current_block_instrs: Vec::new(),
@@ -232,8 +234,8 @@ impl<'a> SsaConverter<'a> {
         let inst = &module.struct_def_instantiations[idx.0 as usize];
         let base_ty = self.struct_type(module, inst.def)?;
         let ty_args_toks = &module.signature_at(inst.type_parameters).0;
-        let ty_args = convert_sig_tokens(ty_args_toks, self.guard, self.struct_types)?;
-        let ty_args_ptr = self.guard.intern_type_list(&ty_args);
+        let ty_args = convert_sig_tokens(ty_args_toks, self.interner, self.struct_types)?;
+        let ty_args_ptr = self.interner.type_list_of(&ty_args);
         Ok((base_ty, ty_args_ptr))
     }
 
@@ -248,8 +250,8 @@ impl<'a> SsaConverter<'a> {
         let handle = &module.struct_variant_handles[inst.handle.0 as usize];
         let enum_ty = self.struct_type(module, handle.struct_index)?;
         let ty_args_toks = &module.signature_at(inst.type_parameters).0;
-        let ty_args = convert_sig_tokens(ty_args_toks, self.guard, self.struct_types)?;
-        let ty_args_ptr = self.guard.intern_type_list(&ty_args);
+        let ty_args = convert_sig_tokens(ty_args_toks, self.interner, self.struct_types)?;
+        let ty_args_ptr = self.interner.type_list_of(&ty_args);
         Ok((enum_ty, handle.variant, ty_args_ptr))
     }
 
@@ -274,7 +276,7 @@ impl<'a> SsaConverter<'a> {
             },
             _ => bail!("field access on native/variant struct"),
         };
-        convert_sig_token(&tok, self.guard, self.struct_types)
+        convert_sig_token(&tok, self.interner, self.struct_types)
     }
 
     fn field_inst_type(
@@ -292,7 +294,7 @@ impl<'a> SsaConverter<'a> {
         };
         let type_params = &module.signature_at(inst.type_parameters).0;
         let tok = substitute_type_params(&base_tok, type_params);
-        convert_sig_token(&tok, self.guard, self.struct_types)
+        convert_sig_token(&tok, self.interner, self.struct_types)
     }
 
     fn variant_field_handle_type(
@@ -310,7 +312,7 @@ impl<'a> SsaConverter<'a> {
             },
             _ => bail!("variant field access on non-variant struct"),
         };
-        convert_sig_token(&tok, self.guard, self.struct_types)
+        convert_sig_token(&tok, self.interner, self.struct_types)
     }
 
     fn variant_field_inst_type(
@@ -331,7 +333,7 @@ impl<'a> SsaConverter<'a> {
         };
         let type_params = &module.signature_at(inst.type_parameters).0;
         let tok = substitute_type_params(&base_tok, type_params);
-        convert_sig_token(&tok, self.guard, self.struct_types)
+        convert_sig_token(&tok, self.interner, self.struct_types)
     }
 
     // --------------------------------------------------------------------------------------------
@@ -459,7 +461,7 @@ impl<'a> SsaConverter<'a> {
             },
             B::LdConst(idx) => {
                 let tok = &module.constant_pool[idx.0 as usize].type_;
-                let ty = convert_sig_token(tok, self.guard, self.struct_types)?;
+                let ty = convert_sig_token(tok, self.interner, self.struct_types)?;
                 let dst = self.alloc_vid(ty)?;
                 self.current_block_instrs.push(Instr::LdConst(dst, *idx));
                 self.push_slot(dst);
@@ -544,7 +546,7 @@ impl<'a> SsaConverter<'a> {
             B::FreezeRef => {
                 let src_ty = self.vid_type(*self.stack.last().context("stack underflow")?)?;
                 // The bytecode verifier guarantees the operand is &mut T.
-                let result_ty = self.guard.convert_mut_to_immut_ref(src_ty)?;
+                let result_ty = ty::convert_mut_to_immut_ref(self.interner, src_ty)?;
                 self.convert_unop(UnaryOp::FreezeRef, result_ty)?;
             },
 
@@ -574,7 +576,7 @@ impl<'a> SsaConverter<'a> {
                 let n = struct_field_count(module, *idx);
                 let ftypes = struct_field_type_toks(module, *idx);
                 let ftypes: Vec<InternedType> =
-                    convert_sig_tokens(&ftypes, self.guard, self.struct_types)?;
+                    convert_sig_tokens(&ftypes, self.interner, self.struct_types)?;
                 let mut dsts = Vec::with_capacity(n);
                 for i in 0..n {
                     let fty = ftypes
@@ -601,7 +603,7 @@ impl<'a> SsaConverter<'a> {
                     .map(|ft| substitute_type_params(ft, &type_params))
                     .collect();
                 let ftypes: Vec<InternedType> =
-                    convert_sig_tokens(&ftypes_tok, self.guard, self.struct_types)?;
+                    convert_sig_tokens(&ftypes_tok, self.interner, self.struct_types)?;
                 let mut dsts = Vec::with_capacity(n);
                 for i in 0..n {
                     let fty = ftypes
@@ -642,7 +644,7 @@ impl<'a> SsaConverter<'a> {
                 let type_params = module.signature_at(inst.type_parameters).0.clone();
                 let def = &module.struct_defs[handle.struct_index.0 as usize];
                 let tok = SignatureToken::StructInstantiation(def.struct_handle, type_params);
-                let result_ty = convert_sig_token(&tok, self.guard, self.struct_types)?;
+                let result_ty = convert_sig_token(&tok, self.interner, self.struct_types)?;
                 let (enum_ty, variant, ty_args) = self.variant_inst_parts(module, *idx)?;
                 let dst = self.alloc_vid(result_ty)?;
                 self.current_block_instrs.push(Instr::PackVariantGeneric(
@@ -657,7 +659,7 @@ impl<'a> SsaConverter<'a> {
                 let n = variant_field_count(module, handle.struct_index, variant);
                 let ftypes_tok = variant_field_type_toks(module, handle.struct_index, variant);
                 let ftypes: Vec<InternedType> =
-                    convert_sig_tokens(&ftypes_tok, self.guard, self.struct_types)?;
+                    convert_sig_tokens(&ftypes_tok, self.interner, self.struct_types)?;
                 let mut dsts = Vec::with_capacity(n);
                 for i in 0..n {
                     let fty = ftypes
@@ -690,7 +692,7 @@ impl<'a> SsaConverter<'a> {
                     .map(|ft| substitute_type_params(ft, &type_params))
                     .collect();
                 let ftypes: Vec<InternedType> =
-                    convert_sig_tokens(&ftypes_tok, self.guard, self.struct_types)?;
+                    convert_sig_tokens(&ftypes_tok, self.interner, self.struct_types)?;
                 let mut dsts = Vec::with_capacity(n);
                 for i in 0..n {
                     let fty = ftypes
@@ -735,7 +737,7 @@ impl<'a> SsaConverter<'a> {
             B::ImmBorrowLoc(idx) => {
                 let src = Slot::Home(*idx as u16);
                 let inner = self.local_types[*idx as usize];
-                let ty = self.guard.intern_immut_ref(inner);
+                let ty = self.interner.immut_ref_of(inner);
                 let dst = self.alloc_vid(ty)?;
                 self.current_block_instrs
                     .push(Instr::ImmBorrowLoc(dst, src));
@@ -744,7 +746,7 @@ impl<'a> SsaConverter<'a> {
             B::MutBorrowLoc(idx) => {
                 let src = Slot::Home(*idx as u16);
                 let inner = self.local_types[*idx as usize];
-                let ty = self.guard.intern_mut_ref(inner);
+                let ty = self.interner.mut_ref_of(inner);
                 let dst = self.alloc_vid(ty)?;
                 self.current_block_instrs
                     .push(Instr::MutBorrowLoc(dst, src));
@@ -753,7 +755,7 @@ impl<'a> SsaConverter<'a> {
             B::ImmBorrowField(idx) => {
                 let src = self.pop_slot()?;
                 let fty = self.field_type(module, *idx)?;
-                let ty = self.guard.intern_immut_ref(fty);
+                let ty = self.interner.immut_ref_of(fty);
                 let dst = self.alloc_vid(ty)?;
                 self.current_block_instrs
                     .push(Instr::ImmBorrowField(dst, *idx, src));
@@ -762,7 +764,7 @@ impl<'a> SsaConverter<'a> {
             B::MutBorrowField(idx) => {
                 let src = self.pop_slot()?;
                 let fty = self.field_type(module, *idx)?;
-                let ty = self.guard.intern_mut_ref(fty);
+                let ty = self.interner.mut_ref_of(fty);
                 let dst = self.alloc_vid(ty)?;
                 self.current_block_instrs
                     .push(Instr::MutBorrowField(dst, *idx, src));
@@ -771,7 +773,7 @@ impl<'a> SsaConverter<'a> {
             B::ImmBorrowFieldGeneric(idx) => {
                 let src = self.pop_slot()?;
                 let fty = self.field_inst_type(module, *idx)?;
-                let ty = self.guard.intern_immut_ref(fty);
+                let ty = self.interner.immut_ref_of(fty);
                 let dst = self.alloc_vid(ty)?;
                 self.current_block_instrs
                     .push(Instr::ImmBorrowFieldGeneric(dst, *idx, src));
@@ -780,7 +782,7 @@ impl<'a> SsaConverter<'a> {
             B::MutBorrowFieldGeneric(idx) => {
                 let src = self.pop_slot()?;
                 let fty = self.field_inst_type(module, *idx)?;
-                let ty = self.guard.intern_mut_ref(fty);
+                let ty = self.interner.mut_ref_of(fty);
                 let dst = self.alloc_vid(ty)?;
                 self.current_block_instrs
                     .push(Instr::MutBorrowFieldGeneric(dst, *idx, src));
@@ -789,7 +791,7 @@ impl<'a> SsaConverter<'a> {
             B::ImmBorrowVariantField(idx) => {
                 let src = self.pop_slot()?;
                 let fty = self.variant_field_handle_type(module, *idx)?;
-                let ty = self.guard.intern_immut_ref(fty);
+                let ty = self.interner.immut_ref_of(fty);
                 let dst = self.alloc_vid(ty)?;
                 self.current_block_instrs
                     .push(Instr::ImmBorrowVariantField(dst, *idx, src));
@@ -798,7 +800,7 @@ impl<'a> SsaConverter<'a> {
             B::MutBorrowVariantField(idx) => {
                 let src = self.pop_slot()?;
                 let fty = self.variant_field_handle_type(module, *idx)?;
-                let ty = self.guard.intern_mut_ref(fty);
+                let ty = self.interner.mut_ref_of(fty);
                 let dst = self.alloc_vid(ty)?;
                 self.current_block_instrs
                     .push(Instr::MutBorrowVariantField(dst, *idx, src));
@@ -807,7 +809,7 @@ impl<'a> SsaConverter<'a> {
             B::ImmBorrowVariantFieldGeneric(idx) => {
                 let src = self.pop_slot()?;
                 let fty = self.variant_field_inst_type(module, *idx)?;
-                let ty = self.guard.intern_immut_ref(fty);
+                let ty = self.interner.immut_ref_of(fty);
                 let dst = self.alloc_vid(ty)?;
                 self.current_block_instrs
                     .push(Instr::ImmBorrowVariantFieldGeneric(dst, *idx, src));
@@ -816,7 +818,7 @@ impl<'a> SsaConverter<'a> {
             B::MutBorrowVariantFieldGeneric(idx) => {
                 let src = self.pop_slot()?;
                 let fty = self.variant_field_inst_type(module, *idx)?;
-                let ty = self.guard.intern_mut_ref(fty);
+                let ty = self.interner.mut_ref_of(fty);
                 let dst = self.alloc_vid(ty)?;
                 self.current_block_instrs
                     .push(Instr::MutBorrowVariantFieldGeneric(dst, *idx, src));
@@ -826,7 +828,7 @@ impl<'a> SsaConverter<'a> {
                 let src = self.pop_slot()?;
                 let src_ty = self.vid_type(src)?;
                 // The bytecode verifier guarantees the operand is `&T` or `&mut T`.
-                let ty = self.guard.strip_ref(src_ty)?;
+                let ty = ty::strip_ref(src_ty)?;
                 let dst = self.alloc_vid(ty)?;
                 self.current_block_instrs.push(Instr::ReadRef(dst, src));
                 self.push_slot(dst);
@@ -888,7 +890,7 @@ impl<'a> SsaConverter<'a> {
             B::ImmBorrowGlobal(idx) => {
                 let addr = self.pop_slot()?;
                 let inner = self.struct_type(module, *idx)?;
-                let ty = self.guard.intern_immut_ref(inner);
+                let ty = self.interner.immut_ref_of(inner);
                 let dst = self.alloc_vid(ty)?;
                 self.current_block_instrs
                     .push(Instr::ImmBorrowGlobal(dst, inner, addr));
@@ -897,7 +899,7 @@ impl<'a> SsaConverter<'a> {
             B::ImmBorrowGlobalGeneric(idx) => {
                 let addr = self.pop_slot()?;
                 let inner = self.struct_inst_type(module, *idx)?;
-                let ty = self.guard.intern_immut_ref(inner);
+                let ty = self.interner.immut_ref_of(inner);
                 let (base_ty, ty_args) = self.struct_inst_parts(module, *idx)?;
                 let dst = self.alloc_vid(ty)?;
                 self.current_block_instrs
@@ -907,7 +909,7 @@ impl<'a> SsaConverter<'a> {
             B::MutBorrowGlobal(idx) => {
                 let addr = self.pop_slot()?;
                 let inner = self.struct_type(module, *idx)?;
-                let ty = self.guard.intern_mut_ref(inner);
+                let ty = self.interner.mut_ref_of(inner);
                 let dst = self.alloc_vid(ty)?;
                 self.current_block_instrs
                     .push(Instr::MutBorrowGlobal(dst, inner, addr));
@@ -916,7 +918,7 @@ impl<'a> SsaConverter<'a> {
             B::MutBorrowGlobalGeneric(idx) => {
                 let addr = self.pop_slot()?;
                 let inner = self.struct_inst_type(module, *idx)?;
-                let ty = self.guard.intern_mut_ref(inner);
+                let ty = self.interner.mut_ref_of(inner);
                 let (base_ty, ty_args) = self.struct_inst_parts(module, *idx)?;
                 let dst = self.alloc_vid(ty)?;
                 self.current_block_instrs
@@ -929,7 +931,7 @@ impl<'a> SsaConverter<'a> {
                 let handle = module.function_handle_at(*idx);
                 let num_args = module.signature_at(handle.parameters).0.len();
                 let ret_toks = &module.signature_at(handle.return_).0;
-                let ret_types = convert_sig_tokens(ret_toks, self.guard, self.struct_types)?;
+                let ret_types = convert_sig_tokens(ret_toks, self.interner, self.struct_types)?;
                 let args = self.pop_n_reverse(num_args)?;
                 let mut rets = Vec::with_capacity(ret_types.len());
                 for rty in ret_types {
@@ -951,7 +953,7 @@ impl<'a> SsaConverter<'a> {
                     .iter()
                     .map(|t| substitute_type_params(t, &type_params))
                     .collect();
-                let ret_types = convert_sig_tokens(&ret_toks, self.guard, self.struct_types)?;
+                let ret_types = convert_sig_tokens(&ret_toks, self.interner, self.struct_types)?;
                 let args = self.pop_n_reverse(num_args)?;
                 let mut rets = Vec::with_capacity(ret_types.len());
                 for rty in ret_types {
@@ -976,7 +978,7 @@ impl<'a> SsaConverter<'a> {
                     returns.clone(),
                     move_core_types::ability::AbilitySet::EMPTY,
                 );
-                let ty = convert_sig_token(&tok, self.guard, self.struct_types)?;
+                let ty = convert_sig_token(&tok, self.interner, self.struct_types)?;
                 let dst = self.alloc_vid(ty)?;
                 self.current_block_instrs
                     .push(Instr::PackClosure(dst, *fhi, *mask, captured));
@@ -994,7 +996,7 @@ impl<'a> SsaConverter<'a> {
                     returns.clone(),
                     move_core_types::ability::AbilitySet::EMPTY,
                 );
-                let ty = convert_sig_token(&tok, self.guard, self.struct_types)?;
+                let ty = convert_sig_token(&tok, self.interner, self.struct_types)?;
                 let dst = self.alloc_vid(ty)?;
                 self.current_block_instrs
                     .push(Instr::PackClosureGeneric(dst, *fii, *mask, captured));
@@ -1008,7 +1010,7 @@ impl<'a> SsaConverter<'a> {
                     } else {
                         bail!("CallClosure signature must start with a Function token")
                     };
-                let ret_types = convert_sig_tokens(&ret_toks, self.guard, self.struct_types)?;
+                let ret_types = convert_sig_tokens(&ret_toks, self.interner, self.struct_types)?;
                 let closure = self.pop_slot()?;
                 let mut all_args = self.pop_n_reverse(num_args)?;
                 all_args.push(closure);
@@ -1016,8 +1018,8 @@ impl<'a> SsaConverter<'a> {
                 for rty in &ret_types {
                     rets.push(self.alloc_vid(*rty)?);
                 }
-                let sig_types_vec = convert_sig_tokens(&sig.0, self.guard, self.struct_types)?;
-                let signature_types = self.guard.intern_type_list(&sig_types_vec);
+                let sig_types_vec = convert_sig_tokens(&sig.0, self.interner, self.struct_types)?;
+                let signature_types = self.interner.type_list_of(&sig_types_vec);
                 self.current_block_instrs.push(Instr::CallClosure(
                     rets.clone(),
                     signature_types,
@@ -1033,8 +1035,8 @@ impl<'a> SsaConverter<'a> {
                 let count = *count as u16;
                 let elems = self.pop_n_reverse(count as usize)?;
                 let elem_tok = &module.signature_at(*sig_idx).0[0];
-                let elem_ty = convert_sig_token(elem_tok, self.guard, self.struct_types)?;
-                let ty = self.guard.intern_vector(elem_ty);
+                let elem_ty = convert_sig_token(elem_tok, self.interner, self.struct_types)?;
+                let ty = self.interner.vector_of(elem_ty);
                 let dst = self.alloc_vid(ty)?;
                 self.current_block_instrs
                     .push(Instr::VecPack(dst, elem_ty, count, elems));
@@ -1043,7 +1045,7 @@ impl<'a> SsaConverter<'a> {
             B::VecLen(sig_idx) => {
                 let vec_ref = self.pop_slot()?;
                 let elem_tok = &module.signature_at(*sig_idx).0[0];
-                let elem_ty = convert_sig_token(elem_tok, self.guard, self.struct_types)?;
+                let elem_ty = convert_sig_token(elem_tok, self.interner, self.struct_types)?;
                 let dst = self.alloc_vid(ty::U64_TY)?;
                 self.current_block_instrs
                     .push(Instr::VecLen(dst, elem_ty, vec_ref));
@@ -1053,8 +1055,8 @@ impl<'a> SsaConverter<'a> {
                 let idx_r = self.pop_slot()?;
                 let vec_ref = self.pop_slot()?;
                 let elem_tok = &module.signature_at(*sig_idx).0[0];
-                let elem_ty = convert_sig_token(elem_tok, self.guard, self.struct_types)?;
-                let ty = self.guard.intern_immut_ref(elem_ty);
+                let elem_ty = convert_sig_token(elem_tok, self.interner, self.struct_types)?;
+                let ty = self.interner.immut_ref_of(elem_ty);
                 let dst = self.alloc_vid(ty)?;
                 self.current_block_instrs
                     .push(Instr::VecImmBorrow(dst, elem_ty, vec_ref, idx_r));
@@ -1064,8 +1066,8 @@ impl<'a> SsaConverter<'a> {
                 let idx_r = self.pop_slot()?;
                 let vec_ref = self.pop_slot()?;
                 let elem_tok = &module.signature_at(*sig_idx).0[0];
-                let elem_ty = convert_sig_token(elem_tok, self.guard, self.struct_types)?;
-                let ty = self.guard.intern_mut_ref(elem_ty);
+                let elem_ty = convert_sig_token(elem_tok, self.interner, self.struct_types)?;
+                let ty = self.interner.mut_ref_of(elem_ty);
                 let dst = self.alloc_vid(ty)?;
                 self.current_block_instrs
                     .push(Instr::VecMutBorrow(dst, elem_ty, vec_ref, idx_r));
@@ -1075,14 +1077,14 @@ impl<'a> SsaConverter<'a> {
                 let val = self.pop_slot()?;
                 let vec_ref = self.pop_slot()?;
                 let elem_tok = &module.signature_at(*sig_idx).0[0];
-                let elem_ty = convert_sig_token(elem_tok, self.guard, self.struct_types)?;
+                let elem_ty = convert_sig_token(elem_tok, self.interner, self.struct_types)?;
                 self.current_block_instrs
                     .push(Instr::VecPushBack(elem_ty, vec_ref, val));
             },
             B::VecPopBack(sig_idx) => {
                 let vec_ref = self.pop_slot()?;
                 let elem_tok = &module.signature_at(*sig_idx).0[0];
-                let elem_ty = convert_sig_token(elem_tok, self.guard, self.struct_types)?;
+                let elem_ty = convert_sig_token(elem_tok, self.interner, self.struct_types)?;
                 let dst = self.alloc_vid(elem_ty)?;
                 self.current_block_instrs
                     .push(Instr::VecPopBack(dst, elem_ty, vec_ref));
@@ -1092,7 +1094,7 @@ impl<'a> SsaConverter<'a> {
                 let count = *count as u16;
                 let src = self.pop_slot()?;
                 let elem_tok = &module.signature_at(*sig_idx).0[0];
-                let elem_ty = convert_sig_token(elem_tok, self.guard, self.struct_types)?;
+                let elem_ty = convert_sig_token(elem_tok, self.interner, self.struct_types)?;
                 let mut dsts = Vec::with_capacity(count as usize);
                 for _ in 0..count {
                     dsts.push(self.alloc_vid(elem_ty)?);
@@ -1108,7 +1110,7 @@ impl<'a> SsaConverter<'a> {
                 let i = self.pop_slot()?;
                 let vec_ref = self.pop_slot()?;
                 let elem_tok = &module.signature_at(*sig_idx).0[0];
-                let elem_ty = convert_sig_token(elem_tok, self.guard, self.struct_types)?;
+                let elem_ty = convert_sig_token(elem_tok, self.interner, self.struct_types)?;
                 self.current_block_instrs
                     .push(Instr::VecSwap(elem_ty, vec_ref, i, j));
             },

@@ -92,8 +92,14 @@ impl FunctionTargetProcessor for SpecInstrumentationProcessor {
                 Instrumenter::run(&options, targets, fun_env, verification_data, scc_opt);
             verification_data = instrumented;
 
-            if split_points.is_empty() {
+            if split_points.is_empty() || options.inference {
                 // No splits — insert the single verification variant.
+                // Proof-block split-fork is verification-only; during inference
+                // (`options.inference`) we never fork, so each function has at
+                // most one verified variant for inference to walk. By
+                // construction `Instrumenter::run` should not produce any
+                // `split_points` under inference, but check explicitly so the
+                // gate is local to this site too.
                 targets.insert_target_data(
                     &fun_env.get_qualified_id(),
                     verification_data.variant.clone(),
@@ -470,13 +476,24 @@ impl<'a> Instrumenter<'a> {
             split_points: vec![],
             freshen_counter: 0,
         };
-        if ProverOptions::get(instrumenter.builder.global_env()).inline_spec_lets {
-            let mut spec = spec;
-            instrumenter.inline_lets(&mut spec, false);
-            instrumenter.instrument(&spec, &inlined_props);
-        } else {
-            instrumenter.instrument(&spec, &inlined_props);
+        // Always inline spec lets in proof actions, independent of the
+        // `inline_spec_lets` option. Proof-action exps are recorded in
+        // `split_points` outside the bytecode, so they are not rewritten by
+        // the subsequent live-var analysis — inlining here is the only way
+        // to ensure they reference only stable Move-level temps.
+        //
+        // Skip during spec inference: proof blocks are a verification-only
+        // construct and must not influence the bytecode the inference walker
+        // sees. `instrument` likewise skips emitting proof actions under
+        // `options.inference`, so this work would be wasted anyway.
+        let mut spec = spec;
+        if !options.inference {
+            instrumenter.inline_lets_in_proof_actions(&mut spec);
         }
+        if ProverOptions::get(instrumenter.builder.global_env()).inline_spec_lets {
+            instrumenter.inline_lets(&mut spec, false);
+        }
+        instrumenter.instrument(&spec, &inlined_props);
 
         // Extract split points before consuming the instrumenter.
         let split_points = std::mem::take(&mut instrumenter.split_points);
@@ -582,6 +599,12 @@ impl<'a> Instrumenter<'a> {
         // Instrument and generate new code.
         // Peel leading TraceLocal instructions and emit them before pre_proof
         // so that pre-proof assertion errors can display model values in counter-examples.
+        //
+        // Skip proof-action emission entirely during spec inference: proof
+        // blocks are a verification-only construct, and emitting their props
+        // (or accumulating their split points) would cause the inference
+        // walker to fork per case and produce per-variant inferred specs.
+        let emit_proof = !self.options.inference;
         let mut old_code = old_code.into_iter();
         let mut pre_proof_emitted = false;
         for bc in old_code.by_ref() {
@@ -589,13 +612,15 @@ impl<'a> Instrumenter<'a> {
                 self.builder.emit(bc);
             } else {
                 // First non-trace instruction: emit pre_proof, then this instruction.
-                self.emit_proof_actions(&spec.pre_proof, spec);
+                if emit_proof {
+                    self.emit_proof_actions(&spec.pre_proof, spec);
+                }
                 pre_proof_emitted = true;
                 self.instrument_bytecode(spec, inlined_props, bc);
                 break;
             }
         }
-        if !pre_proof_emitted {
+        if !pre_proof_emitted && emit_proof {
             self.emit_proof_actions(&spec.pre_proof, spec);
         }
         // Continue with remaining old_code.
@@ -1099,6 +1124,112 @@ impl<'a> Instrumenter<'a> {
         }
     }
 
+    /// Inline spec let bindings into proof-block actions only, leaving
+    /// `spec.lets` and all other conditions untouched. Proof actions are
+    /// recorded out of band (notably `Split` exps in `split_points`), so
+    /// the bytecode-level temp remap performed by later live-var analysis
+    /// does not reach them. Substituting here replaces references to
+    /// spec-let temps with their defining expressions, which use only
+    /// Move-level temps that survive the remap with stable indices.
+    ///
+    /// `LetPre` bindings substituted into post-state proof actions
+    /// (`post_proof`) are annotated with pre-state memory labels and have
+    /// their parameter references remapped to saved versions, mirroring the
+    /// treatment in `inline_lets`. Without this, a `let pre = R[a].f;`
+    /// referenced from a `post { ... }` action would evaluate `R[a].f` at
+    /// post-state instead of the saved entry-state snapshot.
+    fn inline_lets_in_proof_actions(&mut self, spec: &mut TranslatedSpec) {
+        if spec.pre_proof.is_empty() && spec.post_proof.is_empty() {
+            return;
+        }
+        let env = self.builder.global_env();
+        let substitute_exp =
+            |env: &GlobalEnv, cond: &mut Exp, temp: TempIndex, replacement: &Exp| {
+                let replacement = replacement.clone();
+                let mut replacer =
+                    |_id: move_model::model::NodeId, target: RewriteTarget| -> Option<Exp> {
+                        if let RewriteTarget::Temporary(idx) = target {
+                            if idx == temp {
+                                return Some(replacement.clone());
+                            }
+                        }
+                        None
+                    };
+                *cond = ExpRewriter::new(env, &mut replacer).rewrite_exp(cond.clone());
+            };
+        let substitute_proof_action =
+            |env: &GlobalEnv, action: &mut ProofAction, temp, replacement: &Exp| match action {
+                ProofAction::Assert(exp, _) | ProofAction::Assume(exp) => {
+                    substitute_exp(env, exp, temp, replacement);
+                },
+                ProofAction::Split(exp, guard) => {
+                    substitute_exp(env, exp, temp, replacement);
+                    if let Some(g) = guard {
+                        substitute_exp(env, g, temp, replacement);
+                    }
+                },
+            };
+        // Compute the post-state replacement for a `LetPre` lazily — only when
+        // a let temp is actually referenced from a `post_proof` action. This
+        // avoids allocating fresh `saved_memory` labels and `saved_params`
+        // temps for every spec let, which would pollute the pre-state save
+        // sets and bloat downstream Boogie translation even when no proof
+        // action consumes them.
+        let mut resolved_lets: Vec<(TempIndex, bool, Exp)> = Vec::new();
+        for (_, is_post, temp, exp) in spec.lets.clone() {
+            let mut pre_rhs = exp.clone();
+            for (prev_temp, _, prev_pre) in &resolved_lets {
+                substitute_exp(env, &mut pre_rhs, *prev_temp, prev_pre);
+            }
+            resolved_lets.push((temp, is_post, pre_rhs));
+        }
+        for (temp, is_post, pre_replacement) in &resolved_lets {
+            for (_, action) in &mut spec.pre_proof {
+                substitute_proof_action(env, action, *temp, pre_replacement);
+            }
+            if spec.post_proof.is_empty() {
+                continue;
+            }
+            // Only compute the (potentially state-allocating) post replacement
+            // if the temp is actually referenced from a post_proof action.
+            let exp_uses_temp = |exp: &Exp, temp: TempIndex| {
+                let mut found = false;
+                exp.visit_pre_order(&mut |e| {
+                    if let ExpData::Temporary(_, idx) = e {
+                        if *idx == temp {
+                            found = true;
+                        }
+                    }
+                    !found
+                });
+                found
+            };
+            let referenced = spec.post_proof.iter().any(|(_, action)| match action {
+                ProofAction::Assert(exp, _) | ProofAction::Assume(exp) => exp_uses_temp(exp, *temp),
+                ProofAction::Split(exp, guard) => {
+                    exp_uses_temp(exp, *temp)
+                        || guard.as_ref().is_some_and(|g| exp_uses_temp(g, *temp))
+                },
+            });
+            if !referenced {
+                continue;
+            }
+            let post_replacement = if !*is_post {
+                let annotated = Self::annotate_pre_state_memory(
+                    env,
+                    pre_replacement.clone(),
+                    &mut spec.saved_memory,
+                );
+                self.remap_params_to_saved(annotated, &mut spec.saved_params)
+            } else {
+                pre_replacement.clone()
+            };
+            for (_, action) in &mut spec.post_proof {
+                substitute_proof_action(env, action, *temp, &post_replacement);
+            }
+        }
+    }
+
     /// Inline let bindings by substituting the expression directly into conditions.
     /// For `LetPre` expressions in post-state conditions, annotates memory references
     /// with pre-state labels to preserve pre-state evaluation semantics.
@@ -1375,6 +1506,7 @@ impl<'a> Instrumenter<'a> {
                 | Operation::Exists(_)
                 | Operation::CanModify
                 | Operation::ResourceDomain
+                | Operation::StateDomain
                 | Operation::Behavior(..),
                 _,
             ) = e
@@ -1602,7 +1734,10 @@ impl<'a> Instrumenter<'a> {
             }
 
             // Emit return-point proof actions (`post`-prefixed proof statements).
-            self.emit_proof_actions(&spec.post_proof, spec);
+            // Verification-only — see the corresponding gate before pre_proof.
+            if !self.options.inference {
+                self.emit_proof_actions(&spec.post_proof, spec);
+            }
 
             // Emit all post-conditions which must hold.
             // For defining conditions (already assumed), assert the non-defining

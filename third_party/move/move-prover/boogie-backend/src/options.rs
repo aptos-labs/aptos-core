@@ -202,6 +202,17 @@ pub struct BoogieOptions {
     /// Optional aggregate function names for native methods implementing mutable borrow semantics
     #[arg(skip)]
     pub borrow_aggregates: Vec<BorrowAggregate>,
+    /// Generate an independent verification condition for each assertion in a
+    /// function instead of a single combined condition. Can help the prover
+    /// when a function contains both provable-but-hard asserts and asserts
+    /// that produce counterexamples; useful for diagnosing per-function
+    /// timeouts.
+    #[arg(long)]
+    pub split_vcs_by_assert: bool,
+    /// Maximum number of counterexamples reported per verification
+    /// condition.
+    #[arg(long, default_value_t = 5)]
+    pub error_limit: usize,
 }
 
 impl Default for BoogieOptions {
@@ -238,6 +249,8 @@ impl Default for BoogieOptions {
             loop_unroll: None,
             borrow_aggregates: vec![],
             skip_instance_check: false,
+            split_vcs_by_assert: false,
+            error_limit: 5,
         }
     }
 }
@@ -295,6 +308,10 @@ impl BoogieOptions {
         if let Some(iters) = self.loop_unroll {
             add(&[&format!("-loopUnroll:{}", iters)]);
         }
+        if self.split_vcs_by_assert {
+            add(&["-vcsSplitOnEveryAssert"]);
+        }
+        add(&[&format!("-errorLimit:{}", self.error_limit)]);
         add(&[&format!(
             "-vcsCores:{}",
             if self.stable_test_output {

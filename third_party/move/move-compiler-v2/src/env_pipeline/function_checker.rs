@@ -476,6 +476,7 @@ fn collect_struct_op_from_exp(func: &FunctionEnv, exp: &ExpData, ops: &mut Vec<S
             | Operation::TypeValue
             | Operation::TypeDomain
             | Operation::ResourceDomain
+            | Operation::StateDomain
             | Operation::Global(_)
             | Operation::CanModify
             | Operation::Old

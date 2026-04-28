@@ -2907,7 +2907,19 @@ fn parse_quant_binding(context: &mut Context) -> Result<Spanned<(Bind, Exp)>, Bo
     } else {
         // This is a quantifier over a value, like a vector or a range.
         consume_identifier(context.tokens, "in")?;
-        parse_exp(context)?
+        if context.tokens.peek() == Tok::Star {
+            // State domain: `S in *` — quantification over all memory states.
+            let star_start = context.tokens.start_loc();
+            context.tokens.advance()?;
+            let star_loc = make_loc(
+                context.tokens.file_hash(),
+                star_start,
+                context.tokens.previous_end_loc(),
+            );
+            make_builtin_call(star_loc, Symbol::from("$spec_state_domain"), None, vec![])
+        } else {
+            parse_exp(context)?
+        }
     };
     let end_loc = context.tokens.previous_end_loc();
     Ok(spanned(

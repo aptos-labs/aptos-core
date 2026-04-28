@@ -84,10 +84,20 @@ module aptos_std::big_vector {
         while (i < half_other_len) {
             self.push_back(other.swap_remove(i));
             i += 1;
+        }
+        spec {
+            invariant i <= half_other_len;
+            invariant other.length() == other_len - i;
+            invariant self.length() == length(old(self)) + i;
         };
         while (i < other_len) {
             self.push_back(other.pop_back());
             i += 1;
+        }
+        spec {
+            invariant half_other_len <= i && i <= other_len;
+            invariant other.length() == other_len - i;
+            invariant self.length() == length(old(self)) + i;
         };
         other.destroy_empty();
     }
@@ -134,13 +144,10 @@ module aptos_std::big_vector {
         let res = cur_bucket.remove(i % self.bucket_size);
         self.end_index -= 1;
         move cur_bucket;
-        while ({
-            spec {
-                invariant cur_bucket_index <= num_buckets;
-                invariant table_with_length::spec_len(self.buckets) == num_buckets;
-            };
-            (cur_bucket_index < num_buckets)
-        }) {
+        spec {
+            update initial_end_index = self.end_index;
+        };
+        while (cur_bucket_index < num_buckets) {
             // remove one element from the start of current vector
             let cur_bucket = self.buckets.borrow_mut(cur_bucket_index);
             let t = cur_bucket.remove(0);
@@ -149,6 +156,14 @@ module aptos_std::big_vector {
             let prev_bucket = self.buckets.borrow_mut(cur_bucket_index - 1);
             prev_bucket.push_back(t);
             cur_bucket_index += 1;
+        }
+        spec {
+            invariant 1 <= cur_bucket_index && cur_bucket_index <= num_buckets;
+            invariant self.end_index == old(self).end_index - 1;
+            invariant self.bucket_size == old(self).bucket_size;
+            invariant table_with_length::spec_len(self.buckets) == num_buckets;
+            invariant forall j in 0..table_with_length::spec_len(self.buckets):
+                table_with_length::spec_contains(self.buckets, j);
         };
         spec {
             assert cur_bucket_index == num_buckets;
@@ -262,6 +277,13 @@ module aptos_std::big_vector {
                 return (true, bucket_index * self.bucket_size + i)
             };
             bucket_index += 1;
+        }
+        spec {
+            invariant bucket_index <= num_buckets;
+            // All buckets checked so far contain no element equal to val.
+            invariant forall j in 0..bucket_index:
+                (forall k in 0..len(table_with_length::spec_get(self.buckets, j)):
+                    table_with_length::spec_get(self.buckets, j)[k] != val);
         };
         (false, 0)
     }

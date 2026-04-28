@@ -38,6 +38,8 @@ module std::bcs {
 
     spec serialized_size<MoveValue>(v: &MoveValue): u64 {
         pragma opaque;
+        // in practice, this function should never abort
+        aborts_if [abstract] false;
         ensures result == len(serialize(v));
     }
 

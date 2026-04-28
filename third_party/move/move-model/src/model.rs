@@ -861,6 +861,11 @@ impl GlobalEnv {
         self.memory_label_names.borrow().get(&label).copied()
     }
 
+    /// Get a snapshot of all memory label names.
+    pub fn get_memory_label_names(&self) -> BTreeMap<MemoryLabel, Symbol> {
+        self.memory_label_names.borrow().clone()
+    }
+
     /// Returns a reference to the symbol pool owned by this environment.
     pub fn symbol_pool(&self) -> &SymbolPool {
         &self.symbol_pool

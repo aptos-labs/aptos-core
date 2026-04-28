@@ -17,7 +17,7 @@ use crate::{
 use aptos_gas_algebra::{Arg, GasExpression};
 use aptos_gas_schedule::gas_params::natives::aptos_framework::*;
 use aptos_native_interface::{
-    safely_pop_arg, SafeNativeContext, SafeNativeError, SafeNativeResult,
+    safely_pop_arg, with_native_rayon, SafeNativeContext, SafeNativeError, SafeNativeResult,
 };
 use aptos_types::on_chain_config::FeatureFlag;
 use ark_ec::{CurveGroup, PrimeGroup};
@@ -233,13 +233,15 @@ macro_rules! ark_msm_internal {
             $proj_double_cost,
             num_elements,
         ))?;
-        let new_element: $element_typ =
-            ark_ec::VariableBaseMSM::msm(bases.as_slice(), scalars.as_slice()).map_err(|_e| {
-                SafeNativeError::abort_with_message(
-                    E_SCALAR_MUL_MSM_COMPUTATION_FAILED,
-                    "MSM computation failed",
-                )
-            })?;
+        let new_element: $element_typ = with_native_rayon(|| {
+            ark_ec::VariableBaseMSM::msm(bases.as_slice(), scalars.as_slice())
+        })
+        .map_err(|_e| {
+            SafeNativeError::abort_with_message(
+                E_SCALAR_MUL_MSM_COMPUTATION_FAILED,
+                "MSM computation failed",
+            )
+        })?;
         let new_handle = store_element!($context, new_element)?;
         Ok(smallvec![Value::u64(new_handle as u64)])
     }};

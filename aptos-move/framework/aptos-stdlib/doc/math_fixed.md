@@ -15,6 +15,9 @@ Standard math utilities missing in the Move Language.
 -  [Function `mul_div`](#0x1_math_fixed_mul_div)
 -  [Function `exp_raw`](#0x1_math_fixed_exp_raw)
 -  [Function `pow_raw`](#0x1_math_fixed_pow_raw)
+-  [Specification](#@Specification_1)
+    -  [Function `sqrt`](#@Specification_1_sqrt)
+    -  [Function `mul_div`](#@Specification_1_mul_div)
 
 
 <pre><code><b>use</b> <a href="../../move-stdlib/doc/fixed_point32.md#0x1_fixed_point32">0x1::fixed_point32</a>;
@@ -293,6 +296,48 @@ Specialized function for x * y / z that omits intermediate shifting
 
 
 </details>
+
+<a id="@Specification_1"></a>
+
+## Specification
+
+
+<a id="@Specification_1_sqrt"></a>
+
+### Function `sqrt`
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="math_fixed.md#0x1_math_fixed_sqrt">sqrt</a>(x: <a href="../../move-stdlib/doc/fixed_point32.md#0x1_fixed_point32_FixedPoint32">fixed_point32::FixedPoint32</a>): <a href="../../move-stdlib/doc/fixed_point32.md#0x1_fixed_point32_FixedPoint32">fixed_point32::FixedPoint32</a>
+</code></pre>
+
+
+<code>sqrt</code> never aborts: math128::sqrt(0)==0 so the Newton step is skipped; for y>0 result fits in u64.
+No loop in the body, so callers can inline without havocing.
+
+
+<pre><code><b>aborts_if</b> <b>false</b>;
+</code></pre>
+
+
+
+<a id="@Specification_1_mul_div"></a>
+
+### Function `mul_div`
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="math_fixed.md#0x1_math_fixed_mul_div">mul_div</a>(x: <a href="../../move-stdlib/doc/fixed_point32.md#0x1_fixed_point32_FixedPoint32">fixed_point32::FixedPoint32</a>, y: <a href="../../move-stdlib/doc/fixed_point32.md#0x1_fixed_point32_FixedPoint32">fixed_point32::FixedPoint32</a>, z: <a href="../../move-stdlib/doc/fixed_point32.md#0x1_fixed_point32_FixedPoint32">fixed_point32::FixedPoint32</a>): <a href="../../move-stdlib/doc/fixed_point32.md#0x1_fixed_point32_FixedPoint32">fixed_point32::FixedPoint32</a>
+</code></pre>
+
+
+<code>mul_div</code> aborts when z is zero or when x * y / z overflows u64.
+The result equals the exact arithmetic quotient.
+
+
+<pre><code><b>aborts_if</b> z.get_raw_value() == 0;
+<b>aborts_if</b> (x.get_raw_value() <b>as</b> u128) * (y.get_raw_value() <b>as</b> u128) / (z.get_raw_value() <b>as</b> u128) &gt; MAX_U64;
+<b>ensures</b> (result.get_raw_value() <b>as</b> u128) ==
+        (x.get_raw_value() <b>as</b> u128) * (y.get_raw_value() <b>as</b> u128) / (z.get_raw_value() <b>as</b> u128);
+</code></pre>
 
 
 [move-book]: https://aptos.dev/move/book/SUMMARY

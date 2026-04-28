@@ -1,14 +1,13 @@
 // Copyright (c) Aptos Foundation
 // Licensed pursuant to the Innovation-Enabling Source Code License, available at https://github.com/aptos-labs/aptos-core/blob/main/LICENSE
 
-//! Conversion from [`SignatureToken`] to [`InternedType`] via the [`ExecutionGuard`].
+//! Conversion from [`SignatureToken`] to [`InternedType`] via an [`Interner`].
 //!
-//! Delegates to [`mono_move_global_context::walk_sig_token`], supplying a
+//! Delegates to [`mono_move_core::walk_sig_token`], supplying a
 //! [`StructResolver`] that looks up entries in a pre-built table.
 
 use anyhow::{bail, Result};
-use mono_move_core::types::InternedType;
-use mono_move_global_context::{walk_sig_token, ExecutionGuard, StructResolver};
+use mono_move_core::{types::InternedType, walk_sig_token, Interner, StructResolver};
 use move_binary_format::file_format::{SignatureToken, StructHandleIndex};
 
 /// Convert a single [`SignatureToken`] to [`InternedType`].
@@ -17,21 +16,21 @@ use move_binary_format::file_format::{SignatureToken, StructHandleIndex};
 /// interned type pointers; unresolved entries are `None`.
 pub(crate) fn convert_sig_token(
     tok: &SignatureToken,
-    guard: &ExecutionGuard<'_>,
+    interner: &impl Interner,
     struct_types: &[Option<InternedType>],
 ) -> Result<InternedType> {
     let mut resolver = TableResolver { struct_types };
-    walk_sig_token(tok, guard, &mut resolver)
+    walk_sig_token(tok, interner, &mut resolver)
 }
 
 /// Convert a slice of [`SignatureToken`]s to [`Vec`]<[`InternedType`]>.
 pub(crate) fn convert_sig_tokens(
     toks: &[SignatureToken],
-    guard: &ExecutionGuard<'_>,
+    interner: &impl Interner,
     struct_types: &[Option<InternedType>],
 ) -> Result<Vec<InternedType>> {
     toks.iter()
-        .map(|t| convert_sig_token(t, guard, struct_types))
+        .map(|t| convert_sig_token(t, interner, struct_types))
         .collect()
 }
 

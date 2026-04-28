@@ -3,8 +3,8 @@
 
 use crate::{
     chunky::{
+        common::deserialize_chunky_transcript_and_verify,
         types::{ChunkyTranscriptWithHash, MissingTranscriptRequest},
-        validation::validate_chunky_transcript,
     },
     network::NetworkSender,
     DKGMessage,
@@ -191,14 +191,12 @@ impl TranscriptFetcher {
             ));
         }
 
-        let mut rng = rand::thread_rng();
-        validate_chunky_transcript(
+        deserialize_chunky_transcript_and_verify(
             dealer_addr,
             &transcript_response.transcript_bytes,
             &self.dkg_config,
             signing_pubkeys,
             &self.epoch_state,
-            &mut rng,
         )
     }
 }

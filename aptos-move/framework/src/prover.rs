@@ -118,6 +118,18 @@ pub struct ProverOptions {
     #[clap(long = "skip-instance-check")]
     pub skip_instance_check: bool,
 
+    /// Generate an independent verification condition for each assertion in a
+    /// function instead of a single combined condition. Can help when a
+    /// function contains both provable-but-hard asserts and asserts that
+    /// produce counterexamples; useful for diagnosing per-function timeouts.
+    #[clap(long)]
+    pub split_vcs_by_assert: bool,
+
+    /// Maximum number of counterexamples reported per verification
+    /// condition.
+    #[clap(long)]
+    pub error_limit: Option<usize>,
+
     /// Internal flag: use a temp dir for boogie output so parallel invocations
     /// don't interfere. Set automatically by test harnesses.
     #[clap(long, hide = true)]
@@ -212,11 +224,7 @@ impl ProverOptions {
                 .to_string();
             None
         };
-        options.backend.custom_natives =
-            Some(move_prover_boogie_backend::options::CustomNativeOptions {
-                template_bytes: include_bytes!("aptos-natives.bpl").to_vec(),
-                module_instance_names: move_prover_boogie_backend::options::custom_native_options(),
-            });
+        configure_aptos_custom_natives(&mut options);
         if benchmark {
             // Special mode of benchmarking
             run_prover_benchmark(package_path, &mut model, options)?;
@@ -285,6 +293,9 @@ impl ProverOptions {
                 loop_unroll: self.loop_unroll.or(base_opts.backend.loop_unroll),
                 skip_instance_check: self.skip_instance_check
                     || base_opts.backend.skip_instance_check,
+                split_vcs_by_assert: self.split_vcs_by_assert
+                    || base_opts.backend.split_vcs_by_assert,
+                error_limit: self.error_limit.unwrap_or(base_opts.backend.error_limit),
                 ..base_opts.backend
             },
             ..base_opts
@@ -414,4 +425,19 @@ fn run_prover_benchmark(
         }
     }
     move_prover_lab::plot::plot_svg(&args)
+}
+
+/// Sets `options.backend.custom_natives` to the Aptos-specific native Boogie implementations
+/// from `aptos-natives.bpl`.
+///
+/// This must be called before running the Move Prover on any Aptos package (or package that
+/// transitively depends on `move-stdlib`, which includes the `cmp` module with `pragma intrinsic`
+/// types). Without it, the Boogie backend lacks the `$1_cmp_Ordering` type declaration and the
+/// `cmp_vector_instances` axioms, causing Boogie compilation errors.
+pub fn configure_aptos_custom_natives(options: &mut Options) {
+    options.backend.custom_natives =
+        Some(move_prover_boogie_backend::options::CustomNativeOptions {
+            template_bytes: include_bytes!("aptos-natives.bpl").to_vec(),
+            module_instance_names: move_prover_boogie_backend::options::custom_native_options(),
+        });
 }

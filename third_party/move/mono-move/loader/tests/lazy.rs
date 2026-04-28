@@ -17,7 +17,8 @@ module 0x1::test {
 
 #[test]
 fn load_lazy_cache_miss_and_hit() {
-    let modules = mono_move_testsuite::compile_move_modules(TEST_SOURCE);
+    let modules =
+        mono_move_testsuite::compile_move_source(TEST_SOURCE).expect("compilation failed");
     let mut module_provider = InMemoryModuleProvider::new();
     module_provider.add_modules(&modules);
 

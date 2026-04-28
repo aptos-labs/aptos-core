@@ -837,7 +837,11 @@ tiny-keccak = { version = "2.0.2", features = ["keccak", "sha3"] }
 tracing = "0.1.37"
 tracing-log = "0.2.0"
 tracing-opentelemetry = "0.28.0"
-tracing-subscriber = { version = "0.3.17", features = ["json", "env-filter", "registry"] }
+tracing-subscriber = { version = "0.3.17", features = [
+    "json",
+    "env-filter",
+    "registry",
+] }
 triomphe = "0.1.14"
 trybuild = "1.0.80"
 try_match = "0.4.2"

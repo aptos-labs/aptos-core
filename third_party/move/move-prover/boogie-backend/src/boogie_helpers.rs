@@ -370,7 +370,7 @@ pub fn boogie_type(env: &GlobalEnv, ty: &Type, bv_flag: bool) -> String {
         TypeParameter(idx) => boogie_type_param(env, *idx),
         Fun(param, result, abilities) => fun_type(env, param, result, *abilities),
         Tuple(elems) => boogie_tuple_type(ty, elems, |t| boogie_type(env, t, bv_flag)),
-        TypeDomain(..) | ResourceDomain(..) | Error | Var(..) => {
+        TypeDomain(..) | ResourceDomain(..) | StateDomain | Error | Var(..) => {
             format!("<<unsupported: {:?}>>", ty)
         },
     }
@@ -571,7 +571,7 @@ pub fn boogie_type_suffix(env: &GlobalEnv, ty: &Type, bv_flag: bool) -> String {
                 format!("$tup{}'{}'", n, suffixes)
             }
         },
-        TypeDomain(..) | ResourceDomain(..) | Error | Var(..) => {
+        TypeDomain(..) | ResourceDomain(..) | StateDomain | Error | Var(..) => {
             format!("<<unsupported {:?}>>", ty)
         },
     }
@@ -1033,7 +1033,8 @@ fn type_name_to_ident_tokens(
         | Type::Primitive(PrimitiveType::EventStore)
         | Type::Fun(..)
         | Type::TypeDomain(..)
-        | Type::ResourceDomain(..) => {
+        | Type::ResourceDomain(..)
+        | Type::StateDomain => {
             unreachable!("Unexpected spec-only type in type_name call");
         },
         // temporary types
@@ -1131,7 +1132,8 @@ fn type_name_to_info_pack(env: &GlobalEnv, ty: &Type) -> Option<TypeInfoPack> {
         | Type::Primitive(PrimitiveType::EventStore)
         | Type::Fun(..)
         | Type::TypeDomain(..)
-        | Type::ResourceDomain(..) => {
+        | Type::ResourceDomain(..)
+        | Type::StateDomain => {
             unreachable!("Unexpected spec-only type in type_name call");
         },
         // temporary types

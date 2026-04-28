@@ -328,7 +328,8 @@ Provides a framework for comparing two elements
 
 
 
-<pre><code><b>let</b> left_bytes = <a href="../../move-stdlib/doc/bcs.md#0x1_bcs_to_bytes">bcs::to_bytes</a>(left);
+<pre><code><b>aborts_if</b> <b>false</b>;
+<b>let</b> left_bytes = <a href="../../move-stdlib/doc/bcs.md#0x1_bcs_to_bytes">bcs::to_bytes</a>(left);
 <b>let</b> right_bytes = <a href="../../move-stdlib/doc/bcs.md#0x1_bcs_to_bytes">bcs::to_bytes</a>(right);
 <b>ensures</b> result == <a href="comparator.md#0x1_comparator_spec_compare_u8_vector">spec_compare_u8_vector</a>(left_bytes, right_bytes);
 </code></pre>

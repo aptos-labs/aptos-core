@@ -31,7 +31,7 @@ use crate::{
     quorum_store::types::BatchMsg,
     util::is_vtxn_expected,
 };
-use anyhow::{bail, ensure, Context};
+use anyhow::{anyhow, bail, ensure, Context};
 use aptos_channels::aptos_channel;
 use aptos_config::config::{BlockTransactionFilterConfig, ConsensusConfig};
 use aptos_consensus_types::{
@@ -113,7 +113,14 @@ impl UnverifiedEvent {
         max_batch_expiry_gap_usecs: u64,
         max_batch_txns: u64,
         max_batch_bytes: u64,
+        encrypted_enabled: bool,
     ) -> Result<VerifiedEvent, VerifyError> {
+        // Temporary: reject encrypted batches/PoS at the entry point until the
+        // feature is fully rolled out, after which these checks can be removed.
+        if !encrypted_enabled {
+            self.reject_encrypted()?;
+        }
+
         let start_time = Instant::now();
         Ok(match self {
             UnverifiedEvent::ProposalMsg(p) => {
@@ -243,6 +250,29 @@ impl UnverifiedEvent {
                 VerifiedEvent::ProofOfStoreMsg(p)
             },
         })
+    }
+
+    fn reject_encrypted(&self) -> Result<(), VerifyError> {
+        let has_encrypted = match self {
+            UnverifiedEvent::ProposalMsg(p) => p
+                .proposal()
+                .payload()
+                .is_some_and(|payload| payload.has_encrypted_batches()),
+            UnverifiedEvent::OptProposalMsg(p) => p.block_data().payload().has_encrypted_batches(),
+            UnverifiedEvent::BatchMsg(b) => b.has_encrypted_batches(),
+            UnverifiedEvent::BatchMsgV2(b) => b.has_encrypted_batches(),
+            UnverifiedEvent::SignedBatchInfo(sd) => sd.has_encrypted_batches(),
+            UnverifiedEvent::SignedBatchInfoMsgV2(sd) => sd.has_encrypted_batches(),
+            UnverifiedEvent::ProofOfStoreMsg(p) => p.has_encrypted_batches(),
+            UnverifiedEvent::ProofOfStoreMsgV2(p) => p.has_encrypted_batches(),
+            _ => false,
+        };
+        if has_encrypted {
+            return Err(VerifyError::from(anyhow!(
+                "Encrypted batches not allowed: feature disabled in this epoch"
+            )));
+        }
+        Ok(())
     }
 
     pub fn epoch(&self) -> anyhow::Result<u64> {
@@ -2277,4 +2307,78 @@ fn extract_batch_digests(
         _ => {},
     }
     out
+}
+
+#[cfg(test)]
+mod reject_encrypted_tests {
+    use super::*;
+    use crate::quorum_store::types::BatchMsg;
+    use aptos_consensus_types::proof_of_store::{
+        BatchInfoExt, BatchKind, SignedBatchInfo, SignedBatchInfoMsg,
+    };
+    use aptos_types::quorum_store::BatchId;
+    use move_core_types::account_address::AccountAddress;
+
+    fn make_encrypted_batch_msg_v2() -> BatchMsg<BatchInfoExt> {
+        let author = AccountAddress::random();
+        let batch = crate::quorum_store::types::Batch::new_v2(
+            BatchId::new_for_test(1),
+            vec![],
+            1,
+            1,
+            author,
+            0,
+            BatchKind::Encrypted,
+        );
+        BatchMsg::new(vec![batch])
+    }
+
+    fn make_normal_batch_msg_v2() -> BatchMsg<BatchInfoExt> {
+        let author = AccountAddress::random();
+        let batch = crate::quorum_store::types::Batch::new_v2(
+            BatchId::new_for_test(1),
+            vec![],
+            1,
+            1,
+            author,
+            0,
+            BatchKind::Normal,
+        );
+        BatchMsg::new(vec![batch])
+    }
+
+    fn make_encrypted_signed_batch_info_v2() -> SignedBatchInfoMsg<BatchInfoExt> {
+        let author = AccountAddress::random();
+        let info = BatchInfoExt::new_v2(
+            author,
+            BatchId::new_for_test(1),
+            1,
+            1,
+            aptos_crypto::HashValue::random(),
+            0,
+            0,
+            0,
+            BatchKind::Encrypted,
+        );
+        SignedBatchInfoMsg::new(vec![SignedBatchInfo::dummy(info, author)])
+    }
+
+    #[test]
+    fn test_reject_encrypted_batch_msg_v2() {
+        let event = UnverifiedEvent::BatchMsgV2(Box::new(make_encrypted_batch_msg_v2()));
+        assert!(event.reject_encrypted().is_err());
+    }
+
+    #[test]
+    fn test_allow_normal_batch_msg_v2() {
+        let event = UnverifiedEvent::BatchMsgV2(Box::new(make_normal_batch_msg_v2()));
+        assert!(event.reject_encrypted().is_ok());
+    }
+
+    #[test]
+    fn test_reject_encrypted_signed_batch_info_v2() {
+        let event =
+            UnverifiedEvent::SignedBatchInfoMsgV2(Box::new(make_encrypted_signed_batch_info_v2()));
+        assert!(event.reject_encrypted().is_err());
+    }
 }

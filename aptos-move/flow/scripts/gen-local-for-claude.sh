@@ -39,4 +39,4 @@ echo "Generating plugin files in $OUTPUT_DIR..."
 move-flow plugin "$OUTPUT_DIR" "${LOG_ARGS[@]}"
 
 echo "Done. Run Claude with:"
-echo "  claude --plugin $OUTPUT_DIR"
+echo "  claude --plugin-dir $OUTPUT_DIR"

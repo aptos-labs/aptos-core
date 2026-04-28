@@ -292,6 +292,7 @@ impl ExtendedChecker<'_> {
             | Reference(_, _)
             | TypeDomain(_)
             | ResourceDomain(_, _, _)
+            | StateDomain
             | Error
             | Var(_) => false,
         }

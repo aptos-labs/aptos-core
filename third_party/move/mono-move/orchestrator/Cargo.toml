@@ -25,19 +25,5 @@ specializer = { workspace = true }
 name = "mseir-compiler"
 path = "src/bin/mseir-compiler.rs"
 
-[dev-dependencies]
-codespan-reporting = { workspace = true }
-datatest-stable = { workspace = true }
-legacy-move-compiler = { workspace = true }
-move-asm = { workspace = true }
-move-compiler-v2 = { workspace = true }
-move-core-types = { workspace = true }
-move-model = { workspace = true }
-move-prover-test-utils = { workspace = true }
-
-[[test]]
-name = "testsuite"
-harness = false
-
 [lib]
 doctest = false

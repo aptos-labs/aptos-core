@@ -36,12 +36,13 @@ use crate::maintenance_config::MaintenanceConfig;
 use anyhow::{bail, Result};
 use dashmap::DashMap;
 use mono_move_alloc::{GlobalArenaPool, GlobalArenaPtr, GlobalArenaShard};
-use mono_move_core::{types::StructLayout, ExecutableId, ExecutableSlot};
+use mono_move_core::{types::StructLayout, ExecutableId, Interner};
 use move_binary_format::{file_format::SignatureToken, CompiledModule};
 use parking_lot::{RwLock, RwLockReadGuard, RwLockWriteGuard};
 use std::{
     hash::{Hash, Hasher},
     marker::PhantomData,
+    sync::OnceLock,
 };
 
 // Submodules: to split implementation into smaller pieces.
@@ -50,10 +51,10 @@ use identifiers::IdentifierInternerKey;
 mod executable_ids;
 use executable_ids::ExecutableIdInternerKey;
 pub use mono_move_core::Executable;
+mod loaded_module;
+pub use loaded_module::{LoadedModule, LoadedModuleSlot, MandatoryDependencies};
 mod executable_cache;
 use executable_cache::ExecutableCache;
-mod sig_walk;
-pub use sig_walk::{walk_sig_token, StructResolver};
 mod types;
 pub use types::{
     struct_info_at, try_as_primitive_type, view_name, view_type, view_type_list, FieldLayout,
@@ -288,30 +289,28 @@ impl<'ctx> MaintenanceGuard<'ctx> {
 }
 
 impl<'ctx> ExecutionGuard<'ctx> {
-    /// Inserts a loaded executable into the cache, keyed by its interned ID.
+    /// Inserts a loaded module into the cache, keyed by its interned ID.
     ///
     /// Returns an error only if the cache detects an invariant violation
     /// during install. Under normal operation this method always returns
     /// `Ok`.
-    pub fn insert_executable(&self, executable: Box<Executable>) -> Result<&Executable> {
-        let ptr = self
-            .ctx
-            .executable_cache
-            .insert(executable.id(), executable)?;
+    pub fn insert_loaded_module(&self, loaded: Box<LoadedModule>) -> Result<&LoadedModule> {
+        let ptr = self.ctx.executable_cache.insert(loaded.id(), loaded)?;
 
         // SAFETY: The pointer is valid since it was created by leaking a box,
         // and can only be freed during the maintenance phase, while we are in
-        // the execution phase (guard is alive). If the executable was already
-        // in the cache, it is also alive (maintenance has not reset caches).
+        // the execution phase (guard is alive). If the loaded module was
+        // already in the cache, it is also alive (maintenance has not reset
+        // caches).
         Ok(unsafe { ptr.as_ref_unchecked() })
     }
 
-    /// Looks up a cached executable by its interned ID and returns a reference
-    /// tied to the guard's lifetime, if found.
-    pub fn get_executable<'guard>(
+    /// Looks up a cached loaded module by its interned ID and returns a
+    /// reference tied to the guard's lifetime, if found.
+    pub fn get_loaded_module<'guard>(
         &'guard self,
         key: ArenaRef<'guard, ExecutableId>,
-    ) -> Option<&'guard Executable> {
+    ) -> Option<&'guard LoadedModule> {
         let ptr = self.ctx.executable_cache.get(key.into_global_arena_ptr())?;
 
         // SAFETY: The pointer is valid since it was created by leaking a box,
@@ -326,7 +325,7 @@ impl<'ctx> ExecutionGuard<'ctx> {
     pub fn get_or_create_slot<'guard>(
         &'guard self,
         key: ArenaRef<'guard, ExecutableId>,
-    ) -> ExecutableSlot {
+    ) -> LoadedModuleSlot {
         self.ctx
             .executable_cache
             .get_or_create_slot(key.into_global_arena_ptr())
@@ -349,72 +348,6 @@ impl<'ctx> ExecutionGuard<'ctx> {
     // Public type construction helpers
     // ====================================================================
 
-    /// Interns an immutable reference type wrapping `inner`.
-    pub fn intern_immut_ref(&self, inner: InternedType) -> InternedType {
-        let ty = self.global_arena.alloc(Type::ImmutRef { inner });
-        self.insert_allocated_type_pointer_internal(ty)
-    }
-
-    /// Interns a mutable reference type wrapping `inner`.
-    pub fn intern_mut_ref(&self, inner: InternedType) -> InternedType {
-        let ty = self.global_arena.alloc(Type::MutRef { inner });
-        self.insert_allocated_type_pointer_internal(ty)
-    }
-
-    /// Converts `&mut T` to `&T` by interning the immutable counterpart.
-    /// Errors if `mut_ref` is not a mutable reference type.
-    pub fn convert_mut_to_immut_ref(&self, mut_ref: InternedType) -> Result<InternedType> {
-        let Type::MutRef { inner } = self.type_data(mut_ref) else {
-            bail!("convert_mut_to_immut_ref: expected MutRef");
-        };
-        Ok(self.intern_immut_ref(*inner))
-    }
-
-    /// Strips the reference from `&T` or `&mut T`, returning `T`.
-    /// Errors if `ref_ty` is not a reference type.
-    pub fn strip_ref(&self, ref_ty: InternedType) -> Result<InternedType> {
-        let (Type::ImmutRef { inner } | Type::MutRef { inner }) = self.type_data(ref_ty) else {
-            bail!("strip_ref: expected reference type");
-        };
-        Ok(*inner)
-    }
-
-    /// Interns a vector type with element type `elem`.
-    pub fn intern_vector(&self, elem: InternedType) -> InternedType {
-        let ty = self.global_arena.alloc(Type::Vector { elem });
-        self.insert_allocated_type_pointer_internal(ty)
-    }
-
-    /// Interns a type parameter with the given index.
-    pub fn intern_type_param(&self, idx: u16) -> InternedType {
-        let ty = self.global_arena.alloc(Type::TypeParam { idx });
-        self.insert_allocated_type_pointer_internal(ty)
-    }
-
-    /// Interns a function type.
-    pub fn intern_function_type(
-        &self,
-        args: InternedTypeList,
-        results: InternedTypeList,
-        abilities: move_core_types::ability::AbilitySet,
-    ) -> InternedType {
-        let ty = self.global_arena.alloc(Type::Function {
-            args,
-            results,
-            abilities,
-        });
-        self.insert_allocated_type_pointer_internal(ty)
-    }
-
-    /// Interns a list of type pointers. Empty lists return a static pointer.
-    pub fn intern_type_list(&self, types: &[InternedType]) -> InternedTypeList {
-        if types.is_empty() {
-            return types::EMPTY_TYPE_LIST;
-        }
-        let ptr = self.global_arena.alloc_slice_copy(types);
-        self.insert_allocated_type_list_internal(ptr)
-    }
-
     /// Safely dereferences a type pointer. Returns a reference to the
     /// underlying [`Type`] data. The reference is valid for the guard's
     /// lifetime.
@@ -426,26 +359,93 @@ impl<'ctx> ExecutionGuard<'ctx> {
         unsafe { ptr.as_ref_unchecked() }
     }
 
-    /// Interns a struct type with its layout. The field-layout slice is
-    /// allocated in the global arena.
-    pub fn intern_struct_type(
+    /// Interns a struct identity without populating its layout. The returned
+    /// pointer can be used immediately in IR, but [`Type::size_and_align`] and
+    /// [`Type::struct_layout`] will return [`None`] until [`Self::set_struct_layout`]
+    /// is called for this type. Callers using this in cross-module contexts
+    /// must tolerate the missing layout until a layout-population pass runs.
+    pub fn intern_struct_identity(
         &self,
         executable_id: GlobalArenaPtr<ExecutableId>,
         name: GlobalArenaPtr<str>,
         ty_args: InternedTypeList,
-        size: u32,
-        align: u32,
-        fields: &[FieldLayout],
     ) -> InternedType {
-        let fields_ptr = self.global_arena.alloc_slice_copy(fields);
-        let layout = StructLayout::new(size, align, fields_ptr);
         let ty = self.global_arena.alloc(Type::Struct {
             executable_id,
             name,
             ty_args,
-            layout: Some(layout),
+            layout: OnceLock::new(),
         });
         self.insert_allocated_type_pointer_internal(ty)
+    }
+
+    /// Allocates the field-layout slice in the arena, builds a [`StructLayout`]
+    /// and installs it into struct type's layout slot. Returns an error if the
+    /// type was not a struct type.
+    ///
+    /// Setting layouts concurrently is safe. Layout already stores canonical
+    /// field type pointers so is structurally identical for both threads.
+    pub fn set_struct_layout(
+        &self,
+        ty: InternedType,
+        size: u32,
+        align: u32,
+        fields: &[FieldLayout],
+    ) -> Result<()> {
+        let slot = match view_type(ty) {
+            Type::Struct { layout: slot, .. } => slot,
+            Type::Bool
+            | Type::U8
+            | Type::U16
+            | Type::U32
+            | Type::U64
+            | Type::U128
+            | Type::U256
+            | Type::I8
+            | Type::I16
+            | Type::I32
+            | Type::I64
+            | Type::I128
+            | Type::I256
+            | Type::Address
+            | Type::Signer
+            | Type::ImmutRef { .. }
+            | Type::MutRef { .. }
+            | Type::Vector { .. }
+            | Type::Enum { .. }
+            | Type::Function { .. }
+            | Type::TypeParam { .. } => bail!("set_struct_layout called on a non-struct type"),
+        };
+
+        // Fast path: if the layout is already installed, skip the field-slice
+        // allocation entirely. A race can still leak one allocation between
+        // this check and `slot.set` below, but that is bounded and consistent
+        // with the documented arena race trade-off.
+        if slot.get().is_some() {
+            return Ok(());
+        }
+
+        let fields_ptr = self.global_arena.alloc_slice_copy(fields);
+        let layout = StructLayout::new(size, align, fields_ptr);
+        if let Err(other_layout) = slot.set(layout) {
+            let installed_layout = slot.get().expect("Layout was just installed");
+            debug_assert_eq!(installed_layout.size, other_layout.size);
+            debug_assert_eq!(installed_layout.align, other_layout.align);
+            debug_assert_eq!(
+                installed_layout.field_layouts().len(),
+                other_layout.field_layouts().len()
+            );
+            // Layout computation is deterministic given the struct identity,
+            // so per-field offsets must match too.
+            for (installed, other) in installed_layout
+                .field_layouts()
+                .iter()
+                .zip(other_layout.field_layouts().iter())
+            {
+                debug_assert_eq!(installed.offset, other.offset);
+            }
+        }
+        Ok(())
     }
 
     /// Interns an enum type. Enum size/align is fixed metadata, so no
@@ -467,12 +467,62 @@ impl<'ctx> ExecutionGuard<'ctx> {
     /// Looks up a type previously interned from a signature token of `module`.
     /// Returns `None` if the token has not yet been interned in this module's
     /// context.
+    ///
+    /// For struct types, the returned pointer carries identity but its layout
+    /// slot may still be empty — `set_struct_layout` runs in a separate pass
+    /// after all field types are interned. Callers consuming this in cross-
+    /// module contexts must tolerate `None` from [`Type::size_and_align`] and
+    /// [`Type::struct_layout`] until the layout-population pass completes.
     pub fn try_intern_for_module(
         &self,
         token: &SignatureToken,
         module: &CompiledModule,
     ) -> Option<InternedType> {
         self.get_interned_type_pointer_internal(token, module)
+    }
+}
+
+impl<'ctx> Interner for ExecutionGuard<'ctx> {
+    fn type_param_of(&self, idx: u16) -> InternedType {
+        let ty = self.global_arena.alloc(Type::TypeParam { idx });
+        self.insert_allocated_type_pointer_internal(ty)
+    }
+
+    fn vector_of(&self, elem: InternedType) -> InternedType {
+        let ty = self.global_arena.alloc(Type::Vector { elem });
+        self.insert_allocated_type_pointer_internal(ty)
+    }
+
+    fn immut_ref_of(&self, inner: InternedType) -> InternedType {
+        let ty = self.global_arena.alloc(Type::ImmutRef { inner });
+        self.insert_allocated_type_pointer_internal(ty)
+    }
+
+    fn mut_ref_of(&self, inner: InternedType) -> InternedType {
+        let ty = self.global_arena.alloc(Type::MutRef { inner });
+        self.insert_allocated_type_pointer_internal(ty)
+    }
+
+    fn function_of(
+        &self,
+        args: InternedTypeList,
+        results: InternedTypeList,
+        abilities: move_core_types::ability::AbilitySet,
+    ) -> InternedType {
+        let ty = self.global_arena.alloc(Type::Function {
+            args,
+            results,
+            abilities,
+        });
+        self.insert_allocated_type_pointer_internal(ty)
+    }
+
+    fn type_list_of(&self, types: &[InternedType]) -> InternedTypeList {
+        if types.is_empty() {
+            return types::EMPTY_TYPE_LIST;
+        }
+        let ptr = self.global_arena.alloc_slice_copy(types);
+        self.insert_allocated_type_list_internal(ptr)
     }
 }
 

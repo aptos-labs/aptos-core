@@ -1,0 +1,44 @@
+Move prover returns: exiting with verification errors
+error: data invariant does not hold
+   ┌─ tests/sources/functional/closures/amm_example.move:28:9
+   │
+28 │ ╭         invariant forall S in *, client: address, r_in: u64, r_out: u64, amt: u64:
+29 │ │             S |~ !aborts_of<self.0>(client, r_in, r_out, amt);
+   │ ╰──────────────────────────────────────────────────────────────^
+   │
+   =     at tests/sources/functional/closures/amm_example.move:255: create_noncompliant_fee_pool
+   =         account = <redacted>
+   =     at tests/sources/functional/closures/amm_example.move:257: create_noncompliant_fee_pool
+   =     at tests/sources/functional/closures/amm_example.move:28
+
+error: data invariant does not hold
+   ┌─ tests/sources/functional/closures/amm_example.move:36:9
+   │
+36 │ ╭         invariant forall S in *, client: address, r_in: u64, r_out: u64,
+37 │ │                         a1: u64, a2: u64:
+38 │ │             S.. |~ a1 <= a2 ==>
+39 │ │                 result_of<self.0>(client, r_in, r_out, a1)
+40 │ │                     <= result_of<self.0>(client, r_in, r_out, a2);
+   │ ╰──────────────────────────────────────────────────────────────────^
+   │
+   =     at tests/sources/functional/closures/amm_example.move:255: create_noncompliant_fee_pool
+   =         account = <redacted>
+   =     at tests/sources/functional/closures/amm_example.move:257: create_noncompliant_fee_pool
+   =     at tests/sources/functional/closures/amm_example.move:28
+   =     at tests/sources/functional/closures/amm_example.move:32
+   =     at tests/sources/functional/closures/amm_example.move:36
+
+error: data invariant does not hold
+   ┌─ tests/sources/functional/closures/amm_example.move:43:9
+   │
+43 │ ╭         invariant forall S in *, client: address, r_in: u64, r_out: u64, amt: u64:
+44 │ │             S.. |~ (r_in + amt) * (r_out - result_of<self.0>(client, r_in, r_out, amt)) >= r_in * r_out;
+   │ ╰────────────────────────────────────────────────────────────────────────────────────────────────────────^
+   │
+   =     at tests/sources/functional/closures/amm_example.move:255: create_noncompliant_fee_pool
+   =         account = <redacted>
+   =     at tests/sources/functional/closures/amm_example.move:257: create_noncompliant_fee_pool
+   =     at tests/sources/functional/closures/amm_example.move:28
+   =     at tests/sources/functional/closures/amm_example.move:32
+   =     at tests/sources/functional/closures/amm_example.move:36
+   =     at tests/sources/functional/closures/amm_example.move:43

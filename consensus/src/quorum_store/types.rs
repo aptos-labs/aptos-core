@@ -462,6 +462,12 @@ impl<T: TBatchInfo> BatchMsg<T> {
         Ok(())
     }
 
+    pub fn has_encrypted_batches(&self) -> bool {
+        self.batches
+            .iter()
+            .any(|b| b.batch_info().batch_kind() == Some(BatchKind::Encrypted))
+    }
+
     pub fn epoch(&self) -> anyhow::Result<u64> {
         ensure!(!self.batches.is_empty(), "Empty message");
         let epoch = self.batches[0].epoch();

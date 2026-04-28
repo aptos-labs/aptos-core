@@ -46,12 +46,14 @@ spec aptos_std::capability {
 
     spec delegate<Feature>(self: Cap<Feature>, _feature_witness: &Feature, to: &signer) {
         let addr = signer::address_of(to);
+        aborts_if !spec_has_delegate_cap<Feature>(addr) && !spec_has_cap<Feature>(self.root);
         ensures spec_has_delegate_cap<Feature>(addr);
         ensures !old(spec_has_delegate_cap<Feature>(addr)) ==> global<CapDelegateState<Feature>>(addr).root == self.root;
         ensures !old(spec_has_delegate_cap<Feature>(addr)) ==> vector::spec_contains(spec_delegates<Feature>(self.root), addr);
     }
 
     spec revoke<Feature>(self: Cap<Feature>, _feature_witness: &Feature, from: address) {
+        aborts_if spec_has_delegate_cap<Feature>(from) && !spec_has_cap<Feature>(self.root);
         ensures !spec_has_delegate_cap<Feature>(from);
         // TODO: this cannot be proved. See issue #7422
         // ensures old(spec_has_delegate_cap<Feature>(from))

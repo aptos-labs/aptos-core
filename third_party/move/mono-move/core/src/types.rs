@@ -53,9 +53,10 @@
 //!
 //! TODO: support substitution
 
-use crate::ExecutableId;
+use crate::{ExecutableId, Interner};
 use mono_move_alloc::GlobalArenaPtr;
 use move_core_types::ability::AbilitySet;
+use std::sync::OnceLock;
 
 // ================================================================================================
 // Layout types
@@ -138,6 +139,31 @@ pub fn view_name(ptr: GlobalArenaPtr<str>) -> &'static str {
     unsafe { ptr.as_ref_unchecked() }
 }
 
+/// Converts `&mut T` to `&T` by interning the immutable counterpart. Errors
+/// if `mut_ref` is not a [`Type::MutRef`].
+///
+/// Reads through `view_type` and therefore inherits its safety contract.
+pub fn convert_mut_to_immut_ref(
+    interner: &impl Interner,
+    mut_ref: InternedType,
+) -> anyhow::Result<InternedType> {
+    let Type::MutRef { inner } = view_type(mut_ref) else {
+        anyhow::bail!("convert_mut_to_immut_ref: expected MutRef");
+    };
+    Ok(interner.immut_ref_of(*inner))
+}
+
+/// Strips the reference from `&T` or `&mut T`, returning `T`. Errors if
+/// `ref_ty` is not a reference type.
+///
+/// Reads through `view_type` and therefore inherits its safety contract.
+pub fn strip_ref(ref_ty: InternedType) -> anyhow::Result<InternedType> {
+    let (Type::ImmutRef { inner } | Type::MutRef { inner }) = view_type(ref_ty) else {
+        anyhow::bail!("strip_ref: expected reference type");
+    };
+    Ok(*inner)
+}
+
 /// Layout for struct fields:
 ///   - Offset of the field in flat memory representation.
 ///   - Pointer to the field's type for traversals (e.g., serialization).
@@ -181,6 +207,12 @@ impl StructLayout {
     }
 }
 
+// Arena reset bulk-rewinds without running `Drop`. Layout is allowed to skip
+// drop only as long as it owns no non-arena memory. If a future field
+// introduces a heap owner (`Vec`, `String`, `Box`, etc.), this assertion turns
+// the silent leak / double-free into a compile error.
+const _: () = assert!(!std::mem::needs_drop::<StructLayout>());
+
 // ================================================================================================
 // Type enum
 // ================================================================================================
@@ -218,14 +250,21 @@ pub enum Type {
     Vector {
         elem: InternedType,
     },
-    /// Named struct with its layout. Layout is only set for fully-instantiated
-    /// structs.
+    /// Named struct with its layout. The layout slot is empty for generic
+    /// structs and for cross-module references whose layout has not yet been
+    /// populated by the loader; it is filled once via [`OnceLock::set`] when
+    /// all constituent layouts become available.
+    ///
+    /// The slot is `OnceLock`-gated so layout can be filled after interning.
+    /// Drop on arena reset is skipped (bumpalo bulk-rewinds without calling
+    /// `Drop`), which is harmless only as long as `StructLayout` owns no
+    /// non-arena memory - keep it that way.
     Struct {
         // TODO: Make this a pointer to struct type struct which holds these pointers.
         executable_id: GlobalArenaPtr<ExecutableId>,
         name: GlobalArenaPtr<str>,
         ty_args: InternedTypeList,
-        layout: Option<StructLayout>,
+        layout: OnceLock<StructLayout>,
     },
     /// Named enum. Does not store any layout information as it may change (new
     /// variant can be added during module upgrade). Enum layouts are always
@@ -264,8 +303,9 @@ impl Type {
     /// Returns the size and alignment of this type. Returns [`None`] if the
     /// size or alignment cannot be computed:
     ///   - If the type is a generic struct.
+    ///   - If the type is a struct whose layout has not yet been populated
+    ///     (e.g., a cross-module reference awaiting its loader pass).
     ///   - If the type is an unresolved type parameter.
-    /// In both cases, type substitution must run first.
     pub fn size_and_align(&self) -> Option<(Size, Alignment)> {
         Some(match self {
             // Primitives.
@@ -289,16 +329,11 @@ impl Type {
             // Function values - TODO: for now use heap pointer values.
             Type::Function { .. } => (8, 8),
 
-            // Structs: the layout must be pre-computed for all fields inline.
-            Type::Struct { layout, .. } => {
-                match layout {
-                    Some(layout) => (layout.size, layout.align),
-                    None => {
-                        // INVARIANT: If layout is unset, this struct contains
-                        // generic type arguments.
-                        return None;
-                    },
-                }
+            // Structs: the layout slot may be empty for generic structs or
+            // for cross-module references awaiting layout population.
+            Type::Struct { layout, .. } => match layout.get() {
+                Some(layout) => (layout.size, layout.align),
+                None => return None,
             },
 
             // Need type substitution to calculate the size and alignment.
@@ -309,10 +344,10 @@ impl Type {
     }
 
     /// Returns layout for a struct type, or [`None`] for non-struct types or
-    /// generic structs without a computed layout.
+    /// structs whose layout slot has not yet been populated.
     pub fn struct_layout(&self) -> Option<&StructLayout> {
         match self {
-            Type::Struct { layout, .. } => layout.as_ref(),
+            Type::Struct { layout, .. } => layout.get(),
             Type::Bool
             | Type::U8
             | Type::U16

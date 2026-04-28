@@ -140,6 +140,9 @@ impl AptosVM {
         let trx: AggregatedSubtranscript = bcs::from_bytes(&transcript_bytes).map_err(|_| {
             ExecutionFailure::Expected(ExpectedFailure::TranscriptDeserializationFailed)
         })?;
+        if trx.dealer_epoch != metadata.epoch {
+            return Err(ExecutionFailure::Expected(ExpectedFailure::EpochNotCurrent));
+        }
         verifier
             .verify_multi_signatures(&trx, &signature)
             .map_err(|_| ExecutionFailure::Expected(ExpectedFailure::MultiSigVerificationFailed))?;

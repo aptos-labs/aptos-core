@@ -867,11 +867,6 @@ Return the number of coins <code>shares</code> are worth in <code>self</code> wi
 
 
 
-<pre><code><b>pragma</b> verify = <b>false</b>;
-</code></pre>
-
-
-
 <a id="@Specification_1_Pool"></a>
 
 ### Struct `Pool`
@@ -923,8 +918,10 @@ Return the number of coins <code>shares</code> are worth in <code>self</code> wi
 
 
 
-<pre><code><b>invariant</b> <b>forall</b> addr: <b>address</b>:
-    (<a href="simple_map.md#0x1_simple_map_spec_contains_key">simple_map::spec_contains_key</a>(shares, addr) == <a href="../../move-stdlib/doc/vector.md#0x1_vector_spec_contains">vector::spec_contains</a>(shareholders, addr));
+<pre><code><b>invariant</b> <b>forall</b> i in 0..len(shareholders):
+    <a href="simple_map.md#0x1_simple_map_spec_contains_key">simple_map::spec_contains_key</a>(shares, shareholders[i]);
+<b>invariant</b> <a href="simple_map.md#0x1_simple_map_spec_len">simple_map::spec_len</a>(shares) == len(shareholders);
+<b>invariant</b> len(shareholders) &lt;= shareholders_limit;
 <b>invariant</b> <b>forall</b> i in 0..len(shareholders), j in 0..len(shareholders):
     shareholders[i] == shareholders[j] ==&gt; i == j;
 </code></pre>
@@ -1086,7 +1083,12 @@ Return the number of coins <code>shares</code> are worth in <code>self</code> wi
     <b>ensures</b> (!key_exists && new_shares &gt; 0) ==&gt;
         self.shares == <a href="simple_map.md#0x1_simple_map_spec_set">simple_map::spec_set</a>(<b>old</b>(self.shares), shareholder, new_shares);
     <b>ensures</b> (!key_exists && new_shares &gt; 0) ==&gt;
-        <a href="../../move-stdlib/doc/vector.md#0x1_vector_eq_push_back">vector::eq_push_back</a>(self.shareholders, <b>old</b>(self.shareholders), shareholder);
+        len(self.shareholders) == len(<b>old</b>(self.shareholders)) + 1;
+    <b>ensures</b> (!key_exists && new_shares &gt; 0) ==&gt;
+        self.shareholders[len(<b>old</b>(self.shareholders))] == shareholder;
+    <b>ensures</b> (!key_exists && new_shares &gt; 0) ==&gt;
+        (<b>forall</b> i in 0..len(<b>old</b>(self.shareholders)):
+            self.shareholders[i] == <b>old</b>(self.shareholders)[i]);
 }
 </code></pre>
 
@@ -1185,6 +1187,10 @@ Return the number of coins <code>shares</code> are worth in <code>self</code> wi
     <b>ensures</b> remaining_shares &gt; 0 ==&gt; <a href="simple_map.md#0x1_simple_map_spec_get">simple_map::spec_get</a>(self.shares, shareholder) == remaining_shares;
     <b>ensures</b> remaining_shares == 0 ==&gt; !<a href="simple_map.md#0x1_simple_map_spec_contains_key">simple_map::spec_contains_key</a>(self.shares, shareholder);
     <b>ensures</b> remaining_shares == 0 ==&gt; !<a href="../../move-stdlib/doc/vector.md#0x1_vector_spec_contains">vector::spec_contains</a>(self.shareholders, shareholder);
+    <b>ensures</b> remaining_shares == 0 ==&gt;
+        len(self.shareholders) == len(<b>old</b>(self.shareholders)) - 1;
+    <b>ensures</b> remaining_shares == 0 ==&gt;
+        <a href="simple_map.md#0x1_simple_map_spec_len">simple_map::spec_len</a>(self.shares) == <a href="simple_map.md#0x1_simple_map_spec_len">simple_map::spec_len</a>(<b>old</b>(self.shares)) - 1;
 }
 </code></pre>
 

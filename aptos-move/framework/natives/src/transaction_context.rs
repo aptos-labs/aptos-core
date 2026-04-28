@@ -518,6 +518,26 @@ fn native_multisig_payload_internal(
     }
 }
 
+fn native_is_encrypted_txn_internal(
+    context: &mut SafeNativeContext,
+    _ty_args: &[Type],
+    _args: VecDeque<Value>,
+) -> SafeNativeResult<SmallVec<[Value; 1]>> {
+    context.charge(TRANSACTION_CONTEXT_IS_ENCRYPTED_TXN_BASE)?;
+
+    let user_transaction_context_opt = get_user_transaction_context_opt_from_context(context);
+    if let Some(transaction_context) = user_transaction_context_opt {
+        Ok(smallvec![Value::bool(
+            transaction_context.is_encrypted_txn()
+        )])
+    } else {
+        Err(SafeNativeError::abort_with_message(
+            error::invalid_state(abort_codes::ETRANSACTION_CONTEXT_NOT_AVAILABLE),
+            "Transaction context is not available (is_encrypted_txn can only be accessed during transaction execution)",
+        ))
+    }
+}
+
 fn get_user_transaction_context_opt_from_context<'a>(
     context: &'a SafeNativeContext,
 ) -> &'a Option<UserTransactionContext> {
@@ -562,6 +582,10 @@ pub fn make_all(
         (
             "multisig_payload_internal",
             native_multisig_payload_internal,
+        ),
+        (
+            "is_encrypted_txn_internal",
+            native_is_encrypted_txn_internal,
         ),
     ];
 

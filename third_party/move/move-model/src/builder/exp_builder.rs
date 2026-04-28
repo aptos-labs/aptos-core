@@ -5875,6 +5875,7 @@ impl ExpTranslator<'_, '_, '_> {
             let (exp_ty, rdomain_exp) = self.translate_exp_free(domain_exp);
             let elem_ty = self.fresh_type_var();
             let exp_ty = self.subs.specialize(&exp_ty);
+            let is_state_domain = matches!(&exp_ty, Type::StateDomain);
             match &exp_ty {
                 Type::Vector(..) => {
                     self.check_type(
@@ -5900,8 +5901,18 @@ impl ExpTranslator<'_, '_, '_> {
                         &ErrorMessageContext::General,
                     );
                 },
+                Type::StateDomain => {
+                    // State domain: variable is a state label, not a normal local.
+                    // Unify elem_ty with StateDomain so the pattern has a concrete type.
+                    self.check_type(
+                        &loc,
+                        &elem_ty,
+                        &Type::StateDomain,
+                        &ErrorMessageContext::General,
+                    );
+                },
                 _ => {
-                    self.error(&loc, "quantified variables must range over a vector, a type domain, or a number range");
+                    self.error(&loc, "quantified variables must range over a vector, a type domain, a number range, or a state domain");
                     return self.new_error_exp();
                 },
             }
@@ -5913,7 +5924,11 @@ impl ExpTranslator<'_, '_, '_> {
                 false, /*allow_wildcard_for_tuple*/
                 &ErrorMessageContext::Binding,
             );
-            self.define_locals_of_pat(&rpat);
+            if !is_state_domain {
+                // State domain variables are not added to the local scope;
+                // they are resolved as state labels in |~ expressions.
+                self.define_locals_of_pat(&rpat);
+            }
             rranges.push((rpat, rdomain_exp.into_exp()));
         }
         let rtriggers = triggers
@@ -5929,6 +5944,8 @@ impl ExpTranslator<'_, '_, '_> {
         let rcondition = condition
             .as_ref()
             .map(|cond| self.translate_exp(cond, &BOOL_TYPE).into_exp());
+        // Validate that state-domain quantified variables are used as state labels in the body.
+        self.validate_state_domain_usage(&rranges, &rbody);
         self.exit_scope();
         let quant_ty = if rkind.is_choice() {
             self.env().get_node_type(rranges[0].0.node_id())
@@ -5938,6 +5955,56 @@ impl ExpTranslator<'_, '_, '_> {
         self.check_type(loc, &quant_ty, expected_type, context);
         let id = self.new_node_id_with_type_loc(&quant_ty, loc);
         ExpData::Quant(id, rkind, rranges, rtriggers, rcondition, rbody.into_exp())
+    }
+
+    /// Validates that each state-domain quantifier variable is used as a state label
+    /// (`|~`) somewhere in the body of the quantifier.
+    fn validate_state_domain_usage(&self, rranges: &[(Pattern, Exp)], body: &ExpData) {
+        use std::collections::BTreeSet;
+        // Collect symbol names of state-domain quantifier variables
+        let mut state_domain_vars: Vec<(Symbol, Loc)> = Vec::new();
+        for (pat, range) in rranges.iter() {
+            let range_ty = self.env().get_node_type(range.node_id());
+            if matches!(range_ty, Type::StateDomain) {
+                if let Pattern::Var(id, sym) = pat {
+                    let loc = self.env().get_node_loc(*id);
+                    state_domain_vars.push((*sym, loc));
+                }
+            }
+        }
+        if state_domain_vars.is_empty() {
+            return;
+        }
+        // Collect all MemoryLabel values used in the body
+        let mut used_labels = BTreeSet::new();
+        body.visit_pre_order(&mut |e| {
+            if let ExpData::Call(_, op, _) = e {
+                for label in op.memory_labels() {
+                    used_labels.insert(label);
+                }
+            }
+            true
+        });
+        // Map labels back to symbol names
+        let mut used_label_names = BTreeSet::new();
+        for label in &used_labels {
+            if let Some(name) = self.env().get_memory_label_name(*label) {
+                used_label_names.insert(name);
+            }
+        }
+        // Check that each state-domain variable is used as a state label
+        for (sym, loc) in &state_domain_vars {
+            if !used_label_names.contains(sym) {
+                self.error(
+                    loc,
+                    &format!(
+                        "unused quantified state label `{}`; \
+                         state domain variables must be used as state labels (`|~`) in the body",
+                        self.symbol_pool().string(*sym)
+                    ),
+                );
+            }
+        }
     }
 
     /// Translates a behavior predicate expression (requires_of, aborts_of, ensures_of, result_of).

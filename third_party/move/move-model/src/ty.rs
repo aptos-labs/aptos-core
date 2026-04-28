@@ -52,6 +52,7 @@ pub enum Type {
     // Types only appearing in specifications.
     TypeDomain(Box<Type>),
     ResourceDomain(ModuleId, StructId, Option<Vec<Type>>),
+    StateDomain,
 
     // Temporary types used during type checking
     Error,
@@ -1165,7 +1166,7 @@ impl Type {
         match self {
             Primitive(p) => p.is_spec(),
             Fun(args, result, _) => args.is_spec() || result.is_spec(),
-            TypeDomain(..) | ResourceDomain(..) | Error => true,
+            TypeDomain(..) | ResourceDomain(..) | StateDomain | Error => true,
             Var(..) | TypeParameter(..) => false,
             Tuple(ts) => ts.iter().any(|t| t.is_spec()),
             Struct(_, _, ts) => ts.iter().any(|t| t.is_spec()),
@@ -1255,7 +1256,7 @@ impl Type {
                 types.push(self.clone());
                 types
             },
-            Type::ResourceDomain(_, _, None) => {
+            Type::ResourceDomain(_, _, None) | Type::StateDomain => {
                 vec![self.clone()]
             },
             Type::Var(..) => {
@@ -1378,6 +1379,7 @@ impl Type {
             Type::Fun(..)
             | Type::TypeDomain(..)
             | Type::ResourceDomain(..)
+            | Type::StateDomain
             | Type::Var(..)
             | Type::Error => false,
         }
@@ -1578,7 +1580,7 @@ impl Type {
                 *sid,
                 args_opt.as_ref().map(|args| replace_vec(args, visiting)),
             ),
-            Type::Primitive(..) | Type::Error => self.clone(),
+            Type::Primitive(..) | Type::StateDomain | Type::Error => self.clone(),
         }
     }
 
@@ -1613,7 +1615,7 @@ impl Type {
             Vector(et) => et.is_incomplete(),
             Reference(_, bt) => bt.is_incomplete(),
             TypeDomain(bt) => bt.is_incomplete(),
-            Error | Primitive(..) | TypeParameter(_) | ResourceDomain(..) => false,
+            Error | Primitive(..) | TypeParameter(_) | ResourceDomain(..) | StateDomain => false,
         }
     }
 
@@ -1801,7 +1803,7 @@ impl Type {
             Vector(et) => et.internal_get_vars(vars),
             Reference(_, bt) => bt.internal_get_vars(vars),
             TypeDomain(bt) => bt.internal_get_vars(vars),
-            Error | Primitive(..) | TypeParameter(..) | ResourceDomain(..) => {},
+            Error | Primitive(..) | TypeParameter(..) | ResourceDomain(..) | StateDomain => {},
         }
     }
 
@@ -2544,7 +2546,7 @@ impl Substitution {
             },
             Fun(_, _, abilities) => check(*abilities),
             Reference(_, _) => check(AbilitySet::REFERENCES),
-            TypeDomain(_) | ResourceDomain(_, _, _) => check(AbilitySet::EMPTY),
+            TypeDomain(_) | ResourceDomain(_, _, _) | StateDomain => check(AbilitySet::EMPTY),
             Error => Ok(()),
             Var(idx) => {
                 // Discharge the constraint by adding it to the substitution for
@@ -2894,6 +2896,9 @@ impl Substitution {
                     e1,
                     e2,
                 )?)));
+            },
+            (Type::StateDomain, Type::StateDomain) => {
+                return Ok(Type::StateDomain);
             },
             _ => {},
         }
@@ -3893,6 +3898,7 @@ impl fmt::Display for TypeDisplay<'_> {
                 }
                 f.write_str(">")
             },
+            StateDomain => write!(f, "state_domain"),
             Fun(a, t, abilities) => {
                 f.write_str("|")?;
                 if !a.is_unit() {
@@ -4132,9 +4138,10 @@ pub trait AbilityInference: AbilityContext {
                     .unwrap_or(AbilitySet::PRIMITIVES),
             ),
             Type::Fun(_, _, abilities) => (false, *abilities),
-            Type::TypeDomain(_) | Type::ResourceDomain(_, _, _) | Type::Error => {
-                (false, AbilitySet::EMPTY)
-            },
+            Type::TypeDomain(_)
+            | Type::ResourceDomain(_, _, _)
+            | Type::StateDomain
+            | Type::Error => (false, AbilitySet::EMPTY),
         }
     }
 

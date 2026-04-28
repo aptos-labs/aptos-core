@@ -52,11 +52,10 @@ fn is_simple_quant(
     triggers: &[Vec<Exp>],
     where_clause: &Option<Exp>,
 ) -> bool {
-    triggers.is_empty()
-        && where_clause.is_none()
-        && ranges.iter().all(|(_, range)| {
-            matches!(range.as_ref(), ExpData::Call(_, Operation::TypeDomain, args) if args.is_empty())
-        })
+    triggers.is_empty() && where_clause.is_none() && ranges.iter().all(|(_, range)| {
+        matches!(range.as_ref(), ExpData::Call(_, Operation::TypeDomain, args) if args.is_empty())
+            || matches!(range.as_ref(), ExpData::Call(_, Operation::StateDomain, _))
+    })
 }
 
 // NOTE: has_any_state_label was removed — replaced by is_state_neutral which also
@@ -1247,12 +1246,16 @@ impl<'a> Sourcifier<'a> {
         for cond in &spec.conditions {
             self.print_condition(cond, &exp_sourcifier);
         }
-        if let Some(proof) = &spec.proof {
-            self.print_proof(proof, &exp_sourcifier);
-        }
         self.writer.unindent();
 
-        emitln!(self.writer, "}");
+        // The `proof { ... }` clause is a sibling of the `spec { ... }` block in
+        // source syntax, not a member, so emit it after the closing brace.
+        if let Some(proof) = &spec.proof {
+            emit!(self.writer, "} ");
+            self.print_proof(proof, &exp_sourcifier);
+        } else {
+            emitln!(self.writer, "}");
+        }
         emitln!(self.writer);
     }
 
@@ -1332,21 +1335,25 @@ impl<'a> Sourcifier<'a> {
         for cond in &spec.conditions {
             self.print_condition(cond, &exp_sourcifier);
         }
-        if let Some(proof) = &spec.proof {
-            self.print_proof(proof, &exp_sourcifier);
-        }
         self.writer.unindent();
 
-        emitln!(self.writer, "}");
+        // The `proof { ... }` clause is a sibling of the `spec { ... }` block in
+        // source syntax, not a member, so emit it after the closing brace.
+        if let Some(proof) = &spec.proof {
+            emit!(self.writer, "} ");
+            self.print_proof(proof, &exp_sourcifier);
+        } else {
+            emitln!(self.writer, "}");
+        }
         emitln!(self.writer);
     }
 
     fn print_proof(&self, proof: &crate::ast::Proof, exp_sourcifier: &ExpSourcifier) {
-        emitln!(self.writer, "proof {{");
+        emitln!(self.writer, "proof {");
         self.writer.indent();
         self.print_proof_body(proof, exp_sourcifier);
         self.writer.unindent();
-        emitln!(self.writer, "}}");
+        emitln!(self.writer, "}");
     }
 
     fn print_proof_body(&self, proof: &crate::ast::Proof, exp_sourcifier: &ExpSourcifier) {
@@ -1361,17 +1368,17 @@ impl<'a> Sourcifier<'a> {
             Proof::IfElse(_, cond, then_branch, else_branch) => {
                 emit!(self.writer, "if (");
                 exp_sourcifier.print_exp(Prio::General, false, cond);
-                emitln!(self.writer, ") {{");
+                emitln!(self.writer, ") {");
                 self.writer.indent();
                 self.print_proof_body(then_branch, exp_sourcifier);
                 self.writer.unindent();
                 if let Some(eb) = else_branch {
-                    emitln!(self.writer, "}} else {{");
+                    emitln!(self.writer, "} else {");
                     self.writer.indent();
                     self.print_proof_body(eb, exp_sourcifier);
                     self.writer.unindent();
                 }
-                emitln!(self.writer, "}}");
+                emitln!(self.writer, "}");
             },
             Proof::Block(_, stmts) => {
                 for stmt in stmts {
@@ -2013,6 +2020,8 @@ impl<'a> ExpSourcifier<'a> {
                     emit!(self.wr(), " in ");
                     self.print_exp(Prio::General, false, range);
                 }
+            } else if matches!(range.as_ref(), ExpData::Call(_, Operation::StateDomain, _)) {
+                emit!(self.wr(), " in *");
             } else {
                 emit!(self.wr(), " in ");
                 self.print_exp(Prio::General, false, range);
@@ -2706,6 +2715,7 @@ impl<'a> ExpSourcifier<'a> {
                 self.print_node_inst(id);
                 emit!(self.wr(), "()")
             }),
+            Operation::StateDomain => emit!(self.wr(), "*"),
             Operation::MaxU8 => emit!(self.wr(), "MAX_U8"),
             Operation::MaxU16 => emit!(self.wr(), "MAX_U16"),
             Operation::MaxU32 => emit!(self.wr(), "MAX_U32"),

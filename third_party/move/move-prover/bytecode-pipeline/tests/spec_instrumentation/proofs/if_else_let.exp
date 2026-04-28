@@ -110,7 +110,7 @@ fun TestIfElseLet::test_let($t0|x: u64): u64 {
   2: $t3 := +($t0, $t2) on_abort goto 7 with $t4
   3: label L1
      # VC: proof assertion not satisfied at tests/spec_instrumentation/proofs/if_else_let.move:33:14+19
-  4: assert Eq<num>($t1, $t3)
+  4: assert Eq<num>(Add($t0, 1), $t3)
      # VC: post-condition does not hold at tests/spec_instrumentation/proofs/if_else_let.move:30:9+24
   5: assert Eq<u64>($t3, Add($t0, 1))
   6: return $t3

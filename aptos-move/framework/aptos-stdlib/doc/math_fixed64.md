@@ -15,6 +15,9 @@ Standard math utilities missing in the Move Language.
 -  [Function `mul_div`](#0x1_math_fixed64_mul_div)
 -  [Function `exp_raw`](#0x1_math_fixed64_exp_raw)
 -  [Function `pow_raw`](#0x1_math_fixed64_pow_raw)
+-  [Specification](#@Specification_1)
+    -  [Function `sqrt`](#@Specification_1_sqrt)
+    -  [Function `mul_div`](#@Specification_1_mul_div)
 
 
 <pre><code><b>use</b> <a href="fixed_point64.md#0x1_fixed_point64">0x1::fixed_point64</a>;
@@ -288,6 +291,48 @@ Specialized function for x * y / z that omits intermediate shifting
 
 
 </details>
+
+<a id="@Specification_1"></a>
+
+## Specification
+
+
+<a id="@Specification_1_sqrt"></a>
+
+### Function `sqrt`
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="math_fixed64.md#0x1_math_fixed64_sqrt">sqrt</a>(x: <a href="fixed_point64.md#0x1_fixed_point64_FixedPoint64">fixed_point64::FixedPoint64</a>): <a href="fixed_point64.md#0x1_fixed_point64_FixedPoint64">fixed_point64::FixedPoint64</a>
+</code></pre>
+
+
+<code>sqrt</code> aborts when the input is zero (math128::sqrt(0)==0 causes division by zero in the Newton step).
+No loop in the body (single Newton refinement step), so callers can inline without havocing.
+
+
+<pre><code><b>aborts_if</b> x.get_raw_value() == 0;
+</code></pre>
+
+
+
+<a id="@Specification_1_mul_div"></a>
+
+### Function `mul_div`
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="math_fixed64.md#0x1_math_fixed64_mul_div">mul_div</a>(x: <a href="fixed_point64.md#0x1_fixed_point64_FixedPoint64">fixed_point64::FixedPoint64</a>, y: <a href="fixed_point64.md#0x1_fixed_point64_FixedPoint64">fixed_point64::FixedPoint64</a>, z: <a href="fixed_point64.md#0x1_fixed_point64_FixedPoint64">fixed_point64::FixedPoint64</a>): <a href="fixed_point64.md#0x1_fixed_point64_FixedPoint64">fixed_point64::FixedPoint64</a>
+</code></pre>
+
+
+<code>mul_div</code> aborts when z is zero or when x * y / z overflows u128.
+The result equals the exact arithmetic quotient.
+
+
+<pre><code><b>aborts_if</b> z.get_raw_value() == 0;
+<b>aborts_if</b> (x.get_raw_value() <b>as</b> u256) * (y.get_raw_value() <b>as</b> u256) / (z.get_raw_value() <b>as</b> u256) &gt; MAX_U128;
+<b>ensures</b> (result.get_raw_value() <b>as</b> u256) ==
+        (x.get_raw_value() <b>as</b> u256) * (y.get_raw_value() <b>as</b> u256) / (z.get_raw_value() <b>as</b> u256);
+</code></pre>
 
 
 [move-book]: https://aptos.dev/move/book/SUMMARY
