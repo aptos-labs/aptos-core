@@ -202,7 +202,7 @@ fn mempool_config_practically_non_expiring(mempool_config: &mut MempoolConfig) {
 }
 
 fn run_consensus_only_realistic_env_max_tps() -> ForgeConfig {
-    let num_validators = 20;
+    let num_validators = 7;
     ForgeConfig::default()
         .with_initial_validator_count(NonZeroUsize::new(num_validators).unwrap())
         .with_emit_job(
