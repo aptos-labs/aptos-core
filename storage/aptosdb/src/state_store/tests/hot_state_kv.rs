@@ -9,6 +9,7 @@ use crate::{
         stale_state_value_index_by_key_hash::StaleStateValueIndexByKeyHashSchema,
     },
     state_kv_db::{LoadedHotStateShard, StateKvDb},
+    state_store::StateStore,
 };
 use aptos_config::config::{RocksdbConfig, StorageDirPaths};
 use aptos_crypto::{hash::CryptoHash, HashValue};
@@ -536,10 +537,7 @@ fn test_load_write_then_load_roundtrip() {
     };
 
     let mut sharded_batches = hot_state_kv_db.new_sharded_native_batches();
-    aptos_db
-        .state_store
-        .put_hot_state_updates(&hot_state_updates, &mut sharded_batches)
-        .unwrap();
+    StateStore::put_hot_state_updates(&hot_state_updates, &mut sharded_batches).unwrap();
     hot_state_kv_db.commit(999, None, sharded_batches).unwrap();
 
     // Load back.
@@ -669,10 +667,7 @@ fn test_put_hot_state_updates_values_and_stale_indices() {
     };
 
     let mut sharded_batches = hot_state_kv_db.new_sharded_native_batches();
-    aptos_db
-        .state_store
-        .put_hot_state_updates(&hot_state_updates, &mut sharded_batches)
-        .unwrap();
+    StateStore::put_hot_state_updates(&hot_state_updates, &mut sharded_batches).unwrap();
     hot_state_kv_db.commit(999, None, sharded_batches).unwrap();
 
     // -- Verify value entries --
@@ -796,10 +791,7 @@ fn test_hot_state_kv_pruner_deletes_old_entries() {
         for_latest: None,
     };
     let mut batches = hot_state_kv_db.new_sharded_native_batches();
-    aptos_db
-        .state_store
-        .put_hot_state_updates(&updates1, &mut batches)
-        .unwrap();
+    StateStore::put_hot_state_updates(&updates1, &mut batches).unwrap();
     hot_state_kv_db.commit(100, None, batches).unwrap();
 
     // Second batch: write new entry at hot_since=200 superseding 100
@@ -817,10 +809,7 @@ fn test_hot_state_kv_pruner_deletes_old_entries() {
         for_latest: None,
     };
     let mut batches2 = hot_state_kv_db.new_sharded_native_batches();
-    aptos_db
-        .state_store
-        .put_hot_state_updates(&updates2, &mut batches2)
-        .unwrap();
+    StateStore::put_hot_state_updates(&updates2, &mut batches2).unwrap();
     hot_state_kv_db.commit(200, None, batches2).unwrap();
 
     // Both entries exist before pruning
