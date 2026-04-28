@@ -102,10 +102,9 @@ use aptos_types::{
     jwks::SupportedOIDCProviders,
     on_chain_config::{
         ChunkyDKGConfigMoveStruct, ChunkyDKGConfigSeqNum, Features, OnChainChunkyDKGConfig,
-        OnChainConfigPayload, OnChainConfigProvider,
-        OnChainConsensusConfig, OnChainExecutionConfig, OnChainJWKConsensusConfig,
-        OnChainRandomnessConfig, ProposerElectionType, RandomnessConfigMoveStruct,
-        RandomnessConfigSeqNum, ValidatorSet,
+        OnChainConfigPayload, OnChainConfigProvider, OnChainConsensusConfig,
+        OnChainExecutionConfig, OnChainJWKConsensusConfig, OnChainRandomnessConfig,
+        ProposerElectionType, RandomnessConfigMoveStruct, RandomnessConfigSeqNum, ValidatorSet,
     },
     randomness::{RandKeys, WvufPP, WVUF},
     secret_sharing::SecretShareConfig,

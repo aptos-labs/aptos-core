@@ -29,7 +29,7 @@ pub(crate) fn get_land_blocking_test(
     let test = match test_name {
         "land_blocking" | "realistic_env_max_load" => {
             realistic_env_max_load_test(duration, test_cmd, 7, 0, 0)
-                .with_duration_override(Duration::from_secs(1200))
+                .with_duration_override(Duration::from_secs(900))
         },
         "compat" => compat(),
         "framework_upgrade" => framework_upgrade(),
