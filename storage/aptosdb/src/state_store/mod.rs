@@ -842,6 +842,7 @@ impl StateStore {
                 &mut buffered_state,
                 &out_current_state,
                 &out_persisted_state,
+                hot_state_config.delete_on_restart,
             )?;
         }
 
@@ -884,6 +885,7 @@ impl StateStore {
         buffered_state: &mut BufferedState,
         out_current_state: &Mutex<LedgerStateWithSummary>,
         persisted_state: &PersistedState,
+        delete_hot_state_on_restart: bool,
     ) -> Result<()> {
         info!("Replaying writesets from {snapshot_next_version} to {num_transactions} to let state Merkle DB catch up.");
 
@@ -920,6 +922,14 @@ impl StateStore {
             &state_update_refs,
         )?;
         let updated = LedgerStateWithSummary::from_state_and_summary(new_state, new_state_summary);
+
+        // `delete_on_restart` wiped the hot state KV for this range; re-write it so it
+        // matches the JMT we're about to commit.
+        if delete_hot_state_on_restart && let Some(db) = state_db.hot_state_kv_db.as_ref() {
+            let mut sharded_batches = db.new_sharded_native_batches();
+            Self::put_hot_state_updates(&hot_state_updates, &mut sharded_batches)?;
+            db.commit(num_transactions - 1, None, sharded_batches)?;
+        }
 
         // synchronously commit the snapshot at the last checkpoint here if not committed to disk yet.
         buffered_state.update(
@@ -1113,7 +1123,6 @@ impl StateStore {
     // TODO(HotState): multiple writes to the same key are batched (within `for_last_checkpoint`
     // and `for_latest`) and only the last one is persisted. Revisit later if necessary.
     pub fn put_hot_state_updates(
-        &self,
         hot_state_updates: &HotStateUpdates,
         sharded_hot_state_kv_batches: &mut ShardedStateKvSchemaBatch,
     ) -> Result<()> {
