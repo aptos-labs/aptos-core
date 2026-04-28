@@ -50,7 +50,7 @@ impl ExecutableId {
 /// Struct type metadata in an executable.
 pub struct StructType {
     /// Struct type signature. Invariant: stored type is always
-    /// [`Type::Struct`].
+    /// [`Type::StructOrEnum`].
     ty: InternedType,
 }
 
@@ -69,7 +69,7 @@ impl StructType {
 /// Enum type metadata in an executable.
 pub struct EnumType {
     /// Enum type signature. Invariant: stored type is always
-    /// [`Type::Enum`].
+    /// [`Type::StructOrEnum`].
     ty: InternedType,
     /// Per-variant field types, indexed by variant tag.
     #[allow(dead_code)]

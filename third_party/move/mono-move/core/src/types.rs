@@ -35,19 +35,15 @@
 //!
 //! Size of references is 16 bytes (fat pointers). Alignment is also 16 bytes.
 //!
-//! ## Fully-instantiated structs
+//! ## Fully-instantiated structs and enums
 //!
-//! Struct types are arena-allocated, and store executable ID, name and type
-//! arguments that uniquely identify the type. Additionally, fully-instantiated
-//! structs cache their layout information (size, alignment and field offsets).
-//!
-//! ## Enums
-//!
-//! Enums are simply pointers to arena-allocated executable IDs, identifiers
-//! and type arguments that uniquely identify the type. Enum layouts are not
-//! cached in the type graph because enum definitions can change on module
-//! upgrade (new variants added). Instead, variant field layouts are stored
-//! per-executable and resolved at runtime.
+//! Struct and enum types are arena-allocated, and store executable ID, name
+//! and type arguments that uniquely identify the type. Both can carry an
+//! optional layout slot. The slot stores size and alignment of this type. For
+//! structs, per-field offsets in flat memory are also recorded. Note that enum
+//! field offsets are not cached in the type graph because enum definitions
+//! can change on module upgrade (new variants added); per-variant field
+//! layouts are stored per-executable and resolved at runtime.
 //!
 //! ## Generic structs
 //!
@@ -181,29 +177,39 @@ impl FieldLayout {
     }
 }
 
-/// Struct layout information: total size, alignment and information about the
-/// field layouts.
-pub struct StructLayout {
+/// Layout information shared by structs and enums: total size, alignment,
+/// and an optional pointer to per-field offsets (unset for enums).
+pub struct StructOrEnumLayout {
     /// Total size of the struct. Includes necessary padding based on the
     /// alignment requirements.
     pub size: Size,
     pub align: Alignment,
-    fields: GlobalArenaPtr<[FieldLayout]>,
+    fields: Option<GlobalArenaPtr<[FieldLayout]>>,
 }
 
-impl StructLayout {
-    /// Creates a new struct layout entry.
-    pub fn new(size: Size, align: Alignment, fields: GlobalArenaPtr<[FieldLayout]>) -> Self {
+impl StructOrEnumLayout {
+    /// Creates a struct layout entry with per-field offsets.
+    pub fn new_struct(size: Size, align: Alignment, fields: GlobalArenaPtr<[FieldLayout]>) -> Self {
         Self {
             size,
             align,
-            fields,
+            fields: Some(fields),
+        }
+    }
+
+    /// Creates an enum layout entry. Enums do not store per-field offsets
+    /// at the type level.
+    pub fn new_enum(size: Size, align: Alignment) -> Self {
+        Self {
+            size,
+            align,
+            fields: None,
         }
     }
 
     // TODO: This API is test-only for now, will change, so ignore safety.
-    pub fn field_layouts(&self) -> &[FieldLayout] {
-        unsafe { self.fields.as_ref_unchecked() }
+    pub fn field_layouts(&self) -> Option<&[FieldLayout]> {
+        self.fields.map(|p| unsafe { p.as_ref_unchecked() })
     }
 }
 
@@ -211,7 +217,7 @@ impl StructLayout {
 // drop only as long as it owns no non-arena memory. If a future field
 // introduces a heap owner (`Vec`, `String`, `Box`, etc.), this assertion turns
 // the silent leak / double-free into a compile error.
-const _: () = assert!(!std::mem::needs_drop::<StructLayout>());
+const _: () = assert!(!std::mem::needs_drop::<StructOrEnumLayout>());
 
 // ================================================================================================
 // Type enum
@@ -250,31 +256,23 @@ pub enum Type {
     Vector {
         elem: InternedType,
     },
-    /// Named struct with its layout. The layout slot is empty for generic
+    /// Named struct or enum with its layout. The layout slot is empty for generic
     /// structs and for cross-module references whose layout has not yet been
     /// populated by the loader; it is filled once via [`OnceLock::set`] when
-    /// all constituent layouts become available.
+    /// all constituent layouts become available. For structs, layout stores field
+    /// offsets as well. This is not the case for enums. Enums are always pointer-sized
+    /// today, because new variants may be added on module upgrade.
     ///
     /// The slot is `OnceLock`-gated so layout can be filled after interning.
     /// Drop on arena reset is skipped (bumpalo bulk-rewinds without calling
-    /// `Drop`), which is harmless only as long as `StructLayout` owns no
-    /// non-arena memory - keep it that way.
-    Struct {
-        // TODO: Make this a pointer to struct type struct which holds these pointers.
+    /// `Drop`), which is harmless only as long as layout owns no non-arena
+    /// memory - keep it that way.
+    StructOrEnum {
+        // TODO: Make this a pointer to a named-type struct holding these pointers.
         executable_id: GlobalArenaPtr<ExecutableId>,
         name: GlobalArenaPtr<str>,
         ty_args: InternedTypeList,
-        layout: OnceLock<StructLayout>,
-    },
-    /// Named enum. Does not store any layout information as it may change (new
-    /// variant can be added during module upgrade). Enum layouts are always
-    /// resolved through the executable where they are defined.
-    Enum {
-        // TODO: Make this a pointer to enum type struct which holds these pointers.
-        executable_id: GlobalArenaPtr<ExecutableId>,
-        name: GlobalArenaPtr<str>,
-        ty_args: InternedTypeList,
-        // TODO: Optional layout for enums with fixed size (frozen).
+        layout: OnceLock<StructOrEnumLayout>,
     },
     /// Function type with argument types, result types and abilities.
     Function {
@@ -303,8 +301,9 @@ impl Type {
     /// Returns the size and alignment of this type. Returns [`None`] if the
     /// size or alignment cannot be computed:
     ///   - If the type is a generic struct.
-    ///   - If the type is a struct whose layout has not yet been populated
-    ///     (e.g., a cross-module reference awaiting its loader pass).
+    ///   - If the type is a struct or enum whose layout has not yet been
+    ///     populated (e.g., a cross-module reference awaiting its loader
+    ///     pass).
     ///   - If the type is an unresolved type parameter.
     pub fn size_and_align(&self) -> Option<(Size, Alignment)> {
         Some(match self {
@@ -323,15 +322,13 @@ impl Type {
             // References are 16-byte fat pointers.
             Type::ImmutRef { .. } | Type::MutRef { .. } => (16, 16),
 
-            // Enums: always heap pointers because of upgradability.
-            Type::Enum { .. } => (8, 8),
-
             // Function values - TODO: for now use heap pointer values.
             Type::Function { .. } => (8, 8),
 
-            // Structs: the layout slot may be empty for generic structs or
-            // for cross-module references awaiting layout population.
-            Type::Struct { layout, .. } => match layout.get() {
+            // Structs and enums: the layout slot may be empty for generic
+            // types or for cross-module references awaiting layout
+            // population.
+            Type::StructOrEnum { layout, .. } => match layout.get() {
                 Some(layout) => (layout.size, layout.align),
                 None => return None,
             },
@@ -343,11 +340,12 @@ impl Type {
         })
     }
 
-    /// Returns layout for a struct type, or [`None`] for non-struct types or
-    /// structs whose layout slot has not yet been populated.
-    pub fn struct_layout(&self) -> Option<&StructLayout> {
+    /// Returns layout for a struct or enum type, or [`None`] for other
+    /// types or for struct/enum types whose layout slot has not yet been
+    /// populated.
+    pub fn layout(&self) -> Option<&StructOrEnumLayout> {
         match self {
-            Type::Struct { layout, .. } => layout.get(),
+            Type::StructOrEnum { layout, .. } => layout.get(),
             Type::Bool
             | Type::U8
             | Type::U16
@@ -366,7 +364,6 @@ impl Type {
             | Type::ImmutRef { .. }
             | Type::MutRef { .. }
             | Type::Vector { .. }
-            | Type::Enum { .. }
             | Type::Function { .. }
             | Type::TypeParam { .. } => None,
         }

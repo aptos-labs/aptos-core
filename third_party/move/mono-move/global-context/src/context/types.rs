@@ -3,7 +3,7 @@
 
 //! Type interning infrastructure.
 //!
-//! The pure type model ([`Type`], [`FieldLayout`], [`StructLayout`], etc.)
+//! The pure type model ([`Type`], [`FieldLayout`], [`StructOrEnumLayout`], etc.)
 //! lives in `mono_move_core::types`. This module provides the interning
 //! machinery that deduplicates types in the global arena, plus cross-format
 //! hashing/equality between [`SignatureToken`]s and interned [`Type`]s.
@@ -214,16 +214,11 @@ impl Hash for TypeInternerKey {
                 type_discriminant::VECTOR.hash(state);
                 Self(*elem).hash(state);
             },
-            Struct {
+            StructOrEnum {
                 executable_id,
                 name,
                 ty_args,
                 layout: _,
-            }
-            | Enum {
-                executable_id,
-                name,
-                ty_args,
             } => {
                 // SAFETY: It is safe to dereference pointers because the
                 // caller ensures they remain valid during the lifetime of
@@ -234,9 +229,9 @@ impl Hash for TypeInternerKey {
                 let ty_args = unsafe { ty_args.as_ref_unchecked() };
 
                 // Must use structural hash because it is compared against the
-                // hash of lookup key (e.g., signature token). Enums reuse the
-                // same discriminant as structs because type identity is based
-                // on address, executable name, name and type arguments.
+                // hash of lookup key (e.g., signature token). Type identity
+                // is based on address, executable name, name and type
+                // arguments.
                 type_discriminant::STRUCT.hash(state);
                 executable_id.address().hash(state);
                 executable_name.hash(state);
@@ -329,35 +324,17 @@ impl PartialEq for TypeInternerKey {
                     false
                 }
             },
-            Struct {
+            StructOrEnum {
                 executable_id,
                 name,
                 ty_args,
                 ..
             } => {
-                if let Struct {
+                if let StructOrEnum {
                     executable_id: other_executable_id,
                     name: other_name,
                     ty_args: other_ty_args,
                     ..
-                } = other
-                {
-                    executable_id == other_executable_id
-                        && name == other_name
-                        && ty_args == other_ty_args
-                } else {
-                    false
-                }
-            },
-            Enum {
-                executable_id,
-                name,
-                ty_args,
-            } => {
-                if let Enum {
-                    executable_id: other_executable_id,
-                    name: other_name,
-                    ty_args: other_ty_args,
                 } = other
                 {
                     executable_id == other_executable_id
@@ -521,16 +498,11 @@ fn equivalent_struct_types(
     module: &CompiledModule,
 ) -> bool {
     let (other_executable_id, other_name, other_ty_args) = match ty {
-        Type::Struct {
+        Type::StructOrEnum {
             executable_id,
             name,
             ty_args,
             ..
-        }
-        | Type::Enum {
-            executable_id,
-            name,
-            ty_args,
         } => (executable_id, name, ty_args),
         Type::Bool
         | Type::U8

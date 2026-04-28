@@ -67,12 +67,13 @@ struct D
     let layout = executable
         .get_struct(name.into_global_arena_ptr())
         .unwrap()
-        .struct_layout()
+        .layout()
         .unwrap();
     assert_eq!(layout.size, 96);
     assert_eq!(layout.align, 32);
     let offsets = layout
         .field_layouts()
+        .expect("Struct layout carries per-field offsets")
         .iter()
         .map(|f| f.offset)
         .collect::<Vec<_>>();
@@ -82,12 +83,13 @@ struct D
     let layout = executable
         .get_struct(name.into_global_arena_ptr())
         .unwrap()
-        .struct_layout()
+        .layout()
         .unwrap();
     assert_eq!(layout.size, 192);
     assert_eq!(layout.align, 32);
     let offsets = layout
         .field_layouts()
+        .expect("Struct layout carries per-field offsets")
         .iter()
         .map(|f| f.offset)
         .collect::<Vec<_>>();
