@@ -477,7 +477,7 @@ pub(crate) fn realistic_env_max_load_test(
                             use_history_from_previous_epoch_max_count: 5,
                         },
                         use_latency_weighted: true,
-                        latency_weight_multiplier_milli: 4000, // 4.0× — aggressively suppress slow leaders
+                        latency_weight_multiplier_milli: 2000, // 2.0× — suppress slow leaders
                     }),
                 );
             }
