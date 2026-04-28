@@ -456,9 +456,9 @@ pub(crate) fn realistic_env_max_load_test(
             helm_values["chain"]["epoch_duration_secs"] = (24 * 3600).into();
             // Use ProposerAndVoterV3 to enable the latency-weighted heuristic via on-chain
             // config (so all validators deterministically agree on the leader schedule —
-            // node-local toggles would fork during partial rollout). Window size left at
-            // the default 10× to isolate the heuristic's contribution; the window-bump
-            // experiment lives in a separate companion PR.
+            // node-local toggles would fork during partial rollout).
+            // Window bumped to 100× (700 blocks / 35s with 7 validators) for statistical
+            // stability: 100 proposals per validator gives reliable latency mean estimates.
             let mut consensus_config = OnChainConsensusConfig::default_for_genesis();
             if let OnChainConsensusConfig::V5 {
                 alg: ConsensusAlgorithmConfig::JolteonV2 { ref mut main, .. },
@@ -472,7 +472,7 @@ pub(crate) fn realistic_env_max_load_test(
                             inactive_weight: 10,
                             failed_weight: 1,
                             failure_threshold_percent: 10,
-                            proposer_window_num_validators_multiplier: 10, // default
+                            proposer_window_num_validators_multiplier: 100, // bumped from 10 for statistical stability
                             voter_window_num_validators_multiplier: 1,
                             weight_by_voting_power: true,
                             use_history_from_previous_epoch_max_count: 5,
