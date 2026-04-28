@@ -460,7 +460,7 @@ pub(crate) fn realistic_env_max_load_test(
             //   sampling noise).
             // - failed_weight: 1 -> 0 so a validator classified failed is excluded
             //   entirely from leader selection instead of leaking 1/N share.
-            // - proposer_window_num_validators_multiplier: 10 -> 50 so the larger
+            // - proposer_window_num_validators_multiplier: 10 -> 100 so the larger
             //   observation window stabilizes the failure-rate estimate.
             let mut consensus_config = OnChainConsensusConfig::default_for_genesis();
             if let OnChainConsensusConfig::V5 {
@@ -474,7 +474,7 @@ pub(crate) fn realistic_env_max_load_test(
                         inactive_weight: 10,
                         failed_weight: 0,           // bumped from 1: classified-failed -> banned
                         failure_threshold_percent: 5, // bumped from 10: clear of V6's true 10%
-                        proposer_window_num_validators_multiplier: 50, // bumped from 10
+                        proposer_window_num_validators_multiplier: 100, // bumped from 10
                         voter_window_num_validators_multiplier: 1,
                         weight_by_voting_power: true,
                         use_history_from_previous_epoch_max_count: 5,
