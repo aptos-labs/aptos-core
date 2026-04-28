@@ -458,9 +458,13 @@ pub(crate) fn realistic_env_max_load_test(
             // config (so all validators deterministically agree on the leader schedule —
             // node-local toggles would fork during partial rollout).
             //
-            // Bump proposer_window_num_validators_multiplier from 10 to 50 so the heuristic
-            // has enough observations to estimate per-validator mean round time stably
-            // (more failure samples per window for the faulty leader).
+            // - failed_weight: 1 -> 0 so a validator classified failed is excluded
+            //   entirely from leader selection (matches the classifier-only PR for a
+            //   clean apples-to-apples comparison of heuristic contribution).
+            // - failure_threshold_percent: 10 -> 5 so V6's true 10% rate clearly exceeds
+            //   the threshold (prevents oscillation at the boundary).
+            // - proposer_window_num_validators_multiplier: 10 -> 100 for statistical
+            //   stability: 100 proposals per validator gives reliable latency estimates.
             let mut consensus_config = OnChainConsensusConfig::default_for_genesis();
             if let OnChainConsensusConfig::V5 {
                 alg: ConsensusAlgorithmConfig::JolteonV2 { ref mut main, .. },
@@ -472,9 +476,9 @@ pub(crate) fn realistic_env_max_load_test(
                         base: ProposerAndVoterConfig {
                             active_weight: 1000,
                             inactive_weight: 10,
-                            failed_weight: 1,
-                            failure_threshold_percent: 10,
-                            proposer_window_num_validators_multiplier: 50,
+                            failed_weight: 0,           // bumped from 1: classified-failed -> banned
+                            failure_threshold_percent: 5, // bumped from 10: clear of V6's true 10%
+                            proposer_window_num_validators_multiplier: 100, // bumped from 10
                             voter_window_num_validators_multiplier: 1,
                             weight_by_voting_power: true,
                             use_history_from_previous_epoch_max_count: 5,
