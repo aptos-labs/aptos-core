@@ -279,7 +279,8 @@ async fn test_onchain_config_change() {
             panic!()
         };
     let proposer_and_voter_config = match &leader_reputation_type {
-        LeaderReputationType::ProposerAndVoterV2(_) | LeaderReputationType::ProposerAndVoterV3(_) => {
+        LeaderReputationType::ProposerAndVoterV2(_)
+        | LeaderReputationType::ProposerAndVoterV3(_) => {
             panic!()
         },
         LeaderReputationType::ProposerAndVoter(proposer_and_voter_config) => {
