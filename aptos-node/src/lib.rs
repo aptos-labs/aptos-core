@@ -22,7 +22,7 @@ use crate::utils::ensure_max_open_files_limit;
 use anyhow::{anyhow, Context};
 use aptos_admin_service::AdminService;
 use aptos_api::bootstrap as bootstrap_api;
-use aptos_build_info::build_information;
+use aptos_build_info::{build_information, get_git_hash};
 use aptos_config::config::{merge_node_config, NodeConfig, PersistableConfig};
 use aptos_framework::ReleaseBundle;
 use aptos_genesis::builder::GenesisConfiguration;
@@ -60,9 +60,12 @@ pub struct AptosNodeArgs {
         short = 'f',
         long,
         value_parser,
-        required_unless_present_any = ["test", "info"],
+        required_unless_present_any = ["test", "info", "commit"],
     )]
-    #[cfg_attr(target_os = "linux", clap(required_unless_present_any = ["stacktrace"]))]
+    #[cfg_attr(
+        target_os = "linux",
+        clap(required_unless_present_any = ["stacktrace", "test", "info", "commit"])
+    )]
     config: Option<PathBuf>,
 
     /// Directory to run the test mode in.
@@ -106,6 +109,10 @@ pub struct AptosNodeArgs {
     #[clap(long)]
     info: bool,
 
+    /// Display the git commit hash for this node binary
+    #[clap(long)]
+    commit: bool,
+
     #[cfg(target_os = "linux")]
     /// Start as a child process to collect thread dump.
     /// See rstack-self crate for more details.
@@ -133,6 +140,11 @@ impl AptosNodeArgs {
                 serde_json::to_string_pretty(&build_information)
                     .expect("Failed to print build information")
             );
+            return;
+        }
+
+        if self.commit {
+            println!("{}", binary_commit_hash());
             return;
         }
 
@@ -194,6 +206,10 @@ impl AptosNodeArgs {
 pub fn load_seed(input: &str) -> Result<[u8; 32], FromHexError> {
     let trimmed_input = input.trim();
     FromHex::from_hex(trimmed_input)
+}
+
+fn binary_commit_hash() -> String {
+    get_git_hash()
 }
 
 /// Runtime handle to ensure that all inner runtimes stay in scope
@@ -917,4 +933,30 @@ pub fn setup_environment_and_start_node(
 fn verify_tool() {
     use clap::CommandFactory;
     AptosNodeArgs::command().debug_assert()
+}
+
+#[test]
+fn test_commit_flag_parses_without_config() {
+    let args = AptosNodeArgs::try_parse_from(["aptos-node", "--commit"])
+        .expect("--commit should parse without requiring a config");
+
+    assert!(args.commit);
+    assert!(!args.info);
+    assert!(args.config.is_none());
+}
+
+#[test]
+fn test_binary_commit_hash_matches_build_info() {
+    let build_information = build_information!();
+    let commit_hash = build_information
+        .get(aptos_build_info::BUILD_COMMIT_HASH)
+        .expect("build information should include a commit hash");
+
+    assert_eq!(binary_commit_hash(), *commit_hash);
+}
+
+#[test]
+fn test_info_flag_parses_without_config() {
+    AptosNodeArgs::try_parse_from(["aptos-node", "--info"])
+        .expect("--info should parse without requiring a config");
 }
