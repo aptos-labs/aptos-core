@@ -207,6 +207,12 @@ impl StructLayout {
     }
 }
 
+// Arena reset bulk-rewinds without running `Drop`. Layout is allowed to skip
+// drop only as long as it owns no non-arena memory. If a future field
+// introduces a heap owner (`Vec`, `String`, `Box`, etc.), this assertion turns
+// the silent leak / double-free into a compile error.
+const _: () = assert!(!std::mem::needs_drop::<StructLayout>());
+
 // ================================================================================================
 // Type enum
 // ================================================================================================

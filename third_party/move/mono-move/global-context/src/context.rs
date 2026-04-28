@@ -392,10 +392,8 @@ impl<'ctx> ExecutionGuard<'ctx> {
         align: u32,
         fields: &[FieldLayout],
     ) -> Result<()> {
-        let fields_ptr = self.global_arena.alloc_slice_copy(fields);
-        let layout = StructLayout::new(size, align, fields_ptr);
-        let result = match view_type(ty) {
-            Type::Struct { layout: slot, .. } => slot.set(layout),
+        let slot = match view_type(ty) {
+            Type::Struct { layout: slot, .. } => slot,
             Type::Bool
             | Type::U8
             | Type::U16
@@ -418,16 +416,34 @@ impl<'ctx> ExecutionGuard<'ctx> {
             | Type::Function { .. }
             | Type::TypeParam { .. } => bail!("set_struct_layout called on a non-struct type"),
         };
-        if let Err(other_layout) = result {
-            let layout = view_type(ty)
-                .struct_layout()
-                .expect("Layout was just installed");
-            debug_assert_eq!(layout.size, other_layout.size);
-            debug_assert_eq!(layout.align, other_layout.align);
+
+        // Fast path: if the layout is already installed, skip the field-slice
+        // allocation entirely. A race can still leak one allocation between
+        // this check and `slot.set` below, but that is bounded and consistent
+        // with the documented arena race trade-off.
+        if slot.get().is_some() {
+            return Ok(());
+        }
+
+        let fields_ptr = self.global_arena.alloc_slice_copy(fields);
+        let layout = StructLayout::new(size, align, fields_ptr);
+        if let Err(other_layout) = slot.set(layout) {
+            let installed_layout = slot.get().expect("Layout was just installed");
+            debug_assert_eq!(installed_layout.size, other_layout.size);
+            debug_assert_eq!(installed_layout.align, other_layout.align);
             debug_assert_eq!(
-                layout.field_layouts().len(),
+                installed_layout.field_layouts().len(),
                 other_layout.field_layouts().len()
             );
+            // Layout computation is deterministic given the struct identity,
+            // so per-field offsets must match too.
+            for (installed, other) in installed_layout
+                .field_layouts()
+                .iter()
+                .zip(other_layout.field_layouts().iter())
+            {
+                debug_assert_eq!(installed.offset, other.offset);
+            }
         }
         Ok(())
     }
@@ -451,6 +467,12 @@ impl<'ctx> ExecutionGuard<'ctx> {
     /// Looks up a type previously interned from a signature token of `module`.
     /// Returns `None` if the token has not yet been interned in this module's
     /// context.
+    ///
+    /// For struct types, the returned pointer carries identity but its layout
+    /// slot may still be empty — `set_struct_layout` runs in a separate pass
+    /// after all field types are interned. Callers consuming this in cross-
+    /// module contexts must tolerate `None` from [`Type::size_and_align`] and
+    /// [`Type::struct_layout`] until the layout-population pass completes.
     pub fn try_intern_for_module(
         &self,
         token: &SignatureToken,
