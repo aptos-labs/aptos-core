@@ -10,7 +10,7 @@ use crate::{
     scheduler_wrapper::SchedulerWrapper,
     task::{BeforeMaterializationOutput, ExecutionStatus, TransactionOutput},
     txn_commit_hook::TransactionCommitHook,
-    types::ReadWriteSummary,
+    types::{InputOutputKey, ReadWriteSummary},
 };
 use aptos_logger::error;
 use aptos_mvhashmap::{types::TxnIndex, MVHashMap};
@@ -431,6 +431,21 @@ impl<T: Transaction, O: TransactionOutput<Txn = T>> TxnLastInputOutput<T, O> {
         }
 
         Ok(())
+    }
+
+    /// Returns the write summary of the output stored for `txn_idx`, accessed
+    /// pre-materialization. Used by the block-epilogue hot-state hook so it can
+    /// be paired with the captured read set before `materialize_txn_commit`
+    /// consumes the underlying VMOutput.
+    pub(crate) fn write_summary_pre_materialization(
+        &self,
+        txn_idx: TxnIndex,
+    ) -> Result<HashSet<InputOutputKey<T::Key, T::Tag>>, PanicError> {
+        let output_wrapper = self.output_wrappers[txn_idx as usize].lock();
+        match output_wrapper.output.as_ref() {
+            Some(output) => Ok(output.before_materialization()?.get_write_summary()),
+            None => Ok(HashSet::new()),
+        }
     }
 
     pub(crate) fn for_each_resource_key_no_aggregator_v1(

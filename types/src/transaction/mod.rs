@@ -3270,6 +3270,12 @@ impl Transaction {
         })
     }
 
+    pub fn try_set_block_epilogue_keys_to_make_hot(&mut self, to_make_hot: BTreeSet<StateKey>) {
+        if let Transaction::BlockEpilogue(payload) = self {
+            payload.try_set_keys_to_make_hot(to_make_hot);
+        }
+    }
+
     pub fn try_as_signed_user_txn(&self) -> Option<&SignedTransaction> {
         match self {
             Transaction::UserTransaction(txn) => Some(txn),
@@ -3402,6 +3408,9 @@ pub trait BlockExecutableTransaction: Sync + Send + Clone + 'static {
     ) -> Self {
         unimplemented!()
     }
+
+    /// If `self` is a V1 block epilogue, replace its `to_make_hot` set in place. No-op otherwise.
+    fn try_set_block_epilogue_keys_to_make_hot(&mut self, _to_make_hot: BTreeSet<Self::Key>) {}
 
     fn pre_write_values(&self) -> Vec<(Self::Key, Self::Value)> {
         vec![]
