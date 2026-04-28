@@ -476,7 +476,7 @@ pub(crate) fn realistic_env_max_load_test(
                         base: ProposerAndVoterConfig {
                             active_weight: 1000,
                             inactive_weight: 10,
-                            failed_weight: 0,           // bumped from 1: classified-failed -> banned
+                            failed_weight: 0, // bumped from 1: classified-failed -> banned
                             failure_threshold_percent: 5, // bumped from 10: clear of V6's true 10%
                             proposer_window_num_validators_multiplier: 100, // bumped from 10
                             voter_window_num_validators_multiplier: 1,
