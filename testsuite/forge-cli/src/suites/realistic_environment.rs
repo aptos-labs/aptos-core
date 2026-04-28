@@ -21,8 +21,9 @@ use aptos_forge::{
 };
 use aptos_sdk::types::on_chain_config::{
     BlockGasLimitType, ConsensusAlgorithmConfig, FeatureFlag, Features, LeaderReputationType,
-    OnChainChunkyDKGConfig, OnChainConsensusConfig, OnChainExecutionConfig, OnChainRandomnessConfig,
-    ProposerAndVoterConfig, ProposerAndVoterConfigV3, ProposerElectionType, TransactionShufflerType,
+    OnChainChunkyDKGConfig, OnChainConsensusConfig, OnChainExecutionConfig,
+    OnChainRandomnessConfig, ProposerAndVoterConfig, ProposerAndVoterConfigV3,
+    ProposerElectionType, TransactionShufflerType,
 };
 use aptos_testcases::{
     load_vs_perf_benchmark::{LoadVsPerfBenchmark, TransactionWorkload, Workloads},
