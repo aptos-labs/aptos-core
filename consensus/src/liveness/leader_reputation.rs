@@ -553,34 +553,67 @@ impl ReputationHeuristic for ProposerAndVoterHeuristic {
 }
 
 /// A heuristic that wraps `ProposerAndVoterHeuristic` but additionally scales active-validator
-/// weights by their historical round-time performance.  Validators that have been proposing
-/// fast rounds (i.e. collected quorum quickly) get a proportionally higher chance of being
-/// selected as leader, while validators with slow round times get a lower chance.
+/// weights down based on their historical round-time performance. Validators with slow round
+/// times (i.e. those that take longer to produce a committed block, including timeouts
+/// attributed to them via `failed_proposer_indices`) get a proportionally lower chance of
+/// being selected as leader. Healthy validators are not boosted — they keep their base
+/// active weight.
 ///
-/// Concretely, for every active validator we compute the mean interval between consecutive
-/// committed blocks in the history window, splitting each successful pair 50/50 between the
-/// two adjacent proposers and attributing timeout-spanning gaps in full to the failed
-/// proposers (using `failed_proposer_indices`). The weight is then:
+/// ## Penalty formula
 ///
-///   active_weight * (max_mean_round_time_us / validator_mean_round_time_us)^multiplier
+/// For every active validator we compute the mean interval between consecutive committed
+/// blocks in the history window:
+/// * Successful pairs are split 50/50 between the two adjacent proposers.
+/// * Timeout-spanning gaps are attributed in full to the failed proposers
+///   (via `failed_proposer_indices`).
 ///
-/// Inactive / failed validators keep their base weights unchanged.
-/// If a validator has fewer than `MIN_OBSERVATIONS` entries the base active weight is used
-/// for that validator. The scaling ratio is clamped at `MAX_LATENCY_RATIO` to prevent one
-/// anomalously-fast validator from monopolizing leader selection.
+/// We use the **median** of all observed per-validator means as the reference point. The
+/// per-validator weight is:
+///
+///   factor = 1.0 / max(1.0, val_mean / median_mean).clamp(_, MAX_LATENCY_RATIO).powf(multiplier)
+///   weight = active_weight * factor
+///
+/// Properties:
+/// * Validators at or below the median: `factor = 1.0` (no penalty, no boost). This makes
+///   the heuristic robust to small natural variation between healthy validators — at higher
+///   multipliers, transient blips on a fast validator no longer cliff its weight.
+/// * Validators above the median: penalized by `(val_mean / median_mean)^-multiplier`.
+///   The slowest validator (which used to get the **base** weight under the old `max_mean /
+///   val_mean` formula) now gets the **lowest** weight — closer to the original intent.
+/// * Penalty ratio is clamped at `MAX_LATENCY_RATIO` to bound the suppression for a single
+///   anomalously-slow validator.
+///
+/// ## Carry-forward for validators with no observations
+///
+/// A validator with `< MIN_OBSERVATIONS` round-time samples in the window does NOT fall back
+/// to the base active weight (the previous behavior). Instead, we apply the **last computed
+/// factor** for that validator (stored in `last_factor`). This breaks the oscillation cycle
+/// where a successfully-suppressed slow validator would pop back to full weight as soon as
+/// our successful suppression denied it observations:
+///
+///   * fresh observations → recompute factor, store it
+///   * no fresh observations → carry-forward the previous factor
+///   * never seen before → factor = 1.0 (benefit of doubt for newly-rotated-in validators)
+///
+/// State is per-epoch (the heuristic is reconstructed on epoch change), so cross-epoch
+/// rotation is naturally handled.
 pub struct LatencyWeightedHeuristic {
     inner: ProposerAndVoterHeuristic,
     active_weight: u64,
     multiplier: f64,
+    /// Carry-forward state: last computed weight factor per author (guarded for &self
+    /// access). Mutated only inside `get_weights`.
+    last_factor: Mutex<HashMap<Author, f64>>,
 }
 
 /// Minimum number of round-time observations needed before a validator is scaled by the
-/// latency-weighted heuristic; below this we fall back to the base active weight.
+/// latency-weighted heuristic; below this we apply the carry-forward factor (or 1.0 for
+/// validators we have never observed).
 const MIN_OBSERVATIONS: usize = 2;
 
-/// Hard ceiling on the per-validator scaling ratio (`max_mean / val_mean`) to bound the
-/// boost a fast validator can receive over the slowest one. Prevents over-concentration
-/// when one validator's mean is anomalously low.
+/// Hard ceiling on the per-validator scaling ratio (`val_mean / median_mean`) used to
+/// bound how aggressively a single anomalously-slow validator can be suppressed. With
+/// multiplier=2.0 and MAX_LATENCY_RATIO=10, the minimum factor is 1/100 = 0.01.
 const MAX_LATENCY_RATIO: f64 = 10.0;
 
 impl LatencyWeightedHeuristic {
@@ -589,6 +622,7 @@ impl LatencyWeightedHeuristic {
             inner,
             active_weight,
             multiplier: if multiplier > 0.0 { multiplier } else { 1.0 },
+            last_factor: Mutex::new(HashMap::new()),
         }
     }
 
@@ -668,39 +702,65 @@ impl ReputationHeuristic for LatencyWeightedHeuristic {
             .map(|(a, v)| (*a, v.iter().sum::<u64>() / v.len() as u64))
             .collect();
 
-        // No validator has enough data — fall back to base weights.
-        if means.is_empty() {
-            return base_weights;
-        }
+        // Median of observed means is the reference point. Below median: no penalty.
+        // Above median: penalty proportional to ratio. We use median (rather than max)
+        // so that the slowest validator gets the LARGEST penalty rather than the base
+        // weight, and so that small variations among healthy validators do not
+        // exponentially amplify (the failure mode that made the old `max_mean / val_mean`
+        // formula fragile at multiplier > 2).
+        let median_mean = compute_median(&means);
 
-        let max_mean = *means.values().max().expect("means is non-empty");
-        // Degenerate case: every observed mean is zero. Fall back to base weights.
-        if max_mean == 0 {
-            return base_weights;
-        }
+        let mut last_factor = self.last_factor.lock();
 
         epoch_to_candidates[&epoch]
             .iter()
             .zip(base_weights.iter())
             .map(|(author, &base)| {
                 // Only adjust the weight for validators that received the active weight.
+                // Inactive / failed-classified validators keep their base weight (the
+                // inner classifier is already handling those).
                 if base != self.active_weight {
                     return base;
                 }
-                match means.get(author) {
-                    Some(&val_mean) if val_mean > 0 => {
-                        // Scale by (max_mean / val_mean)^multiplier, clamped.
-                        let ratio = (max_mean as f64 / val_mean as f64)
-                            .min(MAX_LATENCY_RATIO)
-                            .powf(self.multiplier);
-                        (self.active_weight as f64 * ratio) as u64
+
+                let factor = match (median_mean, means.get(author)) {
+                    (Some(median), Some(&val_mean)) if median > 0 && val_mean > 0 => {
+                        // Asymmetric penalty: validators at or below median are unchanged
+                        // (max(1.0) clamps the ratio), validators above median are
+                        // penalized by 1 / ratio^multiplier.
+                        let ratio = (val_mean as f64 / median as f64)
+                            .max(1.0)
+                            .min(MAX_LATENCY_RATIO);
+                        let f = 1.0 / ratio.powf(self.multiplier);
+                        // Persist for carry-forward when this validator next has no obs.
+                        last_factor.insert(*author, f);
+                        f
                     },
-                    // Per-validator fallback: insufficient observations → keep base weight.
-                    _ => base,
-                }
+                    // No fresh observations (or degenerate median): apply carry-forward
+                    // factor if we have one for this validator, else 1.0 (benefit of doubt
+                    // for never-before-seen / newly-rotated-in validators).
+                    _ => last_factor.get(author).copied().unwrap_or(1.0),
+                };
+
+                (self.active_weight as f64 * factor) as u64
             })
             .collect()
     }
+}
+
+/// Median of the observed per-validator means. `None` if there are no observations.
+fn compute_median(means: &HashMap<Author, u64>) -> Option<u64> {
+    if means.is_empty() {
+        return None;
+    }
+    let mut vals: Vec<u64> = means.values().copied().collect();
+    vals.sort_unstable();
+    let n = vals.len();
+    Some(if n.is_multiple_of(2) {
+        (vals[n / 2 - 1] + vals[n / 2]) / 2
+    } else {
+        vals[n / 2]
+    })
 }
 
 /// Committed history based proposer election implementation that could help bias towards
