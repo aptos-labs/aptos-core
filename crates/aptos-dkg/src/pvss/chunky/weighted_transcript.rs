@@ -307,15 +307,13 @@ impl<const N: usize, P: FpConfig<N>, E: Pairing<ScalarField = Fp<P, N>>>
         )?;
 
         // Check SoK shape
-        if self.sharing_proof.SoK.z.len() != sc.get_total_num_players() {
-            bail!(
-                "Sharing proof has incorrect shape: z.len() = {}, when it should be {}",
-                self.sharing_proof.SoK.z.len(),
-                sc.get_total_num_players(),
-            );
+        if self.sharing_proof.SoK.z.chunked_plaintexts.len() != sc.get_total_num_players() {
+            bail!("Sharing proof has incorrect shape: z.len() != sc.get_total_num_players()");
         }
-        for (i,chunked_plaintexts) in self.sharing_proof.SoK.z.chunked_plaintexts.enumerate() {
-            if chunked_plaintexts.len() != sc.get_player_weight(&sc.get_player(i)) {
+        for (i,chunked_plaintexts) in self.sharing_proof.SoK.z.chunked_plaintexts.iter().enumerate() {
+            if chunked_plaintexts.len() != sc.get_player_weight(&sc.get_player(i))
+                .expect("Should never fail to get player, b/c of z.len() == sc.get_total_num_players() check above")
+            {
                 bail!("Sharing proof has incorrect shape: chunked plaintext vec lengths do not correspond to player weights");
             }
             for chunked_plaintext in chunked_plaintexts {
@@ -327,7 +325,7 @@ impl<const N: usize, P: FpConfig<N>, E: Pairing<ScalarField = Fp<P, N>>>
         if self.sharing_proof.SoK.z.elgamal_randomness.len() != sc.get_max_weight() {
             bail!("Sharing proof has incorrect shape: elgamal_randomness.len() should equal sc.get_max_weight()");
         }
-        for randomness in self.sharing_proof.SoK.z.elgamal_randomness {
+        for randomness in &self.sharing_proof.SoK.z.elgamal_randomness {
             if randomness.len() != num_chunks_per_scalar::<E::ScalarField>(pp.ell) {
                 bail!("Sharing proof has incorrect shape: elgamal_randomness element has incorrect number of chunks");
             }
