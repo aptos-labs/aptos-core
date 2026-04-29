@@ -7,7 +7,8 @@
 
 use crate::types::ObjectDescriptor;
 use mono_move_core::{
-    CodeOffset, DescriptorId, FrameOffset, Function, MicroOp, FRAME_METADATA_SIZE,
+    CallClosureOp, ClosureFuncRef, CodeOffset, DescriptorId, FrameOffset, Function, MicroOp,
+    PackClosureOp, FRAME_METADATA_SIZE,
 };
 use std::fmt;
 
@@ -37,6 +38,12 @@ impl fmt::Display for VerificationError {
 
 /// Validate a single function and its pointer slots against the descriptor table.
 /// Returns an empty `Vec` on success.
+///
+// TODO: add a separate descriptor-self-soundness pass (run once over the
+// descriptor table, not per function) that checks each entry's
+// `pointer_offsets` are in-bounds, 8-byte aligned, sorted, and
+// non-overlapping. Per-op consistency checks below assume that pass has
+// run.
 pub fn verify_function(
     func: &Function,
     descriptors: &[ObjectDescriptor],
@@ -81,21 +88,21 @@ impl FunctionVerifier<'_> {
             self.err(
                 None,
                 format!(
-                    "extended_frame_size ({}) must be >= frame_size() (args_and_locals_size {} + FRAME_METADATA_SIZE {} = {})",
+                    "extended_frame_size ({}) must be >= frame_size() (param_and_local_sizes_sum {} + FRAME_METADATA_SIZE {} = {})",
                     self.func.extended_frame_size,
-                    self.func.args_and_locals_size,
+                    self.func.param_and_local_sizes_sum,
                     FRAME_METADATA_SIZE,
                     self.func.frame_size()
                 ),
             );
         }
-        // args_size must fit within the data region.
-        if self.func.args_size > self.func.args_and_locals_size {
+        // param_sizes_sum must fit within the data region.
+        if self.func.param_sizes_sum > self.func.param_and_local_sizes_sum {
             self.err(
                 None,
                 format!(
-                    "args_size ({}) must be <= args_and_locals_size ({})",
-                    self.func.args_size, self.func.args_and_locals_size
+                    "param_sizes_sum ({}) must be <= param_and_local_sizes_sum ({})",
+                    self.func.param_sizes_sum, self.func.param_and_local_sizes_sum
                 ),
             );
         }
@@ -426,6 +433,147 @@ impl FunctionVerifier<'_> {
 
             // Inserted by the instrumentation pass; no frame accesses to verify.
             MicroOp::Charge { .. } => {},
+
+            MicroOp::PackClosure(ref op) => self.verify_pack_closure(pc, op),
+            MicroOp::CallClosure(ref op) => self.verify_call_closure(pc, op),
+        }
+    }
+
+    fn verify_pack_closure(&mut self, pc: usize, op: &PackClosureOp) {
+        // Destination: 8-byte heap pointer slot for the closure heap object.
+        self.check_frame_access_8(pc, op.dst);
+        // Allocator descriptors must be valid.
+        self.check_descriptor(pc, op.closure_descriptor_id);
+        self.check_descriptor(pc, op.captured_data_descriptor_id);
+        // The closure descriptor must be the special `Closure` variant —
+        // size and the single heap-pointer offset are baked in.
+        let closure_desc_idx = op.closure_descriptor_id.as_usize();
+        if closure_desc_idx < self.descriptors.len()
+            && !matches!(
+                self.descriptors[closure_desc_idx],
+                ObjectDescriptor::Closure
+            )
+        {
+            self.err(
+                Some(pc),
+                format!(
+                    "PackClosure: closure_descriptor_id {} is not a Closure",
+                    op.closure_descriptor_id
+                ),
+            );
+        }
+        // The captured-data descriptor must be the `CapturedData` variant
+        // (not Struct) — its `size` and `pointer_offsets` are interpreted
+        // relative to the values region, not the full payload.
+        let captured_data_desc_idx = op.captured_data_descriptor_id.as_usize();
+        if captured_data_desc_idx < self.descriptors.len()
+            && !matches!(
+                self.descriptors[captured_data_desc_idx],
+                ObjectDescriptor::CapturedData { .. }
+            )
+        {
+            self.err(
+                Some(pc),
+                format!(
+                    "PackClosure: captured_data_descriptor_id {} is not a CapturedData",
+                    op.captured_data_descriptor_id
+                ),
+            );
+        }
+        // Captured sources: verify each (offset, size) is in-bounds.
+        for slot in &op.captured {
+            self.check_nonzero_size(pc, slot.size);
+            self.check_frame_access(Some(pc), slot.offset, slot.size);
+        }
+        // Captured count must match the mask.
+        let captured_count = op.mask.count_ones() as usize;
+        if op.captured.len() != captured_count {
+            self.err(
+                Some(pc),
+                format!(
+                    "PackClosure: captured list length {} does not match mask captured count {}",
+                    op.captured.len(),
+                    captured_count
+                ),
+            );
+        }
+        // For Resolved targets the mask must not set bits beyond the
+        // callee's parameter count, and the callee's parameter count must
+        // fit in the u64 mask.
+        match &op.func_ref {
+            ClosureFuncRef::Resolved(func_ptr) => {
+                let callee = unsafe { func_ptr.as_ref_unchecked() };
+                let param_count = unsafe { callee.param_sizes.as_ref_unchecked() }.len();
+                if param_count > 64 {
+                    self.err(
+                        Some(pc),
+                        format!(
+                            "PackClosure: callee has {} params, exceeds 64-bit mask capacity",
+                            param_count
+                        ),
+                    );
+                }
+                if param_count < 64 && op.mask >> param_count != 0 {
+                    self.err(
+                        Some(pc),
+                        format!(
+                            "PackClosure: mask 0x{:x} sets bits beyond callee param count {}",
+                            op.mask, param_count
+                        ),
+                    );
+                }
+                // Each captured slot's size must match the corresponding
+                // callee parameter's size. The captured list is in
+                // mask-bit-set order through the param list.
+                let param_sizes = unsafe { callee.param_sizes.as_ref_unchecked() };
+                let mut k = 0usize;
+                for (i, &param_size) in param_sizes.iter().enumerate() {
+                    if (op.mask >> i) & 1 != 0 {
+                        if let Some(slot) = op.captured.get(k) {
+                            if slot.size != param_size {
+                                self.err(
+                                    Some(pc),
+                                    format!(
+                                        "PackClosure: captured[{}].size {} != callee param_sizes[{}] {}",
+                                        k, slot.size, i, param_size,
+                                    ),
+                                );
+                            }
+                        }
+                        k += 1;
+                    }
+                }
+            },
+        }
+        // The captured-data descriptor's values region must be exactly
+        // the materialized captured values — no padding, no extras.
+        // Together with the descriptor self-soundness check (see TODO on
+        // `verify_function`), this is sufficient to ensure the runtime's
+        // fixed-offset writes stay in bounds.
+        let expected_values_size: u32 = op.captured.iter().map(|s| s.size).sum();
+        let idx = op.captured_data_descriptor_id.as_usize();
+        if idx < self.descriptors.len() {
+            if let ObjectDescriptor::CapturedData { size: actual, .. } = &self.descriptors[idx] {
+                if *actual != expected_values_size {
+                    self.err(
+                        Some(pc),
+                        format!(
+                            "PackClosure: captured_data values size {} != expected {}",
+                            actual, expected_values_size
+                        ),
+                    );
+                }
+            }
+        }
+    }
+
+    fn verify_call_closure(&mut self, pc: usize, op: &CallClosureOp) {
+        // Closure source: 8-byte heap pointer slot.
+        self.check_frame_access_8(pc, op.closure_src);
+        // Provided arg sources: each (offset, size) in-bounds.
+        for slot in &op.provided_args {
+            self.check_nonzero_size(pc, slot.size);
+            self.check_frame_access(Some(pc), slot.offset, slot.size);
         }
     }
 
@@ -465,8 +613,8 @@ impl FunctionVerifier<'_> {
             return;
         }
 
-        let meta_start = self.func.args_and_locals_size;
-        let meta_end = self.func.args_and_locals_size + FRAME_METADATA_SIZE;
+        let meta_start = self.func.param_and_local_sizes_sum;
+        let meta_end = self.func.param_and_local_sizes_sum + FRAME_METADATA_SIZE;
         if offset < meta_end && meta_start < end {
             self.err(
                 pc,

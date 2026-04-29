@@ -25,13 +25,12 @@ pub fn lower_module(module_ir: &ModuleIR) -> Result<LoweredModule> {
         let micro_ops = lower_function(func_ir, &ctx)?;
         let code = GasInstrumentor::new(MicroOpGasSchedule).run(micro_ops);
 
-        // End offset of the last param slot, including any inter-slot
-        // alignment padding.
-        let args_size = ctx.home_slots[..func_ir.num_params as usize]
-            .last()
-            .map(|s| (s.offset + s.size) as usize)
-            .unwrap_or(0);
-        let args_and_locals_size = ctx.frame_data_size as usize;
+        let param_sizes: Vec<u32> = ctx.home_slots[..func_ir.num_params as usize]
+            .iter()
+            .map(|s| s.size)
+            .collect();
+        let param_sizes_sum = param_sizes.iter().map(|s| *s as usize).sum::<usize>();
+        let param_and_local_sizes_sum = ctx.frame_data_size as usize;
         let extended_frame_size = ctx
             .call_sites
             .iter()
@@ -39,14 +38,15 @@ pub fn lower_module(module_ir: &ModuleIR) -> Result<LoweredModule> {
             .map(|s| (s.offset + s.size) as usize)
             .max()
             // Leaf function: no callee slots needed beyond metadata.
-            .unwrap_or(args_and_locals_size + FRAME_METADATA_SIZE);
+            .unwrap_or(param_and_local_sizes_sum + FRAME_METADATA_SIZE);
 
         functions.push(LoweredFunction {
             name_idx: func_ir.name_idx,
             handle_idx: func_ir.handle_idx,
             code,
-            args_size,
-            args_and_locals_size,
+            param_sizes,
+            param_sizes_sum,
+            param_and_local_sizes_sum,
             extended_frame_size,
         });
     }

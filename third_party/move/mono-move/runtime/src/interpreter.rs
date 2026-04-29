@@ -7,7 +7,11 @@
 use crate::{
     bail,
     error::ExecutionResult,
-    heap::Heap,
+    heap::{
+        macros::{alloc_obj, alloc_vec, gc_collect, grow_vec_ref},
+        pinned_roots::PinnedRoots,
+        Heap,
+    },
     memory::{read_ptr, read_u32, read_u64, vec_elem_ptr, write_ptr, write_u64, MemoryRegion},
     types::{
         ObjectDescriptor, StepResult, DEFAULT_HEAP_SIZE, DEFAULT_STACK_SIZE, HEADER_SIZE_OFFSET,
@@ -15,7 +19,13 @@ use crate::{
         VEC_LENGTH_OFFSET,
     },
 };
-use mono_move_core::{DescriptorId, Function, MicroOp, TransactionContext, FRAME_METADATA_SIZE};
+use mono_move_core::{
+    CallClosureOp, ClosureFuncRef, DescriptorId, Function, MicroOp, PackClosureOp, SizedSlot,
+    TransactionContext, CAPTURED_DATA_TAG_MATERIALIZED, CAPTURED_DATA_TAG_OFFSET,
+    CAPTURED_DATA_VALUES_OFFSET, CLOSURE_CAPTURED_DATA_PTR_OFFSET, CLOSURE_FUNC_REF_OFFSET,
+    CLOSURE_MASK_OFFSET, FRAME_METADATA_SIZE, FUNC_REF_PAYLOAD_OFFSET, FUNC_REF_TAG_OFFSET,
+    FUNC_REF_TAG_RESOLVED,
+};
 use mono_move_gas::GasMeter;
 use rand::{rngs::StdRng, Rng, SeedableRng};
 use std::ptr::{null, NonNull};
@@ -42,6 +52,10 @@ pub struct InterpreterContext<'a, G: GasMeter> {
 
     pub(crate) stack: MemoryRegion,
     pub(crate) heap: Heap,
+    /// Auxiliary GC root set for temporarily-live heap pointers that are
+    /// not yet stored in any frame slot (e.g. between two allocations in a
+    /// fused micro-op, or in native functions).
+    pub(crate) pinned_roots: PinnedRoots,
     rng: StdRng,
 }
 
@@ -93,6 +107,7 @@ impl<'a, G: GasMeter> InterpreterContext<'a, G> {
             frame_ptr,
             stack,
             heap: Heap::new(heap_size),
+            pinned_roots: PinnedRoots::new(),
             rng: StdRng::seed_from_u64(0),
         }
     }
@@ -126,14 +141,14 @@ impl<'a, G: GasMeter> InterpreterContext<'a, G> {
             write_ptr(base, META_SAVED_FUNC_PTR_OFFSET, null());
         }
 
-        // Zero everything beyond args (locals, metadata, callee arg/return
-        // region) so pointer slots start as null.
+        // Zero everything beyond parameters (locals, metadata, callee
+        // arg/return region) so pointer slots start as null.
         if func.zero_frame {
             unsafe {
                 std::ptr::write_bytes(
-                    self.frame_ptr.add(func.args_size),
+                    self.frame_ptr.add(func.param_sizes_sum),
                     0,
-                    func.extended_frame_size - func.args_size,
+                    func.extended_frame_size - func.param_sizes_sum,
                 );
             }
         }
@@ -174,7 +189,7 @@ impl<'a, G: GasMeter> InterpreterContext<'a, G> {
         values: &[u64],
     ) -> ExecutionResult<u64> {
         let n = values.len() as u64;
-        let ptr = self.alloc_vec(descriptor_id, 8, n)?;
+        let ptr = alloc_vec!(self, self.frame_ptr, descriptor_id, 8, n)?;
         unsafe {
             write_u64(ptr, VEC_LENGTH_OFFSET, n);
             let data = ptr.add(VEC_DATA_OFFSET);
@@ -403,7 +418,7 @@ impl<G: GasMeter> InterpreterContext<'_, G> {
                 },
 
                 MicroOp::ForceGC => {
-                    self.gc_collect()?;
+                    gc_collect!(self)?;
                 },
 
                 MicroOp::Move8 { dst, src } => {
@@ -443,7 +458,7 @@ impl<G: GasMeter> InterpreterContext<'_, G> {
                     let mut vec_ptr = read_ptr(ref_base, ref_off);
 
                     if vec_ptr.is_null() {
-                        vec_ptr = self.alloc_vec(descriptor_id, elem_size, 4)?;
+                        vec_ptr = alloc_vec!(self, fp, descriptor_id, elem_size, 4)?;
                         // Re-read base after potential GC.
                         let ref_base = read_ptr(fp, vec_ref);
                         let ref_off = read_u64(fp, vec_ref + 8) as usize;
@@ -455,7 +470,7 @@ impl<G: GasMeter> InterpreterContext<'_, G> {
                     let cap = ((size - VEC_DATA_OFFSET) / elem_size as usize) as u64;
 
                     if len >= cap {
-                        vec_ptr = self.grow_vec_ref(fp, vec_ref.into(), elem_size, len + 1)?;
+                        vec_ptr = grow_vec_ref!(self, fp, vec_ref.into(), elem_size, len + 1)?;
                     }
 
                     std::ptr::copy_nonoverlapping(
@@ -590,7 +605,7 @@ impl<G: GasMeter> InterpreterContext<'_, G> {
 
                 // ----- Heap object instructions (structs and enums) -----
                 MicroOp::HeapNew { dst, descriptor_id } => {
-                    let ptr = self.alloc_obj(descriptor_id)?;
+                    let ptr = alloc_obj!(self, fp, descriptor_id)?;
                     write_ptr(fp, dst, ptr);
                 },
 
@@ -669,6 +684,13 @@ impl<G: GasMeter> InterpreterContext<'_, G> {
                 MicroOp::Charge { cost } => {
                     self.gas_meter.charge(cost)?;
                 },
+
+                MicroOp::PackClosure(ref op) => {
+                    self.exec_pack_closure(fp, op)?;
+                },
+                MicroOp::CallClosure(ref op) => {
+                    return self.exec_call_closure(func, fp, op);
+                },
             }
         }
 
@@ -676,12 +698,286 @@ impl<G: GasMeter> InterpreterContext<'_, G> {
         Ok(StepResult::Continue)
     }
 
-    /// Implementation of call opcodes.
+    /// Implementation of `MicroOp::PackClosure`.
+    ///
+    /// Allocates a closure heap object and a paired `ClosureCapturedData`
+    /// (Materialized) heap object, copies captured values from the caller's
+    /// frame into the captured data object, and writes the closure pointer
+    /// to `op.dst`.
+    ///
+    /// For non-capturing closures the captured-data allocation is skipped
+    /// and `captured_data_ptr` is left null.
+    ///
+    /// For capturing closures, two allocations happen. The closure object
+    /// is pinned via [`PinnedRoots`] immediately after its own allocation
+    /// and stays pinned across the captured-data allocation, so any GC
+    /// triggered by the second allocation preserves the closure (even
+    /// before it's written to `op.dst`) and relocates our local pointer.
+    ///
+    // TODO: swap the generic `PinnedRoots` machinery here for a
+    // `Heap::reserve(n)` API that pre-secures headroom for both
+    // allocations so the second `alloc_obj` can never trigger GC.
+    // `PinnedRoots` is still justified for native functions but is
+    // overkill for the 2-allocation case here and costs us a guard
+    // construction / pointer reload.
+    ///
+    /// # Safety
+    ///
+    /// - `fp` is the current frame pointer.
+    /// - Each `op.captured` slot is in-bounds for the current frame (the
+    ///   verifier checks this).
+    /// - The closure descriptor must list `CLOSURE_CAPTURED_DATA_PTR_OFFSET`
+    ///   (relative to the data segment, so `32 - 8 = 24`) in its
+    ///   `pointer_offsets`, so GC traces the captured-data pointer after
+    ///   the closure is reachable via the frame slot.
+    unsafe fn exec_pack_closure(&mut self, fp: *mut u8, op: &PackClosureOp) -> ExecutionResult<()> {
+        unsafe {
+            // Fast path: non-capturing closure. Skip the second allocation
+            // and leave `captured_data_ptr` as the zeroed/null value written
+            // by `alloc_obj`. No pinning needed — only one allocation.
+            if op.captured.is_empty() {
+                let closure = alloc_obj!(self, fp, op.closure_descriptor_id)?;
+                self.write_closure_func_ref_and_mask(closure, op);
+                write_ptr(fp, op.dst, closure);
+                return Ok(());
+            }
+
+            // Capturing path: allocate the closure object, pin it, then
+            // allocate and populate the captured-data object.
+            //
+            // The closure has a null `captured_data_ptr` between the two
+            // allocations — safe for GC to see (null heap pointers are
+            // skipped). Pinning keeps the closure live across the second
+            // allocation and lets GC update the pinned slot in-place if
+            // the object is relocated.
+            let closure_ptr = alloc_obj!(self, fp, op.closure_descriptor_id)?;
+            let pin = self.pinned_roots.pin(NonNull::new_unchecked(closure_ptr));
+
+            self.write_closure_func_ref_and_mask(pin.get().as_ptr(), op);
+
+            let captured_data = alloc_obj!(self, fp, op.captured_data_descriptor_id)?;
+            *captured_data.add(CAPTURED_DATA_TAG_OFFSET) = CAPTURED_DATA_TAG_MATERIALIZED;
+
+            let mut captured_offset = CAPTURED_DATA_VALUES_OFFSET;
+            for slot in &op.captured {
+                std::ptr::copy_nonoverlapping(
+                    fp.add(slot.offset.into()),
+                    captured_data.add(captured_offset),
+                    slot.size as usize,
+                );
+                captured_offset += slot.size as usize;
+            }
+
+            let closure = pin.get().as_ptr();
+            write_ptr(closure, CLOSURE_CAPTURED_DATA_PTR_OFFSET, captured_data);
+            write_ptr(fp, op.dst, closure);
+
+            Ok(())
+        }
+    }
+
+    /// Write the `func_ref` enum (Resolved only in v0) and the mask into
+    /// a freshly allocated closure heap object.
+    #[inline]
+    unsafe fn write_closure_func_ref_and_mask(&self, closure: *mut u8, op: &PackClosureOp) {
+        unsafe {
+            match &op.func_ref {
+                ClosureFuncRef::Resolved(func_ptr) => {
+                    *closure.add(CLOSURE_FUNC_REF_OFFSET + FUNC_REF_TAG_OFFSET) =
+                        FUNC_REF_TAG_RESOLVED;
+                    write_ptr(
+                        closure,
+                        CLOSURE_FUNC_REF_OFFSET + FUNC_REF_PAYLOAD_OFFSET,
+                        func_ptr.as_non_null().as_ptr() as *const u8,
+                    );
+                },
+            }
+            write_u64(closure, CLOSURE_MASK_OFFSET, op.mask);
+        }
+    }
+
+    /// Implementation of `MicroOp::CallClosure`.
+    ///
+    /// Reads the closure at `op.closure_src`, interleaves its captured
+    /// values with the provided arguments into the callee's parameter
+    /// region using the mask and the callee's `param_sizes`, then
+    /// performs the standard call protocol.
+    ///
+    /// Only supports `ClosureFuncRef::Resolved` + Materialized captured
+    /// data for v0; other cases are errors.
+    ///
+    /// # Safety
+    ///
+    /// - `func` is the currently executing function (caller).
+    /// - `fp` is the current frame pointer.
+    /// - `op.closure_src` holds a non-null heap pointer to a valid closure
+    ///   object.
+    /// - The callee's `param_sizes` list has one entry per declared
+    ///   parameter and sums to `callee.param_sizes_sum`.
+    /// - The captured values in the captured-data object are packed in
+    ///   param order and their sizes match the corresponding `param_sizes`
+    ///   entries (enforced by `PackClosure`).
+    unsafe fn exec_call_closure(
+        &mut self,
+        func: &Function,
+        fp: *mut u8,
+        op: &CallClosureOp,
+    ) -> ExecutionResult<StepResult> {
+        unsafe {
+            let closure = read_ptr(fp, op.closure_src);
+            if closure.is_null() {
+                bail!("CallClosure: null closure pointer");
+            }
+
+            // Decode `ClosureFuncRef`. v0 supports only Resolved.
+            let func_tag = *closure.add(CLOSURE_FUNC_REF_OFFSET + FUNC_REF_TAG_OFFSET);
+            if func_tag != FUNC_REF_TAG_RESOLVED {
+                bail!(
+                    "CallClosure: unsupported func_ref tag {} (only Resolved supported in v0)",
+                    func_tag
+                );
+            }
+            let callee_raw = read_ptr(closure, CLOSURE_FUNC_REF_OFFSET + FUNC_REF_PAYLOAD_OFFSET)
+                as *const Function;
+            if callee_raw.is_null() {
+                bail!("CallClosure: null function pointer in closure");
+            }
+            let callee = &*callee_raw;
+
+            let mask = read_u64(closure, CLOSURE_MASK_OFFSET);
+
+            // Walk the callee's parameters, interleaving captured values
+            // (from the captured-data object, packed sequentially in
+            // parameter order) with provided arguments (from the caller's
+            // frame).
+            //
+            // TODO: replace this interleaving scheme with one where the
+            // specializer pre-writes provided arguments into the callee's
+            // parameter region at the call site (densely packed, in
+            // parameter order — exactly the same codegen as a regular
+            // call), and `CallClosure` then walks parameter positions
+            // backwards patching captured values in. This eliminates the
+            // `provided_args` list, makes non-capturing closures skip
+            // any copies (every iteration is a no-op move-in-place),
+            // and unifies closure call codegen with direct call codegen.
+            // See George's pseudocode in PR #19519 review thread.
+            let param_sizes = callee.param_sizes.as_ref_unchecked();
+            if param_sizes.len() > 64 {
+                bail!(
+                    "CallClosure: callee has {} params, exceeds 64-bit mask capacity",
+                    param_sizes.len()
+                );
+            }
+
+            // Stack-overflow check up front: `call_unchecked` skips the
+            // check, so we do it here before writing the callee's
+            // parameters at `new_fp`.
+            let new_fp = self.check_stack_for_call(func, fp, callee)?;
+
+            // Only validate captured-data when the closure actually has
+            // captures. Non-capturing closures leave `captured_data_ptr`
+            // null (see `exec_pack_closure`).
+            let captured_data = read_ptr(closure, CLOSURE_CAPTURED_DATA_PTR_OFFSET);
+            if mask != 0 {
+                if captured_data.is_null() {
+                    bail!("CallClosure: null captured_data for closure with captured params");
+                }
+                let cap_tag = *captured_data.add(CAPTURED_DATA_TAG_OFFSET);
+                if cap_tag != CAPTURED_DATA_TAG_MATERIALIZED {
+                    bail!(
+                        "CallClosure: unsupported captured-data tag {} (only Materialized supported in v0)",
+                        cap_tag
+                    );
+                }
+            }
+
+            let mut captured_value_offset = CAPTURED_DATA_VALUES_OFFSET;
+            let mut provided_idx = 0usize;
+            let mut param_offset_in_callee = 0usize;
+            for (i, &param_size) in param_sizes.iter().enumerate() {
+                let is_captured = (mask >> i) & 1 != 0;
+                if is_captured {
+                    std::ptr::copy_nonoverlapping(
+                        captured_data.add(captured_value_offset),
+                        new_fp.add(param_offset_in_callee),
+                        param_size as usize,
+                    );
+                    captured_value_offset += param_size as usize;
+                } else {
+                    let slot: &SizedSlot = op
+                        .provided_args
+                        .get(provided_idx)
+                        .ok_or_else(|| anyhow::anyhow!("CallClosure: not enough provided args"))?;
+                    if slot.size != param_size {
+                        bail!(
+                            "CallClosure: provided_args[{}].size {} != callee param_sizes[{}] {}",
+                            provided_idx,
+                            slot.size,
+                            i,
+                            param_size
+                        );
+                    }
+                    // Use `copy` (not `copy_nonoverlapping`): a provided
+                    // arg's source slot may lie in the caller's reserved
+                    // callee-arg region, which is the same memory as the
+                    // callee's parameter region at `new_fp`. The
+                    // overlap is also routine under the planned
+                    // pre-write-then-patch redesign in the TODO above.
+                    std::ptr::copy(
+                        fp.add(slot.offset.into()),
+                        new_fp.add(param_offset_in_callee),
+                        slot.size as usize,
+                    );
+                    provided_idx += 1;
+                }
+                param_offset_in_callee += param_size as usize;
+            }
+            if provided_idx != op.provided_args.len() {
+                bail!(
+                    "CallClosure: {} provided_args but only {} non-captured params consumed",
+                    op.provided_args.len(),
+                    provided_idx
+                );
+            }
+
+            // Standard call protocol: save metadata and switch to the
+            // callee frame. Use the unchecked variant — we already
+            // validated the stack above.
+            self.call_unchecked(func, fp, callee, new_fp)
+        }
+    }
+
+    /// Compute the callee's frame pointer and verify the callee's full
+    /// frame fits on the stack. Returns the new frame pointer on success.
+    ///
+    /// # Safety
+    ///
+    /// `caller` must be the currently executing function and `fp` the
+    /// current frame pointer.
+    #[inline(always)]
+    unsafe fn check_stack_for_call(
+        &self,
+        caller: &Function,
+        fp: *mut u8,
+        callee: &Function,
+    ) -> ExecutionResult<*mut u8> {
+        unsafe {
+            let new_fp = fp.add(caller.param_and_local_sizes_sum + FRAME_METADATA_SIZE);
+            let stack_end = self.stack.as_ptr().add(self.stack.len());
+            if new_fp.add(callee.extended_frame_size) > stack_end {
+                bail!("stack overflow");
+            }
+            Ok(new_fp)
+        }
+    }
+
+    /// Implementation of call opcodes. Validates the stack first, then
+    /// hands off to [`Self::call_unchecked`].
     ///
     /// # Safety
     ///
     /// `callee` must point to a valid, live `Function`. `fp` must be the
-    /// current frame pointer and `func` the currently executing function.
+    /// current frame pointer and `caller` the currently executing function.
     #[inline(always)]
     unsafe fn call(
         &mut self,
@@ -689,21 +985,40 @@ impl<G: GasMeter> InterpreterContext<'_, G> {
         fp: *mut u8,
         callee: &Function,
     ) -> ExecutionResult<StepResult> {
+        let new_fp = unsafe { self.check_stack_for_call(caller, fp, callee)? };
+        unsafe { self.call_unchecked(caller, fp, callee, new_fp) }
+    }
+
+    /// Perform the standard call protocol after the caller has already
+    /// computed `new_fp` (and ensured the callee's frame fits on the
+    /// stack). Used by `exec_call_closure`, which needs `new_fp` earlier
+    /// to safely write the callee's parameters before the call.
+    ///
+    /// # Safety
+    ///
+    /// In addition to the contract on [`Self::call`], `new_fp` must equal
+    /// `fp + caller.param_and_local_sizes_sum + FRAME_METADATA_SIZE`, and
+    /// `new_fp + callee.extended_frame_size` must be within the stack
+    /// (i.e., the caller has already passed the check that
+    /// [`Self::check_stack_for_call`] performs).
+    #[inline(always)]
+    unsafe fn call_unchecked(
+        &mut self,
+        caller: &Function,
+        fp: *mut u8,
+        callee: &Function,
+        new_fp: *mut u8,
+    ) -> ExecutionResult<StepResult> {
         unsafe {
-            let new_fp = fp.add(caller.args_and_locals_size + FRAME_METADATA_SIZE);
-            let stack_end = self.stack.as_ptr().add(self.stack.len());
-            if new_fp.add(callee.extended_frame_size) > stack_end {
-                bail!("stack overflow");
-            }
-            // Zero everything beyond args (locals, metadata, callee
+            // Zero everything beyond parameters (locals, metadata, callee
             // arg/return region) so pointer slots start as null.
-            // The argument region (0..args_size) was already written
-            // by the caller.
+            // The parameter region (0..param_sizes_sum) was already
+            // written by the caller as call arguments.
             if callee.zero_frame {
-                let zero_size = callee.extended_frame_size - callee.args_size;
-                std::ptr::write_bytes(new_fp.add(callee.args_size), 0, zero_size);
+                let zero_size = callee.extended_frame_size - callee.param_sizes_sum;
+                std::ptr::write_bytes(new_fp.add(callee.param_sizes_sum), 0, zero_size);
             }
-            let meta = fp.add(caller.args_and_locals_size);
+            let meta = fp.add(caller.param_and_local_sizes_sum);
             write_u64(meta, META_SAVED_PC_OFFSET, (self.pc + 1) as u64);
             write_ptr(meta, META_SAVED_FP_OFFSET, fp);
             write_ptr(

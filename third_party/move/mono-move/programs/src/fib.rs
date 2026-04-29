@@ -55,12 +55,12 @@ mod micro_op {
         let n = 0u32;
         let result = n;
         let tmp = 8u32;
-        let args_and_locals_size = 16u32;
-        let callee_n = args_and_locals_size + FRAME_METADATA_SIZE as u32;
+        let param_and_local_sizes_sum = 16u32;
+        let callee_n = param_and_local_sizes_sum + FRAME_METADATA_SIZE as u32;
         let callee_result = callee_n;
 
         #[rustfmt::skip]
-        let code = vec![
+        let code = [
             // if n != 0 goto CHECKGE2
             JumpNotZeroU64 { target: CO(3), src: FO(n) },
             StoreImm8 { dst: FO(result), imm: 0 },
@@ -86,12 +86,13 @@ mod micro_op {
         let func = arena.alloc(Function {
             name: GlobalArenaPtr::from_static("fib"),
             code,
-            args_size: 8,
-            args_and_locals_size: args_and_locals_size as usize,
+            param_sizes: ExecutableArenaPtr::empty_slice(),
+            param_sizes_sum: 8,
+            param_and_local_sizes_sum: param_and_local_sizes_sum as usize,
             extended_frame_size: (callee_n + 8) as usize,
             zero_frame: false,
-            frame_layout: FrameLayoutInfo::empty(&arena),
-            safe_point_layouts: SortedSafePointEntries::empty(&arena),
+            frame_layout: FrameLayoutInfo::empty(),
+            safe_point_layouts: SortedSafePointEntries::empty(),
         });
 
         (vec![Some(func)], vec![ObjectDescriptor::Trivial], arena)

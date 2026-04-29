@@ -69,7 +69,9 @@ impl HasCfgInfo for MicroOp {
             | MicroOp::HeapMoveTo { .. }
             | MicroOp::Charge { .. }
             | MicroOp::StoreRandomU64 { .. }
-            | MicroOp::ForceGC => None,
+            | MicroOp::ForceGC
+            | MicroOp::PackClosure(_)
+            | MicroOp::CallClosure(_) => None,
         }
     }
 }
@@ -157,7 +159,9 @@ impl RemapTargets for MicroOp {
             | MicroOp::HeapMoveTo { .. }
             | MicroOp::Charge { .. }
             | MicroOp::StoreRandomU64 { .. }
-            | MicroOp::ForceGC) => op,
+            | MicroOp::ForceGC
+            | MicroOp::PackClosure(_)
+            | MicroOp::CallClosure(_)) => op,
         }
     }
 }
@@ -232,6 +236,10 @@ impl GasSchedule<MicroOp> for MicroOpGasSchedule {
             // --- Debug ---
             MicroOp::StoreRandomU64 { .. } => 1,
             MicroOp::ForceGC => 100,
+
+            // --- Closures ---
+            MicroOp::PackClosure(_) => 20,
+            MicroOp::CallClosure(_) => 15,
         })
     }
 }

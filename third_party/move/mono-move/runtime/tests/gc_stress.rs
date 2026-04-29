@@ -110,7 +110,7 @@ fn make_gc_stress_program(
     let callee_vec_ref: u32 = 24;
 
     #[rustfmt::skip]
-    let make_entry_code = arena.alloc_slice_fill_iter(vec![
+    let make_entry_code = arena.alloc_slice_fill_iter([
         // PC 0: vec = VecNew(descriptor=0, elem_size=8)
         VecNew { dst: FO(callee_vec) },
         // PC 1: vec_ref = SlotBorrow(vec)
@@ -129,16 +129,17 @@ fn make_gc_stress_program(
     let callee_func = arena.alloc(Function {
         name: GlobalArenaPtr::from_static("test"),
         code: make_entry_code,
-        args_size: 8,
-        args_and_locals_size: 40,
+        param_sizes: ExecutableArenaPtr::empty_slice(),
+        param_sizes_sum: 8,
+        param_and_local_sizes_sum: 40,
         extended_frame_size: 64,
         zero_frame: true,
-        frame_layout: FrameLayoutInfo::new(arena, vec![
+        frame_layout: FrameLayoutInfo::new(arena, [
             FO(callee_vec),
             FO(callee_entry),
             FO(callee_vec_ref),
         ]),
-        safe_point_layouts: SortedSafePointEntries::empty(arena),
+        safe_point_layouts: SortedSafePointEntries::empty(),
     });
 
     // -- Function 0: main --
@@ -149,11 +150,11 @@ fn make_gc_stress_program(
     let tmp: u32 = 32;
     let const_hundred: u32 = 40;
     let outer_vec_ref: u32 = 48; // 16-byte fat pointer to outer_vec slot
-    let callee_arg: u32 = 88; // args_and_locals_size (64) + FRAME_METADATA_SIZE (24)
+    let callee_arg: u32 = 88; // param_and_local_sizes_sum (64) + FRAME_METADATA_SIZE (24)
     let entry_ptr: u32 = 104; // callee result slot (callee fp + 16)
 
     #[rustfmt::skip]
-    let code = arena.alloc_slice_fill_iter(vec![
+    let code = arena.alloc_slice_fill_iter([
         // ---- Setup ----
         // PC 0: outer_vec = VecNew(descriptor=2, elem_size=8)
         VecNew { dst: FO(outer_vec) },
@@ -235,16 +236,17 @@ fn make_gc_stress_program(
     let main_func = arena.alloc(Function {
         name: GlobalArenaPtr::from_static("test"),
         code,
-        args_size: 0,
-        args_and_locals_size: 64,
+        param_sizes: ExecutableArenaPtr::empty_slice(),
+        param_sizes_sum: 0,
+        param_and_local_sizes_sum: 64,
         extended_frame_size: 128,
         zero_frame: true,
-        frame_layout: FrameLayoutInfo::new(arena, vec![
+        frame_layout: FrameLayoutInfo::new(arena, [
             FO(outer_vec),
             FO(outer_vec_ref),
             FO(entry_ptr),
         ]),
-        safe_point_layouts: SortedSafePointEntries::empty(arena),
+        safe_point_layouts: SortedSafePointEntries::empty(),
     });
 
     let descriptors = vec![

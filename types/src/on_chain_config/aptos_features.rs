@@ -173,6 +173,8 @@ pub enum FeatureFlag {
     MULTISIG_SCRIPT = 110,
     /// Enables higher transaction execution/IO limits backed by staking voting power.
     TRANSACTION_LIMITS = 111,
+    /// Whether versioned enum-based transaction validation is enabled.
+    VERSIONED_TRANSACTION_VALIDATION = 112,
 }
 
 impl FeatureFlag {
@@ -284,6 +286,7 @@ impl FeatureFlag {
             Self::PUBLIC_STRUCT_ENUM_ARGS,
             Self::MULTISIG_SCRIPT,
             Self::TRANSACTION_LIMITS,
+            Self::VERSIONED_TRANSACTION_VALIDATION,
         ]
     }
 }
@@ -494,7 +497,14 @@ impl Features {
     }
 
     pub fn is_transaction_limits_enabled(&self) -> bool {
+        // Transaction limits are enforced only through the versioned prologue path
+        // (via PrologueArgs::V1.txn_limits_request), so both flags must be on.
         self.is_enabled(FeatureFlag::TRANSACTION_LIMITS)
+            && self.is_enabled(FeatureFlag::VERSIONED_TRANSACTION_VALIDATION)
+    }
+
+    pub fn is_versioned_transaction_validation_enabled(&self) -> bool {
+        self.is_enabled(FeatureFlag::VERSIONED_TRANSACTION_VALIDATION)
     }
 
     pub fn get_max_identifier_size(&self) -> u64 {

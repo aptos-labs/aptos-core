@@ -28,7 +28,7 @@ fn make_vec_sum_program(
     let slot_vec_ref: u32 = 32;
 
     #[rustfmt::skip]
-    let code = arena.alloc_slice_fill_iter(vec![
+    let code = arena.alloc_slice_fill_iter([
         VecNew { dst: FO(slot_vec) },
         SlotBorrow { dst: FO(slot_vec_ref), local: FO(slot_vec) },
         StoreImm8 { dst: FO(slot_i), imm: 0 },
@@ -51,12 +51,13 @@ fn make_vec_sum_program(
     let func = arena.alloc(Function {
         name: GlobalArenaPtr::from_static("test"),
         code,
-        args_size: 0,
-        args_and_locals_size: 48,
+        param_sizes: ExecutableArenaPtr::empty_slice(),
+        param_sizes_sum: 0,
+        param_and_local_sizes_sum: 48,
         extended_frame_size: 72,
         zero_frame: true,
-        frame_layout: FrameLayoutInfo::new(arena, vec![FO(slot_vec), FO(slot_vec_ref)]),
-        safe_point_layouts: SortedSafePointEntries::empty(arena),
+        frame_layout: FrameLayoutInfo::new(arena, [FO(slot_vec), FO(slot_vec_ref)]),
+        safe_point_layouts: SortedSafePointEntries::empty(),
     });
 
     let descriptors = vec![ObjectDescriptor::Trivial];

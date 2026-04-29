@@ -160,16 +160,18 @@ impl<'a, 'guard, 'ctx> ExecutableBuilder<'a, 'guard, 'ctx> {
             .intern_identifier(self.module.identifier_at(lowered.name_idx))
             .into_global_arena_ptr();
         let code = self.arena.alloc_slice_fill_iter(lowered.code);
+        let param_sizes = self.arena.alloc_slice_fill_iter(lowered.param_sizes);
         let func = Function {
             name,
             code,
-            args_size: lowered.args_size,
-            args_and_locals_size: lowered.args_and_locals_size,
+            param_sizes,
+            param_sizes_sum: lowered.param_sizes_sum,
+            param_and_local_sizes_sum: lowered.param_and_local_sizes_sum,
             extended_frame_size: lowered.extended_frame_size,
             // TODO: hardcoded for now.
             zero_frame: false,
-            frame_layout: FrameLayoutInfo::empty(&self.arena),
-            safe_point_layouts: SortedSafePointEntries::empty(&self.arena),
+            frame_layout: FrameLayoutInfo::empty(),
+            safe_point_layouts: SortedSafePointEntries::empty(),
         };
         let ptr = self.arena.alloc(func);
         self.functions.insert(name, ptr);

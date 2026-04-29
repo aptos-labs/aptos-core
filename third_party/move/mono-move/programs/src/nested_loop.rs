@@ -77,10 +77,10 @@ mod micro_op {
         let i = 16u32;
         let j = 24u32;
         let tmp = 32u32;
-        let args_and_locals_size = 40u32;
+        let param_and_local_sizes_sum = 40u32;
 
         #[rustfmt::skip]
-        let code = vec![
+        let code = [
             // sum = 0; i = 0;
             StoreImm8 { dst: FO(sum), imm: 0 },                    // 0
             StoreImm8 { dst: FO(i), imm: 0 },                      // 1
@@ -110,13 +110,14 @@ mod micro_op {
         let func = arena.alloc(Function {
             name: GlobalArenaPtr::from_static("nested_loop"),
             code,
-            args_size: 8,
-            args_and_locals_size: args_and_locals_size as usize,
-            extended_frame_size: args_and_locals_size as usize
+            param_sizes: ExecutableArenaPtr::empty_slice(),
+            param_sizes_sum: 8,
+            param_and_local_sizes_sum: param_and_local_sizes_sum as usize,
+            extended_frame_size: param_and_local_sizes_sum as usize
                 + mono_move_core::FRAME_METADATA_SIZE,
             zero_frame: false,
-            frame_layout: FrameLayoutInfo::empty(&arena),
-            safe_point_layouts: SortedSafePointEntries::empty(&arena),
+            frame_layout: FrameLayoutInfo::empty(),
+            safe_point_layouts: SortedSafePointEntries::empty(),
         });
 
         (vec![func], vec![ObjectDescriptor::Trivial], arena)

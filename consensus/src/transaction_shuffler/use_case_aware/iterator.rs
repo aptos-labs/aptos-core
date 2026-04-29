@@ -35,6 +35,10 @@ where
         self
     }
 
+    pub(super) fn extend_with(&mut self, txns: impl IntoIterator<Item = Txn>) {
+        self.input_queue.extend(txns);
+    }
+
     pub(super) fn select_next_txn(&mut self) -> Option<Txn> {
         let ret = self.select_next_txn_inner();
         if ret.is_some() {

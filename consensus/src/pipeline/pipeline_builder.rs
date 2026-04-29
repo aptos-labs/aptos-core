@@ -742,7 +742,6 @@ impl PipelineBuilder {
             block_gas_limit,
             decryption_key,
         } = decryption_fut.await?;
-        // TODO(ibalajiarun): make sure decrypted_txns are in front of regular_txns
         let input_txns = [decrypted_txns, regular_txns].concat();
 
         tracker.start_working();

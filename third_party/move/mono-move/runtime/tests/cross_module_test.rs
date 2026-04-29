@@ -75,12 +75,13 @@ fn call_indirect_runtime_dispatch() {
     let callee = arena.alloc(Function {
         name: callee_name,
         code: callee_code,
-        args_size: 8,
-        args_and_locals_size: 8,
+        param_sizes: ExecutableArenaPtr::empty_slice(),
+        param_sizes_sum: 8,
+        param_and_local_sizes_sum: 8,
         extended_frame_size: 8 + FRAME_METADATA_SIZE,
         zero_frame: false,
-        frame_layout: FrameLayoutInfo::empty(&arena),
-        safe_point_layouts: SortedSafePointEntries::empty(&arena),
+        frame_layout: FrameLayoutInfo::empty(),
+        safe_point_layouts: SortedSafePointEntries::empty(),
     });
 
     static EXECUTABLE_ID: LazyLock<ExecutableId> = LazyLock::new(|| unsafe {
@@ -114,12 +115,13 @@ fn call_indirect_runtime_dispatch() {
     let caller = arena.alloc(Function {
         name: caller_name,
         code: caller_code,
-        args_size: 0,
-        args_and_locals_size: 8,
+        param_sizes: ExecutableArenaPtr::empty_slice(),
+        param_sizes_sum: 0,
+        param_and_local_sizes_sum: 8,
         extended_frame_size: 16 + FRAME_METADATA_SIZE,
         zero_frame: false,
-        frame_layout: FrameLayoutInfo::empty(&arena),
-        safe_point_layouts: SortedSafePointEntries::empty(&arena),
+        frame_layout: FrameLayoutInfo::empty(),
+        safe_point_layouts: SortedSafePointEntries::empty(),
     });
 
     // -- Set up interpreter and run --

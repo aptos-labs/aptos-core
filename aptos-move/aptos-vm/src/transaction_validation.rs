@@ -18,9 +18,7 @@ use aptos_types::{
     fee_statement::FeeStatement,
     move_utils::as_move_value::AsMoveValue,
     on_chain_config::Features,
-    transaction::{
-        MultisigTransactionPayload, ReplayProtector, TransactionExecutableRef, TxnLimitsRequest,
-    },
+    transaction::{MultisigTransactionPayload, ReplayProtector, TransactionExecutableRef},
 };
 use aptos_vm_logging::log_schema::AdapterLogSchema;
 use fail::fail_point;
@@ -64,11 +62,6 @@ pub static APTOS_TRANSACTION_VALIDATION: Lazy<TransactionValidation> =
         unified_prologue_fee_payer_v2_name: Identifier::new("unified_prologue_fee_payer_v2")
             .unwrap(),
         unified_epilogue_v2_name: Identifier::new("unified_epilogue_v2").unwrap(),
-
-        // V3 prologues support voting-power-based high-txn-limits.
-        unified_prologue_v3_name: Identifier::new("unified_prologue_v3").unwrap(),
-        unified_prologue_fee_payer_v3_name: Identifier::new("unified_prologue_fee_payer_v3")
-            .unwrap(),
     });
 
 /// On-chain functions used to validate transactions
@@ -94,10 +87,6 @@ pub struct TransactionValidation {
     pub unified_prologue_v2_name: Identifier,
     pub unified_prologue_fee_payer_v2_name: Identifier,
     pub unified_epilogue_v2_name: Identifier,
-
-    // V3 prologues support voting-power-based high-txn-limits.
-    pub unified_prologue_v3_name: Identifier,
-    pub unified_prologue_fee_payer_v3_name: Identifier,
 }
 
 impl TransactionValidation {
@@ -133,6 +122,18 @@ pub(crate) fn run_script_prologue(
     traversal_context: &mut TraversalContext,
     is_simulation: bool,
 ) -> Result<(), VMStatus> {
+    if features.is_versioned_transaction_validation_enabled() {
+        return crate::transaction_validation_versioned::run_prologue(
+            session,
+            module_storage,
+            serialized_signers,
+            txn_data,
+            log_context,
+            traversal_context,
+            is_simulation,
+        );
+    }
+
     let txn_replay_protector = txn_data.replay_protector();
     let txn_authentication_key = txn_data.authentication_proof().optional_auth_key();
     let txn_gas_price = txn_data.gas_unit_price();
@@ -166,103 +167,88 @@ pub(crate) fn run_script_prologue(
             }
         };
 
-        let (prologue_function_name, mut serialized_args) =
-            if let (true, Some(fee_payer_auth_key)) = (
-                txn_data.fee_payer().is_some(),
-                txn_data
-                    .fee_payer_authentication_proof
-                    .as_ref()
-                    .map(|proof| proof.optional_auth_key()),
-            ) {
-                let serialized_args = vec![
-                    serialized_signers.sender(),
-                    serialized_signers
-                        .fee_payer()
-                        .ok_or_else(|| VMStatus::error(StatusCode::UNREACHABLE, None))?,
-                    txn_authentication_key
-                        .as_move_value()
-                        .simple_serialize()
-                        .unwrap(),
-                    fee_payer_auth_key
-                        .as_move_value()
-                        .simple_serialize()
-                        .unwrap(),
-                    replay_protector_move_value,
-                    MoveValue::vector_address(txn_data.secondary_signers())
-                        .simple_serialize()
-                        .unwrap(),
-                    MoveValue::Vector(secondary_auth_keys)
-                        .simple_serialize()
-                        .unwrap(),
-                    MoveValue::U64(txn_gas_price.into())
-                        .simple_serialize()
-                        .unwrap(),
-                    MoveValue::U64(txn_max_gas_units.into())
-                        .simple_serialize()
-                        .unwrap(),
-                    MoveValue::U64(txn_expiration_timestamp_secs)
-                        .simple_serialize()
-                        .unwrap(),
-                    MoveValue::U8(chain_id.id()).simple_serialize().unwrap(),
-                    MoveValue::Bool(is_simulation).simple_serialize().unwrap(),
-                ];
-                (
-                    if features.is_transaction_limits_enabled() {
-                        &APTOS_TRANSACTION_VALIDATION.unified_prologue_fee_payer_v3_name
-                    } else if features.is_transaction_payload_v2_enabled() {
-                        &APTOS_TRANSACTION_VALIDATION.unified_prologue_fee_payer_v2_name
-                    } else {
-                        &APTOS_TRANSACTION_VALIDATION.unified_prologue_fee_payer_name
-                    },
-                    serialized_args,
-                )
-            } else {
-                let serialized_args = vec![
-                    serialized_signers.sender(),
-                    txn_authentication_key
-                        .as_move_value()
-                        .simple_serialize()
-                        .unwrap(),
-                    replay_protector_move_value,
-                    MoveValue::vector_address(txn_data.secondary_signers())
-                        .simple_serialize()
-                        .unwrap(),
-                    MoveValue::Vector(secondary_auth_keys)
-                        .simple_serialize()
-                        .unwrap(),
-                    MoveValue::U64(txn_gas_price.into())
-                        .simple_serialize()
-                        .unwrap(),
-                    MoveValue::U64(txn_max_gas_units.into())
-                        .simple_serialize()
-                        .unwrap(),
-                    MoveValue::U64(txn_expiration_timestamp_secs)
-                        .simple_serialize()
-                        .unwrap(),
-                    MoveValue::U8(chain_id.id()).simple_serialize().unwrap(),
-                    MoveValue::Bool(is_simulation).simple_serialize().unwrap(),
-                ];
-                (
-                    if features.is_transaction_limits_enabled() {
-                        &APTOS_TRANSACTION_VALIDATION.unified_prologue_v3_name
-                    } else if features.is_transaction_payload_v2_enabled() {
-                        &APTOS_TRANSACTION_VALIDATION.unified_prologue_v2_name
-                    } else {
-                        &APTOS_TRANSACTION_VALIDATION.unified_prologue_name
-                    },
-                    serialized_args,
-                )
-            };
-
-        // Append the user's staking-backed request when dispatching to v3 prologue.
-        // Governance scripts pass None (they don't need Move-side validation).
-        if features.is_transaction_limits_enabled() {
-            let user_request = txn_data.txn_limits.as_ref().and_then(|v| match v {
-                TxnLimitsRequest::Staking(req) => Some(req),
-                TxnLimitsRequest::ApprovedGovernanceScript => None,
-            });
-            serialized_args.push(bcs::to_bytes(&user_request).unwrap());
-        }
+        let (prologue_function_name, serialized_args) = if let (true, Some(fee_payer_auth_key)) = (
+            txn_data.fee_payer().is_some(),
+            txn_data
+                .fee_payer_authentication_proof
+                .as_ref()
+                .map(|proof| proof.optional_auth_key()),
+        ) {
+            let serialized_args = vec![
+                serialized_signers.sender(),
+                serialized_signers
+                    .fee_payer()
+                    .ok_or_else(|| VMStatus::error(StatusCode::UNREACHABLE, None))?,
+                txn_authentication_key
+                    .as_move_value()
+                    .simple_serialize()
+                    .unwrap(),
+                fee_payer_auth_key
+                    .as_move_value()
+                    .simple_serialize()
+                    .unwrap(),
+                replay_protector_move_value,
+                MoveValue::vector_address(txn_data.secondary_signers())
+                    .simple_serialize()
+                    .unwrap(),
+                MoveValue::Vector(secondary_auth_keys)
+                    .simple_serialize()
+                    .unwrap(),
+                MoveValue::U64(txn_gas_price.into())
+                    .simple_serialize()
+                    .unwrap(),
+                MoveValue::U64(txn_max_gas_units.into())
+                    .simple_serialize()
+                    .unwrap(),
+                MoveValue::U64(txn_expiration_timestamp_secs)
+                    .simple_serialize()
+                    .unwrap(),
+                MoveValue::U8(chain_id.id()).simple_serialize().unwrap(),
+                MoveValue::Bool(is_simulation).simple_serialize().unwrap(),
+            ];
+            (
+                if features.is_transaction_payload_v2_enabled() {
+                    &APTOS_TRANSACTION_VALIDATION.unified_prologue_fee_payer_v2_name
+                } else {
+                    &APTOS_TRANSACTION_VALIDATION.unified_prologue_fee_payer_name
+                },
+                serialized_args,
+            )
+        } else {
+            let serialized_args = vec![
+                serialized_signers.sender(),
+                txn_authentication_key
+                    .as_move_value()
+                    .simple_serialize()
+                    .unwrap(),
+                replay_protector_move_value,
+                MoveValue::vector_address(txn_data.secondary_signers())
+                    .simple_serialize()
+                    .unwrap(),
+                MoveValue::Vector(secondary_auth_keys)
+                    .simple_serialize()
+                    .unwrap(),
+                MoveValue::U64(txn_gas_price.into())
+                    .simple_serialize()
+                    .unwrap(),
+                MoveValue::U64(txn_max_gas_units.into())
+                    .simple_serialize()
+                    .unwrap(),
+                MoveValue::U64(txn_expiration_timestamp_secs)
+                    .simple_serialize()
+                    .unwrap(),
+                MoveValue::U8(chain_id.id()).simple_serialize().unwrap(),
+                MoveValue::Bool(is_simulation).simple_serialize().unwrap(),
+            ];
+            (
+                if features.is_transaction_payload_v2_enabled() {
+                    &APTOS_TRANSACTION_VALIDATION.unified_prologue_v2_name
+                } else {
+                    &APTOS_TRANSACTION_VALIDATION.unified_prologue_name
+                },
+                serialized_args,
+            )
+        };
 
         session
             .execute_function_bypass_visibility(
@@ -503,6 +489,19 @@ fn run_epilogue(
     traversal_context: &mut TraversalContext,
     is_simulation: bool,
 ) -> VMResult<()> {
+    if features.is_versioned_transaction_validation_enabled() {
+        return crate::transaction_validation_versioned::run_epilogue(
+            session,
+            module_storage,
+            serialized_signers,
+            gas_remaining,
+            fee_statement,
+            txn_data,
+            traversal_context,
+            is_simulation,
+        );
+    }
+
     let txn_gas_price = txn_data.gas_unit_price();
     let txn_max_gas_units = txn_data.max_gas_amount();
     let is_orderless_txn = txn_data.is_orderless();

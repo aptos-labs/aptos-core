@@ -443,38 +443,12 @@ spec aptos_framework::transaction_validation {
         pragma verify = false;
     }
 
-    spec unified_prologue_v3(
-        sender: signer,
-        txn_sender_public_key: Option<vector<u8>>,
-        replay_protector: ReplayProtector,
-        secondary_signer_addresses: vector<address>,
-        secondary_signer_public_key_hashes: vector<Option<vector<u8>>>,
-        txn_gas_price: u64,
-        txn_max_gas_units: u64,
-        txn_expiration_time: u64,
-        chain_id: u8,
-        is_simulation: bool,
-        txn_limits_request: Option<UserTxnLimitsRequest>,
-    ) {
+    spec versioned_prologue(sender: signer, fee_payer: signer, args: PrologueArgs) {
         // TODO: temporary mockup
         pragma verify = false;
     }
 
-    spec unified_prologue_fee_payer_v3(
-        sender: signer,
-        fee_payer: signer,
-        txn_sender_public_key: Option<vector<u8>>,
-        fee_payer_public_key_hash: Option<vector<u8>>,
-        replay_protector: ReplayProtector,
-        secondary_signer_addresses: vector<address>,
-        secondary_signer_public_key_hashes: vector<Option<vector<u8>>>,
-        txn_gas_price: u64,
-        txn_max_gas_units: u64,
-        txn_expiration_time: u64,
-        chain_id: u8,
-        is_simulation: bool,
-        txn_limits_request: Option<UserTxnLimitsRequest>,
-    ) {
+    spec versioned_epilogue(account: signer, fee_payer: signer, args: EpilogueArgs) {
         // TODO: temporary mockup
         pragma verify = false;
     }

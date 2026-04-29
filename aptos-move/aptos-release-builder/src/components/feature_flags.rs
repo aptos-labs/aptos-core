@@ -163,6 +163,7 @@ pub enum FeatureFlag {
     PublicStructEnumArgs,
     MultisigScript,
     TransactionLimits,
+    VersionedTransactionValidation,
 }
 
 fn generate_features_blob(writer: &CodeWriter, data: &[u64]) {
@@ -425,6 +426,9 @@ impl From<FeatureFlag> for AptosFeatureFlag {
             FeatureFlag::PublicStructEnumArgs => AptosFeatureFlag::PUBLIC_STRUCT_ENUM_ARGS,
             FeatureFlag::MultisigScript => AptosFeatureFlag::MULTISIG_SCRIPT,
             FeatureFlag::TransactionLimits => AptosFeatureFlag::TRANSACTION_LIMITS,
+            FeatureFlag::VersionedTransactionValidation => {
+                AptosFeatureFlag::VERSIONED_TRANSACTION_VALIDATION
+            },
         }
     }
 }
@@ -614,6 +618,9 @@ impl From<AptosFeatureFlag> for FeatureFlag {
             AptosFeatureFlag::PUBLIC_STRUCT_ENUM_ARGS => FeatureFlag::PublicStructEnumArgs,
             AptosFeatureFlag::MULTISIG_SCRIPT => FeatureFlag::MultisigScript,
             AptosFeatureFlag::TRANSACTION_LIMITS => FeatureFlag::TransactionLimits,
+            AptosFeatureFlag::VERSIONED_TRANSACTION_VALIDATION => {
+                FeatureFlag::VersionedTransactionValidation
+            },
         }
     }
 }
