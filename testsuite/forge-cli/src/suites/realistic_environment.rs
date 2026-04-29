@@ -479,6 +479,11 @@ pub(crate) fn realistic_env_max_load_test(
                         },
                         use_latency_weighted: true,
                         latency_weight_multiplier_milli: 2000, // 2.0× — suppress slow leaders
+                        // A/B verification: skip the heuristic until round 10,000
+                        // (~5 min at ~32 rounds/sec). Lets us observe baseline behavior
+                        // first, then watch whether spikes appear when the heuristic
+                        // activates. Set to 0 in production.
+                        latency_warmup_rounds: 10_000,
                     }),
                 );
             }

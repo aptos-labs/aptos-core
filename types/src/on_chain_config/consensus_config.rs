@@ -544,11 +544,13 @@ impl LeaderReputationType {
                 base: c,
                 use_latency_weighted: false,
                 latency_weight_multiplier_milli: 0,
+                latency_warmup_rounds: 0,
             },
             Self::ProposerAndVoterV3(c) => ProposerAndVoterParams {
                 base: &c.base,
                 use_latency_weighted: c.use_latency_weighted,
                 latency_weight_multiplier_milli: c.latency_weight_multiplier_milli,
+                latency_warmup_rounds: c.latency_warmup_rounds,
             },
         }
     }
@@ -563,6 +565,9 @@ pub struct ProposerAndVoterParams<'a> {
     /// deterministic BCS serialization across implementations. Ignored when
     /// `use_latency_weighted` is false.
     pub latency_weight_multiplier_milli: u32,
+    /// Skip the latency-weighted heuristic until this round (forge-only A/B verification
+    /// knob). 0 means activate immediately. V1/V2 always set 0.
+    pub latency_warmup_rounds: u64,
 }
 
 #[derive(Clone, Copy, Debug, Deserialize, Eq, PartialEq, Serialize)]
@@ -604,6 +609,11 @@ pub struct ProposerAndVoterConfigV3 {
     /// Integer-encoded for BCS determinism. Decoded as `value as f64 / 1000.0` at runtime.
     /// Ignored when `use_latency_weighted` is false.
     pub latency_weight_multiplier_milli: u32,
+    /// Skip the latency-weighted heuristic (i.e., behave like V2) until the latest event in
+    /// the history window has reached this round number. 0 means activate immediately. Used
+    /// for forge A/B verification where we want a clean baseline phase before the heuristic
+    /// kicks in. Production deployments should use 0.
+    pub latency_warmup_rounds: u64,
 }
 
 #[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]

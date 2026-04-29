@@ -601,6 +601,11 @@ pub struct LatencyWeightedHeuristic {
     inner: ProposerAndVoterHeuristic,
     active_weight: u64,
     multiplier: f64,
+    /// Skip the latency-weighted scaling (behave as inner ProposerAndVoter) until the
+    /// latest event in the history window has reached this round. 0 = activate immediately.
+    /// Used for forge A/B verification: run a clean baseline phase before the heuristic
+    /// kicks in. Production should set 0.
+    warmup_rounds: u64,
     /// Carry-forward state: last computed weight factor per author (guarded for &self
     /// access). Mutated only inside `get_weights`.
     last_factor: Mutex<HashMap<Author, f64>>,
@@ -617,11 +622,17 @@ const MIN_OBSERVATIONS: usize = 2;
 const MAX_LATENCY_RATIO: f64 = 10.0;
 
 impl LatencyWeightedHeuristic {
-    pub fn new(inner: ProposerAndVoterHeuristic, active_weight: u64, multiplier: f64) -> Self {
+    pub fn new(
+        inner: ProposerAndVoterHeuristic,
+        active_weight: u64,
+        multiplier: f64,
+        warmup_rounds: u64,
+    ) -> Self {
         Self {
             inner,
             active_weight,
             multiplier: if multiplier > 0.0 { multiplier } else { 1.0 },
+            warmup_rounds,
             last_factor: Mutex::new(HashMap::new()),
         }
     }
@@ -692,6 +703,17 @@ impl ReputationHeuristic for LatencyWeightedHeuristic {
         history: &[NewBlockEvent],
     ) -> Vec<u64> {
         let base_weights = self.inner.get_weights(epoch, epoch_to_candidates, history);
+
+        // Warmup gate: until the latest history event has reached `warmup_rounds`,
+        // behave as plain ProposerAndVoter (no latency scaling). This is a forge-only
+        // A/B verification knob; production sets warmup_rounds=0 (activate immediately).
+        // Determinism: every validator sees the same `history`, so they all gate identically.
+        if self.warmup_rounds > 0 {
+            let latest_round = history.first().map(|e| e.round()).unwrap_or(0);
+            if latest_round < self.warmup_rounds {
+                return base_weights;
+            }
+        }
 
         let round_times = Self::compute_round_times(history, epoch_to_candidates);
 

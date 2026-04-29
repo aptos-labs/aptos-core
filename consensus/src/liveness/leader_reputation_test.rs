@@ -794,7 +794,7 @@ fn make_latency_weighted_heuristic(self_author: Author) -> LatencyWeightedHeuris
     // failed/inactive branches in the inner heuristic — we want to exercise the latency
     // scaling on top of `active_weight`.
     let inner = ProposerAndVoterHeuristic::new(self_author, 1000, 10, 1, 50, 100, 100, false);
-    LatencyWeightedHeuristic::new(inner, 1000, 1.0)
+    LatencyWeightedHeuristic::new(inner, 1000, 1.0, 0)
 }
 
 #[test]
@@ -1024,6 +1024,74 @@ fn test_latency_weighted_carry_forward_for_unobserved_validator() {
         weights2[1], v1_first_weight,
         "carry-forward must preserve V1's penalty; got weights {:?}, expected V1={}",
         weights2, v1_first_weight,
+    );
+}
+
+#[test]
+fn test_latency_weighted_warmup_gates_heuristic() {
+    // Verify that `warmup_rounds` defers the heuristic. Below the threshold the weights
+    // must equal the base ProposerAndVoter output (no latency scaling). Above the
+    // threshold the heuristic kicks in normally.
+    let validators: Vec<Author> = (0..2).map(|_| Author::random()).collect();
+    let epoch_to_validators = HashMap::from([(0u64, validators.clone())]);
+
+    // History where V1 has a failure attribution → V1 mean >> V0 mean. Without warmup,
+    // V1 would be penalized.
+    let history = vec![
+        make_block_event(validators[0], 0, 100, 5000, vec![1]),
+        make_block_event(validators[1], 0, 98, 500, vec![]),
+        make_block_event(validators[0], 0, 97, 100, vec![]),
+        make_block_event(validators[1], 0, 96, 50, vec![]),
+        make_block_event(validators[0], 0, 95, 25, vec![]),
+        make_block_event(validators[1], 0, 94, 10, vec![]),
+    ];
+
+    // Warmup until round 200 — latest history round is 100, so heuristic is disabled.
+    let inner = ProposerAndVoterHeuristic::new(validators[0], 1000, 10, 1, 50, 100, 100, false);
+    let heuristic_with_warmup = LatencyWeightedHeuristic::new(inner, 1000, 1.0, 200);
+    let weights_warmup = heuristic_with_warmup.get_weights(0, &epoch_to_validators, &history);
+
+    // Same history, no warmup — heuristic active.
+    let inner2 = ProposerAndVoterHeuristic::new(validators[0], 1000, 10, 1, 50, 100, 100, false);
+    let heuristic_no_warmup = LatencyWeightedHeuristic::new(inner2, 1000, 1.0, 0);
+    let weights_active = heuristic_no_warmup.get_weights(0, &epoch_to_validators, &history);
+
+    // Warmup case: V1 should still have base active_weight (no penalty applied).
+    assert_eq!(
+        weights_warmup[1], 1000,
+        "warmup must skip latency scaling; V1 should be at active_weight; got {:?}",
+        weights_warmup,
+    );
+    // Active case: V1 is penalized.
+    assert!(
+        weights_active[1] < 1000,
+        "with warmup expired, V1 should be penalized; got {:?}",
+        weights_active,
+    );
+}
+
+#[test]
+fn test_latency_weighted_warmup_zero_means_active_immediately() {
+    // warmup_rounds = 0 must be a no-op (the production default).
+    let validators: Vec<Author> = (0..2).map(|_| Author::random()).collect();
+    let epoch_to_validators = HashMap::from([(0u64, validators.clone())]);
+
+    let history = vec![
+        make_block_event(validators[0], 0, 5, 5000, vec![1]),
+        make_block_event(validators[1], 0, 3, 100, vec![]),
+        make_block_event(validators[0], 0, 2, 50, vec![]),
+        make_block_event(validators[1], 0, 1, 10, vec![]),
+    ];
+
+    let inner = ProposerAndVoterHeuristic::new(validators[0], 1000, 10, 1, 50, 100, 100, false);
+    let heuristic = LatencyWeightedHeuristic::new(inner, 1000, 1.0, 0);
+    let weights = heuristic.get_weights(0, &epoch_to_validators, &history);
+
+    // V1 should be penalized — heuristic is active from the start.
+    assert!(
+        weights[1] < 1000,
+        "warmup_rounds=0 should not gate the heuristic; got {:?}",
+        weights,
     );
 }
 
