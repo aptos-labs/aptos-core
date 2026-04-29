@@ -40,7 +40,7 @@ l0: move_loc l1
 
 
 === specializer ===
-=== Module 0x42::basic ===
+// module 0x42::basic
 
 fun add(r0, r1): u64 {
   slots: params(2), locals(0), temps(1)
@@ -88,7 +88,7 @@ fun max(r0, r1): u64 {
 }
 
 === micro-ops ===
-=== Module 0x42::basic ===
+// module 0x42::basic
 
 fun add() {
   frame_data_size: 24

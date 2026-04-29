@@ -7,6 +7,7 @@ pub mod compile;
 pub mod matcher;
 pub mod module_provider;
 pub mod parser;
+pub mod print_sections;
 pub mod runner;
 
 pub use compile::{

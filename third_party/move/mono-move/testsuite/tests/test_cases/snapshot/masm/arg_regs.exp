@@ -1,4 +1,4 @@
-=== Module 0x66::arg_regs ===
+// module 0x66::arg_regs
 
 fun identity(r0): u64 {
   slots: params(1), locals(0), temps(0)
@@ -217,7 +217,7 @@ fun no_calls(): u64 {
 }
 
 === micro-ops ===
-=== Module 0x66::arg_regs ===
+// module 0x66::arg_regs
 
 fun identity() {
   frame_data_size: 8

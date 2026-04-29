@@ -24,12 +24,7 @@ impl fmt::Display for ModuleIR {
         let self_handle = module.module_handle_at(module.self_module_handle_idx);
         let addr = module.address_identifier_at(self_handle.address);
         let name = module.identifier_at(self_handle.name);
-        writeln!(
-            f,
-            "=== Module 0x{}::{} ===",
-            addr.short_str_lossless(),
-            name
-        )?;
+        writeln!(f, "// module 0x{}::{}", addr.short_str_lossless(), name)?;
 
         for func_ir in self.functions.iter().flatten() {
             writeln!(f)?;

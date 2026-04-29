@@ -7,9 +7,10 @@
 use crate::{
     compile::{compile, SourceKind},
     matcher::check_output,
-    parser::Step,
+    parser::{PrintSection, Step},
+    print_sections,
 };
-use anyhow::anyhow;
+use anyhow::{anyhow, bail};
 use mono_move_core::NoopTransactionContext;
 use mono_move_gas::SimpleGasMeter;
 use mono_move_global_context::{ExecutionGuard, GlobalContext};
@@ -27,6 +28,7 @@ use move_vm_runtime::{
 };
 use move_vm_test_utils::InMemoryStorage;
 use move_vm_types::{gas::UnmeteredGasMeter, loaded_data::runtime_types::Type};
+use std::path::Path;
 
 /// Execution output from a VM, carrying both the display string and the
 /// number of return values so that mono-move can avoid reparsing.
@@ -35,16 +37,20 @@ struct Output {
     num_returns: usize,
 }
 
-/// Run all steps in a differential test, checking both VMs produce matching output.
-pub fn run_test(steps: Vec<Step>, kind: SourceKind) -> anyhow::Result<()> {
+/// Run all steps in a differential test, checking both VMs produce matching
+/// output. If any `Publish` step requested `--print(...)` sections, the
+/// rendered snapshot is verified against (or written to with `UPBL=1`) a
+/// `.exp` baseline alongside `test_path`.
+pub fn run_test(steps: Vec<Step>, kind: SourceKind, test_path: &Path) -> anyhow::Result<()> {
     let ctx = GlobalContext::with_num_execution_workers(1);
     let guard = ctx.try_execution_context(0).unwrap();
 
     let mut storage = InMemoryStorage::new();
+    let mut snapshot = String::new();
 
     for step in steps {
         match step {
-            Step::Publish { sources } => {
+            Step::Publish { sources, print } => {
                 let modules = compile(&sources, kind)?;
                 for module in &modules {
                     // V1 path.
@@ -63,6 +69,16 @@ pub fn run_test(steps: Vec<Step>, kind: SourceKind) -> anyhow::Result<()> {
                     guard
                         .insert_loaded_module(loaded)
                         .map_err(|err| anyhow!("Failed to insert loaded module: {}", err))?;
+                }
+
+                if !print.is_empty() {
+                    if matches!(kind, SourceKind::Masm) && print.contains(&PrintSection::Bytecode) {
+                        bail!(
+                            "`bytecode` is not a valid print section for .masm inputs — \
+                             the bytecode is the input"
+                        );
+                    }
+                    snapshot.push_str(&print_sections::render(&guard, &modules, &print)?);
                 }
             },
             Step::Execute {
@@ -85,6 +101,11 @@ pub fn run_test(steps: Vec<Step>, kind: SourceKind) -> anyhow::Result<()> {
                 check_output(&checks, &v1_output.display, &v2_output.display)?;
             },
         }
+    }
+
+    if !snapshot.is_empty() {
+        let baseline = test_path.with_extension("exp");
+        move_prover_test_utils::baseline_test::verify_or_update_baseline(&baseline, &snapshot)?;
     }
 
     Ok(())

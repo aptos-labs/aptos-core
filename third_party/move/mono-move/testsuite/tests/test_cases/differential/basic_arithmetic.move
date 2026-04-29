@@ -1,7 +1,7 @@
 // Copyright (c) Aptos Foundation
 // Licensed pursuant to the Innovation-Enabling Source Code License, available at https://github.com/aptos-labs/aptos-core/blob/main/LICENSE
 
-// RUN: publish
+// RUN: publish --print(bytecode,stackless,micro-ops)
 module 0x1::test {
     fun add(a: u64, b: u64): u64 {
         a + b

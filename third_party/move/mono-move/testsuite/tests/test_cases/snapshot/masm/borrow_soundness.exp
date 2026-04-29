@@ -1,4 +1,4 @@
-=== Module 0x66::borrow_soundness ===
+// module 0x66::borrow_soundness
 
 fun borrow_loc_no_source_subst(r0): u64 {
   slots: params(1), locals(1), temps(2)
@@ -60,7 +60,7 @@ fun mut_borrow_kills_reverse(r0): u64 {
 }
 
 === micro-ops ===
-=== Module 0x66::borrow_soundness ===
+// module 0x66::borrow_soundness
 
 fun borrow_loc_no_source_subst(): skipped (lowering: instruction ImmBorrowLoc not yet lowered)
 

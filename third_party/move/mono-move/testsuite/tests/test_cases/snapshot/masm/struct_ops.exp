@@ -1,4 +1,4 @@
-=== Module 0x66::test ===
+// module 0x66::test
 
 fun pack_and_unpack(): u64 {
   slots: params(0), locals(1), temps(2)
@@ -15,6 +15,6 @@ fun pack_and_unpack(): u64 {
 }
 
 === micro-ops ===
-=== Module 0x66::test ===
+// module 0x66::test
 
 fun pack_and_unpack(): skipped (lowering: instruction Pack not yet lowered)

@@ -35,7 +35,7 @@ fn main() {
                 let content = std::fs::read_to_string(&path).map_err(|e| format!("{:?}", e))?;
                 let steps =
                     mono_move_testsuite::parser::parse(&content).map_err(|e| format!("{:?}", e))?;
-                mono_move_testsuite::runner::run_test(steps, kind)
+                mono_move_testsuite::runner::run_test(steps, kind, &path)
                     .map_err(|e| format!("{:?}", e).into())
             })
         })
