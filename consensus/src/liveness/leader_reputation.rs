@@ -728,8 +728,7 @@ impl ReputationHeuristic for LatencyWeightedHeuristic {
                         // Asymmetric penalty: validators at or below median are unchanged
                         // (max(1.0) clamps the ratio), validators above median are
                         // penalized by 1 / ratio^multiplier.
-                        let ratio = (val_mean as f64 / median as f64)
-                            .clamp(1.0, MAX_LATENCY_RATIO);
+                        let ratio = (val_mean as f64 / median as f64).clamp(1.0, MAX_LATENCY_RATIO);
                         let f = 1.0 / ratio.powf(self.multiplier);
                         // Persist for carry-forward when this validator next has no obs.
                         last_factor.insert(*author, f);
@@ -755,11 +754,13 @@ fn compute_median(means: &HashMap<Author, u64>) -> Option<u64> {
     let mut vals: Vec<u64> = means.values().copied().collect();
     vals.sort_unstable();
     let n = vals.len();
-    Some(if n.is_multiple_of(2) {
-        (vals[n / 2 - 1] + vals[n / 2]) / 2
-    } else {
-        vals[n / 2]
-    })
+    Some(
+        if n.is_multiple_of(2) {
+            (vals[n / 2 - 1] + vals[n / 2]) / 2
+        } else {
+            vals[n / 2]
+        },
+    )
 }
 
 /// Committed history based proposer election implementation that could help bias towards

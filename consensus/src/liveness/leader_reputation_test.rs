@@ -992,7 +992,11 @@ fn test_latency_weighted_carry_forward_for_unobserved_validator() {
     let weights1 = heuristic.get_weights(0, &epoch_to_validators, &history_with_obs);
 
     // V1 (slow) is below base; V0 (healthy, below median) stays at base.
-    assert_eq!(weights1[0], 1000, "V0 base preserved in first call; got {:?}", weights1);
+    assert_eq!(
+        weights1[0], 1000,
+        "V0 base preserved in first call; got {:?}",
+        weights1
+    );
     assert!(
         weights1[1] < 1000,
         "V1 should be penalized in first call; got {:?}",
@@ -1010,7 +1014,11 @@ fn test_latency_weighted_carry_forward_for_unobserved_validator() {
     let weights2 = heuristic.get_weights(0, &epoch_to_validators, &history_no_v1_obs);
 
     // V0's stored factor was 1.0 → carry-forward restores base.
-    assert_eq!(weights2[0], 1000, "V0 carry-forward at base; got {:?}", weights2);
+    assert_eq!(
+        weights2[0], 1000,
+        "V0 carry-forward at base; got {:?}",
+        weights2
+    );
     // V1's stored factor was the first-call penalty → must be preserved, NOT reset.
     assert_eq!(
         weights2[1], v1_first_weight,
