@@ -35,6 +35,7 @@ fn open_db<P: AsRef<Path>>(
         delete_on_restart: false,
         compute_root_hash: true,
         persist_hotness_in_write_set: true,
+        persist_hotness_in_epilogue: false,
     };
     AptosDB::open(
         StorageDirPaths::from_path(path),
