@@ -915,31 +915,107 @@ fn test_latency_weighted_empty_history_falls_back_to_base() {
 
 #[test]
 fn test_latency_weighted_max_ratio_clamp() {
-    // V0 makes many fast successful proposals (small mean) while V1 is attributed multiple
-    // large failure gaps (huge mean). The raw scaling ratio (max_mean / V0_mean) is ~1000x;
-    // it must be clamped at MAX_LATENCY_RATIO = 10x → V0's weight tops out at 10 * 1000.
-    let validators: Vec<Author> = (0..2).map(|_| Author::random()).collect();
+    // Three validators, all classified active. V1 has a huge mean from absorbing
+    // failure attributions, while V0 and V2 have small means from successful pairs.
+    // The raw penalty ratio (V1_mean / median_mean) is much larger than
+    // MAX_LATENCY_RATIO=10 and must be clamped → V1 weight floors at
+    // active_weight / 10 = 100 (with multiplier=1.0). V0 and V2 stay at base 1000.
+    let validators: Vec<Author> = (0..3).map(|_| Author::random()).collect();
     let epoch_to_validators = HashMap::from([(0u64, validators.clone())]);
 
-    // History (newest first): V0 successfully proposes a series of fast rounds, then three
-    // huge gaps each attributed to V1 via failed_proposer_indices.
+    // History (newest first):
+    //   - 3 huge V1-failure attributions (gap ≈ 10000 each) — pushes V1 mean way up.
+    //   - 3 V1 successful proposals at small intervals — keeps V1 under the 50%
+    //     failure threshold so it stays classified active.
+    //   - 6 alternating V0/V2 successful proposals at small intervals — both V0 and
+    //     V2 accumulate enough small-mean observations to set the median.
     let history = vec![
-        make_block_event(validators[0], 0, 10, 30_000, vec![1]), // V1 failure, gap = 10000
-        make_block_event(validators[0], 0, 8, 20_000, vec![1]),  // V1 failure, gap = 10000
-        make_block_event(validators[0], 0, 6, 10_000, vec![1]),  // V1 failure, gap = 9990
-        make_block_event(validators[0], 0, 4, 10, vec![]),
-        make_block_event(validators[0], 0, 3, 5, vec![]),
+        make_block_event(validators[0], 0, 18, 1_030_000, vec![1]),
+        make_block_event(validators[0], 0, 16, 1_020_000, vec![1]),
+        make_block_event(validators[0], 0, 14, 1_010_000, vec![1]),
+        make_block_event(validators[1], 0, 12, 1_000_030, vec![]),
+        make_block_event(validators[1], 0, 11, 1_000_020, vec![]),
+        make_block_event(validators[1], 0, 10, 1_000_010, vec![]),
+        make_block_event(validators[2], 0, 9, 1_000_005, vec![]),
+        make_block_event(validators[0], 0, 8, 1_000_000, vec![]),
+        make_block_event(validators[2], 0, 7, 999_995, vec![]),
+        make_block_event(validators[0], 0, 6, 999_990, vec![]),
+        make_block_event(validators[2], 0, 5, 999_985, vec![]),
+        make_block_event(validators[0], 0, 4, 999_980, vec![]),
     ];
 
     let heuristic = make_latency_weighted_heuristic(validators[0]);
     let weights = heuristic.get_weights(0, &epoch_to_validators, &history);
 
-    // V0's raw ratio would be massive (V1_mean ~10000 / V0_mean ~2 = 5000x); clamp pins it
-    // to MAX_LATENCY_RATIO = 10. V0 weight must equal active_weight * 10 = 10_000.
+    // V0, V2 (healthy, near median): no penalty, weight = active_weight = 1000.
     assert_eq!(
-        weights[0], 10_000,
-        "expected V0 weight clamped at 10x active_weight; got {:?}",
+        weights[0], 1000,
+        "expected V0 to keep base active_weight; got {:?}",
         weights,
+    );
+    assert_eq!(
+        weights[2], 1000,
+        "expected V2 to keep base active_weight; got {:?}",
+        weights,
+    );
+    // V1 (very slow): penalty clamped at MAX_LATENCY_RATIO=10, multiplier=1.0
+    // → minimum factor = 1/10 → weight = active_weight / 10 = 100.
+    assert_eq!(
+        weights[1], 100,
+        "expected V1 penalty clamped at 1/10 of active_weight; got {:?}",
+        weights,
+    );
+}
+
+#[test]
+fn test_latency_weighted_carry_forward_for_unobserved_validator() {
+    // Verify carry-forward semantics. First call: V1 has slow observations and gets
+    // penalized. Second call: V1 has too few observations to recompute → must retain
+    // the previous penalty rather than jumping back to base weight (which would
+    // create the oscillation that the carry-forward is designed to prevent).
+    let validators: Vec<Author> = (0..2).map(|_| Author::random()).collect();
+    let epoch_to_validators = HashMap::from([(0u64, validators.clone())]);
+
+    // First call: V0 and V1 alternate as successful proposers; one gap is attributed
+    // to V1 via failed_proposer_indices. V1 has a single failure (3 proposals
+    // succeed, 1 fails → 25% < 50% threshold → active) but its mean is still
+    // dominated by the 4500µs failure attribution → meaningful penalty.
+    let history_with_obs = vec![
+        make_block_event(validators[0], 0, 8, 5000, vec![1]),
+        make_block_event(validators[1], 0, 6, 500, vec![]),
+        make_block_event(validators[0], 0, 5, 100, vec![]),
+        make_block_event(validators[1], 0, 4, 50, vec![]),
+        make_block_event(validators[0], 0, 3, 25, vec![]),
+        make_block_event(validators[1], 0, 2, 10, vec![]),
+    ];
+    let heuristic = make_latency_weighted_heuristic(validators[0]);
+    let weights1 = heuristic.get_weights(0, &epoch_to_validators, &history_with_obs);
+
+    // V1 (slow) is below base; V0 (healthy, below median) stays at base.
+    assert_eq!(weights1[0], 1000, "V0 base preserved in first call; got {:?}", weights1);
+    assert!(
+        weights1[1] < 1000,
+        "V1 should be penalized in first call; got {:?}",
+        weights1,
+    );
+    let v1_first_weight = weights1[1];
+
+    // Second call: just one pair → both V0 and V1 get only 1 round-time observation
+    // (below MIN_OBSERVATIONS=2). Both fall through to carry-forward. Both are still
+    // classified active because they have a successful proposal in this window.
+    let history_no_v1_obs = vec![
+        make_block_event(validators[1], 0, 1, 100, vec![]),
+        make_block_event(validators[0], 0, 0, 50, vec![]),
+    ];
+    let weights2 = heuristic.get_weights(0, &epoch_to_validators, &history_no_v1_obs);
+
+    // V0's stored factor was 1.0 → carry-forward restores base.
+    assert_eq!(weights2[0], 1000, "V0 carry-forward at base; got {:?}", weights2);
+    // V1's stored factor was the first-call penalty → must be preserved, NOT reset.
+    assert_eq!(
+        weights2[1], v1_first_weight,
+        "carry-forward must preserve V1's penalty; got weights {:?}, expected V1={}",
+        weights2, v1_first_weight,
     );
 }
 
