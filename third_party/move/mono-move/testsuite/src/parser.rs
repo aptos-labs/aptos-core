@@ -154,6 +154,9 @@ fn parse_publish_modifiers(rest: &str) -> anyhow::Result<Vec<PrintSection>> {
         .strip_prefix("--print(")
         .and_then(|s| s.strip_suffix(')'))
         .ok_or_else(|| anyhow!("Unrecognized publish modifier: {}", rest))?;
+    if inner.trim().is_empty() {
+        bail!("`--print()` requires at least one section");
+    }
     let mut sections = vec![];
     for raw in inner.split(',') {
         let token = raw.trim();
@@ -167,9 +170,6 @@ fn parse_publish_modifiers(rest: &str) -> anyhow::Result<Vec<PrintSection>> {
             bail!("Duplicate print section: {:?}", token);
         }
         sections.push(section);
-    }
-    if sections.is_empty() {
-        bail!("`--print()` requires at least one section");
     }
     Ok(sections)
 }
