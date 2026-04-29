@@ -86,6 +86,11 @@ impl ChainId {
         self.matches_named_chain(NamedChain::MAINNET)
     }
 
+    /// Returns true iff the chain ID matches the testing chain (used by forge swarms)
+    pub fn is_testing(&self) -> bool {
+        self.matches_named_chain(NamedChain::TESTING)
+    }
+
     /// Returns true iff the chain ID matches the given named chain
     fn matches_named_chain(&self, expected_chain: NamedChain) -> bool {
         if let Ok(named_chain) = NamedChain::from_chain_id(self) {
