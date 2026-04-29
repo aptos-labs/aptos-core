@@ -10,11 +10,12 @@ Our treatment is more directly relational: state labels denote memory snapshots 
 
 \fstar~\cite{fstar2016} likewise verifies higher-order, effectful code, internalizing the WP calculus in its type system via Dijkstra monads~\cite{dm4all}.
 Both systems support pre/post specifications, quantifiers, behavioral abstraction over function values, and structured proof guidance --- in Move via \texttt{proof} blocks, \texttt{lemma} declarations, and \texttt{calc}, \texttt{split}, \texttt{apply} statements.
-\fstar's dependent type and effect system goes beyond Move's support, which is more minimal and focused on Rust-style references and effects on global memory.
-Move also favors separation of specification from program code, which is useful in environments where work itself is distributed along that axis (for example, a multi-agent system).
+One major difference is that \fstar~is based on separation logic, while Move uses traditional frame conditions via modifies declarations. While \fstar~is more expressive via separation logic, it misses the syntactic, compile time separation of memory via Move's resource and reference model, potentially leading to significant more complex verification problems, as memory separation has to be reasoned about by the SMT solver.
 
-Dafny~\cite{DAFNY} is the closest cousin of \MVP: it has a similar specification model of pre/post conditions, higher-order functions, and behavioral predicates.
-Differences lie in the treatment of state: Move's resource-separated global memory and alias-free mutable reference model versus Dafny's heap model.
+Dafny~\cite{DAFNY} is a close cousin of \MVP: it has a similar specification model of pre/post conditions, higher-order functions, and behavioral predicates.
+However, Dafny does not allow function values to modify state.
+This would be a severe restriction for Move, since it is a common usage pattern.
+Moreover, Move's resource-separated global memory and alias-free mutable reference model is not available in Dafny, similar as in \fstar.
 While both languages support state labels, Move state labels as described here can be used in abstract specifications via universal and existential quantification.
 
 Lean~4~\cite{lean4} is a dependently-typed interactive theorem prover in the tradition of older similar systems~\cite{Isabelle, COQ}, supporting higher-order functions.
