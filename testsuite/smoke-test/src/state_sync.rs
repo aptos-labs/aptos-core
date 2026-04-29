@@ -682,8 +682,11 @@ async fn test_validator_sync_and_participate(fast_sync: bool, epoch_changes: boo
                 LeaderReputationType::ProposerAndVoterV2(proposer_and_voter_config) => {
                     proposer_and_voter_config
                 },
+                // V3 is V2 plus the latency-weighted gate; this state-sync test only cares
+                // about the base proposer/voter parameters.
+                LeaderReputationType::ProposerAndVoterV3(config) => &config.base,
                 leader_reputation_type => panic!(
-                    "This test requires a proposer and voter V2 leader reputation, but got: {:?}",
+                    "This test requires a proposer and voter V2/V3 leader reputation, but got: {:?}",
                     leader_reputation_type
                 ),
             };

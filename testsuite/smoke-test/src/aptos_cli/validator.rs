@@ -225,6 +225,7 @@ async fn test_onchain_config_change() {
                 LeaderReputationType::ProposerAndVoterV2(proposer_and_voter_config) => {
                     proposer_and_voter_config
                 },
+                LeaderReputationType::ProposerAndVoterV3(config) => &config.base,
             };
             let new_consensus_config = OnChainConsensusConfig::V1(ConsensusConfigV1 {
                 proposer_election_type: ProposerElectionType::LeaderReputation(
@@ -278,7 +279,10 @@ async fn test_onchain_config_change() {
             panic!()
         };
     let proposer_and_voter_config = match &leader_reputation_type {
-        LeaderReputationType::ProposerAndVoterV2(_) => panic!(),
+        LeaderReputationType::ProposerAndVoterV2(_)
+        | LeaderReputationType::ProposerAndVoterV3(_) => {
+            panic!()
+        },
         LeaderReputationType::ProposerAndVoter(proposer_and_voter_config) => {
             proposer_and_voter_config
         },
