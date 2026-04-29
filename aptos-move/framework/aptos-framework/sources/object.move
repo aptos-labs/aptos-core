@@ -352,25 +352,30 @@ module aptos_framework::object {
     ///
     /// It has no object resources (i.e. ObjectCore, etc) - and so is lightweight.
     public fun create_unique_onchain_signer(): ExtendRef {
+        // Equivalent to this snippet, without creating and then deleting ObjectCore:
+        // let constructor_ref = object::create_object(@0x0);
+        // let extend_ref = constructor_ref.generate_extend_ref();
+        // constructor_ref.generate_delete_ref().delete();
+
         ExtendRef { self: transaction_context::generate_auid_address() }
     }
 
     /// Creates a named onchain signer and returns ExtendRef to create it.
     /// The signer is deterministically created form passed creator and name.
     ///
+    /// ObjectCore is created (and cannot be deleted), to guarantee that the
+    /// same signer cannot be created again.
     /// Aborts if same creator has already created a signer or object with same name.
     ///
-    /// Use `owned_by_creator` if you want object to be owned by creator.
-    /// Note that if object is owned by creator, then creator still can do thing directly to the object,
-    /// for example withdraw from fungible stores signer would own.
-    public fun create_named_onchain_signer(
-        creator: &signer, name: vector<u8>, owned_by_creator: bool
+    /// Object is unowned (owner is set to 0x0), to avoid being owned by creator,
+    /// which would allow creator to still do thing directly to the object,
+    /// for example withdraw from fungible stores returned signer would own.
+    public fun create_named_unowned_onchain_signer(
+        creator: &signer, name: vector<u8>
     ): ExtendRef {
         let constructor_ref = create_named_object(creator, name);
         let extend_ref = constructor_ref.generate_extend_ref();
-        if (!owned_by_creator) {
-            constructor_ref.transfer_with_constructor_ref(extend_ref.self);
-        };
+        constructor_ref.transfer_with_constructor_ref(@0x0);
         extend_ref
     }
 
@@ -1281,7 +1286,7 @@ module aptos_framework::object {
         creator: &signer,
     ) {
         let onchain_signer_address = {
-            let extend_ref = create_named_onchain_signer(creator, b"onchain_signer", false);
+            let extend_ref = create_named_unowned_onchain_signer(creator, b"onchain_signer");
             let address = extend_ref.address_from_extend_ref();
             move_to(&extend_ref.generate_signer_for_extending(), TestOnchainSigner { extend_ref });
             address
@@ -1290,7 +1295,7 @@ module aptos_framework::object {
         // named onchain signer should be an object
         assert!(is_object(onchain_signer_address));
         // not owned by creator
-        assert!(!address_to_object<TestOnchainSigner>(onchain_signer_address).owns(signer::address_of(creator)));
+        assert!(!owns(address_to_object<TestOnchainSigner>(onchain_signer_address), signer::address_of(creator)));
 
         {
             let onchain_signer = TestOnchainSigner[onchain_signer_address].extend_ref.generate_signer_for_extending();
@@ -1303,8 +1308,8 @@ module aptos_framework::object {
     fun test_named_onchain_signer_duplicate(
         creator: &signer,
     ) {
-        create_named_onchain_signer(creator, b"onchain_signer", false);
+        create_named_unowned_onchain_signer(creator, b"onchain_signer");
         // second time fails
-        create_named_onchain_signer(creator, b"onchain_signer", false);
+        create_named_unowned_onchain_signer(creator, b"onchain_signer");
     }
 }
