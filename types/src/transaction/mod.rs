@@ -3270,6 +3270,20 @@ impl Transaction {
         })
     }
 
+    pub fn block_epilogue_v2(
+        block_id: HashValue,
+        block_end_info: BlockEndInfo,
+        fee_distribution: FeeDistribution,
+        to_make_hot: BTreeSet<StateKey>,
+    ) -> Self {
+        Self::BlockEpilogue(BlockEpiloguePayload::V2 {
+            block_id,
+            block_end_info,
+            fee_distribution,
+            to_make_hot,
+        })
+    }
+
     pub fn try_as_signed_user_txn(&self) -> Option<&SignedTransaction> {
         match self {
             Transaction::UserTransaction(txn) => Some(txn),
@@ -3399,6 +3413,15 @@ pub trait BlockExecutableTransaction: Sync + Send + Clone + 'static {
         _block_id: HashValue,
         _block_end_info: TBlockEndInfoExt<Self::Key>,
         _fee_distribution: FeeDistribution,
+    ) -> Self {
+        unimplemented!()
+    }
+
+    fn block_epilogue_v2(
+        _block_id: HashValue,
+        _block_end_info: BlockEndInfo,
+        _fee_distribution: FeeDistribution,
+        _to_make_hot: BTreeSet<Self::Key>,
     ) -> Self {
         unimplemented!()
     }

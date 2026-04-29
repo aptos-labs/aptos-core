@@ -14,7 +14,7 @@ use crate::{
 use aptos_crypto::HashValue;
 use move_core_types::{account_address::AccountAddress, language_storage::StructTag};
 use serde::{Deserialize, Serialize};
-use std::fmt::Debug;
+use std::{collections::BTreeSet, fmt::Debug};
 
 #[derive(Clone, Debug, Deserialize, Serialize)]
 pub enum SignatureVerifiedTransaction {
@@ -124,6 +124,16 @@ impl BlockExecutableTransaction for SignatureVerifiedTransaction {
         fee_distribution: FeeDistribution,
     ) -> Self {
         Transaction::block_epilogue_v1(block_id, block_end_info, fee_distribution).into()
+    }
+
+    fn block_epilogue_v2(
+        block_id: HashValue,
+        block_end_info: BlockEndInfo,
+        fee_distribution: FeeDistribution,
+        to_make_hot: BTreeSet<Self::Key>,
+    ) -> Self {
+        Transaction::block_epilogue_v2(block_id, block_end_info, fee_distribution, to_make_hot)
+            .into()
     }
 
     fn pre_write_values(&self) -> Vec<(Self::Key, Self::Value)> {
