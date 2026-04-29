@@ -19,13 +19,51 @@ use aptos_transaction_generator_lib::{
 use aptos_types::account_address::AccountAddress;
 use core::result::Result::{Err, Ok};
 use futures::{future::try_join_all, StreamExt};
-use log::{error, info};
+use log::{error, info, warn};
 use rand::{rngs::StdRng, Rng, SeedableRng};
 use std::{
     path::Path,
     sync::Arc,
     time::{Duration, Instant},
 };
+
+/// Number of attempts per batch before propagating the failure. The first attempt may route
+/// to a client that's permanently broken (e.g. a validator just restarted by a compat upgrade);
+/// the executor's per-client unhealthy bit gets set during that attempt, so a second attempt
+/// has a real chance of routing to a healthy client.
+const MINTER_BATCH_ATTEMPTS: usize = 2;
+
+/// Submit a batch of transactions, retrying once on failure. We re-submit the same
+/// `SignedTransaction`s — any that landed on the first attempt will hit
+/// `SEQUENCE_NUMBER_TOO_OLD` and fall through to the on-chain check inside
+/// `submit_check_and_retry`, while genuine retries get a fresh client pick informed by the
+/// per-client health state that the first attempt populated.
+async fn execute_batch_with_failover(
+    txn_executor: &dyn ReliableTransactionSubmitter,
+    requests: &[SignedTransaction],
+    counters: &CounterState,
+    label: &str,
+) -> Result<()> {
+    let mut last_err: Option<anyhow::Error> = None;
+    for attempt in 0..MINTER_BATCH_ATTEMPTS {
+        match txn_executor
+            .execute_transactions_with_counter(requests, counters)
+            .await
+        {
+            Ok(()) => return Ok(()),
+            Err(err) => {
+                if attempt + 1 < MINTER_BATCH_ATTEMPTS {
+                    warn!(
+                        "{} attempt {} failed, will retry: {:?}",
+                        label, attempt, err
+                    );
+                }
+                last_err = Some(err);
+            },
+        }
+    }
+    Err(last_err.unwrap_or_else(|| anyhow!("{} exhausted attempts", label)))
+}
 
 pub struct SourceAccountManager<'t> {
     pub source_account: Arc<LocalAccount>,
@@ -385,9 +423,13 @@ impl<'t> AccountMinter<'t> {
                     )
                 })
                 .collect();
-            txn_executor
-                .execute_transactions_with_counter(&create_requests, counters)
-                .await?;
+            execute_batch_with_failover(
+                txn_executor,
+                &create_requests,
+                counters,
+                "create_and_fund_seed_accounts",
+            )
+            .await?;
         }
 
         Ok(())
@@ -495,15 +537,19 @@ async fn create_and_fund_new_accounts(
             })
             .collect();
 
-        txn_executor
-            .execute_transactions_with_counter(&creation_requests, counters)
-            .await
-            .with_context(|| {
-                format!(
-                    "Account {} couldn't mint batch {}",
-                    source_address, batch_index
-                )
-            })?;
+        execute_batch_with_failover(
+            txn_executor,
+            &creation_requests,
+            counters,
+            &format!("create_and_fund_new_accounts batch {}", batch_index),
+        )
+        .await
+        .with_context(|| {
+            format!(
+                "Account {} couldn't mint batch {}",
+                source_address, batch_index
+            )
+        })?;
     }
     Ok(())
 }

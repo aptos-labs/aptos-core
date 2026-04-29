@@ -18,11 +18,20 @@ use std::{
     time::{Duration, Instant},
 };
 
+/// Number of consecutive submit/wait failures against a client at which we treat it as
+/// unhealthy and skip it in subsequent client selection. A successful submission resets
+/// the counter back to zero. Picked small enough that a permanently-broken client (e.g.
+/// a validator just restarted by an upgrade) is excluded after a few txns rather than
+/// after the full `max_retries` worth of attempts that the seeded retry would otherwise
+/// consume on a single doomed client.
+const UNHEALTHY_CONSECUTIVE_FAILURES: usize = 3;
+
 // Reliable/retrying transaction executor, used for initializing
 pub struct RestApiReliableTransactionSubmitter {
     rest_clients: Vec<RestClient>,
     max_retries: usize,
     retry_after: Duration,
+    consecutive_failures: Vec<AtomicUsize>,
 }
 
 impl RestApiReliableTransactionSubmitter {
@@ -32,23 +41,67 @@ impl RestApiReliableTransactionSubmitter {
             max_retries,
             retry_after.as_secs_f32()
         );
+        let consecutive_failures = (0..rest_clients.len())
+            .map(|_| AtomicUsize::new(0))
+            .collect();
         Self {
             rest_clients,
             max_retries,
             retry_after,
+            consecutive_failures,
         }
+    }
+
+    fn client_index(&self, client: &RestClient) -> Option<usize> {
+        let key = client.path_prefix_string();
+        self.rest_clients
+            .iter()
+            .position(|c| c.path_prefix_string() == key)
+    }
+
+    fn note_success(&self, client: &RestClient) {
+        if let Some(idx) = self.client_index(client) {
+            self.consecutive_failures[idx].store(0, std::sync::atomic::Ordering::Relaxed);
+        }
+    }
+
+    fn note_failure(&self, client: &RestClient) {
+        if let Some(idx) = self.client_index(client) {
+            self.consecutive_failures[idx].fetch_add(1, std::sync::atomic::Ordering::Relaxed);
+        }
+    }
+
+    fn healthy_client_indices(&self) -> Vec<usize> {
+        (0..self.rest_clients.len())
+            .filter(|i| {
+                self.consecutive_failures[*i].load(std::sync::atomic::Ordering::Relaxed)
+                    < UNHEALTHY_CONSECUTIVE_FAILURES
+            })
+            .collect()
     }
 
     fn random_rest_client(&self) -> &RestClient {
         let mut rng = thread_rng();
-        self.rest_clients.choose(&mut rng).unwrap()
+        self.random_rest_client_from_rng(&mut rng)
     }
 
+    /// Pick a client, preferring those whose recent submissions succeeded. If every client
+    /// is currently flagged as unhealthy we fall back to the full pool — a deadlock here
+    /// would be worse than retrying against a known-bad client.
     fn random_rest_client_from_rng<R>(&self, rng: &mut R) -> &RestClient
     where
         R: Rng + ?Sized,
     {
-        self.rest_clients.choose(rng).unwrap()
+        let healthy = self.healthy_client_indices();
+        let idx = if healthy.is_empty() {
+            *(0..self.rest_clients.len())
+                .collect::<Vec<_>>()
+                .choose(rng)
+                .unwrap()
+        } else {
+            *healthy.choose(rng).unwrap()
+        };
+        &self.rest_clients[idx]
     }
 
     async fn submit_check_and_retry(
@@ -116,6 +169,7 @@ impl RestApiReliableTransactionSubmitter {
 
             match result {
                 Ok(()) => {
+                    self.note_success(rest_client);
                     counters
                         .successes
                         .fetch_add(1, std::sync::atomic::Ordering::Relaxed);
@@ -130,6 +184,9 @@ impl RestApiReliableTransactionSubmitter {
                     return Ok(());
                 },
                 Err(err) => {
+                    if failed_submit || failed_wait {
+                        self.note_failure(rest_client);
+                    }
                     // TODO: we should have a better way to decide if a failure is retryable
                     if format!("{}", err).contains("SEQUENCE_NUMBER_TOO_OLD") {
                         break;
