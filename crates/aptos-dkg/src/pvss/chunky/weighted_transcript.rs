@@ -310,7 +310,14 @@ impl<const N: usize, P: FpConfig<N>, E: Pairing<ScalarField = Fp<P, N>>>
         if self.sharing_proof.SoK.z.chunked_plaintexts.len() != sc.get_total_num_players() {
             bail!("Sharing proof has incorrect shape: z.len() != sc.get_total_num_players()");
         }
-        for (i,chunked_plaintexts) in self.sharing_proof.SoK.z.chunked_plaintexts.iter().enumerate() {
+        for (i, chunked_plaintexts) in self
+            .sharing_proof
+            .SoK
+            .z
+            .chunked_plaintexts
+            .iter()
+            .enumerate()
+        {
             if chunked_plaintexts.len() != sc.get_player_weight(&sc.get_player(i))
                 .expect("Should never fail to get player, b/c of z.len() == sc.get_total_num_players() check above")
             {
@@ -330,7 +337,6 @@ impl<const N: usize, P: FpConfig<N>, E: Pairing<ScalarField = Fp<P, N>>>
                 bail!("Sharing proof has incorrect shape: elgamal_randomness element has incorrect number of chunks");
             }
         }
-
 
         let Vs_flat = self.subtrs.all_Vs_flat(); // Also has the public key V[0]
 
