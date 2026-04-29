@@ -496,6 +496,12 @@ pub(crate) fn realistic_env_max_load_test(
         .with_validator_override_node_config_fn(Arc::new(|config, _| {
             // Allow validator-PFN connections
             config.base.enable_validator_pfn_connections = true;
+            // EXPERIMENT: disable chain-health backoff entirely to isolate whether
+            // the spike we observe at multiplier=3.0× is caused by the
+            // chain-health-backoff cascade (vs. the heuristic itself). With this
+            // empty, the chain never throttles block size based on participation.
+            // Keep this off in production.
+            config.consensus.chain_health_backoff = vec![];
         }))
         .with_fullnode_override_node_config_fn(Arc::new(|config, _| {
             // Increase the consensus observer fallback thresholds
