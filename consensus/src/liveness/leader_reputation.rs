@@ -729,8 +729,7 @@ impl ReputationHeuristic for LatencyWeightedHeuristic {
                         // (max(1.0) clamps the ratio), validators above median are
                         // penalized by 1 / ratio^multiplier.
                         let ratio = (val_mean as f64 / median as f64)
-                            .max(1.0)
-                            .min(MAX_LATENCY_RATIO);
+                            .clamp(1.0, MAX_LATENCY_RATIO);
                         let f = 1.0 / ratio.powf(self.multiplier);
                         // Persist for carry-forward when this validator next has no obs.
                         last_factor.insert(*author, f);
