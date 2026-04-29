@@ -958,11 +958,12 @@ fn test_latency_weighted_max_ratio_clamp() {
         "expected V2 to keep base active_weight; got {:?}",
         weights,
     );
-    // V1 (very slow): penalty clamped at MAX_LATENCY_RATIO=10, multiplier=1.0
-    // → minimum factor = 1/10 → weight = active_weight / 10 = 100.
+    // V1 (very slow): raw ratio is huge, post-deadband shifted ratio is clamped at
+    // MAX_LATENCY_RATIO=4. With multiplier=1.0 → factor = 1/4 = 0.25.
+    // V1 weight = active_weight * 0.25 = 250.
     assert_eq!(
-        weights[1], 100,
-        "expected V1 penalty clamped at 1/10 of active_weight; got {:?}",
+        weights[1], 250,
+        "expected V1 penalty clamped at 1/4 of active_weight (post-deadband); got {:?}",
         weights,
     );
 }
@@ -1024,6 +1025,54 @@ fn test_latency_weighted_carry_forward_for_unobserved_validator() {
         weights2[1], v1_first_weight,
         "carry-forward must preserve V1's penalty; got weights {:?}, expected V1={}",
         weights2, v1_first_weight,
+    );
+}
+
+#[test]
+fn test_latency_weighted_deadband_protects_mild_outliers() {
+    // Verify the deadband zone: a validator whose mean is within `LATENCY_DEADBAND` (1.3×)
+    // of the median should NOT be penalized. This was the failure mode at the previous
+    // formula — V5-like geographic outliers (mean ~1.5× median) were over-penalized,
+    // dropping into structural cut-off. With deadband, mild outliers are protected
+    // unless they exceed the threshold.
+    let validators: Vec<Author> = (0..3).map(|_| Author::random()).collect();
+    let epoch_to_validators = HashMap::from([(0u64, validators.clone())]);
+
+    // V0 fast (5µs intervals), V1 medium (~6µs/entry), V2 slow (~10µs/entry).
+    // After 50/50 split: V0 mean ≈ 5, V1 mean ≈ 6, V2 mean ≈ 10. Median ≈ 6.
+    // V0 ratio = 5/6 = 0.83 → deadband (factor 1.0)
+    // V1 ratio = 6/6 = 1.0 → deadband (factor 1.0)
+    // V2 ratio = 10/6 = 1.67 → ABOVE deadband 1.3 → penalty applies
+    let history = vec![
+        make_block_event(validators[2], 0, 12, 50, vec![]),
+        make_block_event(validators[2], 0, 11, 40, vec![]),
+        make_block_event(validators[2], 0, 10, 30, vec![]),
+        make_block_event(validators[2], 0, 9, 20, vec![]),
+        make_block_event(validators[1], 0, 8, 14, vec![]),
+        make_block_event(validators[1], 0, 7, 8, vec![]),
+        make_block_event(validators[0], 0, 6, 5, vec![]),
+        make_block_event(validators[0], 0, 5, 0, vec![]),
+    ];
+
+    let heuristic = make_latency_weighted_heuristic(validators[0]);
+    let weights = heuristic.get_weights(0, &epoch_to_validators, &history);
+
+    // V0, V1 within deadband: no penalty
+    assert_eq!(
+        weights[0], 1000,
+        "V0 should be in deadband (ratio < 1.3), no penalty; got {:?}",
+        weights,
+    );
+    assert_eq!(
+        weights[1], 1000,
+        "V1 should be in deadband (ratio = 1.0), no penalty; got {:?}",
+        weights,
+    );
+    // V2 above deadband: penalty applies
+    assert!(
+        weights[2] < 1000,
+        "V2 should be penalized (ratio > 1.3); got {:?}",
+        weights,
     );
 }
 

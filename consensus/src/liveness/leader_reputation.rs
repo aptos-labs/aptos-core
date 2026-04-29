@@ -567,21 +567,27 @@ impl ReputationHeuristic for ProposerAndVoterHeuristic {
 /// * Timeout-spanning gaps are attributed in full to the failed proposers
 ///   (via `failed_proposer_indices`).
 ///
-/// We use the **median** of all observed per-validator means as the reference point. The
-/// per-validator weight is:
+/// We use the **median** of all observed per-validator means as the reference point, with a
+/// **deadband** zone around the median where no penalty is applied. The per-validator
+/// weight is:
 ///
-///   factor = 1.0 / max(1.0, val_mean / median_mean).clamp(_, MAX_LATENCY_RATIO).powf(multiplier)
+///   if ratio <= LATENCY_DEADBAND: factor = 1.0
+///   else: factor = 1.0 / (ratio / LATENCY_DEADBAND).min(MAX_LATENCY_RATIO).powf(multiplier)
 ///   weight = active_weight * factor
 ///
+///   where ratio = val_mean / median_mean
+///
 /// Properties:
-/// * Validators at or below the median: `factor = 1.0` (no penalty, no boost). This makes
-///   the heuristic robust to small natural variation between healthy validators — at higher
-///   multipliers, transient blips on a fast validator no longer cliff its weight.
-/// * Validators above the median: penalized by `(val_mean / median_mean)^-multiplier`.
-///   The slowest validator (which used to get the **base** weight under the old `max_mean /
-///   val_mean` formula) now gets the **lowest** weight — closer to the original intent.
-/// * Penalty ratio is clamped at `MAX_LATENCY_RATIO` to bound the suppression for a single
-///   anomalously-slow validator.
+/// * Validators within `LATENCY_DEADBAND` of the median (e.g., 1.3× = 30% above median):
+///   `factor = 1.0` (no penalty). This protects healthy validators with natural variance
+///   from being penalized for noise. Critical for n-small experimental setups where
+///   geographic outliers' ratios sit in the 1.2-1.5 range.
+/// * Validators above the deadband: penalized by `(ratio/deadband)^multiplier`. The
+///   slowest validator gets the lowest weight. The exponential growth past the deadband
+///   gives strong suppression on truly-slow validators (high `ratio`).
+/// * Penalty ratio is clamped at `MAX_LATENCY_RATIO` to bound suppression. Set tighter
+///   than the previous formula because real-world ratio distributions are compressed
+///   (mainnet: max ~2.5×) and only forge synthetic outliers exceed a few × median.
 ///
 /// ## Carry-forward for validators with no observations
 ///
@@ -611,10 +617,19 @@ pub struct LatencyWeightedHeuristic {
 /// validators we have never observed).
 const MIN_OBSERVATIONS: usize = 2;
 
-/// Hard ceiling on the per-validator scaling ratio (`val_mean / median_mean`) used to
-/// bound how aggressively a single anomalously-slow validator can be suppressed. With
-/// multiplier=2.0 and MAX_LATENCY_RATIO=10, the minimum factor is 1/100 = 0.01.
-const MAX_LATENCY_RATIO: f64 = 10.0;
+/// Deadband zone: validators with `val_mean / median_mean <= LATENCY_DEADBAND` get factor
+/// 1.0 (no penalty). This protects healthy validators with natural variance from being
+/// penalized for noise. Set to 1.3 = "within 30% of median is healthy" based on mainnet
+/// observation that the P50→P90 spread is ~2× and P50→worst is ~2.5×, so tracking
+/// validators in the 1.0-1.3 band as "healthy" cleanly separates noise from real outliers.
+const LATENCY_DEADBAND: f64 = 1.3;
+
+/// Hard ceiling on the per-validator scaling ratio (post-deadband) used to bound how
+/// aggressively a single anomalously-slow validator can be suppressed. Tightened from the
+/// previous 10.0 because real-world ratios are compressed: mainnet's max observed ratio
+/// is ~2.5×, so anything above ~4× post-deadband is forge-synthetic, not a real-world
+/// validator. With multiplier=2.0 and MAX_LATENCY_RATIO=4, the floor factor is 1/16 = 0.0625.
+const MAX_LATENCY_RATIO: f64 = 4.0;
 
 impl LatencyWeightedHeuristic {
     pub fn new(inner: ProposerAndVoterHeuristic, active_weight: u64, multiplier: f64) -> Self {
@@ -725,11 +740,19 @@ impl ReputationHeuristic for LatencyWeightedHeuristic {
 
                 let factor = match (median_mean, means.get(author)) {
                     (Some(median), Some(&val_mean)) if median > 0 && val_mean > 0 => {
-                        // Asymmetric penalty: validators at or below median are unchanged
-                        // (max(1.0) clamps the ratio), validators above median are
-                        // penalized by 1 / ratio^multiplier.
-                        let ratio = (val_mean as f64 / median as f64).clamp(1.0, MAX_LATENCY_RATIO);
-                        let f = 1.0 / ratio.powf(self.multiplier);
+                        // Piecewise penalty:
+                        //   - ratio ≤ LATENCY_DEADBAND: factor = 1.0 (no penalty)
+                        //   - ratio > LATENCY_DEADBAND: factor = 1 / (ratio/deadband)^multiplier
+                        //     clamped at MAX_LATENCY_RATIO post-deadband
+                        // The deadband zone protects healthy validators from being
+                        // penalized for natural variance.
+                        let raw_ratio = val_mean as f64 / median as f64;
+                        let f = if raw_ratio <= LATENCY_DEADBAND {
+                            1.0
+                        } else {
+                            let shifted = (raw_ratio / LATENCY_DEADBAND).min(MAX_LATENCY_RATIO);
+                            1.0 / shifted.powf(self.multiplier)
+                        };
                         // Persist for carry-forward when this validator next has no obs.
                         last_factor.insert(*author, f);
                         f

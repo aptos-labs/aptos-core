@@ -471,6 +471,14 @@ pub(crate) fn realistic_env_max_load_test(
                 ..
             } = consensus_config
             {
+                // EXPERIMENT (piecewise + multiplier=2.0× + back_pressure=30):
+                // The heuristic has a deadband at 1.3× median (validators within natural
+                // variance get no penalty), so multiplier=2.0× can safely give stronger
+                // suppression on truly-slow validators without crushing geographic
+                // outliers like V5. Combined with `back_pressure_limit: 10 → 30` to
+                // absorb V6's 168ms inter-region batch delays without triggering
+                // sync_only and the chain-health-backoff cascade.
+                main.back_pressure_limit = 30; // bumped from 10
                 main.proposer_election_type = ProposerElectionType::LeaderReputation(
                     LeaderReputationType::ProposerAndVoterV3(ProposerAndVoterConfigV3 {
                         base: ProposerAndVoterConfig {
@@ -484,7 +492,7 @@ pub(crate) fn realistic_env_max_load_test(
                             use_history_from_previous_epoch_max_count: 5,
                         },
                         use_latency_weighted: true,
-                        latency_weight_multiplier_milli: 1000, // 1.0× — gentle suppression of slow leaders
+                        latency_weight_multiplier_milli: 2000, // 2.0× (safe with piecewise deadband)
                     }),
                 );
             }
