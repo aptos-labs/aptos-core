@@ -123,8 +123,8 @@ export const CargoBuildProfiles = {
 }
 
 export function getImagesToWaitFor(args) {
-  const perfImages = ["validator", "validator-testing"];
-  const images = ["forge", "tools", "indexer-grpc"];
+  const perfImages = ["validator", "validator-testing", "faucet", "tools", "indexer-grpc"];
+  const images = ["forge"];
   const imagesToWaitFor = {};
   for (const image of [...perfImages, ...images]) {
     const imageConfig = {};
