@@ -700,6 +700,13 @@ module aptos_framework::fungible_asset {
         exists<DispatchFunctionStore>(metadata_addr)
     }
 
+    #[view]
+    /// Return whether a fungible asset type has any dispatch or derived-supply hooks registered.
+    public fun is_asset_type_dispatchable(metadata: Object<Metadata>): bool {
+        let metadata_addr = object::object_address(&metadata);
+        exists<DispatchFunctionStore>(metadata_addr) || exists<DeriveSupply>(metadata_addr)
+    }
+
     public fun deposit_dispatch_function<T: key>(store: Object<T>): Option<FunctionInfo> acquires FungibleStore, DispatchFunctionStore {
         let fa_store = borrow_store_resource(&store);
         let metadata_addr = object::object_address(&fa_store.metadata);
@@ -1535,6 +1542,22 @@ module aptos_framework::fungible_asset {
         create_store(&creator_ref, metadata);
         let delete_ref = object::generate_delete_ref(&creator_ref);
         remove_store(&delete_ref);
+    }
+
+    #[test(creator = @0xcafe)]
+    fun test_is_asset_type_dispatchable_false_for_plain_fa(creator: &signer) {
+        let (_, _, _, _, metadata) = create_fungible_asset(creator);
+        assert!(!is_asset_type_dispatchable(metadata), 1);
+    }
+
+    #[test(creator = @0xcafe)]
+    fun test_is_asset_type_dispatchable_true_with_derived_supply(creator: &signer) {
+        let (creator_ref, token_object) = create_test_token(creator);
+        init_test_metadata(&creator_ref);
+        let metadata = object::convert<TestToken, Metadata>(token_object);
+        assert!(!is_asset_type_dispatchable(metadata), 1);
+        register_derive_supply_dispatch_function(&creator_ref, option::none());
+        assert!(is_asset_type_dispatchable(metadata), 2);
     }
 
     #[test(creator = @0xcafe, aaron = @0xface)]
