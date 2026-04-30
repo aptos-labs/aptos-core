@@ -146,6 +146,8 @@ spec:
           value: {{ .Values.genesis.validator.num_validators_with_larger_stake | quote }}
         - name: LARGER_STAKE_AMOUNT
           value: {{ .Values.genesis.validator.larger_stake_amount | quote }}
+        - name: STAKE_AMOUNTS_STRING
+          value: {{ .Values.genesis.validator.stake_amounts | quote }}
         - name: NAMESPACE
           value: {{ .Release.Namespace | quote }}
         - name: ENABLE_MULTICLUSTER_DOMAIN_SUFFIX

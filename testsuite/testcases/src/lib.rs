@@ -8,6 +8,7 @@ pub mod forge_setup_test;
 pub mod framework_upgrade;
 pub mod fullnode_reboot_stress_test;
 pub mod load_vs_perf_benchmark;
+pub mod mainnet_mirror;
 pub mod modifiers;
 pub mod multi_region_network_test;
 pub mod network_bandwidth_test;

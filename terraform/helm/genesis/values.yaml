@@ -66,6 +66,12 @@ genesis:
     num_validators_with_larger_stake: 0
     # -- Stake amount for nodes we are giving larger state to. Defaults to 10M APTOS coins with 8 decimals
     larger_stake_amount: "1000000000000000"
+    # -- Optional comma-separated list of per-validator stake amounts (octa). When
+    # set, this overrides stake_amount / larger_stake_amount: the genesis script
+    # assigns stake_amounts[i] to validator i. The list length must be at least
+    # numValidators. Used by the mainnet-mirror forge suite to inject a real
+    # mainnet stake distribution; leave empty for uniform stake.
+    stake_amounts: ""
     # -- Random seed to generate validator keys in order to make the key generation deterministic
     key_seed:
   fullnode:
