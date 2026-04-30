@@ -21,7 +21,9 @@ permissions:
 jobs:
   check-aptos-cli-version-changed:
     name: Check aptos crate version bump
-    runs-on: ubuntu-latest
+    # Aptos-hosted runner: pinned OS (not a moving `ubuntu-latest`), controlled base image,
+    # and predictable billing—see PR discussion.
+    runs-on: 4cpu-gh-ubuntu24-x64
     outputs:
       should_run: ${{ steps.compare.outputs.should_run }}
       cli_version: ${{ steps.compare.outputs.cli_version }}
@@ -50,9 +52,9 @@ jobs:
 
           echo "cli_version=$HEAD_VER" >> "$GITHUB_OUTPUT"
 
-          # Run only on a version bump (head strictly greater than base). Ignore downgrades.
-          if [ "$HEAD_VER" != "$BASE_VER" ] && \
-             [ "$(printf '%s\n' "$BASE_VER" "$HEAD_VER" | sort -V | tail -n 1)" = "$HEAD_VER" ]; then
+          # Strict semver bump (head > base); ignore downgrades and equal versions.
+          # Use Python instead of `sort -V` (GNU-specific / fragile across sort implementations).
+          if python3 -c "import sys; p=lambda s: tuple(map(int,s.split('.'))); b,h=p(sys.argv[1]),p(sys.argv[2]); sys.exit(0 if h>b else 1)" "$BASE_VER" "$HEAD_VER"; then
             echo "should_run=true" >> "$GITHUB_OUTPUT"
           else
             echo "should_run=false" >> "$GITHUB_OUTPUT"
@@ -83,7 +85,6 @@ jobs:
             build_cmd: scripts/cli/build_cli_release.sh "macOS" "$CLI_VERSION" "true" "false"
           - platform: windows-x86_64
             runs-on: windows-2025
-            build_cmd: ""
     runs-on: ${{ matrix.runs-on }}
     timeout-minutes: 180
     defaults:
