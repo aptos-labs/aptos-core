@@ -1,0 +1,7 @@
+
+Diagnostics:
+error: invalid modifier
+  ┌─ tests/checking-lang-v2.4/constant_script_visibility.move:3:5
+  │
+3 │     public(script) const Foo: u64 = 0;
+  │     ^^^^^^^^^^^^^^ Invalid constant declaration. 'public(script)' is not a valid visibility modifier for constants

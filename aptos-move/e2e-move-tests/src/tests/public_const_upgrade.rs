@@ -10,6 +10,7 @@ use aptos_package_builder::PackageBuilder;
 use aptos_types::{
     account_address::AccountAddress, on_chain_config::FeatureFlag, transaction::TransactionStatus,
 };
+use bcs;
 use move_core_types::vm_status::StatusCode;
 
 fn publish(h: &mut MoveHarness, account: &Account, source: &str) -> TransactionStatus {
@@ -401,4 +402,125 @@ fn package_const_upgrade_narrow_to_private_treat_friend_as_private_off() {
     "#,
     );
     assert_vm_status!(result, StatusCode::BACKWARD_INCOMPATIBLE_MODULE_UPDATE);
+}
+
+// ---------------------------------------------------------------------------
+// Additional upgrade tests
+// ---------------------------------------------------------------------------
+
+/// Adding a public accessor to a previously private constant is compatible.
+#[test]
+fn private_const_upgrade_to_public() {
+    let mut h = MoveHarness::new();
+    let acc = h.new_account_at(AccountAddress::from_hex_literal("0x830").unwrap());
+
+    assert_success!(publish(
+        &mut h,
+        &acc,
+        r#"module 0x830::m { const VALUE: u64 = 1; }"#,
+    ));
+
+    // Widening private → public adds the accessor — compatible.
+    assert_success!(publish(
+        &mut h,
+        &acc,
+        r#"module 0x830::m { public const VALUE: u64 = 1; }"#,
+    ));
+}
+
+/// A cross-module consumer observes the updated value after the provider is upgraded.
+#[test]
+fn public_const_upgrade_value_change_consumer_observes() {
+    let mut h = MoveHarness::new();
+    let acc = h.new_account_at(AccountAddress::from_hex_literal("0x831").unwrap());
+
+    assert_success!(publish(
+        &mut h,
+        &acc,
+        r#"
+        module 0x831::m { public const VALUE: u64 = 10; }
+        module 0x831::c {
+            use 0x831::m;
+            public entry fun check(expected: u64) {
+                assert!(m::VALUE == expected, 1);
+            }
+        }
+        "#,
+    ));
+
+    assert_success!(h.run_entry_function(
+        &acc,
+        str::parse("0x831::c::check").unwrap(),
+        vec![],
+        vec![bcs::to_bytes(&10u64).unwrap()],
+    ));
+
+    // Upgrade the provider value.
+    assert_success!(publish(
+        &mut h,
+        &acc,
+        r#"
+        module 0x831::m { public const VALUE: u64 = 99; }
+        module 0x831::c {
+            use 0x831::m;
+            public entry fun check(expected: u64) {
+                assert!(m::VALUE == expected, 1);
+            }
+        }
+        "#,
+    ));
+
+    // Consumer's accessor call now returns the new value.
+    assert_success!(h.run_entry_function(
+        &acc,
+        str::parse("0x831::c::check").unwrap(),
+        vec![],
+        vec![bcs::to_bytes(&99u64).unwrap()],
+    ));
+}
+
+/// Narrowing visibility from `public` to `friend` removes the public accessor — incompatible.
+#[test]
+fn public_const_upgrade_narrow_to_friend() {
+    let mut h = MoveHarness::new();
+    let acc = h.new_account_at(AccountAddress::from_hex_literal("0x832").unwrap());
+
+    assert_success!(publish(
+        &mut h,
+        &acc,
+        r#"module 0x832::m { public const VALUE: u64 = 1; }"#,
+    ));
+
+    // Downgrading public → friend lowers the accessor's visibility — incompatible.
+    assert_vm_status!(
+        publish(
+            &mut h,
+            &acc,
+            r#"module 0x832::m { friend const VALUE: u64 = 1; }"#,
+        ),
+        StatusCode::BACKWARD_INCOMPATIBLE_MODULE_UPDATE
+    );
+}
+
+/// Changing the type of a public constant is incompatible (accessor return type changes).
+#[test]
+fn public_const_upgrade_type_change() {
+    let mut h = MoveHarness::new();
+    let acc = h.new_account_at(AccountAddress::from_hex_literal("0x833").unwrap());
+
+    assert_success!(publish(
+        &mut h,
+        &acc,
+        r#"module 0x833::m { public const VALUE: u64 = 1; }"#,
+    ));
+
+    // Changing u64 → u8 changes the accessor's return type — incompatible.
+    assert_vm_status!(
+        publish(
+            &mut h,
+            &acc,
+            r#"module 0x833::m { public const VALUE: u8 = 1; }"#,
+        ),
+        StatusCode::BACKWARD_INCOMPATIBLE_MODULE_UPDATE
+    );
 }

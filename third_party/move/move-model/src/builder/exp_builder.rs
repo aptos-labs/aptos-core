@@ -4096,8 +4096,9 @@ impl ExpTranslator<'_, '_, '_> {
         ExpData::Lambda(id, pattern, body, LambdaCaptureKind::Default, None)
     }
 
-    /// Creates an expression for a constant, checking the expected type.
-    /// Reports an error if the constant is not visible.
+    /// Translates a constant reference, checking visibility for cross-module access.
+    /// Cross-module access in impl mode emits a `const$NAME` accessor call; same-module
+    /// access emits the value directly.
     fn translate_constant(
         &mut self,
         loc: &Loc,
@@ -4108,8 +4109,8 @@ impl ExpTranslator<'_, '_, '_> {
     ) -> ExpData {
         let is_cross_module = sym.module_name != self.parent.module_name
             && sym.module_name != ModuleName::builtin_module(self.env());
-        // Constants are always visible in specs. Builtin constants are visible everywhere.
-        // When compiling the implementation language, cross-module access requires V2_5+ and sufficient visibility.
+        // Specs and builtin constants bypass visibility. Impl-mode cross-module access
+        // requires V2_4+ and sufficient visibility.
         if self.mode != ExpTranslationMode::Spec && is_cross_module {
             let lang_version = self.parent.parent.env.language_version();
             let access_ok = if lang_version.language_version_for_public_const() {
@@ -4117,13 +4118,56 @@ impl ExpTranslator<'_, '_, '_> {
                     Visibility::Public => true,
                     Visibility::Friend => {
                         if entry.has_package_visibility {
-                            // `package` visibility: allow if caller is in the same package
-                            // (i.e. has the same address as the defining module).
-                            sym.module_name.addr() == self.parent.module_name.addr()
+                            // `package`: delegates to `can_call_package_fun_in`.
+                            // Public/friend inline functions are rejected: they can be inlined
+                            // into different-address modules.
+                            let inline_safe = !self.fun_is_inline
+                                || self.fun_name.as_ref().is_none_or(|fname| {
+                                    let fun_id = FunId::new(fname.symbol);
+                                    match self
+                                        .parent
+                                        .parent
+                                        .fun_table
+                                        .get(fname)
+                                        .map(|e| &e.visibility)
+                                    {
+                                        Some(Visibility::Private) => true,
+                                        Some(Visibility::Friend) => {
+                                            self.parent.package_funs.contains(&fun_id)
+                                        },
+                                        _ => false,
+                                    }
+                                });
+                            let package_ok = match (
+                                self.env().find_module(&self.parent.module_name),
+                                self.env().find_module(&sym.module_name),
+                            ) {
+                                (Some(caller), Some(defining)) => {
+                                    caller.can_call_package_fun_in(&defining)
+                                },
+                                // Modules not yet fully registered; fall back to address check.
+                                _ => sym.module_name.addr() == self.parent.module_name.addr(),
+                            };
+                            inline_safe && package_ok
                         } else {
-                            // `friend` visibility: allow if the calling module is a declared
-                            // friend of the defining module.
-                            if let Some(defining_module) =
+                            // `friend`: caller must be a declared friend of the defining module.
+                            // Non-private inline functions are rejected: they can be expanded
+                            // into non-friend modules. Private inline functions are safe (same
+                            // module only).
+                            let inline_rejected = self.fun_is_inline
+                                && self.fun_name.as_ref().is_none_or(|fname| {
+                                    !matches!(
+                                        self.parent
+                                            .parent
+                                            .fun_table
+                                            .get(fname)
+                                            .map(|e| &e.visibility),
+                                        Some(Visibility::Private)
+                                    )
+                                });
+                            if inline_rejected {
+                                false
+                            } else if let Some(defining_module) =
                                 self.parent.parent.env.find_module(&sym.module_name)
                             {
                                 let caller_name = &self.parent.module_name;
@@ -4158,9 +4202,8 @@ impl ExpTranslator<'_, '_, '_> {
                 return self.new_error_exp();
             }
         }
-        // Record constant usage.
-        // Why tracking constants on the fly:
-        // - same-module constants are replaced by values after translation!
+        // Track usage here: same-module constants are replaced by values during translation
+        // and would be invisible to a post-pass.
         if let Some(user_id) = &self.constant_use_context {
             self.track_constant_usage(loc, sym, user_id.clone());
         }
@@ -4168,12 +4211,9 @@ impl ExpTranslator<'_, '_, '_> {
         let ty = self.check_type(loc, &ty, expected_type, context);
         let id = self.new_node_id_with_type_loc(&ty, loc);
         if self.mode != ExpTranslationMode::Spec && is_cross_module {
-            // Cross-module constant in impl mode: emit a call to the `const$NAME` accessor
-            // function (injected into the model by `inject_const_accessor_functions`).
+            // Cross-module in impl mode: call the `const$NAME` accessor.
             let module_id = self
-                .parent
-                .parent
-                .env
+                .env()
                 .find_module(&sym.module_name)
                 .expect("defining module must exist when cross-module access is permitted")
                 .get_id();

@@ -59,6 +59,8 @@ fn should_warn_unused_constant(const_env: &NamedConstantEnv) -> bool {
     {
         return false;
     }
+    // TODO: extend the needless-visibility lint to warn when a `friend` or `package` constant
+    // is only used within its own module (i.e., the visibility grant is unnecessary).
 
     true
 }

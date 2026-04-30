@@ -13,8 +13,9 @@ use crate::{
     builder::builtins,
     intrinsics::IntrinsicDecl,
     model::{
-        FieldData, FieldId, FunId, FunctionKind, GlobalEnv, Loc, ModuleId, Parameter, QualifiedId,
-        QualifiedInstId, SpecFunId, SpecVarId, StructId, TypeParameter, UserId,
+        FieldData, FieldId, FunId, FunctionKind, GlobalEnv, Loc, ModuleId, NamedConstantId,
+        Parameter, QualifiedId, QualifiedInstId, SpecFunId, SpecVarId, StructId, TypeParameter,
+        UserId,
     },
     symbol::Symbol,
     ty::{Constraint, PrimitiveType, Type, TypeDisplayContext},
@@ -261,9 +262,9 @@ pub(crate) struct ConstEntry {
     pub ty: Type,
     pub value: Value,
     pub visibility: EntryVisibility,
-    /// Move language visibility (public/friend/private) for the constant declaration.
+    /// Move language visibility for the constant.
     pub move_visibility: Visibility,
-    /// Whether this constant has `package` visibility (stored as `Friend` in move_visibility).
+    /// `package` visibility flag; when true, `move_visibility` is `Friend`.
     pub has_package_visibility: bool,
     pub users: BTreeSet<UserId>,
     pub attributes: Vec<Attribute>,
@@ -570,12 +571,8 @@ impl<'env> ModelBuilder<'env> {
         self.const_table.insert(name, entry);
     }
 
-    /// Injects a synthetic model-level function `const$<NAME>` for every non-private named
-    /// constant in every module (target and source-dependency alike).
-    ///
-    /// Must be called after `populate_env()` (so constant values are finalised) and before
-    /// `add_friend_decl_for_package_visibility()` (so the friend-injection pass can see the
-    /// accessor functions referenced in consumer function bodies).
+    /// Injects a `const$<NAME>` accessor function for every non-private constant in every module.
+    /// Must run after `populate_env()` and before `add_friend_decl_for_package_visibility()`.
     pub fn inject_const_accessor_functions(&mut self) {
         if !self
             .env
@@ -584,10 +581,7 @@ impl<'env> ModelBuilder<'env> {
         {
             return;
         }
-        // Process ALL modules — including source-dependency modules (is_target = false)
-        // that appear in the same compilation unit. When a target module refers to a
-        // non-private constant from a dependency module, the bytecode generator needs
-        // to find `const$NAME` in the model for that dependency.
+        // Include dependency modules: target modules may reference their constants.
         let module_ids: Vec<ModuleId> = self.env.get_modules().map(|m| m.get_id()).collect();
 
         for module_id in module_ids {
@@ -891,6 +885,29 @@ impl<'env> ModelBuilder<'env> {
         // register all intrinsic declarations
         for decl in &self.intrinsics {
             self.env.intrinsics.add_decl(decl);
+        }
+    }
+
+    /// Propagate cross-module constant users from `const_table` into `GlobalEnv`.
+    ///
+    /// Each module's `NamedConstantData` is finalized when that module is translated, before
+    /// later modules' function bodies are translated. Users recorded by `track_constant_usage`
+    /// for cross-module references therefore arrive in `const_table` after the defining module
+    /// has already been finalized. This pass syncs those late-arriving users back into the env.
+    pub fn sync_const_users(&mut self) {
+        for (sym, entry) in &self.const_table {
+            if entry.users.is_empty() {
+                continue;
+            }
+            if let Some(module_env) = self.env.find_module(&sym.module_name) {
+                let module_id = module_env.get_id();
+                let const_id = NamedConstantId::new(sym.symbol);
+                if let Some(module_data) = self.env.module_data.get_mut(module_id.to_usize()) {
+                    if let Some(const_data) = module_data.named_constants.get_mut(&const_id) {
+                        const_data.users.extend(entry.users.iter().cloned());
+                    }
+                }
+            }
         }
     }
 }

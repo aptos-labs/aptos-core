@@ -3557,7 +3557,7 @@ impl<'env> ModuleEnv<'env> {
     }
 
     /// Returns true if functions in the current module can call a public(package) function in the given module.
-    fn can_call_package_fun_in(&self, other: &Self) -> bool {
+    pub(crate) fn can_call_package_fun_in(&self, other: &Self) -> bool {
         !self.is_script_module()
             && !other.is_script_module()
             // TODO(#13745): fix this when we have a way to check if
@@ -4625,10 +4625,8 @@ pub struct NamedConstantData {
     /// The value of this constant, if known.
     pub(crate) value: Value,
 
-    /// Move language visibility (Public/Friend/Private) for this constant.
     pub(crate) visibility: Visibility,
-
-    /// Whether this constant has `package` visibility. When true, `visibility` is `Friend`.
+    /// `package` visibility flag; when true, `visibility` is `Friend`.
     pub(crate) has_package_visibility: bool,
 
     /// Attributes attached to this constant.
@@ -4672,12 +4670,10 @@ impl NamedConstantEnv<'_> {
         self.data.type_.clone()
     }
 
-    /// Returns the Move language visibility of this constant.
     pub fn get_visibility(&self) -> Visibility {
         self.data.visibility
     }
 
-    /// Returns whether this constant has `package` visibility.
     pub fn has_package_visibility(&self) -> bool {
         self.data.has_package_visibility
     }

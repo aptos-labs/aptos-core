@@ -5,6 +5,9 @@ module 0x42::M {
     friend const FRIEND_CONST: u64 = 42;
 }
 
+// N is a declared friend of M and would be allowed to access FRIEND_CONST.
+module 0x42::N {}
+
 // O is NOT a declared friend of M: access must be rejected.
 module 0x42::O {
     use 0x42::M;
