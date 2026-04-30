@@ -39,19 +39,23 @@ pub fn native_fib(n: u64) -> u64 {
 ///   [40] callee: n / callee_result
 #[cfg(feature = "micro-op")]
 mod micro_op {
-    use mono_move_alloc::{ExecutableArena, ExecutableArenaPtr, GlobalArenaPtr};
+    use mono_move_alloc::GlobalArenaPtr;
     use mono_move_core::{
-        CodeOffset as CO, FrameLayoutInfo, FrameOffset as FO, Function, MicroOp::*,
-        SortedSafePointEntries, FRAME_METADATA_SIZE,
+        Code, CodeOffset as CO, ExecutableId, FrameLayoutInfo, FrameOffset as FO, Function,
+        MicroOp::*, SortedSafePointEntries, FRAME_METADATA_SIZE,
     };
     use mono_move_runtime::ObjectDescriptorTable;
+    use move_core_types::account_address::AccountAddress;
 
-    pub fn program() -> (
-        Vec<Option<ExecutableArenaPtr<Function>>>,
-        ObjectDescriptorTable,
-        ExecutableArena,
-    ) {
-        let arena = ExecutableArena::new();
+    static FIB_MODULE_ID_STORAGE: ExecutableId = unsafe {
+        // SAFETY: the backing `&'static str` outlives the program; the
+        // resulting `GlobalArenaPtr<str>` is valid for that lifetime.
+        ExecutableId::new(AccountAddress::ONE, GlobalArenaPtr::from_static("fib"))
+    };
+    const FIB_MODULE_ID: GlobalArenaPtr<ExecutableId> =
+        GlobalArenaPtr::from_static(&FIB_MODULE_ID_STORAGE);
+
+    pub fn program() -> (Vec<Option<Function>>, ObjectDescriptorTable) {
         let n = 0u32;
         let result = n;
         let tmp = 8u32;
@@ -60,7 +64,7 @@ mod micro_op {
         let callee_result = callee_n;
 
         #[rustfmt::skip]
-        let code = [
+        let code = vec![
             // if n != 0 goto CHECKGE2
             JumpNotZeroU64 { target: CO(3), src: FO(n) },
             StoreImm8 { dst: FO(result), imm: 0 },
@@ -71,31 +75,29 @@ mod micro_op {
             Return,
             // RECURSE: tmp = fib(n - 1)
             SubU64Imm { dst: FO(callee_n), src: FO(n), imm: 1 },
-            CallFunc { func_id: 0 },
+            CallIndirect { executable_id: FIB_MODULE_ID, func_name: GlobalArenaPtr::from_static("fib") },
             Move8 { dst: FO(tmp), src: FO(callee_result) },
             // fib(n - 2)
             SubU64Imm { dst: FO(callee_n), src: FO(n), imm: 2 },
-            CallFunc { func_id: 0 },
+            CallIndirect { executable_id: FIB_MODULE_ID, func_name: GlobalArenaPtr::from_static("fib") },
             // result = tmp + fib(n - 2)
             AddU64 { dst: FO(result), lhs: FO(tmp), rhs: FO(callee_result) },
             Return,
         ];
 
-        let code = arena.alloc_slice_fill_iter(code);
-
-        let func = arena.alloc(Function {
+        let func = Function {
             name: GlobalArenaPtr::from_static("fib"),
-            code,
-            param_sizes: ExecutableArenaPtr::empty_slice(),
+            code: Code::from_vec(code),
+            param_sizes: vec![],
             param_sizes_sum: 8,
             param_and_local_sizes_sum: param_and_local_sizes_sum as usize,
             extended_frame_size: (callee_n + 8) as usize,
             zero_frame: false,
             frame_layout: FrameLayoutInfo::empty(),
             safe_point_layouts: SortedSafePointEntries::empty(),
-        });
+        };
 
-        (vec![Some(func)], ObjectDescriptorTable::new(), arena)
+        (vec![Some(func)], ObjectDescriptorTable::new())
     }
 }
 

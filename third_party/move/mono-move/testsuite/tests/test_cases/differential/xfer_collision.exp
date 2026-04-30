@@ -62,13 +62,13 @@ fun three_args() {
 fun caller() {
   frame_data_size: 16
   code:
-    0: CallFunc #0
+    0: CallIndirect 0x66::xfer_collision::three_rets
     1: Move8 [8] <- [56]
     2: AddU64Imm [8] <- [8] + #5
     3: Move8 [56] <- [48]
     4: Move8 [48] <- [40]
     5: Move8 [40] <- [0]
-    6: CallFunc #1
+    6: CallIndirect 0x66::xfer_collision::three_args
     7: Move8 [0] <- [40]
     8: Return
 }

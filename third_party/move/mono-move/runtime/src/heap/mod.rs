@@ -480,13 +480,12 @@ pub(crate) fn gc_collect(
         let func = unsafe { func_ptr.as_ref() };
         unsafe {
             // Scan base pointer offsets (always active).
-            let base_offsets = func.frame_layout.heap_ptr_offsets.as_ref_unchecked();
+            let base_offsets = &func.frame_layout.heap_ptr_offsets;
             gc_scan_frame_roots(heap, fp, base_offsets, &mut free_ptr);
 
             // Scan safe-point-specific pointer offsets, if any.
             if let Some(sp_layout) = func.safe_point_layout_at(pc) {
-                let sp_offsets = sp_layout.heap_ptr_offsets.as_ref_unchecked();
-                gc_scan_frame_roots(heap, fp, sp_offsets, &mut free_ptr);
+                gc_scan_frame_roots(heap, fp, &sp_layout.heap_ptr_offsets, &mut free_ptr);
             }
 
             let meta = fp.sub(FRAME_METADATA_SIZE);

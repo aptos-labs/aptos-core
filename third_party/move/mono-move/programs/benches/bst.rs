@@ -32,16 +32,16 @@ fn bench_bst(c: &mut Criterion) {
         });
 
         // plain (no gas instrumentation)
-        let (functions, descriptors, _arena) = micro_op_bst();
-        // SAFETY: Exclusive access during bench setup; arena is alive.
-        unsafe { mono_move_core::Function::resolve_calls(&functions) };
+        let (functions, descriptors) = micro_op_bst();
         let mut exec_ctx = LocalExecutionContext::unmetered();
         // TODO: hoist interpreter context setup out of the timed body.
         group.bench_function("micro_op", |b| {
             b.iter(|| {
-                let mut ctx = InterpreterContext::new(&mut exec_ctx, &descriptors, unsafe {
-                    functions[6].unwrap().as_ref_unchecked()
-                });
+                let mut ctx = InterpreterContext::new(
+                    &mut exec_ctx,
+                    &descriptors,
+                    functions[6].as_ref().unwrap(),
+                );
                 let vec_ptr = ctx
                     .alloc_u64_vec(mono_move_core::DescriptorId(0), &ops)
                     .unwrap();
@@ -51,18 +51,17 @@ fn bench_bst(c: &mut Criterion) {
         });
 
         // with gas instrumentation
-        let (functions, _, _arena) = micro_op_bst();
-        // SAFETY: Exclusive access during bench setup; arena is alive.
-        let (functions_gas, _arena) = unsafe { helpers::gas_instrument(&functions) };
-        // SAFETY: Exclusive access during bench setup; arena is alive.
-        unsafe { mono_move_core::Function::resolve_calls(&functions_gas) };
+        let (functions, _) = micro_op_bst();
+        let functions_gas = helpers::gas_instrument(&functions);
         let mut exec_ctx = LocalExecutionContext::with_max_budget();
         // TODO: hoist interpreter context setup out of the timed body.
         group.bench_function("micro_op/gas", |b| {
             b.iter(|| {
-                let mut ctx = InterpreterContext::new(&mut exec_ctx, &descriptors, unsafe {
-                    functions_gas[6].unwrap().as_ref_unchecked()
-                });
+                let mut ctx = InterpreterContext::new(
+                    &mut exec_ctx,
+                    &descriptors,
+                    functions_gas[6].as_ref().unwrap(),
+                );
                 let vec_ptr = ctx
                     .alloc_u64_vec(mono_move_core::DescriptorId(0), &ops)
                     .unwrap();

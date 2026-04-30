@@ -55,11 +55,11 @@ fun sink() {
 fun caller() {
   frame_data_size: 16
   code:
-    0: CallFunc #0
+    0: CallIndirect 0x66::test::three_rets
     1: Move8 [8] <- [56]
     2: Move8 [56] <- [48]
     3: Move8 [48] <- [40]
     4: Move8 [40] <- [0]
-    5: CallFunc #1
+    5: CallIndirect 0x66::test::sink
     6: Return
 }

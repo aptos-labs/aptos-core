@@ -5,7 +5,7 @@
 
 use mono_move_gas::{GasMeter, SimpleGasMeter};
 use mono_move_global_context::GlobalContext;
-use mono_move_loader::{ExecutableReadSet, Loader, LoadingPolicy, LoweringPolicy};
+use mono_move_loader::{Loader, LoadingPolicy, LoweringPolicy, ModuleReadSet};
 use mono_move_testsuite::InMemoryModuleProvider;
 use move_core_types::{account_address::AccountAddress, ident_str, language_storage::ModuleId};
 
@@ -34,10 +34,10 @@ fn load_lazy_cache_miss_and_hit() {
     let id = guard.intern_module_id(&id_module);
 
     // First call is a cache miss: fetches, deserializes, builds, installs.
-    let mut read_set = ExecutableReadSet::new();
+    let mut read_set = ModuleReadSet::new();
     let mut gas = SimpleGasMeter::new(u64::MAX);
     let gas_before = gas.balance();
-    let exec = loader.load(&mut read_set, &mut gas, id).unwrap();
+    let exec = loader.load_module(&mut read_set, &mut gas, id).unwrap();
     let first_cost = exec.cost();
     assert!(first_cost > 0, "cost should reflect bytecode size");
     assert_eq!(gas_before - gas.balance(), first_cost);
@@ -47,10 +47,10 @@ fn load_lazy_cache_miss_and_hit() {
 
     // Second call on a fresh read-set is a cache hit: charges the same
     // cost, records without fetching.
-    let mut read_set2 = ExecutableReadSet::new();
+    let mut read_set2 = ModuleReadSet::new();
     let mut gas2 = SimpleGasMeter::new(u64::MAX);
     let gas_before2 = gas2.balance();
-    let exec2 = loader.load(&mut read_set2, &mut gas2, id).unwrap();
+    let exec2 = loader.load_module(&mut read_set2, &mut gas2, id).unwrap();
     assert_eq!(exec2.cost(), first_cost);
     assert_eq!(gas_before2 - gas2.balance(), first_cost);
     assert_eq!(read_set2.len(), 1);

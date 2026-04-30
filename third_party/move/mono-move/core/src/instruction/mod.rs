@@ -115,8 +115,8 @@
 //!   `elem_ptr_offsets` lists byte offsets *within each element* that hold
 //!   heap pointers.
 
-use crate::{align::MAX_ALIGN, ExecutableId, Function};
-use mono_move_alloc::{ExecutableArenaPtr, GlobalArenaPtr};
+use crate::{align::MAX_ALIGN, ExecutableId, FunctionPtr};
+use mono_move_alloc::GlobalArenaPtr;
 use std::fmt;
 
 // Submodules for instruction.
@@ -193,10 +193,10 @@ pub struct SizedSlot {
 /// Conceptually an enum. The concrete in-memory representation of this enum
 /// (tag size, padding, payload layout) inside closure heap objects is given
 /// by [`CLOSURE_FUNC_REF_SIZE`] and associated constants.
-#[derive(Clone, Debug)]
+#[derive(Clone)]
 pub enum ClosureFuncRef {
     /// Local function, already monomorphized and materialized.
-    Resolved(ExecutableArenaPtr<Function>),
+    Resolved(FunctionPtr),
     // `Unresolved { ... }` — cross-module form, TBD. Resolved lazily at call
     // time. Its payload will mirror whatever representation cross-module
     // calls end up using.
@@ -206,7 +206,7 @@ pub enum ClosureFuncRef {
 ///
 /// Boxed so the micro-op enum stays small despite the variable-length
 /// `captured` list.
-#[derive(Clone, Debug)]
+#[derive(Clone)]
 pub struct PackClosureOp {
     /// Frame slot that receives the heap pointer to the closure object.
     pub dst: FrameOffset,
@@ -238,7 +238,7 @@ pub struct CallClosureOp {
     pub provided_args: Vec<SizedSlot>,
 }
 
-#[derive(Clone, Debug)]
+#[derive(Clone)]
 pub enum MicroOp {
     //======================================================================
     // Data movement
@@ -435,23 +435,19 @@ pub enum MicroOp {
     // - more conditions: ==, !=, >, <=, and const variants,
     // - something for enum dispatch (jump table)?
     //======================================================================
-    /// Call function `func_id`. The compiler has already emitted micro-ops
-    /// to place arguments into the callee's parameter region. This instruction
-    /// implicitly writes the metadata `(pc, fp, func_ptr)` at
+    /// Call a function by module identity and name. The specializer has already
+    /// emitted micro-ops to place arguments into the callee's parameter region.
+    /// This instruction implicitly writes the metadata `(pc, fp, func_ptr)` at
     /// `current_fp + param_and_local_sizes_sum` and sets `fp` to
     /// `current_fp + param_and_local_sizes_sum + FRAME_METADATA_SIZE`.
-    CallFunc { func_id: u32 },
-
-    /// Call a function by module identity and name. Same calling convention
-    /// as `CallFunc`.
     CallIndirect {
         executable_id: GlobalArenaPtr<ExecutableId>,
         func_name: GlobalArenaPtr<str>,
     },
 
     /// Call a function via direct pointer. Same calling convention as
-    /// `CallFunc`.
-    CallDirect { ptr: ExecutableArenaPtr<Function> },
+    /// `CallIndirect`.
+    CallDirect { ptr: FunctionPtr },
 
     /// Return from the current function call. The compiler has already
     /// emitted micro-ops to write return values at the start of the
@@ -849,14 +845,20 @@ impl fmt::Display for MicroOp {
             MicroOp::ShrU64Imm { dst, src, imm } => {
                 write!(f, "ShrU64Imm [{}] <- [{}] >> #{}", dst.0, src.0, imm)
             },
-            MicroOp::CallFunc { func_id } => {
-                write!(f, "CallFunc #{}", func_id)
+            MicroOp::CallIndirect {
+                executable_id,
+                func_name,
+            } => {
+                let executable_id = unsafe { executable_id.as_ref_unchecked() };
+                let addr = executable_id.address().short_str_lossless();
+                let module_name = unsafe { executable_id.name().as_ref_unchecked() };
+                let func_name = unsafe { func_name.as_ref_unchecked() };
+                write!(f, "CallIndirect 0x{}::{}::{}", addr, module_name, func_name)
             },
-            MicroOp::CallIndirect { .. } => {
-                write!(f, "CallIndirect")
-            },
-            MicroOp::CallDirect { .. } => {
-                write!(f, "CallDirect")
+            MicroOp::CallDirect { ptr } => {
+                let func = unsafe { ptr.as_ref_unchecked() };
+                let func_name = unsafe { func.name.as_ref_unchecked() };
+                write!(f, "CallDirect {}", func_name)
             },
             MicroOp::Return => {
                 write!(f, "Return")
@@ -1051,11 +1053,15 @@ impl fmt::Display for MicroOp {
                 write!(f, "Charge #{}", cost)
             },
             MicroOp::PackClosure(op) => {
-                write!(
-                    f,
-                    "PackClosure [{}] <- func_ref={:?}, mask={:b}, captured_desc=",
-                    op.dst.0, op.func_ref, op.mask
-                )?;
+                write!(f, "PackClosure [{}] <- func_ref=", op.dst.0)?;
+                match &op.func_ref {
+                    ClosureFuncRef::Resolved(ptr) => {
+                        let func = unsafe { ptr.as_ref_unchecked() };
+                        let func_name = unsafe { func.name.as_ref_unchecked() };
+                        write!(f, "Resolved({})", func_name)?;
+                    },
+                }
+                write!(f, ", mask={:b}, captured_desc=", op.mask)?;
                 match op.captured_data_descriptor_id {
                     Some(id) => write!(f, "{}", id)?,
                     None => write!(f, "<none>")?,

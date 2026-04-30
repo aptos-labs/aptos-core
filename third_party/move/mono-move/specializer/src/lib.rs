@@ -10,4 +10,4 @@ pub mod pipeline;
 pub use destack::destack;
 pub use lower::{LoweredFunction, LoweredModule};
 pub use pipeline::lower_module;
-pub use stackless_exec_ir::ModuleIR;
+pub use stackless_exec_ir::{FunctionIR, ModuleIR};

@@ -59,13 +59,13 @@ fun two_args() {
 fun caller() {
   frame_data_size: 24
   code:
-    0: CallFunc #0
+    0: CallIndirect 0x66::xfer_ret_order::three_rets
     1: Move8 [0] <- [48]
     2: Move8 [8] <- [56]
     3: Move8 [16] <- [64]
     4: Move8 [56] <- [16]
     5: Move8 [48] <- [8]
-    6: CallFunc #1
+    6: CallIndirect 0x66::xfer_ret_order::two_args
     7: Move8 [16] <- [48]
     8: Return
 }

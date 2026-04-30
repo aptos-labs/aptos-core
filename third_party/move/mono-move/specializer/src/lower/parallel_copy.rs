@@ -290,7 +290,7 @@ mod tests {
         match op {
             MicroOp::Move8 { dst, src } => (src.0, dst.0, 8),
             MicroOp::Move { dst, src, size } => (src.0, dst.0, *size),
-            other => panic!("unexpected micro-op {:?}", other),
+            other => panic!("unexpected micro-op {}", other),
         }
     }
 

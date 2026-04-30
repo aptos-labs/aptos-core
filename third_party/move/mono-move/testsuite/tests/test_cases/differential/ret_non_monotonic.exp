@@ -58,13 +58,13 @@ fun B() {
 fun caller() {
   frame_data_size: 24
   code:
-    0: CallFunc #0
+    0: CallIndirect 0x66::ret_non_monotonic::A
     1: Move8 [16] <- [56]
     2: AddU64Imm [16] <- [16] + #1
     3: Move8 [64] <- [48]
     4: Move8 [56] <- [8]
     5: Move8 [48] <- [0]
-    6: CallFunc #1
+    6: CallIndirect 0x66::ret_non_monotonic::B
     7: Move8 [0] <- [48]
     8: Return
 }

@@ -69,14 +69,14 @@ fun three_args() {
 fun caller() {
   frame_data_size: 40
   code:
-    0: CallFunc #0
+    0: CallIndirect 0x66::test::three_rets
     1: Move8 [16] <- [64]
     2: Move8 [32] <- [72]
     3: Move8 [24] <- [80]
     4: StoreImm8 [88] <- #0
     5: Move8 [80] <- [16]
     6: Move(16) [64] <- [0]
-    7: CallFunc #1
+    7: CallIndirect 0x66::test::three_args
     8: Return
 }
 
@@ -85,6 +85,6 @@ fun trigger() {
   code:
     0: StoreImm8 [0] <- #99
     1: SlotBorrow [32] <- &[0]
-    2: CallFunc #2
+    2: CallIndirect 0x66::test::caller
     3: Return
 }

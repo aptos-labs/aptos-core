@@ -54,7 +54,7 @@ fun add() {
   code:
     0: SlotBorrow [40] <- &[0]
     1: SlotBorrow [56] <- &[8]
-    2: CallFunc #1
+    2: CallIndirect 0xc0ffee::refs::add_refs
     3: Move8 [0] <- [40]
     4: Return
 }

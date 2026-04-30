@@ -5,7 +5,7 @@
 
 use mono_move_gas::{GasMeter, SimpleGasMeter};
 use mono_move_global_context::GlobalContext;
-use mono_move_loader::{ExecutableReadSet, Loader, LoadingPolicy};
+use mono_move_loader::{Loader, LoadingPolicy, ModuleReadSet};
 use mono_move_testsuite::InMemoryModuleProvider;
 use move_core_types::{account_address::AccountAddress, ident_str, language_storage::ModuleId};
 
@@ -35,9 +35,9 @@ fn load_package_cache_miss_loads_all_members() {
     let id_a_module = ModuleId::new(AccountAddress::ONE, ident_str!("a").to_owned());
     let id_a = guard.intern_module_id(&id_a_module);
 
-    let mut read_set = ExecutableReadSet::new();
+    let mut read_set = ModuleReadSet::new();
     let mut gas = SimpleGasMeter::new(u64::MAX);
-    let exec = loader.load(&mut read_set, &mut gas, id_a).unwrap();
+    let exec = loader.load_module(&mut read_set, &mut gas, id_a).unwrap();
 
     // Both package members must be in the read-set.
     assert_eq!(read_set.len(), 2);
@@ -70,16 +70,16 @@ fn load_package_cache_hit_walks_dependencies() {
     let id_a = guard.intern_module_id(&id_a_module);
 
     // Prime the cache with a full package load.
-    let mut rs1 = ExecutableReadSet::new();
+    let mut rs1 = ModuleReadSet::new();
     let mut g1 = SimpleGasMeter::new(u64::MAX);
-    loader.load(&mut rs1, &mut g1, id_a).unwrap();
+    loader.load_module(&mut rs1, &mut g1, id_a).unwrap();
 
     // Second call with a fresh read-set must hit the cache and charge both
     // members without fetching.
-    let mut rs2 = ExecutableReadSet::new();
+    let mut rs2 = ModuleReadSet::new();
     let mut g2 = SimpleGasMeter::new(u64::MAX);
     let before = g2.balance();
-    loader.load(&mut rs2, &mut g2, id_a).unwrap();
+    loader.load_module(&mut rs2, &mut g2, id_a).unwrap();
     let charged = before - g2.balance();
     assert!(charged > 0);
     assert_eq!(rs2.len(), 2);

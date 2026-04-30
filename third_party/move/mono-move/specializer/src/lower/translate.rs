@@ -575,8 +575,9 @@ impl<'a> LoweringState<'a> {
             }
         }
 
-        self.emit(MicroOp::CallFunc {
-            func_id: cs.callee_func_id,
+        self.emit(MicroOp::CallIndirect {
+            executable_id: cs.callee_module_id,
+            func_name: cs.callee_func_name,
         });
         self.call_site_cursor += 1;
 
@@ -613,11 +614,7 @@ impl<'a> LoweringState<'a> {
                 | MicroOp::JumpLessU64 { target, .. }
                 | MicroOp::JumpGreaterEqualU64 { target, .. }
                 | MicroOp::JumpNotEqualU64 { target, .. } => target.0,
-                other => bail!(
-                    "unexpected non-branch op at fixup index {}: {:?}",
-                    idx,
-                    other
-                ),
+                other => bail!("unexpected non-branch op at fixup index {}: {}", idx, other),
             };
             let label = decode_label(encoded);
             let resolved = self.resolve_label(label)?;

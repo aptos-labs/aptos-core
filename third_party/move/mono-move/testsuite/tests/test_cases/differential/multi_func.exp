@@ -52,8 +52,8 @@ fun quad() {
   frame_data_size: 8
   code:
     0: Move8 [32] <- [0]
-    1: CallFunc #0
-    2: CallFunc #0
+    1: CallIndirect 0x1::test::double
+    2: CallIndirect 0x1::test::double
     3: Move8 [0] <- [32]
     4: Return
 }

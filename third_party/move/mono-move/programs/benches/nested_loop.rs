@@ -28,14 +28,12 @@ fn bench_nested_loop(c: &mut Criterion) {
         });
 
         // plain (no gas instrumentation)
-        let (functions, descriptors, _arena) = micro_op_nested_loop();
+        let (functions, descriptors) = micro_op_nested_loop();
         let mut exec_ctx = LocalExecutionContext::unmetered();
         // TODO: hoist interpreter context setup out of the timed body.
         group.bench_function("micro_op", |b| {
             b.iter(|| {
-                let mut ctx = InterpreterContext::new(&mut exec_ctx, &descriptors, unsafe {
-                    functions[0].as_ref_unchecked()
-                });
+                let mut ctx = InterpreterContext::new(&mut exec_ctx, &descriptors, &functions[0]);
                 ctx.set_root_arg(0, &N.to_le_bytes());
                 ctx.run().unwrap();
                 black_box(ctx.root_result());
@@ -43,17 +41,18 @@ fn bench_nested_loop(c: &mut Criterion) {
         });
 
         // with gas instrumentation
-        let (functions, _, _arena) = micro_op_nested_loop();
-        let wrapped = functions.iter().map(|f| Some(*f)).collect::<Vec<_>>();
-        // SAFETY: Exclusive access during bench setup; arena is alive.
-        let (functions_gas, _arena) = unsafe { helpers::gas_instrument(&wrapped) };
+        let (functions, _) = micro_op_nested_loop();
+        let wrapped = functions.into_iter().map(Some).collect::<Vec<_>>();
+        let functions_gas = helpers::gas_instrument(&wrapped);
         let mut exec_ctx = LocalExecutionContext::with_max_budget();
         // TODO: hoist interpreter context setup out of the timed body.
         group.bench_function("micro_op/gas", |b| {
             b.iter(|| {
-                let mut ctx = InterpreterContext::new(&mut exec_ctx, &descriptors, unsafe {
-                    functions_gas[0].unwrap().as_ref_unchecked()
-                });
+                let mut ctx = InterpreterContext::new(
+                    &mut exec_ctx,
+                    &descriptors,
+                    functions_gas[0].as_ref().unwrap(),
+                );
                 ctx.set_root_arg(0, &N.to_le_bytes());
                 ctx.run().unwrap();
                 black_box(ctx.root_result());

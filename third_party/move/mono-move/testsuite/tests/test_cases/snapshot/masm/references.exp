@@ -43,7 +43,7 @@ fun read_field_ref_twice(r0): u64 {
 === micro-ops ===
 // module 0x66::test
 
-fun read_field_val(): skipped (not all types are concrete)
+fun read_field_val(): skipped (context: home slot: slot align 1 < 8 not yet supported (u64-aligned types only))
 
 fun read_and_add() {
   frame_data_size: 24
@@ -54,4 +54,4 @@ fun read_and_add() {
     3: Return
 }
 
-fun read_field_ref_twice(): skipped (not all types are concrete)
+fun read_field_ref_twice(): skipped (lowering: instruction ImmBorrowField not yet lowered)

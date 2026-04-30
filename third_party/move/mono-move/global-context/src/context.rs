@@ -50,9 +50,10 @@ mod identifiers;
 use identifiers::IdentifierInternerKey;
 mod executable_ids;
 use executable_ids::ExecutableIdInternerKey;
-pub use mono_move_core::Executable;
 mod loaded_module;
-pub use loaded_module::{LoadedModule, LoadedModuleSlot, MandatoryDependencies};
+pub use loaded_module::{
+    FunctionSlot, LoadedModule, LoadedModuleSlot, MandatoryDependencies, ModuleSlot,
+};
 mod executable_cache;
 use executable_cache::ExecutableCache;
 use mono_move_core::interner::{InternedIdentifier, InternedModuleId};
@@ -297,8 +298,8 @@ impl<'ctx> ExecutionGuard<'ctx> {
     /// Returns an error only if the cache detects an invariant violation
     /// during install. Under normal operation this method always returns
     /// `Ok`.
-    pub fn insert_loaded_module(&self, loaded: Box<LoadedModule>) -> Result<&LoadedModule> {
-        let ptr = self.ctx.executable_cache.insert(loaded.id(), loaded)?;
+    pub fn insert_module(&self, module: Box<LoadedModule>) -> Result<&LoadedModule> {
+        let ptr = self.ctx.executable_cache.insert(module)?;
 
         // SAFETY: The pointer is valid since it was created by leaking a box,
         // and can only be freed during the maintenance phase, while we are in
@@ -310,7 +311,7 @@ impl<'ctx> ExecutionGuard<'ctx> {
 
     /// Looks up a cached loaded module by its interned ID and returns a
     /// reference tied to the guard's lifetime, if found.
-    pub fn get_loaded_module<'guard>(
+    pub fn get_module<'guard>(
         &'guard self,
         key: ArenaRef<'guard, ExecutableId>,
     ) -> Option<&'guard LoadedModule> {
@@ -325,7 +326,7 @@ impl<'ctx> ExecutionGuard<'ctx> {
     /// Returns the stable slot for `key`, creating an empty one if absent.
     /// The returned pointer is valid for the cache's lifetime. Takes a
     /// shard write lock on the create path.
-    pub fn get_or_create_slot<'guard>(
+    pub fn get_or_create_module_slot<'guard>(
         &'guard self,
         key: ArenaRef<'guard, ExecutableId>,
     ) -> LoadedModuleSlot {

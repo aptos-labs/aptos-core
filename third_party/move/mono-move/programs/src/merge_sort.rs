@@ -61,19 +61,26 @@ pub fn native_merge_sort(v: &mut [u64]) {
 /// and pseudocode.
 #[cfg(feature = "micro-op")]
 mod micro_op {
-    use mono_move_alloc::{ExecutableArena, ExecutableArenaPtr, GlobalArenaPtr};
+    use mono_move_alloc::GlobalArenaPtr;
     use mono_move_core::{
-        CodeOffset as CO, FrameLayoutInfo, FrameOffset as FO, Function, MicroOp::*,
-        SortedSafePointEntries, FRAME_METADATA_SIZE,
+        Code, CodeOffset as CO, ExecutableId, FrameLayoutInfo, FrameOffset as FO, Function,
+        MicroOp::*, SortedSafePointEntries, FRAME_METADATA_SIZE,
     };
     use mono_move_runtime::{ObjectDescriptor, ObjectDescriptorTable};
+    use move_core_types::account_address::AccountAddress;
 
-    pub fn program() -> (
-        Vec<Option<ExecutableArenaPtr<Function>>>,
-        ObjectDescriptorTable,
-        ExecutableArena,
-    ) {
-        let arena = ExecutableArena::new();
+    static MERGE_SORT_MODULE_ID_STORAGE: ExecutableId = unsafe {
+        // SAFETY: the backing `&'static str` outlives the program; the
+        // resulting `GlobalArenaPtr<str>` is valid for that lifetime.
+        ExecutableId::new(
+            AccountAddress::ONE,
+            GlobalArenaPtr::from_static("merge_sort"),
+        )
+    };
+    const MERGE_SORT_MODULE_ID: GlobalArenaPtr<ExecutableId> =
+        GlobalArenaPtr::from_static(&MERGE_SORT_MODULE_ID_STORAGE);
+
+    pub fn program() -> (Vec<Option<Function>>, ObjectDescriptorTable) {
         let meta = FRAME_METADATA_SIZE as u32;
 
         let mut descriptors = ObjectDescriptorTable::new();
@@ -101,28 +108,27 @@ mod micro_op {
             let callee_hi = callee_lo + 8;
 
             #[rustfmt::skip]
-            let code = [
+            let code = vec![
                 SlotBorrow { dst: FO(vec_ref), local: FO(vec) },
                 VecLen { dst: FO(len), vec_ref: FO(vec_ref) },
                 Move8 { dst: FO(callee_vec), src: FO(vec) },
                 StoreImm8 { dst: FO(callee_lo), imm: 0 },
                 Move8 { dst: FO(callee_hi), src: FO(len) },
-                CallFunc { func_id: 1 },
+                CallIndirect { executable_id: MERGE_SORT_MODULE_ID, func_name: GlobalArenaPtr::from_static("merge_sort_range") },
                 Return,
             ];
 
-            let code = arena.alloc_slice_fill_iter(code);
-            arena.alloc(Function {
+            Function {
                 name: GlobalArenaPtr::from_static("merge_sort"),
-                code,
-                param_sizes: ExecutableArenaPtr::empty_slice(),
+                code: Code::from_vec(code),
+                param_sizes: vec![],
                 param_sizes_sum: 8,
                 param_and_local_sizes_sum: param_and_local_sizes_sum as usize,
                 extended_frame_size: (callee_hi + 8) as usize,
                 zero_frame: true,
-                frame_layout: FrameLayoutInfo::new(&arena, [FO(vec), FO(vec_ref)]),
+                frame_layout: FrameLayoutInfo::new(vec![FO(vec), FO(vec_ref)]),
                 safe_point_layouts: SortedSafePointEntries::empty(),
-            })
+            }
         };
 
         // =================================================================
@@ -153,7 +159,7 @@ mod micro_op {
             let callee_3 = callee_2 + 8;
 
             #[rustfmt::skip]
-            let code = [
+            let code = vec![
                 // if lo + 1 < hi, continue; else return
                 AddU64Imm { dst: FO(tmp), src: FO(lo), imm: 1 },
                 JumpLessU64 { target: CO(3), lhs: FO(tmp), rhs: FO(hi) },
@@ -165,33 +171,32 @@ mod micro_op {
                 Move8 { dst: FO(callee_0), src: FO(vec) },
                 Move8 { dst: FO(callee_1), src: FO(lo) },
                 Move8 { dst: FO(callee_2), src: FO(mid) },
-                CallFunc { func_id: 1 },
+                CallIndirect { executable_id: MERGE_SORT_MODULE_ID, func_name: GlobalArenaPtr::from_static("merge_sort_range") },
                 // merge_sort_range(vec, mid, hi)
                 Move8 { dst: FO(callee_0), src: FO(vec) },
                 Move8 { dst: FO(callee_1), src: FO(mid) },
                 Move8 { dst: FO(callee_2), src: FO(hi) },
-                CallFunc { func_id: 1 },
+                CallIndirect { executable_id: MERGE_SORT_MODULE_ID, func_name: GlobalArenaPtr::from_static("merge_sort_range") },
                 // merge(vec, lo, mid, hi)
                 Move8 { dst: FO(callee_0), src: FO(vec) },
                 Move8 { dst: FO(callee_1), src: FO(lo) },
                 Move8 { dst: FO(callee_2), src: FO(mid) },
                 Move8 { dst: FO(callee_3), src: FO(hi) },
-                CallFunc { func_id: 2 },
+                CallIndirect { executable_id: MERGE_SORT_MODULE_ID, func_name: GlobalArenaPtr::from_static("merge") },
                 Return,
             ];
 
-            let code = arena.alloc_slice_fill_iter(code);
-            arena.alloc(Function {
+            Function {
                 name: GlobalArenaPtr::from_static("merge_sort_range"),
-                code,
-                param_sizes: ExecutableArenaPtr::empty_slice(),
+                code: Code::from_vec(code),
+                param_sizes: vec![],
                 param_sizes_sum: 24,
                 param_and_local_sizes_sum: param_and_local_sizes_sum as usize,
                 extended_frame_size: (callee_3 + 8) as usize,
                 zero_frame: true,
-                frame_layout: FrameLayoutInfo::new(&arena, [FO(vec)]),
+                frame_layout: FrameLayoutInfo::new(vec![FO(vec)]),
                 safe_point_layouts: SortedSafePointEntries::empty(),
-            })
+            }
         };
 
         // =================================================================
@@ -228,7 +233,7 @@ mod micro_op {
             let tmp_ref = 104u32;
 
             #[rustfmt::skip]
-            let code = [
+            let code = vec![
                 // i = lo; j = mid; tmp = new vec
                 Move8 { dst: FO(i), src: FO(lo) },                              // 0
                 Move8 { dst: FO(j), src: FO(mid) },                             // 1
@@ -292,23 +297,22 @@ mod micro_op {
                 Jump { target: CO(33) },                                         // 39
             ];
 
-            let code = arena.alloc_slice_fill_iter(code);
-            arena.alloc(Function {
+            Function {
                 name: GlobalArenaPtr::from_static("merge"),
-                code,
-                param_sizes: ExecutableArenaPtr::empty_slice(),
+                code: Code::from_vec(code),
+                param_sizes: vec![],
                 param_sizes_sum: 32,
                 param_and_local_sizes_sum: 120,
                 extended_frame_size: 144,
                 zero_frame: true,
-                frame_layout: FrameLayoutInfo::new(&arena, [
+                frame_layout: FrameLayoutInfo::new(vec![
                     FO(vec),
                     FO(tmp),
                     FO(vec_ref),
                     FO(tmp_ref),
                 ]),
                 safe_point_layouts: SortedSafePointEntries::empty(),
-            })
+            }
         };
 
         (
@@ -318,7 +322,6 @@ mod micro_op {
                 Some(func_merge),
             ],
             descriptors,
-            arena,
         )
     }
 }

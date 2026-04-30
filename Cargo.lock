@@ -12695,11 +12695,11 @@ name = "mono-move-core"
 version = "0.1.0"
 dependencies = [
  "anyhow",
+ "arc-swap",
  "mono-move-alloc",
  "mono-move-gas",
  "move-binary-format",
  "move-core-types",
- "parking_lot 0.12.5",
  "shared-dsa",
 ]
 
@@ -12723,6 +12723,7 @@ dependencies = [
  "move-binary-format",
  "move-core-types",
  "parking_lot 0.12.5",
+ "shared-dsa",
  "specializer",
 ]
 
@@ -12732,16 +12733,14 @@ version = "0.1.0"
 dependencies = [
  "anyhow",
  "bytes",
- "fxhash",
- "mono-move-alloc",
  "mono-move-core",
  "mono-move-gas",
  "mono-move-global-context",
- "mono-move-orchestrator",
  "mono-move-testsuite",
  "move-binary-format",
  "move-core-types",
  "shared-dsa",
+ "specializer",
 ]
 
 [[package]]
@@ -12750,11 +12749,8 @@ version = "0.1.0"
 dependencies = [
  "anyhow",
  "clap 4.5.60",
- "mono-move-alloc",
- "mono-move-core",
  "mono-move-global-context",
  "move-binary-format",
- "shared-dsa",
  "specializer",
 ]
 
@@ -12805,7 +12801,6 @@ dependencies = [
  "mono-move-gas",
  "mono-move-global-context",
  "mono-move-loader",
- "mono-move-orchestrator",
  "mono-move-runtime",
  "move-asm",
  "move-binary-format",

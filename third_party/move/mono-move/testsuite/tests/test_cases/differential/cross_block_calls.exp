@@ -56,11 +56,11 @@ fun trigger() {
   frame_data_size: 8
   code:
     0: JumpGreaterU64Imm @4 [0] > #0
-    1: CallFunc #0
+    1: CallIndirect 0x66::test::get_val
     2: Move8 [0] <- [32]
     3: Return
     4: StoreImm8 [32] <- #5
-    5: CallFunc #1
+    5: CallIndirect 0x66::test::consume
     6: Move8 [0] <- [32]
     7: Return
 }

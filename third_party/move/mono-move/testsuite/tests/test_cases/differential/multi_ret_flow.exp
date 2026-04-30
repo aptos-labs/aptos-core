@@ -85,8 +85,8 @@ fun two_rets(): u64 * u64 {
 fun trigger() {
   frame_data_size: 8
   code:
-    0: CallFunc #1
-    1: CallFunc #2
+    0: CallIndirect 0xc0ffee::multi_ret_flow::two_rets
+    1: CallIndirect 0xc0ffee::multi_ret_flow::two_args
     2: Move8 [0] <- [32]
     3: Return
 }
@@ -94,12 +94,12 @@ fun trigger() {
 fun trigger_swap() {
   frame_data_size: 16
   code:
-    0: CallFunc #1
+    0: CallIndirect 0xc0ffee::multi_ret_flow::two_rets
     1: Move8 [8] <- [40]
     2: Move8 [0] <- [48]
     3: Move8 [48] <- [8]
     4: Move8 [40] <- [0]
-    5: CallFunc #2
+    5: CallIndirect 0xc0ffee::multi_ret_flow::two_args
     6: Move8 [0] <- [40]
     7: Return
 }

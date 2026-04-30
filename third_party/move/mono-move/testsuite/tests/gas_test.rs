@@ -5,31 +5,15 @@
 
 use mono_move_core::{ExecutionContext, LocalExecutionContext};
 use mono_move_gas::SimpleGasMeter;
-use mono_move_global_context::{ExecutionGuard, GlobalContext};
-use mono_move_loader::{Loader, LoadingPolicy, LoweringPolicy, TransactionContext};
+use mono_move_global_context::GlobalContext;
+use mono_move_loader::{Loader, LoadingPolicy, LoweringPolicy, ModuleReadSet, TransactionContext};
 use mono_move_runtime::{ExecutionError, InterpreterContext};
 use mono_move_testsuite::InMemoryModuleProvider;
 use move_core_types::{account_address::AccountAddress, ident_str};
 
-/// Compiles a Move module and adds it to the cache.
-fn add_executable(guard: &ExecutionGuard<'_>, source: &str) {
-    let modules = mono_move_testsuite::compile_move_source(source).expect("compilation failed");
-    for module in modules {
-        let loaded = mono_move_orchestrator::build_executable(guard, module)
-            .expect("Building a loaded module should always succeed");
-        guard
-            .insert_loaded_module(loaded)
-            .expect("insert should succeed");
-    }
-}
-
 #[test]
 fn test_out_of_gas() {
-    let ctx = GlobalContext::with_num_execution_workers(1);
-    let guard = ctx.try_execution_context(0).unwrap();
-
-    add_executable(
-        &guard,
+    let modules = mono_move_testsuite::compile_move_source(
         r#"
 module 0x1::test {
     fun fib(n: u64): u64 {
@@ -37,18 +21,30 @@ module 0x1::test {
     }
 }
 "#,
-    );
+    )
+    .expect("compilation failed");
+    let mut provider = InMemoryModuleProvider::new();
+    provider.add_modules(&modules);
+
+    let ctx = GlobalContext::with_num_execution_workers(1);
+    let guard = ctx.try_execution_context(0).unwrap();
+    let loader =
+        Loader::new_with_policy(&guard, &provider, LoadingPolicy::Lazy(LoweringPolicy::Lazy));
 
     let id = guard.intern_address_name(&AccountAddress::ONE, ident_str!("test"));
-    let fib_name = guard.intern_identifier(ident_str!("fib"));
-    let fib = guard
-        .get_loaded_module(id)
-        .and_then(|loaded| {
-            loaded
-                .executable()
-                .get_function(fib_name.into_global_arena_ptr())
-        })
-        .expect("fib should exist");
+    let fib_name = guard
+        .intern_identifier(ident_str!("fib"))
+        .into_global_arena_ptr();
+    let mut read_set = ModuleReadSet::new();
+    let mut load_gas = SimpleGasMeter::new(u64::MAX);
+    let fib = loader
+        .load_function(
+            &mut read_set,
+            &mut load_gas,
+            id.into_global_arena_ptr(),
+            fib_name,
+        )
+        .expect("load should succeed");
 
     // SAFETY: `fib` is held alive by the executable cache via `guard`.
     let fib = unsafe { fib.as_ref_unchecked() };
@@ -88,9 +84,9 @@ fn test_out_of_gas_during_load() {
         .intern_identifier(ident_str!("f"))
         .into_global_arena_ptr();
 
-    let err = txn_ctx
-        .load_function(id, f_name)
-        .expect_err("loading should run out of gas");
+    let Err(err) = txn_ctx.load_function(id, f_name) else {
+        panic!("loading failed");
+    };
     assert!(
         err.to_string().contains("out of gas"),
         "unexpected error: {err}"

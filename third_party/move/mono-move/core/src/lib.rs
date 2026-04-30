@@ -13,9 +13,11 @@ pub mod types;
 pub use align::{
     align_max, align_up, align_up_u32, checked_align_max, checked_align_up, MAX_ALIGN,
 };
-pub use executable::{EnumType, Executable, ExecutableId, StructType, VariantFields};
-pub use execution_context::{ExecutionContext, FunctionResolver, LocalExecutionContext};
-pub use function::{FrameLayoutInfo, Function, SafePointEntry, SortedSafePointEntries};
+pub use executable::ExecutableId;
+pub use execution_context::{ExecutionContext, LocalExecutionContext};
+pub use function::{
+    Code, FrameLayoutInfo, Function, FunctionPtr, SafePointEntry, SortedSafePointEntries,
+};
 pub use instruction::{
     CallClosureOp, ClosureFuncRef, CodeOffset, DescriptorId, FrameOffset, MicroOp,
     MicroOpGasSchedule, PackClosureOp, SizedSlot, CAPTURED_DATA_TAG_MATERIALIZED,
@@ -25,5 +27,5 @@ pub use instruction::{
     FUNC_REF_TAG_OFFSET, FUNC_REF_TAG_RESOLVED, OBJECT_HEADER_SIZE,
 };
 pub use interner::Interner;
-pub use prepared_module::PreparedModule;
+pub use prepared_module::{FieldTypes, PreparedModule};
 pub use types::{convert_mut_to_immut_ref, strip_ref};

@@ -333,9 +333,10 @@ impl<T: ExecutionContext> InterpreterContext<'_, T> {
         // it is derived from function reference (e.g., entrypoint) or when
         // executing a call instruction, which stores a valid pointer.
         let func = unsafe { self.current_func.as_ref() };
-        // SAFETY: The function's code is allocated in an executable arena that
-        // is alive for the duration of execution.
-        let code = unsafe { func.code.as_ref_unchecked() };
+
+        let code_guard = func.code.load();
+        let code = code_guard.as_slice();
+
         if self.pc >= code.len() {
             bail!(
                 "pc out of bounds: pc={} but function {} has {} instructions",
@@ -354,16 +355,19 @@ impl<T: ExecutionContext> InterpreterContext<'_, T> {
         unsafe {
             match *instr {
                 // ----- Control flow (set pc explicitly, return early) -----
-                MicroOp::CallFunc { .. } => {
-                    bail!("CallFunc must be resolved before execution");
-                },
                 MicroOp::CallIndirect {
                     executable_id,
                     func_name,
                 } => {
-                    // Cross-module slow path: dispatches through the
-                    // transaction context, which triggers lazy module
-                    // loading on a cache miss.
+                    // TODO: full flow should be like this:
+                    //
+                    //   1. IC lookup:
+                    //      - Hit:  return pointer,
+                    //      - Miss: goto 2.
+                    //   2. target = load_function(...)
+                    //   3. IC insert target
+                    //   4. Patching:
+                    //      If can patch caller, try it.
                     let target = self.exec_ctx.load_function(executable_id, func_name)?;
                     // SAFETY: `target` points to a `Function` allocated in a
                     // `LoadedModule`'s arena, which is held alive by the
@@ -1026,11 +1030,10 @@ impl<T: ExecutionContext> InterpreterContext<'_, T> {
             // any copies (every iteration is a no-op move-in-place),
             // and unifies closure call codegen with direct call codegen.
             // See George's pseudocode in PR #19519 review thread.
-            let param_sizes = callee.param_sizes.as_ref_unchecked();
-            if param_sizes.len() > 64 {
+            if callee.param_sizes.len() > 64 {
                 bail!(
                     "CallClosure: callee has {} params, exceeds 64-bit mask capacity",
-                    param_sizes.len()
+                    callee.param_sizes.len()
                 );
             }
 
@@ -1059,7 +1062,7 @@ impl<T: ExecutionContext> InterpreterContext<'_, T> {
             let mut captured_value_offset = CAPTURED_DATA_VALUES_OFFSET;
             let mut provided_idx = 0usize;
             let mut param_offset_in_callee = 0usize;
-            for (i, &param_size) in param_sizes.iter().enumerate() {
+            for (i, &param_size) in callee.param_sizes.iter().enumerate() {
                 let is_captured = (mask >> i) & 1 != 0;
                 if is_captured {
                     std::ptr::copy_nonoverlapping(

@@ -255,7 +255,7 @@ fun simple_promotion() {
   frame_data_size: 8
   code:
     0: StoreImm8 [32] <- #42
-    1: CallFunc #0
+    1: CallIndirect 0x66::arg_regs::identity
     2: Move8 [0] <- [32]
     3: Return
 }
@@ -265,7 +265,7 @@ fun multi_arg() {
   code:
     0: StoreImm8 [32] <- #1
     1: StoreImm8 [40] <- #2
-    2: CallFunc #1
+    2: CallIndirect 0x66::arg_regs::add_two
     3: Move8 [0] <- [32]
     4: Return
 }
@@ -274,8 +274,8 @@ fun nested_fg() {
   frame_data_size: 8
   code:
     0: StoreImm8 [32] <- #7
-    1: CallFunc #0
-    2: CallFunc #0
+    1: CallIndirect 0x66::arg_regs::identity
+    2: CallIndirect 0x66::arg_regs::identity
     3: Move8 [0] <- [32]
     4: Return
 }
@@ -284,13 +284,13 @@ fun two_inner_calls() {
   frame_data_size: 8
   code:
     0: StoreImm8 [32] <- #10
-    1: CallFunc #0
+    1: CallIndirect 0x66::arg_regs::identity
     2: Move8 [0] <- [32]
     3: StoreImm8 [32] <- #20
-    4: CallFunc #0
+    4: CallIndirect 0x66::arg_regs::identity
     5: Move8 [40] <- [32]
     6: Move8 [32] <- [0]
-    7: CallFunc #1
+    7: CallIndirect 0x66::arg_regs::add_two
     8: Move8 [0] <- [32]
     9: Return
 }
@@ -299,7 +299,7 @@ fun computed_arg() {
   frame_data_size: 8
   code:
     0: AddU64Imm [32] <- [0] + #1
-    1: CallFunc #0
+    1: CallIndirect 0x66::arg_regs::identity
     2: Move8 [0] <- [32]
     3: Return
 }
@@ -309,7 +309,7 @@ fun partial_promotion() {
   code:
     0: AddU64Imm [40] <- [0] + #1
     1: Move8 [32] <- [0]
-    2: CallFunc #1
+    2: CallIndirect 0x66::arg_regs::add_two
     3: Move8 [0] <- [32]
     4: Return
 }
@@ -318,7 +318,7 @@ fun call_with_param() {
   frame_data_size: 8
   code:
     0: Move8 [32] <- [0]
-    1: CallFunc #0
+    1: CallIndirect 0x66::arg_regs::identity
     2: Move8 [0] <- [32]
     3: Return
 }
@@ -327,7 +327,7 @@ fun arg_live_after_call() {
   frame_data_size: 24
   code:
     0: Move8 [48] <- [0]
-    1: CallFunc #0
+    1: CallIndirect 0x66::arg_regs::identity
     2: Move8 [8] <- [48]
     3: AddU64 [16] <- [0] + [8]
     4: Move8 [0] <- [16]
@@ -338,10 +338,10 @@ fun ret_used_past_next_call() {
   frame_data_size: 16
   code:
     0: StoreImm8 [40] <- #10
-    1: CallFunc #0
+    1: CallIndirect 0x66::arg_regs::identity
     2: Move8 [0] <- [40]
     3: StoreImm8 [40] <- #20
-    4: CallFunc #0
+    4: CallIndirect 0x66::arg_regs::identity
     5: AddU64 [8] <- [40] + [0]
     6: Move8 [0] <- [8]
     7: Return
@@ -352,8 +352,8 @@ fun multi_ret() {
   code:
     0: StoreImm8 [32] <- #3
     1: StoreImm8 [40] <- #4
-    2: CallFunc #2
-    3: CallFunc #1
+    2: CallIndirect 0x66::arg_regs::swap
+    3: CallIndirect 0x66::arg_regs::add_two
     4: Move8 [0] <- [32]
     5: Return
 }
@@ -362,12 +362,12 @@ fun width_from_max() {
   frame_data_size: 8
   code:
     0: StoreImm8 [32] <- #1
-    1: CallFunc #0
+    1: CallIndirect 0x66::arg_regs::identity
     2: Move8 [0] <- [32]
     3: StoreImm8 [32] <- #10
     4: StoreImm8 [40] <- #20
     5: StoreImm8 [48] <- #30
-    6: CallFunc #3
+    6: CallIndirect 0x66::arg_regs::three_args
     7: AddU64 [0] <- [0] + [32]
     8: Return
 }
@@ -378,7 +378,7 @@ fun call_in_loop() {
     0: StoreImm8 [8] <- #0
     1: JumpLessEqualU64Imm @7 [0] <= #0
     2: Move8 [40] <- [0]
-    3: CallFunc #0
+    3: CallIndirect 0x66::arg_regs::identity
     4: AddU64 [8] <- [40] + [8]
     5: SubU64Imm [0] <- [0] - #1
     6: Jump @1
@@ -392,7 +392,7 @@ fun mixed_at_callsite() {
     0: StoreImm8 [32] <- #10
     1: StoreImm8 [48] <- #30
     2: Move8 [40] <- [0]
-    3: CallFunc #3
+    3: CallIndirect 0x66::arg_regs::three_args
     4: Move8 [0] <- [32]
     5: Return
 }
@@ -401,14 +401,14 @@ fun mixed_intervening_call() {
   frame_data_size: 8
   code:
     0: StoreImm8 [32] <- #10
-    1: CallFunc #0
+    1: CallIndirect 0x66::arg_regs::identity
     2: Move8 [0] <- [32]
     3: StoreImm8 [32] <- #20
-    4: CallFunc #0
+    4: CallIndirect 0x66::arg_regs::identity
     5: StoreImm8 [48] <- #30
     6: Move8 [40] <- [32]
     7: Move8 [32] <- [0]
-    8: CallFunc #3
+    8: CallIndirect 0x66::arg_regs::three_args
     9: Move8 [0] <- [32]
     10: Return
 }

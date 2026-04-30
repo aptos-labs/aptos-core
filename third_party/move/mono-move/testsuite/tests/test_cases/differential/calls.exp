@@ -30,7 +30,7 @@ fun caller() {
   frame_data_size: 8
   code:
     0: StoreImm8 [32] <- #10
-    1: CallFunc #0
+    1: CallIndirect 0x66::test::identity
     2: Move8 [0] <- [32]
     3: Return
 }

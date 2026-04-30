@@ -64,12 +64,12 @@ fun caller() {
   frame_data_size: 24
   code:
     0: Move(16) [48] <- [0]
-    1: CallFunc #0
+    1: CallIndirect 0x66::test::multi_ret
     2: Move8 [16] <- [64]
     3: ReadRef [16] <- *[48] (size=8)
     4: StoreImm8 [48] <- #0
     5: StoreImm8 [56] <- #0
-    6: CallFunc #1
+    6: CallIndirect 0x66::test::other_call
     7: Return
 }
 
@@ -78,6 +78,6 @@ fun trigger() {
   code:
     0: StoreImm8 [0] <- #99
     1: SlotBorrow [32] <- &[0]
-    2: CallFunc #2
+    2: CallIndirect 0x66::test::caller
     3: Return
 }
