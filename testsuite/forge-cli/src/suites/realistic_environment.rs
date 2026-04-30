@@ -471,14 +471,11 @@ pub(crate) fn realistic_env_max_load_test(
                 ..
             } = consensus_config
             {
-                // EXPERIMENT (piecewise + multiplier=2.0× + back_pressure=30):
-                // The heuristic has a deadband at 1.3× median (validators within natural
-                // variance get no penalty), so multiplier=2.0× can safely give stronger
-                // suppression on truly-slow validators without crushing geographic
-                // outliers like V5. Combined with `back_pressure_limit: 10 → 30` to
-                // absorb V6's 168ms inter-region batch delays without triggering
-                // sync_only and the chain-health-backoff cascade.
-                main.back_pressure_limit = 30; // bumped from 10
+                // EXPERIMENT (piecewise + multiplier=3.0×, default back_pressure_limit,
+                // chain-health backoff re-enabled): isolate whether the piecewise+deadband
+                // heuristic alone is enough — without bp=30 and without disabling backoff —
+                // to keep the cascade from firing. Compares against #19590 m=3.0× +
+                // backoff-disabled run (P99=462ms via aptos_core_mempool_txn_commit_latency).
                 main.proposer_election_type = ProposerElectionType::LeaderReputation(
                     LeaderReputationType::ProposerAndVoterV3(ProposerAndVoterConfigV3 {
                         base: ProposerAndVoterConfig {
@@ -492,7 +489,7 @@ pub(crate) fn realistic_env_max_load_test(
                             use_history_from_previous_epoch_max_count: 5,
                         },
                         use_latency_weighted: true,
-                        latency_weight_multiplier_milli: 3000, // 3.0× (safe with piecewise deadband + bp=30 + backoff disabled)
+                        latency_weight_multiplier_milli: 3000, // 3.0× with piecewise+deadband; default bp, backoff re-enabled
                     }),
                 );
             }
@@ -505,13 +502,6 @@ pub(crate) fn realistic_env_max_load_test(
         .with_validator_override_node_config_fn(Arc::new(|config, _| {
             // Allow validator-PFN connections
             config.base.enable_validator_pfn_connections = true;
-            // EXPERIMENT: disable chain-health backoff. Empirically the cascade
-            // (71% participation → 25-txn block cap → mempool overflow → 3-min
-            // p99 spike) is the actual ceiling on p99 in forge n=7. Disabling
-            // backoff with 19567 m=3.0× achieved p99=0.82s (-35% from baseline).
-            // Combined here with piecewise + bp=30 to test the upper bound.
-            // Production must keep the default chain_health_backoff.
-            config.consensus.chain_health_backoff = vec![];
         }))
         .with_fullnode_override_node_config_fn(Arc::new(|config, _| {
             // Increase the consensus observer fallback thresholds
