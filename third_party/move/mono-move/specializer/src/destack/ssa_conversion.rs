@@ -13,7 +13,7 @@ use anyhow::{bail, ensure, Context, Result};
 use mono_move_core::{
     convert_mut_to_immut_ref, strip_ref,
     types::{self as ty, view_type, view_type_list, InternedType, InternedTypeList, Type},
-    Interner, ResolvedModule,
+    Interner, PreparedModule,
 };
 use move_binary_format::{
     access::ModuleAccess,
@@ -178,7 +178,7 @@ impl<'a, I: Interner> SsaConverter<'a, I> {
 
     fn struct_inst_type(
         &self,
-        module: &ResolvedModule,
+        module: &PreparedModule,
         idx: StructDefInstantiationIndex,
     ) -> InternedType {
         // TODO: when generic-instantiation interning lands, return a
@@ -197,7 +197,7 @@ impl<'a, I: Interner> SsaConverter<'a, I> {
     /// without producing a distinct instantiated struct type.
     fn struct_inst_parts(
         &self,
-        module: &ResolvedModule,
+        module: &PreparedModule,
         idx: StructDefInstantiationIndex,
     ) -> (InternedType, InternedTypeList) {
         let inst = &module.struct_def_instantiations[idx.0 as usize];
@@ -212,7 +212,7 @@ impl<'a, I: Interner> SsaConverter<'a, I> {
     /// enum-variant instantiation.
     fn variant_inst_parts(
         &self,
-        module: &ResolvedModule,
+        module: &PreparedModule,
         idx: StructVariantInstantiationIndex,
     ) -> (InternedType, u16, InternedTypeList) {
         let inst = &module.struct_variant_instantiations[idx.0 as usize];
@@ -266,7 +266,7 @@ impl<'a, I: Interner> SsaConverter<'a, I> {
     /// Converts the function's bytecode into SSA form, consuming the converter.
     pub(crate) fn convert_function(
         mut self,
-        module: &ResolvedModule,
+        module: &PreparedModule,
         code: &[Bytecode],
     ) -> Result<SSAFunction> {
         self.assign_labels(code);
@@ -302,7 +302,7 @@ impl<'a, I: Interner> SsaConverter<'a, I> {
     /// value ID for each result, emits the corresponding slot-based instruction, and
     /// pushes the results back. The stack is only a compile-time simulation — the
     /// emitted IR is purely slot-based.
-    fn convert_bytecode(&mut self, module: &ResolvedModule, bc: &Bytecode) -> Result<()> {
+    fn convert_bytecode(&mut self, module: &PreparedModule, bc: &Bytecode) -> Result<()> {
         use Bytecode as B;
         match bc {
             // --- Loads ---
@@ -479,7 +479,9 @@ impl<'a, I: Interner> SsaConverter<'a, I> {
             },
             B::Unpack(idx) => {
                 let src = self.pop_slot()?;
-                let ftypes = module.interned_struct_field_types_at(*idx);
+                let ftypes = module
+                    .interned_struct_field_types_at(*idx)
+                    .expect("Must be a struct");
                 let mut dsts = Vec::with_capacity(ftypes.len());
                 for &fty in ftypes {
                     dsts.push(self.alloc_vid(fty)?);
@@ -492,35 +494,8 @@ impl<'a, I: Interner> SsaConverter<'a, I> {
                 }
             },
             B::UnpackGeneric(_idx) => {
-                // let src = self.pop_slot()?;
-                // let inst = &module.struct_def_instantiations[idx.0 as usize];
-                // let n = struct_field_count(module, inst.def);
-                // let type_params = module.signature_at(inst.type_parameters).0.clone();
-                // let raw_ftypes = struct_field_type_toks(module, inst.def);
-                // let ftypes_tok: Vec<SignatureToken> = raw_ftypes
-                //     .iter()
-                //     .map(|ft| substitute_type_params(ft, &type_params))
-                //     .collect();
-                // let ftypes: Vec<InternedType> =
-                //     convert_sig_tokens(&ftypes_tok, self.interner, self.struct_types)?;
-                // let mut dsts = Vec::with_capacity(n);
-                // for i in 0..n {
-                //     let fty = ftypes
-                //         .get(i)
-                //         .copied()
-                //         .context("field type index out of bounds")?;
-                //     dsts.push(self.alloc_vid(fty)?);
-                // }
-                // let (base_ty, ty_args) = self.struct_inst_parts(module, *idx)?;
-                // self.current_block_instrs.push(Instr::UnpackGeneric(
-                //     dsts.clone(),
-                //     base_ty,
-                //     ty_args,
-                //     src,
-                // ));
-                // for dst in dsts {
-                //     self.push_slot(dst);
-                // }
+                // We need to pop slot values, compute field
+                // types and allocate a new Vid for each field.
                 bail!("generic struct unpack not yet supported");
             },
 
@@ -537,27 +512,17 @@ impl<'a, I: Interner> SsaConverter<'a, I> {
                 self.push_slot(dst);
             },
             B::PackVariantGeneric(_idx) => {
-                // let inst = &module.struct_variant_instantiations[idx.0 as usize];
-                // let handle = &module.struct_variant_handles[inst.handle.0 as usize];
-                // let n = variant_field_count(module, handle.struct_index, handle.variant);
-                // let fields = self.pop_n_reverse(n)?;
-                // let type_params = module.signature_at(inst.type_parameters).0.clone();
-                // let def = &module.struct_defs[handle.struct_index.0 as usize];
-                // let tok = SignatureToken::StructInstantiation(def.struct_handle, type_params);
-                // let result_ty = convert_sig_token(&tok, self.interner, self.struct_types)?;
-                // let (enum_ty, variant, ty_args) = self.variant_inst_parts(module, *idx)?;
-                // let dst = self.alloc_vid(result_ty)?;
-                // self.current_block_instrs.push(Instr::PackVariantGeneric(
-                //     dst, enum_ty, variant, ty_args, fields,
-                // ));
-                // self.push_slot(dst);
+                // We need to pop N (number of fields)  values, compute resulting
+                // types and allocate a new Vid.
                 bail!("generic variant pack not yet supported");
             },
             B::UnpackVariant(idx) => {
                 let src = self.pop_slot()?;
                 let handle = &module.struct_variant_handles[idx.0 as usize];
                 let variant = handle.variant;
-                let ftypes = module.interned_variant_field_types_at(handle.struct_index, variant);
+                let ftypes = module
+                    .interned_variant_field_types_at(handle.struct_index, variant)
+                    .expect("Must be an enum");
                 let mut dsts = Vec::with_capacity(ftypes.len());
                 for &fty in ftypes {
                     dsts.push(self.alloc_vid(fty)?);
@@ -574,38 +539,8 @@ impl<'a, I: Interner> SsaConverter<'a, I> {
                 }
             },
             B::UnpackVariantGeneric(_idx) => {
-                // let src = self.pop_slot()?;
-                // let inst = &module.struct_variant_instantiations[idx.0 as usize];
-                // let handle = &module.struct_variant_handles[inst.handle.0 as usize];
-                // let n = variant_field_count(module, handle.struct_index, handle.variant);
-                // let type_params = module.signature_at(inst.type_parameters).0.clone();
-                // let raw_ftypes =
-                //     variant_field_type_toks(module, handle.struct_index, handle.variant);
-                // let ftypes_tok: Vec<SignatureToken> = raw_ftypes
-                //     .iter()
-                //     .map(|ft| substitute_type_params(ft, &type_params))
-                //     .collect();
-                // let ftypes: Vec<InternedType> =
-                //     convert_sig_tokens(&ftypes_tok, self.interner, self.struct_types)?;
-                // let mut dsts = Vec::with_capacity(n);
-                // for i in 0..n {
-                //     let fty = ftypes
-                //         .get(i)
-                //         .copied()
-                //         .context("field type index out of bounds")?;
-                //     dsts.push(self.alloc_vid(fty)?);
-                // }
-                // let (enum_ty, variant, ty_args) = self.variant_inst_parts(module, *idx)?;
-                // self.current_block_instrs.push(Instr::UnpackVariantGeneric(
-                //     dsts.clone(),
-                //     enum_ty,
-                //     variant,
-                //     ty_args,
-                //     src,
-                // ));
-                // for dst in dsts {
-                //     self.push_slot(dst);
-                // }
+                // We need to pop slot values, compute field
+                // types and allocate a new Vid for each field.
                 bail!("generic variant unpack not yet supported");
             },
             B::TestVariant(idx) => {
@@ -1062,7 +997,7 @@ impl<'a, I: Interner> SsaConverter<'a, I> {
 // Type/field helpers
 // ================================================================================================
 
-fn struct_field_count(module: &ResolvedModule, idx: StructDefinitionIndex) -> usize {
+fn struct_field_count(module: &PreparedModule, idx: StructDefinitionIndex) -> usize {
     match &module.struct_defs[idx.0 as usize].field_information {
         StructFieldInformation::Declared(fields) => fields.len(),
         other => unreachable!("struct_field_count on {:?}", other),
@@ -1070,7 +1005,7 @@ fn struct_field_count(module: &ResolvedModule, idx: StructDefinitionIndex) -> us
 }
 
 fn variant_field_count(
-    module: &ResolvedModule,
+    module: &PreparedModule,
     struct_idx: StructDefinitionIndex,
     variant: VariantIndex,
 ) -> usize {

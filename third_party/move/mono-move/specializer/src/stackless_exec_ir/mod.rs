@@ -10,7 +10,7 @@ mod display;
 
 use mono_move_core::{
     types::{InternedType, InternedTypeList},
-    ResolvedModule,
+    PreparedModule,
 };
 use move_binary_format::file_format::{
     ConstantPoolIndex, FieldHandleIndex, FieldInstantiationIndex, FunctionHandleIndex,
@@ -408,7 +408,7 @@ impl FunctionIR {
 /// access).
 pub struct ModuleIR {
     /// The original compiled module with resolved type pools.
-    pub module: ResolvedModule,
+    pub module: PreparedModule,
     /// Indexed by `FunctionDefinitionIndex`. `None` for native functions.
     pub functions: Vec<Option<FunctionIR>>,
 }

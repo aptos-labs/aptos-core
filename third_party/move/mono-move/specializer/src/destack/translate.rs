@@ -6,7 +6,7 @@
 use super::ssa_conversion::SsaConverter;
 use crate::stackless_exec_ir::{FunctionIR, ModuleIR};
 use anyhow::Result;
-use mono_move_core::{Interner, ResolvedModule};
+use mono_move_core::{Interner, PreparedModule};
 use move_binary_format::access::ModuleAccess;
 
 /// Convert an entire compiled module to stackless IR.
@@ -37,7 +37,7 @@ use move_binary_format::access::ModuleAccess;
 ///   type-parameter list of the enclosing generic context.
 /// - **Reference safety**: the borrow checker guarantees that freed slots
 ///   truly hold dead values, so type-keyed slot recycling is sound.
-pub fn translate_module(module: ResolvedModule, interner: &impl Interner) -> Result<ModuleIR> {
+pub fn translate_module(module: PreparedModule, interner: &impl Interner) -> Result<ModuleIR> {
     let functions = module
         .function_defs
         .iter()

@@ -13,7 +13,7 @@ mod translate;
 
 use crate::stackless_exec_ir::ModuleIR;
 use anyhow::{bail, Result};
-use mono_move_core::{Interner, ResolvedModule};
+use mono_move_core::{Interner, PreparedModule};
 use move_binary_format::CompiledModule;
 
 /// Verify, convert, and optimize a compiled module into stackless execution IR.
@@ -22,7 +22,7 @@ pub fn destack(module: CompiledModule, interner: &impl Interner) -> Result<Modul
         bail!("bytecode verification failed: {:#}", e);
     }
 
-    let module = ResolvedModule::build(module, interner)?;
+    let module = PreparedModule::build(module, interner)?;
     let mut module_ir = translate::translate_module(module, interner)?;
     optimize::optimize_module(&mut module_ir);
     Ok(module_ir)

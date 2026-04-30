@@ -1,7 +1,7 @@
 // Copyright (c) Aptos Foundation
 // Licensed pursuant to the Innovation-Enabling Source Code License, available at https://github.com/aptos-labs/aptos-core/blob/main/LICENSE
 
-//! Builds a [`LoadedModule`] from a [`ResolvedModule`] by resolving its
+//! Builds a [`LoadedModule`] from a [`PreparedModule`] by resolving its
 //! struct/enum types, running the specializer, and packaging the result
 //! alongside the polymorphic IR.
 //!
@@ -16,7 +16,7 @@ use anyhow::{anyhow, bail, Result};
 use mono_move_alloc::{ExecutableArena, ExecutableArenaPtr, GlobalArenaPtr};
 use mono_move_core::{
     types::{align_up, view_type, Type},
-    EnumType, Executable, ExecutableId, FrameLayoutInfo, Function, MicroOp, ResolvedModule,
+    EnumType, Executable, ExecutableId, FrameLayoutInfo, Function, MicroOp, PreparedModule,
     SortedSafePointEntries, StructType, VariantFields,
 };
 use mono_move_global_context::{
@@ -36,7 +36,7 @@ use std::ops::Deref;
 #[allow(dead_code)]
 pub struct ExecutableBuilder<'guard, 'ctx> {
     // TODO: support scripts.
-    module: ResolvedModule,
+    module: PreparedModule,
     /// Maps interned struct/enum names to their `StructDefinitionIndex`
     /// for local defs. Used by the layout pass to recurse into dependent
     /// local defs when a field type points at another local struct/enum.
@@ -70,7 +70,7 @@ impl<'guard, 'ctx> ExecutableBuilder<'guard, 'ctx> {
     where
         'ctx: 'guard,
     {
-        let module = ResolvedModule::build(module, guard)?;
+        let module = PreparedModule::build(module, guard)?;
         let local_def_by_name = module
             .struct_defs()
             .iter()
@@ -130,6 +130,8 @@ impl<'guard, 'ctx> ExecutableBuilder<'guard, 'ctx> {
     /// Runs the full build pipeline (resolve types → destack → lower every
     /// function → resolve calls → assemble `LoadedModule`).
     pub fn build(mut self) -> Result<Box<LoadedModule>> {
+        // TODO: this clone is needed is because we need to resolve layouts.
+        // this will be gone once layout construction is refactored into its own pass.
         let module_ir = specializer::destack(self.module.deref().clone(), self.guard)?;
         self.resolve_types()?;
         let lowered = lower_module(&module_ir)?;
@@ -263,7 +265,10 @@ impl<'guard, 'ctx> ExecutableBuilder<'guard, 'ctx> {
             StructFieldInformation::Native => bail!("Native fields are deprecated"),
             StructFieldInformation::Declared(_) => {
                 let def_index = StructDefinitionIndex(def_idx as u16);
-                let field_types = self.module.interned_struct_field_types_at(def_index);
+                let field_types = self
+                    .module
+                    .interned_struct_field_types_at(def_index)
+                    .expect("Must be a struct");
                 let mut fields = Vec::with_capacity(field_types.len());
                 let mut offset = 0u32;
                 let mut align = 1u32;
@@ -287,7 +292,8 @@ impl<'guard, 'ctx> ExecutableBuilder<'guard, 'ctx> {
                 for v_idx in 0..variant_defs.len() {
                     let vfields = self
                         .module
-                        .interned_variant_field_types_at(def_index, v_idx as u16);
+                        .interned_variant_field_types_at(def_index, v_idx as u16)
+                        .expect("Must be an enum");
                     let fields_slice = self.arena.alloc_slice_copy(vfields);
                     variants.push(VariantFields::new(fields_slice));
                 }
@@ -314,7 +320,11 @@ impl<'guard, 'ctx> ExecutableBuilder<'guard, 'ctx> {
         let mut deps = Vec::new();
         match &def.field_information {
             StructFieldInformation::Declared(_) => {
-                for &fty in self.module.interned_struct_field_types_at(def_index) {
+                for &fty in self
+                    .module
+                    .interned_struct_field_types_at(def_index)
+                    .expect("Must be a struct")
+                {
                     if let Some(d) = self.local_def_idx_for_type(fty) {
                         deps.push(d);
                     }
@@ -325,6 +335,7 @@ impl<'guard, 'ctx> ExecutableBuilder<'guard, 'ctx> {
                     for &fty in self
                         .module
                         .interned_variant_field_types_at(def_index, v_idx as u16)
+                        .expect("Must be an enum")
                     {
                         if let Some(d) = self.local_def_idx_for_type(fty) {
                             deps.push(d);
