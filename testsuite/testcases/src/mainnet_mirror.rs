@@ -26,7 +26,7 @@ use std::{fs, path::Path};
 /// `scripts/pull_mainnet_validator_snapshot.py`. Embedded so the deployed forge
 /// binary doesn't need to read the file off disk at runtime.
 const EMBEDDED_SNAPSHOT: &str =
-    include_str!("../../../mainnet-mirror-data/mainnet_validator_snapshot.json");
+    include_str!("data/mainnet-mirror/mainnet_validator_snapshot.json");
 
 /// A forge region bucket. The variants are listed in the same alphabetical
 /// order as their `link_stats` names so that

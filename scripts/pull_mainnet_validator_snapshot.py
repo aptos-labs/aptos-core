@@ -10,13 +10,16 @@ org), and a forge region bucket.
 
 Two input modes:
   - default (recommended): load the already-pulled validator set from
-    mainnet-mirror-data/stake_distribution.json. Avoids re-hitting mainnet RPC
-    on every iteration; geolocation is the slow / rate-limited step.
+    testsuite/testcases/src/data/mainnet-mirror/stake_distribution.json. Avoids
+    re-hitting mainnet RPC on every iteration; geolocation is the slow /
+    rate-limited step.
   - --from-rest-api: fetch 0x1::stake::ValidatorSet live (use after a long gap
     or to refresh the underlying validator set; will overwrite the input file
     when --refresh-input is also passed).
 
-Output: mainnet-mirror-data/mainnet_validator_snapshot.json by default.
+Output: testsuite/testcases/src/data/mainnet-mirror/mainnet_validator_snapshot.json
+by default. The output file is `include_str!`-embedded into aptos-testcases at
+compile time, so committing a refreshed snapshot is a normal code change.
 
 Usage:
     python3 scripts/pull_mainnet_validator_snapshot.py
@@ -294,8 +297,9 @@ def enrich(entries, sleep_s, ipinfo_token, geolocate_enabled):
 
 def main():
     repo_root = Path(__file__).resolve().parent.parent
-    default_input = repo_root / "mainnet-mirror-data/stake_distribution.json"
-    default_out = repo_root / "mainnet-mirror-data/mainnet_validator_snapshot.json"
+    snapshot_dir = repo_root / "testsuite/testcases/src/data/mainnet-mirror"
+    default_input = snapshot_dir / "stake_distribution.json"
+    default_out = snapshot_dir / "mainnet_validator_snapshot.json"
 
     ap = argparse.ArgumentParser(
         description=__doc__,
