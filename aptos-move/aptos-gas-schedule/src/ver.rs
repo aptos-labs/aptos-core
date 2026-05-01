@@ -8,7 +8,7 @@
 ///   - Changing how gas is calculated in any way
 ///
 /// Change log:
-/// - V46:
+/// - V45:
 ///    - New minimum price per gas unit parameter for higher-limit transactions
 ///    - Gas charging for encrypted transaction decryption
 ///    - Minimum gas unit price for encrypted transactions
