@@ -63,6 +63,16 @@ module aptos_trading::bulk_order_types {
             ask_prices: vector<u64>, // prices for each levels of the order
             ask_sizes: vector<u64>, // sizes for each levels of the order
             metadata: M
+        },
+        V2 {
+            account: address,
+            order_sequence_number: u64, // sequence number for order validation
+            bid_prices: vector<u64>, // prices for each levels of the order
+            bid_sizes: vector<u64>, // sizes for each levels of the order
+            ask_prices: vector<u64>, // prices for each levels of the order
+            ask_sizes: vector<u64>, // sizes for each levels of the order
+            metadata: M,
+            reprice_crossing_orders: bool // if true, reprice crossing orders 1 tick away from best price instead of discarding
         }
     }
 
@@ -90,6 +100,18 @@ module aptos_trading::bulk_order_types {
             cancelled_bid_sizes: vector<u64>,
             cancelled_ask_prices: vector<u64>,
             cancelled_ask_sizes: vector<u64>,
+            previous_seq_num: option::Option<u64>
+        },
+        Success_V2 {
+            order: BulkOrder<M>,
+            cancelled_bid_prices: vector<u64>,
+            cancelled_bid_sizes: vector<u64>,
+            cancelled_ask_prices: vector<u64>,
+            cancelled_ask_sizes: vector<u64>,
+            repriced_bid_prices: vector<u64>,
+            repriced_bid_sizes: vector<u64>,
+            repriced_ask_prices: vector<u64>,
+            repriced_ask_sizes: vector<u64>,
             previous_seq_num: option::Option<u64>
         },
         Rejection_V1 {
@@ -156,6 +178,44 @@ module aptos_trading::bulk_order_types {
         }
     }
 
+    /// Creates a new V2 bulk order request with repricing support.
+    ///
+    /// # Arguments:
+    /// - `account`: The account placing the order
+    /// - `sequence_number`: Sequence number for order validation
+    /// - `bid_prices`: Vector of bid prices in descending order
+    /// - `bid_sizes`: Vector of bid sizes corresponding to each price level
+    /// - `ask_prices`: Vector of ask prices in ascending order
+    /// - `ask_sizes`: Vector of ask sizes corresponding to each price level
+    /// - `metadata`: Additional metadata for the order
+    /// - `reprice_crossing_orders`: If true, reprice crossing orders 1 tick away instead of discarding
+    ///
+    /// # Returns:
+    /// A `BulkOrderRequest` instance with V2 features.
+    ///
+    /// Does no validation itself.
+    public fun new_bulk_order_request_v2<M: store + copy + drop>(
+        account: address,
+        sequence_number: u64,
+        bid_prices: vector<u64>,
+        bid_sizes: vector<u64>,
+        ask_prices: vector<u64>,
+        ask_sizes: vector<u64>,
+        metadata: M,
+        reprice_crossing_orders: bool
+    ): BulkOrderRequest<M> {
+        BulkOrderRequest::V2 {
+            account,
+            order_sequence_number: sequence_number,
+            bid_prices,
+            bid_sizes,
+            ask_prices,
+            ask_sizes,
+            metadata,
+            reprice_crossing_orders
+        }
+    }
+
     public fun new_bulk_order_place_response_success<M: store + copy + drop>(
         order: BulkOrder<M>,
         cancelled_bid_prices: vector<u64>,
@@ -170,6 +230,32 @@ module aptos_trading::bulk_order_types {
             cancelled_bid_sizes,
             cancelled_ask_prices,
             cancelled_ask_sizes,
+            previous_seq_num
+        }
+    }
+
+    public fun new_bulk_order_place_response_success_v2<M: store + copy + drop>(
+        order: BulkOrder<M>,
+        cancelled_bid_prices: vector<u64>,
+        cancelled_bid_sizes: vector<u64>,
+        cancelled_ask_prices: vector<u64>,
+        cancelled_ask_sizes: vector<u64>,
+        repriced_bid_prices: vector<u64>,
+        repriced_bid_sizes: vector<u64>,
+        repriced_ask_prices: vector<u64>,
+        repriced_ask_sizes: vector<u64>,
+        previous_seq_num: option::Option<u64>
+    ): BulkOrderPlaceResponse<M> {
+        BulkOrderPlaceResponse::Success_V2 {
+            order,
+            cancelled_bid_prices,
+            cancelled_bid_sizes,
+            cancelled_ask_prices,
+            cancelled_ask_sizes,
+            repriced_bid_prices,
+            repriced_bid_sizes,
+            repriced_ask_prices,
+            repriced_ask_sizes,
             previous_seq_num
         }
     }
@@ -226,22 +312,48 @@ module aptos_trading::bulk_order_types {
     }
 
     public fun get_account<M: store + copy + drop>(self: &BulkOrderRequest<M>): address {
-        self.account
+        match (self) {
+            BulkOrderRequest::V1 { account, .. } => *account,
+            BulkOrderRequest::V2 { account, .. } => *account,
+        }
     }
 
     public fun get_sequence_number<M: store + copy + drop>(
         self: &BulkOrderRequest<M>
     ): u64 {
-        self.order_sequence_number
+        match (self) {
+            BulkOrderRequest::V1 { order_sequence_number, .. } => *order_sequence_number,
+            BulkOrderRequest::V2 { order_sequence_number, .. } => *order_sequence_number,
+        }
+    }
+
+    public fun get_reprice_crossing_orders<M: store + copy + drop>(
+        self: &BulkOrderRequest<M>
+    ): bool {
+        match (self) {
+            BulkOrderRequest::V1 { .. } => false,
+            BulkOrderRequest::V2 { reprice_crossing_orders, .. } => *reprice_crossing_orders,
+        }
     }
 
     public fun get_total_remaining_size<M: store + copy + drop>(
         self: &BulkOrderRequest<M>, is_bid: bool
     ): u64 {
-        if (is_bid) {
-            self.bid_sizes.fold(0, |acc, size| acc + size)
-        } else {
-            self.ask_sizes.fold(0, |acc, size| acc + size)
+        match (self) {
+            BulkOrderRequest::V1 { bid_sizes, ask_sizes, .. } => {
+                if (is_bid) {
+                    bid_sizes.fold(0, |acc, size| acc + size)
+                } else {
+                    ask_sizes.fold(0, |acc, size| acc + size)
+                }
+            },
+            BulkOrderRequest::V2 { bid_sizes, ask_sizes, .. } => {
+                if (is_bid) {
+                    bid_sizes.fold(0, |acc, size| acc + size)
+                } else {
+                    ask_sizes.fold(0, |acc, size| acc + size)
+                }
+            }
         }
     }
 
@@ -256,56 +368,70 @@ module aptos_trading::bulk_order_types {
     public fun get_active_price<M: store + copy + drop>(
         self: &BulkOrderRequest<M>, is_bid: bool
     ): Option<u64> {
-        let prices =
-            if (is_bid) {
-                &self.bid_prices
-            } else {
-                &self.ask_prices
-            };
+        let prices = match (self) {
+            BulkOrderRequest::V1 { bid_prices, ask_prices, .. } => {
+                if (is_bid) { bid_prices } else { ask_prices }
+            },
+            BulkOrderRequest::V2 { bid_prices, ask_prices, .. } => {
+                if (is_bid) { bid_prices } else { ask_prices }
+            }
+        };
         if (prices.length() == 0) {
-            option::none() // No active price level
+            option::none()
         } else {
-            option::some(prices[0]) // Return the first price level
+            option::some(prices[0])
         }
     }
 
     public fun get_all_prices<M: store + copy + drop>(
         self: &BulkOrderRequest<M>, is_bid: bool
     ): vector<u64> {
-        if (is_bid) {
-            self.bid_prices
-        } else {
-            self.ask_prices
+        match (self) {
+            BulkOrderRequest::V1 { bid_prices, ask_prices, .. } => {
+                if (is_bid) { *bid_prices } else { *ask_prices }
+            },
+            BulkOrderRequest::V2 { bid_prices, ask_prices, .. } => {
+                if (is_bid) { *bid_prices } else { *ask_prices }
+            }
         }
     }
 
     public fun get_all_prices_mut<M: store + copy + drop>(
         self: &mut BulkOrderRequest<M>, is_bid: bool
     ): &mut vector<u64> {
-        if (is_bid) {
-            &mut self.bid_prices
-        } else {
-            &mut self.ask_prices
+        match (self) {
+            BulkOrderRequest::V1 { bid_prices, ask_prices, .. } => {
+                if (is_bid) { bid_prices } else { ask_prices }
+            },
+            BulkOrderRequest::V2 { bid_prices, ask_prices, .. } => {
+                if (is_bid) { bid_prices } else { ask_prices }
+            }
         }
     }
 
     public fun get_all_sizes<M: store + copy + drop>(
         self: &BulkOrderRequest<M>, is_bid: bool
     ): vector<u64> {
-        if (is_bid) {
-            self.bid_sizes
-        } else {
-            self.ask_sizes
+        match (self) {
+            BulkOrderRequest::V1 { bid_sizes, ask_sizes, .. } => {
+                if (is_bid) { *bid_sizes } else { *ask_sizes }
+            },
+            BulkOrderRequest::V2 { bid_sizes, ask_sizes, .. } => {
+                if (is_bid) { *bid_sizes } else { *ask_sizes }
+            }
         }
     }
 
     public fun get_all_sizes_mut<M: store + copy + drop>(
         self: &mut BulkOrderRequest<M>, is_bid: bool
     ): &mut vector<u64> {
-        if (is_bid) {
-            &mut self.bid_sizes
-        } else {
-            &mut self.ask_sizes
+        match (self) {
+            BulkOrderRequest::V1 { bid_sizes, ask_sizes, .. } => {
+                if (is_bid) { bid_sizes } else { ask_sizes }
+            },
+            BulkOrderRequest::V2 { bid_sizes, ask_sizes, .. } => {
+                if (is_bid) { bid_sizes } else { ask_sizes }
+            }
         }
     }
 
@@ -320,33 +446,46 @@ module aptos_trading::bulk_order_types {
     public fun get_active_size<M: store + copy + drop>(
         self: &BulkOrderRequest<M>, is_bid: bool
     ): Option<u64> {
-        let sizes =
-            if (is_bid) {
-                &self.bid_sizes
-            } else {
-                &self.ask_sizes
-            };
+        let sizes = match (self) {
+            BulkOrderRequest::V1 { bid_sizes, ask_sizes, .. } => {
+                if (is_bid) { bid_sizes } else { ask_sizes }
+            },
+            BulkOrderRequest::V2 { bid_sizes, ask_sizes, .. } => {
+                if (is_bid) { bid_sizes } else { ask_sizes }
+            }
+        };
         if (sizes.length() == 0) {
-            option::none() // No active size level
+            option::none()
         } else {
-            option::some(sizes[0]) // Return the first size level
+            option::some(sizes[0])
         }
     }
 
     public fun get_prices_and_sizes_mut<M: store + copy + drop>(
         self: &mut BulkOrderRequest<M>, is_bid: bool
     ): (&mut vector<u64>, &mut vector<u64>) {
-        if (is_bid) {
-            (&mut self.bid_prices, &mut self.bid_sizes)
-        } else {
-            (&mut self.ask_prices, &mut self.ask_sizes)
+        match (self) {
+            BulkOrderRequest::V1 { bid_prices, bid_sizes, ask_prices, ask_sizes, .. } => {
+                if (is_bid) {
+                    (bid_prices, bid_sizes)
+                } else {
+                    (ask_prices, ask_sizes)
+                }
+            },
+            BulkOrderRequest::V2 { bid_prices, bid_sizes, ask_prices, ask_sizes, .. } => {
+                if (is_bid) {
+                    (bid_prices, bid_sizes)
+                } else {
+                    (ask_prices, ask_sizes)
+                }
+            }
         }
     }
 
     public fun is_success_response<M: store + copy + drop>(
         self: &BulkOrderPlaceResponse<M>
     ): bool {
-        self is BulkOrderPlaceResponse::Success_V1
+        self is BulkOrderPlaceResponse::Success_V1 || self is BulkOrderPlaceResponse::Success_V2
     }
 
     public fun is_rejection_response<M: store + copy + drop>(
@@ -365,12 +504,69 @@ module aptos_trading::bulk_order_types {
         vector<u64>,
         option::Option<u64>
     ) {
-        let BulkOrderPlaceResponse::Success_V1 {
+        match (self) {
+            BulkOrderPlaceResponse::Success_V1 {
+                order,
+                cancelled_bid_prices,
+                cancelled_bid_sizes,
+                cancelled_ask_prices,
+                cancelled_ask_sizes,
+                previous_seq_num
+            } => {
+                (
+                    order,
+                    cancelled_bid_prices,
+                    cancelled_bid_sizes,
+                    cancelled_ask_prices,
+                    cancelled_ask_sizes,
+                    previous_seq_num
+                )
+            },
+            BulkOrderPlaceResponse::Success_V2 {
+                order,
+                cancelled_bid_prices,
+                cancelled_bid_sizes,
+                cancelled_ask_prices,
+                cancelled_ask_sizes,
+                previous_seq_num,
+                ..
+            } => {
+                (
+                    order,
+                    cancelled_bid_prices,
+                    cancelled_bid_sizes,
+                    cancelled_ask_prices,
+                    cancelled_ask_sizes,
+                    previous_seq_num
+                )
+            }
+        }
+    }
+
+    public fun destroy_bulk_order_place_response_success_v2<M: store + copy + drop>(
+        self: BulkOrderPlaceResponse<M>
+    ): (
+        BulkOrder<M>,
+        vector<u64>,
+        vector<u64>,
+        vector<u64>,
+        vector<u64>,
+        vector<u64>,
+        vector<u64>,
+        vector<u64>,
+        vector<u64>,
+        option::Option<u64>
+    ) {
+        let BulkOrderPlaceResponse::Success_V2 {
             order,
             cancelled_bid_prices,
             cancelled_bid_sizes,
             cancelled_ask_prices,
             cancelled_ask_sizes,
+            repriced_bid_prices,
+            repriced_bid_sizes,
+            repriced_ask_prices,
+            repriced_ask_sizes,
             previous_seq_num
         } = self;
         (
@@ -379,6 +575,10 @@ module aptos_trading::bulk_order_types {
             cancelled_bid_sizes,
             cancelled_ask_prices,
             cancelled_ask_sizes,
+            repriced_bid_prices,
+            repriced_bid_sizes,
+            repriced_ask_prices,
+            repriced_ask_sizes,
             previous_seq_num
         )
     }
@@ -407,23 +607,34 @@ module aptos_trading::bulk_order_types {
         order: &BulkOrder<M>, is_bid: bool, matched_size: u64
     ): OrderMatch<M> {
         let order_request = &order.order_request;
-        let (price, remaining_size) =
-            if (is_bid) {
-                (order_request.bid_prices[0], order_request.bid_sizes[0] - matched_size)
-            } else {
-                (order_request.ask_prices[0], order_request.ask_sizes[0] - matched_size)
+        let (price, remaining_size, account, sequence_number, metadata) =
+            match (order_request) {
+                BulkOrderRequest::V1 { account, order_sequence_number, bid_prices, bid_sizes, ask_prices, ask_sizes, metadata } => {
+                    if (is_bid) {
+                        (bid_prices[0], bid_sizes[0] - matched_size, *account, *order_sequence_number, *metadata)
+                    } else {
+                        (ask_prices[0], ask_sizes[0] - matched_size, *account, *order_sequence_number, *metadata)
+                    }
+                },
+                BulkOrderRequest::V2 { account, order_sequence_number, bid_prices, bid_sizes, ask_prices, ask_sizes, metadata, .. } => {
+                    if (is_bid) {
+                        (bid_prices[0], bid_sizes[0] - matched_size, *account, *order_sequence_number, *metadata)
+                    } else {
+                        (ask_prices[0], ask_sizes[0] - matched_size, *account, *order_sequence_number, *metadata)
+                    }
+                }
             };
         new_order_match<M>(
             new_bulk_order_match_details<M>(
                 order.order_id,
-                order_request.account,
+                account,
                 order.unique_priority_idx,
                 price,
                 remaining_size,
                 is_bid,
-                order_request.order_sequence_number,
+                sequence_number,
                 order.creation_time_micros,
-                order_request.metadata
+                metadata
             ),
             matched_size
         )
@@ -437,10 +648,20 @@ module aptos_trading::bulk_order_types {
     /// # Arguments:
     /// - `self`: Mutable reference to the bulk order
     public fun set_empty<M: store + copy + drop>(self: &mut BulkOrder<M>) {
-        self.order_request.bid_sizes = vector::empty();
-        self.order_request.ask_sizes = vector::empty();
-        self.order_request.bid_prices = vector::empty();
-        self.order_request.ask_prices = vector::empty();
+        match (&mut self.order_request) {
+            BulkOrderRequest::V1 { bid_prices, bid_sizes, ask_prices, ask_sizes, .. } => {
+                *bid_sizes = vector::empty();
+                *ask_sizes = vector::empty();
+                *bid_prices = vector::empty();
+                *ask_prices = vector::empty();
+            },
+            BulkOrderRequest::V2 { bid_prices, bid_sizes, ask_prices, ask_sizes, .. } => {
+                *bid_sizes = vector::empty();
+                *ask_sizes = vector::empty();
+                *bid_prices = vector::empty();
+                *ask_prices = vector::empty();
+            }
+        }
     }
 
     public fun destroy_bulk_order<M: store + copy + drop>(
@@ -458,23 +679,46 @@ module aptos_trading::bulk_order_types {
     public fun destroy_bulk_order_request<M: store + copy + drop>(
         self: BulkOrderRequest<M>
     ): (address, u64, vector<u64>, vector<u64>, vector<u64>, vector<u64>, M) {
-        let BulkOrderRequest::V1 {
-            account,
-            order_sequence_number,
-            bid_prices,
-            bid_sizes,
-            ask_prices,
-            ask_sizes,
-            metadata
-        } = self;
-        (
-            account,
-            order_sequence_number,
-            bid_prices,
-            bid_sizes,
-            ask_prices,
-            ask_sizes,
-            metadata
-        )
+        match (self) {
+            BulkOrderRequest::V1 {
+                account,
+                order_sequence_number,
+                bid_prices,
+                bid_sizes,
+                ask_prices,
+                ask_sizes,
+                metadata
+            } => {
+                (
+                    account,
+                    order_sequence_number,
+                    bid_prices,
+                    bid_sizes,
+                    ask_prices,
+                    ask_sizes,
+                    metadata
+                )
+            },
+            BulkOrderRequest::V2 {
+                account,
+                order_sequence_number,
+                bid_prices,
+                bid_sizes,
+                ask_prices,
+                ask_sizes,
+                metadata,
+                ..
+            } => {
+                (
+                    account,
+                    order_sequence_number,
+                    bid_prices,
+                    bid_sizes,
+                    ask_prices,
+                    ask_sizes,
+                    metadata
+                )
+            }
+        }
     }
 }

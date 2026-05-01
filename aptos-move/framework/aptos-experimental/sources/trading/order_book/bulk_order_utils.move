@@ -78,6 +78,58 @@ module aptos_experimental::bulk_order_utils {
         )
     }
 
+    /// V2 version: Creates and sanitizes a new bulk order request with repricing support.
+    ///
+    /// # Aborts:
+    /// - If sequence_number is 0 (reserved to avoid ambiguity in events)
+    /// - If bid_prices and bid_sizes have different lengths
+    /// - If ask_prices and ask_sizes have different lengths
+    /// - If bid_prices or ask_prices exceeds MAX_BULK_ORDER_DEPTH_PER_SIDE (30) levels
+    public(friend) fun new_bulk_order_request_with_sanitization_v2<M: store + copy + drop>(
+        account: address,
+        sequence_number: u64,
+        bid_prices: vector<u64>,
+        bid_sizes: vector<u64>,
+        ask_prices: vector<u64>,
+        ask_sizes: vector<u64>,
+        metadata: M,
+        reprice_crossing_orders: bool
+    ): BulkOrderRequest<M> {
+        // Sequence number 0 is reserved to avoid ambiguity in events
+        assert!(sequence_number > 0, E_INVALID_SEQUENCE_NUMBER);
+
+        let num_bids = bid_prices.length();
+        let num_asks = ask_prices.length();
+
+        // Basic length validation
+        assert!(num_bids == bid_sizes.length(), E_BID_LENGTH_MISMATCH);
+        assert!(num_asks == ask_sizes.length(), E_ASK_LENGTH_MISMATCH);
+        assert!(num_bids > 0 || num_asks > 0, E_EMPTY_ORDER);
+        // Depth validation to prevent gas DoS when cancelling
+        assert!(num_bids <= MAX_BULK_ORDER_DEPTH_PER_SIDE, E_BULK_ORDER_DEPTH_EXCEEDED);
+        assert!(num_asks <= MAX_BULK_ORDER_DEPTH_PER_SIDE, E_BULK_ORDER_DEPTH_EXCEEDED);
+        assert!(validate_not_zero_sizes(&bid_sizes), E_BID_SIZE_ZERO);
+        assert!(validate_not_zero_sizes(&ask_sizes), E_ASK_SIZE_ZERO);
+        assert!(validate_price_ordering(&bid_prices, true), E_BID_ORDER_INVALID);
+        assert!(validate_price_ordering(&ask_prices, false), E_ASK_ORDER_INVALID);
+
+        if (num_bids > 0 && num_asks > 0) {
+            // First element in bids is the highest (descending order), first element in asks is the lowest (ascending
+            // order).
+            assert!(bid_prices[0] < ask_prices[0], EPRICE_CROSSING);
+        };
+        bulk_order_types::new_bulk_order_request_v2(
+            account,
+            sequence_number,
+            bid_prices,
+            bid_sizes,
+            ask_prices,
+            ask_sizes,
+            metadata,
+            reprice_crossing_orders
+        )
+    }
+
     /// Creates a new bulk order with the specified parameters.
     ///
     /// # Arguments:
@@ -95,6 +147,45 @@ module aptos_experimental::bulk_order_utils {
     /// - `vector<u64>`: Cancelled ask prices (levels that crossed the spread)
     /// - `vector<u64>`: Cancelled ask sizes corresponding to cancelled prices
     public(friend) fun new_bulk_order_with_sanitization<M: store + copy + drop>(
+        order_id: OrderId,
+        unique_priority_idx: IncreasingIdx,
+        order_req: BulkOrderRequest<M>,
+        best_bid_price: Option<u64>,
+        best_ask_price: Option<u64>
+    ): (BulkOrder<M>, vector<u64>, vector<u64>, vector<u64>, vector<u64>) {
+        let reprice_crossing_orders = order_req.get_reprice_crossing_orders();
+        
+        if (reprice_crossing_orders) {
+            // Use V2 repricing logic
+            new_bulk_order_with_repricing(
+                order_id,
+                unique_priority_idx,
+                order_req,
+                best_bid_price,
+                best_ask_price
+            )
+        } else {
+            // Use V1 cancellation logic
+            new_bulk_order_with_cancellation(
+                order_id,
+                unique_priority_idx,
+                order_req,
+                best_bid_price,
+                best_ask_price
+            )
+        }
+    }
+
+    /// V1 logic: Creates a new bulk order by discarding crossing levels.
+    ///
+    /// # Returns:
+    /// A tuple containing:
+    /// - `BulkOrder<M>`: The created bulk order with non-crossing levels
+    /// - `vector<u64>`: Cancelled bid prices (levels that crossed the spread)
+    /// - `vector<u64>`: Cancelled bid sizes corresponding to cancelled prices
+    /// - `vector<u64>`: Cancelled ask prices (levels that crossed the spread)
+    /// - `vector<u64>`: Cancelled ask sizes corresponding to cancelled prices
+    fun new_bulk_order_with_cancellation<M: store + copy + drop>(
         order_id: OrderId,
         unique_priority_idx: IncreasingIdx,
         order_req: BulkOrderRequest<M>,
@@ -153,6 +244,130 @@ module aptos_experimental::bulk_order_utils {
             cancelled_bid_sizes,
             cancelled_ask_prices,
             cancelled_ask_sizes
+        )
+    }
+
+    /// V2 logic: Creates a new bulk order by repricing crossing levels 1 tick away from the best price.
+    ///
+    /// # Returns:
+    /// A tuple containing:
+    /// - `BulkOrder<M>`: The created bulk order with repriced levels
+    /// - `vector<u64>`: Empty (no levels cancelled in V2, returned for compatibility)
+    /// - `vector<u64>`: Empty (no levels cancelled in V2, returned for compatibility)
+    /// - `vector<u64>`: Empty (no levels cancelled in V2, returned for compatibility)
+    /// - `vector<u64>`: Empty (no levels cancelled in V2, returned for compatibility)
+    fun new_bulk_order_with_repricing<M: store + copy + drop>(
+        order_id: OrderId,
+        unique_priority_idx: IncreasingIdx,
+        mut order_req: BulkOrderRequest<M>,
+        best_bid_price: Option<u64>,
+        best_ask_price: Option<u64>
+    ): (BulkOrder<M>, vector<u64>, vector<u64>, vector<u64>, vector<u64>) {
+        let creation_time_micros = timestamp::now_microseconds();
+        
+        // Reprice bid levels that are >= best ask price to (best_ask - 1)
+        if (best_ask_price.is_some()) {
+            let best_ask = *best_ask_price.borrow();
+            let bid_prices_mut = order_req.get_all_prices_mut(true);
+            let bid_sizes_mut = order_req.get_all_sizes_mut(true);
+            let i = 0;
+            let collapsed_size = 0u64;
+            let num_crossing = 0u64;
+            
+            // Find all crossing bids and calculate total size
+            while (i < bid_prices_mut.length()) {
+                if (bid_prices_mut[i] >= best_ask) {
+                    collapsed_size += bid_sizes_mut[i];
+                    num_crossing += 1;
+                } else {
+                    break;
+                };
+                i += 1;
+            };
+            
+            // If there are crossing bids, collapse them to 1 tick away from best ask
+            if (num_crossing > 0 && best_ask > 0) {
+                let target_price = best_ask - 1;
+                
+                // Remove all crossing levels
+                let j = 0;
+                while (j < num_crossing) {
+                    bid_prices_mut.remove(0);
+                    bid_sizes_mut.remove(0);
+                    j += 1;
+                };
+                
+                // Check if the target price already exists in the remaining levels
+                if (bid_prices_mut.length() > 0 && bid_prices_mut[0] == target_price) {
+                    // Collapse into existing level at target price
+                    bid_sizes_mut[0] += collapsed_size;
+                } else {
+                    // Insert new level at target price
+                    bid_prices_mut.insert(0, target_price);
+                    bid_sizes_mut.insert(0, collapsed_size);
+                }
+            }
+        };
+        
+        // Reprice ask levels that are <= best bid price to (best_bid + 1)
+        if (best_bid_price.is_some()) {
+            let best_bid = *best_bid_price.borrow();
+            let ask_prices_mut = order_req.get_all_prices_mut(false);
+            let ask_sizes_mut = order_req.get_all_sizes_mut(false);
+            let i = 0;
+            let collapsed_size = 0u64;
+            let num_crossing = 0u64;
+            
+            // Find all crossing asks and calculate total size
+            while (i < ask_prices_mut.length()) {
+                if (ask_prices_mut[i] <= best_bid) {
+                    collapsed_size += ask_sizes_mut[i];
+                    num_crossing += 1;
+                } else {
+                    break;
+                };
+                i += 1;
+            };
+            
+            // If there are crossing asks, collapse them to 1 tick away from best bid
+            if (num_crossing > 0) {
+                let target_price = best_bid + 1;
+                
+                // Remove all crossing levels
+                let j = 0;
+                while (j < num_crossing) {
+                    ask_prices_mut.remove(0);
+                    ask_sizes_mut.remove(0);
+                    j += 1;
+                };
+                
+                // Check if the target price already exists in the remaining levels
+                if (ask_prices_mut.length() > 0 && ask_prices_mut[0] == target_price) {
+                    // Collapse into existing level at target price
+                    ask_sizes_mut[0] += collapsed_size;
+                } else {
+                    // Insert new level at target price
+                    ask_prices_mut.insert(0, target_price);
+                    ask_sizes_mut.insert(0, collapsed_size);
+                }
+            }
+        };
+        
+        let bulk_order =
+            bulk_order_types::new_bulk_order(
+                order_req,
+                order_id,
+                unique_priority_idx,
+                creation_time_micros
+            );
+        
+        // Return empty vectors for cancelled levels (nothing cancelled in V2)
+        (
+            bulk_order,
+            vector::empty<u64>(),
+            vector::empty<u64>(),
+            vector::empty<u64>(),
+            vector::empty<u64>()
         )
     }
 
