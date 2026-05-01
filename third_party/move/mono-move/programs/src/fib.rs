@@ -44,11 +44,11 @@ mod micro_op {
         CodeOffset as CO, FrameLayoutInfo, FrameOffset as FO, Function, MicroOp::*,
         SortedSafePointEntries, FRAME_METADATA_SIZE,
     };
-    use mono_move_runtime::ObjectDescriptor;
+    use mono_move_runtime::ObjectDescriptorTable;
 
     pub fn program() -> (
         Vec<Option<ExecutableArenaPtr<Function>>>,
-        Vec<ObjectDescriptor>,
+        ObjectDescriptorTable,
         ExecutableArena,
     ) {
         let arena = ExecutableArena::new();
@@ -95,7 +95,7 @@ mod micro_op {
             safe_point_layouts: SortedSafePointEntries::empty(),
         });
 
-        (vec![Some(func)], vec![ObjectDescriptor::Trivial], arena)
+        (vec![Some(func)], ObjectDescriptorTable::new(), arena)
     }
 }
 

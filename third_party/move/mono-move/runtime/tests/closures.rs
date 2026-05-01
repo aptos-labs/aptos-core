@@ -17,7 +17,7 @@ use mono_move_core::{
     FrameOffset as FO, Function, LocalExecutionContext, MicroOp, PackClosureOp, SizedSlot,
     SortedSafePointEntries, FRAME_METADATA_SIZE,
 };
-use mono_move_runtime::{InterpreterContext, ObjectDescriptor};
+use mono_move_runtime::{InterpreterContext, ObjectDescriptor, ObjectDescriptorTable};
 
 // ---------------------------------------------------------------------------
 // Descriptors (shared — these describe object *shapes*, not test state)
@@ -32,33 +32,31 @@ use mono_move_runtime::{InterpreterContext, ObjectDescriptor};
 //     [header(8)] [tag(1)] [padding(7)] [captured values packed]
 //   Payload = 8 + sum(captured sizes). No pointer offsets for these
 //   tests (captures are u64 scalars).
+//
+// Descriptor 0 is reserved for `Trivial`; descriptor 1 is reserved for
+// `Closure` and is used implicitly by `PackClosure` (no per-op id field).
 
-const CLOSURE_DESC: DescriptorId = DescriptorId(0);
-const CAPTURED_0: DescriptorId = DescriptorId(1);
-const CAPTURED_1_U64: DescriptorId = DescriptorId(2);
-const CAPTURED_2_U64: DescriptorId = DescriptorId(3);
-const VEC_U64_DESC: DescriptorId = DescriptorId(4);
+/// Bundle of the descriptor table and the named ids it returns. Each test
+/// calls [`test_descriptors`] once at the top and threads the captured ids
+/// into its `PackClosure` / `VecPushBack` micro-ops.
+struct TestDescriptors {
+    table: ObjectDescriptorTable,
+    desc_captured_1_u64: DescriptorId,
+    desc_captured_2_u64: DescriptorId,
+    desc_vec_u64: DescriptorId,
+}
 
-fn test_descriptors() -> Vec<ObjectDescriptor> {
-    vec![
-        ObjectDescriptor::Closure,
-        ObjectDescriptor::CapturedData {
-            size: 0, // no captured values
-            pointer_offsets: vec![],
-        },
-        ObjectDescriptor::CapturedData {
-            size: 8, // 1 * u64
-            pointer_offsets: vec![],
-        },
-        ObjectDescriptor::CapturedData {
-            size: 16, // 2 * u64
-            pointer_offsets: vec![],
-        },
-        ObjectDescriptor::Vector {
-            elem_size: 8,
-            elem_pointer_offsets: vec![],
-        },
-    ]
+fn test_descriptors() -> TestDescriptors {
+    let mut table = ObjectDescriptorTable::new();
+    let desc_captured_1_u64 = table.push(ObjectDescriptor::new_captured_data(8, vec![]).unwrap());
+    let desc_captured_2_u64 = table.push(ObjectDescriptor::new_captured_data(16, vec![]).unwrap());
+    let desc_vec_u64 = table.push(ObjectDescriptor::new_vector(8, vec![]).unwrap());
+    TestDescriptors {
+        table,
+        desc_captured_1_u64,
+        desc_captured_2_u64,
+        desc_vec_u64,
+    }
 }
 
 // ---------------------------------------------------------------------------
@@ -239,6 +237,7 @@ fn identity_no_captures() {
     let args_and_locals: usize = 24;
     let callee_arg0 = FO((args_and_locals + FRAME_METADATA_SIZE) as u32);
 
+    let descs = test_descriptors();
     let arena = ExecutableArena::new();
     let identity = make_identity(&arena);
 
@@ -253,8 +252,7 @@ fn identity_no_captures() {
                 dst: closure,
                 func_ref: ClosureFuncRef::Resolved(identity),
                 mask: 0,
-                closure_descriptor_id: CLOSURE_DESC,
-                captured_data_descriptor_id: CAPTURED_0,
+                captured_data_descriptor_id: None,
                 captured: vec![],
             })),
             MicroOp::CallClosure(Box::new(CallClosureOp {
@@ -279,8 +277,7 @@ fn identity_no_captures() {
         safe_point_layouts: SortedSafePointEntries::empty(),
     });
 
-    let result =
-        run_main_and_get_u64_result(unsafe { main.as_ref_unchecked() }, &test_descriptors());
+    let result = run_main_and_get_u64_result(unsafe { main.as_ref_unchecked() }, &descs.table);
     assert_eq!(result, 42);
 }
 
@@ -310,6 +307,7 @@ fn add_captured_a_provided_b() {
     let args_and_locals: usize = 32;
     let callee_arg0 = FO((args_and_locals + FRAME_METADATA_SIZE) as u32);
 
+    let descs = test_descriptors();
     let arena = ExecutableArena::new();
     let add = make_add_u64(&arena);
 
@@ -322,8 +320,7 @@ fn add_captured_a_provided_b() {
                 dst: closure,
                 func_ref: ClosureFuncRef::Resolved(add),
                 mask: 0b01, // capture position 0
-                closure_descriptor_id: CLOSURE_DESC,
-                captured_data_descriptor_id: CAPTURED_1_U64,
+                captured_data_descriptor_id: Some(descs.desc_captured_1_u64),
                 captured: vec![SizedSlot { offset: a, size: 8 }],
             })),
             MicroOp::CallClosure(Box::new(CallClosureOp {
@@ -345,8 +342,7 @@ fn add_captured_a_provided_b() {
         safe_point_layouts: SortedSafePointEntries::empty(),
     });
 
-    let result =
-        run_main_and_get_u64_result(unsafe { main.as_ref_unchecked() }, &test_descriptors());
+    let result = run_main_and_get_u64_result(unsafe { main.as_ref_unchecked() }, &descs.table);
     assert_eq!(result, 42);
 }
 
@@ -369,6 +365,7 @@ fn add_provided_a_captured_b() {
     let args_and_locals: usize = 32;
     let callee_arg0 = FO((args_and_locals + FRAME_METADATA_SIZE) as u32);
 
+    let descs = test_descriptors();
     let arena = ExecutableArena::new();
     let add = make_add_u64(&arena);
 
@@ -381,8 +378,7 @@ fn add_provided_a_captured_b() {
                 dst: closure,
                 func_ref: ClosureFuncRef::Resolved(add),
                 mask: 0b10, // capture position 1
-                closure_descriptor_id: CLOSURE_DESC,
-                captured_data_descriptor_id: CAPTURED_1_U64,
+                captured_data_descriptor_id: Some(descs.desc_captured_1_u64),
                 captured: vec![SizedSlot { offset: b, size: 8 }],
             })),
             MicroOp::CallClosure(Box::new(CallClosureOp {
@@ -404,8 +400,7 @@ fn add_provided_a_captured_b() {
         safe_point_layouts: SortedSafePointEntries::empty(),
     });
 
-    let result =
-        run_main_and_get_u64_result(unsafe { main.as_ref_unchecked() }, &test_descriptors());
+    let result = run_main_and_get_u64_result(unsafe { main.as_ref_unchecked() }, &descs.table);
     assert_eq!(result, 42);
 }
 
@@ -428,6 +423,7 @@ fn add_all_captured() {
     let args_and_locals: usize = 32;
     let callee_arg0 = FO((args_and_locals + FRAME_METADATA_SIZE) as u32);
 
+    let descs = test_descriptors();
     let arena = ExecutableArena::new();
     let add = make_add_u64(&arena);
 
@@ -440,8 +436,7 @@ fn add_all_captured() {
                 dst: closure,
                 func_ref: ClosureFuncRef::Resolved(add),
                 mask: 0b11,
-                closure_descriptor_id: CLOSURE_DESC,
-                captured_data_descriptor_id: CAPTURED_2_U64,
+                captured_data_descriptor_id: Some(descs.desc_captured_2_u64),
                 captured: vec![SizedSlot { offset: a, size: 8 }, SizedSlot {
                     offset: b,
                     size: 8,
@@ -466,8 +461,7 @@ fn add_all_captured() {
         safe_point_layouts: SortedSafePointEntries::empty(),
     });
 
-    let result =
-        run_main_and_get_u64_result(unsafe { main.as_ref_unchecked() }, &test_descriptors());
+    let result = run_main_and_get_u64_result(unsafe { main.as_ref_unchecked() }, &descs.table);
     assert_eq!(result, 42);
 }
 
@@ -516,6 +510,7 @@ fn vector_map_add_captured() {
     let n: u64 = 3;
     let y_val: u64 = 10;
 
+    let descs = test_descriptors();
     let arena = ExecutableArena::new();
     let add = make_add_u64(&arena);
     let vector_map = make_vector_map(&arena);
@@ -537,21 +532,21 @@ fn vector_map_add_captured() {
                 vec_ref,
                 elem: tmp,
                 elem_size: 8,
-                descriptor_id: VEC_U64_DESC,
+                descriptor_id: descs.desc_vec_u64,
             },
             StoreImm8 { dst: tmp, imm: 3 },
             VecPushBack {
                 vec_ref,
                 elem: tmp,
                 elem_size: 8,
-                descriptor_id: VEC_U64_DESC,
+                descriptor_id: descs.desc_vec_u64,
             },
             StoreImm8 { dst: tmp, imm: 4 },
             VecPushBack {
                 vec_ref,
                 elem: tmp,
                 elem_size: 8,
-                descriptor_id: VEC_U64_DESC,
+                descriptor_id: descs.desc_vec_u64,
             },
             // === Pack closure: `|x| x + y`, wrapping add_u64 with `b` captured ===
             // pc 8: y = 10
@@ -561,8 +556,7 @@ fn vector_map_add_captured() {
                 dst: closure,
                 func_ref: ClosureFuncRef::Resolved(add),
                 mask: 0b10,
-                closure_descriptor_id: CLOSURE_DESC,
-                captured_data_descriptor_id: CAPTURED_1_U64,
+                captured_data_descriptor_id: Some(descs.desc_captured_1_u64),
                 captured: vec![SizedSlot { offset: y, size: 8 }],
             })),
             // === Call vector_map(vec, closure, n) ===
@@ -630,7 +624,6 @@ fn vector_map_add_captured() {
         safe_point_layouts: SortedSafePointEntries::empty(),
     });
 
-    let result =
-        run_main_and_get_u64_result(unsafe { main.as_ref_unchecked() }, &test_descriptors());
+    let result = run_main_and_get_u64_result(unsafe { main.as_ref_unchecked() }, &descs.table);
     assert_eq!(result, (2 + y_val) + (3 + y_val) + (4 + y_val));
 }

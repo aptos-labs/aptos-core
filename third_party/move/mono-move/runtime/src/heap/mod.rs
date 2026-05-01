@@ -9,16 +9,18 @@
 //! into [`PinnedRoots`]) while still invoking allocation paths that mutate
 //! only the heap.
 
+pub(crate) mod object_descriptor;
 pub(crate) mod pinned_roots;
 
 use crate::{
     bail,
     error::ExecutionResult,
+    heap::object_descriptor::{ObjectDescriptor, ObjectDescriptorInner},
     memory::{read_ptr, read_u32, read_u64, write_ptr, write_u32, write_u64, MemoryRegion},
     types::{
-        ObjectDescriptor, DEFAULT_HEAP_SIZE, FORWARDED_MARKER, HEADER_DESCRIPTOR_OFFSET,
-        HEADER_SIZE_OFFSET, META_SAVED_FP_OFFSET, META_SAVED_FUNC_PTR_OFFSET, META_SAVED_PC_OFFSET,
-        VEC_DATA_OFFSET, VEC_LENGTH_OFFSET,
+        DEFAULT_HEAP_SIZE, FORWARDED_MARKER, HEADER_DESCRIPTOR_OFFSET, HEADER_SIZE_OFFSET,
+        META_SAVED_FP_OFFSET, META_SAVED_FUNC_PTR_OFFSET, META_SAVED_PC_OFFSET, VEC_DATA_OFFSET,
+        VEC_LENGTH_OFFSET,
     },
 };
 use mono_move_core::{
@@ -283,15 +285,15 @@ pub(crate) fn alloc_obj(
     pc: usize,
     descriptor_id: DescriptorId,
 ) -> ExecutionResult<*mut u8> {
-    let payload_size = match &descriptors[descriptor_id.as_usize()] {
-        ObjectDescriptor::Struct { size, .. } => *size as usize,
-        ObjectDescriptor::Enum { size, .. } => *size as usize,
-        ObjectDescriptor::Closure => CLOSURE_OBJECT_SIZE - OBJECT_HEADER_SIZE,
-        ObjectDescriptor::CapturedData { size, .. } => {
+    let payload_size = match descriptors[descriptor_id.as_usize()].inner() {
+        ObjectDescriptorInner::Struct { size, .. } => *size as usize,
+        ObjectDescriptorInner::Enum { size, .. } => *size as usize,
+        ObjectDescriptorInner::Closure => CLOSURE_OBJECT_SIZE - OBJECT_HEADER_SIZE,
+        ObjectDescriptorInner::CapturedData { size, .. } => {
             // Add the 8-byte tag+padding prefix to the values-region size.
             (CAPTURED_DATA_VALUES_OFFSET - OBJECT_HEADER_SIZE) + *size as usize
         },
-        ObjectDescriptor::Trivial | ObjectDescriptor::Vector { .. } => bail!(
+        ObjectDescriptorInner::Trivial | ObjectDescriptorInner::Vector { .. } => bail!(
             "alloc_obj called with non-allocatable descriptor {}",
             descriptor_id
         ),
@@ -622,9 +624,9 @@ fn gc_scan_object(
         return;
     };
 
-    match desc {
-        ObjectDescriptor::Trivial => {},
-        ObjectDescriptor::Vector {
+    match desc.inner() {
+        ObjectDescriptorInner::Trivial => {},
+        ObjectDescriptorInner::Vector {
             elem_size,
             elem_pointer_offsets,
         } => {
@@ -648,7 +650,7 @@ fn gc_scan_object(
                 }
             }
         },
-        ObjectDescriptor::Struct {
+        ObjectDescriptorInner::Struct {
             pointer_offsets, ..
         } => {
             if pointer_offsets.is_empty() {
@@ -664,7 +666,7 @@ fn gc_scan_object(
                 }
             }
         },
-        ObjectDescriptor::Enum {
+        ObjectDescriptorInner::Enum {
             variant_pointer_offsets,
             ..
         } => unsafe {
@@ -684,7 +686,7 @@ fn gc_scan_object(
                 }
             }
         },
-        ObjectDescriptor::Closure => unsafe {
+        ObjectDescriptorInner::Closure => unsafe {
             // The closure's only heap pointer is `captured_data_ptr` at a
             // fixed payload offset.
             let off = CLOSURE_CAPTURED_DATA_PTR_OFFSET;
@@ -694,7 +696,7 @@ fn gc_scan_object(
                 write_ptr(obj_ptr, off, new_ptr);
             }
         },
-        ObjectDescriptor::CapturedData {
+        ObjectDescriptorInner::CapturedData {
             pointer_offsets, ..
         } => {
             if pointer_offsets.is_empty() {

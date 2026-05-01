@@ -23,11 +23,12 @@
 
 use mono_move_alloc::{ExecutableArena, ExecutableArenaPtr, GlobalArenaPtr};
 use mono_move_core::{
-    CodeOffset as CO, DescriptorId, FrameLayoutInfo, FrameOffset as FO, Function,
-    LocalExecutionContext, MicroOp, SortedSafePointEntries, STRUCT_DATA_OFFSET,
+    CodeOffset as CO, FrameLayoutInfo, FrameOffset as FO, Function, LocalExecutionContext, MicroOp,
+    SortedSafePointEntries, STRUCT_DATA_OFFSET,
 };
 use mono_move_runtime::{
-    read_ptr, read_u64, InterpreterContext, ObjectDescriptor, VEC_DATA_OFFSET, VEC_LENGTH_OFFSET,
+    read_ptr, read_u64, InterpreterContext, ObjectDescriptor, ObjectDescriptorTable,
+    VEC_DATA_OFFSET, VEC_LENGTH_OFFSET,
 };
 use rand::{rngs::StdRng, Rng, SeedableRng};
 
@@ -98,9 +99,14 @@ fn make_gc_stress_program(
     max_len: u64,
 ) -> (
     Vec<Option<ExecutableArenaPtr<Function>>>,
-    Vec<ObjectDescriptor>,
+    ObjectDescriptorTable,
 ) {
     use MicroOp::*;
+
+    let mut descriptors = ObjectDescriptorTable::new();
+    let desc_entry_struct = descriptors.push(ObjectDescriptor::new_struct(16, vec![8]).unwrap());
+    let desc_outer_vec = descriptors.push(ObjectDescriptor::new_vector(8, vec![0]).unwrap());
+    let desc_inner_vec = descriptors.push(ObjectDescriptor::new_vector(8, vec![]).unwrap());
 
     // -- Function 1: make_entry(val) -> entry_ptr --
     let callee_val: u32 = 0;
@@ -110,14 +116,10 @@ fn make_gc_stress_program(
 
     #[rustfmt::skip]
     let make_entry_code = arena.alloc_slice_fill_iter([
-        // PC 0: vec = VecNew(descriptor=0, elem_size=8)
         VecNew { dst: FO(callee_vec) },
-        // PC 1: vec_ref = SlotBorrow(vec)
         SlotBorrow { dst: FO(callee_vec_ref), local: FO(callee_vec) },
-        // PC 2: VecPushBack(vec_ref, val)
-        VecPushBack { vec_ref: FO(callee_vec_ref), elem: FO(callee_val), elem_size: 8, descriptor_id: DescriptorId(0) },
-        // PC 3: entry = HeapNew(descriptor=1)
-        HeapNew { dst: FO(callee_entry), descriptor_id: DescriptorId(1) },
+        VecPushBack { vec_ref: FO(callee_vec_ref), elem: FO(callee_val), elem_size: 8, descriptor_id: desc_inner_vec },
+        HeapNew { dst: FO(callee_entry), descriptor_id: desc_entry_struct },
         // PC 4: entry.key = val
         MicroOp::struct_store8(FO(callee_entry), 0, FO(callee_val)),
         // PC 5: entry.values = vec
@@ -189,7 +191,7 @@ fn make_gc_stress_program(
         // PC 13: if len >= max_len: goto REPLACE (PC 16)
         JumpGreaterEqualU64Imm { target: CO(16), src: FO(len), imm: max_len },
         // ---- PUSH (PC 14) ----
-        VecPushBack { vec_ref: FO(outer_vec_ref), elem: FO(entry_ptr), elem_size: 8, descriptor_id: DescriptorId(2) },
+        VecPushBack { vec_ref: FO(outer_vec_ref), elem: FO(entry_ptr), elem_size: 8, descriptor_id: desc_outer_vec },
         // PC 15: goto NEXT (PC 28)
         Jump { target: CO(28) },
 
@@ -248,21 +250,6 @@ fn make_gc_stress_program(
         safe_point_layouts: SortedSafePointEntries::empty(),
     });
 
-    let descriptors = vec![
-        // Descriptor 0: trivial — inner vectors hold plain u64 values
-        ObjectDescriptor::Trivial,
-        // Descriptor 1: Entry struct { key: u64, values: *vec }
-        ObjectDescriptor::Struct {
-            size: 16,
-            pointer_offsets: vec![8],
-        },
-        // Descriptor 2: outer vector whose 8-byte elements are heap pointers (to Entry structs)
-        ObjectDescriptor::Vector {
-            elem_size: 8,
-            elem_pointer_offsets: vec![0],
-        },
-    ];
-
     (vec![Some(main_func), Some(callee_func)], descriptors)
 }
 
@@ -307,6 +294,7 @@ fn gc_stress() {
     let (functions, descriptors) = make_gc_stress_program(&arena, n, max_len);
     // SAFETY: Exclusive access during test setup; arena is alive.
     unsafe { Function::resolve_calls(&functions) };
+
     let mut exec_ctx = LocalExecutionContext::with_max_budget();
     let mut ctx = InterpreterContext::with_heap_size(
         &mut exec_ctx,

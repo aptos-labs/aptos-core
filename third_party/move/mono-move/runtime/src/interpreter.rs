@@ -9,12 +9,13 @@ use crate::{
     error::ExecutionResult,
     heap::{
         macros::{alloc_obj, alloc_vec, gc_collect, grow_vec_ref},
+        object_descriptor::{ObjectDescriptor, CLOSURE_DESCRIPTOR_ID},
         pinned_roots::PinnedRoots,
         Heap,
     },
     memory::{read_ptr, read_u32, read_u64, vec_elem_ptr, write_ptr, write_u64, MemoryRegion},
     types::{
-        ObjectDescriptor, StepResult, DEFAULT_HEAP_SIZE, DEFAULT_STACK_SIZE, HEADER_SIZE_OFFSET,
+        StepResult, DEFAULT_HEAP_SIZE, DEFAULT_STACK_SIZE, HEADER_SIZE_OFFSET,
         META_SAVED_FP_OFFSET, META_SAVED_FUNC_PTR_OFFSET, META_SAVED_PC_OFFSET, VEC_DATA_OFFSET,
         VEC_LENGTH_OFFSET,
     },
@@ -727,7 +728,7 @@ impl<T: ExecutionContext> InterpreterContext<'_, T> {
             // and leave `captured_data_ptr` as the zeroed/null value written
             // by `alloc_obj`. No pinning needed — only one allocation.
             if op.captured.is_empty() {
-                let closure = alloc_obj!(self, fp, op.closure_descriptor_id)?;
+                let closure = alloc_obj!(self, fp, CLOSURE_DESCRIPTOR_ID)?;
                 self.write_closure_func_ref_and_mask(closure, op);
                 write_ptr(fp, op.dst, closure);
                 return Ok(());
@@ -741,12 +742,17 @@ impl<T: ExecutionContext> InterpreterContext<'_, T> {
             // skipped). Pinning keeps the closure live across the second
             // allocation and lets GC update the pinned slot in-place if
             // the object is relocated.
-            let closure_ptr = alloc_obj!(self, fp, op.closure_descriptor_id)?;
+            let closure_ptr = alloc_obj!(self, fp, CLOSURE_DESCRIPTOR_ID)?;
             let pin = self.pinned_roots.pin(NonNull::new_unchecked(closure_ptr));
 
             self.write_closure_func_ref_and_mask(pin.get().as_ptr(), op);
 
-            let captured_data = alloc_obj!(self, fp, op.captured_data_descriptor_id)?;
+            // SAFETY: the verifier guarantees `captured_data_descriptor_id`
+            // is `Some(CapturedData)` whenever `captured` is non-empty.
+            let captured_desc_id = op
+                .captured_data_descriptor_id
+                .expect("verifier ensures Some when captured is non-empty");
+            let captured_data = alloc_obj!(self, fp, captured_desc_id)?;
             *captured_data.add(CAPTURED_DATA_TAG_OFFSET) = CAPTURED_DATA_TAG_MATERIALIZED;
 
             let mut captured_offset = CAPTURED_DATA_VALUES_OFFSET;

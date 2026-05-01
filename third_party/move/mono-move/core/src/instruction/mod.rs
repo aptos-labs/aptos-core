@@ -214,10 +214,13 @@ pub struct PackClosureOp {
     pub func_ref: ClosureFuncRef,
     /// Bitmask of which function parameters are captured vs provided.
     pub mask: u64,
-    /// Descriptor for the allocated closure object.
-    pub closure_descriptor_id: DescriptorId,
-    /// Descriptor for the allocated `ClosureCapturedData` (Materialized) object.
-    pub captured_data_descriptor_id: DescriptorId,
+    /// Descriptor for the allocated `ClosureCapturedData` (Materialized)
+    /// object. `Some` iff this closure captures at least one value;
+    /// otherwise `None` and no captured-data object is allocated.
+    ///
+    /// The closure object's own descriptor is implicit: it is always the
+    /// reserved `CLOSURE_DESCRIPTOR_ID` slot in the descriptor table.
+    pub captured_data_descriptor_id: Option<DescriptorId>,
     /// Sources (in caller's frame) of the captured values, in the order that
     /// `mask.is_captured(i)` is true — i.e. ascending `i` through the
     /// function's parameter list.
@@ -921,9 +924,14 @@ impl fmt::Display for MicroOp {
             MicroOp::PackClosure(op) => {
                 write!(
                     f,
-                    "PackClosure [{}] <- func_ref={:?}, mask={:b}, closure_desc={}, captured_desc={}, captured=[",
-                    op.dst.0, op.func_ref, op.mask, op.closure_descriptor_id, op.captured_data_descriptor_id
+                    "PackClosure [{}] <- func_ref={:?}, mask={:b}, captured_desc=",
+                    op.dst.0, op.func_ref, op.mask
                 )?;
+                match op.captured_data_descriptor_id {
+                    Some(id) => write!(f, "{}", id)?,
+                    None => write!(f, "<none>")?,
+                }
+                write!(f, ", captured=[")?;
                 for (i, slot) in op.captured.iter().enumerate() {
                     if i > 0 {
                         write!(f, ", ")?;

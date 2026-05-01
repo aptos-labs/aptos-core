@@ -1,17 +1,19 @@
 // Copyright (c) Aptos Foundation
 // Licensed pursuant to the Innovation-Enabling Source Code License, available at https://github.com/aptos-labs/aptos-core/blob/main/LICENSE
 
-//! Tests for the static verifier (`verify_function`).
+//! Tests for the static verifier (`verify_function`, `verify_descriptors`).
 
 use mono_move_alloc::{ExecutableArena, ExecutableArenaPtr, GlobalArenaPtr};
 use mono_move_core::{
     CodeOffset as CO, DescriptorId, FrameLayoutInfo, FrameOffset as FO, Function, MicroOp,
     SortedSafePointEntries,
 };
-use mono_move_runtime::{verify_function, ObjectDescriptor};
+use mono_move_runtime::{verify_function, ObjectDescriptor, ObjectDescriptorTable};
 
-fn trivial_descriptors() -> Vec<ObjectDescriptor> {
-    vec![ObjectDescriptor::Trivial]
+fn trivial_descriptors() -> ObjectDescriptorTable {
+    let mut t = ObjectDescriptorTable::new();
+    t.push(ObjectDescriptor::new_vector(8, vec![]).unwrap());
+    t
 }
 
 /// A minimal well-formed function: one `Return`, param_and_local_sizes_sum 8.
@@ -90,7 +92,7 @@ fn valid_with_vec_and_pointer_slots() {
         VecNew { dst: FO(0) },
         SlotBorrow { dst: FO(16), local: FO(0) },
         StoreImm8 { dst: FO(8), imm: 42 },
-        VecPushBack { vec_ref: FO(16), elem: FO(8), elem_size: 8, descriptor_id: DescriptorId(0) },
+        VecPushBack { vec_ref: FO(16), elem: FO(8), elem_size: 8, descriptor_id: DescriptorId(2) },
         Return,
     ]);
     // SAFETY: Arena is alive for the duration of the test.
@@ -630,4 +632,85 @@ fn multiple_errors_collected() {
         "expected at least 2 errors, got {}",
         errors.len()
     );
+}
+
+// ---------------------------------------------------------------------------
+// Op/variant tightening
+//
+// Descriptor table self-soundness (reserved indices, nonzero sizes,
+// in-bounds pointer offsets, etc.) is now enforced structurally by
+// `ObjectDescriptorTable`; see its unit tests in `runtime/src/types.rs`.
+// ---------------------------------------------------------------------------
+
+#[test]
+fn vec_pushback_must_target_vector_descriptor() {
+    use MicroOp::*;
+    let arena = ExecutableArena::new();
+    // SAFETY: arena outlives the test.
+    let func = unsafe {
+        arena
+            .alloc(Function {
+                name: GlobalArenaPtr::from_static("test"),
+                code: arena.alloc_slice_fill_iter([
+                    VecNew { dst: FO(0) },
+                    SlotBorrow {
+                        dst: FO(16),
+                        local: FO(0),
+                    },
+                    StoreImm8 { dst: FO(8), imm: 1 },
+                    VecPushBack {
+                        vec_ref: FO(16),
+                        elem: FO(8),
+                        elem_size: 8,
+                        descriptor_id: DescriptorId(0), // Trivial — wrong variant
+                    },
+                    Return,
+                ]),
+                param_sizes: ExecutableArenaPtr::empty_slice(),
+                param_sizes_sum: 0,
+                param_and_local_sizes_sum: 32,
+                extended_frame_size: 56,
+                zero_frame: true,
+                frame_layout: FrameLayoutInfo::new(&arena, [FO(0)]),
+                safe_point_layouts: SortedSafePointEntries::empty(),
+            })
+            .as_ref_unchecked()
+    };
+    let errors = verify_function(func, &trivial_descriptors());
+    assert!(errors
+        .iter()
+        .any(|e| e.message.contains("VecPushBack") && e.message.contains("not a Vector")));
+}
+
+#[test]
+fn heap_new_rejects_vector_descriptor() {
+    use MicroOp::*;
+    let arena = ExecutableArena::new();
+    // trivial_descriptors() has Vector at index 2.
+    // SAFETY: arena outlives the test.
+    let func = unsafe {
+        arena
+            .alloc(Function {
+                name: GlobalArenaPtr::from_static("test"),
+                code: arena.alloc_slice_fill_iter([
+                    HeapNew {
+                        dst: FO(0),
+                        descriptor_id: DescriptorId(2),
+                    },
+                    Return,
+                ]),
+                param_sizes: ExecutableArenaPtr::empty_slice(),
+                param_sizes_sum: 0,
+                param_and_local_sizes_sum: 8,
+                extended_frame_size: 32,
+                zero_frame: true,
+                frame_layout: FrameLayoutInfo::new(&arena, [FO(0)]),
+                safe_point_layouts: SortedSafePointEntries::empty(),
+            })
+            .as_ref_unchecked()
+    };
+    let errors = verify_function(func, &trivial_descriptors());
+    assert!(errors
+        .iter()
+        .any(|e| e.message.contains("not a Struct or Enum")));
 }
