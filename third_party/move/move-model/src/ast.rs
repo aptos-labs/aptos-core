@@ -620,6 +620,11 @@ impl Spec {
         for exp in self.proof_exps() {
             result.append(&mut exp.used_funs_with_uses())
         }
+        if let Some(fs) = &self.frame_spec {
+            for target in &fs.modifies_targets {
+                result.append(&mut target.used_funs_with_uses())
+            }
+        }
         result
     }
 
