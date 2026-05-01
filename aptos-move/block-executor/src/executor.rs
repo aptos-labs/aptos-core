@@ -102,6 +102,11 @@ pub struct BlockExecutor<T, E, S, L, TP, A> {
     // Number of active concurrent tasks, corresponding to the maximum number of rayon
     // threads that may be concurrently participating in parallel execution.
     config: BlockExecutorConfig,
+    // Retained for API compatibility with callers (aptos-vm, sharded exec, tests)
+    // that construct and pass it. Block-STM itself no longer dispatches work
+    // onto this pool; workers run on `std::thread::scope` — see the deadlock
+    // note on the scope sites below.
+    #[allow(dead_code)]
     executor_thread_pool: Arc<rayon::ThreadPool>,
     transaction_commit_hook: Option<L>,
     phantom: PhantomData<fn() -> (T, E, S, L, TP, A)>,
@@ -1854,9 +1859,17 @@ where
         let timer = RAYON_EXECUTION_SECONDS.start_timer();
         let worker_ids: Vec<u32> = (0..num_workers).collect();
         let maybe_executor = ExplicitSyncWrapper::new(None);
-        self.executor_thread_pool.scope(|s| {
+        // Block-STM workers run as plain OS threads, not rayon workers. This
+        // is deliberate: a rayon worker that enters a native calling
+        // `par_iter` / `rayon::scope` (transitively via ark-ec / ark-ff etc.)
+        // will have rayon work-steal sibling `worker_loop` tasks onto it via
+        // `WorkerThread::wait_until_cold`. Combined with writer-preferring
+        // per-txn RwLocks, that closes into a deadlock. Plain `std::thread`
+        // workers are not part of any rayon registry, so rayon cannot steal
+        // block-executor jobs onto them.
+        std::thread::scope(|s| {
             for worker_id in &worker_ids {
-                s.spawn(|_| {
+                s.spawn(|| {
                     let environment = module_cache_manager_guard.environment();
                     let executor = {
                         let _init_timer = VM_INIT_SECONDS.start_timer();
@@ -2024,9 +2037,11 @@ where
             worker_ids.len() as u32,
         );
 
-        self.executor_thread_pool.scope(|s| {
+        // See BlockSTMv2 site above for why we use `std::thread::scope` here
+        // rather than the rayon pool.
+        std::thread::scope(|s| {
             for worker_id in &worker_ids {
-                s.spawn(|_| {
+                s.spawn(|| {
                     let environment = module_cache_manager_guard.environment();
                     let executor = {
                         let _init_timer = VM_INIT_SECONDS.start_timer();
