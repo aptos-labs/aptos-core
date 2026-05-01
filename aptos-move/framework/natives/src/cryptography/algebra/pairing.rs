@@ -77,7 +77,7 @@ macro_rules! pairing_internal {
         let g2_element_affine = g2_element.into_affine();
         $context.charge($pairing_gas_cost)?;
         let new_element =
-            with_native_rayon(|| <$pairing>::pairing(g1_element_affine, g2_element_affine)).0;
+            with_native_rayon(move || <$pairing>::pairing(g1_element_affine, g2_element_affine))?.0;
         let new_handle = store_element!($context, new_element)?;
         Ok(smallvec![Value::u64(new_handle as u64)])
     }};
@@ -121,9 +121,10 @@ macro_rules! multi_pairing_internal {
             $multi_pairing_base_gas
                 + $multi_pairing_per_pair_gas * NumArgs::from(num_entries as u64),
         )?;
-        let new_element =
-            with_native_rayon(|| <$pairing>::multi_pairing(g1_elements_affine, g2_elements_affine))
-                .0;
+        let new_element = with_native_rayon(move || {
+            <$pairing>::multi_pairing(g1_elements_affine, g2_elements_affine)
+        })?
+        .0;
         let new_handle = store_element!($context, new_element)?;
         Ok(smallvec![Value::u64(new_handle as u64)])
     }};
