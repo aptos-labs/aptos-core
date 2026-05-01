@@ -552,6 +552,240 @@ impl ReputationHeuristic for ProposerAndVoterHeuristic {
     }
 }
 
+/// A heuristic that wraps `ProposerAndVoterHeuristic` but additionally scales active-validator
+/// weights down based on their historical round-time performance. Validators with slow round
+/// times (i.e. those that take longer to produce a committed block, including timeouts
+/// attributed to them via `failed_proposer_indices`) get a proportionally lower chance of
+/// being selected as leader. Healthy validators are not boosted — they keep their base
+/// active weight.
+///
+/// ## Penalty formula
+///
+/// For every active validator we compute the mean interval between consecutive committed
+/// blocks in the history window:
+/// * Successful pairs are split 50/50 between the two adjacent proposers.
+/// * Timeout-spanning gaps are attributed in full to the failed proposers
+///   (via `failed_proposer_indices`).
+///
+/// We use the **median** of all observed per-validator means as the reference point, with a
+/// **deadband** zone around the median where no penalty is applied. The per-validator
+/// weight is:
+///
+///   if ratio <= LATENCY_DEADBAND: factor = 1.0
+///   else: factor = 1.0 / (ratio / LATENCY_DEADBAND).min(MAX_LATENCY_RATIO).powf(multiplier)
+///   weight = active_weight * factor
+///
+///   where ratio = val_mean / median_mean
+///
+/// Properties:
+/// * Validators within `LATENCY_DEADBAND` of the median (e.g., 1.3× = 30% above median):
+///   `factor = 1.0` (no penalty). This protects healthy validators with natural variance
+///   from being penalized for noise. Critical for n-small experimental setups where
+///   geographic outliers' ratios sit in the 1.2-1.5 range.
+/// * Validators above the deadband: penalized by `(ratio/deadband)^multiplier`. The
+///   slowest validator gets the lowest weight. The exponential growth past the deadband
+///   gives strong suppression on truly-slow validators (high `ratio`).
+/// * Penalty ratio is clamped at `MAX_LATENCY_RATIO` to bound suppression. Set tighter
+///   than the previous formula because real-world ratio distributions are compressed
+///   (mainnet: max ~2.5×) and only forge synthetic outliers exceed a few × median.
+///
+/// ## Carry-forward for validators with no observations
+///
+/// A validator with `< MIN_OBSERVATIONS` round-time samples in the window does NOT fall back
+/// to the base active weight (the previous behavior). Instead, we apply the **last computed
+/// factor** for that validator (stored in `last_factor`). This breaks the oscillation cycle
+/// where a successfully-suppressed slow validator would pop back to full weight as soon as
+/// our successful suppression denied it observations:
+///
+///   * fresh observations → recompute factor, store it
+///   * no fresh observations → carry-forward the previous factor
+///   * never seen before → factor = 1.0 (benefit of doubt for newly-rotated-in validators)
+///
+/// State is per-epoch (the heuristic is reconstructed on epoch change), so cross-epoch
+/// rotation is naturally handled.
+pub struct LatencyWeightedHeuristic {
+    inner: ProposerAndVoterHeuristic,
+    active_weight: u64,
+    multiplier: f64,
+    /// Carry-forward state: last computed weight factor per author (guarded for &self
+    /// access). Mutated only inside `get_weights`.
+    last_factor: Mutex<HashMap<Author, f64>>,
+}
+
+/// Minimum number of round-time observations needed before a validator is scaled by the
+/// latency-weighted heuristic; below this we apply the carry-forward factor (or 1.0 for
+/// validators we have never observed).
+const MIN_OBSERVATIONS: usize = 2;
+
+/// Deadband zone: validators with `val_mean / median_mean <= LATENCY_DEADBAND` get factor
+/// 1.0 (no penalty). This protects healthy validators with natural variance from being
+/// penalized for noise. Set to 1.3 = "within 30% of median is healthy" based on mainnet
+/// observation that the P50→P90 spread is ~2× and P50→worst is ~2.5×, so tracking
+/// validators in the 1.0-1.3 band as "healthy" cleanly separates noise from real outliers.
+const LATENCY_DEADBAND: f64 = 1.3;
+
+/// Hard ceiling on the per-validator scaling ratio (post-deadband) used to bound how
+/// aggressively a single anomalously-slow validator can be suppressed. Tightened from the
+/// previous 10.0 because real-world ratios are compressed: mainnet's max observed ratio
+/// is ~2.5×, so anything above ~4× post-deadband is forge-synthetic, not a real-world
+/// validator. With multiplier=2.0 and MAX_LATENCY_RATIO=4, the floor factor is 1/16 = 0.0625.
+const MAX_LATENCY_RATIO: f64 = 4.0;
+
+impl LatencyWeightedHeuristic {
+    pub fn new(inner: ProposerAndVoterHeuristic, active_weight: u64, multiplier: f64) -> Self {
+        Self {
+            inner,
+            active_weight,
+            multiplier: if multiplier > 0.0 { multiplier } else { 1.0 },
+            last_factor: Mutex::new(HashMap::new()),
+        }
+    }
+
+    /// Compute per-proposer round-time observations from the history.
+    ///
+    /// History is ordered newest-first: `history[0]` is the latest block.
+    /// For each consecutive pair `(newer, older)` within the same epoch we compute
+    /// `interval = newer.proposed_time() - older.proposed_time()` and attribute it as follows:
+    /// * If `newer.failed_proposer_indices()` is empty the pair represents a clean
+    ///   consecutive-round commit: split the interval 50/50 between `newer.proposer()` and
+    ///   `older.proposer()`. Both contributed to closing the round (the older proposed it,
+    ///   the newer aggregated votes and built the next proposal), so each absorbs half.
+    /// * If `newer.failed_proposer_indices()` is non-empty the gap absorbed one or more
+    ///   timeouts: divide the full interval equally among the failed proposers (resolved via
+    ///   `epoch_to_candidates`) and attribute none of it to `newer`/`older`. The healthy
+    ///   adjacent proposers should not be penalized for absorbing someone else's timeout.
+    fn compute_round_times(
+        history: &[NewBlockEvent],
+        epoch_to_candidates: &HashMap<u64, Vec<Author>>,
+    ) -> HashMap<Author, Vec<u64>> {
+        let mut round_times: HashMap<Author, Vec<u64>> = HashMap::new();
+        for i in 0..history.len().saturating_sub(1) {
+            let newer = &history[i];
+            let older = &history[i + 1];
+            // Only compute within the same epoch to avoid epoch-boundary outliers.
+            if newer.epoch() != older.epoch() {
+                continue;
+            }
+            let interval = newer.proposed_time().saturating_sub(older.proposed_time());
+            if interval == 0 {
+                continue;
+            }
+
+            let failed = newer.failed_proposer_indices();
+            if failed.is_empty() {
+                // Successful pair: 50/50 split between the two adjacent proposers.
+                let half = interval / 2;
+                if half > 0 {
+                    round_times.entry(newer.proposer()).or_default().push(half);
+                    round_times.entry(older.proposer()).or_default().push(half);
+                }
+            } else {
+                // Timeout-spanning pair: attribute the full gap to the failed proposer(s).
+                let candidates = match epoch_to_candidates.get(&newer.epoch()) {
+                    Some(c) => c,
+                    None => continue,
+                };
+                let per_failure = interval / failed.len() as u64;
+                if per_failure > 0 {
+                    for &idx in failed {
+                        if let Some(author) = candidates.get(idx as usize) {
+                            round_times.entry(*author).or_default().push(per_failure);
+                        }
+                    }
+                }
+            }
+        }
+        round_times
+    }
+}
+
+impl ReputationHeuristic for LatencyWeightedHeuristic {
+    fn get_weights(
+        &self,
+        epoch: u64,
+        epoch_to_candidates: &HashMap<u64, Vec<Author>>,
+        history: &[NewBlockEvent],
+    ) -> Vec<u64> {
+        let base_weights = self.inner.get_weights(epoch, epoch_to_candidates, history);
+
+        let round_times = Self::compute_round_times(history, epoch_to_candidates);
+
+        // Per-validator mean round time, computed only for validators with enough data.
+        let means: HashMap<Author, u64> = round_times
+            .iter()
+            .filter(|(_, v)| v.len() >= MIN_OBSERVATIONS)
+            .map(|(a, v)| (*a, v.iter().sum::<u64>() / v.len() as u64))
+            .collect();
+
+        // Median of observed means is the reference point. Below median: no penalty.
+        // Above median: penalty proportional to ratio. We use median (rather than max)
+        // so that the slowest validator gets the LARGEST penalty rather than the base
+        // weight, and so that small variations among healthy validators do not
+        // exponentially amplify (the failure mode that made the old `max_mean / val_mean`
+        // formula fragile at multiplier > 2).
+        let median_mean = compute_median(&means);
+
+        let mut last_factor = self.last_factor.lock();
+
+        epoch_to_candidates[&epoch]
+            .iter()
+            .zip(base_weights.iter())
+            .map(|(author, &base)| {
+                // Only adjust the weight for validators that received the active weight.
+                // Inactive / failed-classified validators keep their base weight (the
+                // inner classifier is already handling those).
+                if base != self.active_weight {
+                    return base;
+                }
+
+                let factor = match (median_mean, means.get(author)) {
+                    (Some(median), Some(&val_mean)) if median > 0 && val_mean > 0 => {
+                        // Piecewise penalty:
+                        //   - ratio ≤ LATENCY_DEADBAND: factor = 1.0 (no penalty)
+                        //   - ratio > LATENCY_DEADBAND: factor = 1 / (ratio/deadband)^multiplier
+                        //     clamped at MAX_LATENCY_RATIO post-deadband
+                        // The deadband zone protects healthy validators from being
+                        // penalized for natural variance.
+                        let raw_ratio = val_mean as f64 / median as f64;
+                        let f = if raw_ratio <= LATENCY_DEADBAND {
+                            1.0
+                        } else {
+                            let shifted = (raw_ratio / LATENCY_DEADBAND).min(MAX_LATENCY_RATIO);
+                            1.0 / shifted.powf(self.multiplier)
+                        };
+                        // Persist for carry-forward when this validator next has no obs.
+                        last_factor.insert(*author, f);
+                        f
+                    },
+                    // No fresh observations (or degenerate median): apply carry-forward
+                    // factor if we have one for this validator, else 1.0 (benefit of doubt
+                    // for never-before-seen / newly-rotated-in validators).
+                    _ => last_factor.get(author).copied().unwrap_or(1.0),
+                };
+
+                (self.active_weight as f64 * factor) as u64
+            })
+            .collect()
+    }
+}
+
+/// Median of the observed per-validator means. `None` if there are no observations.
+fn compute_median(means: &HashMap<Author, u64>) -> Option<u64> {
+    if means.is_empty() {
+        return None;
+    }
+    let mut vals: Vec<u64> = means.values().copied().collect();
+    vals.sort_unstable();
+    let n = vals.len();
+    Some(
+        if n.is_multiple_of(2) {
+            (vals[n / 2 - 1] + vals[n / 2]) / 2
+        } else {
+            vals[n / 2]
+        },
+    )
+}
+
 /// Committed history based proposer election implementation that could help bias towards
 /// successful leaders to help improve performance.
 pub struct LeaderReputation {
