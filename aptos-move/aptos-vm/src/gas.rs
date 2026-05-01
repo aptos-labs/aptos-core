@@ -5,7 +5,7 @@ use crate::{move_vm_ext::AptosMoveResolver, transaction_metadata::TransactionMet
 use aptos_gas_algebra::{Gas, GasExpression, InternalGas};
 use aptos_gas_meter::{StandardGasAlgebra, StandardGasMeter};
 use aptos_gas_schedule::{
-    gas_feature_versions::{RELEASE_V1_13, RELEASE_V1_46},
+    gas_feature_versions::{RELEASE_V1_13, RELEASE_V1_45},
     gas_params::txn::{
         ENCRYPTED_TXN_DECRYPTION_BASE_COST, KEYLESS_BASE_COST, SLH_DSA_SHA2_128S_BASE_COST,
     },
@@ -152,7 +152,7 @@ pub(crate) fn check_gas(
         InternalGas::zero()
     };
     let encrypted_txn_cost =
-        if txn_metadata.is_encrypted_txn() && gas_feature_version >= RELEASE_V1_46 {
+        if txn_metadata.is_encrypted_txn() && gas_feature_version >= RELEASE_V1_45 {
             // Encrypted txns must meet a higher minimum gas unit price (priority pricing).
             // Uses max() so encrypted floor never goes below base minimum.
             let encrypted_min = std::cmp::max(
