@@ -5,10 +5,9 @@
 
 use mono_move_alloc::{ExecutableArena, ExecutableArenaPtr, GlobalArenaPtr};
 use mono_move_core::{
-    CodeOffset as CO, DescriptorId, FrameLayoutInfo, FrameOffset as FO, Function, MicroOp,
-    NoopTransactionContext, SortedSafePointEntries, ENUM_DATA_OFFSET, ENUM_TAG_OFFSET,
+    CodeOffset as CO, DescriptorId, FrameLayoutInfo, FrameOffset as FO, Function,
+    LocalExecutionContext, MicroOp, SortedSafePointEntries, ENUM_DATA_OFFSET, ENUM_TAG_OFFSET,
 };
-use mono_move_gas::SimpleGasMeter;
 use mono_move_runtime::{
     read_ptr, read_u64, InterpreterContext, ObjectDescriptor, VEC_DATA_OFFSET, VEC_LENGTH_OFFSET,
 };
@@ -57,9 +56,8 @@ fn enum_basic() {
         size: 24,
         variant_pointer_offsets: vec![vec![], vec![]],
     }];
-    let txn_ctx = NoopTransactionContext;
-    let gas_meter = SimpleGasMeter::new(u64::MAX);
-    let mut ctx = InterpreterContext::new(&txn_ctx, &descriptors, gas_meter, unsafe {
+    let mut exec_ctx = LocalExecutionContext::with_max_budget();
+    let mut ctx = InterpreterContext::new(&mut exec_ctx, &descriptors, unsafe {
         functions[0].as_ref_unchecked()
     });
     ctx.run().unwrap();
@@ -116,9 +114,8 @@ fn enum_survives_gc() {
         size: 24,
         variant_pointer_offsets: vec![vec![], vec![]],
     }];
-    let txn_ctx = NoopTransactionContext;
-    let gas_meter = SimpleGasMeter::new(u64::MAX);
-    let mut ctx = InterpreterContext::new(&txn_ctx, &descriptors, gas_meter, unsafe {
+    let mut exec_ctx = LocalExecutionContext::with_max_budget();
+    let mut ctx = InterpreterContext::new(&mut exec_ctx, &descriptors, unsafe {
         functions[0].as_ref_unchecked()
     });
     ctx.run().unwrap();
@@ -185,9 +182,8 @@ fn enum_gc_traces_refs() {
         },
         ObjectDescriptor::Trivial,
     ];
-    let txn_ctx = NoopTransactionContext;
-    let gas_meter = SimpleGasMeter::new(u64::MAX);
-    let mut ctx = InterpreterContext::new(&txn_ctx, &descriptors, gas_meter, unsafe {
+    let mut exec_ctx = LocalExecutionContext::with_max_budget();
+    let mut ctx = InterpreterContext::new(&mut exec_ctx, &descriptors, unsafe {
         functions[0].as_ref_unchecked()
     });
     ctx.run().unwrap();
@@ -255,9 +251,8 @@ fn enum_pattern_match() {
         size: 24,
         variant_pointer_offsets: vec![vec![], vec![]],
     }];
-    let txn_ctx = NoopTransactionContext;
-    let gas_meter = SimpleGasMeter::new(u64::MAX);
-    let mut ctx = InterpreterContext::new(&txn_ctx, &descriptors, gas_meter, unsafe {
+    let mut exec_ctx = LocalExecutionContext::with_max_budget();
+    let mut ctx = InterpreterContext::new(&mut exec_ctx, &descriptors, unsafe {
         functions[0].as_ref_unchecked()
     });
     ctx.run().unwrap();
@@ -309,9 +304,8 @@ fn enum_variant_switch() {
         size: 16,
         variant_pointer_offsets: vec![vec![], vec![]],
     }];
-    let txn_ctx = NoopTransactionContext;
-    let gas_meter = SimpleGasMeter::new(u64::MAX);
-    let mut ctx = InterpreterContext::new(&txn_ctx, &descriptors, gas_meter, unsafe {
+    let mut exec_ctx = LocalExecutionContext::with_max_budget();
+    let mut ctx = InterpreterContext::new(&mut exec_ctx, &descriptors, unsafe {
         functions[0].as_ref_unchecked()
     });
     ctx.run().unwrap();
@@ -365,9 +359,8 @@ fn enum_borrow_field() {
         size: 24,
         variant_pointer_offsets: vec![vec![], vec![]],
     }];
-    let txn_ctx = NoopTransactionContext;
-    let gas_meter = SimpleGasMeter::new(u64::MAX);
-    let mut ctx = InterpreterContext::new(&txn_ctx, &descriptors, gas_meter, unsafe {
+    let mut exec_ctx = LocalExecutionContext::with_max_budget();
+    let mut ctx = InterpreterContext::new(&mut exec_ctx, &descriptors, unsafe {
         functions[0].as_ref_unchecked()
     });
     ctx.run().unwrap();
@@ -429,9 +422,8 @@ fn enum_gc_variant_switching() {
         },
         ObjectDescriptor::Trivial,
     ];
-    let txn_ctx = NoopTransactionContext;
-    let gas_meter = SimpleGasMeter::new(u64::MAX);
-    let mut ctx = InterpreterContext::new(&txn_ctx, &descriptors, gas_meter, unsafe {
+    let mut exec_ctx = LocalExecutionContext::with_max_budget();
+    let mut ctx = InterpreterContext::new(&mut exec_ctx, &descriptors, unsafe {
         functions[0].as_ref_unchecked()
     });
     ctx.run().unwrap();
@@ -498,9 +490,8 @@ fn enum_in_struct() {
             variant_pointer_offsets: vec![vec![], vec![]],
         },
     ];
-    let txn_ctx = NoopTransactionContext;
-    let gas_meter = SimpleGasMeter::new(u64::MAX);
-    let mut ctx = InterpreterContext::new(&txn_ctx, &descriptors, gas_meter, unsafe {
+    let mut exec_ctx = LocalExecutionContext::with_max_budget();
+    let mut ctx = InterpreterContext::new(&mut exec_ctx, &descriptors, unsafe {
         functions[0].as_ref_unchecked()
     });
     ctx.run().unwrap();
@@ -578,9 +569,8 @@ fn enum_in_vector() {
             elem_pointer_offsets: vec![0],
         },
     ];
-    let txn_ctx = NoopTransactionContext;
-    let gas_meter = SimpleGasMeter::new(u64::MAX);
-    let mut ctx = InterpreterContext::new(&txn_ctx, &descriptors, gas_meter, unsafe {
+    let mut exec_ctx = LocalExecutionContext::with_max_budget();
+    let mut ctx = InterpreterContext::new(&mut exec_ctx, &descriptors, unsafe {
         functions[0].as_ref_unchecked()
     });
     ctx.run().unwrap();

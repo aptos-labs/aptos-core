@@ -1,4 +1,4 @@
-=== Module 0x66::test ===
+// module 0x66::test
 
 fun read_field_val(r0): u8 {
   slots: params(1), locals(0), temps(2)
@@ -41,10 +41,10 @@ fun read_field_ref_twice(r0): u64 {
 }
 
 === micro-ops ===
-=== Module 0x66::test ===
+// module 0x66::test
 
-fun read_field_val(): skipped (lowering: instruction ImmBorrowLoc not yet lowered)
+fun read_field_val(): skipped (not all types are concrete)
 
 fun read_and_add(): skipped (lowering: instruction ReadRef not yet lowered)
 
-fun read_field_ref_twice(): skipped (lowering: instruction ImmBorrowLoc not yet lowered)
+fun read_field_ref_twice(): skipped (not all types are concrete)

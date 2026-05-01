@@ -1,8 +1,7 @@
 // Copyright (c) Aptos Foundation
 // Licensed pursuant to the Innovation-Enabling Source Code License, available at https://github.com/aptos-labs/aptos-core/blob/main/LICENSE
 
-use criterion::{black_box, criterion_group, criterion_main, BatchSize, Criterion};
-use mono_move_gas::NoOpGasMeter;
+use criterion::{black_box, criterion_group, criterion_main, Criterion};
 
 #[path = "helpers.rs"]
 mod helpers;
@@ -12,8 +11,7 @@ const KEY_RANGE: u64 = 2500;
 const SEED: u64 = 42;
 
 fn bench_bst(c: &mut Criterion) {
-    use mono_move_core::NoopTransactionContext;
-    use mono_move_gas::SimpleGasMeter;
+    use mono_move_core::LocalExecutionContext;
     use mono_move_programs::{
         bst::{generate_ops, micro_op_bst, move_bytecode_bst, move_stdlib_vector, native_run_ops},
         testing,
@@ -37,23 +35,19 @@ fn bench_bst(c: &mut Criterion) {
         let (functions, descriptors, _arena) = micro_op_bst();
         // SAFETY: Exclusive access during bench setup; arena is alive.
         unsafe { mono_move_core::Function::resolve_calls(&functions) };
-        let txn_ctx = NoopTransactionContext;
+        let mut exec_ctx = LocalExecutionContext::unmetered();
+        // TODO: hoist interpreter context setup out of the timed body.
         group.bench_function("micro_op", |b| {
-            b.iter_batched(
-                || {
-                    let mut ctx =
-                        InterpreterContext::new(&txn_ctx, &descriptors, NoOpGasMeter, unsafe {
-                            functions[6].unwrap().as_ref_unchecked()
-                        });
-                    let vec_ptr = ctx
-                        .alloc_u64_vec(mono_move_core::DescriptorId(0), &ops)
-                        .unwrap();
-                    ctx.set_root_arg(0, &vec_ptr.to_le_bytes());
-                    ctx
-                },
-                |mut ctx| ctx.run().unwrap(),
-                BatchSize::SmallInput,
-            );
+            b.iter(|| {
+                let mut ctx = InterpreterContext::new(&mut exec_ctx, &descriptors, unsafe {
+                    functions[6].unwrap().as_ref_unchecked()
+                });
+                let vec_ptr = ctx
+                    .alloc_u64_vec(mono_move_core::DescriptorId(0), &ops)
+                    .unwrap();
+                ctx.set_root_arg(0, &vec_ptr.to_le_bytes());
+                ctx.run().unwrap();
+            });
         });
 
         // with gas instrumentation
@@ -62,23 +56,19 @@ fn bench_bst(c: &mut Criterion) {
         let (functions_gas, _arena) = unsafe { helpers::gas_instrument(&functions) };
         // SAFETY: Exclusive access during bench setup; arena is alive.
         unsafe { mono_move_core::Function::resolve_calls(&functions_gas) };
+        let mut exec_ctx = LocalExecutionContext::with_max_budget();
+        // TODO: hoist interpreter context setup out of the timed body.
         group.bench_function("micro_op/gas", |b| {
-            b.iter_batched(
-                || {
-                    let gas_meter = SimpleGasMeter::new(u64::MAX);
-                    let mut ctx =
-                        InterpreterContext::new(&txn_ctx, &descriptors, gas_meter, unsafe {
-                            functions_gas[6].unwrap().as_ref_unchecked()
-                        });
-                    let vec_ptr = ctx
-                        .alloc_u64_vec(mono_move_core::DescriptorId(0), &ops)
-                        .unwrap();
-                    ctx.set_root_arg(0, &vec_ptr.to_le_bytes());
-                    ctx
-                },
-                |mut ctx| ctx.run().unwrap(),
-                BatchSize::SmallInput,
-            );
+            b.iter(|| {
+                let mut ctx = InterpreterContext::new(&mut exec_ctx, &descriptors, unsafe {
+                    functions_gas[6].unwrap().as_ref_unchecked()
+                });
+                let vec_ptr = ctx
+                    .alloc_u64_vec(mono_move_core::DescriptorId(0), &ops)
+                    .unwrap();
+                ctx.set_root_arg(0, &vec_ptr.to_le_bytes());
+                ctx.run().unwrap();
+            });
         });
 
         group.finish();

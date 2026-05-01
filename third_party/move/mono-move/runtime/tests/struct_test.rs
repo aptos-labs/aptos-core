@@ -5,10 +5,9 @@
 
 use mono_move_alloc::{ExecutableArena, ExecutableArenaPtr, GlobalArenaPtr};
 use mono_move_core::{
-    DescriptorId, FrameLayoutInfo, FrameOffset as FO, Function, MicroOp, NoopTransactionContext,
+    DescriptorId, FrameLayoutInfo, FrameOffset as FO, Function, LocalExecutionContext, MicroOp,
     SortedSafePointEntries, STRUCT_DATA_OFFSET,
 };
-use mono_move_gas::SimpleGasMeter;
 use mono_move_runtime::{
     read_ptr, read_u64, InterpreterContext, ObjectDescriptor, VEC_DATA_OFFSET, VEC_LENGTH_OFFSET,
 };
@@ -46,9 +45,8 @@ fn struct_inline() {
         safe_point_layouts: SortedSafePointEntries::empty(),
     })];
     let descriptors = [ObjectDescriptor::Trivial];
-    let txn_ctx = NoopTransactionContext;
-    let gas_meter = SimpleGasMeter::new(u64::MAX);
-    let mut ctx = InterpreterContext::new(&txn_ctx, &descriptors, gas_meter, unsafe {
+    let mut exec_ctx = LocalExecutionContext::with_max_budget();
+    let mut ctx = InterpreterContext::new(&mut exec_ctx, &descriptors, unsafe {
         functions[0].as_ref_unchecked()
     });
     ctx.run().unwrap();
@@ -94,9 +92,8 @@ fn struct_inline_borrow() {
         safe_point_layouts: SortedSafePointEntries::empty(),
     })];
     let descriptors = [ObjectDescriptor::Trivial];
-    let txn_ctx = NoopTransactionContext;
-    let gas_meter = SimpleGasMeter::new(u64::MAX);
-    let mut ctx = InterpreterContext::new(&txn_ctx, &descriptors, gas_meter, unsafe {
+    let mut exec_ctx = LocalExecutionContext::with_max_budget();
+    let mut ctx = InterpreterContext::new(&mut exec_ctx, &descriptors, unsafe {
         functions[0].as_ref_unchecked()
     });
     ctx.run().unwrap();
@@ -145,9 +142,8 @@ fn struct_heap_basic() {
         size: 16,
         pointer_offsets: vec![],
     }];
-    let txn_ctx = NoopTransactionContext;
-    let gas_meter = SimpleGasMeter::new(u64::MAX);
-    let mut ctx = InterpreterContext::new(&txn_ctx, &descriptors, gas_meter, unsafe {
+    let mut exec_ctx = LocalExecutionContext::with_max_budget();
+    let mut ctx = InterpreterContext::new(&mut exec_ctx, &descriptors, unsafe {
         functions[0].as_ref_unchecked()
     });
     ctx.run().unwrap();
@@ -197,9 +193,8 @@ fn struct_heap_survives_gc() {
         size: 16,
         pointer_offsets: vec![],
     }];
-    let txn_ctx = NoopTransactionContext;
-    let gas_meter = SimpleGasMeter::new(u64::MAX);
-    let mut ctx = InterpreterContext::new(&txn_ctx, &descriptors, gas_meter, unsafe {
+    let mut exec_ctx = LocalExecutionContext::with_max_budget();
+    let mut ctx = InterpreterContext::new(&mut exec_ctx, &descriptors, unsafe {
         functions[0].as_ref_unchecked()
     });
     ctx.run().unwrap();
@@ -268,9 +263,8 @@ fn struct_with_vector_field() {
         },
         ObjectDescriptor::Trivial,
     ];
-    let txn_ctx = NoopTransactionContext;
-    let gas_meter = SimpleGasMeter::new(u64::MAX);
-    let mut ctx = InterpreterContext::new(&txn_ctx, &descriptors, gas_meter, unsafe {
+    let mut exec_ctx = LocalExecutionContext::with_max_budget();
+    let mut ctx = InterpreterContext::new(&mut exec_ctx, &descriptors, unsafe {
         functions[0].as_ref_unchecked()
     });
     ctx.run().unwrap();
@@ -335,9 +329,8 @@ fn struct_borrow_field() {
         size: 16,
         pointer_offsets: vec![],
     }];
-    let txn_ctx = NoopTransactionContext;
-    let gas_meter = SimpleGasMeter::new(u64::MAX);
-    let mut ctx = InterpreterContext::new(&txn_ctx, &descriptors, gas_meter, unsafe {
+    let mut exec_ctx = LocalExecutionContext::with_max_budget();
+    let mut ctx = InterpreterContext::new(&mut exec_ctx, &descriptors, unsafe {
         functions[0].as_ref_unchecked()
     });
     ctx.run().unwrap();
@@ -393,9 +386,8 @@ fn struct_borrow_survives_gc() {
         size: 16,
         pointer_offsets: vec![],
     }];
-    let txn_ctx = NoopTransactionContext;
-    let gas_meter = SimpleGasMeter::new(u64::MAX);
-    let mut ctx = InterpreterContext::new(&txn_ctx, &descriptors, gas_meter, unsafe {
+    let mut exec_ctx = LocalExecutionContext::with_max_budget();
+    let mut ctx = InterpreterContext::new(&mut exec_ctx, &descriptors, unsafe {
         functions[0].as_ref_unchecked()
     });
     ctx.run().unwrap();

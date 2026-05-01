@@ -1,7 +1,7 @@
 // Copyright (c) Aptos Foundation
 // Licensed pursuant to the Innovation-Enabling Source Code License, available at https://github.com/aptos-labs/aptos-core/blob/main/LICENSE
 
-//! Builds a [`LoadedModule`] from a [`CompiledModule`] by resolving its
+//! Builds a [`LoadedModule`] from a [`PreparedModule`] by resolving its
 //! struct/enum types, running the specializer, and packaging the result
 //! alongside the polymorphic IR.
 //!
@@ -12,36 +12,35 @@
 //! (struct defs, enum defs, layout computation), delegates leaf type
 //! interning to the guard, and assembles the final `LoadedModule`.
 
-use anyhow::{anyhow, bail};
+use anyhow::{anyhow, bail, Result};
 use mono_move_alloc::{ExecutableArena, ExecutableArenaPtr, GlobalArenaPtr};
 use mono_move_core::{
-    types::{align_up, EMPTY_TYPE_LIST},
-    walk_sig_token, EnumType, Executable, ExecutableId, FrameLayoutInfo, Function, MicroOp,
-    SortedSafePointEntries, StructResolver, StructType, VariantFields,
+    types::{align_up, view_type, Type},
+    EnumType, Executable, ExecutableId, FrameLayoutInfo, Function, MicroOp, PreparedModule,
+    SortedSafePointEntries, StructType, VariantFields,
 };
 use mono_move_global_context::{
-    struct_info_at, ExecutionGuard, FieldLayout, InternedType, LoadedModule, MandatoryDependencies,
+    ExecutionGuard, FieldLayout, InternedType, LoadedModule, MandatoryDependencies,
 };
 use move_binary_format::{
     access::ModuleAccess,
-    file_format::{
-        FunctionHandleIndex, SignatureToken, StructDefinition, StructFieldInformation,
-        StructHandleIndex,
-    },
+    file_format::{FunctionHandleIndex, StructDefinitionIndex, StructFieldInformation},
     CompiledModule,
 };
 use shared_dsa::UnorderedMap;
-use specializer::{lower_module, LoweredFunction, ModuleIR};
+use specializer::lower_module;
+use std::ops::Deref;
 
 // TODO: this is likely to change. Placeholder.
-// TODO: refactor to own CompiledModule instead of borrowing it (needed for ModuleIR cache).
 // Split mutable state into a separate struct to avoid borrow conflicts with self.module.
 #[allow(dead_code)]
-pub struct ExecutableBuilder<'a, 'guard, 'ctx> {
+pub struct ExecutableBuilder<'guard, 'ctx> {
     // TODO: support scripts.
-    module: &'a CompiledModule,
-    /// Maps struct handle indices to struct definition indices.
-    struct_def_idx: UnorderedMap<StructHandleIndex, usize>,
+    module: PreparedModule,
+    /// Maps interned struct/enum names to their `StructDefinitionIndex`
+    /// for local defs. Used by the layout pass to recurse into dependent
+    /// local defs when a field type points at another local struct/enum.
+    local_def_by_name: UnorderedMap<GlobalArenaPtr<str>, usize>,
 
     /// Executable ID.
     id: GlobalArenaPtr<ExecutableId>,
@@ -65,36 +64,44 @@ pub struct ExecutableBuilder<'a, 'guard, 'ctx> {
     guard: &'guard ExecutionGuard<'ctx>,
 }
 
-impl<'a, 'guard, 'ctx> ExecutableBuilder<'a, 'guard, 'ctx> {
+impl<'guard, 'ctx> ExecutableBuilder<'guard, 'ctx> {
     /// Creates a new builder for transforming `module` into an [`Executable`].
-    pub fn new(guard: &'guard ExecutionGuard<'ctx>, module: &'a CompiledModule) -> Self
+    pub fn new(guard: &'guard ExecutionGuard<'ctx>, module: CompiledModule) -> Result<Self>
     where
         'ctx: 'guard,
     {
-        let struct_def_idx = module
+        let module = PreparedModule::build(module, guard)?;
+        let local_def_by_name = module
             .struct_defs()
             .iter()
             .enumerate()
-            .map(|(i, def)| (def.struct_handle, i))
+            .map(|(i, def)| {
+                let handle = module.struct_handle_at(def.struct_handle);
+                let name = guard
+                    .intern_identifier(module.identifier_at(handle.name))
+                    .into_global_arena_ptr();
+                (name, i)
+            })
             .collect::<UnorderedMap<_, _>>();
 
         let id = guard
             .intern_address_name(module.self_addr(), module.self_name())
             .into_global_arena_ptr();
+        let num_func_handles = module.function_handles.len();
 
-        ExecutableBuilder {
+        Ok(ExecutableBuilder {
             module,
-            struct_def_idx,
+            local_def_by_name,
             id,
             cost: 0,
             mandatory_dependencies: MandatoryDependencies::empty(),
             structs: UnorderedMap::new(),
             enums: UnorderedMap::new(),
             functions: UnorderedMap::new(),
-            func_ptrs: vec![None; module.function_handles.len()],
+            func_ptrs: vec![None; num_func_handles],
             arena: ExecutableArena::new(),
             guard,
-        }
+        })
     }
 
     /// Sets the deterministic load cost for the built executable.
@@ -110,94 +117,99 @@ impl<'a, 'guard, 'ctx> ExecutableBuilder<'a, 'guard, 'ctx> {
         self
     }
 
-    /// Resolve all struct and enum type definitions in the module.
-    /// Must be called before `finish()`.
-    pub fn resolve_types(&mut self) -> anyhow::Result<()> {
-        for struct_def in &self.module.struct_defs {
-            self.resolve_struct_def(struct_def)?;
+    /// Computes layouts for every local struct, registers every local enum,
+    /// and populates `self.structs`/`self.enums`. Must be called before
+    /// `finish()`.
+    pub fn resolve_types(&mut self) -> Result<()> {
+        for def_idx in 0..self.module.struct_defs.len() {
+            self.ensure_def(def_idx)?;
         }
         Ok(())
     }
 
-    /// Returns the module being built.
-    pub fn module(&self) -> &CompiledModule {
-        self.module
-    }
+    /// Runs the full build pipeline (resolve types → destack → lower every
+    /// function → resolve calls → assemble `LoadedModule`).
+    pub fn build(mut self) -> Result<Box<LoadedModule>> {
+        // TODO: this clone is needed is because we need to resolve layouts.
+        // this will be gone once layout construction is refactored into its own pass.
+        let module_ir = specializer::destack(self.module.deref().clone(), self.guard)?;
+        self.resolve_types()?;
+        let lowered = lower_module(&module_ir)?;
+        let module = &module_ir.module;
 
-    /// Returns a struct type table mapping `StructHandleIndex` ordinals to
-    /// interned type pointers. Call after `resolve_types()`.
-    ///
-    /// Locally-defined, non-generic struct/enum handles resolve to `Some(ty)`.
-    /// Every other handle — imported from another module, or generic —
-    /// remains `None`. Downstream consumers must treat `None` as an
-    /// unresolved reference rather than a usable type; any attempt to lower
-    /// code that touches such a handle should fail loudly. See the TODO in
-    /// `specializer::destack::type_conversion::TableResolver`.
-    pub fn struct_type_table(&self) -> Vec<Option<InternedType>> {
-        let num_handles = self.module.struct_handles.len();
-        let mut table = vec![None; num_handles];
-        for struct_def in &self.module.struct_defs {
-            let handle = self.module.struct_handle_at(struct_def.struct_handle);
+        // Record each lowered function in the executable arena. Inlined
+        // here (not a `&mut self` method) because `self.module` has been
+        // partially moved into `destack` above, which forbids `&mut self`
+        // borrows; direct field access on `self.arena` etc. is fine.
+        for lowered_fn in lowered.functions {
             let name = self
                 .guard
-                .intern_identifier(self.module.identifier_at(handle.name))
+                .intern_identifier(module.identifier_at(lowered_fn.name_idx))
                 .into_global_arena_ptr();
-            if let Some(st) = self.structs.get(&name) {
-                table[struct_def.struct_handle.0 as usize] = Some(st.ty());
-            } else if let Some(et) = self.enums.get(&name) {
-                table[struct_def.struct_handle.0 as usize] = Some(et.ty());
+            let code = self.arena.alloc_slice_fill_iter(lowered_fn.code);
+            let param_sizes = self.arena.alloc_slice_fill_iter(lowered_fn.param_sizes);
+            let func = Function {
+                name,
+                code,
+                param_sizes,
+                param_sizes_sum: lowered_fn.param_sizes_sum,
+                param_and_local_sizes_sum: lowered_fn.param_and_local_sizes_sum,
+                extended_frame_size: lowered_fn.extended_frame_size,
+                // TODO: hardcoded for now.
+                zero_frame: false,
+                frame_layout: FrameLayoutInfo::empty(),
+                safe_point_layouts: SortedSafePointEntries::empty(),
+            };
+            let ptr = self.arena.alloc(func);
+            self.functions.insert(name, ptr);
+            self.func_ptrs[lowered_fn.handle_idx.0 as usize] = Some(ptr);
+        }
+
+        // Rewrite every `CallFunc` in every local function's code:
+        // - Handles resolving to a local `Function` pointer become `CallDirect`.
+        // - Cross-module handles become `CallIndirect` keyed by the callee's
+        //   interned `(executable_id, func_name)` pair, dispatched at runtime.
+        // Inlined for the same partial-move reason as the loop above.
+        let self_module_handle_idx = module.self_module_handle_idx;
+        for func_ptr in &self.func_ptrs {
+            let Some(mut func_ptr) = *func_ptr else {
+                continue;
+            };
+            // SAFETY: We have exclusive access during build — no concurrent
+            // readers exist yet. The arena is alive because `self` still
+            // owns it until `Executable::new` is called below.
+            let func = unsafe { func_ptr.as_mut_unchecked() };
+            let code = unsafe { func.code.as_mut_unchecked() };
+            for op in code.iter_mut() {
+                let MicroOp::CallFunc { func_id } = *op else {
+                    continue;
+                };
+                if let Some(ptr) = self.func_ptrs[func_id as usize] {
+                    *op = MicroOp::CallDirect { ptr };
+                    continue;
+                }
+                let callee_handle = module.function_handle_at(FunctionHandleIndex(func_id as u16));
+                if callee_handle.module == self_module_handle_idx {
+                    bail!("unresolved local function handle {}", func_id);
+                }
+                let callee_module = module.module_handle_at(callee_handle.module);
+                let executable_id = self
+                    .guard
+                    .intern_address_name(
+                        module.address_identifier_at(callee_module.address),
+                        module.identifier_at(callee_module.name),
+                    )
+                    .into_global_arena_ptr();
+                let func_name = self
+                    .guard
+                    .intern_identifier(module.identifier_at(callee_handle.name))
+                    .into_global_arena_ptr();
+                *op = MicroOp::CallIndirect {
+                    executable_id,
+                    func_name,
+                };
             }
         }
-        table
-    }
-
-    /// Records a lowered function. Functions can be added in any order; the
-    /// handle index carried by `lowered` determines where it lands in the
-    /// call-patching table.
-    pub fn add_function(&mut self, lowered: LoweredFunction) {
-        let name = self
-            .guard
-            .intern_identifier(self.module.identifier_at(lowered.name_idx))
-            .into_global_arena_ptr();
-        let code = self.arena.alloc_slice_fill_iter(lowered.code);
-        let param_sizes = self.arena.alloc_slice_fill_iter(lowered.param_sizes);
-        let func = Function {
-            name,
-            code,
-            param_sizes,
-            param_sizes_sum: lowered.param_sizes_sum,
-            param_and_local_sizes_sum: lowered.param_and_local_sizes_sum,
-            extended_frame_size: lowered.extended_frame_size,
-            // TODO: hardcoded for now.
-            zero_frame: false,
-            frame_layout: FrameLayoutInfo::empty(),
-            safe_point_layouts: SortedSafePointEntries::empty(),
-        };
-        let ptr = self.arena.alloc(func);
-        self.functions.insert(name, ptr);
-        self.func_ptrs[lowered.handle_idx.0 as usize] = Some(ptr);
-    }
-
-    /// Runs the full build pipeline (resolve types → destack → lower every
-    /// function → add it → finish). Use this when callers don't need to
-    /// interleave additional work between stages.
-    pub fn build(mut self) -> anyhow::Result<Box<LoadedModule>> {
-        self.resolve_types()?;
-        let struct_types = self.struct_type_table();
-        let module_ir = specializer::destack(self.module.clone(), self.guard, &struct_types)?;
-        let lowered = lower_module(&module_ir)?;
-        for lowered_fn in lowered.functions {
-            self.add_function(lowered_fn);
-        }
-        self.finish(module_ir)
-    }
-
-    /// Finishes building the loaded module. Call after every function
-    /// definition has been recorded via `add_function`. `module_ir` is the
-    /// polymorphic IR produced earlier in the pipeline; it is preserved on
-    /// the resulting `LoadedModule`.
-    pub fn finish(self, module_ir: ModuleIR) -> anyhow::Result<Box<LoadedModule>> {
-        self.resolve_all_calls()?;
 
         let executable = Executable::new(
             self.id,
@@ -213,220 +225,143 @@ impl<'a, 'guard, 'ctx> ExecutableBuilder<'a, 'guard, 'ctx> {
             self.mandatory_dependencies,
         ))
     }
-
-    /// Rewrites every `CallFunc` in every local function's code:
-    /// - Handles that resolve to a local `Function` pointer become
-    ///   `CallDirect`.
-    /// - Cross-module handles become `CallIndirect` keyed by the callee's
-    ///   interned `(executable_id, func_name)` pair, to be dispatched at
-    ///   runtime.
-    fn resolve_all_calls(&self) -> anyhow::Result<()> {
-        let self_module_handle_idx = self.module.self_module_handle_idx;
-        for func_ptr in &self.func_ptrs {
-            let Some(mut func_ptr) = *func_ptr else {
-                continue;
-            };
-            // SAFETY: We have exclusive access during build — no concurrent
-            // readers exist yet. The arena is alive because `self` still owns
-            // it until `Executable::new` is called below.
-            let func = unsafe { func_ptr.as_mut_unchecked() };
-            let code = unsafe { func.code.as_mut_unchecked() };
-            for op in code.iter_mut() {
-                let MicroOp::CallFunc { func_id } = *op else {
-                    continue;
-                };
-                if let Some(ptr) = self.func_ptrs[func_id as usize] {
-                    *op = MicroOp::CallDirect { ptr };
-                    continue;
-                }
-                let callee_handle = self
-                    .module
-                    .function_handle_at(FunctionHandleIndex(func_id as u16));
-                if callee_handle.module == self_module_handle_idx {
-                    bail!("unresolved local function handle {}", func_id);
-                }
-                let callee_module = self.module.module_handle_at(callee_handle.module);
-                let executable_id = self
-                    .guard
-                    .intern_address_name(
-                        self.module.address_identifier_at(callee_module.address),
-                        self.module.identifier_at(callee_module.name),
-                    )
-                    .into_global_arena_ptr();
-                let func_name = self
-                    .guard
-                    .intern_identifier(self.module.identifier_at(callee_handle.name))
-                    .into_global_arena_ptr();
-                *op = MicroOp::CallIndirect {
-                    executable_id,
-                    func_name,
-                };
-            }
-        }
-        Ok(())
-    }
 }
 
 //
 // Only private APIs below.
 // ------------------------
 
-impl<'a, 'guard, 'ctx> ExecutableBuilder<'a, 'guard, 'ctx> {
-    /// Resolves a struct or enum definition.
-    ///
-    /// For structs, computes layouts **eagerly** by interning each field type
-    /// and computing offsets inline. For now, this implements C-style struct
-    /// layout. For enums, only variant field types are interned (enum
-    /// type-level size is always fixed).
-    fn resolve_struct_def(
-        &mut self,
-        struct_def: &StructDefinition,
-    ) -> anyhow::Result<InternedType> {
-        let handle = self.module.struct_handle_at(struct_def.struct_handle);
+impl<'guard, 'ctx> ExecutableBuilder<'guard, 'ctx> {
+    /// Ensures `def_idx`'s struct or enum has been processed: layout
+    /// computed (for structs) or `EnumType` registered (for variant defs),
+    /// with all locally-defined dependencies recursively processed first.
+    /// Idempotent: short-circuits if `self.structs`/`self.enums` already
+    /// contains an entry for this def's name.
+    fn ensure_def(&mut self, def_idx: usize) -> Result<()> {
+        let struct_handle = self.module.struct_defs[def_idx].struct_handle;
+        let handle = self.module.struct_handle_at(struct_handle);
         if !handle.type_parameters.is_empty() {
             bail!("Generic structs / enums not yet supported");
         }
-
         let name = self
             .guard
             .intern_identifier(self.module.identifier_at(handle.name))
             .into_global_arena_ptr();
-        match &struct_def.field_information {
+        if self.structs.contains_key(&name) || self.enums.contains_key(&name) {
+            return Ok(());
+        }
+
+        // Recurse into local-struct/enum dependencies referenced by direct
+        // field types. Move's bytecode verifier rejects cycles, so this
+        // terminates without an explicit guard.
+        let dependent = self.collect_local_dependencies(def_idx);
+        for dep_idx in dependent {
+            self.ensure_def(dep_idx)?;
+        }
+
+        let bare_ty = self.module.interned_nominal_type_at(struct_handle);
+        let def = &self.module.struct_defs[def_idx];
+        match &def.field_information {
             StructFieldInformation::Native => bail!("Native fields are deprecated"),
-            StructFieldInformation::Declared(field_defs) => {
-                // Check if already visited. For example, if we have structs:
-                //
-                // struct A { x: u64 }
-                // struct B { x: A }
-                //
-                // we do not need to recompute A's type information and can use
-                // cached data.
-                if let Some(st) = self.structs.get(&name) {
-                    return Ok(st.ty());
+            StructFieldInformation::Declared(_) => {
+                let def_index = StructDefinitionIndex(def_idx as u16);
+                let field_types = self
+                    .module
+                    .interned_struct_field_types_at(def_index)
+                    .expect("Must be a struct");
+                let mut fields = Vec::with_capacity(field_types.len());
+                let mut offset = 0u32;
+                let mut align = 1u32;
+                for &fty in field_types {
+                    let (sz, al) = view_type(fty).size_and_align().ok_or_else(|| {
+                        anyhow!("Size and alignment is set for non-generic types")
+                    })?;
+                    offset = align_up(offset, al);
+                    align = align.max(al);
+                    fields.push(FieldLayout::new(offset, fty));
+                    offset += sz;
                 }
-
-                // If not yet processed, the struct type may already be cached
-                // in the global arena (because it is not changing under
-                // upgrades).
-                let tok = SignatureToken::Struct(struct_def.struct_handle);
-                if let Some(ptr) = self.guard.try_intern_for_module(&tok, self.module) {
-                    self.structs.insert(name, StructType::new(ptr));
-                    return Ok(ptr);
-                }
-
-                // Intern each field type and compute layout metadata inline.
-                let mut fields = Vec::with_capacity(field_defs.len());
-                let mut offset = 0;
-                let mut align = 1;
-
-                for field in field_defs {
-                    let field_ty = self.intern_signature_token(&field.signature.0)?;
-
-                    let (field_size, field_align) = self
-                        .guard
-                        .type_data(field_ty)
-                        .size_and_align()
-                        .ok_or_else(|| {
-                            anyhow!("Size and alignment is set for non-generic types")
-                        })?;
-                    offset = align_up(offset, field_align);
-                    align = align.max(field_align);
-
-                    fields.push(FieldLayout::new(offset, field_ty));
-                    offset += field_size;
-                }
-
                 let size = align_up(offset, align);
-                let ptr = self.guard.intern_nominal(self.id, name, EMPTY_TYPE_LIST);
                 self.guard
-                    .set_nominal_layout(ptr, size, align, Some(&fields))?;
-
-                self.structs.insert(name, StructType::new(ptr));
-                Ok(ptr)
+                    .set_nominal_layout(bare_ty, size, align, Some(&fields))?;
+                self.structs.insert(name, StructType::new(bare_ty));
             },
             StructFieldInformation::DeclaredVariants(variant_defs) => {
-                if let Some(enum_def) = self.enums.get(&name) {
-                    return Ok(enum_def.ty());
+                let def_index = StructDefinitionIndex(def_idx as u16);
+                let mut variants = Vec::with_capacity(variant_defs.len());
+                for v_idx in 0..variant_defs.len() {
+                    let vfields = self
+                        .module
+                        .interned_variant_field_types_at(def_index, v_idx as u16)
+                        .expect("Must be an enum");
+                    let fields_slice = self.arena.alloc_slice_copy(vfields);
+                    variants.push(VariantFields::new(fields_slice));
                 }
-
-                // If not yet processed, the enum type may already be cached
-                // in the global arena.
-                let tok = SignatureToken::Struct(struct_def.struct_handle);
-                let ty = self
-                    .guard
-                    .try_intern_for_module(&tok, self.module)
-                    .unwrap_or_else(|| self.guard.intern_nominal(self.id, name, EMPTY_TYPE_LIST));
+                let variants_slice = self.arena.alloc_slice_copy(&variants);
                 // Enum size/align is fixed today (heap pointer); the layout
                 // slot stores no per-field offsets.
-                self.guard.set_nominal_layout(ty, 8, 8, None)?;
+                self.guard.set_nominal_layout(bare_ty, 8, 8, None)?;
+                self.enums
+                    .insert(name, EnumType::new(bare_ty, variants_slice));
+            },
+        }
+        Ok(())
+    }
 
-                let mut variants = Vec::with_capacity(variant_defs.len());
-                for variant_def in variant_defs {
-                    let mut fields = Vec::with_capacity(variant_def.fields.len());
-                    for field in &variant_def.fields {
-                        let field_ty = self.intern_signature_token(&field.signature.0)?;
-                        fields.push(field_ty);
+    /// Walks a def's field types (and variant field types for enums) via
+    /// the type pool, collecting `StructDefinitionIndex` ordinals for any
+    /// directly-referenced local struct or enum. Composite wrappers
+    /// (`Vector`, references) have fixed sizes and don't propagate
+    /// dependencies — only direct `Type::Nominal` field types of this
+    /// module count.
+    fn collect_local_dependencies(&self, def_idx: usize) -> Vec<usize> {
+        let def = &self.module.struct_defs[def_idx];
+        let def_index = StructDefinitionIndex(def_idx as u16);
+        let mut deps = Vec::new();
+        match &def.field_information {
+            StructFieldInformation::Declared(_) => {
+                for &fty in self
+                    .module
+                    .interned_struct_field_types_at(def_index)
+                    .expect("Must be a struct")
+                {
+                    if let Some(d) = self.local_def_idx_for_type(fty) {
+                        deps.push(d);
                     }
-                    let fields = self.arena.alloc_slice_copy(&fields);
-                    variants.push(VariantFields::new(fields));
                 }
-                let variants = self.arena.alloc_slice_copy(&variants);
-                self.enums.insert(name, EnumType::new(ty, variants));
-                Ok(ty)
             },
+            StructFieldInformation::DeclaredVariants(variants) => {
+                for v_idx in 0..variants.len() {
+                    for &fty in self
+                        .module
+                        .interned_variant_field_types_at(def_index, v_idx as u16)
+                        .expect("Must be an enum")
+                    {
+                        if let Some(d) = self.local_def_idx_for_type(fty) {
+                            deps.push(d);
+                        }
+                    }
+                }
+            },
+            StructFieldInformation::Native => {},
         }
+        deps
     }
 
-    /// Interns a signature token as a [`Type`], delegating composite variants
-    /// to [`walk_sig_token`]. This wrapper keeps the per-token cache fast
-    /// path (avoids re-walking tokens already seen during this module's
-    /// resolution).
-    fn intern_signature_token(
-        &mut self,
-        token: &SignatureToken,
-        // TODO:
-        //   In the future, we need to pass type arguments so we can resolve
-        //   field layouts of fully-instantiated generics.
-    ) -> anyhow::Result<InternedType> {
-        if let Some(ptr) = self.guard.try_intern_for_module(token, self.module) {
-            return Ok(ptr);
+    /// Returns the local `StructDefinitionIndex` ordinal for `ty` if it's
+    /// a `Type::Nominal` defined in this module, else `None`.
+    fn local_def_idx_for_type(&self, ty: InternedType) -> Option<usize> {
+        let (executable_id, name) = match view_type(ty) {
+            Type::Nominal {
+                executable_id,
+                name,
+                ..
+            } => (executable_id, name),
+            _ => return None,
+        };
+        if *executable_id != self.id {
+            return None;
         }
-        walk_sig_token(token, self.guard, self)
-    }
-}
-
-impl<'a, 'guard, 'ctx> StructResolver for ExecutableBuilder<'a, 'guard, 'ctx> {
-    fn resolve_struct(
-        &mut self,
-        struct_handle: StructHandleIndex,
-        ty_args: &[SignatureToken],
-    ) -> anyhow::Result<InternedType> {
-        // TODO: handle type arguments for generic structs!
-        match self.struct_def_idx.get(&struct_handle).copied() {
-            Some(def_idx) => self.resolve_struct_def(&self.module.struct_defs[def_idx]),
-            None => {
-                // TODO:
-                //   If this type is a struct or an enum that is non-local,
-                //   assume it must be interned & resolved. In the future,
-                //   this case need to load executable dependency first.
-                let token = if ty_args.is_empty() {
-                    SignatureToken::Struct(struct_handle)
-                } else {
-                    SignatureToken::StructInstantiation(struct_handle, ty_args.to_vec())
-                };
-                self.guard
-                    .try_intern_for_module(&token, self.module)
-                    .ok_or_else(|| {
-                        let (address, module_name, struct_name) =
-                            struct_info_at(self.module, struct_handle);
-                        anyhow!(
-                            "Non-local type not yet interned (transitive dependency not loaded): {}::{}::{}",
-                            address,
-                            module_name,
-                            struct_name
-                        )
-                    })
-            },
-        }
+        self.local_def_by_name.get(name).copied()
     }
 }

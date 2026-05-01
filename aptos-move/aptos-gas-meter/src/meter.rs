@@ -635,7 +635,7 @@ where
     }
 
     fn charge_encrypted_txn_decryption(&mut self) -> VMResult<()> {
-        if self.feature_version() < RELEASE_V1_46 {
+        if self.feature_version() < RELEASE_V1_45 {
             return Ok(());
         }
 

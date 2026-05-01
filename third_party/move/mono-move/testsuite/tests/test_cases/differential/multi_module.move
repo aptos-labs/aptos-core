@@ -1,7 +1,7 @@
 // Copyright (c) Aptos Foundation
 // Licensed pursuant to the Innovation-Enabling Source Code License, available at https://github.com/aptos-labs/aptos-core/blob/main/LICENSE
 
-// RUN: publish
+// RUN: publish --print(bytecode,stackless,micro-ops)
 module 0x1::math {
     public fun double(x: u64): u64 {
         x + x

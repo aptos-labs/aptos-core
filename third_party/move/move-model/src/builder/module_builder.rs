@@ -2752,6 +2752,11 @@ impl<'env, 'translator> ModuleBuilder<'env, 'translator> {
 
                 let mut et = ExpTranslator::new_with_old(self, allows_old);
                 et.define_type_params(loc, &entry.type_params, false);
+                // Build the self type with proper type parameter instantiation.
+                // Type params were just defined as TypeParameter(0), TypeParameter(1), ...
+                let self_type_args: Vec<Type> = (0..entry.type_params.len())
+                    .map(|i| Type::TypeParameter(i as u16))
+                    .collect();
                 if let StructLayout::Singleton(fields, _is_positional) = &entry.layout {
                     et.enter_scope();
                     for f in fields.values() {
@@ -2776,13 +2781,15 @@ impl<'env, 'translator> ModuleBuilder<'env, 'translator> {
                     }
                     let receiver_param_name =
                         et.symbol_pool().make(well_known::RECEIVER_PARAM_NAME);
-                    let struct_type = Type::Struct(entry.module_id, entry.struct_id, vec![]);
+                    let struct_type =
+                        Type::Struct(entry.module_id, entry.struct_id, self_type_args);
                     et.define_local(loc, receiver_param_name, struct_type, None, None);
                 } else if let StructLayout::Variants(_) = &entry.layout {
                     et.enter_scope();
                     let receiver_param_name =
                         et.symbol_pool().make(well_known::RECEIVER_PARAM_NAME);
-                    let struct_type = Type::Struct(entry.module_id, entry.struct_id, vec![]);
+                    let struct_type =
+                        Type::Struct(entry.module_id, entry.struct_id, self_type_args);
                     et.define_local(loc, receiver_param_name, struct_type, None, None);
                 }
 

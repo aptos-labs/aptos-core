@@ -275,6 +275,7 @@ pub trait CurveGroupTrait:
             Some(m) => m,
             None => bail!("proof must contain commitment for Fiat–Shamir"),
         };
+
         let c = self.fiat_shamir_challenge_for_sigma_protocol(
             cntxt,
             public_statement,

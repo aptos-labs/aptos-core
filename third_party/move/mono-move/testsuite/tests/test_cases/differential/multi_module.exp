@@ -1,0 +1,69 @@
+=== bytecode ===
+// Bytecode version v10
+module 0x1::math
+// Function definition at index 0
+#[persistent] public fun double(l0: u64): u64
+    copy_loc l0
+    move_loc l0
+    add
+    ret
+
+=== stackless ===
+// module 0x1::math
+
+fun double(r0): u64 {
+  slots: params(1), locals(0), temps(1)
+    r0: u64
+    r1: u64
+  code:
+  L0:
+    0: r1 := add r0, r0
+    1: ret [r1]
+}
+=== micro-ops ===
+// module 0x1::math
+
+fun double() {
+  frame_data_size: 16
+  code:
+    0: AddU64 [8] <- [0] + [0]
+    1: Move8 [0] <- [8]
+    2: Return
+}
+=== bytecode ===
+// Bytecode version v10
+module 0x1::utils
+// Function definition at index 0
+#[persistent] public fun triple(l0: u64): u64
+    copy_loc l0
+    copy_loc l0
+    add
+    move_loc l0
+    add
+    // @5
+    ret
+
+=== stackless ===
+// module 0x1::utils
+
+fun triple(r0): u64 {
+  slots: params(1), locals(0), temps(1)
+    r0: u64
+    r1: u64
+  code:
+  L0:
+    0: r1 := add r0, r0
+    1: r1 := add r1, r0
+    2: ret [r1]
+}
+=== micro-ops ===
+// module 0x1::utils
+
+fun triple() {
+  frame_data_size: 16
+  code:
+    0: AddU64 [8] <- [0] + [0]
+    1: AddU64 [8] <- [8] + [0]
+    2: Move8 [0] <- [8]
+    3: Return
+}

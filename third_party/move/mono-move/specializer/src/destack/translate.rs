@@ -3,14 +3,11 @@
 
 //! Conversion pipeline: Bytecode → SSA → instruction fusion → slot allocation.
 
-use super::{
-    ssa_conversion::SsaConverter,
-    type_conversion::{convert_sig_token, convert_sig_tokens},
-};
-use crate::stackless_exec_ir::{FuncSignature, FunctionIR, ModuleIR};
+use super::ssa_conversion::SsaConverter;
+use crate::stackless_exec_ir::{FunctionIR, ModuleIR};
 use anyhow::Result;
-use mono_move_core::{types::InternedType, Interner};
-use move_binary_format::{access::ModuleAccess, CompiledModule};
+use mono_move_core::{Interner, PreparedModule};
+use move_binary_format::access::ModuleAccess;
 
 /// Convert an entire compiled module to stackless IR.
 ///
@@ -40,11 +37,7 @@ use move_binary_format::{access::ModuleAccess, CompiledModule};
 ///   type-parameter list of the enclosing generic context.
 /// - **Reference safety**: the borrow checker guarantees that freed slots
 ///   truly hold dead values, so type-keyed slot recycling is sound.
-pub fn translate_module(
-    module: CompiledModule,
-    interner: &impl Interner,
-    struct_types: &[Option<InternedType>],
-) -> Result<ModuleIR> {
+pub fn translate_module(module: PreparedModule, interner: &impl Interner) -> Result<ModuleIR> {
     let functions = module
         .function_defs
         .iter()
@@ -55,18 +48,18 @@ pub fn translate_module(
             let handle = module.function_handle_at(fdef.function);
             let name_idx = handle.name;
             let handle_idx = fdef.function;
-            let param_sig_toks = &module.signature_at(handle.parameters).0;
-            let local_sig_toks = &module.signature_at(code.locals).0;
-            let num_params = param_sig_toks.len() as u16;
-            let num_locals = local_sig_toks.len() as u16;
-            let local_types: Vec<InternedType> = param_sig_toks
+            let param_types = module.interned_types_at(handle.parameters);
+            let local_types = module.interned_types_at(code.locals);
+            let num_params = param_types.len() as u16;
+            let num_locals = local_types.len() as u16;
+            let local_types = param_types
                 .iter()
-                .chain(local_sig_toks.iter())
-                .map(|tok| convert_sig_token(tok, interner, struct_types))
-                .collect::<Result<_>>()?;
+                .chain(local_types.iter())
+                .copied()
+                .collect::<Vec<_>>();
 
             // Pass: Bytecode -> Intra-Block SSA -> Fusion
-            let converter = SsaConverter::new(local_types, interner, struct_types);
+            let converter = SsaConverter::new(local_types, interner);
             let ssa = converter
                 .convert_function(&module, &code.code)?
                 .with_fusion_passes();
@@ -87,82 +80,5 @@ pub fn translate_module(
         })
         .collect::<Result<Vec<_>>>()?;
 
-    // Module-level signature caches. The lowering pass reads these directly
-    // instead of re-walking signature tokens per call site.
-    let handle_signatures = collect_handle_signatures(&module, interner, struct_types)?;
-    let instantiation_signatures =
-        collect_instantiation_signatures(&module, interner, struct_types)?;
-
-    Ok(ModuleIR {
-        module,
-        functions,
-        handle_signatures,
-        instantiation_signatures,
-    })
-}
-
-/// Pre-computes `FuncSignature` for every function handle in the module.
-///
-/// TODO: convert the module's signature pool once and look up signatures by
-/// index here instead of re-walking the same `SignatureToken` slices per
-/// handle/instantiation. Handles that share a signature index currently hit the
-/// interner repeatedly, which is both wasted work; a one-pass pool conversion
-/// collapses this to a single interning per unique signature.
-fn collect_handle_signatures(
-    module: &CompiledModule,
-    interner: &impl Interner,
-    struct_types: &[Option<InternedType>],
-) -> Result<Vec<FuncSignature>> {
-    module
-        .function_handles
-        .iter()
-        .map(|handle| {
-            let param_types = convert_sig_tokens(
-                &module.signature_at(handle.parameters).0,
-                interner,
-                struct_types,
-            )?;
-            let ret_types = convert_sig_tokens(
-                &module.signature_at(handle.return_).0,
-                interner,
-                struct_types,
-            )?;
-            Ok(FuncSignature {
-                param_types,
-                ret_types,
-            })
-        })
-        .collect()
-}
-
-/// Pre-computes `FuncSignature` for every function instantiation in the module.
-/// Today this mirrors the base handle's signature; future work (generic
-/// instantiation substitution) will replace each entry with the concrete
-/// substituted signature.
-fn collect_instantiation_signatures(
-    module: &CompiledModule,
-    interner: &impl Interner,
-    struct_types: &[Option<InternedType>],
-) -> Result<Vec<FuncSignature>> {
-    module
-        .function_instantiations
-        .iter()
-        .map(|inst| {
-            let handle = module.function_handle_at(inst.handle);
-            let param_types = convert_sig_tokens(
-                &module.signature_at(handle.parameters).0,
-                interner,
-                struct_types,
-            )?;
-            let ret_types = convert_sig_tokens(
-                &module.signature_at(handle.return_).0,
-                interner,
-                struct_types,
-            )?;
-            Ok(FuncSignature {
-                param_types,
-                ret_types,
-            })
-        })
-        .collect()
+    Ok(ModuleIR { module, functions })
 }

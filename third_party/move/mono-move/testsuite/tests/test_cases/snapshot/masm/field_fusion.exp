@@ -1,4 +1,4 @@
-=== Module 0x66::field_fusion ===
+// module 0x66::field_fusion
 
 fun identity(r0): u64 {
   slots: params(1), locals(0), temps(0)
@@ -80,7 +80,7 @@ fun increment_field(r0) {
 }
 
 === micro-ops ===
-=== Module 0x66::field_fusion ===
+// module 0x66::field_fusion
 
 fun identity() {
   frame_data_size: 8
@@ -88,12 +88,12 @@ fun identity() {
     0: Return
 }
 
-fun add_two_fields(): skipped (lowering: instruction ImmBorrowLoc not yet lowered)
+fun add_two_fields(): skipped (not all types are concrete)
 
-fun field_to_call(): skipped (lowering: instruction ImmBorrowLoc not yet lowered)
+fun field_to_call(): skipped (not all types are concrete)
 
-fun two_fields_to_call(): skipped (lowering: instruction ImmBorrowLoc not yet lowered)
+fun two_fields_to_call(): skipped (not all types are concrete)
 
-fun field_plus_constant(): skipped (lowering: instruction ImmBorrowLoc not yet lowered)
+fun field_plus_constant(): skipped (not all types are concrete)
 
 fun increment_field(): skipped (lowering: instruction ReadField not yet lowered)

@@ -1,0 +1,43 @@
+=== bytecode ===
+// Bytecode version v10
+module 0x1::test
+// Function definition at index 0
+fun clamp(l0: u64): u64
+    copy_loc l0
+    ld_u64 10
+    le
+    br_false l0
+    move_loc l0
+    // @5
+    ret
+l0: ld_u64 10
+    ret
+
+=== stackless ===
+// module 0x1::test
+
+fun clamp(r0): u64 {
+  slots: params(1), locals(0), temps(1)
+    r0: u64
+    r1: u64
+  code:
+  L2:
+    0: br_gt L0, r0, #10
+  L1:
+    1: ret [r0]
+  L0:
+    2: r1 := ld_u64 10
+    3: ret [r1]
+}
+=== micro-ops ===
+// module 0x1::test
+
+fun clamp() {
+  frame_data_size: 16
+  code:
+    0: JumpGreaterU64Imm @2 [0] > #10
+    1: Return
+    2: StoreImm8 [8] <- #10
+    3: Move8 [0] <- [8]
+    4: Return
+}

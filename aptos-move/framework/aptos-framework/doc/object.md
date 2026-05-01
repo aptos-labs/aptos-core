@@ -57,6 +57,8 @@ make it so that a reference to a global object can be returned from a function.
 -  [Function `create_object_from_object`](#0x1_object_create_object_from_object)
 -  [Function `create_object_from_guid`](#0x1_object_create_object_from_guid)
 -  [Function `create_object_internal`](#0x1_object_create_object_internal)
+-  [Function `create_unique_onchain_signer`](#0x1_object_create_unique_onchain_signer)
+-  [Function `create_named_unowned_onchain_signer`](#0x1_object_create_named_unowned_onchain_signer)
 -  [Function `generate_delete_ref`](#0x1_object_generate_delete_ref)
 -  [Function `generate_extend_ref`](#0x1_object_generate_extend_ref)
 -  [Function `generate_transfer_ref`](#0x1_object_generate_transfer_ref)
@@ -65,6 +67,7 @@ make it so that a reference to a global object can be returned from a function.
 -  [Function `address_from_constructor_ref`](#0x1_object_address_from_constructor_ref)
 -  [Function `object_from_constructor_ref`](#0x1_object_object_from_constructor_ref)
 -  [Function `can_generate_delete_ref`](#0x1_object_can_generate_delete_ref)
+-  [Function `transfer_with_constructor_ref`](#0x1_object_transfer_with_constructor_ref)
 -  [Function `create_guid`](#0x1_object_create_guid)
 -  [Function `new_event_handle`](#0x1_object_new_event_handle)
 -  [Function `address_from_delete_ref`](#0x1_object_address_from_delete_ref)
@@ -143,6 +146,7 @@ make it so that a reference to a global object can be returned from a function.
 <pre><code><b>use</b> <a href="account.md#0x1_account">0x1::account</a>;
 <b>use</b> <a href="../../aptos-stdlib/../move-stdlib/doc/bcs.md#0x1_bcs">0x1::bcs</a>;
 <b>use</b> <a href="create_signer.md#0x1_create_signer">0x1::create_signer</a>;
+<b>use</b> <a href="../../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error">0x1::error</a>;
 <b>use</b> <a href="event.md#0x1_event">0x1::event</a>;
 <b>use</b> <a href="../../aptos-stdlib/doc/from_bcs.md#0x1_from_bcs">0x1::from_bcs</a>;
 <b>use</b> <a href="guid.md#0x1_guid">0x1::guid</a>;
@@ -989,6 +993,8 @@ Derives an object address from source material: sha3_256([creator address | seed
 
 Derives an object address from the source address and an object: sha3_256([source | object addr | 0xFC]).
 
+Only used for primary_fungible_store.
+
 
 <pre><code><b>public</b> <b>fun</b> <a href="object.md#0x1_object_create_user_derived_object_address">create_user_derived_object_address</a>(source: <b>address</b>, derive_from: <b>address</b>): <b>address</b>
 </code></pre>
@@ -1115,6 +1121,9 @@ Convert Object<X> to Object<Y>.
 Create a new named object and return the ConstructorRef. Named objects can be queried globally
 by knowing the user generated seed used to create them. Named objects cannot be deleted.
 
+Note that object returned will be owned by creator, and so creator still can do thing directly to the object,
+for example withdraw from fungible stores signer would own.
+
 
 <pre><code><b>public</b> <b>fun</b> <a href="object.md#0x1_object_create_named_object">create_named_object</a>(creator: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>, seed: <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;): <a href="object.md#0x1_object_ConstructorRef">object::ConstructorRef</a>
 </code></pre>
@@ -1142,6 +1151,8 @@ by knowing the user generated seed used to create them. Named objects cannot be 
 
 Create a new object whose address is derived based on the creator account address and another object.
 Derivde objects, similar to named objects, cannot be deleted.
+
+Only used for primary_fungible_store.
 
 
 <pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="object.md#0x1_object_create_user_derived_object">create_user_derived_object</a>(creator_address: <b>address</b>, derive_ref: &<a href="object.md#0x1_object_DeriveRef">object::DeriveRef</a>): <a href="object.md#0x1_object_ConstructorRef">object::ConstructorRef</a>
@@ -1300,7 +1311,7 @@ doesn't have the same bottlenecks.
 <summary>Implementation</summary>
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="object.md#0x1_object_create_object_from_object">create_object_from_object</a>(creator: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>): <a href="object.md#0x1_object_ConstructorRef">ConstructorRef</a> <b>acquires</b> <a href="object.md#0x1_object_ObjectCore">ObjectCore</a> {
+<pre><code><b>public</b> <b>fun</b> <a href="object.md#0x1_object_create_object_from_object">create_object_from_object</a>(creator: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>): <a href="object.md#0x1_object_ConstructorRef">ConstructorRef</a> {
     <b>let</b> <a href="guid.md#0x1_guid">guid</a> = <a href="object.md#0x1_object_create_guid">create_guid</a>(creator);
     <a href="object.md#0x1_object_create_object_from_guid">create_object_from_guid</a>(<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer_address_of">signer::address_of</a>(creator), <a href="guid.md#0x1_guid">guid</a>)
 }
@@ -1373,6 +1384,78 @@ doesn't have the same bottlenecks.
         },
     );
     <a href="object.md#0x1_object_ConstructorRef">ConstructorRef</a> { self: <a href="object.md#0x1_object">object</a>, can_delete }
+}
+</code></pre>
+
+
+
+</details>
+
+<a id="0x1_object_create_unique_onchain_signer"></a>
+
+## Function `create_unique_onchain_signer`
+
+Create a unique and lightweight onchain signer.
+Returned ExtendRef can be used to create the signer, and can be stored onchain.
+
+It has no object resources (i.e. ObjectCore, etc) - and so is lightweight.
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="object.md#0x1_object_create_unique_onchain_signer">create_unique_onchain_signer</a>(): <a href="object.md#0x1_object_ExtendRef">object::ExtendRef</a>
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="object.md#0x1_object_create_unique_onchain_signer">create_unique_onchain_signer</a>(): <a href="object.md#0x1_object_ExtendRef">ExtendRef</a> {
+    // Equivalent <b>to</b> this snippet, without creating and then deleting <a href="object.md#0x1_object_ObjectCore">ObjectCore</a>:
+    // <b>let</b> constructor_ref = <a href="object.md#0x1_object_create_object">object::create_object</a>(@0x0);
+    // <b>let</b> extend_ref = constructor_ref.<a href="object.md#0x1_object_generate_extend_ref">generate_extend_ref</a>();
+    // constructor_ref.<a href="object.md#0x1_object_generate_delete_ref">generate_delete_ref</a>().<a href="object.md#0x1_object_delete">delete</a>();
+
+    <a href="object.md#0x1_object_ExtendRef">ExtendRef</a> { self: <a href="transaction_context.md#0x1_transaction_context_generate_auid_address">transaction_context::generate_auid_address</a>() }
+}
+</code></pre>
+
+
+
+</details>
+
+<a id="0x1_object_create_named_unowned_onchain_signer"></a>
+
+## Function `create_named_unowned_onchain_signer`
+
+Creates a named onchain signer and returns ExtendRef to create it.
+The signer is deterministically created form passed creator and name.
+
+ObjectCore is created (and cannot be deleted), to guarantee that the
+same signer cannot be created again.
+Aborts if same creator has already created a signer or object with same name.
+
+Object is unowned (owner is set to 0x0), to avoid being owned by creator,
+which would allow creator to still do thing directly to the object,
+for example withdraw from fungible stores returned signer would own.
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="object.md#0x1_object_create_named_unowned_onchain_signer">create_named_unowned_onchain_signer</a>(creator: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>, name: <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;): <a href="object.md#0x1_object_ExtendRef">object::ExtendRef</a>
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="object.md#0x1_object_create_named_unowned_onchain_signer">create_named_unowned_onchain_signer</a>(
+    creator: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>, name: <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;
+): <a href="object.md#0x1_object_ExtendRef">ExtendRef</a> {
+    <b>let</b> constructor_ref = <a href="object.md#0x1_object_create_named_object">create_named_object</a>(creator, name);
+    <b>let</b> extend_ref = constructor_ref.<a href="object.md#0x1_object_generate_extend_ref">generate_extend_ref</a>();
+    constructor_ref.<a href="object.md#0x1_object_transfer_with_constructor_ref">transfer_with_constructor_ref</a>(@0x0);
+    extend_ref
 }
 </code></pre>
 
@@ -1582,6 +1665,30 @@ Returns whether or not the ConstructorRef can be used to create DeleteRef
 
 </details>
 
+<a id="0x1_object_transfer_with_constructor_ref"></a>
+
+## Function `transfer_with_constructor_ref`
+
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="object.md#0x1_object_transfer_with_constructor_ref">transfer_with_constructor_ref</a>(self: &<a href="object.md#0x1_object_ConstructorRef">object::ConstructorRef</a>, <b>to</b>: <b>address</b>)
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="object.md#0x1_object_transfer_with_constructor_ref">transfer_with_constructor_ref</a>(self: &<a href="object.md#0x1_object_ConstructorRef">ConstructorRef</a>, <b>to</b>: <b>address</b>) {
+    self.<a href="object.md#0x1_object_generate_transfer_ref">generate_transfer_ref</a>().<a href="object.md#0x1_object_generate_linear_transfer_ref">generate_linear_transfer_ref</a>().<a href="object.md#0x1_object_transfer_with_ref">transfer_with_ref</a>(<b>to</b>)
+}
+</code></pre>
+
+
+
+</details>
+
 <a id="0x1_object_create_guid"></a>
 
 ## Function `create_guid`
@@ -1598,7 +1705,7 @@ Create a guid for the object, typically used for events
 <summary>Implementation</summary>
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="object.md#0x1_object_create_guid">create_guid</a>(<a href="object.md#0x1_object">object</a>: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>): <a href="guid.md#0x1_guid_GUID">guid::GUID</a> <b>acquires</b> <a href="object.md#0x1_object_ObjectCore">ObjectCore</a> {
+<pre><code><b>public</b> <b>fun</b> <a href="object.md#0x1_object_create_guid">create_guid</a>(<a href="object.md#0x1_object">object</a>: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>): <a href="guid.md#0x1_guid_GUID">guid::GUID</a> {
     <b>let</b> addr = <a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer_address_of">signer::address_of</a>(<a href="object.md#0x1_object">object</a>);
     <b>let</b> object_data = <b>borrow_global_mut</b>&lt;<a href="object.md#0x1_object_ObjectCore">ObjectCore</a>&gt;(addr);
     <a href="guid.md#0x1_guid_create">guid::create</a>(addr, &<b>mut</b> object_data.guid_creation_num)
@@ -1627,7 +1734,7 @@ Generate a new event handle.
 
 <pre><code><b>public</b> <b>fun</b> <a href="object.md#0x1_object_new_event_handle">new_event_handle</a>&lt;T: drop + store&gt;(
     <a href="object.md#0x1_object">object</a>: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>,
-): <a href="event.md#0x1_event_EventHandle">event::EventHandle</a>&lt;T&gt; <b>acquires</b> <a href="object.md#0x1_object_ObjectCore">ObjectCore</a> {
+): <a href="event.md#0x1_event_EventHandle">event::EventHandle</a>&lt;T&gt; {
     <a href="event.md#0x1_event_new_event_handle">event::new_event_handle</a>(<a href="object.md#0x1_object_create_guid">create_guid</a>(<a href="object.md#0x1_object">object</a>))
 }
 </code></pre>
@@ -1702,7 +1809,7 @@ Removes from the specified Object from global storage.
 <summary>Implementation</summary>
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="object.md#0x1_object_delete">delete</a>(self: <a href="object.md#0x1_object_DeleteRef">DeleteRef</a>) <b>acquires</b> <a href="object.md#0x1_object_Untransferable">Untransferable</a>, <a href="object.md#0x1_object_ObjectCore">ObjectCore</a> {
+<pre><code><b>public</b> <b>fun</b> <a href="object.md#0x1_object_delete">delete</a>(self: <a href="object.md#0x1_object_DeleteRef">DeleteRef</a>) {
     <b>let</b> object_core = <b>move_from</b>&lt;<a href="object.md#0x1_object_ObjectCore">ObjectCore</a>&gt;(self.self);
     <b>let</b> <a href="object.md#0x1_object_ObjectCore">ObjectCore</a> {
         guid_creation_num: _,
@@ -1789,7 +1896,7 @@ Disable direct transfer, transfers can only be triggered via a TransferRef
 <summary>Implementation</summary>
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="object.md#0x1_object_disable_ungated_transfer">disable_ungated_transfer</a>(self: &<a href="object.md#0x1_object_TransferRef">TransferRef</a>) <b>acquires</b> <a href="object.md#0x1_object_ObjectCore">ObjectCore</a> {
+<pre><code><b>public</b> <b>fun</b> <a href="object.md#0x1_object_disable_ungated_transfer">disable_ungated_transfer</a>(self: &<a href="object.md#0x1_object_TransferRef">TransferRef</a>) {
     <b>let</b> <a href="object.md#0x1_object">object</a> = <b>borrow_global_mut</b>&lt;<a href="object.md#0x1_object_ObjectCore">ObjectCore</a>&gt;(self.self);
     <a href="object.md#0x1_object">object</a>.allow_ungated_transfer = <b>false</b>;
 }
@@ -1815,7 +1922,7 @@ Prevent moving of the object
 <summary>Implementation</summary>
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="object.md#0x1_object_set_untransferable">set_untransferable</a>(self: &<a href="object.md#0x1_object_ConstructorRef">ConstructorRef</a>) <b>acquires</b> <a href="object.md#0x1_object_ObjectCore">ObjectCore</a> {
+<pre><code><b>public</b> <b>fun</b> <a href="object.md#0x1_object_set_untransferable">set_untransferable</a>(self: &<a href="object.md#0x1_object_ConstructorRef">ConstructorRef</a>) {
     <b>let</b> <a href="object.md#0x1_object">object</a> = <b>borrow_global_mut</b>&lt;<a href="object.md#0x1_object_ObjectCore">ObjectCore</a>&gt;(self.self);
     <a href="object.md#0x1_object">object</a>.allow_ungated_transfer = <b>false</b>;
     <b>let</b> object_signer = self.<a href="object.md#0x1_object_generate_signer">generate_signer</a>();
@@ -1843,7 +1950,7 @@ Enable direct transfer.
 <summary>Implementation</summary>
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="object.md#0x1_object_enable_ungated_transfer">enable_ungated_transfer</a>(self: &<a href="object.md#0x1_object_TransferRef">TransferRef</a>) <b>acquires</b> <a href="object.md#0x1_object_ObjectCore">ObjectCore</a> {
+<pre><code><b>public</b> <b>fun</b> <a href="object.md#0x1_object_enable_ungated_transfer">enable_ungated_transfer</a>(self: &<a href="object.md#0x1_object_TransferRef">TransferRef</a>) {
     <b>assert</b>!(!<b>exists</b>&lt;<a href="object.md#0x1_object_Untransferable">Untransferable</a>&gt;(self.self), <a href="../../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error_permission_denied">error::permission_denied</a>(<a href="object.md#0x1_object_EOBJECT_NOT_TRANSFERRABLE">EOBJECT_NOT_TRANSFERRABLE</a>));
     <b>let</b> <a href="object.md#0x1_object">object</a> = <b>borrow_global_mut</b>&lt;<a href="object.md#0x1_object_ObjectCore">ObjectCore</a>&gt;(self.self);
     <a href="object.md#0x1_object">object</a>.allow_ungated_transfer = <b>true</b>;
@@ -1871,7 +1978,7 @@ time of generation is the owner at the time of transferring.
 <summary>Implementation</summary>
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="object.md#0x1_object_generate_linear_transfer_ref">generate_linear_transfer_ref</a>(self: &<a href="object.md#0x1_object_TransferRef">TransferRef</a>): <a href="object.md#0x1_object_LinearTransferRef">LinearTransferRef</a> <b>acquires</b> <a href="object.md#0x1_object_ObjectCore">ObjectCore</a> {
+<pre><code><b>public</b> <b>fun</b> <a href="object.md#0x1_object_generate_linear_transfer_ref">generate_linear_transfer_ref</a>(self: &<a href="object.md#0x1_object_TransferRef">TransferRef</a>): <a href="object.md#0x1_object_LinearTransferRef">LinearTransferRef</a> {
     <b>assert</b>!(!<b>exists</b>&lt;<a href="object.md#0x1_object_Untransferable">Untransferable</a>&gt;(self.self), <a href="../../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error_permission_denied">error::permission_denied</a>(<a href="object.md#0x1_object_EOBJECT_NOT_TRANSFERRABLE">EOBJECT_NOT_TRANSFERRABLE</a>));
     <b>let</b> owner = <a href="object.md#0x1_object_Object">Object</a>&lt;<a href="object.md#0x1_object_ObjectCore">ObjectCore</a>&gt; { inner: self.self }.<a href="object.md#0x1_object_owner">owner</a>();
     <a href="object.md#0x1_object_LinearTransferRef">LinearTransferRef</a> {
@@ -1901,7 +2008,7 @@ Transfer to the destination address using a LinearTransferRef.
 <summary>Implementation</summary>
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="object.md#0x1_object_transfer_with_ref">transfer_with_ref</a>(self: <a href="object.md#0x1_object_LinearTransferRef">LinearTransferRef</a>, <b>to</b>: <b>address</b>) <b>acquires</b> <a href="object.md#0x1_object_ObjectCore">ObjectCore</a>, <a href="object.md#0x1_object_TombStone">TombStone</a> {
+<pre><code><b>public</b> <b>fun</b> <a href="object.md#0x1_object_transfer_with_ref">transfer_with_ref</a>(self: <a href="object.md#0x1_object_LinearTransferRef">LinearTransferRef</a>, <b>to</b>: <b>address</b>) {
     <b>assert</b>!(!<b>exists</b>&lt;<a href="object.md#0x1_object_Untransferable">Untransferable</a>&gt;(self.self), <a href="../../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error_permission_denied">error::permission_denied</a>(<a href="object.md#0x1_object_EOBJECT_NOT_TRANSFERRABLE">EOBJECT_NOT_TRANSFERRABLE</a>));
 
     // Undo soft burn <b>if</b> present <b>as</b> we don't want the original owner <b>to</b> be able <b>to</b> reclaim by calling unburn later.
@@ -1949,7 +2056,7 @@ Entry function that can be used to transfer, if allow_ungated_transfer is set tr
     owner: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>,
     <a href="object.md#0x1_object">object</a>: <b>address</b>,
     <b>to</b>: <b>address</b>,
-) <b>acquires</b> <a href="object.md#0x1_object_ObjectCore">ObjectCore</a> {
+) {
     <a href="object.md#0x1_object_transfer_raw">transfer_raw</a>(owner, <a href="object.md#0x1_object">object</a>, <b>to</b>)
 }
 </code></pre>
@@ -1979,7 +2086,7 @@ for Object<T> to the "to" address.
     owner: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>,
     <a href="object.md#0x1_object">object</a>: <a href="object.md#0x1_object_Object">Object</a>&lt;T&gt;,
     <b>to</b>: <b>address</b>,
-) <b>acquires</b> <a href="object.md#0x1_object_ObjectCore">ObjectCore</a> {
+) {
     <a href="object.md#0x1_object_transfer_raw">transfer_raw</a>(owner, <a href="object.md#0x1_object">object</a>.inner, <b>to</b>)
 }
 </code></pre>
@@ -2011,7 +2118,7 @@ hierarchy.
     owner: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>,
     <a href="object.md#0x1_object">object</a>: <b>address</b>,
     <b>to</b>: <b>address</b>,
-) <b>acquires</b> <a href="object.md#0x1_object_ObjectCore">ObjectCore</a> {
+) {
     <b>let</b> owner_address = <a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer_address_of">signer::address_of</a>(owner);
     <b>assert</b>!(
         <a href="permissioned_signer.md#0x1_permissioned_signer_check_permission_exists">permissioned_signer::check_permission_exists</a>(owner, <a href="object.md#0x1_object_TransferPermission">TransferPermission</a> { <a href="object.md#0x1_object">object</a> }),
@@ -2080,7 +2187,7 @@ Transfer the given object to another object. See <code>transfer</code> for more 
     owner: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>,
     <a href="object.md#0x1_object">object</a>: <a href="object.md#0x1_object_Object">Object</a>&lt;O&gt;,
     <b>to</b>: <a href="object.md#0x1_object_Object">Object</a>&lt;T&gt;,
-) <b>acquires</b> <a href="object.md#0x1_object_ObjectCore">ObjectCore</a> {
+) {
     <a href="object.md#0x1_object_transfer">transfer</a>(owner, <a href="object.md#0x1_object">object</a>, <b>to</b>.inner)
 }
 </code></pre>
@@ -2107,7 +2214,7 @@ objects may have cyclic dependencies.
 <summary>Implementation</summary>
 
 
-<pre><code><b>fun</b> <a href="object.md#0x1_object_verify_ungated_and_descendant">verify_ungated_and_descendant</a>(owner: <b>address</b>, destination: <b>address</b>) <b>acquires</b> <a href="object.md#0x1_object_ObjectCore">ObjectCore</a> {
+<pre><code><b>fun</b> <a href="object.md#0x1_object_verify_ungated_and_descendant">verify_ungated_and_descendant</a>(owner: <b>address</b>, destination: <b>address</b>) {
     <b>let</b> current_address = destination;
     <b>assert</b>!(
         <b>exists</b>&lt;<a href="object.md#0x1_object_ObjectCore">ObjectCore</a>&gt;(current_address),
@@ -2164,7 +2271,7 @@ Please use the test only [<code>object::burn_object_with_transfer</code>] for te
 <summary>Implementation</summary>
 
 
-<pre><code><b>public</b> entry <b>fun</b> <a href="object.md#0x1_object_burn">burn</a>&lt;T: key&gt;(owner: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>, <a href="object.md#0x1_object">object</a>: <a href="object.md#0x1_object_Object">Object</a>&lt;T&gt;) <b>acquires</b> <a href="object.md#0x1_object_ObjectCore">ObjectCore</a> {
+<pre><code><b>public</b> entry <b>fun</b> <a href="object.md#0x1_object_burn">burn</a>&lt;T: key&gt;(owner: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>, <a href="object.md#0x1_object">object</a>: <a href="object.md#0x1_object_Object">Object</a>&lt;T&gt;) {
     <b>let</b> original_owner = <a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer_address_of">signer::address_of</a>(owner);
     <b>assert</b>!(<a href="object.md#0x1_object_is_owner">is_owner</a>(<a href="object.md#0x1_object">object</a>, original_owner), <a href="../../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error_permission_denied">error::permission_denied</a>(<a href="object.md#0x1_object_ENOT_OBJECT_OWNER">ENOT_OBJECT_OWNER</a>));
     <b>let</b> object_addr = <a href="object.md#0x1_object">object</a>.inner;
@@ -2196,7 +2303,7 @@ Allow origin owners to reclaim any objects they previous burnt.
 <pre><code><b>public</b> entry <b>fun</b> <a href="object.md#0x1_object_unburn">unburn</a>&lt;T: key&gt;(
     original_owner: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>,
     <a href="object.md#0x1_object">object</a>: <a href="object.md#0x1_object_Object">Object</a>&lt;T&gt;,
-) <b>acquires</b> <a href="object.md#0x1_object_TombStone">TombStone</a>, <a href="object.md#0x1_object_ObjectCore">ObjectCore</a> {
+) {
     <b>let</b> object_addr = <a href="object.md#0x1_object">object</a>.inner;
     <b>assert</b>!(<b>exists</b>&lt;<a href="object.md#0x1_object_TombStone">TombStone</a>&gt;(object_addr), <a href="../../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error_invalid_argument">error::invalid_argument</a>(<a href="object.md#0x1_object_EOBJECT_NOT_BURNT">EOBJECT_NOT_BURNT</a>));
     <b>assert</b>!(
@@ -2243,7 +2350,7 @@ Return true if ungated transfer is allowed.
 <summary>Implementation</summary>
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="object.md#0x1_object_ungated_transfer_allowed">ungated_transfer_allowed</a>&lt;T: key&gt;(self: <a href="object.md#0x1_object_Object">Object</a>&lt;T&gt;): bool <b>acquires</b> <a href="object.md#0x1_object_ObjectCore">ObjectCore</a> {
+<pre><code><b>public</b> <b>fun</b> <a href="object.md#0x1_object_ungated_transfer_allowed">ungated_transfer_allowed</a>&lt;T: key&gt;(self: <a href="object.md#0x1_object_Object">Object</a>&lt;T&gt;): bool {
     <b>assert</b>!(
         <b>exists</b>&lt;<a href="object.md#0x1_object_ObjectCore">ObjectCore</a>&gt;(self.inner),
         <a href="../../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error_not_found">error::not_found</a>(<a href="object.md#0x1_object_EOBJECT_DOES_NOT_EXIST">EOBJECT_DOES_NOT_EXIST</a>),
@@ -2273,7 +2380,7 @@ Return the current owner.
 <summary>Implementation</summary>
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="object.md#0x1_object_owner">owner</a>&lt;T: key&gt;(self: <a href="object.md#0x1_object_Object">Object</a>&lt;T&gt;): <b>address</b> <b>acquires</b> <a href="object.md#0x1_object_ObjectCore">ObjectCore</a> {
+<pre><code><b>public</b> <b>fun</b> <a href="object.md#0x1_object_owner">owner</a>&lt;T: key&gt;(self: <a href="object.md#0x1_object_Object">Object</a>&lt;T&gt;): <b>address</b> {
     <b>assert</b>!(
         <b>exists</b>&lt;<a href="object.md#0x1_object_ObjectCore">ObjectCore</a>&gt;(self.inner),
         <a href="../../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error_not_found">error::not_found</a>(<a href="object.md#0x1_object_EOBJECT_DOES_NOT_EXIST">EOBJECT_DOES_NOT_EXIST</a>),
@@ -2305,7 +2412,7 @@ Note: intentionally not using <code>self</code> as first argument, as a.is_owner
 <summary>Implementation</summary>
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="object.md#0x1_object_is_owner">is_owner</a>&lt;T: key&gt;(<a href="object.md#0x1_object">object</a>: <a href="object.md#0x1_object_Object">Object</a>&lt;T&gt;, owner: <b>address</b>): bool <b>acquires</b> <a href="object.md#0x1_object_ObjectCore">ObjectCore</a> {
+<pre><code><b>public</b> <b>fun</b> <a href="object.md#0x1_object_is_owner">is_owner</a>&lt;T: key&gt;(<a href="object.md#0x1_object">object</a>: <a href="object.md#0x1_object_Object">Object</a>&lt;T&gt;, owner: <b>address</b>): bool {
     <a href="object.md#0x1_object">object</a>.<a href="object.md#0x1_object_owner">owner</a>() == owner
 }
 </code></pre>
@@ -2333,7 +2440,7 @@ Note: intentionally not using <code>self</code> as first argument, as a.owns(b) 
 <summary>Implementation</summary>
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="object.md#0x1_object_owns">owns</a>&lt;T: key&gt;(<a href="object.md#0x1_object">object</a>: <a href="object.md#0x1_object_Object">Object</a>&lt;T&gt;, owner: <b>address</b>): bool <b>acquires</b> <a href="object.md#0x1_object_ObjectCore">ObjectCore</a> {
+<pre><code><b>public</b> <b>fun</b> <a href="object.md#0x1_object_owns">owns</a>&lt;T: key&gt;(<a href="object.md#0x1_object">object</a>: <a href="object.md#0x1_object_Object">Object</a>&lt;T&gt;, owner: <b>address</b>): bool {
     <b>let</b> current_address = <a href="object.md#0x1_object">object</a>.<a href="object.md#0x1_object_object_address">object_address</a>();
 
     <b>assert</b>!(
@@ -2385,7 +2492,7 @@ to determine the identity of the starting point of ownership.
 <summary>Implementation</summary>
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="object.md#0x1_object_root_owner">root_owner</a>&lt;T: key&gt;(self: <a href="object.md#0x1_object_Object">Object</a>&lt;T&gt;): <b>address</b> <b>acquires</b> <a href="object.md#0x1_object_ObjectCore">ObjectCore</a> {
+<pre><code><b>public</b> <b>fun</b> <a href="object.md#0x1_object_root_owner">root_owner</a>&lt;T: key&gt;(self: <a href="object.md#0x1_object_Object">Object</a>&lt;T&gt;): <b>address</b> {
     <b>let</b> obj_owner = self.<a href="object.md#0x1_object_owner">owner</a>();
     <b>while</b> (<a href="object.md#0x1_object_is_object">is_object</a>(obj_owner)) {
         obj_owner = <a href="object.md#0x1_object_address_to_object">address_to_object</a>&lt;<a href="object.md#0x1_object_ObjectCore">ObjectCore</a>&gt;(obj_owner).<a href="object.md#0x1_object_owner">owner</a>();

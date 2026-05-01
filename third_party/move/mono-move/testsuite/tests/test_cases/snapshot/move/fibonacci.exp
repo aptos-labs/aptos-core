@@ -25,7 +25,7 @@ l0: copy_loc l0
 
 
 === specializer ===
-=== Module 0x42::fibonacci ===
+// module 0x42::fibonacci
 
 fun fib(r0): u64 {
   slots: params(1), locals(0), temps(1), xfer(1)
@@ -46,7 +46,7 @@ fun fib(r0): u64 {
 }
 
 === micro-ops ===
-=== Module 0x42::fibonacci ===
+// module 0x42::fibonacci
 
 fun fib() {
   frame_data_size: 16

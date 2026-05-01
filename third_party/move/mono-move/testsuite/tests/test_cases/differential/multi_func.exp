@@ -1,0 +1,59 @@
+=== bytecode ===
+// Bytecode version v10
+module 0x1::test
+// Function definition at index 0
+fun double(l0: u64): u64
+    copy_loc l0
+    move_loc l0
+    add
+    ret
+
+// Function definition at index 1
+fun quad(l0: u64): u64
+    move_loc l0
+    call double
+    call double
+    ret
+
+=== stackless ===
+// module 0x1::test
+
+fun double(r0): u64 {
+  slots: params(1), locals(0), temps(1)
+    r0: u64
+    r1: u64
+  code:
+  L0:
+    0: r1 := add r0, r0
+    1: ret [r1]
+}
+
+fun quad(r0): u64 {
+  slots: params(1), locals(0), temps(0), xfer(1)
+    r0: u64
+  code:
+  L0:
+    0: [x0] := call double, [r0]
+    1: [x0] := call double, [x0]
+    2: ret [x0]
+}
+=== micro-ops ===
+// module 0x1::test
+
+fun double() {
+  frame_data_size: 16
+  code:
+    0: AddU64 [8] <- [0] + [0]
+    1: Move8 [0] <- [8]
+    2: Return
+}
+
+fun quad() {
+  frame_data_size: 8
+  code:
+    0: Move8 [32] <- [0]
+    1: CallFunc #0
+    2: CallFunc #0
+    3: Move8 [0] <- [32]
+    4: Return
+}

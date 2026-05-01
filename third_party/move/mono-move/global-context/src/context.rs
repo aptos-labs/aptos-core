@@ -55,6 +55,9 @@ mod loaded_module;
 pub use loaded_module::{LoadedModule, LoadedModuleSlot, MandatoryDependencies};
 mod executable_cache;
 use executable_cache::ExecutableCache;
+use mono_move_core::interner::{InternedIdentifier, InternedModuleId};
+use move_core_types::{account_address::AccountAddress, identifier::IdentStr};
+
 mod types;
 pub use types::{
     struct_info_at, try_as_primitive_type, view_name, view_type, view_type_list, FieldLayout,
@@ -518,6 +521,29 @@ impl<'ctx> Interner for ExecutionGuard<'ctx> {
         }
         let ptr = self.global_arena.alloc_slice_copy(types);
         self.insert_allocated_type_list_internal(ptr)
+    }
+
+    fn nominal_of(
+        &self,
+        executable_id: InternedModuleId,
+        name: InternedIdentifier,
+        ty_args: InternedTypeList,
+    ) -> InternedType {
+        let ty = self.global_arena.alloc(Type::Nominal {
+            executable_id,
+            name,
+            ty_args,
+            layout: OnceLock::new(),
+        });
+        self.insert_allocated_type_pointer_internal(ty)
+    }
+
+    fn module_id_of(&self, address: &AccountAddress, name: &IdentStr) -> InternedModuleId {
+        self.intern_address_name_internal(*address, name)
+    }
+
+    fn identifier_of(&self, identifier: &IdentStr) -> InternedIdentifier {
+        self.intern_identifier_internal(identifier)
     }
 }
 

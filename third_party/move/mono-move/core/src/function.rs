@@ -2,8 +2,8 @@
 // Licensed pursuant to the Innovation-Enabling Source Code License, available at https://github.com/aptos-labs/aptos-core/blob/main/LICENSE
 
 use crate::{
+    execution_context::FunctionResolver,
     instruction::{CodeOffset, FrameOffset, MicroOp, FRAME_METADATA_SIZE},
-    transaction_context::FunctionResolver,
 };
 use mono_move_alloc::{ExecutableArena, ExecutableArenaPtr, GlobalArenaPtr};
 
@@ -315,7 +315,7 @@ impl Function {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::{transaction_context::FunctionResolver, ExecutableId};
+    use crate::{execution_context::FunctionResolver, ExecutableId};
     use mono_move_alloc::{ExecutableArena, GlobalArenaPool, GlobalArenaShard};
     use move_core_types::account_address::AccountAddress;
 

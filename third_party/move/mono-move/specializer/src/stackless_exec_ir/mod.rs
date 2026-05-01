@@ -8,14 +8,14 @@
 
 mod display;
 
-use mono_move_core::types::{InternedType, InternedTypeList};
-use move_binary_format::{
-    file_format::{
-        ConstantPoolIndex, FieldHandleIndex, FieldInstantiationIndex, FunctionHandleIndex,
-        FunctionInstantiationIndex, IdentifierIndex, VariantFieldHandleIndex,
-        VariantFieldInstantiationIndex,
-    },
-    CompiledModule,
+use mono_move_core::{
+    types::{InternedType, InternedTypeList},
+    PreparedModule,
+};
+use move_binary_format::file_format::{
+    ConstantPoolIndex, FieldHandleIndex, FieldInstantiationIndex, FunctionHandleIndex,
+    FunctionInstantiationIndex, IdentifierIndex, VariantFieldHandleIndex,
+    VariantFieldInstantiationIndex,
 };
 use move_core_types::{
     function::ClosureMask,
@@ -371,13 +371,6 @@ pub struct BasicBlock {
     pub instrs: Vec<Instr>,
 }
 
-/// Parameter and return types of a function (or function instantiation),
-/// resolved to [`InternedType`].
-pub struct FuncSignature {
-    pub param_types: Vec<InternedType>,
-    pub ret_types: Vec<InternedType>,
-}
-
 /// IR for a single function.
 pub struct FunctionIR {
     /// Function name in identifier pool.
@@ -411,16 +404,11 @@ impl FunctionIR {
     }
 }
 
-/// IR for a module (wraps the original CompiledModule for pool access).
+/// IR for a module (wraps the original compiled and resolved module for pool
+/// access).
 pub struct ModuleIR {
-    /// The original compiled module for resolving pool indices.
-    pub module: CompiledModule,
+    /// The original compiled module with resolved type pools.
+    pub module: PreparedModule,
     /// Indexed by `FunctionDefinitionIndex`. `None` for native functions.
     pub functions: Vec<Option<FunctionIR>>,
-    /// Signatures for non-generic calls, indexed by `FunctionHandleIndex`.
-    pub handle_signatures: Vec<FuncSignature>,
-    /// Signatures for generic calls, indexed by `FunctionInstantiationIndex`.
-    /// Today these mirror the base handle's signature; when proper generic
-    /// instantiation substitution lands, they will hold substituted types.
-    pub instantiation_signatures: Vec<FuncSignature>,
 }

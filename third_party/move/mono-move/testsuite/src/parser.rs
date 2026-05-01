@@ -9,12 +9,24 @@
 //! A test file is a sequence of **publish** and **execute** steps processed
 //! in order. Each step may have **check** directives attached.
 //!
-//! ## `// RUN: publish`
+//! ## `// RUN: publish [--print(<sections>)]`
 //!
 //! All non-directive lines following this marker (until the next `// RUN:`
 //! directive or EOF) are collected verbatim as Move source text, compiled
 //! into one or more modules, and published into the test storage for both
 //! VMs. Multiple publish blocks accumulate modules across the test.
+//!
+//! The optional `--print(<csv>)` modifier requests that an `.exp` snapshot
+//! be produced alongside the test file. Recognized sections:
+//!
+//! - `bytecode`  — Move bytecode disassembly (rejected for `.masm` inputs,
+//!                 since the bytecode *is* the input).
+//! - `stackless` — stackless execution IR.
+//! - `micro-ops` — lowered micro-ops.
+//!
+//! Sections are emitted in the order above regardless of the order written
+//! in `--print(...)`. Unknown tokens or an empty section list cause the
+//! test to fail at parse time.
 //!
 //! ## `// RUN: execute <addr>::<module>::<func> [--args <v1>, <v2>, ...]`
 //!
@@ -55,11 +67,20 @@ pub enum Check {
     V2(String),
 }
 
+/// A snapshot section requested via `// RUN: publish --print(...)`.
+#[derive(Debug, Copy, Clone, PartialEq, Eq)]
+pub enum PrintSection {
+    Bytecode,
+    Stackless,
+    MicroOps,
+}
+
 /// A single step in a differential test.
 #[derive(Debug)]
 pub enum Step {
     Publish {
         sources: String,
+        print: Vec<PrintSection>,
     },
     Execute {
         address: AccountAddress,
@@ -74,7 +95,7 @@ pub enum Step {
 pub fn parse(content: &str) -> anyhow::Result<Vec<Step>> {
     let mut steps = vec![];
     let mut sources = vec![];
-    let mut in_publish = false;
+    let mut publish_print: Option<Vec<PrintSection>> = None;
 
     for raw_line in content.lines() {
         let line = raw_line.trim();
@@ -82,16 +103,16 @@ pub fn parse(content: &str) -> anyhow::Result<Vec<Step>> {
         if let Some(directive) = line.strip_prefix("// RUN:") {
             let directive = directive.trim();
 
-            if in_publish {
+            if let Some(print) = publish_print.take() {
                 steps.push(Step::Publish {
                     sources: sources.join("\n"),
+                    print,
                 });
                 sources.clear();
-                in_publish = false;
             }
 
-            if directive == "publish" {
-                in_publish = true;
+            if let Some(rest) = directive.strip_prefix("publish") {
+                publish_print = Some(parse_publish_modifiers(rest.trim())?);
             } else if let Some(rest) = directive.strip_prefix("execute") {
                 let rest = rest.trim();
                 let step = parse_execute_step(rest)
@@ -108,18 +129,49 @@ pub fn parse(content: &str) -> anyhow::Result<Vec<Step>> {
             let pattern = pattern.trim().to_string();
             attach_check(&mut steps, Check::V1(pattern.clone()))?;
             attach_check(&mut steps, Check::V2(pattern))?;
-        } else if in_publish {
+        } else if publish_print.is_some() {
             sources.push(raw_line);
         }
     }
 
-    if in_publish {
+    if let Some(print) = publish_print.take() {
         steps.push(Step::Publish {
             sources: sources.join("\n"),
+            print,
         });
     }
 
     Ok(steps)
+}
+
+/// Parse the modifiers after the `publish` keyword. Currently only
+/// `--print(<sections>)` is supported.
+fn parse_publish_modifiers(rest: &str) -> anyhow::Result<Vec<PrintSection>> {
+    if rest.is_empty() {
+        return Ok(vec![]);
+    }
+    let inner = rest
+        .strip_prefix("--print(")
+        .and_then(|s| s.strip_suffix(')'))
+        .ok_or_else(|| anyhow!("Unrecognized publish modifier: {}", rest))?;
+    if inner.trim().is_empty() {
+        bail!("`--print()` requires at least one section");
+    }
+    let mut sections = vec![];
+    for raw in inner.split(',') {
+        let token = raw.trim();
+        let section = match token {
+            "bytecode" => PrintSection::Bytecode,
+            "stackless" => PrintSection::Stackless,
+            "micro-ops" => PrintSection::MicroOps,
+            _ => bail!("Unknown print section: {:?}", token),
+        };
+        if sections.contains(&section) {
+            bail!("Duplicate print section: {:?}", token);
+        }
+        sections.push(section);
+    }
+    Ok(sections)
 }
 
 /// Parses execution step.

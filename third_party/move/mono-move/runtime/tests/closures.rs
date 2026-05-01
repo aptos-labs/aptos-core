@@ -14,10 +14,9 @@
 use mono_move_alloc::{ExecutableArena, ExecutableArenaPtr, GlobalArenaPtr};
 use mono_move_core::{
     CallClosureOp, ClosureFuncRef, CodeOffset as CO, DescriptorId, FrameLayoutInfo,
-    FrameOffset as FO, Function, MicroOp, NoopTransactionContext, PackClosureOp, SizedSlot,
+    FrameOffset as FO, Function, LocalExecutionContext, MicroOp, PackClosureOp, SizedSlot,
     SortedSafePointEntries, FRAME_METADATA_SIZE,
 };
-use mono_move_gas::SimpleGasMeter;
 use mono_move_runtime::{InterpreterContext, ObjectDescriptor};
 
 // ---------------------------------------------------------------------------
@@ -211,9 +210,8 @@ fn make_vector_map(arena: &ExecutableArena) -> ExecutableArenaPtr<Function> {
 }
 
 fn run_main_and_get_u64_result(main: &Function, descriptors: &[ObjectDescriptor]) -> u64 {
-    let txn_ctx = NoopTransactionContext;
-    let gas_meter = SimpleGasMeter::new(u64::MAX);
-    let mut ctx = InterpreterContext::new(&txn_ctx, descriptors, gas_meter, main);
+    let mut exec_ctx = LocalExecutionContext::with_max_budget();
+    let mut ctx = InterpreterContext::new(&mut exec_ctx, descriptors, main);
     ctx.run().unwrap();
     ctx.root_result()
 }

@@ -8,7 +8,7 @@ use crate::{
     gas_schedule::VMGasParameters,
     ver::gas_feature_versions::{
         RELEASE_V1_10, RELEASE_V1_11, RELEASE_V1_12, RELEASE_V1_13, RELEASE_V1_15, RELEASE_V1_26,
-        RELEASE_V1_41, RELEASE_V1_46,
+        RELEASE_V1_41, RELEASE_V1_45,
     },
 };
 use aptos_gas_algebra::{
@@ -63,7 +63,7 @@ crate::gas_schedule::macros::define_gas_parameters!(
         ],
         [
             high_limit_txn_min_price_per_gas_unit: FeePerGasUnit,
-            { RELEASE_V1_46.. => "high_limit_txn_min_price_per_gas_unit" },
+            { RELEASE_V1_45.. => "high_limit_txn_min_price_per_gas_unit" },
             // 10x of the min_price_per_gas_unit (100).
             1000
         ],
@@ -288,14 +288,14 @@ crate::gas_schedule::macros::define_gas_parameters!(
         ],
         [
             encrypted_txn_decryption_base_cost: InternalGas,
-            { RELEASE_V1_46.. => "encrypted_txn_decryption.base" },
+            { RELEASE_V1_45.. => "encrypted_txn_decryption.base" },
             // 120ms e2e decryption latency amortized over 32 txns * 100M internal gas/ms.
             // The per-block max is 64 encrypted txns, so we assume a half-full block.
             375_000_000,
         ],
         [
             encrypted_txn_min_price_per_gas_unit: FeePerGasUnit,
-            { RELEASE_V1_46.. => "encrypted_txn_min_price_per_gas_unit" },
+            { RELEASE_V1_45.. => "encrypted_txn_min_price_per_gas_unit" },
             200,  // 2x the current min_price_per_gas_unit (100)
         ],
     ]

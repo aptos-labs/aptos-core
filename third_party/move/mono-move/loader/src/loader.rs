@@ -133,7 +133,7 @@ impl<'guard, 'ctx> Loader<'guard, 'ctx> {
         }
 
         let (module, cost) = self.get_verified_module_from_storage(id)?;
-        let loaded = self.build_and_insert(&module, cost, MandatoryDependencies::empty())?;
+        let loaded = self.build_and_insert(module, cost, MandatoryDependencies::empty())?;
         self.record_loaded_and_charge(read_set, gas_meter, loaded)?;
         Ok(loaded)
     }
@@ -200,8 +200,8 @@ impl<'guard, 'ctx> Loader<'guard, 'ctx> {
         let mandatory_deps = MandatoryDependencies::package(package_slots);
 
         let mut total = 0u64;
-        for (_, module, cost) in &pending {
-            let loaded = self.build_and_insert(module, *cost, mandatory_deps.clone())?;
+        for (_, module, cost) in pending {
+            let loaded = self.build_and_insert(module, cost, mandatory_deps.clone())?;
             let id = self.guard.arena_ref_for_executable_id(loaded.id());
             read_set.record(id, ExecutableRead::Loaded(loaded))?;
             total = total.saturating_add(loaded.cost());
@@ -287,11 +287,11 @@ impl<'guard, 'ctx> Loader<'guard, 'ctx> {
     /// the cache, returning the canonical pointer.
     fn build_and_insert(
         &self,
-        module: &CompiledModule,
+        module: CompiledModule,
         cost: u64,
         deps: MandatoryDependencies,
     ) -> anyhow::Result<&'guard LoadedModule> {
-        let loaded = ExecutableBuilder::new(self.guard, module)
+        let loaded = ExecutableBuilder::new(self.guard, module)?
             .with_cost(cost)
             .with_mandatory_dependencies(deps)
             .build()?;
