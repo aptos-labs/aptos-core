@@ -233,9 +233,9 @@ macro_rules! ark_msm_internal {
             $proj_double_cost,
             num_elements,
         ))?;
-        let new_element: $element_typ = with_native_rayon(|| {
+        let new_element: $element_typ = with_native_rayon(move || {
             ark_ec::VariableBaseMSM::msm(bases.as_slice(), scalars.as_slice())
-        })
+        })?
         .map_err(|_e| {
             SafeNativeError::abort_with_message(
                 E_SCALAR_MUL_MSM_COMPUTATION_FAILED,

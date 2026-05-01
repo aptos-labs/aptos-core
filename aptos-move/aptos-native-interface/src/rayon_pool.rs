@@ -18,12 +18,22 @@
 //!
 //! Natives that reach into rayon-using code must wrap the relevant section in
 //! [`with_native_rayon`] so the work executes on this isolated pool instead.
+//!
+//! The helper blocks the caller via a channel `recv` (a real OS park) rather
+//! than `ThreadPool::install`. That matters: `install` would leave the caller
+//! eligible for rayon work-stealing from its home pool while the native work
+//! runs, which in `par_exec` can close into a deadlock through writer-
+//! preferring per-txn locks.
 
+use crate::{SafeNativeError, SafeNativeResult};
 use anyhow::{anyhow, Result};
+use move_binary_format::errors::PartialVMError;
+use move_core_types::vm_status::StatusCode;
 use std::{
     cell::OnceCell,
     sync::{
         atomic::{AtomicUsize, Ordering},
+        mpsc::sync_channel,
         Arc, OnceLock,
     },
 };
@@ -74,15 +84,37 @@ pub fn init_native_rayon_pool(threads_per_pool: usize) -> Result<()> {
 ///
 /// Use this to wrap any Move native code path that invokes rayon directly or
 /// via a third-party crate (ark_ec, ark_bls12_381, etc.). The call blocks the
-/// current thread until `op` completes.
-pub fn with_native_rayon<F, R>(op: F) -> R
+/// current thread on a channel `recv` until `op` completes on the native pool.
+///
+/// We deliberately do not use `ThreadPool::install` here. `install`'s
+/// `wait_until` loop is cooperative: if the caller is a `par_exec` rayon
+/// worker, rayon will steal other `par_exec` jobs onto it while the native
+/// work runs. Those stolen jobs can then block on state the caller already
+/// holds (e.g. a writer-preferring per-txn `RwLock` that a sibling worker is
+/// waiting to upgrade), forming a cycle through the caller and deadlocking
+/// block execution. A plain channel `recv` is an OS-level park, so the caller
+/// leaves rayon's steal set entirely until `op` finishes.
+///
+/// Returns [`SafeNativeError::InvariantViolation`] if the native-pool worker
+/// disappears before sending a result (pool dropped, or the spawned closure
+/// panicked). This is not expected in healthy builds.
+pub fn with_native_rayon<F, R>(op: F) -> SafeNativeResult<R>
 where
-    F: FnOnce() -> R + Send,
-    R: Send,
+    F: FnOnce() -> R + Send + 'static,
+    R: Send + 'static,
 {
     PER_CALLER_POOL.with(|cell| {
         let pool = cell.get_or_init(build_pool).clone();
-        pool.install(op)
+        let (tx, rx) = sync_channel(1);
+        pool.spawn(move || {
+            let _ = tx.send(op());
+        });
+        rx.recv().map_err(|_| {
+            SafeNativeError::InvariantViolation(
+                PartialVMError::new(StatusCode::UNKNOWN_INVARIANT_VIOLATION_ERROR)
+                    .with_message("native rayon pool worker disappeared".to_string()),
+            )
+        })
     })
 }
 
@@ -90,14 +122,23 @@ where
 mod tests {
     use super::*;
 
+    fn unwrap_ok<T>(r: SafeNativeResult<T>) -> T {
+        match r {
+            Ok(v) => v,
+            Err(_) => panic!("native rayon pool returned error"),
+        }
+    }
+
+    fn current_thread_name() -> String {
+        std::thread::current()
+            .name()
+            .map(|s| s.to_string())
+            .unwrap_or_default()
+    }
+
     #[test]
-    fn install_runs_on_native_pool() {
-        let name = with_native_rayon(|| {
-            std::thread::current()
-                .name()
-                .map(|s| s.to_string())
-                .unwrap_or_default()
-        });
+    fn runs_on_native_pool() {
+        let name = unwrap_ok(with_native_rayon(current_thread_name));
         assert!(
             name.starts_with("native-rayon-"),
             "expected native-rayon-* thread, got {:?}",
@@ -116,17 +157,12 @@ mod tests {
             .unwrap();
 
         let names = outer_pool.install(|| {
-            with_native_rayon(|| {
+            unwrap_ok(with_native_rayon(|| {
                 (0..64)
                     .into_par_iter()
-                    .map(|_| {
-                        std::thread::current()
-                            .name()
-                            .map(|s| s.to_string())
-                            .unwrap_or_default()
-                    })
+                    .map(|_| current_thread_name())
                     .collect::<Vec<_>>()
-            })
+            }))
         });
 
         assert!(
@@ -140,22 +176,8 @@ mod tests {
     fn distinct_caller_threads_get_distinct_pools() {
         // Two threads concurrently entering with_native_rayon must end up on
         // different per-caller pools (different `native-rayon-{id}-*` prefix).
-        let join_a = std::thread::spawn(|| {
-            with_native_rayon(|| {
-                std::thread::current()
-                    .name()
-                    .map(|s| s.to_string())
-                    .unwrap_or_default()
-            })
-        });
-        let join_b = std::thread::spawn(|| {
-            with_native_rayon(|| {
-                std::thread::current()
-                    .name()
-                    .map(|s| s.to_string())
-                    .unwrap_or_default()
-            })
-        });
+        let join_a = std::thread::spawn(|| unwrap_ok(with_native_rayon(current_thread_name)));
+        let join_b = std::thread::spawn(|| unwrap_ok(with_native_rayon(current_thread_name)));
         let name_a = join_a.join().unwrap();
         let name_b = join_b.join().unwrap();
         assert!(name_a.starts_with("native-rayon-"));
@@ -168,5 +190,40 @@ mod tests {
             "expected distinct pool prefixes, got {} vs {}",
             prefix_a, prefix_b
         );
+    }
+
+    /// Regression test for the `install`-based deadlock: while the native work
+    /// runs, a caller that already holds a lock must not work-steal a sibling
+    /// task that would contend for that lock.
+    #[test]
+    fn caller_does_not_work_steal_while_native_runs() {
+        use std::{
+            sync::{Arc, Mutex},
+            time::Duration,
+        };
+
+        let outer = rayon::ThreadPoolBuilder::new()
+            .num_threads(2)
+            .build()
+            .unwrap();
+        let lock = Arc::new(Mutex::new(()));
+
+        outer.install(|| {
+            let guard = lock.lock().unwrap();
+
+            // Sibling job on the outer pool that also wants the lock. With
+            // `install`, the caller would steal this task onto itself while
+            // blocked on the native pool, deadlocking on `guard`.
+            let l = lock.clone();
+            rayon::spawn(move || {
+                let _g = l.lock().unwrap();
+            });
+
+            unwrap_ok(with_native_rayon(|| {
+                std::thread::sleep(Duration::from_millis(50))
+            }));
+
+            drop(guard);
+        });
     }
 }
