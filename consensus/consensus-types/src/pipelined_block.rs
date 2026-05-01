@@ -619,6 +619,14 @@ impl PipelinedBlock {
                 );
             }
         }
+        // Drop the pipeline input senders so any pending receivers (notably
+        // `commit_proof_fut`, which `pre_commit` parks on when `pre_commit_status`
+        // is paused) resolve immediately with `RecvError` instead of blocking
+        // `wait_until_finishes` inside `abort_pipeline_for_state_sync`. Without
+        // this, aborted blocks can hang forever waiting for a `commit_proof` that
+        // would only arrive after `buffer_manager` is reset, and that reset only
+        // runs after `abort_pipeline_for_state_sync` returns — a circular wait.
+        self.pipeline_tx.lock().take();
         self.pipeline_futs.lock().take()
     }
 
