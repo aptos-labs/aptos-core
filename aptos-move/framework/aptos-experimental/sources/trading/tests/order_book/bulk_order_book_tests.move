@@ -1614,7 +1614,7 @@ module aptos_experimental::bulk_order_book_tests {
     #[test]
     fun test_bulk_order_reprice_crossing_bids() {
         use aptos_experimental::bulk_order_utils::new_bulk_order_request_with_sanitization_v2;
-        
+
         let aptos_framework = account::create_signer_for_test(@0x1);
         timestamp::set_time_has_started_for_testing(&aptos_framework);
         let mut order_book = new_bulk_order_book<TestMetadata>();
@@ -1625,7 +1625,7 @@ module aptos_experimental::bulk_order_book_tests {
         let bid_sizes_1 = vector[10];
         let ask_prices_1 = vector[100, 106];
         let ask_sizes_1 = vector[5, 10];
-        
+
         let order_request_1 =
             new_bulk_order_request_with_sanitization(
                 TEST_ACCOUNT_1,
@@ -1636,9 +1636,9 @@ module aptos_experimental::bulk_order_book_tests {
                 ask_sizes_1,
                 new_test_metadata()
             );
-        
+
         order_book.place_bulk_order(&mut price_time_idx, order_request_1);
-        
+
         // Best ask is now 100
         let best_ask = price_time_idx.best_ask_price();
         assert!(best_ask.is_some(), 0);
@@ -1650,7 +1650,7 @@ module aptos_experimental::bulk_order_book_tests {
         let bid_sizes_2 = vector[5, 10, 15, 20, 25];
         let ask_prices_2 = vector[111, 116, 121];
         let ask_sizes_2 = vector[15, 20, 25];
-        
+
         let order_request_2 =
             new_bulk_order_request_with_sanitization_v2(
                 TEST_ACCOUNT_2,
@@ -1662,19 +1662,19 @@ module aptos_experimental::bulk_order_book_tests {
                 new_test_metadata(),
                 true // Enable repricing
             );
-        
+
         let response = order_book.place_bulk_order(&mut price_time_idx, order_request_2);
         assert!(response.is_success_response(), 2);
-        
+
         // Verify the order was placed with repriced bids
         let bid_prices = order_book.get_prices(TEST_ACCOUNT_2, true);
         let bid_sizes = order_book.get_sizes(TEST_ACCOUNT_2, true);
-        
+
         // First bid should be at 99 (1 tick below best ask of 100)
         // with collapsed size of 5 + 10 = 15
         assert!(bid_prices[0] == 99, 3);
         assert!(bid_sizes[0] == 15, 4);
-        
+
         // Remaining bids should be unchanged
         assert!(bid_prices[1] == 90, 5);
         assert!(bid_sizes[1] == 15, 6);
@@ -1682,7 +1682,7 @@ module aptos_experimental::bulk_order_book_tests {
         assert!(bid_sizes[2] == 20, 8);
         assert!(bid_prices[3] == 80, 9);
         assert!(bid_sizes[3] == 25, 10);
-        
+
         price_time_idx.destroy_price_time_idx();
         order_book.destroy_bulk_order_book();
     }
@@ -1690,7 +1690,7 @@ module aptos_experimental::bulk_order_book_tests {
     #[test]
     fun test_bulk_order_reprice_crossing_asks() {
         use aptos_experimental::bulk_order_utils::new_bulk_order_request_with_sanitization_v2;
-        
+
         let aptos_framework = account::create_signer_for_test(@0x1);
         timestamp::set_time_has_started_for_testing(&aptos_framework);
         let mut order_book = new_bulk_order_book<TestMetadata>();
@@ -1701,7 +1701,7 @@ module aptos_experimental::bulk_order_book_tests {
         let bid_sizes_1 = vector[10, 15];
         let ask_prices_1 = vector[101];
         let ask_sizes_1 = vector[5];
-        
+
         let order_request_1 =
             new_bulk_order_request_with_sanitization(
                 TEST_ACCOUNT_1,
@@ -1712,9 +1712,9 @@ module aptos_experimental::bulk_order_book_tests {
                 ask_sizes_1,
                 new_test_metadata()
             );
-        
+
         order_book.place_bulk_order(&mut price_time_idx, order_request_1);
-        
+
         // Best bid is now 90
         let best_bid = price_time_idx.best_bid_price();
         assert!(best_bid.is_some(), 0);
@@ -1726,7 +1726,7 @@ module aptos_experimental::bulk_order_book_tests {
         let bid_sizes_2 = vector[20, 25];
         let ask_prices_2 = vector[88, 90, 105, 110]; // First two cross
         let ask_sizes_2 = vector[8, 12, 18, 22];
-        
+
         let order_request_2 =
             new_bulk_order_request_with_sanitization_v2(
                 TEST_ACCOUNT_2,
@@ -1738,25 +1738,25 @@ module aptos_experimental::bulk_order_book_tests {
                 new_test_metadata(),
                 true // Enable repricing
             );
-        
+
         let response = order_book.place_bulk_order(&mut price_time_idx, order_request_2);
         assert!(response.is_success_response(), 2);
-        
+
         // Verify the order was placed with repriced asks
         let ask_prices = order_book.get_prices(TEST_ACCOUNT_2, false);
         let ask_sizes = order_book.get_sizes(TEST_ACCOUNT_2, false);
-        
+
         // First ask should be at 91 (1 tick above best bid of 90)
         // with collapsed size of 8 + 12 = 20
         assert!(ask_prices[0] == 91, 3);
         assert!(ask_sizes[0] == 20, 4);
-        
+
         // Remaining asks should be unchanged
         assert!(ask_prices[1] == 105, 5);
         assert!(ask_sizes[1] == 18, 6);
         assert!(ask_prices[2] == 110, 7);
         assert!(ask_sizes[2] == 22, 8);
-        
+
         price_time_idx.destroy_price_time_idx();
         order_book.destroy_bulk_order_book();
     }
@@ -1764,7 +1764,7 @@ module aptos_experimental::bulk_order_book_tests {
     #[test]
     fun test_bulk_order_reprice_collapse_into_existing_level() {
         use aptos_experimental::bulk_order_utils::new_bulk_order_request_with_sanitization_v2;
-        
+
         let aptos_framework = account::create_signer_for_test(@0x1);
         timestamp::set_time_has_started_for_testing(&aptos_framework);
         let mut order_book = new_bulk_order_book<TestMetadata>();
@@ -1775,7 +1775,7 @@ module aptos_experimental::bulk_order_book_tests {
         let bid_sizes_1 = vector[10];
         let ask_prices_1 = vector[100];
         let ask_sizes_1 = vector[5];
-        
+
         let order_request_1 =
             new_bulk_order_request_with_sanitization(
                 TEST_ACCOUNT_1,
@@ -1786,7 +1786,7 @@ module aptos_experimental::bulk_order_book_tests {
                 ask_sizes_1,
                 new_test_metadata()
             );
-        
+
         order_book.place_bulk_order(&mut price_time_idx, order_request_1);
 
         // Now place a bulk order with repricing where the target reprice level (99) already exists
@@ -1794,7 +1794,7 @@ module aptos_experimental::bulk_order_book_tests {
         let bid_sizes_2 = vector[5, 10, 8, 15]; // Crossing: 5+10=15, existing at 99: 8, total should be 23
         let ask_prices_2 = vector[111];
         let ask_sizes_2 = vector[15];
-        
+
         let order_request_2 =
             new_bulk_order_request_with_sanitization_v2(
                 TEST_ACCOUNT_2,
@@ -1806,22 +1806,22 @@ module aptos_experimental::bulk_order_book_tests {
                 new_test_metadata(),
                 true // Enable repricing
             );
-        
+
         let response = order_book.place_bulk_order(&mut price_time_idx, order_request_2);
         assert!(response.is_success_response(), 0);
-        
+
         // Verify the crossing orders were collapsed into the existing level at 99
         let bid_prices = order_book.get_prices(TEST_ACCOUNT_2, true);
         let bid_sizes = order_book.get_sizes(TEST_ACCOUNT_2, true);
-        
+
         // First bid should be at 99 with collapsed size (5 + 10 + 8 = 23)
         assert!(bid_prices[0] == 99, 1);
         assert!(bid_sizes[0] == 23, 2);
-        
+
         // Second bid should be at 90
         assert!(bid_prices[1] == 90, 3);
         assert!(bid_sizes[1] == 15, 4);
-        
+
         price_time_idx.destroy_price_time_idx();
         order_book.destroy_bulk_order_book();
     }

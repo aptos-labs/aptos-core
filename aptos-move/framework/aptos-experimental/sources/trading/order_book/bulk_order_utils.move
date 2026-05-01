@@ -154,7 +154,7 @@ module aptos_experimental::bulk_order_utils {
         best_ask_price: Option<u64>
     ): (BulkOrder<M>, vector<u64>, vector<u64>, vector<u64>, vector<u64>) {
         let reprice_crossing_orders = order_req.get_reprice_crossing_orders();
-        
+
         if (reprice_crossing_orders) {
             // Use V2 repricing logic
             new_bulk_order_with_repricing(
@@ -264,7 +264,7 @@ module aptos_experimental::bulk_order_utils {
         best_ask_price: Option<u64>
     ): (BulkOrder<M>, vector<u64>, vector<u64>, vector<u64>, vector<u64>) {
         let creation_time_micros = timestamp::now_microseconds();
-        
+
         // Reprice bid levels that are >= best ask price to (best_ask - 1)
         if (best_ask_price.is_some()) {
             let best_ask = *best_ask_price.borrow();
@@ -273,7 +273,7 @@ module aptos_experimental::bulk_order_utils {
             let i = 0;
             let collapsed_size = 0u64;
             let num_crossing = 0u64;
-            
+
             // Find all crossing bids and calculate total size
             while (i < bid_prices_mut.length()) {
                 if (bid_prices_mut[i] >= best_ask) {
@@ -284,11 +284,11 @@ module aptos_experimental::bulk_order_utils {
                 };
                 i += 1;
             };
-            
+
             // If there are crossing bids, collapse them to 1 tick away from best ask
             if (num_crossing > 0 && best_ask > 0) {
                 let target_price = best_ask - 1;
-                
+
                 // Remove all crossing levels
                 let j = 0;
                 while (j < num_crossing) {
@@ -296,7 +296,7 @@ module aptos_experimental::bulk_order_utils {
                     bid_sizes_mut.remove(0);
                     j += 1;
                 };
-                
+
                 // Check if the target price already exists in the remaining levels
                 if (bid_prices_mut.length() > 0 && bid_prices_mut[0] == target_price) {
                     // Collapse into existing level at target price
@@ -308,7 +308,7 @@ module aptos_experimental::bulk_order_utils {
                 }
             }
         };
-        
+
         // Reprice ask levels that are <= best bid price to (best_bid + 1)
         if (best_bid_price.is_some()) {
             let best_bid = *best_bid_price.borrow();
@@ -317,7 +317,7 @@ module aptos_experimental::bulk_order_utils {
             let i = 0;
             let collapsed_size = 0u64;
             let num_crossing = 0u64;
-            
+
             // Find all crossing asks and calculate total size
             while (i < ask_prices_mut.length()) {
                 if (ask_prices_mut[i] <= best_bid) {
@@ -328,11 +328,11 @@ module aptos_experimental::bulk_order_utils {
                 };
                 i += 1;
             };
-            
+
             // If there are crossing asks, collapse them to 1 tick away from best bid
             if (num_crossing > 0) {
                 let target_price = best_bid + 1;
-                
+
                 // Remove all crossing levels
                 let j = 0;
                 while (j < num_crossing) {
@@ -340,7 +340,7 @@ module aptos_experimental::bulk_order_utils {
                     ask_sizes_mut.remove(0);
                     j += 1;
                 };
-                
+
                 // Check if the target price already exists in the remaining levels
                 if (ask_prices_mut.length() > 0 && ask_prices_mut[0] == target_price) {
                     // Collapse into existing level at target price
@@ -352,7 +352,7 @@ module aptos_experimental::bulk_order_utils {
                 }
             }
         };
-        
+
         let bulk_order =
             bulk_order_types::new_bulk_order(
                 order_req,
@@ -360,7 +360,7 @@ module aptos_experimental::bulk_order_utils {
                 unique_priority_idx,
                 creation_time_micros
             );
-        
+
         // Return empty vectors for cancelled levels (nothing cancelled in V2)
         (
             bulk_order,
