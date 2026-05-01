@@ -196,12 +196,43 @@ impl FunctionVerifier<'_> {
                 self.check_frame_access_8(pc, dst);
             },
 
-            MicroOp::SubU64Imm { dst, src, imm: _ }
+            MicroOp::AddU64Imm { dst, src, imm: _ }
+            | MicroOp::SubU64Imm { dst, src, imm: _ }
             | MicroOp::RSubU64Imm { dst, src, imm: _ }
-            | MicroOp::AddU64Imm { dst, src, imm: _ }
-            | MicroOp::ShrU64Imm { dst, src, imm: _ } => {
+            | MicroOp::MulU64Imm { dst, src, imm: _ } => {
                 self.check_frame_access_8(pc, src);
                 self.check_frame_access_8(pc, dst);
+            },
+
+            // Div / Mod imm: reject `imm == 0` statically — at runtime it
+            // would always abort, so this is dead-code-with-a-bomb.
+            //
+            // TODO: this changes the surface vs the old VM, which aborted
+            // at runtime with a `DIV_BY_ZERO` status code. The cleanest
+            // fix is probably for the specializer to detect `imm == 0` and
+            // emit an explicit `Abort(DIV_BY_ZERO)` instead of `*U64Imm`,
+            // so the verifier never sees the bad op. Open question: can
+            // the specializer report any error post-bytecode-verification,
+            // and if so should it fail the whole module or only the
+            // function (or only the basic block)? The branch containing
+            // `imm == 0` may not even be reachable at runtime. Revisit
+            // once the abort/error story is settled.
+            MicroOp::DivU64Imm { dst, src, imm } | MicroOp::ModU64Imm { dst, src, imm } => {
+                self.check_frame_access_8(pc, src);
+                self.check_frame_access_8(pc, dst);
+                if imm == 0 {
+                    self.err(Some(pc), "division by zero (imm)");
+                }
+            },
+
+            // Shift imm: reject `imm >= 64` statically — same reason as
+            // div by zero (the runtime would always abort).
+            MicroOp::ShlU64Imm { dst, src, imm } | MicroOp::ShrU64Imm { dst, src, imm } => {
+                self.check_frame_access_8(pc, src);
+                self.check_frame_access_8(pc, dst);
+                if imm >= 64 {
+                    self.err(Some(pc), format!("shift amount {} exceeds 63 (imm)", imm));
+                }
             },
 
             MicroOp::Move8 { dst, src } => {
@@ -210,8 +241,15 @@ impl FunctionVerifier<'_> {
             },
 
             MicroOp::AddU64 { dst, lhs, rhs }
-            | MicroOp::XorU64 { dst, lhs, rhs }
-            | MicroOp::ModU64 { dst, lhs, rhs } => {
+            | MicroOp::SubU64 { dst, lhs, rhs }
+            | MicroOp::MulU64 { dst, lhs, rhs }
+            | MicroOp::DivU64 { dst, lhs, rhs }
+            | MicroOp::ModU64 { dst, lhs, rhs }
+            | MicroOp::BitAndU64 { dst, lhs, rhs }
+            | MicroOp::BitOrU64 { dst, lhs, rhs }
+            | MicroOp::BitXorU64 { dst, lhs, rhs }
+            | MicroOp::ShlU64 { dst, lhs, rhs }
+            | MicroOp::ShrU64 { dst, lhs, rhs } => {
                 self.check_frame_access_8(pc, lhs);
                 self.check_frame_access_8(pc, rhs);
                 self.check_frame_access_8(pc, dst);

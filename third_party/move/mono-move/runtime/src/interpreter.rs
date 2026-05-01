@@ -20,7 +20,7 @@ use crate::{
     },
 };
 use mono_move_core::{
-    CallClosureOp, ClosureFuncRef, DescriptorId, ExecutionContext, Function, MicroOp,
+    CallClosureOp, ClosureFuncRef, DescriptorId, ExecutionContext, FrameOffset, Function, MicroOp,
     PackClosureOp, SizedSlot, CAPTURED_DATA_TAG_MATERIALIZED, CAPTURED_DATA_TAG_OFFSET,
     CAPTURED_DATA_VALUES_OFFSET, CLOSURE_CAPTURED_DATA_PTR_OFFSET, CLOSURE_FUNC_REF_OFFSET,
     CLOSURE_MASK_OFFSET, FRAME_METADATA_SIZE, FUNC_REF_PAYLOAD_OFFSET, FUNC_REF_TAG_OFFSET,
@@ -193,6 +193,131 @@ impl<'a, T: ExecutionContext> InterpreterContext<'a, T> {
 }
 
 // ---------------------------------------------------------------------------
+// Arithmetic helpers
+// ---------------------------------------------------------------------------
+//
+// All arithmetic micro-ops follow one of a few shapes — read 1 or 2 u64
+// frame slots, apply a (possibly fallible) computation, write the result
+// to a destination slot. The helpers below capture each shape so the
+// `step()` arms stay one line each and the read/write boilerplate lives
+// in one place.
+//
+// `#[inline(always)]` ensures the closures and the helper itself are
+// folded into the caller in release builds. Inlining verified by
+// inspecting the release-build x64 asm for `step::<SimpleGasMeter>` on
+// 2026-04-30: zero standalone definitions for any helper or closure,
+// zero call/jmp instructions targeting them, and individual arms
+// compile to a handful of direct memory ops (e.g. AddU64 is 4 movs +
+// addq + jae + jmp).
+//
+// TODO: re-verify inlining after non-trivial changes to the helpers,
+// the call sites, or the rustc/LLVM versions the workspace pins to.
+
+/// `dst <- op(lhs_slot, rhs_slot)` (infallible).
+#[inline(always)]
+unsafe fn binop_u64<F: FnOnce(u64, u64) -> u64>(
+    fp: *mut u8,
+    dst: FrameOffset,
+    lhs: FrameOffset,
+    rhs: FrameOffset,
+    op: F,
+) {
+    // SAFETY: `fp` is the current frame pointer and `lhs`/`rhs`/`dst` are
+    // in-bounds 8-byte slots within that frame (enforced by the verifier).
+    unsafe {
+        let a = read_u64(fp, lhs);
+        let b = read_u64(fp, rhs);
+        write_u64(fp, dst, op(a, b));
+    }
+}
+
+/// `dst <- op(lhs_slot, rhs_slot)`. Bail with `err` on `None`.
+#[inline(always)]
+unsafe fn checked_binop_u64<F: FnOnce(u64, u64) -> Option<u64>>(
+    fp: *mut u8,
+    dst: FrameOffset,
+    lhs: FrameOffset,
+    rhs: FrameOffset,
+    op: F,
+    err: &'static str,
+) -> ExecutionResult<()> {
+    // SAFETY: `fp` is the current frame pointer and `lhs`/`rhs`/`dst` are
+    // in-bounds 8-byte slots within that frame (enforced by the verifier).
+    unsafe {
+        let a = read_u64(fp, lhs);
+        let b = read_u64(fp, rhs);
+        match op(a, b) {
+            Some(v) => write_u64(fp, dst, v),
+            None => bail!(err),
+        }
+        Ok(())
+    }
+}
+
+/// `dst <- op(src_slot, imm)` (infallible).
+#[inline(always)]
+unsafe fn imm_op_u64<F: FnOnce(u64, u64) -> u64>(
+    fp: *mut u8,
+    dst: FrameOffset,
+    src: FrameOffset,
+    imm: u64,
+    op: F,
+) {
+    // SAFETY: `fp` is the current frame pointer and `src`/`dst` are
+    // in-bounds 8-byte slots within that frame (enforced by the verifier).
+    unsafe {
+        let a = read_u64(fp, src);
+        write_u64(fp, dst, op(a, imm));
+    }
+}
+
+/// `dst <- op(src_slot, imm)`. Bail with `err` on `None`.
+#[inline(always)]
+unsafe fn checked_imm_op_u64<F: FnOnce(u64, u64) -> Option<u64>>(
+    fp: *mut u8,
+    dst: FrameOffset,
+    src: FrameOffset,
+    imm: u64,
+    op: F,
+    err: &'static str,
+) -> ExecutionResult<()> {
+    // SAFETY: `fp` is the current frame pointer and `src`/`dst` are
+    // in-bounds 8-byte slots within that frame (enforced by the verifier).
+    unsafe {
+        let a = read_u64(fp, src);
+        match op(a, imm) {
+            Some(v) => write_u64(fp, dst, v),
+            None => bail!(err),
+        }
+        Ok(())
+    }
+}
+
+/// `dst <- op(lhs_slot, rhs_slot_as_shift)`. Bail if shift `>= 64`.
+/// `op_name` is used to format the error message.
+#[inline(always)]
+unsafe fn shift_u64<F: FnOnce(u64, u64) -> u64>(
+    fp: *mut u8,
+    dst: FrameOffset,
+    lhs: FrameOffset,
+    rhs: FrameOffset,
+    op: F,
+    op_name: &'static str,
+) -> ExecutionResult<()> {
+    // SAFETY: `fp` is the current frame pointer and `lhs`/`rhs`/`dst` are
+    // in-bounds 8-byte slots within that frame (enforced by the verifier).
+    unsafe {
+        let shift = read_u64(fp, rhs);
+        if shift >= 64 {
+            bail!("{}: shift amount {} exceeds 63", op_name, shift);
+        }
+        let v = read_u64(fp, lhs);
+        write_u64(fp, dst, op(v, shift));
+        Ok(())
+    }
+}
+
+// ---------------------------------------------------------------------------
 // Interpreter loop
 // ---------------------------------------------------------------------------
 
@@ -339,68 +464,104 @@ impl<T: ExecutionContext> InterpreterContext<'_, T> {
                 },
 
                 // ----- Arithmetic -----
-                MicroOp::StoreImm8 { dst, imm } => {
-                    write_u64(fp, dst, imm);
-                },
+                MicroOp::StoreImm8 { dst, imm } => write_u64(fp, dst, imm),
 
-                MicroOp::SubU64Imm { dst, src, imm } => {
-                    let v = read_u64(fp, src);
-                    let result = match v.checked_sub(imm) {
-                        Some(v) => v,
-                        None => bail!("arithmetic underflow"),
-                    };
-                    write_u64(fp, dst, result);
-                },
-
+                // Add
                 MicroOp::AddU64 { dst, lhs, rhs } => {
-                    let v1 = read_u64(fp, lhs);
-                    let v2 = read_u64(fp, rhs);
-                    let result = match v1.checked_add(v2) {
-                        Some(v) => v,
-                        None => bail!("arithmetic overflow"),
-                    };
-                    write_u64(fp, dst, result);
+                    checked_binop_u64(fp, dst, lhs, rhs, u64::checked_add, "AddU64: overflow")?
                 },
-
                 MicroOp::AddU64Imm { dst, src, imm } => {
-                    let v = read_u64(fp, src);
-                    let result = match v.checked_add(imm) {
-                        Some(v) => v,
-                        None => bail!("arithmetic overflow"),
-                    };
-                    write_u64(fp, dst, result);
+                    checked_imm_op_u64(fp, dst, src, imm, u64::checked_add, "AddU64Imm: overflow")?
                 },
 
-                MicroOp::RSubU64Imm { dst, src, imm } => {
-                    let v = read_u64(fp, src);
-                    let result = match imm.checked_sub(v) {
-                        Some(v) => v,
-                        None => bail!("arithmetic underflow"),
-                    };
-                    write_u64(fp, dst, result);
+                // Sub
+                MicroOp::SubU64 { dst, lhs, rhs } => {
+                    checked_binop_u64(fp, dst, lhs, rhs, u64::checked_sub, "SubU64: underflow")?
+                },
+                MicroOp::SubU64Imm { dst, src, imm } => {
+                    checked_imm_op_u64(fp, dst, src, imm, u64::checked_sub, "SubU64Imm: underflow")?
+                },
+                // dst = imm - src, so flip the operand order.
+                MicroOp::RSubU64Imm { dst, src, imm } => checked_imm_op_u64(
+                    fp,
+                    dst,
+                    src,
+                    imm,
+                    |s, i| u64::checked_sub(i, s),
+                    "RSubU64Imm: underflow",
+                )?,
+
+                // Mul
+                MicroOp::MulU64 { dst, lhs, rhs } => {
+                    checked_binop_u64(fp, dst, lhs, rhs, u64::checked_mul, "MulU64: overflow")?
+                },
+                MicroOp::MulU64Imm { dst, src, imm } => {
+                    checked_imm_op_u64(fp, dst, src, imm, u64::checked_mul, "MulU64Imm: overflow")?
                 },
 
-                MicroOp::XorU64 { dst, lhs, rhs } => {
-                    let lhs_val = read_u64(fp, lhs);
-                    let rhs_val = read_u64(fp, rhs);
-                    write_u64(fp, dst, lhs_val ^ rhs_val);
+                // Div / Mod
+                MicroOp::DivU64 { dst, lhs, rhs } => checked_binop_u64(
+                    fp,
+                    dst,
+                    lhs,
+                    rhs,
+                    u64::checked_div,
+                    "DivU64: division by zero",
+                )?,
+                // INVARIANT: the verifier rejects `imm == 0`, so plain `s / imm`
+                // cannot trigger Rust's div-by-zero panic. Asserted below in
+                // debug builds as a defensive check.
+                MicroOp::DivU64Imm { dst, src, imm } => {
+                    debug_assert!(
+                        imm != 0,
+                        "DivU64Imm: imm must be non-zero (verifier invariant)"
+                    );
+                    imm_op_u64(fp, dst, src, imm, |s, i| s / i)
+                },
+                MicroOp::ModU64 { dst, lhs, rhs } => checked_binop_u64(
+                    fp,
+                    dst,
+                    lhs,
+                    rhs,
+                    u64::checked_rem,
+                    "ModU64: division by zero",
+                )?,
+                // INVARIANT: the verifier rejects `imm == 0`, so plain `s % imm`
+                // cannot trigger Rust's div-by-zero panic. Asserted below in
+                // debug builds as a defensive check.
+                MicroOp::ModU64Imm { dst, src, imm } => {
+                    debug_assert!(
+                        imm != 0,
+                        "ModU64Imm: imm must be non-zero (verifier invariant)"
+                    );
+                    imm_op_u64(fp, dst, src, imm, |s, i| s % i)
                 },
 
+                // Bitwise (infallible)
+                MicroOp::BitAndU64 { dst, lhs, rhs } => binop_u64(fp, dst, lhs, rhs, |a, b| a & b),
+                MicroOp::BitOrU64 { dst, lhs, rhs } => binop_u64(fp, dst, lhs, rhs, |a, b| a | b),
+                MicroOp::BitXorU64 { dst, lhs, rhs } => binop_u64(fp, dst, lhs, rhs, |a, b| a ^ b),
+
+                // Shifts
+                MicroOp::ShlU64 { dst, lhs, rhs } => {
+                    shift_u64(fp, dst, lhs, rhs, |v, s| v << s, "ShlU64")?
+                },
+                // INVARIANT: the verifier rejects `imm >= 64`, so plain `s << imm`
+                // cannot wrap or trigger UB. Asserted below in debug builds as a
+                // defensive check.
+                MicroOp::ShlU64Imm { dst, src, imm } => {
+                    debug_assert!(imm < 64, "ShlU64Imm: imm must be < 64 (verifier invariant)");
+                    imm_op_u64(fp, dst, src, imm, |s, i| s << i)
+                },
+                MicroOp::ShrU64 { dst, lhs, rhs } => {
+                    shift_u64(fp, dst, lhs, rhs, |v, s| v >> s, "ShrU64")?
+                },
+                // INVARIANT: the verifier rejects `imm >= 64`, so plain `s >> imm`
+                // cannot wrap or trigger UB. Asserted below in debug builds as a
+                // defensive check.
                 MicroOp::ShrU64Imm { dst, src, imm } => {
-                    if imm > 63 {
-                        bail!("ShrU64Imm: shift amount {} exceeds 63", imm);
-                    }
-                    let v = read_u64(fp, src);
-                    write_u64(fp, dst, v >> imm);
-                },
-
-                MicroOp::ModU64 { dst, lhs, rhs } => {
-                    let lhs_val = read_u64(fp, lhs);
-                    let rhs_val = read_u64(fp, rhs);
-                    if rhs_val == 0 {
-                        bail!("ModU64: division by zero");
-                    }
-                    write_u64(fp, dst, lhs_val % rhs_val);
+                    debug_assert!(imm < 64, "ShrU64Imm: imm must be < 64 (verifier invariant)");
+                    imm_op_u64(fp, dst, src, imm, |s, i| s >> i)
                 },
 
                 MicroOp::StoreRandomU64 { dst } => {

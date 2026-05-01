@@ -93,7 +93,7 @@ mod micro_op {
             JumpLessU64 { target: CO(7), lhs: FO(j), rhs: FO(n) }, // 5
             Jump { target: CO(11) },                                // 6: goto INNER_END
             // INNER_BODY: sum += i ^ j; j += 1
-            XorU64 { dst: FO(tmp), lhs: FO(i), rhs: FO(j) },      // 7
+            BitXorU64 { dst: FO(tmp), lhs: FO(i), rhs: FO(j) },   // 7
             AddU64 { dst: FO(sum), lhs: FO(sum), rhs: FO(tmp) },   // 8
             AddU64Imm { dst: FO(j), src: FO(j), imm: 1 },          // 9
             Jump { target: CO(5) },                                 // 10: goto INNER_LOOP

@@ -594,6 +594,125 @@ fn zero_frame_size() {
 }
 
 // ---------------------------------------------------------------------------
+// Static arithmetic constraints (imm-form ops)
+// ---------------------------------------------------------------------------
+//
+// Some imm-form ops would always abort at runtime for a particular imm
+// value (`Div`/`Mod` with `0`, shifts with `>= 64`). The verifier rejects
+// these statically.
+
+fn func_with_single_op(arena: &ExecutableArena, op: MicroOp) -> &Function {
+    // SAFETY: Arena is alive for the duration of the test.
+    unsafe {
+        arena
+            .alloc(Function {
+                name: GlobalArenaPtr::from_static("test"),
+                code: arena.alloc_slice_fill_iter([op, MicroOp::Return]),
+                param_sizes: ExecutableArenaPtr::empty_slice(),
+                param_sizes_sum: 0,
+                param_and_local_sizes_sum: 24,
+                extended_frame_size: 48,
+                zero_frame: false,
+                frame_layout: FrameLayoutInfo::empty(),
+                safe_point_layouts: SortedSafePointEntries::empty(),
+            })
+            .as_ref_unchecked()
+    }
+}
+
+#[test]
+fn div_u64_imm_zero() {
+    let arena = ExecutableArena::new();
+    let func = func_with_single_op(&arena, MicroOp::DivU64Imm {
+        dst: FO(0),
+        src: FO(8),
+        imm: 0,
+    });
+    let errors = verify_function(func, &trivial_descriptors());
+    assert!(
+        errors
+            .iter()
+            .any(|e| e.message.contains("division by zero")),
+        "expected division-by-zero error, got: {:?}",
+        errors
+    );
+}
+
+#[test]
+fn mod_u64_imm_zero() {
+    let arena = ExecutableArena::new();
+    let func = func_with_single_op(&arena, MicroOp::ModU64Imm {
+        dst: FO(0),
+        src: FO(8),
+        imm: 0,
+    });
+    let errors = verify_function(func, &trivial_descriptors());
+    assert!(
+        errors
+            .iter()
+            .any(|e| e.message.contains("division by zero")),
+        "expected division-by-zero error, got: {:?}",
+        errors
+    );
+}
+
+#[test]
+fn div_u64_imm_nonzero_ok() {
+    let arena = ExecutableArena::new();
+    let func = func_with_single_op(&arena, MicroOp::DivU64Imm {
+        dst: FO(0),
+        src: FO(8),
+        imm: 1,
+    });
+    let errors = verify_function(func, &trivial_descriptors());
+    assert!(errors.is_empty(), "errors: {:?}", errors);
+}
+
+#[test]
+fn shl_u64_imm_oversize() {
+    let arena = ExecutableArena::new();
+    let func = func_with_single_op(&arena, MicroOp::ShlU64Imm {
+        dst: FO(0),
+        src: FO(8),
+        imm: 64,
+    });
+    let errors = verify_function(func, &trivial_descriptors());
+    assert!(
+        errors.iter().any(|e| e.message.contains("shift amount")),
+        "expected oversize-shift error, got: {:?}",
+        errors
+    );
+}
+
+#[test]
+fn shr_u64_imm_oversize() {
+    let arena = ExecutableArena::new();
+    let func = func_with_single_op(&arena, MicroOp::ShrU64Imm {
+        dst: FO(0),
+        src: FO(8),
+        imm: 100,
+    });
+    let errors = verify_function(func, &trivial_descriptors());
+    assert!(
+        errors.iter().any(|e| e.message.contains("shift amount")),
+        "expected oversize-shift error, got: {:?}",
+        errors
+    );
+}
+
+#[test]
+fn shl_u64_imm_in_range_ok() {
+    let arena = ExecutableArena::new();
+    let func = func_with_single_op(&arena, MicroOp::ShlU64Imm {
+        dst: FO(0),
+        src: FO(8),
+        imm: 63,
+    });
+    let errors = verify_function(func, &trivial_descriptors());
+    assert!(errors.is_empty(), "errors: {:?}", errors);
+}
+
+// ---------------------------------------------------------------------------
 // Multiple errors collected
 // ---------------------------------------------------------------------------
 

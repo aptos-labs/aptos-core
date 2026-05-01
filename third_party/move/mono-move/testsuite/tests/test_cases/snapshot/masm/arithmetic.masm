@@ -16,3 +16,87 @@ fun complex_arith(x: u64): u64
     ld_u64 1
     add
     ret
+
+fun sub_values(a: u64, b: u64): u64
+    copy_loc a
+    copy_loc b
+    sub
+    ret
+
+fun sub_imm(x: u64): u64
+    copy_loc x
+    ld_u64 5
+    sub
+    ret
+
+fun div_values(a: u64, b: u64): u64
+    copy_loc a
+    copy_loc b
+    div
+    ret
+
+fun mod_values(a: u64, b: u64): u64
+    copy_loc a
+    copy_loc b
+    mod
+    ret
+
+fun bit_and(a: u64, b: u64): u64
+    copy_loc a
+    copy_loc b
+    bit_and
+    ret
+
+fun bit_or(a: u64, b: u64): u64
+    copy_loc a
+    copy_loc b
+    bit_or
+    ret
+
+fun bit_xor(a: u64, b: u64): u64
+    copy_loc a
+    copy_loc b
+    xor
+    ret
+
+fun shl_values(a: u64, b: u8): u64
+    copy_loc a
+    copy_loc b
+    shl
+    ret
+
+fun shr_values(a: u64, b: u8): u64
+    copy_loc a
+    copy_loc b
+    shr
+    ret
+
+fun mul_imm(x: u64): u64
+    copy_loc x
+    ld_u64 7
+    mul
+    ret
+
+fun div_imm(x: u64): u64
+    copy_loc x
+    ld_u64 3
+    div
+    ret
+
+fun mod_imm(x: u64): u64
+    copy_loc x
+    ld_u64 10
+    mod
+    ret
+
+fun shl_imm(x: u64): u64
+    copy_loc x
+    ld_u8 4
+    shl
+    ret
+
+fun shr_imm(x: u64): u64
+    copy_loc x
+    ld_u8 2
+    shr
+    ret

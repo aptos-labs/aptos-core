@@ -230,13 +230,24 @@ impl<'a> LoweringState<'a> {
                     let l = self.slot(*lhs);
                     let r = self.slot(*rhs);
                     let d = self.def_slot(*dst);
+                    let dst = FrameOffset(d.offset);
+                    let lhs = FrameOffset(l.offset);
+                    let rhs = FrameOffset(r.offset);
                     match op {
-                        BinaryOp::Add => self.emit(MicroOp::AddU64 {
-                            dst: FrameOffset(d.offset),
-                            lhs: FrameOffset(l.offset),
-                            rhs: FrameOffset(r.offset),
-                        }),
-                        _ => bail!("BinaryOp {:?} for u64-sized type not yet lowered", op),
+                        BinaryOp::Add => self.emit(MicroOp::AddU64 { dst, lhs, rhs }),
+                        BinaryOp::Sub => self.emit(MicroOp::SubU64 { dst, lhs, rhs }),
+                        BinaryOp::Mul => self.emit(MicroOp::MulU64 { dst, lhs, rhs }),
+                        BinaryOp::Div => self.emit(MicroOp::DivU64 { dst, lhs, rhs }),
+                        BinaryOp::Mod => self.emit(MicroOp::ModU64 { dst, lhs, rhs }),
+                        BinaryOp::BitAnd => self.emit(MicroOp::BitAndU64 { dst, lhs, rhs }),
+                        BinaryOp::BitOr => self.emit(MicroOp::BitOrU64 { dst, lhs, rhs }),
+                        BinaryOp::Xor => self.emit(MicroOp::BitXorU64 { dst, lhs, rhs }),
+                        BinaryOp::Shl => self.emit(MicroOp::ShlU64 { dst, lhs, rhs }),
+                        BinaryOp::Shr => self.emit(MicroOp::ShrU64 { dst, lhs, rhs }),
+                        // Phase 2/3: comparison-to-register and logical and/or.
+                        BinaryOp::Cmp(_) | BinaryOp::Or | BinaryOp::And => {
+                            bail!("BinaryOp {:?} for u64-sized type not yet lowered", op)
+                        },
                     }
                 } else {
                     bail!("BinaryOp for non-u64 type not yet lowered");
@@ -250,18 +261,26 @@ impl<'a> LoweringState<'a> {
                     let s = self.slot(*src);
                     let d = self.def_slot(*dst);
                     let v = imm_to_u64(imm);
+                    let dst = FrameOffset(d.offset);
+                    let src = FrameOffset(s.offset);
                     match op {
-                        BinaryOp::Sub => self.emit(MicroOp::SubU64Imm {
-                            dst: FrameOffset(d.offset),
-                            src: FrameOffset(s.offset),
-                            imm: v,
-                        }),
-                        BinaryOp::Add => self.emit(MicroOp::AddU64Imm {
-                            dst: FrameOffset(d.offset),
-                            src: FrameOffset(s.offset),
-                            imm: v,
-                        }),
-                        _ => bail!("BinaryOpImm {:?} for u64-sized type not yet lowered", op),
+                        BinaryOp::Add => self.emit(MicroOp::AddU64Imm { dst, src, imm: v }),
+                        BinaryOp::Sub => self.emit(MicroOp::SubU64Imm { dst, src, imm: v }),
+                        BinaryOp::Mul => self.emit(MicroOp::MulU64Imm { dst, src, imm: v }),
+                        BinaryOp::Div => self.emit(MicroOp::DivU64Imm { dst, src, imm: v }),
+                        BinaryOp::Mod => self.emit(MicroOp::ModU64Imm { dst, src, imm: v }),
+                        BinaryOp::Shl => self.emit(MicroOp::ShlU64Imm { dst, src, imm: v }),
+                        BinaryOp::Shr => self.emit(MicroOp::ShrU64Imm { dst, src, imm: v }),
+                        // No immediate forms today: BitAnd/BitOr/Xor and the
+                        // Phase 2/3 Cmp/Or/And ops.
+                        BinaryOp::BitAnd
+                        | BinaryOp::BitOr
+                        | BinaryOp::Xor
+                        | BinaryOp::Cmp(_)
+                        | BinaryOp::Or
+                        | BinaryOp::And => {
+                            bail!("BinaryOpImm {:?} for u64-sized type not yet lowered", op)
+                        },
                     }
                 } else {
                     bail!("BinaryOpImm for non-u64 type not yet lowered");
