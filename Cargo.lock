@@ -12719,6 +12719,7 @@ dependencies = [
  "anyhow",
  "bytes",
  "fxhash",
+ "mono-move-alloc",
  "mono-move-core",
  "mono-move-gas",
  "mono-move-global-context",

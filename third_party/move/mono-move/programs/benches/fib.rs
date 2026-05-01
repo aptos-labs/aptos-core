@@ -1,7 +1,7 @@
 // Copyright (c) Aptos Foundation
 // Licensed pursuant to the Innovation-Enabling Source Code License, available at https://github.com/aptos-labs/aptos-core/blob/main/LICENSE
 
-use criterion::{black_box, criterion_group, criterion_main, BatchSize, Criterion};
+use criterion::{black_box, criterion_group, criterion_main, Criterion};
 
 #[path = "helpers.rs"]
 mod helpers;
@@ -9,8 +9,7 @@ mod helpers;
 const N: u64 = 25;
 
 fn bench_fib(c: &mut Criterion) {
-    use mono_move_core::NoopTransactionContext;
-    use mono_move_gas::{NoOpGasMeter, SimpleGasMeter};
+    use mono_move_core::LocalExecutionContext;
     use mono_move_programs::{
         fib::{micro_op_fib, move_bytecode_fib, native_fib},
         testing,
@@ -32,23 +31,17 @@ fn bench_fib(c: &mut Criterion) {
         let (functions, descriptors, _arena) = micro_op_fib();
         // SAFETY: Exclusive access during bench setup; arena is alive.
         unsafe { mono_move_core::Function::resolve_calls(&functions) };
-        let txn_ctx = NoopTransactionContext;
+        let mut exec_ctx = LocalExecutionContext::unmetered();
+        // TODO: hoist interpreter context setup out of the timed body.
         group.bench_function("micro_op", |b| {
-            b.iter_batched(
-                || {
-                    let mut ctx =
-                        InterpreterContext::new(&txn_ctx, &descriptors, NoOpGasMeter, unsafe {
-                            functions[0].unwrap().as_ref_unchecked()
-                        });
-                    ctx.set_root_arg(0, &N.to_le_bytes());
-                    ctx
-                },
-                |mut ctx| {
-                    ctx.run().unwrap();
-                    black_box(ctx.root_result())
-                },
-                BatchSize::SmallInput,
-            );
+            b.iter(|| {
+                let mut ctx = InterpreterContext::new(&mut exec_ctx, &descriptors, unsafe {
+                    functions[0].unwrap().as_ref_unchecked()
+                });
+                ctx.set_root_arg(0, &N.to_le_bytes());
+                ctx.run().unwrap();
+                black_box(ctx.root_result());
+            });
         });
 
         // with gas instrumentation
@@ -57,23 +50,17 @@ fn bench_fib(c: &mut Criterion) {
         let (functions_gas, _arena) = unsafe { helpers::gas_instrument(&functions) };
         // SAFETY: Exclusive access during bench setup; arena is alive.
         unsafe { mono_move_core::Function::resolve_calls(&functions_gas) };
+        let mut exec_ctx = LocalExecutionContext::with_max_budget();
+        // TODO: hoist interpreter context setup out of the timed body.
         group.bench_function("micro_op/gas", |b| {
-            b.iter_batched(
-                || {
-                    let gas_meter = SimpleGasMeter::new(u64::MAX);
-                    let mut ctx =
-                        InterpreterContext::new(&txn_ctx, &descriptors, gas_meter, unsafe {
-                            functions_gas[0].unwrap().as_ref_unchecked()
-                        });
-                    ctx.set_root_arg(0, &N.to_le_bytes());
-                    ctx
-                },
-                |mut ctx| {
-                    ctx.run().unwrap();
-                    black_box(ctx.root_result())
-                },
-                BatchSize::SmallInput,
-            );
+            b.iter(|| {
+                let mut ctx = InterpreterContext::new(&mut exec_ctx, &descriptors, unsafe {
+                    functions_gas[0].unwrap().as_ref_unchecked()
+                });
+                ctx.set_root_arg(0, &N.to_le_bytes());
+                ctx.run().unwrap();
+                black_box(ctx.root_result());
+            });
         });
 
         group.finish();

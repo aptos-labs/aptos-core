@@ -7,13 +7,15 @@
 use crate::{
     compile::{compile, SourceKind},
     matcher::check_output,
+    module_provider::InMemoryModuleProvider,
     parser::{PrintSection, Step},
     print_sections,
 };
 use anyhow::{anyhow, bail};
-use mono_move_core::NoopTransactionContext;
+use mono_move_core::ExecutionContext;
 use mono_move_gas::SimpleGasMeter;
 use mono_move_global_context::{ExecutionGuard, GlobalContext};
+use mono_move_loader::{Loader, LoadingPolicy, LoweringPolicy, TransactionContext};
 use mono_move_runtime::InterpreterContext;
 use move_core_types::{
     account_address::AccountAddress, identifier::IdentStr, language_storage::ModuleId,
@@ -46,6 +48,7 @@ pub fn run_test(steps: Vec<Step>, kind: SourceKind, test_path: &Path) -> anyhow:
     let guard = ctx.try_execution_context(0).unwrap();
 
     let mut storage = InMemoryStorage::new();
+    let mut module_provider = InMemoryModuleProvider::new();
     let mut snapshot = String::new();
 
     for step in steps {
@@ -63,13 +66,9 @@ pub fn run_test(steps: Vec<Step>, kind: SourceKind, test_path: &Path) -> anyhow:
                     // etc.) — sufficient for differential testing.
                     storage.add_module_bytes(module.self_addr(), module.self_name(), blob.into());
 
-                    // V2 path.
-                    let loaded =
-                        mono_move_orchestrator::build_executable(&guard, module.clone())
-                            .map_err(|err| anyhow!("Failed to build loaded module: {}", err))?;
-                    guard
-                        .insert_loaded_module(loaded)
-                        .map_err(|err| anyhow!("Failed to insert loaded module: {}", err))?;
+                    // V2 path: stage the bytes; the loader builds executables
+                    // lazily on first dispatch.
+                    module_provider.add_module(module);
                 }
 
                 if !print.is_empty() {
@@ -93,6 +92,7 @@ pub fn run_test(steps: Vec<Step>, kind: SourceKind, test_path: &Path) -> anyhow:
                     execute_function_v1(&storage, &address, &module_name, &function_name, &args);
                 let v2_output = execute_function_v2(
                     &guard,
+                    &module_provider,
                     &address,
                     &module_name,
                     &function_name,
@@ -195,6 +195,7 @@ fn execute_function_v1(
 /// Executes a function via MonoMove VM, and returns normalized output.
 fn execute_function_v2(
     guard: &ExecutionGuard<'_>,
+    module_provider: &InMemoryModuleProvider,
     address: &AccountAddress,
     module_name: &IdentStr,
     function_name: &IdentStr,
@@ -202,22 +203,38 @@ fn execute_function_v2(
     // TODO: Remove once function carries type signature.
     num_returns: usize,
 ) -> Output {
-    // Look up the executable from the context's cache.
-    let id = guard.intern_address_name(address, module_name);
-    let function_name = guard.intern_identifier(function_name);
-    let function = guard
-        .get_loaded_module(id)
-        .and_then(|loaded| {
-            loaded
-                .executable()
-                .get_function(function_name.into_global_arena_ptr())
-        })
-        .unwrap_or_else(|| panic!("Failed to load function or find loaded module"));
+    // Construct a per-transaction context.
+    let loader = Loader::new_with_policy(
+        guard,
+        module_provider,
+        LoadingPolicy::Lazy(LoweringPolicy::Lazy),
+    );
+    let mut txn_ctx = TransactionContext::new(guard, loader, SimpleGasMeter::new(u64::MAX));
 
-    let txn_ctx = NoopTransactionContext;
-    let gas_meter = SimpleGasMeter::new(u64::MAX);
+    // Resolve the entry function via load_function so the entry module is
+    // lazily loaded into the read-set and gas is charged for the load.
+    let id = guard
+        .intern_address_name(address, module_name)
+        .into_global_arena_ptr();
+    let function_name = guard
+        .intern_identifier(function_name)
+        .into_global_arena_ptr();
+
+    // SAFETY: the pointer lives in a `LoadedModule`'s arena. While `guard`
+    // is held, the global executable cache cannot enter the maintenance
+    // phase, so no arena reset can happen for the duration of this step.
+    let function = match txn_ctx.load_function(id, function_name) {
+        Ok(p) => unsafe { p.as_ref_unchecked() },
+        Err(err) => {
+            return Output {
+                display: format!("error: {}", err),
+                num_returns: 0,
+            };
+        },
+    };
+
     // TODO: Set object descriptor table when supported.
-    let mut interpreter = InterpreterContext::new(&txn_ctx, &[], gas_meter, function);
+    let mut interpreter = InterpreterContext::new(&mut txn_ctx, &[], function);
 
     // TODO: Check function signature to decide how to parse arguments.
     for (i, arg) in args.iter().enumerate() {

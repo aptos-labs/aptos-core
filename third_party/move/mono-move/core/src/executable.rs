@@ -163,12 +163,8 @@ impl Executable {
 
     /// Returns a non-generic function from this executable. Returns [`None`]
     /// if such function does not exist.
-    pub fn get_function(&self, name: GlobalArenaPtr<str>) -> Option<&Function> {
-        self.data.functions.get(&name).map(|ptr| {
-            // SAFETY: Because executable is alive, all its allocations are
-            // still valid.
-            unsafe { ptr.as_ref_unchecked() }
-        })
+    pub fn get_function(&self, name: GlobalArenaPtr<str>) -> Option<ExecutableArenaPtr<Function>> {
+        self.data.functions.get(&name).copied()
     }
 
     /// Returns a non-generic struct type from this executable. Returns [`None`]

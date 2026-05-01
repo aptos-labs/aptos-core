@@ -3,10 +3,9 @@
 
 use mono_move_alloc::{ExecutableArena, ExecutableArenaPtr, GlobalArenaPtr};
 use mono_move_core::{
-    CodeOffset as CO, DescriptorId, FrameLayoutInfo, FrameOffset as FO, Function, MicroOp,
-    NoopTransactionContext, SortedSafePointEntries,
+    CodeOffset as CO, DescriptorId, FrameLayoutInfo, FrameOffset as FO, Function,
+    LocalExecutionContext, MicroOp, SortedSafePointEntries,
 };
-use mono_move_gas::SimpleGasMeter;
 use mono_move_runtime::{InterpreterContext, ObjectDescriptor};
 
 /// Data segment (48 bytes):
@@ -69,9 +68,8 @@ fn vec_sum_100() {
     let n: u64 = 100;
     let arena = ExecutableArena::new();
     let (functions, descriptors) = make_vec_sum_program(&arena, n);
-    let txn_ctx = NoopTransactionContext;
-    let gas_meter = SimpleGasMeter::new(u64::MAX);
-    let mut ctx = InterpreterContext::new(&txn_ctx, &descriptors, gas_meter, unsafe {
+    let mut exec_ctx = LocalExecutionContext::with_max_budget();
+    let mut ctx = InterpreterContext::new(&mut exec_ctx, &descriptors, unsafe {
         functions[0].as_ref_unchecked()
     });
     ctx.run().unwrap();
@@ -83,12 +81,10 @@ fn vec_sum_with_gc_pressure() {
     let n: u64 = 200;
     let arena = ExecutableArena::new();
     let (functions, descriptors) = make_vec_sum_program(&arena, n);
-    let txn_ctx = NoopTransactionContext;
-    let gas_meter = SimpleGasMeter::new(u64::MAX);
+    let mut exec_ctx = LocalExecutionContext::with_max_budget();
     let mut ctx = InterpreterContext::with_heap_size(
-        &txn_ctx,
+        &mut exec_ctx,
         &descriptors,
-        gas_meter,
         unsafe { functions[0].as_ref_unchecked() },
         4 * 1024,
     );

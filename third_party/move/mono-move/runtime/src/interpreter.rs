@@ -20,8 +20,8 @@ use crate::{
     },
 };
 use mono_move_core::{
-    CallClosureOp, ClosureFuncRef, DescriptorId, Function, MicroOp, PackClosureOp, SizedSlot,
-    TransactionContext, CAPTURED_DATA_TAG_MATERIALIZED, CAPTURED_DATA_TAG_OFFSET,
+    CallClosureOp, ClosureFuncRef, DescriptorId, ExecutionContext, Function, MicroOp,
+    PackClosureOp, SizedSlot, CAPTURED_DATA_TAG_MATERIALIZED, CAPTURED_DATA_TAG_OFFSET,
     CAPTURED_DATA_VALUES_OFFSET, CLOSURE_CAPTURED_DATA_PTR_OFFSET, CLOSURE_FUNC_REF_OFFSET,
     CLOSURE_MASK_OFFSET, FRAME_METADATA_SIZE, FUNC_REF_PAYLOAD_OFFSET, FUNC_REF_TAG_OFFSET,
     FUNC_REF_TAG_RESOLVED,
@@ -35,13 +35,11 @@ use std::ptr::{null, NonNull};
 // ---------------------------------------------------------------------------
 
 /// Interpreter context with a unified call stack and a GC-managed heap.
-pub struct InterpreterContext<'a, G: GasMeter> {
+pub struct InterpreterContext<'a, T: ExecutionContext> {
     /// Per-transaction context (function resolution, gas counters, etc.).
-    pub(crate) txn_ctx: &'a dyn TransactionContext,
+    pub(crate) exec_ctx: &'a mut T,
     /// Externally-provided object layout descriptors (will be replaced by execution context).
     pub(crate) descriptors: &'a [ObjectDescriptor],
-    /// Externally-provided gas meter (will be replaced by execution context).
-    pub(crate) gas_meter: G,
 
     pub(crate) pc: usize,
     /// Pointer to the currently executing function.
@@ -59,21 +57,15 @@ pub struct InterpreterContext<'a, G: GasMeter> {
     rng: StdRng,
 }
 
-impl<'a, G: GasMeter> InterpreterContext<'a, G> {
-    pub fn new(
-        txn_ctx: &'a dyn TransactionContext,
-        descriptors: &'a [ObjectDescriptor],
-        gas_meter: G,
-        entry: &Function,
-    ) -> Self {
-        Self::with_heap_size(txn_ctx, descriptors, gas_meter, entry, DEFAULT_HEAP_SIZE)
+impl<'a, T: ExecutionContext> InterpreterContext<'a, T> {
+    pub fn new(exec_ctx: &'a mut T, descriptors: &'a [ObjectDescriptor], entry: &Function) -> Self {
+        Self::with_heap_size(exec_ctx, descriptors, entry, DEFAULT_HEAP_SIZE)
     }
 
     /// Create a new context with a custom heap size (for testing GC pressure).
     pub fn with_heap_size(
-        txn_ctx: &'a dyn TransactionContext,
+        exec_ctx: &'a mut T,
         descriptors: &'a [ObjectDescriptor],
-        gas_meter: G,
         entry: &Function,
         heap_size: usize,
     ) -> Self {
@@ -99,9 +91,8 @@ impl<'a, G: GasMeter> InterpreterContext<'a, G> {
         }
 
         Self {
-            txn_ctx,
+            exec_ctx,
             descriptors,
-            gas_meter,
             pc: 0,
             current_func: NonNull::from(entry),
             frame_ptr,
@@ -205,7 +196,7 @@ impl<'a, G: GasMeter> InterpreterContext<'a, G> {
 // Interpreter loop
 // ---------------------------------------------------------------------------
 
-impl<G: GasMeter> InterpreterContext<'_, G> {
+impl<T: ExecutionContext> InterpreterContext<'_, T> {
     #[inline(always)]
     pub fn step(&mut self) -> ExecutionResult<StepResult> {
         // SAFETY: Current function is always a valid, non-null pointer because
@@ -240,13 +231,13 @@ impl<G: GasMeter> InterpreterContext<'_, G> {
                     executable_id,
                     func_name,
                 } => {
-                    // Cross-module slow path, may trigger lazy module loading here.
-                    let Some(target) = self.txn_ctx.resolve_function(executable_id, func_name)
-                    else {
-                        // TODO: Once loader is in place, this should load the module
-                        // and retry resolution instead of bailing immediately.
-                        bail!("CallIndirect: function not found");
-                    };
+                    // Cross-module slow path: dispatches through the
+                    // transaction context, which triggers lazy module
+                    // loading on a cache miss.
+                    let target = self.exec_ctx.load_function(executable_id, func_name)?;
+                    // SAFETY: `target` points to a `Function` allocated in a
+                    // `LoadedModule`'s arena, which is held alive by the
+                    // global executable cache for the lifetime of `exec_ctx`.
                     return self.call(func, fp, target.as_ref_unchecked());
                 },
                 MicroOp::CallDirect { ptr } => {
@@ -682,7 +673,7 @@ impl<G: GasMeter> InterpreterContext<'_, G> {
                 },
 
                 MicroOp::Charge { cost } => {
-                    self.gas_meter.charge(cost)?;
+                    self.exec_ctx.gas_meter().charge(cost)?;
                 },
 
                 MicroOp::PackClosure(ref op) => {

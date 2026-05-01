@@ -20,7 +20,9 @@
 mod loader;
 mod module_provider;
 mod read_set;
+mod transaction_context;
 
 pub use loader::{Loader, LoadingPolicy, LoweringPolicy};
 pub use module_provider::ModuleProvider;
 pub use read_set::ExecutableReadSet;
+pub use transaction_context::TransactionContext;
