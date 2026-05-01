@@ -56,7 +56,6 @@ impl DbDir {
             env,
             block_cache,
             /*readonly=*/ true,
-            /*persist_write_set_hotness=*/ false,
         )
     }
 }
