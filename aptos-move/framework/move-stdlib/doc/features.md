@@ -183,6 +183,7 @@ return true.
     -  [Function `module_event_enabled`](#@Specification_1_module_event_enabled)
     -  [Function `abort_if_multisig_payload_mismatch_enabled`](#@Specification_1_abort_if_multisig_payload_mismatch_enabled)
     -  [Function `is_default_account_resource_enabled`](#@Specification_1_is_default_account_resource_enabled)
+    -  [Function `is_storage_slot_natives_enabled`](#@Specification_1_is_storage_slot_natives_enabled)
     -  [Function `change_feature_flags_internal`](#@Specification_1_change_feature_flags_internal)
     -  [Function `change_feature_flags_for_next_epoch`](#@Specification_1_change_feature_flags_for_next_epoch)
     -  [Function `on_new_epoch`](#@Specification_1_on_new_epoch)
@@ -4730,6 +4731,24 @@ Helper to check whether a feature flag is enabled.
 <pre><code><b>pragma</b> opaque;
 <b>aborts_if</b> [abstract] <b>false</b>;
 <b>ensures</b> [abstract] result == <a href="features.md#0x1_features_spec_is_enabled">spec_is_enabled</a>(<a href="features.md#0x1_features_DEFAULT_ACCOUNT_RESOURCE">DEFAULT_ACCOUNT_RESOURCE</a>);
+</code></pre>
+
+
+
+<a id="@Specification_1_is_storage_slot_natives_enabled"></a>
+
+### Function `is_storage_slot_natives_enabled`
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="features.md#0x1_features_is_storage_slot_natives_enabled">is_storage_slot_natives_enabled</a>(): bool
+</code></pre>
+
+
+
+
+<pre><code><b>pragma</b> opaque;
+<b>aborts_if</b> [abstract] <b>false</b>;
+<b>ensures</b> [abstract] result == <a href="features.md#0x1_features_spec_is_enabled">spec_is_enabled</a>(<a href="features.md#0x1_features_STORAGE_SLOT_NATIVES">STORAGE_SLOT_NATIVES</a>);
 </code></pre>
 
 

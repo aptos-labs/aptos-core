@@ -15,6 +15,12 @@
 -  [Function `borrow_mut`](#0x1_storage_slot_borrow_mut)
 -  [Function `copy_storage_slot`](#0x1_storage_slot_copy_storage_slot)
 -  [Function `destroy`](#0x1_storage_slot_destroy)
+-  [Specification](#@Specification_1)
+    -  [Function `new`](#@Specification_1_new)
+    -  [Function `borrow`](#@Specification_1_borrow)
+    -  [Function `borrow_mut`](#@Specification_1_borrow_mut)
+    -  [Function `copy_storage_slot`](#@Specification_1_copy_storage_slot)
+    -  [Function `destroy`](#@Specification_1_destroy)
 
 
 <pre><code><b>use</b> <a href="../../aptos-stdlib/../move-stdlib/doc/features.md#0x1_features">0x1::features</a>;
@@ -89,6 +95,17 @@ Storage slot natives are not enabled.
 
 
 <pre><code><b>const</b> <a href="storage_slot.md#0x1_storage_slot_ESTORAGE_SLOT_NATIVES_NOT_ENABLED">ESTORAGE_SLOT_NATIVES_NOT_ENABLED</a>: u64 = 1;
+</code></pre>
+
+
+
+<a id="0x1_storage_slot_ESTORAGE_SLOT_NOT_FOUND"></a>
+
+Resource under storage slot not found, this should never happen.
+Emitted by native functions.
+
+
+<pre><code><b>const</b> <a href="storage_slot.md#0x1_storage_slot_ESTORAGE_SLOT_NOT_FOUND">ESTORAGE_SLOT_NOT_FOUND</a>: u64 = 2;
 </code></pre>
 
 
@@ -262,6 +279,99 @@ Storage slot natives are not enabled.
 
 
 </details>
+
+<a id="@Specification_1"></a>
+
+## Specification
+
+
+
+<pre><code><b>pragma</b> verify = <b>false</b>;
+</code></pre>
+
+
+
+<a id="@Specification_1_new"></a>
+
+### Function `new`
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="storage_slot.md#0x1_storage_slot_new">new</a>&lt;T: store&gt;(value: T): <a href="storage_slot.md#0x1_storage_slot_StorageSlot">storage_slot::StorageSlot</a>&lt;T&gt;
+</code></pre>
+
+
+
+
+<pre><code><b>pragma</b> verify = <b>false</b>;
+</code></pre>
+
+
+
+<a id="@Specification_1_borrow"></a>
+
+### Function `borrow`
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="storage_slot.md#0x1_storage_slot_borrow">borrow</a>&lt;T: store&gt;(self: &<a href="storage_slot.md#0x1_storage_slot_StorageSlot">storage_slot::StorageSlot</a>&lt;T&gt;): &T
+</code></pre>
+
+
+
+
+<pre><code><b>pragma</b> opaque;
+<b>pragma</b> verify = <b>false</b>;
+<b>aborts_if</b> [abstract] <b>false</b>;
+</code></pre>
+
+
+
+<a id="@Specification_1_borrow_mut"></a>
+
+### Function `borrow_mut`
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="storage_slot.md#0x1_storage_slot_borrow_mut">borrow_mut</a>&lt;T: store&gt;(self: &<b>mut</b> <a href="storage_slot.md#0x1_storage_slot_StorageSlot">storage_slot::StorageSlot</a>&lt;T&gt;): &<b>mut</b> T
+</code></pre>
+
+
+
+
+<pre><code><b>pragma</b> opaque;
+<b>pragma</b> verify = <b>false</b>;
+<b>aborts_if</b> [abstract] <b>false</b>;
+</code></pre>
+
+
+
+<a id="@Specification_1_copy_storage_slot"></a>
+
+### Function `copy_storage_slot`
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="storage_slot.md#0x1_storage_slot_copy_storage_slot">copy_storage_slot</a>&lt;T: <b>copy</b>, store&gt;(self: &<a href="storage_slot.md#0x1_storage_slot_StorageSlot">storage_slot::StorageSlot</a>&lt;T&gt;): <a href="storage_slot.md#0x1_storage_slot_StorageSlot">storage_slot::StorageSlot</a>&lt;T&gt;
+</code></pre>
+
+
+
+
+<pre><code><b>pragma</b> verify = <b>false</b>;
+</code></pre>
+
+
+
+<a id="@Specification_1_destroy"></a>
+
+### Function `destroy`
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="storage_slot.md#0x1_storage_slot_destroy">destroy</a>&lt;T: store&gt;(self: <a href="storage_slot.md#0x1_storage_slot_StorageSlot">storage_slot::StorageSlot</a>&lt;T&gt;): T
+</code></pre>
+
+
+
+
+<pre><code><b>pragma</b> verify = <b>false</b>;
+</code></pre>
 
 
 [move-book]: https://aptos.dev/move/book/SUMMARY

@@ -15,6 +15,7 @@
 -  [Function `destroy`](#0x1_storage_slot_or_inline_destroy)
 -  [Function `move_to_inline`](#0x1_storage_slot_or_inline_move_to_inline)
 -  [Function `move_to_storage_slot`](#0x1_storage_slot_or_inline_move_to_storage_slot)
+-  [Specification](#@Specification_1)
 
 
 <pre><code><b>use</b> <a href="../../aptos-stdlib/../move-stdlib/doc/mem.md#0x1_mem">0x1::mem</a>;
@@ -335,6 +336,15 @@ StorageSlotOrInline found in inconsistent (transient) state, should never happen
 
 
 </details>
+
+<a id="@Specification_1"></a>
+
+## Specification
+
+
+
+<pre><code><b>pragma</b> verify = <b>false</b>;
+</code></pre>
 
 
 [move-book]: https://aptos.dev/move/book/SUMMARY
