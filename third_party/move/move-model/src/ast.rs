@@ -568,10 +568,12 @@ impl Spec {
             && self.properties.is_empty()
             && self.update_map.is_empty()
             && self.proof.is_none()
-            && self
-                .frame_spec
-                .as_ref()
-                .is_none_or(|fs| fs.modifies_targets.is_empty())
+            && self.frame_spec.as_ref().is_none_or(|fs| {
+                fs.modifies_targets.is_empty()
+                    && fs.reads_targets.is_empty()
+                    && !fs.modifies_all
+                    && !fs.reads_all
+            })
     }
 
     pub fn filter<P>(&self, pred: P) -> impl Iterator<Item = &Condition>
