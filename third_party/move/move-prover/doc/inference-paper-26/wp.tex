@@ -1,0 +1,27 @@
+\Section{Weakest-Precondition Analysis}
+\label{sec:wp}
+
+We run a textbook weakest-precondition (\WP) analysis~\cite{dijkstra1975wp,BL05} over the same bytecode that \MVP normally hands to its Boogie back-end, and read off abort conditions, modifies clauses, and the postconditions that are direct consequences of the function body.
+The novelty here is not in the \WP calculus, but in the \emph{shape of the bytecode it operates on}: by the time the analysis runs, \MVP's standard transformation pipeline has already eliminated all Move references and injected every available specification as in-line \texttt{assume}/\texttt{assert} statements.
+The result is a reference-free, contract-annotated control flow on which backward predicate propagation reduces to the classical case.
+
+\Paragraph{Reference elimination}
+Move has Rust-style references: |&T| for shared reads and |&mut T| for exclusive writes, both with a stack-bounded lifetime.
+Predicate-transformer reasoning over such references is awkward, because the meaning of |*r = v| depends on which root location |r| was derived from.
+\MVP avoids this by rewriting bytecode into a reference-free intermediate form~\cite{DillGPQXZ22}.
+Shared references are inlined: |&T| disappears and reads through it become reads of the underlying value.
+Mutable references are replaced by in/out parameters.
+
+\Paragraph{Specification instrumentation}
+Before \WP runs, the bytecode will run through the regular process of specification instrumentation.
+function-level |requires|, |aborts_if|, |ensures|, and |modifies| clause, and each loop |invariant|, is compiled into an |assume| or |assert| at the appropriate program point.
+Calls are instrumented uniformly via the \emph{behavioral predicates} introduced for higher-order functions in~\cite{GrieskampEtAl26HO}: |requires_of<f>|, |aborts_of<f>|, |ensures_of<f>|, |modifies_of<f>|, and |result_of<f>| reify a callee's contract as predicates over the call site's arguments and result.
+Loops are broken at their headers via the standard \emph{cut-point} encoding of Barnett and Leino for unstructured programs~\cite{BL05}, with the loop |invariant| playing the role of cut-point predicate: the back-edge is severed, the invariant is asserted before and after each iteration, and the loop-modified locations are havoced in between, leaving an acyclic fragment through which \WP propagates as through any straight-line code.
+This is the one place where the construction has a genuine \emph{prerequisite}: without an inductive invariant the inferred specification past the loop becomes vacuous, and an inductive invariant cannot in general be recovered from the loop body alone --- this is where AI-proposed candidates enter the picture (Sec.~\ref{sec:skills}).
+At the input to \WP, the bytecode therefore looks like a sequence of pure assignments interleaved with |assume| and |assert| over plain values; the surface-level features (references, resources, calls, loops) are gone.
+AI-proposed clauses (loop invariants, conservation laws) enter via the same instrumentation pass, so a subsequent \WP run propagates through them as if they had been written by hand.
+
+%%% Local Variables:
+%%% mode: latex
+%%% TeX-master: "main"
+%%% End:
