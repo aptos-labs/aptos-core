@@ -647,6 +647,11 @@ impl Spec {
         for exp in self.proof_exps() {
             result.append(&mut exp.called_funs_with_callsites())
         }
+        if let Some(fs) = &self.frame_spec {
+            for target in &fs.modifies_targets {
+                result.append(&mut target.called_funs_with_callsites())
+            }
+        }
         result
     }
 
