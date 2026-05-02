@@ -31,7 +31,6 @@ error: post-condition does not hold
     │
     =     at tests/sources/functional/proof/lemma.move:150: bad_claim (spec)
     =         x = <redacted>
-    =     at tests/sources/functional/proof/lemma.move:152: bad_claim (spec)
     =     at tests/sources/functional/proof/lemma.move:151: bad_claim (spec)
 
 error: lemma requirement not satisfied
@@ -56,7 +55,6 @@ error: post-condition does not hold
     =         n = <redacted>
     =     at tests/sources/functional/proof/lemma.move:187: sum_upper_bound (spec)
     =     at tests/sources/functional/proof/lemma.move:182: sum_upper_bound (spec)
-    =     at tests/sources/functional/proof/lemma.move:189: sum_upper_bound (spec)
     =     at tests/sources/functional/proof/lemma.move:184: sum_upper_bound (spec)
 
 error: post-condition does not hold
@@ -71,5 +69,4 @@ error: post-condition does not hold
     =         x = <redacted>
     =     at tests/sources/functional/proof/lemma.move:209: strong_claim (spec)
     =     at tests/sources/functional/proof/lemma.move:205: strong_claim (spec)
-    =     at tests/sources/functional/proof/lemma.move:211: strong_claim (spec)
     =     at tests/sources/functional/proof/lemma.move:207: strong_claim (spec)

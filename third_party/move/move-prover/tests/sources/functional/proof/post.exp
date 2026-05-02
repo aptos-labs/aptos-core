@@ -9,5 +9,4 @@ error: proof assertion not satisfied
     =         x = <redacted>
     =     at tests/sources/functional/proof/post.move:110: identity
     =         result = <redacted>
-    =     at tests/sources/functional/proof/post.move:111: identity
     =     at tests/sources/functional/proof/post.move:115: identity (spec)

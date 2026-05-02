@@ -18,13 +18,9 @@ error: post-condition does not hold
    =     at tests/sources/functional/closures/closure_refs.move:35: borrow_a
    =         result = <redacted>
    =         s = <redacted>
-   =     at tests/sources/functional/closures/closure_refs.move:36: borrow_a
    =         <redacted> = <redacted>
-   =         s = <redacted>
-   =     at tests/sources/functional/closures/closure_refs.move:44: update_indirect
    =         s = <redacted>
    =     at tests/sources/functional/closures/closure_refs.move:49: update_a
    =     at tests/sources/functional/closures/closure_refs.move:46: update_a
    =         result = <redacted>
-   =     at tests/sources/functional/closures/closure_refs.move:50: update_a
    =     at tests/sources/functional/closures/closure_refs.move:56: update_a (spec)

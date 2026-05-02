@@ -361,8 +361,6 @@ struct Instrumenter<'a> {
     options: &'a ProverOptions,
     builder: FunctionDataBuilder<'a>,
     ret_locals: Vec<TempIndex>,
-    ret_label: Label,
-    can_return: bool,
     abort_local: TempIndex,
     abort_label: Label,
     can_abort: bool,
@@ -400,17 +398,31 @@ impl<'a> Instrumenter<'a> {
 
         let mut builder = FunctionDataBuilder::new(fun_env, data);
 
-        // Create label and locals for unified return exit point. We translate each `Ret(t..)`
-        // instruction into `Assign(r.., t..); Jump(RetLab)`.
+        // After `NormalizeExitsProcessor`, the input bytecode has at most one
+        // `Ret` instruction. Capture its source temps as `ret_locals` so the
+        // spec translation rewrites `result_*` references to them directly,
+        // and the assertions emitted by `emit_return_assertions` reference the
+        // same temps that the trailing `Ret` returns. For divergent functions
+        // (no `Ret`), allocate placeholder locals — the translated spec is
+        // never asserted in that case.
         let ret_locals = builder
             .data
-            .result_type
-            .clone()
-            .flatten()
-            .into_iter()
-            .map(|ty| builder.new_temp(ty))
-            .collect_vec();
-        let ret_label = builder.new_label();
+            .code
+            .iter()
+            .find_map(|bc| match bc {
+                Bytecode::Ret(_, temps) => Some(temps.clone()),
+                _ => None,
+            })
+            .unwrap_or_else(|| {
+                builder
+                    .data
+                    .result_type
+                    .clone()
+                    .flatten()
+                    .into_iter()
+                    .map(|ty| builder.new_temp(ty))
+                    .collect_vec()
+            });
 
         // Similarly create label and local for unified abort exit point. We translate `Abort(c)`
         // into `Assign(r, c); Jump(AbortLabel)`, as well as `Call(..)` into `Call(..);
@@ -467,8 +479,6 @@ impl<'a> Instrumenter<'a> {
             options,
             builder,
             ret_locals,
-            ret_label,
-            can_return: false,
             abort_local,
             abort_label,
             can_abort: false,
@@ -628,10 +638,9 @@ impl<'a> Instrumenter<'a> {
             self.instrument_bytecode(spec, inlined_props, bc);
         }
 
-        // Generate return and abort blocks
-        if self.can_return {
-            self.generate_return_block(spec);
-        }
+        // The return assertion block is emitted in-place at the trailing `Ret`
+        // (see `instrument_bytecode`). Only the abort exit needs a separate
+        // out-of-line block at this point.
         if self.can_abort {
             self.generate_abort_block(spec);
         }
@@ -680,13 +689,13 @@ impl<'a> Instrumenter<'a> {
         match bc {
             Ret(id, results) => {
                 self.builder.set_loc_from_attr(id);
-                for (i, r) in self.ret_locals.clone().into_iter().enumerate() {
-                    self.builder
-                        .emit_with(|id| Assign(id, r, results[i], AssignKind::Move));
-                }
-                let ret_label = self.ret_label;
-                self.builder.emit_with(|id| Jump(id, ret_label));
-                self.can_return = true;
+                // Emit the spec-decoration block (lets, updates, ensures
+                // assertions, emits checks, ...) in-place before the actual
+                // return. After `NormalizeExitsProcessor` this is the unique
+                // exit point of the function.
+                debug_assert_eq!(self.ret_locals, results);
+                self.emit_return_assertions(spec);
+                self.builder.emit(Ret(id, results));
             },
             Abort(id, code, _) => {
                 self.builder.set_loc_from_attr(id);
@@ -1679,15 +1688,17 @@ impl<'a> Instrumenter<'a> {
         (Some(aborts_cond_temp), aborts_code_cond)
     }
 
-    fn generate_return_block(&mut self, spec: &TranslatedSpec) {
+    /// Emit the spec-decoration block at the function's unified exit: state
+    /// updates, post-state lets, aborts negation, ensures assertions, and emits
+    /// completeness checks. Called from the `Ret` arm of `instrument_bytecode`
+    /// so the assertions execute immediately before the trailing `Ret`. The
+    /// caller is responsible for emitting the `Ret` itself.
+    fn emit_return_assertions(&mut self, spec: &TranslatedSpec) {
         use Bytecode::*;
         use PropKind::*;
 
-        // Set the location to the function and emit label.
         self.builder
             .set_loc(self.builder.fun_env.get_loc().at_end());
-        let ret_label = self.ret_label;
-        self.builder.emit_with(|id| Label(id, ret_label));
 
         // Emit specification variable updates. They are generated for both verified and inlined
         // function variants, as the evolution of state updates is always the same.
@@ -1786,10 +1797,6 @@ impl<'a> Instrumenter<'a> {
                 self.builder.emit_with(move |id| Prop(id, Assert, cond));
             }
         }
-
-        // Emit return
-        let ret_locals = self.ret_locals.clone();
-        self.builder.emit_with(move |id| Ret(id, ret_locals))
     }
 
     /// Emit havoc+assume for intermediate state labels.

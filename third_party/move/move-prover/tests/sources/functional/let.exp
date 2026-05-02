@@ -22,7 +22,6 @@ error: function does not abort under this condition
    =     at tests/sources/functional/let.move:69: spec_let_with_abort_incorrect
    =         a = <redacted>
    =         b = <redacted>
-   =     at tests/sources/functional/let.move:73: spec_let_with_abort_incorrect
    =     at tests/sources/functional/let.move:80: spec_let_with_abort_incorrect (spec)
    =         `let post new_a = old(a) / sum;` = <redacted>
    =     at tests/sources/functional/let.move:77: spec_let_with_abort_incorrect (spec)

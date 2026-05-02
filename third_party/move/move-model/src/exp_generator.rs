@@ -784,6 +784,78 @@ pub trait ExpGenerator<'env> {
     }
 
     // =================================================================================================
+    // Spec Vector Helpers
+
+    /// `len(v)` — element count, `Type::Num`.
+    fn mk_len(&self, v: Exp) -> Exp {
+        self.mk_call(&NUM_TYPE, Operation::Len, vec![v])
+    }
+
+    /// `v[i]` — element access, result type `elem_ty`.
+    fn mk_index(&self, v: Exp, i: Exp, elem_ty: &Type) -> Exp {
+        self.mk_call(elem_ty, Operation::Index, vec![v, i])
+    }
+
+    /// `v[from..to]` — range slice, result type `vec_ty`.
+    fn mk_slice(&self, v: Exp, from: Exp, to: Exp, vec_ty: &Type) -> Exp {
+        self.mk_call(vec_ty, Operation::Slice, vec![v, from, to])
+    }
+
+    /// `in_range(v, i)` — bounds-check predicate.
+    fn mk_in_range_vec(&self, v: Exp, i: Exp) -> Exp {
+        self.mk_bool_call(Operation::InRangeVec, vec![v, i])
+    }
+
+    /// `vec()` — empty vector with element type `elem_ty`.
+    fn mk_empty_vec(&self, elem_ty: &Type) -> Exp {
+        let vec_ty = Type::Vector(Box::new(elem_ty.clone()));
+        self.mk_call_with_inst(&vec_ty, vec![elem_ty.clone()], Operation::EmptyVec, vec![])
+    }
+
+    /// `vec(e)` — singleton vector with element type `elem_ty`.
+    fn mk_single_vec(&self, e: Exp, elem_ty: &Type) -> Exp {
+        let vec_ty = Type::Vector(Box::new(elem_ty.clone()));
+        self.mk_call_with_inst(&vec_ty, vec![elem_ty.clone()], Operation::SingleVec, vec![
+            e,
+        ])
+    }
+
+    /// `concat(a, b)` — vector concatenation.
+    fn mk_concat_vec(&self, a: Exp, b: Exp, vec_ty: &Type) -> Exp {
+        self.mk_call(vec_ty, Operation::ConcatVec, vec![a, b])
+    }
+
+    /// `update(v, i, e)` — functional update.
+    fn mk_update_vec(&self, v: Exp, i: Exp, e: Exp, vec_ty: &Type) -> Exp {
+        self.mk_call(vec_ty, Operation::UpdateVec, vec![v, i, e])
+    }
+
+    /// `contains(v, e)` — membership predicate.
+    ///
+    /// `Operation::ContainsVec` is translated by `spec_translator` via
+    /// `translate_primitive_inst_call`, which uses the node's type
+    /// instantiation to compute the per-element-type suffix
+    /// (e.g. `$ContainsVec'#0'`). Without an explicit instantiation the
+    /// emitted Boogie name has no suffix and fails name resolution.
+    fn mk_contains_vec(&self, v: Exp, e: Exp, elem_ty: &Type) -> Exp {
+        self.mk_call_with_inst(
+            &BOOL_TYPE,
+            vec![elem_ty.clone()],
+            Operation::ContainsVec,
+            vec![v, e],
+        )
+    }
+
+    /// `update(update(v, i, v[j]), j, v[i])` — the post-state vector after
+    /// `vector::swap(v, i, j)`.
+    fn mk_swap_post(&self, v: Exp, i: Exp, j: Exp, elem_ty: &Type, vec_ty: &Type) -> Exp {
+        let v_at_j = self.mk_index(v.clone(), j.clone(), elem_ty);
+        let v_at_i = self.mk_index(v.clone(), i.clone(), elem_ty);
+        let inner = self.mk_update_vec(v, i.clone(), v_at_j, vec_ty);
+        self.mk_update_vec(inner, j, v_at_i, vec_ty)
+    }
+
+    // =================================================================================================
     // Function Values
 
     /// Create a closure expression for a function reference.

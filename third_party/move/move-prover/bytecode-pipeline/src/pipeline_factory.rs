@@ -11,7 +11,7 @@ use crate::{
     global_invariant_instrumentation::GlobalInvariantInstrumentationProcessor,
     inconsistency_check::InconsistencyCheckInstrumenter, loop_analysis::LoopAnalysisProcessor,
     memory_instrumentation::MemoryInstrumentationProcessor, mono_analysis::MonoAnalysisProcessor,
-    mut_ref_instrumentation::MutRefInstrumenter,
+    mut_ref_instrumentation::MutRefInstrumenter, normalize_exits::NormalizeExitsProcessor,
     number_operation_analysis::NumberOperationProcessor, options::ProverOptions,
     spec_inference::SpecInferenceProcessor, spec_instrumentation::SpecInstrumentationProcessor,
     verification_analysis::VerificationAnalysisProcessor,
@@ -44,6 +44,8 @@ pub fn default_pipeline_with_options(options: &ProverOptions) -> FunctionTargetP
         UsageProcessor::new(),
         VerificationAnalysisProcessor::new(),
     ]);
+
+    processors.push(NormalizeExitsProcessor::new());
 
     if !options.skip_loop_analysis {
         processors.push(LoopAnalysisProcessor::new());
@@ -99,6 +101,7 @@ pub fn experimental_pipeline() -> FunctionTargetPipeline {
         CleanAndOptimizeProcessor::new(),
         UsageProcessor::new(),
         VerificationAnalysisProcessor::new(),
+        NormalizeExitsProcessor::new(),
         LoopAnalysisProcessor::new(),
         // spec instrumentation
         SpecInstrumentationProcessor::new(),

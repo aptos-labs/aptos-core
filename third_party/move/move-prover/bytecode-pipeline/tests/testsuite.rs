@@ -11,7 +11,7 @@ use move_prover_bytecode_pipeline::{
     global_invariant_analysis::GlobalInvariantAnalysisProcessor,
     global_invariant_instrumentation::GlobalInvariantInstrumentationProcessor,
     memory_instrumentation::MemoryInstrumentationProcessor, mono_analysis::MonoAnalysisProcessor,
-    mut_ref_instrumentation::MutRefInstrumenter,
+    mut_ref_instrumentation::MutRefInstrumenter, normalize_exits::NormalizeExitsProcessor,
     spec_instrumentation::SpecInstrumentationProcessor,
     verification_analysis::VerificationAnalysisProcessor,
     well_formed_instrumentation::WellFormedInstrumentationProcessor,
@@ -83,6 +83,7 @@ fn get_tested_transformation_pipeline(
             pipeline.add_processor(CleanAndOptimizeProcessor::new());
             pipeline.add_processor(UsageProcessor::new());
             pipeline.add_processor(VerificationAnalysisProcessor::new());
+            pipeline.add_processor(NormalizeExitsProcessor::new());
             pipeline.add_processor(SpecInstrumentationProcessor::new());
             Ok(Some(pipeline))
         },
@@ -97,6 +98,7 @@ fn get_tested_transformation_pipeline(
             pipeline.add_processor(CleanAndOptimizeProcessor::new());
             pipeline.add_processor(UsageProcessor::new());
             pipeline.add_processor(VerificationAnalysisProcessor::new());
+            pipeline.add_processor(NormalizeExitsProcessor::new());
             pipeline.add_processor(SpecInstrumentationProcessor::new());
             pipeline.add_processor(GlobalInvariantAnalysisProcessor::new());
             pipeline.add_processor(WellFormedInstrumentationProcessor::new());
@@ -114,6 +116,7 @@ fn get_tested_transformation_pipeline(
             pipeline.add_processor(CleanAndOptimizeProcessor::new());
             pipeline.add_processor(UsageProcessor::new());
             pipeline.add_processor(VerificationAnalysisProcessor::new());
+            pipeline.add_processor(NormalizeExitsProcessor::new());
             pipeline.add_processor(SpecInstrumentationProcessor::new());
             pipeline.add_processor(GlobalInvariantAnalysisProcessor::new());
             Ok(Some(pipeline))
@@ -129,6 +132,7 @@ fn get_tested_transformation_pipeline(
             pipeline.add_processor(CleanAndOptimizeProcessor::new());
             pipeline.add_processor(UsageProcessor::new());
             pipeline.add_processor(VerificationAnalysisProcessor::new());
+            pipeline.add_processor(NormalizeExitsProcessor::new());
             pipeline.add_processor(SpecInstrumentationProcessor::new());
             pipeline.add_processor(GlobalInvariantAnalysisProcessor::new());
             pipeline.add_processor(GlobalInvariantInstrumentationProcessor::new());
@@ -138,6 +142,7 @@ fn get_tested_transformation_pipeline(
             let mut pipeline = FunctionTargetPipeline::default();
             pipeline.add_processor(UsageProcessor::new());
             pipeline.add_processor(VerificationAnalysisProcessor::new());
+            pipeline.add_processor(NormalizeExitsProcessor::new());
             pipeline.add_processor(SpecInstrumentationProcessor::new());
             pipeline.add_processor(GlobalInvariantAnalysisProcessor::new());
             pipeline.add_processor(WellFormedInstrumentationProcessor::new());

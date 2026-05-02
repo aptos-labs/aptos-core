@@ -13,5 +13,4 @@ error: post-condition does not hold
    │
    =     at tests/sources/functional/proof/lemma_shortcut.move:57: false_identity (spec)
    =         x = <redacted>
-   =     at tests/sources/functional/proof/lemma_shortcut.move:59: false_identity (spec)
    =     at tests/sources/functional/proof/lemma_shortcut.move:58: false_identity (spec)

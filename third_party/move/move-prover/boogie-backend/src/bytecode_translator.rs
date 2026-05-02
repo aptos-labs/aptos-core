@@ -2923,17 +2923,14 @@ impl<'env> BoogieTranslator<'env> {
     }
 
     /// Behavioral predicates reason over plain values, even when the underlying
-    /// function result is a mutable reference or a `&mut` parameter post-state.
+    /// function result is a reference or a `&mut` parameter post-state. Both
+    /// `&T` and `&mut T` are stripped to `T` here so that `result_of<f>(...)`
+    /// has the same Boogie value type as the surrounding spec context's
+    /// auto-derefed `result`.
     fn behavioral_output_types(params: &[Type], results: &[Type]) -> Vec<Type> {
         let mut outputs = results
             .iter()
-            .map(|ty| {
-                if ty.is_mutable_reference() {
-                    ty.skip_reference().clone()
-                } else {
-                    ty.clone()
-                }
-            })
+            .map(|ty| ty.skip_reference().clone())
             .collect::<Vec<_>>();
         outputs.extend(
             params
@@ -2979,17 +2976,13 @@ impl<'env> BoogieTranslator<'env> {
         }
     }
 
-    /// Dereference mutable reference types for behavioral output (used in result tuple types).
+    /// Strip references (both `&T` and `&mut T`) for behavioral-output result
+    /// tuple types. BPs reason over values, so the tuple components match the
+    /// spec-language value types — never the raw `$Mutation` form.
     fn deref_output_types(type_refs: &[&Type]) -> Vec<Type> {
         type_refs
             .iter()
-            .map(|ty| {
-                if ty.is_mutable_reference() {
-                    ty.skip_reference().clone()
-                } else {
-                    (*ty).clone()
-                }
-            })
+            .map(|ty| ty.skip_reference().clone())
             .collect()
     }
 
@@ -3002,11 +2995,9 @@ impl<'env> BoogieTranslator<'env> {
         result_ty: &Type,
         precond: &str,
     ) {
-        let result_ty_for_validity = if result_ty.is_mutable_reference() {
-            result_ty.skip_reference()
-        } else {
-            result_ty
-        };
+        // The result-function returns the spec-language value type — references
+        // stripped — so validity is checked on the deref'd type to match.
+        let result_ty_for_validity = result_ty.skip_reference();
         let result_validity =
             boogie_well_formed_expr(self.env, result_fun_app, result_ty_for_validity, false);
         emitln!(
