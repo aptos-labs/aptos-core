@@ -14,13 +14,6 @@ use std::{
     time::{Duration, Instant},
 };
 
-/// TODO(philiphayes): Use `Duration::MAX` once it stabilizes.
-#[inline]
-#[allow(clippy::arithmetic_side_effects)]
-fn duration_max() -> Duration {
-    Duration::new(u64::MAX, 1_000_000_000 - 1)
-}
-
 /// Each waiter in the pending queue has a unique index to distinguish waiters
 /// with the same deadline.
 type SleepIndex = usize;
@@ -100,7 +93,7 @@ impl MockTimeService {
 
     /// Create a new `MockTimeService` that will auto advance forever.
     pub fn new_auto_advance() -> Self {
-        Self::new_auto_advance_for(duration_max())
+        Self::new_auto_advance_for(Duration::MAX)
     }
 
     /// Create a new `MockTimeService` that will auto advance until the simulation
@@ -312,11 +305,7 @@ impl Inner {
 
     // Unregister and return the next waiter with the earliest deadline.
     fn unregister_min_sleep(&mut self) -> Option<((Duration, SleepIndex), Option<Waker>)> {
-        // TODO(philiphayes): use `BTreeMap::pop_first()` when that stabilizes.
-        let (deadline, index) = self.pending.keys().next()?;
-        let deadline = *deadline;
-        let index = *index;
-        self.pending.remove_entry(&(deadline, index))
+        self.pending.pop_first()
     }
 
     // Wake up the next waiter with the earliest deadline and return the wake
