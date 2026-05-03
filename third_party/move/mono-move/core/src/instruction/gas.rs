@@ -41,11 +41,22 @@ impl HasCfgInfo for MicroOp {
             | MicroOp::Move { .. }
             | MicroOp::AddU64 { .. }
             | MicroOp::AddU64Imm { .. }
+            | MicroOp::SubU64 { .. }
             | MicroOp::SubU64Imm { .. }
             | MicroOp::RSubU64Imm { .. }
-            | MicroOp::XorU64 { .. }
-            | MicroOp::ShrU64Imm { .. }
+            | MicroOp::MulU64 { .. }
+            | MicroOp::MulU64Imm { .. }
+            | MicroOp::DivU64 { .. }
+            | MicroOp::DivU64Imm { .. }
             | MicroOp::ModU64 { .. }
+            | MicroOp::ModU64Imm { .. }
+            | MicroOp::BitAndU64 { .. }
+            | MicroOp::BitOrU64 { .. }
+            | MicroOp::BitXorU64 { .. }
+            | MicroOp::ShlU64 { .. }
+            | MicroOp::ShlU64Imm { .. }
+            | MicroOp::ShrU64 { .. }
+            | MicroOp::ShrU64Imm { .. }
             | MicroOp::Return
             | MicroOp::CallFunc { .. }
             | MicroOp::CallIndirect { .. }
@@ -131,11 +142,22 @@ impl RemapTargets for MicroOp {
             | MicroOp::Move { .. }
             | MicroOp::AddU64 { .. }
             | MicroOp::AddU64Imm { .. }
+            | MicroOp::SubU64 { .. }
             | MicroOp::SubU64Imm { .. }
             | MicroOp::RSubU64Imm { .. }
-            | MicroOp::XorU64 { .. }
-            | MicroOp::ShrU64Imm { .. }
+            | MicroOp::MulU64 { .. }
+            | MicroOp::MulU64Imm { .. }
+            | MicroOp::DivU64 { .. }
+            | MicroOp::DivU64Imm { .. }
             | MicroOp::ModU64 { .. }
+            | MicroOp::ModU64Imm { .. }
+            | MicroOp::BitAndU64 { .. }
+            | MicroOp::BitOrU64 { .. }
+            | MicroOp::BitXorU64 { .. }
+            | MicroOp::ShlU64 { .. }
+            | MicroOp::ShlU64Imm { .. }
+            | MicroOp::ShrU64 { .. }
+            | MicroOp::ShrU64Imm { .. }
             | MicroOp::Return
             | MicroOp::CallFunc { .. }
             | MicroOp::CallIndirect { .. }
@@ -186,11 +208,21 @@ impl GasSchedule<MicroOp> for MicroOpGasSchedule {
             // --- Arithmetic ---
             MicroOp::AddU64 { .. }
             | MicroOp::AddU64Imm { .. }
+            | MicroOp::SubU64 { .. }
             | MicroOp::SubU64Imm { .. }
             | MicroOp::RSubU64Imm { .. }
-            | MicroOp::XorU64 { .. }
+            | MicroOp::BitAndU64 { .. }
+            | MicroOp::BitOrU64 { .. }
+            | MicroOp::BitXorU64 { .. }
+            | MicroOp::ShlU64 { .. }
+            | MicroOp::ShlU64Imm { .. }
+            | MicroOp::ShrU64 { .. }
             | MicroOp::ShrU64Imm { .. } => 3,
-            MicroOp::ModU64 { .. } => 5,
+            MicroOp::MulU64 { .. } | MicroOp::MulU64Imm { .. } => 4,
+            MicroOp::DivU64 { .. }
+            | MicroOp::DivU64Imm { .. }
+            | MicroOp::ModU64 { .. }
+            | MicroOp::ModU64Imm { .. } => 5,
 
             // --- Control flow ---
             MicroOp::CallFunc { .. }

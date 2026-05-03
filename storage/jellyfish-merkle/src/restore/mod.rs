@@ -333,17 +333,18 @@ where
         Ok(partial_nodes)
     }
 
-    /// Restores a chunk of states. This function will verify that the given chunk is correct
-    /// using the proof and root hash, then write things to storage. If the chunk is invalid, an
-    /// error will be returned and nothing will be written to storage.
-    pub fn add_chunk_impl(
+    /// Builds the partial tree in memory from `chunk` and verifies the supplied proof. Does
+    /// not touch storage. Returns `Ok(true)` when there are frozen nodes pending — the caller
+    /// must follow up with [`Self::commit_prepared`]. Returns `Ok(false)` when the chunk was
+    /// skipped (already finished or fully behind `previous_leaf`); no commit is needed.
+    pub fn prepare_chunk(
         &mut self,
         mut chunk: Vec<(&K, HashValue)>,
         proof: SparseMerkleRangeProof,
-    ) -> Result<()> {
+    ) -> Result<bool> {
         if self.finished {
             info!("State snapshot restore already finished, ignoring entire chunk.");
-            return Ok(());
+            return Ok(false);
         }
 
         if let Some(prev_leaf) = &self.previous_leaf {
@@ -353,7 +354,7 @@ where
             chunk = match skip_until {
                 None => {
                     info!("Skipping entire chunk.");
-                    return Ok(());
+                    return Ok(false);
                 },
                 Some((0, _)) => chunk,
                 Some((num_to_skip, next_leaf)) => {
@@ -367,7 +368,7 @@ where
             }
         };
         if chunk.is_empty() {
-            return Ok(());
+            return Ok(false);
         }
 
         for (key, value_hash) in chunk {
@@ -387,10 +388,17 @@ where
             self.num_keys_received += 1;
         }
 
-        // Verify what we have added so far is all correct.
+        // Verify what we have added so far is all correct. After this returns Ok, the chunk
+        // is proven against the expected root hash and it is safe for the caller to commit
+        // dependent state (e.g. KV writes) in parallel with `commit_prepared`.
         self.verify(proof)?;
 
-        // Write the frozen nodes to storage.
+        Ok(true)
+    }
+
+    /// Writes the frozen nodes accumulated by [`Self::prepare_chunk`] to storage. With
+    /// `async_commit`, the write is dispatched to `IO_POOL` and drained on the next call.
+    pub fn commit_prepared(&mut self) -> Result<()> {
         if self.async_commit {
             self.wait_for_async_commit()?;
             let (tx, rx) = channel();

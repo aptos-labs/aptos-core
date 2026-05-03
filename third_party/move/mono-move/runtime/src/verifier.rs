@@ -3,9 +3,18 @@
 
 //! Static verifier for `Function` bodies. Checks well-formedness properties
 //! that would otherwise cause undefined behavior at runtime: frame bounds,
-//! pointer slot validity, invalid jump targets, etc.
+//! pointer slot validity, invalid jump targets, op/descriptor variant
+//! mismatch, etc.
+//!
+//! The descriptor table itself is not verified here — its self-soundness
+//! (reserved entries, nonzero sizes, in-bounds pointer offsets) is enforced
+//! by [`crate::types::ObjectDescriptorTable`] at construction time. The
+//! per-function checks below trust that any descriptor they look up by id
+//! is internally well-formed.
 
-use crate::types::ObjectDescriptor;
+use crate::heap::object_descriptor::{
+    ObjectDescriptor, ObjectDescriptorInner, CLOSURE_DESCRIPTOR_ID,
+};
 use mono_move_core::{
     CallClosureOp, ClosureFuncRef, CodeOffset, DescriptorId, FrameOffset, Function, MicroOp,
     PackClosureOp, FRAME_METADATA_SIZE,
@@ -36,14 +45,8 @@ impl fmt::Display for VerificationError {
 // Public API
 // ---------------------------------------------------------------------------
 
-/// Validate a single function and its pointer slots against the descriptor table.
-/// Returns an empty `Vec` on success.
-///
-// TODO: add a separate descriptor-self-soundness pass (run once over the
-// descriptor table, not per function) that checks each entry's
-// `pointer_offsets` are in-bounds, 8-byte aligned, sorted, and
-// non-overlapping. Per-op consistency checks below assume that pass has
-// run.
+/// Validate a single function and its pointer slots against the descriptor
+/// table. Returns an empty `Vec` on success.
 pub fn verify_function(
     func: &Function,
     descriptors: &[ObjectDescriptor],
@@ -55,6 +58,19 @@ pub fn verify_function(
         errors: &mut errors,
     };
     fv.verify();
+    errors
+}
+
+/// Validate every function in a program against a shared descriptor table.
+/// Errors from each function are concatenated.
+pub fn verify_program(
+    funcs: &[&Function],
+    descriptors: &[ObjectDescriptor],
+) -> Vec<VerificationError> {
+    let mut errors = Vec::new();
+    for func in funcs {
+        errors.extend(verify_function(func, descriptors));
+    }
     errors
 }
 
@@ -196,12 +212,43 @@ impl FunctionVerifier<'_> {
                 self.check_frame_access_8(pc, dst);
             },
 
-            MicroOp::SubU64Imm { dst, src, imm: _ }
+            MicroOp::AddU64Imm { dst, src, imm: _ }
+            | MicroOp::SubU64Imm { dst, src, imm: _ }
             | MicroOp::RSubU64Imm { dst, src, imm: _ }
-            | MicroOp::AddU64Imm { dst, src, imm: _ }
-            | MicroOp::ShrU64Imm { dst, src, imm: _ } => {
+            | MicroOp::MulU64Imm { dst, src, imm: _ } => {
                 self.check_frame_access_8(pc, src);
                 self.check_frame_access_8(pc, dst);
+            },
+
+            // Div / Mod imm: reject `imm == 0` statically — at runtime it
+            // would always abort, so this is dead-code-with-a-bomb.
+            //
+            // TODO: this changes the surface vs the old VM, which aborted
+            // at runtime with a `DIV_BY_ZERO` status code. The cleanest
+            // fix is probably for the specializer to detect `imm == 0` and
+            // emit an explicit `Abort(DIV_BY_ZERO)` instead of `*U64Imm`,
+            // so the verifier never sees the bad op. Open question: can
+            // the specializer report any error post-bytecode-verification,
+            // and if so should it fail the whole module or only the
+            // function (or only the basic block)? The branch containing
+            // `imm == 0` may not even be reachable at runtime. Revisit
+            // once the abort/error story is settled.
+            MicroOp::DivU64Imm { dst, src, imm } | MicroOp::ModU64Imm { dst, src, imm } => {
+                self.check_frame_access_8(pc, src);
+                self.check_frame_access_8(pc, dst);
+                if imm == 0 {
+                    self.err(Some(pc), "division by zero (imm)");
+                }
+            },
+
+            // Shift imm: reject `imm >= 64` statically — same reason as
+            // div by zero (the runtime would always abort).
+            MicroOp::ShlU64Imm { dst, src, imm } | MicroOp::ShrU64Imm { dst, src, imm } => {
+                self.check_frame_access_8(pc, src);
+                self.check_frame_access_8(pc, dst);
+                if imm >= 64 {
+                    self.err(Some(pc), format!("shift amount {} exceeds 63 (imm)", imm));
+                }
             },
 
             MicroOp::Move8 { dst, src } => {
@@ -210,8 +257,15 @@ impl FunctionVerifier<'_> {
             },
 
             MicroOp::AddU64 { dst, lhs, rhs }
-            | MicroOp::XorU64 { dst, lhs, rhs }
-            | MicroOp::ModU64 { dst, lhs, rhs } => {
+            | MicroOp::SubU64 { dst, lhs, rhs }
+            | MicroOp::MulU64 { dst, lhs, rhs }
+            | MicroOp::DivU64 { dst, lhs, rhs }
+            | MicroOp::ModU64 { dst, lhs, rhs }
+            | MicroOp::BitAndU64 { dst, lhs, rhs }
+            | MicroOp::BitOrU64 { dst, lhs, rhs }
+            | MicroOp::BitXorU64 { dst, lhs, rhs }
+            | MicroOp::ShlU64 { dst, lhs, rhs }
+            | MicroOp::ShrU64 { dst, lhs, rhs } => {
                 self.check_frame_access_8(pc, lhs);
                 self.check_frame_access_8(pc, rhs);
                 self.check_frame_access_8(pc, dst);
@@ -316,6 +370,20 @@ impl FunctionVerifier<'_> {
                 self.check_nonzero_size(pc, elem_size);
                 self.check_frame_access(Some(pc), elem, elem_size);
                 self.check_descriptor(pc, descriptor_id);
+                if descriptor_id.as_usize() < self.descriptors.len()
+                    && !matches!(
+                        self.descriptors[descriptor_id.as_usize()].inner(),
+                        ObjectDescriptorInner::Vector { .. }
+                    )
+                {
+                    self.err(
+                        Some(pc),
+                        format!(
+                            "VecPushBack: descriptor_id {} is not a Vector",
+                            descriptor_id
+                        ),
+                    );
+                }
             },
 
             MicroOp::VecPopBack {
@@ -394,8 +462,8 @@ impl FunctionVerifier<'_> {
                 self.check_descriptor(pc, descriptor_id);
                 if descriptor_id.as_usize() < self.descriptors.len()
                     && !matches!(
-                        self.descriptors[descriptor_id.as_usize()],
-                        ObjectDescriptor::Struct { .. } | ObjectDescriptor::Enum { .. }
+                        self.descriptors[descriptor_id.as_usize()].inner(),
+                        ObjectDescriptorInner::Struct { .. } | ObjectDescriptorInner::Enum { .. }
                     )
                 {
                     self.err(
@@ -442,43 +510,64 @@ impl FunctionVerifier<'_> {
     fn verify_pack_closure(&mut self, pc: usize, op: &PackClosureOp) {
         // Destination: 8-byte heap pointer slot for the closure heap object.
         self.check_frame_access_8(pc, op.dst);
-        // Allocator descriptors must be valid.
-        self.check_descriptor(pc, op.closure_descriptor_id);
-        self.check_descriptor(pc, op.captured_data_descriptor_id);
-        // The closure descriptor must be the special `Closure` variant —
-        // size and the single heap-pointer offset are baked in.
-        let closure_desc_idx = op.closure_descriptor_id.as_usize();
-        if closure_desc_idx < self.descriptors.len()
-            && !matches!(
-                self.descriptors[closure_desc_idx],
-                ObjectDescriptor::Closure
-            )
-        {
-            self.err(
-                Some(pc),
-                format!(
-                    "PackClosure: closure_descriptor_id {} is not a Closure",
-                    op.closure_descriptor_id
-                ),
-            );
-        }
-        // The captured-data descriptor must be the `CapturedData` variant
-        // (not Struct) — its `size` and `pointer_offsets` are interpreted
-        // relative to the values region, not the full payload.
-        let captured_data_desc_idx = op.captured_data_descriptor_id.as_usize();
-        if captured_data_desc_idx < self.descriptors.len()
-            && !matches!(
-                self.descriptors[captured_data_desc_idx],
-                ObjectDescriptor::CapturedData { .. }
-            )
-        {
-            self.err(
-                Some(pc),
-                format!(
-                    "PackClosure: captured_data_descriptor_id {} is not a CapturedData",
-                    op.captured_data_descriptor_id
-                ),
-            );
+        // The closure object itself uses the implicit reserved
+        // `CLOSURE_DESCRIPTOR_ID` — no per-op field for it. The descriptor
+        // table is constructed via `ObjectDescriptorTable::new`, which
+        // unconditionally places `Closure` at this index (and therefore
+        // also guarantees `len() > CLOSURE_DESCRIPTOR_ID`). The asserts
+        // below are sanity checks against future internal regressions.
+        debug_assert!(
+            CLOSURE_DESCRIPTOR_ID.as_usize() < self.descriptors.len(),
+            "ObjectDescriptorTable invariant: descriptor table must have entry at {}",
+            CLOSURE_DESCRIPTOR_ID
+        );
+        debug_assert!(
+            matches!(
+                self.descriptors[CLOSURE_DESCRIPTOR_ID.as_usize()].inner(),
+                ObjectDescriptorInner::Closure
+            ),
+            "ObjectDescriptorTable invariant: descriptor[{}] must be Closure",
+            CLOSURE_DESCRIPTOR_ID
+        );
+        // captured_data_descriptor_id and `captured` must agree on emptiness:
+        // a captured-data object is allocated iff at least one value is
+        // captured.
+        match (op.captured_data_descriptor_id, op.captured.is_empty()) {
+            (None, true) => {},
+            (Some(id), false) => {
+                self.check_descriptor(pc, id);
+                let idx = id.as_usize();
+                if idx < self.descriptors.len()
+                    && !matches!(
+                        self.descriptors[idx].inner(),
+                        ObjectDescriptorInner::CapturedData { .. }
+                    )
+                {
+                    self.err(
+                        Some(pc),
+                        format!(
+                            "PackClosure: captured_data_descriptor_id {} is not a CapturedData",
+                            id
+                        ),
+                    );
+                }
+            },
+            (Some(id), true) => {
+                self.err(
+                    Some(pc),
+                    format!(
+                        "PackClosure: captured_data_descriptor_id {} provided but no captures",
+                        id
+                    ),
+                );
+            },
+            (None, false) => {
+                self.err(
+                    Some(pc),
+                    "PackClosure: captured non-empty but captured_data_descriptor_id is None"
+                        .to_string(),
+                );
+            },
         }
         // Captured sources: verify each (offset, size) is in-bounds.
         for slot in &op.captured {
@@ -547,21 +636,25 @@ impl FunctionVerifier<'_> {
         }
         // The captured-data descriptor's values region must be exactly
         // the materialized captured values — no padding, no extras.
-        // Together with the descriptor self-soundness check (see TODO on
-        // `verify_function`), this is sufficient to ensure the runtime's
-        // fixed-offset writes stay in bounds.
-        let expected_values_size: u32 = op.captured.iter().map(|s| s.size).sum();
-        let idx = op.captured_data_descriptor_id.as_usize();
-        if idx < self.descriptors.len() {
-            if let ObjectDescriptor::CapturedData { size: actual, .. } = &self.descriptors[idx] {
-                if *actual != expected_values_size {
-                    self.err(
-                        Some(pc),
-                        format!(
-                            "PackClosure: captured_data values size {} != expected {}",
-                            actual, expected_values_size
-                        ),
-                    );
+        // Together with the descriptor self-soundness pass, this is
+        // sufficient to ensure the runtime's fixed-offset writes stay in
+        // bounds.
+        if let Some(id) = op.captured_data_descriptor_id {
+            let expected_values_size: u32 = op.captured.iter().map(|s| s.size).sum();
+            let idx = id.as_usize();
+            if idx < self.descriptors.len() {
+                if let ObjectDescriptorInner::CapturedData { size: actual, .. } =
+                    self.descriptors[idx].inner()
+                {
+                    if *actual != expected_values_size {
+                        self.err(
+                            Some(pc),
+                            format!(
+                                "PackClosure: captured_data values size {} != expected {}",
+                                actual, expected_values_size
+                            ),
+                        );
+                    }
                 }
             }
         }

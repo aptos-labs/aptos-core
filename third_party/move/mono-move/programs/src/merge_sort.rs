@@ -63,18 +63,21 @@ pub fn native_merge_sort(v: &mut [u64]) {
 mod micro_op {
     use mono_move_alloc::{ExecutableArena, ExecutableArenaPtr, GlobalArenaPtr};
     use mono_move_core::{
-        CodeOffset as CO, DescriptorId, FrameLayoutInfo, FrameOffset as FO, Function, MicroOp::*,
+        CodeOffset as CO, FrameLayoutInfo, FrameOffset as FO, Function, MicroOp::*,
         SortedSafePointEntries, FRAME_METADATA_SIZE,
     };
-    use mono_move_runtime::ObjectDescriptor;
+    use mono_move_runtime::{ObjectDescriptor, ObjectDescriptorTable};
 
     pub fn program() -> (
         Vec<Option<ExecutableArenaPtr<Function>>>,
-        Vec<ObjectDescriptor>,
+        ObjectDescriptorTable,
         ExecutableArena,
     ) {
         let arena = ExecutableArena::new();
         let meta = FRAME_METADATA_SIZE as u32;
+
+        let mut descriptors = ObjectDescriptorTable::new();
+        let desc_vec_u64 = descriptors.push(ObjectDescriptor::new_vector(8, vec![]).unwrap());
 
         // =================================================================
         // Function 0 — merge_sort(vec)
@@ -247,12 +250,12 @@ mod micro_op {
                               idx: FO(j), elem_size: 8 },                       // 11
                 JumpLessU64 { target: CO(16), lhs: FO(elem_a), rhs: FO(elem_b) }, // 12
                 // a >= b: push b
-                VecPushBack { vec_ref: FO(tmp_ref), elem: FO(elem_b), elem_size: 8, descriptor_id: DescriptorId(0) }, // 13
+                VecPushBack { vec_ref: FO(tmp_ref), elem: FO(elem_b), elem_size: 8, descriptor_id: desc_vec_u64 }, // 13
                 AddU64Imm { dst: FO(j), src: FO(j), imm: 1 },                  // 14
                 Jump { target: CO(5) },                                          // 15
 
                 // PUSH_LEFT (16): a < b, push a
-                VecPushBack { vec_ref: FO(tmp_ref), elem: FO(elem_a), elem_size: 8, descriptor_id: DescriptorId(0) }, // 16
+                VecPushBack { vec_ref: FO(tmp_ref), elem: FO(elem_a), elem_size: 8, descriptor_id: desc_vec_u64 }, // 16
                 AddU64Imm { dst: FO(i), src: FO(i), imm: 1 },                  // 17
                 Jump { target: CO(5) },                                          // 18
 
@@ -261,7 +264,7 @@ mod micro_op {
                 Jump { target: CO(31) },                                         // 20
                 VecLoadElem { dst: FO(elem_a), vec_ref: FO(vec_ref),
                               idx: FO(i), elem_size: 8 },                       // 21
-                VecPushBack { vec_ref: FO(tmp_ref), elem: FO(elem_a), elem_size: 8, descriptor_id: DescriptorId(0) }, // 22
+                VecPushBack { vec_ref: FO(tmp_ref), elem: FO(elem_a), elem_size: 8, descriptor_id: desc_vec_u64 }, // 22
                 AddU64Imm { dst: FO(i), src: FO(i), imm: 1 },                  // 23
                 Jump { target: CO(19) },                                         // 24
 
@@ -270,7 +273,7 @@ mod micro_op {
                 Jump { target: CO(31) },                                         // 26
                 VecLoadElem { dst: FO(elem_b), vec_ref: FO(vec_ref),
                               idx: FO(j), elem_size: 8 },                       // 27
-                VecPushBack { vec_ref: FO(tmp_ref), elem: FO(elem_b), elem_size: 8, descriptor_id: DescriptorId(0) }, // 28
+                VecPushBack { vec_ref: FO(tmp_ref), elem: FO(elem_b), elem_size: 8, descriptor_id: desc_vec_u64 }, // 28
                 AddU64Imm { dst: FO(j), src: FO(j), imm: 1 },                  // 29
                 Jump { target: CO(25) },                                         // 30
 
@@ -308,7 +311,6 @@ mod micro_op {
             })
         };
 
-        let descriptors = vec![ObjectDescriptor::Trivial];
         (
             vec![
                 Some(func_merge_sort),

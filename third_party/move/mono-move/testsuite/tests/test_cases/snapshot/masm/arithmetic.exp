@@ -23,6 +23,154 @@ fun complex_arith(r0): u64 {
     2: ret [r2]
 }
 
+fun sub_values(r0, r1): u64 {
+  slots: params(2), locals(0), temps(1)
+    r0: u64
+    r1: u64
+    r2: u64
+  code:
+  L0:
+    0: r2 := sub r0, r1
+    1: ret [r2]
+}
+
+fun sub_imm(r0): u64 {
+  slots: params(1), locals(0), temps(1)
+    r0: u64
+    r1: u64
+  code:
+  L0:
+    0: r1 := sub r0, #5
+    1: ret [r1]
+}
+
+fun div_values(r0, r1): u64 {
+  slots: params(2), locals(0), temps(1)
+    r0: u64
+    r1: u64
+    r2: u64
+  code:
+  L0:
+    0: r2 := div r0, r1
+    1: ret [r2]
+}
+
+fun mod_values(r0, r1): u64 {
+  slots: params(2), locals(0), temps(1)
+    r0: u64
+    r1: u64
+    r2: u64
+  code:
+  L0:
+    0: r2 := mod r0, r1
+    1: ret [r2]
+}
+
+fun bit_and(r0, r1): u64 {
+  slots: params(2), locals(0), temps(1)
+    r0: u64
+    r1: u64
+    r2: u64
+  code:
+  L0:
+    0: r2 := bit_and r0, r1
+    1: ret [r2]
+}
+
+fun bit_or(r0, r1): u64 {
+  slots: params(2), locals(0), temps(1)
+    r0: u64
+    r1: u64
+    r2: u64
+  code:
+  L0:
+    0: r2 := bit_or r0, r1
+    1: ret [r2]
+}
+
+fun bit_xor(r0, r1): u64 {
+  slots: params(2), locals(0), temps(1)
+    r0: u64
+    r1: u64
+    r2: u64
+  code:
+  L0:
+    0: r2 := xor r0, r1
+    1: ret [r2]
+}
+
+fun shl_values(r0, r1): u64 {
+  slots: params(2), locals(0), temps(1)
+    r0: u64
+    r1: u8
+    r2: u64
+  code:
+  L0:
+    0: r2 := shl r0, r1
+    1: ret [r2]
+}
+
+fun shr_values(r0, r1): u64 {
+  slots: params(2), locals(0), temps(1)
+    r0: u64
+    r1: u8
+    r2: u64
+  code:
+  L0:
+    0: r2 := shr r0, r1
+    1: ret [r2]
+}
+
+fun mul_imm(r0): u64 {
+  slots: params(1), locals(0), temps(1)
+    r0: u64
+    r1: u64
+  code:
+  L0:
+    0: r1 := mul r0, #7
+    1: ret [r1]
+}
+
+fun div_imm(r0): u64 {
+  slots: params(1), locals(0), temps(1)
+    r0: u64
+    r1: u64
+  code:
+  L0:
+    0: r1 := div r0, #3
+    1: ret [r1]
+}
+
+fun mod_imm(r0): u64 {
+  slots: params(1), locals(0), temps(1)
+    r0: u64
+    r1: u64
+  code:
+  L0:
+    0: r1 := mod r0, #10
+    1: ret [r1]
+}
+
+fun shl_imm(r0): u64 {
+  slots: params(1), locals(0), temps(1)
+    r0: u64
+    r1: u64
+  code:
+  L0:
+    0: r1 := shl r0, #4u8
+    1: ret [r1]
+}
+
+fun shr_imm(r0): u64 {
+  slots: params(1), locals(0), temps(1)
+    r0: u64
+    r1: u64
+  code:
+  L0:
+    0: r1 := shr r0, #2u8
+    1: ret [r1]
+}
+
 === micro-ops ===
 // module 0x66::test
 
@@ -34,4 +182,123 @@ fun add_values() {
     2: Return
 }
 
-fun complex_arith(): skipped (lowering: BinaryOpImm Mul for u64-sized type not yet lowered)
+fun complex_arith() {
+  frame_data_size: 24
+  code:
+    0: MulU64Imm [8] <- [0] * #2
+    1: AddU64Imm [16] <- [8] + #1
+    2: Move8 [0] <- [16]
+    3: Return
+}
+
+fun sub_values() {
+  frame_data_size: 24
+  code:
+    0: SubU64 [16] <- [0] - [8]
+    1: Move8 [0] <- [16]
+    2: Return
+}
+
+fun sub_imm() {
+  frame_data_size: 16
+  code:
+    0: SubU64Imm [8] <- [0] - #5
+    1: Move8 [0] <- [8]
+    2: Return
+}
+
+fun div_values() {
+  frame_data_size: 24
+  code:
+    0: DivU64 [16] <- [0] / [8]
+    1: Move8 [0] <- [16]
+    2: Return
+}
+
+fun mod_values() {
+  frame_data_size: 24
+  code:
+    0: ModU64 [16] <- [0] % [8]
+    1: Move8 [0] <- [16]
+    2: Return
+}
+
+fun bit_and() {
+  frame_data_size: 24
+  code:
+    0: BitAndU64 [16] <- [0] & [8]
+    1: Move8 [0] <- [16]
+    2: Return
+}
+
+fun bit_or() {
+  frame_data_size: 24
+  code:
+    0: BitOrU64 [16] <- [0] | [8]
+    1: Move8 [0] <- [16]
+    2: Return
+}
+
+fun bit_xor() {
+  frame_data_size: 24
+  code:
+    0: BitXorU64 [16] <- [0] ^ [8]
+    1: Move8 [0] <- [16]
+    2: Return
+}
+
+fun shl_values() {
+  frame_data_size: 24
+  code:
+    0: ShlU64 [16] <- [0] << [8]
+    1: Move8 [0] <- [16]
+    2: Return
+}
+
+fun shr_values() {
+  frame_data_size: 24
+  code:
+    0: ShrU64 [16] <- [0] >> [8]
+    1: Move8 [0] <- [16]
+    2: Return
+}
+
+fun mul_imm() {
+  frame_data_size: 16
+  code:
+    0: MulU64Imm [8] <- [0] * #7
+    1: Move8 [0] <- [8]
+    2: Return
+}
+
+fun div_imm() {
+  frame_data_size: 16
+  code:
+    0: DivU64Imm [8] <- [0] / #3
+    1: Move8 [0] <- [8]
+    2: Return
+}
+
+fun mod_imm() {
+  frame_data_size: 16
+  code:
+    0: ModU64Imm [8] <- [0] % #10
+    1: Move8 [0] <- [8]
+    2: Return
+}
+
+fun shl_imm() {
+  frame_data_size: 16
+  code:
+    0: ShlU64Imm [8] <- [0] << #4
+    1: Move8 [0] <- [8]
+    2: Return
+}
+
+fun shr_imm() {
+  frame_data_size: 16
+  code:
+    0: ShrU64Imm [8] <- [0] >> #2
+    1: Move8 [0] <- [8]
+    2: Return
+}

@@ -3,10 +3,10 @@
 
 use mono_move_alloc::{ExecutableArena, ExecutableArenaPtr, GlobalArenaPtr};
 use mono_move_core::{
-    CodeOffset as CO, DescriptorId, FrameLayoutInfo, FrameOffset as FO, Function,
-    LocalExecutionContext, MicroOp, SortedSafePointEntries,
+    CodeOffset as CO, FrameLayoutInfo, FrameOffset as FO, Function, LocalExecutionContext, MicroOp,
+    SortedSafePointEntries,
 };
-use mono_move_runtime::{InterpreterContext, ObjectDescriptor};
+use mono_move_runtime::{InterpreterContext, ObjectDescriptor, ObjectDescriptorTable};
 
 /// Data segment (48 bytes):
 ///   [fp + 0 ] : result (output) / scratch
@@ -17,7 +17,7 @@ use mono_move_runtime::{InterpreterContext, ObjectDescriptor};
 fn make_vec_sum_program(
     arena: &ExecutableArena,
     n: u64,
-) -> (Vec<ExecutableArenaPtr<Function>>, Vec<ObjectDescriptor>) {
+) -> (Vec<ExecutableArenaPtr<Function>>, ObjectDescriptorTable) {
     use MicroOp::*;
 
     let slot_result: u32 = 0;
@@ -26,13 +26,16 @@ fn make_vec_sum_program(
     let slot_tmp: u32 = 24;
     let slot_vec_ref: u32 = 32;
 
+    let mut descriptors = ObjectDescriptorTable::new();
+    let desc_vec_u64 = descriptors.push(ObjectDescriptor::new_vector(8, vec![]).unwrap());
+
     #[rustfmt::skip]
     let code = arena.alloc_slice_fill_iter([
         VecNew { dst: FO(slot_vec) },
         SlotBorrow { dst: FO(slot_vec_ref), local: FO(slot_vec) },
         StoreImm8 { dst: FO(slot_i), imm: 0 },
         JumpGreaterEqualU64Imm { target: CO(9), src: FO(slot_i), imm: n },
-        VecPushBack { vec_ref: FO(slot_vec_ref), elem: FO(slot_i), elem_size: 8, descriptor_id: DescriptorId(0) },
+        VecPushBack { vec_ref: FO(slot_vec_ref), elem: FO(slot_i), elem_size: 8, descriptor_id: desc_vec_u64 },
         StoreImm8 { dst: FO(slot_tmp), imm: 1 },
         AddU64 { dst: FO(slot_i), lhs: FO(slot_i), rhs: FO(slot_tmp) },
         JumpGreaterEqualU64Imm { target: CO(9), src: FO(slot_i), imm: n },
@@ -59,7 +62,6 @@ fn make_vec_sum_program(
         safe_point_layouts: SortedSafePointEntries::empty(),
     });
 
-    let descriptors = vec![ObjectDescriptor::Trivial];
     (vec![func], descriptors)
 }
 

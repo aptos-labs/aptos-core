@@ -270,14 +270,10 @@ mod micro_op {
         CodeOffset as CO, DescriptorId, FrameLayoutInfo, FrameOffset as FO, Function,
         MicroOp as Op, MicroOp::*, SortedSafePointEntries, FRAME_METADATA_SIZE,
     };
-    use mono_move_runtime::ObjectDescriptor;
+    use mono_move_runtime::{ObjectDescriptor, ObjectDescriptorTable};
 
     const NULL: u64 = u64::MAX;
     const NODE_SIZE: u32 = 32;
-    /// Descriptor index for trivial (no-pointer) vector elements.
-    const DESC_TRIVIAL: DescriptorId = DescriptorId(0);
-    /// Descriptor index for the BstMap heap struct.
-    const DESC_BST_MAP: DescriptorId = DescriptorId(1);
 
     /// BstMap struct field offsets (within the struct payload).
     const BST_NODES: u32 = 0;
@@ -292,27 +288,27 @@ mod micro_op {
 
     pub fn program() -> (
         Vec<Option<ExecutableArenaPtr<Function>>>,
-        Vec<ObjectDescriptor>,
+        ObjectDescriptorTable,
         ExecutableArena,
     ) {
         let arena = ExecutableArena::new();
-        let descriptors = vec![
-            ObjectDescriptor::Trivial, // 0: node elements, free_list elements
-            ObjectDescriptor::Struct {
-                // 1: BstMap { nodes, free_list, root }
-                size: 24,
-                pointer_offsets: vec![0, 8], // nodes and free_list are heap pointers
-            },
-        ];
+        let mut descriptors = ObjectDescriptorTable::new();
+        // BstMap { nodes, free_list, root }: nodes and free_list are heap pointers.
+        let desc_bst_map = descriptors.push(ObjectDescriptor::new_struct(24, vec![0, 8]).unwrap());
+        // Nodes vector: 32-byte trivial node elements.
+        let desc_nodes_vec =
+            descriptors.push(ObjectDescriptor::new_vector(NODE_SIZE, vec![]).unwrap());
+        // Free-list vector: 8-byte trivial elements.
+        let desc_free_list_vec = descriptors.push(ObjectDescriptor::new_vector(8, vec![]).unwrap());
         (
             vec![
-                Some(make_new(&arena)),         // 0
-                Some(make_insert(&arena, 3)),   // 1, calls alloc_node at 3
-                Some(make_get(&arena)),         // 2
-                Some(make_alloc_node(&arena)),  // 3
-                Some(make_remove(&arena, 5)),   // 4, calls remove_node at 5
-                Some(make_remove_node(&arena)), // 5
-                Some(make_run_ops(&arena)),     // 6
+                Some(make_new(&arena, desc_bst_map)),               // 0
+                Some(make_insert(&arena, 3)),                       // 1, calls alloc_node at 3
+                Some(make_get(&arena)),                             // 2
+                Some(make_alloc_node(&arena, desc_nodes_vec)),      // 3
+                Some(make_remove(&arena, 5)),                       // 4, calls remove_node at 5
+                Some(make_remove_node(&arena, desc_free_list_vec)), // 5
+                Some(make_run_ops(&arena)),                         // 6
             ],
             descriptors,
             arena,
@@ -328,7 +324,10 @@ mod micro_op {
     // Frame layout:
     //   [0] result: bst_ref   [8] nodes (temp)   [16] free_list (temp)
     // =================================================================
-    fn make_new(arena: &ExecutableArena) -> ExecutableArenaPtr<Function> {
+    fn make_new(
+        arena: &ExecutableArena,
+        desc_bst_map: DescriptorId,
+    ) -> ExecutableArenaPtr<Function> {
         let bst = 0u32;
         let nodes = 8u32;
         let free_list = 16u32;
@@ -337,7 +336,7 @@ mod micro_op {
         let code = [
             VecNew { dst: FO(nodes) },                                             // 0
             VecNew { dst: FO(free_list) },                                         // 1
-            HeapNew { dst: FO(bst), descriptor_id: DESC_BST_MAP },                 // 2
+            HeapNew { dst: FO(bst), descriptor_id: desc_bst_map },                       // 2
             Op::struct_store8(FO(bst), BST_NODES, FO(nodes)),                 // 3
             Op::struct_store8(FO(bst), BST_FREE_LIST, FO(free_list)),         // 4
             HeapMoveToImm8 { heap_ptr: FO(bst),
@@ -554,7 +553,10 @@ mod micro_op {
     //   [72] idx   [80] fl_len
     //   [88] new_node (32B: key[88] val[96] left[104] right[112])
     // =================================================================
-    fn make_alloc_node(arena: &ExecutableArena) -> ExecutableArenaPtr<Function> {
+    fn make_alloc_node(
+        arena: &ExecutableArena,
+        desc_nodes_vec: DescriptorId,
+    ) -> ExecutableArenaPtr<Function> {
         let bst = 0u32;
         let key = 8u32;
         let value = 16u32;
@@ -587,7 +589,7 @@ mod micro_op {
             // PUSH path: idx = nodes.len(); nodes.push(new_node)
             VecLen { dst: FO(idx), vec_ref: FO(nodes_ref) },                       // 9
             VecPushBack { vec_ref: FO(nodes_ref), elem: FO(new_node),
-                          elem_size: NODE_SIZE, descriptor_id: DESC_TRIVIAL },     // 10
+                          elem_size: NODE_SIZE, descriptor_id: desc_nodes_vec },         // 10
             Jump { target: CO(14) },                                               // 11: → DONE
             // POP path (12): idx = free_list.pop(); nodes[idx] = new_node
             VecPopBack { dst: FO(idx), vec_ref: FO(free_list_ref),
@@ -734,7 +736,10 @@ mod micro_op {
     //   [80] parent   [88] cur   [96] cur_right
     //   [104] scratch (32B: key[104] val[112] left[120] right[128])
     // =================================================================
-    fn make_remove_node(arena: &ExecutableArena) -> ExecutableArenaPtr<Function> {
+    fn make_remove_node(
+        arena: &ExecutableArena,
+        desc_free_list_vec: DescriptorId,
+    ) -> ExecutableArenaPtr<Function> {
         let bst = 0u32;
         let idx = 8u32;
         let bst_ref = 16u32;
@@ -808,7 +813,7 @@ mod micro_op {
             Move8 { dst: FO(result), src: FO(cur) },                              // 32
             // -- FREE_RETURN (33): free_list.push(idx); return --
             VecPushBack { vec_ref: FO(free_list_ref), elem: FO(idx),
-                          elem_size: 8, descriptor_id: DESC_TRIVIAL },             // 33
+                          elem_size: 8, descriptor_id: desc_free_list_vec },             // 33
             Return,                                                                // 34
         ];
 

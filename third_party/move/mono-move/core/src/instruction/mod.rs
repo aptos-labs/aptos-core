@@ -214,10 +214,13 @@ pub struct PackClosureOp {
     pub func_ref: ClosureFuncRef,
     /// Bitmask of which function parameters are captured vs provided.
     pub mask: u64,
-    /// Descriptor for the allocated closure object.
-    pub closure_descriptor_id: DescriptorId,
-    /// Descriptor for the allocated `ClosureCapturedData` (Materialized) object.
-    pub captured_data_descriptor_id: DescriptorId,
+    /// Descriptor for the allocated `ClosureCapturedData` (Materialized)
+    /// object. `Some` iff this closure captures at least one value;
+    /// otherwise `None` and no captured-data object is allocated.
+    ///
+    /// The closure object's own descriptor is implicit: it is always the
+    /// reserved `CLOSURE_DESCRIPTOR_ID` slot in the descriptor table.
+    pub captured_data_descriptor_id: Option<DescriptorId>,
     /// Sources (in caller's frame) of the captured values, in the order that
     /// `mask.is_captured(i)` is true — i.e. ascending `i` through the
     /// function's parameter list.
@@ -265,13 +268,21 @@ pub enum MicroOp {
     // Arithmetic & bitwise
     //======================================================================
     // Currently u64-only. Each op has a reg-reg form and/or an immediate
-    // form; we add variants as the compiler needs them.
+    // form; we add variants as the compiler needs them. All arithmetic is
+    // checked: overflow / underflow / division by zero / oversize shift
+    // all abort.
+    //
+    // Bitwise ops carry the `Bit` prefix to disambiguate from the boolean
+    // logical Or/And/Not (which will not have it).
     //
     // May want:
-    // - Mul, Div, Sub (reg-reg), Negate, bitwise And/Or/Xor/Not, Shl,
+    // - Logical Or/And/Not (Phase 3), Negate (signed), bitwise Not,
+    // - Reverse-imm forms: RDiv, RMod, RShl, RShr (mirroring RSubU64Imm),
     // - u8, u16, u32 variants (mask on u64?), u128/u256 (multi-word),
     // - signed integer support.
     //======================================================================
+
+    // --- Add ---
     /// `dst = lhs + rhs` (u64, checked).
     AddU64 {
         dst: FrameOffset,
@@ -284,6 +295,14 @@ pub enum MicroOp {
         dst: FrameOffset,
         src: FrameOffset,
         imm: u64,
+    },
+
+    // --- Sub ---
+    /// `dst = lhs - rhs` (u64, checked).
+    SubU64 {
+        dst: FrameOffset,
+        lhs: FrameOffset,
+        rhs: FrameOffset,
     },
 
     /// `dst = src - imm` (u64, checked).
@@ -300,25 +319,107 @@ pub enum MicroOp {
         imm: u64,
     },
 
-    /// `dst = lhs ^ rhs` (u64, bitwise XOR).
-    XorU64 {
+    // --- Mul ---
+    /// `dst = lhs * rhs` (u64, checked).
+    MulU64 {
         dst: FrameOffset,
         lhs: FrameOffset,
         rhs: FrameOffset,
     },
 
-    /// `dst = src >> imm` (u64, logical right shift).
-    ShrU64Imm {
+    /// `dst = src * imm` (u64, checked).
+    MulU64Imm {
         dst: FrameOffset,
         src: FrameOffset,
         imm: u64,
     },
 
-    /// `dst = lhs % rhs` (u64 modulo). Panics on division by zero.
+    // --- Div ---
+    /// `dst = lhs / rhs` (u64). Aborts on division by zero.
+    DivU64 {
+        dst: FrameOffset,
+        lhs: FrameOffset,
+        rhs: FrameOffset,
+    },
+
+    /// `dst = src / imm` (u64). Aborts if `imm == 0`.
+    DivU64Imm {
+        dst: FrameOffset,
+        src: FrameOffset,
+        imm: u64,
+    },
+
+    // --- Mod ---
+    /// `dst = lhs % rhs` (u64). Aborts on division by zero.
     ModU64 {
         dst: FrameOffset,
         lhs: FrameOffset,
         rhs: FrameOffset,
+    },
+
+    /// `dst = src % imm` (u64). Aborts if `imm == 0`.
+    ModU64Imm {
+        dst: FrameOffset,
+        src: FrameOffset,
+        imm: u64,
+    },
+
+    // --- Bitwise ---
+    /// `dst = lhs & rhs` (u64, bitwise AND).
+    BitAndU64 {
+        dst: FrameOffset,
+        lhs: FrameOffset,
+        rhs: FrameOffset,
+    },
+
+    /// `dst = lhs | rhs` (u64, bitwise OR).
+    BitOrU64 {
+        dst: FrameOffset,
+        lhs: FrameOffset,
+        rhs: FrameOffset,
+    },
+
+    /// `dst = lhs ^ rhs` (u64, bitwise XOR).
+    BitXorU64 {
+        dst: FrameOffset,
+        lhs: FrameOffset,
+        rhs: FrameOffset,
+    },
+
+    // --- Shifts ---
+    //
+    // TODO: in old Move bytecode the shift amount is a u8, not a u64. We
+    // currently model `rhs` as a full 8-byte slot to match the rest of
+    // the slot ABI; the value living there is zero-extended from a u8 by
+    // the lowerer. Reconsider whether `rhs` (and the imm field of the
+    // imm-form ops) should be narrower once the slot-alignment story is
+    // sorted out — affects destack, lowering, and slot allocation.
+    /// `dst = lhs << rhs` (u64). Aborts if `rhs >= 64`.
+    ShlU64 {
+        dst: FrameOffset,
+        lhs: FrameOffset,
+        rhs: FrameOffset,
+    },
+
+    /// `dst = src << imm` (u64). Aborts if `imm >= 64`.
+    ShlU64Imm {
+        dst: FrameOffset,
+        src: FrameOffset,
+        imm: u64,
+    },
+
+    /// `dst = lhs >> rhs` (u64, logical right shift). Aborts if `rhs >= 64`.
+    ShrU64 {
+        dst: FrameOffset,
+        lhs: FrameOffset,
+        rhs: FrameOffset,
+    },
+
+    /// `dst = src >> imm` (u64, logical right shift). Aborts if `imm >= 64`.
+    ShrU64Imm {
+        dst: FrameOffset,
+        src: FrameOffset,
+        imm: u64,
     },
 
     //======================================================================
@@ -702,17 +803,53 @@ impl fmt::Display for MicroOp {
             MicroOp::AddU64Imm { dst, src, imm } => {
                 write!(f, "AddU64Imm [{}] <- [{}] + #{}", dst.0, src.0, imm)
             },
+            MicroOp::SubU64 { dst, lhs, rhs } => {
+                write!(f, "SubU64 [{}] <- [{}] - [{}]", dst.0, lhs.0, rhs.0)
+            },
             MicroOp::SubU64Imm { dst, src, imm } => {
                 write!(f, "SubU64Imm [{}] <- [{}] - #{}", dst.0, src.0, imm)
             },
             MicroOp::RSubU64Imm { dst, src, imm } => {
                 write!(f, "RSubU64Imm [{}] <- #{} - [{}]", dst.0, imm, src.0)
             },
-            MicroOp::ShrU64Imm { dst, src, imm } => {
-                write!(f, "ShrU64Imm [{}] <- [{}] >> #{}", dst.0, src.0, imm)
+            MicroOp::MulU64 { dst, lhs, rhs } => {
+                write!(f, "MulU64 [{}] <- [{}] * [{}]", dst.0, lhs.0, rhs.0)
+            },
+            MicroOp::MulU64Imm { dst, src, imm } => {
+                write!(f, "MulU64Imm [{}] <- [{}] * #{}", dst.0, src.0, imm)
+            },
+            MicroOp::DivU64 { dst, lhs, rhs } => {
+                write!(f, "DivU64 [{}] <- [{}] / [{}]", dst.0, lhs.0, rhs.0)
+            },
+            MicroOp::DivU64Imm { dst, src, imm } => {
+                write!(f, "DivU64Imm [{}] <- [{}] / #{}", dst.0, src.0, imm)
             },
             MicroOp::ModU64 { dst, lhs, rhs } => {
                 write!(f, "ModU64 [{}] <- [{}] % [{}]", dst.0, lhs.0, rhs.0)
+            },
+            MicroOp::ModU64Imm { dst, src, imm } => {
+                write!(f, "ModU64Imm [{}] <- [{}] % #{}", dst.0, src.0, imm)
+            },
+            MicroOp::BitAndU64 { dst, lhs, rhs } => {
+                write!(f, "BitAndU64 [{}] <- [{}] & [{}]", dst.0, lhs.0, rhs.0)
+            },
+            MicroOp::BitOrU64 { dst, lhs, rhs } => {
+                write!(f, "BitOrU64 [{}] <- [{}] | [{}]", dst.0, lhs.0, rhs.0)
+            },
+            MicroOp::BitXorU64 { dst, lhs, rhs } => {
+                write!(f, "BitXorU64 [{}] <- [{}] ^ [{}]", dst.0, lhs.0, rhs.0)
+            },
+            MicroOp::ShlU64 { dst, lhs, rhs } => {
+                write!(f, "ShlU64 [{}] <- [{}] << [{}]", dst.0, lhs.0, rhs.0)
+            },
+            MicroOp::ShlU64Imm { dst, src, imm } => {
+                write!(f, "ShlU64Imm [{}] <- [{}] << #{}", dst.0, src.0, imm)
+            },
+            MicroOp::ShrU64 { dst, lhs, rhs } => {
+                write!(f, "ShrU64 [{}] <- [{}] >> [{}]", dst.0, lhs.0, rhs.0)
+            },
+            MicroOp::ShrU64Imm { dst, src, imm } => {
+                write!(f, "ShrU64Imm [{}] <- [{}] >> #{}", dst.0, src.0, imm)
             },
             MicroOp::CallFunc { func_id } => {
                 write!(f, "CallFunc #{}", func_id)
@@ -892,9 +1029,6 @@ impl fmt::Display for MicroOp {
             MicroOp::StoreRandomU64 { dst } => {
                 write!(f, "StoreRandomU64 [{}]", dst.0)
             },
-            MicroOp::XorU64 { dst, lhs, rhs } => {
-                write!(f, "XorU64 [{}] <- [{}] ^ [{}]", dst.0, lhs.0, rhs.0)
-            },
             MicroOp::JumpLessU64Imm { target, src, imm } => {
                 write!(f, "JumpLessU64Imm @{} [{}] < #{}", target.0, src.0, imm)
             },
@@ -921,9 +1055,14 @@ impl fmt::Display for MicroOp {
             MicroOp::PackClosure(op) => {
                 write!(
                     f,
-                    "PackClosure [{}] <- func_ref={:?}, mask={:b}, closure_desc={}, captured_desc={}, captured=[",
-                    op.dst.0, op.func_ref, op.mask, op.closure_descriptor_id, op.captured_data_descriptor_id
+                    "PackClosure [{}] <- func_ref={:?}, mask={:b}, captured_desc=",
+                    op.dst.0, op.func_ref, op.mask
                 )?;
+                match op.captured_data_descriptor_id {
+                    Some(id) => write!(f, "{}", id)?,
+                    None => write!(f, "<none>")?,
+                }
+                write!(f, ", captured=[")?;
                 for (i, slot) in op.captured.iter().enumerate() {
                     if i > 0 {
                         write!(f, ", ")?;

@@ -6,11 +6,12 @@
 
 use mono_move_alloc::{ExecutableArena, ExecutableArenaPtr, GlobalArenaPtr};
 use mono_move_core::{
-    DescriptorId, FrameLayoutInfo, FrameOffset as FO, Function, LocalExecutionContext, MicroOp,
+    FrameLayoutInfo, FrameOffset as FO, Function, LocalExecutionContext, MicroOp,
     SortedSafePointEntries, FRAME_METADATA_SIZE, STRUCT_DATA_OFFSET,
 };
 use mono_move_runtime::{
-    read_ptr, read_u64, InterpreterContext, ObjectDescriptor, VEC_DATA_OFFSET,
+    read_ptr, read_u64, InterpreterContext, ObjectDescriptor, ObjectDescriptorTable,
+    VEC_DATA_OFFSET,
 };
 
 // ---------------------------------------------------------------------------
@@ -31,16 +32,19 @@ fn ref_basic() {
 
     let arena = ExecutableArena::new();
 
+    let mut descriptors = ObjectDescriptorTable::new();
+    let desc_vec_u64 = descriptors.push(ObjectDescriptor::new_vector(8, vec![]).unwrap());
+
     #[rustfmt::skip]
     let code = arena.alloc_slice_fill_iter([
         VecNew { dst: FO(vec) },
         SlotBorrow { dst: FO(vec_ref), local: FO(vec) },
         StoreImm8 { dst: FO(tmp), imm: 10 },
-        VecPushBack { vec_ref: FO(vec_ref), elem: FO(tmp), elem_size: 8, descriptor_id: DescriptorId(0) },
+        VecPushBack { vec_ref: FO(vec_ref), elem: FO(tmp), elem_size: 8, descriptor_id: desc_vec_u64 },
         StoreImm8 { dst: FO(tmp), imm: 20 },
-        VecPushBack { vec_ref: FO(vec_ref), elem: FO(tmp), elem_size: 8, descriptor_id: DescriptorId(0) },
+        VecPushBack { vec_ref: FO(vec_ref), elem: FO(tmp), elem_size: 8, descriptor_id: desc_vec_u64 },
         StoreImm8 { dst: FO(tmp), imm: 30 },
-        VecPushBack { vec_ref: FO(vec_ref), elem: FO(tmp), elem_size: 8, descriptor_id: DescriptorId(0) },
+        VecPushBack { vec_ref: FO(vec_ref), elem: FO(tmp), elem_size: 8, descriptor_id: desc_vec_u64 },
         StoreImm8 { dst: FO(idx), imm: 1 },
         VecBorrow { dst: FO(r#ref), vec_ref: FO(vec_ref), idx: FO(idx), elem_size: 8 },
         ReadRef { dst: FO(result), ref_ptr: FO(r#ref), size: 8 },
@@ -60,7 +64,7 @@ fn ref_basic() {
         frame_layout: FrameLayoutInfo::new(&arena, [FO(vec), FO(r#ref), FO(vec_ref)]),
         safe_point_layouts: SortedSafePointEntries::empty(),
     })];
-    let descriptors = [ObjectDescriptor::Trivial];
+
     let mut exec_ctx = LocalExecutionContext::with_max_budget();
     let mut ctx = InterpreterContext::new(&mut exec_ctx, &descriptors, unsafe {
         functions[0].as_ref_unchecked()
@@ -95,16 +99,19 @@ fn ref_survives_gc() {
 
     let arena = ExecutableArena::new();
 
+    let mut descriptors = ObjectDescriptorTable::new();
+    let desc_vec_u64 = descriptors.push(ObjectDescriptor::new_vector(8, vec![]).unwrap());
+
     #[rustfmt::skip]
     let code = arena.alloc_slice_fill_iter([
         VecNew { dst: FO(vec) },
         SlotBorrow { dst: FO(vec_ref), local: FO(vec) },
         StoreImm8 { dst: FO(tmp), imm: 100 },
-        VecPushBack { vec_ref: FO(vec_ref), elem: FO(tmp), elem_size: 8, descriptor_id: DescriptorId(0) },
+        VecPushBack { vec_ref: FO(vec_ref), elem: FO(tmp), elem_size: 8, descriptor_id: desc_vec_u64 },
         StoreImm8 { dst: FO(tmp), imm: 200 },
-        VecPushBack { vec_ref: FO(vec_ref), elem: FO(tmp), elem_size: 8, descriptor_id: DescriptorId(0) },
+        VecPushBack { vec_ref: FO(vec_ref), elem: FO(tmp), elem_size: 8, descriptor_id: desc_vec_u64 },
         StoreImm8 { dst: FO(tmp), imm: 300 },
-        VecPushBack { vec_ref: FO(vec_ref), elem: FO(tmp), elem_size: 8, descriptor_id: DescriptorId(0) },
+        VecPushBack { vec_ref: FO(vec_ref), elem: FO(tmp), elem_size: 8, descriptor_id: desc_vec_u64 },
         StoreImm8 { dst: FO(idx), imm: 2 },
         VecBorrow { dst: FO(r#ref), vec_ref: FO(vec_ref), idx: FO(idx), elem_size: 8 },
         ForceGC,
@@ -125,7 +132,7 @@ fn ref_survives_gc() {
         frame_layout: FrameLayoutInfo::new(&arena, [FO(vec), FO(ref_base), FO(vec_ref)]),
         safe_point_layouts: SortedSafePointEntries::empty(),
     })];
-    let descriptors = [ObjectDescriptor::Trivial];
+
     let mut exec_ctx = LocalExecutionContext::with_max_budget();
     let mut ctx = InterpreterContext::new(&mut exec_ctx, &descriptors, unsafe {
         functions[0].as_ref_unchecked()
@@ -161,6 +168,9 @@ fn ref_cross_frame() {
 
     let arena = ExecutableArena::new();
 
+    let mut descriptors = ObjectDescriptorTable::new();
+    let desc_vec_u64 = descriptors.push(ObjectDescriptor::new_vector(8, vec![]).unwrap());
+
     #[rustfmt::skip]
     let callee_code = arena.alloc_slice_fill_iter([
         ForceGC,
@@ -194,11 +204,11 @@ fn ref_cross_frame() {
         VecNew { dst: FO(m_vec) },
         SlotBorrow { dst: FO(m_vec_ref), local: FO(m_vec) },
         StoreImm8 { dst: FO(m_tmp), imm: 10 },
-        VecPushBack { vec_ref: FO(m_vec_ref), elem: FO(m_tmp), elem_size: 8, descriptor_id: DescriptorId(0) },
+        VecPushBack { vec_ref: FO(m_vec_ref), elem: FO(m_tmp), elem_size: 8, descriptor_id: desc_vec_u64 },
         StoreImm8 { dst: FO(m_tmp), imm: 20 },
-        VecPushBack { vec_ref: FO(m_vec_ref), elem: FO(m_tmp), elem_size: 8, descriptor_id: DescriptorId(0) },
+        VecPushBack { vec_ref: FO(m_vec_ref), elem: FO(m_tmp), elem_size: 8, descriptor_id: desc_vec_u64 },
         StoreImm8 { dst: FO(m_tmp), imm: 30 },
-        VecPushBack { vec_ref: FO(m_vec_ref), elem: FO(m_tmp), elem_size: 8, descriptor_id: DescriptorId(0) },
+        VecPushBack { vec_ref: FO(m_vec_ref), elem: FO(m_tmp), elem_size: 8, descriptor_id: desc_vec_u64 },
         StoreImm8 { dst: FO(m_idx), imm: 1 },
         VecBorrow { dst: FO(m_callee_ref), vec_ref: FO(m_vec_ref), idx: FO(m_idx), elem_size: 8 },
         CallFunc { func_id: 1 },
@@ -217,10 +227,10 @@ fn ref_cross_frame() {
         safe_point_layouts: SortedSafePointEntries::empty(),
     });
 
-    let descriptors = [ObjectDescriptor::Trivial];
     let functions = [Some(main_func), Some(callee_func)];
     // SAFETY: Exclusive access during test setup; arena is alive.
     unsafe { Function::resolve_calls(&functions) };
+
     let mut exec_ctx = LocalExecutionContext::with_max_budget();
     let mut ctx = InterpreterContext::new(&mut exec_ctx, &descriptors, unsafe {
         functions[0].unwrap().as_ref_unchecked()
@@ -263,18 +273,21 @@ fn ref_multiple_borrows() {
 
     let arena = ExecutableArena::new();
 
+    let mut descriptors = ObjectDescriptorTable::new();
+    let desc_vec_u64 = descriptors.push(ObjectDescriptor::new_vector(8, vec![]).unwrap());
+
     #[rustfmt::skip]
     let code = arena.alloc_slice_fill_iter([
         VecNew { dst: FO(vec) },
         SlotBorrow { dst: FO(vec_ref), local: FO(vec) },
         StoreImm8 { dst: FO(tmp), imm: 10 },
-        VecPushBack { vec_ref: FO(vec_ref), elem: FO(tmp), elem_size: 8, descriptor_id: DescriptorId(0) },
+        VecPushBack { vec_ref: FO(vec_ref), elem: FO(tmp), elem_size: 8, descriptor_id: desc_vec_u64 },
         StoreImm8 { dst: FO(tmp), imm: 20 },
-        VecPushBack { vec_ref: FO(vec_ref), elem: FO(tmp), elem_size: 8, descriptor_id: DescriptorId(0) },
+        VecPushBack { vec_ref: FO(vec_ref), elem: FO(tmp), elem_size: 8, descriptor_id: desc_vec_u64 },
         StoreImm8 { dst: FO(tmp), imm: 30 },
-        VecPushBack { vec_ref: FO(vec_ref), elem: FO(tmp), elem_size: 8, descriptor_id: DescriptorId(0) },
+        VecPushBack { vec_ref: FO(vec_ref), elem: FO(tmp), elem_size: 8, descriptor_id: desc_vec_u64 },
         StoreImm8 { dst: FO(tmp), imm: 40 },
-        VecPushBack { vec_ref: FO(vec_ref), elem: FO(tmp), elem_size: 8, descriptor_id: DescriptorId(0) },
+        VecPushBack { vec_ref: FO(vec_ref), elem: FO(tmp), elem_size: 8, descriptor_id: desc_vec_u64 },
         StoreImm8 { dst: FO(idx), imm: 1 },
         VecBorrow { dst: FO(ref_a), vec_ref: FO(vec_ref), idx: FO(idx), elem_size: 8 },
         StoreImm8 { dst: FO(idx), imm: 3 },
@@ -303,7 +316,7 @@ fn ref_multiple_borrows() {
         ]),
         safe_point_layouts: SortedSafePointEntries::empty(),
     })];
-    let descriptors = [ObjectDescriptor::Trivial];
+
     let mut exec_ctx = LocalExecutionContext::with_max_budget();
     let mut ctx = InterpreterContext::new(&mut exec_ctx, &descriptors, unsafe {
         functions[0].as_ref_unchecked()
@@ -345,6 +358,9 @@ fn ref_borrow_local() {
 
     let arena = ExecutableArena::new();
 
+    // No user descriptors used; the table just provides the reserved entries.
+    let descriptors = ObjectDescriptorTable::new();
+
     #[rustfmt::skip]
     let code = arena.alloc_slice_fill_iter([
         StoreImm8 { dst: FO(local_val), imm: 42 },
@@ -371,7 +387,7 @@ fn ref_borrow_local() {
         frame_layout: FrameLayoutInfo::new(&arena, [FO(ref_base), FO(vec), FO(vec_ref)]),
         safe_point_layouts: SortedSafePointEntries::empty(),
     })];
-    let descriptors = [ObjectDescriptor::Trivial];
+
     let mut exec_ctx = LocalExecutionContext::with_max_budget();
     let mut ctx = InterpreterContext::new(&mut exec_ctx, &descriptors, unsafe {
         functions[0].as_ref_unchecked()
@@ -407,29 +423,33 @@ fn ref_nested_vectors() {
 
     let arena = ExecutableArena::new();
 
+    let mut descriptors = ObjectDescriptorTable::new();
+    let desc_vec_outer = descriptors.push(ObjectDescriptor::new_vector(8, vec![0]).unwrap());
+    let desc_vec_inner = descriptors.push(ObjectDescriptor::new_vector(8, vec![]).unwrap());
+
     #[rustfmt::skip]
     let code = arena.alloc_slice_fill_iter([
         // -- Build inner0 = [100, 200] --
         VecNew { dst: FO(inner_ptr) },
         SlotBorrow { dst: FO(inner_ref), local: FO(inner_ptr) },
         StoreImm8 { dst: FO(tmp), imm: 100 },
-        VecPushBack { vec_ref: FO(inner_ref), elem: FO(tmp), elem_size: 8, descriptor_id: DescriptorId(0) },
+        VecPushBack { vec_ref: FO(inner_ref), elem: FO(tmp), elem_size: 8, descriptor_id: desc_vec_inner },
         StoreImm8 { dst: FO(tmp), imm: 200 },
-        VecPushBack { vec_ref: FO(inner_ref), elem: FO(tmp), elem_size: 8, descriptor_id: DescriptorId(0) },
+        VecPushBack { vec_ref: FO(inner_ref), elem: FO(tmp), elem_size: 8, descriptor_id: desc_vec_inner },
         // -- Build outer --
         VecNew { dst: FO(outer) },
         SlotBorrow { dst: FO(outer_ref), local: FO(outer) },
-        VecPushBack { vec_ref: FO(outer_ref), elem: FO(inner_ptr), elem_size: 8, descriptor_id: DescriptorId(1) },
+        VecPushBack { vec_ref: FO(outer_ref), elem: FO(inner_ptr), elem_size: 8, descriptor_id: desc_vec_outer },
         // -- Build inner1 = [300, 400, 500] --
         VecNew { dst: FO(inner_ptr) },
         SlotBorrow { dst: FO(inner_ref), local: FO(inner_ptr) },
         StoreImm8 { dst: FO(tmp), imm: 300 },
-        VecPushBack { vec_ref: FO(inner_ref), elem: FO(tmp), elem_size: 8, descriptor_id: DescriptorId(0) },
+        VecPushBack { vec_ref: FO(inner_ref), elem: FO(tmp), elem_size: 8, descriptor_id: desc_vec_inner },
         StoreImm8 { dst: FO(tmp), imm: 400 },
-        VecPushBack { vec_ref: FO(inner_ref), elem: FO(tmp), elem_size: 8, descriptor_id: DescriptorId(0) },
+        VecPushBack { vec_ref: FO(inner_ref), elem: FO(tmp), elem_size: 8, descriptor_id: desc_vec_inner },
         StoreImm8 { dst: FO(tmp), imm: 500 },
-        VecPushBack { vec_ref: FO(inner_ref), elem: FO(tmp), elem_size: 8, descriptor_id: DescriptorId(0) },
-        VecPushBack { vec_ref: FO(outer_ref), elem: FO(inner_ptr), elem_size: 8, descriptor_id: DescriptorId(1) },
+        VecPushBack { vec_ref: FO(inner_ref), elem: FO(tmp), elem_size: 8, descriptor_id: desc_vec_inner },
+        VecPushBack { vec_ref: FO(outer_ref), elem: FO(inner_ptr), elem_size: 8, descriptor_id: desc_vec_outer },
         // -- Load outer[1] → inner1 ptr, borrow inner1[2] --
         StoreImm8 { dst: FO(idx), imm: 1 },
         VecLoadElem { dst: FO(inner_ptr), vec_ref: FO(outer_ref), idx: FO(idx), elem_size: 8 },
@@ -459,10 +479,7 @@ fn ref_nested_vectors() {
         ]),
         safe_point_layouts: SortedSafePointEntries::empty(),
     })];
-    let descriptors = [ObjectDescriptor::Trivial, ObjectDescriptor::Vector {
-        elem_size: 8,
-        elem_pointer_offsets: vec![0],
-    }];
+
     let mut exec_ctx = LocalExecutionContext::with_max_budget();
     let mut ctx = InterpreterContext::new(&mut exec_ctx, &descriptors, unsafe {
         functions[0].as_ref_unchecked()
@@ -518,16 +535,19 @@ fn ref_survives_double_gc() {
 
     let arena = ExecutableArena::new();
 
+    let mut descriptors = ObjectDescriptorTable::new();
+    let desc_vec_u64 = descriptors.push(ObjectDescriptor::new_vector(8, vec![]).unwrap());
+
     #[rustfmt::skip]
     let code = arena.alloc_slice_fill_iter([
         VecNew { dst: FO(vec) },
         SlotBorrow { dst: FO(vec_ref), local: FO(vec) },
         StoreImm8 { dst: FO(tmp), imm: 10 },
-        VecPushBack { vec_ref: FO(vec_ref), elem: FO(tmp), elem_size: 8, descriptor_id: DescriptorId(0) },
+        VecPushBack { vec_ref: FO(vec_ref), elem: FO(tmp), elem_size: 8, descriptor_id: desc_vec_u64 },
         StoreImm8 { dst: FO(tmp), imm: 20 },
-        VecPushBack { vec_ref: FO(vec_ref), elem: FO(tmp), elem_size: 8, descriptor_id: DescriptorId(0) },
+        VecPushBack { vec_ref: FO(vec_ref), elem: FO(tmp), elem_size: 8, descriptor_id: desc_vec_u64 },
         StoreImm8 { dst: FO(tmp), imm: 30 },
-        VecPushBack { vec_ref: FO(vec_ref), elem: FO(tmp), elem_size: 8, descriptor_id: DescriptorId(0) },
+        VecPushBack { vec_ref: FO(vec_ref), elem: FO(tmp), elem_size: 8, descriptor_id: desc_vec_u64 },
         StoreImm8 { dst: FO(idx), imm: 1 },
         VecBorrow { dst: FO(r#ref), vec_ref: FO(vec_ref), idx: FO(idx), elem_size: 8 },
         ForceGC,
@@ -548,7 +568,7 @@ fn ref_survives_double_gc() {
         frame_layout: FrameLayoutInfo::new(&arena, [FO(vec), FO(ref_base), FO(vec_ref)]),
         safe_point_layouts: SortedSafePointEntries::empty(),
     })];
-    let descriptors = [ObjectDescriptor::Trivial];
+
     let mut exec_ctx = LocalExecutionContext::with_max_budget();
     let mut ctx = InterpreterContext::new(&mut exec_ctx, &descriptors, unsafe {
         functions[0].as_ref_unchecked()
@@ -584,9 +604,12 @@ fn ref_struct_field_borrow() {
 
     let arena = ExecutableArena::new();
 
+    let mut descriptors = ObjectDescriptorTable::new();
+    let desc_entry_struct = descriptors.push(ObjectDescriptor::new_struct(16, vec![]).unwrap());
+
     #[rustfmt::skip]
     let code = arena.alloc_slice_fill_iter([
-        HeapNew { dst: FO(entry), descriptor_id: DescriptorId(0) },
+        HeapNew { dst: FO(entry), descriptor_id: desc_entry_struct },
         StoreImm8 { dst: FO(result), imm: 42 },
         MicroOp::struct_store8(FO(entry), 0, FO(result)),
         StoreImm8 { dst: FO(result), imm: 100 },
@@ -610,10 +633,7 @@ fn ref_struct_field_borrow() {
         frame_layout: FrameLayoutInfo::new(&arena, [FO(entry), FO(r#ref), FO(entry_ref)]),
         safe_point_layouts: SortedSafePointEntries::empty(),
     })];
-    let descriptors = [ObjectDescriptor::Struct {
-        size: 16,
-        pointer_offsets: vec![],
-    }];
+
     let mut exec_ctx = LocalExecutionContext::with_max_budget();
     let mut ctx = InterpreterContext::new(&mut exec_ctx, &descriptors, unsafe {
         functions[0].as_ref_unchecked()
@@ -646,9 +666,12 @@ fn ref_struct_field_survives_gc() {
 
     let arena = ExecutableArena::new();
 
+    let mut descriptors = ObjectDescriptorTable::new();
+    let desc_entry_struct = descriptors.push(ObjectDescriptor::new_struct(16, vec![]).unwrap());
+
     #[rustfmt::skip]
     let code = arena.alloc_slice_fill_iter([
-        HeapNew { dst: FO(entry), descriptor_id: DescriptorId(0) },
+        HeapNew { dst: FO(entry), descriptor_id: desc_entry_struct },
         StoreImm8 { dst: FO(result), imm: 7 },
         MicroOp::struct_store8(FO(entry), 0, FO(result)),
         StoreImm8 { dst: FO(result), imm: 13 },
@@ -670,10 +693,7 @@ fn ref_struct_field_survives_gc() {
         frame_layout: FrameLayoutInfo::new(&arena, [FO(entry), FO(ref_base), FO(entry_ref)]),
         safe_point_layouts: SortedSafePointEntries::empty(),
     })];
-    let descriptors = [ObjectDescriptor::Struct {
-        size: 16,
-        pointer_offsets: vec![],
-    }];
+
     let mut exec_ctx = LocalExecutionContext::with_max_budget();
     let mut ctx = InterpreterContext::new(&mut exec_ctx, &descriptors, unsafe {
         functions[0].as_ref_unchecked()
