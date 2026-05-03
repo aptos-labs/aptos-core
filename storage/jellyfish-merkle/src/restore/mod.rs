@@ -25,7 +25,6 @@ use aptos_types::{
     proof::{SparseMerkleInternalNode, SparseMerkleLeafNode, SparseMerkleRangeProof},
     transaction::Version,
 };
-use itertools::Itertools;
 use once_cell::sync::Lazy;
 use std::{
     cmp::Eq,
@@ -126,6 +125,7 @@ where
 pub struct JellyfishMerkleRestore<K> {
     /// The underlying storage.
     store: Arc<dyn TreeWriter<K>>,
+    reader: Option<Arc<dyn TreeReader<K> + Send + Sync>>,
 
     /// The version of the tree we are restoring.
     version: Version,
@@ -192,7 +192,8 @@ where
         expected_root_hash: HashValue,
         async_commit: bool,
     ) -> Result<Self> {
-        let tree_reader = Arc::clone(&store);
+        let tree_reader: Arc<dyn TreeReader<K> + Send + Sync> = store.clone();
+        let tree_writer: Arc<dyn TreeWriter<K>> = store;
         let (finished, partial_nodes, previous_leaf) = if let Some(root_node) =
             tree_reader.get_node_option(&NodeKey::new_empty_path(version), "restore")?
         {
@@ -221,7 +222,8 @@ where
         };
 
         Ok(Self {
-            store,
+            store: tree_writer,
+            reader: Some(tree_reader),
             version,
             partial_nodes,
             frozen_nodes: HashMap::new(),
@@ -241,6 +243,7 @@ where
     ) -> Result<Self> {
         Ok(Self {
             store,
+            reader: None,
             version,
             partial_nodes: vec![InternalInfo::new_empty(NodeKey::new_empty_path(version))],
             frozen_nodes: HashMap::new(),
@@ -333,50 +336,77 @@ where
         Ok(partial_nodes)
     }
 
-    /// Restores a chunk of states. This function will verify that the given chunk is correct
-    /// using the proof and root hash, then write things to storage. If the chunk is invalid, an
-    /// error will be returned and nothing will be written to storage.
-    pub fn add_chunk_impl(
+    /// Builds the partial tree in memory from `chunk` and verifies the entire chunk against
+    /// the expected root and the JMT-stored leaves. Does not touch storage.
+    ///
+    /// `kv_progress` is the caller's last-written key hash for the dependent KV side (or
+    /// `None` if nothing is written yet). When the JMT restore is ahead of the KV — typically
+    /// after a partial-crash recovery where the previous chunk's tree commit landed but the
+    /// KV write didn't — `kv_progress < previous_leaf.account_key()`, and the chunk arrives
+    /// with a prefix of leaves that the JMT already stores. This function then walks the JMT
+    /// in `(kv_progress, previous_leaf]` and pairs each stored leaf with the chunk's prefix,
+    /// catching wrong values *and* missing keys (left-edge or internal gaps) before any KV
+    /// write is allowed to land. To opt out (e.g., `TreeOnly` mode where there is no
+    /// dependent KV), pass `kv_progress` equal to `previous_leaf.account_key()` — the walk
+    /// then has an empty range and is skipped.
+    ///
+    /// Returns `Ok(true)` when there are frozen nodes pending — the caller must follow up
+    /// with [`Self::commit_prepared`]. Returns `Ok(false)` when the chunk added nothing new
+    /// (already finished, empty, or fully covered by `previous_leaf`); no commit is needed.
+    pub fn prepare_chunk(
         &mut self,
         mut chunk: Vec<(&K, HashValue)>,
         proof: SparseMerkleRangeProof,
-    ) -> Result<()> {
+        kv_progress: Option<HashValue>,
+    ) -> Result<bool> {
         if self.finished {
             info!("State snapshot restore already finished, ignoring entire chunk.");
-            return Ok(());
+            return Ok(false);
         }
-
-        if let Some(prev_leaf) = &self.previous_leaf {
-            let skip_until = chunk
-                .iter()
-                .find_position(|(key, _hash)| key.hash() > *prev_leaf.account_key());
-            chunk = match skip_until {
-                None => {
-                    info!("Skipping entire chunk.");
-                    return Ok(());
-                },
-                Some((0, _)) => chunk,
-                Some((num_to_skip, next_leaf)) => {
-                    info!(
-                        num_to_skip = num_to_skip,
-                        next_leaf = next_leaf,
-                        "Skipping leaves."
-                    );
-                    chunk.split_off(num_to_skip)
-                },
-            }
-        };
         if chunk.is_empty() {
-            return Ok(());
+            return Ok(false);
         }
 
-        for (key, value_hash) in chunk {
+        let jmt_progress = self.previous_leaf.as_ref().map(|l| *l.account_key());
+        let prefix_len = match jmt_progress {
+            Some(jmt) => chunk.iter().take_while(|(k, _)| k.hash() <= jmt).count(),
+            None => 0,
+        };
+
+        // When the dependent KV is behind the JMT, the chunk's prefix must exactly match the
+        // JMT's leaves in `(kv_progress, walk_upper]`, where `walk_upper` is the highest key
+        // the chunk claims to cover that the JMT also has stored — i.e.,
+        // `min(chunk.last_key, jmt_progress)`. The merge-walk catches both wrong values
+        // (Bug 1) and missing keys at the left edge or between prefix entries (Bug 2).
+        let need_prefix_check = match (kv_progress, jmt_progress) {
+            (_, None) => false,
+            (None, Some(_)) => true,
+            (Some(kv), Some(jmt)) => kv < jmt,
+        };
+        if need_prefix_check {
+            let jmt = jmt_progress.expect("jmt_progress is Some when need_prefix_check is true");
+            let chunk_last = chunk
+                .last()
+                .expect("chunk is non-empty (early return above)")
+                .0
+                .hash();
+            let walk_upper = std::cmp::min(chunk_last, jmt);
+            self.wait_for_async_commit()?;
+            self.verify_prefix_against_storage(&chunk[..prefix_len], kv_progress, walk_upper)?;
+        }
+
+        let suffix = chunk.split_off(prefix_len);
+        if suffix.is_empty() {
+            return Ok(false);
+        }
+
+        for (key, value_hash) in suffix {
             let hashed_key = key.hash();
             if let Some(ref prev_leaf) = self.previous_leaf {
                 ensure!(
                     &hashed_key > prev_leaf.account_key(),
                     "State keys must come in increasing order.",
-                )
+                );
             }
             self.previous_leaf.replace(LeafNode::new(
                 hashed_key,
@@ -387,10 +417,209 @@ where
             self.num_keys_received += 1;
         }
 
-        // Verify what we have added so far is all correct.
+        // After this returns Ok, the chunk is proven against the expected root hash and it
+        // is safe for the caller to commit dependent state (e.g. KV writes) in parallel with
+        // `commit_prepared`.
         self.verify(proof)?;
 
-        // Write the frozen nodes to storage.
+        Ok(true)
+    }
+
+    /// Walks the JMT leaves in `(exclusive_lower, inclusive_upper]` in increasing key order
+    /// and pairs them 1-to-1 with `prefix`. Errors on any divergence: a JMT leaf with no
+    /// matching chunk entry (chunk skipped a key — gap), a chunk entry that doesn't match
+    /// the next JMT leaf (out of order, extra entry, or missing key in JMT), a value-hash
+    /// mismatch, or a leftover chunk entry past the upper bound.
+    fn verify_prefix_against_storage(
+        &self,
+        prefix: &[(&K, HashValue)],
+        exclusive_lower: Option<HashValue>,
+        inclusive_upper: HashValue,
+    ) -> Result<()> {
+        let reader = self.reader.as_ref().ok_or_else(|| {
+            AptosDbError::Other("Cannot verify chunk prefix without a tree reader.".into())
+        })?;
+
+        let mut prefix_iter = prefix.iter();
+        self.walk_leaves(
+            reader.as_ref(),
+            exclusive_lower,
+            inclusive_upper,
+            |leaf: LeafNode<K>| match prefix_iter.next() {
+                None => Err(AptosDbError::Other(format!(
+                    "Chunk is missing key {} that exists in restored JMT.",
+                    leaf.account_key(),
+                ))),
+                Some((key, value_hash)) => {
+                    ensure!(
+                        key.hash() == *leaf.account_key(),
+                        "Chunk key {} does not match next restored JMT leaf {}.",
+                        key.hash(),
+                        leaf.account_key(),
+                    );
+                    ensure!(
+                        *value_hash == leaf.value_hash(),
+                        "Restored JMT value hash mismatch for key {}: chunk has {}, JMT has {}.",
+                        leaf.account_key(),
+                        value_hash,
+                        leaf.value_hash(),
+                    );
+                    Ok(())
+                },
+            },
+        )?;
+
+        if let Some((extra_key, _)) = prefix_iter.next() {
+            return Err(AptosDbError::Other(format!(
+                "Chunk has prefix entry {} not found in restored JMT.",
+                extra_key.hash(),
+            )));
+        }
+
+        Ok(())
+    }
+
+    /// Walks the leaves of the in-progress tree whose keys fall in
+    /// `(exclusive_lower, inclusive_upper]`, in increasing key order, invoking `visit` for
+    /// each. The traversal uses `self.partial_nodes` for the rightmost in-memory path
+    /// (whose root may not be in storage yet) and descends into storage only for frozen
+    /// subtrees on the left. Subtrees fully outside the query range are pruned by nibble
+    /// path so the cost is `O(yielded_leaves + log n)` storage reads.
+    fn walk_leaves<F>(
+        &self,
+        reader: &(dyn TreeReader<K> + Send + Sync),
+        exclusive_lower: Option<HashValue>,
+        inclusive_upper: HashValue,
+        mut visit: F,
+    ) -> Result<()>
+    where
+        F: FnMut(LeafNode<K>) -> Result<()>,
+    {
+        self.walk_partial(reader, 0, exclusive_lower, inclusive_upper, &mut visit)
+    }
+
+    fn walk_partial<F>(
+        &self,
+        reader: &(dyn TreeReader<K> + Send + Sync),
+        depth: usize,
+        exclusive_lower: Option<HashValue>,
+        inclusive_upper: HashValue,
+        visit: &mut F,
+    ) -> Result<()>
+    where
+        F: FnMut(LeafNode<K>) -> Result<()>,
+    {
+        let info = &self.partial_nodes[depth];
+        for (child_index, child_opt) in info.children.iter().enumerate() {
+            let child = match child_opt {
+                Some(c) => c,
+                None => continue,
+            };
+            let child_nibble: Nibble = (child_index as u8).into();
+            let child_node_key = info.node_key.gen_child_node_key(self.version, child_nibble);
+            let (sub_min, sub_max) = Self::subtree_key_range(child_node_key.nibble_path());
+            let above_lower = exclusive_lower.map_or(true, |l| sub_max > l);
+            let below_upper = sub_min <= inclusive_upper;
+            if !(above_lower && below_upper) {
+                continue;
+            }
+            match child {
+                ChildInfo::Leaf(leaf) => {
+                    let key = *leaf.account_key();
+                    let above_lower_leaf = exclusive_lower.map_or(true, |l| key > l);
+                    if above_lower_leaf && key <= inclusive_upper {
+                        visit(leaf.clone())?;
+                    }
+                },
+                ChildInfo::Internal { hash: Some(_), .. } => {
+                    // Frozen — fully in storage; descend from this child's node key.
+                    Self::walk_subtree(
+                        reader,
+                        self.version,
+                        child_node_key,
+                        exclusive_lower,
+                        inclusive_upper,
+                        visit,
+                    )?;
+                },
+                ChildInfo::Internal { hash: None, .. } => {
+                    // Partial — points to the next level of `partial_nodes`.
+                    self.walk_partial(reader, depth + 1, exclusive_lower, inclusive_upper, visit)?;
+                },
+            }
+        }
+        Ok(())
+    }
+
+    fn walk_subtree<F>(
+        reader: &(dyn TreeReader<K> + Send + Sync),
+        version: Version,
+        node_key: NodeKey,
+        exclusive_lower: Option<HashValue>,
+        inclusive_upper: HashValue,
+        visit: &mut F,
+    ) -> Result<()>
+    where
+        F: FnMut(LeafNode<K>) -> Result<()>,
+    {
+        let node = match reader.get_node_option(&node_key, "walk_leaves")? {
+            Some(n) => n,
+            None => return Ok(()),
+        };
+        match node {
+            Node::Null => Ok(()),
+            Node::Leaf(leaf) => {
+                let key = *leaf.account_key();
+                let above_lower = exclusive_lower.map_or(true, |l| key > l);
+                if above_lower && key <= inclusive_upper {
+                    visit(leaf)?;
+                }
+                Ok(())
+            },
+            Node::Internal(internal) => {
+                for (nibble, _) in internal.children_sorted() {
+                    let child_key = node_key.gen_child_node_key(version, *nibble);
+                    let (sub_min, sub_max) = Self::subtree_key_range(child_key.nibble_path());
+                    let above_lower = exclusive_lower.map_or(true, |l| sub_max > l);
+                    let below_upper = sub_min <= inclusive_upper;
+                    if above_lower && below_upper {
+                        Self::walk_subtree(
+                            reader,
+                            version,
+                            child_key,
+                            exclusive_lower,
+                            inclusive_upper,
+                            visit,
+                        )?;
+                    }
+                }
+                Ok(())
+            },
+        }
+    }
+
+    /// Returns the smallest and largest possible leaf keys in the subtree rooted at
+    /// `nibble_path` — i.e., the path padded with all-zero / all-`F` suffix bytes.
+    fn subtree_key_range(nibble_path: &NibblePath) -> (HashValue, HashValue) {
+        let mut min_bytes = [0u8; HashValue::LENGTH];
+        let mut max_bytes = [0xFFu8; HashValue::LENGTH];
+        for (i, nibble) in nibble_path.nibbles().enumerate() {
+            let byte_idx = i / 2;
+            let n = u8::from(nibble);
+            if i % 2 == 0 {
+                min_bytes[byte_idx] = n << 4;
+                max_bytes[byte_idx] = (n << 4) | 0x0F;
+            } else {
+                min_bytes[byte_idx] = (min_bytes[byte_idx] & 0xF0) | n;
+                max_bytes[byte_idx] = (max_bytes[byte_idx] & 0xF0) | n;
+            }
+        }
+        (HashValue::new(min_bytes), HashValue::new(max_bytes))
+    }
+
+    /// Writes the frozen nodes accumulated by [`Self::prepare_chunk`] to storage. With
+    /// `async_commit`, the write is dispatched to `IO_POOL` and drained on the next call.
+    pub fn commit_prepared(&mut self) -> Result<()> {
         if self.async_commit {
             self.wait_for_async_commit()?;
             let (tx, rx) = channel();

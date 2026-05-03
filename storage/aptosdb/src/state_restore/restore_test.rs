@@ -228,6 +228,241 @@ proptest! {
     }
 }
 
+#[test]
+fn test_tree_skipped_chunk_is_checked_before_kv_catchup() {
+    let source_kvs: BTreeMap<_, _> = [
+        (ValueBlob::from(vec![1]), ValueBlob::from(vec![10])),
+        (ValueBlob::from(vec![2]), ValueBlob::from(vec![20])),
+        (ValueBlob::from(vec![3]), ValueBlob::from(vec![30])),
+    ]
+    .into_iter()
+    .collect();
+    let all: BTreeMap<_, _> = source_kvs
+        .iter()
+        .map(|(k, v)| (CryptoHash::hash(k), (k.clone(), v.clone())))
+        .collect();
+    let (source_db, version) = init_mock_store(&source_kvs);
+    let source_tree = JellyfishMerkleTree::new(&source_db);
+    let expected_root_hash = source_tree.get_root_hash(version).unwrap();
+
+    let first_two_with_hashes: Vec<_> = all.iter().take(2).collect();
+    let first_two: Vec<_> = first_two_with_hashes
+        .iter()
+        .map(|(_, (k, v))| ((*k).clone(), (*v).clone()))
+        .collect();
+    let first_two_proof = source_tree
+        .get_range_proof(*first_two_with_hashes.last().unwrap().0, version)
+        .unwrap();
+    let third_with_hash = all.iter().nth(2).unwrap();
+    let (third_key, third_value) = third_with_hash.1;
+    let third = (third_key.clone(), third_value.clone());
+    let third_proof = source_tree
+        .get_range_proof(*third_with_hash.0, version)
+        .unwrap();
+
+    let restore_db = Arc::new(MockSnapshotStore::default());
+    {
+        let mut restore = StateSnapshotRestore::new(
+            &restore_db,
+            &restore_db,
+            version,
+            expected_root_hash,
+            false, /* async_commit */
+            StateSnapshotRestoreMode::Default,
+        )
+        .unwrap();
+        restore
+            .add_chunk(first_two.clone(), first_two_proof.clone())
+            .unwrap();
+        restore.add_chunk(vec![third], third_proof).unwrap();
+    }
+
+    // Simulate KV progress falling behind after the tree already restored these leaves.
+    restore_db.kv_store.write().clear();
+    restore_db.progress_store.write().clear();
+
+    let mut restore = StateSnapshotRestore::new(
+        &restore_db,
+        &restore_db,
+        version,
+        expected_root_hash,
+        false, /* async_commit */
+        StateSnapshotRestoreMode::Default,
+    )
+    .unwrap();
+    let mut corrupted_first_two = first_two.clone();
+    corrupted_first_two[0].1 = ValueBlob::from(vec![99]);
+    let err = restore
+        .add_chunk(corrupted_first_two, first_two_proof.clone())
+        .unwrap_err();
+    assert!(
+        err.to_string().contains("Restored JMT value hash mismatch"),
+        "{}",
+        err,
+    );
+    assert!(restore_db.kv_store.read().is_empty());
+    assert!(restore_db.progress_store.read().get(&version).is_none());
+
+    restore
+        .add_chunk(first_two.clone(), first_two_proof)
+        .unwrap();
+    for (key, value) in first_two {
+        assert_eq!(
+            restore_db.get_value_at_version(&(key, version)),
+            Some(value),
+        );
+    }
+}
+
+/// After a partial-crash recovery where the JMT got ahead of the KV, the next chunk straddles
+/// the JMT progress: a prefix of the chunk is already in JMT, plus a suffix of new keys. The
+/// proof for the chunk is valid (it covers the suffix correctly), but a malicious source can
+/// substitute a wrong value in the prefix — those entries used to be silently dropped. The new
+/// `prepare_chunk` walks the JMT-stored leaves alongside the prefix and rejects the mismatch
+/// before any KV writes can land.
+#[test]
+fn test_partial_overlap_chunk_with_corrupt_prefix_value_is_rejected() {
+    let source_kvs: BTreeMap<_, _> = (1u8..=4)
+        .map(|i| (ValueBlob::from(vec![i]), ValueBlob::from(vec![i * 10])))
+        .collect();
+    let all: BTreeMap<_, _> = source_kvs
+        .iter()
+        .map(|(k, v)| (CryptoHash::hash(k), (k.clone(), v.clone())))
+        .collect();
+    let (source_db, version) = init_mock_store(&source_kvs);
+    let source_tree = JellyfishMerkleTree::new(&source_db);
+    let expected_root_hash = source_tree.get_root_hash(version).unwrap();
+
+    // First session restores three leaves and is dropped without `finish` — only the first
+    // two are frozen into JMT storage; the third was rightmost in memory and is lost.
+    let three_with_hashes: Vec<_> = all.iter().take(3).collect();
+    let three: Vec<_> = three_with_hashes
+        .iter()
+        .map(|(_, (k, v))| ((*k).clone(), (*v).clone()))
+        .collect();
+    let three_proof = source_tree
+        .get_range_proof(*three_with_hashes.last().unwrap().0, version)
+        .unwrap();
+    let restore_db = Arc::new(MockSnapshotStore::default());
+    {
+        let mut restore = StateSnapshotRestore::new(
+            &restore_db,
+            &restore_db,
+            version,
+            expected_root_hash,
+            false, /* async_commit */
+            StateSnapshotRestoreMode::Default,
+        )
+        .unwrap();
+        restore.add_chunk(three, three_proof).unwrap();
+    }
+
+    // Simulate KV falling behind the JMT.
+    restore_db.kv_store.write().clear();
+    restore_db.progress_store.write().clear();
+
+    // The replay chunk straddles the JMT progress: the first two entries (prefix) are
+    // already in JMT, the last two (suffix) are new. Corrupt the second entry's value.
+    let mut restore = StateSnapshotRestore::new(
+        &restore_db,
+        &restore_db,
+        version,
+        expected_root_hash,
+        false, /* async_commit */
+        StateSnapshotRestoreMode::Default,
+    )
+    .unwrap();
+    let four_with_hashes: Vec<_> = all.iter().take(4).collect();
+    let mut chunk: Vec<_> = four_with_hashes
+        .iter()
+        .map(|(_, (k, v))| ((*k).clone(), (*v).clone()))
+        .collect();
+    chunk[1].1 = ValueBlob::from(vec![0xFF]);
+    let proof = source_tree
+        .get_range_proof(*four_with_hashes.last().unwrap().0, version)
+        .unwrap();
+
+    let err = restore.add_chunk(chunk, proof).unwrap_err();
+    assert!(
+        err.to_string().contains("Restored JMT value hash mismatch"),
+        "expected value hash mismatch error, got: {}",
+        err,
+    );
+    assert!(restore_db.kv_store.read().is_empty());
+    assert!(restore_db.progress_store.read().get(&version).is_none());
+}
+
+/// A malicious source can otherwise leave a permanent hole in the KV by sending a chunk whose
+/// first key is past KV's progress (skipping JMT-stored leaves the KV still needs to fill).
+/// The proof — which only commits to right siblings — would still verify. The new walk yields
+/// the missing JMT leaf first and rejects the chunk before any KV writes happen.
+#[test]
+fn test_chunk_with_left_gap_after_kv_catchup_is_rejected() {
+    let source_kvs: BTreeMap<_, _> = (1u8..=4)
+        .map(|i| (ValueBlob::from(vec![i]), ValueBlob::from(vec![i * 10])))
+        .collect();
+    let all: BTreeMap<_, _> = source_kvs
+        .iter()
+        .map(|(k, v)| (CryptoHash::hash(k), (k.clone(), v.clone())))
+        .collect();
+    let (source_db, version) = init_mock_store(&source_kvs);
+    let source_tree = JellyfishMerkleTree::new(&source_db);
+    let expected_root_hash = source_tree.get_root_hash(version).unwrap();
+
+    let three_with_hashes: Vec<_> = all.iter().take(3).collect();
+    let three: Vec<_> = three_with_hashes
+        .iter()
+        .map(|(_, (k, v))| ((*k).clone(), (*v).clone()))
+        .collect();
+    let three_proof = source_tree
+        .get_range_proof(*three_with_hashes.last().unwrap().0, version)
+        .unwrap();
+    let restore_db = Arc::new(MockSnapshotStore::default());
+    {
+        let mut restore = StateSnapshotRestore::new(
+            &restore_db,
+            &restore_db,
+            version,
+            expected_root_hash,
+            false, /* async_commit */
+            StateSnapshotRestoreMode::Default,
+        )
+        .unwrap();
+        restore.add_chunk(three, three_proof).unwrap();
+    }
+    restore_db.kv_store.write().clear();
+    restore_db.progress_store.write().clear();
+
+    // Skip the leftmost leaf (`all[0]`): the chunk pretends KV is already caught up past it.
+    let mut restore = StateSnapshotRestore::new(
+        &restore_db,
+        &restore_db,
+        version,
+        expected_root_hash,
+        false, /* async_commit */
+        StateSnapshotRestoreMode::Default,
+    )
+    .unwrap();
+    let skipped_first_with_hashes: Vec<_> = all.iter().skip(1).take(3).collect();
+    let chunk: Vec<_> = skipped_first_with_hashes
+        .iter()
+        .map(|(_, (k, v))| ((*k).clone(), (*v).clone()))
+        .collect();
+    let proof = source_tree
+        .get_range_proof(*skipped_first_with_hashes.last().unwrap().0, version)
+        .unwrap();
+
+    let err = restore.add_chunk(chunk, proof).unwrap_err();
+    let msg = err.to_string();
+    assert!(
+        msg.contains("does not match next restored JMT leaf") || msg.contains("missing key"),
+        "expected gap-detection error, got: {}",
+        err,
+    );
+    assert!(restore_db.kv_store.read().is_empty());
+    assert!(restore_db.progress_store.read().get(&version).is_none());
+}
+
 fn assert_success<V>(
     db: &MockSnapshotStore<V, V>,
     expected_root_hash: HashValue,

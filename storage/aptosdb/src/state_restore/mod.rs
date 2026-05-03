@@ -230,22 +230,56 @@ impl<K: Key + CryptoHash + Hash + Eq, V: Value> StateSnapshotReceiver<K, V>
                 .add_chunk(chunk.clone())
         };
 
-        let tree_fn = || {
-            let _timer = OTHER_TIMERS_SECONDS.timer_with(&["jmt_add_chunk"]);
-            self.tree_restore
-                .lock()
-                .as_mut()
-                .unwrap()
-                .add_chunk_impl(chunk.iter().map(|(k, v)| (k, v.hash())).collect(), proof)
-        };
         match self.restore_mode {
             StateSnapshotRestoreMode::KvOnly => kv_fn()?,
-            StateSnapshotRestoreMode::TreeOnly => tree_fn()?,
+            StateSnapshotRestoreMode::TreeOnly => {
+                let _timer = OTHER_TIMERS_SECONDS.timer_with(&["jmt_add_chunk"]);
+                let mut tree = self.tree_restore.lock();
+                let tree = tree.as_mut().unwrap();
+                // No dependent KV; pass JMT's own progress so the prefix walk is a no-op.
+                let kv_progress = tree.previous_key_hash();
+                if tree.prepare_chunk(
+                    chunk.iter().map(|(k, v)| (k, v.hash())).collect(),
+                    proof,
+                    kv_progress,
+                )? {
+                    tree.commit_prepared()?;
+                }
+            },
             StateSnapshotRestoreMode::Default => {
-                // We run kv_fn with TreeOnly to restore the usage of DB
-                let (r1, r2) = IO_POOL.join(kv_fn, tree_fn);
-                r1?;
-                r2?;
+                // `prepare_chunk` verifies the entire chunk against the expected root and
+                // the JMT-stored leaves (catching wrong values and missing keys when the
+                // JMT is ahead of the KV after a partial crash), so run it before any DB
+                // write.
+                let kv_progress = self
+                    .kv_restore
+                    .lock()
+                    .as_ref()
+                    .unwrap()
+                    .previous_key_hash()?;
+                let needs_commit = {
+                    let _timer = OTHER_TIMERS_SECONDS.timer_with(&["jmt_prepare_chunk"]);
+                    self.tree_restore.lock().as_mut().unwrap().prepare_chunk(
+                        chunk.iter().map(|(k, v)| (k, v.hash())).collect(),
+                        proof,
+                        kv_progress,
+                    )?
+                };
+                if needs_commit {
+                    let tree_commit_fn = || {
+                        let _timer = OTHER_TIMERS_SECONDS.timer_with(&["jmt_commit_chunk"]);
+                        self.tree_restore.lock().as_mut().unwrap().commit_prepared()
+                    };
+                    let (r1, r2) = IO_POOL.join(kv_fn, tree_commit_fn);
+                    r1?;
+                    r2?;
+                } else {
+                    // The chunk added nothing new to the JMT — it was already covered by
+                    // the rightmost stored leaf, e.g. KV catch-up after a partial crash.
+                    // The prefix walk above already verified the chunk's contents match,
+                    // so the KV writes are safe.
+                    kv_fn()?;
+                }
             },
         }
 
