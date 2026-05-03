@@ -1,5 +1,62 @@
-\Section{Validation via Specification Inference}
+\Section{Specification Inference for Higher-Order Code}
 \label{sec:validation}
+
+\SubSection{Spec Inference Overview}
+\label{sec:validation-overview}
+
+\MVP's \emph{specification inference} based on weakest-precondition (\WP) analysis~\cite{dijkstra1975wp} was extended to handle function-valued code.
+\WP inference takes arbitrary Move code and, for each function, computes conditions that are both necessary and sufficient for the implementation's behavior.
+The \WP of a higher-order function is expressed in terms of \texttt{ensures\_of} and \texttt{aborts\_of} on its function-valued arguments rather than inlining their bodies; without this modular abstraction, inferred specs would be impractically large.
+This extension serves two purposes, demonstrated in the following subsections: reducing the annotation burden on developers writing higher-order specs (Sec.~\ref{sec:validation-amm}), and providing a validation pipeline that confirms the encoding is internally consistent (Sec.~\ref{sec:validation-tests}).
+
+\SubSection{AMM Compliance Case Study}
+\label{sec:validation-amm}
+
+Recall from Sec.~\ref{sec:amm} that the !Pool! struct carries a !pricing! closure constrained by a no-abort invariant: the pricing function must not abort for any inputs in any state.
+Two concrete pricing implementations were shown: !constant_product_with_fee!, which is compliant (it never aborts), and !with_fee_non_compliant!, which is not (it aborts when the owner's !Fee! resource is absent).
+Spec inference makes this compliance distinction machine-readable without any manual annotation.
+
+\Paragraph{Bottom-up: exposing abort behavior}
+Given the implementation of !with_fee_non_compliant! with no written spec, \WP inference derives its abort conditions automatically:
+
+% @formatter:off
+\begin{MoveBox}
+  spec with_fee_non_compliant { // [inferred]
+    aborts_if !exists<Fee>(owner);
+    aborts_if Fee[owner].bps > 10000;
+    aborts_if reserve_in + effective_in == 0;
+    ...
+  }
+\end{MoveBox}
+% @formatter:on
+
+\noindent The inferred abort condition --- that the function aborts when the !Fee! resource for the owner is absent --- directly contradicts the Pool no-abort invariant, which requires that !self.pricing! never aborts for any inputs in any state.
+When this function is used to construct a \texttt{Pool}, \MVP reports a pack-time invariant violation --- a precise, counterexample-driven diagnosis of non-compliance.
+
+\Paragraph{Constructor-side: compliance as a conditional postcondition}
+Running \WP inference on !create_pool!, which accepts an arbitrary !pricing! argument, makes the compliance obligation explicit as a guard in the postcondition:
+
+% @formatter:off
+\begin{MoveBox}
+  spec create_pool { // [inferred]
+    ensures (forall x: u64, y: u64, z: u64:
+               !aborts_of<pricing>(x, y, z))
+        ==> publish<Pool>(addr, Pool{..., pricing});
+  }
+\end{MoveBox}
+% @formatter:on
+
+\noindent The pool is published only when the guard holds, i.e.\ only when !pricing! satisfies the no-abort invariant.
+For the non-compliant constructor, the guard can never be satisfied, so the desired postcondition is vacuous --- the pool is never published.
+For the compliant constructor, the guard always holds and the pool is reliably created.
+In both cases, spec inference makes the compliance condition machine-readable without any manual annotation.
+
+\SubSection{Validation Pipeline and Test Coverage}
+\label{sec:validation-tests}
+
+Inferred conditions are labeled \texttt{[inferred]} and feed directly back into \MVP for verification, creating a pipeline: code $\leadsto$ code+specs $\leadsto$ VC, with verification expected to succeed.
+Tab.~\ref{tab:inference-tests} summarizes the inference test suite exercising behavioral predicates across all HOF patterns introduced in this paper.
+All categories pass end-to-end, confirming that the encoding of behavioral predicates and state labels is internally consistent and that inferred specifications are tight enough for the verifier to discharge.
 
 \begin{WideTable}
     \caption{Inference test categories that exercise behavioral predicates.}
@@ -48,31 +105,7 @@
     \end{tabularx}
 \end{WideTable}
 
-Together with the introduction of behavioral predicates and function values, specification inference based on \emph{weakest precondition analysis} \cite{dijkstra1975wp} was added to \MVP.
-One can think of \WP computation as an inversion of verification: given arbitrary code, specifications are generated which are then supposed to pass verification, and precisely describe the code.
-This enables a validation pipeline where we go code $\leadsto$ code+specs $\leadsto$ VC, with verification expected to succeed.
-This pipeline is tremendously helpful in AI-supported development, as it gives a baseline to AI to validate correctness of generated or provided code.
-Tab.~\ref{tab:inference-tests} gives an overview of the current behavioral-predicate-related tests using this pipeline --- including function value parameters and struct fields.
-
-\WP uses behavioral predicates to specify the effect of calls to other functions.
-This enables formulating the \WP of one function in a modular fashion, abstracting from the called function.
-Here is a simple example:
-
-% @formatter:off
-\begin{MoveBox}
-  use account::other;
-  fun incr(x: u64): u64 {
-    other::func(x) + 1
-  }
-  spec incr {
-    pragma opaque;
-    ensures [inferred]
-      result == result_of<other::func>(x)
-  }
-\end{MoveBox}
-% @formatter:on
-
-\noindent Without behavioral predicates, \WP analysis results would have been impractical to represent in Move source code, as we could only inline specs, leading to an explosion of condition sizes.
-
-
-\noindent
+%%% Local Variables:
+%%% mode: latex
+%%% TeX-master: "main"
+%%% End:

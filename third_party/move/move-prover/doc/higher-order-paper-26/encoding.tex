@@ -7,7 +7,7 @@ The fragment of the IVL used in this section is familiar: procedures with $\HAVO
 State is represented by Boogie-style maps; in particular, each resource type $\tau$ yields a map $M_\tau \in \Addr \rightarrow \tau$, with $\Addr$ being the domain of addresses in Move (256-bit integers).
 The representation is similar to that in the earlier \MVP paper~\cite{DillGPQXZ22}.
 
-In the following we focus on the aspects specific to function values: the representation of function values (Sec.~\ref{sec:enc-fvals}), the encoding of invocation of function values, the encoding of behavioral predicates via axioms (Sec.~\ref{sec:enc-bp}), how the state labels of Sec.~\ref{sec:move-hof} materialize as extra memory parameters (Sec.~\ref{sec:enc-mem}), and finally the frame-condition (Sec.~\ref{sec:enc-frame}).
+In the following we focus on the aspects specific to function values: the representation of function values (Sec.~\ref{sec:enc-fvals}), the memory access and modification sets used to define the invocation schema (Sec.~\ref{sec:enc-mem}), the encoding of invocation of function values (Sec.~\ref{sec:enc-invoke}), the encoding of behavioral predicates via axioms (Sec.~\ref{sec:enc-bp}), and finally the encoding of intermediate state labels (Sec.~\ref{sec:enc-frame}).
 Everything in this section operates \emph{after} monomorphization, so type parameters have been specialized and the set of closure, parameter, and field variants reaching a given function type is known statically~\cite{DillGPQXZ22}.
 
 \SubSection{Representing Function Values}
@@ -18,57 +18,31 @@ The union of these three sets is materialized as an algebraic datatype in the IV
 
 \begin{ivl}
 \DATATYPE \tau\ \{\\
-\t1 C_{f}(\sq{c : T}), \ldots, P_{g,x}(), \ldots, F_{S.x}(n : \nat), \ldots \\
+\t1 C_{f}(\sq{c : T}), \ldots, P_{f,x}(), \ldots, F_{\sigma.x}(n : \nat), \ldots \\
 \}
 \end{ivl}
 
-\noindent where $\sq{T}$ are the parameter types of $f$ that are captured by a closure.
-Parameter variants are nullary because, in a well-typed VC, the value of an entrypoint function-typed parameter is a skolem constant pinned to its variant at entry (see below); no runtime payload is required.
-Field variants carry an integer discriminator $n$ so that two locations in memory holding distinct field values are not forced to be equal --- datatypes with a single nullary constructor would otherwise collapse.
+\noindent Here $\sq{c:T}$ are the types of the values captured by closure $f$; $P_{f,x}$ is the parameter variant for function-value parameter $x$ of function $f$; and $F_{\sigma.x}$ is the field variant for struct field $x$ of struct type $\sigma$ (we use $\sigma$ here to avoid confusion with the state-label variable $S$ introduced in Sec.~\ref{sec:enc-frame}).
+Parameter variants are nullary because, in a well-typed verification condition (VC), the value of an entrypoint function-typed parameter is a skolem constant pinned to its variant at entry; no runtime payload is required.
+Field variants carry an integer discriminator $n$ so that two locations in memory holding distinct field values are not forced to be equal --- a datatype with a single nullary constructor would otherwise collapse all field values to one.
 
 Notice that this representation captures \emph{all} possible functions of type $\tau$ relevant for a given VC.
 So we do not actually need to deal with an arbitrary number of function values when it comes to higher-order function verification, but only those which can be derived from the program.
 The representation is further narrowed if the function value of a given type is not stored in a structure which ends in global memory.
-Storing a function value amounts to dynamic dispatch (think of building a 'vtable' explicitly), and this additional complexity is reflected by the $n$ in $F_{S.x}(n)$. Nevertheless, we are able to pinpoint a specification to $F_{S.x}(n)$, as has been seen for the AMM example (cf. Sec.~\ref{sec:amm}).
+Storing a function value in a struct field introduces dynamic dispatch: two different field locations may hold different closures, and the discriminator $n$ in $F_{\sigma.x}(n)$ ensures the solver treats them as distinct.
+Nevertheless, we are able to pinpoint a specification to a particular $F_{\sigma.x}(n)$, as illustrated by the AMM example (Sec.~\ref{sec:amm}).
 
-
-\SubSection{Invoking Function Values}
-\label{sec:enc-invoke}
-
-When a function value is invoked, we are looking at either a concrete closure value $C_{g}$ or a parameter or field selection as described above.
-In the former case, one can simply delegate to calling the actual underlying function $f$, by composing the captured and provided arguments into a full argument list.
-
-In the other cases of parameters and field selections, we use the behavioral predicates as defined for the function value, using the standard schema for encoding a call to a Move function via the function's specification.
-This reduces the problem of invocation to how those behavioral predicates are encoded.
-\begin{ivl}
-\PROC invoke_\tau(x: \tau, \sq{p:T}) \RETURNS (\sq{r: T}) \\
-\t1 \IF x \IS\ C_{f}(\sq{c}) \\
-\t2    \sq{r} := \CALL f(\sq{c}, \sq{p}) \\
-\t1 \ELSE \\
-\t2    \ASSERT requires_\tau(x, \Mem_\tau, \sq{p}) \\
-\t2    \IF\ aborts_\tau(x, \Mem_\tau, \sq{p}) \\
-\t3       abort\_flag := \TRUE \\
-\t2    \ELSE \\
-\t3       \LET \Mem'_\tau := \Mem_\tau \\
-\t3       \HAVOC \Mod_\tau(\sq{p}),\ \bar{r} \\
-\t3       \ASSUME ensures_\tau(x, \Mem'_\tau, \Mem_\tau, \sq{p}, \sq{r}) \\
-\end{ivl}
-
-\noindent See below for $\Mem$ and $\Mod$ definitions.
-Notice that the representation of the else branch is very similar to how opaque functions are mapped down to the solver.
-In fact, for an opaque function and provided $len(c) = 0$, the if-else branches are semantically identical.
-The translation of the IVL to SMT takes care of converting the $\CALL f$ of an opaque $f$ into exactly what we find in the else branch here, so we can omit this detail.
 
 \SubSection{Computing Memory Accesses}
 \label{sec:enc-mem}
 
-In order to express $invoke_\tau$, we need to reason about the memory usage of a function value type $\tau$, $\Mem_\tau$, as well as that subset of memory locations which are modified, $\Mod_\tau(\sq{p})$.
+Invoking a function value requires reasoning about which memory maps a given function type $\tau$ may read ($\Mem_\tau$) and which locations it may modify ($\Mod_\tau(\sq{p})$); we define both here before presenting the invocation schema.
 To recall, in the Move language, persistent global storage, or memory, can be accessed via type indexing.
 For instance, if !R! is a resource type, we write !&mut R[addr]! in the language to obtain a mutable reference to the memory which can then be subsequently mutated.
 
 \MVP's representation of memory uses type-indexed maps $M_\rho \in \Addr \fun \rho$, with $\rho$ a resource type (a !struct! in Move with the !key! ability).
 In the imperative procedures of the IVL, those maps are implicitly available as global variables.
-But in pure expressions like behavioral predicates, they need to be made explicit as parameters; this is the reason why we have been passing $\Mem_\tau$ to behavioral predicates earlier.
+But in pure expressions like behavioral predicates, they need to be made explicit as parameters; this is why $\Mem_\tau$ appears as an explicit argument to behavioral predicates throughout this section.
 
 A few definitions for memory maps are needed.
 Note that these are definitions on the meta level of the description here and not part of the IVL; they are used to describe pseudo code in terms of the IVL.
@@ -83,7 +57,7 @@ We write $\Mod(\sq{p})$ for a set of modifications built on expressions referenc
 
 
 \Paragraph{General Access}
-Memory access $\Mem_\tau$ is computed as the union of all the accesses in the variants of $\tau$, $\Mem_{C_f} \cup \Mem_{P_{f,x}} \cup \Mem_{F_{S.x}}$.
+Memory access $\Mem_\tau$ is computed as the union of all the accesses in the variants of $\tau$, $\Mem_{C_f} \cup \Mem_{P_{f,x}} \cup \Mem_{F_{\sigma.x}}$.
 For a closure, $\Mem_{C_f}$  can be statically derived from the code.
 For parameters and fields, the information is declared in the spec block:
 
@@ -103,7 +77,7 @@ For instance, if we verify function !foo! above in a context where there is no m
 However, we can still know that the specification of !g! holds in every possible state.
 
 \Paragraph{Write Accesses}
-Similarly to general access, the modifies set $\Mod_\tau$ is computed as the union of all the modifications in the variants of $\tau$, $\Mod_{C_f} \cup \Mod_{P_{f,x}} \cup \Mod_{F_{S.x}}$.
+Similarly to general access, the modifies set $\Mod_\tau$ is computed as the union of all the modifications in the variants of $\tau$, $\Mod_{C_f} \cup \Mod_{P_{f,x}} \cup \Mod_{F_{\sigma.x}}$.
 
 For closures, $\Mod_{C_f}$ is derived from the code and, if present, the !modifies R[a]! declaration in the language.
 These existed before higher-order functions, for specifying what functions modify.
@@ -124,6 +98,37 @@ For parameters and fields, the information is declared in the spec block, where 
 Notice that a wildcard (!modifies_of<f> *!) is not supported, since the invocation of !f! would render the memory as arbitrary (no effective frame condition).
 This is a notable restriction on what we can specify with higher-order functions in Move and is left for future work.
 
+\SubSection{Invoking Function Values}
+\label{sec:enc-invoke}
+
+When a function value is invoked, we are looking at either a concrete closure value $C_{g}$ or a parameter or field selection as described above.
+In the former case, one can simply delegate to calling the actual underlying function $f$, by composing the captured and provided arguments into a full argument list.
+
+In the other cases of parameters and field selections, we use the behavioral predicates as defined for the function value, using the standard schema for encoding a call to a Move function via the function's specification.
+This reduces the problem of invocation to how those behavioral predicates are encoded.
+In the procedure below, $\Mem_\tau$ denotes the projection of the current global memory state to the resource types in $\tau$'s access set (as computed in Sec.~\ref{sec:enc-mem}).
+\begin{ivl}
+\PROC invoke_\tau(x: \tau, \sq{p:T}) \RETURNS (\sq{r: T}) \\
+\t1 \IF x \IS\ C_{f}(\sq{c}) \\
+\t2    \sq{r} := \CALL f(\sq{c}, \sq{p}) \\
+\t1 \ELSE \\
+\t2    \ASSERT requires_\tau(x, \Mem_\tau, \sq{p}) \\
+\t2    \IF\ aborts_\tau(x, \Mem_\tau, \sq{p}) \\
+\t3       abort\_flag := \TRUE \\
+\t2    \ELSE \\
+\t3       \LET \Mem'_\tau := \Mem_\tau \\
+\t3       \HAVOC \Mod_\tau(\sq{p}),\ \bar{r} \\
+\t3       \ASSUME ensures_\tau(x, \Mem'_\tau, \Mem_\tau, \sq{p}, \sq{r}) \\
+\end{ivl}
+
+\noindent Here $\LET \Mem'_\tau := \Mem_\tau$ freezes the pre-invocation memory into $\Mem'_\tau$, while $\Mem_\tau$ becomes the post-invocation state after $\HAVOC$.
+We therefore pass $\Mem'_\tau$ as the pre-state and $\Mem_\tau$ as the post-state to $ensures_\tau$ (note that $\Mem'$ consistently denotes the pre-state throughout this section).
+$\HAVOC \Mod_\tau(\sq{p})$ is shorthand for havocing, for each $(\rho, a) \in \Mod_\tau(\sq{p})$, the entry $M_\rho[a]$ of the type-indexed memory map for $\rho$.
+$abort\_flag$ is a prover-internal boolean global that signals an abort to the enclosing verification condition, consistent with how \MVP models Move's abort semantics throughout the IVL.
+The $\IF$ branch reduces to a standard function call $\CALL f(\sq{c}, \sq{p})$, which \MVP encodes using the same $\ASSERT$/$\HAVOC$/$\ASSUME$ schema as the $\ELSE$ branch, specialized to $f$'s declared spec.
+When $f$ is opaque, the two branches are in fact semantically equivalent: an opaque call is already compiled to this schema driven by $f$'s spec, matching what the $\ELSE$ branch does for the abstract variant.
+The $\ELSE$ branch therefore introduces no new encoding machinery; it applies the existing opaque-call schema, driven by the behavioral predicates of the unknown variant $x$ rather than a concrete function's spec.
+
 \SubSection{Behavioral Predicates}
 \label{sec:enc-bp}
 
@@ -132,23 +137,28 @@ Behavioral predicates are derived by switching over the variants of the function
 Below, the definition for ensures is given.
 The other predicates are defined similarly.
 Specific to ensures is that it needs to take care of the frame condition: the caller havoced the full modification set, but only a subset of that is constrained by the given variant.
-The handling needs to account for that addresses in $\Delta$ are only symbolic expressions with unknown aliasing:
+The handling needs to account for the fact that modification addresses are symbolic expressions that may alias.
+
+In what follows, we write $\mathit{pred}_\tau[\Mem', \Mem](\ldots)$ with square brackets for the memory pair: $\Mem'$ is the pre-state and $\Mem$ the post-state, following the convention established in Sec.~\ref{sec:enc-invoke}.
+These memory arguments must be passed explicitly to pure functions, whereas they are implicit globals in IVL procedures.
+We write $\Mod_x$ for the modification set of the specific variant of $x$ --- that is, $\Mod_{C_f}$ when $x = C_f(\sq{c})$, $\Mod_{P_{g,y}}$ when $x = P_{g,y}()$, and $\Mod_{F_{\sigma.x}}$ when $x = F_{\sigma.x}(n)$.
+We write $\Mem'(\rho)$ for the map $M_\rho$ in the pre-state, and $\Mem(\rho)$ for the map $M_\rho$ in the post-state.
 
 \begin{ivl}
-  \FUN ensures_\tau[\Mem', \Mem](x: \tau, \sq{p: T}, \sq{r: S}): \BOOL \\
+  \FUN ensures_\tau[\Mem', \Mem](x: \tau, \sq{p: T}, \sq{r: U}): \BOOL \\
 \t1  \bigwedge_{(\rho, a) \in \Mod_\tau}( \\
 \t2    \IF \rho \notin \Type(\Mod_x) \\
-\t3       \Mem(\rho) = \Mem(\rho') \\
+\t3       \Mem(\rho) = \Mem'(\rho) \\
 \t2    \ELSE \\
 \t3       (\bigwedge_{(\rho, a') \in \Mod_x} a' \neq a) \\
-\t4          \implies \Mem(\rho)[a] = \Mem(\rho')[a] \\
+\t4          \implies \Mem(\rho)[a] = \Mem'(\rho)[a] \\
 \t1  ) \land ensures_x[\Mem'_x, \Mem_x](p, r)
 \end {ivl}
 
 The relational representation of a function via ensures does not guarantee proper functional behavior.
 This is achieved by introducing $result_\tau$ as an uninterpreted function, connected via an axiom:
 \begin{ivl}
-  \FUN result_\tau[\Mem', \Mem](x: \tau, \sq{p: T}) \fun \sq{S} \\
+  \FUN result_\tau[\Mem', \Mem](x: \tau, \sq{p: T}) \fun \sq{U} \\
   \AXIOM \forall x, \sq{p}, \sq{r} @ \\
 \quad  ensures_\tau[\Mem', \Mem](x, \sq{p}, \sq{r}) \iff
         \sq{r} = result_\tau[\Mem', \Mem](x, \sq{p})
@@ -159,10 +169,10 @@ For closures, they are directly extracted from the spec block.
 For parameters and fields, we introduce uninterpreted functions.
 
 \begin{ivl}
-  \FUN ensures_{C_f(\sq{c})}[\Mem', \Mem](\sq{p: T}, \sq{r: S}): \BOOL \\
+  \FUN ensures_{C_f(\sq{c})}[\Mem', \Mem](\sq{p: T}, \sq{r: U}): \BOOL \\
 \t1    \langle \textit{extract from spec block of}~~f(\sq{c}, \sq{p}) \rangle \\
-  \FUN ensures_{P_{f,x}}[\Mem', \Mem](\sq{p: T}, \sq{r: S}): \BOOL \\
-  \FUN ensures_{F_{S.x}}[\Mem', \Mem](\sq{p: T}, \sq{r: S}): \BOOL \\
+  \FUN ensures_{P_{f,x}}[\Mem', \Mem](\sq{p: T}, \sq{r: U}): \BOOL \\
+  \FUN ensures_{F_{\sigma.x}}[\Mem', \Mem](\sq{p: T}, \sq{r: U}): \BOOL \\
 \end{ivl}
 
 \noindent The meaning of the uninterpreted functions is determined by how they are injected into a VC via the regular mechanism by which pre/post conditions and invariants are handled.
@@ -173,6 +183,13 @@ Similarly, for a data invariant of a field an assumption will be generated when 
 
 \SubSection{Intermediate State Labels}
 \label{sec:enc-frame}
+
+Recall from Sec.~\ref{sec:move-hof} that a state label !S! denotes a program point.
+Formally, a \emph{state} at label $S$ is a pair $(\Mem^S, \bar{v}^S)$ consisting of a memory snapshot and a tuple of local values.
+The memory component $\Mem^S$ has the same type as the ambient memory: a tuple of type-indexed maps $M_\rho \in \Addr \to \rho$ for each resource type $\rho$ in scope at that program point, quantified existentially in the IVL.
+The local component $\bar{v}^S$ captures values of mutable-reference parameters at the intermediate point: for a closure over a mutable reference of type $T$ with no global memory effects, $\bar{v}^S$ is a single value $x^S : T$, and $\Mem^S$ is vacuous (the function touches no global resources).
+When a closure both accesses global memory and takes mutable references, both components are non-trivial.
+Here we focus on the global-memory case (vacuous $\bar{v}^S$); Sec.~\ref{sec:imp-notes} notes how the mutable-reference case is handled.
 
 Consider the following specification using intermediate state labels:
 
@@ -192,7 +209,7 @@ As outlined in the last section, we want to be able to extract behavioral predic
 For the ensures we can come up with the following, which simply replicates part of the spec:
 
 \begin{ivl}
-  \FUN ensures_{C_foo}[\Mem', \Mem](a) \\
+  \FUN ensures_{C_{foo}}[\Mem', \Mem](a) \\
 \t1  \exists \Mem^S @
       \<ensures_\tau(f,\Mem',\Mem^S,a) \land R[\Mem^S][a].0 > 0 \land \\
         ensures_{\tau'}(g,\Mem^S,\Mem,a)\>
@@ -202,7 +219,7 @@ For the aborts which happens at the intermediate state !S!, the state !S! needs 
 To achieve this, all ensures conditions which reach !S! are combined with the aborts condition, as in:
 
 \begin{ivl}
-  \FUN aborts_{C_foo}[\Mem', \Mem](a) \\
+  \FUN aborts_{C_{foo}}[\Mem', \Mem](a) \\
 \t1  \exists \Mem^S @
       \<ensures_\tau(f,\Mem',\Mem^S,a) \land R[\Mem^S][a].0 > 0 \land \\
         aborts_{\tau'}(g,\Mem^S,a)\>
@@ -215,7 +232,8 @@ $$
 
 \noindent That is, either the function aborts under one of the given conditions, or all of its ensures conditions hold.
 
-In general, since the relation between state labels spawn by predicates !S1..S2 |~ p! must be acyclic, one can extract from $\sq{P}$ those conditions which lead into $\Mem^S$, and from $\sq{A}$ those which start from state $\Mem^S$. Given this, the aborts condition can be synthesized using the following scheme:
+In general, since the relation between state labels spawned by predicates of the form $\slabeled{S_1..S_2}{p}$ must be acyclic, one can extract from $\sq{P}$ those conditions which lead into $\Mem^S$, and from $\sq{A}$ those which start from state $\Mem^S$.
+Given this, the aborts condition can be synthesized using the following scheme:
 $$
     \bigwedge \sq{P}_{..\Mem^S} \land (\bigvee \sq{A}_{\Mem^S} \lor
     \bigwedge \sq{P}_{\Mem^S..\Mem^T} \land (\bigvee \sq{A}_{\Mem^T} \lor
@@ -226,26 +244,33 @@ $$
 or recurse over the remaining $\sq{P}$ and $\sq{A}$.
 
 \SubSection{Implementation Notes}
+\label{sec:imp-notes}
 
-Besides the conceptual description in this section, the implementation diverges from the idealized presentation in a few high-level ways for better SMT solving performance and cleaner Boogie output:
+A straightforward implementation following the conceptual description above leads to SMT timeouts on non-trivial examples.
+The root cause is that the presentation writes behavioral predicates as IVL functions with explicit bodies ($\FUN \ldots = \mathit{body}$), and Boogie unfolds function bodies eagerly: any quantifier inside a body --- common in arithmetic identities or prelude vector axioms --- spawns trigger instantiations at every call site, causing combinatorial blowup in the SMT search.
+
+We overcame this by adopting a pattern that decouples the \emph{definition} of behavioral predicates from their \emph{use}: declare each predicate as an \emph{uninterpreted} function and connect it to the per-function specification via axioms with explicit, carefully chosen triggers.
+This pattern is not specific to higher-order functions; it is a general Boogie encoding discipline for modular specifications that keeps SMT instantiation under control.
+The remaining implementation choices are natural refinements of applying this pattern consistently:
 
 \begin{itemize}
-    \item \emph{Constraining state-label conjuncts are dropped from the existential.}
-    The paper's BP for an !aborts_if! at an intermediate state $\Mem^S$ includes \emph{all} ensures-with-$S$ conjuncts that reach $\Mem^S$ (including constraining ones such as $R[\Mem^S][a].0 > 0$).
-    The implementation restricts the existential body to the \emph{defining} conjuncts (those introducing label-defining operations like $\ensuresof{f}{\bar{x}}$, $\resultof{f}{\bar{x}}$, or the publish/remove/update builtins).
-    By the validity invariant $\bigvee \sq{A} \lor \bigwedge \sq{P}$, the constraining conjuncts hold at the witness chosen by foo's verification, so dropping them is sound for the BP.
-    Including them would only enlarge the formula without adding information.
-
     \item \emph{Behavioral predicates are uninterpreted functions connected by axioms, not Boogie functions with explicit bodies.}
-    The paper writes $ensures_\tau$ as $\FUN \ldots = \mathit{body}$.
     The implementation declares $ensures_\tau$ as an uninterpreted Boogie function and connects it to the per-function spec via an axiom of the form $(\forall\, \ldots\; ::\;  \mathit{eval\_call} \iff \mathit{rhs})$ with an explicit trigger pattern.
-    A Boogie \texttt{function \{body\}} is unfolded eagerly, so any quantifier in the body (typical for arithmetic identities or the prelude's vector axioms) spawns triggers at every call site, exploding the SMT search.
     Axioms with explicit triggers fire only when the trigger pattern matches a ground term in the proof context, keeping instantiation under control.
 
     \item \emph{Per-variant trigger specialization.}
-    The three variant kinds receive structurally different axioms: closure variants are triggered by the constructor application $C_f(c_0, \ldots, c_K)$ with capture variables bound by the quantifier, function-parameter variants are triggered by the nullary constructor $P_{f,x}()$, and struct-field variants are triggered by the evaluator itself with the variant pinned via an $f \IS F_{S.x}$ guard (because field values at call sites are typically opaque datatype values loaded from memory, not literal constructors).
+    The three variant kinds receive structurally different axioms.
+    Closure variants are triggered by the constructor application $C_f(c_0, \ldots, c_K)$ with capture variables bound by the quantifier.
+    Function-parameter variants are triggered by the nullary constructor $P_{f,x}()$.
+    Struct-field variants are triggered by the evaluator itself with the variant pinned via an $f \IS F_{\sigma.x}$ guard, because field values at call sites are typically opaque datatype values loaded from memory rather than literal constructors.
+    This specialization ensures that the SMT solver instantiates each axiom only where the corresponding variant is syntactically present in the context.
+
+    \item \emph{Constraining state-label conjuncts are dropped from the existential.}
+    The conceptual behavioral predicate for an !aborts_if! at an intermediate state $\Mem^S$ includes \emph{all} ensures-with-$S$ conjuncts that reach $\Mem^S$ (including constraining ones such as $R[\Mem^S][a].0 > 0$).
+    The implementation restricts the existential body to the \emph{defining} conjuncts --- those introduced by label-defining operations like $\ensuresof{f}{\bar{x}}$, $\resultof{f}{\bar{x}}$, or the publish/remove/update builtins.
+    By the validity invariant $\bigvee \sq{A} \lor \bigwedge \sq{P}$, the constraining conjuncts hold at the witness chosen during verification of !foo!, so dropping them is sound and keeps the existential body small.
 
     \item \emph{State-label existential is flat, not recursive.}
     The recursive scheme above is logically equivalent to a single flat $(\exists\, \Mem^S, \Mem^T, \ldots\; ::\;  \ldots)$ wrapping the conjunction of defining fragments and the kind-specific clauses.
-    The implementation uses the flat form, keeping the emitted Boogie smaller.
+    The implementation uses the flat form, reducing the size of emitted Boogie and avoiding the additional SMT quantifier nesting that the recursive scheme would introduce.
 \end{itemize}

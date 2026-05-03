@@ -85,4 +85,19 @@ module defi::collection {
         ensures result == len(v) ==>
             (forall j in 0..len(v): v[j] != 0);
     }
+
+    /// Zero-predicate specialisation of `find` using a lambda inline spec.
+    public fun find_zero_lambda(v: &vector<u64>): u64 {
+        find(v, |x| *x == 0 spec { ensures result == (x == 0); })
+    }
+    spec find_zero_lambda {
+        aborts_if false;
+        ensures result <= len(v);
+        ensures result < len(v) ==>
+            v[result] == 0 &&
+            (forall j in 0..result: v[j] != 0);
+        ensures result == len(v) ==>
+            (forall j in 0..len(v): v[j] != 0);
+    }
+
 }

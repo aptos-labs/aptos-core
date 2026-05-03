@@ -4,7 +4,7 @@
 
 \begin{document}
 
-\title{Formal Verification of\\ Imperative Higher-Order Functions}
+\title{Formal Verification of\\ First-Class Functions in Move}
 
 \author{%
 	\IEEEauthorblockN{Wolfgang Grieskamp\IEEEauthorrefmark{1} and Teng Zhang
@@ -23,7 +23,8 @@
 	We introduce \emph{behavioral predicates} which characterize Move functions (aborts and pre/post conditions) by single-state or two-state predicates.
 	We also introduce \emph{state labels} for naming intermediate memory states in which expressions are evaluated and which allow to compose behavioral predicates to describe sequences of state transitions.
 	On SMT level, function values are encoded by discriminating over the possible function values reaching a call site: when the concrete function is known, its effect is accounted for directly; when it is unknown (for example, a function parameter, or a closure loaded from storage), its behavioral predicates describe the effect.
-	We are able to automatically validate completeness and correctness of the AI-assisted implementation by using \emph{specification inference}: by synthesizing specs of arbitrary code with higher-order functions and then running \MVP on the result, a self-verifying feedback loop is realized, which significantly improved the ability of AI to support this work.
+    Our approach goes beyond, for example, Dafny, by supporting imperative first-class function which can modify state via Rust-style references and global variables, and leads to more efficient SMT encodings than separation logic because of the static separation of memory enabled by Move. 
+	We further extend \MVP's \emph{specification inference} tool to code with function values: given arbitrary higher-order Move code, weakest-precondition analysis automatically derives behavioral-predicate-based specifications, reducing the annotation burden and providing a validation pipeline for the new specification constructs.
 \end{abstract}
 
 \input{intro}

@@ -10,7 +10,8 @@ Our treatment is more directly relational: state labels denote memory snapshots 
 
 \fstar~\cite{fstar2016} likewise verifies higher-order, effectful code, internalizing the WP calculus in its type system via Dijkstra monads~\cite{dm4all}.
 Both systems support pre/post specifications, quantifiers, behavioral abstraction over function values, and structured proof guidance --- in Move via \texttt{proof} blocks, \texttt{lemma} declarations, and \texttt{calc}, \texttt{split}, \texttt{apply} statements.
-One major difference is that \fstar~is based on separation logic, while Move uses traditional frame conditions via modifies declarations. While \fstar~is more expressive via separation logic, it misses the syntactic, compile time separation of memory via Move's resource and reference model, potentially leading to significant more complex verification problems, as memory separation has to be reasoned about by the SMT solver.
+One major difference is that \fstar~is based on separation logic, while Move uses traditional frame conditions via modifies declarations.
+While \fstar~is more expressive via separation logic, it misses the syntactic, compile-time separation of memory via Move's resource and reference model, potentially leading to significantly more complex verification problems, as memory separation has to be reasoned about by the SMT solver.
 
 Dafny~\cite{DAFNY} is a close cousin of \MVP: it has a similar specification model of pre/post conditions, higher-order functions, and behavioral predicates.
 However, Dafny does not allow function values to modify state.
@@ -32,13 +33,16 @@ Other SMT-based Solidity tools~\cite{smtalt18,solcverify,DBLP:conf/esop/HajduJ20
 
 \SubSection{Future Work}
 
+The current encoding enumerates all closure variants reaching a given call site; scaling to programs where the variant set is large or open (e.g.\ dynamically loaded modules) remains future work.
+Proof automation for non-linear arithmetic arising in pricing formulas and similar domains currently relies on user-supplied proof hints; integrating portfolio arithmetic decision procedures is a natural direction.
+The spec inference pipeline produces behavioral-predicate-based specifications from arbitrary code; extending it to synthesize loop invariants involving function values automatically would reduce the remaining manual annotation burden.
 
 \SubSection{Conclusion}
 
 We described the extension of the Move Prover to Move 2's higher-order functions and dynamic dispatch.
 The extension rests on two language additions --- behavioral predicates and state labels --- and on a Boogie encoding that discriminates closure invocations on the function-value variant reaching the call site.
 The design preserves \MVP's production-oriented cost model --- routine, predictable, counterexample-driven verification --- in the presence of dynamic dispatch.
-We validated the approach by extending \MVP's specification inference tool to closures and dynamic dispatch, which now computes weakest-preconditions over Move bytecode containing function values.
+We further extended \MVP's specification inference tool to closures and dynamic dispatch: given arbitrary higher-order Move code, the tool now computes weakest-precondition-based specifications automatically, turning the question of whether a function value complies with a behavioral invariant into an automated verification problem.
 
 %%% Local Variables:
 %%% mode: latex

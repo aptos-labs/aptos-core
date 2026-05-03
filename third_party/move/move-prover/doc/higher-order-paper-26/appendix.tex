@@ -8,7 +8,7 @@ The approach relied on a self-validating feedback loop: verification and specifi
 \begin{itemize}
     \item \emph{Specification language extensions in the frontend.}  Parser and type-checker changes for behavioral predicates and state labels were largely produced by the AI, with human effort limited to review.
     \item \emph{Bug identification and fixing.}  Once a problematic example was unearthed --- typically by inference producing a spec that failed verification --- the AI was effective at diagnosing the root cause and proposing a principled fix.
-    \item AI was very code at diagnosing verification problems like timeouts, by analyzing generated Boogie and SMT code, using Z3's logging features to observe quantifier instantiation, etc.
+    \item AI was very good at diagnosing verification problems like timeouts, by analyzing generated Boogie and SMT code, using Z3's logging features to observe quantifier instantiation, etc.
     \item \emph{Boilerplate and well-understood areas.}  Routine code such as expression simplification, AST traversals, and bytecode-level rewrites was handled essentially autonomously.
 \end{itemize}
 

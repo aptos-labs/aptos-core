@@ -11,7 +11,7 @@ For the purposes of this paper, the relevant properties are:
 \begin{itemize}
     \item \emph{Strong static typing with generics.}  Every expression has a statically known explicit type; generic functions and structs are monomorphized for verification~\cite{DillGPQXZ22}.
 
-    \item \emph{Reference semantics \`a la Rust.}  References are borrowed from local variables or from global storage and cannot be stored inside structs that go to global storage; this yields an alias-free memory model that makes verification tractable~\cite{DillGPQXZ22}.
+    \item \emph{Reference semantics.}  References are borrowed from local variables or from global storage and cannot be stored inside structs that go to global storage; this yields an alias-free memory model that makes verification tractable~\cite{DillGPQXZ22}.
 
     \item \emph{Type-indexed global storage.}  Global state is a map keyed by (resource type, address) pairs: a struct with the !key! ability can be published, borrowed, and moved at an address via !T[addr]!, with linear ownership enforced statically.  Specifications quantify over this memory directly, and !modifies! clauses name the footprint a function may touch, providing a frame condition.
 
@@ -22,9 +22,18 @@ For the purposes of this paper, the relevant properties are:
 \end{itemize}
 
 
+\Paragraph{The Move Prover}
+\MVP~\cite{DillGPQXZ22} is an automated formal verifier built into the Move toolchain.
+Developers annotate Move source with specifications --- preconditions, postconditions, abort conditions, data invariants, and loop invariants --- using a first-order specification language that shares Move's type system.
+\MVP translates the annotated program to Boogie~\cite{thisisboogie2}, an intermediate verification language, which Z3~\cite{z3} then discharges as SMT queries.
+The tool targets routine use during development: verification is designed to complete within seconds per function through careful SMT encoding and monomorphized, modular function summaries.
+Abort conditions deserve special note: multiple !aborts_if! clauses form a \emph{biconditional} --- the function aborts if and only if at least one clause holds --- rather than the one-directional ``if it aborts, then ...'' familiar from partial-correctness Hoare logic.
+
 \Paragraph{Function values in Move 2}
 Move 2 extends the type system with \emph{function types} $T_1 \times \dots \times T_n \to T$ (written !|T1,...,Tn|T! in the concrete syntax) and allows values of such types to be constructed from concrete function symbols or from lambda expressions, possibly with captured arguments.
 In Move's type ability system, function values may be marked !copy!, !drop!, and !store!; a function value with !store! can be persisted to global storage.
+References may not be captured; only plain values may appear in a closure's payload, ensuring that captured data is independent of any borrow scope.
+This restriction is what makes the encoding in Sec.~\ref{sec:enc-fvals} tractable: each closure variant carries only typed values, with no aliasing between captures and the caller's memory.
 Invocation has the form !(expr)(args)! and is dispatched based on the closure reaching the call site.
 
 \SubSection{Automated Market Maker Example}
@@ -32,6 +41,7 @@ Invocation has the form !(expr)(args)! and is dispatched based on the closure re
 
 The running example throughout this paper is a simplified AMM module (Uniswap v2~\cite{UniswapV2}) in which the \emph{pricing curve} is a function value stored in the pool.
 The pricing function has to satisfy a number of invariants: (i)~the function never aborts, (ii)~the output never exceeds the output reserve, (iii)~the output is monotone in the input amount, and (iv)~the product of the two reserves does not decrease after a swap (constant-product preservation).
+The \texttt{spec Pool} block below expresses these invariants using \emph{behavioral predicates} and \emph{state labels}, two constructs introduced by this paper and explained in detail after the listing.
 
 % @formatter:off
 \begin{MoveBox}
@@ -41,39 +51,43 @@ The pricing function has to satisfy a number of invariants: (i)~the function nev
     pricing: |u64, u64, u64|u64 has copy, store
   }
   spec Pool {
-    reads_of<pricing> *;
+    reads_of<self.pricing> *;
 
     // Pricing must never abort.
     invariant forall S in *, ri: u64, ro: u64, a: u64:
-      S |~ !aborts_of<pricing>(ri, ro, a);
+      S |~ !aborts_of<self.pricing>(ri, ro, a);
 
     // Output never exceeds the output reserve.
     invariant forall S in *, ri: u64, ro: u64, a: u64:
-      S.. |~ result_of<pricing>(ri, ro, a) <= ro;
+      S.. |~ result_of<self.pricing>(ri, ro, a) <= ro;
 
     // Monotonicity in the input amount.
     invariant forall S in *, ri: u64, ro: u64,
                              a1: u64, a2: u64:
       S.. |~ a1 <= a2 ==>
-        result_of<pricing>(ri, ro, a1)
-               <= result_of<self.0>(c, ri, ro, a2);
+        result_of<self.pricing>(ri, ro, a1)
+               <= result_of<self.pricing>(ri, ro, a2);
 
     // Constant-product preservation.
     invariant forall S in *, ri: u64, ro: u64, a: u64:
       S.. |~ (ri + a)
-             * (ro - result_of<pricing>(ri, ro, a))
+             * (ro - result_of<self.pricing>(ri, ro, a))
                    >= ri * ro;
   }
 \end{MoveBox}
 % @formatter:on
 
-\noindent Each invariant is universally quantified over a starting state !S! in which the pricing function is evaluated.
-We write !S |~ p! for a single-state predicate to be evaluated in state !S!, and !S..T |~ q! for a two-state predicate, where the pre/post state can also be omitted (as in !S.. |~ q! in the example).
-Note that state symbols like !S! are labels representing a set of global resources present at a given program point.
-Which resources those are is determined by the !reads_of<f>! clause.
-In the example, the pricing function is allowed to read any state relevant for the verified program segment.
+\noindent Each invariant is universally quantified over a state label !S!, ranging over all states reachable during execution in which the pool exists at some address.
+A \emph{state label} such as !S! names a program point; the state at !S! comprises both the global memory state and the local state at that point.
+For the Pool invariants the local component is vacuous, since !pricing! takes only plain value arguments; the global component covers the resources declared by !reads_of<self.pricing> *!.
 
-The behavioral predicates !aborts_of!, !result_of!, and (elsewhere) !ensures_of! and !requires_of! take a function value and its arguments and evaluate to the corresponding aspect of the call's behavior.
+State labels appear in two predicate forms.
+A \emph{single-state} predicate $\slabeled{S}{p}$ evaluates $p$ entirely in state $S$; the no-abort invariant uses this form because whether !pricing! aborts depends only on the pre-state of the call.
+A \emph{two-state} predicate $\slabeled{S..}{q}$ takes $S$ as the pre-state of the !pricing! invocation and the resulting post-state as the second end; the output, monotonicity, and constant-product invariants use this form because the return value of !pricing! is only defined after execution from $S$.
+More generally, $\slabeled{S_1..S_2}{q}$ names both ends explicitly; $\slabeled{..S}{q}$ fixes $S$ as the post-state, with the enclosing context supplying the pre-state.
+
+The behavioral predicates !aborts_of!, !result_of!, and (elsewhere) !ensures_of! and !requires_of!, take a function value and its arguments and evaluate to the corresponding aspect of that call's behavior.
+Without behavioral predicates, specifying a higher-order function would require inlining the callee's conditions at every call site, leading to a combinatorial explosion in specification size; behavioral predicates make reasoning about function values modular and abstract.
 Using them in invariants as in the example creates (i)~a requirement for any code creating a pool to pass only compliant function values, and (ii)~a guarantee for any code calling a pool function that the requirements are met.
 
 \Paragraph{Swapping}
@@ -141,7 +155,7 @@ The next example uses a pricing function which charges a configurable fee:
     let o: address;
     Pool{
       ..,
-      pricing: |ri, ro, a| with_fee(o, ri, ro, o)
+      pricing: |ri, ro, a| with_fee(o, ri, ro, a)
     }
 \end{MoveBox}
 % @formatter:on
@@ -150,10 +164,18 @@ The next example uses a pricing function which charges a configurable fee:
 (Abort happens if the resource !Fee[o]! does not exist.)
 Guarding the definitions with checks and using a default fee fixes this and makes verification succeed.
 
+In practice, pricing functions such as !with_fee! would be annotated with !pragma opaque! --- a directive that hides the function body from callers, so they reason only from the declared spec rather than the implementation, keeping verification costs tractable at scale.
+However, !opaque! creates a subtle dependency: the behavioral predicate !aborts_of<f>! used in the data invariant is derived solely from the declared !aborts_if! conditions of !f!.
+If no !aborts_if! is specified, the prover treats the function as non-aborting --- !aborts_of<f>! defaults to false --- and the no-abort invariant is discharged vacuously, even if the implementation can in fact abort.
+The developer must therefore supply complete !aborts_if! conditions for any function value used in a behavioral invariant, or risk unsound verification.
+Deriving these conditions correctly is non-trivial, especially for functions that read global state under multiple guards.
+\MVP's \emph{specification inference} tool addresses this directly: weakest-precondition analysis of the function body automatically produces the correct !aborts_if! conditions, ensuring the declared spec is complete before the function is used in a behavioral invariant.
+Sec.~\ref{sec:validation} demonstrates this on the AMM pricing functions.
+
 The AMM example shows that non-trivial invariants can be specified for function values, and that the prover is capable of verifying them on construction and caller side.
 What has been shown for data field invariants carries over to function parameters and function call sites.
-The invariants presented constitute non-linear arithmetic problems, which are notoriously hard to solve.
-In the full example, Move 2 proof hints are used to support reliable verification of problems of this kind.
+The invariants presented constitute non-linear arithmetic problems, which are hard to solve.
+In practice, Move 2 proof hints are often needed to support reliable verification of problems of this kind.
 
 \SubSection{Filter-style Loops} \label{sec:find}
 
@@ -165,10 +187,11 @@ A spec-level helper !no_match_before! captures the recurring ``no earlier elemen
 \begin{MoveBox}
    fun find<T>(v: &vector<T>,
               pred: |&T|bool has copy + drop): u64 {
-    let i = 0; let n = vector::length(v);
+    let i = 0;
+    let n = v.length();
     while (i < n) {
-      if (pred(vector::borrow(v, i))) return i;
-      i = i + 1;
+      if (pred(v[i])) return i;
+      i += 1;
     } spec {
       invariant i <= n;
       invariant no_match_before(v, pred, i);
@@ -176,6 +199,7 @@ A spec-level helper !no_match_before! captures the recurring ``no earlier elemen
     n
   }
   spec find {
+    pragma opaque;
     ensures result <= len(v);
     ensures no_match_before(v, pred, result);
     ensures result < len(v)
@@ -192,20 +216,43 @@ A spec-level helper !no_match_before! captures the recurring ``no earlier elemen
 The function's post-condition characterises !result! entirely through the same evaluator: either !result! is a valid index whose call is the first to match, or !result == len(v)! and no element matches at all.
 No concrete predicate is ever named in either the body or the spec; a caller instantiates !pred! with any function value, and the specification is discharged through its behavioral contract.
 
+To illustrate the proof obligation at the caller, consider specialising !find! with an inline lambda whose behavioral contract is given by an inline !spec! clause:
+
+% @formatter:off
+\begin{MoveBox}
+  fun find_zero_lambda(v: &vector<u64>): u64 {
+    find(v, |x| x == 0
+             spec { ensures result == (x == 0); })
+  }
+  spec find_zero_lambda {
+    ensures result <= len(v);
+    ensures result < len(v) ==>
+      v[result] == 0 &&
+      (forall j in 0..result: v[j] != 0);
+    ensures result == len(v) ==>
+      (forall j in 0..len(v): v[j] != 0);
+  }
+\end{MoveBox}
+% @formatter:on
+
+\noindent Since !find! is opaque, the prover reasons from !find!'s spec alone.
+At the match index, !find! guarantees $\resultof{pred}{v[\mathit{result}]}$, which --- by the lambda's inline spec --- reduces to !v[result] == 0!.
+For earlier indices, !no_match_before! constrains $\resultof{pred}{v[j]}$ to be false for every index !j! before !result!, which reduces to $v[j] \neq 0$.
+The prover discharges all three !ensures! clauses of !find_zero_lambda! without ever inspecting the lambda body.
+
 \SubSection{More About State Labels}
 \label{sec:state-labels}
 
-Universally quantified state labels have been used for specifying the invariants of the pricing functions.
-Another major use case of state labels is to express intermediate states resulting from sequential execution in Move.
-One can define a higher-order function which composes the execution of two (stateful) other functions:
+The Pool invariants in Sec.~\ref{sec:amm} used \emph{universally} quantified state labels: every state in which the pool exists must satisfy the pricing invariants.
+State labels have a second, equally important use: \emph{existentially} quantifying over an intermediate state to express that a computation proceeds through a specific intermediate point.
+Consider a higher-order function that sequences two stateful operations on a shared value:
 
 % @formatter:off
 \begin{MoveBox}
   fun followed_by(f: |&mut A|, g: |&mut A|, x: &mut A) {
-    f(x);
-    g(x)
+    f(x); g(x)
   }
-  spec followed_by() {
+  spec followed_by {
     ensures exists S in *:
       (..S |~ ensures_of<f>(x)) &&
       (S.. |~ ensures_of<g>(x))
@@ -213,12 +260,13 @@ One can define a higher-order function which composes the execution of two (stat
 \end{MoveBox}
 % @formatter:on
 
-\noindent The spec denotes that the ensures of !f! is evaluated from the pre-state of !followed_by! into !S! (!..S!), and the ensures of !g! from !S! to the post-state (!S..!).
-Thus the post state of !x! resulting from the !ensures_of<f>! becomes the pre-state (the !old(x)!) of the !ensures_of<g>!
+\noindent The existentially quantified label !S! witnesses the intermediate state between the two calls.
+Since no !reads_of! is declared for !f! or !g!, they are assumed to have no global memory footprint; the local component of the state at !S! is therefore the updated value of !x!, and the global component is vacuous.
+The conjunct $\slabeled{..S}{\ensuresof{f}{x}}$ asserts that the postcondition of !f! holds from the pre-state of !followed_by! up to !S!; the conjunct $\slabeled{S..}{\ensuresof{g}{x}}$ asserts that the postcondition of !g! holds from !S! to the final post-state.
+Crucially, the post-state of !f! automatically becomes the pre-state of !g!, without any explicit threading of intermediate values through the specification.
 
-The application of state labels in this context is not restricted to higher-order functions; concrete function names can be passed to behavioral predicates as well.
-This allows to compose the specs of wrappers around other functions via behavioral predicates of those functions, without the need to duplicate specs.
-Just consider the above example, but !f! and !g! replaced by concrete functions.
+State labels are not restricted to higher-order functions.
+When !f! and !g! are concrete named functions, the same pattern allows a wrapper to be specified by composing the behavioral predicates of its callees, avoiding duplication of their postconditions.
 
 
 
