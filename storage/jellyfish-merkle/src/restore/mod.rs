@@ -126,6 +126,7 @@ where
 pub struct JellyfishMerkleRestore<K> {
     /// The underlying storage.
     store: Arc<dyn TreeWriter<K>>,
+    reader: Option<Arc<dyn TreeReader<K> + Send + Sync>>,
 
     /// The version of the tree we are restoring.
     version: Version,
@@ -192,7 +193,8 @@ where
         expected_root_hash: HashValue,
         async_commit: bool,
     ) -> Result<Self> {
-        let tree_reader = Arc::clone(&store);
+        let tree_reader: Arc<dyn TreeReader<K> + Send + Sync> = store.clone();
+        let tree_writer: Arc<dyn TreeWriter<K>> = store;
         let (finished, partial_nodes, previous_leaf) = if let Some(root_node) =
             tree_reader.get_node_option(&NodeKey::new_empty_path(version), "restore")?
         {
@@ -221,7 +223,8 @@ where
         };
 
         Ok(Self {
-            store,
+            store: tree_writer,
+            reader: Some(tree_reader),
             version,
             partial_nodes,
             frozen_nodes: HashMap::new(),
@@ -241,6 +244,7 @@ where
     ) -> Result<Self> {
         Ok(Self {
             store,
+            reader: None,
             version,
             partial_nodes: vec![InternalInfo::new_empty(NodeKey::new_empty_path(version))],
             frozen_nodes: HashMap::new(),
@@ -333,17 +337,18 @@ where
         Ok(partial_nodes)
     }
 
-    /// Restores a chunk of states. This function will verify that the given chunk is correct
-    /// using the proof and root hash, then write things to storage. If the chunk is invalid, an
-    /// error will be returned and nothing will be written to storage.
-    pub fn add_chunk_impl(
+    /// Builds the partial tree in memory from `chunk` and verifies the supplied proof. Does
+    /// not touch storage. Returns `Ok(true)` when there are frozen nodes pending — the caller
+    /// must follow up with [`Self::commit_prepared`]. Returns `Ok(false)` when the chunk was
+    /// skipped (already finished or fully behind `previous_leaf`); no commit is needed.
+    pub fn prepare_chunk(
         &mut self,
         mut chunk: Vec<(&K, HashValue)>,
         proof: SparseMerkleRangeProof,
-    ) -> Result<()> {
+    ) -> Result<bool> {
         if self.finished {
             info!("State snapshot restore already finished, ignoring entire chunk.");
-            return Ok(());
+            return Ok(false);
         }
 
         if let Some(prev_leaf) = &self.previous_leaf {
@@ -353,7 +358,7 @@ where
             chunk = match skip_until {
                 None => {
                     info!("Skipping entire chunk.");
-                    return Ok(());
+                    return Ok(false);
                 },
                 Some((0, _)) => chunk,
                 Some((num_to_skip, next_leaf)) => {
@@ -367,7 +372,7 @@ where
             }
         };
         if chunk.is_empty() {
-            return Ok(());
+            return Ok(false);
         }
 
         for (key, value_hash) in chunk {
@@ -387,10 +392,106 @@ where
             self.num_keys_received += 1;
         }
 
-        // Verify what we have added so far is all correct.
+        // Verify what we have added so far is all correct. After this returns Ok, the chunk
+        // is proven against the expected root hash and it is safe for the caller to commit
+        // dependent state (e.g. KV writes) in parallel with `commit_prepared`.
         self.verify(proof)?;
 
-        // Write the frozen nodes to storage.
+        Ok(true)
+    }
+
+    /// Verifies a chunk that has already been restored by the tree side. This is used when
+    /// `prepare_chunk` skipped the chunk because the JMT restore progress is ahead of the KV
+    /// restore progress. The range proof was checked when these leaves were originally prepared;
+    /// here we make sure the retried KV values match those already-restored leaves before KV
+    /// writes are allowed to catch up.
+    pub fn verify_chunk_against_storage(&mut self, chunk: Vec<(&K, HashValue)>) -> Result<()> {
+        if chunk.is_empty() {
+            return Ok(());
+        }
+
+        self.wait_for_async_commit()?;
+        let reader = self.reader.as_ref().ok_or_else(|| {
+            AptosDbError::Other("Cannot verify skipped restore chunk without a tree reader.".into())
+        })?;
+
+        let mut previous_key = None;
+        for (key, value_hash) in chunk {
+            let hashed_key = key.hash();
+            if let Some(previous_key) = previous_key {
+                ensure!(
+                    hashed_key > previous_key,
+                    "State keys must come in increasing order.",
+                );
+            }
+            previous_key = Some(hashed_key);
+
+            if let Some(prev_leaf) = &self.previous_leaf {
+                ensure!(
+                    &hashed_key <= prev_leaf.account_key(),
+                    "Skipped restore chunk contains key {} beyond restored tree progress {}.",
+                    hashed_key,
+                    prev_leaf.account_key(),
+                );
+            }
+
+            let leaf = Self::find_leaf_in_storage(reader.as_ref(), self.version, hashed_key)?
+                .ok_or_else(|| {
+                    AptosDbError::Other(format!(
+                        "Restored JMT is missing skipped restore key {}.",
+                        hashed_key,
+                    ))
+                })?;
+            ensure!(
+                leaf.value_hash() == value_hash,
+                "Restored JMT value hash mismatch for skipped restore key {}. \
+                 Expected {}, got {}.",
+                hashed_key,
+                leaf.value_hash(),
+                value_hash,
+            );
+        }
+
+        Ok(())
+    }
+
+    fn find_leaf_in_storage(
+        reader: &(dyn TreeReader<K> + Send + Sync),
+        version: Version,
+        hashed_key: HashValue,
+    ) -> Result<Option<LeafNode<K>>> {
+        if let Some(node) =
+            reader.get_node_option(&NodeKey::new_empty_path(version), "restore_verify")?
+        {
+            match node {
+                Node::Leaf(leaf) if *leaf.account_key() == hashed_key => return Ok(Some(leaf)),
+                Node::Leaf(_) | Node::Null => return Ok(None),
+                Node::Internal(_) => (),
+            }
+        }
+
+        let mut node_path = NibblePath::new_even(vec![]);
+        let full_path = NibblePath::new_even(hashed_key.to_vec());
+        for nibble in full_path.nibbles() {
+            node_path.push(nibble);
+            let node_key = NodeKey::new(version, node_path.clone());
+            if let Some(node) = reader.get_node_option(&node_key, "restore_verify")? {
+                match node {
+                    Node::Leaf(leaf) if *leaf.account_key() == hashed_key => {
+                        return Ok(Some(leaf));
+                    },
+                    Node::Leaf(_) | Node::Null => return Ok(None),
+                    Node::Internal(_) => (),
+                }
+            }
+        }
+
+        Ok(None)
+    }
+
+    /// Writes the frozen nodes accumulated by [`Self::prepare_chunk`] to storage. With
+    /// `async_commit`, the write is dispatched to `IO_POOL` and drained on the next call.
+    pub fn commit_prepared(&mut self) -> Result<()> {
         if self.async_commit {
             self.wait_for_async_commit()?;
             let (tx, rx) = channel();
