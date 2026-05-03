@@ -43,6 +43,7 @@ use move_core_types::{
     ident_str,
     language_storage::{ModuleId, StructTag, TypeTag},
 };
+use rand::{thread_rng, Rng};
 use reqwest::{
     header::{ACCEPT, CONTENT_TYPE},
     Client as ReqwestClient, StatusCode,
@@ -66,6 +67,50 @@ const MODULES_PER_CALL_PAGINATION: u64 = 1000;
 const X_APTOS_SDK_HEADER_VALUE: &str = concat!("aptos-rust-sdk/", env!("CARGO_PKG_VERSION"));
 
 type AptosResult<T> = Result<T, RestError>;
+
+fn jitter_duration(base: Duration) -> Duration {
+    let base_ms = base.as_millis().min(u128::from(u64::MAX)) as u64;
+    if base_ms <= 1 {
+        return base;
+    }
+
+    let lower = (base_ms / 2).max(1);
+    let upper = base_ms;
+    let jittered_ms = if lower == upper {
+        upper
+    } else {
+        thread_rng().gen_range(lower, upper.saturating_add(1))
+    };
+
+    Duration::from_millis(jittered_ms)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::jitter_duration;
+    use std::time::Duration;
+
+    #[test]
+    fn jitter_duration_stays_within_expected_range() {
+        let base = Duration::from_millis(1_000);
+        let lower_bound = Duration::from_millis(500);
+
+        for _ in 0..100 {
+            let jittered = jitter_duration(base);
+            assert!(jittered >= lower_bound);
+            assert!(jittered <= base);
+        }
+    }
+
+    #[test]
+    fn jitter_duration_returns_base_for_small_values() {
+        let zero = Duration::from_millis(0);
+        let one = Duration::from_millis(1);
+
+        assert_eq!(jitter_duration(zero), zero);
+        assert_eq!(jitter_duration(one), one);
+    }
+}
 
 #[derive(Deserialize)]
 pub struct Table {
@@ -1797,7 +1842,6 @@ impl Client {
         let mut result = Err(RestError::Unknown(anyhow!("Failed to run function")));
         let start = Instant::now();
 
-        // TODO: Add jitter
         while start.elapsed() < total_wait {
             result = function().await;
 
@@ -1820,13 +1864,16 @@ impl Client {
                 break;
             }
 
+            let sleep_for = jitter_duration(backoff);
+
             info!(
-                "Failed to call API, retrying in {}ms: {:?}",
+                "Failed to call API, retrying in {}ms (base backoff {}ms): {:?}",
+                sleep_for.as_millis(),
                 backoff.as_millis(),
                 result.as_ref().err().unwrap()
             );
 
-            tokio::time::sleep(backoff).await;
+            tokio::time::sleep(sleep_for).await;
             backoff = backoff.saturating_mul(2);
         }
 

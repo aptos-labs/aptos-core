@@ -28,6 +28,7 @@ bytes = { workspace = true }
 hex = { workspace = true }
 move-core-types = { workspace = true }
 reqwest = { workspace = true }
+rand = { workspace = true }
 serde = { workspace = true }
 serde_json = { workspace = true }
 thiserror = { workspace = true }
