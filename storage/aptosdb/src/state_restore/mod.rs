@@ -230,22 +230,40 @@ impl<K: Key + CryptoHash + Hash + Eq, V: Value> StateSnapshotReceiver<K, V>
                 .add_chunk(chunk.clone())
         };
 
-        let tree_fn = || {
-            let _timer = OTHER_TIMERS_SECONDS.timer_with(&["jmt_add_chunk"]);
-            self.tree_restore
-                .lock()
-                .as_mut()
-                .unwrap()
-                .add_chunk_impl(chunk.iter().map(|(k, v)| (k, v.hash())).collect(), proof)
-        };
         match self.restore_mode {
             StateSnapshotRestoreMode::KvOnly => kv_fn()?,
-            StateSnapshotRestoreMode::TreeOnly => tree_fn()?,
+            StateSnapshotRestoreMode::TreeOnly => {
+                let _timer = OTHER_TIMERS_SECONDS.timer_with(&["jmt_add_chunk"]);
+                let mut tree = self.tree_restore.lock();
+                let tree = tree.as_mut().unwrap();
+                if tree.prepare_chunk(chunk.iter().map(|(k, v)| (k, v.hash())).collect(), proof)? {
+                    tree.commit_prepared()?;
+                }
+            },
             StateSnapshotRestoreMode::Default => {
-                // We run kv_fn with TreeOnly to restore the usage of DB
-                let (r1, r2) = IO_POOL.join(kv_fn, tree_fn);
-                r1?;
-                r2?;
+                // Verify the JMT proof before letting kv_fn touch state_kv_db: kv_fn does
+                // not verify, so writing it concurrently with an unverified tree could
+                // persist bad data. Once prepare_chunk returns Ok, the chunk is proven and
+                // it is safe to overlap kv_fn with the tree's storage commit.
+                let needs_commit = {
+                    let _timer = OTHER_TIMERS_SECONDS.timer_with(&["jmt_prepare_chunk"]);
+                    self.tree_restore
+                        .lock()
+                        .as_mut()
+                        .unwrap()
+                        .prepare_chunk(chunk.iter().map(|(k, v)| (k, v.hash())).collect(), proof)?
+                };
+                if needs_commit {
+                    let tree_commit_fn = || {
+                        let _timer = OTHER_TIMERS_SECONDS.timer_with(&["jmt_commit_chunk"]);
+                        self.tree_restore.lock().as_mut().unwrap().commit_prepared()
+                    };
+                    let (r1, r2) = IO_POOL.join(kv_fn, tree_commit_fn);
+                    r1?;
+                    r2?;
+                } else {
+                    kv_fn()?;
+                }
             },
         }
 
