@@ -28,6 +28,7 @@ use aptos_types::{
         encrypted_payload::{DecryptedPlaintext, DecryptionFailureReason, EncryptedPayload},
         SignedTransaction,
     },
+    validator_txn::ValidatorTransaction,
 };
 use rayon::iter::{IndexedParallelIterator, IntoParallelIterator, ParallelIterator};
 use std::sync::{
@@ -190,6 +191,17 @@ async fn decrypt_observer_path(
     })
 }
 
+fn block_has_epoch_end_vtxn(block: &Block) -> bool {
+    block.validator_txns().is_some_and(|vtxns| {
+        vtxns.iter().any(|v| {
+            matches!(
+                v,
+                ValidatorTransaction::DKGResult(_) | ValidatorTransaction::ChunkyDKGResult(_)
+            )
+        })
+    })
+}
+
 /// Validator path: derive key share, prepare ciphertexts, await the shared
 /// decryption key, and decrypt all encrypted transactions.
 async fn decrypt_validator_path(
@@ -208,6 +220,27 @@ async fn decrypt_validator_path(
         let _ = derived_self_key_share_tx.send(None);
         return Ok(DecryptionResult {
             decrypted_txns: Vec::new(),
+            regular_txns,
+            max_txns_from_block_to_execute,
+            block_gas_limit,
+            decryption_key: Some(None),
+        });
+    }
+
+    // Decrypting txns that the VM will skip after a NewEpochEvent leaks sender
+    // intent. If the block carries an epoch-ending vtxn, mark every encrypted
+    // txn as retry without performing any crypto work.
+    if block_has_epoch_end_vtxn(block) {
+        info!(
+            "Block {} has epoch-ending vtxn; marking {} encrypted txns as EpochEndRetry",
+            block.round(),
+            encrypted_txns.len()
+        );
+        let _ = derived_self_key_share_tx.send(None);
+        let failed_txns =
+            mark_txns_failed_decryption(encrypted_txns, DecryptionFailureReason::EpochEndRetry);
+        return Ok(DecryptionResult {
+            decrypted_txns: failed_txns,
             regular_txns,
             max_txns_from_block_to_execute,
             block_gas_limit,
@@ -474,6 +507,7 @@ fn record_decryption_metrics(result: &DecryptionResult) {
     let mut batch_limit_exceeded = 0u64;
     let mut payload_hash_mismatch = 0u64;
     let mut epoch_mismatch = 0u64;
+    let mut epoch_end_retry = 0u64;
     let mut entry_fun_mismatch = 0u64;
 
     for txn in &result.decrypted_txns {
@@ -489,6 +523,7 @@ fn record_decryption_metrics(result: &DecryptionResult) {
                 DecryptionFailureReason::DecryptionKeyUnavailable => key_unavailable += 1,
                 DecryptionFailureReason::PayloadHashMismatch => payload_hash_mismatch += 1,
                 DecryptionFailureReason::EpochMismatch => epoch_mismatch += 1,
+                DecryptionFailureReason::EpochEndRetry => epoch_end_retry += 1,
                 DecryptionFailureReason::ClaimedEntryFunctionMismatch => entry_fun_mismatch += 1,
             },
             EncryptedPayload::Encrypted(_) => {
@@ -508,6 +543,7 @@ fn record_decryption_metrics(result: &DecryptionResult) {
         ("batch_limit_exceeded", batch_limit_exceeded),
         ("payload_hash_mismatch", payload_hash_mismatch),
         ("epoch_mismatch", epoch_mismatch),
+        ("epoch_end_retry", epoch_end_retry),
         ("entry_fun_mismatch", entry_fun_mismatch),
         ("unencrypted", unencrypted),
     ];

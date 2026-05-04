@@ -374,6 +374,8 @@ DecryptionFailureReason:
       PayloadHashMismatch: UNIT
     6:
       EpochMismatch: UNIT
+    7:
+      EpochEndRetry: UNIT
 DepositEvent:
   STRUCT:
     - amount: U64

@@ -674,6 +674,8 @@ DecryptionFailureReason:
       PayloadHashMismatch: UNIT
     6:
       EpochMismatch: UNIT
+    7:
+      EpochEndRetry: UNIT
 DeprecatedPayload:
   STRUCT:
     - dummy_value: U64
