@@ -762,7 +762,25 @@ impl ReputationHeuristic for LatencyWeightedHeuristic {
                             1.0
                         } else {
                             let shifted = (raw_ratio / self.deadband).min(self.max_ratio);
-                            1.0 / shifted.powf(self.multiplier)
+                            // DETERMINISM: use `libm::pow` (pure-Rust port of MUSL libm)
+                            // instead of `f64::powf`. IEEE-754 only guarantees bit-exact
+                            // results for the basic operations (+, -, *, /, sqrt, fma);
+                            // transcendental functions like `pow` are NOT guaranteed
+                            // bit-identical across platform libms (glibc vs musl vs
+                            // Apple/Darwin vs Windows MSVC). Even a 1-ulp difference in
+                            // `f` here can cause `(active_weight as f64 * factor) as u64`
+                            // below to land on a different integer near a boundary, which
+                            // would give validators on different OS/libc combinations
+                            // different proposer-election weights and fork the chain.
+                            //
+                            // `libm` is pure Rust with no platform dispatch, so the result
+                            // is bit-identical on every target Rust supports. The crate is
+                            // pinned to an exact patch version (`=0.2.8` in the workspace
+                            // Cargo.toml) so future libm releases cannot silently change
+                            // the rounding of last-ulp cases either.
+                            //
+                            // See related discussion in PR #19616.
+                            1.0 / libm::pow(shifted, self.multiplier)
                         };
                         // Persist for carry-forward when this validator next has no obs.
                         last_factor.insert(*author, f);
