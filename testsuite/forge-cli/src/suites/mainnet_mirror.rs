@@ -82,7 +82,9 @@ pub(crate) fn mainnet_mirror_max_load_test(duration: Duration) -> ForgeConfig {
                 .init_gas_price_multiplier(20),
         )
         .with_genesis_helm_config_fn(Arc::new(move |helm_values| {
-            helm_values["chain"]["epoch_duration_secs"] = 300.into();
+            // Long epoch — keep validator-set stable for the full run so we measure
+            // the snapshot-derived shape, not partial-snapshot mid-epoch behavior.
+            helm_values["chain"]["epoch_duration_secs"] = 7200.into();
             helm_values["chain"]["on_chain_consensus_config"] =
                 serde_yaml::to_value(OnChainConsensusConfig::default_for_genesis())
                     .expect("must serialize");
