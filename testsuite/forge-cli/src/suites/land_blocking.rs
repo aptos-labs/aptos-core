@@ -2,7 +2,7 @@
 // Licensed pursuant to the Innovation-Enabling Source Code License, available at https://github.com/aptos-labs/aptos-core/blob/main/LICENSE
 
 use super::ungrouped::mixed_compatible_emit_job;
-use crate::{suites::realistic_environment::realistic_env_max_load_test, TestCommand};
+use crate::{suites::mainnet_mirror::mainnet_mirror_max_load_test, TestCommand};
 use aptos_forge::{
     prometheus_metrics::LatencyBreakdownSlice,
     success_criteria::{
@@ -27,9 +27,11 @@ pub(crate) fn get_land_blocking_test(
     test_cmd: &TestCommand,
 ) -> Option<ForgeConfig> {
     let test = match test_name {
-        "land_blocking" | "realistic_env_max_load" => {
-            realistic_env_max_load_test(duration, test_cmd, 7, 0, 3)
-        },
+        // HACK: temporarily reroute land-blocking to the mainnet-mirror suite
+        // so every CI run on this PR exercises the new suite end-to-end.
+        // Revert before merging — restore the previous call:
+        //   realistic_env_max_load_test(duration, test_cmd, 7, 0, 3)
+        "land_blocking" | "realistic_env_max_load" => mainnet_mirror_max_load_test(duration),
         "compat" => compat(),
         "framework_upgrade" => framework_upgrade(),
         "transaction_tracing_test" => transaction_tracing_test(duration, test_cmd),
