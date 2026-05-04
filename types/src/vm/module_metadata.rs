@@ -545,7 +545,13 @@ impl RuntimeModuleMetadataV1 {
             && self.struct_attributes.is_empty()
     }
 
-    pub fn extract_abort_info(&self, code: u64) -> Option<AbortInfo> {
+    /// Legacy abort-info lookup. Masks `code` with `0xFFF` before searching the error
+    /// map, which lets compiler-generated abort codes (e.g. `UNSPECIFIED_ABORT_CODE`
+    /// from a single-argument `assert!`) collide with a user-defined error constant
+    /// whose lower 12 bits happen to be zero. Retained verbatim so transactions
+    /// executed before [`FeatureFlag::EXTRACT_ABORT_INFO_EXACT_MATCH`] was activated
+    /// can be replayed deterministically; new code must use [`Self::extract_abort_info`].
+    pub fn extract_abort_info_legacy(&self, code: u64) -> Option<AbortInfo> {
         self.error_map
             .get(&(code & 0xFFF))
             .or_else(|| self.error_map.get(&code))
@@ -553,6 +559,35 @@ impl RuntimeModuleMetadataV1 {
                 reason_name: descr.code_name.clone(),
                 description: descr.code_description.clone(),
             })
+    }
+
+    /// Extract abort info for a Move abort `code`.
+    ///
+    /// Looks `code` up exactly first. On a miss, retries with just the reason (the
+    /// low 16 bits) but only if `code` matches the canonical `std::error` layout —
+    /// upper 5 bytes zero, leaving at most one category byte and two reason bytes.
+    /// Compiler-generated codes such as `UNSPECIFIED_ABORT_CODE` set bits beyond bit
+    /// 23 and so do not fall through to the reason lookup, which would otherwise let
+    /// them match an unrelated user error constant.
+    pub fn extract_abort_info(&self, code: u64) -> Option<AbortInfo> {
+        let to_info = |descr: &ErrorDescription| AbortInfo {
+            reason_name: descr.code_name.clone(),
+            description: descr.code_description.clone(),
+        };
+
+        if let Some(descr) = self.error_map.get(&code) {
+            return Some(to_info(descr));
+        }
+
+        // Bits 24-63 are zero only for canonical `std::error` codes; bail out for
+        // anything else (compiler-generated codes, opaque user codes) so the reason
+        // fallback can't pull in an unrelated user constant.
+        if code >> 24 != 0 {
+            return None;
+        }
+
+        let reason = code & 0xFFFF;
+        self.error_map.get(&reason).map(to_info)
     }
 }
 
@@ -795,5 +830,78 @@ mod test {
         assert!(!module_scope.are_equal_module_ids(&id("0x1::foo"), &id("0x1::bar")));
         assert!(!module_scope.are_equal_module_ids(&id("0x1::foo"), &id("0x2::foo")));
         assert!(!module_scope.are_equal_module_ids(&id("0x1::foo"), &id("0x2::bar")));
+    }
+
+    fn metadata_with_user_error_zero() -> RuntimeModuleMetadataV1 {
+        let mut error_map = BTreeMap::new();
+        error_map.insert(0, ErrorDescription {
+            code_name: "E_ZERO".to_string(),
+            code_description: "user error with code 0".to_string(),
+        });
+        RuntimeModuleMetadataV1 {
+            error_map,
+            ..Default::default()
+        }
+    }
+
+    // `assert!(false)` lowers to UNSPECIFIED_ABORT_CODE (0xCA26CD000000) — bits set
+    // far above bit 23, lower 12 bits zero.
+    const UNSPECIFIED_ABORT_CODE: u64 = 0xCA26CD000000;
+    // `error::not_found(0)` packs category 6 in bits 16-23 and reason 0 in bits 0-15.
+    const CANONICAL_NOT_FOUND_REASON_ZERO: u64 = 0x60000;
+
+    #[test]
+    fn extract_abort_info_legacy_matches_compiler_codes_to_user_zero() {
+        // Documents the bug the new lookup fixes: with the old `code & 0xFFF` mask,
+        // a compiler-generated abort whose lower 12 bits are zero collides with a
+        // user-defined error constant equal to zero.
+        let md = metadata_with_user_error_zero();
+        let info = md.extract_abort_info_legacy(UNSPECIFIED_ABORT_CODE);
+        assert!(info.is_some(), "legacy lookup is expected to spuriously match");
+        assert_eq!(info.unwrap().reason_name, "E_ZERO");
+    }
+
+    #[test]
+    fn extract_abort_info_does_not_match_compiler_generated_codes() {
+        let md = metadata_with_user_error_zero();
+        assert!(md.extract_abort_info(UNSPECIFIED_ABORT_CODE).is_none());
+    }
+
+    #[test]
+    fn extract_abort_info_matches_direct_user_code() {
+        let md = metadata_with_user_error_zero();
+        let info = md.extract_abort_info(0).expect("user code 0 must match");
+        assert_eq!(info.reason_name, "E_ZERO");
+    }
+
+    #[test]
+    fn extract_abort_info_falls_back_to_reason_for_canonical_codes() {
+        // A canonical std::error code with reason 0 should still resolve via the
+        // reason fallback because the upper 5 bytes are zero.
+        let md = metadata_with_user_error_zero();
+        let info = md
+            .extract_abort_info(CANONICAL_NOT_FOUND_REASON_ZERO)
+            .expect("canonical std::error reason 0 must fall back to user code 0");
+        assert_eq!(info.reason_name, "E_ZERO");
+    }
+
+    #[test]
+    fn extract_abort_info_prefers_exact_match_over_reason() {
+        // If the map has both an exact entry and a reason entry, the exact entry wins.
+        let mut error_map = BTreeMap::new();
+        error_map.insert(0, ErrorDescription {
+            code_name: "E_REASON".to_string(),
+            code_description: "via reason fallback".to_string(),
+        });
+        error_map.insert(CANONICAL_NOT_FOUND_REASON_ZERO, ErrorDescription {
+            code_name: "E_FULL".to_string(),
+            code_description: "via exact match".to_string(),
+        });
+        let md = RuntimeModuleMetadataV1 {
+            error_map,
+            ..Default::default()
+        };
+        let info = md.extract_abort_info(CANONICAL_NOT_FOUND_REASON_ZERO).unwrap();
+        assert_eq!(info.reason_name, "E_FULL");
     }
 }

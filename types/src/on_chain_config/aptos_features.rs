@@ -145,6 +145,10 @@ pub enum FeatureFlag {
     DISTRIBUTE_TRANSACTION_FEE = 97,
     GOVERNED_GAS_POOL = 223,
     STAKE_REWARD_USING_TREASURY = 224,
+    /// Use the fixed `extract_abort_info` lookup that does not spuriously match
+    /// compiler-generated abort codes (e.g. `UNSPECIFIED_ABORT_CODE`) against
+    /// user-defined error constants whose lower bits happen to coincide.
+    EXTRACT_ABORT_INFO_EXACT_MATCH = 225,
 }
 
 impl FeatureFlag {
