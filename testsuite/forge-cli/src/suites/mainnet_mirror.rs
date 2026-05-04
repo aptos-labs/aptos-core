@@ -76,12 +76,6 @@ pub(crate) fn mainnet_mirror_max_load_test(duration: Duration) -> ForgeConfig {
             MultiRegionNetworkEmulationTest::new_with_config(region_config),
             PerformanceBenchmark,
         ))
-        // Required for chaos-mesh NetworkChaos to apply: enables headless ClusterIP
-        // services so chaos-mesh can resolve pod-level DNS for tc-netem injection.
-        // Without this, MultiRegionNetworkEmulationTest's chaos sits in "selecting"
-        // forever and the framework's `ensure_chaos_experiments_active` retries
-        // until the 30-min timeout, never starting the emit job (mempool stays empty).
-        .with_multi_region_config()
         .with_emit_job(
             EmitJobRequest::default()
                 .mode(EmitJobMode::ConstTps { tps: 4000 })
