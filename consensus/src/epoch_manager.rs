@@ -342,12 +342,19 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
                     leader_reputation_type.use_reputation_window_from_stale_end(),
                 );
                 let heuristic: Box<dyn ReputationHeuristic> = if params.use_latency_weighted {
-                    // Decode milli-multiplier (1000 = 1.0×) deterministically.
+                    // Decode milli-units (1000 = 1.0×) deterministically. All tuning
+                    // parameters come from the on-chain V3 config so every validator
+                    // computes the same proposer schedule.
                     let multiplier = params.latency_weight_multiplier_milli as f64 / 1000.0;
+                    let deadband = params.latency_deadband_milli as f64 / 1000.0;
+                    let max_ratio = params.latency_max_ratio_milli as f64 / 1000.0;
                     Box::new(LatencyWeightedHeuristic::new(
                         inner_heuristic,
                         proposer_and_voter_config.active_weight,
                         multiplier,
+                        params.latency_min_observations as usize,
+                        deadband,
+                        max_ratio,
                     ))
                 } else {
                     Box::new(inner_heuristic)

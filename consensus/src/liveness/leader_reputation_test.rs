@@ -787,14 +787,36 @@ fn make_block_event(
     )
 }
 
+/// Default tuning parameters used by tests, matching the typical values that production
+/// would carry on-chain (deadband=1.3×, max_ratio=4.0×, min_observations=2).
+const TEST_MIN_OBSERVATIONS: usize = 2;
+const TEST_DEADBAND: f64 = 1.3;
+const TEST_MAX_RATIO: f64 = 4.0;
+
 /// Build a `LatencyWeightedHeuristic` wrapping a `ProposerAndVoterHeuristic` configured so
 /// that all candidates with successful proposals receive `active_weight = 1000`.
 fn make_latency_weighted_heuristic(self_author: Author) -> LatencyWeightedHeuristic {
+    make_latency_weighted_heuristic_with_multiplier(self_author, 1.0)
+}
+
+/// Variant for tests that want to exercise the multiplier knob; tuning parameters use
+/// the test defaults.
+fn make_latency_weighted_heuristic_with_multiplier(
+    self_author: Author,
+    multiplier: f64,
+) -> LatencyWeightedHeuristic {
     // Wide windows + low failure threshold so test fixtures do not accidentally trigger the
     // failed/inactive branches in the inner heuristic — we want to exercise the latency
     // scaling on top of `active_weight`.
     let inner = ProposerAndVoterHeuristic::new(self_author, 1000, 10, 1, 50, 100, 100, false);
-    LatencyWeightedHeuristic::new(inner, 1000, 1.0)
+    LatencyWeightedHeuristic::new(
+        inner,
+        1000,
+        multiplier,
+        TEST_MIN_OBSERVATIONS,
+        TEST_DEADBAND,
+        TEST_MAX_RATIO,
+    )
 }
 
 #[test]

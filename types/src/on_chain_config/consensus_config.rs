@@ -544,11 +544,17 @@ impl LeaderReputationType {
                 base: c,
                 use_latency_weighted: false,
                 latency_weight_multiplier_milli: 0,
+                latency_min_observations: 0,
+                latency_deadband_milli: 0,
+                latency_max_ratio_milli: 0,
             },
             Self::ProposerAndVoterV3(c) => ProposerAndVoterParams {
                 base: &c.base,
                 use_latency_weighted: c.use_latency_weighted,
                 latency_weight_multiplier_milli: c.latency_weight_multiplier_milli,
+                latency_min_observations: c.latency_min_observations,
+                latency_deadband_milli: c.latency_deadband_milli,
+                latency_max_ratio_milli: c.latency_max_ratio_milli,
             },
         }
     }
@@ -563,6 +569,18 @@ pub struct ProposerAndVoterParams<'a> {
     /// deterministic BCS serialization across implementations. Ignored when
     /// `use_latency_weighted` is false.
     pub latency_weight_multiplier_milli: u32,
+    /// Minimum round-time observations required before a validator is scaled by the
+    /// latency-weighted heuristic. Below this threshold the heuristic falls back to the
+    /// carry-forward factor (or 1.0 for never-before-seen validators).
+    pub latency_min_observations: u32,
+    /// Deadband threshold in milli-units (1000 = 1.0×): validators with `val_mean / median
+    /// <= deadband` get factor 1.0 (no penalty). Protects healthy validators with natural
+    /// variance from being penalized for noise.
+    pub latency_deadband_milli: u32,
+    /// Hard ceiling on the per-validator scaling ratio (post-deadband) in milli-units
+    /// (1000 = 1.0×). Bounds how aggressively a single anomalously-slow validator can be
+    /// suppressed.
+    pub latency_max_ratio_milli: u32,
 }
 
 #[derive(Clone, Copy, Debug, Deserialize, Eq, PartialEq, Serialize)]
@@ -604,6 +622,15 @@ pub struct ProposerAndVoterConfigV3 {
     /// Integer-encoded for BCS determinism. Decoded as `value as f64 / 1000.0` at runtime.
     /// Ignored when `use_latency_weighted` is false.
     pub latency_weight_multiplier_milli: u32,
+    /// Minimum round-time observations required before a validator is scaled (typical: 2).
+    /// Validators with fewer observations fall back to the carry-forward factor.
+    pub latency_min_observations: u32,
+    /// Deadband threshold in milli-units (typical: 1300 = 1.3×). Validators with
+    /// `val_mean / median <= deadband` get factor 1.0 (no penalty).
+    pub latency_deadband_milli: u32,
+    /// Hard ceiling on the post-deadband scaling ratio in milli-units (typical: 4000 = 4.0×).
+    /// Bounds how aggressively a single anomalously-slow validator can be suppressed.
+    pub latency_max_ratio_milli: u32,
 }
 
 #[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]

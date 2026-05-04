@@ -571,27 +571,30 @@ impl ReputationHeuristic for ProposerAndVoterHeuristic {
 /// **deadband** zone around the median where no penalty is applied. The per-validator
 /// weight is:
 ///
-///   if ratio <= LATENCY_DEADBAND: factor = 1.0
-///   else: factor = 1.0 / (ratio / LATENCY_DEADBAND).min(MAX_LATENCY_RATIO).powf(multiplier)
+///   if ratio <= deadband: factor = 1.0
+///   else: factor = 1.0 / (ratio / deadband).min(max_ratio).powf(multiplier)
 ///   weight = active_weight * factor
 ///
 ///   where ratio = val_mean / median_mean
 ///
+/// All four tuning parameters (`multiplier`, `deadband`, `max_ratio`, `min_observations`)
+/// come from the on-chain `ProposerAndVoterConfigV3` so every validator computes the same
+/// proposer schedule. Hardcoding any of these would risk a fork on partial rollout.
+///
 /// Properties:
-/// * Validators within `LATENCY_DEADBAND` of the median (e.g., 1.3× = 30% above median):
+/// * Validators within `deadband` of the median (e.g., 1.3× = 30% above median):
 ///   `factor = 1.0` (no penalty). This protects healthy validators with natural variance
 ///   from being penalized for noise. Critical for n-small experimental setups where
 ///   geographic outliers' ratios sit in the 1.2-1.5 range.
 /// * Validators above the deadband: penalized by `(ratio/deadband)^multiplier`. The
 ///   slowest validator gets the lowest weight. The exponential growth past the deadband
 ///   gives strong suppression on truly-slow validators (high `ratio`).
-/// * Penalty ratio is clamped at `MAX_LATENCY_RATIO` to bound suppression. Set tighter
-///   than the previous formula because real-world ratio distributions are compressed
-///   (mainnet: max ~2.5×) and only forge synthetic outliers exceed a few × median.
+/// * Penalty ratio is clamped at `max_ratio` to bound suppression. Typical mainnet values
+///   are compressed (max observed ~2.5×); only forge synthetic outliers exceed a few ×.
 ///
 /// ## Carry-forward for validators with no observations
 ///
-/// A validator with `< MIN_OBSERVATIONS` round-time samples in the window does NOT fall back
+/// A validator with `< min_observations` round-time samples in the window does NOT fall back
 /// to the base active weight (the previous behavior). Instead, we apply the **last computed
 /// factor** for that validator (stored in `last_factor`). This breaks the oscillation cycle
 /// where a successfully-suppressed slow validator would pop back to full weight as soon as
@@ -607,36 +610,44 @@ pub struct LatencyWeightedHeuristic {
     inner: ProposerAndVoterHeuristic,
     active_weight: u64,
     multiplier: f64,
+    /// See `ProposerAndVoterConfigV3::latency_min_observations`. Sourced from on-chain
+    /// config so all validators agree on which sparse-history validators get the
+    /// carry-forward fallback vs the computed factor.
+    min_observations: usize,
+    /// See `ProposerAndVoterConfigV3::latency_deadband_milli`. Decoded as
+    /// `value as f64 / 1000.0`. Validators with `val_mean / median <= deadband` get
+    /// factor 1.0 (no penalty).
+    deadband: f64,
+    /// See `ProposerAndVoterConfigV3::latency_max_ratio_milli`. Decoded as
+    /// `value as f64 / 1000.0`. Hard ceiling on the post-deadband scaling ratio.
+    max_ratio: f64,
     /// Carry-forward state: last computed weight factor per author (guarded for &self
     /// access). Mutated only inside `get_weights`.
     last_factor: Mutex<HashMap<Author, f64>>,
 }
 
-/// Minimum number of round-time observations needed before a validator is scaled by the
-/// latency-weighted heuristic; below this we apply the carry-forward factor (or 1.0 for
-/// validators we have never observed).
-const MIN_OBSERVATIONS: usize = 2;
-
-/// Deadband zone: validators with `val_mean / median_mean <= LATENCY_DEADBAND` get factor
-/// 1.0 (no penalty). This protects healthy validators with natural variance from being
-/// penalized for noise. Set to 1.3 = "within 30% of median is healthy" based on mainnet
-/// observation that the P50→P90 spread is ~2× and P50→worst is ~2.5×, so tracking
-/// validators in the 1.0-1.3 band as "healthy" cleanly separates noise from real outliers.
-const LATENCY_DEADBAND: f64 = 1.3;
-
-/// Hard ceiling on the per-validator scaling ratio (post-deadband) used to bound how
-/// aggressively a single anomalously-slow validator can be suppressed. Tightened from the
-/// previous 10.0 because real-world ratios are compressed: mainnet's max observed ratio
-/// is ~2.5×, so anything above ~4× post-deadband is forge-synthetic, not a real-world
-/// validator. With multiplier=2.0 and MAX_LATENCY_RATIO=4, the floor factor is 1/16 = 0.0625.
-const MAX_LATENCY_RATIO: f64 = 4.0;
-
 impl LatencyWeightedHeuristic {
-    pub fn new(inner: ProposerAndVoterHeuristic, active_weight: u64, multiplier: f64) -> Self {
+    /// Construct a `LatencyWeightedHeuristic`. All numeric tuning parameters MUST come
+    /// from the on-chain `ProposerAndVoterConfigV3` so every validator computes the same
+    /// proposer schedule. Hardcoding any of these would risk a fork on partial rollout.
+    pub fn new(
+        inner: ProposerAndVoterHeuristic,
+        active_weight: u64,
+        multiplier: f64,
+        min_observations: usize,
+        deadband: f64,
+        max_ratio: f64,
+    ) -> Self {
         Self {
             inner,
             active_weight,
             multiplier: if multiplier > 0.0 { multiplier } else { 1.0 },
+            // Guard against degenerate on-chain values: deadband must be ≥ 1.0 (else
+            // every validator gets penalized), max_ratio must be ≥ 1.0 (else clamp
+            // would invert the penalty).
+            min_observations: min_observations.max(1),
+            deadband: if deadband >= 1.0 { deadband } else { 1.0 },
+            max_ratio: if max_ratio >= 1.0 { max_ratio } else { 1.0 },
             last_factor: Mutex::new(HashMap::new()),
         }
     }
@@ -713,7 +724,7 @@ impl ReputationHeuristic for LatencyWeightedHeuristic {
         // Per-validator mean round time, computed only for validators with enough data.
         let means: HashMap<Author, u64> = round_times
             .iter()
-            .filter(|(_, v)| v.len() >= MIN_OBSERVATIONS)
+            .filter(|(_, v)| v.len() >= self.min_observations)
             .map(|(a, v)| (*a, v.iter().sum::<u64>() / v.len() as u64))
             .collect();
 
@@ -747,10 +758,10 @@ impl ReputationHeuristic for LatencyWeightedHeuristic {
                         // The deadband zone protects healthy validators from being
                         // penalized for natural variance.
                         let raw_ratio = val_mean as f64 / median as f64;
-                        let f = if raw_ratio <= LATENCY_DEADBAND {
+                        let f = if raw_ratio <= self.deadband {
                             1.0
                         } else {
-                            let shifted = (raw_ratio / LATENCY_DEADBAND).min(MAX_LATENCY_RATIO);
+                            let shifted = (raw_ratio / self.deadband).min(self.max_ratio);
                             1.0 / shifted.powf(self.multiplier)
                         };
                         // Persist for carry-forward when this validator next has no obs.
