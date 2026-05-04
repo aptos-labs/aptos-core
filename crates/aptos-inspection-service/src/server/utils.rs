@@ -5,7 +5,7 @@ use aptos_logger::{error, warn};
 use aptos_metrics_core::{register_int_counter_vec, IntCounterVec};
 use once_cell::sync::Lazy;
 use prometheus::{
-    proto::{MetricFamily, MetricType},
+    proto::{Metric, MetricFamily, MetricType},
     Encoder,
 };
 use std::collections::HashMap;
@@ -14,11 +14,19 @@ use std::collections::HashMap;
 pub const CONTENT_TYPE_JSON: &str = "application/json";
 pub const CONTENT_TYPE_TEXT: &str = "text/plain";
 
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub(crate) enum FlattenedMetricValue {
+    Single(f64),
+    Histogram { count: u64, sum: f64 },
+}
+
 /// Counter for the number of metrics in various states
 pub static NUM_METRICS: Lazy<IntCounterVec> = Lazy::new(|| {
-    register_int_counter_vec!("aptos_metrics", "Number of metrics in certain states", &[
-        "type"
-    ])
+    register_int_counter_vec!(
+        "aptos_metrics",
+        "Number of metrics in certain states",
+        &["type"]
+    )
     .unwrap()
 });
 
@@ -78,53 +86,94 @@ fn get_metric_families() -> Vec<MetricFamily> {
     metric_families
 }
 
+pub(crate) fn format_metric_with_labels(name: &str, metric: &Metric) -> String {
+    let label_strings: Vec<String> = metric
+        .get_label()
+        .iter()
+        .map(|label| format!("{}={}", label.get_name(), label.get_value()))
+        .collect();
+    let labels_string = format!("{{{}}}", label_strings.join(","));
+    format!("{}{}", name, labels_string)
+}
+
+pub(crate) fn flatten_metric_with_labels(name: &str, metric: &Metric) -> String {
+    let name_string = String::from(name);
+    if metric.get_label().is_empty() {
+        return name_string;
+    }
+
+    let values: Vec<&str> = metric
+        .get_label()
+        .iter()
+        .map(|label| label.get_value())
+        .filter(|value| !value.is_empty())
+        .collect();
+    let values = values.join(".");
+
+    if values.is_empty() {
+        return name_string;
+    }
+
+    format!("{}.{}", name_string, values)
+}
+
+pub(crate) fn for_each_flattened_metric<F>(metric_families: &[MetricFamily], mut visitor: F)
+where
+    F: FnMut(&str, &Metric, FlattenedMetricValue),
+{
+    for metric_family in metric_families {
+        let name = metric_family.get_name();
+        match metric_family.get_field_type() {
+            MetricType::COUNTER => {
+                for metric in metric_family.get_metric() {
+                    visitor(
+                        name,
+                        metric,
+                        FlattenedMetricValue::Single(metric.get_counter().get_value()),
+                    );
+                }
+            },
+            MetricType::GAUGE => {
+                for metric in metric_family.get_metric() {
+                    visitor(
+                        name,
+                        metric,
+                        FlattenedMetricValue::Single(metric.get_gauge().get_value()),
+                    );
+                }
+            },
+            MetricType::HISTOGRAM => {
+                for metric in metric_family.get_metric() {
+                    let histogram = metric.get_histogram();
+                    visitor(
+                        name,
+                        metric,
+                        FlattenedMetricValue::Histogram {
+                            count: histogram.get_sample_count(),
+                            sum: histogram.get_sample_sum(),
+                        },
+                    );
+                }
+            },
+            MetricType::SUMMARY => error!("Unsupported Metric 'SUMMARY'"),
+            MetricType::UNTYPED => error!("Unsupported Metric 'UNTYPED'"),
+        }
+    }
+}
+
 /// A simple utility function that parses and collects all metrics
 /// associated with the given families.
 fn get_metrics_map(metric_families: Vec<MetricFamily>) -> HashMap<String, String> {
-    // TODO: use an existing metric encoder (same as used by prometheus/metric-server)
     let mut all_metrics = HashMap::new();
 
-    // Process each metric family
-    for metric_family in metric_families {
-        let values: Vec<_> = match metric_family.get_field_type() {
-            MetricType::COUNTER => metric_family
-                .get_metric()
-                .iter()
-                .map(|m| m.get_counter().get_value().to_string())
-                .collect(),
-            MetricType::GAUGE => metric_family
-                .get_metric()
-                .iter()
-                .map(|m| m.get_gauge().get_value().to_string())
-                .collect(),
-            MetricType::SUMMARY => {
-                error!("Unsupported Metric 'SUMMARY'");
-                vec![]
-            },
-            MetricType::UNTYPED => {
-                error!("Unsupported Metric 'UNTYPED'");
-                vec![]
-            },
-            MetricType::HISTOGRAM => metric_family
-                .get_metric()
-                .iter()
-                .map(|m| m.get_histogram().get_sample_count().to_string())
-                .collect(),
+    for_each_flattened_metric(&metric_families, |name, metric, value| {
+        let key = format_metric_with_labels(name, metric);
+        let value = match value {
+            FlattenedMetricValue::Single(value) => value.to_string(),
+            FlattenedMetricValue::Histogram { count, .. } => count.to_string(),
         };
-        let metric_names = metric_family.get_metric().iter().map(|m| {
-            let label_strings: Vec<String> = m
-                .get_label()
-                .iter()
-                .map(|l| format!("{}={}", l.get_name(), l.get_value()))
-                .collect();
-            let labels_string = format!("{{{}}}", label_strings.join(","));
-            format!("{}{}", metric_family.get_name(), labels_string)
-        });
-
-        for (name, value) in metric_names.zip(values.into_iter()) {
-            all_metrics.insert(name, value);
-        }
-    }
+        all_metrics.insert(key, value);
+    });
 
     all_metrics
 }
