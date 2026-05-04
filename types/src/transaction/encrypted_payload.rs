@@ -85,6 +85,11 @@ pub enum DecryptionFailureReason {
     PayloadHashMismatch,
     /// The payload was encrypted for a different epoch than the available decryption key.
     EpochMismatch,
+    /// The block contains an epoch-ending validator transaction (DKGResult /
+    /// ChunkyDKGResult). Decrypting txns that the VM will skip post-NewEpochEvent
+    /// would leak sender intent, so the txn is failed with retry semantics and
+    /// the user resubmits in the next epoch with the rotated key.
+    EpochEndRetry,
 }
 
 // Mirrors EntryFunction in types/src/transaction/script.rs
