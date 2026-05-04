@@ -3937,7 +3937,15 @@ impl VectorRef {
             Container::VecBool(r) => r.borrow().len(),
             Container::VecAddress(r) => r.borrow().len(),
             Container::Vec(r) => r.borrow().len(),
-            Container::Locals(_) | Container::Struct(_) => unreachable!(),
+            Container::Locals(_) | Container::Struct(_) => {
+                return Err(
+                    PartialVMError::new(StatusCode::UNKNOWN_INVARIANT_VIOLATION_ERROR)
+                        .with_message(
+                            "length_as_usize called on non-vector container (Locals or Struct)"
+                                .to_string(),
+                        ),
+                );
+            },
         };
         Ok(len)
     }
@@ -3967,7 +3975,15 @@ impl VectorRef {
             Container::VecBool(r) => r.borrow_mut().push(e.value_as()?),
             Container::VecAddress(r) => r.borrow_mut().push(e.value_as()?),
             Container::Vec(r) => r.borrow_mut().push(e),
-            Container::Locals(_) | Container::Struct(_) => unreachable!(),
+            Container::Locals(_) | Container::Struct(_) => {
+                return Err(
+                    PartialVMError::new(StatusCode::UNKNOWN_INVARIANT_VIOLATION_ERROR)
+                        .with_message(
+                            "push_back called on non-vector container (Locals or Struct)"
+                                .to_string(),
+                        ),
+                );
+            },
         }
 
         self.0.mark_dirty();
@@ -4067,7 +4083,14 @@ impl VectorRef {
                 Some(x) => x,
                 None => err_pop_empty_vec!(),
             },
-            Container::Locals(_) | Container::Struct(_) => unreachable!(),
+            Container::Locals(_) | Container::Struct(_) => {
+                return Err(
+                    PartialVMError::new(StatusCode::UNKNOWN_INVARIANT_VIOLATION_ERROR)
+                        .with_message(
+                            "pop called on non-vector container (Locals or Struct)".to_string(),
+                        ),
+                );
+            },
         };
 
         self.0.mark_dirty();
@@ -4104,7 +4127,14 @@ impl VectorRef {
             Container::VecBool(r) => swap!(r),
             Container::VecAddress(r) => swap!(r),
             Container::Vec(r) => swap!(r),
-            Container::Locals(_) | Container::Struct(_) => unreachable!(),
+            Container::Locals(_) | Container::Struct(_) => {
+                return Err(
+                    PartialVMError::new(StatusCode::UNKNOWN_INVARIANT_VIOLATION_ERROR)
+                        .with_message(
+                            "swap called on non-vector container (Locals or Struct)".to_string(),
+                        ),
+                );
+            },
         }
 
         self.0.mark_dirty();
@@ -4181,7 +4211,15 @@ impl VectorRef {
                 move_range!(from_r, to_r)
             },
             (Container::Vec(from_r), Container::Vec(to_r)) => move_range!(from_r, to_r),
-            (_, _) => unreachable!(),
+            (_, _) => {
+                return Err(
+                    PartialVMError::new(StatusCode::UNKNOWN_INVARIANT_VIOLATION_ERROR)
+                        .with_message(
+                            "move_range called with mismatched or non-vector container types"
+                                .to_string(),
+                        ),
+                );
+            },
         }
 
         from_self.0.mark_dirty();
@@ -4496,13 +4534,17 @@ impl GlobalValueImpl {
             Self::None | Self::Deleted => {
                 return Err(PartialVMError::new(StatusCode::MISSING_DATA))
             },
-            Self::Fresh { .. } => match mem::replace(self, Self::None) {
-                Self::Fresh { value } => value,
-                _ => unreachable!(),
+            Self::Fresh { .. } => {
+                let Self::Fresh { value } = mem::replace(self, Self::None) else {
+                    unreachable!("Value has been checked to be fresh")
+                };
+                value
             },
-            Self::Cached { .. } => match mem::replace(self, Self::Deleted) {
-                Self::Cached { value, .. } => value,
-                _ => unreachable!(),
+            Self::Cached { .. } => {
+                let Self::Cached { value, .. } = mem::replace(self, Self::Deleted) else {
+                    unreachable!("Value has been checked to be cached")
+                };
+                value
             },
         };
         let fields = Self::expect_struct_fields(&value);

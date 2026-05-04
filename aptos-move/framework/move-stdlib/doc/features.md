@@ -165,6 +165,7 @@ return true.
 -  [Function `is_encrypted_transactions_enabled`](#0x1_features_is_encrypted_transactions_enabled)
 -  [Function `get_transaction_limits_feature`](#0x1_features_get_transaction_limits_feature)
 -  [Function `is_transaction_limits_enabled`](#0x1_features_is_transaction_limits_enabled)
+-  [Function `is_storage_slot_natives_enabled`](#0x1_features_is_storage_slot_natives_enabled)
 -  [Function `change_feature_flags`](#0x1_features_change_feature_flags)
 -  [Function `change_feature_flags_internal`](#0x1_features_change_feature_flags_internal)
 -  [Function `change_feature_flags_for_next_epoch`](#0x1_features_change_feature_flags_for_next_epoch)
@@ -908,6 +909,16 @@ Lifetime: transient
 
 
 <pre><code><b>const</b> <a href="features.md#0x1_features_SPONSORED_AUTOMATIC_ACCOUNT_CREATION">SPONSORED_AUTOMATIC_ACCOUNT_CREATION</a>: u64 = 34;
+</code></pre>
+
+
+
+<a id="0x1_features_STORAGE_SLOT_NATIVES"></a>
+
+Whether the storage slot natives are enabled.
+
+
+<pre><code><b>const</b> <a href="features.md#0x1_features_STORAGE_SLOT_NATIVES">STORAGE_SLOT_NATIVES</a>: u64 = 113;
 </code></pre>
 
 
@@ -4207,6 +4218,30 @@ Deprecated feature
 
 <pre><code><b>public</b> <b>fun</b> <a href="features.md#0x1_features_is_transaction_limits_enabled">is_transaction_limits_enabled</a>(): bool {
     <a href="features.md#0x1_features_is_enabled">is_enabled</a>(<a href="features.md#0x1_features_TRANSACTION_LIMITS">TRANSACTION_LIMITS</a>)
+}
+</code></pre>
+
+
+
+</details>
+
+<a id="0x1_features_is_storage_slot_natives_enabled"></a>
+
+## Function `is_storage_slot_natives_enabled`
+
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="features.md#0x1_features_is_storage_slot_natives_enabled">is_storage_slot_natives_enabled</a>(): bool
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="features.md#0x1_features_is_storage_slot_natives_enabled">is_storage_slot_natives_enabled</a>(): bool {
+    <a href="features.md#0x1_features_is_enabled">is_enabled</a>(<a href="features.md#0x1_features_STORAGE_SLOT_NATIVES">STORAGE_SLOT_NATIVES</a>)
 }
 </code></pre>
 
