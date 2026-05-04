@@ -338,6 +338,22 @@ where
     /// error will be returned and nothing will be written to storage.
     pub fn add_chunk_impl(
         &mut self,
+        chunk: Vec<(&K, HashValue)>,
+        proof: SparseMerkleRangeProof,
+    ) -> Result<()> {
+        self.verify_chunk(chunk, proof)?;
+        self.commit_chunk()
+    }
+
+    /// Verifies a chunk against the proof and stages frozen nodes in memory without writing
+    /// them to storage. The caller must subsequently invoke [`Self::commit_chunk`] to flush.
+    ///
+    /// Splitting verify from commit lets a caller persist a sibling DB (e.g. state_kv_db) in
+    /// between, ensuring the sibling never lags this tree on disk — otherwise resume logic
+    /// could feed unverified bytes into the lagging side. If verification fails, frozen nodes
+    /// produced by this call remain in memory and the receiver should be discarded.
+    pub fn verify_chunk(
+        &mut self,
         mut chunk: Vec<(&K, HashValue)>,
         proof: SparseMerkleRangeProof,
     ) -> Result<()> {
@@ -389,8 +405,17 @@ where
 
         // Verify what we have added so far is all correct.
         self.verify(proof)?;
+        Ok(())
+    }
 
-        // Write the frozen nodes to storage.
+    /// Persists frozen nodes accumulated by [`Self::verify_chunk`] to storage. No-op when
+    /// nothing is staged or when the restore is already finished. With async commit enabled,
+    /// returns once the previous async write has completed and the new write has been spawned.
+    pub fn commit_chunk(&mut self) -> Result<()> {
+        if self.finished || self.frozen_nodes.is_empty() {
+            return Ok(());
+        }
+
         if self.async_commit {
             self.wait_for_async_commit()?;
             let (tx, rx) = channel();
