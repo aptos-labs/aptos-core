@@ -13650,6 +13650,7 @@ dependencies = [
  "better_any",
  "bytes",
  "claims",
+ "criterion",
  "crossbeam",
  "dashmap 7.0.0-rc2",
  "derivative",
