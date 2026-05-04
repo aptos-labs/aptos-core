@@ -31,6 +31,10 @@ module 0x42::followed_by {
         g(x)
     }
     spec followed_by {
+        // f can abort on the input.
+        aborts_if aborts_of<f>(x);
+        // g can abort on the intermediate value produced by f.
+        aborts_if aborts_of<g>(result_of<f>(x));
         ensures exists S in *:
             (..S |~ ensures_of<f>(old(x), x)) &&
             (S.. |~ ensures_of<g>(old(x), x));
@@ -69,7 +73,10 @@ module 0x42::followed_by {
         followed_by(add_one, double_val, x)
     }
     spec add_then_double {
-        pragma aborts_if_is_partial;
+        // add_one aborts on the initial value.
+        aborts_if x.value + 1 > MAX_U64;
+        // double_val aborts on the intermediate value (x.value + 1).
+        aborts_if (x.value + 1) * 2 > MAX_U64;
         ensures x.value == (old(x.value) + 1) * 2;
     }
 }

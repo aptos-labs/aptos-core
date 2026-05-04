@@ -2727,8 +2727,7 @@ impl SpecTranslator<'_> {
                             if let Type::Fun(arg_ty, _, _) = &inst_fun_type {
                                 for ty in arg_ty.clone().flatten() {
                                     if ty.is_mutable_reference() {
-                                        result =
-                                            Some((label, ty.skip_reference().clone()));
+                                        result = Some((label, ty.skip_reference().clone()));
                                         return false;
                                     }
                                 }
