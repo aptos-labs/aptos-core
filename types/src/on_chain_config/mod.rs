@@ -47,7 +47,7 @@ pub use self::{
     consensus_config::{
         AnchorElectionMode, ConsensusAlgorithmConfig, ConsensusConfigV1, DagConsensusConfigV1,
         LeaderReputationType, OnChainConsensusConfig, ProposerAndVoterConfig,
-        ProposerAndVoterConfigV3, ProposerAndVoterParams, ProposerElectionType, ValidatorTxnConfig,
+        ProposerAndVoterConfigV3, ProposerElectionType, ValidatorTxnConfig,
         DEFAULT_ENABLED_WINDOW_SIZE, DEFAULT_WINDOW_SIZE,
     },
     execution_config::{

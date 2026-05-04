@@ -534,53 +534,6 @@ impl LeaderReputationType {
         // all versions after V1 shouldn't use from stale end
         matches!(self, Self::ProposerAndVoter(_))
     }
-
-    /// Borrow the inner `ProposerAndVoter*` parameters in a version-agnostic way. Returns
-    /// the latency-weighted toggle and milli-multiplier alongside; both are zero/false for
-    /// V1/V2 since those versions predate the latency-weighted feature.
-    pub fn proposer_and_voter_params(&self) -> ProposerAndVoterParams<'_> {
-        match self {
-            Self::ProposerAndVoter(c) | Self::ProposerAndVoterV2(c) => ProposerAndVoterParams {
-                base: c,
-                use_latency_weighted: false,
-                latency_weight_multiplier_milli: 0,
-                latency_min_observations: 0,
-                latency_deadband_milli: 0,
-                latency_max_ratio_milli: 0,
-            },
-            Self::ProposerAndVoterV3(c) => ProposerAndVoterParams {
-                base: &c.base,
-                use_latency_weighted: c.use_latency_weighted,
-                latency_weight_multiplier_milli: c.latency_weight_multiplier_milli,
-                latency_min_observations: c.latency_min_observations,
-                latency_deadband_milli: c.latency_deadband_milli,
-                latency_max_ratio_milli: c.latency_max_ratio_milli,
-            },
-        }
-    }
-}
-
-/// Borrowed view over the parameters needed to construct a `LeaderReputation` heuristic,
-/// abstracting over `LeaderReputationType` versions. See `proposer_and_voter_params`.
-pub struct ProposerAndVoterParams<'a> {
-    pub base: &'a ProposerAndVoterConfig,
-    pub use_latency_weighted: bool,
-    /// Multiplier expressed in milli-units (1000 = 1.0×). Stored as integer for
-    /// deterministic BCS serialization across implementations. Ignored when
-    /// `use_latency_weighted` is false.
-    pub latency_weight_multiplier_milli: u32,
-    /// Minimum round-time observations required before a validator is scaled by the
-    /// latency-weighted heuristic. Below this threshold the heuristic falls back to the
-    /// carry-forward factor (or 1.0 for never-before-seen validators).
-    pub latency_min_observations: u32,
-    /// Deadband threshold in milli-units (1000 = 1.0×): validators with `val_mean / median
-    /// <= deadband` get factor 1.0 (no penalty). Protects healthy validators with natural
-    /// variance from being penalized for noise.
-    pub latency_deadband_milli: u32,
-    /// Hard ceiling on the per-validator scaling ratio (post-deadband) in milli-units
-    /// (1000 = 1.0×). Bounds how aggressively a single anomalously-slow validator can be
-    /// suppressed.
-    pub latency_max_ratio_milli: u32,
 }
 
 #[derive(Clone, Copy, Debug, Deserialize, Eq, PartialEq, Serialize)]

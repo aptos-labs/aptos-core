@@ -101,10 +101,11 @@ use aptos_types::{
     epoch_state::EpochState,
     jwks::SupportedOIDCProviders,
     on_chain_config::{
-        ChunkyDKGConfigMoveStruct, ChunkyDKGConfigSeqNum, Features, OnChainChunkyDKGConfig,
-        OnChainConfigPayload, OnChainConfigProvider, OnChainConsensusConfig,
-        OnChainExecutionConfig, OnChainJWKConsensusConfig, OnChainRandomnessConfig,
-        ProposerElectionType, RandomnessConfigMoveStruct, RandomnessConfigSeqNum, ValidatorSet,
+        ChunkyDKGConfigMoveStruct, ChunkyDKGConfigSeqNum, Features, LeaderReputationType,
+        OnChainChunkyDKGConfig, OnChainConfigPayload, OnChainConfigProvider,
+        OnChainConsensusConfig, OnChainExecutionConfig, OnChainJWKConsensusConfig,
+        OnChainRandomnessConfig, ProposerElectionType, RandomnessConfigMoveStruct,
+        RandomnessConfigSeqNum, ValidatorSet,
     },
     randomness::{RandKeys, WvufPP, WVUF},
     secret_sharing::SecretShareConfig,
@@ -322,47 +323,75 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
                 Arc::new(RotatingProposer::new(vec![proposer], *contiguous_rounds))
             },
             ProposerElectionType::LeaderReputation(leader_reputation_type) => {
-                // Pull base parameters and the latency-weighted gate out of the on-chain
-                // config in a version-agnostic way. V3 carries the latency settings; V1/V2
-                // return false for `use_latency_weighted` so behavior is unchanged for them.
-                let params = leader_reputation_type.proposer_and_voter_params();
-                let proposer_and_voter_config = params.base;
-                let proposer_window_size = proposers.len()
-                    * proposer_and_voter_config.proposer_window_num_validators_multiplier;
-                let voter_window_size = proposers.len()
-                    * proposer_and_voter_config.voter_window_num_validators_multiplier;
-                let inner_heuristic = ProposerAndVoterHeuristic::new(
-                    self.author,
-                    proposer_and_voter_config.active_weight,
-                    proposer_and_voter_config.inactive_weight,
-                    proposer_and_voter_config.failed_weight,
-                    proposer_and_voter_config.failure_threshold_percent,
-                    voter_window_size,
-                    proposer_window_size,
-                    leader_reputation_type.use_reputation_window_from_stale_end(),
-                );
-                let heuristic: Box<dyn ReputationHeuristic> = if params.use_latency_weighted {
-                    // Decode milli-units (1000 = 1.0×) deterministically. All tuning
-                    // parameters come from the on-chain V3 config so every validator
-                    // computes the same proposer schedule.
-                    let multiplier = params.latency_weight_multiplier_milli as f64 / 1000.0;
-                    let deadband = params.latency_deadband_milli as f64 / 1000.0;
-                    let max_ratio = params.latency_max_ratio_milli as f64 / 1000.0;
-                    Box::new(LatencyWeightedHeuristic::new(
-                        inner_heuristic,
-                        proposer_and_voter_config.active_weight,
-                        multiplier,
-                        params.latency_min_observations as usize,
-                        deadband,
-                        max_ratio,
-                    ))
-                } else {
-                    Box::new(inner_heuristic)
+                let (
+                    heuristic,
+                    window_size,
+                    weight_by_voting_power,
+                    use_history_from_previous_epoch_max_count,
+                ) = match &leader_reputation_type {
+                    LeaderReputationType::ProposerAndVoter(proposer_and_voter_config)
+                    | LeaderReputationType::ProposerAndVoterV2(proposer_and_voter_config) => {
+                        let proposer_window_size = proposers.len()
+                            * proposer_and_voter_config.proposer_window_num_validators_multiplier;
+                        let voter_window_size = proposers.len()
+                            * proposer_and_voter_config.voter_window_num_validators_multiplier;
+                        let heuristic: Box<dyn ReputationHeuristic> =
+                            Box::new(ProposerAndVoterHeuristic::new(
+                                self.author,
+                                proposer_and_voter_config.active_weight,
+                                proposer_and_voter_config.inactive_weight,
+                                proposer_and_voter_config.failed_weight,
+                                proposer_and_voter_config.failure_threshold_percent,
+                                voter_window_size,
+                                proposer_window_size,
+                                leader_reputation_type.use_reputation_window_from_stale_end(),
+                            ));
+                        (
+                            heuristic,
+                            std::cmp::max(proposer_window_size, voter_window_size),
+                            proposer_and_voter_config.weight_by_voting_power,
+                            proposer_and_voter_config.use_history_from_previous_epoch_max_count,
+                        )
+                    },
+                    LeaderReputationType::ProposerAndVoterV3(v3) => {
+                        let base = &v3.base;
+                        let proposer_window_size =
+                            proposers.len() * base.proposer_window_num_validators_multiplier;
+                        let voter_window_size =
+                            proposers.len() * base.voter_window_num_validators_multiplier;
+                        let inner = ProposerAndVoterHeuristic::new(
+                            self.author,
+                            base.active_weight,
+                            base.inactive_weight,
+                            base.failed_weight,
+                            base.failure_threshold_percent,
+                            voter_window_size,
+                            proposer_window_size,
+                            leader_reputation_type.use_reputation_window_from_stale_end(),
+                        );
+                        // Decode milli-units (1000 = 1.0×) deterministically. All tuning
+                        // parameters come from the on-chain V3 config so every validator
+                        // computes the same proposer schedule.
+                        let heuristic: Box<dyn ReputationHeuristic> = if v3.use_latency_weighted {
+                            Box::new(LatencyWeightedHeuristic::new(
+                                inner,
+                                base.active_weight,
+                                v3.latency_weight_multiplier_milli as f64 / 1000.0,
+                                v3.latency_min_observations as usize,
+                                v3.latency_deadband_milli as f64 / 1000.0,
+                                v3.latency_max_ratio_milli as f64 / 1000.0,
+                            ))
+                        } else {
+                            Box::new(inner)
+                        };
+                        (
+                            heuristic,
+                            std::cmp::max(proposer_window_size, voter_window_size),
+                            base.weight_by_voting_power,
+                            base.use_history_from_previous_epoch_max_count,
+                        )
+                    },
                 };
-                let window_size = std::cmp::max(proposer_window_size, voter_window_size);
-                let weight_by_voting_power = proposer_and_voter_config.weight_by_voting_power;
-                let use_history_from_previous_epoch_max_count =
-                    proposer_and_voter_config.use_history_from_previous_epoch_max_count;
 
                 let seek_len = onchain_config.leader_reputation_exclude_round() as usize
                     + onchain_config.max_failed_authors_to_store()
