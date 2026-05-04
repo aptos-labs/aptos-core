@@ -338,6 +338,18 @@ where
     /// error will be returned and nothing will be written to storage.
     pub fn add_chunk_impl(
         &mut self,
+        chunk: Vec<(&K, HashValue)>,
+        proof: SparseMerkleRangeProof,
+    ) -> Result<()> {
+        self.verify_chunk(chunk, proof)?;
+        self.commit_chunk()
+    }
+
+    /// Verifies a chunk and stages frozen nodes in memory; call [`Self::commit_chunk`] to
+    /// flush. On error, in-memory state is partially updated — abort the restore rather
+    /// than calling again.
+    pub fn verify_chunk(
+        &mut self,
         mut chunk: Vec<(&K, HashValue)>,
         proof: SparseMerkleRangeProof,
     ) -> Result<()> {
@@ -389,8 +401,16 @@ where
 
         // Verify what we have added so far is all correct.
         self.verify(proof)?;
+        Ok(())
+    }
 
-        // Write the frozen nodes to storage.
+    /// Flushes frozen nodes staged by [`Self::verify_chunk`]. With async commit, awaits the
+    /// previous write before spawning the new one.
+    pub fn commit_chunk(&mut self) -> Result<()> {
+        if self.finished || self.frozen_nodes.is_empty() {
+            return Ok(());
+        }
+
         if self.async_commit {
             self.wait_for_async_commit()?;
             let (tx, rx) = channel();
