@@ -214,20 +214,6 @@ module 0x42::amm {
             >= old(pool.reserve_x) * old(pool.reserve_y);
     }
 
-    fun followed_by_pool(
-        f: |&mut Pool| has drop,
-        g: |&mut Pool| has drop,
-        x: &mut Pool,
-    ) {
-        f(x);
-        g(x)
-    }
-    spec followed_by_pool {
-        ensures exists S in *:
-            (..S |~ ensures_of<f>(old(x), x)) &&
-            (S.. |~ ensures_of<g>(old(x), x));
-    }
-
     // -------------------------------------------------------
     // Usage examples
     // -------------------------------------------------------
