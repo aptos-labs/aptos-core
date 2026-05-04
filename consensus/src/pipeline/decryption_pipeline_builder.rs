@@ -584,3 +584,637 @@ fn do_final_decryption(
 ) -> anyhow::Result<DecryptedPlaintext> {
     FPTXWeighted::decrypt(decryption_key, &prepared_ciphertext_or_error?)
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::rand::secret_sharing::test_utils::TestContext;
+    use aptos_consensus_types::{
+        block::block_test_utils::certificate_for_genesis, block_data::BlockData, common::Payload,
+        pipelined_block::TaskError,
+    };
+    use aptos_crypto::{
+        ed25519::Ed25519PrivateKey,
+        hash::{CryptoHash, HashValue},
+        PrivateKey, SigningKey, Uniform,
+    };
+    use aptos_types::{
+        aggregate_signature::AggregateSignature,
+        chain_id::ChainId,
+        dkg::{
+            chunky_dkg::{CertifiedAggregatedChunkySubtranscript, CertifiedChunkyDKGOutput},
+            DKGTranscriptMetadata,
+        },
+        jwks::QuorumCertifiedUpdate,
+        secret_sharing::{Ciphertext, EvalProof},
+        transaction::{
+            encrypted_payload::EncryptedInner, EntryFunction, RawTransaction, Script,
+            TransactionExecutable, TransactionExtraConfig, TransactionPayload,
+        },
+        validator_txn::ValidatorTransaction,
+    };
+    use futures::FutureExt;
+    use move_core_types::{account_address::AccountAddress, ident_str, language_storage::ModuleId};
+    use rand::thread_rng;
+
+    // ---------- Test helpers ----------
+
+    fn sign_payload(payload: TransactionPayload) -> SignedTransaction {
+        let raw = RawTransaction::new(
+            AccountAddress::random(),
+            0,
+            payload,
+            0,
+            0,
+            0,
+            ChainId::new(10),
+        );
+        let private_key = Ed25519PrivateKey::generate(&mut thread_rng());
+        let public_key = private_key.public_key();
+        SignedTransaction::new(raw.clone(), public_key, private_key.sign(&raw).unwrap())
+    }
+
+    fn encrypted_inner() -> EncryptedInner {
+        EncryptedInner {
+            ciphertext: Ciphertext::random(),
+            extra_config: TransactionExtraConfig::V1 {
+                multisig_address: None,
+                replay_protection_nonce: None,
+            },
+            payload_hash: HashValue::random(),
+            encryption_epoch: 1,
+            claimed_entry_fun: None,
+        }
+    }
+
+    fn make_encrypted_txn() -> SignedTransaction {
+        sign_payload(TransactionPayload::EncryptedPayload(
+            EncryptedPayload::Encrypted(encrypted_inner()),
+        ))
+    }
+
+    fn make_failed_decryption_txn(reason: DecryptionFailureReason) -> SignedTransaction {
+        sign_payload(TransactionPayload::EncryptedPayload(
+            EncryptedPayload::FailedDecryption {
+                original: encrypted_inner(),
+                eval_proof: Some(EvalProof::random()),
+                reason,
+            },
+        ))
+    }
+
+    fn make_decrypted_txn() -> SignedTransaction {
+        let executable = TransactionExecutable::EntryFunction(EntryFunction::new(
+            ModuleId::new(AccountAddress::ONE, ident_str!("coin").to_owned()),
+            ident_str!("transfer").to_owned(),
+            vec![],
+            vec![],
+        ));
+        let plaintext = DecryptedPlaintext::new(executable, [0; 16]);
+        let mut original = encrypted_inner();
+        original.payload_hash = CryptoHash::hash(&plaintext);
+        sign_payload(TransactionPayload::EncryptedPayload(
+            EncryptedPayload::Decrypted {
+                original,
+                eval_proof: EvalProof::random(),
+                decrypted: plaintext,
+            },
+        ))
+    }
+
+    fn make_regular_txn() -> SignedTransaction {
+        sign_payload(TransactionPayload::Script(Script::new(
+            vec![],
+            vec![],
+            vec![],
+        )))
+    }
+
+    fn make_block(vtxns: Option<Vec<ValidatorTransaction>>) -> Arc<Block> {
+        let qc = certificate_for_genesis();
+        let block_data = match vtxns {
+            Some(vtxns) => BlockData::new_proposal_ext(
+                vtxns,
+                Payload::empty(false),
+                AccountAddress::random(),
+                Vec::new(),
+                1,
+                1,
+                qc,
+            ),
+            None => BlockData::new_proposal(
+                Payload::empty(false),
+                AccountAddress::random(),
+                Vec::new(),
+                1,
+                1,
+                qc,
+            ),
+        };
+        let id = block_data.hash();
+        Arc::new(Block::new_for_testing(id, block_data, None))
+    }
+
+    fn dkg_vtxn() -> ValidatorTransaction {
+        ValidatorTransaction::dummy(b"dkg".to_vec())
+    }
+
+    fn chunky_dkg_vtxn() -> ValidatorTransaction {
+        ValidatorTransaction::ChunkyDKGResult(CertifiedChunkyDKGOutput {
+            certified_transcript: CertifiedAggregatedChunkySubtranscript {
+                metadata: DKGTranscriptMetadata {
+                    epoch: 0,
+                    author: AccountAddress::ZERO,
+                },
+                transcript_bytes: vec![],
+                signature: AggregateSignature::empty(),
+            },
+            encryption_key: vec![],
+        })
+    }
+
+    fn jwk_vtxn() -> ValidatorTransaction {
+        ValidatorTransaction::ObservedJWKUpdate(QuorumCertifiedUpdate::dummy())
+    }
+
+    fn materialize_ok(txns: Vec<SignedTransaction>) -> TaskFuture<MaterializeResult> {
+        async move { Ok((txns, None, None)) }.boxed().shared()
+    }
+
+    fn materialize_err() -> TaskFuture<MaterializeResult> {
+        async {
+            Err(TaskError::InternalError(Arc::new(anyhow!(
+                "materialize failed"
+            ))))
+        }
+        .boxed()
+        .shared()
+    }
+
+    fn assert_failed_with(txn: &SignedTransaction, expected: &DecryptionFailureReason) {
+        match txn
+            .payload()
+            .as_encrypted_payload()
+            .expect("must be encrypted payload")
+        {
+            EncryptedPayload::FailedDecryption { reason, .. } => assert_eq!(reason, expected),
+            other => panic!("expected FailedDecryption, got {:?}", other),
+        }
+    }
+
+    // ---------- Helper functions and metrics ----------
+
+    #[test]
+    fn block_has_epoch_end_vtxn_returns_true_for_dkg_result() {
+        let block = make_block(Some(vec![dkg_vtxn()]));
+        assert!(block_has_epoch_end_vtxn(&block));
+    }
+
+    #[test]
+    fn block_has_epoch_end_vtxn_returns_true_for_chunky_dkg_result() {
+        let block = make_block(Some(vec![chunky_dkg_vtxn()]));
+        assert!(block_has_epoch_end_vtxn(&block));
+    }
+
+    #[test]
+    fn block_has_epoch_end_vtxn_returns_false_for_jwk_update_only() {
+        let block = make_block(Some(vec![jwk_vtxn()]));
+        assert!(!block_has_epoch_end_vtxn(&block));
+    }
+
+    #[test]
+    fn block_has_epoch_end_vtxn_returns_false_for_no_vtxns() {
+        let block = make_block(None);
+        assert!(!block_has_epoch_end_vtxn(&block));
+    }
+
+    #[test]
+    fn block_has_epoch_end_vtxn_returns_false_for_empty_vtxns() {
+        let block = make_block(Some(vec![]));
+        assert!(!block_has_epoch_end_vtxn(&block));
+    }
+
+    #[test]
+    fn block_has_epoch_end_vtxn_returns_true_for_mixed() {
+        let block = make_block(Some(vec![jwk_vtxn(), dkg_vtxn()]));
+        assert!(block_has_epoch_end_vtxn(&block));
+    }
+
+    #[test]
+    fn mark_txn_failed_decryption_transitions_state() {
+        let txn = make_encrypted_txn();
+        let proof = EvalProof::random();
+        let marked = mark_txn_failed_decryption(
+            txn,
+            Some(proof.clone()),
+            DecryptionFailureReason::CryptoFailure,
+        );
+        match marked
+            .payload()
+            .as_encrypted_payload()
+            .expect("must be encrypted")
+        {
+            EncryptedPayload::FailedDecryption {
+                eval_proof, reason, ..
+            } => {
+                assert_eq!(*reason, DecryptionFailureReason::CryptoFailure);
+                assert_eq!(eval_proof.as_ref(), Some(&proof));
+            },
+            other => panic!("expected FailedDecryption, got {:?}", other),
+        }
+    }
+
+    #[test]
+    fn mark_txns_failed_decryption_marks_all() {
+        let txns: Vec<_> = (0..3).map(|_| make_encrypted_txn()).collect();
+        let marked = mark_txns_failed_decryption(txns, DecryptionFailureReason::EpochEndRetry);
+        assert_eq!(marked.len(), 3);
+        for txn in &marked {
+            assert_failed_with(txn, &DecryptionFailureReason::EpochEndRetry);
+            // No eval_proof when bulk-marking before crypto.
+            match txn.payload().as_encrypted_payload().unwrap() {
+                EncryptedPayload::FailedDecryption { eval_proof, .. } => {
+                    assert!(eval_proof.is_none());
+                },
+                _ => unreachable!(),
+            }
+        }
+    }
+
+    #[test]
+    fn record_decryption_metrics_counts_every_variant_exhaustively() {
+        // Snapshot every label so we can assert deltas (the counter is global).
+        let labels = [
+            "decrypted",
+            "failed_decryption",
+            "config_unavailable",
+            "key_unavailable",
+            "batch_limit_exceeded",
+            "payload_hash_mismatch",
+            "epoch_mismatch",
+            "epoch_end_retry",
+            "entry_fun_mismatch",
+            "unencrypted",
+        ];
+        let before: Vec<u64> = labels
+            .iter()
+            .map(|l| {
+                counters::DECRYPTION_PIPELINE_TXNS_COUNT
+                    .with_label_values(&[l])
+                    .get()
+            })
+            .collect();
+
+        // One txn per FailedDecryption variant + one Decrypted + two regular.
+        let result = DecryptionResult {
+            decrypted_txns: vec![
+                make_decrypted_txn(),
+                make_failed_decryption_txn(DecryptionFailureReason::CryptoFailure),
+                make_failed_decryption_txn(DecryptionFailureReason::BatchLimitReached),
+                make_failed_decryption_txn(DecryptionFailureReason::ConfigUnavailable),
+                make_failed_decryption_txn(DecryptionFailureReason::DecryptionKeyUnavailable),
+                make_failed_decryption_txn(DecryptionFailureReason::PayloadHashMismatch),
+                make_failed_decryption_txn(DecryptionFailureReason::EpochMismatch),
+                make_failed_decryption_txn(DecryptionFailureReason::EpochEndRetry),
+                make_failed_decryption_txn(DecryptionFailureReason::ClaimedEntryFunctionMismatch),
+            ],
+            regular_txns: vec![make_regular_txn(), make_regular_txn()],
+            max_txns_from_block_to_execute: None,
+            block_gas_limit: None,
+            decryption_key: Some(None),
+        };
+        record_decryption_metrics(&result);
+
+        let after: Vec<u64> = labels
+            .iter()
+            .map(|l| {
+                counters::DECRYPTION_PIPELINE_TXNS_COUNT
+                    .with_label_values(&[l])
+                    .get()
+            })
+            .collect();
+        let deltas: Vec<u64> = before
+            .iter()
+            .zip(after.iter())
+            .map(|(b, a)| a - b)
+            .collect();
+        let expected = [1, 1, 1, 1, 1, 1, 1, 1, 1, 2];
+        assert_eq!(deltas, expected, "labels: {:?}", labels);
+    }
+
+    // ---------- decrypt_encrypted_txns_inner routing ----------
+
+    #[tokio::test]
+    async fn routing_disabled_marks_config_unavailable() {
+        let encrypted = vec![make_encrypted_txn(), make_encrypted_txn()];
+        let regular = vec![make_regular_txn()];
+        let mut input = encrypted.clone();
+        input.extend(regular.clone());
+
+        let (key_share_tx, key_share_rx) = oneshot::channel();
+        let (_skey_tx, skey_rx) = oneshot::channel();
+
+        let result = PipelineBuilder::decrypt_encrypted_txns_inner(
+            materialize_ok(input),
+            make_block(None),
+            AccountAddress::random(),
+            false, // is_decryption_enabled
+            None,
+            key_share_tx,
+            skey_rx,
+            false,
+            None,
+        )
+        .await
+        .expect("should succeed");
+
+        assert_eq!(result.decrypted_txns.len(), 2);
+        for txn in &result.decrypted_txns {
+            assert_failed_with(txn, &DecryptionFailureReason::ConfigUnavailable);
+        }
+        assert_eq!(result.regular_txns.len(), 1);
+        assert_eq!(result.decryption_key, None);
+        assert!(key_share_rx.await.unwrap().is_none());
+    }
+
+    #[tokio::test]
+    async fn routing_no_config_no_observer_marks_config_unavailable() {
+        let encrypted = vec![make_encrypted_txn()];
+        let regular = vec![make_regular_txn()];
+        let mut input = encrypted.clone();
+        input.extend(regular.clone());
+
+        let (key_share_tx, key_share_rx) = oneshot::channel();
+        let (_skey_tx, skey_rx) = oneshot::channel();
+
+        let result = PipelineBuilder::decrypt_encrypted_txns_inner(
+            materialize_ok(input),
+            make_block(None),
+            AccountAddress::random(),
+            true,
+            None, // maybe_secret_share_config
+            key_share_tx,
+            skey_rx,
+            false, // observer_enabled
+            None,
+        )
+        .await
+        .expect("should succeed");
+
+        assert_eq!(result.decrypted_txns.len(), 1);
+        assert_failed_with(
+            &result.decrypted_txns[0],
+            &DecryptionFailureReason::ConfigUnavailable,
+        );
+        assert_eq!(result.regular_txns.len(), 1);
+        assert_eq!(result.decryption_key, Some(None));
+        assert!(key_share_rx.await.unwrap().is_none());
+    }
+
+    #[tokio::test]
+    async fn routing_no_config_with_observer_uses_observer_path() {
+        // Observer path: encrypted txns are NOT marked here (the observer
+        // consumes pre-decrypted txns provided by the validator).
+        let encrypted = vec![make_encrypted_txn()];
+        let observer_decrypted = vec![make_decrypted_txn()];
+        let mut input = encrypted.clone();
+        input.push(make_regular_txn());
+
+        let (key_share_tx, _key_share_rx) = oneshot::channel();
+        let (skey_tx, skey_rx) = oneshot::channel();
+        skey_tx.send(None).unwrap();
+
+        let result = PipelineBuilder::decrypt_encrypted_txns_inner(
+            materialize_ok(input),
+            make_block(None),
+            AccountAddress::random(),
+            true,
+            None,
+            key_share_tx,
+            skey_rx,
+            true, // observer_enabled
+            Some(observer_decrypted.clone()),
+        )
+        .await
+        .expect("should succeed");
+
+        // Observer-path output: decrypted_txns mirror the provided observer txns
+        // (Decrypted state, not FailedDecryption).
+        assert_eq!(result.decrypted_txns.len(), 1);
+        assert!(matches!(
+            result.decrypted_txns[0]
+                .payload()
+                .as_encrypted_payload()
+                .unwrap(),
+            EncryptedPayload::Decrypted { .. }
+        ));
+        assert_eq!(result.decryption_key, Some(None));
+    }
+
+    #[tokio::test]
+    async fn routing_propagates_materialize_fut_error() {
+        let (key_share_tx, _key_share_rx) = oneshot::channel();
+        let (_skey_tx, skey_rx) = oneshot::channel();
+
+        let err = PipelineBuilder::decrypt_encrypted_txns_inner(
+            materialize_err(),
+            make_block(None),
+            AccountAddress::random(),
+            true,
+            None,
+            key_share_tx,
+            skey_rx,
+            false,
+            None,
+        )
+        .await
+        .expect_err("should propagate error");
+
+        assert!(format!("{}", err).contains("materialize failed"));
+    }
+
+    // ---------- decrypt_observer_path ----------
+
+    #[tokio::test]
+    async fn observer_with_key_and_decrypted_txns_passes_through() {
+        let ctx = TestContext::new(vec![100]);
+        let metadata = crate::rand::secret_sharing::test_utils::create_metadata(1, 1);
+        let key =
+            crate::rand::secret_sharing::test_utils::create_secret_shared_key(&ctx, &metadata);
+
+        let regular = vec![make_regular_txn()];
+        let observer_decrypted = vec![make_decrypted_txn(), make_decrypted_txn()];
+
+        let (skey_tx, skey_rx) = oneshot::channel();
+        skey_tx.send(Some(key)).unwrap();
+
+        let result = decrypt_observer_path(
+            vec![],
+            regular.clone(),
+            skey_rx,
+            Some(observer_decrypted.clone()),
+            None,
+            None,
+        )
+        .await
+        .expect("should succeed");
+
+        assert_eq!(result.decrypted_txns.len(), 2);
+        assert!(matches!(result.decryption_key, Some(Some(_))));
+        assert_eq!(result.regular_txns.len(), 1);
+    }
+
+    #[tokio::test]
+    async fn observer_with_no_key_but_decrypted_txns_returns_some_none() {
+        let observer_decrypted = vec![make_decrypted_txn()];
+        let (skey_tx, skey_rx) = oneshot::channel();
+        skey_tx.send(None).unwrap();
+
+        let result = decrypt_observer_path(
+            vec![],
+            vec![],
+            skey_rx,
+            Some(observer_decrypted.clone()),
+            None,
+            None,
+        )
+        .await
+        .expect("should succeed");
+
+        assert_eq!(result.decrypted_txns.len(), 1);
+        assert_eq!(result.decryption_key, Some(None));
+    }
+
+    #[tokio::test]
+    async fn observer_with_no_key_no_txns_returns_empty() {
+        let (skey_tx, skey_rx) = oneshot::channel();
+        skey_tx.send(None).unwrap();
+
+        let result = decrypt_observer_path(vec![], vec![], skey_rx, None, None, None)
+            .await
+            .expect("should succeed");
+
+        assert!(result.decrypted_txns.is_empty());
+        assert_eq!(result.decryption_key, Some(None));
+    }
+
+    #[tokio::test]
+    async fn observer_with_dropped_rx_returns_error() {
+        let (skey_tx, skey_rx) = oneshot::channel::<Option<SecretSharedKey>>();
+        drop(skey_tx);
+
+        let err = decrypt_observer_path(vec![], vec![], skey_rx, None, None, None)
+            .await
+            .expect_err("should error");
+        assert!(format!("{}", err).contains("secret_shared_key_rx dropped"));
+    }
+
+    #[tokio::test]
+    async fn observer_preserves_regular_txns() {
+        let regular = vec![make_regular_txn(), make_regular_txn(), make_regular_txn()];
+        let (skey_tx, skey_rx) = oneshot::channel();
+        skey_tx.send(None).unwrap();
+
+        let result = decrypt_observer_path(vec![], regular.clone(), skey_rx, None, None, None)
+            .await
+            .expect("should succeed");
+
+        assert_eq!(result.regular_txns.len(), regular.len());
+    }
+
+    // ---------- decrypt_validator_path (pre-crypto branches) ----------
+
+    #[tokio::test]
+    async fn validator_path_empty_encrypted_txns_short_circuits() {
+        let ctx = TestContext::new(vec![100]);
+        let block = make_block(None);
+        let regular = vec![make_regular_txn()];
+
+        let (key_share_tx, key_share_rx) = oneshot::channel();
+        let (_skey_tx, skey_rx) = oneshot::channel();
+
+        let result = decrypt_validator_path(
+            vec![], // empty encrypted_txns
+            regular.clone(),
+            &block,
+            ctx.authors[0],
+            &ctx.secret_share_config,
+            key_share_tx,
+            skey_rx,
+            None,
+            None,
+        )
+        .await
+        .expect("should succeed");
+
+        assert!(result.decrypted_txns.is_empty());
+        assert_eq!(result.regular_txns.len(), 1);
+        assert_eq!(result.decryption_key, Some(None));
+        assert!(key_share_rx.await.unwrap().is_none());
+    }
+
+    #[tokio::test]
+    async fn validator_path_dkg_result_vtxn_marks_all_epoch_end_retry() {
+        let ctx = TestContext::new(vec![100]);
+        let block = make_block(Some(vec![dkg_vtxn()]));
+        let encrypted = vec![make_encrypted_txn(), make_encrypted_txn()];
+        let regular = vec![make_regular_txn()];
+
+        let (key_share_tx, key_share_rx) = oneshot::channel();
+        let (_skey_tx, skey_rx) = oneshot::channel();
+
+        let result = decrypt_validator_path(
+            encrypted.clone(),
+            regular.clone(),
+            &block,
+            ctx.authors[0],
+            &ctx.secret_share_config,
+            key_share_tx,
+            skey_rx,
+            None,
+            None,
+        )
+        .await
+        .expect("should succeed");
+
+        assert_eq!(result.decrypted_txns.len(), 2);
+        for txn in &result.decrypted_txns {
+            assert_failed_with(txn, &DecryptionFailureReason::EpochEndRetry);
+        }
+        assert_eq!(result.regular_txns.len(), 1);
+        assert_eq!(result.decryption_key, Some(None));
+        assert!(key_share_rx.await.unwrap().is_none());
+    }
+
+    #[tokio::test]
+    async fn validator_path_chunky_dkg_result_vtxn_marks_all_epoch_end_retry() {
+        let ctx = TestContext::new(vec![100]);
+        let block = make_block(Some(vec![chunky_dkg_vtxn()]));
+        let encrypted = vec![make_encrypted_txn()];
+
+        let (key_share_tx, key_share_rx) = oneshot::channel();
+        let (_skey_tx, skey_rx) = oneshot::channel();
+
+        let result = decrypt_validator_path(
+            encrypted,
+            vec![],
+            &block,
+            ctx.authors[0],
+            &ctx.secret_share_config,
+            key_share_tx,
+            skey_rx,
+            None,
+            None,
+        )
+        .await
+        .expect("should succeed");
+
+        assert_eq!(result.decrypted_txns.len(), 1);
+        assert_failed_with(
+            &result.decrypted_txns[0],
+            &DecryptionFailureReason::EpochEndRetry,
+        );
+        assert_eq!(result.decryption_key, Some(None));
+        assert!(key_share_rx.await.unwrap().is_none());
+    }
+}
