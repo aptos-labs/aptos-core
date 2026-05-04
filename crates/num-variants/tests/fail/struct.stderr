@@ -1,0 +1,5 @@
+error: #[derive(NumVariants)] can only be used on an enum
+ --> tests/fail/struct.rs:4:1
+  |
+4 | struct NotEnum {
+  | ^^^^^^

@@ -1,0 +1,5 @@
+error: #[derive(NumVariants)] can only be used on an enum
+ --> tests/fail/union.rs:4:1
+  |
+4 | union MyUnion {
+  | ^^^^^
