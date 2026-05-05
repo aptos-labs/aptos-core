@@ -4,7 +4,7 @@
 use crate::{
     db_access::DbAccessUtil,
     native::{
-        native_config::{NativeConfig, NATIVE_EXECUTOR_POOL},
+        native_config::NativeConfig,
         native_transaction::{compute_deltas_for_batch, NativeTransaction},
     },
 };
@@ -64,7 +64,7 @@ use move_core_types::{
 };
 use move_vm_types::delayed_values::delayed_field_id::DelayedFieldID;
 use serde::{de::DeserializeOwned, Serialize};
-use std::{collections::BTreeMap, fmt::Debug, sync::Arc};
+use std::{collections::BTreeMap, fmt::Debug};
 
 pub struct NativeVMBlockExecutor;
 
@@ -86,12 +86,11 @@ impl VMBlockExecutor for NativeVMBlockExecutor {
         onchain_config: BlockExecutorConfigFromOnchain,
         transaction_slice_metadata: TransactionSliceMetadata,
     ) -> Result<BlockOutput<SignatureVerifiedTransaction, TransactionOutput>, VMStatus> {
-        AptosBlockExecutorWrapper::<NativeVMExecutorTask>::execute_block_on_thread_pool::<
+        AptosBlockExecutorWrapper::<NativeVMExecutorTask>::execute_block::<
             _,
             NoOpTransactionCommitHook<VMStatus>,
             _,
         >(
-            Arc::clone(&NATIVE_EXECUTOR_POOL),
             txn_provider,
             state_view,
             &AptosModuleCacheManager::new(),
