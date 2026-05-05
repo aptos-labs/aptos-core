@@ -843,31 +843,33 @@ impl TransactionStore {
         sender_bucket: MempoolSenderBucket,
         start_end_pairs: HashMap<TimelineIndexIdentifier, (u64, u64)>,
     ) -> Vec<(SignedTransaction, u64)> {
-        self.timeline_index
-            .get(&sender_bucket)
-            .unwrap_or_else(|| {
-                panic!(
+        match self.timeline_index.get(&sender_bucket) {
+            None => {
+                error!(
                     "Unable to get the timeline index for the sender bucket {}",
                     sender_bucket
-                )
-            })
-            .timeline_range(start_end_pairs)
-            .iter()
-            .filter_map(|(account, replay_protector)| {
-                self.transactions
-                    .get(account)
-                    .and_then(|txns| txns.get(replay_protector))
-                    .map(|txn| {
-                        (
-                            txn.txn.clone(),
-                            aptos_infallible::duration_since_epoch_at(
-                                &txn.insertion_info.ready_time,
+                );
+                Vec::new()
+            },
+            Some(index) => index
+                .timeline_range(start_end_pairs)
+                .iter()
+                .filter_map(|(account, replay_protector)| {
+                    self.transactions
+                        .get(account)
+                        .and_then(|txns| txns.get(replay_protector))
+                        .map(|txn| {
+                            (
+                                txn.txn.clone(),
+                                aptos_infallible::duration_since_epoch_at(
+                                    &txn.insertion_info.ready_time,
+                                )
+                                .as_millis() as u64,
                             )
-                            .as_millis() as u64,
-                        )
-                    })
-            })
-            .collect()
+                        })
+                })
+                .collect(),
+        }
     }
 
     /// If the oldest transaction (that never entered parking lot) is larger than
