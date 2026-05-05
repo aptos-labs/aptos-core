@@ -9,7 +9,6 @@ error: function does not abort under this condition
     =         addr = <redacted>
     =     at tests/sources/functional/state_labels/frame_conditions.move:149: test_aborts_of_wrong
     =         result = <redacted>
-    =     at tests/sources/functional/state_labels/frame_conditions.move:153: test_aborts_of_wrong
     =     at tests/sources/functional/state_labels/frame_conditions.move:155: test_aborts_of_wrong (spec)
 
 error: post-condition does not hold
@@ -22,5 +21,4 @@ error: post-condition does not hold
     =         addr = <redacted>
     =     at tests/sources/functional/state_labels/frame_conditions.move:164: test_reads_frame_wrong_result
     =         result = <redacted>
-    =     at tests/sources/functional/state_labels/frame_conditions.move:168: test_reads_frame_wrong_result
     =     at tests/sources/functional/state_labels/frame_conditions.move:171: test_reads_frame_wrong_result (spec)

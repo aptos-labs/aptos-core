@@ -1,0 +1,82 @@
+\Section{Discussion and Conclusion}
+\label{sec:conclusion}
+
+\SubSection{Evaluation}
+
+We have applied the combined inference approach to a number of examples throughout the basic Move libraries, covering scenarios such as loops, higher-order functions, arithmetic, state-dependent algorithms, and more.
+While the \WP algorithm is stable and well-tested, the definition of skills and instructions seems to be an ever-moving target.
+
+\Paragraph{Ordering of Inference Tasks}
+Currently the agent is instructed to walk in a fixed order through the inference tasks of loop invariants, \WP analysis, simplification, and verification.
+This order was determined by experimentation. In one experiment, we first run WP analysis to fix some basic specs, then let the model infer invariants, and then again run WP.
+The vacuous specifications resulting from this in the first run appeared to be not helpful, and confused the model diverging in unfavourable chains of thoughts.
+
+However, we believe that as workflows as described here become more common and foundation models have them ingested, we should leave the ordering to the planning abilities of the model, and not implement heuristics on top of heuristics.
+Technically, by having each of the individual steps transactional in nature, the agent can execute them in any chosen order.
+
+\Paragraph{Effectiveness of the Hybrid Approach}
+One interesting conceptual question is to what extent the \WP-generated specs, which are known to be mechanically correct, are actually used by the agent as a baseline for its own spec generation.
+This comes up in our workflow at the `Simplify inferred specs' task, where the agent works on the combination of loop invariants it generated earlier and the subsequently \WP-generated specs.
+At this stage, the agent may still make significant changes to the specs.
+Is \WP generation potentially unnecessary --- could we just let the agent do all the work?
+Such an approach would bring us closer to earlier work such as~\cite{PeiEtAl23, KamathEtAl23, MSG25}. At this point we do not have enough data to answer this question conclusively, though we do observe that with the \WP baseline in place the agent rarely suggests outright wrong specifications.
+
+
+\Paragraph{Skill Design}
+Writing effective skills can be considered a bit of a `black art'. A few lessons have emerged.
+
+\begin{Itemize}
+\item \emph{Minimize context.}
+The skill should carry only the information the agent needs to perform inference --- not a tour of the Move ecosystem.
+We have repeatedly found that extra background dilutes attention, lengthens the working context, and gives the agent opportunities to diverge from the task.
+
+\item \emph{Task first, then supporting material bottom-up.}
+The skill opens with a concise statement of what to do --- the task list described in Sec.~\ref{sec:skills} --- with forward references to the rules and reference material that follow.
+The body is then ordered bottom-up: spec-language reference first, then tool documentation, then the domain-specific guidelines, so that by the time the agent revisits the task list every term in it has already been introduced. In our experience, if the reference material is organized top-down, the agent tends to start drawing conclusions and acting on them before having read all the relevant information.
+
+\item \emph{Restate the prohibitions.}
+Agents have a tendency to take shortcuts while searching for the shortest path to a solution.
+The agent will often attempt to bypass a hard verification problem by weakening a condition --- silencing an abort case, narrowing a postcondition --- so that the prover reports success.
+We therefore restate the prohibition on this kind of move at every relevant point in the skill text.
+Even so, \CC can occasionally still be caught taking the shortcut, which is why the user-visible task tracker and the verification oracle remain the last line of defense.
+\end{Itemize}
+
+A major problem in implementing the skill system is that there is no good way to automate testing of it: the agent's choices are non-deterministic, and coding-agent usage is metered, which makes it hard to integrate such tests into continuous integration. The best chance we have to stabilize our implementation is extended manual application. We currently have a project under way that re-specifies larger parts of the Move and Aptos frameworks; continuous human feedback from this activity flows into the evolution of the plugin.
+
+
+\SubSection{Related Work}
+
+Specification inference has a long history.
+Daikon~\cite{DaikonTSE01} pioneered \emph{dynamic} invariant detection, learning likely invariants from program traces; subsequent work explored static inference, abstract interpretation, and template-based synthesis, but no unified approach has emerged --- tools have relied on heuristics tuned to particular property classes and source languages.
+
+The advent of large language models has revived interest in the area.
+Pei et al.~\cite{PeiEtAl23} showed that fine-tuned LLMs can predict program invariants statically at quality competitive with dynamic analysis.
+Kamath et al.~\cite{KamathEtAl23} pair an LLM that \emph{proposes} loop invariants with a symbolic checker that \emph{validates} them, retrying on failure --- a propose-and-validate loop that recurs in much of the subsequent work.
+For Verus, AlphaVerus and VeriStruct~\cite{VeriStruct26} synthesize Verus-style specifications (and proofs) for Rust functions, modules, and data structures, using fine-tuned LLMs, tree search, or planner-orchestrated phases.
+For smart contracts in Solidity, PropertyGPT~\cite{PropertyGPT25} retrieves human-written Certora properties as input examples for specification generation.
+Most directly related to our work, MSG~\cite{MSG25} targets the same Move specification language through a skill-based agentic design that ingests verifier feedback beyond a binary success/failure verdict.
+Unlike the hybrid approach we pursue, MSG leaves all specification generation to the LLM; it does not exploit that --- once loop invariants are in place --- weakest-precondition computation is mechanical and well-defined, and yields a substantial fragment of the specification (abort conditions, modifies clauses, consequence-style postconditions) at essentially no token cost and with full precision.
+Across these systems the LLM remains responsible for the entire specification; the verifier serves either as a binary oracle or, in MSG and in our setup, as a feedback channel, but in no case as a contributor of mechanically derived content.
+
+A separate but related thread, exemplified by DafnyPro~\cite{DafnyPro26} and AutoVerus~\cite{AutoVerus25}, tackles the complementary problem of synthesizing the auxiliary proof annotations a verifier needs when the specification is already given. Our plugin can also synthesize proof hints, as illustrated for exponentiation in Sec.~\ref{sec:pow}, but that is not the primary subject of this paper.
+
+Reference elimination, the bytecode transformation underlying our \WP analysis (Sec.~\ref{sec:wp}), was first introduced in our 2022 paper~\cite{DillGPQXZ22} and is conceptually shared with Aeneas~\cite{Aeneas}, which compiles Rust to a pure functional model in a target prover (Lean, F*, Coq, HOL4) via forward and backward functions.
+Aeneas notably does \emph{not} infer specifications: the user writes them in the target prover, against the translated functional model.
+
+Two aspects distinguish our setup from the work above.
+First, to our knowledge, no prior LLM-based spec-inference system uses a sound mechanical baseline alongside the LLM.
+\WP itself produces a substantial part of the inferred specification --- abort conditions, modifies clauses, and consequence-style postconditions --- so the AI is left only with what \WP cannot recover (loop invariants, high-level conservation laws), and the two streams are validated together by the Move Prover.
+The AI side runs a propose-observe-refine loop similar to the systems above; what differs is that the mechanical baseline narrows its target.
+Second, the workflow is delivered through a general-purpose coding agent (Claude Code) via skills, edit-time hooks, and an MCP server, rather than as a custom-built research tool: the agent participates in the loop and the user can intervene at any point.
+To our knowledge, this kind of coding-agent integration has not appeared in prior LLM-based inference systems for verification languages either, including those --- like MSG --- that are themselves agentic in design.
+
+\SubSection{Conclusion}
+
+We have presented early work on a specification inference tool for the Move Prover that combines a sound, mechanical \WP analysis over Move bytecode with an agentic coding CLI, with the prover serving as the oracle for both signals.
+The two inference streams compose in a single instrumentation pipeline, and the workflow is delivered as a Claude Code plugin --- skills, hooks, and an MCP server --- so that inference runs inside the same conversational loop in which the user is already writing Move.
+The system has been applied to a corpus of canonical Move libraries spanning loops, higher-order functions, arithmetic, references, and global state. Future work will include stabilizing and refining the tool via application to the large corpus of safety relevant Move code used at Aptos for applications like perpetual trading and onchain money management.
+
+%%% Local Variables:
+%%% mode: latex
+%%% TeX-master: "main"
+%%% End:

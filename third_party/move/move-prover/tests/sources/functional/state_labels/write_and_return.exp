@@ -9,7 +9,6 @@ error: post-condition does not hold
    =         addr = <redacted>
    =     at tests/sources/functional/state_labels/write_and_return.move:80: test_write_return_wrong
    =         result = <redacted>
-   =     at tests/sources/functional/state_labels/write_and_return.move:85: test_write_return_wrong
    =     at tests/sources/functional/state_labels/write_and_return.move:88: test_write_return_wrong (spec)
 
 error: post-condition does not hold
@@ -22,7 +21,6 @@ error: post-condition does not hold
     =         addr = <redacted>
     =     at tests/sources/functional/state_labels/write_and_return.move:115: test_incr_return_wrong
     =         result = <redacted>
-    =     at tests/sources/functional/state_labels/write_and_return.move:122: test_incr_return_wrong
     =     at tests/sources/functional/state_labels/write_and_return.move:124: test_incr_return_wrong (spec)
     =     at tests/sources/functional/state_labels/write_and_return.move:125: test_incr_return_wrong (spec)
     =     at tests/sources/functional/state_labels/write_and_return.move:126: test_incr_return_wrong (spec)

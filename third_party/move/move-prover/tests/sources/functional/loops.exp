@@ -82,6 +82,7 @@ error: induction case of the loop invariant does not hold
     =     at tests/sources/functional/loops.move:147: nested_loop_inner_invariant_incorrect
     =     at tests/sources/functional/loops.move:150: nested_loop_inner_invariant_incorrect
     =         y = <redacted>
+    =     at tests/sources/functional/loops.move:143: nested_loop_inner_invariant_incorrect
     =     at tests/sources/functional/loops.move:145: nested_loop_inner_invariant_incorrect
 
 error: induction case of the loop invariant does not hold

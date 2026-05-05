@@ -10,6 +10,7 @@ pub mod loop_analysis;
 pub mod memory_instrumentation;
 pub mod mono_analysis;
 pub mod mut_ref_instrumentation;
+pub mod normalize_exits;
 pub mod number_operation;
 pub mod number_operation_analysis;
 pub mod options;

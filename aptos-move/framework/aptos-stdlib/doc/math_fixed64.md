@@ -69,9 +69,13 @@ Square root of fixed point number
 
 <pre><code><b>public</b> <b>fun</b> <a href="math_fixed64.md#0x1_math_fixed64_sqrt">sqrt</a>(x: FixedPoint64): FixedPoint64 {
     <b>let</b> y = x.get_raw_value();
-    <b>let</b> z = (<a href="math128.md#0x1_math128_sqrt">math128::sqrt</a>(y) &lt;&lt; 32 <b>as</b> u256);
-    z = (z + ((y <b>as</b> u256) &lt;&lt; 64) / z) &gt;&gt; 1;
-    <a href="fixed_point64.md#0x1_fixed_point64_create_from_raw_value">fixed_point64::create_from_raw_value</a>((z <b>as</b> u128))
+    <b>if</b> (y == 0) {
+        <a href="fixed_point64.md#0x1_fixed_point64_create_from_raw_value">fixed_point64::create_from_raw_value</a>(0)
+    } <b>else</b> {
+        <b>let</b> z = (<a href="math128.md#0x1_math128_sqrt">math128::sqrt</a>(y) &lt;&lt; 32 <b>as</b> u256);
+        z = (z + ((y <b>as</b> u256) &lt;&lt; 64) / z) &gt;&gt; 1;
+        <a href="fixed_point64.md#0x1_fixed_point64_create_from_raw_value">fixed_point64::create_from_raw_value</a>((z <b>as</b> u128))
+    }
 }
 </code></pre>
 
@@ -306,11 +310,9 @@ Specialized function for x * y / z that omits intermediate shifting
 </code></pre>
 
 
-<code>sqrt</code> aborts when the input is zero (math128::sqrt(0)==0 causes division by zero in the Newton step).
-No loop in the body (single Newton refinement step), so callers can inline without havocing.
 
 
-<pre><code><b>aborts_if</b> x.get_raw_value() == 0;
+<pre><code><b>aborts_if</b> [abstract] <b>false</b>;
 </code></pre>
 
 

@@ -1364,6 +1364,40 @@ fn is_well_formed_prop(exp: &Exp) -> bool {
     }
 }
 
+/// Returns true if `exp` is statically `false` on the normal‑return path
+/// because of a verification‑only abort marker (`AbortFlag()` itself, or
+/// `aborts_of<f>(args)` — both are `false` whenever the caller is on the
+/// normal‑return path). When the cond is false on that path,
+/// `cond ==> Q` simplifies to `true`, so wrapping `Q` with such a cond
+/// adds only a vacuous antecedent. The corresponding `aborts_if` clauses
+/// already capture the same fact via `post = aborts ∨ ensures`.
+///
+/// Detection is structural: the cond is a marker by itself, or a
+/// conjunction with at least one marker as a (possibly nested) conjunct.
+/// A marker buried in a *disjunction* (e.g. `P || AbortFlag()`) does
+/// **not** make the cond false — `P || false == P` — so we must keep the
+/// wrapping in that case.
+fn cond_is_false_on_normal_return(exp: &Exp) -> bool {
+    use move_model::ast::BehaviorKind;
+    fn is_marker(e: &ExpData) -> bool {
+        matches!(
+            e,
+            ExpData::Call(_, AstOp::AbortFlag, _)
+                | ExpData::Call(_, AstOp::Behavior(BehaviorKind::AbortsOf, _), _)
+        )
+    }
+    fn check(e: &ExpData) -> bool {
+        if is_marker(e) {
+            return true;
+        }
+        if let ExpData::Call(_, AstOp::And, args) = e {
+            return args.iter().any(|a| check(a.as_ref()));
+        }
+        false
+    }
+    check(exp.as_ref())
+}
+
 /// An entity determined by an ensures clause: either a temporary or a global expression.
 #[derive(Debug)]
 enum DeterminedEntity {
@@ -1757,6 +1791,20 @@ fn rename_quant_vars_in_exp(env: &GlobalEnv, reserved: &BTreeSet<String>, exp: &
                 .filter(|s| !bound_syms.contains(s))
                 .map(|s| s.display(pool).to_string())
                 .collect();
+            // Also collect names of variables bound by nested quantifiers in the
+            // body. The recursive call has already renamed those, so they appear
+            // only as bound symbols (not in free_vars). Picking the same name for
+            // this quantifier would capture them.
+            body.as_ref().visit_post_order(&mut |e| {
+                if let ExpData::Quant(_, _, inner_ranges, _, _, _) = e {
+                    for (pat, _) in inner_ranges {
+                        if let Pattern::Var(_, sym) = pat {
+                            used_names.insert(sym.display(pool).to_string());
+                        }
+                    }
+                }
+                true
+            });
             // Also avoid reserved names (function parameters/locals)
             used_names.extend(reserved.iter().cloned());
 
@@ -2081,13 +2129,24 @@ impl<'env> TransferFunctions for SpecInferenceAnalyzer<'env> {
 
                     // Direct function call
                     Operation::Function(module_id, fun_id, type_inst) => {
-                        // Check if the callee has an associated pure spec function.
-                        // If so, substitute with a SpecFunction call for the result,
-                        // but still generate aborts_of for abort conditions.
-                        if dests.len() == 1
+                        // Vector bytecode-instruction natives (and
+                        // singleton/contains) get their WP applied directly
+                        // via substitution, so no BP over a vector op appears
+                        // in the inferred spec. Checked before the pure path
+                        // so the rewrite wins for both pure (e.g., `borrow`)
+                        // and mutating (e.g., `swap`) vector callees.
+                        if self.try_wp_vector_intrinsic_call(
+                            state, offset, *module_id, *fun_id, type_inst, srcs, dests,
+                        ) {
+                            self.add_direct_call_modifies(
+                                state, *module_id, *fun_id, type_inst, srcs,
+                            );
+                        } else if dests.len() == 1
                             && let Some((spec_fun_id, result_type)) =
                                 self.try_as_pure_spec_call(*module_id, *fun_id, type_inst)
                         {
+                            // Pure callee with no `&mut` params: substitute the
+                            // result with a SpecFunction call and emit aborts_of.
                             // WP[dest := f(args)](Q) = Q[dest ↦ spec_f(args)]
                             let args: Vec<Exp> =
                                 srcs.iter().map(|s| self.mk_temporary(*s)).collect();
@@ -2101,10 +2160,8 @@ impl<'env> TransferFunctions for SpecInferenceAnalyzer<'env> {
                                 args.clone(),
                             );
                             *state = self.substitute_exp_state(state, dests[0], &spec_call);
-                            // Mark the spec function as used
                             self.global_env()
                                 .add_used_spec_fun(module_id.qualified(spec_fun_id));
-                            // Still add aborts_of for the callee
                             let (fun_exp, _) = self.mk_closure(
                                 *module_id,
                                 *fun_id,
@@ -2966,12 +3023,21 @@ impl<'env> TransferFunctions for SpecInferenceAnalyzer<'env> {
                         } else {
                             self.replace_global_of_captured_globals_with_freeze(exp, state)
                         };
-                        // ensures: standard WP (P ==> Q)
-                        state.ensures = state
-                            .ensures
-                            .iter()
-                            .map(|e| self.mk_implies(cond.clone(), e.clone()))
-                            .collect();
+                        // ensures: standard WP (P ==> Q), but skip abort‑related
+                        // antecedents. The total Move post‑condition is
+                        // `aborts ∨ ensures`, so when ensures is checked the
+                        // function did not abort — making `AbortFlag()` and
+                        // `aborts_of(…)`‑bearing conditions tautologies on this
+                        // path. Wrapping ensures with such conditions only clutters
+                        // the inferred spec; the corresponding `aborts_if` clauses
+                        // already capture the same information.
+                        if !cond_is_false_on_normal_return(&cond) {
+                            state.ensures = state
+                                .ensures
+                                .iter()
+                                .map(|e| self.mk_implies(cond.clone(), e.clone()))
+                                .collect();
+                        }
                         // aborts: abort requires assumption to hold (P AND C)
                         state.aborts = state
                             .aborts
@@ -3391,6 +3457,90 @@ impl<'env> SpecInferenceAnalyzer<'env> {
         state.post = pre_label;
     }
 
+    /// WP for a `std::vector` bytecode-instruction native (and `singleton`/
+    /// `contains`) — applies the call's spec semantics directly via
+    /// substitution, so no behavioral predicate over the vector intrinsic
+    /// ever appears in inferred specs.
+    ///
+    /// Returns `true` when the callee is a recognized vector intrinsic and
+    /// the WP rewrite was applied; `false` otherwise (caller falls back to
+    /// the generic BP-emission path).
+    fn try_wp_vector_intrinsic_call(
+        &self,
+        state: &mut WPState,
+        offset: CodeOffset,
+        module_id: ModuleId,
+        fun_id: FunId,
+        type_inst: &[Type],
+        srcs: &[TempIndex],
+        dests: &[TempIndex],
+    ) -> bool {
+        let args = self.mk_behavioral_call_args(state, srcs);
+        let mut_ref_srcs: Vec<(usize, TempIndex)> = srcs
+            .iter()
+            .enumerate()
+            .filter(|&(_, &idx)| self.get_local_type(idx).is_mutable_reference())
+            .map(|(i, &idx)| (i, idx))
+            .collect();
+
+        // Tag outputs with the dest temp types (and `&mut` src local types
+        // stripped of references) so the simplifier's type-bound reasoning
+        // matches the dests — e.g. `vector::length` returns `u64`, not the
+        // operator `Len`'s natural `Num` type.
+        let mut output_types: Vec<Type> = dests
+            .iter()
+            .map(|&d| self.get_local_type(d).clone())
+            .collect();
+        for (_, idx) in &mut_ref_srcs {
+            output_types.push(self.get_local_type(*idx).skip_reference().clone());
+        }
+
+        let wp = match move_model::well_known::vector_intrinsic_wp(
+            self.global_env(),
+            self,
+            module_id.qualified(fun_id),
+            type_inst,
+            &args,
+            &output_types,
+        ) {
+            Some(wp) => wp,
+            None => return false,
+        };
+
+        let num_explicit = dests.len();
+
+        let mut all_subs: Vec<(TempIndex, Exp)> = Vec::new();
+        for (i, &dest) in dests.iter().enumerate() {
+            all_subs.push((dest, wp.outputs[i].clone()));
+        }
+        for (j, (_, idx)) in mut_ref_srcs.iter().enumerate() {
+            all_subs.push((*idx, wp.outputs[num_explicit + j].clone()));
+        }
+        *state = self.substitute_multiple_temps_in_state(state, &all_subs);
+
+        // Captured-param tracking for `&mut` params, mirroring
+        // `wp_function_call` but using the vector intrinsic's concrete
+        // post-state expression in place of `result_of<f>(args)[…]`.
+        for (j, (_, idx)) in mut_ref_srcs.iter().enumerate() {
+            if self.is_mut_ref_param(*idx) {
+                let post_exp = wp.outputs[num_explicit + j].clone();
+                if !state.captured_mut_params.contains(idx) {
+                    if state.is_normal_return {
+                        let param_exp = self.mk_temporary(*idx);
+                        state.add_ensures(self.mk_eq(param_exp, post_exp));
+                    }
+                    state.captured_mut_params.insert(*idx);
+                } else {
+                    *state = self.substitute_old_param_in_state(state, *idx, &post_exp);
+                }
+            }
+        }
+
+        state.add_aborts(wp.aborts);
+        state.post = self.forward_label_at(offset);
+        true
+    }
+
     /// WP for Pack/PackVariant: Q[dest ↦ pack(fields)].
     fn wp_pack(
         &self,
@@ -3527,7 +3677,9 @@ impl<'env> SpecInferenceAnalyzer<'env> {
     /// the spec function id and instantiated result type if so.
     ///
     /// A function qualifies if it has no `&mut` params, no function-type params,
-    /// and an associated spec function with a body and empty `used_memory`.
+    /// and an associated spec function with empty `used_memory`. Native pure
+    /// functions are accepted even though their derived spec function has no
+    /// body — the Boogie backend resolves them through prelude theories.
     fn try_as_pure_spec_call(
         &self,
         module_id: ModuleId,
@@ -3546,11 +3698,16 @@ impl<'env> SpecInferenceAnalyzer<'env> {
         {
             return None;
         }
-        // Must have an associated pure spec function with a body and no memory use.
-        // Functions without a body (e.g., those with side effects like move_to that
-        // can't be expressed as spec expressions) are not pure.
         let (spec_fun_id, decl) = callee.find_spec_fun()?;
-        if decl.body.is_none() || !decl.used_memory.is_empty() {
+        // Non-native functions without a derived body cannot be expressed as a
+        // spec call — typical of effectful operations like `move_to`/`move_from`.
+        // Native body-less spec functions (e.g. `vector::length`) are pure and
+        // resolved natively by the backend, so we let them through.
+        if !decl.is_native && decl.body.is_none() {
+            return None;
+        }
+        // Must not access global memory.
+        if !decl.used_memory.is_empty() {
             return None;
         }
         let result_type = callee.get_result_type().instantiate(type_inst);

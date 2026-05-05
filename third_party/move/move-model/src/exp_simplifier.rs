@@ -1694,6 +1694,15 @@ impl<'a, 'env, G: ExpGenerator<'env>> ExpSimplifier<'a, 'env, G> {
             body
         };
 
+        // Vacuous / trivially-true forall: `forall x: T: true` is `true` regardless
+        // of T's domain (vacuous when T is empty, trivially true otherwise). This
+        // catches `forall x where false: P` after `mk_implies` collapsed
+        // `false ==> P` to `true` — e.g. an empty integer range `forall j: u64
+        // where j < 0: P` once `simplify_by_type_bounds` reduced `j < 0` to `false`.
+        if is_bool_const(&body, true) {
+            return self.mk_bool_const(true);
+        }
+
         // Step 1: Flatten nested foralls.
         let mut body = self.flatten_nested_quant(QuantKind::Forall, &mut ranges, &body);
 
@@ -1999,6 +2008,15 @@ impl<'a, 'env, G: ExpGenerator<'env>> ExpSimplifier<'a, 'env, G> {
         } else {
             body
         };
+
+        // Empty / trivially-false exists: `exists x: T: false` is `false` (no
+        // witness can satisfy `false`). This catches `exists x where false: P` after
+        // `mk_and` collapsed `false /\ P` to `false` — e.g. an empty integer range
+        // `exists j: u64 where j < 0: P` once `simplify_by_type_bounds` reduced
+        // `j < 0` to `false`.
+        if is_bool_const(&body, false) {
+            return self.mk_bool_const(false);
+        }
 
         // Step 1: Flatten nested exists.
         let mut body = self.flatten_nested_quant(QuantKind::Exists, &mut ranges, &body);
@@ -4834,6 +4852,65 @@ mod tests {
         assert_is_bool(&result, true);
     }
 
+    /// Build a quantifier expression with an explicit `where` clause.
+    fn mk_quant_where(
+        env: &GlobalEnv,
+        kind: QuantKind,
+        vars: Vec<(&str, Type)>,
+        cond: Exp,
+        body: Exp,
+    ) -> Exp {
+        let pool = env.symbol_pool();
+        let ranges: Vec<(Pattern, Exp)> = vars
+            .into_iter()
+            .map(|(name, ty)| {
+                let sym = pool.make(name);
+                let pat_id = env.new_node(Loc::default(), ty.clone());
+                let range_id = env.new_node(Loc::default(), Type::TypeDomain(Box::new(ty)));
+                let range = ExpData::Call(range_id, Operation::TypeDomain, vec![]).into_exp();
+                (Pattern::Var(pat_id, sym), range)
+            })
+            .collect();
+        let id = env.new_node(Loc::default(), BOOL_TYPE.clone());
+        ExpData::Quant(id, kind, ranges, vec![], Some(cond), body).into_exp()
+    }
+
+    #[test]
+    fn test_forall_where_false() {
+        // forall x: u64 where false: P(x) → true (vacuous)
+        let env = test_env();
+        let num_ty = Type::Primitive(PrimitiveType::U64);
+        let p = mk_temp(&env, 0, BOOL_TYPE.clone());
+        let quant = mk_quant_where(
+            &env,
+            QuantKind::Forall,
+            vec![("x", num_ty)],
+            mk_bool(&env, false),
+            p,
+        );
+        let mut g = test_gen(&env);
+        let mut s = ExpSimplifier::new(&mut g);
+        let result = s.simplify(quant);
+        assert_is_bool(&result, true);
+    }
+
+    #[test]
+    fn test_forall_empty_int_range() {
+        // forall x: u64 where x < 0: P(x) → true
+        // The where clause `x < 0` with `x: u64` reduces to `false` via type bounds,
+        // and the forall over an empty range is vacuously true.
+        let env = test_env();
+        let num_ty = Type::Primitive(PrimitiveType::U64);
+        let x = mk_local(&env, "x", num_ty.clone());
+        let p = mk_temp(&env, 0, BOOL_TYPE.clone());
+        let cond = mk_bool_op(&env, Operation::Lt, vec![x, mk_num(&env, 0)]);
+        let quant = mk_quant_where(&env, QuantKind::Forall, vec![("x", num_ty)], cond, p);
+        let mut g = test_gen(&env);
+        let mut s = ExpSimplifier::new(&mut g);
+        let result = s.simplify(quant);
+        assert_is_bool(&result, true);
+    }
+
     #[test]
     fn test_forall_antecedent_only_elimination() {
         // forall x: (x <= n ==> P) where P doesn't mention x → P
@@ -4934,6 +5011,55 @@ mod tests {
         let mut s = ExpSimplifier::new(&mut g);
         let result = s.simplify(quant);
         assert_is_temp(&result, 0);
+    }
+
+    #[test]
+    fn test_exists_body_false() {
+        // exists x: u64: false → false
+        let env = test_env();
+        let num_ty = Type::Primitive(PrimitiveType::U64);
+        let body = mk_bool(&env, false);
+        let quant = mk_quant(&env, QuantKind::Exists, vec![("x", num_ty)], body);
+        let mut g = test_gen(&env);
+        let mut s = ExpSimplifier::new(&mut g);
+        let result = s.simplify(quant);
+        assert_is_bool(&result, false);
+    }
+
+    #[test]
+    fn test_exists_where_false() {
+        // exists x: u64 where false: P(x) → false (no witness)
+        let env = test_env();
+        let num_ty = Type::Primitive(PrimitiveType::U64);
+        let p = mk_temp(&env, 0, BOOL_TYPE.clone());
+        let quant = mk_quant_where(
+            &env,
+            QuantKind::Exists,
+            vec![("x", num_ty)],
+            mk_bool(&env, false),
+            p,
+        );
+        let mut g = test_gen(&env);
+        let mut s = ExpSimplifier::new(&mut g);
+        let result = s.simplify(quant);
+        assert_is_bool(&result, false);
+    }
+
+    #[test]
+    fn test_exists_empty_int_range() {
+        // exists x: u64 where x < 0: P(x) → false
+        // The where clause `x < 0` with `x: u64` reduces to `false` via type bounds,
+        // and an exists over an empty range has no witness.
+        let env = test_env();
+        let num_ty = Type::Primitive(PrimitiveType::U64);
+        let x = mk_local(&env, "x", num_ty.clone());
+        let p = mk_temp(&env, 0, BOOL_TYPE.clone());
+        let cond = mk_bool_op(&env, Operation::Lt, vec![x, mk_num(&env, 0)]);
+        let quant = mk_quant_where(&env, QuantKind::Exists, vec![("x", num_ty)], cond, p);
+        let mut g = test_gen(&env);
+        let mut s = ExpSimplifier::new(&mut g);
+        let result = s.simplify(quant);
+        assert_is_bool(&result, false);
     }
 
     #[test]

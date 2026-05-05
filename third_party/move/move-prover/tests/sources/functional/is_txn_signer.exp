@@ -30,7 +30,6 @@ error: unknown assertion failed
    =         s = <redacted>
    =     at ../move-stdlib/sources/signer.move:27: address_of
    =         result = <redacted>
-   =     at ../move-stdlib/sources/signer.move:28: address_of
    =     at tests/sources/functional/is_txn_signer.move:31: f4_incorrect
 
 error: precondition does not hold at this call
@@ -53,7 +52,6 @@ error: global memory invariant does not hold
    =     at tests/sources/functional/is_txn_signer.move:84: increment_incorrect
    =     at tests/sources/functional/is_txn_signer.move:60: ADMIN_ADDRESS
    =         result = <redacted>
-   =     at tests/sources/functional/is_txn_signer.move:61: ADMIN_ADDRESS
    =         c_ref = <redacted>
    =     at tests/sources/functional/is_txn_signer.move:85: increment_incorrect
    =     at tests/sources/functional/is_txn_signer.move:83: increment_incorrect

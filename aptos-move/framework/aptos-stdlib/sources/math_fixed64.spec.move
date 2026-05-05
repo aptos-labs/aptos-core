@@ -1,9 +1,6 @@
 spec aptos_std::math_fixed64 {
-
-    /// `sqrt` aborts when the input is zero (math128::sqrt(0)==0 causes division by zero in the Newton step).
-    /// No loop in the body (single Newton refinement step), so callers can inline without havocing.
     spec sqrt(x: FixedPoint64): FixedPoint64 {
-        aborts_if x.get_raw_value() == 0;
+        aborts_if [abstract] false;
     }
 
     /// `mul_div` aborts when z is zero or when x * y / z overflows u128.

@@ -11,7 +11,4 @@ error: post-condition does not hold
    =         x = <redacted>
    =         y = <redacted>
    =         result = <redacted>
-   =     at tests/sources/functional/closures/closure_optimized_away.move:14: test_closure_2
-   =         result = <redacted>
-   =     at tests/sources/functional/closures/closure_optimized_away.move:15: test_closure_2
    =     at tests/sources/functional/closures/closure_optimized_away.move:17: test_closure_2 (spec)

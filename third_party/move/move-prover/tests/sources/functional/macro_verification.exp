@@ -127,10 +127,8 @@ error: post-condition does not hold
    =     at tests/sources/functional/macro_verification.move:43: reduce
    =     at tests/sources/functional/macro_verification.move:40: reduce
    =         result = <redacted>
-   =     at tests/sources/functional/macro_verification.move:53: reduce
    =     at tests/sources/functional/macro_verification.move:67: reduce_test
    =         result = <redacted>
-   =     at tests/sources/functional/macro_verification.move:73: reduce_test
    =     at tests/sources/functional/macro_verification.move:75: reduce_test (spec)
    =         `ensures result == x + y + z;` = <redacted>
    =     at tests/sources/functional/macro_verification.move:76: reduce_test (spec)

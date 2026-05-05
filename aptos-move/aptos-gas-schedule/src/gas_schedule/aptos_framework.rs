@@ -4,11 +4,11 @@
 //! This module defines the gas parameters for Aptos Framework & Stdlib.
 
 use crate::{
-    gas_feature_versions::{RELEASE_V1_14, RELEASE_V1_8, RELEASE_V1_9_SKIPPED},
     gas_schedule::NativeGasParameters,
     ver::gas_feature_versions::{
-        RELEASE_V1_12, RELEASE_V1_13, RELEASE_V1_23, RELEASE_V1_26, RELEASE_V1_28, RELEASE_V1_36,
-        RELEASE_V1_39, RELEASE_V1_45,
+        RELEASE_V1_12, RELEASE_V1_13, RELEASE_V1_14, RELEASE_V1_23, RELEASE_V1_26, RELEASE_V1_28,
+        RELEASE_V1_36, RELEASE_V1_39, RELEASE_V1_45, RELEASE_V1_46, RELEASE_V1_8,
+        RELEASE_V1_9_SKIPPED,
     },
 };
 use aptos_gas_algebra::{
@@ -362,5 +362,11 @@ crate::gas_schedule::macros::define_gas_parameters!(
 
         // Reflection
         [reflect_resolve_base: InternalGas, { RELEASE_V1_39.. => "reflect.resolve_base" }, 40960],
+
+        // Storage slot
+        [storage_slot_borrow_base: InternalGas, { RELEASE_V1_46.. => "storage_slot.borrow.base" }, 9190],
+        [storage_slot_borrow_per_byte_loaded: InternalGasPerByte, { RELEASE_V1_46.. => "storage_slot.borrow.per_byte_loaded" }, 1830],
+        [storage_slot_borrow_mut_base: InternalGas, { RELEASE_V1_46.. => "storage_slot.borrow_mut.base" }, 9190],
+        [storage_slot_borrow_mut_per_byte_loaded: InternalGasPerByte, { RELEASE_V1_46.. => "storage_slot.borrow_mut.per_byte_loaded" }, 1830],
     ]
 );

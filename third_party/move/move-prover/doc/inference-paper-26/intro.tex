@@ -1,0 +1,38 @@
+\Section{Introduction}
+\label{sec:intro}
+
+The Move Prover (\MVP)~\cite{DillGPQXZ22} is a formal verification tool for Move smart contracts that is designed to be used routinely during code development, with a finish time comparable to type checkers and linters.
+\MVP is deployed at Aptos~\cite{ParkZGXGCLC24} for formal verification of core protocol logic such as staking, metering, code deployment, and auxiliary data structures that underpin the framework.
+Recently, \MVP was extended to support Move's higher-order functions and dynamic dispatch, including behavioral predicates over function values and state labels naming intermediate memory states~\cite{grieskamp2025movehigherorder}.
+
+A practical bottleneck in program verification is the cost of \emph{writing} the specifications that drive verification.
+The properties developers actually want to establish are typically high-level: that a call chain does abort only under stated preconditions, that a global storage invariant is preserved, that funds are conserved across a transfer.
+While \MVP can sometimes verify cross-module calls by inlining their bodies, this does not scale; modular verification requires explicit per-function !requires!, !aborts_if!, !ensures!, and !modifies! clauses.
+This per-function detail is mechanical and tedious to write, dominates the cost of using a verifier, and is a significant barrier to wider adoption of routine verification.
+
+\emph{Specification inference} is a promising approach to attack this problem. Work on inference goes back for quite a time \cite{DaikonTSE01}, and has gained steam again with LLMs \cite{PeiEtAl23, KamathEtAl23}.
+The rise of coding agents like Claude Code (\CC) opens further avenues: those systems support exposing tools to the AI (e.g. via the Model Context Protocol, MCP), and a systematic workflow where AI and developers can collaborate and reach agreement on code changes. Moreover, models have become significantly more powerful than they were 3 years ago.
+
+In this paper, we present early work on a novel combination of (a) mechanical spec inference via weakest preconditions analysis (\WP)~\cite{dijkstra1975wp,BL05} and (b) agentic inference guided by a set of skills (English instructions).
+Our ultimate goal is to support a methodology were AI, mechanical deduction, and users can collaborate on creating and verifying Move specifications.
+This paper defines some building blocks on the way to there, focusing on the spec inference aspect.
+
+Sec.~\ref{sec:wp} describes the analysis: by reusing \MVP's reference-elimination pass~\cite{DillGPQXZ22} (also adopted by Aeneas~\cite{Aeneas}), \WP propagates over a reference-free intermediate form on which classical Dijkstra-style reasoning applies directly, and recovers abort conditions, modifies clauses, and consequence-style postconditions from the bytecode.
+
+The principal bottleneck of \WP-based inference is \emph{loop invariants}: backward propagation through a loop requires an inductive invariant that is in general not derivable from the loop body alone, and without it the rest of the inferred specification becomes vacuous.
+Here is where LLMs come in. LLMs are good at pattern recognition that loop invariants demand --- spotting that a counter is monotone, that a sum is preserved, that an element stays in a sorted prefix --- and at proposing specifications written in the idiom in which a human would write them.
+
+Both signals are validated against the code by the prover; counter-examples feed back into the agent for refinement, and the user can intervene at any point.
+
+\Paragraph{Outline}
+This paper describes \MVP's specification inference tool, which is integrated into Claude Code~\cite{ClaudeCode}.
+Sec.~\ref{sec:example} starts with a step-by-step example illustrating how the tool operates for the end user.
+Sec.~\ref{sec:wp} outlines \WP analysis for Move code in the presence of Rust-style references and their elimination by the Move prover via bytecode rewriting.
+In Sec.~\ref{sec:skills} we discuss the system of skills and prompts we have set up for inference and verification.
+Sec.~\ref{sec:conclusion} concludes with a discussion of related and future work.
+
+
+%%% Local Variables:
+%%% mode: latex
+%%% TeX-master: "main"
+%%% End:

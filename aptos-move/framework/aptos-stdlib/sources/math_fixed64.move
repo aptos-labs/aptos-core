@@ -14,9 +14,13 @@ module aptos_std::math_fixed64 {
     /// Square root of fixed point number
     public fun sqrt(x: FixedPoint64): FixedPoint64 {
         let y = x.get_raw_value();
-        let z = (math128::sqrt(y) << 32 as u256);
-        z = (z + ((y as u256) << 64) / z) >> 1;
-        fixed_point64::create_from_raw_value((z as u128))
+        if (y == 0) {
+            fixed_point64::create_from_raw_value(0)
+        } else {
+            let z = (math128::sqrt(y) << 32 as u256);
+            z = (z + ((y as u256) << 64) / z) >> 1;
+            fixed_point64::create_from_raw_value((z as u128))
+        }
     }
 
     /// Exponent function with a precission of 9 digits.
@@ -100,6 +104,9 @@ module aptos_std::math_fixed64 {
         let fixed_base = 1 << 64;
         let result = sqrt(fixed_point64::create_from_u128(1));
         assert!(result.get_raw_value() == fixed_base, 0);
+
+        let result = sqrt(fixed_point64::create_from_u128(0));
+        assert!(result.get_raw_value() == 0, 1);
 
         let result = sqrt(fixed_point64::create_from_u128(2));
         assert_approx_the_same((result.get_raw_value() as u256), 26087635650665564424, 16);

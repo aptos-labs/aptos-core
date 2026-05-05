@@ -7,7 +7,6 @@ error: post-condition does not hold
    │
    =     at tests/sources/functional/consts.move:27: init_incorrect
    =         result = <redacted>
-   =     at tests/sources/functional/consts.move:28: init_incorrect
    =     at tests/sources/functional/consts.move:31: init_incorrect (spec)
    =     at tests/sources/functional/consts.move:32: init_incorrect (spec)
 

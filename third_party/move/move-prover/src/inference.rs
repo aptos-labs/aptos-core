@@ -33,7 +33,11 @@ use codespan_reporting::term::termcolor::WriteColor;
 #[allow(unused_imports)]
 use log::{debug, info};
 use move_model::{
-    ast::SpecBlockTarget, emitln, model::GlobalEnv, sourcifier::Sourcifier, symbol::Symbol,
+    ast::SpecBlockTarget,
+    emitln,
+    model::{FunctionEnv, GlobalEnv, VerificationScope},
+    sourcifier::Sourcifier,
+    symbol::Symbol,
 };
 use move_prover_bytecode_pipeline::pipeline_factory;
 use move_stackless_bytecode::{
@@ -197,7 +201,7 @@ fn run_spec_inference_inner<W: WriteColor>(
     let inferred_sym = env.symbol_pool().make("inferred");
     match options.inference.inference_output {
         InferenceOutput::Stdout => {
-            output_to_stdout(env, inferred_sym);
+            output_to_stdout(env, inferred_sym, &options);
         },
         InferenceOutput::File => {
             output_to_files(env, inferred_sym, &options)?;
@@ -219,8 +223,9 @@ fn run_spec_inference_inner<W: WriteColor>(
 }
 
 /// Output inferred specs to stdout (default mode).
-fn output_to_stdout(env: &GlobalEnv, inferred_sym: Symbol) {
+fn output_to_stdout(env: &GlobalEnv, inferred_sym: Symbol, options: &Options) {
     let sourcifier = Sourcifier::new(env, true);
+    let scope = &options.prover.verify_scope;
 
     for module in env.get_modules() {
         if !module.is_target() {
@@ -228,6 +233,9 @@ fn output_to_stdout(env: &GlobalEnv, inferred_sym: Symbol) {
         }
         for fun in module.get_functions() {
             if fun.is_native() || fun.is_intrinsic() || fun.is_test_only() {
+                continue;
+            }
+            if !matches_verify_scope(&fun, scope) {
                 continue;
             }
             let spec = fun.get_spec();
@@ -247,6 +255,21 @@ fn output_to_stdout(env: &GlobalEnv, inferred_sym: Symbol) {
     }
 }
 
+/// Returns true when `fun` is in the user-specified verification scope.
+/// Mirrors the predicate used by `is_within_verification_scope` in
+/// `verification_analysis.rs`, which gates the spec inference processor itself.
+/// Threading this check into the writers ensures `filter` restricts which
+/// source files are edited, not just which functions get inferred conditions.
+fn matches_verify_scope(fun: &FunctionEnv, scope: &VerificationScope) -> bool {
+    match scope {
+        VerificationScope::All => true,
+        VerificationScope::Public => fun.is_exposed(),
+        VerificationScope::Only(name) => fun.matches_name(name),
+        VerificationScope::OnlyModule(name) => fun.module_env.matches_name(name),
+        VerificationScope::None => false,
+    }
+}
+
 /// Output inferred specs to per-module `.spec.move` files.
 ///
 /// If a `.spec.move` file already exists and was compiled as part of the module,
@@ -254,14 +277,24 @@ fn output_to_stdout(env: &GlobalEnv, inferred_sym: Symbol) {
 /// inserted as new blocks) — mirroring the merge logic in `output_unified`.
 /// Otherwise, a fresh file is generated from scratch.
 fn output_to_files(env: &GlobalEnv, inferred_sym: Symbol, options: &Options) -> anyhow::Result<()> {
+    let scope = &options.prover.verify_scope;
     for module in env.get_modules() {
         if !module.is_target() {
+            continue;
+        }
+        if !module
+            .get_functions()
+            .any(|f| matches_verify_scope(&f, scope))
+        {
             continue;
         }
 
         // Check if this module has any functions with inferred specs.
         let has_any_inferred = module.get_functions().any(|fun| {
             if fun.is_native() || fun.is_intrinsic() || fun.is_test_only() {
+                return false;
+            }
+            if !matches_verify_scope(&fun, scope) {
                 return false;
             }
             let spec = fun.get_spec();
@@ -315,6 +348,9 @@ fn output_to_files(env: &GlobalEnv, inferred_sym: Symbol, options: &Options) -> 
 
             for fun in module.get_functions() {
                 if fun.is_native() || fun.is_intrinsic() || fun.is_test_only() {
+                    continue;
+                }
+                if !matches_verify_scope(&fun, scope) {
                     continue;
                 }
                 let has_inferred = {
@@ -428,7 +464,7 @@ fn output_to_files(env: &GlobalEnv, inferred_sym: Symbol, options: &Options) -> 
             merged
         } else {
             // No existing spec file — generate from scratch.
-            generate_fresh_spec_file(env, &module, inferred_sym)
+            generate_fresh_spec_file(env, &module, inferred_sym, scope)
         };
 
         if let Some(parent) = output_path.parent() {
@@ -445,6 +481,7 @@ fn generate_fresh_spec_file(
     env: &GlobalEnv,
     module: &move_model::model::ModuleEnv,
     inferred_sym: Symbol,
+    scope: &VerificationScope,
 ) -> String {
     let sourcifier = Sourcifier::new(env, true);
     emitln!(
@@ -456,6 +493,9 @@ fn generate_fresh_spec_file(
 
     for fun in module.get_functions() {
         if fun.is_native() || fun.is_intrinsic() || fun.is_test_only() {
+            continue;
+        }
+        if !matches_verify_scope(&fun, scope) {
             continue;
         }
         let original_conditions = {
@@ -483,14 +523,24 @@ fn generate_fresh_spec_file(
 /// inferred spec blocks injected inline after each function definition (or
 /// appended to existing spec blocks).
 fn output_unified(env: &GlobalEnv, inferred_sym: Symbol, options: &Options) -> anyhow::Result<()> {
+    let scope = &options.prover.verify_scope;
     for module in env.get_modules() {
         if !module.is_target() {
+            continue;
+        }
+        if !module
+            .get_functions()
+            .any(|f| matches_verify_scope(&f, scope))
+        {
             continue;
         }
 
         // Check if this module has any functions with inferred specs.
         let has_any_inferred = module.get_functions().any(|fun| {
             if fun.is_native() || fun.is_intrinsic() || fun.is_test_only() {
+                return false;
+            }
+            if !matches_verify_scope(&fun, scope) {
                 return false;
             }
             let spec = fun.get_spec();
@@ -515,6 +565,9 @@ fn output_unified(env: &GlobalEnv, inferred_sym: Symbol, options: &Options) -> a
 
         for fun in module.get_functions() {
             if fun.is_native() || fun.is_intrinsic() || fun.is_test_only() {
+                continue;
+            }
+            if !matches_verify_scope(&fun, scope) {
                 continue;
             }
             // Check for inferred conditions/frame_spec without keeping the Ref alive,

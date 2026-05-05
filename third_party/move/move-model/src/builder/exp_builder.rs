@@ -3995,8 +3995,15 @@ impl ExpTranslator<'_, '_, '_> {
             let id = self.env().new_node(loc.clone(), fun_type.clone());
             self.env().set_node_instantiation(id, instantiation.clone());
 
-            // Special-case handling for functions that are bytecode instructions in the `std::vector` module.
-            if global_var_sym.module_name.addr() == &self.env().get_stdlib_address()
+            // Special-case handling for functions that are bytecode instructions in the
+            // `std::vector` module. The Move VM cannot dispatch a closure to a function that
+            // has been lowered to a bytecode primitive, so for runtime contexts we wrap the
+            // reference in a lambda the file-format generator can compile. Spec contexts are
+            // exempt: the prover's behavioural predicates work directly off the function's
+            // declared semantics, and the Boogie backend already emits a procedure for native
+            // vector intrinsics.
+            if !self.is_spec_mode()
+                && global_var_sym.module_name.addr() == &self.env().get_stdlib_address()
                 && global_var_sym.module_name.name() == self.symbol_pool().make(VECTOR_MODULE)
             {
                 let function_name = global_var_sym
@@ -6065,6 +6072,29 @@ impl ExpTranslator<'_, '_, '_> {
         };
         let result_ty = self.check_type(loc, &computed_result_ty, expected_type, context);
         let id = self.new_node_id_with_type_loc(&result_ty, loc);
+
+        // Reject BPs over `std::vector` bytecode-instruction natives (and
+        // `singleton` / `contains`): these functions have direct spec-language
+        // equivalents (e.g. `len(v)`, `v[i]`, `concat(v, vec(e))`,
+        // `contains(v, e)`) which the user should write instead.  Allowing
+        // BPs here would create two equivalent ways to spell the same fact
+        // and would carry no information that is not already expressible.
+        if let Some((fun_name, _inst)) =
+            crate::well_known::match_special_vector_bp_target(self.env(), &fun_exp)
+        {
+            self.error(
+                loc,
+                &format!(
+                    "behavioral predicates are not supported on `std::vector::{}` — \
+                     use the spec language directly (e.g. write `len(v)` instead of \
+                     `result_of<vector::length>(v)`, `v[i]` instead of \
+                     `result_of<vector::borrow>(v, i)`, `!in_range(v, i)` instead of \
+                     `aborts_of<vector::borrow>(v, i)`)",
+                    fun_name
+                ),
+            );
+            return self.new_error_exp();
+        }
 
         // Build args with function expression as first argument
         let mut all_args = vec![fun_exp];
