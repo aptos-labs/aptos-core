@@ -54,6 +54,11 @@ use std::{
 };
 use tokio::time::Instant;
 
+// Byzantine experiment knobs — edit and recompile between runs.
+// Set BYZANTINE_NODE_ID >= n_nodes to disable (honest baseline).
+const BYZANTINE_NODE_ID: NodeId = 3;
+const EXTRA_PROPOSE_DELAY: Duration = Duration::from_millis(500);
+
 #[derive(Clone, Serialize, Deserialize)]
 pub enum Message {
     // Consensus
@@ -1054,6 +1059,9 @@ impl<DL: DisseminationLayer> Protocol for RaptrNode<DL> {
                 observe_block(block.data.timestamp_usecs, "Propose");
 
                 self.block_create_time.insert(round, Instant::now());
+                if self.node_id == BYZANTINE_NODE_ID {
+                    tokio::time::sleep(EXTRA_PROPOSE_DELAY).await;
+                }
                 ctx.multicast(Message::Propose(block)).await;
             }
 
