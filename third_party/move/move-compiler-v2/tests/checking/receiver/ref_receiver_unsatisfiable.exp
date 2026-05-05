@@ -1,0 +1,19 @@
+
+Diagnostics:
+error: unable to infer instantiation of type `fun self.get_nav(..):_ + &_ + fun self.get_size(..):u64` (consider providing type arguments or annotating the type)
+   ┌─ tests/checking/receiver/ref_receiver_unsatisfiable.move:23:16
+   │
+23 │         apply(|x| {
+   │                ^
+
+error: unable to infer instantiation of type `_` (consider providing type arguments or annotating the type)
+   ┌─ tests/checking/receiver/ref_receiver_unsatisfiable.move:24:21
+   │
+24 │             let _ = *x;
+   │                     ^^
+
+error: unable to infer instantiation of type `_` (consider providing type arguments or annotating the type)
+   ┌─ tests/checking/receiver/ref_receiver_unsatisfiable.move:25:21
+   │
+25 │             let _ = x.get_nav();
+   │                     ^^^^^^^^^^^

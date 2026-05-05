@@ -1,0 +1,4 @@
+processed 3 tasks
+task 0 lines 1-58:  publish [module 0x42::ref_constraint_test {]
+task 1 lines 60-60:  run --verbose -- 0x42::ref_constraint_test::test_receiver
+task 2 lines 62-62:  run --verbose -- 0x42::ref_constraint_test::test_field
