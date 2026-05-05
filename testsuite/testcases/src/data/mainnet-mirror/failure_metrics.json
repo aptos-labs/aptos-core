@@ -1,0 +1,32 @@
+{
+  "_comment": "Per-validator failure metrics pulled from Prometheus aptos_failed_proposals_in_window. fp_7d_avg = avg over last 7 days; fp_30d_max = max sampled over last 30 days. Used by the snapshot script to assign availability_class. Refresh: re-run the Prometheus queries and update this file. Multi-pod entries for the same peer_id (e.g. labs validators that get renamed) are aggregated by max.",
+  "_pulled_at": "2026-04-30T22:10:00Z",
+  "metrics": {
+    "0x312c22e7500a4037df87db35718959deeb937c734fb2169b95d720a09b5e74f5": {"fp_7d_avg": 0.378, "fp_30d_max": 0.412, "operator": "hashport"},
+    "0x50b27eee627c0648ff4867894e264d67de2049ee9a8b92040cb35020b74afa39": {"fp_7d_avg": 0.228, "fp_30d_max": 0.255, "operator": "sirouk-delegation"},
+    "0x3eaf3ebc49555c705c34ec1ffe77404bdb7383b388476c36538b92b7b1b806c9": {"fp_7d_avg": 0.304, "fp_30d_max": 0.351, "operator": "aptos-apne1-0/aptos-euwe4-1"},
+    "0xc32f662cd9718f02d8a8e5628f8f642fa27cd9b5f457b406ed734901a4939e34": {"fp_7d_avg": 0.137, "fp_30d_max": 0.149, "operator": "Stakely"},
+    "0x180c86aa5da47ec3393c329b65d82c9f50f53f3faac0f9807d8d3a6ff8ef85ac": {"fp_7d_avg": 0.140, "fp_30d_max": 0.161, "operator": "rockawayx-delegation"},
+    "0x6099edbe54f242bad50020dfd67646b1e46282999483e7064e70f02f7ea3c15": {"fp_7d_avg": 0.037, "fp_30d_max": 0.208, "operator": "bware-delegation"},
+    "0x35b922386bd35db0f33c732a70d7b6a2e91e463812c8d710f925f6da0e0ace07": {"fp_7d_avg": 0.046, "fp_30d_max": 0.055, "operator": "GCP"},
+    "0xce8294a77912a6802adf093ba15a4f09d2d3c85400d161a0022499de4e2aeb92": {"fp_7d_avg": 0.048, "fp_30d_max": 1.000, "operator": "superfast"},
+    "0x5dece2ed08c68f8730527e9b3ebb3536efc3361f4ef37ba0b16a3310db836af": {"fp_7d_avg": 0.037, "fp_30d_max": 0.500, "operator": "CryptoMolot"},
+    "0x2fd1e866773ea3670cbef6dc6e952ba6fa13130a69fabc98ad234bd834c3bcaf": {"fp_7d_avg": 0.175, "fp_30d_max": 0.677, "operator": "coinbase"},
+    "0xfc90c3e74dfb562827ef85dea5669beeca7717faee0c3ba520c3ab08f9b53135": {"fp_7d_avg": 0.033, "fp_30d_max": 0.130, "operator": "flipside"},
+    "0xe2789cdac410113f017fa684bf08fbacd0877612d84464ae6e8474b56e5f21da": {"fp_7d_avg": 0.030, "fp_30d_max": 0.059, "operator": "p2p-delegation-2"},
+    "0xf0d49cff005d03312934ce027e30f4a84143d5af53623b30036e7dac1510c218": {"fp_7d_avg": 0.025, "fp_30d_max": 0.048, "operator": "p2p-delegation"},
+    "0xcc75dd107c69486adb1c405832709ce04ed6653cbe586a73ab36748c282629cf": {"fp_7d_avg": 0.024, "fp_30d_max": 1.333, "operator": "artifact"},
+    "0x2367d4d22503e28e48c44e38237961f37896f6868c96dc7800203d261a45e5b4": {"fp_7d_avg": 0.011, "fp_30d_max": 0.108, "operator": "amnis-delegation-2"},
+    "0xa651c7c52d64a2014379902bbc92439d196499bcc36d94ff0395aa45837c66db": {"fp_7d_avg": 0.020, "fp_30d_max": 0.108, "operator": "amnis-delegation"},
+    "0xddf23883328d39d8cbb4fad97f0e4bd45827ea999b66aa2a1cffa76615b9ef01": {"fp_7d_avg": 0.007, "fp_30d_max": 0.206, "operator": "anchorage"},
+    "0xef191e643c2ed2d103de4109a506e020f5dde818cbc1ffe5e4ee36328cd22e9b": {"fp_7d_avg": 0.011, "fp_30d_max": 0.198, "operator": "P2PValidator"},
+    "0xb3254509d1cd652d6e1ca06fd37f3d20aaa42f7faeaf297577b85cf92d2f7462": {"fp_7d_avg": 0.007, "fp_30d_max": 0.333, "operator": "ValidationCloud"},
+    "0xbb410047e29f9cc9bd1e5b66f2b4d2f3a8cad579e45b609e357dcdc536b05ade": {"fp_7d_avg": 0.003, "fp_30d_max": 3.000, "operator": "meria-delegation"},
+    "0xab4a80ccc772691cb03e3ee8d22b5c13acc92472dd4a19987c1aade2691404a": {"fp_7d_avg": 0.002, "fp_30d_max": 1.667, "operator": "aptos-euwe6-1"},
+    "0x191076a71acffafe737f5c1ce0fe4b7fa48569b437ba795a5482860925f89133": {"fp_7d_avg": 0.001, "fp_30d_max": 1.000, "operator": "lixianyun"},
+    "0xb6a8774f0ba2420f88091d25363cccd58712e1fae3c83608690ccb4228f51847": {"fp_7d_avg": 0.018, "fp_30d_max": 0.571, "operator": "(anonymous)"},
+    "0x4c7c21084620f9e55f50f292d1803e5fbcf55c6d850b24b5e64efef08d2aa428": {"fp_7d_avg": 0.0, "fp_30d_max": 0.891, "operator": "a16z-delegation-1"},
+    "0x2ded75e99c6efbe143a9648a3e88ebf9d0cf249b2af44d510bdd0287e8adcc79": {"fp_7d_avg": 0.002, "fp_30d_max": 0.404, "operator": "artifact-delegation"},
+    "0x371dfdee9fbecaa358683936c5946aa28393067fa60e1e185c4250da461e15cf": {"fp_7d_avg": 0.002, "fp_30d_max": 0.233, "operator": "DSRV"}
+  }
+}
