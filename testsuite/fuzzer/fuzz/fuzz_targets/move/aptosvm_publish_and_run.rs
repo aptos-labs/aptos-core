@@ -22,7 +22,7 @@ use move_binary_format::{
 };
 use move_core_types::vm_status::{StatusCode, StatusType};
 use once_cell::sync::Lazy;
-use std::{collections::HashSet, sync::Arc, time::Instant};
+use std::{collections::HashSet, time::Instant};
 mod utils;
 use fuzzer::{Authenticator, ExecVariant, RunnableState};
 use move_vm_runtime::RuntimeEnvironment;
@@ -35,14 +35,6 @@ use utils::vm::{
 static VM_WRITE_SET: Lazy<WriteSet> = Lazy::new(|| GENESIS_CHANGE_SET_HEAD.write_set().clone());
 
 const FUZZER_CONCURRENCY_LEVEL: usize = 1;
-static TP: Lazy<Arc<rayon::ThreadPool>> = Lazy::new(|| {
-    Arc::new(
-        rayon::ThreadPoolBuilder::new()
-            .num_threads(FUZZER_CONCURRENCY_LEVEL)
-            .build()
-            .unwrap(),
-    )
-});
 
 const MAX_TYPE_PARAMETER_VALUE: u16 = 64 / 4 * 16; // third_party/move/move-bytecode-verifier/src/signature_v2.rs#L1306-L1312
 
@@ -113,10 +105,10 @@ fn run_case(mut input: RunnableState) -> Result<(), Corpus> {
     AptosVM::set_concurrency_level_once(FUZZER_CONCURRENCY_LEVEL);
     // Enable runtime reference-safety checks for the Move VM
     // prod_configs::set_paranoid_ref_checks(true);
-    let mut vm = FakeExecutor::from_genesis_with_existing_thread_pool(
+    let mut vm = FakeExecutor::from_genesis_with_module_cache_manager(
         &VM_WRITE_SET,
         ChainId::mainnet(),
-        Arc::clone(&TP),
+        FUZZER_CONCURRENCY_LEVEL,
         None,
     )
     .set_not_parallel();
