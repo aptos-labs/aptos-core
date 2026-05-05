@@ -565,6 +565,9 @@ spec aptos_framework::stake {
         include GetReconfigStartTimeRequirement;
         include features::spec_periodical_reward_rate_decrease_enabled() ==>
             staking_config::StakingRewardsConfigEnabledRequirement;
+        // Proof support for I2 in `reconfiguration_with_dkg::try_start*`:
+        // the cache is created on first call and preserved on subsequent ones.
+        ensures exists<PrecomputedValidatorSet>(@aptos_framework);
     }
 
     spec update_stake_pool {
