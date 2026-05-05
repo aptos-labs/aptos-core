@@ -144,12 +144,14 @@ class ReplayConfig:
     def __init__(self, network: Network) -> None:
         if network == Network.TESTNET:
             self.concurrent_replayer = 35
-            self.pvc_number = 35
+            self.pvc_number = 20
+            self.workers_per_pvc = 15
             self.min_range_size = 10_000
             self.range_size = 5_000_000
         else:
             self.concurrent_replayer = 35
             self.pvc_number = 10
+            self.workers_per_pvc = 10
             self.min_range_size = 10_000
             self.range_size = 2_000_000
 
@@ -1060,7 +1062,11 @@ if __name__ == "__main__":
     run_id = f"{datetime.datetime.now().strftime('%Y%m%d-%H%M%S')}-{image[-5:]}"
     network = Network.from_string(args.network)
     config = ReplayConfig(network)
-    worker_cnt = args.worker_cnt if args.worker_cnt else config.pvc_number * 10
+    worker_cnt = (
+        args.worker_cnt
+        if args.worker_cnt
+        else config.pvc_number * config.workers_per_pvc
+    )
     range_size = args.range_size if args.range_size else config.range_size
 
     # Resolve time-based args to versions
