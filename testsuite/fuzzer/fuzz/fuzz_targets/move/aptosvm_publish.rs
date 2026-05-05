@@ -16,7 +16,7 @@ use move_binary_format::{
     file_format::{CompiledModule, CompiledScript},
 };
 use once_cell::sync::Lazy;
-use std::{collections::HashSet, sync::Arc};
+use std::collections::HashSet;
 use utils::vm::{group_modules_by_address_topo, publish_group};
 
 // genesis write set generated once for each fuzzing session
@@ -24,14 +24,6 @@ static VM: Lazy<WriteSet> = Lazy::new(|| GENESIS_CHANGE_SET_HEAD.write_set().clo
 
 const TEST_UPGRADE: bool = true;
 const FUZZER_CONCURRENCY_LEVEL: usize = 1;
-static TP: Lazy<Arc<rayon::ThreadPool>> = Lazy::new(|| {
-    Arc::new(
-        rayon::ThreadPoolBuilder::new()
-            .num_threads(FUZZER_CONCURRENCY_LEVEL)
-            .build()
-            .unwrap(),
-    )
-});
 
 fn run_case(mut input: RunnableState) -> Result<(), Corpus> {
     tdbg!(&input);
@@ -72,10 +64,10 @@ fn run_case(mut input: RunnableState) -> Result<(), Corpus> {
     let packages = group_modules_by_address_topo(input.dep_modules.clone())?;
 
     AptosVM::set_concurrency_level_once(FUZZER_CONCURRENCY_LEVEL);
-    let mut vm = FakeExecutor::from_genesis_with_existing_thread_pool(
+    let mut vm = FakeExecutor::from_genesis_with_module_cache_manager(
         &VM,
         ChainId::mainnet(),
-        Arc::clone(&TP),
+        FUZZER_CONCURRENCY_LEVEL,
         None,
     )
     .set_not_parallel();
