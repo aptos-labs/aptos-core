@@ -16,6 +16,8 @@ This module is responsible for configuring keyless blockchain accounts which wer
 -  [Function `validate_groth16_vk`](#0x1_keyless_account_validate_groth16_vk)
 -  [Function `update_groth16_verification_key`](#0x1_keyless_account_update_groth16_verification_key)
 -  [Function `update_configuration`](#0x1_keyless_account_update_configuration)
+-  [Function `upsert_ed25519_backup_key_and_encrypt_dk`](#0x1_keyless_account_upsert_ed25519_backup_key_and_encrypt_dk)
+-  [Function `register_ek_and_encrypt_dk`](#0x1_keyless_account_register_ek_and_encrypt_dk)
 -  [Function `update_training_wheels`](#0x1_keyless_account_update_training_wheels)
 -  [Function `update_max_exp_horizon`](#0x1_keyless_account_update_max_exp_horizon)
 -  [Function `remove_all_override_auds`](#0x1_keyless_account_remove_all_override_auds)
@@ -30,13 +32,21 @@ This module is responsible for configuring keyless blockchain accounts which wer
 -  [Specification](#@Specification_1)
 
 
-<pre><code><b>use</b> <a href="../../aptos-stdlib/doc/bn254_algebra.md#0x1_bn254_algebra">0x1::bn254_algebra</a>;
+<pre><code><b>use</b> <a href="account.md#0x1_account">0x1::account</a>;
+<b>use</b> <a href="../../aptos-stdlib/../move-stdlib/doc/bcs.md#0x1_bcs">0x1::bcs</a>;
+<b>use</b> <a href="../../aptos-stdlib/doc/bn254_algebra.md#0x1_bn254_algebra">0x1::bn254_algebra</a>;
 <b>use</b> <a href="chain_status.md#0x1_chain_status">0x1::chain_status</a>;
+<b>use</b> <a href="confidential_asset.md#0x1_confidential_asset">0x1::confidential_asset</a>;
 <b>use</b> <a href="config_buffer.md#0x1_config_buffer">0x1::config_buffer</a>;
 <b>use</b> <a href="../../aptos-stdlib/doc/crypto_algebra.md#0x1_crypto_algebra">0x1::crypto_algebra</a>;
 <b>use</b> <a href="../../aptos-stdlib/doc/ed25519.md#0x1_ed25519">0x1::ed25519</a>;
+<b>use</b> <a href="fungible_asset.md#0x1_fungible_asset">0x1::fungible_asset</a>;
+<b>use</b> <a href="../../aptos-stdlib/../move-stdlib/doc/hash.md#0x1_hash">0x1::hash</a>;
+<b>use</b> <a href="../../aptos-stdlib/doc/multi_key.md#0x1_multi_key">0x1::multi_key</a>;
+<b>use</b> <a href="object.md#0x1_object">0x1::object</a>;
 <b>use</b> <a href="../../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option">0x1::option</a>;
 <b>use</b> <a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">0x1::signer</a>;
+<b>use</b> <a href="../../aptos-stdlib/doc/single_key.md#0x1_single_key">0x1::single_key</a>;
 <b>use</b> <a href="../../aptos-stdlib/../move-stdlib/doc/string.md#0x1_string">0x1::string</a>;
 <b>use</b> <a href="system_addresses.md#0x1_system_addresses">0x1::system_addresses</a>;
 </code></pre>
@@ -283,6 +293,28 @@ A serialized BN254 G2 point is invalid.
 
 
 
+<a id="0x1_keyless_account_E_KEYLESS_ACCOUNT_DK_ALREADY_BACKED_UP"></a>
+
+A DK has already been backed up for this keyless account. Please call <code><a href="confidential_asset.md#0x1_confidential_asset_register_raw">confidential_asset::register_raw</a></code> instead
+with the corresponding EK.
+
+
+<pre><code><b>const</b> <a href="keyless_account.md#0x1_keyless_account_E_KEYLESS_ACCOUNT_DK_ALREADY_BACKED_UP">E_KEYLESS_ACCOUNT_DK_ALREADY_BACKED_UP</a>: u64 = 4;
+</code></pre>
+
+
+
+<a id="0x1_keyless_account_E_NOT_KEYLESS_BACKUP_ACCOUNT"></a>
+
+The account's authentication key does not match the multi-key derived from the provided keyless public key
+and Ed25519 backup public key. Indicates this is not a keyless+Ed25519-backup account.
+
+
+<pre><code><b>const</b> <a href="keyless_account.md#0x1_keyless_account_E_NOT_KEYLESS_BACKUP_ACCOUNT">E_NOT_KEYLESS_BACKUP_ACCOUNT</a>: u64 = 5;
+</code></pre>
+
+
+
 <a id="0x1_keyless_account_E_TRAINING_WHEELS_PK_WRONG_SIZE"></a>
 
 The training wheels PK needs to be 32 bytes long.
@@ -457,6 +489,131 @@ WARNING: See <code>set_configuration_for_next_epoch</code> for caveats.
     <a href="chain_status.md#0x1_chain_status_assert_genesis">chain_status::assert_genesis</a>();
     // There should not be a previous resource set here.
     <b>move_to</b>(fx, config);
+}
+</code></pre>
+
+
+
+</details>
+
+<a id="0x1_keyless_account_upsert_ed25519_backup_key_and_encrypt_dk"></a>
+
+## Function `upsert_ed25519_backup_key_and_encrypt_dk`
+
+Atomically performs an <code><a href="account.md#0x1_account_upsert_ed25519_backup_key_on_keyless_account">account::upsert_ed25519_backup_key_on_keyless_account</a></code> and stores an encrypted payload
+in the account's <code>AccountBlob</code>. Currently used for backing up confidential-asset decryption keys on-chain
+in Petra for keyless accounts. The encrypted payload is opaque to the chain — see <code><a href="account.md#0x1_account_AccountBlob">account::AccountBlob</a></code>.
+
+
+<pre><code>entry <b>fun</b> <a href="keyless_account.md#0x1_keyless_account_upsert_ed25519_backup_key_and_encrypt_dk">upsert_ed25519_backup_key_and_encrypt_dk</a>(<a href="account.md#0x1_account">account</a>: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>, keyless_public_key: <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;, backup_public_key: <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;, backup_key_proof: <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;, dk_ciphertext: <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;)
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code>entry <b>fun</b> <a href="keyless_account.md#0x1_keyless_account_upsert_ed25519_backup_key_and_encrypt_dk">upsert_ed25519_backup_key_and_encrypt_dk</a>(
+    <a href="account.md#0x1_account">account</a>: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>,
+    keyless_public_key: <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;,
+    backup_public_key: <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;,
+    backup_key_proof: <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;,
+    dk_ciphertext: <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;
+) {
+    // Step 1: Perform the key rotation/installation
+    <b>let</b> keyless_single_key = <a href="../../aptos-stdlib/doc/single_key.md#0x1_single_key_new_public_key_from_bytes">single_key::new_public_key_from_bytes</a>(keyless_public_key);
+
+    <a href="account.md#0x1_account_upsert_ed25519_backup_key_on_keyless_account_internal">account::upsert_ed25519_backup_key_on_keyless_account_internal</a>(
+        <a href="account.md#0x1_account">account</a>,
+        keyless_single_key,
+        backup_public_key,
+        backup_key_proof
+    );
+
+    // Step 2: Store the encrypted payload <b>as</b> the <a href="account.md#0x1_account">account</a>'s opaque blob (size-checked by `<a href="account.md#0x1_account">account</a>`).
+    <a href="account.md#0x1_account_upsert_account_blob">account::upsert_account_blob</a>(<a href="account.md#0x1_account">account</a>, dk_ciphertext);
+}
+</code></pre>
+
+
+
+</details>
+
+<a id="0x1_keyless_account_register_ek_and_encrypt_dk"></a>
+
+## Function `register_ek_and_encrypt_dk`
+
+Atomically registers an EK for the specified <code>asset_type</code> and stores a DK ciphertext in the <code><a href="account.md#0x1_account_AccountBlob">account::AccountBlob</a></code>
+resource. This can only be called once: i.e., when registering an EK for the 1st time. Subsequent EK registrations
+for other asset types should be done via <code><a href="confidential_asset.md#0x1_confidential_asset_register_raw">confidential_asset::register_raw</a></code>.
+
+<code>keyless_public_key</code> and <code>backup_public_key</code> must be the (1-of-2) keyless + Ed25519-backup multi-key currently
+authorizing this account; otherwise the call aborts. This check pins the function to keyless+backup accounts and
+prevents accidentally backing up a DK for an account whose auth key has a different (incompatible) shape.
+
+
+<pre><code>entry <b>fun</b> <a href="keyless_account.md#0x1_keyless_account_register_ek_and_encrypt_dk">register_ek_and_encrypt_dk</a>(owner: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>, keyless_public_key: <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;, backup_public_key: <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;, asset_type: <a href="object.md#0x1_object_Object">object::Object</a>&lt;<a href="fungible_asset.md#0x1_fungible_asset_Metadata">fungible_asset::Metadata</a>&gt;, ek: <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;, sigma_proto_comm: <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;<a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;&gt;, sigma_proto_resp: <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;<a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;&gt;, dk_ciphertext: <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;)
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code>entry <b>fun</b> <a href="keyless_account.md#0x1_keyless_account_register_ek_and_encrypt_dk">register_ek_and_encrypt_dk</a>(
+    owner: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>,
+    keyless_public_key: <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;,
+    backup_public_key: <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;,
+    asset_type: Object&lt;<a href="fungible_asset.md#0x1_fungible_asset_Metadata">fungible_asset::Metadata</a>&gt;,
+    ek: <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;,
+    sigma_proto_comm: <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;<a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;&gt;,
+    sigma_proto_resp: <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;<a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;&gt;,
+    dk_ciphertext: <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;)
+{
+    <b>let</b> owner_addr = <a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer_address_of">signer::address_of</a>(owner);
+
+    // Step 1: Verify the <a href="account.md#0x1_account">account</a> is currently authorized by a 1-of-2 multi-key over the supplied <a href="../../aptos-stdlib/doc/keyless.md#0x1_keyless">keyless</a> PK and
+    // Ed25519 backup PK. This rejects calls on accounts that haven't gone through `upsert_ed25519_backup_key_*`.
+    // The <a href="../../aptos-stdlib/doc/keyless.md#0x1_keyless">keyless</a> slot must actually be a `Keyless` or `FederatedKeyless` `AnyPublicKey`; without this check, a
+    // 1-of-2 multi-key built from two Ed25519 keys (or <a href="../../aptos-stdlib/doc/any.md#0x1_any">any</a> other shape) <b>with</b> a matching auth key would slip past.
+    <b>let</b> keyless_single_key = <a href="../../aptos-stdlib/doc/single_key.md#0x1_single_key_new_public_key_from_bytes">single_key::new_public_key_from_bytes</a>(keyless_public_key);
+    <b>assert</b>!(
+        <a href="../../aptos-stdlib/doc/single_key.md#0x1_single_key_is_keyless_or_federated_keyless_public_key">single_key::is_keyless_or_federated_keyless_public_key</a>(&keyless_single_key),
+        <a href="../../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error_invalid_argument">error::invalid_argument</a>(<a href="keyless_account.md#0x1_keyless_account_E_NOT_KEYLESS_BACKUP_ACCOUNT">E_NOT_KEYLESS_BACKUP_ACCOUNT</a>)
+    );
+
+    <b>let</b> expected_auth_key = <a href="../../aptos-stdlib/doc/multi_key.md#0x1_multi_key_new_multi_key_from_single_keys">multi_key::new_multi_key_from_single_keys</a>(
+        <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>[
+            keyless_single_key,
+            <a href="../../aptos-stdlib/doc/single_key.md#0x1_single_key_from_ed25519_public_key_unvalidated">single_key::from_ed25519_public_key_unvalidated</a>(
+                <a href="../../aptos-stdlib/doc/ed25519.md#0x1_ed25519_new_unvalidated_public_key_from_bytes">ed25519::new_unvalidated_public_key_from_bytes</a>(backup_public_key)
+            )
+        ],
+        1
+    ).to_authentication_key();
+
+    <b>assert</b>!(
+        <a href="account.md#0x1_account_get_authentication_key">account::get_authentication_key</a>(owner_addr) == expected_auth_key,
+        <a href="../../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error_invalid_argument">error::invalid_argument</a>(<a href="keyless_account.md#0x1_keyless_account_E_NOT_KEYLESS_BACKUP_ACCOUNT">E_NOT_KEYLESS_BACKUP_ACCOUNT</a>)
+    );
+
+    // Step 2: We must only <b>use</b> this when first registering an EK. Subsequent EK registrations for other asset types
+    // must be done via `<a href="confidential_asset.md#0x1_confidential_asset_register_raw">confidential_asset::register_raw</a>` and are assumed <b>to</b> <b>use</b> the same DK backed up in `<a href="account.md#0x1_account_AccountBlob">account::AccountBlob</a>`.
+    <b>assert</b>!(
+        <a href="account.md#0x1_account_account_blob_exists">account::account_blob_exists</a>(owner_addr) == <b>false</b>,
+        <a href="../../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error_already_exists">error::already_exists</a>(<a href="keyless_account.md#0x1_keyless_account_E_KEYLESS_ACCOUNT_DK_ALREADY_BACKED_UP">E_KEYLESS_ACCOUNT_DK_ALREADY_BACKED_UP</a>));
+
+    <a href="confidential_asset.md#0x1_confidential_asset_register_raw">confidential_asset::register_raw</a>(
+        owner,
+        asset_type,
+        ek,
+        sigma_proto_comm,
+        sigma_proto_resp
+    );
+
+    <a href="account.md#0x1_account_upsert_account_blob">account::upsert_account_blob</a>(owner, dk_ciphertext);
 }
 </code></pre>
 

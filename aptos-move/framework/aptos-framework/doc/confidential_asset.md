@@ -2034,6 +2034,9 @@ Withdraws tokens from the sender's available balance to recipient's primary FA s
     <b>assert</b>!(!<a href="confidential_asset.md#0x1_confidential_asset_is_emergency_paused">is_emergency_paused</a>(), <a href="../../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error_invalid_state">error::invalid_state</a>(<a href="confidential_asset.md#0x1_confidential_asset_E_EMERGENCY_PAUSED">E_EMERGENCY_PAUSED</a>));
     <b>assert</b>!(<a href="confidential_asset.md#0x1_confidential_asset_is_safe_for_confidentiality">is_safe_for_confidentiality</a>(&asset_type), <a href="../../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error_invalid_argument">error::invalid_argument</a>(<a href="confidential_asset.md#0x1_confidential_asset_E_UNSAFE_DISPATCHABLE_FA">E_UNSAFE_DISPATCHABLE_FA</a>));
 
+    // WARNING: We do not <b>assert</b> `is_confidentiality_enabled_for_asset_type` because we want <b>to</b> give users a way <b>to</b>
+    // withdraw from the confidential into their <b>public</b> balance after an asset type is disabled.
+
     <b>let</b> sender_addr = <a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer_address_of">signer::address_of</a>(sender);
 
     // Read values before mutable borrow <b>to</b> avoid conflicting borrows of <a href="confidential_asset.md#0x1_confidential_asset_ConfidentialStore">ConfidentialStore</a>

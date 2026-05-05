@@ -26,7 +26,7 @@ This module implements the Keyless authentication scheme.
 
 ## Struct `PublicKey`
 
-An *unvalidated* any public key: not necessarily an elliptic curve point, just a sequence of 32 bytes
+An *unvalidated* keyless public key
 
 
 <pre><code><b>struct</b> <a href="keyless.md#0x1_keyless_PublicKey">PublicKey</a> <b>has</b> <b>copy</b>, drop, store

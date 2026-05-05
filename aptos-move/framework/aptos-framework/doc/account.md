@@ -15,6 +15,7 @@
 -  [Struct `RotationCapability`](#0x1_account_RotationCapability)
 -  [Struct `SignerCapability`](#0x1_account_SignerCapability)
 -  [Resource `OriginatingAddress`](#0x1_account_OriginatingAddress)
+-  [Enum Resource `AccountBlob`](#0x1_account_AccountBlob)
 -  [Struct `RotationProofChallenge`](#0x1_account_RotationProofChallenge)
 -  [Struct `RotationCapabilityOfferProofChallenge`](#0x1_account_RotationCapabilityOfferProofChallenge)
 -  [Struct `SignerCapabilityOfferProofChallenge`](#0x1_account_SignerCapabilityOfferProofChallenge)
@@ -45,6 +46,10 @@
     -  [Arguments](#@Arguments_1)
     -  [Aborts](#@Aborts_2)
     -  [Events](#@Events_3)
+-  [Function `upsert_ed25519_backup_key_on_keyless_account_internal`](#0x1_account_upsert_ed25519_backup_key_on_keyless_account_internal)
+-  [Function `upsert_account_blob`](#0x1_account_upsert_account_blob)
+-  [Function `get_account_blob`](#0x1_account_get_account_blob)
+-  [Function `account_blob_exists`](#0x1_account_account_blob_exists)
 -  [Function `rotate_authentication_key`](#0x1_account_rotate_authentication_key)
 -  [Function `rotate_authentication_key_with_rotation_capability`](#0x1_account_rotate_authentication_key_with_rotation_capability)
 -  [Function `offer_rotation_capability`](#0x1_account_offer_rotation_capability)
@@ -512,6 +517,52 @@ This struct solves this problem by mapping the new authentication key <code>b</c
 
 </details>
 
+<a id="0x1_account_AccountBlob"></a>
+
+## Enum Resource `AccountBlob`
+
+A generic, account-scoped auxiliary data resource. Account-type-agnostic: works for keyless, MultiEd25519,
+MultiKey, passkey-based accounts, etc. Each variant tags the kind of payload stored. Writers go through
+<code>upsert_account_blob</code> (friend-only) so the calling module owns the policy (e.g. atomicity with a key
+rotation); readers can use the <code>get_account_blob</code> view.
+
+Variants:
+* <code>EncryptedDK</code> — a Petra-encrypted backup of an account's confidential-asset decryption key.
+
+
+<pre><code>enum <a href="account.md#0x1_account_AccountBlob">AccountBlob</a> <b>has</b> <b>copy</b>, drop, store, key
+</code></pre>
+
+
+
+<details>
+<summary>Variants</summary>
+
+
+<details>
+<summary>EncryptedDK</summary>
+
+
+<details>
+<summary>Fields</summary>
+
+
+<dl>
+<dt>
+<code>ciphertext: <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;</code>
+</dt>
+<dd>
+
+</dd>
+</dl>
+
+
+</details>
+
+</details>
+
+</details>
+
 <a id="0x1_account_RotationProofChallenge"></a>
 
 ## Struct `RotationProofChallenge`
@@ -814,6 +865,26 @@ An attempt to create a resource account on an account that has a committed trans
 
 
 
+<a id="0x1_account_EACCOUNT_BLOB_NOT_FOUND"></a>
+
+No <code><a href="account.md#0x1_account_AccountBlob">AccountBlob</a></code> resource exists for the queried address.
+
+
+<pre><code><b>const</b> <a href="account.md#0x1_account_EACCOUNT_BLOB_NOT_FOUND">EACCOUNT_BLOB_NOT_FOUND</a>: u64 = 29;
+</code></pre>
+
+
+
+<a id="0x1_account_EACCOUNT_BLOB_TOO_LONG"></a>
+
+The blob being written into <code><a href="account.md#0x1_account_AccountBlob">AccountBlob</a></code> exceeds <code><a href="account.md#0x1_account_MAX_ACCOUNT_BLOB_BYTES">MAX_ACCOUNT_BLOB_BYTES</a></code>.
+
+
+<pre><code><b>const</b> <a href="account.md#0x1_account_EACCOUNT_BLOB_TOO_LONG">EACCOUNT_BLOB_TOO_LONG</a>: u64 = 28;
+</code></pre>
+
+
+
 <a id="0x1_account_EACCOUNT_DOES_NOT_EXIST"></a>
 
 Account does not exist
@@ -1070,6 +1141,17 @@ Specified current public key is not correct
 
 
 <pre><code><b>const</b> <a href="account.md#0x1_account_EWRONG_CURRENT_PUBLIC_KEY">EWRONG_CURRENT_PUBLIC_KEY</a>: u64 = 7;
+</code></pre>
+
+
+
+<a id="0x1_account_MAX_ACCOUNT_BLOB_BYTES"></a>
+
+Maximum size of the payload stored in <code><a href="account.md#0x1_account_AccountBlob">AccountBlob</a></code>. 96 bytes is generous for the initial use case
+(an encrypted 32-byte confidential-asset DK with nonce + auth tag), while keeping per-account state small.
+
+
+<pre><code><b>const</b> <a href="account.md#0x1_account_MAX_ACCOUNT_BLOB_BYTES">MAX_ACCOUNT_BLOB_BYTES</a>: u64 = 96;
 </code></pre>
 
 
@@ -1765,9 +1847,9 @@ Note: This function does not update the <code><a href="account.md#0x1_account_Or
 
 ## Function `upsert_ed25519_backup_key_on_keyless_account`
 
-Upserts an ED25519 backup key to an account that has a keyless public key as its original public key by converting the account's authentication key
+Upserts an Ed25519 backup key to an account that has a keyless public key as its original public key by converting the account's authentication key
 to a multi-key of the original keyless public key and the new backup key that requires 1 signature from either key to authenticate.
-This function takes a the account's original keyless public key and a ED25519 backup public key and rotates the account's authentication key to a multi-key of
+This function takes the account's original keyless public key and a Ed25519 backup public key and rotates the account's authentication key to a multi-key of
 the original keyless public key and the new backup key that requires 1 signature from either key to authenticate.
 
 Note: This function emits a <code>KeyRotationToMultiPublicKey</code> event marking both keys as verified since the keyless public key
@@ -1780,7 +1862,7 @@ is the original public key of the account and the new backup key has been valida
 
 * <code><a href="account.md#0x1_account">account</a></code> - The signer representing the keyless account
 * <code>keyless_public_key</code> - The original keyless public key of the account (wrapped in an AnyPublicKey)
-* <code>backup_public_key</code> - The ED25519 public key to add as a backup
+* <code>backup_public_key</code> - The Ed25519 public key to add as a backup
 * <code>backup_key_proof</code> - A signature from the backup key proving ownership
 
 
@@ -1811,8 +1893,47 @@ is the original public key of the account and the new backup key has been valida
 
 
 <pre><code>entry <b>fun</b> <a href="account.md#0x1_account_upsert_ed25519_backup_key_on_keyless_account">upsert_ed25519_backup_key_on_keyless_account</a>(<a href="account.md#0x1_account">account</a>: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>, keyless_public_key: <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;, backup_public_key: <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;, backup_key_proof: <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;) <b>acquires</b> <a href="account.md#0x1_account_Account">Account</a> {
-    // Check that the provided <b>public</b> key is a <a href="../../aptos-stdlib/doc/keyless.md#0x1_keyless">keyless</a> <b>public</b> key
     <b>let</b> keyless_single_key = <a href="../../aptos-stdlib/doc/single_key.md#0x1_single_key_new_public_key_from_bytes">single_key::new_public_key_from_bytes</a>(keyless_public_key);
+
+    <a href="account.md#0x1_account_upsert_ed25519_backup_key_on_keyless_account_internal">upsert_ed25519_backup_key_on_keyless_account_internal</a>(
+        <a href="account.md#0x1_account">account</a>,
+        keyless_single_key,
+        backup_public_key,
+        backup_key_proof
+    )
+}
+</code></pre>
+
+
+
+</details>
+
+<a id="0x1_account_upsert_ed25519_backup_key_on_keyless_account_internal"></a>
+
+## Function `upsert_ed25519_backup_key_on_keyless_account_internal`
+
+Arguments:
+keyless_single_key    expected to be an <code>AnyPublicKey::Keyless</code> or an <code>AnyPublicKey::FederatedKeyless</code>
+
+Note: The way this was written makes it hard to trivially change it to use the more type-safe <code><a href="../../aptos-stdlib/doc/keyless.md#0x1_keyless_PublicKey">keyless::PublicKey</a></code> rather than <code>AnyPublicKey</code>
+
+
+<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="account.md#0x1_account_upsert_ed25519_backup_key_on_keyless_account_internal">upsert_ed25519_backup_key_on_keyless_account_internal</a>(<a href="account.md#0x1_account">account</a>: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>, keyless_single_key: <a href="../../aptos-stdlib/doc/single_key.md#0x1_single_key_AnyPublicKey">single_key::AnyPublicKey</a>, backup_public_key: <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;, backup_key_proof: <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;)
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="account.md#0x1_account_upsert_ed25519_backup_key_on_keyless_account_internal">upsert_ed25519_backup_key_on_keyless_account_internal</a>(
+    <a href="account.md#0x1_account">account</a>: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>,
+    keyless_single_key: AnyPublicKey,
+    backup_public_key: <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;,
+    backup_key_proof: <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;
+) <b>acquires</b> <a href="account.md#0x1_account_Account">Account</a> {
+    // Check that the provided <b>public</b> key is a <a href="../../aptos-stdlib/doc/keyless.md#0x1_keyless">keyless</a> <b>public</b> key
     <b>assert</b>!(<a href="../../aptos-stdlib/doc/single_key.md#0x1_single_key_is_keyless_or_federated_keyless_public_key">single_key::is_keyless_or_federated_keyless_public_key</a>(&keyless_single_key), <a href="../../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error_invalid_argument">error::invalid_argument</a>(<a href="account.md#0x1_account_ENOT_A_KEYLESS_PUBLIC_KEY">ENOT_A_KEYLESS_PUBLIC_KEY</a>));
 
     <b>let</b> addr = <a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer_address_of">signer::address_of</a>(<a href="account.md#0x1_account">account</a>);
@@ -1864,6 +1985,99 @@ is the original public key of the account and the new backup key has been valida
         old_auth_key,
         new_auth_key,
     });
+}
+</code></pre>
+
+
+
+</details>
+
+<a id="0x1_account_upsert_account_blob"></a>
+
+## Function `upsert_account_blob`
+
+Upserts the opaque per-account <code><a href="account.md#0x1_account_AccountBlob">AccountBlob</a></code> for <code><a href="account.md#0x1_account">account</a></code>. Friend-only so that the policy of who can
+write a blob (and the atomicity guarantees that come with it, e.g. coupling with a key rotation) lives
+in the calling module rather than at this layer.
+
+
+<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="account.md#0x1_account_upsert_account_blob">upsert_account_blob</a>(<a href="account.md#0x1_account">account</a>: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>, blob: <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;)
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="account.md#0x1_account_upsert_account_blob">upsert_account_blob</a>(<a href="account.md#0x1_account">account</a>: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>, blob: <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;) <b>acquires</b> <a href="account.md#0x1_account_AccountBlob">AccountBlob</a> {
+    <b>assert</b>!(
+        blob.length() &lt;= <a href="account.md#0x1_account_MAX_ACCOUNT_BLOB_BYTES">MAX_ACCOUNT_BLOB_BYTES</a>,
+        <a href="../../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error_invalid_argument">error::invalid_argument</a>(<a href="account.md#0x1_account_EACCOUNT_BLOB_TOO_LONG">EACCOUNT_BLOB_TOO_LONG</a>)
+    );
+    <b>let</b> addr = <a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer_address_of">signer::address_of</a>(<a href="account.md#0x1_account">account</a>);
+    <b>if</b> (!<b>exists</b>&lt;<a href="account.md#0x1_account_AccountBlob">AccountBlob</a>&gt;(addr)) {
+        <b>move_to</b>(<a href="account.md#0x1_account">account</a>, AccountBlob::EncryptedDK { ciphertext: blob });
+    } <b>else</b> {
+        <a href="account.md#0x1_account_AccountBlob">AccountBlob</a>[addr].ciphertext = blob;
+    };
+}
+</code></pre>
+
+
+
+</details>
+
+<a id="0x1_account_get_account_blob"></a>
+
+## Function `get_account_blob`
+
+Returns the <code><a href="account.md#0x1_account_AccountBlob">AccountBlob</a></code> stored for <code>addr</code>. Aborts with <code><a href="account.md#0x1_account_EACCOUNT_BLOB_NOT_FOUND">EACCOUNT_BLOB_NOT_FOUND</a></code> if none exists,
+so callers must check <code><a href="account.md#0x1_account_account_blob_exists">account_blob_exists</a>(addr)</code> first if absence is a valid case.
+
+
+<pre><code>#[view]
+<b>public</b> <b>fun</b> <a href="account.md#0x1_account_get_account_blob">get_account_blob</a>(addr: <b>address</b>): <a href="account.md#0x1_account_AccountBlob">account::AccountBlob</a>
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="account.md#0x1_account_get_account_blob">get_account_blob</a>(addr: <b>address</b>): <a href="account.md#0x1_account_AccountBlob">AccountBlob</a> <b>acquires</b> <a href="account.md#0x1_account_AccountBlob">AccountBlob</a> {
+    <b>assert</b>!(
+        <b>exists</b>&lt;<a href="account.md#0x1_account_AccountBlob">AccountBlob</a>&gt;(addr),
+        <a href="../../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error_not_found">error::not_found</a>(<a href="account.md#0x1_account_EACCOUNT_BLOB_NOT_FOUND">EACCOUNT_BLOB_NOT_FOUND</a>)
+    );
+    <a href="account.md#0x1_account_AccountBlob">AccountBlob</a>[addr]
+}
+</code></pre>
+
+
+
+</details>
+
+<a id="0x1_account_account_blob_exists"></a>
+
+## Function `account_blob_exists`
+
+Returns whether an <code><a href="account.md#0x1_account_AccountBlob">AccountBlob</a></code> is stored for <code>addr</code>.
+
+
+<pre><code>#[view]
+<b>public</b> <b>fun</b> <a href="account.md#0x1_account_account_blob_exists">account_blob_exists</a>(addr: <b>address</b>): bool
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="account.md#0x1_account_account_blob_exists">account_blob_exists</a>(addr: <b>address</b>): bool {
+    <b>exists</b>&lt;<a href="account.md#0x1_account_AccountBlob">AccountBlob</a>&gt;(addr)
 }
 </code></pre>
 

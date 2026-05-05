@@ -121,7 +121,7 @@ Creates a new public key from a serialized Ristretto255 point.
 Returns a commitment as a serialized byte array
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="ristretto255_pedersen.md#0x1_ristretto255_pedersen_commitment_to_bytes">commitment_to_bytes</a>(comm: &<a href="ristretto255_pedersen.md#0x1_ristretto255_pedersen_Commitment">ristretto255_pedersen::Commitment</a>): <a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;
+<pre><code><b>public</b> <b>fun</b> <a href="ristretto255_pedersen.md#0x1_ristretto255_pedersen_commitment_to_bytes">commitment_to_bytes</a>(self: &<a href="ristretto255_pedersen.md#0x1_ristretto255_pedersen_Commitment">ristretto255_pedersen::Commitment</a>): <a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;
 </code></pre>
 
 
@@ -130,8 +130,8 @@ Returns a commitment as a serialized byte array
 <summary>Implementation</summary>
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="ristretto255_pedersen.md#0x1_ristretto255_pedersen_commitment_to_bytes">commitment_to_bytes</a>(comm: &<a href="ristretto255_pedersen.md#0x1_ristretto255_pedersen_Commitment">Commitment</a>): <a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt; {
-    <a href="ristretto255.md#0x1_ristretto255_point_to_bytes">ristretto255::point_to_bytes</a>(&<a href="ristretto255.md#0x1_ristretto255_point_compress">ristretto255::point_compress</a>(&comm.point))
+<pre><code><b>public</b> <b>fun</b> <a href="ristretto255_pedersen.md#0x1_ristretto255_pedersen_commitment_to_bytes">commitment_to_bytes</a>(self: &<a href="ristretto255_pedersen.md#0x1_ristretto255_pedersen_Commitment">Commitment</a>): <a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt; {
+    self.point.point_compress().point_to_bytes()
 }
 </code></pre>
 
