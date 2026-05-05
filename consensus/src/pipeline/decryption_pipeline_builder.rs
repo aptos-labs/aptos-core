@@ -227,6 +227,31 @@ async fn decrypt_validator_path(
         });
     }
 
+    // Trusted setup capacity is fixed for the epoch. Once block.round() reaches
+    // num_rounds, no further encrypted txns can be decrypted in this epoch —
+    // mark them all as TrustedSetupExhausted (non-retryable in-epoch).
+    let num_rounds = secret_share_config.digest_key().num_rounds();
+    if block.round() >= num_rounds as u64 {
+        error!(
+            "Block round {} >= trusted setup num_rounds {}; marking {} encrypted txns as TrustedSetupExhausted",
+            block.round(),
+            num_rounds,
+            encrypted_txns.len()
+        );
+        let _ = derived_self_key_share_tx.send(None);
+        let failed_txns = mark_txns_failed_decryption(
+            encrypted_txns,
+            DecryptionFailureReason::TrustedSetupExhausted,
+        );
+        return Ok(DecryptionResult {
+            decrypted_txns: failed_txns,
+            regular_txns,
+            max_txns_from_block_to_execute,
+            block_gas_limit,
+            decryption_key: Some(None),
+        });
+    }
+
     // Decrypting txns that the VM will skip after a NewEpochEvent leaks sender
     // intent. If the block carries an epoch-ending vtxn, mark every encrypted
     // txn as retry without performing any crypto work.
@@ -258,16 +283,50 @@ async fn decrypt_validator_path(
         );
         let mut all = encrypted_txns;
         let exceeded = all.split_off(max_encrypted_txns);
+        let exceeded =
+            mark_txns_failed_decryption(exceeded, DecryptionFailureReason::BatchLimitReached);
         (all, exceeded)
     } else {
         (encrypted_txns, Vec::new())
     };
 
-    // Mark batch-limit-exceeded txns as failed decryption with retry reason.
-    let batch_limit_exceeded_txns = mark_txns_failed_decryption(
-        batch_limit_exceeded_txns,
-        DecryptionFailureReason::BatchLimitReached,
-    );
+    // Cap the encrypted partition at max_txns_from_block_to_execute. The cap is
+    // applied pre-shuffle here; prepare_block later concats [decrypted, regular]
+    // and truncates at the same limit, so this is a conservative optimization:
+    // it may over-mark txns that would have survived shuffle, but it never
+    // under-decrypts, since ExecuteBlockLimitReached is a Retry status.
+    let (encrypted_txns, execute_limit_exceeded_txns) = match max_txns_from_block_to_execute {
+        Some(max) if (encrypted_txns.len() as u64) > max => {
+            let max = max as usize;
+            warn!(
+                "Block {} has {} encrypted txns exceeding execute-block limit {}; marking excess as ExecuteBlockLimitReached",
+                block.round(),
+                encrypted_txns.len(),
+                max,
+            );
+            let mut all = encrypted_txns;
+            let exceeded = all.split_off(max);
+            let exceeded = mark_txns_failed_decryption(
+                exceeded,
+                DecryptionFailureReason::ExecuteBlockLimitReached,
+            );
+            (all, exceeded)
+        },
+        _ => (encrypted_txns, Vec::new()),
+    };
+
+    // If the cap left no encrypted txns to decrypt, short-circuit before crypto.
+    if encrypted_txns.is_empty() {
+        let _ = derived_self_key_share_tx.send(None);
+        let decrypted_txns = [batch_limit_exceeded_txns, execute_limit_exceeded_txns].concat();
+        return Ok(DecryptionResult {
+            decrypted_txns,
+            regular_txns,
+            max_txns_from_block_to_execute,
+            block_gas_limit,
+            decryption_key: Some(None),
+        });
+    }
 
     let txn_ciphertexts: Vec<Ciphertext> = encrypted_txns
         .iter()
@@ -282,9 +341,8 @@ async fn decrypt_validator_path(
         .collect();
 
     // TODO(ibalajiarun): Consider using commit block height to reduce trusted setup size
-    // TODO(ibalajiarun): Fix this wrapping
-    let num_rounds = secret_share_config.digest_key().num_rounds() as u64;
-    let encryption_round = block.round() % num_rounds;
+    // Safe: TrustedSetupExhausted check above guarantees block.round() < num_rounds.
+    let encryption_round = block.round();
     let digest_key = secret_share_config.digest_key_arc();
     let (txn_ciphertexts, digest, proofs_promise) = tokio::task::spawn_blocking(move || {
         monitor!(
@@ -393,7 +451,12 @@ async fn decrypt_validator_path(
                 )
             })
             .collect();
-        let decrypted_txns = [failed_txns, batch_limit_exceeded_txns].concat();
+        let decrypted_txns = [
+            failed_txns,
+            batch_limit_exceeded_txns,
+            execute_limit_exceeded_txns,
+        ]
+        .concat();
         return Ok(DecryptionResult {
             decrypted_txns,
             regular_txns,
@@ -478,14 +541,20 @@ async fn decrypt_validator_path(
     let num_failed = num_failed_decryptions.into_inner();
     let num_decrypted = decrypted_txns.len() - num_failed;
     info!(
-        "Decryption complete for block {}: {} decrypted, {} failed, {} batch_limit_exceeded, {} unencrypted",
+        "Decryption complete for block {}: {} decrypted, {} failed, {} batch_limit_exceeded, {} execute_limit_exceeded, {} unencrypted",
         block.round(),
         num_decrypted,
         num_failed,
         batch_limit_exceeded_txns.len(),
+        execute_limit_exceeded_txns.len(),
         regular_txns.len(),
     );
-    let decrypted_txns = [decrypted_txns, batch_limit_exceeded_txns].concat();
+    let decrypted_txns = [
+        decrypted_txns,
+        batch_limit_exceeded_txns,
+        execute_limit_exceeded_txns,
+    ]
+    .concat();
 
     let block_txn_dec_key = BlockTxnDecryptionKey::from_secret_shared_key(&decryption_key)
         .context("Decryption key serialization failed")?;
@@ -505,9 +574,11 @@ fn record_decryption_metrics(result: &DecryptionResult) {
     let mut config_unavailable = 0u64;
     let mut key_unavailable = 0u64;
     let mut batch_limit_exceeded = 0u64;
+    let mut execute_block_limit_exceeded = 0u64;
     let mut payload_hash_mismatch = 0u64;
     let mut epoch_mismatch = 0u64;
     let mut epoch_end_retry = 0u64;
+    let mut trusted_setup_exhausted = 0u64;
     let mut entry_fun_mismatch = 0u64;
 
     for txn in &result.decrypted_txns {
@@ -519,11 +590,15 @@ fn record_decryption_metrics(result: &DecryptionResult) {
             EncryptedPayload::FailedDecryption { reason, .. } => match reason {
                 DecryptionFailureReason::CryptoFailure => failed_decryption += 1,
                 DecryptionFailureReason::BatchLimitReached => batch_limit_exceeded += 1,
+                DecryptionFailureReason::ExecuteBlockLimitReached => {
+                    execute_block_limit_exceeded += 1
+                },
                 DecryptionFailureReason::ConfigUnavailable => config_unavailable += 1,
                 DecryptionFailureReason::DecryptionKeyUnavailable => key_unavailable += 1,
                 DecryptionFailureReason::PayloadHashMismatch => payload_hash_mismatch += 1,
                 DecryptionFailureReason::EpochMismatch => epoch_mismatch += 1,
                 DecryptionFailureReason::EpochEndRetry => epoch_end_retry += 1,
+                DecryptionFailureReason::TrustedSetupExhausted => trusted_setup_exhausted += 1,
                 DecryptionFailureReason::ClaimedEntryFunctionMismatch => entry_fun_mismatch += 1,
             },
             EncryptedPayload::Encrypted(_) => {
@@ -541,9 +616,11 @@ fn record_decryption_metrics(result: &DecryptionResult) {
         ("config_unavailable", config_unavailable),
         ("key_unavailable", key_unavailable),
         ("batch_limit_exceeded", batch_limit_exceeded),
+        ("execute_block_limit_exceeded", execute_block_limit_exceeded),
         ("payload_hash_mismatch", payload_hash_mismatch),
         ("epoch_mismatch", epoch_mismatch),
         ("epoch_end_retry", epoch_end_retry),
+        ("trusted_setup_exhausted", trusted_setup_exhausted),
         ("entry_fun_mismatch", entry_fun_mismatch),
         ("unencrypted", unencrypted),
     ];
@@ -850,9 +927,11 @@ mod tests {
             "config_unavailable",
             "key_unavailable",
             "batch_limit_exceeded",
+            "execute_block_limit_exceeded",
             "payload_hash_mismatch",
             "epoch_mismatch",
             "epoch_end_retry",
+            "trusted_setup_exhausted",
             "entry_fun_mismatch",
             "unencrypted",
         ];
@@ -877,6 +956,8 @@ mod tests {
                 make_failed_decryption_txn(DecryptionFailureReason::EpochMismatch),
                 make_failed_decryption_txn(DecryptionFailureReason::EpochEndRetry),
                 make_failed_decryption_txn(DecryptionFailureReason::ClaimedEntryFunctionMismatch),
+                make_failed_decryption_txn(DecryptionFailureReason::ExecuteBlockLimitReached),
+                make_failed_decryption_txn(DecryptionFailureReason::TrustedSetupExhausted),
             ],
             regular_txns: vec![make_regular_txn(), make_regular_txn()],
             max_txns_from_block_to_execute: None,
@@ -898,7 +979,7 @@ mod tests {
             .zip(after.iter())
             .map(|(b, a)| a - b)
             .collect();
-        let expected = [1, 1, 1, 1, 1, 1, 1, 1, 1, 2];
+        let expected = [1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 2];
         assert_eq!(deltas, expected, "labels: {:?}", labels);
     }
 
@@ -1155,7 +1236,8 @@ mod tests {
 
     #[tokio::test]
     async fn validator_path_dkg_result_vtxn_marks_all_epoch_end_retry() {
-        let ctx = TestContext::new(vec![100]);
+        // num_rounds=2 so block.round()=1 doesn't trigger TrustedSetupExhausted.
+        let ctx = TestContext::new_with_capacity(vec![100], 1, 2);
         let block = make_block(Some(vec![dkg_vtxn()]));
         let encrypted = vec![make_encrypted_txn(), make_encrypted_txn()];
         let regular = vec![make_regular_txn()];
@@ -1188,7 +1270,8 @@ mod tests {
 
     #[tokio::test]
     async fn validator_path_chunky_dkg_result_vtxn_marks_all_epoch_end_retry() {
-        let ctx = TestContext::new(vec![100]);
+        // num_rounds=2 so block.round()=1 doesn't trigger TrustedSetupExhausted.
+        let ctx = TestContext::new_with_capacity(vec![100], 1, 2);
         let block = make_block(Some(vec![chunky_dkg_vtxn()]));
         let encrypted = vec![make_encrypted_txn()];
 
@@ -1214,6 +1297,121 @@ mod tests {
             &result.decrypted_txns[0],
             &DecryptionFailureReason::EpochEndRetry,
         );
+        assert_eq!(result.decryption_key, Some(None));
+        assert!(key_share_rx.await.unwrap().is_none());
+    }
+
+    #[tokio::test]
+    async fn validator_path_round_exceeds_num_rounds_marks_trusted_setup_exhausted() {
+        // TestContext::new uses num_rounds=1; make_block uses round=1, so the
+        // round check fires. Setting max_txns_from_block_to_execute=Some(0)
+        // also verifies that TrustedSetupExhausted takes precedence over
+        // ExecuteBlockLimitReached. (See the dkg-vtxn precedence test below
+        // for precedence over EpochEndRetry.)
+        let ctx = TestContext::new(vec![100]);
+        let block = make_block(None);
+        assert!(block.round() >= ctx.secret_share_config.digest_key().num_rounds() as u64);
+        let encrypted = vec![make_encrypted_txn(), make_encrypted_txn()];
+        let regular = vec![make_regular_txn()];
+
+        let (key_share_tx, key_share_rx) = oneshot::channel();
+        let (_skey_tx, skey_rx) = oneshot::channel();
+
+        let result = decrypt_validator_path(
+            encrypted,
+            regular,
+            &block,
+            ctx.authors[0],
+            &ctx.secret_share_config,
+            key_share_tx,
+            skey_rx,
+            Some(0),
+            None,
+        )
+        .await
+        .expect("should succeed");
+
+        assert_eq!(result.decrypted_txns.len(), 2);
+        for txn in &result.decrypted_txns {
+            assert_failed_with(txn, &DecryptionFailureReason::TrustedSetupExhausted);
+        }
+        assert_eq!(result.regular_txns.len(), 1);
+        assert_eq!(result.decryption_key, Some(None));
+        assert!(key_share_rx.await.unwrap().is_none());
+    }
+
+    #[tokio::test]
+    async fn validator_path_trusted_setup_exhausted_wins_over_epoch_end_retry() {
+        // Both `block.round() >= num_rounds` and a DKG vtxn are present;
+        // TrustedSetupExhausted should win since it's checked first.
+        let ctx = TestContext::new(vec![100]);
+        let block = make_block(Some(vec![dkg_vtxn()]));
+        assert!(block.round() >= ctx.secret_share_config.digest_key().num_rounds() as u64);
+        let encrypted = vec![make_encrypted_txn(), make_encrypted_txn()];
+
+        let (key_share_tx, key_share_rx) = oneshot::channel();
+        let (_skey_tx, skey_rx) = oneshot::channel();
+
+        let result = decrypt_validator_path(
+            encrypted,
+            vec![],
+            &block,
+            ctx.authors[0],
+            &ctx.secret_share_config,
+            key_share_tx,
+            skey_rx,
+            None,
+            None,
+        )
+        .await
+        .expect("should succeed");
+
+        assert_eq!(result.decrypted_txns.len(), 2);
+        for txn in &result.decrypted_txns {
+            assert_failed_with(txn, &DecryptionFailureReason::TrustedSetupExhausted);
+        }
+        assert_eq!(result.decryption_key, Some(None));
+        assert!(key_share_rx.await.unwrap().is_none());
+    }
+
+    #[tokio::test]
+    async fn validator_path_execute_block_limit_caps_encrypted_txns() {
+        // num_rounds=2 so block.round()=1 passes the trusted-setup check.
+        // max_batch_size=8 (must be a power of 2) so batch limit doesn't fire.
+        let ctx = TestContext::new_with_capacity(vec![100], 8, 2);
+        let block = make_block(None);
+        assert!(block.round() < ctx.secret_share_config.digest_key().num_rounds() as u64);
+        let encrypted = vec![
+            make_encrypted_txn(),
+            make_encrypted_txn(),
+            make_encrypted_txn(),
+        ];
+        let regular = vec![make_regular_txn()];
+
+        let (key_share_tx, key_share_rx) = oneshot::channel();
+        let (_skey_tx, skey_rx) = oneshot::channel();
+
+        // max=0 forces all encrypted txns past the cap and triggers the
+        // post-cap empty short-circuit (no crypto work).
+        let result = decrypt_validator_path(
+            encrypted,
+            regular,
+            &block,
+            ctx.authors[0],
+            &ctx.secret_share_config,
+            key_share_tx,
+            skey_rx,
+            Some(0),
+            None,
+        )
+        .await
+        .expect("should succeed");
+
+        assert_eq!(result.decrypted_txns.len(), 3);
+        for txn in &result.decrypted_txns {
+            assert_failed_with(txn, &DecryptionFailureReason::ExecuteBlockLimitReached);
+        }
+        assert_eq!(result.regular_txns.len(), 1);
         assert_eq!(result.decryption_key, Some(None));
         assert!(key_share_rx.await.unwrap().is_none());
     }
