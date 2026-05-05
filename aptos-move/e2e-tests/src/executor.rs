@@ -890,12 +890,7 @@ impl<O: OutputLogger> FakeExecutorImpl<O> {
         let txn_provider = DefaultTxnProvider::new(txn_block, auxiliary_info);
         let metadata = self.get_txn_slice_metadata();
         let result = {
-            AptosVMBlockExecutorWrapper::execute_block_on_thread_pool::<
-                _,
-                NoOpTransactionCommitHook<VMStatus>,
-                _,
-            >(
-                self.executor_thread_pool.clone(),
+            AptosVMBlockExecutorWrapper::execute_block::<_, NoOpTransactionCommitHook<VMStatus>, _>(
                 &txn_provider,
                 &state_view,
                 self.module_cache_manager_opt()
