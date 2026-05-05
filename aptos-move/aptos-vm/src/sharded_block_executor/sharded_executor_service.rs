@@ -142,8 +142,7 @@ impl<S: StateView + Sync + Send + 'static> ShardedExecutorService<S> {
             s.spawn(move |_| {
                 let txn_provider =
                     DefaultTxnProvider::new_without_info(signature_verified_transactions);
-                let ret = AptosVMBlockExecutorWrapper::execute_block_on_thread_pool(
-                    executor_thread_pool,
+                let ret = AptosVMBlockExecutorWrapper::execute_block(
                     &txn_provider,
                     aggr_overridden_state_view.as_ref(),
                     // Since we execute blocks in parallel, we cannot share module caches, so each
