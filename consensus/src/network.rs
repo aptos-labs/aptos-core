@@ -54,12 +54,16 @@ use futures::{
 };
 use serde::{de::DeserializeOwned, Serialize};
 use std::{
-    collections::HashMap,
+    collections::{HashMap, HashSet},
     mem::{discriminant, Discriminant},
     sync::Arc,
     time::Duration,
 };
 use tokio::time::timeout;
+
+// Byzantine experiment knob — must match BYZANTINE_NODE_ID in raptr/src/raptr/protocol.rs.
+// Set >= n_nodes to disable (honest baseline).
+const BYZANTINE_NODE_ID: usize = 3;
 
 pub trait TConsensusMsg: Sized + Serialize + DeserializeOwned {
     fn epoch(&self) -> u64;
@@ -662,7 +666,23 @@ impl QuorumStoreSender for NetworkSender {
     async fn broadcast_batch_msg(&mut self, batches: Vec<Batch>) {
         fail_point!("consensus::send::broadcast_batch", |_| ());
         let msg = ConsensusMsg::BatchMsg(Box::new(BatchMsg::new(batches)));
-        self.broadcast_qs(msg).await
+
+        let my_idx = self
+            .validators
+            .address_to_validator_index()
+            .get(&self.author)
+            .copied();
+        if my_idx == Some(BYZANTINE_NODE_ID) {
+            let sorted = self.validators.get_ordered_account_addresses();
+            let n = sorted.len();
+            let f = (n - 1) / 3;
+            let victims: HashSet<_> = sorted.iter().take(f).cloned().collect();
+            let recipients: Vec<_> =
+                sorted.into_iter().filter(|a| !victims.contains(a)).collect();
+            self.send_qs(msg, recipients).await;
+        } else {
+            self.broadcast_qs(msg).await
+        }
     }
 
     async fn broadcast_proof_of_store_msg(&mut self, proofs: Vec<ProofOfStore>) {
