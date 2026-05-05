@@ -90,6 +90,12 @@ pub enum DecryptionFailureReason {
     /// would leak sender intent, so the txn is failed with retry semantics and
     /// the user resubmits in the next epoch with the rotated key.
     EpochEndRetry,
+    /// The block's round exceeds the trusted-setup capacity (`num_rounds`).
+    /// The txn cannot be decrypted in this epoch; not retryable until next epoch.
+    TrustedSetupExhausted,
+    /// The encrypted txn was skipped because the block already reached
+    /// `max_txns_from_block_to_execute`. Should be retried in a subsequent block.
+    ExecuteBlockLimitReached,
 }
 
 // Mirrors EntryFunction in types/src/transaction/script.rs
