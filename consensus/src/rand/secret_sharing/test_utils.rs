@@ -24,6 +24,10 @@ pub struct TestContext {
 
 impl TestContext {
     pub fn new(weights: Vec<u64>) -> Self {
+        Self::new_with_capacity(weights, 1, 1)
+    }
+
+    pub fn new_with_capacity(weights: Vec<u64>, max_batch_size: usize, num_rounds: usize) -> Self {
         let num_validators = weights.len();
         let (signers, validator_verifier) =
             random_validator_verifier_with_voting_power(num_validators, None, false, &weights);
@@ -39,7 +43,8 @@ impl TestContext {
         .expect("Failed to create weighted config");
 
         let (ek, dk, vks, msk_shares) =
-            FPTXWeighted::setup_for_testing(8, 1, 1, &tc).expect("Failed to setup crypto");
+            FPTXWeighted::setup_for_testing(8, max_batch_size, num_rounds, &tc)
+                .expect("Failed to setup crypto");
 
         let secret_share_config = SecretShareConfig::new(
             Arc::new(validator_verifier),

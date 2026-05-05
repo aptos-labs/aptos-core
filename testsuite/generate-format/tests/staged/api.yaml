@@ -376,6 +376,10 @@ DecryptionFailureReason:
       EpochMismatch: UNIT
     7:
       EpochEndRetry: UNIT
+    8:
+      TrustedSetupExhausted: UNIT
+    9:
+      ExecuteBlockLimitReached: UNIT
 DepositEvent:
   STRUCT:
     - amount: U64

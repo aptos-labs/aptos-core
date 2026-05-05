@@ -2162,10 +2162,19 @@ impl AptosVM {
                 DecryptionFailureReason::BatchLimitReached => {
                     Some("Encrypted transaction exceeded batch limit; retrying")
                 },
+                DecryptionFailureReason::ExecuteBlockLimitReached => {
+                    Some("Encrypted transaction exceeded execute-block limit; retrying")
+                },
                 DecryptionFailureReason::EpochEndRetry => {
                     Some("Block contained an epoch-ending vtxn; retrying encrypted txn next epoch")
                 },
-                _ => None,
+                DecryptionFailureReason::CryptoFailure
+                | DecryptionFailureReason::ConfigUnavailable
+                | DecryptionFailureReason::DecryptionKeyUnavailable
+                | DecryptionFailureReason::ClaimedEntryFunctionMismatch
+                | DecryptionFailureReason::PayloadHashMismatch
+                | DecryptionFailureReason::EpochMismatch
+                | DecryptionFailureReason::TrustedSetupExhausted => None,
             };
             if let Some(message) = message {
                 return (
