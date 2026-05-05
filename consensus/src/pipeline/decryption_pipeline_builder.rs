@@ -290,8 +290,11 @@ async fn decrypt_validator_path(
         (encrypted_txns, Vec::new())
     };
 
-    // Cap encrypted txns at max_txns_from_block_to_execute. Anything past the
-    // cap will be truncated by prepare_block anyway, so skip the crypto.
+    // Cap the encrypted partition at max_txns_from_block_to_execute. The cap is
+    // applied pre-shuffle here; prepare_block later concats [decrypted, regular]
+    // and truncates at the same limit, so this is a conservative optimization:
+    // it may over-mark txns that would have survived shuffle, but it never
+    // under-decrypts, since ExecuteBlockLimitReached is a Retry status.
     let (encrypted_txns, execute_limit_exceeded_txns) = match max_txns_from_block_to_execute {
         Some(max) if (encrypted_txns.len() as u64) > max => {
             let max = max as usize;
@@ -1303,7 +1306,8 @@ mod tests {
         // TestContext::new uses num_rounds=1; make_block uses round=1, so the
         // round check fires. Setting max_txns_from_block_to_execute=Some(0)
         // also verifies that TrustedSetupExhausted takes precedence over
-        // ExecuteBlockLimitReached.
+        // ExecuteBlockLimitReached. (See the dkg-vtxn precedence test below
+        // for precedence over EpochEndRetry.)
         let ctx = TestContext::new(vec![100]);
         let block = make_block(None);
         assert!(block.round() >= ctx.secret_share_config.digest_key().num_rounds() as u64);
@@ -1332,6 +1336,40 @@ mod tests {
             assert_failed_with(txn, &DecryptionFailureReason::TrustedSetupExhausted);
         }
         assert_eq!(result.regular_txns.len(), 1);
+        assert_eq!(result.decryption_key, Some(None));
+        assert!(key_share_rx.await.unwrap().is_none());
+    }
+
+    #[tokio::test]
+    async fn validator_path_trusted_setup_exhausted_wins_over_epoch_end_retry() {
+        // Both `block.round() >= num_rounds` and a DKG vtxn are present;
+        // TrustedSetupExhausted should win since it's checked first.
+        let ctx = TestContext::new(vec![100]);
+        let block = make_block(Some(vec![dkg_vtxn()]));
+        assert!(block.round() >= ctx.secret_share_config.digest_key().num_rounds() as u64);
+        let encrypted = vec![make_encrypted_txn(), make_encrypted_txn()];
+
+        let (key_share_tx, key_share_rx) = oneshot::channel();
+        let (_skey_tx, skey_rx) = oneshot::channel();
+
+        let result = decrypt_validator_path(
+            encrypted,
+            vec![],
+            &block,
+            ctx.authors[0],
+            &ctx.secret_share_config,
+            key_share_tx,
+            skey_rx,
+            None,
+            None,
+        )
+        .await
+        .expect("should succeed");
+
+        assert_eq!(result.decrypted_txns.len(), 2);
+        for txn in &result.decrypted_txns {
+            assert_failed_with(txn, &DecryptionFailureReason::TrustedSetupExhausted);
+        }
         assert_eq!(result.decryption_key, Some(None));
         assert!(key_share_rx.await.unwrap().is_none());
     }

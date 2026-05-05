@@ -2168,6 +2168,13 @@ impl AptosVM {
                 DecryptionFailureReason::EpochEndRetry => {
                     Some("Block contained an epoch-ending vtxn; retrying encrypted txn next epoch")
                 },
+                // TODO(ibalajiarun): TrustedSetupExhausted is an operational
+                // condition (the epoch outlived the trusted setup's num_rounds);
+                // falling through here charges the user gas + bumps their seq#
+                // for a system issue. Alert on the
+                // `aptos_consensus_decryption_pipeline_txns_count{category="trusted_setup_exhausted"}`
+                // counter so ops can extend the setup before users are affected.
+                // Revisit to use a Discard path that does not charge.
                 DecryptionFailureReason::CryptoFailure
                 | DecryptionFailureReason::ConfigUnavailable
                 | DecryptionFailureReason::DecryptionKeyUnavailable
