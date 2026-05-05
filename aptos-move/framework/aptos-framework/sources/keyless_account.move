@@ -3,7 +3,6 @@
 module aptos_framework::keyless_account {
     use std::bn254_algebra;
     use std::config_buffer;
-    use std::error;
     use std::option::Option;
     use std::signer;
     use std::string::String;
@@ -25,13 +24,6 @@ module aptos_framework::keyless_account {
 
     /// A serialized BN254 G2 point is invalid.
     const E_INVALID_BN254_G2_SERIALIZATION: u64 = 3;
-
-    /// The encrypted payload exceeds `MAX_ENCRYPTED_PAYLOAD_BYTES`.
-    const E_ENCRYPTED_PAYLOAD_TOO_LONG: u64 = 4;
-
-    /// Maximum size of the encrypted payload stored in `KeylessAccountStorage`.
-    /// 256 bytes is generous for an encrypted 32-byte DK (key + nonce + auth tag).
-    const MAX_ENCRYPTED_PAYLOAD_BYTES: u64 = 256;
 
     #[resource_group(scope = global)]
     struct Group {}
@@ -142,14 +134,6 @@ module aptos_framework::keyless_account {
         max_jwt_header_b64_bytes: u32,
     }
 
-    /// An on-chain struct for keyless accounts to store various data in. Initial use case is for storing an encryption
-    /// of their confidential asset decryption key.
-    enum KeylessAccountStorage has key, store, drop {
-        V1 {
-            encrypted_payload: vector<u8>
-        }
-    }
-
     #[test_only]
     public fun initialize_for_test(fx: &signer, vk: Groth16VerificationKey, constants: Configuration) {
         system_addresses::assert_aptos_framework(fx);
@@ -230,14 +214,15 @@ module aptos_framework::keyless_account {
     }
 
     /// Atomically performs an `account::upsert_ed25519_backup_key_on_keyless_account` and stores an encrypted payload
-    /// for the user. Currently used for backing up decryption keys on-chain in Petra for keyless accounts.
-    entry fun upsert_ed25519_backup_key_on_keyless_account_with_encrypted_payload(
+    /// in the account's `AccountBlob`. Currently used for backing up confidential-asset decryption keys on-chain
+    /// in Petra for keyless accounts. The encrypted payload is opaque to the chain — see `account::AccountBlob`.
+    entry fun upsert_ed25519_backup_key_on_keyless_account_and_encrypt_dk(
         account: &signer,
         keyless_public_key: vector<u8>,
         backup_public_key: vector<u8>,
         backup_key_proof: vector<u8>,
-        encrypted_payload: vector<u8>
-    ) acquires KeylessAccountStorage {
+        dk_ciphertext: vector<u8>
+    ) {
         // Step 1: Perform the key rotation/installation
         let keyless_single_key = single_key::new_public_key_from_bytes(keyless_public_key);
 
@@ -248,27 +233,8 @@ module aptos_framework::keyless_account {
             backup_key_proof
         );
 
-        // Step 2: Validate and store the encrypted payload
-        assert!(
-            encrypted_payload.length() <= MAX_ENCRYPTED_PAYLOAD_BYTES,
-            error::invalid_argument(E_ENCRYPTED_PAYLOAD_TOO_LONG)
-        );
-        let addr = signer::address_of(account);
-        if (!exists<KeylessAccountStorage>(addr)) {
-            move_to(account, KeylessAccountStorage::V1 { encrypted_payload });
-        } else {
-            KeylessAccountStorage[addr].encrypted_payload = encrypted_payload;
-        };
-    }
-
-    #[view]
-    /// Returns the encrypted payload stored for `addr`, or an empty vector if none exists.
-    public fun get_encrypted_payload(addr: address): vector<u8> acquires KeylessAccountStorage {
-        if (exists<KeylessAccountStorage>(addr)) {
-            KeylessAccountStorage[addr].encrypted_payload
-        } else {
-            vector[]
-        }
+        // Step 2: Store the encrypted payload as the account's opaque blob (size-checked by `account`).
+        account::upsert_account_blob(account, dk_ciphertext);
     }
 
     #[deprecated]
