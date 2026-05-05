@@ -3,6 +3,7 @@
 module aptos_framework::keyless_account {
     use std::bn254_algebra;
     use std::config_buffer;
+    use std::error;
     use std::option::Option;
     use std::signer;
     use std::string::String;
@@ -11,6 +12,9 @@ module aptos_framework::keyless_account {
     use aptos_std::single_key;
     use aptos_framework::account;
     use aptos_framework::chain_status;
+    use aptos_framework::confidential_asset;
+    use aptos_framework::fungible_asset;
+    use aptos_framework::object::Object;
     use aptos_framework::system_addresses;
 
     // The `aptos_framework::reconfiguration_with_dkg` module needs to be able to call `on_new_epoch`.
@@ -24,6 +28,10 @@ module aptos_framework::keyless_account {
 
     /// A serialized BN254 G2 point is invalid.
     const E_INVALID_BN254_G2_SERIALIZATION: u64 = 3;
+
+    /// A DK has already been backed up for this keyless account. Please call `confidential_asset::register_raw` instead
+    /// with the corresponding EK.
+    const E_KEYLESS_ACCOUNT_DK_ALREADY_BACKED_UP: u64 = 4;
 
     #[resource_group(scope = global)]
     struct Group {}
@@ -216,7 +224,7 @@ module aptos_framework::keyless_account {
     /// Atomically performs an `account::upsert_ed25519_backup_key_on_keyless_account` and stores an encrypted payload
     /// in the account's `AccountBlob`. Currently used for backing up confidential-asset decryption keys on-chain
     /// in Petra for keyless accounts. The encrypted payload is opaque to the chain — see `account::AccountBlob`.
-    entry fun upsert_ed25519_backup_key_on_keyless_account_and_encrypt_dk(
+    entry fun upsert_ed25519_backup_key_and_encrypt_dk(
         account: &signer,
         keyless_public_key: vector<u8>,
         backup_public_key: vector<u8>,
@@ -235,6 +243,34 @@ module aptos_framework::keyless_account {
 
         // Step 2: Store the encrypted payload as the account's opaque blob (size-checked by `account`).
         account::upsert_account_blob(account, dk_ciphertext);
+    }
+
+    /// Atomically registers an EK for the specified `asset_type` and stores a DK ciphertext in the `account::AccountBlob`
+    /// resource. This can only be called once: i.e., when registering an EK for the 1st time. Subsequent EK registrations
+    /// for other asset types should be done via `confidential_asset::register_raw`.
+    entry fun register_ek_and_encrypt_dk(
+        owner: &signer,
+        asset_type: Object<fungible_asset::Metadata>,
+        ek: vector<u8>,
+        sigma_proto_comm: vector<vector<u8>>,
+        sigma_proto_resp: vector<vector<u8>>,
+        dk_ciphertext: vector<u8>)
+    {
+        // We must only use this when first registering an EK. Subsequent EK registrations for other asset types
+        // must be done via `confidential_asset::register_raw` and are assumed to use the same DK backed up in `account::AccountBlob`.
+        assert!(
+            account::account_blob_exists(signer::address_of(owner)) == false,
+            error::already_exists(E_KEYLESS_ACCOUNT_DK_ALREADY_BACKED_UP));
+
+        confidential_asset::register_raw(
+            owner,
+            asset_type,
+            ek,
+            sigma_proto_comm,
+            sigma_proto_resp
+        );
+
+        account::upsert_account_blob(owner, dk_ciphertext);
     }
 
     #[deprecated]

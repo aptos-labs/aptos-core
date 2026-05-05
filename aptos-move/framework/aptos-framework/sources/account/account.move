@@ -642,6 +642,12 @@ module aptos_framework::account {
         AccountBlob[addr]
     }
 
+    #[view]
+    /// Returns whether an `AccountBlob` is stored for `addr`.
+    public fun account_blob_exists(addr: address): bool {
+        exists<AccountBlob>(addr)
+    }
+
     /// Generic authentication key rotation function that allows the user to rotate their authentication key from any scheme to any scheme.
     /// To authorize the rotation, we need two signatures:
     /// - the first signature `cap_rotate_key` refers to the signature by the account owner's current key on a valid `RotationProofChallenge`,
