@@ -27,6 +27,7 @@ use crate::{
     txn_provider::TxnProvider,
     types::ReadWriteSummary,
     view::{LatestView, ParallelState, SequentialState, ViewState},
+    worker_pool::WorkerPool,
 };
 use aptos_aggregator::{
     delayed_change::{ApplyBase, DelayedChange},
@@ -67,15 +68,12 @@ use move_core_types::{language_storage::ModuleId, value::MoveTypeLayout, vm_stat
 use move_vm_runtime::{Module, RuntimeEnvironment, TypeChecker, WithRuntimeEnvironment};
 use move_vm_types::delayed_values::delayed_field_id::DelayedFieldID;
 use num_cpus;
-use rayon::ThreadPool;
+use once_cell::sync::Lazy;
 use std::{
     cell::RefCell,
     collections::{BTreeMap, BTreeSet, HashMap, HashSet},
     marker::{PhantomData, Sync},
-    sync::{
-        atomic::{AtomicBool, AtomicU32, Ordering},
-        Arc,
-    },
+    sync::atomic::{AtomicBool, AtomicU32, Ordering},
 };
 use triomphe::Arc as TriompheArc;
 
@@ -98,11 +96,11 @@ where
     maybe_block_epilogue_txn_idx: &'a ExplicitSyncWrapper<Option<TxnIndex>>,
 }
 
+/// BlockSTM worker pool.
+static WORKER_POOL: Lazy<WorkerPool> = Lazy::new(WorkerPool::new);
+
 pub struct BlockExecutor<T, E, S, L, TP, A> {
-    // Number of active concurrent tasks, corresponding to the maximum number of rayon
-    // threads that may be concurrently participating in parallel execution.
     config: BlockExecutorConfig,
-    executor_thread_pool: Arc<rayon::ThreadPool>,
     transaction_commit_hook: Option<L>,
     phantom: PhantomData<fn() -> (T, E, S, L, TP, A)>,
 }
@@ -118,11 +116,7 @@ where
 {
     /// The caller needs to ensure that concurrency_level > 1 (0 is illegal and 1 should
     /// be handled by sequential execution) and that concurrency_level <= num_cpus.
-    pub fn new(
-        config: BlockExecutorConfig,
-        executor_thread_pool: Arc<ThreadPool>,
-        transaction_commit_hook: Option<L>,
-    ) -> Self {
+    pub fn new(config: BlockExecutorConfig, transaction_commit_hook: Option<L>) -> Self {
         let num_cpus = num_cpus::get();
         assert!(
             config.local.concurrency_level > 0 && config.local.concurrency_level <= num_cpus,
@@ -132,7 +126,6 @@ where
         );
         Self {
             config,
-            executor_thread_pool,
             transaction_commit_hook,
             phantom: PhantomData,
         }
@@ -1852,48 +1845,44 @@ where
         );
 
         let timer = RAYON_EXECUTION_SECONDS.start_timer();
-        let worker_ids: Vec<u32> = (0..num_workers).collect();
         let maybe_executor = ExplicitSyncWrapper::new(None);
-        self.executor_thread_pool.scope(|s| {
-            for worker_id in &worker_ids {
-                s.spawn(|_| {
-                    let environment = module_cache_manager_guard.environment();
-                    let executor = {
-                        let _init_timer = VM_INIT_SECONDS.start_timer();
-                        E::init(
-                            &environment.clone(),
-                            shared_sync_params.base_view,
-                            async_runtime_checks_enabled,
-                        )
-                    };
+        WORKER_POOL.scope(num_workers as usize, |worker_id| {
+            let worker_id = worker_id as u32;
+            let environment = module_cache_manager_guard.environment();
+            let executor = {
+                let _init_timer = VM_INIT_SECONDS.start_timer();
+                E::init(
+                    &environment.clone(),
+                    shared_sync_params.base_view,
+                    async_runtime_checks_enabled,
+                )
+            };
 
-                    if let Err(err) = self.worker_loop_v2(
-                        &executor,
-                        signature_verified_block,
-                        environment,
-                        *worker_id,
-                        num_workers,
-                        &scheduler,
-                        &shared_sync_params,
-                    ) {
-                        // If there are multiple errors, they all get logged: FatalVMError is
-                        // logged at construction, below we log CodeInvariantErrors.
-                        if let PanicOr::CodeInvariantError(err_msg) = err {
-                            alert!(
-                                "[BlockSTMv2] worker loop: CodeInvariantError({:?})",
-                                err_msg
-                            );
-                        }
-                        shared_maybe_error.store(true, Ordering::SeqCst);
+            if let Err(err) = self.worker_loop_v2(
+                &executor,
+                signature_verified_block,
+                environment,
+                worker_id,
+                num_workers,
+                &scheduler,
+                &shared_sync_params,
+            ) {
+                // If there are multiple errors, they all get logged: FatalVMError is
+                // logged at construction, below we log CodeInvariantErrors.
+                if let PanicOr::CodeInvariantError(err_msg) = err {
+                    alert!(
+                        "[BlockSTMv2] worker loop: CodeInvariantError({:?})",
+                        err_msg
+                    );
+                }
+                shared_maybe_error.store(true, Ordering::SeqCst);
 
-                        // Make sure to halt the scheduler if it hasn't already been halted.
-                        scheduler.halt();
-                    }
+                // Make sure to halt the scheduler if it hasn't already been halted.
+                scheduler.halt();
+            }
 
-                    if *worker_id == 0 {
-                        maybe_executor.acquire().replace(executor);
-                    }
-                });
+            if worker_id == 0 {
+                maybe_executor.acquire().replace(executor);
             }
         });
         drop(timer);
@@ -2003,7 +1992,6 @@ where
         let scheduler = Scheduler::new(num_txns);
 
         let timer = RAYON_EXECUTION_SECONDS.start_timer();
-        let worker_ids: Vec<u32> = (0..num_workers as u32).collect();
         let maybe_executor = ExplicitSyncWrapper::new(None);
 
         let shared_sync_params: SharedSyncParams<'_, T, E, S> = SharedSyncParams {
@@ -2021,47 +2009,44 @@ where
         let async_runtime_checks_enabled = should_perform_async_runtime_checks_for_block(
             module_cache_manager_guard.environment(),
             num_txns,
-            worker_ids.len() as u32,
+            num_workers as u32,
         );
 
-        self.executor_thread_pool.scope(|s| {
-            for worker_id in &worker_ids {
-                s.spawn(|_| {
-                    let environment = module_cache_manager_guard.environment();
-                    let executor = {
-                        let _init_timer = VM_INIT_SECONDS.start_timer();
-                        E::init(
-                            &environment.clone(),
-                            base_view,
-                            async_runtime_checks_enabled,
-                        )
-                    };
+        WORKER_POOL.scope(num_workers, |worker_id| {
+            let worker_id = worker_id as u32;
+            let environment = module_cache_manager_guard.environment();
+            let executor = {
+                let _init_timer = VM_INIT_SECONDS.start_timer();
+                E::init(
+                    &environment.clone(),
+                    base_view,
+                    async_runtime_checks_enabled,
+                )
+            };
 
-                    if let Err(err) = self.worker_loop(
-                        &executor,
-                        environment,
-                        signature_verified_block,
-                        &scheduler,
-                        &skip_module_reads_validation,
-                        &shared_sync_params,
-                        num_workers,
-                    ) {
-                        // If there are multiple errors, they all get logged:
-                        // ModulePathReadWriteError and FatalVMError variant is logged at construction,
-                        // and below we log CodeInvariantErrors.
-                        if let PanicOr::CodeInvariantError(err_msg) = err {
-                            alert!("[BlockSTM] worker loop: CodeInvariantError({:?})", err_msg);
-                        }
-                        shared_maybe_error.store(true, Ordering::SeqCst);
+            if let Err(err) = self.worker_loop(
+                &executor,
+                environment,
+                signature_verified_block,
+                &scheduler,
+                &skip_module_reads_validation,
+                &shared_sync_params,
+                num_workers,
+            ) {
+                // If there are multiple errors, they all get logged:
+                // ModulePathReadWriteError and FatalVMError variant is logged at construction,
+                // and below we log CodeInvariantErrors.
+                if let PanicOr::CodeInvariantError(err_msg) = err {
+                    alert!("[BlockSTM] worker loop: CodeInvariantError({:?})", err_msg);
+                }
+                shared_maybe_error.store(true, Ordering::SeqCst);
 
-                        // Make sure to halt the scheduler if it hasn't already been halted.
-                        scheduler.halt();
-                    }
+                // Make sure to halt the scheduler if it hasn't already been halted.
+                scheduler.halt();
+            }
 
-                    if *worker_id == 0 {
-                        maybe_executor.acquire().replace(executor);
-                    }
-                });
+            if worker_id == 0 {
+                maybe_executor.acquire().replace(executor);
             }
         });
         drop(timer);
