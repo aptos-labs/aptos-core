@@ -14,11 +14,10 @@ module 0x42::m {
     //   *x           adds SomeReference
     //   x.get_nav()  adds SomeReceiverFunction(get_nav)
     //   x.get_size() adds SomeReceiverFunction(get_size) (different name, coexists)
-    // After the orthogonality fix, SomeReference coexists with the
-    // SomeReceiverFunction constraints. No type has both `get_nav` and
-    // `get_size` methods, so the compiler should produce a clean "unable to
-    // infer" diagnostic rather than the bogus "constraint `&_` incompatible
-    // with `fun self.get_nav(...)`".
+    // SomeReference coexists with the SomeReceiverFunction constraints.
+    // No type has both `get_nav` and `get_size` methods, so the compiler should
+    // produce a clean "unable to infer" diagnostic rather than the bogus
+    // "constraint `&_` incompatible with `fun self.get_nav(...)`".
     fun test(): u64 {
         apply(|x| {
             let _ = *x;
