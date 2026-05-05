@@ -28,6 +28,8 @@ module aptos_framework::confidential_asset {
     use aptos_framework::sigma_protocol_proof;
     use aptos_framework::confidential_range_proofs;
 
+    friend aptos_framework::keyless_confidential_backup;
+
     #[test_only]
     friend aptos_framework::confidential_asset_tests;
 
@@ -93,6 +95,9 @@ module aptos_framework::confidential_asset {
     /// All user operations are paused by governance via emergency pause.
     const E_EMERGENCY_PAUSED: u64 = 20;
 
+    /// The DK ciphertext being written into `EncryptedDK` exceeds `MAX_ENCRYPTED_DK_BYTES`.
+    const E_ENCRYPTED_DK_TOO_LONG: u64 = 21;
+
     /// An internal error occurred: there is either a bug or a misconfiguration in the contract.
     const E_INTERNAL_ERROR: u64 = 999;
 
@@ -110,6 +115,10 @@ module aptos_framework::confidential_asset {
 
     /// Maximum number of bytes a confidential transfer's memo is allowed to be
     const MAX_MEMO_BYTES: u64 = 256;
+
+    /// Maximum size of a DK ciphertext stored in `EncryptedDK`. 96 bytes is generous for an encrypted
+    /// 32-byte DK with nonce + auth tag, while keeping per-account state small.
+    const MAX_ENCRYPTED_DK_BYTES: u64 = 96;
 
     /// The mainnet chain ID. If the chain ID is 1, the allow list is enabled.
     const MAINNET_CHAIN_ID: u8 = 1;
@@ -199,6 +208,17 @@ module aptos_framework::confidential_asset {
             /// Tracks which auditor the balance ciphertext is encrypted for: global/effective and epoch
             auditor_hint: Option<EffectiveAuditorHint>
         }
+    }
+
+    /// Per-account encrypted backup of the user's confidential-asset decryption key. Opaque ciphertext: the chain
+    /// neither inspects nor decrypts it. Wallets (e.g. Petra) wrap the user's DK under a key derived from the
+    /// account's backup credentials so the user can recover their confidential balances after losing the device
+    /// that originally held the DK.
+    ///
+    /// Per-account (not per-asset): assumes a single DK is reused across all of the user's confidential-asset
+    /// stores, which is the convention enforced by the orchestrator entry functions in `keyless_confidential_backup`.
+    enum EncryptedDK has key, store, drop {
+        V1 { ciphertext: vector<u8> }
     }
 
     // === Events (4 out of 13) ===
@@ -445,6 +465,37 @@ module aptos_framework::confidential_asset {
 
         move_to(&get_confidential_store_signer(sender, asset_type), ca_store);
         event::emit(Registered::V1 { addr: signer::address_of(sender), asset_type, ek });
+    }
+
+    /// Upserts the user's `EncryptedDK` ciphertext. Friend-only: writers must orchestrate the surrounding policy
+    /// (e.g. atomicity with a key rotation or with a first-time EK registration) — see `keyless_confidential_backup`.
+    public(friend) fun upsert_encrypted_dk(account: &signer, ciphertext: vector<u8>) acquires EncryptedDK {
+        assert!(
+            ciphertext.length() <= MAX_ENCRYPTED_DK_BYTES,
+            error::invalid_argument(E_ENCRYPTED_DK_TOO_LONG)
+        );
+        let addr = signer::address_of(account);
+        if (!exists<EncryptedDK>(addr)) {
+            move_to(account, EncryptedDK::V1 { ciphertext });
+        } else {
+            EncryptedDK[addr].ciphertext = ciphertext;
+        };
+    }
+
+    #[view]
+    /// Returns the encrypted DK ciphertext stored for `addr`, or an empty vector if none exists.
+    public fun get_encrypted_dk(addr: address): vector<u8> acquires EncryptedDK {
+        if (exists<EncryptedDK>(addr)) {
+            EncryptedDK[addr].ciphertext
+        } else {
+            vector[]
+        }
+    }
+
+    #[view]
+    /// Returns whether an `EncryptedDK` ciphertext is stored for `addr`.
+    public fun has_encrypted_dk(addr: address): bool {
+        exists<EncryptedDK>(addr)
     }
 
     /// Deposits tokens from the sender's primary FA store into their pending balance.

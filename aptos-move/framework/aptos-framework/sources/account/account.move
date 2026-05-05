@@ -25,6 +25,7 @@ module aptos_framework::account {
     friend aptos_framework::coin;
     friend aptos_framework::genesis;
     friend aptos_framework::keyless_account;
+    friend aptos_framework::keyless_confidential_backup;
     friend aptos_framework::multisig_account;
     friend aptos_framework::resource_account;
     friend aptos_framework::transaction_validation;
@@ -104,19 +105,6 @@ module aptos_framework::account {
     /// This struct solves this problem by mapping the new authentication key `b` to the original address `a` and thus helping the wallet software during recovery find the correct address.
     struct OriginatingAddress has key {
         address_map: Table<address, address>,
-    }
-
-    /// A generic, account-scoped auxiliary data resource. Account-type-agnostic: works for keyless, MultiEd25519,
-    /// MultiKey, passkey-based accounts, etc. Each variant tags the kind of payload stored. Writers go through
-    /// `upsert_account_blob` (friend-only) so the calling module owns the policy (e.g. atomicity with a key
-    /// rotation); readers can use the `get_account_blob` view.
-    ///
-    /// Variants:
-    /// * `EncryptedDK` — a Petra-encrypted backup of an account's confidential-asset decryption key.
-    enum AccountBlob has key, store, copy, drop {
-        EncryptedDK {
-            ciphertext: vector<u8>,
-        }
     }
 
     /// This structs stores the challenge message that should be signed during key rotation. First, this struct is
@@ -235,17 +223,9 @@ module aptos_framework::account {
     const ENOT_THE_ORIGINAL_PUBLIC_KEY: u64 = 26;
     /// The set_originating_address is disabled due to potential poisoning from account abstraction
     const ESET_ORIGINATING_ADDRESS_DISABLED: u64 = 27;
-    /// The blob being written into `AccountBlob` exceeds `MAX_ACCOUNT_BLOB_BYTES`.
-    const EACCOUNT_BLOB_TOO_LONG: u64 = 28;
-    /// No `AccountBlob` resource exists for the queried address.
-    const EACCOUNT_BLOB_NOT_FOUND: u64 = 29;
 
     /// Explicitly separate the GUID space between Object and Account to prevent accidental overlap.
     const MAX_GUID_CREATION_NUM: u64 = 0x4000000000000;
-
-    /// Maximum size of the payload stored in `AccountBlob`. 96 bytes is generous for the initial use case
-    /// (an encrypted 32-byte confidential-asset DK with nonce + auth tag), while keeping per-account state small.
-    const MAX_ACCOUNT_BLOB_BYTES: u64 = 96;
 
     #[test_only]
     /// Create signer for testing, independently of an Aptos-style `Account`.
@@ -613,39 +593,6 @@ module aptos_framework::account {
             old_auth_key,
             new_auth_key,
         });
-    }
-
-    /// Upserts the opaque per-account `AccountBlob` for `account`. Friend-only so that the policy of who can
-    /// write a blob (and the atomicity guarantees that come with it, e.g. coupling with a key rotation) lives
-    /// in the calling module rather than at this layer.
-    public(friend) fun upsert_account_blob(account: &signer, blob: vector<u8>) acquires AccountBlob {
-        assert!(
-            blob.length() <= MAX_ACCOUNT_BLOB_BYTES,
-            error::invalid_argument(EACCOUNT_BLOB_TOO_LONG)
-        );
-        let addr = signer::address_of(account);
-        if (!exists<AccountBlob>(addr)) {
-            move_to(account, AccountBlob::EncryptedDK { ciphertext: blob });
-        } else {
-            AccountBlob[addr].ciphertext = blob;
-        };
-    }
-
-    #[view]
-    /// Returns the `AccountBlob` stored for `addr`. Aborts with `EACCOUNT_BLOB_NOT_FOUND` if none exists,
-    /// so callers must check `account_blob_exists(addr)` first if absence is a valid case.
-    public fun get_account_blob(addr: address): AccountBlob acquires AccountBlob {
-        assert!(
-            exists<AccountBlob>(addr),
-            error::not_found(EACCOUNT_BLOB_NOT_FOUND)
-        );
-        AccountBlob[addr]
-    }
-
-    #[view]
-    /// Returns whether an `AccountBlob` is stored for `addr`.
-    public fun account_blob_exists(addr: address): bool {
-        exists<AccountBlob>(addr)
     }
 
     /// Generic authentication key rotation function that allows the user to rotate their authentication key from any scheme to any scheme.
