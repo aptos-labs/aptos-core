@@ -262,6 +262,15 @@ impl RestoreRunMode {
         }
     }
 
+    pub fn save_ledger_pruner_progress(&self, version: Version) -> Result<()> {
+        match self {
+            RestoreRunMode::Restore { restore_handler } => {
+                restore_handler.save_ledger_pruner_progress(version)
+            },
+            RestoreRunMode::Verify => Ok(()),
+        }
+    }
+
     pub fn get_state_snapshot_before(&self, version: Version) -> Option<(Version, HashValue)> {
         match self {
             RestoreRunMode::Restore { restore_handler } => restore_handler

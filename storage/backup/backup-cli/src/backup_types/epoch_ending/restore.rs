@@ -285,6 +285,7 @@ pub struct EpochHistory {
 impl EpochHistory {
     pub fn verify_ledger_info(&self, li_with_sigs: &LedgerInfoWithSignatures) -> Result<()> {
         let epoch = li_with_sigs.ledger_info().epoch();
+        let version = li_with_sigs.ledger_info().version();
         ensure!(!self.epoch_endings.is_empty(), "Empty epoch history.",);
         if epoch > self.epoch_endings.len() as u64 {
             // TODO(aldenhu): fix this from upper level
@@ -303,7 +304,7 @@ impl EpochHistory {
             );
         } else if let Some(wp_trusted) = self
             .trusted_waypoints
-            .get(&li_with_sigs.ledger_info().version())
+            .get(&version)
         {
             let wp_li = Waypoint::new_any(li_with_sigs.ledger_info());
             ensure!(
@@ -312,6 +313,15 @@ impl EpochHistory {
                 wp_li,
                 wp_trusted,
             );
+        } else if self
+            .trusted_waypoints
+            .keys()
+            .max()
+            .is_some_and(|max_wp| version <= *max_wp)
+        {
+            // For historical restore, anything up to the highest trusted waypoint is treated as
+            // trusted data. This keeps transaction/state restore aligned with epoch-ending
+            // preheat, which already bypasses signature verification for this range.
         } else {
             self.epoch_endings[epoch as usize - 1]
                 .next_epoch_state()

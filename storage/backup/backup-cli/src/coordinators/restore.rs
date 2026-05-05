@@ -135,6 +135,12 @@ impl RestoreCoordinator {
         COORDINATOR_TARGET_VERSION.set(target_version as i64);
         let lhs = self.ledger_history_start_version();
 
+        // Make the readable ledger history boundary explicit in the restored DB.
+        // Otherwise, when these metadata keys are missing, node startup infers
+        // the ledger pruner progress from the first VersionData row, which is
+        // typically the state snapshot version rather than the requested lhs.
+        self.global_opt.run_mode.save_ledger_pruner_progress(lhs)?;
+
         let latest_tree_version = self
             .global_opt
             .run_mode

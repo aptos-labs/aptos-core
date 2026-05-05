@@ -18,17 +18,20 @@ use crate::{
 };
 use aptos_backup_service::start_backup_service;
 use aptos_config::utils::get_available_port;
+use aptos_crypto::hash::HashValue;
 use aptos_db::AptosDB;
 use aptos_storage_interface::DbReader;
 use aptos_temppath::TempPath;
 use aptos_types::{
     aggregate_signature::AggregateSignature,
-    ledger_info::LedgerInfoWithSignatures,
+    block_info::BlockInfo,
+    ledger_info::{LedgerInfo, LedgerInfoWithSignatures},
     proptest_types::{AccountInfoUniverse, LedgerInfoWithSignaturesGen},
     waypoint::Waypoint,
 };
 use proptest::{collection::vec, prelude::*};
 use std::{
+    collections::HashMap,
     convert::TryInto,
     io::Write,
     net::{IpAddr, Ipv4Addr, SocketAddr},
@@ -268,4 +271,48 @@ proptest! {
     ) {
         Runtime::new().unwrap().block_on(test_trusted_waypoints_impl(lis, trusted_waypoints, should_fail_without))
     }
+}
+
+#[test]
+fn epoch_history_skips_verification_before_highest_trusted_waypoint() {
+    let pre_waypoint_li = LedgerInfoWithSignatures::new(
+        LedgerInfo::new(
+            BlockInfo::new(
+                1,
+                0,
+                HashValue::zero(),
+                HashValue::zero(),
+                10,
+                0,
+                None,
+            ),
+            HashValue::zero(),
+        ),
+        AggregateSignature::empty(),
+    );
+    let trusted_waypoint_li = LedgerInfoWithSignatures::new(
+        LedgerInfo::new(
+            BlockInfo::new(
+                2,
+                0,
+                HashValue::zero(),
+                HashValue::zero(),
+                20,
+                0,
+                None,
+            ),
+            HashValue::zero(),
+        ),
+        AggregateSignature::empty(),
+    );
+
+    let epoch_history = crate::backup_types::epoch_ending::restore::EpochHistory {
+        epoch_endings: vec![LedgerInfo::dummy(), LedgerInfo::dummy(), LedgerInfo::dummy()],
+        trusted_waypoints: Arc::new(HashMap::from([(
+            20,
+            Waypoint::new_any(trusted_waypoint_li.ledger_info()),
+        )])),
+    };
+
+    epoch_history.verify_ledger_info(&pre_waypoint_li).unwrap();
 }

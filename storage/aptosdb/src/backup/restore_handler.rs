@@ -63,6 +63,10 @@ impl RestoreHandler {
         restore_utils::save_ledger_infos(self.aptosdb.ledger_db.metadata_db(), ledger_infos, None)
     }
 
+    pub fn save_ledger_pruner_progress(&self, version: Version) -> Result<()> {
+        self.ledger_db.write_pruner_progress(version)
+    }
+
     pub fn confirm_or_save_frozen_subtrees(
         &self,
         num_leaves: LeafCount,
