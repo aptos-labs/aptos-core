@@ -100,6 +100,10 @@ pub struct SpecTranslator<'env> {
     /// (including memory snapshot variables like `$M_$memory#3`). Used to
     /// verify that BP memory-arg emissions only reference declared variables.
     declared_mem_names: RefCell<BTreeSet<String>>,
+    /// Value-typed state variables introduced by `exists S in *` when the body
+    /// uses `..S |~` / `S.. |~` with `|&mut T|` closure parameters rather than
+    /// global memory. Maps `MemoryLabel → (boogie_var_name, T)`.
+    value_state_vars: RefCell<BTreeMap<MemoryLabel, (String, Type)>>,
 }
 
 /// A struct which contains information about a lifted choice expression (like `some x:int: p(x)`).
@@ -139,6 +143,7 @@ impl<'env> SpecTranslator<'env> {
             current_fun_qid: RefCell::new(None),
             label_info: RefCell::new(BTreeMap::new()),
             declared_mem_names: RefCell::new(BTreeSet::new()),
+            value_state_vars: RefCell::new(BTreeMap::new()),
         }
     }
 
@@ -1698,8 +1703,44 @@ impl SpecTranslator<'_> {
             emit!(self.writer, ", ");
         }
         self.translate_exp(fun_exp);
-        for arg in pred_args {
+        // For value-typed state labels (|&mut T| closures with no global memory):
+        // substitute the state variable S_val into the appropriate pred_arg position.
+        //   ..S |~ ensures_of<f>(old_x, x)  →  ensures_of<f>(old_x, S_val)   [post label: replace last]
+        //   S.. |~ ensures_of<g>(old_x, x)  →  ensures_of<g>(S_val, x)       [pre label: replace first &mut input]
+        let post_sub = range.post.and_then(|label| {
+            self.value_state_vars
+                .borrow()
+                .get(&label)
+                .map(|(v, _)| v.clone())
+        });
+        let (pre_sub, mut_input_pos) = if let Some(label) = range.pre {
+            let sub = self
+                .value_state_vars
+                .borrow()
+                .get(&label)
+                .map(|(v, _)| v.clone());
+            let pos = sub
+                .as_ref()
+                .and_then(|_| Self::find_mut_ref_input_position(&inst_fun_type));
+            (sub, pos)
+        } else {
+            (None, None)
+        };
+        let last_idx = pred_args.len().saturating_sub(1);
+        for (i, arg) in pred_args.iter().enumerate() {
             emit!(self.writer, ", ");
+            if let Some(ref var) = post_sub {
+                if i == last_idx {
+                    emit!(self.writer, "{}", var);
+                    continue;
+                }
+            }
+            if let Some(ref var) = pre_sub {
+                if Some(i) == mut_input_pos {
+                    emit!(self.writer, "{}", var);
+                    continue;
+                }
+            }
             self.translate_exp(arg);
         }
         emit!(self.writer, ")");
@@ -2654,6 +2695,67 @@ impl SpecTranslator<'_> {
         );
     }
 
+    /// For a `StateDomain` quantifier variable with name `label_name`, scan `exp` for
+    /// `Behavior(EnsuresOf, range)` operations where `range.pre` or `range.post` maps to
+    /// `label_name` AND the closure has `|&mut T|`-style parameters with no global memory.
+    /// Returns `(MemoryLabel, T)` — the label and the value type to use for the state variable.
+    fn find_value_state_for_label(
+        &self,
+        exp: &Exp,
+        label_name: Symbol,
+    ) -> Option<(MemoryLabel, Type)> {
+        let label_names = self.env.get_memory_label_names();
+        let mut result: Option<(MemoryLabel, Type)> = None;
+        exp.visit_pre_order(&mut |e| {
+            if result.is_some() {
+                return false;
+            }
+            if let ExpData::Call(_, Operation::Behavior(BehaviorKind::EnsuresOf, range), args) = e {
+                let matching_label = range
+                    .pre
+                    .into_iter()
+                    .chain(range.post)
+                    .find(|label| label_names.get(label).copied() == Some(label_name));
+                if let Some(label) = matching_label {
+                    if let Some(fun_arg) = args.first() {
+                        let fun_type = self.env.get_node_type(fun_arg.node_id());
+                        let inst_fun_type = fun_type.instantiate(&self.type_inst);
+                        let (union_used, _) =
+                            compute_evaluator_memory_union(self.env, &inst_fun_type);
+                        if union_used.is_empty() {
+                            // No global memory — check for &mut T params
+                            if let Type::Fun(arg_ty, _, _) = &inst_fun_type {
+                                for ty in arg_ty.clone().flatten() {
+                                    if ty.is_mutable_reference() {
+                                        result = Some((label, ty.skip_reference().clone()));
+                                        return false;
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+            true
+        });
+        result
+    }
+
+    /// Returns the pred_arg index corresponding to the "old value" input of the first
+    /// `&mut T` parameter in a function type, for use in `S.. |~` substitution.
+    /// For `|&mut T|` this is 0; for `|A, &mut T|` this is 1; etc.
+    fn find_mut_ref_input_position(fun_type: &Type) -> Option<usize> {
+        if let Type::Fun(arg_ty, _, _) = fun_type {
+            arg_ty
+                .clone()
+                .flatten()
+                .iter()
+                .position(|ty| ty.is_mutable_reference())
+        } else {
+            None
+        }
+    }
+
     fn translate_quant(
         &self,
         _node_id: NodeId,
@@ -2722,6 +2824,10 @@ impl SpecTranslator<'_> {
                 state_domain_labels.insert(var_name, affected);
             }
         }
+        // Snapshot value_state_vars before variable emission so we can
+        // restore it after the body, preventing leakage across quantifiers.
+        let pre_vs_keys: BTreeSet<MemoryLabel> =
+            self.value_state_vars.borrow().keys().copied().collect();
         // Translate quantified variables.
         emit!(self.writer, "({} ", kind);
         let mut quant_vars = HashMap::new();
@@ -2760,15 +2866,38 @@ impl SpecTranslator<'_> {
                 Type::StateDomain => {
                     // Emit one Boogie memory variable per affected (label, memory_type) pair.
                     if let Some(affected) = state_domain_labels.get(&var_name) {
-                        for (label, mem) in affected {
-                            let name = boogie_resource_memory_name(self.env, mem, &Some(*label));
-                            let ty = boogie_struct_name(
-                                &self.env.get_struct_qid(mem.to_qualified_id()),
-                                &mem.inst,
-                                false,
-                            );
-                            emit!(self.writer, "{}{}: $Memory {}", comma, name, ty);
-                            comma = ", ";
+                        if !affected.is_empty() {
+                            for (label, mem) in affected {
+                                let name =
+                                    boogie_resource_memory_name(self.env, mem, &Some(*label));
+                                let ty = boogie_struct_name(
+                                    &self.env.get_struct_qid(mem.to_qualified_id()),
+                                    &mem.inst,
+                                    false,
+                                );
+                                emit!(self.writer, "{}{}: $Memory {}", comma, name, ty);
+                                comma = ", ";
+                            }
+                        } else {
+                            // No global memory labels — check for value-typed state variables
+                            // arising from `|&mut T|` closure parameters.
+                            if let Some((label, val_ty)) =
+                                self.find_value_state_for_label(body, var_name)
+                            {
+                                let boogie_var = format!("{}_val", var_name_str);
+                                let bv_flag = false;
+                                emit!(
+                                    self.writer,
+                                    "{}{}: {}",
+                                    comma,
+                                    boogie_var,
+                                    boogie_type(self.env, &val_ty, bv_flag)
+                                );
+                                comma = ", ";
+                                self.value_state_vars
+                                    .borrow_mut()
+                                    .insert(label, (boogie_var, val_ty));
+                            }
                         }
                     }
                     // Skip incrementing comma at the end — already done above
@@ -2911,6 +3040,10 @@ impl SpecTranslator<'_> {
             self.writer,
             &")".repeat(quant_vars.len().checked_add(1).unwrap())
         );
+        // Restore value_state_vars to pre-quantifier state to prevent leakage.
+        self.value_state_vars
+            .borrow_mut()
+            .retain(|k, _| pre_vs_keys.contains(k));
     }
 
     /// Translate a `some x: T: P[x]` expression. This saves information about the axiomatized

@@ -3374,7 +3374,10 @@ impl ModuleBuilder<'_, '_> {
             }
             let translated_modifies: Vec<Exp> = modifies
                 .iter()
-                .map(|target| et.translate_modify_target(target).into_exp())
+                .map(|target| {
+                    let exp = et.translate_modify_target(target).into_exp();
+                    et.post_process_body(exp)
+                })
                 .collect();
             // Translate reads types to QualifiedInstId<StructId>
             let mut reads_targets = BTreeSet::new();
@@ -3491,7 +3494,10 @@ impl ModuleBuilder<'_, '_> {
             .collect();
         let translated_targets: Vec<Exp> = targets
             .iter()
-            .map(|target| et.translate_modify_target(target).into_exp())
+            .map(|target| {
+                let exp = et.translate_modify_target(target).into_exp();
+                et.post_process_body(exp)
+            })
             .collect();
         et.finalize_types(true);
         // Find or create entry for this parameter/field
@@ -3651,22 +3657,20 @@ impl ModuleBuilder<'_, '_> {
     }
 
     fn def_ana_modifies(&mut self, loc: &Loc, context: &SpecBlockContext, targets: &[EA::Exp]) {
-        // Use AbortsIf as the condition kind for scope setup — gives function params
-        // in scope without result variables.
         let mut et = self.exp_translator_for_context(loc, context, &ConditionKind::AbortsIf);
-        let translated: Vec<Exp> = targets
-            .iter()
-            .filter_map(|target| {
-                let (_, exp) = et.translate_exp_free(target);
-                match &exp {
-                    ExpData::Call(_, Operation::Global(_), _) => Some(exp.into_exp()),
-                    _ => {
-                        et.error(&et.to_loc(&target.loc), "global resource access expected");
-                        None
-                    },
-                }
-            })
-            .collect();
+        let mut translated: Vec<Exp> = vec![];
+        for target in targets {
+            let (_, exp) = et.translate_exp_free(target);
+            match &exp {
+                ExpData::Call(_, Operation::Global(_), _) => {
+                    let exp = et.post_process_body(exp.into_exp());
+                    translated.push(exp);
+                },
+                _ => {
+                    et.error(&et.to_loc(&target.loc), "global resource access expected");
+                },
+            }
+        }
         et.finalize_types(true);
         self.update_spec(context, |spec| {
             let frame = spec.frame_spec.get_or_insert_with(FrameSpec::default);

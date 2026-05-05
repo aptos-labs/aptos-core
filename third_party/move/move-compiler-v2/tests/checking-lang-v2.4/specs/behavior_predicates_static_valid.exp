@@ -96,6 +96,11 @@ module 0x42::M {
           }
         }
     }
+    spec {
+      modifies global<0x42::M::Counter>($t0);
+      modifies global<0x42::M::Counter>($t1);
+    }
+
     private fun test_aborts(x: u64): u64 {
         M::increment(x)
     }
@@ -1026,6 +1031,11 @@ module 0x42::M {
           }
         }
     }
+    spec {
+      modifies global<0x42::M::Counter>($t0);
+      modifies global<0x42::M::Counter>($t1);
+    }
+
     private fun test_aborts(x: u64): u64 {
         M::increment(x)
     }

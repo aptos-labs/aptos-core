@@ -676,6 +676,10 @@ DecryptionFailureReason:
       EpochMismatch: UNIT
     7:
       EpochEndRetry: UNIT
+    8:
+      TrustedSetupExhausted: UNIT
+    9:
+      ExecuteBlockLimitReached: UNIT
 DeprecatedPayload:
   STRUCT:
     - dummy_value: U64

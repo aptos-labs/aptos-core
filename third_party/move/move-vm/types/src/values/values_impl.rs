@@ -193,10 +193,10 @@ impl std::ops::Deref for NestedValues {
 /// heap work-stack rather than the Rust call stack. Only uniquely-owned Rcs are decomposed;
 /// shared containers (refcount > 1) fall through to the default Rc drop (refcount decrement).
 ///
-/// We drain the inner `Vec<Value>` in place via `Rc::get_mut` — no replacement `Rc`/`RefCell`
-/// is ever allocated. The work stack holds owned `Vec<Value>`s rather than `Rc<...>`s, so the
-/// only possible heap allocation is the stack itself, which stays at `Vec::new()` capacity 0
-/// until the first push.
+/// For nested children we use `into_rc` + `Rc::try_unwrap` to claim the inner `Vec<Value>`
+/// without re-entering this `Drop` on the consumed `NestedValues`. The work stack holds
+/// owned `Vec<Value>`s rather than `Rc<...>`s, so the only possible heap allocation is the
+/// stack itself, which stays at `Vec::new()` capacity 0 until the first push.
 impl Drop for NestedValues {
     fn drop(&mut self) {
         // Drain the root level in place: if we hold the sole reference, take the inner
@@ -215,22 +215,21 @@ impl Drop for NestedValues {
         // values never push, so this stays at capacity 0.
         let mut stack: Vec<Vec<Value>> = vec![];
         loop {
+            stack.reserve(cur_vec.len());
             for v in cur_vec {
                 match v {
                     Value::Container(c) => match c {
-                        Container::Locals(mut nv)
-                        | Container::Vec(mut nv)
-                        | Container::Struct(mut nv) => {
-                            // Drain `nv`'s inner Vec iff uniquely owned. `nv` then drops
-                            // normally — its own `Drop` re-enters this function, sees an
-                            // empty drained vec, pushes nothing, and exits.
-                            if let Some(inner_cell) = Rc::get_mut(&mut nv.0) {
-                                let inner = std::mem::take(inner_cell.get_mut());
+                        Container::Locals(nv) | Container::Vec(nv) | Container::Struct(nv) => {
+                            // Claim sole ownership of the inner `RefCell<Vec<Value>>`
+                            // if unique. On the unique path we extract the `Vec` directly.
+                            // On the shared path the returned `Rc` drops normally — just a
+                            // refcount decrement.
+                            if let Ok(inner_cell) = Rc::try_unwrap(nv.into_rc()) {
+                                let inner = inner_cell.into_inner();
                                 if !inner.is_empty() {
                                     stack.push(inner);
                                 }
                             }
-                            // Shared Rc (refcount > 1): fall through, nv drops normally.
                         },
                         // Primitive-vec variants cannot hold further `Value`s — their
                         // default drop is non-recursive and bounded.

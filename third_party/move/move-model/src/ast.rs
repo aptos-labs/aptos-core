@@ -568,6 +568,12 @@ impl Spec {
             && self.properties.is_empty()
             && self.update_map.is_empty()
             && self.proof.is_none()
+            && self.frame_spec.as_ref().is_none_or(|fs| {
+                fs.modifies_targets.is_empty()
+                    && fs.reads_targets.is_empty()
+                    && !fs.modifies_all
+                    && !fs.reads_all
+            })
     }
 
     pub fn filter<P>(&self, pred: P) -> impl Iterator<Item = &Condition>
@@ -620,6 +626,11 @@ impl Spec {
         for exp in self.proof_exps() {
             result.append(&mut exp.used_funs_with_uses())
         }
+        if let Some(fs) = &self.frame_spec {
+            for target in &fs.modifies_targets {
+                result.append(&mut target.used_funs_with_uses())
+            }
+        }
         result
     }
 
@@ -637,6 +648,11 @@ impl Spec {
         }
         for exp in self.proof_exps() {
             result.append(&mut exp.called_funs_with_callsites())
+        }
+        if let Some(fs) = &self.frame_spec {
+            for target in &fs.modifies_targets {
+                result.append(&mut target.called_funs_with_callsites())
+            }
         }
         result
     }
