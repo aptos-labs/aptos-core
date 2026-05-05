@@ -363,7 +363,8 @@ re-dealing DKG (dkg::start is idempotent per epoch).
     <a href="staking_config.md#0x1_staking_config_StakingRewardsConfigEnabledRequirement">staking_config::StakingRewardsConfigEnabledRequirement</a>;
 <b>aborts_if</b> <b>false</b>;
 <b>pragma</b> verify_duration_estimate = 600;
-<b>ensures</b> <b>exists</b>&lt;<a href="stake.md#0x1_stake_PrecomputedValidatorSet">stake::PrecomputedValidatorSet</a>&gt;(@aptos_framework);
+<b>ensures</b> !<b>old</b>(<a href="reconfiguration_state.md#0x1_reconfiguration_state_spec_is_in_progress">reconfiguration_state::spec_is_in_progress</a>()) ==&gt;
+    <b>exists</b>&lt;<a href="stake.md#0x1_stake_PrecomputedValidatorSet">stake::PrecomputedValidatorSet</a>&gt;(@aptos_framework);
 </code></pre>
 
 
@@ -379,8 +380,18 @@ re-dealing DKG (dkg::start is idempotent per epoch).
 
 
 
-<pre><code><b>pragma</b> verify = <b>false</b>;
-<b>ensures</b> <b>exists</b>&lt;<a href="stake.md#0x1_stake_PrecomputedValidatorSet">stake::PrecomputedValidatorSet</a>&gt;(@aptos_framework);
+<pre><code><b>pragma</b> verify_duration_estimate = 600;
+<b>requires</b> <b>exists</b>&lt;<a href="reconfiguration.md#0x1_reconfiguration_Configuration">reconfiguration::Configuration</a>&gt;(@aptos_framework);
+<b>requires</b> <a href="chain_status.md#0x1_chain_status_is_operating">chain_status::is_operating</a>();
+<b>requires</b> <b>exists</b>&lt;<a href="chunky_dkg.md#0x1_chunky_dkg_ChunkyDKGState">chunky_dkg::ChunkyDKGState</a>&gt;(@aptos_framework);
+<b>requires</b> <b>exists</b>&lt;<a href="timestamp.md#0x1_timestamp_CurrentTimeMicroseconds">timestamp::CurrentTimeMicroseconds</a>&gt;(@aptos_framework);
+<b>include</b> <a href="stake.md#0x1_stake_ResourceRequirement">stake::ResourceRequirement</a>;
+<b>include</b> <a href="stake.md#0x1_stake_GetReconfigStartTimeRequirement">stake::GetReconfigStartTimeRequirement</a>;
+<b>include</b> <a href="../../aptos-stdlib/../move-stdlib/doc/features.md#0x1_features_spec_periodical_reward_rate_decrease_enabled">features::spec_periodical_reward_rate_decrease_enabled</a>() ==&gt;
+    <a href="staking_config.md#0x1_staking_config_StakingRewardsConfigEnabledRequirement">staking_config::StakingRewardsConfigEnabledRequirement</a>;
+<b>aborts_if</b> <b>false</b>;
+<b>ensures</b> !<b>old</b>(<a href="reconfiguration_state.md#0x1_reconfiguration_state_spec_is_in_progress">reconfiguration_state::spec_is_in_progress</a>()) ==&gt;
+    <b>exists</b>&lt;<a href="stake.md#0x1_stake_PrecomputedValidatorSet">stake::PrecomputedValidatorSet</a>&gt;(@aptos_framework);
 </code></pre>
 
 
