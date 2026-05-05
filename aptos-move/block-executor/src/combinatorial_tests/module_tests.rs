@@ -5,9 +5,7 @@ use crate::{
     combinatorial_tests::{
         baseline::BaselineOutput,
         mock_executor::{MockEvent, MockTask},
-        resource_tests::{
-            create_executor_thread_pool, execute_block_parallel, get_gas_limit_variants,
-        },
+        resource_tests::{execute_block_parallel, get_gas_limit_variants},
         types::{
             key_to_mock_module_id, KeyType, MockTransaction, TransactionGen, TransactionGenParams,
         },
@@ -48,7 +46,6 @@ fn execute_module_tests(
     assert!(fail::has_failpoints());
     fail::cfg("module_test", "return").unwrap();
 
-    let executor_thread_pool = create_executor_thread_pool();
     let mut runner = TestRunner::default();
 
     let module_id_pool = InternedModuleIdPool::new();
@@ -124,7 +121,6 @@ fn execute_module_tests(
                         AuxiliaryInfo,
                     >,
                 >(
-                    executor_thread_pool.clone(),
                     *maybe_block_gas_limit,
                     &txn_provider,
                     &state_view,
