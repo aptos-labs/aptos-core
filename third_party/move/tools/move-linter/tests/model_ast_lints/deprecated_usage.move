@@ -1,3 +1,4 @@
+// @checks=experimental
 // Tests for deprecated_usage lint
 
 // --- Test modules with deprecated items ---

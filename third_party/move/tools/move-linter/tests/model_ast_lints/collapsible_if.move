@@ -1,3 +1,4 @@
+// @checks=experimental
 module 0xc0ffee::m {
     fun foo(x: u64): bool {
         x > 10

@@ -1,3 +1,4 @@
+// @checks=experimental
 module 0xc0ffee::m {
     fun consume_mut(x: &mut u64) {
         *x = 10;

@@ -1,3 +1,4 @@
+// @checks=experimental
 module 0xc0ffee::complexity {
     // complexity: 12
     public fun high_complexity(a: bool, b: bool): bool {

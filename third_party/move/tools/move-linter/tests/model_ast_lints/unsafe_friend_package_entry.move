@@ -1,3 +1,4 @@
+// @checks=experimental
 module 0x42::friend_caller {}
 
 // Test friend entry functions

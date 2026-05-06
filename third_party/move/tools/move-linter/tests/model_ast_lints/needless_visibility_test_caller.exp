@@ -1,0 +1,9 @@
+
+Diagnostics:
+warning: [lint] package function `foo` is only called from the same module: package visibility is not needed
+  ┌─ tests/model_ast_lints/needless_visibility_test_caller.move:3:17
+  │
+3 │     package fun foo(): u64 {
+  │                 ^^^
+  │
+  = Consider removing the visibility modifier, or suppress with `#[lint::skip(needless_visibility)]`.

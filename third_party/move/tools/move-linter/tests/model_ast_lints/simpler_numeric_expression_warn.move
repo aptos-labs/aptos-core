@@ -1,3 +1,4 @@
+// @checks=experimental
 module 0xc0ffee::m {
     public fun test1(x: u64): u64 {
         (x & 0) + 1

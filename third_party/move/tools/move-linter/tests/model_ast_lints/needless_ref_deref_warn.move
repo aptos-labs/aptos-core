@@ -1,3 +1,4 @@
+// @checks=experimental
 module 0xc0ffee::m {
     use std::string::{Self, String};
     use std::vector;
