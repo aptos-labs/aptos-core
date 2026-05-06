@@ -240,6 +240,7 @@ members = [
     "third_party/move/move-prover",
     "third_party/move/move-prover/boogie-backend",
     "third_party/move/move-prover/bytecode-pipeline",
+    "third_party/move/move-prover/e2e-tests",
     "third_party/move/move-prover/lab",
     "third_party/move/move-prover/test-utils",
     "third_party/move/move-symbol-pool",

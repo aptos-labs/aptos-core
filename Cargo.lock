@@ -2015,12 +2015,14 @@ dependencies = [
  "move-prover-boogie-backend",
  "move-prover-bytecode-pipeline",
  "move-prover-lab",
+ "move-prover-test-utils",
  "move-stackless-bytecode",
  "move-unit-test",
  "move-vm-runtime",
  "move-vm-types",
  "num-traits",
  "once_cell",
+ "regex",
  "serde",
  "tempfile",
  "toml 0.7.8",
@@ -13330,6 +13332,21 @@ dependencies = [
  "shell-words",
  "tempfile",
  "walkdir",
+]
+
+[[package]]
+name = "move-prover-e2e-tests"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "codespan-reporting",
+ "move-core-types",
+ "move-model",
+ "move-package",
+ "move-prover",
+ "move-prover-test-utils",
+ "regex",
+ "tempfile",
 ]
 
 [[package]]

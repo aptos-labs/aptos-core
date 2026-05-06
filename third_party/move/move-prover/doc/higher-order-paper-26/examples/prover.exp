@@ -1,0 +1,77 @@
+Move prover returns: exiting with verification errors
+warning: Unused value of parameter `caller`. Consider removing the parameter, or prefixing with an underscore (e.g., `_caller`), or binding to `_`
+   ┌─ <PKG>/sources/vault.move:48:24
+   │
+48 │     public fun harvest(caller: &signer, vault_addr: address) {
+   │                        ^^^^^^
+
+error: data invariant does not hold
+   ┌─ <PKG>/sources/amm_example.move:30:9
+   │
+30 │ ╭         invariant forall S in *, r_in: u64, r_out: u64, amt: u64:
+31 │ │             S |~ !aborts_of<self.pricing>(r_in, r_out, amt);
+   │ ╰────────────────────────────────────────────────────────────^
+   │
+   =     at <PKG>/sources/amm_example.move:241: create_noncompliant_fee_pool
+   =         account = <redacted>
+   =     at <PKG>/sources/amm_example.move:242: create_noncompliant_fee_pool
+   =     at <PKG>/../../../../move-stdlib/sources/signer.move:26: address_of
+   =         s = <redacted>
+   =     at <PKG>/../../../../move-stdlib/sources/signer.move:27: address_of
+   =         result = <redacted>
+   =         owner = <redacted>
+   =     at <PKG>/sources/amm_example.move:245: create_noncompliant_fee_pool
+   =     at <PKG>/sources/amm_example.move:246: create_noncompliant_fee_pool
+   =     at <PKG>/sources/amm_example.move:247: create_noncompliant_fee_pool
+   =     at <PKG>/sources/amm_example.move:244: create_noncompliant_fee_pool
+   =     at <PKG>/sources/amm_example.move:30
+
+error: data invariant does not hold
+   ┌─ <PKG>/sources/amm_example.move:38:9
+   │
+38 │ ╭         invariant forall S in *, r_in: u64, r_out: u64,
+39 │ │                         a1: u64, a2: u64:
+40 │ │             S.. |~ a1 <= a2 ==>
+41 │ │                 result_of<self.pricing>(r_in, r_out, a1)
+42 │ │                     <= result_of<self.pricing>(r_in, r_out, a2);
+   │ ╰────────────────────────────────────────────────────────────────^
+   │
+   =     at <PKG>/sources/amm_example.move:241: create_noncompliant_fee_pool
+   =         account = <redacted>
+   =     at <PKG>/sources/amm_example.move:242: create_noncompliant_fee_pool
+   =     at <PKG>/../../../../move-stdlib/sources/signer.move:26: address_of
+   =         s = <redacted>
+   =     at <PKG>/../../../../move-stdlib/sources/signer.move:27: address_of
+   =         result = <redacted>
+   =         owner = <redacted>
+   =     at <PKG>/sources/amm_example.move:245: create_noncompliant_fee_pool
+   =     at <PKG>/sources/amm_example.move:246: create_noncompliant_fee_pool
+   =     at <PKG>/sources/amm_example.move:247: create_noncompliant_fee_pool
+   =     at <PKG>/sources/amm_example.move:244: create_noncompliant_fee_pool
+   =     at <PKG>/sources/amm_example.move:30
+   =     at <PKG>/sources/amm_example.move:34
+   =     at <PKG>/sources/amm_example.move:38
+
+error: data invariant does not hold
+   ┌─ <PKG>/sources/amm_example.move:45:9
+   │
+45 │ ╭         invariant forall S in *, r_in: u64, r_out: u64, amt: u64:
+46 │ │             S.. |~ (r_in + amt) * (r_out - result_of<self.pricing>(r_in, r_out, amt)) >= r_in * r_out;
+   │ ╰──────────────────────────────────────────────────────────────────────────────────────────────────────^
+   │
+   =     at <PKG>/sources/amm_example.move:241: create_noncompliant_fee_pool
+   =         account = <redacted>
+   =     at <PKG>/sources/amm_example.move:242: create_noncompliant_fee_pool
+   =     at <PKG>/../../../../move-stdlib/sources/signer.move:26: address_of
+   =         s = <redacted>
+   =     at <PKG>/../../../../move-stdlib/sources/signer.move:27: address_of
+   =         result = <redacted>
+   =         owner = <redacted>
+   =     at <PKG>/sources/amm_example.move:245: create_noncompliant_fee_pool
+   =     at <PKG>/sources/amm_example.move:246: create_noncompliant_fee_pool
+   =     at <PKG>/sources/amm_example.move:247: create_noncompliant_fee_pool
+   =     at <PKG>/sources/amm_example.move:244: create_noncompliant_fee_pool
+   =     at <PKG>/sources/amm_example.move:30
+   =     at <PKG>/sources/amm_example.move:34
+   =     at <PKG>/sources/amm_example.move:38
+   =     at <PKG>/sources/amm_example.move:45
