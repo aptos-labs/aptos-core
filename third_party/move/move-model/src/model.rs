@@ -3385,6 +3385,11 @@ impl<'env> ModuleEnv<'env> {
         })
     }
 
+    /// Checks whether this item is only used in tests or verification.
+    pub fn is_test_or_verify_only(&self) -> bool {
+        self.is_test_only() || self.is_verify_only()
+    }
+
     /// Returns the use declarations of this module.
     pub fn get_use_decls(&self) -> &[UseDecl] {
         &self.data.use_decls

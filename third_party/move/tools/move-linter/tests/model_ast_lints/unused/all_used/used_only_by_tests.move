@@ -1,12 +1,10 @@
 module 0x42::m {
-    // Items clearly meant for testing but missing #[test_only] attribute
-    // These are harmless false positives - the warning correctly suggests adding #[test_only]
 
     fun test_helper(): u64 {
         42
     }
 
-    struct TestStruct {
+    struct TestStruct has drop {
         x: u64
     }
 

@@ -168,6 +168,8 @@ impl CliCommand<&'static str> for LintPackage {
         let package_path = move_options.get_package_path()?;
         let included_artifacts = IncludedArtifacts::Sparse;
         let build_options = BuildOptions {
+            // Make test callers visible to the linter.
+            with_test_mode: true,
             ..included_artifacts.build_options_with_experiments(
                 &move_options,
                 more_experiments,

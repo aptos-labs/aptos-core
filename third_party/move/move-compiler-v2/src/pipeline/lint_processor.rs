@@ -35,6 +35,11 @@ impl FunctionTargetProcessor for LintProcessor {
         if !target.module_env().is_primary_target() {
             return data;
         }
+        // Test/verify-only items are kept in the model so their callers are
+        // visible to lints, but the items are not themselves linted.
+        if func_env.is_test_or_verify_only() {
+            return data;
+        }
         let linters = Self::get_applicable_linter_pipeline(&target);
         for lint in linters {
             lint.check(&target);

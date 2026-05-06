@@ -61,6 +61,8 @@ fn test_runner(path: &Path) -> datatest_stable::Result<()> {
             "resource_group_member".to_string(),
         ]),
         external_checks: vec![lint_checks],
+        // Make test callers visible to the linter.
+        compile_test_code: true,
         ..Default::default()
     };
     let mut output = String::new();
