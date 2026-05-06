@@ -172,17 +172,26 @@ impl NetworkLoadTest for MainnetMirrorFailureTest {
         // Bucket validators by class. Chronic + flaky get a continuous failpoint
         // (`X%delay(2s)` matching their fp_7d_avg). Spike validators get a
         // separately-spawned task that sets+removes a `100%return` failpoint.
+        // Build the emitter pool to include Healthy + Chronic + Flaky but
+        // exclude Spike: spike's `100%return` for ~30s drops ALL outgoing
+        // consensus messages, so any txn admitted to a spike validator's
+        // mempool during its window sits stuck for the whole window — that
+        // single-validator stall produces 30+ second P99 outliers without
+        // contributing realistic mainnet P90 modeling.
+        let mut non_spike_peers: Vec<PeerId> = Vec::new();
         let mut by_class = [
             (AvailabilityClass::StableChronic, 0usize),
             (AvailabilityClass::OnlineButFlaky, 0usize),
             (AvailabilityClass::EpisodicSpike, 0usize),
         ];
 
-        for (i, _peer_id) in validator_peers.iter().enumerate() {
+        for (i, peer_id) in validator_peers.iter().enumerate() {
             let entry = &snap_validators[i];
             let (name, client) = &validator_clients[i];
             match entry.availability {
-                AvailabilityClass::Healthy => {},
+                AvailabilityClass::Healthy => {
+                    non_spike_peers.push(*peer_id);
+                },
                 AvailabilityClass::EpisodicSpike => {
                     by_class[2].1 += 1;
                     // Spike: spawn a task that flips the failpoint on at offset,
@@ -214,26 +223,26 @@ impl NetworkLoadTest for MainnetMirrorFailureTest {
                             name, SEND_FAILPOINT, action, e
                         );
                     }
+                    non_spike_peers.push(*peer_id);
                 },
             }
         }
 
         info!(
             "MainnetMirrorFailureTest: set continuous failpoints on {} chronic + {} flaky; \
-             spawned {} spike tasks; emitter pool = ALL {} validators",
+             spawned {} spike tasks; emitter pool = {} non-spike validators",
             by_class[0].1,
             by_class[1].1,
             self.spike_tasks.lock().await.len(),
-            validator_peers.len(),
+            non_spike_peers.len(),
         );
 
-        // Emit to all validators (including chronic/flaky) to mirror mainnet
-        // ingress topology — in mainnet, ~85% of batches are authored by 3 AL
-        // validators (one of which is classified chronic), and PFN/VFN routing
-        // means user txns flow through chronic validators at high volume.
-        // Excluding chronic from emit kept their `consensus::send::any` delay
-        // off the QS proof-formation path, which is where mainnet P90 lives.
-        Ok(LoadDestination::AllValidators)
+        // Include Healthy + Chronic + Flaky in the emit pool to exercise the
+        // chronic-validator-as-batch-author path that drives mainnet P90 (the
+        // QS proof-formation latency from chronic broadcasts hitting
+        // `consensus::send::any` delay). Spike is excluded — see comment above
+        // about 30s catastrophic-tail outliers.
+        Ok(LoadDestination::Peers(non_spike_peers))
     }
 
     async fn finish<'a>(&self, ctx: &mut NetworkContext<'a>) -> Result<()> {
