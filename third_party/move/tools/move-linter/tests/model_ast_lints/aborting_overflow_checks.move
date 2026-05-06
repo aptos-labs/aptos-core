@@ -1,3 +1,4 @@
+// @checks=experimental
 module 0xc0ffee::m {
 
   struct Counter has key, store { i: u64 }

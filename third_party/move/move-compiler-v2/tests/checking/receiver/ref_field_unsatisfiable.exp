@@ -1,0 +1,25 @@
+
+Diagnostics:
+error: unable to infer instantiation of type `struct{duration,is_isolated} + &_` (consider providing type arguments or annotating the type)
+   ┌─ tests/checking/receiver/ref_field_unsatisfiable.move:20:16
+   │
+20 │         apply(|x| {
+   │                ^
+
+error: unable to infer instantiation of type `_` (consider providing type arguments or annotating the type)
+   ┌─ tests/checking/receiver/ref_field_unsatisfiable.move:21:21
+   │
+21 │             let _ = *x;
+   │                     ^^
+
+error: unable to infer instantiation of type `_` (consider providing type arguments or annotating the type)
+   ┌─ tests/checking/receiver/ref_field_unsatisfiable.move:22:21
+   │
+22 │             let _ = x.is_isolated;
+   │                     ^^^^^^^^^^^^^
+
+error: unable to infer instantiation of type `_` (consider providing type arguments or annotating the type)
+   ┌─ tests/checking/receiver/ref_field_unsatisfiable.move:23:21
+   │
+23 │             let _ = x.duration;
+   │                     ^^^^^^^^^^

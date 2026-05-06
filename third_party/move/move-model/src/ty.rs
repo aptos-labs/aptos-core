@@ -682,6 +682,15 @@ impl Constraint {
             // (field existence vs receiver function existence), so they can coexist.
             (Constraint::SomeStruct(..), Constraint::SomeReceiverFunction(..))
             | (Constraint::SomeReceiverFunction(..), Constraint::SomeStruct(..)) => Ok(false),
+            // SomeReference is orthogonal to constraints that propagate over references
+            // (SomeStruct, SomeReceiverFunction — see `propagate_over_reference`): the
+            // reference shape applies to the outer type while the field/method
+            // requirement is satisfied by the referent. E.g. `&mut S` is a reference and
+            // `S` has the field/method.
+            (Constraint::SomeReference(..), Constraint::SomeStruct(..))
+            | (Constraint::SomeStruct(..), Constraint::SomeReference(..))
+            | (Constraint::SomeReference(..), Constraint::SomeReceiverFunction(..))
+            | (Constraint::SomeReceiverFunction(..), Constraint::SomeReference(..)) => Ok(false),
             // After the above checks, if one of the constraints is
             // accumulating, indicate its compatible but cannot be joined.
             (c1, c2) if c1.accumulating() || c2.accumulating() => Ok(false),

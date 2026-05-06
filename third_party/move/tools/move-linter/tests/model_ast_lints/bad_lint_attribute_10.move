@@ -1,3 +1,4 @@
+// @checks=experimental
 module 0xc0ffee::m {
     public fun test() {
         #[lint::skip(while_true)]
