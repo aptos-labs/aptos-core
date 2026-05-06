@@ -144,8 +144,8 @@ class ReplayConfig:
     def __init__(self, network: Network) -> None:
         if network == Network.TESTNET:
             self.concurrent_replayer = 35
-            self.pvc_number = 20
-            self.workers_per_pvc = 15
+            self.pvc_number = 10
+            self.workers_per_pvc = 20
             self.min_range_size = 10_000
             self.range_size = 5_000_000
         else:
