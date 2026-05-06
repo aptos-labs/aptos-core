@@ -366,7 +366,7 @@ impl<R: Clone + Ord> ColdValidationRequirements<R> {
     /// Note that processing validation requirement may mean (a) completing the actual
     /// required validation (always if requirement was not deferred), or (b) scheduling it
     /// in deferred case to be performed if the txn was observed to still be executing.
-    /// validation_completed parameter is true in case (a) and false in case (b).
+    /// validation_still_needed parameter is false in case (a) and true in case (b).
     ///
     /// The return value indicates if this was the last requirement (i.e. there are no more
     /// cold validation requirements and the worker is no longer assigned to process them).
@@ -408,7 +408,8 @@ impl<R: Clone + Ord> ColdValidationRequirements<R> {
             // min_idx_with_unprocessed_validation_requirement may be increased below, after
             // deferred status is already updated. When checking if txn can be committed, the
             // access order is opposite, ensuring that if minimum index is higher, we will
-            // also observe the incremented count below (even w. Relaxed ordering).
+            // also observe the deferred status set below. This relies on the Release/Acquire
+            // pair on min_idx_with_unprocessed_validation_requirement.
             //
             // The reason for using fetch_max is because the deferred requirement can be
             // fulfilled by a different worker (the one executing the txn), which may report
@@ -442,7 +443,7 @@ impl<R: Clone + Ord> ColdValidationRequirements<R> {
         // requirements below (incl.) the given index, and then that there are no scheduled
         // but yet unfulfilled (validated) requirements for the index.
         self.min_idx_with_unprocessed_validation_requirement
-            .load(Ordering::Relaxed)
+            .load(Ordering::Acquire)
             <= txn_idx
             || self.deferred_requirements_status[txn_idx as usize].load(Ordering::Relaxed)
                 == blocked_incarnation_status(incarnation)
@@ -479,7 +480,7 @@ impl<R: Clone + Ord> ColdValidationRequirements<R> {
         }
         let prev_min = self
             .min_idx_with_unprocessed_validation_requirement
-            .swap(new_min, Ordering::Relaxed);
+            .swap(new_min, Ordering::Release);
         if new_min == u32::MAX {
             active_reqs.requirements.clear();
             self.dedicated_worker_id.store(u32::MAX, Ordering::Relaxed);

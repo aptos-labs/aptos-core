@@ -460,9 +460,19 @@ where
             // Recording in order to check the invariant that the final, committed incarnation
             // of each transaction is not a speculative failure.
             last_input_output.record_speculative_failure(idx_to_execute);
-            // Ignoring module validation requirements since speculative failure
-            // anyway requires re-execution.
-            let _ = scheduler.finish_execution(abort_manager)?;
+            // Unblock the commit path if deferred module validation requirements exist.
+            // The speculative failure guarantees re-execution, but re-execution may only
+            // be triggered by the commit worker (via validate_and_commit_delayed_fields
+            // returning false). The commit worker checks deferred requirements first
+            // (is_commit_blocked), so we must mark them completed to avoid a deadlock.
+            if scheduler.finish_execution(abort_manager)?.is_some() {
+                scheduler.finish_cold_validation_requirement(
+                    worker_id,
+                    idx_to_execute,
+                    incarnation,
+                    true,
+                )?;
+            }
             return Ok(());
         }
 
@@ -776,23 +786,26 @@ where
         // 2. The only possible time to take the read-set from txn_last_input_output
         // is in prepare_and_queue_commit_ready_txn (applying module publishing output).
         // However, required module validation necessarily occurs before the commit.
-        let (read_set, is_speculative_failure) =
-            last_input_output.read_set(idx_to_validate).ok_or_else(|| {
-                code_invariant_error(format!(
-                    "Prior read-set of txn {} incarnation {} not recorded for module verification",
-                    idx_to_validate, incarnation_to_validate
-                ))
-            })?;
+        if last_input_output.is_speculative_failure(idx_to_validate) {
+            // No need to validate — the incarnation resulted in a speculative failure
+            // and will be re-executed.
+            return Ok(true);
+        }
+        let read_set = last_input_output.read_set(idx_to_validate).ok_or_else(|| {
+            code_invariant_error(format!(
+                "Prior read-set of txn {} incarnation {} not recorded for module verification",
+                idx_to_validate, incarnation_to_validate
+            ))
+        })?;
         // Perform invariant checks or return early based on read set's incarnation.
         let blockstm_v2_incarnation = read_set.blockstm_v2_incarnation().ok_or_else(|| {
             code_invariant_error(
                 "BlockSTMv2 must be enabled in CapturedReads when validating module reads",
             )
         })?;
-        if blockstm_v2_incarnation > incarnation_to_validate || is_speculative_failure {
+        if blockstm_v2_incarnation > incarnation_to_validate {
             // No need to validate as a newer incarnation has already been executed
-            // and recorded its output, or the incarnation has resulted in a speculative
-            // failure, which means there will be a further re-execution.
+            // and recorded its output.
             return Ok(true);
         }
         if blockstm_v2_incarnation < incarnation_to_validate {
@@ -827,13 +840,12 @@ where
         skip_module_reads_validation: bool,
     ) -> bool {
         let _timer = TASK_VALIDATE_SECONDS.start_timer();
-        let (read_set, is_speculative_failure) = last_input_output
-            .read_set(idx_to_validate)
-            .expect("[BlockSTM]: Prior read-set must be recorded");
-
-        if is_speculative_failure {
+        if last_input_output.is_speculative_failure(idx_to_validate) {
             return false;
         }
+        let read_set = last_input_output
+            .read_set(idx_to_validate)
+            .expect("[BlockSTM]: Prior read-set must be recorded");
 
         assert!(
             !read_set.is_incorrect_use(),
@@ -891,13 +903,12 @@ where
         last_input_output: &TxnLastInputOutput<T, E::Output>,
         is_v2: bool,
     ) -> Result<bool, PanicError> {
-        let (read_set, is_speculative_failure) = last_input_output
-            .read_set(txn_idx)
-            .ok_or_else(|| code_invariant_error("Read set must be recorded"))?;
-
-        if is_speculative_failure {
+        if last_input_output.is_speculative_failure(txn_idx) {
             return Ok(false);
         }
+        let read_set = last_input_output
+            .read_set(txn_idx)
+            .ok_or_else(|| code_invariant_error("Read set must be recorded"))?;
 
         if !read_set.validate_delayed_field_reads(versioned_cache.delayed_fields(), txn_idx)?
             || (is_v2
@@ -1281,7 +1292,7 @@ where
             // Retrieve the read-set that was captured during execution. This contains the snapshot
             // of all modules accessed at execution time. It is important to use this view so that
             // replay does not see potentially different newer state.
-            let (read_set, _) = last_input_output.read_set(txn_idx).ok_or_else(|| {
+            let read_set = last_input_output.read_set(txn_idx).ok_or_else(|| {
                 code_invariant_error("Read set must be recorded for trace replay")
             })?;
 

@@ -282,13 +282,12 @@ impl<T: Transaction, O: TransactionOutput<Txn = T>> TxnLastInputOutput<T, O> {
         }
     }
 
-    // Alongside the latest read set, returns the indicator of whether the latest
-    // incarnation of the txn resulted in a speculative failure.
-    pub(crate) fn read_set(&self, txn_idx: TxnIndex) -> Option<(Arc<TxnInput<T>>, bool)> {
-        let input = Arc::clone(self.inputs[txn_idx as usize].lock().as_ref()?);
-        let speculative_failure =
-            self.speculative_failures[txn_idx as usize].load(Ordering::Relaxed);
-        Some((input, speculative_failure))
+    pub(crate) fn is_speculative_failure(&self, txn_idx: TxnIndex) -> bool {
+        self.speculative_failures[txn_idx as usize].load(Ordering::Relaxed)
+    }
+
+    pub(crate) fn read_set(&self, txn_idx: TxnIndex) -> Option<Arc<TxnInput<T>>> {
+        Some(Arc::clone(self.inputs[txn_idx as usize].lock().as_ref()?))
     }
 
     // Should be called when txn_idx is committed, while holding commit lock.
