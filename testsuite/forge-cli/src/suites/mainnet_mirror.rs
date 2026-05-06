@@ -212,6 +212,13 @@ fn build_failures_test(
             )),
             failure_test,
         ))
+        .with_validator_override_node_config_fn(Arc::new(|config, _| {
+            // MainnetMirrorFailureTest injects per-validator failpoints via the
+            // /v1/-/set_failpoint API. The image is built with --features failpoints,
+            // but the endpoint also requires this config knob — without it every
+            // set_failpoint call returns 500 "Failpoints are not enabled at a config level".
+            config.api.failpoints_enabled = true;
+        }))
         .with_emit_job(
             EmitJobRequest::default()
                 .mode(EmitJobMode::ConstTps { tps: emit_tps })
