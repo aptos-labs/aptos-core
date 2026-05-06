@@ -505,6 +505,27 @@ impl MoveDebugger for AptosDebugger {
         self.execute_transaction_at_version_with_gas_profiler(version, txn, auxiliary_info)
     }
 
+    fn execute_transaction_at_version(
+        &self,
+        version: u64,
+        transaction: Transaction,
+        auxiliary_info: PersistedAuxiliaryInfo,
+    ) -> anyhow::Result<TransactionOutput> {
+        // Route through the block-executor path so all Transaction variants
+        // (user + system) are handled uniformly. Single-element batch.
+        let outputs = self.execute_transactions_at_version(
+            version,
+            vec![transaction],
+            vec![auxiliary_info],
+            1,
+            &[1],
+        )?;
+        outputs
+            .into_iter()
+            .next()
+            .ok_or_else(|| anyhow::anyhow!("execute_transactions_at_version returned no outputs"))
+    }
+
     async fn get_committed_transaction_at_version(
         &self,
         version: u64,
