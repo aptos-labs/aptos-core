@@ -1405,99 +1405,28 @@ module aptos_framework::stake {
         // Officially deactivate all pending_inactive validators. They will now no longer receive rewards.
         validator_set.pending_inactive = vector::empty();
 
-        // Update active validator set so that network address/public key change takes effect.
-        // Moreover, recalculate the total voting power, and deactivate the validator whose
-        // voting power is less than the minimum required stake.
-        let next_epoch_validators = vector::empty();
-        let (minimum_stake, _) = staking_config::get_required_stake(&config);
-        let vlen = validator_set.active_validators.length();
-        let total_voting_power = 0;
-        let i = 0;
-        while ({
-            spec {
-                invariant spec_validators_are_initialized(next_epoch_validators);
-                invariant i <= vlen;
-            };
-            i < vlen
-        }) {
-            let old_validator_info = validator_set.active_validators.borrow_mut(i);
-            let pool_address = old_validator_info.addr;
-            let validator_config = borrow_global<ValidatorConfig>(pool_address);
-            let stake_pool = borrow_global<StakePool>(pool_address);
-            let new_validator_info =
-                generate_validator_info(pool_address, stake_pool, *validator_config);
-
-            // A validator needs at least the min stake required to join the validator set.
-            if (new_validator_info.voting_power >= minimum_stake) {
-                spec {
-                    assume total_voting_power + new_validator_info.voting_power
-                        <= MAX_U128;
-                };
-                total_voting_power +=(new_validator_info.voting_power as u128);
-                next_epoch_validators.push_back(new_validator_info);
-            };
-            i += 1;
-        };
-
-        // In the extreme case where the next epoch validator election produces an empty set (i.e., no staker satisfies the minimum stake or participation requirements), the system enters an emergency liveness preservation mode.
-        // Instead of transitioning to an empty validator set—which would render the network inoperable—the protocol retains the previous active validator set and recomputes the total voting power from it.
-        // A ValidatorSetLivenessFallback event is emitted to signal this critical governance and economic security failure.
-        let liveness_fallback_event: Option<ValidatorSetLivenessFallback> = option::none();
-        if (!next_epoch_validators.is_empty()) {
-            validator_set.active_validators = next_epoch_validators;
-            validator_set.total_voting_power = total_voting_power;
-        } else {
-            // We derive the next validator set from the previous epoch's active and pending-active stakers.
-            // If the resulting set is empty, it indicates that no staker is willing or qualified to participate
-            // in consensus anymore. In this case, the chain is considered effectively dead, and we must retain
-            // the previous active validator set as a last-resort liveness fallback.
-            // Recompute each validator's info from current stake (after update_stake_pool) so that
-            // voting_power and total_voting_power reflect rewards, fees, and merged stake—not stale values.
-            let refreshed_validators = vector::empty();
-            let emergency_total_voting_power = 0u128;
-            let fallback_vlen = validator_set.active_validators.length();
-            let fallback_i = 0;
-            while (fallback_i < fallback_vlen) {
-                let old_validator_info =
-                    validator_set.active_validators.borrow(fallback_i);
-                let pool_address = old_validator_info.addr;
-                let validator_config = &ValidatorConfig[pool_address];
-                let stake_pool = &StakePool[pool_address];
-                let new_validator_info =
-                    generate_validator_info(pool_address, stake_pool, *validator_config);
-                refreshed_validators.push_back(new_validator_info);
-                emergency_total_voting_power +=(new_validator_info.voting_power as u128);
-                fallback_i += 1;
-            };
-            validator_set.active_validators = refreshed_validators;
-            validator_set.total_voting_power = emergency_total_voting_power;
-            liveness_fallback_event = option::some(
-                ValidatorSetLivenessFallback {
-                    minimum_stake,
-                    emergency_validator_count: validator_set.active_validators.length(),
-                    total_emergency_voting_power: validator_set.total_voting_power
-                }
-            );
-        };
-        validator_set.total_joining_power = 0;
-
-        // If a next validator set has been pre-computed and stored, consume it (move_from destroys the resource).
-        if (exists<PrecomputedValidatorSet>(@aptos_framework)) {
+        // Determine the next-epoch active set: either consume the cached value
+        // produced when reconfig started (async/DKG path), or compute it now from
+        // live state (sync/governance path). The two paths are mutually exclusive,
+        // so we avoid the O(n) per-validator recomputation when the cache exists.
+        let liveness_fallback_event = if (exists<PrecomputedValidatorSet>(@aptos_framework)) {
             let PrecomputedValidatorSet { validator_set: precomputed, is_liveness_fallback } =
                 move_from<PrecomputedValidatorSet>(@aptos_framework);
             *validator_set = precomputed;
             if (is_liveness_fallback) {
-                liveness_fallback_event = option::some(
-                    ValidatorSetLivenessFallback {
-                        minimum_stake,
-                        emergency_validator_count: validator_set.active_validators.length(),
-                        total_emergency_voting_power: validator_set.total_voting_power,
-                    }
-                );
+                let (minimum_stake, _) = staking_config::get_required_stake(&config);
+                option::some(ValidatorSetLivenessFallback {
+                    minimum_stake,
+                    emergency_validator_count: validator_set.active_validators.length(),
+                    total_emergency_voting_power: validator_set.total_voting_power,
+                })
             } else {
-                liveness_fallback_event = option::none();
-            };
+                option::none()
+            }
+        } else {
+            refresh_validator_set_in_place(validator_set, &config)
         };
+        validator_set.total_joining_power = 0;
 
         if (liveness_fallback_event.is_some()) {
             event::emit(liveness_fallback_event.extract());
@@ -1577,6 +1506,89 @@ module aptos_framework::stake {
             // Update rewards rate after reward distribution.
             staking_config::calculate_and_save_latest_epoch_rewards_rate();
         };
+    }
+
+    /// Compute the next-epoch active validator set in place from live `StakePool`/`ValidatorConfig` state.
+    /// Used by `on_new_epoch` only on the sync (non-DKG) path; the async/DKG path consumes a
+    /// pre-computed `PrecomputedValidatorSet` instead.
+    /// Returns `Some(ValidatorSetLivenessFallback)` when the freshly-computed set was empty and we
+    /// fell back to retaining the previous active set.
+    fun refresh_validator_set_in_place(
+        validator_set: &mut ValidatorSet,
+        config: &staking_config::StakingConfig,
+    ): Option<ValidatorSetLivenessFallback> acquires StakePool, ValidatorConfig {
+        // Update active validator set so that network address/public key change takes effect.
+        // Moreover, recalculate the total voting power, and deactivate the validator whose
+        // voting power is less than the minimum required stake.
+        let next_epoch_validators = vector::empty();
+        let (minimum_stake, _) = staking_config::get_required_stake(config);
+        let vlen = validator_set.active_validators.length();
+        let total_voting_power = 0;
+        let i = 0;
+        while ({
+            spec {
+                invariant spec_validators_are_initialized(next_epoch_validators);
+                invariant i <= vlen;
+            };
+            i < vlen
+        }) {
+            let old_validator_info = validator_set.active_validators.borrow_mut(i);
+            let pool_address = old_validator_info.addr;
+            let validator_config = borrow_global<ValidatorConfig>(pool_address);
+            let stake_pool = borrow_global<StakePool>(pool_address);
+            let new_validator_info =
+                generate_validator_info(pool_address, stake_pool, *validator_config);
+
+            // A validator needs at least the min stake required to join the validator set.
+            if (new_validator_info.voting_power >= minimum_stake) {
+                spec {
+                    assume total_voting_power + new_validator_info.voting_power
+                        <= MAX_U128;
+                };
+                total_voting_power +=(new_validator_info.voting_power as u128);
+                next_epoch_validators.push_back(new_validator_info);
+            };
+            i += 1;
+        };
+
+        // In the extreme case where the next epoch validator election produces an empty set (i.e., no staker satisfies the minimum stake or participation requirements), the system enters an emergency liveness preservation mode.
+        // Instead of transitioning to an empty validator set—which would render the network inoperable—the protocol retains the previous active validator set and recomputes the total voting power from it.
+        // A ValidatorSetLivenessFallback event is emitted to signal this critical governance and economic security failure.
+        if (!next_epoch_validators.is_empty()) {
+            validator_set.active_validators = next_epoch_validators;
+            validator_set.total_voting_power = total_voting_power;
+            option::none()
+        } else {
+            // We derive the next validator set from the previous epoch's active and pending-active stakers.
+            // If the resulting set is empty, it indicates that no staker is willing or qualified to participate
+            // in consensus anymore. In this case, the chain is considered effectively dead, and we must retain
+            // the previous active validator set as a last-resort liveness fallback.
+            // Recompute each validator's info from current stake (after update_stake_pool) so that
+            // voting_power and total_voting_power reflect rewards, fees, and merged stake—not stale values.
+            let refreshed_validators = vector::empty();
+            let emergency_total_voting_power = 0u128;
+            let fallback_vlen = validator_set.active_validators.length();
+            let fallback_i = 0;
+            while (fallback_i < fallback_vlen) {
+                let old_validator_info =
+                    validator_set.active_validators.borrow(fallback_i);
+                let pool_address = old_validator_info.addr;
+                let validator_config = &ValidatorConfig[pool_address];
+                let stake_pool = &StakePool[pool_address];
+                let new_validator_info =
+                    generate_validator_info(pool_address, stake_pool, *validator_config);
+                refreshed_validators.push_back(new_validator_info);
+                emergency_total_voting_power +=(new_validator_info.voting_power as u128);
+                fallback_i += 1;
+            };
+            validator_set.active_validators = refreshed_validators;
+            validator_set.total_voting_power = emergency_total_voting_power;
+            option::some(ValidatorSetLivenessFallback {
+                minimum_stake,
+                emergency_validator_count: validator_set.active_validators.length(),
+                total_emergency_voting_power: validator_set.total_voting_power
+            })
+        }
     }
 
     /// Return the `ValidatorConsensusInfo` of each current validator, sorted by current validator index.

@@ -121,6 +121,7 @@ or if their stake drops below the min required, they would get removed at the en
 -  [Function `is_current_epoch_validator`](#0x1_stake_is_current_epoch_validator)
 -  [Function `update_performance_statistics`](#0x1_stake_update_performance_statistics)
 -  [Function `on_new_epoch`](#0x1_stake_on_new_epoch)
+-  [Function `refresh_validator_set_in_place`](#0x1_stake_refresh_validator_set_in_place)
 -  [Function `cur_validator_consensus_infos`](#0x1_stake_cur_validator_consensus_infos)
 -  [Function `compute_simulated_validator_info`](#0x1_stake_compute_simulated_validator_info)
 -  [Function `next_validator_consensus_infos`](#0x1_stake_next_validator_consensus_infos)
@@ -4190,99 +4191,28 @@ power.
     // Officially deactivate all pending_inactive validators. They will now no longer receive rewards.
     validator_set.pending_inactive = <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector_empty">vector::empty</a>();
 
-    // Update active validator set so that network <b>address</b>/<b>public</b> key change takes effect.
-    // Moreover, recalculate the total <a href="voting.md#0x1_voting">voting</a> power, and deactivate the validator whose
-    // <a href="voting.md#0x1_voting">voting</a> power is less than the minimum required <a href="stake.md#0x1_stake">stake</a>.
-    <b>let</b> next_epoch_validators = <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector_empty">vector::empty</a>();
-    <b>let</b> (minimum_stake, _) = <a href="staking_config.md#0x1_staking_config_get_required_stake">staking_config::get_required_stake</a>(&config);
-    <b>let</b> vlen = validator_set.active_validators.length();
-    <b>let</b> total_voting_power = 0;
-    <b>let</b> i = 0;
-    <b>while</b> ({
-        <b>spec</b> {
-            <b>invariant</b> <a href="stake.md#0x1_stake_spec_validators_are_initialized">spec_validators_are_initialized</a>(next_epoch_validators);
-            <b>invariant</b> i &lt;= vlen;
-        };
-        i &lt; vlen
-    }) {
-        <b>let</b> old_validator_info = validator_set.active_validators.borrow_mut(i);
-        <b>let</b> pool_address = old_validator_info.addr;
-        <b>let</b> validator_config = <b>borrow_global</b>&lt;<a href="stake.md#0x1_stake_ValidatorConfig">ValidatorConfig</a>&gt;(pool_address);
-        <b>let</b> stake_pool = <b>borrow_global</b>&lt;<a href="stake.md#0x1_stake_StakePool">StakePool</a>&gt;(pool_address);
-        <b>let</b> new_validator_info =
-            <a href="stake.md#0x1_stake_generate_validator_info">generate_validator_info</a>(pool_address, stake_pool, *validator_config);
-
-        // A validator needs at least the <b>min</b> <a href="stake.md#0x1_stake">stake</a> required <b>to</b> join the validator set.
-        <b>if</b> (new_validator_info.voting_power &gt;= minimum_stake) {
-            <b>spec</b> {
-                <b>assume</b> total_voting_power + new_validator_info.voting_power
-                    &lt;= MAX_U128;
-            };
-            total_voting_power +=(new_validator_info.voting_power <b>as</b> u128);
-            next_epoch_validators.push_back(new_validator_info);
-        };
-        i += 1;
-    };
-
-    // In the extreme case <b>where</b> the next epoch validator election produces an empty set (i.e., no staker satisfies the minimum <a href="stake.md#0x1_stake">stake</a> or participation requirements), the system enters an emergency liveness preservation mode.
-    // Instead of transitioning <b>to</b> an empty validator set—which would render the network inoperable—the protocol retains the previous active validator set and recomputes the total <a href="voting.md#0x1_voting">voting</a> power from it.
-    // A <a href="stake.md#0x1_stake_ValidatorSetLivenessFallback">ValidatorSetLivenessFallback</a> <a href="event.md#0x1_event">event</a> is emitted <b>to</b> signal this critical governance and economic security failure.
-    <b>let</b> liveness_fallback_event: Option&lt;<a href="stake.md#0x1_stake_ValidatorSetLivenessFallback">ValidatorSetLivenessFallback</a>&gt; = <a href="../../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_none">option::none</a>();
-    <b>if</b> (!next_epoch_validators.is_empty()) {
-        validator_set.active_validators = next_epoch_validators;
-        validator_set.total_voting_power = total_voting_power;
-    } <b>else</b> {
-        // We derive the next validator set from the previous epoch's active and pending-active stakers.
-        // If the resulting set is empty, it indicates that no staker is willing or qualified <b>to</b> participate
-        // in consensus anymore. In this case, the chain is considered effectively dead, and we must retain
-        // the previous active validator set <b>as</b> a last-resort liveness fallback.
-        // Recompute each validator's info from current <a href="stake.md#0x1_stake">stake</a> (after update_stake_pool) so that
-        // voting_power and total_voting_power <a href="../../aptos-stdlib/../move-stdlib/doc/reflect.md#0x1_reflect">reflect</a> rewards, fees, and merged <a href="stake.md#0x1_stake">stake</a>—not stale values.
-        <b>let</b> refreshed_validators = <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector_empty">vector::empty</a>();
-        <b>let</b> emergency_total_voting_power = 0u128;
-        <b>let</b> fallback_vlen = validator_set.active_validators.length();
-        <b>let</b> fallback_i = 0;
-        <b>while</b> (fallback_i &lt; fallback_vlen) {
-            <b>let</b> old_validator_info =
-                validator_set.active_validators.borrow(fallback_i);
-            <b>let</b> pool_address = old_validator_info.addr;
-            <b>let</b> validator_config = &<a href="stake.md#0x1_stake_ValidatorConfig">ValidatorConfig</a>[pool_address];
-            <b>let</b> stake_pool = &<a href="stake.md#0x1_stake_StakePool">StakePool</a>[pool_address];
-            <b>let</b> new_validator_info =
-                <a href="stake.md#0x1_stake_generate_validator_info">generate_validator_info</a>(pool_address, stake_pool, *validator_config);
-            refreshed_validators.push_back(new_validator_info);
-            emergency_total_voting_power +=(new_validator_info.voting_power <b>as</b> u128);
-            fallback_i += 1;
-        };
-        validator_set.active_validators = refreshed_validators;
-        validator_set.total_voting_power = emergency_total_voting_power;
-        liveness_fallback_event = <a href="../../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_some">option::some</a>(
-            <a href="stake.md#0x1_stake_ValidatorSetLivenessFallback">ValidatorSetLivenessFallback</a> {
-                minimum_stake,
-                emergency_validator_count: validator_set.active_validators.length(),
-                total_emergency_voting_power: validator_set.total_voting_power
-            }
-        );
-    };
-    validator_set.total_joining_power = 0;
-
-    // If a next validator set <b>has</b> been pre-computed and stored, consume it (<b>move_from</b> destroys the resource).
-    <b>if</b> (<b>exists</b>&lt;<a href="stake.md#0x1_stake_PrecomputedValidatorSet">PrecomputedValidatorSet</a>&gt;(@aptos_framework)) {
+    // Determine the next-epoch active set: either consume the cached value
+    // produced when reconfig started (async/DKG path), or compute it now from
+    // live state (sync/governance path). The two paths are mutually exclusive,
+    // so we avoid the O(n) per-validator recomputation when the cache <b>exists</b>.
+    <b>let</b> liveness_fallback_event = <b>if</b> (<b>exists</b>&lt;<a href="stake.md#0x1_stake_PrecomputedValidatorSet">PrecomputedValidatorSet</a>&gt;(@aptos_framework)) {
         <b>let</b> <a href="stake.md#0x1_stake_PrecomputedValidatorSet">PrecomputedValidatorSet</a> { validator_set: precomputed, is_liveness_fallback } =
             <b>move_from</b>&lt;<a href="stake.md#0x1_stake_PrecomputedValidatorSet">PrecomputedValidatorSet</a>&gt;(@aptos_framework);
         *validator_set = precomputed;
         <b>if</b> (is_liveness_fallback) {
-            liveness_fallback_event = <a href="../../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_some">option::some</a>(
-                <a href="stake.md#0x1_stake_ValidatorSetLivenessFallback">ValidatorSetLivenessFallback</a> {
-                    minimum_stake,
-                    emergency_validator_count: validator_set.active_validators.length(),
-                    total_emergency_voting_power: validator_set.total_voting_power,
-                }
-            );
+            <b>let</b> (minimum_stake, _) = <a href="staking_config.md#0x1_staking_config_get_required_stake">staking_config::get_required_stake</a>(&config);
+            <a href="../../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_some">option::some</a>(<a href="stake.md#0x1_stake_ValidatorSetLivenessFallback">ValidatorSetLivenessFallback</a> {
+                minimum_stake,
+                emergency_validator_count: validator_set.active_validators.length(),
+                total_emergency_voting_power: validator_set.total_voting_power,
+            })
         } <b>else</b> {
-            liveness_fallback_event = <a href="../../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_none">option::none</a>();
-        };
+            <a href="../../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_none">option::none</a>()
+        }
+    } <b>else</b> {
+        <a href="stake.md#0x1_stake_refresh_validator_set_in_place">refresh_validator_set_in_place</a>(validator_set, &config)
     };
+    validator_set.total_joining_power = 0;
 
     <b>if</b> (liveness_fallback_event.is_some()) {
         <a href="event.md#0x1_event_emit">event::emit</a>(liveness_fallback_event.extract());
@@ -4362,6 +4292,109 @@ power.
         // Update rewards rate after reward distribution.
         <a href="staking_config.md#0x1_staking_config_calculate_and_save_latest_epoch_rewards_rate">staking_config::calculate_and_save_latest_epoch_rewards_rate</a>();
     };
+}
+</code></pre>
+
+
+
+</details>
+
+<a id="0x1_stake_refresh_validator_set_in_place"></a>
+
+## Function `refresh_validator_set_in_place`
+
+Compute the next-epoch active validator set in place from live <code><a href="stake.md#0x1_stake_StakePool">StakePool</a></code>/<code><a href="stake.md#0x1_stake_ValidatorConfig">ValidatorConfig</a></code> state.
+Used by <code>on_new_epoch</code> only on the sync (non-DKG) path; the async/DKG path consumes a
+pre-computed <code><a href="stake.md#0x1_stake_PrecomputedValidatorSet">PrecomputedValidatorSet</a></code> instead.
+Returns <code>Some(<a href="stake.md#0x1_stake_ValidatorSetLivenessFallback">ValidatorSetLivenessFallback</a>)</code> when the freshly-computed set was empty and we
+fell back to retaining the previous active set.
+
+
+<pre><code><b>fun</b> <a href="stake.md#0x1_stake_refresh_validator_set_in_place">refresh_validator_set_in_place</a>(validator_set: &<b>mut</b> <a href="stake.md#0x1_stake_ValidatorSet">stake::ValidatorSet</a>, config: &<a href="staking_config.md#0x1_staking_config_StakingConfig">staking_config::StakingConfig</a>): <a href="../../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_Option">option::Option</a>&lt;<a href="stake.md#0x1_stake_ValidatorSetLivenessFallback">stake::ValidatorSetLivenessFallback</a>&gt;
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code><b>fun</b> <a href="stake.md#0x1_stake_refresh_validator_set_in_place">refresh_validator_set_in_place</a>(
+    validator_set: &<b>mut</b> <a href="stake.md#0x1_stake_ValidatorSet">ValidatorSet</a>,
+    config: &<a href="staking_config.md#0x1_staking_config_StakingConfig">staking_config::StakingConfig</a>,
+): Option&lt;<a href="stake.md#0x1_stake_ValidatorSetLivenessFallback">ValidatorSetLivenessFallback</a>&gt; <b>acquires</b> <a href="stake.md#0x1_stake_StakePool">StakePool</a>, <a href="stake.md#0x1_stake_ValidatorConfig">ValidatorConfig</a> {
+    // Update active validator set so that network <b>address</b>/<b>public</b> key change takes effect.
+    // Moreover, recalculate the total <a href="voting.md#0x1_voting">voting</a> power, and deactivate the validator whose
+    // <a href="voting.md#0x1_voting">voting</a> power is less than the minimum required <a href="stake.md#0x1_stake">stake</a>.
+    <b>let</b> next_epoch_validators = <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector_empty">vector::empty</a>();
+    <b>let</b> (minimum_stake, _) = <a href="staking_config.md#0x1_staking_config_get_required_stake">staking_config::get_required_stake</a>(config);
+    <b>let</b> vlen = validator_set.active_validators.length();
+    <b>let</b> total_voting_power = 0;
+    <b>let</b> i = 0;
+    <b>while</b> ({
+        <b>spec</b> {
+            <b>invariant</b> <a href="stake.md#0x1_stake_spec_validators_are_initialized">spec_validators_are_initialized</a>(next_epoch_validators);
+            <b>invariant</b> i &lt;= vlen;
+        };
+        i &lt; vlen
+    }) {
+        <b>let</b> old_validator_info = validator_set.active_validators.borrow_mut(i);
+        <b>let</b> pool_address = old_validator_info.addr;
+        <b>let</b> validator_config = <b>borrow_global</b>&lt;<a href="stake.md#0x1_stake_ValidatorConfig">ValidatorConfig</a>&gt;(pool_address);
+        <b>let</b> stake_pool = <b>borrow_global</b>&lt;<a href="stake.md#0x1_stake_StakePool">StakePool</a>&gt;(pool_address);
+        <b>let</b> new_validator_info =
+            <a href="stake.md#0x1_stake_generate_validator_info">generate_validator_info</a>(pool_address, stake_pool, *validator_config);
+
+        // A validator needs at least the <b>min</b> <a href="stake.md#0x1_stake">stake</a> required <b>to</b> join the validator set.
+        <b>if</b> (new_validator_info.voting_power &gt;= minimum_stake) {
+            <b>spec</b> {
+                <b>assume</b> total_voting_power + new_validator_info.voting_power
+                    &lt;= MAX_U128;
+            };
+            total_voting_power +=(new_validator_info.voting_power <b>as</b> u128);
+            next_epoch_validators.push_back(new_validator_info);
+        };
+        i += 1;
+    };
+
+    // In the extreme case <b>where</b> the next epoch validator election produces an empty set (i.e., no staker satisfies the minimum <a href="stake.md#0x1_stake">stake</a> or participation requirements), the system enters an emergency liveness preservation mode.
+    // Instead of transitioning <b>to</b> an empty validator set—which would render the network inoperable—the protocol retains the previous active validator set and recomputes the total <a href="voting.md#0x1_voting">voting</a> power from it.
+    // A <a href="stake.md#0x1_stake_ValidatorSetLivenessFallback">ValidatorSetLivenessFallback</a> <a href="event.md#0x1_event">event</a> is emitted <b>to</b> signal this critical governance and economic security failure.
+    <b>if</b> (!next_epoch_validators.is_empty()) {
+        validator_set.active_validators = next_epoch_validators;
+        validator_set.total_voting_power = total_voting_power;
+        <a href="../../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_none">option::none</a>()
+    } <b>else</b> {
+        // We derive the next validator set from the previous epoch's active and pending-active stakers.
+        // If the resulting set is empty, it indicates that no staker is willing or qualified <b>to</b> participate
+        // in consensus anymore. In this case, the chain is considered effectively dead, and we must retain
+        // the previous active validator set <b>as</b> a last-resort liveness fallback.
+        // Recompute each validator's info from current <a href="stake.md#0x1_stake">stake</a> (after update_stake_pool) so that
+        // voting_power and total_voting_power <a href="../../aptos-stdlib/../move-stdlib/doc/reflect.md#0x1_reflect">reflect</a> rewards, fees, and merged <a href="stake.md#0x1_stake">stake</a>—not stale values.
+        <b>let</b> refreshed_validators = <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector_empty">vector::empty</a>();
+        <b>let</b> emergency_total_voting_power = 0u128;
+        <b>let</b> fallback_vlen = validator_set.active_validators.length();
+        <b>let</b> fallback_i = 0;
+        <b>while</b> (fallback_i &lt; fallback_vlen) {
+            <b>let</b> old_validator_info =
+                validator_set.active_validators.borrow(fallback_i);
+            <b>let</b> pool_address = old_validator_info.addr;
+            <b>let</b> validator_config = &<a href="stake.md#0x1_stake_ValidatorConfig">ValidatorConfig</a>[pool_address];
+            <b>let</b> stake_pool = &<a href="stake.md#0x1_stake_StakePool">StakePool</a>[pool_address];
+            <b>let</b> new_validator_info =
+                <a href="stake.md#0x1_stake_generate_validator_info">generate_validator_info</a>(pool_address, stake_pool, *validator_config);
+            refreshed_validators.push_back(new_validator_info);
+            emergency_total_voting_power +=(new_validator_info.voting_power <b>as</b> u128);
+            fallback_i += 1;
+        };
+        validator_set.active_validators = refreshed_validators;
+        validator_set.total_voting_power = emergency_total_voting_power;
+        <a href="../../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_some">option::some</a>(<a href="stake.md#0x1_stake_ValidatorSetLivenessFallback">ValidatorSetLivenessFallback</a> {
+            minimum_stake,
+            emergency_validator_count: validator_set.active_validators.length(),
+            total_emergency_voting_power: validator_set.total_voting_power
+        })
+    }
 }
 </code></pre>
 
