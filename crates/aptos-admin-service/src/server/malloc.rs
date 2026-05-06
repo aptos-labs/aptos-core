@@ -1,15 +1,18 @@
 // Copyright (c) Aptos Foundation
 // Licensed pursuant to the Innovation-Enabling Source Code License, available at https://github.com/aptos-labs/aptos-core/blob/main/LICENSE
 
+use aptos_logger::info;
 use aptos_system_utils::utils::{reply_with, reply_with_status};
-use hyper::{Body, Response, StatusCode};
+use hyper::{Body, Request, Response, StatusCode};
 use std::{
+    collections::HashMap,
     ffi::{CStr, CString},
     os::raw::{c_char, c_void},
+    path::Path,
     time::SystemTime,
 };
 
-const PROFILE_PATH_PREFIX: &str = "/tmp/heap-profile";
+const DEFAULT_PROFILE_PATH_PREFIX: &str = "/tmp/heap-profile";
 
 unsafe extern "C" fn write_cb(buf: *mut c_void, s: *const c_char) {
     let out = unsafe { &mut *(buf as *mut Vec<u8>) };
@@ -43,17 +46,21 @@ pub fn handle_malloc_stats_request(max_len: usize) -> hyper::Result<Response<Bod
     }
 }
 
-fn dump_heap_profile() -> anyhow::Result<String> {
+fn dump_heap_profile(output_path: Option<String>) -> anyhow::Result<String> {
     let _ = jemalloc_ctl::epoch::advance();
 
     let key = b"prof.dump\0";
-    let path = format!(
-        "{}.{}",
-        PROFILE_PATH_PREFIX,
-        SystemTime::now()
-            .duration_since(SystemTime::UNIX_EPOCH)?
-            .as_millis()
-    );
+    let path = match output_path {
+        Some(path) => path,
+        None => format!(
+            "{}.{}",
+            DEFAULT_PROFILE_PATH_PREFIX,
+            SystemTime::now()
+                .duration_since(SystemTime::UNIX_EPOCH)?
+                .as_millis()
+        ),
+    };
+    info!("Dumping heap profile to {path}.");
     let value = CString::new(path.clone())?;
     unsafe {
         jemalloc_ctl::raw::write(key, value.as_ptr())
@@ -62,15 +69,53 @@ fn dump_heap_profile() -> anyhow::Result<String> {
     Ok(path)
 }
 
-pub fn handle_dump_profile_request() -> hyper::Result<Response<Body>> {
-    match dump_heap_profile() {
-        Ok(path) => Ok(reply_with(
-            Vec::new(),
-            Body::from(format!("Successfully dumped heap profile to {path}")),
-        )),
-        Err(e) => Ok(reply_with_status(
-            StatusCode::INTERNAL_SERVER_ERROR,
-            format!("Failed to dump heap profile: {e}"),
-        )),
+fn validate_output_path(path: &str) -> Result<(), String> {
+    let p = Path::new(path);
+    if p.exists() {
+        return Err(format!(
+            "output path '{path}' already exists; refusing to overwrite"
+        ));
+    }
+    if let Some(parent) = p.parent()
+        && !parent.as_os_str().is_empty()
+        && !parent.exists()
+    {
+        return Err(format!(
+            "parent directory '{}' of output path '{path}' does not exist",
+            parent.display()
+        ));
+    }
+    Ok(())
+}
+
+pub fn handle_dump_profile_request(req: Request<Body>) -> hyper::Result<Response<Body>> {
+    let query = req.uri().query().unwrap_or("");
+    let query_pairs: HashMap<_, _> = url::form_urlencoded::parse(query.as_bytes()).collect();
+    let output_path = query_pairs
+        .get("output")
+        .map(|p| p.to_string())
+        .filter(|p| !p.is_empty());
+
+    if let Some(path) = output_path.as_deref()
+        && let Err(msg) = validate_output_path(path)
+    {
+        return Ok(reply_with_status(StatusCode::BAD_REQUEST, msg));
+    }
+
+    match dump_heap_profile(output_path) {
+        Ok(path) => {
+            info!("Finished dumping heap profile to {path}.");
+            Ok(reply_with(
+                Vec::new(),
+                Body::from(format!("Successfully dumped heap profile to {path}")),
+            ))
+        },
+        Err(e) => {
+            info!("Failed to dump heap profile: {e:?}");
+            Ok(reply_with_status(
+                StatusCode::INTERNAL_SERVER_ERROR,
+                format!("Failed to dump heap profile: {e}"),
+            ))
+        },
     }
 }
