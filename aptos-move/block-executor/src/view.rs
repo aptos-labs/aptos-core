@@ -873,7 +873,6 @@ impl<'a, T: Transaction> SequentialState<'a, T> {
     pub(crate) fn read_delayed_field(&self, id: DelayedFieldID) -> Option<DelayedFieldValue> {
         self.unsync_map.fetch_delayed_field(&id)
     }
-
 }
 
 impl<T: Transaction> ResourceState<T> for SequentialState<'_, T> {
