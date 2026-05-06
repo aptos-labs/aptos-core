@@ -1,0 +1,33 @@
+// RUN: publish
+module 0x66::test
+
+fun id_ref(r: &mut u64): &mut u64
+    move_loc r
+    ret
+
+fun aux(_x: u64)
+    ret
+
+fun caller(r: &mut u64)
+    ld_u64 99
+    move_loc r
+    call id_ref
+    write_ref
+    ld_u64 0
+    call aux
+    ret
+
+fun entry(x: u64): u64
+    local l: u64
+    move_loc x
+    st_loc l
+    mut_borrow_loc l
+    call caller
+    move_loc l
+    ret
+
+// RUN: execute 0x66::test::entry --args 7
+// CHECK: results: 99
+
+// RUN: execute 0x66::test::entry --args 0
+// CHECK: results: 99

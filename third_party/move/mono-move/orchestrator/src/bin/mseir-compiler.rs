@@ -82,14 +82,14 @@ fn print_stats(module_ir: &specializer::stackless_exec_ir::ModuleIR) {
         let num_temps = func_ir
             .num_home_slots
             .saturating_sub(func_ir.num_params + func_ir.num_locals);
-        let total_slots = func_ir.num_home_slots + func_ir.num_xfer_slots;
+        let total_slots = func_ir.num_home_slots + func_ir.num_xfer_positions;
 
         eprintln!(
             "{mod_prefix}::{func_name}  \
              bytecode: {bc_instrs} instrs, {bc_locals} locals  |  \
              IR: {ir_instrs} instrs, {total_slots} slots \
              (= {} params + {} locals + {num_temps} temps + {} xfer)",
-            func_ir.num_params, func_ir.num_locals, func_ir.num_xfer_slots,
+            func_ir.num_params, func_ir.num_locals, func_ir.num_xfer_positions,
         );
     }
 }

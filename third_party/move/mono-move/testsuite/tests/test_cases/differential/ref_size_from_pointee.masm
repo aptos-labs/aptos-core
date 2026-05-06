@@ -1,0 +1,53 @@
+// Copyright (c) Aptos Foundation
+// Licensed pursuant to the Innovation-Enabling Source Code License, available at https://github.com/aptos-labs/aptos-core/blob/main/LICENSE
+
+// Regression for the WriteRef-size bug: when the value being written is
+// a u64 return that the slot allocator placed in Xfer(0), and the next
+// callsite expects a `&u64`/`&mut u64` at Xfer(0), `active_xfer_types[0]`
+// has already advanced to the ref type by the time `write_ref` is
+// lowered. Sizing `write_ref` from the source slot's transient type
+// would produce a 16-byte copy through an 8-byte target, scribbling
+// past `l` into `other` in the caller frame.
+//
+// Written in masm to keep `other` as an explicit local — the Move
+// compiler tends to inline literal locals into the return slot and
+// sidestep the bug pattern.
+
+// RUN: publish
+module 0x66::test
+
+fun aux1(): u64
+    ld_u64 7
+    ret
+
+fun aux3(r: &mut u64)
+    ld_u64 0
+    move_loc r
+    write_ref
+    ret
+
+fun trigger(x: &mut u64)
+    call aux1
+    copy_loc x
+    write_ref
+    move_loc x
+    call aux3
+    ret
+
+fun entry(x: u64): u64
+    local l: u64
+    local other: u64
+    move_loc x
+    st_loc l
+    ld_u64 42
+    st_loc other
+    mut_borrow_loc l
+    call trigger
+    move_loc other
+    ret
+
+// RUN: execute 0x66::test::entry --args 1
+// CHECK: results: 42
+
+// RUN: execute 0x66::test::entry --args 100
+// CHECK: results: 42

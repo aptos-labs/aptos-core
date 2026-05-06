@@ -16,7 +16,7 @@ use anyhow::{anyhow, bail, Result};
 use mono_move_alloc::{ExecutableArena, ExecutableArenaPtr, GlobalArenaPtr};
 use mono_move_core::{
     align_up_u32,
-    types::{view_type, Type},
+    types::{view_name, view_type, Type},
     EnumType, Executable, ExecutableId, FrameLayoutInfo, Function, MicroOp, PreparedModule,
     SortedSafePointEntries, StructType, VariantFields,
 };
@@ -147,6 +147,29 @@ impl<'guard, 'ctx> ExecutableBuilder<'guard, 'ctx> {
                 .guard
                 .intern_identifier(module.identifier_at(lowered_fn.name_idx))
                 .into_global_arena_ptr();
+            // TODO: `frame_layout` is hardcoded empty (no slots scanned by GC).
+            // That is sound only while every fat-pointer slot in this function
+            // holds a stack base (filtered by `is_heap_ptr` at GC time). If the
+            // lowering ever emits an op that produces a heap-base pointer, the
+            // resulting slot is invisible to GC and a collection during a callee
+            // would leave it dangling. Refuse to build such a function until
+            // `frame_layout` is derived from the lowering context.
+            for op in &lowered_fn.code {
+                match op {
+                    MicroOp::HeapBorrow { .. }
+                    | MicroOp::VecBorrow { .. }
+                    | MicroOp::HeapNew { .. }
+                    | MicroOp::VecPushBack { .. } => {
+                        bail!(
+                            "function `{}` lowers a heap-pointer-producing op but \
+                             frame_layout is not yet derived from the lowering context — \
+                             GC would not see the resulting slot",
+                            view_name(name),
+                        );
+                    },
+                    _ => {},
+                }
+            }
             let code = self.arena.alloc_slice_fill_iter(lowered_fn.code);
             let param_sizes = self.arena.alloc_slice_fill_iter(lowered_fn.param_sizes);
             let func = Function {

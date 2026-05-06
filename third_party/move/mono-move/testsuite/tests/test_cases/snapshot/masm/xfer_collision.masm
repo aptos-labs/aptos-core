@@ -1,0 +1,34 @@
+// Regression for the cross-call Xfer-slot collision check: a ret of
+// `three_rets` consumed between calls (v2 → `add`/`pop`) and another
+// ret feeding the next call's args (v1 → `three_args` arg) want the
+// same Xfer position with overlapping lifetimes. The rets walk must
+// detect the collision and route v2 to Home; otherwise both Vids
+// bind to the same Xfer slot and `three_args` reads the wrong value.
+//
+// Hand-crafted masm — current Move source doesn't trigger this shape
+// (compiler routes multi-ret destructuring through st_loc/move_loc).
+
+module 0x66::xfer_collision
+
+fun three_rets(): (u64, u64, u64)
+    ld_u64 1
+    ld_u64 2
+    ld_u64 3
+    ret
+
+fun three_args(a: u64, b: u64, c: u64): u64
+    move_loc a
+    move_loc b
+    add
+    move_loc c
+    add
+    ret
+
+fun caller(extra: u64): u64
+    move_loc extra
+    call three_rets
+    ld_u64 5
+    add
+    pop
+    call three_args
+    ret

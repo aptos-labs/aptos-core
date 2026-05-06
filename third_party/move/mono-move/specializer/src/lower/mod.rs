@@ -5,6 +5,7 @@
 
 pub mod context;
 pub mod display;
+mod parallel_copy;
 mod translate;
 
 pub use context::{try_build_context, LoweringContext, SlotInfo};

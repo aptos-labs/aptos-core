@@ -751,14 +751,16 @@ impl<T: ExecutionContext> InterpreterContext<'_, T> {
                     let base = read_ptr(fp, ref_ptr);
                     let offset = read_u64(fp, ref_ptr + 8);
                     let target = base.add(offset as usize);
-                    std::ptr::copy_nonoverlapping(target, fp.add(dst.into()), size as usize);
+                    // Overlap-safe `copy`: `dst` and `*ref` may alias.
+                    std::ptr::copy(target, fp.add(dst.into()), size as usize);
                 },
 
                 MicroOp::WriteRef { ref_ptr, src, size } => {
                     let base = read_ptr(fp, ref_ptr);
                     let offset = read_u64(fp, ref_ptr + 8);
                     let target = base.add(offset as usize);
-                    std::ptr::copy_nonoverlapping(fp.add(src.into()), target, size as usize);
+                    // Overlap-safe `copy`: `src` and `*ref` may alias.
+                    std::ptr::copy(fp.add(src.into()), target, size as usize);
                 },
 
                 // ----- Heap object instructions (structs and enums) -----

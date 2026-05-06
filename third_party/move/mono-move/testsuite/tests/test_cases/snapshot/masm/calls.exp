@@ -27,10 +27,10 @@ fun identity() {
 }
 
 fun caller() {
-  frame_data_size: 0
+  frame_data_size: 8
   code:
-    0: StoreImm8 [24] <- #10
+    0: StoreImm8 [32] <- #10
     1: CallFunc #0
-    2: Move8 [0] <- [24]
+    2: Move8 [0] <- [32]
     3: Return
 }

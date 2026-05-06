@@ -34,16 +34,14 @@ fun borrow_written_local(r0): u64 {
 === micro-ops ===
 // module 0x66::locals_soundness
 
-fun local_across_blocks() {
-  frame_data_size: 32
-  code:
-    0: Move8 [16] <- [8]
-    1: JumpNotZeroU64 @5 [0]
-    2: StoreImm8 [24] <- #0
-    3: Move8 [0] <- [24]
-    4: Return
-    5: Move8 [0] <- [16]
-    6: Return
-}
+fun local_across_blocks(): skipped (context: home slot: slot align 1 < 8 not yet supported (u64-aligned types only))
 
-fun borrow_written_local(): skipped (lowering: instruction ImmBorrowLoc not yet lowered)
+fun borrow_written_local() {
+  frame_data_size: 40
+  code:
+    0: Move8 [8] <- [0]
+    1: SlotBorrow [16] <- &[8]
+    2: ReadRef [32] <- *[16] (size=8)
+    3: Move8 [0] <- [32]
+    4: Return
+}

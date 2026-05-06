@@ -18324,6 +18324,7 @@ dependencies = [
  "move-bytecode-verifier",
  "move-core-types",
  "shared-dsa",
+ "smallbitvec",
  "smallvec",
 ]
 

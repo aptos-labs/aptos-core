@@ -383,8 +383,9 @@ pub struct FunctionIR {
     pub num_locals: u16,
     /// Total Home slots used (params + locals + temps).
     pub num_home_slots: u16,
-    /// Maximum number of Xfer slots needed across all call sites in this function.
-    pub num_xfer_slots: u16,
+    /// Number of distinct `Xfer(j)` positions used across all calls in this
+    /// function.
+    pub num_xfer_positions: u16,
     /// Basic blocks of the function.
     pub blocks: Vec<BasicBlock>,
     /// Type of each Home slot (indexed by Home slot index, 0..num_home_slots-1).
