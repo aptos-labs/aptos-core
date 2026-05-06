@@ -226,31 +226,7 @@ module aptos_framework::keyless_account {
         move_to(fx, config);
     }
 
-    /// Atomically performs an `account::upsert_ed25519_backup_key_on_keyless_account` and stores an encrypted payload
-    /// in the account's `AccountBlob`. Currently used for backing up confidential-asset decryption keys on-chain
-    /// in Petra for keyless accounts. The encrypted payload is opaque to the chain — see `account::AccountBlob`.
-    entry fun upsert_ed25519_backup_key_and_encrypt_dk(
-        account: &signer,
-        keyless_public_key: vector<u8>,
-        backup_public_key: vector<u8>,
-        backup_key_proof: vector<u8>,
-        dk_ciphertext: vector<u8>
-    ) {
-        // Step 1: Perform the key rotation/installation
-        let keyless_single_key = single_key::new_public_key_from_bytes(keyless_public_key);
-
-        account::upsert_ed25519_backup_key_on_keyless_account_internal(
-            account,
-            keyless_single_key,
-            backup_public_key,
-            backup_key_proof
-        );
-
-        // Step 2: Store the encrypted payload as the account's opaque blob (size-checked by `account`).
-        account::upsert_account_blob(account, dk_ciphertext);
-    }
-
-    /// Atomically registers an EK for the specified `asset_type` and stores a DK ciphertext in the `account::AccountBlob`
+    /// Atomically registers an EK for the specified `asset_type` and stores a DK ciphertext in the `account::EncryptedDK`
     /// resource. This can only be called once: i.e., when registering an EK for the 1st time. Subsequent EK registrations
     /// for other asset types should be done via `confidential_asset::register_raw`.
     ///
@@ -295,9 +271,9 @@ module aptos_framework::keyless_account {
         );
 
         // Step 2: We must only use this when first registering an EK. Subsequent EK registrations for other asset types
-        // must be done via `confidential_asset::register_raw` and are assumed to use the same DK backed up in `account::AccountBlob`.
+        // must be done via `confidential_asset::register_raw` and are assumed to use the same DK backed up in `account::EncryptedDK`.
         assert!(
-            account::account_blob_exists(owner_addr) == false,
+            account::encrypted_dk_exists(owner_addr) == false,
             error::already_exists(E_KEYLESS_ACCOUNT_DK_ALREADY_BACKED_UP));
 
         confidential_asset::register_raw(
@@ -308,7 +284,7 @@ module aptos_framework::keyless_account {
             sigma_proto_resp
         );
 
-        account::upsert_account_blob(owner, dk_ciphertext);
+        account::upsert_encrypted_dk(owner, dk_ciphertext);
     }
 
     #[deprecated]

@@ -106,15 +106,12 @@ module aptos_framework::account {
         address_map: Table<address, address>,
     }
 
-    /// A generic, account-scoped auxiliary data resource. Account-type-agnostic: works for keyless, MultiEd25519,
-    /// MultiKey, passkey-based accounts, etc. Each variant tags the kind of payload stored. Writers go through
-    /// `upsert_account_blob` (friend-only) so the calling module owns the policy (e.g. atomicity with a key
-    /// rotation); readers can use the `get_account_blob` view.
-    ///
-    /// Variants:
-    /// * `EncryptedDK` — a Petra-encrypted backup of an account's confidential-asset decryption key.
-    enum AccountBlob has key, store, copy, drop {
-        EncryptedDK {
+    /// Per-account encrypted backup of a confidential-asset decryption key (DK). The ciphertext is opaque to the
+    /// chain — clients (e.g. Petra) own encryption/decryption. Writers go through `upsert_encrypted_dk` (friend-only)
+    /// so the calling module owns the policy (e.g. atomicity with a key rotation); readers can use the
+    /// `get_encrypted_dk` view. Versioned via the `V1` variant so the schema can evolve.
+    enum EncryptedDK has key, store, copy, drop {
+        V1 {
             ciphertext: vector<u8>,
         }
     }
@@ -235,17 +232,17 @@ module aptos_framework::account {
     const ENOT_THE_ORIGINAL_PUBLIC_KEY: u64 = 26;
     /// The set_originating_address is disabled due to potential poisoning from account abstraction
     const ESET_ORIGINATING_ADDRESS_DISABLED: u64 = 27;
-    /// The blob being written into `AccountBlob` exceeds `MAX_ACCOUNT_BLOB_BYTES`.
-    const EACCOUNT_BLOB_TOO_LONG: u64 = 28;
-    /// No `AccountBlob` resource exists for the queried address.
-    const EACCOUNT_BLOB_NOT_FOUND: u64 = 29;
+    /// The blob being written into `EncryptedDK` exceeds `MAX_ENCRYPTED_DK_BYTES`.
+    const EENCRYPTED_DK_TOO_LONG: u64 = 28;
+    /// No `EncryptedDK` resource exists for the queried address.
+    const EENCRYPTED_DK_NOT_FOUND: u64 = 29;
 
     /// Explicitly separate the GUID space between Object and Account to prevent accidental overlap.
     const MAX_GUID_CREATION_NUM: u64 = 0x4000000000000;
 
-    /// Maximum size of the payload stored in `AccountBlob`. 96 bytes is generous for the initial use case
+    /// Maximum size of the payload stored in `EncryptedDK`. 128 bytes is generous for the initial use case
     /// (an encrypted 32-byte confidential-asset DK with nonce + auth tag), while keeping per-account state small.
-    const MAX_ACCOUNT_BLOB_BYTES: u64 = 96;
+    const MAX_ENCRYPTED_DK_BYTES: u64 = 128;
 
     #[test_only]
     /// Create signer for testing, independently of an Aptos-style `Account`.
@@ -551,6 +548,28 @@ module aptos_framework::account {
         )
     }
 
+    /// Atomically performs an `upsert_ed25519_backup_key_on_keyless_account` and stores `dk_ciphertext` in the
+    /// account's `EncryptedDK` resource. Currently used for backing up confidential-asset decryption keys on-chain
+    /// in Petra for keyless accounts. The ciphertext is opaque to the chain — see `EncryptedDK`.
+    entry fun upsert_ed25519_backup_key_and_encrypt_dk(
+        account: &signer,
+        keyless_public_key: vector<u8>,
+        backup_public_key: vector<u8>,
+        backup_key_proof: vector<u8>,
+        dk_ciphertext: vector<u8>
+    ) acquires Account, EncryptedDK {
+        let keyless_single_key = single_key::new_public_key_from_bytes(keyless_public_key);
+
+        upsert_ed25519_backup_key_on_keyless_account_internal(
+            account,
+            keyless_single_key,
+            backup_public_key,
+            backup_key_proof
+        );
+
+        upsert_encrypted_dk(account, dk_ciphertext);
+    }
+
     /// Arguments:
     ///   keyless_single_key    expected to be an `AnyPublicKey::Keyless` or an `AnyPublicKey::FederatedKeyless`
     ///
@@ -615,37 +634,37 @@ module aptos_framework::account {
         });
     }
 
-    /// Upserts the opaque per-account `AccountBlob` for `account`. Friend-only so that the policy of who can
+    /// Upserts the opaque per-account `EncryptedDK` for `account`. Friend-only so that the policy of who can
     /// write a blob (and the atomicity guarantees that come with it, e.g. coupling with a key rotation) lives
     /// in the calling module rather than at this layer.
-    public(friend) fun upsert_account_blob(account: &signer, blob: vector<u8>) acquires AccountBlob {
+    public(friend) fun upsert_encrypted_dk(account: &signer, blob: vector<u8>) acquires EncryptedDK {
         assert!(
-            blob.length() <= MAX_ACCOUNT_BLOB_BYTES,
-            error::invalid_argument(EACCOUNT_BLOB_TOO_LONG)
+            blob.length() <= MAX_ENCRYPTED_DK_BYTES,
+            error::invalid_argument(EENCRYPTED_DK_TOO_LONG)
         );
         let addr = signer::address_of(account);
-        if (!exists<AccountBlob>(addr)) {
-            move_to(account, AccountBlob::EncryptedDK { ciphertext: blob });
+        if (!exists<EncryptedDK>(addr)) {
+            move_to(account, EncryptedDK::V1 { ciphertext: blob });
         } else {
-            AccountBlob[addr].ciphertext = blob;
+            EncryptedDK[addr].ciphertext = blob;
         };
     }
 
     #[view]
-    /// Returns the `AccountBlob` stored for `addr`. Aborts with `EACCOUNT_BLOB_NOT_FOUND` if none exists,
-    /// so callers must check `account_blob_exists(addr)` first if absence is a valid case.
-    public fun get_account_blob(addr: address): AccountBlob acquires AccountBlob {
+    /// Returns the `EncryptedDK` stored for `addr`. Aborts with `EENCRYPTED_DK_NOT_FOUND` if none exists,
+    /// so callers must check `encrypted_dk_exists(addr)` first if absence is a valid case.
+    public fun get_encrypted_dk(addr: address): EncryptedDK acquires EncryptedDK {
         assert!(
-            exists<AccountBlob>(addr),
-            error::not_found(EACCOUNT_BLOB_NOT_FOUND)
+            exists<EncryptedDK>(addr),
+            error::not_found(EENCRYPTED_DK_NOT_FOUND)
         );
-        AccountBlob[addr]
+        EncryptedDK[addr]
     }
 
     #[view]
-    /// Returns whether an `AccountBlob` is stored for `addr`.
-    public fun account_blob_exists(addr: address): bool {
-        exists<AccountBlob>(addr)
+    /// Returns whether an `EncryptedDK` is stored for `addr`.
+    public fun encrypted_dk_exists(addr: address): bool {
+        exists<EncryptedDK>(addr)
     }
 
     /// Generic authentication key rotation function that allows the user to rotate their authentication key from any scheme to any scheme.
