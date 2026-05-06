@@ -17,7 +17,6 @@ module aptos_framework::account {
     use aptos_std::multi_ed25519;
     use aptos_std::single_key;
     use aptos_std::multi_key;
-    use aptos_std::single_key::AnyPublicKey;
     use aptos_std::table::{Self, Table};
     use aptos_std::type_info::{Self, TypeInfo};
 
@@ -538,49 +537,8 @@ module aptos_framework::account {
     /// # Events
     /// * Emits a `KeyRotationToMultiPublicKey` event with the new multi-key configuration
     entry fun upsert_ed25519_backup_key_on_keyless_account(account: &signer, keyless_public_key: vector<u8>, backup_public_key: vector<u8>, backup_key_proof: vector<u8>) acquires Account {
-        let keyless_single_key = single_key::new_public_key_from_bytes(keyless_public_key);
-
-        upsert_ed25519_backup_key_on_keyless_account_internal(
-            account,
-            keyless_single_key,
-            backup_public_key,
-            backup_key_proof
-        )
-    }
-
-    /// Atomically performs an `upsert_ed25519_backup_key_on_keyless_account` and stores `dk_ciphertext` in the
-    /// account's `EncryptedDK` resource. Currently used for backing up confidential-asset decryption keys on-chain
-    /// in Petra for keyless accounts. The ciphertext is opaque to the chain — see `EncryptedDK`.
-    entry fun upsert_ed25519_backup_key_and_encrypt_dk(
-        account: &signer,
-        keyless_public_key: vector<u8>,
-        backup_public_key: vector<u8>,
-        backup_key_proof: vector<u8>,
-        dk_ciphertext: vector<u8>
-    ) acquires Account, EncryptedDK {
-        let keyless_single_key = single_key::new_public_key_from_bytes(keyless_public_key);
-
-        upsert_ed25519_backup_key_on_keyless_account_internal(
-            account,
-            keyless_single_key,
-            backup_public_key,
-            backup_key_proof
-        );
-
-        upsert_encrypted_dk(account, dk_ciphertext);
-    }
-
-    /// Arguments:
-    ///   keyless_single_key    expected to be an `AnyPublicKey::Keyless` or an `AnyPublicKey::FederatedKeyless`
-    ///
-    /// Note: The way this was written makes it hard to trivially change it to use the more type-safe `keyless::PublicKey` rather than `AnyPublicKey`
-    public(friend) fun upsert_ed25519_backup_key_on_keyless_account_internal(
-        account: &signer,
-        keyless_single_key: AnyPublicKey,
-        backup_public_key: vector<u8>,
-        backup_key_proof: vector<u8>
-    ) acquires Account {
         // Check that the provided public key is a keyless public key
+        let keyless_single_key = single_key::new_public_key_from_bytes(keyless_public_key);
         assert!(single_key::is_keyless_or_federated_keyless_public_key(&keyless_single_key), error::invalid_argument(ENOT_A_KEYLESS_PUBLIC_KEY));
 
         let addr = signer::address_of(account);
@@ -632,6 +590,20 @@ module aptos_framework::account {
             old_auth_key,
             new_auth_key,
         });
+    }
+
+    /// Atomically performs an `upsert_ed25519_backup_key_on_keyless_account` and stores `dk_ciphertext` in the
+    /// account's `EncryptedDK` resource. Currently used for backing up confidential-asset decryption keys on-chain
+    /// in Petra for keyless accounts. The ciphertext is opaque to the chain — see `EncryptedDK`.
+    entry fun upsert_ed25519_backup_key_and_encrypt_dk(
+        account: &signer,
+        keyless_public_key: vector<u8>,
+        backup_public_key: vector<u8>,
+        backup_key_proof: vector<u8>,
+        dk_ciphertext: vector<u8>
+    ) acquires Account, EncryptedDK {
+        upsert_ed25519_backup_key_on_keyless_account(account, keyless_public_key, backup_public_key, backup_key_proof);
+        upsert_encrypted_dk(account, dk_ciphertext);
     }
 
     /// Upserts the opaque per-account `EncryptedDK` for `account`. Friend-only so that the policy of who can
