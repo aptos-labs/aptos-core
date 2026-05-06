@@ -36,9 +36,24 @@ module 0x42::vault {
         let store_addr = object::object_address(Vault[vault_obj.object_address()].store);
         ensures FungibleStore[store_addr].balance >= old(FungibleStore[store_addr].balance);
         let object_address_0 = object::object_address(vault_obj);
-        ensures [inferred] S3.. |~ ensures_of<fungible_asset::deposit<fungible_asset::FungibleStore>>(Vault[object_address_0].store, S2..S3 |~ result_of<Vault[object_address_0].strategy.0>(S1..S2 |~ result_of<fungible_asset::withdraw<fungible_asset::FungibleStore>>(caller, Vault[object_address_0].store, ..S1 |~ result_of<fungible_asset::balance<fungible_asset::FungibleStore>>(Vault[object_address_0].store))));
-        aborts_if [inferred] S3 |~ aborts_of<fungible_asset::deposit<fungible_asset::FungibleStore>>(Vault[object_address_0].store, S2..S3 |~ result_of<Vault[object_address_0].strategy.0>(S1..S2 |~ result_of<fungible_asset::withdraw<fungible_asset::FungibleStore>>(caller, Vault[object_address_0].store, ..S1 |~ result_of<fungible_asset::balance<fungible_asset::FungibleStore>>(Vault[object_address_0].store))));
-        aborts_if [inferred] S2 |~ aborts_of<Vault[object_address_0].strategy.0>(S1..S2 |~ result_of<fungible_asset::withdraw<fungible_asset::FungibleStore>>(caller, Vault[object_address_0].store, ..S1 |~ result_of<fungible_asset::balance<fungible_asset::FungibleStore>>(Vault[object_address_0].store)));
+        ensures [inferred] S3.. |~ ensures_of<fungible_asset::deposit<fungible_asset::FungibleStore>>(Vault[object_address_0].store, {
+            let a = {
+                let b = ..S1 |~ result_of<fungible_asset::balance<fungible_asset::FungibleStore>>(Vault[object_address_0].store);
+                S1..S2 |~ result_of<fungible_asset::withdraw<fungible_asset::FungibleStore>>(caller, Vault[object_address_0].store, b)
+            };
+            S2..S3 |~ result_of<Vault[object_address_0].strategy.0>(a)
+        });
+        aborts_if [inferred] S3 |~ aborts_of<fungible_asset::deposit<fungible_asset::FungibleStore>>(Vault[object_address_0].store, {
+            let a = {
+                let b = ..S1 |~ result_of<fungible_asset::balance<fungible_asset::FungibleStore>>(Vault[object_address_0].store);
+                S1..S2 |~ result_of<fungible_asset::withdraw<fungible_asset::FungibleStore>>(caller, Vault[object_address_0].store, b)
+            };
+            S2..S3 |~ result_of<Vault[object_address_0].strategy.0>(a)
+        });
+        aborts_if [inferred] S2 |~ aborts_of<Vault[object_address_0].strategy.0>({
+            let a = ..S1 |~ result_of<fungible_asset::balance<fungible_asset::FungibleStore>>(Vault[object_address_0].store);
+            S1..S2 |~ result_of<fungible_asset::withdraw<fungible_asset::FungibleStore>>(caller, Vault[object_address_0].store, a)
+        });
         aborts_if [inferred] S1 |~ aborts_of<fungible_asset::withdraw<fungible_asset::FungibleStore>>(caller, Vault[object_address_0].store, ..S1 |~ result_of<fungible_asset::balance<fungible_asset::FungibleStore>>(Vault[object_address_0].store));
         aborts_if [inferred] aborts_of<fungible_asset::balance<fungible_asset::FungibleStore>>(Vault[object_address_0].store);
         aborts_if [inferred] !exists<Vault>(object_address_0);

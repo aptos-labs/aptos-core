@@ -34,6 +34,7 @@ module 0x42::shadowed_behavior_pred {
         set_value(s, v);
     }
     spec do_set {
+        pragma verify = false;
         let set_value = 0u64; // shadows the function 'set_value'
     }
 }

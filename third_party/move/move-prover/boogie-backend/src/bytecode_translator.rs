@@ -2196,7 +2196,22 @@ impl<'env> BoogieTranslator<'env> {
                 input_args.push(format!("p{}", i));
             }
 
-            // Generate requires_of and aborts_of
+            // Generate requires_of and aborts_of without `{:inline}` so the
+            // symbol stays opaque at the SMT level. With `{:inline}`, Boogie
+            // inlines the body at every use, which means a downstream
+            // `assert bp_*_of(...)` re-Skolemizes the existential body each
+            // time and Z3's quantifier-instantiation heuristics can blow up
+            // (issue #19422 / calculator). Keeping the symbol as a defined
+            // function (Boogie auto-generates an unfolding axiom) lets a
+            // call-site `assume bp_*_of(...)` and the downstream `assert
+            // bp_*_of(...)` match by syntactic equality. Higher-order
+            // callees keep `{:inline}` because their body references the
+            // closure-type dispatcher's globals (which Boogie disallows in
+            // a non-inline function body).
+            let is_higher_order = fun_param_tys
+                .iter()
+                .any(|ty| matches!(ty.skip_reference(), Type::Fun(..)));
+            let inline_attr = if is_higher_order { "{:inline} " } else { "" };
             for kind in [BehaviorKind::RequiresOf, BehaviorKind::AbortsOf] {
                 let bp_name = boogie_behavioral_fun_spec_name(self.env, &info.fun, kind);
                 let body = self.translate_fun_spec_conditions(
@@ -2208,7 +2223,8 @@ impl<'env> BoogieTranslator<'env> {
                 );
                 emitln!(
                     self.writer,
-                    "function {{:inline}} {}({}): bool {{ {} }}",
+                    "function {}{}({}): bool {{ {} }}",
+                    inline_attr,
                     bp_name,
                     input_param_decls.join(", "),
                     body

@@ -33,7 +33,7 @@ use codespan_reporting::term::termcolor::WriteColor;
 #[allow(unused_imports)]
 use log::{debug, info};
 use move_model::{
-    ast::SpecBlockTarget,
+    ast::{ConditionKind, SpecBlockTarget},
     emitln,
     model::{FunctionEnv, GlobalEnv, VerificationScope},
     sourcifier::Sourcifier,
@@ -910,7 +910,21 @@ fn generate_inferred_conditions(
         (orig_conds, orig_props, orig_proof)
     };
 
+    // Expose the user-written let-binding names to the sourcifier so that
+    // `print_behavior_target` can detect shadowing and emit fully-qualified
+    // function names when the bare name would resolve to a let-binding instead.
+    let user_let_names = original_conditions
+        .iter()
+        .filter_map(|c| match &c.kind {
+            ConditionKind::LetPre(sym, _) | ConditionKind::LetPost(sym, _) => Some(*sym),
+            _ => None,
+        })
+        .collect();
+    sourcifier.set_context_let_names(user_let_names);
+
     sourcifier.print_fun_spec(fun);
+
+    sourcifier.clear_context_let_names();
 
     // Restore original conditions, properties, and proof block.
     {

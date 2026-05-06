@@ -60,7 +60,10 @@ module 0x42::chained_opaque {
     }
     spec chain(self: &Pool, x: u64): u64 {
         pragma opaque = true;
-        ensures [inferred] result == (S1.. |~ result_of<f2>(self, result_of<f1>(self, x)));
+        ensures [inferred] result == {
+            let a = ..S1 |~ result_of<f1>(self, x);
+            S1.. |~ result_of<f2>(self, a)
+        };
         aborts_if [inferred] S1 |~ aborts_of<f2>(self, ..S1 |~ result_of<f1>(self, x));
         aborts_if [inferred] aborts_of<f1>(self, x);
     }

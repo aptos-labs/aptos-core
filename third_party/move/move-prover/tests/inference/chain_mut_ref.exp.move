@@ -85,11 +85,19 @@ module 0x42::chain_mut_ref {
     spec chain(self: &mut Pool, x: u64): u64 {
         pragma opaque = true;
         ensures [inferred] result == {
-            let (_t0,_t1) = S1.. |~ result_of<update>(update_field(old(self), total, old(self).total + result_of<compute>(old(self), x)), result_of<compute>(old(self), x));
+            let (_t0,_t1) = {
+                let a = update_field(old(self), total, old(self).total + (..S1 |~ result_of<compute>(old(self), x)));
+                let b = ..S1 |~ result_of<compute>(old(self), x);
+                S1.. |~ result_of<update>(a, b)
+            };
             _t0
         };
         ensures [inferred] self == {
-            let (_t0,_t1) = S1.. |~ result_of<update>(update_field(old(self), total, old(self).total + result_of<compute>(old(self), x)), result_of<compute>(old(self), x));
+            let (_t0,_t1) = {
+                let a = update_field(old(self), total, old(self).total + (..S1 |~ result_of<compute>(old(self), x)));
+                let b = ..S1 |~ result_of<compute>(old(self), x);
+                S1.. |~ result_of<update>(a, b)
+            };
             _t1
         };
         aborts_if [inferred] S1 |~ aborts_of<update>(update_field(self, total, self.total + (..S1 |~ result_of<compute>(self, x))), ..S1 |~ result_of<compute>(self, x));

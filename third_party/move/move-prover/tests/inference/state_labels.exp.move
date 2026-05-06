@@ -395,8 +395,17 @@ module 0x42::state_labels {
         modifies Resource[a3];
         modifies Resource[a2];
         modifies Resource[a1];
-        ensures [inferred] result == (S2.. |~ result_of<swap_value>(a3, S1..S2 |~ result_of<swap_value>(a2, ..S1 |~ result_of<swap_value>(a1, 0))));
-        aborts_if [inferred] S2 |~ aborts_of<swap_value>(a3, S1..S2 |~ result_of<swap_value>(a2, ..S1 |~ result_of<swap_value>(a1, 0)));
+        ensures [inferred] result == {
+            let a = {
+                let b = ..S1 |~ result_of<swap_value>(a1, 0);
+                S1..S2 |~ result_of<swap_value>(a2, b)
+            };
+            S2.. |~ result_of<swap_value>(a3, a)
+        };
+        aborts_if [inferred] S2 |~ aborts_of<swap_value>(a3, {
+            let a = ..S1 |~ result_of<swap_value>(a1, 0);
+            S1..S2 |~ result_of<swap_value>(a2, a)
+        });
         aborts_if [inferred] S1 |~ aborts_of<swap_value>(a2, ..S1 |~ result_of<swap_value>(a1, 0));
         aborts_if [inferred] aborts_of<swap_value>(a1, 0);
     }
