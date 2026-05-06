@@ -116,6 +116,10 @@ pub struct QuorumStoreConfig {
     pub enable_opt_qs_v2_payload_tx: bool,
     /// Enables handling of proposals with OptQS V2 Payload with Batch V2
     pub enable_opt_qs_v2_payload_rx: bool,
+    /// When true, the leader pulls proofs/opt-batches in (gas_bucket DESC, age ASC) order
+    /// instead of round-robin across authors. Reduces tail latency for batches that would
+    /// otherwise wait many round-robin cycles behind co-located authors with full queues.
+    pub enable_age_based_pull: bool,
 }
 
 impl Default for QuorumStoreConfig {
@@ -164,6 +168,7 @@ impl Default for QuorumStoreConfig {
             enable_batch_v2_rx: true,
             enable_opt_qs_v2_payload_tx: true,
             enable_opt_qs_v2_payload_rx: true,
+            enable_age_based_pull: true,
         }
     }
 }

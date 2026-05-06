@@ -50,12 +50,14 @@ impl ProofManager {
         batch_store: Arc<BatchStore>,
         allow_batches_without_pos_in_proposal: bool,
         batch_expiry_gap_when_init_usecs: u64,
+        enable_age_based_pull: bool,
     ) -> Self {
         Self {
             batch_proof_queue: BatchProofQueue::new(
                 my_peer_id,
                 batch_store,
                 batch_expiry_gap_when_init_usecs,
+                enable_age_based_pull,
             ),
             back_pressure_total_txn_limit,
             remaining_total_txn_num: 0,

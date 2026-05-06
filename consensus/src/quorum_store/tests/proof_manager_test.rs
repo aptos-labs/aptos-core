@@ -17,8 +17,20 @@ use futures::channel::oneshot;
 use std::{cmp::max, collections::HashSet};
 
 fn create_proof_manager() -> ProofManager {
+    create_proof_manager_with_age_based(true)
+}
+
+fn create_proof_manager_with_age_based(enable_age_based_pull: bool) -> ProofManager {
     let batch_store = batch_store_for_test(5 * 1024 * 1024);
-    ProofManager::new(PeerId::random(), 10, 10, batch_store, true, 1)
+    ProofManager::new(
+        PeerId::random(),
+        10,
+        10,
+        batch_store,
+        true,
+        1,
+        enable_age_based_pull,
+    )
 }
 
 fn create_proof(
@@ -184,7 +196,11 @@ async fn test_batch_commit() {
 
 #[tokio::test]
 async fn test_proposal_priority() {
-    let mut proof_manager = create_proof_manager();
+    // Tiebreak between same-gas-bucket batches differs between modes; this test asserts
+    // the round-robin mode's batch_id-DESC tiebreak. The age-based path tiebreaks by
+    // insertion Instant, which in production matches batch_id order anyway because
+    // BatchGenerator emits sequentially.
+    let mut proof_manager = create_proof_manager_with_age_based(false);
     let peer0 = PeerId::random();
 
     let peer0_proof0 = create_proof_with_gas(peer0, 10, 2, 1000);
@@ -213,7 +229,9 @@ async fn test_proposal_priority() {
 
 #[tokio::test]
 async fn test_proposal_fairness() {
-    let mut proof_manager = create_proof_manager();
+    // This test explicitly verifies the round-robin path; age-based intentionally drops
+    // the cross-author fairness floor in favor of (gas DESC, age ASC) global ordering.
+    let mut proof_manager = create_proof_manager_with_age_based(false);
     let peer0 = PeerId::random();
     let peer1 = PeerId::random();
 

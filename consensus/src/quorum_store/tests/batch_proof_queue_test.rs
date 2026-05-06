@@ -68,7 +68,7 @@ fn proof_of_store_with_size(
 async fn test_proof_queue_sorting() {
     let my_peer_id = PeerId::random();
     let batch_store = batch_store_for_test(5 * 1024 * 1024);
-    let mut proof_queue = BatchProofQueue::new(my_peer_id, batch_store, 1);
+    let mut proof_queue = BatchProofQueue::new(my_peer_id, batch_store, 1, false);
 
     let author_0 = PeerId::random();
     let author_1 = PeerId::random();
@@ -161,7 +161,7 @@ async fn test_proof_queue_sorting() {
 async fn test_proof_calculate_remaining_txns_and_proofs() {
     let my_peer_id = PeerId::random();
     let batch_store = batch_store_for_test(5 * 1024 * 1024);
-    let mut proof_queue = BatchProofQueue::new(my_peer_id, batch_store, 1);
+    let mut proof_queue = BatchProofQueue::new(my_peer_id, batch_store, 1, false);
     let now_in_secs = aptos_infallible::duration_since_epoch().as_secs() as u64;
     let now_in_usecs = aptos_infallible::duration_since_epoch().as_micros() as u64;
     let author_0 = PeerId::random();
@@ -441,7 +441,7 @@ async fn test_proof_calculate_remaining_txns_and_proofs() {
 async fn test_proof_pull_proofs_with_duplicates() {
     let my_peer_id = PeerId::random();
     let batch_store = batch_store_for_test(5 * 1024 * 1024);
-    let mut proof_queue = BatchProofQueue::new(my_peer_id, batch_store, 1);
+    let mut proof_queue = BatchProofQueue::new(my_peer_id, batch_store, 1, false);
     let now_in_secs = aptos_infallible::duration_since_epoch().as_secs() as u64;
     let now_in_usecs = now_in_secs * 1_000_000;
     let txns = [
@@ -745,7 +745,7 @@ async fn test_proof_pull_proofs_with_duplicates() {
 async fn test_proof_queue_soft_limit() {
     let my_peer_id = PeerId::random();
     let batch_store = batch_store_for_test(5 * 1024 * 1024);
-    let mut proof_queue = BatchProofQueue::new(my_peer_id, batch_store, 1);
+    let mut proof_queue = BatchProofQueue::new(my_peer_id, batch_store, 1, false);
 
     let author = PeerId::random();
 
@@ -793,7 +793,7 @@ async fn test_proof_queue_soft_limit() {
 async fn test_proof_queue_insert_after_commit() {
     let my_peer_id = PeerId::random();
     let batch_store = batch_store_for_test(5 * 1024);
-    let mut proof_queue = BatchProofQueue::new(my_peer_id, batch_store, 1);
+    let mut proof_queue = BatchProofQueue::new(my_peer_id, batch_store, 1, false);
 
     let author = PeerId::random();
     let author_batches = vec![
@@ -825,7 +825,7 @@ async fn test_proof_queue_insert_after_commit() {
 async fn test_proof_queue_pull_full_utilization() {
     let my_peer_id = PeerId::random();
     let batch_store = batch_store_for_test(5 * 1024);
-    let mut proof_queue = BatchProofQueue::new(my_peer_id, batch_store, 1);
+    let mut proof_queue = BatchProofQueue::new(my_peer_id, batch_store, 1, false);
 
     let author = PeerId::random();
     let author_batches = vec![
@@ -882,4 +882,86 @@ async fn test_proof_queue_pull_full_utilization() {
 
     proof_queue.handle_updated_block_timestamp(10);
     assert!(proof_queue.is_empty());
+}
+
+#[tokio::test]
+async fn test_age_based_pull_orders_by_gas_then_age() {
+    // With age-based pull on, the leader should pull all top-gas-bucket batches first
+    // (regardless of author), with ties broken by insertion age. This is the opposite of
+    // round-robin, which gives one slot per author per cycle.
+    let my_peer_id = PeerId::random();
+    let batch_store = batch_store_for_test(5 * 1024 * 1024);
+    let mut proof_queue = BatchProofQueue::new(my_peer_id, batch_store, 1, true);
+
+    let author_high = PeerId::random();
+    let author_low = PeerId::random();
+
+    // High-gas author has all the top buckets.
+    proof_queue.insert_proof(proof_of_store(
+        author_high,
+        BatchId::new_for_test(0),
+        600,
+        1,
+    ));
+    proof_queue.insert_proof(proof_of_store(
+        author_high,
+        BatchId::new_for_test(1),
+        500,
+        1,
+    ));
+    // Low-gas author trails.
+    proof_queue.insert_proof(proof_of_store(author_low, BatchId::new_for_test(2), 100, 1));
+    proof_queue.insert_proof(proof_of_store(author_low, BatchId::new_for_test(3), 50, 1));
+
+    // Pull 2: with age-based, both come from author_high (round-robin would split 1-1).
+    let excluded = hashset![];
+    let mut session = proof_queue.create_pull_session(&excluded);
+    let (pulled, _, _, _, _) = proof_queue.pull_proofs(
+        &mut session,
+        PayloadTxnsSize::new(4, 10),
+        2,
+        2,
+        true,
+        aptos_infallible::duration_since_epoch(),
+        &PerBatchKindTxnLimits::default(),
+    );
+    assert_eq!(pulled.len(), 2);
+    assert_eq!(pulled[0].gas_bucket_start(), 600);
+    assert_eq!(pulled[1].gas_bucket_start(), 500);
+    assert_eq!(pulled[0].author(), author_high);
+    assert_eq!(pulled[1].author(), author_high);
+}
+
+#[tokio::test]
+async fn test_age_based_pull_age_tiebreak_within_gas_bucket() {
+    // When multiple batches share a gas bucket, the oldest insertion wins. This test
+    // inserts proofs serially so insertion-Instant order matches insertion sequence.
+    let my_peer_id = PeerId::random();
+    let batch_store = batch_store_for_test(5 * 1024 * 1024);
+    let mut proof_queue = BatchProofQueue::new(my_peer_id, batch_store, 1, true);
+
+    let author_a = PeerId::random();
+    let author_b = PeerId::random();
+
+    // Inserted first → older age key.
+    proof_queue.insert_proof(proof_of_store(author_a, BatchId::new_for_test(0), 100, 1));
+    // Sleep just enough that the next Instant is strictly later.
+    std::thread::sleep(Duration::from_millis(2));
+    proof_queue.insert_proof(proof_of_store(author_b, BatchId::new_for_test(1), 100, 1));
+
+    let excluded = hashset![];
+    let mut session = proof_queue.create_pull_session(&excluded);
+    let (pulled, _, _, _, _) = proof_queue.pull_proofs(
+        &mut session,
+        PayloadTxnsSize::new(4, 10),
+        2,
+        2,
+        true,
+        aptos_infallible::duration_since_epoch(),
+        &PerBatchKindTxnLimits::default(),
+    );
+    assert_eq!(pulled.len(), 2);
+    // Author A inserted first → comes out first under age tiebreak.
+    assert_eq!(pulled[0].author(), author_a);
+    assert_eq!(pulled[1].author(), author_b);
 }
