@@ -4,10 +4,11 @@
 //! Low-level memory utilities: aligned buffer and raw pointer helpers.
 
 use crate::VEC_DATA_OFFSET;
+use mono_move_core::MAX_ALIGN;
 use std::alloc::{self, Layout};
 
 // ---------------------------------------------------------------------------
-// Aligned buffer — owns a zeroed, 8-byte-aligned allocation
+// Aligned buffer — owns a zeroed, `MAX_ALIGN`-aligned allocation
 // ---------------------------------------------------------------------------
 
 pub struct MemoryRegion {
@@ -15,15 +16,13 @@ pub struct MemoryRegion {
     layout: Layout,
 }
 
-const ALIGNMENT: usize = 8;
-
 impl MemoryRegion {
-    /// Allocates a zeroed, 8-byte-aligned memory region of the given size.
+    /// Allocates a zeroed, `MAX_ALIGN`-aligned memory region of the given size.
     ///
     /// OOM is handled by aborting via `handle_alloc_error`.
     pub fn new(size: usize) -> Self {
         debug_assert!(size > 0);
-        let layout = Layout::from_size_align(size, ALIGNMENT).expect("invalid memory layout");
+        let layout = Layout::from_size_align(size, MAX_ALIGN).expect("invalid memory layout");
         // SAFETY: layout is valid (power-of-two alignment) and `alloc_zeroed` handles
         // zero-size layouts per the GlobalAlloc contract. Null is checked below.
         let ptr = unsafe { alloc::alloc_zeroed(layout) };

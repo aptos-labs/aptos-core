@@ -33,7 +33,8 @@
 //! References are arena-allocated composite types with their inner
 //! pointee types interned recursively.
 //!
-//! Size of references is 16 bytes (fat pointers). Alignment is also 16 bytes.
+//! Size of references is 16 bytes (fat pointers). Alignment is 8 bytes (each
+//! half is an 8-byte word; see `docs/memory_alignment.md`).
 //!
 //! ## Fully-instantiated structs and enums
 //!
@@ -326,15 +327,15 @@ impl Type {
             Type::U16 | Type::I16 => (2, 2),
             Type::U32 | Type::I32 => (4, 4),
             Type::U64 | Type::I64 => (8, 8),
-            Type::U128 | Type::I128 => (16, 16),
-            Type::U256 | Type::I256 | Type::Address | Type::Signer => (32, 32),
+            Type::U128 | Type::I128 => (16, 8),
+            Type::U256 | Type::I256 | Type::Address | Type::Signer => (32, 8),
 
             // Vectors: pointer to the heap which stores vector metadata such
             // as length, capacity.
             Type::Vector { .. } => (8, 8),
 
-            // References are 16-byte fat pointers.
-            Type::ImmutRef { .. } | Type::MutRef { .. } => (16, 16),
+            // References are 16-byte fat pointers, 8-byte aligned.
+            Type::ImmutRef { .. } | Type::MutRef { .. } => (16, 8),
 
             // Function values - TODO: for now use heap pointer values.
             Type::Function { .. } => (8, 8),

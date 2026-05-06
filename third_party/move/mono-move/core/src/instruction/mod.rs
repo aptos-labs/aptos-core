@@ -1093,6 +1093,19 @@ impl fmt::Display for MicroOp {
 // Constructor helpers for the re-compiler
 // ---------------------------------------------------------------------------
 
+/// Maximum alignment used by any value or VM-internal layout.
+///
+/// Bounds the alignment of region bases, `fp`, the bump pointer, and the
+/// padding rounded into per-object `size` fields and frame segments. See
+/// `mono-move/docs/memory_alignment.md` (§2) for the full design.
+///
+/// Constraints:
+///   - Power of two.
+///   - At least 8 (the heap object header is 8 bytes; the 24-byte frame
+///     metadata block needs 8-byte granularity).
+///   - A multiple of every alignment in use (today: any multiple of 8).
+pub const MAX_ALIGN: usize = 8;
+
 /// Size of the per-frame metadata section: `(saved_pc, saved_fp, func_id)`.
 pub const FRAME_METADATA_SIZE: usize = 24;
 

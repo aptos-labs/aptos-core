@@ -26,7 +26,7 @@ use crate::{
 use mono_move_core::{
     DescriptorId, FrameOffset, Function, CAPTURED_DATA_VALUES_OFFSET,
     CLOSURE_CAPTURED_DATA_PTR_OFFSET, CLOSURE_OBJECT_SIZE, ENUM_DATA_OFFSET, ENUM_TAG_OFFSET,
-    FRAME_METADATA_SIZE, OBJECT_HEADER_SIZE, STRUCT_DATA_OFFSET,
+    FRAME_METADATA_SIZE, MAX_ALIGN, OBJECT_HEADER_SIZE, STRUCT_DATA_OFFSET,
 };
 use pinned_roots::PinnedRoots;
 use std::ptr::NonNull;
@@ -145,15 +145,19 @@ pub(crate) mod macros {
 /// (likely driven by gas limits).
 const MAX_SINGLE_ALLOCATION_SIZE: usize = DEFAULT_HEAP_SIZE;
 
-/// Round `size` up to the next multiple of 8.
+/// Round `size` up to the next multiple of `MAX_ALIGN`.
+///
+/// Used by `heap_alloc` so the bump pointer stays `MAX_ALIGN`-aligned
+/// after each allocation — every header lands on an aligned offset and
+/// Cheney's linear scan steps cleanly between objects. See
+/// `docs/memory_alignment.md` (§3.1).
 //
-// TODO: the 8-byte alignment here is a placeholder that matches the
-// current assumption that every field is 8-byte aligned. Once the object
-// layout admits other widths (u32 / u16 / u128), this needs to take the
-// object's max-alignment into account — either from the descriptor or
-// from a per-op alignment hint.
-fn align8(size: usize) -> usize {
-    (size + 7) & !7
+// TODO: a future change will plumb per-allocation alignment through so
+// that allocations smaller than `MAX_ALIGN` don't pay full padding when
+// `MAX_ALIGN` is raised. Today every primitive ≤ 8-byte aligned, so
+// `MAX_ALIGN`-rounding is exactly right.
+fn align_max(size: usize) -> usize {
+    (size + (MAX_ALIGN - 1)) & !(MAX_ALIGN - 1)
 }
 
 /// True if `bump_ptr + size` still lies within the heap buffer (or one
@@ -218,7 +222,7 @@ pub(crate) fn heap_alloc(
             size
         );
     }
-    let aligned = align8(size);
+    let aligned = align_max(size);
 
     // Bound check uses integer arithmetic on addresses rather than
     // `bump_ptr.add(aligned)` against `buffer.as_ptr().add(buffer.len())`:
@@ -256,7 +260,7 @@ pub(crate) fn alloc_vec(
         .checked_mul(elem_size as usize)
         .and_then(|v| v.checked_add(VEC_DATA_OFFSET))
         .ok_or_else(|| anyhow::anyhow!("alloc_vec: size overflow"))?;
-    let aligned_size = align8(total_size);
+    let aligned_size = align_max(total_size);
     let ptr = heap_alloc(
         heap,
         descriptors,
@@ -299,7 +303,7 @@ pub(crate) fn alloc_obj(
         ),
     };
     let total_size = OBJECT_HEADER_SIZE + payload_size;
-    let aligned_size = align8(total_size);
+    let aligned_size = align_max(total_size);
     let ptr = heap_alloc(
         heap,
         descriptors,
@@ -498,7 +502,7 @@ pub(crate) fn gc_collect(
             let descriptor_id = read_u32(scan_ptr, HEADER_DESCRIPTOR_OFFSET);
             let obj_size = read_u32(scan_ptr, HEADER_SIZE_OFFSET) as usize;
 
-            if obj_size == 0 || obj_size != align8(obj_size) {
+            if obj_size == 0 || obj_size != align_max(obj_size) {
                 bail!(
                     "GC scan: invalid object size {} (expected non-zero, 8-byte aligned)",
                     obj_size
@@ -578,7 +582,7 @@ fn gc_copy_object(old_ptr: *mut u8, free_ptr: &mut *mut u8) -> *mut u8 {
 
         let obj_size = read_u32(old_ptr, HEADER_SIZE_OFFSET) as usize;
         debug_assert!(
-            obj_size > 0 && obj_size == align8(obj_size),
+            obj_size > 0 && obj_size == align_max(obj_size),
             "gc_copy_object: invalid object size {}",
             obj_size
         );

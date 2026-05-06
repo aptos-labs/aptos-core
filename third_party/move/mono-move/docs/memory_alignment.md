@@ -44,7 +44,7 @@ The heap and the stack each live in a `MemoryRegion` whose base address is alloc
 
 The bump allocator advances by aligned steps. For each `heap_alloc` call, it rounds the bump pointer up to the object's alignment (≤ `MAX_ALIGN`), reserves the requested size, and then rounds the bump pointer up to `MAX_ALIGN` so the next allocation starts on a `MAX_ALIGN`-aligned address. The size recorded in the object header is the post-padding size, so Cheney's linear heap scan steps from one header to the next without alignment correction.
 
-The current implementation hardcodes 8-byte alignment via `align8`. The proposal is to derive the alignment from the descriptor (or accept it as a parameter to `heap_alloc`) so the allocator generalizes when `MAX_ALIGN` is raised.
+The current implementation rounds every allocation up to `MAX_ALIGN` (via `align_max`). A future change will plumb per-allocation alignment through `heap_alloc` so that allocations smaller than `MAX_ALIGN` don't pay full padding when `MAX_ALIGN` is raised.
 
 ### 3.2 The Stack
 

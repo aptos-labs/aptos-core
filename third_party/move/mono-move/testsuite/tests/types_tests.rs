@@ -69,15 +69,15 @@ struct D
         .unwrap()
         .layout()
         .unwrap();
-    assert_eq!(layout.size, 96);
-    assert_eq!(layout.align, 32);
+    assert_eq!(layout.size, 72);
+    assert_eq!(layout.align, 8);
     let offsets = layout
         .field_layouts()
         .expect("Struct layout carries per-field offsets")
         .iter()
         .map(|f| f.offset)
         .collect::<Vec<_>>();
-    assert_eq!(offsets, vec![0, 32, 64]);
+    assert_eq!(offsets, vec![0, 32, 40]);
 
     let name = guard.intern_identifier(ident_str!("D"));
     let layout = executable
@@ -85,15 +85,15 @@ struct D
         .unwrap()
         .layout()
         .unwrap();
-    assert_eq!(layout.size, 192);
-    assert_eq!(layout.align, 32);
+    assert_eq!(layout.size, 128);
+    assert_eq!(layout.align, 8);
     let offsets = layout
         .field_layouts()
         .expect("Struct layout carries per-field offsets")
         .iter()
         .map(|f| f.offset)
         .collect::<Vec<_>>();
-    assert_eq!(offsets, vec![0, 1, 8, 16, 32, 48, 64, 160]);
+    assert_eq!(offsets, vec![0, 1, 8, 16, 24, 40, 48, 120]);
 
     let name = guard.intern_identifier(ident_str!("E"));
     assert!(executable
