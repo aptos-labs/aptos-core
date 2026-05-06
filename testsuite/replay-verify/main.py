@@ -34,8 +34,8 @@ QUERY_DELAY = 5  # seconds
 POD_STATUS_CACHE_TTL = 3  # seconds — reuse cached pod status for this long
 
 # Timeout chain — each layer is a backstop for the one before:
-#   scheduler (20m) → binary (30m) → K8s TTL controller (40m)
-POD_TIMEOUT = 20 * 60  # scheduler kills stuck pods after 20 min
+#   scheduler (40m) → binary (50m) → K8s TTL controller (60m)
+POD_TIMEOUT = 40 * 60  # scheduler kills stuck pods after 40 min
 BINARY_TIMEOUT = POD_TIMEOUT + 10 * 60  # aptos-debugger self-terminates as backstop
 POD_TTL = BINARY_TIMEOUT + 10 * 60  # K8s TTL controller as last resort
 
