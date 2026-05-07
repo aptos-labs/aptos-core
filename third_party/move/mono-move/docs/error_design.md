@@ -1,0 +1,274 @@
+# Error System
+
+## 1. Motivation
+
+The current MoveVM error model has accumulated several pain points:
+
+1. **Error code names rarely communicate what went wrong.** Names like `UNKNOWN_INVARIANT_VIOLATION_ERROR`, `UNKNOWN_VERIFICATION_ERROR`, `DATA_FORMAT_ERROR`, or `VECTOR_OPERATION_ERROR` say very little on their own, which is why error sites have grown to attach free-form messages alongside the code. The name is decorative; the message is what readers actually consult.
+
+2. **Adding a new code is enough boilerplate that people reuse existing ones.** Introducing a new `StatusCode` variant means touching the enum, picking a number in the right range, updating conversions to and from `VMStatus`, and potentially adjusting serialisation. New error sites tend to reuse a vaguely-related existing code rather than introduce a precise one — so the taxonomy drifts toward generic codes carrying specific messages.
+
+3. **Codes are rarely branched on in production code.** Outside of tests, there are essentially no `if status == StatusCode::FOO { ... } else { ... }` branches anywhere in the codebase. Downstream code overwhelmingly inspects the *message*, not the code. A 273-variant surface optimises for a use case that does not really exist; what callers actually need is a small set of categories they *can* branch on, plus a useful message.
+
+4. **i18n is not a goal and never will be.** There is no plan to translate codes into different languages. The reason error codes traditionally avoid carrying English text — to leave room for translation — does not apply here, so messages can carry human-readable context directly.
+
+5. **Messages are not consistently persisted.** Notably, transactions rejected in mempool or prologue drop the message before it reaches storage. Downstream tools end up with neither the code (which says little) nor the message (which is gone) for those rejections.
+
+6. **There is no compile-time guarantee of error-path coverage.** With error variants encoded as integer constants attached to a free-form message, tests cannot assert against a specific error path without inspecting message strings, and adding a new error site does not force a corresponding test to be added.
+
+A code survey corroborates these patterns: of the 273 `StatusCode` variants, roughly 35% are never raised, another 40% appear at fewer than three call sites, every numeric range has a catch-all `UNKNOWN_*` code, and the structured fields (`indices`, `offsets`, `sub_status`) are inconsistently set across error sites. The "live" surface is closer to 60 codes than 273.
+
+MonoMove starts from a clean slate, so the error system can be redesigned around an explicit set of goals.
+
+---
+
+## 2. Goals
+
+1. **Small, stable public surface.** A caller can branch on a small number of categories (≈9) with full coverage of the failure space. Adding a new error site inside the VM should not add a new public category.
+
+2. **Exhaustive internal taxonomy.** Every error site is a variant of a typed internal enum carrying structured payload (indices, types, addresses — whatever is useful for diagnosis). There is no untyped catch-all variant, no `with_message("...")` escape hatch, and no string-tag-as-variant pattern. This lets tests match on variants and fields directly, rather than on numeric codes or message substrings.
+
+3. **Compile-time category decisions.** The internal-to-public mapping is a single exhaustive `match` per subsystem (e.g. a `From` impl). Adding an internal variant fails to compile until the corresponding public category is chosen explicitly.
+
+4. **No untyped error propagation inside the VM.** No `anyhow::Error`, no `Box<dyn std::error::Error>`, no `Result<T, String>`, no `?`-on-anyhow inside VM code paths. Goal 2 only holds if the typed chain is unbroken from error site to conversion point — a single anyhow-returning function in the middle erases the variant for everyone above it. anyhow is acceptable at outer harness boundaries (e.g. testsuite glue); it is not acceptable inside the VM.
+
+5. **Aborts and errors are structurally separate end-to-end.** A user abort is the program asking to stop; an error is the VM unable to continue. They flow through distinct types and distinct return channels at every layer — different categories of result, not different cases of the same error type.
+
+6. **Messages are persisted and deterministic.** Every error carries a message that is saved alongside the transaction outcome. The message is deterministic for a given internal variant and payload — the same error in the same context produces the same bytes. Messages are not i18n-translated and never will be. Phrasing changes are a soft contract: possible across major versions but reviewed the way protocol constants are. Downstream consumers that need *programmatic* access to a value should rely on the public category and any structured payload it carries (§10.1), not parse the message string.
+
+---
+
+## 3. Non-Goals
+
+- **Backward compatibility with `StatusCode` numeric values.** MonoMove does not promise to preserve the integer codes from the existing VM.
+- **A general-purpose error framework.** This design is specific to MonoMove's needs. It is not a recommendation for Aptos-level error types outside the VM.
+- **Reproducing every diagnostic field of the current `VMError`.** Fields like `indices` and `offsets` are encoded into the message string at conversion time; they are not separately retrievable from `VMError`. If a downstream consumer needs them programmatically, that is a structured-payload question (§10.1).
+- **Transaction-prologue error handling.** The current VM reserves codes 0–999 for transaction validation (signature checks, sequence numbers, balance checks). These belong outside the VM in MonoMove's layering and have their own error type. The same two-layer shape (typed internal taxonomy + small public surface) is recommended for that layer too — including persisting the message for txns rejected in mempool or prologue, which the current pipeline does not do — but the design of that layer is not in scope here.
+
+---
+
+## 4. Terminology
+
+| Term | Definition |
+| --- | --- |
+| **VMStatus** | The top-level result of executing a transaction or script: success, user abort, or VM failure. Replaces the same-named type from VM 1.0. |
+| **VMError** | The public error type returned for non-success, non-abort outcomes. Carries a small `kind` enum, a message, and an optional location. |
+| **VMErrorKind** | The small public category enum (≈9 variants). The set of values callers can meaningfully branch on. |
+| **Internal error** | A fully-typed internal enum (e.g. `RuntimeError`, `VerifierError`) with one variant per real error site. Used inside the VM crates and in tests. |
+| **Conversion** | The `From` impl that maps an internal error to a `VMError`, formatting the message and selecting the public category. |
+
+---
+
+## 5. Two-Layer Architecture
+
+Errors flow through two layers — a typed internal error specific to each subsystem, then a small public surface that callers consume. The two layers are described in §5.1–§5.3. Aborts are not errors and take a separate channel; see §6 for the public `VMStatus` and §6.1 for how the runtime produces it.
+
+### 5.1 Internal errors
+
+Each VM subsystem (verifier, deserializer, loader, runtime) defines its own `enum` whose variants enumerate every concrete error condition that subsystem can produce. Variants carry structured payload (indices, offsets, types, addresses) — whatever is useful for diagnosis or for tests to assert on.
+
+```rust
+pub(crate) enum RuntimeError {
+    VectorIndexOutOfBounds { index: u64, len: u64 },
+    PopFromEmptyVector,
+    ResourceNotFound { addr: AccountAddress, ty: TypeTag },
+    ResourceAlreadyExists { addr: AccountAddress, ty: TypeTag },
+    TypeMismatch { expected: Type, actual: Type },
+    DivisionByZero,
+    ArithmeticOverflow { op: ArithOp, lhs: u128, rhs: u128 },
+    CallStackTooDeep { depth: usize },
+    // ... one variant per real runtime error site
+}
+```
+
+These types are crate-private. They are the contract that tests and internal callers see, but not the public API. They implement `Display` (typically derived via `thiserror::Error`) so that the message lives with the variant — the conversion to `VMError` only needs to pick the public category, not format a string.
+
+### 5.2 Public VMError
+
+```rust
+pub struct VMError {
+    pub kind: VMErrorKind,
+    pub message: String,
+    pub location: Option<Location>,
+}
+
+pub enum VMErrorKind {
+    OutOfGas,
+    LimitExceeded,
+    Arithmetic,
+    InvalidOperation,
+    VerificationFailed,
+    DeserializationFailed,
+    LinkError,
+    InvariantViolation,
+}
+```
+
+`VMErrorKind` is the stable public surface. Callers branch on it; they do not branch on the internal types or on the message string. The message is human-readable and may be persisted, but should not be parsed programmatically.
+
+Variants may carry kind-specific structured payload (e.g. `OutOfGas { gas_used: u64, gas_limit: u64 }`) when downstream consumers need programmatic access to a value rather than parsing it out of the message. Which variants warrant payload is the open question §10.1.
+
+### 5.3 Conversion
+
+Each internal error type implements `Into<VMError>`. The message comes from the internal type's `Display` impl; the conversion's only job is to pick the public category:
+
+```rust
+impl From<RuntimeError> for VMError {
+    fn from(err: RuntimeError) -> Self {
+        use RuntimeError::*;
+        let kind = match err {
+            VectorIndexOutOfBounds { .. } => VMErrorKind::InvalidOperation,
+            PopFromEmptyVector            => VMErrorKind::InvalidOperation,
+            ResourceNotFound { .. }       => VMErrorKind::InvalidOperation,
+            ResourceAlreadyExists { .. }  => VMErrorKind::InvalidOperation,
+            TypeMismatch { .. }           => VMErrorKind::InvalidOperation,
+            DivisionByZero                => VMErrorKind::Arithmetic,
+            ArithmeticOverflow { .. }     => VMErrorKind::Arithmetic,
+            CallStackTooDeep { .. }       => VMErrorKind::LimitExceeded,
+            // ...
+        };
+        VMError { kind, message: err.to_string(), location: None }
+    }
+}
+```
+
+The category match is the only place where the mapping internal→public is encoded. It is exhaustive (no wildcard), so adding a new internal variant fails to compile until its public category is chosen explicitly.
+
+---
+
+## 6. Top-Level VMStatus
+
+A user abort is the program asking to stop; an error is the VM unable to continue. Conflating them in a single error enum forces every caller to inspect a discriminator before doing anything useful. Splitting them at the top level is clearer:
+
+```rust
+pub enum VMStatus {
+    Success(SuccessPayload),
+    Aborted {
+        code: u64,
+        message: Option<String>,
+        location: Location,
+    },
+    Failed(VMError),
+}
+```
+
+`Aborted` carries a structured `code: u64` because every downstream consumer (Move source-level error mapping, CLI output, indexer) needs to read it programmatically. The optional `message` carries a user-supplied string from Move source — populated when an abort uses the message form (`AbortWithMessage` bytecode) or when a native function aborts with a message — and is `None` for code-only aborts. The `location` identifies which module raised the abort.
+
+The `code` follows the existing `errors.move` convention: the upper byte categorises (`INVALID_ARGUMENT`, `INVALID_STATE`, `OUT_OF_RANGE`, `LIMIT_EXCEEDED`, `INTERNAL`, `NOT_IMPLEMENTED`, `UNAVAILABLE`, etc.) and the lower bytes carry a module-specific reason code. This is the place where Move-source-level canonical error categories surface — they classify *application* failures and are orthogonal to `VMErrorKind`, which classifies VM-detected failures.
+
+Abort messages were added to the current VM recently (new `AbortWithMessage` bytecode instruction and abort-message support in native functions, gated by the `NATIVE_ABORT_MESSAGES` feature flag). MonoMove adopts them natively — no feature gate — and treats the message as an integral part of the abort outcome, persisted alongside the code. The same size cap that the current VM enforces applies, to keep abort-message storage costs predictable.
+
+### 6.1 How the runtime produces it
+
+The interpreter's `run` method ([interpreter.rs:1202](third_party/move/mono-move/runtime/src/interpreter.rs#L1202)) currently returns `ExecutionResult<()>`. Under this design, it returns a result over an `ExecutionOutcome` payload covering the two successful terminal cases:
+
+```rust
+pub(crate) enum ExecutionOutcome {
+    Success(SuccessPayload),
+    Aborted { code: u64, message: Option<String>, location: Location },
+}
+
+impl Interpreter {
+    pub fn run(&mut self) -> Result<ExecutionOutcome, RuntimeError> { .. }
+}
+```
+
+The three terminal cases are:
+
+- Normal return from the entry function → `Ok(ExecutionOutcome::Success(_))`
+- `Abort` opcode or abort-returning native function → `Ok(ExecutionOutcome::Aborted { ... })`
+- Runtime failure (vector OOB at the VM level, missing resource, gas exhaustion, etc.) → `Err(RuntimeError::...)`
+
+The orchestrator lifts these into `VMStatus`:
+
+```rust
+match interpreter.run() {
+    Ok(ExecutionOutcome::Success(p)) => VMStatus::Success(p),
+    Ok(ExecutionOutcome::Aborted { code, message, location }) => VMStatus::Aborted { code, message, location },
+    Err(e) => VMStatus::Failed(VMError::from(e)),
+}
+```
+
+`RuntimeError` has no abort variant; the `From<RuntimeError> for VMError` conversion in §5.3 has no abort case. Aborts are tagged at every internal level (e.g. native function dispatch returns a `NativeResult` enum with a distinct `Abort` variant) so they propagate up through the `Ok` channel of the `Result`, structurally distinct from runtime failures in the `Err` channel — which is what makes Goal §2.5 hold.
+
+---
+
+## 7. Public Categories
+
+The eight `VMErrorKind` variants, with the rough class of internal errors that map into each:
+
+| Kind | Meaning | Examples of internal variants |
+| --- | --- | --- |
+| `OutOfGas` | Gas budget exhausted. | `GasExhausted { used, limit }` |
+| `LimitExceeded` | A static or dynamic structural limit was hit. | `CallStackTooDeep`, `ValueDepthTooDeep`, `TypeDepthTooDeep`, `OperandStackOverflow` |
+| `Arithmetic` | Numeric operation produced an undefined result. | `DivisionByZero`, `ArithmeticOverflow`, `ArithmeticUnderflow`, `ShiftAmountOutOfRange` |
+| `InvalidOperation` | Program attempted a runtime-illegal operation. | `VectorIndexOutOfBounds`, `PopFromEmptyVector`, `ResourceNotFound`, `ResourceAlreadyExists`, `TypeMismatch`, `BadCast` |
+| `VerificationFailed` | Bytecode verifier rejected a module before execution. | All variants of `VerifierError` (control-flow, type safety, bounds, ability checks). |
+| `DeserializationFailed` | A binary blob (module, script, value) was malformed. | `BadMagic`, `UnknownOpcode`, `TruncatedInput`, `InvalidUtf8`, `BadFieldEncoding` |
+| `LinkError` | A referenced module, function, or struct could not be resolved or had an incompatible signature. | `ModuleNotFound`, `FunctionNotFound`, `StructNotFound`, `SignatureMismatch`, `UpgradeIncompatible` |
+| `InvariantViolation` | A condition that should never occur — a VM bug. | `OperandStackUnderflow`, `MissingFrame`, `LoaderInconsistency`, `ParanoidCheckFailed` |
+
+`InvariantViolation` is operationally distinct from the rest: it indicates a VM bug, not a program bug. Production deployments should alert on it; users should never see it surface as a transaction failure with diagnostic detail. Keeping it as a category (rather than panicking) lets the orchestrator translate the transaction outcome cleanly without unwinding.
+
+`Aborted` is *not* in this list because it lives at the `VMStatus` level (§6), not inside `VMError`.
+
+---
+
+## 8. Why This Categorisation
+
+The categories are chosen by **what action a caller takes when they see one**, not by where in the VM the error originated. Two error sites that the caller handles identically should map to the same kind; two error sites that demand different handling should not.
+
+Conversely, a single subsystem typically produces errors across multiple categories. The loader, for instance, raises `DeserializationFailed` (malformed module bytes), `VerificationFailed` (verifier rejection during load), `LinkError` (missing or incompatible dependency), and occasionally `InvariantViolation` (cache corruption). The specializer leans toward `LimitExceeded` (depth and instantiation caps) and `InvariantViolation` (since its input is already verified, most failures genuinely shouldn't happen). The runtime spans almost every category. The classification is variant-level, not subsystem-level — each subsystem's internal enum is mapped variant-by-variant to a public category by its `From` impl.
+
+- `OutOfGas` vs. `LimitExceeded`: both are "you asked for too much," but the caller's response differs. `OutOfGas` is fixable by raising the gas budget; `LimitExceeded` is not (raising gas does nothing for a 200-deep call stack).
+- `Arithmetic` vs. `InvalidOperation`: both are program bugs, but arithmetic failures (overflow, underflow, div-by-zero, shift out of range) are common and semantically distinct enough that downstream observability typically wants them as their own metric. Folding them into `InvalidOperation` would force callers to parse message substrings to distinguish.
+- `VerificationFailed` vs. `DeserializationFailed` vs. `LinkError`: all are pre-execution module-loading failures, but the caller's response differs. Verification failures mean the module is invalid; deserialisation failures mean the bytes are corrupted; link errors mean a dependency is missing or incompatible (and may be fixable by publishing the dependency).
+- `InvariantViolation` vs. all others: invariant violations require operational alerting; everything else is a normal failure mode.
+
+Whether `InvalidOperation` should be sub-categorised (e.g. into `ResourceError`, `TypeError`, `IndexError`) is an open question. Those distinctions are useful for diagnosis and would naturally surface in the internal variant and message regardless; promoting them to public categories depends on whether callers want to branch on them.
+
+---
+
+## 9. Testability
+
+The design's testability claim rests on the internal error types being exhaustive and their variants carrying structured payload. A test for a runtime feature can assert:
+
+```rust
+assert!(matches!(
+    result,
+    Err(RuntimeError::VectorIndexOutOfBounds { index: 7, len: 5 })
+));
+```
+
+— rather than:
+
+```rust
+assert_eq!(result.unwrap_err().major_status, StatusCode::VECTOR_OPERATION_ERROR);
+assert!(result.unwrap_err().message.unwrap().contains("index 7"));
+```
+
+The former binds against types; the latter binds against integers and English. Adding a new error site is a new internal variant, and the exhaustive `From` impl forces an explicit category decision, which means every error path has a compile-time-verified place in both the internal taxonomy and the public taxonomy.
+
+---
+
+## 10. Open Questions
+
+### 10.1 Structured payloads on `VMErrorKind` variants
+
+The drafted `VMErrorKind` shows all variants as units; the design permits structured payload on any of them (see §5.2). Which variants should grow payload?
+
+Arguments for: downstream consumers (indexer, gas profiler, CLI) sometimes need to extract values programmatically, and parsing the message is fragile.
+
+Arguments against: every additional structured field is a versioning commitment, and the internal error type already carries the data.
+
+Pragmatic middle ground: keep variants as units by default, and promote a field to structured payload only when every downstream consumer would otherwise have to parse it out of the message. Candidates worth considering: `LimitExceeded` (which limit, and the value), `Arithmetic` (operation kind), `LinkError` (the missing module/function name).
+
+### 10.2 Error chaining
+
+Should `VMError` carry a `source: Option<Box<dyn std::error::Error>>` for chained causes (e.g. an I/O error during module load wrapped as a `LinkError`)? Useful for debugging, but introduces dynamic dispatch on the public surface.
+
+### 10.3 Compatibility with the existing `TransactionStatus`
+
+The on-chain shape of a transaction outcome is `TransactionStatus`, which wraps `ExecutionStatus` (5 variants: `Success`, `OutOfGas`, `MoveAbort`, `ExecutionFailure`, `MiscellaneousError`). The integration between the VM and the rest of Aptos lives at one site, [`TransactionStatus::from_vm_status`](aptos-move/aptos-vm/src/aptos_vm.rs#L629), where today's `VMStatus` gets boiled down.
+
+The open question is how MonoMove's `VMStatus` plugs into that same boundary — directly, or via a thin shim that mirrors `from_vm_status`. The mapping is straightforward (`Outcome::Success` → `ExecutionStatus::Success`, `Outcome::Aborted { ... }` → `ExecutionStatus::MoveAbort { ... }`, the various `VMErrorKind`s split between `OutOfGas`, `ExecutionFailure`, and `MiscellaneousError`), but it does need to be designed alongside how the VM is wired in.
