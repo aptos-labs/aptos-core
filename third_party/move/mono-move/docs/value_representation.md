@@ -12,7 +12,7 @@ Primitives (`u8`, `u16`, `u32`, `u64`, `u128`, `u256`, `bool`, `address`, `signe
 └─────────────┘
 ```
 
-Alignment is still under consideration. There will likely be some form of alignment requirement, but the exact scheme has not been finalized.
+For the alignment story (per-primitive alignments, references, and how it flows through regions), see [`memory_alignment.md`](memory_alignment.md).
 
 ## Heap Object Header
 
@@ -60,7 +60,7 @@ Owner region                       Heap
 
 The `desc_id` indexes into the descriptor table so the GC knows which field offsets hold heap pointers (`ObjectDescriptor::Struct`).
 
-Alignment of fields within heap structs is also under consideration.
+For field alignment within heap structs, see [`memory_alignment.md`](memory_alignment.md).
 
 ## Enums
 
@@ -87,7 +87,7 @@ Owner region                       Heap
 
 The GC traces enums via `ObjectDescriptor::Enum`, which provides per-variant pointer offset lists indexed by the tag.
 
-The exact layout of heap enums is not fully settled. The current implementation pads all variants to the maximum variant size, but an alternative approach is to allocate a new heap object when switching from one variant to another, which would allow each variant to be sized exactly. The tag size and alignment are also under consideration.
+The exact layout of heap enums is not fully settled. The current implementation pads all variants to the maximum variant size, but an alternative approach is to allocate a new heap object when switching from one variant to another, which would allow each variant to be sized exactly. For tag size and alignment, see [`memory_alignment.md`](memory_alignment.md).
 
 Enums may need to stay on the heap for now because Move allows adding new variants via compatible module upgrades, which can change the layout. We are aiming to support inline enums and are considering introducing attributes like `[frozen]` that guarantee no future variants will be added, enabling inline representations.
 
@@ -116,7 +116,7 @@ A null pointer represents an empty vector with no heap allocation. `VecNew` writ
 
 The `desc_id` tells the GC how to trace element pointers via `ObjectDescriptor::Vector`, which stores the element size and the byte offsets within each element that hold heap pointers.
 
-Alignment of elements within vectors is also under consideration.
+For element alignment within vectors, see [`memory_alignment.md`](memory_alignment.md).
 
 ## Composite Layouts
 

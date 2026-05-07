@@ -13,7 +13,7 @@ pub use executable::{EnumType, Executable, ExecutableId, StructType, VariantFiel
 pub use execution_context::{ExecutionContext, FunctionResolver, LocalExecutionContext};
 pub use function::{FrameLayoutInfo, Function, SafePointEntry, SortedSafePointEntries};
 pub use instruction::{
-    CallClosureOp, ClosureFuncRef, CodeOffset, DescriptorId, FrameOffset, MicroOp,
+    align_max, CallClosureOp, ClosureFuncRef, CodeOffset, DescriptorId, FrameOffset, MicroOp,
     MicroOpGasSchedule, PackClosureOp, SizedSlot, CAPTURED_DATA_TAG_MATERIALIZED,
     CAPTURED_DATA_TAG_OFFSET, CAPTURED_DATA_VALUES_OFFSET, CLOSURE_CAPTURED_DATA_PTR_OFFSET,
     CLOSURE_FUNC_REF_OFFSET, CLOSURE_FUNC_REF_SIZE, CLOSURE_MASK_OFFSET, CLOSURE_OBJECT_SIZE,

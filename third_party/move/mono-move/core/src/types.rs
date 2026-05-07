@@ -33,8 +33,8 @@
 //! References are arena-allocated composite types with their inner
 //! pointee types interned recursively.
 //!
-//! Size of references is 16 bytes (fat pointers). Alignment is 8 bytes (each
-//! half is an 8-byte word; see `docs/memory_alignment.md`).
+//! Size of references is 16 bytes (fat pointers). Alignment is 8 bytes —
+//! each half (`base_ptr` and `byte_offset`) is an 8-byte word.
 //!
 //! ## Fully-instantiated structs and enums
 //!

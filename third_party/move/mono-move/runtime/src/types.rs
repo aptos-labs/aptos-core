@@ -5,7 +5,7 @@
 //!
 //! Object descriptors live in [`crate::heap::object_descriptor`].
 
-pub(crate) use mono_move_core::OBJECT_HEADER_SIZE;
+pub(crate) use mono_move_core::{MAX_ALIGN, OBJECT_HEADER_SIZE};
 
 // ---------------------------------------------------------------------------
 // Step result
@@ -45,6 +45,13 @@ pub const VEC_LENGTH_OFFSET: usize = OBJECT_HEADER_SIZE; // 8
 /// Capacity is not stored; it is derived from the header's `size_in_bytes`
 /// field: `capacity = (size_in_bytes - VEC_DATA_OFFSET) / elem_size`.
 pub const VEC_DATA_OFFSET: usize = OBJECT_HEADER_SIZE + 8; // 16
+
+// Element 0 must land on a `MAX_ALIGN`-aligned offset so that any element
+// type (whose alignment is ≤ `MAX_ALIGN`) is naturally aligned. If a future
+// change adds another field before the element data (e.g., capacity) and
+// pushes `VEC_DATA_OFFSET` to a non-`MAX_ALIGN` boundary, this assertion
+// catches it. See `docs/memory_alignment.md` (§8.3).
+const _: () = assert!(VEC_DATA_OFFSET % MAX_ALIGN == 0);
 
 /// Marker written into the `descriptor_id` field of a forwarded object during GC.
 pub(crate) const FORWARDED_MARKER: u32 = u32::MAX;

@@ -2,25 +2,25 @@
 
 This document specifies how MonoMove aligns values in memory: where each primitive sits, how composite layouts are derived, and how the alignment requirement flows through the regions the VM owns (heap, stack, hardcoded headers). It also covers how alignment is enforced, optimization opportunities, and the configurability we want to keep open for the future.
 
-For the layouts themselves (without the alignment lens), see `value_representation.md`. For the regions, see `heap_and_gc.md` and `stack_and_calling_convention.md`. This document is the single source of truth for *alignment*, and resolves the "alignment is under consideration" placeholders left in those documents.
+For the layouts themselves (without the alignment lens), see [`value_representation.md`](value_representation.md). For the regions, see [`heap_and_gc.md`](heap_and_gc.md) and [`stack_and_calling_convention.md`](stack_and_calling_convention.md).
 
 ## 1. Principles
 
-1. **Follow natural alignment for small types**, à la Rust / C++: a value at an aligned offset can be loaded with a single aligned instruction. This matches what hardware wants.
+1. **Natural alignment for small types.** A value of size ≤ 8 bytes is placed at an address that is a multiple of its size (`bool` counts as 1 byte). This is what Rust and C++ do for primitives and is the alignment most hardware loads expect.
 
-2. **Cap alignment at 8 bytes.** All Move primitives 8 bytes or larger (`u64`, `u128`, `u256`, `address`, `signer`) get 8-byte alignment, even when their size exceeds 8. This avoids the cascading padding that stronger alignment would impose on every container — the trade-off is discussed in §8.2.
+2. **Cap alignment at 8 bytes.** All Move primitives 8 bytes or larger (`u64`, `u128`, `u256`, `address`, `signer`) get 8-byte alignment, even when their size exceeds 8. This avoids the cascading padding that stronger alignment would impose on every container — the trade-off is discussed in [§8.2](#82-stronger-alignment-for-u128--u256--address--signer).
 
 3. **Layout is a VM-internal decision.** BCS — the canonical on-disk encoding — is alignment-free, so the in-memory layout can be reshuffled on each round-trip through storage with no compatibility cost.
 
-4. **Alignment is uniform within a build.** Two MonoMove instances of the same build produce identical layouts. We keep one global `MAX_ALIGN` (see §2) so frames and heap regions share a single alignment guarantee.
+4. **Alignment is uniform within a build.** Two MonoMove instances of the same build produce identical layouts. We keep one global `MAX_ALIGN` (see [§2](#2-the-max_align-constant)) so frames and heap regions share a single alignment guarantee.
 
-5. **Stay general — the VM is generic over the alignment strategy.** Hardcoding `8` everywhere makes it expensive to support a future type with stronger alignment. We thread `MAX_ALIGN` and per-type alignment through, even if today's default values match `8` everywhere.
+5. **Stay general.** 8 bytes is today's de facto bound, but hardcoding `8` everywhere would make any future bump expensive. We thread `MAX_ALIGN` and per-type alignment through the layout pipeline so raising the cap later is a constant change rather than a structural rewrite.
 
 ## 2. The `MAX_ALIGN` Constant
 
 `MAX_ALIGN` is a single `usize` constant in `mono-move-core`, defaulting to **8**. It is referenced throughout this document as the bound on every alignment guarantee the VM provides.
 
-It governs the alignment of the stack and heap regions, of `fp` and the bump pointer, and the padding rounded into per-object `size` fields and into frame segments. §3 describes how each region maintains this guarantee in practice.
+It governs the alignment of the stack and heap regions, of `fp` and the bump pointer, and the padding rounded into per-object `size` fields and into frame segments. [§3](#3-vm-managed-memory-regions) describes how each region maintains this guarantee in practice.
 
 **Constraints on `MAX_ALIGN`:**
 
@@ -32,7 +32,7 @@ It governs the alignment of the stack and heap regions, of `fp` and the bump poi
 
 - **Heap objects.** The header is fixed at 8 bytes. To put a 16-aligned field at the start of the body, the specializer must emit 8 bytes of padding between the header and the field. To put a 32-aligned field, 24 bytes of padding. The header could be redesigned to consume more space when stronger alignment is needed, but doing so is a layout change that must be planned explicitly.
 - **Frame metadata.** The 24-byte metadata block is not `MAX_ALIGN`-aligned in size when `MAX_ALIGN > 8`. The frame layout pass must pad the metadata up to `MAX_ALIGN` so the next callee's `fp` lands on an aligned offset.
-- **Vector data offset.** Element 0 currently starts at offset 16 (header + length). For elements requiring more than 16-byte alignment, the data offset would need to grow per vector — but the current vector micro-ops have no mechanism to express this. See §8.3.
+- **Vector data offset.** Element 0 currently starts at offset 16 (header + length). For elements requiring more than 16-byte alignment, the data offset would need to grow per vector — but the current vector micro-ops have no mechanism to express this. See [§8.3](#83-vector-data-offset-under-stronger-element-alignment).
 
 **Natives inherit `MAX_ALIGN`.** Native functions follow the same calling convention and read parameters from the frame at the same offsets. Any pointer they receive into the stack or heap inherits the `MAX_ALIGN` (and below) alignment guarantees. If a native ever needs stronger alignment than `MAX_ALIGN` for a Rust-side type, it must allocate its own scratch space — the VM frame won't satisfy it.
 
@@ -68,7 +68,7 @@ The current implementation rounds every allocation up to `MAX_ALIGN` (via `align
 - **Frame metadata** (`[pl_sum, pl_sum + FRAME_METADATA_SIZE)`) is a `FRAME_METADATA_SIZE`-byte block holding `(saved_pc: u64, saved_fp: ptr, saved_func_ptr: ptr)` and requires 8-byte alignment. Today `FRAME_METADATA_SIZE = 24`.
 - **Callee arg/return region** (`[pl_sum + FRAME_METADATA_SIZE, extended)`) doubles as the start of the callee's frame, so the callee's `fp = caller_fp + pl_sum + FRAME_METADATA_SIZE`.
 
-For the callee's `fp` to be `MAX_ALIGN`-aligned given the caller's is, `pl_sum + FRAME_METADATA_SIZE` must be a multiple of `MAX_ALIGN`. With `MAX_ALIGN = 8` this is automatic (`FRAME_METADATA_SIZE = 24` is divisible by 8 and `pl_sum` is already 8-aligned by the locals layout). With `MAX_ALIGN > 8`, the metadata block needs to be padded up to `MAX_ALIGN` bytes — see §2.
+For the callee's `fp` to be `MAX_ALIGN`-aligned given the caller's is, `pl_sum + FRAME_METADATA_SIZE` must be a multiple of `MAX_ALIGN`. With `MAX_ALIGN = 8` this is automatic (`FRAME_METADATA_SIZE = 24` is divisible by 8 and `pl_sum` is already 8-aligned by the locals layout). With `MAX_ALIGN > 8`, the metadata block needs to be padded up to `MAX_ALIGN` bytes — see [§2](#2-the-max_align-constant).
 
 Note that `extended_frame_size` itself does *not* need to be `MAX_ALIGN`-aligned; only the `pl_sum + FRAME_METADATA_SIZE` boundary that the callee's `fp` lands on does. Multiple calls from the same caller all reuse the same callee region, and the caller's frame doesn't propagate any further alignment constraint after the metadata.
 
@@ -87,7 +87,7 @@ Proposed (size, alignment) for each primitive, in bytes:
 | `address` | 32 | 8 |
 | `signer` | 32 | 8 |
 
-Up through `u64` we follow Rust / C++'s natural alignment. From `u128` onwards we cap at 8: stronger alignment would force padding into every container holding such a field, which is a cost we don't want to pay by default (see §8.2 for when it might be worth revisiting).
+Up through `u64` we follow Rust / C++'s natural alignment. From `u128` onwards we cap at 8: stronger alignment would force padding into every container holding such a field, which is a cost we don't want to pay by default (see [§8.2](#82-stronger-alignment-for-u128--u256--address--signer) for when it might be worth revisiting).
 
 ### References
 
@@ -105,11 +105,13 @@ Stored as a heap pointer in the owner region. 8 bytes, 8-byte aligned.
 
 ### 5.1 Heap Object Header
 
-Every heap object starts with the 8-byte header `[desc_id: u32 | size: u32]`. The header itself is 8-byte aligned and sits at offset 0 of every heap object. Because the heap allocator always places objects at `MAX_ALIGN`-aligned addresses (§3.1), the header is automatically aligned without any work from the body layout.
+Every heap object starts with the 8-byte header `[desc_id: u32 | size: u32]`. The header itself is 8-byte aligned and sits at offset 0 of every heap object. Because the heap allocator always places objects at `MAX_ALIGN`-aligned addresses ([§3.1](#31-the-heap)), the header is automatically aligned without any work from the body layout.
 
 ### 5.2 Heap Object Body
 
-The body starts at offset 8 (immediately after the header). Body fields are placed at offsets that satisfy each field's natural alignment relative to the start of the heap object. Because every field has alignment ≤ 8 and the body starts at an 8-aligned offset, no extra padding is needed at the start of the body — fields can be packed in immediately, with the usual alignment-up between fields of different sizes.
+The body starts at offset 8 (immediately after the header). Body fields are placed at offsets that satisfy each field's natural alignment relative to the start of the heap object. Today the body offset equals `MAX_ALIGN`, so the first field can sit at offset 8 regardless of its alignment (which is ≤ `MAX_ALIGN` by construction); if `MAX_ALIGN` is ever raised above the header size, padding between header and body is needed (see [§2](#2-the-max_align-constant)).
+
+> TODO: a future refactor will move the header to a *negative* offset relative to the body (the way `malloc` does). Once that lands, the body always starts at offset 0 and the header-vs-body alignment discussion above goes away.
 
 ### 5.3 Inline Structs
 
@@ -119,7 +121,7 @@ The struct's alignment is the max of its fields' alignments. The owner is respon
 
 ### 5.4 Heap Structs
 
-Heap structs follow §5.1–§5.2. Field offsets *within the body* are computed relative to the body start (offset 8), using the same natural-alignment rule as inline structs. The compiler-provided `pointer_offsets` for the GC are body-relative offsets.
+Heap structs follow [§5.1](#51-heap-object-header)–[§5.2](#52-heap-object-body). Field offsets *within the body* are computed relative to the body start (offset 8), using the same natural-alignment rule as inline structs. The compiler-provided `pointer_offsets` for the GC are body-relative offsets.
 
 ### 5.5 Inline Enums
 
@@ -135,7 +137,7 @@ The whole enum's alignment is `max(tag_align, variant_region_align)` — i.e., t
 
 ### 5.6 Heap Enums
 
-Same as §5.4, with the body laid out as `[tag | pad | variant_fields…]`. Today the runtime stores the tag as a `u64` for convenience, which is itself the result of manual alignment up to 8. Conceptually the tag is 1 byte; the extra 7 bytes are padding before the variant region (whose max field alignment is ≤ 8). Treating the tag as 1-byte conceptually keeps the door open to shrinking the storage if a future micro-optimization wants to reclaim those bytes for a small variant field.
+Same as [§5.4](#54-heap-structs), with the body laid out as `[tag | pad | variant_fields…]`. Today the runtime stores the tag as a `u64` for convenience, which is itself the result of manual alignment up to 8. Conceptually the tag is 1 byte; the extra 7 bytes are padding before the variant region (whose max field alignment is ≤ `MAX_ALIGN`). Treating the tag as 1-byte conceptually keeps the door open to shrinking the storage if a future micro-optimization wants to reclaim those bytes for a small variant field.
 
 ### 5.7 Vectors
 
@@ -146,19 +148,19 @@ offset 0    4    8         16        16 + i*elem_size
       └────┴────┴──────────┴──────────────────────┘
 ```
 
-The header is at offsets 0–7 (§5.1). The vector also stores a `length` field as a `u64` immediately after the header at offset 8 (8-byte aligned). Element 0 starts at offset 16, which is 8-byte aligned — sufficient for any primitive under §4's 8-byte cap. Element `i` is at offset `16 + i * elem_size`, where `elem_size` is rounded up to the element's alignment (so successive elements remain aligned). Within an element, fields are at their natural alignment.
+The header is at offsets 0–7 ([§5.1](#51-heap-object-header)). The vector also stores a `length` field as a `u64` immediately after the header at offset 8 (8-byte aligned). Element 0 starts at offset 16, which is 8-byte aligned — sufficient for any primitive under [§4](#4-primitive-types)'s 8-byte cap. Element `i` is at offset `16 + i * elem_size`, where `elem_size` is rounded up to the element's alignment (so successive elements remain aligned). Within an element, fields are at their natural alignment.
 
-This layout assumes element alignment is ≤ 16, which holds today and would still hold under any `MAX_ALIGN` ≤ 16. Stronger element alignment would require a per-vector data offset that the current micro-ops cannot express; see §8.3.
+This layout assumes element alignment is ≤ 16, which holds today and would still hold under any `MAX_ALIGN` ≤ 16. Stronger element alignment would require a per-vector data offset that the current micro-ops cannot express; see [§8.3](#83-vector-data-offset-under-stronger-element-alignment).
 
 ### 5.8 Closures
 
 A closure is a heap object (see `closure_design.md` for full layout). The closure object itself has all fields at 8-byte alignment, so the object's overall alignment is 8.
 
-A closure's captured values live in a *separate* heap object pointed to by `captured_data_ptr`. That object is also a heap object — same header at offset 0, body at offset 8. Within the body, the captured values are laid out like an inline struct (per §5.3): each captured value at its natural alignment, packed with intervening padding as needed. The captured-data tag (Raw vs. Materialized) is conceptually 1 byte at the start of the body, currently stored with 7 bytes of padding before the values.
+A closure's captured values live in a *separate* heap object pointed to by `captured_data_ptr`. That object is also a heap object — same header at offset 0, body at offset 8. Within the body, the captured values are laid out like an inline struct (per [§5.3](#53-inline-structs)): each captured value at its natural alignment, packed with intervening padding as needed. The captured-data tag (Raw vs. Materialized) is conceptually 1 byte at the start of the body, currently stored with 7 bytes of padding before the values.
 
 ### 5.9 Worked Examples
 
-These examples assume `MAX_ALIGN = 8` and the alignments from §4.
+These examples assume `MAX_ALIGN = 8` and the alignments from [§4](#4-primitive-types).
 
 **Example 1 — simple struct, inline.**
 
@@ -267,10 +269,12 @@ Alignment correctness depends on three layers cooperating; if any of them is wro
 
 3. **Runtime invariants.** Three structural invariants do the rest:
    - `MemoryRegion::new` allocates with `MAX_ALIGN`, so the heap and stack base addresses are always sufficiently aligned.
-   - The bump allocator (§3.1) advances by `MAX_ALIGN`-aligned steps, so every object's address satisfies `MAX_ALIGN`.
-   - Every `fp` is `MAX_ALIGN`-aligned (§3.2), so frame-relative offsets composed with `fp` produce aligned addresses.
+   - The bump allocator ([§3.1](#31-the-heap)) advances by `MAX_ALIGN`-aligned steps, so every object's address satisfies `MAX_ALIGN`.
+   - Every `fp` is `MAX_ALIGN`-aligned ([§3.2](#32-the-stack)), so frame-relative offsets composed with `fp` produce aligned addresses.
 
 The combination of (1) computing aligned offsets, (2) verifying them statically, and (3) maintaining aligned base pointers gives end-to-end alignment safety without runtime alignment checks on the hot path.
+
+> TODO: the specializer rounds `pl_sum` up to `MAX_ALIGN` so the callee's `fp` lands on a `MAX_ALIGN`-aligned offset ([§3.2](#32-the-stack)). This is currently a specializer-side convention with no static verifier check — a bug there silently misaligns every callee frame. Either extend the verifier to enforce `(pl_sum + FRAME_METADATA_SIZE) % MAX_ALIGN == 0`, or add a `debug_assert!` on the call path.
 
 ## 7. Optimizations
 
@@ -290,7 +294,7 @@ The same idea applies to inline structs, heap struct bodies, enum variant fields
 
 ### 7.2 Local Reordering
 
-The same argument applies to a function's locals (and home slots more generally). The specializer can permute local indexes to minimize frame size; with everything ≤ 8-aligned the savings per frame are small (a few bytes), but they compound across deep call stacks.
+The same argument applies to a function's locals (and home slots more generally). The specializer can permute local indexes to minimize frame size; with everything ≤ `MAX_ALIGN`-aligned the savings per frame are small (a few bytes), but they compound across deep call stacks.
 
 Parameters are *not* reordered (they're a public ABI constrained by the calling convention), and neither are slots tied to the callee arg/return region.
 
@@ -300,11 +304,11 @@ Parameters are *not* reordered (they're a public ABI constrained by the calling 
 
 The alignment choices in this document are calibrated for what MonoMove does today. As the VM evolves — new primitives, new optimizations, SIMD-based natives, broader hardware targets — we may need to adjust these decisions. Each adjustment is a breaking change for any persisted in-memory state (the storage cache at the block level, or any in-memory representation that crosses a build boundary), although BCS round-trips remain unaffected because BCS is alignment-free.
 
-In practice this means alignment changes need to be **feature-gated** the same way other layout-affecting upgrades are, with a clean cut-over point that invalidates and rebuilds any in-memory caches. This is tractable today (the runtime is at PoC stage, no committed in-memory cache yet), but the cost grows once consumers pin specific layouts. Designing alignment as a `MAX_ALIGN` constant plus per-type alignment metadata (§2) is exactly so that "alignment evolution" is a localized change rather than a structural rewrite.
+In practice this means alignment changes need to be **feature-gated** the same way other layout-affecting upgrades are, with a clean cut-over point that invalidates and rebuilds any in-memory caches. This is tractable today (the runtime is at PoC stage, no committed in-memory cache yet), but the cost grows once consumers pin specific layouts. Designing alignment as a `MAX_ALIGN` constant plus per-type alignment metadata ([§2](#2-the-max_align-constant)) is exactly so that "alignment evolution" is a localized change rather than a structural rewrite.
 
 ### 8.2 Stronger alignment for `u128` / `u256` / `address` / `signer`
 
-We capped alignment at 8 for these types in §4. The arguments for raising it:
+We capped alignment at 8 for these types in [§4](#4-primitive-types). The arguments for raising it:
 
 - **SIMD-friendly loads.** `u128` at 16-byte alignment enables a single 128-bit load (SSE2). `u256` / `address` at 32-byte alignment enables a single AVX2 load.
 - **Cache-line alignment.** 32-byte alignment puts each `address` on half a cache line, which can matter for hot resources accessed by many transactions.
@@ -316,13 +320,15 @@ The arguments against (and why we picked 8):
 - **No SIMD use case today.** The hot path doesn't have wide-vector loads; the cost of higher alignment would be paid up front for unrealized future benefit.
 - **Container starts limited.** With a fixed 8-byte heap header, the body never naturally lands at a 16- or 32-aligned offset, so adopting stronger alignment would either require redesigning the header or paying header-side padding everywhere.
 
-The recommendation is to revisit if profiling shows arithmetic on `u128` / `u256` is hot, or if SIMD-based crypto natives become a measurable win. The constants are centralized, so the change is mostly mechanical (with the caveats from §2).
+The recommendation is to revisit if profiling shows arithmetic on `u128` / `u256` is hot, or if SIMD-based crypto natives become a measurable win. The constants are centralized, so the change is mostly mechanical (with the caveats from [§2](#2-the-max_align-constant)).
+
+> TODO: file an issue (and link it here) to benchmark the SIMD / cache-line-alignment win against the padding cost on representative workloads before deciding. Also worth considering: parallel moves and arg reshuffling may benefit from SIMD scatter/gather even without wide arithmetic.
 
 ### 8.3 Vector data offset under stronger element alignment
 
-Vector micro-ops compute the address of element `i` as `vec_ptr + VEC_DATA_OFFSET + i * elem_size`, where `VEC_DATA_OFFSET = OBJECT_HEADER_SIZE + 8 = 16` is a global constant. This works as long as every element alignment is ≤ 16, which is satisfied today (max is 8 per §4) and would still be satisfied under any `MAX_ALIGN` ≤ 16.
+Vector micro-ops compute the address of element `i` as `vec_ptr + VEC_DATA_OFFSET + i * elem_size`, where `VEC_DATA_OFFSET = OBJECT_HEADER_SIZE + 8 = 16` is a global constant. This works as long as every element alignment is ≤ 16, which is satisfied today (max is 8 per [§4](#4-primitive-types)) and would still be satisfied under any `MAX_ALIGN` ≤ 16.
 
-If a future change introduces a vector element with alignment > 16 — most plausibly via §8.2's stronger-alignment proposal for `address` / `u256` — the correct data offset becomes `align_up(OBJECT_HEADER_SIZE + 8, elem_align)`, which varies per vector. Unlike struct or enum field offsets — which are baked into each access op at specialization time — vector access uses an indexed pattern (`base + data_offset + i * elem_size`), so the data offset must be expressible as a single value the runtime can use across every elem load, store, push, pop, and growth on a given vector.
+If a future change introduces a vector element with alignment > 16 — most plausibly via [§8.2](#82-stronger-alignment-for-u128--u256--address--signer)'s stronger-alignment proposal for `address` / `u256` — the correct data offset becomes `align_up(OBJECT_HEADER_SIZE + 8, elem_align)`, which varies per vector. Unlike struct or enum field offsets — which are baked into each access op at specialization time — vector access uses an indexed pattern (`base + data_offset + i * elem_size`), so the data offset must be expressible as a single value the runtime can use across every elem load, store, push, pop, and growth on a given vector.
 
 The current micro-op design has no channel for this: `VecLoadElem`, `VecStoreElem`, `VecPushBack`, `VecPopBack`, `AllocVec`, and `GrowVec` all rely on a hardcoded `VEC_DATA_OFFSET`. Bridging the gap would require adding per-vector or per-instruction data-offset metadata, or globally raising `VEC_DATA_OFFSET`, each with its own cost profile.
 

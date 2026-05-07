@@ -24,9 +24,9 @@ use crate::{
     },
 };
 use mono_move_core::{
-    DescriptorId, FrameOffset, Function, CAPTURED_DATA_VALUES_OFFSET,
+    align_max, DescriptorId, FrameOffset, Function, CAPTURED_DATA_VALUES_OFFSET,
     CLOSURE_CAPTURED_DATA_PTR_OFFSET, CLOSURE_OBJECT_SIZE, ENUM_DATA_OFFSET, ENUM_TAG_OFFSET,
-    FRAME_METADATA_SIZE, MAX_ALIGN, OBJECT_HEADER_SIZE, STRUCT_DATA_OFFSET,
+    FRAME_METADATA_SIZE, OBJECT_HEADER_SIZE, STRUCT_DATA_OFFSET,
 };
 use pinned_roots::PinnedRoots;
 use std::ptr::NonNull;
@@ -144,21 +144,6 @@ pub(crate) mod macros {
 /// `DEFAULT_HEAP_SIZE` once heaps become per-context configurable
 /// (likely driven by gas limits).
 const MAX_SINGLE_ALLOCATION_SIZE: usize = DEFAULT_HEAP_SIZE;
-
-/// Round `size` up to the next multiple of `MAX_ALIGN`.
-///
-/// Used by `heap_alloc` so the bump pointer stays `MAX_ALIGN`-aligned
-/// after each allocation — every header lands on an aligned offset and
-/// Cheney's linear scan steps cleanly between objects. See
-/// `docs/memory_alignment.md` (§3.1).
-//
-// TODO: a future change will plumb per-allocation alignment through so
-// that allocations smaller than `MAX_ALIGN` don't pay full padding when
-// `MAX_ALIGN` is raised. Today every primitive ≤ 8-byte aligned, so
-// `MAX_ALIGN`-rounding is exactly right.
-fn align_max(size: usize) -> usize {
-    (size + (MAX_ALIGN - 1)) & !(MAX_ALIGN - 1)
-}
 
 /// True if `bump_ptr + size` still lies within the heap buffer (or one
 /// byte past the end). Compares integer addresses to avoid forming an
@@ -504,7 +489,7 @@ pub(crate) fn gc_collect(
 
             if obj_size == 0 || obj_size != align_max(obj_size) {
                 bail!(
-                    "GC scan: invalid object size {} (expected non-zero, 8-byte aligned)",
+                    "GC scan: invalid object size {} (expected non-zero, MAX_ALIGN-byte aligned)",
                     obj_size
                 );
             }

@@ -8,7 +8,7 @@ use mono_move_core::MAX_ALIGN;
 use std::alloc::{self, Layout};
 
 // ---------------------------------------------------------------------------
-// Aligned buffer — owns a zeroed, `MAX_ALIGN`-aligned allocation
+// Aligned buffer — owns a zeroed, [`MAX_ALIGN`]-aligned allocation
 // ---------------------------------------------------------------------------
 
 pub struct MemoryRegion {
@@ -17,7 +17,7 @@ pub struct MemoryRegion {
 }
 
 impl MemoryRegion {
-    /// Allocates a zeroed, `MAX_ALIGN`-aligned memory region of the given size.
+    /// Allocates a zeroed, [`MAX_ALIGN`]-aligned memory region of the given size.
     ///
     /// OOM is handled by aborting via `handle_alloc_error`.
     pub fn new(size: usize) -> Self {
