@@ -271,12 +271,11 @@ impl KeyLevelConsensusManager {
         match msg {
             JWKConsensusMsg::KeyLevelObservationRequest(request) => {
                 let ObservedKeyLevelUpdateRequest { issuer, kid, .. } = request;
-                let consensus_state = self
+                let response: Result<JWKConsensusMsg> = match self
                     .states_by_key
-                    .entry((issuer.clone(), kid.clone()))
-                    .or_default();
-                let response: Result<JWKConsensusMsg> = match &consensus_state {
-                    ConsensusState::NotStarted => {
+                    .get(&(issuer.clone(), kid.clone()))
+                {
+                    None | Some(ConsensusState::NotStarted) => {
                         debug!(
                             issuer = String::from_utf8(issuer.clone()).ok(),
                             kid = String::from_utf8(kid.clone()).ok(),
@@ -284,8 +283,8 @@ impl KeyLevelConsensusManager {
                         );
                         return Ok(());
                     },
-                    ConsensusState::InProgress { my_proposal, .. }
-                    | ConsensusState::Finished { my_proposal, .. } => Ok(
+                    Some(ConsensusState::InProgress { my_proposal, .. })
+                    | Some(ConsensusState::Finished { my_proposal, .. }) => Ok(
                         JWKConsensusMsg::ObservationResponse(ObservedUpdateResponse {
                             epoch: self.epoch_state.epoch,
                             update: ObservedUpdate {
