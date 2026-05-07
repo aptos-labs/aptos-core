@@ -15,8 +15,9 @@
 //!    weights which drift from real mainnet over time.
 
 use aptos_forge::{
+    args::TransactionTypeArg,
     success_criteria::{StateProgressThreshold, SuccessCriteria},
-    EmitJobMode, EmitJobRequest, ForgeConfig,
+    EmitJobMode, EmitJobRequest, ForgeConfig, TransactionType,
 };
 use aptos_sdk::types::on_chain_config::{OnChainConsensusConfig, OnChainExecutionConfig};
 use aptos_testcases::{
@@ -29,6 +30,37 @@ use aptos_testcases::{
     CompositeNetworkTest,
 };
 use std::{num::NonZeroUsize, sync::Arc, time::Duration};
+
+/// Mainnet-realistic transaction mix. Mainnet's consistent ~0.7 execution
+/// backpressure comes from the mix of light (APT transfer) and heavy
+/// (NFT mint, contention writes, large resource ops) transactions. Plain
+/// p2p transfers don't push validators hard enough on execution time, so
+/// chain stays well under target_block_time_ms and never triggers
+/// `aptos_execution_backpressure_on_proposal_triggered`.
+///
+/// Weights chosen to roughly match observed mainnet activity profile:
+///   60% CoinTransfer        (cheap APT transfers — most of mainnet volume)
+///   20% TokenV2AmbassadorMint (NFT mints — moderate execution cost)
+///   10% ModifyGlobalResource (heavy contention on a shared resource)
+///   10% ResourceGroupsGlobalWriteAndReadTag1KB (large resource ops)
+fn mainnet_realistic_mix() -> Vec<(TransactionType, usize)> {
+    vec![
+        (TransactionTypeArg::CoinTransfer.materialize_default(), 60),
+        (
+            TransactionTypeArg::TokenV2AmbassadorMint.materialize_default(),
+            20,
+        ),
+        (
+            TransactionTypeArg::ModifyGlobalResource.materialize_default(),
+            10,
+        ),
+        (
+            TransactionTypeArg::ResourceGroupsGlobalWriteAndReadTag1KB
+                .materialize_default(),
+            10,
+        ),
+    ]
+}
 
 /// Attempts to match the test name to a mainnet-mirror test.
 pub(crate) fn get_mainnet_mirror_test(test_name: &str, duration: Duration) -> Option<ForgeConfig> {
@@ -70,24 +102,33 @@ fn small_stratified_subset() -> MainnetMirrorSnapshot {
 pub(crate) fn mainnet_mirror_max_load_test(duration: Duration) -> ForgeConfig {
     let snapshot = MainnetMirrorSnapshot::load_embedded()
         .expect("embedded mainnet validator snapshot failed to parse");
-    build_max_load_test(snapshot, duration, 4000, 2000)
+    // Heavy mix lowers achievable TPS but matches mainnet's exec profile and
+    // reliably triggers ~0.7 execution backpressure. min_tps lowered from the
+    // pre-mix 2000 to 700 — heavy txns sustain less throughput than plain
+    // transfers at the same exec headroom.
+    build_max_load_test(snapshot, duration, 2000, 700, true)
 }
 
 /// Small-scale variant of `mainnet_mirror_max_load_test` on the stratified
-/// 21-validator subset. Pairs with `mainnet_mirror_failures_small_test`:
-/// run both back-to-back to validate the multi-region netem plumbing and
-/// then the failpoint-based failure injection on the same validator set.
+/// 21-validator subset. Same heavy mix and TPS targets as the full test —
+/// chain TPS is per-block (same blocks committed regardless of validator
+/// count), so the per-validator exec profile and backpressure dynamics
+/// reproduce on the smaller subset. Pairs with
+/// `mainnet_mirror_failures_small_test` for fast (~10 min) mainnet-shape
+/// validation before committing to the full 30+ min run.
 pub(crate) fn mainnet_mirror_max_load_small_test(duration: Duration) -> ForgeConfig {
-    build_max_load_test(small_stratified_subset(), duration, 200, 100)
+    build_max_load_test(small_stratified_subset(), duration, 2000, 700, true)
 }
 
 /// Shared body of both max-load tests; differs only by snapshot subset, emit
-/// TPS target, and success-criteria TPS floor.
+/// TPS target, success-criteria TPS floor, and whether to use the
+/// mainnet-realistic transaction mix (true = full, false = small).
 fn build_max_load_test(
     snapshot: MainnetMirrorSnapshot,
     duration: Duration,
     emit_tps: usize,
     min_tps: usize,
+    heavy_mix: bool,
 ) -> ForgeConfig {
     let validator_count = snapshot.validator_count();
     let stake_amounts: Vec<u64> = snapshot.stake_amounts();
@@ -121,11 +162,15 @@ fn build_max_load_test(
             MultiRegionNetworkEmulationTest::new_with_config(region_config),
             PerformanceBenchmark,
         ))
-        .with_emit_job(
-            EmitJobRequest::default()
+        .with_emit_job({
+            let mut req = EmitJobRequest::default()
                 .mode(EmitJobMode::ConstTps { tps: emit_tps })
-                .init_gas_price_multiplier(20),
-        )
+                .init_gas_price_multiplier(20);
+            if heavy_mix {
+                req = req.transaction_mix(mainnet_realistic_mix());
+            }
+            req
+        })
         .with_genesis_helm_config_fn(Arc::new(move |helm_values| {
             // Long epoch — keep validator-set stable for the full run so we measure
             // the snapshot-derived shape, not partial-snapshot mid-epoch behavior.
@@ -150,28 +195,40 @@ fn build_max_load_test(
 /// end-to-end in ~10 min before committing to a full 50-min run on the
 /// full 100+ validator snapshot.
 pub(crate) fn mainnet_mirror_failures_small_test(duration: Duration) -> ForgeConfig {
-    build_failures_test(small_stratified_subset(), duration, 200, 100)
+    // Same heavy mix and TPS targets as the full test — small variant is a
+    // mainnet-shape simulator at faster wall-clock, not just a plumbing test.
+    // Chain TPS doesn't scale with validator count (every validator commits
+    // the same blocks), so per-block exec profile and the resulting
+    // backpressure dynamics reproduce on the 21-validator subset.
+    build_failures_test(small_stratified_subset(), duration, 1500, 600, true)
 }
 
 /// Mainnet-mirror with failure-pattern injection. Applies per-validator
 /// failpoints matching each validator's real mainnet `fp_7d_avg` (chronic /
-/// flaky get continuous `consensus::send::any` delay; spike validators get
-/// a one-shot 100%-return failpoint at a randomized offset). Loosens success
-/// criteria modestly to account for the ~0.3-0.5% failed-round rate this
-/// produces.
+/// flaky get continuous targeted-failpoint delay; spike validators get a
+/// one-shot 100%-return failpoint at a randomized offset). Uses the
+/// mainnet-realistic transaction mix so block execution time matches mainnet
+/// and `aptos_execution_backpressure_on_proposal_triggered` activates around
+/// 0.7 the way it does on real mainnet (plain p2p transfers don't push exec
+/// hard enough to trigger backpressure). Loosens success criteria modestly
+/// to account for the ~0.3-0.5% failed-round rate this produces.
 pub(crate) fn mainnet_mirror_failures_test(duration: Duration) -> ForgeConfig {
     let snapshot = MainnetMirrorSnapshot::load_embedded()
         .expect("embedded mainnet validator snapshot failed to parse");
-    build_failures_test(snapshot, duration, 2000, 1500)
+    // min_tps lowered from the pre-mix 1500 to 600 — heavy mix at 0.7
+    // backpressure caps achievable TPS well below the light-mix ceiling.
+    build_failures_test(snapshot, duration, 1500, 600, true)
 }
 
 /// Shared body of both failures tests; differs only by snapshot subset, emit
-/// TPS target, and success-criteria TPS floor.
+/// TPS target, success-criteria TPS floor, and whether to use the
+/// mainnet-realistic transaction mix (true = full, false = small).
 fn build_failures_test(
     snapshot: MainnetMirrorSnapshot,
     duration: Duration,
     emit_tps: usize,
     min_tps: usize,
+    heavy_mix: bool,
 ) -> ForgeConfig {
     let validator_count = snapshot.validator_count();
     let stake_amounts_str = snapshot
@@ -219,11 +276,15 @@ fn build_failures_test(
             // set_failpoint call returns 500 "Failpoints are not enabled at a config level".
             config.api.failpoints_enabled = true;
         }))
-        .with_emit_job(
-            EmitJobRequest::default()
+        .with_emit_job({
+            let mut req = EmitJobRequest::default()
                 .mode(EmitJobMode::ConstTps { tps: emit_tps })
-                .init_gas_price_multiplier(20),
-        )
+                .init_gas_price_multiplier(20);
+            if heavy_mix {
+                req = req.transaction_mix(mainnet_realistic_mix());
+            }
+            req
+        })
         .with_genesis_helm_config_fn(Arc::new(move |helm_values| {
             // Long epoch — same as mainnet_mirror_max_load_test, keeps validator
             // set stable so we measure failure-pattern dynamics not reconfig.
