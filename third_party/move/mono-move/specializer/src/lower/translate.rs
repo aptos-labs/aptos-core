@@ -594,7 +594,7 @@ impl<'a> LoweringState<'a> {
                     let dst = self.ctx.home_slots[i as usize];
                     self.emit_single_move(dst.offset, src);
                 },
-                Slot::Vid(_) => unreachable!("Vid slot in post-allocation IR"),
+                Slot::Vid(_) => bail!("Vid slot in post-allocation IR"),
             }
         }
         Ok(())
