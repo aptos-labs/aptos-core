@@ -178,10 +178,10 @@ mod micro_op {
     /// as `native_run_ops_with_results`.
     fn micro_op_run_ops_with_results(ops: &[u64]) -> Vec<(u64, u64)> {
         let (functions, descriptors) = micro_op_bst();
-        let fn_new = functions[FN_NEW].as_ref().unwrap();
-        let fn_insert = functions[FN_INSERT].as_ref().unwrap();
-        let fn_get = functions[FN_GET].as_ref().unwrap();
-        let fn_remove = functions[FN_REMOVE].as_ref().unwrap();
+        let fn_new = unsafe { functions[FN_NEW].as_ref_unchecked() };
+        let fn_insert = unsafe { functions[FN_INSERT].as_ref_unchecked() };
+        let fn_get = unsafe { functions[FN_GET].as_ref_unchecked() };
+        let fn_remove = unsafe { functions[FN_REMOVE].as_ref_unchecked() };
         let mut exec_ctx = LocalExecutionContext::with_max_budget();
         let mut ctx = InterpreterContext::new(&mut exec_ctx, &descriptors, fn_new);
         let bst = bst_new(&mut ctx, fn_new);

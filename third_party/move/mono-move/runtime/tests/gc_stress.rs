@@ -23,25 +23,13 @@
 
 use mono_move_alloc::GlobalArenaPtr;
 use mono_move_core::{
-    Code, CodeOffset as CO, ExecutableId, FrameLayoutInfo, FrameOffset as FO, Function,
+    Code, CodeOffset as CO, FrameLayoutInfo, FrameOffset as FO, Function, FunctionPtr,
     LocalExecutionContext, MicroOp, SortedSafePointEntries,
 };
 use mono_move_runtime::{
     read_ptr, read_u64, InterpreterContext, ObjectDescriptor, ObjectDescriptorTable,
     VEC_DATA_OFFSET, VEC_LENGTH_OFFSET,
 };
-use move_core_types::account_address::AccountAddress;
-
-static GC_STRESS_MODULE_ID_STORAGE: ExecutableId = unsafe {
-    // SAFETY: the backing `&'static str` outlives the program; the
-    // resulting `GlobalArenaPtr<str>` is valid for that lifetime.
-    ExecutableId::new(
-        AccountAddress::ONE,
-        GlobalArenaPtr::from_static("gc_stress"),
-    )
-};
-const GC_STRESS_MODULE_ID: GlobalArenaPtr<ExecutableId> =
-    GlobalArenaPtr::from_static(&GC_STRESS_MODULE_ID_STORAGE);
 use rand::{rngs::StdRng, Rng, SeedableRng};
 
 // ---------------------------------------------------------------------------
@@ -108,7 +96,7 @@ fn simulate(n: u64, max_len: u64, seed: u64) -> Vec<(u64, Vec<u64>)> {
 fn make_gc_stress_program(
     num_iterations: u64,
     max_len: u64,
-) -> (Vec<Option<Function>>, ObjectDescriptorTable) {
+) -> (Vec<FunctionPtr>, ObjectDescriptorTable) {
     use MicroOp::*;
 
     let mut descriptors = ObjectDescriptorTable::new();
@@ -136,7 +124,7 @@ fn make_gc_stress_program(
         // PC 6: return
         Return,
     ];
-    let callee_func = Function {
+    let callee_ptr = FunctionPtr::new(Box::new(Function {
         name: GlobalArenaPtr::from_static("test"),
         code: Code::from_vec(make_entry_code),
         param_sizes: vec![],
@@ -150,7 +138,7 @@ fn make_gc_stress_program(
             FO(callee_vec_ref),
         ]),
         safe_point_layouts: SortedSafePointEntries::empty(),
-    };
+    }));
 
     // -- Function 0: main --
     let outer_vec: u32 = 0;
@@ -193,7 +181,7 @@ fn make_gc_stress_program(
         // PC 10: write val to callee's argument slot
         Move8 { dst: FO(callee_arg), src: FO(r1) },
         // PC 11: call make_entry (func 1)
-        CallIndirect { executable_id: GC_STRESS_MODULE_ID, func_name: GlobalArenaPtr::from_static("fn_1") },
+        CallDirect { ptr: callee_ptr },
         // After return: entry pointer is at fp+104 (callee's fp+16)
         // PC 12: len = VecLen(outer_vec_ref)
         VecLen { dst: FO(len), vec_ref: FO(outer_vec_ref) },
@@ -232,7 +220,7 @@ fn make_gc_stress_program(
         // PC 26: write val to callee's argument slot
         Move8 { dst: FO(callee_arg), src: FO(r1) },
         // PC 27: call make_entry (func 1) — result becomes garbage
-        CallIndirect { executable_id: GC_STRESS_MODULE_ID, func_name: GlobalArenaPtr::from_static("fn_1") },
+        CallDirect { ptr: callee_ptr },
         // falls through to NEXT
 
         // ---- NEXT (PC 28) ----
@@ -243,7 +231,7 @@ fn make_gc_stress_program(
         // ---- DONE (PC 30) ----
         Return,
     ];
-    let main_func = Function {
+    let main_ptr = FunctionPtr::new(Box::new(Function {
         name: GlobalArenaPtr::from_static("test"),
         code: Code::from_vec(code),
         param_sizes: vec![],
@@ -253,9 +241,9 @@ fn make_gc_stress_program(
         zero_frame: true,
         frame_layout: FrameLayoutInfo::new(vec![FO(outer_vec), FO(outer_vec_ref), FO(entry_ptr)]),
         safe_point_layouts: SortedSafePointEntries::empty(),
-    };
+    }));
 
-    (vec![Some(main_func), Some(callee_func)], descriptors)
+    (vec![main_ptr, callee_ptr], descriptors)
 }
 
 // ---------------------------------------------------------------------------
@@ -300,7 +288,7 @@ fn gc_stress() {
     let mut ctx = InterpreterContext::with_heap_size(
         &mut exec_ctx,
         &descriptors,
-        functions[0].as_ref().unwrap(),
+        unsafe { functions[0].as_ref_unchecked() },
         8 * 1024,
     );
     ctx.set_rng_seed(seed);

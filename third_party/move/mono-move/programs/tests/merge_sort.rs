@@ -23,8 +23,9 @@ mod micro_op {
         let values = shuffled_range(n, 42);
         let (functions, descriptors) = micro_op_merge_sort();
         let mut exec_ctx = LocalExecutionContext::with_max_budget();
-        let mut ctx =
-            InterpreterContext::new(&mut exec_ctx, &descriptors, functions[0].as_ref().unwrap());
+        let mut ctx = InterpreterContext::new(&mut exec_ctx, &descriptors, unsafe {
+            functions[0].as_ref_unchecked()
+        });
         let vec_ptr = ctx
             .alloc_u64_vec(mono_move_core::DescriptorId(0), &values)
             .unwrap();

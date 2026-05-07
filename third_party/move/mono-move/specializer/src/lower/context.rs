@@ -77,8 +77,6 @@ pub struct TypedSlot {
 pub struct CallSiteInfo {
     pub callee_module_id: InternedModuleId,
     pub callee_func_name: InternedIdentifier,
-    /// Module-local handle index of the callee.
-    pub callee_func_id: u32,
     pub arg_slots: Vec<TypedSlot>,
     pub ret_slots: Vec<TypedSlot>,
 }
@@ -198,14 +196,11 @@ pub fn try_build_context(
     let callee_base = frame_data_size + FRAME_METADATA_SIZE as u32;
     let mut call_sites = Vec::new();
     for instr in func_ir.instrs() {
-        let (handle_idx, callee_handle) = match instr {
-            Instr::Call(_, idx, _) => (*idx, module_ir.module.function_handle_at(*idx)),
+        let callee_handle = match instr {
+            Instr::Call(_, idx, _) => module_ir.module.function_handle_at(*idx),
             Instr::CallGeneric(_, idx, _) => {
                 let inst = module_ir.module.function_instantiation_at(*idx);
-                (
-                    inst.handle,
-                    module_ir.module.function_handle_at(inst.handle),
-                )
+                module_ir.module.function_handle_at(inst.handle)
             },
             _ => continue,
         };
@@ -219,12 +214,12 @@ pub fn try_build_context(
         };
         check_supported_alignment(&arg_slots, |s| s.slot.align, "callee arg")?;
         check_supported_alignment(&ret_slots, |s| s.slot.align, "callee ret")?;
+
         let callee_module_id = module_ir.module.module_id_at(callee_handle.module);
         let callee_func_name = module_ir.module.interned_identifier_at(callee_handle.name);
         call_sites.push(CallSiteInfo {
             callee_module_id,
             callee_func_name,
-            callee_func_id: handle_idx.0 as u32,
             arg_slots,
             ret_slots,
         });

@@ -61,12 +61,12 @@ pub fn native_nested_loop(n: u64) -> u64 {
 mod micro_op {
     use mono_move_alloc::GlobalArenaPtr;
     use mono_move_core::{
-        Code, CodeOffset as CO, FrameLayoutInfo, FrameOffset as FO, Function, MicroOp::*,
-        SortedSafePointEntries,
+        Code, CodeOffset as CO, FrameLayoutInfo, FrameOffset as FO, Function, FunctionPtr,
+        MicroOp::*, SortedSafePointEntries,
     };
     use mono_move_runtime::ObjectDescriptorTable;
 
-    pub fn program() -> (Vec<Function>, ObjectDescriptorTable) {
+    pub fn program() -> (Vec<FunctionPtr>, ObjectDescriptorTable) {
         let n = 0u32;
         let sum = 8u32;
         let i = 16u32;
@@ -100,7 +100,7 @@ mod micro_op {
             Return,                                                 // 14
         ];
 
-        let func = Function {
+        let func_ptr = FunctionPtr::new(Box::new(Function {
             name: GlobalArenaPtr::from_static("nested_loop"),
             code: Code::from_vec(code),
             param_sizes: vec![],
@@ -111,9 +111,9 @@ mod micro_op {
             zero_frame: false,
             frame_layout: FrameLayoutInfo::empty(),
             safe_point_layouts: SortedSafePointEntries::empty(),
-        };
+        }));
 
-        (vec![func], ObjectDescriptorTable::new())
+        (vec![func_ptr], ObjectDescriptorTable::new())
     }
 }
 

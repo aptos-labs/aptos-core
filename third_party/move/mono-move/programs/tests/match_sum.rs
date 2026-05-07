@@ -19,7 +19,9 @@ mod micro_op {
     fn run(n: u64) -> u64 {
         let (functions, descriptors) = micro_op_match_sum();
         let mut exec_ctx = LocalExecutionContext::with_max_budget();
-        let mut ctx = InterpreterContext::new(&mut exec_ctx, &descriptors, &functions[0]);
+        let mut ctx = InterpreterContext::new(&mut exec_ctx, &descriptors, unsafe {
+            functions[0].as_ref_unchecked()
+        });
         ctx.set_root_arg(0, &n.to_le_bytes());
         ctx.run().unwrap();
         ctx.root_result()

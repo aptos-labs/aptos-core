@@ -6,22 +6,13 @@
 
 use mono_move_alloc::GlobalArenaPtr;
 use mono_move_core::{
-    Code, ExecutableId, FrameLayoutInfo, FrameOffset as FO, Function, LocalExecutionContext,
+    Code, FrameLayoutInfo, FrameOffset as FO, Function, FunctionPtr, LocalExecutionContext,
     MicroOp, SortedSafePointEntries, FRAME_METADATA_SIZE,
 };
 use mono_move_runtime::{
     read_ptr, read_u64, InterpreterContext, ObjectDescriptor, ObjectDescriptorTable,
     VEC_DATA_OFFSET,
 };
-use move_core_types::account_address::AccountAddress;
-
-static REF_TEST_MODULE_ID_STORAGE: ExecutableId = unsafe {
-    // SAFETY: the backing `&'static str` outlives the program; the
-    // resulting `GlobalArenaPtr<str>` is valid for that lifetime.
-    ExecutableId::new(AccountAddress::ONE, GlobalArenaPtr::from_static("ref_test"))
-};
-const REF_TEST_MODULE_ID: GlobalArenaPtr<ExecutableId> =
-    GlobalArenaPtr::from_static(&REF_TEST_MODULE_ID_STORAGE);
 
 #[test]
 fn ref_basic() {
@@ -163,7 +154,7 @@ fn ref_cross_frame() {
         WriteRef { ref_ptr: FO(c_ref), src: FO(c_val), size: 8 },
         Return,
     ];
-    let callee_func = Function {
+    let callee_ptr = FunctionPtr::new(Box::new(Function {
         name: GlobalArenaPtr::from_static("test"),
         code: Code::from_vec(callee_code),
         param_sizes: vec![],
@@ -173,7 +164,7 @@ fn ref_cross_frame() {
         zero_frame: true,
         frame_layout: FrameLayoutInfo::new(vec![FO(c_ref_base)]),
         safe_point_layouts: SortedSafePointEntries::empty(),
-    };
+    }));
 
     // -- Function 0: main --
     let m_result: u32 = 0;
@@ -196,7 +187,7 @@ fn ref_cross_frame() {
         VecPushBack { vec_ref: FO(m_vec_ref), elem: FO(m_tmp), elem_size: 8, descriptor_id: desc_vec_u64 },
         StoreImm8 { dst: FO(m_idx), imm: 1 },
         VecBorrow { dst: FO(m_callee_ref), vec_ref: FO(m_vec_ref), idx: FO(m_idx), elem_size: 8 },
-        CallIndirect { executable_id: REF_TEST_MODULE_ID, func_name: GlobalArenaPtr::from_static("fn_1") },
+        CallDirect { ptr: callee_ptr },
         VecLoadElem { dst: FO(m_result), vec_ref: FO(m_vec_ref), idx: FO(m_idx), elem_size: 8 },
         Return,
     ];
@@ -212,10 +203,8 @@ fn ref_cross_frame() {
         safe_point_layouts: SortedSafePointEntries::empty(),
     };
 
-    let functions = [Some(main_func), Some(callee_func)];
     let mut exec_ctx = LocalExecutionContext::with_max_budget();
-    let mut ctx =
-        InterpreterContext::new(&mut exec_ctx, &descriptors, functions[0].as_ref().unwrap());
+    let mut ctx = InterpreterContext::new(&mut exec_ctx, &descriptors, &main_func);
     ctx.run().unwrap();
 
     assert_eq!(

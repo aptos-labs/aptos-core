@@ -37,11 +37,9 @@ fn bench_bst(c: &mut Criterion) {
         // TODO: hoist interpreter context setup out of the timed body.
         group.bench_function("micro_op", |b| {
             b.iter(|| {
-                let mut ctx = InterpreterContext::new(
-                    &mut exec_ctx,
-                    &descriptors,
-                    functions[6].as_ref().unwrap(),
-                );
+                let mut ctx = InterpreterContext::new(&mut exec_ctx, &descriptors, unsafe {
+                    functions[6].as_ref_unchecked()
+                });
                 let vec_ptr = ctx
                     .alloc_u64_vec(mono_move_core::DescriptorId(0), &ops)
                     .unwrap();
@@ -51,17 +49,15 @@ fn bench_bst(c: &mut Criterion) {
         });
 
         // with gas instrumentation
-        let (functions, _) = micro_op_bst();
-        let functions_gas = helpers::gas_instrument(&functions);
+        let (functions_gas, _) = micro_op_bst();
+        helpers::gas_instrument(&functions_gas);
         let mut exec_ctx = LocalExecutionContext::with_max_budget();
         // TODO: hoist interpreter context setup out of the timed body.
         group.bench_function("micro_op/gas", |b| {
             b.iter(|| {
-                let mut ctx = InterpreterContext::new(
-                    &mut exec_ctx,
-                    &descriptors,
-                    functions_gas[6].as_ref().unwrap(),
-                );
+                let mut ctx = InterpreterContext::new(&mut exec_ctx, &descriptors, unsafe {
+                    functions_gas[6].as_ref_unchecked()
+                });
                 let vec_ptr = ctx
                     .alloc_u64_vec(mono_move_core::DescriptorId(0), &ops)
                     .unwrap();

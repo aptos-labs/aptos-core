@@ -33,7 +33,9 @@ fn bench_nested_loop(c: &mut Criterion) {
         // TODO: hoist interpreter context setup out of the timed body.
         group.bench_function("micro_op", |b| {
             b.iter(|| {
-                let mut ctx = InterpreterContext::new(&mut exec_ctx, &descriptors, &functions[0]);
+                let mut ctx = InterpreterContext::new(&mut exec_ctx, &descriptors, unsafe {
+                    functions[0].as_ref_unchecked()
+                });
                 ctx.set_root_arg(0, &N.to_le_bytes());
                 ctx.run().unwrap();
                 black_box(ctx.root_result());
@@ -41,18 +43,15 @@ fn bench_nested_loop(c: &mut Criterion) {
         });
 
         // with gas instrumentation
-        let (functions, _) = micro_op_nested_loop();
-        let wrapped = functions.into_iter().map(Some).collect::<Vec<_>>();
-        let functions_gas = helpers::gas_instrument(&wrapped);
+        let (functions_gas, _) = micro_op_nested_loop();
+        helpers::gas_instrument(&functions_gas);
         let mut exec_ctx = LocalExecutionContext::with_max_budget();
         // TODO: hoist interpreter context setup out of the timed body.
         group.bench_function("micro_op/gas", |b| {
             b.iter(|| {
-                let mut ctx = InterpreterContext::new(
-                    &mut exec_ctx,
-                    &descriptors,
-                    functions_gas[0].as_ref().unwrap(),
-                );
+                let mut ctx = InterpreterContext::new(&mut exec_ctx, &descriptors, unsafe {
+                    functions_gas[0].as_ref_unchecked()
+                });
                 ctx.set_root_arg(0, &N.to_le_bytes());
                 ctx.run().unwrap();
                 black_box(ctx.root_result());

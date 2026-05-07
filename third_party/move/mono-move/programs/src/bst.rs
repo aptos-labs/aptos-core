@@ -267,19 +267,10 @@ pub fn native_run_ops_with_results(ops: &[u64]) -> Vec<(u64, u64)> {
 mod micro_op {
     use mono_move_alloc::GlobalArenaPtr;
     use mono_move_core::{
-        Code, CodeOffset as CO, DescriptorId, ExecutableId, FrameLayoutInfo, FrameOffset as FO,
-        Function, MicroOp as Op, MicroOp::*, SortedSafePointEntries, FRAME_METADATA_SIZE,
+        Code, CodeOffset as CO, DescriptorId, FrameLayoutInfo, FrameOffset as FO, Function,
+        FunctionPtr, MicroOp as Op, MicroOp::*, SortedSafePointEntries, FRAME_METADATA_SIZE,
     };
     use mono_move_runtime::{ObjectDescriptor, ObjectDescriptorTable};
-    use move_core_types::account_address::AccountAddress;
-
-    static BST_MODULE_ID_STORAGE: ExecutableId = unsafe {
-        // SAFETY: the backing `&'static str` outlives the program; the
-        // resulting `GlobalArenaPtr<str>` is valid for that lifetime.
-        ExecutableId::new(AccountAddress::ONE, GlobalArenaPtr::from_static("bst"))
-    };
-    const BST_MODULE_ID: GlobalArenaPtr<ExecutableId> =
-        GlobalArenaPtr::from_static(&BST_MODULE_ID_STORAGE);
 
     const NULL: u64 = u64::MAX;
     const NODE_SIZE: u32 = 32;
@@ -295,7 +286,7 @@ mod micro_op {
     pub const FN_GET: usize = 2;
     pub const FN_REMOVE: usize = 4;
 
-    pub fn program() -> (Vec<Option<Function>>, ObjectDescriptorTable) {
+    pub fn program() -> (Vec<FunctionPtr>, ObjectDescriptorTable) {
         let mut descriptors = ObjectDescriptorTable::new();
         // BstMap { nodes, free_list, root }: nodes and free_list are heap pointers.
         let desc_bst_map = descriptors.push(ObjectDescriptor::new_struct(24, vec![0, 8]).unwrap());
@@ -304,15 +295,26 @@ mod micro_op {
             descriptors.push(ObjectDescriptor::new_vector(NODE_SIZE, vec![]).unwrap());
         // Free-list vector: 8-byte trivial elements.
         let desc_free_list_vec = descriptors.push(ObjectDescriptor::new_vector(8, vec![]).unwrap());
+
+        let new_ptr = FunctionPtr::new(Box::new(make_new(desc_bst_map)));
+        let get_ptr = FunctionPtr::new(Box::new(make_get()));
+        let alloc_node_ptr = FunctionPtr::new(Box::new(make_alloc_node(desc_nodes_vec)));
+        let remove_node_ptr = FunctionPtr::new(Box::new(make_remove_node(desc_free_list_vec)));
+        let insert_ptr = FunctionPtr::new(Box::new(make_insert(alloc_node_ptr)));
+        let remove_ptr = FunctionPtr::new(Box::new(make_remove(remove_node_ptr)));
+        let run_ops_ptr = FunctionPtr::new(Box::new(make_run_ops(
+            new_ptr, insert_ptr, get_ptr, remove_ptr,
+        )));
+
         (
             vec![
-                Some(make_new(desc_bst_map)),               // 0
-                Some(make_insert(3)),                       // 1, calls alloc_node at 3
-                Some(make_get()),                           // 2
-                Some(make_alloc_node(desc_nodes_vec)),      // 3
-                Some(make_remove(5)),                       // 4, calls remove_node at 5
-                Some(make_remove_node(desc_free_list_vec)), // 5
-                Some(make_run_ops()),                       // 6
+                new_ptr,         // 0
+                insert_ptr,      // 1
+                get_ptr,         // 2
+                alloc_node_ptr,  // 3
+                remove_ptr,      // 4
+                remove_node_ptr, // 5
+                run_ops_ptr,     // 6
             ],
             descriptors,
         )
@@ -436,7 +438,7 @@ mod micro_op {
     //   [104] metadata (24B)
     //   [128] callee: bst  [136] callee: key  [144] callee: value
     // =================================================================
-    fn make_insert(_alloc_node_id: u32) -> Function {
+    fn make_insert(alloc_node_ptr: FunctionPtr) -> Function {
         let meta = FRAME_METADATA_SIZE as u32;
         let bst = 0u32;
         let key = 8u32;
@@ -468,7 +470,7 @@ mod micro_op {
             Move8 { dst: FO(c0), src: FO(bst) },                                  // 4
             Move8 { dst: FO(c1), src: FO(key) },                                  // 5
             Move8 { dst: FO(c2), src: FO(value) },                                // 6
-            CallIndirect { executable_id: BST_MODULE_ID, func_name: GlobalArenaPtr::from_static("alloc_node") },                                   // 7
+            CallDirect { ptr: alloc_node_ptr },                                                                                                  // 7
             Op::struct_store8(FO(bst), BST_ROOT, FO(c0)),                          // 8
             Return,                                                                // 9
             // -- LOOP_SETUP (10) --
@@ -486,7 +488,7 @@ mod micro_op {
             Move8 { dst: FO(c0), src: FO(bst) },                                  // 14
             Move8 { dst: FO(c1), src: FO(key) },                                  // 15
             Move8 { dst: FO(c2), src: FO(value) },                                // 16
-            CallIndirect { executable_id: BST_MODULE_ID, func_name: GlobalArenaPtr::from_static("alloc_node") },                                   // 17
+            CallDirect { ptr: alloc_node_ptr },                                                                                                  // 17
             Move8 { dst: FO(node_left), src: FO(c0) },                            // 18
             VecStoreElem { vec_ref: FO(nodes_ref), idx: FO(idx),
                            src: FO(node), elem_size: NODE_SIZE },                  // 19
@@ -504,7 +506,7 @@ mod micro_op {
             Move8 { dst: FO(c0), src: FO(bst) },                                  // 25
             Move8 { dst: FO(c1), src: FO(key) },                                  // 26
             Move8 { dst: FO(c2), src: FO(value) },                                // 27
-            CallIndirect { executable_id: BST_MODULE_ID, func_name: GlobalArenaPtr::from_static("alloc_node") },                                   // 28
+            CallDirect { ptr: alloc_node_ptr },                                                                                                  // 28
             Move8 { dst: FO(node_right), src: FO(c0) },                           // 29
             VecStoreElem { vec_ref: FO(nodes_ref), idx: FO(idx),
                            src: FO(node), elem_size: NODE_SIZE },                  // 30
@@ -624,7 +626,7 @@ mod micro_op {
     //   [104] metadata (24B)
     //   [128] callee: bst / result  [136] callee: idx
     // =================================================================
-    fn make_remove(_remove_node_id: u32) -> Function {
+    fn make_remove(remove_node_ptr: FunctionPtr) -> Function {
         let meta = FRAME_METADATA_SIZE as u32;
         let bst = 0u32;
         let key = 8u32;
@@ -671,7 +673,7 @@ mod micro_op {
             // -- EQUAL (15): remove_node(bst, idx) → c0 holds replacement --
             Move8 { dst: FO(c0), src: FO(bst) },                                  // 15
             Move8 { dst: FO(c1), src: FO(idx) },                                  // 16
-            CallIndirect { executable_id: BST_MODULE_ID, func_name: GlobalArenaPtr::from_static("remove_node") },                                  // 17
+            CallDirect { ptr: remove_node_ptr },                                                                                                 // 17
             // -- if parent != NULL → HAS_PARENT --
             JumpLessU64Imm { target: CO(21),
                              src: FO(parent), imm: NULL },                        // 18: → HAS_PARENT
@@ -834,7 +836,12 @@ mod micro_op {
     //   [72] metadata (24 bytes)
     //   [96] c0   [104] c1   [112] c2
     // =================================================================
-    fn make_run_ops() -> Function {
+    fn make_run_ops(
+        new_ptr: FunctionPtr,
+        insert_ptr: FunctionPtr,
+        get_ptr: FunctionPtr,
+        remove_ptr: FunctionPtr,
+    ) -> Function {
         let meta = FRAME_METADATA_SIZE as u32;
         let ops = 0u32;
         let bst = 8u32;
@@ -852,7 +859,7 @@ mod micro_op {
         #[rustfmt::skip]
         let code = vec![
             // -- Create BST --
-            CallIndirect { executable_id: BST_MODULE_ID, func_name: GlobalArenaPtr::from_static("new") },                                  // 0
+            CallDirect { ptr: new_ptr },                                                                                                 // 0
             Move8 { dst: FO(bst), src: FO(c0) },                                 // 1
             // -- Init loop --
             SlotBorrow { dst: FO(ops_ref), local: FO(ops) },                      // 2
@@ -877,7 +884,7 @@ mod micro_op {
             Move8 { dst: FO(c0), src: FO(bst) },                                 // 13
             Move8 { dst: FO(c1), src: FO(key) },                                 // 14
             Move8 { dst: FO(c2), src: FO(value) },                               // 15
-            CallIndirect { executable_id: BST_MODULE_ID, func_name: GlobalArenaPtr::from_static("insert") },                               // 16
+            CallDirect { ptr: insert_ptr },                                                                                              // 16
             Jump { target: CO(5) },                                               // 17
             // CHECK_GET (18)
             JumpGreaterEqualU64Imm { target: CO(24),
@@ -885,14 +892,14 @@ mod micro_op {
             // GET (19)
             Move8 { dst: FO(c0), src: FO(bst) },                                 // 19
             Move8 { dst: FO(c1), src: FO(key) },                                 // 20
-            CallIndirect { executable_id: BST_MODULE_ID, func_name: GlobalArenaPtr::from_static("get") },                                  // 21
+            CallDirect { ptr: get_ptr },                                                                                                 // 21
             Jump { target: CO(5) },                                               // 22
             // skip (23) — padding for alignment, shouldn't be reached
             Jump { target: CO(5) },                                               // 23
             // REMOVE (24)
             Move8 { dst: FO(c0), src: FO(bst) },                                 // 24
             Move8 { dst: FO(c1), src: FO(key) },                                 // 25
-            CallIndirect { executable_id: BST_MODULE_ID, func_name: GlobalArenaPtr::from_static("remove") },                               // 26
+            CallDirect { ptr: remove_ptr },                                                                                              // 26
             Jump { target: CO(5) },                                               // 27
             // DONE (28)
             Return,                                                               // 28
