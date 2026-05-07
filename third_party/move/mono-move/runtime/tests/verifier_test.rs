@@ -300,7 +300,7 @@ fn pointer_slots_overlaps_metadata() {
 }
 
 #[test]
-fn args_and_locals_size_misaligned() {
+fn param_and_local_sizes_sum_misaligned() {
     let arena = ExecutableArena::new();
     // SAFETY: Arena is alive for the duration of the test.
     let func = unsafe {
@@ -308,12 +308,13 @@ fn args_and_locals_size_misaligned() {
             .alloc(Function {
                 name: GlobalArenaPtr::from_static("test"),
                 code: arena.alloc_slice_fill_iter(vec![MicroOp::Return]),
-                args_size: 0,
-                args_and_locals_size: 1, // not a multiple of 8
+                param_sizes: ExecutableArenaPtr::empty_slice(),
+                param_sizes_sum: 0,
+                param_and_local_sizes_sum: 1, // not a multiple of 8
                 extended_frame_size: 32,
                 zero_frame: false,
-                frame_layout: FrameLayoutInfo::empty(&arena),
-                safe_point_layouts: SortedSafePointEntries::empty(&arena),
+                frame_layout: FrameLayoutInfo::empty(),
+                safe_point_layouts: SortedSafePointEntries::empty(),
             })
             .as_ref_unchecked()
     };

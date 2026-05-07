@@ -699,17 +699,18 @@ fn ref_self_copy() {
     let functions = [arena.alloc(Function {
         name: GlobalArenaPtr::from_static("test"),
         code,
-        args_size: 0,
-        args_and_locals_size: 32,
+        param_sizes: ExecutableArenaPtr::empty_slice(),
+        param_sizes_sum: 0,
+        param_and_local_sizes_sum: 32,
         extended_frame_size: 32 + FRAME_METADATA_SIZE,
         zero_frame: false,
-        frame_layout: FrameLayoutInfo::empty(&arena),
-        safe_point_layouts: SortedSafePointEntries::empty(&arena),
+        frame_layout: FrameLayoutInfo::empty(),
+        safe_point_layouts: SortedSafePointEntries::empty(),
     })];
-    let descriptors: Vec<ObjectDescriptor> = vec![];
-    let txn_ctx = NoopTransactionContext;
-    let gas_meter = SimpleGasMeter::new(u64::MAX);
-    let mut ctx = InterpreterContext::new(&txn_ctx, &descriptors, gas_meter, unsafe {
+    let descriptors = ObjectDescriptorTable::new();
+
+    let mut exec_ctx = LocalExecutionContext::with_max_budget();
+    let mut ctx = InterpreterContext::new(&mut exec_ctx, &descriptors, unsafe {
         functions[0].as_ref_unchecked()
     });
     ctx.run().unwrap();
