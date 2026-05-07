@@ -55,8 +55,7 @@ fn mainnet_realistic_mix() -> Vec<(TransactionType, usize)> {
             10,
         ),
         (
-            TransactionTypeArg::ResourceGroupsGlobalWriteAndReadTag1KB
-                .materialize_default(),
+            TransactionTypeArg::ResourceGroupsGlobalWriteAndReadTag1KB.materialize_default(),
             10,
         ),
     ]
@@ -76,21 +75,29 @@ pub(crate) fn get_mainnet_mirror_test(test_name: &str, duration: Duration) -> Op
 /// Stratified 21-validator subset used by the `_small` test variants. Picks
 /// deterministically from the embedded snapshot so both small tests run
 /// against the exact same validator set (one with failure injection, one
-/// without). 4 non-Healthy + 17 Healthy distributed proportional to mainnet
-/// stake fractions; covers all 6 regions.
+/// without).
+///
+/// Region totals (apne1=1, ca=2, eu-central=5, eu-west=9, sa-east=1, us=3)
+/// track mainnet's region-stake proportions for 21 validators. Failure
+/// validators (5 of 21, ~24%, vs ~19% in mainnet) are biased toward
+/// outsized-impact picks: top-stake within each (class, region) bucket means
+/// `(StableChronic, Apne1)` resolves to `val0.apne1-0.mainnet.aptoslabs.com`,
+/// the chronic that authors ~23% of mainnet batches by stake.
 fn small_stratified_subset() -> MainnetMirrorSnapshot {
     use aptos_testcases::mainnet_mirror::{AvailabilityClass::*, Region::*};
     MainnetMirrorSnapshot::load_embedded()
         .expect("embedded mainnet validator snapshot failed to parse")
         .stratified_subset(&[
-            (StableChronic, UsCentral1, 1),
-            (OnlineButFlaky, EuCentral1, 1),
-            (OnlineButFlaky, SaEast1, 1),
-            (EpisodicSpike, EuWest1, 1),
-            (Healthy, Apne1, 1),
+            // 5 failure validators, top-stake within each bucket.
+            (StableChronic, Apne1, 1), // val0.apne1-0 — drives 23% of mainnet batches
+            (OnlineButFlaky, EuCentral1, 1), // bwarelabs
+            (OnlineButFlaky, EuWest1, 1), // bitgo-val1 (top-stake flaky overall)
+            (OnlineButFlaky, SaEast1, 1), // sole sa-east-1 validator
+            (EpisodicSpike, EuWest1, 1), // euwe6-1 (4 of 5 mainnet spikes are eu-west-1)
+            // 16 healthy validators distributed proportional to mainnet region stake.
+            (Healthy, CaCentral1, 2),
             (Healthy, EuCentral1, 4),
             (Healthy, EuWest1, 7),
-            (Healthy, CaCentral1, 2),
             (Healthy, UsCentral1, 3),
         ])
 }
