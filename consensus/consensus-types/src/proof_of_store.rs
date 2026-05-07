@@ -418,6 +418,29 @@ where
     }
 }
 
+impl SignedBatchInfoMsg<BatchInfoExt> {
+    pub fn verify_v2(
+        &self,
+        sender: PeerId,
+        max_num_batches: usize,
+        max_batch_expiry_gap_usecs: u64,
+        validator: &ValidatorVerifier,
+    ) -> anyhow::Result<()> {
+        for signed_info in &self.signed_infos {
+            ensure!(
+                signed_info.batch_info().is_v2(),
+                "Non-V2 entry in SignedBatchInfoMsgV2"
+            );
+        }
+        self.verify(
+            sender,
+            max_num_batches,
+            max_batch_expiry_gap_usecs,
+            validator,
+        )
+    }
+}
+
 impl From<SignedBatchInfoMsg<BatchInfo>> for SignedBatchInfoMsg<BatchInfoExt> {
     fn from(info: SignedBatchInfoMsg<BatchInfo>) -> Self {
         Self {
@@ -623,6 +646,20 @@ where
 
     pub fn take(self) -> Vec<ProofOfStore<T>> {
         self.proofs
+    }
+}
+
+impl ProofOfStoreMsg<BatchInfoExt> {
+    pub fn verify_v2(
+        &self,
+        max_num_proofs: usize,
+        validator: &ValidatorVerifier,
+        cache: &ProofCache,
+    ) -> anyhow::Result<()> {
+        for proof in &self.proofs {
+            ensure!(proof.info().is_v2(), "Non-V2 entry in ProofOfStoreMsgV2");
+        }
+        self.verify(max_num_proofs, validator, cache)
     }
 }
 

@@ -491,6 +491,20 @@ impl<T: TBatchInfo> BatchMsg<T> {
     }
 }
 
+impl BatchMsg<BatchInfoExt> {
+    pub fn verify_v2(
+        &self,
+        peer_id: PeerId,
+        max_num_batches: usize,
+        verifier: &ValidatorVerifier,
+    ) -> anyhow::Result<()> {
+        for batch in self.batches.iter() {
+            ensure!(batch.batch_info().is_v2(), "Non-V2 batch in BatchMsgV2");
+        }
+        self.verify(peer_id, max_num_batches, verifier)
+    }
+}
+
 impl From<BatchMsg<BatchInfo>> for BatchMsg<BatchInfoExt> {
     fn from(msg: BatchMsg<BatchInfo>) -> Self {
         Self {

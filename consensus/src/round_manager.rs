@@ -196,7 +196,7 @@ impl UnverifiedEvent {
             },
             UnverifiedEvent::BatchMsgV2(b) => {
                 if !self_message {
-                    b.verify(peer_id, max_num_batches, validator)?;
+                    b.verify_v2(peer_id, max_num_batches, validator)?;
                     counters::VERIFY_MSG
                         .with_label_values(&["batch_v2"])
                         .observe(start_time.elapsed().as_secs_f64());
@@ -219,7 +219,7 @@ impl UnverifiedEvent {
             },
             UnverifiedEvent::SignedBatchInfoMsgV2(sd) => {
                 if !self_message {
-                    sd.verify(
+                    sd.verify_v2(
                         peer_id,
                         max_num_batches,
                         max_batch_expiry_gap_usecs,
@@ -242,7 +242,7 @@ impl UnverifiedEvent {
             },
             UnverifiedEvent::ProofOfStoreMsgV2(p) => {
                 if !self_message {
-                    p.verify(max_num_batches, validator, proof_cache)?;
+                    p.verify_v2(max_num_batches, validator, proof_cache)?;
                     counters::VERIFY_MSG
                         .with_label_values(&["proof_of_store_v2"])
                         .observe(start_time.elapsed().as_secs_f64());
