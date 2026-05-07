@@ -1,4 +1,4 @@
-// RUN: publish
+// RUN: publish --print(bytecode,stackless,micro-ops)
 module 0xc0ffee::multi_ret_flow {
     fun two_rets(): (u64, u64) {
         (10, 20)

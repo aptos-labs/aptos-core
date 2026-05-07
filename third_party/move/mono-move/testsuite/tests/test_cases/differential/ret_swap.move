@@ -1,4 +1,4 @@
-// RUN: publish
+// RUN: publish --print(bytecode,stackless,micro-ops)
 module 0xc0ffee::ret_swap {
     fun swap_back(a: u64, b: u64): (u64, u64) {
         (b, a)
@@ -6,17 +6,15 @@ module 0xc0ffee::ret_swap {
 
     public fun first(): u64 {
         let (x, _y) = swap_back(11, 22);
-        x // expects 22
+        x
     }
 
     public fun second(): u64 {
         let (_x, y) = swap_back(11, 22);
-        y // expects 11
+        y
     }
 
     public fun second_offset(): u64 {
-        // y - 5 isolates the second ret slot. With cycle handling
-        // working, y = 11 → 6. Without it, y might equal x = 22 → 17.
         let (_x, y) = swap_back(11, 22);
         y - 5
     }

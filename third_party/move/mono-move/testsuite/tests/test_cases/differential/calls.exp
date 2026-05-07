@@ -1,3 +1,4 @@
+=== stackless ===
 // module 0x66::test
 
 fun identity(r0): u64 {
@@ -16,7 +17,6 @@ fun caller(): u64 {
     1: [x0] := call identity, [x0]
     2: ret [x0]
 }
-
 === micro-ops ===
 // module 0x66::test
 

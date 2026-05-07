@@ -1,3 +1,4 @@
+=== stackless ===
 // module 0x66::test
 
 fun three_rets(): u64 * u64 * u64 {
@@ -33,7 +34,6 @@ fun caller(r0) {
     1: [] := call sink, [r0, x1, x2]
     2: ret []
 }
-
 === micro-ops ===
 // module 0x66::test
 

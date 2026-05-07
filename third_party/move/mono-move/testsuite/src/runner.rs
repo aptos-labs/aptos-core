@@ -172,16 +172,21 @@ fn execute_function_v1(
     ) {
         Ok(result) => {
             let num_returns = result.return_values.len();
-            let vals = result
-                .return_values
-                .iter()
-                .map(|(bytes, _layout)| {
-                    let val = u64::from_le_bytes(bytes[..8].try_into().unwrap());
-                    val.to_string()
-                })
-                .collect::<Vec<_>>();
+            let display = if num_returns == 0 {
+                "results:".to_string()
+            } else {
+                let vals = result
+                    .return_values
+                    .iter()
+                    .map(|(bytes, _layout)| {
+                        let val = u64::from_le_bytes(bytes[..8].try_into().unwrap());
+                        val.to_string()
+                    })
+                    .collect::<Vec<_>>();
+                format!("results: {}", vals.join(", "))
+            };
             Output {
-                display: format!("results: {}", vals.join(", ")),
+                display,
                 num_returns,
             }
         },

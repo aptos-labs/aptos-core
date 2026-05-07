@@ -1,3 +1,4 @@
+=== stackless ===
 // module 0x66::borrow_soundness
 
 fun borrow_loc_no_source_subst(r0): u64 {
@@ -58,7 +59,6 @@ fun mut_borrow_kills_reverse(r0): u64 {
     3: write_ref r3, r2
     4: ret [r1]
 }
-
 === micro-ops ===
 // module 0x66::borrow_soundness
 

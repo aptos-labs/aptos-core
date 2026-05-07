@@ -1,4 +1,6 @@
-// RUN: publish
+// Regression: dead-on-arrival ret must cascade later rets to Home (Xfer-prefix invariant).
+
+// RUN: publish --print(stackless,micro-ops)
 module 0x66::xfer_ret_order
 
 fun three_rets(): (u64, u64, u64)

@@ -1,3 +1,4 @@
+=== stackless ===
 // module 0x66::test
 
 fun three_rets(): u64 * u64 * u64 {
@@ -37,6 +38,16 @@ fun caller(r0) {
     3: ret []
 }
 
+fun trigger(): u64 {
+  slots: params(0), locals(1), temps(0), xfer(1)
+    r0: u64
+  code:
+  L0:
+    0: r0 := ld_u64 99
+    1: x0 := mut_borrow_loc r0
+    2: [] := call caller, [x0]
+    3: ret [r0]
+}
 === micro-ops ===
 // module 0x66::test
 
@@ -67,4 +78,13 @@ fun caller() {
     6: Move(16) [64] <- [0]
     7: CallFunc #1
     8: Return
+}
+
+fun trigger() {
+  frame_data_size: 8
+  code:
+    0: StoreImm8 [0] <- #99
+    1: SlotBorrow [32] <- &[0]
+    2: CallFunc #2
+    3: Return
 }

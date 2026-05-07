@@ -25,7 +25,7 @@ module 0xc0ffee::shuffle_args {
         a0: u64, a1: u64, a2: u64, a3: u64, a4: u64,
         a5: u64, a6: u64, a7: u64, a8: u64, a9: u64,
     ): (u64, u64, u64, u64, u64, u64, u64, u64, u64, u64) {
-        // Cycles: (0,3), (2,7), (5,6). Identity at 1, 4, 8, 9.
+        // Cycles (0,3), (2,7), (5,6); identity at 1, 4, 8, 9.
         (a3, a1, a7, a0, a4, a6, a5, a2, a8, a9)
     }
 }

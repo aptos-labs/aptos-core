@@ -1,3 +1,4 @@
+// RUN: publish --print(stackless,micro-ops)
 module 0x66::ret_non_monotonic
 
 fun A(): (u64, u64)
@@ -18,3 +19,9 @@ fun caller(h0: u64, h1: u64): u64
     pop
     call B
     ret
+
+// RUN: execute 0x66::ret_non_monotonic::caller --args 0, 0
+// CHECK: results: 0
+
+// RUN: execute 0x66::ret_non_monotonic::caller --args 5, 7
+// CHECK: results: 0

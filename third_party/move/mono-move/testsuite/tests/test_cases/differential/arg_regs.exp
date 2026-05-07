@@ -1,3 +1,4 @@
+=== stackless ===
 // module 0x66::arg_regs
 
 fun identity(r0): u64 {
@@ -215,7 +216,6 @@ fun no_calls(): u64 {
     0: r0 := ld_u64 99
     1: ret [r0]
 }
-
 === micro-ops ===
 // module 0x66::arg_regs
 

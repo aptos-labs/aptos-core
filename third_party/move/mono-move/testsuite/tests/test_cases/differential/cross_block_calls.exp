@@ -1,3 +1,4 @@
+=== stackless ===
 // module 0x66::test
 
 fun get_val(): u64 {
@@ -33,7 +34,6 @@ fun trigger(r0): u64 {
     4: [x0] := call consume, [x0]
     5: ret [x0]
 }
-
 === micro-ops ===
 // module 0x66::test
 
