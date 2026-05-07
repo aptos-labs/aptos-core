@@ -199,6 +199,13 @@ impl IssuerLevelConsensusManager {
                 version: state.on_chain_version() + 1,
                 jwks,
             };
+            // NOTE: signing `&observed` does not bind `self.epoch_state.epoch`,
+            // so partials collected here remain verifiable in any later epoch
+            // whose validator set still maps the signer addresses to the same
+            // consensus pubkeys. See the residual-risk note in
+            // `validator_txns::jwk::process_jwk_update_inner`.
+            // TODO: sign `(self.epoch_state.epoch, observed)` once the
+            // verification path is updated to match.
             let signature = self
                 .consensus_key
                 .sign(&observed)

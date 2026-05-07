@@ -137,6 +137,24 @@ impl AptosVM {
             .map_err(|_| Expected(NotEnoughVotingPower))?;
 
         // Verify multi-sig.
+        //
+        // NOTE: `observed` (a `ProviderJWKs`) is signed without the producing
+        // epoch, so this verifier accepts any aggregate whose signer set still
+        // maps to current consensus pubkeys — including aggregates whose
+        // partials were formed in a prior epoch. Combined with the strict
+        // `on_chain.version + 1 == observed.version` gate above, the chain can
+        // never be rolled back to a historical snapshot, but a stale snapshot
+        // from a prior epoch can occupy a still-unfilled `current + 1` slot.
+        // Honest validators overwrite within seconds via a `current + 2`
+        // update; the residual harm window is bounded by that landing latency,
+        // and the only attack surface is kids that were present in the stale
+        // snapshot but revoked upstream since then (briefly honored by keyless
+        // auth). The precondition — a quorum-certified update formed but never
+        // landed, with no other update for the same issuer landing since — is
+        // narrow under healthy operation.
+        // TODO: bind the producing epoch into the signed payload (sign and
+        // verify `(epoch, ProviderJWKs)` with `epoch == current_epoch`) so
+        // cached partials cryptographically expire at epoch boundaries.
         verifier
             .verify_multi_signatures(&observed, &multi_sig)
             .map_err(|_| Expected(MultiSigVerificationFailed))?;
