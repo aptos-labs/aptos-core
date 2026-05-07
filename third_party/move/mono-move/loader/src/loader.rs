@@ -30,7 +30,7 @@ use mono_move_core::{
 use mono_move_gas::GasMeter;
 use mono_move_global_context::{
     ArenaRef, ExecutionGuard, FieldLayout, FunctionSlot, LoadedModule, LoadedModuleSlot,
-    MandatoryDependencies, ModuleSlot,
+    ModuleMandatoryDependencies, ModuleSlot,
 };
 use shared_dsa::UnorderedSet;
 use specializer::{
@@ -147,7 +147,7 @@ impl<'guard, 'ctx> Loader<'guard, 'ctx> {
 
         let module = match read_set.get(id) {
             Some(ModuleRead::Loaded { module, state }) => match state {
-                State::ReadyForLoweringAndMetered => module,
+                State::ReadyForLowering => module,
                 State::Metered => {
                     self.ensure_ready_for_lowering(read_set, gas_meter, id, module)?;
                     module
@@ -221,7 +221,9 @@ impl<'guard, 'ctx> Loader<'guard, 'ctx> {
         read_set.record_pending_loading(id)?;
         let module = match self.guard.get_module(id) {
             Some(module) => module,
-            None => self.build_and_insert_module_ir(id, MandatoryDependencies::lazy_unset())?,
+            None => {
+                self.build_and_insert_module_ir(id, ModuleMandatoryDependencies::lazy_unset())?
+            },
         };
 
         read_set.record_ready_for_lowering(id, module)?;
@@ -253,7 +255,7 @@ impl<'guard, 'ctx> Loader<'guard, 'ctx> {
                         self.guard.get_or_create_module_slot(module_id)
                     })
                     .collect::<Vec<_>>();
-                MandatoryDependencies::package(package_slots)
+                ModuleMandatoryDependencies::package(package_slots)
             },
         };
 
@@ -278,7 +280,7 @@ impl<'guard, 'ctx> Loader<'guard, 'ctx> {
         )?;
 
         if let Some(ModuleRead::Loaded { module, state }) = read_set.get(id) {
-            if !matches!(state, State::ReadyForLoweringAndMetered) {
+            if !matches!(state, State::ReadyForLowering) {
                 bail!("Target module is not metered and ready");
             }
             Ok(module)
@@ -300,7 +302,7 @@ impl<'guard, 'ctx> Loader<'guard, 'ctx> {
             None => {
                 read_set.record_pending_loading(id)?;
                 let module =
-                    self.build_and_insert_module_ir(id, MandatoryDependencies::lazy_unset())?;
+                    self.build_and_insert_module_ir(id, ModuleMandatoryDependencies::lazy_unset())?;
                 read_set.record_unmetered(id, module)?;
                 module
             },
@@ -448,7 +450,7 @@ impl<'guard, 'ctx> Loader<'guard, 'ctx> {
     fn build_and_insert_module_ir(
         &self,
         id: ArenaRef<'guard, ExecutableId>,
-        deps: MandatoryDependencies,
+        deps: ModuleMandatoryDependencies,
     ) -> anyhow::Result<&'guard LoadedModule> {
         let (module_ir, cost) = self.get_verified_module_from_storage(id)?;
         self.guard
@@ -472,7 +474,7 @@ impl<'guard, 'ctx> Loader<'guard, 'ctx> {
             let id = self.guard.arena_ref_for_executable_id(slot.id());
             match read_set.get(id) {
                 Some(ModuleRead::Loaded { module, state }) => match state {
-                    State::ReadyForLoweringAndMetered | State::Metered => continue,
+                    State::ReadyForLowering | State::Metered => continue,
                     State::Unmetered => {
                         loading_cost = loading_cost.saturating_add(module.cost());
                         read_set.mark_metered(id)?;
@@ -502,7 +504,9 @@ impl<'guard, 'ctx> Loader<'guard, 'ctx> {
             read_set.record_pending_loading(id)?;
             let module = match slot.get(self.guard) {
                 Some(module) => module,
-                None => self.build_and_insert_module_ir(id, MandatoryDependencies::lazy_unset())?,
+                None => {
+                    self.build_and_insert_module_ir(id, ModuleMandatoryDependencies::lazy_unset())?
+                },
             };
             read_set.record_metered(id, module)?;
             Ok(module)
@@ -554,9 +558,10 @@ impl SpecializerContext for LoweringContext<'_, '_, '_> {
                 self.read_set.record_pending_loading(id)?;
                 let module = match self.loader.guard.get_module(id) {
                     Some(module) => module,
-                    None => self
-                        .loader
-                        .build_and_insert_module_ir(id, MandatoryDependencies::lazy_unset())?,
+                    None => self.loader.build_and_insert_module_ir(
+                        id,
+                        ModuleMandatoryDependencies::lazy_unset(),
+                    )?,
                 };
                 self.read_set.record_unmetered(id, module)?;
                 module

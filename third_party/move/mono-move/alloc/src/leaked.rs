@@ -30,7 +30,7 @@ impl<T> LeakedBoxPtr<T> {
     }
 
     /// Returns the underlying non-null pointer.
-    pub fn as_non_null(self) -> NonNull<T> {
+    pub fn as_non_null(&self) -> NonNull<T> {
         self.0
     }
 

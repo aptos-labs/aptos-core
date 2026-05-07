@@ -86,7 +86,7 @@ fn load_eager_preloads_struct_closure() {
     );
 
     // a's stored MS holds {a, b, c}: filled MS entries include self
-    // (MandatoryDependencies invariant 4, DESIGN.md §3).
+    // (ModuleMandatoryDependencies invariant 4, DESIGN.md §3).
     assert_eq!(
         exec.mandatory_dependencies().slots().len(),
         3,

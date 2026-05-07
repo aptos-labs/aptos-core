@@ -52,7 +52,7 @@ mod executable_ids;
 use executable_ids::ExecutableIdInternerKey;
 mod loaded_module;
 pub use loaded_module::{
-    FunctionSlot, LoadedModule, LoadedModuleSlot, MandatoryDependencies, ModuleSlot,
+    FunctionSlot, LoadedModule, LoadedModuleSlot, ModuleMandatoryDependencies, ModuleSlot,
 };
 mod executable_cache;
 use executable_cache::ExecutableCache;

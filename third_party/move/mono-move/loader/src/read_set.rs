@@ -13,16 +13,16 @@ use shared_dsa::UnorderedMap;
 /// state transitions:
 ///   1. [`State::Unmetered`] can become [`State::Metered`] if gas has been
 ///      charged for the module.
-///   2. [`State::Unmetered`] can become [`State::ReadyForLoweringAndMetered`]
+///   2. [`State::Unmetered`] can become [`State::ReadyForLowering`]
 ///      if gas has been charged for this module, and it is ready for lowering
 ///      (its mandatory dependency set has been computed).
-///   3. [`State::Metered`] can become [`State::ReadyForLoweringAndMetered`] if
+///   3. [`State::Metered`] can become [`State::ReadyForLowering`] if
 ///      the module became ready for lowering.
 #[derive(Copy, Clone, Eq, PartialEq)]
 pub enum State {
     /// This module has been loaded, charged gas and its mandatory dependency
     /// set is known. Function IR can be lowered.
-    ReadyForLoweringAndMetered,
+    ReadyForLowering,
     /// This module has been loaded and charged gas. Lowering of functions is
     /// not yet possible because module's mandatory dependency set has not yet
     /// been computed.
@@ -134,7 +134,7 @@ impl<'guard> ModuleReadSet<'guard> {
     ) -> Result<()> {
         let read = ModuleRead::Loaded {
             module,
-            state: State::ReadyForLoweringAndMetered,
+            state: State::ReadyForLowering,
         };
         let prev = self.inner.insert(id, read);
         match prev {
@@ -144,8 +144,8 @@ impl<'guard> ModuleReadSet<'guard> {
                 module: prev_module,
                 state,
             }) => match state {
-                State::ReadyForLoweringAndMetered => {
-                    bail!("Module is already ready for lowering and metered")
+                State::ReadyForLowering => {
+                    bail!("Module is already ready for lowering")
                 },
                 State::Metered | State::Unmetered => {
                     let prev_ptr = prev_module as *const _;
@@ -168,7 +168,7 @@ impl<'guard> ModuleReadSet<'guard> {
                     *state = State::Metered;
                     Ok(())
                 },
-                State::Metered | State::ReadyForLoweringAndMetered => {
+                State::Metered | State::ReadyForLowering => {
                     bail!("Module is already metered")
                 },
             },
@@ -181,11 +181,10 @@ impl<'guard> ModuleReadSet<'guard> {
     pub fn mark_ready_for_lowering(&mut self, id: ArenaRef<'guard, ExecutableId>) -> Result<()> {
         match self.inner.get_mut(&id) {
             Some(ModuleRead::Loaded { state, .. }) => match state {
-                State::ReadyForLoweringAndMetered | State::Unmetered => {
-                    bail!("Module must be metered and cannot be ready")
-                },
+                State::Unmetered => bail!("Module must be metered"),
+                State::ReadyForLowering => bail!("Module is already ready for lowering"),
                 State::Metered => {
-                    *state = State::ReadyForLoweringAndMetered;
+                    *state = State::ReadyForLowering;
                     Ok(())
                 },
             },

@@ -75,7 +75,7 @@ fn test_out_of_gas_during_load() {
         LoadingPolicy::Lazy(LoweringPolicy::Lazy),
     );
     // 1 gas unit — far below the byte-length cost of any real module.
-    let mut txn_ctx = TransactionContext::new(&guard, loader, SimpleGasMeter::new(1));
+    let mut txn_ctx = TransactionContext::new(loader, SimpleGasMeter::new(1));
 
     let id = guard
         .intern_address_name(&AccountAddress::ONE, ident_str!("test"))

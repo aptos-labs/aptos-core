@@ -21,6 +21,3 @@ specializer = { workspace = true }
 [[bin]]
 name = "mseir-compiler"
 path = "src/bin/mseir-compiler.rs"
-
-[lib]
-doctest = false

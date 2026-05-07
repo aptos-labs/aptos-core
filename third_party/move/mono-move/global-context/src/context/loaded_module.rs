@@ -4,7 +4,7 @@
 //! Loaded module — what the executable cache stores.
 //!
 //! [`LoadedModule`] wraps the polymorphic [`ModuleIR`] with the monomorphic
-//! [`Executable`] and a [`MandatoryDependencies`] descriptor.
+//! [`Executable`] and a [`ModuleMandatoryDependencies`] descriptor.
 
 use crate::context::ExecutionGuard;
 use anyhow::{anyhow, bail};
@@ -71,7 +71,7 @@ pub type LoadedModuleSlot = LeakedBoxPtr<ModuleSlot>;
 /// What a loaded module says about its mandatory dependencies, keyed by the
 /// loading policy that built it.
 #[derive(Clone)]
-pub enum MandatoryDependencies {
+pub enum ModuleMandatoryDependencies {
     /// Cell that may be filled with slots at a later time. Used by all lazy
     /// (LL and EL) policies, and for module loads for lowering (shallow).
     ///
@@ -87,7 +87,7 @@ pub enum MandatoryDependencies {
     Package(Arc<[LoadedModuleSlot]>),
 }
 
-impl MandatoryDependencies {
+impl ModuleMandatoryDependencies {
     /// Slots of the modules this module loaded together with.
     pub fn slots(&self) -> &[LoadedModuleSlot] {
         match self {
@@ -141,7 +141,7 @@ pub struct LoadedModule {
     cost: u64,
     /// Mandatory-dependency descriptor produced by the loader's policy. These
     /// are all modules that have to be loaded together with this module.
-    mandatory_dependencies: MandatoryDependencies,
+    mandatory_dependencies: ModuleMandatoryDependencies,
     /// Per-name slot for the lazily lowered monomorphic functions.
     functions: UnorderedMap<InternedIdentifier, OnceLock<FunctionSlot>>,
     /// Maps function's name to its index in file format (to query its IR).
@@ -152,7 +152,7 @@ impl LoadedModule {
     pub fn new(
         ir: ModuleIR,
         cost: u64,
-        mandatory_dependencies: MandatoryDependencies,
+        mandatory_dependencies: ModuleMandatoryDependencies,
     ) -> Box<Self> {
         let mut functions = UnorderedMap::with_capacity(ir.functions.len());
         let mut function_indices = UnorderedMap::with_capacity(ir.functions.len());
@@ -184,7 +184,7 @@ impl LoadedModule {
     }
 
     /// Returns the mandatory-dependency descriptor.
-    pub fn mandatory_dependencies(&self) -> &MandatoryDependencies {
+    pub fn mandatory_dependencies(&self) -> &ModuleMandatoryDependencies {
         &self.mandatory_dependencies
     }
 

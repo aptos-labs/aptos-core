@@ -202,6 +202,18 @@ pub enum ClosureFuncRef {
     // calls end up using.
 }
 
+impl fmt::Display for ClosureFuncRef {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            ClosureFuncRef::Resolved(ptr) => {
+                let func = unsafe { ptr.as_ref_unchecked() };
+                let func_name = unsafe { func.name.as_ref_unchecked() };
+                write!(f, "Resolved({})", func_name)
+            },
+        }
+    }
+}
+
 /// Operand data for [`MicroOp::PackClosure`].
 ///
 /// Boxed so the micro-op enum stays small despite the variable-length
@@ -447,6 +459,9 @@ pub enum MicroOp {
 
     /// Call a function via direct pointer. Same calling convention as
     /// `CallIndirect`.
+    // TODO: Currently dead code — the specializer never emits this. A follow-up
+    // pass should patch same-module `CallIndirect` sites to `CallDirect` once
+    // the target is known to live in the same module.
     CallDirect { ptr: FunctionPtr },
 
     /// Return from the current function call. The compiler has already
@@ -1053,15 +1068,11 @@ impl fmt::Display for MicroOp {
                 write!(f, "Charge #{}", cost)
             },
             MicroOp::PackClosure(op) => {
-                write!(f, "PackClosure [{}] <- func_ref=", op.dst.0)?;
-                match &op.func_ref {
-                    ClosureFuncRef::Resolved(ptr) => {
-                        let func = unsafe { ptr.as_ref_unchecked() };
-                        let func_name = unsafe { func.name.as_ref_unchecked() };
-                        write!(f, "Resolved({})", func_name)?;
-                    },
-                }
-                write!(f, ", mask={:b}, captured_desc=", op.mask)?;
+                write!(
+                    f,
+                    "PackClosure [{}] <- func_ref={}, mask={:b}, captured_desc=",
+                    op.dst.0, op.func_ref, op.mask
+                )?;
                 match op.captured_data_descriptor_id {
                     Some(id) => write!(f, "{}", id)?,
                     None => write!(f, "<none>")?,

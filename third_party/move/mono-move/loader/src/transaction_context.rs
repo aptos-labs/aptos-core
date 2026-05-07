@@ -10,26 +10,19 @@ use mono_move_core::{
     ExecutionContext, FunctionPtr,
 };
 use mono_move_gas::GasMeter;
-use mono_move_global_context::ExecutionGuard;
 
 /// Per-transaction execution context. Maintains per-transaction state
 /// (gas meter, read-set of loaded modules) and serves the interpreter's
 /// runtime queries against it.
 pub struct TransactionContext<'guard, 'ctx, G: GasMeter> {
-    _guard: &'guard ExecutionGuard<'ctx>,
     loader: Loader<'guard, 'ctx>,
     read_set: ModuleReadSet<'guard>,
     gas_meter: G,
 }
 
 impl<'guard, 'ctx, G: GasMeter> TransactionContext<'guard, 'ctx, G> {
-    pub fn new(
-        guard: &'guard ExecutionGuard<'ctx>,
-        loader: Loader<'guard, 'ctx>,
-        gas_meter: G,
-    ) -> Self {
+    pub fn new(loader: Loader<'guard, 'ctx>, gas_meter: G) -> Self {
         Self {
-            _guard: guard,
             loader,
             read_set: ModuleReadSet::new(),
             gas_meter,

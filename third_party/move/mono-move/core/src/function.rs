@@ -252,7 +252,7 @@ impl FunctionPtr {
     }
 
     /// Returns the underlying non-null pointer.
-    pub fn as_non_null(self) -> NonNull<Function> {
+    pub fn as_non_null(&self) -> NonNull<Function> {
         self.0.as_non_null()
     }
 
