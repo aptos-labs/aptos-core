@@ -18,12 +18,21 @@
 //! messages, they're just slow (slow disk, GC, network jitter). The proposal
 //! IS sent, just late enough that voters time out the round before it arrives.
 //!
-//! We model this with the `consensus::send::any` failpoint in the validator
-//! binary. Probabilistic delay (`X%delay(2000)` via the `fail` crate's
-//! built-in syntax) makes a fraction of consensus sends arrive 2 seconds
-//! late — well past the typical 1-second round timeout. Per-validator delay
-//! percentage is set to that validator's measured `fp_7d_avg × 100`, so each
-//! chronic/flaky validator fails proposals at exactly its mainnet rate.
+//! We model this by setting probabilistic delay (`X%delay(2000)` via the
+//! `fail` crate's built-in syntax) on a list of TARGETED consensus failpoints
+//! covering the leader-side critical path (`broadcast_proposal`,
+//! `broadcast_opt_proposal`, `vote`, `commit_vote`, `order_vote`) and the QS
+//! batch-author critical path (`broadcast_batch`, `signed_batch_info`,
+//! `proof_of_store`). Per-validator delay percentage = `fp_7d_avg × 100`.
+//!
+//! Importantly we do NOT set `consensus::send::any` — that broad failpoint
+//! also fires inside `request_block` (state-sync block retrieval) and inside
+//! every `send_rpc` / `broadcast`. Stacking 2-second delays on state-sync
+//! requests on top of multi-region netem RTT cascaded into stalled state-sync
+//! drivers in the 107-validator full run; ~20 chronic+flaky validators got
+//! permanently stuck at constant version offsets. Restricting to the leader
+//! and QS critical paths preserves the modeling intent ("chronic validators
+//! propose / vote / disseminate batches slowly") without breaking sync.
 //!
 //! Failpoints (vs the previous chaos-mesh `loss` approach) avoid tc-qdisc
 //! conflicts on pods that already carry inter-region netem rules, and apply
@@ -105,9 +114,32 @@ impl Default for FailurePatternConfig {
     }
 }
 
-/// Failpoint name used to inject failure on outbound consensus messages.
-/// Matches `fail_point!("consensus::send::any", ...)` in `consensus/src/network.rs`.
-const SEND_FAILPOINT: &str = "consensus::send::any";
+/// Failpoint names used to inject failure on outbound consensus messages.
+/// Each name matches a `fail_point!(...)` site in `consensus/src/network.rs`.
+///
+/// Covers the leader-side critical path (proposal + voting) and the QS
+/// batch-author path (batch dissemination + proof formation). Excludes the
+/// `consensus::send::any` superset failpoint because it also fires on
+/// `request_block` (state-sync block retrieval) — applying a 2-second delay
+/// there cascades into stalled state-sync drivers under multi-region netem.
+///
+/// Each chronic/flaky validator gets the SAME `X%delay(2000)` action applied
+/// to all of these failpoints. Spike validators get `100%return` applied to
+/// all of them for the spike duration.
+const SEND_FAILPOINTS: &[&str] = &[
+    // Leader-side: proposal broadcast + vote / commit_vote / order_vote sends.
+    "consensus::send::broadcast_proposal",
+    "consensus::send::broadcast_opt_proposal",
+    "consensus::send::vote",
+    "consensus::send::commit_vote",
+    "consensus::send::order_vote",
+    // QS batch-author critical path: dissemination + proof formation.
+    // These drive mainnet's P90 latency (per memory note 2026-05-06,
+    // ~410ms of mainnet's 748ms P90 lives in QS proof assembly).
+    "consensus::send::broadcast_batch",
+    "consensus::send::signed_batch_info",
+    "consensus::send::proof_of_store",
+];
 
 pub struct MainnetMirrorFailureTest {
     snapshot: Arc<MainnetMirrorSnapshot>,
@@ -214,14 +246,16 @@ impl NetworkLoadTest for MainnetMirrorFailureTest {
                     by_class[class_idx].1 += 1;
                     let pct = continuous_delay_pct(entry, self.config.min_continuous_pct);
                     let action = format!("{}%delay({})", pct, self.config.continuous_delay_ms);
-                    if let Err(e) = client
-                        .set_failpoint(SEND_FAILPOINT.to_string(), action.clone())
-                        .await
-                    {
-                        warn!(
-                            "set_failpoint chronic/flaky on {} ({}={}) failed: {:?}",
-                            name, SEND_FAILPOINT, action, e
-                        );
+                    for fp in SEND_FAILPOINTS {
+                        if let Err(e) = client
+                            .set_failpoint(fp.to_string(), action.clone())
+                            .await
+                        {
+                            warn!(
+                                "set_failpoint chronic/flaky on {} ({}={}) failed: {:?}",
+                                name, fp, action, e
+                            );
+                        }
                     }
                     non_spike_peers.push(*peer_id);
                 },
@@ -238,10 +272,11 @@ impl NetworkLoadTest for MainnetMirrorFailureTest {
         );
 
         // Include Healthy + Chronic + Flaky in the emit pool to exercise the
-        // chronic-validator-as-batch-author path that drives mainnet P90 (the
-        // QS proof-formation latency from chronic broadcasts hitting
-        // `consensus::send::any` delay). Spike is excluded — see comment above
-        // about 30s catastrophic-tail outliers.
+        // chronic-validator-as-batch-author path that drives mainnet P90 (chronic
+        // broadcasts hit `consensus::send::broadcast_batch` /
+        // `consensus::send::signed_batch_info` / `consensus::send::proof_of_store`
+        // delays from this test, slowing QS proof formation). Spike is excluded
+        // — see comment above about 30s catastrophic-tail outliers.
         Ok(LoadDestination::Peers(non_spike_peers))
     }
 
@@ -259,17 +294,20 @@ impl NetworkLoadTest for MainnetMirrorFailureTest {
         let validator_clients: Vec<(String, RestClient)> =
             { ctx.swarm.read().await.get_validator_clients_with_names() };
         for (name, client) in &validator_clients {
-            if let Err(e) = client
-                .set_failpoint(SEND_FAILPOINT.to_string(), "off".to_string())
-                .await
-            {
-                warn!("clear failpoint on {} failed: {:?}", name, e);
+            for fp in SEND_FAILPOINTS {
+                if let Err(e) = client
+                    .set_failpoint(fp.to_string(), "off".to_string())
+                    .await
+                {
+                    warn!("clear failpoint {} on {} failed: {:?}", fp, name, e);
+                }
             }
         }
 
         info!(
-            "MainnetMirrorFailureTest: aborted {} spike tasks; cleared {} failpoints",
+            "MainnetMirrorFailureTest: aborted {} spike tasks; cleared {} failpoints across {} validators",
             n,
+            SEND_FAILPOINTS.len(),
             validator_clients.len()
         );
         Ok(())
@@ -293,9 +331,10 @@ fn continuous_delay_pct(entry: &ValidatorEntry, min_pct: u32) -> u32 {
 }
 
 /// Spawn the spike task for a single EpisodicSpike validator. Sleeps for a
-/// random offset within `config.spike_at_offset_secs`, then sets the
-/// `consensus::send::any` failpoint to `100%return` for `spike_pause_secs`,
-/// then turns it off.
+/// random offset within `config.spike_at_offset_secs`, then sets each of the
+/// `SEND_FAILPOINTS` to `100%return` for `spike_pause_secs`, then turns them
+/// off. Targeting the leader + QS critical paths (rather than
+/// `consensus::send::any`) keeps state-sync working through the spike window.
 fn spawn_spike_task(
     name: String,
     client: RestClient,
@@ -316,19 +355,28 @@ fn spawn_spike_task(
         }
         let pause = rand_dur(&mut rng, &config.spike_pause_secs).min(remaining);
 
-        if let Err(e) = client
-            .set_failpoint(SEND_FAILPOINT.to_string(), "100%return".to_string())
-            .await
-        {
-            warn!("spike set_failpoint on {} failed: {:?}", name, e);
+        let mut any_set = false;
+        for fp in SEND_FAILPOINTS {
+            if let Err(e) = client
+                .set_failpoint(fp.to_string(), "100%return".to_string())
+                .await
+            {
+                warn!("spike set_failpoint {} on {} failed: {:?}", fp, name, e);
+            } else {
+                any_set = true;
+            }
+        }
+        if !any_set {
             return;
         }
         tokio::time::sleep(pause).await;
-        if let Err(e) = client
-            .set_failpoint(SEND_FAILPOINT.to_string(), "off".to_string())
-            .await
-        {
-            warn!("spike clear_failpoint on {} failed: {:?}", name, e);
+        for fp in SEND_FAILPOINTS {
+            if let Err(e) = client
+                .set_failpoint(fp.to_string(), "off".to_string())
+                .await
+            {
+                warn!("spike clear_failpoint {} on {} failed: {:?}", fp, name, e);
+            }
         }
     })
 }
