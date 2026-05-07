@@ -14,8 +14,8 @@ This per-function detail is mechanical and tedious to write, dominates the cost 
 The rise of coding agents like Claude Code (\CC) opens further avenues: those systems support exposing tools to the AI (e.g. via the Model Context Protocol, MCP), and a systematic workflow where AI and developers can collaborate and reach agreement on code changes. Moreover, models have become significantly more powerful than they were 3 years ago.
 
 In this paper, we present early work on a novel combination of (a) mechanical spec inference via weakest preconditions analysis (\WP)~\cite{dijkstra1975wp,BL05} and (b) agentic inference guided by a set of skills (English instructions).
-Our ultimate goal is to support a methodology were AI, mechanical deduction, and users can collaborate on creating and verifying Move specifications.
-This paper defines some building blocks on the way to there, focusing on the spec inference aspect.
+Our ultimate goal is to support a methodology where AI, mechanical deduction, and users can collaborate on creating and verifying Move specifications.
+This paper defines some building blocks on the way there, focusing on the spec inference aspect.
 
 Sec.~\ref{sec:wp} describes the analysis: by reusing \MVP's reference-elimination pass~\cite{DillGPQXZ22} (also adopted by Aeneas~\cite{Aeneas}), \WP propagates over a reference-free intermediate form on which classical Dijkstra-style reasoning applies directly, and recovers abort conditions, modifies clauses, and consequence-style postconditions from the bytecode.
 

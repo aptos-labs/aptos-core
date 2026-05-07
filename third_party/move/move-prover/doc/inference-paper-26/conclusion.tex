@@ -8,7 +8,7 @@ While the \WP algorithm is stable and well-tested, the definition of skills and 
 
 \Paragraph{Ordering of Inference Tasks}
 Currently the agent is instructed to walk in a fixed order through the inference tasks of loop invariants, \WP analysis, simplification, and verification.
-This order was determined by experimentation. In one experiment, we first run WP analysis to fix some basic specs, then let the model infer invariants, and then again run WP.
+This order was determined by experimentation. In one experiment, we first ran WP analysis to fix some basic specs, then let the model infer invariants, and then ran WP again.
 The vacuous specifications resulting from this in the first run appeared to be not helpful, and confused the model diverging in unfavourable chains of thoughts.
 
 However, we believe that as workflows as described here become more common and foundation models have them ingested, we should leave the ordering to the planning abilities of the model, and not implement heuristics on top of heuristics.
@@ -74,7 +74,7 @@ To our knowledge, this kind of coding-agent integration has not appeared in prio
 
 We have presented early work on a specification inference tool for the Move Prover that combines a sound, mechanical \WP analysis over Move bytecode with an agentic coding CLI, with the prover serving as the oracle for both signals.
 The two inference streams compose in a single instrumentation pipeline, and the workflow is delivered as a Claude Code plugin --- skills, hooks, and an MCP server --- so that inference runs inside the same conversational loop in which the user is already writing Move.
-The system has been applied to a corpus of canonical Move libraries spanning loops, higher-order functions, arithmetic, references, and global state. Future work will include stabilizing and refining the tool via application to the large corpus of safety relevant Move code used at Aptos for applications like perpetual trading and onchain money management.
+The system has been applied to a corpus of canonical Move libraries spanning loops, higher-order functions, arithmetic, references, and global state. Future work will include stabilizing and refining the tool via application to the large corpus of safety-relevant Move code used at Aptos for applications like perpetual trading and onchain money management.
 
 %%% Local Variables:
 %%% mode: latex

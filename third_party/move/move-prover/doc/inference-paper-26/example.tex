@@ -18,7 +18,7 @@ We look at a simple function to find an element in a vector based on a predicate
   }
 \end{MoveBox}
 
-We now ask Claude Code (\CC) to infer specs for these functions. This will cause it to load a skill which instructs it to create a list of tasks:
+We now ask Claude Code (\CC) to infer specs for this function. This will cause it to load a skill which instructs it to create a list of tasks:
 
 \begin{claude}
 > infer specs for the functions in this package
@@ -56,9 +56,9 @@ The skill defines guidelines on how to do this in Move. For the !find! example, 
   }
 \end{MoveBox}
 
-\noindent Notice the use of behavioral predicates !result_of! and !aborts_of! to access the specification of another function -- in this case the runtime value !pred! \footnote{Specifications with function values are described in \cite{GrieskampEtAl26HO}}. Behavioral predicates are an important feature for specification inference: we can refer to what other functions are doing, abstracting how they are actually doing it, localizing inference to inter-function analysis.
+\noindent Notice the use of behavioral predicates !result_of! and !aborts_of! to access the specification of another function --- in this case the runtime value !pred! \footnote{Specifications with function values are described in \cite{GrieskampEtAl26HO}}. Behavioral predicates are an important feature for specification inference: we can refer to what other functions are doing, abstracting how they are actually doing it, localizing inference to inter-function analysis.
 
-\Paragraph{Infer weakest preconditions}
+\Paragraph{Inferring Weakest Preconditions}
 For this task, \CC calls \MVP's \WP algorithm via its MCP service. For our example, the following code is produced:
 
 \begin{MoveBox}
@@ -181,25 +181,46 @@ Note that below, !num! is Move's unbounded precision signed integer type availab
 
 \SubSection{State-Dependent Inference}
 
-As a final example, we look at a state-dependent problem, where the Move function modifies global storage. This example does not contain loops but illustrates how \WP deals with state.
+As a final example, we look at a state-dependent problem where the Move function modifies global storage at multiple addresses in sequence.
 
 \begin{MoveBox}
   struct Balance has key { v: u64 }
-  fun transfer(from: address, to: address, amount: u64) {
-    Balance[from].v -= amount;
-    Balance[to].v += amount;
-  }
-  spec transfer(from: address, to: address, amount: u64) {
-    modifies Balance[from];
-    modifies Balance[to];
-    aborts_if !exists<Balance>(from);
-    aborts_if !exists<Balance>(to);
-    aborts_if Balance[from].v < amount;
-    aborts_if from != to && Balance[to].v + amount > MAX_U64;
-    ensures from == to ==> Balance[from] == old(Balance[from]);
-    ensures from != to ==> Balance[from].v == old(Balance[from]).v - amount;
-    ensures from != to ==> Balance[to].v == old(Balance[to]).v + amount;
+  fun split_balance(
+        dst1: &signer, dst2: &signer,
+        src: address): u64 {
+    let Balance { v } = move_from<Balance>(src);
+    let half = v / 2;
+    move_to(dst1, Balance { v: half });
+    move_to(dst2, Balance { v: v - half });
+    half
   }
 \end{MoveBox}
 
-\TODO{}{better example which requires state labels -- for this exampleeven though \WP creates state labels, \CC removes them as they are redundant}
+\noindent After running spec inference and simplification we obtain:
+
+\begin{MoveBox}
+  spec split_balance(
+         dst1: &signer, dst2: &signer,
+         src: address): u64 {
+    pragma opaque = true;
+    modifies Balance[src];
+    modifies Balance[signer::address_of(dst1)];
+    modifies Balance[signer::address_of(dst2)];
+    ensures result == old(Balance[src]).v / 2;
+    ensures ..S1 |~ remove<Balance>(src);
+    ensures S1..S2 |~
+      publish<Balance>(signer::address_of(dst1),
+                       Balance{v: old(Balance[src]).v / 2});
+    ensures S2.. |~
+      publish<Balance>(signer::address_of(dst2),
+                       Balance{v: old(Balance[src]).v
+                                  - old(Balance[src]).v / 2});
+    aborts_if !exists<Balance>(src);
+    aborts_if S1 |~
+      exists<Balance>(signer::address_of(dst1));
+    aborts_if S2 |~
+      exists<Balance>(signer::address_of(dst2));
+  }
+\end{MoveBox}
+
+\noindent !S1! and !S2! are state labels naming intermediate memory states --- here, the memory between the !move_from! and the first !move_to!, and between the two !move_to!s, respectively.  The modality !..S1 |~ e!, !S1..S2 |~ e!, !S2.. |~ e! evaluates !e! over the named memory range, while !S |~ e! evaluates at the single state !S!.  The global-memory operators are !publish<R>(addr, val)!, which asserts that resource !R! at !addr! equals !val!, !remove<R>(addr)!, which asserts that no resource of type !R! is present at !addr!, and !exists<R>(addr)!, the standard MSL existence predicate.
