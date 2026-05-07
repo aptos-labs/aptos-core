@@ -2,6 +2,7 @@
 // Licensed pursuant to the Innovation-Enabling Source Code License, available at https://github.com/aptos-labs/aptos-core/blob/main/LICENSE
 
 mod code_cache_tests;
+mod rayon_pool_deadlock;
 
 use crate::{
     code_cache_global_manager::AptosModuleCacheManagerGuard,
