@@ -101,6 +101,17 @@ pub struct FailurePatternConfig {
     /// Floor on continuous-delay percentage applied to chronic/flaky
     /// validators with a missing or zero `fp_7d_avg` in the snapshot.
     pub min_continuous_pct: u32,
+    /// Cap on continuous-delay percentage for the StableChronic class.
+    /// Mainnet's "30% failed_proposals" is a per-leader-slot event count
+    /// (~1 missed proposal per 3 min for hashport-class validators), not a
+    /// 30% per-message dropout rate. Without this cap, mapping
+    /// `fp_7d_avg × 100` directly produces e.g. `30%×delay(2s)` on every
+    /// consensus message — order-of-magnitude over-modeling that cascades
+    /// into leader-reputation suppression of healthy validators (observed
+    /// run 25525952511, val 5/6/15 throttled despite being Healthy class).
+    /// Flaky and Healthy classes are unaffected (flaky `fp_7d_avg` peaks
+    /// around 5% on mainnet, well below this cap).
+    pub max_chronic_continuous_pct: u32,
 }
 
 impl Default for FailurePatternConfig {
@@ -110,6 +121,7 @@ impl Default for FailurePatternConfig {
             spike_at_offset_secs: 60..420,
             spike_pause_secs: 30..90,
             min_continuous_pct: 1,
+            max_chronic_continuous_pct: 8,
         }
     }
 }
@@ -244,7 +256,16 @@ impl NetworkLoadTest for MainnetMirrorFailureTest {
                         1
                     };
                     by_class[class_idx].1 += 1;
-                    let pct = continuous_delay_pct(entry, self.config.min_continuous_pct);
+                    let max_pct = if entry.availability == AvailabilityClass::StableChronic {
+                        self.config.max_chronic_continuous_pct
+                    } else {
+                        99
+                    };
+                    let pct = continuous_delay_pct(
+                        entry,
+                        self.config.min_continuous_pct,
+                        max_pct,
+                    );
                     let action = format!("{}%delay({})", pct, self.config.continuous_delay_ms);
                     for fp in SEND_FAILPOINTS {
                         if let Err(e) = client.set_failpoint(fp.to_string(), action.clone()).await {
@@ -319,12 +340,15 @@ impl NetworkTest for MainnetMirrorFailureTest {
 }
 
 /// Compute the percentage to inject for chronic/flaky validators from the
-/// snapshot's `fp_7d_avg` (a fraction in [0, 1]). Clamped to [min_pct, 99]
-/// since the failpoint engine requires a non-zero, sub-100 percentage.
-fn continuous_delay_pct(entry: &ValidatorEntry, min_pct: u32) -> u32 {
+/// snapshot's `fp_7d_avg` (a fraction in [0, 1]). Clamped to
+/// [`min_pct`, `max_pct`]. Caller passes `max_pct = 99` for flaky and a
+/// lower value (e.g. 8) for chronic so that mainnet's chronic event-rate
+/// failure isn't translated into a per-message dropout rate that would
+/// over-model by an order of magnitude.
+fn continuous_delay_pct(entry: &ValidatorEntry, min_pct: u32, max_pct: u32) -> u32 {
     let fp = entry.fp_7d_avg.unwrap_or(0.0);
     let raw = (fp * 100.0).round() as i64;
-    raw.clamp(min_pct as i64, 99) as u64 as u32
+    raw.clamp(min_pct as i64, max_pct as i64) as u64 as u32
 }
 
 /// Spawn the spike task for a single EpisodicSpike validator. Sleeps for a
@@ -424,17 +448,18 @@ mod tests {
     fn delay_pct_clamped_within_range() {
         // Below the floor: clamps up to min_pct.
         let e = entry(AvailabilityClass::OnlineButFlaky, Some(0.0));
-        assert_eq!(continuous_delay_pct(&e, 1), 1);
+        assert_eq!(continuous_delay_pct(&e, 1, 99), 1);
 
-        // Above 99%: clamps down.
+        // Above max_pct: clamps down.
         let e = entry(AvailabilityClass::StableChronic, Some(1.5));
-        assert_eq!(continuous_delay_pct(&e, 1), 99);
-
-        // Typical chronic and flaky values pass through.
+        assert_eq!(continuous_delay_pct(&e, 1, 99), 99);
+        // Chronic cap (8) clamps a typical mainnet chronic fp_7d_avg.
         let e = entry(AvailabilityClass::StableChronic, Some(0.378));
-        assert_eq!(continuous_delay_pct(&e, 1), 38);
+        assert_eq!(continuous_delay_pct(&e, 1, 8), 8);
+
+        // Flaky's typical mainnet values pass through with max_pct=99.
         let e = entry(AvailabilityClass::OnlineButFlaky, Some(0.033));
-        assert_eq!(continuous_delay_pct(&e, 1), 3);
+        assert_eq!(continuous_delay_pct(&e, 1, 99), 3);
     }
 
     #[test]
