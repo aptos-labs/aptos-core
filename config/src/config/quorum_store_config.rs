@@ -168,7 +168,7 @@ impl Default for QuorumStoreConfig {
             enable_batch_v2_rx: true,
             enable_opt_qs_v2_payload_tx: true,
             enable_opt_qs_v2_payload_rx: true,
-            enable_age_based_pull: true,
+            enable_age_based_pull: false,
         }
     }
 }
