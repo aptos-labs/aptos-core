@@ -494,9 +494,8 @@ mod tests {
         eprintln!("{:#?}", snap);
         let total_octa: u128 = snap.stake_amounts().iter().map(|s| *s as u128).sum();
         eprintln!("total stake: {} APT", total_octa / 100_000_000);
-        // Today: 108 raw entries, 2 in `unknown` region (Kraken pair) → 106 active.
-        // We sanity-check bounds rather than an exact value; the snapshot drifts as
-        // validators join/leave between pulls.
+        // The snapshot drifts as validators join/leave between pulls (current
+        // pull is 107, but we sanity-check bounds rather than an exact value).
         assert!(snap.validator_count() >= 80 && snap.validator_count() <= 200);
         let weights = snap.region_weights();
         let sum: f64 = weights.iter().sum();

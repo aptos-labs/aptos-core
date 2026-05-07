@@ -2,203 +2,164 @@
   {
     "addr": "0xf0d49cff005d03312934ce027e30f4a84143d5af53623b30036e7dac1510c218",
     "addr_prefix8": "f0d49cff",
-    "voting_power": 2582298056355558,
-    "voting_power_apt": 25822980.56355558,
-    "consensus_pubkey": null,
-    "network_addresses": null,
-    "fullnode_addresses": null,
+    "voting_power": 2583994241286853,
+    "voting_power_apt": 25839942.41286853,
     "config": {
       "consensus_pubkey": "0x957ead308d5c803bc86c998c52084da26886b26e9b0faebef4429a96863e072af908f22d78c438135b71c70eaf9d8eb1",
       "fullnode_addresses": "0x014b040221626974676f2d66756c6c312e6d61696e6e65742e6170746f732e7032702e6f726705261807208e2d5ecf7dd92cdf560341d5ad8c8c105b84594bce84754d406b37439ba1924c0800",
       "network_addresses": "0x014a040220626974676f2d76616c312e6d61696e6e65742e6170746f732e7032702e6f7267052418072014d2cd3b78241cdac16644ffdf9157680b8963c18ced41cc7e9a94ea56cbf21d0800",
-      "validator_index": "61"
+      "validator_index": "60"
     },
     "rank": 1
   },
   {
     "addr": "0x2738d91e160d9be37cd9689177546b567e28a3644b702388fd2c2be9c97682de",
     "addr_prefix8": "2738d91e",
-    "voting_power": 2538521090965483,
-    "voting_power_apt": 25385210.90965483,
-    "consensus_pubkey": null,
-    "network_addresses": null,
-    "fullnode_addresses": null,
+    "voting_power": 2539693945358002,
+    "voting_power_apt": 25396939.45358002,
     "config": {
       "consensus_pubkey": "0x94b49ecb8f704b381ac8b81dc528f790ec3835eabf4c9f8f6cbb22f36ba662be0c8ddc4f852489915b361312fb9bba15",
       "fullnode_addresses": "0x014c04022276666e302e65757765322d332e6d61696e6e65742e6170746f736c6162732e636f6d0526180720f5ecdc1d1b575c146d65d9a071c16cce01a24a2f817a53a4b21bebc84ca2317a0800",
       "network_addresses": "0x014b040221766e302e65757765322d332e6d61696e6e65742e6170746f736c6162732e636f6d0524180720f71bcb3cc2e64c542f68d7ec445c9c3e49a11f3ca298ee42973571c8a26ede680800",
-      "validator_index": "96"
+      "validator_index": "95"
     },
     "rank": 2
   },
   {
     "addr": "0x8dd8b23892be142c2ec4b7e1427584c97403e570cde4e6d9a81d2b220c884af5",
     "addr_prefix8": "8dd8b238",
-    "voting_power": 2538514364159059,
-    "voting_power_apt": 25385143.64159059,
-    "consensus_pubkey": null,
-    "network_addresses": null,
-    "fullnode_addresses": null,
+    "voting_power": 2539687178747166,
+    "voting_power_apt": 25396871.78747166,
     "config": {
       "consensus_pubkey": "0x83752349baa30be98bbced42fce88fc8bffb21a7294902424802f845037f6600f17e202cb9eb0867ad9bdcf118fa169c",
       "fullnode_addresses": "0x014c04022276666e302e65757765322d322e6d61696e6e65742e6170746f736c6162732e636f6d0526180720f12a860c702df80f47ba718c015a8a5353a71832d1d61ed08cfbbc7e62d251390800",
       "network_addresses": "0x014b040221766e302e65757765322d322e6d61696e6e65742e6170746f736c6162732e636f6d05241807203d24a5a3c72513c395fa61cacf54ffbbd52de27dd66b0035e528889365175e030800",
-      "validator_index": "54"
+      "validator_index": "53"
     },
     "rank": 3
   },
   {
-    "addr": "0xb3b1719eece4c1bbb074115df8886a133ea863127c77c9f0a5ed5161a4a4393",
-    "addr_prefix8": "b3b1719e",
-    "voting_power": 2046413163232514,
-    "voting_power_apt": 20464131.63232514,
-    "consensus_pubkey": null,
-    "network_addresses": null,
-    "fullnode_addresses": null,
+    "addr": "0xcfb4330556f9e4d3283a944d4c1763113cee40143182e8d874437368bd1b33ba",
+    "addr_prefix8": "cfb43305",
+    "voting_power": 2160740680835059,
+    "voting_power_apt": 21607406.80835059,
     "config": {
-      "consensus_pubkey": "0x821384fd7c75c84ab7bba662288d9d44e46a2e570d7c2b135d16c359b04cadb922ff69f2f0d913f284ac5cd900d662ff",
-      "fullnode_addresses": "0x016704023d66756c6c6e6f64652e65353666323139352d356562342d343865662d393864652d6233303638333737313763322e6170746f732e6269736f6e2e72756e0526180720aac9eec2c0ba71c3aaa602cfe8f3b5817757b340b87d13397b82aa242a05690a0800",
-      "network_addresses": "0x016804023e76616c696461746f722e65353666323139352d356562342d343865662d393864652d6233303638333737313763322e6170746f732e6269736f6e2e72756e05241807209fc4ead27381c1966298f03ed2436dac5b59c350eb973fa923082a4eac8c8d440800",
-      "validator_index": "90"
+      "consensus_pubkey": "0xb200c50a777413c72b638cdff64b04e8134e2454dc152bde6875fc6d67f42fda9c80a2a2cf329671da6982479c24d665",
+      "fullnode_addresses": "0x014c04022276666e302e65757765342d322e6d61696e6e65742e6170746f736c6162732e636f6d0526180720139207ea83b50ff4a62d899b3a883a3f4dc17d1fa1696c0169ee6083f2a9b8320800",
+      "network_addresses": "0x014c04022276616c302e65757765342d322e6d61696e6e65742e6170746f736c6162732e636f6d0524180720a7c69c6a3b7cd4b2be101814d0aa0e6fd203b1b7b3d962e84909200189f4d63c0800",
+      "validator_index": "58"
     },
     "rank": 4
   },
   {
+    "addr": "0xb3b1719eece4c1bbb074115df8886a133ea863127c77c9f0a5ed5161a4a4393",
+    "addr_prefix8": "b3b1719e",
+    "voting_power": 2047706205210857,
+    "voting_power_apt": 20477062.05210857,
+    "config": {
+      "consensus_pubkey": "0x821384fd7c75c84ab7bba662288d9d44e46a2e570d7c2b135d16c359b04cadb922ff69f2f0d913f284ac5cd900d662ff",
+      "fullnode_addresses": "0x016704023d66756c6c6e6f64652e65353666323139352d356562342d343865662d393864652d6233303638333737313763322e6170746f732e6269736f6e2e72756e0526180720aac9eec2c0ba71c3aaa602cfe8f3b5817757b340b87d13397b82aa242a05690a0800",
+      "network_addresses": "0x016804023e76616c696461746f722e65353666323139352d356562342d343865662d393864652d6233303638333737313763322e6170746f732e6269736f6e2e72756e05241807209fc4ead27381c1966298f03ed2436dac5b59c350eb973fa923082a4eac8c8d440800",
+      "validator_index": "89"
+    },
+    "rank": 5
+  },
+  {
     "addr": "0x9bfd93ebaa1efd65515642942a607eeca53a0188c04c21ced646d2f0b9f551e8",
     "addr_prefix8": "9bfd93eb",
-    "voting_power": 1987894599265894,
-    "voting_power_apt": 19878945.99265894,
-    "consensus_pubkey": null,
-    "network_addresses": null,
-    "fullnode_addresses": null,
+    "voting_power": 1981738308993264,
+    "voting_power_apt": 19817383.08993264,
     "config": {
       "consensus_pubkey": "0x8001dc62bc59553db229a04c0a37fbfbbe1245568b70bca598a6610cb98c8deade1a9d272bf15042d1558ec6dafc0228",
       "fullnode_addresses": "0x01530402296170746f732d6d61696e6e65742d76666e332e73657276696365732e6173796d6d65747269632e72650526180720f4da6c0c2c920220b07418e9161071795f2dfd6ea80f799795e68880f79c93430800",
       "network_addresses": "0x01530402296170746f732d6d61696e6e65742d76616c332e73657276696365732e6173796d6d65747269632e726505241807204a94c9dfca6395ed0d4ff7dd6edf30b42054617e4675ee22ebe5fa77215ea05a0800",
       "validator_index": "24"
     },
-    "rank": 5
+    "rank": 6
   },
   {
     "addr": "0x346361873c235e1a300fd67a2e8b7bd1ea3744001b2e0d1942317c4c8521f5dd",
     "addr_prefix8": "34636187",
-    "voting_power": 1765970422142746,
-    "voting_power_apt": 17659704.22142746,
-    "consensus_pubkey": null,
-    "network_addresses": null,
-    "fullnode_addresses": null,
+    "voting_power": 1748019227249839,
+    "voting_power_apt": 17480192.27249839,
     "config": {
       "consensus_pubkey": "0xac36951a1588965a3767fba32dc956ad5dfe0fb6014ff57e9da625024ecd5bf525d640e6c06149157971c266dae7a98e",
       "fullnode_addresses": "0x016604023c6170746f732d6d61696e6e65742d6669676d656e742d64702d76666e2d332e7374616b696e672e70726f64756374696f6e2e6669676d656e742e696f0526180720d8bfdfd70df4cb43d872814c293c66fb6e6df5abdfe25cbc588a3b264dd33b220800",
       "network_addresses": "0x01620402386170746f732d6d61696e6e65742d6669676d656e742d64702d332e7374616b696e672e70726f64756374696f6e2e6669676d656e742e696f05241807207a2bd25fdfc5ad9694a5dd6b4a6c78a71365354300adf335ed6fb771dda0c77d0800",
       "validator_index": "36"
     },
-    "rank": 6
+    "rank": 7
   },
   {
     "addr": "0x30e2f4236a88d2201b9bc27365d8516ab9cb3b53d82cee8c76369a3a01cef6ec",
     "addr_prefix8": "30e2f423",
-    "voting_power": 1716937037276960,
-    "voting_power_apt": 17169370.3727696,
-    "consensus_pubkey": null,
-    "network_addresses": null,
-    "fullnode_addresses": null,
+    "voting_power": 1718222456231032,
+    "voting_power_apt": 17182224.56231032,
     "config": {
       "consensus_pubkey": "0x844496a6257b4b5684498e2befcdc4b4020ec2f71844e01132f0a0a30ab55a2bca35c0adbdaa823604ec3c4b28448db2",
       "fullnode_addresses": "0x014c04022276666e302e65757765342d332e6d61696e6e65742e6170746f736c6162732e636f6d0526180720f23ede6bd52f66400e6ab9c72ed24b7b36275469bc073dbc2a084211496cdd540800",
       "network_addresses": "0x014c04022276616c302e65757765342d332e6d61696e6e65742e6170746f736c6162732e636f6d052418072099d947cb5c4bf269a42eee8c50d8535ee1599b75fec7e76420f17c59d3bc67390800",
-      "validator_index": "57"
-    },
-    "rank": 7
-  },
-  {
-    "addr": "0xf923e8203e8d534c7357e0761179a76d6593e21c53d5f8120044c7d2cc650679",
-    "addr_prefix8": "f923e820",
-    "voting_power": 1546719903271054,
-    "voting_power_apt": 15467199.03271054,
-    "consensus_pubkey": null,
-    "network_addresses": null,
-    "fullnode_addresses": null,
-    "config": {
-      "consensus_pubkey": "0x808136e322f94711cf5b20037fcfc329781d5584439ee43df4c53582278b5ef7c174cdf024681d933b370a784c180617",
-      "fullnode_addresses": "0x014504021b66616c636f6e2e6263792d762e6d6574616c686f7374732e636f6d0526180720abc0bdc9e9bdff91ed6b15c14c801b06cf6242f2f0e065ff653a1249d731943a0800",
-      "network_addresses": "0x014504021b726170746f722e6263792d762e6d6574616c686f7374732e636f6d0524180720b72fc12607fafb1134cebab4cd6349a84b243ab2547080dd11cc520ff9e5427b0800",
-      "validator_index": "71"
+      "validator_index": "56"
     },
     "rank": 8
   },
   {
-    "addr": "0xab4a80ccc772691cb03e3ee8d22b5c13acc92472dd4a19987c1aade2691404a",
-    "addr_prefix8": "ab4a80cc",
-    "voting_power": 1529514201253999,
-    "voting_power_apt": 15295142.01253999,
-    "consensus_pubkey": null,
-    "network_addresses": null,
-    "fullnode_addresses": null,
+    "addr": "0xf923e8203e8d534c7357e0761179a76d6593e21c53d5f8120044c7d2cc650679",
+    "addr_prefix8": "f923e820",
+    "voting_power": 1545874715000579,
+    "voting_power_apt": 15458747.15000579,
     "config": {
-      "consensus_pubkey": "0xa5d1a9397f63c51166932f9be8088d00d947e9e59043c899a8faacd932a7f6cc2103d324b885dc0d5454e6340ae98a0a",
-      "fullnode_addresses": "0x014c04022276666e302e65757765362d312e6d61696e6e65742e6170746f736c6162732e636f6d05261807200c5cfb2a5ff006cb92f2ee8cf438ad8aa6702783acaeab85eb9e4e25596cab4e0800",
-      "network_addresses": "0x014c04022276616c302e65757765362d312e6d61696e6e65742e6170746f736c6162732e636f6d05241807207349d06429b7858f533d1e36520b8556299cef9e4f869f336a76120fb9c472360800",
-      "validator_index": "60"
+      "consensus_pubkey": "0x808136e322f94711cf5b20037fcfc329781d5584439ee43df4c53582278b5ef7c174cdf024681d933b370a784c180617",
+      "fullnode_addresses": "0x014504021b66616c636f6e2e6263792d762e6d6574616c686f7374732e636f6d0526180720abc0bdc9e9bdff91ed6b15c14c801b06cf6242f2f0e065ff653a1249d731943a0800",
+      "network_addresses": "0x014504021b726170746f722e6263792d762e6d6574616c686f7374732e636f6d0524180720b72fc12607fafb1134cebab4cd6349a84b243ab2547080dd11cc520ff9e5427b0800",
+      "validator_index": "70"
     },
     "rank": 9
   },
   {
-    "addr": "0xcfb4330556f9e4d3283a944d4c1763113cee40143182e8d874437368bd1b33ba",
-    "addr_prefix8": "cfb43305",
-    "voting_power": 1466626010798050,
-    "voting_power_apt": 14666260.1079805,
-    "consensus_pubkey": null,
-    "network_addresses": null,
-    "fullnode_addresses": null,
+    "addr": "0xab4a80ccc772691cb03e3ee8d22b5c13acc92472dd4a19987c1aade2691404a",
+    "addr_prefix8": "ab4a80cc",
+    "voting_power": 1530221353794574,
+    "voting_power_apt": 15302213.53794574,
     "config": {
-      "consensus_pubkey": "0xb200c50a777413c72b638cdff64b04e8134e2454dc152bde6875fc6d67f42fda9c80a2a2cf329671da6982479c24d665",
-      "fullnode_addresses": "0x014c04022276666e302e65757765342d322e6d61696e6e65742e6170746f736c6162732e636f6d0526180720139207ea83b50ff4a62d899b3a883a3f4dc17d1fa1696c0169ee6083f2a9b8320800",
-      "network_addresses": "0x014c04022276616c302e65757765342d322e6d61696e6e65742e6170746f736c6162732e636f6d0524180720a7c69c6a3b7cd4b2be101814d0aa0e6fd203b1b7b3d962e84909200189f4d63c0800",
+      "consensus_pubkey": "0xa5d1a9397f63c51166932f9be8088d00d947e9e59043c899a8faacd932a7f6cc2103d324b885dc0d5454e6340ae98a0a",
+      "fullnode_addresses": "0x014c04022276666e302e65757765362d312e6d61696e6e65742e6170746f736c6162732e636f6d05261807200c5cfb2a5ff006cb92f2ee8cf438ad8aa6702783acaeab85eb9e4e25596cab4e0800",
+      "network_addresses": "0x014c04022276616c302e65757765362d312e6d61696e6e65742e6170746f736c6162732e636f6d05241807207349d06429b7858f533d1e36520b8556299cef9e4f869f336a76120fb9c472360800",
       "validator_index": "59"
     },
     "rank": 10
   },
   {
-    "addr": "0x324df1e27c4129a58d73851ae0e9366064dc666a73e747051e203694a4cb257",
-    "addr_prefix8": "324df1e2",
-    "voting_power": 1424513075048597,
-    "voting_power_apt": 14245130.75048597,
-    "consensus_pubkey": null,
-    "network_addresses": null,
-    "fullnode_addresses": null,
-    "config": {
-      "consensus_pubkey": "0x866517eea1372da09adc99e810ab5e94bed852bb81c30600ccf1a1a8d9b9b034a039e594ef410b0b600efb2b246f54e3",
-      "fullnode_addresses": "0x014204021876666e2e6170746f732e7268696e6f7374616b652e636f6d0526180720023c6d9ba8399b0b324d8aab7ddbeb8f076230e7b5500c014e71288e5c0b01070800",
-      "network_addresses": "0x01430402196e6f64652e6170746f732e7268696e6f7374616b652e636f6d052418072072ca8564ccdc59ac0d7a836eae525caa666a0093e00d24d92b82c1ed659505660800",
-      "validator_index": "100"
-    },
-    "rank": 11
-  },
-  {
     "addr": "0x52561f4a14bc0cc48b0e13ce66d1f48dd9a8425ce3dc92046ebbef644dd8fe83",
     "addr_prefix8": "52561f4a",
-    "voting_power": 1416205413647115,
-    "voting_power_apt": 14162054.13647115,
-    "consensus_pubkey": null,
-    "network_addresses": null,
-    "fullnode_addresses": null,
+    "voting_power": 1428372238052405,
+    "voting_power_apt": 14283722.38052405,
     "config": {
       "consensus_pubkey": "0xb633351e4c4e17426b6dddeb7c0e3adf7fd06dca3a06639f6aa4d306ba91c0b61932e25222501ce21c1c11cd33f60c68",
       "fullnode_addresses": "0x014f0402256f72616e67652d6d6f72646f722d34663963622e6170746f732e62646e6f6465732e6e65740526180720ff44aff982e666acc119f80a2087625e0ea3e0b93a8edd4075f621486459fc590800",
       "network_addresses": "0x01520402286372696d736f6e2d73616e746961676f2d30323936362e6170746f732e62646e6f6465732e6e65740524180720fbb0c49e17a474ce9ca4fc3e59f2ac6d15446bf75d37e0a7531ed03b13e0c7330800",
-      "validator_index": "88"
+      "validator_index": "87"
+    },
+    "rank": 11
+  },
+  {
+    "addr": "0x324df1e27c4129a58d73851ae0e9366064dc666a73e747051e203694a4cb257",
+    "addr_prefix8": "324df1e2",
+    "voting_power": 1425171514687282,
+    "voting_power_apt": 14251715.14687282,
+    "config": {
+      "consensus_pubkey": "0x866517eea1372da09adc99e810ab5e94bed852bb81c30600ccf1a1a8d9b9b034a039e594ef410b0b600efb2b246f54e3",
+      "fullnode_addresses": "0x014204021876666e2e6170746f732e7268696e6f7374616b652e636f6d0526180720023c6d9ba8399b0b324d8aab7ddbeb8f076230e7b5500c014e71288e5c0b01070800",
+      "network_addresses": "0x01430402196e6f64652e6170746f732e7268696e6f7374616b652e636f6d052418072072ca8564ccdc59ac0d7a836eae525caa666a0093e00d24d92b82c1ed659505660800",
+      "validator_index": "99"
     },
     "rank": 12
   },
   {
     "addr": "0xa651c7c52d64a2014379902bbc92439d196499bcc36d94ff0395aa45837c66db",
     "addr_prefix8": "a651c7c5",
-    "voting_power": 1371611487669102,
-    "voting_power_apt": 13716114.87669102,
-    "consensus_pubkey": null,
-    "network_addresses": null,
-    "fullnode_addresses": null,
+    "voting_power": 1372845856341697,
+    "voting_power_apt": 13728458.56341697,
     "config": {
       "consensus_pubkey": "0xa7a5b20fb6b827a13d2aeebc347f880592328f995193266f51d1d6c298e753e41fc83b038aaa89b75194d57eb0a77324",
       "fullnode_addresses": "0x012d0400362765230526180720c781cf9e2cb86456c27c222e3ace4c153b2bf1b168a71896784582a06a5457430800",
@@ -208,61 +169,49 @@
     "rank": 13
   },
   {
-    "addr": "0x23ce6b936c6c8e9114950c4bbbd454e1d4c6a4e3842a50e367b9bc0046aacf7b",
-    "addr_prefix8": "23ce6b93",
-    "voting_power": 1368160130012821,
-    "voting_power_apt": 13681601.30012821,
-    "consensus_pubkey": null,
-    "network_addresses": null,
-    "fullnode_addresses": null,
-    "config": {
-      "consensus_pubkey": "0xb7ab91c0ceb50c7557acce6a6702585565674c977bc16b9bfadd93042222d97c6461ac1fff93bed190e4a4b1b5128732",
-      "fullnode_addresses": "0x015904022f76666e5f64702e6170746f732e6d61696e6e65742e72657075626c696363727970746f2d736f757263652e696e666f0526180720f9cf646a9f1cee7afa2c45355cc050bee89df4f59e7659be7dbae84089fb97060800",
-      "network_addresses": "0x015704022d765f64702e6170746f732e6d61696e6e65742e72657075626c696363727970746f2d736f757263652e696e666f05241807208dc81d56e50e7720792c488c194311a426c988e724dc14da008a0e2ed8c9eb2d0800",
-      "validator_index": "92"
-    },
-    "rank": 14
-  },
-  {
     "addr": "0xd7b10a9ddee853b3585dd1efd4902ab3ad4f482b94425a3780cc39e79e6d398",
     "addr_prefix8": "d7b10a9d",
-    "voting_power": 1328554244259450,
-    "voting_power_apt": 13285542.4425945,
-    "consensus_pubkey": null,
-    "network_addresses": null,
-    "fullnode_addresses": null,
+    "voting_power": 1337427517081583,
+    "voting_power_apt": 13374275.17081583,
     "config": {
       "consensus_pubkey": "0xb0237037c801c85e3b833e2e3c9e80a6143154876a81837fe3c34a393302be3ab27aa63ddcdacfe7bdc932da648e7535",
       "fullnode_addresses": "0x012d04002fee2d430526180720e7fadd82412a07342e97a8ed184fc6ed215951d83591761c32c37a81441491640800",
       "network_addresses": "0x012d04002ff276420524180720ea346bc8e2c658c7f2502125dfa83ab7328661b8747ee9a4103eb4580c9ffb7c0800",
       "validator_index": "34"
     },
-    "rank": 15
+    "rank": 14
   },
   {
     "addr": "0x4b187c13fa53cd3ee9a964641bf53eabd89c5e7378ea2266cfab186f066c1815",
     "addr_prefix8": "4b187c13",
-    "voting_power": 1317096721419805,
-    "voting_power_apt": 13170967.21419805,
-    "consensus_pubkey": null,
-    "network_addresses": null,
-    "fullnode_addresses": null,
+    "voting_power": 1317707967046262,
+    "voting_power_apt": 13177079.67046262,
     "config": {
       "consensus_pubkey": "0x91e0df322c7bdc34dec7a2024d61cb6535b41a5b546ed0cd7dc8f49d4aa462c1afda6563668bfe596578654bbfe45e08",
       "fullnode_addresses": "0x016504023b6170746f732d2d6d61696e6e65742d2d76666e2d2d6170746f732d31612e7374616b696e672e70726f64756374696f6e2e6669676d656e742e696f05261807209de615e17aa3a7a06c59077db87eb440c29077361154f36bcd0e38da2f3dc36c0800",
       "network_addresses": "0x016404023a6170746f732d2d6d61696e6e65742d2d64702d2d6170746f732d31612e7374616b696e672e70726f64756374696f6e2e6669676d656e742e696f0524180720cb0bf96e27c5e519210acbca9aef1a1cd0b329ad7b966f3db1d867b344fac3620800",
-      "validator_index": "82"
+      "validator_index": "81"
+    },
+    "rank": 15
+  },
+  {
+    "addr": "0x23ce6b936c6c8e9114950c4bbbd454e1d4c6a4e3842a50e367b9bc0046aacf7b",
+    "addr_prefix8": "23ce6b93",
+    "voting_power": 1306079722240491,
+    "voting_power_apt": 13060797.22240491,
+    "config": {
+      "consensus_pubkey": "0xb7ab91c0ceb50c7557acce6a6702585565674c977bc16b9bfadd93042222d97c6461ac1fff93bed190e4a4b1b5128732",
+      "fullnode_addresses": "0x015904022f76666e5f64702e6170746f732e6d61696e6e65742e72657075626c696363727970746f2d736f757263652e696e666f0526180720f9cf646a9f1cee7afa2c45355cc050bee89df4f59e7659be7dbae84089fb97060800",
+      "network_addresses": "0x015704022d765f64702e6170746f732e6d61696e6e65742e72657075626c696363727970746f2d736f757263652e696e666f05241807208dc81d56e50e7720792c488c194311a426c988e724dc14da008a0e2ed8c9eb2d0800",
+      "validator_index": "91"
     },
     "rank": 16
   },
   {
     "addr": "0xdb5247f859ce63dbe8940cf8773be722a60dcc594a8be9aca4b76abceb251b8e",
     "addr_prefix8": "db5247f8",
-    "voting_power": 1249069517812054,
-    "voting_power_apt": 12490695.17812054,
-    "consensus_pubkey": null,
-    "network_addresses": null,
-    "fullnode_addresses": null,
+    "voting_power": 1246201037751865,
+    "voting_power_apt": 12462010.37751865,
     "config": {
       "consensus_pubkey": "0x8dd8153fda57e5d0acb2ffa887fe3c9bf0fa6dc4a89c87d4e14883bddafc96317f282a3b7fbb8012505f1013949a7105",
       "fullnode_addresses": "0x014c0402226170746f732d6d61696e2d706f6f6c2d66756c6c2e657665727374616b652e6f6e6505261807200cb28e7d3cef7ad977e38894be05ab4a158e907456c6a4d2ee88fef484bcf8740800",
@@ -274,75 +223,60 @@
   {
     "addr": "0xc32f662cd9718f02d8a8e5628f8f642fa27cd9b5f457b406ed734901a4939e34",
     "addr_prefix8": "c32f662c",
-    "voting_power": 1207701916879935,
-    "voting_power_apt": 12077019.16879935,
-    "consensus_pubkey": null,
-    "network_addresses": null,
-    "fullnode_addresses": null,
+    "voting_power": 1208258426824496,
+    "voting_power_apt": 12082584.26824496,
     "config": {
       "consensus_pubkey": "0xb9875cecb4588e06d3db277beda15e7ab8a2931372ff2049a8bcc5ca0c607bfc2e2aa250b8dbef916d374f74d34f6c3e",
       "fullnode_addresses": "0x013e0402146170746f732d76666e2e7374616b656c792e696f05261807205a86c97203a41684739f42733727d79a1390579f1ac460b453b752a8ccdc8c460800",
       "network_addresses": "0x014404021a6170746f732d76616c696461746f722e7374616b656c792e696f0524180720796e34b3ffbd8396ad4ade8e397420bad3b5c49dee20a1dbcf8e6256105a1a2a0800",
-      "validator_index": "99"
+      "validator_index": "98"
     },
     "rank": 18
   },
   {
     "addr": "0x61b64e39286bf11cd642f03417ab725f15a09dcbf8be23b752851c3c33e74d7b",
     "addr_prefix8": "61b64e39",
-    "voting_power": 1190368275916020,
-    "voting_power_apt": 11903682.7591602,
-    "consensus_pubkey": null,
-    "network_addresses": null,
-    "fullnode_addresses": null,
+    "voting_power": 1190555802985816,
+    "voting_power_apt": 11905558.02985816,
     "config": {
       "consensus_pubkey": "0x91ae755fd2bd85b8a127e0178ba1bde21592e158406c39cd76068d4ed272c308cab82f18fe4dd1014296c627aa170f3c",
       "fullnode_addresses": "0x01530402296170746f732d6c617469747564652d6d6e2d66756c6c2d6e6f64652e6e6f646578706572742e78797a05261807202cb747005f45afb3aae9f6ed8bb0459e075d34c8be06119839388055090e02560800",
       "network_addresses": "0x01530402296170746f732d6c617469747564652d6d6e2d76616c696461746f722e6e6f646578706572742e78797a0524180720200d44c9c4d59e68fa18d44cf0a8b32878338f1b39d38f65a86df689c8e5cd1f0800",
-      "validator_index": "83"
+      "validator_index": "82"
     },
     "rank": 19
   },
   {
     "addr": "0x20ae7e67009dbc40e5a0c68e99c4287e2764fe22d135bcd318100de1b7950c28",
     "addr_prefix8": "20ae7e67",
-    "voting_power": 1163379183985917,
-    "voting_power_apt": 11633791.83985917,
-    "consensus_pubkey": null,
-    "network_addresses": null,
-    "fullnode_addresses": null,
+    "voting_power": 1163875549576413,
+    "voting_power_apt": 11638755.49576413,
     "config": {
       "consensus_pubkey": "0x8986d56c7b1b3832104b829480ea5615bd4d46345e2bdd9d08e0ccdd3c9ef0bd87dafd8cf38df136f96508a6d70930ee",
       "fullnode_addresses": "0x012d04005e9ef2c0052618072035627643bd58f66d1a9a0f95c95eedeb93017f793aa54a6a3c901a58dae7c1400800",
       "network_addresses": "0x012d04005e9ef2c00524180720caeebc8f9c9321075b94aabff7fe3800e7d5dcc8aee713798f746648db54530f0800",
-      "validator_index": "67"
+      "validator_index": "66"
     },
     "rank": 20
   },
   {
     "addr": "0x3eaf3ebc49555c705c34ec1ffe77404bdb7383b388476c36538b92b7b1b806c9",
     "addr_prefix8": "3eaf3ebc",
-    "voting_power": 1079470568013970,
-    "voting_power_apt": 10794705.6801397,
-    "consensus_pubkey": null,
-    "network_addresses": null,
-    "fullnode_addresses": null,
+    "voting_power": 1079962102656567,
+    "voting_power_apt": 10799621.02656567,
     "config": {
       "consensus_pubkey": "0xa43ea6c2d3b5c6d87b51506aa1b7d477936aca06f7b3e7d68c4e839bf97a2360331e74c0eac41f0eb2d2971b28793554",
       "fullnode_addresses": "0x014c04022276666e302e61706e65312d302e6d61696e6e65742e6170746f736c6162732e636f6d0526180720537c398001a4d903f86739307979c688cd49032ca980584fa1f62f1cb6e781480800",
       "network_addresses": "0x014c04022276616c302e61706e65312d302e6d61696e6e65742e6170746f736c6162732e636f6d05241807209fcf681bf5b6f5d6a03e4ce4b0a28bbfea1a4bd390412432c09937b731596d550800",
-      "validator_index": "107"
+      "validator_index": "106"
     },
     "rank": 21
   },
   {
     "addr": "0x9c721c79ee082aafcdd99b1a71a833accdc48dba1a9a1bc5b5f8cc47ff7d49c0",
     "addr_prefix8": "9c721c79",
-    "voting_power": 1076932333309161,
-    "voting_power_apt": 10769323.33309161,
-    "consensus_pubkey": null,
-    "network_addresses": null,
-    "fullnode_addresses": null,
+    "voting_power": 1077429006743290,
+    "voting_power_apt": 10774290.0674329,
     "config": {
       "consensus_pubkey": "0x84dbf552edeffed075c7198fa159fbd084f7567c746bb039027d04e5ed18abe86b13996837b1479b6235b5236509be42",
       "fullnode_addresses": "0x016704023d66756c6c6e6f64652e64653635393535322d613966322d346364612d393964632d3161313138656234303732382e6170746f732e6269736f6e2e72756e0526180720dc9ab6f7d07c3ccd37034e965ce2c26faddf2377dfa194e948418f1b6d09264c0800",
@@ -354,43 +288,34 @@
   {
     "addr": "0xc84eb99fa08a8dbae9cf8be48b312a946c7cb5f4d109c59b49aa3d446180034e",
     "addr_prefix8": "c84eb99f",
-    "voting_power": 1038103568737187,
-    "voting_power_apt": 10381035.68737187,
-    "consensus_pubkey": null,
-    "network_addresses": null,
-    "fullnode_addresses": null,
+    "voting_power": 1040453859773749,
+    "voting_power_apt": 10404538.59773749,
     "config": {
       "consensus_pubkey": "0x8e493fb6dabe8d1626ad42066e5233ff8433adb3eab2759e84d42e04555b1434c5ef12fa11e37570d322a3bc86cbdd3a",
       "fullnode_addresses": "0x014404021a76666e2e6170746f732e626c6f636b6875626c6162732e636f6d0526180720dca994991a8dae78edf4ac4a1de95be376a401e3decada1f292f6b3555fb9c220800",
       "network_addresses": "0x014a04022076616c696461746f722e6170746f732e626c6f636b6875626c6162732e636f6d052418072059f6f3089d631d08a3a209cc893a8d73a9aa371f72e63de47cb91ec64a000d760800",
-      "validator_index": "80"
+      "validator_index": "79"
     },
     "rank": 23
   },
   {
     "addr": "0x880cb2b03f4158dc927fe6058c5b968636932d49fa1d2896a86bd849456455c7",
     "addr_prefix8": "880cb2b0",
-    "voting_power": 1037829043392192,
-    "voting_power_apt": 10378290.43392192,
-    "consensus_pubkey": null,
-    "network_addresses": null,
-    "fullnode_addresses": null,
+    "voting_power": 1037890223806897,
+    "voting_power_apt": 10378902.23806897,
     "config": {
       "consensus_pubkey": "0xb7dc8b3bcc1daa12536f042cf2de7f922ae920e5000499e3476ab74f73a8bb26682a4531351fb7cb3292fd1e0656b806",
       "fullnode_addresses": "0x014704021d73656375726974697a652d76666e2e73656e7365696e6f64652e636f6d0526180720d01d5afab9a0f07ae8f656c57f266d5e3dabb7e1e567d16024d35173fb8be5520800",
       "network_addresses": "0x014704021d73656375726974697a652d76616c2e73656e7365696e6f64652e636f6d052418072079afce6a1f2cf113e01ffce73170834dcdf47247349f78df2ebbcbd31deaf53d0800",
-      "validator_index": "50"
+      "validator_index": "49"
     },
     "rank": 24
   },
   {
     "addr": "0xd89481a2f4ff5598f8a6e83e67f21dba6a0df56a1bc35b9c67a2de6dce166b30",
     "addr_prefix8": "d89481a2",
-    "voting_power": 1025498007902719,
-    "voting_power_apt": 10254980.07902719,
-    "consensus_pubkey": null,
-    "network_addresses": null,
-    "fullnode_addresses": null,
+    "voting_power": 1025972390493515,
+    "voting_power_apt": 10259723.90493515,
     "config": {
       "consensus_pubkey": "0x8719d00e59db5ce1083593ec819b832dc325ba72e2f349885e7690b82a2eed6f8fb5230c86f38910bc5d6f703ec7fbe0",
       "fullnode_addresses": "0x012d0400224e3a130526180720963a52b99f2aa8931bfa949f6d006d674bb0fcff945f4cd22e2974ad1862230f0800",
@@ -402,187 +327,151 @@
   {
     "addr": "0x33f0c333f6fcb9d1ef54d54093f0482b31bb0bdcd34bfa446e7416ff930453c0",
     "addr_prefix8": "33f0c333",
-    "voting_power": 1022918198096122,
-    "voting_power_apt": 10229181.98096122,
-    "consensus_pubkey": null,
-    "network_addresses": null,
-    "fullnode_addresses": null,
+    "voting_power": 1023425912716231,
+    "voting_power_apt": 10234259.12716231,
     "config": {
       "consensus_pubkey": "0xb47e1dc1335be93aa7e39ddc83301d52fd354e37e0a7d1b23bb158278fc0e8ed36d3df31889681b563a38d545b36bbc2",
       "fullnode_addresses": "0x014b04022176666e2d74662e6170746f732d6d61696e6e65742e7477696e7374616b652e696f0526180720a79f03f5af1f73053ee05112a0c2831845ad55112907e8e37ca4a81444e504290800",
       "network_addresses": "0x014a040220766e2d74662e6170746f732d6d61696e6e65742e7477696e7374616b652e696f0524180720f23a9f0e226de5ab8982cd1f43be8e3f03d52823f6e69fc06243ef12e610e3670800",
-      "validator_index": "49"
+      "validator_index": "48"
     },
     "rank": 26
   },
   {
+    "addr": "0x3edbf3e6444054c2a5a391221c9023882d0b2478576c445923a39b3bd0cde0a3",
+    "addr_prefix8": "3edbf3e6",
+    "voting_power": 1009503311584143,
+    "voting_power_apt": 10095033.11584143,
+    "config": {
+      "consensus_pubkey": "0xb3f3ebedd8b3ba81da2697c4a4835949538ae73d427e8bff23c69e7eb8af2a5a394a05bd85e7b9f74b90ba2f90e85ddf",
+      "fullnode_addresses": "0x01400402166170746f732d76666e2d332e616c636f76652e70726f0526180720249185fc610dc89021028c80115b51eea6dc449cc53b3c92e44c306f792bfd210800",
+      "network_addresses": "0x014604021c6170746f732d76616c696461746f722d332e616c636f76652e70726f0524180720983194f5774ba7b0e31be20a3985c30f192dfdd4c2ab3a2e5b5d20f7e4ac07270800",
+      "validator_index": "46"
+    },
+    "rank": 27
+  },
+  {
     "addr": "0xf1f6f780321e7259d0feeef98745da7f766eace664c43325779302b2724c8692",
     "addr_prefix8": "f1f6f780",
-    "voting_power": 1009188386002918,
-    "voting_power_apt": 10091883.86002918,
-    "consensus_pubkey": null,
-    "network_addresses": null,
-    "fullnode_addresses": null,
+    "voting_power": 1009474306605303,
+    "voting_power_apt": 10094743.06605303,
     "config": {
       "consensus_pubkey": "0x8628a6924279ab4ba35cdd1e4cb887c6059804eca72c2a11b5cc15fd888b5b5aa67d8dac468b18ac415d09e4789d8074",
       "fullnode_addresses": "0x012d040048fb07c0052618072094f89efb818a447be66ec393964f89b870698cf3b9948d9f6d82de7b5621334f0800",
       "network_addresses": "0x012d040048fb07710524180720f6ba21acc0d9da4f808ba7566e152a457ba4781cc06cd5586d6cf950a9e918290800",
       "validator_index": "41"
     },
-    "rank": 27
-  },
-  {
-    "addr": "0x3edbf3e6444054c2a5a391221c9023882d0b2478576c445923a39b3bd0cde0a3",
-    "addr_prefix8": "3edbf3e6",
-    "voting_power": 1009038229377668,
-    "voting_power_apt": 10090382.29377668,
-    "consensus_pubkey": null,
-    "network_addresses": null,
-    "fullnode_addresses": null,
-    "config": {
-      "consensus_pubkey": "0xb3f3ebedd8b3ba81da2697c4a4835949538ae73d427e8bff23c69e7eb8af2a5a394a05bd85e7b9f74b90ba2f90e85ddf",
-      "fullnode_addresses": "0x01400402166170746f732d76666e2d332e616c636f76652e70726f0526180720249185fc610dc89021028c80115b51eea6dc449cc53b3c92e44c306f792bfd210800",
-      "network_addresses": "0x014604021c6170746f732d76616c696461746f722d332e616c636f76652e70726f0524180720983194f5774ba7b0e31be20a3985c30f192dfdd4c2ab3a2e5b5d20f7e4ac07270800",
-      "validator_index": "47"
-    },
     "rank": 28
   },
   {
     "addr": "0x8bf2201bf4cec31f736aacc0f44f29c014ecd8562975aecce19271ca179e8db5",
     "addr_prefix8": "8bf2201b",
-    "voting_power": 993341896885639,
-    "voting_power_apt": 9933418.96885639,
-    "consensus_pubkey": null,
-    "network_addresses": null,
-    "fullnode_addresses": null,
+    "voting_power": 993800970292187,
+    "voting_power_apt": 9938009.70292187,
     "config": {
       "consensus_pubkey": "0xa909b0b260c85566b0917d1e40da1656d3c3abd84c9a3287679cec86b301c5fdac4d5bce7425199fe37e957a4127752e",
       "fullnode_addresses": "0x014a04022076666e2d322e6170746f732d6d61696e6e65742e7477696e7374616b652e696f0526180720195d1dcdd1d3ee7c4b18c032aa3de5297f77c7ee556f59c4b9136792ca49e1370800",
       "network_addresses": "0x014904021f766e2d322e6170746f732d6d61696e6e65742e7477696e7374616b652e696f052418072040e4407e1fec1153112dc058efe144326964a577b47f980d65cf1816d95a833d0800",
-      "validator_index": "55"
+      "validator_index": "54"
     },
     "rank": 29
   },
   {
     "addr": "0x4534b92f2f9c66d58b6acd7f39211f4c1a1c96b0cea3189c2dcb692440723020",
     "addr_prefix8": "4534b92f",
-    "voting_power": 989767742561894,
-    "voting_power_apt": 9897677.42561894,
-    "consensus_pubkey": null,
-    "network_addresses": null,
-    "fullnode_addresses": null,
+    "voting_power": 990225572235680,
+    "voting_power_apt": 9902255.7223568,
     "config": {
       "consensus_pubkey": "0x9849b77fa2811edeefe5a096e6d55cfe67351065a72a19d2dd139930ebb57c84d075a0f51f9697889a9f68d66aed39f6",
       "fullnode_addresses": "0x014c0402226170746f732d6d61696e6e65742e76616c696461746f722e73656e74696f2e78797a0526180720b57576f4a433eb60c1e2c6bdd2e9ca65c147599d12737d116f3b4b185333c1260800",
       "network_addresses": "0x014c0402226170746f732d6d61696e6e65742e76616c696461746f722e73656e74696f2e78797a05241807209da43f9cb833c068bb8fdaa9ea10d9da3b807b0f79465f65918b79a515ad710f0800",
-      "validator_index": "79"
+      "validator_index": "78"
     },
     "rank": 30
   },
   {
     "addr": "0xb6a8774f0ba2420f88091d25363cccd58712e1fae3c83608690ccb4228f51847",
     "addr_prefix8": "b6a8774f",
-    "voting_power": 950862121701836,
-    "voting_power_apt": 9508621.21701836,
-    "consensus_pubkey": null,
-    "network_addresses": null,
-    "fullnode_addresses": null,
+    "voting_power": 951306341385452,
+    "voting_power_apt": 9513063.41385452,
     "config": {
       "consensus_pubkey": "0x955806cdced75707e8a0b4a46a90df89b4dd977fe56041ae8e9d3106f1fcf24b99d40a4175f9fb10b0293c675b541b0c",
       "fullnode_addresses": "0x012d04003980bb2005261807207d9348a4e93a17dbb73b511807710415ebe2a6c2c36ab404e2d63174407e625b0800",
       "network_addresses": "0x012d0400c6f4fdfa0524180720afa4342b513585903e76217289be010a3aa877e4e7613684ec38c0f39721d4080800",
-      "validator_index": "101"
+      "validator_index": "100"
     },
     "rank": 31
   },
   {
     "addr": "0x7afa66ac85f30c426978e9d31cd751861c9d864c1955419063f3fdbf85f50e73",
     "addr_prefix8": "7afa66ac",
-    "voting_power": 950749731631778,
-    "voting_power_apt": 9507497.31631778,
-    "consensus_pubkey": null,
-    "network_addresses": null,
-    "fullnode_addresses": null,
+    "voting_power": 951188983391391,
+    "voting_power_apt": 9511889.83391391,
     "config": {
       "consensus_pubkey": "0xa9444b0f2845f4a159465877fbea1bc8aabd760d946d2a08b4894e0ab2727aed45d19934045285c5fc9915e31c771572",
       "fullnode_addresses": "0x014304021966756c6c6e6f64652e656e766f79732d6170746f732e636f6d0526180720fd3c256cd01390bfcf123983532dbd1402652204099ac67c1d3e91f0e3a7ad3c0800",
       "network_addresses": "0x014404021a76616c696461746f722e656e766f79732d6170746f732e636f6d052418072093578af40d8d96eaaf80c2065201806beb88b32e276a28c5b5d80a15d0dbc2430800",
-      "validator_index": "102"
+      "validator_index": "101"
     },
     "rank": 32
   },
   {
     "addr": "0x7eeb51ffcda6b718f87a0ce50978adbf976b921a15bba8d71ce4b05826adedf9",
     "addr_prefix8": "7eeb51ff",
-    "voting_power": 950608420958047,
-    "voting_power_apt": 9506084.20958047,
-    "consensus_pubkey": null,
-    "network_addresses": null,
-    "fullnode_addresses": null,
+    "voting_power": 951034797728641,
+    "voting_power_apt": 9510347.97728641,
     "config": {
       "consensus_pubkey": "0xa243fb9141d334bff8a4cc40f648a02f6c6c6ac35de375859c5ab33294b7d57f8995f1aea6871ae61746a483ccc1af7b",
       "fullnode_addresses": "0x014504021b6170746f732d66756c6c6e6f64652e706f6c6b616368752e636f6d05261807201059b842b505b72eaf6cf3e898536c7fab73855c26b64725eb0ddc3fdeea82270800",
       "network_addresses": "0x014604021c6170746f732d76616c696461746f722e706f6c6b616368752e636f6d052418072026100844272e2371b6beefa5e6001e9175656e378c7cfd2546aea8a64768a4210800",
-      "validator_index": "103"
+      "validator_index": "102"
     },
     "rank": 33
   },
   {
     "addr": "0xcc75dd107c69486adb1c405832709ce04ed6653cbe586a73ab36748c282629cf",
     "addr_prefix8": "cc75dd10",
-    "voting_power": 950471985334079,
-    "voting_power_apt": 9504719.85334079,
-    "consensus_pubkey": null,
-    "network_addresses": null,
-    "fullnode_addresses": null,
+    "voting_power": 950910196711549,
+    "voting_power_apt": 9509101.96711549,
     "config": {
       "consensus_pubkey": "0x9761cfd8837023ac15652470109de6d5e2b137d3c213ff7080334dba28faa0df99991a7d6ec1e54ba74367e4dffc39a2",
       "fullnode_addresses": "0x014604021c6170746f732d666e2e61727469666163742d7374616b696e672e696f052618072099664f17c7bcb1fdec94ffd867c588e0b30f5b145e05dbe455354de0cec2b32f0800",
       "network_addresses": "0x01430402196170746f732e61727469666163742d7374616b696e672e696f0524180720d38b6dd4d0055c4a6190c386990f77df1ee6b64ba1d91a21684fe7a22ef206560800",
-      "validator_index": "104"
+      "validator_index": "103"
     },
     "rank": 34
   },
   {
     "addr": "0x87fb7758e343328e3a7ea86c15382eabb1a9ab3144854ad0713134a342f67f8b",
     "addr_prefix8": "87fb7758",
-    "voting_power": 950466134616196,
-    "voting_power_apt": 9504661.34616196,
-    "consensus_pubkey": null,
-    "network_addresses": null,
-    "fullnode_addresses": null,
+    "voting_power": 950905096790985,
+    "voting_power_apt": 9509050.96790985,
     "config": {
       "consensus_pubkey": "0x9220048416d0b1eed80f9ef9b2085a61935a98c3a39c2a199c624907c5aff44135e789de57732c6ddb779e1a8a81e514",
       "fullnode_addresses": "0x013e04021476666e2e6170746f732e6e6f6465732e6775727505261807200278a5b5fac22252c80fcdada55ab80dcfaf03ea9c91cb24ccc3ed54b5ef4f2b0800",
       "network_addresses": "0x014404021a76616c696461746f722e6170746f732e6e6f6465732e6775727505241807203deb2d94d3d75438e2e3afdd3aec98cf57505baa329045fe05415b96260d8f440800",
-      "validator_index": "105"
+      "validator_index": "104"
     },
     "rank": 35
   },
   {
     "addr": "0xc5d59dc1ea45c528fd0656088f52fbba7774495c0347f80527256317c334271b",
     "addr_prefix8": "c5d59dc1",
-    "voting_power": 950460207534479,
-    "voting_power_apt": 9504602.07534479,
-    "consensus_pubkey": null,
-    "network_addresses": null,
-    "fullnode_addresses": null,
+    "voting_power": 950899139868097,
+    "voting_power_apt": 9508991.39868097,
     "config": {
       "consensus_pubkey": "0x97697afb615084c36369dcc42c2e69e9b62bbf66b73aa7252d75374e93aaf49130b87fdde09db50f1e9aef9a25d18eb1",
       "fullnode_addresses": "0x014404021a76666e2e6170746f732e6c6176656e646572666976652e636f6d0526180720d44f650aff8bcabb5a34d038443f1c0ecf9d6e5d5a0a2f4fb1b3492fd6f347170800",
       "network_addresses": "0x01400402166170746f732e6c6176656e646572666976652e636f6d05241807209ae143a96188dbe3893016b5a13b0fc34ebb5927cea79062ed9730e8dd3b4e4c0800",
-      "validator_index": "106"
+      "validator_index": "105"
     },
     "rank": 36
   },
   {
     "addr": "0x32b57ba82a856bc7e2de6a9016efa4a11ec6f44c2e538dc0e51484b908a357cf",
     "addr_prefix8": "32b57ba8",
-    "voting_power": 950409485409327,
-    "voting_power_apt": 9504094.85409327,
-    "consensus_pubkey": null,
-    "network_addresses": null,
-    "fullnode_addresses": null,
+    "voting_power": 950848888601748,
+    "voting_power_apt": 9508488.88601748,
     "config": {
       "consensus_pubkey": "0xa6d2af57193cf144ec918882fef758576f206841d3149e4ef2cb806fd434ea807f81bc653f506c2ccd73a3fdd9f78c7f",
       "fullnode_addresses": "0x01420402186170746f736d61696e6e657476666e2e6d69726e792e696f052618072039df8ecd826c37753af70a9641085e978280fce963d1ad2fe0d30f616d5d477f0800",
@@ -594,27 +483,21 @@
   {
     "addr": "0xbb410047e29f9cc9bd1e5b66f2b4d2f3a8cad579e45b609e357dcdc536b05ade",
     "addr_prefix8": "bb410047",
-    "voting_power": 927629418913506,
-    "voting_power_apt": 9276294.18913506,
-    "consensus_pubkey": null,
-    "network_addresses": null,
-    "fullnode_addresses": null,
+    "voting_power": 928148295147932,
+    "voting_power_apt": 9281482.95147932,
     "config": {
       "consensus_pubkey": "0xa7900ab0d6b7632497d3eae5d72179bca161ed424d95c1ba11fcc892067a1c8d6e407fbad9c1f177a399ac2fee98632f",
       "fullnode_addresses": "0x014504021b6f76682d6170746f732d3030312e626c6f636b6361742e7465636805261807208916fa85bcd68ae18eec24908c75ce4ced87e391651ea7852d1d80965b82b56b0800",
       "network_addresses": "0x014504021b6f76682d6170746f732d3030312e626c6f636b6361742e74656368052418072085397dc97007e4c79957e7f8e7d84a691f6039880784a3514561274068fe97460800",
-      "validator_index": "76"
+      "validator_index": "75"
     },
     "rank": 38
   },
   {
     "addr": "0xda418307cff595ced2af5eb471ec11b1ad6a4907ef57d6e2eeb253bdd5bd9d0d",
     "addr_prefix8": "da418307",
-    "voting_power": 901847233664513,
-    "voting_power_apt": 9018472.33664513,
-    "consensus_pubkey": null,
-    "network_addresses": null,
-    "fullnode_addresses": null,
+    "voting_power": 902823310312921,
+    "voting_power_apt": 9028233.10312921,
     "config": {
       "consensus_pubkey": "0x84f5d5d327e4656eff9a6e826f2db201fec8abe100705e026bc36c075421fd1c60085011bfa0024885fafdbf56afe81f",
       "fullnode_addresses": "0x00",
@@ -626,11 +509,8 @@
   {
     "addr": "0xa4a00989d8ecc6d116b2283503f58de94d7fc33fff9e28010868abeb70d7d051",
     "addr_prefix8": "a4a00989",
-    "voting_power": 867142593762514,
-    "voting_power_apt": 8671425.93762514,
-    "consensus_pubkey": null,
-    "network_addresses": null,
-    "fullnode_addresses": null,
+    "voting_power": 867542187657015,
+    "voting_power_apt": 8675421.87657015,
     "config": {
       "consensus_pubkey": "0xad727f7d91704e234ea8f9c694b85b750258052d5e33b758801d3b9a878bd8f5aea0bbe8dc611584b7a75e4ce534bcec",
       "fullnode_addresses": "0x014a0402206170746f732d6d61696e6e65742d6e6f64652d302e6e6f64657265616c2e696f0526180720b6efef1ce4bb0245a169b5fe15ae186eb84b176023d789f51d0deb5661c68b420800",
@@ -642,11 +522,8 @@
   {
     "addr": "0x550fe3956e44112599b8410404e0977e74cc5bcb59a11b0706da734cd0f9beb2",
     "addr_prefix8": "550fe395",
-    "voting_power": 864718144024959,
-    "voting_power_apt": 8647181.44024959,
-    "consensus_pubkey": null,
-    "network_addresses": null,
-    "fullnode_addresses": null,
+    "voting_power": 865118042230548,
+    "voting_power_apt": 8651180.42230548,
     "config": {
       "consensus_pubkey": "0xb6552006b0777da4012327b5330f1b615b0c26c5f0fde8aecf2da4fca9451f782b2517f444d953fd01c877b9ebbf8949",
       "fullnode_addresses": "0x013f04021576666e2e666f726573747374616b696e672e636f6d0526180720ccb91f858a6b2e552984be00dd07f87617ec783deb2ffcac3a37d9f028e00f2c0800",
@@ -658,11 +535,8 @@
   {
     "addr": "0xb3254509d1cd652d6e1ca06fd37f3d20aaa42f7faeaf297577b85cf92d2f7462",
     "addr_prefix8": "b3254509",
-    "voting_power": 861198403996822,
-    "voting_power_apt": 8611984.03996822,
-    "consensus_pubkey": null,
-    "network_addresses": null,
-    "fullnode_addresses": null,
+    "voting_power": 861596414075721,
+    "voting_power_apt": 8615964.14075721,
     "config": {
       "consensus_pubkey": "0xb8e46bd67eb6582ad38ad3df929bb3c671412d1935b74af02a5cacb6bbe684d9a300731530dbd2bf7881c9803c32d205",
       "fullnode_addresses": "0x015e0402346170746f732d6d6e65742d76662d302e63612d63656e7472616c2d312e737072642e76616c69646174696f6e636c6f75642e696f0526180720a814aaa8ad4901bbfc08e75af3f0068435bd8ca134505b6d8f2c145c0e8677430800",
@@ -674,11 +548,8 @@
   {
     "addr": "0xef191e643c2ed2d103de4109a506e020f5dde818cbc1ffe5e4ee36328cd22e9b",
     "addr_prefix8": "ef191e64",
-    "voting_power": 813846529613138,
-    "voting_power_apt": 8138465.29613138,
-    "consensus_pubkey": null,
-    "network_addresses": null,
-    "fullnode_addresses": null,
+    "voting_power": 814088778973077,
+    "voting_power_apt": 8140887.78973077,
     "config": {
       "consensus_pubkey": "0x963d5f5dd0179a9ded5e1af7e450786e93f41ff01b1d74baa0f776a8e5b72924839d5c4e4fd868b127315e19d595312a",
       "fullnode_addresses": "0x014504021b66756c6c312e6d61696e6e65742e6170746f732e7032702e6f726705261807208c7ad723dd13cf91afb6b976c31db785113f7e95d1fec8593c9ac8bbfaa5dc7e0800",
@@ -690,11 +561,8 @@
   {
     "addr": "0xb4a4f1ef8b0702d85547dc444571a473f736e1205a86db36dad13815ad9bbbf6",
     "addr_prefix8": "b4a4f1ef",
-    "voting_power": 813682499439956,
-    "voting_power_apt": 8136824.99439956,
-    "consensus_pubkey": null,
-    "network_addresses": null,
-    "fullnode_addresses": null,
+    "voting_power": 814018763462872,
+    "voting_power_apt": 8140187.63462872,
     "config": {
       "consensus_pubkey": "0xa5a4d90b3d84e3bdc23fa47f6f010f90d4a082bf2d903f299a10b3fe309a9ed1964892985abd864bc3a83e68c2cda66e",
       "fullnode_addresses": "0x014404021a6170746f732d73702d76666e2e62776172656c6162732e636f6d052618072028b9f4b32b0ffa3d5b1d53b6b93cf05e8d0aad443f5e08d592dd0710d05a0c210800",
@@ -706,11 +574,8 @@
   {
     "addr": "0x6099edbe54f242bad50020dfd67646b1e46282999483e7064e70f02f7ea3c15",
     "addr_prefix8": "6099edbe",
-    "voting_power": 776903666232170,
-    "voting_power_apt": 7769036.6623217,
-    "consensus_pubkey": null,
-    "network_addresses": null,
-    "fullnode_addresses": null,
+    "voting_power": 777414958308012,
+    "voting_power_apt": 7774149.58308012,
     "config": {
       "consensus_pubkey": "0xb017b62a576df41b797d31277fb9e992b614cb2742ea1bf005479b62a537daa52f6455c6237d5f548c22b907a4cd0ab4",
       "fullnode_addresses": "0x014404021a6170746f732d64702d76666e2e62776172656c6162732e636f6d0526180720f25e9c09250f95df0af9437bb47440eda0ff7c12dde82238aa090ac733e67f480800",
@@ -722,11 +587,8 @@
   {
     "addr": "0x4cc22e5d2e84794c3c672b0b34145898ee971a4ff042eabae23627547f6dac80",
     "addr_prefix8": "4cc22e5d",
-    "voting_power": 734826548842159,
-    "voting_power_apt": 7348265.48842159,
-    "consensus_pubkey": null,
-    "network_addresses": null,
-    "fullnode_addresses": null,
+    "voting_power": 735167264487027,
+    "voting_power_apt": 7351672.64487027,
     "config": {
       "consensus_pubkey": "0x8af9cfdfd49dcc3a1a5d18d060d8ab11c82ff9dfe30a31a7cac15ef13961445b40a061eb54336c19893f7929f9106e4d",
       "fullnode_addresses": "0x015104022766756c6c6e6f64652d6170746f732d6d61696e6e65742e70726f76616c696461746f722e636f6d05261807207394f7d5b8e4103ae9dfc0bccd768ad65f7900104e336212db51e495a84e0d3b0800",
@@ -738,75 +600,60 @@
   {
     "addr": "0xe888a0adfb4ca871bfe6aada8511f5326e877a8ce66a9980ef089eb2218d740c",
     "addr_prefix8": "e888a0ad",
-    "voting_power": 709029119762927,
-    "voting_power_apt": 7090291.19762927,
-    "consensus_pubkey": null,
-    "network_addresses": null,
-    "fullnode_addresses": null,
+    "voting_power": 714625560921090,
+    "voting_power_apt": 7146255.6092109,
     "config": {
       "consensus_pubkey": "0xb85d80cb5d945573a708ffd15fa69153d11329755dfc685832816f5aa490b02903dc8c1397282cda5ca7816c8d6c67b6",
       "fullnode_addresses": "0x012d040023ef8d250526180720ee867b185eff1ed682105b60763e1bf3ad21c2757a2ad2c305603e61d920a20f0800",
       "network_addresses": "0x012d0400223c68c30524180720d28c1386973f0f914c97dfa8a15666491bac9af476588e7fb24381138f667a0a0800",
-      "validator_index": "53"
+      "validator_index": "52"
     },
     "rank": 47
   },
   {
     "addr": "0xff39ddd0944f2fd4db88cd9e0730990b7bce674c3710584719da2263cba36cdc",
     "addr_prefix8": "ff39ddd0",
-    "voting_power": 637386787396021,
-    "voting_power_apt": 6373867.87396021,
-    "consensus_pubkey": null,
-    "network_addresses": null,
-    "fullnode_addresses": null,
+    "voting_power": 637681255093585,
+    "voting_power_apt": 6376812.55093585,
     "config": {
       "consensus_pubkey": "0xaa0fc6d061f510b0d42635876f5c413315dc33f1c243db102c4147921ef9d55979f49d7685732d476346985323fd9f45",
       "fullnode_addresses": "0x014004021676666e2e6170746f732e6d6f76656d6f76652e6f726705261807208eb1acc5737314aff2fb6e592c3a7c1c761fc7a1301f7168d6241478ff5910570800",
       "network_addresses": "0x013f040215766e2e6170746f732e6d6f76656d6f76652e6f72670524180720c1a7cb25ee9856962856fcddfe034626e014c9bbacbf21e872c0d8fd8017f01a0800",
-      "validator_index": "75"
+      "validator_index": "74"
     },
     "rank": 48
   },
   {
     "addr": "0x91df39d4ae2fac731d02ade7848f332ce701e1a598d773e1be1f6382d3959150",
     "addr_prefix8": "91df39d4",
-    "voting_power": 629683792954223,
-    "voting_power_apt": 6296837.92954223,
-    "consensus_pubkey": null,
-    "network_addresses": null,
-    "fullnode_addresses": null,
+    "voting_power": 629913504305681,
+    "voting_power_apt": 6299135.04305681,
     "config": {
       "consensus_pubkey": "0x892b06096a8d632a20a71030282654c8e8dc8d28c39cab429a1631367222881c25d514e79b9d293c6421f14d5113cb59",
       "fullnode_addresses": "0x012d0400221fe67805261807200ce2d1800c40783106f514b0609845e5ce32760a2ec6555b676183ecee20ed560800",
       "network_addresses": "0x012d040022abc8b10524180720d9e8bba3a490e03dcf1438783d2cb046b347df5c72795eee524b47dd920476270800",
-      "validator_index": "58"
+      "validator_index": "57"
     },
     "rank": 49
   },
   {
     "addr": "0x3c4d9be0f74cd198b88eeb087632951465045004ec67cefe6f4f170382a20a46",
     "addr_prefix8": "3c4d9be0",
-    "voting_power": 623493511039955,
-    "voting_power_apt": 6234935.11039955,
-    "consensus_pubkey": null,
-    "network_addresses": null,
-    "fullnode_addresses": null,
+    "voting_power": 623948445309238,
+    "voting_power_apt": 6239484.45309238,
     "config": {
       "consensus_pubkey": "0xaa322f40638c55ee99aa56dc856f98a531f1c5d94bad1d5285a5a618dfb8807307d2420a614caf5db969bb4a34fbac6b",
       "fullnode_addresses": "0x012d040033b2b5740526180720db969d471ec41876847000bb108c676fb7c0e6c860518029333ffa1dc8c7ee690800",
       "network_addresses": "0x012d040033b2b575052418072010dbd554c77b63d057b9a24d0ae5cafa3c43cc5fed22f645ecbba58afc0f32300800",
-      "validator_index": "98"
+      "validator_index": "97"
     },
     "rank": 50
   },
   {
     "addr": "0x50b27eee627c0648ff4867894e264d67de2049ee9a8b92040cb35020b74afa39",
     "addr_prefix8": "50b27eee",
-    "voting_power": 593149094870905,
-    "voting_power_apt": 5931490.94870905,
-    "consensus_pubkey": null,
-    "network_addresses": null,
-    "fullnode_addresses": null,
+    "voting_power": 593385459628207,
+    "voting_power_apt": 5933854.59628207,
     "config": {
       "consensus_pubkey": "0x92d63f78f95d61063bd6d7cb9a664a8dca8df50318926fbd7297dab24a1380cdfdfb69548c55049a71f9db88c96aebef",
       "fullnode_addresses": "0x012d0400cea8be2b05261807209abcee839272c308a34900c1c719edcd59a8a4b23ff41833fb1570694a9be6290800",
@@ -818,75 +665,60 @@
   {
     "addr": "0xaca44df45038a367255d03a3f6bc6af018c73892924b52e3f4a1dd8757094b1d",
     "addr_prefix8": "aca44df4",
-    "voting_power": 590006470908459,
-    "voting_power_apt": 5900064.70908459,
-    "consensus_pubkey": null,
-    "network_addresses": null,
-    "fullnode_addresses": null,
+    "voting_power": 590279022080016,
+    "voting_power_apt": 5902790.22080016,
     "config": {
       "consensus_pubkey": "0xae9ddcc3a1802a085be6bb218596dc9140096a20cf078a2de2619a345329baad76389f156f1bebeafef49a4f3a82013e",
       "fullnode_addresses": "0x01430402196170746f732d66756c6c6e6f6465302e74617261732e756e6f0526180720fb01fa893915bc66acb4a6ef79536191294b13cdd382f17acf9fe99dc4a770350800",
       "network_addresses": "0x014404021a6170746f732d76616c696461746f72302e74617261732e756e6f052418072002d0eaa9511cddee685739821a76024a8b91b825bac2a4005b4fe21fb4d1ff360800",
-      "validator_index": "70"
+      "validator_index": "69"
     },
     "rank": 52
   },
   {
     "addr": "0x4a693f759250c03d4a743ab52b41a3b7bdea8bff58abc568be569af56d82098e",
     "addr_prefix8": "4a693f75",
-    "voting_power": 588067160309478,
-    "voting_power_apt": 5880671.60309478,
-    "consensus_pubkey": null,
-    "network_addresses": null,
-    "fullnode_addresses": null,
+    "voting_power": 588338992649775,
+    "voting_power_apt": 5883389.92649775,
     "config": {
       "consensus_pubkey": "0x92e9b6a4b1a2943632a66f46076dd0f4180a78626bb7b3bd514519f43ac46bdd60f2ac7f94e8f2ab1ca7a46d1f2a031d",
       "fullnode_addresses": "0x013e0402146d61696e6e65742e6170746f732e65752e6f726705261807201b91523ee77cef70192b0d20197049d53d208a61fc89391eb6c067a9d4b49a5d0800",
       "network_addresses": "0x0141040217766e2e6d61696e6e65742e6170746f732e65752e6f72670524180720c30bc1e1aad627d791ef6884016ea29c93fd07562b5f337799f6bc1368323b6a0800",
-      "validator_index": "69"
+      "validator_index": "68"
     },
     "rank": 53
   },
   {
     "addr": "0xf747e3a6282cc0dee1c89239c529b039c64fe48e88b50e5cedd40e9c094800bb",
     "addr_prefix8": "f747e3a6",
-    "voting_power": 584930988759638,
-    "voting_power_apt": 5849309.88759638,
-    "consensus_pubkey": null,
-    "network_addresses": null,
-    "fullnode_addresses": null,
+    "voting_power": 585195145237904,
+    "voting_power_apt": 5851951.45237904,
     "config": {
       "consensus_pubkey": "0x97bf888ac1f911b5efe782328a9a7faebca3c8ddc7ca8ff3b4356d7c97a86c99e18587051c4b101b29441b0d067db975",
       "fullnode_addresses": "0x013804020e666e2e617074636f72652e6f6e65052618072018dde05daf575d4f6808745933e9dac878a23c1a0b53066f5b055410e1a46b300800",
       "network_addresses": "0x013804020e766e2e617074636f72652e6f6e650524180720ef082c995f31d17f40e191d8e778452af1b9b458a06b9a6ad4c5fe597750b8500800",
-      "validator_index": "68"
+      "validator_index": "67"
     },
     "rank": 54
   },
   {
     "addr": "0x2367d4d22503e28e48c44e38237961f37896f6868c96dc7800203d261a45e5b4",
     "addr_prefix8": "2367d4d2",
-    "voting_power": 575184435410250,
-    "voting_power_apt": 5751844.3541025,
-    "consensus_pubkey": null,
-    "network_addresses": null,
-    "fullnode_addresses": null,
+    "voting_power": 575849020110811,
+    "voting_power_apt": 5758490.20110811,
     "config": {
       "consensus_pubkey": "0xb95376a14f7885341319f33ac0723a686dce34e44e7505921eb39eb312a21043890036da33db159576ededec42356287",
       "fullnode_addresses": "0x012d0400362765240526180720f8606255cc1c0953aee901ae94ae94a2aa3b4f3189b43e4b8a7c45949afa4e180800",
       "network_addresses": "0x012d0400362765250524180720644e1dcacfade52f9816381189e31d2368d82374c7f37ed9013349670d565d4e0800",
-      "validator_index": "66"
+      "validator_index": "65"
     },
     "rank": 55
   },
   {
     "addr": "0x890c86c19974b98594a4e5cd7b0b3a69af1b30afc78853a0c11e882801497320",
     "addr_prefix8": "890c86c1",
-    "voting_power": 562693659718481,
-    "voting_power_apt": 5626936.59718481,
-    "consensus_pubkey": null,
-    "network_addresses": null,
-    "fullnode_addresses": null,
+    "voting_power": 562954280873963,
+    "voting_power_apt": 5629542.80873963,
     "config": {
       "consensus_pubkey": "0xa28939b564a461a78e486c5127e69733f1a4dc562324b95cb27c6933fce849583db46739cfe5fa1d6a57947a7d5d895b",
       "fullnode_addresses": "0x012d040034cfa2a80526180720627e142a7551e2a41fbc6579aa5e68afbeae25f7d342b5d9e629d4284be4901c0800",
@@ -898,43 +730,34 @@
   {
     "addr": "0x998afcba25003201aaa99ac9b8c209d90fc5bb6639f6f1638465d26e96ed7b0",
     "addr_prefix8": "998afcba",
-    "voting_power": 519544803502051,
-    "voting_power_apt": 5195448.03502051,
-    "consensus_pubkey": null,
-    "network_addresses": null,
-    "fullnode_addresses": null,
+    "voting_power": 519785066581412,
+    "voting_power_apt": 5197850.66581412,
     "config": {
       "consensus_pubkey": "0x8b4892da73526aeb9ad57b82df50c7ab23c7132cc8d778bf73fbac4b036a20fcca9ced7ca92c7e7076dae9bb11c90155",
       "fullnode_addresses": "0x014904021f6170746f732d6d61696e6e65742d76666e2d30312e647a646169632e636f6d05261807201a8060a07f6c400e75674a9a4a8554c5ce9e1f91f0b155c58d11ed03468d3d3f0800",
       "network_addresses": "0x01420402186170746f732d6d61696e6e65742e647a646169632e636f6d0524180720c137500fc0d7bbbec0c462ad248f047d736c3ffc4d6e7718759d0eeb6f07353e0800",
-      "validator_index": "97"
+      "validator_index": "96"
     },
     "rank": 57
   },
   {
-    "addr": "0xa57ed536dea7ae3250790ab12fbb6ca6ae669bf4eac5a12446b8769e534082f8",
-    "addr_prefix8": "a57ed536",
-    "voting_power": 513944922850391,
-    "voting_power_apt": 5139449.22850391,
-    "consensus_pubkey": null,
-    "network_addresses": null,
-    "fullnode_addresses": null,
+    "addr": "0xe2789cdac410113f017fa684bf08fbacd0877612d84464ae6e8474b56e5f21da",
+    "addr_prefix8": "e2789cda",
+    "voting_power": 500594958313124,
+    "voting_power_apt": 5005949.58313124,
     "config": {
-      "consensus_pubkey": "0x8ff941f18277c35dde25854bc0241663909163f12f9afa9402eab2832e88364e83acca1c42404de8db2351ff0092c58d",
-      "fullnode_addresses": "0x016004023676666e5f746f796d616b33727a2e6170746f732e6d61696e6e65742e72657075626c696363727970746f2d736f757263652e696e666f0526180720bb1d143122bbf0635cfef1399a2791b0a18d9459ba44a53447a1a903e3cba9000800",
-      "network_addresses": "0x015e040234765f746f796d616b33727a2e6170746f732e6d61696e6e65742e72657075626c696363727970746f2d736f757263652e696e666f0524180720fb178575f0edbda0c5dbdab4ae3dcb4863983d32547abe9e7be5198e17c3050e0800",
-      "validator_index": "44"
+      "consensus_pubkey": "0x860ac0e8705d654ac985ca1789aa9282b45a828e14826f889abfca8e99662d81c87070ae98ccb940b79f616e3ebbf78b",
+      "fullnode_addresses": "0x014c0402227032706134312d66756c6c312e6d61696e6e65742e6170746f732e7032702e6f72670526180720faf13b6c215cb031cb9e9c21dac8cd9c938f910867e29aa351a072000404aa790800",
+      "network_addresses": "0x014b0402217032706134312d76616c312e6d61696e6e65742e6170746f732e7032702e6f72670524180720dac3355b5a407c8ed897f1bd5c78af2bddf1dca18d5e44eacca839f8118a9f510800",
+      "validator_index": "40"
     },
     "rank": 58
   },
   {
     "addr": "0x2fd1e866773ea3670cbef6dc6e952ba6fa13130a69fabc98ad234bd834c3bcaf",
     "addr_prefix8": "2fd1e866",
-    "voting_power": 500614635415959,
-    "voting_power_apt": 5006146.35415959,
-    "consensus_pubkey": null,
-    "network_addresses": null,
-    "fullnode_addresses": null,
+    "voting_power": 500381405765771,
+    "voting_power_apt": 5003814.05765771,
     "config": {
       "consensus_pubkey": "0x90296e0697f8a87468584317e1ec78d8362a418e32c5a5d205a376fa31daa8b02e0daf4c705296a6578b4080c44a839a",
       "fullnode_addresses": "0x016604023c66756c6c6e6f64652e39373338393166352d323762362d346532342d383765312d3138613962663065333361662e6170746f732e686572642e72756e0526180720f8219851a39f4946a5c115d4335127381b9b28083d6e81e3d4036da032f3a4330800",
@@ -944,573 +767,465 @@
     "rank": 59
   },
   {
-    "addr": "0xe2789cdac410113f017fa684bf08fbacd0877612d84464ae6e8474b56e5f21da",
-    "addr_prefix8": "e2789cda",
-    "voting_power": 500359516735964,
-    "voting_power_apt": 5003595.16735964,
-    "consensus_pubkey": null,
-    "network_addresses": null,
-    "fullnode_addresses": null,
-    "config": {
-      "consensus_pubkey": "0x860ac0e8705d654ac985ca1789aa9282b45a828e14826f889abfca8e99662d81c87070ae98ccb940b79f616e3ebbf78b",
-      "fullnode_addresses": "0x014c0402227032706134312d66756c6c312e6d61696e6e65742e6170746f732e7032702e6f72670526180720faf13b6c215cb031cb9e9c21dac8cd9c938f910867e29aa351a072000404aa790800",
-      "network_addresses": "0x014b0402217032706134312d76616c312e6d61696e6e65742e6170746f732e7032702e6f72670524180720dac3355b5a407c8ed897f1bd5c78af2bddf1dca18d5e44eacca839f8118a9f510800",
-      "validator_index": "40"
-    },
-    "rank": 60
-  },
-  {
     "addr": "0x384e89330e07edf394565fcf48e63da5a378dc22a6f69ed8b2300c15223e06db",
     "addr_prefix8": "384e8933",
-    "voting_power": 482641063017692,
-    "voting_power_apt": 4826410.63017692,
-    "consensus_pubkey": null,
-    "network_addresses": null,
-    "fullnode_addresses": null,
+    "voting_power": 482863890546567,
+    "voting_power_apt": 4828638.90546567,
     "config": {
       "consensus_pubkey": "0x978340dbc74d21300f32c8b35f52179847196a7c3c27de7263d2304dec2ad78eefd7f45c04201af7c468bf1426ada284",
       "fullnode_addresses": "0x014d0402236170746f732e6d61696e6e65742e66756c6c6e6f64652e66756c6c7374616b652e696f0526180720ffd6994f31ec642f84cdc159fc2f313d3d95afd56737dc1de1aba39d467db65d0800",
       "network_addresses": "0x014e0402246170746f732e6d61696e6e65742e76616c696461746f722e66756c6c7374616b652e696f052418072058ca3e58bc16bd213ebed2714b0dd225d495b51f1df4518e8b00539e2e3b11230800",
-      "validator_index": "81"
+      "validator_index": "80"
     },
-    "rank": 61
+    "rank": 60
   },
   {
     "addr": "0xaa8b1ffbb47ed279cb04c2b6e2eece9453b453017f14c93db6b72371a31f4507",
     "addr_prefix8": "aa8b1ffb",
-    "voting_power": 481112628542777,
-    "voting_power_apt": 4811126.28542777,
-    "consensus_pubkey": null,
-    "network_addresses": null,
-    "fullnode_addresses": null,
+    "voting_power": 481335136433096,
+    "voting_power_apt": 4813351.36433096,
     "config": {
       "consensus_pubkey": "0x8b46c560cb73b0f6bc85ad49d4c5d37100a868b916f3fc615ab41ecf1ed5c22c76006b8f9962e4eea157ad49b704066b",
       "fullnode_addresses": "0x0141040217666e2e6170746f732e7175616e746e6f64652e746563680526180720bae830d35cbd87fc7e0a8a9d066e1e2ad7c8d597446211050b2dd43ba0c25a630800",
       "network_addresses": "0x0141040217766e2e6170746f732e7175616e746e6f64652e7465636805241807203b0b19f2c1e0bb929239ba92dc2c5e537dab1edf9e07299ced47f33cab147c370800",
-      "validator_index": "72"
+      "validator_index": "71"
     },
-    "rank": 62
+    "rank": 61
   },
   {
     "addr": "0x79e2670b72361dcbf6f48ac2638993ab67dd75feaa080b34760c917b1310880e",
     "addr_prefix8": "79e2670b",
-    "voting_power": 480087537959251,
-    "voting_power_apt": 4800875.37959251,
-    "consensus_pubkey": null,
-    "network_addresses": null,
-    "fullnode_addresses": null,
+    "voting_power": 480263110553782,
+    "voting_power_apt": 4802631.10553782,
     "config": {
       "consensus_pubkey": "0xb8305348e1572fbaba85198ce3185b139d6fc9e23282bfd1fc6dfdcd673c5ec7d95001f2529c11463f7e1c8c0dbac488",
       "fullnode_addresses": "0x014b04022166756c6c6e6f64652e6d61696e6e65742e6170746f732e666f72676f6f2e636f6d05261807208f49c6d7d4c49ac7297b31cc34ed185d30934b22e6d30ef7e44a1be8435c76560800",
       "network_addresses": "0x014c04022276616c696461746f722e6d61696e6e65742e6170746f732e666f72676f6f2e636f6d052418072028ea9abf5fe2d80c809ba3fed52022d1f846bbf8c388a097b9050a837d0585050800",
-      "validator_index": "74"
+      "validator_index": "73"
     },
-    "rank": 63
+    "rank": 62
   },
   {
     "addr": "0x5dece2ed08c68f8730527e9b3ebb3536efc3361f4ef37ba0b16a3310db836af",
     "addr_prefix8": "5dece2ed",
-    "voting_power": 479787368891333,
-    "voting_power_apt": 4797873.68891333,
-    "consensus_pubkey": null,
-    "network_addresses": null,
-    "fullnode_addresses": null,
+    "voting_power": 479807477869202,
+    "voting_power_apt": 4798074.77869202,
     "config": {
       "consensus_pubkey": "0x854cdb1633ed413a07e103577adb6e708b54581b8d3711b085fdbc31db1177148b8e153c3124c5984cda1dc9c707ac1c",
       "fullnode_addresses": "0x01430402196170746f732e76666e2e63727970746f6d6f6c6f742e636f6d0526180720b0c58e2ef9958ccd3ac1e6fcafa8752594c76b5808b3642d3bc09c6ea4bd90590800",
       "network_addresses": "0x01420402186170746f732e766e2e63727970746f6d6f6c6f742e636f6d0524180720caaebd25ad702242e94fbbdf391aa81aa041a937815851015eba8ade96c6fc710800",
-      "validator_index": "73"
+      "validator_index": "72"
     },
-    "rank": 64
+    "rank": 63
   },
   {
     "addr": "0x39b844cb561d2a04c800164465e2eb2c2ea520499d718c35492244346da07b5f",
     "addr_prefix8": "39b844cb",
-    "voting_power": 464826115165919,
-    "voting_power_apt": 4648261.15165919,
-    "consensus_pubkey": null,
-    "network_addresses": null,
-    "fullnode_addresses": null,
+    "voting_power": 464513191485280,
+    "voting_power_apt": 4645131.9148528,
     "config": {
       "consensus_pubkey": "0xac575d5e206df18ace40438fd0b57feab67db4b84890bb142389c822827c185c9e12713d1f4e8ba3f0373b56feed4fef",
       "fullnode_addresses": "0x014804021e76666e2e6170746f732d6d61696e6e65742e7477696e7374616b652e696f0526180720afcaedc0521813dcd3ebf48a27201f09eb7fe62a0717fa968a97d5ef028a17020800",
       "network_addresses": "0x014704021d766e2e6170746f732d6d61696e6e65742e7477696e7374616b652e696f052418072073bb5fde4a22c979577faefecfd290703b82a3681b34bd2e037a700ea02388630800",
       "validator_index": "26"
     },
-    "rank": 65
+    "rank": 64
   },
   {
     "addr": "0x34a4233d71981aa2b2441fdc97d55c62c75b1ec5f29c74058d6c922089984d86",
     "addr_prefix8": "34a4233d",
-    "voting_power": 433311607062086,
-    "voting_power_apt": 4333116.07062086,
-    "consensus_pubkey": null,
-    "network_addresses": null,
-    "fullnode_addresses": null,
+    "voting_power": 433525126270024,
+    "voting_power_apt": 4335251.26270024,
     "config": {
       "consensus_pubkey": "0x92e063bb63a21d6699161fb4175f160204e1b993505d2de4787bbda84ff94f73e183a4aff8a3e2878df9ce3e78050d11",
       "fullnode_addresses": "0x012d04008d5e9dd005261807209adcd0db3afe6d02c10fcbc9e38846cf6d2a20f518b870fd4f8e79a28837c06d0800",
       "network_addresses": "0x012d04008d5e9dc805241807206339ecd7e0b35a4539c96c2c0be1f43f74312231d66cbd2503d5a06d74295f260800",
-      "validator_index": "85"
+      "validator_index": "84"
     },
-    "rank": 66
+    "rank": 65
   },
   {
     "addr": "0x312c22e7500a4037df87db35718959deeb937c734fb2169b95d720a09b5e74f5",
     "addr_prefix8": "312c22e7",
-    "voting_power": 426004369577822,
-    "voting_power_apt": 4260043.69577822,
-    "consensus_pubkey": null,
-    "network_addresses": null,
-    "fullnode_addresses": null,
+    "voting_power": 426182963308378,
+    "voting_power_apt": 4261829.63308378,
     "config": {
       "consensus_pubkey": "0x8d1cdb990790094c2e9cdbbfeaa511f93b90acf2c6205171182daa0cde179db0f5e043c9cdfb84f5f0840fcc3ba8e628",
       "fullnode_addresses": "0x012d040012b12f4b05261807206f1d2c1a59dbfa7d4c8b40d99f72dc182831f1567f8e37006199605592d9492d0800",
       "network_addresses": "0x012d040034c662fd052418072010db7a6e197cd9137ebca5e19b3e6365d8766d0e13eb6c70298cbd1fdcbc7e290800",
-      "validator_index": "63"
+      "validator_index": "62"
     },
-    "rank": 67
+    "rank": 66
   },
   {
     "addr": "0xfc90c3e74dfb562827ef85dea5669beeca7717faee0c3ba520c3ab08f9b53135",
     "addr_prefix8": "fc90c3e7",
-    "voting_power": 418520875289367,
-    "voting_power_apt": 4185208.75289367,
-    "consensus_pubkey": null,
-    "network_addresses": null,
-    "fullnode_addresses": null,
+    "voting_power": 418714165519569,
+    "voting_power_apt": 4187141.65519569,
     "config": {
       "consensus_pubkey": "0xb6be13806b42f10cc20f6e4df4069e93e8186b736e4bde8f53f599ed7228f25ac24e8f8b5ace3975adcfc6380182246a",
       "fullnode_addresses": "0x014f04022576666e2d312e6d61696e6e65742e6170746f732e666c6970736964652e73657276696365730526180720c4bbeb105df7f5953413fe24845d8cbe7ea86b05b444130c13a25227df21af140800",
       "network_addresses": "0x014c040222766e2e6d61696e6e65742e6170746f732e666c6970736964652e7365727669636573052418072050f41f1dac12a677e1a23f5853ed6e574094c1480b5d8b1356d0edc5a67f2a4e0800",
       "validator_index": "35"
     },
-    "rank": 68
+    "rank": 67
   },
   {
     "addr": "0x6183c471802b5ec52af163d4da0ae983a56908491a212985ae0bc0f204080498",
     "addr_prefix8": "6183c471",
-    "voting_power": 417905002948877,
-    "voting_power_apt": 4179050.02948877,
-    "consensus_pubkey": null,
-    "network_addresses": null,
-    "fullnode_addresses": null,
+    "voting_power": 418097366474212,
+    "voting_power_apt": 4180973.66474212,
     "config": {
       "consensus_pubkey": "0x8c19a78238ac8a79680a033317cc3f6793dcbcc73be39a3f2788fa9015c730b7b2d2b22c3b089f240cc106bef90f7ef6",
       "fullnode_addresses": "0x01530402296170746f732d6d61696e6e65742d76666e312e73657276696365732e6173796d6d65747269632e72650526180720b7dba519f8a0da18f39baf04aeef10db93adbcc8c5646303c7a252f786e5373f0800",
       "network_addresses": "0x01530402296170746f732d6d61696e6e65742d76616c312e73657276696365732e6173796d6d65747269632e72650524180720931a17ab3dbbcdd3b2fce163ae8b1a0f94a8fe054b52157a9445a78ba02887060800",
-      "validator_index": "62"
+      "validator_index": "61"
     },
-    "rank": 69
+    "rank": 68
   },
   {
     "addr": "0x2ded75e99c6efbe143a9648a3e88ebf9d0cf249b2af44d510bdd0287e8adcc79",
     "addr_prefix8": "2ded75e9",
-    "voting_power": 417649649997148,
-    "voting_power_apt": 4176496.49997148,
-    "consensus_pubkey": null,
-    "network_addresses": null,
-    "fullnode_addresses": null,
+    "voting_power": 417843140894786,
+    "voting_power_apt": 4178431.40894786,
     "config": {
       "consensus_pubkey": "0x8000b5beb0a9798110ccec1f012ed0a15a620c4ba642d309e3365e72e05b49a1ca9716777e812732a44e8f0c8b282437",
       "fullnode_addresses": "0x00",
       "network_addresses": "0x013f0402156170746f732e766573746967652e73797374656d7305241807201cb653e043d29fa8583483c6699783ec42b3ebd5ef23fba97a924e2545e2bc3b0800",
       "validator_index": "22"
     },
-    "rank": 70
+    "rank": 69
   },
   {
     "addr": "0xec70d5edf8061420c10da21d416a3bca49e3352620ddd1e651086b5647f3529",
     "addr_prefix8": "ec70d5ed",
-    "voting_power": 405886138974904,
-    "voting_power_apt": 4058861.38974904,
-    "consensus_pubkey": null,
-    "network_addresses": null,
-    "fullnode_addresses": null,
+    "voting_power": 406073837821083,
+    "voting_power_apt": 4060738.37821083,
     "config": {
       "consensus_pubkey": "0x88fb357f3c40f61aeaf0cb29eabc78fa9e85cfcc1062b4c67914fe6fd1abf1bd3e08d851595629fc9ef96104c0df4f9d",
       "fullnode_addresses": "0x012d04009200ee630525180720b1536a8e4315a6bf42308cf437a7de7d9f465177bf02ba2cc77b8129616789480800",
       "network_addresses": "0x012d04009200ee630524180720ee0290e0b5c4371eea1674a3062b526fd1c32b3941a84890b91fb1be7156d3390800",
-      "validator_index": "94"
+      "validator_index": "93"
     },
-    "rank": 71
+    "rank": 70
   },
   {
     "addr": "0xb87476d8877cfc324a520cef4d0cd6e42e26ec3ce613a8127220e2e444561e16",
     "addr_prefix8": "b87476d8",
-    "voting_power": 392412254346030,
-    "voting_power_apt": 3924122.5434603,
-    "consensus_pubkey": null,
-    "network_addresses": null,
-    "fullnode_addresses": null,
+    "voting_power": 392553470270995,
+    "voting_power_apt": 3925534.70270995,
     "config": {
       "consensus_pubkey": "0x810184f96a60655c340d254354f3f1b7c2b4a59530e5e8b9ed8765aefe4525a2d80393030e3be609fcc54742ff6a5186",
       "fullnode_addresses": "0x01530402296170746f732d6d61696e6e65742d76666e322e73657276696365732e6173796d6d65747269632e72650526180720e51632cf8004506fff126942cda2a3e0fe6b8ca1edaac4e1fa5a5383a2b3f0370800",
       "network_addresses": "0x01530402296170746f732d6d61696e6e65742d76616c322e73657276696365732e6173796d6d65747269632e72650524180720fd0d681d4aa63696df5847ed36d72415e580fd097889b9f2be3b65e31868d87d0800",
       "validator_index": "9"
     },
-    "rank": 72
+    "rank": 71
   },
   {
     "addr": "0xddf23883328d39d8cbb4fad97f0e4bd45827ea999b66aa2a1cffa76615b9ef01",
     "addr_prefix8": "ddf23883",
-    "voting_power": 341667408859288,
-    "voting_power_apt": 3416674.08859288,
-    "consensus_pubkey": null,
-    "network_addresses": null,
-    "fullnode_addresses": null,
+    "voting_power": 341824954866238,
+    "voting_power_apt": 3418249.54866238,
     "config": {
       "consensus_pubkey": "0x95aec1e70766b03f8afa773ef6cdc297354ae4cf9667ec359298925caef4e686ccb42f0fe893b44df0deb289a2b1071f",
       "fullnode_addresses": "0x00",
       "network_addresses": "0x013d0402136170746f732e74616c6f732e6e6574776f726b0524180720d119f4bf42ca8e116f56e6c5a11acdd9781b7f7059ce62e65ed521f1b18e472b0800",
       "validator_index": "29"
     },
-    "rank": 73
+    "rank": 72
   },
   {
     "addr": "0xce8294a77912a6802adf093ba15a4f09d2d3c85400d161a0022499de4e2aeb92",
     "addr_prefix8": "ce8294a7",
-    "voting_power": 338971894873403,
-    "voting_power_apt": 3389718.94873403,
-    "consensus_pubkey": null,
-    "network_addresses": null,
-    "fullnode_addresses": null,
+    "voting_power": 339160605437329,
+    "voting_power_apt": 3391606.05437329,
     "config": {
       "consensus_pubkey": "0x8aa09cbe115acc682fc01a02d0baf04781f4432131c9c2591c3d2ec334aab6572f05963e7cae785493931e157cbf2905",
       "fullnode_addresses": "0x01410402176170746f732d76666e2e7375706572666173742e6f726705261807206279b2a9ceaf4bce8cde62453830d30a01bcb57d3860dd33ccbea1d1402dd1150800",
       "network_addresses": "0x01400402166170746f732d766e2e7375706572666173742e6f72670524180720fd48919dd5732dc1c7af597aa2151bfc66c4fd65cc0363bde9437a49fb9b9f2f0800",
-      "validator_index": "45"
+      "validator_index": "44"
     },
-    "rank": 74
+    "rank": 73
   },
   {
     "addr": "0x191076a71acffafe737f5c1ce0fe4b7fa48569b437ba795a5482860925f89133",
     "addr_prefix8": "191076a7",
-    "voting_power": 326950021707190,
-    "voting_power_apt": 3269500.2170719,
-    "consensus_pubkey": null,
-    "network_addresses": null,
-    "fullnode_addresses": null,
+    "voting_power": 327106845195064,
+    "voting_power_apt": 3271068.45195064,
     "config": {
       "consensus_pubkey": "0xa7b46e42a523b296b51e8563005acf932430782245cf0b4056e4840587132e8a32535c118da770a3f59a6071dde7d6a8",
       "fullnode_addresses": "0x013804020e662e6170746f736c6162732e63630526180720b8d25776ffffc2dcd328df80debaa651068cf3dd7e909e962289b935298e026b0800",
       "network_addresses": "0x013804020e762e6170746f736c6162732e6363052418072050fb8258d65e8e55f4e683e7c1828e8bf8df41b437a03751cfa71ee09b822d7c0800",
-      "validator_index": "77"
+      "validator_index": "76"
     },
-    "rank": 75
+    "rank": 74
   },
   {
     "addr": "0xa793321c88361b3ed2418ef8490a59558e71b8434c2ad73e0c2f22ad06ad3e1f",
     "addr_prefix8": "a793321c",
-    "voting_power": 316907871691723,
-    "voting_power_apt": 3169078.71691723,
-    "consensus_pubkey": null,
-    "network_addresses": null,
-    "fullnode_addresses": null,
+    "voting_power": 317054451289271,
+    "voting_power_apt": 3170544.51289271,
     "config": {
       "consensus_pubkey": "0xb29442e6b38d8cf435d48766a3f56858e895558745f5c24f0e225ab0aa2ccc1076d2446e809046ad8a908bd40eff486f",
       "fullnode_addresses": "0x014404021a76666e2e6170746f732d6d61696e6e65742e6e6f6469742e696f053e4f0720a67347e486bb2f5f94ec7ffc6743f00803c9a28124d9cd30deef31055b52184b0800",
       "network_addresses": "0x014a04022076616c696461746f722e6170746f732d6d61696e6e65742e6e6f6469742e696f053c4f07203a9d7053fe766a4237d09663ac541fa7662c35f9e12eab7686c4e4fd9704bb0f0800",
-      "validator_index": "86"
+      "validator_index": "85"
     },
-    "rank": 76
+    "rank": 75
   },
   {
     "addr": "0x216d47203603af013a54581844d734906a92242cf25c1d6a8f937666a9919840",
     "addr_prefix8": "216d4720",
-    "voting_power": 310570401343120,
-    "voting_power_apt": 3105704.0134312,
-    "consensus_pubkey": null,
-    "network_addresses": null,
-    "fullnode_addresses": null,
+    "voting_power": 310680703325686,
+    "voting_power_apt": 3106807.03325686,
     "config": {
       "consensus_pubkey": "0xa2001b714f8af8434d6875c32594fb1c0affaebb41f066995855a108f9a223a19572ed414b5df5cfc9e8f6693fbd038f",
       "fullnode_addresses": "0x014a04022063766c383761636163366c3373706370643566672e62646e6f6465732e6e6574052618072096b60a775fbe43771585f522925c88f5bba5d24d7d23aa821e9a7d04073f250d0800",
       "network_addresses": "0x014a04022063766c38616b676e6a706d7639397669737431302e62646e6f6465732e6e65740524180720106d8f847d9e18e22a2696a990db112435d39c184f03112b4e8257977e3309540800",
-      "validator_index": "89"
+      "validator_index": "88"
     },
-    "rank": 77
-  },
-  {
-    "addr": "0x2c73a85b9e98e3c009b79efc19b1c63dc3a3c752a3445623363bb6bd3eee43b5",
-    "addr_prefix8": "2c73a85b",
-    "voting_power": 291447904120147,
-    "voting_power_apt": 2914479.04120147,
-    "consensus_pubkey": null,
-    "network_addresses": null,
-    "fullnode_addresses": null,
-    "config": {
-      "consensus_pubkey": "0x989bf0354a73241c95e4f22704537dc5564c194877bf545ba61246963a2cef84fe08754c604eab78a5edb4e6ca4df213",
-      "fullnode_addresses": "0x014904021f7032702d66756c6c312e6d61696e6e65742e6170746f732e7032702e6f726705261807209757c2935da8a8cb6311e2e4b0158713f3655db81f5afa1cfea9deef42381a2a0800",
-      "network_addresses": "0x014804021e7032702d76616c312e6d61696e6e65742e6170746f732e7032702e6f726705241807202258533507006df7b7c21286de938dd7d08db27aba56743a3e1e56f1982149630800",
-      "validator_index": "84"
-    },
-    "rank": 78
+    "rank": 76
   },
   {
     "addr": "0x877d09996086effe241b1a740d46675754c17f8620ee9be42c5c7e322ce1598c",
     "addr_prefix8": "877d0999",
-    "voting_power": 282100314009537,
-    "voting_power_apt": 2821003.14009537,
-    "consensus_pubkey": null,
-    "network_addresses": null,
-    "fullnode_addresses": null,
+    "voting_power": 282230451290705,
+    "voting_power_apt": 2822304.51290705,
     "config": {
       "consensus_pubkey": "0xb12b91a8281d1a90cee04e5f3dd3940ce14c85e53261a2cf1c1011549c67b2e3246f0bd83ec269b6699a7c727a5fe9cb",
       "fullnode_addresses": "0x014104021776666e2e6170746f732e7a687374616b696e672e636f6d052618072040b087488c7695bc75da8be0ef9ab188bb2d98717e8d8a9b00c6809b637cd1340800",
       "network_addresses": "0x014704021d76616c696461746f722e6170746f732e7a687374616b696e672e636f6d0524180720d36ee99d7562efa74ec761c4254a7bca4e8fa0daef358966d00cdde156c1421b0800",
       "validator_index": "42"
     },
-    "rank": 79
+    "rank": 77
+  },
+  {
+    "addr": "0x2c73a85b9e98e3c009b79efc19b1c63dc3a3c752a3445623363bb6bd3eee43b5",
+    "addr_prefix8": "2c73a85b",
+    "voting_power": 276212473289107,
+    "voting_power_apt": 2762124.73289107,
+    "config": {
+      "consensus_pubkey": "0x989bf0354a73241c95e4f22704537dc5564c194877bf545ba61246963a2cef84fe08754c604eab78a5edb4e6ca4df213",
+      "fullnode_addresses": "0x014904021f7032702d66756c6c312e6d61696e6e65742e6170746f732e7032702e6f726705261807209757c2935da8a8cb6311e2e4b0158713f3655db81f5afa1cfea9deef42381a2a0800",
+      "network_addresses": "0x014804021e7032702d76616c312e6d61696e6e65742e6170746f732e7032702e6f726705241807202258533507006df7b7c21286de938dd7d08db27aba56743a3e1e56f1982149630800",
+      "validator_index": "83"
+    },
+    "rank": 78
   },
   {
     "addr": "0xff3e9c10dd3781a1e0750a75ae9e5b04133cd7e8ca18b9936ffcf3b2a2538a49",
     "addr_prefix8": "ff3e9c10",
-    "voting_power": 242524579041742,
-    "voting_power_apt": 2425245.79041742,
-    "consensus_pubkey": null,
-    "network_addresses": null,
-    "fullnode_addresses": null,
+    "voting_power": 242636603989692,
+    "voting_power_apt": 2426366.03989692,
     "config": {
       "consensus_pubkey": "0x8b2c1cb46fa7bc2348852ef341dc1516b5a7934e158ef761e3ccd45f5d5aba0ddc5b77e9d69d3cca153b20635ade6056",
       "fullnode_addresses": "0x013c0402126170746f732d76666e2e6c676e732e78797a0526180720786514b4acf580901f4040ccb0c3aeff4709f2b2709a180d01c6b156e1a694500800",
       "network_addresses": "0x013b0402116170746f732d766e2e6c676e732e78797a05241807207956c2c66fd0d7d2146f85cad157c72e88c9ca28e5d32c3b28813157b1e5aa180800",
       "validator_index": "19"
     },
-    "rank": 80
+    "rank": 79
   },
   {
     "addr": "0xee36c1068076b199cf537bf652b1e586216a7dfb7c3447ff40333c971717eee6",
     "addr_prefix8": "ee36c106",
-    "voting_power": 241464287298272,
-    "voting_power_apt": 2414642.87298272,
-    "consensus_pubkey": null,
-    "network_addresses": null,
-    "fullnode_addresses": null,
+    "voting_power": 240740865354032,
+    "voting_power_apt": 2407408.65354032,
     "config": {
       "consensus_pubkey": "0x8c36e6bcd0c1181880d976ec7472e915a01b946c7ab6bc39e07cfa21ee83c1ac5d1e229c87e2202b85a51351f5697739",
       "fullnode_addresses": "0x014504021b76666e5f706f6f6c2e6170746f732e647372766c6162732e6e6574052618072094d44886a684c2882fbdbc3aee0a2eed97461bb68d0dd26b8cf01f2eb81e77330800",
       "network_addresses": "0x014404021a766e5f706f6f6c2e6170746f732e647372766c6162732e6e657405241807208d3f418b665e11ee3cb935982f18b66b793602889456f85dcf2db4b88ac263720800",
-      "validator_index": "56"
+      "validator_index": "55"
     },
-    "rank": 81
+    "rank": 80
   },
   {
     "addr": "0x63b0a7343c481fe176603e4e30cc5acc521c75d4310ce1b7b657c8168df66c66",
     "addr_prefix8": "63b0a734",
-    "voting_power": 237529143466737,
-    "voting_power_apt": 2375291.43466737,
-    "consensus_pubkey": null,
-    "network_addresses": null,
-    "fullnode_addresses": null,
+    "voting_power": 240142555635630,
+    "voting_power_apt": 2401425.5563563,
     "config": {
       "consensus_pubkey": "0xa2bea2c2c1f3b2b3a724319a416273932b8784c27e44781ad61c5236326192573302ae9b160cd0d33f422346d410aa8f",
       "fullnode_addresses": "0x014504021b6e6f6465312e6d61696e6e65742e6170746f732e6b696c6e2e666905261807200e2bddf8b8797de019a9e9322332fd5ede3c19d4107bddf5d5b9bd450c9b346b0800",
       "network_addresses": "0x014a04022076616c696461746f72312e6d61696e6e65742e6170746f732e6b696c6e2e66690524180720e9ec97d24d57bbf1c43070038304243bc18a72edf6eb533480f82714e43061030800",
-      "validator_index": "46"
+      "validator_index": "45"
     },
-    "rank": 82
+    "rank": 81
   },
   {
     "addr": "0xc807d24a6ac70599cc9b72c649eb6b00c34a0e9c704447c44d75fade07213a26",
     "addr_prefix8": "c807d24a",
-    "voting_power": 229522542234848,
-    "voting_power_apt": 2295225.42234848,
-    "consensus_pubkey": null,
-    "network_addresses": null,
-    "fullnode_addresses": null,
+    "voting_power": 229395023098386,
+    "voting_power_apt": 2293950.23098386,
     "config": {
       "consensus_pubkey": "0xab31ec8d42d2154645cf4c1ac36b9bb162ca8b841f0e374fcebf585050fb064326947ca02bc5ef66b63d7288fa0ae942",
       "fullnode_addresses": "0x015604022c76666e2e6170746f732e6d61696e6e65742e72657075626c696363727970746f2d736f757263652e696e666f0526180720c4587e699ffbdfc8a3fb3869513e8ef2fe903300bb26e4d39cf436163ba0d8620800",
       "network_addresses": "0x015404022a762e6170746f732e6d61696e6e65742e72657075626c696363727970746f2d736f757263652e696e666f0524180720deead78f3a93b7e5ea08d2ff1faeec5551a313284b002a79e019568717bae0650800",
       "validator_index": "4"
     },
-    "rank": 83
+    "rank": 82
   },
   {
     "addr": "0x1232f58b963938486a11f88c1c36d61d82738b1828625a95a1e85b4c8d1282",
     "addr_prefix8": "1232f58b",
-    "voting_power": 223527466266158,
-    "voting_power_apt": 2235274.66266158,
-    "consensus_pubkey": null,
-    "network_addresses": null,
-    "fullnode_addresses": null,
+    "voting_power": 223649862742684,
+    "voting_power_apt": 2236498.62742684,
     "config": {
       "consensus_pubkey": "0xa05bdc13dbd7e224732cbf1eda9bb92e189c0b4e8919bfc42c0107bffc909f3494b003b5f36a870caa52cda31beebab4",
       "fullnode_addresses": "0x012d040048fb07c1052618072011a67510b0cc2788b19b3f14edb1dd43acbe7a36d36ed4b98b023628c04f01580800",
       "network_addresses": "0x012d040048fb077405241807204d113530b74b4b308749bb27943edfaa663e54146316ec32729a5ef7b1a52a4e0800",
-      "validator_index": "51"
+      "validator_index": "50"
     },
-    "rank": 84
+    "rank": 83
   },
   {
     "addr": "0x209154f6e735562ff13b963b91588039a162fa95f409c068f917f27b762dfff8",
     "addr_prefix8": "209154f6",
-    "voting_power": 219829785150176,
-    "voting_power_apt": 2198297.85150176,
-    "consensus_pubkey": null,
-    "network_addresses": null,
-    "fullnode_addresses": null,
+    "voting_power": 219707796763759,
+    "voting_power_apt": 2197077.96763759,
     "config": {
       "consensus_pubkey": "0x81d7713f73affa178654302130ee7c3eea16ed9eba5c22e153e651869eef405d78cee026db3418335c9ecf634c0bcbab",
       "fullnode_addresses": "0x013804020e666e2e617074636f72652e6f6e650526180720aded04e1b55204feddccc0e65b7cf97604b31764310d9507c0522b1dc5065e3c0800",
       "network_addresses": "0x013904020f766e322e617074636f72652e6f6e650524180720c17584c5cd21539bdd9a6854d702872eefb6a5057168139a43f82d361a80c4090800",
       "validator_index": "13"
     },
-    "rank": 85
+    "rank": 84
   },
   {
     "addr": "0xaa22e8f642839d2d961941c44bf65eca496a7cf7e322edcfa19aac4d21a41d96",
     "addr_prefix8": "aa22e8f6",
-    "voting_power": 214024727510555,
-    "voting_power_apt": 2140247.27510555,
-    "consensus_pubkey": null,
-    "network_addresses": null,
-    "fullnode_addresses": null,
+    "voting_power": 214123550130943,
+    "voting_power_apt": 2141235.50130943,
     "config": {
       "consensus_pubkey": "0xb92ea19c2c3cdae9b2b1009a9b765152ba6779dc7ea180813e730dcca1784c6985e374d0aadbb9bb687caf11f1e3f418",
       "fullnode_addresses": "0x014704021d6170746f732d76666e2e706c742e636f72702e63657274696b2e636f6d0526180720e9cacd021e61862ab533f8abcd5324478e1f529eacc0bbf591cb9eddadfd15770800",
       "network_addresses": "0x014d0402236170746f732d76616c696461746f722e706c742e636f72702e63657274696b2e636f6d052418072056166c2395d1baf4f255c19c47d30c01b19df960bfa3209c91363947c65671580800",
-      "validator_index": "87"
+      "validator_index": "86"
     },
-    "rank": 86
+    "rank": 85
   },
   {
     "addr": "0xf05d2fe6618a3cb4258e94f2da24c1ee71ae4e7942b4f8b5836ad5267e59568f",
     "addr_prefix8": "f05d2fe6",
-    "voting_power": 211541989988306,
-    "voting_power_apt": 2115419.89988306,
-    "consensus_pubkey": null,
-    "network_addresses": null,
-    "fullnode_addresses": null,
+    "voting_power": 211424412424010,
+    "voting_power_apt": 2114244.1242401,
     "config": {
       "consensus_pubkey": "0xa17afb962545cc71548c859af67ec5039db81a0761978b0c948f35b75034470da6cb30a4b249b63c5ce567b4489f47e5",
       "fullnode_addresses": "0x014a040220636e65756e6132766a37316d64656632713632672e62646e6f6465732e6e65740526180720385bc8a1f3769d87b80dd83884e5a3fce1dd825f3476ef4a131c51d0ebe91c1e0800",
       "network_addresses": "0x014a040220636e65756e766d337632313273346c386c7634672e62646e6f6465732e6e65740524180720debe55fb55f1fafc768dd6967d08948f9974ca44901502c9f2076997e4b733520800",
       "validator_index": "17"
     },
-    "rank": 87
+    "rank": 86
   },
   {
     "addr": "0x649127a4d1b26b4cf936f7b795917dbcb571c59c2926ae473fe4d9df3575790e",
     "addr_prefix8": "649127a4",
-    "voting_power": 208917693308971,
-    "voting_power_apt": 2089176.93308971,
-    "consensus_pubkey": null,
-    "network_addresses": null,
-    "fullnode_addresses": null,
+    "voting_power": 208801608311232,
+    "voting_power_apt": 2088016.08311232,
     "config": {
       "consensus_pubkey": "0xb44e1fbba0326a0f22ff829276827593e195263b011503bfae88aa50204fe2a9633f0c99845cb78053d4ac3aa1919c40",
       "fullnode_addresses": "0x012d04007f0000010526180720bc4787945bdbfaa1a432b4b4d056c86d795ccae83a751899fa78c272e30e23400800",
       "network_addresses": "0x01430402196170746f732e766e322e63727970746f6d6f6c6f742e636f6d0524180720d747935a82b9c1d44265669098864222b3a0786df15de9b6004b72ae7e7ce5780800",
       "validator_index": "8"
     },
-    "rank": 88
+    "rank": 87
   },
   {
     "addr": "0x7ec963a7f9a4ee5d87e9431f5646162626c35774c799f4181d574f0ba938bf38",
     "addr_prefix8": "7ec963a7",
-    "voting_power": 206483172878120,
-    "voting_power_apt": 2064831.7287812,
-    "consensus_pubkey": null,
-    "network_addresses": null,
-    "fullnode_addresses": null,
+    "voting_power": 206518707282777,
+    "voting_power_apt": 2065187.07282777,
     "config": {
       "consensus_pubkey": "0x8be43c16a0bdcb80a5575c66d7fbcb95327a2b802eb8e76ec05b60d9f23cf9bcc0523fff3038c5880c96c23fd76e396e",
       "fullnode_addresses": "0x014704021d6170746f732d66756c6c6e6f64652d322e7374616b65642e636c6f756405261807209f8927edb762cbe44e442871732344b7b485b159702a1988eaff43ed4cda62700800",
       "network_addresses": "0x014804021e6170746f732d76616c696461746f722d322e7374616b65642e636c6f756405241807205a56f6c21863b8da5264641a7dd2b1d9e52ebae83ca7030ffade74c770f494740800",
-      "validator_index": "93"
+      "validator_index": "92"
     },
-    "rank": 89
+    "rank": 88
   },
   {
     "addr": "0x8be2ba62bfd783e5fbff57a07acf2a9a95f4d234b3729fbfda9c63f3f42fb78f",
     "addr_prefix8": "8be2ba62",
-    "voting_power": 204728341700137,
-    "voting_power_apt": 2047283.41700137,
-    "consensus_pubkey": null,
-    "network_addresses": null,
-    "fullnode_addresses": null,
+    "voting_power": 204614274986968,
+    "voting_power_apt": 2046142.74986968,
     "config": {
       "consensus_pubkey": "0x9538315379ee817e621adf1c3ffb2890063628eb55276ec25288de5a1946ecd2d8be91e3846408947f6a8ef6b00600f4",
       "fullnode_addresses": "0x01630402396170746f732d6d61696e6e65742d6669676d656e742d76666e2d312e7374616b696e672e70726f64756374696f6e2e6669676d656e742e696f0526180720c6fde909bcc5a2728aade9b20037d0323151daa3420d4eb2dc0986438b51b8730800",
       "network_addresses": "0x016904023f6170746f732d6d61696e6e65742d6669676d656e742d76616c696461746f722d312e7374616b696e672e70726f64756374696f6e2e6669676d656e742e696f0524180720d72de74ccf8828a01521418b9b6a7495d043fcf22ae171cf115a6ff26e0d3b0d0800",
       "validator_index": "18"
     },
-    "rank": 90
+    "rank": 89
   },
   {
     "addr": "0x9a41af5c002f91dc29cb2843ab823e3d6cdaa6cc86e6331646a4f1328609a744",
     "addr_prefix8": "9a41af5c",
-    "voting_power": 203820872321773,
-    "voting_power_apt": 2038208.72321773,
-    "consensus_pubkey": null,
-    "network_addresses": null,
-    "fullnode_addresses": null,
+    "voting_power": 203707632513508,
+    "voting_power_apt": 2037076.32513508,
     "config": {
       "consensus_pubkey": "0x91faace19486d9284c3137b4812e42738731f3d7b5775d473f820ecb4ce45470199ab2ea90554263df9b8028fdedf5eb",
       "fullnode_addresses": "0x014404021a6e6f64652e6d61696e6e65742e6170746f732e6b696c6e2e6669052618072038c7ae31dc43715db025f377220199b643a2efd915293a82796bd9f2b8e764170800",
       "network_addresses": "0x014904021f76616c696461746f722e6d61696e6e65742e6170746f732e6b696c6e2e666905241807209f494f6dca7cd6b9ab007be4b69e4f8c5b23a21c358aa1e78a3aeac35a38de6e0800",
       "validator_index": "14"
     },
-    "rank": 91
+    "rank": 90
   },
   {
     "addr": "0x3d654d35d558d6381fe6a0484d81c4fed128cd8adc1ca7a1482c297da80ee039",
     "addr_prefix8": "3d654d35",
-    "voting_power": 203347345461325,
-    "voting_power_apt": 2033473.45461325,
-    "consensus_pubkey": null,
-    "network_addresses": null,
-    "fullnode_addresses": null,
+    "voting_power": 203234617566048,
+    "voting_power_apt": 2032346.17566048,
     "config": {
       "consensus_pubkey": "0xa12f81ad01631276dbbae35c0d9c11c2ced1bd43a943eb849d049b8636a6e9ea7158e515b3f5722258607f0c1a855e87",
       "fullnode_addresses": "0x013e04021476666e2e6170746f732e666f72676f6f2e636f6d05261807205856bdde1908e4df719ccdde3d5bcd1509f168e9bb60cd7ad5d823232f197d470800",
       "network_addresses": "0x013d040213766e2e6170746f732e666f72676f6f2e636f6d0524180720cd559b01f268b6522b05c97dc7e872d29bcd9bf5f9ba558af5cd0d6093606f660800",
       "validator_index": "2"
     },
-    "rank": 92
+    "rank": 91
   },
   {
     "addr": "0x32ad233a939bfbafb8d9056c0ae2eba58828d8baf5582277578ced38477f0f14",
     "addr_prefix8": "32ad233a",
-    "voting_power": 196813269721707,
-    "voting_power_apt": 1968132.69721707,
-    "consensus_pubkey": null,
-    "network_addresses": null,
-    "fullnode_addresses": null,
+    "voting_power": 196904312446072,
+    "voting_power_apt": 1969043.12446072,
     "config": {
       "consensus_pubkey": "0x90ef1d56c15ecc4574420d8897dd93b11c8958b9145860af5e6cb3f867b8edaa42aa9292c8ad492f7741b4de920b7189",
       "fullnode_addresses": "0x016604023c66756c6c6e6f64652e62356537653233642d303637322d343962352d393133392d3536356561306431613136652e6170746f732e686572642e72756e0526180720430c1f838c93e4bc80a4a65fad1fd5448328a0d6d0cfb342e680fb196a68da390800",
       "network_addresses": "0x016704023d76616c696461746f722e62356537653233642d303637322d343962352d393133392d3536356561306431613136652e6170746f732e686572642e72756e0524180720ea0f65faab5667196dfe0142048c0108232432e6073bc84cb706d5ae2be619390800",
       "validator_index": "1"
     },
-    "rank": 93
+    "rank": 92
   },
   {
     "addr": "0xa286a9187c86b4a3cef60478e5c61bb45757b795a8e6577ebbf0fa990db574cc",
     "addr_prefix8": "a286a918",
-    "voting_power": 196093560573689,
-    "voting_power_apt": 1960935.60573689,
-    "consensus_pubkey": null,
-    "network_addresses": null,
-    "fullnode_addresses": null,
+    "voting_power": 195985934842442,
+    "voting_power_apt": 1959859.34842442,
     "config": {
       "consensus_pubkey": "0x83ddf24d5759259b40a61dc1a1ec2ebc9433504ecfd3033d7805c795506dbfeb03085df3b66c231036abf8e0cb24dd5b",
       "fullnode_addresses": "0x014704021d6170746f732d66756c6c6e6f64652d312e7374616b65642e636c6f75640526180720caf90fdcd8cf327a17b3e03b26e0f62a31a494a313c710b722f8c74ff877476d0800",
       "network_addresses": "0x014804021e6170746f732d76616c696461746f722d312e7374616b65642e636c6f756405241807206a1c7b94f02a75a8d1934e9548abfdf666b04c7301c2aef516248c4d02af96240800",
       "validator_index": "16"
     },
+    "rank": 93
+  },
+  {
+    "addr": "0x2537e9d461d311dc6f1dee690f093b4e353f472abc2493c64275a3d5572532cc",
+    "addr_prefix8": "2537e9d4",
+    "voting_power": 192857513910414,
+    "voting_power_apt": 1928575.13910414,
+    "config": {
+      "consensus_pubkey": "0x99b09a09cb154d0a4e4449b6b3db7afdddf2daa733af9d9bca09c159c2a82684809148e17cc558e6c1323df5929a9a3b",
+      "fullnode_addresses": "0x016504023b6170746f732d6d61696e6e65742d61706f6c6c6f2d64702d76666e2d322e7374616b696e672e70726f64756374696f6e2e6669676d656e742e696f052618072004989f34811b2eae5837c58e6fc0501513b57e638289935c87e28d838a732c1f0800",
+      "network_addresses": "0x01610402376170746f732d6d61696e6e65742d61706f6c6c6f2d64702d322e7374616b696e672e70726f64756374696f6e2e6669676d656e742e696f0524180720f692c242c6d6befe576cdcc00790dd83a2ac7e61b570ce44151ff3aa20caeb0e0800",
+      "validator_index": "25"
+    },
     "rank": 94
   },
   {
     "addr": "0x6c8a3474cb49202515d121fea0f3217d303e41f6bdc43e615f1cd90855118089",
     "addr_prefix8": "6c8a3474",
-    "voting_power": 192904119774188,
-    "voting_power_apt": 1929041.19774188,
-    "consensus_pubkey": null,
-    "network_addresses": null,
-    "fullnode_addresses": null,
+    "voting_power": 192797178748620,
+    "voting_power_apt": 1927971.7874862,
     "config": {
       "consensus_pubkey": "0x9941f373719cd95cf834d7a30ce5343d9fbe0d38e19111f5490aae09c454ff60c924c89abadbe805a15c34efbd34d520",
       "fullnode_addresses": "0x00",
@@ -1522,11 +1237,8 @@
   {
     "addr": "0x1c6a051d9a5ec4cf4200bab21a794d3afe8259d625f6b78aa4d01ab4652327d5",
     "addr_prefix8": "1c6a051d",
-    "voting_power": 192741080167353,
-    "voting_power_apt": 1927410.80167353,
-    "consensus_pubkey": null,
-    "network_addresses": null,
-    "fullnode_addresses": null,
+    "voting_power": 192634244373291,
+    "voting_power_apt": 1926342.44373291,
     "config": {
       "consensus_pubkey": "0x8526b919d79f06e2133edf146c64dce4ebf251a10b49f063f9a369d92a9678ba962d21e05160114cdde351fcb0560699",
       "fullnode_addresses": "0x00",
@@ -1536,195 +1248,146 @@
     "rank": 96
   },
   {
-    "addr": "0x2537e9d461d311dc6f1dee690f093b4e353f472abc2493c64275a3d5572532cc",
-    "addr_prefix8": "2537e9d4",
-    "voting_power": 192668631297635,
-    "voting_power_apt": 1926686.31297635,
-    "consensus_pubkey": null,
-    "network_addresses": null,
-    "fullnode_addresses": null,
-    "config": {
-      "consensus_pubkey": "0x99b09a09cb154d0a4e4449b6b3db7afdddf2daa733af9d9bca09c159c2a82684809148e17cc558e6c1323df5929a9a3b",
-      "fullnode_addresses": "0x016504023b6170746f732d6d61696e6e65742d61706f6c6c6f2d64702d76666e2d322e7374616b696e672e70726f64756374696f6e2e6669676d656e742e696f052618072004989f34811b2eae5837c58e6fc0501513b57e638289935c87e28d838a732c1f0800",
-      "network_addresses": "0x01610402376170746f732d6d61696e6e65742d61706f6c6c6f2d64702d322e7374616b696e672e70726f64756374696f6e2e6669676d656e742e696f0524180720f692c242c6d6befe576cdcc00790dd83a2ac7e61b570ce44151ff3aa20caeb0e0800",
-      "validator_index": "25"
-    },
-    "rank": 97
-  },
-  {
     "addr": "0x6e60dd385a87a14d80741ad3070e3ff0ae064e3884e75ee918593126762650cd",
     "addr_prefix8": "6e60dd38",
     "voting_power": 190277375836706,
     "voting_power_apt": 1902773.75836706,
-    "consensus_pubkey": null,
-    "network_addresses": null,
-    "fullnode_addresses": null,
     "config": {
       "consensus_pubkey": "0xb261a22cd6d232bf60d7a3e471835dcc8f54b3f4801fb9e4a483501f1b8a34a11ba673cb5b4b3db119d30d5f224d48a4",
       "fullnode_addresses": "0x012d040023e73e0605261807201b4bcdd5dc81016f432988f28f56163ef004a47e75500d6362182f0346dab50a0800",
       "network_addresses": "0x012d040023e51dfa0524180720133a9d9678cd33b9ec038c0d6cabab4a3aceff6c348312895cfe071989dc494a0800",
-      "validator_index": "52"
+      "validator_index": "51"
     },
-    "rank": 98
+    "rank": 97
   },
   {
     "addr": "0xf4a6e0753687faaff17d32f72900094019fe7d2d35e45b94b87d113faec0d9e9",
     "addr_prefix8": "f4a6e075",
-    "voting_power": 173017136963949,
-    "voting_power_apt": 1730171.36963949,
-    "consensus_pubkey": null,
-    "network_addresses": null,
-    "fullnode_addresses": null,
+    "voting_power": 173097151067646,
+    "voting_power_apt": 1730971.51067646,
     "config": {
       "consensus_pubkey": "0x924ad4dccbd256a36a528dd42bf07301135e98a94f1c76d8174bbbde16047ed3d536de675d09c055c919a7019547adb6",
       "fullnode_addresses": "0x014404021a6170746f732d66756c6c6e6f64652e6e656c72616e6e2e6f72670526180720a29e56c9d402bb64834bb90397eb10d4f218d386bd32b5d302bd9a77607cf3480800",
       "network_addresses": "0x014f0402256170746f732d76616c696461746f722d64656c656761746f722e6e656c72616e6e2e6f7267052418072020bea4388e0257fa474b3d0976282fe743907d76b5c403bdf3a59ebd5a6f61750800",
-      "validator_index": "78"
+      "validator_index": "77"
     },
-    "rank": 99
+    "rank": 98
   },
   {
     "addr": "0x371dfdee9fbecaa358683936c5946aa28393067fa60e1e185c4250da461e15cf",
     "addr_prefix8": "371dfdee",
-    "voting_power": 171147694054962,
-    "voting_power_apt": 1711476.94054962,
-    "consensus_pubkey": null,
-    "network_addresses": null,
-    "fullnode_addresses": null,
+    "voting_power": 171226986807311,
+    "voting_power_apt": 1712269.86807311,
     "config": {
       "consensus_pubkey": "0xa5a7d87c6037d4e98c4003459e63c88de7ca99b55cffaa36b1f8162866eb5bbf1978ecb13b09c66571f8ccd0dd3e2d94",
       "fullnode_addresses": "0x014004021676666e2e6170746f732e647372766c6162732e6e65740526180720df0eb85221ed6f116dd5caa1e7461d2ec2e3c6be4b252ac90246b3384e46d96d0800",
       "network_addresses": "0x014604021c76616c696461746f722e6170746f732e647372766c6162732e6e657405241807203a4def33aecebb139d4bf57f697e305f9241885cb30acae23f7ac9e354e4b95d0800",
       "validator_index": "10"
     },
-    "rank": 100
+    "rank": 99
   },
   {
     "addr": "0x180c86aa5da47ec3393c329b65d82c9f50f53f3faac0f9807d8d3a6ff8ef85ac",
     "addr_prefix8": "180c86aa",
-    "voting_power": 171026044360846,
-    "voting_power_apt": 1710260.44360846,
-    "consensus_pubkey": null,
-    "network_addresses": null,
-    "fullnode_addresses": null,
+    "voting_power": 171100465410569,
+    "voting_power_apt": 1711004.65410569,
     "config": {
       "consensus_pubkey": "0xa819fbd58c568538aba021e2850d789a2182716a66a19f834bea06551e97864a9cb5accef38967fc10d1680040e1451e",
       "fullnode_addresses": "0x013f0402156170746f732d76666e2e726f636b7270632e6e65740526180720703c83e264225adb3bf66254aeb58a9a845cfdc0b4c25b491feaa81512d9d71d0800",
       "network_addresses": "0x013f0402156170746f732d76616c2e726f636b7270632e6e6574052418072014e570f3d57e4cd734f2e07feedd51505b9f413af672f07cbe2fa0bf377ebf5e0800",
-      "validator_index": "91"
+      "validator_index": "90"
     },
-    "rank": 101
+    "rank": 100
   },
   {
     "addr": "0xf16cdebe221b819504c96014b81b0903fd345c3c066415a30ec75148358426dc",
     "addr_prefix8": "f16cdebe",
-    "voting_power": 161645512790757,
-    "voting_power_apt": 1616455.12790757,
-    "consensus_pubkey": null,
-    "network_addresses": null,
-    "fullnode_addresses": null,
+    "voting_power": 161692489188218,
+    "voting_power_apt": 1616924.89188218,
     "config": {
       "consensus_pubkey": "0x80734006f8d3673bb4d640240a69b8ef4eaf5ace72d83b11ccf1e57de6325556917f60187b85c8526c4fc5b5383824a3",
       "fullnode_addresses": "0x014e0402246e6f64652d6c312d6170746f732d76666e2d636d2e6e6f646573776966742e636c6f756405261807209293c36b10ce1ecde8e1ad6bdcae07d1fed71291d2c93ddebae67c83f0f3bb330800",
       "network_addresses": "0x014d0402236e6f64652d6c312d6170746f732d766e2d636d2e6e6f646573776966742e636c6f756405241807200ce46c0337303c80947377e0d6a80fd18c1579a59e55d99d337d293a5a4273540800",
       "validator_index": "3"
     },
-    "rank": 102
+    "rank": 101
   },
   {
     "addr": "0xbcfe20d6df15fe888dd7c5a15cb32e5396cd358adc02d07c51cc08f3785b79b6",
     "addr_prefix8": "bcfe20d6",
-    "voting_power": 150483161848589,
-    "voting_power_apt": 1504831.61848589,
-    "consensus_pubkey": null,
-    "network_addresses": null,
-    "fullnode_addresses": null,
+    "voting_power": 150552746702864,
+    "voting_power_apt": 1505527.46702864,
     "config": {
       "consensus_pubkey": "0xab707632125fad2d35cac86ff9046df56cf2eaba6a118d087809a4cdad4e3c6106d5d96696b127b17d43d994ed8f8061",
       "fullnode_addresses": "0x016704023d66756c6c6e6f64652e61396236626435622d333431642d346432392d393537632d6661623633656136613131622e6170746f732e6269736f6e2e72756e05261807207666deacf75b48bf16a2f91fdd1830996e9f9403492f1dd0256a5a2efe858e460800",
       "network_addresses": "0x016804023e76616c696461746f722e61396236626435622d333431642d346432392d393537632d6661623633656136613131622e6170746f732e6269736f6e2e72756e05241807208caae2c0c82ef6073ffa98b4aeb08b4646ad1e8f70fab6ae426d24d9564703130800",
-      "validator_index": "48"
+      "validator_index": "47"
     },
-    "rank": 103
+    "rank": 102
   },
   {
     "addr": "0x7ba7dd0aff5acdc056a2f1f7f1fb24bf1e7d3d6909c33d45f8c2333b13bd2f80",
     "addr_prefix8": "7ba7dd0a",
-    "voting_power": 147351318936428,
-    "voting_power_apt": 1473513.18936428,
-    "consensus_pubkey": null,
-    "network_addresses": null,
-    "fullnode_addresses": null,
+    "voting_power": 147419140996561,
+    "voting_power_apt": 1474191.40996561,
     "config": {
       "consensus_pubkey": "0x90f6f73c297e4a1e7b8b9ff1024e6c39afde7f1ddd7fdf9b18271dab1fec949b8305df53f3053bac4b8ffae5b9826b8e",
       "fullnode_addresses": "0x012d0400482e55ab0526180720ce9debb8ad83d7f615341b09c9832ba6d41fe7eef6c88f62f5e02957d0d1d2390800",
       "network_addresses": "0x012d0400482e55ab052418072052d2e01fdb974c18eefd86c3ed9e1d73cf8e1a9a0b9f577e107c212b5777933b0800",
       "validator_index": "23"
     },
-    "rank": 104
+    "rank": 103
   },
   {
     "addr": "0xc448e3f4175eba677870bf0a5a438fd0b2bf3155f9cd61201ad397bfcd75ee4e",
     "addr_prefix8": "c448e3f4",
-    "voting_power": 138057636542078,
-    "voting_power_apt": 1380576.36542078,
-    "consensus_pubkey": null,
-    "network_addresses": null,
-    "fullnode_addresses": null,
+    "voting_power": 138121318599586,
+    "voting_power_apt": 1381213.18599586,
     "config": {
       "consensus_pubkey": "0xa71faec96c0f1ea2deab32a61d0509ba274d88b98f2dad37de530bd5aed4e1bdd5deeea665ade00be5888154f57eaec8",
       "fullnode_addresses": "0x016704023d66756c6c6e6f64652e34353435333666352d393930392d343337362d396436362d3435343462633161373930382e6170746f732e6269736f6e2e72756e0526180720c5d9d52297e58cad2c739baf27c2e97b8f984b1aa1cff8f7ea36c7b6b01068530800",
       "network_addresses": "0x016804023e76616c696461746f722e34353435333666352d393930392d343337362d396436362d3435343462633161373930382e6170746f732e6269736f6e2e72756e05241807203f734689f5e2345dd30d361a2059a8606bbcb0448dbc92afae81a51a063741760800",
-      "validator_index": "65"
+      "validator_index": "64"
     },
-    "rank": 105
+    "rank": 104
   },
   {
     "addr": "0x35b922386bd35db0f33c732a70d7b6a2e91e463812c8d710f925f6da0e0ace07",
     "addr_prefix8": "35b92238",
-    "voting_power": 126067664113268,
-    "voting_power_apt": 1260676.64113268,
-    "consensus_pubkey": null,
-    "network_addresses": null,
-    "fullnode_addresses": null,
+    "voting_power": 126121656973578,
+    "voting_power_apt": 1261216.56973578,
     "config": {
       "consensus_pubkey": "0xaa70d27f7b44955e59daae4002de10e00dd0ad3c9d3a54a9d5bb49f0af6d78b29b3d2f33d868fee48058b037216d08ea",
       "fullnode_addresses": "0x012d040023c75e67052618072098b923097936cc53df5138a8a1a67c18bd2b33421777b55b808652fff513e1660800",
       "network_addresses": "0x012d040023c61ede05241807205c37eb57684ced6a80eefc4e434f635acba094a66f7550bbada806b89d8fb35c0800",
-      "validator_index": "64"
+      "validator_index": "63"
     },
-    "rank": 106
+    "rank": 105
   },
   {
     "addr": "0xeb5d1dfba88204036132b2bf4f4600f20822738e01985401ba45e75c464d1965",
     "addr_prefix8": "eb5d1dfb",
-    "voting_power": 118164774375619,
-    "voting_power_apt": 1181647.74375619,
-    "consensus_pubkey": null,
-    "network_addresses": null,
-    "fullnode_addresses": null,
+    "voting_power": 118219400150895,
+    "voting_power_apt": 1182194.00150895,
     "config": {
       "consensus_pubkey": "0xb4399f716b06a1dfb187bd29255dc89fa89f4bbe259b930e16bb373f1152c0f91c31928437b2050ab3ac36cb6e6913ca",
       "fullnode_addresses": "0x016704023d66756c6c6e6f64652e62626237366432642d303262352d346533652d626663332d3966313061326536393834392e6170746f732e6269736f6e2e72756e05261807202494f31865a994a7ef8c2723a5f3fcfa05a8dad872e7420de8c542dac59fb1070800",
       "network_addresses": "0x016804023e76616c696461746f722e62626237366432642d303262352d346533652d626663332d3966313061326536393834392e6170746f732e6269736f6e2e72756e05241807203601215a079b0114a32104bd02149cf2258a206c8f8c79790e0684f4adfeae400800",
       "validator_index": "0"
     },
-    "rank": 107
+    "rank": 106
   },
   {
     "addr": "0x43f33e00198e348de6b18d0d60dc09e5a74c1cc717ab1ca4d6026ab6b4fa6524",
     "addr_prefix8": "43f33e00",
-    "voting_power": 111830806632954,
-    "voting_power_apt": 1118308.06632954,
-    "consensus_pubkey": null,
-    "network_addresses": null,
-    "fullnode_addresses": null,
+    "voting_power": 111984868155178,
+    "voting_power_apt": 1119848.68155178,
     "config": {
       "consensus_pubkey": "0xb02e90b97f02a4d5c1056f97919cfe9036a81a387905ad54c15e7a333f74980e252dd74bbc101f8c66c902b919220689",
       "fullnode_addresses": "0x012d040023dd0ccd0526180720903bb35d2af31f1db5540e5a8b188fbfedcfd1fc903dfadfff0b1f5ace246c1a0800",
       "network_addresses": "0x012d0400886b388005241807204b264271417b526f441acfd5ccc6964b0bb108827b4eec1e1897da02347914110800",
-      "validator_index": "95"
+      "validator_index": "94"
     },
-    "rank": 108
+    "rank": 107
   }
 ]
