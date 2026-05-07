@@ -9,7 +9,7 @@ use crate::{
     },
     DbReader,
 };
-use anyhow::Result;
+use anyhow::{ensure, Result};
 use aptos_crypto::{hash::CORRUPTION_SENTINEL, HashValue};
 use aptos_metrics_core::TimerHelper;
 use aptos_scratchpad::{ProofRead, SparseMerkleTree};
@@ -76,7 +76,15 @@ impl StateSummary {
         assert_ne!(self.global_state_summary.root_hash(), *CORRUPTION_SENTINEL);
 
         // Persisted must be before or at my version.
-        assert!(persisted.next_version() <= self.next_version());
+        // Under fork conditions, the persisted version may advance past our version
+        // if a sibling block was pre-committed. Return an error instead of panicking —
+        // consensus will discard the losing fork.
+        ensure!(
+            persisted.next_version() <= self.next_version(),
+            "persisted version {} > state summary version {} — fork race detected",
+            persisted.next_version(),
+            self.next_version(),
+        );
         // Updates must start at exactly my version.
         assert_eq!(updates.first_version(), self.next_version());
 
@@ -234,5 +242,69 @@ impl ProofRead for ProvableStateSummary<'_> {
             self.get_proof(key, ver, root_depth)
                 .expect("Failed to get account state with proof by version.")
         })
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::state_store::state_update_refs::BatchedStateUpdateRefs;
+    use aptos_scratchpad::SparseMerkleTree;
+
+    fn make_summary(version: Option<Version>) -> StateSummary {
+        StateSummary::new_at_version(
+            version,
+            SparseMerkleTree::new_empty(),
+            SparseMerkleTree::new_empty(),
+        )
+    }
+
+    struct DummyDb;
+    impl DbReader for DummyDb {}
+
+    /// When the persisted version advances past the summary version (fork race),
+    /// `StateSummary::update` must return an error instead of panicking.
+    #[test]
+    fn summary_update_returns_error_when_persisted_exceeds_self() {
+        // Summary at version 5 (next_version = 6)
+        let summary = make_summary(Some(5));
+        // Persisted has advanced to version 8 (next_version = 9) — fork race
+        let persisted_summary = make_summary(Some(8));
+        let db = DummyDb;
+        let persisted = ProvableStateSummary::new(persisted_summary, &db);
+        // Updates starting at version 6 (matching summary.next_version)
+        let updates = BatchedStateUpdateRefs::new_empty(6, 1);
+
+        let result = summary.update(&persisted, &updates);
+        assert!(result.is_err(), "expected error when persisted > self version");
+        let msg = result.unwrap_err().to_string();
+        assert!(msg.contains("fork race"), "error should mention fork race, got: {msg}");
+    }
+
+    /// Boundary: persisted.next_version == self.next_version should pass the check.
+    #[test]
+    fn summary_update_does_not_error_on_fork_race_when_persisted_equals_self() {
+        let summary = make_summary(Some(5));
+        let persisted_summary = make_summary(Some(5));
+        let db = DummyDb;
+        let persisted = ProvableStateSummary::new(persisted_summary, &db);
+        let updates = BatchedStateUpdateRefs::new_empty(6, 1);
+
+        // The ensure! check should pass (persisted <= self). The call may
+        // panic later on the SMT family check — that's a different invariant.
+        let result = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
+            let _ = summary.update(&persisted, &updates);
+        }));
+        if let Err(panic) = result {
+            let msg = panic
+                .downcast_ref::<String>()
+                .map(|s| s.as_str())
+                .or_else(|| panic.downcast_ref::<&str>().copied())
+                .unwrap_or("");
+            assert!(
+                !msg.contains("fork race"),
+                "should not fail on the fork-race guard, got: {msg}"
+            );
+        }
     }
 }

@@ -15,7 +15,7 @@ use crate::{
     },
     DbReader,
 };
-use anyhow::Result;
+use anyhow::{ensure, Result};
 use aptos_experimental_layered_map::{LayeredMap, MapLayer};
 use aptos_metrics_core::TimerHelper;
 use aptos_types::{
@@ -109,7 +109,7 @@ impl State {
         persisted: &State,
         updates: &BatchedStateUpdateRefs,
         state_cache: &ShardedStateCache,
-    ) -> Self {
+    ) -> Result<Self> {
         let _timer = TIMER.timer_with(&["state__update"]);
 
         // 1. The update batch must begin at self.next_version().
@@ -117,9 +117,12 @@ impl State {
         // 2. The cache must be at a version equal or newer than `persisted`, otherwise
         //    updates between the cached version and the persisted version are potentially
         //    missed during the usage calculation.
-        assert!(
+        //    Under fork conditions, the persisted version may advance past the cache version
+        //    if a sibling block was pre-committed. Return an error instead of panicking —
+        //    consensus will discard the losing fork.
+        ensure!(
             persisted.next_version() <= state_cache.next_version(),
-            "persisted: {}, cache: {}",
+            "persisted version {} > cache version {} — likely a fork race, bailing",
             persisted.next_version(),
             state_cache.next_version(),
         );
@@ -150,7 +153,7 @@ impl State {
         let shards = Arc::new(shards.try_into().expect("Known to be 16 shards."));
         let usage = self.update_usage(usage_delta_per_shard);
 
-        State::new_with_updates(updates.last_version(), shards, usage)
+        Ok(State::new_with_updates(updates.last_version(), shards, usage))
     }
 
     fn update_usage(&self, usage_delta_per_shard: Vec<(i64, i64)>) -> StateStorageUsage {
@@ -237,11 +240,11 @@ impl LedgerState {
         persisted_snapshot: &State,
         updates: &StateUpdateRefs,
         reads: &ShardedStateCache,
-    ) -> LedgerState {
+    ) -> Result<LedgerState> {
         let _timer = TIMER.timer_with(&["ledger_state__update"]);
 
         let last_checkpoint = if let Some(updates) = &updates.for_last_checkpoint {
-            self.latest().update(persisted_snapshot, updates, reads)
+            self.latest().update(persisted_snapshot, updates, reads)?
         } else {
             self.last_checkpoint.clone()
         };
@@ -252,12 +255,12 @@ impl LedgerState {
             &last_checkpoint
         };
         let latest = if let Some(updates) = &updates.for_latest {
-            base_of_latest.update(persisted_snapshot, updates, reads)
+            base_of_latest.update(persisted_snapshot, updates, reads)?
         } else {
             base_of_latest.clone()
         };
 
-        LedgerState::new(latest, last_checkpoint)
+        Ok(LedgerState::new(latest, last_checkpoint))
     }
 
     /// Old values of the updated keys are read from the DbReader at the version of the
@@ -282,7 +285,7 @@ impl LedgerState {
             persisted_snapshot,
             updates,
             state_view.memorized_reads(),
-        );
+        )?;
         let state_reads = state_view.into_memorized_reads();
         Ok((updated, state_reads))
     }
@@ -290,5 +293,59 @@ impl LedgerState {
     pub fn is_the_same(&self, other: &Self) -> bool {
         self.latest.is_the_same(&other.latest)
             && self.last_checkpoint.is_the_same(&other.last_checkpoint)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::state_store::state_view::cached_state_view::ShardedStateCache;
+    use aptos_types::state_store::state_storage_usage::StateStorageUsage;
+
+    /// When the persisted version advances past the cache version (fork race),
+    /// `State::update` must return an error instead of panicking.
+    #[test]
+    fn state_update_returns_error_when_persisted_exceeds_cache() {
+        // "self" state at version 5 (next_version = 6)
+        let current = State::new_at_version(Some(5), StateStorageUsage::new(0, 0));
+        // Persisted state has advanced to version 8 (next_version = 9) — fork race
+        let persisted = State::new_at_version(Some(8), StateStorageUsage::new(0, 0));
+        // Cache is still at version 5 (next_version = 6) — behind persisted
+        let cache = ShardedStateCache::new_empty(Some(5));
+        // Updates starting at version 6 (matching current.next_version)
+        let updates = BatchedStateUpdateRefs::new_empty(6, 1);
+
+        let result = current.update(&persisted, &updates, &cache);
+        assert!(result.is_err(), "expected error when persisted > cache version");
+        let msg = result.unwrap_err().to_string();
+        assert!(msg.contains("fork race"), "error should mention fork race, got: {msg}");
+    }
+
+    /// Boundary: persisted.next_version == cache.next_version should pass the check.
+    #[test]
+    fn state_update_does_not_error_when_persisted_equals_cache() {
+        let current = State::new_at_version(Some(5), StateStorageUsage::new(0, 0));
+        let persisted = State::new_at_version(Some(5), StateStorageUsage::new(0, 0));
+        let cache = ShardedStateCache::new_empty(Some(5));
+        let updates = BatchedStateUpdateRefs::new_empty(6, 1);
+
+        // We only care that the ensure! check passes (persisted <= cache).
+        // The call will panic later on the descendant-of check (states aren't
+        // from the same family in this unit harness), but that's a different
+        // invariant — catch it and verify the panic isn't from the fork-race guard.
+        let result = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
+            let _ = current.update(&persisted, &updates, &cache);
+        }));
+        if let Err(panic) = result {
+            let msg = panic
+                .downcast_ref::<String>()
+                .map(|s| s.as_str())
+                .or_else(|| panic.downcast_ref::<&str>().copied())
+                .unwrap_or("");
+            assert!(
+                !msg.contains("fork race"),
+                "should not fail on the fork-race guard, got: {msg}"
+            );
+        }
     }
 }

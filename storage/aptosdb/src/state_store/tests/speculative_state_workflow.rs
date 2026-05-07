@@ -418,7 +418,7 @@ fn update_state(
             &persisted_state,
             block.update_refs(),
             &memorized_reads,
-        );
+        ).expect("state update failed");
 
         state_by_version.assert_ledger_state(&next_state);
 
