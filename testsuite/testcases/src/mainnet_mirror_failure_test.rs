@@ -247,10 +247,7 @@ impl NetworkLoadTest for MainnetMirrorFailureTest {
                     let pct = continuous_delay_pct(entry, self.config.min_continuous_pct);
                     let action = format!("{}%delay({})", pct, self.config.continuous_delay_ms);
                     for fp in SEND_FAILPOINTS {
-                        if let Err(e) = client
-                            .set_failpoint(fp.to_string(), action.clone())
-                            .await
-                        {
+                        if let Err(e) = client.set_failpoint(fp.to_string(), action.clone()).await {
                             warn!(
                                 "set_failpoint chronic/flaky on {} ({}={}) failed: {:?}",
                                 name, fp, action, e
