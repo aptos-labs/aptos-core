@@ -51,7 +51,7 @@ pub const VEC_DATA_OFFSET: usize = OBJECT_HEADER_SIZE + 8; // 16
 // change adds another field before the element data (e.g., capacity) and
 // pushes `VEC_DATA_OFFSET` to a non-`MAX_ALIGN` boundary, this assertion
 // catches it. See `docs/memory_alignment.md` (§8.3).
-const _: () = assert!(VEC_DATA_OFFSET % MAX_ALIGN == 0);
+const _: () = assert!(VEC_DATA_OFFSET.is_multiple_of(MAX_ALIGN));
 
 /// Marker written into the `descriptor_id` field of a forwarded object during GC.
 pub(crate) const FORWARDED_MARKER: u32 = u32::MAX;
