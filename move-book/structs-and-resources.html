@@ -1,0 +1,795 @@
+<!DOCTYPE HTML>
+<html lang="en" class="light sidebar-visible" dir="ltr">
+    <head>
+        <!-- Book generated using mdBook -->
+        <meta charset="UTF-8">
+        <title>Structs and Resources - The Move on Aptos Book</title>
+
+
+        <!-- Custom HTML head -->
+
+        <meta name="description" content="Move book maintained by the Move team at Aptos.">
+        <meta name="viewport" content="width=device-width, initial-scale=1">
+        <meta name="theme-color" content="#ffffff">
+
+        <link rel="icon" href="favicon-de23e50b.svg">
+        <link rel="shortcut icon" href="favicon-8114d1fc.png">
+        <link rel="stylesheet" href="css/variables-8adf115d.css">
+        <link rel="stylesheet" href="css/general-2459343d.css">
+        <link rel="stylesheet" href="css/chrome-ae938929.css">
+        <link rel="stylesheet" href="css/print-9e4910d8.css" media="print">
+
+        <!-- Fonts -->
+        <link rel="stylesheet" href="fonts/fonts-9644e21d.css">
+
+        <!-- Highlight.js Stylesheets -->
+        <link rel="stylesheet" id="mdbook-highlight-css" href="highlight-493f70e1.css">
+        <link rel="stylesheet" id="mdbook-tomorrow-night-css" href="tomorrow-night-4c0ae647.css">
+        <link rel="stylesheet" id="mdbook-ayu-highlight-css" href="ayu-highlight-3fdfc3ac.css">
+
+        <!-- Custom theme stylesheets -->
+
+
+        <!-- Provide site root and default themes to javascript -->
+        <script>
+            const path_to_root = "";
+            const default_light_theme = "light";
+            const default_dark_theme = "navy";
+            window.path_to_searchindex_js = "searchindex-542db50c.js";
+        </script>
+        <!-- Start loading toc.js asap -->
+        <script src="toc-3d0ce12d.js"></script>
+    </head>
+    <body>
+    <div id="mdbook-help-container">
+        <div id="mdbook-help-popup">
+            <h2 class="mdbook-help-title">Keyboard shortcuts</h2>
+            <div>
+                <p>Press <kbd>←</kbd> or <kbd>→</kbd> to navigate between chapters</p>
+                <p>Press <kbd>S</kbd> or <kbd>/</kbd> to search in the book</p>
+                <p>Press <kbd>?</kbd> to show this help</p>
+                <p>Press <kbd>Esc</kbd> to hide this help</p>
+            </div>
+        </div>
+    </div>
+    <div id="mdbook-body-container">
+        <!-- Work around some values being stored in localStorage wrapped in quotes -->
+        <script>
+            try {
+                let theme = localStorage.getItem('mdbook-theme');
+                let sidebar = localStorage.getItem('mdbook-sidebar');
+
+                if (theme.startsWith('"') && theme.endsWith('"')) {
+                    localStorage.setItem('mdbook-theme', theme.slice(1, theme.length - 1));
+                }
+
+                if (sidebar.startsWith('"') && sidebar.endsWith('"')) {
+                    localStorage.setItem('mdbook-sidebar', sidebar.slice(1, sidebar.length - 1));
+                }
+            } catch (e) { }
+        </script>
+
+        <!-- Set the theme before any content is loaded, prevents flash -->
+        <script>
+            const default_theme = window.matchMedia("(prefers-color-scheme: dark)").matches ? default_dark_theme : default_light_theme;
+            let theme;
+            try { theme = localStorage.getItem('mdbook-theme'); } catch(e) { }
+            if (theme === null || theme === undefined) { theme = default_theme; }
+            const html = document.documentElement;
+            html.classList.remove('light')
+            html.classList.add(theme);
+            html.classList.add("js");
+        </script>
+
+        <input type="checkbox" id="mdbook-sidebar-toggle-anchor" class="hidden">
+
+        <!-- Hide / unhide sidebar before it is displayed -->
+        <script>
+            let sidebar = null;
+            const sidebar_toggle = document.getElementById("mdbook-sidebar-toggle-anchor");
+            if (document.body.clientWidth >= 1080) {
+                try { sidebar = localStorage.getItem('mdbook-sidebar'); } catch(e) { }
+                sidebar = sidebar || 'visible';
+            } else {
+                sidebar = 'hidden';
+                sidebar_toggle.checked = false;
+            }
+            if (sidebar === 'visible') {
+                sidebar_toggle.checked = true;
+            } else {
+                html.classList.remove('sidebar-visible');
+            }
+        </script>
+
+        <nav id="mdbook-sidebar" class="sidebar" aria-label="Table of contents">
+            <!-- populated by js -->
+            <mdbook-sidebar-scrollbox class="sidebar-scrollbox"></mdbook-sidebar-scrollbox>
+            <noscript>
+                <iframe class="sidebar-iframe-outer" src="toc.html"></iframe>
+            </noscript>
+            <div id="mdbook-sidebar-resize-handle" class="sidebar-resize-handle">
+                <div class="sidebar-resize-indicator"></div>
+            </div>
+        </nav>
+
+        <div id="mdbook-page-wrapper" class="page-wrapper">
+
+            <div class="page">
+                <div id="mdbook-menu-bar-hover-placeholder"></div>
+                <div id="mdbook-menu-bar" class="menu-bar sticky">
+                    <div class="left-buttons">
+                        <label id="mdbook-sidebar-toggle" class="icon-button" for="mdbook-sidebar-toggle-anchor" title="Toggle Table of Contents" aria-label="Toggle Table of Contents" aria-controls="mdbook-sidebar">
+                            <span class=fa-svg><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 448 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M0 96C0 78.3 14.3 64 32 64H416c17.7 0 32 14.3 32 32s-14.3 32-32 32H32C14.3 128 0 113.7 0 96zM0 256c0-17.7 14.3-32 32-32H416c17.7 0 32 14.3 32 32s-14.3 32-32 32H32c-17.7 0-32-14.3-32-32zM448 416c0 17.7-14.3 32-32 32H32c-17.7 0-32-14.3-32-32s14.3-32 32-32H416c17.7 0 32 14.3 32 32z"/></svg></span>
+                        </label>
+                        <button id="mdbook-theme-toggle" class="icon-button" type="button" title="Change theme" aria-label="Change theme" aria-haspopup="true" aria-expanded="false" aria-controls="mdbook-theme-list">
+                            <span class=fa-svg><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 576 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M371.3 367.1c27.3-3.9 51.9-19.4 67.2-42.9L600.2 74.1c12.6-19.5 9.4-45.3-7.6-61.2S549.7-4.4 531.1 9.6L294.4 187.2c-24 18-38.2 46.1-38.4 76.1L371.3 367.1zm-19.6 25.4l-116-104.4C175.9 290.3 128 339.6 128 400c0 3.9 .2 7.8 .6 11.6c1.8 17.5-10.2 36.4-27.8 36.4H96c-17.7 0-32 14.3-32 32s14.3 32 32 32H240c61.9 0 112-50.1 112-112c0-2.5-.1-5-.2-7.5z"/></svg></span>
+                        </button>
+                        <ul id="mdbook-theme-list" class="theme-popup" aria-label="Themes" role="menu">
+                            <li role="none"><button role="menuitem" class="theme" id="mdbook-theme-default_theme">Auto</button></li>
+                            <li role="none"><button role="menuitem" class="theme" id="mdbook-theme-light">Light</button></li>
+                            <li role="none"><button role="menuitem" class="theme" id="mdbook-theme-rust">Rust</button></li>
+                            <li role="none"><button role="menuitem" class="theme" id="mdbook-theme-coal">Coal</button></li>
+                            <li role="none"><button role="menuitem" class="theme" id="mdbook-theme-navy">Navy</button></li>
+                            <li role="none"><button role="menuitem" class="theme" id="mdbook-theme-ayu">Ayu</button></li>
+                        </ul>
+                        <button id="mdbook-search-toggle" class="icon-button" type="button" title="Search (`/`)" aria-label="Toggle Searchbar" aria-expanded="false" aria-keyshortcuts="/ s" aria-controls="mdbook-searchbar">
+                            <span class=fa-svg><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M416 208c0 45.9-14.9 88.3-40 122.7L502.6 457.4c12.5 12.5 12.5 32.8 0 45.3s-32.8 12.5-45.3 0L330.7 376c-34.4 25.2-76.8 40-122.7 40C93.1 416 0 322.9 0 208S93.1 0 208 0S416 93.1 416 208zM208 352c79.5 0 144-64.5 144-144s-64.5-144-144-144S64 128.5 64 208s64.5 144 144 144z"/></svg></span>
+                        </button>
+                    </div>
+
+                    <h1 class="menu-title">The Move on Aptos Book</h1>
+
+                    <div class="right-buttons">
+                        <a href="print.html" title="Print this book" aria-label="Print this book">
+                            <span class=fa-svg id="print-button"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M128 0C92.7 0 64 28.7 64 64v96h64V64H354.7L384 93.3V160h64V93.3c0-17-6.7-33.3-18.7-45.3L400 18.7C388 6.7 371.7 0 354.7 0H128zM384 352v32 64H128V384 368 352H384zm64 32h32c17.7 0 32-14.3 32-32V256c0-35.3-28.7-64-64-64H64c-35.3 0-64 28.7-64 64v96c0 17.7 14.3 32 32 32H64v64c0 35.3 28.7 64 64 64H384c35.3 0 64-28.7 64-64V384zm-16-88c-13.3 0-24-10.7-24-24s10.7-24 24-24s24 10.7 24 24s-10.7 24-24 24z"/></svg></span>
+                        </a>
+                        <a href="https://github.com/aptos-labs/aptos-core" title="Git repository" aria-label="Git repository">
+                            <span class=fa-svg><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 496 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M165.9 397.4c0 2-2.3 3.6-5.2 3.6-3.3.3-5.6-1.3-5.6-3.6 0-2 2.3-3.6 5.2-3.6 3-.3 5.6 1.3 5.6 3.6zm-31.1-4.5c-.7 2 1.3 4.3 4.3 4.9 2.6 1 5.6 0 6.2-2s-1.3-4.3-4.3-5.2c-2.6-.7-5.5.3-6.2 2.3zm44.2-1.7c-2.9.7-4.9 2.6-4.6 4.9.3 2 2.9 3.3 5.9 2.6 2.9-.7 4.9-2.6 4.6-4.6-.3-1.9-3-3.2-5.9-2.9zM244.8 8C106.1 8 0 113.3 0 252c0 110.9 69.8 205.8 169.5 239.2 12.8 2.3 17.3-5.6 17.3-12.1 0-6.2-.3-40.4-.3-61.4 0 0-70 15-84.7-29.8 0 0-11.4-29.1-27.8-36.6 0 0-22.9-15.7 1.6-15.4 0 0 24.9 2 38.6 25.8 21.9 38.6 58.6 27.5 72.9 20.9 2.3-16 8.8-27.1 16-33.7-55.9-6.2-112.3-14.3-112.3-110.5 0-27.5 7.6-41.3 23.6-58.9-2.6-6.5-11.1-33.3 2.6-67.9 20.9-6.5 69 27 69 27 20-5.6 41.5-8.5 62.8-8.5s42.8 2.9 62.8 8.5c0 0 48.1-33.6 69-27 13.7 34.7 5.2 61.4 2.6 67.9 16 17.7 25.8 31.5 25.8 58.9 0 96.5-58.9 104.2-114.8 110.5 9.2 7.9 17 22.9 17 46.4 0 33.7-.3 75.4-.3 83.6 0 6.5 4.6 14.4 17.3 12.1C428.2 457.8 496 362.9 496 252 496 113.3 383.5 8 244.8 8zM97.2 352.9c-1.3 1-1 3.3.7 5.2 1.6 1.6 3.9 2.3 5.2 1 1.3-1 1-3.3-.7-5.2-1.6-1.6-3.9-2.3-5.2-1zm-10.8-8.1c-.7 1.3.3 2.9 2.3 3.9 1.6 1 3.6.7 4.3-.7.7-1.3-.3-2.9-2.3-3.9-2-.6-3.6-.3-4.3.7zm32.4 35.6c-1.6 1.3-1 4.3 1.3 6.2 2.3 2.3 5.2 2.6 6.5 1 1.3-1.3.7-4.3-1.3-6.2-2.2-2.3-5.2-2.6-6.5-1zm-11.4-14.7c-1.6 1-1.6 3.6 0 5.9 1.6 2.3 4.3 3.3 5.6 2.3 1.6-1.3 1.6-3.9 0-6.2-1.4-2.3-4-3.3-5.6-2z"/></svg></span>
+                        </a>
+                        <a href="https://github.com/aptos-labs/aptos-core/edit/main/third_party/move/documentation/book/src/structs-and-resources.md" title="Suggest an edit" aria-label="Suggest an edit" rel="edit">
+                            <span class=fa-svg id="git-edit-button"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M421.7 220.3l-11.3 11.3-22.6 22.6-205 205c-6.6 6.6-14.8 11.5-23.8 14.1L30.8 511c-8.4 2.5-17.5 .2-23.7-6.1S-1.5 489.7 1 481.2L38.7 353.1c2.6-9 7.5-17.2 14.1-23.8l205-205 22.6-22.6 11.3-11.3 33.9 33.9 62.1 62.1 33.9 33.9zM96 353.9l-9.3 9.3c-.9 .9-1.6 2.1-2 3.4l-25.3 86 86-25.3c1.3-.4 2.5-1.1 3.4-2l9.3-9.3H112c-8.8 0-16-7.2-16-16V353.9zM453.3 19.3l39.4 39.4c25 25 25 65.5 0 90.5l-14.5 14.5-22.6 22.6-11.3 11.3-33.9-33.9-62.1-62.1L314.3 67.7l11.3-11.3 22.6-22.6 14.5-14.5c25-25 65.5-25 90.5 0z"/></svg></span>
+                        </a>
+
+                    </div>
+                </div>
+
+                <div id="mdbook-search-wrapper" class="hidden">
+                    <form id="mdbook-searchbar-outer" class="searchbar-outer">
+                        <div class="search-wrapper">
+                            <input type="search" id="mdbook-searchbar" name="searchbar" placeholder="Search this book ..." aria-controls="mdbook-searchresults-outer" aria-describedby="searchresults-header">
+                            <div class="spinner-wrapper">
+                                <span class=fa-svg id="fa-spin"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M304 48c0-26.5-21.5-48-48-48s-48 21.5-48 48s21.5 48 48 48s48-21.5 48-48zm0 416c0-26.5-21.5-48-48-48s-48 21.5-48 48s21.5 48 48 48s48-21.5 48-48zM48 304c26.5 0 48-21.5 48-48s-21.5-48-48-48s-48 21.5-48 48s21.5 48 48 48zm464-48c0-26.5-21.5-48-48-48s-48 21.5-48 48s21.5 48 48 48s48-21.5 48-48zM142.9 437c18.7-18.7 18.7-49.1 0-67.9s-49.1-18.7-67.9 0s-18.7 49.1 0 67.9s49.1 18.7 67.9 0zm0-294.2c18.7-18.7 18.7-49.1 0-67.9S93.7 56.2 75 75s-18.7 49.1 0 67.9s49.1 18.7 67.9 0zM369.1 437c18.7 18.7 49.1 18.7 67.9 0s18.7-49.1 0-67.9s-49.1-18.7-67.9 0s-18.7 49.1 0 67.9z"/></svg></span>
+                            </div>
+                        </div>
+                    </form>
+                    <div id="mdbook-searchresults-outer" class="searchresults-outer hidden">
+                        <div id="mdbook-searchresults-header" class="searchresults-header"></div>
+                        <ul id="mdbook-searchresults">
+                        </ul>
+                    </div>
+                </div>
+
+                <!-- Apply ARIA attributes after the sidebar and the sidebar toggle button are added to the DOM -->
+                <script>
+                    document.getElementById('mdbook-sidebar-toggle').setAttribute('aria-expanded', sidebar === 'visible');
+                    document.getElementById('mdbook-sidebar').setAttribute('aria-hidden', sidebar !== 'visible');
+                    Array.from(document.querySelectorAll('#mdbook-sidebar a')).forEach(function(link) {
+                        link.setAttribute('tabIndex', sidebar === 'visible' ? 0 : -1);
+                    });
+                </script>
+
+                <div id="mdbook-content" class="content">
+                    <main>
+                        <h1 id="structs-and-resources"><a class="header" href="#structs-and-resources">Structs and Resources</a></h1>
+<p>A <em>struct</em> is a user-defined data structure containing typed fields. Structs can store any
+non-reference type, including other structs.</p>
+<p>We often refer to struct values as <em>resources</em> if they cannot be copied and cannot be dropped. In
+this case, resource values must have ownership transferred by the end of the function. This property
+makes resources particularly well served for defining global storage schemas or for representing
+important values (such as a token).</p>
+<p>By default, structs are linear and ephemeral. By this we mean that they: cannot be copied, cannot be
+dropped, and cannot be stored in global storage. This means that all values have to have ownership
+transferred (linear) and the values must be dealt with by the end of the program’s execution
+(ephemeral). We can relax this behavior by giving the struct <a href="./abilities.html">abilities</a> which allow
+values to be copied or dropped and also to be stored in global storage or to define global storage
+schemas.</p>
+<h2 id="defining-structs"><a class="header" href="#defining-structs">Defining Structs</a></h2>
+<p>Structs must be defined inside a module:</p>
+<pre><code class="language-move">module 0x2::m {
+    struct Foo { x: u64, y: bool }
+    struct Bar {}
+    struct Baz { foo: Foo, }
+    //                   ^ note: it is fine to have a trailing comma
+}
+</code></pre>
+<p>Structs cannot be recursive, so the following definition is invalid:</p>
+<pre><code class="language-move">module 0x2::m {
+  struct Foo { x: Foo }
+  //              ^ error! Foo cannot contain Foo
+}
+</code></pre>
+<p>For positional structs which used numbered instead of named fields, see
+the <a href="#positional-structs">positional structs</a> section.</p>
+<p>As mentioned above: by default, a struct declaration is linear and ephemeral. So to allow the value
+to be used with certain operations (that copy it, drop it, store it in global storage, or use it as
+a storage schema), structs can be granted <a href="./abilities.html">abilities</a> by annotating them with
+<code>has &lt;ability&gt;</code>:</p>
+<pre><code class="language-move">module 0x2::m {
+  struct Foo has copy, drop { x: u64, y: bool }
+}
+</code></pre>
+<p>For more details, see the <a href="./abilities.html#annotating-structs">annotating structs</a> section.</p>
+<h3 id="naming"><a class="header" href="#naming">Naming</a></h3>
+<p>Structs must start with a capital letter <code>A</code> to <code>Z</code>. After the first letter, struct names can
+contain underscores <code>_</code>, letters <code>a</code> to <code>z</code>, letters <code>A</code> to <code>Z</code>, or digits <code>0</code> to <code>9</code>.</p>
+<pre><code class="language-move">module 0x2::m {
+  struct Foo {}
+  struct BAR {}
+  struct B_a_z_4_2 {}
+}
+</code></pre>
+<p>This naming restriction of starting with <code>A</code> to <code>Z</code> is in place to give room for future language
+features. It may or may not be removed later.</p>
+<h2 id="using-structs"><a class="header" href="#using-structs">Using Structs</a></h2>
+<h3 id="creating-structs"><a class="header" href="#creating-structs">Creating Structs</a></h3>
+<p>Values of a struct type can be created (or “packed”) by indicating the struct name, followed by
+value for each field:</p>
+<pre><code class="language-move">module 0x2::m {
+  struct Foo has drop { x: u64, y: bool }
+  struct Baz has drop { foo: Foo }
+
+  fun example() {
+    let foo = Foo { x: 0, y: false };
+    let baz = Baz { foo };
+  }
+}
+</code></pre>
+<p>If you initialize a struct field with a local variable whose name is the same as the field, you can
+use the following shorthand:</p>
+<pre><code class="language-move">module 0x2::m {
+  fun example() {
+    let baz = Baz { foo: foo };
+    // is equivalent to
+    let baz = Baz { foo };
+  }
+}
+</code></pre>
+<p>This is sometimes called “field name punning”.</p>
+<h3 id="destroying-structs-via-pattern-matching"><a class="header" href="#destroying-structs-via-pattern-matching">Destroying Structs via Pattern Matching</a></h3>
+<p>Struct values can be destroyed by binding or assigning them patterns.</p>
+<pre><code class="language-move">module 0x2::m {
+  struct Foo { x: u64, y: bool }
+  struct Bar { foo: Foo }
+  struct Baz {}
+
+  fun example_destroy_foo() {
+    let foo = Foo { x: 3, y: false };
+    let Foo { x, y: foo_y } = foo;
+    //        ^ shorthand for `x: x`
+
+    // two new bindings
+    //   x: u64 = 3
+    //   foo_y: bool = false
+  }
+
+  fun example_destroy_foo_wildcard() {
+    let foo = Foo { x: 3, y: false };
+    let Foo { x, y: _ } = foo;
+
+    // only one new binding since y was bound to a wildcard
+    //   x: u64 = 3
+  }
+
+  fun example_destroy_foo_assignment() {
+    let x: u64;
+    let y: bool;
+    Foo { x, y } = Foo { x: 3, y: false };
+
+    // mutating existing variables x &amp; y
+    //   x = 3, y = false
+  }
+
+  fun example_foo_ref() {
+    let foo = Foo { x: 3, y: false };
+    let Foo { x, y } = &amp;foo;
+
+    // two new bindings
+    //   x: &amp;u64
+    //   y: &amp;bool
+  }
+
+  fun example_foo_ref_mut() {
+    let foo = Foo { x: 3, y: false };
+    let Foo { x, y } = &amp;mut foo;
+
+    // two new bindings
+    //   x: &amp;mut u64
+    //   y: &amp;mut bool
+  }
+
+  fun example_destroy_bar() {
+    let bar = Bar { foo: Foo { x: 3, y: false } };
+    let Bar { foo: Foo { x, y } } = bar;
+    //             ^ nested pattern
+
+    // two new bindings
+    //   x: u64 = 3
+    //   y: bool = false
+  }
+
+  fun example_destroy_baz() {
+    let baz = Baz {};
+    let Baz {} = baz;
+  }
+}
+</code></pre>
+<h3 id="borrowing-structs-and-fields"><a class="header" href="#borrowing-structs-and-fields">Borrowing Structs and Fields</a></h3>
+<p>The <code>&amp;</code> and <code>&amp;mut</code> operator can be used to create references to structs or fields. These examples
+include some optional type annotations (e.g., <code>: &amp;Foo</code>) to demonstrate the type of operations.</p>
+<pre><code class="language-move">module 0x2::m {
+  fun example() {
+    let foo = Foo { x: 3, y: true };
+    let foo_ref: &amp;Foo = &amp;foo;
+    let y: bool = foo_ref.y;  // reading a field via a reference to the struct
+    let x_ref: &amp;u64 = &amp;foo.x;
+
+    let x_ref_mut: &amp;mut u64 = &amp;mut foo.x;
+    *x_ref_mut = 42;  // modifying a field via a mutable reference
+  }
+}
+</code></pre>
+<p>It is possible to borrow inner fields of nested structs:</p>
+<pre><code class="language-move">module 0x2::m {
+  fun example() {
+    let foo = Foo { x: 3, y: true };
+    let bar = Bar { foo };
+
+    let x_ref = &amp;bar.foo.x;
+  }
+}
+</code></pre>
+<p>You can also borrow a field via a reference to a struct:</p>
+<pre><code class="language-move">module 0x2::m {
+  fun example() {
+    let foo = Foo { x: 3, y: true };
+    let foo_ref = &amp;foo;
+    let x_ref = &amp;foo_ref.x;
+    // this has the same effect as let x_ref = &amp;foo.x
+  }
+}
+</code></pre>
+<h3 id="reading-and-writing-fields"><a class="header" href="#reading-and-writing-fields">Reading and Writing Fields</a></h3>
+<p>If a field is copyable, you can read and copy a field’s value by dereferencing the borrowed field:</p>
+<pre><code class="language-move">module 0x2::m {
+  fun example() {
+    let foo = Foo { x: 3, y: true };
+    let bar = Bar { foo: copy foo };
+    let x: u64 = *&amp;foo.x;
+    let y: bool = *&amp;foo.y;
+    let foo2: Foo = *&amp;bar.foo;
+  }
+}
+</code></pre>
+<p>The dot operator can be used to read and copy any copyable field of a struct without explicit
+borrowing and dereferencing:</p>
+<pre><code class="language-move">module 0x2::m {
+  fun example() {
+    let foo = Foo { x: 3, y: true };
+    let x = foo.x;  // x == 3
+    let y = foo.y;  // y == true
+
+    let bar = Bar { foo };
+    let foo2: Foo = *&amp;bar.foo; // `Foo` must be copyable
+    let foo3: Foo = bar.foo;   // same as the statement above
+  }
+}
+</code></pre>
+<p>Dot operators can be chained to access nested fields:</p>
+<pre><code class="language-move">module 0x2::m {
+  fun example() {
+    let baz = Baz { foo: Foo { x: 3, y: true } };
+    let x = baz.foo.x; // x = 3;
+  }
+}
+</code></pre>
+<p>Furthermore, the dot syntax can be used to modify fields.</p>
+<pre><code class="language-move">module 0x2::m {
+  fun example() {
+    let foo = Foo { x: 3, y: true };
+    foo.x = 42;     // foo = Foo { x: 42, y: true }
+    foo.y = !foo.y; // foo = Foo { x: 42, y: false }
+    let bar = Bar { foo };            // bar = Bar { foo: Foo { x: 42, y: false } }
+    bar.foo.x = 52;                   // bar = Bar { foo: Foo { x: 52, y: false } }
+    bar.foo = Foo { x: 62, y: true }; // bar = Bar { foo: Foo { x: 62, y: true } }
+  }
+}
+</code></pre>
+<p>The dot syntax also works via a reference to a struct:</p>
+<pre><code class="language-move">module 0x2::m {
+  fun example() {
+    let foo = Foo { x: 3, y: true };
+    let foo_ref = &amp;mut foo;
+    foo_ref.x = foo_ref.x + 1;
+  }
+}
+</code></pre>
+<h2 id="privileged-struct-operations"><a class="header" href="#privileged-struct-operations">Privileged Struct Operations</a></h2>
+<p>Most struct operations on a struct type <code>T</code> can only be performed inside the module that declares
+<code>T</code>:</p>
+<ul>
+<li>Struct types can only be created (“packed”), destroyed (“unpacked”) inside the module that defines
+the struct.</li>
+<li>The fields of a struct are only accessible inside the module that defines the struct.</li>
+</ul>
+<p>Following these rules, if you want to modify your struct outside the module, you will need to
+provide public APIs for them. The end of the chapter contains some examples of this.</p>
+<p>However, struct <em>types</em> are always visible to another module or script:</p>
+<pre><code class="language-move">// m.move
+module 0x2::m {
+  struct Foo has drop { x: u64 }
+
+  public fun new_foo(): Foo {
+    Foo { x: 42 }
+  }
+}
+</code></pre>
+<pre><code class="language-move">// n.move
+module 0x2::n {
+  use 0x2::m;
+
+  struct Wrapper has drop {
+    foo: m::Foo
+  }
+
+  fun f1(foo: m::Foo) {
+    let x = foo.x;
+    //      ^ error! cannot access fields of `foo` here
+  }
+
+  fun f2() {
+    let foo_wrapper = Wrapper { foo: m::new_foo() };
+  }
+}
+</code></pre>
+<p>By default, structs do not have visibility modifiers—all struct operations are restricted to the defining module. Move 2.4 introduces explicit visibility modifiers; see <a href="#struct-visibility">Struct Visibility</a> below.</p>
+<h2 id="struct-visibility"><a class="header" href="#struct-visibility">Struct Visibility</a></h2>
+<p><em>Since language version 2.4</em></p>
+<p>By default, struct construction, destruction, and field access are module-private, as described in <a href="#privileged-struct-operations">Privileged Struct Operations</a>. Move 2.4 introduces explicit visibility modifiers that allow external modules to perform these operations. See <a href="./struct-and-enum-visibility.html">Struct and Enum Visibility</a> for shared rules on visibility levels, performance, restrictions, transaction arguments, and upgradability.</p>
+<h3 id="syntax"><a class="header" href="#syntax">Syntax</a></h3>
+<p>Place the modifier before the <code>struct</code> keyword:</p>
+<pre><code class="language-move">module 0x42::shapes {
+    // Accessible from any module
+    public struct Point {
+        x: u64,
+        y: u64,
+    }
+
+    // Accessible from modules in the same package
+    package struct Config {
+        value: u64,
+    }
+}
+
+module 0x42::lib {
+    friend 0x42::consumer;
+
+    // Accessible only from declared friend modules
+    friend struct Token {
+        amount: u64,
+    }
+}
+</code></pre>
+<h3 id="cross-module-access"><a class="header" href="#cross-module-access">Cross-Module Access</a></h3>
+<p>External modules with sufficient visibility can construct and destruct the struct, read and mutate its fields.</p>
+<pre><code class="language-move">module 0x42::shapes {
+    public struct Point {
+        x: u64,
+        y: u64,
+    }
+}
+
+module 0x42::user {
+    use 0x42::shapes::Point;
+
+    fun mirror(p: Point): Point {
+        let Point { x, y } = p;   // destruct
+        Point { x: y, y: x }     // construct
+    }
+
+    fun shift_x(p: &amp;mut Point, delta: u64) {
+        p.x = p.x + delta;       // read and write to fields
+    }
+}
+</code></pre>
+<h2 id="ownership"><a class="header" href="#ownership">Ownership</a></h2>
+<p>As mentioned above in <a href="#defining-structs">Defining Structs</a>, structs are by default linear and
+ephemeral. This means they cannot be copied or dropped. This property can be very useful when
+modeling real world resources like money, as you do not want money to be duplicated or get lost in
+circulation.</p>
+<pre><code class="language-move">module 0x2::m {
+  struct Foo { x: u64 }
+
+  public fun copying_resource() {
+    let foo = Foo { x: 100 };
+    let foo_copy = copy foo; // error! 'copy'-ing requires the 'copy' ability
+    let foo_ref = &amp;foo;
+    let another_copy = *foo_ref // error! dereference requires the 'copy' ability
+  }
+
+  public fun destroying_resource1() {
+    let foo = Foo { x: 100 };
+
+    // error! when the function returns, foo still contains a value.
+    // This destruction requires the 'drop' ability
+  }
+
+  public fun destroying_resource2(f: &amp;mut Foo) {
+    *f = Foo { x: 100 } // error!
+                        // destroying the old value via a write requires the 'drop' ability
+  }
+}
+</code></pre>
+<p>To fix the second example (<code>fun destroying_resource1</code>), you would need to manually “unpack” the
+resource:</p>
+<pre><code class="language-move">module 0x2::m {
+  struct Foo { x: u64 }
+
+  public fun destroying_resource1_fixed() {
+    let foo = Foo { x: 100 };
+    let Foo { x: _ } = foo;
+  }
+}
+</code></pre>
+<p>Recall that you are only able to deconstruct a resource within the module in which it is defined.
+This can be leveraged to enforce certain invariants in a system, for example, conservation of money.</p>
+<p>If on the other hand, your struct does not represent something valuable, you can add the abilities
+<code>copy</code> and <code>drop</code> to get a struct value that might feel more familiar from other programming
+languages:</p>
+<pre><code class="language-move">module 0x2::m {
+  struct Foo has copy, drop { x: u64 }
+
+  public fun run() {
+    let foo = Foo { x: 100 };
+    let foo_copy = copy foo;
+    // ^ this code copies foo, whereas `let x = foo` or
+    // `let x = move foo` both move foo
+
+    let x = foo.x;            // x = 100
+    let x_copy = foo_copy.x;  // x = 100
+
+    // both foo and foo_copy are implicitly discarded when the function returns
+  }
+}
+</code></pre>
+<h2 id="positional-structs"><a class="header" href="#positional-structs">Positional Structs</a></h2>
+<p><em>Since language version 2.0</em></p>
+<p>A struct can be declared to have <em>positional fields</em>, fields which are not named
+but numbered. Positional structs behave similar to regular structs,
+except providing a different syntax which may be more suitable for use cases with
+only a few fields.</p>
+<p>Fields of positional structs are assigned in the order they appear. In the below
+example, field <code>0</code> is of type <code>u64</code> and field <code>1</code> of type <code>u8</code>:</p>
+<pre><code class="language-move">module 0x2::m {
+  struct Pair(u64, u8);
+}
+</code></pre>
+<p>Abilities for positional structs are declared <em>after</em> and not before the field list,</p>
+<pre><code class="language-move">module 0x2::m {
+  struct Pair(u64, u8) has copy, drop;
+}
+</code></pre>
+<p>For pure type tags, often used for phantom types in Move code, the list of arguments
+can be also completely omitted:</p>
+<pre><code class="language-move">module 0x2::m {
+  struct TypeTag has copy, drop;
+}
+</code></pre>
+<p>Values of positional structs are created and deconstructed as shown below:
+using <code>PositionalStructs(arguments)</code>:</p>
+<pre><code class="language-move">module 0x2::m {
+  fun work() {
+    let value = Pair(1, true);
+    let Pair(number, boolean) = value;
+    assert!(number == 1 &amp;&amp; boolean == true);
+  }
+}
+</code></pre>
+<p>Fields of positional structs can be accessed using the position as a field selector. For example, in the above code example, <code>value.0</code> and <code>value.1</code> can be used to access the two fields without deconstructing the <code>value</code>.
+<code>positional_struct.0</code>.</p>
+<h2 id="partial-patterns"><a class="header" href="#partial-patterns">Partial Patterns</a></h2>
+<p><em>Since language version 2.0</em></p>
+<p>Patterns can use the <code>..</code> notation to match any remaining, non-listed fields in structs or variants with named fields, and omitted fields at either the beginning or end of a struct or variant with positional fields. Here are
+some examples:</p>
+<pre><code class="language-move">module 0x2::m {
+  struct Foo{ x: u8, y: u16, z: u32 }
+  struct Bar(u8, u16, u32);
+
+  fun foo_get_x(self: &amp;Foo): u16 {
+    let Foo{y, ..} = self;
+    x
+  }
+
+  fun bar_get_0(self: &amp;Foo): u8 {
+    let Bar(x, ..) = self;
+    x
+  }
+
+  fun bar_get_2(self: &amp;Foo): u52 {
+    // For positional structs, one can also put the
+    // .. at the beginning.
+    let Bar(.., z) = self;
+    z
+  }
+}
+</code></pre>
+<p>Notice that partial patterns can currently not be used as the left-hand side of assignment.
+While one can use <code>let Bar(x, ..) = v</code>, we do not yet support <code>let x; Bar(x, ..) = v</code>.</p>
+<h2 id="storing-resources-in-global-storage"><a class="header" href="#storing-resources-in-global-storage">Storing Resources in Global Storage</a></h2>
+<p>Structs with the <code>key</code> ability can be saved directly in
+<a href="./global-storage-operators.html">persistent global storage</a>. All values stored within those <code>key</code>
+structs must have the <code>store</code> ability. See the <a href="./abilities.html">ability</a> and
+<a href="./global-storage-operators.html">global storage</a> chapters for more detail.</p>
+<h2 id="examples"><a class="header" href="#examples">Examples</a></h2>
+<p>Here are two short examples of how you might use structs to represent valuable data (in the case of
+<code>Coin</code>) or more classical data (in the case of <code>Point</code> and <code>Circle</code>).</p>
+<h3 id="example-1-coin"><a class="header" href="#example-1-coin">Example 1: Coin</a></h3>
+<pre><code class="language-move">module 0x2::m {
+  // We do not want the Coin to be copied because that would be duplicating this "money",
+  // so we do not give the struct the 'copy' ability.
+  // Similarly, we do not want programmers to destroy coins, so we do not give the struct the
+  // 'drop' ability.
+  // However, we *want* users of the modules to be able to store this coin in persistent global
+  // storage, so we grant the struct the 'store' ability. This struct will only be inside of
+  // other resources inside of global storage, so we do not give the struct the 'key' ability.
+  struct Coin has store {
+    value: u64,
+  }
+
+  public fun mint(value: u64): Coin {
+    // You would want to gate this function with some form of access control to prevent
+    // anyone using this module from minting an infinite amount of coins.
+    Coin { value }
+  }
+
+  public fun withdraw(coin: &amp;mut Coin, amount: u64): Coin {
+    assert!(coin.value &gt;= amount, 1000);
+    coin.value = coin.value - amount;
+    Coin { value: amount }
+  }
+
+  public fun deposit(coin: &amp;mut Coin, other: Coin) {
+    let Coin { value } = other;
+    coin.value = coin.value + value;
+  }
+
+  public fun split(coin: Coin, amount: u64): (Coin, Coin) {
+    let other = withdraw(&amp;mut coin, amount);
+    (coin, other)
+  }
+
+  public fun merge(coin1: Coin, coin2: Coin): Coin {
+    deposit(&amp;mut coin1, coin2);
+    coin1
+  }
+
+  public fun destroy_zero(coin: Coin) {
+    let Coin { value } = coin;
+    assert!(value == 0, 1001);
+  }
+}
+</code></pre>
+<h3 id="example-2-geometry"><a class="header" href="#example-2-geometry">Example 2: Geometry</a></h3>
+<pre><code class="language-move">module 0x2::point {
+  struct Point has copy, drop, store {
+    x: u64,
+    y: u64,
+  }
+
+  public fun new(x: u64, y: u64): Point {
+    Point {
+      x, y
+    }
+  }
+
+  public fun x(p: &amp;Point): u64 {
+    p.x
+  }
+
+  public fun y(p: &amp;Point): u64 {
+    p.y
+  }
+
+  fun abs_sub(a: u64, b: u64): u64 {
+    if (a &lt; b) {
+      b - a
+    }
+    else {
+      a - b
+    }
+  }
+
+  public fun dist_squared(p1: &amp;Point, p2: &amp;Point): u64 {
+    let dx = abs_sub(p1.x, p2.x);
+    let dy = abs_sub(p1.y, p2.y);
+    dx*dx + dy*dy
+  }
+}
+</code></pre>
+<pre><code class="language-move">module 0x2::circle {
+  use 0x2::point::{Self, Point};
+
+  struct Circle has copy, drop, store {
+    center: Point,
+    radius: u64,
+  }
+
+  public fun new(center: Point, radius: u64): Circle {
+    Circle { center, radius }
+  }
+
+  public fun overlaps(c1: &amp;Circle, c2: &amp;Circle): bool {
+    let dist_squared_value = point::dist_squared(&amp;c1.center, &amp;c2.center);
+    let r1 = c1.radius;
+    let r2 = c2.radius;
+    dist_squared_value &lt;= r1*r1 + 2*r1*r2 + r2*r2
+  }
+}
+</code></pre>
+
+                    </main>
+
+                    <nav class="nav-wrapper" aria-label="Page navigation">
+                        <!-- Mobile navigation buttons -->
+                            <a rel="prev" href="functions.html" class="mobile-nav-chapters previous" title="Previous chapter" aria-label="Previous chapter" aria-keyshortcuts="Left">
+                                <span class=fa-svg><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 320 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M41.4 233.4c-12.5 12.5-12.5 32.8 0 45.3l160 160c12.5 12.5 32.8 12.5 45.3 0s12.5-32.8 0-45.3L109.3 256 246.6 118.6c12.5-12.5 12.5-32.8 0-45.3s-32.8-12.5-45.3 0l-160 160z"/></svg></span>
+                            </a>
+
+                            <a rel="next prefetch" href="enums.html" class="mobile-nav-chapters next" title="Next chapter" aria-label="Next chapter" aria-keyshortcuts="Right">
+                                <span class=fa-svg><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 320 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M278.6 233.4c12.5 12.5 12.5 32.8 0 45.3l-160 160c-12.5 12.5-32.8 12.5-45.3 0s-12.5-32.8 0-45.3L210.7 256 73.4 118.6c-12.5-12.5-12.5-32.8 0-45.3s32.8-12.5 45.3 0l160 160z"/></svg></span>
+                            </a>
+
+                        <div style="clear: both"></div>
+                    </nav>
+                </div>
+            </div>
+
+            <nav class="nav-wide-wrapper" aria-label="Page navigation">
+                    <a rel="prev" href="functions.html" class="nav-chapters previous" title="Previous chapter" aria-label="Previous chapter" aria-keyshortcuts="Left">
+                        <span class=fa-svg><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 320 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M41.4 233.4c-12.5 12.5-12.5 32.8 0 45.3l160 160c12.5 12.5 32.8 12.5 45.3 0s12.5-32.8 0-45.3L109.3 256 246.6 118.6c12.5-12.5 12.5-32.8 0-45.3s-32.8-12.5-45.3 0l-160 160z"/></svg></span>
+                    </a>
+
+                    <a rel="next prefetch" href="enums.html" class="nav-chapters next" title="Next chapter" aria-label="Next chapter" aria-keyshortcuts="Right">
+                        <span class=fa-svg><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 320 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M278.6 233.4c12.5 12.5 12.5 32.8 0 45.3l-160 160c-12.5 12.5-32.8 12.5-45.3 0s-12.5-32.8 0-45.3L210.7 256 73.4 118.6c-12.5-12.5-12.5-32.8 0-45.3s32.8-12.5 45.3 0l160 160z"/></svg></span>
+                    </a>
+            </nav>
+
+        </div>
+
+        <template id=fa-eye><span class=fa-svg><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 576 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M288 32c-80.8 0-145.5 36.8-192.6 80.6C48.6 156 17.3 208 2.5 243.7c-3.3 7.9-3.3 16.7 0 24.6C17.3 304 48.6 356 95.4 399.4C142.5 443.2 207.2 480 288 480s145.5-36.8 192.6-80.6c46.8-43.5 78.1-95.4 93-131.1c3.3-7.9 3.3-16.7 0-24.6c-14.9-35.7-46.2-87.7-93-131.1C433.5 68.8 368.8 32 288 32zM432 256c0 79.5-64.5 144-144 144s-144-64.5-144-144s64.5-144 144-144s144 64.5 144 144zM288 192c0 35.3-28.7 64-64 64c-11.5 0-22.3-3-31.6-8.4c-.2 2.8-.4 5.5-.4 8.4c0 53 43 96 96 96s96-43 96-96s-43-96-96-96c-2.8 0-5.6 .1-8.4 .4c5.3 9.3 8.4 20.1 8.4 31.6z"/></svg></span></template>
+        <template id=fa-eye-slash><span class=fa-svg><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 640 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M38.8 5.1C28.4-3.1 13.3-1.2 5.1 9.2S-1.2 34.7 9.2 42.9l592 464c10.4 8.2 25.5 6.3 33.7-4.1s6.3-25.5-4.1-33.7L525.6 386.7c39.6-40.6 66.4-86.1 79.9-118.4c3.3-7.9 3.3-16.7 0-24.6c-14.9-35.7-46.2-87.7-93-131.1C465.5 68.8 400.8 32 320 32c-68.2 0-125 26.3-169.3 60.8L38.8 5.1zM223.1 149.5C248.6 126.2 282.7 112 320 112c79.5 0 144 64.5 144 144c0 24.9-6.3 48.3-17.4 68.7L408 294.5c5.2-11.8 8-24.8 8-38.5c0-53-43-96-96-96c-2.8 0-5.6 .1-8.4 .4c5.3 9.3 8.4 20.1 8.4 31.6c0 10.2-2.4 19.8-6.6 28.3l-90.3-70.8zm223.1 298L373 389.9c-16.4 6.5-34.3 10.1-53 10.1c-79.5 0-144-64.5-144-144c0-6.9 .5-13.6 1.4-20.2L83.1 161.5C60.3 191.2 44 220.8 34.5 243.7c-3.3 7.9-3.3 16.7 0 24.6c14.9 35.7 46.2 87.7 93 131.1C174.5 443.2 239.2 480 320 480c47.8 0 89.9-12.9 126.2-32.5z"/></svg></span></template>
+        <template id=fa-copy><span class=fa-svg><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M502.6 70.63l-61.25-61.25C435.4 3.371 427.2 0 418.7 0H255.1c-35.35 0-64 28.66-64 64l.0195 256C192 355.4 220.7 384 256 384h192c35.2 0 64-28.8 64-64V93.25C512 84.77 508.6 76.63 502.6 70.63zM464 320c0 8.836-7.164 16-16 16H255.1c-8.838 0-16-7.164-16-16L239.1 64.13c0-8.836 7.164-16 16-16h128L384 96c0 17.67 14.33 32 32 32h47.1V320zM272 448c0 8.836-7.164 16-16 16H63.1c-8.838 0-16-7.164-16-16L47.98 192.1c0-8.836 7.164-16 16-16H160V128H63.99c-35.35 0-64 28.65-64 64l.0098 256C.002 483.3 28.66 512 64 512h192c35.2 0 64-28.8 64-64v-32h-47.1L272 448z"/></svg></span></template>
+        <template id=fa-play><span class=fa-svg><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 384 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M73 39c-14.8-9.1-33.4-9.4-48.5-.9S0 62.6 0 80V432c0 17.4 9.4 33.4 24.5 41.9s33.7 8.1 48.5-.9L361 297c14.3-8.7 23-24.2 23-41s-8.7-32.2-23-41L73 39z"/></svg></span></template>
+        <template id=fa-clock-rotate-left><span class=fa-svg><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M75 75L41 41C25.9 25.9 0 36.6 0 57.9V168c0 13.3 10.7 24 24 24H134.1c21.4 0 32.1-25.9 17-41l-30.8-30.8C155 85.5 203 64 256 64c106 0 192 86 192 192s-86 192-192 192c-40.8 0-78.6-12.7-109.7-34.4c-14.5-10.1-34.4-6.6-44.6 7.9s-6.6 34.4 7.9 44.6C151.2 495 201.7 512 256 512c141.4 0 256-114.6 256-256S397.4 0 256 0C185.3 0 121.3 28.7 75 75zm181 53c-13.3 0-24 10.7-24 24V256c0 6.4 2.5 12.5 7 17l72 72c9.4 9.4 24.6 9.4 33.9 0s9.4-24.6 0-33.9l-65-65V152c0-13.3-10.7-24-24-24z"/></svg></span></template>
+
+
+
+        <script>
+            window.playground_copyable = true;
+        </script>
+
+
+        <script src="elasticlunr-ef4e11c1.min.js"></script>
+        <script src="mark-09e88c2c.min.js"></script>
+        <script src="searcher-c2a407aa.js"></script>
+
+        <script src="clipboard-1626706a.min.js"></script>
+        <script src="highlight-abc7f01d.js"></script>
+        <script src="book-a0b12cfe.js"></script>
+
+        <!-- Custom JS scripts -->
+
+
+
+    </div>
+    </body>
+</html>

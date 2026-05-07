@@ -1,0 +1,2264 @@
+<!DOCTYPE HTML>
+<html lang="en" class="light sidebar-visible" dir="ltr">
+    <head>
+        <!-- Book generated using mdBook -->
+        <meta charset="UTF-8">
+        <title>Specification Language - The Move on Aptos Book</title>
+
+
+        <!-- Custom HTML head -->
+
+        <meta name="description" content="Move book maintained by the Move team at Aptos.">
+        <meta name="viewport" content="width=device-width, initial-scale=1">
+        <meta name="theme-color" content="#ffffff">
+
+        <link rel="icon" href="favicon-de23e50b.svg">
+        <link rel="shortcut icon" href="favicon-8114d1fc.png">
+        <link rel="stylesheet" href="css/variables-8adf115d.css">
+        <link rel="stylesheet" href="css/general-2459343d.css">
+        <link rel="stylesheet" href="css/chrome-ae938929.css">
+        <link rel="stylesheet" href="css/print-9e4910d8.css" media="print">
+
+        <!-- Fonts -->
+        <link rel="stylesheet" href="fonts/fonts-9644e21d.css">
+
+        <!-- Highlight.js Stylesheets -->
+        <link rel="stylesheet" id="mdbook-highlight-css" href="highlight-493f70e1.css">
+        <link rel="stylesheet" id="mdbook-tomorrow-night-css" href="tomorrow-night-4c0ae647.css">
+        <link rel="stylesheet" id="mdbook-ayu-highlight-css" href="ayu-highlight-3fdfc3ac.css">
+
+        <!-- Custom theme stylesheets -->
+
+
+        <!-- Provide site root and default themes to javascript -->
+        <script>
+            const path_to_root = "";
+            const default_light_theme = "light";
+            const default_dark_theme = "navy";
+            window.path_to_searchindex_js = "searchindex-542db50c.js";
+        </script>
+        <!-- Start loading toc.js asap -->
+        <script src="toc-3d0ce12d.js"></script>
+    </head>
+    <body>
+    <div id="mdbook-help-container">
+        <div id="mdbook-help-popup">
+            <h2 class="mdbook-help-title">Keyboard shortcuts</h2>
+            <div>
+                <p>Press <kbd>←</kbd> or <kbd>→</kbd> to navigate between chapters</p>
+                <p>Press <kbd>S</kbd> or <kbd>/</kbd> to search in the book</p>
+                <p>Press <kbd>?</kbd> to show this help</p>
+                <p>Press <kbd>Esc</kbd> to hide this help</p>
+            </div>
+        </div>
+    </div>
+    <div id="mdbook-body-container">
+        <!-- Work around some values being stored in localStorage wrapped in quotes -->
+        <script>
+            try {
+                let theme = localStorage.getItem('mdbook-theme');
+                let sidebar = localStorage.getItem('mdbook-sidebar');
+
+                if (theme.startsWith('"') && theme.endsWith('"')) {
+                    localStorage.setItem('mdbook-theme', theme.slice(1, theme.length - 1));
+                }
+
+                if (sidebar.startsWith('"') && sidebar.endsWith('"')) {
+                    localStorage.setItem('mdbook-sidebar', sidebar.slice(1, sidebar.length - 1));
+                }
+            } catch (e) { }
+        </script>
+
+        <!-- Set the theme before any content is loaded, prevents flash -->
+        <script>
+            const default_theme = window.matchMedia("(prefers-color-scheme: dark)").matches ? default_dark_theme : default_light_theme;
+            let theme;
+            try { theme = localStorage.getItem('mdbook-theme'); } catch(e) { }
+            if (theme === null || theme === undefined) { theme = default_theme; }
+            const html = document.documentElement;
+            html.classList.remove('light')
+            html.classList.add(theme);
+            html.classList.add("js");
+        </script>
+
+        <input type="checkbox" id="mdbook-sidebar-toggle-anchor" class="hidden">
+
+        <!-- Hide / unhide sidebar before it is displayed -->
+        <script>
+            let sidebar = null;
+            const sidebar_toggle = document.getElementById("mdbook-sidebar-toggle-anchor");
+            if (document.body.clientWidth >= 1080) {
+                try { sidebar = localStorage.getItem('mdbook-sidebar'); } catch(e) { }
+                sidebar = sidebar || 'visible';
+            } else {
+                sidebar = 'hidden';
+                sidebar_toggle.checked = false;
+            }
+            if (sidebar === 'visible') {
+                sidebar_toggle.checked = true;
+            } else {
+                html.classList.remove('sidebar-visible');
+            }
+        </script>
+
+        <nav id="mdbook-sidebar" class="sidebar" aria-label="Table of contents">
+            <!-- populated by js -->
+            <mdbook-sidebar-scrollbox class="sidebar-scrollbox"></mdbook-sidebar-scrollbox>
+            <noscript>
+                <iframe class="sidebar-iframe-outer" src="toc.html"></iframe>
+            </noscript>
+            <div id="mdbook-sidebar-resize-handle" class="sidebar-resize-handle">
+                <div class="sidebar-resize-indicator"></div>
+            </div>
+        </nav>
+
+        <div id="mdbook-page-wrapper" class="page-wrapper">
+
+            <div class="page">
+                <div id="mdbook-menu-bar-hover-placeholder"></div>
+                <div id="mdbook-menu-bar" class="menu-bar sticky">
+                    <div class="left-buttons">
+                        <label id="mdbook-sidebar-toggle" class="icon-button" for="mdbook-sidebar-toggle-anchor" title="Toggle Table of Contents" aria-label="Toggle Table of Contents" aria-controls="mdbook-sidebar">
+                            <span class=fa-svg><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 448 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M0 96C0 78.3 14.3 64 32 64H416c17.7 0 32 14.3 32 32s-14.3 32-32 32H32C14.3 128 0 113.7 0 96zM0 256c0-17.7 14.3-32 32-32H416c17.7 0 32 14.3 32 32s-14.3 32-32 32H32c-17.7 0-32-14.3-32-32zM448 416c0 17.7-14.3 32-32 32H32c-17.7 0-32-14.3-32-32s14.3-32 32-32H416c17.7 0 32 14.3 32 32z"/></svg></span>
+                        </label>
+                        <button id="mdbook-theme-toggle" class="icon-button" type="button" title="Change theme" aria-label="Change theme" aria-haspopup="true" aria-expanded="false" aria-controls="mdbook-theme-list">
+                            <span class=fa-svg><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 576 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M371.3 367.1c27.3-3.9 51.9-19.4 67.2-42.9L600.2 74.1c12.6-19.5 9.4-45.3-7.6-61.2S549.7-4.4 531.1 9.6L294.4 187.2c-24 18-38.2 46.1-38.4 76.1L371.3 367.1zm-19.6 25.4l-116-104.4C175.9 290.3 128 339.6 128 400c0 3.9 .2 7.8 .6 11.6c1.8 17.5-10.2 36.4-27.8 36.4H96c-17.7 0-32 14.3-32 32s14.3 32 32 32H240c61.9 0 112-50.1 112-112c0-2.5-.1-5-.2-7.5z"/></svg></span>
+                        </button>
+                        <ul id="mdbook-theme-list" class="theme-popup" aria-label="Themes" role="menu">
+                            <li role="none"><button role="menuitem" class="theme" id="mdbook-theme-default_theme">Auto</button></li>
+                            <li role="none"><button role="menuitem" class="theme" id="mdbook-theme-light">Light</button></li>
+                            <li role="none"><button role="menuitem" class="theme" id="mdbook-theme-rust">Rust</button></li>
+                            <li role="none"><button role="menuitem" class="theme" id="mdbook-theme-coal">Coal</button></li>
+                            <li role="none"><button role="menuitem" class="theme" id="mdbook-theme-navy">Navy</button></li>
+                            <li role="none"><button role="menuitem" class="theme" id="mdbook-theme-ayu">Ayu</button></li>
+                        </ul>
+                        <button id="mdbook-search-toggle" class="icon-button" type="button" title="Search (`/`)" aria-label="Toggle Searchbar" aria-expanded="false" aria-keyshortcuts="/ s" aria-controls="mdbook-searchbar">
+                            <span class=fa-svg><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M416 208c0 45.9-14.9 88.3-40 122.7L502.6 457.4c12.5 12.5 12.5 32.8 0 45.3s-32.8 12.5-45.3 0L330.7 376c-34.4 25.2-76.8 40-122.7 40C93.1 416 0 322.9 0 208S93.1 0 208 0S416 93.1 416 208zM208 352c79.5 0 144-64.5 144-144s-64.5-144-144-144S64 128.5 64 208s64.5 144 144 144z"/></svg></span>
+                        </button>
+                    </div>
+
+                    <h1 class="menu-title">The Move on Aptos Book</h1>
+
+                    <div class="right-buttons">
+                        <a href="print.html" title="Print this book" aria-label="Print this book">
+                            <span class=fa-svg id="print-button"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M128 0C92.7 0 64 28.7 64 64v96h64V64H354.7L384 93.3V160h64V93.3c0-17-6.7-33.3-18.7-45.3L400 18.7C388 6.7 371.7 0 354.7 0H128zM384 352v32 64H128V384 368 352H384zm64 32h32c17.7 0 32-14.3 32-32V256c0-35.3-28.7-64-64-64H64c-35.3 0-64 28.7-64 64v96c0 17.7 14.3 32 32 32H64v64c0 35.3 28.7 64 64 64H384c35.3 0 64-28.7 64-64V384zm-16-88c-13.3 0-24-10.7-24-24s10.7-24 24-24s24 10.7 24 24s-10.7 24-24 24z"/></svg></span>
+                        </a>
+                        <a href="https://github.com/aptos-labs/aptos-core" title="Git repository" aria-label="Git repository">
+                            <span class=fa-svg><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 496 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M165.9 397.4c0 2-2.3 3.6-5.2 3.6-3.3.3-5.6-1.3-5.6-3.6 0-2 2.3-3.6 5.2-3.6 3-.3 5.6 1.3 5.6 3.6zm-31.1-4.5c-.7 2 1.3 4.3 4.3 4.9 2.6 1 5.6 0 6.2-2s-1.3-4.3-4.3-5.2c-2.6-.7-5.5.3-6.2 2.3zm44.2-1.7c-2.9.7-4.9 2.6-4.6 4.9.3 2 2.9 3.3 5.9 2.6 2.9-.7 4.9-2.6 4.6-4.6-.3-1.9-3-3.2-5.9-2.9zM244.8 8C106.1 8 0 113.3 0 252c0 110.9 69.8 205.8 169.5 239.2 12.8 2.3 17.3-5.6 17.3-12.1 0-6.2-.3-40.4-.3-61.4 0 0-70 15-84.7-29.8 0 0-11.4-29.1-27.8-36.6 0 0-22.9-15.7 1.6-15.4 0 0 24.9 2 38.6 25.8 21.9 38.6 58.6 27.5 72.9 20.9 2.3-16 8.8-27.1 16-33.7-55.9-6.2-112.3-14.3-112.3-110.5 0-27.5 7.6-41.3 23.6-58.9-2.6-6.5-11.1-33.3 2.6-67.9 20.9-6.5 69 27 69 27 20-5.6 41.5-8.5 62.8-8.5s42.8 2.9 62.8 8.5c0 0 48.1-33.6 69-27 13.7 34.7 5.2 61.4 2.6 67.9 16 17.7 25.8 31.5 25.8 58.9 0 96.5-58.9 104.2-114.8 110.5 9.2 7.9 17 22.9 17 46.4 0 33.7-.3 75.4-.3 83.6 0 6.5 4.6 14.4 17.3 12.1C428.2 457.8 496 362.9 496 252 496 113.3 383.5 8 244.8 8zM97.2 352.9c-1.3 1-1 3.3.7 5.2 1.6 1.6 3.9 2.3 5.2 1 1.3-1 1-3.3-.7-5.2-1.6-1.6-3.9-2.3-5.2-1zm-10.8-8.1c-.7 1.3.3 2.9 2.3 3.9 1.6 1 3.6.7 4.3-.7.7-1.3-.3-2.9-2.3-3.9-2-.6-3.6-.3-4.3.7zm32.4 35.6c-1.6 1.3-1 4.3 1.3 6.2 2.3 2.3 5.2 2.6 6.5 1 1.3-1.3.7-4.3-1.3-6.2-2.2-2.3-5.2-2.6-6.5-1zm-11.4-14.7c-1.6 1-1.6 3.6 0 5.9 1.6 2.3 4.3 3.3 5.6 2.3 1.6-1.3 1.6-3.9 0-6.2-1.4-2.3-4-3.3-5.6-2z"/></svg></span>
+                        </a>
+                        <a href="https://github.com/aptos-labs/aptos-core/edit/main/third_party/move/documentation/book/src/spec-lang.md" title="Suggest an edit" aria-label="Suggest an edit" rel="edit">
+                            <span class=fa-svg id="git-edit-button"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M421.7 220.3l-11.3 11.3-22.6 22.6-205 205c-6.6 6.6-14.8 11.5-23.8 14.1L30.8 511c-8.4 2.5-17.5 .2-23.7-6.1S-1.5 489.7 1 481.2L38.7 353.1c2.6-9 7.5-17.2 14.1-23.8l205-205 22.6-22.6 11.3-11.3 33.9 33.9 62.1 62.1 33.9 33.9zM96 353.9l-9.3 9.3c-.9 .9-1.6 2.1-2 3.4l-25.3 86 86-25.3c1.3-.4 2.5-1.1 3.4-2l9.3-9.3H112c-8.8 0-16-7.2-16-16V353.9zM453.3 19.3l39.4 39.4c25 25 25 65.5 0 90.5l-14.5 14.5-22.6 22.6-11.3 11.3-33.9-33.9-62.1-62.1L314.3 67.7l11.3-11.3 22.6-22.6 14.5-14.5c25-25 65.5-25 90.5 0z"/></svg></span>
+                        </a>
+
+                    </div>
+                </div>
+
+                <div id="mdbook-search-wrapper" class="hidden">
+                    <form id="mdbook-searchbar-outer" class="searchbar-outer">
+                        <div class="search-wrapper">
+                            <input type="search" id="mdbook-searchbar" name="searchbar" placeholder="Search this book ..." aria-controls="mdbook-searchresults-outer" aria-describedby="searchresults-header">
+                            <div class="spinner-wrapper">
+                                <span class=fa-svg id="fa-spin"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M304 48c0-26.5-21.5-48-48-48s-48 21.5-48 48s21.5 48 48 48s48-21.5 48-48zm0 416c0-26.5-21.5-48-48-48s-48 21.5-48 48s21.5 48 48 48s48-21.5 48-48zM48 304c26.5 0 48-21.5 48-48s-21.5-48-48-48s-48 21.5-48 48s21.5 48 48 48zm464-48c0-26.5-21.5-48-48-48s-48 21.5-48 48s21.5 48 48 48s48-21.5 48-48zM142.9 437c18.7-18.7 18.7-49.1 0-67.9s-49.1-18.7-67.9 0s-18.7 49.1 0 67.9s49.1 18.7 67.9 0zm0-294.2c18.7-18.7 18.7-49.1 0-67.9S93.7 56.2 75 75s-18.7 49.1 0 67.9s49.1 18.7 67.9 0zM369.1 437c18.7 18.7 49.1 18.7 67.9 0s18.7-49.1 0-67.9s-49.1-18.7-67.9 0s-18.7 49.1 0 67.9z"/></svg></span>
+                            </div>
+                        </div>
+                    </form>
+                    <div id="mdbook-searchresults-outer" class="searchresults-outer hidden">
+                        <div id="mdbook-searchresults-header" class="searchresults-header"></div>
+                        <ul id="mdbook-searchresults">
+                        </ul>
+                    </div>
+                </div>
+
+                <!-- Apply ARIA attributes after the sidebar and the sidebar toggle button are added to the DOM -->
+                <script>
+                    document.getElementById('mdbook-sidebar-toggle').setAttribute('aria-expanded', sidebar === 'visible');
+                    document.getElementById('mdbook-sidebar').setAttribute('aria-hidden', sidebar !== 'visible');
+                    Array.from(document.querySelectorAll('#mdbook-sidebar a')).forEach(function(link) {
+                        link.setAttribute('tabIndex', sidebar === 'visible' ? 0 : -1);
+                    });
+                </script>
+
+                <div id="mdbook-content" class="content">
+                    <main>
+                        <h1 id="move-specification-language"><a class="header" href="#move-specification-language">Move Specification Language</a></h1>
+<p>This chapter describes the <em>Move specification language (MSL)</em>, a subset of the
+<a href="https://aptos.dev/build/smart-contracts">Move</a> language that supports specification of the
+behavior of Move programs. MSL works together with the <a href="https://aptos.dev/build/smart-contracts/prover">Move Prover</a>,
+a tool that can statically verify the correctness of MSL specifications against
+Move programs. In contrast to traditional testing, verification of MSL is
+exhaustive and holds for all possible inputs and global states of a
+<a href="https://aptos.dev/network/glossary#move-module">Move module</a> or
+<a href="https://aptos.dev/network/glossary#move-script">Move script</a>. At the
+same time, this verification of MSL is fast and automated enough that it can be
+used at a similar place in the developer workflow where tests are typically
+conducted (for example, for qualification of pull requests in continuous
+integration).</p>
+<p>While the Move programming language at this point is stable, the subset
+represented by MSL should be considered evolving. This has no impact on platform
+stability, since MSL is not running in production; yet MSL is used for offline
+quality assurance where it is continuously improved for evolving objectives.</p>
+<p>This document describes the language only; see <a href="https://aptos.dev/build/smart-contracts/prover/prover-guide">Use the Move Prover</a>
+for instructions. The reader is expected to have basic knowledge of the Move
+language, as well as basic principles of pre- and post-condition specifications.
+(See for example the <a href="https://en.wikipedia.org/wiki/Design_by_contract">Design by contract</a>).
+For examples of specifications, we refer to the <a href="https://github.com/aptos-labs/aptos-core/blob/main/aptos-move/framework/aptos-framework/doc/overview.md">Aptos framework</a>
+documentation, which has specifications embedded.</p>
+<h1 id="expressions"><a class="header" href="#expressions">Expressions</a></h1>
+<p>Expressions in MSL are a subset of Move program expressions plus a set of
+additional constructs, as discussed in the following sections.</p>
+<h2 id="type-system"><a class="header" href="#type-system">Type System</a></h2>
+<p>The type system of MSL is similar to that of Move, with the following differences:</p>
+<ul>
+<li>There are two types of encodings for integer types: <code>num</code> and <code>bv</code> (bit vector).
+If an integer (either a constant or a variable) is not involved in any bitwise operations directly or indirectly,
+regardless of its type in Move (<code>u8</code>, <code>u16</code>, <code>u32</code>, <code>u64</code>, <code>u128</code> and <code>u256</code>), it is treated as the same type. In
+specifications, this type is called <code>num</code>, which is an arbitrary precision <em>signed</em> integer type.
+When MSL refers to a Move name that represents an <code>u8</code> or such, it will be automatically widened
+to <code>num</code>. This allows writing MSL expressions like <code>x + 1 &lt;= MAX_U128</code> or <code>x - y &gt;= 0</code> without
+needing to worry about overflow or underflow.
+Different from <code>num</code>, <code>bv</code> cannot and does not need to be explicitly used in specifications: if an integer is involved in bitwise operations such as <code>&amp;</code>, <code>|</code> or <code>^</code>, it will be automatically encoded as <code>bv</code>at the backend.
+Moreover, a <code>bv</code> integer has a fixed precision, which is consistent with its precision in Move (<code>bv8</code>, <code>bv16</code>, <code>bv32</code>, <code>bv64</code>, <code>bv128</code> and <code>bv256</code>).
+Note that, in general using <code>bv</code> is not so efficient as <code>num</code> in the <a href="https://en.wikipedia.org/wiki/Satisfiability_modulo_theories">SMT</a> solver such as <a href="https://github.com/Z3Prover/z3">Z3</a>. Consequently,
+the Move Prover has some restrictions when using bitwise operations, which are stated in detail below.</li>
+<li>The Move types <code>&amp;T</code>, <code>&amp;mut T</code>, and <code>T</code> are considered equivalent for MSL. Equality is interpreted
+as value equality. There is no need to worry about dereferencing a reference from the Move
+program: these are automatically dereferenced as needed. This simplification is possible because
+MSL cannot modify values from a Move program, and the program cannot directly reason about
+reference equality (which eliminates the need for doing so in MSL). (Note there is also a
+restriction in expressiveness coming with this, namely
+for <a href="#expressiveness">functions which return <code>&amp;mut T</code></a>. However, this is rarely hit in practice,
+and there are workarounds).</li>
+<li>There is the additional type <code>type</code>, which is the type of all types. It can be used only in
+quantifiers.</li>
+<li>There is the additional type <code>range</code>, which represents an integer range (and the notation <code>n..m</code> to
+denote a value).</li>
+</ul>
+<h2 id="naming"><a class="header" href="#naming">Naming</a></h2>
+<p>Name resolution in MSL works similar to the Move language. <code>use</code> declarations can introduce aliases for
+imported names. MSL functions and variable names must start with a lowercase letter. Schema names
+are treated like types and must start with a capital letter. (<a href="#schemas">Schemas</a> are a named construct
+discussed later).</p>
+<p>Move functions, MSL functions, Move types, and schemas all share the same namespace and are
+therefore unambiguous if aliased via a Move <code>use</code> clause. Because of the common name space, an MSL
+function cannot have the same name as a Move function. This is often handled via the convention to
+prefix MSL functions as in <code>spec_has_access</code> when the related Move function is called <code>has_access</code>.</p>
+<h2 id="operators"><a class="header" href="#operators">Operators</a></h2>
+<p>All Move operators are supported in MSL, except <code>&amp;</code>, <code>&amp;mut</code>, and <code>*</code> (dereference).</p>
+<p>In addition to the existing operators, vector subscript <code>v[i]</code>, slicing <code>v[i..j]</code>, and range
+construction <code>i..j</code> are supported (the type of integer ranges is a new builtin type called <code>range</code>). Moreover, boolean implication <code>p ==&gt; q</code> is supported as a more intuitive form than <code>!p || q</code>.</p>
+<h2 id="function-calls"><a class="header" href="#function-calls">Function calls</a></h2>
+<p>In MSL expressions, functions can be called like in Move. However, the callee must either be
+an <a href="#helper-functions">MSL helper function</a> or a <strong>pure</strong> Move function.</p>
+<p>Move functions are considered pure if they do not modify global state and do not use Move expression
+features that are not supported in MSL expressions (as defined in this document).</p>
+<p>There is one extension. If a Move function definition contains a direct <code>assert</code>, this will be
+ignored when it is called from an MSL expression, and the function will be considered pure. For
+example:</p>
+<pre><code class="language-move">module 0x42::m {
+  fun get(addr: address): &amp;T {
+    assert(exists&lt;T&gt;(addr), ERROR_CODE);
+    borrow_global&lt;T&gt;(addr)
+  }
+}
+</code></pre>
+<p>This function is pure and can be called from an MSL expression. The assertion will be ignored, and
+the function will be interpreted as:</p>
+<pre><code class="language-move">module 0x42::m {
+  spec fun get(addr: address): T { global&lt;T&gt;(addr) }
+}
+</code></pre>
+<p>This is justified by that MSL having <a href="#partial-semantics"><em>partial semantics</em></a>.</p>
+<h2 id="statements"><a class="header" href="#statements">Statements</a></h2>
+<p>Limited sequencing of the form <code>{ let x = foo(); x + x }</code> is supported, as well as if-then-else.
+Other statement forms of the Move language are not supported.</p>
+<h2 id="pack-and-unpack"><a class="header" href="#pack-and-unpack">Pack and unpack</a></h2>
+<p>Pack expressions are supported. Unpack expressions are currently <em>not</em> supported.</p>
+<h2 id="quantifiers"><a class="header" href="#quantifiers">Quantifiers</a></h2>
+<p>Universal and existential quantification is supported. The general form is:</p>
+<pre><code class="language-move">forall &lt;binding&gt;, ..., &lt;binding&gt; [ where &lt;exp&gt; ] : &lt;exp&gt;
+exists &lt;binding&gt;, ..., &lt;binding&gt; [ where &lt;exp&gt; ] : &lt;exp&gt;
+</code></pre>
+<ul>
+<li>Bindings can either be of the form <code>name: &lt;type&gt;</code> or <code>name in &lt;exp&gt;</code>. For the second form, the
+expression must either be a <code>range</code> or a vector.</li>
+<li>The optional constraint <code>where &lt;exp&gt;</code> allows to restrict the quantified range. <code>forall x: T where p: q</code>
+is equivalent to <code>forall x: T : p ==&gt; q</code> and <code>exists x: T where p: q</code> is equivalent to <code>exists x: T : p &amp;&amp; q</code>.</li>
+</ul>
+<h2 id="choice-operator"><a class="header" href="#choice-operator">Choice operator</a></h2>
+<p>The choice operator allows selecting a value that satisfies a predicate:</p>
+<pre><code class="language-move">choose a: address where exists&lt;R&gt;(a) &amp;&amp; global&lt;R&gt;(a).value &gt; 0
+</code></pre>
+<p>If the predicate is not satisfiable, the result of the choice will be undetermined. (See <a href="#partial-semantics">partial semantics</a>).</p>
+<p>The choice also comes in a form to select the <em>minimal</em> value from a set of integers, as in:</p>
+<pre><code class="language-move">choose min i: num where in_range(v, i) &amp;&amp; v[i] == 2
+</code></pre>
+<h2 id="cast-operator"><a class="header" href="#cast-operator">Cast operator</a></h2>
+<p>In the specification language, we can use the same syntax <code>(e as T)</code> to cast an expression <code>e</code> with one integer type to <code>T</code>, an integer type of another size.</p>
+<h2 id="shift-operator"><a class="header" href="#shift-operator">Shift operator</a></h2>
+<p>Shift operators <code>&lt;&lt;</code> and <code>&gt;&gt;</code> are supported in the specification language, and both of them have the same semantics with the Move language. As for abort, if a value <code>v</code> has width <code>n</code>, then <code>v &lt;&lt; m</code> or <code>v &gt;&gt; m</code> will abort if <code>m &gt;= n</code>.</p>
+<h2 id="bitwise-operators"><a class="header" href="#bitwise-operators">Bitwise operators</a></h2>
+<p>Move programs using bitwise operators <code>&amp;</code>, <code>|</code> and <code>^</code> can be verified in the prover, and these operators are also supported in the specification language.
+Due to encoding and efficiency issues, using bitwise operators has more caveats:</p>
+<ul>
+<li>
+<p>Integers involved in bitwise operations are encoded as <code>bv</code> types at the backend, and two encodings of integers are not compatible. For instance, if a variable <code>v</code> is involved in a bitwise operation such as <code>v &amp; 2</code> or <code>v = a ^ b</code>, then when it is used in an arithmetic operation <code>v * w</code> or a shift operation <code>v &lt;&lt; w</code>, <code>w</code> will be implicitly cast to a <code>bv</code> type in the Move program.
+However, the specification language does not support implicit type cast so users must explicitly use the built-in function <code>int2bv</code> in the specification: <code>v &lt;&lt; int2bv(w)</code>.
+Not that since each <code>bv</code> type has a fixed length (from 8 to 256), values with type <code>num</code> cannot be converted into <code>bv</code>.</p>
+</li>
+<li>
+<p>Verification of <code>bv</code> types is not efficient and may lead to timeout. As a result, users may prefer isolating bitwise operations from other operations and not using <code>int2bv</code> if possible. Moreover, users need to use pragmas to explicitly specify which integer-typed function arguments or struct fields will be used in bitwise computations:</p>
+</li>
+</ul>
+<pre><code class="language-move">module 0x42::m {
+  struct C has drop {
+    a: u64,
+    b: u64
+  }
+  spec C {
+    // b, the second field of C, will be of bv type
+    pragma bv = b"1";
+  }
+  public fun foo_generic&lt;T&gt;(i: T): T {
+    i
+  }
+
+  spec foo_generic {
+    // The first parameter will be of bv type if T is instantiated as a number type
+    pragma bv = b"0";
+    // The first return value will be of bv type if T is instantiated as a number type
+    pragma bv_ret = b"0";
+  }
+
+  public fun test(i: C): u64 {
+    let x1 = foo_generic(C.b);
+    x1 ^ x1
+  }
+
+  spec test {
+    // Explicit type cast is mandatory for generating correct boogie program
+    ensures result == (0 as u64);
+  }
+}
+</code></pre>
+<p>Note that if arguments or fields of a generic function or struct are specified with <code>bv</code> types,
+they will be of <code>bv</code> types in all instances of the function or the struct when the instantiated type is an integer type.</p>
+<ul>
+<li>Values with integer types in vectors and tables can be encoded as <code>bv</code> types; indices and keys in tables cannot be <code>bv</code> types for now. Using other types will lead to internal errors.</li>
+</ul>
+<h2 id="built-in-functions"><a class="header" href="#built-in-functions">Built-in functions</a></h2>
+<p>MSL supports a number of built-in constants and functions. Most of them are not available in the Move
+language:</p>
+<ul>
+<li><code>MAX_U8: num</code>, <code>MAX_U64: num</code>, <code>MAX_U128: num</code> returns the maximum value of the corresponding
+type.</li>
+<li><code>exists&lt;T&gt;(address): bool</code> returns true if the resource T exists at address.</li>
+<li><code>global&lt;T&gt;(address): T</code> returns the resource value at address.</li>
+<li><code>len&lt;T&gt;(vector&lt;T&gt;): num</code> returns the length of the vector.</li>
+<li><code>update&lt;T&gt;(vector&lt;T&gt;, num, T&gt;): vector&lt;T&gt;</code> returns a new vector with the element replaced at the
+given index.</li>
+<li><code>vec&lt;T&gt;(): vector&lt;T&gt;</code> returns an empty vector.</li>
+<li><code>vec&lt;T&gt;(x): vector&lt;T&gt;</code> returns a singleton vector.</li>
+<li><code>concat&lt;T&gt;(vector&lt;T&gt;, vector&lt;T&gt;): vector&lt;T&gt;</code> returns the concatenation of the parameters.</li>
+<li><code>contains&lt;T&gt;(vector&lt;T&gt;, T): bool</code> returns true if element is in vector.</li>
+<li><code>index_of&lt;T&gt;(vector&lt;T&gt;, T): num</code> returns the index of the element in the vector, or the length of
+the vector if it does not contain it.</li>
+<li><code>range&lt;T&gt;(vector&lt;T&gt;): range</code> returns the index range of the vector.</li>
+<li><code>in_range&lt;T&gt;(vector&lt;T&gt;, num): bool</code> returns true if the number is in the index range of the
+vector.</li>
+<li><code>in_range&lt;T&gt;(range, num): bool</code> returns true if the number is in the range.</li>
+<li><code>update_field(S, F, T): S</code> updates a field in a struct, preserving the values of other fields,
+where <code>S</code> is some struct, <code>F</code> the name of a field in <code>S</code>, and <code>T</code> a value for this field.</li>
+<li><code>old(T): T</code> delivers the value of the passed argument at point of entry into a Move function. This
+is allowed in
+<code>ensures</code> post-conditions,
+inline spec blocks (with additional restrictions), and
+certain forms of invariants, as discussed later.</li>
+<li><code>TRACE(T): T</code> is semantically the identity function and causes visualization of the argument’s
+value in error messages created by the prover.</li>
+<li><code>int2bv(v)</code> explicitly converts an integer <code>v</code> into its <code>bv</code> representation.</li>
+<li><code>bv2int(b)</code> explicitly converts a ‘bv’ integer ‘b’ into the <code>num</code> representation. However, it is not encouraged to use it due to efficiency issue.</li>
+</ul>
+<p>Built-in functions live in an unnamed outer scope of a module. If the module defines a function <code>len</code>,
+then this definition will shadow that of the according built-in function. To access the built-in
+function in such a situation, one can use the notation <code>::len(v)</code>.</p>
+<h2 id="partial-semantics"><a class="header" href="#partial-semantics">Partial semantics</a></h2>
+<p>In MSL, expressions have partial semantics. This is in contrast to Move program expressions, which
+have total semantics, since they either deliver a value or abort.</p>
+<p>An expression <code>e[X]</code> that depends on some variables <code>X</code> may have a known interpretation for
+some assignments to variables in <code>X</code> but is unknown for others. An unknown interpretation for a
+sub-expression causes no issue if its value is not needed for the overall expression result.
+Therefore, it does not matter if we say <code>y != 0 &amp;&amp; x / y &gt; 0</code>
+or <code>x / y &gt; 0 &amp;&amp; y != 0</code>: boolean operators are commutative.</p>
+<p>This basic principle inherits to higher-level language constructs. For example, in specifications,
+it does not matter in which order conditions are supplied: <code>aborts_if y != 0; ensures result == x / y;</code> is the same as
+<code>ensures result == x / y; aborts_if y != 0;</code>. Also, <code>aborts_if P; aborts_if Q;</code> is the same
+as <code>aborts_if Q || P</code>
+.</p>
+<p>Moreover, the principle of partial semantics is inherited to <a href="#helper-functions">specification helper functions</a>, which behave transparently. Specifically, inlining those functions is equivalent to calling them (call-by-expression parameter passing semantics).</p>
+<h1 id="specifications"><a class="header" href="#specifications">Specifications</a></h1>
+<p>Specifications are contained in so-called <em>specification blocks</em> (abbreviated <strong>spec block</strong>) that
+can appear as module members and inside Move functions. The various types of spec blocks are shown
+below, and will be discussed in subsequent sections.</p>
+<pre><code class="language-move">module addr::M {
+  struct Counter has key {
+    value: u8,
+  }
+
+  public fun increment(a: address) acquires Counter {
+    let r = borrow_global_mut&lt;Counter&gt;(a);
+    spec {
+      // spec block targeting this code position
+      // ...
+    };
+    r.value = r.value + 1;
+  }
+
+  spec increment {
+    // spec block targeting function increment
+    // ...
+  }
+
+  spec Counter {
+    // spec block targeting struct Counter
+    // ...
+  }
+
+  spec schema Schema {
+    // spec block declaring a schema
+    // ...
+  }
+
+  spec fun f(x: num): num {
+    // spec block declaring a helper function
+    // ...
+  }
+
+  spec module {
+    // spec block targeting the whole module
+    // ...
+  }
+}
+</code></pre>
+<p>Apart from spec blocks inside Move functions, the textual position of spec block is irrelevant. Also,
+a spec block for a struct, function, or module can be repeated multiple times, accumulating the
+content.</p>
+<h2 id="separating-specifications"><a class="header" href="#separating-specifications">Separating specifications</a></h2>
+<p>Instead of putting specifications into the same module as the regular Move definitions, one can also
+put them into a separate “specification” module, which can live in the same or a different file:</p>
+<pre><code class="language-move">module addr::M {
+    //...
+}
+spec addr::M {
+    spec increment { /* ... */ }
+}
+</code></pre>
+<p>The syntax of a specification module is the same as for a regular module; however, Move functions
+and structures are not allowed.</p>
+<p>A specification module must be compiled together with the Move module it is targeting and cannot be
+compiled and verified standalone.</p>
+<p>In case Move definitions are far apart (e.g., in different files), it is possible to augment the
+specification of a Move function with a signature of this function to give sufficient context to
+understand the specification. This syntax is optionally enabled in regular and in specification
+modules:</p>
+<pre><code class="language-move">module 0x42::m {
+  public fun increment(a: address) acquires Counter { /* ... */ }
+  // ...
+  spec increment(a: address) { /* ... */ }
+}
+</code></pre>
+<h2 id="pragmas-and-properties"><a class="header" href="#pragmas-and-properties">Pragmas and properties</a></h2>
+<p>Pragmas and properties are a generic mechanism to influence interpretation of specifications. They
+are also an extension point to experiment with new concepts before they become part of the mainstream
+syntax. Here we give a brief introduction into their general syntax; individual instances are
+discussed later.</p>
+<p>The general form of a pragma is:</p>
+<pre><code class="language-move">module 0x42::m {
+  spec item {
+    pragma &lt;name&gt; = &lt;literal&gt;;
+  }
+}
+</code></pre>
+<p>The general form of a property is:</p>
+<pre><code class="language-move">module 0x42::m {
+  spec item {
+  &lt;directive&gt; [&lt;name&gt; = &lt;literal&gt;] &lt;content&gt;; // ensures, aborts_if, include, etc..
+  }
+}
+</code></pre>
+<p>The <code>&lt;literal&gt;</code> can be any value supported by MSL (or the Move language). A value assignment can
+also be omitted, in which case a default is used. For example, it is common to use <code>pragma option;</code>
+as a shortcut for <code>pragma option = true;</code>.</p>
+<p>Instead of a single pragma or property, a list can also be provided, as in <code>invariant [global, isolated] P</code>.</p>
+<h3 id="pragma-inheritance"><a class="header" href="#pragma-inheritance">Pragma inheritance</a></h3>
+<p>A pragma in a module spec block sets a value that applies to all other spec blocks in the module. A
+pragma in a function or struct spec block can override this value for the function or struct.
+Furthermore, the default value of some pragmas can be defined via the prover configuration.</p>
+<p>As an example, we look at the <code>verify</code> pragma. This pragma is used to turn verification on or off.</p>
+<pre><code class="language-move">module 0x42::m {
+  spec module {
+    pragma verify = false; // By default, do not verify specs in this module ...
+  }
+
+  spec increment {
+    pragma verify = true; // ... but do verify this function.
+    // ...
+  }
+}
+</code></pre>
+<h3 id="general-pragmas-and-properties"><a class="header" href="#general-pragmas-and-properties">General pragmas and properties</a></h3>
+<p>A number of pragmas control general behavior of verification. Those are listed in the table below.</p>
+<div class="table-wrapper">
+<table>
+<thead>
+<tr><th>Name</th><th>Description</th></tr>
+</thead>
+<tbody>
+<tr><td><code>verify</code></td><td>Turns on or off verification.</td></tr>
+<tr><td><code>intrinsic</code></td><td>Marks a function to skip the Move implementation and use a prover native implementation. This makes a function behave like a native function even if it not so in Move.</td></tr>
+<tr><td><code>timeout</code></td><td>Sets a timeout (in seconds) for function or module. Overrides the timeout provided by command line flags.</td></tr>
+<tr><td><code>verify_duration_estimate</code></td><td>Sets an estimate (in seconds) for how long the verification of function takes. If the configured <code>timeout</code> is less than this value, verification will be skipped.</td></tr>
+<tr><td><code>seed</code></td><td>Sets a random seed for function or module. Overrides the seed provided by command line flags.</td></tr>
+</tbody>
+</table>
+</div>
+<p>The following properties control general behavior of verification:</p>
+<div class="table-wrapper">
+<table>
+<thead>
+<tr><th>Name</th><th>Description</th></tr>
+</thead>
+<tbody>
+<tr><td><code>[deactivated]</code></td><td>Excludes the associated condition from verification.</td></tr>
+</tbody>
+</table>
+</div>
+<h2 id="pre-and-post-state"><a class="header" href="#pre-and-post-state">Pre and post state</a></h2>
+<p>Multiple conditions in spec blocks work with a <em>pre</em> and <em>post</em> state, relating them to each other.
+Function specifications are one example of this: in the <code>ensures P</code> condition, the pre-state (at
+function entry) and the post-state (at function exit) are related via the predicate <code>P</code>. However,
+the concept is more general and also applied for invariants, where the pre-state is before and
+post-state after a global update.</p>
+<p>In contexts where a pre/post-state is active, expressions are evaluated implicitly in the
+post-state. To evaluate an expression in a pre-state, one uses the built-in function <code>old(exp)</code>,
+which evaluates its parameter in the pre-state and returns its value. It is important to understand
+that every sub-expression in <code>exp</code> is computed in the pre-state as well, including calls to helper
+functions.</p>
+<p>The ‘state’ in question here consists of assignments to global resource memory, as well as to any
+parameters of the function of type <code>&amp;mut T</code>. Examples:</p>
+<pre><code class="language-move">module 0x42::m {
+  fun increment(counter: &amp;mut u64) { *counter = *counter + 1 }
+  spec increment {
+    ensures counter == old(counter) + 1;
+  }
+
+  fun increment_R(addr: address) {
+    let r = borrow_global_mut&lt;R&gt;(addr);
+    r.value = r.value + 1;
+  }
+  spec increment_R {
+    ensures global&lt;R&gt;(addr).value == old(global&lt;R&gt;(addr).value) + 1;
+  }
+}
+</code></pre>
+<h2 id="helper-functions"><a class="header" href="#helper-functions">Helper functions</a></h2>
+<p>MSL allows defining helper functions. Those functions can then be used in expressions.</p>
+<p>Helper functions are defined using the following syntax:</p>
+<pre><code class="language-move">module 0x42::m {
+  spec fun exists_balance&lt;Currency&gt;(a: address): bool { exists&lt;Balance&lt;Currency&gt;&gt;(a) }
+}
+</code></pre>
+<p>As seen in the example, helper functions can be generic. Moreover, they can access global state.</p>
+<p>Definitions of helper functions are neutral regarding whether they apply to
+a <a href="#pre-and-post-state">pre- or post-state</a>. They are evaluated in the currently active state. For
+instance, in order to see whether a balance existed in the pre-state, one
+uses <code>old(exists_balance&lt;Currency&gt;(a))</code>. Consequently, the expression <code>old(..)</code> is not allowed
+within the definition of a helper function.</p>
+<p>Helper functions are partial functions; see the discussion of <a href="#partial-semantics">partial semantics</a>.</p>
+<h3 id="uninterpreted-functions"><a class="header" href="#uninterpreted-functions">Uninterpreted functions</a></h3>
+<p>A helper function can be defined as <strong>uninterpreted</strong> by simply omitting its body:</p>
+<pre><code class="language-move">module 0x42::m {
+  spec fun something(x: num): num;
+}
+</code></pre>
+<p>An uninterpreted function is one of the prover is allowed to assign some arbitrary meaning to, as long
+as it is consistent within a given verification context. Uninterpreted functions are a useful tool
+for abstraction in specifications (see also <a href="#abstract-specifications">abstract specifications</a>).</p>
+<h3 id="axioms"><a class="header" href="#axioms">Axioms</a></h3>
+<p>The meaning of helper functions can be further constrained by using <strong>axioms</strong>. Currently, axioms
+must be contained in module spec blocks:</p>
+<pre><code class="language-move">module 0x42::m {
+  spec module {
+    axiom forall x: num: something(x) == x + 1;
+  }
+}
+</code></pre>
+<p>Axioms should be used with care as they can introduce unsoundness in the specification logic via
+contradicting assumptions. The Move Prover supports a smoke test for detecting unsoundness via
+the <code>--check-inconsistency</code> flag.</p>
+<h2 id="let-bindings"><a class="header" href="#let-bindings">Let bindings</a></h2>
+<p>A spec block can contain let bindings that introduce names for expressions:</p>
+<pre><code class="language-move">module 0x42::m {
+  fun get_R(account: signer): R { /* ... */ }
+  spec get_R {
+    let addr = signer::spec_address_of(account);
+    aborts_if addr != ROOT;
+    ensures result == global&lt;R&gt;(addr);
+  }
+}
+</code></pre>
+<p>In a spec block that has a pre-state and post-state (like a function specification), the <code>let name = e</code>
+form will evaluate <code>e</code> in the pre-state. In order to evaluate an expression in the post-state, use <code>let post name = e</code>. In the rhs expression of this form, one can use <code>old(..)</code> to refer to the
+pre-state.</p>
+<h2 id="aborts_if-condition"><a class="header" href="#aborts_if-condition">Aborts_if condition</a></h2>
+<p>The <code>aborts_if</code> condition is a spec block member that can appear only in a function context. It
+specifies conditions under which the function aborts.</p>
+<p>In the following example, we specify that the function <code>increment</code> aborts if the <code>Counter</code> resource
+does not exist at address <code>a</code> (recall that <code>a</code> is the name of the parameter of <code>increment</code>).</p>
+<pre><code class="language-move">module 0x42::m {
+  spec increment {
+    aborts_if !exists&lt;Counter&gt;(a);
+  }
+}
+</code></pre>
+<p>If a function has more than one <code>aborts_if</code> condition, those conditions are or-ed with each other.
+The evaluation of the combined aborts condition (or-ed from each individual condition) depends on
+the value of the pragma <code>aborts_if_is_partial</code>. If this value is false (the default), the function
+aborts <em>if and only if</em> the combined aborts condition is true. In this case, the above aborts
+specification for <code>increment</code> will lead to a verification error, since there are additional
+situations where <code>increment</code> can abort, namely if incrementing <code>Counter.value</code> would lead to an
+overflow. To fix this, the specification can be completed like this:</p>
+<pre><code class="language-move">module 0x42::m {
+  spec increment {
+    pragma aborts_if_is_partial = false; // This is the default, but added here for illustration.
+    aborts_if !exists&lt;Counter&gt;(a);
+    aborts_if global&lt;Counter&gt;(a).value == 255;
+  }
+}
+</code></pre>
+<p>If the value of <code>aborts_if_is_partial</code> is true, the combined aborts condition (the or-ed individual
+conditions) only <em>implies</em> that the function aborts. Formally, if <code>A</code> is the combined aborts condition, then
+with <code>aborts_if_is_partial = true</code>, we have <code>A ==&gt; function_aborts</code>; otherwise we have
+<code>A &lt;==&gt; function_aborts</code>. Therefore, the following does verify:</p>
+<pre><code class="language-move">module 0x42::m {
+  spec increment {
+    pragma aborts_if_is_partial = true;
+    aborts_if !exists&lt;Counter&gt;(a);
+  }
+}
+</code></pre>
+<a name="risk-aborts-if-is-partial" />
+<blockquote>
+<p>Note that there is a certain risk in setting <code>aborts_if_is_partial</code> to true, and best practice is to avoid it in specifications of public functions and Move scripts once those are considered finalized. This is because changing the code after finalization of the spec can add new (non-trivial, undesired) abort situations the original specification did not anticipate yet will nevertheless silently pass verification.</p>
+</blockquote>
+<p>If no aborts condition is specified for a function, abort behavior is unspecified. The function may
+or may not abort, and verification will not raise any errors, whether <code>aborts_if_is_partial</code> is set
+or not. In order to state that a function never aborts, use <code>aborts_if false</code>. One can use the
+pragma <code>aborts_if_is_strict</code> to change this behavior; this is equivalent to an <code>aborts_if false</code> being added to each function that does not have an explicit <code>aborts_if</code> clause.</p>
+<h3 id="aborts_if-condition-with-code"><a class="header" href="#aborts_if-condition-with-code">Aborts_if condition with code</a></h3>
+<p>The <code>aborts_if</code> condition can be augmented with code:</p>
+<pre><code class="language-move">module 0x42::m {
+  fun get_value(addr: address): u64 {
+    aborts(exists&lt;Counter&gt;(addr), 3);
+    borrow_global&lt;Counter&gt;(addr).value
+  }
+  spec get_value {
+    aborts_if !exists&lt;Counter&gt;(addr) with 3;
+  }
+}
+</code></pre>
+<p>It is a verification error if the above function does not abort with code <code>3</code> under the given
+condition.</p>
+<p>In order to specify a direct VM abort, one can use the special constant <code>EXECUTION_FAILURE</code>:</p>
+<pre><code class="language-move">module 0x42::m {
+  fun get(addr: address): &amp;Counter acquires Counter {
+    borrow_global&lt;Counter&gt;(addr)
+  }
+  spec get {
+    aborts_if !exists&lt;Counter&gt;(addr) with EXECUTION_FAILURE;
+  }
+}
+</code></pre>
+<p>This same constant can be used for all other VM failures (division by zero, overflow, etc.).</p>
+<h2 id="aborts_with-condition"><a class="header" href="#aborts_with-condition">Aborts_with condition</a></h2>
+<p>The <code>aborts_with</code> condition allows specifying with which codes a function can abort, independent
+under which condition. It is similar to a ‘throws’ clause in languages like Java.</p>
+<pre><code class="language-move">module 0x42::m {
+  fun get_one_off(addr: address): u64 {
+    aborts(exists&lt;Counter&gt;(addr), 3);
+    borrow_global&lt;Counter&gt;(addr).value - 1
+  }
+  spec get_one_off {
+    aborts_with 3, EXECUTION_FAILURE;
+  }
+}
+</code></pre>
+<p>If the function aborts with any other or none of the specified codes, a verification error will be
+produced.</p>
+<p>The <code>aborts_with</code> condition can be combined with <code>aborts_if</code> conditions. In this case, the <code>aborts_with</code>
+specifies any other codes with which the function may abort, in addition to the ones given in the <code>aborts_if</code>:</p>
+<pre><code class="language-move">module 0x42::m {
+  spec get_one_off {
+    aborts_if !exists&lt;Counter&gt;(addr) with 3;
+    aborts_with EXECUTION_FAILURE;
+  }
+}
+</code></pre>
+<h2 id="requires-condition"><a class="header" href="#requires-condition">Requires condition</a></h2>
+<p>The <code>requires</code> condition is a spec block member that postulates a pre-condition for a function. The
+Move Prover will produce verification errors for functions that are called with violating
+pre-conditions.</p>
+<p>A <code>requires</code> is different from an <code>aborts_if</code>: in the latter case, the function can be called, and
+any aborts it produces will be propagated to the caller context. In the <code>requires</code> case, the Move Prover
+will not allow the function to be called in the first place. Nevertheless, the function can <em>still
+be called at runtime</em> if verification is skipped. Because of this, <code>requires</code> are rare in Move
+specifications, and <code>aborts_if</code> are more common. Specifically, <code>requires</code> should be avoided for public APIs.</p>
+<p>An example of <code>requires</code> is:</p>
+<pre><code class="language-move">module 0x42::m {
+  spec increment {
+    requires global&lt;Counter&gt;(a).value &lt; 255;
+  }
+}
+</code></pre>
+<h2 id="ensures-condition"><a class="header" href="#ensures-condition">Ensures condition</a></h2>
+<p>The <code>ensures</code> condition postulates a post-condition for a function that must be satisfied when the
+function terminates successfully (i.e., does not abort). The Move Prover will verify each <code>ensures</code> to
+this end.</p>
+<p>An example for the <code>ensures</code> condition is the following:</p>
+<pre><code class="language-move">module 0x42::m {
+  spec increment {
+    ensures global&lt;Counter&gt;(a) == old(global&lt;Counter&gt;(a)) + 1;
+  }
+}
+</code></pre>
+<p>Within the expression for the <code>ensures</code> condition, one can use the <code>old</code> function, as discussed in
+<a href="#pre-and-post-state">Pre and post state</a>.</p>
+<h2 id="modifies-condition"><a class="header" href="#modifies-condition">Modifies condition</a></h2>
+<p>The <code>modifies</code> condition is used to provide permissions to a function to modify global storage. The
+annotation itself comprises a list of global access expressions. It is specifically used together
+with <a href="#opaque-specifications">opaque function specifications</a>.</p>
+<pre><code class="language-move">module 0x42::m {
+  struct S has key {
+    x: u64
+  }
+
+  fun mutate_at(addr: address) acquires S {
+    let s = borrow_global_mut&lt;S&gt;(addr);
+    s.x = 2;
+  }
+  spec mutate_at {
+    pragma opaque;
+    modifies global&lt;S&gt;(addr);
+  }
+}
+</code></pre>
+<p>In general, a global access expression has the form <code>global&lt;type_expr&gt;(address_expr)</code>. The
+address-valued expression is evaluated in the pre-state of the annotated function.</p>
+<pre><code class="language-move">module 0x42::m {
+  fun read_at(addr: address): u64 acquires S {
+    let s = borrow_global&lt;S&gt;(addr);
+    s.x
+  }
+
+  fun mutate_S_test(addr1: address, addr2: address): bool acquires T {
+    assert(addr1 != addr2, 43);
+    let x = read_at(addr2);
+    mutate_at(
+      addr1
+    ); // Note we are mutating a different address than the one read before and after
+    x == read_at(addr2)
+  }
+  spec mutate_S_test {
+    aborts_if addr1 == addr2;
+    ensures result == true;
+  }
+}
+</code></pre>
+<p>In the function <code>mutate_S_test</code>, the assertion in the spec block is expected to hold. A benefit of
+the modifies specification on <code>mutate_at</code> is that this assertion can be proved whether <code>mutate_at</code> is inlined.</p>
+<p>If the modifies annotation is omitted on a function, then that function is deemed to have all
+possible permissions for those resources it may modify during its execution. The set of all
+resources that may be modified by a function is obtained via an interprocedural analysis of the
+code. In the example above, <code>mutate_S_test</code> does not have a modifies specification and modifies
+resource <code>S</code> via the call to <code>mutate_at</code>. Therefore, it is considered to have modified <code>S</code> at any
+possible address. Instead, if the programmer adds <code>modifies global&lt;S&gt;(addr1)</code>
+to the specification of <code>mutate_S_test</code>, then the call to <code>mutate_at</code> is checked to make sure that
+modify permissions granted to <code>mutate_S_test</code> cover the permissions it grants to <code>mutate_at</code>.</p>
+<h2 id="invariant-condition"><a class="header" href="#invariant-condition">Invariant condition</a></h2>
+<p>The invariant condition can be applied on structs and on global level.</p>
+<h3 id="function-invariants"><a class="header" href="#function-invariants">Function invariants</a></h3>
+<p>The <code>invariant</code> condition on a function is simply a shortcut for a <code>requires</code> and <code>ensures</code> with the
+same predicate.</p>
+<p>Thus, the following spec block:</p>
+<pre><code class="language-move">module 0x42::m {
+  spec increment {
+    invariant global&lt;Counter&gt;(a).value &lt; 128;
+  }
+}
+</code></pre>
+<p>… is equivalent to:</p>
+<pre><code class="language-move">module 0x42::m {
+  spec increment {
+    requires global&lt;Counter&gt;(a).value &lt; 128;
+    ensures global&lt;Counter&gt;(a).value &lt; 128;
+  }
+}
+</code></pre>
+<h3 id="struct-invariants"><a class="header" href="#struct-invariants">Struct invariants</a></h3>
+<p>When the <code>invariant</code> condition is applied to a struct, it expresses a well-formedness property of
+the struct data. Any instance of this struct that is currently not mutated will satisfy this
+property (with exceptions as outlined below).</p>
+<p>For example, we can postulate an invariant on our counter that it never must exceed the value of
+127:</p>
+<pre><code class="language-move">module 0x42::m {
+  spec Counter {
+    invariant value &lt; 128;
+  }
+}
+</code></pre>
+<p>A struct invariant is checked by the Move Prover whenever the struct value is constructed (packed). While
+the struct is mutated (e.g., via a <code>&amp;mut Counter</code>) the invariant does <em>not</em> hold (but see exception
+below). In general, we consider mutation as an implicit unpack, and end of mutation as a pack.</p>
+<p>The Move language semantics unambiguously identifies the point when mutation ends and starts. This
+follows from the borrow semantics of Move and includes mutation via an enclosing struct.
+(The mutation of an inner struct ends when the mutation of the root struct where mutation started
+ends).</p>
+<p>There is one exception to this rule. When a mutable reference to a struct declared in module M is
+passed into a <em>public</em> function of M which does by itself <em>not</em> return any other mutable reference (which could be borrowed from the input parameter), we treat this parameter as “packed”. That means, on function entry, we will unpack it and on function exit we will pack again, enforcing the invariant. This reflects that in Move, struct data can be mutated only within the module that declares the struct; so for an outside caller of the public function, the mutable reference can actually not be mutated unless by calling public functions of module M again. It is a significant simplification of the verification problem to exploit this in the semantics.</p>
+<h3 id="global-invariants"><a class="header" href="#global-invariants">Global invariants</a></h3>
+<p>A global invariant appears as a member of module. It can express a condition over the global state
+of the Move program, as represented by resources stored in memory. For example, the below invariant
+states that a <code>Counter</code> resource stored at any given address can never be zero:</p>
+<pre><code class="language-move">module addr::M {
+    invariant forall a: addr where exists&lt;Counter&gt;(a): global&lt;Counter&gt;(a).value &gt; 0;
+}
+</code></pre>
+<p>A global invariant is assumed to hold when data is read from the global state, and is asserted (and
+may fail to verify) at the moment the state is updated. For example, the below function will never abort with arithmetic underflow because the counter value is always greater than zero; however, it will create a verification error since the counter can drop to zero:</p>
+<pre><code class="language-move">module 0x42::m {
+  fun decrement_ad(addr: address) acquires Counter {
+    let counter = borrow_global_mut&lt;Counter&gt;(addr);
+    let new_value = counter.value - 1;   // Will not abort because counter.value &gt; 0
+    *counter.value = new_value;          // Fails verification since value can drop to zero
+  }
+}
+</code></pre>
+<p>Notice that type parameters are supported in global invariants. For example, the invariant above can be rewritten into the below one if <code>Counter</code> is generic:</p>
+<pre><code class="language-move">module addr::M {
+    invariant&lt;T&gt; forall a: addr where exists&lt;Counter&lt;T&gt;&gt;(a): global&lt;Counter&lt;T&gt;&gt;(a).value &gt; 0;
+}
+</code></pre>
+<h4 id="disabling-invariants"><a class="header" href="#disabling-invariants">Disabling invariants</a></h4>
+<p>There are times when a global invariant holds almost everywhere, except for a brief interval inside a function. In current Move code, this often occurs when something (e.g., an account) is being set up and
+several structs are published together. Almost everywhere, an invariant holds that all the structs are published or none of them are. But the code that publishes the structs must do so sequentially. While the structs are being published, there will be a point where some are published and others are not.</p>
+<p>In order to verify invariants that hold except during small regions, there is a feature to allow users to disable invariants temporarily. Consider the following code fragment:</p>
+<pre><code class="language-move">module 0x42::m {
+  fun setup() {
+    publish1();
+    publish2();
+  }
+}
+</code></pre>
+<p>where <code>publish1</code> and <code>publish2</code> publish two different structs, <code>T1</code> and <code>T2</code> at address <code>a</code>.</p>
+<pre><code class="language-move">module addr::M {
+    invariant [global] exists&lt;T1&gt;(a) == exists&lt;T2&gt;(a)
+}
+</code></pre>
+<p>As written, the Move Prover will report that the invariant is violated after the call to <code>publish1</code> and before the call to <code>publish2</code>. If either of <code>publish1</code> or <code>publish2</code> is without the other, the Move Prover
+will also report a violation of the invariant.</p>
+<p>By default, a global invariant is checked immediately after the instruction <code>I</code> that touches the resources mentioned in the global invariant. The <code>[suspendable]</code> attribute (at the invariant side) together with two pragmas (specified in function spec block) provide fine-grained control on where we hope this invariant to be checked:</p>
+<ul>
+<li><code>disable_invariants_in_body</code>: the invariant will be checked at the end of the function where <code>I</code> resides.</li>
+<li><code>delegate_invariants_to_caller</code>: the invariant will be checked by all callers of the function where <code>I</code> resides.</li>
+</ul>
+<p>For the example above, we can add the pragma <code>disable_invariants_in_body</code>:</p>
+<pre><code class="language-move">module 0x42::m {
+  spec setup {
+    pragma disable_invariants_in_body;
+  }
+}
+</code></pre>
+<p>which says that invariants are not required to hold while <code>setup</code> is executing but are assumed to hold on entry to and exit from <code>setup</code>.</p>
+<p>This pragma changes the Move Prover’s behavior. The invariants are assumed on entry to <code>setup</code> but not proved during or after <code>publish1</code> and <code>publish2</code>. Instead, all invariants that could be invalidated in the
+body of <code>setup</code> are asserted and proved at the point of return from <code>setup</code>. A consequence of this processing is that the user may need to provide stronger post-conditions on <code>publish1</code> and <code>publish2</code> to
+make it possible to prove the invariants on exit from <code>setup</code>.</p>
+<p>Another consequence of this processing is that invariants cannot safely be assumed to hold during the execution of <code>publish1</code> and <code>publish2</code> (unless nothing in the body of <code>setup</code> changes state
+mentioned in the invariant). Therefore, if proving a post-condition requires the invariant to be assumed, the post-condition will fail.</p>
+<p>In the example, invariants hold at the call sites of <code>setup</code> but not in the body. For <code>publish1</code>, invariants don’t necessarily hold at the call site <em>or</em> in the body of the function. In the example, that
+behavior is implied because <code>publish1</code> is called in a context where invariants are disabled.</p>
+<p>When invariants are disabled in <code>setup</code> in the above example, the Move Prover cannot assume them on entry to <code>publish1</code> and <code>publish2</code> and should not try to prove them on exit from those functions. The Move Prover
+would have the same behavior for any functions called by <code>publish1</code> or <code>publish2</code>. The Move Prover <em>automatically</em> adopts this behavior when invariants are disabled in a calling function, but it is possible for the user to declare that a function be treated like <code>publish1</code>.</p>
+<p>For example, if <code>publish2</code> is <em>only</em> called from the setup function above, and we did <em>not</em> disable invariants in <code>setup</code>, we could achieve a similar effect by using the pragma <code>delegate_invariants_to_caller</code>, instead.</p>
+<pre><code class="language-move">module 0x42::m {
+  spec setup {
+    pragma delegate_invariants_to_caller;
+  }
+}
+</code></pre>
+<p>This would be legal only if <code>setup</code> is a private or <code>public (friend)</code> function. The difference between this and disabling invariants in <code>setup</code> is that the invariants would not be assumed at the beginning of <code>setup</code> and would be proved after <code>setup</code> returns at each site where it is called.</p>
+<p>While both pragmas disable invariants in the body of a function, the difference is that <code>disable_invariants_in_body</code> assumes invariants on entry and proves them on exit, while <code>delegate_invariants_to_caller</code> does neither.</p>
+<p>There are some limitations on how these pragmas can be used. <code>disable_invariants_in_body</code> cannot be declared for functions where invariants are delegated to a caller, either explicitly via the pragma
+or implicitly because the function is called in a context where invariants have been disabled. (This restriction is to ensure consistent processing, because on pragma assumes that invariants hold
+in the calling context and the other does not). Second, it is illegal for a public or script function to delegate invariant checking to its callers (since the Move Prover does not know all the call sites), <em>unless</em> the function cannot possibly invalidate an invariant because it doesn’t change any of the state mentioned in <code>exists</code> and <code>global</code> expressions appearing in the invariant.</p>
+<h4 id="update-invariants"><a class="header" href="#update-invariants">Update invariants</a></h4>
+<p>The <code>update</code> form of a global invariant allows to express a relation between <a href="#pre-and-post-state">pre-state and post-state</a> of a global state update. For example, the following invariant states that the counter must decrease monotonically whenever it is updated:</p>
+<pre><code class="language-move">module addr::M {
+    invariant update [global] forall a: addr where old(exists&lt;Counter&gt;(a)) &amp;&amp; exists&lt;Counter&gt;(addr):
+        global&lt;Counter&gt;(a).value &lt;= old(global&lt;Counter&gt;(a));
+}
+</code></pre>
+<h4 id="isolated-global-invariants"><a class="header" href="#isolated-global-invariants">Isolated global invariants</a></h4>
+<p>A global invariant can be marked as <code>[isolated]</code> to indicate that it is not relevant for proving
+other properties of the program. An isolated global invariant will not be assumed when the related
+global state is read. It will only be assumed before the state is updated to help prove that the
+invariant still holds after the update. This feature is for improving performance in situations
+where there are many global invariants, but they have no direct influence on verification.</p>
+<h4 id="modular-verification-and-global-invariants"><a class="header" href="#modular-verification-and-global-invariants">Modular verification and global invariants</a></h4>
+<p>Certain usage of global invariants leads to verification problems that cannot be checked in a modular fashion. “Modular” here means that a module can be verified standalone and proven to be universally correct in all usage contexts (if preconditions are met).</p>
+<p>A non-modular verification problem may arise if a global invariant refers to state from multiple modules. Consider a situation where module <code>M1</code> uses module <code>M2</code>, and <code>M1</code> contains the following invariant, with the helper function <code>condition</code> referring to global state of each respective module:</p>
+<pre><code class="language-move">module addr::M1 {
+    invariant M1::condition() ==&gt; M2::condition();
+}
+</code></pre>
+<p>When we verify <code>M1</code> standalone, the Move Prover will determine that it also needs to verify functions in <code>M2</code>, namely those which update the M2 memory such that the invariant in M1 can fail.</p>
+<h2 id="assume-and-assert-conditions-in-code"><a class="header" href="#assume-and-assert-conditions-in-code">Assume and assert conditions in code</a></h2>
+<p>A spec block might also occur anywhere an ordinary Move statement block can occur.
+Here is an example:</p>
+<pre><code class="language-move">module 0x42::m {
+  fun simple1(x: u64, y: u64) {
+    let z;
+    y = x;
+    z = x + y;
+    spec {
+      assert x == y;
+      assert z == 2 * x;
+    }
+  }
+}
+</code></pre>
+<p>In such inline spec blocks, only a subset of conditions are permitted:</p>
+<ul>
+<li><code>assume</code> and <code>assert</code> statements are allowed in any code locations.</li>
+<li>loop <code>invariant</code> statements are allowed only in code locations that represent loop headers.</li>
+</ul>
+<p>An assert statement inside a spec block indicates a condition that must hold when control reaches
+that block. If the condition does not hold, an error is reported by the Move Prover. An <code>assume</code>
+statement, on the other hand, blocks executions violating the condition in the statement. The
+function <code>simple2</code> shown below is verified by the Move Prover. However, if the first spec block
+containing the assume statement is removed, Move Prover will show a violation to the <code>assert</code>
+statement in the second spec block.</p>
+<pre><code class="language-move">module 0x42::m {
+  fun simple2(x: u64, y: u64) {
+    let z: u64;
+    spec {
+      assume x &gt; y;
+    };
+    z = x + y;
+    spec {
+      assert z &gt; 2 * y;
+    }
+  }
+}
+</code></pre>
+<h3 id="loop-invariants"><a class="header" href="#loop-invariants">Loop invariants</a></h3>
+<p>An <code>invariant</code> statement encodes a loop invariant and must be placed at a loop head, as in the
+following example:</p>
+<pre><code class="language-move">module 0x42::m {
+  fun simple3(n: u64) {
+    let x = 0;
+    loop {
+      spec {
+        invariant x &lt;= n;
+      };
+      if (x &lt; n) {
+        x = x + 1
+      } else {
+        break
+      }
+    };
+    spec {
+      assert x == n;
+    }
+  }
+}
+</code></pre>
+<p>A loop invariant is translated into two <code>assert</code> statements and one <code>assume</code> statement to facilitate the inductive reasoning of properties about the loop. In break down, a loop invariant is translated to:</p>
+<ul>
+<li>An <code>assert</code> statement that confirms the invariant holds when the loop is first encountered in the
+execution – establishing the base case.</li>
+<li>An <code>assume</code> statement that encodes the property that the invariant holds at loop iteration <code>I</code>.</li>
+<li>An <code>assert</code> statement that checks whether the invariant continues to hold at loop iteration <code>I+1</code>.</li>
+</ul>
+<h3 id="referring-to-pre-state"><a class="header" href="#referring-to-pre-state">Referring to pre-state</a></h3>
+<p>Occasionally, we would like to refer to the pre-state of a mutable function argument in inline spec
+blocks. In MSL, this can be done with the <code>old(T)</code> expression. Similar to the semantics of <code>old(..)</code>
+in post conditions, an <code>old(T)</code> expression in an <code>assume</code> or <code>assert</code> statement always yields the
+value of <code>T</code> at the function entry point. Here is an example that illustrate the use of
+<code>old(..)</code> in an inline spec block:</p>
+<pre><code class="language-move">module 0x42::m {
+  fun swap(x: &amp;mut u64, y: &amp;mut u64) {
+    let t = *x;
+    *x = *y;
+    *y = t;
+    spec {
+      assert x == old(y);
+      assert y == old(x);
+    };
+  }
+}
+</code></pre>
+<p>The above example is trivial as the same property can be expressed with post conditions
+(i.e., <code>ensures</code>) too. But there are cases where we must use <code>old(..)</code> to refer to the pre-state, especially in the specification of loop invariants. Consider the following example
+where we verify that the <code>vector_reverse</code> function properly reverses the order of all elements
+in a vector:</p>
+<pre><code class="language-move">module 0x42::m {
+  fun verify_reverse&lt;Element&gt;(v: &amp;mut vector&lt;Element&gt;) {
+    let vlen = vector::length(v);
+    if (vlen == 0) return;
+
+    let front_index = 0;
+    let back_index = vlen - 1;
+    while ({
+      spec {
+        assert front_index + back_index == vlen - 1;
+        assert forall i in 0..front_index: v[i] == old(v)[vlen - 1 - i];
+        assert forall i in 0..front_index: v[vlen - 1 - i] == old(v)[i];
+        assert forall j in front_index..back_index + 1: v[j] == old(v)[j];
+        assert len(v) == vlen;
+      };
+      (front_index &lt; back_index)
+    }) {
+      vector::swap(v, front_index, back_index);
+      front_index = front_index + 1;
+      back_index = back_index - 1;
+    };
+  }
+  spec verify_reverse {
+    aborts_if false;
+    ensures forall i in 0..len(v): v[i] == old(v)[len(v) - 1 - i];
+  }
+}
+</code></pre>
+<p>Note the usage of <code>old(v)</code> in the loop invariants. Without them, it is hard to express the
+invariant that the vector is partially reversed while the loop is iterating and the rest
+remain unchanged.</p>
+<p>However, unlike the <code>old(T)</code> expressions in <code>ensures</code> conditions where <code>T</code> can be any valid
+expression (e.g., <code>old(v[i])</code> is allowed), the <code>old(T)</code> expressions in <code>assert</code> and <code>assumes</code>
+statements accept only a single variable as <code>T</code> and that variable must be a function argument of
+a mutable reference type. In the above example, <code>old(v[i])</code> is not allowed, and we should use
+<code>old(v)[i]</code> instead.</p>
+<h2 id="specification-variables"><a class="header" href="#specification-variables">Specification variables</a></h2>
+<p>MSL supports <em>spec variables</em>, also called <em>ghost variables</em> in the verification community. These
+variables are used only in specifications and represent information derived from the global state of
+resources. An example use case is to compute the sum of all coins available in the system and
+specify that the sum can be changed only in certain scenarios.</p>
+<p>We illustrate this feature by introducing a spec variable that maintains the sum of all <code>Counter</code>
+resources from our running example. First, a spec variable is introduced via spec module block as
+follows:</p>
+<pre><code class="language-move">module 0x42::m {
+  spec module {
+    global sum_of_counters: num;
+  }
+}
+</code></pre>
+<p>This value is going to be updated whenever a <code>Counter</code> is packed or unpacked. (Recall that mutation
+is interpreted as an implicit unpack and pack):</p>
+<pre><code class="language-move">module 0x42::m {
+  spec Counter {
+    invariant pack sum_of_counters = sum_of_counters + value;
+    invariant unpack sum_of_counters = sum_of_counters - value;
+  }
+}
+</code></pre>
+<blockquote>
+<p>TODO: <code>invariant pack</code> and <code>invariant unpack</code> are currently not implemented</p>
+</blockquote>
+<p>Now we may for example want to specify that the sum of all Counter instances in the global state
+should never exceed a particular value. We can do this as follows:</p>
+<pre><code class="language-move">module 0x42::m {
+  spec module {
+    invariant [global] sum_of_counters &lt; 4711;
+  }
+}
+</code></pre>
+<p>Note that spec variables can also be referenced from helper functions. Moreover, spec variables can
+be generic:</p>
+<pre><code class="language-move">module 0x42::m {
+  spec module {
+    global some_generic_var&lt;T&gt;: num;
+  }
+}
+</code></pre>
+<p>When using such a spec variable, a type parameter must be provided, as in <code>some_generic_var&lt;u64&gt;</code>. Effectively, a generic spec variable is like a family of variables indexed by types.</p>
+<h2 id="schemas"><a class="header" href="#schemas">Schemas</a></h2>
+<p>Schemas are a means for structuring specifications by grouping properties together. Semantically,
+they are just syntactic sugar that expand to conditions on functions, structs, or modules.</p>
+<h3 id="basic-schema-usage"><a class="header" href="#basic-schema-usage">Basic Schema Usage</a></h3>
+<p>Schemas are used as such:</p>
+<pre><code class="language-move">module 0x42::m {
+  spec schema IncrementAborts {
+    a: address;
+    aborts_if !exists&lt;Counter&gt;(a);
+    aborts_if global&lt;Counter&gt;(a).value == 255;
+  }
+
+  spec increment {
+    include IncrementAborts;
+  }
+}
+</code></pre>
+<p>Each schema may declare a number of typed variable names and a list of conditions over those
+variables. All supported condition types can be used in schemas. The schema can then be included in
+another spec block:</p>
+<ul>
+<li>If that spec block is for a function or a struct, all variable names the schema declares must be
+matched against existing names of compatible type in the context.</li>
+<li>If a schema is included in another schema, existing names are matched and must have the same type,
+but non-existing names will be added as new declarations to the inclusion context.</li>
+</ul>
+<p>When a schema is included in another spec block, it will be checked whether the conditions it
+contains are allowed in this block. For example, including the schema <code>IncrementAborts</code> into a
+struct spec block will lead to a compile-time error.</p>
+<p>When a schema is included, the names it declares can also bound by expressions. For example, one can
+write <code>include IncrementAborts{a: some_helper_address()}</code>. Effectively, not providing a binding is
+equivalent to writing <code>IncrementAborts{a: a}</code> if <code>a</code> is an existing name in scope.</p>
+<p>Schemas can be generic. Generic schemas must be fully instantiated where they are included; type
+inference is not available for schemas.</p>
+<h3 id="schema-expressions"><a class="header" href="#schema-expressions">Schema expressions</a></h3>
+<p>When a schema is included, one can use a limited set of Boolean operators as follows:</p>
+<ul>
+<li><code>P ==&gt; SchemaExp</code>: all conditions in the schema will be prefixed with <code>P ==&gt; ..</code>. Conditions that
+are not based on Boolean expressions will be rejected.</li>
+<li><code>if (P) SchemaExp1 else SchemaExp2</code>: this is treated similar to including both
+<code>P ==&gt; SchemaExp1</code> and <code>!P ==&gt; SchemaExp2</code>.</li>
+<li><code>SchemaExp1 &amp;&amp; SchemaExp2</code>: this is treated as two includes for both schema expressions.</li>
+</ul>
+<h3 id="schema-apply-operation"><a class="header" href="#schema-apply-operation">Schema apply operation</a></h3>
+<p>One of the main use cases for schemas is to be able to name a group of properties and then apply
+those to a set of functions. This is achieved by the <code>apply</code> operator. The <code>apply</code> spec block member
+can appear only in module spec blocks.</p>
+<p>The general form of the apply operator is <code>apply Schema to FunctionPattern, .. except FunctionPattern, ..</code>. Here, <code>Schema</code> can be a schema name or a schema name plus formal type arguments. <code>FunctionPatterns</code> consists of an optional visibility modifier <code>public</code> or <code>internal</code> (if not provided, both visibilities will match), a name pattern in the style of a shell file pattern ( e.g., <code>*</code>, <code>foo*</code>, <code>foo*bar</code>, etc.), and finally an optional type argument list. All type arguments provided to <code>Schema</code> must be bound
+in this list and vice versa.</p>
+<p>The <code>apply</code> operator includes the given schema in all function spec blocks that match the patterns,
+except those excluded via the <code>except</code> patterns.</p>
+<p>A typical use of the <code>apply</code> operator is to provide common pre-conditions and post-conditions to all functions in
+a module with some exceptions. Example:</p>
+<pre><code class="language-move">module 0x42::m {
+  spec schema Unchanged {
+    let resource = global&lt;R&gt;(ADDR);
+    ensures resource == old(resource);
+  }
+
+  spec module {
+    // Enforce Unchanged for all functions except the initialize function.
+    apply Unchanged to * except initialize;
+  }
+}
+</code></pre>
+<p>Notice that while with <a href="#global-invariants">global invariants</a> we can express similar things, we <em>cannot</em>
+express the restriction of the invariant to only specific functions.</p>
+<h2 id="opaque-specifications"><a class="header" href="#opaque-specifications">Opaque specifications</a></h2>
+<p>With the pragma <code>opaque</code>, a function is declared to be solely defined by its specification at caller
+sides. In contrast, if this pragma is not provided, then the function’s implementation will be used
+as the basis to verify the caller.</p>
+<p>Using <code>opaque</code> requires the specification to be sufficiently complete for the verification problem at hand. Without <code>opaque</code>, the Move Prover will use the implementation as the source of truth for the definition of the function. But with <code>opaque</code>, if there is an aspect of the function definition unspecified, an arbitrary meaning will be assumed. For example, with the specification below, the <code>increment</code> function can abort under arbitrary conditions:</p>
+<pre><code class="language-move">module 0x42::m {
+  spec increment {
+    pragma opaque;
+    // aborts_if !exists&lt;Counter&gt;(a);  // We need to add this to make the function not abort arbitrarily
+    ensures global&lt;Counter&gt;(a) == old(global&lt;Counter&gt;(a)) + 1;
+  }
+}
+</code></pre>
+<p>In general, <code>opaque</code> functions enable modular verification, as they abstract from the implementation
+of functions, resulting in much faster verification.</p>
+<p>If an <code>opaque</code> function modifies state, it is advised to use the <a href="#modifies-condition"><code>modifies</code> condition</a> in its specification. If this is omitted, verification of the state changes will fail.</p>
+<h2 id="abstract-specifications"><a class="header" href="#abstract-specifications">Abstract specifications</a></h2>
+<p>The <code>[abstract]</code> property allows specifying a function such that abstract semantics are used at the
+caller side that is different from the actual implementation. This is useful if the implementation
+is too complex for verification, and abstract semantics are sufficient for verification goals.
+The <code>[concrete]</code> property, in turn, still allows specifying conditions that are verified against
+the implementation but not used at the caller side.</p>
+<p>Consider the following example of a hash function. The actual value of the hash is not relevant for
+verification of callers, and we use an <a href="#uninterpreted-functions">uninterpreted helper function</a> delivering an arbitrary value chosen by the Move Prover. We can still specify the concrete implementation and verify its correctness:</p>
+<pre><code class="language-move">module 0x42::m {
+  fun hash(v: vector&lt;u8&gt;): u64 {
+    &lt;&lt;sum up values&gt;&gt;(v)
+  }
+  spec hash {
+    pragma opaque;
+    aborts_if false;
+    ensures [concrete] result == &lt;&lt; sum up values &gt;&gt; (v);
+    ensures [abstract] result == spec_hash_abstract(v);
+  }
+  spec fun abstract_hash(v: vector&lt;u8&gt;): u64; // uninterpreted function
+}
+</code></pre>
+<p>The soundness of the abstraction is the responsibility of the specifier and not verified by the
+Move Prover.</p>
+<blockquote>
+<p>NOTE: The abstract/concrete properties should only be used with opaque specifications, but the Move Prover will currently not generate an error message even though they are not used with opaque specifications.</p>
+</blockquote>
+<blockquote>
+<p>NOTE: The <code>modifies</code> clause does not currently support abstract/concrete. Also, if no modifies is given, the modified state will be computed from the implementation anyway, possibly conflicting with <code>[abstract]</code> properties.</p>
+</blockquote>
+<h2 id="documentation-generation"><a class="header" href="#documentation-generation">Documentation generation</a></h2>
+<p>The organization of specification blocks in a file is relevant for documentation generation – even
+though it is not for the semantics.</p>
+<h2 id="behavioral-predicates"><a class="header" href="#behavioral-predicates">Behavioral Predicates</a></h2>
+<p><em>Since language version 2.4</em></p>
+<h3 id="overview"><a class="header" href="#overview">Overview</a></h3>
+<p>A key challenge in specifying higher-order functions is expressing the behavior of function parameters without knowing their implementation. Behavioral predicates solve this by lifting the specification clauses of a function — its preconditions, postconditions, and abort conditions — into first-class predicates that can be referenced in the specifications of other functions.</p>
+<p>There are four behavioral predicates:</p>
+<div class="table-wrapper">
+<table>
+<thead>
+<tr><th>Predicate</th><th>Meaning</th></tr>
+</thead>
+<tbody>
+<tr><td><code>ensures_of&lt;f&gt;(args, result)</code></td><td>The postcondition of <code>f</code> applied to <code>args</code> yielding <code>result</code></td></tr>
+<tr><td><code>aborts_of&lt;f&gt;(args)</code></td><td>The abort condition of <code>f</code> applied to <code>args</code></td></tr>
+<tr><td><code>requires_of&lt;f&gt;(args)</code></td><td>The precondition of <code>f</code> applied to <code>args</code></td></tr>
+<tr><td><code>result_of&lt;f&gt;(args)</code></td><td>A deterministic result selector: the value <code>y</code> such that <code>ensures_of&lt;f&gt;(args, y)</code> holds</td></tr>
+</tbody>
+</table>
+</div>
+<p>In all cases, <code>f</code> must be a name that refers to either a function parameter of function type or a concrete function.</p>
+<h3 id="ensures_of"><a class="header" href="#ensures_of"><code>ensures_of</code></a></h3>
+<p>The <code>ensures_of&lt;f&gt;(args, result)</code> predicate represents the postcondition of function <code>f</code>. When used in a specification, it asserts that whatever postcondition <code>f</code> guarantees will hold for the given arguments and result.</p>
+<p>Consider a basic higher-order function that applies a function to an argument:</p>
+<pre><code class="language-move">fun apply(f: |u64| u64, x: u64): u64 {
+    f(x)
+}
+spec apply {
+    ensures ensures_of&lt;f&gt;(x, result);
+}
+</code></pre>
+<p>This specification says: whatever the postcondition of the function <code>f</code> is, it holds between the input <code>x</code> and the returned <code>result</code>.</p>
+<p>When <code>apply</code> is <strong>transparent</strong> (the default — not marked <code>pragma opaque</code>), the prover inlines the function body and reasons through the actual implementation. This means closures without explicit inline specs work:</p>
+<pre><code class="language-move">fun test_add_five(x: u64): u64 {
+    apply(|y| y + 5, x)
+}
+spec test_add_five {
+    ensures result == x + 5;
+}
+</code></pre>
+<p>When <code>apply</code> is <strong>opaque</strong> (<code>pragma opaque</code>), the prover only sees the specification, not the implementation. In this case, closures must carry explicit inline specs (see <a href="#inline-closure-specifications">Inline Closure Specifications</a> below).</p>
+<h3 id="aborts_of"><a class="header" href="#aborts_of"><code>aborts_of</code></a></h3>
+<p>The <code>aborts_of&lt;f&gt;(args)</code> predicate represents the abort condition of function <code>f</code>. It is used in <code>aborts_if</code> clauses to propagate abort conditions from function parameters:</p>
+<pre><code class="language-move">fun apply_may_abort(f: |u64| u64, x: u64): u64 {
+    f(x)
+}
+spec apply_may_abort {
+    aborts_if aborts_of&lt;f&gt;(x);
+    ensures ensures_of&lt;f&gt;(x, result);
+}
+</code></pre>
+<p>Since <code>apply_may_abort</code> is transparent here, the prover inlines the body and resolves the closure’s abort behavior directly:</p>
+<pre><code class="language-move">fun test_may_abort(x: u64): u64 {
+    apply_may_abort(|y| if (y == 0) abort 1 else y, x)
+}
+spec test_may_abort {
+    aborts_if x == 0;
+    ensures result == x;
+}
+</code></pre>
+<p>For opaque higher-order functions, the closure would need an explicit inline spec with <code>aborts_if</code> conditions.</p>
+<h3 id="requires_of"><a class="header" href="#requires_of"><code>requires_of</code></a></h3>
+<p>The <code>requires_of&lt;f&gt;(args)</code> predicate represents the precondition of function <code>f</code>. It allows higher-order functions to place requirements on their callers based on what the passed function expects:</p>
+<pre><code class="language-move">fun apply_no_abort(f: |u64| u64, x: u64): u64 {
+    f(x)
+}
+spec apply_no_abort {
+    requires !aborts_of&lt;f&gt;(x);
+    aborts_if false;
+    ensures ensures_of&lt;f&gt;(x, result);
+}
+</code></pre>
+<p>This specifies that callers must pass arguments for which <code>f</code> will not abort. If a caller violates this, the prover reports an error:</p>
+<pre><code class="language-move">fun test_fail(): u64 {
+    // FAILS: passing MAX_U64 violates !aborts_of&lt;f&gt;(x) since the closure aborts on MAX_U64
+    apply_no_abort(
+        |x| x + 1 spec { aborts_if x == MAX_U64; ensures result == x + 1; },
+        MAX_U64
+    )
+}
+</code></pre>
+<p>The prover output:</p>
+<pre><code>error: precondition does not hold at this call
+  ┌─ requires_of_err.move:6:9
+  │
+6 │         requires !aborts_of&lt;f&gt;(x);
+  │         ^^^^^^^^^^^^^^^^^^^^^^^^^^
+</code></pre>
+<h3 id="result_of"><a class="header" href="#result_of"><code>result_of</code></a></h3>
+<p>The <code>result_of&lt;f&gt;(args)</code> predicate is a deterministic result selector. Semantically, <code>result_of&lt;f&gt;(x)</code> denotes the value <code>y</code> such that <code>ensures_of&lt;f&gt;(x, y)</code> holds. It is particularly useful for specifying sequential applications and loop invariants:</p>
+<pre><code class="language-move">fun apply_seq(f: |u64| u64 has copy, x: u64): u64 {
+    f(f(x))
+}
+spec apply_seq {
+    let y = result_of&lt;f&gt;(x);
+    requires requires_of&lt;f&gt;(x) &amp;&amp; requires_of&lt;f&gt;(y);
+    aborts_if aborts_of&lt;f&gt;(x) || aborts_of&lt;f&gt;(y);
+    ensures result == result_of&lt;f&gt;(y);
+}
+</code></pre>
+<p>Here <code>result_of</code> is used to name the intermediate value <code>y</code> — the result of the first application — and then specify that the final result is <code>f</code> applied to <code>y</code>.</p>
+<p><code>result_of</code> can also be used with known concrete functions:</p>
+<pre><code class="language-move">fun double(x: u64): u64 { x * 2 }
+spec double { ensures result == x * 2; }
+
+fun test_known(): u64 { double(5) }
+spec test_known {
+    ensures result == result_of&lt;double&gt;(5);
+}
+</code></pre>
+<p>The existence of <code>result_of&lt;f&gt;(args)</code> implies that <code>f</code> is deterministic — it denotes the unique value <code>y</code> satisfying <code>ensures_of&lt;f&gt;(args, y)</code>. This is why <code>result_of</code> also establishes functional behavior: if <code>ensures_of&lt;f&gt;(x, y1)</code> and <code>ensures_of&lt;f&gt;(x, y2)</code> both hold, then <code>y1 == y2 == result_of&lt;f&gt;(x)</code>.</p>
+<h3 id="inline-closure-specifications"><a class="header" href="#inline-closure-specifications">Inline Closure Specifications</a></h3>
+<p>When a closure is passed to an opaque higher-order function, the prover needs to know the closure’s specification to reason about it. Closures can carry inline specifications using the <code>spec { ... }</code> syntax:</p>
+<pre><code class="language-move">fun test_guarded_apply(x: u64): u64 {
+    guarded_apply(|y| {
+        if (y &gt; 500) abort 1;
+        y * 2
+    } spec {
+        aborts_if y &gt; 500;
+        ensures result == y * 2;
+    }, x)
+}
+</code></pre>
+<p>The inline specification provides the closure’s contract: its abort conditions and postconditions. The prover uses these to instantiate behavioral predicates at the call site.</p>
+<p>When the higher-order function is transparent (not opaque), the prover can often derive the closure’s behavior from its implementation, making inline specs optional. However, for opaque functions, inline specs are required since the prover relies solely on specifications.</p>
+<h3 id="opaque-higher-order-functions"><a class="header" href="#opaque-higher-order-functions">Opaque Higher-Order Functions</a></h3>
+<p>Opaque functions are verified only from their specifications, not their implementations. Behavioral predicates enable writing useful specifications for opaque higher-order functions:</p>
+<pre><code class="language-move">fun apply_opaque(f: |u64| u64, x: u64): u64 {
+    f(x)
+}
+spec apply_opaque {
+    pragma opaque = true;
+    ensures ensures_of&lt;f&gt;(x, result);
+}
+</code></pre>
+<p>At the call site, callers must provide closures with explicit inline specs:</p>
+<pre><code class="language-move">fun test_opaque(x: u64): u64 {
+    apply_opaque(|y| y + 5 spec { ensures result == y + 5; }, x)
+}
+spec test_opaque {
+    ensures result == x + 5;
+}
+</code></pre>
+<p>This approach enables modular verification: the implementation of <code>apply_opaque</code> is verified once against its specification, and callers are verified against the specification without seeing the implementation.</p>
+<h3 id="mutable-reference-parameters"><a class="header" href="#mutable-reference-parameters">Mutable Reference Parameters</a></h3>
+<p>Behavioral predicates extend to closures with mutable reference parameters. When a function takes <code>&amp;mut T</code>, it effectively has two outputs: the explicit return value and the modified reference. The predicates account for both:</p>
+<pre><code class="language-move">fun apply_void_mut(f: |&amp;mut u64|, x: &amp;mut u64) { f(x) }
+spec apply_void_mut {
+    // For void return with &amp;mut param, result_of returns the modified value
+    ensures x == result_of&lt;f&gt;(old(x));
+}
+
+fun apply_mut(f: |&amp;mut u64| u64, x: &amp;mut u64): u64 { f(x) }
+spec apply_mut {
+    // For non-void return with &amp;mut, ensures_of takes (input, result, modified_param)
+    ensures ensures_of&lt;f&gt;(old(x), result, x);
+}
+</code></pre>
+<p>When a closure both returns a value and modifies a <code>&amp;mut</code> parameter, <code>result_of</code> returns a tuple <code>(explicit_result, modified_value)</code>:</p>
+<pre><code class="language-move">fun apply_mut_result(f: |&amp;mut u64| u64, x: &amp;mut u64): u64 { f(x) }
+spec apply_mut_result {
+    ensures (result, x) == result_of&lt;f&gt;(old(x));
+}
+</code></pre>
+<p>Tuple components can be extracted with let expressions:</p>
+<pre><code class="language-move">spec apply_mut_extract {
+    ensures result == {let (r, _p) = result_of&lt;f&gt;(old(x)); r};
+    ensures x == {let (_r, p) = result_of&lt;f&gt;(old(x)); p};
+}
+</code></pre>
+<h3 id="behavioral-predicates-with-loops"><a class="header" href="#behavioral-predicates-with-loops">Behavioral Predicates with Loops</a></h3>
+<p>Behavioral predicates integrate with loop invariants, enabling specification of functions like <code>contains</code>, <code>index</code>, and <code>reduce</code> over vectors:</p>
+<pre><code class="language-move">fun contains(v: &amp;vector&lt;u64&gt;, pred: |&amp;u64| bool has copy + drop): bool {
+    let i = 0;
+    let len = std::vector::length(v);
+    while (i &lt; len) {
+        if (pred(std::vector::borrow(v, i))) {
+            return true;
+        };
+        i = i + 1;
+    }
+        spec {
+            invariant i &lt;= len;
+            invariant forall j in 0..i: !result_of&lt;pred&gt;(v[j]);
+        };
+    false
+}
+spec contains {
+    requires forall x in 0..len(v): !aborts_of&lt;pred&gt;(v[x]);
+    aborts_if false;
+    ensures result == (exists k in 0..len(v): result_of&lt;pred&gt;(v[k]));
+}
+</code></pre>
+<p>Notice how <code>result_of&lt;pred&gt;</code> is used in both the loop invariant and the postcondition to express the predicate’s behavior over vector elements.</p>
+<p>A recursive specification function can use <code>result_of</code> to define the semantics of a fold operation:</p>
+<pre><code class="language-move">spec fun spec_reduce(reducer: |u64, u64|u64, v: vector&lt;u64&gt;, val: u64, end: u64): u64 {
+    if (end == 0) val
+    else {
+        let val = spec_reduce(reducer, v, val, end - 1);
+        result_of&lt;reducer&gt;(val, v[end - 1])
+    }
+}
+
+fun reduce(vec: vector&lt;u64&gt;, start: u64, reducer: |u64, u64|u64 has copy + drop): u64 {
+    // ... loop implementation ...
+}
+spec reduce {
+    ensures result == spec_reduce(reducer, vec, start, len(vec));
+}
+</code></pre>
+<h2 id="access-specifiers-and-frame-conditions"><a class="header" href="#access-specifiers-and-frame-conditions">Access Specifiers and Frame Conditions</a></h2>
+<p><em>Since language version 2.4</em></p>
+<h3 id="the-modifies_of-and-reads_of-declarations"><a class="header" href="#the-modifies_of-and-reads_of-declarations">The <code>modifies_of</code> and <code>reads_of</code> Declarations</a></h3>
+<p>When a higher-order function takes a function parameter, the prover needs to know which global resources the parameter may read or write in order to establish frame conditions (what is unchanged after the call). Without <code>modifies_of</code>/<code>reads_of</code> declarations, the function parameter is treated as <strong>pure</strong>: its behavioral predicates can only reason about data arguments and return values, not global state. This is correct for transparent (non-opaque) higher-order functions, where the closure body is inlined and verified directly. For opaque higher-order functions whose parameters modify global state, <code>modifies_of</code> and/or <code>reads_of</code> declarations are required to make those effects visible to the specification.</p>
+<p>The <code>modifies_of</code> and <code>reads_of</code> declarations in a function’s specification describe these resource access permissions:</p>
+<pre><code class="language-move">spec apply {
+    pragma opaque;
+    reads_of&lt;f&gt; Config;
+    modifies_of&lt;f&gt;(a: address) Data[a];
+    ensures ensures_of&lt;f&gt;(x, result);
+    aborts_if aborts_of&lt;f&gt;(x);
+}
+</code></pre>
+<p>The syntax is:</p>
+<pre><code>reads_of&lt;param_name&gt; Resource1, Resource2, ...;
+modifies_of&lt;param_name&gt;(formal_params) Resource1[addr], Resource2[addr], ...;
+</code></pre>
+<p><code>reads_of</code> names the resource types that the function parameter may read. It takes only type names — no address expressions or parenthesized parameters.</p>
+<p><code>modifies_of</code> names the resource types that the function parameter may modify, using Move-2 index syntax (e.g. <code>Data[a]</code>) to specify the address at which modification is permitted. The formal parameters are variables that can be used in the modify target expressions — for example, <code>Data[a]</code> where <code>a</code> is a formal parameter.</p>
+<p>These declarations serve two purposes:</p>
+<ol>
+<li><strong>Frame conditions</strong>: The prover uses access declarations to determine which resources are unchanged after a call. Resources declared with <code>reads_of</code> are guaranteed unchanged everywhere. Resources declared with <code>modifies_of</code> using an address expression like <code>Resource[a]</code> are guaranteed unchanged at all addresses other than <code>a</code>.</li>
+<li><strong>Access validation</strong>: The compiler checks that closures passed to the function do not access resources beyond what is declared.</li>
+</ol>
+<p>Functions can also declare <code>reads</code> and <code>modifies</code> directly in their spec blocks:</p>
+<pre><code class="language-move">spec my_fun {
+    reads R, S;
+    modifies R[addr];
+}
+</code></pre>
+<p>Both declarations are enforced. The prover checks that opaque functions have <code>modifies</code> clauses covering all resources they actually modify. If a function declares <code>reads</code>, the prover checks that every resource the function accesses is covered by either the <code>reads</code> or <code>modifies</code> declaration:</p>
+<pre><code>error: function `my_fun` accesses resource `S`
+       which is not covered by its `reads` or `modifies` declaration
+</code></pre>
+<p>If no <code>reads</code> declaration is present, no read checking is performed — the prover only checks <code>modifies</code> for opaque functions.</p>
+<h3 id="read-access"><a class="header" href="#read-access">Read Access</a></h3>
+<p>When a resource is declared with <code>reads_of</code>, the prover becomes aware that the function parameter’s behavior depends on these resources, making it sensitive to their current values. As a secondary effect, <code>reads_of</code> resources are guaranteed unchanged after the function parameter executes, enabling frame conditions at the call site:</p>
+<pre><code class="language-move">fun apply_reads(f: |address| u64, x: address): u64 {
+    f(x)
+}
+spec apply_reads {
+    pragma opaque;
+    reads_of&lt;f&gt; Data, Index;
+    ensures result == result_of&lt;f&gt;(x);
+    ensures ensures_of&lt;f&gt;(x, result);
+}
+</code></pre>
+<p>Callers can rely on the frame condition — both <code>Data</code> and <code>Index</code> are unchanged after the call:</p>
+<pre><code class="language-move">fun test_reads(addr: address): u64 acquires Data, Index {
+    apply_reads(|a| read_indexed(a) spec {
+        ensures result == Data[a].value + Index[a].pos;
+    }, addr)
+}
+spec test_reads {
+    ensures result == Data[addr].value + Index[addr].pos;
+    // Both resources are guaranteed unchanged since reads_of declares reads-only
+    ensures Data[addr] == old(Data[addr]);
+    ensures Index[addr] == old(Index[addr]);
+}
+</code></pre>
+<h3 id="write-access"><a class="header" href="#write-access">Write Access</a></h3>
+<p>When a resource is declared with <code>modifies_of</code>, the function parameter may modify it. The <code>modifies_of</code> clause includes an address expression to specify where modification is permitted. The enclosing function’s <code>modifies</code> clause must also list the resource:</p>
+<pre><code class="language-move">fun apply_writes(f: |address| u64, x: address): u64 {
+    f(x)
+}
+spec apply_writes {
+    pragma opaque;
+    modifies Data[x];
+    modifies_of&lt;f&gt;(a: address) Data[a];
+    ensures ensures_of&lt;f&gt;(x, result);
+    aborts_if aborts_of&lt;f&gt;(x);
+}
+</code></pre>
+<p>The <code>modifies_of&lt;f&gt;(a: address) Data[a]</code> declaration says that <code>f</code> may only modify <code>Data</code> at address <code>a</code> (the formal parameter of the <code>modifies_of</code> declaration). This enables the prover to establish that <code>Data</code> is unchanged at all other addresses:</p>
+<pre><code class="language-move">fun test_writes(addr: address): u64 acquires Data {
+    apply_writes(|a| set_data(a, 99) spec {
+        modifies Data[a];
+        ensures result == 99;
+        ensures Data[a].value == 99;
+        aborts_if !exists&lt;Data&gt;(a);
+    }, addr)
+}
+spec test_writes {
+    aborts_if !exists&lt;Data&gt;(addr);
+    ensures result == 99;
+    // Data at other addresses is unchanged
+    ensures forall a: address where a != addr:
+        Data[a] == old(Data[a]);
+}
+</code></pre>
+<h3 id="mixed-access"><a class="header" href="#mixed-access">Mixed Access</a></h3>
+<p>Different resources can have different access modes declared separately. This is common when a function reads configuration state but writes data state:</p>
+<pre><code class="language-move">fun apply_mixed(f: |address| u64, x: address): u64 {
+    f(x)
+}
+spec apply_mixed {
+    pragma opaque;
+    modifies Data[x];
+    reads_of&lt;f&gt; Config;
+    modifies_of&lt;f&gt;(a: address) Data[a];
+    ensures ensures_of&lt;f&gt;(x, result);
+    aborts_if aborts_of&lt;f&gt;(x);
+}
+</code></pre>
+<p>Here, <code>Config</code> is guaranteed unchanged everywhere, and <code>Data</code> may only be modified at address <code>a</code>. The caller can rely on both frame conditions:</p>
+<pre><code class="language-move">spec test_mixed {
+    // Config is unchanged since reads_of declares it as reads-only
+    ensures Config[addr] == old(Config[addr]);
+    // Data is unchanged at all addresses except addr
+    ensures forall a: address where a != addr:
+        Data[a] == old(Data[a]);
+}
+</code></pre>
+<h3 id="access-validation"><a class="header" href="#access-validation">Access Validation</a></h3>
+<p>The compiler validates that closures passed to a function do not exceed the declared access. If a closure accesses resources not listed in <code>reads_of</code> or <code>modifies_of</code>, or writes to a resource declared with <code>reads_of</code>, the compiler reports an error. When no <code>modifies_of</code>/<code>reads_of</code> declarations exist for a parameter, no access validation is performed — the parameter is treated as pure (see above).</p>
+<p><strong>Too narrow (missing resource):</strong> The <code>reads_of</code> declares only <code>Counter</code>, but the closure also reads <code>Config</code>:</p>
+<pre><code class="language-move">spec apply_narrow_read {
+    reads_of&lt;f&gt; Counter;
+    ensures ensures_of&lt;f&gt;(x, result);
+}
+
+fun test_narrow_read(addr: address): u64 acquires Counter, Config {
+    apply_narrow_read(|a| {
+        // ERROR: closure accesses Config which isn't in reads_of or modifies_of
+        if (Config[a].active) { Counter[a].value } else { 0 }
+    } spec { ... }, addr)
+}
+</code></pre>
+<p>The prover reports:</p>
+<pre><code>error: function argument accesses resource `Config`
+       which is not declared in `modifies_of`/`reads_of` for `f`
+</code></pre>
+<p><strong>Writes violation:</strong> The <code>reads_of</code> declares read access but the closure modifies the resource:</p>
+<pre><code class="language-move">spec apply_reads_only {
+    reads_of&lt;f&gt; Counter;
+    ensures ensures_of&lt;f&gt;(x);
+}
+
+fun test_writes_violation(addr: address) acquires Counter {
+    apply_reads_only(|a| write_counter(a) spec {
+        // ERROR: closure writes Counter but reads_of only allows reads
+        modifies Counter[a];
+        ...
+    }, addr);
+}
+</code></pre>
+<p>The prover reports:</p>
+<pre><code>error: function argument writes resource `Counter`
+       but only `reads_of` (not `modifies_of`) is declared for `f`
+</code></pre>
+<p><strong>Parameter forwarding:</strong> When wrapping a higher-order function, the wrapper’s access declarations must not exceed the callee’s:</p>
+<pre><code class="language-move">spec apply_counter_only {
+    reads_of&lt;f&gt; Counter;
+}
+
+fun wrapper(g: |address| u64, x: address): u64 {
+    // ERROR: g may access Config (per wrapper's reads_of) but apply_counter_only only allows Counter
+    apply_counter_only(g, x)
+}
+spec wrapper {
+    reads_of&lt;g&gt; Counter, Config;
+}
+</code></pre>
+<h2 id="state-labels"><a class="header" href="#state-labels">State Labels</a></h2>
+<p><em>Since language version 2.4</em></p>
+<h3 id="motivation"><a class="header" href="#motivation">Motivation</a></h3>
+<p>Behavioral predicates like <code>ensures_of&lt;f&gt;(x, result)</code> describe a relation between the pre-state and post-state of a function call. When a function makes a single call, there is one pre-state (the function’s entry) and one post-state (the function’s exit), and these are implicit. But when a function makes <em>multiple</em> state-modifying calls, intermediate states arise: the post-state of the first call becomes the pre-state of the second call. State labels make these intermediate states explicit.</p>
+<h3 id="abstract-state"><a class="header" href="#abstract-state">Abstract State</a></h3>
+<p>State labels in specifications represent <em>abstract</em> snapshots of the global memory at particular points in a function’s execution. They are not tied to concrete program counters or bytecode offsets — instead, they name logical states that are connected by specification constraints.</p>
+<p>A specification with state labels defines a system of constraints over a sequence of abstract states. Each constraint says something about the relationship between two states (or observes a single state). The verifier treats these states as symbolic: it introduces unconstrained memory variables for each labeled state and then assumes only what the specification constraints assert about them (see <a href="#mutation-primitives">Mutation Primitives</a> below for the primary mechanism that constrains how states relate to each other).</p>
+<p>For example, in a specification with label <code>S</code>:</p>
+<ul>
+<li>The <em>entry state</em> is the function’s pre-state (accessible via <code>old()</code>)</li>
+<li>State <code>S</code> is an intermediate abstract state</li>
+<li>The <em>exit state</em> is the function’s post-state (the default)</li>
+</ul>
+<p>The constraints connect these states into a chain: entry → S → exit. Each link in the chain is established by a mutation primitive or a behavioral predicate that describes how global resources change between two states.</p>
+<h3 id="the--operator"><a class="header" href="#the--operator">The <code>|~</code> Operator</a></h3>
+<div class="table-wrapper">
+<table>
+<thead>
+<tr><th>Syntax</th><th>Meaning</th></tr>
+</thead>
+<tbody>
+<tr><td><code>S1..S2 |~ expr</code></td><td>Evaluate <code>expr</code> with pre-state <code>S1</code> and post-state <code>S2</code></td></tr>
+<tr><td><code>..S |~ expr</code></td><td>Evaluate <code>expr</code> with the function’s entry as pre-state; name the post-state <code>S</code></td></tr>
+<tr><td><code>S.. |~ expr</code></td><td>Evaluate <code>expr</code> with pre-state <code>S</code> and the function’s exit as post-state</td></tr>
+<tr><td><code>S |~ expr</code></td><td>Evaluate <code>expr</code> in state <code>S</code> (single state, no transition)</td></tr>
+</tbody>
+</table>
+</div>
+<h3 id="defining-and-using-state-labels"><a class="header" href="#defining-and-using-state-labels">Defining and Using State Labels</a></h3>
+<p>State labels appear in two roles: <em>defining</em> a label establishes a new abstract state, while <em>using</em> a label references a previously defined state. The distinction determines how the verifier introduces and constrains memory variables.</p>
+<p><strong>Defining a label.</strong> A label is defined when it appears as the post-state (after <code>..</code>) in one of these constructs:</p>
+<ul>
+<li><strong>Mutation primitives</strong>: <code>..S |~ publish&lt;R&gt;(addr, val)</code>, <code>..S |~ remove&lt;R&gt;(addr)</code>, <code>..S |~ update&lt;R&gt;(addr, val)</code>. These are the primary state-defining operations — they specify exactly how global memory changes from the pre-state to the newly defined state S. See <a href="#mutation-primitives">Mutation Primitives</a> below.</li>
+<li><strong>Behavioral predicates</strong>: <code>..S |~ ensures_of&lt;f&gt;(x)</code>. This defines S as the post-state of calling <code>f</code>, constraining it by <code>f</code>’s specification.</li>
+<li><strong>Two-state spec functions</strong>: <code>..S |~ counter_increased(addr)</code>. This defines S as the post-state of a two-state spec function evaluation.</li>
+</ul>
+<p><strong>Using a label.</strong> A label is used when it appears as the pre-state (before <code>..</code>) or as a single-state label:</p>
+<ul>
+<li><code>S.. |~ expr</code> — evaluate <code>expr</code> starting from state S</li>
+<li><code>S |~ expr</code> — observe <code>expr</code> in state S (single state, no transition)</li>
+<li><code>S |~ global&lt;R&gt;(addr)</code> or equivalently <code>S |~ R[addr]</code> — read resource R at addr in state S</li>
+</ul>
+<p>Every label that is defined must also be used (no orphaned labels), and every label that is used must have been defined (no dangling references). This ensures the chain of states is well-connected.</p>
+<h3 id="mutation-primitives"><a class="header" href="#mutation-primitives">Mutation Primitives</a></h3>
+<p>Mutation primitives are specification-only builtins that describe how a global resource changes between two states. They are the fundamental building blocks for constraining abstract state transitions.</p>
+<div class="table-wrapper">
+<table>
+<thead>
+<tr><th>Primitive</th><th>Meaning</th></tr>
+</thead>
+<tbody>
+<tr><td><code>publish&lt;R&gt;(addr, value)</code></td><td>Resource R is created at <code>addr</code> with <code>value</code>. Requires R did not exist before.</td></tr>
+<tr><td><code>remove&lt;R&gt;(addr)</code></td><td>Resource R is removed from <code>addr</code>. Requires R existed before.</td></tr>
+<tr><td><code>update&lt;R&gt;(addr, value)</code></td><td>Resource R at <code>addr</code> is replaced with <code>value</code>. Requires R existed before.</td></tr>
+</tbody>
+</table>
+</div>
+<p>Each primitive is a boolean-valued expression that constrains the relationship between a pre-state and a post-state. When used with a state label range, the primitive defines how memory transitions between those states:</p>
+<pre><code class="language-move">ensures ..S |~ publish&lt;Counter&gt;(addr, Counter{value: 0});
+</code></pre>
+<p>This says: transitioning from the entry state to state S, a <code>Counter</code> resource with value 0 is published at <code>addr</code>. The implicit assertion is that <code>Counter</code> did not exist at <code>addr</code> in the entry state.</p>
+<p><strong>Without state labels</strong>, mutation primitives describe the transition from the function’s entry to its exit:</p>
+<pre><code class="language-move">spec create_counter(account: &amp;signer, init_value: u64) {
+    ensures publish&lt;Counter&gt;(signer::address_of(account), Counter{value: init_value});
+}
+</code></pre>
+<p><strong>With state labels</strong>, mutation primitives chain together to describe sequences of state changes:</p>
+<pre><code class="language-move">spec double_update(addr: address, v1: u64, v2: u64) {
+    // First update: entry → S
+    ensures ..S |~ update&lt;Counter&gt;(addr, update_field(old(Counter[addr]), value, v1));
+    // Second update: S → exit
+    ensures S.. |~ update&lt;Counter&gt;(addr, update_field(S |~ Counter[addr], value, v2));
+}
+</code></pre>
+<p>Note how the second <code>update</code> reads <code>Counter[addr]</code> in state S (via <code>S |~ Counter[addr]</code>) to get the value after the first update, then modifies it further.</p>
+<p><strong>Conditional mutations</strong> use implications to describe path-dependent state changes:</p>
+<pre><code class="language-move">spec conditional_remove(addr: address, cond: bool) {
+    ensures cond ==&gt; remove&lt;Counter&gt;(addr);
+}
+</code></pre>
+<p><strong>Verification semantics.</strong> Under the hood, the verifier implements mutation primitives using a <em>havoc-and-assume</em> pattern:</p>
+<ol>
+<li>The memory for each modified resource type is havoced (set to an unconstrained value).</li>
+<li>Frame conditions constrain that unmodified resource types and unmodified addresses are unchanged.</li>
+<li>The mutation primitive constraints are assumed, pinning the havoced memory to the specified values.</li>
+</ol>
+<p>This approach is sound and decoupled from the implementation — the verifier reasons about state transitions purely through the specification constraints, without tracking bytecode offsets or instruction ordering.</p>
+<h3 id="examples"><a class="header" href="#examples">Examples</a></h3>
+<p><strong>Two sequential state-modifying calls.</strong> Here <code>..S</code> <em>defines</em> state <code>S</code> as the post-state of the first call, and <code>S..</code> <em>uses</em> it as the pre-state of the second. The single-state form <code>S |~ expr</code> observes <code>expr</code> in state <code>S</code> (e.g. for abort checks):</p>
+<pre><code class="language-move">fun double_remove(addr1: address, addr2: address): (Resource, Resource) acquires Resource {
+    let r1 = remove_resource(addr1);
+    let r2 = remove_resource(addr2);
+    (r1, r2)
+}
+spec double_remove {
+    // First removal: entry state → S
+    ensures ..S |~ result_1 == result_of&lt;remove_resource&gt;(addr1);
+    // Second removal: S → exit state
+    ensures S.. |~ result_2 == result_of&lt;remove_resource&gt;(addr2);
+    // Abort of second call checked in state S (after first removal)
+    aborts_if S |~ aborts_of&lt;remove_resource&gt;(addr2);
+    // Abort of first call checked in entry state (implicit)
+    aborts_if aborts_of&lt;remove_resource&gt;(addr1);
+}
+</code></pre>
+<p><strong>Create then read.</strong> The single-state form <code>S |~ expr</code> is useful for observing intermediate state:</p>
+<pre><code class="language-move">fun create_then_read(account: &amp;signer, addr: address): u64 acquires Resource {
+    move_to(account, Resource { value: 42 });
+    read_resource(addr)
+}
+spec create_then_read {
+    ensures S.. |~ result == result_of&lt;read_resource&gt;(addr);
+    ensures S |~ exists&lt;Resource&gt;(signer::address_of(account));
+    ensures S |~ Resource[signer::address_of(account)] == Resource{value: 42};
+    aborts_if S |~ aborts_of&lt;read_resource&gt;(addr);
+    aborts_if exists&lt;Resource&gt;(signer::address_of(account));
+}
+</code></pre>
+<p><strong>Three or more sequential calls.</strong> The full <code>S1..S2</code> form chains intermediate states:</p>
+<pre><code class="language-move">spec three_calls {
+    ensures ..s1 |~ ensures_of&lt;f&gt;(x);
+    ensures s1..s2 |~ ensures_of&lt;g&gt;(x);
+    ensures s2.. |~ ensures_of&lt;h&gt;(x);
+}
+</code></pre>
+<h3 id="predicate-restrictions"><a class="header" href="#predicate-restrictions">Predicate Restrictions</a></h3>
+<p>Not all behavioral predicates can carry both pre and post labels:</p>
+<ul>
+<li><code>requires_of</code> and <code>aborts_of</code> describe conditions in a <em>single state</em>. They cannot have post-state labels:</li>
+</ul>
+<pre><code class="language-move">spec apply_requires_err {
+    ensures ..post |~ requires_of&lt;f&gt;(x); // ERROR: post-state label not allowed on requires_of
+}
+</code></pre>
+<ul>
+<li><code>ensures_of</code> and <code>result_of</code> describe state transitions and can carry both pre and post labels.</li>
+</ul>
+<h3 id="validation-rules"><a class="header" href="#validation-rules">Validation Rules</a></h3>
+<p>The compiler enforces three rules on state labels:</p>
+<ol>
+<li><strong>No orphaned labels</strong>: Every post-state label defined with <code>..S</code> must be referenced by some pre-state label <code>S..</code> or <code>S..T</code> in the same spec block.</li>
+</ol>
+<pre><code class="language-move">spec apply_orphan_post {
+    ensures ..orphan |~ ensures_of&lt;f&gt;(x, result); // ERROR: 'orphan' is never referenced
+}
+</code></pre>
+<ol start="2">
+<li><strong>No cycles</strong>: State label references must form a directed acyclic graph.</li>
+</ol>
+<pre><code class="language-move">spec apply_cycle {
+    ensures a..b |~ ensures_of&lt;f&gt;(x, result);
+    ensures b..a |~ ensures_of&lt;f&gt;(x, result); // ERROR: cyclic reference a -&gt; b -&gt; a
+}
+</code></pre>
+<ol start="3">
+<li><strong>No self-references</strong>: A label cannot reference itself.</li>
+</ol>
+<pre><code class="language-move">spec apply_self_cycle {
+    ensures a..a |~ ensures_of&lt;f&gt;(x, result); // ERROR: self-referencing label
+}
+</code></pre>
+<h2 id="two-state-specification-functions"><a class="header" href="#two-state-specification-functions">Two-State Specification Functions</a></h2>
+<p><em>Since language version 2.4</em></p>
+<h3 id="defining-two-state-spec-functions"><a class="header" href="#defining-two-state-spec-functions">Defining Two-State Spec Functions</a></h3>
+<p>A two-state specification function is a <code>spec fun</code> that uses <code>old()</code> to reference the pre-state while also reading the current (post) state. This allows expressing transition properties that relate state before and after a function executes:</p>
+<pre><code class="language-move">spec fun counter_increased(addr: address): bool {
+    old(Counter[addr].value) &lt; Counter[addr].value
+}
+</code></pre>
+<p>This spec function evaluates to <code>true</code> when the <code>Counter</code> value at <code>addr</code> in the current state is strictly greater than its value in the pre-state. The prover detects the use of <code>old()</code> and automatically provides dual memory parameters (pre-state and post-state) when translating to the verification backend.</p>
+<h3 id="using-two-state-spec-functions"><a class="header" href="#using-two-state-spec-functions">Using Two-State Spec Functions</a></h3>
+<p>Two-state spec functions are used in <code>ensures</code> clauses to express transition properties:</p>
+<pre><code class="language-move">fun increment_if_active(addr: address) acquires Counter, Config {
+    if (Config[addr].active) {
+        Counter[addr].value = Counter[addr].value + 1;
+    };
+}
+spec increment_if_active {
+    pragma opaque;
+    modifies Counter[addr];
+    ensures Config[addr].active ==&gt; counter_increased(addr);
+}
+</code></pre>
+<p>The spec function <code>counter_increased</code> compactly expresses that the counter went up, without repeating the <code>old()</code> pattern in every specification that needs to say this.</p>
+<p>Two-state spec functions can also be used with state labels. When used with <code>|~</code>, the <code>old()</code> references resolve to the labeled pre-state:</p>
+<pre><code class="language-move">spec two_increments {
+    // First increment: entry → S
+    ensures ..S |~ counter_increased(addr);
+    // Second increment: S → exit
+    ensures S.. |~ counter_increased(addr);
+}
+</code></pre>
+<p>Here <code>counter_increased</code> is evaluated twice with different state pairs: first between the function’s entry and state <code>S</code>, then between <code>S</code> and the function’s exit.</p>
+<p>Spec functions without <code>old()</code> can be composed with two-state spec functions:</p>
+<pre><code class="language-move">spec fun counter_is_positive(addr: address): bool {
+    Counter[addr].value &gt; 0
+}
+
+spec fun counter_ok(addr: address): bool {
+    counter_is_positive(addr)  // transitive: reads Counter in current state
+}
+</code></pre>
+<p>The prover discovers the memory footprint of spec functions transitively through the call chain, so even wrapper spec functions that don’t directly reference a resource will receive the correct memory parameters.</p>
+<h3 id="two-state-spec-functions-with-behavioral-predicates"><a class="header" href="#two-state-spec-functions-with-behavioral-predicates">Two-State Spec Functions with Behavioral Predicates</a></h3>
+<p>Two-state spec functions work seamlessly with behavioral predicates and closures. When a closure’s inline spec uses a two-state spec function, the prover correctly threads the state labels through the behavioral predicate evaluation:</p>
+<pre><code class="language-move">spec fun counter_increased(addr: address): bool {
+    old(Counter[addr].value) &lt; Counter[addr].value
+}
+
+fun apply(f: |address|, x: address) {
+    f(x)
+}
+spec apply {
+    pragma opaque;
+    reads_of&lt;f&gt; Config;
+    modifies_of&lt;f&gt;(a: address) Counter[a];
+    ensures ensures_of&lt;f&gt;(x);
+    aborts_if aborts_of&lt;f&gt;(x);
+}
+
+fun test_uses_old_in_closure(addr: address) acquires Counter, Config {
+    apply(|a| increment_if_active(a) spec {
+        modifies Counter[a];
+        ensures Config[a].active ==&gt; counter_increased(a);
+    }, addr);
+}
+spec test_uses_old_in_closure {
+    // Config is read-only, so it's unchanged
+    ensures Config[addr] == old(Config[addr]);
+}
+</code></pre>
+<p>The prover handles the dual-state memory parameters: <code>old()</code> inside <code>counter_increased</code> resolves to the state before the closure executed, while unqualified resource references resolve to the state after the closure executed. Combined with the <code>reads_of</code> declaration that marks <code>Config</code> as reads-only and the <code>modifies_of</code> declaration that restricts <code>Counter</code> modifications to address <code>a</code>, the prover can establish that <code>Config</code> is unchanged while <code>Counter</code> may have been modified.</p>
+<h2 id="proofs-and-lemmas"><a class="header" href="#proofs-and-lemmas">Proofs and Lemmas</a></h2>
+<p><em>Since language version 2.4</em></p>
+<h3 id="overview-1"><a class="header" href="#overview-1">Overview</a></h3>
+<p>Some verification tasks are too hard for an SMT solver to discharge automatically. The solver may time out on non-linear arithmetic, need a case split the heuristics miss, or require an intermediate fact that bridges a gap in reasoning. MSL addresses this with two complementary features:</p>
+<ul>
+<li><strong>Proof blocks</strong> (<code>proof { ... }</code>) attached to a function specification, containing structured hints — assertions, assumptions, case splits, and calculational chains — that guide the solver step by step.</li>
+<li><strong>Lemma declarations</strong> (<code>lemma name(...) { ... }</code>) that state reusable theorems with their own specifications and optional proof bodies. Lemmas are applied at proof sites with <code>apply</code> or <code>forall...apply</code>.</li>
+</ul>
+<p>Together, these features let developers express proof strategies that would otherwise require restructuring the code or adding ghost state.</p>
+<h3 id="proof-blocks"><a class="header" href="#proof-blocks">Proof Blocks</a></h3>
+<p>A proof block is attached to a <code>spec</code> block with the <code>proof</code> keyword:</p>
+<pre><code class="language-move">fun double(x: u64): u64 {
+    x + x
+}
+spec double {
+    aborts_if 2 * x &gt; MAX_U64;
+    ensures result == 2 * x;
+} proof {
+    assert x + x == 2 * x;
+}
+</code></pre>
+<p>The proof block contains <em>proof statements</em> that are emitted as assumptions and assertions during verification. Statements in a proof block execute in two contexts:</p>
+<ul>
+<li><strong>Entry context</strong> (default): evaluated at the function’s entry point, before the body runs. The variable <code>result</code> is not available.</li>
+<li><strong>Post context</strong> (via <code>post</code>): evaluated at the function’s return point, after the body runs. Both <code>result</code> and <code>old()</code> are available.</li>
+</ul>
+<p>Proof blocks are local to the specification they are attached to. They do not change the executable Move code; they only influence verification by adding auxiliary verification conditions and assumptions.</p>
+<h3 id="proof-statement-summary"><a class="header" href="#proof-statement-summary">Proof Statement Summary</a></h3>
+<p>The following table summarizes the proof statements currently supported:</p>
+<div class="table-wrapper">
+<table>
+<thead>
+<tr><th>Statement</th><th>Context</th><th>Effect</th></tr>
+</thead>
+<tbody>
+<tr><td><code>assert e;</code></td><td>entry, post</td><td>Prove <code>e</code> as a separate verification condition</td></tr>
+<tr><td><code>assume [trusted] e;</code></td><td>entry, post</td><td>Inject <code>e</code> as a trusted assumption; emits a warning</td></tr>
+<tr><td><code>let x = e;</code></td><td>entry, post</td><td>Bind a local proof name for later statements in the same scope</td></tr>
+<tr><td><code>if (c) { ... } else { ... }</code></td><td>entry, post</td><td>Split the proof into cases under the corresponding path conditions</td></tr>
+<tr><td><code>post stmt</code> / <code>post { ... }</code></td><td>entry only</td><td>Move the enclosed statement(s) to return-point checking</td></tr>
+<tr><td><code>calc(e1 == e2 &lt;= e3 ...);</code></td><td>entry, post</td><td>Emit one verification condition per chain step</td></tr>
+<tr><td><code>split e;</code></td><td>entry, post</td><td>Create separate verification variants for boolean or enum cases</td></tr>
+<tr><td><code>apply lemma(args);</code></td><td>entry, post</td><td>Assert lemma preconditions and assume lemma postconditions</td></tr>
+<tr><td><code>forall ... apply lemma(args);</code></td><td>entry, post</td><td>Introduce a quantified lemma instantiation, optionally with triggers</td></tr>
+</tbody>
+</table>
+</div>
+<p>As a rule of thumb:</p>
+<ul>
+<li>Use <code>assert</code> when the solver is missing an intermediate fact.</li>
+<li>Use <code>calc</code> when a proof is primarily algebraic rewriting.</li>
+<li>Use <code>if</code> or <code>split</code> when the prover needs explicit case analysis.</li>
+<li>Use <code>apply</code> when you want to reuse a previously established theorem.</li>
+</ul>
+<h3 id="assert"><a class="header" href="#assert"><code>assert</code></a></h3>
+<p>An <code>assert</code> in a proof block emits a verification condition — the solver must prove it holds. Assertions serve as intermediate lemmas that break a hard proof into smaller steps:</p>
+<pre><code class="language-move">fun weighted_avg_x2(x: u64, y: u64): u64 {
+    (3 * x + y) / 4 * 2
+}
+spec weighted_avg_x2 {
+    requires 3 * x + y &lt;= MAX_U64;
+    ensures result == (3 * x + y) / 4 * 2;
+    ensures result &lt;= 3 * x + y;
+} proof {
+    let wx = 3 * x;
+    let sum = wx + y;
+    let half = sum / 4;
+    assert half &lt;= sum;
+    assert half * 2 &lt;= sum;
+}
+</code></pre>
+<p>Each <code>assert</code> establishes a fact that helps the solver reach the postconditions step by step.</p>
+<h3 id="assume-trusted"><a class="header" href="#assume-trusted"><code>assume [trusted]</code></a></h3>
+<p>An <code>assume [trusted]</code> introduces a fact without proof. This is an escape hatch for properties the SMT solver cannot derive on its own. Trusted assumptions are unsound if wrong — use them sparingly and only for well-understood mathematical facts:</p>
+<pre><code class="language-move">fun div3_le(x: u64): u64 { x / 3 }
+spec div3_le {
+    ensures result &lt;= x;
+} proof {
+    assume [trusted] x / 3 &lt;= x;
+}
+</code></pre>
+<p>The <code>[trusted]</code> annotation is required. An unannotated <code>assume</code> is rejected so that trusted assumptions are always explicit in the source.</p>
+<h3 id="let-bindings-1"><a class="header" href="#let-bindings-1"><code>let</code> Bindings</a></h3>
+<p>A <code>let</code> in a proof block names an intermediate value for use in subsequent statements. Let bindings are scoped to their enclosing block:</p>
+<pre><code class="language-move">fun square_plus_one(x: u64): u64 {
+    (x + 1) * (x + 1)
+}
+spec square_plus_one {
+    requires x + 1 &lt;= 4294967295;
+    ensures result == (x + 1) * (x + 1);
+} proof {
+    let y = x + 1;
+    let r = y * y;
+    assert r == (x + 1) * (x + 1);
+    post assert r == result;
+}
+</code></pre>
+<p>Let bindings make complex proofs readable by giving names to subexpressions.</p>
+<ul>
+<li>A binding introduced at entry can be used by later entry statements and by later <code>post</code> statements.</li>
+<li>A binding introduced inside a nested block is scoped to that block.</li>
+<li>A binding introduced inside <code>post { ... }</code> is available only inside that post block.</li>
+</ul>
+<h3 id="ifelse-case-splits"><a class="header" href="#ifelse-case-splits"><code>if</code>/<code>else</code> Case Splits</a></h3>
+<p>An <code>if</code>/<code>else</code> in a proof block splits the verification into branches. Each branch adds its condition as an assumption, letting the solver reason about cases independently:</p>
+<pre><code class="language-move">fun max(a: u64, b: u64): u64 {
+    if (a &gt;= b) { a } else { b }
+}
+spec max {
+    ensures result &gt;= a;
+    ensures result &gt;= b;
+    ensures result == a || result == b;
+} proof {
+    if (a &gt;= b) {
+        post assert result == a;
+        assert a &gt;= a;
+        assert a &gt;= b;
+    } else {
+        post assert result == b;
+        assert b &gt; a;
+        assert b &gt;= b;
+    }
+}
+</code></pre>
+<h3 id="post-statements"><a class="header" href="#post-statements"><code>post</code> Statements</a></h3>
+<p>The <code>post</code> prefix moves a statement to the return-point context, where <code>result</code> and <code>old()</code> are available. Without <code>post</code>, statements execute at the entry point where <code>result</code> is not yet defined:</p>
+<pre><code class="language-move">fun double(x: u64): u64 {
+    x + x
+}
+spec double {
+    requires x + x &lt;= MAX_U64;
+    ensures result == 2 * x;
+} proof {
+    // Entry-point assertion (no result available)
+    assert x + x == 2 * x;
+    // Return-point assertion (result available)
+    post assert result == x + x;
+}
+</code></pre>
+<p>A <code>post</code> block groups multiple post-context statements together:</p>
+<pre><code class="language-move">fun shift_add(x: u64, y: u64): u64 {
+    x * 2 + y
+}
+spec shift_add {
+    requires x * 2 + y &lt;= MAX_U64;
+    ensures result == x * 2 + y;
+} proof {
+    let doubled = x * 2;
+    assert doubled + y &lt;= MAX_U64;
+    post {
+        let expected = doubled + y;
+        assert result == expected;
+    }
+}
+</code></pre>
+<p>Let bindings defined at entry are available inside <code>post</code> blocks. Let bindings inside a <code>post</code> block are scoped to that block.</p>
+<p><code>post</code> is intended for function proofs. Because lemmas have no return value, <code>post</code> statements are not meaningful inside lemma proofs.</p>
+<h3 id="calc-chains"><a class="header" href="#calc-chains"><code>calc</code> Chains</a></h3>
+<p>A <code>calc(...)</code> statement expresses a step-by-step chain of equalities or inequalities. Each step is a separate verification condition, and the chain’s conclusion follows by transitivity:</p>
+<pre><code class="language-move">fun add_three(x: u64): u64 {
+    x + 1 + 1 + 1
+}
+spec add_three {
+    requires x + 3 &lt;= MAX_U64;
+    ensures result == x + 3;
+} proof {
+    calc(
+        x + 1 + 1 + 1
+        == x + 2 + 1
+        == x + 3
+    );
+}
+</code></pre>
+<p>Calc chains support mixed operators (<code>==</code>, <code>&lt;=</code>, <code>&gt;=</code>). The overall relation is the weakest one in the chain:</p>
+<pre><code class="language-move">fun double_plus_one(x: u64): u64 {
+    2 * x + 1
+}
+spec double_plus_one {
+    requires 2 * x + 1 &lt;= MAX_U64;
+    ensures result &gt;= x;
+} proof {
+    calc(
+        2 * x + 1
+        &gt;= 2 * x
+        &gt;= x
+    );
+}
+</code></pre>
+<p>If any step in the chain is wrong, the prover reports an error at that specific step.</p>
+<h3 id="split"><a class="header" href="#split"><code>split</code></a></h3>
+<p>The <code>split</code> statement generates separate verification variants for each possible value of an expression. For a boolean expression, this creates two variants (true/false). For an enum, it creates one variant per constructor:</p>
+<pre><code class="language-move">fun abs_diff(a: u64, b: u64): u64 {
+    if (a &gt;= b) { a - b } else { b - a }
+}
+spec abs_diff {
+    ensures result == if (a &gt;= b) { a - b } else { b - a };
+} proof {
+    split a &gt;= b;
+}
+</code></pre>
+<p>Splitting on an enum:</p>
+<pre><code class="language-move">enum Color has drop {
+    Red,
+    Green,
+    Blue,
+}
+
+fun color_code(c: Color): u64 {
+    match (c) {
+        Color::Red =&gt; 1,
+        Color::Green =&gt; 2,
+        Color::Blue =&gt; 3,
+    }
+}
+spec color_code {
+    ensures result &gt;= 1;
+    ensures result &lt;= 3;
+} proof {
+    split c;
+}
+</code></pre>
+<p>Each variant assumes the corresponding case and must independently satisfy all postconditions. If the postcondition is too strong for any variant, the prover reports an error for that variant.</p>
+<p>Practical notes:</p>
+<ul>
+<li>The split expression must have type <code>bool</code> or an enum type.</li>
+<li>Multiple <code>split</code> statements multiply the number of verification variants, so they should be used sparingly.</li>
+<li><code>split</code> is most useful when the function body already branches on the same condition or enum and the solver is failing to connect the cases.</li>
+</ul>
+<h3 id="lemma-declarations"><a class="header" href="#lemma-declarations">Lemma Declarations</a></h3>
+<p>A lemma is a reusable theorem declared with <code>spec lemma</code>. It has a name, typed parameters, specification conditions (<code>requires</code>/<code>ensures</code>), and an optional proof body. Lemmas are specification-only declarations: they are not executable Move functions, and their result type is implicitly <code>()</code>. Without a proof body, the lemma is discharged as a verification condition — the prover must prove it holds for all inputs satisfying the preconditions. With a proof body, the proof block provides hints to guide the solver.</p>
+<p>Here is a lemma proving that a recursive sum function is monotone. The proof is inductive — it applies itself on a smaller argument:</p>
+<pre><code class="language-move">spec fun sum(n: num): num {
+    if (n == 0) { 0 } else { n + sum(n - 1) }
+}
+
+spec lemma monotonicity(x: num, y: num) {
+    requires 0 &lt;= x;
+    requires x &lt;= y;
+    ensures sum(x) &lt;= sum(y);
+} proof {
+    if (x &lt; y) {
+        assert sum(y - 1) &lt;= sum(y);
+        apply monotonicity(x, y - 1);
+    }
+}
+</code></pre>
+<p>The base case (<code>x == y</code>) is trivial. The inductive step assumes <code>x &lt; y</code>, asserts a one-step fact about <code>sum</code>, and recurses on <code>(x, y - 1)</code>. The prover verifies both cases.</p>
+<h3 id="apply-and-forallapply"><a class="header" href="#apply-and-forallapply"><code>apply</code> and <code>forall...apply</code></a></h3>
+<p>The <code>apply</code> statement instantiates a lemma at a proof site. Operationally, it does two things:</p>
+<ol>
+<li>It emits proof obligations for the lemma’s <code>requires</code> clauses at the application site.</li>
+<li>It makes the lemma’s <code>ensures</code> clauses available to the remainder of the current proof.</li>
+</ol>
+<p>Multiple <code>apply</code> statements can be chained — each one’s conclusions are available to subsequent steps. If a lemma’s preconditions are not satisfied, the prover reports an error at the <code>apply</code> site.</p>
+<p>The <code>forall...apply</code> variant instantiates a lemma universally for all values of the quantified variables. This is essential when the lemma needs to be available across all iterations of a loop or for a recursive function. Using the <code>monotonicity</code> lemma from above:</p>
+<pre><code class="language-move">fun sum_up_to(n: u64): u64 {
+    if (n == 0) { 0 }
+    else { n + sum_up_to(n - 1) }
+}
+spec sum_up_to {
+    aborts_if sum(n) &gt; MAX_U64;
+    ensures result == sum(n);
+} proof {
+    forall x: num, y: num {sum(x), sum(y)} apply monotonicity(x, y);
+}
+</code></pre>
+<p>The <code>{sum(x), sum(y)}</code> clause provides <em>triggers</em> — patterns that tell the SMT solver when to instantiate the quantified lemma. The solver will instantiate <code>monotonicity(x, y)</code> whenever it encounters terms matching <code>sum(x)</code> and <code>sum(y)</code>. Without triggers, the solver may fail to instantiate the quantified lemma at the right points.</p>
+<p>In practice:</p>
+<ul>
+<li>Prefer a plain <code>apply</code> when you need a theorem only for the current concrete arguments.</li>
+<li>Use <code>forall...apply</code> when the proof needs a quantified fact that must be available at many later uses.</li>
+<li>Add triggers when the quantified lemma mentions recursive spec functions or other terms the solver is unlikely to instantiate on its own.</li>
+</ul>
+<h3 id="proofs-with-mut-parameters"><a class="header" href="#proofs-with-mut-parameters">Proofs with <code>&amp;mut</code> Parameters</a></h3>
+<p>Proof blocks work with functions that take mutable reference parameters. In the entry context, <code>&amp;mut</code> parameters refer to their original (pre-mutation) values. In the post context, <code>old()</code> accesses the pre-mutation value and the bare name accesses the post-mutation value:</p>
+<pre><code class="language-move">struct Counter has drop {
+    value: u64,
+}
+
+fun increment(c: &amp;mut Counter) {
+    c.value = c.value + 1;
+}
+spec increment {
+    requires c.value &lt; MAX_U64;
+    ensures c.value == old(c.value) + 1;
+} proof {
+    // Entry context: c.value is the original value
+    assert c.value &lt; MAX_U64;
+    assert c.value + 1 &lt;= MAX_U64;
+}
+</code></pre>
+<p>Post-context statements can use <code>old()</code> to relate pre and post states, and <code>result</code> for return values:</p>
+<pre><code class="language-move">fun add_and_return(c: &amp;mut Counter, n: u64): u64 {
+    c.value = c.value + n;
+    c.value
+}
+spec add_and_return {
+    requires c.value + n &lt;= MAX_U64;
+    ensures c.value == old(c.value) + n;
+    ensures result == c.value;
+} proof {
+    assert c.value + n &lt;= MAX_U64;
+    post assert c.value == old(c.value) + n;
+    post assert result == c.value;
+}
+</code></pre>
+<p>Lemmas can be applied at post points with <code>old()</code> arguments to relate pre and post state:</p>
+<pre><code class="language-move">spec lemma strict_increase(a: u64, b: u64) {
+    requires b == a + 1;
+    ensures a &lt; b;
+}
+
+fun bump(c: &amp;mut Counter) {
+    c.value = c.value + 1;
+}
+spec bump {
+    requires c.value &lt; MAX_U64;
+    ensures c.value == old(c.value) + 1;
+    ensures old(c.value) &lt; c.value;
+} proof {
+    post apply strict_increase(old(c.value), c.value);
+}
+</code></pre>
+<h3 id="lemma-shortcut-syntax"><a class="header" href="#lemma-shortcut-syntax">Lemma Shortcut Syntax</a></h3>
+<p>Lemmas can also be declared inside a <code>spec module { ... }</code> block using bare <code>lemma</code> (without the <code>spec</code> prefix). This is equivalent to top-level <code>spec lemma</code> and is useful when grouping multiple lemmas together:</p>
+<pre><code class="language-move">spec module {
+    lemma add_zero_left(x: u64) {
+        ensures 0 + x == x;
+    }
+
+    lemma mul_comm(a: u64, b: u64) {
+        ensures a * b == b * a;
+    }
+}
+</code></pre>
+<p>Note that if a function is literally named <code>lemma</code>, <code>spec lemma { ... }</code> (with <code>{</code> immediately after <code>lemma</code>) is parsed as the function’s spec block, not a lemma declaration, since the parser looks for an identifier after <code>lemma</code> to distinguish the two forms.</p>
+<h2 id="specification-inference"><a class="header" href="#specification-inference">Specification Inference</a></h2>
+<p><em>Since language version 2.4</em></p>
+<p>With these constructs, the Move Prover now includes a <em>specification inference engine</em> that can automatically derive specifications for functions. This is a key ingredient for scaling formal verification: rather than requiring developers to manually annotate every function, the prover can infer many specifications automatically.</p>
+<h3 id="weakest-precondition-approach"><a class="header" href="#weakest-precondition-approach">Weakest-Precondition Approach</a></h3>
+<p>The inference engine uses a <em>weakest-precondition</em> (WP) backward analysis over the function’s bytecode. Starting from the function’s exit point, it works backward through each instruction, accumulating the conditions that must hold for the function to satisfy its specification. For each state-changing operation (global writes, function calls, aborts), the analysis emits an appropriate specification condition:</p>
+<ul>
+<li><strong>Direct mutations</strong> (e.g., <code>Counter[addr].value = v</code>) produce <code>ensures</code> conditions that relate the final state to the initial state using <code>update_field</code>.</li>
+<li><strong>Opaque function calls</strong> produce behavioral predicate conditions (<code>ensures_of</code>, <code>aborts_of</code>) that delegate to the callee’s specification.</li>
+<li><strong>Abort points</strong> produce <code>aborts_if</code> conditions.</li>
+<li><strong>Frame conditions</strong> (<code>modifies</code>) are inferred from the set of global resources written by the function.</li>
+</ul>
+<p>When multiple state-changing operations occur in sequence, the inference engine introduces <a href="#state-labels">state labels</a> to distinguish intermediate states, producing a chain of constraints (e.g., <code>..S |~ ensures_of&lt;f&gt;(a)</code> followed by <code>S.. |~ ensures_of&lt;g&gt;(b)</code>).</p>
+<h3 id="loops-and-invariants"><a class="header" href="#loops-and-invariants">Loops and Invariants</a></h3>
+<p>The WP analysis requires that each loop in the function body has an explicit <em>loop invariant</em>. Without invariants, the analysis cannot reason across loop iterations and will produce vacuous (trivially true) specifications that are unsound for verification.</p>
+<p>If a function contains loops without invariants, the inference engine will still produce output, but the inferred specifications should be treated as incomplete. For correct results, loop invariants must be provided by the developer (or AI – see below) before inference can derive meaningful specifications.</p>
+<h3 id="integration-with-ai-based-inference"><a class="header" href="#integration-with-ai-based-inference">Integration with AI-Based Inference</a></h3>
+<p>The WP-based inference engine is designed to complement AI-based specification inference, specifically for loop invariants, as provided by the <strong>MoveFlow</strong> tool. The two approaches have complementary strengths:</p>
+<ul>
+<li><strong>WP inference</strong> is precise and sound for straight-line code with opaque calls and mutations, but requires human-provided loop invariants and cannot guess high-level intent.</li>
+<li><strong>AI-based inference</strong> can suggest loop invariants, high-level properties, and specifications for functions where WP analysis alone is insufficient.</li>
+</ul>
+<p>A typical workflow combines both: AI-based tools propose candidate specifications (including loop invariants), and the WP engine fills in the precise arithmetic and frame conditions. The result is then verified by the Move Prover to ensure soundness.</p>
+<h1 id="expressiveness"><a class="header" href="#expressiveness">Expressiveness</a></h1>
+<p>The Move specification language is expressive enough to represent the full Move language semantics (formal argument outstanding) with one exception: functions that return a <code>&amp;mut T</code> type.</p>
+<p>Consider the following code:</p>
+<pre><code class="language-move">module 0x42::m {
+  struct S { x: u64, y: u64 }
+
+  fun x_or_y(b: bool, s: &amp;mut S): &amp;mut u64 {
+    if (b) &amp;mut s.x else &amp;mut s.y
+  }
+  spec x_or_y {
+    ensures b ==&gt; result == s.x;
+    ensures !b ==&gt; result == s.y;
+  }
+}
+</code></pre>
+<p>We are not able to specify the <em>full</em> semantics of <code>x_or_y</code> in MSL because we cannot capture the
+semantics of mutable references. While we can say something about the value behind the reference at
+function exit, subsequent effects as in <code>*x_or_y(b, &amp;mut s) = 2</code> cannot be specified.</p>
+<p>However, the Move Prover <em>does</em> understand the meaning of such functions – the restriction is only
+in what we can specify. Practically, this means we cannot make the function <code>x_or_y</code> opaque and must
+let verification rely on that the Move Prover directly works with the implementation. Specifically, we
+can verify the following (which can then be opaque):</p>
+<pre><code class="language-move">module 0x42::m {
+  fun x_or_y_test(s: S): S {
+    *x_or_y(true, &amp;mut s) = 2;
+    s
+  }
+  spec x_or_y_test {
+    pragma opaque;
+    ensures result.x == 2;
+    ensures result.y == s.y;
+  }
+}
+</code></pre>
+<h2 id="supporting-resources"><a class="header" href="#supporting-resources">Supporting resources</a></h2>
+<ul>
+<li><a href="https://en.wikipedia.org/wiki/Design_by_contract">Design by contract</a></li>
+<li><a href="https://github.com/aptos-labs/aptos-core/blob/main/aptos-move/framework/aptos-framework/doc/overview.md">Aptos framework documentation</a></li>
+</ul>
+
+                    </main>
+
+                    <nav class="nav-wrapper" aria-label="Page navigation">
+                        <!-- Mobile navigation buttons -->
+                            <a rel="prev" href="global-storage-operators.html" class="mobile-nav-chapters previous" title="Previous chapter" aria-label="Previous chapter" aria-keyshortcuts="Left">
+                                <span class=fa-svg><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 320 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M41.4 233.4c-12.5 12.5-12.5 32.8 0 45.3l160 160c12.5 12.5 32.8 12.5 45.3 0s12.5-32.8 0-45.3L109.3 256 246.6 118.6c12.5-12.5 12.5-32.8 0-45.3s-32.8-12.5-45.3 0l-160 160z"/></svg></span>
+                            </a>
+
+                            <a rel="next prefetch" href="standard-library.html" class="mobile-nav-chapters next" title="Next chapter" aria-label="Next chapter" aria-keyshortcuts="Right">
+                                <span class=fa-svg><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 320 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M278.6 233.4c12.5 12.5 12.5 32.8 0 45.3l-160 160c-12.5 12.5-32.8 12.5-45.3 0s-12.5-32.8 0-45.3L210.7 256 73.4 118.6c-12.5-12.5-12.5-32.8 0-45.3s32.8-12.5 45.3 0l160 160z"/></svg></span>
+                            </a>
+
+                        <div style="clear: both"></div>
+                    </nav>
+                </div>
+            </div>
+
+            <nav class="nav-wide-wrapper" aria-label="Page navigation">
+                    <a rel="prev" href="global-storage-operators.html" class="nav-chapters previous" title="Previous chapter" aria-label="Previous chapter" aria-keyshortcuts="Left">
+                        <span class=fa-svg><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 320 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M41.4 233.4c-12.5 12.5-12.5 32.8 0 45.3l160 160c12.5 12.5 32.8 12.5 45.3 0s12.5-32.8 0-45.3L109.3 256 246.6 118.6c12.5-12.5 12.5-32.8 0-45.3s-32.8-12.5-45.3 0l-160 160z"/></svg></span>
+                    </a>
+
+                    <a rel="next prefetch" href="standard-library.html" class="nav-chapters next" title="Next chapter" aria-label="Next chapter" aria-keyshortcuts="Right">
+                        <span class=fa-svg><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 320 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M278.6 233.4c12.5 12.5 12.5 32.8 0 45.3l-160 160c-12.5 12.5-32.8 12.5-45.3 0s-12.5-32.8 0-45.3L210.7 256 73.4 118.6c-12.5-12.5-12.5-32.8 0-45.3s32.8-12.5 45.3 0l160 160z"/></svg></span>
+                    </a>
+            </nav>
+
+        </div>
+
+        <template id=fa-eye><span class=fa-svg><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 576 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M288 32c-80.8 0-145.5 36.8-192.6 80.6C48.6 156 17.3 208 2.5 243.7c-3.3 7.9-3.3 16.7 0 24.6C17.3 304 48.6 356 95.4 399.4C142.5 443.2 207.2 480 288 480s145.5-36.8 192.6-80.6c46.8-43.5 78.1-95.4 93-131.1c3.3-7.9 3.3-16.7 0-24.6c-14.9-35.7-46.2-87.7-93-131.1C433.5 68.8 368.8 32 288 32zM432 256c0 79.5-64.5 144-144 144s-144-64.5-144-144s64.5-144 144-144s144 64.5 144 144zM288 192c0 35.3-28.7 64-64 64c-11.5 0-22.3-3-31.6-8.4c-.2 2.8-.4 5.5-.4 8.4c0 53 43 96 96 96s96-43 96-96s-43-96-96-96c-2.8 0-5.6 .1-8.4 .4c5.3 9.3 8.4 20.1 8.4 31.6z"/></svg></span></template>
+        <template id=fa-eye-slash><span class=fa-svg><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 640 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M38.8 5.1C28.4-3.1 13.3-1.2 5.1 9.2S-1.2 34.7 9.2 42.9l592 464c10.4 8.2 25.5 6.3 33.7-4.1s6.3-25.5-4.1-33.7L525.6 386.7c39.6-40.6 66.4-86.1 79.9-118.4c3.3-7.9 3.3-16.7 0-24.6c-14.9-35.7-46.2-87.7-93-131.1C465.5 68.8 400.8 32 320 32c-68.2 0-125 26.3-169.3 60.8L38.8 5.1zM223.1 149.5C248.6 126.2 282.7 112 320 112c79.5 0 144 64.5 144 144c0 24.9-6.3 48.3-17.4 68.7L408 294.5c5.2-11.8 8-24.8 8-38.5c0-53-43-96-96-96c-2.8 0-5.6 .1-8.4 .4c5.3 9.3 8.4 20.1 8.4 31.6c0 10.2-2.4 19.8-6.6 28.3l-90.3-70.8zm223.1 298L373 389.9c-16.4 6.5-34.3 10.1-53 10.1c-79.5 0-144-64.5-144-144c0-6.9 .5-13.6 1.4-20.2L83.1 161.5C60.3 191.2 44 220.8 34.5 243.7c-3.3 7.9-3.3 16.7 0 24.6c14.9 35.7 46.2 87.7 93 131.1C174.5 443.2 239.2 480 320 480c47.8 0 89.9-12.9 126.2-32.5z"/></svg></span></template>
+        <template id=fa-copy><span class=fa-svg><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M502.6 70.63l-61.25-61.25C435.4 3.371 427.2 0 418.7 0H255.1c-35.35 0-64 28.66-64 64l.0195 256C192 355.4 220.7 384 256 384h192c35.2 0 64-28.8 64-64V93.25C512 84.77 508.6 76.63 502.6 70.63zM464 320c0 8.836-7.164 16-16 16H255.1c-8.838 0-16-7.164-16-16L239.1 64.13c0-8.836 7.164-16 16-16h128L384 96c0 17.67 14.33 32 32 32h47.1V320zM272 448c0 8.836-7.164 16-16 16H63.1c-8.838 0-16-7.164-16-16L47.98 192.1c0-8.836 7.164-16 16-16H160V128H63.99c-35.35 0-64 28.65-64 64l.0098 256C.002 483.3 28.66 512 64 512h192c35.2 0 64-28.8 64-64v-32h-47.1L272 448z"/></svg></span></template>
+        <template id=fa-play><span class=fa-svg><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 384 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M73 39c-14.8-9.1-33.4-9.4-48.5-.9S0 62.6 0 80V432c0 17.4 9.4 33.4 24.5 41.9s33.7 8.1 48.5-.9L361 297c14.3-8.7 23-24.2 23-41s-8.7-32.2-23-41L73 39z"/></svg></span></template>
+        <template id=fa-clock-rotate-left><span class=fa-svg><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M75 75L41 41C25.9 25.9 0 36.6 0 57.9V168c0 13.3 10.7 24 24 24H134.1c21.4 0 32.1-25.9 17-41l-30.8-30.8C155 85.5 203 64 256 64c106 0 192 86 192 192s-86 192-192 192c-40.8 0-78.6-12.7-109.7-34.4c-14.5-10.1-34.4-6.6-44.6 7.9s-6.6 34.4 7.9 44.6C151.2 495 201.7 512 256 512c141.4 0 256-114.6 256-256S397.4 0 256 0C185.3 0 121.3 28.7 75 75zm181 53c-13.3 0-24 10.7-24 24V256c0 6.4 2.5 12.5 7 17l72 72c9.4 9.4 24.6 9.4 33.9 0s9.4-24.6 0-33.9l-65-65V152c0-13.3-10.7-24-24-24z"/></svg></span></template>
+
+
+
+        <script>
+            window.playground_copyable = true;
+        </script>
+
+
+        <script src="elasticlunr-ef4e11c1.min.js"></script>
+        <script src="mark-09e88c2c.min.js"></script>
+        <script src="searcher-c2a407aa.js"></script>
+
+        <script src="clipboard-1626706a.min.js"></script>
+        <script src="highlight-abc7f01d.js"></script>
+        <script src="book-a0b12cfe.js"></script>
+
+        <!-- Custom JS scripts -->
+
+
+
+    </div>
+    </body>
+</html>
