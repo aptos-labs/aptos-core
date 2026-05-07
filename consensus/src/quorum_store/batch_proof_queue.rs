@@ -276,13 +276,25 @@ impl BatchProofQueue {
             return;
         }
         let batch_key = BatchKey::from_info(proof.info());
-        if self
-            .items
-            .get(&batch_key)
-            .is_some_and(|item| item.proof.is_some() || item.is_committed())
-        {
-            counters::inc_rejected_pos_count(counters::POS_DUPLICATE_LABEL);
-            return;
+        if let Some(existing) = self.items.get(&batch_key) {
+            if existing.info != *proof.info() {
+                // Same (author, batch_id) but different full BatchInfo (e.g. different
+                // digest, expiration, or num_txns). Accepting this proof would corrupt
+                // the queue's invariants because items[batch_key].info would no longer
+                // match the proof attached to it.
+                warn!(
+                    author = proof.author().short_str().as_str(),
+                    "Rejecting ProofOfStore: BatchKey collision between {:?} (queue) and {:?} (proof)",
+                    existing.info,
+                    proof.info(),
+                );
+                counters::inc_rejected_pos_count(counters::POS_COLLISION_LABEL);
+                return;
+            }
+            if existing.proof.is_some() || existing.is_committed() {
+                counters::inc_rejected_pos_count(counters::POS_DUPLICATE_LABEL);
+                return;
+            }
         }
 
         let author = proof.author();
@@ -410,14 +422,26 @@ impl BatchProofQueue {
             let batch_sort_key = BatchSortKey::from_info(&batch_info);
             let batch_key = BatchKey::from_info(&batch_info);
 
-            // If the batch is either committed or the txn summary already exists, skip
-            // inserting this batch.
-            if self
-                .items
-                .get(&batch_key)
-                .is_some_and(|item| item.is_committed() || item.txn_summaries.is_some())
-            {
-                continue;
+            if let Some(existing) = self.items.get(&batch_key) {
+                if existing.info != batch_info {
+                    // Same (author, batch_id) but different full BatchInfo. Drop this
+                    // summary; the queue is keyed on (author, batch_id) and accepting it
+                    // would split the bookkeeping (e.g. distinct sort keys for the same
+                    // queue item) and lead to underflow on expiration.
+                    warn!(
+                        author = batch_info.author().short_str().as_str(),
+                        "Rejecting batch summary: BatchKey collision between {:?} (queue) and {:?} (incoming)",
+                        existing.info,
+                        batch_info,
+                    );
+                    counters::inc_rejected_batch_count(counters::BATCH_COLLISION_LABEL);
+                    continue;
+                }
+                // If the batch is either committed or the txn summary already exists, skip
+                // inserting this batch.
+                if existing.is_committed() || existing.txn_summaries.is_some() {
+                    continue;
+                }
             }
 
             // Determine if existing item already has a proof
