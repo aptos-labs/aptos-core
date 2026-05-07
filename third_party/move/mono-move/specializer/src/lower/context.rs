@@ -75,6 +75,7 @@ pub struct CallSiteInfo {
 }
 
 /// Frame layout for one function.
+/// [TODO]: instead of raw unsigned types, use named types everywhere.
 pub struct LoweringContext {
     pub home_slots: Vec<SlotInfo>,
     /// End offset of the home-slot region; feeds `callee_base`.
@@ -85,6 +86,19 @@ pub struct LoweringContext {
     /// from offset 0 so addresses match the caller's `ret_slots`.
     pub return_slots: Vec<SlotInfo>,
     pub num_xfer_positions: u16,
+    /// Frame offset of the cycle-breaking scratch slot used by
+    /// `parallel_copy::emit_parallel_copy` for `Instr::Ret`. Sized to
+    /// hold the widest value in this function's `return_slots` (Ret
+    /// copies have matching src/dst types, so that's a safe upper
+    /// bound). `0` (with `scratch_size == 0`) when the function has no
+    /// returns. The scratch lives at the end of the home region, so
+    /// callees see a slightly bumped `callee_base`. Only inspected for
+    /// at most one micro-op of any pair, so it doesn't need GC
+    /// tracking.
+    pub scratch_offset: u32,
+    /// Width of the scratch slot in bytes, or `0` if no scratch is
+    /// reserved.
+    pub scratch_size: u32,
 }
 
 /// Try to build a `LoweringContext` for a monomorphic function.
@@ -129,7 +143,32 @@ pub fn try_build_context(
         frame_data_size = ret_end;
     }
 
-    // 3. Walk `Call`/`CallGeneric` instructions and lay out each callee's
+    // 3. Reserve a scratch slot at the tail of the home region for
+    //    `Ret` cycle-breaking — `return_slots` overlap home, so swaps
+    //    like `(b, a)` form copy cycles that `emit_parallel_copy`
+    //    routes through this slot. Sized to the widest return slot
+    //    (Ret copies are type-matched).
+    //
+    //    Skipped when fewer than 2 return values: a cycle requires at
+    //    least two copies, so single-return (and no-return) functions
+    //    can never need scratch.
+    //
+    //    TODO: tighten further by walking the IR's `Ret` instructions
+    //    and detecting whether any copy graph actually contains a
+    //    cycle. That would let multi-return functions whose Ret
+    //    copies are all identity or otherwise acyclic skip the slot
+    //    too, at the cost of ~O(N²) per Ret graph cycle check.
+    let max_value_width: u32 = return_slots.iter().map(|s| s.size).max().unwrap_or(0);
+    let (scratch_offset, scratch_size) = if return_slots.len() >= 2 && max_value_width > 0 {
+        let offset = align_up(frame_data_size, MIN_SLOT_ALIGN);
+        let bumped = offset + align_up(max_value_width, MIN_SLOT_ALIGN);
+        frame_data_size = bumped;
+        (offset, max_value_width)
+    } else {
+        (0, 0)
+    };
+
+    // 4. Walk `Call`/`CallGeneric` instructions and lay out each callee's
     //    arg/ret region from `callee_base`.
     let callee_base = frame_data_size + FRAME_METADATA_SIZE as u32;
     let mut call_sites = Vec::new();
@@ -138,7 +177,10 @@ pub fn try_build_context(
             Instr::Call(_, idx, _) => (*idx, module_ir.module.function_handle_at(*idx)),
             Instr::CallGeneric(_, idx, _) => {
                 let inst = module_ir.module.function_instantiation_at(*idx);
-                (inst.handle, module_ir.module.function_handle_at(inst.handle))
+                (
+                    inst.handle,
+                    module_ir.module.function_handle_at(inst.handle),
+                )
             },
             _ => continue,
         };
@@ -165,6 +207,8 @@ pub fn try_build_context(
         call_sites,
         return_slots,
         num_xfer_positions: func_ir.num_xfer_positions,
+        scratch_offset,
+        scratch_size,
     }))
 }
 

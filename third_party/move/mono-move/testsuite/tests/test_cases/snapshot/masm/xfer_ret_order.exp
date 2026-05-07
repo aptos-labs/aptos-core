@@ -38,7 +38,7 @@ fun caller() {
 // module 0x66::xfer_ret_order
 
 fun three_rets() {
-  frame_data_size: 24
+  frame_data_size: 32
   code:
     0: StoreImm8 [0] <- #1
     1: StoreImm8 [8] <- #2

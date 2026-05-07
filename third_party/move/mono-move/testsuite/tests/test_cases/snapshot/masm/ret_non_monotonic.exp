@@ -40,7 +40,7 @@ fun caller(r0, r1): u64 {
 // module 0x66::ret_non_monotonic
 
 fun A() {
-  frame_data_size: 16
+  frame_data_size: 24
   code:
     0: StoreImm8 [0] <- #1
     1: StoreImm8 [8] <- #2

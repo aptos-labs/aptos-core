@@ -3,9 +3,10 @@
 
 //! Lowers stackless exec IR to micro-ops.
 
-use super::context::{LoweringContext, SlotInfo, TypedSlot};
-#[cfg(debug_assertions)]
-use super::parallel_copy;
+use super::{
+    context::{LoweringContext, SlotInfo, TypedSlot},
+    parallel_copy,
+};
 use crate::stackless_exec_ir::{BinaryOp, CmpOp, FunctionIR, ImmValue, Instr, Label, Slot};
 use anyhow::{bail, Context, Result};
 use mono_move_core::{
@@ -475,11 +476,26 @@ impl<'a> LoweringState<'a> {
 
             // --- Return ---
             Instr::Ret(slots) => {
+                // `return_slots` overlap the home region (calling
+                // convention reuses that space), so a function like
+                // `swap(a, b) -> (b, a)` produces a swap-cycle in the
+                // copy graph. `emit_parallel_copy` handles arbitrary
+                // cycles via the function's reserved scratch slot.
+                let mut copies: Vec<parallel_copy::Copy> = Vec::with_capacity(slots.len());
                 for (k, slot) in slots.iter().enumerate() {
                     let src = self.slot(*slot)?;
                     let dst = self.ctx.return_slots[k];
-                    self.emit_single_move(dst.offset, src);
+                    copies.push(parallel_copy::Copy {
+                        src: src.offset,
+                        dst: dst.offset,
+                        width: src.size,
+                    });
                 }
+                parallel_copy::emit_parallel_copy(
+                    &mut self.out_buf,
+                    &copies,
+                    self.ctx.scratch_offset,
+                );
                 self.emit(MicroOp::Return);
             },
 

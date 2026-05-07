@@ -113,7 +113,7 @@ fun two_args() {
 }
 
 fun two_rets() {
-  frame_data_size: 16
+  frame_data_size: 24
   code:
     0: StoreImm8 [0] <- #10
     1: StoreImm8 [8] <- #20
