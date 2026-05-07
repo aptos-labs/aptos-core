@@ -547,6 +547,7 @@ impl<'a> LoweringState<'a> {
         // Decreasing-j arg emit: reverse iteration places each value
         // before any later copy could clobber its source. Identity
         // copies (src == dst) are elided.
+        // [TODO] Consider an optimization: if we can safely do a bulk move here.
         for (j, arg_slot) in args.iter().enumerate().rev() {
             let arg_info = self.slot(*arg_slot)?;
             let dst_off = cs.arg_slots[j].slot.offset;
