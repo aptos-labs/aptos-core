@@ -36,7 +36,7 @@ use aptos_channels::{aptos_channel, message_queues::QueueStyle};
 use aptos_config::config::{ConsensusConfig, ConsensusObserverConfig};
 use aptos_consensus_types::{
     common::{Author, Round},
-    pipelined_block::PipelinedBlock,
+    pipelined_block::{OrderedBlocksForObserver, PipelinedBlock},
     wrapped_ledger_info::WrappedLedgerInfo,
 };
 use aptos_crypto::{bls12381::PrivateKey, HashValue};
@@ -614,12 +614,16 @@ impl TExecutionClient for ExecutionProxyClient {
             },
         };
 
+        let ordered_blocks_for_observer = OrderedBlocksForObserver::new(&blocks);
         for block in &blocks {
             block.set_insertion_time();
             if let Some(tx) = block.pipeline_tx().lock().as_mut() {
-                tx.ordered_blocks_and_proof_fut
+                tx.order_proof_tx
                     .take()
-                    .map(|tx| tx.send((blocks.clone(), ordered_proof.clone())));
+                    .map(|tx| tx.send(ordered_proof.clone()));
+                tx.ordered_blocks_for_observer_tx
+                    .take()
+                    .map(|tx| tx.send(ordered_blocks_for_observer.clone()));
             }
         }
 
