@@ -35,10 +35,10 @@
             const path_to_root = "";
             const default_light_theme = "light";
             const default_dark_theme = "navy";
-            window.path_to_searchindex_js = "searchindex-ec2ebe67.js";
+            window.path_to_searchindex_js = "searchindex-9dd572a7.js";
         </script>
         <!-- Start loading toc.js asap -->
-        <script src="toc-cc3fa448.js"></script>
+        <script src="toc-d9956b74.js"></script>
     </head>
     <body>
     <div id="mdbook-help-container">
@@ -199,7 +199,7 @@
 <p>Each of these instructions is parameterized by a type <code>T</code> with the <a href="./abilities.html"><code>key</code> ability</a>. However, each type <code>T</code> <em>must be declared in the current module</em>. This ensures that a resource can only be manipulated via the API exposed by its defining module. The instructions also take either an <a href="./address.html"><code>address</code></a> or <a href="./signer.html"><code>&amp;signer</code></a> representing the account address where the resource of type <code>T</code> is stored.</p>
 <p>See also <a href="#index-notation-for-storage-operators">index notation (<code>[]</code>)</a> for accessing global storage.</p>
 <h2 id="references-to-resources"><a class="header" href="#references-to-resources">References to resources</a></h2>
-<p>References to global resources returned by <code>borrow_global</code> or <code>borrow_global_mut</code> mostly behave like references to local storage: they can be extended, read, and written using ordinary <a href="./references.html">reference operators</a> and passed as arguments to other function. However, there is one important difference between local and global references: <strong>a function cannot return a reference that points into global storage</strong>. For example, these two functions will each fail to compile:</p>
+<p>References to global resources returned by <code>borrow_global</code> or <code>borrow_global_mut</code> mostly behave like references to local storage: they can be extended, read, and written using ordinary <a href="./references.html">reference operators</a> and passed as arguments to other functions. However, there is one important difference between local and global references: <strong>a function cannot return a reference that points into global storage</strong>. For example, these two functions will each fail to compile:</p>
 <pre><code class="language-move">module 0x42::example {
   struct R has key { f: u64 }
   // will not compile
@@ -389,7 +389,7 @@ storage. <a href="#reference-safety-for-global-resources">This section</a> conta
 }
 </code></pre>
 <p>Line 16 acquires a reference to a global resource <code>m1::T</code>, then line 17 removes that same resource, which makes <code>t_ref</code> dangle. In this case, <code>acquires</code> annotations do not help us because the <code>borrow_then_remove_bad</code> function is outside the <code>m1</code> module that declares <code>T</code> (recall that <code>acquires</code> annotations can only be used for resources declared in the current module). Instead, the type system avoids this problem by preventing the return of a global reference at line 6.</p>
-<p>Fancier type systems that would allow returning global references without sacrificing reference safety are possible, and we may consider them in future iterations of Move. We chose the current design because it strikes a good balance between being expressive, annotation burden, and type system complexity.</p>
+<p>Fancier type systems that would allow returning global references without sacrificing reference safety are possible, and we may consider them in future iterations of Move. We chose the current design because it strikes a good balance between expressiveness, annotation burden, and type system complexity.</p>
 <h2 id="index-notation-for-storage-operators"><a class="header" href="#index-notation-for-storage-operators">Index Notation for Storage Operators</a></h2>
 <p><em>Since language version 2.0</em></p>
 <p>Instead of the verbose <code>borrow_global</code> and <code>borrow_global_mut</code> functions, one

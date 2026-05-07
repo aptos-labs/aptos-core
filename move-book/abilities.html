@@ -35,10 +35,10 @@
             const path_to_root = "";
             const default_light_theme = "light";
             const default_dark_theme = "navy";
-            window.path_to_searchindex_js = "searchindex-ec2ebe67.js";
+            window.path_to_searchindex_js = "searchindex-9dd572a7.js";
         </script>
         <!-- Start loading toc.js asap -->
-        <script src="toc-cc3fa448.js"></script>
+        <script src="toc-d9956b74.js"></script>
     </head>
     <body>
     <div id="mdbook-help-container">
@@ -181,7 +181,7 @@
                 <div id="mdbook-content" class="content">
                     <main>
                         <h1 id="abilities"><a class="header" href="#abilities">Abilities</a></h1>
-<p>Abilities are a typing feature in Move that control what actions are permissible for values of a given type. This system grants fine-grained control over the “linear” typing behavior of values, as well as if and how values are used in global storage. This is implemented by gating access to certain bytecode instructions so that for a value to be used with the bytecode instruction, it must have the ability required (if one is required at all—not every instruction is gated by an ability).</p>
+<p>Abilities are a typing feature in Move that controls what actions are permissible for values of a given type. This system grants fine-grained control over the “linear” typing behavior of values, as well as if and how values are used in global storage. This is implemented by gating access to certain bytecode instructions so that for a value to be used with the bytecode instruction, it must have the ability required (if one is required at all—not every instruction is gated by an ability).</p>
 <h2 id="the-four-abilities"><a class="header" href="#the-four-abilities">The Four Abilities</a></h2>
 <p>The four abilities are:</p>
 <ul>
@@ -220,12 +220,12 @@
 <p>If a value has <code>drop</code>, all values contained inside of that value have <code>drop</code>.</p>
 <h3 id="store"><a class="header" href="#store"><code>store</code></a></h3>
 <p>The <code>store</code> ability allows values of types with this ability to exist inside a struct (resource) in global storage, <em>but</em> not necessarily as a top-level resource in global storage. This is the only ability that does not directly gate an operation. Instead, it gates the existence in global storage when used in tandem with <code>key</code>.</p>
-<p>If a value has <code>store</code>, all values contained inside of that value have <code>store</code></p>
+<p>If a value has <code>store</code>, all values contained inside of that value have <code>store</code>.</p>
 <h3 id="key"><a class="header" href="#key"><code>key</code></a></h3>
 <p>The <code>key</code> ability allows the type to serve as a key for <a href="./global-storage-operators.html">global storage operations</a>. It gates all global storage operations, so in order for a type to be used with <code>move_to</code>, <code>borrow_global</code>, <code>move_from</code>, etc., the type must have the <code>key</code> ability. Note that the operations still must be used in the module where the <code>key</code> type is defined (in a sense, the operations are private to the defining module).</p>
 <p>If a value has <code>key</code>, all values contained inside of that value have <code>store</code>. This is the only ability with this sort of asymmetry.</p>
 <h2 id="builtin-types"><a class="header" href="#builtin-types">Builtin Types</a></h2>
-<p>Most primitive, builtin types have <code>copy</code>, <code>drop</code>, and <code>store</code> except for <code>signer</code>, which just has <code>drop</code></p>
+<p>Most primitive, builtin types have <code>copy</code>, <code>drop</code>, and <code>store</code> except for <code>signer</code>, which just has <code>drop</code>.</p>
 <ul>
 <li><code>bool</code>, <code>u8</code>, <code>u16</code>, <code>u32</code>, <code>u64</code>, <code>u128</code>, <code>u256</code>, and <code>address</code> all have <code>copy</code>, <code>drop</code>, and <code>store</code>.</li>
 <li><code>signer</code> has <code>drop</code>
@@ -297,8 +297,8 @@
 <p>This behavior might sound a bit confusing at first, but it might be more understandable if we think about collection types. We could consider the builtin type <code>vector</code> to have the following type declaration:</p>
 <pre><code class="language-move">vector&lt;T&gt; has copy, drop, store;
 </code></pre>
-<p>We want <code>vector</code>s to work with any type. We don’t want separate <code>vector</code> types for different abilities. So what are the rules we would want? Precisely the same that we would want with the field rules above. So, it would be safe to copy a <code>vector</code> value only if the inner elements can be copied. It would be safe to ignore a <code>vector</code> value only if the inner elements can be ignored/dropped. And, it would be safe to put a <code>vector</code> in global storage only if the inner elements can be in global storage.</p>
-<p>To have this extra expressiveness, a type might not have all the abilities it was declared with depending on the instantiation of that type; instead, the abilities a type will have depends on both its declaration <strong>and</strong> its type arguments. For any type, type parameters are pessimistically assumed to be used inside the struct, so the abilities are only granted if the type parameters meet the requirements described above for fields. Taking <code>Cup</code> from above as an example:</p>
+<p>We want <code>vector</code>s to work with any type. We don’t want separate <code>vector</code> types for different abilities. So what are the rules we would want? Precisely the same ones we would want for the field rules above. So, it would be safe to copy a <code>vector</code> value only if the inner elements can be copied. It would be safe to ignore a <code>vector</code> value only if the inner elements can be ignored/dropped. And, it would be safe to put a <code>vector</code> in global storage only if the inner elements can be in global storage.</p>
+<p>To have this extra expressiveness, a type might not have all the abilities it was declared with, depending on the instantiation of that type; instead, the abilities a type will have depend on both its declaration <strong>and</strong> its type arguments. For any type, type parameters are pessimistically assumed to be used inside the struct, so the abilities are only granted if the type parameters meet the requirements described above for fields. Taking <code>Cup</code> from above as an example:</p>
 <ul>
 <li><code>Cup</code> has the ability <code>copy</code> only if <code>T</code> has <code>copy</code>.</li>
 <li>It has <code>drop</code> only if <code>T</code> has <code>drop</code>.</li>

@@ -35,10 +35,10 @@
             const path_to_root = "";
             const default_light_theme = "light";
             const default_dark_theme = "navy";
-            window.path_to_searchindex_js = "searchindex-ec2ebe67.js";
+            window.path_to_searchindex_js = "searchindex-9dd572a7.js";
         </script>
         <!-- Start loading toc.js asap -->
-        <script src="toc-cc3fa448.js"></script>
+        <script src="toc-d9956b74.js"></script>
     </head>
     <body>
     <div id="mdbook-help-container">
@@ -182,8 +182,8 @@
                     <main>
                         <h1 id="constants"><a class="header" href="#constants">Constants</a></h1>
 <p>Constants are a way of giving a name to shared, static values inside of a <code>module</code> or <code>script</code>.</p>
-<p>The constant’s must be known at compilation. The constant’s value is stored in the compiled module
-or script. And each time the constant is used, a new copy of that value is made.</p>
+<p>The constant’s value must be known at compile time. The constant’s value is stored in the compiled
+module or script, and each time the constant is used, a new copy of that value is made.</p>
 <h2 id="declaration"><a class="header" href="#declaration">Declaration</a></h2>
 <p>Constant declarations begin with the <code>const</code> keyword, followed by a name, a type, and a value. They
 can exist in either a script or module</p>
@@ -215,7 +215,7 @@ contain underscores <code>_</code>, letters <code>a</code> to <code>z</code>, le
   const ADDRESS_42: address = @0x42;
 }
 </code></pre>
-<p>Even though you can use letters <code>a</code> to <code>z</code> in a constant. The
+<p>Even though you can use letters <code>a</code> to <code>z</code> in a constant, the
 <a href="./coding-conventions.html">general style guidelines</a> are to use just uppercase letters <code>A</code> to <code>Z</code>,
 with underscores <code>_</code> between each word.</p>
 <p>This naming restriction of starting with <code>A</code> to <code>Z</code> is in place to give room for future language
@@ -253,7 +253,7 @@ operations can be used.</p>
 }
 </code></pre>
 <p>If the operation results in a runtime exception, the compiler will give an error that it is
-unable to generate the constant’s value</p>
+unable to generate the constant’s value:</p>
 <pre><code class="language-move">script {
   const DIV_BY_ZERO: u64 = 1 / 0; // error!
   const SHIFT_BY_A_LOT: u64 = 1 &lt;&lt; 100; // error!

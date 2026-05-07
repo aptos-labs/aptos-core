@@ -35,10 +35,10 @@
             const path_to_root = "";
             const default_light_theme = "light";
             const default_dark_theme = "navy";
-            window.path_to_searchindex_js = "searchindex-ec2ebe67.js";
+            window.path_to_searchindex_js = "searchindex-9dd572a7.js";
         </script>
         <!-- Start loading toc.js asap -->
-        <script src="toc-cc3fa448.js"></script>
+        <script src="toc-d9956b74.js"></script>
     </head>
     <body>
     <div id="mdbook-help-container">
@@ -198,9 +198,9 @@ syntax when using an address differs depending on the context where it’s used:
 </ul>
 <p>In general, you can think of <code>@</code> as an operator that takes an address from being a namespace item to being an expression item.</p>
 <h2 id="named-addresses"><a class="header" href="#named-addresses">Named Addresses</a></h2>
-<p>Named addresses are a feature that allow identifiers to be used in place of
+<p>Named addresses are a feature that allows identifiers to be used in place of
 numerical values in any spot where addresses are used, and not just at the
-value level. Named addresses are declared and bound as top level elements
+value level. Named addresses are declared and bound as top-level elements
 (outside of modules and scripts) in Move Packages, or passed as arguments
 to the Move compiler.</p>
 <p>Named addresses only exist at the source language level and will be fully
@@ -234,7 +234,7 @@ module std::other_module {  // Can use a named address as a namespace item to de
 }
 </code></pre>
 <h2 id="global-storage-operations"><a class="header" href="#global-storage-operations">Global Storage Operations</a></h2>
-<p>The primary purpose of <code>address</code> values are to interact with the global storage operations.</p>
+<p>The primary purpose of <code>address</code> values is to interact with the global storage operations.</p>
 <p><code>address</code> values are used with the <code>exists</code>, <code>borrow_global</code>, <code>borrow_global_mut</code>, and <code>move_from</code> <a href="./global-storage-operators.html">operations</a>.</p>
 <p>The only global storage operation that <em>does not</em> use <code>address</code> is <code>move_to</code>, which uses <a href="./signer.html"><code>signer</code></a>.</p>
 <h2 id="ownership"><a class="header" href="#ownership">Ownership</a></h2>

@@ -35,10 +35,10 @@
             const path_to_root = "";
             const default_light_theme = "light";
             const default_dark_theme = "navy";
-            window.path_to_searchindex_js = "searchindex-ec2ebe67.js";
+            window.path_to_searchindex_js = "searchindex-9dd572a7.js";
         </script>
         <!-- Start loading toc.js asap -->
-        <script src="toc-cc3fa448.js"></script>
+        <script src="toc-d9956b74.js"></script>
     </head>
     <body>
     <div id="mdbook-help-container">
@@ -213,8 +213,8 @@ execution errors, such as <code>arithmetic_error</code>, <code>major_status</cod
 <p>If the error is expected from a specific location, that may also be specified:
 <code>#[expected_failure(abort_code = &lt;code&gt;, location = &lt;loc&gt;)]</code>.
 If the test then fails with the right error but in a different module, the test will also fail.
-Note that <code>&lt;loc&gt;</code> can be <code>Self</code>(in the current module) or a qualified name, e.g. <code>vector::std</code>.</p>
-<p>Only functions that have the <code>#[test]</code> annotation can also be annotated as an #<code>[expected_failure]</code>.</p>
+Note that <code>&lt;loc&gt;</code> can be <code>Self</code> (the current module) or a qualified name, e.g., <code>vector::std</code>.</p>
+<p>Only functions that have the <code>#[test]</code> annotation can also be annotated as <code>#[expected_failure]</code>.</p>
 <pre><code class="language-move">module 0x42::example {
   #[test]
   #[expected_failure]
@@ -362,7 +362,7 @@ Running Move unit tests
 Test result: OK. Total tests: 2; passed: 2; failed: 0
 </code></pre>
 <h4 id="--coverage"><a class="header" href="#--coverage"><code>--coverage</code></a></h4>
-<p>This will compute code being covered by test cases and generate coverage summary.</p>
+<p>This will compute code coverage from test cases and generate a coverage summary.</p>
 <pre><code class="language-shellscript filename=&quot;Terminal&quot;">$ aptos move test --coverage
 INCLUDING DEPENDENCY AptosFramework
 INCLUDING DEPENDENCY AptosStdlib

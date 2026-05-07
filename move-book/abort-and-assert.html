@@ -35,10 +35,10 @@
             const path_to_root = "";
             const default_light_theme = "light";
             const default_dark_theme = "navy";
-            window.path_to_searchindex_js = "searchindex-ec2ebe67.js";
+            window.path_to_searchindex_js = "searchindex-9dd572a7.js";
         </script>
         <!-- Start loading toc.js asap -->
-        <script src="toc-cc3fa448.js"></script>
+        <script src="toc-d9956b74.js"></script>
     </head>
     <body>
     <div id="mdbook-help-container">
@@ -183,7 +183,7 @@
                         <h1 id="abort-and-assert"><a class="header" href="#abort-and-assert">Abort and Assert</a></h1>
 <p><a href="./functions.html"><code>return</code></a> and <code>abort</code> are two control flow constructs that end execution, one for
 the current function and one for the entire transaction.</p>
-<p>More information on <a href="./functions.html"><code>return</code> can be found in the linked section</a></p>
+<p>More information on <a href="./functions.html"><code>return</code> can be found in the linked section</a>.</p>
 <h2 id="abort"><a class="header" href="#abort"><code>abort</code></a></h2>
 <p><code>abort</code> is an expression that takes one argument: an <strong>abort code</strong> of type <code>u64</code>. For example:</p>
 <pre><code class="language-move">abort 42
@@ -209,7 +209,7 @@ vector does not have two items</p>
 }
 </code></pre>
 <p>This is even more useful deep inside a control-flow construct. For example, this function checks
-that all numbers in the vector are less than the specified <code>bound</code>. And aborts otherwise</p>
+that all numbers in the vector are less than the specified <code>bound</code>, and aborts otherwise:</p>
 <pre><code class="language-move">script {
   use std::vector;
   fun check_vec(v: &amp;vector&lt;u64&gt;, bound: u64) {
@@ -235,7 +235,7 @@ does not exist at the bytecode level. It is replaced inside the compiler with</p
 <pre><code class="language-move">if (condition) () else abort code
 </code></pre>
 <p>Since Move 2.0, <code>assert</code> without an error code is supported. If this assert is used, the
-abort code <code>0xCA26CBD9BE0B0000</code> is generated.  In terms of the <code>std::error</code> convention, this code has
+abort code <code>0xCA26CBD9BE0B0000</code> is generated. In terms of the <code>std::error</code> convention, this code has
 category <code>std::error::INTERNAL</code> and reason <code>0</code>.</p>
 <p><code>assert</code> is more commonly used than just <code>abort</code> by itself. The <code>abort</code> examples above can be
 rewritten using <code>assert</code></p>

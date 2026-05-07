@@ -35,10 +35,10 @@
             const path_to_root = "";
             const default_light_theme = "light";
             const default_dark_theme = "navy";
-            window.path_to_searchindex_js = "searchindex-ec2ebe67.js";
+            window.path_to_searchindex_js = "searchindex-9dd572a7.js";
         </script>
         <!-- Start loading toc.js asap -->
-        <script src="toc-cc3fa448.js"></script>
+        <script src="toc-d9956b74.js"></script>
     </head>
     <body>
     <div id="mdbook-help-container">
@@ -187,7 +187,7 @@ under a single, stable, well-known account address that doesn’t change. If a
 module upgrade happens, all consumers of that module will automatically receive
 the latest version of the code (e.g., the next time they interact with it).</p>
 <p>The Aptos blockchain natively supports different <em>upgrade policies</em>, which allow
-move developers to explicitly define the constraints around how their move code
+Move developers to explicitly define the constraints around how their Move code
 can be upgraded. The default policy is <em>backwards compatible</em>. This means that
 code upgrades are accepted only if they guarantee that no existing resource storage
 or public APIs are broken by the upgrade (including public functions).
@@ -213,7 +213,7 @@ upgrade_policy = "compatible"
 </blockquote>
 <h2 id="how-to-upgrade"><a class="header" href="#how-to-upgrade">How to upgrade</a></h2>
 <p>To upgrade already published Move code, simply attempt to republish the code at
-the same address that it was previously published. This can be done by following the
+the same address where it was previously published. This can be done by following the
 instructions for code compilation and publishing using the
 <a href="https://aptos.dev/build/cli/working-with-move-contracts">Aptos CLI</a>. For an example,
 see the <a href="https://aptos.dev/build/guides/first-move-module">Your First Move Module</a> tutorial.</p>
@@ -233,7 +233,7 @@ before. New functions, including public and entry functions, can be added.</li>
 <li><code>immutable</code>: the code is not upgradeable and is guaranteed to stay the same
 forever.</li>
 </ul>
-<p>Those policies are ordered regarding strength such that <code>compatible &lt; immutable</code>,
+<p>Those policies are ordered by strength such that <code>compatible &lt; immutable</code>,
 i.e., compatible is weaker than immutable. The policy of a package on-chain can
 only get stronger, not weaker. Moreover, the policy of all dependencies of a
 package must be stronger or equal to the policy of the given package. For example,
@@ -249,7 +249,7 @@ published previously need to be compatible and follow the rules below:</p>
 <ul>
 <li>All existing structs’ fields cannot be updated. This means no new fields can be added and existing fields cannot be
 modified.</li>
-<li>All public and entry functions cannot change their signature (argument types, type argument, return types). However,
+<li>All public and entry functions cannot change their signature (argument types, type arguments, return types). However,
 argument names can change.</li>
 <li><code>public(friend)</code> functions are treated as private and thus their signature can arbitrarily change. This is safe as
 only modules in the same package can call friend functions anyway, and they need to be updated if the signature changes.</li>
@@ -263,8 +263,8 @@ applications that depend on the upgraded code. These effects can come from bugs,
 but they can also be the result of malicious upgrades. For example,
 an upgraded dependency can suddenly make all functions abort, breaking the
 operation of your Move code. Alternatively, an upgraded dependency can make
-all functions suddenly cost much more gas to execute then before the upgrade.
-As result, dependencies to upgradeable packages need to be handled with care:</p>
+all functions suddenly cost much more gas to execute than before the upgrade.
+As a result, dependencies on upgradeable packages need to be handled with care:</p>
 <ul>
 <li>The safest dependency is, of course, an <code>immutable</code> package. This guarantees
 that the dependency will never change, including its transitive dependencies.
@@ -274,7 +274,7 @@ and independent package. This is because major versioning can be expressed
 only by name (e.g., <code>module feature_v1</code> and <code>module feature_v2</code>). However,
 not all package owners like to publish their code as <code>immutable</code>, because this
 takes away the ability to fix bugs and update the code in place.</li>
-<li>If you have a dependency to a <code>compatible</code> package, it is highly
+<li>If you have a dependency on a <code>compatible</code> package, it is highly
 recommended you know and understand the entity publishing the package.
 The highest level of assurance is when the package is governed by a
 Decentralized Autonomous Organization (DAO) where no single user can initiate
@@ -287,7 +287,7 @@ ways to publish code from anywhere in your smart contracts. However,
 notice that code published in the current transaction can be executed
 only after that transaction ends.</p>
 <p>The Aptos framework itself, including all the on-chain administration logic, is
-an example for programmatic upgrade. The framework is marked as <code>compatible</code>.
+an example of a programmatic upgrade. The framework is marked as <code>compatible</code>.
 Upgrades happen via specific generated governance scripts. For more details,
 see <a href="https://aptos.dev/network/blockchain/governance">Aptos Governance</a>.</p>
 

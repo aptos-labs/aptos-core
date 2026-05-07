@@ -35,10 +35,10 @@
             const path_to_root = "";
             const default_light_theme = "light";
             const default_dark_theme = "navy";
-            window.path_to_searchindex_js = "searchindex-ec2ebe67.js";
+            window.path_to_searchindex_js = "searchindex-9dd572a7.js";
         </script>
         <!-- Start loading toc.js asap -->
-        <script src="toc-cc3fa448.js"></script>
+        <script src="toc-d9956b74.js"></script>
     </head>
     <body>
     <div id="mdbook-help-container">
@@ -185,7 +185,7 @@
 non-reference type, including other structs.</p>
 <p>We often refer to struct values as <em>resources</em> if they cannot be copied and cannot be dropped. In
 this case, resource values must have ownership transferred by the end of the function. This property
-makes resources particularly well served for defining global storage schemas or for representing
+makes resources particularly well suited for defining global storage schemas or for representing
 important values (such as a token).</p>
 <p>By default, structs are linear and ephemeral. By this we mean that they: cannot be copied, cannot be
 dropped, and cannot be stored in global storage. This means that all values have to have ownership
@@ -208,7 +208,7 @@ schemas.</p>
   //              ^ error! Foo cannot contain Foo
 }
 </code></pre>
-<p>For positional structs which used numbered instead of named fields, see
+<p>For positional structs that use numbered instead of named fields, see
 the <a href="#positional-structs">positional structs</a> section.</p>
 <p>As mentioned above: by default, a struct declaration is linear and ephemeral. So to allow the value
 to be used with certain operations (that copy it, drop it, store it in global storage, or use it as
@@ -233,7 +233,7 @@ features. It may or may not be removed later.</p>
 <h2 id="using-structs"><a class="header" href="#using-structs">Using Structs</a></h2>
 <h3 id="creating-structs"><a class="header" href="#creating-structs">Creating Structs</a></h3>
 <p>Values of a struct type can be created (or “packed”) by indicating the struct name, followed by
-value for each field:</p>
+a value for each field:</p>
 <pre><code class="language-move">module 0x2::m {
   struct Foo has drop { x: u64, y: bool }
   struct Baz has drop { foo: Foo }
@@ -256,7 +256,7 @@ use the following shorthand:</p>
 </code></pre>
 <p>This is sometimes called “field name punning”.</p>
 <h3 id="destroying-structs-via-pattern-matching"><a class="header" href="#destroying-structs-via-pattern-matching">Destroying Structs via Pattern Matching</a></h3>
-<p>Struct values can be destroyed by binding or assigning them patterns.</p>
+<p>Struct values can be destroyed by pattern matching them in <code>let</code> bindings or assignments.</p>
 <pre><code class="language-move">module 0x2::m {
   struct Foo { x: u64, y: bool }
   struct Bar { foo: Foo }
@@ -324,7 +324,7 @@ use the following shorthand:</p>
 }
 </code></pre>
 <h3 id="borrowing-structs-and-fields"><a class="header" href="#borrowing-structs-and-fields">Borrowing Structs and Fields</a></h3>
-<p>The <code>&amp;</code> and <code>&amp;mut</code> operator can be used to create references to structs or fields. These examples
+<p>The <code>&amp;</code> and <code>&amp;mut</code> operators can be used to create references to structs or fields. These examples
 include some optional type annotations (e.g., <code>: &amp;Foo</code>) to demonstrate the type of operations.</p>
 <pre><code class="language-move">module 0x2::m {
   fun example() {
@@ -480,7 +480,7 @@ module 0x42::lib {
 }
 </code></pre>
 <h3 id="cross-module-access"><a class="header" href="#cross-module-access">Cross-Module Access</a></h3>
-<p>External modules with sufficient visibility can construct and destruct the struct, read and mutate its fields.</p>
+<p>External modules with sufficient visibility can construct and destruct the struct, and read and mutate its fields.</p>
 <pre><code class="language-move">module 0x42::shapes {
     public struct Point {
         x: u64,
@@ -504,7 +504,7 @@ module 0x42::user {
 <h2 id="ownership"><a class="header" href="#ownership">Ownership</a></h2>
 <p>As mentioned above in <a href="#defining-structs">Defining Structs</a>, structs are by default linear and
 ephemeral. This means they cannot be copied or dropped. This property can be very useful when
-modeling real world resources like money, as you do not want money to be duplicated or get lost in
+modeling real-world resources like money, as you do not want money to be duplicated or get lost in
 circulation.</p>
 <pre><code class="language-move">module 0x2::m {
   struct Foo { x: u64 }
@@ -563,12 +563,12 @@ languages:</p>
 </code></pre>
 <h2 id="positional-structs"><a class="header" href="#positional-structs">Positional Structs</a></h2>
 <p><em>Since language version 2.0</em></p>
-<p>A struct can be declared to have <em>positional fields</em>, fields which are not named
-but numbered. Positional structs behave similar to regular structs,
-except providing a different syntax which may be more suitable for use cases with
+<p>A struct can be declared to have <em>positional fields</em>, fields that are not named
+but numbered. Positional structs behave similarly to regular structs,
+except they provide a different syntax that may be more suitable for use cases with
 only a few fields.</p>
-<p>Fields of positional structs are assigned in the order they appear. In the below
-example, field <code>0</code> is of type <code>u64</code> and field <code>1</code> of type <code>u8</code>:</p>
+<p>Fields of positional structs are assigned in the order they appear. In the example
+below, field <code>0</code> is of type <code>u64</code> and field <code>1</code> is of type <code>u8</code>:</p>
 <pre><code class="language-move">module 0x2::m {
   struct Pair(u64, u8);
 }
@@ -584,8 +584,8 @@ can be also completely omitted:</p>
   struct TypeTag has copy, drop;
 }
 </code></pre>
-<p>Values of positional structs are created and deconstructed as shown below:
-using <code>PositionalStructs(arguments)</code>:</p>
+<p>Values of positional structs are created and deconstructed using
+<code>PositionalStructs(arguments)</code>, as shown below:</p>
 <pre><code class="language-move">module 0x2::m {
   fun work() {
     let value = Pair(1, true);
@@ -594,8 +594,7 @@ using <code>PositionalStructs(arguments)</code>:</p>
   }
 }
 </code></pre>
-<p>Fields of positional structs can be accessed using the position as a field selector. For example, in the above code example, <code>value.0</code> and <code>value.1</code> can be used to access the two fields without deconstructing the <code>value</code>.
-<code>positional_struct.0</code>.</p>
+<p>Fields of positional structs can be accessed using the position as a field selector. For example, in the code above, <code>value.0</code> and <code>value.1</code> can be used to access the two fields without deconstructing <code>value</code>.</p>
 <h2 id="partial-patterns"><a class="header" href="#partial-patterns">Partial Patterns</a></h2>
 <p><em>Since language version 2.0</em></p>
 <p>Patterns can use the <code>..</code> notation to match any remaining, non-listed fields in structs or variants with named fields, and omitted fields at either the beginning or end of a struct or variant with positional fields. Here are

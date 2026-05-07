@@ -35,10 +35,10 @@
             const path_to_root = "";
             const default_light_theme = "light";
             const default_dark_theme = "navy";
-            window.path_to_searchindex_js = "searchindex-ec2ebe67.js";
+            window.path_to_searchindex_js = "searchindex-9dd572a7.js";
         </script>
         <!-- Start loading toc.js asap -->
-        <script src="toc-cc3fa448.js"></script>
+        <script src="toc-d9956b74.js"></script>
     </head>
     <body>
     <div id="mdbook-help-container">
@@ -245,7 +245,7 @@ authors* = [&lt;string&gt;]            # e.g., ["Joe Smith (joesmith@noemail.com
 # One or more lines declaring dev dependencies in the following format
 &lt;string&gt; = { local = &lt;string&gt;, addr_subst* = { (&lt;string&gt; = (&lt;string&gt; | &lt;address&gt;))+ } }
 </code></pre>
-<p>An example of a minimal package manifest with one local dependency and one git dependency:</p>
+<p>An example of a minimal package manifest:</p>
 <pre><code class="language-toml">[package]
 name = "AName"
 version = "0.0.0"
@@ -359,7 +359,7 @@ coming from <code>P1</code>:</p>
 }
 </code></pre>
 <p>It is important to note that <em>renaming is not local</em>: once a named address <code>N</code>
-has been renamed to <code>N2</code> in a package <code>P</code> all packages that import <code>P</code> will not
+has been renamed to <code>N2</code> in a package <code>P</code>, all packages that import <code>P</code> will not
 see <code>N</code> but only <code>N2</code> unless <code>N</code> is reintroduced from outside of <code>P</code>. This is
 why rule (2) in the scoping rules at the start of this section specifies a
 “dependency path in the package graph between <code>P</code> and the declaring
@@ -374,7 +374,7 @@ This presents issues if the package wishes to expose an uninstantiated named
 address. This is what the <code>[dev-addresses]</code> section solves. This section can
 set values for named addresses, but cannot introduce any named addresses.
 Additionally, only the <code>[dev-addresses]</code> in the root package are included in
-<code>dev</code> mode. For example a root package with the following manifest would not compile
+<code>dev</code> mode. For example, a root package with the following manifest would not compile
 outside of <code>dev</code> mode since <code>named_addr</code> would be uninstantiated:</p>
 <pre><code class="language-toml">[package]
 name = "ExamplePkg"
@@ -425,10 +425,10 @@ the <code>CompiledPackage</code> laid out in the file system in the following fo
 <p>See the <code>move-package</code> crate for more information on these data structures and
 how to use the Move package system as a Rust library.</p>
 <h2 id="using-bytecode-for-dependencies"><a class="header" href="#using-bytecode-for-dependencies">Using Bytecode for Dependencies</a></h2>
-<p>Move bytecode can be used as dependencies when the Move source code for those dependencies are not available locally. To use this feature, you will need co-locate the files in directories at the same level and then specify their paths in the corresponding <code>Move.toml</code> files.</p>
+<p>Move bytecode can be used as dependencies when the Move source code for those dependencies is not available locally. To use this feature, you will need to co-locate the files in directories at the same level and then specify their paths in the corresponding <code>Move.toml</code> files.</p>
 <h2 id="requirements-and-limitations"><a class="header" href="#requirements-and-limitations">Requirements and limitations</a></h2>
 <p>Using local bytecode as dependencies requires bytecode files to be downloaded locally, and the actual address for each named address must be specified in either <code>Move.toml</code> or through <code>--named-addresses</code>.</p>
-<p>Note, both <code>aptos move prove</code> and <code>aptos move test</code> commands, currently, do not support bytecode as dependencies.</p>
+<p>Note that both the <code>aptos move prove</code> and <code>aptos move test</code> commands currently do not support bytecode as dependencies.</p>
 <h2 id="recommended-structure"><a class="header" href="#recommended-structure">Recommended structure</a></h2>
 <p>We use an example to illustrate the development flow of using this feature. Suppose we want to compile the package <code>A</code>. The package layout is:</p>
 <pre><code>A/
@@ -446,7 +446,7 @@ how to use the Move package system as a Rust library.</p>
 }
 </code></pre>
 <p>Suppose the source of <code>Bar</code> and <code>Foo</code> are not available but the corresponding bytecode <code>Bar.mv</code> and <code>Foo.mv</code> are available locally. To use them as dependencies, we would:</p>
-<p>Specify <code>Move.toml</code> for <code>Bar</code> and <code>Foo</code>. Note that named addresses are already instantiated with the actual address in the bytecode. In our example, the actual address for <code>C</code> is already bound to <code>0x3</code>. As a result, <code>[addresses]</code> must be specified <code>C</code> as <code>0x3</code>, as shown below:</p>
+<p>Specify <code>Move.toml</code> for <code>Bar</code> and <code>Foo</code>. Note that named addresses are already instantiated with the actual address in the bytecode. In our example, the actual address for <code>C</code> is already bound to <code>0x3</code>. As a result, the <code>[addresses]</code> section must specify <code>C</code> as <code>0x3</code>, as shown below:</p>
 <pre><code class="language-toml filename=&quot;workspace/C/Move.toml&quot;">[package]
 name = "Foo"
 version = "0.0.0"
@@ -512,7 +512,7 @@ Foo = { local = "../C" }
 
                     <nav class="nav-wrapper" aria-label="Page navigation">
                         <!-- Mobile navigation buttons -->
-                            <a rel="prev" href="friends.html" class="mobile-nav-chapters previous" title="Previous chapter" aria-label="Previous chapter" aria-keyshortcuts="Left">
+                            <a rel="prev" href="modules-and-scripts.html" class="mobile-nav-chapters previous" title="Previous chapter" aria-label="Previous chapter" aria-keyshortcuts="Left">
                                 <span class=fa-svg><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 320 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M41.4 233.4c-12.5 12.5-12.5 32.8 0 45.3l160 160c12.5 12.5 32.8 12.5 45.3 0s12.5-32.8 0-45.3L109.3 256 246.6 118.6c12.5-12.5 12.5-32.8 0-45.3s-32.8-12.5-45.3 0l-160 160z"/></svg></span>
                             </a>
 
@@ -526,7 +526,7 @@ Foo = { local = "../C" }
             </div>
 
             <nav class="nav-wide-wrapper" aria-label="Page navigation">
-                    <a rel="prev" href="friends.html" class="nav-chapters previous" title="Previous chapter" aria-label="Previous chapter" aria-keyshortcuts="Left">
+                    <a rel="prev" href="modules-and-scripts.html" class="nav-chapters previous" title="Previous chapter" aria-label="Previous chapter" aria-keyshortcuts="Left">
                         <span class=fa-svg><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 320 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M41.4 233.4c-12.5 12.5-12.5 32.8 0 45.3l160 160c12.5 12.5 32.8 12.5 45.3 0s12.5-32.8 0-45.3L109.3 256 246.6 118.6c12.5-12.5 12.5-32.8 0-45.3s-32.8-12.5-45.3 0l-160 160z"/></svg></span>
                     </a>
 

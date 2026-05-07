@@ -35,10 +35,10 @@
             const path_to_root = "";
             const default_light_theme = "light";
             const default_dark_theme = "navy";
-            window.path_to_searchindex_js = "searchindex-ec2ebe67.js";
+            window.path_to_searchindex_js = "searchindex-9dd572a7.js";
         </script>
         <!-- Start loading toc.js asap -->
-        <script src="toc-cc3fa448.js"></script>
+        <script src="toc-d9956b74.js"></script>
     </head>
     <body>
     <div id="mdbook-help-container">
@@ -182,7 +182,7 @@
                     <main>
                         <h1 id="enums"><a class="header" href="#enums">Enums</a></h1>
 <p><em>Since language version 2.0</em></p>
-<p>Enum types are similar to struct types but support defining multiple <em>variants</em> of the data layout. Each variant has its distinct set of fields. Enum variants are supported in expressions, tools for testing, matching, and deconstructing.</p>
+<p>Enum types are similar to struct types but support defining multiple <em>variants</em> of the data layout. Each variant has its own distinct set of fields. Enum variants are supported in expressions, with tools for testing, matching, and deconstructing them.</p>
 <h2 id="declaration-of-enum-types"><a class="header" href="#declaration-of-enum-types">Declaration of Enum Types</a></h2>
 <p>An enum type declaration lists the number of different variants, as seen in the example below:</p>
 <pre><code class="language-move">enum Shape {
@@ -221,7 +221,7 @@ let data = VersionedData::V1{name: s};
 <h2 id="name-resolution-for-enum-variants"><a class="header" href="#name-resolution-for-enum-variants">Name Resolution for Enum Variants</a></h2>
 <p>The variant names for an enum need to be qualified by the enum type name, as in <code>VersionedData::V1</code>.</p>
 <blockquote>
-<p>Note: Aliasing via the <code>use</code> clause is currently not supported for enum variants, but will be added in later language versions</p>
+<p>Note: Aliasing via the <code>use</code> clause is currently not supported for enum variants, but will be added in later language versions.</p>
 </blockquote>
 <p>In certain cases (such as match expressions, below), the Move compiler can infer the enum type from the context, and the qualification by the type name may be omitted:</p>
 <pre><code class="language-move">fun f(data: VersionedData) {
@@ -245,7 +245,7 @@ let data = VersionedData::V1{name: s};
   }
 }
 </code></pre>
-<p>The patterns provided in the match expression are evaluated sequentially, in order of textual occurrence, until a match is found. It is a compile time error if not all known patterns are covered.</p>
+<p>The patterns provided in the match expression are evaluated sequentially, in order of textual occurrence, until a match is found. It is a compile-time error if not all known patterns are covered.</p>
 <p>Patterns can be nested and contain conditions, as in the following example:</p>
 <pre><code class="language-move">let r : Result&lt;Result&lt;u64&gt;&gt; = Ok(Err(42));
 let v = match (r) {
@@ -256,7 +256,7 @@ let v = match (r) {
 };
 assert!(v == 1);
 </code></pre>
-<p>Notice that in the above example, the last match clause (<code>_</code>) covers both patterns <code>Ok(Err(_))</code> and <code>Err(_)</code>.  Although at execution time, the earlier clauses match <code>Ok(Err(c))</code> for all values of <code>c</code>, the compiler cannot be sure all cases are covered due to the conditionals: conditions in match expressions are not considered when tracking coverage.  Thus the first two clauses in the match expression above are not sufficient for match completeness, and an additional clause is required to avoid a compiler error.</p>
+<p>Notice that in the above example, the last match clause (<code>_</code>) covers both patterns <code>Ok(Err(_))</code> and <code>Err(_)</code>. Although at execution time, the earlier clauses match <code>Ok(Err(c))</code> for all values of <code>c</code>, the compiler cannot be sure all cases are covered due to the conditionals: conditions in match expressions are not considered when tracking coverage. Thus the first two clauses in the match expression above are not sufficient for match completeness, and an additional clause is required to avoid a compiler error.</p>
 <h2 id="testing-enum-variants"><a class="header" href="#testing-enum-variants">Testing Enum Variants</a></h2>
 <p>With the <code>is</code> operator, one can examine whether a given enum value is of a given variant:</p>
 <pre><code class="language-move">let data: VersionedData;
@@ -279,10 +279,10 @@ let data2 = VersionedData::V2{name: s, age: 20};
 assert!(data1.name == data2.name)
 assert!(data2.age == 20);
 </code></pre>
-<p>Notice that field selection aborts if the enum value has no variant with the given field. This is the case for  <code>data1.age</code>.
+<p>Notice that field selection aborts if the enum value has no variant with the given field. This is the case for <code>data1.age</code>.
 The abort code used for this case is <code>0xCA26CBD9BE0B0001</code>. In terms of the <code>std::error</code> convention, this code has
 category <code>std::error::INTERNAL</code> and reason <code>1</code>.</p>
-<p>Field selection is only possible if the field is uniquely named and typed throughout all variants. Thus, the following yields a compile time error:</p>
+<p>Field selection is only possible if the field is uniquely named and typed throughout all variants. Thus, the following yields a compile-time error:</p>
 <pre><code class="language-move">enum VersionedData has key {
   V1{name: String}
   V2{name: u64}
@@ -347,7 +347,7 @@ module 0x42::lib {
 }
 </code></pre>
 <h3 id="cross-module-access"><a class="header" href="#cross-module-access">Cross-Module Access</a></h3>
-<p>External modules with sufficient visibility can construct and destruct the enum, test variants and select fields from variants and mutate them.</p>
+<p>External modules with sufficient visibility can construct and destruct the enum, test variants, select fields from variants, and mutate them.</p>
 <pre><code class="language-move">module 0x42::types {
     public enum Shape has drop {
         Circle { radius: u64 },

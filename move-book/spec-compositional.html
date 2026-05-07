@@ -1,0 +1,845 @@
+<!DOCTYPE HTML>
+<html lang="en" class="light sidebar-visible" dir="ltr">
+    <head>
+        <!-- Book generated using mdBook -->
+        <meta charset="UTF-8">
+        <title>Compositional Specifications - The Move on Aptos Book</title>
+
+
+        <!-- Custom HTML head -->
+
+        <meta name="description" content="Move book maintained by the Move team at Aptos.">
+        <meta name="viewport" content="width=device-width, initial-scale=1">
+        <meta name="theme-color" content="#ffffff">
+
+        <link rel="icon" href="favicon-de23e50b.svg">
+        <link rel="shortcut icon" href="favicon-8114d1fc.png">
+        <link rel="stylesheet" href="css/variables-8adf115d.css">
+        <link rel="stylesheet" href="css/general-2459343d.css">
+        <link rel="stylesheet" href="css/chrome-ae938929.css">
+        <link rel="stylesheet" href="css/print-9e4910d8.css" media="print">
+
+        <!-- Fonts -->
+        <link rel="stylesheet" href="fonts/fonts-9644e21d.css">
+
+        <!-- Highlight.js Stylesheets -->
+        <link rel="stylesheet" id="mdbook-highlight-css" href="highlight-493f70e1.css">
+        <link rel="stylesheet" id="mdbook-tomorrow-night-css" href="tomorrow-night-4c0ae647.css">
+        <link rel="stylesheet" id="mdbook-ayu-highlight-css" href="ayu-highlight-3fdfc3ac.css">
+
+        <!-- Custom theme stylesheets -->
+
+
+        <!-- Provide site root and default themes to javascript -->
+        <script>
+            const path_to_root = "";
+            const default_light_theme = "light";
+            const default_dark_theme = "navy";
+            window.path_to_searchindex_js = "searchindex-9dd572a7.js";
+        </script>
+        <!-- Start loading toc.js asap -->
+        <script src="toc-d9956b74.js"></script>
+    </head>
+    <body>
+    <div id="mdbook-help-container">
+        <div id="mdbook-help-popup">
+            <h2 class="mdbook-help-title">Keyboard shortcuts</h2>
+            <div>
+                <p>Press <kbd>←</kbd> or <kbd>→</kbd> to navigate between chapters</p>
+                <p>Press <kbd>S</kbd> or <kbd>/</kbd> to search in the book</p>
+                <p>Press <kbd>?</kbd> to show this help</p>
+                <p>Press <kbd>Esc</kbd> to hide this help</p>
+            </div>
+        </div>
+    </div>
+    <div id="mdbook-body-container">
+        <!-- Work around some values being stored in localStorage wrapped in quotes -->
+        <script>
+            try {
+                let theme = localStorage.getItem('mdbook-theme');
+                let sidebar = localStorage.getItem('mdbook-sidebar');
+
+                if (theme.startsWith('"') && theme.endsWith('"')) {
+                    localStorage.setItem('mdbook-theme', theme.slice(1, theme.length - 1));
+                }
+
+                if (sidebar.startsWith('"') && sidebar.endsWith('"')) {
+                    localStorage.setItem('mdbook-sidebar', sidebar.slice(1, sidebar.length - 1));
+                }
+            } catch (e) { }
+        </script>
+
+        <!-- Set the theme before any content is loaded, prevents flash -->
+        <script>
+            const default_theme = window.matchMedia("(prefers-color-scheme: dark)").matches ? default_dark_theme : default_light_theme;
+            let theme;
+            try { theme = localStorage.getItem('mdbook-theme'); } catch(e) { }
+            if (theme === null || theme === undefined) { theme = default_theme; }
+            const html = document.documentElement;
+            html.classList.remove('light')
+            html.classList.add(theme);
+            html.classList.add("js");
+        </script>
+
+        <input type="checkbox" id="mdbook-sidebar-toggle-anchor" class="hidden">
+
+        <!-- Hide / unhide sidebar before it is displayed -->
+        <script>
+            let sidebar = null;
+            const sidebar_toggle = document.getElementById("mdbook-sidebar-toggle-anchor");
+            if (document.body.clientWidth >= 1080) {
+                try { sidebar = localStorage.getItem('mdbook-sidebar'); } catch(e) { }
+                sidebar = sidebar || 'visible';
+            } else {
+                sidebar = 'hidden';
+                sidebar_toggle.checked = false;
+            }
+            if (sidebar === 'visible') {
+                sidebar_toggle.checked = true;
+            } else {
+                html.classList.remove('sidebar-visible');
+            }
+        </script>
+
+        <nav id="mdbook-sidebar" class="sidebar" aria-label="Table of contents">
+            <!-- populated by js -->
+            <mdbook-sidebar-scrollbox class="sidebar-scrollbox"></mdbook-sidebar-scrollbox>
+            <noscript>
+                <iframe class="sidebar-iframe-outer" src="toc.html"></iframe>
+            </noscript>
+            <div id="mdbook-sidebar-resize-handle" class="sidebar-resize-handle">
+                <div class="sidebar-resize-indicator"></div>
+            </div>
+        </nav>
+
+        <div id="mdbook-page-wrapper" class="page-wrapper">
+
+            <div class="page">
+                <div id="mdbook-menu-bar-hover-placeholder"></div>
+                <div id="mdbook-menu-bar" class="menu-bar sticky">
+                    <div class="left-buttons">
+                        <label id="mdbook-sidebar-toggle" class="icon-button" for="mdbook-sidebar-toggle-anchor" title="Toggle Table of Contents" aria-label="Toggle Table of Contents" aria-controls="mdbook-sidebar">
+                            <span class=fa-svg><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 448 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M0 96C0 78.3 14.3 64 32 64H416c17.7 0 32 14.3 32 32s-14.3 32-32 32H32C14.3 128 0 113.7 0 96zM0 256c0-17.7 14.3-32 32-32H416c17.7 0 32 14.3 32 32s-14.3 32-32 32H32c-17.7 0-32-14.3-32-32zM448 416c0 17.7-14.3 32-32 32H32c-17.7 0-32-14.3-32-32s14.3-32 32-32H416c17.7 0 32 14.3 32 32z"/></svg></span>
+                        </label>
+                        <button id="mdbook-theme-toggle" class="icon-button" type="button" title="Change theme" aria-label="Change theme" aria-haspopup="true" aria-expanded="false" aria-controls="mdbook-theme-list">
+                            <span class=fa-svg><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 576 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M371.3 367.1c27.3-3.9 51.9-19.4 67.2-42.9L600.2 74.1c12.6-19.5 9.4-45.3-7.6-61.2S549.7-4.4 531.1 9.6L294.4 187.2c-24 18-38.2 46.1-38.4 76.1L371.3 367.1zm-19.6 25.4l-116-104.4C175.9 290.3 128 339.6 128 400c0 3.9 .2 7.8 .6 11.6c1.8 17.5-10.2 36.4-27.8 36.4H96c-17.7 0-32 14.3-32 32s14.3 32 32 32H240c61.9 0 112-50.1 112-112c0-2.5-.1-5-.2-7.5z"/></svg></span>
+                        </button>
+                        <ul id="mdbook-theme-list" class="theme-popup" aria-label="Themes" role="menu">
+                            <li role="none"><button role="menuitem" class="theme" id="mdbook-theme-default_theme">Auto</button></li>
+                            <li role="none"><button role="menuitem" class="theme" id="mdbook-theme-light">Light</button></li>
+                            <li role="none"><button role="menuitem" class="theme" id="mdbook-theme-rust">Rust</button></li>
+                            <li role="none"><button role="menuitem" class="theme" id="mdbook-theme-coal">Coal</button></li>
+                            <li role="none"><button role="menuitem" class="theme" id="mdbook-theme-navy">Navy</button></li>
+                            <li role="none"><button role="menuitem" class="theme" id="mdbook-theme-ayu">Ayu</button></li>
+                        </ul>
+                        <button id="mdbook-search-toggle" class="icon-button" type="button" title="Search (`/`)" aria-label="Toggle Searchbar" aria-expanded="false" aria-keyshortcuts="/ s" aria-controls="mdbook-searchbar">
+                            <span class=fa-svg><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M416 208c0 45.9-14.9 88.3-40 122.7L502.6 457.4c12.5 12.5 12.5 32.8 0 45.3s-32.8 12.5-45.3 0L330.7 376c-34.4 25.2-76.8 40-122.7 40C93.1 416 0 322.9 0 208S93.1 0 208 0S416 93.1 416 208zM208 352c79.5 0 144-64.5 144-144s-64.5-144-144-144S64 128.5 64 208s64.5 144 144 144z"/></svg></span>
+                        </button>
+                    </div>
+
+                    <h1 class="menu-title">The Move on Aptos Book</h1>
+
+                    <div class="right-buttons">
+                        <a href="print.html" title="Print this book" aria-label="Print this book">
+                            <span class=fa-svg id="print-button"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M128 0C92.7 0 64 28.7 64 64v96h64V64H354.7L384 93.3V160h64V93.3c0-17-6.7-33.3-18.7-45.3L400 18.7C388 6.7 371.7 0 354.7 0H128zM384 352v32 64H128V384 368 352H384zm64 32h32c17.7 0 32-14.3 32-32V256c0-35.3-28.7-64-64-64H64c-35.3 0-64 28.7-64 64v96c0 17.7 14.3 32 32 32H64v64c0 35.3 28.7 64 64 64H384c35.3 0 64-28.7 64-64V384zm-16-88c-13.3 0-24-10.7-24-24s10.7-24 24-24s24 10.7 24 24s-10.7 24-24 24z"/></svg></span>
+                        </a>
+                        <a href="https://github.com/aptos-labs/aptos-core" title="Git repository" aria-label="Git repository">
+                            <span class=fa-svg><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 496 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M165.9 397.4c0 2-2.3 3.6-5.2 3.6-3.3.3-5.6-1.3-5.6-3.6 0-2 2.3-3.6 5.2-3.6 3-.3 5.6 1.3 5.6 3.6zm-31.1-4.5c-.7 2 1.3 4.3 4.3 4.9 2.6 1 5.6 0 6.2-2s-1.3-4.3-4.3-5.2c-2.6-.7-5.5.3-6.2 2.3zm44.2-1.7c-2.9.7-4.9 2.6-4.6 4.9.3 2 2.9 3.3 5.9 2.6 2.9-.7 4.9-2.6 4.6-4.6-.3-1.9-3-3.2-5.9-2.9zM244.8 8C106.1 8 0 113.3 0 252c0 110.9 69.8 205.8 169.5 239.2 12.8 2.3 17.3-5.6 17.3-12.1 0-6.2-.3-40.4-.3-61.4 0 0-70 15-84.7-29.8 0 0-11.4-29.1-27.8-36.6 0 0-22.9-15.7 1.6-15.4 0 0 24.9 2 38.6 25.8 21.9 38.6 58.6 27.5 72.9 20.9 2.3-16 8.8-27.1 16-33.7-55.9-6.2-112.3-14.3-112.3-110.5 0-27.5 7.6-41.3 23.6-58.9-2.6-6.5-11.1-33.3 2.6-67.9 20.9-6.5 69 27 69 27 20-5.6 41.5-8.5 62.8-8.5s42.8 2.9 62.8 8.5c0 0 48.1-33.6 69-27 13.7 34.7 5.2 61.4 2.6 67.9 16 17.7 25.8 31.5 25.8 58.9 0 96.5-58.9 104.2-114.8 110.5 9.2 7.9 17 22.9 17 46.4 0 33.7-.3 75.4-.3 83.6 0 6.5 4.6 14.4 17.3 12.1C428.2 457.8 496 362.9 496 252 496 113.3 383.5 8 244.8 8zM97.2 352.9c-1.3 1-1 3.3.7 5.2 1.6 1.6 3.9 2.3 5.2 1 1.3-1 1-3.3-.7-5.2-1.6-1.6-3.9-2.3-5.2-1zm-10.8-8.1c-.7 1.3.3 2.9 2.3 3.9 1.6 1 3.6.7 4.3-.7.7-1.3-.3-2.9-2.3-3.9-2-.6-3.6-.3-4.3.7zm32.4 35.6c-1.6 1.3-1 4.3 1.3 6.2 2.3 2.3 5.2 2.6 6.5 1 1.3-1.3.7-4.3-1.3-6.2-2.2-2.3-5.2-2.6-6.5-1zm-11.4-14.7c-1.6 1-1.6 3.6 0 5.9 1.6 2.3 4.3 3.3 5.6 2.3 1.6-1.3 1.6-3.9 0-6.2-1.4-2.3-4-3.3-5.6-2z"/></svg></span>
+                        </a>
+                        <a href="https://github.com/aptos-labs/aptos-core/edit/main/third_party/move/documentation/book/src/spec-compositional.md" title="Suggest an edit" aria-label="Suggest an edit" rel="edit">
+                            <span class=fa-svg id="git-edit-button"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M421.7 220.3l-11.3 11.3-22.6 22.6-205 205c-6.6 6.6-14.8 11.5-23.8 14.1L30.8 511c-8.4 2.5-17.5 .2-23.7-6.1S-1.5 489.7 1 481.2L38.7 353.1c2.6-9 7.5-17.2 14.1-23.8l205-205 22.6-22.6 11.3-11.3 33.9 33.9 62.1 62.1 33.9 33.9zM96 353.9l-9.3 9.3c-.9 .9-1.6 2.1-2 3.4l-25.3 86 86-25.3c1.3-.4 2.5-1.1 3.4-2l9.3-9.3H112c-8.8 0-16-7.2-16-16V353.9zM453.3 19.3l39.4 39.4c25 25 25 65.5 0 90.5l-14.5 14.5-22.6 22.6-11.3 11.3-33.9-33.9-62.1-62.1L314.3 67.7l11.3-11.3 22.6-22.6 14.5-14.5c25-25 65.5-25 90.5 0z"/></svg></span>
+                        </a>
+
+                    </div>
+                </div>
+
+                <div id="mdbook-search-wrapper" class="hidden">
+                    <form id="mdbook-searchbar-outer" class="searchbar-outer">
+                        <div class="search-wrapper">
+                            <input type="search" id="mdbook-searchbar" name="searchbar" placeholder="Search this book ..." aria-controls="mdbook-searchresults-outer" aria-describedby="searchresults-header">
+                            <div class="spinner-wrapper">
+                                <span class=fa-svg id="fa-spin"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M304 48c0-26.5-21.5-48-48-48s-48 21.5-48 48s21.5 48 48 48s48-21.5 48-48zm0 416c0-26.5-21.5-48-48-48s-48 21.5-48 48s21.5 48 48 48s48-21.5 48-48zM48 304c26.5 0 48-21.5 48-48s-21.5-48-48-48s-48 21.5-48 48s21.5 48 48 48zm464-48c0-26.5-21.5-48-48-48s-48 21.5-48 48s21.5 48 48 48s48-21.5 48-48zM142.9 437c18.7-18.7 18.7-49.1 0-67.9s-49.1-18.7-67.9 0s-18.7 49.1 0 67.9s49.1 18.7 67.9 0zm0-294.2c18.7-18.7 18.7-49.1 0-67.9S93.7 56.2 75 75s-18.7 49.1 0 67.9s49.1 18.7 67.9 0zM369.1 437c18.7 18.7 49.1 18.7 67.9 0s18.7-49.1 0-67.9s-49.1-18.7-67.9 0s-18.7 49.1 0 67.9z"/></svg></span>
+                            </div>
+                        </div>
+                    </form>
+                    <div id="mdbook-searchresults-outer" class="searchresults-outer hidden">
+                        <div id="mdbook-searchresults-header" class="searchresults-header"></div>
+                        <ul id="mdbook-searchresults">
+                        </ul>
+                    </div>
+                </div>
+
+                <!-- Apply ARIA attributes after the sidebar and the sidebar toggle button are added to the DOM -->
+                <script>
+                    document.getElementById('mdbook-sidebar-toggle').setAttribute('aria-expanded', sidebar === 'visible');
+                    document.getElementById('mdbook-sidebar').setAttribute('aria-hidden', sidebar !== 'visible');
+                    Array.from(document.querySelectorAll('#mdbook-sidebar a')).forEach(function(link) {
+                        link.setAttribute('tabIndex', sidebar === 'visible' ? 0 : -1);
+                    });
+                </script>
+
+                <div id="mdbook-content" class="content">
+                    <main>
+                        <h1 id="compositional-specifications"><a class="header" href="#compositional-specifications">Compositional Specifications</a></h1>
+<p><em>Since language version 2.4</em></p>
+<p>This chapter describes the constructs that allow specifications to be
+<em>composed</em> from other specifications, including reasoning about higher-order
+functions, the global state a function may read or write, and intermediate
+states between calls.</p>
+<h2 id="behavioral-predicates"><a class="header" href="#behavioral-predicates">Behavioral Predicates</a></h2>
+<h3 id="overview"><a class="header" href="#overview">Overview</a></h3>
+<p>A key challenge in specifying higher-order functions is expressing the behavior of function parameters without knowing their implementation. Behavioral predicates solve this by lifting the specification clauses of a function — its preconditions, postconditions, and abort conditions — into first-class predicates that can be referenced in the specifications of other functions.</p>
+<p>There are four behavioral predicates:</p>
+<div class="table-wrapper">
+<table>
+<thead>
+<tr><th>Predicate</th><th>Meaning</th></tr>
+</thead>
+<tbody>
+<tr><td><code>ensures_of&lt;f&gt;(args, result)</code></td><td>The postcondition of <code>f</code> applied to <code>args</code> yielding <code>result</code></td></tr>
+<tr><td><code>aborts_of&lt;f&gt;(args)</code></td><td>The abort condition of <code>f</code> applied to <code>args</code></td></tr>
+<tr><td><code>requires_of&lt;f&gt;(args)</code></td><td>The precondition of <code>f</code> applied to <code>args</code></td></tr>
+<tr><td><code>result_of&lt;f&gt;(args)</code></td><td>A deterministic result selector: the value <code>y</code> such that <code>ensures_of&lt;f&gt;(args, y)</code> holds</td></tr>
+</tbody>
+</table>
+</div>
+<p>In all cases, <code>f</code> must be a name that refers to either a function parameter of function type or a concrete function.</p>
+<h3 id="ensures_of"><a class="header" href="#ensures_of"><code>ensures_of</code></a></h3>
+<p>The <code>ensures_of&lt;f&gt;(args, result)</code> predicate represents the postcondition of function <code>f</code>. When used in a specification, it asserts that whatever postcondition <code>f</code> guarantees will hold for the given arguments and result.</p>
+<p>Consider a basic higher-order function that applies a function to an argument:</p>
+<pre><code class="language-move">fun apply(f: |u64| u64, x: u64): u64 {
+    f(x)
+}
+spec apply {
+    ensures ensures_of&lt;f&gt;(x, result);
+}
+</code></pre>
+<p>This specification says: whatever the postcondition of the function <code>f</code> is, it holds between the input <code>x</code> and the returned <code>result</code>.</p>
+<p>When <code>apply</code> is <strong>transparent</strong> (the default — not marked <code>pragma opaque</code>), the prover inlines the function body and reasons through the actual implementation. This means closures without explicit inline specs work:</p>
+<pre><code class="language-move">fun test_add_five(x: u64): u64 {
+    apply(|y| y + 5, x)
+}
+spec test_add_five {
+    ensures result == x + 5;
+}
+</code></pre>
+<p>When <code>apply</code> is <strong>opaque</strong> (<code>pragma opaque</code>), the prover only sees the specification, not the implementation. In this case, closures must carry explicit inline specs (see <a href="#inline-closure-specifications">Inline Closure Specifications</a> below).</p>
+<h3 id="aborts_of"><a class="header" href="#aborts_of"><code>aborts_of</code></a></h3>
+<p>The <code>aborts_of&lt;f&gt;(args)</code> predicate represents the abort condition of function <code>f</code>. It is used in <code>aborts_if</code> clauses to propagate abort conditions from function parameters:</p>
+<pre><code class="language-move">fun apply_may_abort(f: |u64| u64, x: u64): u64 {
+    f(x)
+}
+spec apply_may_abort {
+    aborts_if aborts_of&lt;f&gt;(x);
+    ensures ensures_of&lt;f&gt;(x, result);
+}
+</code></pre>
+<p>Since <code>apply_may_abort</code> is transparent here, the prover inlines the body and resolves the closure’s abort behavior directly:</p>
+<pre><code class="language-move">fun test_may_abort(x: u64): u64 {
+    apply_may_abort(|y| if (y == 0) abort 1 else y, x)
+}
+spec test_may_abort {
+    aborts_if x == 0;
+    ensures result == x;
+}
+</code></pre>
+<p>For opaque higher-order functions, the closure would need an explicit inline spec with <code>aborts_if</code> conditions.</p>
+<h3 id="requires_of"><a class="header" href="#requires_of"><code>requires_of</code></a></h3>
+<p>The <code>requires_of&lt;f&gt;(args)</code> predicate represents the precondition of function <code>f</code>. It allows higher-order functions to place requirements on their callers based on what the passed function expects:</p>
+<pre><code class="language-move">fun apply_no_abort(f: |u64| u64, x: u64): u64 {
+    f(x)
+}
+spec apply_no_abort {
+    requires !aborts_of&lt;f&gt;(x);
+    aborts_if false;
+    ensures ensures_of&lt;f&gt;(x, result);
+}
+</code></pre>
+<p>This specifies that callers must pass arguments for which <code>f</code> will not abort. If a caller violates this, the prover reports an error:</p>
+<pre><code class="language-move">fun test_fail(): u64 {
+    // FAILS: passing MAX_U64 violates !aborts_of&lt;f&gt;(x) since the closure aborts on MAX_U64
+    apply_no_abort(
+        |x| x + 1 spec { aborts_if x == MAX_U64; ensures result == x + 1; },
+        MAX_U64
+    )
+}
+</code></pre>
+<p>The prover output:</p>
+<pre><code>error: precondition does not hold at this call
+  ┌─ requires_of_err.move:6:9
+  │
+6 │         requires !aborts_of&lt;f&gt;(x);
+  │         ^^^^^^^^^^^^^^^^^^^^^^^^^^
+</code></pre>
+<h3 id="result_of"><a class="header" href="#result_of"><code>result_of</code></a></h3>
+<p>The <code>result_of&lt;f&gt;(args)</code> predicate is a deterministic result selector. Semantically, <code>result_of&lt;f&gt;(x)</code> denotes the value <code>y</code> such that <code>ensures_of&lt;f&gt;(x, y)</code> holds. It is particularly useful for specifying sequential applications and loop invariants:</p>
+<pre><code class="language-move">fun apply_seq(f: |u64| u64 has copy, x: u64): u64 {
+    f(f(x))
+}
+spec apply_seq {
+    let y = result_of&lt;f&gt;(x);
+    requires requires_of&lt;f&gt;(x) &amp;&amp; requires_of&lt;f&gt;(y);
+    aborts_if aborts_of&lt;f&gt;(x) || aborts_of&lt;f&gt;(y);
+    ensures result == result_of&lt;f&gt;(y);
+}
+</code></pre>
+<p>Here <code>result_of</code> is used to name the intermediate value <code>y</code> — the result of the first application — and then specify that the final result is <code>f</code> applied to <code>y</code>.</p>
+<p><code>result_of</code> can also be used with known concrete functions:</p>
+<pre><code class="language-move">fun double(x: u64): u64 { x * 2 }
+spec double { ensures result == x * 2; }
+
+fun test_known(): u64 { double(5) }
+spec test_known {
+    ensures result == result_of&lt;double&gt;(5);
+}
+</code></pre>
+<p>The existence of <code>result_of&lt;f&gt;(args)</code> implies that <code>f</code> is deterministic — it denotes the unique value <code>y</code> satisfying <code>ensures_of&lt;f&gt;(args, y)</code>. This is why <code>result_of</code> also establishes functional behavior: if <code>ensures_of&lt;f&gt;(x, y1)</code> and <code>ensures_of&lt;f&gt;(x, y2)</code> both hold, then <code>y1 == y2 == result_of&lt;f&gt;(x)</code>.</p>
+<h3 id="inline-closure-specifications"><a class="header" href="#inline-closure-specifications">Inline Closure Specifications</a></h3>
+<p>When a closure is passed to an opaque higher-order function, the prover needs to know the closure’s specification to reason about it. Closures can carry inline specifications using the <code>spec { ... }</code> syntax:</p>
+<pre><code class="language-move">fun test_guarded_apply(x: u64): u64 {
+    guarded_apply(|y| {
+        if (y &gt; 500) abort 1;
+        y * 2
+    } spec {
+        aborts_if y &gt; 500;
+        ensures result == y * 2;
+    }, x)
+}
+</code></pre>
+<p>The inline specification provides the closure’s contract: its abort conditions and postconditions. The prover uses these to instantiate behavioral predicates at the call site.</p>
+<p>When the higher-order function is transparent (not opaque), the prover can often derive the closure’s behavior from its implementation, making inline specs optional. However, for opaque functions, inline specs are required since the prover relies solely on specifications.</p>
+<h3 id="opaque-higher-order-functions"><a class="header" href="#opaque-higher-order-functions">Opaque Higher-Order Functions</a></h3>
+<p>Opaque functions are verified only from their specifications, not their implementations. Behavioral predicates enable writing useful specifications for opaque higher-order functions:</p>
+<pre><code class="language-move">fun apply_opaque(f: |u64| u64, x: u64): u64 {
+    f(x)
+}
+spec apply_opaque {
+    pragma opaque = true;
+    ensures ensures_of&lt;f&gt;(x, result);
+}
+</code></pre>
+<p>At the call site, callers must provide closures with explicit inline specs:</p>
+<pre><code class="language-move">fun test_opaque(x: u64): u64 {
+    apply_opaque(|y| y + 5 spec { ensures result == y + 5; }, x)
+}
+spec test_opaque {
+    ensures result == x + 5;
+}
+</code></pre>
+<p>This approach enables modular verification: the implementation of <code>apply_opaque</code> is verified once against its specification, and callers are verified against the specification without seeing the implementation.</p>
+<h3 id="mutable-reference-parameters"><a class="header" href="#mutable-reference-parameters">Mutable Reference Parameters</a></h3>
+<p>Behavioral predicates extend to closures with mutable reference parameters. When a function takes <code>&amp;mut T</code>, it effectively has two outputs: the explicit return value and the modified reference. The predicates account for both:</p>
+<pre><code class="language-move">fun apply_void_mut(f: |&amp;mut u64|, x: &amp;mut u64) { f(x) }
+spec apply_void_mut {
+    // For void return with &amp;mut param, result_of returns the modified value
+    ensures x == result_of&lt;f&gt;(old(x));
+}
+
+fun apply_mut(f: |&amp;mut u64| u64, x: &amp;mut u64): u64 { f(x) }
+spec apply_mut {
+    // For non-void return with &amp;mut, ensures_of takes (input, result, modified_param)
+    ensures ensures_of&lt;f&gt;(old(x), result, x);
+}
+</code></pre>
+<p>When a closure both returns a value and modifies a <code>&amp;mut</code> parameter, <code>result_of</code> returns a tuple <code>(explicit_result, modified_value)</code>:</p>
+<pre><code class="language-move">fun apply_mut_result(f: |&amp;mut u64| u64, x: &amp;mut u64): u64 { f(x) }
+spec apply_mut_result {
+    ensures (result, x) == result_of&lt;f&gt;(old(x));
+}
+</code></pre>
+<p>Tuple components can be extracted with let expressions:</p>
+<pre><code class="language-move">spec apply_mut_extract {
+    ensures result == {let (r, _p) = result_of&lt;f&gt;(old(x)); r};
+    ensures x == {let (_r, p) = result_of&lt;f&gt;(old(x)); p};
+}
+</code></pre>
+<h3 id="behavioral-predicates-with-loops"><a class="header" href="#behavioral-predicates-with-loops">Behavioral Predicates with Loops</a></h3>
+<p>Behavioral predicates integrate with loop invariants, enabling specification of functions like <code>contains</code>, <code>index</code>, and <code>reduce</code> over vectors:</p>
+<pre><code class="language-move">fun contains(v: &amp;vector&lt;u64&gt;, pred: |&amp;u64| bool has copy + drop): bool {
+    let i = 0;
+    let len = std::vector::length(v);
+    while (i &lt; len) {
+        if (pred(std::vector::borrow(v, i))) {
+            return true;
+        };
+        i = i + 1;
+    }
+        spec {
+            invariant i &lt;= len;
+            invariant forall j in 0..i: !result_of&lt;pred&gt;(v[j]);
+        };
+    false
+}
+spec contains {
+    requires forall x in 0..len(v): !aborts_of&lt;pred&gt;(v[x]);
+    aborts_if false;
+    ensures result == (exists k in 0..len(v): result_of&lt;pred&gt;(v[k]));
+}
+</code></pre>
+<p>Notice how <code>result_of&lt;pred&gt;</code> is used in both the loop invariant and the postcondition to express the predicate’s behavior over vector elements.</p>
+<p>A recursive specification function can use <code>result_of</code> to define the semantics of a fold operation:</p>
+<pre><code class="language-move">spec fun spec_reduce(reducer: |u64, u64|u64, v: vector&lt;u64&gt;, val: u64, end: u64): u64 {
+    if (end == 0) val
+    else {
+        let val = spec_reduce(reducer, v, val, end - 1);
+        result_of&lt;reducer&gt;(val, v[end - 1])
+    }
+}
+
+fun reduce(vec: vector&lt;u64&gt;, start: u64, reducer: |u64, u64|u64 has copy + drop): u64 {
+    // ... loop implementation ...
+}
+spec reduce {
+    ensures result == spec_reduce(reducer, vec, start, len(vec));
+}
+</code></pre>
+<h2 id="access-specifiers-and-frame-conditions"><a class="header" href="#access-specifiers-and-frame-conditions">Access Specifiers and Frame Conditions</a></h2>
+<h3 id="the-modifies_of-and-reads_of-declarations"><a class="header" href="#the-modifies_of-and-reads_of-declarations">The <code>modifies_of</code> and <code>reads_of</code> Declarations</a></h3>
+<p>When a higher-order function takes a function parameter, the prover needs to know which global resources the parameter may read or write in order to establish frame conditions (what is unchanged after the call). Without <code>modifies_of</code>/<code>reads_of</code> declarations, the function parameter is treated as <strong>pure</strong>: its behavioral predicates can only reason about data arguments and return values, not global state. This is correct for transparent (non-opaque) higher-order functions, where the closure body is inlined and verified directly. For opaque higher-order functions whose parameters modify global state, <code>modifies_of</code> and/or <code>reads_of</code> declarations are required to make those effects visible to the specification.</p>
+<p>The <code>modifies_of</code> and <code>reads_of</code> declarations in a function’s specification describe these resource access permissions:</p>
+<pre><code class="language-move">spec apply {
+    pragma opaque;
+    reads_of&lt;f&gt; Config;
+    modifies_of&lt;f&gt;(a: address) Data[a];
+    ensures ensures_of&lt;f&gt;(x, result);
+    aborts_if aborts_of&lt;f&gt;(x);
+}
+</code></pre>
+<p>The syntax is:</p>
+<pre><code>reads_of&lt;param_name&gt; Resource1, Resource2, ...;
+modifies_of&lt;param_name&gt;(formal_params) Resource1[addr], Resource2[addr], ...;
+</code></pre>
+<p><code>reads_of</code> names the resource types that the function parameter may read. It takes only type names — no address expressions or parenthesized parameters.</p>
+<p><code>modifies_of</code> names the resource types that the function parameter may modify, using Move-2 index syntax (e.g., <code>Data[a]</code>) to specify the address at which modification is permitted. The formal parameters are variables that can be used in the modify target expressions — for example, <code>Data[a]</code> where <code>a</code> is a formal parameter.</p>
+<p>These declarations serve two purposes:</p>
+<ol>
+<li><strong>Frame conditions</strong>: The prover uses access declarations to determine which resources are unchanged after a call. Resources declared with <code>reads_of</code> are guaranteed unchanged everywhere. Resources declared with <code>modifies_of</code> using an address expression like <code>Resource[a]</code> are guaranteed unchanged at all addresses other than <code>a</code>.</li>
+<li><strong>Access validation</strong>: The compiler checks that closures passed to the function do not access resources beyond what is declared.</li>
+</ol>
+<p>Functions can also declare <code>reads</code> and <code>modifies</code> directly in their spec blocks:</p>
+<pre><code class="language-move">spec my_fun {
+    reads R, S;
+    modifies R[addr];
+}
+</code></pre>
+<p>Both declarations are enforced. The prover checks that opaque functions have <code>modifies</code> clauses covering all resources they actually modify. If a function declares <code>reads</code>, the prover checks that every resource the function accesses is covered by either the <code>reads</code> or <code>modifies</code> declaration:</p>
+<pre><code>error: function `my_fun` accesses resource `S`
+       which is not covered by its `reads` or `modifies` declaration
+</code></pre>
+<p>If no <code>reads</code> declaration is present, no read checking is performed — the prover only checks <code>modifies</code> for opaque functions.</p>
+<h3 id="read-access"><a class="header" href="#read-access">Read Access</a></h3>
+<p>When a resource is declared with <code>reads_of</code>, the prover becomes aware that the function parameter’s behavior depends on these resources, making it sensitive to their current values. As a secondary effect, <code>reads_of</code> resources are guaranteed unchanged after the function parameter executes, enabling frame conditions at the call site:</p>
+<pre><code class="language-move">fun apply_reads(f: |address| u64, x: address): u64 {
+    f(x)
+}
+spec apply_reads {
+    pragma opaque;
+    reads_of&lt;f&gt; Data, Index;
+    ensures result == result_of&lt;f&gt;(x);
+    ensures ensures_of&lt;f&gt;(x, result);
+}
+</code></pre>
+<p>Callers can rely on the frame condition — both <code>Data</code> and <code>Index</code> are unchanged after the call:</p>
+<pre><code class="language-move">fun test_reads(addr: address): u64 acquires Data, Index {
+    apply_reads(|a| read_indexed(a) spec {
+        ensures result == Data[a].value + Index[a].pos;
+    }, addr)
+}
+spec test_reads {
+    ensures result == Data[addr].value + Index[addr].pos;
+    // Both resources are guaranteed unchanged since reads_of declares reads-only
+    ensures Data[addr] == old(Data[addr]);
+    ensures Index[addr] == old(Index[addr]);
+}
+</code></pre>
+<h3 id="write-access"><a class="header" href="#write-access">Write Access</a></h3>
+<p>When a resource is declared with <code>modifies_of</code>, the function parameter may modify it. The <code>modifies_of</code> clause includes an address expression to specify where modification is permitted. The enclosing function’s <code>modifies</code> clause must also list the resource:</p>
+<pre><code class="language-move">fun apply_writes(f: |address| u64, x: address): u64 {
+    f(x)
+}
+spec apply_writes {
+    pragma opaque;
+    modifies Data[x];
+    modifies_of&lt;f&gt;(a: address) Data[a];
+    ensures ensures_of&lt;f&gt;(x, result);
+    aborts_if aborts_of&lt;f&gt;(x);
+}
+</code></pre>
+<p>The <code>modifies_of&lt;f&gt;(a: address) Data[a]</code> declaration says that <code>f</code> may only modify <code>Data</code> at address <code>a</code> (the formal parameter of the <code>modifies_of</code> declaration). This enables the prover to establish that <code>Data</code> is unchanged at all other addresses:</p>
+<pre><code class="language-move">fun test_writes(addr: address): u64 acquires Data {
+    apply_writes(|a| set_data(a, 99) spec {
+        modifies Data[a];
+        ensures result == 99;
+        ensures Data[a].value == 99;
+        aborts_if !exists&lt;Data&gt;(a);
+    }, addr)
+}
+spec test_writes {
+    aborts_if !exists&lt;Data&gt;(addr);
+    ensures result == 99;
+    // Data at other addresses is unchanged
+    ensures forall a: address where a != addr:
+        Data[a] == old(Data[a]);
+}
+</code></pre>
+<h3 id="mixed-access"><a class="header" href="#mixed-access">Mixed Access</a></h3>
+<p>Different resources can have different access modes declared separately. This is common when a function reads configuration state but writes data state:</p>
+<pre><code class="language-move">fun apply_mixed(f: |address| u64, x: address): u64 {
+    f(x)
+}
+spec apply_mixed {
+    pragma opaque;
+    modifies Data[x];
+    reads_of&lt;f&gt; Config;
+    modifies_of&lt;f&gt;(a: address) Data[a];
+    ensures ensures_of&lt;f&gt;(x, result);
+    aborts_if aborts_of&lt;f&gt;(x);
+}
+</code></pre>
+<p>Here, <code>Config</code> is guaranteed unchanged everywhere, and <code>Data</code> may only be modified at address <code>a</code>. The caller can rely on both frame conditions:</p>
+<pre><code class="language-move">spec test_mixed {
+    // Config is unchanged since reads_of declares it as reads-only
+    ensures Config[addr] == old(Config[addr]);
+    // Data is unchanged at all addresses except addr
+    ensures forall a: address where a != addr:
+        Data[a] == old(Data[a]);
+}
+</code></pre>
+<h3 id="access-validation"><a class="header" href="#access-validation">Access Validation</a></h3>
+<p>The compiler validates that closures passed to a function do not exceed the declared access. If a closure accesses resources not listed in <code>reads_of</code> or <code>modifies_of</code>, or writes to a resource declared with <code>reads_of</code>, the compiler reports an error. When no <code>modifies_of</code>/<code>reads_of</code> declarations exist for a parameter, no access validation is performed — the parameter is treated as pure (see above).</p>
+<p><strong>Too narrow (missing resource):</strong> The <code>reads_of</code> declares only <code>Counter</code>, but the closure also reads <code>Config</code>:</p>
+<pre><code class="language-move">spec apply_narrow_read {
+    reads_of&lt;f&gt; Counter;
+    ensures ensures_of&lt;f&gt;(x, result);
+}
+
+fun test_narrow_read(addr: address): u64 acquires Counter, Config {
+    apply_narrow_read(|a| {
+        // ERROR: closure accesses Config which isn't in reads_of or modifies_of
+        if (Config[a].active) { Counter[a].value } else { 0 }
+    } spec { ... }, addr)
+}
+</code></pre>
+<p>The prover reports:</p>
+<pre><code>error: function argument accesses resource `Config`
+       which is not declared in `modifies_of`/`reads_of` for `f`
+</code></pre>
+<p><strong>Writes violation:</strong> The <code>reads_of</code> declares read access but the closure modifies the resource:</p>
+<pre><code class="language-move">spec apply_reads_only {
+    reads_of&lt;f&gt; Counter;
+    ensures ensures_of&lt;f&gt;(x);
+}
+
+fun test_writes_violation(addr: address) acquires Counter {
+    apply_reads_only(|a| write_counter(a) spec {
+        // ERROR: closure writes Counter but reads_of only allows reads
+        modifies Counter[a];
+        ...
+    }, addr);
+}
+</code></pre>
+<p>The prover reports:</p>
+<pre><code>error: function argument writes resource `Counter`
+       but only `reads_of` (not `modifies_of`) is declared for `f`
+</code></pre>
+<p><strong>Parameter forwarding:</strong> When wrapping a higher-order function, the wrapper’s access declarations must not exceed the callee’s:</p>
+<pre><code class="language-move">spec apply_counter_only {
+    reads_of&lt;f&gt; Counter;
+}
+
+fun wrapper(g: |address| u64, x: address): u64 {
+    // ERROR: g may access Config (per wrapper's reads_of) but apply_counter_only only allows Counter
+    apply_counter_only(g, x)
+}
+spec wrapper {
+    reads_of&lt;g&gt; Counter, Config;
+}
+</code></pre>
+<h2 id="state-labels"><a class="header" href="#state-labels">State Labels</a></h2>
+<h3 id="motivation"><a class="header" href="#motivation">Motivation</a></h3>
+<p>Behavioral predicates like <code>ensures_of&lt;f&gt;(x, result)</code> describe a relation between the pre-state and post-state of a function call. When a function makes a single call, there is one pre-state (the function’s entry) and one post-state (the function’s exit), and these are implicit. But when a function makes <em>multiple</em> state-modifying calls, intermediate states arise: the post-state of the first call becomes the pre-state of the second call. State labels make these intermediate states explicit.</p>
+<h3 id="abstract-state"><a class="header" href="#abstract-state">Abstract State</a></h3>
+<p>State labels in specifications represent <em>abstract</em> snapshots of the global memory at particular points in a function’s execution. They are not tied to concrete program counters or bytecode offsets — instead, they name logical states that are connected by specification constraints.</p>
+<p>A specification with state labels defines a system of constraints over a sequence of abstract states. Each constraint says something about the relationship between two states (or observes a single state). The verifier treats these states as symbolic: it introduces unconstrained memory variables for each labeled state and then assumes only what the specification constraints assert about them (see <a href="#mutation-primitives">Mutation Primitives</a> below for the primary mechanism that constrains how states relate to each other).</p>
+<p>For example, in a specification with label <code>S</code>:</p>
+<ul>
+<li>The <em>entry state</em> is the function’s pre-state (accessible via <code>old()</code>)</li>
+<li>State <code>S</code> is an intermediate abstract state</li>
+<li>The <em>exit state</em> is the function’s post-state (the default)</li>
+</ul>
+<p>The constraints connect these states into a chain: entry → S → exit. Each link in the chain is established by a mutation primitive or a behavioral predicate that describes how global resources change between two states.</p>
+<h3 id="the--operator"><a class="header" href="#the--operator">The <code>|~</code> Operator</a></h3>
+<div class="table-wrapper">
+<table>
+<thead>
+<tr><th>Syntax</th><th>Meaning</th></tr>
+</thead>
+<tbody>
+<tr><td><code>S1..S2 |~ expr</code></td><td>Evaluate <code>expr</code> with pre-state <code>S1</code> and post-state <code>S2</code></td></tr>
+<tr><td><code>..S |~ expr</code></td><td>Evaluate <code>expr</code> with the function’s entry as pre-state; name the post-state <code>S</code></td></tr>
+<tr><td><code>S.. |~ expr</code></td><td>Evaluate <code>expr</code> with pre-state <code>S</code> and the function’s exit as post-state</td></tr>
+<tr><td><code>S |~ expr</code></td><td>Evaluate <code>expr</code> in state <code>S</code> (single state, no transition)</td></tr>
+</tbody>
+</table>
+</div>
+<h3 id="defining-and-using-state-labels"><a class="header" href="#defining-and-using-state-labels">Defining and Using State Labels</a></h3>
+<p>State labels appear in two roles: <em>defining</em> a label establishes a new abstract state, while <em>using</em> a label references a previously defined state. The distinction determines how the verifier introduces and constrains memory variables.</p>
+<p><strong>Defining a label.</strong> A label is defined when it appears as the post-state (after <code>..</code>) in one of these constructs:</p>
+<ul>
+<li><strong>Mutation primitives</strong>: <code>..S |~ publish&lt;R&gt;(addr, val)</code>, <code>..S |~ remove&lt;R&gt;(addr)</code>, <code>..S |~ update&lt;R&gt;(addr, val)</code>. These are the primary state-defining operations — they specify exactly how global memory changes from the pre-state to the newly defined state S. See <a href="#mutation-primitives">Mutation Primitives</a> below.</li>
+<li><strong>Behavioral predicates</strong>: <code>..S |~ ensures_of&lt;f&gt;(x)</code>. This defines S as the post-state of calling <code>f</code>, constraining it by <code>f</code>’s specification.</li>
+<li><strong>Two-state spec functions</strong>: <code>..S |~ counter_increased(addr)</code>. This defines S as the post-state of a two-state spec function evaluation.</li>
+</ul>
+<p><strong>Using a label.</strong> A label is used when it appears as the pre-state (before <code>..</code>) or as a single-state label:</p>
+<ul>
+<li><code>S.. |~ expr</code> — evaluate <code>expr</code> starting from state S</li>
+<li><code>S |~ expr</code> — observe <code>expr</code> in state S (single state, no transition)</li>
+<li><code>S |~ global&lt;R&gt;(addr)</code> or equivalently <code>S |~ R[addr]</code> — read resource R at addr in state S</li>
+</ul>
+<p>Every label that is defined must also be used (no orphaned labels), and every label that is used must have been defined (no dangling references). This ensures the chain of states is well-connected.</p>
+<h3 id="mutation-primitives"><a class="header" href="#mutation-primitives">Mutation Primitives</a></h3>
+<p>Mutation primitives are specification-only builtins that describe how a global resource changes between two states. They are the fundamental building blocks for constraining abstract state transitions.</p>
+<div class="table-wrapper">
+<table>
+<thead>
+<tr><th>Primitive</th><th>Meaning</th></tr>
+</thead>
+<tbody>
+<tr><td><code>publish&lt;R&gt;(addr, value)</code></td><td>Resource R is created at <code>addr</code> with <code>value</code>. Requires R did not exist before.</td></tr>
+<tr><td><code>remove&lt;R&gt;(addr)</code></td><td>Resource R is removed from <code>addr</code>. Requires R existed before.</td></tr>
+<tr><td><code>update&lt;R&gt;(addr, value)</code></td><td>Resource R at <code>addr</code> is replaced with <code>value</code>. Requires R existed before.</td></tr>
+</tbody>
+</table>
+</div>
+<p>Each primitive is a boolean-valued expression that constrains the relationship between a pre-state and a post-state. When used with a state label range, the primitive defines how memory transitions between those states:</p>
+<pre><code class="language-move">ensures ..S |~ publish&lt;Counter&gt;(addr, Counter{value: 0});
+</code></pre>
+<p>This says: transitioning from the entry state to state S, a <code>Counter</code> resource with value 0 is published at <code>addr</code>. The implicit assertion is that <code>Counter</code> did not exist at <code>addr</code> in the entry state.</p>
+<p><strong>Without state labels</strong>, mutation primitives describe the transition from the function’s entry to its exit:</p>
+<pre><code class="language-move">spec create_counter(account: &amp;signer, init_value: u64) {
+    ensures publish&lt;Counter&gt;(signer::address_of(account), Counter{value: init_value});
+}
+</code></pre>
+<p><strong>With state labels</strong>, mutation primitives chain together to describe sequences of state changes:</p>
+<pre><code class="language-move">spec double_update(addr: address, v1: u64, v2: u64) {
+    // First update: entry → S
+    ensures ..S |~ update&lt;Counter&gt;(addr, update_field(old(Counter[addr]), value, v1));
+    // Second update: S → exit
+    ensures S.. |~ update&lt;Counter&gt;(addr, update_field(S |~ Counter[addr], value, v2));
+}
+</code></pre>
+<p>Note how the second <code>update</code> reads <code>Counter[addr]</code> in state S (via <code>S |~ Counter[addr]</code>) to get the value after the first update, then modifies it further.</p>
+<p><strong>Conditional mutations</strong> use implications to describe path-dependent state changes:</p>
+<pre><code class="language-move">spec conditional_remove(addr: address, cond: bool) {
+    ensures cond ==&gt; remove&lt;Counter&gt;(addr);
+}
+</code></pre>
+<p><strong>Verification semantics.</strong> Under the hood, the verifier implements mutation primitives using a <em>havoc-and-assume</em> pattern:</p>
+<ol>
+<li>The memory for each modified resource type is havoced (set to an unconstrained value).</li>
+<li>Frame conditions constrain that unmodified resource types and unmodified addresses are unchanged.</li>
+<li>The mutation primitive constraints are assumed, pinning the havoced memory to the specified values.</li>
+</ol>
+<p>This approach is sound and decoupled from the implementation — the verifier reasons about state transitions purely through the specification constraints, without tracking bytecode offsets or instruction ordering.</p>
+<h3 id="examples"><a class="header" href="#examples">Examples</a></h3>
+<p><strong>Two sequential state-modifying calls.</strong> Here <code>..S</code> <em>defines</em> state <code>S</code> as the post-state of the first call, and <code>S..</code> <em>uses</em> it as the pre-state of the second. The single-state form <code>S |~ expr</code> observes <code>expr</code> in state <code>S</code> (e.g., for abort checks):</p>
+<pre><code class="language-move">fun double_remove(addr1: address, addr2: address): (Resource, Resource) acquires Resource {
+    let r1 = remove_resource(addr1);
+    let r2 = remove_resource(addr2);
+    (r1, r2)
+}
+spec double_remove {
+    // First removal: entry state → S
+    ensures ..S |~ result_1 == result_of&lt;remove_resource&gt;(addr1);
+    // Second removal: S → exit state
+    ensures S.. |~ result_2 == result_of&lt;remove_resource&gt;(addr2);
+    // Abort of second call checked in state S (after first removal)
+    aborts_if S |~ aborts_of&lt;remove_resource&gt;(addr2);
+    // Abort of first call checked in entry state (implicit)
+    aborts_if aborts_of&lt;remove_resource&gt;(addr1);
+}
+</code></pre>
+<p><strong>Create then read.</strong> The single-state form <code>S |~ expr</code> is useful for observing intermediate state:</p>
+<pre><code class="language-move">fun create_then_read(account: &amp;signer, addr: address): u64 acquires Resource {
+    move_to(account, Resource { value: 42 });
+    read_resource(addr)
+}
+spec create_then_read {
+    ensures S.. |~ result == result_of&lt;read_resource&gt;(addr);
+    ensures S |~ exists&lt;Resource&gt;(signer::address_of(account));
+    ensures S |~ Resource[signer::address_of(account)] == Resource{value: 42};
+    aborts_if S |~ aborts_of&lt;read_resource&gt;(addr);
+    aborts_if exists&lt;Resource&gt;(signer::address_of(account));
+}
+</code></pre>
+<p><strong>Three or more sequential calls.</strong> The full <code>S1..S2</code> form chains intermediate states:</p>
+<pre><code class="language-move">spec three_calls {
+    ensures ..s1 |~ ensures_of&lt;f&gt;(x);
+    ensures s1..s2 |~ ensures_of&lt;g&gt;(x);
+    ensures s2.. |~ ensures_of&lt;h&gt;(x);
+}
+</code></pre>
+<h3 id="predicate-restrictions"><a class="header" href="#predicate-restrictions">Predicate Restrictions</a></h3>
+<p>Not all behavioral predicates can carry both pre and post labels:</p>
+<ul>
+<li><code>requires_of</code> and <code>aborts_of</code> describe conditions in a <em>single state</em>. They cannot have post-state labels:</li>
+</ul>
+<pre><code class="language-move">spec apply_requires_err {
+    ensures ..post |~ requires_of&lt;f&gt;(x); // ERROR: post-state label not allowed on requires_of
+}
+</code></pre>
+<ul>
+<li><code>ensures_of</code> and <code>result_of</code> describe state transitions and can carry both pre and post labels.</li>
+</ul>
+<h3 id="validation-rules"><a class="header" href="#validation-rules">Validation Rules</a></h3>
+<p>The compiler enforces three rules on state labels:</p>
+<ol>
+<li><strong>No orphaned labels</strong>: Every post-state label defined with <code>..S</code> must be referenced by some pre-state label <code>S..</code> or <code>S..T</code> in the same spec block.</li>
+</ol>
+<pre><code class="language-move">spec apply_orphan_post {
+    ensures ..orphan |~ ensures_of&lt;f&gt;(x, result); // ERROR: 'orphan' is never referenced
+}
+</code></pre>
+<ol start="2">
+<li><strong>No cycles</strong>: State label references must form a directed acyclic graph.</li>
+</ol>
+<pre><code class="language-move">spec apply_cycle {
+    ensures a..b |~ ensures_of&lt;f&gt;(x, result);
+    ensures b..a |~ ensures_of&lt;f&gt;(x, result); // ERROR: cyclic reference a -&gt; b -&gt; a
+}
+</code></pre>
+<ol start="3">
+<li><strong>No self-references</strong>: A label cannot reference itself.</li>
+</ol>
+<pre><code class="language-move">spec apply_self_cycle {
+    ensures a..a |~ ensures_of&lt;f&gt;(x, result); // ERROR: self-referencing label
+}
+</code></pre>
+<h2 id="two-state-specification-functions"><a class="header" href="#two-state-specification-functions">Two-State Specification Functions</a></h2>
+<h3 id="defining-two-state-spec-functions"><a class="header" href="#defining-two-state-spec-functions">Defining Two-State Spec Functions</a></h3>
+<p>A two-state specification function is a <code>spec fun</code> that uses <code>old()</code> to reference the pre-state while also reading the current (post) state. This allows expressing transition properties that relate state before and after a function executes:</p>
+<pre><code class="language-move">spec fun counter_increased(addr: address): bool {
+    old(Counter[addr].value) &lt; Counter[addr].value
+}
+</code></pre>
+<p>This spec function evaluates to <code>true</code> when the <code>Counter</code> value at <code>addr</code> in the current state is strictly greater than its value in the pre-state. The prover detects the use of <code>old()</code> and automatically provides dual memory parameters (pre-state and post-state) when translating to the verification backend.</p>
+<h3 id="using-two-state-spec-functions"><a class="header" href="#using-two-state-spec-functions">Using Two-State Spec Functions</a></h3>
+<p>Two-state spec functions are used in <code>ensures</code> clauses to express transition properties:</p>
+<pre><code class="language-move">fun increment_if_active(addr: address) acquires Counter, Config {
+    if (Config[addr].active) {
+        Counter[addr].value = Counter[addr].value + 1;
+    };
+}
+spec increment_if_active {
+    pragma opaque;
+    modifies Counter[addr];
+    ensures Config[addr].active ==&gt; counter_increased(addr);
+}
+</code></pre>
+<p>The spec function <code>counter_increased</code> compactly expresses that the counter went up, without repeating the <code>old()</code> pattern in every specification that needs to say this.</p>
+<p>Two-state spec functions can also be used with state labels. When used with <code>|~</code>, the <code>old()</code> references resolve to the labeled pre-state:</p>
+<pre><code class="language-move">spec two_increments {
+    // First increment: entry → S
+    ensures ..S |~ counter_increased(addr);
+    // Second increment: S → exit
+    ensures S.. |~ counter_increased(addr);
+}
+</code></pre>
+<p>Here <code>counter_increased</code> is evaluated twice with different state pairs: first between the function’s entry and state <code>S</code>, then between <code>S</code> and the function’s exit.</p>
+<p>Spec functions without <code>old()</code> can be composed with two-state spec functions:</p>
+<pre><code class="language-move">spec fun counter_is_positive(addr: address): bool {
+    Counter[addr].value &gt; 0
+}
+
+spec fun counter_ok(addr: address): bool {
+    counter_is_positive(addr)  // transitive: reads Counter in current state
+}
+</code></pre>
+<p>The prover discovers the memory footprint of spec functions transitively through the call chain, so even wrapper spec functions that don’t directly reference a resource will receive the correct memory parameters.</p>
+<h3 id="two-state-spec-functions-with-behavioral-predicates"><a class="header" href="#two-state-spec-functions-with-behavioral-predicates">Two-State Spec Functions with Behavioral Predicates</a></h3>
+<p>Two-state spec functions work seamlessly with behavioral predicates and closures. When a closure’s inline spec uses a two-state spec function, the prover correctly threads the state labels through the behavioral predicate evaluation:</p>
+<pre><code class="language-move">spec fun counter_increased(addr: address): bool {
+    old(Counter[addr].value) &lt; Counter[addr].value
+}
+
+fun apply(f: |address|, x: address) {
+    f(x)
+}
+spec apply {
+    pragma opaque;
+    reads_of&lt;f&gt; Config;
+    modifies_of&lt;f&gt;(a: address) Counter[a];
+    ensures ensures_of&lt;f&gt;(x);
+    aborts_if aborts_of&lt;f&gt;(x);
+}
+
+fun test_uses_old_in_closure(addr: address) acquires Counter, Config {
+    apply(|a| increment_if_active(a) spec {
+        modifies Counter[a];
+        ensures Config[a].active ==&gt; counter_increased(a);
+    }, addr);
+}
+spec test_uses_old_in_closure {
+    // Config is read-only, so it's unchanged
+    ensures Config[addr] == old(Config[addr]);
+}
+</code></pre>
+<p>The prover handles the dual-state memory parameters: <code>old()</code> inside <code>counter_increased</code> resolves to the state before the closure executed, while unqualified resource references resolve to the state after the closure executed. Combined with the <code>reads_of</code> declaration that marks <code>Config</code> as reads-only and the <code>modifies_of</code> declaration that restricts <code>Counter</code> modifications to address <code>a</code>, the prover can establish that <code>Config</code> is unchanged while <code>Counter</code> may have been modified.</p>
+
+                    </main>
+
+                    <nav class="nav-wrapper" aria-label="Page navigation">
+                        <!-- Mobile navigation buttons -->
+                            <a rel="prev" href="spec-lang.html" class="mobile-nav-chapters previous" title="Previous chapter" aria-label="Previous chapter" aria-keyshortcuts="Left">
+                                <span class=fa-svg><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 320 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M41.4 233.4c-12.5 12.5-12.5 32.8 0 45.3l160 160c12.5 12.5 32.8 12.5 45.3 0s12.5-32.8 0-45.3L109.3 256 246.6 118.6c12.5-12.5 12.5-32.8 0-45.3s-32.8-12.5-45.3 0l-160 160z"/></svg></span>
+                            </a>
+
+                            <a rel="next prefetch" href="spec-proofs.html" class="mobile-nav-chapters next" title="Next chapter" aria-label="Next chapter" aria-keyshortcuts="Right">
+                                <span class=fa-svg><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 320 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M278.6 233.4c12.5 12.5 12.5 32.8 0 45.3l-160 160c-12.5 12.5-32.8 12.5-45.3 0s-12.5-32.8 0-45.3L210.7 256 73.4 118.6c-12.5-12.5-12.5-32.8 0-45.3s32.8-12.5 45.3 0l160 160z"/></svg></span>
+                            </a>
+
+                        <div style="clear: both"></div>
+                    </nav>
+                </div>
+            </div>
+
+            <nav class="nav-wide-wrapper" aria-label="Page navigation">
+                    <a rel="prev" href="spec-lang.html" class="nav-chapters previous" title="Previous chapter" aria-label="Previous chapter" aria-keyshortcuts="Left">
+                        <span class=fa-svg><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 320 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M41.4 233.4c-12.5 12.5-12.5 32.8 0 45.3l160 160c12.5 12.5 32.8 12.5 45.3 0s12.5-32.8 0-45.3L109.3 256 246.6 118.6c12.5-12.5 12.5-32.8 0-45.3s-32.8-12.5-45.3 0l-160 160z"/></svg></span>
+                    </a>
+
+                    <a rel="next prefetch" href="spec-proofs.html" class="nav-chapters next" title="Next chapter" aria-label="Next chapter" aria-keyshortcuts="Right">
+                        <span class=fa-svg><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 320 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M278.6 233.4c12.5 12.5 12.5 32.8 0 45.3l-160 160c-12.5 12.5-32.8 12.5-45.3 0s-12.5-32.8 0-45.3L210.7 256 73.4 118.6c-12.5-12.5-12.5-32.8 0-45.3s32.8-12.5 45.3 0l160 160z"/></svg></span>
+                    </a>
+            </nav>
+
+        </div>
+
+        <template id=fa-eye><span class=fa-svg><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 576 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M288 32c-80.8 0-145.5 36.8-192.6 80.6C48.6 156 17.3 208 2.5 243.7c-3.3 7.9-3.3 16.7 0 24.6C17.3 304 48.6 356 95.4 399.4C142.5 443.2 207.2 480 288 480s145.5-36.8 192.6-80.6c46.8-43.5 78.1-95.4 93-131.1c3.3-7.9 3.3-16.7 0-24.6c-14.9-35.7-46.2-87.7-93-131.1C433.5 68.8 368.8 32 288 32zM432 256c0 79.5-64.5 144-144 144s-144-64.5-144-144s64.5-144 144-144s144 64.5 144 144zM288 192c0 35.3-28.7 64-64 64c-11.5 0-22.3-3-31.6-8.4c-.2 2.8-.4 5.5-.4 8.4c0 53 43 96 96 96s96-43 96-96s-43-96-96-96c-2.8 0-5.6 .1-8.4 .4c5.3 9.3 8.4 20.1 8.4 31.6z"/></svg></span></template>
+        <template id=fa-eye-slash><span class=fa-svg><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 640 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M38.8 5.1C28.4-3.1 13.3-1.2 5.1 9.2S-1.2 34.7 9.2 42.9l592 464c10.4 8.2 25.5 6.3 33.7-4.1s6.3-25.5-4.1-33.7L525.6 386.7c39.6-40.6 66.4-86.1 79.9-118.4c3.3-7.9 3.3-16.7 0-24.6c-14.9-35.7-46.2-87.7-93-131.1C465.5 68.8 400.8 32 320 32c-68.2 0-125 26.3-169.3 60.8L38.8 5.1zM223.1 149.5C248.6 126.2 282.7 112 320 112c79.5 0 144 64.5 144 144c0 24.9-6.3 48.3-17.4 68.7L408 294.5c5.2-11.8 8-24.8 8-38.5c0-53-43-96-96-96c-2.8 0-5.6 .1-8.4 .4c5.3 9.3 8.4 20.1 8.4 31.6c0 10.2-2.4 19.8-6.6 28.3l-90.3-70.8zm223.1 298L373 389.9c-16.4 6.5-34.3 10.1-53 10.1c-79.5 0-144-64.5-144-144c0-6.9 .5-13.6 1.4-20.2L83.1 161.5C60.3 191.2 44 220.8 34.5 243.7c-3.3 7.9-3.3 16.7 0 24.6c14.9 35.7 46.2 87.7 93 131.1C174.5 443.2 239.2 480 320 480c47.8 0 89.9-12.9 126.2-32.5z"/></svg></span></template>
+        <template id=fa-copy><span class=fa-svg><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M502.6 70.63l-61.25-61.25C435.4 3.371 427.2 0 418.7 0H255.1c-35.35 0-64 28.66-64 64l.0195 256C192 355.4 220.7 384 256 384h192c35.2 0 64-28.8 64-64V93.25C512 84.77 508.6 76.63 502.6 70.63zM464 320c0 8.836-7.164 16-16 16H255.1c-8.838 0-16-7.164-16-16L239.1 64.13c0-8.836 7.164-16 16-16h128L384 96c0 17.67 14.33 32 32 32h47.1V320zM272 448c0 8.836-7.164 16-16 16H63.1c-8.838 0-16-7.164-16-16L47.98 192.1c0-8.836 7.164-16 16-16H160V128H63.99c-35.35 0-64 28.65-64 64l.0098 256C.002 483.3 28.66 512 64 512h192c35.2 0 64-28.8 64-64v-32h-47.1L272 448z"/></svg></span></template>
+        <template id=fa-play><span class=fa-svg><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 384 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M73 39c-14.8-9.1-33.4-9.4-48.5-.9S0 62.6 0 80V432c0 17.4 9.4 33.4 24.5 41.9s33.7 8.1 48.5-.9L361 297c14.3-8.7 23-24.2 23-41s-8.7-32.2-23-41L73 39z"/></svg></span></template>
+        <template id=fa-clock-rotate-left><span class=fa-svg><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M75 75L41 41C25.9 25.9 0 36.6 0 57.9V168c0 13.3 10.7 24 24 24H134.1c21.4 0 32.1-25.9 17-41l-30.8-30.8C155 85.5 203 64 256 64c106 0 192 86 192 192s-86 192-192 192c-40.8 0-78.6-12.7-109.7-34.4c-14.5-10.1-34.4-6.6-44.6 7.9s-6.6 34.4 7.9 44.6C151.2 495 201.7 512 256 512c141.4 0 256-114.6 256-256S397.4 0 256 0C185.3 0 121.3 28.7 75 75zm181 53c-13.3 0-24 10.7-24 24V256c0 6.4 2.5 12.5 7 17l72 72c9.4 9.4 24.6 9.4 33.9 0s9.4-24.6 0-33.9l-65-65V152c0-13.3-10.7-24-24-24z"/></svg></span></template>
+
+
+
+        <script>
+            window.playground_copyable = true;
+        </script>
+
+
+        <script src="elasticlunr-ef4e11c1.min.js"></script>
+        <script src="mark-09e88c2c.min.js"></script>
+        <script src="searcher-c2a407aa.js"></script>
+
+        <script src="clipboard-1626706a.min.js"></script>
+        <script src="highlight-abc7f01d.js"></script>
+        <script src="book-a0b12cfe.js"></script>
+
+        <!-- Custom JS scripts -->
+
+
+
+    </div>
+    </body>
+</html>

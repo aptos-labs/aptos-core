@@ -35,10 +35,10 @@
             const path_to_root = "";
             const default_light_theme = "light";
             const default_dark_theme = "navy";
-            window.path_to_searchindex_js = "searchindex-ec2ebe67.js";
+            window.path_to_searchindex_js = "searchindex-9dd572a7.js";
         </script>
         <!-- Start loading toc.js asap -->
-        <script src="toc-cc3fa448.js"></script>
+        <script src="toc-d9956b74.js"></script>
     </head>
     <body>
     <div id="mdbook-help-container">
@@ -274,7 +274,7 @@ to <code>9</code>. Variable names must start with either an underscore <code>_</
 }
 </code></pre>
 <h3 id="type-annotations"><a class="header" href="#type-annotations">Type annotations</a></h3>
-<p>The type of local variable can almost always be inferred by Move’s type system. However, Move
+<p>The type of a local variable can almost always be inferred by Move’s type system. However, Move
 allows explicit type annotations that can be useful for readability, clarity, or debuggability. The
 syntax for adding a type annotation is:</p>
 <pre><code class="language-move">script {
@@ -339,7 +339,7 @@ annotation is required. For example, this code:</p>
 variables, but the example is still helpful for understanding this problem.</p>
 <h3 id="multiple-declarations-with-tuples"><a class="header" href="#multiple-declarations-with-tuples">Multiple declarations with tuples</a></h3>
 <p><code>let</code> can introduce more than one local at a time using tuples. The locals declared inside the
-parenthesis are initialized to the corresponding values from the tuple.</p>
+parentheses are initialized to the corresponding values from the tuple.</p>
 <pre><code class="language-move">script {
   fun example() {
     let () = ();
@@ -507,7 +507,7 @@ will be ignored and not introduce a new variable</p>
 }
 </code></pre>
 <h3 id="general-let-grammar"><a class="header" href="#general-let-grammar">General <code>let</code> grammar</a></h3>
-<p>All the different structures in <code>let</code> can be combined! With that we arrive at this general
+<p>All the different structures in <code>let</code> can be combined! With that, we arrive at this general
 grammar for <code>let</code> statements:</p>
 <blockquote>
 <p><em>let-binding</em> → <strong>let</strong> <em>pattern-or-list</em> <em>type-annotation</em><sub><em>opt</em></sub> <em>initializer</em><sub><em>opt</em></sub></p>
@@ -950,7 +950,7 @@ the local variable is unavailable.</p>
 <h3 id="safety"><a class="header" href="#safety">Safety</a></h3>
 <p>Move’s type system will prevent a value from being used after it is moved. This is the same safety
 check described in <a href="#let-bindings"><code>let</code> declaration</a> that prevents local variables from being used
-before it is assigned a value.</p>
+before they are assigned a value.</p>
 <h3 id="inference"><a class="header" href="#inference">Inference</a></h3>
 <p>As mentioned above, the Move compiler will infer a <code>copy</code> or <code>move</code> if one is not indicated. The
 algorithm for doing so is quite simple:</p>

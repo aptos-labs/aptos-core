@@ -35,10 +35,10 @@
             const path_to_root = "";
             const default_light_theme = "light";
             const default_dark_theme = "navy";
-            window.path_to_searchindex_js = "searchindex-ec2ebe67.js";
+            window.path_to_searchindex_js = "searchindex-9dd572a7.js";
         </script>
         <!-- Start loading toc.js asap -->
-        <script src="toc-cc3fa448.js"></script>
+        <script src="toc-d9956b74.js"></script>
     </head>
     <body>
     <div id="mdbook-help-container">
@@ -221,7 +221,7 @@ script {
 <li>functions defined in another module, or</li>
 <li>the function defined in a script.</li>
 </ul>
-<p>There are also no restrictions for what the argument types a public function can take and its return type.</p>
+<p>There are also no restrictions on what argument types a public function can take or on what its return type can be.</p>
 <pre><code class="language-move">address 0x42 {
 module m {
     public fun foo(): u64 { 0 }
@@ -243,8 +243,8 @@ script {
 }
 </code></pre>
 <h3 id="package-visibility"><a class="header" href="#package-visibility"><code>package</code> visibility</a></h3>
-<p><em>Since Language Version 2.0</em></p>
-<p>A <code>package</code> function can be only called within the same package. The notion of a package is
+<p><em>Since language version 2.0</em></p>
+<p>A <code>package</code> function can only be called within the same package. The notion of a package is
 defined by the hosting environment of Move, and not explicit in the language. Typically, the package
 is defined by a manifest file <code>Move.toml</code> which is processed by the build environment.</p>
 <p>The following works, provided the two modules belong to the same package and are at the same address:</p>
@@ -259,11 +259,11 @@ module 0x42::other {
 }
 </code></pre>
 <p>An attempt to access <code>0x42::m::foo</code> from another package will fail at compile time.</p>
-<p>In addition to the notation <code>package fun</code>, also the longer notation <code>public(package) fun</code> is supported.</p>
-<p>Notice that package visibility is a compile time concept which is reduced by the compiler to friend visibility (described <a href="#friend-visibility">below</a>), which can be verified by the Move VM. The Move VM guarantees that friend functions
+<p>In addition to the notation <code>package fun</code>, the longer notation <code>public(package) fun</code> is also supported.</p>
+<p>Notice that package visibility is a compile-time concept that is reduced by the compiler to friend visibility (described <a href="#friend-visibility">below</a>), which can be verified by the Move VM. The Move VM guarantees that friend functions
 cannot be called across address boundaries, independent of what package system a compilation environment supports.</p>
 <h4 id="publicfriend-visibility"><a class="header" href="#publicfriend-visibility"><code>public(friend)</code> visibility</a></h4>
-<p><em>Since Language Version 2.0</em>, <code>friend fun</code> replaces <code>public(friend) fun</code>. The old notation is still supported.</p>
+<p><em>Since language version 2.0</em>, <code>friend fun</code> replaces <code>public(friend) fun</code>. The old notation is still supported.</p>
 <p>The <code>public(friend)</code> visibility modifier is a more restricted form of the <code>public</code> modifier to give more control about where a function can be used. A <code>public(friend)</code> function can be called by:</p>
 <ul>
 <li>other functions defined in the same module, or</li>
@@ -313,7 +313,7 @@ script {
 <h3 id="entry-modifier"><a class="header" href="#entry-modifier"><code>entry</code> modifier</a></h3>
 <p>The <code>entry</code> modifier is designed to allow module functions to be safely and directly invoked much like scripts. This allows module writers to specify which functions can be invoked to begin execution. The module writer then knows that any non-<code>entry</code> function will be called from a Move program already in execution.</p>
 <p>Essentially, <code>entry</code> functions are the “main” functions of a module, and they specify where Move programs start executing.</p>
-<p>Note though, an <code>entry</code> function <em>can</em> still be called by other Move functions. So while they <em>can</em> serve as the start of a Move program, they aren’t restricted to that case.</p>
+<p>Note, though, that an <code>entry</code> function <em>can</em> still be called by other Move functions. So while they <em>can</em> serve as the start of a Move program, they aren’t restricted to that case.</p>
 <p>For example:</p>
 <pre><code class="language-move">address 0x42 {
 module m {
@@ -369,7 +369,7 @@ script {
     }
 }
 </code></pre>
-<p>Entry functions can accept parameters that are: primitive types, reference to a
+<p>Entry functions can accept parameters of the following types: primitive types, references to a
 <code>signer</code>, vectors (where the element type is itself acceptable),
 and certain standard library types such as <code>String</code>, <code>Object</code>, and <code>Option</code>.
 Entry functions must not have any return values.</p>
@@ -398,7 +398,7 @@ Entry functions must not have any return values.</p>
 </code></pre>
 <p>For more details, see <a href="./generics.html">Move generics</a>.</p>
 <h3 id="parameters"><a class="header" href="#parameters">Parameters</a></h3>
-<p>Functions parameters are declared with a local variable name followed by a type annotation</p>
+<p>Function parameters are declared with a local variable name followed by a type annotation:</p>
 <pre><code class="language-move">module 0x42::example {
     fun add(x: u64, y: u64): u64 { x + y }
 }
@@ -434,7 +434,7 @@ Entry functions must not have any return values.</p>
     }
 }
 </code></pre>
-<p><code>acquires</code> annotations must also be added for transitive calls within the module. Calls to these functions from another module do not need to annotated with these acquires because one module cannot access resources declared in another module–so the annotation is not needed to ensure reference safety.</p>
+<p><code>acquires</code> annotations must also be added for transitive calls within the module. Calls to these functions from another module do not need to be annotated with these acquires because one module cannot access resources declared in another module — so the annotation is not needed to ensure reference safety.</p>
 <pre><code class="language-move">module 0x42::example {
 
     struct Balance has key { value: u64 }
@@ -490,7 +490,7 @@ module 0x42::other {
 </code></pre>
 <p>Here <code>: u64</code> indicates that the function’s return type is <code>u64</code>.</p>
 <blockquote>
-<p><strong>Note:</strong> A function can return an immutable <code>&amp;</code> or mutable <code>&amp;mut</code> <a href="./references.html">reference</a> if derived from an input reference. Keep in mind, this means that a function <a href="./references.html#references-cannot-be-stored">cannot return a reference to global storage</a> unless it is an <a href="#inline-functions">inline function</a>.</p>
+<p><strong>Note:</strong> A function can return an immutable <code>&amp;</code> or mutable <code>&amp;mut</code> <a href="./references.html">reference</a> if derived from an input reference. Keep in mind that this means a function <a href="./references.html#references-cannot-be-stored">cannot return a reference to global storage</a> unless it is an <a href="#inline-functions">inline function</a>.</p>
 </blockquote>
 <p>Using tuples, a function can return multiple values:</p>
 <pre><code class="language-move">module 0x42::example {
@@ -648,7 +648,7 @@ script {
 </code></pre>
 <h2 id="inline-functions"><a class="header" href="#inline-functions">Inline Functions</a></h2>
 <p>Inline functions are functions whose bodies are expanded in place at the caller location during compile time.
-Thus, inline functions do not appear in Move bytecode as a separate functions: all calls to them are expanded away by the compiler.
+Thus, inline functions do not appear in Move bytecode as separate functions: all calls to them are expanded away by the compiler.
 In certain circumstances, they may lead to faster execution and save gas.
 However, users should be aware that they could lead to larger bytecode size: excessive inlining potentially triggers various size restrictions.</p>
 <p>One can define an inline function by adding the <code>inline</code> keyword to a function declaration as shown below:</p>
@@ -766,9 +766,9 @@ probably explain any underlying restrictions on reference parameters and results
 </code></pre>
 <h2 id="function-values"><a class="header" href="#function-values">Function Values</a></h2>
 <p><em>Since language version 2.2</em></p>
-<p>Move supports <em>function values</em> as first-class citizen of the language. A function value is constructed from the name of a function or by a lambda expression, and is evaluated by passing parameters to it and causing the underlying function to be executed. This feature is often also called <em>dynamic dispatch</em>. Which concrete function is called, is not known to the caller, and determined from the runtime value. Dynamic dispatch is an important tool for composing applications. Move makes dynamic dispatch safe by providing builtin protection mechanisms against reentrancy, which can be further refined by user choice.</p>
+<p>Move supports <em>function values</em> as first-class citizens of the language. A function value is constructed from the name of a function or by a lambda expression, and is evaluated by passing parameters to it and causing the underlying function to be executed. This feature is often called <em>dynamic dispatch</em>. Which concrete function is called is not known to the caller and is determined by the runtime value. Dynamic dispatch is an important tool for composing applications. Move makes dynamic dispatch safe by providing builtin protection mechanisms against reentrancy, which can be further refined by user choice.</p>
 <h3 id="function-types"><a class="header" href="#function-types">Function Types</a></h3>
-<p>The type of functions values is already known from <a href="#function-parameters-and-lambda-expressions">inline functions</a>. A function type is denoted, for example, as <code>|u64|bool</code>, indicating a function which takes a number and returns a boolean. Lists of types are separated by comma, as in <code>|u64, bool|(bool,u4)</code>.</p>
+<p>The type of function values is already known from <a href="#function-parameters-and-lambda-expressions">inline functions</a>. A function type is denoted, for example, as <code>|u64|bool</code>, indicating a function that takes a number and returns a boolean. Lists of types are separated by commas, as in <code>|u64, bool|(bool, u8)</code>.</p>
 <p>Function types can have associated abilities, written as <code>|u64|bool has copy</code>. Multiple abilities are separated by plus, as in <code>|u64|bool has copy+drop</code>. If no abilities are provided, the value can be only moved around and evaluated (for evaluation of function values, see <a href="#function-evaluation">below</a>).</p>
 <p>Function values can be stored in fields of structs or enums. In this case, the field type inherits the abilities of the struct:</p>
 <pre><code class="language-move">struct S has key {
@@ -776,13 +776,13 @@ probably explain any underlying restrictions on reference parameters and results
 }
 </code></pre>
 <h3 id="operations-on-functions"><a class="header" href="#operations-on-functions">Operations on Functions</a></h3>
-<p>A function value is evaluated by providing the corresponding number of parameters, similar as when calling a named function. During evaluation, the function value is <em>consumed</em>. Hence if the value needs to be evaluated multiple times, its type must have the <code>copy</code> ability:</p>
+<p>A function value is evaluated by providing the corresponding number of parameters, similarly to calling a named function. During evaluation, the function value is <em>consumed</em>. Hence if the value needs to be evaluated multiple times, its type must have the <code>copy</code> ability:</p>
 <pre><code class="language-move">let f: |u64|bool has copy = |x| x &gt; 0;
 assert!(f(1) == f(2))
 </code></pre>
 <p>Function values support equality and ordering. Note that those relations are based on the name of the underlying function behind a runtime value, and do not reflect semantic equivalence.</p>
 <h3 id="function-type-wrappers"><a class="header" href="#function-type-wrappers">Function Type Wrappers</a></h3>
-<p>Function types, specifically if they come together with abilities, can be verbose, and if the same type of function type is used many times in the code, repetitive. For this purpose, Move recognizes struct wrappers around function types as a special case. They can be used to effectively create named function types:</p>
+<p>Function types, especially those with abilities, can be verbose, and repetitive when the same function type appears many times in the code. For this purpose, Move recognizes struct wrappers around function types as a special case. They can be used to effectively create named function types:</p>
 <pre><code class="language-move">struct Predicate&lt;T&gt;(|&amp;T|bool) has copy;
 </code></pre>
 <p>Move supports this feature by automatically converting function values into the wrapper type and vice versa. Examples:</p>
@@ -797,7 +797,7 @@ fun is_odd(x: u64): bool { x % 2 == 1 }
 let f: |u64|bool has copy+drop+store = is_even;
 let g: |u64|bool has copy+drop = is_odd;
 </code></pre>
-<p>A <em>persistent</em> function is required to build a storable function value because it needs to be guaranteed that the underlying function exists and can be safely restored from storage at any point in the future. However, code upgrade may change the underlying implementation of the function, while its signature is persistent.</p>
+<p>A <em>persistent</em> function is required to build a storable function value because it needs to be guaranteed that the underlying function exists and can be safely restored from storage at any point in the future. However, a code upgrade may change the underlying implementation of the function, while its signature is persistent.</p>
 <p>While <code>public</code> and <code>entry</code> functions are persistent by default, a non-public function needs to be marked with the attribute <code>#[persistent]</code> to become storable:</p>
 <pre><code class="language-move">#[persistent] fun is_odd(x: u64): bool { x % 2 == 1 }
 ...
@@ -812,7 +812,7 @@ let s = S(1);
 let add = |y| { let S(x) = s; x + y }; // s will be moved into the closure
 assert!(add(2) == 3)
 </code></pre>
-<p>Closures with captured values are lexicographical ordered using first the name of the underlying function (which maybe generated from lambda lifting), and then the captured values.</p>
+<p>Closures with captured values are lexicographically ordered using first the name of the underlying function (which may be generated from lambda lifting), and then the captured values.</p>
 <p>The type of the closure constructed by a lambda expression is inferred from the expression (for example, the type of <code>add</code> in the example above is inferred as <code>|u64|u64</code>). The abilities of this function type are derived as follows. By default, the function underlying a closure is a private function, so the function itself is <code>copy+drop</code> (and not <code>store</code>). This is intersected with the abilities of all the captured context variables. However, there is a special case for lambdas where instead of a private function an underlying persistent function can be identified, such that the lambda just ‘delays’ certain arguments of this function. This pattern is also called ‘currying’ in functional programming (named after the mathematician Curry). Here are some examples:</p>
 <pre><code class="language-move">#[persistent] fun add(x: u64, y: u64) { x + y }
 ...
@@ -834,7 +834,7 @@ let f : |&amp;u64|u64 = |y| add(x, *y)
 </code></pre>
 <h3 id="reentrancy-check"><a class="header" href="#reentrancy-check">Reentrancy Check</a></h3>
 <p>Via dynamic dispatch of function values, reentrancy of modules in a chain of function calls is possible. If module <code>m1</code> uses module <code>m2</code>, and <code>m1</code> calls <code>m2::f</code> passing a function value to it, this function value can callback into <code>m1</code>. This situation is called <em>reentrancy</em>, and is not possible in Move without function values, since the module usage relation is acyclic.</p>
-<p>The Move VM dynamically detects reentrancy of a module, and <em>locks</em> all resources declared in this module from being accessed. Thus during reentrancy of <code>m</code>, calling resource operations like <code>&amp;m::R[addr]</code>, <code>&amp;mut m::R[addr]</code>, and <code>move_from&lt;m::R&gt;</code> lead to an abort. Here is an example:</p>
+<p>The Move VM dynamically detects reentrancy of a module and <em>locks</em> all resources declared in that module from being accessed. Thus, during reentrancy of <code>m</code>, calling resource operations like <code>&amp;m::R[addr]</code>, <code>&amp;mut m::R[addr]</code>, and <code>move_from&lt;m::R&gt;</code> leads to an abort. Here is an example:</p>
 <pre><code class="language-move">module 0x42::caller {
   use 0x42::callee;
   struct R{ count: u64 } has key;
@@ -870,8 +870,8 @@ module 0x42::caller {
   }
 }
 </code></pre>
-<p>While a function with this attribute is running, all calls reentering any module will lead to an abort, given a stronger protection.</p>
-<p>The attribute <code>#[module_lock]</code> restriction is not the default behavior since it is too strong for typical patterns of higher-order programming. For example, <code>collection.find(|x| cond(x))</code> will lead to a reentrancy of the module which contains this expression, from the module which defines the collection type.</p>
+<p>While a function with this attribute is running, all calls reentering any module will lead to an abort, providing stronger protection.</p>
+<p>The <code>#[module_lock]</code> restriction is not the default behavior because it is too strong for typical patterns of higher-order programming. For example, <code>collection.find(|x| cond(x))</code> will lead to a reentrancy of the module that contains this expression, from the module that defines the collection type.</p>
 
                     </main>
 

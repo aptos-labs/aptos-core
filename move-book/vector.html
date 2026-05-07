@@ -35,10 +35,10 @@
             const path_to_root = "";
             const default_light_theme = "light";
             const default_dark_theme = "navy";
-            window.path_to_searchindex_js = "searchindex-ec2ebe67.js";
+            window.path_to_searchindex_js = "searchindex-9dd572a7.js";
         </script>
         <!-- Start loading toc.js asap -->
-        <script src="toc-cc3fa448.js"></script>
+        <script src="toc-d9956b74.js"></script>
     </head>
     <body>
     <div id="mdbook-help-container">
@@ -244,7 +244,7 @@ sequences are:</p>
 </div>
 <h4 id="hex-strings"><a class="header" href="#hex-strings">Hex Strings</a></h4>
 <p>Hex strings are quoted string literals prefixed by a <code>x</code>, e.g. <code>x"48656C6C6F210A"</code>.</p>
-<p>Each byte pair, ranging from <code>00</code> to <code>FF</code>, is interpreted as hex encoded <code>u8</code> value. So each byte
+<p>Each byte pair, ranging from <code>00</code> to <code>FF</code>, is interpreted as a hex-encoded <code>u8</code> value. So each byte
 pair corresponds to a single entry in the resulting <code>vector&lt;u8&gt;</code>.</p>
 <h4 id="example-string-literals"><a class="header" href="#example-string-literals">Example String Literals</a></h4>
 <pre><code class="language-move">script {
@@ -263,7 +263,7 @@ pair corresponds to a single entry in the resulting <code>vector&lt;u8&gt;</code
 <h2 id="operations"><a class="header" href="#operations">Operations</a></h2>
 <p><code>vector</code> provides several operations via the <code>std::vector</code> module in the Move standard
 library, as shown below. More operations may be added over time.
-Up-to-date document on <code>vector</code> can be found <a href="https://github.com/aptos-labs/aptos-core/blob/main/aptos-move/framework/move-stdlib/doc/vector.md">here</a>.</p>
+Up-to-date documentation on <code>vector</code> can be found <a href="https://github.com/aptos-labs/aptos-core/blob/main/aptos-move/framework/move-stdlib/doc/vector.md">here</a>.</p>
 <div class="table-wrapper">
 <table>
 <thead>
@@ -315,8 +315,8 @@ Up-to-date document on <code>vector</code> can be found <a href="https://github.
 <h2 id="index-notation-for-vectors"><a class="header" href="#index-notation-for-vectors">Index Notation for Vectors</a></h2>
 <p><em>Since language version 2.0</em></p>
 <p>Index notation using square brackets (<code>[]</code>) is available for vector operations, simplifying syntax
-and making programs easier to understand. The index notation is simply syntactic sugar which
-is reduced to existing operations by the compiler;  the named operations are also still supported.</p>
+and making programs easier to understand. The index notation is simply syntactic sugar that
+is reduced to existing operations by the compiler; the named operations are also still supported.</p>
 <p>The table below gives an overview of index notations for vectors:</p>
 <div class="table-wrapper">
 <table>
@@ -358,7 +358,7 @@ is reduced to existing operations by the compiler;  the named operations are als
 <h2 id="destroying-and-copying-vectors"><a class="header" href="#destroying-and-copying-vectors">Destroying and copying vectors</a></h2>
 <p>Some behaviors of <code>vector&lt;T&gt;</code> depend on the abilities of the element type, <code>T</code>. For example, vectors
 containing elements that do not have <code>drop</code> cannot be implicitly discarded like <code>v</code> in the example
-above–they must be explicitly destroyed with <code>vector::destroy_empty</code>.</p>
+above — they must be explicitly destroyed with <code>vector::destroy_empty</code>.</p>
 <p>Note that <code>vector::destroy_empty</code> will abort at runtime unless <code>vec</code> contains zero elements:</p>
 <pre><code class="language-move">script {
   fun destroy_any_vector&lt;T&gt;(vec: vector&lt;T&gt;) {

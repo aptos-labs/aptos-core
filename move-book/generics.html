@@ -35,10 +35,10 @@
             const path_to_root = "";
             const default_light_theme = "light";
             const default_dark_theme = "navy";
-            window.path_to_searchindex_js = "searchindex-ec2ebe67.js";
+            window.path_to_searchindex_js = "searchindex-9dd572a7.js";
         </script>
         <!-- Start loading toc.js asap -->
-        <script src="toc-cc3fa448.js"></script>
+        <script src="toc-d9956b74.js"></script>
     </head>
     <body>
     <div id="mdbook-help-container">
@@ -182,7 +182,7 @@
                     <main>
                         <h1 id="generics"><a class="header" href="#generics">Generics</a></h1>
 <p>Generics can be used to define functions and structs over different input data types. This language feature is sometimes referred to as <em>parametric polymorphism</em>. In Move, we will often use the term generics interchangeably with type parameters and type arguments.</p>
-<p>Generics are commonly used in library code, such as in vector, to declare code that works over any possible instantiation (that satisfies the specified constraints). In other frameworks, generic code can sometimes be used to interact with global storage many different ways that all still share the same implementation.</p>
+<p>Generics are commonly used in library code, such as in vector, to declare code that works over any possible instantiation (that satisfies the specified constraints). In other frameworks, generic code can sometimes be used to interact with global storage in many different ways that all still share the same implementation.</p>
 <h2 id="declaring-type-parameters"><a class="header" href="#declaring-type-parameters">Declaring Type Parameters</a></h2>
 <p>Both functions and structs can take a list of type parameters in their signatures, enclosed by a pair of angle brackets <code>&lt;...&gt;</code>.</p>
 <h3 id="generic-functions"><a class="header" href="#generic-functions">Generic Functions</a></h3>
@@ -206,7 +206,7 @@
   }
 }
 </code></pre>
-<p>Note that <a href="#unused-type-parameters">type parameters do not have to be used</a></p>
+<p>Note that <a href="#unused-type-parameters">type parameters do not have to be used</a>.</p>
 <h2 id="type-arguments"><a class="header" href="#type-arguments">Type Arguments</a></h2>
 <h3 id="calling-generic-functions"><a class="header" href="#calling-generic-functions">Calling Generic Functions</a></h3>
 <p>When calling a generic function, one can specify the type arguments for the function’s type parameters in a list enclosed by a pair of angle brackets.</p>
@@ -258,7 +258,7 @@
   }
 }
 </code></pre>
-<p>Note: when the compiler is unable to infer the types, you’ll need annotate them manually. A common scenario is to call a function with type parameters appearing only at return positions.</p>
+<p>Note: when the compiler is unable to infer the types, you’ll need to annotate them manually. A common scenario is to call a function with type parameters appearing only at return positions.</p>
 <pre><code class="language-move">module 0x2::m {
   use std::vector;
 
@@ -487,7 +487,7 @@ T: copy + drop + store + key
 <p>For more information, see the abilities section on <a href="./abilities.html#conditional-abilities-and-generic-types">conditional abilities and generic types</a>.</p>
 <h2 id="limitations-on-recursions"><a class="header" href="#limitations-on-recursions">Limitations on Recursions</a></h2>
 <h3 id="recursive-structs"><a class="header" href="#recursive-structs">Recursive Structs</a></h3>
-<p>Generic structs can not contain fields of the same type, either directly or indirectly, even with different type arguments. All the following struct definitions are invalid:</p>
+<p>Generic structs cannot contain fields of the same type, either directly or indirectly, even with different type arguments. All the following struct definitions are invalid:</p>
 <pre><code class="language-move">module 0x2::m {
   struct Foo&lt;T&gt; {
     x: Foo&lt;u64&gt; // error! 'Foo' containing 'Foo'
@@ -509,7 +509,7 @@ T: copy + drop + store + key
 }
 </code></pre>
 <h3 id="advanced-topic-type-level-recursions"><a class="header" href="#advanced-topic-type-level-recursions">Advanced Topic: Type-level Recursions</a></h3>
-<p>Move allows generic functions to be called recursively. However, when used in combination with generic structs, this could create an infinite number of types in certain cases, and allowing this means adding unnecessary complexity to the compiler, vm and other language components. Therefore, such recursions are forbidden.</p>
+<p>Move allows generic functions to be called recursively. However, when used in combination with generic structs, this could create an infinite number of types in certain cases, and allowing this means adding unnecessary complexity to the compiler, VM, and other language components. Therefore, such recursions are forbidden.</p>
 <p>Allowed:</p>
 <pre><code class="language-move">module 0x2::m {
   struct A&lt;T&gt; {}
@@ -557,7 +557,7 @@ T: copy + drop + store + key
   }
 }
 </code></pre>
-<p>Note, the check for type level recursions is based on a conservative analysis on the call sites and does NOT take control flow or runtime values into account.</p>
+<p>Note that the check for type-level recursions is based on a conservative analysis of the call sites and does NOT take control flow or runtime values into account.</p>
 <pre><code class="language-move">module 0x2::m {
   struct A&lt;T&gt; {}
 
@@ -568,7 +568,7 @@ T: copy + drop + store + key
   }
 }
 </code></pre>
-<p>The function in the example above will technically terminate for any given input and therefore only creating finitely many types, but it is still considered invalid by Move’s type system.</p>
+<p>The function in the example above will technically terminate for any given input and therefore create only finitely many types, but it is still considered invalid by Move’s type system.</p>
 
                     </main>
 

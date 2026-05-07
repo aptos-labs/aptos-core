@@ -36,10 +36,10 @@
             const path_to_root = "";
             const default_light_theme = "light";
             const default_dark_theme = "navy";
-            window.path_to_searchindex_js = "searchindex-ec2ebe67.js";
+            window.path_to_searchindex_js = "searchindex-9dd572a7.js";
         </script>
         <!-- Start loading toc.js asap -->
-        <script src="toc-cc3fa448.js"></script>
+        <script src="toc-d9956b74.js"></script>
     </head>
     <body>
     <div id="mdbook-help-container">
@@ -179,7 +179,7 @@
                 <div id="mdbook-content" class="content">
                     <main>
                         <h1 id="the-move-book"><a class="header" href="#the-move-book">The Move Book</a></h1>
-<p>Welcome to Move, a next generation language for secure, sandboxed, and formally
+<p>Welcome to Move, a next-generation language for secure, sandboxed, and formally
 verified programming. It has been used as the smart contract language for
 several blockchains including Aptos. Move allows developers to write programs
 that flexibly manage and transfer assets, while providing the security and
@@ -188,192 +188,20 @@ with use cases in mind outside a blockchain context as well.</p>
 <p>Move takes its cue from <a href="https://www.rust-lang.org/">Rust</a> by using resource
 types with move (hence the name) semantics as an explicit representation of
 digital assets, such as currency.</p>
-<h2 id="who-is-aptos-move-book-for"><a class="header" href="#who-is-aptos-move-book-for">Who is Aptos Move Book for?</a></h2>
+<h2 id="who-is-the-aptos-move-book-for"><a class="header" href="#who-is-the-aptos-move-book-for">Who is the Aptos Move Book for?</a></h2>
 <p>Move was designed and created as a secure, verified, yet flexible programming
-language. The first use of Move is for the implementation of the Diem
-blockchain, and it is currently being used on Aptos.</p>
+language. The first use of Move was for the implementation of the Diem
+blockchain, and it is currently used on Aptos.</p>
 <p>This book is suitable for developers with some programming experience
 and who want to begin understanding the core programming language and see
 examples of its usage.</p>
 <h2 id="where-do-i-start"><a class="header" href="#where-do-i-start">Where Do I Start?</a></h2>
-<p>Begin with understanding <a href="#modules-and-scripts">modules and scripts</a>
-and then work through the <a href="#move-tutorial">Move Tutorial</a>.</p>
-<div style="break-before: page; page-break-before: always;"></div>
-<h1 id="modules-and-scripts"><a class="header" href="#modules-and-scripts">Modules and Scripts</a></h1>
-<p>Move has two different types of programs: *<strong>Modules</strong>* and **<em>Scripts</em>**. Modules are libraries that define struct types along with functions that operate on these types. Struct types define the schema of Move’s <a href="#global-storage---structure">global storage</a>, and module functions define the rules for updating storage. Modules themselves are also stored in global storage. A scripts is an executable entrypoint similar to a <code>main</code> function in a conventional language. A script typically calls functions of a published module that perform updates to global storage. Scripts are ephemeral code snippets that are not published in global storage.</p>
-<p>A Move source file (or <strong>compilation unit</strong>) may contain multiple modules and scripts. However, publishing a module or executing a script are separate VM operations.</p>
-<h2 id="syntax"><a class="header" href="#syntax">Syntax</a></h2>
-<h3 id="scripts"><a class="header" href="#scripts">Scripts</a></h3>
-<blockquote>
-<p><strong>Note:</strong> To learn how to publish and execute a Move script, follow the <a href="https://aptos.dev/build/smart-contracts/scripts/script-tutorial">Move Scripts</a> example.</p>
-</blockquote>
-<p>A script has the following structure:</p>
-<pre><code class="language-text">script {
-    &lt;use&gt;*
-    &lt;constants&gt;*
-    fun &lt;identifier&gt;&lt;[type parameters: constraint]*&gt;([identifier: type]*) &lt;function_body&gt;
-}
-</code></pre>
-<p>A <code>script</code> block must start with all of its <a href="#uses-and-aliases"><code>use</code></a> declarations, followed by any <a href="#constants">constants</a> and (finally) the main
-<a href="#functions">function</a> declaration.
-The main function can have any name (i.e., it need not be called <code>main</code>), is the only function in a script block, can have any number of
-arguments, and must not return a value. Here is an example with each of these components:</p>
-<pre><code class="language-move">script {
-    // Import the debug module published at the named account address std.
-    use std::debug;
-
-    const ONE: u64 = 1;
-
-    fun main(x: u64) {
-        let sum = x + ONE;
-        debug::print(&amp;sum)
-    }
-}
-</code></pre>
-<p>Scripts have very limited power—they cannot declare friends, struct types or access global storage. Their primary purpose is to invoke module functions.</p>
-<h3 id="modules"><a class="header" href="#modules">Modules</a></h3>
-<p>A module has the following syntax:</p>
-<pre><code class="language-move">module &lt;address&gt;::&lt;identifier&gt; {
-    (&lt;use&gt; | &lt;friend&gt; | &lt;type&gt; | &lt;function&gt; | &lt;constant&gt;)*
-}
-</code></pre>
-<p>where <code>&lt;address&gt;</code> is a valid <a href="#address">named or literal address</a>.</p>
-<p>For example:</p>
-<pre><code class="language-move">module 0x42::example {
-    struct Example has copy, drop { i: u64 }
-
-    use std::debug;
-    friend 0x42::another_example;
-
-    const ONE: u64 = 1;
-
-    public fun print(x: u64) {
-        let sum = x + ONE;
-        let example = Example { i: sum };
-        debug::print(&amp;sum)
-    }
-}
-</code></pre>
-<p>The <code>module 0x42::example</code> part specifies that the module <code>example</code> will be published under the <a href="#address">account address</a> <code>0x42</code> in <a href="#global-storage---structure">global storage</a>.</p>
-<p>Modules can also be declared using <a href="#address">named addresses</a>. For example:</p>
-<pre><code class="language-move">module example_addr::example {
-    struct Example has copy, drop { a: address }
-
-    use std::debug;
-    friend example_addr::another_example;
-
-    public fun print() {
-        let example = Example { a: @example_addr };
-        debug::print(&amp;example)
-    }
-}
-</code></pre>
-<p>Because named addresses only exist at the source language level and during compilation,
-named addresses will be fully substituted for their value at the bytecode
-level. For example if we had the following code:</p>
-<pre><code class="language-move">script {
-    fun example() {
-        my_addr::m::foo(@my_addr);
-    }
-}
-</code></pre>
-<p>and we compiled it with <code>my_addr</code> set to <code>0xC0FFEE</code>, then it would be equivalent
-to the following operationally:</p>
-<pre><code class="language-move">script {
-    fun example() {
-        0xC0FFEE::m::foo(@0xC0FFEE);
-    }
-}
-</code></pre>
-<p>However, at the source level, these <em>are not equivalent</em>—the function
-<code>m::foo</code> <em>must</em> be accessed through the <code>my_addr</code> named address, and not through
-the numerical value assigned to that address.</p>
-<p>Module names can start with letters <code>a</code> to <code>z</code> or letters <code>A</code> to <code>Z</code>. After the first character, module names can contain underscores <code>_</code>, letters <code>a</code> to <code>z</code>, letters <code>A</code> to <code>Z</code>, or digits <code>0</code> to <code>9</code>.</p>
-<pre><code class="language-move">module my_module {}
-module foo_bar_42 {}
-</code></pre>
-<p>Typically, module names start with a lowercase letter. A module named <code>my_module</code> should be stored in a source file named <code>my_module.move</code>.</p>
-<p>All elements inside a <code>module</code> block can appear in any order.
-Fundamentally, a module is a collection of <a href="#structs-and-resources"><code>types</code></a> and <a href="#functions"><code>functions</code></a>.
-The <a href="#uses-and-aliases"><code>use</code></a> keyword is used to import types from other modules.
-The <a href="#friends"><code>friend</code></a> keyword specifies a list of trusted modules.
-The <a href="#constants"><code>const</code></a> keyword defines private constants that can be used in the functions of a module.</p>
-<div style="break-before: page; page-break-before: always;"></div>
-<h1 id="move-tutorial"><a class="header" href="#move-tutorial">Move Tutorial</a></h1>
-<p>Please refer to the <a href="https://github.com/aptos-labs/aptos-core/tree/main/aptos-move/move-examples/move-tutorial">Move Core Language Tutorial</a>.</p>
-<div style="break-before: page; page-break-before: always;"></div>
-<h1 id="move-2-release-notes"><a class="header" href="#move-2-release-notes">Move 2 Release Notes</a></h1>
-<p>The Move 2 language releases are described on this page. The reference documentation of the new features is integrated into the book, and marked in the text with “<em>Since language version 2.n</em>”.</p>
-<h2 id="move-24"><a class="header" href="#move-24">Move 2.4</a></h2>
-<p>The Move 2.4 language release adds the following features to Move:</p>
-<ul>
-<li><strong>Struct and Enum Visibility Modifiers</strong>: Structs and enums can now be declared with <code>public</code>, <code>package</code>, or <code>friend</code> visibility modifiers. This allows external modules to construct, destruct, pattern-match, and access or modify fields of the type, lifting the previous restriction that limited all such operations to the defining module. See the reference docs for <a href="#struct-visibility">structs</a> and <a href="#enum-visibility">enums</a>.</li>
-<li><strong>Compositional Specifications for the Move Prover</strong>: The Move Specification Language gains a set of compositional constructs supporting higher-order functions, frame conditions, intermediate-state reasoning, and proof guidance. See the reference docs for <a href="#behavioral-predicates">Behavioral Predicates</a>, <a href="#access-specifiers-and-frame-conditions">Access Specifiers and Frame Conditions</a>, <a href="#state-labels">State Labels</a>, <a href="#two-state-specification-functions">Two-State Specification Functions</a>, <a href="#proofs-and-lemmas">Proofs and Lemmas</a>, and <a href="#specification-inference">Specification Inference</a>.</li>
-</ul>
-<h2 id="move-23"><a class="header" href="#move-23">Move 2.3</a></h2>
-<p>The Move 2.3 language release adds the following features to Move:</p>
-<ul>
-<li><strong>Signed Integer Types</strong>: Move now supports <code>i8</code>, <code>i16</code>, <code>i32</code>, <code>i64</code>, <code>i128</code>, and <code>i256</code> signed integer types. See the <a href="#integers">reference doc here</a>.</li>
-<li><strong>Builtin Constants</strong>: Move now supports a number of builtin constants, namely min/max values for integer types (e.g. <code>MAX_U64</code>, <code>MIN_I32</code>), as well as a constant to determine whether code is running in testing mode. See the <a href="#builtin-constants">reference doc here</a>.</li>
-</ul>
-<h2 id="move-22"><a class="header" href="#move-22">Move 2.2</a></h2>
-<p>The Move 2.2 language release adds the following features to Move:</p>
-<ul>
-<li><strong>Optional Acquires</strong>: The <code>acquires</code> annotation on function declarations can be omitted, to be inferred by the compiler.</li>
-<li><strong>Function Values</strong>: Move now supports function values, which can be passed around as parameters and stored in resources. See the <a href="#function-values">reference doc here</a>.</li>
-<li><strong>Comparison Operations</strong>: Move now supports comparison operations (<code>&lt;</code>, <code>&gt;</code>, <code>&lt;=</code>, <code>&gt;=</code>) on all types. See the <a href="#typing-1">reference doc here</a>.</li>
-</ul>
-<h2 id="move-21"><a class="header" href="#move-21">Move 2.1</a></h2>
-<p>The Move 2.1 language release adds the following features to Move:</p>
-<ul>
-<li>
-<p><strong>Compound Assignments</strong> One can now use <code>x += n</code>, <code>x -= n</code>, etc. to combine assignments and arithmetic operations. See <a href="#compound-assignments">reference doc here</a> for the supported operations.</p>
-</li>
-<li>
-<p><strong>Loop Labels</strong> One can now use labels for loops and have a <code>break</code> or <code>continue</code> expression refer to those labels. This allows to continue or break outer loops from within nested loops. See <a href="#loop-labels">reference doc here</a>.</p>
-</li>
-<li>
-<p><strong>Underscore function parameters are wildcards, not symbols</strong> Function parameters named <code>_</code> no longer act like variables: they do not bind a value, and multiple such parameters to a function does not cause a conflict.  Using <code>_</code> in a value expression will yield an error, as it has no value.  This makes the behavior of <code>_</code> more like the wildcard it is in patterns and let expressions, where it does not bind a value.</p>
-</li>
-</ul>
-<h2 id="move-20"><a class="header" href="#move-20">Move 2.0</a></h2>
-<p>The Move 2.0 language release adds the following features to Move:</p>
-<ul>
-<li>
-<p><strong>Enum Types</strong> add the option to define different variants of data layout in one storable type. They are documented in the <a href="#enums">Enum Type section</a>.</p>
-</li>
-<li>
-<p><strong>Receiver Style Functions</strong> add the ability to call functions in the familiar notation <code>value.func(arg)</code>. They are documented in <a href="#dot-receiver-function-call-style">this section</a>.</p>
-</li>
-<li>
-<p><strong>Index Notation</strong> allows access to <a href="#index-notation-for-vectors">elements of vectors</a> and of <a href="#index-notation-for-storage-operators">resource storage</a> with notations like <code>&amp;mut vector[index]</code>, or <code>&amp;mut Resource[addr]</code>, respectively.</p>
-</li>
-<li>
-<p><strong>Positional Structs</strong> allow to define wrapper types such as <code>struct Wrapped(u64)</code>. Positional structs are described <a href="#positional-structs">here</a>. Enum variants are also allowed to be positional.</p>
-</li>
-<li>
-<p><strong>Dot-dot pattern wildcards</strong> enable statements like <code>let Struct{x, ..} = value</code> to match selective parts of data. They are described <a href="#partial-patterns">here</a>. Those patterns are also allowed for enum variants.</p>
-</li>
-<li>
-<p><strong>Package visibility</strong> allows to declare a function to be visible anywhere inside, but not outside a package. Friend functions continue to be supported, although package visibility is in many cases more suitable. As a more concise notation, package and friend functions can be simply declared as <code>package fun</code> or <code>friend fun</code>, respectively, instead of the longer <code>public(package) fun</code> and <code>public(friend) fun</code>. This feature is documented <a href="#package-visibility">here</a>.</p>
-</li>
-<li>
-<p><strong>Assert abort code optional</strong> The <code>assert!</code> macro can now be used with just one argument, omitting the abort code, in which case a default code will be chosen. See also <a href="#assert">here</a>.</p>
-</li>
-<li>
-<p><strong>New Cast Syntax</strong> Until now, casts had to always be in parentheses, requiring code like <code>function((x as u256))</code>. This requirement is now dropped and casts can be top-level expressions without parenthesis, as in <code>function(x as u256)</code>. One still needs to write <code>(x as u64) + (y as u64)</code> in expressions. This similarly applies to the new enum variant test, <code>data is VersionedData::V1</code>.</p>
-</li>
-<li>
-<p><strong>Well-defined evaluation order</strong> The evaluation order in the cases below is now well-defined (these were previously unspecified):</p>
-<ul>
-<li>The (a) arguments to a function call, and the (b) operand expressions in a binary operation, are both evaluated from left-to-right.</li>
-<li>Given a “mutate” expression (see <a href="#mutating-through-a-reference">mutating through a reference</a>) of the form <code>*lexp = rexp</code>, where <code>lexp</code> is an expression of type <code>&amp;mut T</code> and <code>rexp</code> is an expression of type <code>T</code>, <code>rexp</code> is evaluated first, followed by <code>lexp</code>.</li>
-</ul>
-</li>
-<li>
-<p><strong>Bug fix for acquires annotation</strong> <a href="#acquires">A function should be annotated with <code>acquires</code></a> if and only if it accesses a resource using <code>move_from</code>, <code>borrow_global</code>, or <code>borrow_global_mut</code>, either directly or transitively through a call. Otherwise, it is an error. Previously, when the transitive call graph included a cycle, such errors were not reported: this was incorrect behavior. We have now corrected this behavior to report these errors even when the transitive call graph has cycles.</p>
-</li>
-</ul>
+<p>Begin by working through the
+<a href="https://github.com/aptos-labs/aptos-core/tree/main/aptos-move/move-examples/move-tutorial">Move Core Language Tutorial</a>.
+The <a href="#integers">Primitive Types</a> and <a href="#local-variables-and-scope">Basic Concepts</a>
+sections then walk through the language feature by feature, including
+<a href="#modules-and-scripts">modules and scripts</a>. For an overview of what each
+release of the language adds, see <a href="#language-versions">Language Versions</a>.</p>
 <div style="break-before: page; page-break-before: always;"></div>
 <h1 id="integers"><a class="header" href="#integers">Integers</a></h1>
 <p>Move supports six unsigned integer types: <code>u8</code>, <code>u16</code>, <code>u32</code>, <code>u64</code>, <code>u128</code>, and <code>u256</code>. Values of these types range from 0 to a maximum that depends on the size of the type.</p>
@@ -409,9 +237,9 @@ The <a href="#constants"><code>const</code></a> keyword defines private constant
 </table>
 </div>
 <h2 id="literals"><a class="header" href="#literals">Literals</a></h2>
-<p>Literal values for these types are specified either as a sequence of digits (e.g.,<code>112</code>) or as hex literals, e.g., <code>0xFF</code>. The type of the literal can optionally be added as a suffix, e.g., <code>112u8</code>. If the type is not specified, the compiler will try to infer the type from the context where the literal is used. If the type cannot be inferred, it is assumed to be <code>u64</code>.</p>
-<p>Number literals can be separated by underscores for grouping and readability. (e.g.,<code>1_234_5678</code>, <code>1_000u128</code>, <code>0xAB_CD_12_35</code>).</p>
-<p>To denote a negative number, it can be prefixed by the <code>-</code> sign. (e.g., <code>-112</code>)</p>
+<p>Literal values for these types are specified either as a sequence of digits (e.g., <code>112</code>) or as hex literals, e.g., <code>0xFF</code>. The type of the literal can optionally be added as a suffix, e.g., <code>112u8</code>. If the type is not specified, the compiler will try to infer the type from the context where the literal is used. If the type cannot be inferred, it is assumed to be <code>u64</code>.</p>
+<p>Number literals can be separated by underscores for grouping and readability (e.g., <code>1_234_5678</code>, <code>1_000u128</code>, <code>0xAB_CD_12_35</code>).</p>
+<p>To denote a negative number, prefix it with a <code>-</code> sign (e.g., <code>-112</code>).</p>
 <p>If a literal is too large for its specified (or inferred) size range, an error is reported.</p>
 <h3 id="examples"><a class="header" href="#examples">Examples</a></h3>
 <pre><code class="language-move">script {
@@ -473,7 +301,7 @@ The <a href="#constants"><code>const</code></a> keyword defines private constant
 <tr><td><code>a - b</code></td><td>subtraction</td><td>Result is less than zero</td></tr>
 <tr><td><code>a * b</code></td><td>multiplication</td><td>Result is too large/small for the integer type</td></tr>
 <tr><td><code>a % b</code></td><td>modular division</td><td>The divisor is <code>0</code></td></tr>
-<tr><td><code>a / b</code></td><td>truncating division</td><td>The divisor is <code>0</code>, or result overflow</td></tr>
+<tr><td><code>a / b</code></td><td>truncating division</td><td>The divisor is <code>0</code>, or the result overflows</td></tr>
 <tr><td><code>-a</code></td><td>negation</td><td>Negated result too large (e.g. <code>-MIN_I64</code>)</td></tr>
 </tbody>
 </table>
@@ -551,7 +379,7 @@ The <a href="#constants"><code>const</code></a> keyword defines private constant
 </tbody>
 </table>
 </div>
-<p>Any integer can be cast into any other integer type, including signed to unsigned and unsigned to signed, provided the target type is able to represent the source type.</p>
+<p>Any integer can be cast into any other integer type, including signed to unsigned and unsigned to signed, provided the target type is able to represent the source value.</p>
 <p>For example:</p>
 <ul>
 <li><code>(x as u8)</code></li>
@@ -561,7 +389,7 @@ The <a href="#constants"><code>const</code></a> keyword defines private constant
 <li><code>(1 + 3 as u128)</code></li>
 <li><code>(4/2 + 12345 as u256)</code></li>
 </ul>
-<p>Notice that since Language Version 2.0, casts don’t always need to be in parentheses. Thus, <code>x as u8</code> is a valid expression.</p>
+<p>Notice that since language version 2.0, casts don’t always need to be in parentheses. Thus, <code>x as u8</code> is a valid expression.</p>
 <h2 id="ownership"><a class="header" href="#ownership">Ownership</a></h2>
 <p>As with the other scalar values built-in to the language, integer values are implicitly copyable, meaning they can be copied without an explicit instruction such as <a href="#move-and-copy"><code>copy</code></a>.</p>
 <div style="break-before: page; page-break-before: always;"></div>
@@ -614,9 +442,9 @@ syntax when using an address differs depending on the context where it’s used:
 </ul>
 <p>In general, you can think of <code>@</code> as an operator that takes an address from being a namespace item to being an expression item.</p>
 <h2 id="named-addresses"><a class="header" href="#named-addresses">Named Addresses</a></h2>
-<p>Named addresses are a feature that allow identifiers to be used in place of
+<p>Named addresses are a feature that allows identifiers to be used in place of
 numerical values in any spot where addresses are used, and not just at the
-value level. Named addresses are declared and bound as top level elements
+value level. Named addresses are declared and bound as top-level elements
 (outside of modules and scripts) in Move Packages, or passed as arguments
 to the Move compiler.</p>
 <p>Named addresses only exist at the source language level and will be fully
@@ -650,7 +478,7 @@ module std::other_module {  // Can use a named address as a namespace item to de
 }
 </code></pre>
 <h2 id="global-storage-operations"><a class="header" href="#global-storage-operations">Global Storage Operations</a></h2>
-<p>The primary purpose of <code>address</code> values are to interact with the global storage operations.</p>
+<p>The primary purpose of <code>address</code> values is to interact with the global storage operations.</p>
 <p><code>address</code> values are used with the <code>exists</code>, <code>borrow_global</code>, <code>borrow_global_mut</code>, and <code>move_from</code> <a href="#global-storage---operators">operations</a>.</p>
 <p>The only global storage operation that <em>does not</em> use <code>address</code> is <code>move_to</code>, which uses <a href="#signer"><code>signer</code></a>.</p>
 <h2 id="ownership-2"><a class="header" href="#ownership-2">Ownership</a></h2>
@@ -720,7 +548,7 @@ sequences are:</p>
 </div>
 <h4 id="hex-strings"><a class="header" href="#hex-strings">Hex Strings</a></h4>
 <p>Hex strings are quoted string literals prefixed by a <code>x</code>, e.g. <code>x"48656C6C6F210A"</code>.</p>
-<p>Each byte pair, ranging from <code>00</code> to <code>FF</code>, is interpreted as hex encoded <code>u8</code> value. So each byte
+<p>Each byte pair, ranging from <code>00</code> to <code>FF</code>, is interpreted as a hex-encoded <code>u8</code> value. So each byte
 pair corresponds to a single entry in the resulting <code>vector&lt;u8&gt;</code>.</p>
 <h4 id="example-string-literals"><a class="header" href="#example-string-literals">Example String Literals</a></h4>
 <pre><code class="language-move">script {
@@ -739,7 +567,7 @@ pair corresponds to a single entry in the resulting <code>vector&lt;u8&gt;</code
 <h2 id="operations-2"><a class="header" href="#operations-2">Operations</a></h2>
 <p><code>vector</code> provides several operations via the <code>std::vector</code> module in the Move standard
 library, as shown below. More operations may be added over time.
-Up-to-date document on <code>vector</code> can be found <a href="https://github.com/aptos-labs/aptos-core/blob/main/aptos-move/framework/move-stdlib/doc/vector.md">here</a>.</p>
+Up-to-date documentation on <code>vector</code> can be found <a href="https://github.com/aptos-labs/aptos-core/blob/main/aptos-move/framework/move-stdlib/doc/vector.md">here</a>.</p>
 <div class="table-wrapper">
 <table>
 <thead>
@@ -791,8 +619,8 @@ Up-to-date document on <code>vector</code> can be found <a href="https://github.
 <h2 id="index-notation-for-vectors"><a class="header" href="#index-notation-for-vectors">Index Notation for Vectors</a></h2>
 <p><em>Since language version 2.0</em></p>
 <p>Index notation using square brackets (<code>[]</code>) is available for vector operations, simplifying syntax
-and making programs easier to understand. The index notation is simply syntactic sugar which
-is reduced to existing operations by the compiler;  the named operations are also still supported.</p>
+and making programs easier to understand. The index notation is simply syntactic sugar that
+is reduced to existing operations by the compiler; the named operations are also still supported.</p>
 <p>The table below gives an overview of index notations for vectors:</p>
 <div class="table-wrapper">
 <table>
@@ -834,7 +662,7 @@ is reduced to existing operations by the compiler;  the named operations are als
 <h2 id="destroying-and-copying-vectors"><a class="header" href="#destroying-and-copying-vectors">Destroying and copying vectors</a></h2>
 <p>Some behaviors of <code>vector&lt;T&gt;</code> depend on the abilities of the element type, <code>T</code>. For example, vectors
 containing elements that do not have <code>drop</code> cannot be implicitly discarded like <code>v</code> in the example
-above–they must be explicitly destroyed with <code>vector::destroy_empty</code>.</p>
+above — they must be explicitly destroyed with <code>vector::destroy_empty</code>.</p>
 <p>Note that <code>vector::destroy_empty</code> will abort at runtime unless <code>vec</code> contains zero elements:</p>
 <pre><code class="language-move">script {
   fun destroy_any_vector&lt;T&gt;(vec: vector&lt;T&gt;) {
@@ -879,7 +707,7 @@ signature or password).</p>
 }
 </code></pre>
 <p>However, <code>signer</code> values are special because they cannot be created via literals or
-instructions–only by the Move VM. Before the VM runs a script with parameters of type <code>signer</code>, it
+instructions — only by the Move VM. Before the VM runs a script with parameters of type <code>signer</code>, it
 will automatically create <code>signer</code> values and pass them into the script:</p>
 <pre><code class="language-move">script {
     use std::signer;
@@ -927,7 +755,7 @@ or through a <a href="#reading-and-writing-through-references">dereference <code
 only, and cannot modify the underlying value (or any of its fields). Mutable references allow for
 modifications via a write through that reference. Move’s type system enforces an ownership
 discipline that prevents reference errors.</p>
-<p>For more details on the rules of references, see <a href="#structs-and-resources">Structs and Resources</a></p>
+<p>For more details on the rules of references, see <a href="#structs-and-resources">Structs and Resources</a>.</p>
 <h2 id="reference-operators"><a class="header" href="#reference-operators">Reference Operators</a></h2>
 <p>Move provides operators for creating and extending references as well as converting a mutable
 reference to an immutable one. Here and elsewhere, we use the notation <code>e: T</code> for “expression <code>e</code>
@@ -941,7 +769,7 @@ has type <code>T</code>”.</p>
 <tr><td><code>&amp;e</code></td><td><code>&amp;T</code> where <code>e: T</code> and <code>T</code> is a non-reference type</td><td>Create an immutable reference to <code>e</code></td></tr>
 <tr><td><code>&amp;mut e</code></td><td><code>&amp;mut T</code> where <code>e: T</code> and <code>T</code> is a non-reference type</td><td>Create a mutable reference to <code>e</code>.</td></tr>
 <tr><td><code>&amp;e.f</code></td><td><code>&amp;T</code> where <code>e.f: T</code></td><td>Create an immutable reference to field <code>f</code> of struct <code>e</code>.</td></tr>
-<tr><td><code>&amp;mut e.f</code></td><td><code>&amp;mut T</code> where <code>e.f: T</code></td><td>Create a mutable reference to field <code>f</code> of struct<code>e</code>.</td></tr>
+<tr><td><code>&amp;mut e.f</code></td><td><code>&amp;mut T</code> where <code>e.f: T</code></td><td>Create a mutable reference to field <code>f</code> of struct <code>e</code>.</td></tr>
 <tr><td><code>freeze(e)</code></td><td><code>&amp;T</code> where <code>e: &amp;mut T</code></td><td>Convert the mutable reference <code>e</code> into an immutable reference.</td></tr>
 </tbody>
 </table>
@@ -981,7 +809,7 @@ extend an existing reference:</p>
 <p>Only mutable references can be written. A write <code>*x = v</code> discards the value previously stored in <code>x</code>
 and updates it with <code>v</code>.</p>
 <p>Both operations use the C-like <code>*</code> syntax. However, note that a read is an expression, whereas a
-write is a mutation that must occur on the left hand side of an equals.</p>
+write is a mutation that must occur on the left-hand side of an equals sign.</p>
 <div class="table-wrapper">
 <table>
 <thead>
@@ -1028,7 +856,7 @@ This rule prevents the destruction of resource values:</p>
   }
 }
 </code></pre>
-<p>This works because the under the hood, the compiler inserts <code>freeze</code> instructions where they are
+<p>This works because, under the hood, the compiler inserts <code>freeze</code> instructions where they are
 needed. Here are a few more examples of <code>freeze</code> inference in action:</p>
 <pre><code class="language-move">module 0x42::example {
   fun takes_immut_returns_immut(x: &amp;u64): &amp;u64 { x }
@@ -1058,7 +886,7 @@ needed. Here are a few more examples of <code>freeze</code> inference in action:
 </code></pre>
 <h3 id="subtyping"><a class="header" href="#subtyping">Subtyping</a></h3>
 <p>With this <code>freeze</code> inference, the Move type checker can view <code>&amp;mut T</code> as a subtype of <code>&amp;T</code>. As shown
-above, this means that anywhere for any expression where a <code>&amp;T</code> value is used, a <code>&amp;mut T</code> value can
+above, this means that anywhere a <code>&amp;T</code> value is expected, a <code>&amp;mut T</code> value can
 also be used. This terminology is used in error messages to concisely indicate that a <code>&amp;mut T</code> was
 needed where a <code>&amp;T</code> was supplied. For example</p>
 <pre><code class="language-move">module 0x42::example {
@@ -1107,7 +935,7 @@ error:
     │                                -------- Is not a subtype of: '&amp;mut u64'
     │
 </code></pre>
-<p>The only other types currently that has subtyping are <a href="#tuples-and-unit">tuples</a></p>
+<p>The only other type that currently has subtyping is <a href="#tuples-and-unit">tuples</a>.</p>
 <h2 id="ownership-5"><a class="header" href="#ownership-5">Ownership</a></h2>
 <p>Both mutable and immutable references can always be copied and extended <em>even if there are existing
 copies or extensions of the same reference</em>:</p>
@@ -1154,18 +982,18 @@ expressions. These expressions do not result in a concrete value at runtime (the
 the bytecode), and as a result they are very limited: they can only appear in expressions (usually
 in the return position for a function); they cannot be bound to local variables; they cannot be
 stored in structs; and tuple types cannot be used to instantiate generics.</p>
-<p>Similarly, <a href="https://en.wikipedia.org/wiki/Unit_type">unit <code>()</code></a> is a type created by the Move source language in order to be expression based.
-The unit value <code>()</code> does not result in any runtime value. We can consider unit<code>()</code> to be an empty
+<p>Similarly, <a href="https://en.wikipedia.org/wiki/Unit_type">unit <code>()</code></a> is a type created by the Move source language in order to be expression-based.
+The unit value <code>()</code> does not result in any runtime value. We can consider unit <code>()</code> to be an empty
 tuple, and any restrictions that apply to tuples also apply to unit.</p>
 <p>It might feel weird to have tuples in the language at all given these restrictions. But one of the
-most common use cases for tuples in other languages is for functions to allow functions to return
+most common use cases for tuples in other languages is to allow functions to return
 multiple values. Some languages work around this by forcing the users to write structs that contain
 the multiple return values. However, in Move, you cannot put references inside of
 <a href="#structs-and-resources">structs</a>. This required Move to support multiple return values. These
 multiple return values are all pushed on the stack at the bytecode level. At the source level, these
 multiple return values are represented using tuples.</p>
 <h2 id="literals-3"><a class="header" href="#literals-3">Literals</a></h2>
-<p>Tuples are created by a comma separated list of expressions inside of parentheses.</p>
+<p>Tuples are created by a comma-separated list of expressions inside parentheses.</p>
 <div class="table-wrapper">
 <table>
 <thead>
@@ -1238,7 +1066,7 @@ disambiguation and do not carry any other special meaning.</p>
 </code></pre>
 <p>For more details, see <a href="#local-variables-and-scope">Move Variables</a>.</p>
 <h2 id="subtyping-1"><a class="header" href="#subtyping-1">Subtyping</a></h2>
-<p>Along with references, tuples are the only other type that have <a href="https://en.wikipedia.org/wiki/Subtyping">subtyping</a> in Move. Tuples have
+<p>Along with references, tuples are the only other type that has <a href="https://en.wikipedia.org/wiki/Subtyping">subtyping</a> in Move. Tuples have
 subtyping only in the sense that they subtype with references (in a covariant way).</p>
 <p>For example:</p>
 <pre><code class="language-move">script {
@@ -1262,8 +1090,8 @@ subtyping only in the sense that they subtype with references (in a covariant wa
 </code></pre>
 <h2 id="ownership-6"><a class="header" href="#ownership-6">Ownership</a></h2>
 <p>As mentioned above, tuple values don’t really exist at runtime. And currently they cannot be stored
-into local variables because of this (but it is likely that this feature will come soon). As such,
-tuples can only be moved currently, as copying them would require putting them into a local variable
+in local variables because of this (but it is likely that this feature will come soon). As such,
+tuples can currently only be moved, as copying them would require putting them into a local variable
 first.</p>
 <div style="break-before: page; page-break-before: always;"></div>
 <h1 id="local-variables-and-scope"><a class="header" href="#local-variables-and-scope">Local Variables and Scope</a></h1>
@@ -1360,7 +1188,7 @@ to <code>9</code>. Variable names must start with either an underscore <code>_</
 }
 </code></pre>
 <h3 id="type-annotations"><a class="header" href="#type-annotations">Type annotations</a></h3>
-<p>The type of local variable can almost always be inferred by Move’s type system. However, Move
+<p>The type of a local variable can almost always be inferred by Move’s type system. However, Move
 allows explicit type annotations that can be useful for readability, clarity, or debuggability. The
 syntax for adding a type annotation is:</p>
 <pre><code class="language-move">script {
@@ -1425,7 +1253,7 @@ annotation is required. For example, this code:</p>
 variables, but the example is still helpful for understanding this problem.</p>
 <h3 id="multiple-declarations-with-tuples"><a class="header" href="#multiple-declarations-with-tuples">Multiple declarations with tuples</a></h3>
 <p><code>let</code> can introduce more than one local at a time using tuples. The locals declared inside the
-parenthesis are initialized to the corresponding values from the tuple.</p>
+parentheses are initialized to the corresponding values from the tuple.</p>
 <pre><code class="language-move">script {
   fun example() {
     let () = ();
@@ -1593,7 +1421,7 @@ will be ignored and not introduce a new variable</p>
 }
 </code></pre>
 <h3 id="general-let-grammar"><a class="header" href="#general-let-grammar">General <code>let</code> grammar</a></h3>
-<p>All the different structures in <code>let</code> can be combined! With that we arrive at this general
+<p>All the different structures in <code>let</code> can be combined! With that, we arrive at this general
 grammar for <code>let</code> statements:</p>
 <blockquote>
 <p><em>let-binding</em> → <strong>let</strong> <em>pattern-or-list</em> <em>type-annotation</em><sub><em>opt</em></sub> <em>initializer</em><sub><em>opt</em></sub></p>
@@ -2036,7 +1864,7 @@ the local variable is unavailable.</p>
 <h3 id="safety"><a class="header" href="#safety">Safety</a></h3>
 <p>Move’s type system will prevent a value from being used after it is moved. This is the same safety
 check described in <a href="#let-bindings"><code>let</code> declaration</a> that prevents local variables from being used
-before it is assigned a value.</p>
+before they are assigned a value.</p>
 <h3 id="inference"><a class="header" href="#inference">Inference</a></h3>
 <p>As mentioned above, the Move compiler will infer a <code>copy</code> or <code>move</code> if one is not indicated. The
 algorithm for doing so is quite simple:</p>
@@ -2111,7 +1939,7 @@ to the programmer (except in possible decreased time or gas cost).</li>
   }
 }
 </code></pre>
-<p>Equality and non-equality also work over user defined types!</p>
+<p>Equality and non-equality also work over user-defined types!</p>
 <pre><code class="language-move">module 0x42::example {
     struct S has copy, drop { f: u64, s: vector&lt;u8&gt; }
 
@@ -2276,7 +2104,7 @@ is more efficient.</p>
   }
 }
 </code></pre>
-<p>Prior to language version 2.2, comparison operations only work with integer types. <em>Since language
+<p>Prior to language version 2.2, comparison operations only worked with integer types. <em>Since language
 version 2.2</em>, comparison operations work with all types.</p>
 <div class="table-wrapper">
 <table>
@@ -2329,7 +2157,7 @@ the same underlying type.</p>
   }
 }
 </code></pre>
-<p>The above is equivalent to applying an explicit freeze to each mutable reference where needed</p>
+<p>The above is equivalent to applying an explicit freeze to each mutable reference where needed:</p>
 <pre><code class="language-move">script {
   fun example() {
     let i = &amp;0u64;
@@ -2370,7 +2198,7 @@ and mandate the <a href="#abilities"><code>drop</code> ability</a>.</p>
 <h1 id="abort-and-assert"><a class="header" href="#abort-and-assert">Abort and Assert</a></h1>
 <p><a href="#functions"><code>return</code></a> and <code>abort</code> are two control flow constructs that end execution, one for
 the current function and one for the entire transaction.</p>
-<p>More information on <a href="#functions"><code>return</code> can be found in the linked section</a></p>
+<p>More information on <a href="#functions"><code>return</code> can be found in the linked section</a>.</p>
 <h2 id="abort"><a class="header" href="#abort"><code>abort</code></a></h2>
 <p><code>abort</code> is an expression that takes one argument: an <strong>abort code</strong> of type <code>u64</code>. For example:</p>
 <pre><code class="language-move">abort 42
@@ -2396,7 +2224,7 @@ vector does not have two items</p>
 }
 </code></pre>
 <p>This is even more useful deep inside a control-flow construct. For example, this function checks
-that all numbers in the vector are less than the specified <code>bound</code>. And aborts otherwise</p>
+that all numbers in the vector are less than the specified <code>bound</code>, and aborts otherwise:</p>
 <pre><code class="language-move">script {
   use std::vector;
   fun check_vec(v: &amp;vector&lt;u64&gt;, bound: u64) {
@@ -2422,7 +2250,7 @@ does not exist at the bytecode level. It is replaced inside the compiler with</p
 <pre><code class="language-move">if (condition) () else abort code
 </code></pre>
 <p>Since Move 2.0, <code>assert</code> without an error code is supported. If this assert is used, the
-abort code <code>0xCA26CBD9BE0B0000</code> is generated.  In terms of the <code>std::error</code> convention, this code has
+abort code <code>0xCA26CBD9BE0B0000</code> is generated. In terms of the <code>std::error</code> convention, this code has
 category <code>std::error::INTERNAL</code> and reason <code>0</code>.</p>
 <p><code>assert</code> is more commonly used than just <code>abort</code> by itself. The <code>abort</code> examples above can be
 rewritten using <code>assert</code></p>
@@ -2579,7 +2407,7 @@ value on some branches, but not all. For example:</p>
   }
 }
 </code></pre>
-<p>Commonly, <a href="#conditionals"><code>if</code> expressions</a> are used in conjunction with expression blocks.</p>
+<p>Commonly, <code>if</code> expressions are used in conjunction with expression blocks.</p>
 <pre><code class="language-move">script {
   fun example() {
     let maximum = if (x &gt; y) x else y;
@@ -2606,7 +2434,7 @@ value on some branches, but not all. For example:</p>
 <p>Move offers three constructs for looping: <code>while</code>, <code>for</code>, and <code>loop</code>.</p>
 <h2 id="while-loops"><a class="header" href="#while-loops"><code>while</code> loops</a></h2>
 <p>The <code>while</code> construct repeats the body (an expression of type unit) until the condition (an expression of type <code>bool</code>) evaluates to <code>false</code>.</p>
-<p>Here is an example of simple <code>while</code> loop that computes the sum of the numbers from <code>1</code> to <code>n</code>:</p>
+<p>Here is an example of a simple <code>while</code> loop that computes the sum of the numbers from <code>1</code> to <code>n</code>:</p>
 <pre><code class="language-move">script {
   fun sum(n: u64): u64 {
     let sum = 0;
@@ -2720,7 +2548,7 @@ value on some branches, but not all. For example:</p>
 </code></pre>
 <p>The loop iterator variable (<code>i</code> in the above example) currently must be a numeric type (inferred from the bounds), and the bounds <code>0</code> and <code>n</code> here can be replaced by arbitrary numeric expressions. Each is only evaluated once at the start of the loop. The iterator variable <code>i</code> is assigned the <code>lower_bound</code> (in this case <code>0</code>) and incremented after each loop iteration; the loop exits when the iterator <code>i</code> reaches or exceeds <code>upper_bound</code> (in this case <code>n</code>).</p>
 <h3 id="break-and-continue-in-for-loops"><a class="header" href="#break-and-continue-in-for-loops"><code>break</code> and <code>continue</code> in <code>for</code> loops</a></h3>
-<p>Similar to <code>while</code> loops, the <code>break</code> expression can be used in <code>for</code> loops to exit prematurely. The <code>continue</code> expression can be used to skip the current iteration and move to the next. Here’s an example that demonstrates the use of both <code>break</code> and <code>continue</code>. The loop will iterate through numbers from <code>0</code> to <code>n-1</code>, summing up them up. It will skip numbers that are divisible by <code>3</code> (using <code>continue</code>) and stop when it encounters a number greater than <code>10</code> (using <code>break</code>):</p>
+<p>Similar to <code>while</code> loops, the <code>break</code> expression can be used in <code>for</code> loops to exit prematurely. The <code>continue</code> expression can be used to skip the current iteration and move to the next. Here’s an example that demonstrates the use of both <code>break</code> and <code>continue</code>. The loop will iterate through numbers from <code>0</code> to <code>n-1</code>, summing them up. It will skip numbers that are divisible by <code>3</code> (using <code>continue</code>) and stop when it encounters a number greater than <code>10</code> (using <code>break</code>):</p>
 <pre><code class="language-move">script {
   fun sum_conditional(n: u64): u64 {
     let sum = 0;
@@ -2782,7 +2610,7 @@ value on some branches, but not all. For example:</p>
 }
 </code></pre>
 <h2 id="the-type-of-while-loop-and-for-expression"><a class="header" href="#the-type-of-while-loop-and-for-expression">The type of <code>while</code>, <code>loop</code>, and <code>for</code> expression</a></h2>
-<p>Move loops are typed expressions. The <code>while</code> and <code>for</code> expression always has type <code>()</code>.</p>
+<p>Move loops are typed expressions. The <code>while</code> and <code>for</code> expressions always have type <code>()</code>.</p>
 <pre><code class="language-move">script {
   fun example() {
     let () = while (i &lt; 10) { i = i + 1 };
@@ -2809,7 +2637,7 @@ value on some branches, but not all. For example:</p>
 </code></pre>
 <h2 id="loop-labels"><a class="header" href="#loop-labels">Loop Labels</a></h2>
 <p><em>Since language version 2.1</em></p>
-<p>A <code>while</code> or <code>loop</code> statement can have a label which can be referred to by a <code>break</code> or <code>continue</code> statement. In the presence of nested loops, this allows to refer to outer loops. Example:</p>
+<p>A <code>while</code> or <code>loop</code> statement can have a label that can be referred to by a <code>break</code> or <code>continue</code> statement. In the presence of nested loops, this allows referring to outer loops. Example:</p>
 <pre><code class="language-move">script {
   fun example(x: u64): u64 {
     'label1: while (x &gt; 10) {
@@ -2869,7 +2697,7 @@ script {
 <li>functions defined in another module, or</li>
 <li>the function defined in a script.</li>
 </ul>
-<p>There are also no restrictions for what the argument types a public function can take and its return type.</p>
+<p>There are also no restrictions on what argument types a public function can take or on what its return type can be.</p>
 <pre><code class="language-move">address 0x42 {
 module m {
     public fun foo(): u64 { 0 }
@@ -2891,8 +2719,8 @@ script {
 }
 </code></pre>
 <h3 id="package-visibility"><a class="header" href="#package-visibility"><code>package</code> visibility</a></h3>
-<p><em>Since Language Version 2.0</em></p>
-<p>A <code>package</code> function can be only called within the same package. The notion of a package is
+<p><em>Since language version 2.0</em></p>
+<p>A <code>package</code> function can only be called within the same package. The notion of a package is
 defined by the hosting environment of Move, and not explicit in the language. Typically, the package
 is defined by a manifest file <code>Move.toml</code> which is processed by the build environment.</p>
 <p>The following works, provided the two modules belong to the same package and are at the same address:</p>
@@ -2907,11 +2735,11 @@ module 0x42::other {
 }
 </code></pre>
 <p>An attempt to access <code>0x42::m::foo</code> from another package will fail at compile time.</p>
-<p>In addition to the notation <code>package fun</code>, also the longer notation <code>public(package) fun</code> is supported.</p>
-<p>Notice that package visibility is a compile time concept which is reduced by the compiler to friend visibility (described <a href="#friend-visibility">below</a>), which can be verified by the Move VM. The Move VM guarantees that friend functions
+<p>In addition to the notation <code>package fun</code>, the longer notation <code>public(package) fun</code> is also supported.</p>
+<p>Notice that package visibility is a compile-time concept that is reduced by the compiler to friend visibility (described <a href="#friend-visibility">below</a>), which can be verified by the Move VM. The Move VM guarantees that friend functions
 cannot be called across address boundaries, independent of what package system a compilation environment supports.</p>
 <h4 id="publicfriend-visibility"><a class="header" href="#publicfriend-visibility"><code>public(friend)</code> visibility</a></h4>
-<p><em>Since Language Version 2.0</em>, <code>friend fun</code> replaces <code>public(friend) fun</code>. The old notation is still supported.</p>
+<p><em>Since language version 2.0</em>, <code>friend fun</code> replaces <code>public(friend) fun</code>. The old notation is still supported.</p>
 <p>The <code>public(friend)</code> visibility modifier is a more restricted form of the <code>public</code> modifier to give more control about where a function can be used. A <code>public(friend)</code> function can be called by:</p>
 <ul>
 <li>other functions defined in the same module, or</li>
@@ -2961,7 +2789,7 @@ script {
 <h3 id="entry-modifier"><a class="header" href="#entry-modifier"><code>entry</code> modifier</a></h3>
 <p>The <code>entry</code> modifier is designed to allow module functions to be safely and directly invoked much like scripts. This allows module writers to specify which functions can be invoked to begin execution. The module writer then knows that any non-<code>entry</code> function will be called from a Move program already in execution.</p>
 <p>Essentially, <code>entry</code> functions are the “main” functions of a module, and they specify where Move programs start executing.</p>
-<p>Note though, an <code>entry</code> function <em>can</em> still be called by other Move functions. So while they <em>can</em> serve as the start of a Move program, they aren’t restricted to that case.</p>
+<p>Note, though, that an <code>entry</code> function <em>can</em> still be called by other Move functions. So while they <em>can</em> serve as the start of a Move program, they aren’t restricted to that case.</p>
 <p>For example:</p>
 <pre><code class="language-move">address 0x42 {
 module m {
@@ -3017,7 +2845,7 @@ script {
     }
 }
 </code></pre>
-<p>Entry functions can accept parameters that are: primitive types, reference to a
+<p>Entry functions can accept parameters of the following types: primitive types, references to a
 <code>signer</code>, vectors (where the element type is itself acceptable),
 and certain standard library types such as <code>String</code>, <code>Object</code>, and <code>Option</code>.
 Entry functions must not have any return values.</p>
@@ -3046,7 +2874,7 @@ Entry functions must not have any return values.</p>
 </code></pre>
 <p>For more details, see <a href="#generics">Move generics</a>.</p>
 <h3 id="parameters"><a class="header" href="#parameters">Parameters</a></h3>
-<p>Functions parameters are declared with a local variable name followed by a type annotation</p>
+<p>Function parameters are declared with a local variable name followed by a type annotation:</p>
 <pre><code class="language-move">module 0x42::example {
     fun add(x: u64, y: u64): u64 { x + y }
 }
@@ -3082,7 +2910,7 @@ Entry functions must not have any return values.</p>
     }
 }
 </code></pre>
-<p><code>acquires</code> annotations must also be added for transitive calls within the module. Calls to these functions from another module do not need to annotated with these acquires because one module cannot access resources declared in another module–so the annotation is not needed to ensure reference safety.</p>
+<p><code>acquires</code> annotations must also be added for transitive calls within the module. Calls to these functions from another module do not need to be annotated with these acquires because one module cannot access resources declared in another module — so the annotation is not needed to ensure reference safety.</p>
 <pre><code class="language-move">module 0x42::example {
 
     struct Balance has key { value: u64 }
@@ -3138,7 +2966,7 @@ module 0x42::other {
 </code></pre>
 <p>Here <code>: u64</code> indicates that the function’s return type is <code>u64</code>.</p>
 <blockquote>
-<p><strong>Note:</strong> A function can return an immutable <code>&amp;</code> or mutable <code>&amp;mut</code> <a href="#references">reference</a> if derived from an input reference. Keep in mind, this means that a function <a href="#references-cannot-be-stored">cannot return a reference to global storage</a> unless it is an <a href="#inline-functions">inline function</a>.</p>
+<p><strong>Note:</strong> A function can return an immutable <code>&amp;</code> or mutable <code>&amp;mut</code> <a href="#references">reference</a> if derived from an input reference. Keep in mind that this means a function <a href="#references-cannot-be-stored">cannot return a reference to global storage</a> unless it is an <a href="#inline-functions">inline function</a>.</p>
 </blockquote>
 <p>Using tuples, a function can return multiple values:</p>
 <pre><code class="language-move">module 0x42::example {
@@ -3296,7 +3124,7 @@ script {
 </code></pre>
 <h2 id="inline-functions"><a class="header" href="#inline-functions">Inline Functions</a></h2>
 <p>Inline functions are functions whose bodies are expanded in place at the caller location during compile time.
-Thus, inline functions do not appear in Move bytecode as a separate functions: all calls to them are expanded away by the compiler.
+Thus, inline functions do not appear in Move bytecode as separate functions: all calls to them are expanded away by the compiler.
 In certain circumstances, they may lead to faster execution and save gas.
 However, users should be aware that they could lead to larger bytecode size: excessive inlining potentially triggers various size restrictions.</p>
 <p>One can define an inline function by adding the <code>inline</code> keyword to a function declaration as shown below:</p>
@@ -3414,9 +3242,9 @@ probably explain any underlying restrictions on reference parameters and results
 </code></pre>
 <h2 id="function-values"><a class="header" href="#function-values">Function Values</a></h2>
 <p><em>Since language version 2.2</em></p>
-<p>Move supports <em>function values</em> as first-class citizen of the language. A function value is constructed from the name of a function or by a lambda expression, and is evaluated by passing parameters to it and causing the underlying function to be executed. This feature is often also called <em>dynamic dispatch</em>. Which concrete function is called, is not known to the caller, and determined from the runtime value. Dynamic dispatch is an important tool for composing applications. Move makes dynamic dispatch safe by providing builtin protection mechanisms against reentrancy, which can be further refined by user choice.</p>
+<p>Move supports <em>function values</em> as first-class citizens of the language. A function value is constructed from the name of a function or by a lambda expression, and is evaluated by passing parameters to it and causing the underlying function to be executed. This feature is often called <em>dynamic dispatch</em>. Which concrete function is called is not known to the caller and is determined by the runtime value. Dynamic dispatch is an important tool for composing applications. Move makes dynamic dispatch safe by providing builtin protection mechanisms against reentrancy, which can be further refined by user choice.</p>
 <h3 id="function-types"><a class="header" href="#function-types">Function Types</a></h3>
-<p>The type of functions values is already known from <a href="#function-parameters-and-lambda-expressions">inline functions</a>. A function type is denoted, for example, as <code>|u64|bool</code>, indicating a function which takes a number and returns a boolean. Lists of types are separated by comma, as in <code>|u64, bool|(bool,u4)</code>.</p>
+<p>The type of function values is already known from <a href="#function-parameters-and-lambda-expressions">inline functions</a>. A function type is denoted, for example, as <code>|u64|bool</code>, indicating a function that takes a number and returns a boolean. Lists of types are separated by commas, as in <code>|u64, bool|(bool, u8)</code>.</p>
 <p>Function types can have associated abilities, written as <code>|u64|bool has copy</code>. Multiple abilities are separated by plus, as in <code>|u64|bool has copy+drop</code>. If no abilities are provided, the value can be only moved around and evaluated (for evaluation of function values, see <a href="#function-evaluation">below</a>).</p>
 <p>Function values can be stored in fields of structs or enums. In this case, the field type inherits the abilities of the struct:</p>
 <pre><code class="language-move">struct S has key {
@@ -3424,13 +3252,13 @@ probably explain any underlying restrictions on reference parameters and results
 }
 </code></pre>
 <h3 id="operations-on-functions"><a class="header" href="#operations-on-functions">Operations on Functions</a></h3>
-<p>A function value is evaluated by providing the corresponding number of parameters, similar as when calling a named function. During evaluation, the function value is <em>consumed</em>. Hence if the value needs to be evaluated multiple times, its type must have the <code>copy</code> ability:</p>
+<p>A function value is evaluated by providing the corresponding number of parameters, similarly to calling a named function. During evaluation, the function value is <em>consumed</em>. Hence if the value needs to be evaluated multiple times, its type must have the <code>copy</code> ability:</p>
 <pre><code class="language-move">let f: |u64|bool has copy = |x| x &gt; 0;
 assert!(f(1) == f(2))
 </code></pre>
 <p>Function values support equality and ordering. Note that those relations are based on the name of the underlying function behind a runtime value, and do not reflect semantic equivalence.</p>
 <h3 id="function-type-wrappers"><a class="header" href="#function-type-wrappers">Function Type Wrappers</a></h3>
-<p>Function types, specifically if they come together with abilities, can be verbose, and if the same type of function type is used many times in the code, repetitive. For this purpose, Move recognizes struct wrappers around function types as a special case. They can be used to effectively create named function types:</p>
+<p>Function types, especially those with abilities, can be verbose, and repetitive when the same function type appears many times in the code. For this purpose, Move recognizes struct wrappers around function types as a special case. They can be used to effectively create named function types:</p>
 <pre><code class="language-move">struct Predicate&lt;T&gt;(|&amp;T|bool) has copy;
 </code></pre>
 <p>Move supports this feature by automatically converting function values into the wrapper type and vice versa. Examples:</p>
@@ -3445,7 +3273,7 @@ fun is_odd(x: u64): bool { x % 2 == 1 }
 let f: |u64|bool has copy+drop+store = is_even;
 let g: |u64|bool has copy+drop = is_odd;
 </code></pre>
-<p>A <em>persistent</em> function is required to build a storable function value because it needs to be guaranteed that the underlying function exists and can be safely restored from storage at any point in the future. However, code upgrade may change the underlying implementation of the function, while its signature is persistent.</p>
+<p>A <em>persistent</em> function is required to build a storable function value because it needs to be guaranteed that the underlying function exists and can be safely restored from storage at any point in the future. However, a code upgrade may change the underlying implementation of the function, while its signature is persistent.</p>
 <p>While <code>public</code> and <code>entry</code> functions are persistent by default, a non-public function needs to be marked with the attribute <code>#[persistent]</code> to become storable:</p>
 <pre><code class="language-move">#[persistent] fun is_odd(x: u64): bool { x % 2 == 1 }
 ...
@@ -3460,7 +3288,7 @@ let s = S(1);
 let add = |y| { let S(x) = s; x + y }; // s will be moved into the closure
 assert!(add(2) == 3)
 </code></pre>
-<p>Closures with captured values are lexicographical ordered using first the name of the underlying function (which maybe generated from lambda lifting), and then the captured values.</p>
+<p>Closures with captured values are lexicographically ordered using first the name of the underlying function (which may be generated from lambda lifting), and then the captured values.</p>
 <p>The type of the closure constructed by a lambda expression is inferred from the expression (for example, the type of <code>add</code> in the example above is inferred as <code>|u64|u64</code>). The abilities of this function type are derived as follows. By default, the function underlying a closure is a private function, so the function itself is <code>copy+drop</code> (and not <code>store</code>). This is intersected with the abilities of all the captured context variables. However, there is a special case for lambdas where instead of a private function an underlying persistent function can be identified, such that the lambda just ‘delays’ certain arguments of this function. This pattern is also called ‘currying’ in functional programming (named after the mathematician Curry). Here are some examples:</p>
 <pre><code class="language-move">#[persistent] fun add(x: u64, y: u64) { x + y }
 ...
@@ -3482,7 +3310,7 @@ let f : |&amp;u64|u64 = |y| add(x, *y)
 </code></pre>
 <h3 id="reentrancy-check"><a class="header" href="#reentrancy-check">Reentrancy Check</a></h3>
 <p>Via dynamic dispatch of function values, reentrancy of modules in a chain of function calls is possible. If module <code>m1</code> uses module <code>m2</code>, and <code>m1</code> calls <code>m2::f</code> passing a function value to it, this function value can callback into <code>m1</code>. This situation is called <em>reentrancy</em>, and is not possible in Move without function values, since the module usage relation is acyclic.</p>
-<p>The Move VM dynamically detects reentrancy of a module, and <em>locks</em> all resources declared in this module from being accessed. Thus during reentrancy of <code>m</code>, calling resource operations like <code>&amp;m::R[addr]</code>, <code>&amp;mut m::R[addr]</code>, and <code>move_from&lt;m::R&gt;</code> lead to an abort. Here is an example:</p>
+<p>The Move VM dynamically detects reentrancy of a module and <em>locks</em> all resources declared in that module from being accessed. Thus, during reentrancy of <code>m</code>, calling resource operations like <code>&amp;m::R[addr]</code>, <code>&amp;mut m::R[addr]</code>, and <code>move_from&lt;m::R&gt;</code> leads to an abort. Here is an example:</p>
 <pre><code class="language-move">module 0x42::caller {
   use 0x42::callee;
   struct R{ count: u64 } has key;
@@ -3518,15 +3346,15 @@ module 0x42::caller {
   }
 }
 </code></pre>
-<p>While a function with this attribute is running, all calls reentering any module will lead to an abort, given a stronger protection.</p>
-<p>The attribute <code>#[module_lock]</code> restriction is not the default behavior since it is too strong for typical patterns of higher-order programming. For example, <code>collection.find(|x| cond(x))</code> will lead to a reentrancy of the module which contains this expression, from the module which defines the collection type.</p>
+<p>While a function with this attribute is running, all calls reentering any module will lead to an abort, providing stronger protection.</p>
+<p>The <code>#[module_lock]</code> restriction is not the default behavior because it is too strong for typical patterns of higher-order programming. For example, <code>collection.find(|x| cond(x))</code> will lead to a reentrancy of the module that contains this expression, from the module that defines the collection type.</p>
 <div style="break-before: page; page-break-before: always;"></div>
 <h1 id="structs-and-resources"><a class="header" href="#structs-and-resources">Structs and Resources</a></h1>
 <p>A <em>struct</em> is a user-defined data structure containing typed fields. Structs can store any
 non-reference type, including other structs.</p>
 <p>We often refer to struct values as <em>resources</em> if they cannot be copied and cannot be dropped. In
 this case, resource values must have ownership transferred by the end of the function. This property
-makes resources particularly well served for defining global storage schemas or for representing
+makes resources particularly well suited for defining global storage schemas or for representing
 important values (such as a token).</p>
 <p>By default, structs are linear and ephemeral. By this we mean that they: cannot be copied, cannot be
 dropped, and cannot be stored in global storage. This means that all values have to have ownership
@@ -3549,7 +3377,7 @@ schemas.</p>
   //              ^ error! Foo cannot contain Foo
 }
 </code></pre>
-<p>For positional structs which used numbered instead of named fields, see
+<p>For positional structs that use numbered instead of named fields, see
 the <a href="#positional-structs">positional structs</a> section.</p>
 <p>As mentioned above: by default, a struct declaration is linear and ephemeral. So to allow the value
 to be used with certain operations (that copy it, drop it, store it in global storage, or use it as
@@ -3574,7 +3402,7 @@ features. It may or may not be removed later.</p>
 <h2 id="using-structs"><a class="header" href="#using-structs">Using Structs</a></h2>
 <h3 id="creating-structs"><a class="header" href="#creating-structs">Creating Structs</a></h3>
 <p>Values of a struct type can be created (or “packed”) by indicating the struct name, followed by
-value for each field:</p>
+a value for each field:</p>
 <pre><code class="language-move">module 0x2::m {
   struct Foo has drop { x: u64, y: bool }
   struct Baz has drop { foo: Foo }
@@ -3597,7 +3425,7 @@ use the following shorthand:</p>
 </code></pre>
 <p>This is sometimes called “field name punning”.</p>
 <h3 id="destroying-structs-via-pattern-matching"><a class="header" href="#destroying-structs-via-pattern-matching">Destroying Structs via Pattern Matching</a></h3>
-<p>Struct values can be destroyed by binding or assigning them patterns.</p>
+<p>Struct values can be destroyed by pattern matching them in <code>let</code> bindings or assignments.</p>
 <pre><code class="language-move">module 0x2::m {
   struct Foo { x: u64, y: bool }
   struct Bar { foo: Foo }
@@ -3665,7 +3493,7 @@ use the following shorthand:</p>
 }
 </code></pre>
 <h3 id="borrowing-structs-and-fields"><a class="header" href="#borrowing-structs-and-fields">Borrowing Structs and Fields</a></h3>
-<p>The <code>&amp;</code> and <code>&amp;mut</code> operator can be used to create references to structs or fields. These examples
+<p>The <code>&amp;</code> and <code>&amp;mut</code> operators can be used to create references to structs or fields. These examples
 include some optional type annotations (e.g., <code>: &amp;Foo</code>) to demonstrate the type of operations.</p>
 <pre><code class="language-move">module 0x2::m {
   fun example() {
@@ -3796,7 +3624,7 @@ module 0x2::n {
 <h2 id="struct-visibility"><a class="header" href="#struct-visibility">Struct Visibility</a></h2>
 <p><em>Since language version 2.4</em></p>
 <p>By default, struct construction, destruction, and field access are module-private, as described in <a href="#privileged-struct-operations">Privileged Struct Operations</a>. Move 2.4 introduces explicit visibility modifiers that allow external modules to perform these operations. See <a href="#struct-and-enum-visibility">Struct and Enum Visibility</a> for shared rules on visibility levels, performance, restrictions, transaction arguments, and upgradability.</p>
-<h3 id="syntax-1"><a class="header" href="#syntax-1">Syntax</a></h3>
+<h3 id="syntax"><a class="header" href="#syntax">Syntax</a></h3>
 <p>Place the modifier before the <code>struct</code> keyword:</p>
 <pre><code class="language-move">module 0x42::shapes {
     // Accessible from any module
@@ -3821,7 +3649,7 @@ module 0x42::lib {
 }
 </code></pre>
 <h3 id="cross-module-access"><a class="header" href="#cross-module-access">Cross-Module Access</a></h3>
-<p>External modules with sufficient visibility can construct and destruct the struct, read and mutate its fields.</p>
+<p>External modules with sufficient visibility can construct and destruct the struct, and read and mutate its fields.</p>
 <pre><code class="language-move">module 0x42::shapes {
     public struct Point {
         x: u64,
@@ -3845,7 +3673,7 @@ module 0x42::user {
 <h2 id="ownership-7"><a class="header" href="#ownership-7">Ownership</a></h2>
 <p>As mentioned above in <a href="#defining-structs">Defining Structs</a>, structs are by default linear and
 ephemeral. This means they cannot be copied or dropped. This property can be very useful when
-modeling real world resources like money, as you do not want money to be duplicated or get lost in
+modeling real-world resources like money, as you do not want money to be duplicated or get lost in
 circulation.</p>
 <pre><code class="language-move">module 0x2::m {
   struct Foo { x: u64 }
@@ -3904,12 +3732,12 @@ languages:</p>
 </code></pre>
 <h2 id="positional-structs"><a class="header" href="#positional-structs">Positional Structs</a></h2>
 <p><em>Since language version 2.0</em></p>
-<p>A struct can be declared to have <em>positional fields</em>, fields which are not named
-but numbered. Positional structs behave similar to regular structs,
-except providing a different syntax which may be more suitable for use cases with
+<p>A struct can be declared to have <em>positional fields</em>, fields that are not named
+but numbered. Positional structs behave similarly to regular structs,
+except they provide a different syntax that may be more suitable for use cases with
 only a few fields.</p>
-<p>Fields of positional structs are assigned in the order they appear. In the below
-example, field <code>0</code> is of type <code>u64</code> and field <code>1</code> of type <code>u8</code>:</p>
+<p>Fields of positional structs are assigned in the order they appear. In the example
+below, field <code>0</code> is of type <code>u64</code> and field <code>1</code> is of type <code>u8</code>:</p>
 <pre><code class="language-move">module 0x2::m {
   struct Pair(u64, u8);
 }
@@ -3925,8 +3753,8 @@ can be also completely omitted:</p>
   struct TypeTag has copy, drop;
 }
 </code></pre>
-<p>Values of positional structs are created and deconstructed as shown below:
-using <code>PositionalStructs(arguments)</code>:</p>
+<p>Values of positional structs are created and deconstructed using
+<code>PositionalStructs(arguments)</code>, as shown below:</p>
 <pre><code class="language-move">module 0x2::m {
   fun work() {
     let value = Pair(1, true);
@@ -3935,8 +3763,7 @@ using <code>PositionalStructs(arguments)</code>:</p>
   }
 }
 </code></pre>
-<p>Fields of positional structs can be accessed using the position as a field selector. For example, in the above code example, <code>value.0</code> and <code>value.1</code> can be used to access the two fields without deconstructing the <code>value</code>.
-<code>positional_struct.0</code>.</p>
+<p>Fields of positional structs can be accessed using the position as a field selector. For example, in the code above, <code>value.0</code> and <code>value.1</code> can be used to access the two fields without deconstructing <code>value</code>.</p>
 <h2 id="partial-patterns"><a class="header" href="#partial-patterns">Partial Patterns</a></h2>
 <p><em>Since language version 2.0</em></p>
 <p>Patterns can use the <code>..</code> notation to match any remaining, non-listed fields in structs or variants with named fields, and omitted fields at either the beginning or end of a struct or variant with positional fields. Here are
@@ -4079,7 +3906,7 @@ structs must have the <code>store</code> ability. See the <a href="#abilities">a
 <div style="break-before: page; page-break-before: always;"></div>
 <h1 id="enums"><a class="header" href="#enums">Enums</a></h1>
 <p><em>Since language version 2.0</em></p>
-<p>Enum types are similar to struct types but support defining multiple <em>variants</em> of the data layout. Each variant has its distinct set of fields. Enum variants are supported in expressions, tools for testing, matching, and deconstructing.</p>
+<p>Enum types are similar to struct types but support defining multiple <em>variants</em> of the data layout. Each variant has its own distinct set of fields. Enum variants are supported in expressions, with tools for testing, matching, and deconstructing them.</p>
 <h2 id="declaration-of-enum-types"><a class="header" href="#declaration-of-enum-types">Declaration of Enum Types</a></h2>
 <p>An enum type declaration lists the number of different variants, as seen in the example below:</p>
 <pre><code class="language-move">enum Shape {
@@ -4118,7 +3945,7 @@ let data = VersionedData::V1{name: s};
 <h2 id="name-resolution-for-enum-variants"><a class="header" href="#name-resolution-for-enum-variants">Name Resolution for Enum Variants</a></h2>
 <p>The variant names for an enum need to be qualified by the enum type name, as in <code>VersionedData::V1</code>.</p>
 <blockquote>
-<p>Note: Aliasing via the <code>use</code> clause is currently not supported for enum variants, but will be added in later language versions</p>
+<p>Note: Aliasing via the <code>use</code> clause is currently not supported for enum variants, but will be added in later language versions.</p>
 </blockquote>
 <p>In certain cases (such as match expressions, below), the Move compiler can infer the enum type from the context, and the qualification by the type name may be omitted:</p>
 <pre><code class="language-move">fun f(data: VersionedData) {
@@ -4142,7 +3969,7 @@ let data = VersionedData::V1{name: s};
   }
 }
 </code></pre>
-<p>The patterns provided in the match expression are evaluated sequentially, in order of textual occurrence, until a match is found. It is a compile time error if not all known patterns are covered.</p>
+<p>The patterns provided in the match expression are evaluated sequentially, in order of textual occurrence, until a match is found. It is a compile-time error if not all known patterns are covered.</p>
 <p>Patterns can be nested and contain conditions, as in the following example:</p>
 <pre><code class="language-move">let r : Result&lt;Result&lt;u64&gt;&gt; = Ok(Err(42));
 let v = match (r) {
@@ -4153,7 +3980,7 @@ let v = match (r) {
 };
 assert!(v == 1);
 </code></pre>
-<p>Notice that in the above example, the last match clause (<code>_</code>) covers both patterns <code>Ok(Err(_))</code> and <code>Err(_)</code>.  Although at execution time, the earlier clauses match <code>Ok(Err(c))</code> for all values of <code>c</code>, the compiler cannot be sure all cases are covered due to the conditionals: conditions in match expressions are not considered when tracking coverage.  Thus the first two clauses in the match expression above are not sufficient for match completeness, and an additional clause is required to avoid a compiler error.</p>
+<p>Notice that in the above example, the last match clause (<code>_</code>) covers both patterns <code>Ok(Err(_))</code> and <code>Err(_)</code>. Although at execution time, the earlier clauses match <code>Ok(Err(c))</code> for all values of <code>c</code>, the compiler cannot be sure all cases are covered due to the conditionals: conditions in match expressions are not considered when tracking coverage. Thus the first two clauses in the match expression above are not sufficient for match completeness, and an additional clause is required to avoid a compiler error.</p>
 <h2 id="testing-enum-variants"><a class="header" href="#testing-enum-variants">Testing Enum Variants</a></h2>
 <p>With the <code>is</code> operator, one can examine whether a given enum value is of a given variant:</p>
 <pre><code class="language-move">let data: VersionedData;
@@ -4176,10 +4003,10 @@ let data2 = VersionedData::V2{name: s, age: 20};
 assert!(data1.name == data2.name)
 assert!(data2.age == 20);
 </code></pre>
-<p>Notice that field selection aborts if the enum value has no variant with the given field. This is the case for  <code>data1.age</code>.
+<p>Notice that field selection aborts if the enum value has no variant with the given field. This is the case for <code>data1.age</code>.
 The abort code used for this case is <code>0xCA26CBD9BE0B0001</code>. In terms of the <code>std::error</code> convention, this code has
 category <code>std::error::INTERNAL</code> and reason <code>1</code>.</p>
-<p>Field selection is only possible if the field is uniquely named and typed throughout all variants. Thus, the following yields a compile time error:</p>
+<p>Field selection is only possible if the field is uniquely named and typed throughout all variants. Thus, the following yields a compile-time error:</p>
 <pre><code class="language-move">enum VersionedData has key {
   V1{name: String}
   V2{name: u64}
@@ -4219,7 +4046,7 @@ fun example_destroy_shapes() {
 <h2 id="enum-visibility"><a class="header" href="#enum-visibility">Enum Visibility</a></h2>
 <p><em>Since language version 2.4</em></p>
 <p>By default, enum construction, deconstruction, matching, and field selection are restricted to the defining module. Move 2.4 introduces explicit visibility modifiers for enums, following the same model described in <a href="#struct-and-enum-visibility">Struct and Enum Visibility</a>.</p>
-<h3 id="syntax-2"><a class="header" href="#syntax-2">Syntax</a></h3>
+<h3 id="syntax-1"><a class="header" href="#syntax-1">Syntax</a></h3>
 <p>Place the modifier before the <code>enum</code> keyword. For enums with abilities, the <code>has</code> clause follows the variant list as usual:</p>
 <pre><code class="language-move">module 0x42::types {
     // Accessible from any module
@@ -4244,7 +4071,7 @@ module 0x42::lib {
 }
 </code></pre>
 <h3 id="cross-module-access-1"><a class="header" href="#cross-module-access-1">Cross-Module Access</a></h3>
-<p>External modules with sufficient visibility can construct and destruct the enum, test variants and select fields from variants and mutate them.</p>
+<p>External modules with sufficient visibility can construct and destruct the enum, test variants, select fields from variants, and mutate them.</p>
 <pre><code class="language-move">module 0x42::types {
     public enum Shape has drop {
         Circle { radius: u64 },
@@ -4340,8 +4167,8 @@ public enum VersionedData has key { V1 { name: vector&lt;u8&gt; } }
 <div style="break-before: page; page-break-before: always;"></div>
 <h1 id="constants"><a class="header" href="#constants">Constants</a></h1>
 <p>Constants are a way of giving a name to shared, static values inside of a <code>module</code> or <code>script</code>.</p>
-<p>The constant’s must be known at compilation. The constant’s value is stored in the compiled module
-or script. And each time the constant is used, a new copy of that value is made.</p>
+<p>The constant’s value must be known at compile time. The constant’s value is stored in the compiled
+module or script, and each time the constant is used, a new copy of that value is made.</p>
 <h2 id="declaration-1"><a class="header" href="#declaration-1">Declaration</a></h2>
 <p>Constant declarations begin with the <code>const</code> keyword, followed by a name, a type, and a value. They
 can exist in either a script or module</p>
@@ -4373,7 +4200,7 @@ contain underscores <code>_</code>, letters <code>a</code> to <code>z</code>, le
   const ADDRESS_42: address = @0x42;
 }
 </code></pre>
-<p>Even though you can use letters <code>a</code> to <code>z</code> in a constant. The
+<p>Even though you can use letters <code>a</code> to <code>z</code> in a constant, the
 <a href="#move-coding-conventions">general style guidelines</a> are to use just uppercase letters <code>A</code> to <code>Z</code>,
 with underscores <code>_</code> between each word.</p>
 <p>This naming restriction of starting with <code>A</code> to <code>Z</code> is in place to give room for future language
@@ -4411,7 +4238,7 @@ operations can be used.</p>
 }
 </code></pre>
 <p>If the operation results in a runtime exception, the compiler will give an error that it is
-unable to generate the constant’s value</p>
+unable to generate the constant’s value:</p>
 <pre><code class="language-move">script {
   const DIV_BY_ZERO: u64 = 1 / 0; // error!
   const SHIFT_BY_A_LOT: u64 = 1 &lt;&lt; 100; // error!
@@ -4469,7 +4296,7 @@ other expressions, will be added in the future.</p>
 <div style="break-before: page; page-break-before: always;"></div>
 <h1 id="generics"><a class="header" href="#generics">Generics</a></h1>
 <p>Generics can be used to define functions and structs over different input data types. This language feature is sometimes referred to as <em>parametric polymorphism</em>. In Move, we will often use the term generics interchangeably with type parameters and type arguments.</p>
-<p>Generics are commonly used in library code, such as in vector, to declare code that works over any possible instantiation (that satisfies the specified constraints). In other frameworks, generic code can sometimes be used to interact with global storage many different ways that all still share the same implementation.</p>
+<p>Generics are commonly used in library code, such as in vector, to declare code that works over any possible instantiation (that satisfies the specified constraints). In other frameworks, generic code can sometimes be used to interact with global storage in many different ways that all still share the same implementation.</p>
 <h2 id="declaring-type-parameters"><a class="header" href="#declaring-type-parameters">Declaring Type Parameters</a></h2>
 <p>Both functions and structs can take a list of type parameters in their signatures, enclosed by a pair of angle brackets <code>&lt;...&gt;</code>.</p>
 <h3 id="generic-functions"><a class="header" href="#generic-functions">Generic Functions</a></h3>
@@ -4493,7 +4320,7 @@ other expressions, will be added in the future.</p>
   }
 }
 </code></pre>
-<p>Note that <a href="#unused-type-parameters">type parameters do not have to be used</a></p>
+<p>Note that <a href="#unused-type-parameters">type parameters do not have to be used</a>.</p>
 <h2 id="type-arguments"><a class="header" href="#type-arguments">Type Arguments</a></h2>
 <h3 id="calling-generic-functions"><a class="header" href="#calling-generic-functions">Calling Generic Functions</a></h3>
 <p>When calling a generic function, one can specify the type arguments for the function’s type parameters in a list enclosed by a pair of angle brackets.</p>
@@ -4545,7 +4372,7 @@ other expressions, will be added in the future.</p>
   }
 }
 </code></pre>
-<p>Note: when the compiler is unable to infer the types, you’ll need annotate them manually. A common scenario is to call a function with type parameters appearing only at return positions.</p>
+<p>Note: when the compiler is unable to infer the types, you’ll need to annotate them manually. A common scenario is to call a function with type parameters appearing only at return positions.</p>
 <pre><code class="language-move">module 0x2::m {
   use std::vector;
 
@@ -4774,7 +4601,7 @@ T: copy + drop + store + key
 <p>For more information, see the abilities section on <a href="#conditional-abilities-and-generic-types">conditional abilities and generic types</a>.</p>
 <h2 id="limitations-on-recursions"><a class="header" href="#limitations-on-recursions">Limitations on Recursions</a></h2>
 <h3 id="recursive-structs"><a class="header" href="#recursive-structs">Recursive Structs</a></h3>
-<p>Generic structs can not contain fields of the same type, either directly or indirectly, even with different type arguments. All the following struct definitions are invalid:</p>
+<p>Generic structs cannot contain fields of the same type, either directly or indirectly, even with different type arguments. All the following struct definitions are invalid:</p>
 <pre><code class="language-move">module 0x2::m {
   struct Foo&lt;T&gt; {
     x: Foo&lt;u64&gt; // error! 'Foo' containing 'Foo'
@@ -4796,7 +4623,7 @@ T: copy + drop + store + key
 }
 </code></pre>
 <h3 id="advanced-topic-type-level-recursions"><a class="header" href="#advanced-topic-type-level-recursions">Advanced Topic: Type-level Recursions</a></h3>
-<p>Move allows generic functions to be called recursively. However, when used in combination with generic structs, this could create an infinite number of types in certain cases, and allowing this means adding unnecessary complexity to the compiler, vm and other language components. Therefore, such recursions are forbidden.</p>
+<p>Move allows generic functions to be called recursively. However, when used in combination with generic structs, this could create an infinite number of types in certain cases, and allowing this means adding unnecessary complexity to the compiler, VM, and other language components. Therefore, such recursions are forbidden.</p>
 <p>Allowed:</p>
 <pre><code class="language-move">module 0x2::m {
   struct A&lt;T&gt; {}
@@ -4844,7 +4671,7 @@ T: copy + drop + store + key
   }
 }
 </code></pre>
-<p>Note, the check for type level recursions is based on a conservative analysis on the call sites and does NOT take control flow or runtime values into account.</p>
+<p>Note that the check for type-level recursions is based on a conservative analysis of the call sites and does NOT take control flow or runtime values into account.</p>
 <pre><code class="language-move">module 0x2::m {
   struct A&lt;T&gt; {}
 
@@ -4855,10 +4682,10 @@ T: copy + drop + store + key
   }
 }
 </code></pre>
-<p>The function in the example above will technically terminate for any given input and therefore only creating finitely many types, but it is still considered invalid by Move’s type system.</p>
+<p>The function in the example above will technically terminate for any given input and therefore create only finitely many types, but it is still considered invalid by Move’s type system.</p>
 <div style="break-before: page; page-break-before: always;"></div>
 <h1 id="abilities"><a class="header" href="#abilities">Abilities</a></h1>
-<p>Abilities are a typing feature in Move that control what actions are permissible for values of a given type. This system grants fine-grained control over the “linear” typing behavior of values, as well as if and how values are used in global storage. This is implemented by gating access to certain bytecode instructions so that for a value to be used with the bytecode instruction, it must have the ability required (if one is required at all—not every instruction is gated by an ability).</p>
+<p>Abilities are a typing feature in Move that controls what actions are permissible for values of a given type. This system grants fine-grained control over the “linear” typing behavior of values, as well as if and how values are used in global storage. This is implemented by gating access to certain bytecode instructions so that for a value to be used with the bytecode instruction, it must have the ability required (if one is required at all—not every instruction is gated by an ability).</p>
 <h2 id="the-four-abilities"><a class="header" href="#the-four-abilities">The Four Abilities</a></h2>
 <p>The four abilities are:</p>
 <ul>
@@ -4897,12 +4724,12 @@ T: copy + drop + store + key
 <p>If a value has <code>drop</code>, all values contained inside of that value have <code>drop</code>.</p>
 <h3 id="store"><a class="header" href="#store"><code>store</code></a></h3>
 <p>The <code>store</code> ability allows values of types with this ability to exist inside a struct (resource) in global storage, <em>but</em> not necessarily as a top-level resource in global storage. This is the only ability that does not directly gate an operation. Instead, it gates the existence in global storage when used in tandem with <code>key</code>.</p>
-<p>If a value has <code>store</code>, all values contained inside of that value have <code>store</code></p>
+<p>If a value has <code>store</code>, all values contained inside of that value have <code>store</code>.</p>
 <h3 id="key"><a class="header" href="#key"><code>key</code></a></h3>
 <p>The <code>key</code> ability allows the type to serve as a key for <a href="#global-storage---operators">global storage operations</a>. It gates all global storage operations, so in order for a type to be used with <code>move_to</code>, <code>borrow_global</code>, <code>move_from</code>, etc., the type must have the <code>key</code> ability. Note that the operations still must be used in the module where the <code>key</code> type is defined (in a sense, the operations are private to the defining module).</p>
 <p>If a value has <code>key</code>, all values contained inside of that value have <code>store</code>. This is the only ability with this sort of asymmetry.</p>
 <h2 id="builtin-types"><a class="header" href="#builtin-types">Builtin Types</a></h2>
-<p>Most primitive, builtin types have <code>copy</code>, <code>drop</code>, and <code>store</code> except for <code>signer</code>, which just has <code>drop</code></p>
+<p>Most primitive, builtin types have <code>copy</code>, <code>drop</code>, and <code>store</code> except for <code>signer</code>, which just has <code>drop</code>.</p>
 <ul>
 <li><code>bool</code>, <code>u8</code>, <code>u16</code>, <code>u32</code>, <code>u64</code>, <code>u128</code>, <code>u256</code>, and <code>address</code> all have <code>copy</code>, <code>drop</code>, and <code>store</code>.</li>
 <li><code>signer</code> has <code>drop</code>
@@ -4974,8 +4801,8 @@ T: copy + drop + store + key
 <p>This behavior might sound a bit confusing at first, but it might be more understandable if we think about collection types. We could consider the builtin type <code>vector</code> to have the following type declaration:</p>
 <pre><code class="language-move">vector&lt;T&gt; has copy, drop, store;
 </code></pre>
-<p>We want <code>vector</code>s to work with any type. We don’t want separate <code>vector</code> types for different abilities. So what are the rules we would want? Precisely the same that we would want with the field rules above. So, it would be safe to copy a <code>vector</code> value only if the inner elements can be copied. It would be safe to ignore a <code>vector</code> value only if the inner elements can be ignored/dropped. And, it would be safe to put a <code>vector</code> in global storage only if the inner elements can be in global storage.</p>
-<p>To have this extra expressiveness, a type might not have all the abilities it was declared with depending on the instantiation of that type; instead, the abilities a type will have depends on both its declaration <strong>and</strong> its type arguments. For any type, type parameters are pessimistically assumed to be used inside the struct, so the abilities are only granted if the type parameters meet the requirements described above for fields. Taking <code>Cup</code> from above as an example:</p>
+<p>We want <code>vector</code>s to work with any type. We don’t want separate <code>vector</code> types for different abilities. So what are the rules we would want? Precisely the same ones we would want for the field rules above. So, it would be safe to copy a <code>vector</code> value only if the inner elements can be copied. It would be safe to ignore a <code>vector</code> value only if the inner elements can be ignored/dropped. And, it would be safe to put a <code>vector</code> in global storage only if the inner elements can be in global storage.</p>
+<p>To have this extra expressiveness, a type might not have all the abilities it was declared with, depending on the instantiation of that type; instead, the abilities a type will have depend on both its declaration <strong>and</strong> its type arguments. For any type, type parameters are pessimistically assumed to be used inside the struct, so the abilities are only granted if the type parameters meet the requirements described above for fields. Taking <code>Cup</code> from above as an example:</p>
 <ul>
 <li><code>Cup</code> has the ability <code>copy</code> only if <code>T</code> has <code>copy</code>.</li>
 <li>It has <code>drop</code> only if <code>T</code> has <code>drop</code>.</li>
@@ -5101,7 +4928,7 @@ T: copy + drop + store + key
 <h1 id="uses-and-aliases"><a class="header" href="#uses-and-aliases">Uses and Aliases</a></h1>
 <p>The <code>use</code> syntax can be used to create aliases to members in other modules. <code>use</code> can be used to
 create aliases that last either for the entire module, or for a given expression block scope.</p>
-<h2 id="syntax-3"><a class="header" href="#syntax-3">Syntax</a></h2>
+<h2 id="syntax-2"><a class="header" href="#syntax-2">Syntax</a></h2>
 <p>There are several different syntax cases for <code>use</code>. Starting with the most simple, we have the
 following for creating aliases to other modules</p>
 <pre><code class="language-move">use &lt;address&gt;::&lt;module name&gt;;
@@ -5129,7 +4956,7 @@ would want to use the module name <code>std::vector</code> (assuming this <code>
   }
 }
 </code></pre>
-<p>If you want to import a specific module member (such as a function, struct, or constant). You can
+<p>If you want to import a specific module member (such as a function, struct, or constant), you can
 use the following syntax.</p>
 <pre><code class="language-move">use &lt;address&gt;::&lt;module name&gt;::&lt;module member&gt;;
 use &lt;address&gt;::&lt;module name&gt;::&lt;module member&gt; as &lt;member alias&gt;;
@@ -5172,7 +4999,7 @@ syntax</p>
   }
 }
 </code></pre>
-<p>If you need to add an alias to the Module itself in addition to module members, you can do that in a
+<p>If you need to add an alias to the module itself in addition to module members, you can do that in a
 single <code>use</code> using <code>Self</code>. <code>Self</code> is a member of sorts that refers to the module.</p>
 <pre><code class="language-move">script {
   use std::vector::{Self, empty};
@@ -5391,7 +5218,7 @@ outer scope. As with shadowing of locals, the shadowing ends at the end of the e
 <div style="break-before: page; page-break-before: always;"></div>
 <h1 id="friends"><a class="header" href="#friends">Friends</a></h1>
 <p>The <code>friend</code> syntax is used to declare modules that are trusted by the current module.
-A trusted module is allowed to call any function defined in the current module that have the <code>public(friend)</code> visibility.
+A trusted module is allowed to call any function defined in the current module that has the <code>public(friend)</code> visibility.
 For details on function visibilities, please refer to the <em>Visibility</em> section in <a href="#functions">Functions</a>.</p>
 <h2 id="friend-declaration"><a class="header" href="#friend-declaration">Friend declaration</a></h2>
 <p>A module can declare other modules as friends via friend declaration statements, in the format of</p>
@@ -5425,7 +5252,7 @@ However, for readability, it is advised to place friend declarations near the be
 <p>Note that the concept of friendship does not apply to Move scripts:</p>
 <ul>
 <li>A Move script cannot declare <code>friend</code> modules as doing so is considered meaningless: there is no mechanism to call the function defined in a script.</li>
-<li>A Move module cannot declare <code>friend</code> scripts as well because scripts are ephemeral code snippets that are never published to global storage.</li>
+<li>A Move module cannot declare <code>friend</code> scripts either, because scripts are ephemeral code snippets that are never published to global storage.</li>
 </ul>
 <h3 id="friend-declaration-rules"><a class="header" href="#friend-declaration-rules">Friend declaration rules</a></h3>
 <p>Friend declarations are subject to the following rules:</p>
@@ -5462,7 +5289,7 @@ module 0x43::n {
 </code></pre>
 </li>
 <li>
-<p>Friends relationships cannot create cyclic module dependencies.</p>
+<p>Friend relationships cannot create cyclic module dependencies.</p>
 <p>Cycles are not allowed in the friend relationships, e.g., the relation <code>0x2::a</code> friends <code>0x2::b</code> friends <code>0x2::c</code> friends <code>0x2::a</code> is not allowed.
 More generally, declaring a friend module adds a dependency upon the current module to the friend module (because the purpose is for the friend to call functions in the current module).
 If that friend module is already used, either directly or transitively, a cycle of dependencies would be created.</p>
@@ -5502,6 +5329,106 @@ If that friend module is already used, either directly or transitively, a cycle 
 </code></pre>
 </li>
 </ul>
+<div style="break-before: page; page-break-before: always;"></div>
+<h1 id="modules-and-scripts"><a class="header" href="#modules-and-scripts">Modules and Scripts</a></h1>
+<p>Move has two different types of programs: <strong>modules</strong> and <strong>scripts</strong>. Modules are libraries that define struct types along with functions that operate on these types. Struct types define the schema of Move’s <a href="#global-storage---structure">global storage</a>, and module functions define the rules for updating storage. Modules themselves are also stored in global storage. A script is an executable entrypoint similar to a <code>main</code> function in a conventional language. A script typically calls functions of a published module that perform updates to global storage. Scripts are ephemeral code snippets that are not published in global storage.</p>
+<p>A Move source file (or <strong>compilation unit</strong>) may contain multiple modules and scripts. However, publishing a module and executing a script are separate VM operations.</p>
+<h2 id="syntax-3"><a class="header" href="#syntax-3">Syntax</a></h2>
+<h3 id="scripts"><a class="header" href="#scripts">Scripts</a></h3>
+<blockquote>
+<p><strong>Note:</strong> To learn how to publish and execute a Move script, follow the <a href="https://aptos.dev/build/smart-contracts/scripts/script-tutorial">Move Scripts</a> example.</p>
+</blockquote>
+<p>A script has the following structure:</p>
+<pre><code class="language-text">script {
+    &lt;use&gt;*
+    &lt;constants&gt;*
+    fun &lt;identifier&gt;&lt;[type parameters: constraint]*&gt;([identifier: type]*) &lt;function_body&gt;
+}
+</code></pre>
+<p>A <code>script</code> block must start with all of its <a href="#uses-and-aliases"><code>use</code></a> declarations, followed by any <a href="#constants">constants</a> and (finally) the main
+<a href="#functions">function</a> declaration.
+The main function can have any name (i.e., it need not be called <code>main</code>), is the only function in a script block, can have any number of
+arguments, and must not return a value. Here is an example with each of these components:</p>
+<pre><code class="language-move">script {
+    // Import the debug module published at the named account address std.
+    use std::debug;
+
+    const ONE: u64 = 1;
+
+    fun main(x: u64) {
+        let sum = x + ONE;
+        debug::print(&amp;sum)
+    }
+}
+</code></pre>
+<p>Scripts have very limited power—they cannot declare friends or struct types, and they cannot access global storage. Their primary purpose is to invoke module functions.</p>
+<h3 id="modules"><a class="header" href="#modules">Modules</a></h3>
+<p>A module has the following syntax:</p>
+<pre><code class="language-move">module &lt;address&gt;::&lt;identifier&gt; {
+    (&lt;use&gt; | &lt;friend&gt; | &lt;type&gt; | &lt;function&gt; | &lt;constant&gt;)*
+}
+</code></pre>
+<p>where <code>&lt;address&gt;</code> is a valid <a href="#address">named or literal address</a>.</p>
+<p>For example:</p>
+<pre><code class="language-move">module 0x42::example {
+    struct Example has copy, drop { i: u64 }
+
+    use std::debug;
+    friend 0x42::another_example;
+
+    const ONE: u64 = 1;
+
+    public fun print(x: u64) {
+        let sum = x + ONE;
+        let example = Example { i: sum };
+        debug::print(&amp;sum)
+    }
+}
+</code></pre>
+<p>The <code>module 0x42::example</code> part specifies that the module <code>example</code> will be published under the <a href="#address">account address</a> <code>0x42</code> in <a href="#global-storage---structure">global storage</a>.</p>
+<p>Modules can also be declared using <a href="#address">named addresses</a>. For example:</p>
+<pre><code class="language-move">module example_addr::example {
+    struct Example has copy, drop { a: address }
+
+    use std::debug;
+    friend example_addr::another_example;
+
+    public fun print() {
+        let example = Example { a: @example_addr };
+        debug::print(&amp;example)
+    }
+}
+</code></pre>
+<p>Because named addresses only exist at the source language level and during compilation,
+named addresses will be fully substituted for their value at the bytecode
+level. For example if we had the following code:</p>
+<pre><code class="language-move">script {
+    fun example() {
+        my_addr::m::foo(@my_addr);
+    }
+}
+</code></pre>
+<p>and we compiled it with <code>my_addr</code> set to <code>0xC0FFEE</code>, then it would be equivalent
+to the following operationally:</p>
+<pre><code class="language-move">script {
+    fun example() {
+        0xC0FFEE::m::foo(@0xC0FFEE);
+    }
+}
+</code></pre>
+<p>However, at the source level, these <em>are not equivalent</em>—the function
+<code>m::foo</code> <em>must</em> be accessed through the <code>my_addr</code> named address, and not through
+the numerical value assigned to that address.</p>
+<p>Module names can start with letters <code>a</code> to <code>z</code> or letters <code>A</code> to <code>Z</code>. After the first character, module names can contain underscores <code>_</code>, letters <code>a</code> to <code>z</code>, letters <code>A</code> to <code>Z</code>, or digits <code>0</code> to <code>9</code>.</p>
+<pre><code class="language-move">module my_module {}
+module foo_bar_42 {}
+</code></pre>
+<p>Typically, module names start with a lowercase letter. A module named <code>my_module</code> should be stored in a source file named <code>my_module.move</code>.</p>
+<p>All elements inside a <code>module</code> block can appear in any order.
+Fundamentally, a module is a collection of <a href="#structs-and-resources"><code>types</code></a> and <a href="#functions"><code>functions</code></a>.
+The <a href="#uses-and-aliases"><code>use</code></a> keyword is used to import types from other modules.
+The <a href="#friends"><code>friend</code></a> keyword specifies a list of trusted modules.
+The <a href="#constants"><code>const</code></a> keyword defines private constants that can be used in the functions of a module.</p>
 <div style="break-before: page; page-break-before: always;"></div>
 <h1 id="packages"><a class="header" href="#packages">Packages</a></h1>
 <p>Packages allow Move programmers to more easily re-use code and share it
@@ -5568,7 +5495,7 @@ authors* = [&lt;string&gt;]            # e.g., ["Joe Smith (joesmith@noemail.com
 # One or more lines declaring dev dependencies in the following format
 &lt;string&gt; = { local = &lt;string&gt;, addr_subst* = { (&lt;string&gt; = (&lt;string&gt; | &lt;address&gt;))+ } }
 </code></pre>
-<p>An example of a minimal package manifest with one local dependency and one git dependency:</p>
+<p>An example of a minimal package manifest:</p>
 <pre><code class="language-toml">[package]
 name = "AName"
 version = "0.0.0"
@@ -5682,7 +5609,7 @@ coming from <code>P1</code>:</p>
 }
 </code></pre>
 <p>It is important to note that <em>renaming is not local</em>: once a named address <code>N</code>
-has been renamed to <code>N2</code> in a package <code>P</code> all packages that import <code>P</code> will not
+has been renamed to <code>N2</code> in a package <code>P</code>, all packages that import <code>P</code> will not
 see <code>N</code> but only <code>N2</code> unless <code>N</code> is reintroduced from outside of <code>P</code>. This is
 why rule (2) in the scoping rules at the start of this section specifies a
 “dependency path in the package graph between <code>P</code> and the declaring
@@ -5697,7 +5624,7 @@ This presents issues if the package wishes to expose an uninstantiated named
 address. This is what the <code>[dev-addresses]</code> section solves. This section can
 set values for named addresses, but cannot introduce any named addresses.
 Additionally, only the <code>[dev-addresses]</code> in the root package are included in
-<code>dev</code> mode. For example a root package with the following manifest would not compile
+<code>dev</code> mode. For example, a root package with the following manifest would not compile
 outside of <code>dev</code> mode since <code>named_addr</code> would be uninstantiated:</p>
 <pre><code class="language-toml">[package]
 name = "ExamplePkg"
@@ -5748,10 +5675,10 @@ the <code>CompiledPackage</code> laid out in the file system in the following fo
 <p>See the <code>move-package</code> crate for more information on these data structures and
 how to use the Move package system as a Rust library.</p>
 <h2 id="using-bytecode-for-dependencies"><a class="header" href="#using-bytecode-for-dependencies">Using Bytecode for Dependencies</a></h2>
-<p>Move bytecode can be used as dependencies when the Move source code for those dependencies are not available locally. To use this feature, you will need co-locate the files in directories at the same level and then specify their paths in the corresponding <code>Move.toml</code> files.</p>
+<p>Move bytecode can be used as dependencies when the Move source code for those dependencies is not available locally. To use this feature, you will need to co-locate the files in directories at the same level and then specify their paths in the corresponding <code>Move.toml</code> files.</p>
 <h2 id="requirements-and-limitations"><a class="header" href="#requirements-and-limitations">Requirements and limitations</a></h2>
 <p>Using local bytecode as dependencies requires bytecode files to be downloaded locally, and the actual address for each named address must be specified in either <code>Move.toml</code> or through <code>--named-addresses</code>.</p>
-<p>Note, both <code>aptos move prove</code> and <code>aptos move test</code> commands, currently, do not support bytecode as dependencies.</p>
+<p>Note that both the <code>aptos move prove</code> and <code>aptos move test</code> commands currently do not support bytecode as dependencies.</p>
 <h2 id="recommended-structure"><a class="header" href="#recommended-structure">Recommended structure</a></h2>
 <p>We use an example to illustrate the development flow of using this feature. Suppose we want to compile the package <code>A</code>. The package layout is:</p>
 <pre><code>A/
@@ -5769,7 +5696,7 @@ how to use the Move package system as a Rust library.</p>
 }
 </code></pre>
 <p>Suppose the source of <code>Bar</code> and <code>Foo</code> are not available but the corresponding bytecode <code>Bar.mv</code> and <code>Foo.mv</code> are available locally. To use them as dependencies, we would:</p>
-<p>Specify <code>Move.toml</code> for <code>Bar</code> and <code>Foo</code>. Note that named addresses are already instantiated with the actual address in the bytecode. In our example, the actual address for <code>C</code> is already bound to <code>0x3</code>. As a result, <code>[addresses]</code> must be specified <code>C</code> as <code>0x3</code>, as shown below:</p>
+<p>Specify <code>Move.toml</code> for <code>Bar</code> and <code>Foo</code>. Note that named addresses are already instantiated with the actual address in the bytecode. In our example, the actual address for <code>C</code> is already bound to <code>0x3</code>. As a result, the <code>[addresses]</code> section must specify <code>C</code> as <code>0x3</code>, as shown below:</p>
 <pre><code class="language-toml filename=&quot;workspace/C/Move.toml&quot;">[package]
 name = "Foo"
 version = "0.0.0"
@@ -5838,7 +5765,7 @@ under a single, stable, well-known account address that doesn’t change. If a
 module upgrade happens, all consumers of that module will automatically receive
 the latest version of the code (e.g., the next time they interact with it).</p>
 <p>The Aptos blockchain natively supports different <em>upgrade policies</em>, which allow
-move developers to explicitly define the constraints around how their move code
+Move developers to explicitly define the constraints around how their Move code
 can be upgraded. The default policy is <em>backwards compatible</em>. This means that
 code upgrades are accepted only if they guarantee that no existing resource storage
 or public APIs are broken by the upgrade (including public functions).
@@ -5864,7 +5791,7 @@ upgrade_policy = "compatible"
 </blockquote>
 <h2 id="how-to-upgrade"><a class="header" href="#how-to-upgrade">How to upgrade</a></h2>
 <p>To upgrade already published Move code, simply attempt to republish the code at
-the same address that it was previously published. This can be done by following the
+the same address where it was previously published. This can be done by following the
 instructions for code compilation and publishing using the
 <a href="https://aptos.dev/build/cli/working-with-move-contracts">Aptos CLI</a>. For an example,
 see the <a href="https://aptos.dev/build/guides/first-move-module">Your First Move Module</a> tutorial.</p>
@@ -5884,7 +5811,7 @@ before. New functions, including public and entry functions, can be added.</li>
 <li><code>immutable</code>: the code is not upgradeable and is guaranteed to stay the same
 forever.</li>
 </ul>
-<p>Those policies are ordered regarding strength such that <code>compatible &lt; immutable</code>,
+<p>Those policies are ordered by strength such that <code>compatible &lt; immutable</code>,
 i.e., compatible is weaker than immutable. The policy of a package on-chain can
 only get stronger, not weaker. Moreover, the policy of all dependencies of a
 package must be stronger or equal to the policy of the given package. For example,
@@ -5900,7 +5827,7 @@ published previously need to be compatible and follow the rules below:</p>
 <ul>
 <li>All existing structs’ fields cannot be updated. This means no new fields can be added and existing fields cannot be
 modified.</li>
-<li>All public and entry functions cannot change their signature (argument types, type argument, return types). However,
+<li>All public and entry functions cannot change their signature (argument types, type arguments, return types). However,
 argument names can change.</li>
 <li><code>public(friend)</code> functions are treated as private and thus their signature can arbitrarily change. This is safe as
 only modules in the same package can call friend functions anyway, and they need to be updated if the signature changes.</li>
@@ -5914,8 +5841,8 @@ applications that depend on the upgraded code. These effects can come from bugs,
 but they can also be the result of malicious upgrades. For example,
 an upgraded dependency can suddenly make all functions abort, breaking the
 operation of your Move code. Alternatively, an upgraded dependency can make
-all functions suddenly cost much more gas to execute then before the upgrade.
-As result, dependencies to upgradeable packages need to be handled with care:</p>
+all functions suddenly cost much more gas to execute than before the upgrade.
+As a result, dependencies on upgradeable packages need to be handled with care:</p>
 <ul>
 <li>The safest dependency is, of course, an <code>immutable</code> package. This guarantees
 that the dependency will never change, including its transitive dependencies.
@@ -5925,7 +5852,7 @@ and independent package. This is because major versioning can be expressed
 only by name (e.g., <code>module feature_v1</code> and <code>module feature_v2</code>). However,
 not all package owners like to publish their code as <code>immutable</code>, because this
 takes away the ability to fix bugs and update the code in place.</li>
-<li>If you have a dependency to a <code>compatible</code> package, it is highly
+<li>If you have a dependency on a <code>compatible</code> package, it is highly
 recommended you know and understand the entity publishing the package.
 The highest level of assurance is when the package is governed by a
 Decentralized Autonomous Organization (DAO) where no single user can initiate
@@ -5938,7 +5865,7 @@ ways to publish code from anywhere in your smart contracts. However,
 notice that code published in the current transaction can be executed
 only after that transaction ends.</p>
 <p>The Aptos framework itself, including all the on-chain administration logic, is
-an example for programmatic upgrade. The framework is marked as <code>compatible</code>.
+an example of a programmatic upgrade. The framework is marked as <code>compatible</code>.
 Upgrades happen via specific generated governance scripts. For more details,
 see <a href="https://aptos.dev/network/blockchain/governance">Aptos Governance</a>.</p>
 <div style="break-before: page; page-break-before: always;"></div>
@@ -5975,8 +5902,8 @@ execution errors, such as <code>arithmetic_error</code>, <code>major_status</cod
 <p>If the error is expected from a specific location, that may also be specified:
 <code>#[expected_failure(abort_code = &lt;code&gt;, location = &lt;loc&gt;)]</code>.
 If the test then fails with the right error but in a different module, the test will also fail.
-Note that <code>&lt;loc&gt;</code> can be <code>Self</code>(in the current module) or a qualified name, e.g. <code>vector::std</code>.</p>
-<p>Only functions that have the <code>#[test]</code> annotation can also be annotated as an #<code>[expected_failure]</code>.</p>
+Note that <code>&lt;loc&gt;</code> can be <code>Self</code> (the current module) or a qualified name, e.g., <code>vector::std</code>.</p>
+<p>Only functions that have the <code>#[test]</code> annotation can also be annotated as <code>#[expected_failure]</code>.</p>
 <pre><code class="language-move">module 0x42::example {
   #[test]
   #[expected_failure]
@@ -6124,7 +6051,7 @@ Running Move unit tests
 Test result: OK. Total tests: 2; passed: 2; failed: 0
 </code></pre>
 <h4 id="--coverage"><a class="header" href="#--coverage"><code>--coverage</code></a></h4>
-<p>This will compute code being covered by test cases and generate coverage summary.</p>
+<p>This will compute code coverage from test cases and generate a coverage summary.</p>
 <pre><code class="language-shellscript filename=&quot;Terminal&quot;">$ aptos move test --coverage
 INCLUDING DEPENDENCY AptosFramework
 INCLUDING DEPENDENCY AptosStdlib
@@ -6180,7 +6107,7 @@ Please use `aptos move coverage -h` for more detailed source or bytecode test co
 <p>Each of these instructions is parameterized by a type <code>T</code> with the <a href="#abilities"><code>key</code> ability</a>. However, each type <code>T</code> <em>must be declared in the current module</em>. This ensures that a resource can only be manipulated via the API exposed by its defining module. The instructions also take either an <a href="#address"><code>address</code></a> or <a href="#signer"><code>&amp;signer</code></a> representing the account address where the resource of type <code>T</code> is stored.</p>
 <p>See also <a href="#index-notation-for-storage-operators">index notation (<code>[]</code>)</a> for accessing global storage.</p>
 <h2 id="references-to-resources"><a class="header" href="#references-to-resources">References to resources</a></h2>
-<p>References to global resources returned by <code>borrow_global</code> or <code>borrow_global_mut</code> mostly behave like references to local storage: they can be extended, read, and written using ordinary <a href="#references">reference operators</a> and passed as arguments to other function. However, there is one important difference between local and global references: <strong>a function cannot return a reference that points into global storage</strong>. For example, these two functions will each fail to compile:</p>
+<p>References to global resources returned by <code>borrow_global</code> or <code>borrow_global_mut</code> mostly behave like references to local storage: they can be extended, read, and written using ordinary <a href="#references">reference operators</a> and passed as arguments to other functions. However, there is one important difference between local and global references: <strong>a function cannot return a reference that points into global storage</strong>. For example, these two functions will each fail to compile:</p>
 <pre><code class="language-move">module 0x42::example {
   struct R has key { f: u64 }
   // will not compile
@@ -6370,7 +6297,7 @@ storage. <a href="#reference-safety-for-global-resources">This section</a> conta
 }
 </code></pre>
 <p>Line 16 acquires a reference to a global resource <code>m1::T</code>, then line 17 removes that same resource, which makes <code>t_ref</code> dangle. In this case, <code>acquires</code> annotations do not help us because the <code>borrow_then_remove_bad</code> function is outside the <code>m1</code> module that declares <code>T</code> (recall that <code>acquires</code> annotations can only be used for resources declared in the current module). Instead, the type system avoids this problem by preventing the return of a global reference at line 6.</p>
-<p>Fancier type systems that would allow returning global references without sacrificing reference safety are possible, and we may consider them in future iterations of Move. We chose the current design because it strikes a good balance between being expressive, annotation burden, and type system complexity.</p>
+<p>Fancier type systems that would allow returning global references without sacrificing reference safety are possible, and we may consider them in future iterations of Move. We chose the current design because it strikes a good balance between expressiveness, annotation burden, and type system complexity.</p>
 <h2 id="index-notation-for-storage-operators"><a class="header" href="#index-notation-for-storage-operators">Index Notation for Storage Operators</a></h2>
 <p><em>Since language version 2.0</em></p>
 <p>Instead of the verbose <code>borrow_global</code> and <code>borrow_global_mut</code> functions, one
@@ -6441,20 +6368,20 @@ additional constructs, as discussed in the following sections.</p>
 If an integer (either a constant or a variable) is not involved in any bitwise operations directly or indirectly,
 regardless of its type in Move (<code>u8</code>, <code>u16</code>, <code>u32</code>, <code>u64</code>, <code>u128</code> and <code>u256</code>), it is treated as the same type. In
 specifications, this type is called <code>num</code>, which is an arbitrary precision <em>signed</em> integer type.
-When MSL refers to a Move name that represents an <code>u8</code> or such, it will be automatically widened
+When MSL refers to a Move name that represents a <code>u8</code> or such, it will be automatically widened
 to <code>num</code>. This allows writing MSL expressions like <code>x + 1 &lt;= MAX_U128</code> or <code>x - y &gt;= 0</code> without
 needing to worry about overflow or underflow.
-Different from <code>num</code>, <code>bv</code> cannot and does not need to be explicitly used in specifications: if an integer is involved in bitwise operations such as <code>&amp;</code>, <code>|</code> or <code>^</code>, it will be automatically encoded as <code>bv</code>at the backend.
-Moreover, a <code>bv</code> integer has a fixed precision, which is consistent with its precision in Move (<code>bv8</code>, <code>bv16</code>, <code>bv32</code>, <code>bv64</code>, <code>bv128</code> and <code>bv256</code>).
-Note that, in general using <code>bv</code> is not so efficient as <code>num</code> in the <a href="https://en.wikipedia.org/wiki/Satisfiability_modulo_theories">SMT</a> solver such as <a href="https://github.com/Z3Prover/z3">Z3</a>. Consequently,
+Unlike <code>num</code>, <code>bv</code> cannot and does not need to be explicitly used in specifications: if an integer is involved in bitwise operations such as <code>&amp;</code>, <code>|</code>, or <code>^</code>, it will be automatically encoded as <code>bv</code> at the backend.
+Moreover, a <code>bv</code> integer has a fixed precision, which is consistent with its precision in Move (<code>bv8</code>, <code>bv16</code>, <code>bv32</code>, <code>bv64</code>, <code>bv128</code>, and <code>bv256</code>).
+Note that, in general, using <code>bv</code> is not as efficient as <code>num</code> in the <a href="https://en.wikipedia.org/wiki/Satisfiability_modulo_theories">SMT</a> solver such as <a href="https://github.com/Z3Prover/z3">Z3</a>. Consequently,
 the Move Prover has some restrictions when using bitwise operations, which are stated in detail below.</li>
 <li>The Move types <code>&amp;T</code>, <code>&amp;mut T</code>, and <code>T</code> are considered equivalent for MSL. Equality is interpreted
 as value equality. There is no need to worry about dereferencing a reference from the Move
 program: these are automatically dereferenced as needed. This simplification is possible because
 MSL cannot modify values from a Move program, and the program cannot directly reason about
-reference equality (which eliminates the need for doing so in MSL). (Note there is also a
+reference equality (which eliminates the need for doing so in MSL). (Note that there is also a
 restriction in expressiveness coming with this, namely
-for <a href="#expressiveness">functions which return <code>&amp;mut T</code></a>. However, this is rarely hit in practice,
+for <a href="#expressiveness">functions that return <code>&amp;mut T</code></a>. However, this is rarely hit in practice,
 and there are workarounds).</li>
 <li>There is the additional type <code>type</code>, which is the type of all types. It can be used only in
 quantifiers.</li>
@@ -6462,7 +6389,7 @@ quantifiers.</li>
 denote a value).</li>
 </ul>
 <h2 id="naming-2"><a class="header" href="#naming-2">Naming</a></h2>
-<p>Name resolution in MSL works similar to the Move language. <code>use</code> declarations can introduce aliases for
+<p>Name resolution in MSL works similarly to the Move language. <code>use</code> declarations can introduce aliases for
 imported names. MSL functions and variable names must start with a lowercase letter. Schema names
 are treated like types and must start with a capital letter. (<a href="#schemas">Schemas</a> are a named construct
 discussed later).</p>
@@ -6495,7 +6422,7 @@ the function will be interpreted as:</p>
   spec fun get(addr: address): T { global&lt;T&gt;(addr) }
 }
 </code></pre>
-<p>This is justified by that MSL having <a href="#partial-semantics"><em>partial semantics</em></a>.</p>
+<p>This is justified by the fact that MSL has <a href="#partial-semantics"><em>partial semantics</em></a>.</p>
 <h2 id="statements"><a class="header" href="#statements">Statements</a></h2>
 <p>Limited sequencing of the form <code>{ let x = foo(); x + x }</code> is supported, as well as if-then-else.
 Other statement forms of the Move language are not supported.</p>
@@ -6509,7 +6436,7 @@ exists &lt;binding&gt;, ..., &lt;binding&gt; [ where &lt;exp&gt; ] : &lt;exp&gt;
 <ul>
 <li>Bindings can either be of the form <code>name: &lt;type&gt;</code> or <code>name in &lt;exp&gt;</code>. For the second form, the
 expression must either be a <code>range</code> or a vector.</li>
-<li>The optional constraint <code>where &lt;exp&gt;</code> allows to restrict the quantified range. <code>forall x: T where p: q</code>
+<li>The optional constraint <code>where &lt;exp&gt;</code> allows restricting the quantified range. <code>forall x: T where p: q</code>
 is equivalent to <code>forall x: T : p ==&gt; q</code> and <code>exists x: T where p: q</code> is equivalent to <code>exists x: T : p &amp;&amp; q</code>.</li>
 </ul>
 <h2 id="choice-operator"><a class="header" href="#choice-operator">Choice operator</a></h2>
@@ -6523,15 +6450,15 @@ is equivalent to <code>forall x: T : p ==&gt; q</code> and <code>exists x: T whe
 <h2 id="cast-operator"><a class="header" href="#cast-operator">Cast operator</a></h2>
 <p>In the specification language, we can use the same syntax <code>(e as T)</code> to cast an expression <code>e</code> with one integer type to <code>T</code>, an integer type of another size.</p>
 <h2 id="shift-operator"><a class="header" href="#shift-operator">Shift operator</a></h2>
-<p>Shift operators <code>&lt;&lt;</code> and <code>&gt;&gt;</code> are supported in the specification language, and both of them have the same semantics with the Move language. As for abort, if a value <code>v</code> has width <code>n</code>, then <code>v &lt;&lt; m</code> or <code>v &gt;&gt; m</code> will abort if <code>m &gt;= n</code>.</p>
+<p>Shift operators <code>&lt;&lt;</code> and <code>&gt;&gt;</code> are supported in the specification language, and both of them have the same semantics as in the Move language. As for abort, if a value <code>v</code> has width <code>n</code>, then <code>v &lt;&lt; m</code> or <code>v &gt;&gt; m</code> will abort if <code>m &gt;= n</code>.</p>
 <h2 id="bitwise-operators"><a class="header" href="#bitwise-operators">Bitwise operators</a></h2>
-<p>Move programs using bitwise operators <code>&amp;</code>, <code>|</code> and <code>^</code> can be verified in the prover, and these operators are also supported in the specification language.
+<p>Move programs using bitwise operators <code>&amp;</code>, <code>|</code>, and <code>^</code> can be verified by the prover, and these operators are also supported in the specification language.
 Due to encoding and efficiency issues, using bitwise operators has more caveats:</p>
 <ul>
 <li>
 <p>Integers involved in bitwise operations are encoded as <code>bv</code> types at the backend, and two encodings of integers are not compatible. For instance, if a variable <code>v</code> is involved in a bitwise operation such as <code>v &amp; 2</code> or <code>v = a ^ b</code>, then when it is used in an arithmetic operation <code>v * w</code> or a shift operation <code>v &lt;&lt; w</code>, <code>w</code> will be implicitly cast to a <code>bv</code> type in the Move program.
 However, the specification language does not support implicit type cast so users must explicitly use the built-in function <code>int2bv</code> in the specification: <code>v &lt;&lt; int2bv(w)</code>.
-Not that since each <code>bv</code> type has a fixed length (from 8 to 256), values with type <code>num</code> cannot be converted into <code>bv</code>.</p>
+Note that since each <code>bv</code> type has a fixed length (from 8 to 256), values of type <code>num</code> cannot be converted into <code>bv</code>.</p>
 </li>
 <li>
 <p>Verification of <code>bv</code> types is not efficient and may lead to timeout. As a result, users may prefer isolating bitwise operations from other operations and not using <code>int2bv</code> if possible. Moreover, users need to use pragmas to explicitly specify which integer-typed function arguments or struct fields will be used in bitwise computations:</p>
@@ -6577,17 +6504,17 @@ they will be of <code>bv</code> types in all instances of the function or the st
 <p>MSL supports a number of built-in constants and functions. Most of them are not available in the Move
 language:</p>
 <ul>
-<li><code>MAX_U8: num</code>, <code>MAX_U64: num</code>, <code>MAX_U128: num</code> returns the maximum value of the corresponding
+<li><code>MAX_U8: num</code>, <code>MAX_U64: num</code>, <code>MAX_U128: num</code> return the maximum value of the corresponding
 type.</li>
-<li><code>exists&lt;T&gt;(address): bool</code> returns true if the resource T exists at address.</li>
-<li><code>global&lt;T&gt;(address): T</code> returns the resource value at address.</li>
+<li><code>exists&lt;T&gt;(address): bool</code> returns true if the resource <code>T</code> exists at the address.</li>
+<li><code>global&lt;T&gt;(address): T</code> returns the resource value at the address.</li>
 <li><code>len&lt;T&gt;(vector&lt;T&gt;): num</code> returns the length of the vector.</li>
 <li><code>update&lt;T&gt;(vector&lt;T&gt;, num, T&gt;): vector&lt;T&gt;</code> returns a new vector with the element replaced at the
 given index.</li>
 <li><code>vec&lt;T&gt;(): vector&lt;T&gt;</code> returns an empty vector.</li>
 <li><code>vec&lt;T&gt;(x): vector&lt;T&gt;</code> returns a singleton vector.</li>
 <li><code>concat&lt;T&gt;(vector&lt;T&gt;, vector&lt;T&gt;): vector&lt;T&gt;</code> returns the concatenation of the parameters.</li>
-<li><code>contains&lt;T&gt;(vector&lt;T&gt;, T): bool</code> returns true if element is in vector.</li>
+<li><code>contains&lt;T&gt;(vector&lt;T&gt;, T): bool</code> returns true if the element is in the vector.</li>
 <li><code>index_of&lt;T&gt;(vector&lt;T&gt;, T): num</code> returns the index of the element in the vector, or the length of
 the vector if it does not contain it.</li>
 <li><code>range&lt;T&gt;(vector&lt;T&gt;): range</code> returns the index range of the vector.</li>
@@ -6604,7 +6531,7 @@ certain forms of invariants, as discussed later.</li>
 <li><code>TRACE(T): T</code> is semantically the identity function and causes visualization of the argument’s
 value in error messages created by the prover.</li>
 <li><code>int2bv(v)</code> explicitly converts an integer <code>v</code> into its <code>bv</code> representation.</li>
-<li><code>bv2int(b)</code> explicitly converts a ‘bv’ integer ‘b’ into the <code>num</code> representation. However, it is not encouraged to use it due to efficiency issue.</li>
+<li><code>bv2int(b)</code> explicitly converts a <code>bv</code> integer <code>b</code> into the <code>num</code> representation. However, its use is not encouraged due to efficiency issues.</li>
 </ul>
 <p>Built-in functions live in an unnamed outer scope of a module. If the module defines a function <code>len</code>,
 then this definition will shadow that of the according built-in function. To access the built-in
@@ -6617,11 +6544,10 @@ some assignments to variables in <code>X</code> but is unknown for others. An un
 sub-expression causes no issue if its value is not needed for the overall expression result.
 Therefore, it does not matter if we say <code>y != 0 &amp;&amp; x / y &gt; 0</code>
 or <code>x / y &gt; 0 &amp;&amp; y != 0</code>: boolean operators are commutative.</p>
-<p>This basic principle inherits to higher-level language constructs. For example, in specifications,
+<p>This basic principle applies to higher-level language constructs. For example, in specifications,
 it does not matter in which order conditions are supplied: <code>aborts_if y != 0; ensures result == x / y;</code> is the same as
 <code>ensures result == x / y; aborts_if y != 0;</code>. Also, <code>aborts_if P; aborts_if Q;</code> is the same
-as <code>aborts_if Q || P</code>
-.</p>
+as <code>aborts_if Q || P</code>.</p>
 <p>Moreover, the principle of partial semantics is inherited to <a href="#helper-functions">specification helper functions</a>, which behave transparently. Specifically, inlining those functions is equivalent to calling them (call-by-expression parameter passing semantics).</p>
 <h1 id="specifications"><a class="header" href="#specifications">Specifications</a></h1>
 <p>Specifications are contained in so-called <em>specification blocks</em> (abbreviated <strong>spec block</strong>) that
@@ -6667,7 +6593,7 @@ below, and will be discussed in subsequent sections.</p>
   }
 }
 </code></pre>
-<p>Apart from spec blocks inside Move functions, the textual position of spec block is irrelevant. Also,
+<p>Apart from spec blocks inside Move functions, the textual position of a spec block is irrelevant. Also,
 a spec block for a struct, function, or module can be repeated multiple times, accumulating the
 content.</p>
 <h2 id="separating-specifications"><a class="header" href="#separating-specifications">Separating specifications</a></h2>
@@ -6742,10 +6668,10 @@ Furthermore, the default value of some pragmas can be defined via the prover con
 </thead>
 <tbody>
 <tr><td><code>verify</code></td><td>Turns on or off verification.</td></tr>
-<tr><td><code>intrinsic</code></td><td>Marks a function to skip the Move implementation and use a prover native implementation. This makes a function behave like a native function even if it not so in Move.</td></tr>
-<tr><td><code>timeout</code></td><td>Sets a timeout (in seconds) for function or module. Overrides the timeout provided by command line flags.</td></tr>
-<tr><td><code>verify_duration_estimate</code></td><td>Sets an estimate (in seconds) for how long the verification of function takes. If the configured <code>timeout</code> is less than this value, verification will be skipped.</td></tr>
-<tr><td><code>seed</code></td><td>Sets a random seed for function or module. Overrides the seed provided by command line flags.</td></tr>
+<tr><td><code>intrinsic</code></td><td>Marks a function to skip the Move implementation and use a prover-native implementation. This makes a function behave like a native function even if it is not so in Move.</td></tr>
+<tr><td><code>timeout</code></td><td>Sets a timeout (in seconds) for a function or module. Overrides the timeout provided by command-line flags.</td></tr>
+<tr><td><code>verify_duration_estimate</code></td><td>Sets an estimate (in seconds) for how long the verification of a function takes. If the configured <code>timeout</code> is less than this value, verification will be skipped.</td></tr>
+<tr><td><code>seed</code></td><td>Sets a random seed for a function or module. Overrides the seed provided by command-line flags.</td></tr>
 </tbody>
 </table>
 </div>
@@ -6764,8 +6690,8 @@ Furthermore, the default value of some pragmas can be defined via the prover con
 <p>Multiple conditions in spec blocks work with a <em>pre</em> and <em>post</em> state, relating them to each other.
 Function specifications are one example of this: in the <code>ensures P</code> condition, the pre-state (at
 function entry) and the post-state (at function exit) are related via the predicate <code>P</code>. However,
-the concept is more general and also applied for invariants, where the pre-state is before and
-post-state after a global update.</p>
+the concept is more general and also applies to invariants, where the pre-state is before and the
+post-state is after a global update.</p>
 <p>In contexts where a pre/post-state is active, expressions are evaluated implicitly in the
 post-state. To evaluate an expression in a pre-state, one uses the built-in function <code>old(exp)</code>,
 which evaluates its parameter in the pre-state and returns its value. It is important to understand
@@ -6808,7 +6734,7 @@ within the definition of a helper function.</p>
   spec fun something(x: num): num;
 }
 </code></pre>
-<p>An uninterpreted function is one of the prover is allowed to assign some arbitrary meaning to, as long
+<p>An uninterpreted function is one to which the prover is allowed to assign some arbitrary meaning, as long
 as it is consistent within a given verification context. Uninterpreted functions are a useful tool
 for abstraction in specifications (see also <a href="#abstract-specifications">abstract specifications</a>).</p>
 <h3 id="axioms"><a class="header" href="#axioms">Axioms</a></h3>
@@ -6909,7 +6835,7 @@ condition.</p>
 <p>This same constant can be used for all other VM failures (division by zero, overflow, etc.).</p>
 <h2 id="aborts_with-condition"><a class="header" href="#aborts_with-condition">Aborts_with condition</a></h2>
 <p>The <code>aborts_with</code> condition allows specifying with which codes a function can abort, independent
-under which condition. It is similar to a ‘throws’ clause in languages like Java.</p>
+of the condition under which it aborts. It is similar to a <code>throws</code> clause in languages like Java.</p>
 <pre><code class="language-move">module 0x42::m {
   fun get_one_off(addr: address): u64 {
     aborts(exists&lt;Counter&gt;(addr), 3);
@@ -7002,7 +6928,7 @@ address-valued expression is evaluated in the pre-state of the annotated functio
 }
 </code></pre>
 <p>In the function <code>mutate_S_test</code>, the assertion in the spec block is expected to hold. A benefit of
-the modifies specification on <code>mutate_at</code> is that this assertion can be proved whether <code>mutate_at</code> is inlined.</p>
+the modifies specification on <code>mutate_at</code> is that this assertion can be proved whether or not <code>mutate_at</code> is inlined.</p>
 <p>If the modifies annotation is omitted on a function, then that function is deemed to have all
 possible permissions for those resources it may modify during its execution. The set of all
 resources that may be modified by a function is obtained via an interprocedural analysis of the
@@ -7012,7 +6938,7 @@ possible address. Instead, if the programmer adds <code>modifies global&lt;S&gt;
 to the specification of <code>mutate_S_test</code>, then the call to <code>mutate_at</code> is checked to make sure that
 modify permissions granted to <code>mutate_S_test</code> cover the permissions it grants to <code>mutate_at</code>.</p>
 <h2 id="invariant-condition"><a class="header" href="#invariant-condition">Invariant condition</a></h2>
-<p>The invariant condition can be applied on structs and on global level.</p>
+<p>The invariant condition can be applied to structs and at the global level.</p>
 <h3 id="function-invariants"><a class="header" href="#function-invariants">Function invariants</a></h3>
 <p>The <code>invariant</code> condition on a function is simply a shortcut for a <code>requires</code> and <code>ensures</code> with the
 same predicate.</p>
@@ -7035,7 +6961,7 @@ same predicate.</p>
 <p>When the <code>invariant</code> condition is applied to a struct, it expresses a well-formedness property of
 the struct data. Any instance of this struct that is currently not mutated will satisfy this
 property (with exceptions as outlined below).</p>
-<p>For example, we can postulate an invariant on our counter that it never must exceed the value of
+<p>For example, we can postulate an invariant on our counter that it must never exceed the value of
 127:</p>
 <pre><code class="language-move">module 0x42::m {
   spec Counter {
@@ -7053,7 +6979,7 @@ ends).</p>
 <p>There is one exception to this rule. When a mutable reference to a struct declared in module M is
 passed into a <em>public</em> function of M which does by itself <em>not</em> return any other mutable reference (which could be borrowed from the input parameter), we treat this parameter as “packed”. That means, on function entry, we will unpack it and on function exit we will pack again, enforcing the invariant. This reflects that in Move, struct data can be mutated only within the module that declares the struct; so for an outside caller of the public function, the mutable reference can actually not be mutated unless by calling public functions of module M again. It is a significant simplification of the verification problem to exploit this in the semantics.</p>
 <h3 id="global-invariants"><a class="header" href="#global-invariants">Global invariants</a></h3>
-<p>A global invariant appears as a member of module. It can express a condition over the global state
+<p>A global invariant appears as a member of a module. It can express a condition over the global state
 of the Move program, as represented by resources stored in memory. For example, the below invariant
 states that a <code>Counter</code> resource stored at any given address can never be zero:</p>
 <pre><code class="language-move">module addr::M {
@@ -7093,7 +7019,7 @@ several structs are published together. Almost everywhere, an invariant holds th
 </code></pre>
 <p>As written, the Move Prover will report that the invariant is violated after the call to <code>publish1</code> and before the call to <code>publish2</code>. If either of <code>publish1</code> or <code>publish2</code> is without the other, the Move Prover
 will also report a violation of the invariant.</p>
-<p>By default, a global invariant is checked immediately after the instruction <code>I</code> that touches the resources mentioned in the global invariant. The <code>[suspendable]</code> attribute (at the invariant side) together with two pragmas (specified in function spec block) provide fine-grained control on where we hope this invariant to be checked:</p>
+<p>By default, a global invariant is checked immediately after the instruction <code>I</code> that touches the resources mentioned in the global invariant. The <code>[suspendable]</code> attribute (on the invariant) together with two pragmas (specified in a function spec block) provide fine-grained control over where this invariant is checked:</p>
 <ul>
 <li><code>disable_invariants_in_body</code>: the invariant will be checked at the end of the function where <code>I</code> resides.</li>
 <li><code>delegate_invariants_to_caller</code>: the invariant will be checked by all callers of the function where <code>I</code> resides.</li>
@@ -7125,10 +7051,10 @@ would have the same behavior for any functions called by <code>publish1</code> o
 <p>This would be legal only if <code>setup</code> is a private or <code>public (friend)</code> function. The difference between this and disabling invariants in <code>setup</code> is that the invariants would not be assumed at the beginning of <code>setup</code> and would be proved after <code>setup</code> returns at each site where it is called.</p>
 <p>While both pragmas disable invariants in the body of a function, the difference is that <code>disable_invariants_in_body</code> assumes invariants on entry and proves them on exit, while <code>delegate_invariants_to_caller</code> does neither.</p>
 <p>There are some limitations on how these pragmas can be used. <code>disable_invariants_in_body</code> cannot be declared for functions where invariants are delegated to a caller, either explicitly via the pragma
-or implicitly because the function is called in a context where invariants have been disabled. (This restriction is to ensure consistent processing, because on pragma assumes that invariants hold
-in the calling context and the other does not). Second, it is illegal for a public or script function to delegate invariant checking to its callers (since the Move Prover does not know all the call sites), <em>unless</em> the function cannot possibly invalidate an invariant because it doesn’t change any of the state mentioned in <code>exists</code> and <code>global</code> expressions appearing in the invariant.</p>
+or implicitly because the function is called in a context where invariants have been disabled. (This restriction is to ensure consistent processing, because one pragma assumes that invariants hold
+in the calling context and the other does not.) Second, it is illegal for a public or script function to delegate invariant checking to its callers (since the Move Prover does not know all the call sites), <em>unless</em> the function cannot possibly invalidate an invariant because it doesn’t change any of the state mentioned in <code>exists</code> and <code>global</code> expressions appearing in the invariant.</p>
 <h4 id="update-invariants"><a class="header" href="#update-invariants">Update invariants</a></h4>
-<p>The <code>update</code> form of a global invariant allows to express a relation between <a href="#pre-and-post-state">pre-state and post-state</a> of a global state update. For example, the following invariant states that the counter must decrease monotonically whenever it is updated:</p>
+<p>The <code>update</code> form of a global invariant allows expressing a relation between the <a href="#pre-and-post-state">pre-state and post-state</a> of a global state update. For example, the following invariant states that the counter must decrease monotonically whenever it is updated:</p>
 <pre><code class="language-move">module addr::M {
     invariant update [global] forall a: addr where old(exists&lt;Counter&gt;(a)) &amp;&amp; exists&lt;Counter&gt;(addr):
         global&lt;Counter&gt;(a).value &lt;= old(global&lt;Counter&gt;(a));
@@ -7209,7 +7135,7 @@ following example:</p>
   }
 }
 </code></pre>
-<p>A loop invariant is translated into two <code>assert</code> statements and one <code>assume</code> statement to facilitate the inductive reasoning of properties about the loop. In break down, a loop invariant is translated to:</p>
+<p>A loop invariant is translated into two <code>assert</code> statements and one <code>assume</code> statement to facilitate inductive reasoning about properties of the loop. Specifically, a loop invariant is translated to:</p>
 <ul>
 <li>An <code>assert</code> statement that confirms the invariant holds when the loop is first encountered in the
 execution – establishing the base case.</li>
@@ -7220,7 +7146,7 @@ execution – establishing the base case.</li>
 <p>Occasionally, we would like to refer to the pre-state of a mutable function argument in inline spec
 blocks. In MSL, this can be done with the <code>old(T)</code> expression. Similar to the semantics of <code>old(..)</code>
 in post conditions, an <code>old(T)</code> expression in an <code>assume</code> or <code>assert</code> statement always yields the
-value of <code>T</code> at the function entry point. Here is an example that illustrate the use of
+value of <code>T</code> at the function entry point. Here is an example that illustrates the use of
 <code>old(..)</code> in an inline spec block:</p>
 <pre><code class="language-move">module 0x42::m {
   fun swap(x: &amp;mut u64, y: &amp;mut u64) {
@@ -7346,7 +7272,7 @@ but non-existing names will be added as new declarations to the inclusion contex
 <p>When a schema is included in another spec block, it will be checked whether the conditions it
 contains are allowed in this block. For example, including the schema <code>IncrementAborts</code> into a
 struct spec block will lead to a compile-time error.</p>
-<p>When a schema is included, the names it declares can also bound by expressions. For example, one can
+<p>When a schema is included, the names it declares can also be bound by expressions. For example, one can
 write <code>include IncrementAborts{a: some_helper_address()}</code>. Effectively, not providing a binding is
 equivalent to writing <code>IncrementAborts{a: a}</code> if <code>a</code> is an existing name in scope.</p>
 <p>Schemas can be generic. Generic schemas must be fully instantiated where they are included; type
@@ -7356,7 +7282,7 @@ inference is not available for schemas.</p>
 <ul>
 <li><code>P ==&gt; SchemaExp</code>: all conditions in the schema will be prefixed with <code>P ==&gt; ..</code>. Conditions that
 are not based on Boolean expressions will be rejected.</li>
-<li><code>if (P) SchemaExp1 else SchemaExp2</code>: this is treated similar to including both
+<li><code>if (P) SchemaExp1 else SchemaExp2</code>: this is treated similarly to including both
 <code>P ==&gt; SchemaExp1</code> and <code>!P ==&gt; SchemaExp2</code>.</li>
 <li><code>SchemaExp1 &amp;&amp; SchemaExp2</code>: this is treated as two includes for both schema expressions.</li>
 </ul>
@@ -7364,7 +7290,7 @@ are not based on Boolean expressions will be rejected.</li>
 <p>One of the main use cases for schemas is to be able to name a group of properties and then apply
 those to a set of functions. This is achieved by the <code>apply</code> operator. The <code>apply</code> spec block member
 can appear only in module spec blocks.</p>
-<p>The general form of the apply operator is <code>apply Schema to FunctionPattern, .. except FunctionPattern, ..</code>. Here, <code>Schema</code> can be a schema name or a schema name plus formal type arguments. <code>FunctionPatterns</code> consists of an optional visibility modifier <code>public</code> or <code>internal</code> (if not provided, both visibilities will match), a name pattern in the style of a shell file pattern ( e.g., <code>*</code>, <code>foo*</code>, <code>foo*bar</code>, etc.), and finally an optional type argument list. All type arguments provided to <code>Schema</code> must be bound
+<p>The general form of the apply operator is <code>apply Schema to FunctionPattern, .. except FunctionPattern, ..</code>. Here, <code>Schema</code> can be a schema name or a schema name plus formal type arguments. <code>FunctionPatterns</code> consists of an optional visibility modifier <code>public</code> or <code>internal</code> (if not provided, both visibilities will match), a name pattern in the style of a shell file pattern (e.g., <code>*</code>, <code>foo*</code>, <code>foo*bar</code>, etc.), and finally an optional type argument list. All type arguments provided to <code>Schema</code> must be bound
 in this list and vice versa.</p>
 <p>The <code>apply</code> operator includes the given schema in all function spec blocks that match the patterns,
 except those excluded via the <code>except</code> patterns.</p>
@@ -7385,8 +7311,8 @@ a module with some exceptions. Example:</p>
 <p>Notice that while with <a href="#global-invariants">global invariants</a> we can express similar things, we <em>cannot</em>
 express the restriction of the invariant to only specific functions.</p>
 <h2 id="opaque-specifications"><a class="header" href="#opaque-specifications">Opaque specifications</a></h2>
-<p>With the pragma <code>opaque</code>, a function is declared to be solely defined by its specification at caller
-sides. In contrast, if this pragma is not provided, then the function’s implementation will be used
+<p>With the pragma <code>opaque</code>, a function is declared to be solely defined by its specification at call
+sites. In contrast, if this pragma is not provided, then the function’s implementation will be used
 as the basis to verify the caller.</p>
 <p>Using <code>opaque</code> requires the specification to be sufficiently complete for the verification problem at hand. Without <code>opaque</code>, the Move Prover will use the implementation as the source of truth for the definition of the function. But with <code>opaque</code>, if there is an aspect of the function definition unspecified, an arbitrary meaning will be assumed. For example, with the specification below, the <code>increment</code> function can abort under arbitrary conditions:</p>
 <pre><code class="language-move">module 0x42::m {
@@ -7401,11 +7327,11 @@ as the basis to verify the caller.</p>
 of functions, resulting in much faster verification.</p>
 <p>If an <code>opaque</code> function modifies state, it is advised to use the <a href="#modifies-condition"><code>modifies</code> condition</a> in its specification. If this is omitted, verification of the state changes will fail.</p>
 <h2 id="abstract-specifications"><a class="header" href="#abstract-specifications">Abstract specifications</a></h2>
-<p>The <code>[abstract]</code> property allows specifying a function such that abstract semantics are used at the
-caller side that is different from the actual implementation. This is useful if the implementation
+<p>The <code>[abstract]</code> property allows specifying a function such that abstract semantics — different
+from the actual implementation — are used at the call site. This is useful if the implementation
 is too complex for verification, and abstract semantics are sufficient for verification goals.
-The <code>[concrete]</code> property, in turn, still allows specifying conditions that are verified against
-the implementation but not used at the caller side.</p>
+The <code>[concrete]</code> property, in turn, allows specifying conditions that are verified against
+the implementation but not used at the call site.</p>
 <p>Consider the following example of a hash function. The actual value of the hash is not relevant for
 verification of callers, and we use an <a href="#uninterpreted-functions">uninterpreted helper function</a> delivering an arbitrary value chosen by the Move Prover. We can still specify the concrete implementation and verify its correctness:</p>
 <pre><code class="language-move">module 0x42::m {
@@ -7424,7 +7350,7 @@ verification of callers, and we use an <a href="#uninterpreted-functions">uninte
 <p>The soundness of the abstraction is the responsibility of the specifier and not verified by the
 Move Prover.</p>
 <blockquote>
-<p>NOTE: The abstract/concrete properties should only be used with opaque specifications, but the Move Prover will currently not generate an error message even though they are not used with opaque specifications.</p>
+<p>NOTE: The abstract/concrete properties should only be used with opaque specifications, but the Move Prover currently does not generate an error if they are not.</p>
 </blockquote>
 <blockquote>
 <p>NOTE: The <code>modifies</code> clause does not currently support abstract/concrete. Also, if no modifies is given, the modified state will be computed from the implementation anyway, possibly conflicting with <code>[abstract]</code> properties.</p>
@@ -7432,8 +7358,53 @@ Move Prover.</p>
 <h2 id="documentation-generation"><a class="header" href="#documentation-generation">Documentation generation</a></h2>
 <p>The organization of specification blocks in a file is relevant for documentation generation – even
 though it is not for the semantics.</p>
-<h2 id="behavioral-predicates"><a class="header" href="#behavioral-predicates">Behavioral Predicates</a></h2>
+<h1 id="expressiveness"><a class="header" href="#expressiveness">Expressiveness</a></h1>
+<p>The Move specification language is expressive enough to represent the full Move language semantics (formal argument outstanding) with one exception: functions that return a <code>&amp;mut T</code> type.</p>
+<p>Consider the following code:</p>
+<pre><code class="language-move">module 0x42::m {
+  struct S { x: u64, y: u64 }
+
+  fun x_or_y(b: bool, s: &amp;mut S): &amp;mut u64 {
+    if (b) &amp;mut s.x else &amp;mut s.y
+  }
+  spec x_or_y {
+    ensures b ==&gt; result == s.x;
+    ensures !b ==&gt; result == s.y;
+  }
+}
+</code></pre>
+<p>We are not able to specify the <em>full</em> semantics of <code>x_or_y</code> in MSL because we cannot capture the
+semantics of mutable references. While we can say something about the value behind the reference at
+function exit, subsequent effects as in <code>*x_or_y(b, &amp;mut s) = 2</code> cannot be specified.</p>
+<p>However, the Move Prover <em>does</em> understand the meaning of such functions – the restriction is only
+in what we can specify. Practically, this means we cannot make the function <code>x_or_y</code> opaque and must
+let verification rely on the Move Prover working directly with the implementation. Specifically, we
+can verify the following (which can then be opaque):</p>
+<pre><code class="language-move">module 0x42::m {
+  fun x_or_y_test(s: S): S {
+    *x_or_y(true, &amp;mut s) = 2;
+    s
+  }
+  spec x_or_y_test {
+    pragma opaque;
+    ensures result.x == 2;
+    ensures result.y == s.y;
+  }
+}
+</code></pre>
+<h2 id="supporting-resources"><a class="header" href="#supporting-resources">Supporting resources</a></h2>
+<ul>
+<li><a href="https://en.wikipedia.org/wiki/Design_by_contract">Design by contract</a></li>
+<li><a href="https://github.com/aptos-labs/aptos-core/blob/main/aptos-move/framework/aptos-framework/doc/overview.md">Aptos framework documentation</a></li>
+</ul>
+<div style="break-before: page; page-break-before: always;"></div>
+<h1 id="compositional-specifications"><a class="header" href="#compositional-specifications">Compositional Specifications</a></h1>
 <p><em>Since language version 2.4</em></p>
+<p>This chapter describes the constructs that allow specifications to be
+<em>composed</em> from other specifications, including reasoning about higher-order
+functions, the global state a function may read or write, and intermediate
+states between calls.</p>
+<h2 id="behavioral-predicates"><a class="header" href="#behavioral-predicates">Behavioral Predicates</a></h2>
 <h3 id="overview"><a class="header" href="#overview">Overview</a></h3>
 <p>A key challenge in specifying higher-order functions is expressing the behavior of function parameters without knowing their implementation. Behavioral predicates solve this by lifting the specification clauses of a function — its preconditions, postconditions, and abort conditions — into first-class predicates that can be referenced in the specifications of other functions.</p>
 <p>There are four behavioral predicates:</p>
@@ -7641,7 +7612,6 @@ spec reduce {
 }
 </code></pre>
 <h2 id="access-specifiers-and-frame-conditions"><a class="header" href="#access-specifiers-and-frame-conditions">Access Specifiers and Frame Conditions</a></h2>
-<p><em>Since language version 2.4</em></p>
 <h3 id="the-modifies_of-and-reads_of-declarations"><a class="header" href="#the-modifies_of-and-reads_of-declarations">The <code>modifies_of</code> and <code>reads_of</code> Declarations</a></h3>
 <p>When a higher-order function takes a function parameter, the prover needs to know which global resources the parameter may read or write in order to establish frame conditions (what is unchanged after the call). Without <code>modifies_of</code>/<code>reads_of</code> declarations, the function parameter is treated as <strong>pure</strong>: its behavioral predicates can only reason about data arguments and return values, not global state. This is correct for transparent (non-opaque) higher-order functions, where the closure body is inlined and verified directly. For opaque higher-order functions whose parameters modify global state, <code>modifies_of</code> and/or <code>reads_of</code> declarations are required to make those effects visible to the specification.</p>
 <p>The <code>modifies_of</code> and <code>reads_of</code> declarations in a function’s specification describe these resource access permissions:</p>
@@ -7658,7 +7628,7 @@ spec reduce {
 modifies_of&lt;param_name&gt;(formal_params) Resource1[addr], Resource2[addr], ...;
 </code></pre>
 <p><code>reads_of</code> names the resource types that the function parameter may read. It takes only type names — no address expressions or parenthesized parameters.</p>
-<p><code>modifies_of</code> names the resource types that the function parameter may modify, using Move-2 index syntax (e.g. <code>Data[a]</code>) to specify the address at which modification is permitted. The formal parameters are variables that can be used in the modify target expressions — for example, <code>Data[a]</code> where <code>a</code> is a formal parameter.</p>
+<p><code>modifies_of</code> names the resource types that the function parameter may modify, using Move-2 index syntax (e.g., <code>Data[a]</code>) to specify the address at which modification is permitted. The formal parameters are variables that can be used in the modify target expressions — for example, <code>Data[a]</code> where <code>a</code> is a formal parameter.</p>
 <p>These declarations serve two purposes:</p>
 <ol>
 <li><strong>Frame conditions</strong>: The prover uses access declarations to determine which resources are unchanged after a call. Resources declared with <code>reads_of</code> are guaranteed unchanged everywhere. Resources declared with <code>modifies_of</code> using an address expression like <code>Resource[a]</code> are guaranteed unchanged at all addresses other than <code>a</code>.</li>
@@ -7804,7 +7774,6 @@ spec wrapper {
 }
 </code></pre>
 <h2 id="state-labels"><a class="header" href="#state-labels">State Labels</a></h2>
-<p><em>Since language version 2.4</em></p>
 <h3 id="motivation"><a class="header" href="#motivation">Motivation</a></h3>
 <p>Behavioral predicates like <code>ensures_of&lt;f&gt;(x, result)</code> describe a relation between the pre-state and post-state of a function call. When a function makes a single call, there is one pre-state (the function’s entry) and one post-state (the function’s exit), and these are implicit. But when a function makes <em>multiple</em> state-modifying calls, intermediate states arise: the post-state of the first call becomes the pre-state of the second call. State labels make these intermediate states explicit.</p>
 <h3 id="abstract-state"><a class="header" href="#abstract-state">Abstract State</a></h3>
@@ -7891,7 +7860,7 @@ spec wrapper {
 </ol>
 <p>This approach is sound and decoupled from the implementation — the verifier reasons about state transitions purely through the specification constraints, without tracking bytecode offsets or instruction ordering.</p>
 <h3 id="examples-4"><a class="header" href="#examples-4">Examples</a></h3>
-<p><strong>Two sequential state-modifying calls.</strong> Here <code>..S</code> <em>defines</em> state <code>S</code> as the post-state of the first call, and <code>S..</code> <em>uses</em> it as the pre-state of the second. The single-state form <code>S |~ expr</code> observes <code>expr</code> in state <code>S</code> (e.g. for abort checks):</p>
+<p><strong>Two sequential state-modifying calls.</strong> Here <code>..S</code> <em>defines</em> state <code>S</code> as the post-state of the first call, and <code>S..</code> <em>uses</em> it as the pre-state of the second. The single-state form <code>S |~ expr</code> observes <code>expr</code> in state <code>S</code> (e.g., for abort checks):</p>
 <pre><code class="language-move">fun double_remove(addr1: address, addr2: address): (Resource, Resource) acquires Resource {
     let r1 = remove_resource(addr1);
     let r2 = remove_resource(addr2);
@@ -7965,7 +7934,6 @@ spec create_then_read {
 }
 </code></pre>
 <h2 id="two-state-specification-functions"><a class="header" href="#two-state-specification-functions">Two-State Specification Functions</a></h2>
-<p><em>Since language version 2.4</em></p>
 <h3 id="defining-two-state-spec-functions"><a class="header" href="#defining-two-state-spec-functions">Defining Two-State Spec Functions</a></h3>
 <p>A two-state specification function is a <code>spec fun</code> that uses <code>old()</code> to reference the pre-state while also reading the current (post) state. This allows expressing transition properties that relate state before and after a function executes:</p>
 <pre><code class="language-move">spec fun counter_increased(addr: address): bool {
@@ -8035,8 +8003,14 @@ spec test_uses_old_in_closure {
 }
 </code></pre>
 <p>The prover handles the dual-state memory parameters: <code>old()</code> inside <code>counter_increased</code> resolves to the state before the closure executed, while unqualified resource references resolve to the state after the closure executed. Combined with the <code>reads_of</code> declaration that marks <code>Config</code> as reads-only and the <code>modifies_of</code> declaration that restricts <code>Counter</code> modifications to address <code>a</code>, the prover can establish that <code>Config</code> is unchanged while <code>Counter</code> may have been modified.</p>
-<h2 id="proofs-and-lemmas"><a class="header" href="#proofs-and-lemmas">Proofs and Lemmas</a></h2>
+<div style="break-before: page; page-break-before: always;"></div>
+<h1 id="proofs-and-inference"><a class="header" href="#proofs-and-inference">Proofs and Inference</a></h1>
 <p><em>Since language version 2.4</em></p>
+<p>This chapter describes the proof toolkit available alongside automated
+verification: explicit proof blocks and reusable lemmas that guide the SMT
+solver through hard verification tasks, and a weakest-precondition based
+inference engine that can derive specifications from code.</p>
+<h2 id="proofs-and-lemmas"><a class="header" href="#proofs-and-lemmas">Proofs and Lemmas</a></h2>
 <h3 id="overview-1"><a class="header" href="#overview-1">Overview</a></h3>
 <p>Some verification tasks are too hard for an SMT solver to discharge automatically. The solver may time out on non-linear arithmetic, need a case split the heuristics miss, or require an intermediate fact that bridges a gap in reasoning. MSL addresses this with two complementary features:</p>
 <ul>
@@ -8117,7 +8091,7 @@ spec div3_le {
 }
 </code></pre>
 <p>The <code>[trusted]</code> annotation is required. An unannotated <code>assume</code> is rejected so that trusted assumptions are always explicit in the source.</p>
-<h3 id="let-bindings-1-1"><a class="header" href="#let-bindings-1-1"><code>let</code> Bindings</a></h3>
+<h3 id="let-bindings-2"><a class="header" href="#let-bindings-2"><code>let</code> Bindings</a></h3>
 <p>A <code>let</code> in a proof block names an intermediate value for use in subsequent statements. Let bindings are scoped to their enclosing block:</p>
 <pre><code class="language-move">fun square_plus_one(x: u64): u64 {
     (x + 1) * (x + 1)
@@ -8372,7 +8346,6 @@ spec bump {
 </code></pre>
 <p>Note that if a function is literally named <code>lemma</code>, <code>spec lemma { ... }</code> (with <code>{</code> immediately after <code>lemma</code>) is parsed as the function’s spec block, not a lemma declaration, since the parser looks for an identifier after <code>lemma</code> to distinguish the two forms.</p>
 <h2 id="specification-inference"><a class="header" href="#specification-inference">Specification Inference</a></h2>
-<p><em>Since language version 2.4</em></p>
 <p>With these constructs, the Move Prover now includes a <em>specification inference engine</em> that can automatically derive specifications for functions. This is a key ingredient for scaling formal verification: rather than requiring developers to manually annotate every function, the prover can infer many specifications automatically.</p>
 <h3 id="weakest-precondition-approach"><a class="header" href="#weakest-precondition-approach">Weakest-Precondition Approach</a></h3>
 <p>The inference engine uses a <em>weakest-precondition</em> (WP) backward analysis over the function’s bytecode. Starting from the function’s exit point, it works backward through each instruction, accumulating the conditions that must hold for the function to satisfy its specification. For each state-changing operation (global writes, function calls, aborts), the analysis emits an appropriate specification condition:</p>
@@ -8393,45 +8366,6 @@ spec bump {
 <li><strong>AI-based inference</strong> can suggest loop invariants, high-level properties, and specifications for functions where WP analysis alone is insufficient.</li>
 </ul>
 <p>A typical workflow combines both: AI-based tools propose candidate specifications (including loop invariants), and the WP engine fills in the precise arithmetic and frame conditions. The result is then verified by the Move Prover to ensure soundness.</p>
-<h1 id="expressiveness"><a class="header" href="#expressiveness">Expressiveness</a></h1>
-<p>The Move specification language is expressive enough to represent the full Move language semantics (formal argument outstanding) with one exception: functions that return a <code>&amp;mut T</code> type.</p>
-<p>Consider the following code:</p>
-<pre><code class="language-move">module 0x42::m {
-  struct S { x: u64, y: u64 }
-
-  fun x_or_y(b: bool, s: &amp;mut S): &amp;mut u64 {
-    if (b) &amp;mut s.x else &amp;mut s.y
-  }
-  spec x_or_y {
-    ensures b ==&gt; result == s.x;
-    ensures !b ==&gt; result == s.y;
-  }
-}
-</code></pre>
-<p>We are not able to specify the <em>full</em> semantics of <code>x_or_y</code> in MSL because we cannot capture the
-semantics of mutable references. While we can say something about the value behind the reference at
-function exit, subsequent effects as in <code>*x_or_y(b, &amp;mut s) = 2</code> cannot be specified.</p>
-<p>However, the Move Prover <em>does</em> understand the meaning of such functions – the restriction is only
-in what we can specify. Practically, this means we cannot make the function <code>x_or_y</code> opaque and must
-let verification rely on that the Move Prover directly works with the implementation. Specifically, we
-can verify the following (which can then be opaque):</p>
-<pre><code class="language-move">module 0x42::m {
-  fun x_or_y_test(s: S): S {
-    *x_or_y(true, &amp;mut s) = 2;
-    s
-  }
-  spec x_or_y_test {
-    pragma opaque;
-    ensures result.x == 2;
-    ensures result.y == s.y;
-  }
-}
-</code></pre>
-<h2 id="supporting-resources"><a class="header" href="#supporting-resources">Supporting resources</a></h2>
-<ul>
-<li><a href="https://en.wikipedia.org/wiki/Design_by_contract">Design by contract</a></li>
-<li><a href="https://github.com/aptos-labs/aptos-core/blob/main/aptos-move/framework/aptos-framework/doc/overview.md">Aptos framework documentation</a></li>
-</ul>
 <div style="break-before: page; page-break-before: always;"></div>
 <h1 id="libraries"><a class="header" href="#libraries">Libraries</a></h1>
 <p>Aptos provides multiple useful libraries for developers. The complete up-to-date
@@ -8445,7 +8379,6 @@ docs can be found <a href="https://aptos.dev/move-reference">here</a>.</p>
 <li><strong>Type names</strong>: should be camel case if they are not a native type, e.g., <code>Coin</code>, <code>RoleId</code>.</li>
 <li><strong>Function names</strong>: should be lowercase snake case, e.g., <code>destroy_empty</code>.</li>
 <li><strong>Constant names</strong>: should be upper camel case and begin with an <code>E</code> if they represent error codes (e.g., <code>EIndexOutOfBounds</code>) and upper snake case if they represent a non-error value (e.g., <code>MIN_STAKE</code>).</li>
-<li></li>
 <li><strong>Generic type names</strong>: should be descriptive, or anti-descriptive where appropriate, e.g., <code>T</code> or <code>Element</code> for the Vector generic type parameter. Most of the time the “main” type in a module should be the same name as the module e.g., <code>option::Option</code>, <code>fixed_point32::FixedPoint32</code>.</li>
 <li><strong>Module file names</strong>: should be the same as the module name e.g., <code>option.move</code>.</li>
 <li><strong>Script file names</strong>: should be lowercase snake case and should match the name of the “main” function in the script.</li>
@@ -8519,7 +8452,7 @@ module 0x42::example { // double slash can be anywhere
   /* Similarly block comments can be anywhere */
 }
 </code></pre>
-<p>Below here are examples of doc comments <code>///</code> that will fail</p>
+<p>Below are examples of doc comments <code>///</code> that will fail:</p>
 <pre><code class="language-move">module 0x42::example {
 
   /// My awesome view function &lt;- must be below the annotation, right above the thing commented
@@ -8538,6 +8471,79 @@ module 0x42::example { // double slash can be anywhere
 <li>Four space indentation should be used except for <code>script</code> and <code>address</code> blocks whose contents should not be indented.</li>
 <li>Lines should be broken if they are longer than 100 characters.</li>
 <li>Structs and constants should be declared before all functions in a module.</li>
+</ul>
+<div style="break-before: page; page-break-before: always;"></div>
+<h1 id="language-versions"><a class="header" href="#language-versions">Language Versions</a></h1>
+<p>The Move 2 language releases are described on this page. The reference documentation of the new features is integrated into the book, and marked in the text with “<em>Since language version 2.n</em>”.</p>
+<h2 id="move-24"><a class="header" href="#move-24">Move 2.4</a></h2>
+<p>The Move 2.4 language release adds the following features to Move:</p>
+<ul>
+<li><strong>Struct and Enum Visibility Modifiers</strong>: Structs and enums can now be declared with <code>public</code>, <code>package</code>, or <code>friend</code> visibility modifiers. This allows external modules to construct, destruct, pattern-match, and access or modify fields of the type, lifting the previous restriction that limited all such operations to the defining module. See the reference docs for <a href="#struct-visibility">structs</a> and <a href="#enum-visibility">enums</a>.</li>
+<li><strong>Compositional Specifications for the Move Prover</strong>: The Move Specification Language gains a set of compositional constructs supporting higher-order functions, frame conditions, intermediate-state reasoning, and proof guidance. See the reference docs for <a href="#behavioral-predicates">Behavioral Predicates</a>, <a href="#access-specifiers-and-frame-conditions">Access Specifiers and Frame Conditions</a>, <a href="#state-labels">State Labels</a>, <a href="#two-state-specification-functions">Two-State Specification Functions</a>, <a href="#proofs-and-lemmas">Proofs and Lemmas</a>, and <a href="#specification-inference">Specification Inference</a>.</li>
+</ul>
+<h2 id="move-23"><a class="header" href="#move-23">Move 2.3</a></h2>
+<p>The Move 2.3 language release adds the following features to Move:</p>
+<ul>
+<li><strong>Signed Integer Types</strong>: Move now supports <code>i8</code>, <code>i16</code>, <code>i32</code>, <code>i64</code>, <code>i128</code>, and <code>i256</code> signed integer types. See the <a href="#integers">reference doc here</a>.</li>
+<li><strong>Builtin Constants</strong>: Move now supports a number of builtin constants, namely min/max values for integer types (e.g. <code>MAX_U64</code>, <code>MIN_I32</code>), as well as a constant to determine whether code is running in testing mode. See the <a href="#builtin-constants">reference doc here</a>.</li>
+</ul>
+<h2 id="move-22"><a class="header" href="#move-22">Move 2.2</a></h2>
+<p>The Move 2.2 language release adds the following features to Move:</p>
+<ul>
+<li><strong>Optional Acquires</strong>: The <code>acquires</code> annotation on function declarations can be omitted, to be inferred by the compiler.</li>
+<li><strong>Function Values</strong>: Move now supports function values, which can be passed around as parameters and stored in resources. See the <a href="#function-values">reference doc here</a>.</li>
+<li><strong>Comparison Operations</strong>: Move now supports comparison operations (<code>&lt;</code>, <code>&gt;</code>, <code>&lt;=</code>, <code>&gt;=</code>) on all types. See the <a href="#typing-1">reference doc here</a>.</li>
+</ul>
+<h2 id="move-21"><a class="header" href="#move-21">Move 2.1</a></h2>
+<p>The Move 2.1 language release adds the following features to Move:</p>
+<ul>
+<li>
+<p><strong>Compound Assignments</strong>: One can now use <code>x += n</code>, <code>x -= n</code>, etc. to combine assignments and arithmetic operations. See the <a href="#compound-assignments">reference doc here</a> for the supported operations.</p>
+</li>
+<li>
+<p><strong>Loop Labels</strong>: One can now use labels for loops and have a <code>break</code> or <code>continue</code> expression refer to those labels. This makes it possible to continue or break outer loops from within nested loops. See the <a href="#loop-labels">reference doc here</a>.</p>
+</li>
+<li>
+<p><strong>Underscore function parameters are wildcards, not symbols</strong>: Function parameters named <code>_</code> no longer act like variables: they do not bind a value, and multiple such parameters to a function do not cause a conflict. Using <code>_</code> in a value expression will yield an error, as it has no value. This makes the behavior of <code>_</code> more like the wildcard it is in patterns and <code>let</code> expressions, where it does not bind a value.</p>
+</li>
+</ul>
+<h2 id="move-20"><a class="header" href="#move-20">Move 2.0</a></h2>
+<p>The Move 2.0 language release adds the following features to Move:</p>
+<ul>
+<li>
+<p><strong>Enum Types</strong>: add the option to define different variants of data layout in one storable type. They are documented in the <a href="#enums">Enum Type section</a>.</p>
+</li>
+<li>
+<p><strong>Receiver Style Functions</strong>: add the ability to call functions in the familiar notation <code>value.func(arg)</code>. They are documented in <a href="#dot-receiver-function-call-style">this section</a>.</p>
+</li>
+<li>
+<p><strong>Index Notation</strong>: allows access to <a href="#index-notation-for-vectors">elements of vectors</a> and of <a href="#index-notation-for-storage-operators">resource storage</a> with notations like <code>&amp;mut vector[index]</code> or <code>&amp;mut Resource[addr]</code>.</p>
+</li>
+<li>
+<p><strong>Positional Structs</strong>: allow defining wrapper types such as <code>struct Wrapped(u64)</code>. Positional structs are described <a href="#positional-structs">here</a>. Enum variants can also be positional.</p>
+</li>
+<li>
+<p><strong>Dot-dot pattern wildcards</strong>: enable statements like <code>let Struct{x, ..} = value</code> to match selective parts of data. They are described <a href="#partial-patterns">here</a>. These patterns are also allowed for enum variants.</p>
+</li>
+<li>
+<p><strong>Package visibility</strong>: allows declaring a function to be visible anywhere inside, but not outside, a package. Friend functions continue to be supported, although package visibility is in many cases more suitable. As a more concise notation, package and friend functions can be declared as <code>package fun</code> or <code>friend fun</code>, respectively, instead of the longer <code>public(package) fun</code> and <code>public(friend) fun</code>. This feature is documented <a href="#package-visibility">here</a>.</p>
+</li>
+<li>
+<p><strong>Assert abort code optional</strong>: The <code>assert!</code> macro can now be used with just one argument, omitting the abort code, in which case a default code will be chosen. See <a href="#assert">here</a>.</p>
+</li>
+<li>
+<p><strong>New Cast Syntax</strong>: Until now, casts always had to be in parentheses, requiring code like <code>function((x as u256))</code>. This requirement is now dropped and casts can be top-level expressions without parentheses, as in <code>function(x as u256)</code>. One still needs to write <code>(x as u64) + (y as u64)</code> in expressions. This similarly applies to the new enum variant test, <code>data is VersionedData::V1</code>.</p>
+</li>
+<li>
+<p><strong>Well-defined evaluation order</strong>: The evaluation order in the cases below is now well-defined (these were previously unspecified):</p>
+<ul>
+<li>The (a) arguments to a function call and the (b) operand expressions in a binary operation are both evaluated from left to right.</li>
+<li>Given a “mutate” expression (see <a href="#mutating-through-a-reference">mutating through a reference</a>) of the form <code>*lexp = rexp</code>, where <code>lexp</code> is an expression of type <code>&amp;mut T</code> and <code>rexp</code> is an expression of type <code>T</code>, <code>rexp</code> is evaluated first, followed by <code>lexp</code>.</li>
+</ul>
+</li>
+<li>
+<p><strong>Bug fix for acquires annotation</strong>: <a href="#acquires">A function should be annotated with <code>acquires</code></a> if and only if it accesses a resource using <code>move_from</code>, <code>borrow_global</code>, or <code>borrow_global_mut</code>, either directly or transitively through a call. Otherwise, it is an error. Previously, when the transitive call graph included a cycle, such errors were not reported: this was incorrect behavior. We have now corrected this behavior to report these errors even when the transitive call graph has cycles.</p>
+</li>
 </ul>
 
                     </main>

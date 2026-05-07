@@ -35,10 +35,10 @@
             const path_to_root = "";
             const default_light_theme = "light";
             const default_dark_theme = "navy";
-            window.path_to_searchindex_js = "searchindex-ec2ebe67.js";
+            window.path_to_searchindex_js = "searchindex-9dd572a7.js";
         </script>
         <!-- Start loading toc.js asap -->
-        <script src="toc-cc3fa448.js"></script>
+        <script src="toc-d9956b74.js"></script>
     </head>
     <body>
     <div id="mdbook-help-container">
@@ -182,7 +182,7 @@
                     <main>
                         <h1 id="friends"><a class="header" href="#friends">Friends</a></h1>
 <p>The <code>friend</code> syntax is used to declare modules that are trusted by the current module.
-A trusted module is allowed to call any function defined in the current module that have the <code>public(friend)</code> visibility.
+A trusted module is allowed to call any function defined in the current module that has the <code>public(friend)</code> visibility.
 For details on function visibilities, please refer to the <em>Visibility</em> section in <a href="./functions.html">Functions</a>.</p>
 <h2 id="friend-declaration"><a class="header" href="#friend-declaration">Friend declaration</a></h2>
 <p>A module can declare other modules as friends via friend declaration statements, in the format of</p>
@@ -216,7 +216,7 @@ However, for readability, it is advised to place friend declarations near the be
 <p>Note that the concept of friendship does not apply to Move scripts:</p>
 <ul>
 <li>A Move script cannot declare <code>friend</code> modules as doing so is considered meaningless: there is no mechanism to call the function defined in a script.</li>
-<li>A Move module cannot declare <code>friend</code> scripts as well because scripts are ephemeral code snippets that are never published to global storage.</li>
+<li>A Move module cannot declare <code>friend</code> scripts either, because scripts are ephemeral code snippets that are never published to global storage.</li>
 </ul>
 <h3 id="friend-declaration-rules"><a class="header" href="#friend-declaration-rules">Friend declaration rules</a></h3>
 <p>Friend declarations are subject to the following rules:</p>
@@ -253,7 +253,7 @@ module 0x43::n {
 </code></pre>
 </li>
 <li>
-<p>Friends relationships cannot create cyclic module dependencies.</p>
+<p>Friend relationships cannot create cyclic module dependencies.</p>
 <p>Cycles are not allowed in the friend relationships, e.g., the relation <code>0x2::a</code> friends <code>0x2::b</code> friends <code>0x2::c</code> friends <code>0x2::a</code> is not allowed.
 More generally, declaring a friend module adds a dependency upon the current module to the friend module (because the purpose is for the friend to call functions in the current module).
 If that friend module is already used, either directly or transitively, a cycle of dependencies would be created.</p>
@@ -302,7 +302,7 @@ If that friend module is already used, either directly or transitively, a cycle 
                                 <span class=fa-svg><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 320 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M41.4 233.4c-12.5 12.5-12.5 32.8 0 45.3l160 160c12.5 12.5 32.8 12.5 45.3 0s12.5-32.8 0-45.3L109.3 256 246.6 118.6c12.5-12.5 12.5-32.8 0-45.3s-32.8-12.5-45.3 0l-160 160z"/></svg></span>
                             </a>
 
-                            <a rel="next prefetch" href="packages.html" class="mobile-nav-chapters next" title="Next chapter" aria-label="Next chapter" aria-keyshortcuts="Right">
+                            <a rel="next prefetch" href="modules-and-scripts.html" class="mobile-nav-chapters next" title="Next chapter" aria-label="Next chapter" aria-keyshortcuts="Right">
                                 <span class=fa-svg><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 320 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M278.6 233.4c12.5 12.5 12.5 32.8 0 45.3l-160 160c-12.5 12.5-32.8 12.5-45.3 0s-12.5-32.8 0-45.3L210.7 256 73.4 118.6c-12.5-12.5-12.5-32.8 0-45.3s32.8-12.5 45.3 0l160 160z"/></svg></span>
                             </a>
 
@@ -316,7 +316,7 @@ If that friend module is already used, either directly or transitively, a cycle 
                         <span class=fa-svg><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 320 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M41.4 233.4c-12.5 12.5-12.5 32.8 0 45.3l160 160c12.5 12.5 32.8 12.5 45.3 0s12.5-32.8 0-45.3L109.3 256 246.6 118.6c12.5-12.5 12.5-32.8 0-45.3s-32.8-12.5-45.3 0l-160 160z"/></svg></span>
                     </a>
 
-                    <a rel="next prefetch" href="packages.html" class="nav-chapters next" title="Next chapter" aria-label="Next chapter" aria-keyshortcuts="Right">
+                    <a rel="next prefetch" href="modules-and-scripts.html" class="nav-chapters next" title="Next chapter" aria-label="Next chapter" aria-keyshortcuts="Right">
                         <span class=fa-svg><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 320 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M278.6 233.4c12.5 12.5 12.5 32.8 0 45.3l-160 160c-12.5 12.5-32.8 12.5-45.3 0s-12.5-32.8 0-45.3L210.7 256 73.4 118.6c-12.5-12.5-12.5-32.8 0-45.3s32.8-12.5 45.3 0l160 160z"/></svg></span>
                     </a>
             </nav>

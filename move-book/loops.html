@@ -35,10 +35,10 @@
             const path_to_root = "";
             const default_light_theme = "light";
             const default_dark_theme = "navy";
-            window.path_to_searchindex_js = "searchindex-ec2ebe67.js";
+            window.path_to_searchindex_js = "searchindex-9dd572a7.js";
         </script>
         <!-- Start loading toc.js asap -->
-        <script src="toc-cc3fa448.js"></script>
+        <script src="toc-d9956b74.js"></script>
     </head>
     <body>
     <div id="mdbook-help-container">
@@ -184,7 +184,7 @@
 <p>Move offers three constructs for looping: <code>while</code>, <code>for</code>, and <code>loop</code>.</p>
 <h2 id="while-loops"><a class="header" href="#while-loops"><code>while</code> loops</a></h2>
 <p>The <code>while</code> construct repeats the body (an expression of type unit) until the condition (an expression of type <code>bool</code>) evaluates to <code>false</code>.</p>
-<p>Here is an example of simple <code>while</code> loop that computes the sum of the numbers from <code>1</code> to <code>n</code>:</p>
+<p>Here is an example of a simple <code>while</code> loop that computes the sum of the numbers from <code>1</code> to <code>n</code>:</p>
 <pre><code class="language-move">script {
   fun sum(n: u64): u64 {
     let sum = 0;
@@ -298,7 +298,7 @@
 </code></pre>
 <p>The loop iterator variable (<code>i</code> in the above example) currently must be a numeric type (inferred from the bounds), and the bounds <code>0</code> and <code>n</code> here can be replaced by arbitrary numeric expressions. Each is only evaluated once at the start of the loop. The iterator variable <code>i</code> is assigned the <code>lower_bound</code> (in this case <code>0</code>) and incremented after each loop iteration; the loop exits when the iterator <code>i</code> reaches or exceeds <code>upper_bound</code> (in this case <code>n</code>).</p>
 <h3 id="break-and-continue-in-for-loops"><a class="header" href="#break-and-continue-in-for-loops"><code>break</code> and <code>continue</code> in <code>for</code> loops</a></h3>
-<p>Similar to <code>while</code> loops, the <code>break</code> expression can be used in <code>for</code> loops to exit prematurely. The <code>continue</code> expression can be used to skip the current iteration and move to the next. Here’s an example that demonstrates the use of both <code>break</code> and <code>continue</code>. The loop will iterate through numbers from <code>0</code> to <code>n-1</code>, summing up them up. It will skip numbers that are divisible by <code>3</code> (using <code>continue</code>) and stop when it encounters a number greater than <code>10</code> (using <code>break</code>):</p>
+<p>Similar to <code>while</code> loops, the <code>break</code> expression can be used in <code>for</code> loops to exit prematurely. The <code>continue</code> expression can be used to skip the current iteration and move to the next. Here’s an example that demonstrates the use of both <code>break</code> and <code>continue</code>. The loop will iterate through numbers from <code>0</code> to <code>n-1</code>, summing them up. It will skip numbers that are divisible by <code>3</code> (using <code>continue</code>) and stop when it encounters a number greater than <code>10</code> (using <code>break</code>):</p>
 <pre><code class="language-move">script {
   fun sum_conditional(n: u64): u64 {
     let sum = 0;
@@ -360,7 +360,7 @@
 }
 </code></pre>
 <h2 id="the-type-of-while-loop-and-for-expression"><a class="header" href="#the-type-of-while-loop-and-for-expression">The type of <code>while</code>, <code>loop</code>, and <code>for</code> expression</a></h2>
-<p>Move loops are typed expressions. The <code>while</code> and <code>for</code> expression always has type <code>()</code>.</p>
+<p>Move loops are typed expressions. The <code>while</code> and <code>for</code> expressions always have type <code>()</code>.</p>
 <pre><code class="language-move">script {
   fun example() {
     let () = while (i &lt; 10) { i = i + 1 };
@@ -387,7 +387,7 @@
 </code></pre>
 <h2 id="loop-labels"><a class="header" href="#loop-labels">Loop Labels</a></h2>
 <p><em>Since language version 2.1</em></p>
-<p>A <code>while</code> or <code>loop</code> statement can have a label which can be referred to by a <code>break</code> or <code>continue</code> statement. In the presence of nested loops, this allows to refer to outer loops. Example:</p>
+<p>A <code>while</code> or <code>loop</code> statement can have a label that can be referred to by a <code>break</code> or <code>continue</code> statement. In the presence of nested loops, this allows referring to outer loops. Example:</p>
 <pre><code class="language-move">script {
   fun example(x: u64): u64 {
     'label1: while (x &gt; 10) {

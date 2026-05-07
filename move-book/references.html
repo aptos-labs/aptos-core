@@ -35,10 +35,10 @@
             const path_to_root = "";
             const default_light_theme = "light";
             const default_dark_theme = "navy";
-            window.path_to_searchindex_js = "searchindex-ec2ebe67.js";
+            window.path_to_searchindex_js = "searchindex-9dd572a7.js";
         </script>
         <!-- Start loading toc.js asap -->
-        <script src="toc-cc3fa448.js"></script>
+        <script src="toc-d9956b74.js"></script>
     </head>
     <body>
     <div id="mdbook-help-container">
@@ -185,7 +185,7 @@
 only, and cannot modify the underlying value (or any of its fields). Mutable references allow for
 modifications via a write through that reference. Move’s type system enforces an ownership
 discipline that prevents reference errors.</p>
-<p>For more details on the rules of references, see <a href="./structs-and-resources.html">Structs and Resources</a></p>
+<p>For more details on the rules of references, see <a href="./structs-and-resources.html">Structs and Resources</a>.</p>
 <h2 id="reference-operators"><a class="header" href="#reference-operators">Reference Operators</a></h2>
 <p>Move provides operators for creating and extending references as well as converting a mutable
 reference to an immutable one. Here and elsewhere, we use the notation <code>e: T</code> for “expression <code>e</code>
@@ -199,7 +199,7 @@ has type <code>T</code>”.</p>
 <tr><td><code>&amp;e</code></td><td><code>&amp;T</code> where <code>e: T</code> and <code>T</code> is a non-reference type</td><td>Create an immutable reference to <code>e</code></td></tr>
 <tr><td><code>&amp;mut e</code></td><td><code>&amp;mut T</code> where <code>e: T</code> and <code>T</code> is a non-reference type</td><td>Create a mutable reference to <code>e</code>.</td></tr>
 <tr><td><code>&amp;e.f</code></td><td><code>&amp;T</code> where <code>e.f: T</code></td><td>Create an immutable reference to field <code>f</code> of struct <code>e</code>.</td></tr>
-<tr><td><code>&amp;mut e.f</code></td><td><code>&amp;mut T</code> where <code>e.f: T</code></td><td>Create a mutable reference to field <code>f</code> of struct<code>e</code>.</td></tr>
+<tr><td><code>&amp;mut e.f</code></td><td><code>&amp;mut T</code> where <code>e.f: T</code></td><td>Create a mutable reference to field <code>f</code> of struct <code>e</code>.</td></tr>
 <tr><td><code>freeze(e)</code></td><td><code>&amp;T</code> where <code>e: &amp;mut T</code></td><td>Convert the mutable reference <code>e</code> into an immutable reference.</td></tr>
 </tbody>
 </table>
@@ -239,7 +239,7 @@ extend an existing reference:</p>
 <p>Only mutable references can be written. A write <code>*x = v</code> discards the value previously stored in <code>x</code>
 and updates it with <code>v</code>.</p>
 <p>Both operations use the C-like <code>*</code> syntax. However, note that a read is an expression, whereas a
-write is a mutation that must occur on the left hand side of an equals.</p>
+write is a mutation that must occur on the left-hand side of an equals sign.</p>
 <div class="table-wrapper">
 <table>
 <thead>
@@ -286,7 +286,7 @@ This rule prevents the destruction of resource values:</p>
   }
 }
 </code></pre>
-<p>This works because the under the hood, the compiler inserts <code>freeze</code> instructions where they are
+<p>This works because, under the hood, the compiler inserts <code>freeze</code> instructions where they are
 needed. Here are a few more examples of <code>freeze</code> inference in action:</p>
 <pre><code class="language-move">module 0x42::example {
   fun takes_immut_returns_immut(x: &amp;u64): &amp;u64 { x }
@@ -316,7 +316,7 @@ needed. Here are a few more examples of <code>freeze</code> inference in action:
 </code></pre>
 <h3 id="subtyping"><a class="header" href="#subtyping">Subtyping</a></h3>
 <p>With this <code>freeze</code> inference, the Move type checker can view <code>&amp;mut T</code> as a subtype of <code>&amp;T</code>. As shown
-above, this means that anywhere for any expression where a <code>&amp;T</code> value is used, a <code>&amp;mut T</code> value can
+above, this means that anywhere a <code>&amp;T</code> value is expected, a <code>&amp;mut T</code> value can
 also be used. This terminology is used in error messages to concisely indicate that a <code>&amp;mut T</code> was
 needed where a <code>&amp;T</code> was supplied. For example</p>
 <pre><code class="language-move">module 0x42::example {
@@ -365,7 +365,7 @@ error:
     │                                -------- Is not a subtype of: '&amp;mut u64'
     │
 </code></pre>
-<p>The only other types currently that has subtyping are <a href="./tuples.html">tuples</a></p>
+<p>The only other type that currently has subtyping is <a href="./tuples.html">tuples</a>.</p>
 <h2 id="ownership"><a class="header" href="#ownership">Ownership</a></h2>
 <p>Both mutable and immutable references can always be copied and extended <em>even if there are existing
 copies or extensions of the same reference</em>:</p>
