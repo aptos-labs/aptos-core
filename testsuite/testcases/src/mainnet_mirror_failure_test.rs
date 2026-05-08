@@ -129,11 +129,20 @@ impl Default for FailurePatternConfig {
 /// Failpoint names used to inject failure on outbound consensus messages.
 /// Each name matches a `fail_point!(...)` site in `consensus/src/network.rs`.
 ///
-/// Covers the leader-side critical path (proposal + voting) and the QS
-/// batch-author path (batch dissemination + proof formation). Excludes the
-/// `consensus::send::any` superset failpoint because it also fires on
-/// `request_block` (state-sync block retrieval) — applying a 2-second delay
-/// there cascades into stalled state-sync drivers under multi-region netem.
+/// Covers ONLY the leader-side critical path (proposal + voting). QS batch
+/// paths (broadcast_batch / signed_batch_info / proof_of_store) are
+/// intentionally excluded: applying continuous X%delay(2s) to QS paths makes
+/// every batch's lifecycle wait on slow validators, which over-models mainnet
+/// — mainnet chronic validators do have elevated `failed_proposals_in_window`
+/// but their QS contribution shows up as occasional misses (offline events),
+/// not consistent 2s message delays. Run 25581268015 with QS paths included
+/// produced p90=2000ms vs mainnet's ~750ms; removing them is the biggest
+/// fidelity lever.
+///
+/// Also excludes the `consensus::send::any` superset failpoint because it
+/// fires on `request_block` (state-sync block retrieval) — applying a
+/// 2-second delay there cascades into stalled state-sync drivers under
+/// multi-region netem.
 ///
 /// Each chronic/flaky validator gets the SAME `X%delay(2000)` action applied
 /// to all of these failpoints. Spike validators get `100%return` applied to
@@ -145,12 +154,6 @@ const SEND_FAILPOINTS: &[&str] = &[
     "consensus::send::vote",
     "consensus::send::commit_vote",
     "consensus::send::order_vote",
-    // QS batch-author critical path: dissemination + proof formation.
-    // These drive mainnet's P90 latency (per memory note 2026-05-06,
-    // ~410ms of mainnet's 748ms P90 lives in QS proof assembly).
-    "consensus::send::broadcast_batch",
-    "consensus::send::signed_batch_info",
-    "consensus::send::proof_of_store",
 ];
 
 pub struct MainnetMirrorFailureTest {
