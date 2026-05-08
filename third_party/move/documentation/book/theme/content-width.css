@@ -1,0 +1,12 @@
+/* mdbook clamps the main content column to ~750px by default. Cap by
+ * characters instead so the column scales with the chosen font: 100ch
+ * matches the conventional 100-column code-line standard, which is more
+ * than wide enough for prose while preventing overly long lines on big
+ * displays. The `ch` unit is the width of the "0" glyph in the
+ * inherited font. */
+:root {
+    --content-max-width: 100ch;
+}
+.content main {
+    max-width: 100ch;
+}

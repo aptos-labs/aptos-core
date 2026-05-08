@@ -877,7 +877,7 @@ module 0x42::caller {
      callee::call_me(r, |x| do_something(x))
      // This callback will lead to reentrancy runtime error
      callee::call_me(r, |_| R[@addr].count += 1)
-     r.call_count += 1
+     r.count += 1
   }
   fun do_something(r: &mut R) { .. }
 }

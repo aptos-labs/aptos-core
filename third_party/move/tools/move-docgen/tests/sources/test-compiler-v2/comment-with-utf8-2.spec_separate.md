@@ -1,7 +1,4 @@
-
-<a id="0xc0ffee_m"></a>
-
-# Module `0xc0ffee::m`
+# Module `0xc0ffee::m` <a id="0xc0ffee_m"></a>
 
 
 这个是文档注释
@@ -18,10 +15,7 @@
 <pre><code></code></pre>
 
 
-
-<a id="0xc0ffee_m_Test1"></a>
-
-## Struct `Test1`
+## Struct `Test1` <a id="0xc0ffee_m_Test1"></a>
 
 这个也是文档注释
 

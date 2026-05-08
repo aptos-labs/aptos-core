@@ -28,18 +28,19 @@
 # Testing
 - [Unit Tests](unit-testing.md)
 
-# Specification
-
-- [Specification Language](spec-lang.md)
-- [Compositional Specifications](spec-compositional.md)
-- [Proofs and Inference](spec-proofs.md)
-
 # Aptos CLI
 
 - [Overview](cli.md)
 - [Develop](cli-develop.md)
 - [Publish](cli-deploy.md)
 - [Run](cli-run.md)
+
+# Move Prover
+
+- [Specification Language](spec-lang.md)
+- [Compositional Specifications](spec-compositional.md)
+- [Proofs and Inference](spec-proofs.md)
+- [User Guide](prover-guide.md)
 
 # Reference
 

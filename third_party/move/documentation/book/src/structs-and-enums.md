@@ -713,8 +713,8 @@ Enum types can also have the `key` ability and appear as roots of data in global
 
 ```move
 enum VersionedData has key {
-  V1{name: String}
-  V2{name: String, age: u64}
+  V1{name: String},
+  V2{name: String, age: u64},
 }
 ```
 
@@ -818,8 +818,8 @@ It is possible to directly select a field from an enum value. Recall the definit
 
 ```move
 enum VersionedData has key {
-  V1{name: String}
-  V2{name: String, age: u64}
+  V1{name: String},
+  V2{name: String, age: u64},
 }
 ```
 
@@ -829,7 +829,7 @@ One can write code as below to directly select the fields of variants:
 let s: String;
 let data1 = VersionedData::V1{name: s};
 let data2 = VersionedData::V2{name: s, age: 20};
-assert!(data1.name == data2.name)
+assert!(data1.name == data2.name);
 assert!(data2.age == 20);
 ```
 
@@ -841,8 +841,8 @@ Field selection is only possible if the field is uniquely named and typed throug
 
 ```move
 enum VersionedData has key {
-  V1{name: String}
-  V2{name: u64}
+  V1{name: String},
+  V2{name: u64},
 }
 
 data.name
@@ -962,8 +962,8 @@ This type could be upgraded to the version we used so far in this text:
 
 ```move
 enum VersionedData has key {
-  V1{name: String}
-  V2{name: String, age: u64}
+  V1{name: String},
+  V2{name: String, age: u64},
 }
 ```
 
@@ -971,8 +971,8 @@ The following upgrade would not be allowed, since the order of variants must be 
 
 ```move
 enum VersionedData has key {
-  V2{name: String, age: u64}   // not a compatible upgrade
-  V1{name: String}
+  V2{name: String, age: u64},   // not a compatible upgrade
+  V1{name: String},
 }
 ```
 
@@ -1033,8 +1033,13 @@ module 0x42::types {
 
 ### Upgradability
 
-Visibility can be broadened in a package upgrade but not narrowed:
+In a package upgrade, struct and enum visibility may change in the
+following ways. The general principle is that no transition is allowed
+which would break code outside the defining package: `public` can never
+be narrowed, but transitions among the package-internal levels are safe
+because their consumers live inside the same package and are republished
+atomically with the upgrade.
 
 - A private type can be upgraded to `package`, `friend`, or `public`.
 - A `friend` or `package` type can be upgraded to `public`.
-- A `friend` or `package` type can be downgraded back to private.
+- A `friend` or `package` type can be narrowed back to private.

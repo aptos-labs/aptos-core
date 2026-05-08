@@ -1,7 +1,4 @@
-
-<a id="<SELF>_0"></a>
-
-# Script `<SELF>_0`
+# Script `<SELF>_0` <a id="<SELF>_0"></a>
 
 
 
@@ -11,10 +8,7 @@
 <pre><code></code></pre>
 
 
-
-<a id="@Explanation_of_the_algorithm_0"></a>
-
-## Explanation of the algorithm
+## Explanation of the algorithm <a id="@Explanation_of_the_algorithm_0"></a>
 
 ```
 code block

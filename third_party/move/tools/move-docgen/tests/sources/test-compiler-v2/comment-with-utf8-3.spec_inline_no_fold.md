@@ -1,7 +1,4 @@
-
-<a id="0x2_TestViz"></a>
-
-# Module `0x2::TestViz`
+# Module `0x2::TestViz` <a id="0x2_TestViz"></a>
 
 
 
@@ -13,10 +10,7 @@
 <pre><code></code></pre>
 
 
-
-<a id="0x2_TestViz_this_is_a_public_fun"></a>
-
-## Function `this_is_a_public_fun`
+## Function `this_is_a_public_fun` <a id="0x2_TestViz_this_is_a_public_fun"></a>
 
 这是一个公用函数
 
@@ -33,10 +27,7 @@
 </code></pre>
 
 
-
-<a id="0x2_TestViz_this_is_a_public_script_fun"></a>
-
-## Function `this_is_a_public_script_fun`
+## Function `this_is_a_public_script_fun` <a id="0x2_TestViz_this_is_a_public_script_fun"></a>
 
 这是一个公用，入口函数
 
@@ -53,10 +44,7 @@
 </code></pre>
 
 
-
-<a id="0x2_TestViz_this_is_a_private_fun"></a>
-
-## Function `this_is_a_private_fun`
+## Function `this_is_a_private_fun` <a id="0x2_TestViz_this_is_a_private_fun"></a>
 
 这是一个私有函数
 
@@ -73,10 +61,7 @@
 </code></pre>
 
 
-
-<a id="0x2_TestViz1"></a>
-
-# Module `0x2::TestViz1`
+# Module `0x2::TestViz1` <a id="0x2_TestViz1"></a>
 
 
 
@@ -87,15 +72,9 @@
 <pre><code></code></pre>
 
 
+## Function `main` <a id="0x2_TestViz1_main"></a>
 
-<a id="0x2_TestViz1_main"></a>
-
-## Function `main`
-
-
-<a id="@算法注释_0"></a>
-
-### 算法注释
+### 算法注释 <a id="@算法注释_0"></a>
 
 ```
 代码块
@@ -115,10 +94,7 @@
 </code></pre>
 
 
-
-<a id="0x2_TestViz2"></a>
-
-# Module `0x2::TestViz2`
+# Module `0x2::TestViz2` <a id="0x2_TestViz2"></a>
 
 
 
@@ -129,15 +105,9 @@
 <pre><code></code></pre>
 
 
+## Function `main` <a id="0x2_TestViz2_main"></a>
 
-<a id="0x2_TestViz2_main"></a>
-
-## Function `main`
-
-
-<a id="@算法注释_0"></a>
-
-### 算法注释
+### 算法注释 <a id="@算法注释_0"></a>
 
 ```
 代码块

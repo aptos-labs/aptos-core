@@ -1,8 +1,5 @@
 
-
-<a id="@A_Root_Documentation_Template_0"></a>
-
-# A Root Documentation Template
+# A Root Documentation Template <a id="@A_Root_Documentation_Template_0"></a>
 
 
 This document contains the description of multiple move scripts.
@@ -21,44 +18,29 @@ The script <code>yet_another</code> is documented in its own file.
 -  [Index](#@Index_4)
 
 
-
-<a id="@Some_Scripts_1"></a>
-
-## Some Scripts
+## Some Scripts <a id="@Some_Scripts_1"></a>
 
 
 > undefined move-include `some`
 
 
-
-<a id="@Other_Scripts_2"></a>
-
-## Other Scripts
+## Other Scripts <a id="@Other_Scripts_2"></a>
 
 
 > undefined move-include `other`
 
 
-
-<a id="@Some_other_scripts_from_a_module_3"></a>
-
-## Some other scripts from a module
+## Some other scripts from a module <a id="@Some_other_scripts_from_a_module_3"></a>
 
 
-
-<a id="0x1_OneTypeOfScript"></a>
-
-### Module `0x1::OneTypeOfScript`
+### Module `0x1::OneTypeOfScript` <a id="0x1_OneTypeOfScript"></a>
 
 
 
 <pre><code></code></pre>
 
 
-
-<a id="0x1_OneTypeOfScript_script1"></a>
-
-#### Function `script1`
+#### Function `script1` <a id="0x1_OneTypeOfScript_script1"></a>
 
 This is a script
 
@@ -75,10 +57,7 @@ This is a script
 </code></pre>
 
 
-
-<a id="0x1_OneTypeOfScript_script2"></a>
-
-#### Function `script2`
+#### Function `script2` <a id="0x1_OneTypeOfScript_script2"></a>
 
 This is another script
 
@@ -99,20 +78,14 @@ This is another script
 
 This is another module full of script funs too:
 
-
-<a id="0x1_AnotherTypeOfScript"></a>
-
-### Module `0x1::AnotherTypeOfScript`
+### Module `0x1::AnotherTypeOfScript` <a id="0x1_AnotherTypeOfScript"></a>
 
 
 
 <pre><code></code></pre>
 
 
-
-<a id="0x1_AnotherTypeOfScript_script3"></a>
-
-#### Function `script3`
+#### Function `script3` <a id="0x1_AnotherTypeOfScript_script3"></a>
 
 This is a script
 
@@ -129,10 +102,7 @@ This is a script
 </code></pre>
 
 
-
-<a id="0x1_AnotherTypeOfScript_script4"></a>
-
-#### Function `script4`
+#### Function `script4` <a id="0x1_AnotherTypeOfScript_script4"></a>
 
 This is another script
 
@@ -151,10 +121,7 @@ This is another script
 
 
 
-
-<a id="@Index_4"></a>
-
-## Index
+## Index <a id="@Index_4"></a>
 
 
 -  [`<SELF>_0`](root_template_script2.md#<SELF>_0)

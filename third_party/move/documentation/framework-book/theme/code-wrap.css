@@ -1,0 +1,22 @@
+/* Auto-generated module docs put each function synopsis on a single long
+ * line inside a <pre><code> block. mdbook's default styling gives those a
+ * horizontal scrollbar, which is awkward at narrow viewports and clips the
+ * end of long signatures on small screens. Wrap them instead. */
+pre code {
+    white-space: pre-wrap;
+    word-break: break-word;
+    overflow-wrap: anywhere;
+}
+
+/* mdbook clamps the main content column to ~750px — fine for hand-written
+ * prose, too narrow for auto-generated reference docs with wide function
+ * signatures. Cap by characters instead: 120ch leaves comfortable room
+ * for the 100-column code-line standard plus the slight font-width
+ * mismatch when monospace code lives inside a proportional-font column.
+ * The `ch` unit is the width of the "0" glyph in the inherited font. */
+:root {
+    --content-max-width: 120ch;
+}
+.content main {
+    max-width: 120ch;
+}

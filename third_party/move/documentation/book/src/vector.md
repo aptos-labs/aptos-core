@@ -94,7 +94,8 @@ script {
 
 `vector` provides several operations via the `std::vector` module in the Move standard
 library, as shown below. More operations may be added over time.
-Up-to-date documentation on `vector` can be found [here](https://github.com/aptos-labs/aptos-core/blob/main/aptos-move/framework/move-stdlib/doc/vector.md).
+Up-to-date documentation on `vector` is in the
+[Aptos Framework Book](https://aptos-labs.github.io/framework-book/move-stdlib/vector.html).
 
 | Function                                                                              | Description                                                                                                                                                        | Aborts?                                                  |
 | ------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------ | -------------------------------------------------------- |

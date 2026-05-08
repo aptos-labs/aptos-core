@@ -28,3 +28,13 @@ The [Primitive Types](./primitive-types.md) and [Basic Concepts](./variables.md)
 sections then walk through the language feature by feature, including
 [modules and scripts](./modules-and-packages.md). For an overview of what each
 release of the language adds, see [Language Versions](./move-versions.md).
+
+## Other References
+
+- **[Aptos Framework Book](https://aptos-labs.github.io/framework-book/)** —
+  reference documentation for every on-chain Move module: the Move standard
+  library, the Aptos standard library, and the framework packages.
+- **[Aptos developer docs](https://aptos.dev/)** — getting started, tutorials,
+  tooling, and ecosystem.
+- **[aptos-core on GitHub](https://github.com/aptos-labs/aptos-core)** —
+  source code for the framework, the Move toolchain, and the node.

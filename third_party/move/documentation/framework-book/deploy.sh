@@ -1,10 +1,11 @@
 #!/usr/bin/env bash
 #
-# Deploy the Move book to the Aptos Labs org-level GitHub Pages site.
+# Deploy the Aptos Framework Book to the Aptos Labs org-level GitHub Pages site.
 #
-# Builds the mdbook output and pushes it into a subdirectory of the
-# `aptos-labs/aptos-labs.github.io` repository. After the push, GitHub Pages
-# rebuilds automatically and the book becomes available at
+# Builds the per-package module docs (via the framework-book-builder cargo
+# binary), runs mdbook, then pushes the rendered output into a subdirectory
+# of the `aptos-labs/aptos-labs.github.io` repository. After the push,
+# GitHub Pages rebuilds automatically and the book becomes available at
 #
 #     https://aptos-labs.github.io/<SUBPATH>/
 #
@@ -22,7 +23,7 @@
 #   PAGES_REPO       git URL or local path to aptos-labs.github.io
 #                    (default: https://github.com/aptos-labs/aptos-labs.github.io.git)
 #   BRANCH           branch to push (default: main)
-#   SUBPATH          subdirectory under the org repo (default: move-book)
+#   SUBPATH          subdirectory under the org repo (default: framework-book)
 #   UPSTREAM_REMOTE  remote to validate HEAD against
 #                    (auto: `upstream` if present, else `origin`)
 #   UPSTREAM_BRANCH  branch on that remote (default: main)
@@ -53,11 +54,11 @@ done
 
 PAGES_REPO="${PAGES_REPO:-https://github.com/aptos-labs/aptos-labs.github.io.git}"
 BRANCH="${BRANCH:-main}"
-# `${SUBPATH-move-book}` defaults only when SUBPATH is unset; an explicit
+# `${SUBPATH-framework-book}` defaults only when SUBPATH is unset; an explicit
 # empty SUBPATH= falls through to the guard below and is rejected. We never
 # want to publish at the org root because that would clobber the landing
 # page (`index.html`, `robots.txt`, etc.) the org repo already serves.
-SUBPATH="${SUBPATH-move-book}"
+SUBPATH="${SUBPATH-framework-book}"
 UPSTREAM_BRANCH="${UPSTREAM_BRANCH:-main}"
 
 # Pick a remote pointing at the canonical repo. By convention people who
@@ -80,7 +81,7 @@ if [ -z "$SUBPATH" ]; then
 fi
 
 BOOK_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-WORK_DIR="$(mktemp -d -t move-book-deploy.XXXXXX)"
+WORK_DIR="$(mktemp -d -t framework-book-deploy.XXXXXX)"
 
 cleanup() {
   if [ -d "$WORK_DIR" ]; then
@@ -91,6 +92,10 @@ trap cleanup EXIT
 
 command -v mdbook >/dev/null || {
   echo "error: mdbook not found in PATH" >&2
+  exit 1
+}
+command -v cargo >/dev/null || {
+  echo "error: cargo not found in PATH" >&2
   exit 1
 }
 
@@ -115,8 +120,11 @@ if [ -z "$DEBUG" ]; then
   fi
 fi
 
-echo "==> Building book"
-mdbook build "$BOOK_DIR"
+# Two-step build: the framework-book-builder regenerates per-package module
+# docs from the Move source, then mdbook renders the book. Use build.sh so
+# the deploy path matches the local development path.
+echo "==> Building framework book"
+"$BOOK_DIR/build.sh"
 
 # Stamp every page with the deploy time and source commit. The
 # placeholder "(local build)" lives in theme/build-stamp.js, which mdbook
@@ -149,7 +157,7 @@ if git diff --cached --quiet; then
   exit 0
 fi
 
-git commit -m "deploy move book from aptos-core $BUILD_SHA ($BUILD_TIME)${DEBUG:+ [debug]}"
+git commit -m "deploy framework book from aptos-core $BUILD_SHA ($BUILD_TIME)${DEBUG:+ [debug]}"
 
 if [ -n "${DRY_RUN:-}" ]; then
   echo "==> DRY_RUN set; skipping push. Staged commit lives in $WORK_DIR (cleaned on exit)."

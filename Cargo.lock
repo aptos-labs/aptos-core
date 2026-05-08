@@ -2029,6 +2029,17 @@ dependencies = [
 ]
 
 [[package]]
+name = "aptos-framework-book-builder"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "aptos-framework",
+ "move-docgen",
+ "move-model",
+ "tempfile",
+]
+
+[[package]]
 name = "aptos-framework-natives"
 version = "0.1.0"
 dependencies = [

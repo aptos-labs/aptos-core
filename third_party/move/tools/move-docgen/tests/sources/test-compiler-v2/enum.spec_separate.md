@@ -1,7 +1,4 @@
-
-<a id="0x815_m"></a>
-
-# Module `0x815::m`
+# Module `0x815::m` <a id="0x815_m"></a>
 
 
 
@@ -19,10 +16,7 @@
 <pre><code></code></pre>
 
 
-
-<a id="0x815_m_CommonFields"></a>
-
-## Enum Resource `CommonFields`
+## Enum Resource `CommonFields` <a id="0x815_m_CommonFields"></a>
 
 
 
@@ -61,7 +55,9 @@
 
 </details>
 
+
 </details>
+
 
 <details>
 <summary>Bar</summary>
@@ -95,13 +91,13 @@
 
 </details>
 
-</details>
 
 </details>
 
-<a id="0x815_m_CommonFieldsVector"></a>
 
-## Enum `CommonFieldsVector`
+</details>
+
+## Enum `CommonFieldsVector` <a id="0x815_m_CommonFieldsVector"></a>
 
 
 
@@ -134,7 +130,9 @@
 
 </details>
 
+
 </details>
+
 
 <details>
 <summary>Bar</summary>
@@ -162,13 +160,13 @@
 
 </details>
 
-</details>
 
 </details>
 
-<a id="0x815_m_t9_common_field"></a>
 
-## Function `t9_common_field`
+</details>
+
+## Function `t9_common_field` <a id="0x815_m_t9_common_field"></a>
 
 
 
@@ -196,9 +194,7 @@
 
 </details>
 
-<a id="0x815_m_test_data_invariant"></a>
-
-## Function `test_data_invariant`
+## Function `test_data_invariant` <a id="0x815_m_test_data_invariant"></a>
 
 
 
@@ -226,9 +222,7 @@
 
 </details>
 
-<a id="0x815_m_test_match_ref"></a>
-
-## Function `test_match_ref`
+## Function `test_match_ref` <a id="0x815_m_test_match_ref"></a>
 
 
 
@@ -258,9 +252,7 @@
 
 </details>
 
-<a id="0x815_m_test_enum_vector"></a>
-
-## Function `test_enum_vector`
+## Function `test_enum_vector` <a id="0x815_m_test_enum_vector"></a>
 
 
 
@@ -310,14 +302,9 @@
 
 </details>
 
-<a id="@Specification_0"></a>
+## Specification <a id="@Specification_0"></a>
 
-## Specification
-
-
-<a id="@Specification_0_CommonFields"></a>
-
-### Enum Resource `CommonFields`
+### Enum Resource `CommonFields` <a id="@Specification_0_CommonFields"></a>
 
 
 <pre><code>enum <a href="enum.md#0x815_m_CommonFields">CommonFields</a> <b>has</b> <b>copy</b>, drop, key
@@ -353,7 +340,9 @@
 
 </details>
 
+
 </details>
+
 
 <details>
 <summary>Bar</summary>
@@ -387,7 +376,9 @@
 
 </details>
 
+
 </details>
+
 </dl>
 
 
@@ -397,10 +388,7 @@
 </code></pre>
 
 
-
-<a id="@Specification_0_test_match_ref"></a>
-
-### Function `test_match_ref`
+### Function `test_match_ref` <a id="@Specification_0_test_match_ref"></a>
 
 
 <pre><code><b>fun</b> <a href="enum.md#0x815_m_test_match_ref">test_match_ref</a>(): u64

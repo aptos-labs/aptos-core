@@ -22,8 +22,9 @@ This document describes the language only; see [Use the Move Prover](https://apt
 for instructions. The reader is expected to have basic knowledge of the Move
 language, as well as basic principles of pre- and post-condition specifications.
 (See for example the [Design by contract](https://en.wikipedia.org/wiki/Design_by_contract)).
-For examples of specifications, we refer to the [Aptos framework](https://github.com/aptos-labs/aptos-core/blob/main/aptos-move/framework/aptos-framework/doc/overview.md)
-documentation, which has specifications embedded.
+For examples of specifications, we refer to the
+[Aptos Framework Book](https://aptos-labs.github.io/framework-book/), which
+has specifications embedded throughout each module's documentation.
 
 # Expressions
 
@@ -215,7 +216,7 @@ language:
 - `exists<T>(address): bool` returns true if the resource `T` exists at the address.
 - `global<T>(address): T` returns the resource value at the address.
 - `len<T>(vector<T>): num` returns the length of the vector.
-- `update<T>(vector<T>, num, T>): vector<T>` returns a new vector with the element replaced at the
+- `update<T>(vector<T>, num, T): vector<T>` returns a new vector with the element replaced at the
   given index.
 - `vec<T>(): vector<T>` returns an empty vector.
 - `vec<T>(x): vector<T>` returns a singleton vector.
@@ -588,7 +589,7 @@ The `aborts_if` condition can be augmented with code:
 ```move
 module 0x42::m {
   fun get_value(addr: address): u64 {
-    aborts(exists<Counter>(addr), 3);
+    assert!(exists<Counter>(addr), 3);
     borrow_global<Counter>(addr).value
   }
   spec get_value {
@@ -1343,4 +1344,4 @@ module 0x42::m {
 ## Supporting resources
 
 - [Design by contract](https://en.wikipedia.org/wiki/Design_by_contract)
-- [Aptos framework documentation](https://github.com/aptos-labs/aptos-core/blob/main/aptos-move/framework/aptos-framework/doc/overview.md)
+- [Aptos Framework Book](https://aptos-labs.github.io/framework-book/) — module reference with embedded specifications.

@@ -201,7 +201,8 @@ impl ProverOptions {
             skip_attribute_checks,
             known_attributes.clone(),
             experiments_vec,
-            true, // with_bytecode: prover needs FileFormat bytecode
+            true,  // with_bytecode: prover needs FileFormat bytecode
+            false, // all_files_as_targets
         )?;
         model.check_errors("in compilation")?;
         let mut options = self.convert_options(package_path)?;
