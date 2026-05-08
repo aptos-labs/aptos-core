@@ -14,7 +14,7 @@ Mutable references are replaced by in/out parameters.
 
 \Paragraph{Specification instrumentation}
 Before \WP runs, the bytecode will run through the regular process of specification instrumentation.
-function-level |requires|, |aborts_if|, |ensures|, and |modifies| clause, and each loop |invariant|, is compiled into an |assume| or |assert| at the appropriate program point.
+Each function-level |requires|, |aborts_if|, |ensures|, or |modifies| clause, and each loop |invariant|, is compiled into an |assume| or |assert| at the appropriate program point.
 Calls are instrumented uniformly via the \emph{behavioral predicates} introduced for higher-order functions in~\cite{GrieskampEtAl26HO}: |requires_of<f>|, |aborts_of<f>|, |ensures_of<f>|, |modifies_of<f>|, and |result_of<f>| reify a callee's contract as predicates over the call site's arguments and result.
 Loops are broken at their headers via the standard \emph{cut-point} encoding of Barnett and Leino for unstructured programs~\cite{BL05}, with the loop |invariant| playing the role of cut-point predicate: the back-edge is severed, the invariant is asserted before and after each iteration, and the loop-modified locations are havoced in between, leaving an acyclic fragment through which \WP propagates as through any straight-line code.
 This is the one place where the construction has a genuine \emph{prerequisite}: without an inductive invariant the inferred specification past the loop becomes vacuous, and an inductive invariant cannot in general be recovered from the loop body alone --- this is where AI-proposed candidates enter the picture (Sec.~\ref{sec:skills}).
