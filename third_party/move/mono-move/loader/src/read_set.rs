@@ -13,19 +13,19 @@ use shared_dsa::UnorderedMap;
 /// state transitions:
 ///   1. [`State::Unmetered`] can become [`State::Metered`] if gas has been
 ///      charged for the module.
-///   2. [`State::Unmetered`] can become [`State::ReadyForLowering`]
-///      if gas has been charged for this module, and it is ready for lowering
-///      (its mandatory dependency set has been computed).
-///   3. [`State::Metered`] can become [`State::ReadyForLowering`] if
+///   2. [`State::Metered`] can become [`State::ReadyForLowering`] if
 ///      the module became ready for lowering.
 #[derive(Copy, Clone, Eq, PartialEq)]
 pub enum State {
     /// This module has been loaded, charged gas and its mandatory dependency
     /// set is known. Function IR can be lowered.
     ReadyForLowering,
-    /// This module has been loaded and charged gas. Lowering of functions is
-    /// not yet possible because module's mandatory dependency set has not yet
-    /// been computed.
+    /// This module has been loaded and is about to be charged gas. Lowering of
+    /// functions is not yet possible because module's mandatory dependency set
+    /// has not yet been computed.
+    ///
+    /// Note that this state is recorded before gas is charged to make sure
+    /// that running out-of-gas still has a read in the read-set.
     Metered,
     /// This module has not been metered yet and is only used for caching to
     /// ensure that transactions always sees the same module version during
@@ -132,31 +132,16 @@ impl<'guard> ModuleReadSet<'guard> {
         id: ArenaRef<'guard, ExecutableId>,
         module: &'guard LoadedModule,
     ) -> Result<()> {
-        let read = ModuleRead::Loaded {
-            module,
-            state: State::ReadyForLowering,
-        };
-        let prev = self.inner.insert(id, read);
-        match prev {
-            None => bail!("Module must be recorded as pending"),
-            Some(ModuleRead::Pending) => Ok(()),
-            Some(ModuleRead::Loaded {
-                module: prev_module,
-                state,
-            }) => match state {
-                State::ReadyForLowering => {
-                    bail!("Module is already ready for lowering")
-                },
-                State::Metered | State::Unmetered => {
-                    let prev_ptr = prev_module as *const _;
-                    let curr_ptr = module as *const _;
-                    if prev_ptr != curr_ptr {
-                        bail!("Existing module must be the same and have no lowering requirements");
-                    } else {
-                        Ok(())
-                    }
-                },
+        match self.inner.get(&id) {
+            Some(ModuleRead::Pending) => {
+                self.inner.insert(id, ModuleRead::Loaded {
+                    module,
+                    state: State::ReadyForLowering,
+                });
+                Ok(())
             },
+            None => bail!("Module must be recorded as pending"),
+            Some(ModuleRead::Loaded { .. }) => bail!("Module is already loaded"),
         }
     }
 

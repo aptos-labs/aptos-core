@@ -206,6 +206,9 @@ impl fmt::Display for ClosureFuncRef {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
             ClosureFuncRef::Resolved(ptr) => {
+                // SAFETY: Micro-ops are currently displayed only during execution
+                // when the guard is held.
+                // TODO: Have a safe display impl that takes guard.
                 let func = unsafe { ptr.as_ref_unchecked() };
                 let func_name = unsafe { func.name.as_ref_unchecked() };
                 write!(f, "Resolved({})", func_name)
@@ -864,6 +867,9 @@ impl fmt::Display for MicroOp {
                 executable_id,
                 func_name,
             } => {
+                // SAFETY: Micro-ops are currently displayed only during execution
+                // when the guard is held.
+                // TODO: Have a safe display impl that takes guard.
                 let executable_id = unsafe { executable_id.as_ref_unchecked() };
                 let addr = executable_id.address().short_str_lossless();
                 let module_name = unsafe { executable_id.name().as_ref_unchecked() };
@@ -871,6 +877,9 @@ impl fmt::Display for MicroOp {
                 write!(f, "CallIndirect 0x{}::{}::{}", addr, module_name, func_name)
             },
             MicroOp::CallDirect { ptr } => {
+                // SAFETY: Micro-ops are currently displayed only during execution
+                // when the guard is held.
+                // TODO: Have a safe display impl that takes guard.
                 let func = unsafe { ptr.as_ref_unchecked() };
                 let func_name = unsafe { func.name.as_ref_unchecked() };
                 write!(f, "CallDirect {}", func_name)

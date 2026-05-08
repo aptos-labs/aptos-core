@@ -104,6 +104,47 @@ fn load_eager_preloads_struct_closure() {
     );
 }
 
+// Module whose only function uses primitives. The lowering walker visits
+// no struct fields, so without seeding self the MS would be empty and
+// mark_ready_for_lowering would bail.
+const PRIMITIVE_ONLY_SOURCE: &str = r#"
+module 0x1::p {
+    public fun f(x: u64): u64 { x + 1 }
+}
+"#;
+
+#[test]
+fn load_eager_primitive_only_module_includes_self() {
+    let modules = mono_move_testsuite::compile_move_source(PRIMITIVE_ONLY_SOURCE)
+        .expect("compilation failed");
+    let mut module_provider = InMemoryModuleProvider::new();
+    module_provider.add_modules(&modules);
+
+    let ctx = GlobalContext::with_num_execution_workers(1);
+    let guard = ctx.try_execution_context(0).unwrap();
+    let loader = Loader::new_with_policy(
+        &guard,
+        &module_provider,
+        LoadingPolicy::Lazy(LoweringPolicy::Eager),
+    );
+
+    let id_p = guard.intern_module_id(&ModuleId::new(
+        AccountAddress::ONE,
+        ident_str!("p").to_owned(),
+    ));
+
+    let mut read_set = ModuleReadSet::new();
+    let mut gas = SimpleGasMeter::new(u64::MAX);
+    let exec = loader.load_module(&mut read_set, &mut gas, id_p).unwrap();
+
+    assert_eq!(read_set.len(), 1);
+    assert_eq!(
+        exec.mandatory_dependencies().slots().len(),
+        1,
+        "MS must always include self even without struct refs"
+    );
+}
+
 #[test]
 fn load_eager_cache_hit_reproduces_state() {
     let modules =

@@ -56,7 +56,7 @@ module 0x1::a {
 
     let idx = ir
         .module
-        .interned_nomial_type_def_idx(guard.identifier_of(ident_str!("B")))
+        .interned_nominal_type_def_idx(guard.identifier_of(ident_str!("B")))
         .unwrap();
     let ty = ir.module.interned_nominal_def_type_at(idx);
     let layout = view_type(ty).layout().unwrap();
@@ -72,7 +72,7 @@ module 0x1::a {
 
     let idx = ir
         .module
-        .interned_nomial_type_def_idx(guard.identifier_of(ident_str!("D")))
+        .interned_nominal_type_def_idx(guard.identifier_of(ident_str!("D")))
         .unwrap();
     let ty = ir.module.interned_nominal_def_type_at(idx);
     let layout = view_type(ty).layout().unwrap();
@@ -88,7 +88,7 @@ module 0x1::a {
 
     let idx = ir
         .module
-        .interned_nomial_type_def_idx(guard.identifier_of(ident_str!("C")))
+        .interned_nominal_type_def_idx(guard.identifier_of(ident_str!("C")))
         .unwrap();
     let ty = ir.module.interned_nominal_def_type_at(idx);
     let layout = view_type(ty).layout().unwrap();

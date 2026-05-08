@@ -291,7 +291,7 @@ pub trait SpecializerContext {
         size: u32,
         align: u32,
         fields: Option<&[FieldLayout]>,
-    );
+    ) -> Result<()>;
 }
 
 /// Attempts to lower a function, and returns an error if lowering failed. The
@@ -540,14 +540,14 @@ fn walk_and_size(
                     }
                     if all_sized {
                         let total = align_up_u32(offset, max_align);
-                        ctx.set_nominal_layout(ty, total, max_align, Some(&layout));
+                        ctx.set_nominal_layout(ty, total, max_align, Some(&layout))?;
                     }
                 },
                 Some(FieldTypes::Enum(_)) => {
                     // Enum size is fixed (heap pointer) regardless of variant
                     // fields. We do not walk variants here because their types
                     // are only needed for pack/unpack/test.
-                    ctx.set_nominal_layout(ty, 8, 8, None);
+                    ctx.set_nominal_layout(ty, 8, 8, None)?;
                 },
             }
         },

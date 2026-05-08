@@ -118,7 +118,7 @@ impl PreparedModule {
 
     /// Looks up a struct or enum definition by its interned name, and returns
     /// its index.
-    pub fn interned_nomial_type_def_idx(
+    pub fn interned_nominal_type_def_idx(
         &self,
         name: InternedIdentifier,
     ) -> Option<StructDefinitionIndex> {
@@ -154,7 +154,7 @@ impl PreparedModule {
     /// Looks up a struct or enum definition by its interned name, and returns
     /// its fields (or variants with fields).
     pub fn interned_field_types(&self, name: InternedIdentifier) -> Option<&FieldTypes> {
-        let idx = self.interned_nomial_type_def_idx(name)?;
+        let idx = self.interned_nominal_type_def_idx(name)?;
         Some(&self.field_types[idx.0 as usize])
     }
 

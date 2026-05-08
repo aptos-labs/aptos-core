@@ -175,7 +175,7 @@ impl SpecializerContext for SnapshotLoaderContext<'_, '_, '_> {
         size: u32,
         align: u32,
         fields: Option<&[FieldLayout]>,
-    ) {
-        let _ = self.guard.set_nominal_layout(ty, size, align, fields);
+    ) -> Result<()> {
+        self.guard.set_nominal_layout(ty, size, align, fields)
     }
 }

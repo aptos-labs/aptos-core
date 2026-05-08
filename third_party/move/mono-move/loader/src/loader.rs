@@ -392,6 +392,10 @@ impl<'guard, 'ctx> Loader<'guard, 'ctx> {
         module: &'guard LoadedModule,
     ) -> anyhow::Result<()> {
         let mut walker = LoweringContext::new(self, read_set);
+        let self_slot = self.guard.get_or_create_module_slot(id);
+        walker.discovered_seen.insert(module.id());
+        walker.discovered.push(self_slot);
+
         try_set_lowering_requirements(&mut walker, module.ir())?;
 
         // Set the mandatory set for the module. Because of concurrency, it is
@@ -588,10 +592,9 @@ impl SpecializerContext for LoweringContext<'_, '_, '_> {
         size: u32,
         align: u32,
         fields: Option<&[FieldLayout]>,
-    ) {
-        let _ = self
-            .loader
+    ) -> anyhow::Result<()> {
+        self.loader
             .guard
-            .set_nominal_layout(ty, size, align, fields);
+            .set_nominal_layout(ty, size, align, fields)
     }
 }
