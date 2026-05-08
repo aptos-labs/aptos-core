@@ -207,7 +207,7 @@ pub(crate) fn mainnet_mirror_failures_small_test(duration: Duration) -> ForgeCon
     // Chain TPS doesn't scale with validator count (every validator commits
     // the same blocks), so per-block exec profile and the resulting
     // backpressure dynamics reproduce on the 21-validator subset.
-    build_failures_test(small_stratified_subset(), duration, 1200, 600, true)
+    build_failures_test(small_stratified_subset(), duration, 1400, 600, true)
 }
 
 /// Mainnet-mirror with failure-pattern injection. Applies per-validator
@@ -222,10 +222,10 @@ pub(crate) fn mainnet_mirror_failures_small_test(duration: Duration) -> ForgeCon
 pub(crate) fn mainnet_mirror_failures_test(duration: Duration) -> ForgeConfig {
     let snapshot = MainnetMirrorSnapshot::load_embedded()
         .expect("embedded mainnet validator snapshot failed to parse");
-    // emit_tps lowered 1500 → 1200: at 1500 the heavy-mix run drove exec
-    // backpressure to ~0.8, vs mainnet's ~0.6-0.65; 1200 brings it down toward
-    // mainnet. min_tps stays at 600 — well above the achievable ceiling.
-    build_failures_test(snapshot, duration, 1200, 600, true)
+    // emit_tps 1400: 1500 drove exec backpressure to ~0.8 (mainnet ~0.76),
+    // 1200 was a touch under-driven, 1400 is the sweet spot. min_tps stays
+    // at 600 — well above the achievable ceiling.
+    build_failures_test(snapshot, duration, 1400, 600, true)
 }
 
 /// Shared body of both failures tests; differs only by snapshot subset, emit

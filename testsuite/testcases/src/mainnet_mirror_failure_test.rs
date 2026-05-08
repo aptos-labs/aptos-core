@@ -121,7 +121,7 @@ impl Default for FailurePatternConfig {
             spike_at_offset_secs: 60..420,
             spike_pause_secs: 30..90,
             min_continuous_pct: 1,
-            max_chronic_continuous_pct: 4,
+            max_chronic_continuous_pct: 2,
         }
     }
 }
