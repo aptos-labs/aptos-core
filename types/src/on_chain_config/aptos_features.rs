@@ -177,6 +177,9 @@ pub enum FeatureFlag {
     VERSIONED_TRANSACTION_VALIDATION = 112,
     /// Whether storage_slot move natives are enabled.
     STORAGE_SLOT_NATIVES = 113,
+    /// If enabled, a module upgrade may convert a `friend/package entry`
+    /// function into a private `entry` function.
+    FRIEND_ENTRY_TO_PRIVATE_ENTRY = 114,
 }
 
 impl FeatureFlag {
@@ -290,6 +293,7 @@ impl FeatureFlag {
             Self::TRANSACTION_LIMITS,
             Self::VERSIONED_TRANSACTION_VALIDATION,
             Self::STORAGE_SLOT_NATIVES,
+            Self::FRIEND_ENTRY_TO_PRIVATE_ENTRY,
         ]
     }
 }

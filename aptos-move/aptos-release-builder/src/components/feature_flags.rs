@@ -165,6 +165,7 @@ pub enum FeatureFlag {
     TransactionLimits,
     VersionedTransactionValidation,
     StorageSlotNatives,
+    FriendEntryToPrivateEntry,
 }
 
 fn generate_features_blob(writer: &CodeWriter, data: &[u64]) {
@@ -431,6 +432,9 @@ impl From<FeatureFlag> for AptosFeatureFlag {
                 AptosFeatureFlag::VERSIONED_TRANSACTION_VALIDATION
             },
             FeatureFlag::StorageSlotNatives => AptosFeatureFlag::STORAGE_SLOT_NATIVES,
+            FeatureFlag::FriendEntryToPrivateEntry => {
+                AptosFeatureFlag::FRIEND_ENTRY_TO_PRIVATE_ENTRY
+            },
         }
     }
 }
@@ -624,6 +628,9 @@ impl From<AptosFeatureFlag> for FeatureFlag {
                 FeatureFlag::VersionedTransactionValidation
             },
             AptosFeatureFlag::STORAGE_SLOT_NATIVES => FeatureFlag::StorageSlotNatives,
+            AptosFeatureFlag::FRIEND_ENTRY_TO_PRIVATE_ENTRY => {
+                FeatureFlag::FriendEntryToPrivateEntry
+            },
         }
     }
 }
