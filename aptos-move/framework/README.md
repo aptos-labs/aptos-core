@@ -16,23 +16,32 @@ files. See the [Layout](#layout) section for a more detailed overview of the str
 
 ## Documentation
 
-Each of the main components of the Aptos Framework and contributing guidelines are documented separately. See them by version below:
+Reference documentation for every framework module lives in the
+**[Aptos Framework Book](https://aptos-labs.github.io/framework-book/)**,
+auto-generated from the source in this directory:
 
-* *Aptos tokens* - [main](https://github.com/aptos-labs/aptos-core/blob/main/aptos-move/framework/aptos-token/doc/overview.md), [testnet](https://github.com/aptos-labs/aptos-core/blob/testnet/aptos-move/framework/aptos-token/doc/overview.md), [devnet](https://github.com/aptos-labs/aptos-core/blob/devnet/aptos-move/framework/aptos-token/doc/overview.md)
-* *Aptos framework* - [main](https://github.com/aptos-labs/aptos-core/blob/main/aptos-move/framework/aptos-framework/doc/overview.md), [testnet](https://github.com/aptos-labs/aptos-core/blob/testnet/aptos-move/framework/aptos-framework/doc/overview.md), [devnet](https://github.com/aptos-labs/aptos-core/blob/devnet/aptos-move/framework/aptos-framework/doc/overview.md)
-* *Aptos stdlib* - [main](https://github.com/aptos-labs/aptos-core/blob/main/aptos-move/framework/aptos-stdlib/doc/overview.md), [testnet](https://github.com/aptos-labs/aptos-core/blob/testnet/aptos-move/framework/aptos-stdlib/doc/overview.md), [devnet](https://github.com/aptos-labs/aptos-core/blob/devnet/aptos-move/framework/aptos-stdlib/doc/overview.md)
-* *Move stdlib* - [main](https://github.com/aptos-labs/aptos-core/blob/main/aptos-move/framework/move-stdlib/doc/overview.md), [testnet](https://github.com/aptos-labs/aptos-core/blob/testnet/aptos-move/framework/move-stdlib/doc/overview.md), [devnet](https://github.com/aptos-labs/aptos-core/blob/devnet/aptos-move/framework/move-stdlib/doc/overview.md)
+* [Move Standard Library](https://aptos-labs.github.io/framework-book/move-stdlib/overview.html)
+* [Aptos Standard Library](https://aptos-labs.github.io/framework-book/aptos-stdlib/overview.html)
+* [Aptos Framework](https://aptos-labs.github.io/framework-book/aptos-framework/overview.html)
+* [Aptos Token Objects](https://aptos-labs.github.io/framework-book/aptos-token-objects/overview.html)
+* [Aptos Trading Framework](https://aptos-labs.github.io/framework-book/aptos-trading/overview.html)
+* [Aptos Experimental Framework](https://aptos-labs.github.io/framework-book/aptos-experimental/overview.html)
+
+The book is built and deployed by
+`third_party/move/documentation/framework-book/deploy.sh`; see
+[`third_party/move/documentation/README.md`](../../third_party/move/documentation/README.md)
+for the deploy workflow.
 
 Follow our [contributing guidelines](CONTRIBUTING.md) and basic coding standards for the Aptos Framework.
 
-## Compilation and Generation
+## Generating documentation for your own packages
 
-The documents above were created by the Move documentation generator for Aptos. It is available as part of the Aptos CLI. To see its options, run:
+The Move documentation generator is also available as part of the Aptos CLI for
+documenting user packages:
+
 ```shell
 aptos move document --help
 ```
-
-The documentation process is also integrated into the framework building process and will be automatically triggered like other derived artifacts, via `cached-packages` or explicit release building.
 
 ## Running Move tests
 

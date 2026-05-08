@@ -1,4 +1,5 @@
-// Copyright © Aptos Foundation
+// Copyright (c) Aptos Foundation
+// Licensed pursuant to the Innovation-Enabling Source Code License, available at https://github.com/aptos-labs/aptos-core/blob/main/LICENSE
 
 //! Generates the Aptos Framework Book by driving move-docgen across the
 //! six framework packages.
@@ -62,6 +63,16 @@ fn main() -> Result<()> {
                 .exists()
                 .then(|| references.to_string_lossy().into_owned());
 
+            // Each package contributes a hand-authored landing page via
+            // `doc_template/overview.md`; its `{{move-index}}` placeholder
+            // expands to that package's modules during this per-package pass.
+            let overview = package_path.join("doc_template/overview.md");
+            let root_doc_templates = if overview.exists() {
+                vec![overview.to_string_lossy().into_owned()]
+            } else {
+                vec![]
+            };
+
             eprintln!("[book] generating module docs for {}", subdir);
             run_docgen(
                 &package_path,
@@ -77,7 +88,7 @@ fn main() -> Result<()> {
                     collapsed_sections: true,
                     output_directory: (*subdir).to_string(),
                     doc_path,
-                    root_doc_templates: vec![],
+                    root_doc_templates,
                     references_file,
                     include_dep_diagrams: false,
                     include_call_diagrams: false,
@@ -138,8 +149,7 @@ fn run_docgen(
         if let Some(parent) = dest.parent() {
             std::fs::create_dir_all(parent)?;
         }
-        std::fs::write(&dest, content)
-            .with_context(|| format!("writing `{}`", dest.display()))?;
+        std::fs::write(&dest, content).with_context(|| format!("writing `{}`", dest.display()))?;
     }
     Ok(())
 }
@@ -207,7 +217,7 @@ fn build_summary(framework_dir: &Path) -> Result<()> {
         pkg_path,
         true, // umbrella depends on aptos-experimental → use latest language
         true, // load every dep source file as a primary target so all modules
-              // appear in the model and can be enumerated by `{{move-index PKG}}`
+        // appear in the model and can be enumerated by `{{move-index PKG}}`
         DocgenOptions {
             section_level_start: 1,
             include_private_fun: false,

@@ -28,6 +28,6 @@ double-spending at compile time.
 
 ### Links
 
-- [The Move Book](https://aptos.dev/move/book/SUMMARY)
-- [Aptos Framework Reference](https://aptos.dev/reference/move/?branch=mainnet&page=aptos-framework/doc/overview.md)
+- [The Move Book](https://aptos-labs.github.io/move-book/)
+- [Aptos Framework Book](https://aptos-labs.github.io/framework-book/)
 {% endif %}

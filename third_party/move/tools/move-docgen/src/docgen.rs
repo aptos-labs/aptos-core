@@ -179,9 +179,7 @@ pub struct DocgenOptions {
 }
 
 /// Controls how `{{move-index}}` (and `{{move-index PKG}}`) renders entries.
-#[derive(
-    ValueEnum, Clone, Copy, Debug, Default, Hash, Eq, PartialEq, Serialize, Deserialize,
-)]
+#[derive(ValueEnum, Clone, Copy, Debug, Default, Hash, Eq, PartialEq, Serialize, Deserialize)]
 pub enum IndexLinkStyle {
     /// `[`addr::mod`](file.md#0x1_mod)` — fully-qualified module path as
     /// link text and an in-document anchor as the fragment. Suited to
