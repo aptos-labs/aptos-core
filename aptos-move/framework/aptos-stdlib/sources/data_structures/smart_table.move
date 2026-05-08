@@ -135,10 +135,11 @@ module aptos_std::smart_table {
         let bucket = self.buckets.borrow_mut(index);
         // We set a per-bucket limit here with a upper bound (10000) that nobody should normally reach.
         assert!(bucket.length() <= 10000, error::permission_denied(EEXCEED_MAX_BUCKET_SIZE));
-        assert!(bucket.all(| entry | {
+        let key_not_in_bucket = bucket.all(|entry| {
             let e: &Entry<K, V> = entry;
             &e.key != &key
-        }), error::invalid_argument(EALREADY_EXIST));
+        });
+        assert!(key_not_in_bucket, error::invalid_argument(EALREADY_EXIST));
         let e = Entry { hash, key, value };
         if (self.target_bucket_size == 0) {
             let estimated_entry_size = max(size_of_val(&e), 1);
