@@ -1,6 +1,7 @@
 // Copyright (c) Aptos Foundation
 // Licensed pursuant to the Innovation-Enabling Source Code License, available at https://github.com/aptos-labs/aptos-core/blob/main/LICENSE
 
+use crate::rand::rand_gen::lazy_types::LazyDelta;
 use anyhow::{anyhow, bail, ensure};
 use aptos_consensus_types::common::{Author, Round};
 use aptos_crypto::bls12381::Signature;
@@ -10,7 +11,7 @@ use aptos_dkg::{
     weighted_vuf::traits::WeightedVUF,
 };
 use aptos_experimental_runtimes::thread_manager::THREAD_MANAGER;
-use aptos_logger::{debug, warn};
+use aptos_logger::{debug, error, warn};
 use aptos_types::{
     aggregate_signature::AggregateSignature,
     randomness::{
@@ -39,10 +40,18 @@ pub struct Share {
     share: ProofShare,
 }
 
+/// `delta` and `fast_delta` carry compressed bytes only — the expensive
+/// subgroup-checked decompression happens after structural validation in
+/// `verify`. This bounds the per-message CPU cost an inbound payload can force
+/// on the receiver. See `lazy_types` module docs for details.
+///
+/// `fast_delta` was retained on the wire by PR #18870 for BCS compatibility
+/// after the fast-path runtime code was removed; it is now always `None` for
+/// honest senders, and a non-`None` value is treated as a verification failure.
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 pub struct AugmentedData {
-    delta: Delta,
-    fast_delta: Option<Delta>,
+    delta: LazyDelta,
+    fast_delta: Option<LazyDelta>,
 }
 
 impl TShare for Share {
@@ -238,23 +247,53 @@ impl TAugmentedData for AugmentedData {
             .expect("Add self delta should succeed");
 
         let data = AugmentedData {
-            delta: delta.clone(),
+            delta: LazyDelta::from_decompressed(&delta),
             fast_delta: None,
         };
         AugData::new(rand_config.epoch(), rand_config.author(), data)
     }
 
     fn augment(&self, rand_config: &RandConfig, author: &Author) {
-        let AugmentedData { delta, .. } = self;
-        rand_config
-            .add_certified_delta(author, delta.clone())
-            .expect("Add delta should succeed");
+        // `augment` runs after either the inner `verify` (runtime-receive
+        // path), the `CertifiedAugData` multi-signature check (runtime
+        // certified-data path), or replay from `RandDb` (startup recovery).
+        // In normal operation the structural invariant and subgroup-validity
+        // hold, so `validate_and_decompress` succeeds. Re-checking the
+        // length here (vs. trusting it) costs nothing on the happy path and
+        // bounds the work an attacker can force on a corrupted input.
+        //
+        // We log-and-skip on failure rather than panic: a single corrupted
+        // on-disk blob would otherwise block validator startup. Skipping one
+        // entry only loses that peer's APK certification — their shares fail
+        // share-verification downstream, the network proceeds with the
+        // remaining contributions.
+        let pk_len = rand_config.get_pk_share(author).len();
+        let delta = match self.delta.validate_and_decompress(pk_len) {
+            Ok(delta) => delta,
+            Err(e) => {
+                error!(
+                    "[AugmentedData::augment] validate_and_decompress failed for {}: {}",
+                    author, e,
+                );
+                return;
+            },
+        };
+        if let Err(e) = rand_config.add_certified_delta(author, delta) {
+            error!(
+                "[AugmentedData::augment] add_certified_delta failed for {}: {}",
+                author, e,
+            );
+        }
     }
 
     fn verify(&self, rand_config: &RandConfig, author: &Author) -> anyhow::Result<()> {
-        rand_config
-            .derive_apk(author, self.delta.clone())
-            .map(|_| ())?;
+        ensure!(
+            self.fast_delta.is_none(),
+            "fast_delta is no longer supported (removed by PR #18870); rejecting",
+        );
+        let pk_len = rand_config.get_pk_share(author).len();
+        let delta = self.delta.validate_and_decompress(pk_len)?;
+        rand_config.derive_apk(author, delta).map(|_| ())?;
         Ok(())
     }
 }
@@ -1157,5 +1196,115 @@ mod tests {
             bcs::to_bytes(&apk).unwrap()
         );
         assert!(fast.is_none());
+    }
+
+    /// Self-generated AugmentedData must round-trip through verify on a peer's
+    /// RandConfig.
+    #[test]
+    fn test_augmented_data_verify_happy_path() {
+        let ctx = MultiValidatorTestContext::new(vec![1, 1, 1, 1], false);
+        let aug = AugmentedData::generate(&ctx.rand_configs[0]);
+
+        // A peer (rand_configs[1]) verifies the data authored by validator 0.
+        aug.verify(&ctx.rand_configs[1], ctx.authors[0])
+            .expect("verify should succeed");
+    }
+
+    /// A non-`None` `fast_delta` must be rejected by verify, regardless of its
+    /// payload validity. This is the dead-field defense-in-depth check.
+    #[test]
+    fn test_augmented_data_rejects_nonempty_fast_delta() {
+        let ctx = MultiValidatorTestContext::new(vec![1, 1, 1, 1], false);
+        let aug = AugmentedData::generate(&ctx.rand_configs[0]);
+
+        // Smuggle the (otherwise valid) delta into fast_delta.
+        let AugData {
+            epoch,
+            author,
+            data: AugmentedData { delta, .. },
+        } = aug;
+        let tampered = AugmentedData {
+            delta: delta.clone(),
+            fast_delta: Some(delta),
+        };
+        let tampered = AugData::new(epoch, author, tampered);
+
+        let err = tampered
+            .data
+            .verify(&ctx.rand_configs[1], &ctx.authors[0])
+            .unwrap_err();
+        assert!(
+            err.to_string().contains("fast_delta"),
+            "expected fast_delta rejection, got: {err}",
+        );
+    }
+
+    /// `augment` is invoked at startup on entries replayed from `RandDb`.
+    /// If a stored blob is corrupted on disk, decompression fails — but a
+    /// single bad entry must not panic the validator on startup. The expected
+    /// behavior is log-and-skip; the bad entry is dropped and the remaining
+    /// certified peers load normally.
+    #[test]
+    fn test_augment_does_not_panic_on_corrupt_delta() {
+        use crate::rand::rand_gen::lazy_types::LazyG1;
+
+        let ctx = MultiValidatorTestContext::new(vec![1, 1, 1, 1], false);
+        let pk_len = ctx.rand_configs[1].get_pk_share(&ctx.authors[0]).len();
+
+        // 0xFF in the first byte forces an invalid compressed encoding;
+        // `G1Affine::from_compressed` returns `None` and `decompress` errors.
+        let mut bad_bytes = [0u8; 48];
+        bad_bytes[0] = 0xFF;
+        let bad_g1 = LazyG1::from_raw_bytes_for_test(bad_bytes);
+        let bad_rks: Vec<LazyG1> = (0..pk_len).map(|_| bad_g1.clone()).collect();
+        let bad = AugmentedData {
+            delta: LazyDelta::from_raw_bytes_for_test(bad_g1, bad_rks),
+            fast_delta: None,
+        };
+
+        // Must not panic. Logs an error and silently no-ops.
+        bad.augment(&ctx.rand_configs[1], &ctx.authors[0]);
+    }
+
+    /// An AugmentedData whose `delta.rks.len()` does not match the author's
+    /// pk-share weight must be rejected before any subgroup-checked
+    /// decompression occurs. This is the load-bearing DoS mitigation.
+    #[test]
+    fn test_augmented_data_rejects_oversized_delta_before_decompression() {
+        use crate::rand::rand_gen::lazy_types::LazyG1;
+        use blstrs::G1Projective;
+        use group::Group;
+
+        let ctx = MultiValidatorTestContext::new(vec![1, 1, 1, 1], false);
+        let pk_len = ctx.rand_configs[1].get_pk_share(&ctx.authors[0]).len();
+
+        // Construct a malicious LazyDelta with an intentionally oversized rks
+        // vector. The byte content is valid G1 (so decompression *would*
+        // succeed if attempted), but verify must reject on length mismatch
+        // BEFORE attempting per-element decompression.
+        let oversized: usize = pk_len + 10_000;
+        let valid_pi = LazyG1::from_decompressed(&G1Projective::generator());
+        let oversized_rks: Vec<LazyG1> = (0..oversized).map(|_| valid_pi.clone()).collect();
+        let bad_delta = LazyDelta::from_raw_bytes_for_test(valid_pi, oversized_rks);
+        let bad = AugmentedData {
+            delta: bad_delta,
+            fast_delta: None,
+        };
+
+        let start = std::time::Instant::now();
+        let err = bad
+            .verify(&ctx.rand_configs[1], &ctx.authors[0])
+            .unwrap_err();
+        let elapsed = start.elapsed();
+
+        assert!(err.to_string().contains("length"));
+        // pk_len is small (test weights vec![1,1,1,1] gives small pk_len).
+        // Oversized = pk_len + 10k. Length-bounded rejection completes in <ms.
+        // A regression that decompressed all 10k+ entries would take >1s.
+        assert!(
+            elapsed.as_millis() < 100,
+            "verify took {}ms; expected <100ms (no per-element decompression on length mismatch)",
+            elapsed.as_millis(),
+        );
     }
 }
