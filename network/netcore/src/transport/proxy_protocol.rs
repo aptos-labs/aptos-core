@@ -157,7 +157,11 @@ pub async fn read_header<T: AsyncRead + std::marker::Unpin>(
 mod test {
     use super::*;
     use aptos_memsocket::MemorySocket;
-    use futures::{executor::block_on, future::join, io::{AsyncWriteExt, Cursor}};
+    use futures::{
+        executor::block_on,
+        future::join,
+        io::{AsyncWriteExt, Cursor},
+    };
     use std::{
         net::ToSocketAddrs,
         pin::Pin,
