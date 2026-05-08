@@ -15,7 +15,9 @@ use crate::{
     },
     store_element, structure_from_ty_arg,
 };
-use aptos_gas_schedule::gas_params::natives::aptos_framework::*;
+use aptos_gas_schedule::{
+    gas_feature_versions::RELEASE_V1_46, gas_params::natives::aptos_framework::*,
+};
 use aptos_native_interface::{SafeNativeContext, SafeNativeError, SafeNativeResult};
 use ark_ec::PrimeGroup;
 use move_vm_types::{loaded_data::runtime_types::Type, values::Value};
@@ -142,7 +144,11 @@ pub fn one_internal(
             Ok(smallvec![Value::u64(handle as u64)])
         },
         Some(Structure::BN254Fr) => {
-            ark_constant_op_internal!(context, ark_bn254::Fr, one, ALGEBRA_ARK_BLS12_381_FR_ONE)
+            if context.gas_feature_version() >= RELEASE_V1_46 {
+                ark_constant_op_internal!(context, ark_bn254::Fr, one, ALGEBRA_ARK_BN254_FR_ONE)
+            } else {
+                ark_constant_op_internal!(context, ark_bn254::Fr, one, ALGEBRA_ARK_BLS12_381_FR_ONE)
+            }
         },
         Some(Structure::BN254Fq) => {
             ark_constant_op_internal!(context, ark_bn254::Fq, one, ALGEBRA_ARK_BN254_FQ_ONE)
