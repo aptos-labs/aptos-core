@@ -140,6 +140,34 @@ mod tests {
             config::BATCH_PADDING_BYTES
         );
     }
+
+    #[test]
+    fn verify_v2_rejects_v1_batch_in_batch_msg_v2() {
+        use super::*;
+        use aptos_consensus_types::proof_of_store::BatchKind;
+        use aptos_types::quorum_store::BatchId;
+
+        let author = PeerId::random();
+        let v1 = Batch::<BatchInfoExt>::new_v1(BatchId::new_for_test(1), vec![], 1, 1, author, 0);
+        let v2 = Batch::<BatchInfoExt>::new_v2(
+            BatchId::new_for_test(2),
+            vec![],
+            1,
+            u64::MAX,
+            author,
+            0,
+            BatchKind::Normal,
+        );
+        // Mirrors the disclosed crafted message: V1 first, V2 second.
+        let msg = BatchMsg::new(vec![v1, v2]);
+        let err = msg
+            .verify_v2(author, 10, &ValidatorVerifier::new(vec![]))
+            .expect_err("must reject V1 entry in BatchMsgV2");
+        assert!(
+            err.to_string().contains("Non-V2 batch in BatchMsgV2"),
+            "unexpected error: {err}"
+        );
+    }
 }
 
 #[derive(Clone, Debug, Deserialize, Serialize)]

@@ -770,3 +770,68 @@ impl From<ProofOfStore<BatchInfo>> for ProofOfStore<BatchInfoExt> {
         }
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn v1_info() -> BatchInfoExt {
+        BatchInfoExt::new_v1(
+            PeerId::random(),
+            BatchId::new_for_test(1),
+            1,
+            1,
+            HashValue::random(),
+            0,
+            0,
+            0,
+        )
+    }
+
+    fn v2_info() -> BatchInfoExt {
+        BatchInfoExt::new_v2(
+            PeerId::random(),
+            BatchId::new_for_test(2),
+            1,
+            u64::MAX,
+            HashValue::random(),
+            0,
+            0,
+            0,
+            BatchKind::Normal,
+        )
+    }
+
+    #[test]
+    fn signed_batch_info_msg_verify_v2_rejects_v1_entry() {
+        let author = PeerId::random();
+        let msg = SignedBatchInfoMsg::new(vec![
+            SignedBatchInfo::dummy(v1_info(), author),
+            SignedBatchInfo::dummy(v2_info(), author),
+        ]);
+        let err = msg
+            .verify_v2(author, 10, u64::MAX, &ValidatorVerifier::new(vec![]))
+            .expect_err("must reject V1 entry in SignedBatchInfoMsgV2");
+        assert!(
+            err.to_string()
+                .contains("Non-V2 entry in SignedBatchInfoMsgV2"),
+            "unexpected error: {err}"
+        );
+    }
+
+    #[test]
+    fn proof_of_store_msg_verify_v2_rejects_v1_entry() {
+        let msg = ProofOfStoreMsg::new(vec![
+            ProofOfStore::new(v1_info(), AggregateSignature::empty()),
+            ProofOfStore::new(v2_info(), AggregateSignature::empty()),
+        ]);
+        let err = msg
+            .verify_v2(10, &ValidatorVerifier::new(vec![]), &ProofCache::new(1))
+            .expect_err("must reject V1 entry in ProofOfStoreMsgV2");
+        assert!(
+            err.to_string()
+                .contains("Non-V2 entry in ProofOfStoreMsgV2"),
+            "unexpected error: {err}"
+        );
+    }
+}
