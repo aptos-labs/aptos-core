@@ -373,7 +373,9 @@ where
         Self { signed_infos }
     }
 
-    pub fn verify(
+    /// Per-entry verification shared by V1 (`verify`) and V2 (`verify_v2`).
+    /// Variant-specific gating is layered on by the concrete impls.
+    fn verify_inner(
         &self,
         sender: PeerId,
         max_num_batches: usize,
@@ -418,6 +420,23 @@ where
     }
 }
 
+impl SignedBatchInfoMsg<BatchInfo> {
+    pub fn verify(
+        &self,
+        sender: PeerId,
+        max_num_batches: usize,
+        max_batch_expiry_gap_usecs: u64,
+        validator: &ValidatorVerifier,
+    ) -> anyhow::Result<()> {
+        self.verify_inner(
+            sender,
+            max_num_batches,
+            max_batch_expiry_gap_usecs,
+            validator,
+        )
+    }
+}
+
 impl SignedBatchInfoMsg<BatchInfoExt> {
     pub fn verify_v2(
         &self,
@@ -432,7 +451,7 @@ impl SignedBatchInfoMsg<BatchInfoExt> {
                 "Non-V2 entry in SignedBatchInfoMsgV2"
             );
         }
-        self.verify(
+        self.verify_inner(
             sender,
             max_num_batches,
             max_batch_expiry_gap_usecs,
@@ -605,7 +624,9 @@ where
         Self { proofs }
     }
 
-    pub fn verify(
+    /// Per-proof verification shared by V1 (`verify`) and V2 (`verify_v2`).
+    /// Variant-specific gating is layered on by the concrete impls.
+    fn verify_inner(
         &self,
         max_num_proofs: usize,
         validator: &ValidatorVerifier,
@@ -649,6 +670,17 @@ where
     }
 }
 
+impl ProofOfStoreMsg<BatchInfo> {
+    pub fn verify(
+        &self,
+        max_num_proofs: usize,
+        validator: &ValidatorVerifier,
+        cache: &ProofCache,
+    ) -> anyhow::Result<()> {
+        self.verify_inner(max_num_proofs, validator, cache)
+    }
+}
+
 impl ProofOfStoreMsg<BatchInfoExt> {
     pub fn verify_v2(
         &self,
@@ -659,7 +691,7 @@ impl ProofOfStoreMsg<BatchInfoExt> {
         for proof in &self.proofs {
             ensure!(proof.info().is_v2(), "Non-V2 entry in ProofOfStoreMsgV2");
         }
-        self.verify(max_num_proofs, validator, cache)
+        self.verify_inner(max_num_proofs, validator, cache)
     }
 }
 

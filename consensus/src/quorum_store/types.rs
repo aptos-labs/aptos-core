@@ -460,7 +460,9 @@ impl<T: TBatchInfo> BatchMsg<T> {
         Self { batches }
     }
 
-    pub fn verify(
+    /// Per-batch verification shared by V1 (`verify`) and V2 (`verify_v2`).
+    /// Variant-specific gating is layered on by the concrete impls.
+    fn verify_inner(
         &self,
         peer_id: PeerId,
         max_num_batches: usize,
@@ -519,6 +521,17 @@ impl<T: TBatchInfo> BatchMsg<T> {
     }
 }
 
+impl BatchMsg<BatchInfo> {
+    pub fn verify(
+        &self,
+        peer_id: PeerId,
+        max_num_batches: usize,
+        verifier: &ValidatorVerifier,
+    ) -> anyhow::Result<()> {
+        self.verify_inner(peer_id, max_num_batches, verifier)
+    }
+}
+
 impl BatchMsg<BatchInfoExt> {
     pub fn verify_v2(
         &self,
@@ -529,7 +542,7 @@ impl BatchMsg<BatchInfoExt> {
         for batch in self.batches.iter() {
             ensure!(batch.batch_info().is_v2(), "Non-V2 batch in BatchMsgV2");
         }
-        self.verify(peer_id, max_num_batches, verifier)
+        self.verify_inner(peer_id, max_num_batches, verifier)
     }
 }
 
