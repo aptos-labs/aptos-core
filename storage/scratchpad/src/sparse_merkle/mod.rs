@@ -130,7 +130,11 @@ impl Drop for Inner {
                 stack.extend(descendant.drain_children_for_drop());
             }
         }
-        self.log_generation("drop");
+
+        // Avoid logging for dummy / empty trees.
+        if self.generation > 0 {
+            self.log_generation("drop");
+        }
     }
 }
 
