@@ -258,8 +258,8 @@ module aptos_framework::keyless_account {
         let expected_auth_key = multi_key::new_multi_key_from_single_keys(
             vector[
                 keyless_single_key,
-                single_key::from_ed25519_public_key_unvalidated(
-                    ed25519::new_unvalidated_public_key_from_bytes(backup_public_key)
+                single_key::from_ed25519_public_key(
+                    ed25519::new_validated_public_key_from_bytes(backup_public_key).extract()
                 )
             ],
             1
