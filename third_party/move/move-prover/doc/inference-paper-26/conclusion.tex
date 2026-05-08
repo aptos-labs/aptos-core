@@ -15,11 +15,21 @@ However, we believe that as workflows as described here become more common and f
 Technically, by having each of the individual steps transactional in nature, the agent can execute them in any chosen order.
 
 \Paragraph{Effectiveness of the Hybrid Approach}
-One interesting conceptual question is to what extent the \WP-generated specs, which are known to be mechanically correct, are actually used by the agent as a baseline for its own spec generation.
-This comes up in our workflow at the `Simplify inferred specs' task, where the agent works on the combination of loop invariants it generated earlier and the subsequently \WP-generated specs.
-At this stage, the agent may still make significant changes to the specs.
-Is \WP generation potentially unnecessary --- could we just let the agent do all the work?
-Such an approach would bring us closer to earlier work such as~\cite{PeiEtAl23, KamathEtAl23, MSG25}. At this point we do not have enough data to answer this question conclusively, though we do observe that with the \WP baseline in place the agent rarely suggests outright wrong specifications.
+One interesting conceptual question is to what extent the \WP-generated specs are actually used by the agent as a baseline for its own spec generation, and whether \WP generation is potentially unnecessary --- could we just let the agent do all the work, in the style of~\cite{PeiEtAl23, KamathEtAl23, MSG25}?
+We do not have enough data to answer this conclusively, but one example from a small controlled study suggests the potential usefulness of the hybrid approach.
+Both conditions ran as isolated Claude Sonnet~4.6 sessions with identical documentation access; the sole difference was that the hybrid condition (\textbf{H}) could invoke the \WP MCP tool and the agent-only condition (\textbf{A}) could not.
+
+Consider !fold!, which left-folds a !vector<u64>! with a closure !f: |u64,u64|u64! that may abort.
+A complete abort contract requires a safety loop invariant certifying that no prefix application of !f! has aborted:
+\begin{MoveBox}
+invariant forall j: u64 where j < i:
+    !aborts_of<f>(spec_fold(v, f, init, j), v[j]);
+\end{MoveBox}
+It is derived by simplifying the one that \WP derives mechanically by backward analysis from the abort postcondition.
+\textbf{H} received it directly and verified in two iterations (each iteration is one edit-then-verify cycle against the prover); \textbf{A} independently discovered the !spec_fold! helper and the existential abort condition but needed one additional iteration to arrive at the same safety invariant from a failing proof.
+
+Although more case studies are needed to draw firm conclusions, this example illustrates where the hybrid approach has potential: \WP pre-fills structural invariants that follow mechanically from the call graph but are non-obvious to discover from scratch.
+We also observe that with the \WP baseline in place, the agent rarely suggests outright wrong specifications.
 
 
 \Paragraph{Skill Design}
