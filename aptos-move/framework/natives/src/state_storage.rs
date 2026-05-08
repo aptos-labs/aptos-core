@@ -72,6 +72,15 @@ fn native_get_usage(
             .with_message(format!("Failed to get state storage usage: {}", err))
     })?;
 
+    // TEMP: replay-verify ssu-debug — remove after the StateStorageUsage replay mismatch is fixed.
+    aptos_logger::info!(
+        "[ssu-debug:native get_state_storage_usage_only_at_epoch_beginning] view_id={:?} items={} bytes={} is_untracked={}",
+        ctx.resolver.id(),
+        usage.items(),
+        usage.bytes(),
+        usage.is_untracked(),
+    );
+
     Ok(smallvec![Value::struct_(Struct::pack(vec![
         Value::u64(usage.items() as u64),
         Value::u64(usage.bytes() as u64),

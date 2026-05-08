@@ -52,6 +52,27 @@ impl TransactionDb {
         self.db.write_schemas(batch)
     }
 
+    /// TEMP: replay-verify ssu-debug — remove after the StateStorageUsage replay mismatch is fixed.
+    /// Logs the first and last versions present in the transaction column family.
+    pub(crate) fn debug_log_range(&self) -> Result<()> {
+        let first = {
+            let mut iter = self.db.iter::<TransactionSchema>()?;
+            iter.seek_to_first();
+            iter.next().transpose()?.map(|(v, _)| v)
+        };
+        let last = {
+            let mut iter = self.db.iter::<TransactionSchema>()?;
+            iter.seek_to_last();
+            iter.next().transpose()?.map(|(v, _)| v)
+        };
+        aptos_logger::info!(
+            "[ssu-debug:db_range] cf=transaction first={:?} last={:?}",
+            first,
+            last,
+        );
+        Ok(())
+    }
+
     /// Returns signed transaction given its `version`.
     pub(crate) fn get_transaction(&self, version: Version) -> Result<Transaction> {
         self.db

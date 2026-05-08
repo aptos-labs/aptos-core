@@ -18,6 +18,8 @@ aptos-aggregator = { workspace = true }
 aptos-crypto = { workspace = true }
 aptos-gas-algebra = { workspace = true }
 aptos-gas-schedule = { workspace = true }
+# TEMP: replay-verify ssu-debug — remove with the temporary logging in src/state_storage.rs.
+aptos-logger = { workspace = true }
 aptos-native-interface = { workspace = true }
 aptos-types = { workspace = true }
 aptos-vm-types = { workspace = true }

@@ -190,6 +190,24 @@ impl AptosDB {
         BackupHandler::new(Arc::clone(&self.state_store), Arc::clone(&self.ledger_db))
     }
 
+    /// TEMP: replay-verify ssu-debug — remove after the StateStorageUsage replay mismatch is fixed.
+    /// Dumps a window of VersionData entries around `target` to the log.
+    pub fn debug_dump_usage_around(&self, target: Version, count: usize) -> Result<()> {
+        self.ledger_db
+            .metadata_db()
+            .debug_dump_usage_around(target, count)
+    }
+
+    /// TEMP: replay-verify ssu-debug — remove after the StateStorageUsage replay mismatch is fixed.
+    /// Logs the first/last versions present in the transaction CF and the VersionData CF.
+    pub fn debug_log_db_ranges(&self) -> Result<()> {
+        self.ledger_db.transaction_db().debug_log_range()?;
+        self.ledger_db
+            .metadata_db()
+            .debug_log_version_data_range()?;
+        Ok(())
+    }
+
     /// Creates new physical DB checkpoint in directory specified by `path`.
     pub fn create_checkpoint(db_path: impl AsRef<Path>, cp_path: impl AsRef<Path>) -> Result<()> {
         let start = Instant::now();

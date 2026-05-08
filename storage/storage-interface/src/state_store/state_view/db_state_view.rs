@@ -67,9 +67,23 @@ impl TStateView for DbStateView {
     }
 
     fn get_usage(&self) -> StateViewResult<StateStorageUsage> {
-        self.db
-            .get_state_storage_usage(self.version)
-            .map_err(Into::into)
+        let result = self.db.get_state_storage_usage(self.version);
+        // TEMP: replay-verify ssu-debug — remove after the StateStorageUsage replay mismatch is fixed.
+        match &result {
+            Ok(u) => aptos_logger::info!(
+                "[ssu-debug:DbStateView::get_usage] version={:?} items={} bytes={} is_untracked={}",
+                self.version,
+                u.items(),
+                u.bytes(),
+                u.is_untracked(),
+            ),
+            Err(e) => aptos_logger::info!(
+                "[ssu-debug:DbStateView::get_usage] version={:?} err={}",
+                self.version,
+                e,
+            ),
+        }
+        result.map_err(Into::into)
     }
 
     fn next_version(&self) -> Version {

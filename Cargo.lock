@@ -2048,6 +2048,7 @@ dependencies = [
  "aptos-crypto",
  "aptos-gas-algebra",
  "aptos-gas-schedule",
+ "aptos-logger",
  "aptos-native-interface",
  "aptos-types",
  "aptos-vm-types",

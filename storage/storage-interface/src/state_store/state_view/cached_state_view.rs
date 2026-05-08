@@ -300,7 +300,16 @@ impl TStateView for CachedStateView {
     }
 
     fn get_usage(&self) -> StateViewResult<StateStorageUsage> {
-        Ok(self.speculative.current.usage())
+        let usage = self.speculative.current.usage();
+        // TEMP: replay-verify ssu-debug — remove after the StateStorageUsage replay mismatch is fixed.
+        aptos_logger::info!(
+            "[ssu-debug:CachedStateView::get_usage] next_version={} items={} bytes={} is_untracked={}",
+            self.speculative.next_version(),
+            usage.items(),
+            usage.bytes(),
+            usage.is_untracked(),
+        );
+        Ok(usage)
     }
 
     fn next_version(&self) -> Version {
@@ -343,6 +352,8 @@ impl TStateView for CachedDbStateView {
     }
 
     fn get_usage(&self) -> StateViewResult<StateStorageUsage> {
+        // TEMP: replay-verify ssu-debug — remove after the StateStorageUsage replay mismatch is fixed.
+        aptos_logger::info!("[ssu-debug:CachedDbStateView::get_usage] delegating to DbStateView");
         self.db_state_view.get_usage()
     }
 

@@ -320,9 +320,25 @@ impl LedgerMetadataDb {
 impl LedgerMetadataDb {
     /// Returns the state usage, or error if it doesn't exist in database.
     pub(crate) fn get_usage(&self, version: Version) -> Result<StateStorageUsage> {
-        Ok(self
-            .db
-            .get::<VersionDataSchema>(&version)?
+        let raw = self.db.get::<VersionDataSchema>(&version)?;
+        // TEMP: replay-verify ssu-debug — remove after the StateStorageUsage replay mismatch is fixed.
+        match &raw {
+            Some(data) => {
+                let usage = data.get_state_storage_usage();
+                aptos_logger::info!(
+                    "[ssu-debug:LedgerMetadataDb::get_usage] version={} row=Some items={} bytes={} is_untracked={}",
+                    version,
+                    usage.items(),
+                    usage.bytes(),
+                    usage.is_untracked(),
+                );
+            },
+            None => aptos_logger::info!(
+                "[ssu-debug:LedgerMetadataDb::get_usage] version={} row=None",
+                version,
+            ),
+        }
+        Ok(raw
             .ok_or_else(|| anyhow!("VersionData missing for version {version}"))?
             .get_state_storage_usage())
     }
@@ -330,6 +346,106 @@ impl LedgerMetadataDb {
     /// Writes the state usage to database.
     pub(crate) fn put_usage(&self, version: Version, usage: StateStorageUsage) -> Result<()> {
         self.db.put::<VersionDataSchema>(&version, &usage.into())
+    }
+
+    /// TEMP: replay-verify ssu-debug — remove after the StateStorageUsage replay mismatch is fixed.
+    /// Logs the first and last versions present in the VersionData column family.
+    pub(crate) fn debug_log_version_data_range(&self) -> Result<()> {
+        let first = {
+            let mut iter = self.db.iter::<VersionDataSchema>()?;
+            iter.seek_to_first();
+            iter.next().transpose()?.map(|(v, _)| v)
+        };
+        let last = {
+            let mut iter = self.db.iter::<VersionDataSchema>()?;
+            iter.seek_to_last();
+            iter.next().transpose()?.map(|(v, _)| v)
+        };
+        aptos_logger::info!(
+            "[ssu-debug:db_range] cf=version_data first={:?} last={:?}",
+            first,
+            last,
+        );
+        Ok(())
+    }
+
+    /// TEMP: replay-verify ssu-debug — remove after the StateStorageUsage replay mismatch is fixed.
+    /// Logs the first/last keys of the VersionData column family, plus up to `count` entries
+    /// at-or-before `target` (newest first) and up to `count` entries strictly after `target`
+    /// (oldest first).
+    pub(crate) fn debug_dump_usage_around(&self, target: Version, count: usize) -> Result<()> {
+        let first_key = {
+            let mut iter = self.db.iter::<VersionDataSchema>()?;
+            iter.seek_to_first();
+            iter.next().transpose()?.map(|(v, _)| v)
+        };
+        let last_key = {
+            let mut iter = self.db.iter::<VersionDataSchema>()?;
+            iter.seek_to_last();
+            iter.next().transpose()?.map(|(v, _)| v)
+        };
+        aptos_logger::info!(
+            "[ssu-debug:dump_usage_around] target={} count={} first_key={:?} last_key={:?}",
+            target,
+            count,
+            first_key,
+            last_key,
+        );
+
+        let mut iter = self.db.rev_iter::<VersionDataSchema>()?;
+        iter.seek_for_prev(&target)?;
+        let mut backward = 0usize;
+        while backward < count {
+            match iter.next().transpose()? {
+                Some((v, data)) => {
+                    let usage = data.get_state_storage_usage();
+                    aptos_logger::info!(
+                        "[ssu-debug:dump_usage_around] before idx={} version={} items={} bytes={} is_untracked={}",
+                        backward,
+                        v,
+                        usage.items(),
+                        usage.bytes(),
+                        usage.is_untracked(),
+                    );
+                    backward += 1;
+                },
+                None => break,
+            }
+        }
+        aptos_logger::info!(
+            "[ssu-debug:dump_usage_around] before_total={} (max {})",
+            backward,
+            count,
+        );
+
+        let next_target = target.saturating_add(1);
+        let mut iter = self.db.iter::<VersionDataSchema>()?;
+        iter.seek(&next_target)?;
+        let mut forward = 0usize;
+        while forward < count {
+            match iter.next().transpose()? {
+                Some((v, data)) => {
+                    let usage = data.get_state_storage_usage();
+                    aptos_logger::info!(
+                        "[ssu-debug:dump_usage_around] after idx={} version={} items={} bytes={} is_untracked={}",
+                        forward,
+                        v,
+                        usage.items(),
+                        usage.bytes(),
+                        usage.is_untracked(),
+                    );
+                    forward += 1;
+                },
+                None => break,
+            }
+        }
+        aptos_logger::info!(
+            "[ssu-debug:dump_usage_around] after_total={} (max {})",
+            forward,
+            count,
+        );
+
+        Ok(())
     }
 
     #[cfg(feature = "db-debugger")]

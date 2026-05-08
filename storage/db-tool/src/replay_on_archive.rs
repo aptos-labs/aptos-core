@@ -181,6 +181,13 @@ impl Verifier {
         )?;
 
         let backup_handler = aptos_db.get_backup_handler();
+        // TEMP: replay-verify ssu-debug — remove after the StateStorageUsage replay mismatch is fixed.
+        if let Err(e) = aptos_db.debug_log_db_ranges() {
+            warn!("[ssu-debug:db_range] failed: {}", e);
+        }
+        if let Err(e) = aptos_db.debug_dump_usage_around(5_954_307_366, 100) {
+            warn!("[ssu-debug:dump_usage_around] failed: {}", e);
+        }
         let arc_db = Arc::new(aptos_db) as Arc<dyn DbReader>;
 
         // calculate a valid start and limit
@@ -369,6 +376,14 @@ impl Verifier {
                 .iter()
                 .map(|info| AuxiliaryInfo::new(*info, None))
                 .collect(),
+        );
+        // TEMP: replay-verify ssu-debug — remove after the StateStorageUsage replay mismatch is fixed.
+        info!(
+            "[ssu-debug:execute_and_verify] chunk begin={} end={} state_view_at_version={:?} txn_count={}",
+            *current_version,
+            *current_version + cur_txns.len() as u64,
+            current_version.checked_sub(1),
+            cur_txns.len(),
         );
         let executed_outputs = executor
             .execute_block(

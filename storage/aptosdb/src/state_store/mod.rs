@@ -287,14 +287,34 @@ impl DbReader for StateDb {
     }
 
     fn get_state_storage_usage(&self, version: Option<Version>) -> Result<StateStorageUsage> {
-        version.map_or(Ok(StateStorageUsage::zero()), |version| {
-            Ok(match self.ledger_db.metadata_db().get_usage(version) {
-                Ok(data) => data,
-                _ => {
-                    ensure!(self.skip_usage, "VersionData at {version} is missing.");
-                    StateStorageUsage::new_untracked()
-                },
-            })
+        let Some(version) = version else {
+            // TEMP: replay-verify ssu-debug — remove after the StateStorageUsage replay mismatch is fixed.
+            info!(
+                "[ssu-debug:StateDb::get_state_storage_usage] version=None -> returning zero",
+            );
+            return Ok(StateStorageUsage::zero());
+        };
+        Ok(match self.ledger_db.metadata_db().get_usage(version) {
+            Ok(data) => {
+                // TEMP: replay-verify ssu-debug — remove after the StateStorageUsage replay mismatch is fixed.
+                info!(
+                    "[ssu-debug:StateDb::get_state_storage_usage] version={} ok items={} bytes={} is_untracked={}",
+                    version,
+                    data.items(),
+                    data.bytes(),
+                    data.is_untracked(),
+                );
+                data
+            },
+            Err(e) => {
+                // TEMP: replay-verify ssu-debug — remove after the StateStorageUsage replay mismatch is fixed.
+                info!(
+                    "[ssu-debug:StateDb::get_state_storage_usage] version={} err={} skip_usage={} -> untracked",
+                    version, e, self.skip_usage,
+                );
+                ensure!(self.skip_usage, "VersionData at {version} is missing.");
+                StateStorageUsage::new_untracked()
+            },
         })
     }
 }
