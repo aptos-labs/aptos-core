@@ -269,7 +269,13 @@ impl NetworkLoadTest for MainnetMirrorFailureTest {
                         self.config.min_continuous_pct,
                         max_pct,
                     );
-                    let action = format!("{}%delay({})", pct, self.config.continuous_delay_ms);
+                    // Use `return` (drop the message) instead of `delay(2000)` so the
+                    // failpoint reliably fails the round when triggered. With delay=2000ms,
+                    // observed runs showed flaky validators recording 0 failures because
+                    // the 2s delay didn't always exceed round timeout — the leader still
+                    // managed to commit. Dropping the message guarantees the round fails
+                    // for the leader at exactly the configured pct.
+                    let action = format!("{}%return", pct);
                     for fp in SEND_FAILPOINTS {
                         if let Err(e) = client.set_failpoint(fp.to_string(), action.clone()).await {
                             warn!(
