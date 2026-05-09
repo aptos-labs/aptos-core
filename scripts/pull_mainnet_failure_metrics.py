@@ -7,8 +7,22 @@ Build the per-validator failure metrics file used by the mainnet-mirror snapshot
 script to assign each validator an availability_class (Healthy / OnlineButFlaky
 / StableChronic / EpisodicSpike).
 
-The metric `aptos_failed_proposals_in_window` is reported by the network for
-each validator. It has two well-known data quality issues we have to handle:
+We compute per-validator FAILURE RATE (a fraction in [0, 1]) — the fraction of
+this validator's leader rounds that ended in `failed_proposer_indices`:
+
+    rate = aptos_failed_proposals_in_window /
+           (aptos_failed_proposals_in_window + aptos_committed_proposals_in_window)
+
+NOTE on semantics: prior versions stored the raw `aptos_failed_proposals_in_window`
+gauge AVERAGED over 7d. That gauge is a COUNT of failed proposals in the rolling
+LR window (default ~1070 blocks ≈ 10 leader rounds per validator on mainnet) —
+NOT a fraction. Treating it as a percentage in the forge failpoint code
+(`(fp * 100).round() as %`) over-modeled chronic failure by ~10× (apne1-0's
+real rate is ~3% per leader round, but its old `fp_7d_avg=0.304` × 100 → 30%
+which we used as the failpoint rate). Switching to the rate fraction makes the
+field's value mean what its name suggests.
+
+Two well-known data-quality issues we still handle:
 
   1. Multi-source duplication. Aptos Labs validators report via the cluster
      vmagent (`metrics_source="vmagent"`, kubernetes_pod_name like
@@ -22,23 +36,16 @@ each validator. It has two well-known data quality issues we have to handle:
      time series per `run_uuid` (a session id assigned at validator start).
      When a validator restarts the old uuid keeps appearing in queries with
      its last-known value indefinitely, even though that instance is gone.
-     A stuck-high stale uuid can falsely classify a healthy validator as
-     chronic. Mitigation: `avg by (kubernetes_pod_name)` aggregates across
-     run_uuids — the current live uuid contributes its low real value, the
-     stale uuid contributes its stuck high value, the average dampens but
-     doesn't fully filter the stale signal. In practice this gives a closer
-     approximation than `max by` (false alarms from stuck) or `min by` (loses
-     real chronic signal from validators with multiple uuids).
+     Mitigation: `avg by (kubernetes_pod_name)` aggregates across run_uuids,
+     dampening but not fully filtering the stale signal.
 
 Usage:
     GRAFANA_TOKEN=... python3 scripts/pull_mainnet_failure_metrics.py
-    GRAFANA_TOKEN=... python3 scripts/pull_mainnet_failure_metrics.py \
-        --out testsuite/testcases/src/data/mainnet-mirror/failure_metrics.json
 
 Output: testsuite/testcases/src/data/mainnet-mirror/failure_metrics.json
-keyed by peer_id (with leading-zero-stripped REST API addr format), each
-entry holding {fp_7d_avg, fp_30d_max}. Validators without measurable failures
-are omitted (the snapshot script defaults missing peers to Healthy).
+keyed by peer_id, each entry holding {fp_7d_avg, fp_30d_max} where both fields
+are now FAIL RATES (fractions in [0,1]), e.g. fp_7d_avg=0.025 means 2.5% of
+this validator's leader rounds failed averaged over 7 days.
 """
 
 import argparse
@@ -137,20 +144,38 @@ def collect_metrics(token, win_avg, win_max, samples_step_avg, samples_step_max)
     """Run the avg_over_time and max_over_time queries against Grafana. Aggregates
     across (run_uuid, instance) by avg_by(kubernetes_pod_name) before applying
     the time-window aggregator — this dampens stale-instance contributions but
-    keeps real signal from live instances."""
+    keeps real signal from live instances.
+
+    Computes per-validator FAILURE RATE (a fraction in [0,1]), not the raw
+    `aptos_failed_proposals_in_window` gauge count. Earlier versions stored
+    the gauge value directly which then got multiplied by 100 in the forge
+    failpoint code as if it were a percentage — but the gauge is a COUNT of
+    failed proposals in the LR window (with default mainnet config that's a
+    ~1070-block window with ~10 leader rounds per validator), not a fraction.
+    Treating it as a percentage over-modeled chronic failure by ~10x.
+
+    Right metric is failed / (failed + committed) per validator.
+    `clamp_min(_, 1)` guards against divide-by-zero for validators that have
+    not led a round in the window.
+    """
+    rate_expr = (
+        "(aptos_failed_proposals_in_window{chain_name=\"mainnet\"} / "
+        "clamp_min(aptos_failed_proposals_in_window{chain_name=\"mainnet\"} + "
+        "aptos_committed_proposals_in_window{chain_name=\"mainnet\"}, 1))"
+    )
     fp_7d_q = (
         f"avg by (kubernetes_pod_name) ("
-        f"  avg_over_time(aptos_failed_proposals_in_window{{chain_name=\"mainnet\"}}[{win_avg}])"
+        f"  avg_over_time({rate_expr}[{win_avg}])"
         f")"
     )
     fp_30d_q = (
         f"max_over_time("
-        f"  (avg by (kubernetes_pod_name) (aptos_failed_proposals_in_window{{chain_name=\"mainnet\"}}))"
+        f"  (avg by (kubernetes_pod_name) ({rate_expr}))"
         f"[{win_max}:{samples_step_max}])"
     )
-    print(f"  query fp_7d_avg over [{win_avg}]", file=sys.stderr)
+    print(f"  query failure_rate_7d_avg over [{win_avg}]", file=sys.stderr)
     fp7 = grafana_query(fp_7d_q, token)
-    print(f"  query fp_30d_max over [{win_max}:{samples_step_max}]", file=sys.stderr)
+    print(f"  query failure_rate_30d_max over [{win_max}:{samples_step_max}]", file=sys.stderr)
     fp30 = grafana_query(fp_30d_q, token)
     return fp7, fp30
 
@@ -262,12 +287,14 @@ def main():
 
     out = {
         "_comment": (
-            "Per-validator failure metrics pulled from Prometheus "
-            "aptos_failed_proposals_in_window via scripts/pull_mainnet_failure_metrics.py. "
-            "fp_7d_avg = avg_over_time over last 7 days; fp_30d_max = max_over_time over last 30 days, "
-            "both computed after avg_by(kubernetes_pod_name) to dampen (but not fully eliminate) "
-            "stuck-instance contamination from stale run_uuids. Used by pull_mainnet_validator_snapshot.py "
-            "to assign availability_class. Refresh: GRAFANA_TOKEN=... python3 scripts/pull_mainnet_failure_metrics.py"
+            "Per-validator FAILURE RATE (fractions in [0,1]) — fraction of this validator's "
+            "leader rounds that ended in failed_proposer_indices. "
+            "Computed as failed/(failed+committed) over the LR rolling window, then averaged "
+            "(7d) or max-aggregated (30d) over time. "
+            "Field semantics changed from earlier versions: previously fp_7d_avg was the raw "
+            "aptos_failed_proposals_in_window gauge AVG (a count, not a fraction); the forge "
+            "failpoint code multiplied that by 100 as if it were a fraction, which over-modeled "
+            "chronic failure. Now both fields are true fractions: fp_7d_avg=0.025 means 2.5%."
         ),
         "_pulled_at": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()),
         "metrics": dict(sorted(metrics.items())),

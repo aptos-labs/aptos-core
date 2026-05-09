@@ -88,17 +88,28 @@ fn small_stratified_subset() -> MainnetMirrorSnapshot {
     MainnetMirrorSnapshot::load_embedded()
         .expect("embedded mainnet validator snapshot failed to parse")
         .stratified_subset(&[
-            // 5 failure validators, top-stake within each bucket.
-            (StableChronic, Apne1, 1), // val0.apne1-0 — drives 23% of mainnet batches
-            (OnlineButFlaky, EuCentral1, 1), // bwarelabs
-            (OnlineButFlaky, EuWest1, 1), // bitgo-val1 (top-stake flaky overall)
-            (OnlineButFlaky, SaEast1, 1), // sole sa-east-1 validator
-            (EpisodicSpike, EuWest1, 1), // euwe6-1 (4 of 5 mainnet spikes are eu-west-1)
-            // 16 healthy validators distributed proportional to mainnet region stake.
+            // 4 failure validators, top-stake within each bucket. After the
+            // 2026-05-09 reclassification (failure_metrics.json switched from
+            // count-gauge to rate-fraction semantics), the picks resolve to:
+            //   (StableChronic, Apne1)   → hashport (0x312c22e7), real rate 14.3%
+            //   (OnlineButFlaky, EuCent) → bwarelabs, real rate 0.9%
+            //   (OnlineButFlaky, EuWest) → Stakely, real rate 1.7%
+            //   (EpisodicSpike, EuWest)  → val0.euwe6-1 (Aptos Labs), spike via burst
+            //
+            // Notable shifts: val0.apne1-0 (was StableChronic at "0.304 count")
+            // is now OnlineButFlaky (real rate 3.6%); bitgo (was top flaky) is
+            // now Healthy (rate 0.03%, below 0.5% threshold).
+            (StableChronic, Apne1, 1),
+            (OnlineButFlaky, EuCentral1, 1),
+            (OnlineButFlaky, EuWest1, 1),
+            (EpisodicSpike, EuWest1, 1),
+            // 17 healthy validators distributed proportional to mainnet region
+            // stake. Bitgo + several other formerly-flaky validators now fall
+            // into the Healthy bucket and are eligible top-stake picks.
             (Healthy, CaCentral1, 2),
             (Healthy, EuCentral1, 4),
             (Healthy, EuWest1, 7),
-            (Healthy, UsCentral1, 3),
+            (Healthy, UsCentral1, 4),
         ])
 }
 

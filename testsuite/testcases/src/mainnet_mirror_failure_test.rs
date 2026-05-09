@@ -101,17 +101,17 @@ pub struct FailurePatternConfig {
     /// Floor on continuous-delay percentage applied to chronic/flaky
     /// validators with a missing or zero `fp_7d_avg` in the snapshot.
     pub min_continuous_pct: u32,
-    /// Cap on continuous-delay percentage for the StableChronic class.
-    /// Mainnet's "30% failed_proposals" is a per-leader-slot event count
-    /// (~1 missed proposal per 3 min for hashport-class validators), not a
-    /// 30% per-message dropout rate. Without this cap, mapping
-    /// `fp_7d_avg × 100` directly produces e.g. `30%×delay(2s)` on every
-    /// consensus message — order-of-magnitude over-modeling that cascades
-    /// into leader-reputation suppression of healthy validators (observed
-    /// run 25525952511, val 5/6/15 throttled despite being Healthy class).
-    /// Flaky and Healthy classes are unaffected (flaky `fp_7d_avg` peaks
-    /// around 5% on mainnet, well below this cap).
-    pub max_chronic_continuous_pct: u32,
+    /// Multiplier applied to per-validator failure rate ONLY when the
+    /// raw rate is below `amplifier_threshold_pct`. Chronic-class
+    /// validators (real rate ≥ threshold) pass through at faithful
+    /// mainnet rate; sub-threshold flaky validators get amplified so
+    /// their signal registers in the 7-min test window. Expressed in
+    /// milli-units (1000 = 1.0×).
+    pub failure_rate_amplifier_milli: u32,
+    /// Threshold (percent) below which `failure_rate_amplifier_milli`
+    /// applies. Default 5: amplifier scales rates strictly under 5%
+    /// (flaky band) but not chronic (≥5%, treated as already meaningful).
+    pub amplifier_threshold_pct: u32,
 }
 
 impl Default for FailurePatternConfig {
@@ -123,18 +123,19 @@ impl Default for FailurePatternConfig {
             // producing a clear chain-level signal.
             spike_at_offset_secs: 60..180,
             spike_pause_secs: 120..240,
-            // Raised 1 -> 8 to bump flaky validators (bware/bitgo/sa-east at
-            // raw 2.5-4.6%) up to a clearly-observable rate. Acts as a floor
-            // for both flaky and chronic, but chronic's max=15 caps the top
-            // so the effective range is [8, 15] for chronic, [8, 99] for
-            // flaky. With X%return mechanism, this is the per-leader-round
-            // failure rate.
-            min_continuous_pct: 8,
-            // Bumped 2 -> 15 so chronic apne1-0 returns 15% of leader-side
-            // messages (matches mainnet's 30% failed_proposals magnitude
-            // class while accounting for forge model differences). With
-            // X%return mechanism, this is the per-leader-round failure rate.
-            max_chronic_continuous_pct: 15,
+            // Floor at 1 (no real bump). Earlier we raised this to 8 because
+            // we believed flaky validators had ~3-5% rates that were "too low
+            // to register"; that belief was based on a misinterpretation of
+            // fp_7d_avg as a count rather than a rate. After the 2026-05-09
+            // failure_metrics.json switch to true rates, mainnet flaky rates
+            // are 0.5-3% and we want forge to match — no floor needed.
+            min_continuous_pct: 1,
+            // 2× amplifier applied only to sub-threshold flaky validators.
+            // Mainnet flaky rates of 0.5-3% are too rare to register in a
+            // 7-min test; amplifying lifts them to 1-6%. Chronic (≥5%) is
+            // already meaningful and passes through at mainnet-faithful rate.
+            failure_rate_amplifier_milli: 2000,
+            amplifier_threshold_pct: 5,
         }
     }
 }
@@ -272,15 +273,11 @@ impl NetworkLoadTest for MainnetMirrorFailureTest {
                         1
                     };
                     by_class[class_idx].1 += 1;
-                    let max_pct = if entry.availability == AvailabilityClass::StableChronic {
-                        self.config.max_chronic_continuous_pct
-                    } else {
-                        99
-                    };
                     let pct = continuous_delay_pct(
                         entry,
                         self.config.min_continuous_pct,
-                        max_pct,
+                        self.config.failure_rate_amplifier_milli,
+                        self.config.amplifier_threshold_pct,
                     );
                     // Use `return` (drop the message) instead of `delay(2000)` so the
                     // failpoint reliably fails the round when triggered. With delay=2000ms,
@@ -362,15 +359,29 @@ impl NetworkTest for MainnetMirrorFailureTest {
 }
 
 /// Compute the percentage to inject for chronic/flaky validators from the
-/// snapshot's `fp_7d_avg` (a fraction in [0, 1]). Clamped to
-/// [`min_pct`, `max_pct`]. Caller passes `max_pct = 99` for flaky and a
-/// lower value (e.g. 8) for chronic so that mainnet's chronic event-rate
-/// failure isn't translated into a per-message dropout rate that would
-/// over-model by an order of magnitude.
-fn continuous_delay_pct(entry: &ValidatorEntry, min_pct: u32, max_pct: u32) -> u32 {
+/// snapshot's `fp_7d_avg` (a fraction in [0, 1] after the 2026-05-09
+/// rate-semantic switch).
+///
+/// `amplifier_milli` (1000 = 1.0×) is applied **only when the raw rate is
+/// below `amplifier_threshold_pct`**. Chronic-class validators (real rate ≥
+/// threshold) pass through at faithful mainnet rate; sub-threshold flaky
+/// validators get amplified so their signal registers in the 7-min test
+/// window. Result clamped to `[min_pct, 99]`.
+fn continuous_delay_pct(
+    entry: &ValidatorEntry,
+    min_pct: u32,
+    amplifier_milli: u32,
+    amplifier_threshold_pct: u32,
+) -> u32 {
     let fp = entry.fp_7d_avg.unwrap_or(0.0);
-    let raw = (fp * 100.0).round() as i64;
-    raw.clamp(min_pct as i64, max_pct as i64) as u64 as u32
+    let raw_pct = fp * 100.0;
+    let amp = amplifier_milli as f64 / 1000.0;
+    let pct_f = if raw_pct < amplifier_threshold_pct as f64 {
+        raw_pct * amp
+    } else {
+        raw_pct
+    };
+    (pct_f.round() as i64).clamp(min_pct as i64, 99) as u64 as u32
 }
 
 /// Spawn the spike task for a single EpisodicSpike validator. Sleeps for a
@@ -467,21 +478,33 @@ mod tests {
     }
 
     #[test]
-    fn delay_pct_clamped_within_range() {
-        // Below the floor: clamps up to min_pct.
+    fn delay_pct_threshold_amplifier() {
+        // Sub-threshold (raw < 5%): amplifier applies.
+        // Flaky 1.7% × 2 = 3.4% → 3.
+        let e = entry(AvailabilityClass::OnlineButFlaky, Some(0.017));
+        assert_eq!(continuous_delay_pct(&e, 1, 2000, 5), 3);
+
+        // At-or-above threshold (raw ≥ 5%): amplifier does NOT apply,
+        // raw rate passes through. hashport 14.3% → 14.
+        let e = entry(AvailabilityClass::StableChronic, Some(0.143));
+        assert_eq!(continuous_delay_pct(&e, 1, 2000, 5), 14);
+
+        // Chronic boundary case: 5% raw is at threshold. Threshold check is
+        // strict "<", so 5% does NOT amplify, stays at 5.
+        let e = entry(AvailabilityClass::StableChronic, Some(0.05));
+        assert_eq!(continuous_delay_pct(&e, 1, 2000, 5), 5);
+
+        // Below threshold: 4.9% × 2 = 9.8% → 10.
+        let e = entry(AvailabilityClass::OnlineButFlaky, Some(0.049));
+        assert_eq!(continuous_delay_pct(&e, 1, 2000, 5), 10);
+
+        // Floor: zero rate clamps up to min_pct.
         let e = entry(AvailabilityClass::OnlineButFlaky, Some(0.0));
-        assert_eq!(continuous_delay_pct(&e, 1, 99), 1);
+        assert_eq!(continuous_delay_pct(&e, 1, 2000, 5), 1);
 
-        // Above max_pct: clamps down.
+        // Hard ceiling: clamped at 99.
         let e = entry(AvailabilityClass::StableChronic, Some(1.5));
-        assert_eq!(continuous_delay_pct(&e, 1, 99), 99);
-        // Chronic cap (8) clamps a typical mainnet chronic fp_7d_avg.
-        let e = entry(AvailabilityClass::StableChronic, Some(0.378));
-        assert_eq!(continuous_delay_pct(&e, 1, 8), 8);
-
-        // Flaky's typical mainnet values pass through with max_pct=99.
-        let e = entry(AvailabilityClass::OnlineButFlaky, Some(0.033));
-        assert_eq!(continuous_delay_pct(&e, 1, 99), 3);
+        assert_eq!(continuous_delay_pct(&e, 1, 2000, 5), 99);
     }
 
     #[test]

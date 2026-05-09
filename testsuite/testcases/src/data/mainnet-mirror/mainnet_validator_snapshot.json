@@ -14,8 +14,8 @@
       "city": "Lelystad",
       "org": "AS7979 Servers.com, Inc.",
       "region": "eu-west-1",
-      "availability_class": "OnlineButFlaky",
-      "fp_7d_avg": 0.025,
+      "availability_class": "Healthy",
+      "fp_7d_avg": 0.0003,
       "fp_30d_max": 0.048
     },
     {
@@ -150,7 +150,7 @@
       "org": "AS396982 Google LLC",
       "region": "eu-west-1",
       "availability_class": "EpisodicSpike",
-      "fp_7d_avg": 0.002,
+      "fp_7d_avg": 0.0001,
       "fp_30d_max": 1.667
     },
     {
@@ -194,8 +194,8 @@
       "city": "Beauharnois",
       "org": "AS16276 OVH SAS",
       "region": "ca-central-1",
-      "availability_class": "OnlineButFlaky",
-      "fp_7d_avg": 0.02,
+      "availability_class": "Healthy",
+      "fp_7d_avg": 0.001,
       "fp_30d_max": 0.108
     },
     {
@@ -269,8 +269,8 @@
       "city": "\u0160iauliai",
       "org": "AS16125 UAB Cherry Servers",
       "region": "eu-west-1",
-      "availability_class": "StableChronic",
-      "fp_7d_avg": 0.137,
+      "availability_class": "OnlineButFlaky",
+      "fp_7d_avg": 0.0175,
       "fp_30d_max": 0.149
     },
     {
@@ -314,8 +314,8 @@
       "city": "Tokyo",
       "org": "AS396982 Google LLC",
       "region": "apne1",
-      "availability_class": "StableChronic",
-      "fp_7d_avg": 0.304,
+      "availability_class": "OnlineButFlaky",
+      "fp_7d_avg": 0.0361,
       "fp_30d_max": 0.351
     },
     {
@@ -464,8 +464,8 @@
       "city": "Bexley",
       "org": "AS16276 OVH SAS",
       "region": "eu-west-1",
-      "availability_class": "EpisodicSpike",
-      "fp_7d_avg": 0.018,
+      "availability_class": "OnlineButFlaky",
+      "fp_7d_avg": 0.0072,
       "fp_30d_max": 0.571
     },
     {
@@ -509,8 +509,8 @@
       "city": "Omaha",
       "org": "AS393521 Scott Technology Center",
       "region": "us-central1",
-      "availability_class": "OnlineButFlaky",
-      "fp_7d_avg": 0.024,
+      "availability_class": "EpisodicSpike",
+      "fp_7d_avg": 0.0036,
       "fp_30d_max": 1.333
     },
     {
@@ -570,7 +570,7 @@
       "org": "AS16276 OVH SAS",
       "region": "eu-west-1",
       "availability_class": "EpisodicSpike",
-      "fp_7d_avg": 0.003,
+      "fp_7d_avg": 0.0004,
       "fp_30d_max": 3.0
     },
     {
@@ -629,7 +629,7 @@
       "city": "Montr\u00e9al",
       "org": "AS16509 Amazon.com, Inc.",
       "region": "ca-central-1",
-      "availability_class": "Healthy",
+      "availability_class": "OnlineButFlaky",
       "fp_7d_avg": 0.007,
       "fp_30d_max": 0.333
     },
@@ -645,7 +645,7 @@
       "org": "AS7979 Servers.com, Inc.",
       "region": "eu-west-1",
       "availability_class": "Healthy",
-      "fp_7d_avg": 0.011,
+      "fp_7d_avg": 0.0034,
       "fp_30d_max": 0.198
     },
     {
@@ -675,7 +675,7 @@
       "org": "AS16276 OVH SAS",
       "region": "eu-central1",
       "availability_class": "OnlineButFlaky",
-      "fp_7d_avg": 0.037,
+      "fp_7d_avg": 0.0086,
       "fp_30d_max": 0.208
     },
     {
@@ -765,7 +765,7 @@
       "org": "AS16276 OVH SAS",
       "region": "us-central1",
       "availability_class": "StableChronic",
-      "fp_7d_avg": 0.228,
+      "fp_7d_avg": 0.1369,
       "fp_30d_max": 0.255
     },
     {
@@ -824,8 +824,8 @@
       "city": "Beauharnois",
       "org": "AS16276 OVH SAS",
       "region": "ca-central-1",
-      "availability_class": "Healthy",
-      "fp_7d_avg": 0.011,
+      "availability_class": "OnlineButFlaky",
+      "fp_7d_avg": 0.0052,
       "fp_30d_max": 0.108
     },
     {
@@ -869,8 +869,8 @@
       "city": "Lelystad",
       "org": "AS7979 Servers.com, Inc.",
       "region": "eu-west-1",
-      "availability_class": "OnlineButFlaky",
-      "fp_7d_avg": 0.03,
+      "availability_class": "Healthy",
+      "fp_7d_avg": 0.0041,
       "fp_30d_max": 0.059
     },
     {
@@ -990,7 +990,7 @@
       "org": "AS16509 Amazon.com, Inc.",
       "region": "apne1",
       "availability_class": "StableChronic",
-      "fp_7d_avg": 0.378,
+      "fp_7d_avg": 0.1429,
       "fp_30d_max": 0.412
     },
     {
@@ -1004,8 +1004,8 @@
       "city": "Lille",
       "org": "AS16276 OVH SAS",
       "region": "eu-west-1",
-      "availability_class": "OnlineButFlaky",
-      "fp_7d_avg": 0.033,
+      "availability_class": "Healthy",
+      "fp_7d_avg": 0,
       "fp_30d_max": 0.13
     },
     {
@@ -1035,7 +1035,7 @@
       "org": "AS31122 Digiweb ltd",
       "region": "eu-west-1",
       "availability_class": "EpisodicSpike",
-      "fp_7d_avg": 0.002,
+      "fp_7d_avg": 0.0002,
       "fp_30d_max": 0.404
     },
     {
@@ -1079,8 +1079,8 @@
       "city": "Omaha",
       "org": "AS393521 Scott Technology Center",
       "region": "us-central1",
-      "availability_class": "Healthy",
-      "fp_7d_avg": 0.007,
+      "availability_class": "OnlineButFlaky",
+      "fp_7d_avg": 0.0102,
       "fp_30d_max": 0.206
     },
     {
@@ -1095,7 +1095,7 @@
       "org": "AS30083 velia.net",
       "region": "us-central1",
       "availability_class": "OnlineButFlaky",
-      "fp_7d_avg": 0.048,
+      "fp_7d_avg": 0.0287,
       "fp_30d_max": 1.0
     },
     {
@@ -1110,7 +1110,7 @@
       "org": "AS16276 OVH SAS",
       "region": "eu-central1",
       "availability_class": "EpisodicSpike",
-      "fp_7d_avg": 0.001,
+      "fp_7d_avg": 0,
       "fp_30d_max": 1.0
     },
     {
@@ -1500,7 +1500,7 @@
       "org": "AS1299 Arelion Sweden AB",
       "region": "eu-central1",
       "availability_class": "StableChronic",
-      "fp_7d_avg": 0.14,
+      "fp_7d_avg": 0.112,
       "fp_30d_max": 0.161
     },
     {
@@ -1575,7 +1575,7 @@
       "org": "AS396982 Google LLC",
       "region": "sa-east-1",
       "availability_class": "OnlineButFlaky",
-      "fp_7d_avg": 0.046,
+      "fp_7d_avg": 0.016,
       "fp_30d_max": 0.055
     },
     {
