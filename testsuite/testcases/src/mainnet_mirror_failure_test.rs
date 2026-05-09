@@ -101,17 +101,6 @@ pub struct FailurePatternConfig {
     /// Floor on continuous-delay percentage applied to chronic/flaky
     /// validators with a missing or zero `fp_7d_avg` in the snapshot.
     pub min_continuous_pct: u32,
-    /// Multiplier applied to per-validator failure rate ONLY when the
-    /// raw rate is below `amplifier_threshold_pct`. Chronic-class
-    /// validators (real rate ≥ threshold) pass through at faithful
-    /// mainnet rate; sub-threshold flaky validators get amplified so
-    /// their signal registers in the 7-min test window. Expressed in
-    /// milli-units (1000 = 1.0×).
-    pub failure_rate_amplifier_milli: u32,
-    /// Threshold (percent) below which `failure_rate_amplifier_milli`
-    /// applies. Default 5: amplifier scales rates strictly under 5%
-    /// (flaky band) but not chronic (≥5%, treated as already meaningful).
-    pub amplifier_threshold_pct: u32,
 }
 
 impl Default for FailurePatternConfig {
@@ -130,12 +119,6 @@ impl Default for FailurePatternConfig {
             // failure_metrics.json switch to true rates, mainnet flaky rates
             // are 0.5-3% and we want forge to match — no floor needed.
             min_continuous_pct: 1,
-            // 2× amplifier applied only to sub-threshold flaky validators.
-            // Mainnet flaky rates of 0.5-3% are too rare to register in a
-            // 7-min test; amplifying lifts them to 1-6%. Chronic (≥5%) is
-            // already meaningful and passes through at mainnet-faithful rate.
-            failure_rate_amplifier_milli: 2000,
-            amplifier_threshold_pct: 5,
         }
     }
 }
@@ -273,12 +256,7 @@ impl NetworkLoadTest for MainnetMirrorFailureTest {
                         1
                     };
                     by_class[class_idx].1 += 1;
-                    let pct = continuous_delay_pct(
-                        entry,
-                        self.config.min_continuous_pct,
-                        self.config.failure_rate_amplifier_milli,
-                        self.config.amplifier_threshold_pct,
-                    );
+                    let pct = continuous_delay_pct(entry, self.config.min_continuous_pct);
                     // Use `return` (drop the message) instead of `delay(2000)` so the
                     // failpoint reliably fails the round when triggered. With delay=2000ms,
                     // observed runs showed flaky validators recording 0 failures because
@@ -360,28 +338,12 @@ impl NetworkTest for MainnetMirrorFailureTest {
 
 /// Compute the percentage to inject for chronic/flaky validators from the
 /// snapshot's `fp_7d_avg` (a fraction in [0, 1] after the 2026-05-09
-/// rate-semantic switch).
-///
-/// `amplifier_milli` (1000 = 1.0×) is applied **only when the raw rate is
-/// below `amplifier_threshold_pct`**. Chronic-class validators (real rate ≥
-/// threshold) pass through at faithful mainnet rate; sub-threshold flaky
-/// validators get amplified so their signal registers in the 7-min test
-/// window. Result clamped to `[min_pct, 99]`.
-fn continuous_delay_pct(
-    entry: &ValidatorEntry,
-    min_pct: u32,
-    amplifier_milli: u32,
-    amplifier_threshold_pct: u32,
-) -> u32 {
+/// rate-semantic switch). Maps directly: `pct = round(fp × 100)`, then
+/// clamped to `[min_pct, 99]`. Mainnet-faithful by construction.
+fn continuous_delay_pct(entry: &ValidatorEntry, min_pct: u32) -> u32 {
     let fp = entry.fp_7d_avg.unwrap_or(0.0);
-    let raw_pct = fp * 100.0;
-    let amp = amplifier_milli as f64 / 1000.0;
-    let pct_f = if raw_pct < amplifier_threshold_pct as f64 {
-        raw_pct * amp
-    } else {
-        raw_pct
-    };
-    (pct_f.round() as i64).clamp(min_pct as i64, 99) as u64 as u32
+    let raw = (fp * 100.0).round() as i64;
+    raw.clamp(min_pct as i64, 99) as u64 as u32
 }
 
 /// Spawn the spike task for a single EpisodicSpike validator. Sleeps for a
@@ -478,33 +440,21 @@ mod tests {
     }
 
     #[test]
-    fn delay_pct_threshold_amplifier() {
-        // Sub-threshold (raw < 5%): amplifier applies.
-        // Flaky 1.7% × 2 = 3.4% → 3.
-        let e = entry(AvailabilityClass::OnlineButFlaky, Some(0.017));
-        assert_eq!(continuous_delay_pct(&e, 1, 2000, 5), 3);
-
-        // At-or-above threshold (raw ≥ 5%): amplifier does NOT apply,
-        // raw rate passes through. hashport 14.3% → 14.
+    fn delay_pct_clamped_within_range() {
+        // Mainnet-faithful: rate × 100, no amplification.
         let e = entry(AvailabilityClass::StableChronic, Some(0.143));
-        assert_eq!(continuous_delay_pct(&e, 1, 2000, 5), 14);
+        assert_eq!(continuous_delay_pct(&e, 1), 14);
 
-        // Chronic boundary case: 5% raw is at threshold. Threshold check is
-        // strict "<", so 5% does NOT amplify, stays at 5.
-        let e = entry(AvailabilityClass::StableChronic, Some(0.05));
-        assert_eq!(continuous_delay_pct(&e, 1, 2000, 5), 5);
-
-        // Below threshold: 4.9% × 2 = 9.8% → 10.
-        let e = entry(AvailabilityClass::OnlineButFlaky, Some(0.049));
-        assert_eq!(continuous_delay_pct(&e, 1, 2000, 5), 10);
+        let e = entry(AvailabilityClass::OnlineButFlaky, Some(0.017));
+        assert_eq!(continuous_delay_pct(&e, 1), 2);
 
         // Floor: zero rate clamps up to min_pct.
         let e = entry(AvailabilityClass::OnlineButFlaky, Some(0.0));
-        assert_eq!(continuous_delay_pct(&e, 1, 2000, 5), 1);
+        assert_eq!(continuous_delay_pct(&e, 1), 1);
 
         // Hard ceiling: clamped at 99.
         let e = entry(AvailabilityClass::StableChronic, Some(1.5));
-        assert_eq!(continuous_delay_pct(&e, 1, 2000, 5), 99);
+        assert_eq!(continuous_delay_pct(&e, 1), 99);
     }
 
     #[test]

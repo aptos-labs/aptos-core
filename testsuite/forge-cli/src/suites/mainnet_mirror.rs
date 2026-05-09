@@ -90,26 +90,31 @@ fn small_stratified_subset() -> MainnetMirrorSnapshot {
         .stratified_subset(&[
             // 4 failure validators, top-stake within each bucket. After the
             // 2026-05-09 reclassification (failure_metrics.json switched from
-            // count-gauge to rate-fraction semantics), the picks resolve to:
-            //   (StableChronic, Apne1)   → hashport (0x312c22e7), real rate 14.3%
-            //   (OnlineButFlaky, EuCent) → bwarelabs, real rate 0.9%
-            //   (OnlineButFlaky, EuWest) → Stakely, real rate 1.7%
-            //   (EpisodicSpike, EuWest)  → val0.euwe6-1 (Aptos Labs), spike via burst
+            // count-gauge to rate-fraction semantics), picks resolve to:
+            //   (StableChronic, Apne1)     → hashport (0x312c22e7), rate 14.3%
+            //   (StableChronic, UsCentral) → sirouk (0x50b27eee), rate 13.7%
+            //   (OnlineButFlaky, EuWest)   → Stakely, rate 1.7%
+            //   (EpisodicSpike, EuWest)    → val0.euwe6-1 (Aptos Labs), burst
             //
-            // Notable shifts: val0.apne1-0 (was StableChronic at "0.304 count")
-            // is now OnlineButFlaky (real rate 3.6%); bitgo (was top flaky) is
-            // now Healthy (rate 0.03%, below 0.5% threshold).
+            // Two chronic picks (apne1 + us-central1) model both
+            // geographic-amplified (high cross-region RTT) and pure-rate-driven
+            // (low RTT) chronic dynamics. One flaky pick: Stakely is highest-
+            // stake among real-rate flaky validators.
+            //
+            // Notable shifts since count→rate switch: val0.apne1-0 (was
+            // StableChronic at count 0.304) is now OnlineButFlaky (real 3.6%);
+            // bitgo (was top flaky) is now Healthy (rate 0.03%).
             (StableChronic, Apne1, 1),
-            (OnlineButFlaky, EuCentral1, 1),
+            (StableChronic, UsCentral1, 1),
             (OnlineButFlaky, EuWest1, 1),
             (EpisodicSpike, EuWest1, 1),
             // 17 healthy validators distributed proportional to mainnet region
-            // stake. Bitgo + several other formerly-flaky validators now fall
-            // into the Healthy bucket and are eligible top-stake picks.
+            // stake. EuCentral1 bumped 4→5 (absorbs the dropped flaky slot);
+            // UsCentral1 dropped 4→3 (absorbed by the new chronic pick).
             (Healthy, CaCentral1, 2),
-            (Healthy, EuCentral1, 4),
+            (Healthy, EuCentral1, 5),
             (Healthy, EuWest1, 7),
-            (Healthy, UsCentral1, 4),
+            (Healthy, UsCentral1, 3),
         ])
 }
 
