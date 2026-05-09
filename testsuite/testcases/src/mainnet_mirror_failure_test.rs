@@ -118,10 +118,23 @@ impl Default for FailurePatternConfig {
     fn default() -> Self {
         Self {
             continuous_delay_ms: 2000,
-            spike_at_offset_secs: 60..420,
-            spike_pause_secs: 30..90,
-            min_continuous_pct: 1,
-            max_chronic_continuous_pct: 2,
+            // Earlier window so spike fires within the measured test window;
+            // longer pause so val 4 leads 60-120+ rounds during the burst,
+            // producing a clear chain-level signal.
+            spike_at_offset_secs: 60..180,
+            spike_pause_secs: 120..240,
+            // Raised 1 -> 8 to bump flaky validators (bware/bitgo/sa-east at
+            // raw 2.5-4.6%) up to a clearly-observable rate. Acts as a floor
+            // for both flaky and chronic, but chronic's max=15 caps the top
+            // so the effective range is [8, 15] for chronic, [8, 99] for
+            // flaky. With X%return mechanism, this is the per-leader-round
+            // failure rate.
+            min_continuous_pct: 8,
+            // Bumped 2 -> 15 so chronic apne1-0 returns 15% of leader-side
+            // messages (matches mainnet's 30% failed_proposals magnitude
+            // class while accounting for forge model differences). With
+            // X%return mechanism, this is the per-leader-round failure rate.
+            max_chronic_continuous_pct: 15,
         }
     }
 }
