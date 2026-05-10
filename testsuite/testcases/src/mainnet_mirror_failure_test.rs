@@ -101,6 +101,17 @@ pub struct FailurePatternConfig {
     /// Floor on continuous-delay percentage applied to chronic/flaky
     /// validators with a missing or zero `fp_7d_avg` in the snapshot.
     pub min_continuous_pct: u32,
+    /// Ceiling on continuous-delay percentage. Mainnet's stable-chronic
+    /// validators run at 14% measured failure rate, but injecting %return at
+    /// that rate against forge's leader-reputation config (`failed_weight=1`,
+    /// `failure_threshold_percent=10`) silences the validator after the first
+    /// 1-2 failures: the rate consistently lands above 10%, weight drops 1000×,
+    /// and the validator never re-leads in an 8-min run. Capping at 10
+    /// keeps the windowed rate at the LR threshold boundary so the chronic
+    /// stays in the leader rotation. The strict comparison
+    /// (`failed * 100 > total * threshold`) means `failed_pct == threshold`
+    /// uses `active_weight`, not `failed_weight`.
+    pub max_continuous_pct: u32,
 }
 
 impl Default for FailurePatternConfig {
@@ -119,6 +130,9 @@ impl Default for FailurePatternConfig {
             // failure_metrics.json switch to true rates, mainnet flaky rates
             // are 0.5-3% and we want forge to match — no floor needed.
             min_continuous_pct: 1,
+            // Cap chronics at the LR failure_threshold_percent boundary so
+            // they stay in the leader rotation. See the field docstring.
+            max_continuous_pct: 10,
         }
     }
 }
@@ -256,7 +270,11 @@ impl NetworkLoadTest for MainnetMirrorFailureTest {
                         1
                     };
                     by_class[class_idx].1 += 1;
-                    let pct = continuous_delay_pct(entry, self.config.min_continuous_pct);
+                    let pct = continuous_delay_pct(
+                        entry,
+                        self.config.min_continuous_pct,
+                        self.config.max_continuous_pct,
+                    );
                     // Use `return` (drop the message) instead of `delay(2000)` so the
                     // failpoint reliably fails the round when triggered. With delay=2000ms,
                     // observed runs showed flaky validators recording 0 failures because
@@ -339,11 +357,13 @@ impl NetworkTest for MainnetMirrorFailureTest {
 /// Compute the percentage to inject for chronic/flaky validators from the
 /// snapshot's `fp_7d_avg` (a fraction in [0, 1] after the 2026-05-09
 /// rate-semantic switch). Maps directly: `pct = round(fp × 100)`, then
-/// clamped to `[min_pct, 99]`. Mainnet-faithful by construction.
-fn continuous_delay_pct(entry: &ValidatorEntry, min_pct: u32) -> u32 {
+/// clamped to `[min_pct, max_pct]`. The upper clamp keeps chronic validators
+/// at or below the leader-reputation `failure_threshold_percent` boundary so
+/// they don't get permanently demoted to `failed_weight`.
+fn continuous_delay_pct(entry: &ValidatorEntry, min_pct: u32, max_pct: u32) -> u32 {
     let fp = entry.fp_7d_avg.unwrap_or(0.0);
     let raw = (fp * 100.0).round() as i64;
-    raw.clamp(min_pct as i64, 99) as u64 as u32
+    raw.clamp(min_pct as i64, max_pct as i64) as u64 as u32
 }
 
 /// Spawn the spike task for a single EpisodicSpike validator. Sleeps for a
@@ -441,20 +461,22 @@ mod tests {
 
     #[test]
     fn delay_pct_clamped_within_range() {
-        // Mainnet-faithful: rate × 100, no amplification.
+        // Chronic at 14.3% rate is capped at the 10% LR threshold so the
+        // validator stays in the leader rotation.
         let e = entry(AvailabilityClass::StableChronic, Some(0.143));
-        assert_eq!(continuous_delay_pct(&e, 1), 14);
+        assert_eq!(continuous_delay_pct(&e, 1, 10), 10);
 
+        // Flaky at 1.7% is below the cap, passes through unchanged.
         let e = entry(AvailabilityClass::OnlineButFlaky, Some(0.017));
-        assert_eq!(continuous_delay_pct(&e, 1), 2);
+        assert_eq!(continuous_delay_pct(&e, 1, 10), 2);
 
         // Floor: zero rate clamps up to min_pct.
         let e = entry(AvailabilityClass::OnlineButFlaky, Some(0.0));
-        assert_eq!(continuous_delay_pct(&e, 1), 1);
+        assert_eq!(continuous_delay_pct(&e, 1, 10), 1);
 
-        // Hard ceiling: clamped at 99.
+        // Higher max_pct lets the rate through.
         let e = entry(AvailabilityClass::StableChronic, Some(1.5));
-        assert_eq!(continuous_delay_pct(&e, 1), 99);
+        assert_eq!(continuous_delay_pct(&e, 1, 99), 99);
     }
 
     #[test]
