@@ -13,15 +13,22 @@
 \usepackage{bbding}
 \usepackage{tabularx}
 \usepackage{enumitem}
+\usepackage{cite}
+\usepackage[compact]{titlesec}
+% IEEEtran.cls sets \citepunct to "], [", which produces "[A], [B]" for
+% \cite{A,B}. Override to a plain ", " so consecutive cites share one bracket.
+\renewcommand{\citepunct}{, }
 
 \hypersetup{colorlinks=true,linkcolor=blue,citecolor=blue,urlcolor=blue}
 \def\UrlFont{\rmfamily}
 
-
+% Tighten section/subsection vertical spacing for two-column layout.
+\titlespacing*{\section}{0pt}{1.2ex plus 0.2ex minus 0.2ex}{0.6ex plus 0.1ex}
+\titlespacing*{\subsection}{0pt}{0.8ex plus 0.1ex minus 0.1ex}{0.4ex plus 0.1ex}
 
 \newcommand{\Section}[1]{\section{#1}}
 \newcommand{\SubSection}[1]{\subsection{#1}}
-\newcommand{\Paragraph}[1]{\vspace{0.5ex}\noindent\textbf{#1.}\xspace}
+\newcommand{\Paragraph}[1]{\vspace{0.25ex}\noindent\textbf{#1.}\xspace}
 
 % Labeled-paragraph list: bold inline label, lightly indented.
 % Use as \begin{Description} \item[Label.] body \item[...] ... \end{Description}.
@@ -246,8 +253,13 @@
 % Short inline delimiters for Move code: both |...| and !...! work.
 % The ! alternative is useful when the snippet itself contains |,
 % e.g. function-type syntax !|T1,...,Tn| -> T!.
-\lstMakeShortInline[language=Move,style=MoveStyle]|
-\lstMakeShortInline[language=Move,style=MoveStyle]!
+%
+% Inline snippets must never wrap mid-token (e.g. between & and T in |&T|),
+% but they may still break at whitespace so a long inline snippet does not
+% overflow the column. Block listings (Move environment) keep MoveStyle's
+% default break-anywhere behavior.
+\lstMakeShortInline[language=Move,style=MoveStyle,breaklines=true,breakatwhitespace=true,escapechar=@]|
+\lstMakeShortInline[language=Move,style=MoveStyle,breaklines=true,breakatwhitespace=true,escapechar=@]!
 
 
 % This defines a new environment for Move code.

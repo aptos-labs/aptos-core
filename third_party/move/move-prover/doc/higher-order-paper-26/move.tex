@@ -28,7 +28,7 @@ For the purposes of this paper, the relevant properties are:
 \MVP is an automated formal verifier built into the Move toolchain;
 the version discussed here and described in~\cite{DillGPQXZ22} is a complete rewrite of the earlier version in~\cite{MOVE_PROVER}.
 Developers annotate Move source with specifications --- preconditions, postconditions, abort conditions, data invariants, and loop invariants --- using a first-order specification language that shares Move's type system.
-\MVP translates the annotated program to Boogie~\cite{thisisboogie2}, an intermediate verification language, which Z3~\cite{z3} then discharges as SMT queries.
+\MVP translates the annotated program to Boogie~\cite{boogie,thisisboogie2}, an intermediate verification language, which Z3~\cite{z3} then discharges as SMT queries.
 The tool targets routine use during development: verification is designed to complete within seconds per function through careful SMT encoding and monomorphized, modular function summaries; it is used in CI (continuous integration testing) in the workflows at Aptos.
 Abort conditions deserve special note: multiple !aborts_if! clauses form a \emph{biconditional} --- the function aborts if and only if at least one clause holds --- rather than the one-directional ``if it aborts, then ...'' familiar from partial-correctness Hoare logic.
 

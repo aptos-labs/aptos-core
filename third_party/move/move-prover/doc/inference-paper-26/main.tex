@@ -4,7 +4,7 @@
 
 \begin{document}
 
-\title{Combining Mechanical and Agentic \\ Specification Inference for the Move Prover}
+\title{Hybrid Mechanical and Agentic \\ Specification Inference for the Move Prover}
 
 \author{%
 	\IEEEauthorblockN{Wolfgang Grieskamp\IEEEauthorrefmark{1} and Teng Zhang and Vineeth Kashyap}
@@ -19,7 +19,7 @@
 	In this paper, we describe early work on a \emph{specification inference tool} for the Move Prover that combines a weakest-precondition (\WP) analysis over Move bytecode with an agentic coding CLI such as Claude Code.
 	Specification inference reduces the boilerplate of writing specifications in Move: in order to verify a high-level property such as a global state invariant, pre- and post-conditions for the supporting functions typically have to be written by hand, which is tedious.
 	In our setting, a Model Context Protocol (MCP) service exposes the \WP analysis and the prover itself to the coding agent.
-	The \WP analysis provides a sound, mechanical baseline for inference; the AI is used precisely where \WP is weakest --- in particular for loop invariants and high-level idiomatic specifications such as monotonicity, conservation, and structural invariants.
+	The \WP analysis provides a sound, mechanical baseline for inference; the AI is used precisely where \WP is weakest --- for loop invariants and high-level idiomatic specifications such as monotonicity, conservation, and structural invariants.
 	The Move Prover serves as the oracle that decides whether the generated specs are valid, and the agent is equipped to generate proof hints and to refine the inferred specification until verification succeeds.
 	The tool has been applied to a corpus of canonical Move code, including code that uses higher-order functions, dynamic dispatch, global state, references, and various forms of loops.
 \end{abstract}

@@ -1,7 +1,7 @@
 \Section{Encoding}
 \label{sec:enc}
 
-We describe the implementation of function values as a translation into a conceptual (pseudo-code style) imperative intermediate verification language (IVL) inspired by Boogie \cite{thisisboogie2}.
+We describe the implementation of function values as a translation into a conceptual (pseudo-code style) imperative intermediate verification language (IVL) inspired by Boogie~\cite{boogieIVL,thisisboogie2}.
 The encoding is given at the IVL level because this is where the interesting design decisions become visible --- the subsequent step to pure SMT is straightforward and uses standard techniques.
 The fragment of the IVL used in this section is familiar: procedures with $\HAVOC$, $\ASSUME$, $\ASSERT$, pure functions, \emph{algebraic datatypes} (tagged unions with selectors, like Rust enums), universal \emph{axioms} with \emph{triggers}, and polymorphic map types.
 State is represented by Boogie-style maps; in particular, each resource type $\tau$ yields a map $M_\tau \in \Addr \rightarrow \tau$, with $\Addr$ being the domain of addresses in Move (256-bit integers).
