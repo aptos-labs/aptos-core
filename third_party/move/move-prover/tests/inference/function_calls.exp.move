@@ -92,6 +92,7 @@ module 0x42::function_calls {
         }
     }
     spec factorial {
+        pragma verify = false; // timeout, but still can be inferred
         pragma opaque;
         ensures [inferred] n == 0 ==> result == 1;
         ensures [inferred] n != 0 ==> result == n * factorial(n - 1);

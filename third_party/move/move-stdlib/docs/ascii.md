@@ -1,7 +1,4 @@
-
-<a id="0x1_ascii"></a>
-
-# Module `0x1::ascii`
+# Module `0x1::ascii` <a id="0x1_ascii"></a>
 
 The <code>ASCII</code> module defines basic string and char newtypes in Move that verify
 that characters are valid ASCII, and that strings consist of only valid ASCII characters.
@@ -28,10 +25,7 @@ that characters are valid ASCII, and that strings consist of only valid ASCII ch
 </code></pre>
 
 
-
-<a id="0x1_ascii_String"></a>
-
-## Struct `String`
+## Struct `String` <a id="0x1_ascii_String"></a>
 
 The <code><a href="ascii.md#0x1_ascii_String">String</a></code> struct holds a vector of bytes that all represent
 valid ASCII characters. Note that these ASCII characters may not all
@@ -61,6 +55,7 @@ defined in this module.
 
 </details>
 
+
 <details>
 <summary>Specification</summary>
 
@@ -73,9 +68,7 @@ defined in this module.
 
 </details>
 
-<a id="0x1_ascii_Char"></a>
-
-## Struct `Char`
+## Struct `Char` <a id="0x1_ascii_Char"></a>
 
 An ASCII character.
 
@@ -101,6 +94,7 @@ An ASCII character.
 
 </details>
 
+
 <details>
 <summary>Specification</summary>
 
@@ -113,9 +107,7 @@ An ASCII character.
 
 </details>
 
-<a id="@Constants_0"></a>
-
-## Constants
+## Constants <a id="@Constants_0"></a>
 
 
 <a id="0x1_ascii_EINVALID_ASCII_CHARACTER"></a>
@@ -127,10 +119,7 @@ An invalid ASCII character was encountered when creating an ASCII string.
 </code></pre>
 
 
-
-<a id="0x1_ascii_char"></a>
-
-## Function `char`
+## Function `char` <a id="0x1_ascii_char"></a>
 
 Convert a <code>byte</code> into a <code><a href="ascii.md#0x1_ascii_Char">Char</a></code> that is checked to make sure it is valid ASCII.
 
@@ -154,6 +143,7 @@ Convert a <code>byte</code> into a <code><a href="ascii.md#0x1_ascii_Char">Char<
 
 </details>
 
+
 <details>
 <summary>Specification</summary>
 
@@ -166,9 +156,7 @@ Convert a <code>byte</code> into a <code><a href="ascii.md#0x1_ascii_Char">Char<
 
 </details>
 
-<a id="0x1_ascii_string"></a>
-
-## Function `string`
+## Function `string` <a id="0x1_ascii_string"></a>
 
 Convert a vector of bytes <code>bytes</code> into an <code><a href="ascii.md#0x1_ascii_String">String</a></code>. Aborts if
 <code>bytes</code> contains non-ASCII characters.
@@ -197,6 +185,7 @@ Convert a vector of bytes <code>bytes</code> into an <code><a href="ascii.md#0x1
 
 </details>
 
+
 <details>
 <summary>Specification</summary>
 
@@ -209,9 +198,7 @@ Convert a vector of bytes <code>bytes</code> into an <code><a href="ascii.md#0x1
 
 </details>
 
-<a id="0x1_ascii_try_string"></a>
-
-## Function `try_string`
+## Function `try_string` <a id="0x1_ascii_try_string"></a>
 
 Convert a vector of bytes <code>bytes</code> into an <code><a href="ascii.md#0x1_ascii_String">String</a></code>. Returns
 <code>Some(&lt;ascii_string&gt;)</code> if the <code>bytes</code> contains all valid ASCII
@@ -253,9 +240,7 @@ characters. Otherwise returns <code>None</code>.
 
 </details>
 
-<a id="0x1_ascii_all_characters_printable"></a>
-
-## Function `all_characters_printable`
+## Function `all_characters_printable` <a id="0x1_ascii_all_characters_printable"></a>
 
 Returns <code><b>true</b></code> if all characters in <code><a href="string.md#0x1_string">string</a></code> are printable characters
 Returns <code><b>false</b></code> otherwise. Not all <code><a href="ascii.md#0x1_ascii_String">String</a></code>s are printable strings.
@@ -296,6 +281,7 @@ Returns <code><b>false</b></code> otherwise. Not all <code><a href="ascii.md#0x1
 
 </details>
 
+
 <details>
 <summary>Specification</summary>
 
@@ -308,9 +294,7 @@ Returns <code><b>false</b></code> otherwise. Not all <code><a href="ascii.md#0x1
 
 </details>
 
-<a id="0x1_ascii_push_char"></a>
-
-## Function `push_char`
+## Function `push_char` <a id="0x1_ascii_push_char"></a>
 
 
 
@@ -332,6 +316,7 @@ Returns <code><b>false</b></code> otherwise. Not all <code><a href="ascii.md#0x1
 
 </details>
 
+
 <details>
 <summary>Specification</summary>
 
@@ -344,9 +329,7 @@ Returns <code><b>false</b></code> otherwise. Not all <code><a href="ascii.md#0x1
 
 </details>
 
-<a id="0x1_ascii_pop_char"></a>
-
-## Function `pop_char`
+## Function `pop_char` <a id="0x1_ascii_pop_char"></a>
 
 
 
@@ -368,6 +351,7 @@ Returns <code><b>false</b></code> otherwise. Not all <code><a href="ascii.md#0x1
 
 </details>
 
+
 <details>
 <summary>Specification</summary>
 
@@ -380,9 +364,7 @@ Returns <code><b>false</b></code> otherwise. Not all <code><a href="ascii.md#0x1
 
 </details>
 
-<a id="0x1_ascii_length"></a>
-
-## Function `length`
+## Function `length` <a id="0x1_ascii_length"></a>
 
 
 
@@ -404,9 +386,7 @@ Returns <code><b>false</b></code> otherwise. Not all <code><a href="ascii.md#0x1
 
 </details>
 
-<a id="0x1_ascii_as_bytes"></a>
-
-## Function `as_bytes`
+## Function `as_bytes` <a id="0x1_ascii_as_bytes"></a>
 
 Get the inner bytes of the <code><a href="string.md#0x1_string">string</a></code> as a reference
 
@@ -429,9 +409,7 @@ Get the inner bytes of the <code><a href="string.md#0x1_string">string</a></code
 
 </details>
 
-<a id="0x1_ascii_into_bytes"></a>
-
-## Function `into_bytes`
+## Function `into_bytes` <a id="0x1_ascii_into_bytes"></a>
 
 Unpack the <code><a href="string.md#0x1_string">string</a></code> to get its backing bytes
 
@@ -455,9 +433,7 @@ Unpack the <code><a href="string.md#0x1_string">string</a></code> to get its bac
 
 </details>
 
-<a id="0x1_ascii_byte"></a>
-
-## Function `byte`
+## Function `byte` <a id="0x1_ascii_byte"></a>
 
 Unpack the <code>char</code> into its underlying byte.
 
@@ -481,9 +457,7 @@ Unpack the <code>char</code> into its underlying byte.
 
 </details>
 
-<a id="0x1_ascii_is_valid_char"></a>
-
-## Function `is_valid_char`
+## Function `is_valid_char` <a id="0x1_ascii_is_valid_char"></a>
 
 Returns <code><b>true</b></code> if <code>b</code> is a valid ASCII character. Returns <code><b>false</b></code> otherwise.
 
@@ -506,9 +480,7 @@ Returns <code><b>true</b></code> if <code>b</code> is a valid ASCII character. R
 
 </details>
 
-<a id="0x1_ascii_is_printable_char"></a>
-
-## Function `is_printable_char`
+## Function `is_printable_char` <a id="0x1_ascii_is_printable_char"></a>
 
 Returns <code><b>true</b></code> if <code>byte</code> is an printable ASCII character. Returns <code><b>false</b></code> otherwise.
 

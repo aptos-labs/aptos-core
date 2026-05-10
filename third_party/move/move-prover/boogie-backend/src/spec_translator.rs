@@ -36,7 +36,7 @@ use move_model::{
     },
     pragmas::INTRINSIC_TYPE_MAP,
     symbol::Symbol,
-    ty::{PrimitiveType, Type},
+    ty::{PrimitiveType, ReferenceKind, Type},
     well_known::{TYPE_INFO_SPEC, TYPE_NAME_GET_SPEC, TYPE_NAME_SPEC, TYPE_SPEC_IS_STRUCT},
 };
 use move_prover_bytecode_pipeline::{
@@ -104,6 +104,12 @@ pub struct SpecTranslator<'env> {
     /// uses `..S |~` / `S.. |~` with `|&mut T|` closure parameters rather than
     /// global memory. Maps `MemoryLabel → (boogie_var_name, T)`.
     value_state_vars: RefCell<BTreeMap<MemoryLabel, (String, Type)>>,
+    /// True while translating the argument of a behavioral predicate
+    /// (`ensures_of` / `result_of` / etc.). In this context, a `&mut x.foo`
+    /// borrow expression is treated as a value-yielding selector rather than
+    /// a runtime borrow operation: the inner field path is translated and the
+    /// surrounding `in_old_context` flag selects pre- vs post-state.
+    in_behavior_pred_arg: RefCell<bool>,
 }
 
 /// A struct which contains information about a lifted choice expression (like `some x:int: p(x)`).
@@ -144,6 +150,7 @@ impl<'env> SpecTranslator<'env> {
             label_info: RefCell::new(BTreeMap::new()),
             declared_mem_names: RefCell::new(BTreeSet::new()),
             value_state_vars: RefCell::new(BTreeMap::new()),
+            in_behavior_pred_arg: RefCell::new(false),
         }
     }
 
@@ -1667,6 +1674,13 @@ impl SpecTranslator<'_> {
                     ),
                 );
             },
+            Operation::Borrow(ReferenceKind::Mutable) if *self.in_behavior_pred_arg.borrow() => {
+                // `&mut x.foo` (and similar selector chains) inside a behavioral
+                // predicate argument: drop the borrow wrapper and translate the
+                // inner expression. The enclosing `in_old_context` flag chooses
+                // pre- vs post-state of the selected field.
+                self.translate_exp(&args[0]);
+            },
             Operation::BorrowGlobal(_)
             | Operation::Borrow(..)
             | Operation::Deref
@@ -1683,8 +1697,23 @@ impl SpecTranslator<'_> {
         }
     }
 
+    /// Translate a behavioral-predicate argument expression. The
+    /// `in_behavior_pred_arg` flag enables special-case handling of
+    /// `&mut x.foo` selector borrows in the inner expression.
+    fn translate_behavior_arg(&self, arg: &Exp) {
+        let prev = self.in_behavior_pred_arg.replace(true);
+        self.translate_exp(arg);
+        self.in_behavior_pred_arg.replace(prev);
+    }
+
     /// Translate a behavioral predicate using the per-type evaluator dispatch function.
     /// Used for runtime function values (e.g., function-typed parameters after substitution).
+    ///
+    /// `pred_args` arrive in canonical 3-arg shape (input slots followed by
+    /// explicit-result + post-state slots for `EnsuresOf`). State-label
+    /// substitutions (`..S |~` and `S.. |~`) replace the post-state of the
+    /// *last* mut-ref param and the pre-state of the *first* mut-ref param,
+    /// respectively, matching the prior semantics for single-mut-ref closures.
     fn translate_behavior_via_evaluator(
         &self,
         node_id: NodeId,
@@ -1703,6 +1732,7 @@ impl SpecTranslator<'_> {
             emit!(self.writer, ", ");
         }
         self.translate_exp(fun_exp);
+
         // For value-typed state labels (|&mut T| closures with no global memory):
         // substitute the state variable S_val into the appropriate pred_arg position.
         //   ..S |~ ensures_of<f>(old_x, x)  →  ensures_of<f>(old_x, S_val)   [post label: replace last]
@@ -1741,9 +1771,24 @@ impl SpecTranslator<'_> {
                     continue;
                 }
             }
-            self.translate_exp(arg);
+            self.translate_behavior_arg(arg);
         }
         emit!(self.writer, ")");
+    }
+
+    /// Position of the first `&mut T` parameter in a function type — used by
+    /// the `S.. |~` state-label substitution path in
+    /// `translate_behavior_via_evaluator`.
+    fn find_mut_ref_input_position(fun_type: &Type) -> Option<usize> {
+        if let Type::Fun(arg_ty, _, _) = fun_type {
+            arg_ty
+                .clone()
+                .flatten()
+                .iter()
+                .position(|ty| ty.is_mutable_reference())
+        } else {
+            None
+        }
     }
 
     /// Emit memory arguments for an evaluator call by computing the memory union
@@ -1796,8 +1841,13 @@ impl SpecTranslator<'_> {
     }
 
     /// Translate a behavioral predicate for a closure expression.
-    /// Calls the per-function behavioral spec function directly, mapping
-    /// captured and non-captured args to the callee's parameter positions.
+    ///
+    /// Calls the per-function behavioral spec function (or `result_of` function)
+    /// directly. The `pred_args` arrive already augmented with the canonical
+    /// 3-arg shape produced by `translate_behavior_predicate` (and the
+    /// inference engine): input args wrapped in `old(...)` for `&mut`
+    /// parameters, then for `EnsuresOf`, the explicit-result args followed by
+    /// the (un-wrapped) post-state clones of each `&mut` input.
     #[allow(clippy::too_many_arguments)]
     fn translate_behavior_for_closure(
         &self,
@@ -1819,7 +1869,6 @@ impl SpecTranslator<'_> {
         let fun_env = self.env.get_function(fun_qid.to_qualified_id());
         let num_params = fun_env.get_parameter_count();
 
-        // Choose the function name based on kind
         let fun_name = if kind == BehaviorKind::ResultOf {
             let multi_result = fun_env.get_return_count()
                 + fun_env
@@ -1844,19 +1893,20 @@ impl SpecTranslator<'_> {
             }
             has_args = true;
             if mask.is_captured(i) {
-                self.translate_exp(&closure_args[captured_pos]);
+                self.translate_behavior_arg(&closure_args[captured_pos]);
                 captured_pos += 1;
             } else {
-                self.translate_exp(&pred_args[non_captured_pos]);
+                self.translate_behavior_arg(&pred_args[non_captured_pos]);
                 non_captured_pos += 1;
             }
         }
 
-        // For ensures_of: emit result args from remaining pred_args
+        // For `EnsuresOf`: emit result args + post-state slots from remaining
+        // pred_args (already in canonical order: explicit_results, post_states).
         if kind == BehaviorKind::EnsuresOf {
             for arg in &pred_args[non_captured_pos..] {
                 emit!(self.writer, ", ");
-                self.translate_exp(arg);
+                self.translate_behavior_arg(arg);
             }
         }
         emit!(self.writer, ")");
@@ -2739,21 +2789,6 @@ impl SpecTranslator<'_> {
             true
         });
         result
-    }
-
-    /// Returns the pred_arg index corresponding to the "old value" input of the first
-    /// `&mut T` parameter in a function type, for use in `S.. |~` substitution.
-    /// For `|&mut T|` this is 0; for `|A, &mut T|` this is 1; etc.
-    fn find_mut_ref_input_position(fun_type: &Type) -> Option<usize> {
-        if let Type::Fun(arg_ty, _, _) = fun_type {
-            arg_ty
-                .clone()
-                .flatten()
-                .iter()
-                .position(|ty| ty.is_mutable_reference())
-        } else {
-            None
-        }
     }
 
     fn translate_quant(

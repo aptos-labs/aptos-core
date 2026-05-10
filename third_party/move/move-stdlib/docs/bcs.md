@@ -1,7 +1,4 @@
-
-<a id="0x1_bcs"></a>
-
-# Module `0x1::bcs`
+# Module `0x1::bcs` <a id="0x1_bcs"></a>
 
 Utility for converting a Move value to its binary representation in BCS (Binary Canonical
 Serialization). BCS is the binary encoding for Move resources and other non-module values
@@ -16,10 +13,7 @@ details on BCS.
 <pre><code></code></pre>
 
 
-
-<a id="0x1_bcs_to_bytes"></a>
-
-## Function `to_bytes`
+## Function `to_bytes` <a id="0x1_bcs_to_bytes"></a>
 
 Return the binary representation of <code>v</code> in BCS (Binary Canonical Serialization) format
 
@@ -40,9 +34,7 @@ Return the binary representation of <code>v</code> in BCS (Binary Canonical Seri
 
 </details>
 
-<a id="@Module_Specification_0"></a>
-
-## Module Specification
+## Module Specification <a id="@Module_Specification_0"></a>
 
 
 

@@ -121,6 +121,12 @@ pub(crate) struct ExpTranslator<'env, 'translator, 'module_translator> {
     /// Map from state label names to their GlobalId, ensuring the same label name
     /// always resolves to the same MemoryLabel across behavior predicates.
     pub state_label_map: BTreeMap<Symbol, MemoryLabel>,
+    /// True while translating an argument expression of a behavioral predicate
+    /// (`ensures_of` / `result_of` / etc.). In this context, `&mut x.foo`
+    /// selector borrows are accepted in spec mode (the spec rewriter and
+    /// Boogie translator interpret them as field-path expressions over the
+    /// underlying mut-ref param).
+    pub in_behavior_pred_arg: bool,
 }
 
 #[derive(Debug)]
@@ -194,6 +200,7 @@ impl<'env, 'translator, 'module_translator> ExpTranslator<'env, 'translator, 'mo
             insert_freeze: true,
             loop_stack: vec![],
             state_label_map: BTreeMap::new(),
+            in_behavior_pred_arg: false,
         }
     }
 
@@ -1966,7 +1973,12 @@ impl ExpTranslator<'_, '_, '_> {
                 ExpData::Call(id, Operation::Deref, vec![target_exp.into_exp()])
             },
             EA::Exp_::Borrow(mutable, exp) => {
-                self.require_impl_language(&loc);
+                // Behavioral predicate arguments accept `&mut x.foo` selector
+                // borrows even in spec mode — the model spec rewriter / Boogie
+                // translator interpret them as field-path expressions.
+                if !self.in_behavior_pred_arg {
+                    self.require_impl_language(&loc);
+                }
                 let ref_kind = ReferenceKind::from_is_mut(*mutable);
                 let target_ty = self.fresh_type_var();
                 let ty = Type::Reference(ref_kind, Box::new(target_ty.clone()));
@@ -6056,15 +6068,20 @@ impl ExpTranslator<'_, '_, '_> {
             return self.new_error_exp();
         };
 
-        // Compute expected argument types based on behavior kind and function signature
-        let expected_arg_types = self.compute_behavior_arg_types(&arg_ty, &result_ty, &model_kind);
-
-        // Translate arguments and check types
+        // Translate arguments and check types. Both the user-facing minimum
+        // arity (inputs + explicit results for `EnsuresOf`) and the canonical
+        // augmented arity (with post-state slots for `&mut` params) are
+        // accepted; `augment_behavior_call` in the spec rewriter normalizes
+        // the minimum form to the canonical form automatically.
         let translated_args =
-            self.translate_and_check_behavior_args(loc, args, &expected_arg_types, &model_kind);
+            self.translate_and_check_behavior_args(loc, args, &arg_ty, &result_ty, &model_kind);
 
         // Determine the result type based on the behavior kind
-        let fun_type = Type::Fun(Box::new(arg_ty), Box::new(result_ty), AbilitySet::EMPTY);
+        let fun_type = Type::Fun(
+            Box::new(arg_ty.clone()),
+            Box::new(result_ty),
+            AbilitySet::EMPTY,
+        );
         let Some(computed_result_ty) =
             self.compute_behavior_result_type(loc, &model_kind, &fun_type)
         else {
@@ -6096,7 +6113,9 @@ impl ExpTranslator<'_, '_, '_> {
             return self.new_error_exp();
         }
 
-        // Build args with function expression as first argument
+        // Build args with function expression as first argument. The
+        // user-facing 2-arg form is canonicalized to the internal 3-arg form
+        // by `SpecTranslator::augment_behavior_call` during spec rewriting.
         let mut all_args = vec![fun_exp];
         all_args.extend(translated_args);
 
@@ -6296,45 +6315,51 @@ impl ExpTranslator<'_, '_, '_> {
     }
 
     /// Computes the expected argument types for a behavior predicate based on kind.
-    fn compute_behavior_arg_types(
+    ///
+    /// Input parameter types are stripped of all references — spec language
+    /// treats references transparently. For `EnsuresOf`, explicit result types
+    /// are appended after inputs (the user-facing "minimum" form). When the
+    /// caller writes the canonical form (with explicit post-state slots for
+    /// each `&mut` parameter), `compute_behavior_arg_types_canonical` returns
+    /// the extended type list. `translate_and_check_behavior_args` accepts
+    /// either arity.
+    fn compute_behavior_arg_types_minimum(
         &self,
         arg_ty: &Type,
         result_ty: &Type,
         kind: &BehaviorKind,
     ) -> Vec<Type> {
-        match kind {
-            BehaviorKind::RequiresOf | BehaviorKind::AbortsOf | BehaviorKind::ResultOf => {
-                // requires_of, aborts_of, and result_of take the VALUES of input parameters.
-                // In spec language, references are transparent: a caller writing
-                // `result_of<f>(self.shares, shareholder)` passes value-typed expressions
-                // regardless of whether `f` declares `&T` or `&mut T` params. Strip all
-                // reference wrappers so the expected type for each arg slot is the value type T.
-                arg_ty
-                    .clone()
-                    .flatten()
-                    .into_iter()
-                    .map(|ty| ty.skip_reference().clone())
-                    .collect()
-            },
-            BehaviorKind::EnsuresOf => {
-                // ensures_of takes the VALUES of input parameters + result + modified mut ref values.
-                // Input param expected types: strip all references (same rationale as above).
-                let mut types: Vec<Type> = arg_ty
-                    .clone()
-                    .flatten()
-                    .into_iter()
-                    .map(|ty| ty.skip_reference().clone())
-                    .collect();
-                types.extend(result_ty.clone().flatten());
-                // Add mutable reference parameters as outputs (their post-state values).
-                for ty in arg_ty.clone().flatten() {
-                    if ty.is_mutable_reference() {
-                        types.push(ty.skip_reference().clone());
-                    }
-                }
-                types
-            },
+        let mut types: Vec<Type> = arg_ty
+            .clone()
+            .flatten()
+            .into_iter()
+            .map(|ty| ty.skip_reference().clone())
+            .collect();
+        if matches!(kind, BehaviorKind::EnsuresOf) {
+            types.extend(result_ty.clone().flatten());
         }
+        types
+    }
+
+    /// The canonical (augmented) expected argument types for a behavior
+    /// predicate. For `EnsuresOf`, the inputs and explicit results are
+    /// followed by the post-state value type for each `&mut T` parameter.
+    /// For other kinds, this matches the minimum form.
+    fn compute_behavior_arg_types_canonical(
+        &self,
+        arg_ty: &Type,
+        result_ty: &Type,
+        kind: &BehaviorKind,
+    ) -> Vec<Type> {
+        let mut types = self.compute_behavior_arg_types_minimum(arg_ty, result_ty, kind);
+        if matches!(kind, BehaviorKind::EnsuresOf) {
+            for ty in arg_ty.clone().flatten() {
+                if ty.is_mutable_reference() {
+                    types.push(ty.skip_reference().clone());
+                }
+            }
+        }
+        types
     }
 
     /// Computes the result type for a behavior predicate based on the kind.
@@ -6384,37 +6409,65 @@ impl ExpTranslator<'_, '_, '_> {
         Some(Type::tuple(result_types))
     }
 
-    /// Translates and type-checks behavior predicate arguments.
+    /// Translates and type-checks behavior predicate arguments. Accepts
+    /// either the user-facing minimum arity or the canonical augmented arity
+    /// (which includes post-state slots for `&mut T` parameters in
+    /// `EnsuresOf`). The model spec rewriter normalizes the minimum form to
+    /// the canonical form via `augment_behavior_call`.
     fn translate_and_check_behavior_args(
         &mut self,
         loc: &Loc,
         args: &[EA::Exp],
-        expected_types: &[Type],
+        arg_ty: &Type,
+        result_ty: &Type,
         kind: &BehaviorKind,
     ) -> Vec<Exp> {
-        // Check arity for behavior kinds
+        let minimum = self.compute_behavior_arg_types_minimum(arg_ty, result_ty, kind);
+        let canonical = self.compute_behavior_arg_types_canonical(arg_ty, result_ty, kind);
+        let expected_types: &[Type] =
+            if args.len() == canonical.len() && canonical.len() != minimum.len() {
+                &canonical
+            } else {
+                &minimum
+            };
+
         if args.len() != expected_types.len() {
-            self.error(
-                loc,
-                &format!(
+            // Report against the minimum-arity (the user-facing default);
+            // also mention the canonical arity if it differs.
+            let msg = if minimum.len() == canonical.len() {
+                format!(
                     "expected {} argument(s) for {} but {} were provided",
-                    expected_types.len(),
+                    minimum.len(),
                     kind,
                     args.len()
-                ),
-            );
-            // Still translate arguments to provide better error messages
-            return args
+                )
+            } else {
+                format!(
+                    "expected {} argument(s) for {} (or {} for the canonical form including post-state slots), but {} were provided",
+                    minimum.len(),
+                    kind,
+                    canonical.len(),
+                    args.len()
+                )
+            };
+            self.error(loc, &msg);
+            let prev = std::mem::replace(&mut self.in_behavior_pred_arg, true);
+            let translated = args
                 .iter()
                 .map(|arg| self.translate_exp_free(arg).1.into_exp())
                 .collect();
+            self.in_behavior_pred_arg = prev;
+            return translated;
         }
 
-        // Translate each argument with expected type
-        args.iter()
+        let prev = std::mem::replace(&mut self.in_behavior_pred_arg, true);
+        let translated = args
+            .iter()
             .zip(expected_types.iter())
             .map(|(arg, expected_ty)| self.translate_exp(arg, expected_ty).into_exp())
-            .collect()
+            .collect();
+        self.in_behavior_pred_arg = prev;
+        translated
     }
 
     /// Unify types with order `LeftToRight` and shallow variance

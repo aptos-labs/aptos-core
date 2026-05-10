@@ -30,7 +30,7 @@ module 0x42::followed_by_mut_ref {
     }
     spec followed_by {
         ensures exists S in *:
-            (..S |~ ensures_of<f>(old(x), x)) &&
-            (S.. |~ ensures_of<g>(old(x), x));
+            (..S |~ ensures_of<f>(x)) &&
+            (S.. |~ ensures_of<g>(x));
     }
 }

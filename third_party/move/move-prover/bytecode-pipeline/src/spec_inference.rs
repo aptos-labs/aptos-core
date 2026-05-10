@@ -3449,7 +3449,11 @@ impl<'env> SpecInferenceAnalyzer<'env> {
             state.add_ensures(ensures_of);
         } else if !any_dest_referenced {
             {
-                // Result discarded: emit ensures_of<f>(args, result_of<f>(args)...)
+                // Result discarded: emit `ensures_of<f>(args, result_of<f>(args)...)`.
+                // The trailing slots cover both explicit results and post-states of
+                // any `&mut` inputs — together they form the canonical ensures-of
+                // shape. The model-level rewriter (`augment_behavior_call`) leaves
+                // this canonical form unchanged.
                 let mut ensures_args = args.clone();
                 for i in 0..num_all_outputs {
                     ensures_args.push(self.mk_result_of_at_with_state(
@@ -3678,9 +3682,15 @@ impl<'env> SpecInferenceAnalyzer<'env> {
     }
 
     /// Build behavioral predicate arguments for a call site.
-    /// Direct `&mut` parameters must contribute their pre-state value because
-    /// inferred postconditions interpret the bare parameter name as the
-    /// post-state pointee value.
+    ///
+    /// `&mut` source temps are wrapped in `old(...)` so the inferred
+    /// expression captures the *pre-call* value. The wrapping is essential for
+    /// the WP substitution machinery: without it, substituting a `&mut` temp
+    /// during state propagation would replace its occurrences inside its own
+    /// `result_of` post-state expression, producing nested-loop garbage like
+    /// `result_of<f>(result_of<f>(...))`. With `old(...)`, the substitution
+    /// only fires for bare temps in the state (post-state references), while
+    /// pre-state references are preserved by `substitute_old_param_in_state`.
     fn mk_behavioral_call_args(&self, _state: &WPState, srcs: &[TempIndex]) -> Vec<Exp> {
         srcs.iter()
             .map(|&idx| {

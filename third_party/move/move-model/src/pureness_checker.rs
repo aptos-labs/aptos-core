@@ -79,9 +79,25 @@ where
     pub fn check_exp(&mut self, env: &GlobalEnv, exp: &Exp) -> bool {
         // Reset before start of traversal
         self.is_impure = false;
-        exp.visit_post_order(&mut |e| {
+        // Track behavioral-predicate argument depth: while > 0, we are inside
+        // an `ensures_of` / `result_of` / etc. argument expression, where
+        // `&mut x.foo` selector borrows are accepted (the spec rewriter and
+        // Boogie translator interpret them as field-path expressions).
+        let mut bp_arg_depth: usize = 0;
+        exp.visit_pre_post(&mut |post, e| {
             use ExpData::*;
             use Operation::*;
+            // Maintain bp_arg_depth around Behavior nodes' descendants.
+            if !post {
+                if matches!(e, Call(_, Behavior(_, _), _)) {
+                    bp_arg_depth += 1;
+                }
+                return !self.is_impure;
+            }
+            // post-visit (children fully visited)
+            if matches!(e, Call(_, Behavior(_, _), _)) {
+                bp_arg_depth = bp_arg_depth.saturating_sub(1);
+            }
             match e {
                 Assign(id, ..) if self.mode == FunctionPurenessCheckerMode::Specification => {
                     (self.impure_action)(*id, "assigns variable", &self.visiting);
@@ -107,7 +123,7 @@ where
                         &self.visiting,
                     );
                 },
-                Call(id, Borrow(ReferenceKind::Mutable), ..) => {
+                Call(id, Borrow(ReferenceKind::Mutable), ..) if bp_arg_depth == 0 => {
                     (self.impure_action)(*id, "mutably borrows value", &self.visiting);
                     self.is_impure = true;
                 },

@@ -1,7 +1,4 @@
-
-<a id="0x1_type_name"></a>
-
-# Module `0x1::type_name`
+# Module `0x1::type_name` <a id="0x1_type_name"></a>
 
 Functionality for converting Move types into values. Use with care!
 
@@ -16,10 +13,7 @@ Functionality for converting Move types into values. Use with care!
 </code></pre>
 
 
-
-<a id="0x1_type_name_TypeName"></a>
-
-## Struct `TypeName`
+## Struct `TypeName` <a id="0x1_type_name_TypeName"></a>
 
 
 
@@ -50,9 +44,7 @@ Functionality for converting Move types into values. Use with care!
 
 </details>
 
-<a id="0x1_type_name_get"></a>
-
-## Function `get`
+## Function `get` <a id="0x1_type_name_get"></a>
 
 Return a value representation of the type <code>T</code>.
 
@@ -73,9 +65,7 @@ Return a value representation of the type <code>T</code>.
 
 </details>
 
-<a id="0x1_type_name_borrow_string"></a>
-
-## Function `borrow_string`
+## Function `borrow_string` <a id="0x1_type_name_borrow_string"></a>
 
 Get the String representation of <code>self</code>
 
@@ -98,9 +88,7 @@ Get the String representation of <code>self</code>
 
 </details>
 
-<a id="0x1_type_name_into_string"></a>
-
-## Function `into_string`
+## Function `into_string` <a id="0x1_type_name_into_string"></a>
 
 Convert <code>self</code> into its inner String
 

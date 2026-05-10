@@ -1,15 +1,9 @@
-
-<a id="@Move_Stdlib_Modules_0"></a>
-
-# Move Stdlib Modules
+# Move Stdlib Modules <a id="@Move_Stdlib_Modules_0"></a>
 
 
 This is the root document for the Move stdlib module documentation. The Move stdlib provides modules that can be used to access or interact with core language features.
 
-
-<a id="@Index_1"></a>
-
-## Index
+## Index <a id="@Index_1"></a>
 
 
 -  [`0x1::ascii`](ascii.md#0x1_ascii)
