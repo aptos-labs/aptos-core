@@ -449,6 +449,15 @@ pub fn create_multi_region_swarm_network_chaos(
         network_emulation_config.region_weights.as_deref(),
     );
 
+    // Drop regions whose weight (or chunk allocation) produced 0 peers. An
+    // empty chunk renders as `expressionSelectors: { In, values: [] }`, which
+    // is an invalid Kubernetes label selector — chaos-mesh can't reconcile
+    // those NetworkChaos resources to Active and forge then times out waiting.
+    let peer_groups: LinkStatsTableWithPeerGroups = peer_groups
+        .into_iter()
+        .filter(|(_, chunk, _)| !chunk.is_empty())
+        .collect();
+
     // Create the inter and intra network emulation configs
     let inter_region_netem = network_emulation_config
         .inter_region_config
