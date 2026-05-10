@@ -72,47 +72,45 @@ pub(crate) fn get_mainnet_mirror_test(test_name: &str, duration: Duration) -> Op
     }
 }
 
-/// Stratified 21-validator subset used by the `_small` test variants. Picks
+/// Stratified 23-validator subset used by the `_small` test variants. Picks
 /// deterministically from the embedded snapshot so both small tests run
 /// against the exact same validator set (one with failure injection, one
 /// without).
 ///
-/// Region totals (apne1=1, ca=2, eu-central=5, eu-west=9, sa-east=1, us=3)
-/// track mainnet's region-stake proportions for 21 validators. Failure
-/// validators (5 of 21, ~24%, vs ~19% in mainnet) are biased toward
-/// outsized-impact picks: top-stake within each (class, region) bucket means
-/// `(StableChronic, Apne1)` resolves to `val0.apne1-0.mainnet.aptoslabs.com`,
-/// the chronic that authors ~23% of mainnet batches by stake.
+/// 7 failure validators (all 4 mainnet StableChronics + 1 OnlineButFlaky in
+/// each of apne1/eu-west-1 + 1 EpisodicSpike). Stake-weighted faulty share
+/// = 16.83% vs mainnet's 16.03%. apne1-0 (the top batch author, 23% of
+/// mainnet batches) is now included as the apne1 flaky pick.
 fn small_stratified_subset() -> MainnetMirrorSnapshot {
     use aptos_testcases::mainnet_mirror::{AvailabilityClass::*, Region::*};
     MainnetMirrorSnapshot::load_embedded()
         .expect("embedded mainnet validator snapshot failed to parse")
         .stratified_subset(&[
-            // 4 failure validators, top-stake within each bucket. After the
-            // 2026-05-09 reclassification (failure_metrics.json switched from
-            // count-gauge to rate-fraction semantics), picks resolve to:
-            //   (StableChronic, Apne1)     → hashport (0x312c22e7), rate 14.3%
-            //   (StableChronic, UsCentral) → sirouk (0x50b27eee), rate 13.7%
-            //   (OnlineButFlaky, EuWest)   → Stakely, rate 1.7%
-            //   (EpisodicSpike, EuWest)    → val0.euwe6-1 (Aptos Labs), burst
+            // 7 failure validators. Picks resolve to:
+            //   (StableChronic, Apne1)         → hashport (0x312c22e7), rate 14.3%
+            //   (StableChronic, EuCentral1)    → rockrpc.net,           rate 11.2%
+            //   (StableChronic, UsCentral1)×2  → sirouk (0x50b27eee, 13.7%) +
+            //                                    herd.run (0x973891f5,  17.5%)
+            //   (OnlineButFlaky, Apne1)        → val0.apne1-0 (Aptos Labs, 3.6%,
+            //                                    top batch author 23% of mainnet)
+            //   (OnlineButFlaky, EuWest1)      → Stakely, rate 1.7%
+            //   (EpisodicSpike,  EuWest1)      → val0.euwe6-1 (Aptos Labs), burst
             //
-            // Two chronic picks (apne1 + us-central1) model both
-            // geographic-amplified (high cross-region RTT) and pure-rate-driven
-            // (low RTT) chronic dynamics. One flaky pick: Stakely is highest-
-            // stake among real-rate flaky validators.
-            //
-            // Notable shifts since count→rate switch: val0.apne1-0 (was
-            // StableChronic at count 0.304) is now OnlineButFlaky (real 3.6%);
-            // bitgo (was top flaky) is now Healthy (rate 0.03%).
+            // Chronic configured rates are clamped at 10% by
+            // FailurePatternConfig::max_continuous_pct so they sit at the
+            // leader-reputation failure_threshold_percent boundary and stay in
+            // the leader rotation rather than getting demoted to failed_weight.
             (StableChronic, Apne1, 1),
-            (StableChronic, UsCentral1, 1),
+            (StableChronic, EuCentral1, 1),
+            (StableChronic, UsCentral1, 2),
+            (OnlineButFlaky, Apne1, 1),
             (OnlineButFlaky, EuWest1, 1),
             (EpisodicSpike, EuWest1, 1),
-            // 17 healthy validators distributed proportional to mainnet region
-            // stake. EuCentral1 bumped 4→5 (absorbs the dropped flaky slot);
-            // UsCentral1 dropped 4→3 (absorbed by the new chronic pick).
+            // 16 healthy validators distributed proportional to mainnet region
+            // stake. EuCentral1 dropped 5→4 (rockrpc takes a chronic slot in
+            // that region); other healthy slots unchanged.
             (Healthy, CaCentral1, 2),
-            (Healthy, EuCentral1, 5),
+            (Healthy, EuCentral1, 4),
             (Healthy, EuWest1, 7),
             (Healthy, UsCentral1, 3),
         ])
