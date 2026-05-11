@@ -48,6 +48,9 @@ mod aptosdb_internal;
 // Testonly methods.
 #[cfg(any(test, feature = "fuzzing", feature = "consensus-only-perf-test"))]
 mod aptosdb_testonly;
+// One-off backfill of VersionData rows at epoch-ending versions. See
+// `version_data_backfill.rs` for feature flags.
+mod version_data_backfill;
 
 #[cfg(feature = "consensus-only-perf-test")]
 pub mod fake_aptosdb;

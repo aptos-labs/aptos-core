@@ -159,6 +159,8 @@ impl AptosDB {
             hot_state_config,
         );
 
+        myself.maybe_spawn_version_data_backfill_thread();
+
         if !readonly {
             if let Some(version) = myself.get_synced_version()? {
                 myself
