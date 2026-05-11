@@ -1014,6 +1014,7 @@ dependencies = [
  "futures-channel",
  "hex",
  "itertools 0.13.0",
+ "libm",
  "maplit",
  "mini-moka",
  "mirai-annotations",

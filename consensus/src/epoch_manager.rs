@@ -14,7 +14,7 @@ use crate::{
     liveness::{
         cached_proposer_election::CachedProposerElection,
         leader_reputation::{
-            extract_epoch_to_proposers, AptosDBBackend, LeaderReputation,
+            extract_epoch_to_proposers, AptosDBBackend, LatencyWeightedHeuristic, LeaderReputation,
             ProposerAndVoterHeuristic, ReputationHeuristic,
         },
         proposal_generator::{
@@ -351,6 +351,44 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
                             std::cmp::max(proposer_window_size, voter_window_size),
                             proposer_and_voter_config.weight_by_voting_power,
                             proposer_and_voter_config.use_history_from_previous_epoch_max_count,
+                        )
+                    },
+                    LeaderReputationType::ProposerAndVoterV3(v3) => {
+                        let base = &v3.base;
+                        let proposer_window_size =
+                            proposers.len() * base.proposer_window_num_validators_multiplier;
+                        let voter_window_size =
+                            proposers.len() * base.voter_window_num_validators_multiplier;
+                        let inner = ProposerAndVoterHeuristic::new(
+                            self.author,
+                            base.active_weight,
+                            base.inactive_weight,
+                            base.failed_weight,
+                            base.failure_threshold_percent,
+                            voter_window_size,
+                            proposer_window_size,
+                            leader_reputation_type.use_reputation_window_from_stale_end(),
+                        );
+                        // Decode milli-units (1000 = 1.0×) deterministically. All tuning
+                        // parameters come from the on-chain V3 config so every validator
+                        // computes the same proposer schedule.
+                        let heuristic: Box<dyn ReputationHeuristic> = if v3.use_latency_weighted {
+                            Box::new(LatencyWeightedHeuristic::new(
+                                inner,
+                                base.active_weight,
+                                v3.latency_weight_multiplier_milli as f64 / 1000.0,
+                                v3.latency_min_observations as usize,
+                                v3.latency_deadband_milli as f64 / 1000.0,
+                                v3.latency_max_ratio_milli as f64 / 1000.0,
+                            ))
+                        } else {
+                            Box::new(inner)
+                        };
+                        (
+                            heuristic,
+                            std::cmp::max(proposer_window_size, voter_window_size),
+                            base.weight_by_voting_power,
+                            base.use_history_from_previous_epoch_max_count,
                         )
                     },
                 };

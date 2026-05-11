@@ -516,6 +516,12 @@ pub enum LeaderReputationType {
     // * use reputation window from recent end
     // * unpredictable seed, based on root hash
     ProposerAndVoterV2(ProposerAndVoterConfig),
+    // Version 3: extends V2 with on-chain gating for the latency-weighted heuristic.
+    // Adds `use_latency_weighted` and `latency_weight_multiplier_milli` so all validators
+    // deterministically agree on whether to apply latency weighting and with what exponent.
+    // Without on-chain gating, validators on different node-local config values would
+    // compute different leader schedules and fork.
+    ProposerAndVoterV3(ProposerAndVoterConfigV3),
 }
 
 impl LeaderReputationType {
@@ -553,6 +559,31 @@ pub struct ProposerAndVoterConfig {
     // representing a number of historical epochs (beyond the current one)
     // to consider.
     pub use_history_from_previous_epoch_max_count: u32,
+}
+
+/// V3 leader-reputation parameters: V2's `ProposerAndVoterConfig` plus the on-chain gate
+/// for the latency-weighted heuristic. New fields live on a new struct so existing on-chain
+/// V1/V2 payloads continue to deserialize unchanged.
+#[derive(Clone, Copy, Debug, Deserialize, Eq, PartialEq, Serialize)]
+pub struct ProposerAndVoterConfigV3 {
+    /// V2 parameters (selection weights, windows, etc.).
+    pub base: ProposerAndVoterConfig,
+    /// On-chain toggle for the latency-weighted heuristic that scales active validators by
+    /// per-validator mean round time. When false the heuristic behaves like V2.
+    pub use_latency_weighted: bool,
+    /// Exponent applied to the latency ratio, expressed in milli-units (1000 = 1.0×).
+    /// Integer-encoded for BCS determinism. Decoded as `value as f64 / 1000.0` at runtime.
+    /// Ignored when `use_latency_weighted` is false.
+    pub latency_weight_multiplier_milli: u32,
+    /// Minimum round-time observations required before a validator is scaled (typical: 2).
+    /// Validators with fewer observations fall back to the carry-forward factor.
+    pub latency_min_observations: u32,
+    /// Deadband threshold in milli-units (typical: 1300 = 1.3×). Validators with
+    /// `val_mean / median <= deadband` get factor 1.0 (no penalty).
+    pub latency_deadband_milli: u32,
+    /// Hard ceiling on the post-deadband scaling ratio in milli-units (typical: 4000 = 4.0×).
+    /// Bounds how aggressively a single anomalously-slow validator can be suppressed.
+    pub latency_max_ratio_milli: u32,
 }
 
 #[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
