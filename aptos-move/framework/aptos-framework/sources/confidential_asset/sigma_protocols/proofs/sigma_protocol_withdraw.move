@@ -223,7 +223,7 @@ module aptos_framework::sigma_protocol_withdraw {
         assert!(b.add_point(compressed_ek) == IDX_EK, err);                                                           // ek
         assert!(b.add_points(compressed_old_balance.get_compressed_P()) == START_IDX_OLD_P, err);                  // old_P
         assert!(b.add_points(compressed_old_balance.get_compressed_R()) == START_IDX_OLD_P + ell, err);            // old_R
-        assert!(b.add_points(compressed_new_balance.get_compressed_P()) == START_IDX_OLD_P + 2 * ell, err); // new_P
+        assert!(b.add_points(compressed_new_balance.get_compressed_P()) == START_IDX_OLD_P + 2 * ell, err);        // new_P
         assert!(b.add_points(compressed_new_balance.get_compressed_R()) == START_IDX_OLD_P + 3 * ell, err);        // new_R
 
         if (compressed_ek_aud.is_some()) {
@@ -233,7 +233,7 @@ module aptos_framework::sigma_protocol_withdraw {
 
         assert!(b.add_scalar(v) == IDX_V, err);
         let stmt = b.build();
-        assert_withdraw_statement_is_well_formed(&stmt, compressed_ek_aud.is_some());
+            assert_withdraw_statement_is_well_formed(&stmt, compressed_ek_aud.is_some());
         stmt
     }
 
