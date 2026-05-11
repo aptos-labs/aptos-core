@@ -1,10 +1,4 @@
 Move prover returns: exiting with verification errors
-warning: Unused value of parameter `caller`. Consider removing the parameter, or prefixing with an underscore (e.g., `_caller`), or binding to `_`
-   ┌─ <PKG>/sources/vault.move:48:24
-   │
-48 │     public fun harvest(caller: &signer, vault_addr: address) {
-   │                        ^^^^^^
-
 error: data invariant does not hold
    ┌─ <PKG>/sources/amm_example.move:30:9
    │
