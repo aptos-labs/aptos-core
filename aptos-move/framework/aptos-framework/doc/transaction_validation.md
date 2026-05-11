@@ -65,6 +65,8 @@
     -  [Function `unified_prologue_v2`](#@Specification_1_unified_prologue_v2)
     -  [Function `unified_prologue_fee_payer_v2`](#@Specification_1_unified_prologue_fee_payer_v2)
     -  [Function `unified_epilogue_v2`](#@Specification_1_unified_epilogue_v2)
+    -  [Function `versioned_prologue`](#@Specification_1_versioned_prologue)
+    -  [Function `versioned_epilogue`](#@Specification_1_versioned_epilogue)
 
 
 <pre><code><b>use</b> <a href="account.md#0x1_account">0x1::account</a>;
@@ -2483,6 +2485,38 @@ Skip transaction_fee::burn_fee verification.
 
 
 <pre><code><b>fun</b> <a href="transaction_validation.md#0x1_transaction_validation_unified_epilogue_v2">unified_epilogue_v2</a>(<a href="account.md#0x1_account">account</a>: <a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>, gas_payer: <a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>, storage_fee_refunded: u64, txn_gas_price: u64, txn_max_gas_units: u64, gas_units_remaining: u64, is_simulation: bool, is_orderless_txn: bool)
+</code></pre>
+
+
+
+
+<pre><code><b>pragma</b> verify = <b>false</b>;
+</code></pre>
+
+
+
+<a id="@Specification_1_versioned_prologue"></a>
+
+### Function `versioned_prologue`
+
+
+<pre><code><b>fun</b> <a href="transaction_validation.md#0x1_transaction_validation_versioned_prologue">versioned_prologue</a>(sender: <a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>, fee_payer: <a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>, args: <a href="transaction_validation.md#0x1_transaction_validation_PrologueArgs">transaction_validation::PrologueArgs</a>)
+</code></pre>
+
+
+
+
+<pre><code><b>pragma</b> verify = <b>false</b>;
+</code></pre>
+
+
+
+<a id="@Specification_1_versioned_epilogue"></a>
+
+### Function `versioned_epilogue`
+
+
+<pre><code><b>fun</b> <a href="transaction_validation.md#0x1_transaction_validation_versioned_epilogue">versioned_epilogue</a>(<a href="account.md#0x1_account">account</a>: <a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>, fee_payer: <a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>, args: <a href="transaction_validation.md#0x1_transaction_validation_EpilogueArgs">transaction_validation::EpilogueArgs</a>)
 </code></pre>
 
 
