@@ -2,7 +2,7 @@ processed 1 task
 task 0 lines 1-21:  publish --print-bytecode [module 0x66::test_unpack_valid]
 
 == BEGIN Bytecode ==
-// Bytecode version v9
+// Bytecode version v10
 module 0x66::test_unpack_valid
 struct S
   x: u64

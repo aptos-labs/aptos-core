@@ -2,7 +2,7 @@ processed 2 tasks
 task 0 lines 1-30:  publish --print-bytecode [// Test struct with '$' in name: Foo$Bar has pack/unpack/borrow/borrow_mut APIs]
 
 == BEGIN Bytecode ==
-// Bytecode version v9
+// Bytecode version v10
 module 0x66::test_dollar_struct_valid
 struct Foo$Bar
   x: u64
@@ -36,7 +36,7 @@ struct Foo$Bar
 task 1 lines 32-89:  publish --print-bytecode [// Test enum with '$' in name and variant name: Color$Ext with Red$A and Blue variants]
 
 == BEGIN Bytecode ==
-// Bytecode version v9
+// Bytecode version v10
 module 0x66::test_dollar_enum_valid
 enum Color$Ext has drop
   Red$A
