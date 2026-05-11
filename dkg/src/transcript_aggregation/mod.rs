@@ -86,14 +86,6 @@ impl<S: DKGTrait> BroadcastStatus<DKGMessage> for Arc<TranscriptAggregationState
             "[DKG] adding peer transcript failed with node author mismatch"
         );
 
-        // Skip duplicate contributors without re-deserializing.
-        {
-            let trx_aggregator = self.trx_aggregator.lock();
-            if trx_aggregator.contributors.contains(&sender) {
-                return Ok(None);
-            }
-        }
-
         let session_max = S::expected_max_transcript_size(&self.dkg_pub_params);
         ensure!(
             transcript_bytes.len() <= session_max,
@@ -106,7 +98,6 @@ impl<S: DKGTrait> BroadcastStatus<DKGMessage> for Arc<TranscriptAggregationState
             anyhow!("[DKG] adding peer transcript failed with trx deserialization error: {e}")
         })?;
         let mut trx_aggregator = self.trx_aggregator.lock();
-        // Re-check under the lock against a concurrent insert for the same sender.
         if trx_aggregator.contributors.contains(&metadata.author) {
             return Ok(None);
         }
