@@ -340,7 +340,8 @@ fn build_failures_test(
 /// * `use_latency_weighted = true`
 /// * `latency_weight_multiplier_milli = 1000` (m = 1.0×)
 /// * `latency_min_observations = 2`
-/// * `latency_deadband_milli = 1300` (1.3× — no penalty inside)
+/// * `latency_deadband_milli = 1000` (1.0× — deadband disabled; any
+///   above-median latency triggers scaling)
 /// * `latency_max_ratio_milli = 4000` (4.0× — clamp)
 fn latency_weighted_consensus_config() -> OnChainConsensusConfig {
     let mut cfg = OnChainConsensusConfig::default_for_genesis();
@@ -367,7 +368,7 @@ fn latency_weighted_consensus_config() -> OnChainConsensusConfig {
             use_latency_weighted: true,
             latency_weight_multiplier_milli: 1000,
             latency_min_observations: 2,
-            latency_deadband_milli: 1300,
+            latency_deadband_milli: 1000,
             latency_max_ratio_milli: 4000,
         }),
     );
