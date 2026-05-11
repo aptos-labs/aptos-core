@@ -117,7 +117,7 @@ pub struct FailurePatternConfig {
 impl Default for FailurePatternConfig {
     fn default() -> Self {
         Self {
-            continuous_delay_ms: 2000,
+            continuous_delay_ms: 1500,
             // Earlier window so spike fires within the measured test window;
             // longer pause so val 4 leads 60-120+ rounds during the burst,
             // producing a clear chain-level signal.
@@ -264,24 +264,29 @@ impl NetworkLoadTest for MainnetMirrorFailureTest {
                     self.spike_tasks.lock().await.push(handle);
                 },
                 AvailabilityClass::StableChronic | AvailabilityClass::OnlineButFlaky => {
-                    let class_idx = if entry.availability == AvailabilityClass::StableChronic {
-                        0
-                    } else {
-                        1
-                    };
+                    let is_chronic = entry.availability == AvailabilityClass::StableChronic;
+                    let class_idx = if is_chronic { 0 } else { 1 };
                     by_class[class_idx].1 += 1;
                     let pct = continuous_delay_pct(
                         entry,
                         self.config.min_continuous_pct,
                         self.config.max_continuous_pct,
                     );
-                    // Use `return` (drop the message) instead of `delay(2000)` so the
-                    // failpoint reliably fails the round when triggered. With delay=2000ms,
-                    // observed runs showed flaky validators recording 0 failures because
-                    // the 2s delay didn't always exceed round timeout — the leader still
-                    // managed to commit. Dropping the message guarantees the round fails
-                    // for the leader at exactly the configured pct.
-                    let action = format!("{}%return", pct);
+                    // Chronic: model real mainnet chronics as SLOW (delayed
+                    // proposals), not drop-message. continuous_delay_ms must
+                    // exceed the round timeout so the delayed message reliably
+                    // misses the round. This makes the validator's measured
+                    // commit-to-commit latency rise, which is what the V3
+                    // latency-weighted heuristic uses.
+                    //
+                    // Flaky: keep `%return` because flaky observed rates are
+                    // already low (1-3%) and `%delay` at low pct rarely fires;
+                    // %return guarantees the per-leader rate matches config.
+                    let action = if is_chronic {
+                        format!("{}%delay({})", pct, self.config.continuous_delay_ms)
+                    } else {
+                        format!("{}%return", pct)
+                    };
                     for fp in SEND_FAILPOINTS {
                         if let Err(e) = client.set_failpoint(fp.to_string(), action.clone()).await {
                             warn!(
