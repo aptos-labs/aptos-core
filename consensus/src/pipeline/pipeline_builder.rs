@@ -23,9 +23,9 @@ use aptos_consensus_types::{
     pipeline::commit_vote::CommitVote,
     pipelined_block::{
         CommitLedgerResult, CommitVoteResult, DecryptionResult, ExecuteResult, LedgerUpdateResult,
-        MaterializeResult, NotifyStateSyncResult, PipelineFutures, PipelineInputRx,
-        PipelineInputTx, PipelinedBlock, PostCommitResult, PostLedgerUpdateResult, PreCommitResult,
-        PrepareResult, RandResult, TaskError, TaskFuture, TaskResult,
+        MaterializeResult, NotifyStateSyncResult, OrderedBlocksForObserver, PipelineFutures,
+        PipelineInputRx, PipelineInputTx, PipelinedBlock, PostCommitResult, PostLedgerUpdateResult,
+        PreCommitResult, PrepareResult, RandResult, TaskError, TaskFuture, TaskResult,
     },
     quorum_cert::QuorumCert,
     wrapped_ledger_info::WrappedLedgerInfo,
@@ -329,6 +329,7 @@ impl PipelineBuilder {
         let (order_vote_tx, order_vote_rx) = oneshot::channel();
         let (order_proof_tx, order_proof_fut) = oneshot::channel();
         let (commit_proof_tx, commit_proof_fut) = oneshot::channel();
+        let (ordered_blocks_for_observer_tx, ordered_blocks_for_observer_fut) = oneshot::channel();
         let order_proof_fut = spawn_shared_fut(
             async move {
                 order_proof_fut
@@ -345,13 +346,22 @@ impl PipelineBuilder {
             },
             Some(abort_handles),
         );
+        let ordered_blocks_for_observer_fut = spawn_shared_fut(
+            async move {
+                ordered_blocks_for_observer_fut.await.map_err(|_| {
+                    TaskError::from(anyhow!("ordered blocks for observer tx cancelled"))
+                })
+            },
+            Some(abort_handles),
+        );
         let (secret_shared_key_tx, secret_shared_key_rx) = oneshot::channel();
         (
             PipelineInputTx {
                 qc_tx: Some(qc_tx),
                 rand_tx: Some(rand_tx),
                 order_vote_tx: Some(order_vote_tx),
-                ordered_blocks_and_proof_fut: Some(order_proof_tx),
+                order_proof_tx: Some(order_proof_tx),
+                ordered_blocks_for_observer_tx: Some(ordered_blocks_for_observer_tx),
                 commit_proof_tx: Some(commit_proof_tx),
                 secret_shared_key_tx: Some(secret_shared_key_tx),
             },
@@ -359,7 +369,8 @@ impl PipelineBuilder {
                 qc_rx,
                 rand_rx,
                 order_vote_rx,
-                ordered_blocks_and_proof_fut: order_proof_fut,
+                order_proof_fut,
+                ordered_blocks_for_observer_fut,
                 commit_proof_fut,
                 secret_shared_key_rx,
             },
@@ -482,12 +493,14 @@ impl PipelineBuilder {
         pipelined_block: &PipelinedBlock,
     ) -> (PipelineFutures, PipelineInputTx, Vec<AbortHandle>) {
         let mut abort_handles = vec![];
+        let enable_observer_publish = self.consensus_publisher.is_some();
         let (tx, rx) = Self::channel(&mut abort_handles);
         let PipelineInputRx {
             qc_rx,
             rand_rx,
             order_vote_rx,
-            ordered_blocks_and_proof_fut: order_proof_fut,
+            order_proof_fut,
+            ordered_blocks_for_observer_fut,
             commit_proof_fut,
             secret_shared_key_rx,
         } = rx;
@@ -561,12 +574,13 @@ impl PipelineBuilder {
             ),
             None,
         );
-        let observer_publish_fut = if self.consensus_publisher.is_some() {
+        let observer_publish_fut = if enable_observer_publish {
             spawn_shared_fut(
                 Self::observer_publish(
                     parent.observer_publish_fut.clone(),
                     decryption_fut.clone(),
                     order_proof_fut.clone(),
+                    ordered_blocks_for_observer_fut,
                     rand_check_fut.clone(),
                     block.clone(),
                     observer_enabled,
@@ -980,7 +994,8 @@ impl PipelineBuilder {
     async fn observer_publish(
         parent_observer_publish_fut: TaskFuture<()>,
         decryption_fut: TaskFuture<DecryptionResult>,
-        order_proof_fut: TaskFuture<(Vec<Arc<PipelinedBlock>>, WrappedLedgerInfo)>,
+        order_proof_fut: TaskFuture<WrappedLedgerInfo>,
+        ordered_blocks_for_observer_fut: TaskFuture<OrderedBlocksForObserver>,
         rand_check: TaskFuture<RandResult>,
         block: Arc<Block>,
         observer_enabled: bool,
@@ -990,34 +1005,47 @@ impl PipelineBuilder {
         let mut tracker = Tracker::start_waiting("observer_publish", &block);
         parent_observer_publish_fut.await?;
         let DecryptionResult { decrypted_txns, .. } = decryption_fut.await?;
-        let (ordered_blocks, order_proof) = order_proof_fut.await?;
+        let order_proof = order_proof_fut.await?;
+        let ordered_blocks_for_observer = ordered_blocks_for_observer_fut.await?;
         rand_check.await?;
 
         tracker.start_working();
-
-        if ordered_blocks
-            .iter()
-            .find(|ordered_block| ordered_block.id() == block.id())
-            .map(|block| {
-                if !observer_enabled {
-                    block.set_decrypted_txns(decrypted_txns);
-                }
-            })
-            .is_none()
-        {
+        let ordered_block = ordered_blocks_for_observer
+            .pipelined_block(block.id())
+            .map_err(|missing_block_id| {
+                TaskError::InternalError(Arc::new(anyhow!(
+                    "Ordered block {} dropped before observer publishing block {}, ordered blocks: {:?}",
+                    missing_block_id,
+                    block.id(),
+                    ordered_blocks_for_observer.block_ids(),
+                )))
+            })?;
+        if let Some(ordered_block) = ordered_block {
+            // Consensus publishers cache decrypted txns for serialization; observers receive them already set.
+            if !observer_enabled {
+                ordered_block.set_decrypted_txns(decrypted_txns);
+            }
+        } else {
             return Err(TaskError::InternalError(Arc::new(anyhow!(
                 "Could not find the block {} in the ordered blocks, {:?}",
                 block.id(),
-                ordered_blocks
-                    .iter()
-                    .map(|block| block.id())
-                    .collect::<Vec<_>>()
+                ordered_blocks_for_observer.block_ids(),
             ))));
         }
         if let Some(publisher) = publisher
-            && let Some(last_block) = ordered_blocks.last()
-            && last_block.id() == block.id()
+            && ordered_blocks_for_observer.last_block_id() == Some(block.id())
         {
+            let ordered_blocks =
+                ordered_blocks_for_observer
+                    .pipelined_blocks()
+                    .map_err(|missing_block_id| {
+                        TaskError::InternalError(Arc::new(anyhow!(
+                            "Ordered block {} dropped before observer publishing block {}, ordered blocks: {:?}",
+                            missing_block_id,
+                            block.id(),
+                            ordered_blocks_for_observer.block_ids(),
+                        )))
+                    })?;
             // Only send if this block is the last block in the blocks
             let message = ConsensusObserverMessage::new_ordered_block_message(
                 ordered_blocks,
@@ -1139,7 +1167,7 @@ impl PipelineBuilder {
     async fn sign_and_broadcast_commit_vote(
         ledger_update_fut: TaskFuture<LedgerUpdateResult>,
         order_vote_rx: oneshot::Receiver<()>,
-        order_proof_fut: TaskFuture<(Vec<Arc<PipelinedBlock>>, WrappedLedgerInfo)>,
+        order_proof_fut: TaskFuture<WrappedLedgerInfo>,
         commit_proof_fut: TaskFuture<LedgerInfoWithSignatures>,
         signer: Arc<ValidatorSigner>,
         block: Arc<Block>,
@@ -1152,7 +1180,7 @@ impl PipelineBuilder {
             Ok(_) = order_vote_rx => {
                 HashValue::zero()
             }
-            Ok((_, li)) = order_proof_fut => {
+            Ok(li) = order_proof_fut => {
                 li.ledger_info().ledger_info().consensus_data_hash()
             }
             Ok(li) = commit_proof_fut => {
@@ -1196,7 +1224,7 @@ impl PipelineBuilder {
     async fn pre_commit(
         ledger_update_fut: TaskFuture<LedgerUpdateResult>,
         parent_block_pre_commit_fut: TaskFuture<PreCommitResult>,
-        order_proof_fut: TaskFuture<(Vec<Arc<PipelinedBlock>>, WrappedLedgerInfo)>,
+        order_proof_fut: TaskFuture<WrappedLedgerInfo>,
         commit_proof_fut: TaskFuture<LedgerInfoWithSignatures>,
         executor: Arc<dyn BlockExecutorTrait>,
         block: Arc<Block>,
@@ -1292,7 +1320,7 @@ impl PipelineBuilder {
     /// What it does: Update counters for the block, and notify block tree about the commit
     async fn post_commit_ledger(
         pre_commit_fut: TaskFuture<PreCommitResult>,
-        order_proof_fut: TaskFuture<(Vec<Arc<PipelinedBlock>>, WrappedLedgerInfo)>,
+        order_proof_fut: TaskFuture<WrappedLedgerInfo>,
         commit_ledger_fut: TaskFuture<CommitLedgerResult>,
         notify_state_sync_fut: TaskFuture<NotifyStateSyncResult>,
         parent_post_commit: TaskFuture<PostCommitResult>,
@@ -1318,7 +1346,7 @@ impl PipelineBuilder {
         payload_manager.notify_commit(timestamp, payload_vec);
 
         if let Some(ledger_info_with_sigs) = maybe_ledger_info_with_sigs {
-            let (_, order_proof) = order_proof_fut.await?;
+            let order_proof = order_proof_fut.await?;
             block_store_callback(order_proof, ledger_info_with_sigs);
         }
         Ok(())

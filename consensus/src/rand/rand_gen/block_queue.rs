@@ -250,7 +250,8 @@ mod tests {
                 qc_tx: None,
                 rand_tx: Some(rand_tx),
                 order_vote_tx: None,
-                ordered_blocks_and_proof_fut: None,
+                order_proof_tx: None,
+                ordered_blocks_for_observer_tx: None,
                 commit_proof_tx: None,
                 secret_shared_key_tx: None,
             });
