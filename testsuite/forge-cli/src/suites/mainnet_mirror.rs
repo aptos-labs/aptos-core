@@ -19,7 +19,10 @@ use aptos_forge::{
     success_criteria::{StateProgressThreshold, SuccessCriteria},
     EmitJobMode, EmitJobRequest, ForgeConfig, TransactionType,
 };
-use aptos_sdk::types::on_chain_config::{OnChainConsensusConfig, OnChainExecutionConfig};
+use aptos_sdk::types::on_chain_config::{
+    ConsensusAlgorithmConfig, LeaderReputationType, OnChainConsensusConfig, OnChainExecutionConfig,
+    ProposerElectionType,
+};
 use aptos_testcases::{
     mainnet_mirror::MainnetMirrorSnapshot,
     mainnet_mirror_failure_test::{MainnetMirrorFailureTest, MultiRegionChaosNoCleanup},
@@ -311,13 +314,49 @@ fn build_failures_test(
             // Long epoch — same as mainnet_mirror_max_load_test, keeps validator
             // set stable so we measure failure-pattern dynamics not reconfig.
             helm_values["chain"]["epoch_duration_secs"] = 7200.into();
+            // V2 leader-reputation tuning: wider window + tighter failure
+            // threshold catches chronic/flaky validators that default
+            // (10× multiplier, 10% threshold) misses.
             helm_values["chain"]["on_chain_consensus_config"] =
-                serde_yaml::to_value(OnChainConsensusConfig::default_for_genesis())
-                    .expect("must serialize");
+                serde_yaml::to_value(v2_tuned_consensus_config()).expect("must serialize");
             helm_values["chain"]["on_chain_execution_config"] =
                 serde_yaml::to_value(OnChainExecutionConfig::default_for_genesis())
                     .expect("must serialize");
             helm_values["genesis"]["validator"]["stake_amounts"] = stake_amounts_str.clone().into();
         }))
         .with_success_criteria(success_criteria)
+}
+
+/// Builds the genesis on-chain consensus config with V2 leader-reputation
+/// parameters tuned for the mainnet-mirror failures suite.
+///
+/// V2 tuning vs `default_for_genesis`:
+/// * `proposer_window_num_validators_multiplier`: 10 → **100**. With 107
+///   mainnet validators that gives a ~10,700-block window (~9 min wall
+///   clock at 20 blocks/sec) — enough samples to see sub-10% failure
+///   rates with tight σ (~2% on a 4% true rate).
+/// * `failure_threshold_percent`: 10 → **5**. Catches mainnet
+///   OnlineButFlaky validators (real rates 0.5-3%) that default 10%
+///   threshold misses, while leaving chronics (capped at 10% by the
+///   failure-injection code) at the boundary so they still rotate.
+fn v2_tuned_consensus_config() -> OnChainConsensusConfig {
+    let mut cfg = OnChainConsensusConfig::default_for_genesis();
+    let alg = match &mut cfg {
+        OnChainConsensusConfig::V5 { alg, .. } => alg,
+        other => panic!(
+            "default consensus config is expected to be V5, got {:?}",
+            other
+        ),
+    };
+    let main = match alg {
+        ConsensusAlgorithmConfig::JolteonV2 { main, .. } => main,
+        _ => panic!("default consensus algorithm is expected to be JolteonV2"),
+    };
+    let v2_base = match &mut main.proposer_election_type {
+        ProposerElectionType::LeaderReputation(LeaderReputationType::ProposerAndVoterV2(c)) => c,
+        other => panic!("expected ProposerAndVoterV2 default, got {:?}", other),
+    };
+    v2_base.proposer_window_num_validators_multiplier = 100;
+    v2_base.failure_threshold_percent = 5;
+    cfg
 }
