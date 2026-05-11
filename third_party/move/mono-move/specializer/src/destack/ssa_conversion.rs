@@ -9,7 +9,7 @@
 
 use super::ssa_function::SSAFunction;
 use crate::stackless_exec_ir::{BasicBlock, BinaryOp, CmpOp, Instr, Label, Slot, UnaryOp};
-use anyhow::{bail, ensure, Context, Result};
+use anyhow::{anyhow, bail, ensure, Context, Result};
 use mono_move_core::{
     convert_mut_to_immut_ref, strip_ref,
     types::{self as ty, view_type, view_type_list, InternedType, InternedTypeList, Type},
@@ -176,36 +176,17 @@ impl<'a, I: Interner> SsaConverter<'a, I> {
     // Type helpers
     // --------------------------------------------------------------------------------------------
 
-    fn struct_inst_type(
+    fn struct_inst_ty(
         &self,
         module: &PreparedModule,
         idx: StructDefInstantiationIndex,
-    ) -> InternedType {
-        // TODO: when generic-instantiation interning lands, return a
-        // distinct type for the instantiation. For now, the base struct
-        // type is what the rest of the pipeline uses.
+    ) -> Result<InternedType> {
         let inst = &module.struct_def_instantiations[idx.0 as usize];
-        module.interned_nominal_def_type_at(inst.def)
-    }
-
-    /// Returns `(base_struct_ty, ty_args_list)` for a generic struct
-    /// instantiation. `base_struct_ty` is the (uninstantiated) struct type;
-    /// `ty_args_list` is the interned list of type arguments.
-    ///
-    /// Because proper generic-instantiation interning is not yet implemented,
-    /// this pair preserves the information needed for later monomorphization
-    /// without producing a distinct instantiated struct type.
-    fn struct_inst_parts(
-        &self,
-        module: &PreparedModule,
-        idx: StructDefInstantiationIndex,
-    ) -> (InternedType, InternedTypeList) {
-        let inst = &module.struct_def_instantiations[idx.0 as usize];
-        let base_ty = module.interned_nominal_def_type_at(inst.def);
-        let ty_args_ptr = self
+        let generic_ty = module.interned_nominal_def_type_at(inst.def);
+        let ty_args = self
             .interner
             .type_list_of(module.interned_types_at(inst.type_parameters));
-        (base_ty, ty_args_ptr)
+        self.interner.subst_type(generic_ty, ty_args)
     }
 
     /// Returns `(enum_ty, variant_ordinal, ty_args_list)` for a generic
@@ -214,33 +195,41 @@ impl<'a, I: Interner> SsaConverter<'a, I> {
         &self,
         module: &PreparedModule,
         idx: StructVariantInstantiationIndex,
-    ) -> (InternedType, u16, InternedTypeList) {
+    ) -> Result<(InternedType, u16, InternedTypeList)> {
         let inst = &module.struct_variant_instantiations[idx.0 as usize];
         let handle = &module.struct_variant_handles[inst.handle.0 as usize];
-        let enum_ty = module.interned_nominal_def_type_at(handle.struct_index);
-        let ty_args_ptr = self
+        let generic_ty = module.interned_nominal_def_type_at(handle.struct_index);
+        let ty_args = self
             .interner
             .type_list_of(module.interned_types_at(inst.type_parameters));
-        (enum_ty, handle.variant, ty_args_ptr)
+        let ty = self.interner.subst_type(generic_ty, ty_args)?;
+        Ok((ty, handle.variant, ty_args))
     }
 
-    fn field_inst_type(&self, _idx: FieldInstantiationIndex) -> Result<InternedType> {
-        // TODO: requires substituting `TypeParam` placeholders inside the
-        // base field type with the instantiation's type args at the
-        // `InternedType` level. The instantiation's type args are already
-        // in the pool (`pool.signature(inst.type_parameters)`); the base
-        // field type is `pool.field_handle(handle)`. Substitution at the
-        // `InternedType` level is a follow-up.
-        bail!("generic field instantiation not yet supported");
+    fn field_inst_type(
+        &self,
+        module: &PreparedModule,
+        idx: FieldInstantiationIndex,
+    ) -> Result<InternedType> {
+        let inst = &module.field_instantiations[idx.0 as usize];
+        let base = module.interned_field_type_at(inst.handle);
+        let ty_args = self
+            .interner
+            .type_list_of(module.interned_types_at(inst.type_parameters));
+        self.interner.subst_type(base, ty_args)
     }
 
     fn variant_field_inst_type(
         &self,
-        _idx: VariantFieldInstantiationIndex,
+        module: &PreparedModule,
+        idx: VariantFieldInstantiationIndex,
     ) -> Result<InternedType> {
-        // TODO: same as `field_inst_type` — needs InternedType-level
-        // substitution.
-        bail!("generic variant field instantiation not yet supported");
+        let inst = &module.variant_field_instantiations[idx.0 as usize];
+        let base = module.interned_variant_field_type_at(inst.handle);
+        let ty_args = self
+            .interner
+            .type_list_of(module.interned_types_at(inst.type_parameters));
+        self.interner.subst_type(base, ty_args)
     }
 
     // --------------------------------------------------------------------------------------------
@@ -470,18 +459,17 @@ impl<'a, I: Interner> SsaConverter<'a, I> {
                 let inst = &module.struct_def_instantiations[idx.0 as usize];
                 let n = struct_field_count(module, inst.def);
                 let fields = self.pop_n_reverse(n)?;
-                let result_ty = self.struct_inst_type(module, *idx);
-                let (base_ty, ty_args) = self.struct_inst_parts(module, *idx);
+                let result_ty = self.struct_inst_ty(module, *idx)?;
                 let dst = self.alloc_vid(result_ty)?;
                 self.current_block_instrs
-                    .push(Instr::PackGeneric(dst, base_ty, ty_args, fields));
+                    .push(Instr::PackGeneric(dst, result_ty, fields));
                 self.push_slot(dst);
             },
             B::Unpack(idx) => {
                 let src = self.pop_slot()?;
                 let ftypes = module
                     .interned_struct_field_types_at(*idx)
-                    .expect("Must be a struct");
+                    .ok_or_else(|| anyhow!("Must be a struct"))?;
                 let mut dsts = Vec::with_capacity(ftypes.len());
                 for &fty in ftypes {
                     dsts.push(self.alloc_vid(fty)?);
@@ -493,10 +481,26 @@ impl<'a, I: Interner> SsaConverter<'a, I> {
                     self.push_slot(dst);
                 }
             },
-            B::UnpackGeneric(_idx) => {
-                // We need to pop slot values, compute field
-                // types and allocate a new Vid for each field.
-                bail!("generic struct unpack not yet supported");
+            B::UnpackGeneric(idx) => {
+                let src = self.pop_slot()?;
+                let inst = &module.struct_def_instantiations[idx.0 as usize];
+                let fields = module
+                    .interned_struct_field_types_at(inst.def)
+                    .ok_or_else(|| anyhow!("Must be a struct"))?;
+                let inst_ty = self.struct_inst_ty(module, *idx)?;
+                let ty_args = self
+                    .interner
+                    .type_list_of(module.interned_types_at(inst.type_parameters));
+                let mut dsts = Vec::with_capacity(fields.len());
+                for &fty in fields {
+                    let fty = self.interner.subst_type(fty, ty_args)?;
+                    dsts.push(self.alloc_vid(fty)?);
+                }
+                self.current_block_instrs
+                    .push(Instr::UnpackGeneric(dsts.clone(), inst_ty, src));
+                for dst in dsts {
+                    self.push_slot(dst);
+                }
             },
 
             // --- Variant ops ---
@@ -511,10 +515,21 @@ impl<'a, I: Interner> SsaConverter<'a, I> {
                     .push(Instr::PackVariant(dst, result_ty, variant, fields));
                 self.push_slot(dst);
             },
-            B::PackVariantGeneric(_idx) => {
-                // We need to pop N (number of fields)  values, compute resulting
-                // types and allocate a new Vid.
-                bail!("generic variant pack not yet supported");
+            B::PackVariantGeneric(idx) => {
+                let inst = &module.struct_variant_instantiations[idx.0 as usize];
+                let handle = &module.struct_variant_handles[inst.handle.0 as usize];
+                let variant = handle.variant;
+                let n = variant_field_count(module, handle.struct_index, variant);
+                let fields = self.pop_n_reverse(n)?;
+                let (inst_ty, variant_ord, _) = self.variant_inst_parts(module, *idx)?;
+                let dst = self.alloc_vid(inst_ty)?;
+                self.current_block_instrs.push(Instr::PackVariantGeneric(
+                    dst,
+                    inst_ty,
+                    variant_ord,
+                    fields,
+                ));
+                self.push_slot(dst);
             },
             B::UnpackVariant(idx) => {
                 let src = self.pop_slot()?;
@@ -522,7 +537,7 @@ impl<'a, I: Interner> SsaConverter<'a, I> {
                 let variant = handle.variant;
                 let ftypes = module
                     .interned_variant_field_types_at(handle.struct_index, variant)
-                    .expect("Must be an enum");
+                    .ok_or_else(|| anyhow!("Must be an enum"))?;
                 let mut dsts = Vec::with_capacity(ftypes.len());
                 for &fty in ftypes {
                     dsts.push(self.alloc_vid(fty)?);
@@ -538,10 +553,29 @@ impl<'a, I: Interner> SsaConverter<'a, I> {
                     self.push_slot(dst);
                 }
             },
-            B::UnpackVariantGeneric(_idx) => {
-                // We need to pop slot values, compute field
-                // types and allocate a new Vid for each field.
-                bail!("generic variant unpack not yet supported");
+            B::UnpackVariantGeneric(idx) => {
+                let src = self.pop_slot()?;
+                let inst = &module.struct_variant_instantiations[idx.0 as usize];
+                let handle = &module.struct_variant_handles[inst.handle.0 as usize];
+                let variant = handle.variant;
+                let fields = module
+                    .interned_variant_field_types_at(handle.struct_index, variant)
+                    .ok_or_else(|| anyhow!("Must be an enum"))?;
+                let (inst_ty, variant_ord, ty_args) = self.variant_inst_parts(module, *idx)?;
+                let mut dsts = Vec::with_capacity(fields.len());
+                for &fty in fields {
+                    let fty = self.interner.subst_type(fty, ty_args)?;
+                    dsts.push(self.alloc_vid(fty)?);
+                }
+                self.current_block_instrs.push(Instr::UnpackVariantGeneric(
+                    dsts.clone(),
+                    inst_ty,
+                    variant_ord,
+                    src,
+                ));
+                for dst in dsts {
+                    self.push_slot(dst);
+                }
             },
             B::TestVariant(idx) => {
                 let src = self.pop_slot()?;
@@ -555,11 +589,10 @@ impl<'a, I: Interner> SsaConverter<'a, I> {
             },
             B::TestVariantGeneric(idx) => {
                 let src = self.pop_slot()?;
-                let (enum_ty, variant, ty_args) = self.variant_inst_parts(module, *idx);
+                let (inst_ty, variant, _) = self.variant_inst_parts(module, *idx)?;
                 let dst = self.alloc_vid(ty::BOOL_TY)?;
-                self.current_block_instrs.push(Instr::TestVariantGeneric(
-                    dst, enum_ty, variant, ty_args, src,
-                ));
+                self.current_block_instrs
+                    .push(Instr::TestVariantGeneric(dst, inst_ty, variant, src));
                 self.push_slot(dst);
             },
 
@@ -602,7 +635,7 @@ impl<'a, I: Interner> SsaConverter<'a, I> {
             },
             B::ImmBorrowFieldGeneric(idx) => {
                 let src = self.pop_slot()?;
-                let fty = self.field_inst_type(*idx)?;
+                let fty = self.field_inst_type(module, *idx)?;
                 let ty = self.interner.immut_ref_of(fty);
                 let dst = self.alloc_vid(ty)?;
                 self.current_block_instrs
@@ -611,7 +644,7 @@ impl<'a, I: Interner> SsaConverter<'a, I> {
             },
             B::MutBorrowFieldGeneric(idx) => {
                 let src = self.pop_slot()?;
-                let fty = self.field_inst_type(*idx)?;
+                let fty = self.field_inst_type(module, *idx)?;
                 let ty = self.interner.mut_ref_of(fty);
                 let dst = self.alloc_vid(ty)?;
                 self.current_block_instrs
@@ -638,7 +671,7 @@ impl<'a, I: Interner> SsaConverter<'a, I> {
             },
             B::ImmBorrowVariantFieldGeneric(idx) => {
                 let src = self.pop_slot()?;
-                let fty = self.variant_field_inst_type(*idx)?;
+                let fty = self.variant_field_inst_type(module, *idx)?;
                 let ty = self.interner.immut_ref_of(fty);
                 let dst = self.alloc_vid(ty)?;
                 self.current_block_instrs
@@ -647,7 +680,7 @@ impl<'a, I: Interner> SsaConverter<'a, I> {
             },
             B::MutBorrowVariantFieldGeneric(idx) => {
                 let src = self.pop_slot()?;
-                let fty = self.variant_field_inst_type(*idx)?;
+                let fty = self.variant_field_inst_type(module, *idx)?;
                 let ty = self.interner.mut_ref_of(fty);
                 let dst = self.alloc_vid(ty)?;
                 self.current_block_instrs
@@ -680,10 +713,10 @@ impl<'a, I: Interner> SsaConverter<'a, I> {
             },
             B::ExistsGeneric(idx) => {
                 let addr = self.pop_slot()?;
-                let (base_ty, ty_args) = self.struct_inst_parts(module, *idx);
+                let inst_ty = self.struct_inst_ty(module, *idx)?;
                 let dst = self.alloc_vid(ty::BOOL_TY)?;
                 self.current_block_instrs
-                    .push(Instr::ExistsGeneric(dst, base_ty, ty_args, addr));
+                    .push(Instr::ExistsGeneric(dst, inst_ty, addr));
                 self.push_slot(dst);
             },
             B::MoveFrom(idx) => {
@@ -696,11 +729,10 @@ impl<'a, I: Interner> SsaConverter<'a, I> {
             },
             B::MoveFromGeneric(idx) => {
                 let addr = self.pop_slot()?;
-                let ty = self.struct_inst_type(module, *idx);
-                let (base_ty, ty_args) = self.struct_inst_parts(module, *idx);
+                let ty = self.struct_inst_ty(module, *idx)?;
                 let dst = self.alloc_vid(ty)?;
                 self.current_block_instrs
-                    .push(Instr::MoveFromGeneric(dst, base_ty, ty_args, addr));
+                    .push(Instr::MoveFromGeneric(dst, ty, addr));
                 self.push_slot(dst);
             },
             B::MoveTo(idx) => {
@@ -713,9 +745,9 @@ impl<'a, I: Interner> SsaConverter<'a, I> {
             B::MoveToGeneric(idx) => {
                 let val = self.pop_slot()?;
                 let signer = self.pop_slot()?;
-                let (base_ty, ty_args) = self.struct_inst_parts(module, *idx);
+                let inst_ty = self.struct_inst_ty(module, *idx)?;
                 self.current_block_instrs
-                    .push(Instr::MoveToGeneric(base_ty, ty_args, signer, val));
+                    .push(Instr::MoveToGeneric(inst_ty, signer, val));
             },
             B::ImmBorrowGlobal(idx) => {
                 let addr = self.pop_slot()?;
@@ -728,12 +760,11 @@ impl<'a, I: Interner> SsaConverter<'a, I> {
             },
             B::ImmBorrowGlobalGeneric(idx) => {
                 let addr = self.pop_slot()?;
-                let inner = self.struct_inst_type(module, *idx);
+                let inner = self.struct_inst_ty(module, *idx)?;
                 let ty = self.interner.immut_ref_of(inner);
-                let (base_ty, ty_args) = self.struct_inst_parts(module, *idx);
                 let dst = self.alloc_vid(ty)?;
                 self.current_block_instrs
-                    .push(Instr::ImmBorrowGlobalGeneric(dst, base_ty, ty_args, addr));
+                    .push(Instr::ImmBorrowGlobalGeneric(dst, inner, addr));
                 self.push_slot(dst);
             },
             B::MutBorrowGlobal(idx) => {
@@ -747,12 +778,11 @@ impl<'a, I: Interner> SsaConverter<'a, I> {
             },
             B::MutBorrowGlobalGeneric(idx) => {
                 let addr = self.pop_slot()?;
-                let inner = self.struct_inst_type(module, *idx);
+                let inner = self.struct_inst_ty(module, *idx)?;
                 let ty = self.interner.mut_ref_of(inner);
-                let (base_ty, ty_args) = self.struct_inst_parts(module, *idx);
                 let dst = self.alloc_vid(ty)?;
                 self.current_block_instrs
-                    .push(Instr::MutBorrowGlobalGeneric(dst, base_ty, ty_args, addr));
+                    .push(Instr::MutBorrowGlobalGeneric(dst, inner, addr));
                 self.push_slot(dst);
             },
 
@@ -773,10 +803,26 @@ impl<'a, I: Interner> SsaConverter<'a, I> {
                     self.push_slot(r);
                 }
             },
-            B::CallGeneric(_idx) => {
-                // TODO: needs InternedType-level substitution of return
-                // types against `pool.signature(inst.type_parameters)`.
-                bail!("generic call not yet supported");
+            B::CallGeneric(idx) => {
+                let inst = module.function_instantiation_at(*idx);
+                let handle = module.function_handle_at(inst.handle);
+                let ty_args = self
+                    .interner
+                    .type_list_of(module.interned_types_at(inst.type_parameters));
+                let params = module.interned_types_at(handle.parameters);
+                let ret_types = module.interned_types_at(handle.return_);
+                let num_args = params.len();
+                let args = self.pop_n_reverse(num_args)?;
+                let mut rets = Vec::with_capacity(ret_types.len());
+                for &rty in ret_types {
+                    let rty = self.interner.subst_type(rty, ty_args)?;
+                    rets.push(self.alloc_vid(rty)?);
+                }
+                self.current_block_instrs
+                    .push(Instr::CallGeneric(rets.clone(), *idx, args));
+                for r in rets {
+                    self.push_slot(r);
+                }
             },
 
             // --- Closures ---
@@ -805,16 +851,18 @@ impl<'a, I: Interner> SsaConverter<'a, I> {
                 let captured = self.pop_n_reverse(captured_count)?;
                 let inst = &module.function_instantiations[fii.0 as usize];
                 let handle = module.function_handle_at(inst.handle);
-                // TODO: substitute type params into params/returns at the
-                // InternedType level. Today we use the bare-handle
-                // signatures; the existing test suite does not exercise
-                // generic closures.
+                let ty_args = self
+                    .interner
+                    .type_list_of(module.interned_types_at(inst.type_parameters));
                 let params = self
                     .interner
                     .type_list_of(module.interned_types_at(handle.parameters));
                 let returns = self
                     .interner
                     .type_list_of(module.interned_types_at(handle.return_));
+
+                let params = self.interner.subst_type_list(params, ty_args)?;
+                let returns = self.interner.subst_type_list(returns, ty_args)?;
                 let ty = self.interner.function_of(
                     params,
                     returns,

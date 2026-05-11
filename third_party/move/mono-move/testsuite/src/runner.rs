@@ -12,7 +12,7 @@ use crate::{
     print_sections,
 };
 use anyhow::{anyhow, bail};
-use mono_move_core::ExecutionContext;
+use mono_move_core::{types::EMPTY_TYPE_LIST, ExecutionContext};
 use mono_move_gas::SimpleGasMeter;
 use mono_move_global_context::{ExecutionGuard, GlobalContext};
 use mono_move_loader::{Loader, LoadingPolicy, LoweringPolicy, TransactionContext};
@@ -223,7 +223,7 @@ fn execute_function_v2(
     // SAFETY: the pointer lives in a `LoadedModule`'s arena. While `guard`
     // is held, the global executable cache cannot enter the maintenance
     // phase, so no arena reset can happen for the duration of this step.
-    let function = match txn_ctx.load_function(id, function_name) {
+    let function = match txn_ctx.load_function(id, function_name, EMPTY_TYPE_LIST) {
         Ok(p) => unsafe { p.as_ref_unchecked() },
         Err(err) => {
             return Output {

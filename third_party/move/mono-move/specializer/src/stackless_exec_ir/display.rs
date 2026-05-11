@@ -5,9 +5,7 @@
 //! entity handles (functions, fields, variants) resolve via `CompiledModule`.
 
 use super::{BinaryOp, CmpOp, FunctionIR, ImmValue, Instr, ModuleIR, Slot, UnaryOp};
-use mono_move_core::types::{
-    view_name, view_type, view_type_list, InternedType, InternedTypeList, Type,
-};
+use mono_move_core::types::{display_type, display_type_list};
 use move_binary_format::{
     access::ModuleAccess,
     file_format::{
@@ -296,11 +294,10 @@ fn display_instr(
             display_type(f, *ty)?;
             write!(f, ", {}", slot_names(fields))
         },
-        Instr::PackGeneric(d, base_ty, ty_args, fields) => {
+        Instr::PackGeneric(d, ty, fields) => {
             write_dst(f, *d)?;
             write!(f, "pack ")?;
-            display_type(f, *base_ty)?;
-            display_type_list(f, *ty_args)?;
+            display_type(f, *ty)?;
             write!(f, ", {}", slot_names(fields))
         },
         Instr::Unpack(ds, ty, s) => {
@@ -309,11 +306,10 @@ fn display_instr(
             display_type(f, *ty)?;
             write!(f, ", {}", slot_name(*s))
         },
-        Instr::UnpackGeneric(ds, base_ty, ty_args, s) => {
+        Instr::UnpackGeneric(ds, ty, s) => {
             write_dsts(f, ds)?;
             write!(f, "unpack ")?;
-            display_type(f, *base_ty)?;
-            display_type_list(f, *ty_args)?;
+            display_type(f, *ty)?;
             write!(f, ", {}", slot_name(*s))
         },
 
@@ -324,11 +320,10 @@ fn display_instr(
             display_type(f, *ty)?;
             write!(f, "@{}, {}", variant, slot_names(fields))
         },
-        Instr::PackVariantGeneric(d, enum_ty, variant, ty_args, fields) => {
+        Instr::PackVariantGeneric(d, ty, variant, fields) => {
             write_dst(f, *d)?;
             write!(f, "pack_variant ")?;
-            display_type(f, *enum_ty)?;
-            display_type_list(f, *ty_args)?;
+            display_type(f, *ty)?;
             write!(f, "@{}, {}", variant, slot_names(fields))
         },
         Instr::UnpackVariant(ds, ty, variant, s) => {
@@ -337,11 +332,10 @@ fn display_instr(
             display_type(f, *ty)?;
             write!(f, "@{}, {}", variant, slot_name(*s))
         },
-        Instr::UnpackVariantGeneric(ds, enum_ty, variant, ty_args, s) => {
+        Instr::UnpackVariantGeneric(ds, ty, variant, s) => {
             write_dsts(f, ds)?;
             write!(f, "unpack_variant ")?;
-            display_type(f, *enum_ty)?;
-            display_type_list(f, *ty_args)?;
+            display_type(f, *ty)?;
             write!(f, "@{}, {}", variant, slot_name(*s))
         },
         Instr::TestVariant(d, ty, variant, s) => {
@@ -350,11 +344,10 @@ fn display_instr(
             display_type(f, *ty)?;
             write!(f, "@{}, {}", variant, slot_name(*s))
         },
-        Instr::TestVariantGeneric(d, enum_ty, variant, ty_args, s) => {
+        Instr::TestVariantGeneric(d, ty, variant, s) => {
             write_dst(f, *d)?;
             write!(f, "test_variant ")?;
-            display_type(f, *enum_ty)?;
-            display_type_list(f, *ty_args)?;
+            display_type(f, *ty)?;
             write!(f, "@{}, {}", variant, slot_name(*s))
         },
 
@@ -527,11 +520,10 @@ fn display_instr(
             display_type(f, *ty)?;
             write!(f, ", {}", slot_name(*a))
         },
-        Instr::ExistsGeneric(d, base_ty, ty_args, a) => {
+        Instr::ExistsGeneric(d, ty, a) => {
             write_dst(f, *d)?;
             write!(f, "exists ")?;
-            display_type(f, *base_ty)?;
-            display_type_list(f, *ty_args)?;
+            display_type(f, *ty)?;
             write!(f, ", {}", slot_name(*a))
         },
         Instr::MoveFrom(d, ty, a) => {
@@ -540,11 +532,10 @@ fn display_instr(
             display_type(f, *ty)?;
             write!(f, ", {}", slot_name(*a))
         },
-        Instr::MoveFromGeneric(d, base_ty, ty_args, a) => {
+        Instr::MoveFromGeneric(d, ty, a) => {
             write_dst(f, *d)?;
             write!(f, "move_from ")?;
-            display_type(f, *base_ty)?;
-            display_type_list(f, *ty_args)?;
+            display_type(f, *ty)?;
             write!(f, ", {}", slot_name(*a))
         },
         // MoveTo has no destination (side-effect)
@@ -553,10 +544,9 @@ fn display_instr(
             display_type(f, *ty)?;
             write!(f, ", {}, {}", slot_name(*s), slot_name(*v))
         },
-        Instr::MoveToGeneric(base_ty, ty_args, s, v) => {
+        Instr::MoveToGeneric(ty, s, v) => {
             write!(f, "move_to ")?;
-            display_type(f, *base_ty)?;
-            display_type_list(f, *ty_args)?;
+            display_type(f, *ty)?;
             write!(f, ", {}, {}", slot_name(*s), slot_name(*v))
         },
         Instr::ImmBorrowGlobal(d, ty, a) => {
@@ -565,11 +555,10 @@ fn display_instr(
             display_type(f, *ty)?;
             write!(f, ", {}", slot_name(*a))
         },
-        Instr::ImmBorrowGlobalGeneric(d, base_ty, ty_args, a) => {
+        Instr::ImmBorrowGlobalGeneric(d, ty, a) => {
             write_dst(f, *d)?;
             write!(f, "imm_borrow_global ")?;
-            display_type(f, *base_ty)?;
-            display_type_list(f, *ty_args)?;
+            display_type(f, *ty)?;
             write!(f, ", {}", slot_name(*a))
         },
         Instr::MutBorrowGlobal(d, ty, a) => {
@@ -578,11 +567,10 @@ fn display_instr(
             display_type(f, *ty)?;
             write!(f, ", {}", slot_name(*a))
         },
-        Instr::MutBorrowGlobalGeneric(d, base_ty, ty_args, a) => {
+        Instr::MutBorrowGlobalGeneric(d, ty, a) => {
             write_dst(f, *d)?;
             write!(f, "mut_borrow_global ")?;
-            display_type(f, *base_ty)?;
-            display_type_list(f, *ty_args)?;
+            display_type(f, *ty)?;
             write!(f, ", {}", slot_name(*a))
         },
 
@@ -625,7 +613,9 @@ fn display_instr(
         Instr::CallClosure(rets, sig_types, args) => {
             write_dsts(f, rets)?;
             write!(f, "call_closure ")?;
+            write!(f, "[")?;
             display_type_list(f, *sig_types)?;
+            write!(f, "]")?;
             write!(f, ", {}", slot_names(args))
         },
 
@@ -772,76 +762,6 @@ fn imm_value(imm: &ImmValue) -> String {
         ImmValue::I16(v) => format!("#{}i16", v),
         ImmValue::I32(v) => format!("#{}i32", v),
         ImmValue::I64(v) => format!("#{}i64", v),
-    }
-}
-
-/// Display an interned type list as `[T0, T1, ...]`.
-fn display_type_list(f: &mut fmt::Formatter<'_>, types: InternedTypeList) -> fmt::Result {
-    write!(f, "[")?;
-    for (i, ty) in view_type_list(types).iter().enumerate() {
-        if i > 0 {
-            write!(f, ", ")?;
-        }
-        display_type(f, *ty)?;
-    }
-    write!(f, "]")
-}
-
-/// Display an interned `Type`. Names are carried on the interned type itself,
-/// so no module lookup is needed.
-fn display_type(f: &mut fmt::Formatter<'_>, ty: InternedType) -> fmt::Result {
-    match view_type(ty) {
-        Type::Bool => write!(f, "bool"),
-        Type::U8 => write!(f, "u8"),
-        Type::U16 => write!(f, "u16"),
-        Type::U32 => write!(f, "u32"),
-        Type::U64 => write!(f, "u64"),
-        Type::U128 => write!(f, "u128"),
-        Type::U256 => write!(f, "u256"),
-        Type::I8 => write!(f, "i8"),
-        Type::I16 => write!(f, "i16"),
-        Type::I32 => write!(f, "i32"),
-        Type::I64 => write!(f, "i64"),
-        Type::I128 => write!(f, "i128"),
-        Type::I256 => write!(f, "i256"),
-        Type::Address => write!(f, "address"),
-        Type::Signer => write!(f, "signer"),
-        Type::TypeParam { idx } => write!(f, "_{}", idx),
-        Type::Vector { elem } => {
-            write!(f, "vector<")?;
-            display_type(f, *elem)?;
-            write!(f, ">")
-        },
-        Type::ImmutRef { inner } => {
-            write!(f, "&")?;
-            display_type(f, *inner)
-        },
-        Type::MutRef { inner } => {
-            write!(f, "&mut ")?;
-            display_type(f, *inner)
-        },
-        Type::Nominal { name, .. } => {
-            write!(f, "{}", view_name(*name))
-        },
-        Type::Function { args, results, .. } => {
-            let args = view_type_list(*args);
-            let results = view_type_list(*results);
-            write!(f, "|")?;
-            for (i, arg) in args.iter().enumerate() {
-                if i > 0 {
-                    write!(f, ", ")?;
-                }
-                display_type(f, *arg)?;
-            }
-            write!(f, "|")?;
-            for (i, r) in results.iter().enumerate() {
-                if i > 0 {
-                    write!(f, ", ")?;
-                }
-                display_type(f, *r)?;
-            }
-            Ok(())
-        },
     }
 }
 

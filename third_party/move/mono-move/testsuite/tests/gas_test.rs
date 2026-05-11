@@ -3,7 +3,7 @@
 
 //! Integration tests for gas metering through the full pipeline.
 
-use mono_move_core::{ExecutionContext, LocalExecutionContext};
+use mono_move_core::{types::EMPTY_TYPE_LIST, ExecutionContext, LocalExecutionContext};
 use mono_move_gas::SimpleGasMeter;
 use mono_move_global_context::GlobalContext;
 use mono_move_loader::{Loader, LoadingPolicy, LoweringPolicy, ModuleReadSet, TransactionContext};
@@ -43,6 +43,7 @@ module 0x1::test {
             &mut load_gas,
             id.into_global_arena_ptr(),
             fib_name,
+            EMPTY_TYPE_LIST,
         )
         .expect("load should succeed");
 
@@ -84,7 +85,7 @@ fn test_out_of_gas_during_load() {
         .intern_identifier(ident_str!("f"))
         .into_global_arena_ptr();
 
-    let Err(err) = txn_ctx.load_function(id, f_name) else {
+    let Err(err) = txn_ctx.load_function(id, f_name, EMPTY_TYPE_LIST) else {
         panic!("loading failed");
     };
     assert!(

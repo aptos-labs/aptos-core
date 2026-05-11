@@ -57,7 +57,7 @@ pub fn type_size_and_align(ty: InternedType) -> Option<(Size, Alignment)> {
 }
 
 /// Byte-level location of a typed value in the current function's frame.
-#[derive(Clone, Copy, Debug)]
+#[derive(Clone, Copy)]
 pub struct SlotInfo {
     pub offset: FrameOffset,
     /// Width of the type currently bound to this slot.
@@ -66,7 +66,7 @@ pub struct SlotInfo {
 }
 
 /// A frame slot paired with the type of its value.
-#[derive(Clone, Copy, Debug)]
+#[derive(Clone, Copy)]
 pub struct TypedSlot {
     pub slot: SlotInfo,
     pub ty: InternedType,
@@ -502,7 +502,7 @@ fn walk_and_size(
             // size - just continue.
         },
         Type::Nominal {
-            executable_id,
+            module_id: executable_id,
             name,
             ..
         } => {

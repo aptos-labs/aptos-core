@@ -24,7 +24,7 @@ use crate::{
 use anyhow::{anyhow, bail};
 use mono_move_core::{
     interner::{InternedIdentifier, InternedModuleId},
-    types::InternedType,
+    types::{InternedType, InternedTypeList},
     ExecutableId, FieldTypes, FunctionPtr,
 };
 use mono_move_gas::GasMeter;
@@ -142,6 +142,10 @@ impl<'guard, 'ctx> Loader<'guard, 'ctx> {
         gas_meter: &mut impl GasMeter,
         module_id: InternedModuleId,
         func_name: InternedIdentifier,
+        // TODO: connect with monomorphization:
+        //   1. Build monomoprhic IR -> lower, or
+        //   2. Lower under type args context.
+        _ty_args: InternedTypeList,
     ) -> anyhow::Result<FunctionPtr> {
         let id = self.guard.arena_ref_for_module_id(module_id);
 

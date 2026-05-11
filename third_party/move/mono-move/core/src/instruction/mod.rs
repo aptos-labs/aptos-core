@@ -113,8 +113,12 @@
 //!   `elem_ptr_offsets` lists byte offsets *within each element* that hold
 //!   heap pointers.
 
-use crate::{align::MAX_ALIGN, ExecutableId, FunctionPtr};
-use mono_move_alloc::GlobalArenaPtr;
+use crate::{
+    align::MAX_ALIGN,
+    interner::{InternedIdentifier, InternedModuleId},
+    types::{display_type_list, InternedTypeList},
+    FunctionPtr,
+};
 use std::fmt;
 
 // Submodules for instruction.
@@ -454,8 +458,9 @@ pub enum MicroOp {
     /// `current_fp + param_and_local_sizes_sum` and sets `fp` to
     /// `current_fp + param_and_local_sizes_sum + FRAME_METADATA_SIZE`.
     CallIndirect {
-        executable_id: GlobalArenaPtr<ExecutableId>,
-        func_name: GlobalArenaPtr<str>,
+        module_id: InternedModuleId,
+        func_name: InternedIdentifier,
+        ty_args: InternedTypeList,
     },
 
     /// Call a function via direct pointer. Same calling convention as
@@ -862,17 +867,24 @@ impl fmt::Display for MicroOp {
                 write!(f, "ShrU64Imm [{}] <- [{}] >> #{}", dst.0, src.0, imm)
             },
             MicroOp::CallIndirect {
-                executable_id,
+                module_id,
                 func_name,
+                ty_args,
             } => {
                 // SAFETY: Micro-ops are currently displayed only during execution
                 // when the guard is held.
                 // TODO: Have a safe display impl that takes guard.
-                let executable_id = unsafe { executable_id.as_ref_unchecked() };
-                let addr = executable_id.address().short_str_lossless();
-                let module_name = unsafe { executable_id.name().as_ref_unchecked() };
+                let module_id = unsafe { module_id.as_ref_unchecked() };
+                let addr = module_id.address().short_str_lossless();
+                let module_name = unsafe { module_id.name().as_ref_unchecked() };
                 let func_name = unsafe { func_name.as_ref_unchecked() };
-                write!(f, "CallIndirect 0x{}::{}::{}", addr, module_name, func_name)
+                write!(f, "CallIndirect 0x{}::{}::{}", addr, module_name, func_name)?;
+                if !ty_args.is_empty() {
+                    write!(f, "<")?;
+                    display_type_list(f, *ty_args)?;
+                    write!(f, ">")?;
+                }
+                Ok(())
             },
             MicroOp::CallDirect { ptr } => {
                 // SAFETY: Micro-ops are currently displayed only during execution
@@ -1355,8 +1367,9 @@ mod tests {
 
     #[test]
     fn micro_op_size() {
-        // Size is 32 bytes due to CallIndirect which carries two
-        // GlobalArenaPtr fields (8 + 16 bytes). TODO: bring this down.
-        assert_eq!(std::mem::size_of::<MicroOp>(), 32);
+        // TODO:
+        //   Size is dominated by indirect call: refactor to keep variant size
+        //   small and keep call metadata in a side table.
+        assert_eq!(std::mem::size_of::<MicroOp>(), 48);
     }
 }

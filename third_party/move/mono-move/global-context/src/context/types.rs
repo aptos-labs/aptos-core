@@ -215,7 +215,7 @@ impl Hash for TypeInternerKey {
                 Self(*elem).hash(state);
             },
             Nominal {
-                executable_id,
+                module_id,
                 name,
                 ty_args,
                 layout: _,
@@ -223,18 +223,17 @@ impl Hash for TypeInternerKey {
                 // SAFETY: It is safe to dereference pointers because the
                 // caller ensures they remain valid during the lifetime of
                 // the key.
-                let executable_id = unsafe { executable_id.as_ref_unchecked() };
-                let executable_name = unsafe { executable_id.name().as_ref_unchecked() };
+                let module_id = unsafe { module_id.as_ref_unchecked() };
+                let module_name = unsafe { module_id.name().as_ref_unchecked() };
                 let name = unsafe { name.as_ref_unchecked() };
-                let ty_args = unsafe { ty_args.as_ref_unchecked() };
+                let ty_args = view_type_list(*ty_args);
 
                 // Must use structural hash because it is compared against the
                 // hash of lookup key (e.g., signature token). Type identity
-                // is based on address, executable name, name and type
-                // arguments.
+                // is based on address, module name, name and type arguments.
                 type_discriminant::NOMINAL.hash(state);
-                executable_id.address().hash(state);
-                executable_name.hash(state);
+                module_id.address().hash(state);
+                module_name.hash(state);
                 name.hash(state);
                 ty_args.len().hash(state);
                 for ty_arg in ty_args {
@@ -250,8 +249,8 @@ impl Hash for TypeInternerKey {
                 // SAFETY: It is safe to dereference pointers because the
                 // caller ensures they remain valid during the lifetime of
                 // the key.
-                let args = unsafe { args.as_ref_unchecked() };
-                let results = unsafe { results.as_ref_unchecked() };
+                let args = view_type_list(*args);
+                let results = view_type_list(*results);
 
                 args.len().hash(state);
                 for arg in args {
@@ -325,21 +324,19 @@ impl PartialEq for TypeInternerKey {
                 }
             },
             Nominal {
-                executable_id,
+                module_id,
                 name,
                 ty_args,
                 ..
             } => {
                 if let Nominal {
-                    executable_id: other_executable_id,
+                    module_id: other_module_id,
                     name: other_name,
                     ty_args: other_ty_args,
                     ..
                 } = other
                 {
-                    executable_id == other_executable_id
-                        && name == other_name
-                        && ty_args == other_ty_args
+                    module_id == other_module_id && name == other_name && ty_args == other_ty_args
                 } else {
                     false
                 }
@@ -497,13 +494,13 @@ fn equivalent_nominal_types(
     ty_args: &[SignatureToken],
     module: &CompiledModule,
 ) -> bool {
-    let (other_executable_id, other_name, other_ty_args) = match ty {
+    let (other_module_id, other_name, other_ty_args) = match ty {
         Type::Nominal {
-            executable_id,
+            module_id,
             name,
             ty_args,
             ..
-        } => (executable_id, name, ty_args),
+        } => (module_id, name, ty_args),
         Type::Bool
         | Type::U8
         | Type::U16
@@ -530,14 +527,14 @@ fn equivalent_nominal_types(
 
     // SAFETY: It is safe to dereference pointers because the caller ensures
     // they remain valid during the lifetime of the key.
-    let other_executable_id = unsafe { other_executable_id.as_ref_unchecked() };
-    let other_executable_name = unsafe { other_executable_id.name().as_ref_unchecked() };
-    let other_name = unsafe { other_name.as_ref_unchecked() };
-    let other_ty_args = unsafe { other_ty_args.as_ref_unchecked() };
+    let other_module_id = unsafe { other_module_id.as_ref_unchecked() };
+    let other_module_name = unsafe { other_module_id.name().as_ref_unchecked() };
+    let other_name = view_name(*other_name);
+    let other_ty_args = view_type_list(*other_ty_args);
 
     let (address, module_name, struct_name) = struct_info_at(module, idx);
-    address == other_executable_id.address()
-        && module_name.as_str() == other_executable_name
+    address == other_module_id.address()
+        && module_name.as_str() == other_module_name
         && struct_name.as_str() == other_name
         && ty_args.len() == other_ty_args.len()
         && ty_args
@@ -609,8 +606,8 @@ impl Equivalent<TypeInternerKey> for SignatureTokenKey<'_> {
                     // SAFETY: It is safe to dereference pointers because the
                     // caller ensures they remain valid during the lifetime of
                     // the key.
-                    let other_args = unsafe { other_args.as_ref_unchecked() };
-                    let other_results = unsafe { other_results.as_ref_unchecked() };
+                    let other_args = view_type_list(*other_args);
+                    let other_results = view_type_list(*other_results);
 
                     if args.len() != other_args.len()
                         || results.len() != other_results.len()
@@ -667,7 +664,7 @@ impl Hash for TypeListInternerKey {
     fn hash<H: Hasher>(&self, state: &mut H) {
         // SAFETY: It is safe to dereference the pointer because the caller
         // ensures it remains valid during the lifetime of the key.
-        let tys = unsafe { self.0.as_ref_unchecked() };
+        let tys = view_type_list(self.0);
         tys.len().hash(state);
         for ty_ptr in tys {
             TypeInternerKey(*ty_ptr).hash(state);
@@ -679,8 +676,8 @@ impl PartialEq for TypeListInternerKey {
     fn eq(&self, other: &Self) -> bool {
         // SAFETY: It is safe to dereference the pointer because the caller
         // ensures it remains valid during the lifetime of the key.
-        let this = unsafe { self.0.as_ref_unchecked() };
-        let other = unsafe { other.0.as_ref_unchecked() };
+        let this = view_type_list(self.0);
+        let other = view_type_list(other.0);
 
         if this.len() != other.len() {
             return false;

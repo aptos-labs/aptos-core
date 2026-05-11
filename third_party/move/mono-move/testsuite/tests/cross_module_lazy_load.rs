@@ -9,7 +9,7 @@
 //! `CallIndirect` at runtime lazily loads it through the transaction
 //! context.
 
-use mono_move_core::ExecutionContext;
+use mono_move_core::{types::EMPTY_TYPE_LIST, ExecutionContext};
 use mono_move_gas::SimpleGasMeter;
 use mono_move_global_context::GlobalContext;
 use mono_move_loader::{Loader, LoadingPolicy, LoweringPolicy, TransactionContext};
@@ -56,7 +56,7 @@ fn call_indirect_triggers_lazy_module_load() {
         .intern_identifier(ident_str!("main"))
         .into_global_arena_ptr();
     let main_ptr = txn_ctx
-        .load_function(bar_id, main_name)
+        .load_function(bar_id, main_name, EMPTY_TYPE_LIST)
         .expect("bar::main should resolve");
     assert_eq!(txn_ctx.read_set().len(), 1, "only bar loaded so far");
 

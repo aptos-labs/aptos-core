@@ -2,8 +2,8 @@
 
 fun read_field_val(r0): u8 {
   slots: params(1), locals(0), temps(2)
-    r0: S
-    r1: &S
+    r0: 0x66::test::S
+    r1: &0x66::test::S
     r2: u8
   code:
   L0:
@@ -25,9 +25,9 @@ fun read_and_add(r0): u64 {
 
 fun read_field_ref_twice(r0): u64 {
   slots: params(1), locals(1), temps(3)
-    r0: S
+    r0: 0x66::test::S
     r1: &u64
-    r2: &S
+    r2: &0x66::test::S
     r3: u64
     r4: u64
   code:

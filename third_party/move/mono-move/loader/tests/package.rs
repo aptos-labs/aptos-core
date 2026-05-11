@@ -3,6 +3,7 @@
 
 //! Integration tests for the Package loading policy.
 
+use mono_move_core::types::EMPTY_TYPE_LIST;
 use mono_move_gas::{GasMeter, SimpleGasMeter};
 use mono_move_global_context::GlobalContext;
 use mono_move_loader::{Loader, LoadingPolicy, ModuleReadSet};
@@ -100,12 +101,12 @@ fn package_policy_promotes_side_loaded_metered_module_on_function_call() {
 
     // 1. Lowering `a::f` side-loads `b` for layout of `b::S`.
     loader
-        .load_function(&mut read_set, &mut gas, id_a, name_f)
+        .load_function(&mut read_set, &mut gas, id_a, name_f, EMPTY_TYPE_LIST)
         .expect("load_function(a::f) must succeed");
 
     // 2. Dispatch to `b::g`. Must promote `b` to ready and return the function successfully.
     loader
-        .load_function(&mut read_set, &mut gas, id_b, name_g)
+        .load_function(&mut read_set, &mut gas, id_b, name_g, EMPTY_TYPE_LIST)
         .expect("load_function(b::g) must promote b, not bail");
 }
 

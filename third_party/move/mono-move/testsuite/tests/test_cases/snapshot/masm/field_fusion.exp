@@ -10,8 +10,8 @@ fun identity(r0): u64 {
 
 fun add_two_fields(r0): u64 {
   slots: params(1), locals(0), temps(3)
-    r0: Pair
-    r1: &Pair
+    r0: 0x66::field_fusion::Pair
+    r1: &0x66::field_fusion::Pair
     r2: u64
     r3: u64
   code:
@@ -26,8 +26,8 @@ fun add_two_fields(r0): u64 {
 
 fun field_to_call(r0): u64 {
   slots: params(1), locals(0), temps(1), xfer(1)
-    r0: Pair
-    r1: &Pair
+    r0: 0x66::field_fusion::Pair
+    r1: &0x66::field_fusion::Pair
   code:
   L0:
     0: r1 := imm_borrow_loc r0
@@ -38,9 +38,9 @@ fun field_to_call(r0): u64 {
 
 fun two_fields_to_call(r0, r1): u64 {
   slots: params(2), locals(0), temps(3), xfer(1)
-    r0: Pair
-    r1: Pair
-    r2: &Pair
+    r0: 0x66::field_fusion::Pair
+    r1: 0x66::field_fusion::Pair
+    r2: &0x66::field_fusion::Pair
     r3: u64
     r4: u64
   code:
@@ -56,8 +56,8 @@ fun two_fields_to_call(r0, r1): u64 {
 
 fun field_plus_constant(r0): u64 {
   slots: params(1), locals(0), temps(2)
-    r0: Pair
-    r1: &Pair
+    r0: 0x66::field_fusion::Pair
+    r1: &0x66::field_fusion::Pair
     r2: u64
   code:
   L0:
@@ -69,7 +69,7 @@ fun field_plus_constant(r0): u64 {
 
 fun increment_field(r0) {
   slots: params(1), locals(0), temps(1)
-    r0: &mut Pair
+    r0: &mut 0x66::field_fusion::Pair
     r1: u64
   code:
   L0:

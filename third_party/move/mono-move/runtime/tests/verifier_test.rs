@@ -5,8 +5,8 @@
 
 use mono_move_alloc::GlobalArenaPtr;
 use mono_move_core::{
-    Code, CodeOffset as CO, DescriptorId, ExecutableId, FrameLayoutInfo, FrameOffset as FO,
-    Function, MicroOp, SortedSafePointEntries,
+    types::EMPTY_TYPE_LIST, Code, CodeOffset as CO, DescriptorId, ExecutableId, FrameLayoutInfo,
+    FrameOffset as FO, Function, MicroOp, SortedSafePointEntries,
 };
 use mono_move_runtime::{verify_function, ObjectDescriptor, ObjectDescriptorTable};
 use move_core_types::account_address::AccountAddress;
@@ -198,8 +198,9 @@ fn frame_bounds_callfunc_metadata() {
         name: GlobalArenaPtr::from_static("test"),
         code: Code::from_vec(vec![
             CallIndirect {
-                executable_id: VERIFIER_TEST_MODULE_ID,
+                module_id: VERIFIER_TEST_MODULE_ID,
                 func_name: GlobalArenaPtr::from_static("fn_1"),
+                ty_args: EMPTY_TYPE_LIST,
             },
             Return,
         ]),
@@ -363,8 +364,9 @@ fn invalid_callfunc_func_id() {
         name: GlobalArenaPtr::from_static("test"),
         code: Code::from_vec(vec![
             CallIndirect {
-                executable_id: VERIFIER_TEST_MODULE_ID,
+                module_id: VERIFIER_TEST_MODULE_ID,
                 func_name: GlobalArenaPtr::from_static("fn_42"),
+                ty_args: EMPTY_TYPE_LIST,
             },
             Return,
         ]),

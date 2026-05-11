@@ -48,14 +48,14 @@ use std::{
 // Submodules: to split implementation into smaller pieces.
 mod identifiers;
 use identifiers::IdentifierInternerKey;
-mod executable_ids;
-use executable_ids::ExecutableIdInternerKey;
+mod module_ids;
+use module_ids::ExecutableIdInternerKey;
 mod loaded_module;
 pub use loaded_module::{
     FunctionSlot, LoadedModule, LoadedModuleSlot, ModuleMandatoryDependencies, ModuleSlot,
 };
-mod executable_cache;
-use executable_cache::ModuleCache;
+mod module_cache;
+use module_cache::ModuleCache;
 use mono_move_core::interner::{InternedIdentifier, InternedModuleId};
 use move_core_types::{account_address::AccountAddress, identifier::IdentStr};
 
@@ -375,7 +375,7 @@ impl<'ctx> ExecutionGuard<'ctx> {
         ty_args: InternedTypeList,
     ) -> InternedType {
         let ty = self.global_arena.alloc(Type::Nominal {
-            executable_id: module_id,
+            module_id,
             name,
             ty_args,
             layout: OnceLock::new(),
@@ -520,7 +520,7 @@ impl<'ctx> Interner for ExecutionGuard<'ctx> {
             return types::EMPTY_TYPE_LIST;
         }
         let ptr = self.global_arena.alloc_slice_copy(types);
-        self.insert_allocated_type_list_internal(ptr)
+        self.insert_allocated_type_list_internal(InternedTypeList::new(ptr))
     }
 
     fn nominal_of(
@@ -530,7 +530,7 @@ impl<'ctx> Interner for ExecutionGuard<'ctx> {
         ty_args: InternedTypeList,
     ) -> InternedType {
         let ty = self.global_arena.alloc(Type::Nominal {
-            executable_id: module_id,
+            module_id,
             name,
             ty_args,
             layout: OnceLock::new(),
@@ -544,6 +544,124 @@ impl<'ctx> Interner for ExecutionGuard<'ctx> {
 
     fn identifier_of(&self, identifier: &IdentStr) -> InternedIdentifier {
         self.intern_identifier_internal(identifier)
+    }
+
+    // TODO:
+    //   1. Non-recursive implementation.
+    //   2. Current implementation is O(N^2) because hashes of inner types are
+    //      not cached, and have to be recomputed on insertion.
+    fn subst_type(
+        &self,
+        ty: InternedType,
+        ty_args: InternedTypeList,
+    ) -> anyhow::Result<InternedType> {
+        if ty_args.is_empty() {
+            return Ok(ty);
+        }
+
+        Ok(match view_type(ty) {
+            Type::Bool
+            | Type::U8
+            | Type::U16
+            | Type::U32
+            | Type::U64
+            | Type::U128
+            | Type::U256
+            | Type::I8
+            | Type::I16
+            | Type::I32
+            | Type::I64
+            | Type::I128
+            | Type::I256
+            | Type::Address
+            | Type::Signer => ty,
+
+            Type::Vector { elem } => {
+                let new_elem = self.subst_type(*elem, ty_args)?;
+                if new_elem == *elem {
+                    ty
+                } else {
+                    self.vector_of(new_elem)
+                }
+            },
+            Type::ImmutRef { inner } => {
+                let new_inner = self.subst_type(*inner, ty_args)?;
+                if new_inner == *inner {
+                    ty
+                } else {
+                    self.immut_ref_of(new_inner)
+                }
+            },
+            Type::MutRef { inner } => {
+                let new_inner = self.subst_type(*inner, ty_args)?;
+                if new_inner == *inner {
+                    ty
+                } else {
+                    self.mut_ref_of(new_inner)
+                }
+            },
+            Type::Nominal {
+                module_id,
+                name,
+                ty_args: inner_args,
+                layout,
+            } => {
+                let new_inner_args = self.subst_type_list(*inner_args, ty_args)?;
+                if new_inner_args == *inner_args {
+                    ty
+                } else {
+                    debug_assert!(layout.get().is_none(), "Layout cannot be set for generics");
+                    self.nominal_of(*module_id, *name, new_inner_args)
+                }
+            },
+            Type::Function {
+                args,
+                results,
+                abilities,
+            } => {
+                let new_args = self.subst_type_list(*args, ty_args)?;
+                let new_results = self.subst_type_list(*results, ty_args)?;
+                if new_args == *args && new_results == *results {
+                    ty
+                } else {
+                    self.function_of(new_args, new_results, *abilities)
+                }
+            },
+            Type::TypeParam { idx } => {
+                let table = view_type_list(ty_args);
+                *table.get(*idx as usize).ok_or_else(|| {
+                    anyhow::anyhow!(
+                        "type parameter index {idx} out of bounds: substitution table has {} entries",
+                        table.len(),
+                    )
+                })?
+            },
+        })
+    }
+
+    fn subst_type_list(
+        &self,
+        tys: InternedTypeList,
+        ty_args: InternedTypeList,
+    ) -> anyhow::Result<InternedTypeList> {
+        if ty_args.is_empty() || tys.is_empty() {
+            return Ok(tys);
+        }
+
+        let slice = view_type_list(tys);
+        let mut changed = false;
+        let mut new_tys = Vec::with_capacity(slice.len());
+        for &ty in slice {
+            let new_ty = self.subst_type(ty, ty_args)?;
+            if new_ty != ty {
+                changed = true;
+            }
+            new_tys.push(new_ty);
+        }
+        if !changed {
+            return Ok(tys);
+        }
+        Ok(self.type_list_of(&new_tys))
     }
 }
 

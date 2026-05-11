@@ -6,6 +6,7 @@
 
 use crate::{
     interner::{InternedIdentifier, InternedModuleId},
+    types::InternedTypeList,
     FunctionPtr,
 };
 use mono_move_gas::{GasMeter, NoOpGasMeter, SimpleGasMeter};
@@ -17,11 +18,13 @@ pub trait ExecutionContext {
     fn gas_meter(&mut self) -> &mut impl GasMeter;
 
     /// Resolve a runtime function call.
-    /// May trigger lazy module loading and gas charge on a cache miss.
+    /// May trigger lazy module loading, gas charge on a cache miss, and
+    /// lowering of the function's code.
     fn load_function(
         &mut self,
         module_id: InternedModuleId,
         name: InternedIdentifier,
+        ty_args: InternedTypeList,
     ) -> anyhow::Result<FunctionPtr>;
 }
 
@@ -68,6 +71,7 @@ impl<G: GasMeter> ExecutionContext for LocalExecutionContext<G> {
         &mut self,
         _module_id: InternedModuleId,
         _name: InternedIdentifier,
+        _ty_args: InternedTypeList,
     ) -> anyhow::Result<FunctionPtr> {
         anyhow::bail!("LocalExecutionContext: load_function not supported")
     }

@@ -55,7 +55,7 @@ fun add(r0, r1): u64 {
 
 fun get_x(r0): u64 {
   slots: params(1), locals(0), temps(1)
-    r0: &Point
+    r0: &0x42::basic::Point
     r1: u64
   code:
   L0:
@@ -67,10 +67,10 @@ fun make_point(r0, r1): Point {
   slots: params(2), locals(0), temps(1)
     r0: u64
     r1: u64
-    r2: Point
+    r2: 0x42::basic::Point
   code:
   L0:
-    0: r2 := pack Point, [r0, r1]
+    0: r2 := pack 0x42::basic::Point, [r0, r1]
     1: ret [r2]
 }
 

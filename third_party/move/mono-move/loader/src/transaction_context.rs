@@ -7,6 +7,7 @@
 use crate::{read_set::ModuleReadSet, Loader};
 use mono_move_core::{
     interner::{InternedIdentifier, InternedModuleId},
+    types::InternedTypeList,
     ExecutionContext, FunctionPtr,
 };
 use mono_move_gas::GasMeter;
@@ -45,8 +46,14 @@ impl<'guard, 'ctx, G: GasMeter> ExecutionContext for TransactionContext<'guard, 
         &mut self,
         module_id: InternedModuleId,
         name: InternedIdentifier,
+        ty_args: InternedTypeList,
     ) -> anyhow::Result<FunctionPtr> {
-        self.loader
-            .load_function(&mut self.read_set, &mut self.gas_meter, module_id, name)
+        self.loader.load_function(
+            &mut self.read_set,
+            &mut self.gas_meter,
+            module_id,
+            name,
+            ty_args,
+        )
     }
 }

@@ -181,18 +181,17 @@ pub enum Instr {
     // TODO: depending on how we pre-intern types, we may be able to unify
     // some of instructions here.
     Pack(Slot, InternedType, Vec<Slot>),
-    PackGeneric(Slot, InternedType, InternedTypeList, Vec<Slot>),
+    PackGeneric(Slot, InternedType, Vec<Slot>),
     Unpack(Vec<Slot>, InternedType, Slot),
-    UnpackGeneric(Vec<Slot>, InternedType, InternedTypeList, Slot),
+    UnpackGeneric(Vec<Slot>, InternedType, Slot),
 
-    // --- Variant (enum type + variant ordinal; generic variants also
-    // carry an interned type-argument list) ---
+    // --- Variant (enum type + variant ordinal) ---
     PackVariant(Slot, InternedType, u16, Vec<Slot>),
-    PackVariantGeneric(Slot, InternedType, u16, InternedTypeList, Vec<Slot>),
+    PackVariantGeneric(Slot, InternedType, u16, Vec<Slot>),
     UnpackVariant(Vec<Slot>, InternedType, u16, Slot),
-    UnpackVariantGeneric(Vec<Slot>, InternedType, u16, InternedTypeList, Slot),
+    UnpackVariantGeneric(Vec<Slot>, InternedType, u16, Slot),
     TestVariant(Slot, InternedType, u16, Slot),
-    TestVariantGeneric(Slot, InternedType, u16, InternedTypeList, Slot),
+    TestVariantGeneric(Slot, InternedType, u16, Slot),
 
     // --- References ---
     ImmBorrowLoc(Slot, Slot),
@@ -221,19 +220,19 @@ pub enum Instr {
     WriteVariantField(VariantFieldHandleIndex, Slot, Slot),
     WriteVariantFieldGeneric(VariantFieldInstantiationIndex, Slot, Slot),
 
-    // --- Globals (struct type is the interned `Type` for the named resource;
-    // generic variants additionally carry an interned type-argument list) ---
+    // --- Globals (struct type is the interned `Type` for the named
+    // resource; generic variants carry the instantiated nominal) ---
     Exists(Slot, InternedType, Slot),
-    ExistsGeneric(Slot, InternedType, InternedTypeList, Slot),
+    ExistsGeneric(Slot, InternedType, Slot),
     MoveFrom(Slot, InternedType, Slot),
-    MoveFromGeneric(Slot, InternedType, InternedTypeList, Slot),
+    MoveFromGeneric(Slot, InternedType, Slot),
     /// `(struct_ty, signer, val)`
     MoveTo(InternedType, Slot, Slot),
-    MoveToGeneric(InternedType, InternedTypeList, Slot, Slot),
+    MoveToGeneric(InternedType, Slot, Slot),
     ImmBorrowGlobal(Slot, InternedType, Slot),
-    ImmBorrowGlobalGeneric(Slot, InternedType, InternedTypeList, Slot),
+    ImmBorrowGlobalGeneric(Slot, InternedType, Slot),
     MutBorrowGlobal(Slot, InternedType, Slot),
-    MutBorrowGlobalGeneric(Slot, InternedType, InternedTypeList, Slot),
+    MutBorrowGlobalGeneric(Slot, InternedType, Slot),
 
     // --- Calls ---
     Call(Vec<Slot>, FunctionHandleIndex, Vec<Slot>),

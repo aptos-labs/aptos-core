@@ -361,8 +361,9 @@ impl<T: ExecutionContext> InterpreterContext<'_, T> {
             match *instr {
                 // ----- Control flow (set pc explicitly, return early) -----
                 MicroOp::CallIndirect {
-                    executable_id,
+                    module_id,
                     func_name,
+                    ty_args,
                 } => {
                     // TODO: full flow should be like this:
                     //
@@ -373,7 +374,7 @@ impl<T: ExecutionContext> InterpreterContext<'_, T> {
                     //   3. IC insert target
                     //   4. Patching:
                     //      If can patch caller, try it.
-                    let target = self.exec_ctx.load_function(executable_id, func_name)?;
+                    let target = self.exec_ctx.load_function(module_id, func_name, ty_args)?;
                     // SAFETY: `target` points to a `Function`, which is not reclaimed during
                     // execution as guaranteed by the execution guard.
                     return self.call(func, fp, target.as_ref_unchecked());
