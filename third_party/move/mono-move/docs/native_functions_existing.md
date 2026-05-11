@@ -137,7 +137,7 @@ A native can ask for the gas budget (to emulate "would this work fit?"). It cann
 
 These are the buckets, ordered roughly by how broadly used they are. For each bucket, the natives listed are the ones whose behavior *materially* depends on that capability — not every native that touches it incidentally. The very common categories (popping argument values, charging gas, constructing primitive return values) are not enumerated because **essentially every native uses them**; they form the baseline of the interface.
 
-### TL;DR — the 20 buckets, in 5 themes
+### TL;DR — the 20 buckets, in 6 themes
 
 The 20 buckets cluster into 6 themes. Buckets marked ★ are the "tricky" ones — where any new VM interface design will live or die. The tricky buckets concentrate in **Code** (4 of 5), with the rest split between **State** (E, M), **Crypto** (O, P), and **Data** (K).
 
@@ -416,6 +416,8 @@ Natives where feature gating is *non-trivial* (multiple code paths, or behavior 
 - `table-natives::*` — gas-feature-version branches + `FixTableNativesMemoryDoubleCounting`.
 
 **Trickiness**: The new VM must continue to make features and the gas feature version cheaply queryable from inside a native, because some natives query them in tight loops (e.g., `string_utils::native_format_impl` per-node).
+
+**Implications for the new VM.** The new VM does not need to reimplement the historical per-flag branching listed above — natives should just use the latest implementation of each operation, since the alternative branches exist only to preserve replay-compatibility for code that ran on older feature/gas-version configurations. The `Features` / `TimedFeatures` / `gas_feature_version` *query infrastructure* should still be exposed to natives so future natives can opt back in for backward-compatibility if needed, but designing that surface is a defer-until-needed concern.
 
 ## R. VM-config-dependent behavior
 
