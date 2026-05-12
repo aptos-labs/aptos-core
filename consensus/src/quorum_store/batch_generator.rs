@@ -187,23 +187,38 @@ impl BatchGenerator {
         // Pre-compute FastProof params for this epoch.
         let (fast_proof_aggregators, fast_proof_threshold) = if config.enable_fast_batches_tx {
             let validator_set = validator_verifier.address_to_validator_index();
-            let aggregators: Vec<PeerId> = config
-                .fast_batch_aggregators
-                .iter()
-                .filter(|peer| validator_set.contains_key(peer))
-                .take(
-                    config
-                        .fast_batch_num_aggregators
-                        .min(MAX_K_FAST_PROOF_AGGREGATORS),
-                )
-                .copied()
-                .collect();
+            let num_aggregators = config
+                .fast_batch_num_aggregators
+                .min(MAX_K_FAST_PROOF_AGGREGATORS);
+            // When `fast_batch_aggregators` is configured, use it (filtered to the
+            // current validator set). Otherwise auto-pick the k lowest-PeerId
+            // validators excluding self — deterministic across the cluster and
+            // convenient for forge/operator setups that don't want to hardcode
+            // peer ids.
+            let aggregators: Vec<PeerId> = if config.fast_batch_aggregators.is_empty() {
+                let mut peers: Vec<PeerId> = validator_set
+                    .keys()
+                    .filter(|peer| **peer != my_peer_id)
+                    .copied()
+                    .collect();
+                peers.sort();
+                peers.truncate(num_aggregators);
+                peers
+            } else {
+                config
+                    .fast_batch_aggregators
+                    .iter()
+                    .filter(|peer| validator_set.contains_key(peer))
+                    .take(num_aggregators)
+                    .copied()
+                    .collect()
+            };
             let threshold = (validator_verifier.total_voting_power()
                 - validator_verifier.quorum_voting_power()
                 + 1) as u64;
             if aggregators.is_empty() {
                 warn!(
-                    "enable_fast_batches_tx=true but no configured aggregators are in the validator set; FastProof emission disabled this epoch"
+                    "enable_fast_batches_tx=true but no aggregators available; FastProof emission disabled this epoch"
                 );
             }
             (aggregators, threshold)
