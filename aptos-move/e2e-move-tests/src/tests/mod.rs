@@ -16,6 +16,7 @@ mod chain_id;
 mod code_publishing;
 mod common;
 mod confidential_asset;
+mod confidential_asset_replay;
 mod constructor_args;
 mod cryptoalgebra;
 mod dependencies;

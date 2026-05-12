@@ -8751,6 +8751,7 @@ dependencies = [
  "proptest",
  "rstest",
  "serde",
+ "serde_json",
  "sha3 0.9.1",
  "test-case",
  "thousands",
