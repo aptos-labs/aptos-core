@@ -556,12 +556,25 @@ pub(crate) fn gc_collect(
     Ok(())
 }
 
-/// Returns true if `ptr` falls within the (from-space) heap buffer.
+/// Returns true if `ptr` is a valid object pointer (data-region start)
+/// in the from-space heap buffer.
+///
+/// Valid obj_ptrs lie in `[start + OBJECT_HEADER_SIZE, end]`:
+/// - The header at `obj_ptr - OBJECT_HEADER_SIZE` must be in-bounds
+///   (lower bound).
+/// - The data region `[obj_ptr, obj_ptr + payload)` must be in-bounds;
+///   `obj_ptr == end` is permitted for a zero-payload object whose
+///   header occupies the very last bytes of the buffer (upper bound).
+///
+/// Current descriptor validation enforces `payload_size > 0`, so
+/// `obj_ptr == end` is unreachable in practice. The bound is written
+/// to match the semantic invariant so it stays correct under future
+/// changes.
 fn is_heap_ptr(heap: &Heap, ptr: *const u8) -> bool {
     let start = heap.buffer.as_ptr() as usize;
     let end = start + heap.buffer.len();
     let p = ptr as usize;
-    p >= start && p < end
+    p >= start + OBJECT_HEADER_SIZE && p <= end
 }
 
 /// Scan a set of pointer offsets in a frame, copying any heap objects
