@@ -15,6 +15,7 @@ module 0xc0ffee::dummy2 {
 
 // -- Sourcified model before first bytecode pipeline
 module 0xc0ffee::dummy1 {
+    const CC: u64 = 1;
     public inline fun expose(): u64 {
         1
     }

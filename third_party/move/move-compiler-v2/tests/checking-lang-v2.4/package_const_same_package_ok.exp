@@ -14,9 +14,7 @@ module 0x42::N {
 // -- Sourcified model before first bytecode pipeline
 module 0x42::M {
     friend 0x42::N;
-    friend fun const_PKG(): u64 {
-        10
-    }
+    package const PKG: u64 = 10;
 }
 module 0x42::N {
     use 0x42::M;

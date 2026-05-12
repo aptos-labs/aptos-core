@@ -1,0 +1,25 @@
+
+Diagnostics:
+warning: [lint] package constant `PKG_ONLY_LOCAL` is only used in the same module: package visibility is not needed
+  ┌─ tests/model_ast_lints/needless_visibility_const.move:5:5
+  │
+5 │     package const PKG_ONLY_LOCAL: u64 = 30;       // flagged
+  │     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  │
+  = Consider removing the visibility modifier, or suppress with `#[lint::skip(needless_visibility)]`.
+
+warning: [lint] friend constant `FRIEND_ONLY_LOCAL` is only used in the same module: friend visibility is not needed
+   ┌─ tests/model_ast_lints/needless_visibility_const.move:18:5
+   │
+18 │     friend const FRIEND_ONLY_LOCAL: u64 = 50;     // flagged
+   │     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+   │
+   = Consider removing the visibility modifier, or suppress with `#[lint::skip(needless_visibility)]`.
+
+warning: [lint] friend constant `ORPHAN_FRIEND` has needless visibility: module declares no friends
+   ┌─ tests/model_ast_lints/needless_visibility_const.move:34:5
+   │
+34 │     friend const ORPHAN_FRIEND: u64 = 1;          // flagged
+   │     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+   │
+   = This module declares no friends, so friend visibility is not needed. Remove this visibility, or add friend declarations. Suppress with `#[lint::skip(needless_visibility)]` if appropriate.

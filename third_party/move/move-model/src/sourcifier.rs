@@ -11,8 +11,8 @@ use crate::{
     emit, emitln,
     exp_builder::ExpBuilder,
     model::{
-        FieldEnv, FunId, FunctionEnv, GlobalEnv, ModuleId, NodeId, Parameter, QualifiedId,
-        QualifiedInstId, SpecVarId, StructEnv, StructId, TypeParameter, Visibility,
+        FieldEnv, FunId, FunctionEnv, GlobalEnv, ModuleId, NamedConstantEnv, NodeId, Parameter,
+        QualifiedId, QualifiedInstId, SpecVarId, StructEnv, StructId, TypeParameter, Visibility,
     },
     symbol::Symbol,
     ty::{PrimitiveType, ReferenceKind, Type, TypeDisplayContext},
@@ -226,6 +226,11 @@ impl<'a> Sourcifier<'a> {
                 }
             }
         }
+        if module_env.get_named_constant_count() > 0 {
+            for const_env in module_env.get_named_constants() {
+                self.print_named_constant(&const_env);
+            }
+        }
         if module_env.get_function_count() > 0 {
             for fun_env in module_env.get_functions() {
                 // Skip auto-generated struct API wrappers (pack$S, unpack$S, borrow$S$N, …).
@@ -238,6 +243,10 @@ impl<'a> Sourcifier<'a> {
                          lift_to_stackless_bytecode must have excluded it",
                         fun_env.get_name_string()
                     );
+                    continue;
+                }
+                // Skip `const$NAME` accessors — covered by `print_named_constant` above.
+                if fun_env.is_const_accessor() {
                     continue;
                 }
                 self.print_fun(fun_env.get_qualified_id(), fun_env.get_def())
@@ -680,6 +689,26 @@ impl<'a> Sourcifier<'a> {
 
         // Print struct spec if present
         self.print_struct_spec(&struct_env);
+    }
+
+    /// Print a `const` declaration: `<vis> const NAME: TYPE = VALUE;`.
+    pub fn print_named_constant(&self, const_env: &NamedConstantEnv) {
+        let vis_prefix = match const_env.get_visibility() {
+            Visibility::Private => "",
+            Visibility::Public => "public ",
+            Visibility::Friend if const_env.has_package_visibility() => "package ",
+            Visibility::Friend => "friend ",
+        };
+        let tctx = const_env.get_type_display_ctx();
+        emit!(
+            self.writer,
+            "{}const {}: {} = ",
+            vis_prefix,
+            self.sym(const_env.get_name()),
+            const_env.get_type().display(&tctx)
+        );
+        self.print_value(&const_env.get_value(), Some(&const_env.get_type()), false);
+        emitln!(self.writer, ";");
     }
 
     /// Check for dummy field the compiler introduces for empty structs

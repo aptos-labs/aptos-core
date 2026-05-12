@@ -129,6 +129,12 @@ module 0xc0ffee::no_warn {
 
 // -- Sourcified model before first bytecode pipeline
 module 0xc0ffee::m {
+    const U128_MAX: u128 = MAX_U128;
+    const U16_MAX: u16 = MAX_U16;
+    const U256_MAX: u256 = MAX_U256;
+    const U32_MAX: u32 = MAX_U32;
+    const U64_MAX: u64 = MAX_U64;
+    const U8_MAX: u8 = MAX_U8;
     fun apply(f: |u8|bool, x: u8): bool {
         f(x)
     }

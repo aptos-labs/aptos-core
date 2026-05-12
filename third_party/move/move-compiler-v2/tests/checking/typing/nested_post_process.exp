@@ -63,6 +63,7 @@ module 0x42::simple_map {
     struct SimpleMap<Key, Value> has copy, drop, store {
         data: vector<Element<Key, Value>>,
     }
+    const EKEY_NOT_FOUND: u64 = 2;
     public fun borrow<Key: store, Value: store>(map: &SimpleMap<Key, Value>, key: &Key): &Value {
         let maybe_idx = find<Key, Value>(map, key);
         if (0x1::option::is_some<u64>(&maybe_idx)) () else abort 0x1::error::invalid_argument(2);

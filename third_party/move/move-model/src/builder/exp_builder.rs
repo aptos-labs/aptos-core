@@ -4096,9 +4096,11 @@ impl ExpTranslator<'_, '_, '_> {
         ExpData::Lambda(id, pattern, body, LambdaCaptureKind::Default, None)
     }
 
-    /// Translates a constant reference, checking visibility for cross-module access.
-    /// Cross-module access in impl mode emits a `const$NAME` accessor call; same-module
-    /// access emits the value directly.
+    /// Translates a constant reference. Same-module/spec accesses emit the value
+    /// directly; cross-module impl access emits a `const$NAME` accessor call.
+    /// Rejects two cases here (the rest go through `function_checker`): private
+    /// cross-module access, and pre-V2.4 cross-module access — in both cases the
+    /// accessor isn't injected.
     fn translate_constant(
         &mut self,
         loc: &Loc,
@@ -4109,96 +4111,46 @@ impl ExpTranslator<'_, '_, '_> {
     ) -> ExpData {
         let is_cross_module = sym.module_name != self.parent.module_name
             && sym.module_name != ModuleName::builtin_module(self.env());
-        // Specs and builtin constants bypass visibility. Impl-mode cross-module access
-        // requires V2_4+ and sufficient visibility.
         if self.mode != ExpTranslationMode::Spec && is_cross_module {
+            // Private const: reject. Also covers pre-V2.4 since non-private const
+            // syntax is gated to V2.4+.
+            if entry.move_visibility == Visibility::Private {
+                self.error(
+                    loc,
+                    &format!(
+                        "constant `{}` cannot be used here because it is private to the module `{}`",
+                        sym.display_full(self.env()),
+                        sym.module_name.display_full(self.env()),
+                    ),
+                );
+                return self.new_error_exp();
+            }
+            // Defensive: non-private cross-module ref pre-V2.4 — the accessor
+            // wasn't injected, so a `Call(const$NAME)` would not resolve.
             let lang_version = self.parent.parent.env.language_version();
-            let access_ok = if lang_version.language_version_for_public_const() {
-                match entry.move_visibility {
-                    Visibility::Public => true,
-                    Visibility::Friend => {
-                        if entry.has_package_visibility {
-                            // `package`: delegates to `can_call_package_fun_in`.
-                            // Public/friend inline functions are rejected: they can be inlined
-                            // into different-address modules.
-                            let inline_safe = !self.fun_is_inline
-                                || self.fun_name.as_ref().is_none_or(|fname| {
-                                    let fun_id = FunId::new(fname.symbol);
-                                    match self
-                                        .parent
-                                        .parent
-                                        .fun_table
-                                        .get(fname)
-                                        .map(|e| &e.visibility)
-                                    {
-                                        Some(Visibility::Private) => true,
-                                        Some(Visibility::Friend) => {
-                                            self.parent.package_funs.contains(&fun_id)
-                                        },
-                                        _ => false,
-                                    }
-                                });
-                            let package_ok = match (
-                                self.env().find_module(&self.parent.module_name),
-                                self.env().find_module(&sym.module_name),
-                            ) {
-                                (Some(caller), Some(defining)) => {
-                                    caller.can_call_package_fun_in(&defining)
-                                },
-                                // Modules not yet fully registered; fall back to address check.
-                                _ => sym.module_name.addr() == self.parent.module_name.addr(),
-                            };
-                            inline_safe && package_ok
-                        } else {
-                            // `friend`: caller must be a declared friend of the defining module.
-                            // Non-private inline functions are rejected: they can be expanded
-                            // into non-friend modules. Private inline functions are safe (same
-                            // module only).
-                            let inline_rejected = self.fun_is_inline
-                                && self.fun_name.as_ref().is_none_or(|fname| {
-                                    !matches!(
-                                        self.parent
-                                            .parent
-                                            .fun_table
-                                            .get(fname)
-                                            .map(|e| &e.visibility),
-                                        Some(Visibility::Private)
-                                    )
-                                });
-                            if inline_rejected {
-                                false
-                            } else if let Some(defining_module) =
-                                self.parent.parent.env.find_module(&sym.module_name)
-                            {
-                                let caller_name = &self.parent.module_name;
-                                defining_module
-                                    .get_friend_decls()
-                                    .iter()
-                                    .any(|d| &d.module_name == caller_name)
-                            } else {
-                                false
-                            }
-                        }
-                    },
-                    Visibility::Private => false,
-                }
-            } else {
-                false
-            };
-            if !access_ok {
-                let msg = if entry.move_visibility == Visibility::Private {
-                    format!(
-                    "constant `{}` cannot be used here because it is private to the module `{}`",
-                    sym.display_full(self.env()),
-                    sym.module_name.display_full(self.env())
-                )
-                } else {
-                    format!(
+            if !lang_version.language_version_for_public_const() {
+                self.error(
+                    loc,
+                    &format!(
                         "constant `{}` cannot be used here due to visibility constraints",
                         sym.display_full(self.env()),
-                    )
-                };
-                self.error(loc, &msg);
+                    ),
+                );
+                return self.new_error_exp();
+            }
+            // A const initializer cannot contain a function call; catch the
+            // cross-module case here for a targeted message instead of the
+            // generic "Invalid call or operation in constant" from constant
+            // folding. (`constant_use_context` also fires for function bodies,
+            // so match on `Constant` specifically.)
+            if matches!(self.constant_use_context, Some(UserId::Constant(_))) {
+                self.error(
+                    loc,
+                    &format!(
+                        "cross-module constant `{}` cannot be used in another constant's initializer",
+                        sym.display_full(self.env()),
+                    ),
+                );
                 return self.new_error_exp();
             }
         }

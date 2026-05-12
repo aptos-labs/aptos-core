@@ -45,6 +45,7 @@ module 0xc0ffee::m {
 
 // -- Sourcified model before first bytecode pipeline
 module 0xc0ffee::n {
+    const ERROR_CODE_2: u64 = 42;
     public fun not_inlined(x: &mut u64) {
         if (*x > 5) {
             if (*x > 5) () else abort 42;
@@ -55,6 +56,8 @@ module 0xc0ffee::n {
     }
 }
 module 0xc0ffee::m {
+    const ERROR_CODE: u64 = 42;
+    const N_ERROR_CODE_2: u64 = 43;
     public fun compute(): u64 {
         let x = 3;
         0xc0ffee::n::not_inlined(&mut x);

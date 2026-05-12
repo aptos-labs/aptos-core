@@ -1406,7 +1406,12 @@ impl ModuleBuilder<'_, '_> {
                 );
                 ok = false;
             }
-            if ok {
+            // Suppress the folder when the translated expression already contains an
+            // `Invalid` placeholder: that means an upstream translator error fired
+            // (e.g. a rejected cross-module const reference), and the folder would
+            // only stack a redundant "not foldable" diagnostic on top.
+            let has_invalid_subexp = exp.as_ref().any(&mut |e| matches!(e, ExpData::Invalid(_)));
+            if ok && !has_invalid_subexp {
                 let mut folder = ConstantFolder::new(self.parent.env, true);
                 let rewritten = folder.rewrite_exp(exp);
                 if let ExpData::Value(_, value) = rewritten.as_ref() {

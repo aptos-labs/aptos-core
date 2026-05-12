@@ -5226,6 +5226,18 @@ impl<'env> FunctionEnv<'env> {
         self.data.is_struct_api
     }
 
+    /// Returns `true` for synthetic `const$<NAME>` accessors injected by
+    /// `inject_const_accessor_functions`. Hide from decompiled source and skip
+    /// lints that target the underlying constant.
+    pub fn is_const_accessor(&self) -> bool {
+        let name = self.symbol_pool().string(self.get_name());
+        name.starts_with(&format!(
+            "{}{}",
+            language_storage::CONST,
+            language_storage::DOLLAR_SIGN_DELIMITER
+        ))
+    }
+
     /// Returns `true` for functions that have no independently-processed bytecode target in the
     /// prover pipeline and should be skipped when iterating over functions for analysis:
     /// - inline functions: their bodies are inlined at every call site

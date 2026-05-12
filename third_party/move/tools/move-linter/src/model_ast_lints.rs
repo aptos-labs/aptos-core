@@ -59,7 +59,7 @@ use needless_deref_ref::NeedlessDerefRef;
 use needless_ref_deref::NeedlessRefDeref;
 use needless_ref_in_field_access::NeedlessRefInFieldAccess;
 use needless_return::NeedlessReturn;
-use needless_visibility::NeedlessVisibility;
+use needless_visibility::{NeedlessVisibility, NeedlessVisibilityOnConstant};
 use nonminimal_bool::NonminimalBool;
 use self_assignment::SelfAssignment;
 use simpler_bool_expression::SimplerBoolExpression;
@@ -123,6 +123,7 @@ pub(crate) fn all_constant_lints() -> Vec<(LintTier, Box<dyn ConstantChecker>)> 
     vec![
         // ── default tier ──────────────────────────────────────────────
         (Default, Box::<UnusedConstant>::default()),
+        (Default, Box::<NeedlessVisibilityOnConstant>::default()),
         // ── strict tier ───────────────────────────────────────────────
         (Strict, Box::<DeprecatedUsageOfConstants>::default()),
     ]

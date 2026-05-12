@@ -6,6 +6,7 @@
 use crate::{experiments::Experiment, Options};
 use codespan_reporting::diagnostic::Severity;
 use move_binary_format::file_format::Visibility;
+use move_core_types::language_storage::{CONST, DOLLAR_SIGN_DELIMITER};
 use move_model::{
     ast::{ExpData, Operation, Pattern},
     metadata::LanguageVersion,
@@ -13,6 +14,15 @@ use move_model::{
     ty::Type,
 };
 use std::{collections::BTreeSet, iter::Iterator, vec::Vec};
+
+/// Returns the underlying constant name if `name` is a `const$<NAME>` accessor.
+fn const_accessor_target(name: &str) -> Option<&str> {
+    name.strip_prefix(&const_accessor_prefix())
+}
+
+fn const_accessor_prefix() -> String {
+    format!("{}{}", CONST, DOLLAR_SIGN_DELIMITER)
+}
 
 // ===============================================================================================
 // Access checking
@@ -121,9 +131,22 @@ pub fn check_access_after_inlining(env: &GlobalEnv) {
 /// Check visibility rules for a cross-module function call.
 /// Reports errors for calls to script functions, private functions,
 /// and friend/package-visible functions from non-authorized callers.
+/// For `const$<NAME>` accessor callees, the message refers to the underlying
+/// constant and is anchored at each use site.
 fn check_function_call(caller: &FunctionEnv, callee: &FunctionEnv, sites: &BTreeSet<NodeId>) {
     let env = caller.module_env.env;
+    let const_name = const_accessor_target(&callee.get_name_str())
+        .map(|bare| format!("{}::{}", callee.module_env.get_full_name_str(), bare,));
     let report = |msg: &str, primary: &str| {
+        if let Some(const_qname) = const_name.as_deref() {
+            let const_msg = format!(
+                "constant `{const_qname}` cannot be used here due to visibility constraints"
+            );
+            for site in sites {
+                env.diag(Severity::Error, &env.get_node_loc(*site), &const_msg);
+            }
+            return;
+        }
         let call_sites: Vec<_> = sites
             .iter()
             .map(|id| (env.get_node_loc(*id), "called here".to_owned()))
@@ -605,6 +628,10 @@ fn check_inline_function_calls(func: &FunctionEnv) {
 }
 
 /// Warn when an inline function calls a callee that may be inaccessible after expansion.
+/// For `const$<NAME>` accessor callees, emit an error (not a warning) with stricter
+/// rules: `check_friend_visibility_compatibility`'s same-address ≈ same-package
+/// approximation (TODO #13745) is unsound for const accessors because the leaked
+/// access would only be caught by the bytecode verifier, not the source compiler.
 fn check_inline_callee_visibility(
     env: &GlobalEnv,
     caller: &FunctionEnv,
@@ -613,6 +640,38 @@ fn check_inline_callee_visibility(
 ) {
     let caller_vis = caller.visibility();
     let callee_vis = callee.visibility();
+
+    // 1. Callee is public → safe (covers `public const` accessors as well).
+    if callee_vis == Visibility::Public {
+        return;
+    }
+
+    // 2. Const accessor: skip if `check_function_call` already errored (avoid
+    //    duplicate diagnostics). Otherwise only `package inline → package const`
+    //    survives inline expansion safely.
+    if let Some(bare) = const_accessor_target(&callee.get_name_str()) {
+        let access_ok_now = caller.module_env.get_id() == callee.module_env.get_id()
+            || callee.module_env.has_friend(&caller.module_env.get_id());
+        if !access_ok_now {
+            return;
+        }
+        let const_qname = format!("{}::{}", callee.module_env.get_full_name_str(), bare);
+        let callee_is_package = callee.has_package_visibility();
+        let caller_is_package = caller.has_package_visibility();
+        let safe = matches!(
+            (caller_vis, caller_is_package, callee_is_package),
+            (Visibility::Friend, true, true)
+        );
+        if !safe {
+            let msg = format!(
+                "constant `{const_qname}` cannot be used here due to visibility constraints"
+            );
+            for site in sites {
+                env.diag(Severity::Error, &env.get_node_loc(*site), &msg);
+            }
+        }
+        return;
+    }
 
     let report_warning = |context: &str| {
         let caller_vis_desc =
@@ -647,12 +706,7 @@ fn check_inline_callee_visibility(
         );
     };
 
-    // 1. Callee is public → safe
-    if callee_vis == Visibility::Public {
-        return;
-    }
-
-    // Now: callee is not public
+    // 3. Generic case for non-const-accessor callees.
     match caller_vis {
         Visibility::Public => {
             // Now: callee is not public; caller is public → warning

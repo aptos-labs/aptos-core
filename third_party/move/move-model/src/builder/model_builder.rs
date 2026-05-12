@@ -262,12 +262,23 @@ pub(crate) struct ConstEntry {
     pub ty: Type,
     pub value: Value,
     pub visibility: EntryVisibility,
-    /// Move language visibility for the constant.
+    /// File-format visibility (`Public`/`Friend`/`Private`). The Move-source
+    /// `package` modifier is encoded as `Friend` + `has_package_visibility = true`.
     pub move_visibility: Visibility,
-    /// `package` visibility flag; when true, `move_visibility` is `Friend`.
+    /// True iff declared with `package`. Implies `move_visibility = Friend`.
     pub has_package_visibility: bool,
     pub users: BTreeSet<UserId>,
     pub attributes: Vec<Attribute>,
+}
+
+/// Snapshot of a non-private constant used by `inject_const_accessor_functions`.
+struct PublicConstInfo {
+    name: Symbol,
+    loc: Loc,
+    ty: Type,
+    value: Value,
+    visibility: Visibility,
+    has_package_visibility: bool,
 }
 
 impl<'env> ModelBuilder<'env> {
@@ -585,42 +596,40 @@ impl<'env> ModelBuilder<'env> {
         let module_ids: Vec<ModuleId> = self.env.get_modules().map(|m| m.get_id()).collect();
 
         for module_id in module_ids {
-            let const_infos: Vec<(Symbol, Loc, Type, Value, Visibility, bool)> = self
+            let const_infos: Vec<PublicConstInfo> = self
                 .env
                 .get_module(module_id)
                 .get_named_constants()
                 .filter(|c| c.get_visibility() != Visibility::Private)
-                .map(|c| {
-                    (
-                        c.get_name(),
-                        c.get_loc(),
-                        c.get_type(),
-                        c.get_value(),
-                        c.get_visibility(),
-                        c.has_package_visibility(),
-                    )
+                .map(|c| PublicConstInfo {
+                    name: c.get_name(),
+                    loc: c.get_loc(),
+                    ty: c.get_type(),
+                    value: c.get_value(),
+                    visibility: c.get_visibility(),
+                    has_package_visibility: c.has_package_visibility(),
                 })
                 .collect();
 
-            for (const_name, loc, const_type, const_value, visibility, has_pkg) in const_infos {
+            for info in const_infos {
                 let accessor_name = format!(
                     "{}{}{}",
                     move_core_types::language_storage::CONST,
                     move_core_types::language_storage::DOLLAR_SIGN_DELIMITER,
-                    self.env.symbol_pool().string(const_name)
+                    self.env.symbol_pool().string(info.name)
                 );
                 let accessor_sym = self.env.symbol_pool().make(&accessor_name);
-                let node_id = self.env.new_node(loc.clone(), const_type.clone());
-                let body = ExpData::Value(node_id, const_value).into_exp();
+                let node_id = self.env.new_node(info.loc.clone(), info.ty.clone());
+                let body = ExpData::Value(node_id, info.value).into_exp();
                 self.env.add_function_def(
                     module_id,
                     accessor_sym,
-                    loc,
-                    visibility,
-                    has_pkg,
+                    info.loc,
+                    info.visibility,
+                    info.has_package_visibility,
                     vec![],
                     vec![],
-                    const_type,
+                    info.ty,
                     body,
                     None,
                 );
