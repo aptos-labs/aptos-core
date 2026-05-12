@@ -417,7 +417,7 @@ impl<'a, I: Interner> SsaConverter<'a, I> {
             B::Mod => self.convert_binop(BinaryOp::Mod, false)?,
             B::BitOr => self.convert_binop(BinaryOp::BitOr, false)?,
             B::BitAnd => self.convert_binop(BinaryOp::BitAnd, false)?,
-            B::Xor => self.convert_binop(BinaryOp::Xor, false)?,
+            B::Xor => self.convert_binop(BinaryOp::BitXor, false)?,
             B::Shl => self.convert_binop(BinaryOp::Shl, false)?,
             B::Shr => self.convert_binop(BinaryOp::Shr, false)?,
             // --- Comparisons / logical (result type = bool) ---

@@ -95,7 +95,7 @@ fun bit_xor(r0, r1): u64 {
     r2: u64
   code:
   L0:
-    0: r2 := xor r0, r1
+    0: r2 := bit_xor r0, r1
     1: ret [r2]
 }
 

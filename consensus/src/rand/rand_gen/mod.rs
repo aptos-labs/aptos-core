@@ -5,6 +5,7 @@
 pub(crate) mod test_utils;
 
 pub mod block_queue;
+pub mod lazy_types;
 pub mod network_messages;
 pub mod rand_store;
 pub mod types;

@@ -740,7 +740,7 @@ fn binary_op_name(op: &BinaryOp) -> &'static str {
         BinaryOp::Mod => "mod",
         BinaryOp::BitOr => "bit_or",
         BinaryOp::BitAnd => "bit_and",
-        BinaryOp::Xor => "xor",
+        BinaryOp::BitXor => "bit_xor",
         BinaryOp::Shl => "shl",
         BinaryOp::Shr => "shr",
         BinaryOp::Cmp(cmp) => cmp_op_name(cmp),

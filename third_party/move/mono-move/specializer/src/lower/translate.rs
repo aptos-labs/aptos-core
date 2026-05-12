@@ -241,7 +241,7 @@ impl<'a> LoweringState<'a> {
                         BinaryOp::Mod => self.emit(MicroOp::ModU64 { dst, lhs, rhs }),
                         BinaryOp::BitAnd => self.emit(MicroOp::BitAndU64 { dst, lhs, rhs }),
                         BinaryOp::BitOr => self.emit(MicroOp::BitOrU64 { dst, lhs, rhs }),
-                        BinaryOp::Xor => self.emit(MicroOp::BitXorU64 { dst, lhs, rhs }),
+                        BinaryOp::BitXor => self.emit(MicroOp::BitXorU64 { dst, lhs, rhs }),
                         BinaryOp::Shl => self.emit(MicroOp::ShlU64 { dst, lhs, rhs }),
                         BinaryOp::Shr => self.emit(MicroOp::ShrU64 { dst, lhs, rhs }),
                         // Phase 2/3: comparison-to-register and logical and/or.
@@ -260,22 +260,49 @@ impl<'a> LoweringState<'a> {
                 if Self::fits_in_u64(src_ty) {
                     let s = self.slot(*src);
                     let d = self.def_slot(*dst);
-                    let v = imm_to_u64(imm);
                     let dst = FrameOffset(d.offset);
                     let src = FrameOffset(s.offset);
                     match op {
-                        BinaryOp::Add => self.emit(MicroOp::AddU64Imm { dst, src, imm: v }),
-                        BinaryOp::Sub => self.emit(MicroOp::SubU64Imm { dst, src, imm: v }),
-                        BinaryOp::Mul => self.emit(MicroOp::MulU64Imm { dst, src, imm: v }),
-                        BinaryOp::Div => self.emit(MicroOp::DivU64Imm { dst, src, imm: v }),
-                        BinaryOp::Mod => self.emit(MicroOp::ModU64Imm { dst, src, imm: v }),
-                        BinaryOp::Shl => self.emit(MicroOp::ShlU64Imm { dst, src, imm: v }),
-                        BinaryOp::Shr => self.emit(MicroOp::ShrU64Imm { dst, src, imm: v }),
-                        // No immediate forms today: BitAnd/BitOr/Xor and the
+                        BinaryOp::Add => self.emit(MicroOp::AddU64Imm {
+                            dst,
+                            src,
+                            imm: imm_to_u64(imm),
+                        }),
+                        BinaryOp::Sub => self.emit(MicroOp::SubU64Imm {
+                            dst,
+                            src,
+                            imm: imm_to_u64(imm),
+                        }),
+                        BinaryOp::Mul => self.emit(MicroOp::MulU64Imm {
+                            dst,
+                            src,
+                            imm: imm_to_u64(imm),
+                        }),
+                        BinaryOp::Div => self.emit(MicroOp::DivU64Imm {
+                            dst,
+                            src,
+                            imm: imm_to_u64(imm),
+                        }),
+                        BinaryOp::Mod => self.emit(MicroOp::ModU64Imm {
+                            dst,
+                            src,
+                            imm: imm_to_u64(imm),
+                        }),
+                        BinaryOp::Shl => self.emit(MicroOp::ShlU64Imm {
+                            dst,
+                            src,
+                            imm: shift_imm_u8(imm)?,
+                        }),
+                        BinaryOp::Shr => self.emit(MicroOp::ShrU64Imm {
+                            dst,
+                            src,
+                            imm: shift_imm_u8(imm)?,
+                        }),
+                        // No immediate forms today: BitAnd/BitOr/BitXor and the
                         // Phase 2/3 Cmp/Or/And ops.
                         BinaryOp::BitAnd
                         | BinaryOp::BitOr
-                        | BinaryOp::Xor
+                        | BinaryOp::BitXor
                         | BinaryOp::Cmp(_)
                         | BinaryOp::Or
                         | BinaryOp::And => {
@@ -542,5 +569,14 @@ fn imm_to_u64(imm: &ImmValue) -> u64 {
         ImmValue::I16(v) => *v as u64,
         ImmValue::I32(v) => *v as u64,
         ImmValue::I64(v) => *v as u64,
+    }
+}
+
+/// Extract a u8 shift amount. The rhs of a Move `Shl`/`Shr` is always u8
+/// by language spec; anything else is an upstream invariant violation.
+fn shift_imm_u8(imm: &ImmValue) -> Result<u8> {
+    match imm {
+        ImmValue::U8(v) => Ok(*v),
+        other => bail!("shift immediate must be u8, got {:?}", other),
     }
 }

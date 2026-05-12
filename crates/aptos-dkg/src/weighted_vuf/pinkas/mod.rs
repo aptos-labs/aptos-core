@@ -41,6 +41,23 @@ pub struct RandomizedPKs {
     rks: Vec<G1Projective>, // g^{r \sk_i}, for all shares i
 }
 
+impl RandomizedPKs {
+    /// Construct from already-decompressed group elements. Callers must ensure
+    /// that `pi` and `rks` are valid subgroup elements (e.g., obtained from a
+    /// successful `G1Affine::from_compressed` decode).
+    pub fn from_decompressed(pi: G1Projective, rks: Vec<G1Projective>) -> Self {
+        Self { pi, rks }
+    }
+
+    pub fn pi(&self) -> &G1Projective {
+        &self.pi
+    }
+
+    pub fn rks(&self) -> &[G1Projective] {
+        &self.rks
+    }
+}
+
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct PublicParameters {
     g: G1Projective,
