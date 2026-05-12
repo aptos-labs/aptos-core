@@ -92,7 +92,8 @@ Returns true if it succeeds and false otherwise.
     // Step 1: Fiat-Shamir transform on `(dst, (psi, f), stmt)` <b>to</b> derive the random challenge `e`
     <b>let</b> _A = proof.get_commitment();
     <b>let</b> m = _A.length();
-    <b>let</b> (e, betas) = fiat_shamir(dst, stmt, proof.get_compressed_commitment(), proof.get_response_length());
+    <b>let</b> (e, betas) = fiat_shamir(dst, stmt, proof.get_compressed_commitment(),
+        proof.get_response(), proof.get_response_length());
 
     // Step 2:
     <b>let</b> psi_sigma = psi(stmt, &proof.response_to_witness());

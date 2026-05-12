@@ -11,6 +11,7 @@
 -  [Function `new_proof_from_bytes`](#0x1_sigma_protocol_proof_new_proof_from_bytes)
 -  [Function `response_to_witness`](#0x1_sigma_protocol_proof_response_to_witness)
 -  [Function `get_commitment`](#0x1_sigma_protocol_proof_get_commitment)
+-  [Function `get_response`](#0x1_sigma_protocol_proof_get_response)
 -  [Function `get_compressed_commitment`](#0x1_sigma_protocol_proof_get_compressed_commitment)
 -  [Function `get_response_length`](#0x1_sigma_protocol_proof_get_response_length)
 
@@ -190,6 +191,30 @@ This is needed during proof verification: when calling the homomorphism on the <
 
 <pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="sigma_protocol_proof.md#0x1_sigma_protocol_proof_get_commitment">get_commitment</a>(self: &<a href="sigma_protocol_proof.md#0x1_sigma_protocol_proof_Proof">Proof</a>): &<a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;RistrettoPoint&gt; {
     &self.comm_A
+}
+</code></pre>
+
+
+
+</details>
+
+<a id="0x1_sigma_protocol_proof_get_response"></a>
+
+## Function `get_response`
+
+
+
+<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="sigma_protocol_proof.md#0x1_sigma_protocol_proof_get_response">get_response</a>(self: &<a href="sigma_protocol_proof.md#0x1_sigma_protocol_proof_Proof">sigma_protocol_proof::Proof</a>): &<a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;<a href="../../aptos-stdlib/doc/ristretto255.md#0x1_ristretto255_Scalar">ristretto255::Scalar</a>&gt;
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="sigma_protocol_proof.md#0x1_sigma_protocol_proof_get_response">get_response</a>(self: &<a href="sigma_protocol_proof.md#0x1_sigma_protocol_proof_Proof">Proof</a>): &<a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;Scalar&gt; {
+    &self.resp_sigma
 }
 </code></pre>
 

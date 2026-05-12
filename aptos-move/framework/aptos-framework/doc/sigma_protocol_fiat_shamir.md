@@ -226,7 +226,7 @@ The length of the <code>A</code> field in <code>Proof</code> should NOT be zero
 Returns the Sigma protocol challenge $e$ and $1,\beta,\beta^2,\ldots, \beta^{m-1}$
 
 
-<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="sigma_protocol_fiat_shamir.md#0x1_sigma_protocol_fiat_shamir_fiat_shamir">fiat_shamir</a>&lt;P&gt;(dst: <a href="sigma_protocol_fiat_shamir.md#0x1_sigma_protocol_fiat_shamir_DomainSeparator">sigma_protocol_fiat_shamir::DomainSeparator</a>, stmt: &<a href="sigma_protocol_statement.md#0x1_sigma_protocol_statement_Statement">sigma_protocol_statement::Statement</a>&lt;P&gt;, compressed_A: &<a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;<a href="../../aptos-stdlib/doc/ristretto255.md#0x1_ristretto255_CompressedRistretto">ristretto255::CompressedRistretto</a>&gt;, k: u64): (<a href="../../aptos-stdlib/doc/ristretto255.md#0x1_ristretto255_Scalar">ristretto255::Scalar</a>, <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;<a href="../../aptos-stdlib/doc/ristretto255.md#0x1_ristretto255_Scalar">ristretto255::Scalar</a>&gt;)
+<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="sigma_protocol_fiat_shamir.md#0x1_sigma_protocol_fiat_shamir_fiat_shamir">fiat_shamir</a>&lt;P&gt;(dst: <a href="sigma_protocol_fiat_shamir.md#0x1_sigma_protocol_fiat_shamir_DomainSeparator">sigma_protocol_fiat_shamir::DomainSeparator</a>, stmt: &<a href="sigma_protocol_statement.md#0x1_sigma_protocol_statement_Statement">sigma_protocol_statement::Statement</a>&lt;P&gt;, compressed_A: &<a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;<a href="../../aptos-stdlib/doc/ristretto255.md#0x1_ristretto255_CompressedRistretto">ristretto255::CompressedRistretto</a>&gt;, sigmas: &<a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;<a href="../../aptos-stdlib/doc/ristretto255.md#0x1_ristretto255_Scalar">ristretto255::Scalar</a>&gt;, k: u64): (<a href="../../aptos-stdlib/doc/ristretto255.md#0x1_ristretto255_Scalar">ristretto255::Scalar</a>, <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;<a href="../../aptos-stdlib/doc/ristretto255.md#0x1_ristretto255_Scalar">ristretto255::Scalar</a>&gt;)
 </code></pre>
 
 
@@ -239,6 +239,7 @@ Returns the Sigma protocol challenge $e$ and $1,\beta,\beta^2,\ldots, \beta^{m-1
     dst: <a href="sigma_protocol_fiat_shamir.md#0x1_sigma_protocol_fiat_shamir_DomainSeparator">DomainSeparator</a>,
     stmt: &Statement&lt;P&gt;,
     compressed_A: &<a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;CompressedRistretto&gt;,
+    sigmas: &<a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;Scalar&gt;,
     k: u64): (Scalar, <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;Scalar&gt;)
 {
     <b>let</b> m = compressed_A.length();
@@ -247,32 +248,36 @@ Returns the Sigma protocol challenge $e$ and $1,\beta,\beta^2,\ldots, \beta^{m-1
     // We will <a href="../../aptos-stdlib/../move-stdlib/doc/hash.md#0x1_hash">hash</a> an application-specific domain separator and the (full) <b>public</b> statement,
     // which will <b>include</b> <a href="../../aptos-stdlib/doc/any.md#0x1_any">any</a> <b>public</b> parameters like group generators $G$, $H$.
 
-    // Note: A hardcodes $m$, the statement hardcodes $n_1$ and $n_2$, and $k$ is specified manually!
-    <b>let</b> fs_inputs = <a href="sigma_protocol_fiat_shamir.md#0x1_sigma_protocol_fiat_shamir_FiatShamirInputs">FiatShamirInputs</a> {
+    // Note: A more principled `Merlin` / `spongefish`-like approach would have been preferred, but... more <a href="code.md#0x1_code">code</a>.
+
+    // Note: A hardcodes $m$, the statement hardcodes $n_1$ and $n_2$, and $k$ is specified manually!;
+    <b>let</b> seed = sha2_512_value(&<a href="sigma_protocol_fiat_shamir.md#0x1_sigma_protocol_fiat_shamir_FiatShamirInputs">FiatShamirInputs</a> {
         dst,
         type_name: <a href="../../aptos-stdlib/doc/type_info.md#0x1_type_info_type_name">type_info::type_name</a>&lt;P&gt;(),
         k,
         stmt_X: *stmt.get_compressed_points(),
         stmt_x: *stmt.get_scalars(),
         proof_A: *compressed_A
-    };
-
-    <b>let</b> seed = sha2_512_value(&fs_inputs);
-
-    // Note:A more principled `Merlin` / `spongefish`-like approach would have been preferred, but... more <a href="code.md#0x1_code">code</a>.
-    //
-    // e = SHA2-512(SHA2-512(fs_inputs.to_bcs_bytes()) || 0x00)
+    });
     seed.push_back(0u8);
     <b>assert</b>!(*seed.last() == 0, <a href="../../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error_internal">error::internal</a>(<a href="sigma_protocol_fiat_shamir.md#0x1_sigma_protocol_fiat_shamir_E_INTERNAL_INVARIANT_FAILED">E_INTERNAL_INVARIANT_FAILED</a>));
-    <b>let</b> e_hash = sha2_512(seed);
 
-    // beta = SHA2-512(SHA2-512(fs_inputs.to_bcs_bytes()) || 0x01)
+    // i.e., SHA2-512(
+    //         SHA2-512(BCS{ dst, type_name, k, stmt_X, stmt_x, proof_A })
+    //         || 0x00
+    //       )
+    <b>let</b> e = new_scalar_uniform_from_64_bytes(sha2_512(seed)).extract();
+
     *seed.last_mut() += 1;
     <b>assert</b>!(*seed.last() == 1, <a href="../../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error_internal">error::internal</a>(<a href="sigma_protocol_fiat_shamir.md#0x1_sigma_protocol_fiat_shamir_E_INTERNAL_INVARIANT_FAILED">E_INTERNAL_INVARIANT_FAILED</a>));
-    <b>let</b> beta_hash = sha2_512(seed);
+    seed.append(<a href="../../aptos-stdlib/../move-stdlib/doc/bcs.md#0x1_bcs_to_bytes">bcs::to_bytes</a>(sigmas));
 
-    <b>let</b> e = new_scalar_uniform_from_64_bytes(e_hash).extract();
-    <b>let</b> beta = new_scalar_uniform_from_64_bytes(beta_hash).extract();
+    // i.e., SHA2-512(
+    //         SHA2-512(BCS{ dst, type_name, k, stmt_X, stmt_x, proof_A })
+    //         || 0x01
+    //         || BCS{ sigmas }
+    //       )
+    <b>let</b> beta = new_scalar_uniform_from_64_bytes(sha2_512(seed)).extract();
 
     <b>let</b> betas = <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>[];
     <b>let</b> prev_beta = scalar_one();
