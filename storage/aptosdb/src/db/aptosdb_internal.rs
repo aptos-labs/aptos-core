@@ -145,6 +145,16 @@ impl AptosDB {
                 hot_state_config,
             )?;
 
+        // Seed pruner progress after `delete_on_restart` wipes the hot KV metadata DB, so the
+        // pruner doesn't catch up from 0 over an empty DB.
+        if !readonly && hot_state_config.delete_on_restart {
+            if let Some(hot_db) = hot_state_kv_db.as_ref() {
+                if let Some(synced_version) = ledger_db.metadata_db().get_synced_version()? {
+                    hot_db.write_pruner_progress(synced_version)?;
+                }
+            }
+        }
+
         let myself = Self::new_with_dbs(
             ledger_db,
             hot_state_merkle_db,
