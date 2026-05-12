@@ -59,6 +59,14 @@ impl Drop for MemoryRegion {
 // ---------------------------------------------------------------------------
 
 /// # Safety
+/// `base.add(byte_offset)` must be valid and point to an initialized `u8`.
+#[inline(always)]
+pub unsafe fn read_u8(base: *const u8, byte_offset: impl Into<usize>) -> u8 {
+    // SAFETY: caller must uphold the documented pointer requirements.
+    unsafe { base.add(byte_offset.into()).read() }
+}
+
+/// # Safety
 /// `base.add(byte_offset)` must be valid, aligned, and point to an initialized `u64`.
 #[inline(always)]
 pub unsafe fn read_u64(base: *const u8, byte_offset: impl Into<usize>) -> u64 {

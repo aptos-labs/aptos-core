@@ -263,11 +263,16 @@ impl FunctionVerifier<'_> {
             | MicroOp::ModU64 { dst, lhs, rhs }
             | MicroOp::BitAndU64 { dst, lhs, rhs }
             | MicroOp::BitOrU64 { dst, lhs, rhs }
-            | MicroOp::BitXorU64 { dst, lhs, rhs }
-            | MicroOp::ShlU64 { dst, lhs, rhs }
-            | MicroOp::ShrU64 { dst, lhs, rhs } => {
+            | MicroOp::BitXorU64 { dst, lhs, rhs } => {
                 self.check_frame_access_8(pc, lhs);
                 self.check_frame_access_8(pc, rhs);
+                self.check_frame_access_8(pc, dst);
+            },
+
+            // Shifts: `rhs` is a 1-byte slot (the Move shift amount is u8).
+            MicroOp::ShlU64 { dst, lhs, rhs } | MicroOp::ShrU64 { dst, lhs, rhs } => {
+                self.check_frame_access_8(pc, lhs);
+                self.check_frame_access_1(pc, rhs);
                 self.check_frame_access_8(pc, dst);
             },
 
@@ -721,6 +726,10 @@ impl FunctionVerifier<'_> {
 
     fn check_frame_access_8(&mut self, pc: usize, offset: FrameOffset) {
         self.check_frame_access(Some(pc), offset, 8);
+    }
+
+    fn check_frame_access_1(&mut self, pc: usize, offset: FrameOffset) {
+        self.check_frame_access(Some(pc), offset, 1);
     }
 
     fn check_descriptor(&mut self, pc: usize, descriptor_id: DescriptorId) {

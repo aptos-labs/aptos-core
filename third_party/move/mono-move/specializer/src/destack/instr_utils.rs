@@ -198,7 +198,7 @@ pub(crate) fn is_commutative(op: &BinaryOp) -> bool {
             | BinaryOp::Mul
             | BinaryOp::BitOr
             | BinaryOp::BitAnd
-            | BinaryOp::Xor
+            | BinaryOp::BitXor
             | BinaryOp::Cmp(CmpOp::Eq)
             | BinaryOp::Cmp(CmpOp::Neq)
             | BinaryOp::Or

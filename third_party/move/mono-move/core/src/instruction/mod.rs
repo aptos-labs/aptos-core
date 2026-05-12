@@ -388,13 +388,10 @@ pub enum MicroOp {
 
     // --- Shifts ---
     //
-    // TODO: in old Move bytecode the shift amount is a u8, not a u64. We
-    // currently model `rhs` as a full 8-byte slot to match the rest of
-    // the slot ABI; the value living there is zero-extended from a u8 by
-    // the lowerer. Reconsider whether `rhs` (and the imm field of the
-    // imm-form ops) should be narrower once the slot-alignment story is
-    // sorted out — affects destack, lowering, and slot allocation.
-    /// `dst = lhs << rhs` (u64). Aborts if `rhs >= 64`.
+    // The shift amount is a u8 (matching Move bytecode, where the rhs of
+    // `Shl`/`Shr` is always u8). For the reg-reg forms, `rhs` is the offset
+    // of a 1-byte slot; the interpreter reads exactly one byte from it.
+    /// `dst = lhs << rhs` (u64). `rhs` is a 1-byte slot. Aborts if `rhs >= 64`.
     ShlU64 {
         dst: FrameOffset,
         lhs: FrameOffset,
@@ -405,10 +402,11 @@ pub enum MicroOp {
     ShlU64Imm {
         dst: FrameOffset,
         src: FrameOffset,
-        imm: u64,
+        imm: u8,
     },
 
-    /// `dst = lhs >> rhs` (u64, logical right shift). Aborts if `rhs >= 64`.
+    /// `dst = lhs >> rhs` (u64, logical right shift). `rhs` is a 1-byte slot.
+    /// Aborts if `rhs >= 64`.
     ShrU64 {
         dst: FrameOffset,
         lhs: FrameOffset,
@@ -419,7 +417,7 @@ pub enum MicroOp {
     ShrU64Imm {
         dst: FrameOffset,
         src: FrameOffset,
-        imm: u64,
+        imm: u8,
     },
 
     //======================================================================

@@ -13,7 +13,9 @@ use crate::{
         pinned_roots::PinnedRoots,
         Heap,
     },
-    memory::{read_ptr, read_u32, read_u64, vec_elem_ptr, write_ptr, write_u64, MemoryRegion},
+    memory::{
+        read_ptr, read_u32, read_u64, read_u8, vec_elem_ptr, write_ptr, write_u64, MemoryRegion,
+    },
     types::{
         StepResult, DEFAULT_HEAP_SIZE, DEFAULT_STACK_SIZE, HEADER_SIZE_OFFSET,
         META_SAVED_FP_OFFSET, META_SAVED_FUNC_PTR_OFFSET, META_SAVED_PC_OFFSET, VEC_DATA_OFFSET,
@@ -295,7 +297,8 @@ unsafe fn checked_imm_op_u64<F: FnOnce(u64, u64) -> Option<u64>>(
 }
 
 /// `dst <- op(lhs_slot, rhs_slot_as_shift)`. Bail if shift `>= 64`.
-/// `op_name` is used to format the error message.
+/// `op_name` is used to format the error message. The shift amount lives in
+/// a 1-byte slot (Move bytecode invariant); only that byte is read.
 #[inline(always)]
 unsafe fn shift_u64<F: FnOnce(u64, u64) -> u64>(
     fp: *mut u8,
@@ -305,10 +308,11 @@ unsafe fn shift_u64<F: FnOnce(u64, u64) -> u64>(
     op: F,
     op_name: &'static str,
 ) -> ExecutionResult<()> {
-    // SAFETY: `fp` is the current frame pointer and `lhs`/`rhs`/`dst` are
-    // in-bounds 8-byte slots within that frame (enforced by the verifier).
+    // SAFETY: `fp` is the current frame pointer; `lhs`/`dst` are in-bounds
+    // 8-byte slots and `rhs` is an in-bounds 1-byte slot within that frame
+    // (enforced by the verifier).
     unsafe {
-        let shift = read_u64(fp, rhs);
+        let shift = read_u8(fp, rhs) as u64;
         if shift >= 64 {
             bail!("{}: shift amount {} exceeds 63", op_name, shift);
         }
@@ -552,7 +556,7 @@ impl<T: ExecutionContext> InterpreterContext<'_, T> {
                 // defensive check.
                 MicroOp::ShlU64Imm { dst, src, imm } => {
                     debug_assert!(imm < 64, "ShlU64Imm: imm must be < 64 (verifier invariant)");
-                    imm_op_u64(fp, dst, src, imm, |s, i| s << i)
+                    imm_op_u64(fp, dst, src, imm as u64, |s, i| s << i)
                 },
                 MicroOp::ShrU64 { dst, lhs, rhs } => {
                     shift_u64(fp, dst, lhs, rhs, |v, s| v >> s, "ShrU64")?
@@ -562,7 +566,7 @@ impl<T: ExecutionContext> InterpreterContext<'_, T> {
                 // defensive check.
                 MicroOp::ShrU64Imm { dst, src, imm } => {
                     debug_assert!(imm < 64, "ShrU64Imm: imm must be < 64 (verifier invariant)");
-                    imm_op_u64(fp, dst, src, imm, |s, i| s >> i)
+                    imm_op_u64(fp, dst, src, imm as u64, |s, i| s >> i)
                 },
 
                 MicroOp::StoreRandomU64 { dst } => {
