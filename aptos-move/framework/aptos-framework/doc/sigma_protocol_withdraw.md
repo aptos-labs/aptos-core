@@ -451,7 +451,7 @@ and ensure <code>new_balance</code> / <code>compressed_new_balance</code> have e
     <b>assert</b>!(b.add_point(compressed_ek) == <a href="sigma_protocol_withdraw.md#0x1_sigma_protocol_withdraw_IDX_EK">IDX_EK</a>, err);                                                           // ek
     <b>assert</b>!(b.add_points(compressed_old_balance.get_compressed_P()) == <a href="sigma_protocol_withdraw.md#0x1_sigma_protocol_withdraw_START_IDX_OLD_P">START_IDX_OLD_P</a>, err);                  // old_P
     <b>assert</b>!(b.add_points(compressed_old_balance.get_compressed_R()) == <a href="sigma_protocol_withdraw.md#0x1_sigma_protocol_withdraw_START_IDX_OLD_P">START_IDX_OLD_P</a> + ell, err);            // old_R
-    <b>assert</b>!(b.add_points(compressed_new_balance.get_compressed_P()) == <a href="sigma_protocol_withdraw.md#0x1_sigma_protocol_withdraw_START_IDX_OLD_P">START_IDX_OLD_P</a> + 2 * ell, err); // new_P
+    <b>assert</b>!(b.add_points(compressed_new_balance.get_compressed_P()) == <a href="sigma_protocol_withdraw.md#0x1_sigma_protocol_withdraw_START_IDX_OLD_P">START_IDX_OLD_P</a> + 2 * ell, err);        // new_P
     <b>assert</b>!(b.add_points(compressed_new_balance.get_compressed_R()) == <a href="sigma_protocol_withdraw.md#0x1_sigma_protocol_withdraw_START_IDX_OLD_P">START_IDX_OLD_P</a> + 3 * ell, err);        // new_R
 
     <b>if</b> (compressed_ek_aud.is_some()) {
@@ -461,7 +461,7 @@ and ensure <code>new_balance</code> / <code>compressed_new_balance</code> have e
 
     <b>assert</b>!(b.add_scalar(v) == <a href="sigma_protocol_withdraw.md#0x1_sigma_protocol_withdraw_IDX_V">IDX_V</a>, err);
     <b>let</b> stmt = b.build();
-    <a href="sigma_protocol_withdraw.md#0x1_sigma_protocol_withdraw_assert_withdraw_statement_is_well_formed">assert_withdraw_statement_is_well_formed</a>(&stmt, compressed_ek_aud.is_some());
+        <a href="sigma_protocol_withdraw.md#0x1_sigma_protocol_withdraw_assert_withdraw_statement_is_well_formed">assert_withdraw_statement_is_well_formed</a>(&stmt, compressed_ek_aud.is_some());
     stmt
 }
 </code></pre>
