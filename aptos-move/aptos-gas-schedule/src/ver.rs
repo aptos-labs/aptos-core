@@ -8,6 +8,10 @@
 ///   - Changing how gas is calculated in any way
 ///
 /// Change log:
+/// - V46:
+///    - Fix BN254 `Fr::one()` native to charge `algebra.ark_bn254_fr_one` instead of
+///      `algebra.ark_bls12_381_fr_one`. Schedule key renamed to `..._fr_one_v2` so the
+///      old (zero-valued) key remains in effect for pre-V46 versions.
 /// - V45:
 ///    - New minimum price per gas unit parameter for higher-limit transactions
 ///    - Gas charging for encrypted transaction decryption

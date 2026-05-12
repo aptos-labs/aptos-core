@@ -196,7 +196,7 @@ impl UnverifiedEvent {
             },
             UnverifiedEvent::BatchMsgV2(b) => {
                 if !self_message {
-                    b.verify(peer_id, max_num_batches, validator)?;
+                    b.verify_v2(peer_id, max_num_batches, validator)?;
                     counters::VERIFY_MSG
                         .with_label_values(&["batch_v2"])
                         .observe(start_time.elapsed().as_secs_f64());
@@ -219,7 +219,7 @@ impl UnverifiedEvent {
             },
             UnverifiedEvent::SignedBatchInfoMsgV2(sd) => {
                 if !self_message {
-                    sd.verify(
+                    sd.verify_v2(
                         peer_id,
                         max_num_batches,
                         max_batch_expiry_gap_usecs,
@@ -242,7 +242,7 @@ impl UnverifiedEvent {
             },
             UnverifiedEvent::ProofOfStoreMsgV2(p) => {
                 if !self_message {
-                    p.verify(max_num_batches, validator, proof_cache)?;
+                    p.verify_v2(max_num_batches, validator, proof_cache)?;
                     counters::VERIFY_MSG
                         .with_label_values(&["proof_of_store_v2"])
                         .observe(start_time.elapsed().as_secs_f64());
@@ -2380,5 +2380,55 @@ mod reject_encrypted_tests {
         let event =
             UnverifiedEvent::SignedBatchInfoMsgV2(Box::new(make_encrypted_signed_batch_info_v2()));
         assert!(event.reject_encrypted().is_err());
+    }
+
+    /// Exercises the disclosed crafted `BatchMsgV2` (V1 entry with expiration=1
+    /// followed by V2 entry with expiration=u64::MAX) through
+    /// `UnverifiedEvent::verify`, ensuring `round_manager` routes V2 wire
+    /// messages through `verify_v2` and that the variant check rejects the
+    /// message before any panic-prone downstream consumer runs.
+    #[test]
+    fn test_unverified_event_rejects_v1_in_batch_msg_v2() {
+        use aptos_consensus_types::proof_of_store::ProofCache;
+        use aptos_types::validator_verifier::ValidatorVerifier;
+
+        let author = AccountAddress::random();
+        let v1 = crate::quorum_store::types::Batch::<BatchInfoExt>::new_v1(
+            BatchId::new_for_test(1),
+            vec![],
+            1,
+            1,
+            author,
+            0,
+        );
+        let v2 = crate::quorum_store::types::Batch::<BatchInfoExt>::new_v2(
+            BatchId::new_for_test(2),
+            vec![],
+            1,
+            u64::MAX,
+            author,
+            0,
+            BatchKind::Normal,
+        );
+        let event = UnverifiedEvent::BatchMsgV2(Box::new(BatchMsg::new(vec![v1, v2])));
+        let err = event
+            .verify(
+                author,
+                &ValidatorVerifier::new(vec![]),
+                &ProofCache::new(1),
+                true,     // quorum_store_enabled
+                true,     // opt_qs_v2_rx_enabled
+                false,    // self_message
+                100,      // max_num_batches
+                u64::MAX, // max_batch_expiry_gap_usecs
+                1_000_000,
+                1_000_000,
+                true, // encrypted_enabled
+            )
+            .expect_err("must reject mixed-variant BatchMsgV2");
+        assert!(
+            err.to_string().contains("Non-V2 batch in BatchMsgV2"),
+            "unexpected error: {err}"
+        );
     }
 }
