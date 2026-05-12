@@ -445,6 +445,107 @@ fn build_payload(func_id: &str, args: &[String]) -> TransactionPayload {
 }
 
 // =================================================================================================
+// Human-readable per-tx descriptions
+//
+// We print *only* public information: addresses, asset_type, plaintext
+// amounts, encryption keys, booleans, and small public hex fields. We
+// deliberately omit ciphertexts (P/R arrays), bulletproof bytes, and the
+// sigma proof itself — those are large, unilluminating to a human reader, and
+// already covered by the per-component verification that the harness does
+// underneath. The intent is a "tail -f" friendly transcript of who did what.
+// =================================================================================================
+
+fn fmt_addr(a: AccountAddress) -> String {
+    // Shortest 0x-prefixed form; consistent for special addresses like 0xa.
+    a.to_hex_literal()
+}
+
+fn fmt_hex(bytes: &[u8]) -> String {
+    format!("0x{}", hex::encode(bytes))
+}
+
+#[allow(non_snake_case)]
+fn describe_entry_call(fn_id: &str, args: &[String]) -> String {
+    match fn_id {
+        "0x1::confidential_asset::register_raw" => {
+            let asset = parse_object_metadata_inner_address(&args[0]);
+            let ek = parse_vec_u8(&args[1]);
+            format!(
+                "register_raw(asset={}, ek={})",
+                fmt_addr(asset),
+                fmt_hex(&ek)
+            )
+        },
+        "0x1::confidential_asset::deposit" => {
+            let asset = parse_object_metadata_inner_address(&args[0]);
+            let amount = parse_u64(&args[1]);
+            format!("deposit(asset={}, amount={})", fmt_addr(asset), amount)
+        },
+        "0x1::confidential_asset::withdraw_to_raw" => {
+            let asset = parse_object_metadata_inner_address(&args[0]);
+            let to = parse_address(&args[1]);
+            let amount = parse_u64(&args[2]);
+            format!(
+                "withdraw_to_raw(asset={}, to={}, amount={})",
+                fmt_addr(asset),
+                fmt_addr(to),
+                amount
+            )
+        },
+        "0x1::confidential_asset::confidential_transfer_raw" => {
+            // amount is encrypted; only sender / recipient / asset / memo are public.
+            let asset = parse_object_metadata_inner_address(&args[0]);
+            let to = parse_address(&args[1]);
+            let memo = parse_vec_u8(&args[15]);
+            let n_volun_auds = parse_vec_vec_u8(&args[9]).len();
+            format!(
+                "confidential_transfer_raw(asset={}, to={}, memo_len={}, voluntary_auditors={})",
+                fmt_addr(asset),
+                fmt_addr(to),
+                memo.len(),
+                n_volun_auds
+            )
+        },
+        "0x1::confidential_asset::rotate_encryption_key_raw" => {
+            let asset = parse_object_metadata_inner_address(&args[0]);
+            let new_ek = parse_vec_u8(&args[1]);
+            let resume = parse_bool(&args[2]);
+            format!(
+                "rotate_encryption_key_raw(asset={}, new_ek={}, resume_incoming={})",
+                fmt_addr(asset),
+                fmt_hex(&new_ek),
+                resume
+            )
+        },
+        "0x1::confidential_asset::normalize_raw" => {
+            let asset = parse_object_metadata_inner_address(&args[0]);
+            format!("normalize_raw(asset={})", fmt_addr(asset))
+        },
+        "0x1::confidential_asset::rollover_pending_balance" => {
+            let asset = parse_object_metadata_inner_address(&args[0]);
+            format!("rollover_pending_balance(asset={})", fmt_addr(asset))
+        },
+        "0x1::confidential_asset::rollover_pending_balance_and_pause" => {
+            let asset = parse_object_metadata_inner_address(&args[0]);
+            format!(
+                "rollover_pending_balance_and_pause(asset={})",
+                fmt_addr(asset)
+            )
+        },
+        "0x1::confidential_asset::set_incoming_transfers_paused" => {
+            let asset = parse_object_metadata_inner_address(&args[0]);
+            let paused = parse_bool(&args[1]);
+            format!(
+                "set_incoming_transfers_paused(asset={}, paused={})",
+                fmt_addr(asset),
+                paused
+            )
+        },
+        other => format!("<unknown fn {}>", other),
+    }
+}
+
+// =================================================================================================
 // Harness bootstrap
 // =================================================================================================
 
@@ -581,6 +682,10 @@ fn handle_script_payload(payload: &Payload, version: u64, script_payloads_seen: 
     );
     // Script is the expected proposal-188 resolution; bootstrap_apt_confidentiality
     // already applied the equivalent state change. Skip execution.
+    eprintln!(
+        "[v={}] gov_script: resolve proposal {} (APT confidentiality enable) — skipped, bootstrap applied",
+        version, proposal_id
+    );
 }
 
 #[test]
@@ -603,7 +708,7 @@ fn replay_mainnet_audit_window() {
 
     let mut accounts: HashMap<AccountAddress, Account> = HashMap::new();
     let mut script_payloads_seen: u32 = 0;
-    let mut tx_count: u64 = 0;
+    let mut entry_fn_replayed: u64 = 0;
 
     // `transactions.jsonl` is NDJSON (one Response per line) after fetch.sh's
     // jq-based heartbeat filter. Each Response has a `transactions` array; we
@@ -658,6 +763,12 @@ fn replay_mainnet_audit_window() {
                             panic!("v={}: bad sender {:?}: {}", v, user.request.sender, e)
                         });
                     let acc = ensure_account(&mut h, &mut accounts, sender);
+                    eprintln!(
+                        "[v={}] {} {}",
+                        v,
+                        fmt_addr(sender),
+                        describe_entry_call(&efp.entry_function_id_str, &efp.arguments),
+                    );
                     let payload = build_payload(&efp.entry_function_id_str, &efp.arguments);
                     let status = h.run_transaction_payload(&acc, payload);
 
@@ -675,18 +786,23 @@ fn replay_mainnet_audit_window() {
                         efp.entry_function_id_str,
                         status
                     );
+                    entry_fn_replayed += 1;
                 },
                 other => panic!(
                     "v={}: unknown payload type {:?}; extend the test to dispatch it",
                     v, other
                 ),
             }
-            tx_count += 1;
         }
     }
 
+    // Total = entry-function txns we re-executed + governance scripts we
+    // encountered-but-skipped. This should match the total event count
+    // produced by `histogram.sh` over the same JSONL (each confidential-asset
+    // tx in our window emits exactly one event).
+    let total = entry_fn_replayed + script_payloads_seen as u64;
     eprintln!(
-        "[replay] OK: {} txn(s) replayed, {} script payload(s) encountered",
-        tx_count, script_payloads_seen
+        "[replay] OK: {} txn(s) in audit window = {} entry-function replayed + {} governance script(s) skipped",
+        total, entry_fn_replayed, script_payloads_seen
     );
 }
