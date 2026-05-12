@@ -12,7 +12,9 @@ use aptos_types::{
     account_config::CoinStoreResource,
     move_utils::MemberId,
     on_chain_config::FeatureFlag,
-    transaction::{EntryFunction, ExecutionStatus, Script, TransactionPayload, TransactionStatus},
+    transaction::{
+        Auth, EntryFunction, ExecutionStatus, Script, TransactionPayload, TransactionStatus,
+    },
     AptosCoinType,
 };
 use aptos_vm_types::storage::StorageGasParameters;
@@ -427,3 +429,101 @@ static PRICING: Lazy<FeePayerPricingInfo> = Lazy::new(|| {
         ),
     }
 });
+
+#[test]
+fn test_prologue_same_address_fee_payer_rejects() {
+    let mut h = MoveHarness::new();
+
+    let sender = h.new_account_at(AccountAddress::from_hex_literal("0xa11ce").unwrap());
+    let sender_balance = h.read_aptos_balance(sender.address());
+    let sender_balance_seq_num = h.sequence_number(sender.address());
+
+    let fee_payer = Account::new();
+    let txn = TransactionBuilder::new(sender.clone())
+        .payload(aptos_stdlib::aptos_account_set_allow_direct_coin_transfers(
+            true,
+        ))
+        .sequence_number(sender_balance_seq_num)
+        .max_gas_amount(1_000_000)
+        .gas_unit_price(1)
+        .raw()
+        // The sender signs the open sponsored-transaction message with
+        // fee payer address of 0x0.
+        .sign_aa_transaction(
+            Auth::Ed25519(&sender.privkey),
+            vec![],
+            vec![],
+            // Attaches fee payer address to be the sender but sign the fee
+            // payer leg with an unrelated key. Must be rejected by prologue.
+            Some((*sender.address(), Auth::Ed25519(&fee_payer.privkey))),
+        )
+        .unwrap()
+        .into_inner();
+
+    let status = h.run(txn);
+    assert!(matches!(
+        status,
+        TransactionStatus::Discard(StatusCode::INVALID_AUTH_KEY)
+    ));
+    assert_eq!(sender_balance, h.read_aptos_balance(sender.address()));
+    assert_eq!(sender_balance_seq_num, h.sequence_number(sender.address()));
+}
+
+fn account_at_address_with_key(address: AccountAddress, key_owner: &Account) -> Account {
+    Account::new_validator(
+        address,
+        key_owner.privkey.clone(),
+        key_owner.pubkey.as_ed25519().unwrap().clone(),
+    )
+}
+
+#[test]
+fn test_sponsored_new_account_sender_auth_key_not_skipped_when_default_account_resource_disabled() {
+    let payload = aptos_stdlib::aptos_account_set_allow_direct_coin_transfers(true);
+    let victim_address = AccountAddress::from_hex_literal("0xca11ed").unwrap();
+    let attacker_key_owner = Account::new();
+
+    let default_auth_key = bcs::to_bytes(&victim_address).unwrap();
+    assert_ne!(attacker_key_owner.auth_key(), default_auth_key);
+
+    let mut h = MoveHarness::new();
+    let sender_with_attacker_key = account_at_address_with_key(victim_address, &attacker_key_owner);
+    let fee_payer = h.new_account_at(AccountAddress::from_hex_literal("0xb0b").unwrap());
+    assert!(h
+        .sequence_number_opt(sender_with_attacker_key.address())
+        .is_none());
+
+    let txn = TransactionBuilder::new(sender_with_attacker_key.clone())
+        .fee_payer(fee_payer)
+        .payload(payload.clone())
+        .sequence_number(0)
+        .max_gas_amount(1_000_000)
+        .gas_unit_price(1)
+        .sign_fee_payer();
+    let status = h.run(txn);
+    assert!(matches!(
+        status,
+        TransactionStatus::Discard(StatusCode::INVALID_AUTH_KEY)
+    ));
+
+    assert!(h
+        .sequence_number_opt(sender_with_attacker_key.address())
+        .is_none());
+
+    h.enable_features(vec![], vec![FeatureFlag::DEFAULT_ACCOUNT_RESOURCE]);
+
+    let sender_with_attacker_key = account_at_address_with_key(victim_address, &attacker_key_owner);
+    let fee_payer = h.new_account_at(AccountAddress::from_hex_literal("0xb0b").unwrap());
+    let txn = TransactionBuilder::new(sender_with_attacker_key.clone())
+        .fee_payer(fee_payer.clone())
+        .payload(payload)
+        .sequence_number(0)
+        .max_gas_amount(1_000_000)
+        .gas_unit_price(1)
+        .sign_fee_payer();
+    let status = h.run(txn);
+    assert!(matches!(
+        status,
+        TransactionStatus::Discard(StatusCode::INVALID_AUTH_KEY)
+    ));
+}

@@ -2,12 +2,15 @@
 /// staking.
 ///
 /// Users can request multipliers to transaction limits (e..g, execution limit
-/// or IO limit) if they prove they control a significant stake:
+/// or IO limit) if they prove they control a significant stake in a stake pool
+/// that is currently in the active validator set:
 ///   - as a stake pool owner,
 ///   - as a delegated voter,
 ///   - as a delegation pool delegator.
 /// For example, one can request 2.5x on execution limits and 5x on IO limits.
-/// Multipliers are in basis points where 1 maps to 100, to support fractions.
+///
+/// Multipliers are expressed as percent of the base limit where 100 is 1x,
+/// 250 is 2.5x.
 ///
 /// The on-chain config stores a vector of tiers. Each tier maps multiplier to
 /// the required minimum stake threshold. A smallest multiplier that is greater
@@ -34,28 +37,30 @@ module aptos_framework::transaction_limits {
     const EINSUFFICIENT_STAKE: u64 = 5;
     /// Config tiers are not monotonically ordered.
     const ETHRESHOLDS_NOT_MONOTONIC: u64 = 6;
-    /// Multiplier must be > 100 bps (> 1x).
+    /// Multiplier must be > 100 (> 1x).
     const EINVALID_MULTIPLIER: u64 = 7;
     /// Requested multiplier is not available in any configured tier.
     const EMULTIPLIER_NOT_AVAILABLE: u64 = 8;
+    /// Stake pool is not in the current-epoch validator set.
+    const EPOOL_NOT_IN_VALIDATOR_SET: u64 = 9;
     /// Min-stakes and multipliers vectors have different lengths.
-    const EVECTOR_LENGTH_MISMATCH: u64 = 9;
+    const EVECTOR_LENGTH_MISMATCH: u64 = 10;
 
     /// Every multiplier must be greater than this minimum (1x).
     ///
     /// INVARIANT: must match Rust version checked by VM.
-    const MIN_MULTIPLIER_BPS: u64 = 100;
+    const MIN_MULTIPLIER_PERCENT: u64 = 100;
     /// Every multiplier must be less than or equal to this maximum (100x).
     ///
     /// INVARIANT: must match Rust version checked by VM.
-    const MAX_MULTIPLIER_BPS: u64 = 10000;
+    const MAX_MULTIPLIER_PERCENT: u64 = 10000;
 
     /// A single tier: the minimum committed stake required and the multiplier
     /// it unlocks.
     struct TxnLimitTier has copy, drop, store {
         min_stake: u64,
-        // Multiplier in basis points (100 = 1x, 200 = 2x, 250 = 2.5x).
-        multiplier_bps: u64
+        // Multiplier as percent of the base limit (100 = 1x, 200 = 2x, 250 = 2.5x).
+        multiplier_percent: u64
     }
 
     /// On-chain configuration for higher transaction limits. Stores a vector
@@ -68,14 +73,15 @@ module aptos_framework::transaction_limits {
         }
     }
 
-    /// Multipliers requested by the user, expressed in basis points (That is,
-    /// 1x is 100, 2.5x is 250).
+    /// Multipliers requested by the user.
     ///
     /// INVARIANT: must match Rust enum for BCS serialization.
     enum RequestedMultipliers has copy, drop, store {
         V1 {
-            execution_bps: u64,
-            io_bps: u64
+            /// Execution-gas multiplier (100 is 1x).
+            execution_multiplier_percent: u64,
+            /// IO-gas multiplier (100 is 1x).
+            io_multiplier_percent: u64
         }
     }
 
@@ -97,13 +103,14 @@ module aptos_framework::transaction_limits {
         }
     }
 
-    /// Creates a new tier. Aborts if multiplier is not in (100, 10000] bps.
-    public fun new_tier(min_stake: u64, multiplier_bps: u64): TxnLimitTier {
+    /// Creates a new tier. Aborts if multiplier is not in (100, 10000].
+    friend fun new_tier(min_stake: u64, multiplier_percent: u64): TxnLimitTier {
         assert!(
-            multiplier_bps > MIN_MULTIPLIER_BPS && multiplier_bps <= MAX_MULTIPLIER_BPS,
+            multiplier_percent > MIN_MULTIPLIER_PERCENT
+                && multiplier_percent <= MAX_MULTIPLIER_PERCENT,
             error::invalid_argument(EINVALID_MULTIPLIER)
         );
-        TxnLimitTier { min_stake, multiplier_bps }
+        TxnLimitTier { min_stake, multiplier_percent }
     }
 
     /// Aborts if:
@@ -118,7 +125,7 @@ module aptos_framework::transaction_limits {
             let curr = &tiers[i];
             assert!(
                 curr.min_stake >= prev.min_stake
-                    && curr.multiplier_bps > prev.multiplier_bps,
+                    && curr.multiplier_percent > prev.multiplier_percent,
                 error::invalid_argument(ETHRESHOLDS_NOT_MONOTONIC)
             );
             i += 1;
@@ -132,18 +139,18 @@ module aptos_framework::transaction_limits {
     ///   - Minimum stakes and multipliers vectors are not monotonically
     ///     increasing.
     ///   - Multiplier is not valid (1x or below).
-    fun new_tiers(min_stakes: vector<u64>, multipliers_bps: vector<u64>)
+    fun new_tiers(min_stakes: vector<u64>, multipliers_percent: vector<u64>)
         : vector<TxnLimitTier> {
         let len = min_stakes.length();
         assert!(
-            len == multipliers_bps.length(),
+            len == multipliers_percent.length(),
             error::invalid_argument(EVECTOR_LENGTH_MISMATCH)
         );
 
         let tiers = vector[];
         let i = 0;
         while (i < len) {
-            tiers.push_back(new_tier(min_stakes[i], multipliers_bps[i]));
+            tiers.push_back(new_tier(min_stakes[i], multipliers_percent[i]));
             i += 1;
         };
         validate_tiers(&tiers);
@@ -156,10 +163,14 @@ module aptos_framework::transaction_limits {
     /// tier.
     ///
     /// Aborts if no tier can cover the request.
+    ///
+    /// Implemnetation note: Tier count is small in practice, so using linear
+    /// search here, which is cheaper and currently faster than a binary search
+    /// in Move bytecode.
     fun find_min_stake_required(
-        tiers: &vector<TxnLimitTier>, multiplier_bps: u64
+        tiers: &vector<TxnLimitTier>, multiplier_percent: u64
     ): u64 {
-        let (found, i) = tiers.find(|t| t.multiplier_bps >= multiplier_bps);
+        let (found, i) = tiers.find(|t| t.multiplier_percent >= multiplier_percent);
         assert!(found, error::invalid_argument(EMULTIPLIER_NOT_AVAILABLE));
         tiers[i].min_stake
     }
@@ -184,16 +195,16 @@ module aptos_framework::transaction_limits {
     public fun update_config(
         aptos_framework: &signer,
         execution_min_stakes: vector<u64>,
-        execution_multipliers_bps: vector<u64>,
+        execution_multipliers_percent: vector<u64>,
         io_min_stakes: vector<u64>,
-        io_multipliers_bps: vector<u64>
-    ) acquires TxnLimitsConfig {
+        io_multipliers_percent: vector<u64>
+    ) {
         system_addresses::assert_aptos_framework(aptos_framework);
 
         let execution_tiers = new_tiers(
-            execution_min_stakes, execution_multipliers_bps
+            execution_min_stakes, execution_multipliers_percent
         );
-        let io_tiers = new_tiers(io_min_stakes, io_multipliers_bps);
+        let io_tiers = new_tiers(io_min_stakes, io_multipliers_percent);
 
         if (!exists<TxnLimitsConfig>(@aptos_framework)) {
             move_to(
@@ -214,24 +225,30 @@ module aptos_framework::transaction_limits {
     ///   - There is not enough stake to cover the minimum required amount.
     fun validate_enough_stake(
         stake_amount: u64, multipliers: RequestedMultipliers
-    ) acquires TxnLimitsConfig {
-        let (execution_bps, io_bps) =
+    ) {
+        let (execution_multiplier_percent, io_multiplier_percent) =
             match(multipliers) {
-                RequestedMultipliers::V1 { execution_bps, io_bps } => (execution_bps, io_bps)
+                RequestedMultipliers::V1 {
+                    execution_multiplier_percent,
+                    io_multiplier_percent
+                } => (execution_multiplier_percent, io_multiplier_percent)
             };
         assert!(
-            execution_bps > MIN_MULTIPLIER_BPS && execution_bps <= MAX_MULTIPLIER_BPS,
+            execution_multiplier_percent > MIN_MULTIPLIER_PERCENT
+                && execution_multiplier_percent <= MAX_MULTIPLIER_PERCENT,
             error::invalid_argument(EINVALID_MULTIPLIER)
         );
         assert!(
-            io_bps > MIN_MULTIPLIER_BPS && io_bps <= MAX_MULTIPLIER_BPS,
+            io_multiplier_percent > MIN_MULTIPLIER_PERCENT
+                && io_multiplier_percent <= MAX_MULTIPLIER_PERCENT,
             error::invalid_argument(EINVALID_MULTIPLIER)
         );
 
         let config = &TxnLimitsConfig[@aptos_framework];
         let execution_threshold =
-            find_min_stake_required(&config.execution_tiers, execution_bps);
-        let io_threshold = find_min_stake_required(&config.io_tiers, io_bps);
+            find_min_stake_required(&config.execution_tiers, execution_multiplier_percent);
+        let io_threshold =
+            find_min_stake_required(&config.io_tiers, io_multiplier_percent);
 
         assert!(
             stake_amount >= execution_threshold,
@@ -246,7 +263,7 @@ module aptos_framework::transaction_limits {
     /// for the requested limit multipliers.
     friend fun validate_high_txn_limits(
         fee_payer: address, request: UserTxnLimitsRequest
-    ) acquires TxnLimitsConfig {
+    ) {
         match(request) {
             StakePoolOwner { multipliers } => {
                 assert!(
@@ -254,6 +271,10 @@ module aptos_framework::transaction_limits {
                     error::permission_denied(ENOT_STAKE_POOL_OWNER)
                 );
                 let pool_address = stake::get_pool_address_for_owner(fee_payer);
+                assert!(
+                    stake::is_current_epoch_validator(pool_address),
+                    error::permission_denied(EPOOL_NOT_IN_VALIDATOR_SET)
+                );
                 let stake_amount = aptos_governance::get_voting_power(pool_address);
                 validate_enough_stake(stake_amount, multipliers);
             },
@@ -266,6 +287,10 @@ module aptos_framework::transaction_limits {
                     fee_payer == stake::get_delegated_voter(pool_address),
                     error::permission_denied(ENOT_DELEGATED_VOTER)
                 );
+                assert!(
+                    stake::is_current_epoch_validator(pool_address),
+                    error::permission_denied(EPOOL_NOT_IN_VALIDATOR_SET)
+                );
                 let stake_amount = aptos_governance::get_voting_power(pool_address);
                 validate_enough_stake(stake_amount, multipliers);
             },
@@ -273,6 +298,10 @@ module aptos_framework::transaction_limits {
                 assert!(
                     delegation_pool::delegation_pool_exists(pool_address),
                     error::not_found(EDELEGATION_POOL_NOT_FOUND)
+                );
+                assert!(
+                    stake::is_current_epoch_validator(pool_address),
+                    error::permission_denied(EPOOL_NOT_IN_VALIDATOR_SET)
                 );
                 let (active, _, pending_inactive) = delegation_pool::get_stake(
                     pool_address, fee_payer
@@ -297,21 +326,60 @@ module aptos_framework::transaction_limits {
     }
 
     #[test_only]
-    fun initialize_for_test_with_staking(
-        aptos_framework: &signer, validator: &signer, amount: u64
+    fun initialize_for_test_with_staking_impl(
+        aptos_framework: &signer,
+        validator: &signer,
+        amount: u64,
+        should_join_validator_set: bool,
+        should_end_epoch: bool,
     ) {
         initialize_for_test(aptos_framework);
         stake::initialize_for_test(aptos_framework);
         let (_sk, pk, pop) = stake::generate_identity();
-        stake::initialize_test_validator(&pk, &pop, validator, amount, true, true);
+        stake::initialize_test_validator(
+            &pk,
+            &pop,
+            validator,
+            amount,
+            should_join_validator_set,
+            should_end_epoch
+        );
     }
 
     #[test_only]
-    fun initialize_for_test_with_delegation_pool(
+    fun initialize_for_test_with_staking(
+        aptos_framework: &signer, validator: &signer, amount: u64
+    ) {
+        initialize_for_test_with_staking_impl(
+            aptos_framework,
+            validator,
+            amount,
+            true,
+            true,
+        )
+    }
+
+    #[test_only]
+    fun initialize_for_test_with_inactive_stake_pool(
+        aptos_framework: &signer, validator: &signer, amount: u64
+    ) {
+        initialize_for_test_with_staking_impl(
+            aptos_framework,
+            validator,
+            amount,
+            false,
+            false,
+        )
+    }
+
+    #[test_only]
+    fun initialize_for_test_with_delegation_pool_impl(
         aptos_framework: &signer,
         pool_owner: &signer,
         delegator: &signer,
-        delegator_stake: u64
+        delegator_stake: u64,
+        should_join_validator_set: bool,
+        should_end_epoch: bool,
     ) {
         // Use higher thresholds for delegation pool tests since because we
         // need to have at least 10 APT in the pool.
@@ -325,7 +393,7 @@ module aptos_framework::transaction_limits {
         );
         delegation_pool::initialize_for_test(aptos_framework);
         delegation_pool::initialize_test_validator(
-            pool_owner, 1_000_0000_0000, true, true
+            pool_owner, 1_000_0000_0000, should_join_validator_set, should_end_epoch
         );
 
         let delegator_addr = std::signer::address_of(delegator);
@@ -341,15 +409,49 @@ module aptos_framework::transaction_limits {
         delegation_pool::end_aptos_epoch();
     }
 
+    #[test_only]
+    fun initialize_for_test_with_delegation_pool(
+        aptos_framework: &signer,
+        pool_owner: &signer,
+        delegator: &signer,
+        delegator_stake: u64
+    ) {
+        initialize_for_test_with_delegation_pool_impl(
+            aptos_framework,
+            pool_owner,
+            delegator,
+            delegator_stake,
+            true,
+            true,
+        )
+    }
+
+    #[test_only]
+    fun initialize_for_test_with_inactive_delegation_pool(
+        aptos_framework: &signer,
+        pool_owner: &signer,
+        delegator: &signer,
+        delegator_stake: u64
+    ) {
+        initialize_for_test_with_delegation_pool_impl(
+            aptos_framework,
+            pool_owner,
+            delegator,
+            delegator_stake,
+            false,
+            false,
+        )
+    }
+
     #[test]
     fun test_new_tier() {
         let tier = new_tier(1000, 200);
         assert!(tier.min_stake == 1000);
-        assert!(tier.multiplier_bps == 200);
+        assert!(tier.multiplier_percent == 200);
 
         let tier = new_tier(1000, 10000);
         assert!(tier.min_stake == 1000);
-        assert!(tier.multiplier_bps == 10000);
+        assert!(tier.multiplier_percent == 10000);
     }
 
     #[test]
@@ -378,20 +480,20 @@ module aptos_framework::transaction_limits {
         let tiers = new_tiers(vector[100], vector[200]);
         assert!(tiers.length() == 1);
         assert!(tiers[0].min_stake == 100);
-        assert!(tiers[0].multiplier_bps == 200);
+        assert!(tiers[0].multiplier_percent == 200);
 
         let tiers = new_tiers(vector[500, 500, 1000], vector[200, 400, 800]);
         assert!(tiers.length() == 3);
         assert!(tiers[0].min_stake == 500);
-        assert!(tiers[0].multiplier_bps == 200);
+        assert!(tiers[0].multiplier_percent == 200);
         assert!(tiers[1].min_stake == 500);
-        assert!(tiers[1].multiplier_bps == 400);
+        assert!(tiers[1].multiplier_percent == 400);
         assert!(tiers[2].min_stake == 1000);
-        assert!(tiers[2].multiplier_bps == 800);
+        assert!(tiers[2].multiplier_percent == 800);
     }
 
     #[test]
-    #[expected_failure(abort_code = 0x10009)]
+    #[expected_failure(abort_code = 0x1000A)]
     fun test_new_tiers_length_mismatch() {
         new_tiers(vector[100, 200], vector[200]);
     }
@@ -423,11 +525,11 @@ module aptos_framework::transaction_limits {
         assert!(find_min_stake_required(&tiers, 400) == 50);
         assert!(find_min_stake_required(&tiers, 800) == 100);
 
-        // 250 bps rounds up to 400 bps tier, threshold 50.
+        // 250 rounds up to 400 tier, threshold 50.
         assert!(find_min_stake_required(&tiers, 250) == 50);
-        // 101 bps rounds up to 200 bps tier,  threshold 10.
+        // 101 rounds up to 200 tier, threshold 10.
         assert!(find_min_stake_required(&tiers, 101) == 10);
-        // 799 bps rounds up to 800 bps tier, threshold 100.
+        // 799 rounds up to 800 tier, threshold 100.
         assert!(find_min_stake_required(&tiers, 799) == 100);
     }
 
@@ -439,10 +541,10 @@ module aptos_framework::transaction_limits {
     }
 
     #[test(aptos_framework = @aptos_framework)]
-    fun test_validate_enough_stake(aptos_framework: &signer) acquires TxnLimitsConfig {
+    fun test_validate_enough_stake(aptos_framework: &signer) {
         initialize_for_test(aptos_framework);
         validate_enough_stake(
-            200, RequestedMultipliers::V1 { execution_bps: 200, io_bps: 200 }
+            200, RequestedMultipliers::V1 { execution_multiplier_percent: 200, io_multiplier_percent: 200 }
         );
     }
 
@@ -450,19 +552,19 @@ module aptos_framework::transaction_limits {
     #[expected_failure(abort_code = 0x50005)]
     fun test_validate_enough_stake_execution_fails(
         aptos_framework: &signer
-    ) acquires TxnLimitsConfig {
+    ) {
         initialize_for_test(aptos_framework);
         validate_enough_stake(
-            300, RequestedMultipliers::V1 { execution_bps: 400, io_bps: 200 }
+            300, RequestedMultipliers::V1 { execution_multiplier_percent: 400, io_multiplier_percent: 200 }
         );
     }
 
     #[test(aptos_framework = @aptos_framework)]
     #[expected_failure(abort_code = 0x50005)]
-    fun test_validate_enough_stake_io_fails(aptos_framework: &signer) acquires TxnLimitsConfig {
+    fun test_validate_enough_stake_io_fails(aptos_framework: &signer) {
         initialize_for_test(aptos_framework);
         validate_enough_stake(
-            300, RequestedMultipliers::V1 { execution_bps: 200, io_bps: 400 }
+            300, RequestedMultipliers::V1 { execution_multiplier_percent: 200, io_multiplier_percent: 400 }
         );
     }
 
@@ -470,10 +572,10 @@ module aptos_framework::transaction_limits {
     #[expected_failure(abort_code = 0x10007)]
     fun test_validate_enough_stake_too_small_execution_multiplier(
         aptos_framework: &signer
-    ) acquires TxnLimitsConfig {
+    ) {
         initialize_for_test(aptos_framework);
         validate_enough_stake(
-            9999, RequestedMultipliers::V1 { execution_bps: 100, io_bps: 200 }
+            9999, RequestedMultipliers::V1 { execution_multiplier_percent: 100, io_multiplier_percent: 200 }
         );
     }
 
@@ -481,10 +583,10 @@ module aptos_framework::transaction_limits {
     #[expected_failure(abort_code = 0x10007)]
     fun test_validate_enough_stake_too_small_io_multiplier(
         aptos_framework: &signer
-    ) acquires TxnLimitsConfig {
+    ) {
         initialize_for_test(aptos_framework);
         validate_enough_stake(
-            9999, RequestedMultipliers::V1 { execution_bps: 200, io_bps: 100 }
+            9999, RequestedMultipliers::V1 { execution_multiplier_percent: 200, io_multiplier_percent: 100 }
         );
     }
 
@@ -492,10 +594,10 @@ module aptos_framework::transaction_limits {
     #[expected_failure(abort_code = 0x10007)]
     fun test_validate_enough_stake_too_large_execution_multiplier(
         aptos_framework: &signer
-    ) acquires TxnLimitsConfig {
+    ) {
         initialize_for_test(aptos_framework);
         validate_enough_stake(
-            9999, RequestedMultipliers::V1 { execution_bps: 10001, io_bps: 200 }
+            9999, RequestedMultipliers::V1 { execution_multiplier_percent: 10001, io_multiplier_percent: 200 }
         );
     }
 
@@ -504,22 +606,22 @@ module aptos_framework::transaction_limits {
     // EINVALID_MULTIPLIER
     fun test_validate_enough_stake_too_large_io_multiplier(
         aptos_framework: &signer
-    ) acquires TxnLimitsConfig {
+    ) {
         initialize_for_test(aptos_framework);
         validate_enough_stake(
-            9999, RequestedMultipliers::V1 { execution_bps: 200, io_bps: 10001 }
+            9999, RequestedMultipliers::V1 { execution_multiplier_percent: 200, io_multiplier_percent: 10001 }
         );
     }
 
     #[test(aptos_framework = @aptos_framework, validator = @0x123)]
     fun test_validate_stake_pool_owner_success(
         aptos_framework: &signer, validator: &signer
-    ) acquires TxnLimitsConfig {
+    ) {
         initialize_for_test_with_staking(aptos_framework, validator, 1000);
         validate_high_txn_limits(
             @0x123,
             UserTxnLimitsRequest::StakePoolOwner {
-                multipliers: RequestedMultipliers::V1 { execution_bps: 200, io_bps: 200 }
+                multipliers: RequestedMultipliers::V1 { execution_multiplier_percent: 200, io_multiplier_percent: 200 }
             }
         );
     }
@@ -528,13 +630,13 @@ module aptos_framework::transaction_limits {
     #[expected_failure(abort_code = 0x50002)]
     fun test_validate_stake_pool_owner_no_cap(
         aptos_framework: &signer, validator: &signer
-    ) acquires TxnLimitsConfig {
+    ) {
         initialize_for_test_with_staking(aptos_framework, validator, 1000);
         // @0x456 has no OwnerCapability.
         validate_high_txn_limits(
             @0x456,
             UserTxnLimitsRequest::StakePoolOwner {
-                multipliers: RequestedMultipliers::V1 { execution_bps: 200, io_bps: 200 }
+                multipliers: RequestedMultipliers::V1 { execution_multiplier_percent: 200, io_multiplier_percent: 200 }
             }
         );
     }
@@ -543,12 +645,12 @@ module aptos_framework::transaction_limits {
     #[expected_failure(abort_code = 0x50005)]
     fun test_validate_stake_pool_owner_insufficient(
         aptos_framework: &signer, validator: &signer
-    ) acquires TxnLimitsConfig {
+    ) {
         initialize_for_test_with_staking(aptos_framework, validator, 100);
         validate_high_txn_limits(
             @0x123,
             UserTxnLimitsRequest::StakePoolOwner {
-                multipliers: RequestedMultipliers::V1 { execution_bps: 800, io_bps: 200 }
+                multipliers: RequestedMultipliers::V1 { execution_multiplier_percent: 800, io_multiplier_percent: 200 }
             }
         );
     }
@@ -556,14 +658,14 @@ module aptos_framework::transaction_limits {
     #[test(aptos_framework = @aptos_framework, validator = @0x123)]
     fun test_validate_delegated_voter_success(
         aptos_framework: &signer, validator: &signer
-    ) acquires TxnLimitsConfig {
+    ) {
         initialize_for_test_with_staking(aptos_framework, validator, 1000);
         stake::set_delegated_voter(validator, @0x456);
         validate_high_txn_limits(
             @0x456,
             UserTxnLimitsRequest::DelegatedVoter {
                 pool_address: @0x123,
-                multipliers: RequestedMultipliers::V1 { execution_bps: 200, io_bps: 200 }
+                multipliers: RequestedMultipliers::V1 { execution_multiplier_percent: 200, io_multiplier_percent: 200 }
             }
         );
     }
@@ -572,14 +674,14 @@ module aptos_framework::transaction_limits {
     #[expected_failure(abort_code = 0x50003)]
     fun test_validate_delegated_voter_wrong_voter(
         aptos_framework: &signer, validator: &signer
-    ) acquires TxnLimitsConfig {
+    ) {
         initialize_for_test_with_staking(aptos_framework, validator, 1000);
         // @0x789 is not the delegated voter (default voter is the owner @0x123).
         validate_high_txn_limits(
             @0x789,
             UserTxnLimitsRequest::DelegatedVoter {
                 pool_address: @0x123,
-                multipliers: RequestedMultipliers::V1 { execution_bps: 200, io_bps: 200 }
+                multipliers: RequestedMultipliers::V1 { execution_multiplier_percent: 200, io_multiplier_percent: 200 }
             }
         );
     }
@@ -588,13 +690,13 @@ module aptos_framework::transaction_limits {
     #[expected_failure(abort_code = 0x60001)]
     fun test_validate_delegated_voter_pool_not_found(
         aptos_framework: &signer, validator: &signer
-    ) acquires TxnLimitsConfig {
+    ) {
         initialize_for_test_with_staking(aptos_framework, validator, 1000);
         validate_high_txn_limits(
             @0x456,
             UserTxnLimitsRequest::DelegatedVoter {
                 pool_address: @0x789,
-                multipliers: RequestedMultipliers::V1 { execution_bps: 200, io_bps: 200 }
+                multipliers: RequestedMultipliers::V1 { execution_multiplier_percent: 200, io_multiplier_percent: 200 }
             }
         );
     }
@@ -602,7 +704,7 @@ module aptos_framework::transaction_limits {
     #[test(aptos_framework = @aptos_framework, pool_owner = @0x111, delegator = @0x222)]
     fun test_validate_delegation_pool_delegator_success(
         aptos_framework: &signer, pool_owner: &signer, delegator: &signer
-    ) acquires TxnLimitsConfig {
+    ) {
         // 20 APT stake, 2x needs 5 APT for execution and 10 APT for IO, passes.
         initialize_for_test_with_delegation_pool(
             aptos_framework,
@@ -614,7 +716,7 @@ module aptos_framework::transaction_limits {
             @0x222,
             UserTxnLimitsRequest::DelegationPoolDelegator {
                 pool_address: delegation_pool::get_owned_pool_address(@0x111),
-                multipliers: RequestedMultipliers::V1 { execution_bps: 200, io_bps: 200 }
+                multipliers: RequestedMultipliers::V1 { execution_multiplier_percent: 200, io_multiplier_percent: 200 }
             }
         );
     }
@@ -623,7 +725,7 @@ module aptos_framework::transaction_limits {
     #[expected_failure(abort_code = 0x60004)]
     fun test_validate_delegation_pool_not_found(
         aptos_framework: &signer, pool_owner: &signer, delegator: &signer
-    ) acquires TxnLimitsConfig {
+    ) {
         initialize_for_test_with_delegation_pool(
             aptos_framework,
             pool_owner,
@@ -634,7 +736,7 @@ module aptos_framework::transaction_limits {
             @0x222,
             UserTxnLimitsRequest::DelegationPoolDelegator {
                 pool_address: @0x333,
-                multipliers: RequestedMultipliers::V1 { execution_bps: 200, io_bps: 200 }
+                multipliers: RequestedMultipliers::V1 { execution_multiplier_percent: 200, io_multiplier_percent: 200 }
             }
         );
     }
@@ -643,7 +745,7 @@ module aptos_framework::transaction_limits {
     #[expected_failure(abort_code = 0x50005)]
     fun test_validate_delegation_pool_insufficient_stake(
         aptos_framework: &signer, pool_owner: &signer, delegator: &signer
-    ) acquires TxnLimitsConfig {
+    ) {
         // 20 APT stake, but 8x execution needs 50 APT, so test fails.
         initialize_for_test_with_delegation_pool(
             aptos_framework,
@@ -655,7 +757,67 @@ module aptos_framework::transaction_limits {
             @0x222,
             UserTxnLimitsRequest::DelegationPoolDelegator {
                 pool_address: delegation_pool::get_owned_pool_address(@0x111),
-                multipliers: RequestedMultipliers::V1 { execution_bps: 800, io_bps: 200 }
+                multipliers: RequestedMultipliers::V1 { execution_multiplier_percent: 800, io_multiplier_percent: 200 }
+            }
+        );
+    }
+
+    #[test(aptos_framework = @aptos_framework, validator = @0x123)]
+    #[expected_failure(abort_code = 0x50009)]
+    fun test_validate_stake_pool_owner_pool_not_in_validator_set(
+        aptos_framework: &signer, validator: &signer
+    ) {
+        // Stake pool has plenty of APT but never joined the validator set.
+        initialize_for_test_with_inactive_stake_pool(aptos_framework, validator, 1000);
+        validate_high_txn_limits(
+            @0x123,
+            UserTxnLimitsRequest::StakePoolOwner {
+                multipliers: RequestedMultipliers::V1 {
+                    execution_multiplier_percent: 200,
+                    io_multiplier_percent: 200
+                }
+            }
+        );
+    }
+
+    #[test(aptos_framework = @aptos_framework, validator = @0x123)]
+    #[expected_failure(abort_code = 0x50009)]
+    fun test_validate_delegated_voter_pool_not_in_validator_set(
+        aptos_framework: &signer, validator: &signer
+    ) {
+        initialize_for_test_with_inactive_stake_pool(aptos_framework, validator, 1000);
+        stake::set_delegated_voter(validator, @0x456);
+        validate_high_txn_limits(
+            @0x456,
+            UserTxnLimitsRequest::DelegatedVoter {
+                pool_address: @0x123,
+                multipliers: RequestedMultipliers::V1 {
+                    execution_multiplier_percent: 200,
+                    io_multiplier_percent: 200
+                }
+            }
+        );
+    }
+
+    #[test(aptos_framework = @aptos_framework, pool_owner = @0x111, delegator = @0x222)]
+    #[expected_failure(abort_code = 0x50009)]
+    fun test_validate_delegation_pool_delegator_pool_not_in_validator_set(
+        aptos_framework: &signer, pool_owner: &signer, delegator: &signer
+    ) {
+        initialize_for_test_with_inactive_delegation_pool(
+            aptos_framework,
+            pool_owner,
+            delegator,
+            20_0000_0000
+        );
+        validate_high_txn_limits(
+            @0x222,
+            UserTxnLimitsRequest::DelegationPoolDelegator {
+                pool_address: delegation_pool::get_owned_pool_address(@0x111),
+                multipliers: RequestedMultipliers::V1 {
+                    execution_multiplier_percent: 200,
+                    io_multiplier_percent: 200
+                }
             }
         );
     }

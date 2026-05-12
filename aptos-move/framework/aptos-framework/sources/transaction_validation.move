@@ -1,4 +1,5 @@
 module aptos_framework::transaction_validation {
+    use std::bcs;
     use std::error;
     use std::features;
     use std::option;
@@ -148,16 +149,21 @@ module aptos_framework::transaction_validation {
         // Check if the authentication key is valid
         if (!skip_auth_key_check(is_simulation, &txn_authentication_key)) {
             if (txn_authentication_key.is_some()) {
-                if (
-                    sender_address == gas_payer_address ||
-                    account::exists_at(sender_address) ||
-                    !features::sponsored_automatic_account_creation_enabled()
+                let authentication_key = if (
+                    sender_address != gas_payer_address &&
+                        !account::exists_at(sender_address) &&
+                        features::sponsored_automatic_account_creation_enabled()
                 ) {
-                    assert!(
-                        txn_authentication_key == option::some(account::get_authentication_key(sender_address)),
-                        error::invalid_argument(PROLOGUE_EINVALID_ACCOUNT_AUTH_KEY),
-                    );
+                    // This is a sponsored transaction with account that does
+                    // not exist and there is no default account resource.
+                    bcs::to_bytes(&sender_address)
+                } else {
+                    account::get_authentication_key(sender_address)
                 };
+                assert!(
+                    txn_authentication_key.destroy_some() == authentication_key,
+                    error::invalid_argument(PROLOGUE_EINVALID_ACCOUNT_AUTH_KEY),
+                );
             } else {
                 assert!(
                     allow_missing_txn_authentication_key(sender_address),
@@ -867,6 +873,8 @@ module aptos_framework::transaction_validation {
     ///   against the framework version that shipped them and are not reached from this code.
     enum PrologueArgs {
         V1 {
+            sender: signer,
+            fee_payer: Option<signer>,
             txn_sender_public_key: Option<vector<u8>>,
             fee_payer_public_key_hash: Option<vector<u8>>,
             replay_protector: ReplayProtector,
@@ -881,9 +889,11 @@ module aptos_framework::transaction_validation {
         },
     }
 
-    fun versioned_prologue(sender: signer, fee_payer: signer, args: PrologueArgs) {
+    fun versioned_prologue(args: PrologueArgs) {
         match (args) {
             V1 {
+                sender,
+                fee_payer,
                 txn_sender_public_key,
                 fee_payer_public_key_hash,
                 replay_protector,
@@ -898,7 +908,11 @@ module aptos_framework::transaction_validation {
             } => {
                 prologue_common(
                     &sender,
-                    &fee_payer,
+                    if (fee_payer.is_some()) {
+                        fee_payer.borrow()
+                    } else {
+                        &sender
+                    },
                     replay_protector,
                     txn_sender_public_key,
                     txn_gas_price,
@@ -914,8 +928,9 @@ module aptos_framework::transaction_validation {
                     is_simulation,
                 );
 
-                let fee_payer_address = signer::address_of(&fee_payer);
-                if (fee_payer_address != signer::address_of(&sender)) {
+                if (fee_payer.is_some()) {
+                    let fee_payer = fee_payer.destroy_some();
+                    let fee_payer_address = signer::address_of(&fee_payer);
                     if (!skip_auth_key_check(is_simulation, &fee_payer_public_key_hash)) {
                         if (fee_payer_public_key_hash.is_some()) {
                             let fee_payer_public_key_hash = fee_payer_public_key_hash.destroy_some();
@@ -942,6 +957,8 @@ module aptos_framework::transaction_validation {
     ///   against the framework version that shipped them and are not reached from this code.
     enum EpilogueArgs {
         V1 {
+            sender: signer,
+            fee_payer: signer,
             fee_statement: FeeStatement,
             txn_gas_price: u64,
             txn_max_gas_units: u64,
@@ -951,9 +968,11 @@ module aptos_framework::transaction_validation {
         },
     }
 
-    fun versioned_epilogue(account: signer, fee_payer: signer, args: EpilogueArgs) {
+    fun versioned_epilogue(args: EpilogueArgs) {
         match (args) {
             V1 {
+                sender,
+                fee_payer,
                 fee_statement,
                 txn_gas_price,
                 txn_max_gas_units,
@@ -962,7 +981,7 @@ module aptos_framework::transaction_validation {
                 is_orderless_txn,
             } => {
                 unified_epilogue_v2(
-                    account,
+                    sender,
                     fee_payer,
                     fee_statement.storage_fee_refund_octas(),
                     txn_gas_price,

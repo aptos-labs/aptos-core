@@ -884,25 +884,38 @@ impl TransactionExecutableRef<'_> {
     }
 }
 
-/// Multipliers for higher transaction limits, expressed in basis points
-/// (100 = 1x, 200 = 2x, 250 = 2.5x).
+/// Multipliers for higher transaction limits, expressed as percent of the base
+/// limit (100 = 1x, 200 = 2x, 250 = 2.5x).
 ///
 /// INVARIANT: must match Move representation for BCS serialization.
 #[derive(Clone, Debug, Hash, Eq, PartialEq, Serialize, Deserialize)]
 pub enum RequestedMultipliers {
-    V1 { execution_bps: u64, io_bps: u64 },
+    V1 {
+        /// Execution-gas multiplier as percent of the base limit where 100 is 1x.
+        execution_multiplier_percent: u64,
+        /// IO-gas multiplier as percent of the base limit where 100 is 1x.
+        io_multiplier_percent: u64,
+    },
 }
 
 impl RequestedMultipliers {
-    pub fn execution_bps(&self) -> u64 {
+    /// Returns the execution-gas multiplier as percent (100 is 1x).
+    pub fn execution_multiplier_percent(&self) -> u64 {
         match self {
-            Self::V1 { execution_bps, .. } => *execution_bps,
+            Self::V1 {
+                execution_multiplier_percent,
+                ..
+            } => *execution_multiplier_percent,
         }
     }
 
-    pub fn io_bps(&self) -> u64 {
+    /// Returns the IO-gas multiplier as percent (100 is 1x).
+    pub fn io_multiplier_percent(&self) -> u64 {
         match self {
-            Self::V1 { io_bps, .. } => *io_bps,
+            Self::V1 {
+                io_multiplier_percent,
+                ..
+            } => *io_multiplier_percent,
         }
     }
 }

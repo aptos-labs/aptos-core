@@ -2,7 +2,6 @@
 // Licensed pursuant to the Innovation-Enabling Source Code License, available at https://github.com/aptos-labs/aptos-core/blob/main/LICENSE
 
 use crate::{
-    aptos_vm::SerializedSigners,
     errors::convert_prologue_error,
     move_vm_ext::{AptosMoveResolver, SessionExt},
     system_module_names::{
@@ -18,7 +17,7 @@ use aptos_types::{
 };
 use aptos_vm_logging::log_schema::AdapterLogSchema;
 use move_binary_format::errors::VMResult;
-use move_core_types::account_address::AccountAddress;
+use move_core_types::{account_address::AccountAddress, value::MoveValue};
 use move_vm_runtime::{
     logging::expect_no_verification_errors, module_traversal::TraversalContext, ModuleStorage,
 };
@@ -30,6 +29,8 @@ use serde::Serialize;
 #[derive(Serialize)]
 enum PrologueArgs {
     V1 {
+        sender: MoveValue,
+        fee_payer: Option<MoveValue>,
         txn_sender_public_key: Option<Vec<u8>>,
         fee_payer_public_key_hash: Option<Vec<u8>>,
         replay_protector: ReplayProtector,
@@ -47,6 +48,8 @@ enum PrologueArgs {
 /// Builder that collects prologue arguments and selects the appropriate enum
 /// variant to build.
 pub(crate) struct PrologueBuilder {
+    sender: AccountAddress,
+    fee_payer: Option<AccountAddress>,
     txn_sender_public_key: Option<Vec<u8>>,
     fee_payer_public_key_hash: Option<Vec<u8>>,
     replay_protector: ReplayProtector,
@@ -63,6 +66,8 @@ pub(crate) struct PrologueBuilder {
 impl PrologueBuilder {
     pub fn new(txn_data: &TransactionMetadata, is_simulation: bool) -> Self {
         Self {
+            sender: txn_data.sender(),
+            fee_payer: txn_data.fee_payer,
             txn_sender_public_key: txn_data.authentication_proof().optional_auth_key(),
             fee_payer_public_key_hash: txn_data
                 .fee_payer_authentication_proof
@@ -91,6 +96,8 @@ impl PrologueBuilder {
     /// Currently only V1 exists.
     pub fn build(self) -> Vec<u8> {
         let args = PrologueArgs::V1 {
+            sender: MoveValue::Signer(self.sender),
+            fee_payer: self.fee_payer.map(MoveValue::Signer),
             txn_sender_public_key: self.txn_sender_public_key,
             fee_payer_public_key_hash: self.fee_payer_public_key_hash,
             replay_protector: self.replay_protector,
@@ -110,26 +117,18 @@ impl PrologueBuilder {
 pub(crate) fn run_prologue(
     session: &mut SessionExt<impl AptosMoveResolver>,
     module_storage: &impl ModuleStorage,
-    serialized_signers: &SerializedSigners,
     txn_data: &TransactionMetadata,
     log_context: &AdapterLogSchema,
     traversal_context: &mut TraversalContext,
     is_simulation: bool,
 ) -> Result<(), move_core_types::vm_status::VMStatus> {
     let builder = PrologueBuilder::new(txn_data, is_simulation);
-    let serialized_args = vec![
-        serialized_signers.sender(),
-        serialized_signers
-            .fee_payer()
-            .unwrap_or(serialized_signers.sender()),
-        builder.build(),
-    ];
     session
         .execute_function_bypass_visibility(
             &TRANSACTION_VALIDATION_MODULE,
             VERSIONED_PROLOGUE_NAME,
             vec![],
-            serialized_args,
+            vec![builder.build()],
             &mut UnmeteredGasMeter,
             traversal_context,
             module_storage,
@@ -144,6 +143,8 @@ pub(crate) fn run_prologue(
 #[derive(Serialize)]
 enum EpilogueArgs {
     V1 {
+        account: MoveValue,
+        fee_payer: MoveValue,
         fee_statement: FeeStatement,
         txn_gas_price: u64,
         txn_max_gas_units: u64,
@@ -156,6 +157,8 @@ enum EpilogueArgs {
 /// Builder that collects epilogue arguments and selects the appropriate enum
 /// variant based on feature flags.
 pub(crate) struct EpilogueBuilder {
+    account: AccountAddress,
+    fee_payer: AccountAddress,
     fee_statement: FeeStatement,
     txn_gas_price: u64,
     txn_max_gas_units: u64,
@@ -172,6 +175,8 @@ impl EpilogueBuilder {
         is_simulation: bool,
     ) -> Self {
         Self {
+            account: txn_data.sender(),
+            fee_payer: txn_data.fee_payer.unwrap_or_else(|| txn_data.sender()),
             fee_statement,
             txn_gas_price: txn_data.gas_unit_price().into(),
             txn_max_gas_units: txn_data.max_gas_amount().into(),
@@ -185,6 +190,8 @@ impl EpilogueBuilder {
     /// Currently only V1 exists.
     pub fn build(self) -> Vec<u8> {
         let args = EpilogueArgs::V1 {
+            account: MoveValue::Signer(self.account),
+            fee_payer: MoveValue::Signer(self.fee_payer),
             fee_statement: self.fee_statement,
             txn_gas_price: self.txn_gas_price,
             txn_max_gas_units: self.txn_max_gas_units,
@@ -199,7 +206,6 @@ impl EpilogueBuilder {
 pub(crate) fn run_epilogue(
     session: &mut SessionExt<impl AptosMoveResolver>,
     module_storage: &impl ModuleStorage,
-    serialized_signers: &SerializedSigners,
     gas_remaining: Gas,
     fee_statement: FeeStatement,
     txn_data: &TransactionMetadata,
@@ -207,20 +213,12 @@ pub(crate) fn run_epilogue(
     is_simulation: bool,
 ) -> VMResult<()> {
     let builder = EpilogueBuilder::new(fee_statement, txn_data, gas_remaining, is_simulation);
-    let serialized_args = vec![
-        serialized_signers.sender(),
-        serialized_signers
-            .fee_payer()
-            .unwrap_or(serialized_signers.sender()),
-        builder.build(),
-    ];
-
     session
         .execute_function_bypass_visibility(
             &TRANSACTION_VALIDATION_MODULE,
             VERSIONED_EPILOGUE_NAME,
             vec![],
-            serialized_args,
+            vec![builder.build()],
             &mut UnmeteredGasMeter,
             traversal_context,
             module_storage,
