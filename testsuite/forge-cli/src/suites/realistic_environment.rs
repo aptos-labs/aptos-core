@@ -510,6 +510,31 @@ pub(crate) fn realistic_env_max_load_test(
         .with_num_pfns(num_pfns)
 }
 
+/// Variant of `realistic_env_max_load_test` with QS fast batches enabled
+/// end-to-end. The validator override flips `enable_fast_batches_rx=true` on
+/// every validator and `enable_fast_batches_tx=true` on every author;
+/// `fast_batch_aggregators` is left empty so BatchGenerator auto-picks the
+/// lowest-k PeerIds in the validator set (deterministic across the cluster).
+///
+/// In the 7-validator multi-region setup there is one validator in
+/// `gcp--as-southeast1`; the remaining 6 are in EU/US. Self-exclusion + a
+/// k=2 default guarantees the Asian author picks two non-Asian aggregators,
+/// which is exactly the scenario this PR targets.
+pub(crate) fn realistic_env_max_load_with_fast_batches_test(
+    duration: Duration,
+    test_cmd: &TestCommand,
+    num_validators: usize,
+    num_vfns: usize,
+    num_pfns: usize,
+) -> ForgeConfig {
+    realistic_env_max_load_test(duration, test_cmd, num_validators, num_vfns, num_pfns)
+        .with_validator_override_node_config_fn(Arc::new(|config, _| {
+            config.base.enable_validator_pfn_connections = true;
+            config.consensus.quorum_store.enable_fast_batches_rx = true;
+            config.consensus.quorum_store.enable_fast_batches_tx = true;
+        }))
+}
+
 pub(crate) fn realistic_env_max_load_encrypted_test(duration: Duration) -> ForgeConfig {
     let num_validators = 5;
     let num_fullnodes = 1;
