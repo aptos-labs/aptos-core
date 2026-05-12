@@ -117,6 +117,9 @@ pub struct FailurePatternConfig {
 impl Default for FailurePatternConfig {
     fn default() -> Self {
         Self {
+            // Unused since chronics use %return (see comment in setup). Kept
+            // for future use if/when we adopt a non-busy-wait delay mechanism
+            // (custom failpoint or chaos-mesh layer).
             continuous_delay_ms: 1500,
             // Earlier window so spike fires within the measured test window;
             // longer pause so val 4 leads 60-120+ rounds during the burst,
@@ -264,29 +267,33 @@ impl NetworkLoadTest for MainnetMirrorFailureTest {
                     self.spike_tasks.lock().await.push(handle);
                 },
                 AvailabilityClass::StableChronic | AvailabilityClass::OnlineButFlaky => {
-                    let is_chronic = entry.availability == AvailabilityClass::StableChronic;
-                    let class_idx = if is_chronic { 0 } else { 1 };
+                    let class_idx = if entry.availability == AvailabilityClass::StableChronic {
+                        0
+                    } else {
+                        1
+                    };
                     by_class[class_idx].1 += 1;
                     let pct = continuous_delay_pct(
                         entry,
                         self.config.min_continuous_pct,
                         self.config.max_continuous_pct,
                     );
-                    // Chronic: model real mainnet chronics as SLOW (delayed
-                    // proposals), not drop-message. continuous_delay_ms must
-                    // exceed the round timeout so the delayed message reliably
-                    // misses the round. This makes the validator's measured
-                    // commit-to-commit latency rise, which is what the V3
-                    // latency-weighted heuristic uses.
-                    //
-                    // Flaky: keep `%return` because flaky observed rates are
-                    // already low (1-3%) and `%delay` at low pct rarely fires;
-                    // %return guarantees the per-leader rate matches config.
-                    let action = if is_chronic {
-                        format!("{}%delay({})", pct, self.config.continuous_delay_ms)
-                    } else {
-                        format!("{}%return", pct)
-                    };
+                    // Use `%return` (drop the message) for both chronic and
+                    // flaky. We considered `%delay(N)` to model mainnet's
+                    // "chronics are slow not drop-message" reality, but the
+                    // `fail` crate (v0.5.1) implements `delay` as a
+                    // busy-spin CPU loop (`while timer.elapsed() < timeout {}`,
+                    // src/lib.rs:504-508), NOT a tokio yield. A 10%delay(1500)
+                    // pegs one worker core at 100% for 1.5s on each trigger,
+                    // starving the chronic's other consensus tasks and
+                    // amplifying the effective per-round failure rate to
+                    // 50-60% (vs configured 10%). This over-models mainnet,
+                    // where real chronics are IO/GC-bound and release CPU.
+                    // See LR comparison run 25700907475 for evidence.
+                    // %return guarantees the per-leader-round failure rate
+                    // matches `pct` exactly, with no CPU-starvation side
+                    // effect on the chronic's wider consensus stack.
+                    let action = format!("{}%return", pct);
                     for fp in SEND_FAILPOINTS {
                         if let Err(e) = client.set_failpoint(fp.to_string(), action.clone()).await {
                             warn!(
