@@ -14,9 +14,10 @@ use aptos_forge::{
     prometheus_metrics::LatencyBreakdownSlice,
     success_criteria::{
         LatencyBreakdownThreshold, LatencyType, MetricsThreshold, StateProgressThreshold,
-        SuccessCriteria, SystemMetricsThreshold,
+        SuccessCriteria, SuccessCriteriaChecker, SystemMetricsThreshold,
     },
-    EmitJobMode, EmitJobRequest, EntryPoints, ForgeConfig, NetworkTest, NodeResourceOverride,
+    EmitJobMode, EmitJobRequest, EntryPoints, ForgeConfig, NetworkContext,
+    NetworkContextSynchronizer, NetworkTest, NodeResourceOverride, Result, Swarm, Test, TestReport,
     TransactionType,
 };
 use aptos_sdk::types::on_chain_config::{
@@ -24,12 +25,15 @@ use aptos_sdk::types::on_chain_config::{
     OnChainExecutionConfig, OnChainRandomnessConfig, TransactionShufflerType,
 };
 use aptos_testcases::{
+    create_buffered_load,
     load_vs_perf_benchmark::{LoadVsPerfBenchmark, TransactionWorkload, Workloads},
     multi_region_network_test::MultiRegionNetworkEmulationTest,
     performance_test::PerformanceBenchmark,
     two_traffics_test::TwoTrafficsTest,
-    CompositeNetworkTest,
+    CompositeNetworkTest, LoadDestination, NetworkLoadTest, COOLDOWN_DURATION_FRACTION,
+    WARMUP_DURATION_FRACTION,
 };
+use async_trait::async_trait;
 use std::{num::NonZeroUsize, sync::Arc, time::Duration};
 
 /// Whether to enable the fullnode failure test in the max load test
@@ -510,29 +514,179 @@ pub(crate) fn realistic_env_max_load_test(
         .with_num_pfns(num_pfns)
 }
 
+/// Variant of `TwoTrafficsTest` that sends traffic directly to all validators
+/// (bypassing PFN/mempool-sync routing asymmetry). Used by the FastProof
+/// experiment so every validator's mempool stays populated regardless of
+/// network topology effects.
+struct AllValidatorsTwoTrafficsTest {
+    inner_traffic: EmitJobRequest,
+    inner_success_criteria: SuccessCriteria,
+}
+
+impl Test for AllValidatorsTwoTrafficsTest {
+    fn name(&self) -> &'static str {
+        "two traffics test (all validators)"
+    }
+}
+
+#[async_trait]
+impl NetworkLoadTest for AllValidatorsTwoTrafficsTest {
+    async fn setup<'a>(&self, _ctx: &mut NetworkContext<'a>) -> Result<LoadDestination> {
+        Ok(LoadDestination::AllValidators)
+    }
+
+    async fn test(
+        &self,
+        swarm: Arc<tokio::sync::RwLock<Box<dyn Swarm>>>,
+        report: &mut TestReport,
+        duration: Duration,
+    ) -> Result<()> {
+        let clients_to_send_load_to = LoadDestination::AllValidators
+            .get_destination_clients(swarm.clone())
+            .await;
+        let stats_by_phase = create_buffered_load(
+            swarm,
+            clients_to_send_load_to,
+            self.inner_traffic.clone(),
+            duration,
+            WARMUP_DURATION_FRACTION,
+            COOLDOWN_DURATION_FRACTION,
+            None,
+            None,
+        )
+        .await?;
+        for phase_stats in stats_by_phase.into_iter() {
+            report.report_txn_stats(
+                format!("{}: inner traffic", self.name()),
+                &phase_stats.emitter_stats,
+            );
+            SuccessCriteriaChecker::check_core_for_success(
+                &self.inner_success_criteria,
+                report,
+                &phase_stats.emitter_stats.rate(),
+                None,
+                Some("inner traffic".to_string()),
+            )?;
+        }
+        Ok(())
+    }
+}
+
+#[async_trait]
+impl NetworkTest for AllValidatorsTwoTrafficsTest {
+    async fn run<'a>(&self, ctx: NetworkContextSynchronizer<'a>) -> Result<()> {
+        <dyn NetworkLoadTest>::run(self, ctx).await
+    }
+}
+
 /// Variant of `realistic_env_max_load_test` with QS fast batches enabled
-/// end-to-end. The validator override flips `enable_fast_batches_rx=true` on
-/// every validator and `enable_fast_batches_tx=true` on every author;
-/// `fast_batch_aggregators` is left empty so BatchGenerator auto-picks the
-/// lowest-k PeerIds in the validator set (deterministic across the cluster).
+/// end-to-end and traffic sent directly to all validators (no PFNs).
 ///
-/// In the 7-validator multi-region setup there is one validator in
-/// `gcp--as-southeast1`; the remaining 6 are in EU/US. Self-exclusion + a
-/// k=2 default guarantees the Asian author picks two non-Asian aggregators,
-/// which is exactly the scenario this PR targets.
+/// `_rx=true` and `_tx=true` are set on every validator; `fast_batch_aggregators`
+/// is left empty so BatchGenerator auto-picks the lowest-k PeerIds.
+///
+/// Bypasses PFN routing by setting `num_pfns=0` and sending the load directly
+/// to validator REST APIs. This keeps every validator's mempool populated,
+/// so the Asian validator (last index, `gcp--as-southeast1`) actually authors
+/// batches and the FastProof path can be measured for cross-region traffic.
 pub(crate) fn realistic_env_max_load_with_fast_batches_test(
     duration: Duration,
     test_cmd: &TestCommand,
     num_validators: usize,
     num_vfns: usize,
-    num_pfns: usize,
+    _num_pfns: usize,
 ) -> ForgeConfig {
-    realistic_env_max_load_test(duration, test_cmd, num_validators, num_vfns, num_pfns)
+    let ha_proxy = if let TestCommand::K8sSwarm(k8s) = test_cmd {
+        k8s.enable_haproxy
+    } else {
+        false
+    };
+    let duration_secs = duration.as_secs();
+    let long_running = duration_secs >= 2400;
+    let resource_override = if long_running {
+        NodeResourceOverride {
+            storage_gib: Some(1000),
+            ..NodeResourceOverride::default()
+        }
+    } else {
+        NodeResourceOverride::default()
+    };
+    let mempool_backlog = if ha_proxy { 14000 } else { 19000 };
+    let mut success_criteria = SuccessCriteria::new(85)
+        .add_system_metrics_threshold(SystemMetricsThreshold::new(
+            MetricsThreshold::new(25.0, 15),
+            MetricsThreshold::new_gb(16.0 + 8.0 * (duration_secs as f64 / 3600.0), 20),
+        ))
+        .add_no_restarts()
+        .add_wait_for_catchup_s((duration.as_secs() / 10).max(60))
+        .add_latency_threshold(3.6, LatencyType::P50)
+        .add_latency_threshold(4.8, LatencyType::P70)
+        .add_chain_progress(StateProgressThreshold {
+            max_non_epoch_no_progress_secs: 15.0,
+            max_epoch_no_progress_secs: 16.0,
+            max_non_epoch_round_gap: 4,
+            max_epoch_round_gap: 4,
+        });
+    if !long_running && ENABLE_FULLNODE_FAILURE_TEST {
+        success_criteria = success_criteria.add_no_fullnode_failures();
+    }
+    if !ha_proxy {
+        success_criteria = success_criteria.add_latency_breakdown_threshold(
+            LatencyBreakdownThreshold::new_with_breach_pct(
+                vec![
+                    (LatencyBreakdownSlice::MempoolToBlockCreation, 0.35 + 3.25),
+                    (LatencyBreakdownSlice::ConsensusProposalToOrdered, 0.85),
+                    (LatencyBreakdownSlice::ConsensusOrderedToCommit, 1.0),
+                ],
+                5,
+            ),
+        )
+    }
+    let inner_success_tps = if ha_proxy {
+        7000
+    } else if long_running {
+        11000
+    } else {
+        10000
+    };
+
+    ForgeConfig::default()
+        .with_initial_validator_count(NonZeroUsize::new(num_validators).unwrap())
+        .with_initial_fullnode_count(num_vfns)
+        .add_network_test(wrap_with_realistic_env(
+            num_validators,
+            AllValidatorsTwoTrafficsTest {
+                inner_traffic: EmitJobRequest::default()
+                    .mode(EmitJobMode::MaxLoad { mempool_backlog })
+                    .init_gas_price_multiplier(20),
+                inner_success_criteria: SuccessCriteria::new(inner_success_tps),
+            },
+        ))
+        .with_genesis_helm_config_fn(Arc::new(move |helm_values| {
+            helm_values["chain"]["epoch_duration_secs"] =
+                (if long_running { 600 } else { 300 }).into();
+            helm_values["chain"]["on_chain_consensus_config"] =
+                serde_yaml::to_value(OnChainConsensusConfig::default_for_genesis())
+                    .expect("must serialize");
+            helm_values["chain"]["on_chain_execution_config"] =
+                serde_yaml::to_value(OnChainExecutionConfig::default_for_genesis())
+                    .expect("must serialize");
+        }))
         .with_validator_override_node_config_fn(Arc::new(|config, _| {
             config.base.enable_validator_pfn_connections = true;
             config.consensus.quorum_store.enable_fast_batches_rx = true;
             config.consensus.quorum_store.enable_fast_batches_tx = true;
         }))
+        .with_emit_job(
+            EmitJobRequest::default()
+                .mode(EmitJobMode::ConstTps { tps: 100 })
+                .gas_price(5 * aptos_global_constants::GAS_UNIT_PRICE)
+                .latency_polling_interval(Duration::from_millis(100)),
+        )
+        .with_success_criteria(success_criteria)
+        .with_validator_resource_override(resource_override)
+        .with_fullnode_resource_override(resource_override)
+        .with_num_pfns(0)
 }
 
 pub(crate) fn realistic_env_max_load_encrypted_test(duration: Duration) -> ForgeConfig {
