@@ -143,7 +143,7 @@ fn friend_entry_to_private_entry() {
         false, // check_friend_linking (TREAT_FRIEND_AS_PRIVATE on)
         true,  // treat_entry_as_public
         false, // function_type_compat_bug
-        true,  // allow_friend_entry_to_private_entry
+        true,  // allow_friend_entry_visibility_downgrade
     );
     assert!(allow.check(&friend_entry, &private_entry).is_ok());
 

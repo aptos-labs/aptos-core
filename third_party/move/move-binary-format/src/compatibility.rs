@@ -37,11 +37,11 @@ pub struct Compatibility {
     /// A temporary flag to preserve compatibility.
     /// TODO(#17171): remove this once 1.34 rolled out
     function_type_compat_bug: bool,
-    /// If true, allow a `friend entry` (thus also `package entry`) function to be converted
-    /// to a private `entry` function during a module upgrade. Has no effect when
-    /// `check_friend_linking` is true, since friend linking is then a contract that must
-    /// be preserved.
-    pub(crate) allow_friend_entry_to_private_entry: bool,
+    /// If true, allow an `entry` function's visibility to be downgraded from `friend`
+    /// (a.k.a. `package`) to private during a module upgrade, while keeping `entry`.
+    /// Has no effect when `check_friend_linking` is true, since friend linking is then
+    /// a contract that must be preserved.
+    pub(crate) allow_friend_entry_visibility_downgrade: bool,
 }
 
 impl Default for Compatibility {
@@ -52,7 +52,7 @@ impl Default for Compatibility {
             check_friend_linking: true,
             treat_entry_as_public: true,
             function_type_compat_bug: false,
-            allow_friend_entry_to_private_entry: true,
+            allow_friend_entry_visibility_downgrade: true,
         }
     }
 }
@@ -69,7 +69,7 @@ impl Compatibility {
             check_friend_linking: false,
             treat_entry_as_public: false,
             function_type_compat_bug: false,
-            allow_friend_entry_to_private_entry: false,
+            allow_friend_entry_visibility_downgrade: false,
         }
     }
 
@@ -79,7 +79,7 @@ impl Compatibility {
         treat_entry_as_public: bool,
         // TODO: remove this once 1.34 is released
         function_type_compat_bug: bool,
-        allow_friend_entry_to_private_entry: bool,
+        allow_friend_entry_visibility_downgrade: bool,
     ) -> Self {
         Self {
             check_struct_and_pub_function_linking: true,
@@ -87,7 +87,7 @@ impl Compatibility {
             check_friend_linking,
             treat_entry_as_public,
             function_type_compat_bug,
-            allow_friend_entry_to_private_entry,
+            allow_friend_entry_visibility_downgrade,
         }
     }
 
@@ -228,7 +228,7 @@ impl Compatibility {
                 // independently allowed when friend linking is not a contract and the flag
                 // is set.
                 (Visibility::Friend, Visibility::Private) => {
-                    !self.check_friend_linking && self.allow_friend_entry_to_private_entry
+                    !self.check_friend_linking && self.allow_friend_entry_visibility_downgrade
                 },
                 // private can become public or friend, or stay private
                 (Visibility::Private, _) => true,
