@@ -150,16 +150,44 @@ impl<'guard, 'ctx> ExecutableBuilder<'guard, 'ctx> {
             // TODO: `frame_layout` is hardcoded empty (no slots scanned by GC).
             // That is sound only while every fat-pointer slot in this function
             // holds a stack base (filtered by `is_heap_ptr` at GC time). If the
-            // lowering ever emits an op that produces a heap-base pointer, the
-            // resulting slot is invisible to GC and a collection during a callee
-            // would leave it dangling. Refuse to build such a function until
-            // `frame_layout` is derived from the lowering context.
+            // lowering ever emits an op that puts a heap pointer in a frame
+            // slot, the resulting slot is invisible to GC and a collection
+            // during a callee would leave it dangling. Refuse to build such a
+            // function until `frame_layout` is derived from the lowering
+            // context.
+            //
+            // Today's lowering doesn't emit any of these ops (the destacker
+            // bails first on unsupported Move instructions), so this is a
+            // future-trip guard. Categories listed by what semantically puts
+            // a heap pointer in a frame slot:
+            //   - heap object create / borrow / field read:
+            //     `HeapNew`, `HeapBorrow`, `HeapMoveFrom8`, `HeapMoveFrom`
+            //   - vector create / borrow / element read / pop:
+            //     `VecNew`, `VecBorrow`, `VecLoadElem`, `VecPopBack`
+            //   - heap-pointer republish (in-place vec base mutation):
+            //     `VecPushBack`
+            //   - closures (heap-pointer captures):
+            //     `PackClosure`, `CallClosure`
+            //
+            // Calls (`CallFunc` / `CallDirect` / `CallIndirect`) are not
+            // listed here even though a callee returning a heap-typed value
+            // would put a heap pointer in the caller's ret region: the
+            // hazard depends on the callee's return signature, not on the
+            // op itself, and today's lowering bails before emitting a call
+            // that returns anything heap-backed.
             for op in &lowered_fn.code {
                 match op {
-                    MicroOp::HeapBorrow { .. }
+                    MicroOp::HeapNew { .. }
+                    | MicroOp::HeapBorrow { .. }
+                    | MicroOp::HeapMoveFrom8 { .. }
+                    | MicroOp::HeapMoveFrom { .. }
+                    | MicroOp::VecNew { .. }
                     | MicroOp::VecBorrow { .. }
-                    | MicroOp::HeapNew { .. }
-                    | MicroOp::VecPushBack { .. } => {
+                    | MicroOp::VecLoadElem { .. }
+                    | MicroOp::VecPopBack { .. }
+                    | MicroOp::VecPushBack { .. }
+                    | MicroOp::PackClosure(..)
+                    | MicroOp::CallClosure(..) => {
                         bail!(
                             "function `{}` lowers a heap-pointer-producing op but \
                              frame_layout is not yet derived from the lowering context — \

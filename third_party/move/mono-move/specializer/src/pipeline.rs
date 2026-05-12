@@ -35,7 +35,7 @@ pub fn lower_module(module_ir: &ModuleIR) -> Result<LoweredModule> {
             .call_sites
             .iter()
             .flat_map(|cs| cs.arg_slots.iter().chain(cs.ret_slots.iter()))
-            .map(|ts| (ts.slot.offset + ts.slot.size) as usize)
+            .map(|ts| (ts.slot.offset.0 + ts.slot.size) as usize)
             .max()
             // Leaf function: no callee slots needed beyond metadata.
             .unwrap_or(param_and_local_sizes_sum + FRAME_METADATA_SIZE);

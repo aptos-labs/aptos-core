@@ -172,21 +172,16 @@ fn execute_function_v1(
     ) {
         Ok(result) => {
             let num_returns = result.return_values.len();
-            let display = if num_returns == 0 {
-                "results:".to_string()
-            } else {
-                let vals = result
-                    .return_values
-                    .iter()
-                    .map(|(bytes, _layout)| {
-                        let val = u64::from_le_bytes(bytes[..8].try_into().unwrap());
-                        val.to_string()
-                    })
-                    .collect::<Vec<_>>();
-                format!("results: {}", vals.join(", "))
-            };
+            let vals = result
+                .return_values
+                .iter()
+                .map(|(bytes, _layout)| {
+                    let val = u64::from_le_bytes(bytes[..8].try_into().unwrap());
+                    val.to_string()
+                })
+                .collect::<Vec<_>>();
             Output {
-                display,
+                display: format!("results: {}", vals.join(", ")),
                 num_returns,
             }
         },
@@ -255,20 +250,12 @@ fn execute_function_v2(
             num_returns: 0,
         },
         Ok(()) => {
-            if num_returns == 0 {
-                // TODO: Check frame contents?
-                Output {
-                    display: "results:".to_string(),
-                    num_returns: 0,
-                }
-            } else {
-                let vals = (0..num_returns)
-                    .map(|i| interpreter.root_result_at((i * 8) as u32).to_string())
-                    .collect::<Vec<_>>();
-                Output {
-                    display: format!("results: {}", vals.join(", ")),
-                    num_returns,
-                }
+            let vals = (0..num_returns)
+                .map(|i| interpreter.root_result_at((i * 8) as u32).to_string())
+                .collect::<Vec<_>>();
+            Output {
+                display: format!("results: {}", vals.join(", ")),
+                num_returns,
             }
         },
     }

@@ -11,7 +11,7 @@ use anyhow::{bail, Result};
 use mono_move_core::{
     align_up_u32,
     types::{view_type, Alignment, InternedType, Size},
-    FRAME_METADATA_SIZE,
+    FrameOffset, FRAME_METADATA_SIZE,
 };
 use move_binary_format::access::ModuleAccess;
 
@@ -52,7 +52,7 @@ pub fn type_size_and_align(ty: InternedType) -> Option<(Size, Alignment)> {
 /// Byte-level location of a typed value in the current function's frame.
 #[derive(Clone, Copy, Debug)]
 pub struct SlotInfo {
-    pub offset: u32,
+    pub offset: FrameOffset,
     /// Width of the type currently bound to this slot.
     pub size: u32,
     pub align: u32,
@@ -75,7 +75,8 @@ pub struct CallSiteInfo {
 }
 
 /// Frame layout for one function.
-/// [TODO]: instead of raw unsigned types, use named types everywhere.
+/// [TODO]: a few raw-`u32` fields remain (sizes/alignments); migrate
+/// them to dedicated newtypes for consistency with `FrameOffset`.
 pub struct LoweringContext {
     pub home_slots: Vec<SlotInfo>,
     /// End offset of the home-slot region; feeds `callee_base`.
@@ -95,7 +96,7 @@ pub struct LoweringContext {
     /// callees see a slightly bumped `callee_base`. Only inspected for
     /// at most one micro-op of any pair, so it doesn't need GC
     /// tracking.
-    pub scratch_offset: u32,
+    pub scratch_offset: FrameOffset,
     /// Width of the scratch slot in bytes, or `0` if no scratch is
     /// reserved.
     pub scratch_size: u32,
@@ -122,7 +123,14 @@ pub fn try_build_context(
         return Ok(None);
     };
     check_supported_alignment(&home_slots, |s| s.align, "home slot")?;
-    let mut frame_data_size = home_slots.last().map(|s| s.offset + s.size).unwrap_or(0);
+    // `frame_data_size` must be `MIN_SLOT_ALIGN`-aligned so that
+    // `callee_base = frame_data_size + FRAME_METADATA_SIZE` is also
+    // aligned (the runtime writes saved pc/fp/func_id as `u64`s
+    // starting at `frame_data_size`).
+    let mut frame_data_size = align_up_u32(
+        home_slots.last().map(|s| s.offset.0 + s.size).unwrap_or(0),
+        MIN_SLOT_ALIGN,
+    );
 
     // 2. Build `return_slots` from this function's own signature.
     let own_handle = module_ir.module.function_handle_at(func_ir.handle_idx);
@@ -138,7 +146,13 @@ pub fn try_build_context(
     // be ≥ ret_size — otherwise the return writes would land in frame metadata.
     // Leaf functions with no params/locals but a non-empty return signature
     // trip this without the bump.
-    let ret_end = return_slots.last().map(|s| s.offset + s.size).unwrap_or(0);
+    let ret_end = align_up_u32(
+        return_slots
+            .last()
+            .map(|s| s.offset.0 + s.size)
+            .unwrap_or(0),
+        MIN_SLOT_ALIGN,
+    );
     if ret_end > frame_data_size {
         frame_data_size = ret_end;
     }
@@ -158,14 +172,16 @@ pub fn try_build_context(
     //    cycle. That would let multi-return functions whose Ret
     //    copies are all identity or otherwise acyclic skip the slot
     //    too, at the cost of ~O(N²) per Ret graph cycle check.
+    //    We may also want to consider stricter bounding on number of
+    //    return values in the bytecode verifier.
     let max_value_width: u32 = return_slots.iter().map(|s| s.size).max().unwrap_or(0);
     let (scratch_offset, scratch_size) = if return_slots.len() >= 2 && max_value_width > 0 {
-        let offset = align_up(frame_data_size, MIN_SLOT_ALIGN);
-        let bumped = offset + align_up(max_value_width, MIN_SLOT_ALIGN);
-        frame_data_size = bumped;
-        (offset, max_value_width)
+        let offset = align_up_u32(frame_data_size, MIN_SLOT_ALIGN);
+        let size = align_up_u32(max_value_width, MIN_SLOT_ALIGN);
+        frame_data_size = offset + size;
+        (FrameOffset(offset), size)
     } else {
-        (0, 0)
+        (FrameOffset(0), 0)
     };
 
     // 4. Walk `Call`/`CallGeneric` instructions and lay out each callee's
@@ -224,7 +240,7 @@ fn layout_typed_slots_contiguously(base: u32, types: &[InternedType]) -> Option<
         offset = align_up_u32(offset, align);
         slots.push(TypedSlot {
             slot: SlotInfo {
-                offset,
+                offset: FrameOffset(offset),
                 size,
                 align,
             },

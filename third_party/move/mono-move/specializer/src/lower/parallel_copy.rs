@@ -27,11 +27,16 @@ use mono_move_core::{FrameOffset, MicroOp};
 use smallbitvec::SmallBitVec;
 use smallvec::SmallVec;
 
-/// One byte-copy: `width` bytes from `src` to `dst`.
+/// Stack-resident capacity of the `SmallVec`s sized to the typical
+/// small-N path. Emits involving at most this many copies avoid heap
+/// allocation; wider signatures spill to the heap transparently.
+const STACK_COPY_CAPACITY: usize = 4;
+
+/// Represents a copy of `width` bytes from `src` to `dst`.
 #[derive(Clone, Copy, Debug)]
 pub(crate) struct Copy {
-    pub src: u32,
-    pub dst: u32,
+    pub src: FrameOffset,
+    pub dst: FrameOffset,
     pub width: u32,
 }
 
@@ -54,10 +59,10 @@ pub(crate) struct Copy {
 /// copy width that could appear in a cycle; the caller is responsible for
 /// reserving it (`LoweringContext::scratch_offset`). When `copies` is acyclic,
 /// `scratch` is unused.
-pub(crate) fn emit_parallel_copy(out: &mut Vec<MicroOp>, copies: &[Copy], scratch: u32) {
+pub(crate) fn emit_parallel_copy(out: &mut Vec<MicroOp>, copies: &[Copy], scratch: FrameOffset) {
     // Filter trivial copies. Inline-stack-allocated for the common
     // small-N path; spills to heap only for adversarial wide signatures.
-    let mut copies: SmallVec<[Copy; 4]> = copies
+    let mut copies: SmallVec<[Copy; STACK_COPY_CAPACITY]> = copies
         .iter()
         .copied()
         .filter(|c| c.width > 0 && c.src != c.dst)
@@ -71,20 +76,72 @@ pub(crate) fn emit_parallel_copy(out: &mut Vec<MicroOp>, copies: &[Copy], scratc
         return;
     }
 
+    // Invariants:
+    // 1. `[scratch, scratch + max_width)` is disjoint from every
+    //    copy's src and dst range. `max_width` is the contract's
+    //    minimum scratch width; the actual reservation is at least
+    //    this wide.
+    // 2. No two copies write overlapping bytes. Two writers to one
+    //    location makes emit-order significant and breaks the
+    //    algorithm's correctness assumption (and termination — see
+    //    below).
+    #[cfg(debug_assertions)]
+    {
+        let max_width: u32 = copies.iter().map(|c| c.width).max().unwrap_or(0);
+        for c in copies.iter() {
+            debug_assert!(
+                !ranges_overlap(scratch.0, max_width, c.src.0, c.width),
+                "scratch [{}, {}) overlaps copy src [{}, {})",
+                scratch.0,
+                scratch.0 + max_width,
+                c.src.0,
+                c.src.0 + c.width,
+            );
+            debug_assert!(
+                !ranges_overlap(scratch.0, max_width, c.dst.0, c.width),
+                "scratch [{}, {}) overlaps copy dst [{}, {})",
+                scratch.0,
+                scratch.0 + max_width,
+                c.dst.0,
+                c.dst.0 + c.width,
+            );
+        }
+        for i in 0..copies.len() {
+            for j in (i + 1)..copies.len() {
+                debug_assert!(
+                    !ranges_overlap(
+                        copies[i].dst.0,
+                        copies[i].width,
+                        copies[j].dst.0,
+                        copies[j].width,
+                    ),
+                    "copies {} and {} write overlapping bytes: \
+                     [{}, {}) and [{}, {})",
+                    i,
+                    j,
+                    copies[i].dst.0,
+                    copies[i].dst.0 + copies[i].width,
+                    copies[j].dst.0,
+                    copies[j].dst.0 + copies[j].width,
+                );
+            }
+        }
+    }
+
     // `blockers[i]` is the bitset of indices `j` such that `copies[j].src`
     // overlaps `copies[i].dst` — the copies that must emit before `i`.
     // When we emit (or unblock via cycle break) copy `e`, we clear bit
     // `e` from every other `blockers[k]`. `alive` tracks which copies
     // remain pending; safety check is `alive[i] && blockers[i].all_false()`.
-    let mut blockers: SmallVec<[SmallBitVec; 4]> = (0..n)
+    let mut blockers: SmallVec<[SmallBitVec; STACK_COPY_CAPACITY]> = (0..n)
         .map(|i| {
             let mut bv = SmallBitVec::from_elem(n, false);
             for j in 0..n {
                 if i != j
                     && ranges_overlap(
-                        copies[i].dst,
+                        copies[i].dst.0,
                         copies[i].width,
-                        copies[j].src,
+                        copies[j].src.0,
                         copies[j].width,
                     )
                 {
@@ -97,6 +154,13 @@ pub(crate) fn emit_parallel_copy(out: &mut Vec<MicroOp>, copies: &[Copy], scratc
     let mut alive = SmallBitVec::from_elem(n, true);
     let mut remaining = n;
 
+    // Termination: a safe emit decrements `remaining`; a cycle-break
+    // clears `chosen` from some alive `blockers[k]`. For well-formed
+    // inputs (no two copies write overlapping bytes), every cycle
+    // member blocks its predecessor, so the latter always shrinks at
+    // least one `blockers[k]`. The debug-assert below catches the
+    // ill-formed case (node with non-empty `blockers` and zero
+    // out-edges) before it loops.
     while remaining > 0 {
         let safe =
             (0..n).find(|&i| alive.get(i).expect("alive sized to n") && blockers[i].all_false());
@@ -115,6 +179,18 @@ pub(crate) fn emit_parallel_copy(out: &mut Vec<MicroOp>, copies: &[Copy], scratc
             let chosen = (0..n)
                 .find(|&i| alive.get(i).expect("alive sized to n"))
                 .expect("remaining > 0 implies at least one alive copy");
+            #[cfg(debug_assertions)]
+            let blocks_someone = (0..n).any(|k| {
+                k != chosen
+                    && alive.get(k).expect("alive sized to n")
+                    && blockers[k].get(chosen).expect("blockers sized to n")
+            });
+            debug_assert!(
+                blocks_someone,
+                "cycle-break would not make progress: chosen copy {} blocks no one (ill-formed input \
+                 with overlapping writes, or a non-cyclic dead-end alive copy)",
+                chosen,
+            );
             emit_one(out, Copy {
                 src: copies[chosen].src,
                 dst: scratch,
@@ -148,13 +224,13 @@ fn clear_blocker(i: usize, n: usize, alive: &SmallBitVec, blockers: &mut [SmallB
 fn emit_one(out: &mut Vec<MicroOp>, c: Copy) {
     if c.width == 8 {
         out.push(MicroOp::Move8 {
-            dst: FrameOffset(c.dst),
-            src: FrameOffset(c.src),
+            dst: c.dst,
+            src: c.src,
         });
     } else {
         out.push(MicroOp::Move {
-            dst: FrameOffset(c.dst),
-            src: FrameOffset(c.src),
+            dst: c.dst,
+            src: c.src,
             size: c.width,
         });
     }
@@ -174,9 +250,9 @@ pub(crate) fn reverse_emit_is_safe(copies: &[Copy]) -> bool {
     for j_a in 0..copies.len() {
         for j_b in (j_a + 1)..copies.len() {
             if ranges_overlap(
-                copies[j_a].src,
+                copies[j_a].src.0,
                 copies[j_a].width,
-                copies[j_b].dst,
+                copies[j_b].dst.0,
                 copies[j_b].width,
             ) {
                 return false;
@@ -190,9 +266,21 @@ pub(crate) fn reverse_emit_is_safe(copies: &[Copy]) -> bool {
 mod tests {
     use super::*;
 
+    impl Copy {
+        /// Test-only constructor that wraps raw `u32` offsets in
+        /// `FrameOffset`. Keeps `Copy { ... }` literals out of every test.
+        fn from_raw(src: u32, dst: u32, width: u32) -> Self {
+            Self {
+                src: FrameOffset(src),
+                dst: FrameOffset(dst),
+                width,
+            }
+        }
+    }
+
     fn run(copies: &[Copy], scratch: u32) -> Vec<MicroOp> {
         let mut out = Vec::new();
-        emit_parallel_copy(&mut out, copies, scratch);
+        emit_parallel_copy(&mut out, copies, FrameOffset(scratch));
         out
     }
 
@@ -217,69 +305,25 @@ mod tests {
     fn reverse_emit_forward_chain_is_safe() {
         // copies[1].src overlaps copies[0].dst — j_a=0's src does NOT
         // overlap j_b=1's dst, so reverse-order emit is safe.
-        let copies = [
-            Copy {
-                src: 0,
-                dst: 8,
-                width: 8,
-            },
-            Copy {
-                src: 8,
-                dst: 16,
-                width: 8,
-            },
-        ];
+        let copies = [Copy::from_raw(0, 8, 8), Copy::from_raw(8, 16, 8)];
         assert!(reverse_emit_is_safe(&copies));
     }
 
     #[test]
     fn reverse_emit_cycle_is_unsafe() {
-        let copies = [
-            Copy {
-                src: 0,
-                dst: 8,
-                width: 8,
-            },
-            Copy {
-                src: 8,
-                dst: 0,
-                width: 8,
-            },
-        ];
+        let copies = [Copy::from_raw(0, 8, 8), Copy::from_raw(8, 0, 8)];
         assert!(!reverse_emit_is_safe(&copies));
     }
 
     #[test]
     fn reverse_emit_backward_chain_is_unsafe() {
-        let copies = [
-            Copy {
-                src: 8,
-                dst: 0,
-                width: 8,
-            },
-            Copy {
-                src: 16,
-                dst: 8,
-                width: 8,
-            },
-        ];
+        let copies = [Copy::from_raw(8, 0, 8), Copy::from_raw(16, 8, 8)];
         assert!(!reverse_emit_is_safe(&copies));
     }
 
     #[test]
     fn reverse_emit_varied_widths_disjoint_is_safe() {
-        let copies = [
-            Copy {
-                src: 0,
-                dst: 32,
-                width: 16,
-            },
-            Copy {
-                src: 16,
-                dst: 48,
-                width: 8,
-            },
-        ];
+        let copies = [Copy::from_raw(0, 32, 16), Copy::from_raw(16, 48, 8)];
         assert!(reverse_emit_is_safe(&copies));
     }
 
@@ -292,40 +336,19 @@ mod tests {
 
     #[test]
     fn identity_is_elided() {
-        let ops = run(
-            &[Copy {
-                src: 8,
-                dst: 8,
-                width: 8,
-            }],
-            100,
-        );
+        let ops = run(&[Copy::from_raw(8, 8, 8)], 100);
         assert!(ops.is_empty());
     }
 
     #[test]
     fn zero_width_is_filtered() {
-        let ops = run(
-            &[Copy {
-                src: 0,
-                dst: 8,
-                width: 0,
-            }],
-            100,
-        );
+        let ops = run(&[Copy::from_raw(0, 8, 0)], 100);
         assert!(ops.is_empty());
     }
 
     #[test]
     fn single_copy_emits_one_move() {
-        let ops = run(
-            &[Copy {
-                src: 0,
-                dst: 8,
-                width: 8,
-            }],
-            100,
-        );
+        let ops = run(&[Copy::from_raw(0, 8, 8)], 100);
         assert_eq!(ops.len(), 1);
         assert_eq!(decode(&ops[0]), (0, 8, 8));
     }
@@ -334,21 +357,7 @@ mod tests {
     fn disjoint_copies_emit_in_topo_order() {
         // Two independent copies; either order is correct, but neither
         // should require the scratch slot.
-        let ops = run(
-            &[
-                Copy {
-                    src: 0,
-                    dst: 16,
-                    width: 8,
-                },
-                Copy {
-                    src: 8,
-                    dst: 24,
-                    width: 8,
-                },
-            ],
-            100,
-        );
+        let ops = run(&[Copy::from_raw(0, 16, 8), Copy::from_raw(8, 24, 8)], 100);
         assert_eq!(ops.len(), 2);
         for op in &ops {
             let (_, dst, _) = decode(op);
@@ -360,21 +369,7 @@ mod tests {
     fn forward_chain_emits_dependent_first() {
         // C0: 0 -> 8, C1: 8 -> 16. C0.dst overlaps C1.src, so C1 must
         // emit before C0. Result: [C1, C0].
-        let ops = run(
-            &[
-                Copy {
-                    src: 0,
-                    dst: 8,
-                    width: 8,
-                },
-                Copy {
-                    src: 8,
-                    dst: 16,
-                    width: 8,
-                },
-            ],
-            100,
-        );
+        let ops = run(&[Copy::from_raw(0, 8, 8), Copy::from_raw(8, 16, 8)], 100);
         assert_eq!(ops.len(), 2);
         assert_eq!(decode(&ops[0]), (8, 16, 8));
         assert_eq!(decode(&ops[1]), (0, 8, 8));
@@ -385,21 +380,7 @@ mod tests {
         // Swap: 0 ↔ 8. Expected: scratch ← [0]; [8] ← [0]; [0] ← scratch.
         // Or equivalently: scratch ← [8]; [0] ← [8]; [8] ← scratch.
         // (Either choice — the algorithm picks `pending[0]`.)
-        let ops = run(
-            &[
-                Copy {
-                    src: 0,
-                    dst: 8,
-                    width: 8,
-                },
-                Copy {
-                    src: 8,
-                    dst: 0,
-                    width: 8,
-                },
-            ],
-            100,
-        );
+        let ops = run(&[Copy::from_raw(0, 8, 8), Copy::from_raw(8, 0, 8)], 100);
         assert_eq!(ops.len(), 3);
         let (s0, d0, w0) = decode(&ops[0]);
         // First op saves one cycle member's source to scratch.
@@ -422,21 +403,9 @@ mod tests {
         // 0 -> 8, 8 -> 16, 16 -> 0. Expect 4 ops: 1 save + 3 cycle moves.
         let ops = run(
             &[
-                Copy {
-                    src: 0,
-                    dst: 8,
-                    width: 8,
-                },
-                Copy {
-                    src: 8,
-                    dst: 16,
-                    width: 8,
-                },
-                Copy {
-                    src: 16,
-                    dst: 0,
-                    width: 8,
-                },
+                Copy::from_raw(0, 8, 8),
+                Copy::from_raw(8, 16, 8),
+                Copy::from_raw(16, 0, 8),
             ],
             100,
         );
@@ -453,26 +422,10 @@ mod tests {
         // scratch reused.
         let ops = run(
             &[
-                Copy {
-                    src: 0,
-                    dst: 8,
-                    width: 8,
-                },
-                Copy {
-                    src: 8,
-                    dst: 0,
-                    width: 8,
-                },
-                Copy {
-                    src: 16,
-                    dst: 24,
-                    width: 8,
-                },
-                Copy {
-                    src: 24,
-                    dst: 16,
-                    width: 8,
-                },
+                Copy::from_raw(0, 8, 8),
+                Copy::from_raw(8, 0, 8),
+                Copy::from_raw(16, 24, 8),
+                Copy::from_raw(24, 16, 8),
             ],
             100,
         );
@@ -501,21 +454,7 @@ mod tests {
     fn fat_pointer_cycle_uses_full_width_scratch() {
         // 16-byte fat-ref swap. Scratch must hold 16 bytes; algorithm
         // emits Move (not Move8) ops at width 16.
-        let ops = run(
-            &[
-                Copy {
-                    src: 0,
-                    dst: 16,
-                    width: 16,
-                },
-                Copy {
-                    src: 16,
-                    dst: 0,
-                    width: 16,
-                },
-            ],
-            100,
-        );
+        let ops = run(&[Copy::from_raw(0, 16, 16), Copy::from_raw(16, 0, 16)], 100);
         assert_eq!(ops.len(), 3);
         for op in &ops {
             let (_, _, w) = decode(op);
@@ -529,21 +468,9 @@ mod tests {
         // emit at some point, scratch unused for C2.
         let ops = run(
             &[
-                Copy {
-                    src: 0,
-                    dst: 8,
-                    width: 8,
-                },
-                Copy {
-                    src: 8,
-                    dst: 0,
-                    width: 8,
-                },
-                Copy {
-                    src: 32,
-                    dst: 40,
-                    width: 8,
-                },
+                Copy::from_raw(0, 8, 8),
+                Copy::from_raw(8, 0, 8),
+                Copy::from_raw(32, 40, 8),
             ],
             100,
         );

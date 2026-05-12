@@ -144,19 +144,19 @@ impl<'a> LoweringState<'a> {
     /// Emit one byte-copy from `src` to `dst_offset`. Caller is
     /// responsible for ensuring no other concurrent move clobbers the
     /// source bytes.
-    fn emit_single_move(&mut self, dst_offset: u32, src: SlotInfo) {
+    fn emit_single_move(&mut self, dst_offset: FrameOffset, src: SlotInfo) {
         if dst_offset == src.offset {
             return;
         }
         if src.size == 8 {
             self.emit(MicroOp::Move8 {
-                dst: FrameOffset(dst_offset),
-                src: FrameOffset(src.offset),
+                dst: dst_offset,
+                src: src.offset,
             });
         } else {
             self.emit(MicroOp::Move {
-                dst: FrameOffset(dst_offset),
-                src: FrameOffset(src.offset),
+                dst: dst_offset,
+                src: src.offset,
                 size: src.size,
             });
         }
@@ -169,70 +169,70 @@ impl<'a> LoweringState<'a> {
             Instr::LdU64(dst, v) => {
                 let dst_info = self.def_slot(*dst)?;
                 self.emit(MicroOp::StoreImm8 {
-                    dst: FrameOffset(dst_info.offset),
+                    dst: dst_info.offset,
                     imm: *v,
                 });
             },
             Instr::LdTrue(dst) => {
                 let dst_info = self.def_slot(*dst)?;
                 self.emit(MicroOp::StoreImm8 {
-                    dst: FrameOffset(dst_info.offset),
+                    dst: dst_info.offset,
                     imm: 1,
                 });
             },
             Instr::LdFalse(dst) => {
                 let dst_info = self.def_slot(*dst)?;
                 self.emit(MicroOp::StoreImm8 {
-                    dst: FrameOffset(dst_info.offset),
+                    dst: dst_info.offset,
                     imm: 0,
                 });
             },
             Instr::LdU8(dst, v) => {
                 let dst_info = self.def_slot(*dst)?;
                 self.emit(MicroOp::StoreImm8 {
-                    dst: FrameOffset(dst_info.offset),
+                    dst: dst_info.offset,
                     imm: *v as u64,
                 });
             },
             Instr::LdU16(dst, v) => {
                 let dst_info = self.def_slot(*dst)?;
                 self.emit(MicroOp::StoreImm8 {
-                    dst: FrameOffset(dst_info.offset),
+                    dst: dst_info.offset,
                     imm: *v as u64,
                 });
             },
             Instr::LdU32(dst, v) => {
                 let dst_info = self.def_slot(*dst)?;
                 self.emit(MicroOp::StoreImm8 {
-                    dst: FrameOffset(dst_info.offset),
+                    dst: dst_info.offset,
                     imm: *v as u64,
                 });
             },
             Instr::LdI8(dst, v) => {
                 let dst_info = self.def_slot(*dst)?;
                 self.emit(MicroOp::StoreImm8 {
-                    dst: FrameOffset(dst_info.offset),
+                    dst: dst_info.offset,
                     imm: *v as u64,
                 });
             },
             Instr::LdI16(dst, v) => {
                 let dst_info = self.def_slot(*dst)?;
                 self.emit(MicroOp::StoreImm8 {
-                    dst: FrameOffset(dst_info.offset),
+                    dst: dst_info.offset,
                     imm: *v as u64,
                 });
             },
             Instr::LdI32(dst, v) => {
                 let dst_info = self.def_slot(*dst)?;
                 self.emit(MicroOp::StoreImm8 {
-                    dst: FrameOffset(dst_info.offset),
+                    dst: dst_info.offset,
                     imm: *v as u64,
                 });
             },
             Instr::LdI64(dst, v) => {
                 let dst_info = self.def_slot(*dst)?;
                 self.emit(MicroOp::StoreImm8 {
-                    dst: FrameOffset(dst_info.offset),
+                    dst: dst_info.offset,
                     imm: *v as u64,
                 });
             },
@@ -251,9 +251,9 @@ impl<'a> LoweringState<'a> {
                     let lhs_info = self.slot(*lhs)?;
                     let rhs_info = self.slot(*rhs)?;
                     let dst_info = self.def_slot(*dst)?;
-                    let dst = FrameOffset(dst_info.offset);
-                    let lhs = FrameOffset(lhs_info.offset);
-                    let rhs = FrameOffset(rhs_info.offset);
+                    let dst = dst_info.offset;
+                    let lhs = lhs_info.offset;
+                    let rhs = rhs_info.offset;
                     match op {
                         BinaryOp::Add => self.emit(MicroOp::AddU64 { dst, lhs, rhs }),
                         BinaryOp::Sub => self.emit(MicroOp::SubU64 { dst, lhs, rhs }),
@@ -281,8 +281,8 @@ impl<'a> LoweringState<'a> {
                     let src_info = self.slot(*src)?;
                     let dst_info = self.def_slot(*dst)?;
                     let v = imm_to_u64(imm);
-                    let dst = FrameOffset(dst_info.offset);
-                    let src = FrameOffset(src_info.offset);
+                    let dst = dst_info.offset;
+                    let src = src_info.offset;
                     match op {
                         BinaryOp::Add => self.emit(MicroOp::AddU64Imm { dst, src, imm: v }),
                         BinaryOp::Sub => self.emit(MicroOp::SubU64Imm { dst, src, imm: v }),
@@ -320,8 +320,8 @@ impl<'a> LoweringState<'a> {
                 let src_info = self.slot(*src)?;
                 let dst_info = self.def_slot(*dst)?;
                 self.emit(MicroOp::SlotBorrow {
-                    dst: FrameOffset(dst_info.offset),
-                    local: FrameOffset(src_info.offset),
+                    dst: dst_info.offset,
+                    local: src_info.offset,
                 });
             },
             Instr::ReadRef(dst, ref_src) => {
@@ -333,8 +333,8 @@ impl<'a> LoweringState<'a> {
                 let ref_info = self.slot(*ref_src)?;
                 let dst_info = self.def_slot(*dst)?;
                 self.emit(MicroOp::ReadRef {
-                    dst: FrameOffset(dst_info.offset),
-                    ref_ptr: FrameOffset(ref_info.offset),
+                    dst: dst_info.offset,
+                    ref_ptr: ref_info.offset,
                     size,
                 });
             },
@@ -347,8 +347,8 @@ impl<'a> LoweringState<'a> {
                 let ref_info = self.slot(*ref_dst)?;
                 let src_info = self.slot(*src)?;
                 self.emit(MicroOp::WriteRef {
-                    ref_ptr: FrameOffset(ref_info.offset),
-                    src: FrameOffset(src_info.offset),
+                    ref_ptr: ref_info.offset,
+                    src: src_info.offset,
                     size,
                 });
             },
@@ -369,7 +369,7 @@ impl<'a> LoweringState<'a> {
                 // This needs to be updated with a more compact boolean representation.
                 self.emit(MicroOp::JumpNotZeroU64 {
                     target: CodeOffset(encode_label(*l)),
-                    src: FrameOffset(cond_info.offset),
+                    src: cond_info.offset,
                 });
             },
             Instr::BrFalse(Label(l), cond) => {
@@ -380,7 +380,7 @@ impl<'a> LoweringState<'a> {
                 // This needs to be updated with a more compact boolean representation.
                 self.emit(MicroOp::JumpLessU64Imm {
                     target: CodeOffset(encode_label(*l)),
-                    src: FrameOffset(cond_info.offset),
+                    src: cond_info.offset,
                     imm: 1,
                 });
             },
@@ -396,30 +396,30 @@ impl<'a> LoweringState<'a> {
                     match op {
                         CmpOp::Lt => self.emit(MicroOp::JumpLessU64 {
                             target: CodeOffset(encode_label(*l)),
-                            lhs: FrameOffset(lhs_info.offset),
-                            rhs: FrameOffset(rhs_info.offset),
+                            lhs: lhs_info.offset,
+                            rhs: rhs_info.offset,
                         }),
                         CmpOp::Ge => self.emit(MicroOp::JumpGreaterEqualU64 {
                             target: CodeOffset(encode_label(*l)),
-                            lhs: FrameOffset(lhs_info.offset),
-                            rhs: FrameOffset(rhs_info.offset),
+                            lhs: lhs_info.offset,
+                            rhs: rhs_info.offset,
                         }),
                         // x > y ↔ y < x
                         CmpOp::Gt => self.emit(MicroOp::JumpLessU64 {
                             target: CodeOffset(encode_label(*l)),
-                            lhs: FrameOffset(rhs_info.offset),
-                            rhs: FrameOffset(lhs_info.offset),
+                            lhs: rhs_info.offset,
+                            rhs: lhs_info.offset,
                         }),
                         // x <= y ↔ y >= x
                         CmpOp::Le => self.emit(MicroOp::JumpGreaterEqualU64 {
                             target: CodeOffset(encode_label(*l)),
-                            lhs: FrameOffset(rhs_info.offset),
-                            rhs: FrameOffset(lhs_info.offset),
+                            lhs: rhs_info.offset,
+                            rhs: lhs_info.offset,
                         }),
                         CmpOp::Neq => self.emit(MicroOp::JumpNotEqualU64 {
                             target: CodeOffset(encode_label(*l)),
-                            lhs: FrameOffset(lhs_info.offset),
-                            rhs: FrameOffset(rhs_info.offset),
+                            lhs: lhs_info.offset,
+                            rhs: rhs_info.offset,
                         }),
                         CmpOp::Eq => {
                             bail!("BrCmp Eq for u64-sized type not yet lowered")
@@ -439,22 +439,22 @@ impl<'a> LoweringState<'a> {
                     match op {
                         CmpOp::Ge => self.emit(MicroOp::JumpGreaterEqualU64Imm {
                             target: CodeOffset(encode_label(*l)),
-                            src: FrameOffset(src_info.offset),
+                            src: src_info.offset,
                             imm: v,
                         }),
                         CmpOp::Lt => self.emit(MicroOp::JumpLessU64Imm {
                             target: CodeOffset(encode_label(*l)),
-                            src: FrameOffset(src_info.offset),
+                            src: src_info.offset,
                             imm: v,
                         }),
                         CmpOp::Gt => self.emit(MicroOp::JumpGreaterU64Imm {
                             target: CodeOffset(encode_label(*l)),
-                            src: FrameOffset(src_info.offset),
+                            src: src_info.offset,
                             imm: v,
                         }),
                         CmpOp::Le => self.emit(MicroOp::JumpLessEqualU64Imm {
                             target: CodeOffset(encode_label(*l)),
-                            src: FrameOffset(src_info.offset),
+                            src: src_info.offset,
                             imm: v,
                         }),
                         CmpOp::Eq | CmpOp::Neq => {
@@ -481,7 +481,7 @@ impl<'a> LoweringState<'a> {
                 // `swap(a, b) -> (b, a)` produces a swap-cycle in the
                 // copy graph. `emit_parallel_copy` handles arbitrary
                 // cycles via the function's reserved scratch slot.
-                let mut copies: Vec<parallel_copy::Copy> = Vec::with_capacity(slots.len());
+                let mut copies = Vec::with_capacity(slots.len());
                 for (k, slot) in slots.iter().enumerate() {
                     let src = self.slot(*slot)?;
                     let dst = self.ctx.return_slots[k];
@@ -526,7 +526,7 @@ impl<'a> LoweringState<'a> {
         // a layer-skipping regression at the lowering site.
         #[cfg(debug_assertions)]
         {
-            let mut copies: Vec<parallel_copy::Copy> = Vec::with_capacity(args.len());
+            let mut copies = Vec::with_capacity(args.len());
             for (j, arg_slot) in args.iter().enumerate() {
                 let arg_info = self.slot(*arg_slot)?;
                 copies.push(parallel_copy::Copy {
@@ -563,13 +563,13 @@ impl<'a> LoweringState<'a> {
             );
             if arg_info.size == 8 {
                 self.emit(MicroOp::Move8 {
-                    dst: FrameOffset(dst_off),
-                    src: FrameOffset(arg_info.offset),
+                    dst: dst_off,
+                    src: arg_info.offset,
                 });
             } else {
                 self.emit(MicroOp::Move {
-                    dst: FrameOffset(dst_off),
-                    src: FrameOffset(arg_info.offset),
+                    dst: dst_off,
+                    src: arg_info.offset,
                     size: arg_info.size,
                 });
             }
