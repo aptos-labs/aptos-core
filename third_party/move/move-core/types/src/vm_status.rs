@@ -669,7 +669,7 @@ pub enum StatusCode {
     NOT_DELEGATED_VOTER = 47,
     // Fee payer's committed stake is insufficient for the requested multiplier tier.
     INSUFFICIENT_STAKE = 48,
-    // Multiplier must be > 100 bps (> 1x).
+    // Multiplier must be > 100 (> 1x).
     INVALID_HIGH_TXN_LIMITS_MULTIPLIER = 49,
     // No stake pool exists at the specified address.
     STAKE_POOL_NOT_FOUND = 50,
@@ -679,14 +679,18 @@ pub enum StatusCode {
     MULTIPLIER_NOT_AVAILABLE = 52,
     // Gas unit price is below the scaled minimum for high-limit transactions.
     HIGH_LIMIT_TXN_GAS_UNIT_PRICE_BELOW_MIN_BOUND = 53,
-
     // Encrypted transaction gas unit price is below the minimum required.
     ENCRYPTED_TXN_GAS_UNIT_PRICE_BELOW_MIN_BOUND = 54,
+    // A high-limit request was attached to a transaction that was the approved
+    // governance proposal.
+    TXN_LIMITS_REQUEST_NOT_ALLOWED_FOR_GOVERNANCE_SCRIPT = 55,
+    // Stake pool is not in the current-epoch validator set.
+    STAKE_POOL_NOT_IN_VALIDATOR_SET = 56,
 
     // Reserved error code for future use
-    RESERVED_VALIDATION_ERROR_2 = 55,
-    RESERVED_VALIDATION_ERROR_3 = 56,
-    RESERVED_VALIDATION_ERROR_4 = 57,
+    RESERVED_VALIDATION_ERROR_2 = 57,
+    RESERVED_VALIDATION_ERROR_3 = 58,
+    RESERVED_VALIDATION_ERROR_4 = 59,
 
 
     // When a code module/script is published it is verified. These are the

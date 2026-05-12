@@ -66,10 +66,12 @@ const ENOT_DELEGATED_VOTER: u64 = 3;
 const EDELEGATION_POOL_NOT_FOUND: u64 = 4;
 // Sender's committed stake is insufficient for the requested multiplier tier.
 const EINSUFFICIENT_STAKE: u64 = 5;
-// Multiplier must be > 100 bps (> 1x).
+// Multiplier must be > 100 (> 1x).
 const EINVALID_MULTIPLIER: u64 = 7;
 // Requested multiplier is not available in any configured tier.
 const EMULTIPLIER_NOT_AVAILABLE: u64 = 8;
+// Stake pool is not in the current-epoch validator set.
+const EPOOL_NOT_IN_VALIDATOR_SET: u64 = 9;
 
 const INVALID_ARGUMENT: u8 = 0x1;
 const LIMIT_EXCEEDED: u8 = 0x2;
@@ -102,6 +104,9 @@ pub fn convert_prologue_error(
                 (PERMISSION_DENIED, ENOT_STAKE_POOL_OWNER) => StatusCode::NOT_STAKE_POOL_OWNER,
                 (PERMISSION_DENIED, ENOT_DELEGATED_VOTER) => StatusCode::NOT_DELEGATED_VOTER,
                 (PERMISSION_DENIED, EINSUFFICIENT_STAKE) => StatusCode::INSUFFICIENT_STAKE,
+                (PERMISSION_DENIED, EPOOL_NOT_IN_VALIDATOR_SET) => {
+                    StatusCode::STAKE_POOL_NOT_IN_VALIDATOR_SET
+                },
                 (NOT_FOUND, ESTAKE_POOL_NOT_FOUND) => StatusCode::STAKE_POOL_NOT_FOUND,
                 (NOT_FOUND, EDELEGATION_POOL_NOT_FOUND) => StatusCode::DELEGATION_POOL_NOT_FOUND,
                 (INVALID_ARGUMENT, EINVALID_MULTIPLIER) => {

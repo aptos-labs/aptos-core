@@ -126,7 +126,6 @@ pub(crate) fn run_script_prologue(
         return crate::transaction_validation_versioned::run_prologue(
             session,
             module_storage,
-            serialized_signers,
             txn_data,
             log_context,
             traversal_context,
@@ -493,7 +492,6 @@ fn run_epilogue(
         return crate::transaction_validation_versioned::run_epilogue(
             session,
             module_storage,
-            serialized_signers,
             gas_remaining,
             fee_statement,
             txn_data,
