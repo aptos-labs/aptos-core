@@ -53,6 +53,7 @@ pub struct BatchCoordinator {
     max_total_bytes: u64,
     batch_expiry_gap_when_init_usecs: u64,
     transaction_filter_config: BatchTransactionFilterConfig,
+    enable_fast_batches_rx: bool,
 }
 
 impl BatchCoordinator {
@@ -69,6 +70,7 @@ impl BatchCoordinator {
         max_total_bytes: u64,
         batch_expiry_gap_when_init_usecs: u64,
         transaction_filter_config: BatchTransactionFilterConfig,
+        enable_fast_batches_rx: bool,
     ) -> Self {
         Self {
             my_peer_id,
@@ -83,6 +85,7 @@ impl BatchCoordinator {
             max_total_bytes,
             batch_expiry_gap_when_init_usecs,
             transaction_filter_config,
+            enable_fast_batches_rx,
         }
     }
 
@@ -98,6 +101,7 @@ impl BatchCoordinator {
         let batch_store = self.batch_store.clone();
         let network_sender = self.network_sender.clone();
         let sender_to_proof_manager = self.sender_to_proof_manager.clone();
+        let enable_fast_batches_rx = self.enable_fast_batches_rx;
         tokio::spawn(async move {
             let peer_id = persist_requests[0].author();
             let batches = persist_requests
@@ -122,8 +126,22 @@ impl BatchCoordinator {
                             &first_batch_info,
                         );
                     }
+                    let mut recipients = vec![peer_id];
+                    if enable_fast_batches_rx {
+                        for sbi in &signed_batch_infos {
+                            if let Some(BatchKind::FastProof(params)) =
+                                sbi.batch_info().batch_kind()
+                            {
+                                for agg in params.aggregators() {
+                                    if !recipients.contains(agg) {
+                                        recipients.push(*agg);
+                                    }
+                                }
+                            }
+                        }
+                    }
                     network_sender
-                        .send_signed_batch_info_msg_v2(signed_batch_infos, vec![peer_id])
+                        .send_signed_batch_info_msg_v2(signed_batch_infos, recipients)
                         .await;
                 }
             } else {

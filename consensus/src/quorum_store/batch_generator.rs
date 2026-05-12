@@ -14,12 +14,17 @@ use crate::{
 use aptos_config::config::QuorumStoreConfig;
 use aptos_consensus_types::{
     common::{TransactionInProgress, TransactionSummary},
-    proof_of_store::{BatchInfoExt, BatchKind, TBatchInfo},
+    proof_of_store::{
+        BatchInfoExt, BatchKind, FastProofParams, TBatchInfo, MAX_K_FAST_PROOF_AGGREGATORS,
+    },
 };
 use aptos_experimental_runtimes::thread_manager::optimal_min_len;
 use aptos_logger::prelude::*;
 use aptos_mempool::QuorumStoreRequest;
-use aptos_types::{quorum_store::BatchId, transaction::SignedTransaction, PeerId};
+use aptos_types::{
+    quorum_store::BatchId, transaction::SignedTransaction, validator_verifier::ValidatorVerifier,
+    PeerId,
+};
 use futures_channel::mpsc::Sender;
 use rayon::prelude::*;
 use std::{
@@ -82,6 +87,11 @@ pub struct BatchGenerator {
         std::collections::VecDeque<aptos_transaction_tracing::types::BatchCreationRecord>,
     /// Cached Arc of batch bucket boundaries for tracing records (avoids cloning per record).
     tracing_bucket_boundaries: std::sync::Arc<Vec<u64>>,
+    /// FastProof aggregator list filtered to current validator set (epoch-scoped).
+    /// Empty when `enable_fast_batches_tx=false` or no configured aggregators are in the set.
+    fast_proof_aggregators: Vec<PeerId>,
+    /// Pre-computed f+1 voting power threshold (epoch-scoped), embedded into FastProof batches.
+    fast_proof_threshold: u64,
 }
 
 impl BatchGenerator {
@@ -103,7 +113,7 @@ impl BatchGenerator {
         expiry_time: u64,
         reverse_buckets_excluding_zero: &[u64],
         max_batches_remaining: &mut u64,
-        batch_kind: BatchKind,
+        batch_kind: &BatchKind,
     ) {
         for bucket_start in reverse_buckets_excluding_zero {
             if txns.is_empty() || *max_batches_remaining == 0 {
@@ -154,6 +164,7 @@ impl BatchGenerator {
         batch_writer: Arc<dyn BatchWriter>,
         mempool_tx: Sender<QuorumStoreRequest>,
         mempool_txn_pull_timeout_ms: u64,
+        validator_verifier: &ValidatorVerifier,
     ) -> Self {
         let batch_id = if let Some(mut id) = db
             .clean_and_get_batch_id(epoch)
@@ -172,6 +183,34 @@ impl BatchGenerator {
             .expect("Could not save to db");
 
         let tracing_bucket_boundaries = std::sync::Arc::new(config.batch_buckets.clone());
+
+        // Pre-compute FastProof params for this epoch.
+        let (fast_proof_aggregators, fast_proof_threshold) = if config.enable_fast_batches_tx {
+            let validator_set = validator_verifier.address_to_validator_index();
+            let aggregators: Vec<PeerId> = config
+                .fast_batch_aggregators
+                .iter()
+                .filter(|peer| validator_set.contains_key(peer))
+                .take(
+                    config
+                        .fast_batch_num_aggregators
+                        .min(MAX_K_FAST_PROOF_AGGREGATORS),
+                )
+                .copied()
+                .collect();
+            let threshold = (validator_verifier.total_voting_power()
+                - validator_verifier.quorum_voting_power()
+                + 1) as u64;
+            if aggregators.is_empty() {
+                warn!(
+                    "enable_fast_batches_tx=true but no configured aggregators are in the validator set; FastProof emission disabled this epoch"
+                );
+            }
+            (aggregators, threshold)
+        } else {
+            (vec![], 0)
+        };
+
         Self {
             epoch,
             my_peer_id,
@@ -193,6 +232,8 @@ impl BatchGenerator {
             total_batches_created: 0,
             recent_batch_records: std::collections::VecDeque::new(),
             tracing_bucket_boundaries,
+            fast_proof_aggregators,
+            fast_proof_threshold,
         }
     }
 
@@ -251,7 +292,7 @@ impl BatchGenerator {
         txns: Vec<SignedTransaction>,
         expiry_time: u64,
         bucket_start: u64,
-        batch_kind: BatchKind,
+        batch_kind: &BatchKind,
     ) -> Batch<BatchInfoExt> {
         let batch_id = self.batch_id;
         self.batch_id.increment();
@@ -261,15 +302,28 @@ impl BatchGenerator {
 
         self.insert_batch(self.my_peer_id, batch_id, txns.clone(), expiry_time);
 
+        // Upgrade Normal → FastProof when fast-batch emission is configured for this epoch.
+        // Encrypted batches keep their kind (correctness > optimization).
+        let upgraded_kind =
+            if matches!(batch_kind, BatchKind::Normal) && !self.fast_proof_aggregators.is_empty() {
+                BatchKind::FastProof(FastProofParams::new(
+                    self.fast_proof_aggregators.clone(),
+                    self.fast_proof_threshold,
+                ))
+            } else {
+                batch_kind.clone()
+            };
+
         let batch_version = if self.config.enable_batch_v2_tx {
             "v2"
         } else {
             "v1"
         };
         let kind_str = if self.config.enable_batch_v2_tx {
-            match batch_kind {
+            match &upgraded_kind {
                 BatchKind::Normal => "normal",
                 BatchKind::Encrypted => "encrypted",
+                BatchKind::FastProof(_) => "fast_proof",
             }
         } else {
             "na"
@@ -301,7 +355,7 @@ impl BatchGenerator {
                 expiry_time,
                 self.my_peer_id,
                 bucket_start,
-                batch_kind,
+                upgraded_kind,
             )
         } else {
             Batch::new_v1(
@@ -335,7 +389,7 @@ impl BatchGenerator {
         expiry_time: u64,
         bucket_start: u64,
         total_batches_remaining: &mut u64,
-        batch_kind: BatchKind,
+        batch_kind: &BatchKind,
     ) {
         let mut txns_remaining = num_txns_in_bucket;
         while txns_remaining > 0 {
@@ -344,7 +398,7 @@ impl BatchGenerator {
             }
             let max_batch_txns = match batch_kind {
                 BatchKind::Encrypted => self.config.sender_max_encrypted_batch_txns,
-                BatchKind::Normal => self.config.sender_max_batch_txns,
+                BatchKind::Normal | BatchKind::FastProof(_) => self.config.sender_max_batch_txns,
             };
             let num_take_txns = std::cmp::min(max_batch_txns, txns_remaining);
             let mut batch_bytes_remaining = self.config.sender_max_batch_bytes as u64;
@@ -425,8 +479,8 @@ impl BatchGenerator {
             // This ensures backwards compatibility and prioritizes regular transactions.
             let batch_kind_order = [BatchKind::Normal, BatchKind::Encrypted];
 
-            for &batch_kind in &batch_kind_order {
-                if let Some(mut txns) = txns_by_kind.remove(&batch_kind) {
+            for batch_kind in &batch_kind_order {
+                if let Some(mut txns) = txns_by_kind.remove(batch_kind) {
                     self.process_transaction_group(
                         &mut batches,
                         &mut txns,
@@ -453,7 +507,7 @@ impl BatchGenerator {
                 expiry_time,
                 &reverse_buckets_excluding_zero,
                 &mut max_batches_remaining,
-                BatchKind::Normal,
+                &BatchKind::Normal,
             );
         }
 

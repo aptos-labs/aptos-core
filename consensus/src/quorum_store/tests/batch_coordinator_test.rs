@@ -143,6 +143,7 @@ fn create_batch_coordinator(
         10_000,
         10_000,
         transaction_filter_config,
+        false,
     )
 }
 

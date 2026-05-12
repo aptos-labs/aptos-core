@@ -140,6 +140,7 @@ fn batch_kind_metric_label(kind: Option<BatchKind>) -> &'static str {
     match kind {
         Some(BatchKind::Normal) => "normal",
         Some(BatchKind::Encrypted) => "encrypted",
+        Some(BatchKind::FastProof(_)) => "fast_proof",
         None => "v1",
     }
 }
@@ -661,7 +662,7 @@ impl BatchProofQueue {
         session.add_pulled_batches(&result, &self.items);
         // Merge per-kind counts into session
         for (kind, count) in &cur_txns_per_kind {
-            *session.cur_txns_per_kind.entry(*kind).or_insert(0) += count;
+            *session.cur_txns_per_kind.entry(kind.clone()).or_insert(0) += count;
         }
 
         (result, pulled_txns, unique_txns, cur_txns_per_kind)

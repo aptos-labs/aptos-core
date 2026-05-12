@@ -43,6 +43,12 @@ pub trait TBatchInfo:
     fn size(&self) -> PayloadTxnsSize;
 
     fn batch_kind(&self) -> Option<BatchKind>;
+
+    /// Verify kind-specific parameters (e.g. FastProofParams threshold/aggregators).
+    /// Default Ok(()) for V1 / kinds with no extra params.
+    fn verify_kind(&self, _validator: &ValidatorVerifier) -> anyhow::Result<()> {
+        Ok(())
+    }
 }
 
 #[derive(
@@ -322,7 +328,17 @@ impl TBatchInfo for BatchInfoExt {
     fn batch_kind(&self) -> Option<BatchKind> {
         match self {
             BatchInfoExt::V1 { .. } => None,
-            BatchInfoExt::V2 { extra, .. } => Some(extra.batch_kind),
+            BatchInfoExt::V2 { extra, .. } => Some(extra.batch_kind.clone()),
+        }
+    }
+
+    fn verify_kind(&self, validator: &ValidatorVerifier) -> anyhow::Result<()> {
+        match self {
+            BatchInfoExt::V1 { .. } => Ok(()),
+            BatchInfoExt::V2 { extra, .. } => match &extra.batch_kind {
+                BatchKind::Normal | BatchKind::Encrypted => Ok(()),
+                BatchKind::FastProof(params) => params.verify(validator),
+            },
         }
     }
 }
@@ -353,11 +369,64 @@ pub struct ExtraBatchInfo {
 }
 
 #[derive(
-    Copy, Clone, Debug, Deserialize, Serialize, CryptoHasher, BCSCryptoHash, PartialEq, Eq, Hash,
+    Clone, Debug, Deserialize, Serialize, CryptoHasher, BCSCryptoHash, PartialEq, Eq, Hash,
 )]
 pub enum BatchKind {
     Normal,
     Encrypted,
+    FastProof(FastProofParams),
+}
+
+pub const MAX_K_FAST_PROOF_AGGREGATORS: usize = 4;
+
+#[derive(
+    Clone, Debug, Deserialize, Serialize, CryptoHasher, BCSCryptoHash, PartialEq, Eq, Hash,
+)]
+pub struct FastProofParams {
+    aggregators: Vec<PeerId>,
+    threshold: u64,
+}
+
+impl FastProofParams {
+    pub fn new(aggregators: Vec<PeerId>, threshold: u64) -> Self {
+        Self {
+            aggregators,
+            threshold,
+        }
+    }
+
+    pub fn aggregators(&self) -> &[PeerId] {
+        &self.aggregators
+    }
+
+    pub fn threshold(&self) -> u64 {
+        self.threshold
+    }
+
+    pub fn verify(&self, validator: &ValidatorVerifier) -> anyhow::Result<()> {
+        ensure!(
+            !self.aggregators.is_empty(),
+            "FastProof aggregator list is empty"
+        );
+        ensure!(
+            self.aggregators.len() <= MAX_K_FAST_PROOF_AGGREGATORS,
+            "FastProof aggregator list too long: {} > {}",
+            self.aggregators.len(),
+            MAX_K_FAST_PROOF_AGGREGATORS
+        );
+        let validator_set = validator.address_to_validator_index();
+        for peer in &self.aggregators {
+            ensure!(
+                validator_set.contains_key(peer),
+                "FastProof aggregator {} not in validator set",
+                peer
+            );
+        }
+        validator
+            .check_aggregated_voting_power(self.threshold as u128, false)
+            .map_err(|e| anyhow::anyhow!("FastProof threshold below f+1: {:?}", e))?;
+        Ok(())
+    }
 }
 
 #[derive(Clone, Debug, Deserialize, Serialize)]
@@ -496,6 +565,8 @@ where
                     + max_batch_expiry_gap_usecs
             );
         }
+
+        self.info.verify_kind(validator)?;
 
         Ok(validator.optimistic_verify(self.signer, &self.info, &self.signature)?)
     }
@@ -664,6 +735,7 @@ where
                 return Ok(());
             }
         }
+        self.info.verify_kind(validator)?;
         let result = validator
             .verify_multi_signatures(&self.info, &self.multi_signature)
             .context(format!(

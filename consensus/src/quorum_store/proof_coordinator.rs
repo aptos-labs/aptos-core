@@ -14,8 +14,8 @@ use crate::{
     },
 };
 use aptos_consensus_types::proof_of_store::{
-    BatchInfo, BatchInfoExt, ProofCache, ProofOfStore, SignedBatchInfo, SignedBatchInfoError,
-    SignedBatchInfoMsg, TBatchInfo,
+    BatchInfo, BatchInfoExt, BatchKind, ProofCache, ProofOfStore, SignedBatchInfo,
+    SignedBatchInfoError, SignedBatchInfoMsg, TBatchInfo,
 };
 use aptos_logger::prelude::*;
 use aptos_short_hex_str::AsShortHexStr;
@@ -240,6 +240,7 @@ pub(crate) struct ProofCoordinator {
     proof_cache: ProofCache,
     broadcast_proofs: bool,
     batch_expiry_gap_when_init_usecs: u64,
+    enable_fast_batches_rx: bool,
 }
 
 //PoQS builder object - gather signed digest to form PoQS
@@ -252,6 +253,7 @@ impl ProofCoordinator {
         proof_cache: ProofCache,
         broadcast_proofs: bool,
         batch_expiry_gap_when_init_usecs: u64,
+        enable_fast_batches_rx: bool,
     ) -> Self {
         Self {
             peer_id,
@@ -264,7 +266,28 @@ impl ProofCoordinator {
             proof_cache,
             broadcast_proofs,
             batch_expiry_gap_when_init_usecs,
+            enable_fast_batches_rx,
         }
+    }
+
+    /// Returns true when this validator should aggregate sigs for `signed_batch_info`:
+    /// - Always for batches it authored itself (today's behavior)
+    /// - For FastProof batches naming this validator as an aggregator, iff
+    ///   `enable_fast_batches_rx` is set
+    fn is_authorized_to_aggregate(
+        &self,
+        signed_batch_info: &SignedBatchInfo<BatchInfoExt>,
+    ) -> bool {
+        if signed_batch_info.author() == self.peer_id {
+            return true;
+        }
+        if self.enable_fast_batches_rx {
+            if let Some(BatchKind::FastProof(params)) = signed_batch_info.batch_info().batch_kind()
+            {
+                return params.aggregators().contains(&self.peer_id);
+            }
+        }
+        false
     }
 
     fn init_proof(
@@ -272,7 +295,7 @@ impl ProofCoordinator {
         signed_batch_info: &SignedBatchInfo<BatchInfoExt>,
     ) -> Result<(), SignedBatchInfoError> {
         // Check if the signed digest corresponding to our batch
-        if signed_batch_info.author() != self.peer_id {
+        if !self.is_authorized_to_aggregate(signed_batch_info) {
             return Err(SignedBatchInfoError::WrongAuthor);
         }
         let batch_author = self

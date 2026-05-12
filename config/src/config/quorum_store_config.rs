@@ -5,7 +5,7 @@ use crate::config::{
     config_sanitizer::ConfigSanitizer, node_config_loader::NodeType, Error, NodeConfig,
 };
 use aptos_global_constants::DEFAULT_BUCKETS;
-use aptos_types::chain_id::ChainId;
+use aptos_types::{account_address::AccountAddress, chain_id::ChainId};
 use serde::{Deserialize, Serialize};
 use std::time::Duration;
 
@@ -116,6 +116,20 @@ pub struct QuorumStoreConfig {
     pub enable_opt_qs_v2_payload_tx: bool,
     /// Enables handling of proposals with OptQS V2 Payload with Batch V2
     pub enable_opt_qs_v2_payload_rx: bool,
+    /// When true, this validator's batch generator emits BatchKind::FastProof
+    /// batches naming `fast_batch_aggregators[..fast_batch_num_aggregators]`.
+    pub enable_fast_batches_tx: bool,
+    /// When true, this validator:
+    /// (1) broadcasts SignedBatchInfo to the listed aggregators + author when signing
+    ///     a FastProof batch (instead of unicasting to the author only);
+    /// (2) runs local proof aggregation for FastProof batches that name it.
+    pub enable_fast_batches_rx: bool,
+    /// Number of aggregators to embed per FastProof batch (clamped to
+    /// MAX_K_FAST_PROOF_AGGREGATORS at the consensus-types layer).
+    pub fast_batch_num_aggregators: usize,
+    /// Static list of PeerIds this validator will use as FastProof aggregators
+    /// (first `fast_batch_num_aggregators` entries selected per batch).
+    pub fast_batch_aggregators: Vec<AccountAddress>,
 }
 
 impl Default for QuorumStoreConfig {
@@ -164,6 +178,10 @@ impl Default for QuorumStoreConfig {
             enable_batch_v2_rx: true,
             enable_opt_qs_v2_payload_tx: true,
             enable_opt_qs_v2_payload_rx: true,
+            enable_fast_batches_tx: false,
+            enable_fast_batches_rx: false,
+            fast_batch_num_aggregators: 2,
+            fast_batch_aggregators: vec![],
         }
     }
 }
