@@ -9,20 +9,17 @@ module aptos_framework::sigma_protocol {
     friend aptos_framework::sigma_protocol_schnorr_example;
 
     use std::error;
-    use aptos_std::ristretto255::{point_identity, multi_scalar_mul};
-    use aptos_framework::sigma_protocol_utils::{neg_scalars, points_clone};
+    use std::vector;
+    use aptos_std::ristretto255::{RistrettoPoint, Scalar};
     use aptos_framework::sigma_protocol_proof::Proof;
     use aptos_framework::sigma_protocol_statement::Statement;
     use aptos_framework::sigma_protocol_fiat_shamir::{DomainSeparator, fiat_shamir};
     use aptos_framework::sigma_protocol_homomorphism::{Homomorphism, TransformationFunction};
-    #[test_only]
     use aptos_framework::sigma_protocol_homomorphism::{evaluate_f, evaluate_psi};
     #[test_only]
     use aptos_framework::sigma_protocol_proof;
     #[test_only]
     use aptos_framework::sigma_protocol_witness::Witness;
-    #[test_only]
-    use aptos_framework::confidential_crypto_test_utils::{random_witness, equal_vec_points, add_vec_points, mul_points, mul_scalars, add_vec_scalars, compress_points};
 
     //
     // Error codes
@@ -65,10 +62,10 @@ module aptos_framework::sigma_protocol {
         (sigma_protocol_proof::new_proof(_A, compressed_A, sigma), alpha)
     }
 
-    #[test_only]
-    /// This is implemented both as a "warm-up" *and* to test the faster `verify` implementation against it.
+    /// Verifies a ZK `proof` that the prover knows a witness $w$ such that $f(X) = \psi(w)$ where $X$ is the
+    /// statement in `stmt`.
     ///
-    /// Recall that, given a statement `stmt`, proof $(A, \sigma)$ and Fiat-Shamir challenge $e$, the verifier checks:
+    /// Given a statement `stmt`, proof $(A, \sigma)$ and Fiat-Shamir challenge $e$, the verifier checks:
     ///   A + e f(stmt) = \psi(\sigma)
     ///         <=>
     ///   A + e f(stmt) - \psi(\sigma) = zero()
@@ -85,7 +82,7 @@ module aptos_framework::sigma_protocol {
     ///      );
     ///   );
     /// ```
-    public(friend) inline fun verify_slow<P>(
+    public(friend) inline fun verify<P>(
         dst: DomainSeparator,
         psi: Homomorphism<P>,
         f: TransformationFunction<P>,
@@ -118,107 +115,13 @@ module aptos_framework::sigma_protocol {
         )
     }
 
-    /// Verifies a ZK `proof` that the prover knows a witness $w$ such that $f(X) = \psi(w)$ where $X$ is the
-    /// statement in `stmt`.
-    ///
-    /// Optimized to perform a faster batched verification:
-    ///   A + e f(X) - \psi(\sigma) = zero()
-    ///         <=>
-    ///   \forall i \in[m], A[i] + e f(X)[i] - \psi(\sigma)[i] = 0
-    ///         <=>
-    ///   \sum_{i \in [m]} \beta[i] A[i] + \beta[i] ( e f(X)[i] ) - \beta[i] ( \psi(\sigma)[i] ) = 0,
-    ///   for random \beta[i]'s (picked via Fiat-Shamir)
-    ///
-    /// Note: I don't think picking $\beta_i$'s via on-chain randomness will save that much gas. Plus, we do not want to
-    /// premise the security of confidential assets on the unpredictability of on-chain randomness.
-    ///
-    /// @param  dst    application-specific domain separator
-    ///                (e.g., "Aptos confidential assets protocol v2025.06 :: public withdrawal NP relation")
-    ///
-    /// @param  psi    a homomorphism mapping a vector of scalars to a vector of $m$ group elements, except each group
-    ///                element is returned as a `Representation` so that, later on, the main $\psi(\sigma) = A + e f(X)$
-    ///                can be done efficiently in one MSM.
-    ///
-    /// @param  f      transformation function takes takes in the public statement and outputs $m$ group elements, also
-    ///                returned as a `RepresentationVec`.
-    ///
-    /// @param  stmt   the public statement $X$ that satisfies $f(X) = \psi(w)$ for some secret witness $w$
-    ///
-    /// @param  proof  the ZKP proving that the prover knows a $w$ s.t. $f(X) = \psi(w)$
-    ///
-    /// Returns true if it succeeds and false otherwise.
-    public(friend) inline fun verify<P>(
-        dst: DomainSeparator,
-        psi: Homomorphism<P>,
-        f: TransformationFunction<P>,
-        stmt: &Statement<P>,
-        proof: &Proof,
-    ): bool {
-        // Step 1: Fiat-Shamir transform on `(dst, (psi, f), stmt)` to derive the random challenge `e`
-        let _A = proof.get_commitment();
-        let m = _A.length();
-        let (e, betas) = fiat_shamir(dst, stmt, proof.get_compressed_commitment(),
-            proof.get_response(), proof.get_response_length());
-
-        // Step 2:
-        let psi_sigma = psi(stmt, &proof.response_to_witness());
-        let efx = f(stmt);
-
-        assert!(m == psi_sigma.length(), error::invalid_argument(E_PROOF_COMMITMENT_WRONG_LEN));
-        assert!(m == efx.length(), error::invalid_argument(E_PROOF_COMMITMENT_WRONG_LEN));
-
-        // "Scale" all the representations in `f(stmt)` by `e`. (Implicit assumption here is that `f` is homomorphic:
-        // i.e., `e f(X) = f(eX)`, which holds because our `f`'s are a `RepresentationVec`.)
-        efx.scale_all(&e);
-
-        // "Scale" the `i`th reprentation in `efx` by `\beta[i]`
-        efx.scale_each(&betas);
-
-        // "Scale" the `i`th reprentation in `\psi` by `-\beta[i]`
-        // TODO(Perf): I think this could be sub-optimal: we will redo the same \beta[i] \sigma[j] multiplication several times
-        //   when a `RepresentationVec`'s row reuses \sigma[j].
-        psi_sigma.scale_each(&neg_scalars(&betas));
-
-        // We start with an empty MSM: \sum_{i \in m} 0
-        // ...and extend it to: \sum_{i \in [m]} A[i]^{\beta[i]}
-        //                                          ^^^^^^^^^^^^^^^
-        let bases = points_clone(_A);
-        let scalars = betas;
-
-        // These asserts will only fail when we have mis-implemented the cloning of `A` above
-        assert!(bases.length() == m, error::internal(E_INTERNAL_INVARIANT_FAILED));
-        assert!(scalars.length() == m, error::internal(E_INTERNAL_INVARIANT_FAILED));
-
-        // Extend MSM to: be \sum_{i \in [m]} A[i]^\beta[i] + \beta[i] ( e f(stmt)[i] )
-        //                                                    ^^^^^^^^^^^^^^^^^^^^^^^^^
-        efx.for_each_ref(|repr| {
-            bases.append(repr.to_points(stmt));
-            scalars.append(*repr.get_scalars());
-        });
-
-        // Extend MSM to: be \sum_{i \in [m]} A[i]^\beta[i] + \beta[i] ( e f(stmt)[i] ) - \beta[i] (\psi(\sigma)[i])
-        //                                                                                ^^^^^^^^^^^^^^^^^^^^^^^^^^
-        psi_sigma.for_each_ref(|repr| {
-            bases.append(repr.to_points(stmt));
-            scalars.append(*repr.get_scalars());
-        });
-
-        // TODO(Perf): Could combine exponents for shared bases more aggresively? Or does the MSM code do it implicitly?
-
-        // Do the MSM and check it equals the (zero) identity
-        multi_scalar_mul(&bases, &scalars).point_equals(&point_identity())
-    }
-
     //
     // Test-only error codes
     //
 
     #[test_only]
-    /// The slow verification of the sigma protocol proof failed (instead of succeeding) in one of the tests.
-    const E_SLOW_VERIFICATION_FAILED: u64 = 3;
-    #[test_only]
-    /// The fast verification of the sigma protocol proof failed (instead of succeeding) in one of the tests.
-    const E_FAST_VERIFICATION_FAILED: u64 = 4;
+    /// Verification of the sigma protocol proof failed (instead of succeeding) in one of the tests.
+    const E_VERIFICATION_FAILED: u64 = 3;
 
     #[test_only]
     /// A generic correctness test that takes the DST, the public statement, the secret witness, and the $\psi$ and $f$
@@ -237,17 +140,7 @@ module aptos_framework::sigma_protocol {
             &witn
         );
 
-        // Make sure the sigma protocol proof verifies (slowly)
-        assert!(
-            verify_slow(
-                dst,
-                |_X, w| psi(_X, w),
-                |_X| f(_X),
-                &stmt,
-                &proof
-            ), error::invalid_argument(E_SLOW_VERIFICATION_FAILED));
-
-        // Make sure the sigma protocol proof verifies (quickly)
+        // Make sure the sigma protocol proof verifies
         assert!(
             verify(
                 dst,
@@ -255,7 +148,7 @@ module aptos_framework::sigma_protocol {
                 |_X| f(_X),
                 &stmt,
                 &proof
-            ), error::invalid_argument(E_FAST_VERIFICATION_FAILED));
+            ), error::invalid_argument(E_VERIFICATION_FAILED));
 
         (proof, alpha)
     }
@@ -270,22 +163,37 @@ module aptos_framework::sigma_protocol {
     ): bool {
         let proof = sigma_protocol_proof::empty();
 
-        let r1 = !verify_slow(
+        !verify(
             dst,
             |_X, w| psi(_X, w),
             |_X| f(_X),
             &stmt,
             &proof
-        );
+        )
+    }
 
-        let r2 = !verify(
-            dst,
-            |_X, w| psi(_X, w),
-            |_X| f(_X),
-            &stmt,
-            &proof
-        );
+    /// Adds up two vectors of points `a` and `b` returning a new vector `c` where `c[i] = a[i] + b[i]`.
+    public fun add_vec_points(a: &vector<RistrettoPoint>, b: &vector<RistrettoPoint>): vector<RistrettoPoint> {
+        assert!(a.length() == b.length(), error::internal(E_INTERNAL_INVARIANT_FAILED));
 
-        r1 && r2
+        let r = vector[];
+        a.enumerate_ref(|i, pt| {
+            r.push_back(pt.point_add(&b[i]));
+        });
+
+        r
+    }
+
+    /// Given a vector of Ristretto255 points `a` and a scalar `e`, returns a new vector `c` where `c[i] = e * a[i]`.
+    public fun mul_points(a: &vector<RistrettoPoint>, e: &Scalar): vector<RistrettoPoint> {
+        a.map_ref(|pt| pt.point_mul(e))
+    }
+
+    /// Ensures two vectors of Ristretto255 points are equal.
+    public fun equal_vec_points(a: &vector<RistrettoPoint>, b: &vector<RistrettoPoint>): bool {
+        let m = a.length();
+        assert!(m == b.length(), error::internal(E_INTERNAL_INVARIANT_FAILED));
+
+        vector::range(0, m).all(|i| a[*i].point_equals(&b[*i]))
     }
 }
