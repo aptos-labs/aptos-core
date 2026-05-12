@@ -41,12 +41,12 @@ pub(crate) enum ObjectDescriptorInner {
 
     /// Closure object — fixed runtime layout shared by every closure.
     ///
-    /// Payload layout (`size = CLOSURE_OBJECT_SIZE - OBJECT_HEADER_SIZE = 32`):
+    /// Data-region layout (`size = CLOSURE_DATA_SIZE = 32`):
     /// `[func_ref(16)] [mask(8)] [captured_data_ptr(8)]`. The single heap
-    /// pointer is `captured_data_ptr` at payload offset
-    /// `CLOSURE_CAPTURED_DATA_PTR_OFFSET - OBJECT_HEADER_SIZE = 24`. Both
-    /// the size and the pointer offset are constants of the runtime
-    /// layout — there is nothing per-instance to store here.
+    /// pointer is `captured_data_ptr` at offset
+    /// `CLOSURE_CAPTURED_DATA_PTR_OFFSET = 24`. Both the size and the
+    /// pointer offset are constants of the runtime layout — there is
+    /// nothing per-instance to store here.
     Closure,
 
     /// Vector whose elements may contain heap pointers at known offsets.
@@ -69,7 +69,7 @@ pub(crate) enum ObjectDescriptorInner {
     },
 
     /// Enum (tagged union) allocated on the heap.
-    /// Layout: [header(8)] [tag: u64(8)] [fields padded to max variant size]
+    /// Data-region layout: [tag: u64(8)] [fields padded to max variant size]
     Enum {
         /// Total payload size in bytes (tag + max variant fields, excluding header).
         size: u32,
@@ -81,12 +81,11 @@ pub(crate) enum ObjectDescriptorInner {
 
     /// `ClosureCapturedData` (Materialized) object.
     ///
-    /// Object layout: `[header(8)] [tag(1) + padding(7)] [values...]`.
+    /// Data-region layout: `[tag(1) + padding(7)] [values...]`.
     /// `size` and `pointer_offsets` are interpreted relative to the
-    /// values region (i.e., excluding both the header and the
-    /// tag+padding prefix), so an offset of `0` names the first byte of
-    /// the first captured value. The 8-byte tag prefix is added
-    /// internally by the GC.
+    /// values region (i.e., excluding the tag+padding prefix), so an
+    /// offset of `0` names the first byte of the first captured value.
+    /// The 8-byte tag prefix is added internally by the GC.
     CapturedData {
         /// Byte size of the values region (sum of captured value sizes).
         size: u32,

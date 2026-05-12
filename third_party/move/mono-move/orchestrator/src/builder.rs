@@ -15,7 +15,8 @@
 use anyhow::{anyhow, bail, Result};
 use mono_move_alloc::{ExecutableArena, ExecutableArenaPtr, GlobalArenaPtr};
 use mono_move_core::{
-    types::{align_up, view_type, Type},
+    align_up_u32,
+    types::{view_type, Type},
     EnumType, Executable, ExecutableId, FrameLayoutInfo, Function, MicroOp, PreparedModule,
     SortedSafePointEntries, StructType, VariantFields,
 };
@@ -276,12 +277,12 @@ impl<'guard, 'ctx> ExecutableBuilder<'guard, 'ctx> {
                     let (sz, al) = view_type(fty).size_and_align().ok_or_else(|| {
                         anyhow!("Size and alignment is set for non-generic types")
                     })?;
-                    offset = align_up(offset, al);
+                    offset = align_up_u32(offset, al);
                     align = align.max(al);
                     fields.push(FieldLayout::new(offset, fty));
                     offset += sz;
                 }
-                let size = align_up(offset, align);
+                let size = align_up_u32(offset, align);
                 self.guard
                     .set_nominal_layout(bare_ty, size, align, Some(&fields))?;
                 self.structs.insert(name, StructType::new(bare_ty));

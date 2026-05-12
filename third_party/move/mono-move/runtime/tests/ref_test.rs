@@ -7,7 +7,7 @@
 use mono_move_alloc::{ExecutableArena, ExecutableArenaPtr, GlobalArenaPtr};
 use mono_move_core::{
     FrameLayoutInfo, FrameOffset as FO, Function, LocalExecutionContext, MicroOp,
-    SortedSafePointEntries, FRAME_METADATA_SIZE, STRUCT_DATA_OFFSET,
+    SortedSafePointEntries, FRAME_METADATA_SIZE,
 };
 use mono_move_runtime::{
     read_ptr, read_u64, InterpreterContext, ObjectDescriptor, ObjectDescriptorTable,
@@ -646,7 +646,7 @@ fn ref_struct_field_borrow() {
         "entry.value should be 55 after WriteRef through StructBorrow"
     );
     let entry_ptr = ctx.root_heap_ptr(8);
-    let key = unsafe { read_u64(entry_ptr, STRUCT_DATA_OFFSET) };
+    let key = unsafe { read_u64(entry_ptr, 0usize) };
     assert_eq!(key, 42, "entry.key should be untouched");
 }
 
@@ -704,6 +704,6 @@ fn ref_struct_field_survives_gc() {
     assert_eq!(ctx.gc_count(), 1);
 
     let entry_ptr = ctx.root_heap_ptr(8);
-    let key = unsafe { read_u64(entry_ptr, STRUCT_DATA_OFFSET) };
+    let key = unsafe { read_u64(entry_ptr, 0usize) };
     assert_eq!(key, 7, "entry.key should survive GC");
 }

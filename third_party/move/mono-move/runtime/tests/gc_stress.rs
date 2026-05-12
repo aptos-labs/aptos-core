@@ -24,7 +24,7 @@
 use mono_move_alloc::{ExecutableArena, ExecutableArenaPtr, GlobalArenaPtr};
 use mono_move_core::{
     CodeOffset as CO, FrameLayoutInfo, FrameOffset as FO, Function, LocalExecutionContext, MicroOp,
-    SortedSafePointEntries, STRUCT_DATA_OFFSET,
+    SortedSafePointEntries,
 };
 use mono_move_runtime::{
     read_ptr, read_u64, InterpreterContext, ObjectDescriptor, ObjectDescriptorTable,
@@ -264,8 +264,8 @@ unsafe fn read_vm_outer_vec(outer_ptr: *const u8) -> Vec<(u64, Vec<u64>)> {
 
         for i in 0..outer_len {
             let entry_ptr = read_ptr(outer_ptr, VEC_DATA_OFFSET + i * 8);
-            let key = read_u64(entry_ptr, STRUCT_DATA_OFFSET);
-            let values_ptr = read_ptr(entry_ptr, STRUCT_DATA_OFFSET + 8);
+            let key = read_u64(entry_ptr, 0usize);
+            let values_ptr = read_ptr(entry_ptr, 8usize);
             let values_len = read_u64(values_ptr, VEC_LENGTH_OFFSET) as usize;
             let mut values = Vec::with_capacity(values_len);
             for j in 0..values_len {

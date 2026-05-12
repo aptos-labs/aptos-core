@@ -28,11 +28,11 @@ It governs the alignment of the stack and heap regions, of `fp` and the bump poi
 - It must be at least **8**, because the heap object header (8 bytes) and the `params + locals + metadata` region (which contains the 24-byte metadata block) both need 8-byte granularity at minimum.
 - It must be a multiple of every alignment used by any value or VM-internal layout. With current alignments (1, 2, 4, 8) this is satisfied by any multiple of 8.
 
-**Raising `MAX_ALIGN` does not automatically resize headers.** If a future change introduces values requiring more than 8-byte alignment, the specializer and runtime have to insert extra padding *inside* containers to make the post-header offsets land at the new alignment — `MAX_ALIGN` only guarantees that *object base addresses* are sufficiently aligned. Concretely:
+**Raising `MAX_ALIGN` resizes the heap header reservation automatically.** Per [§5.1](#51-heap-object-header), `OBJECT_HEADER_SIZE = MAX_ALIGN` — the allocator reserves at least `MAX_ALIGN` bytes before each data region so that the object pointer (and therefore field 0) lands on a `MAX_ALIGN` boundary. The descriptor/size pair always lives in the *last* 8 bytes of that reservation (at `obj_ptr - 8` / `obj_ptr - 4`), independent of `MAX_ALIGN`. Per-type layouts (struct field offsets, enum data offset, vector data offset, closure fields, captured-data values) are all expressed relative to the data start, so none of them shift when `MAX_ALIGN` grows. Costs to keep in mind:
 
-- **Heap objects.** The header is fixed at 8 bytes. To put a 16-aligned field at the start of the body, the specializer must emit 8 bytes of padding between the header and the field. To put a 32-aligned field, 24 bytes of padding. The header could be redesigned to consume more space when stronger alignment is needed, but doing so is a layout change that must be planned explicitly.
+- **Per-object padding when `MAX_ALIGN > 8`.** A 16-byte `MAX_ALIGN` adds 8 bytes of header padding (header reservation goes from 8 → 16 bytes); a 32-byte `MAX_ALIGN` adds 24. The padding pays for "data start is always `MAX_ALIGN`-aligned" without needing per-container layout changes.
 - **Frame metadata.** The 24-byte metadata block is not `MAX_ALIGN`-aligned in size when `MAX_ALIGN > 8`. The frame layout pass must pad the metadata up to `MAX_ALIGN` so the next callee's `fp` lands on an aligned offset.
-- **Vector data offset.** Element 0 currently starts at offset 16 (header + length). For elements requiring more than 16-byte alignment, the data offset would need to grow per vector — but the current vector micro-ops have no mechanism to express this. See [§8.3](#83-vector-data-offset-under-stronger-element-alignment).
+- **Vector data offset.** Element 0 starts at `VEC_DATA_OFFSET = 8` within the data region (after the length field). For elements requiring more than 8-byte alignment, the data offset would need to grow per vector — but the current vector micro-ops have no mechanism to express this. See [§8.3](#83-vector-data-offset-under-stronger-element-alignment).
 
 **Natives inherit `MAX_ALIGN`.** Native functions follow the same calling convention and read parameters from the frame at the same offsets. Any pointer they receive into the stack or heap inherits the `MAX_ALIGN` (and below) alignment guarantees. If a native ever needs stronger alignment than `MAX_ALIGN` for a Rust-side type, it must allocate its own scratch space — the VM frame won't satisfy it.
 
@@ -105,13 +105,11 @@ Stored as a heap pointer in the owner region. 8 bytes, 8-byte aligned.
 
 ### 5.1 Heap Object Header
 
-Every heap object starts with the 8-byte header `[desc_id: u32 | size: u32]`. The header itself is 8-byte aligned and sits at offset 0 of every heap object. Because the heap allocator always places objects at `MAX_ALIGN`-aligned addresses ([§3.1](#31-the-heap)), the header is automatically aligned without any work from the body layout.
+Every heap object has an 8-byte header `[desc_id: u32 | size: u32]` that sits at a *negative* offset relative to the object pointer that callers hold (`desc_id` at `obj_ptr - 8`, `size` at `obj_ptr - 4`). The allocator reserves `OBJECT_HEADER_SIZE = MAX_ALIGN` bytes before each data region, so the header is `MAX_ALIGN`-aligned for free (the bump pointer is `MAX_ALIGN`-aligned per [§3.1](#31-the-heap)) and the descriptor+size pair stays adjacent to the data — good for cache locality. When `MAX_ALIGN > 8`, the lower bytes of the reservation are unused padding; the negative offsets `-8` / `-4` don't shift.
 
 ### 5.2 Heap Object Body
 
-The body starts at offset 8 (immediately after the header). Body fields are placed at offsets that satisfy each field's natural alignment relative to the start of the heap object. Today the body offset equals `MAX_ALIGN`, so the first field can sit at offset 8 regardless of its alignment (which is ≤ `MAX_ALIGN` by construction); if `MAX_ALIGN` is ever raised above the header size, padding between header and body is needed (see [§2](#2-the-max_align-constant)).
-
-> TODO: a future refactor will move the header to a *negative* offset relative to the body (the way `malloc` does). Once that lands, the body always starts at offset 0 and the header-vs-body alignment discussion above goes away.
+The body starts at the object pointer (offset 0 of the data region). Body fields are placed at offsets that satisfy each field's natural alignment relative to `obj_ptr`. Because the allocator guarantees `obj_ptr` is `MAX_ALIGN`-aligned, the first field can sit at offset 0 regardless of its alignment (which is ≤ `MAX_ALIGN` by construction); raising `MAX_ALIGN` does not require any per-type layout changes.
 
 ### 5.3 Inline Structs
 
@@ -121,7 +119,7 @@ The struct's alignment is the max of its fields' alignments. The owner is respon
 
 ### 5.4 Heap Structs
 
-Heap structs follow [§5.1](#51-heap-object-header)–[§5.2](#52-heap-object-body). Field offsets *within the body* are computed relative to the body start (offset 8), using the same natural-alignment rule as inline structs. The compiler-provided `pointer_offsets` for the GC are body-relative offsets.
+Heap structs follow [§5.1](#51-heap-object-header)–[§5.2](#52-heap-object-body). Field offsets *within the body* are computed relative to `obj_ptr` (offset 0), using the same natural-alignment rule as inline structs. The compiler-provided `pointer_offsets` for the GC are body-relative offsets.
 
 ### 5.5 Inline Enums
 
@@ -142,15 +140,20 @@ Same as [§5.4](#54-heap-structs), with the body laid out as `[tag | pad | varia
 ### 5.7 Vectors
 
 ```
-offset 0    4    8         16        16 + i*elem_size
-      ┌────┬────┬──────────┬──────────────────────┐
-      │desc│size│ length   │  elem_0  elem_1 ...  │
-      └────┴────┴──────────┴──────────────────────┘
+          obj_ptr    obj_ptr + VEC_DATA_OFFSET
+          │          │
+          ▼          ▼
+┌────┬────┬──────────┬──────────────────────┐
+│desc│size│ length   │  elem_0  elem_1 ...  │
+└────┴────┴──────────┴──────────────────────┘
+ ▲    ▲    ╰──────── data region ──────────╯
+ │    └ size, at obj_ptr - 4
+ └ desc, at obj_ptr - 8
 ```
 
-The header is at offsets 0–7 ([§5.1](#51-heap-object-header)). The vector also stores a `length` field as a `u64` immediately after the header at offset 8 (8-byte aligned). Element 0 starts at offset 16, which is 8-byte aligned — sufficient for any primitive under [§4](#4-primitive-types)'s 8-byte cap. Element `i` is at offset `16 + i * elem_size`, where `elem_size` is rounded up to the element's alignment (so successive elements remain aligned). Within an element, fields are at their natural alignment.
+The header is at `obj_ptr - 8` / `obj_ptr - 4` ([§5.1](#51-heap-object-header)). `obj_ptr` itself points at the start of the data region, where the vector stores a `length` field (`u64`, at `VEC_LENGTH_OFFSET = 0`). Element 0 starts at `VEC_DATA_OFFSET = 8` from `obj_ptr`, which is 8-byte aligned — sufficient for any primitive under [§4](#4-primitive-types)'s 8-byte cap. Element `i` is at offset `VEC_DATA_OFFSET + i * elem_size`, where `elem_size` is rounded up to the element's alignment (so successive elements remain aligned). Within an element, fields are at their natural alignment.
 
-This layout assumes element alignment is ≤ 16, which holds today and would still hold under any `MAX_ALIGN` ≤ 16. Stronger element alignment would require a per-vector data offset that the current micro-ops cannot express; see [§8.3](#83-vector-data-offset-under-stronger-element-alignment).
+This layout assumes element alignment is ≤ 8, which holds today. Stronger element alignment would require a per-vector data offset that the current micro-ops cannot express; see [§8.3](#83-vector-data-offset-under-stronger-element-alignment).
 
 ### 5.8 Closures
 
@@ -179,16 +182,18 @@ Struct size = 16, alignment = 8.
 
 **Example 2 — same struct, heap.**
 
+Offsets below are relative to `obj_ptr` (the data start). The 8-byte header `[desc_id | size]` lives at `obj_ptr - 8` and adds 8 bytes of allocator-owned reservation per object.
+
 | Offset | Content |
 |---|---|
-| 0–7 | header |
-| 8 | `a` (1 byte) |
-| 9–11 | pad |
-| 12 | `b` (4 bytes) |
-| 16 | `c` (8 bytes) |
-| 24 | end |
+| -8 .. 0 | header (allocator-owned) |
+| 0 | `a` (1 byte) |
+| 1–3 | pad |
+| 4 | `b` (4 bytes) |
+| 8 | `c` (8 bytes) |
+| 16 | end |
 
-Total object size = 24 (already a multiple of `MAX_ALIGN = 8`).
+Data-region size = 16. Total object size (header + data) = 24 — a multiple of `MAX_ALIGN = 8`.
 
 **Example 3 — nested struct, heap.**
 
@@ -206,19 +211,19 @@ Inner inline:
 
 Inner has alignment 4 and size 8: `x` occupies offsets 0–3 and `y` offset 4, with 3 bytes of trailing padding so that successive Inners (e.g., in a vector) keep `x` 4-aligned.
 
-Outer on the heap:
+Outer on the heap (offsets relative to `obj_ptr`; the header lives at `obj_ptr - 8`):
 
 | Offset | Content |
 |---|---|
-| 0–7 | header |
-| 8 | Outer.`a` (1B) |
-| 9–11 | pad (align Inner to 4) |
-| 12 | Inner.`x` (4B) |
-| 16 | Inner.`y` (1B) |
-| 17–19 | Inner trailing pad |
-| 20–23 | Outer trailing pad to `MAX_ALIGN` |
+| -8 .. 0 | header (allocator-owned) |
+| 0 | Outer.`a` (1B) |
+| 1–3 | pad (align Inner to 4) |
+| 4 | Inner.`x` (4B) |
+| 8 | Inner.`y` (1B) |
+| 9–11 | Inner trailing pad |
+| 12–15 | Outer trailing pad to `MAX_ALIGN` |
 
-Total object size = 24. Outer's body is 12 bytes (`a` + pad + Inner = 1 + 3 + 8); body alignment = 4.
+Data-region size = 16. Total object size = 24. Outer's body is 12 bytes (`a` + pad + Inner = 1 + 3 + 8); body alignment = 4.
 
 **Example 4 — enum, heap.**
 
@@ -231,15 +236,17 @@ enum Result {
 
 Variant region: max size = 8 (Ok's u64), max alignment = 8.
 
+Offsets relative to `obj_ptr`; header at `obj_ptr - 8`.
+
 | Offset | Content |
 |---|---|
-| 0–7 | header |
-| 8 | tag (1 byte conceptually; 8 bytes as currently stored) |
-| 9–15 | pad |
-| 16 | variant payload (8 bytes; `u64` for Ok, `u32` + 4B padding for Err) |
-| 24 | end |
+| -8 .. 0 | header (allocator-owned) |
+| 0 | tag (1 byte conceptually; 8 bytes as currently stored) |
+| 1–7 | pad |
+| 8 | variant payload (8 bytes; `u64` for Ok, `u32` + 4B padding for Err) |
+| 16 | end |
 
-Total object size = 24, body size = 16.
+Total object size = 24, data-region size = 16.
 
 **Example 5 — vector of struct.**
 
@@ -248,16 +255,18 @@ struct Point { x: u32, y: u32 }   // size 8, align 4
 let v: vector<Point>;             // 3 elements
 ```
 
+Offsets relative to `obj_ptr`; header at `obj_ptr - 8`.
+
 | Offset | Content |
 |---|---|
-| 0–7 | header |
-| 8–15 | length (u64) |
-| 16 | element 0: `x`@16, `y`@20 |
-| 24 | element 1: `x`@24, `y`@28 |
-| 32 | element 2: `x`@32, `y`@36 |
-| 40 | end |
+| -8 .. 0 | header (allocator-owned) |
+| 0–7 | length (u64) |
+| 8 | element 0: `x`@8, `y`@12 |
+| 16 | element 1: `x`@16, `y`@20 |
+| 24 | element 2: `x`@24, `y`@28 |
+| 32 | end |
 
-Total object size = 40 (already a multiple of `MAX_ALIGN`).
+Data-region size = 32. Total object size = 40 — a multiple of `MAX_ALIGN`.
 
 ## 6. Enforcement
 
@@ -316,9 +325,9 @@ We capped alignment at 8 for these types in [§4](#4-primitive-types). The argum
 
 The arguments against (and why we picked 8):
 
-- **Padding cost.** Raising any of these to 16 or 32 forces padding before the field in any container that doesn't start on a sufficiently aligned boundary — heap object bodies (which start at offset 8 after the header), inline structs at odd offsets, etc. That overhead applies to every object containing such a field, not just SIMD-hot ones.
+- **Padding cost.** Raising any of these to 16 or 32 forces padding before the field in any container that doesn't start on a sufficiently aligned boundary — inline structs at odd offsets, etc. That overhead applies to every object containing such a field, not just SIMD-hot ones.
 - **No SIMD use case today.** The hot path doesn't have wide-vector loads; the cost of higher alignment would be paid up front for unrealized future benefit.
-- **Container starts limited.** With a fixed 8-byte heap header, the body never naturally lands at a 16- or 32-aligned offset, so adopting stronger alignment would either require redesigning the header or paying header-side padding everywhere.
+- **Per-object header padding.** With `OBJECT_HEADER_SIZE = MAX_ALIGN`, raising `MAX_ALIGN` from 8 to 16 adds 8 bytes of unused header padding per heap object; 32 adds 24 bytes. Heap object bodies still start at `obj_ptr`, which the allocator guarantees is `MAX_ALIGN`-aligned — so no per-container layout change is needed when `MAX_ALIGN` grows. The cost is the padding, not the layout churn.
 
 The recommendation is to revisit if profiling shows arithmetic on `u128` / `u256` is hot, or if SIMD-based crypto natives become a measurable win. The constants are centralized, so the change is mostly mechanical (with the caveats from [§2](#2-the-max_align-constant)).
 
@@ -326,9 +335,9 @@ The recommendation is to revisit if profiling shows arithmetic on `u128` / `u256
 
 ### 8.3 Vector data offset under stronger element alignment
 
-Vector micro-ops compute the address of element `i` as `vec_ptr + VEC_DATA_OFFSET + i * elem_size`, where `VEC_DATA_OFFSET = OBJECT_HEADER_SIZE + 8 = 16` is a global constant. This works as long as every element alignment is ≤ 16, which is satisfied today (max is 8 per [§4](#4-primitive-types)) and would still be satisfied under any `MAX_ALIGN` ≤ 16.
+Vector micro-ops compute the address of element `i` as `vec_ptr + VEC_DATA_OFFSET + i * elem_size`, where `VEC_DATA_OFFSET = 8` is a global constant (the offset past the length field within the data region). This works as long as every element alignment is ≤ 8, which is satisfied today (max is 8 per [§4](#4-primitive-types)).
 
-If a future change introduces a vector element with alignment > 16 — most plausibly via [§8.2](#82-stronger-alignment-for-u128--u256--address--signer)'s stronger-alignment proposal for `address` / `u256` — the correct data offset becomes `align_up(OBJECT_HEADER_SIZE + 8, elem_align)`, which varies per vector. Unlike struct or enum field offsets — which are baked into each access op at specialization time — vector access uses an indexed pattern (`base + data_offset + i * elem_size`), so the data offset must be expressible as a single value the runtime can use across every elem load, store, push, pop, and growth on a given vector.
+If a future change introduces a vector element with alignment > 8 — most plausibly via [§8.2](#82-stronger-alignment-for-u128--u256--address--signer)'s stronger-alignment proposal for `address` / `u256` — the correct data offset becomes `align_up(8, elem_align)`, which varies per vector. Unlike struct or enum field offsets — which are baked into each access op at specialization time — vector access uses an indexed pattern (`base + data_offset + i * elem_size`), so the data offset must be expressible as a single value the runtime can use across every elem load, store, push, pop, and growth on a given vector.
 
 The current micro-op design has no channel for this: `VecLoadElem`, `VecStoreElem`, `VecPushBack`, `VecPopBack`, `AllocVec`, and `GrowVec` all rely on a hardcoded `VEC_DATA_OFFSET`. Bridging the gap would require adding per-vector or per-instruction data-offset metadata, or globally raising `VEC_DATA_OFFSET`, each with its own cost profile.
 

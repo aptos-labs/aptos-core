@@ -9,7 +9,8 @@
 use crate::stackless_exec_ir::{FunctionIR, Instr, ModuleIR};
 use anyhow::Result;
 use mono_move_core::{
-    types::{align_up, view_type, Alignment, InternedType, Size},
+    align_up_u32,
+    types::{view_type, Alignment, InternedType, Size},
     FRAME_METADATA_SIZE,
 };
 use move_binary_format::access::ModuleAccess;
@@ -132,7 +133,7 @@ fn layout_slots(base: u32, types: &[InternedType]) -> Option<Vec<SlotInfo>> {
     let mut offset = base;
     for ty in types {
         let (size, alignment) = type_size_and_align(*ty)?;
-        offset = align_up(offset, alignment);
+        offset = align_up_u32(offset, alignment);
         slots.push(SlotInfo {
             offset,
             size,

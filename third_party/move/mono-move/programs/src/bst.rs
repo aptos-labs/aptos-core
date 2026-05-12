@@ -340,7 +340,7 @@ mod micro_op {
             Op::struct_store8(FO(bst), BST_NODES, FO(nodes)),                 // 3
             Op::struct_store8(FO(bst), BST_FREE_LIST, FO(free_list)),         // 4
             HeapMoveToImm8 { heap_ptr: FO(bst),
-                             offset: 8 + BST_ROOT, imm: NULL },                   // 5: STRUCT_DATA_OFFSET=8
+                             offset: BST_ROOT, imm: NULL },                       // 5
             Return,                                                                // 6
         ];
 
