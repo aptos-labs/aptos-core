@@ -129,6 +129,22 @@ fn abort_details_from(status: &ExecutionStatus) -> Option<AbortDetails> {
     }
 }
 
+fn execution_failure_details_from(status: &ExecutionStatus) -> Option<ExecutionFailureDetails> {
+    match status {
+        ExecutionStatus::ExecutionFailure { location, function, code_offset } => {
+            Some(ExecutionFailureDetails {
+                location: format_abort_location(location),
+                function: *function,
+                code_offset: *code_offset,
+            })
+        }
+        ExecutionStatus::Success
+        | ExecutionStatus::OutOfGas
+        | ExecutionStatus::MoveAbort { .. }
+        | ExecutionStatus::MiscellaneousError(_) => None,
+    }
+}
+
 #[tool_router(router = replay_transaction_router, vis = "pub(crate)")]
 impl FlowSession {}
 
@@ -238,5 +254,27 @@ mod tests {
 
         let status = aptos_types::transaction::ExecutionStatus::OutOfGas;
         assert!(abort_details_from(&status).is_none());
+    }
+
+    #[test]
+    fn execution_failure_details_module() {
+        let status = ExecutionStatus::ExecutionFailure {
+            location: AbortLocation::Module(ModuleId::new(
+                AccountAddress::ONE,
+                Identifier::new("vector").unwrap(),
+            )),
+            function: 3,
+            code_offset: 42,
+        };
+        let details = execution_failure_details_from(&status).expect("expected Some");
+        assert_eq!(details.location, "0x1::vector");
+        assert_eq!(details.function, 3);
+        assert_eq!(details.code_offset, 42);
+    }
+
+    #[test]
+    fn execution_failure_details_none_for_other_status() {
+        let status = ExecutionStatus::Success;
+        assert!(execution_failure_details_from(&status).is_none());
     }
 }
