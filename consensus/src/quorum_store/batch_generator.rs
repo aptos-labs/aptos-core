@@ -186,13 +186,19 @@ impl BatchGenerator {
 
         // Pre-compute FastProof params for this epoch.
         // Forge-only experimental gate: if `fast_batches_tx_only_for_validator_index`
-        // is set, only the validator at that position in the (sorted) validator
-        // set actually emits FastProof. Lets a uniform forge override simulate a
-        // single-validator production rollout.
+        // is set, only the validator whose k8s pod ordinal (parsed from HOSTNAME
+        // env var, e.g. "aptos-node-6-validator-0") matches will emit FastProof.
+        // Pod ordinal correlates with forge's positional region assignment, so
+        // pod 6 in a 7-validator setup is always the Asian validator. Lets a
+        // uniform forge override simulate a single-validator production rollout.
         let validator_set = validator_verifier.address_to_validator_index();
-        let tx_gated_off = match config.fast_batches_tx_only_for_validator_index {
-            None => false,
-            Some(target) => validator_set.get(&my_peer_id) != Some(&target),
+        let pod_ordinal: Option<usize> = std::env::var("HOSTNAME")
+            .ok()
+            .and_then(|h| h.split('-').nth(2).and_then(|s| s.parse().ok()));
+        let tx_gated_off = match (config.fast_batches_tx_only_for_validator_index, pod_ordinal) {
+            (None, _) => false,
+            (Some(target), Some(idx)) => idx != target,
+            (Some(_), None) => true,
         };
         let (fast_proof_aggregators, fast_proof_threshold) = if config.enable_fast_batches_tx
             && !tx_gated_off

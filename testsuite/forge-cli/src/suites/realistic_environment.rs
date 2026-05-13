@@ -632,9 +632,9 @@ pub(crate) fn realistic_env_max_load_with_fast_batches_test(
 }
 
 /// Same as `realistic_env_max_load_with_fast_batches_test` but `_tx=true`
-/// only fires on the single validator at position `1` in the PeerId-sorted
-/// validator set — which is the Asian (`gcp--as-southeast1`) validator in
-/// the 7-validator forge setup (PeerId `2772eb68…` is second-lowest).
+/// only fires on the single validator whose pod ordinal matches the
+/// configured index. Pod ordinal 6 in a 7-validator setup is the Asian
+/// (`gcp--as-southeast1`) validator per forge's positional region chunking.
 ///
 /// Simulates a targeted production rollout (only apne1-0 with `_tx=true`)
 /// inside a uniform-override forge test.
@@ -651,7 +651,7 @@ pub(crate) fn realistic_env_max_load_fast_batches_asian_only_test(
         num_validators,
         num_vfns,
         /*enable_fast_batches=*/ true,
-        /*tx_only_for_validator_index=*/ Some(1),
+        /*tx_only_for_pod_ordinal=*/ Some(6),
     )
 }
 
