@@ -102,23 +102,73 @@ pub struct SingleRunResults {
 pub fn default_benchmark_features() -> Features {
     let mut features = Features::default();
     features.disable(FeatureFlag::CALCULATE_TRANSACTION_FEE_FOR_DISTRIBUTION);
+    // Enable native-position subsystem for bench experiments. The Move
+    // side gates actual usage on USE_NATIVE_POSITION const in
+    // perp_positions.move, so enabling here is harmless for legacy
+    // runs.
+    features.enable(FeatureFlag::NATIVE_POSITION);
     features
 }
 
+/// Drive the position pruner to drain all stale rows up to
+/// `u64::MAX`, then log the resulting counter. The non-zero reading
+/// confirms that the stale-index emission at commit is wired
+/// correctly — each multi-version write should have produced one
+/// stale-index entry that the pruner now drops.
+pub fn print_native_pruner_counts() {
+    if let Some(pos_pruner) = aptos_db::native_state_reader::global_pruners() {
+        let pos_drained = pos_pruner.prune_up_to(u64::MAX).unwrap_or(0);
+        info!("native-pruner-drain pruned_positions={pos_drained}");
+    }
+    let positions = aptos_db::position_metrics::POSITION_PRUNE_ROWS.get();
+    info!("native-pruner-counts pruned_positions_total={positions}");
+}
+
+/// Dump the resident size of the native-position in-memory mirror.
+/// Used at end-of-bench to confirm the dual-write pipeline (Move
+/// write → VMChangeSet → commit applier → in-memory) is actually
+/// populating the store.
+pub fn print_native_mirror_sizes() {
+    let positions = aptos_db::position_metrics::POSITION_IN_MEMORY_COUNT.get();
+    let positions_staged = aptos_position_natives::context::total_positions_staged();
+    info!("native-mirror-sizes positions={positions} positions_staged={positions_staged}");
+}
+
 pub fn init_db(config: &NodeConfig) -> DbReaderWriter {
-    DbReaderWriter::new(
-        AptosDB::open(
-            config.storage.get_dir_paths(),
-            false, /* readonly */
-            config.storage.storage_pruner_config,
-            config.storage.rocksdb_configs,
-            config.storage.buffered_state_target_items,
-            config.storage.max_num_nodes_per_lru_cache_shard,
-            None,
-            HotStateConfig::default(),
-        )
-        .expect("DB should open."),
+    let mut db = AptosDB::open(
+        config.storage.get_dir_paths(),
+        false, /* readonly */
+        config.storage.storage_pruner_config,
+        config.storage.rocksdb_configs,
+        config.storage.buffered_state_target_items,
+        config.storage.max_num_nodes_per_lru_cache_shard,
+        None,
+        HotStateConfig::default(),
     )
+    .expect("DB should open.");
+
+    // Opt-in native-position initialization for A/B bench experiments.
+    // Gated on `APTOS_INIT_NATIVE_POSITION=1` so the legacy-baseline
+    // run pays zero native-position overhead.
+    if std::env::var("APTOS_INIT_NATIVE_POSITION").is_ok() {
+        let dir_paths = config.storage.get_dir_paths();
+        let base = dir_paths.default_root_path();
+        let position_db_path = base.join("position_db");
+        let position_merkle_db_path = base.join("position_merkle_db");
+        db.init_native_position(
+            &position_db_path,
+            &position_merkle_db_path,
+            config.storage.rocksdb_configs.ledger_db_config,
+            false, /* readonly */
+        )
+        .expect("native-position init failed");
+        info!(
+            "native-position subsystem initialized under {}",
+            base.display()
+        );
+    }
+
+    DbReaderWriter::new(db)
 }
 
 fn init_indexer_wrapper(
@@ -468,6 +518,9 @@ where
     let overall_results =
         overall_measuring.elapsed("Overall".to_string(), "".to_string(), num_txns);
     overall_results.print_end();
+
+    print_native_mirror_sizes();
+    print_native_pruner_counts();
 
     if !pipeline_config.skip_commit {
         if verify_sequence_numbers {
