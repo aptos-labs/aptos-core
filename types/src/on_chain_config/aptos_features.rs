@@ -181,6 +181,15 @@ pub enum FeatureFlag {
     /// from `friend/package` to private, while keeping the `entry` modifier. The `entry`
     /// modifier itself still cannot be removed. See issue #19650.
     ALLOW_FRIEND_ENTRY_VISIBILITY_DOWNGRADE = 114,
+    /// When enabled, per-block hot-state promotions are persisted through the block
+    /// epilogue: the promotion set is embedded into the block epilogue transaction
+    /// payload (`BlockEpiloguePayload::V2`), and every transaction output in the block
+    /// uses the V1 write-set format, which encodes hot-state changes in its serialized
+    /// writes.
+    HOTNESS_IN_EPILOGUE = 116,
+    /// When enabled, execution assembles `TransactionInfoV1`, which carries the hot
+    /// state root hash, so it is committed to the ledger accumulator.
+    TRANSACTION_INFO_V1 = 117,
     /// Enables the native-trading subsystem: the
     /// `TradingNativeCapability` cap + `ExchangeRegistry` auth layer
     /// shared by every native trading store. Per-store flags (e.g.
@@ -192,15 +201,6 @@ pub enum FeatureFlag {
     /// layer, composite state root, and the native position Move
     /// module.
     NATIVE_POSITION = 119,
-    /// When enabled, per-block hot-state promotions are persisted through the block
-    /// epilogue: the promotion set is embedded into the block epilogue transaction
-    /// payload (`BlockEpiloguePayload::V2`), and every transaction output in the block
-    /// uses the V1 write-set format, which encodes hot-state changes in its serialized
-    /// writes.
-    HOTNESS_IN_EPILOGUE = 116,
-    /// When enabled, execution assembles `TransactionInfoV1`, which carries the hot
-    /// state root hash, so it is committed to the ledger accumulator.
-    TRANSACTION_INFO_V1 = 117,
 }
 
 impl FeatureFlag {
