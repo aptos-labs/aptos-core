@@ -1,0 +1,25 @@
+
+Diagnostics:
+error: Macro `debug_assert_eq!` must have at least two arguments
+  ┌─ tests/checking/debug_assert/eq_bad_arity.move:7:25
+  │
+7 │         debug_assert_eq!(x);
+  │                         ^^^
+
+error: Macro `debug_assert_ne!` must have at least two arguments
+   ┌─ tests/checking/debug_assert/eq_bad_arity.move:11:25
+   │
+11 │         debug_assert_ne!(x);
+   │                         ^^^
+
+error: Macro `debug_assert_eq!` cannot take more than 7 arguments
+   ┌─ tests/checking/debug_assert/eq_bad_arity.move:15:25
+   │
+15 │         debug_assert_eq!(left, right, b"x", left, right, left, right, left);
+   │                         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+error: Macro `debug_assert_ne!` cannot take more than 7 arguments
+   ┌─ tests/checking/debug_assert/eq_bad_arity.move:19:25
+   │
+19 │         debug_assert_ne!(left, right, b"x", left, right, left, right, left);
+   │                         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
