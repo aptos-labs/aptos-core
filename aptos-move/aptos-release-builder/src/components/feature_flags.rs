@@ -166,6 +166,7 @@ pub enum FeatureFlag {
     VersionedTransactionValidation,
     StorageSlotNatives,
     AllowFriendEntryVisibilityDowngrade,
+    NativePosition,
 }
 
 fn generate_features_blob(writer: &CodeWriter, data: &[u64]) {
@@ -435,6 +436,7 @@ impl From<FeatureFlag> for AptosFeatureFlag {
             FeatureFlag::AllowFriendEntryVisibilityDowngrade => {
                 AptosFeatureFlag::ALLOW_FRIEND_ENTRY_VISIBILITY_DOWNGRADE
             },
+            FeatureFlag::NativePosition => AptosFeatureFlag::NATIVE_POSITION,
         }
     }
 }
@@ -631,6 +633,7 @@ impl From<AptosFeatureFlag> for FeatureFlag {
             AptosFeatureFlag::ALLOW_FRIEND_ENTRY_VISIBILITY_DOWNGRADE => {
                 FeatureFlag::AllowFriendEntryVisibilityDowngrade
             },
+            AptosFeatureFlag::NATIVE_POSITION => FeatureFlag::NativePosition,
         }
     }
 }

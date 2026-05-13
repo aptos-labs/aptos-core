@@ -181,6 +181,11 @@ pub enum FeatureFlag {
     /// from `friend/package` to private, while keeping the `entry` modifier. The `entry`
     /// modifier itself still cannot be removed. See issue #19650.
     ALLOW_FRIEND_ENTRY_VISIBILITY_DOWNGRADE = 114,
+    /// Enables the native position subsystem: new StateKey variant
+    /// (TradingNative), the position_db / position_merkle_db storage
+    /// layer, composite state root, and the native position Move
+    /// module.
+    NATIVE_POSITION = 115,
 }
 
 impl FeatureFlag {

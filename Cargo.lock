@@ -1274,6 +1274,7 @@ dependencies = [
  "aptos-jellyfish-merkle",
  "aptos-logger",
  "aptos-metrics-core",
+ "aptos-position-natives",
  "aptos-proptest-helpers",
  "aptos-rocksdb-options",
  "aptos-schemadb",
@@ -2055,6 +2056,7 @@ dependencies = [
  "aptos-gas-algebra",
  "aptos-gas-schedule",
  "aptos-native-interface",
+ "aptos-position-natives",
  "aptos-types",
  "aptos-vm-types",
  "ark-bls12-381 0.5.0",
@@ -3819,6 +3821,22 @@ dependencies = [
 ]
 
 [[package]]
+name = "aptos-position-natives"
+version = "0.1.0"
+dependencies = [
+ "aptos-gas-schedule",
+ "aptos-native-interface",
+ "aptos-types",
+ "better_any",
+ "move-binary-format",
+ "move-core-types",
+ "move-vm-runtime",
+ "move-vm-types",
+ "smallvec",
+ "thiserror 1.0.69",
+]
+
+[[package]]
 name = "aptos-profiler"
 version = "0.1.0"
 dependencies = [
@@ -5132,6 +5150,7 @@ dependencies = [
  "aptos-gas-schedule",
  "aptos-move-stdlib",
  "aptos-native-interface",
+ "aptos-position-natives",
  "aptos-table-natives",
  "aptos-types",
  "aptos-vm-types",
@@ -8165,6 +8184,7 @@ dependencies = [
  "hashbrown 0.15.3",
  "lock_api",
  "parking_lot_core 0.9.12",
+ "rayon",
 ]
 
 [[package]]

@@ -32,6 +32,7 @@ mod event_store;
 mod ledger_db;
 mod lru_node_cache;
 pub mod native_state_committer;
+pub mod native_state_reader;
 pub mod native_state_store;
 pub mod position_backup;
 pub mod position_buffered_state;
@@ -49,6 +50,7 @@ mod sharded_jmt_merkle_db;
 mod sharded_kv_db;
 
 pub use native_state_committer::{MerkleLeafUpdate, NativeMerkleLeafUpdates, NativeStateCommitter};
+pub use native_state_reader::{InMemoryNativeStateReader, NativeStateReader};
 pub use native_state_store::{
     decode_position_state_key_pub, verify_startup_consistency, ConsistencyMismatches,
     DecodedPositionKey, NativeStateStore, PopulateError, UserKey, UserState,

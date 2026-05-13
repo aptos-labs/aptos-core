@@ -1269,6 +1269,27 @@ fn publish_framework(
         );
     }
 
+    // Explicit init hook for aptos_experimental::position_counts.
+    // vm-genesis doesn't call `init_module` for release-bundle packages,
+    // so the PositionCounters resource has to be set up via a dedicated
+    // public function that genesis invokes with a signer for 0x7.
+    const APTOS_EXPERIMENTAL_ADDRESS: AccountAddress = AccountAddress::new([
+        0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+        0, 7,
+    ]);
+    exec_function_internal(
+        &mut session,
+        &module_storage,
+        &mut traversal_context,
+        "position_counts",
+        "initialize_for_genesis",
+        vec![],
+        vec![MoveValue::Signer(APTOS_EXPERIMENTAL_ADDRESS)
+            .simple_serialize()
+            .unwrap()],
+        APTOS_EXPERIMENTAL_ADDRESS,
+    );
+
     let change_set =
         assert_ok!(session.finish(&genesis_vm.genesis_change_set_configs(), &module_storage,));
     (change_set, module_write_set)

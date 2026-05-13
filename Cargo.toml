@@ -44,6 +44,7 @@ members = [
     "aptos-move/framework",
     "aptos-move/framework/cached-packages",
     "aptos-move/framework/natives",
+    "aptos-move/framework/position-natives",
     "aptos-move/framework/release-bundle",
     "aptos-move/framework/table-natives",
     "aptos-move/move-examples",
@@ -591,7 +592,7 @@ crossterm = "0.26.1"
 csv = "1.2.1"
 curve25519-dalek = "3"
 curve25519-dalek-ng = "4"
-dashmap = { version = "7.0.0-rc2", features = ["inline-more"] }
+dashmap = { version = "7.0.0-rc2", features = ["inline-more", "rayon"] }
 datatest-stable = "0.1.1"
 debug-ignore = { version = "1.0.3", features = ["serde"] }
 derivative = "2.2.0"
@@ -928,6 +929,7 @@ move-prover-bytecode-pipeline = { path = "third_party/move/move-prover/bytecode-
 move-prover-test-utils = { path = "third_party/move/move-prover/test-utils" }
 move-prover-lab = { path = "third_party/move/move-prover/lab" }
 aptos-move-stdlib = { path = "aptos-move/framework/move-stdlib" }
+aptos-position-natives = { path = "aptos-move/framework/position-natives" }
 aptos-table-natives = { path = "aptos-move/framework/table-natives" }
 move-resource-viewer = { path = "third_party/move/tools/move-resource-viewer" }
 move-stackless-bytecode = { path = "third_party/move/move-model/bytecode" }
