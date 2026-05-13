@@ -17,9 +17,14 @@ path = "src/main.rs"
 
 [dependencies]
 anyhow = { workspace = true }
+aptos-cli-common = { workspace = true }
 aptos-framework = { workspace = true }
 aptos-gas-schedule = { workspace = true }
+aptos-move-cli = { workspace = true }
+aptos-move-debugger = { workspace = true }
+aptos-rest-client = { workspace = true }
 aptos-types = { workspace = true }
+aptos-validator-interface = { workspace = true }
 aptos-vm = { workspace = true, features = ["testing"] }
 clap = { workspace = true, features = ["derive"] }
 codespan-reporting = { workspace = true }
@@ -45,6 +50,7 @@ tempfile = { workspace = true }
 tera = { workspace = true }
 tokio = { workspace = true }
 tracing-log = { workspace = true }
+url = { workspace = true }
 walkdir = { workspace = true }
 
 [dev-dependencies]
