@@ -300,6 +300,30 @@ fn pointer_slots_overlaps_metadata() {
 }
 
 #[test]
+fn param_and_local_sizes_sum_misaligned() {
+    let arena = ExecutableArena::new();
+    // SAFETY: Arena is alive for the duration of the test.
+    let func = unsafe {
+        arena
+            .alloc(Function {
+                name: GlobalArenaPtr::from_static("test"),
+                code: arena.alloc_slice_fill_iter(vec![MicroOp::Return]),
+                param_sizes: ExecutableArenaPtr::empty_slice(),
+                param_sizes_sum: 0,
+                param_and_local_sizes_sum: 1, // not a multiple of 8
+                extended_frame_size: 32,
+                zero_frame: false,
+                frame_layout: FrameLayoutInfo::empty(),
+                safe_point_layouts: SortedSafePointEntries::empty(),
+            })
+            .as_ref_unchecked()
+    };
+    let errors = verify_function(func, &trivial_descriptors());
+    assert!(!errors.is_empty());
+    assert!(errors.iter().any(|e| e.message.contains("8-byte aligned")));
+}
+
+#[test]
 fn args_size_exceeds_data_size() {
     let arena = ExecutableArena::new();
     // SAFETY: Arena is alive for the duration of the test.

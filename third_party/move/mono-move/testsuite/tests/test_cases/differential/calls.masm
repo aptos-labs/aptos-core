@@ -1,3 +1,4 @@
+// RUN: publish --print(stackless,micro-ops)
 module 0x66::test
 
 fun identity(x: u64): u64
@@ -8,3 +9,6 @@ fun caller(): u64
     ld_u64 10
     call identity
     ret
+
+// RUN: execute 0x66::test::caller
+// CHECK: results: 10

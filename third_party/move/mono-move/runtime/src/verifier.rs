@@ -122,6 +122,20 @@ impl FunctionVerifier<'_> {
                 ),
             );
         }
+        // param_and_local_sizes_sum must be 8-byte aligned. The runtime writes
+        // frame metadata (saved pc/fp/func_ptr) at `fp + param_and_local_sizes_sum`
+        // via `write_u64`, which requires 8-byte alignment, and the callee
+        // frame pointer (`fp + param_and_local_sizes_sum + FRAME_METADATA_SIZE`)
+        // inherits this alignment for the callee's slot accesses.
+        if !self.func.param_and_local_sizes_sum.is_multiple_of(8) {
+            self.err(
+                None,
+                format!(
+                    "param_and_local_sizes_sum ({}) must be 8-byte aligned",
+                    self.func.param_and_local_sizes_sum
+                ),
+            );
+        }
 
         // --- Base frame_layout: pointer offsets valid at every PC ---
         // Each offset must be in-bounds, not overlap metadata, and sorted.

@@ -250,20 +250,12 @@ fn execute_function_v2(
             num_returns: 0,
         },
         Ok(()) => {
-            if num_returns == 0 {
-                // TODO: Check frame contents?
-                Output {
-                    display: "results:".to_string(),
-                    num_returns: 0,
-                }
-            } else {
-                let vals = (0..num_returns)
-                    .map(|i| interpreter.root_result_at((i * 8) as u32).to_string())
-                    .collect::<Vec<_>>();
-                Output {
-                    display: format!("results: {}", vals.join(", ")),
-                    num_returns,
-                }
+            let vals = (0..num_returns)
+                .map(|i| interpreter.root_result_at((i * 8) as u32).to_string())
+                .collect::<Vec<_>>();
+            Output {
+                display: format!("results: {}", vals.join(", ")),
+                num_returns,
             }
         },
     }

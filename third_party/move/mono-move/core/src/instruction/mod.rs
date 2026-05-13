@@ -115,7 +115,7 @@
 //!   `elem_ptr_offsets` lists byte offsets *within each element* that hold
 //!   heap pointers.
 
-use crate::{ExecutableId, Function};
+use crate::{align::MAX_ALIGN, ExecutableId, Function};
 use mono_move_alloc::{ExecutableArenaPtr, GlobalArenaPtr};
 use std::fmt;
 
@@ -1091,50 +1091,48 @@ impl fmt::Display for MicroOp {
 // Constructor helpers for the re-compiler
 // ---------------------------------------------------------------------------
 
-/// Maximum alignment used by any value or VM-internal layout. Bounds the
-/// alignment of region bases, the frame pointer, the bump pointer, and
-/// the padding rounded into per-object `size` fields and frame segments.
-///
-/// Must be a power of two, at least 8 (the heap object header is 8 bytes,
-/// and the 24-byte frame metadata block needs 8-byte granularity), and a
-/// multiple of every alignment used by any value or VM-internal layout
-/// (the third constraint is implied by the first two as long as every
-/// such alignment is a power of two ≤ [`MAX_ALIGN`]).
-pub const MAX_ALIGN: usize = 8;
-
-const _: () = {
-    assert!(MAX_ALIGN.is_power_of_two());
-    assert!(MAX_ALIGN >= 8);
-};
-
-/// Round `size` up to the next multiple of [`MAX_ALIGN`].
-#[inline(always)]
-pub const fn align_max(size: usize) -> usize {
-    (size + (MAX_ALIGN - 1)) & !(MAX_ALIGN - 1)
-}
-
 /// Size of the per-frame metadata section: `(saved_pc, saved_fp, func_id)`.
 pub const FRAME_METADATA_SIZE: usize = 24;
 
-/// Size of the object header: [descriptor_id: u32 | size_in_bytes: u32].
-pub const OBJECT_HEADER_SIZE: usize = 8;
+/// Allocation overhead per heap object — the number of bytes the bump
+/// allocator reserves *before* the data region for the
+/// `[descriptor_id: u32 | size_in_bytes: u32]` header. The header pair
+/// always sits in the last 8 bytes of this reservation (at `obj_ptr - 8`
+/// and `obj_ptr - 4`); any additional bytes are padding so the data start
+/// remains [`MAX_ALIGN`]-aligned.
+///
+/// Tying `OBJECT_HEADER_SIZE` to [`MAX_ALIGN`] is what keeps both
+/// invariants (header-aligned, data-aligned) automatic as [`MAX_ALIGN`]
+/// grows: a future bump to 16 expands the reservation without changing
+/// any per-type layout constant below.
+pub const OBJECT_HEADER_SIZE: usize = MAX_ALIGN;
 
-/// Offset where struct field data begins (same as OBJECT_HEADER_SIZE).
-pub const STRUCT_DATA_OFFSET: usize = OBJECT_HEADER_SIZE; // 8
+const _: () = {
+    // The header pair (`desc_id: u32 + size: u32`) needs the last 8 bytes
+    // of the reservation. Cannot be less.
+    assert!(OBJECT_HEADER_SIZE >= 8);
+    // Data start = header start + OBJECT_HEADER_SIZE; needs to land on a
+    // `MAX_ALIGN` boundary.
+    assert!(OBJECT_HEADER_SIZE.is_multiple_of(MAX_ALIGN));
+};
 
 /// Offset of the variant tag (u64) within an enum object.
-pub const ENUM_TAG_OFFSET: usize = OBJECT_HEADER_SIZE; // 8
+pub const ENUM_TAG_OFFSET: usize = 0;
 
-/// Offset where enum variant field data begins (after header + tag).
-pub const ENUM_DATA_OFFSET: usize = OBJECT_HEADER_SIZE + 8; // 16
+/// Offset where enum variant field data begins (after the tag).
+pub const ENUM_DATA_OFFSET: usize = 8;
 
 // ---------------------------------------------------------------------------
 // Closure object layout
 // ---------------------------------------------------------------------------
 //
-// Closure object (heap-allocated, fixed size):
+// Closure object (heap-allocated, fixed data-region size):
 //
-//   [header(8)] [func_ref(16)] [mask(8)] [captured_data_ptr(8)]  = 40 bytes
+//   [func_ref(16)] [mask(8)] [captured_data_ptr(8)]  = 32 bytes
+//
+// Offsets below are relative to the data start (the object pointer). The
+// 8-byte header lives at `obj_ptr - 8`; allocator bookkeeping is hidden
+// from per-type layouts.
 //
 // `func_ref` is an inline `ClosureFuncRef` enum. Reserved as 16 bytes to
 // leave room for a future `Unresolved` variant; v0 uses only `Resolved`:
@@ -1149,18 +1147,18 @@ pub const ENUM_DATA_OFFSET: usize = OBJECT_HEADER_SIZE + 8; // 16
 /// changes.
 pub const CLOSURE_FUNC_REF_SIZE: usize = 16;
 
-/// Offset of the `func_ref` field within a closure heap object (after header).
-pub const CLOSURE_FUNC_REF_OFFSET: usize = OBJECT_HEADER_SIZE; // 8
+/// Offset of the `func_ref` field within a closure heap object's data region.
+pub const CLOSURE_FUNC_REF_OFFSET: usize = 0;
 
 /// Offset of the `mask` field within a closure heap object.
-pub const CLOSURE_MASK_OFFSET: usize = CLOSURE_FUNC_REF_OFFSET + CLOSURE_FUNC_REF_SIZE; // 24
+pub const CLOSURE_MASK_OFFSET: usize = CLOSURE_FUNC_REF_OFFSET + CLOSURE_FUNC_REF_SIZE; // 16
 
 /// Offset of the `captured_data_ptr` field within a closure heap object.
 /// The GC traces this slot (heap pointer to the `ClosureCapturedData` object).
-pub const CLOSURE_CAPTURED_DATA_PTR_OFFSET: usize = CLOSURE_MASK_OFFSET + 8; // 32
+pub const CLOSURE_CAPTURED_DATA_PTR_OFFSET: usize = CLOSURE_MASK_OFFSET + 8; // 24
 
-/// Total size of a closure heap object (header + payload).
-pub const CLOSURE_OBJECT_SIZE: usize = CLOSURE_CAPTURED_DATA_PTR_OFFSET + 8; // 40
+/// Size of a closure heap object's data region (the header is separate).
+pub const CLOSURE_DATA_SIZE: usize = CLOSURE_CAPTURED_DATA_PTR_OFFSET + 8; // 32
 
 // Offsets within the `func_ref` region.
 /// Byte offset of the tag within `func_ref`.
@@ -1176,7 +1174,10 @@ pub const FUNC_REF_TAG_RESOLVED: u8 = 0;
 // ClosureCapturedData object layout (Materialized)
 // ---------------------------------------------------------------------------
 //
-//   [header(8)] [tag(1)] [padding(7)] [captured values packed in param order]
+//   Data region: [tag(1)] [padding(7)] [captured values packed in param order]
+//
+// Offsets below are relative to the data start (the object pointer). The
+// 8-byte header lives at `obj_ptr - 8`.
 //
 // Captured values are packed tightly, in the order of their parameter
 // positions (i.e. ascending `i` where `mask.is_captured(i)` is true).
@@ -1184,23 +1185,28 @@ pub const FUNC_REF_TAG_RESOLVED: u8 = 0;
 // read from the target function's `param_sizes` at call time.
 
 /// Byte offset of the tag (u8) within a `ClosureCapturedData` heap object.
-pub const CAPTURED_DATA_TAG_OFFSET: usize = OBJECT_HEADER_SIZE; // 8
+pub const CAPTURED_DATA_TAG_OFFSET: usize = 0;
 
-/// Byte offset where captured values begin (after header + tag + padding).
-pub const CAPTURED_DATA_VALUES_OFFSET: usize = OBJECT_HEADER_SIZE + 8; // 16
+/// Byte offset where captured values begin (after tag + padding).
+pub const CAPTURED_DATA_VALUES_OFFSET: usize = 8;
 
 /// `ClosureCapturedData::Materialized` tag value.
 pub const CAPTURED_DATA_TAG_MATERIALIZED: u8 = 0;
 // Future: `CAPTURED_DATA_TAG_RAW: u8 = 1`
 
 impl MicroOp {
-    // ----- Struct helpers (offsets relative to STRUCT_DATA_OFFSET) -----
+    // ----- Struct helpers -----
+    //
+    // Field offsets are byte offsets within the struct's data region, which
+    // is exactly what each Heap* op's `offset` field already names — the
+    // header lives at a negative offset and is invisible to per-type
+    // layouts.
 
     pub fn struct_load8(heap_ptr: FrameOffset, field_offset: u32, dst: FrameOffset) -> Self {
         MicroOp::HeapMoveFrom8 {
             dst,
             heap_ptr,
-            offset: STRUCT_DATA_OFFSET as u32 + field_offset,
+            offset: field_offset,
         }
     }
 
@@ -1213,7 +1219,7 @@ impl MicroOp {
         MicroOp::HeapMoveFrom {
             dst,
             heap_ptr,
-            offset: STRUCT_DATA_OFFSET as u32 + field_offset,
+            offset: field_offset,
             size,
         }
     }
@@ -1221,7 +1227,7 @@ impl MicroOp {
     pub fn struct_store8(heap_ptr: FrameOffset, field_offset: u32, src: FrameOffset) -> Self {
         MicroOp::HeapMoveTo8 {
             heap_ptr,
-            offset: STRUCT_DATA_OFFSET as u32 + field_offset,
+            offset: field_offset,
             src,
         }
     }
@@ -1234,7 +1240,7 @@ impl MicroOp {
     ) -> Self {
         MicroOp::HeapMoveTo {
             heap_ptr,
-            offset: STRUCT_DATA_OFFSET as u32 + field_offset,
+            offset: field_offset,
             src,
             size,
         }
@@ -1244,11 +1250,11 @@ impl MicroOp {
         MicroOp::HeapBorrow {
             dst,
             obj_ref,
-            offset: STRUCT_DATA_OFFSET as u32 + field_offset,
+            offset: field_offset,
         }
     }
 
-    // ----- Enum helpers (offsets relative to ENUM_DATA_OFFSET) -----
+    // ----- Enum helpers (variant fields live after the 8-byte tag) -----
 
     pub fn enum_get_tag(heap_ptr: FrameOffset, dst: FrameOffset) -> Self {
         MicroOp::HeapMoveFrom8 {

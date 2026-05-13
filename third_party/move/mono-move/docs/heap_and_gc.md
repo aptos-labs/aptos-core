@@ -138,7 +138,7 @@ All pointers must be updated after memory moves during GC. Missing a pointer lea
 
 1. **Frame metadata integrity** — saved `fp`/`pc`/`func_ptr` are written only by call/return, never by user micro-ops.
 2. **Pointer-slot accuracy** — `Function::frame_layout` (and, at safe points, the matching `safe_point_layouts` entry) together exactly match slots that hold live heap pointers.
-3. **Object header integrity** — `descriptor_id` and `size` are set by the allocator and never overwritten by user code.
+3. **Object header integrity** — `descriptor_id` and `size` live at fixed negative offsets (`obj_ptr - 8` and `obj_ptr - 4`) and are set by the allocator; user-emitted micro-ops only access offsets within the data region (≥ 0) so they cannot reach the header.
 
 ### Auxiliary GC Roots: `PinnedRoots`
 

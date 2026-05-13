@@ -15,7 +15,8 @@
 use anyhow::{anyhow, bail, Result};
 use mono_move_alloc::{ExecutableArena, ExecutableArenaPtr, GlobalArenaPtr};
 use mono_move_core::{
-    types::{align_up, view_type, Type},
+    align_up_u32,
+    types::{view_name, view_type, Type},
     EnumType, Executable, ExecutableId, FrameLayoutInfo, Function, MicroOp, PreparedModule,
     SortedSafePointEntries, StructType, VariantFields,
 };
@@ -146,6 +147,57 @@ impl<'guard, 'ctx> ExecutableBuilder<'guard, 'ctx> {
                 .guard
                 .intern_identifier(module.identifier_at(lowered_fn.name_idx))
                 .into_global_arena_ptr();
+            // TODO: `frame_layout` is hardcoded empty (no slots scanned by GC).
+            // That is sound only while every fat-pointer slot in this function
+            // holds a stack base (filtered by `is_heap_ptr` at GC time). If the
+            // lowering ever emits an op that puts a heap pointer in a frame
+            // slot, the resulting slot is invisible to GC and a collection
+            // during a callee would leave it dangling. Refuse to build such a
+            // function until `frame_layout` is derived from the lowering
+            // context.
+            //
+            // Today's lowering doesn't emit any of these ops (the destacker
+            // bails first on unsupported Move instructions), so this is a
+            // future-trip guard. Categories listed by what semantically puts
+            // a heap pointer in a frame slot:
+            //   - heap object create / borrow / field read:
+            //     `HeapNew`, `HeapBorrow`, `HeapMoveFrom8`, `HeapMoveFrom`
+            //   - vector create / borrow / element read / pop:
+            //     `VecNew`, `VecBorrow`, `VecLoadElem`, `VecPopBack`
+            //   - heap-pointer republish (in-place vec base mutation):
+            //     `VecPushBack`
+            //   - closures (heap-pointer captures):
+            //     `PackClosure`, `CallClosure`
+            //
+            // Calls (`CallFunc` / `CallDirect` / `CallIndirect`) are not
+            // listed here even though a callee returning a heap-typed value
+            // would put a heap pointer in the caller's ret region: the
+            // hazard depends on the callee's return signature, not on the
+            // op itself, and today's lowering bails before emitting a call
+            // that returns anything heap-backed.
+            for op in &lowered_fn.code {
+                match op {
+                    MicroOp::HeapNew { .. }
+                    | MicroOp::HeapBorrow { .. }
+                    | MicroOp::HeapMoveFrom8 { .. }
+                    | MicroOp::HeapMoveFrom { .. }
+                    | MicroOp::VecNew { .. }
+                    | MicroOp::VecBorrow { .. }
+                    | MicroOp::VecLoadElem { .. }
+                    | MicroOp::VecPopBack { .. }
+                    | MicroOp::VecPushBack { .. }
+                    | MicroOp::PackClosure(..)
+                    | MicroOp::CallClosure(..) => {
+                        bail!(
+                            "function `{}` lowers a heap-pointer-producing op but \
+                             frame_layout is not yet derived from the lowering context — \
+                             GC would not see the resulting slot",
+                            view_name(name),
+                        );
+                    },
+                    _ => {},
+                }
+            }
             let code = self.arena.alloc_slice_fill_iter(lowered_fn.code);
             let param_sizes = self.arena.alloc_slice_fill_iter(lowered_fn.param_sizes);
             let func = Function {
@@ -276,12 +328,12 @@ impl<'guard, 'ctx> ExecutableBuilder<'guard, 'ctx> {
                     let (sz, al) = view_type(fty).size_and_align().ok_or_else(|| {
                         anyhow!("Size and alignment is set for non-generic types")
                     })?;
-                    offset = align_up(offset, al);
+                    offset = align_up_u32(offset, al);
                     align = align.max(al);
                     fields.push(FieldLayout::new(offset, fty));
                     offset += sz;
                 }
-                let size = align_up(offset, align);
+                let size = align_up_u32(offset, align);
                 self.guard
                     .set_nominal_layout(bare_ty, size, align, Some(&fields))?;
                 self.structs.insert(name, StructType::new(bare_ty));

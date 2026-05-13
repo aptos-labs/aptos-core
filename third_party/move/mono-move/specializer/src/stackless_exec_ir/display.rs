@@ -65,11 +65,11 @@ fn display_function(
     }
     writeln!(f, " {{")?;
     let num_temps = func.num_home_slots - func.num_params - func.num_locals;
-    if func.num_xfer_slots > 0 {
+    if func.num_xfer_positions > 0 {
         writeln!(
             f,
             "  slots: params({}), locals({}), temps({}), xfer({})",
-            func.num_params, func.num_locals, num_temps, func.num_xfer_slots
+            func.num_params, func.num_locals, num_temps, func.num_xfer_positions
         )?;
     } else {
         writeln!(

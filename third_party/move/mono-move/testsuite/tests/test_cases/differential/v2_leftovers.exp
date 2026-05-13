@@ -1,3 +1,4 @@
+=== stackless ===
 // module 0x66::v2_leftovers
 
 fun identity(r0): u64 {
@@ -68,7 +69,6 @@ fun two_copies_to_call(r0, r1): u64 {
     0: [x0] := call add_two, [r0, r1]
     1: ret [x0]
 }
-
 === micro-ops ===
 // module 0x66::v2_leftovers
 
@@ -126,8 +126,8 @@ fun copy_call_then_use() {
 fun two_copies_to_call() {
   frame_data_size: 16
   code:
-    0: Move8 [40] <- [0]
-    1: Move8 [48] <- [8]
+    0: Move8 [48] <- [8]
+    1: Move8 [40] <- [0]
     2: CallFunc #1
     3: Move8 [0] <- [40]
     4: Return

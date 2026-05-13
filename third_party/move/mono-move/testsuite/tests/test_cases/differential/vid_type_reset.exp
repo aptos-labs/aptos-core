@@ -1,3 +1,4 @@
+=== stackless ===
 // module 0x66::test
 
 fun vid_type_mismatch(r0): u64 {
@@ -13,7 +14,6 @@ fun vid_type_mismatch(r0): u64 {
     2: r1 := add r0, #1
     3: ret [r1]
 }
-
 === micro-ops ===
 // module 0x66::test
 

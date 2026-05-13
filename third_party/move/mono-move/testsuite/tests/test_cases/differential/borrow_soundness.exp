@@ -1,3 +1,4 @@
+=== stackless ===
 // module 0x66::borrow_soundness
 
 fun borrow_loc_no_source_subst(r0): u64 {
@@ -58,14 +59,48 @@ fun mut_borrow_kills_reverse(r0): u64 {
     3: write_ref r3, r2
     4: ret [r1]
 }
-
 === micro-ops ===
 // module 0x66::borrow_soundness
 
-fun borrow_loc_no_source_subst(): skipped (lowering: instruction ImmBorrowLoc not yet lowered)
+fun borrow_loc_no_source_subst() {
+  frame_data_size: 40
+  code:
+    0: Move8 [8] <- [0]
+    1: SlotBorrow [16] <- &[8]
+    2: ReadRef [32] <- *[16] (size=8)
+    3: Move8 [0] <- [32]
+    4: Return
+}
 
-fun imm_borrow_value_prop(): skipped (lowering: instruction ImmBorrowLoc not yet lowered)
+fun imm_borrow_value_prop() {
+  frame_data_size: 40
+  code:
+    0: Move8 [8] <- [0]
+    1: SlotBorrow [16] <- &[8]
+    2: ReadRef [32] <- *[16] (size=8)
+    3: AddU64 [32] <- [32] + [0]
+    4: Move8 [0] <- [32]
+    5: Return
+}
 
-fun mut_borrow_kills_subst(): skipped (lowering: instruction MutBorrowLoc not yet lowered)
+fun mut_borrow_kills_subst() {
+  frame_data_size: 40
+  code:
+    0: Move8 [8] <- [0]
+    1: StoreImm8 [16] <- #42
+    2: SlotBorrow [24] <- &[8]
+    3: WriteRef *[24] <- [16] (size=8)
+    4: Move8 [0] <- [8]
+    5: Return
+}
 
-fun mut_borrow_kills_reverse(): skipped (lowering: instruction MutBorrowLoc not yet lowered)
+fun mut_borrow_kills_reverse() {
+  frame_data_size: 40
+  code:
+    0: Move8 [8] <- [0]
+    1: StoreImm8 [16] <- #99
+    2: SlotBorrow [24] <- &[0]
+    3: WriteRef *[24] <- [16] (size=8)
+    4: Move8 [0] <- [8]
+    5: Return
+}

@@ -14,12 +14,12 @@ use crate::{
         Heap,
     },
     memory::{
-        read_ptr, read_u32, read_u64, read_u8, vec_elem_ptr, write_ptr, write_u64, MemoryRegion,
+        read_obj_size, read_ptr, read_u64, read_u8, vec_elem_ptr, write_ptr, write_u64,
+        MemoryRegion,
     },
     types::{
-        StepResult, DEFAULT_HEAP_SIZE, DEFAULT_STACK_SIZE, HEADER_SIZE_OFFSET,
-        META_SAVED_FP_OFFSET, META_SAVED_FUNC_PTR_OFFSET, META_SAVED_PC_OFFSET, VEC_DATA_OFFSET,
-        VEC_LENGTH_OFFSET,
+        StepResult, DEFAULT_HEAP_SIZE, DEFAULT_STACK_SIZE, META_SAVED_FP_OFFSET,
+        META_SAVED_FUNC_PTR_OFFSET, META_SAVED_PC_OFFSET, VEC_DATA_OFFSET, VEC_LENGTH_OFFSET,
     },
 };
 use mono_move_core::{
@@ -27,7 +27,7 @@ use mono_move_core::{
     PackClosureOp, SizedSlot, CAPTURED_DATA_TAG_MATERIALIZED, CAPTURED_DATA_TAG_OFFSET,
     CAPTURED_DATA_VALUES_OFFSET, CLOSURE_CAPTURED_DATA_PTR_OFFSET, CLOSURE_FUNC_REF_OFFSET,
     CLOSURE_MASK_OFFSET, FRAME_METADATA_SIZE, FUNC_REF_PAYLOAD_OFFSET, FUNC_REF_TAG_OFFSET,
-    FUNC_REF_TAG_RESOLVED,
+    FUNC_REF_TAG_RESOLVED, OBJECT_HEADER_SIZE,
 };
 use mono_move_gas::GasMeter;
 use rand::{rngs::StdRng, Rng, SeedableRng};
@@ -623,10 +623,11 @@ impl<T: ExecutionContext> InterpreterContext<'_, T> {
                     }
 
                     let len = read_u64(vec_ptr, VEC_LENGTH_OFFSET);
-                    let size = read_u32(vec_ptr, HEADER_SIZE_OFFSET) as usize;
-                    let cap = ((size - VEC_DATA_OFFSET) / elem_size as usize) as u64;
+                    let total = read_obj_size(vec_ptr) as usize;
+                    let cap_in_elems = ((total - OBJECT_HEADER_SIZE - VEC_DATA_OFFSET)
+                        / elem_size as usize) as u64;
 
-                    if len >= cap {
+                    if len >= cap_in_elems {
                         vec_ptr = grow_vec_ref!(self, fp, vec_ref.into(), elem_size, len + 1)?;
                     }
 
@@ -750,14 +751,16 @@ impl<T: ExecutionContext> InterpreterContext<'_, T> {
                     let base = read_ptr(fp, ref_ptr);
                     let offset = read_u64(fp, ref_ptr + 8);
                     let target = base.add(offset as usize);
-                    std::ptr::copy_nonoverlapping(target, fp.add(dst.into()), size as usize);
+                    // Overlap-safe `copy`: `dst` and `*ref` may alias.
+                    std::ptr::copy(target, fp.add(dst.into()), size as usize);
                 },
 
                 MicroOp::WriteRef { ref_ptr, src, size } => {
                     let base = read_ptr(fp, ref_ptr);
                     let offset = read_u64(fp, ref_ptr + 8);
                     let target = base.add(offset as usize);
-                    std::ptr::copy_nonoverlapping(fp.add(src.into()), target, size as usize);
+                    // Overlap-safe `copy`: `src` and `*ref` may alias.
+                    std::ptr::copy(fp.add(src.into()), target, size as usize);
                 },
 
                 // ----- Heap object instructions (structs and enums) -----

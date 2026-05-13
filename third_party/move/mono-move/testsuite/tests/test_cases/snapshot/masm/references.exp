@@ -45,6 +45,13 @@ fun read_field_ref_twice(r0): u64 {
 
 fun read_field_val(): skipped (not all types are concrete)
 
-fun read_and_add(): skipped (lowering: instruction ReadRef not yet lowered)
+fun read_and_add() {
+  frame_data_size: 24
+  code:
+    0: ReadRef [16] <- *[0] (size=8)
+    1: AddU64Imm [16] <- [16] + #1
+    2: Move8 [0] <- [16]
+    3: Return
+}
 
 fun read_field_ref_twice(): skipped (not all types are concrete)

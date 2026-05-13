@@ -1,0 +1,121 @@
+=== bytecode ===
+// Bytecode version v10
+module 0xc0ffee::multi_ret_flow
+// Function definition at index 0
+#[persistent] public fun trigger(): u64
+    local l0: u64
+    local l1: u64
+    call two_rets
+    call two_args
+    ret
+
+// Function definition at index 1
+#[persistent] public fun trigger_swap(): u64
+    local l0: u64
+    local l1: u64
+    call two_rets
+    st_loc l0
+    st_loc l1
+    move_loc l0
+    move_loc l1
+    // @5
+    call two_args
+    ret
+
+// Function definition at index 2
+fun two_args(l0: u64, l1: u64): u64
+    move_loc l0
+    move_loc l1
+    add
+    ret
+
+// Function definition at index 3
+fun two_rets(): (u64, u64)
+    ld_u64 10
+    ld_u64 20
+    ret
+
+=== stackless ===
+// module 0xc0ffee::multi_ret_flow
+
+fun trigger(): u64 {
+  slots: params(0), locals(0), temps(0), xfer(2)
+  code:
+  L0:
+    0: [x0, x1] := call two_rets, []
+    1: [x0] := call two_args, [x0, x1]
+    2: ret [x0]
+}
+
+fun trigger_swap(): u64 {
+  slots: params(0), locals(2), temps(0), xfer(2)
+    r0: u64
+    r1: u64
+  code:
+  L0:
+    0: [r1, r0] := call two_rets, []
+    1: [x0] := call two_args, [r0, r1]
+    2: ret [x0]
+}
+
+fun two_args(r0, r1): u64 {
+  slots: params(2), locals(0), temps(1)
+    r0: u64
+    r1: u64
+    r2: u64
+  code:
+  L0:
+    0: r2 := add r0, r1
+    1: ret [r2]
+}
+
+fun two_rets(): u64 * u64 {
+  slots: params(0), locals(0), temps(2)
+    r0: u64
+    r1: u64
+  code:
+  L0:
+    0: r0 := ld_u64 10
+    1: r1 := ld_u64 20
+    2: ret [r0, r1]
+}
+=== micro-ops ===
+// module 0xc0ffee::multi_ret_flow
+
+fun trigger() {
+  frame_data_size: 8
+  code:
+    0: CallFunc #1
+    1: CallFunc #2
+    2: Move8 [0] <- [32]
+    3: Return
+}
+
+fun trigger_swap() {
+  frame_data_size: 16
+  code:
+    0: CallFunc #1
+    1: Move8 [8] <- [40]
+    2: Move8 [0] <- [48]
+    3: Move8 [48] <- [8]
+    4: Move8 [40] <- [0]
+    5: CallFunc #2
+    6: Move8 [0] <- [40]
+    7: Return
+}
+
+fun two_args() {
+  frame_data_size: 24
+  code:
+    0: AddU64 [16] <- [0] + [8]
+    1: Move8 [0] <- [16]
+    2: Return
+}
+
+fun two_rets() {
+  frame_data_size: 24
+  code:
+    0: StoreImm8 [0] <- #10
+    1: StoreImm8 [8] <- #20
+    2: Return
+}

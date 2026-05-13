@@ -432,15 +432,3 @@ pub const ADDRESS_TY: InternedType = GlobalArenaPtr::from_static(&ADDRESS);
 pub const SIGNER_TY: InternedType = GlobalArenaPtr::from_static(&SIGNER);
 
 pub const EMPTY_TYPE_LIST: InternedTypeList = GlobalArenaPtr::from_static(&EMPTY_LIST);
-
-// ================================================================================================
-// Alignment utility
-// ================================================================================================
-
-/// Rounds a byte offset up to the next multiple of `align`.
-///
-/// **Pre-condition:** `align` is non-zero and is a power of two.
-pub fn align_up(offset: u32, align: u32) -> u32 {
-    debug_assert!(align > 0 && align.is_power_of_two());
-    (offset + align - 1) & !(align - 1)
-}

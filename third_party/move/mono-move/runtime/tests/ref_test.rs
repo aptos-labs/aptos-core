@@ -7,17 +7,14 @@
 use mono_move_alloc::{ExecutableArena, ExecutableArenaPtr, GlobalArenaPtr};
 use mono_move_core::{
     FrameLayoutInfo, FrameOffset as FO, Function, LocalExecutionContext, MicroOp,
-    SortedSafePointEntries, FRAME_METADATA_SIZE, STRUCT_DATA_OFFSET,
+    SortedSafePointEntries, FRAME_METADATA_SIZE,
 };
 use mono_move_runtime::{
     read_ptr, read_u64, InterpreterContext, ObjectDescriptor, ObjectDescriptorTable,
     VEC_DATA_OFFSET,
 };
 
-// ---------------------------------------------------------------------------
-// Test 1: ref_basic — single-frame, no GC
-// ---------------------------------------------------------------------------
-
+/// Single-frame, no GC.
 #[test]
 fn ref_basic() {
     use MicroOp::*;
@@ -80,10 +77,6 @@ fn ref_basic() {
     let elem1 = unsafe { read_u64(vec_ptr, VEC_DATA_OFFSET + 8) };
     assert_eq!(elem1, 99, "WriteRef should have written 99 to vec[1]");
 }
-
-// ---------------------------------------------------------------------------
-// Test 2: ref_survives_gc
-// ---------------------------------------------------------------------------
 
 #[test]
 fn ref_survives_gc() {
@@ -152,10 +145,6 @@ fn ref_survives_gc() {
     );
     assert_eq!(ctx.gc_count(), 1, "ForceGC should have run exactly once");
 }
-
-// ---------------------------------------------------------------------------
-// Test 3: ref_cross_frame
-// ---------------------------------------------------------------------------
 
 #[test]
 fn ref_cross_frame() {
@@ -252,10 +241,6 @@ fn ref_cross_frame() {
     assert_eq!(ctx.gc_count(), 1, "ForceGC should have run exactly once");
 }
 
-// ---------------------------------------------------------------------------
-// Test 4: ref_multiple_borrows
-// ---------------------------------------------------------------------------
-
 #[test]
 fn ref_multiple_borrows() {
     use MicroOp::*;
@@ -340,10 +325,6 @@ fn ref_multiple_borrows() {
     assert_eq!(ctx.gc_count(), 1);
 }
 
-// ---------------------------------------------------------------------------
-// Test 5: ref_borrow_local
-// ---------------------------------------------------------------------------
-
 #[test]
 fn ref_borrow_local() {
     use MicroOp::*;
@@ -401,10 +382,6 @@ fn ref_borrow_local() {
     );
     assert_eq!(ctx.gc_count(), 1);
 }
-
-// ---------------------------------------------------------------------------
-// Test 6: ref_nested_vectors
-// ---------------------------------------------------------------------------
 
 #[test]
 fn ref_nested_vectors() {
@@ -517,10 +494,6 @@ fn ref_nested_vectors() {
     assert_eq!(ctx.gc_count(), 1);
 }
 
-// ---------------------------------------------------------------------------
-// Test 7: ref_survives_double_gc
-// ---------------------------------------------------------------------------
-
 #[test]
 fn ref_survives_double_gc() {
     use MicroOp::*;
@@ -589,10 +562,6 @@ fn ref_survives_double_gc() {
     assert_eq!(ctx.gc_count(), 2, "ForceGC should have run exactly twice");
 }
 
-// ---------------------------------------------------------------------------
-// Test 8: ref_struct_field_borrow
-// ---------------------------------------------------------------------------
-
 #[test]
 fn ref_struct_field_borrow() {
     use MicroOp::*;
@@ -646,13 +615,9 @@ fn ref_struct_field_borrow() {
         "entry.value should be 55 after WriteRef through StructBorrow"
     );
     let entry_ptr = ctx.root_heap_ptr(8);
-    let key = unsafe { read_u64(entry_ptr, STRUCT_DATA_OFFSET) };
+    let key = unsafe { read_u64(entry_ptr, 0usize) };
     assert_eq!(key, 42, "entry.key should be untouched");
 }
-
-// ---------------------------------------------------------------------------
-// Test 9: ref_struct_field_survives_gc
-// ---------------------------------------------------------------------------
 
 #[test]
 fn ref_struct_field_survives_gc() {
@@ -704,6 +669,55 @@ fn ref_struct_field_survives_gc() {
     assert_eq!(ctx.gc_count(), 1);
 
     let entry_ptr = ctx.root_heap_ptr(8);
-    let key = unsafe { read_u64(entry_ptr, STRUCT_DATA_OFFSET) };
+    let key = unsafe { read_u64(entry_ptr, 0usize) };
     assert_eq!(key, 7, "entry.key should survive GC");
+}
+
+/// `ReadRef`/`WriteRef` whose runtime target aliases the dst/src slot.
+/// Guards the interpreter's overlap-safe copy.
+#[test]
+fn ref_self_copy() {
+    use MicroOp::*;
+
+    let result: u32 = 0;
+    let local: u32 = 8;
+    let r#ref: u32 = 16;
+
+    let arena = ExecutableArena::new();
+
+    #[rustfmt::skip]
+    let code = arena.alloc_slice_fill_iter(vec![
+        StoreImm8 { dst: FO(local), imm: 99 },
+        SlotBorrow { dst: FO(r#ref), local: FO(local) },
+        // Self-overlapping ReadRef: dst == target == fp+local.
+        ReadRef { dst: FO(local), ref_ptr: FO(r#ref), size: 8 },
+        // Self-overlapping WriteRef: src == target == fp+local.
+        WriteRef { ref_ptr: FO(r#ref), src: FO(local), size: 8 },
+        Move8 { dst: FO(result), src: FO(local) },
+        Return,
+    ]);
+    let functions = [arena.alloc(Function {
+        name: GlobalArenaPtr::from_static("test"),
+        code,
+        param_sizes: ExecutableArenaPtr::empty_slice(),
+        param_sizes_sum: 0,
+        param_and_local_sizes_sum: 32,
+        extended_frame_size: 32 + FRAME_METADATA_SIZE,
+        zero_frame: false,
+        frame_layout: FrameLayoutInfo::empty(),
+        safe_point_layouts: SortedSafePointEntries::empty(),
+    })];
+    let descriptors = ObjectDescriptorTable::new();
+
+    let mut exec_ctx = LocalExecutionContext::with_max_budget();
+    let mut ctx = InterpreterContext::new(&mut exec_ctx, &descriptors, unsafe {
+        functions[0].as_ref_unchecked()
+    });
+    ctx.run().unwrap();
+
+    assert_eq!(
+        ctx.root_result(),
+        99,
+        "self-overlapping ReadRef/WriteRef should preserve the value"
+    );
 }

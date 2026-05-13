@@ -6,7 +6,7 @@
 use mono_move_alloc::{ExecutableArena, ExecutableArenaPtr, GlobalArenaPtr};
 use mono_move_core::{
     FrameLayoutInfo, FrameOffset as FO, Function, LocalExecutionContext, MicroOp,
-    SortedSafePointEntries, STRUCT_DATA_OFFSET,
+    SortedSafePointEntries,
 };
 use mono_move_runtime::{
     read_ptr, read_u64, InterpreterContext, ObjectDescriptor, ObjectDescriptorTable,
@@ -273,7 +273,7 @@ fn struct_with_vector_field() {
     assert_eq!(ctx.root_result(), 999, "ctr.tag should be 999 after GC");
 
     let ctr_ptr = ctx.root_heap_ptr(8);
-    let items_ptr = unsafe { read_ptr(ctr_ptr, STRUCT_DATA_OFFSET + 8) };
+    let items_ptr = unsafe { read_ptr(ctr_ptr, 8usize) };
     let len = unsafe { read_u64(items_ptr, VEC_LENGTH_OFFSET) };
     assert_eq!(len, 3, "items vector should have 3 elements");
     let e0 = unsafe { read_u64(items_ptr, VEC_DATA_OFFSET) };
@@ -397,6 +397,6 @@ fn struct_borrow_survives_gc() {
     assert_eq!(ctx.gc_count(), 1);
 
     let entry_ptr = ctx.root_heap_ptr(8);
-    let key = unsafe { read_u64(entry_ptr, STRUCT_DATA_OFFSET) };
+    let key = unsafe { read_u64(entry_ptr, 0usize) };
     assert_eq!(key, 100, "entry.key should be 100 after GC");
 }
