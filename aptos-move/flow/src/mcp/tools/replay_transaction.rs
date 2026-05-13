@@ -9,24 +9,29 @@ use super::super::{
     session::{into_call_tool_result, FlowSession},
 };
 use rmcp::{
-    handler::server::wrapper::Parameters,
-    model::{CallToolResult, Content},
-    tool, tool_router,
+    handler::server::wrapper::Parameters, model::CallToolResult, tool, tool_router,
 };
 
+use aptos_cli_common::format_txn_status;
 use aptos_framework::{BuildOptions, BuiltPackage};
 use aptos_move_cli::source_locator::AptosSourceLocator;
 use aptos_move_cli::MoveDebugger;
 use aptos_move_debugger::aptos_debugger::AptosDebugger;
 use aptos_rest_client::{AptosBaseUrl, Client};
-use aptos_types::transaction::{ExecutionStatus, TransactionStatus};
+use aptos_types::transaction::{
+    ExecutionStatus, ReplayProtector, SignedTransaction, Transaction, TransactionOutput,
+    TransactionStatus,
+};
 use aptos_types::vm_status::AbortLocation;
 use aptos_validator_interface::LocalModuleOverrides;
+use aptos_vm::data_cache::AsMoveResolver;
 use move_core_types::account_address::AccountAddress;
+use move_core_types::vm_status::VMStatus;
 use rmcp::schemars;
 use std::collections::BTreeMap;
 use std::path::{Path, PathBuf};
 use std::str::FromStr;
+use std::sync::Arc;
 use url::Url;
 
 /// Parse the `network` parameter into a base URL. Accepts the well-known names
@@ -304,6 +309,44 @@ impl FlowSession {
     }
 }
 
+/// Construct the JSON response from the materialized transaction output and the
+/// raw VM status. Mirrors the fields the CLI Replay command surfaces, plus the
+/// structured abort/execution-failure details produced by our helpers.
+fn build_response(
+    txn: &SignedTransaction,
+    version: u64,
+    txn_output: TransactionOutput,
+    vm_status: &VMStatus,
+    local_override_in_use: bool,
+) -> ReplayResponse {
+    let status = txn_output.status();
+    let exec_status_opt = match status {
+        TransactionStatus::Keep(e) => Some(e),
+        TransactionStatus::Discard(_) | TransactionStatus::Retry => None,
+    };
+    let abort = exec_status_opt.and_then(abort_details_from);
+    let execution_failure = exec_status_opt.and_then(execution_failure_details_from);
+
+    let sequence_number = match txn.replay_protector() {
+        ReplayProtector::SequenceNumber(s) => Some(s),
+        ReplayProtector::Nonce(_) => None,
+    };
+
+    ReplayResponse {
+        success: success_from(status),
+        vm_status: format_txn_status(status, vm_status),
+        abort,
+        execution_failure,
+        transaction_hash: format!("{}", txn.committed_hash()),
+        version,
+        sender: txn.sender().to_hex_literal(),
+        sequence_number,
+        gas_used: txn_output.gas_used(),
+        gas_unit_price: txn.gas_unit_price(),
+        local_override_in_use,
+    }
+}
+
 impl FlowSession {
     async fn move_replay_transaction_impl(
         &self,
@@ -317,20 +360,106 @@ impl FlowSession {
         );
 
         // Validate inputs up front so errors are clear and cheap.
-        let _base = parse_network(&params.network).map_err(mcp_err)?;
+        parse_network(&params.network).map_err(mcp_err)?;
         let pkg_paths = validate_package_paths(&params.local_package_paths).map_err(mcp_err)?;
         let named = validate_named_addresses(&params.named_addresses).map_err(mcp_err)?;
 
         // Build the debugger up here so connection errors surface before we touch the VM.
-        let _debugger = build_debugger(&params.network, params.node_api_key.as_deref())
+        let debugger = build_debugger(&params.network, params.node_api_key.as_deref())
             .map_err(mcp_err)?;
 
-        // VM execution path is wired in Task 13.
-        let _ = (pkg_paths, named);
-        Err(rmcp::ErrorData::internal_error(
-            "replay execution not yet implemented",
-            None,
-        ))
+        // Fetch the transaction (async, network I/O).
+        let txn_id = params.txn_id;
+        let (txn, _txn_info, aux_info) = debugger
+            .get_committed_transaction_at_version(txn_id)
+            .await
+            .map_err(|e| mcp_err(format!("failed to fetch transaction {}: {}", txn_id, e)))?;
+
+        // Reject system transactions: only user transactions are supported here.
+        let user_txn = match txn {
+            Transaction::UserTransaction(t) => t,
+            other => {
+                let variant = match other {
+                    Transaction::GenesisTransaction(_) => "Genesis",
+                    Transaction::BlockMetadata(_) => "BlockMetadata",
+                    Transaction::BlockMetadataExt(_) => "BlockMetadataExt",
+                    Transaction::BlockEpilogue(_) => "BlockEpilogue",
+                    Transaction::StateCheckpoint(_) => "StateCheckpoint",
+                    Transaction::ValidatorTransaction(_) => "ValidatorTransaction",
+                    Transaction::UserTransaction(_) => unreachable!(),
+                };
+                return Err(mcp_err(format!(
+                    "transaction at version {} is a {} transaction; only user transactions are supported. \
+                     Use `aptos move replay` directly for system transactions.",
+                    txn_id, variant
+                )));
+            },
+        };
+        let hash = user_txn.committed_hash();
+
+        let local_override_in_use = !pkg_paths.is_empty();
+        let tool_timeout = self.tool_timeout();
+
+        // Offload VM execution (and any local-package compilation) to a blocking thread.
+        let result = tokio::time::timeout(
+            tool_timeout,
+            tokio::task::spawn_blocking(move || -> Result<ReplayResponse, String> {
+                let (vm_status, vm_output) = if local_override_in_use {
+                    let (overrides, locator) = build_local_overrides(&pkg_paths, &named)?;
+                    let overrides = Arc::new(overrides);
+                    let locator: Arc<dyn move_vm_runtime::source_locator::SourceLocator> =
+                        Arc::new(locator);
+                    aptos_move_cli::local_simulation::run_transaction_with_local_overrides(
+                        debugger.as_ref(),
+                        txn_id,
+                        user_txn.clone(),
+                        aux_info,
+                        overrides,
+                        Some(locator),
+                    )
+                    .map_err(|e| format!("VM execution failed: {}", e))?
+                } else {
+                    aptos_move_cli::local_simulation::run_transaction_using_debugger(
+                        debugger.as_ref(),
+                        txn_id,
+                        user_txn.clone(),
+                        hash,
+                        aux_info,
+                    )
+                    .map_err(|e| format!("VM execution failed: {}", e))?
+                };
+
+                // Materialize the VMOutput so we can read gas + status.
+                let state_view = debugger.state_view_at_version(txn_id);
+                let resolver = state_view.as_move_resolver();
+                let txn_output = vm_output
+                    .try_materialize_into_transaction_output(&resolver)
+                    .map_err(|e| format!("failed to materialize transaction output: {}", e))?;
+
+                Ok(build_response(
+                    &user_txn,
+                    txn_id,
+                    txn_output,
+                    &vm_status,
+                    local_override_in_use,
+                ))
+            }),
+        )
+        .await;
+
+        let response = match result {
+            Err(_) => {
+                return Err(mcp_err(format!(
+                    "tool timeout ({}s exceeded)",
+                    tool_timeout.as_secs()
+                )));
+            },
+            Ok(join_result) => join_result
+                .map_err(|e| mcp_err(format!("replay task error: {}", e)))?
+                .map_err(mcp_err)?,
+        };
+
+        Ok(into_call_tool_result(&response))
     }
 }
 
