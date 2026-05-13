@@ -3,10 +3,10 @@
 
 //! Tests for Move enum support (heap-allocated tagged unions).
 
-use mono_move_alloc::{ExecutableArena, ExecutableArenaPtr, GlobalArenaPtr};
+use mono_move_alloc::GlobalArenaPtr;
 use mono_move_core::{
-    CodeOffset as CO, FrameLayoutInfo, FrameOffset as FO, Function, LocalExecutionContext, MicroOp,
-    SortedSafePointEntries, ENUM_DATA_OFFSET, ENUM_TAG_OFFSET,
+    Code, CodeOffset as CO, FrameLayoutInfo, FrameOffset as FO, Function, LocalExecutionContext,
+    MicroOp, SortedSafePointEntries, ENUM_DATA_OFFSET, ENUM_TAG_OFFSET,
 };
 use mono_move_runtime::{
     read_ptr, read_u64, InterpreterContext, ObjectDescriptor, ObjectDescriptorTable,
@@ -25,14 +25,12 @@ fn enum_basic() {
     let shape: u32 = 8;
     let tmp: u32 = 16;
 
-    let arena = ExecutableArena::new();
-
     let mut descriptors = ObjectDescriptorTable::new();
     let desc_shape_enum =
         descriptors.push(ObjectDescriptor::new_enum(24, vec![vec![], vec![]]).unwrap());
 
     #[rustfmt::skip]
-    let code = arena.alloc_slice_fill_iter([
+    let code = vec![
         HeapNew { dst: FO(shape), descriptor_id: desc_shape_enum },
         MicroOp::enum_set_tag(FO(shape), 1),
         StoreImm8 { dst: FO(tmp), imm: 3 },
@@ -45,23 +43,20 @@ fn enum_basic() {
         MicroOp::enum_load8(FO(shape), 8, FO(tmp)),
         AddU64 { dst: FO(result), lhs: FO(result), rhs: FO(tmp) },
         Return,
-    ]);
-    let functions = [arena.alloc(Function {
+    ];
+    let functions = [Function {
         name: GlobalArenaPtr::from_static("test"),
-        code,
-        param_sizes: ExecutableArenaPtr::empty_slice(),
+        code: Code::from_vec(code),
+        param_sizes: vec![],
         param_sizes_sum: 0,
         param_and_local_sizes_sum: 24,
         extended_frame_size: 48,
         zero_frame: true,
-        frame_layout: FrameLayoutInfo::new(&arena, [FO(shape)]),
+        frame_layout: FrameLayoutInfo::new(vec![FO(shape)]),
         safe_point_layouts: SortedSafePointEntries::empty(),
-    })];
-
+    }];
     let mut exec_ctx = LocalExecutionContext::with_max_budget();
-    let mut ctx = InterpreterContext::new(&mut exec_ctx, &descriptors, unsafe {
-        functions[0].as_ref_unchecked()
-    });
+    let mut ctx = InterpreterContext::new(&mut exec_ctx, &descriptors, &functions[0]);
     ctx.run().unwrap();
 
     assert_eq!(ctx.root_result(), 7, "result should be 3 + 4 = 7");
@@ -87,14 +82,12 @@ fn enum_survives_gc() {
     let shape: u32 = 8;
     let tmp: u32 = 16;
 
-    let arena = ExecutableArena::new();
-
     let mut descriptors = ObjectDescriptorTable::new();
     let desc_shape_enum =
         descriptors.push(ObjectDescriptor::new_enum(24, vec![vec![], vec![]]).unwrap());
 
     #[rustfmt::skip]
-    let code = arena.alloc_slice_fill_iter([
+    let code = vec![
         HeapNew { dst: FO(shape), descriptor_id: desc_shape_enum },
         MicroOp::enum_set_tag(FO(shape), 0),
         StoreImm8 { dst: FO(tmp), imm: 42 },
@@ -104,23 +97,20 @@ fn enum_survives_gc() {
         MicroOp::enum_load8(FO(shape), 0, FO(tmp)),
         AddU64 { dst: FO(result), lhs: FO(result), rhs: FO(tmp) },
         Return,
-    ]);
-    let functions = [arena.alloc(Function {
+    ];
+    let functions = [Function {
         name: GlobalArenaPtr::from_static("test"),
-        code,
-        param_sizes: ExecutableArenaPtr::empty_slice(),
+        code: Code::from_vec(code),
+        param_sizes: vec![],
         param_sizes_sum: 0,
         param_and_local_sizes_sum: 24,
         extended_frame_size: 48,
         zero_frame: true,
-        frame_layout: FrameLayoutInfo::new(&arena, [FO(shape)]),
+        frame_layout: FrameLayoutInfo::new(vec![FO(shape)]),
         safe_point_layouts: SortedSafePointEntries::empty(),
-    })];
-
+    }];
     let mut exec_ctx = LocalExecutionContext::with_max_budget();
-    let mut ctx = InterpreterContext::new(&mut exec_ctx, &descriptors, unsafe {
-        functions[0].as_ref_unchecked()
-    });
+    let mut ctx = InterpreterContext::new(&mut exec_ctx, &descriptors, &functions[0]);
     ctx.run().unwrap();
 
     assert_eq!(
@@ -145,15 +135,13 @@ fn enum_gc_traces_refs() {
     let tmp: u32 = 24;
     let vec_ref: u32 = 32;
 
-    let arena = ExecutableArena::new();
-
     let mut descriptors = ObjectDescriptorTable::new();
     let desc_val_enum =
         descriptors.push(ObjectDescriptor::new_enum(16, vec![vec![], vec![0]]).unwrap());
     let desc_vec_u64 = descriptors.push(ObjectDescriptor::new_vector(8, vec![]).unwrap());
 
     #[rustfmt::skip]
-    let code = arena.alloc_slice_fill_iter([
+    let code = vec![
         VecNew { dst: FO(vec) },
         SlotBorrow { dst: FO(vec_ref), local: FO(vec) },
         StoreImm8 { dst: FO(tmp), imm: 10 },
@@ -171,23 +159,20 @@ fn enum_gc_traces_refs() {
         StoreImm8 { dst: FO(tmp), imm: 0 },
         VecLoadElem { dst: FO(result), vec_ref: FO(vec_ref), idx: FO(tmp), elem_size: 8 },
         Return,
-    ]);
-    let functions = [arena.alloc(Function {
+    ];
+    let functions = [Function {
         name: GlobalArenaPtr::from_static("test"),
-        code,
-        param_sizes: ExecutableArenaPtr::empty_slice(),
+        code: Code::from_vec(code),
+        param_sizes: vec![],
         param_sizes_sum: 0,
         param_and_local_sizes_sum: 48,
         extended_frame_size: 72,
         zero_frame: true,
-        frame_layout: FrameLayoutInfo::new(&arena, [FO(val), FO(vec), FO(vec_ref)]),
+        frame_layout: FrameLayoutInfo::new(vec![FO(val), FO(vec), FO(vec_ref)]),
         safe_point_layouts: SortedSafePointEntries::empty(),
-    })];
-
+    }];
     let mut exec_ctx = LocalExecutionContext::with_max_budget();
-    let mut ctx = InterpreterContext::new(&mut exec_ctx, &descriptors, unsafe {
-        functions[0].as_ref_unchecked()
-    });
+    let mut ctx = InterpreterContext::new(&mut exec_ctx, &descriptors, &functions[0]);
     ctx.run().unwrap();
 
     assert_eq!(ctx.root_result(), 10, "vec[0] should be 10 after GC");
@@ -219,14 +204,12 @@ fn enum_pattern_match() {
     let op: u32 = 8;
     let tmp: u32 = 16;
 
-    let arena = ExecutableArena::new();
-
     let mut descriptors = ObjectDescriptorTable::new();
     let desc_op_enum =
         descriptors.push(ObjectDescriptor::new_enum(24, vec![vec![], vec![]]).unwrap());
 
     #[rustfmt::skip]
-    let code = arena.alloc_slice_fill_iter([
+    let code = vec![
         HeapNew { dst: FO(op), descriptor_id: desc_op_enum },
         MicroOp::enum_set_tag(FO(op), 0),
         StoreImm8 { dst: FO(tmp), imm: 10 },
@@ -241,23 +224,20 @@ fn enum_pattern_match() {
         Return,
         StoreImm8 { dst: FO(result), imm: 0 },
         Return,
-    ]);
-    let functions = [arena.alloc(Function {
+    ];
+    let functions = [Function {
         name: GlobalArenaPtr::from_static("test"),
-        code,
-        param_sizes: ExecutableArenaPtr::empty_slice(),
+        code: Code::from_vec(code),
+        param_sizes: vec![],
         param_sizes_sum: 0,
         param_and_local_sizes_sum: 24,
         extended_frame_size: 48,
         zero_frame: true,
-        frame_layout: FrameLayoutInfo::new(&arena, [FO(op)]),
+        frame_layout: FrameLayoutInfo::new(vec![FO(op)]),
         safe_point_layouts: SortedSafePointEntries::empty(),
-    })];
-
+    }];
     let mut exec_ctx = LocalExecutionContext::with_max_budget();
-    let mut ctx = InterpreterContext::new(&mut exec_ctx, &descriptors, unsafe {
-        functions[0].as_ref_unchecked()
-    });
+    let mut ctx = InterpreterContext::new(&mut exec_ctx, &descriptors, &functions[0]);
     ctx.run().unwrap();
 
     assert_eq!(ctx.root_result(), 35, "result should be 10 + 25 = 35");
@@ -275,14 +255,12 @@ fn enum_variant_switch() {
     let e: u32 = 8;
     let tmp: u32 = 16;
 
-    let arena = ExecutableArena::new();
-
     let mut descriptors = ObjectDescriptorTable::new();
     let desc_e_enum =
         descriptors.push(ObjectDescriptor::new_enum(16, vec![vec![], vec![]]).unwrap());
 
     #[rustfmt::skip]
-    let code = arena.alloc_slice_fill_iter([
+    let code = vec![
         HeapNew { dst: FO(e), descriptor_id: desc_e_enum },
         MicroOp::enum_set_tag(FO(e), 0),
         StoreImm8 { dst: FO(tmp), imm: 111 },
@@ -295,23 +273,20 @@ fn enum_variant_switch() {
         MicroOp::enum_load8(FO(e), 0, FO(tmp)),
         AddU64 { dst: FO(result), lhs: FO(result), rhs: FO(tmp) },
         Return,
-    ]);
-    let functions = [arena.alloc(Function {
+    ];
+    let functions = [Function {
         name: GlobalArenaPtr::from_static("test"),
-        code,
-        param_sizes: ExecutableArenaPtr::empty_slice(),
+        code: Code::from_vec(code),
+        param_sizes: vec![],
         param_sizes_sum: 0,
         param_and_local_sizes_sum: 24,
         extended_frame_size: 48,
         zero_frame: true,
-        frame_layout: FrameLayoutInfo::new(&arena, [FO(e)]),
+        frame_layout: FrameLayoutInfo::new(vec![FO(e)]),
         safe_point_layouts: SortedSafePointEntries::empty(),
-    })];
-
+    }];
     let mut exec_ctx = LocalExecutionContext::with_max_budget();
-    let mut ctx = InterpreterContext::new(&mut exec_ctx, &descriptors, unsafe {
-        functions[0].as_ref_unchecked()
-    });
+    let mut ctx = InterpreterContext::new(&mut exec_ctx, &descriptors, &functions[0]);
     ctx.run().unwrap();
 
     assert_eq!(ctx.root_result(), 223, "result should be 1 + 222 = 223");
@@ -330,14 +305,12 @@ fn enum_borrow_field() {
     let r#ref: u32 = 16;
     let e_ref: u32 = 32; // 16-byte fat pointer ref to e (for enum_borrow)
 
-    let arena = ExecutableArena::new();
-
     let mut descriptors = ObjectDescriptorTable::new();
     let desc_e_enum =
         descriptors.push(ObjectDescriptor::new_enum(24, vec![vec![], vec![]]).unwrap());
 
     #[rustfmt::skip]
-    let code = arena.alloc_slice_fill_iter([
+    let code = vec![
         HeapNew { dst: FO(e), descriptor_id: desc_e_enum },
         MicroOp::enum_set_tag(FO(e), 0),
         StoreImm8 { dst: FO(result), imm: 10 },
@@ -351,23 +324,20 @@ fn enum_borrow_field() {
         WriteRef { ref_ptr: FO(r#ref), src: FO(result), size: 8 },
         MicroOp::enum_load8(FO(e), 8, FO(result)),
         Return,
-    ]);
-    let functions = [arena.alloc(Function {
+    ];
+    let functions = [Function {
         name: GlobalArenaPtr::from_static("test"),
-        code,
-        param_sizes: ExecutableArenaPtr::empty_slice(),
+        code: Code::from_vec(code),
+        param_sizes: vec![],
         param_sizes_sum: 0,
         param_and_local_sizes_sum: 48,
         extended_frame_size: 72,
         zero_frame: true,
-        frame_layout: FrameLayoutInfo::new(&arena, [FO(e), FO(r#ref), FO(e_ref)]),
+        frame_layout: FrameLayoutInfo::new(vec![FO(e), FO(r#ref), FO(e_ref)]),
         safe_point_layouts: SortedSafePointEntries::empty(),
-    })];
-
+    }];
     let mut exec_ctx = LocalExecutionContext::with_max_budget();
-    let mut ctx = InterpreterContext::new(&mut exec_ctx, &descriptors, unsafe {
-        functions[0].as_ref_unchecked()
-    });
+    let mut ctx = InterpreterContext::new(&mut exec_ctx, &descriptors, &functions[0]);
     ctx.run().unwrap();
 
     assert_eq!(ctx.root_result(), 99, "field_b should be 99 after WriteRef");
@@ -387,15 +357,13 @@ fn enum_gc_variant_switching() {
     let tmp: u32 = 24;
     let vec_ref: u32 = 32;
 
-    let arena = ExecutableArena::new();
-
     let mut descriptors = ObjectDescriptorTable::new();
     let desc_ctr_enum =
         descriptors.push(ObjectDescriptor::new_enum(16, vec![vec![], vec![0]]).unwrap());
     let desc_vec_u64 = descriptors.push(ObjectDescriptor::new_vector(8, vec![]).unwrap());
 
     #[rustfmt::skip]
-    let code = arena.alloc_slice_fill_iter([
+    let code = vec![
         VecNew { dst: FO(vec) },
         SlotBorrow { dst: FO(vec_ref), local: FO(vec) },
         StoreImm8 { dst: FO(tmp), imm: 100 },
@@ -413,23 +381,20 @@ fn enum_gc_variant_switching() {
         ForceGC,
         MicroOp::enum_get_tag(FO(ctr), FO(result)),
         Return,
-    ]);
-    let functions = [arena.alloc(Function {
+    ];
+    let functions = [Function {
         name: GlobalArenaPtr::from_static("test"),
-        code,
-        param_sizes: ExecutableArenaPtr::empty_slice(),
+        code: Code::from_vec(code),
+        param_sizes: vec![],
         param_sizes_sum: 0,
         param_and_local_sizes_sum: 48,
         extended_frame_size: 72,
         zero_frame: true,
-        frame_layout: FrameLayoutInfo::new(&arena, [FO(ctr), FO(vec), FO(vec_ref)]),
+        frame_layout: FrameLayoutInfo::new(vec![FO(ctr), FO(vec), FO(vec_ref)]),
         safe_point_layouts: SortedSafePointEntries::empty(),
-    })];
-
+    }];
     let mut exec_ctx = LocalExecutionContext::with_max_budget();
-    let mut ctx = InterpreterContext::new(&mut exec_ctx, &descriptors, unsafe {
-        functions[0].as_ref_unchecked()
-    });
+    let mut ctx = InterpreterContext::new(&mut exec_ctx, &descriptors, &functions[0]);
     ctx.run().unwrap();
 
     assert_eq!(
@@ -453,15 +418,13 @@ fn enum_in_struct() {
     let payload: u32 = 16;
     let tmp: u32 = 24;
 
-    let arena = ExecutableArena::new();
-
     let mut descriptors = ObjectDescriptorTable::new();
     let desc_wrapper_struct = descriptors.push(ObjectDescriptor::new_struct(16, vec![8]).unwrap());
     let desc_payload_enum =
         descriptors.push(ObjectDescriptor::new_enum(16, vec![vec![], vec![]]).unwrap());
 
     #[rustfmt::skip]
-    let code = arena.alloc_slice_fill_iter([
+    let code = vec![
         HeapNew { dst: FO(payload), descriptor_id: desc_payload_enum },
         MicroOp::enum_set_tag(FO(payload), 1),
         StoreImm8 { dst: FO(tmp), imm: 42 },
@@ -477,23 +440,20 @@ fn enum_in_struct() {
         MicroOp::enum_load8(FO(payload), 0, FO(tmp)),
         AddU64 { dst: FO(result), lhs: FO(result), rhs: FO(tmp) },
         Return,
-    ]);
-    let functions = [arena.alloc(Function {
+    ];
+    let functions = [Function {
         name: GlobalArenaPtr::from_static("test"),
-        code,
-        param_sizes: ExecutableArenaPtr::empty_slice(),
+        code: Code::from_vec(code),
+        param_sizes: vec![],
         param_sizes_sum: 0,
         param_and_local_sizes_sum: 32,
         extended_frame_size: 56,
         zero_frame: true,
-        frame_layout: FrameLayoutInfo::new(&arena, [FO(wrapper), FO(payload)]),
+        frame_layout: FrameLayoutInfo::new(vec![FO(wrapper), FO(payload)]),
         safe_point_layouts: SortedSafePointEntries::empty(),
-    })];
-
+    }];
     let mut exec_ctx = LocalExecutionContext::with_max_budget();
-    let mut ctx = InterpreterContext::new(&mut exec_ctx, &descriptors, unsafe {
-        functions[0].as_ref_unchecked()
-    });
+    let mut ctx = InterpreterContext::new(&mut exec_ctx, &descriptors, &functions[0]);
     ctx.run().unwrap();
 
     assert_eq!(
@@ -518,15 +478,13 @@ fn enum_in_vector() {
     let tmp: u32 = 24;
     let vec_ref: u32 = 32;
 
-    let arena = ExecutableArena::new();
-
     let mut descriptors = ObjectDescriptorTable::new();
     let desc_e_enum =
         descriptors.push(ObjectDescriptor::new_enum(24, vec![vec![], vec![]]).unwrap());
     let desc_vec_enum_ptrs = descriptors.push(ObjectDescriptor::new_vector(8, vec![0]).unwrap());
 
     #[rustfmt::skip]
-    let code = arena.alloc_slice_fill_iter([
+    let code = vec![
         VecNew { dst: FO(vec) },
         SlotBorrow { dst: FO(vec_ref), local: FO(vec) },
         HeapNew { dst: FO(e), descriptor_id: desc_e_enum },
@@ -552,23 +510,20 @@ fn enum_in_vector() {
         MicroOp::enum_load8(FO(e), 8, FO(tmp)),
         AddU64 { dst: FO(result), lhs: FO(result), rhs: FO(tmp) },
         Return,
-    ]);
-    let functions = [arena.alloc(Function {
+    ];
+    let functions = [Function {
         name: GlobalArenaPtr::from_static("test"),
-        code,
-        param_sizes: ExecutableArenaPtr::empty_slice(),
+        code: Code::from_vec(code),
+        param_sizes: vec![],
         param_sizes_sum: 0,
         param_and_local_sizes_sum: 48,
         extended_frame_size: 72,
         zero_frame: true,
-        frame_layout: FrameLayoutInfo::new(&arena, [FO(vec), FO(e), FO(vec_ref)]),
+        frame_layout: FrameLayoutInfo::new(vec![FO(vec), FO(e), FO(vec_ref)]),
         safe_point_layouts: SortedSafePointEntries::empty(),
-    })];
-
+    }];
     let mut exec_ctx = LocalExecutionContext::with_max_budget();
-    let mut ctx = InterpreterContext::new(&mut exec_ctx, &descriptors, unsafe {
-        functions[0].as_ref_unchecked()
-    });
+    let mut ctx = InterpreterContext::new(&mut exec_ctx, &descriptors, &functions[0]);
     ctx.run().unwrap();
 
     assert_eq!(

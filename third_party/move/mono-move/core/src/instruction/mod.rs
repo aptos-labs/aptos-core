@@ -16,8 +16,7 @@
 //!
 //! - **Fixed-size micro-ops**: each [`MicroOp`] variant should fit in a fixed
 //!   number of bytes so side-tables (e.g. source maps, gas tables) can be
-//!   indexed by program counter without indirection. Current size is 24 bytes;
-//!   we should aim to bring this down to 16.
+//!   indexed by program counter without indirection.
 //!
 //! - **Variable-size frame slots**: frame slots are variable-sized. Each
 //!   micro-op makes the width explicit — either baked into the opcode name
@@ -46,10 +45,9 @@
 //!   ```
 //!
 //!   **Call**: the compiler emits explicit micro-ops to place arguments
-//!   into the callee's parameter region. The `CallFunc`/`CallIndirect`/`CallDirect`
-//!   instruction itself implicitly writes the metadata `(pc, fp,
-//!   func_ptr)` at the end of the caller frame and sets `fp` to the
-//!   callee frame.
+//!   into the callee's parameter region. Call instructions ([`CallIndirect`],
+//!   [`CallDirect`]) implicitly write the metadata `(pc, fp, func_ptr)` at
+//!   the end of the caller frame and sets `fp` to the callee frame.
 //!   **Return**: the compiler emits explicit micro-ops to write return
 //!   values at the start of the callee's frame (potentially overwriting
 //!   parameter slots). The `Return` instruction itself implicitly restores
@@ -115,8 +113,12 @@
 //!   `elem_ptr_offsets` lists byte offsets *within each element* that hold
 //!   heap pointers.
 
-use crate::{ExecutableId, Function};
-use mono_move_alloc::{ExecutableArenaPtr, GlobalArenaPtr};
+use crate::{
+    align::MAX_ALIGN,
+    interner::{InternedIdentifier, InternedModuleId},
+    types::{display_type_list, InternedTypeList},
+    FunctionPtr,
+};
 use std::fmt;
 
 // Submodules for instruction.
@@ -193,20 +195,35 @@ pub struct SizedSlot {
 /// Conceptually an enum. The concrete in-memory representation of this enum
 /// (tag size, padding, payload layout) inside closure heap objects is given
 /// by [`CLOSURE_FUNC_REF_SIZE`] and associated constants.
-#[derive(Clone, Debug)]
+#[derive(Clone)]
 pub enum ClosureFuncRef {
     /// Local function, already monomorphized and materialized.
-    Resolved(ExecutableArenaPtr<Function>),
+    Resolved(FunctionPtr),
     // `Unresolved { ... }` — cross-module form, TBD. Resolved lazily at call
     // time. Its payload will mirror whatever representation cross-module
     // calls end up using.
+}
+
+impl fmt::Display for ClosureFuncRef {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            ClosureFuncRef::Resolved(ptr) => {
+                // SAFETY: Micro-ops are currently displayed only during execution
+                // when the guard is held.
+                // TODO: Have a safe display impl that takes guard.
+                let func = unsafe { ptr.as_ref_unchecked() };
+                let func_name = unsafe { func.name.as_ref_unchecked() };
+                write!(f, "Resolved({})", func_name)
+            },
+        }
+    }
 }
 
 /// Operand data for [`MicroOp::PackClosure`].
 ///
 /// Boxed so the micro-op enum stays small despite the variable-length
 /// `captured` list.
-#[derive(Clone, Debug)]
+#[derive(Clone)]
 pub struct PackClosureOp {
     /// Frame slot that receives the heap pointer to the closure object.
     pub dst: FrameOffset,
@@ -238,7 +255,7 @@ pub struct CallClosureOp {
     pub provided_args: Vec<SizedSlot>,
 }
 
-#[derive(Clone, Debug)]
+#[derive(Clone)]
 pub enum MicroOp {
     //======================================================================
     // Data movement
@@ -388,13 +405,10 @@ pub enum MicroOp {
 
     // --- Shifts ---
     //
-    // TODO: in old Move bytecode the shift amount is a u8, not a u64. We
-    // currently model `rhs` as a full 8-byte slot to match the rest of
-    // the slot ABI; the value living there is zero-extended from a u8 by
-    // the lowerer. Reconsider whether `rhs` (and the imm field of the
-    // imm-form ops) should be narrower once the slot-alignment story is
-    // sorted out — affects destack, lowering, and slot allocation.
-    /// `dst = lhs << rhs` (u64). Aborts if `rhs >= 64`.
+    // The shift amount is a u8 (matching Move bytecode, where the rhs of
+    // `Shl`/`Shr` is always u8). For the reg-reg forms, `rhs` is the offset
+    // of a 1-byte slot; the interpreter reads exactly one byte from it.
+    /// `dst = lhs << rhs` (u64). `rhs` is a 1-byte slot. Aborts if `rhs >= 64`.
     ShlU64 {
         dst: FrameOffset,
         lhs: FrameOffset,
@@ -405,10 +419,11 @@ pub enum MicroOp {
     ShlU64Imm {
         dst: FrameOffset,
         src: FrameOffset,
-        imm: u64,
+        imm: u8,
     },
 
-    /// `dst = lhs >> rhs` (u64, logical right shift). Aborts if `rhs >= 64`.
+    /// `dst = lhs >> rhs` (u64, logical right shift). `rhs` is a 1-byte slot.
+    /// Aborts if `rhs >= 64`.
     ShrU64 {
         dst: FrameOffset,
         lhs: FrameOffset,
@@ -419,7 +434,7 @@ pub enum MicroOp {
     ShrU64Imm {
         dst: FrameOffset,
         src: FrameOffset,
-        imm: u64,
+        imm: u8,
     },
 
     //======================================================================
@@ -437,23 +452,23 @@ pub enum MicroOp {
     // - more conditions: ==, !=, >, <=, and const variants,
     // - something for enum dispatch (jump table)?
     //======================================================================
-    /// Call function `func_id`. The compiler has already emitted micro-ops
-    /// to place arguments into the callee's parameter region. This instruction
-    /// implicitly writes the metadata `(pc, fp, func_ptr)` at
+    /// Call a function by module identity and name. The specializer has already
+    /// emitted micro-ops to place arguments into the callee's parameter region.
+    /// This instruction implicitly writes the metadata `(pc, fp, func_ptr)` at
     /// `current_fp + param_and_local_sizes_sum` and sets `fp` to
     /// `current_fp + param_and_local_sizes_sum + FRAME_METADATA_SIZE`.
-    CallFunc { func_id: u32 },
-
-    /// Call a function by module identity and name. Same calling convention
-    /// as `CallFunc`.
     CallIndirect {
-        executable_id: GlobalArenaPtr<ExecutableId>,
-        func_name: GlobalArenaPtr<str>,
+        module_id: InternedModuleId,
+        func_name: InternedIdentifier,
+        ty_args: InternedTypeList,
     },
 
     /// Call a function via direct pointer. Same calling convention as
-    /// `CallFunc`.
-    CallDirect { ptr: ExecutableArenaPtr<Function> },
+    /// `CallIndirect`.
+    // TODO: Currently dead code — the specializer never emits this. A follow-up
+    // pass should patch same-module `CallIndirect` sites to `CallDirect` once
+    // the target is known to live in the same module.
+    CallDirect { ptr: FunctionPtr },
 
     /// Return from the current function call. The compiler has already
     /// emitted micro-ops to write return values at the start of the
@@ -851,14 +866,33 @@ impl fmt::Display for MicroOp {
             MicroOp::ShrU64Imm { dst, src, imm } => {
                 write!(f, "ShrU64Imm [{}] <- [{}] >> #{}", dst.0, src.0, imm)
             },
-            MicroOp::CallFunc { func_id } => {
-                write!(f, "CallFunc #{}", func_id)
+            MicroOp::CallIndirect {
+                module_id,
+                func_name,
+                ty_args,
+            } => {
+                // SAFETY: Micro-ops are currently displayed only during execution
+                // when the guard is held.
+                // TODO: Have a safe display impl that takes guard.
+                let module_id = unsafe { module_id.as_ref_unchecked() };
+                let addr = module_id.address().short_str_lossless();
+                let module_name = unsafe { module_id.name().as_ref_unchecked() };
+                let func_name = unsafe { func_name.as_ref_unchecked() };
+                write!(f, "CallIndirect 0x{}::{}::{}", addr, module_name, func_name)?;
+                if !ty_args.is_empty() {
+                    write!(f, "<")?;
+                    display_type_list(f, *ty_args)?;
+                    write!(f, ">")?;
+                }
+                Ok(())
             },
-            MicroOp::CallIndirect { .. } => {
-                write!(f, "CallIndirect")
-            },
-            MicroOp::CallDirect { .. } => {
-                write!(f, "CallDirect")
+            MicroOp::CallDirect { ptr } => {
+                // SAFETY: Micro-ops are currently displayed only during execution
+                // when the guard is held.
+                // TODO: Have a safe display impl that takes guard.
+                let func = unsafe { ptr.as_ref_unchecked() };
+                let func_name = unsafe { func.name.as_ref_unchecked() };
+                write!(f, "CallDirect {}", func_name)
             },
             MicroOp::Return => {
                 write!(f, "Return")
@@ -1055,7 +1089,7 @@ impl fmt::Display for MicroOp {
             MicroOp::PackClosure(op) => {
                 write!(
                     f,
-                    "PackClosure [{}] <- func_ref={:?}, mask={:b}, captured_desc=",
+                    "PackClosure [{}] <- func_ref={}, mask={:b}, captured_desc=",
                     op.dst.0, op.func_ref, op.mask
                 )?;
                 match op.captured_data_descriptor_id {
@@ -1093,50 +1127,48 @@ impl fmt::Display for MicroOp {
 // Constructor helpers for the re-compiler
 // ---------------------------------------------------------------------------
 
-/// Maximum alignment used by any value or VM-internal layout. Bounds the
-/// alignment of region bases, the frame pointer, the bump pointer, and
-/// the padding rounded into per-object `size` fields and frame segments.
-///
-/// Must be a power of two, at least 8 (the heap object header is 8 bytes,
-/// and the 24-byte frame metadata block needs 8-byte granularity), and a
-/// multiple of every alignment used by any value or VM-internal layout
-/// (the third constraint is implied by the first two as long as every
-/// such alignment is a power of two ≤ [`MAX_ALIGN`]).
-pub const MAX_ALIGN: usize = 8;
-
-const _: () = {
-    assert!(MAX_ALIGN.is_power_of_two());
-    assert!(MAX_ALIGN >= 8);
-};
-
-/// Round `size` up to the next multiple of [`MAX_ALIGN`].
-#[inline(always)]
-pub const fn align_max(size: usize) -> usize {
-    (size + (MAX_ALIGN - 1)) & !(MAX_ALIGN - 1)
-}
-
 /// Size of the per-frame metadata section: `(saved_pc, saved_fp, func_id)`.
 pub const FRAME_METADATA_SIZE: usize = 24;
 
-/// Size of the object header: [descriptor_id: u32 | size_in_bytes: u32].
-pub const OBJECT_HEADER_SIZE: usize = 8;
+/// Allocation overhead per heap object — the number of bytes the bump
+/// allocator reserves *before* the data region for the
+/// `[descriptor_id: u32 | size_in_bytes: u32]` header. The header pair
+/// always sits in the last 8 bytes of this reservation (at `obj_ptr - 8`
+/// and `obj_ptr - 4`); any additional bytes are padding so the data start
+/// remains [`MAX_ALIGN`]-aligned.
+///
+/// Tying `OBJECT_HEADER_SIZE` to [`MAX_ALIGN`] is what keeps both
+/// invariants (header-aligned, data-aligned) automatic as [`MAX_ALIGN`]
+/// grows: a future bump to 16 expands the reservation without changing
+/// any per-type layout constant below.
+pub const OBJECT_HEADER_SIZE: usize = MAX_ALIGN;
 
-/// Offset where struct field data begins (same as OBJECT_HEADER_SIZE).
-pub const STRUCT_DATA_OFFSET: usize = OBJECT_HEADER_SIZE; // 8
+const _: () = {
+    // The header pair (`desc_id: u32 + size: u32`) needs the last 8 bytes
+    // of the reservation. Cannot be less.
+    assert!(OBJECT_HEADER_SIZE >= 8);
+    // Data start = header start + OBJECT_HEADER_SIZE; needs to land on a
+    // `MAX_ALIGN` boundary.
+    assert!(OBJECT_HEADER_SIZE.is_multiple_of(MAX_ALIGN));
+};
 
 /// Offset of the variant tag (u64) within an enum object.
-pub const ENUM_TAG_OFFSET: usize = OBJECT_HEADER_SIZE; // 8
+pub const ENUM_TAG_OFFSET: usize = 0;
 
-/// Offset where enum variant field data begins (after header + tag).
-pub const ENUM_DATA_OFFSET: usize = OBJECT_HEADER_SIZE + 8; // 16
+/// Offset where enum variant field data begins (after the tag).
+pub const ENUM_DATA_OFFSET: usize = 8;
 
 // ---------------------------------------------------------------------------
 // Closure object layout
 // ---------------------------------------------------------------------------
 //
-// Closure object (heap-allocated, fixed size):
+// Closure object (heap-allocated, fixed data-region size):
 //
-//   [header(8)] [func_ref(16)] [mask(8)] [captured_data_ptr(8)]  = 40 bytes
+//   [func_ref(16)] [mask(8)] [captured_data_ptr(8)]  = 32 bytes
+//
+// Offsets below are relative to the data start (the object pointer). The
+// 8-byte header lives at `obj_ptr - 8`; allocator bookkeeping is hidden
+// from per-type layouts.
 //
 // `func_ref` is an inline `ClosureFuncRef` enum. Reserved as 16 bytes to
 // leave room for a future `Unresolved` variant; v0 uses only `Resolved`:
@@ -1151,18 +1183,18 @@ pub const ENUM_DATA_OFFSET: usize = OBJECT_HEADER_SIZE + 8; // 16
 /// changes.
 pub const CLOSURE_FUNC_REF_SIZE: usize = 16;
 
-/// Offset of the `func_ref` field within a closure heap object (after header).
-pub const CLOSURE_FUNC_REF_OFFSET: usize = OBJECT_HEADER_SIZE; // 8
+/// Offset of the `func_ref` field within a closure heap object's data region.
+pub const CLOSURE_FUNC_REF_OFFSET: usize = 0;
 
 /// Offset of the `mask` field within a closure heap object.
-pub const CLOSURE_MASK_OFFSET: usize = CLOSURE_FUNC_REF_OFFSET + CLOSURE_FUNC_REF_SIZE; // 24
+pub const CLOSURE_MASK_OFFSET: usize = CLOSURE_FUNC_REF_OFFSET + CLOSURE_FUNC_REF_SIZE; // 16
 
 /// Offset of the `captured_data_ptr` field within a closure heap object.
 /// The GC traces this slot (heap pointer to the `ClosureCapturedData` object).
-pub const CLOSURE_CAPTURED_DATA_PTR_OFFSET: usize = CLOSURE_MASK_OFFSET + 8; // 32
+pub const CLOSURE_CAPTURED_DATA_PTR_OFFSET: usize = CLOSURE_MASK_OFFSET + 8; // 24
 
-/// Total size of a closure heap object (header + payload).
-pub const CLOSURE_OBJECT_SIZE: usize = CLOSURE_CAPTURED_DATA_PTR_OFFSET + 8; // 40
+/// Size of a closure heap object's data region (the header is separate).
+pub const CLOSURE_DATA_SIZE: usize = CLOSURE_CAPTURED_DATA_PTR_OFFSET + 8; // 32
 
 // Offsets within the `func_ref` region.
 /// Byte offset of the tag within `func_ref`.
@@ -1178,7 +1210,10 @@ pub const FUNC_REF_TAG_RESOLVED: u8 = 0;
 // ClosureCapturedData object layout (Materialized)
 // ---------------------------------------------------------------------------
 //
-//   [header(8)] [tag(1)] [padding(7)] [captured values packed in param order]
+//   Data region: [tag(1)] [padding(7)] [captured values packed in param order]
+//
+// Offsets below are relative to the data start (the object pointer). The
+// 8-byte header lives at `obj_ptr - 8`.
 //
 // Captured values are packed tightly, in the order of their parameter
 // positions (i.e. ascending `i` where `mask.is_captured(i)` is true).
@@ -1186,23 +1221,28 @@ pub const FUNC_REF_TAG_RESOLVED: u8 = 0;
 // read from the target function's `param_sizes` at call time.
 
 /// Byte offset of the tag (u8) within a `ClosureCapturedData` heap object.
-pub const CAPTURED_DATA_TAG_OFFSET: usize = OBJECT_HEADER_SIZE; // 8
+pub const CAPTURED_DATA_TAG_OFFSET: usize = 0;
 
-/// Byte offset where captured values begin (after header + tag + padding).
-pub const CAPTURED_DATA_VALUES_OFFSET: usize = OBJECT_HEADER_SIZE + 8; // 16
+/// Byte offset where captured values begin (after tag + padding).
+pub const CAPTURED_DATA_VALUES_OFFSET: usize = 8;
 
 /// `ClosureCapturedData::Materialized` tag value.
 pub const CAPTURED_DATA_TAG_MATERIALIZED: u8 = 0;
 // Future: `CAPTURED_DATA_TAG_RAW: u8 = 1`
 
 impl MicroOp {
-    // ----- Struct helpers (offsets relative to STRUCT_DATA_OFFSET) -----
+    // ----- Struct helpers -----
+    //
+    // Field offsets are byte offsets within the struct's data region, which
+    // is exactly what each Heap* op's `offset` field already names — the
+    // header lives at a negative offset and is invisible to per-type
+    // layouts.
 
     pub fn struct_load8(heap_ptr: FrameOffset, field_offset: u32, dst: FrameOffset) -> Self {
         MicroOp::HeapMoveFrom8 {
             dst,
             heap_ptr,
-            offset: STRUCT_DATA_OFFSET as u32 + field_offset,
+            offset: field_offset,
         }
     }
 
@@ -1215,7 +1255,7 @@ impl MicroOp {
         MicroOp::HeapMoveFrom {
             dst,
             heap_ptr,
-            offset: STRUCT_DATA_OFFSET as u32 + field_offset,
+            offset: field_offset,
             size,
         }
     }
@@ -1223,7 +1263,7 @@ impl MicroOp {
     pub fn struct_store8(heap_ptr: FrameOffset, field_offset: u32, src: FrameOffset) -> Self {
         MicroOp::HeapMoveTo8 {
             heap_ptr,
-            offset: STRUCT_DATA_OFFSET as u32 + field_offset,
+            offset: field_offset,
             src,
         }
     }
@@ -1236,7 +1276,7 @@ impl MicroOp {
     ) -> Self {
         MicroOp::HeapMoveTo {
             heap_ptr,
-            offset: STRUCT_DATA_OFFSET as u32 + field_offset,
+            offset: field_offset,
             src,
             size,
         }
@@ -1246,11 +1286,11 @@ impl MicroOp {
         MicroOp::HeapBorrow {
             dst,
             obj_ref,
-            offset: STRUCT_DATA_OFFSET as u32 + field_offset,
+            offset: field_offset,
         }
     }
 
-    // ----- Enum helpers (offsets relative to ENUM_DATA_OFFSET) -----
+    // ----- Enum helpers (variant fields live after the 8-byte tag) -----
 
     pub fn enum_get_tag(heap_ptr: FrameOffset, dst: FrameOffset) -> Self {
         MicroOp::HeapMoveFrom8 {
@@ -1327,8 +1367,9 @@ mod tests {
 
     #[test]
     fn micro_op_size() {
-        // Size is 32 bytes due to CallIndirect which carries two
-        // GlobalArenaPtr fields (8 + 16 bytes). TODO: bring this down.
-        assert_eq!(std::mem::size_of::<MicroOp>(), 32);
+        // TODO:
+        //   Size is dominated by indirect call: refactor to keep variant size
+        //   small and keep call metadata in a side table.
+        assert_eq!(std::mem::size_of::<MicroOp>(), 48);
     }
 }

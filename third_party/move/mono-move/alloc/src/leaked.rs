@@ -29,6 +29,11 @@ impl<T> LeakedBoxPtr<T> {
         Self(unsafe { NonNull::new_unchecked(Box::into_raw(boxed)) })
     }
 
+    /// Returns the underlying non-null pointer.
+    pub fn as_non_null(&self) -> NonNull<T> {
+        self.0
+    }
+
     /// Frees allocated data.
     ///
     /// # Safety

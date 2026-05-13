@@ -52,7 +52,7 @@ module aptos_framework::sigma_protocol {
 
         // Step 3: Derive a random-challenge `e` via Fiat-Shamir
         let compressed_A = compress_points(&_A);
-        let (e, _) = fiat_shamir(dst, stmt, &compressed_A, k);
+        let (e, _) = fiat_shamir(dst, stmt, &compressed_A, &vector[], k);
 
         // Step 4: \sigma <- \alpha + e w
         let sigma = add_vec_scalars(
@@ -96,7 +96,7 @@ module aptos_framework::sigma_protocol {
         // Step 1: Fiat-Shamir transform on `(dst, (psi, f), stmt)` to derive the random challenge `e`
         let _A = proof.get_commitment();
         let sigma = proof.response_to_witness();
-        let (e, _) = fiat_shamir(dst, stmt, proof.get_compressed_commitment(), sigma.length());
+        let (e, _) = fiat_shamir(dst, stmt, proof.get_compressed_commitment(), &vector[], sigma.length());
 
         // Step 3: Compute the `m` entries of `f(X)`
         let fx = evaluate_f(|_X| f(_X), stmt);
@@ -157,7 +157,8 @@ module aptos_framework::sigma_protocol {
         // Step 1: Fiat-Shamir transform on `(dst, (psi, f), stmt)` to derive the random challenge `e`
         let _A = proof.get_commitment();
         let m = _A.length();
-        let (e, betas) = fiat_shamir(dst, stmt, proof.get_compressed_commitment(), proof.get_response_length());
+        let (e, betas) = fiat_shamir(dst, stmt, proof.get_compressed_commitment(),
+            proof.get_response(), proof.get_response_length());
 
         // Step 2:
         let psi_sigma = psi(stmt, &proof.response_to_witness());

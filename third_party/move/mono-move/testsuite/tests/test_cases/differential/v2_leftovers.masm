@@ -1,0 +1,64 @@
+// RUN: publish --print(stackless,micro-ops)
+module 0x66::v2_leftovers
+
+fun identity(x: u64): u64
+    move_loc x
+    ret
+
+fun add_two(a: u64, b: u64): u64
+    copy_loc a
+    copy_loc b
+    add
+    ret
+
+fun copy_to_call(x: u64): u64
+    copy_loc x
+    call identity
+    ret
+
+fun move_to_call(x: u64): u64
+    move_loc x
+    call identity
+    ret
+
+fun multi_use_local_alias(x: u64): u64
+    local tmp: u64
+    copy_loc x
+    st_loc tmp
+    copy_loc tmp
+    ld_u64 1
+    add
+    move_loc tmp
+    add
+    ret
+
+fun copy_call_then_use(x: u64): u64
+    local y: u64
+    copy_loc x
+    st_loc y
+    copy_loc y
+    call identity
+    move_loc y
+    add
+    ret
+
+fun two_copies_to_call(x: u64, y: u64): u64
+    copy_loc x
+    copy_loc y
+    call add_two
+    ret
+
+// RUN: execute 0x66::v2_leftovers::copy_to_call --args 7
+// CHECK: results: 7
+
+// RUN: execute 0x66::v2_leftovers::move_to_call --args 7
+// CHECK: results: 7
+
+// RUN: execute 0x66::v2_leftovers::multi_use_local_alias --args 5
+// CHECK: results: 11
+
+// RUN: execute 0x66::v2_leftovers::copy_call_then_use --args 7
+// CHECK: results: 14
+
+// RUN: execute 0x66::v2_leftovers::two_copies_to_call --args 3, 4
+// CHECK: results: 7

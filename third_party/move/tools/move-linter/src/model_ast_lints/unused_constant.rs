@@ -1,13 +1,13 @@
 // Copyright (c) Aptos Foundation
 // Licensed pursuant to the Innovation-Enabling Source Code License, available at https://github.com/aptos-labs/aptos-core/blob/main/LICENSE
 
-//! Lint check for unused constants.
+//! Lint check for unused constants (private, package, and friend).
 
 use super::unused_common::SHARED_SUPPRESSION_ATTRS;
 use move_compiler_v2::external_checks::ConstantChecker;
 use move_model::{
     ast::Attribute,
-    model::{GlobalEnv, Loc, NamedConstantEnv},
+    model::{GlobalEnv, Loc, NamedConstantEnv, Visibility},
     ty::Type,
 };
 
@@ -22,12 +22,8 @@ impl ConstantChecker for UnusedConstant {
     }
 
     fn check_constant(&self, const_env: &NamedConstantEnv) {
-        if should_warn_unused_constant(const_env) {
+        if let Some(msg) = check_unused(const_env) {
             let env = const_env.module_env.env;
-            let msg = format!(
-                "constant `{}` is unused",
-                const_env.get_name().display(env.symbol_pool()),
-            );
             self.report(env, &const_env.get_loc(), &msg);
         }
     }
@@ -41,8 +37,10 @@ impl ConstantChecker for UnusedConstant {
     }
 }
 
-/// Returns true if constant should be warned as unused.
-fn should_warn_unused_constant(const_env: &NamedConstantEnv) -> bool {
+/// Returns a warning message if the constant is unused, else None.
+/// `public` is intentionally not flagged — it may be a future external
+/// consumer's contract. Mirrors the visibility logic in `unused_function`.
+fn check_unused(const_env: &NamedConstantEnv) -> Option<String> {
     let env = const_env.module_env.env;
 
     let is_suppression_attr = |attr: &Attribute| {
@@ -56,10 +54,21 @@ fn should_warn_unused_constant(const_env: &NamedConstantEnv) -> bool {
         || !const_env.get_users().is_empty()
         || is_error_code(const_env)
     {
-        return false;
+        return None;
     }
 
-    true
+    let visibility_prefix = match const_env.get_visibility() {
+        Visibility::Public => return None,
+        Visibility::Private => "",
+        Visibility::Friend if const_env.has_package_visibility() => "package ",
+        Visibility::Friend => "friend ",
+    };
+
+    Some(format!(
+        "{}constant `{}` is unused",
+        visibility_prefix,
+        const_env.get_name().display(env.symbol_pool()),
+    ))
 }
 
 /// Check if a constant is an error code. Error code constants are named with an

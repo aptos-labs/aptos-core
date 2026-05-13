@@ -1,0 +1,15 @@
+module 0x66::test
+
+fun identity<T>(x: T): T
+    move_loc x
+    ret
+
+fun call_u64(): u64
+    ld_u64 10
+    call identity<u64>
+    ret
+
+fun call_bool(): bool
+    ld_true
+    call identity<bool>
+    ret

@@ -5,7 +5,8 @@ mod context;
 
 pub use context::{
     struct_info_at, try_as_primitive_type, view_name, view_type, view_type_list, ArenaRef,
-    Executable, ExecutionGuard, FieldLayout, GlobalContext, InternedType, InternedTypeList,
-    LoadedModule, LoadedModuleSlot, MaintenanceGuard, MandatoryDependencies, Type,
+    ExecutionGuard, FieldLayout, FunctionSlot, GlobalContext, InternedType, InternedTypeList,
+    LoadedModule, LoadedModuleSlot, MaintenanceGuard, ModuleMandatoryDependencies, ModuleSlot,
+    Type,
 };
 pub mod maintenance_config;

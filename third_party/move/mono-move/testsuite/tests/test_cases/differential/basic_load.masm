@@ -1,0 +1,18 @@
+// RUN: publish --print(stackless,micro-ops)
+module 0x66::test
+
+fun load_values(): u64
+    ld_u64 42
+    ret
+
+fun load_and_store()
+    local x: u64
+    ld_u64 10
+    st_loc x
+    ret
+
+// RUN: execute 0x66::test::load_values
+// CHECK: results: 42
+
+// RUN: execute 0x66::test::load_and_store
+// CHECK: results:
