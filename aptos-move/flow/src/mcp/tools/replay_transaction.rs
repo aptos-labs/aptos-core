@@ -10,8 +10,11 @@ use rmcp::{handler::server::router::tool::ToolRouter, tool_router};
 use aptos_rest_client::AptosBaseUrl;
 use aptos_types::transaction::{ExecutionStatus, TransactionStatus};
 use aptos_types::vm_status::AbortLocation;
+use move_core_types::account_address::AccountAddress;
 use rmcp::schemars;
 use std::collections::BTreeMap;
+use std::path::{Path, PathBuf};
+use std::str::FromStr;
 use url::Url;
 
 /// Parse the `network` parameter into a base URL. Accepts the well-known names
@@ -150,6 +153,40 @@ fn success_from(status: &TransactionStatus) -> Option<bool> {
         TransactionStatus::Keep(exec) => Some(exec.is_success()),
         TransactionStatus::Discard(_) | TransactionStatus::Retry => None,
     }
+}
+
+fn validate_package_paths(paths: &[String]) -> Result<Vec<PathBuf>, String> {
+    let mut out = Vec::with_capacity(paths.len());
+    for p in paths {
+        let path = Path::new(p);
+        if !path.exists() {
+            return Err(format!("local package path `{}` does not exist", p));
+        }
+        if !path.is_dir() {
+            return Err(format!("local package path `{}` is not a directory", p));
+        }
+        if !path.join("Move.toml").exists() {
+            return Err(format!(
+                "local package path `{}` is not a Move package (no Move.toml)",
+                p
+            ));
+        }
+        out.push(path.to_path_buf());
+    }
+    Ok(out)
+}
+
+fn validate_named_addresses(
+    addrs: &BTreeMap<String, String>,
+) -> Result<BTreeMap<String, AccountAddress>, String> {
+    addrs
+        .iter()
+        .map(|(k, v)| {
+            AccountAddress::from_str(v)
+                .map(|a| (k.clone(), a))
+                .map_err(|e| format!("invalid named address `{}={}`: {}", k, v, e))
+        })
+        .collect()
 }
 
 #[tool_router(router = replay_transaction_router, vis = "pub(crate)")]
@@ -313,5 +350,47 @@ mod tests {
 
         let retry = aptos_types::transaction::TransactionStatus::Retry;
         assert_eq!(success_from(&retry), None);
+    }
+
+    #[test]
+    fn validate_package_paths_accepts_real_package() {
+        let tmp = tempfile::TempDir::new().unwrap();
+        std::fs::write(tmp.path().join("Move.toml"), "[package]\nname = \"x\"\n").unwrap();
+        let paths = vec![tmp.path().to_string_lossy().into_owned()];
+        let resolved = validate_package_paths(&paths).expect("should accept valid package");
+        assert_eq!(resolved.len(), 1);
+        assert_eq!(resolved[0], tmp.path());
+    }
+
+    #[test]
+    fn validate_package_paths_rejects_missing_dir() {
+        let paths = vec!["/no/such/path/12345xyz".to_string()];
+        let err = validate_package_paths(&paths).unwrap_err();
+        assert!(err.contains("does not exist"), "got: {}", err);
+    }
+
+    #[test]
+    fn validate_package_paths_rejects_missing_manifest() {
+        let tmp = tempfile::TempDir::new().unwrap();
+        let paths = vec![tmp.path().to_string_lossy().into_owned()];
+        let err = validate_package_paths(&paths).unwrap_err();
+        assert!(err.contains("Move.toml"), "got: {}", err);
+    }
+
+    #[test]
+    fn validate_named_addresses_accepts_hex_addr() {
+        let mut m = std::collections::BTreeMap::new();
+        m.insert("my_module".to_string(), "0x1".to_string());
+        let parsed = validate_named_addresses(&m).expect("should accept hex");
+        assert_eq!(parsed.len(), 1);
+        assert_eq!(parsed.get("my_module").unwrap(), &AccountAddress::ONE);
+    }
+
+    #[test]
+    fn validate_named_addresses_rejects_garbage() {
+        let mut m = std::collections::BTreeMap::new();
+        m.insert("bad".to_string(), "not an address".to_string());
+        let err = validate_named_addresses(&m).unwrap_err();
+        assert!(err.contains("bad"), "got: {}", err);
     }
 }
