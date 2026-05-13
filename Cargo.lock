@@ -3316,10 +3316,15 @@ name = "aptos-move-flow"
 version = "1.0.4"
 dependencies = [
  "anyhow",
+ "aptos-cli-common",
  "aptos-framework",
  "aptos-gas-schedule",
+ "aptos-move-cli",
+ "aptos-move-debugger",
  "aptos-package-builder",
+ "aptos-rest-client",
  "aptos-types",
+ "aptos-validator-interface",
  "aptos-vm",
  "clap 4.5.60",
  "codespan-reporting",
@@ -3347,6 +3352,7 @@ dependencies = [
  "tera",
  "tokio",
  "tracing-log",
+ "url",
  "walkdir",
 ]
 
