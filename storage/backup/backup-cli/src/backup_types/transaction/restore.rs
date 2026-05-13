@@ -260,6 +260,47 @@ pub struct TransactionRestoreBatchController {
     first_version: Option<Version>,
 }
 
+/// Save a chunk of transactions and replay their KV writes, splitting the
+/// chunk at the epoch-ending versions in `epoch_end_versions` (sorted, empty
+/// when `--skip-epoch-endings` is set).
+fn save_kv_split_at_epoch_ends(
+    handler: &RestoreHandler,
+    epoch_end_versions: &[Version],
+    base_version: Version,
+    txns: &[Transaction],
+    persisted_aux_info: &[PersistedAuxiliaryInfo],
+    txn_infos: &[TransactionInfo],
+    events: &[Vec<ContractEvent>],
+    mut write_sets: Vec<WriteSet>,
+) -> Result<()> {
+    let len = txns.len();
+    let last_version = base_version + len as u64 - 1;
+    let lo = epoch_end_versions.partition_point(|&v| v < base_version);
+    let hi = epoch_end_versions.partition_point(|&v| v <= last_version);
+    let mut sub_ends: Vec<_> = epoch_end_versions[lo..hi]
+        .iter()
+        .map(|&v| (v - base_version + 1) as usize)
+        .collect();
+    if sub_ends.last().copied() != Some(len) {
+        sub_ends.push(len);
+    }
+
+    let mut start = 0usize;
+    for sub_end in sub_ends {
+        let n = sub_end - start;
+        handler.save_transactions_and_replay_kv(
+            base_version + start as u64,
+            &txns[start..sub_end],
+            &persisted_aux_info[start..sub_end],
+            &txn_infos[start..sub_end],
+            &events[start..sub_end],
+            write_sets.drain(..n).collect(),
+        )?;
+        start = sub_end;
+    }
+    Ok(())
+}
+
 impl TransactionRestoreBatchController {
     pub fn new(
         global_opt: GlobalRestoreOptions,
@@ -567,6 +608,14 @@ impl TransactionRestoreBatchController {
         let (first_version, _) = self.replay_from_version.unwrap();
         restore_handler.force_state_version_for_kv_restore(first_version.checked_sub(1))?;
 
+        // Sorted ascending; empty when `--skip-epoch-endings` is set.
+        let epoch_end_versions: Arc<Vec<Version>> = Arc::new(
+            self.epoch_history
+                .as_ref()
+                .map(|h| h.epoch_endings.iter().map(|li| li.version()).collect())
+                .unwrap_or_default(),
+        );
+
         let mut base_version = first_version;
         let mut offset = 0u64;
         let replay_start = Instant::now();
@@ -584,13 +633,15 @@ impl TransactionRestoreBatchController {
                     Vec<_>,
                 ) = chunk.into_iter().multiunzip();
                 let handler = arc_restore_handler.clone();
+                let epoch_end_versions = Arc::clone(&epoch_end_versions);
                 base_version += offset;
                 offset = txns.len() as u64;
                 async move {
                     let _timer = OTHER_TIMERS_SECONDS.timer_with(&["replay_txn_chunk_kv_only"]);
                     tokio::task::spawn_blocking(move || {
-                        // we directly save transaction and kvs to DB without involving chunk executor
-                        handler.save_transactions_and_replay_kv(
+                        save_kv_split_at_epoch_ends(
+                            &handler,
+                            &epoch_end_versions,
                             base_version,
                             &txns,
                             &persisted_aux_info,
