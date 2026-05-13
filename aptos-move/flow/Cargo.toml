@@ -55,6 +55,7 @@ walkdir = { workspace = true }
 
 [dev-dependencies]
 aptos-package-builder = { workspace = true }
+move-core-types = { workspace = true }
 move-prover-test-utils = { workspace = true }
 regex = { workspace = true }
 rmcp = { workspace = true, features = ["client"] }

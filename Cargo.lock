@@ -3332,6 +3332,7 @@ dependencies = [
  "log",
  "move-command-line-common",
  "move-compiler-v2",
+ "move-core-types",
  "move-coverage",
  "move-ir-types",
  "move-model",

@@ -8,6 +8,7 @@ use super::super::session::FlowSession;
 use rmcp::{handler::server::router::tool::ToolRouter, tool_router};
 
 use aptos_rest_client::AptosBaseUrl;
+use aptos_types::vm_status::AbortLocation;
 use rmcp::schemars;
 use std::collections::BTreeMap;
 use url::Url;
@@ -94,6 +95,15 @@ struct ExecutionFailureDetails {
     code_offset: u16,
 }
 
+/// Format an `AbortLocation` as `"0xADDR::module_name"` (for `Module` variants) or
+/// `"script"` (for the `Script` variant).
+fn format_abort_location(loc: &AbortLocation) -> String {
+    match loc {
+        AbortLocation::Module(m) => format!("{}::{}", m.address().to_hex_literal(), m.name()),
+        AbortLocation::Script => "script".to_string(),
+    }
+}
+
 #[tool_router(router = replay_transaction_router, vis = "pub(crate)")]
 impl FlowSession {}
 
@@ -101,6 +111,22 @@ impl FlowSession {}
 mod tests {
     use super::*;
     use aptos_rest_client::AptosBaseUrl;
+    use aptos_types::vm_status::AbortLocation;
+    use move_core_types::account_address::AccountAddress;
+    use move_core_types::identifier::Identifier;
+    use move_core_types::language_storage::ModuleId;
+
+    #[test]
+    fn abort_location_module() {
+        let module_id = ModuleId::new(AccountAddress::ONE, Identifier::new("coin").unwrap());
+        let loc = AbortLocation::Module(module_id);
+        assert_eq!(format_abort_location(&loc), "0x1::coin");
+    }
+
+    #[test]
+    fn abort_location_script() {
+        assert_eq!(format_abort_location(&AbortLocation::Script), "script");
+    }
 
     #[test]
     fn parse_network_known_names() {
