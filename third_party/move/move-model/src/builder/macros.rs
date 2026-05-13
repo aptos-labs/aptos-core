@@ -82,11 +82,26 @@ impl From<AssertKind> for BinOp_ {
     }
 }
 
+#[derive(Copy, Clone)]
+enum AssertMacro {
+    Assert,
+    DebugAssert,
+}
+
+impl Display for AssertMacro {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            AssertMacro::Assert => write!(f, "assert!"),
+            AssertMacro::DebugAssert => write!(f, "debug_assert!"),
+        }
+    }
+}
+
 impl ExpTranslator<'_, '_, '_> {
     pub fn expand_macro(&self, loc: Loc, name: &str, args: &Spanned<Vec<Exp>>) -> Exp {
         // Currently, there are only built-in macros, and no user definable ones.
         let expansion_ = match name {
-            "assert" => self.expand_assert(loc, args),
+            "assert" => self.expand_assert(loc, args, AssertMacro::Assert),
             "assert_eq" => self.expand_assert_eq(loc, args),
             "assert_ne" => self.expand_assert_ne(loc, args),
             "debug_assert" => self.expand_debug_assert(loc, args),
@@ -140,11 +155,11 @@ impl ExpTranslator<'_, '_, '_> {
     ///     abort string::into_bytes(string_utils::format<N>(&fmt, arg1, ..., argN))
     /// }
     /// ```
-    fn expand_assert(&self, loc: Loc, args: &Spanned<Vec<Exp>>) -> Exp_ {
+    fn expand_assert(&self, loc: Loc, args: &Spanned<Vec<Exp>>, kind: AssertMacro) -> Exp_ {
         if args.value.is_empty() {
             self.error(
                 &self.to_loc(&args.loc),
-                "Macro `assert!` must have at least one argument",
+                &format!("Macro `{}` must have at least one argument", kind),
             );
             return Exp_::UnresolvedError;
         }
@@ -157,7 +172,7 @@ impl ExpTranslator<'_, '_, '_> {
                 // assert!(cond)
                 self.check_language_version(
                     &self.to_loc(&loc),
-                    "single-argument `assert!` macro",
+                    &format!("single-argument `{}` macro", kind),
                     LanguageVersion::V2_0,
                 );
                 sp(
@@ -176,7 +191,7 @@ impl ExpTranslator<'_, '_, '_> {
                 // assert!(cond, fmt, arg1, ..., argN)
                 self.check_language_version(
                     &self.to_loc(&loc),
-                    "`assert!` macro with string formatting",
+                    &format!("`{}` macro with string formatting", kind),
                     LanguageVersion::V2_4,
                 );
                 self.check_format_string(&rest[0], n - 1);
@@ -189,7 +204,8 @@ impl ExpTranslator<'_, '_, '_> {
                 self.error(
                     &self.to_loc(&args.loc),
                     &format!(
-                        "Macro `assert!` cannot take more than {} arguments",
+                        "Macro `{}` cannot take more than {} arguments",
+                        kind,
                         MAX_FORMAT_ARGS + 1
                     ),
                 );
@@ -218,7 +234,7 @@ impl ExpTranslator<'_, '_, '_> {
             .get_extension::<ModelBuilderOptions>()
             .is_some_and(|opts| opts.compile_for_testing);
         if testing {
-            self.expand_assert(loc, args)
+            self.expand_assert(loc, args, AssertMacro::DebugAssert)
         } else {
             Exp_::Unit { trailing: false }
         }
