@@ -213,9 +213,9 @@ fn mark_emitted(i: usize, n: usize, alive: &mut SmallBitVec, blockers: &mut [Sma
 /// Clear bit `i` from `blockers[k]` for every alive `k != i`.
 #[inline]
 fn clear_blocker(i: usize, n: usize, alive: &SmallBitVec, blockers: &mut [SmallBitVec]) {
-    for k in 0..n {
+    for (k, blocker) in blockers.iter_mut().enumerate().take(n) {
         if k != i && alive.get(k).expect("alive sized to n") {
-            blockers[k].set(i, false);
+            blocker.set(i, false);
         }
     }
 }
