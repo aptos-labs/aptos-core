@@ -8,6 +8,7 @@ use super::super::session::FlowSession;
 use rmcp::{handler::server::router::tool::ToolRouter, tool_router};
 
 use aptos_rest_client::AptosBaseUrl;
+use aptos_types::transaction::ExecutionStatus;
 use aptos_types::vm_status::AbortLocation;
 use rmcp::schemars;
 use std::collections::BTreeMap;
@@ -104,8 +105,6 @@ fn format_abort_location(loc: &AbortLocation) -> String {
     }
 }
 
-use aptos_types::transaction::ExecutionStatus;
-
 fn abort_details_from(status: &ExecutionStatus) -> Option<AbortDetails> {
     match status {
         ExecutionStatus::MoveAbort { location, code, info } => {
@@ -123,7 +122,10 @@ fn abort_details_from(status: &ExecutionStatus) -> Option<AbortDetails> {
                 description,
             })
         }
-        _ => None,
+        ExecutionStatus::Success
+        | ExecutionStatus::OutOfGas
+        | ExecutionStatus::ExecutionFailure { .. }
+        | ExecutionStatus::MiscellaneousError(_) => None,
     }
 }
 
