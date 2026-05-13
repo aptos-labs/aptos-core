@@ -21,7 +21,6 @@ use crate::{
         check_function_type_count_and_depth, verify_pack_closure, FullRuntimeTypeCheck,
         NoRuntimeTypeCheck, RuntimeTypeCheck, UntrustedOnlyRuntimeTypeCheck,
     },
-    source_locator,
     storage::{
         loader::traits::Loader, ty_depth_checker::TypeDepthChecker,
         ty_layout_converter::LayoutConverter,
@@ -45,7 +44,6 @@ use move_core_types::{
 };
 use move_vm_profiler::{FnGuard, Profiler, VM_PROFILER};
 use move_vm_types::{
-    debug_write, debug_writeln,
     gas::{GasMeter, SimpleInstruction},
     instr::Instruction,
     limits::check_abort_message_limit,
@@ -53,17 +51,16 @@ use move_vm_types::{
     natives::function::NativeResult,
     ty_interner::InternedTypePool,
     values::{
-        self, AbstractFunction, Closure, GlobalValue, Locals, Reference, SignerRef, Struct,
-        StructRef, VMValueCast, Value, Vector, VectorRef,
+        AbstractFunction, Closure, GlobalValue, Locals, Reference, SignerRef, Struct, StructRef,
+        VMValueCast, Value, Vector, VectorRef,
     },
     views::TypeView,
 };
 use once_cell::sync::Lazy;
 use std::{
     cell::RefCell,
-    cmp::min,
     collections::{btree_map::Entry, BTreeSet, VecDeque},
-    fmt::{Debug, Write},
+    fmt::Debug,
     rc::Rc,
     str::FromStr,
 };
@@ -119,20 +116,13 @@ macro_rules! set_err_info {
     }};
 }
 
+pub(crate) use crate::debug::interpreter::InterpreterDebugInterface;
+
 /// `Interpreter` instances can execute Move functions.
 ///
 /// An `Interpreter` instance is a stand alone execution context for a function.
 /// It mimics execution on a single thread, with an call stack and an operand stack.
 pub(crate) struct Interpreter;
-
-pub(crate) trait InterpreterDebugInterface {
-    fn get_stack_frames(&self, count: usize) -> ExecutionState;
-    fn debug_print_stack_trace(
-        &self,
-        buf: &mut String,
-        runtime_environment: &RuntimeEnvironment,
-    ) -> PartialVMResult<()>;
-}
 
 /// `InterpreterImpl` instances can execute Move functions.
 ///
@@ -142,7 +132,7 @@ pub(crate) struct InterpreterImpl<'ctx, LoaderImpl> {
     /// Operand stack, where Move `Value`s are stored for stack operations.
     pub(crate) operand_stack: Stack,
     /// The stack of active functions.
-    call_stack: CallStack,
+    pub(crate) call_stack: CallStack,
     /// VM configuration used by the interpreter.
     vm_config: &'ctx VMConfig,
     /// Pool of interned types.
@@ -153,7 +143,7 @@ pub(crate) struct InterpreterImpl<'ctx, LoaderImpl> {
     reentrancy_checker: ReentrancyChecker,
     /// Loader to resolve functions and modules from remote storage. Ensures all module accesses
     /// are metered.
-    loader: &'ctx LoaderImpl,
+    pub(crate) loader: &'ctx LoaderImpl,
     /// Checks depth of types of values. Used to bound packing too deep structs or vectors.
     ty_depth_checker: &'ctx TypeDepthChecker<'ctx, LoaderImpl>,
     /// Converts runtime types ([Type]) to layouts for (de)serialization.
@@ -1673,85 +1663,6 @@ where
         err
     }
 
-    #[allow(dead_code)]
-    fn debug_print_frame<B: Write>(
-        &self,
-        buf: &mut B,
-        runtime_environment: &RuntimeEnvironment,
-        idx: usize,
-        frame: &Frame,
-    ) -> PartialVMResult<()> {
-        debug_write!(buf, "    [{}] ", idx)?;
-
-        // Print out the function name.
-        let function = &frame.function;
-        debug_write!(buf, "{}", function.name_as_pretty_string())?;
-
-        // Print out type arguments, if they exist.
-        let ty_args = function.ty_args();
-        if !ty_args.is_empty() {
-            let mut ty_tags = vec![];
-            for ty in ty_args {
-                let tag = runtime_environment.ty_to_ty_tag(ty)?;
-                ty_tags.push(tag);
-            }
-            debug_write!(buf, "<")?;
-            let mut it = ty_tags.iter();
-            if let Some(tag) = it.next() {
-                debug_write!(buf, "{}", tag.to_canonical_string())?;
-                for tag in it {
-                    debug_write!(buf, ", ")?;
-                    debug_write!(buf, "{}", tag.to_canonical_string())?;
-                }
-            }
-            debug_write!(buf, ">")?;
-        }
-        debug_writeln!(buf)?;
-
-        // Print source location if available.
-        if let Some(module_id) = function.module_id() {
-            if let Some(loc) =
-                source_locator::get_bytecode_source_location(module_id, function.index(), frame.pc)
-            {
-                debug_writeln!(buf, "          at {}", loc)?;
-            }
-        }
-
-        // Print out the current instruction.
-        debug_writeln!(buf)?;
-        debug_writeln!(buf, "        Code:")?;
-        let pc = frame.pc as usize;
-        let code = function.code();
-        let before = pc.saturating_sub(3);
-        let after = min(code.len(), pc + 4);
-        for (idx, instr) in code.iter().enumerate().take(pc).skip(before) {
-            debug_writeln!(buf, "            [{}] {:?}", idx, instr)?;
-        }
-        debug_writeln!(buf, "          > [{}] {:?}", pc, &code[pc])?;
-        for (idx, instr) in code.iter().enumerate().take(after).skip(pc + 1) {
-            debug_writeln!(buf, "            [{}] {:?}", idx, instr)?;
-        }
-
-        // Print out the locals.
-        debug_writeln!(buf)?;
-        if function.local_tys().is_empty() {
-            debug_writeln!(buf, "        Locals:")?;
-            debug_writeln!(buf, "            (none)")?;
-        } else {
-            source_locator::print_locals_enriched(
-                buf,
-                function,
-                &frame.locals,
-                runtime_environment,
-                true,
-            )?;
-            debug_writeln!(buf)?;
-        }
-
-        debug_writeln!(buf)?;
-        Ok(())
-    }
-
     /// Generate a string which is the status of the interpreter: call stack, current bytecode
     /// stream, locals and operand stack.
     ///
@@ -1828,55 +1739,6 @@ where
             }
         }
         Ok(())
-    }
-}
-
-impl<LoaderImpl> InterpreterDebugInterface for InterpreterImpl<'_, LoaderImpl>
-where
-    LoaderImpl: Loader,
-{
-    #[allow(dead_code)]
-    #[cold]
-    fn debug_print_stack_trace(
-        &self,
-        buf: &mut String,
-        runtime_environment: &RuntimeEnvironment,
-    ) -> PartialVMResult<()> {
-        debug_writeln!(buf, "Call Stack:")?;
-        for (i, frame) in self.call_stack.0.iter().enumerate() {
-            self.debug_print_frame(buf, runtime_environment, i, frame)?;
-        }
-        debug_writeln!(buf, "Operand Stack:")?;
-        for (idx, val) in self.operand_stack.value.iter().enumerate() {
-            // TODO: Currently we do not know the types of the values on the operand stack.
-            // Revisit.
-            debug_write!(buf, "    [{}] ", idx)?;
-            values::debug::print_value(buf, val)?;
-            debug_writeln!(buf)?;
-        }
-        Ok(())
-    }
-
-    /// Get count stack frames starting from the top of the stack.
-    fn get_stack_frames(&self, count: usize) -> ExecutionState {
-        // collect frames in the reverse order as this is what is
-        // normally expected from the stack trace (outermost frame
-        // is the last one)
-        let stack_trace = self
-            .call_stack
-            .0
-            .iter()
-            .rev()
-            .take(count)
-            .map(|frame| {
-                (
-                    frame.function.module_id().cloned(),
-                    frame.function.index(),
-                    frame.pc,
-                )
-            })
-            .collect();
-        ExecutionState::new(stack_trace)
     }
 }
 
@@ -2030,7 +1892,7 @@ impl Stack {
 }
 
 /// A call stack.
-pub(crate) struct CallStack(Vec<Frame>);
+pub(crate) struct CallStack(pub(crate) Vec<Frame>);
 
 impl CallStack {
     /// Create a new empty call stack.

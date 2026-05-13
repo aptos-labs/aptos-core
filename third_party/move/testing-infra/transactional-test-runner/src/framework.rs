@@ -37,7 +37,7 @@ use move_core_types::{
 };
 use move_model::{metadata::LanguageVersion, model::GlobalEnv};
 use move_symbol_pool::Symbol;
-use move_vm_runtime::move_vm::SerializedReturnValues;
+use move_vm_runtime::{move_vm::SerializedReturnValues, source_locator};
 use move_vm_types::values::Value;
 use regex::Regex;
 use std::{
@@ -668,7 +668,7 @@ pub trait MoveTestAdapter<'a>: Sized {
                 .iter()
                 .map(|(idx, v)| {
                     let mut buf = String::new();
-                    move_vm_types::values::debug::print_value(&mut buf, v).unwrap();
+                    source_locator::print_value(&mut buf, v).unwrap();
                     format!("local#{}: {}", idx, buf)
                 })
                 .collect::<Vec<_>>()
@@ -684,7 +684,7 @@ pub trait MoveTestAdapter<'a>: Sized {
                 .iter()
                 .map(|v| {
                     let mut buf = String::new();
-                    move_vm_types::values::debug::print_value(&mut buf, v).unwrap();
+                    source_locator::print_value(&mut buf, v).unwrap();
                     buf
                 })
                 .collect::<Vec<_>>()
