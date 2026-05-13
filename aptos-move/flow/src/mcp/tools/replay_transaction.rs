@@ -250,10 +250,27 @@ fn build_local_overrides(
                 overrides.add_module(&module_id, bytes);
 
                 let sm_bytes = unit.unit.serialize_source_map();
-                let source_text =
-                    std::fs::read_to_string(&unit.source_path).unwrap_or_default();
+                let source_text = match std::fs::read_to_string(&unit.source_path) {
+                    Ok(text) => text,
+                    Err(e) => {
+                        log::warn!(
+                            "could not read source file {} for local override: {}",
+                            unit.source_path.display(),
+                            e
+                        );
+                        String::new()
+                    },
+                };
                 let filename = unit.source_path.to_string_lossy().into_owned();
-                let _ = locator.add_local_module(module, &sm_bytes, &source_text, &filename);
+                if let Err(e) =
+                    locator.add_local_module(module, &sm_bytes, &source_text, &filename)
+                {
+                    log::warn!(
+                        "could not load source map for module {}: {}",
+                        module.self_id(),
+                        e
+                    );
+                }
             }
         }
     }
