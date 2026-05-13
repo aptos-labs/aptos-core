@@ -1,0 +1,35 @@
+// -- Model dump before first bytecode pipeline
+module 0x42::m {
+    public fun too_few_eq<T>(x: T) {
+        Tuple();
+        Tuple()
+    }
+    public fun too_few_ne<T>(x: T) {
+        Tuple();
+        Tuple()
+    }
+    public fun too_many_eq<T>(left: T,right: T) {
+        Tuple();
+        Tuple()
+    }
+    public fun too_many_ne<T>(left: T,right: T) {
+        Tuple();
+        Tuple()
+    }
+} // end 0x42::m
+
+// -- Sourcified model before first bytecode pipeline
+module 0x42::m {
+    public fun too_few_eq<T: drop>(x: T) {
+        ();
+    }
+    public fun too_few_ne<T: drop>(x: T) {
+        ();
+    }
+    public fun too_many_eq<T: copy + drop>(left: T, right: T) {
+        ();
+    }
+    public fun too_many_ne<T: copy + drop>(left: T, right: T) {
+        ();
+    }
+}

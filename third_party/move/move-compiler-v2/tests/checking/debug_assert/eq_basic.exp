@@ -1,0 +1,53 @@
+// -- Model dump before first bytecode pipeline
+module 0x1::string_utils {
+    use std::string::{String};
+    public fun format2<T0,T1>(_fmt: &vector<u8>,_a: T0,_b: T1): string::String {
+        Abort(0)
+    }
+} // end 0x1::string_utils
+module 0x42::m {
+    public fun check_eq<T>(left: T,right: T) {
+        {
+          let ($left: T, $right: T): (T, T) = Tuple(left, right);
+          if Eq<T>($left, $right) {
+            Tuple()
+          } else {
+            Abort(14566554180833181696, string::into_bytes(string_utils::format2<T, T>(Borrow(Immutable)([97, 115, 115, 101, 114, 116, 105, 111, 110, 32, 96, 108, 101, 102, 116, 32, 61, 61, 32, 114, 105, 103, 104, 116, 96, 32, 102, 97, 105, 108, 101, 100, 10, 32, 32, 108, 101, 102, 116, 58, 32, 123, 125, 10, 32, 114, 105, 103, 104, 116, 58, 32, 123, 125]), $left, $right)))
+          }
+        };
+        Tuple()
+    }
+    public fun check_ne<T>(left: T,right: T) {
+        {
+          let ($left: T, $right: T): (T, T) = Tuple(left, right);
+          if Neq<T>($left, $right) {
+            Tuple()
+          } else {
+            Abort(14566554180833181696, string::into_bytes(string_utils::format2<T, T>(Borrow(Immutable)([97, 115, 115, 101, 114, 116, 105, 111, 110, 32, 96, 108, 101, 102, 116, 32, 33, 61, 32, 114, 105, 103, 104, 116, 96, 32, 102, 97, 105, 108, 101, 100, 10, 32, 32, 108, 101, 102, 116, 58, 32, 123, 125, 10, 32, 114, 105, 103, 104, 116, 58, 32, 123, 125]), $left, $right)))
+          }
+        };
+        Tuple()
+    }
+} // end 0x42::m
+
+// -- Sourcified model before first bytecode pipeline
+module 0x1::string_utils {
+    use std::string;
+    public fun format2<T0: drop, T1: drop>(_fmt: &vector<u8>, _a: T0, _b: T1): string::String {
+        abort 0
+    }
+}
+module 0x42::m {
+    public fun check_eq<T: copy + drop>(left: T, right: T) {
+        {
+            let (_left,_right) = (left, right);
+            if (_left == _right) () else abort 0x1::string::into_bytes(0x1::string_utils::format2<T, T>(&vector[97u8, 115u8, 115u8, 101u8, 114u8, 116u8, 105u8, 111u8, 110u8, 32u8, 96u8, 108u8, 101u8, 102u8, 116u8, 32u8, 61u8, 61u8, 32u8, 114u8, 105u8, 103u8, 104u8, 116u8, 96u8, 32u8, 102u8, 97u8, 105u8, 108u8, 101u8, 100u8, 10u8, 32u8, 32u8, 108u8, 101u8, 102u8, 116u8, 58u8, 32u8, 123u8, 125u8, 10u8, 32u8, 114u8, 105u8, 103u8, 104u8, 116u8, 58u8, 32u8, 123u8, 125u8], _left, _right))
+        };
+    }
+    public fun check_ne<T: copy + drop>(left: T, right: T) {
+        {
+            let (_left,_right) = (left, right);
+            if (_left != _right) () else abort 0x1::string::into_bytes(0x1::string_utils::format2<T, T>(&vector[97u8, 115u8, 115u8, 101u8, 114u8, 116u8, 105u8, 111u8, 110u8, 32u8, 96u8, 108u8, 101u8, 102u8, 116u8, 32u8, 33u8, 61u8, 32u8, 114u8, 105u8, 103u8, 104u8, 116u8, 96u8, 32u8, 102u8, 97u8, 105u8, 108u8, 101u8, 100u8, 10u8, 32u8, 32u8, 108u8, 101u8, 102u8, 116u8, 58u8, 32u8, 123u8, 125u8, 10u8, 32u8, 114u8, 105u8, 103u8, 104u8, 116u8, 58u8, 32u8, 123u8, 125u8], _left, _right))
+        };
+    }
+}
