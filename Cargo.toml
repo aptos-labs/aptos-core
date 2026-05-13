@@ -8,6 +8,7 @@ members = [
     "api/types",
     "aptos-move/aptos-abstract-gas-usage",
     "aptos-move/aptos-aggregator",
+    "aptos-move/aptos-dap",
     "aptos-move/aptos-debugger",
     "aptos-move/aptos-e2e-comparison-testing",
     "aptos-move/aptos-gas-algebra",
@@ -410,6 +411,7 @@ aptos-mempool = { path = "mempool" }
 aptos-mempool-notifications = { path = "state-sync/inter-component/mempool-notifications" }
 aptos-memsocket = { path = "network/memsocket" }
 aptos-metrics-core = { path = "crates/aptos-metrics-core" }
+aptos-dap = { path = "aptos-move/aptos-dap" }
 aptos-move-cli = { path = "aptos-move/cli" }
 aptos-move-debugger = { path = "aptos-move/aptos-debugger" }
 aptos-move-examples = { path = "aptos-move/move-examples" }

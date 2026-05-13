@@ -1191,6 +1191,37 @@ dependencies = [
 ]
 
 [[package]]
+name = "aptos-dap"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "aptos-framework",
+ "aptos-gas-schedule",
+ "aptos-move-cli",
+ "aptos-move-debugger",
+ "aptos-rest-client",
+ "aptos-types",
+ "aptos-validator-interface",
+ "aptos-vm-environment",
+ "clap 4.5.60",
+ "crossbeam-channel",
+ "dap",
+ "hex",
+ "indexmap 2.7.0",
+ "legacy-move-compiler",
+ "move-binary-format",
+ "move-model",
+ "move-package",
+ "move-unit-test",
+ "move-vm-runtime",
+ "move-vm-types",
+ "serde_json",
+ "tempfile",
+ "tokio",
+ "url",
+]
+
+[[package]]
 name = "aptos-data-client"
 version = "0.1.0"
 dependencies = [
@@ -7957,6 +7988,17 @@ dependencies = [
  "serde",
  "subtle-ng",
  "zeroize",
+]
+
+[[package]]
+name = "dap"
+version = "0.4.1-alpha1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "35c7fc89d334ab745ba679f94c7314c9b17ecdcd923c111df6206e9fd7729fa9"
+dependencies = [
+ "serde",
+ "serde_json",
+ "thiserror 1.0.69",
 ]
 
 [[package]]

@@ -1,0 +1,42 @@
+[package]
+name = "aptos-dap"
+version = "0.1.0"
+description = "Debug Adapter Protocol server for replaying Move transactions"
+
+# Workspace inherited keys
+authors = { workspace = true }
+edition = { workspace = true }
+homepage = { workspace = true }
+license = { workspace = true }
+publish = { workspace = true }
+repository = { workspace = true }
+rust-version = { workspace = true }
+
+[dependencies]
+anyhow = { workspace = true }
+aptos-framework = { workspace = true }
+aptos-gas-schedule = { workspace = true }
+aptos-move-cli = { workspace = true, features = ["testing"] }
+aptos-move-debugger = { workspace = true }
+aptos-rest-client = { workspace = true }
+aptos-types = { workspace = true }
+aptos-validator-interface = { workspace = true }
+aptos-vm-environment = { workspace = true }
+clap = { workspace = true }
+crossbeam-channel = { workspace = true }
+dap = "0.4.1-alpha1"
+hex = { workspace = true }
+legacy-move-compiler = { workspace = true }
+move-binary-format = { workspace = true }
+move-model = { workspace = true }
+move-package = { workspace = true }
+move-unit-test = { workspace = true }
+move-vm-runtime = { workspace = true }
+move-vm-types = { workspace = true }
+serde_json = { workspace = true }
+tokio = { workspace = true }
+url = { workspace = true }
+
+[dev-dependencies]
+indexmap = { workspace = true }
+tempfile = { workspace = true }
