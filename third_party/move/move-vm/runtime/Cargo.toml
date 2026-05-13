@@ -20,6 +20,7 @@ bitvec = { workspace = true }
 bytes = { workspace = true }
 cfg-if = { workspace = true }
 claims = { workspace = true }
+crossbeam-channel = { workspace = true }
 fail = { workspace = true }
 fxhash = { workspace = true }
 hashbrown = { workspace = true }
