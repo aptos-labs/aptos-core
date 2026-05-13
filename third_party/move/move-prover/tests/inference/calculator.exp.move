@@ -117,14 +117,15 @@ module 0x66::calculator {
     entry fun number(s: &signer, x: u64) acquires State {
         process(s, Input::Number(x))
     }
-    spec number(s: &signer, x: u64) {
+    spec number {
         use 0x1::signer;
         pragma opaque = true;
         modifies State[signer::address_of(s)];
         ensures [inferred] ensures_of<process>(s, Input::Number(x));
         aborts_if [inferred] aborts_of<process>(s, Input::Number(x));
+    } proof {
+        split State[address_of(s)];
     }
-
 
     entry fun add(s: &signer) acquires State {
         process(s, Input::Add)

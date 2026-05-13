@@ -1,0 +1,66 @@
+=== stackless ===
+// module 0x66::test
+
+fun get_val(): u64 {
+  slots: params(0), locals(0), temps(1)
+    r0: u64
+  code:
+  L0:
+    0: r0 := ld_u64 42
+    1: ret [r0]
+}
+
+fun consume(r0): u64 {
+  slots: params(1), locals(0), temps(1)
+    r0: u64
+    r1: u64
+  code:
+  L0:
+    0: r1 := ld_u64 99
+    1: ret [r1]
+}
+
+fun trigger(r0): u64 {
+  slots: params(1), locals(0), temps(0), xfer(1)
+    r0: u64
+  code:
+  L2:
+    0: br_gt L0, r0, #0
+  L1:
+    1: [x0] := call get_val, []
+    2: ret [x0]
+  L0:
+    3: x0 := ld_u64 5
+    4: [x0] := call consume, [x0]
+    5: ret [x0]
+}
+=== micro-ops ===
+// module 0x66::test
+
+fun get_val() {
+  frame_data_size: 8
+  code:
+    0: StoreImm8 [0] <- #42
+    1: Return
+}
+
+fun consume() {
+  frame_data_size: 16
+  code:
+    0: StoreImm8 [8] <- #99
+    1: Move8 [0] <- [8]
+    2: Return
+}
+
+fun trigger() {
+  frame_data_size: 8
+  code:
+    0: JumpGreaterU64Imm @4 [0] > #0
+    1: CallFunc #0
+    2: Move8 [0] <- [32]
+    3: Return
+    4: StoreImm8 [32] <- #5
+    5: CallFunc #1
+    6: Move8 [0] <- [32]
+    7: Return
+}

@@ -18,6 +18,7 @@ use aptos_batch_encryption::{
     group::{Fr, G2Affine, Pairing},
     shared::{digest::DigestKey, digest_key_file, encryption_key::EncryptionKey},
 };
+use aptos_bitvec::BitVec;
 use aptos_crypto::{bls12381, weighted_config::WeightedConfigArkworks};
 use aptos_crypto_derive::{BCSCryptoHash, CryptoHasher};
 use aptos_dkg::pvss::{
@@ -25,8 +26,7 @@ use aptos_dkg::pvss::{
         DecryptPrivKey, EncryptPubKey, InputSecret, PublicParameters, SignedWeightedTranscript,
         WeightedSubtranscript,
     },
-    traits::{transcript::Transcript, TranscriptCore},
-    Player,
+    traits::TranscriptCore,
 };
 use ark_ec::AffineRepr;
 use fixed::types::U64F64;
@@ -35,7 +35,7 @@ use move_core_types::{
     move_resource::MoveStructType,
 };
 use once_cell::sync::Lazy;
-use rand::{rngs::StdRng, CryptoRng, RngCore, SeedableRng};
+use rand::{rngs::StdRng, SeedableRng};
 use serde::{Deserialize, Serialize};
 use std::{
     cmp::max,
@@ -270,11 +270,15 @@ pub fn initialize_digest_key(chain_id: ChainId, is_validator: bool) -> DigestKey
     }
 }
 
-/// An aggregated transcript with the list of dealers who contributed to it.
+/// An aggregated transcript with the set of dealers who contributed to it.
+///
+/// Dealers are represented as a `BitVec` bitmask over validator indices,
+/// which inherently prevents duplicates and ensures canonical ordering.
 #[derive(Clone, Debug, Serialize, Deserialize, CryptoHasher, BCSCryptoHash)]
 pub struct AggregatedSubtranscript {
+    pub dealer_epoch: u64,
     pub subtranscript: ChunkySubtranscript,
-    pub dealers: Vec<Player>,
+    pub dealer_bitmask: BitVec,
 }
 
 impl AggregatedSubtranscript {
@@ -333,28 +337,6 @@ pub struct ChunkyDKGSession {
 }
 
 impl ChunkyDKGSession {
-    pub fn deal<A: Serialize + Clone, R: RngCore + CryptoRng>(
-        &self,
-        ssk: &DealerPrivateKey,
-        spk: &DealerPublicKey,
-        s: &ChunkyInputSecret,
-        sid: &A,
-        dealer: &Player,
-        rng: &mut R,
-    ) -> ChunkyTranscript {
-        ChunkyTranscript::deal(
-            &self.threshold_config,
-            &self.public_parameters,
-            ssk,
-            spk,
-            &self.eks,
-            s,
-            sid,
-            dealer,
-            rng,
-        )
-    }
-
     /// Create a new DKG session from on-chain session metadata.
     pub fn new(dkg_session_metadata: &ChunkyDKGSessionMetadata) -> Arc<ChunkyDKGSession> {
         let onchain_config = dkg_session_metadata

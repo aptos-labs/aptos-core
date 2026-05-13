@@ -1,0 +1,37 @@
+// RUN: publish --print(stackless,micro-ops)
+module 0x66::test
+
+fun three_rets(): (u64, u64, u64)
+    ld_u64 1
+    ld_u64 2
+    ld_u64 3
+    ret
+
+fun three_args(_a: &mut u64, _b: u64, _c: u64)
+    ret
+
+fun caller(x: &mut u64)
+    local loc_a: u64
+    local loc_c: u64
+    call three_rets
+    st_loc loc_c
+    pop
+    st_loc loc_a
+    move_loc x
+    move_loc loc_a
+    ld_u64 0
+    call three_args
+    ret
+
+// Wrapper: harness can only pass u64 args.
+fun trigger(): u64
+    local v: u64
+    ld_u64 99
+    st_loc v
+    mut_borrow_loc v
+    call caller
+    move_loc v
+    ret
+
+// RUN: execute 0x66::test::trigger
+// CHECK: results: 99

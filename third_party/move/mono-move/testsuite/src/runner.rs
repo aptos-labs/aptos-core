@@ -4,14 +4,19 @@
 //! Executes parsed test steps against both MoveVM and mono-move, producing
 //! normalized output for comparison.
 
-use crate::{matcher::check_output, parser::Step};
-use anyhow::anyhow;
-use legacy_move_compiler::{compiled_unit::CompiledUnit, shared::known_attributes::KnownAttribute};
+use crate::{
+    compile::{compile, SourceKind},
+    matcher::check_output,
+    module_provider::InMemoryModuleProvider,
+    parser::{PrintSection, Step},
+    print_sections,
+};
+use anyhow::{anyhow, bail};
+use mono_move_core::ExecutionContext;
 use mono_move_gas::SimpleGasMeter;
 use mono_move_global_context::{ExecutionGuard, GlobalContext};
+use mono_move_loader::{Loader, LoadingPolicy, LoweringPolicy, TransactionContext};
 use mono_move_runtime::InterpreterContext;
-use move_binary_format::CompiledModule;
-use move_compiler_v2::{run_move_compiler_to_stderr, Options};
 use move_core_types::{
     account_address::AccountAddress, identifier::IdentStr, language_storage::ModuleId,
     value::MoveValue,
@@ -34,17 +39,22 @@ struct Output {
     num_returns: usize,
 }
 
-/// Run all steps in a differential test, checking both VMs produce matching output.
-pub fn run_test(steps: Vec<Step>) -> anyhow::Result<()> {
+/// Run all steps in a differential test, checking both VMs produce matching
+/// output. If any `Publish` step requested `--print(...)` sections, the
+/// rendered snapshot is verified against (or written to with `UPBL=1`) a
+/// `.exp` baseline alongside `test_path`.
+pub fn run_test(steps: Vec<Step>, kind: SourceKind, test_path: &Path) -> anyhow::Result<()> {
     let ctx = GlobalContext::with_num_execution_workers(1);
     let guard = ctx.try_execution_context(0).unwrap();
 
     let mut storage = InMemoryStorage::new();
+    let mut module_provider = InMemoryModuleProvider::new();
+    let mut snapshot = String::new();
 
     for step in steps {
         match step {
-            Step::Publish { sources } => {
-                let modules = compile_move_modules(&sources);
+            Step::Publish { sources, print } => {
+                let modules = compile(&sources, kind)?;
                 for module in &modules {
                     // V1 path.
                     let mut blob = vec![];
@@ -56,13 +66,19 @@ pub fn run_test(steps: Vec<Step>) -> anyhow::Result<()> {
                     // etc.) — sufficient for differential testing.
                     storage.add_module_bytes(module.self_addr(), module.self_name(), blob.into());
 
-                    // V2 path.
-                    let id = guard.intern_address_name(module.self_addr(), module.self_name());
-                    let executable = guard
-                        .executable_builder_for_module(module)
-                        .build()
-                        .map_err(|err| anyhow!("Failed to build executable: {}", err))?;
-                    guard.insert_executable(id, executable);
+                    // V2 path: stage the bytes; the loader builds executables
+                    // lazily on first dispatch.
+                    module_provider.add_module(module);
+                }
+
+                if !print.is_empty() {
+                    if matches!(kind, SourceKind::Masm) && print.contains(&PrintSection::Bytecode) {
+                        bail!(
+                            "`bytecode` is not a valid print section for .masm inputs — \
+                             the bytecode is the input"
+                        );
+                    }
+                    snapshot.push_str(&print_sections::render(&guard, &modules, &print)?);
                 }
             },
             Step::Execute {
@@ -76,6 +92,7 @@ pub fn run_test(steps: Vec<Step>) -> anyhow::Result<()> {
                     execute_function_v1(&storage, &address, &module_name, &function_name, &args);
                 let v2_output = execute_function_v2(
                     &guard,
+                    &module_provider,
                     &address,
                     &module_name,
                     &function_name,
@@ -87,40 +104,12 @@ pub fn run_test(steps: Vec<Step>) -> anyhow::Result<()> {
         }
     }
 
-    Ok(())
-}
-
-/// Compile Move sources into binary format.
-pub fn compile_move_modules(sources: &str) -> Vec<CompiledModule> {
-    use std::io::Write;
-
-    let tmp_dir = tempfile::tempdir().expect("Should always be able to create temporary directory");
-    let path = tmp_dir.path().join("sources.move");
-    std::fs::File::create(&path)
-        .and_then(|mut f| f.write_all(sources.as_bytes()))
-        .expect("failed to write temp source file");
-
-    let options = compiler_options(&path);
-    run_move_compiler_to_stderr(options)
-        .unwrap_or_else(|err| panic!("Move compilation failed: {}", err))
-        .1
-        .into_iter()
-        .map(|unit| match unit.into_compiled_unit() {
-            CompiledUnit::Module(m) => m.module,
-            CompiledUnit::Script(_) => unreachable!("Only modules can be published"),
-        })
-        .collect()
-}
-
-/// Returns default compiler options used in the test.
-fn compiler_options(sources_path: &Path) -> Options {
-    Options {
-        sources: vec![sources_path.to_string_lossy().into_owned()],
-        dependencies: vec![],
-        named_address_mapping: vec![],
-        known_attributes: KnownAttribute::get_all_attribute_names().clone(),
-        ..Options::default()
+    if !snapshot.is_empty() {
+        let baseline = test_path.with_extension("exp");
+        move_prover_test_utils::baseline_test::verify_or_update_baseline(&baseline, &snapshot)?;
     }
+
+    Ok(())
 }
 
 /// Execute a function via legacy MoveVM and returns normalized output.
@@ -206,6 +195,7 @@ fn execute_function_v1(
 /// Executes a function via MonoMove VM, and returns normalized output.
 fn execute_function_v2(
     guard: &ExecutionGuard<'_>,
+    module_provider: &InMemoryModuleProvider,
     address: &AccountAddress,
     module_name: &IdentStr,
     function_name: &IdentStr,
@@ -213,17 +203,38 @@ fn execute_function_v2(
     // TODO: Remove once function carries type signature.
     num_returns: usize,
 ) -> Output {
-    // Look up the executable from the context's cache.
-    let id = guard.intern_address_name(address, module_name);
-    let function_name = guard.intern_identifier(function_name);
-    let function = guard
-        .get_executable(id)
-        .and_then(|executable| executable.get_function(function_name))
-        .unwrap_or_else(|| panic!("Failed to load function or find executable"));
+    // Construct a per-transaction context.
+    let loader = Loader::new_with_policy(
+        guard,
+        module_provider,
+        LoadingPolicy::Lazy(LoweringPolicy::Lazy),
+    );
+    let mut txn_ctx = TransactionContext::new(guard, loader, SimpleGasMeter::new(u64::MAX));
 
-    let gas_meter = SimpleGasMeter::new(u64::MAX);
+    // Resolve the entry function via load_function so the entry module is
+    // lazily loaded into the read-set and gas is charged for the load.
+    let id = guard
+        .intern_address_name(address, module_name)
+        .into_global_arena_ptr();
+    let function_name = guard
+        .intern_identifier(function_name)
+        .into_global_arena_ptr();
+
+    // SAFETY: the pointer lives in a `LoadedModule`'s arena. While `guard`
+    // is held, the global executable cache cannot enter the maintenance
+    // phase, so no arena reset can happen for the duration of this step.
+    let function = match txn_ctx.load_function(id, function_name) {
+        Ok(p) => unsafe { p.as_ref_unchecked() },
+        Err(err) => {
+            return Output {
+                display: format!("error: {}", err),
+                num_returns: 0,
+            };
+        },
+    };
+
     // TODO: Set object descriptor table when supported.
-    let mut interpreter = InterpreterContext::new(&[], gas_meter, function);
+    let mut interpreter = InterpreterContext::new(&mut txn_ctx, &[], function);
 
     // TODO: Check function signature to decide how to parse arguments.
     for (i, arg) in args.iter().enumerate() {
@@ -239,20 +250,12 @@ fn execute_function_v2(
             num_returns: 0,
         },
         Ok(()) => {
-            if num_returns == 0 {
-                // TODO: Check frame contents?
-                Output {
-                    display: "results:".to_string(),
-                    num_returns: 0,
-                }
-            } else {
-                let vals = (0..num_returns)
-                    .map(|i| interpreter.root_result_at((i * 8) as u32).to_string())
-                    .collect::<Vec<_>>();
-                Output {
-                    display: format!("results: {}", vals.join(", ")),
-                    num_returns,
-                }
+            let vals = (0..num_returns)
+                .map(|i| interpreter.root_result_at((i * 8) as u32).to_string())
+                .collect::<Vec<_>>();
+            Output {
+                display: format!("results: {}", vals.join(", ")),
+                num_returns,
             }
         },
     }

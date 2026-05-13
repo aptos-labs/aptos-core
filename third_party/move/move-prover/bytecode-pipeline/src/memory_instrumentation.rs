@@ -216,6 +216,7 @@ impl<'a> Instrumenter<'a> {
             | Fun(..)
             | TypeDomain(_)
             | ResourceDomain(_, _, _)
+            | StateDomain
             | Error
             | Var(_) => false,
         }

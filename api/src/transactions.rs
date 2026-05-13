@@ -1344,10 +1344,17 @@ impl TransactionsApi {
                     ));
                 }
 
-                let auth_key = signed_transaction
+                if payload.extra_config().is_multisig() {
+                    return Err(SubmitTransactionError::bad_request_with_code(
+                        "Encrypted transactions do not support multisig",
+                        AptosErrorCode::InvalidInput,
+                        ledger_info,
+                    ));
+                }
+
+                let signer_auth_keys = signed_transaction
                     .authenticator()
-                    .sender()
-                    .authentication_key()
+                    .all_signer_auth_keys(signed_transaction.sender())
                     .ok_or_else(|| {
                         SubmitTransactionError::bad_request_with_code(
                             "Encrypted transactions are not supported with this authenticator type",
@@ -1356,7 +1363,7 @@ impl TransactionsApi {
                         )
                     })?;
 
-                if let Err(e) = payload.verify(signed_transaction.sender(), auth_key) {
+                if let Err(e) = payload.verify(signed_transaction.sender(), signer_auth_keys) {
                     return Err(SubmitTransactionError::bad_request_with_code(
                         e.context("Encrypted transaction payload could not be verified"),
                         AptosErrorCode::InvalidInput,

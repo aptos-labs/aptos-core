@@ -63,18 +63,21 @@ pub fn native_merge_sort(v: &mut [u64]) {
 mod micro_op {
     use mono_move_alloc::{ExecutableArena, ExecutableArenaPtr, GlobalArenaPtr};
     use mono_move_core::{
-        CodeOffset as CO, DescriptorId, FrameLayoutInfo, FrameOffset as FO, Function, MicroOp::*,
+        CodeOffset as CO, FrameLayoutInfo, FrameOffset as FO, Function, MicroOp::*,
         SortedSafePointEntries, FRAME_METADATA_SIZE,
     };
-    use mono_move_runtime::ObjectDescriptor;
+    use mono_move_runtime::{ObjectDescriptor, ObjectDescriptorTable};
 
     pub fn program() -> (
         Vec<Option<ExecutableArenaPtr<Function>>>,
-        Vec<ObjectDescriptor>,
+        ObjectDescriptorTable,
         ExecutableArena,
     ) {
         let arena = ExecutableArena::new();
         let meta = FRAME_METADATA_SIZE as u32;
+
+        let mut descriptors = ObjectDescriptorTable::new();
+        let desc_vec_u64 = descriptors.push(ObjectDescriptor::new_vector(8, vec![]).unwrap());
 
         // =================================================================
         // Function 0 — merge_sort(vec)
@@ -92,13 +95,13 @@ mod micro_op {
             let vec = 0u32;
             let len = 8u32;
             let vec_ref = 16u32;
-            let args_and_locals_size = 32u32;
-            let callee_vec = args_and_locals_size + meta;
+            let param_and_local_sizes_sum = 32u32;
+            let callee_vec = param_and_local_sizes_sum + meta;
             let callee_lo = callee_vec + 8;
             let callee_hi = callee_lo + 8;
 
             #[rustfmt::skip]
-            let code = vec![
+            let code = [
                 SlotBorrow { dst: FO(vec_ref), local: FO(vec) },
                 VecLen { dst: FO(len), vec_ref: FO(vec_ref) },
                 Move8 { dst: FO(callee_vec), src: FO(vec) },
@@ -112,12 +115,13 @@ mod micro_op {
             arena.alloc(Function {
                 name: GlobalArenaPtr::from_static("merge_sort"),
                 code,
-                args_size: 8,
-                args_and_locals_size: args_and_locals_size as usize,
+                param_sizes: ExecutableArenaPtr::empty_slice(),
+                param_sizes_sum: 8,
+                param_and_local_sizes_sum: param_and_local_sizes_sum as usize,
                 extended_frame_size: (callee_hi + 8) as usize,
                 zero_frame: true,
-                frame_layout: FrameLayoutInfo::new(&arena, vec![FO(vec), FO(vec_ref)]),
-                safe_point_layouts: SortedSafePointEntries::empty(&arena),
+                frame_layout: FrameLayoutInfo::new(&arena, [FO(vec), FO(vec_ref)]),
+                safe_point_layouts: SortedSafePointEntries::empty(),
             })
         };
 
@@ -142,14 +146,14 @@ mod micro_op {
             let hi = 16u32;
             let mid = 24u32;
             let tmp = 32u32;
-            let args_and_locals_size = 40u32;
-            let callee_0 = args_and_locals_size + meta;
+            let param_and_local_sizes_sum = 40u32;
+            let callee_0 = param_and_local_sizes_sum + meta;
             let callee_1 = callee_0 + 8;
             let callee_2 = callee_1 + 8;
             let callee_3 = callee_2 + 8;
 
             #[rustfmt::skip]
-            let code = vec![
+            let code = [
                 // if lo + 1 < hi, continue; else return
                 AddU64Imm { dst: FO(tmp), src: FO(lo), imm: 1 },
                 JumpLessU64 { target: CO(3), lhs: FO(tmp), rhs: FO(hi) },
@@ -180,12 +184,13 @@ mod micro_op {
             arena.alloc(Function {
                 name: GlobalArenaPtr::from_static("merge_sort_range"),
                 code,
-                args_size: 24,
-                args_and_locals_size: args_and_locals_size as usize,
+                param_sizes: ExecutableArenaPtr::empty_slice(),
+                param_sizes_sum: 24,
+                param_and_local_sizes_sum: param_and_local_sizes_sum as usize,
                 extended_frame_size: (callee_3 + 8) as usize,
                 zero_frame: true,
-                frame_layout: FrameLayoutInfo::new(&arena, vec![FO(vec)]),
-                safe_point_layouts: SortedSafePointEntries::empty(&arena),
+                frame_layout: FrameLayoutInfo::new(&arena, [FO(vec)]),
+                safe_point_layouts: SortedSafePointEntries::empty(),
             })
         };
 
@@ -223,7 +228,7 @@ mod micro_op {
             let tmp_ref = 104u32;
 
             #[rustfmt::skip]
-            let code = vec![
+            let code = [
                 // i = lo; j = mid; tmp = new vec
                 Move8 { dst: FO(i), src: FO(lo) },                              // 0
                 Move8 { dst: FO(j), src: FO(mid) },                             // 1
@@ -245,12 +250,12 @@ mod micro_op {
                               idx: FO(j), elem_size: 8 },                       // 11
                 JumpLessU64 { target: CO(16), lhs: FO(elem_a), rhs: FO(elem_b) }, // 12
                 // a >= b: push b
-                VecPushBack { vec_ref: FO(tmp_ref), elem: FO(elem_b), elem_size: 8, descriptor_id: DescriptorId(0) }, // 13
+                VecPushBack { vec_ref: FO(tmp_ref), elem: FO(elem_b), elem_size: 8, descriptor_id: desc_vec_u64 }, // 13
                 AddU64Imm { dst: FO(j), src: FO(j), imm: 1 },                  // 14
                 Jump { target: CO(5) },                                          // 15
 
                 // PUSH_LEFT (16): a < b, push a
-                VecPushBack { vec_ref: FO(tmp_ref), elem: FO(elem_a), elem_size: 8, descriptor_id: DescriptorId(0) }, // 16
+                VecPushBack { vec_ref: FO(tmp_ref), elem: FO(elem_a), elem_size: 8, descriptor_id: desc_vec_u64 }, // 16
                 AddU64Imm { dst: FO(i), src: FO(i), imm: 1 },                  // 17
                 Jump { target: CO(5) },                                          // 18
 
@@ -259,7 +264,7 @@ mod micro_op {
                 Jump { target: CO(31) },                                         // 20
                 VecLoadElem { dst: FO(elem_a), vec_ref: FO(vec_ref),
                               idx: FO(i), elem_size: 8 },                       // 21
-                VecPushBack { vec_ref: FO(tmp_ref), elem: FO(elem_a), elem_size: 8, descriptor_id: DescriptorId(0) }, // 22
+                VecPushBack { vec_ref: FO(tmp_ref), elem: FO(elem_a), elem_size: 8, descriptor_id: desc_vec_u64 }, // 22
                 AddU64Imm { dst: FO(i), src: FO(i), imm: 1 },                  // 23
                 Jump { target: CO(19) },                                         // 24
 
@@ -268,7 +273,7 @@ mod micro_op {
                 Jump { target: CO(31) },                                         // 26
                 VecLoadElem { dst: FO(elem_b), vec_ref: FO(vec_ref),
                               idx: FO(j), elem_size: 8 },                       // 27
-                VecPushBack { vec_ref: FO(tmp_ref), elem: FO(elem_b), elem_size: 8, descriptor_id: DescriptorId(0) }, // 28
+                VecPushBack { vec_ref: FO(tmp_ref), elem: FO(elem_b), elem_size: 8, descriptor_id: desc_vec_u64 }, // 28
                 AddU64Imm { dst: FO(j), src: FO(j), imm: 1 },                  // 29
                 Jump { target: CO(25) },                                         // 30
 
@@ -291,21 +296,21 @@ mod micro_op {
             arena.alloc(Function {
                 name: GlobalArenaPtr::from_static("merge"),
                 code,
-                args_size: 32,
-                args_and_locals_size: 120,
+                param_sizes: ExecutableArenaPtr::empty_slice(),
+                param_sizes_sum: 32,
+                param_and_local_sizes_sum: 120,
                 extended_frame_size: 144,
                 zero_frame: true,
-                frame_layout: FrameLayoutInfo::new(&arena, vec![
+                frame_layout: FrameLayoutInfo::new(&arena, [
                     FO(vec),
                     FO(tmp),
                     FO(vec_ref),
                     FO(tmp_ref),
                 ]),
-                safe_point_layouts: SortedSafePointEntries::empty(&arena),
+                safe_point_layouts: SortedSafePointEntries::empty(),
             })
         };
 
-        let descriptors = vec![ObjectDescriptor::Trivial];
         (
             vec![
                 Some(func_merge_sort),

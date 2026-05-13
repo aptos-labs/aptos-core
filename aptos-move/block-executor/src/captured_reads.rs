@@ -1461,6 +1461,15 @@ impl ModuleStorage for SnapshotModuleView<'_> {
             },
         }
     }
+
+    #[cfg(fuzzing)]
+    fn unmetered_get_module_skip_verification(
+        &self,
+        _address: &AccountAddress,
+        _module_name: &IdentStr,
+    ) -> VMResult<Option<Arc<Module>>> {
+        Ok(None)
+    }
 }
 
 #[cfg(test)]

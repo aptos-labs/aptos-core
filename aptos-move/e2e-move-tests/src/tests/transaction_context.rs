@@ -2,12 +2,18 @@
 // Licensed pursuant to the Innovation-Enabling Source Code License, available at https://github.com/aptos-labs/aptos-core/blob/main/LICENSE
 
 use crate::{tests::common, BlockSplit, SUCCESS};
+use aptos_crypto::HashValue;
 use aptos_language_e2e_tests::account::{Account, TransactionBuilder};
 use aptos_move_e2e_test_harness::{assert_success, MoveHarness};
 use aptos_types::{
     move_utils::MemberId,
     on_chain_config::FeatureFlag,
-    transaction::{EntryFunction, MultisigTransactionPayload, TransactionPayload},
+    secret_sharing::{Ciphertext, EvalProof},
+    transaction::{
+        encrypted_payload::{DecryptedPlaintext, EncryptedInner, EncryptedPayload},
+        EntryFunction, MultisigTransactionPayload, TransactionExecutable, TransactionExtraConfig,
+        TransactionPayload,
+    },
 };
 use bcs::to_bytes;
 use move_core_types::{
@@ -33,6 +39,7 @@ struct TransactionContextStore {
     type_arg_names: Vec<String>,
     args: Vec<Vec<u8>>,
     multisig_address: AccountAddress,
+    is_encrypted_txn: bool,
     // Fields for monotonically increasing counter tests
     counter_values: Vec<u128>,
     counter_timestamps: Vec<u64>,
@@ -279,6 +286,89 @@ fn test_transaction_context_chain_id() {
 
     let chain_id = call_get_chain_id_from_native_txn_context(&mut harness, &account);
     assert_eq!(chain_id, 4);
+}
+
+#[test]
+fn test_transaction_context_is_encrypted_txn_false_for_normal_txn() {
+    let mut harness = new_move_harness();
+    let account = setup(&mut harness);
+
+    let status = harness.run_entry_function(
+        &account,
+        str::parse("0x1::transaction_context_test::store_is_encrypted_txn").unwrap(),
+        vec![],
+        vec![],
+    );
+    assert!(status.status().unwrap().is_success());
+
+    let txn_ctx_store = harness
+        .read_resource::<TransactionContextStore>(
+            account.address(),
+            parse_struct_tag("0x1::transaction_context_test::TransactionContextStore").unwrap(),
+        )
+        .unwrap();
+
+    assert!(!txn_ctx_store.is_encrypted_txn);
+}
+
+#[test]
+fn test_transaction_context_is_encrypted_txn_true() {
+    let mut harness = MoveHarness::new_with_features(
+        vec![
+            FeatureFlag::GAS_PAYER_ENABLED,
+            FeatureFlag::SPONSORED_AUTOMATIC_ACCOUNT_V1_CREATION,
+            FeatureFlag::TRANSACTION_CONTEXT_EXTENSION,
+            FeatureFlag::ENCRYPTED_TRANSACTIONS,
+        ],
+        vec![],
+    );
+    harness.default_gas_unit_price = 200;
+    let account = setup(&mut harness);
+
+    let entry_fn = EntryFunction::new(
+        ModuleId::new(
+            CORE_CODE_ADDRESS,
+            ident_str!("transaction_context_test").to_owned(),
+        ),
+        ident_str!("store_is_encrypted_txn").to_owned(),
+        vec![],
+        vec![],
+    );
+    let entry_fn_executable = TransactionExecutable::EntryFunction(entry_fn.clone());
+
+    let original = EncryptedInner {
+        ciphertext: Ciphertext::random(),
+        extra_config: TransactionExtraConfig::V1 {
+            multisig_address: None,
+            replay_protection_nonce: None,
+        },
+        payload_hash: HashValue::random(),
+        encryption_epoch: 1,
+        claimed_entry_fun: None,
+    };
+
+    let encrypted_payload = EncryptedPayload::Encrypted(original.clone());
+    let payload = TransactionPayload::EncryptedPayload(encrypted_payload);
+    let mut txn = harness.create_transaction_payload(&account, payload);
+
+    let decrypted_payload = EncryptedPayload::Decrypted {
+        original,
+        eval_proof: EvalProof::random(),
+        decrypted: DecryptedPlaintext::new(entry_fn_executable, [0u8; 16]),
+    };
+    *txn.payload_mut() = TransactionPayload::EncryptedPayload(decrypted_payload);
+
+    let output = harness.run_raw(txn);
+    assert_success!(*output.status());
+
+    let txn_ctx_store = harness
+        .read_resource::<TransactionContextStore>(
+            account.address(),
+            parse_struct_tag("0x1::transaction_context_test::TransactionContextStore").unwrap(),
+        )
+        .unwrap();
+
+    assert!(txn_ctx_store.is_encrypted_txn);
 }
 
 #[test]

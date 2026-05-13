@@ -137,15 +137,22 @@ async function main() {
             profilePrefix,
             featureSuffix,
           )}`;
+          // Second ref: same image, tag with git SHA appended (joinTagSegments adds "_" before the sha segment).
+          const imageTargetWithSha = joinTagSegments(imageTarget, parsedArgs.GIT_SHA);
           await waitForImageToBecomeAvailable(imageSource, parsedArgs.WAIT_FOR_IMAGE_SECONDS);
           if (parsedArgs.DRY_RUN) {
-            console.info(chalk.yellow(`INFO: skipping copy of ${imageSource} to ${imageTarget} due to dry run`));
+            console.info(
+              chalk.yellow(
+                `INFO: skipping copy of ${imageSource} to ${imageTarget} and ${imageTargetWithSha} due to dry run`,
+              ),
+            );
             continue;
           } else {
             console.info(chalk.green(`INFO: copying ${imageSource} to ${imageTarget}`));
+            console.info(chalk.green(`INFO: copying ${imageSource} to ${imageTargetWithSha}`));
           }
           await $`${crane} copy ${imageSource} ${imageTarget}`;
-          await $`${crane} copy ${imageSource} ${joinTagSegments(imageTarget, parsedArgs.GIT_SHA)}`;
+          await $`${crane} copy ${imageSource} ${imageTargetWithSha}`;
         }
       }
     }

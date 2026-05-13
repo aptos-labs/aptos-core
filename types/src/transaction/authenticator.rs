@@ -330,6 +330,46 @@ impl TransactionAuthenticator {
         }
     }
 
+    /// Collect `(address, auth_key)` pairs for every signer in the transaction,
+    /// in deterministic order: sender, then secondary signers, then fee payer.
+    /// Returns `None` if any signer uses an authenticator incompatible with
+    /// encrypted transactions (keyless, abstract auth, etc.).
+    pub fn all_signer_auth_keys(
+        &self,
+        sender_address: AccountAddress,
+    ) -> Option<Vec<(AccountAddress, AuthenticationKey)>> {
+        let mut result = Vec::new();
+
+        let sender_auth = self.sender();
+        if !sender_auth.supports_encrypted_txn() {
+            return None;
+        }
+        result.push((sender_address, sender_auth.authentication_key()?));
+
+        let secondary_addresses = self.secondary_signer_addresses();
+        let secondary_auths = self.secondary_signers();
+        if secondary_addresses.len() != secondary_auths.len() {
+            return None;
+        }
+        for (addr, auth) in secondary_addresses.into_iter().zip(secondary_auths.iter()) {
+            if !auth.supports_encrypted_txn() {
+                return None;
+            }
+            result.push((addr, auth.authentication_key()?));
+        }
+
+        if let (Some(fee_payer_addr), Some(fee_payer_auth)) =
+            (self.fee_payer_address(), self.fee_payer_signer())
+        {
+            if !fee_payer_auth.supports_encrypted_txn() {
+                return None;
+            }
+            result.push((fee_payer_addr, fee_payer_auth.authentication_key()?));
+        }
+
+        Some(result)
+    }
+
     pub fn all_signers(&self) -> Vec<AccountAuthenticator> {
         match self {
             // This is to ensure that any new TransactionAuthenticator variant must update this function.
@@ -763,6 +803,19 @@ impl AccountAuthenticator {
 
     pub fn is_abstracted(&self) -> bool {
         matches!(self, Self::Abstract { .. })
+    }
+
+    pub fn supports_encrypted_txn(&self) -> bool {
+        match self {
+            Self::Ed25519 { .. } | Self::MultiEd25519 { .. } => true,
+            Self::SingleKey { authenticator } => {
+                authenticator.public_key().supports_encrypted_txn()
+            },
+            Self::MultiKey { authenticator } => {
+                authenticator.public_keys().supports_encrypted_txn()
+            },
+            Self::Abstract { .. } | Self::NoAccountAuthenticator => false,
+        }
     }
 
     /// Return Ok if the authenticator's public key matches its signature, Err otherwise
@@ -1222,6 +1275,12 @@ impl MultiKey {
         &self.public_keys
     }
 
+    pub fn supports_encrypted_txn(&self) -> bool {
+        self.public_keys
+            .iter()
+            .all(|pk| pk.supports_encrypted_txn())
+    }
+
     pub fn signatures_required(&self) -> u8 {
         self.signatures_required
     }
@@ -1436,6 +1495,16 @@ impl AnyPublicKey {
 
     pub fn federated_keyless(public_key: FederatedKeylessPublicKey) -> Self {
         Self::FederatedKeyless { public_key }
+    }
+
+    pub fn supports_encrypted_txn(&self) -> bool {
+        match self {
+            Self::Ed25519 { .. }
+            | Self::Secp256k1Ecdsa { .. }
+            | Self::Secp256r1Ecdsa { .. }
+            | Self::SlhDsa_Sha2_128s { .. } => true,
+            Self::Keyless { .. } | Self::FederatedKeyless { .. } => false,
+        }
     }
 
     pub fn to_bytes(&self) -> Vec<u8> {

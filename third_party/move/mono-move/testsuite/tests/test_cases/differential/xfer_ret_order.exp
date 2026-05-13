@@ -1,0 +1,71 @@
+=== stackless ===
+// module 0x66::xfer_ret_order
+
+fun three_rets(): u64 * u64 * u64 {
+  slots: params(0), locals(0), temps(3)
+    r0: u64
+    r1: u64
+    r2: u64
+  code:
+  L0:
+    0: r0 := ld_u64 1
+    1: r1 := ld_u64 2
+    2: r2 := ld_u64 3
+    3: ret [r0, r1, r2]
+}
+
+fun two_args(r0, r1): u64 {
+  slots: params(2), locals(0), temps(1)
+    r0: u64
+    r1: u64
+    r2: u64
+  code:
+  L0:
+    0: r2 := add r0, r1
+    1: ret [r2]
+}
+
+fun caller(): u64 {
+  slots: params(0), locals(0), temps(3), xfer(3)
+    r0: u64
+    r1: u64
+    r2: u64
+  code:
+  L0:
+    0: [r0, r1, r2] := call three_rets, []
+    1: [r2] := call two_args, [r1, r2]
+    2: ret [r0]
+}
+=== micro-ops ===
+// module 0x66::xfer_ret_order
+
+fun three_rets() {
+  frame_data_size: 32
+  code:
+    0: StoreImm8 [0] <- #1
+    1: StoreImm8 [8] <- #2
+    2: StoreImm8 [16] <- #3
+    3: Return
+}
+
+fun two_args() {
+  frame_data_size: 24
+  code:
+    0: AddU64 [16] <- [0] + [8]
+    1: Move8 [0] <- [16]
+    2: Return
+}
+
+fun caller() {
+  frame_data_size: 24
+  code:
+    0: CallFunc #0
+    1: Move8 [0] <- [48]
+    2: Move8 [8] <- [56]
+    3: Move8 [16] <- [64]
+    4: Move8 [56] <- [16]
+    5: Move8 [48] <- [8]
+    6: CallFunc #1
+    7: Move8 [16] <- [48]
+    8: Return
+}

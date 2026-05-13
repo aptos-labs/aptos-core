@@ -799,7 +799,7 @@ impl DbReader for FakeAptosDB {
 
     fn get_state_value_with_proof_by_version_ext(
         &self,
-        key_hash: &HashValue,
+        key_hash: HashValue,
         version: Version,
         root_depth: usize,
     ) -> Result<(Option<StateValue>, SparseMerkleProofExt)> {

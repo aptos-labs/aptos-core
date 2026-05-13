@@ -421,62 +421,56 @@ impl<'a, S: StateView> MoveConverter<'a, S> {
             Payload(aptos_types::transaction::TransactionPayloadInner::V1 {
                 executable,
                 extra_config,
-            }) => match extra_config {
-                aptos_types::transaction::TransactionExtraConfig::V1 {
-                    multisig_address,
-                    replay_protection_nonce: _,
-                } => {
-                    if let Some(multisig_address) = multisig_address {
-                        match executable {
-                            aptos_types::transaction::TransactionExecutable::EntryFunction(
-                                entry_function,
-                            ) => TransactionPayload::MultisigPayload(MultisigPayload {
-                                multisig_address: multisig_address.into(),
+            }) => {
+                let multisig_address = extra_config.multisig_address().map(Address::from);
+                if let Some(multisig_address) = multisig_address {
+                    match executable {
+                        aptos_types::transaction::TransactionExecutable::EntryFunction(
+                            entry_function,
+                        ) => TransactionPayload::MultisigPayload(MultisigPayload {
+                            multisig_address,
+                            transaction_payload: Some(
+                                MultisigTransactionPayload::EntryFunctionPayload(
+                                    try_into_entry_function_payload(entry_function)?,
+                                ),
+                            ),
+                        }),
+                        aptos_types::transaction::TransactionExecutable::Encrypted => {
+                            bail!("Encrypted executable is not supported for multisig transactions")
+                        },
+                        aptos_types::transaction::TransactionExecutable::Script(script) => {
+                            TransactionPayload::MultisigPayload(MultisigPayload {
+                                multisig_address,
                                 transaction_payload: Some(
-                                    MultisigTransactionPayload::EntryFunctionPayload(
-                                        try_into_entry_function_payload(entry_function)?,
+                                    MultisigTransactionPayload::ScriptPayload(
+                                        try_into_script_payload(script)?,
                                     ),
                                 ),
-                            }),
-                            aptos_types::transaction::TransactionExecutable::Encrypted => {
-                                bail!(
-                                    "Encrypted executable is not supported for multisig transactions"
-                                )
-                            },
-                            aptos_types::transaction::TransactionExecutable::Script(script) => {
-                                TransactionPayload::MultisigPayload(MultisigPayload {
-                                    multisig_address: multisig_address.into(),
-                                    transaction_payload: Some(
-                                        MultisigTransactionPayload::ScriptPayload(
-                                            try_into_script_payload(script)?,
-                                        ),
-                                    ),
-                                })
-                            },
-                            aptos_types::transaction::TransactionExecutable::Empty => {
-                                TransactionPayload::MultisigPayload(MultisigPayload {
-                                    multisig_address: multisig_address.into(),
-                                    transaction_payload: None,
-                                })
-                            },
-                        }
-                    } else {
-                        match executable {
-                            aptos_types::transaction::TransactionExecutable::EntryFunction(
-                                entry_function,
-                            ) => TransactionPayload::EntryFunctionPayload(
-                                try_into_entry_function_payload(entry_function)?,
-                            ),
-                            aptos_types::transaction::TransactionExecutable::Script(script) => {
-                                TransactionPayload::ScriptPayload(try_into_script_payload(script)?)
-                            },
-                            aptos_types::transaction::TransactionExecutable::Empty
-                            | aptos_types::transaction::TransactionExecutable::Encrypted => {
-                                bail!("Empty/encrypted executable is not supported for non-multisig transactions")
-                            },
-                        }
+                            })
+                        },
+                        aptos_types::transaction::TransactionExecutable::Empty => {
+                            TransactionPayload::MultisigPayload(MultisigPayload {
+                                multisig_address,
+                                transaction_payload: None,
+                            })
+                        },
                     }
-                },
+                } else {
+                    match executable {
+                        aptos_types::transaction::TransactionExecutable::EntryFunction(
+                            entry_function,
+                        ) => TransactionPayload::EntryFunctionPayload(
+                            try_into_entry_function_payload(entry_function)?,
+                        ),
+                        aptos_types::transaction::TransactionExecutable::Script(script) => {
+                            TransactionPayload::ScriptPayload(try_into_script_payload(script)?)
+                        },
+                        aptos_types::transaction::TransactionExecutable::Empty
+                        | aptos_types::transaction::TransactionExecutable::Encrypted => {
+                            bail!("Empty/encrypted executable is not supported for non-multisig transactions")
+                        },
+                    }
+                }
             },
             // Deprecated.
             ModuleBundle(_) => bail!("Module bundle payload has been removed"),

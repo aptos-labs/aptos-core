@@ -25,6 +25,7 @@ runs:
         sudo update-alternatives --install /usr/bin/clang clang /usr/bin/clang-21 100
         sudo update-alternatives --install /usr/bin/clang++ clang++ /usr/bin/clang++-21 100
         sudo update-alternatives --install /usr/bin/lld lld /usr/bin/lld-21 100
+        sudo update-alternatives --install /usr/bin/ld.lld ld.lld /usr/bin/ld.lld-21 100
       shell: bash
 
     - uses: dsherret/rust-toolchain-file@v1

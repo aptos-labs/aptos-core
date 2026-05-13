@@ -11,5 +11,4 @@ error: post-condition does not hold
    =         addr = <redacted>
    =     at tests/sources/functional/state_labels/spec_fun_mixed_memory.move:58: increment_and_lower_limit
    =     at tests/sources/functional/state_labels/spec_fun_mixed_memory.move:59: increment_and_lower_limit
-   =     at tests/sources/functional/state_labels/spec_fun_mixed_memory.move:60: increment_and_lower_limit
    =     at tests/sources/functional/state_labels/spec_fun_mixed_memory.move:63: increment_and_lower_limit (spec)

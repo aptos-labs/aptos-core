@@ -242,7 +242,11 @@ fn ty_contains_ty_parameter(ty: &Type) -> Option<u16> {
         },
         Type::Reference(_, ty) => ty_contains_ty_parameter(ty),
         Type::Tuple(ty) => ty.iter().filter_map(ty_contains_ty_parameter).next(),
-        Type::TypeDomain(_) | Type::ResourceDomain(..) | Type::Error | Type::Var(_) => {
+        Type::TypeDomain(_)
+        | Type::ResourceDomain(..)
+        | Type::StateDomain
+        | Type::Error
+        | Type::Var(_) => {
             panic!("ICE: {:?} used as a type parameter", ty)
         },
     }
@@ -259,7 +263,11 @@ fn ty_properly_contains_ty_parameter(ty: &Type) -> Option<u16> {
         },
         Type::Reference(_, ty) => ty_contains_ty_parameter(ty),
         Type::Tuple(ty) => ty.iter().filter_map(ty_contains_ty_parameter).next(),
-        Type::TypeDomain(_) | Type::ResourceDomain(..) | Type::Error | Type::Var(_) => {
+        Type::TypeDomain(_)
+        | Type::ResourceDomain(..)
+        | Type::StateDomain
+        | Type::Error
+        | Type::Var(_) => {
             panic!("ICE: {:?} used as a type parameter", ty)
         },
     }

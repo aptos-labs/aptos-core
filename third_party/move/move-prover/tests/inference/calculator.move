@@ -52,6 +52,10 @@ module 0x66::calculator {
     entry fun number(s: &signer, x: u64) acquires State {
         process(s, Input::Number(x))
     }
+    spec number {
+    } proof {
+        split State[address_of(s)];
+    }
 
     entry fun add(s: &signer) acquires State {
         process(s, Input::Add)

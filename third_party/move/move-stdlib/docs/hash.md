@@ -1,7 +1,4 @@
-
-<a id="0x1_hash"></a>
-
-# Module `0x1::hash`
+# Module `0x1::hash` <a id="0x1_hash"></a>
 
 Module which defines SHA hashes for byte vectors.
 
@@ -16,10 +13,7 @@ as in the Move prover's prelude.
 <pre><code></code></pre>
 
 
-
-<a id="0x1_hash_sha2_256"></a>
-
-## Function `sha2_256`
+## Function `sha2_256` <a id="0x1_hash_sha2_256"></a>
 
 
 
@@ -39,9 +33,7 @@ as in the Move prover's prelude.
 
 </details>
 
-<a id="0x1_hash_sha3_256"></a>
-
-## Function `sha3_256`
+## Function `sha3_256` <a id="0x1_hash_sha3_256"></a>
 
 
 
@@ -60,6 +52,7 @@ as in the Move prover's prelude.
 
 
 </details>
+
 
 <details>
 <summary>Specification</summary>

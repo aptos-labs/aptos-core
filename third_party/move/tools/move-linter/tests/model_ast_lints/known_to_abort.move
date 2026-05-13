@@ -1,3 +1,4 @@
+// @checks=experimental
 module 0xc0ffee::m {
     // Constants for testing
     const OVERFLOW_VALUE: u16 = 256;

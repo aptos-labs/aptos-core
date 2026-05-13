@@ -270,14 +270,10 @@ mod micro_op {
         CodeOffset as CO, DescriptorId, FrameLayoutInfo, FrameOffset as FO, Function,
         MicroOp as Op, MicroOp::*, SortedSafePointEntries, FRAME_METADATA_SIZE,
     };
-    use mono_move_runtime::ObjectDescriptor;
+    use mono_move_runtime::{ObjectDescriptor, ObjectDescriptorTable};
 
     const NULL: u64 = u64::MAX;
     const NODE_SIZE: u32 = 32;
-    /// Descriptor index for trivial (no-pointer) vector elements.
-    const DESC_TRIVIAL: DescriptorId = DescriptorId(0);
-    /// Descriptor index for the BstMap heap struct.
-    const DESC_BST_MAP: DescriptorId = DescriptorId(1);
 
     /// BstMap struct field offsets (within the struct payload).
     const BST_NODES: u32 = 0;
@@ -292,27 +288,27 @@ mod micro_op {
 
     pub fn program() -> (
         Vec<Option<ExecutableArenaPtr<Function>>>,
-        Vec<ObjectDescriptor>,
+        ObjectDescriptorTable,
         ExecutableArena,
     ) {
         let arena = ExecutableArena::new();
-        let descriptors = vec![
-            ObjectDescriptor::Trivial, // 0: node elements, free_list elements
-            ObjectDescriptor::Struct {
-                // 1: BstMap { nodes, free_list, root }
-                size: 24,
-                pointer_offsets: vec![0, 8], // nodes and free_list are heap pointers
-            },
-        ];
+        let mut descriptors = ObjectDescriptorTable::new();
+        // BstMap { nodes, free_list, root }: nodes and free_list are heap pointers.
+        let desc_bst_map = descriptors.push(ObjectDescriptor::new_struct(24, vec![0, 8]).unwrap());
+        // Nodes vector: 32-byte trivial node elements.
+        let desc_nodes_vec =
+            descriptors.push(ObjectDescriptor::new_vector(NODE_SIZE, vec![]).unwrap());
+        // Free-list vector: 8-byte trivial elements.
+        let desc_free_list_vec = descriptors.push(ObjectDescriptor::new_vector(8, vec![]).unwrap());
         (
             vec![
-                Some(make_new(&arena)),         // 0
-                Some(make_insert(&arena, 3)),   // 1, calls alloc_node at 3
-                Some(make_get(&arena)),         // 2
-                Some(make_alloc_node(&arena)),  // 3
-                Some(make_remove(&arena, 5)),   // 4, calls remove_node at 5
-                Some(make_remove_node(&arena)), // 5
-                Some(make_run_ops(&arena)),     // 6
+                Some(make_new(&arena, desc_bst_map)),               // 0
+                Some(make_insert(&arena, 3)),                       // 1, calls alloc_node at 3
+                Some(make_get(&arena)),                             // 2
+                Some(make_alloc_node(&arena, desc_nodes_vec)),      // 3
+                Some(make_remove(&arena, 5)),                       // 4, calls remove_node at 5
+                Some(make_remove_node(&arena, desc_free_list_vec)), // 5
+                Some(make_run_ops(&arena)),                         // 6
             ],
             descriptors,
             arena,
@@ -328,20 +324,23 @@ mod micro_op {
     // Frame layout:
     //   [0] result: bst_ref   [8] nodes (temp)   [16] free_list (temp)
     // =================================================================
-    fn make_new(arena: &ExecutableArena) -> ExecutableArenaPtr<Function> {
+    fn make_new(
+        arena: &ExecutableArena,
+        desc_bst_map: DescriptorId,
+    ) -> ExecutableArenaPtr<Function> {
         let bst = 0u32;
         let nodes = 8u32;
         let free_list = 16u32;
 
         #[rustfmt::skip]
-        let code = vec![
+        let code = [
             VecNew { dst: FO(nodes) },                                             // 0
             VecNew { dst: FO(free_list) },                                         // 1
-            HeapNew { dst: FO(bst), descriptor_id: DESC_BST_MAP },                 // 2
+            HeapNew { dst: FO(bst), descriptor_id: desc_bst_map },                       // 2
             Op::struct_store8(FO(bst), BST_NODES, FO(nodes)),                 // 3
             Op::struct_store8(FO(bst), BST_FREE_LIST, FO(free_list)),         // 4
             HeapMoveToImm8 { heap_ptr: FO(bst),
-                             offset: 8 + BST_ROOT, imm: NULL },                   // 5: STRUCT_DATA_OFFSET=8
+                             offset: BST_ROOT, imm: NULL },                       // 5
             Return,                                                                // 6
         ];
 
@@ -350,12 +349,13 @@ mod micro_op {
         arena.alloc(Function {
             name: GlobalArenaPtr::from_static("new"),
             code,
-            args_size: 0,
-            args_and_locals_size: 24,
+            param_sizes: ExecutableArenaPtr::empty_slice(),
+            param_sizes_sum: 0,
+            param_and_local_sizes_sum: 24,
             extended_frame_size: 24 + FRAME_METADATA_SIZE,
             zero_frame: true,
-            frame_layout: FrameLayoutInfo::new(arena, vec![FO(bst), FO(nodes), FO(free_list)]),
-            safe_point_layouts: SortedSafePointEntries::empty(arena),
+            frame_layout: FrameLayoutInfo::new(arena, [FO(bst), FO(nodes), FO(free_list)]),
+            safe_point_layouts: SortedSafePointEntries::empty(),
         })
     }
 
@@ -383,7 +383,7 @@ mod micro_op {
         let value = 8u32;
 
         #[rustfmt::skip]
-        let code = vec![
+        let code = [
             // -- Prologue: borrow struct fields --
             SlotBorrow { dst: FO(bst_ref), local: FO(bst) },                      // 0
             Op::struct_borrow(FO(bst_ref), BST_NODES, FO(nodes_ref)),             // 1
@@ -416,12 +416,13 @@ mod micro_op {
         arena.alloc(Function {
             name: GlobalArenaPtr::from_static("get"),
             code,
-            args_size: 16,
-            args_and_locals_size: 96,
+            param_sizes: ExecutableArenaPtr::empty_slice(),
+            param_sizes_sum: 16,
+            param_and_local_sizes_sum: 96,
             extended_frame_size: 96 + FRAME_METADATA_SIZE,
             zero_frame: false,
-            frame_layout: FrameLayoutInfo::new(arena, vec![FO(bst), FO(bst_ref), FO(nodes_ref)]),
-            safe_point_layouts: SortedSafePointEntries::empty(arena),
+            frame_layout: FrameLayoutInfo::new(arena, [FO(bst), FO(bst_ref), FO(nodes_ref)]),
+            safe_point_layouts: SortedSafePointEntries::empty(),
         })
     }
 
@@ -453,13 +454,13 @@ mod micro_op {
         let node_val = 80u32;
         let node_left = 88u32;
         let node_right = 96u32;
-        let args_and_locals_size = 104u32;
-        let c0 = args_and_locals_size + meta; // 128
+        let param_and_local_sizes_sum = 104u32;
+        let c0 = param_and_local_sizes_sum + meta; // 128
         let c1 = c0 + 8; // 136
         let c2 = c1 + 8; // 144
 
         #[rustfmt::skip]
-        let code = vec![
+        let code = [
             // -- Prologue: borrow struct fields --
             SlotBorrow { dst: FO(bst_ref), local: FO(bst) },                      // 0
             Op::struct_borrow(FO(bst_ref), BST_NODES, FO(nodes_ref)),              // 1
@@ -527,12 +528,13 @@ mod micro_op {
         arena.alloc(Function {
             name: GlobalArenaPtr::from_static("insert"),
             code,
-            args_size: 24,
-            args_and_locals_size: args_and_locals_size as usize,
+            param_sizes: ExecutableArenaPtr::empty_slice(),
+            param_sizes_sum: 24,
+            param_and_local_sizes_sum: param_and_local_sizes_sum as usize,
             extended_frame_size: (c2 + 8) as usize,
             zero_frame: true,
-            frame_layout: FrameLayoutInfo::new(arena, vec![FO(bst), FO(bst_ref), FO(nodes_ref)]),
-            safe_point_layouts: SortedSafePointEntries::empty(arena),
+            frame_layout: FrameLayoutInfo::new(arena, [FO(bst), FO(bst_ref), FO(nodes_ref)]),
+            safe_point_layouts: SortedSafePointEntries::empty(),
         })
     }
 
@@ -551,7 +553,10 @@ mod micro_op {
     //   [72] idx   [80] fl_len
     //   [88] new_node (32B: key[88] val[96] left[104] right[112])
     // =================================================================
-    fn make_alloc_node(arena: &ExecutableArena) -> ExecutableArenaPtr<Function> {
+    fn make_alloc_node(
+        arena: &ExecutableArena,
+        desc_nodes_vec: DescriptorId,
+    ) -> ExecutableArenaPtr<Function> {
         let bst = 0u32;
         let key = 8u32;
         let value = 16u32;
@@ -568,7 +573,7 @@ mod micro_op {
         let result = 0u32;
 
         #[rustfmt::skip]
-        let code = vec![
+        let code = [
             // -- Prologue: borrow struct fields --
             SlotBorrow { dst: FO(bst_ref), local: FO(bst) },                      // 0
             Op::struct_borrow(FO(bst_ref), BST_NODES, FO(nodes_ref)),              // 1
@@ -584,7 +589,7 @@ mod micro_op {
             // PUSH path: idx = nodes.len(); nodes.push(new_node)
             VecLen { dst: FO(idx), vec_ref: FO(nodes_ref) },                       // 9
             VecPushBack { vec_ref: FO(nodes_ref), elem: FO(new_node),
-                          elem_size: NODE_SIZE, descriptor_id: DESC_TRIVIAL },     // 10
+                          elem_size: NODE_SIZE, descriptor_id: desc_nodes_vec },         // 10
             Jump { target: CO(14) },                                               // 11: → DONE
             // POP path (12): idx = free_list.pop(); nodes[idx] = new_node
             VecPopBack { dst: FO(idx), vec_ref: FO(free_list_ref),
@@ -601,17 +606,18 @@ mod micro_op {
         arena.alloc(Function {
             name: GlobalArenaPtr::from_static("alloc_node"),
             code,
-            args_size: 24,
-            args_and_locals_size: 120,
+            param_sizes: ExecutableArenaPtr::empty_slice(),
+            param_sizes_sum: 24,
+            param_and_local_sizes_sum: 120,
             extended_frame_size: 120 + FRAME_METADATA_SIZE,
             zero_frame: true,
-            frame_layout: FrameLayoutInfo::new(arena, vec![
+            frame_layout: FrameLayoutInfo::new(arena, [
                 FO(bst),
                 FO(bst_ref),
                 FO(nodes_ref),
                 FO(free_list_ref),
             ]),
-            safe_point_layouts: SortedSafePointEntries::empty(arena),
+            safe_point_layouts: SortedSafePointEntries::empty(),
         })
     }
 
@@ -642,12 +648,12 @@ mod micro_op {
         let node_key = 72u32;
         let node_left = 88u32;
         let node_right = 96u32;
-        let args_and_locals_size = 104u32;
-        let c0 = args_and_locals_size + meta; // 128 — also holds replacement after CallFunc
+        let param_and_local_sizes_sum = 104u32;
+        let c0 = param_and_local_sizes_sum + meta; // 128 — also holds replacement after CallFunc
         let c1 = c0 + 8; // 136
 
         #[rustfmt::skip]
-        let code = vec![
+        let code = [
             // -- Prologue --
             SlotBorrow { dst: FO(bst_ref), local: FO(bst) },                      // 0
             Op::struct_borrow(FO(bst_ref), BST_NODES, FO(nodes_ref)),              // 1
@@ -704,12 +710,13 @@ mod micro_op {
         arena.alloc(Function {
             name: GlobalArenaPtr::from_static("remove"),
             code,
-            args_size: 16,
-            args_and_locals_size: args_and_locals_size as usize,
+            param_sizes: ExecutableArenaPtr::empty_slice(),
+            param_sizes_sum: 16,
+            param_and_local_sizes_sum: param_and_local_sizes_sum as usize,
             extended_frame_size: (c1 + 8) as usize,
             zero_frame: true,
-            frame_layout: FrameLayoutInfo::new(arena, vec![FO(bst), FO(bst_ref), FO(nodes_ref)]),
-            safe_point_layouts: SortedSafePointEntries::empty(arena),
+            frame_layout: FrameLayoutInfo::new(arena, [FO(bst), FO(bst_ref), FO(nodes_ref)]),
+            safe_point_layouts: SortedSafePointEntries::empty(),
         })
     }
 
@@ -729,7 +736,10 @@ mod micro_op {
     //   [80] parent   [88] cur   [96] cur_right
     //   [104] scratch (32B: key[104] val[112] left[120] right[128])
     // =================================================================
-    fn make_remove_node(arena: &ExecutableArena) -> ExecutableArenaPtr<Function> {
+    fn make_remove_node(
+        arena: &ExecutableArena,
+        desc_free_list_vec: DescriptorId,
+    ) -> ExecutableArenaPtr<Function> {
         let bst = 0u32;
         let idx = 8u32;
         let bst_ref = 16u32;
@@ -746,7 +756,7 @@ mod micro_op {
         let result = 0u32;
 
         #[rustfmt::skip]
-        let code = vec![
+        let code = [
             // -- Prologue --
             SlotBorrow { dst: FO(bst_ref), local: FO(bst) },                      // 0
             Op::struct_borrow(FO(bst_ref), BST_NODES, FO(nodes_ref)),              // 1
@@ -803,7 +813,7 @@ mod micro_op {
             Move8 { dst: FO(result), src: FO(cur) },                              // 32
             // -- FREE_RETURN (33): free_list.push(idx); return --
             VecPushBack { vec_ref: FO(free_list_ref), elem: FO(idx),
-                          elem_size: 8, descriptor_id: DESC_TRIVIAL },             // 33
+                          elem_size: 8, descriptor_id: desc_free_list_vec },             // 33
             Return,                                                                // 34
         ];
 
@@ -812,17 +822,18 @@ mod micro_op {
         arena.alloc(Function {
             name: GlobalArenaPtr::from_static("remove_node"),
             code,
-            args_size: 16,
-            args_and_locals_size: 136,
+            param_sizes: ExecutableArenaPtr::empty_slice(),
+            param_sizes_sum: 16,
+            param_and_local_sizes_sum: 136,
             extended_frame_size: 136 + FRAME_METADATA_SIZE,
             zero_frame: true,
-            frame_layout: FrameLayoutInfo::new(arena, vec![
+            frame_layout: FrameLayoutInfo::new(arena, [
                 FO(bst),
                 FO(bst_ref),
                 FO(nodes_ref),
                 FO(free_list_ref),
             ]),
-            safe_point_layouts: SortedSafePointEntries::empty(arena),
+            safe_point_layouts: SortedSafePointEntries::empty(),
         })
     }
 
@@ -851,13 +862,13 @@ mod micro_op {
         let key = 40u32;
         let value = 48u32;
         let ops_ref = 56u32;
-        let args_and_locals_size = 72u32;
-        let c0 = args_and_locals_size + meta; // 96
+        let param_and_local_sizes_sum = 72u32;
+        let c0 = param_and_local_sizes_sum + meta; // 96
         let c1 = c0 + 8; // 104
         let c2 = c1 + 8; // 112
 
         #[rustfmt::skip]
-        let code = vec![
+        let code = [
             // -- Create BST --
             CallFunc { func_id: FN_NEW as u32 },                                  // 0
             Move8 { dst: FO(bst), src: FO(c0) },                                 // 1
@@ -910,12 +921,13 @@ mod micro_op {
         arena.alloc(Function {
             name: GlobalArenaPtr::from_static("run_ops"),
             code,
-            args_size: 8,
-            args_and_locals_size: args_and_locals_size as usize,
+            param_sizes: ExecutableArenaPtr::empty_slice(),
+            param_sizes_sum: 8,
+            param_and_local_sizes_sum: param_and_local_sizes_sum as usize,
             extended_frame_size: (c2 + 8) as usize,
             zero_frame: true,
-            frame_layout: FrameLayoutInfo::new(arena, vec![FO(ops), FO(bst), FO(ops_ref)]),
-            safe_point_layouts: SortedSafePointEntries::empty(arena),
+            frame_layout: FrameLayoutInfo::new(arena, [FO(ops), FO(bst), FO(ops_ref)]),
+            safe_point_layouts: SortedSafePointEntries::empty(),
         })
     }
 }

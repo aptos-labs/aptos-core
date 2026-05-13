@@ -7,6 +7,7 @@
 
 use crate::{options::ProverOptions, verification_analysis};
 use itertools::Itertools;
+use move_core_types::function::ClosureMask;
 use move_model::{
     ast,
     ast::{Exp, ExpData, MemoryLabel, QuantKind, RewriteResult, TempIndex, Value},
@@ -92,8 +93,14 @@ impl FunctionTargetProcessor for SpecInstrumentationProcessor {
                 Instrumenter::run(&options, targets, fun_env, verification_data, scc_opt);
             verification_data = instrumented;
 
-            if split_points.is_empty() {
+            if split_points.is_empty() || options.inference {
                 // No splits — insert the single verification variant.
+                // Proof-block split-fork is verification-only; during inference
+                // (`options.inference`) we never fork, so each function has at
+                // most one verified variant for inference to walk. By
+                // construction `Instrumenter::run` should not produce any
+                // `split_points` under inference, but check explicitly so the
+                // gate is local to this site too.
                 targets.insert_target_data(
                     &fun_env.get_qualified_id(),
                     verification_data.variant.clone(),
@@ -355,8 +362,6 @@ struct Instrumenter<'a> {
     options: &'a ProverOptions,
     builder: FunctionDataBuilder<'a>,
     ret_locals: Vec<TempIndex>,
-    ret_label: Label,
-    can_return: bool,
     abort_local: TempIndex,
     abort_label: Label,
     can_abort: bool,
@@ -394,17 +399,31 @@ impl<'a> Instrumenter<'a> {
 
         let mut builder = FunctionDataBuilder::new(fun_env, data);
 
-        // Create label and locals for unified return exit point. We translate each `Ret(t..)`
-        // instruction into `Assign(r.., t..); Jump(RetLab)`.
+        // After `NormalizeExitsProcessor`, the input bytecode has at most one
+        // `Ret` instruction. Capture its source temps as `ret_locals` so the
+        // spec translation rewrites `result_*` references to them directly,
+        // and the assertions emitted by `emit_return_assertions` reference the
+        // same temps that the trailing `Ret` returns. For divergent functions
+        // (no `Ret`), allocate placeholder locals — the translated spec is
+        // never asserted in that case.
         let ret_locals = builder
             .data
-            .result_type
-            .clone()
-            .flatten()
-            .into_iter()
-            .map(|ty| builder.new_temp(ty))
-            .collect_vec();
-        let ret_label = builder.new_label();
+            .code
+            .iter()
+            .find_map(|bc| match bc {
+                Bytecode::Ret(_, temps) => Some(temps.clone()),
+                _ => None,
+            })
+            .unwrap_or_else(|| {
+                builder
+                    .data
+                    .result_type
+                    .clone()
+                    .flatten()
+                    .into_iter()
+                    .map(|ty| builder.new_temp(ty))
+                    .collect_vec()
+            });
 
         // Similarly create label and local for unified abort exit point. We translate `Abort(c)`
         // into `Assign(r, c); Jump(AbortLabel)`, as well as `Call(..)` into `Call(..);
@@ -461,8 +480,6 @@ impl<'a> Instrumenter<'a> {
             options,
             builder,
             ret_locals,
-            ret_label,
-            can_return: false,
             abort_local,
             abort_label,
             can_abort: false,
@@ -470,13 +487,24 @@ impl<'a> Instrumenter<'a> {
             split_points: vec![],
             freshen_counter: 0,
         };
-        if ProverOptions::get(instrumenter.builder.global_env()).inline_spec_lets {
-            let mut spec = spec;
-            instrumenter.inline_lets(&mut spec, false);
-            instrumenter.instrument(&spec, &inlined_props);
-        } else {
-            instrumenter.instrument(&spec, &inlined_props);
+        // Always inline spec lets in proof actions, independent of the
+        // `inline_spec_lets` option. Proof-action exps are recorded in
+        // `split_points` outside the bytecode, so they are not rewritten by
+        // the subsequent live-var analysis — inlining here is the only way
+        // to ensure they reference only stable Move-level temps.
+        //
+        // Skip during spec inference: proof blocks are a verification-only
+        // construct and must not influence the bytecode the inference walker
+        // sees. `instrument` likewise skips emitting proof actions under
+        // `options.inference`, so this work would be wasted anyway.
+        let mut spec = spec;
+        if !options.inference {
+            instrumenter.inline_lets_in_proof_actions(&mut spec);
         }
+        if ProverOptions::get(instrumenter.builder.global_env()).inline_spec_lets {
+            instrumenter.inline_lets(&mut spec, false);
+        }
+        instrumenter.instrument(&spec, &inlined_props);
 
         // Extract split points before consuming the instrumenter.
         let split_points = std::mem::take(&mut instrumenter.split_points);
@@ -582,6 +610,12 @@ impl<'a> Instrumenter<'a> {
         // Instrument and generate new code.
         // Peel leading TraceLocal instructions and emit them before pre_proof
         // so that pre-proof assertion errors can display model values in counter-examples.
+        //
+        // Skip proof-action emission entirely during spec inference: proof
+        // blocks are a verification-only construct, and emitting their props
+        // (or accumulating their split points) would cause the inference
+        // walker to fork per case and produce per-variant inferred specs.
+        let emit_proof = !self.options.inference;
         let mut old_code = old_code.into_iter();
         let mut pre_proof_emitted = false;
         for bc in old_code.by_ref() {
@@ -589,13 +623,15 @@ impl<'a> Instrumenter<'a> {
                 self.builder.emit(bc);
             } else {
                 // First non-trace instruction: emit pre_proof, then this instruction.
-                self.emit_proof_actions(&spec.pre_proof, spec);
+                if emit_proof {
+                    self.emit_proof_actions(&spec.pre_proof, spec);
+                }
                 pre_proof_emitted = true;
                 self.instrument_bytecode(spec, inlined_props, bc);
                 break;
             }
         }
-        if !pre_proof_emitted {
+        if !pre_proof_emitted && emit_proof {
             self.emit_proof_actions(&spec.pre_proof, spec);
         }
         // Continue with remaining old_code.
@@ -603,10 +639,9 @@ impl<'a> Instrumenter<'a> {
             self.instrument_bytecode(spec, inlined_props, bc);
         }
 
-        // Generate return and abort blocks
-        if self.can_return {
-            self.generate_return_block(spec);
-        }
+        // The return assertion block is emitted in-place at the trailing `Ret`
+        // (see `instrument_bytecode`). Only the abort exit needs a separate
+        // out-of-line block at this point.
         if self.can_abort {
             self.generate_abort_block(spec);
         }
@@ -655,13 +690,13 @@ impl<'a> Instrumenter<'a> {
         match bc {
             Ret(id, results) => {
                 self.builder.set_loc_from_attr(id);
-                for (i, r) in self.ret_locals.clone().into_iter().enumerate() {
-                    self.builder
-                        .emit_with(|id| Assign(id, r, results[i], AssignKind::Move));
-                }
-                let ret_label = self.ret_label;
-                self.builder.emit_with(|id| Jump(id, ret_label));
-                self.can_return = true;
+                // Emit the spec-decoration block (lets, updates, ensures
+                // assertions, emits checks, ...) in-place before the actual
+                // return. After `NormalizeExitsProcessor` this is the unique
+                // exit point of the function.
+                debug_assert_eq!(self.ret_locals, results);
+                self.emit_return_assertions(spec);
+                self.builder.emit(Ret(id, results));
             },
             Abort(id, code, _) => {
                 self.builder.set_loc_from_attr(id);
@@ -673,7 +708,7 @@ impl<'a> Instrumenter<'a> {
                 self.can_abort = true;
             },
             Call(id, dests, Function(mid, fid, targs), srcs, aa) => {
-                self.instrument_call(id, dests, mid, fid, targs, srcs, aa);
+                self.instrument_call(spec, id, dests, mid, fid, targs, srcs, aa);
             },
             Call(id, dests, oper, srcs, _) if oper.can_abort() => {
                 self.builder.emit(Call(
@@ -708,6 +743,7 @@ impl<'a> Instrumenter<'a> {
 
     fn instrument_call(
         &mut self,
+        spec: &TranslatedSpec,
         id: AttrId,
         dests: Vec<TempIndex>,
         mid: ModuleId,
@@ -872,6 +908,30 @@ impl<'a> Instrumenter<'a> {
                     self.emit_traces(&callee_spec, &cond);
                     self.builder.emit_with(move |id| Prop(id, Assume, cond));
                 }
+                // Aggregate `aborts_of<callee>` on the abort path so a
+                // caller's `aborts_of<callee>` assertion discharges directly.
+                // See the success-path comment below `OpaqueCall` end for
+                // soundness and the gating rationale.
+                let abort_callee_is_higher_order = callee_env
+                    .get_parameters()
+                    .iter()
+                    .any(|p| matches!(p.1.skip_reference(), Type::Fun(..)));
+                let abort_entry_label = find_behavior_pre_label_for_callee(spec, mid, fid);
+                if abort_entry_label.is_some() && !abort_callee_is_higher_order {
+                    let abort_arg_exps: Vec<Exp> =
+                        srcs.iter().map(|s| self.builder.mk_temporary(*s)).collect();
+                    let (abort_closure_exp, _) =
+                        self.builder
+                            .mk_closure(mid, fid, targs, ClosureMask::empty(), vec![]);
+                    let abort_aborts_exp = self.builder.mk_aborts_of_with_state(
+                        abort_closure_exp,
+                        abort_arg_exps,
+                        abort_entry_label,
+                        None,
+                    );
+                    self.builder
+                        .emit_with(|id| Prop(id, Assume, abort_aborts_exp));
+                }
                 self.builder.emit_with(move |id| {
                     Call(id, vec![], Operation::TraceAbort, vec![abort_local], None)
                 });
@@ -972,6 +1032,72 @@ impl<'a> Instrumenter<'a> {
             if callee_env.is_pragma_true(EMITS_IS_PARTIAL_PRAGMA, || false) {
                 self.builder
                     .emit(Call(id, vec![], Operation::EventStoreDiverge, vec![], None));
+            }
+
+            // Aggregate the per-clause post-state assumes into the callee's
+            // behavioral predicates `ensures_of<callee>` and `!aborts_of<callee>`
+            // on the success path. The per-clause assumes already establish
+            // the body of these predicates with the call-site memory labels
+            // as concrete witnesses; emitting these aggregated assumes lets a
+            // caller's `ensures_of<callee>` / `aborts_of<callee>` assertion
+            // discharge directly (rather than forcing the SMT solver to
+            // re-Skolemize the existential over intermediate state labels at
+            // each caller's exit — which without this triggers runaway
+            // quantifier instantiations and timeouts). Sound because the
+            // predicates are defined as the existential closure of the same
+            // conjunction we just assumed.
+            //
+            // Skip when the callee has a function-typed parameter: in that
+            // case the callee's `bp_*_of` body delegates to a generic
+            // dispatcher whose memory-arg handling is invoked via the
+            // per-clause assumes above; emitting a parallel `bp_*_of<callee>`
+            // assume would use the dispatcher with weaker memory args
+            // (current memory for both pre and post) and create an
+            // inconsistent context.
+            //
+            // Only emit when the enclosing spec already references this
+            // callee via `ensures_of<callee>` or `aborts_of<callee>` — that
+            // guarantees `spec.saved_memory` has the right pre-state label
+            // for the callee's used memory (so the emitted memory args match
+            // the assertion's at the caller's exit). For callees the
+            // enclosing spec doesn't mention, our assume would have nothing
+            // to discharge and risks using a mismatched label.
+            let callee_is_higher_order = callee_env
+                .get_parameters()
+                .iter()
+                .any(|p| matches!(p.1.skip_reference(), Type::Fun(..)));
+            let entry_label = find_behavior_pre_label_for_callee(spec, mid, fid);
+            if entry_label.is_some() && !callee_is_higher_order {
+                let arg_exps: Vec<Exp> =
+                    srcs.iter().map(|s| self.builder.mk_temporary(*s)).collect();
+                let (closure_exp, _) =
+                    self.builder
+                        .mk_closure(mid, fid, targs, ClosureMask::empty(), vec![]);
+                // ensures_of takes args followed by results: explicit dests
+                // first, then post-values of &mut srcs (matches the order
+                // produced by `behavioral_output_types` in the Boogie backend).
+                let mut ensures_args = arg_exps.clone();
+                for &dest in &dests {
+                    ensures_args.push(self.builder.mk_temporary(dest));
+                }
+                for &src in &srcs {
+                    if self.builder.data.local_types[src].is_mutable_reference() {
+                        ensures_args.push(self.builder.mk_temporary(src));
+                    }
+                }
+                let ensures_exp = self.builder.mk_ensures_of_with_state(
+                    closure_exp.clone(),
+                    ensures_args,
+                    entry_label,
+                    None,
+                );
+                self.builder.emit_with(|id| Prop(id, Assume, ensures_exp));
+                let aborts_exp =
+                    self.builder
+                        .mk_aborts_of_with_state(closure_exp, arg_exps, entry_label, None);
+                let not_aborts_exp = self.builder.mk_not(aborts_exp);
+                self.builder
+                    .emit_with(|id| Prop(id, Assume, not_aborts_exp));
             }
 
             // Generate OpaqueCallEnd instruction if invariant_v2.
@@ -1096,6 +1222,112 @@ impl<'a> Instrumenter<'a> {
                 .mk_identical(self.builder.mk_temporary(*temp), exp.clone());
             self.builder
                 .emit_with(|id| Prop(id, PropKind::Assume, assign));
+        }
+    }
+
+    /// Inline spec let bindings into proof-block actions only, leaving
+    /// `spec.lets` and all other conditions untouched. Proof actions are
+    /// recorded out of band (notably `Split` exps in `split_points`), so
+    /// the bytecode-level temp remap performed by later live-var analysis
+    /// does not reach them. Substituting here replaces references to
+    /// spec-let temps with their defining expressions, which use only
+    /// Move-level temps that survive the remap with stable indices.
+    ///
+    /// `LetPre` bindings substituted into post-state proof actions
+    /// (`post_proof`) are annotated with pre-state memory labels and have
+    /// their parameter references remapped to saved versions, mirroring the
+    /// treatment in `inline_lets`. Without this, a `let pre = R[a].f;`
+    /// referenced from a `post { ... }` action would evaluate `R[a].f` at
+    /// post-state instead of the saved entry-state snapshot.
+    fn inline_lets_in_proof_actions(&mut self, spec: &mut TranslatedSpec) {
+        if spec.pre_proof.is_empty() && spec.post_proof.is_empty() {
+            return;
+        }
+        let env = self.builder.global_env();
+        let substitute_exp =
+            |env: &GlobalEnv, cond: &mut Exp, temp: TempIndex, replacement: &Exp| {
+                let replacement = replacement.clone();
+                let mut replacer =
+                    |_id: move_model::model::NodeId, target: RewriteTarget| -> Option<Exp> {
+                        if let RewriteTarget::Temporary(idx) = target {
+                            if idx == temp {
+                                return Some(replacement.clone());
+                            }
+                        }
+                        None
+                    };
+                *cond = ExpRewriter::new(env, &mut replacer).rewrite_exp(cond.clone());
+            };
+        let substitute_proof_action =
+            |env: &GlobalEnv, action: &mut ProofAction, temp, replacement: &Exp| match action {
+                ProofAction::Assert(exp, _) | ProofAction::Assume(exp) => {
+                    substitute_exp(env, exp, temp, replacement);
+                },
+                ProofAction::Split(exp, guard) => {
+                    substitute_exp(env, exp, temp, replacement);
+                    if let Some(g) = guard {
+                        substitute_exp(env, g, temp, replacement);
+                    }
+                },
+            };
+        // Compute the post-state replacement for a `LetPre` lazily — only when
+        // a let temp is actually referenced from a `post_proof` action. This
+        // avoids allocating fresh `saved_memory` labels and `saved_params`
+        // temps for every spec let, which would pollute the pre-state save
+        // sets and bloat downstream Boogie translation even when no proof
+        // action consumes them.
+        let mut resolved_lets: Vec<(TempIndex, bool, Exp)> = Vec::new();
+        for (_, is_post, temp, exp) in spec.lets.clone() {
+            let mut pre_rhs = exp.clone();
+            for (prev_temp, _, prev_pre) in &resolved_lets {
+                substitute_exp(env, &mut pre_rhs, *prev_temp, prev_pre);
+            }
+            resolved_lets.push((temp, is_post, pre_rhs));
+        }
+        for (temp, is_post, pre_replacement) in &resolved_lets {
+            for (_, action) in &mut spec.pre_proof {
+                substitute_proof_action(env, action, *temp, pre_replacement);
+            }
+            if spec.post_proof.is_empty() {
+                continue;
+            }
+            // Only compute the (potentially state-allocating) post replacement
+            // if the temp is actually referenced from a post_proof action.
+            let exp_uses_temp = |exp: &Exp, temp: TempIndex| {
+                let mut found = false;
+                exp.visit_pre_order(&mut |e| {
+                    if let ExpData::Temporary(_, idx) = e {
+                        if *idx == temp {
+                            found = true;
+                        }
+                    }
+                    !found
+                });
+                found
+            };
+            let referenced = spec.post_proof.iter().any(|(_, action)| match action {
+                ProofAction::Assert(exp, _) | ProofAction::Assume(exp) => exp_uses_temp(exp, *temp),
+                ProofAction::Split(exp, guard) => {
+                    exp_uses_temp(exp, *temp)
+                        || guard.as_ref().is_some_and(|g| exp_uses_temp(g, *temp))
+                },
+            });
+            if !referenced {
+                continue;
+            }
+            let post_replacement = if !*is_post {
+                let annotated = Self::annotate_pre_state_memory(
+                    env,
+                    pre_replacement.clone(),
+                    &mut spec.saved_memory,
+                );
+                self.remap_params_to_saved(annotated, &mut spec.saved_params)
+            } else {
+                pre_replacement.clone()
+            };
+            for (_, action) in &mut spec.post_proof {
+                substitute_proof_action(env, action, *temp, &post_replacement);
+            }
         }
     }
 
@@ -1375,6 +1607,7 @@ impl<'a> Instrumenter<'a> {
                 | Operation::Exists(_)
                 | Operation::CanModify
                 | Operation::ResourceDomain
+                | Operation::StateDomain
                 | Operation::Behavior(..),
                 _,
             ) = e
@@ -1547,15 +1780,17 @@ impl<'a> Instrumenter<'a> {
         (Some(aborts_cond_temp), aborts_code_cond)
     }
 
-    fn generate_return_block(&mut self, spec: &TranslatedSpec) {
+    /// Emit the spec-decoration block at the function's unified exit: state
+    /// updates, post-state lets, aborts negation, ensures assertions, and emits
+    /// completeness checks. Called from the `Ret` arm of `instrument_bytecode`
+    /// so the assertions execute immediately before the trailing `Ret`. The
+    /// caller is responsible for emitting the `Ret` itself.
+    fn emit_return_assertions(&mut self, spec: &TranslatedSpec) {
         use Bytecode::*;
         use PropKind::*;
 
-        // Set the location to the function and emit label.
         self.builder
             .set_loc(self.builder.fun_env.get_loc().at_end());
-        let ret_label = self.ret_label;
-        self.builder.emit_with(|id| Label(id, ret_label));
 
         // Emit specification variable updates. They are generated for both verified and inlined
         // function variants, as the evolution of state updates is always the same.
@@ -1602,7 +1837,10 @@ impl<'a> Instrumenter<'a> {
             }
 
             // Emit return-point proof actions (`post`-prefixed proof statements).
-            self.emit_proof_actions(&spec.post_proof, spec);
+            // Verification-only — see the corresponding gate before pre_proof.
+            if !self.options.inference {
+                self.emit_proof_actions(&spec.post_proof, spec);
+            }
 
             // Emit all post-conditions which must hold.
             // For defining conditions (already assumed), assert the non-defining
@@ -1651,10 +1889,6 @@ impl<'a> Instrumenter<'a> {
                 self.builder.emit_with(move |id| Prop(id, Assert, cond));
             }
         }
-
-        // Emit return
-        let ret_locals = self.ret_locals.clone();
-        self.builder.emit_with(move |id| Ret(id, ret_locals))
     }
 
     /// Emit havoc+assume for intermediate state labels.
@@ -1942,6 +2176,51 @@ impl<'a> Instrumenter<'a> {
             }
         }
     }
+}
+
+/// Find the pre-state memory label that the enclosing function's spec uses
+/// for a behavioral predicate over `(mid, fid)`. Returns `Some(label)` if
+/// any condition contains a `Behavior(_, _)` whose first arg is a `Closure`
+/// with the given module/function id; `None` otherwise.
+///
+/// Used to gate the call-site `assume bp_*_of<callee>(...)` in the opaque
+/// instrumentation: emitting it only when the enclosing spec already has an
+/// assertion of that predicate ensures `spec.saved_memory` was populated
+/// with the right label for the callee's used memory.
+fn find_behavior_pre_label_for_callee(
+    spec: &TranslatedSpec,
+    mid: ModuleId,
+    fid: FunId,
+) -> Option<MemoryLabel> {
+    let mut found: Option<MemoryLabel> = None;
+    let pre_post_exps = spec.pre.iter().chain(spec.post.iter()).map(|(_, e)| e);
+    let abort_exps = spec.aborts.iter().map(|(_, e, _)| e);
+    for exp in pre_post_exps.chain(abort_exps) {
+        if found.is_some() {
+            break;
+        }
+        exp.visit_pre_order(&mut |e| {
+            if found.is_some() {
+                return false;
+            }
+            if let ExpData::Call(_, ast::Operation::Behavior(_, range), args) = e {
+                if let Some(first) = args.first() {
+                    if let ExpData::Call(_, ast::Operation::Closure(cmid, cfid, _), _) =
+                        first.as_ref()
+                    {
+                        if *cmid == mid && *cfid == fid {
+                            if let Some(label) = range.pre {
+                                found = Some(label);
+                                return false;
+                            }
+                        }
+                    }
+                }
+            }
+            true
+        });
+    }
+    found
 }
 
 //  ================================================================================================

@@ -5,7 +5,7 @@ use aptos_crypto::{ed25519::Ed25519PublicKey, HashValue};
 use aptos_types::transaction::{
     authenticator::{AccountAuthenticator, AnyPublicKey, TransactionAuthenticator},
     EntryFunction, MultisigTransactionPayload, Script, SignedTransaction, TransactionExecutableRef,
-    TransactionExtraConfig, TransactionPayload, TransactionPayloadInner,
+    TransactionPayload, TransactionPayloadInner,
 };
 use move_core_types::{account_address::AccountAddress, transaction_argument::TransactionArgument};
 use serde::{Deserialize, Serialize};
@@ -439,21 +439,16 @@ fn matches_multisig_address(
         | TransactionPayload::ModuleBundle(_) => false,
         TransactionPayload::Multisig(multisig) => multisig.multisig_address == *address,
         TransactionPayload::Payload(TransactionPayloadInner::V1 { extra_config, .. }) => {
-            match extra_config {
-                TransactionExtraConfig::V1 {
-                    multisig_address, ..
-                } => multisig_address
-                    .map(|multisig_address| multisig_address == *address)
-                    .unwrap_or(false),
-            }
-        },
-        TransactionPayload::EncryptedPayload(payload) => match payload.extra_config() {
-            TransactionExtraConfig::V1 {
-                multisig_address, ..
-            } => multisig_address
+            extra_config
+                .multisig_address()
                 .map(|multisig_address| multisig_address == *address)
-                .unwrap_or(false),
+                .unwrap_or(false)
         },
+        TransactionPayload::EncryptedPayload(payload) => payload
+            .extra_config()
+            .multisig_address()
+            .map(|multisig_address| multisig_address == *address)
+            .unwrap_or(false),
     }
 }
 

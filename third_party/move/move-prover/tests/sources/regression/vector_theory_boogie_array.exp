@@ -16,6 +16,5 @@ error: post-condition does not hold
    =     at tests/sources/regression/vector_theory_boogie_array.move:8: f1
    =     at tests/sources/regression/vector_theory_boogie_array.move:6: f1
    =         pool = <redacted>
-   =     at tests/sources/regression/vector_theory_boogie_array.move:9: f1
    =     at tests/sources/regression/vector_theory_boogie_array.move:11: f1 (spec)
    =     at tests/sources/regression/vector_theory_boogie_array.move:14: f1 (spec)

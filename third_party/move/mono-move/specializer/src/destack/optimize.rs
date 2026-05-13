@@ -17,7 +17,7 @@ use shared_dsa::{UnorderedMap, UnorderedSet};
 /// Optimize all functions in a module IR.
 /// Pre: slot allocation complete — no `Vid`s remain.
 pub fn optimize_module(module_ir: &mut ModuleIR) {
-    for func in &mut module_ir.functions {
+    for func in module_ir.functions.iter_mut().flatten() {
         eliminate_identity_moves(func);
         copy_propagation(func);
         eliminate_identity_moves(func);

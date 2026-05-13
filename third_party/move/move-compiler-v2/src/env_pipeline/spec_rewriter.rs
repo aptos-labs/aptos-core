@@ -1077,6 +1077,11 @@ struct SpecConverter<'a> {
     contains_imperative_expression: bool,
     /// Set to true when rewriting spec during inlining phase
     for_inline: bool,
+    /// Depth tracker for behavioral-predicate argument context. When > 0,
+    /// the rewriter is descending into args of an `ensures_of` / `result_of`
+    /// (etc.) call; in this context, `Borrow(Mut, ...)` selector borrows
+    /// must be preserved so the model spec rewriter can normalize them.
+    bp_arg_depth: usize,
 }
 
 impl<'a> SpecConverter<'a> {
@@ -1093,6 +1098,7 @@ impl<'a> SpecConverter<'a> {
             reference_strip_exempted: Default::default(),
             contains_imperative_expression: false,
             for_inline: false,
+            bp_arg_depth: 0,
         }
     }
 
@@ -1109,6 +1115,7 @@ impl<'a> SpecConverter<'a> {
             reference_strip_exempted: Default::default(),
             contains_imperative_expression: false,
             for_inline: true,
+            bp_arg_depth: 0,
         }
     }
 
@@ -1180,7 +1187,18 @@ impl ExpRewriterFunctions for SpecConverter<'_> {
                 _ => exp,
             };
 
+            // Track behavioral-predicate argument depth across descent so
+            // `Borrow(Mut, ...)` selectors inside `ensures_of(&mut x.foo, ...)`
+            // are preserved (their stripping is done later by the model spec
+            // rewriter only after augmenting the call to its canonical form).
+            let is_behavior = matches!(exp.as_ref(), Call(_, Behavior(_, _), _));
+            if is_behavior {
+                self.bp_arg_depth += 1;
+            }
             let exp = self.rewrite_exp_descent(exp);
+            if is_behavior {
+                self.bp_arg_depth -= 1;
+            }
 
             // Simplification after descent
             match exp.as_ref() {
@@ -1196,6 +1214,13 @@ impl ExpRewriterFunctions for SpecConverter<'_> {
                 Call(id, BorrowGlobal(ReferenceKind::Immutable), args) => {
                     // Map borrow_global to specification global
                     Call(*id, Global(None), args.clone()).into_exp()
+                },
+                Call(_, Borrow(ReferenceKind::Mutable), _) if self.bp_arg_depth > 0 => {
+                    // Inside a behavioral-predicate argument: preserve the
+                    // `Borrow(Mut, ...)` so the model spec rewriter can
+                    // augment the call (extracting pre-state via
+                    // `old(...)` and appending post-state clones).
+                    exp.clone()
                 },
                 Call(_, Borrow(_), args) | Call(_, Deref, args) => {
                     // Skip local borrow

@@ -11,5 +11,4 @@ error: proof assertion not satisfied
    =         x = <redacted>
    =     at tests/sources/functional/proof/assert.move:53: successor
    =         result = <redacted>
-   =     at tests/sources/functional/proof/assert.move:54: successor
    =     at tests/sources/functional/proof/assert.move:59: successor (spec)

@@ -141,13 +141,26 @@ pub fn verify_batch_kind_transactions(
                         txn.is_encrypted_txn(),
                         "Encrypted batch contains non-encrypted transaction"
                     );
-                    let auth_key = txn.authenticator().sender().authentication_key().context(
+                    let encrypted_payload = txn
+                        .payload()
+                        .as_encrypted_payload()
+                        .expect("already verified is_encrypted_txn");
+                    ensure!(
+                        encrypted_payload.is_encrypted(),
+                        "Encrypted batch contains transaction not in Encrypted state"
+                    );
+                    ensure!(
+                        !encrypted_payload.extra_config().is_multisig(),
+                        "Encrypted transactions do not support multisig"
+                    );
+                    let signer_auth_keys = txn
+                        .authenticator()
+                        .all_signer_auth_keys(txn.sender())
+                        .context(
                         "Encrypted transactions are not supported with this authenticator type",
                     )?;
-                    txn.payload()
-                        .as_encrypted_payload()
-                        .expect("already verified is_encrypted_txn")
-                        .verify(txn.sender(), auth_key)
+                    encrypted_payload
+                        .verify(txn.sender(), signer_auth_keys)
                         .context("Encrypted transaction ciphertext verification failed")
                 })?;
         },
@@ -296,6 +309,13 @@ impl Payload {
             },
             // Deprecated or incompatible - return self
             (s, _) => s,
+        }
+    }
+
+    pub fn has_encrypted_batches(&self) -> bool {
+        match self {
+            Payload::OptQuorumStore(opt_qs) => opt_qs.has_encrypted_batches(),
+            _ => false,
         }
     }
 
@@ -653,7 +673,7 @@ mod tests {
         chain_id::ChainId,
         secret_sharing::Ciphertext,
         transaction::{
-            encrypted_payload::{EncryptedInner, EncryptedPayload},
+            encrypted_payload::{DecryptionFailureReason, EncryptedInner, EncryptedPayload},
             RawTransaction, Script, TransactionExtraConfig, TransactionPayload,
         },
         validator_verifier::random_validator_verifier,
@@ -962,6 +982,108 @@ mod tests {
         assert!(
             err.to_string().contains("ciphertext verification failed"),
             "Expected ciphertext verification error through Payload::verify, got: {}",
+            err
+        );
+    }
+
+    fn create_failed_decryption_signed_transaction() -> SignedTransaction {
+        let private_key = Ed25519PrivateKey::generate_for_testing();
+        let public_key = private_key.public_key();
+        let encrypted_payload = EncryptedPayload::FailedDecryption {
+            original: EncryptedInner {
+                ciphertext: Ciphertext::random(),
+                extra_config: TransactionExtraConfig::V1 {
+                    multisig_address: None,
+                    replay_protection_nonce: None,
+                },
+                payload_hash: HashValue::random(),
+                encryption_epoch: 0,
+                claimed_entry_fun: None,
+            },
+            eval_proof: None,
+            reason: DecryptionFailureReason::CryptoFailure,
+        };
+        let raw_transaction = RawTransaction::new(
+            AccountAddress::random(),
+            0,
+            TransactionPayload::EncryptedPayload(encrypted_payload),
+            0,
+            0,
+            0,
+            ChainId::new(10),
+        );
+        SignedTransaction::new(
+            raw_transaction,
+            public_key,
+            aptos_crypto::ed25519::Ed25519Signature::dummy_signature(),
+        )
+    }
+
+    fn create_encrypted_multisig_signed_transaction() -> SignedTransaction {
+        let private_key = Ed25519PrivateKey::generate_for_testing();
+        let public_key = private_key.public_key();
+        let encrypted_payload = EncryptedPayload::Encrypted(EncryptedInner {
+            ciphertext: Ciphertext::random(),
+            extra_config: TransactionExtraConfig::V1 {
+                multisig_address: Some(AccountAddress::random()),
+                replay_protection_nonce: None,
+            },
+            payload_hash: HashValue::random(),
+            encryption_epoch: 0,
+            claimed_entry_fun: None,
+        });
+        let raw_transaction = RawTransaction::new(
+            AccountAddress::random(),
+            0,
+            TransactionPayload::EncryptedPayload(encrypted_payload),
+            0,
+            0,
+            0,
+            ChainId::new(10),
+        );
+        SignedTransaction::new(
+            raw_transaction,
+            public_key,
+            aptos_crypto::ed25519::Ed25519Signature::dummy_signature(),
+        )
+    }
+
+    #[test]
+    fn test_verify_inline_batches_rejects_non_encrypted_state_payload() {
+        let author = PeerId::random();
+        let txns = vec![create_failed_decryption_signed_transaction()];
+        let batch = make_batch_info_ext_v2_with_txns(author, &txns, BatchKind::Encrypted);
+        let inline_batches = vec![(&batch, &txns)];
+
+        let err = Payload::verify_inline_batches(
+            inline_batches.into_iter(),
+            MAX_BATCH_TXNS,
+            MAX_BATCH_BYTES,
+        )
+        .unwrap_err();
+        assert!(
+            err.to_string().contains("not in Encrypted state"),
+            "Expected non-Encrypted state error, got: {}",
+            err
+        );
+    }
+
+    #[test]
+    fn test_verify_inline_batches_rejects_encrypted_multisig() {
+        let author = PeerId::random();
+        let txns = vec![create_encrypted_multisig_signed_transaction()];
+        let batch = make_batch_info_ext_v2_with_txns(author, &txns, BatchKind::Encrypted);
+        let inline_batches = vec![(&batch, &txns)];
+
+        let err = Payload::verify_inline_batches(
+            inline_batches.into_iter(),
+            MAX_BATCH_TXNS,
+            MAX_BATCH_BYTES,
+        )
+        .unwrap_err();
+        assert!(
+            err.to_string().contains("do not support multisig"),
+            "Expected multisig rejection error, got: {}",
             err
         );
     }

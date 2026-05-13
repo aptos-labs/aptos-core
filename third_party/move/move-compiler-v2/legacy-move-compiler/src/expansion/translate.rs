@@ -2837,12 +2837,60 @@ fn bind_with_range_list(
     let rs_: Option<Vec<E::LValueWithRange>> = prs_
         .into_iter()
         .map(|sp!(loc, (pb, pr))| -> Option<E::LValueWithRange> {
+            // State-domain ranges (`S in *`) produce a $spec_state_domain call.
+            // The binding variable must be treated as a plain variable, not a
+            // struct pattern, even if uppercase (since state labels conventionally
+            // use uppercase names like `S`).
+            let is_state_domain = is_state_domain_range(&pr);
             let r = exp_(context, pr);
-            let b = bind(context, pb)?;
+            let b = if is_state_domain {
+                bind_as_var(context, pb)
+            } else {
+                bind(context, pb)?
+            };
             Some(sp(loc, (b, r)))
         })
         .collect();
     Some(sp(loc, rs_?))
+}
+
+/// Returns true if the range expression is a `$spec_state_domain()` call.
+fn is_state_domain_range(exp: &P::Exp) -> bool {
+    use crate::parser::ast::{Exp_ as PE, NameAccessChain_ as NA};
+    if let PE::Call(sp!(_, NA::One(name)), _, _, _) = &exp.value {
+        name.value.as_str() == "$spec_state_domain"
+    } else {
+        false
+    }
+}
+
+/// Like `bind`, but always produces a variable binding (never struct destructure).
+/// Used for state-domain quantifier variables, which use uppercase names by convention
+/// (e.g., `S` in `forall S in *:`). Skips the local name validity check since these
+/// are state labels, not regular local variables.
+fn bind_as_var(context: &mut Context, sp!(loc, pb_): P::Bind) -> E::LValue {
+    use E::LValue_ as EL;
+    use P::Bind_ as PB;
+    let b_ = match pb_ {
+        PB::Var(v) => {
+            // Skip check_valid_local_name: state labels use uppercase by convention.
+            EL::Var(sp(loc, E::ModuleAccess_::Name(v.0)), None)
+        },
+        _ => {
+            context.env.add_diag(diag!(
+                Syntax::SpecContextRestricted,
+                (
+                    loc,
+                    "state domain quantifier variable must be a simple variable"
+                )
+            ));
+            EL::Var(
+                sp(loc, E::ModuleAccess_::Name(sp(loc, Symbol::from("_")))),
+                None,
+            )
+        },
+    };
+    sp(loc, b_)
 }
 
 fn bind(context: &mut Context, sp!(loc, pb_): P::Bind) -> Option<E::LValue> {

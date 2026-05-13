@@ -3,14 +3,14 @@
 
 //! Tests for Move enum support (heap-allocated tagged unions).
 
-use mono_move_alloc::{ExecutableArena, GlobalArenaPtr};
+use mono_move_alloc::{ExecutableArena, ExecutableArenaPtr, GlobalArenaPtr};
 use mono_move_core::{
-    CodeOffset as CO, DescriptorId, FrameLayoutInfo, FrameOffset as FO, Function, MicroOp,
+    CodeOffset as CO, FrameLayoutInfo, FrameOffset as FO, Function, LocalExecutionContext, MicroOp,
     SortedSafePointEntries, ENUM_DATA_OFFSET, ENUM_TAG_OFFSET,
 };
-use mono_move_gas::SimpleGasMeter;
 use mono_move_runtime::{
-    read_ptr, read_u64, InterpreterContext, ObjectDescriptor, VEC_DATA_OFFSET, VEC_LENGTH_OFFSET,
+    read_ptr, read_u64, InterpreterContext, ObjectDescriptor, ObjectDescriptorTable,
+    VEC_DATA_OFFSET, VEC_LENGTH_OFFSET,
 };
 
 // ---------------------------------------------------------------------------
@@ -27,9 +27,13 @@ fn enum_basic() {
 
     let arena = ExecutableArena::new();
 
+    let mut descriptors = ObjectDescriptorTable::new();
+    let desc_shape_enum =
+        descriptors.push(ObjectDescriptor::new_enum(24, vec![vec![], vec![]]).unwrap());
+
     #[rustfmt::skip]
-    let code = arena.alloc_slice_fill_iter(vec![
-        HeapNew { dst: FO(shape), descriptor_id: DescriptorId(0) },
+    let code = arena.alloc_slice_fill_iter([
+        HeapNew { dst: FO(shape), descriptor_id: desc_shape_enum },
         MicroOp::enum_set_tag(FO(shape), 1),
         StoreImm8 { dst: FO(tmp), imm: 3 },
         MicroOp::enum_store8(FO(shape), 0, FO(tmp)),
@@ -45,19 +49,17 @@ fn enum_basic() {
     let functions = [arena.alloc(Function {
         name: GlobalArenaPtr::from_static("test"),
         code,
-        args_size: 0,
-        args_and_locals_size: 24,
+        param_sizes: ExecutableArenaPtr::empty_slice(),
+        param_sizes_sum: 0,
+        param_and_local_sizes_sum: 24,
         extended_frame_size: 48,
         zero_frame: true,
-        frame_layout: FrameLayoutInfo::new(&arena, vec![FO(shape)]),
-        safe_point_layouts: SortedSafePointEntries::empty(&arena),
+        frame_layout: FrameLayoutInfo::new(&arena, [FO(shape)]),
+        safe_point_layouts: SortedSafePointEntries::empty(),
     })];
-    let descriptors = vec![ObjectDescriptor::Enum {
-        size: 24,
-        variant_pointer_offsets: vec![vec![], vec![]],
-    }];
-    let gas_meter = SimpleGasMeter::new(u64::MAX);
-    let mut ctx = InterpreterContext::new(&descriptors, gas_meter, unsafe {
+
+    let mut exec_ctx = LocalExecutionContext::with_max_budget();
+    let mut ctx = InterpreterContext::new(&mut exec_ctx, &descriptors, unsafe {
         functions[0].as_ref_unchecked()
     });
     ctx.run().unwrap();
@@ -87,9 +89,13 @@ fn enum_survives_gc() {
 
     let arena = ExecutableArena::new();
 
+    let mut descriptors = ObjectDescriptorTable::new();
+    let desc_shape_enum =
+        descriptors.push(ObjectDescriptor::new_enum(24, vec![vec![], vec![]]).unwrap());
+
     #[rustfmt::skip]
-    let code = arena.alloc_slice_fill_iter(vec![
-        HeapNew { dst: FO(shape), descriptor_id: DescriptorId(0) },
+    let code = arena.alloc_slice_fill_iter([
+        HeapNew { dst: FO(shape), descriptor_id: desc_shape_enum },
         MicroOp::enum_set_tag(FO(shape), 0),
         StoreImm8 { dst: FO(tmp), imm: 42 },
         MicroOp::enum_store8(FO(shape), 0, FO(tmp)),
@@ -102,19 +108,17 @@ fn enum_survives_gc() {
     let functions = [arena.alloc(Function {
         name: GlobalArenaPtr::from_static("test"),
         code,
-        args_size: 0,
-        args_and_locals_size: 24,
+        param_sizes: ExecutableArenaPtr::empty_slice(),
+        param_sizes_sum: 0,
+        param_and_local_sizes_sum: 24,
         extended_frame_size: 48,
         zero_frame: true,
-        frame_layout: FrameLayoutInfo::new(&arena, vec![FO(shape)]),
-        safe_point_layouts: SortedSafePointEntries::empty(&arena),
+        frame_layout: FrameLayoutInfo::new(&arena, [FO(shape)]),
+        safe_point_layouts: SortedSafePointEntries::empty(),
     })];
-    let descriptors = vec![ObjectDescriptor::Enum {
-        size: 24,
-        variant_pointer_offsets: vec![vec![], vec![]],
-    }];
-    let gas_meter = SimpleGasMeter::new(u64::MAX);
-    let mut ctx = InterpreterContext::new(&descriptors, gas_meter, unsafe {
+
+    let mut exec_ctx = LocalExecutionContext::with_max_budget();
+    let mut ctx = InterpreterContext::new(&mut exec_ctx, &descriptors, unsafe {
         functions[0].as_ref_unchecked()
     });
     ctx.run().unwrap();
@@ -143,17 +147,22 @@ fn enum_gc_traces_refs() {
 
     let arena = ExecutableArena::new();
 
+    let mut descriptors = ObjectDescriptorTable::new();
+    let desc_val_enum =
+        descriptors.push(ObjectDescriptor::new_enum(16, vec![vec![], vec![0]]).unwrap());
+    let desc_vec_u64 = descriptors.push(ObjectDescriptor::new_vector(8, vec![]).unwrap());
+
     #[rustfmt::skip]
-    let code = arena.alloc_slice_fill_iter(vec![
+    let code = arena.alloc_slice_fill_iter([
         VecNew { dst: FO(vec) },
         SlotBorrow { dst: FO(vec_ref), local: FO(vec) },
         StoreImm8 { dst: FO(tmp), imm: 10 },
-        VecPushBack { vec_ref: FO(vec_ref), elem: FO(tmp), elem_size: 8, descriptor_id: DescriptorId(1) },
+        VecPushBack { vec_ref: FO(vec_ref), elem: FO(tmp), elem_size: 8, descriptor_id: desc_vec_u64 },
         StoreImm8 { dst: FO(tmp), imm: 20 },
-        VecPushBack { vec_ref: FO(vec_ref), elem: FO(tmp), elem_size: 8, descriptor_id: DescriptorId(1) },
+        VecPushBack { vec_ref: FO(vec_ref), elem: FO(tmp), elem_size: 8, descriptor_id: desc_vec_u64 },
         StoreImm8 { dst: FO(tmp), imm: 30 },
-        VecPushBack { vec_ref: FO(vec_ref), elem: FO(tmp), elem_size: 8, descriptor_id: DescriptorId(1) },
-        HeapNew { dst: FO(val), descriptor_id: DescriptorId(0) },
+        VecPushBack { vec_ref: FO(vec_ref), elem: FO(tmp), elem_size: 8, descriptor_id: desc_vec_u64 },
+        HeapNew { dst: FO(val), descriptor_id: desc_val_enum },
         MicroOp::enum_set_tag(FO(val), 1),
         MicroOp::enum_store8(FO(val), 0, FO(vec)),
         ForceGC,
@@ -166,22 +175,17 @@ fn enum_gc_traces_refs() {
     let functions = [arena.alloc(Function {
         name: GlobalArenaPtr::from_static("test"),
         code,
-        args_size: 0,
-        args_and_locals_size: 48,
+        param_sizes: ExecutableArenaPtr::empty_slice(),
+        param_sizes_sum: 0,
+        param_and_local_sizes_sum: 48,
         extended_frame_size: 72,
         zero_frame: true,
-        frame_layout: FrameLayoutInfo::new(&arena, vec![FO(val), FO(vec), FO(vec_ref)]),
-        safe_point_layouts: SortedSafePointEntries::empty(&arena),
+        frame_layout: FrameLayoutInfo::new(&arena, [FO(val), FO(vec), FO(vec_ref)]),
+        safe_point_layouts: SortedSafePointEntries::empty(),
     })];
-    let descriptors = vec![
-        ObjectDescriptor::Enum {
-            size: 16,
-            variant_pointer_offsets: vec![vec![], vec![0]],
-        },
-        ObjectDescriptor::Trivial,
-    ];
-    let gas_meter = SimpleGasMeter::new(u64::MAX);
-    let mut ctx = InterpreterContext::new(&descriptors, gas_meter, unsafe {
+
+    let mut exec_ctx = LocalExecutionContext::with_max_budget();
+    let mut ctx = InterpreterContext::new(&mut exec_ctx, &descriptors, unsafe {
         functions[0].as_ref_unchecked()
     });
     ctx.run().unwrap();
@@ -217,9 +221,13 @@ fn enum_pattern_match() {
 
     let arena = ExecutableArena::new();
 
+    let mut descriptors = ObjectDescriptorTable::new();
+    let desc_op_enum =
+        descriptors.push(ObjectDescriptor::new_enum(24, vec![vec![], vec![]]).unwrap());
+
     #[rustfmt::skip]
-    let code = arena.alloc_slice_fill_iter(vec![
-        HeapNew { dst: FO(op), descriptor_id: DescriptorId(0) },
+    let code = arena.alloc_slice_fill_iter([
+        HeapNew { dst: FO(op), descriptor_id: desc_op_enum },
         MicroOp::enum_set_tag(FO(op), 0),
         StoreImm8 { dst: FO(tmp), imm: 10 },
         MicroOp::enum_store8(FO(op), 0, FO(tmp)),
@@ -237,19 +245,17 @@ fn enum_pattern_match() {
     let functions = [arena.alloc(Function {
         name: GlobalArenaPtr::from_static("test"),
         code,
-        args_size: 0,
-        args_and_locals_size: 24,
+        param_sizes: ExecutableArenaPtr::empty_slice(),
+        param_sizes_sum: 0,
+        param_and_local_sizes_sum: 24,
         extended_frame_size: 48,
         zero_frame: true,
-        frame_layout: FrameLayoutInfo::new(&arena, vec![FO(op)]),
-        safe_point_layouts: SortedSafePointEntries::empty(&arena),
+        frame_layout: FrameLayoutInfo::new(&arena, [FO(op)]),
+        safe_point_layouts: SortedSafePointEntries::empty(),
     })];
-    let descriptors = vec![ObjectDescriptor::Enum {
-        size: 24,
-        variant_pointer_offsets: vec![vec![], vec![]],
-    }];
-    let gas_meter = SimpleGasMeter::new(u64::MAX);
-    let mut ctx = InterpreterContext::new(&descriptors, gas_meter, unsafe {
+
+    let mut exec_ctx = LocalExecutionContext::with_max_budget();
+    let mut ctx = InterpreterContext::new(&mut exec_ctx, &descriptors, unsafe {
         functions[0].as_ref_unchecked()
     });
     ctx.run().unwrap();
@@ -271,9 +277,13 @@ fn enum_variant_switch() {
 
     let arena = ExecutableArena::new();
 
+    let mut descriptors = ObjectDescriptorTable::new();
+    let desc_e_enum =
+        descriptors.push(ObjectDescriptor::new_enum(16, vec![vec![], vec![]]).unwrap());
+
     #[rustfmt::skip]
-    let code = arena.alloc_slice_fill_iter(vec![
-        HeapNew { dst: FO(e), descriptor_id: DescriptorId(0) },
+    let code = arena.alloc_slice_fill_iter([
+        HeapNew { dst: FO(e), descriptor_id: desc_e_enum },
         MicroOp::enum_set_tag(FO(e), 0),
         StoreImm8 { dst: FO(tmp), imm: 111 },
         MicroOp::enum_store8(FO(e), 0, FO(tmp)),
@@ -289,19 +299,17 @@ fn enum_variant_switch() {
     let functions = [arena.alloc(Function {
         name: GlobalArenaPtr::from_static("test"),
         code,
-        args_size: 0,
-        args_and_locals_size: 24,
+        param_sizes: ExecutableArenaPtr::empty_slice(),
+        param_sizes_sum: 0,
+        param_and_local_sizes_sum: 24,
         extended_frame_size: 48,
         zero_frame: true,
-        frame_layout: FrameLayoutInfo::new(&arena, vec![FO(e)]),
-        safe_point_layouts: SortedSafePointEntries::empty(&arena),
+        frame_layout: FrameLayoutInfo::new(&arena, [FO(e)]),
+        safe_point_layouts: SortedSafePointEntries::empty(),
     })];
-    let descriptors = vec![ObjectDescriptor::Enum {
-        size: 16,
-        variant_pointer_offsets: vec![vec![], vec![]],
-    }];
-    let gas_meter = SimpleGasMeter::new(u64::MAX);
-    let mut ctx = InterpreterContext::new(&descriptors, gas_meter, unsafe {
+
+    let mut exec_ctx = LocalExecutionContext::with_max_budget();
+    let mut ctx = InterpreterContext::new(&mut exec_ctx, &descriptors, unsafe {
         functions[0].as_ref_unchecked()
     });
     ctx.run().unwrap();
@@ -324,9 +332,13 @@ fn enum_borrow_field() {
 
     let arena = ExecutableArena::new();
 
+    let mut descriptors = ObjectDescriptorTable::new();
+    let desc_e_enum =
+        descriptors.push(ObjectDescriptor::new_enum(24, vec![vec![], vec![]]).unwrap());
+
     #[rustfmt::skip]
-    let code = arena.alloc_slice_fill_iter(vec![
-        HeapNew { dst: FO(e), descriptor_id: DescriptorId(0) },
+    let code = arena.alloc_slice_fill_iter([
+        HeapNew { dst: FO(e), descriptor_id: desc_e_enum },
         MicroOp::enum_set_tag(FO(e), 0),
         StoreImm8 { dst: FO(result), imm: 10 },
         MicroOp::enum_store8(FO(e), 0, FO(result)),
@@ -343,19 +355,17 @@ fn enum_borrow_field() {
     let functions = [arena.alloc(Function {
         name: GlobalArenaPtr::from_static("test"),
         code,
-        args_size: 0,
-        args_and_locals_size: 48,
+        param_sizes: ExecutableArenaPtr::empty_slice(),
+        param_sizes_sum: 0,
+        param_and_local_sizes_sum: 48,
         extended_frame_size: 72,
         zero_frame: true,
-        frame_layout: FrameLayoutInfo::new(&arena, vec![FO(e), FO(r#ref), FO(e_ref)]),
-        safe_point_layouts: SortedSafePointEntries::empty(&arena),
+        frame_layout: FrameLayoutInfo::new(&arena, [FO(e), FO(r#ref), FO(e_ref)]),
+        safe_point_layouts: SortedSafePointEntries::empty(),
     })];
-    let descriptors = vec![ObjectDescriptor::Enum {
-        size: 24,
-        variant_pointer_offsets: vec![vec![], vec![]],
-    }];
-    let gas_meter = SimpleGasMeter::new(u64::MAX);
-    let mut ctx = InterpreterContext::new(&descriptors, gas_meter, unsafe {
+
+    let mut exec_ctx = LocalExecutionContext::with_max_budget();
+    let mut ctx = InterpreterContext::new(&mut exec_ctx, &descriptors, unsafe {
         functions[0].as_ref_unchecked()
     });
     ctx.run().unwrap();
@@ -379,13 +389,18 @@ fn enum_gc_variant_switching() {
 
     let arena = ExecutableArena::new();
 
+    let mut descriptors = ObjectDescriptorTable::new();
+    let desc_ctr_enum =
+        descriptors.push(ObjectDescriptor::new_enum(16, vec![vec![], vec![0]]).unwrap());
+    let desc_vec_u64 = descriptors.push(ObjectDescriptor::new_vector(8, vec![]).unwrap());
+
     #[rustfmt::skip]
-    let code = arena.alloc_slice_fill_iter(vec![
+    let code = arena.alloc_slice_fill_iter([
         VecNew { dst: FO(vec) },
         SlotBorrow { dst: FO(vec_ref), local: FO(vec) },
         StoreImm8 { dst: FO(tmp), imm: 100 },
-        VecPushBack { vec_ref: FO(vec_ref), elem: FO(tmp), elem_size: 8, descriptor_id: DescriptorId(1) },
-        HeapNew { dst: FO(ctr), descriptor_id: DescriptorId(0) },
+        VecPushBack { vec_ref: FO(vec_ref), elem: FO(tmp), elem_size: 8, descriptor_id: desc_vec_u64 },
+        HeapNew { dst: FO(ctr), descriptor_id: desc_ctr_enum },
         MicroOp::enum_set_tag(FO(ctr), 1),
         MicroOp::enum_store8(FO(ctr), 0, FO(vec)),
         ForceGC,
@@ -402,22 +417,17 @@ fn enum_gc_variant_switching() {
     let functions = [arena.alloc(Function {
         name: GlobalArenaPtr::from_static("test"),
         code,
-        args_size: 0,
-        args_and_locals_size: 48,
+        param_sizes: ExecutableArenaPtr::empty_slice(),
+        param_sizes_sum: 0,
+        param_and_local_sizes_sum: 48,
         extended_frame_size: 72,
         zero_frame: true,
-        frame_layout: FrameLayoutInfo::new(&arena, vec![FO(ctr), FO(vec), FO(vec_ref)]),
-        safe_point_layouts: SortedSafePointEntries::empty(&arena),
+        frame_layout: FrameLayoutInfo::new(&arena, [FO(ctr), FO(vec), FO(vec_ref)]),
+        safe_point_layouts: SortedSafePointEntries::empty(),
     })];
-    let descriptors = vec![
-        ObjectDescriptor::Enum {
-            size: 16,
-            variant_pointer_offsets: vec![vec![], vec![0]],
-        },
-        ObjectDescriptor::Trivial,
-    ];
-    let gas_meter = SimpleGasMeter::new(u64::MAX);
-    let mut ctx = InterpreterContext::new(&descriptors, gas_meter, unsafe {
+
+    let mut exec_ctx = LocalExecutionContext::with_max_budget();
+    let mut ctx = InterpreterContext::new(&mut exec_ctx, &descriptors, unsafe {
         functions[0].as_ref_unchecked()
     });
     ctx.run().unwrap();
@@ -445,13 +455,18 @@ fn enum_in_struct() {
 
     let arena = ExecutableArena::new();
 
+    let mut descriptors = ObjectDescriptorTable::new();
+    let desc_wrapper_struct = descriptors.push(ObjectDescriptor::new_struct(16, vec![8]).unwrap());
+    let desc_payload_enum =
+        descriptors.push(ObjectDescriptor::new_enum(16, vec![vec![], vec![]]).unwrap());
+
     #[rustfmt::skip]
-    let code = arena.alloc_slice_fill_iter(vec![
-        HeapNew { dst: FO(payload), descriptor_id: DescriptorId(1) },
+    let code = arena.alloc_slice_fill_iter([
+        HeapNew { dst: FO(payload), descriptor_id: desc_payload_enum },
         MicroOp::enum_set_tag(FO(payload), 1),
         StoreImm8 { dst: FO(tmp), imm: 42 },
         MicroOp::enum_store8(FO(payload), 0, FO(tmp)),
-        HeapNew { dst: FO(wrapper), descriptor_id: DescriptorId(0) },
+        HeapNew { dst: FO(wrapper), descriptor_id: desc_wrapper_struct },
         StoreImm8 { dst: FO(tmp), imm: 7 },
         MicroOp::struct_store8(FO(wrapper), 0, FO(tmp)),
         MicroOp::struct_store8(FO(wrapper), 8, FO(payload)),
@@ -466,25 +481,17 @@ fn enum_in_struct() {
     let functions = [arena.alloc(Function {
         name: GlobalArenaPtr::from_static("test"),
         code,
-        args_size: 0,
-        args_and_locals_size: 32,
+        param_sizes: ExecutableArenaPtr::empty_slice(),
+        param_sizes_sum: 0,
+        param_and_local_sizes_sum: 32,
         extended_frame_size: 56,
         zero_frame: true,
-        frame_layout: FrameLayoutInfo::new(&arena, vec![FO(wrapper), FO(payload)]),
-        safe_point_layouts: SortedSafePointEntries::empty(&arena),
+        frame_layout: FrameLayoutInfo::new(&arena, [FO(wrapper), FO(payload)]),
+        safe_point_layouts: SortedSafePointEntries::empty(),
     })];
-    let descriptors = vec![
-        ObjectDescriptor::Struct {
-            size: 16,
-            pointer_offsets: vec![8],
-        },
-        ObjectDescriptor::Enum {
-            size: 16,
-            variant_pointer_offsets: vec![vec![], vec![]],
-        },
-    ];
-    let gas_meter = SimpleGasMeter::new(u64::MAX);
-    let mut ctx = InterpreterContext::new(&descriptors, gas_meter, unsafe {
+
+    let mut exec_ctx = LocalExecutionContext::with_max_budget();
+    let mut ctx = InterpreterContext::new(&mut exec_ctx, &descriptors, unsafe {
         functions[0].as_ref_unchecked()
     });
     ctx.run().unwrap();
@@ -513,22 +520,27 @@ fn enum_in_vector() {
 
     let arena = ExecutableArena::new();
 
+    let mut descriptors = ObjectDescriptorTable::new();
+    let desc_e_enum =
+        descriptors.push(ObjectDescriptor::new_enum(24, vec![vec![], vec![]]).unwrap());
+    let desc_vec_enum_ptrs = descriptors.push(ObjectDescriptor::new_vector(8, vec![0]).unwrap());
+
     #[rustfmt::skip]
-    let code = arena.alloc_slice_fill_iter(vec![
+    let code = arena.alloc_slice_fill_iter([
         VecNew { dst: FO(vec) },
         SlotBorrow { dst: FO(vec_ref), local: FO(vec) },
-        HeapNew { dst: FO(e), descriptor_id: DescriptorId(0) },
+        HeapNew { dst: FO(e), descriptor_id: desc_e_enum },
         MicroOp::enum_set_tag(FO(e), 0),
         StoreImm8 { dst: FO(tmp), imm: 10 },
         MicroOp::enum_store8(FO(e), 0, FO(tmp)),
-        VecPushBack { vec_ref: FO(vec_ref), elem: FO(e), elem_size: 8, descriptor_id: DescriptorId(1) },
-        HeapNew { dst: FO(e), descriptor_id: DescriptorId(0) },
+        VecPushBack { vec_ref: FO(vec_ref), elem: FO(e), elem_size: 8, descriptor_id: desc_vec_enum_ptrs },
+        HeapNew { dst: FO(e), descriptor_id: desc_e_enum },
         MicroOp::enum_set_tag(FO(e), 1),
         StoreImm8 { dst: FO(tmp), imm: 30 },
         MicroOp::enum_store8(FO(e), 0, FO(tmp)),
         StoreImm8 { dst: FO(tmp), imm: 40 },
         MicroOp::enum_store8(FO(e), 8, FO(tmp)),
-        VecPushBack { vec_ref: FO(vec_ref), elem: FO(e), elem_size: 8, descriptor_id: DescriptorId(1) },
+        VecPushBack { vec_ref: FO(vec_ref), elem: FO(e), elem_size: 8, descriptor_id: desc_vec_enum_ptrs },
         ForceGC,
         StoreImm8 { dst: FO(tmp), imm: 0 },
         VecLoadElem { dst: FO(e), vec_ref: FO(vec_ref), idx: FO(tmp), elem_size: 8 },
@@ -544,25 +556,17 @@ fn enum_in_vector() {
     let functions = [arena.alloc(Function {
         name: GlobalArenaPtr::from_static("test"),
         code,
-        args_size: 0,
-        args_and_locals_size: 48,
+        param_sizes: ExecutableArenaPtr::empty_slice(),
+        param_sizes_sum: 0,
+        param_and_local_sizes_sum: 48,
         extended_frame_size: 72,
         zero_frame: true,
-        frame_layout: FrameLayoutInfo::new(&arena, vec![FO(vec), FO(e), FO(vec_ref)]),
-        safe_point_layouts: SortedSafePointEntries::empty(&arena),
+        frame_layout: FrameLayoutInfo::new(&arena, [FO(vec), FO(e), FO(vec_ref)]),
+        safe_point_layouts: SortedSafePointEntries::empty(),
     })];
-    let descriptors = vec![
-        ObjectDescriptor::Enum {
-            size: 24,
-            variant_pointer_offsets: vec![vec![], vec![]],
-        },
-        ObjectDescriptor::Vector {
-            elem_size: 8,
-            elem_pointer_offsets: vec![0],
-        },
-    ];
-    let gas_meter = SimpleGasMeter::new(u64::MAX);
-    let mut ctx = InterpreterContext::new(&descriptors, gas_meter, unsafe {
+
+    let mut exec_ctx = LocalExecutionContext::with_max_budget();
+    let mut ctx = InterpreterContext::new(&mut exec_ctx, &descriptors, unsafe {
         functions[0].as_ref_unchecked()
     });
     ctx.run().unwrap();

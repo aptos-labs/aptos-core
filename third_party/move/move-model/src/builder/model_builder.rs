@@ -50,6 +50,7 @@ impl BuiltinReceiverType {
             Type::Reference(..) => None,
             Type::Fun(..) => None,
             Type::ResourceDomain(..) => None,
+            Type::StateDomain => None,
         }
     }
 

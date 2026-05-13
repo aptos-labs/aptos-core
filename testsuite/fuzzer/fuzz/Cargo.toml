@@ -109,7 +109,6 @@ move-vm-runtime = { workspace = true }
 move-vm-types = { workspace = true, features = ["fuzzing"] }
 once_cell = { workspace = true }
 primitive-types = { workspace = true }
-rayon = { workspace = true }
 ring = { workspace = true }
 serde = { workspace = true }
 serde_json = { workspace = true }

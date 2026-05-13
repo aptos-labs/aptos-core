@@ -12,6 +12,7 @@ use crate::{
     traits::{transcript::Aggregated, Aggregatable, TranscriptCore},
     Scalar,
 };
+use anyhow::ensure;
 use aptos_crypto::{
     arkworks::{
         random::{unsafe_random_point, unsafe_random_points},
@@ -165,18 +166,48 @@ impl<E: Pairing> Aggregated<Subtranscript<E>> for SubtranscriptProjective<E> {
         sc: &WeightedConfigArkworks<E::ScalarField>,
         other: &Subtranscript<E>,
     ) -> anyhow::Result<()> {
-        debug_assert_eq!(self.Cs_proj.len(), sc.get_total_num_players());
-        debug_assert_eq!(self.Vs_proj.len(), sc.get_total_num_players());
-        debug_assert_eq!(self.Cs_proj.len(), other.Cs.len());
-        debug_assert_eq!(self.Rs_proj.len(), other.Rs.len());
-        debug_assert_eq!(self.Vs_proj.len(), other.Vs.len());
+        ensure!(
+            self.Cs_proj.len() == sc.get_total_num_players(),
+            "Cs_proj length {} != num_players {}",
+            self.Cs_proj.len(),
+            sc.get_total_num_players()
+        );
+        ensure!(
+            self.Vs_proj.len() == sc.get_total_num_players(),
+            "Vs_proj length {} != num_players {}",
+            self.Vs_proj.len(),
+            sc.get_total_num_players()
+        );
+        ensure!(
+            self.Cs_proj.len() == other.Cs.len(),
+            "Cs_proj length {} != other {}",
+            self.Cs_proj.len(),
+            other.Cs.len()
+        );
+        ensure!(
+            self.Rs_proj.len() == other.Rs.len(),
+            "Rs_proj length {} != other {}",
+            self.Rs_proj.len(),
+            other.Rs.len()
+        );
+        ensure!(
+            self.Vs_proj.len() == other.Vs.len(),
+            "Vs_proj length {} != other {}",
+            self.Vs_proj.len(),
+            other.Vs.len()
+        );
 
         // Aggregate the V0s
         self.V0_proj += other.V0;
 
         // Aggregate Vs (nested) element-wise
         for (vs_row, other_row) in self.Vs_proj.iter_mut().zip(&other.Vs) {
-            debug_assert_eq!(vs_row.len(), other_row.len());
+            ensure!(
+                vs_row.len() == other_row.len(),
+                "Vs row length {} != other {}",
+                vs_row.len(),
+                other_row.len()
+            );
             for (v_ij, other_v_ij) in vs_row.iter_mut().zip(other_row) {
                 *v_ij += *other_v_ij;
             }

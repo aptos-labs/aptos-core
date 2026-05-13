@@ -1,3 +1,4 @@
+// @checks=experimental
 // Tests for the use_receiver_style lint.
 // Detects function calls that can use receiver-style (method) syntax.
 

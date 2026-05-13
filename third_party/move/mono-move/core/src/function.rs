@@ -1,7 +1,10 @@
 // Copyright (c) Aptos Foundation
 // Licensed pursuant to the Innovation-Enabling Source Code License, available at https://github.com/aptos-labs/aptos-core/blob/main/LICENSE
 
-use crate::instruction::{CodeOffset, FrameOffset, MicroOp, FRAME_METADATA_SIZE};
+use crate::{
+    execution_context::FunctionResolver,
+    instruction::{CodeOffset, FrameOffset, MicroOp, FRAME_METADATA_SIZE},
+};
 use mono_move_alloc::{ExecutableArena, ExecutableArenaPtr, GlobalArenaPtr};
 
 /// ---------------------------------------------------------------------------
@@ -27,7 +30,7 @@ pub struct FrameLayoutInfo {
     /// offset and is not listed.
     ///
     /// Offsets must not fall in the metadata segment
-    /// (`args_and_locals_size..args_and_locals_size + FRAME_METADATA_SIZE`).
+    /// (`param_and_local_sizes_sum..param_and_local_sizes_sum + FRAME_METADATA_SIZE`).
     pub heap_ptr_offsets: ExecutableArenaPtr<[FrameOffset]>,
 }
 
@@ -44,9 +47,12 @@ impl FrameLayoutInfo {
         }
     }
 
-    /// Create an empty `FrameLayoutInfo` (no pointer offsets).
-    pub fn empty(arena: &ExecutableArena) -> Self {
-        Self::new(arena, std::iter::empty::<FrameOffset>())
+    /// Create an empty `FrameLayoutInfo` (no pointer offsets). Does not
+    /// require an arena: backed by a static empty slice.
+    pub fn empty() -> Self {
+        Self {
+            heap_ptr_offsets: ExecutableArenaPtr::empty_slice(),
+        }
     }
 }
 
@@ -60,7 +66,7 @@ impl FrameLayoutInfo {
 /// - **Call return sites**: when a callee triggers GC, the caller's
 ///   saved PC is `call_pc + 1`. The safe point for a caller frame is
 ///   the instruction *after* the call — at that point, the shared
-///   arg/return region holds return values, not args.
+///   arg/return region holds return values, not arguments.
 pub struct SafePointEntry {
     pub code_offset: CodeOffset,
     pub layout: FrameLayoutInfo,
@@ -91,9 +97,12 @@ impl SortedSafePointEntries {
         }
     }
 
-    /// Create an empty `SortedSafePointEntries`.
-    pub fn empty(arena: &ExecutableArena) -> Self {
-        Self::new(arena, std::iter::empty::<SafePointEntry>())
+    /// Create an empty `SortedSafePointEntries`. Does not require an arena:
+    /// backed by a static empty slice.
+    pub fn empty() -> Self {
+        Self {
+            entries: ExecutableArenaPtr::empty_slice(),
+        }
     }
 
     /// Look up the safe-point layout for a given code offset, if one exists.
@@ -126,53 +135,70 @@ impl SortedSafePointEntries {
 /// Frame layout (fp-relative):
 ///
 /// ```text
-///   [0 .. args_size)                    arguments (written by caller)
-///   [args_size .. args_and_locals_size)          locals
-///   [args_and_locals_size .. args_and_locals_size+24)     metadata (saved_pc, saved_fp, saved_func_id)
-///   [args_and_locals_size+24 .. extended_frame_size)  callee arg/return slots
+///   [0 .. param_sizes_sum)                    parameters (written by caller as arguments)
+///   [param_sizes_sum .. param_and_local_sizes_sum)          locals
+///   [param_and_local_sizes_sum .. param_and_local_sizes_sum+24)     metadata (saved_pc, saved_fp, saved_func_id)
+///   [param_and_local_sizes_sum+24 .. extended_frame_size)  callee arg/return slots
 /// ```
 ///
-/// `extended_frame_size` == `args_and_locals_size + FRAME_METADATA_SIZE` for leaf
+/// `extended_frame_size` == `param_and_local_sizes_sum + FRAME_METADATA_SIZE` for leaf
 /// functions (no callee region).
 pub struct Function {
     pub name: GlobalArenaPtr<str>,
     pub code: ExecutableArenaPtr<[MicroOp]>,
-    /// Size of the argument region at the start of the frame.
-    /// Arguments are placed by the caller before `CallFunc`; when
-    /// `zero_frame` is true, the runtime zeroes everything beyond args
-    /// (`args_size..extended_frame_size`) at frame creation to ensure
-    /// pointer slots start as null.
-    pub args_size: usize,
-    /// Size of the arguments + locals region. Frame metadata is stored
-    /// immediately after this region at offset `args_and_locals_size`.
-    pub args_and_locals_size: usize,
+    /// Byte size of each parameter, in declaration order.
+    ///
+    /// Used by `CallClosure` (together with the closure's `ClosureMask`) to
+    /// compute each parameter's offset in the callee's parameter region and
+    /// to advance through the packed captured values. The sum of these sizes
+    /// must equal `param_sizes_sum`.
+    //
+    // TODO: this only captures sizes, not alignment. Once the layout admits
+    // non-8-byte fields, the closure-call interleaver will need per-param
+    // alignment (either encoded alongside `size` here, or as a sibling
+    // `param_alignments` slice).
+    pub param_sizes: ExecutableArenaPtr<[u32]>,
+    /// Size of the parameter region at the start of the frame.
+    /// The caller writes the corresponding arguments into this region
+    /// before `CallFunc`; when `zero_frame` is true, the runtime zeroes
+    /// everything beyond the parameter region
+    /// (`param_sizes_sum..extended_frame_size`) at frame creation to
+    /// ensure pointer slots start as null.
+    pub param_sizes_sum: usize,
+    /// Size of the parameters + locals region. Frame metadata is stored
+    /// immediately after this region at offset `param_and_local_sizes_sum`.
+    pub param_and_local_sizes_sum: usize,
     /// Total frame footprint including metadata and callee slots.
-    /// Must be >= `frame_size()` (i.e., `args_and_locals_size + FRAME_METADATA_SIZE`).
+    /// Must be >= `frame_size()` (i.e., `param_and_local_sizes_sum + FRAME_METADATA_SIZE`).
     /// For leaf functions this equals `frame_size()`; for calling functions
     /// it additionally includes callee argument / return value slots
-    /// (sized to fit the largest callee's args or return values).
+    /// (sized to fit the largest callee's arguments or return values).
     pub extended_frame_size: usize,
-    /// Whether the runtime must zero-initialize the region beyond args
-    /// (`args_size..extended_frame_size`) when a new frame is created.
-    /// This is required when `frame_layout` has pointer slots so the GC
-    /// sees null instead of garbage. Functions with no heap pointer slots
-    /// in `frame_layout` (beyond args) can set this to `false` to skip
-    /// the memset. Not needed if the function uses only per-PC layouts
-    /// and the specializer ensures slots are written before becoming
-    /// visible as pointers.
+    /// Whether the runtime must zero-initialize the region beyond
+    /// parameters (`param_sizes_sum..extended_frame_size`) when a new
+    /// frame is created. This is required when `frame_layout` has
+    /// pointer slots so the GC sees null instead of garbage. Functions
+    /// with no heap pointer slots in `frame_layout` (beyond parameters)
+    /// can set this to `false` to skip the memset. Not needed if the
+    /// function uses only per-PC layouts and the specializer ensures
+    /// slots are written before becoming visible as pointers.
+    //
+    // TODO: derive from `frame_layout` instead of taking as input.
+    // `safe_point_layouts` doesn't need zeroing — each entry already
+    // pins which slots hold valid pointers at that PC.
     pub zero_frame: bool,
     /// Base frame layout — pointer offsets that are valid at every point
     /// in the function's execution. The GC always scans these.
     ///
     /// Offsets span `[0..extended_frame_size)` — they may reference the
-    /// data segment AND the callee argument/return region beyond the
+    /// data segment AND the callee arg/return region beyond the
     /// metadata, but must NOT fall in the metadata segment itself.
     ///
     /// Invariants:
     ///
     /// - **Zeroed at frame creation**: when `zero_frame` is true, the
-    ///   runtime zeroes `args_size..extended_frame_size` when a frame
-    ///   is created, so all non-argument pointer slots (including the
+    ///   runtime zeroes `param_sizes_sum..extended_frame_size` when a frame
+    ///   is created, so all non-parameter pointer slots (including the
     ///   callee arg/return region) start as null.
     /// - **Pointer-only writes**: a pointer slot may only be
     ///   overwritten with another valid heap pointer (or null). The
@@ -205,10 +231,10 @@ pub struct Function {
 }
 
 impl Function {
-    /// The frame size including metadata: `args_and_locals_size + FRAME_METADATA_SIZE`.
-    /// This is the offset where callee arguments begin.
+    /// The frame size including metadata: `param_and_local_sizes_sum + FRAME_METADATA_SIZE`.
+    /// This is the offset where the callee arg region begins.
     pub fn frame_size(&self) -> usize {
-        self.args_and_locals_size + FRAME_METADATA_SIZE
+        self.param_and_local_sizes_sum + FRAME_METADATA_SIZE
     }
 
     /// Look up the safe-point layout for a given code offset, if one exists.
@@ -223,10 +249,10 @@ impl Function {
     }
 
     /// Replaces every [`MicroOp::CallFunc`] (index-based dispatch) with
-    /// [`MicroOp::CallLocalFunc`] (direct pointer dispatch).
+    /// [`MicroOp::CallDirect`] (direct pointer dispatch).
     ///
-    /// `func_ptrs` is indexed by definition index and may contain `None`
-    /// for functions that were not lowered (e.g. generic functions).
+    /// Only used by hand-built test programs. The executable builder uses
+    /// its own rewrite pass that handles both local and cross-module calls.
     ///
     /// # Safety
     ///
@@ -244,12 +270,133 @@ impl Function {
             let code = unsafe { func.code.as_mut_unchecked() };
             for op in code.iter_mut() {
                 if let MicroOp::CallFunc { func_id } = *op {
-                    *op = MicroOp::CallLocalFunc {
-                        ptr: func_ptrs[func_id as usize]
-                            .expect("CallFunc target must be a lowered function"),
-                    };
+                    if let Some(ptr) = func_ptrs[func_id as usize] {
+                        *op = MicroOp::CallDirect { ptr };
+                    }
                 }
             }
         }
+    }
+
+    /// Replaces every [`MicroOp::CallIndirect`] (name-based dispatch) with
+    /// [`MicroOp::CallDirect`] (direct pointer dispatch) using the
+    /// provided function resolver.
+    ///
+    /// `func_ptrs` yields the functions whose code should be patched.
+    ///
+    /// # Safety
+    ///
+    /// The caller must have exclusive access to the functions and their
+    /// arena-allocated code.
+    pub unsafe fn resolve_module_calls(
+        func_ptrs: impl IntoIterator<Item = ExecutableArenaPtr<Function>>,
+        resolver: &impl FunctionResolver,
+    ) {
+        for mut func_ptr in func_ptrs {
+            // SAFETY: We have exclusive access during build — no concurrent
+            // readers exist yet. The arena is alive because the caller owns it.
+            let func = unsafe { func_ptr.as_mut_unchecked() };
+            let code = unsafe { func.code.as_mut_unchecked() };
+            for op in code.iter_mut() {
+                if let MicroOp::CallIndirect {
+                    executable_id,
+                    func_name,
+                } = *op
+                {
+                    if let Some(ptr) = resolver.resolve_function(executable_id, func_name) {
+                        *op = MicroOp::CallDirect { ptr };
+                    }
+                }
+            }
+        }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::{execution_context::FunctionResolver, ExecutableId};
+    use mono_move_alloc::{ExecutableArena, GlobalArenaPool, GlobalArenaShard};
+    use move_core_types::account_address::AccountAddress;
+
+    /// Minimal helper: build a [`Function`] with the given code into `arena`.
+    fn make_function(
+        arena: &ExecutableArena,
+        global: &GlobalArenaShard<'_>,
+        name: &str,
+        code: Vec<MicroOp>,
+    ) -> ExecutableArenaPtr<Function> {
+        let name_ptr = global.alloc_str(name);
+        let code_ptr = arena.alloc_slice_fill_iter(code);
+        let empty_layout = FrameLayoutInfo::new(arena, std::iter::empty::<FrameOffset>());
+        let empty_safe_points =
+            SortedSafePointEntries::new(arena, std::iter::empty::<SafePointEntry>());
+        arena.alloc(Function {
+            name: name_ptr,
+            code: code_ptr,
+            param_sizes: ExecutableArenaPtr::empty_slice(),
+            param_sizes_sum: 0,
+            param_and_local_sizes_sum: 8,
+            extended_frame_size: 8 + FRAME_METADATA_SIZE,
+            zero_frame: false,
+            frame_layout: empty_layout,
+            safe_point_layouts: empty_safe_points,
+        })
+    }
+
+    /// A test [`FunctionResolver`] that resolves everything to a fixed target.
+    struct FixedResolver {
+        target: ExecutableArenaPtr<Function>,
+    }
+
+    impl FunctionResolver for FixedResolver {
+        fn resolve_function(
+            &self,
+            _executable_id: GlobalArenaPtr<ExecutableId>,
+            _name: GlobalArenaPtr<str>,
+        ) -> Option<ExecutableArenaPtr<Function>> {
+            Some(self.target)
+        }
+    }
+
+    #[test]
+    fn resolve_module_calls_patches_to_call_local_func() {
+        let arena = ExecutableArena::new();
+        let global_pool = GlobalArenaPool::with_num_arenas(1);
+        let global = global_pool.lock_arena(0);
+
+        // Build the target function (just a Return).
+        let target = make_function(&arena, &global, "target", vec![MicroOp::Return]);
+
+        // Build interned pointers for the cross-module call.
+        let addr = AccountAddress::ONE;
+        let exe_name = global.alloc_str("mod_b");
+        let exe_id_ptr = global.alloc(unsafe { ExecutableId::new(addr, exe_name) });
+        let func_name = global.alloc_str("target");
+
+        // Build the caller with one CallIndirect → Return.
+        let caller = make_function(&arena, &global, "caller", vec![
+            MicroOp::CallIndirect {
+                executable_id: exe_id_ptr,
+                func_name,
+            },
+            MicroOp::Return,
+        ]);
+
+        let func_ptrs = [caller];
+        let resolver = FixedResolver { target };
+
+        unsafe {
+            Function::resolve_module_calls(func_ptrs.iter().copied(), &resolver);
+        }
+
+        // Should now be a CallDirect pointing at target.
+        let resolved_code = unsafe { func_ptrs[0].as_ref_unchecked().code.as_ref_unchecked() };
+        assert!(
+            matches!(resolved_code[0], MicroOp::CallDirect { ptr } if ptr.as_non_null() == target.as_non_null()),
+            "expected CallDirect pointing to target, got {:?}",
+            resolved_code[0]
+        );
+        assert!(matches!(resolved_code[1], MicroOp::Return));
     }
 }

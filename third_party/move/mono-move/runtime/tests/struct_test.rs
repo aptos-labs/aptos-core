@@ -3,14 +3,14 @@
 
 //! Tests for Move struct support (both inline and heap-allocated).
 
-use mono_move_alloc::{ExecutableArena, GlobalArenaPtr};
+use mono_move_alloc::{ExecutableArena, ExecutableArenaPtr, GlobalArenaPtr};
 use mono_move_core::{
-    DescriptorId, FrameLayoutInfo, FrameOffset as FO, Function, MicroOp, SortedSafePointEntries,
-    STRUCT_DATA_OFFSET,
+    FrameLayoutInfo, FrameOffset as FO, Function, LocalExecutionContext, MicroOp,
+    SortedSafePointEntries,
 };
-use mono_move_gas::SimpleGasMeter;
 use mono_move_runtime::{
-    read_ptr, read_u64, InterpreterContext, ObjectDescriptor, VEC_DATA_OFFSET, VEC_LENGTH_OFFSET,
+    read_ptr, read_u64, InterpreterContext, ObjectDescriptor, ObjectDescriptorTable,
+    VEC_DATA_OFFSET, VEC_LENGTH_OFFSET,
 };
 
 // ---------------------------------------------------------------------------
@@ -28,7 +28,7 @@ fn struct_inline() {
     let arena = ExecutableArena::new();
 
     #[rustfmt::skip]
-    let code = arena.alloc_slice_fill_iter(vec![
+    let code = arena.alloc_slice_fill_iter([
         StoreImm8 { dst: FO(pair_a), imm: 10 },
         StoreImm8 { dst: FO(pair_b), imm: 20 },
         AddU64 { dst: FO(result), lhs: FO(pair_a), rhs: FO(pair_b) },
@@ -37,16 +37,18 @@ fn struct_inline() {
     let functions = [arena.alloc(Function {
         name: GlobalArenaPtr::from_static("test"),
         code,
-        args_size: 0,
-        args_and_locals_size: 24,
+        param_sizes: ExecutableArenaPtr::empty_slice(),
+        param_sizes_sum: 0,
+        param_and_local_sizes_sum: 24,
         extended_frame_size: 48,
         zero_frame: false,
-        frame_layout: FrameLayoutInfo::empty(&arena),
-        safe_point_layouts: SortedSafePointEntries::empty(&arena),
+        frame_layout: FrameLayoutInfo::empty(),
+        safe_point_layouts: SortedSafePointEntries::empty(),
     })];
-    let descriptors = vec![ObjectDescriptor::Trivial];
-    let gas_meter = SimpleGasMeter::new(u64::MAX);
-    let mut ctx = InterpreterContext::new(&descriptors, gas_meter, unsafe {
+    let descriptors = ObjectDescriptorTable::new();
+
+    let mut exec_ctx = LocalExecutionContext::with_max_budget();
+    let mut ctx = InterpreterContext::new(&mut exec_ctx, &descriptors, unsafe {
         functions[0].as_ref_unchecked()
     });
     ctx.run().unwrap();
@@ -70,7 +72,7 @@ fn struct_inline_borrow() {
     let arena = ExecutableArena::new();
 
     #[rustfmt::skip]
-    let code = arena.alloc_slice_fill_iter(vec![
+    let code = arena.alloc_slice_fill_iter([
         StoreImm8 { dst: FO(pair_a), imm: 10 },
         StoreImm8 { dst: FO(pair_b), imm: 20 },
         SlotBorrow { dst: FO(r#ref), local: FO(pair_b) },
@@ -83,16 +85,18 @@ fn struct_inline_borrow() {
     let functions = [arena.alloc(Function {
         name: GlobalArenaPtr::from_static("test"),
         code,
-        args_size: 0,
-        args_and_locals_size: 40,
+        param_sizes: ExecutableArenaPtr::empty_slice(),
+        param_sizes_sum: 0,
+        param_and_local_sizes_sum: 40,
         extended_frame_size: 64,
         zero_frame: true,
-        frame_layout: FrameLayoutInfo::new(&arena, vec![FO(r#ref)]),
-        safe_point_layouts: SortedSafePointEntries::empty(&arena),
+        frame_layout: FrameLayoutInfo::new(&arena, [FO(r#ref)]),
+        safe_point_layouts: SortedSafePointEntries::empty(),
     })];
-    let descriptors = vec![ObjectDescriptor::Trivial];
-    let gas_meter = SimpleGasMeter::new(u64::MAX);
-    let mut ctx = InterpreterContext::new(&descriptors, gas_meter, unsafe {
+    let descriptors = ObjectDescriptorTable::new();
+
+    let mut exec_ctx = LocalExecutionContext::with_max_budget();
+    let mut ctx = InterpreterContext::new(&mut exec_ctx, &descriptors, unsafe {
         functions[0].as_ref_unchecked()
     });
     ctx.run().unwrap();
@@ -114,9 +118,12 @@ fn struct_heap_basic() {
 
     let arena = ExecutableArena::new();
 
+    let mut descriptors = ObjectDescriptorTable::new();
+    let desc_entry_struct = descriptors.push(ObjectDescriptor::new_struct(16, vec![]).unwrap());
+
     #[rustfmt::skip]
-    let code = arena.alloc_slice_fill_iter(vec![
-        HeapNew { dst: FO(entry), descriptor_id: DescriptorId(0) },
+    let code = arena.alloc_slice_fill_iter([
+        HeapNew { dst: FO(entry), descriptor_id: desc_entry_struct },
         StoreImm8 { dst: FO(tmp), imm: 42 },
         MicroOp::struct_store8(FO(entry), 0, FO(tmp)),
         StoreImm8 { dst: FO(tmp), imm: 100 },
@@ -129,19 +136,17 @@ fn struct_heap_basic() {
     let functions = [arena.alloc(Function {
         name: GlobalArenaPtr::from_static("test"),
         code,
-        args_size: 0,
-        args_and_locals_size: 24,
+        param_sizes: ExecutableArenaPtr::empty_slice(),
+        param_sizes_sum: 0,
+        param_and_local_sizes_sum: 24,
         extended_frame_size: 48,
         zero_frame: true,
-        frame_layout: FrameLayoutInfo::new(&arena, vec![FO(entry)]),
-        safe_point_layouts: SortedSafePointEntries::empty(&arena),
+        frame_layout: FrameLayoutInfo::new(&arena, [FO(entry)]),
+        safe_point_layouts: SortedSafePointEntries::empty(),
     })];
-    let descriptors = vec![ObjectDescriptor::Struct {
-        size: 16,
-        pointer_offsets: vec![],
-    }];
-    let gas_meter = SimpleGasMeter::new(u64::MAX);
-    let mut ctx = InterpreterContext::new(&descriptors, gas_meter, unsafe {
+
+    let mut exec_ctx = LocalExecutionContext::with_max_budget();
+    let mut ctx = InterpreterContext::new(&mut exec_ctx, &descriptors, unsafe {
         functions[0].as_ref_unchecked()
     });
     ctx.run().unwrap();
@@ -163,9 +168,12 @@ fn struct_heap_survives_gc() {
 
     let arena = ExecutableArena::new();
 
+    let mut descriptors = ObjectDescriptorTable::new();
+    let desc_entry_struct = descriptors.push(ObjectDescriptor::new_struct(16, vec![]).unwrap());
+
     #[rustfmt::skip]
-    let code = arena.alloc_slice_fill_iter(vec![
-        HeapNew { dst: FO(entry), descriptor_id: DescriptorId(0) },
+    let code = arena.alloc_slice_fill_iter([
+        HeapNew { dst: FO(entry), descriptor_id: desc_entry_struct },
         StoreImm8 { dst: FO(tmp), imm: 7 },
         MicroOp::struct_store8(FO(entry), 0, FO(tmp)),
         StoreImm8 { dst: FO(tmp), imm: 13 },
@@ -179,19 +187,17 @@ fn struct_heap_survives_gc() {
     let functions = [arena.alloc(Function {
         name: GlobalArenaPtr::from_static("test"),
         code,
-        args_size: 0,
-        args_and_locals_size: 24,
+        param_sizes: ExecutableArenaPtr::empty_slice(),
+        param_sizes_sum: 0,
+        param_and_local_sizes_sum: 24,
         extended_frame_size: 48,
         zero_frame: true,
-        frame_layout: FrameLayoutInfo::new(&arena, vec![FO(entry)]),
-        safe_point_layouts: SortedSafePointEntries::empty(&arena),
+        frame_layout: FrameLayoutInfo::new(&arena, [FO(entry)]),
+        safe_point_layouts: SortedSafePointEntries::empty(),
     })];
-    let descriptors = vec![ObjectDescriptor::Struct {
-        size: 16,
-        pointer_offsets: vec![],
-    }];
-    let gas_meter = SimpleGasMeter::new(u64::MAX);
-    let mut ctx = InterpreterContext::new(&descriptors, gas_meter, unsafe {
+
+    let mut exec_ctx = LocalExecutionContext::with_max_budget();
+    let mut ctx = InterpreterContext::new(&mut exec_ctx, &descriptors, unsafe {
         functions[0].as_ref_unchecked()
     });
     ctx.run().unwrap();
@@ -221,19 +227,23 @@ fn struct_with_vector_field() {
 
     let arena = ExecutableArena::new();
 
+    let mut descriptors = ObjectDescriptorTable::new();
+    let desc_ctr_struct = descriptors.push(ObjectDescriptor::new_struct(16, vec![8]).unwrap());
+    let desc_vec_u64 = descriptors.push(ObjectDescriptor::new_vector(8, vec![]).unwrap());
+
     #[rustfmt::skip]
-    let code = arena.alloc_slice_fill_iter(vec![
-        HeapNew { dst: FO(ctr), descriptor_id: DescriptorId(0) },
+    let code = arena.alloc_slice_fill_iter([
+        HeapNew { dst: FO(ctr), descriptor_id: desc_ctr_struct },
         StoreImm8 { dst: FO(tmp), imm: 999 },
         MicroOp::struct_store8(FO(ctr), 0, FO(tmp)),
         VecNew { dst: FO(items) },
         SlotBorrow { dst: FO(vec_ref), local: FO(items) },
         StoreImm8 { dst: FO(tmp), imm: 10 },
-        VecPushBack { vec_ref: FO(vec_ref), elem: FO(tmp), elem_size: 8, descriptor_id: DescriptorId(1) },
+        VecPushBack { vec_ref: FO(vec_ref), elem: FO(tmp), elem_size: 8, descriptor_id: desc_vec_u64 },
         StoreImm8 { dst: FO(tmp), imm: 20 },
-        VecPushBack { vec_ref: FO(vec_ref), elem: FO(tmp), elem_size: 8, descriptor_id: DescriptorId(1) },
+        VecPushBack { vec_ref: FO(vec_ref), elem: FO(tmp), elem_size: 8, descriptor_id: desc_vec_u64 },
         StoreImm8 { dst: FO(tmp), imm: 30 },
-        VecPushBack { vec_ref: FO(vec_ref), elem: FO(tmp), elem_size: 8, descriptor_id: DescriptorId(1) },
+        VecPushBack { vec_ref: FO(vec_ref), elem: FO(tmp), elem_size: 8, descriptor_id: desc_vec_u64 },
         MicroOp::struct_store8(FO(ctr), 8, FO(items)),
         ForceGC,
         SlotBorrow { dst: FO(ctr_ref), local: FO(ctr) },
@@ -245,27 +255,17 @@ fn struct_with_vector_field() {
     let functions = [arena.alloc(Function {
         name: GlobalArenaPtr::from_static("test"),
         code,
-        args_size: 0,
-        args_and_locals_size: 64,
+        param_sizes: ExecutableArenaPtr::empty_slice(),
+        param_sizes_sum: 0,
+        param_and_local_sizes_sum: 64,
         extended_frame_size: 88,
         zero_frame: true,
-        frame_layout: FrameLayoutInfo::new(&arena, vec![
-            FO(ctr),
-            FO(items),
-            FO(vec_ref),
-            FO(ctr_ref),
-        ]),
-        safe_point_layouts: SortedSafePointEntries::empty(&arena),
+        frame_layout: FrameLayoutInfo::new(&arena, [FO(ctr), FO(items), FO(vec_ref), FO(ctr_ref)]),
+        safe_point_layouts: SortedSafePointEntries::empty(),
     })];
-    let descriptors = vec![
-        ObjectDescriptor::Struct {
-            size: 16,
-            pointer_offsets: vec![8],
-        },
-        ObjectDescriptor::Trivial,
-    ];
-    let gas_meter = SimpleGasMeter::new(u64::MAX);
-    let mut ctx = InterpreterContext::new(&descriptors, gas_meter, unsafe {
+
+    let mut exec_ctx = LocalExecutionContext::with_max_budget();
+    let mut ctx = InterpreterContext::new(&mut exec_ctx, &descriptors, unsafe {
         functions[0].as_ref_unchecked()
     });
     ctx.run().unwrap();
@@ -273,7 +273,7 @@ fn struct_with_vector_field() {
     assert_eq!(ctx.root_result(), 999, "ctr.tag should be 999 after GC");
 
     let ctr_ptr = ctx.root_heap_ptr(8);
-    let items_ptr = unsafe { read_ptr(ctr_ptr, STRUCT_DATA_OFFSET + 8) };
+    let items_ptr = unsafe { read_ptr(ctr_ptr, 8usize) };
     let len = unsafe { read_u64(items_ptr, VEC_LENGTH_OFFSET) };
     assert_eq!(len, 3, "items vector should have 3 elements");
     let e0 = unsafe { read_u64(items_ptr, VEC_DATA_OFFSET) };
@@ -300,9 +300,12 @@ fn struct_borrow_field() {
 
     let arena = ExecutableArena::new();
 
+    let mut descriptors = ObjectDescriptorTable::new();
+    let desc_entry_struct = descriptors.push(ObjectDescriptor::new_struct(16, vec![]).unwrap());
+
     #[rustfmt::skip]
-    let code = arena.alloc_slice_fill_iter(vec![
-        HeapNew { dst: FO(entry), descriptor_id: DescriptorId(0) },
+    let code = arena.alloc_slice_fill_iter([
+        HeapNew { dst: FO(entry), descriptor_id: desc_entry_struct },
         StoreImm8 { dst: FO(result), imm: 5 },
         MicroOp::struct_store8(FO(entry), 0, FO(result)),
         StoreImm8 { dst: FO(result), imm: 10 },
@@ -318,19 +321,17 @@ fn struct_borrow_field() {
     let functions = [arena.alloc(Function {
         name: GlobalArenaPtr::from_static("test"),
         code,
-        args_size: 0,
-        args_and_locals_size: 48,
+        param_sizes: ExecutableArenaPtr::empty_slice(),
+        param_sizes_sum: 0,
+        param_and_local_sizes_sum: 48,
         extended_frame_size: 72,
         zero_frame: true,
-        frame_layout: FrameLayoutInfo::new(&arena, vec![FO(entry), FO(r#ref), FO(entry_ref)]),
-        safe_point_layouts: SortedSafePointEntries::empty(&arena),
+        frame_layout: FrameLayoutInfo::new(&arena, [FO(entry), FO(r#ref), FO(entry_ref)]),
+        safe_point_layouts: SortedSafePointEntries::empty(),
     })];
-    let descriptors = vec![ObjectDescriptor::Struct {
-        size: 16,
-        pointer_offsets: vec![],
-    }];
-    let gas_meter = SimpleGasMeter::new(u64::MAX);
-    let mut ctx = InterpreterContext::new(&descriptors, gas_meter, unsafe {
+
+    let mut exec_ctx = LocalExecutionContext::with_max_budget();
+    let mut ctx = InterpreterContext::new(&mut exec_ctx, &descriptors, unsafe {
         functions[0].as_ref_unchecked()
     });
     ctx.run().unwrap();
@@ -358,9 +359,12 @@ fn struct_borrow_survives_gc() {
 
     let arena = ExecutableArena::new();
 
+    let mut descriptors = ObjectDescriptorTable::new();
+    let desc_entry_struct = descriptors.push(ObjectDescriptor::new_struct(16, vec![]).unwrap());
+
     #[rustfmt::skip]
-    let code = arena.alloc_slice_fill_iter(vec![
-        HeapNew { dst: FO(entry), descriptor_id: DescriptorId(0) },
+    let code = arena.alloc_slice_fill_iter([
+        HeapNew { dst: FO(entry), descriptor_id: desc_entry_struct },
         StoreImm8 { dst: FO(result), imm: 100 },
         MicroOp::struct_store8(FO(entry), 0, FO(result)),
         StoreImm8 { dst: FO(result), imm: 200 },
@@ -374,19 +378,17 @@ fn struct_borrow_survives_gc() {
     let functions = [arena.alloc(Function {
         name: GlobalArenaPtr::from_static("test"),
         code,
-        args_size: 0,
-        args_and_locals_size: 48,
+        param_sizes: ExecutableArenaPtr::empty_slice(),
+        param_sizes_sum: 0,
+        param_and_local_sizes_sum: 48,
         extended_frame_size: 72,
         zero_frame: true,
-        frame_layout: FrameLayoutInfo::new(&arena, vec![FO(entry), FO(ref_base), FO(entry_ref)]),
-        safe_point_layouts: SortedSafePointEntries::empty(&arena),
+        frame_layout: FrameLayoutInfo::new(&arena, [FO(entry), FO(ref_base), FO(entry_ref)]),
+        safe_point_layouts: SortedSafePointEntries::empty(),
     })];
-    let descriptors = vec![ObjectDescriptor::Struct {
-        size: 16,
-        pointer_offsets: vec![],
-    }];
-    let gas_meter = SimpleGasMeter::new(u64::MAX);
-    let mut ctx = InterpreterContext::new(&descriptors, gas_meter, unsafe {
+
+    let mut exec_ctx = LocalExecutionContext::with_max_budget();
+    let mut ctx = InterpreterContext::new(&mut exec_ctx, &descriptors, unsafe {
         functions[0].as_ref_unchecked()
     });
     ctx.run().unwrap();
@@ -395,6 +397,6 @@ fn struct_borrow_survives_gc() {
     assert_eq!(ctx.gc_count(), 1);
 
     let entry_ptr = ctx.root_heap_ptr(8);
-    let key = unsafe { read_u64(entry_ptr, STRUCT_DATA_OFFSET) };
+    let key = unsafe { read_u64(entry_ptr, 0usize) };
     assert_eq!(key, 100, "entry.key should be 100 after GC");
 }

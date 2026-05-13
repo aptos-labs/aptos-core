@@ -25,6 +25,12 @@ pub enum BlockEpiloguePayload {
         block_end_info: BlockEndInfoExt,
         fee_distribution: FeeDistribution,
     },
+    V2 {
+        block_id: HashValue,
+        block_end_info: BlockEndInfo,
+        fee_distribution: FeeDistribution,
+        to_make_hot: BTreeSet<StateKey>,
+    },
 }
 
 impl BlockEpiloguePayload {
@@ -32,6 +38,7 @@ impl BlockEpiloguePayload {
         match self {
             BlockEpiloguePayload::V0 { block_end_info, .. } => Some(block_end_info),
             BlockEpiloguePayload::V1 { block_end_info, .. } => Some(&block_end_info.inner),
+            BlockEpiloguePayload::V2 { block_end_info, .. } => Some(block_end_info),
         }
     }
 
@@ -39,6 +46,7 @@ impl BlockEpiloguePayload {
         match self {
             Self::V0 { .. } => None,
             Self::V1 { block_end_info, .. } => Some(&block_end_info.to_make_hot),
+            Self::V2 { to_make_hot, .. } => Some(to_make_hot),
         }
     }
 }
@@ -127,6 +135,10 @@ impl<Key: Debug + Ord> TBlockEndInfoExt<Key> {
 
     pub fn to_persistent(&self) -> BlockEndInfo {
         self.inner.clone()
+    }
+
+    pub fn into_parts(self) -> (BlockEndInfo, BTreeSet<Key>) {
+        (self.inner, self.to_make_hot)
     }
 }
 

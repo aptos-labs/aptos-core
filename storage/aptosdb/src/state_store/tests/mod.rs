@@ -2,6 +2,7 @@
 // Licensed pursuant to the Innovation-Enabling Source Code License, available at https://github.com/aptos-labs/aptos-core/blob/main/LICENSE
 
 mod hot_state_kv;
+mod restart;
 mod speculative_state_workflow;
 
 use super::*;

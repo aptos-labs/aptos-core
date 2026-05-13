@@ -51,7 +51,6 @@ error: post-condition does not hold
     =         result = <redacted>
     =     at tests/sources/functional/closures/behavioral_predicates_examples.move:190: contains
     =         result = <redacted>
-    =     at tests/sources/functional/closures/behavioral_predicates_examples.move:224: contains_test_found
     =     at tests/sources/functional/closures/behavioral_predicates_examples.move:226: contains_test_found (spec)
 
 error: post-condition does not hold
@@ -65,7 +64,6 @@ error: post-condition does not hold
     =     at tests/sources/functional/closures/behavioral_predicates_examples.move:216: contains_opaque (spec)
     =     at tests/sources/functional/closures/behavioral_predicates_examples.move:231: contains_opaque_test_found
     =         result = <redacted>
-    =     at tests/sources/functional/closures/behavioral_predicates_examples.move:232: contains_opaque_test_found
     =     at tests/sources/functional/closures/behavioral_predicates_examples.move:234: contains_opaque_test_found (spec)
 
 error: post-condition does not hold
@@ -97,9 +95,6 @@ error: post-condition does not hold
     =     at tests/sources/functional/closures/behavioral_predicates_examples.move:330: reduce
     =     at tests/sources/functional/closures/behavioral_predicates_examples.move:326: reduce
     =         result = <redacted>
-    =     at tests/sources/functional/closures/behavioral_predicates_examples.move:339: reduce
-    =         result = <redacted>
-    =     at tests/sources/functional/closures/behavioral_predicates_examples.move:393: reduce_test_fail
     =     at tests/sources/functional/closures/behavioral_predicates_examples.move:395: reduce_test_fail (spec)
 
 error: post-condition does not hold
@@ -110,5 +105,4 @@ error: post-condition does not hold
     │
     =     at tests/sources/functional/closures/behavioral_predicates_examples.move:400: reduce_opaque_test_fail
     =         result = <redacted>
-    =     at tests/sources/functional/closures/behavioral_predicates_examples.move:401: reduce_opaque_test_fail
     =     at tests/sources/functional/closures/behavioral_predicates_examples.move:403: reduce_opaque_test_fail (spec)

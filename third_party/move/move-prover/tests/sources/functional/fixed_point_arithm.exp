@@ -9,7 +9,6 @@ error: post-condition does not hold
    =         x = <redacted>
    =     at tests/sources/functional/fixed_point_arithm.move:27: multiply_0_x_incorrect
    =         result = <redacted>
-   =     at tests/sources/functional/fixed_point_arithm.move:28: multiply_0_x_incorrect
    =     at tests/sources/functional/fixed_point_arithm.move:30: multiply_0_x_incorrect (spec)
    =     at tests/sources/functional/fixed_point_arithm.move:31: multiply_0_x_incorrect (spec)
 
@@ -23,7 +22,6 @@ error: post-condition does not hold
    =         x = <redacted>
    =     at tests/sources/functional/fixed_point_arithm.move:43: multiply_x_0_incorrect
    =         result = <redacted>
-   =     at tests/sources/functional/fixed_point_arithm.move:44: multiply_x_0_incorrect
    =     at tests/sources/functional/fixed_point_arithm.move:46: multiply_x_0_incorrect (spec)
    =     at tests/sources/functional/fixed_point_arithm.move:47: multiply_x_0_incorrect (spec)
 
@@ -37,7 +35,6 @@ error: post-condition does not hold
    =         x = <redacted>
    =     at tests/sources/functional/fixed_point_arithm.move:65: multiply_1_x_incorrect
    =         result = <redacted>
-   =     at tests/sources/functional/fixed_point_arithm.move:66: multiply_1_x_incorrect
    =     at tests/sources/functional/fixed_point_arithm.move:68: multiply_1_x_incorrect (spec)
    =     at tests/sources/functional/fixed_point_arithm.move:70: multiply_1_x_incorrect (spec)
 
@@ -55,7 +52,6 @@ error: post-condition does not hold
    =     at ../move-stdlib/sources/fixed_point32.move:127
    =     at tests/sources/functional/fixed_point_arithm.move:82: multiply_x_1_incorrect
    =         result = <redacted>
-   =     at tests/sources/functional/fixed_point_arithm.move:83: multiply_x_1_incorrect
    =     at tests/sources/functional/fixed_point_arithm.move:85: multiply_x_1_incorrect (spec)
    =     at tests/sources/functional/fixed_point_arithm.move:86: multiply_x_1_incorrect (spec)
 
@@ -73,12 +69,10 @@ error: post-condition does not hold
     =         num = <redacted>
     =     at ../move-stdlib/sources/fixed_point32.move:150: get_raw_value
     =         result = <redacted>
-    =     at ../move-stdlib/sources/fixed_point32.move:151: get_raw_value
     =         y_raw_val = <redacted>
     =     at tests/sources/functional/fixed_point_arithm.move:106: mul_div_incorrect
     =     at tests/sources/functional/fixed_point_arithm.move:107: mul_div_incorrect
     =         result = <redacted>
-    =     at tests/sources/functional/fixed_point_arithm.move:108: mul_div_incorrect
     =     at tests/sources/functional/fixed_point_arithm.move:110: mul_div_incorrect (spec)
 
 error: post-condition does not hold
@@ -95,12 +89,10 @@ error: post-condition does not hold
     =         num = <redacted>
     =     at ../move-stdlib/sources/fixed_point32.move:150: get_raw_value
     =         result = <redacted>
-    =     at ../move-stdlib/sources/fixed_point32.move:151: get_raw_value
     =         y_raw_val = <redacted>
     =     at tests/sources/functional/fixed_point_arithm.move:106: mul_div_incorrect
     =     at tests/sources/functional/fixed_point_arithm.move:107: mul_div_incorrect
     =         result = <redacted>
-    =     at tests/sources/functional/fixed_point_arithm.move:108: mul_div_incorrect
     =     at tests/sources/functional/fixed_point_arithm.move:110: mul_div_incorrect (spec)
     =     at tests/sources/functional/fixed_point_arithm.move:112: mul_div_incorrect (spec)
 
@@ -116,7 +108,6 @@ error: post-condition does not hold
     =         c = <redacted>
     =     at tests/sources/functional/fixed_point_arithm.move:140: mul_2_times_incorrect
     =         result = <redacted>
-    =     at tests/sources/functional/fixed_point_arithm.move:141: mul_2_times_incorrect
     =     at tests/sources/functional/fixed_point_arithm.move:144: mul_2_times_incorrect (spec)
 
 error: post-condition does not hold
@@ -132,5 +123,4 @@ error: post-condition does not hold
     =         d = <redacted>
     =     at tests/sources/functional/fixed_point_arithm.move:148: mul_3_times_incorrect
     =         result = <redacted>
-    =     at tests/sources/functional/fixed_point_arithm.move:149: mul_3_times_incorrect
     =     at tests/sources/functional/fixed_point_arithm.move:152: mul_3_times_incorrect (spec)

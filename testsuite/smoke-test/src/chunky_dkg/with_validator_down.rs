@@ -47,11 +47,11 @@ async fn chunky_dkg_with_validator_down() {
     // Verify the transcript is valid even with a validator down
     let subtranscript = verify_chunky_dkg_transcript(&session_2);
     assert!(
-        !subtranscript.dealers.is_empty(),
+        subtranscript.dealer_bitmask.count_ones() > 0,
         "Transcript should have dealers even with one validator down"
     );
     info!(
         "Transcript verified successfully with {} dealers",
-        subtranscript.dealers.len()
+        subtranscript.dealer_bitmask.count_ones()
     );
 }

@@ -19,11 +19,10 @@ fun LemmaConsumer::commutative_add($t0|x: u64, $t1|y: u64): u64 {
      var $t3: num
   0: assume Le(Add($t0, $t1), 18446744073709551615)
   1: assume Eq<num>(Add($t0, $t1), Add($t1, $t0))
-  2: $t2 := +($t0, $t1) on_abort goto 5 with $t3
-  3: label L1
-  4: return $t2
-  5: label L2
-  6: abort($t3)
+  2: $t2 := +($t0, $t1) on_abort goto 4 with $t3
+  3: return $t2
+  4: label L1
+  5: abort($t3)
 }
 
 
@@ -33,13 +32,12 @@ fun LemmaConsumer::commutative_add($t0|x: u64, $t1|y: u64): u64 {
      var $t3: num
   0: assume Le(Add($t0, $t1), 18446744073709551615)
   1: assume Eq<num>(Add($t0, $t1), Add($t1, $t0))
-  2: $t2 := +($t0, $t1) on_abort goto 6 with $t3
-  3: label L1
+  2: $t2 := +($t0, $t1) on_abort goto 5 with $t3
      # VC: post-condition does not hold at tests/spec_instrumentation/proofs/cross_module_lemma.move:22:9+24
-  4: assert Eq<u64>($t2, Add($t1, $t0))
-  5: return $t2
-  6: label L2
-  7: abort($t3)
+  3: assert Eq<u64>($t2, Add($t1, $t0))
+  4: return $t2
+  5: label L1
+  6: abort($t3)
 }
 
 

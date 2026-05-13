@@ -55,6 +55,7 @@ aptos-vm = { workspace = true }
 ark-std = { workspace = true }
 async-trait = { workspace = true }
 bcs = { workspace = true }
+blstrs = { workspace = true }
 byteorder = { workspace = true }
 bytes = { workspace = true }
 chrono = { workspace = true }
@@ -65,6 +66,7 @@ enum_dispatch = { workspace = true }
 fail = { workspace = true }
 futures = { workspace = true }
 futures-channel = { workspace = true }
+group = { workspace = true }
 hex = { workspace = true }
 itertools = { workspace = true }
 maplit = { workspace = true }
@@ -80,6 +82,7 @@ rand = { workspace = true }
 rayon = { workspace = true }
 scopeguard = { workspace = true }
 serde = { workspace = true }
+serde-big-array = { workspace = true }
 serde-name = { workspace = true }
 serde_bytes = { workspace = true }
 serde_json = { workspace = true }

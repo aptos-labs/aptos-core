@@ -1,0 +1,62 @@
+=== bytecode ===
+// Bytecode version v10
+module 0x1::test
+// Function definition at index 0
+fun fib(l0: u64): u64
+    copy_loc l0
+    ld_u64 1
+    le
+    br_false l0
+    move_loc l0
+    // @5
+    ret
+l0: copy_loc l0
+    ld_u64 1
+    sub
+    call fib
+    // @10
+    move_loc l0
+    ld_u64 2
+    sub
+    call fib
+    add
+    // @15
+    ret
+
+=== stackless ===
+// module 0x1::test
+
+fun fib(r0): u64 {
+  slots: params(1), locals(0), temps(1), xfer(1)
+    r0: u64
+    r1: u64
+  code:
+  L2:
+    0: br_gt L0, r0, #1
+  L1:
+    1: ret [r0]
+  L0:
+    2: x0 := sub r0, #1
+    3: [r1] := call fib, [x0]
+    4: x0 := sub r0, #2
+    5: [x0] := call fib, [x0]
+    6: r1 := add r1, x0
+    7: ret [r1]
+}
+=== micro-ops ===
+// module 0x1::test
+
+fun fib() {
+  frame_data_size: 16
+  code:
+    0: JumpGreaterU64Imm @2 [0] > #1
+    1: Return
+    2: SubU64Imm [40] <- [0] - #1
+    3: CallFunc #0
+    4: Move8 [8] <- [40]
+    5: SubU64Imm [40] <- [0] - #2
+    6: CallFunc #0
+    7: AddU64 [8] <- [8] + [40]
+    8: Move8 [0] <- [8]
+    9: Return
+}

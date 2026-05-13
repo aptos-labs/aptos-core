@@ -13,20 +13,22 @@ The stackless execution IR is then lowered into monomorphic micro-ops, when all 
 
 ## Test Infrastructure
 
+The specializer pipeline is exercised by the **snapshot tests** in the `mono-move-testsuite` crate (`mono-move/testsuite/tests/snapshot.rs`).
+
 ### Framework
 
-Tests use `datatest-stable` (a data-driven test harness) with `harness = false` in `Cargo.toml`. The single test entry point is `tests/testsuite.rs`.
+Tests use `datatest-stable` (a data-driven test harness) with `harness = false` in the testsuite crate's `Cargo.toml`. The entry point is `mono-move/testsuite/tests/snapshot.rs`.
 
 ## Test Runners
 
 Two runners are registered, one per input format:
 
-- **`masm_runner`** — Takes `.masm` files (Move assembly), assembles them via `move-asm`, then runs `destack`.
-- **`move_runner`** — Takes `.move` files, compiles them with `move-compiler-v2`, then runs `destack`. Move test output additionally includes the disassembled masm for reference.
+- **`masm_runner`** — Takes `.masm` files (Move assembly), assembles them via `move-asm`, then runs `destack` and per-function micro-op lowering.
+- **`move_runner`** — Takes `.move` files, compiles them with `move-compiler-v2`, then runs `destack` and micro-op lowering. Move test output additionally includes the disassembled masm for reference.
 
 ## Test Cases
 
-Located under `tests/test_cases/`:
+Located under `mono-move/testsuite/tests/test_cases/snapshot/`:
 
 - `masm/` — Hand-written Move assembly inputs (`.masm` files).
 - `move/` — Move source inputs (`.move` files).
@@ -42,6 +44,6 @@ Baselines are verified (or auto-updated). To update baselines after intentional 
 ## Running Tests
 
 ```bash
-cargo test -p specializer  # normal mode, verify against baselines
-UPBL=1 cargo test -p specializer   # update baselines
+cargo test -p mono-move-testsuite --test snapshot          # verify against baselines
+UPBL=1 cargo test -p mono-move-testsuite --test snapshot   # update baselines
 ```

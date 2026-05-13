@@ -33,9 +33,9 @@ async fn chunky_dkg_correctness() {
     // Verify transcript
     let subtranscript_1 = verify_chunky_dkg_transcript(&session_1);
     assert!(
-        subtranscript_1.dealers.len() >= 3,
+        subtranscript_1.dealer_bitmask.count_ones() >= 3,
         "Expected >= 3 dealers (BFT threshold), got {}",
-        subtranscript_1.dealers.len()
+        subtranscript_1.dealer_bitmask.count_ones()
     );
 
     // Verify encryption key
@@ -59,9 +59,9 @@ async fn chunky_dkg_correctness() {
     // Verify second transcript
     let subtranscript_2 = verify_chunky_dkg_transcript(&session_2);
     assert!(
-        subtranscript_2.dealers.len() >= 3,
+        subtranscript_2.dealer_bitmask.count_ones() >= 3,
         "Expected >= 3 dealers for second session, got {}",
-        subtranscript_2.dealers.len()
+        subtranscript_2.dealer_bitmask.count_ones()
     );
 
     // Verify consecutive dealer epochs

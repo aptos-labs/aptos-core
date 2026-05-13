@@ -155,6 +155,7 @@ pub struct EpochManager<P: OnChainConfigProvider> {
     network_sender: ConsensusNetworkClient<NetworkClient<ConsensusMsg>>,
     timeout_sender: aptos_channels::Sender<Round>,
     quorum_store_enabled: bool,
+    encrypted_enabled: bool,
     quorum_store_to_mempool_sender: Sender<QuorumStoreRequest>,
     execution_client: Arc<dyn TExecutionClient>,
     storage: Arc<dyn PersistentLivenessStorage>,
@@ -239,6 +240,8 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
             timeout_sender,
             // This default value is updated at epoch start
             quorum_store_enabled: false,
+            // This default value is updated at epoch start
+            encrypted_enabled: false,
             quorum_store_to_mempool_sender,
             execution_client,
             storage,
@@ -1240,6 +1243,10 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
         self.epoch_state = Some(epoch_state.clone());
 
         let onchain_consensus_config: anyhow::Result<OnChainConsensusConfig> = payload.get();
+        self.encrypted_enabled = payload
+            .get::<Features>()
+            .map(|f| f.is_encrypted_transactions_enabled())
+            .unwrap_or(false);
         let onchain_execution_config: anyhow::Result<OnChainExecutionConfig> = payload.get();
         let onchain_randomness_config_seq_num: anyhow::Result<RandomnessConfigSeqNum> =
             payload.get();
@@ -1688,6 +1695,7 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
                 .ok_or_else(|| anyhow::anyhow!("Epoch state is not available"))?;
             let proof_cache = self.proof_cache.clone();
             let quorum_store_enabled = self.quorum_store_enabled;
+            let encrypted_enabled = self.encrypted_enabled;
             let opt_qs_v2_rx_enabled = self.config.quorum_store.enable_opt_qs_v2_payload_rx;
             let quorum_store_msg_tx = self.quorum_store_msg_tx.clone();
             let buffered_proposal_tx = self.buffered_proposal_tx.clone();
@@ -1715,6 +1723,7 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
                             max_batch_expiry_gap_usecs,
                             max_batch_txns,
                             max_batch_bytes,
+                            encrypted_enabled,
                         )
                     ) {
                         Ok(verified_event) => {

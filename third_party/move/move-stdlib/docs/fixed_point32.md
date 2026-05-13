@@ -1,7 +1,4 @@
-
-<a id="0x1_fixed_point32"></a>
-
-# Module `0x1::fixed_point32`
+# Module `0x1::fixed_point32` <a id="0x1_fixed_point32"></a>
 
 Defines a fixed-point numeric type with a 32-bit integer part and
 a 32-bit fractional part.
@@ -27,10 +24,7 @@ a 32-bit fractional part.
 <pre><code></code></pre>
 
 
-
-<a id="0x1_fixed_point32_FixedPoint32"></a>
-
-## Struct `FixedPoint32`
+## Struct `FixedPoint32` <a id="0x1_fixed_point32_FixedPoint32"></a>
 
 Define a fixed-point numeric type with 32 fractional bits.
 This is just a u64 integer but it is wrapped in a struct to
@@ -64,9 +58,7 @@ decimal.
 
 </details>
 
-<a id="@Constants_0"></a>
-
-## Constants
+## Constants <a id="@Constants_0"></a>
 
 
 <a id="0x1_fixed_point32_MAX_U64"></a>
@@ -128,10 +120,7 @@ The computed ratio when converting to a <code><a href="fixed_point32.md#0x1_fixe
 </code></pre>
 
 
-
-<a id="0x1_fixed_point32_multiply_u64"></a>
-
-## Function `multiply_u64`
+## Function `multiply_u64` <a id="0x1_fixed_point32_multiply_u64"></a>
 
 Multiply a u64 integer by a fixed-point number, truncating any
 fractional part of the product. This will abort if the product
@@ -164,6 +153,7 @@ overflows.
 
 
 </details>
+
 
 <details>
 <summary>Specification</summary>
@@ -203,9 +193,7 @@ overflows.
 
 </details>
 
-<a id="0x1_fixed_point32_divide_u64"></a>
-
-## Function `divide_u64`
+## Function `divide_u64` <a id="0x1_fixed_point32_divide_u64"></a>
 
 Divide a u64 integer by a fixed-point number, truncating any
 fractional part of the quotient. This will abort if the divisor
@@ -239,6 +227,7 @@ is zero or if the quotient overflows.
 
 
 </details>
+
 
 <details>
 <summary>Specification</summary>
@@ -279,9 +268,7 @@ is zero or if the quotient overflows.
 
 </details>
 
-<a id="0x1_fixed_point32_create_from_rational"></a>
-
-## Function `create_from_rational`
+## Function `create_from_rational` <a id="0x1_fixed_point32_create_from_rational"></a>
 
 Create a fixed-point value from a rational number specified by its
 numerator and denominator. Calling this function should be preferred
@@ -324,6 +311,7 @@ rounding, e.g., 0.0125 will round down to 0.012 instead of up to 0.013.
 
 
 </details>
+
 
 <details>
 <summary>Specification</summary>
@@ -369,9 +357,7 @@ rounding, e.g., 0.0125 will round down to 0.012 instead of up to 0.013.
 
 </details>
 
-<a id="0x1_fixed_point32_create_from_raw_value"></a>
-
-## Function `create_from_raw_value`
+## Function `create_from_raw_value` <a id="0x1_fixed_point32_create_from_raw_value"></a>
 
 Create a fixedpoint value from a raw value.
 
@@ -394,6 +380,7 @@ Create a fixedpoint value from a raw value.
 
 </details>
 
+
 <details>
 <summary>Specification</summary>
 
@@ -408,9 +395,7 @@ Create a fixedpoint value from a raw value.
 
 </details>
 
-<a id="0x1_fixed_point32_get_raw_value"></a>
-
-## Function `get_raw_value`
+## Function `get_raw_value` <a id="0x1_fixed_point32_get_raw_value"></a>
 
 Accessor for the raw u64 value. Other less common operations, such as
 adding or subtracting FixedPoint32 values, can be done using the raw
@@ -435,9 +420,7 @@ values directly.
 
 </details>
 
-<a id="0x1_fixed_point32_is_zero"></a>
-
-## Function `is_zero`
+## Function `is_zero` <a id="0x1_fixed_point32_is_zero"></a>
 
 Returns true if the ratio is zero.
 
@@ -460,9 +443,7 @@ Returns true if the ratio is zero.
 
 </details>
 
-<a id="0x1_fixed_point32_min"></a>
-
-## Function `min`
+## Function `min` <a id="0x1_fixed_point32_min"></a>
 
 Returns the smaller of the two FixedPoint32 numbers.
 
@@ -488,6 +469,7 @@ Returns the smaller of the two FixedPoint32 numbers.
 
 
 </details>
+
 
 <details>
 <summary>Specification</summary>
@@ -518,9 +500,7 @@ Returns the smaller of the two FixedPoint32 numbers.
 
 </details>
 
-<a id="0x1_fixed_point32_max"></a>
-
-## Function `max`
+## Function `max` <a id="0x1_fixed_point32_max"></a>
 
 Returns the larger of the two FixedPoint32 numbers.
 
@@ -546,6 +526,7 @@ Returns the larger of the two FixedPoint32 numbers.
 
 
 </details>
+
 
 <details>
 <summary>Specification</summary>
@@ -576,9 +557,7 @@ Returns the larger of the two FixedPoint32 numbers.
 
 </details>
 
-<a id="0x1_fixed_point32_create_from_u64"></a>
-
-## Function `create_from_u64`
+## Function `create_from_u64` <a id="0x1_fixed_point32_create_from_u64"></a>
 
 Create a fixedpoint value from a u64 value.
 
@@ -602,6 +581,7 @@ Create a fixedpoint value from a u64 value.
 
 
 </details>
+
 
 <details>
 <summary>Specification</summary>
@@ -641,9 +621,7 @@ Create a fixedpoint value from a u64 value.
 
 </details>
 
-<a id="0x1_fixed_point32_floor"></a>
-
-## Function `floor`
+## Function `floor` <a id="0x1_fixed_point32_floor"></a>
 
 Returns the largest integer less than or equal to a given number.
 
@@ -665,6 +643,7 @@ Returns the largest integer less than or equal to a given number.
 
 
 </details>
+
 
 <details>
 <summary>Specification</summary>
@@ -696,9 +675,7 @@ Returns the largest integer less than or equal to a given number.
 
 </details>
 
-<a id="0x1_fixed_point32_ceil"></a>
-
-## Function `ceil`
+## Function `ceil` <a id="0x1_fixed_point32_ceil"></a>
 
 Rounds up the given FixedPoint32 to the next largest integer.
 
@@ -725,6 +702,7 @@ Rounds up the given FixedPoint32 to the next largest integer.
 
 
 </details>
+
 
 <details>
 <summary>Specification</summary>
@@ -758,9 +736,7 @@ Rounds up the given FixedPoint32 to the next largest integer.
 
 </details>
 
-<a id="0x1_fixed_point32_round"></a>
-
-## Function `round`
+## Function `round` <a id="0x1_fixed_point32_round"></a>
 
 Returns the value of a FixedPoint32 to the nearest integer.
 
@@ -788,6 +764,7 @@ Returns the value of a FixedPoint32 to the nearest integer.
 
 
 </details>
+
 
 <details>
 <summary>Specification</summary>
@@ -822,9 +799,7 @@ Returns the value of a FixedPoint32 to the nearest integer.
 
 </details>
 
-<a id="@Module_Specification_1"></a>
-
-## Module Specification
+## Module Specification <a id="@Module_Specification_1"></a>
 
 
 

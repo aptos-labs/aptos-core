@@ -23,6 +23,8 @@ permissions:
 
 jobs:
   copy-images-to-docker-hub:
+    # Skip hotfix branches/tags; same substring rule as before, without shell interpolation.
+    if: ${{ !contains(github.ref_name, 'hotfix') }}
     uses: ./.github/workflows/copy-images-to-dockerhub.yaml
     with:
       image_tag_prefix: ${{ github.ref_name }}

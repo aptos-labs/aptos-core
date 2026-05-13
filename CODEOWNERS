@@ -131,6 +131,7 @@
 
 # Owners for third_party/move
 /third_party/move/ @aptos-labs/move
+/third_party/move/mono-move/ @calintat @georgemitenkov @vgao1996 @vineethk
 
 # Owners for the `aptos-dkg` crate.
 /crates/aptos-dkg @alinush @rex1fernando @waamm

@@ -67,6 +67,7 @@ use aptos_storage_interface::{
 use aptos_types::{
     proof::{definition::LeafCount, SparseMerkleProofExt, SparseMerkleRangeProof},
     state_store::{
+        hot_state::HotStateValue,
         state_key::StateKey,
         state_slot::{StateSlot, StateSlotKind},
         state_storage_usage::StateStorageUsage,
@@ -248,19 +249,13 @@ impl DbReader for StateDb {
     /// Get the state value with proof given the state key and version
     fn get_state_value_with_proof_by_version_ext(
         &self,
-        key_hash: &HashValue,
+        key_hash: HashValue,
         version: Version,
         root_depth: usize,
-        use_hot_state: bool,
     ) -> Result<(Option<StateValue>, SparseMerkleProofExt)> {
-        let db = if use_hot_state {
-            self.hot_state_merkle_db
-                .as_ref()
-                .ok_or(AptosDbError::HotStateError)?
-        } else {
-            &self.state_merkle_db
-        };
-        let (leaf_data, proof) = db.get_with_proof_ext(key_hash, version, root_depth)?;
+        let (leaf_data, proof) = self
+            .state_merkle_db
+            .get_with_proof_ext(&key_hash, version, root_depth)?;
         Ok((
             match leaf_data {
                 Some((_val_hash, (key, ver))) => Some(self.expect_value_by_version(&key, ver)?),
@@ -268,6 +263,27 @@ impl DbReader for StateDb {
             },
             proof,
         ))
+    }
+
+    /// Get the hot state value with proof given the state key (hash) and version
+    fn get_hot_state_value_with_proof_by_version_ext(
+        &self,
+        key_hash: HashValue,
+        version: Version,
+        root_depth: usize,
+    ) -> Result<(Option<HotStateValue>, SparseMerkleProofExt)> {
+        let merkle_db = self
+            .hot_state_merkle_db
+            .as_ref()
+            .ok_or(AptosDbError::HotStateError)?;
+        let (leaf_data, proof) = merkle_db.get_with_proof_ext(&key_hash, version, root_depth)?;
+        let value = match leaf_data {
+            Some((_val_hash, (_key, ver))) => {
+                Some(self.expect_hot_state_value_by_version(key_hash, ver)?)
+            },
+            None => None,
+        };
+        Ok((value, proof))
     }
 
     fn get_state_storage_usage(&self, version: Option<Version>) -> Result<StateStorageUsage> {
@@ -337,17 +353,22 @@ impl DbReader for StateStore {
     /// Get the state value with proof extension given the state key and version
     fn get_state_value_with_proof_by_version_ext(
         &self,
-        key_hash: &HashValue,
+        key_hash: HashValue,
         version: Version,
         root_depth: usize,
-        use_hot_state: bool,
     ) -> Result<(Option<StateValue>, SparseMerkleProofExt)> {
-        self.deref().get_state_value_with_proof_by_version_ext(
-            key_hash,
-            version,
-            root_depth,
-            use_hot_state,
-        )
+        self.deref()
+            .get_state_value_with_proof_by_version_ext(key_hash, version, root_depth)
+    }
+
+    fn get_hot_state_value_with_proof_by_version_ext(
+        &self,
+        key_hash: HashValue,
+        version: Version,
+        root_depth: usize,
+    ) -> Result<(Option<HotStateValue>, SparseMerkleProofExt)> {
+        self.deref()
+            .get_hot_state_value_with_proof_by_version_ext(key_hash, version, root_depth)
     }
 }
 
@@ -363,6 +384,52 @@ impl StateDb {
                     AptosDbError::NotFound(format!(
                         "State Value is missing for key {:?} by version {}",
                         state_key, version
+                    ))
+                })
+            })
+    }
+
+    /// Reads the persisted hot-state KV and assembles the `HotStateValue` for `key_hash` at
+    /// `version`. Returns `None` when no entry exists (key was never hot, or was evicted at/before
+    /// `version`).
+    fn get_hot_state_value_by_version(
+        &self,
+        key_hash: HashValue,
+        version: Version,
+    ) -> Result<Option<HotStateValue>> {
+        let db = self
+            .hot_state_kv_db
+            .as_ref()
+            .ok_or(AptosDbError::HotStateError)?;
+        Ok(
+            match db.get_hot_state_entry_by_version(key_hash, version)? {
+                // No row at or before `version` — key was never hot.
+                None => None,
+                // Eviction tombstone — no hot entry at `version`.
+                Some((_, None)) => None,
+                Some((hot_since_version, Some(HotStateEntry::Occupied { value, .. }))) => {
+                    Some(HotStateValue::new(Some(value), hot_since_version))
+                },
+                Some((hot_since_version, Some(HotStateEntry::Vacant))) => {
+                    Some(HotStateValue::new(None, hot_since_version))
+                },
+            },
+        )
+    }
+
+    /// Asserts a hot-state KV entry exists — used when the caller has already seen a JMT leaf
+    /// at `version`, so the KV must have the matching entry by invariant.
+    fn expect_hot_state_value_by_version(
+        &self,
+        key_hash: HashValue,
+        version: Version,
+    ) -> Result<HotStateValue> {
+        self.get_hot_state_value_by_version(key_hash, version)
+            .and_then(|opt| {
+                opt.ok_or_else(|| {
+                    AptosDbError::NotFound(format!(
+                        "HotStateValue is missing for key hash {} by version {}",
+                        key_hash, version
                     ))
                 })
             })
@@ -775,6 +842,7 @@ impl StateStore {
                 &mut buffered_state,
                 &out_current_state,
                 &out_persisted_state,
+                hot_state_config.delete_on_restart,
             )?;
         }
 
@@ -817,6 +885,7 @@ impl StateStore {
         buffered_state: &mut BufferedState,
         out_current_state: &Mutex<LedgerStateWithSummary>,
         persisted_state: &PersistedState,
+        delete_hot_state_on_restart: bool,
     ) -> Result<()> {
         info!("Replaying writesets from {snapshot_next_version} to {num_transactions} to let state Merkle DB catch up.");
 
@@ -854,9 +923,19 @@ impl StateStore {
         )?;
         let updated = LedgerStateWithSummary::from_state_and_summary(new_state, new_state_summary);
 
+        // `delete_on_restart` wiped the hot state KV for this range; re-write it so it
+        // matches the JMT we're about to commit.
+        if delete_hot_state_on_restart && let Some(db) = state_db.hot_state_kv_db.as_ref() {
+            let mut sharded_batches = db.new_sharded_native_batches();
+            Self::put_hot_state_updates(&hot_state_updates, &mut sharded_batches)?;
+            db.commit(num_transactions - 1, None, sharded_batches)?;
+        }
+
         // synchronously commit the snapshot at the last checkpoint here if not committed to disk yet.
         buffered_state.update(
-            updated, 0,    /* estimated_items, doesn't matter since we sync-commit */
+            updated,
+            hot_state_updates,
+            0,    /* estimated_items, doesn't matter since we sync-commit */
             true, /* sync_commit */
         )?;
         Ok(())
@@ -1044,7 +1123,6 @@ impl StateStore {
     // TODO(HotState): multiple writes to the same key are batched (within `for_last_checkpoint`
     // and `for_latest`) and only the last one is persisted. Revisit later if necessary.
     pub fn put_hot_state_updates(
-        &self,
         hot_state_updates: &HotStateUpdates,
         sharded_hot_state_kv_batches: &mut ShardedStateKvSchemaBatch,
     ) -> Result<()> {
@@ -1709,6 +1787,7 @@ mod test_only {
                         new_ledger_state,
                         new_state_summary,
                     ),
+                    hot_state_updates,
                     0,    /* estimated_items, doesn't matter since we sync-commit */
                     true, /* sync_commit */
                 )

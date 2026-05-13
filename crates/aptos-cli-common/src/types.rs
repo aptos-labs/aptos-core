@@ -7,12 +7,15 @@
 use aptos_crypto::encoding_type::EncodingError;
 use aptos_logger::Level;
 use aptos_rest_client::{aptos_api_types::HashValue, error::RestError, Transaction};
-use aptos_types::transaction::ReplayProtector;
+use aptos_types::transaction::{ExecutionStatus, ReplayProtector, TransactionStatus};
 use async_trait::async_trait;
 use clap::ValueEnum;
 use hex::FromHexError;
 use indoc::indoc;
-use move_core_types::account_address::AccountAddress;
+use move_core_types::{
+    account_address::AccountAddress,
+    vm_status::{AbortLocation, VMStatus},
+};
 use serde::{Deserialize, Serialize};
 use std::{
     fmt::{Display, Formatter},
@@ -335,6 +338,72 @@ pub struct TransactionSummary {
     pub deployed_object_address: Option<AccountAddress>,
 }
 
+/// Format a `TransactionStatus` into the string surfaced as `vm_status` in
+/// `TransactionSummary`. Prefers the VM-enriched `ExecutionStatus` (which
+/// carries abort location and `AbortInfo`) over the top-level `VMStatus`,
+/// whose `Display` impl drops both. `fallback` is used only for `Retry`.
+///
+/// TODO: See if we can unify this with `fn explain_vm_status` in `api/src/view_function.rs`
+pub fn format_txn_status(status: &TransactionStatus, fallback: &VMStatus) -> String {
+    fn loc(l: &AbortLocation) -> String {
+        match l {
+            AbortLocation::Module(m) => {
+                format!("{}::{}", m.address().to_hex_literal(), m.name())
+            },
+            AbortLocation::Script => "script".to_string(),
+        }
+    }
+
+    fn format_description(desc: &str) -> &str {
+        if desc.trim_start().is_empty() {
+            "(no description)"
+        } else {
+            desc
+        }
+    }
+
+    match status {
+        TransactionStatus::Keep(ExecutionStatus::Success) => "Executed successfully".to_string(),
+        TransactionStatus::Keep(ExecutionStatus::OutOfGas) => "Out of gas".to_string(),
+        TransactionStatus::Keep(ExecutionStatus::MoveAbort {
+            location,
+            code,
+            info,
+        }) => match info {
+            Some(i) if !i.reason_name.is_empty() => format!(
+                "Move abort in {}: {}({:#x}): {}",
+                loc(location),
+                i.reason_name,
+                code,
+                format_description(&i.description)
+            ),
+            Some(i) => format!(
+                "Move abort in {}: {:#x}: {}",
+                loc(location),
+                code,
+                format_description(&i.description)
+            ),
+            None => format!("Move abort in {}: {:#x}", loc(location), code),
+        },
+        TransactionStatus::Keep(ExecutionStatus::ExecutionFailure {
+            location,
+            function,
+            code_offset,
+        }) => format!(
+            "Execution failure in {} at function #{} offset {}",
+            loc(location),
+            function,
+            code_offset
+        ),
+        TransactionStatus::Keep(ExecutionStatus::MiscellaneousError(code)) => match code {
+            Some(c) => format!("Miscellaneous error: {:?}", c),
+            None => "Miscellaneous error".to_string(),
+        },
+        TransactionStatus::Discard(code) => format!("Discarded: {:?}", code),
+        TransactionStatus::Retry => fallback.to_string(),
+    }
+}
+
 impl From<Transaction> for TransactionSummary {
     fn from(transaction: Transaction) -> Self {
         TransactionSummary::from(&transaction)
@@ -470,4 +539,154 @@ pub struct ChangeSummary {
     resource: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
     value: Option<String>,
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use aptos_types::transaction::AbortInfo;
+    use move_core_types::{
+        ident_str,
+        language_storage::ModuleId,
+        vm_status::{DiscardedVMStatus, StatusCode},
+    };
+
+    fn sample_module() -> ModuleId {
+        ModuleId::new(AccountAddress::ONE, ident_str!("code").to_owned())
+    }
+
+    fn fallback() -> VMStatus {
+        VMStatus::Executed
+    }
+
+    #[test]
+    fn success_and_out_of_gas() {
+        assert_eq!(
+            format_txn_status(
+                &TransactionStatus::Keep(ExecutionStatus::Success),
+                &fallback()
+            ),
+            "Executed successfully",
+        );
+        assert_eq!(
+            format_txn_status(
+                &TransactionStatus::Keep(ExecutionStatus::OutOfGas),
+                &fallback()
+            ),
+            "Out of gas",
+        );
+    }
+
+    #[test]
+    fn move_abort_with_reason_name() {
+        let status = TransactionStatus::Keep(ExecutionStatus::MoveAbort {
+            location: AbortLocation::Module(sample_module()),
+            code: 0x60005,
+            info: Some(AbortInfo {
+                reason_name: "EPACKAGE_DEP_MISSING".to_string(),
+                description: "Dependency missing".to_string(),
+            }),
+        });
+        assert_eq!(
+            format_txn_status(&status, &fallback()),
+            "Move abort in 0x1::code: EPACKAGE_DEP_MISSING(0x60005): Dependency missing",
+        );
+    }
+
+    #[test]
+    fn move_abort_with_info_but_empty_reason() {
+        let status = TransactionStatus::Keep(ExecutionStatus::MoveAbort {
+            location: AbortLocation::Module(sample_module()),
+            code: 0x60005,
+            info: Some(AbortInfo {
+                reason_name: String::new(),
+                description: "Something went wrong".to_string(),
+            }),
+        });
+        assert_eq!(
+            format_txn_status(&status, &fallback()),
+            "Move abort in 0x1::code: 0x60005: Something went wrong",
+        );
+    }
+
+    #[test]
+    fn move_abort_without_info() {
+        let status = TransactionStatus::Keep(ExecutionStatus::MoveAbort {
+            location: AbortLocation::Module(sample_module()),
+            code: 0x60005,
+            info: None,
+        });
+        assert_eq!(
+            format_txn_status(&status, &fallback()),
+            "Move abort in 0x1::code: 0x60005",
+        );
+    }
+
+    #[test]
+    fn move_abort_in_script() {
+        let status = TransactionStatus::Keep(ExecutionStatus::MoveAbort {
+            location: AbortLocation::Script,
+            code: 42,
+            info: None,
+        });
+        assert_eq!(
+            format_txn_status(&status, &fallback()),
+            "Move abort in script: 0x2a",
+        );
+    }
+
+    #[test]
+    fn execution_failure_module_and_script() {
+        let module = TransactionStatus::Keep(ExecutionStatus::ExecutionFailure {
+            location: AbortLocation::Module(sample_module()),
+            function: 3,
+            code_offset: 17,
+        });
+        assert_eq!(
+            format_txn_status(&module, &fallback()),
+            "Execution failure in 0x1::code at function #3 offset 17",
+        );
+        let script = TransactionStatus::Keep(ExecutionStatus::ExecutionFailure {
+            location: AbortLocation::Script,
+            function: 0,
+            code_offset: 5,
+        });
+        assert_eq!(
+            format_txn_status(&script, &fallback()),
+            "Execution failure in script at function #0 offset 5",
+        );
+    }
+
+    #[test]
+    fn miscellaneous_error() {
+        let with_code = TransactionStatus::Keep(ExecutionStatus::MiscellaneousError(Some(
+            StatusCode::ARITHMETIC_ERROR,
+        )));
+        assert_eq!(
+            format_txn_status(&with_code, &fallback()),
+            "Miscellaneous error: ARITHMETIC_ERROR",
+        );
+        let without_code = TransactionStatus::Keep(ExecutionStatus::MiscellaneousError(None));
+        assert_eq!(
+            format_txn_status(&without_code, &fallback()),
+            "Miscellaneous error",
+        );
+    }
+
+    #[test]
+    fn discard() {
+        let status = TransactionStatus::Discard(DiscardedVMStatus::SEQUENCE_NUMBER_TOO_OLD);
+        assert_eq!(
+            format_txn_status(&status, &fallback()),
+            "Discarded: SEQUENCE_NUMBER_TOO_OLD",
+        );
+    }
+
+    #[test]
+    fn retry_uses_fallback() {
+        assert_eq!(
+            format_txn_status(&TransactionStatus::Retry, &VMStatus::Executed),
+            VMStatus::Executed.to_string(),
+        );
+    }
 }

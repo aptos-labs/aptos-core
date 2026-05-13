@@ -47,14 +47,22 @@ impl DecryptedPlaintext {
 impl Plaintext for DecryptedPlaintext {}
 
 #[derive(Clone, Debug, Hash, Eq, PartialEq, Serialize, Deserialize)]
-pub struct PayloadAssociatedData {
-    sender: AccountAddress,
-    auth_key: AuthenticationKey,
+pub enum PayloadAssociatedData {
+    V1 {
+        sender: AccountAddress,
+        signer_auth_keys: Vec<(AccountAddress, AuthenticationKey)>,
+    },
 }
 
 impl PayloadAssociatedData {
-    pub fn new(sender: AccountAddress, auth_key: AuthenticationKey) -> Self {
-        Self { sender, auth_key }
+    pub fn new(
+        sender: AccountAddress,
+        signer_auth_keys: Vec<(AccountAddress, AuthenticationKey)>,
+    ) -> Self {
+        Self::V1 {
+            sender,
+            signer_auth_keys,
+        }
     }
 }
 
@@ -77,6 +85,17 @@ pub enum DecryptionFailureReason {
     PayloadHashMismatch,
     /// The payload was encrypted for a different epoch than the available decryption key.
     EpochMismatch,
+    /// The block contains an epoch-ending validator transaction (DKGResult /
+    /// ChunkyDKGResult). Decrypting txns that the VM will skip post-NewEpochEvent
+    /// would leak sender intent, so the txn is failed with retry semantics and
+    /// the user resubmits in the next epoch with the rotated key.
+    EpochEndRetry,
+    /// The block's round exceeds the trusted-setup capacity (`num_rounds`).
+    /// The txn cannot be decrypted in this epoch; not retryable until next epoch.
+    TrustedSetupExhausted,
+    /// The encrypted txn was skipped because the block already reached
+    /// `max_txns_from_block_to_execute`. Should be retried in a subsequent block.
+    ExecuteBlockLimitReached,
 }
 
 // Mirrors EntryFunction in types/src/transaction/script.rs
@@ -224,9 +243,9 @@ impl EncryptedPayload {
     pub fn verify(
         &self,
         sender: AccountAddress,
-        auth_key: AuthenticationKey,
+        signer_auth_keys: Vec<(AccountAddress, AuthenticationKey)>,
     ) -> anyhow::Result<()> {
-        let associated_data = PayloadAssociatedData::new(sender, auth_key);
+        let associated_data = PayloadAssociatedData::new(sender, signer_auth_keys);
         self.ciphertext().verify(&associated_data)
     }
 }

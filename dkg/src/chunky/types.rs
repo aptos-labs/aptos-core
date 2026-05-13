@@ -1,9 +1,10 @@
 // Copyright (c) Aptos Foundation
 // Licensed pursuant to the Innovation-Enabling Source Code License, available at https://github.com/aptos-labs/aptos-core/blob/main/LICENSE
 
+use aptos_bitvec::BitVec;
 use aptos_crypto::HashValue;
 use aptos_crypto_derive::CryptoHasher;
-use aptos_dkg::pvss::{traits::transcript::HasAggregatableSubtranscript, Player};
+use aptos_dkg::pvss::traits::transcript::HasAggregatableSubtranscript;
 use aptos_types::{
     aggregate_signature::AggregateSignature,
     dkg::{
@@ -52,13 +53,14 @@ impl ChunkyDKGTranscriptRequest {
     }
 }
 
-/// Request to validate an aggregated subtranscript. Contains the hash of the subtranscript and the dealers.
+/// Request to validate an aggregated subtranscript. Contains the hash of the subtranscript
+/// and a bitmask identifying which dealers contributed.
 #[derive(Clone, Serialize, Deserialize, CryptoHasher, Debug, PartialEq)]
 pub struct ChunkyDKGSubtranscriptSignatureRequest {
     pub dealer_epoch: u64,
     pub subtranscript_hash: HashValue,
-    pub aggregated_subtrx_dealers: Vec<Player>,
-    /// Per-dealer transcript hash, same order as `aggregated_subtrx_dealers`.
+    pub dealer_bitmask: BitVec,
+    /// Per-dealer transcript hash, ordered by set-bit position (ascending validator index).
     /// Allows the responder to detect equivocated transcripts (not just missing ones).
     pub dealer_transcript_hashes: Vec<HashValue>,
 }
@@ -67,13 +69,13 @@ impl ChunkyDKGSubtranscriptSignatureRequest {
     pub fn new(
         dealer_epoch: u64,
         subtranscript_hash: HashValue,
-        aggregated_subtrx_dealers: Vec<Player>,
+        dealer_bitmask: BitVec,
         dealer_transcript_hashes: Vec<HashValue>,
     ) -> Self {
         Self {
             dealer_epoch,
             subtranscript_hash,
-            aggregated_subtrx_dealers,
+            dealer_bitmask,
             dealer_transcript_hashes,
         }
     }

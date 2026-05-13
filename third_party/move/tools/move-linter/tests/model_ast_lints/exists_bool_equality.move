@@ -1,3 +1,4 @@
+// @checks=experimental
 module 0xc0ffee::m {
     struct A(bool) has key, drop;
     struct B(bool) has key, drop;

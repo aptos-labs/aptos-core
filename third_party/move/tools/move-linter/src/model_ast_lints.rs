@@ -36,98 +36,139 @@ mod use_index_syntax;
 mod use_receiver_style;
 mod while_true;
 
+use crate::{select_lints, LintSpec, LintTier};
+use aborting_overflow_checks::AbortingOverflowChecks;
+use almost_swapped::AlmostSwapped;
+use assert_const::AssertConst;
+use blocks_in_conditions::BlocksInConditions;
+use collapsible_if::CollapsibleIf;
+use cyclomatic_complexity::CyclomaticComplexity;
+use deprecated_usage::{
+    DeprecatedUsage, DeprecatedUsageInFields, DeprecatedUsageInSignatures,
+    DeprecatedUsageOfConstants,
+};
+use empty_if::EmptyIf;
+use equal_operands_in_bin_op::EqualOperandsInBinOp;
+use known_to_abort::KnownToAbort;
 use move_compiler_v2::external_checks::{
     ConstantChecker, ExpChecker, FunctionChecker, StructChecker,
 };
-use std::collections::BTreeMap;
+use mutable_view_function::MutableViewFunction;
+use needless_bool::NeedlessBool;
+use needless_deref_ref::NeedlessDerefRef;
+use needless_ref_deref::NeedlessRefDeref;
+use needless_ref_in_field_access::NeedlessRefInFieldAccess;
+use needless_return::NeedlessReturn;
+use needless_visibility::NeedlessVisibility;
+use nonminimal_bool::NonminimalBool;
+use self_assignment::SelfAssignment;
+use simpler_bool_expression::SimplerBoolExpression;
+use simpler_numeric_expression::SimplerNumericExpression;
+use unnecessary_boolean_identity_comparison::UnnecessaryBooleanIdentityComparison;
+use unnecessary_cast::FindUnnecessaryCast;
+use unnecessary_numerical_extreme_comparison::UnnecessaryNumericalExtremeComparison;
+use unsafe_friend_package_entry::UnsafeFriendPackageEntry;
+use unused_constant::UnusedConstant;
+use unused_function::UnusedFunction;
+use unused_struct::UnusedStruct;
+use use_index_syntax::UseIndexSyntax;
+use use_receiver_style::UseReceiverStyle;
+use while_true::WhileTrue;
 
-/// Returns a default pipeline of "expression linters" to run.
-/// The `config` parameter gates checkers by category. The `"checks"` key selects which
-/// tier of lints to enable:
-/// - `"default"`: curated checks that minimize false positives.
-/// - `"strict"`: stricter checks (may produce more false positives); includes default.
-/// - `"experimental"`: unstable checks; includes strict and default.
-pub fn get_default_exp_linter_pipeline(
-    config: &BTreeMap<String, String>,
-) -> Vec<Box<dyn ExpChecker>> {
-    // Start with the default set of checks.
-    let mut checks: Vec<Box<dyn ExpChecker>> = vec![
-        Box::<aborting_overflow_checks::AbortingOverflowChecks>::default(),
-        Box::<almost_swapped::AlmostSwapped>::default(),
-        Box::<assert_const::AssertConst>::default(),
-        Box::<blocks_in_conditions::BlocksInConditions>::default(),
-        Box::<collapsible_if::CollapsibleIf>::default(),
-        Box::<empty_if::EmptyIf>::default(),
-        Box::<equal_operands_in_bin_op::EqualOperandsInBinOp>::default(),
-        Box::<unnecessary_cast::FindUnnecessaryCast>::default(),
-        Box::<known_to_abort::KnownToAbort>::default(),
-        Box::<needless_bool::NeedlessBool>::default(),
-        Box::<needless_deref_ref::NeedlessDerefRef>::default(),
-        Box::<needless_ref_deref::NeedlessRefDeref>::default(),
-        Box::<needless_ref_in_field_access::NeedlessRefInFieldAccess>::default(),
-        Box::<needless_return::NeedlessReturn>::default(),
-        Box::<nonminimal_bool::NonminimalBool>::default(),
-        Box::<self_assignment::SelfAssignment>::default(),
-        Box::<simpler_bool_expression::SimplerBoolExpression>::default(),
-        Box::<simpler_numeric_expression::SimplerNumericExpression>::default(),
-        Box::<unnecessary_boolean_identity_comparison::UnnecessaryBooleanIdentityComparison>::default(),
-        Box::<unnecessary_numerical_extreme_comparison::UnnecessaryNumericalExtremeComparison>::default(),
-        Box::<while_true::WhileTrue>::default(),
-    ];
-    let checks_category = config.get("checks").map_or("default", |s| s.as_str());
-    if checks_category == "strict" || checks_category == "experimental" {
-        checks.push(Box::<deprecated_usage::DeprecatedUsage>::default());
-        checks.push(Box::<use_index_syntax::UseIndexSyntax>::default());
-        checks.push(Box::<use_receiver_style::UseReceiverStyle>::default());
-    }
-    if checks_category == "experimental" {
-        checks.push(Box::<cyclomatic_complexity::CyclomaticComplexity>::default());
-    }
-    checks
+/// Registry of every expression-AST lint with its tier, unfiltered.
+/// `select_lints` narrows this list according to a [`LintSpec`].
+pub(crate) fn all_exp_lints() -> Vec<(LintTier, Box<dyn ExpChecker>)> {
+    use LintTier::{Default, Experimental, Strict};
+    vec![
+        // ── default tier ──────────────────────────────────────────────
+        (Default, Box::<AbortingOverflowChecks>::default()),
+        (Default, Box::<AlmostSwapped>::default()),
+        (Default, Box::<AssertConst>::default()),
+        (Default, Box::<BlocksInConditions>::default()),
+        (Default, Box::<CollapsibleIf>::default()),
+        (Default, Box::<EmptyIf>::default()),
+        (Default, Box::<EqualOperandsInBinOp>::default()),
+        (Default, Box::<FindUnnecessaryCast>::default()),
+        (Default, Box::<KnownToAbort>::default()),
+        (Default, Box::<NeedlessBool>::default()),
+        (Default, Box::<NeedlessDerefRef>::default()),
+        (Default, Box::<NeedlessRefDeref>::default()),
+        (Default, Box::<NeedlessRefInFieldAccess>::default()),
+        (Default, Box::<NeedlessReturn>::default()),
+        (Default, Box::<NonminimalBool>::default()),
+        (Default, Box::<SelfAssignment>::default()),
+        (Default, Box::<SimplerBoolExpression>::default()),
+        (Default, Box::<SimplerNumericExpression>::default()),
+        (
+            Default,
+            Box::<UnnecessaryBooleanIdentityComparison>::default(),
+        ),
+        (
+            Default,
+            Box::<UnnecessaryNumericalExtremeComparison>::default(),
+        ),
+        (Default, Box::<WhileTrue>::default()),
+        // ── strict tier ───────────────────────────────────────────────
+        (Strict, Box::<DeprecatedUsage>::default()),
+        (Strict, Box::<UseIndexSyntax>::default()),
+        (Strict, Box::<UseReceiverStyle>::default()),
+        // ── experimental tier ─────────────────────────────────────────
+        (Experimental, Box::<CyclomaticComplexity>::default()),
+    ]
 }
 
-/// Returns a default pipeline of constant linters.
-/// The `config` parameter follows the same convention as in [`get_default_exp_linter_pipeline`].
-pub fn get_default_constant_linter_pipeline(
-    config: &BTreeMap<String, String>,
-) -> Vec<Box<dyn ConstantChecker>> {
-    let mut checks: Vec<Box<dyn ConstantChecker>> =
-        vec![Box::<unused_constant::UnusedConstant>::default()];
-    let checks_category = config.get("checks").map_or("default", |s| s.as_str());
-    if checks_category == "strict" || checks_category == "experimental" {
-        checks.push(Box::<deprecated_usage::DeprecatedUsageOfConstants>::default());
-    }
-    checks
+/// Registry of every constant-level lint with its tier, unfiltered.
+pub(crate) fn all_constant_lints() -> Vec<(LintTier, Box<dyn ConstantChecker>)> {
+    use LintTier::{Default, Strict};
+    vec![
+        // ── default tier ──────────────────────────────────────────────
+        (Default, Box::<UnusedConstant>::default()),
+        // ── strict tier ───────────────────────────────────────────────
+        (Strict, Box::<DeprecatedUsageOfConstants>::default()),
+    ]
 }
 
-/// Returns a default pipeline of struct linters.
-/// The `config` parameter follows the same convention as in [`get_default_exp_linter_pipeline`].
-pub fn get_default_struct_linter_pipeline(
-    config: &BTreeMap<String, String>,
-) -> Vec<Box<dyn StructChecker>> {
-    let mut checks: Vec<Box<dyn StructChecker>> =
-        vec![Box::<unused_struct::UnusedStruct>::default()];
-    let checks_category = config.get("checks").map_or("default", |s| s.as_str());
-    if checks_category == "strict" || checks_category == "experimental" {
-        checks.push(Box::<deprecated_usage::DeprecatedUsageInFields>::default());
-    }
-    checks
+/// Registry of every struct-level lint with its tier, unfiltered.
+pub(crate) fn all_struct_lints() -> Vec<(LintTier, Box<dyn StructChecker>)> {
+    use LintTier::{Default, Strict};
+    vec![
+        // ── default tier ──────────────────────────────────────────────
+        (Default, Box::<UnusedStruct>::default()),
+        // ── strict tier ───────────────────────────────────────────────
+        (Strict, Box::<DeprecatedUsageInFields>::default()),
+    ]
 }
 
-/// Returns a default pipeline of function linters.
-/// The `config` parameter follows the same convention as in [`get_default_exp_linter_pipeline`].
-pub fn get_default_function_linter_pipeline(
-    config: &BTreeMap<String, String>,
-) -> Vec<Box<dyn FunctionChecker>> {
-    let mut checks: Vec<Box<dyn FunctionChecker>> = vec![
-        Box::new(mutable_view_function::MutableViewFunction::new()),
-        Box::<unused_function::UnusedFunction>::default(),
-        Box::<needless_visibility::NeedlessVisibility>::default(),
-        Box::<unsafe_friend_package_entry::UnsafeFriendPackageEntry>::default(),
-    ];
-    let checks_category = config.get("checks").map_or("default", |s| s.as_str());
-    if checks_category == "strict" || checks_category == "experimental" {
-        checks.push(Box::<deprecated_usage::DeprecatedUsageInSignatures>::default());
-    }
-    checks
+/// Registry of every function-level lint with its tier, unfiltered.
+pub(crate) fn all_function_lints() -> Vec<(LintTier, Box<dyn FunctionChecker>)> {
+    use LintTier::{Default, Strict};
+    vec![
+        // ── default tier ──────────────────────────────────────────────
+        (Default, Box::new(MutableViewFunction::new())),
+        (Default, Box::<UnusedFunction>::default()),
+        (Default, Box::<NeedlessVisibility>::default()),
+        (Default, Box::<UnsafeFriendPackageEntry>::default()),
+        // ── strict tier ───────────────────────────────────────────────
+        (Strict, Box::<DeprecatedUsageInSignatures>::default()),
+    ]
+}
+
+/// Expression-AST checkers enabled by `spec`.
+pub fn get_default_exp_linter_pipeline(spec: &LintSpec) -> Vec<Box<dyn ExpChecker>> {
+    select_lints(spec, all_exp_lints(), |c| c.get_name())
+}
+
+/// Constant-level checkers enabled by `spec`.
+pub fn get_default_constant_linter_pipeline(spec: &LintSpec) -> Vec<Box<dyn ConstantChecker>> {
+    select_lints(spec, all_constant_lints(), |c| c.get_name())
+}
+
+/// Struct-level checkers enabled by `spec`.
+pub fn get_default_struct_linter_pipeline(spec: &LintSpec) -> Vec<Box<dyn StructChecker>> {
+    select_lints(spec, all_struct_lints(), |c| c.get_name())
+}
+
+/// Function-level checkers enabled by `spec`.
+pub fn get_default_function_linter_pipeline(spec: &LintSpec) -> Vec<Box<dyn FunctionChecker>> {
+    select_lints(spec, all_function_lints(), |c| c.get_name())
 }

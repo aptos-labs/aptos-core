@@ -10,24 +10,20 @@ mod slot_alloc;
 mod ssa_conversion;
 mod ssa_function;
 mod translate;
-mod type_conversion;
 
 use crate::stackless_exec_ir::ModuleIR;
 use anyhow::{bail, Result};
+use mono_move_core::{Interner, PreparedModule};
 use move_binary_format::CompiledModule;
-use move_vm_types::loaded_data::struct_name_indexing::StructNameIndex;
 
 /// Verify, convert, and optimize a compiled module into stackless execution IR.
-///
-/// `struct_name_table` maps `StructHandleIndex` ordinals to globally unique
-/// `StructNameIndex` values, used to convert bytecode-level struct references
-/// into runtime `Type` representations.
-pub fn destack(module: CompiledModule, struct_name_table: &[StructNameIndex]) -> Result<ModuleIR> {
+pub fn destack(module: CompiledModule, interner: &impl Interner) -> Result<ModuleIR> {
     if let Err(e) = move_bytecode_verifier::verify_module(&module) {
         bail!("bytecode verification failed: {:#}", e);
     }
 
-    let mut module_ir = translate::translate_module(module, struct_name_table)?;
+    let module = PreparedModule::build(module, interner)?;
+    let mut module_ir = translate::translate_module(module, interner)?;
     optimize::optimize_module(&mut module_ir);
     Ok(module_ir)
 }

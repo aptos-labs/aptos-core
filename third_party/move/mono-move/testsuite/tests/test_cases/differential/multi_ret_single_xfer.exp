@@ -1,0 +1,90 @@
+=== stackless ===
+// module 0x66::test
+
+fun three_rets(): u64 * u64 * u64 {
+  slots: params(0), locals(0), temps(3)
+    r0: u64
+    r1: u64
+    r2: u64
+  code:
+  L0:
+    0: r0 := ld_u64 1
+    1: r1 := ld_u64 2
+    2: r2 := ld_u64 3
+    3: ret [r0, r1, r2]
+}
+
+fun three_args(r0, r1, r2) {
+  slots: params(3), locals(0), temps(0)
+    r0: &mut u64
+    r1: u64
+    r2: u64
+  code:
+  L0:
+    0: ret []
+}
+
+fun caller(r0) {
+  slots: params(1), locals(2), temps(1), xfer(3)
+    r0: &mut u64
+    r1: u64
+    r2: u64
+    r3: u64
+  code:
+  L0:
+    0: [r1, r3, r2] := call three_rets, []
+    1: x2 := ld_u64 0
+    2: [] := call three_args, [r0, r1, x2]
+    3: ret []
+}
+
+fun trigger(): u64 {
+  slots: params(0), locals(1), temps(0), xfer(1)
+    r0: u64
+  code:
+  L0:
+    0: r0 := ld_u64 99
+    1: x0 := mut_borrow_loc r0
+    2: [] := call caller, [x0]
+    3: ret [r0]
+}
+=== micro-ops ===
+// module 0x66::test
+
+fun three_rets() {
+  frame_data_size: 32
+  code:
+    0: StoreImm8 [0] <- #1
+    1: StoreImm8 [8] <- #2
+    2: StoreImm8 [16] <- #3
+    3: Return
+}
+
+fun three_args() {
+  frame_data_size: 32
+  code:
+    0: Return
+}
+
+fun caller() {
+  frame_data_size: 40
+  code:
+    0: CallFunc #0
+    1: Move8 [16] <- [64]
+    2: Move8 [32] <- [72]
+    3: Move8 [24] <- [80]
+    4: StoreImm8 [88] <- #0
+    5: Move8 [80] <- [16]
+    6: Move(16) [64] <- [0]
+    7: CallFunc #1
+    8: Return
+}
+
+fun trigger() {
+  frame_data_size: 8
+  code:
+    0: StoreImm8 [0] <- #99
+    1: SlotBorrow [32] <- &[0]
+    2: CallFunc #2
+    3: Return
+}

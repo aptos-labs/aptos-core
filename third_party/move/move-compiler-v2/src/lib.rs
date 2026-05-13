@@ -625,6 +625,8 @@ pub fn stackless_bytecode_check_pipeline(options: &Options) -> FunctionTargetPip
     if options.experiment_on(Experiment::LINT_CHECKS) {
         // Some lint checks need live variable analysis.
         pipeline.add_processor(Box::new(LiveVarAnalysisProcessor::new(false)));
+        // Some lint checks need reachability annotations.
+        pipeline.add_processor(Box::new(UnreachableCodeProcessor {}));
         pipeline.add_processor(Box::new(LintProcessor {}));
     }
 

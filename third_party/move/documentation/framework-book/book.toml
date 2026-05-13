@@ -1,0 +1,18 @@
+[book]
+title = "The Aptos Framework Book"
+description = "Reference documentation for the Aptos Move framework."
+authors = ["The Aptos Framework Team"]
+language = "en"
+src = "src"
+
+[build]
+build-dir = "html"
+create-missing = true
+use-default-preprocessors = true
+extra-watch-dirs = []
+
+[output.html]
+git-repository-url = "https://github.com/aptos-labs/aptos-core"
+edit-url-template = "https://github.com/aptos-labs/aptos-core/edit/main/third_party/move/documentation/framework-book/{path}"
+additional-js = ["theme/build-stamp.js"]
+additional-css = ["theme/code-wrap.css", "theme/build-stamp.css"]

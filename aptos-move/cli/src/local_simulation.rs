@@ -174,6 +174,45 @@ pub fn benchmark_transaction_using_debugger(
     Ok((vm_status, vm_output))
 }
 
+/// Runs the gas profiler's consistency checks on `log` and reports any
+/// discrepancies using CLI-flavored messaging (including a pointer to
+/// `--skip-gas-profiler-consistency-check`).
+///
+/// When `skip` is true, inconsistencies are emitted as warnings on stderr so
+/// the user still gets a (potentially incomplete) gas report. Otherwise, the
+/// first inconsistency causes a panic so the failure is loud.
+fn handle_gas_profiler_consistency_check(log: &aptos_gas_profiling::TransactionGasLog, skip: bool) {
+    let errors: Vec<_> = [
+        log.exec_io.check_consistency(),
+        log.storage.check_consistency(),
+    ]
+    .into_iter()
+    .filter_map(Result::err)
+    .collect();
+    if errors.is_empty() {
+        return;
+    }
+    // Collect all errors before reporting so a panic on the first doesn't hide
+    // a second simultaneous failure.
+    let combined = errors
+        .iter()
+        .map(|e| e.to_string())
+        .collect::<Vec<_>>()
+        .join("\n\n");
+    if skip {
+        eprintln!(
+            "warning: {combined}\n\
+             (consistency check was bypassed via --skip-gas-profiler-consistency-check; \
+             the generated gas report may be incomplete or inaccurate.)"
+        );
+    } else {
+        panic!(
+            "{combined}\n\nRerun with --skip-gas-profiler-consistency-check to bypass this \
+             check and still produce a (possibly incomplete) gas report."
+        );
+    }
+}
+
 pub fn profile_transaction_using_debugger(
     debugger: &dyn MoveDebugger,
     version: u64,
@@ -181,6 +220,7 @@ pub fn profile_transaction_using_debugger(
     hash: HashValue,
     persisted_auxiliary_info: PersistedAuxiliaryInfo,
     fold_unique_stack: bool,
+    skip_gas_profiler_consistency_check: bool,
 ) -> CliTypedResult<(VMStatus, VMOutput)> {
     let (vm_status, vm_output, mut gas_log) = debugger
         .execute_transaction_at_version_with_gas_profiler(
@@ -191,6 +231,8 @@ pub fn profile_transaction_using_debugger(
         .map_err(|err| {
             CliError::UnexpectedError(format!("failed to simulate txn with gas profiler: {}", err))
         })?;
+
+    handle_gas_profiler_consistency_check(&gas_log, skip_gas_profiler_consistency_check);
 
     // Optionally fold the call graph by unique stack traces
     if fold_unique_stack {

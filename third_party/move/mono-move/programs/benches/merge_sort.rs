@@ -3,10 +3,13 @@
 
 use criterion::{black_box, criterion_group, criterion_main, BatchSize, Criterion};
 
+#[path = "helpers.rs"]
+mod helpers;
+
 const N: u64 = 1000;
 
 fn bench_merge_sort(c: &mut Criterion) {
-    use mono_move_gas::SimpleGasMeter;
+    use mono_move_core::LocalExecutionContext;
     use mono_move_programs::{
         merge_sort::{
             micro_op_merge_sort, move_bytecode_merge_sort, native_merge_sort, shuffled_range,
@@ -35,26 +38,46 @@ fn bench_merge_sort(c: &mut Criterion) {
             );
         });
 
+        // plain (no gas instrumentation)
         let (functions, descriptors, _arena) = micro_op_merge_sort();
         // SAFETY: Exclusive access during bench setup; arena is alive.
         unsafe { mono_move_core::Function::resolve_calls(&functions) };
+        let mut exec_ctx = LocalExecutionContext::unmetered();
+        // TODO: hoist interpreter context setup out of the timed body.
         group.bench_function("micro_op", |b| {
-            b.iter_batched(
-                || {
-                    let gas_meter = SimpleGasMeter::new(u64::MAX);
-                    let mut ctx = InterpreterContext::new(&descriptors, gas_meter, unsafe {
-                        functions[0].unwrap().as_ref_unchecked()
-                    });
-                    let vec_ptr = ctx
-                        .alloc_u64_vec(mono_move_core::DescriptorId(0), &input)
-                        .unwrap();
-                    ctx.set_root_arg(0, &vec_ptr.to_le_bytes());
-                    ctx
-                },
-                |mut ctx| ctx.run().unwrap(),
-                BatchSize::SmallInput,
-            );
+            b.iter(|| {
+                let mut ctx = InterpreterContext::new(&mut exec_ctx, &descriptors, unsafe {
+                    functions[0].unwrap().as_ref_unchecked()
+                });
+                let vec_ptr = ctx
+                    .alloc_u64_vec(mono_move_core::DescriptorId(0), &input)
+                    .unwrap();
+                ctx.set_root_arg(0, &vec_ptr.to_le_bytes());
+                ctx.run().unwrap();
+            });
         });
+
+        // with gas instrumentation
+        let (functions, _, _arena) = micro_op_merge_sort();
+        // SAFETY: Exclusive access during bench setup; arena is alive.
+        let (functions_gas, _arena) = unsafe { helpers::gas_instrument(&functions) };
+        // SAFETY: Exclusive access during bench setup; arena is alive.
+        unsafe { mono_move_core::Function::resolve_calls(&functions_gas) };
+        let mut exec_ctx = LocalExecutionContext::with_max_budget();
+        // TODO: hoist interpreter context setup out of the timed body.
+        group.bench_function("micro_op/gas", |b| {
+            b.iter(|| {
+                let mut ctx = InterpreterContext::new(&mut exec_ctx, &descriptors, unsafe {
+                    functions_gas[0].unwrap().as_ref_unchecked()
+                });
+                let vec_ptr = ctx
+                    .alloc_u64_vec(mono_move_core::DescriptorId(0), &input)
+                    .unwrap();
+                ctx.set_root_arg(0, &vec_ptr.to_le_bytes());
+                ctx.run().unwrap();
+            });
+        });
+
         group.finish();
     }
 
