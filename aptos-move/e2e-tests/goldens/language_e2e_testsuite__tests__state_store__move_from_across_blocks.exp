@@ -12,6 +12,7 @@ Ok(
                     ),
                 ),
                 hotness: {},
+                native_positions: {},
             },
             events: [
                 ModuleEvent { type: Struct(StructTag { address: 0000000000000000000000000000000000000000000000000000000000000001, module: Identifier("transaction_fee"), name: Identifier("FeeStatement"), type_args: [] }), event_data: "20000000000000001d00000000000000040000000000000000000000000000000000000000000000" },
@@ -43,6 +44,7 @@ Ok(
                     ),
                 ),
                 hotness: {},
+                native_positions: {},
             },
             events: [
                 ModuleEvent { type: Struct(StructTag { address: 0000000000000000000000000000000000000000000000000000000000000001, module: Identifier("transaction_fee"), name: Identifier("FeeStatement"), type_args: [] }), event_data: "21000000000000001d00000000000000050000000000000000000000000000000000000000000000" },
@@ -69,6 +71,7 @@ Ok(
                     ),
                 ),
                 hotness: {},
+                native_positions: {},
             },
             events: [
                 ModuleEvent { type: Struct(StructTag { address: 0000000000000000000000000000000000000000000000000000000000000001, module: Identifier("transaction_fee"), name: Identifier("FeeStatement"), type_args: [] }), event_data: "27000000000000001d000000000000000a0000000000000000000000000000000000000000000000" },
@@ -96,6 +99,7 @@ Ok(
                     ),
                 ),
                 hotness: {},
+                native_positions: {},
             },
             events: [
                 ModuleEvent { type: Struct(StructTag { address: 0000000000000000000000000000000000000000000000000000000000000001, module: Identifier("transaction_fee"), name: Identifier("FeeStatement"), type_args: [] }), event_data: "28000000000000001d000000000000000b0000000000000000000000000000000000000000000000" },
@@ -122,6 +126,7 @@ Ok(
                     ),
                 ),
                 hotness: {},
+                native_positions: {},
             },
             events: [
                 ModuleEvent { type: Struct(StructTag { address: 0000000000000000000000000000000000000000000000000000000000000001, module: Identifier("transaction_fee"), name: Identifier("FeeStatement"), type_args: [] }), event_data: "20000000000000001d00000000000000040000000000000000000000000000000000000000000000" },
@@ -152,6 +157,7 @@ Ok(
                     ),
                 ),
                 hotness: {},
+                native_positions: {},
             },
             events: [
                 ModuleEvent { type: Struct(StructTag { address: 0000000000000000000000000000000000000000000000000000000000000001, module: Identifier("transaction_fee"), name: Identifier("FeeStatement"), type_args: [] }), event_data: "20000000000000001d00000000000000040000000000000000000000000000000000000000000000" },
@@ -183,6 +189,7 @@ Ok(
                     ),
                 ),
                 hotness: {},
+                native_positions: {},
             },
             events: [
                 ModuleEvent { type: Struct(StructTag { address: 0000000000000000000000000000000000000000000000000000000000000001, module: Identifier("transaction_fee"), name: Identifier("FeeStatement"), type_args: [] }), event_data: "21000000000000001d00000000000000050000000000000000000000000000000000000000000000" },
@@ -210,6 +217,7 @@ Ok(
                     ),
                 ),
                 hotness: {},
+                native_positions: {},
             },
             events: [
                 ModuleEvent { type: Struct(StructTag { address: 0000000000000000000000000000000000000000000000000000000000000001, module: Identifier("transaction_fee"), name: Identifier("FeeStatement"), type_args: [] }), event_data: "28000000000000001d000000000000000b0000000000000000000000000000000000000000000000" },
@@ -232,6 +240,7 @@ Ok(
                     ),
                 ),
                 hotness: {},
+                native_positions: {},
             },
             events: [
                 ModuleEvent { type: Struct(StructTag { address: 0000000000000000000000000000000000000000000000000000000000000001, module: Identifier("transaction_fee"), name: Identifier("FeeStatement"), type_args: [] }), event_data: "20000000000000001d00000000000000040000000000000000000000000000000000000000000000" },

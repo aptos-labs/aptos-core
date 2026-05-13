@@ -4,7 +4,7 @@
 use crate::{
     access_path::AccessPath,
     state_store::{
-        state_key::inner::{StateKeyInner, StateKeyInnerHasher},
+        state_key::inner::{StateKeyInner, StateKeyInnerHasher, TradingNativeKey},
         table::TableHandle,
     },
 };
@@ -64,6 +64,15 @@ impl Drop for Entry {
                 REGISTRY.table_item(handle, key).maybe_remove(handle, key)
             },
             StateKeyInner::Raw(bytes) => REGISTRY.raw(bytes).maybe_remove(bytes, &()),
+            StateKeyInner::TradingNative(key) => match key {
+                TradingNativeKey::Position {
+                    exchange,
+                    account,
+                    market,
+                } => REGISTRY
+                    .position((*exchange, *account), market)
+                    .maybe_remove(&(*exchange, *account), market),
+            },
         }
     }
 }
@@ -198,6 +207,7 @@ const NUM_RESOURCE_GROUP_SHARDS: usize = 8;
 const NUM_MODULE_SHARDS: usize = 8;
 const NUM_TABLE_ITEM_SHARDS: usize = 8;
 const NUM_RAW_SHARDS: usize = 4;
+const NUM_POSITION_SHARDS: usize = 8;
 
 #[derive(Default)]
 pub struct StateKeyRegistry {
@@ -206,6 +216,10 @@ pub struct StateKeyRegistry {
     module_shards: [TwoKeyRegistry<AccountAddress, Identifier>; NUM_MODULE_SHARDS],
     table_item_shards: [TwoKeyRegistry<TableHandle, Vec<u8>>; NUM_TABLE_ITEM_SHARDS],
     raw_shards: [TwoKeyRegistry<Vec<u8>, ()>; NUM_RAW_SHARDS], // for tests only
+    /// (exchange, account) -> market -> Entry. Positions are bounded by a
+    /// single exchange's universe so the shard count is modest.
+    position_shards:
+        [TwoKeyRegistry<(AccountAddress, AccountAddress), AccountAddress>; NUM_POSITION_SHARDS],
 }
 
 impl StateKeyRegistry {
@@ -258,5 +272,18 @@ impl StateKeyRegistry {
 
     pub(crate) fn raw(&self, bytes: &[u8]) -> &TwoKeyRegistry<Vec<u8>, ()> {
         &self.raw_shards[Self::hash_address_and_name(&AccountAddress::ONE, bytes) % NUM_RAW_SHARDS]
+    }
+
+    pub(crate) fn position(
+        &self,
+        key1: (AccountAddress, AccountAddress),
+        market: &AccountAddress,
+    ) -> &TwoKeyRegistry<(AccountAddress, AccountAddress), AccountAddress> {
+        let (exchange, account) = key1;
+        let mut hasher = fxhash::FxHasher::default();
+        hasher.write_u8(exchange.as_ref()[AccountAddress::LENGTH - 1]);
+        hasher.write_u8(account.as_ref()[AccountAddress::LENGTH - 1]);
+        hasher.write_u8(market.as_ref()[AccountAddress::LENGTH - 1]);
+        &self.position_shards[hasher.finish() as usize % NUM_POSITION_SHARDS]
     }
 }
