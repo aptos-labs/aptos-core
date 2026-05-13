@@ -1,0 +1,17 @@
+
+Diagnostics:
+error: match not exhaustive
+  ┌─ tests/match-checks/range_in_enum_non_exhaustive.move:9:16
+  │
+9 │         match (c) {
+  │                ^
+  │
+  = missing at least `Color::RGB(128.., _, _)`
+
+error: match not exhaustive
+   ┌─ tests/match-checks/range_in_enum_non_exhaustive.move:22:16
+   │
+22 │         match (e) {
+   │                ^
+   │
+   = missing at least `E::V1(100..)`

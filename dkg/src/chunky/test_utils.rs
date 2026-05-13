@@ -1,17 +1,23 @@
 // Copyright (c) Aptos Foundation
 // Licensed pursuant to the Innovation-Enabling Source Code License, available at https://github.com/aptos-labs/aptos-core/blob/main/LICENSE
 
-use crate::types::DKGMessage;
+use crate::{chunky::types::AggregatedSubtranscriptWithHashes, types::DKGMessage};
+use aptos_bitvec::BitVec;
 use aptos_crypto::{
     bls12381::{PrivateKey, PublicKey},
-    Uniform,
+    HashValue, Uniform,
 };
-use aptos_dkg::pvss::{traits::transcript::HasAggregatableSubtranscript, Player};
+use aptos_dkg::pvss::{
+    traits::{transcript::HasAggregatableSubtranscript, Transcript},
+    Player,
+};
 use aptos_reliable_broadcast::RBNetworkSender;
 use aptos_types::{
+    chain_id::ChainId,
     dkg::chunky_dkg::{
-        AggregatedSubtranscript, ChunkyDKG, ChunkyDKGConfig, ChunkyDKGSessionMetadata,
-        ChunkyDKGTranscript, ChunkyInputSecret, ChunkyTranscript, DealerPublicKey,
+        initialize_digest_key, initialize_public_parameters, AggregatedSubtranscript,
+        ChunkyDKGSession, ChunkyDKGSessionMetadata, ChunkyDKGTranscript, ChunkyInputSecret,
+        ChunkyTranscript, DealerPublicKey,
     },
     epoch_state::EpochState,
     on_chain_config::OnChainChunkyDKGConfig,
@@ -23,20 +29,21 @@ use move_core_types::account_address::AccountAddress;
 use rand::{prelude::StdRng, thread_rng, SeedableRng};
 use std::{collections::HashMap, sync::Arc, time::Duration};
 
-#[allow(dead_code)]
 pub struct ChunkyTestSetup {
     pub private_keys: Vec<Arc<PrivateKey>>,
     pub public_keys: Vec<PublicKey>,
     pub addrs: Vec<AccountAddress>,
-    pub voting_powers: Vec<u64>,
     pub epoch_state: Arc<EpochState>,
     pub session_metadata: ChunkyDKGSessionMetadata,
-    pub dkg_config: ChunkyDKGConfig,
+    pub dkg_config: Arc<ChunkyDKGSession>,
 }
 
 impl ChunkyTestSetup {
     pub fn new(n: usize, voting_powers: Vec<u64>) -> Self {
         assert_eq!(n, voting_powers.len());
+        // Ensure the test DigestKey and PublicParameters are available.
+        let _ = initialize_digest_key(ChainId::test(), true);
+        let _ = initialize_public_parameters(ChainId::test());
 
         let mut rng = thread_rng();
         let private_keys: Vec<Arc<PrivateKey>> = (0..n)
@@ -70,13 +77,12 @@ impl ChunkyTestSetup {
             dealer_validator_set: validator_consensus_info_move_structs.clone(),
             target_validator_set: validator_consensus_info_move_structs,
         };
-        let dkg_config = ChunkyDKG::generate_config(&session_metadata);
+        let dkg_config = ChunkyDKGSession::new(&session_metadata);
 
         Self {
             private_keys,
             public_keys,
             addrs,
-            voting_powers,
             epoch_state,
             session_metadata,
             dkg_config,
@@ -98,10 +104,12 @@ impl ChunkyTestSetup {
             id: validator_index,
         };
 
-        let trx = ChunkyDKG::deal(
-            &self.dkg_config,
+        let trx = ChunkyTranscript::deal(
+            &self.dkg_config.threshold_config,
+            &self.dkg_config.public_parameters,
             &self.private_keys[validator_index],
             &self.public_keys[validator_index],
+            &self.dkg_config.eks,
             &input_secret,
             &self.session_metadata,
             &dealer,
@@ -132,29 +140,73 @@ impl ChunkyTestSetup {
         let agg =
             Aggregatable::aggregate(&self.dkg_config.threshold_config, subtranscripts).unwrap();
 
-        let mut sorted_indices: Vec<usize> = indices.to_vec();
-        sorted_indices.sort();
-        // Map indices through address sort order to match production code behavior.
-        // Production code sorts contributors by AccountAddress, then maps to Player indices.
-        // We must do the same.
-        let mut contributor_addrs: Vec<AccountAddress> =
-            indices.iter().map(|&i| self.addrs[i]).collect();
-        contributor_addrs.sort();
-        let addr_to_index = self
-            .epoch_state
-            .verifier
-            .address_to_validator_index()
-            .clone();
-        let dealers: Vec<Player> = contributor_addrs
-            .into_iter()
-            .map(|addr| Player {
-                id: *addr_to_index.get(&addr).unwrap(),
+        let addr_to_index = self.epoch_state.verifier.address_to_validator_index();
+        let num_validators = self.epoch_state.verifier.len();
+        let mut dealer_bitmask = BitVec::with_num_bits(num_validators as u16);
+        for &i in indices {
+            let idx = *addr_to_index.get(&self.addrs[i]).unwrap();
+            dealer_bitmask.set(idx as u16);
+        }
+
+        AggregatedSubtranscript {
+            dealer_epoch: 999,
+            subtranscript: agg,
+            dealer_bitmask,
+        }
+    }
+
+    /// Like `aggregate_subtranscripts` but also returns per-dealer hashes in the wrapper type.
+    pub fn aggregate_subtranscripts_with_hashes(
+        &self,
+        indices: &[usize],
+    ) -> AggregatedSubtranscriptWithHashes {
+        let transcripts: Vec<_> = indices
+            .iter()
+            .map(|&i| {
+                let (_, trx) = self.deal_transcript(i);
+                trx
             })
             .collect();
 
-        AggregatedSubtranscript {
-            subtranscript: agg,
-            dealers,
+        let subtranscripts: Vec<_> = transcripts.iter().map(|t| t.get_subtranscript()).collect();
+
+        use aptos_dkg::pvss::traits::transcript::Aggregatable;
+        let agg =
+            Aggregatable::aggregate(&self.dkg_config.threshold_config, subtranscripts).unwrap();
+
+        let addr_to_index = self.epoch_state.verifier.address_to_validator_index();
+        let ordered_addrs = self.epoch_state.verifier.get_ordered_account_addresses();
+        let num_validators = self.epoch_state.verifier.len();
+        let mut dealer_bitmask = BitVec::with_num_bits(num_validators as u16);
+        for &i in indices {
+            let idx = *addr_to_index.get(&self.addrs[i]).unwrap();
+            dealer_bitmask.set(idx as u16);
+        }
+
+        // Build a map from addr to transcript for hash lookup
+        let addr_to_transcript: HashMap<AccountAddress, &ChunkyTranscript> = indices
+            .iter()
+            .map(|&i| (self.addrs[i], &transcripts[i]))
+            .collect();
+
+        // Per-dealer hashes ordered by set-bit position (ascending validator index).
+        let dealer_transcript_hashes: Vec<HashValue> = dealer_bitmask
+            .iter_ones()
+            .map(|idx| {
+                let addr = &ordered_addrs[idx];
+                let transcript = addr_to_transcript.get(addr).unwrap();
+                let bytes = bcs::to_bytes(*transcript).unwrap();
+                HashValue::sha3_256_of(&bytes)
+            })
+            .collect();
+
+        AggregatedSubtranscriptWithHashes {
+            aggregated_subtranscript: AggregatedSubtranscript {
+                dealer_epoch: 999,
+                subtranscript: agg,
+                dealer_bitmask,
+            },
+            dealer_transcript_hashes,
         }
     }
 

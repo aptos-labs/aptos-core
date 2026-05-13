@@ -1,0 +1,77 @@
+// -- Model dump before first bytecode pipeline
+module 0xc0ffee::m {
+    enum E {
+        V1 {
+            0: u64,
+        }
+        V2,
+    }
+    private fun ref_enum_mixed_tuple(e: &E,n: u64): u64 {
+        {
+          let _$np_0: &E = e;
+          {
+            let _$prim_0: u64 = n;
+            match (_$np_0) {
+              m::E::V1{ 0: _$nlit_0 } if And(Eq(_$prim_0, 2), Eq(Deref(_$nlit_0), 1)) => {
+                10
+              }
+              m::E::V1{ 0: x } => {
+                Deref(x)
+              }
+              m::E::V2 => {
+                99
+              }
+            }
+
+          }
+        }
+    }
+    private fun ref_prim_mixed_tuple(x: &u64,e: E): u64 {
+        {
+          let _$prim_0: &u64 = x;
+          {
+            let _$np_0: E = e;
+            match (_$np_0) {
+              m::E::V1{ 0: _$nlit_0 } if And(Eq(Deref(_$prim_0), 1), Eq(_$nlit_0, 2)) => {
+                10
+              }
+              m::E::V1{ 0: y } => {
+                y
+              }
+              m::E::V2 => {
+                99
+              }
+            }
+
+          }
+        }
+    }
+} // end 0xc0ffee::m
+
+// -- Sourcified model before first bytecode pipeline
+module 0xc0ffee::m {
+    enum E has copy, drop {
+        V1 {
+            0: u64,
+        }
+        V2,
+    }
+    fun ref_enum_mixed_tuple(e: &E, n: u64): u64 {
+        let __np_0 = e;
+        let __prim_0 = n;
+        match (__np_0) {
+            E::V1(__nlit_0) if __prim_0 == 2 && *__nlit_0 == 1 => 10,
+            E::V1(x) => *x,
+            E::V2{} => 99,
+        }
+    }
+    fun ref_prim_mixed_tuple(x: &u64, e: E): u64 {
+        let __prim_0 = x;
+        let __np_0 = e;
+        match (__np_0) {
+            E::V1(__nlit_0) if *__prim_0 == 1 && __nlit_0 == 2 => 10,
+            E::V1(y) => y,
+            E::V2{} => 99,
+        }
+    }
+}

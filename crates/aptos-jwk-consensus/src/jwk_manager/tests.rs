@@ -145,9 +145,9 @@ async fn test_jwk_manager_state_transition() {
     assert!(last_invocations.len() == 1 && last_invocations[0].is_err());
     assert_eq!(expected_states, jwk_manager.states_by_issuer);
 
-    // When JWK consensus is `NotStarted` for issuer Carl, JWKConsensusManager should:
-    // reply an error to any observation request and keep the state unchanged;
-    // also create an entry in the state table on the fly.
+    // When an observation request arrives for an issuer with no local state
+    // (Carl), JWKConsensusManager should reply an error and leave
+    // `states_by_issuer` unchanged.
     let carl_ob_req = new_rpc_observation_request(
         999,
         issuer_carl.clone(),
@@ -157,7 +157,6 @@ async fn test_jwk_manager_state_transition() {
     assert!(jwk_manager.process_peer_request(carl_ob_req).is_ok());
     let last_invocations = std::mem::take(&mut *rpc_response_collector.write());
     assert!(last_invocations.len() == 1 && last_invocations[0].is_err());
-    expected_states.insert(issuer_carl.clone(), PerProviderState::default());
     assert_eq!(expected_states, jwk_manager.states_by_issuer);
 
     // When JWK consensus is `NotStarted` for issuer Bob, JWKConsensusManager should:
@@ -207,6 +206,7 @@ async fn test_jwk_manager_state_transition() {
     assert!(jwk_manager
         .process_new_observation(issuer_carl.clone(), carl_jwks_new.clone())
         .is_ok());
+    expected_states.insert(issuer_carl.clone(), PerProviderState::default());
     {
         let expected_carl_state = expected_states.get_mut(&issuer_carl).unwrap();
         expected_carl_state.observed = Some(carl_jwks_new.clone());

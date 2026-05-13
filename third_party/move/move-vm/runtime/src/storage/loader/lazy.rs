@@ -1,5 +1,7 @@
-// Copyright (c) The Move Contributors
-// SPDX-License-Identifier: Apache-2.0
+// Parts of the file are Copyright (c) The Diem Core Contributors
+// Parts of the file are Copyright (c) The Move Contributors
+// Parts of the file are Copyright (c) Aptos Foundation
+// All Aptos Foundation code and content is licensed pursuant to the Innovation-Enabling Source Code License, available at https://github.com/aptos-labs/aptos-core/blob/main/LICENSE
 
 use crate::{
     module_traversal::TraversalContext,
@@ -185,13 +187,13 @@ where
         true
     }
 
-    fn unmetered_get_module_hash(
+    fn unmetered_get_module_hash_and_size(
         &self,
         address: &AccountAddress,
         module_name: &IdentStr,
-    ) -> VMResult<[u8; 32]> {
+    ) -> VMResult<([u8; 32], usize)> {
         self.module_storage
-            .unmetered_get_existing_module_hash(address, module_name)
+            .unmetered_get_existing_module_hash_and_size(address, module_name)
     }
 
     fn load_struct_definition(
@@ -218,10 +220,12 @@ where
     ) -> Option<PartialVMResult<LayoutWithDelayedFields>> {
         let entry = self.module_storage.get_struct_layout(key)?;
         let (layout, modules) = entry.unpack();
+
+        let mut module_sizes = Vec::with_capacity(modules.iter().count());
         for (module_id, stored_hash) in modules.iter() {
             // If failed to get the module, treat as a cache miss.
-            let current_module_hash = self
-                .unmetered_get_module_hash(module_id.address(), module_id.name())
+            let (current_module_hash, current_size) = self
+                .unmetered_get_module_hash_and_size(module_id.address(), module_id.name())
                 .ok()?;
 
             // Validate that the module has not been republished since this layout was cached.
@@ -239,18 +243,25 @@ where
                 self.module_storage.remove_struct_layout(key);
                 return None;
             }
+            module_sizes.push((module_id, current_size));
         }
 
         // Gas-charge all defining modules. This is done in a separate loop after hash
         // validation above, so that we never charge gas for a stale cache hit that
         // will be discarded.
-        for (module_id, _) in modules.iter() {
-            // Re-read all modules for this layout, so that transaction gets invalidated
-            // on module publish. Also, we re-read them in exactly the same way as they
-            // were traversed during layout construction, so gas charging should be exactly
+        for (module_id, size) in module_sizes {
+            // Go over all modules for this layout, charging gas in exactly the same order as
+            // they were traversed during layout construction, so gas charging should be exactly
             // the same as on the cache miss.
-            if let Err(err) = self.charge_module(gas_meter, traversal_context, module_id) {
-                return Some(Err(err));
+            if traversal_context.visit_if_not_special_module_id(module_id) {
+                if let Err(err) = gas_meter.charge_dependency(
+                    DependencyKind::Existing,
+                    module_id.address(),
+                    module_id.name(),
+                    NumBytes::new(size as u64),
+                ) {
+                    return Some(Err(err));
+                }
             }
         }
         Some(Ok(layout))

@@ -10,11 +10,15 @@ use aptos_framework::natives::code::PackageMetadata;
 use aptos_types::{
     account_address::AccountAddress,
     state_store::{
-        state_key::StateKey, state_slot::StateSlot, state_storage_usage::StateStorageUsage,
-        state_value::StateValue, StateViewId, StateViewResult, TStateView,
+        state_key::StateKey,
+        state_slot::{StateSlot, StateSlotKind},
+        state_storage_usage::StateStorageUsage,
+        state_value::StateValue,
+        StateViewId, StateViewResult, TStateView,
     },
     transaction::{PersistedAuxiliaryInfo, Transaction, TransactionInfo, Version},
 };
+use bytes::Bytes;
 use lru::LruCache;
 use move_core_types::language_storage::ModuleId;
 use std::{
@@ -23,6 +27,34 @@ use std::{
     sync::{Arc, Mutex},
 };
 use tokio::sync::mpsc::{unbounded_channel, UnboundedReceiver, UnboundedSender};
+
+/// Pre-compiled local module bytecodes that override on-chain versions during
+/// replay.  Build one by compiling a local Move package and passing each
+/// module's serialized bytes.
+#[derive(Default)]
+pub struct LocalModuleOverrides {
+    /// StateKey → raw serialized module bytes.
+    ///
+    /// Keyed by `StateKey` (not `ModuleId`) so the override lookup in
+    /// [`DebuggerStateView::get_state_slot`] is a single map look-up.
+    pub overrides: HashMap<StateKey, Vec<u8>>,
+}
+
+impl LocalModuleOverrides {
+    pub fn new() -> Self {
+        Self::default()
+    }
+
+    /// Register `bytes` as the override for `module_id`.
+    pub fn add_module(&mut self, module_id: &ModuleId, bytes: Vec<u8>) {
+        let key = StateKey::module(module_id.address(), module_id.name());
+        self.overrides.insert(key, bytes);
+    }
+
+    pub fn is_empty(&self) -> bool {
+        self.overrides.is_empty()
+    }
+}
 
 #[derive(Clone, Copy)]
 pub struct FilterCondition {
@@ -101,6 +133,8 @@ pub struct DebuggerStateView {
         )>,
     >,
     version: Version,
+    /// Optional local-package overrides that shadow on-chain module bytes.
+    local_overrides: Option<Arc<LocalModuleOverrides>>,
 }
 
 async fn handler_thread(
@@ -150,6 +184,22 @@ impl DebuggerStateView {
         Self {
             query_sender: Mutex::new(query_sender),
             version,
+            local_overrides: None,
+        }
+    }
+
+    /// Like [`new`] but with local module overrides applied to all state reads.
+    pub fn new_with_overrides(
+        db: Arc<dyn AptosValidatorInterface + Send>,
+        version: Version,
+        local_overrides: Arc<LocalModuleOverrides>,
+    ) -> Self {
+        let (query_sender, thread_receiver) = unbounded_channel();
+        tokio::spawn(async move { handler_thread(db, thread_receiver).await });
+        Self {
+            query_sender: Mutex::new(query_sender),
+            version,
+            local_overrides: Some(local_overrides),
         }
     }
 
@@ -162,11 +212,11 @@ impl DebuggerStateView {
             .unwrap();
         let result = rx.recv()?;
         result.map(|s| match s {
-            None => StateSlot::ColdVacant,
-            Some(value) => StateSlot::ColdOccupied {
+            None => StateSlot::new(state_key.clone(), StateSlotKind::ColdVacant),
+            Some(value) => StateSlot::new(state_key.clone(), StateSlotKind::ColdOccupied {
                 value_version: version,
                 value,
-            },
+            }),
         })
     }
 }
@@ -179,6 +229,19 @@ impl TStateView for DebuggerStateView {
     }
 
     fn get_state_slot(&self, state_key: &StateKey) -> StateViewResult<StateSlot> {
+        // Check local overrides before hitting the network/DB.
+        if let Some(ref overrides) = self.local_overrides {
+            if let Some(bytes) = overrides.overrides.get(state_key) {
+                let value = StateValue::new_legacy(Bytes::copy_from_slice(bytes));
+                return Ok(StateSlot::new(
+                    state_key.clone(),
+                    StateSlotKind::ColdOccupied {
+                        value_version: self.version,
+                        value,
+                    },
+                ));
+            }
+        }
         self.get_state_slot_internal(state_key, self.version)
             .map_err(Into::into)
     }

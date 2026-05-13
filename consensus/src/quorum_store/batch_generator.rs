@@ -72,6 +72,16 @@ pub struct BatchGenerator {
     last_end_batch_time: Instant,
     // quorum store back pressure, get updated from proof manager
     back_pressure: BackPressure,
+    /// Monotonic counter for pull rounds, used by transaction tracing.
+    pull_round: u64,
+    /// Monotonic counter for total batches created, used by transaction tracing.
+    total_batches_created: u64,
+    /// Recent batch creation events, capped at 500 entries (~37s at 75ms/round).
+    /// Each entry = one pull round that produced batches, with gas bucket breakdown.
+    recent_batch_records:
+        std::collections::VecDeque<aptos_transaction_tracing::types::BatchCreationRecord>,
+    /// Cached Arc of batch bucket boundaries for tracing records (avoids cloning per record).
+    tracing_bucket_boundaries: std::sync::Arc<Vec<u64>>,
 }
 
 impl BatchGenerator {
@@ -161,6 +171,7 @@ impl BatchGenerator {
         db.save_batch_id(epoch, incremented_batch_id)
             .expect("Could not save to db");
 
+        let tracing_bucket_boundaries = std::sync::Arc::new(config.batch_buckets.clone());
         Self {
             epoch,
             my_peer_id,
@@ -178,6 +189,10 @@ impl BatchGenerator {
                 txn_count: false,
                 proof_count: false,
             },
+            pull_round: 0,
+            total_batches_created: 0,
+            recent_batch_records: std::collections::VecDeque::new(),
+            tracing_bucket_boundaries,
         }
     }
 
@@ -267,7 +282,18 @@ impl BatchGenerator {
             .with_label_values(&[batch_version, kind_str])
             .inc_by(txns.len() as u64);
 
-        if self.config.enable_batch_v2_tx {
+        // Always collect hashes for register_batch when tracing is enabled.
+        // register_batch is cheap (filters against traces DashMap), and ensures
+        // all traced txns get complete pipeline coverage (BlockProposed → Committed).
+        // Only the expensive QsBatchPull metadata loop is gated by should_sample_batch.
+        let store = aptos_transaction_tracing::store::TransactionTraceStore::global();
+        let txn_hashes: Option<Vec<_>> = if store.is_enabled() {
+            Some(txns.iter().map(|t| t.committed_hash()).collect())
+        } else {
+            None
+        };
+
+        let batch = if self.config.enable_batch_v2_tx {
             Batch::new_v2(
                 batch_id,
                 txns,
@@ -286,7 +312,17 @@ impl BatchGenerator {
                 self.my_peer_id,
                 bucket_start,
             )
+        };
+
+        if let Some(hashes) = &txn_hashes {
+            store.register_batch(*batch.digest(), hashes);
+            store.record_batch_stage(
+                batch.digest(),
+                aptos_transaction_tracing::types::TransactionStage::QsBatchCreated,
+            );
         }
+
+        batch
     }
 
     /// Push num_txns from txns into batches. If num_txns is larger than max size, then multiple
@@ -456,11 +492,10 @@ impl BatchGenerator {
         &mut self,
         max_count: u64,
     ) -> Vec<Batch<BatchInfoExt>> {
-        counters::BATCH_PULL_EXCLUDED_TXNS.observe(self.txns_in_progress_sorted.len() as f64);
-        trace!(
-            "QS: excluding txs len: {:?}",
-            self.txns_in_progress_sorted.len()
-        );
+        self.pull_round += 1;
+        let excluded_count = self.txns_in_progress_sorted.len();
+        counters::BATCH_PULL_EXCLUDED_TXNS.observe(excluded_count as f64);
+        trace!("QS: excluding txs len: {:?}", excluded_count);
 
         let mut pulled_txns = self
             .mempool_proxy
@@ -473,6 +508,46 @@ impl BatchGenerator {
             .unwrap_or_default();
 
         trace!("QS: pulled_txns len: {:?}", pulled_txns.len());
+
+        // Record QsBatchPull with context for traced transactions.
+        // Two-level gating: should_sample_batch() skips ~90% of pull rounds (~5ns),
+        // then per-txn is_traced() skips non-traced txns within sampled rounds.
+        {
+            let store = aptos_transaction_tracing::store::TransactionTraceStore::global();
+            if store.should_sample_batch(self.pull_round) {
+                use std::sync::Arc;
+                let mut pull_info: Option<Arc<aptos_transaction_tracing::types::BatchPullInfo>> =
+                    None;
+                for txn in &pulled_txns {
+                    let hash = txn.committed_hash();
+                    if !store.is_traced(&hash) {
+                        continue;
+                    }
+                    let info = pull_info.get_or_insert_with(|| {
+                        Arc::new(aptos_transaction_tracing::types::BatchPullInfo {
+                            pull_round: self.pull_round,
+                            total_batches_created: self.total_batches_created,
+                            pulled_txn_count: pulled_txns.len() as u64,
+                            pull_max_txn: max_count,
+                            excluded_txn_count: excluded_count as u64,
+                            bp_txn: self.back_pressure.txn_count,
+                            bp_proof: self.back_pressure.proof_count,
+                            recent_batches: Arc::new(
+                                self.recent_batch_records.iter().cloned().collect(),
+                            ),
+                        })
+                    });
+                    store.set_gas_unit_price(&hash, txn.gas_unit_price());
+                    store.record_stage_with_metadata(
+                        &hash,
+                        aptos_transaction_tracing::types::TransactionStage::QsBatchPull,
+                        aptos_transaction_tracing::types::StageMetadata::BatchPull(Arc::clone(
+                            info,
+                        )),
+                    );
+                }
+            }
+        }
 
         if pulled_txns.is_empty() {
             counters::PULLED_EMPTY_TXNS_COUNT.inc();
@@ -493,9 +568,40 @@ impl BatchGenerator {
         counters::BATCH_CREATION_DURATION.observe_duration(self.last_end_batch_time.elapsed());
 
         let bucket_compute_start = Instant::now();
+        let pulled_count = pulled_txns.len() as u64;
         let expiry_time = aptos_infallible::duration_since_epoch().as_micros() as u64
             + self.config.batch_expiry_gap_when_init_usecs;
         let batches = self.bucket_into_batches(&mut pulled_txns, expiry_time);
+        self.total_batches_created += batches.len() as u64;
+
+        // Always record BatchCreationRecord when tracing is enabled (cheap: ~50ns).
+        // Gas bucket info comes from the batches themselves -- O(num_batches), no per-txn iteration.
+        // This keeps wait() summary accurate even when batch sampling skips the per-txn loop.
+        if aptos_transaction_tracing::store::TransactionTraceStore::global().is_enabled()
+            && !batches.is_empty()
+        {
+            use aptos_consensus_types::proof_of_store::TBatchInfo;
+            let gas_bucket_txn_counts: Vec<(u64, u64)> = batches
+                .iter()
+                .map(|b| (b.batch_info().gas_bucket_start(), b.batch_info().num_txns()))
+                .collect();
+            let now = aptos_infallible::duration_since_epoch().as_micros() as u64;
+            self.recent_batch_records.push_back(
+                aptos_transaction_tracing::types::BatchCreationRecord {
+                    timestamp_usecs: now,
+                    num_batches: batches.len() as u64,
+                    pulled_txn_count: pulled_count,
+                    pull_max_txn: max_count,
+                    bp_txn: self.back_pressure.txn_count,
+                    bp_proof: self.back_pressure.proof_count,
+                    gas_bucket_txn_counts,
+                    bucket_boundaries: self.tracing_bucket_boundaries.clone(),
+                },
+            );
+            while self.recent_batch_records.len() > 500 {
+                self.recent_batch_records.pop_front();
+            }
+        }
         self.last_end_batch_time = Instant::now();
         counters::BATCH_CREATION_COMPUTE_LATENCY.observe_duration(bucket_compute_start.elapsed());
 

@@ -412,10 +412,12 @@ impl NodeSetup {
             10, // max pruned blocks in mem
             time_service.clone(),
             10,
+            60,
             payload_manager,
             false,
             window_size,
             Arc::new(Mutex::new(PendingBlocks::new())),
+            None,
             None,
         ));
         let block_store_clone = Arc::clone(&block_store);

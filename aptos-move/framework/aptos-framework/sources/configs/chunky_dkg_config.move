@@ -1,5 +1,7 @@
 /// Structs and functions for on-chain chunky DKG configurations.
 module aptos_framework::chunky_dkg_config {
+    use std::option;
+    use std::option::Option;
     use aptos_std::copyable_any;
     use aptos_std::copyable_any::Any;
     use aptos_std::fixed_point64::FixedPoint64;
@@ -14,6 +16,7 @@ module aptos_framework::chunky_dkg_config {
         /// Currently the variant type is one of the following.
         /// - `ConfigOff`
         /// - `ConfigV1`
+        /// - `ConfigShadowV1`
         variant: Any
     }
 
@@ -26,6 +29,14 @@ module aptos_framework::chunky_dkg_config {
         secrecy_threshold: FixedPoint64,
         /// Any validator subset should be able to reconstruct randomness if `subset_power / total_power > reconstruction_threshold`.
         reconstruction_threshold: FixedPoint64
+    }
+
+    /// A chunky DKG config variant for shadow mode: chunky DKG runs alongside regular DKG,
+    /// but epoch change is forced after `grace_period_secs` if chunky DKG hasn't completed.
+    struct ConfigShadowV1 has copy, drop, store {
+        secrecy_threshold: FixedPoint64,
+        reconstruction_threshold: FixedPoint64,
+        grace_period_secs: u64
     }
 
     /// Initialize the configuration. Used in genesis or governance.
@@ -87,6 +98,32 @@ module aptos_framework::chunky_dkg_config {
         }
     }
 
+    /// Create a `ConfigShadowV1` variant for shadow mode.
+    public fun new_shadow_v1(
+        secrecy_threshold: FixedPoint64,
+        reconstruction_threshold: FixedPoint64,
+        grace_period_secs: u64
+    ): ChunkyDKGConfig {
+        ChunkyDKGConfig {
+            variant: copyable_any::pack(
+                ConfigShadowV1 { secrecy_threshold, reconstruction_threshold, grace_period_secs }
+            )
+        }
+    }
+
+    /// Return the grace period in seconds if configured (i.e. shadow mode), or none otherwise.
+    public fun grace_period_secs(): Option<u64> acquires ChunkyDKGConfig {
+        if (exists<ChunkyDKGConfig>(@aptos_framework)) {
+            let config = borrow_global<ChunkyDKGConfig>(@aptos_framework);
+            let variant_type_name = *config.variant.type_name().bytes();
+            if (variant_type_name == b"0x1::chunky_dkg_config::ConfigShadowV1") {
+                let shadow_v1 = copyable_any::unpack<ConfigShadowV1>(config.variant);
+                return std::option::some(shadow_v1.grace_period_secs)
+            }
+        };
+        option::none()
+    }
+
     /// Get the currently effective chunky DKG configuration object.
     public fun current(): ChunkyDKGConfig acquires ChunkyDKGConfig {
         if (exists<ChunkyDKGConfig>(@aptos_framework)) {
@@ -123,5 +160,41 @@ module aptos_framework::chunky_dkg_config {
         set_for_next_epoch(&framework, new_off());
         on_new_epoch(&framework);
         assert!(!enabled(), 2);
+    }
+
+    #[test(framework = @0x1)]
+    fun shadow_v1_config(framework: signer) acquires ChunkyDKGConfig {
+        initialize_for_testing(&framework);
+
+        // Shadow mode is enabled but has a grace period.
+        let config =
+            new_shadow_v1(
+                fixed_point64::create_from_rational(1, 2),
+                fixed_point64::create_from_rational(2, 3),
+                30
+            );
+        set_for_next_epoch(&framework, config);
+        on_new_epoch(&framework);
+        assert!(enabled(), 1);
+        let gp = grace_period_secs();
+        assert!(gp.is_some(), 2);
+        assert!(*gp.borrow() == 30, 3);
+
+        // ConfigV1 has no grace period.
+        let config =
+            new_v1(
+                fixed_point64::create_from_rational(1, 2),
+                fixed_point64::create_from_rational(2, 3)
+            );
+        set_for_next_epoch(&framework, config);
+        on_new_epoch(&framework);
+        assert!(enabled(), 4);
+        assert!(grace_period_secs().is_none(), 5);
+
+        // ConfigOff has no grace period and is not enabled.
+        set_for_next_epoch(&framework, new_off());
+        on_new_epoch(&framework);
+        assert!(!enabled(), 6);
+        assert!(grace_period_secs().is_none(), 7);
     }
 }

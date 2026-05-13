@@ -27,6 +27,9 @@ proptest-derive = { workspace = true, optional = true }
 default = []
 fuzzing = ["proptest", "proptest-derive"]
 testing = ["aptos-framework", "aptos-package-builder"]
+# Enable test mode genesis bundle which includes #[test_only] Move code.
+# This is used by MoveHarness in e2e tests that need to call #[test_only] functions.
+move-harness-with-test-only = []
 
 [package.metadata.cargo-machete]
 ignored = ["proptest"]

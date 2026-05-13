@@ -6,7 +6,7 @@ error: match not exhaustive
 6 │         match (s) {
   │                ^
   │
-  = missing `S{..}`
+  = missing at least `S{x: ..42, y: _}`
 
 error: unreachable pattern
    ┌─ tests/match-checks/struct_literal_coverage.move:15:13

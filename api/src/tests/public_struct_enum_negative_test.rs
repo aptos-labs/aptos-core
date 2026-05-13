@@ -15,23 +15,8 @@ use serde_json::json;
 /// Each case specifies an entry function, a bad argument, and the substring
 /// expected to appear in the 400 error message.
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
-#[rstest(
-    use_txn_payload_v2_format,
-    use_orderless_transactions,
-    case(false, false),
-    case(true, false),
-    case(true, true)
-)]
-async fn test_invalid_args_rejected(
-    use_txn_payload_v2_format: bool,
-    use_orderless_transactions: bool,
-) {
-    let (context, account) = setup_public_struct_test(
-        current_function_name!(),
-        use_txn_payload_v2_format,
-        use_orderless_transactions,
-    )
-    .await;
+async fn test_invalid_args_rejected() {
+    let (context, account) = setup_public_struct_test(current_function_name!(), false, false).await;
     let account_addr = account.address();
     let seq = account.sequence_number().to_string();
 

@@ -1,7 +1,7 @@
 [package]
 name = "aptos"
 description = "Aptos tool for management of nodes and interacting with the blockchain"
-version = "9.0.0"
+version = "9.2.0"
 
 # Workspace inherited keys
 authors = { workspace = true }
@@ -16,6 +16,7 @@ rust-version = { workspace = true }
 anyhow = { workspace = true }
 aptos-api-types = { workspace = true }
 aptos-backup-cli = { workspace = true }
+aptos-batch-encryption = { workspace = true }
 aptos-bitvec = { workspace = true }
 aptos-build-info = { workspace = true }
 aptos-cached-packages = { workspace = true }
@@ -80,6 +81,7 @@ serde = { workspace = true }
 serde_json = { workspace = true }
 serde_yaml = { workspace = true }
 set_env = { workspace = true }
+sha2 = { workspace = true }
 tempfile = { workspace = true }
 thiserror = { workspace = true }
 tokio = { workspace = true }

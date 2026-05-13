@@ -1,0 +1,14 @@
+Move prover returns: exiting with verification errors
+error: post-condition does not hold
+   ┌─ tests/sources/functional/state_labels/nonlinear_cfg_error.move:25:9
+   │
+25 │         ensures ..S |~ Counter[addr].value == old(Counter[addr].value) + 1; // error: non-linear CFG
+   │         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+   │
+   =     at tests/sources/functional/state_labels/nonlinear_cfg_error.move:17: branching_with_labels
+   =         addr = <redacted>
+   =         cond = <redacted>
+   =     at tests/sources/functional/state_labels/nonlinear_cfg_error.move:18: branching_with_labels
+   =     at tests/sources/functional/state_labels/nonlinear_cfg_error.move:19: branching_with_labels
+   =     at tests/sources/functional/state_labels/nonlinear_cfg_error.move:22: branching_with_labels
+   =     at tests/sources/functional/state_labels/nonlinear_cfg_error.move:25: branching_with_labels (spec)

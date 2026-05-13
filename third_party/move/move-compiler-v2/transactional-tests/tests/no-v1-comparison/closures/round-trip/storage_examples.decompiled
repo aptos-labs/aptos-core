@@ -7,7 +7,7 @@ module 0xc0ffee::m {
         _0: |&signer|(u64) has copy + drop + store,
     }
     public fun init(p0: &signer) {
-        let _v0 = Wrapper{_0: |arg0| foo(arg0)};
+        let _v0 = Wrapper{_0: |x| foo(x)};
         move_to<Wrapper>(p0, _v0);
     }
     #[persistent]

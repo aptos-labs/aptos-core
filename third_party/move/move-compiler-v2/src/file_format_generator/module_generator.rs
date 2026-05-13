@@ -1,5 +1,5 @@
-// Copyright © Aptos Foundation
-// SPDX-License-Identifier: Apache-2.0
+// Copyright (c) Aptos Foundation
+// Licensed pursuant to the Innovation-Enabling Source Code License, available at https://github.com/aptos-labs/aptos-core/blob/main/LICENSE
 
 use crate::{
     file_format_generator::{
@@ -22,7 +22,7 @@ use move_core_types::{
     account_address::AccountAddress,
     identifier::Identifier,
     language_storage::{
-        BORROW, BORROW_MUT, PACK, PACK_VARIANT, PUBLIC_STRUCT_DELIMITER, TEST_VARIANT, UNPACK,
+        BORROW, BORROW_MUT, DOLLAR_SIGN_DELIMITER, PACK, PACK_VARIANT, TEST_VARIANT, UNPACK,
         UNPACK_VARIANT,
     },
     metadata::Metadata,
@@ -263,8 +263,8 @@ impl ModuleGenerator {
 
         let acquires_map = ctx.generate_acquires_map(module_env);
         for fun_env in module_env.get_functions() {
-            // Do not need to generate code for inline functions
-            if fun_env.is_inline() {
+            // Do not need to generate code for inline or lemma functions
+            if fun_env.is_inline() || fun_env.is_lemma() {
                 continue;
             }
             assert!(compile_test_code || !fun_env.is_test_only());
@@ -446,7 +446,7 @@ impl ModuleGenerator {
                     *abilities,
                 )
             },
-            TypeDomain(_) | ResourceDomain(_, _, _) | Error | Var(_) => {
+            TypeDomain(_) | ResourceDomain(_, _, _) | StateDomain | Error | Var(_) => {
                 ctx.internal_error(
                     loc,
                     format!(
@@ -639,7 +639,7 @@ impl ModuleGenerator {
     ) -> BTreeMap<K, FF::FunctionHandleIndex> {
         let module = self.module_index(ctx, loc, &struct_env.module_env);
         let struct_name = struct_env.get_name_str();
-        let fun_name_prefix = format!("{}{}{}", op_prefix, PUBLIC_STRUCT_DELIMITER, struct_name);
+        let fun_name_prefix = format!("{}{}{}", op_prefix, DOLLAR_SIGN_DELIMITER, struct_name);
 
         let type_parameters = struct_env
             .get_type_parameters()
@@ -655,7 +655,7 @@ impl ModuleGenerator {
                     let name = format!(
                         "{}{}{}",
                         fun_name_prefix,
-                        PUBLIC_STRUCT_DELIMITER,
+                        DOLLAR_SIGN_DELIMITER,
                         variant.display(pool)
                     );
                     let field_types = struct_env
@@ -973,7 +973,7 @@ impl ModuleGenerator {
         let fun_name_prefix = format!(
             "{}{}{}",
             if is_imm { BORROW } else { BORROW_MUT },
-            PUBLIC_STRUCT_DELIMITER,
+            DOLLAR_SIGN_DELIMITER,
             struct_name
         );
         let struct_ty = Type::Struct(
@@ -1006,11 +1006,7 @@ impl ModuleGenerator {
                 let ty_order = ty_offset_to_order_map.get(&(*offset, ty.clone())).unwrap();
                 let name = format!(
                     "{}{}{}{}{}",
-                    fun_name_prefix,
-                    PUBLIC_STRUCT_DELIMITER,
-                    offset,
-                    PUBLIC_STRUCT_DELIMITER,
-                    ty_order
+                    fun_name_prefix, DOLLAR_SIGN_DELIMITER, offset, DOLLAR_SIGN_DELIMITER, ty_order
                 );
                 handle_elements.push((name, ty.clone(), variant_vec.clone(), offset));
             }
@@ -1042,7 +1038,7 @@ impl ModuleGenerator {
                 let offset = field.get_offset();
                 let ref_type = field.get_type().wrap_in_reference(!is_imm);
                 let return_: FF::SignatureIndex = self.signature(ctx, loc, vec![ref_type.clone()]);
-                let name = format!("{}{}{}", fun_name_prefix, PUBLIC_STRUCT_DELIMITER, offset);
+                let name = format!("{}{}{}", fun_name_prefix, DOLLAR_SIGN_DELIMITER, offset);
                 let idx = FF::FunctionHandleIndex(ctx.checked_bound(
                     loc,
                     self.module.function_handles.len(),
@@ -1630,7 +1626,7 @@ impl ModuleContext<'_> {
     ) -> BTreeMap<FunId, BTreeSet<FunId>> {
         let mut called_functions_map = BTreeMap::new();
         for fun in module.get_functions() {
-            if fun.is_inline() {
+            if fun.is_inline() || fun.is_lemma() {
                 continue;
             }
             let mut called_functions = BTreeSet::new();
@@ -1655,7 +1651,7 @@ impl ModuleContext<'_> {
         // Compute map with direct usage of resources
         let mut usage_map = module
             .get_functions()
-            .filter(|f| !f.is_inline())
+            .filter(|f| !f.is_inline() && !f.is_lemma())
             .map(|f| (f.get_id(), self.get_direct_function_acquires(&f)))
             .collect::<BTreeMap<_, _>>();
         let called_functions_map = self.get_same_module_called_functions(module);
@@ -1664,7 +1660,7 @@ impl ModuleContext<'_> {
         loop {
             let mut changes = false;
             for fun in module.get_functions() {
-                if fun.is_inline() {
+                if fun.is_inline() || fun.is_lemma() {
                     continue;
                 }
                 let mut usage = usage_map[&fun.get_id()].clone();

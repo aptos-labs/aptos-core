@@ -92,6 +92,7 @@ spec aptos_std::simple_map {
     spec to_vec_pair<Key: store, Value: store>(self: SimpleMap<Key, Value>): (vector<Key>, vector<Value>) {
         pragma intrinsic;
         pragma opaque;
+        aborts_if [abstract] false;
         ensures [abstract]
             forall k: Key: vector::spec_contains(result_1, k) <==>
                 spec_contains_key(self, k);

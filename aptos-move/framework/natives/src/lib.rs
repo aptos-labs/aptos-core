@@ -21,6 +21,7 @@ pub mod object_code_deployment;
 pub mod permissioned_signer;
 pub mod randomness;
 pub mod state_storage;
+pub mod storage_slot;
 pub mod string_utils;
 pub mod transaction_context;
 pub mod type_info;
@@ -79,6 +80,10 @@ pub fn all_natives(
         cryptography::bulletproofs::make_all(builder)
     );
     add_natives_from_module!(
+        "confidential_range_proofs",
+        cryptography::bulletproofs::make_batch_verify_native(builder)
+    );
+    add_natives_from_module!(
         "transaction_context",
         transaction_context::make_all(builder)
     );
@@ -93,6 +98,7 @@ pub fn all_natives(
     add_natives_from_module!("string_utils", string_utils::make_all(builder));
     add_natives_from_module!("consensus_config", consensus_config::make_all(builder));
     add_natives_from_module!("function_info", function_info::make_all(builder));
+    add_natives_from_module!("storage_slot", storage_slot::make_all(builder));
     add_natives_from_module!(
         "dispatchable_fungible_asset",
         dispatchable_fungible_asset::make_all(builder)

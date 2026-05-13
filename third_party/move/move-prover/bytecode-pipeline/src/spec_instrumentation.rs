@@ -1,18 +1,23 @@
-// Copyright (c) The Diem Core Contributors
-// Copyright (c) The Move Contributors
-// SPDX-License-Identifier: Apache-2.0
+// Parts of the file are Copyright (c) The Diem Core Contributors
+// Parts of the file are Copyright (c) The Move Contributors
+// Parts of the file are Copyright (c) Aptos Foundation
+// All Aptos Foundation code and content is licensed pursuant to the Innovation-Enabling Source Code License, available at https://github.com/aptos-labs/aptos-core/blob/main/LICENSE
 
 // Transformation which injects specifications (Move function spec blocks) into the bytecode.
 
 use crate::{options::ProverOptions, verification_analysis};
 use itertools::Itertools;
+use move_core_types::function::ClosureMask;
 use move_model::{
     ast,
-    ast::{Exp, ExpData, QuantKind, TempIndex, Value},
+    ast::{Exp, ExpData, MemoryLabel, QuantKind, RewriteResult, TempIndex, Value},
     exp_generator::ExpGenerator,
+    exp_rewriter::{ExpRewriter, ExpRewriterFunctions, RewriteTarget},
+    memory_labels::all_labels_in_exp,
     model::{FunId, FunctionEnv, GlobalEnv, Loc, ModuleId, QualifiedId, QualifiedInstId, StructId},
     pragmas::{ABORTS_IF_IS_PARTIAL_PRAGMA, EMITS_IS_PARTIAL_PRAGMA, EMITS_IS_STRICT_PRAGMA},
-    spec_translator::{SpecTranslator, TranslatedSpec},
+    spec_translator::{ProofAction, SpecTranslator, TranslatedSpec},
+    symbol::Symbol,
     ty::{ReferenceKind, Type, TypeDisplayContext, BOOL_TYPE, NUM_TYPE},
 };
 use move_stackless_bytecode::{
@@ -44,103 +49,8 @@ const EMITS_FAILS_MESSAGE: &str = "function does not emit the expected event";
 const EMITS_NOT_COVERED: &str = "emitted event not covered by any of the `emits` clauses";
 const CHOICE_WITNESS_FAILS_MESSAGE: &str = "choice expression requires a witness to exist";
 
-fn modify_check_fails_message(
-    env: &GlobalEnv,
-    mem: QualifiedId<StructId>,
-    targs: &[Type],
-) -> String {
-    let targs_str = if targs.is_empty() {
-        "".to_string()
-    } else {
-        let tctx = TypeDisplayContext::new(env);
-        format!(
-            "<{}>",
-            targs
-                .iter()
-                .map(|ty| ty.display(&tctx).to_string())
-                .join(", ")
-        )
-    };
-    let module_env = env.get_module(mem.module_id);
-    format!(
-        "caller does not have permission to modify `{}::{}{}` at given address",
-        module_env.get_name().display(env),
-        module_env
-            .get_struct(mem.id)
-            .get_name()
-            .display(env.symbol_pool()),
-        targs_str
-    )
-}
-
-/// Checks if an expression uses memory operations or behavioral predicates.
-/// This is used to determine if a choice expression needs a well-formedness assertion.
-fn uses_memory_or_behavior(exp: &Exp) -> bool {
-    use ast::Operation;
-    let mut uses_memory = false;
-    exp.visit_pre_order(&mut |e| {
-        if let ExpData::Call(_, op, _) = e {
-            match op {
-                Operation::Global(_)
-                | Operation::Exists(_)
-                | Operation::CanModify
-                | Operation::ResourceDomain
-                | Operation::Behavior(..) => {
-                    uses_memory = true;
-                    return false; // stop traversal
-                },
-                _ => {},
-            }
-        }
-        !uses_memory // continue only if we haven't found memory ops
-    });
-    uses_memory
-}
-
-/// For choice expressions that involve memory or behavioral predicates,
-/// return the existential well-formedness check.
-/// Converts `choose y: T where pred(y)` to `exists y: T :: pred(y)`.
-///
-/// We only emit this for choices involving state/memory because:
-/// 1. The SMT solver may not be able to prove simple mathematical existentials
-///    like `exists i: u64 :: i > 0` due to quantifier handling
-/// 2. The fix is specifically needed for behavioral predicates and stateful choices
-///    where Z3 ignores the conditional choice axiom
-fn extract_choice_exists_check(env: &GlobalEnv, exp: &Exp) -> Option<Exp> {
-    if let ExpData::Quant(node_id, kind, ranges, triggers, condition, body) = exp.as_ref() {
-        if kind.is_choice() {
-            // Only emit well-formedness assertion for choices involving memory/state
-            // Pure mathematical choices don't need this and may cause false positives
-            if !uses_memory_or_behavior(body)
-                && condition
-                    .as_ref()
-                    .is_none_or(|c| !uses_memory_or_behavior(c))
-            {
-                return None;
-            }
-            // Create exists with same structure but QuantKind::Exists
-            let exists_id = env.new_node(env.get_node_loc(*node_id), BOOL_TYPE.clone());
-            if let Some(inst) = env.get_node_instantiation_opt(*node_id) {
-                env.set_node_instantiation(exists_id, inst);
-            }
-            return Some(
-                ExpData::Quant(
-                    exists_id,
-                    QuantKind::Exists,
-                    ranges.clone(),
-                    triggers.clone(),
-                    condition.clone(),
-                    body.clone(),
-                )
-                .into_exp(),
-            );
-        }
-    }
-    None
-}
-
-//  ================================================================================================
-/// # Spec Instrumenter
+// ================================================================================================
+// # Spec Instrumenter
 
 pub struct SpecInstrumentationProcessor {}
 
@@ -179,18 +89,39 @@ impl FunctionTargetProcessor for SpecInstrumentationProcessor {
             // out of this data and into the clone.
             let mut verification_data =
                 data.fork(FunctionVariant::Verification(VerificationFlavor::Regular));
-            verification_data =
+            let (instrumented, split_points) =
                 Instrumenter::run(&options, targets, fun_env, verification_data, scc_opt);
-            targets.insert_target_data(
-                &fun_env.get_qualified_id(),
-                verification_data.variant.clone(),
-                verification_data,
-            );
+            verification_data = instrumented;
+
+            if split_points.is_empty() || options.inference {
+                // No splits — insert the single verification variant.
+                // Proof-block split-fork is verification-only; during inference
+                // (`options.inference`) we never fork, so each function has at
+                // most one verified variant for inference to walk. By
+                // construction `Instrumenter::run` should not produce any
+                // `split_points` under inference, but check explicitly so the
+                // gate is local to this site too.
+                targets.insert_target_data(
+                    &fun_env.get_qualified_id(),
+                    verification_data.variant.clone(),
+                    verification_data,
+                );
+            } else {
+                // Expand splits into multiple verification variants.
+                Self::expand_splits(
+                    fun_env.module_env.env,
+                    targets,
+                    fun_env,
+                    verification_data,
+                    &split_points,
+                );
+            }
         }
 
         // Instrument baseline variant only if it is inlined.
         if is_inlined {
-            Instrumenter::run(&options, targets, fun_env, data, scc_opt)
+            let (data, _) = Instrumenter::run(&options, targets, fun_env, data, scc_opt);
+            data
         } else {
             // Clear code but keep function data stub.
             // TODO(refactoring): the stub is currently still needed because boogie_wrapper
@@ -221,12 +152,15 @@ impl FunctionTargetProcessor for SpecInstrumentationProcessor {
                 continue;
             }
             for ref fun in module.get_functions() {
-                if fun.is_not_prover_target() {
+                if fun.is_not_prover_target() || !fun.is_compiled() {
                     continue;
                 }
                 for (variant, target) in targets.get_targets(fun) {
                     let spec = &*target.get_spec();
-                    if !spec.conditions.is_empty() {
+                    let has_frame = spec.frame_spec.as_ref().is_some_and(|f| {
+                        !f.modifies_targets.is_empty() || !f.reads_targets.is_empty()
+                    });
+                    if !spec.conditions.is_empty() || !spec.properties.is_empty() || has_frame {
                         writeln!(
                             f,
                             "fun {}[{}]\n{}",
@@ -243,27 +177,215 @@ impl FunctionTargetProcessor for SpecInstrumentationProcessor {
     }
 }
 
+/// Maximum number of split combinations before we emit an error.
+const MAX_SPLIT_COMBINATIONS: usize = 1024;
+
+impl SpecInstrumentationProcessor {
+    /// Expand split points into multiple verification variants.
+    /// Each split point on a bool expression creates 2 cases; on an enum, N cases
+    /// (one per variant). If a split has a guard (path condition from an enclosing `if`
+    /// in the proof block), an extra case is added for `!guard`, and the base cases
+    /// are conjuncted with `guard`. The total combinations is the product of all case counts.
+    fn expand_splits(
+        env: &GlobalEnv,
+        targets: &mut FunctionTargetsHolder,
+        fun_env: &FunctionEnv,
+        verification_data: FunctionData,
+        split_points: &[(AttrId, Exp, Option<Exp>)],
+    ) {
+        // Determine the number of base cases for each split point, validating types.
+        let mut has_error = false;
+        let base_case_counts: Vec<usize> = split_points
+            .iter()
+            .map(|(_, exp, _)| {
+                let ty = env.get_node_type(exp.node_id());
+                if ty == BOOL_TYPE {
+                    2
+                } else if let Some((struct_env, _)) = ty.get_struct(env) {
+                    if struct_env.has_variants() {
+                        struct_env.get_variants().count()
+                    } else {
+                        env.error(
+                            &env.get_node_loc(exp.node_id()),
+                            "`split` expression must be of type `bool` or an enum type",
+                        );
+                        has_error = true;
+                        2
+                    }
+                } else {
+                    env.error(
+                        &env.get_node_loc(exp.node_id()),
+                        "`split` expression must be of type `bool` or an enum type",
+                    );
+                    has_error = true;
+                    2
+                }
+            })
+            .collect();
+
+        if has_error {
+            // Insert the original variant to avoid cascading errors.
+            targets.insert_target_data(
+                &fun_env.get_qualified_id(),
+                verification_data.variant.clone(),
+                verification_data,
+            );
+            return;
+        }
+
+        // If there's a guard, add one extra case for `!guard`.
+        let case_counts: Vec<usize> = split_points
+            .iter()
+            .zip(base_case_counts.iter())
+            .map(|((_, _, guard), &base)| if guard.is_some() { base + 1 } else { base })
+            .collect();
+
+        let total: usize = case_counts.iter().product();
+        if total > MAX_SPLIT_COMBINATIONS {
+            env.error(
+                &fun_env.get_loc(),
+                &format!(
+                    "split produces {} verification variants, exceeding the limit of {}",
+                    total, MAX_SPLIT_COMBINATIONS
+                ),
+            );
+            // Fall back: insert the original (with Nop placeholders) as single variant.
+            targets.insert_target_data(
+                &fun_env.get_qualified_id(),
+                verification_data.variant.clone(),
+                verification_data,
+            );
+            return;
+        }
+
+        let original_flavor = match &verification_data.variant {
+            FunctionVariant::Verification(f) => f.clone(),
+            _ => VerificationFlavor::Regular,
+        };
+
+        for combo in 0..total {
+            let new_flavor = VerificationFlavor::Split(Box::new(original_flavor.clone()), combo);
+            let new_variant = FunctionVariant::Verification(new_flavor);
+            let mut forked = verification_data.fork(new_variant.clone());
+
+            // For each split point, replace the Nop at that offset with the
+            // appropriate Assume.
+            let mut remainder = combo;
+            for (i, (split_attr, exp, guard)) in split_points.iter().enumerate() {
+                let case_idx = remainder % case_counts[i];
+                remainder /= case_counts[i];
+
+                let base_cases = base_case_counts[i];
+
+                // Extra guard-false case: assume !guard.
+                if guard.is_some() && case_idx == base_cases {
+                    let guard_exp = guard.as_ref().unwrap();
+                    let not_node =
+                        env.new_node(env.get_node_loc(guard_exp.node_id()), BOOL_TYPE.clone());
+                    let assume_exp =
+                        ExpData::Call(not_node, ast::Operation::Not, vec![guard_exp.clone()])
+                            .into_exp();
+                    if let Some(offset) = forked
+                        .code
+                        .iter()
+                        .position(|bc| matches!(bc, Bytecode::Nop(aid) if *aid == *split_attr))
+                    {
+                        forked.code[offset] =
+                            Bytecode::Prop(*split_attr, PropKind::Assume, assume_exp);
+                    }
+                    continue;
+                }
+
+                let ty = env.get_node_type(exp.node_id());
+                let base_assume = if ty == BOOL_TYPE {
+                    if case_idx == 0 {
+                        // true case: assume the expression
+                        exp.clone()
+                    } else {
+                        // false case: assume !expression
+                        let not_node =
+                            env.new_node(env.get_node_loc(exp.node_id()), BOOL_TYPE.clone());
+                        ExpData::Call(not_node, ast::Operation::Not, vec![exp.clone()]).into_exp()
+                    }
+                } else if let Some((struct_env, inst)) = ty.get_struct(env) {
+                    // Enum case: assume TestVariants for variant at case_idx
+                    let variant_sym: Symbol = struct_env
+                        .get_variants()
+                        .nth(case_idx)
+                        .expect("variant exists");
+                    let test_node =
+                        env.new_node(env.get_node_loc(exp.node_id()), BOOL_TYPE.clone());
+                    env.set_node_instantiation(test_node, inst.to_vec());
+                    ExpData::Call(
+                        test_node,
+                        ast::Operation::TestVariants(
+                            struct_env.module_env.get_id(),
+                            struct_env.get_id(),
+                            vec![variant_sym],
+                        ),
+                        vec![exp.clone()],
+                    )
+                    .into_exp()
+                } else {
+                    // Fallback (shouldn't happen): just assume the expression
+                    exp.clone()
+                };
+
+                // If guarded, conjunct with the guard: assume guard && base_assume.
+                let assume_exp = if let Some(guard_exp) = guard {
+                    let and_node = env.new_node(env.get_node_loc(exp.node_id()), BOOL_TYPE.clone());
+                    ExpData::Call(and_node, ast::Operation::And, vec![
+                        guard_exp.clone(),
+                        base_assume,
+                    ])
+                    .into_exp()
+                } else {
+                    base_assume
+                };
+
+                // Find and replace the Nop with matching AttrId (stable across optimization).
+                if let Some(offset) = forked
+                    .code
+                    .iter()
+                    .position(|bc| matches!(bc, Bytecode::Nop(aid) if *aid == *split_attr))
+                {
+                    forked.code[offset] = Bytecode::Prop(*split_attr, PropKind::Assume, assume_exp);
+                }
+            }
+
+            targets.insert_target_data(&fun_env.get_qualified_id(), new_variant, forked);
+        }
+    }
+}
+
 struct Instrumenter<'a> {
     options: &'a ProverOptions,
     builder: FunctionDataBuilder<'a>,
     ret_locals: Vec<TempIndex>,
-    ret_label: Label,
-    can_return: bool,
     abort_local: TempIndex,
     abort_label: Label,
     can_abort: bool,
     mem_info: &'a BTreeSet<QualifiedInstId<StructId>>,
+    /// Map from Nop AttrId to split expression and optional guard (for `split` proof items).
+    /// AttrIds are stable across optimization passes, unlike bytecode offsets.
+    /// The optional guard is a path condition from enclosing `if` in the proof block.
+    split_points: Vec<(AttrId, Exp, Option<Exp>)>,
+    /// Counter for deterministic label freshening across opaque call sites.
+    /// Starts at 0 so that freshened labels are independent of the global counter.
+    freshen_counter: usize,
 }
 
+// =================================================================================================
+// # Core Instrumentation
+
 impl<'a> Instrumenter<'a> {
-    #[allow(clippy::needless_collect)]
     fn run(
         options: &'a ProverOptions,
         targets: &mut FunctionTargetsHolder,
         fun_env: &FunctionEnv<'a>,
         data: FunctionData,
         scc_opt: Option<&[FunctionEnv]>,
-    ) -> FunctionData {
+    ) -> (FunctionData, Vec<(AttrId, Exp, Option<Exp>)>) {
         // Pre-collect properties in the original function data
         let props: Vec<_> = data
             .code
@@ -277,17 +399,31 @@ impl<'a> Instrumenter<'a> {
 
         let mut builder = FunctionDataBuilder::new(fun_env, data);
 
-        // Create label and locals for unified return exit point. We translate each `Ret(t..)`
-        // instruction into `Assign(r.., t..); Jump(RetLab)`.
+        // After `NormalizeExitsProcessor`, the input bytecode has at most one
+        // `Ret` instruction. Capture its source temps as `ret_locals` so the
+        // spec translation rewrites `result_*` references to them directly,
+        // and the assertions emitted by `emit_return_assertions` reference the
+        // same temps that the trailing `Ret` returns. For divergent functions
+        // (no `Ret`), allocate placeholder locals — the translated spec is
+        // never asserted in that case.
         let ret_locals = builder
             .data
-            .result_type
-            .clone()
-            .flatten()
-            .into_iter()
-            .map(|ty| builder.new_temp(ty))
-            .collect_vec();
-        let ret_label = builder.new_label();
+            .code
+            .iter()
+            .find_map(|bc| match bc {
+                Bytecode::Ret(_, temps) => Some(temps.clone()),
+                _ => None,
+            })
+            .unwrap_or_else(|| {
+                builder
+                    .data
+                    .result_type
+                    .clone()
+                    .flatten()
+                    .into_iter()
+                    .map(|ty| builder.new_temp(ty))
+                    .collect_vec()
+            });
 
         // Similarly create label and local for unified abort exit point. We translate `Abort(c)`
         // into `Assign(r, c); Jump(AbortLabel)`, as well as `Call(..)` into `Call(..);
@@ -344,14 +480,34 @@ impl<'a> Instrumenter<'a> {
             options,
             builder,
             ret_locals,
-            ret_label,
-            can_return: false,
             abort_local,
             abort_label,
             can_abort: false,
             mem_info: &mem_info,
+            split_points: vec![],
+            freshen_counter: 0,
         };
+        // Always inline spec lets in proof actions, independent of the
+        // `inline_spec_lets` option. Proof-action exps are recorded in
+        // `split_points` outside the bytecode, so they are not rewritten by
+        // the subsequent live-var analysis — inlining here is the only way
+        // to ensure they reference only stable Move-level temps.
+        //
+        // Skip during spec inference: proof blocks are a verification-only
+        // construct and must not influence the bytecode the inference walker
+        // sees. `instrument` likewise skips emitting proof actions under
+        // `options.inference`, so this work would be wasted anyway.
+        let mut spec = spec;
+        if !options.inference {
+            instrumenter.inline_lets_in_proof_actions(&mut spec);
+        }
+        if ProverOptions::get(instrumenter.builder.global_env()).inline_spec_lets {
+            instrumenter.inline_lets(&mut spec, false);
+        }
         instrumenter.instrument(&spec, &inlined_props);
+
+        // Extract split points before consuming the instrumenter.
+        let split_points = std::mem::take(&mut instrumenter.split_points);
 
         // Run copy propagation (reaching definitions) and then assignment
         // elimination (live vars). This cleans up some redundancy created by
@@ -360,7 +516,10 @@ impl<'a> Instrumenter<'a> {
         let reach_def = ReachingDefProcessor::new();
         let live_vars = LiveVarAnalysisProcessor::new_no_annotate();
         data = reach_def.process(targets, fun_env, data, scc_opt);
-        live_vars.process(targets, fun_env, data, scc_opt)
+        (
+            live_vars.process(targets, fun_env, data, scc_opt),
+            split_points,
+        )
     }
 
     fn is_verified(&self) -> bool {
@@ -398,7 +557,12 @@ impl<'a> Instrumenter<'a> {
         if self.is_verified() {
             // Inject 'CanModify' assumptions for this function.
             for (loc, exp) in &spec.modifies {
-                let struct_ty = self.builder.global_env().get_node_type(exp.node_id());
+                let struct_ty = self
+                    .builder
+                    .global_env()
+                    .get_node_type(exp.node_id())
+                    .skip_reference()
+                    .clone();
                 self.generate_modifies_check(
                     PropKind::Assume,
                     spec,
@@ -443,15 +607,41 @@ impl<'a> Instrumenter<'a> {
             }
         }
 
-        // Instrument and generate new code
+        // Instrument and generate new code.
+        // Peel leading TraceLocal instructions and emit them before pre_proof
+        // so that pre-proof assertion errors can display model values in counter-examples.
+        //
+        // Skip proof-action emission entirely during spec inference: proof
+        // blocks are a verification-only construct, and emitting their props
+        // (or accumulating their split points) would cause the inference
+        // walker to fork per case and produce per-variant inferred specs.
+        let emit_proof = !self.options.inference;
+        let mut old_code = old_code.into_iter();
+        let mut pre_proof_emitted = false;
+        for bc in old_code.by_ref() {
+            if matches!(&bc, Call(_, _, Operation::TraceLocal(_), _, _)) {
+                self.builder.emit(bc);
+            } else {
+                // First non-trace instruction: emit pre_proof, then this instruction.
+                if emit_proof {
+                    self.emit_proof_actions(&spec.pre_proof, spec);
+                }
+                pre_proof_emitted = true;
+                self.instrument_bytecode(spec, inlined_props, bc);
+                break;
+            }
+        }
+        if !pre_proof_emitted && emit_proof {
+            self.emit_proof_actions(&spec.pre_proof, spec);
+        }
+        // Continue with remaining old_code.
         for bc in old_code {
             self.instrument_bytecode(spec, inlined_props, bc);
         }
 
-        // Generate return and abort blocks
-        if self.can_return {
-            self.generate_return_block(spec);
-        }
+        // The return assertion block is emitted in-place at the trailing `Ret`
+        // (see `instrument_bytecode`). Only the abort exit needs a separate
+        // out-of-line block at this point.
         if self.can_abort {
             self.generate_abort_block(spec);
         }
@@ -500,13 +690,13 @@ impl<'a> Instrumenter<'a> {
         match bc {
             Ret(id, results) => {
                 self.builder.set_loc_from_attr(id);
-                for (i, r) in self.ret_locals.clone().into_iter().enumerate() {
-                    self.builder
-                        .emit_with(|id| Assign(id, r, results[i], AssignKind::Move));
-                }
-                let ret_label = self.ret_label;
-                self.builder.emit_with(|id| Jump(id, ret_label));
-                self.can_return = true;
+                // Emit the spec-decoration block (lets, updates, ensures
+                // assertions, emits checks, ...) in-place before the actual
+                // return. After `NormalizeExitsProcessor` this is the unique
+                // exit point of the function.
+                debug_assert_eq!(self.ret_locals, results);
+                self.emit_return_assertions(spec);
+                self.builder.emit(Ret(id, results));
             },
             Abort(id, code, _) => {
                 self.builder.set_loc_from_attr(id);
@@ -518,7 +708,7 @@ impl<'a> Instrumenter<'a> {
                 self.can_abort = true;
             },
             Call(id, dests, Function(mid, fid, targs), srcs, aa) => {
-                self.instrument_call(id, dests, mid, fid, targs, srcs, aa);
+                self.instrument_call(spec, id, dests, mid, fid, targs, srcs, aa);
             },
             Call(id, dests, oper, srcs, _) if oper.can_abort() => {
                 self.builder.emit(Call(
@@ -553,6 +743,7 @@ impl<'a> Instrumenter<'a> {
 
     fn instrument_call(
         &mut self,
+        spec: &TranslatedSpec,
         id: AttrId,
         dests: Vec<TempIndex>,
         mid: ModuleId,
@@ -579,7 +770,15 @@ impl<'a> Instrumenter<'a> {
             &dests,
         );
 
+        // Freshen state labels to avoid collisions between different inlining sites.
+        // Uses a function-scoped counter for deterministic label IDs.
+        callee_spec.freshen_labels(&mut self.freshen_counter);
+
         self.builder.set_loc_from_attr(id);
+
+        if ProverOptions::get(self.builder.global_env()).inline_spec_lets {
+            self.inline_lets(&mut callee_spec, true);
+        }
 
         // Emit `let` assignments.
         self.emit_lets(&callee_spec, false);
@@ -618,7 +817,7 @@ impl<'a> Instrumenter<'a> {
         if self.is_verified() {
             let loc = self.builder.get_loc(id);
             for (_, exp) in &callee_spec.modifies {
-                let rty = env.get_node_type(exp.node_id());
+                let rty = env.get_node_type(exp.node_id()).skip_reference().clone();
                 let new_addr = exp.call_args()[0].clone();
                 self.generate_modifies_check(
                     PropKind::Assert,
@@ -657,6 +856,39 @@ impl<'a> Instrumenter<'a> {
             // to in aborts conditions, and must be initialized before evaluating those.
             self.emit_save_for_old(&callee_spec.saved_params);
 
+            // Emit memory and spec var saves BEFORE label defines. The label-defining
+            // ensures conditions reference these saved labels (e.g., global[@0] maps to
+            // a SaveMem'd memory). They must be initialized before the label defines
+            // and abort condition evaluation — on BOTH the abort and success paths.
+            for (mem, label) in std::mem::take(&mut callee_spec.saved_memory) {
+                self.builder.emit_with(|id| SaveMem(id, label, mem));
+            }
+            for (var, label) in std::mem::take(&mut callee_spec.saved_spec_vars) {
+                self.builder.emit_with(|id| SaveSpecVar(id, label, var));
+            }
+
+            // Emit state label defining conditions BEFORE the abort condition.
+            // This constrains abstract memory labels that may be referenced by
+            // aborts_if conditions. Uses abort_path=true to emit only the
+            // defining fragment (label-defining conjuncts), not full postcondition
+            // properties that reference post-havoc state.
+            let defining_indices = self.emit_state_label_assumes(&callee_spec, true);
+            // Remove defining conditions from post so they aren't double-emitted
+            // later when assumes for ensures are emitted on the non-abort path.
+            if !defining_indices.is_empty() {
+                let post_count = callee_spec.post.len();
+                callee_spec.post = callee_spec
+                    .post
+                    .drain(..)
+                    .enumerate()
+                    .filter(|(i, _)| !defining_indices.contains(i))
+                    .map(|(_, v)| v)
+                    .collect();
+                // Adjust aborts indices (they start after post in the combined list)
+                // No adjustment needed — aborts are separate from post in callee_spec
+                let _ = post_count; // suppress unused warning
+            }
+
             let callee_aborts_if_is_partial =
                 callee_env.is_pragma_true(ABORTS_IF_IS_PARTIAL_PRAGMA, || false);
 
@@ -676,6 +908,30 @@ impl<'a> Instrumenter<'a> {
                     self.emit_traces(&callee_spec, &cond);
                     self.builder.emit_with(move |id| Prop(id, Assume, cond));
                 }
+                // Aggregate `aborts_of<callee>` on the abort path so a
+                // caller's `aborts_of<callee>` assertion discharges directly.
+                // See the success-path comment below `OpaqueCall` end for
+                // soundness and the gating rationale.
+                let abort_callee_is_higher_order = callee_env
+                    .get_parameters()
+                    .iter()
+                    .any(|p| matches!(p.1.skip_reference(), Type::Fun(..)));
+                let abort_entry_label = find_behavior_pre_label_for_callee(spec, mid, fid);
+                if abort_entry_label.is_some() && !abort_callee_is_higher_order {
+                    let abort_arg_exps: Vec<Exp> =
+                        srcs.iter().map(|s| self.builder.mk_temporary(*s)).collect();
+                    let (abort_closure_exp, _) =
+                        self.builder
+                            .mk_closure(mid, fid, targs, ClosureMask::empty(), vec![]);
+                    let abort_aborts_exp = self.builder.mk_aborts_of_with_state(
+                        abort_closure_exp,
+                        abort_arg_exps,
+                        abort_entry_label,
+                        None,
+                    );
+                    self.builder
+                        .emit_with(|id| Prop(id, Assume, abort_aborts_exp));
+                }
                 self.builder.emit_with(move |id| {
                     Call(id, vec![], Operation::TraceAbort, vec![abort_local], None)
                 });
@@ -684,13 +940,8 @@ impl<'a> Instrumenter<'a> {
                 self.can_abort = true;
             }
 
-            // Emit memory state saves
-            for (mem, label) in std::mem::take(&mut callee_spec.saved_memory) {
-                self.builder.emit_with(|id| SaveMem(id, label, mem));
-            }
-            for (var, label) in std::mem::take(&mut callee_spec.saved_spec_vars) {
-                self.builder.emit_with(|id| SaveSpecVar(id, label, var));
-            }
+            // Note: saved_memory and saved_spec_vars were already emitted above,
+            // before the label defines and abort condition evaluation.
 
             // Emit modifies properties which havoc memory at the modified location.
             for (_, exp) in std::mem::take(&mut callee_spec.modifies) {
@@ -783,11 +1034,82 @@ impl<'a> Instrumenter<'a> {
                     .emit(Call(id, vec![], Operation::EventStoreDiverge, vec![], None));
             }
 
+            // Aggregate the per-clause post-state assumes into the callee's
+            // behavioral predicates `ensures_of<callee>` and `!aborts_of<callee>`
+            // on the success path. The per-clause assumes already establish
+            // the body of these predicates with the call-site memory labels
+            // as concrete witnesses; emitting these aggregated assumes lets a
+            // caller's `ensures_of<callee>` / `aborts_of<callee>` assertion
+            // discharge directly (rather than forcing the SMT solver to
+            // re-Skolemize the existential over intermediate state labels at
+            // each caller's exit — which without this triggers runaway
+            // quantifier instantiations and timeouts). Sound because the
+            // predicates are defined as the existential closure of the same
+            // conjunction we just assumed.
+            //
+            // Skip when the callee has a function-typed parameter: in that
+            // case the callee's `bp_*_of` body delegates to a generic
+            // dispatcher whose memory-arg handling is invoked via the
+            // per-clause assumes above; emitting a parallel `bp_*_of<callee>`
+            // assume would use the dispatcher with weaker memory args
+            // (current memory for both pre and post) and create an
+            // inconsistent context.
+            //
+            // Only emit when the enclosing spec already references this
+            // callee via `ensures_of<callee>` or `aborts_of<callee>` — that
+            // guarantees `spec.saved_memory` has the right pre-state label
+            // for the callee's used memory (so the emitted memory args match
+            // the assertion's at the caller's exit). For callees the
+            // enclosing spec doesn't mention, our assume would have nothing
+            // to discharge and risks using a mismatched label.
+            let callee_is_higher_order = callee_env
+                .get_parameters()
+                .iter()
+                .any(|p| matches!(p.1.skip_reference(), Type::Fun(..)));
+            let entry_label = find_behavior_pre_label_for_callee(spec, mid, fid);
+            if entry_label.is_some() && !callee_is_higher_order {
+                let arg_exps: Vec<Exp> =
+                    srcs.iter().map(|s| self.builder.mk_temporary(*s)).collect();
+                let (closure_exp, _) =
+                    self.builder
+                        .mk_closure(mid, fid, targs, ClosureMask::empty(), vec![]);
+                // ensures_of takes args followed by results: explicit dests
+                // first, then post-values of &mut srcs (matches the order
+                // produced by `behavioral_output_types` in the Boogie backend).
+                let mut ensures_args = arg_exps.clone();
+                for &dest in &dests {
+                    ensures_args.push(self.builder.mk_temporary(dest));
+                }
+                for &src in &srcs {
+                    if self.builder.data.local_types[src].is_mutable_reference() {
+                        ensures_args.push(self.builder.mk_temporary(src));
+                    }
+                }
+                let ensures_exp = self.builder.mk_ensures_of_with_state(
+                    closure_exp.clone(),
+                    ensures_args,
+                    entry_label,
+                    None,
+                );
+                self.builder.emit_with(|id| Prop(id, Assume, ensures_exp));
+                let aborts_exp =
+                    self.builder
+                        .mk_aborts_of_with_state(closure_exp, arg_exps, entry_label, None);
+                let not_aborts_exp = self.builder.mk_not(aborts_exp);
+                self.builder
+                    .emit_with(|id| Prop(id, Assume, not_aborts_exp));
+            }
+
             // Generate OpaqueCallEnd instruction if invariant_v2.
             self.generate_opaque_call(dests, mid, fid, targs, srcs, aa, false);
         }
     }
+}
 
+// =================================================================================================
+// # Spec Condition Emission
+
+impl<'a> Instrumenter<'a> {
     fn emit_save_for_old(&mut self, vars: &BTreeMap<TempIndex, TempIndex>) {
         use Bytecode::*;
         for (idx, saved_idx) in vars {
@@ -903,6 +1225,308 @@ impl<'a> Instrumenter<'a> {
         }
     }
 
+    /// Inline spec let bindings into proof-block actions only, leaving
+    /// `spec.lets` and all other conditions untouched. Proof actions are
+    /// recorded out of band (notably `Split` exps in `split_points`), so
+    /// the bytecode-level temp remap performed by later live-var analysis
+    /// does not reach them. Substituting here replaces references to
+    /// spec-let temps with their defining expressions, which use only
+    /// Move-level temps that survive the remap with stable indices.
+    ///
+    /// `LetPre` bindings substituted into post-state proof actions
+    /// (`post_proof`) are annotated with pre-state memory labels and have
+    /// their parameter references remapped to saved versions, mirroring the
+    /// treatment in `inline_lets`. Without this, a `let pre = R[a].f;`
+    /// referenced from a `post { ... }` action would evaluate `R[a].f` at
+    /// post-state instead of the saved entry-state snapshot.
+    fn inline_lets_in_proof_actions(&mut self, spec: &mut TranslatedSpec) {
+        if spec.pre_proof.is_empty() && spec.post_proof.is_empty() {
+            return;
+        }
+        let env = self.builder.global_env();
+        let substitute_exp =
+            |env: &GlobalEnv, cond: &mut Exp, temp: TempIndex, replacement: &Exp| {
+                let replacement = replacement.clone();
+                let mut replacer =
+                    |_id: move_model::model::NodeId, target: RewriteTarget| -> Option<Exp> {
+                        if let RewriteTarget::Temporary(idx) = target {
+                            if idx == temp {
+                                return Some(replacement.clone());
+                            }
+                        }
+                        None
+                    };
+                *cond = ExpRewriter::new(env, &mut replacer).rewrite_exp(cond.clone());
+            };
+        let substitute_proof_action =
+            |env: &GlobalEnv, action: &mut ProofAction, temp, replacement: &Exp| match action {
+                ProofAction::Assert(exp, _) | ProofAction::Assume(exp) => {
+                    substitute_exp(env, exp, temp, replacement);
+                },
+                ProofAction::Split(exp, guard) => {
+                    substitute_exp(env, exp, temp, replacement);
+                    if let Some(g) = guard {
+                        substitute_exp(env, g, temp, replacement);
+                    }
+                },
+            };
+        // Compute the post-state replacement for a `LetPre` lazily — only when
+        // a let temp is actually referenced from a `post_proof` action. This
+        // avoids allocating fresh `saved_memory` labels and `saved_params`
+        // temps for every spec let, which would pollute the pre-state save
+        // sets and bloat downstream Boogie translation even when no proof
+        // action consumes them.
+        let mut resolved_lets: Vec<(TempIndex, bool, Exp)> = Vec::new();
+        for (_, is_post, temp, exp) in spec.lets.clone() {
+            let mut pre_rhs = exp.clone();
+            for (prev_temp, _, prev_pre) in &resolved_lets {
+                substitute_exp(env, &mut pre_rhs, *prev_temp, prev_pre);
+            }
+            resolved_lets.push((temp, is_post, pre_rhs));
+        }
+        for (temp, is_post, pre_replacement) in &resolved_lets {
+            for (_, action) in &mut spec.pre_proof {
+                substitute_proof_action(env, action, *temp, pre_replacement);
+            }
+            if spec.post_proof.is_empty() {
+                continue;
+            }
+            // Only compute the (potentially state-allocating) post replacement
+            // if the temp is actually referenced from a post_proof action.
+            let exp_uses_temp = |exp: &Exp, temp: TempIndex| {
+                let mut found = false;
+                exp.visit_pre_order(&mut |e| {
+                    if let ExpData::Temporary(_, idx) = e {
+                        if *idx == temp {
+                            found = true;
+                        }
+                    }
+                    !found
+                });
+                found
+            };
+            let referenced = spec.post_proof.iter().any(|(_, action)| match action {
+                ProofAction::Assert(exp, _) | ProofAction::Assume(exp) => exp_uses_temp(exp, *temp),
+                ProofAction::Split(exp, guard) => {
+                    exp_uses_temp(exp, *temp)
+                        || guard.as_ref().is_some_and(|g| exp_uses_temp(g, *temp))
+                },
+            });
+            if !referenced {
+                continue;
+            }
+            let post_replacement = if !*is_post {
+                let annotated = Self::annotate_pre_state_memory(
+                    env,
+                    pre_replacement.clone(),
+                    &mut spec.saved_memory,
+                );
+                self.remap_params_to_saved(annotated, &mut spec.saved_params)
+            } else {
+                pre_replacement.clone()
+            };
+            for (_, action) in &mut spec.post_proof {
+                substitute_proof_action(env, action, *temp, &post_replacement);
+            }
+        }
+    }
+
+    /// Inline let bindings by substituting the expression directly into conditions.
+    /// For `LetPre` expressions in post-state conditions, annotates memory references
+    /// with pre-state labels to preserve pre-state evaluation semantics.
+    /// Clears `spec.lets` so subsequent `emit_lets` calls are no-ops.
+    fn inline_lets(&mut self, spec: &mut TranslatedSpec, for_call: bool) {
+        let env = self.builder.global_env();
+        let mut lets = std::mem::take(&mut spec.lets);
+
+        let substitute_exp =
+            |env: &GlobalEnv, cond: &mut Exp, temp: TempIndex, replacement: &Exp| {
+                let replacement = replacement.clone();
+                let mut replacer =
+                    |_id: move_model::model::NodeId, target: RewriteTarget| -> Option<Exp> {
+                        if let RewriteTarget::Temporary(idx) = target {
+                            if idx == temp {
+                                return Some(replacement.clone());
+                            }
+                        }
+                        None
+                    };
+                *cond = ExpRewriter::new(env, &mut replacer).rewrite_exp(cond.clone());
+            };
+
+        for i in 0..lets.len() {
+            let (_, is_post, temp, ref exp) = lets[i];
+            let exp = exp.clone();
+
+            // Skip choice expressions — they need the Identical temp for
+            // the witness wellformedness assertion.
+            if matches!(exp.as_ref(), ExpData::Quant(_, kind, ..) if kind.is_choice()) {
+                spec.lets.push(lets[i].clone());
+                continue;
+            }
+
+            // For LetPre substituted into post-state conditions:
+            // 1. Annotate memory references with pre-state labels
+            // 2. Remap param temporaries to saved (pre-state) versions
+            let post_state_replacement = if !is_post {
+                let annotated =
+                    Self::annotate_pre_state_memory(env, exp.clone(), &mut spec.saved_memory);
+                self.remap_params_to_saved(annotated, &mut spec.saved_params)
+            } else {
+                exp.clone()
+            };
+            let pre_state_replacement = exp;
+
+            // Substitute into subsequent let expressions (for chained lets like
+            // `let x = a + 1; let y = x + b;`). When a LetPre is referenced by
+            // a subsequent LetPost, use post_state_replacement (with saved params)
+            // since the LetPost will be used in post-state context.
+            for subsequent_let in lets.iter_mut().skip(i + 1) {
+                let subsequent_is_post = subsequent_let.1;
+                let replacement = if subsequent_is_post && !is_post {
+                    &post_state_replacement
+                } else {
+                    &pre_state_replacement
+                };
+                substitute_exp(env, &mut subsequent_let.3, temp, replacement);
+            }
+
+            // Pre-state conditions: requires (always pre-state)
+            for (_, cond) in &mut spec.pre {
+                substitute_exp(env, cond, temp, &pre_state_replacement);
+            }
+            // Aborts_if: pre-state when translated for a call, post-state for a definition
+            let aborts_replacement = if for_call {
+                &pre_state_replacement
+            } else {
+                &post_state_replacement
+            };
+            for (_, cond, code_opt) in &mut spec.aborts {
+                substitute_exp(env, cond, temp, aborts_replacement);
+                if let Some(code) = code_opt {
+                    substitute_exp(env, code, temp, aborts_replacement);
+                }
+            }
+
+            // Post-state conditions: ensures
+            for (_, cond) in &mut spec.post {
+                substitute_exp(env, cond, temp, &post_state_replacement);
+            }
+
+            // Other conditions
+            for (_, cond) in &mut spec.modifies {
+                substitute_exp(env, cond, temp, &pre_state_replacement);
+            }
+            for (_, lhs, rhs) in &mut spec.updates {
+                substitute_exp(env, lhs, temp, &post_state_replacement);
+                substitute_exp(env, rhs, temp, &post_state_replacement);
+            }
+            for (_, cond, msg, flag_opt) in &mut spec.emits {
+                substitute_exp(env, cond, temp, &post_state_replacement);
+                substitute_exp(env, msg, temp, &post_state_replacement);
+                if let Some(flag) = flag_opt {
+                    substitute_exp(env, flag, temp, &post_state_replacement);
+                }
+            }
+
+            // Proof block actions
+            let substitute_proof_action =
+                |env: &GlobalEnv, action: &mut ProofAction, temp, replacement: &Exp| match action {
+                    ProofAction::Assert(exp, _) | ProofAction::Assume(exp) => {
+                        substitute_exp(env, exp, temp, replacement);
+                    },
+                    ProofAction::Split(exp, guard) => {
+                        substitute_exp(env, exp, temp, replacement);
+                        if let Some(g) = guard {
+                            substitute_exp(env, g, temp, replacement);
+                        }
+                    },
+                };
+            for (_, action) in &mut spec.pre_proof {
+                substitute_proof_action(env, action, temp, &pre_state_replacement);
+            }
+            for (_, action) in &mut spec.post_proof {
+                substitute_proof_action(env, action, temp, &post_state_replacement);
+            }
+        }
+    }
+
+    /// Annotate an expression's unlabeled memory references (`Global(None)`, `Exists(None)`)
+    /// with a pre-state memory label. This is used when a LetPre expression (translated in
+    /// pre-state context) is substituted into a post-state condition (ensures), so that
+    /// memory accesses still evaluate against entry-state. For pure expressions without
+    /// memory references, this is a no-op.
+    fn annotate_pre_state_memory(
+        env: &GlobalEnv,
+        exp: Exp,
+        saved_memory: &mut BTreeMap<QualifiedInstId<StructId>, MemoryLabel>,
+    ) -> Exp {
+        use ast::Operation as AstOp;
+        ExpData::rewrite(exp, &mut |e| match e.as_ref() {
+            ExpData::Call(id, AstOp::Global(None), args) => {
+                let mem = env.get_node_instantiation(*id);
+                if let Some(rty) = mem.first() {
+                    let (mid, sid, inst) = rty.require_struct();
+                    let l = *saved_memory
+                        .entry(mid.qualified_inst(sid, inst.to_owned()))
+                        .or_insert_with(|| MemoryLabel::new(env.new_global_id().as_usize()));
+                    RewriteResult::Rewritten(
+                        ExpData::Call(*id, AstOp::Global(Some(l)), args.clone()).into_exp(),
+                    )
+                } else {
+                    RewriteResult::Unchanged(e)
+                }
+            },
+            ExpData::Call(id, AstOp::Exists(None), args) => {
+                let mem = env.get_node_instantiation(*id);
+                if let Some(rty) = mem.first() {
+                    let (mid, sid, inst) = rty.require_struct();
+                    let l = *saved_memory
+                        .entry(mid.qualified_inst(sid, inst.to_owned()))
+                        .or_insert_with(|| MemoryLabel::new(env.new_global_id().as_usize()));
+                    RewriteResult::Rewritten(
+                        ExpData::Call(*id, AstOp::Exists(Some(l)), args.clone()).into_exp(),
+                    )
+                } else {
+                    RewriteResult::Unchanged(e)
+                }
+            },
+            _ => RewriteResult::Unchanged(e),
+        })
+    }
+
+    /// Remap function parameter temporaries in an expression to their saved (pre-state)
+    /// versions. This is needed when a LetPre expression (translated in pre-state context
+    /// where params have their original values) is substituted into post-state conditions
+    /// (ensures), where the original param temps may have been modified by the function body.
+    /// Creates new saved_params entries for any params not yet saved.
+    fn remap_params_to_saved(
+        &mut self,
+        exp: Exp,
+        saved_params: &mut BTreeMap<TempIndex, TempIndex>,
+    ) -> Exp {
+        let param_count = self.builder.fun_env.get_parameter_count();
+        let env = self.builder.global_env();
+        ExpData::rewrite(exp, &mut |e| {
+            if let ExpData::Temporary(id, idx) = e.as_ref() {
+                if *idx < param_count {
+                    let saved = *saved_params.entry(*idx).or_insert_with(|| {
+                        self.builder
+                            .new_temp(self.builder.get_local_type(*idx).skip_reference().clone())
+                    });
+                    if saved != *idx {
+                        let new_id =
+                            env.new_node(env.get_node_loc(*id), self.builder.get_local_type(saved));
+                        return RewriteResult::Rewritten(
+                            ExpData::Temporary(new_id, saved).into_exp(),
+                        );
+                    }
+                }
+            }
+            RewriteResult::Unchanged(e)
+        })
+    }
+
     /// Emit well-formedness assertions for choice expressions in let bindings.
     /// This should be called AFTER preconditions are assumed, so that the
     /// preconditions can establish witnesses for the choices.
@@ -916,8 +1540,7 @@ impl<'a> Instrumenter<'a> {
             .iter()
             .filter(|(_, is_post, ..)| *is_post == post_state);
         for (loc, _, _, exp) in lets {
-            let env = self.builder.global_env();
-            if let Some(exists_check) = extract_choice_exists_check(env, exp) {
+            if let Some(exists_check) = self.extract_choice_exists_check(exp) {
                 self.builder
                     .set_loc_and_vc_info(loc.clone(), CHOICE_WITNESS_FAILS_MESSAGE);
                 self.builder
@@ -973,6 +1596,96 @@ impl<'a> Instrumenter<'a> {
         }
     }
 
+    /// Checks if an expression uses memory operations or behavioral predicates.
+    fn uses_memory_or_behavior(exp: &Exp) -> bool {
+        use ast::Operation;
+        let mut uses_memory = false;
+        exp.visit_pre_order(&mut |e| {
+            if let ExpData::Call(
+                _,
+                Operation::Global(_)
+                | Operation::Exists(_)
+                | Operation::CanModify
+                | Operation::ResourceDomain
+                | Operation::StateDomain
+                | Operation::Behavior(..),
+                _,
+            ) = e
+            {
+                uses_memory = true;
+                return false; // stop traversal
+            }
+            !uses_memory // continue only if we haven't found memory ops
+        });
+        uses_memory
+    }
+
+    /// Extract an exists-check from a choice expression for well-formedness assertions.
+    fn extract_choice_exists_check(&self, exp: &Exp) -> Option<Exp> {
+        let env = self.builder.global_env();
+        if let ExpData::Quant(node_id, kind, ranges, triggers, condition, body) = exp.as_ref()
+            && kind.is_choice()
+        {
+            if !Self::uses_memory_or_behavior(body)
+                && condition
+                    .as_ref()
+                    .is_none_or(|c| !Self::uses_memory_or_behavior(c))
+            {
+                return None;
+            }
+            let exists_id = env.new_node(env.get_node_loc(*node_id), BOOL_TYPE.clone());
+            if let Some(inst) = env.get_node_instantiation_opt(*node_id) {
+                env.set_node_instantiation(exists_id, inst);
+            }
+            return Some(
+                ExpData::Quant(
+                    exists_id,
+                    QuantKind::Exists,
+                    ranges.clone(),
+                    triggers.clone(),
+                    condition.clone(),
+                    body.clone(),
+                )
+                .into_exp(),
+            );
+        }
+        None
+    }
+
+    fn modify_check_fails_message(
+        env: &GlobalEnv,
+        mem: QualifiedId<StructId>,
+        targs: &[Type],
+    ) -> String {
+        let targs_str = if targs.is_empty() {
+            "".to_string()
+        } else {
+            let tctx = TypeDisplayContext::new(env);
+            format!(
+                "<{}>",
+                targs
+                    .iter()
+                    .map(|ty| ty.display(&tctx).to_string())
+                    .join(", ")
+            )
+        };
+        let module_env = env.get_module(mem.module_id);
+        format!(
+            "caller does not have permission to modify `{}::{}{}` at given address",
+            module_env.get_name().display(env),
+            module_env
+                .get_struct(mem.id)
+                .get_name()
+                .display(env.symbol_pool()),
+            targs_str
+        )
+    }
+}
+
+// =================================================================================================
+// # Block Generation
+
+impl<'a> Instrumenter<'a> {
     fn generate_abort_block(&mut self, spec: &TranslatedSpec) {
         use Bytecode::*;
         // Set the location to the function and emit label.
@@ -994,6 +1707,15 @@ impl<'a> Instrumenter<'a> {
     fn generate_abort_verify(&mut self, spec: &TranslatedSpec) {
         use Bytecode::*;
         use PropKind::*;
+
+        // Emit state-label-defining assumes so labeled memory variables are
+        // constrained on the abort path (not only the normal return path).
+        // Without this, labeled variables like Resource_$memory#S are
+        // unconstrained when checking abort coverage, causing spurious failures
+        // when address aliasing makes the abort condition depend on labeled state.
+        // Use abort_path=true to assume only the defining fragment of each
+        // condition, not extra properties that only hold on successful returns.
+        self.emit_state_label_assumes(spec, true);
 
         let is_partial = self
             .builder
@@ -1058,15 +1780,17 @@ impl<'a> Instrumenter<'a> {
         (Some(aborts_cond_temp), aborts_code_cond)
     }
 
-    fn generate_return_block(&mut self, spec: &TranslatedSpec) {
+    /// Emit the spec-decoration block at the function's unified exit: state
+    /// updates, post-state lets, aborts negation, ensures assertions, and emits
+    /// completeness checks. Called from the `Ret` arm of `instrument_bytecode`
+    /// so the assertions execute immediately before the trailing `Ret`. The
+    /// caller is responsible for emitting the `Ret` itself.
+    fn emit_return_assertions(&mut self, spec: &TranslatedSpec) {
         use Bytecode::*;
         use PropKind::*;
 
-        // Set the location to the function and emit label.
         self.builder
             .set_loc(self.builder.fun_env.get_loc().at_end());
-        let ret_label = self.ret_label;
-        self.builder.emit_with(|id| Label(id, ret_label));
 
         // Emit specification variable updates. They are generated for both verified and inlined
         // function variants, as the evolution of state updates is always the same.
@@ -1087,8 +1811,24 @@ impl<'a> Instrumenter<'a> {
             // Emit well-formedness checks for choice expressions in post-state let bindings.
             self.emit_choice_wellformedness(spec, true);
 
+            let defining_indices = self.emit_state_label_assumes(spec, false);
+
             // Emit the negation of all aborts conditions.
-            for (loc, abort_cond, _) in &spec.aborts {
+            // For defining conditions (already assumed), assert the non-defining
+            // residual so mixed conditions like `mutation(...) && property` still
+            // verify the property part.
+            let post_count = spec.post.len();
+            for (i, (loc, abort_cond, _)) in spec.aborts.iter().enumerate() {
+                if defining_indices.contains(&(post_count + i)) {
+                    if let Some(residual) = self.non_defining_residual(abort_cond) {
+                        self.emit_traces(spec, abort_cond);
+                        let exp = self.builder.mk_not(residual);
+                        self.builder
+                            .set_loc_and_vc_info(loc.clone(), ABORTS_IF_FAILS_MESSAGE);
+                        self.builder.emit_with(|id| Prop(id, Assert, exp));
+                    }
+                    continue;
+                }
                 self.emit_traces(spec, abort_cond);
                 let exp = self.builder.mk_not(abort_cond.clone());
                 self.builder
@@ -1096,8 +1836,26 @@ impl<'a> Instrumenter<'a> {
                 self.builder.emit_with(|id| Prop(id, Assert, exp))
             }
 
-            // Emit all post-conditions which must hold as we do not abort.
-            for (loc, cond) in &spec.post {
+            // Emit return-point proof actions (`post`-prefixed proof statements).
+            // Verification-only — see the corresponding gate before pre_proof.
+            if !self.options.inference {
+                self.emit_proof_actions(&spec.post_proof, spec);
+            }
+
+            // Emit all post-conditions which must hold.
+            // For defining conditions (already assumed), assert the non-defining
+            // residual so mixed conditions like `mutation(...) && result == 0`
+            // still verify the `result == 0` part.
+            for (i, (loc, cond)) in spec.post.iter().enumerate() {
+                if defining_indices.contains(&i) {
+                    if let Some(residual) = self.non_defining_residual(cond) {
+                        self.emit_traces(spec, cond);
+                        self.builder
+                            .set_loc_and_vc_info(loc.clone(), ENSURES_FAILS_MESSAGE);
+                        self.builder.emit_with(move |id| Prop(id, Assert, residual));
+                    }
+                    continue;
+                }
                 self.emit_traces(spec, cond);
                 self.builder
                     .set_loc_and_vc_info(loc.clone(), ENSURES_FAILS_MESSAGE);
@@ -1131,10 +1889,203 @@ impl<'a> Instrumenter<'a> {
                 self.builder.emit_with(move |id| Prop(id, Assert, cond));
             }
         }
+    }
 
-        // Emit return
-        let ret_locals = self.ret_locals.clone();
-        self.builder.emit_with(move |id| Ret(id, ret_locals))
+    /// Emit havoc+assume for intermediate state labels.
+    /// Collects all conditions (ensures + aborts), finds which ones define state labels,
+    /// and emits them as assumes in topological (dependency) order.
+    /// Returns the set of condition indices that were emitted as assumes (defining conditions).
+    /// If `abort_path` is true, assume only the defining fragment of each condition
+    /// (conjuncts that contain label-defining operations), not extra properties
+    /// that only hold on successful returns.
+    fn emit_state_label_assumes(
+        &mut self,
+        spec: &TranslatedSpec,
+        abort_path: bool,
+    ) -> BTreeSet<usize> {
+        use Bytecode::*;
+        use PropKind::*;
+
+        let saved_labels: BTreeSet<MemoryLabel> = spec.saved_memory.values().copied().collect();
+
+        // Build map: label -> defining condition (the condition with range.post == Some(label))
+        let mut label_definers: BTreeMap<MemoryLabel, Vec<usize>> = BTreeMap::new();
+        // Only ensures and aborts conditions can define state labels (via mutation
+        // builtins, behavioral predicates, or spec functions with range.post).
+        // Other spec fields (modifies, emits, updates) don't carry these operations.
+        let all_conditions: Vec<&Exp> = spec
+            .post
+            .iter()
+            .map(|(_, e)| e)
+            .chain(spec.aborts.iter().map(|(_, e, _)| e))
+            .collect();
+        for (idx, cond) in all_conditions.iter().enumerate() {
+            for label in Self::defined_labels(cond) {
+                if !saved_labels.contains(&label) {
+                    label_definers.entry(label).or_default().push(idx);
+                }
+            }
+        }
+
+        // Multiple conditions may define the same label (e.g., the same
+        // result_of chain appearing in both ensures and aborts_if).
+        // The topological sort handles this by emitting only the first
+        // definer and tracking it via defining_indices.
+
+        // Topological sort: emit definitions in dependency order.
+        // Each label may have multiple defining conditions (conditional mutations).
+        let mut emitted_labels: BTreeSet<MemoryLabel> = BTreeSet::new();
+        let mut defining_indices: BTreeSet<usize> = BTreeSet::new();
+        let mut remaining: BTreeMap<MemoryLabel, Vec<usize>> = BTreeMap::new();
+        for (label, definers) in &label_definers {
+            remaining.insert(*label, definers.clone());
+        }
+        // Iterate until all definitions are emitted (or stuck = cycle).
+        while !remaining.is_empty() {
+            let mut progress = false;
+            let snapshot: Vec<_> = remaining
+                .iter()
+                .map(|(l, indices)| (*l, indices.clone()))
+                .collect();
+            for (label, indices) in snapshot {
+                // Check all labels USED by ALL defining conditions are already defined.
+                // Labels co-defined by the same condition (nested chain like
+                // result_of<f>(result_of<g>(...))) are inherently ordered within
+                // the expression tree, so they don't block each other.
+                let all_deps_met = indices.iter().all(|&idx| {
+                    let deps = Self::all_labels(all_conditions[idx]);
+                    let co_defined = Self::defined_labels(all_conditions[idx]);
+                    deps.iter().all(|dep| {
+                        *dep == label
+                            || saved_labels.contains(dep)
+                            || emitted_labels.contains(dep)
+                            || !label_definers.contains_key(dep)
+                            || co_defined.contains(dep)
+                    })
+                });
+                if all_deps_met {
+                    for &idx in &indices {
+                        self.emit_traces(spec, all_conditions[idx]);
+                        let cond = if abort_path {
+                            Self::defining_fragment(all_conditions[idx])
+                        } else {
+                            all_conditions[idx].clone()
+                        };
+                        self.builder.emit_with(move |id| Prop(id, Assume, cond));
+                        defining_indices.insert(idx);
+                    }
+                    emitted_labels.insert(label);
+                    remaining.remove(&label);
+                    progress = true;
+                }
+            }
+            if !progress {
+                let env = self.builder.global_env();
+                env.error(
+                    &self.builder.fun_env.get_spec_loc(),
+                    "cyclic dependency among state label definitions",
+                );
+                break;
+            }
+        }
+        defining_indices
+    }
+
+    /// Returns the set of labels DEFINED by a condition (all range.post labels).
+    fn defined_labels(exp: &Exp) -> BTreeSet<MemoryLabel> {
+        exp.as_ref().all_defined_labels()
+    }
+
+    /// Extract the defining fragment of a condition: only the conjuncts that
+    /// contain label-defining operations. Non-defining conjuncts (properties
+    /// that only hold on successful returns) are dropped. Used on the abort
+    /// path to avoid assuming postcondition properties.
+    fn defining_fragment(exp: &Exp) -> Exp {
+        use move_model::exp_simplifier::flatten_conjunction_owned;
+        let conjuncts = flatten_conjunction_owned(exp);
+        let defining: Vec<Exp> = conjuncts
+            .into_iter()
+            .filter(|c| !c.as_ref().all_defined_labels().is_empty())
+            .collect();
+        if defining.is_empty() {
+            // No defining conjuncts — return true (no constraint).
+            let id = exp.as_ref().node_id();
+            ExpData::Value(id, Value::Bool(true)).into_exp()
+        } else {
+            defining
+                .into_iter()
+                .reduce(|a, b| {
+                    let id = a.as_ref().node_id();
+                    ExpData::Call(id, ast::Operation::And, vec![a, b]).into_exp()
+                })
+                .unwrap()
+        }
+    }
+
+    /// Returns all labels referenced by a condition.
+    fn all_labels(exp: &Exp) -> BTreeSet<MemoryLabel> {
+        all_labels_in_exp(exp)
+    }
+
+    /// Compute the non-defining residual of a condition: the condition with all
+    /// label-defining operations neutralized. Mutation builtins are replaced by `true`
+    /// (boolean predicates about state transitions). For behavioral predicates and spec
+    /// functions with `range.post`, stripping the label would change the state context
+    /// (evaluating at exit instead of the labeled intermediate state), producing
+    /// semantically incorrect assertions. For those, no residual is returned.
+    /// Returns `None` if the residual is trivially `true` (pure definition) or if
+    /// the condition contains label-defining Behavior/SpecFunction operations.
+    fn non_defining_residual(&self, exp: &Exp) -> Option<Exp> {
+        // If the condition contains label-defining Behavior or SpecFunction operations,
+        // there is no meaningful residual: stripping the label changes the state context.
+        // The assume already covers the verification obligation.
+        let has_non_mutation_definers = {
+            let mut found = false;
+            exp.as_ref().visit_pre_order(&mut |e| {
+                if let ExpData::Call(_, op, _) = e {
+                    match op {
+                        ast::Operation::Behavior(_, range)
+                        | ast::Operation::SpecFunction(_, _, range)
+                            if range.post.is_some() =>
+                        {
+                            found = true;
+                            return false;
+                        },
+                        _ => {},
+                    }
+                }
+                !found
+            });
+            found
+        };
+        if has_non_mutation_definers {
+            return None;
+        }
+        struct MutationStripper;
+        impl ExpRewriterFunctions for MutationStripper {
+            fn rewrite_call(
+                &mut self,
+                id: move_model::model::NodeId,
+                oper: &ast::Operation,
+                _args: &[Exp],
+            ) -> Option<Exp> {
+                match oper {
+                    ast::Operation::SpecPublish(_)
+                    | ast::Operation::SpecRemove(_)
+                    | ast::Operation::SpecUpdate(_) => {
+                        Some(ExpData::Value(id, Value::Bool(true)).into_exp())
+                    },
+                    _ => None,
+                }
+            }
+        }
+        let mut stripper = MutationStripper;
+        let residual = stripper.rewrite_exp(exp.clone());
+        if matches!(residual.as_ref(), ExpData::Value(_, Value::Bool(true))) {
+            None // Pure definition, no residual to assert
+        } else {
+            Some(residual)
+        }
     }
 
     /// Generate a check whether the target can modify the given memory provided
@@ -1165,7 +2116,7 @@ impl<'a> Instrumenter<'a> {
                 let (mid, sid, inst) = resource_type.require_struct();
                 self.builder.set_loc_and_vc_info(
                     loc.clone(),
-                    &modify_check_fails_message(env, mid.qualified(sid), inst),
+                    &Self::modify_check_fails_message(env, mid.qualified(sid), inst),
                 );
             } else {
                 self.builder.set_loc(loc.clone());
@@ -1195,18 +2146,95 @@ impl<'a> Instrumenter<'a> {
     }
 }
 
+// =================================================================================================
+// # Proof Emission
+
+impl<'a> Instrumenter<'a> {
+    /// Emit bytecode for a flat list of proof actions.
+    fn emit_proof_actions(&mut self, actions: &[(Loc, ProofAction)], spec: &TranslatedSpec) {
+        use Bytecode::*;
+        for (loc, action) in actions {
+            match action {
+                ProofAction::Assert(exp, msg) => {
+                    self.emit_traces(spec, exp);
+                    self.builder.set_loc_and_vc_info(loc.clone(), msg);
+                    self.builder
+                        .emit_with(|id| Prop(id, PropKind::Assert, exp.clone()));
+                },
+                ProofAction::Assume(exp) => {
+                    self.builder.set_loc(loc.clone());
+                    self.builder
+                        .emit_with(|id| Prop(id, PropKind::Assume, exp.clone()));
+                },
+                ProofAction::Split(exp, guard) => {
+                    self.builder.set_loc(loc.clone());
+                    let attr_id = self.builder.new_attr();
+                    self.builder.emit(Bytecode::Nop(attr_id));
+                    self.split_points
+                        .push((attr_id, exp.clone(), guard.clone()));
+                },
+            }
+        }
+    }
+}
+
+/// Find the pre-state memory label that the enclosing function's spec uses
+/// for a behavioral predicate over `(mid, fid)`. Returns `Some(label)` if
+/// any condition contains a `Behavior(_, _)` whose first arg is a `Closure`
+/// with the given module/function id; `None` otherwise.
+///
+/// Used to gate the call-site `assume bp_*_of<callee>(...)` in the opaque
+/// instrumentation: emitting it only when the enclosing spec already has an
+/// assertion of that predicate ensures `spec.saved_memory` was populated
+/// with the right label for the callee's used memory.
+fn find_behavior_pre_label_for_callee(
+    spec: &TranslatedSpec,
+    mid: ModuleId,
+    fid: FunId,
+) -> Option<MemoryLabel> {
+    let mut found: Option<MemoryLabel> = None;
+    let pre_post_exps = spec.pre.iter().chain(spec.post.iter()).map(|(_, e)| e);
+    let abort_exps = spec.aborts.iter().map(|(_, e, _)| e);
+    for exp in pre_post_exps.chain(abort_exps) {
+        if found.is_some() {
+            break;
+        }
+        exp.visit_pre_order(&mut |e| {
+            if found.is_some() {
+                return false;
+            }
+            if let ExpData::Call(_, ast::Operation::Behavior(_, range), args) = e {
+                if let Some(first) = args.first() {
+                    if let ExpData::Call(_, ast::Operation::Closure(cmid, cfid, _), _) =
+                        first.as_ref()
+                    {
+                        if *cmid == mid && *cfid == fid {
+                            if let Some(label) = range.pre {
+                                found = Some(label);
+                                return false;
+                            }
+                        }
+                    }
+                }
+            }
+            true
+        });
+    }
+    found
+}
+
 //  ================================================================================================
 /// # Modifies Checker
-
 /// Check modifies annotations. This is depending on usage analysis and is therefore
 /// invoked here from the initialize trait function of this processor.
 fn check_modifies(env: &GlobalEnv, targets: &FunctionTargetsHolder) {
     for module_env in env.get_modules() {
         if module_env.is_target() {
             for fun_env in module_env.get_functions() {
-                if !fun_env.is_not_prover_target() {
+                if !fun_env.is_not_prover_target() && fun_env.is_compiled() {
                     check_caller_callee_modifies_relation(env, targets, &fun_env);
                     check_opaque_modifies_completeness(env, targets, &fun_env);
+                    check_reads_completeness(env, targets, &fun_env);
                 }
             }
         }
@@ -1291,6 +2319,56 @@ fn check_opaque_modifies_completeness(
             &format!("function `{}` is opaque but its specification does not have a modifies clause for `{}`",
                 fun_env.get_full_name_str(),
                 env.display(mem))
+            )
+        }
+    }
+}
+
+/// Check that a function's actual resource access is covered by its `reads` declaration.
+/// If a function declares `reads R, S;`, every resource it accesses (reads or writes)
+/// must be listed. Resources in `modifies` are implicitly included.
+fn check_reads_completeness(
+    env: &GlobalEnv,
+    targets: &FunctionTargetsHolder,
+    fun_env: &FunctionEnv,
+) {
+    let frame_spec = fun_env.get_frame_spec();
+    let reads_targets = match &frame_spec {
+        Some(fs) if !fs.reads_targets.is_empty() => &fs.reads_targets,
+        _ => return, // No reads declaration — nothing to check
+    };
+
+    let target = targets.get_target(fun_env, &FunctionVariant::Baseline);
+    let modify_ids = target.get_modify_ids();
+
+    // All accessed memory must be in reads_targets or modify_ids
+    for mem in usage_analysis::get_memory_usage(&target)
+        .accessed
+        .all
+        .iter()
+    {
+        if env.is_wellknown_event_handle_type(&Type::Struct(mem.module_id, mem.id, vec![])) {
+            continue;
+        }
+        if env.get_struct_qid(mem.to_qualified_id()).is_ghost_memory() {
+            continue;
+        }
+        let in_reads = reads_targets
+            .iter()
+            .any(|r| r.to_qualified_id() == mem.to_qualified_id());
+        let in_modifies = modify_ids
+            .iter()
+            .any(|m| m.to_qualified_id() == mem.to_qualified_id());
+        if !in_reads && !in_modifies {
+            let loc = fun_env.get_spec_loc();
+            env.error(
+                &loc,
+                &format!(
+                    "function `{}` accesses resource `{}` which is not covered by \
+                     its `reads` or `modifies` declaration",
+                    fun_env.get_full_name_str(),
+                    env.display(mem)
+                ),
             )
         }
     }

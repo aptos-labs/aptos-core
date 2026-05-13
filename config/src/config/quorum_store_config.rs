@@ -75,6 +75,9 @@ pub struct QuorumStoreConfig {
     pub sender_max_total_bytes: usize,
     /// The maximum number of transactions a single batch received from peers could contain.
     pub receiver_max_batch_txns: usize,
+    /// The maximum number of transactions an encrypted batch received from peers could contain.
+    /// Stricter limit matching the sender side to protect the decryption pipeline.
+    pub receiver_max_encrypted_batch_txns: usize,
     /// The maximum number of bytes a single batch received from peers could contain.
     pub receiver_max_batch_bytes: usize,
     /// The maximum number of batches a BatchMsg received from peers can contain.
@@ -97,6 +100,8 @@ pub struct QuorumStoreConfig {
     pub db_quota: usize,
     pub batch_quota: usize,
     pub back_pressure: QuorumStoreBackPressureConfig,
+    /// Per-author capacity for each remote batch coordinator ingress queue.
+    pub remote_batch_coordinator_channel_size: usize,
     pub num_workers_for_remote_batches: usize,
     pub batch_buckets: Vec<u64>,
     pub allow_batches_without_pos_in_proposal: bool,
@@ -130,6 +135,7 @@ impl Default for QuorumStoreConfig {
             // TODO: on next release, remove DEFAULT_MAX_NUM_BATCHES * BATCH_PADDING_BYTES
             sender_max_total_bytes: 4 * 1024 * 1024 - DEFAULT_MAX_NUM_BATCHES * BATCH_PADDING_BYTES,
             receiver_max_batch_txns: 100,
+            receiver_max_encrypted_batch_txns: DEFAULT_MAX_ENCRYPTED_BATCH_TXNS,
             receiver_max_batch_bytes: 1024 * 1024 + BATCH_PADDING_BYTES,
             receiver_max_num_batches: 20,
             receiver_max_total_txns: 2000,
@@ -146,6 +152,7 @@ impl Default for QuorumStoreConfig {
             db_quota: 300_000_000,
             batch_quota: 300_000,
             back_pressure: QuorumStoreBackPressureConfig::default(),
+            remote_batch_coordinator_channel_size: 10,
             // number of batch coordinators to handle QS batch messages, should be >= 1
             num_workers_for_remote_batches: 10,
             batch_buckets: DEFAULT_BUCKETS.to_vec(),
@@ -153,10 +160,10 @@ impl Default for QuorumStoreConfig {
             enable_opt_quorum_store: true,
             opt_qs_minimum_batch_age_usecs: Duration::from_millis(50).as_micros() as u64,
             enable_payload_v2: false,
-            enable_batch_v2_tx: false,
-            enable_batch_v2_rx: false,
-            enable_opt_qs_v2_payload_tx: false,
-            enable_opt_qs_v2_payload_rx: false,
+            enable_batch_v2_tx: true,
+            enable_batch_v2_rx: true,
+            enable_opt_qs_v2_payload_tx: true,
+            enable_opt_qs_v2_payload_rx: true,
         }
     }
 }
@@ -170,11 +177,13 @@ impl QuorumStoreConfig {
     pub fn default_for_dag() -> Self {
         Self {
             sender_max_batch_txns: 300,
+            sender_max_encrypted_batch_txns: 0,
             sender_max_batch_bytes: 4 * 1024 * 1024,
             sender_max_num_batches: 5,
             sender_max_total_txns: 500,
             sender_max_total_bytes: 8 * 1024 * 1024,
             receiver_max_batch_txns: 300,
+            receiver_max_encrypted_batch_txns: 0,
             receiver_max_batch_bytes: 4 * 1024 * 1024,
             receiver_max_num_batches: 5,
             receiver_max_total_txns: 500,
@@ -204,6 +213,11 @@ impl QuorumStoreConfig {
                 config.sender_max_batch_bytes,
                 config.receiver_max_batch_bytes,
                 "bytes",
+            ),
+            (
+                config.sender_max_encrypted_batch_txns,
+                config.receiver_max_encrypted_batch_txns,
+                "encrypted_batch_txns",
             ),
             (
                 config.sender_max_total_txns,
@@ -241,6 +255,11 @@ impl QuorumStoreConfig {
                 config.sender_max_batch_bytes,
                 config.sender_max_total_bytes,
                 "send_bytes",
+            ),
+            (
+                config.receiver_max_encrypted_batch_txns,
+                config.receiver_max_total_txns,
+                "recv_encrypted_txns",
             ),
             (
                 config.receiver_max_batch_txns,
@@ -382,6 +401,56 @@ mod test {
             &node_config,
             NodeType::Validator,
             Some(ChainId::testnet()),
+        )
+        .unwrap_err();
+        assert!(matches!(error, Error::ConfigSanitizerFailed(_, _)));
+    }
+
+    #[test]
+    fn test_send_recv_batch_limits_encrypted_txns() {
+        // Create a node config with invalid encrypted batch txn limits
+        let node_config = NodeConfig {
+            consensus: ConsensusConfig {
+                quorum_store: QuorumStoreConfig {
+                    sender_max_encrypted_batch_txns: 100,
+                    receiver_max_encrypted_batch_txns: 50,
+                    ..Default::default()
+                },
+                ..Default::default()
+            },
+            ..Default::default()
+        };
+
+        // Sanitize the config and verify that it fails
+        let error = QuorumStoreConfig::sanitize(
+            &node_config,
+            NodeType::Validator,
+            Some(ChainId::mainnet()),
+        )
+        .unwrap_err();
+        assert!(matches!(error, Error::ConfigSanitizerFailed(_, _)));
+    }
+
+    #[test]
+    fn test_batch_total_limits_recv_encrypted_txns() {
+        // Create a node config where receiver_max_encrypted_batch_txns > receiver_max_total_txns
+        let node_config = NodeConfig {
+            consensus: ConsensusConfig {
+                quorum_store: QuorumStoreConfig {
+                    receiver_max_encrypted_batch_txns: 3000,
+                    receiver_max_total_txns: 2000,
+                    ..Default::default()
+                },
+                ..Default::default()
+            },
+            ..Default::default()
+        };
+
+        // Sanitize the config and verify that it fails
+        let error = QuorumStoreConfig::sanitize(
+            &node_config,
+            NodeType::Validator,
+            Some(ChainId::mainnet()),
         )
         .unwrap_err();
         assert!(matches!(error, Error::ConfigSanitizerFailed(_, _)));

@@ -1,0 +1,257 @@
+# This defines a workflow to build and release any binary from the aptos-core repository.
+# In order to trigger it go to the Actions Tab of the Repo, click "Binary Release" and then "Run Workflow".
+
+name: "Binary Release"
+
+on:
+  workflow_dispatch:
+    inputs:
+      binary_name:
+        type: string
+        required: true
+        description: "The name of the binary to build (e.g., 'aptos-node', 'aptos-debugger'):"
+      crate_name:
+        type: string
+        required: true
+        description: "The crate name to build with -p flag (e.g., 'aptos-node', 'aptos-debugger'):"
+      build_profile:
+        type: choice
+        required: true
+        description: "Build profile to use:"
+        options:
+          - tool
+          - performance
+        default: tool
+      release_version:
+        type: string
+        required: true
+        description: "The release version. E.g. '1.2.3':"
+      source_git_ref_override:
+        type: string
+        required: false
+        description: "GIT_SHA_OVERRIDE: Use this to override the Git SHA1, branch name (e.g., devnet) or tag to build the binaries from. Defaults to the workflow Git REV:"
+      release_title:
+        type: string
+        required: false
+        description: "Optional custom release title. Defaults to '<binary-name> v<version>':"
+      dry_run:
+        type: boolean
+        required: false
+        default: true
+        description: "Dry run - If checked, the release will not be created"
+      skip_checks:
+        type: boolean
+        required: false
+        default: false
+        description: "Skip checks - If checked, the release will skip version checks"
+  workflow_call:
+    inputs:
+      binary_name:
+        type: string
+        required: true
+        description: "The name of the binary to build"
+      crate_name:
+        type: string
+        required: true
+        description: "The crate name to build with -p flag"
+      build_profile:
+        type: string
+        required: true
+        description: "Build profile to use (tool or performance)"
+      release_version:
+        type: string
+        required: true
+        description: "The release version"
+      source_git_ref_override:
+        type: string
+        required: false
+        description: "Git ref to build from"
+      release_title:
+        type: string
+        required: false
+        description: "Custom release title"
+      dry_run:
+        type: boolean
+        required: false
+        default: true
+        description: "Dry run mode"
+      skip_checks:
+        type: boolean
+        required: false
+        default: false
+        description: "Skip version checks"
+
+jobs:
+  build-linux-x86:
+    name: "Build Linux x86_64"
+    runs-on: ubuntu-22.04
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          ref: ${{ inputs.source_git_ref_override || github.sha }}
+      - uses: aptos-labs/aptos-core/.github/actions/cli-rust-setup@main
+      - name: Build Binary
+        run: |
+          scripts/binary_release/build_binary_release.sh \
+            "${{ inputs.binary_name }}" \
+            "${{ inputs.crate_name }}" \
+            "${{ inputs.build_profile }}" \
+            "${{ inputs.release_version }}" \
+            "${{ inputs.skip_checks }}"
+      - name: Upload Binary
+        uses: actions/upload-artifact@v4
+        with:
+          name: binary-builds-x86_64-unknown-linux-gnu
+          path: |
+            ${{ inputs.binary_name }}-*.zip
+            ${{ inputs.binary_name }}-*.zip.sha256
+
+  build-linux-arm:
+    name: "Build Linux ARM64"
+    runs-on: ubuntu-22.04-arm
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          ref: ${{ inputs.source_git_ref_override || github.sha }}
+      - uses: aptos-labs/aptos-core/.github/actions/cli-rust-setup@main
+      - name: Build Binary
+        run: |
+          scripts/binary_release/build_binary_release.sh \
+            "${{ inputs.binary_name }}" \
+            "${{ inputs.crate_name }}" \
+            "${{ inputs.build_profile }}" \
+            "${{ inputs.release_version }}" \
+            "${{ inputs.skip_checks }}"
+      - name: Upload Binary
+        uses: actions/upload-artifact@v4
+        with:
+          name: binary-builds-aarch64-unknown-linux-gnu
+          path: |
+            ${{ inputs.binary_name }}-*.zip
+            ${{ inputs.binary_name }}-*.zip.sha256
+
+  build-macos-x86:
+    name: "Build macOS x86_64"
+    runs-on: macos-15-intel
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          ref: ${{ inputs.source_git_ref_override || github.sha }}
+      - uses: aptos-labs/aptos-core/.github/actions/cli-rust-setup@main
+      - name: Build Binary
+        run: |
+          scripts/binary_release/build_binary_release.sh \
+            "${{ inputs.binary_name }}" \
+            "${{ inputs.crate_name }}" \
+            "${{ inputs.build_profile }}" \
+            "${{ inputs.release_version }}" \
+            "${{ inputs.skip_checks }}"
+      - name: Upload Binary
+        uses: actions/upload-artifact@v4
+        with:
+          name: binary-builds-x86_64-apple-darwin
+          path: |
+            ${{ inputs.binary_name }}-*.zip
+            ${{ inputs.binary_name }}-*.zip.sha256
+
+  build-macos-arm:
+    name: "Build macOS ARM64"
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          ref: ${{ inputs.source_git_ref_override || github.sha }}
+      - uses: aptos-labs/aptos-core/.github/actions/cli-rust-setup@main
+      - name: Build Binary
+        run: |
+          scripts/binary_release/build_binary_release.sh \
+            "${{ inputs.binary_name }}" \
+            "${{ inputs.crate_name }}" \
+            "${{ inputs.build_profile }}" \
+            "${{ inputs.release_version }}" \
+            "${{ inputs.skip_checks }}"
+      - name: Upload Binary
+        uses: actions/upload-artifact@v4
+        with:
+          name: binary-builds-aarch64-apple-darwin
+          path: |
+            ${{ inputs.binary_name }}-*.zip
+            ${{ inputs.binary_name }}-*.zip.sha256
+
+  build-windows-x86:
+    name: "Build Windows x86_64"
+    runs-on: windows-2025
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          ref: ${{ inputs.source_git_ref_override || github.sha }}
+      # Ensure we use caching
+      - name: Run cargo cache
+        uses: Swatinem/rust-cache@c19371144df3bb44fab255c43d04cbc2ab54d1c4 # pin@v2.9.1
+      # Ensure that long paths work
+      - name: Ensure long paths work
+        run: git config --global core.longpaths true
+        shell: bash
+      - name: Build Binary
+        run: |
+          .\scripts\binary_release\build_binary_release.ps1 `
+            -BinaryName "${{ inputs.binary_name }}" `
+            -CrateName "${{ inputs.crate_name }}" `
+            -BuildProfile "${{ inputs.build_profile }}" `
+            -Version "${{ inputs.release_version }}" `
+            -SkipChecks $${{ inputs.skip_checks }}
+        shell: powershell
+      - name: Upload Binary
+        uses: actions/upload-artifact@v4
+        with:
+          name: binary-builds-x86_64-pc-windows-msvc
+          path: |
+            ${{ inputs.binary_name }}-*.zip
+            ${{ inputs.binary_name }}-*.zip.sha256
+
+  release-binaries:
+    name: "Release binaries"
+    needs:
+      - build-linux-x86
+      - build-linux-arm
+      - build-macos-x86
+      - build-macos-arm
+      - build-windows-x86
+    runs-on: 2cpu-gh-ubuntu24-x64
+    permissions:
+      contents: "write"
+      pull-requests: "read"
+    if: ${{ inputs.dry_run == false }}
+    steps:
+      - name: Download prebuilt binaries
+        uses: actions/download-artifact@v4
+        with:
+          pattern: binary-builds-*
+          merge-multiple: true
+      - name: List downloaded artifacts
+        run: ls -lh
+      - name: Create combined SHA256SUMS file
+        run: |
+          cat ${{ inputs.binary_name }}-*.zip.sha256 > SHA256SUMS
+          echo "Combined checksums:"
+          cat SHA256SUMS
+      - name: Determine release title
+        id: release_info
+        run: |
+          if [ -n "${{ inputs.release_title }}" ]; then
+            echo "title=${{ inputs.release_title }}" >> $GITHUB_OUTPUT
+          else
+            echo "title=${{ inputs.binary_name }} v${{ inputs.release_version }}" >> $GITHUB_OUTPUT
+          fi
+          echo "tag=${{ inputs.binary_name }}-v${{ inputs.release_version }}" >> $GITHUB_OUTPUT
+      - name: Create GitHub Release
+        uses: marvinpinto/action-automatic-releases@919008cf3f741b179569b7a6fb4d8860689ab7f0 # pin@v1.2.1
+        with:
+          repo_token: "${{ secrets.GITHUB_TOKEN }}"
+          automatic_release_tag: "${{ steps.release_info.outputs.tag }}"
+          prerelease: false
+          title: "${{ steps.release_info.outputs.title }}"
+          files: |
+            ${{ inputs.binary_name }}-*.zip
+            ${{ inputs.binary_name }}-*.zip.sha256
+            SHA256SUMS

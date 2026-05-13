@@ -1,7 +1,4 @@
-
-<a id="0x1_error"></a>
-
-# Module `0x1::error`
+# Module `0x1::error` <a id="0x1_error"></a>
 
 This module defines a set of canonical error codes which are optional to use by applications for the
 <code><b>abort</b></code> and <code><b>assert</b>!</code> features.
@@ -45,10 +42,7 @@ error codes here are a bit richer than HTTP codes.
 <pre><code></code></pre>
 
 
-
-<a id="@Constants_0"></a>
-
-## Constants
+## Constants <a id="@Constants_0"></a>
 
 
 <a id="0x1_error_ABORTED"></a>
@@ -180,10 +174,7 @@ The service is currently unavailable. Indicates that a retry could solve the iss
 </code></pre>
 
 
-
-<a id="0x1_error_canonical"></a>
-
-## Function `canonical`
+## Function `canonical` <a id="0x1_error_canonical"></a>
 
 Construct a canonical error code from a category and a reason.
 
@@ -206,9 +197,7 @@ Construct a canonical error code from a category and a reason.
 
 </details>
 
-<a id="0x1_error_invalid_argument"></a>
-
-## Function `invalid_argument`
+## Function `invalid_argument` <a id="0x1_error_invalid_argument"></a>
 
 Functions to construct a canonical error code of the given category.
 
@@ -229,9 +218,7 @@ Functions to construct a canonical error code of the given category.
 
 </details>
 
-<a id="0x1_error_out_of_range"></a>
-
-## Function `out_of_range`
+## Function `out_of_range` <a id="0x1_error_out_of_range"></a>
 
 
 
@@ -251,9 +238,7 @@ Functions to construct a canonical error code of the given category.
 
 </details>
 
-<a id="0x1_error_invalid_state"></a>
-
-## Function `invalid_state`
+## Function `invalid_state` <a id="0x1_error_invalid_state"></a>
 
 
 
@@ -273,9 +258,7 @@ Functions to construct a canonical error code of the given category.
 
 </details>
 
-<a id="0x1_error_unauthenticated"></a>
-
-## Function `unauthenticated`
+## Function `unauthenticated` <a id="0x1_error_unauthenticated"></a>
 
 
 
@@ -295,9 +278,7 @@ Functions to construct a canonical error code of the given category.
 
 </details>
 
-<a id="0x1_error_permission_denied"></a>
-
-## Function `permission_denied`
+## Function `permission_denied` <a id="0x1_error_permission_denied"></a>
 
 
 
@@ -317,9 +298,7 @@ Functions to construct a canonical error code of the given category.
 
 </details>
 
-<a id="0x1_error_not_found"></a>
-
-## Function `not_found`
+## Function `not_found` <a id="0x1_error_not_found"></a>
 
 
 
@@ -339,9 +318,7 @@ Functions to construct a canonical error code of the given category.
 
 </details>
 
-<a id="0x1_error_aborted"></a>
-
-## Function `aborted`
+## Function `aborted` <a id="0x1_error_aborted"></a>
 
 
 
@@ -361,9 +338,7 @@ Functions to construct a canonical error code of the given category.
 
 </details>
 
-<a id="0x1_error_already_exists"></a>
-
-## Function `already_exists`
+## Function `already_exists` <a id="0x1_error_already_exists"></a>
 
 
 
@@ -383,9 +358,7 @@ Functions to construct a canonical error code of the given category.
 
 </details>
 
-<a id="0x1_error_resource_exhausted"></a>
-
-## Function `resource_exhausted`
+## Function `resource_exhausted` <a id="0x1_error_resource_exhausted"></a>
 
 
 
@@ -405,9 +378,7 @@ Functions to construct a canonical error code of the given category.
 
 </details>
 
-<a id="0x1_error_internal"></a>
-
-## Function `internal`
+## Function `internal` <a id="0x1_error_internal"></a>
 
 
 
@@ -427,9 +398,7 @@ Functions to construct a canonical error code of the given category.
 
 </details>
 
-<a id="0x1_error_not_implemented"></a>
-
-## Function `not_implemented`
+## Function `not_implemented` <a id="0x1_error_not_implemented"></a>
 
 
 
@@ -449,9 +418,7 @@ Functions to construct a canonical error code of the given category.
 
 </details>
 
-<a id="0x1_error_unavailable"></a>
-
-## Function `unavailable`
+## Function `unavailable` <a id="0x1_error_unavailable"></a>
 
 
 

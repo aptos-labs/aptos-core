@@ -1,8 +1,8 @@
 {
   "compilerOptions": {
-    "target": "es5",
-    "moduleResolution": "node",
-    "module": "commonjs",
+    "target": "es2022",
+    "moduleResolution": "NodeNext",
+    "module": "NodeNext",
     "noEmit": true,
     "allowJs": true,
     "removeComments": false,

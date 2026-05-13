@@ -20,6 +20,7 @@ pub mod quorum_store_onchain_enable_test;
 pub mod reconfiguration_test;
 pub mod state_sync_performance;
 pub mod three_region_simulation_test;
+pub mod transaction_tracing_test;
 pub mod twin_validator_test;
 pub mod two_traffics_test;
 pub mod validator_join_leave_test;
@@ -28,8 +29,9 @@ pub mod validator_reboot_stress_test;
 use anyhow::Context;
 use aptos_forge::{
     prometheus_metrics::{fetch_latency_breakdown, LatencyBreakdown},
-    EmitJob, EmitJobRequest, NetworkContext, NetworkContextSynchronizer, NetworkTest, NodeExt,
-    Result, Swarm, SwarmExt, Test, TestReport, TxnEmitter, TxnStats, Version,
+    wait_for_clients_to_be_txn_ready, EmitJob, EmitJobRequest, NetworkContext,
+    NetworkContextSynchronizer, NetworkTest, NodeExt, Result, Swarm, SwarmExt, Test, TestReport,
+    TxnEmitter, TxnStats, Version,
 };
 use aptos_logger::warn;
 use aptos_rest_client::Client as RestClient;
@@ -47,8 +49,17 @@ use std::{
 };
 use tokio::runtime::{Handle, Runtime};
 
+const DEFAULT_REST_CLIENT_TIMEOUT_SECS: u64 = 30;
 pub const WARMUP_DURATION_FRACTION: f32 = 0.07;
 pub const COOLDOWN_DURATION_FRACTION: f32 = 0.04;
+
+/// Bounds for the txn-ready probe used before emitting load against a chosen client set.
+/// The timestamp bound is the load-bearing check (catches PFNs that haven't peered or
+/// validators that just restarted); the version bound is a sanity check that the chosen
+/// clients agree with each other. The overall timeout caps how long we'll wait.
+const TXN_READY_MAX_LAG_VERSIONS: u64 = 1_000;
+const TXN_READY_MAX_TIMESTAMP_LAG: Duration = Duration::from_secs(30);
+const TXN_READY_TIMEOUT: Duration = Duration::from_secs(120);
 
 async fn batch_update(
     ctx: &mut NetworkContext<'_>,
@@ -135,12 +146,9 @@ async fn batch_update_gradually(
 pub async fn create_emitter_and_request(
     swarm: Arc<tokio::sync::RwLock<Box<dyn Swarm>>>,
     mut emit_job_request: EmitJobRequest,
-    nodes: &[PeerId],
+    clients: Vec<RestClient>,
     rng: StdRng,
 ) -> Result<(TxnEmitter, EmitJobRequest)> {
-    // as we are loading nodes, use higher client timeout
-    let client_timeout = Duration::from_secs(30);
-
     let chain_info = swarm.read().await.chain_info();
     let transaction_factory = TransactionFactory::new(chain_info.chain_id);
     let rest_cli = swarm
@@ -152,12 +160,7 @@ pub async fn create_emitter_and_request(
         .rest_client();
     let emitter = TxnEmitter::new(transaction_factory, rng, rest_cli);
 
-    emit_job_request = emit_job_request.rest_clients(
-        swarm
-            .read()
-            .await
-            .get_clients_for_peers(nodes, client_timeout),
-    );
+    emit_job_request = emit_job_request.rest_clients(clients);
     Ok((emitter, emit_job_request))
 }
 
@@ -173,8 +176,21 @@ pub async fn generate_traffic(
 ) -> Result<TxnStats> {
     let emit_job_request = ctx.emit_job.clone();
     let rng = SeedableRng::from_rng(ctx.core().rng())?;
+    let clients = ctx
+        .swarm
+        .read()
+        .await
+        .get_clients_for_peers(nodes, Duration::from_secs(DEFAULT_REST_CLIENT_TIMEOUT_SECS));
+    wait_for_clients_to_be_txn_ready(
+        &clients,
+        TXN_READY_MAX_LAG_VERSIONS,
+        TXN_READY_MAX_TIMESTAMP_LAG,
+        TXN_READY_TIMEOUT,
+    )
+    .await
+    .context("wait for traffic clients to be txn-ready")?;
     let (emitter, emit_job_request) =
-        create_emitter_and_request(ctx.swarm.clone(), emit_job_request, nodes, rng).await?;
+        create_emitter_and_request(ctx.swarm.clone(), emit_job_request, clients, rng).await?;
 
     let stats = emitter
         .emit_txn_for(
@@ -187,36 +203,77 @@ pub async fn generate_traffic(
     Ok(stats)
 }
 
+#[derive(Debug)]
 pub enum LoadDestination {
     AllNodes,
     AllValidators,
     AllFullnodes,
     // Send to AllFullnodes, if any exist, otherwise to AllValidators
     FullnodesOtherwiseValidators,
+    // Send to PFNs if any exist, otherwise AllFullnodes, otherwise AllValidators
+    PfnsOtherwiseFullnodesOtherwiseValidators,
     Peers(Vec<PeerId>),
 }
 
 impl LoadDestination {
-    async fn get_destination_nodes(
+    pub async fn get_destination_clients(
         self,
         swarm: Arc<tokio::sync::RwLock<Box<dyn Swarm>>>,
-    ) -> Vec<PeerId> {
-        let swarm = swarm.read().await;
-        let all_validators = swarm.validators().map(|v| v.peer_id()).collect::<Vec<_>>();
-        let all_fullnodes = swarm.full_nodes().map(|v| v.peer_id()).collect::<Vec<_>>();
+    ) -> Vec<RestClient> {
+        // Collect validator and fullnode clients
+        let client_timeout = Duration::from_secs(DEFAULT_REST_CLIENT_TIMEOUT_SECS);
+        let (all_validator_clients, all_fullnode_clients) = {
+            let swarm_lock = swarm.read().await;
+            let validator_clients = swarm_lock
+                .validators()
+                .map(|v| v.rest_client_with_timeout(client_timeout))
+                .collect::<Vec<_>>();
+            let fullnode_clients = swarm_lock
+                .full_nodes()
+                .map(|f| f.rest_client_with_timeout(client_timeout))
+                .collect::<Vec<_>>();
+            (validator_clients, fullnode_clients)
+        };
+
+        // Determine the clients based on the specified destination
+        info!(
+            "Load destination: {:?}, validator clients found: {:?}, fullnode clients found: {:?}",
+            self, all_validator_clients, all_fullnode_clients
+        );
 
         match self {
-            LoadDestination::AllNodes => [&all_validators[..], &all_fullnodes[..]].concat(),
-            LoadDestination::AllValidators => all_validators,
-            LoadDestination::AllFullnodes => all_fullnodes,
+            LoadDestination::AllNodes => [all_validator_clients, all_fullnode_clients].concat(),
+            LoadDestination::AllValidators => all_validator_clients,
+            LoadDestination::AllFullnodes => all_fullnode_clients,
             LoadDestination::FullnodesOtherwiseValidators => {
-                if all_fullnodes.is_empty() {
-                    all_validators
+                if all_fullnode_clients.is_empty() {
+                    all_validator_clients
                 } else {
-                    all_fullnodes
+                    all_fullnode_clients
                 }
             },
-            LoadDestination::Peers(peers) => peers,
+            LoadDestination::Peers(peers) => swarm
+                .read()
+                .await
+                .get_clients_for_peers(&peers, client_timeout),
+            LoadDestination::PfnsOtherwiseFullnodesOtherwiseValidators => {
+                // Get the PFN clients
+                let pfn_clients = swarm
+                    .read()
+                    .await
+                    .get_pfn_rest_clients(client_timeout)
+                    .await;
+                info!("PFN destination clients found: {:?}", pfn_clients);
+
+                // Determine the clients based on the specified destination
+                if !pfn_clients.is_empty() {
+                    pfn_clients
+                } else if !all_fullnode_clients.is_empty() {
+                    all_fullnode_clients
+                } else {
+                    all_validator_clients
+                }
+            },
         }
     }
 }
@@ -340,7 +397,7 @@ impl NetworkTest for dyn NetworkLoadTest {
 
 pub async fn create_buffered_load(
     swarm: Arc<tokio::sync::RwLock<Box<dyn Swarm>>>,
-    nodes_to_send_load_to: &[PeerId],
+    clients_to_send_load_to: Vec<RestClient>,
     emit_job_request: EmitJobRequest,
     duration: Duration,
     warmup_duration_fraction: f32,
@@ -349,19 +406,23 @@ pub async fn create_buffered_load(
     mut synchronized_with_job: Option<&mut EmitJob>,
 ) -> Result<Vec<LoadTestPhaseStats>> {
     // Generate some traffic
+    let clients = clients_to_send_load_to.clone();
+    wait_for_clients_to_be_txn_ready(
+        &clients,
+        TXN_READY_MAX_LAG_VERSIONS,
+        TXN_READY_MAX_TIMESTAMP_LAG,
+        TXN_READY_TIMEOUT,
+    )
+    .await
+    .context("wait for load clients to be txn-ready")?;
     let (mut emitter, emit_job_request) = create_emitter_and_request(
         swarm.clone(),
         emit_job_request,
-        nodes_to_send_load_to,
+        clients_to_send_load_to,
         StdRng::from_entropy(),
     )
     .await
     .context("create emitter")?;
-
-    let clients = swarm
-        .read()
-        .await
-        .get_clients_for_peers(nodes_to_send_load_to, Duration::from_secs(10));
 
     let mut stats_tracking_phases = emit_job_request.get_num_phases();
     assert!(stats_tracking_phases > 0 && stats_tracking_phases != 2);
@@ -520,11 +581,11 @@ impl dyn NetworkLoadTest + '_ {
         synchronized_with_job: Option<&mut EmitJob>,
     ) -> Result<Vec<LoadTestPhaseStats>> {
         let destination = self.setup(ctx).await.context("setup NetworkLoadTest")?;
-        let nodes_to_send_load_to = destination.get_destination_nodes(ctx.swarm.clone()).await;
+        let clients_to_send_load_to = destination.get_destination_clients(ctx.swarm.clone()).await;
 
         create_buffered_load(
             ctx.swarm.clone(),
-            &nodes_to_send_load_to,
+            clients_to_send_load_to,
             emit_job_request,
             duration,
             warmup_duration_fraction,

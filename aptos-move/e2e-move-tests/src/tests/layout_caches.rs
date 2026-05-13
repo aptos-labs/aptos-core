@@ -21,15 +21,9 @@ fn test_layout_cache_successful_reads() {
     let mut h = MoveHarness::new_with_executor(executor);
     let acc = h.new_account_at(AccountAddress::from_hex_literal("0xcafe").unwrap());
 
-    assert_success!(
-        h.publish_package_cache_building(&acc, &common::test_dir_path("layout_caches.data/p1"))
-    );
-    assert_success!(
-        h.publish_package_cache_building(&acc, &common::test_dir_path("layout_caches.data/p2"))
-    );
-    assert_success!(
-        h.publish_package_cache_building(&acc, &common::test_dir_path("layout_caches.data/p3"))
-    );
+    assert_success!(h.publish_package(&acc, &common::test_dir_path("layout_caches.data/p1")));
+    assert_success!(h.publish_package(&acc, &common::test_dir_path("layout_caches.data/p2")));
+    assert_success!(h.publish_package(&acc, &common::test_dir_path("layout_caches.data/p3")));
 
     let mut txns = vec![];
     for i in 0..32 {
@@ -109,9 +103,10 @@ fn test_layout_cache_successful_reads() {
         let account =
             h.new_account_at(AccountAddress::from_hex_literal(&format!("0xcafe3{}", i)).unwrap());
         let txn = if i == 15 {
-            h.create_publish_package_cache_building(
+            h.create_publish_package(
                 &acc,
                 &common::test_dir_path("layout_caches.data/p3_upgraded"),
+                None,
                 |_| {},
             )
         } else {
@@ -162,18 +157,9 @@ fn test_stale_layouts_are_ignored() {
     let mut h = MoveHarness::new_with_executor(executor);
 
     let publisher = h.new_account_at(AccountAddress::from_hex_literal("0xcafe").unwrap());
-    assert_success!(h.publish_package_cache_building(
-        &publisher,
-        &common::test_dir_path("layout_caches.data/p1"),
-    ));
-    assert_success!(h.publish_package_cache_building(
-        &publisher,
-        &common::test_dir_path("layout_caches.data/p2"),
-    ));
-    assert_success!(h.publish_package_cache_building(
-        &publisher,
-        &common::test_dir_path("layout_caches.data/p3"),
-    ));
+    assert_success!(h.publish_package(&publisher, &common::test_dir_path("layout_caches.data/p1"),));
+    assert_success!(h.publish_package(&publisher, &common::test_dir_path("layout_caches.data/p2"),));
+    assert_success!(h.publish_package(&publisher, &common::test_dir_path("layout_caches.data/p3"),));
     h.modify_gas_schedule(|gas_params| {
         gas_params.vm.txn.max_num_dependencies = 8.into();
     });
@@ -188,9 +174,10 @@ fn test_stale_layouts_are_ignored() {
     let mut reader_iter = accounts.iter();
     for i in 0..201 {
         if i == 2 {
-            txns.push(h.create_publish_package_cache_building(
+            txns.push(h.create_publish_package(
                 &publisher,
                 &common::test_dir_path("layout_caches.data/p3_upgraded"),
+                None,
                 |_| {},
             ));
         } else {

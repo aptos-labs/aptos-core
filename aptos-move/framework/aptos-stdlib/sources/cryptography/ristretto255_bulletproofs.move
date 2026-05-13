@@ -124,10 +124,17 @@ module aptos_std::ristretto255_bulletproofs {
     ///
     /// NOTE: currently, domain separation tags of size larger than 256 bytes are not supported.
     public fun verify_batch_range_proof_pedersen(
+        _comms: &vector<pedersen::Commitment>, _proof: &RangeProof,
+        _num_bits: u64, _dst: vector<u8>): bool
+    {
+        abort error::unavailable(E_NATIVE_FUN_NOT_AVAILABLE)
+    }
+
+    fun verify_batch_range_proof_pedersen_helper(
         comms: &vector<pedersen::Commitment>, proof: &RangeProof,
         num_bits: u64, dst: vector<u8>): bool
     {
-        verify_batch_range_proof(
+        verify_batch_range_proof_helper(
             &comms.map_ref(|com| ristretto255::point_clone(pedersen::commitment_as_point(com))),
             &ristretto255::basepoint(), &ristretto255::hash_to_point_base(),
             proof,
@@ -136,13 +143,21 @@ module aptos_std::ristretto255_bulletproofs {
         )
     }
 
-    // Verifies a zero-knowledge range proof for a batch of commitments `comms` (each of the form
+    /// Verifies a zero-knowledge range proof for a batch of commitments `comms` (each of the form
     /// `v * val_base + r * rand_base`), ensuring that all values `v` satisfy
     /// `v` in `[0, 2^num_bits)`. Only works for `num_bits` in `{8, 16, 32, 64}` and batch size
     /// (length of the `comms`) in `{1, 2, 4, 8, 16}`.
     ///
     /// NOTE: currently, domain separation tags of size larger than 256 bytes are not supported.
     public fun verify_batch_range_proof(
+        _comms: &vector<RistrettoPoint>,
+        _val_base: &RistrettoPoint, _rand_base: &RistrettoPoint,
+        _proof: &RangeProof, _num_bits: u64, _dst: vector<u8>): bool
+    {
+        abort error::unavailable(E_NATIVE_FUN_NOT_AVAILABLE)
+    }
+
+    fun verify_batch_range_proof_helper(
         comms: &vector<RistrettoPoint>,
         val_base: &RistrettoPoint, rand_base: &RistrettoPoint,
         proof: &RangeProof, num_bits: u64, dst: vector<u8>): bool
@@ -333,7 +348,7 @@ module aptos_std::ristretto255_bulletproofs {
 
         let comms = vector[comm_a.extract(), comm_b.extract()];
 
-        verify_batch_range_proof_pedersen(&comms, &range_proof_from_bytes(AB_BATCH_RANGE_PROOF_PEDERSEN), 10, A_DST);
+        verify_batch_range_proof_pedersen_helper(&comms, &range_proof_from_bytes(AB_BATCH_RANGE_PROOF_PEDERSEN), 10, A_DST);
     }
 
     #[test(fx = @std)]
@@ -369,10 +384,10 @@ module aptos_std::ristretto255_bulletproofs {
 
         let (proof, comms) = prove_batch_range_pedersen(&vs, &rs, num_bits, A_DST);
 
-        assert!(verify_batch_range_proof_pedersen(&comms, &proof, 64, A_DST) == false, 1);
-        assert!(verify_batch_range_proof_pedersen(&comms, &proof, 32, A_DST) == false, 1);
-        assert!(verify_batch_range_proof_pedersen(&comms, &proof, 16, A_DST) == false, 1);
-        assert!(verify_batch_range_proof_pedersen(&comms, &proof, num_bits, A_DST), 1);
+        assert!(verify_batch_range_proof_pedersen_helper(&comms, &proof, 64, A_DST) == false, 1);
+        assert!(verify_batch_range_proof_pedersen_helper(&comms, &proof, 32, A_DST) == false, 1);
+        assert!(verify_batch_range_proof_pedersen_helper(&comms, &proof, 16, A_DST) == false, 1);
+        assert!(verify_batch_range_proof_pedersen_helper(&comms, &proof, num_bits, A_DST), 1);
     }
 
     #[test(fx = @std)]
@@ -409,7 +424,7 @@ module aptos_std::ristretto255_bulletproofs {
         let (proof, comms) = prove_batch_range_pedersen(&vs, &rs, num_bits, A_DST);
 
         // This will fail with error::invalid_state(E_NATIVE_FUN_NOT_AVAILABLE)
-        verify_batch_range_proof_pedersen(&comms, &proof, num_bits, A_DST);
+        verify_batch_range_proof_pedersen_helper(&comms, &proof, num_bits, A_DST);
     }
 
     #[test(fx = @std)]
@@ -441,7 +456,7 @@ module aptos_std::ristretto255_bulletproofs {
         )];
 
         // This will fail with error::invalid_argument(E_DESERIALIZE_RANGE_PROOF)
-        verify_batch_range_proof_pedersen(&comms, proof, num_bits, A_DST);
+        verify_batch_range_proof_pedersen_helper(&comms, proof, num_bits, A_DST);
     }
 
     #[test(fx = @std)]
@@ -564,7 +579,7 @@ module aptos_std::ristretto255_bulletproofs {
         assert!(commitment_equals(comms.borrow(1), &pedersen::new_commitment_from_bytes(B_COMM).extract()
         ), 1);
 
-        assert!(verify_batch_range_proof_pedersen(
+        assert!(verify_batch_range_proof_pedersen_helper(
             &comms,
             &range_proof_from_bytes(AB_BATCH_RANGE_PROOF_PEDERSEN), MAX_RANGE_BITS, A_DST), 1);
     }
@@ -605,7 +620,7 @@ module aptos_std::ristretto255_bulletproofs {
         let pos = range_proof_invalid.length() / 2;
         range_proof_invalid[pos] += 1;
 
-        assert!(verify_batch_range_proof_pedersen(
+        assert!(verify_batch_range_proof_pedersen_helper(
             &comms,
             &range_proof_from_bytes(range_proof_invalid), MAX_RANGE_BITS, A_DST) == false, 1);
     }

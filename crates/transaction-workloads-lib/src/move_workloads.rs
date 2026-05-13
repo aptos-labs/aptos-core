@@ -305,6 +305,9 @@ pub enum EntryPoints {
 
     /// Different microbenchmarks to stress-test Move VM.
     MoveVmMicroBenchmark(MoveVmMicroBenchmark),
+
+    /// Roll a dice using on-chain randomness (#[randomness] entry function)
+    DiceRoll,
 }
 
 impl EntryPointTrait for EntryPoints {
@@ -362,7 +365,8 @@ impl EntryPointTrait for EntryPoints {
             | EntryPoints::FungibleAssetMint
             | EntryPoints::APTTransferWithPermissionedSigner
             | EntryPoints::APTTransferWithMasterSigner
-            | EntryPoints::MonotonicCounter { .. } => "framework_usecases",
+            | EntryPoints::MonotonicCounter { .. }
+            | EntryPoints::DiceRoll => "framework_usecases",
             EntryPoints::OrderBook { .. } => "experimental_usecases",
             EntryPoints::TokenV2AmbassadorMint { .. } | EntryPoints::TokenV2AmbassadorBurn => {
                 "ambassador_token"
@@ -451,6 +455,7 @@ impl EntryPointTrait for EntryPoints {
             | EntryPoints::APTTransferWithMasterSigner => "permissioned_transfer",
             EntryPoints::MonotonicCounter { .. } => "transaction_context_example",
             EntryPoints::OrderBook { .. } => "order_book_example",
+            EntryPoints::DiceRoll => "dice_roll",
             EntryPoints::MoveVmMicroBenchmark(entrypoint) => match entrypoint {
                 MoveVmMicroBenchmark::Locals | MoveVmMicroBenchmark::LocalsGeneric => "locals",
             },
@@ -952,6 +957,7 @@ impl EntryPointTrait for EntryPoints {
                     get_payload_void(module_id, ident_str!("benchmark_generic").to_owned())
                 },
             },
+            EntryPoints::DiceRoll => get_payload_void(module_id, ident_str!("roll").to_owned()),
         }
     }
 
@@ -1077,6 +1083,7 @@ impl EntryPointTrait for EntryPoints {
             EntryPoints::MonotonicCounter { .. } => AutomaticArgs::None,
             EntryPoints::OrderBook { .. } => AutomaticArgs::None,
             EntryPoints::MoveVmMicroBenchmark(_) => AutomaticArgs::None,
+            EntryPoints::DiceRoll => AutomaticArgs::Signer,
         }
     }
 }

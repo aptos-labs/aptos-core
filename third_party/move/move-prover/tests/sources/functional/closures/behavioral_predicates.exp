@@ -15,11 +15,6 @@ error: post-condition does not hold
    =     at tests/sources/functional/closures/behavioral_predicates.move:35: test_ensures_of_fail
    =         y = <redacted>
    =         result = <redacted>
-   =     at tests/sources/functional/closures/behavioral_predicates.move:35: test_ensures_of_fail
-   =         result = <redacted>
-   =     at tests/sources/functional/closures/behavioral_predicates.move:20: apply
-   =         result = <redacted>
-   =     at tests/sources/functional/closures/behavioral_predicates.move:36: test_ensures_of_fail
    =     at tests/sources/functional/closures/behavioral_predicates.move:38: test_ensures_of_fail (spec)
 
 error: post-condition does not hold
@@ -38,11 +33,6 @@ error: post-condition does not hold
     =     at tests/sources/functional/closures/behavioral_predicates.move:234: test_wrong_ensures
     =         y = <redacted>
     =         result = <redacted>
-    =     at tests/sources/functional/closures/behavioral_predicates.move:234: test_wrong_ensures
-    =         result = <redacted>
-    =     at tests/sources/functional/closures/behavioral_predicates.move:20: apply
-    =         result = <redacted>
-    =     at tests/sources/functional/closures/behavioral_predicates.move:235: test_wrong_ensures
     =     at tests/sources/functional/closures/behavioral_predicates.move:237: test_wrong_ensures (spec)
 
 error: post-condition does not hold
@@ -61,11 +51,6 @@ error: post-condition does not hold
     =     at tests/sources/functional/closures/behavioral_predicates.move:242: test_postcondition_too_strong
     =         y = <redacted>
     =         result = <redacted>
-    =     at tests/sources/functional/closures/behavioral_predicates.move:242: test_postcondition_too_strong
-    =         result = <redacted>
-    =     at tests/sources/functional/closures/behavioral_predicates.move:20: apply
-    =         result = <redacted>
-    =     at tests/sources/functional/closures/behavioral_predicates.move:243: test_postcondition_too_strong
     =     at tests/sources/functional/closures/behavioral_predicates.move:245: test_postcondition_too_strong (spec)
     =     at tests/sources/functional/closures/behavioral_predicates.move:246: test_postcondition_too_strong (spec)
 
@@ -88,11 +73,6 @@ error: post-condition does not hold
     =         a = <redacted>
     =         b = <redacted>
     =         result = <redacted>
-    =     at tests/sources/functional/closures/behavioral_predicates.move:251: test_wrong_binary
-    =         result = <redacted>
-    =     at tests/sources/functional/closures/behavioral_predicates.move:48: apply2
-    =         result = <redacted>
-    =     at tests/sources/functional/closures/behavioral_predicates.move:252: test_wrong_binary
     =     at tests/sources/functional/closures/behavioral_predicates.move:254: test_wrong_binary (spec)
 
 error: post-condition does not hold
@@ -105,7 +85,6 @@ error: post-condition does not hold
     =         x = <redacted>
     =     at tests/sources/functional/closures/behavioral_predicates.move:537: test_ensures_of_fail_opaque
     =         result = <redacted>
-    =     at tests/sources/functional/closures/behavioral_predicates.move:538: test_ensures_of_fail_opaque
     =     at tests/sources/functional/closures/behavioral_predicates.move:540: test_ensures_of_fail_opaque (spec)
 
 error: post-condition does not hold
@@ -118,7 +97,6 @@ error: post-condition does not hold
     =         x = <redacted>
     =     at tests/sources/functional/closures/behavioral_predicates.move:619: test_wrong_ensures_opaque
     =         result = <redacted>
-    =     at tests/sources/functional/closures/behavioral_predicates.move:620: test_wrong_ensures_opaque
     =     at tests/sources/functional/closures/behavioral_predicates.move:622: test_wrong_ensures_opaque (spec)
 
 error: post-condition does not hold
@@ -131,7 +109,6 @@ error: post-condition does not hold
     =         x = <redacted>
     =     at tests/sources/functional/closures/behavioral_predicates.move:627: test_postcondition_too_strong_opaque
     =         result = <redacted>
-    =     at tests/sources/functional/closures/behavioral_predicates.move:628: test_postcondition_too_strong_opaque
     =     at tests/sources/functional/closures/behavioral_predicates.move:630: test_postcondition_too_strong_opaque (spec)
     =     at tests/sources/functional/closures/behavioral_predicates.move:631: test_postcondition_too_strong_opaque (spec)
 
@@ -146,5 +123,4 @@ error: post-condition does not hold
     =         y = <redacted>
     =     at tests/sources/functional/closures/behavioral_predicates.move:636: test_wrong_binary_opaque
     =         result = <redacted>
-    =     at tests/sources/functional/closures/behavioral_predicates.move:637: test_wrong_binary_opaque
     =     at tests/sources/functional/closures/behavioral_predicates.move:639: test_wrong_binary_opaque (spec)

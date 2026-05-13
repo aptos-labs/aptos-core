@@ -3,9 +3,9 @@
 
 use crate::{
     payload::{OptBatches, OptQuorumStorePayload, PayloadExecutionLimit, TxnAndGasLimits},
-    proof_of_store::{BatchInfoExt, ProofCache, ProofOfStore, TBatchInfo},
+    proof_of_store::{BatchInfoExt, BatchKind, ProofCache, ProofOfStore, TBatchInfo},
 };
-use anyhow::{bail, ensure};
+use anyhow::{bail, ensure, Context};
 use aptos_crypto::{
     hash::{CryptoHash, CryptoHasher},
     HashValue,
@@ -124,6 +124,88 @@ pub struct RejectedTransactionSummary {
     pub reason: DiscardedVMStatus,
 }
 
+/// Verify that transactions match the expected BatchKind:
+/// - Encrypted: all txns must be encrypted with valid ciphertext
+/// - Normal: no txns may be encrypted
+/// - None (V1): no encrypted txns allowed
+pub fn verify_batch_kind_transactions(
+    kind: Option<BatchKind>,
+    txns: &[SignedTransaction],
+) -> anyhow::Result<()> {
+    match kind {
+        Some(BatchKind::Encrypted) => {
+            txns.par_iter()
+                .with_min_len(24)
+                .try_for_each(|txn| -> anyhow::Result<()> {
+                    ensure!(
+                        txn.is_encrypted_txn(),
+                        "Encrypted batch contains non-encrypted transaction"
+                    );
+                    let encrypted_payload = txn
+                        .payload()
+                        .as_encrypted_payload()
+                        .expect("already verified is_encrypted_txn");
+                    ensure!(
+                        encrypted_payload.is_encrypted(),
+                        "Encrypted batch contains transaction not in Encrypted state"
+                    );
+                    ensure!(
+                        !encrypted_payload.extra_config().is_multisig(),
+                        "Encrypted transactions do not support multisig"
+                    );
+                    let signer_auth_keys = txn
+                        .authenticator()
+                        .all_signer_auth_keys(txn.sender())
+                        .context(
+                        "Encrypted transactions are not supported with this authenticator type",
+                    )?;
+                    encrypted_payload
+                        .verify(txn.sender(), signer_auth_keys)
+                        .context("Encrypted transaction ciphertext verification failed")
+                })?;
+        },
+        Some(BatchKind::Normal) => {
+            for txn in txns {
+                ensure!(
+                    !txn.is_encrypted_txn(),
+                    "Normal batch contains encrypted transaction"
+                );
+            }
+        },
+        None => {
+            // V1 batches do not support encrypted transactions
+            for txn in txns {
+                ensure!(
+                    !txn.is_encrypted_txn(),
+                    "V1 batch contains encrypted transaction"
+                );
+            }
+        },
+    }
+    Ok(())
+}
+
+/// Validates that a single batch's num_txns and num_bytes are within receiver-side limits.
+pub fn verify_batch_info_limits<T: TBatchInfo>(
+    batch: &T,
+    max_batch_txns: u64,
+    max_batch_bytes: u64,
+) -> anyhow::Result<()> {
+    ensure!(
+        batch.num_txns() <= max_batch_txns,
+        "Batch txn count {} exceeds limit {}",
+        batch.num_txns(),
+        max_batch_txns,
+    );
+    ensure!(
+        batch.num_bytes() <= max_batch_bytes,
+        "Batch byte count {} exceeds limit {}",
+        batch.num_bytes(),
+        max_batch_bytes,
+    );
+    Ok(())
+}
+
 /// The payload in block.
 #[derive(Deserialize, Serialize, Clone, Debug, PartialEq, Eq)]
 pub enum Payload {
@@ -230,6 +312,13 @@ impl Payload {
         }
     }
 
+    pub fn has_encrypted_batches(&self) -> bool {
+        match self {
+            Payload::OptQuorumStore(opt_qs) => opt_qs.has_encrypted_batches(),
+            _ => false,
+        }
+    }
+
     pub fn is_direct(&self) -> bool {
         matches!(self, Payload::DirectMempool(_))
     }
@@ -281,8 +370,11 @@ impl Payload {
 
     pub fn verify_inline_batches<'a, T: TBatchInfo + 'a>(
         inline_batches: impl Iterator<Item = (&'a T, &'a Vec<SignedTransaction>)>,
+        max_batch_txns: u64,
+        max_batch_bytes: u64,
     ) -> anyhow::Result<()> {
         for (batch, payload) in inline_batches {
+            verify_batch_info_limits(batch, max_batch_txns, max_batch_bytes)?;
             // TODO: Can cloning be avoided here?
             let computed_digest = BatchPayload::new(batch.author(), payload.clone()).hash();
             ensure!(
@@ -292,6 +384,7 @@ impl Payload {
                 computed_digest,
                 batch.digest()
             );
+            verify_batch_kind_transactions(batch.batch_kind(), payload)?;
         }
         Ok(())
     }
@@ -299,9 +392,12 @@ impl Payload {
     pub fn verify_opt_batches<T: TBatchInfo>(
         verifier: &ValidatorVerifier,
         opt_batches: &OptBatches<T>,
+        max_batch_txns: u64,
+        max_batch_bytes: u64,
     ) -> anyhow::Result<()> {
         let authors = verifier.address_to_validator_index();
         for batch in &opt_batches.batch_summary {
+            verify_batch_info_limits(batch, max_batch_txns, max_batch_bytes)?;
             ensure!(
                 authors.contains_key(&batch.author()),
                 "Invalid author {} for batch {}",
@@ -318,18 +414,30 @@ impl Payload {
         proof_cache: &ProofCache,
         quorum_store_enabled: bool,
         opt_qs_v2_rx_enabled: bool,
+        max_batch_txns: u64,
+        max_batch_bytes: u64,
     ) -> anyhow::Result<()> {
         match (quorum_store_enabled, self) {
             (false, Payload::DirectMempool(_)) => Ok(()),
             (true, Payload::OptQuorumStore(OptQuorumStorePayload::V1(p))) => {
                 let proof_with_data = p.proof_with_data();
                 Self::verify_with_cache(&proof_with_data.batch_summary, verifier, proof_cache)?;
+                for proof in &proof_with_data.batch_summary {
+                    verify_batch_info_limits(proof.info(), max_batch_txns, max_batch_bytes)?;
+                }
                 Self::verify_inline_batches(
                     p.inline_batches()
                         .iter()
                         .map(|batch| (batch.info(), batch.transactions())),
+                    max_batch_txns,
+                    max_batch_bytes,
                 )?;
-                Self::verify_opt_batches(verifier, p.opt_batches())?;
+                Self::verify_opt_batches(
+                    verifier,
+                    p.opt_batches(),
+                    max_batch_txns,
+                    max_batch_bytes,
+                )?;
                 Ok(())
             },
             (true, Payload::OptQuorumStore(OptQuorumStorePayload::V2(p))) => {
@@ -339,12 +447,22 @@ impl Payload {
                 );
                 let proof_with_data = p.proof_with_data();
                 Self::verify_with_cache(&proof_with_data.batch_summary, verifier, proof_cache)?;
+                for proof in &proof_with_data.batch_summary {
+                    verify_batch_info_limits(proof.info(), max_batch_txns, max_batch_bytes)?;
+                }
                 Self::verify_inline_batches(
                     p.inline_batches()
                         .iter()
                         .map(|batch| (batch.info(), batch.transactions())),
+                    max_batch_txns,
+                    max_batch_bytes,
                 )?;
-                Self::verify_opt_batches(verifier, p.opt_batches())?;
+                Self::verify_opt_batches(
+                    verifier,
+                    p.opt_batches(),
+                    max_batch_txns,
+                    max_batch_bytes,
+                )?;
                 Ok(())
             },
             (_, _) => Err(anyhow::anyhow!(
@@ -538,5 +656,435 @@ impl fmt::Display for PayloadFilter {
                 write!(f, "Empty filter")
             },
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::{
+        payload::{
+            BatchPointer, InlineBatches, OptBatches, OptQuorumStorePayload, PayloadExecutionLimit,
+        },
+        proof_of_store::{BatchInfo, ProofCache},
+    };
+    use aptos_crypto::{ed25519::Ed25519PrivateKey, HashValue, PrivateKey, SigningKey, Uniform};
+    use aptos_types::{
+        chain_id::ChainId,
+        secret_sharing::Ciphertext,
+        transaction::{
+            encrypted_payload::{DecryptionFailureReason, EncryptedInner, EncryptedPayload},
+            RawTransaction, Script, TransactionExtraConfig, TransactionPayload,
+        },
+        validator_verifier::random_validator_verifier,
+    };
+
+    const MAX_BATCH_TXNS: u64 = 100;
+    const MAX_BATCH_BYTES: u64 = 1024 * 1024;
+
+    fn make_batch_info(author: PeerId, num_txns: u64, num_bytes: u64) -> BatchInfo {
+        BatchInfo::new(
+            author,
+            aptos_types::quorum_store::BatchId::new_for_test(1),
+            1, // epoch
+            1000,
+            HashValue::random(),
+            num_txns,
+            num_bytes,
+            0,
+        )
+    }
+
+    fn make_batch_info_with_txns(author: PeerId, txns: &[SignedTransaction]) -> BatchInfo {
+        let batch_payload = BatchPayload::new(author, txns.to_vec());
+        let digest = batch_payload.hash();
+        let num_bytes = batch_payload.num_bytes() as u64;
+        BatchInfo::new(
+            author,
+            aptos_types::quorum_store::BatchId::new_for_test(1),
+            1,
+            1000,
+            digest,
+            txns.len() as u64,
+            num_bytes,
+            0,
+        )
+    }
+
+    #[test]
+    fn test_verify_batch_info_limits_accepts_valid() {
+        let author = PeerId::random();
+        let batch = make_batch_info(author, 50, 500_000);
+        assert!(verify_batch_info_limits(&batch, MAX_BATCH_TXNS, MAX_BATCH_BYTES).is_ok());
+    }
+
+    #[test]
+    fn test_verify_batch_info_limits_rejects_excess_txns() {
+        let author = PeerId::random();
+        let batch = make_batch_info(author, MAX_BATCH_TXNS + 1, 100);
+        assert!(verify_batch_info_limits(&batch, MAX_BATCH_TXNS, MAX_BATCH_BYTES).is_err());
+    }
+
+    #[test]
+    fn test_verify_batch_info_limits_rejects_excess_bytes() {
+        let author = PeerId::random();
+        let batch = make_batch_info(author, 1, MAX_BATCH_BYTES + 1);
+        assert!(verify_batch_info_limits(&batch, MAX_BATCH_TXNS, MAX_BATCH_BYTES).is_err());
+    }
+
+    #[test]
+    fn test_verify_batch_info_limits_rejects_overflow_values() {
+        let author = PeerId::random();
+        let batch = make_batch_info(author, u64::MAX, u64::MAX);
+        assert!(verify_batch_info_limits(&batch, MAX_BATCH_TXNS, MAX_BATCH_BYTES).is_err());
+    }
+
+    #[test]
+    fn test_verify_opt_batches_rejects_oversized_batch() {
+        let (signers, validators) = random_validator_verifier(1, None, false);
+        let author = signers[0].author();
+
+        let bad_batch = make_batch_info(author, 1, u64::MAX);
+        let opt_batches: OptBatches<BatchInfo> = BatchPointer::new(vec![bad_batch]);
+
+        assert!(Payload::verify_opt_batches(
+            &validators,
+            &opt_batches,
+            MAX_BATCH_TXNS,
+            MAX_BATCH_BYTES
+        )
+        .is_err());
+    }
+
+    #[test]
+    fn test_verify_opt_batches_accepts_valid() {
+        let (signers, validators) = random_validator_verifier(1, None, false);
+        let author = signers[0].author();
+
+        let batch = make_batch_info(author, 50, 500_000);
+        let opt_batches: OptBatches<BatchInfo> = BatchPointer::new(vec![batch]);
+
+        assert!(Payload::verify_opt_batches(
+            &validators,
+            &opt_batches,
+            MAX_BATCH_TXNS,
+            MAX_BATCH_BYTES
+        )
+        .is_ok());
+    }
+
+    #[test]
+    fn test_verify_opt_batches_rejects_before_checking_author() {
+        let (_signers, validators) = random_validator_verifier(1, None, false);
+        // Use a random author NOT in the validator set, but with oversized batch.
+        // The limit check should fire before the author check.
+        let bad_author = PeerId::random();
+        let bad_batch = make_batch_info(bad_author, MAX_BATCH_TXNS + 1, 100);
+        let opt_batches: OptBatches<BatchInfo> = BatchPointer::new(vec![bad_batch]);
+
+        let err =
+            Payload::verify_opt_batches(&validators, &opt_batches, MAX_BATCH_TXNS, MAX_BATCH_BYTES)
+                .unwrap_err();
+        // Should fail on batch limit, not author
+        assert!(err.to_string().contains("Batch txn count"));
+    }
+
+    #[test]
+    fn test_verify_inline_batches_rejects_oversized_batch() {
+        let author = PeerId::random();
+        let bad_batch = make_batch_info(author, u64::MAX / 2 + 1, u64::MAX / 2 + 1);
+        let empty_txns = vec![];
+        let inline_batches = vec![(&bad_batch, &empty_txns)];
+
+        assert!(Payload::verify_inline_batches(
+            inline_batches.into_iter(),
+            MAX_BATCH_TXNS,
+            MAX_BATCH_BYTES,
+        )
+        .is_err());
+    }
+
+    fn create_normal_signed_transaction() -> SignedTransaction {
+        let private_key = Ed25519PrivateKey::generate_for_testing();
+        let public_key = private_key.public_key();
+        let raw_transaction = RawTransaction::new(
+            AccountAddress::random(),
+            0,
+            TransactionPayload::Script(Script::new(vec![], vec![], vec![])),
+            0,
+            0,
+            0,
+            ChainId::new(10),
+        );
+        let signature = private_key.sign(&raw_transaction).unwrap();
+        SignedTransaction::new(raw_transaction, public_key, signature)
+    }
+
+    fn create_encrypted_signed_transaction() -> SignedTransaction {
+        let private_key = Ed25519PrivateKey::generate_for_testing();
+        let public_key = private_key.public_key();
+        let encrypted_payload = EncryptedPayload::Encrypted(EncryptedInner {
+            ciphertext: Ciphertext::random(),
+            extra_config: TransactionExtraConfig::V1 {
+                multisig_address: None,
+                replay_protection_nonce: None,
+            },
+            payload_hash: HashValue::random(),
+            encryption_epoch: 0,
+            claimed_entry_fun: None,
+        });
+        let raw_transaction = RawTransaction::new(
+            AccountAddress::random(),
+            0,
+            TransactionPayload::EncryptedPayload(encrypted_payload),
+            0,
+            0,
+            0,
+            ChainId::new(10),
+        );
+        SignedTransaction::new(
+            raw_transaction,
+            public_key,
+            aptos_crypto::ed25519::Ed25519Signature::dummy_signature(),
+        )
+    }
+
+    fn make_batch_info_ext_v2_with_txns(
+        author: PeerId,
+        txns: &[SignedTransaction],
+        kind: BatchKind,
+    ) -> BatchInfoExt {
+        let batch_payload = BatchPayload::new(author, txns.to_vec());
+        let digest = batch_payload.hash();
+        let num_bytes = batch_payload.num_bytes() as u64;
+        BatchInfoExt::new_v2(
+            author,
+            aptos_types::quorum_store::BatchId::new_for_test(1),
+            1,
+            1000,
+            digest,
+            txns.len() as u64,
+            num_bytes,
+            0,
+            kind,
+        )
+    }
+
+    #[test]
+    fn test_verify_inline_batches_rejects_encrypted_batch_with_normal_txn() {
+        let author = PeerId::random();
+        let txns = vec![create_normal_signed_transaction()];
+        let batch = make_batch_info_ext_v2_with_txns(author, &txns, BatchKind::Encrypted);
+        let inline_batches = vec![(&batch, &txns)];
+
+        let err = Payload::verify_inline_batches(
+            inline_batches.into_iter(),
+            MAX_BATCH_TXNS,
+            MAX_BATCH_BYTES,
+        )
+        .unwrap_err();
+        assert!(
+            err.to_string().contains("non-encrypted"),
+            "Expected non-encrypted error, got: {}",
+            err
+        );
+    }
+
+    #[test]
+    fn test_verify_inline_batches_rejects_normal_batch_with_encrypted_txn() {
+        let author = PeerId::random();
+        let txns = vec![create_encrypted_signed_transaction()];
+        let batch = make_batch_info_ext_v2_with_txns(author, &txns, BatchKind::Normal);
+        let inline_batches = vec![(&batch, &txns)];
+
+        let err = Payload::verify_inline_batches(
+            inline_batches.into_iter(),
+            MAX_BATCH_TXNS,
+            MAX_BATCH_BYTES,
+        )
+        .unwrap_err();
+        assert!(
+            err.to_string().contains("encrypted transaction"),
+            "Expected encrypted transaction error, got: {}",
+            err
+        );
+    }
+
+    #[test]
+    fn test_verify_inline_batches_rejects_invalid_ciphertext() {
+        let author = PeerId::random();
+        // Ciphertext::random() produces ciphertext that won't verify against the sender
+        let txns = vec![create_encrypted_signed_transaction()];
+        let batch = make_batch_info_ext_v2_with_txns(author, &txns, BatchKind::Encrypted);
+        let inline_batches = vec![(&batch, &txns)];
+
+        let err = Payload::verify_inline_batches(
+            inline_batches.into_iter(),
+            MAX_BATCH_TXNS,
+            MAX_BATCH_BYTES,
+        )
+        .unwrap_err();
+        assert!(
+            err.to_string().contains("ciphertext verification failed"),
+            "Expected ciphertext verification error, got: {}",
+            err
+        );
+    }
+
+    #[test]
+    fn test_verify_inline_batches_rejects_v1_batch_with_encrypted_txn() {
+        let author = PeerId::random();
+        let txns = vec![create_encrypted_signed_transaction()];
+        let batch = make_batch_info_with_txns(author, &txns);
+        let inline_batches = vec![(&batch, &txns)];
+
+        let err = Payload::verify_inline_batches(
+            inline_batches.into_iter(),
+            MAX_BATCH_TXNS,
+            MAX_BATCH_BYTES,
+        )
+        .unwrap_err();
+        assert!(
+            err.to_string()
+                .contains("V1 batch contains encrypted transaction"),
+            "Expected V1 encrypted transaction error, got: {}",
+            err
+        );
+    }
+
+    #[test]
+    fn test_payload_verify_rejects_encrypted_inline_batch_with_invalid_ciphertext() {
+        let (signers, validators) = random_validator_verifier(1, None, false);
+        let author = signers[0].author();
+        let proof_cache = ProofCache::new(16);
+
+        let txns = vec![create_encrypted_signed_transaction()];
+        let batch_info = make_batch_info_ext_v2_with_txns(author, &txns, BatchKind::Encrypted);
+        let inline_batches: InlineBatches<BatchInfoExt> = vec![(batch_info, txns)].into();
+
+        let payload = Payload::OptQuorumStore(OptQuorumStorePayload::new_v2(
+            inline_batches,
+            BatchPointer::new(vec![]),
+            BatchPointer::new(vec![]),
+            PayloadExecutionLimit::None,
+        ));
+
+        let err = payload
+            .verify(
+                &validators,
+                &proof_cache,
+                true, // quorum_store_enabled
+                true, // opt_qs_v2_rx_enabled
+                MAX_BATCH_TXNS,
+                MAX_BATCH_BYTES,
+            )
+            .unwrap_err();
+        assert!(
+            err.to_string().contains("ciphertext verification failed"),
+            "Expected ciphertext verification error through Payload::verify, got: {}",
+            err
+        );
+    }
+
+    fn create_failed_decryption_signed_transaction() -> SignedTransaction {
+        let private_key = Ed25519PrivateKey::generate_for_testing();
+        let public_key = private_key.public_key();
+        let encrypted_payload = EncryptedPayload::FailedDecryption {
+            original: EncryptedInner {
+                ciphertext: Ciphertext::random(),
+                extra_config: TransactionExtraConfig::V1 {
+                    multisig_address: None,
+                    replay_protection_nonce: None,
+                },
+                payload_hash: HashValue::random(),
+                encryption_epoch: 0,
+                claimed_entry_fun: None,
+            },
+            eval_proof: None,
+            reason: DecryptionFailureReason::CryptoFailure,
+        };
+        let raw_transaction = RawTransaction::new(
+            AccountAddress::random(),
+            0,
+            TransactionPayload::EncryptedPayload(encrypted_payload),
+            0,
+            0,
+            0,
+            ChainId::new(10),
+        );
+        SignedTransaction::new(
+            raw_transaction,
+            public_key,
+            aptos_crypto::ed25519::Ed25519Signature::dummy_signature(),
+        )
+    }
+
+    fn create_encrypted_multisig_signed_transaction() -> SignedTransaction {
+        let private_key = Ed25519PrivateKey::generate_for_testing();
+        let public_key = private_key.public_key();
+        let encrypted_payload = EncryptedPayload::Encrypted(EncryptedInner {
+            ciphertext: Ciphertext::random(),
+            extra_config: TransactionExtraConfig::V1 {
+                multisig_address: Some(AccountAddress::random()),
+                replay_protection_nonce: None,
+            },
+            payload_hash: HashValue::random(),
+            encryption_epoch: 0,
+            claimed_entry_fun: None,
+        });
+        let raw_transaction = RawTransaction::new(
+            AccountAddress::random(),
+            0,
+            TransactionPayload::EncryptedPayload(encrypted_payload),
+            0,
+            0,
+            0,
+            ChainId::new(10),
+        );
+        SignedTransaction::new(
+            raw_transaction,
+            public_key,
+            aptos_crypto::ed25519::Ed25519Signature::dummy_signature(),
+        )
+    }
+
+    #[test]
+    fn test_verify_inline_batches_rejects_non_encrypted_state_payload() {
+        let author = PeerId::random();
+        let txns = vec![create_failed_decryption_signed_transaction()];
+        let batch = make_batch_info_ext_v2_with_txns(author, &txns, BatchKind::Encrypted);
+        let inline_batches = vec![(&batch, &txns)];
+
+        let err = Payload::verify_inline_batches(
+            inline_batches.into_iter(),
+            MAX_BATCH_TXNS,
+            MAX_BATCH_BYTES,
+        )
+        .unwrap_err();
+        assert!(
+            err.to_string().contains("not in Encrypted state"),
+            "Expected non-Encrypted state error, got: {}",
+            err
+        );
+    }
+
+    #[test]
+    fn test_verify_inline_batches_rejects_encrypted_multisig() {
+        let author = PeerId::random();
+        let txns = vec![create_encrypted_multisig_signed_transaction()];
+        let batch = make_batch_info_ext_v2_with_txns(author, &txns, BatchKind::Encrypted);
+        let inline_batches = vec![(&batch, &txns)];
+
+        let err = Payload::verify_inline_batches(
+            inline_batches.into_iter(),
+            MAX_BATCH_TXNS,
+            MAX_BATCH_BYTES,
+        )
+        .unwrap_err();
+        assert!(
+            err.to_string().contains("do not support multisig"),
+            "Expected multisig rejection error, got: {}",
+            err
+        );
     }
 }

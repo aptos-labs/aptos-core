@@ -113,6 +113,20 @@ else:
 HIDE_OUTPUT = os.environ.get("HIDE_OUTPUT")
 SKIP_MOVE_E2E = os.environ.get("SKIP_MOVE_E2E")
 
+# Executor types still under active development. Their results are reported
+# as warnings only -- never block CI -- so we can track perf trends without
+# letting noise on experimental code paths fail builds.
+NON_BLOCKING_EXECUTOR_TYPES = frozenset(
+    {
+        "NativeVM",
+        "NativeSpeculative",
+        "AptosVMSpeculative",
+        "NativeValueCacheSpeculative",
+        "NativeNoStorageSpeculative",
+        "sharded",
+    }
+)
+
 
 @dataclass(frozen=True)
 class RunGroupKey:
@@ -1019,9 +1033,14 @@ with tempfile.TemporaryDirectory() as tmpdirname:
             )
             print_table(results, by_levels=False, only_fields=[])
 
+        is_blocking = (
+            not test.waived
+            and test.key.executor_type not in NON_BLOCKING_EXECUTOR_TYPES
+        )
+
         if single_node_result.tps < criteria.min_tps:
             text = f"regression detected {single_node_result.tps}, expected median {criteria.expected_tps}, threshold: {criteria.min_tps}), {test.key} didn't meet TPS requirements"
-            if not test.waived:
+            if is_blocking:
                 errors.append(text)
             else:
                 warnings.append(text)
@@ -1033,7 +1052,7 @@ with tempfile.TemporaryDirectory() as tmpdirname:
             and single_node_result.tps > criteria.max_tps
         ):
             text = f"perf improvement detected {single_node_result.tps}, expected median {criteria.expected_tps}, threshold: {criteria.max_tps}), {test.key} exceeded TPS requirements, increase TPS requirements to match new baseline"
-            if not test.waived:
+            if is_blocking:
                 errors.append(text)
             else:
                 warnings.append(text)

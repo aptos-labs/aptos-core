@@ -44,7 +44,7 @@ pub mod block_test;
 
 #[derive(Serialize, Clone, PartialEq, Eq)]
 /// Block has the core data of a consensus block that should be persistent when necessary.
-/// Each block must know the id of its parent and keep the QuorurmCertificate to that parent.
+/// Each block must know the id of its parent and keep the QuorumCertificate to that parent.
 pub struct Block {
     /// This block's id as a hash value, it is generated at call time
     #[serde(skip)]
@@ -470,7 +470,10 @@ impl Block {
             // but don't allow anything that shouldn't be there.
             //
             // we validate the full correctness of this field in round_manager.process_proposal()
-            let succ_round = self.round() + u64::from(self.is_nil_block());
+            let succ_round = self
+                .round()
+                .checked_add(u64::from(self.is_nil_block()))
+                .ok_or_else(|| format_err!("Block round overflow"))?;
             let skipped_rounds = succ_round.checked_sub(parent.round() + 1);
             ensure!(
                 skipped_rounds.is_some(),

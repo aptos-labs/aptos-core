@@ -58,8 +58,8 @@ module 0x42::M {
 
     spec apply2 {
         // First predicate defines post-state "s1"
-        ensures ensures_of<f>(x, result)@s1;
+        ensures ..s1 |~ ensures_of<f>(x, result);
         // Second predicate reads from "s1" (completes the chain)
-        ensures s1@ensures_of<f>(x, result);
+        ensures s1.. |~ ensures_of<f>(x, result);
     }
 }

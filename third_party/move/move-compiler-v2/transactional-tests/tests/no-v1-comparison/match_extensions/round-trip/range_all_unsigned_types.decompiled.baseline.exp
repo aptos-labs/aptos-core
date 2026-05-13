@@ -1,0 +1,50 @@
+processed 25 tasks
+task 0 lines 3-119:  publish [module 0xc0ffee::m {]
+task 1 lines 122-122:  run 0xc0ffee::m::test_u8 --args 0u8
+return values: 1
+task 2 lines 124-124:  run 0xc0ffee::m::test_u8 --args 5u8
+return values: 1
+task 3 lines 126-126:  run 0xc0ffee::m::test_u8 --args 10u8
+return values: 2
+task 4 lines 128-128:  run 0xc0ffee::m::test_u8 --args 50u8
+return values: 2
+task 5 lines 130-130:  run 0xc0ffee::m::test_u8 --args 200u8
+return values: 3
+task 6 lines 132-132:  run 0xc0ffee::m::test_u16 --args 0u16
+return values: 1
+task 7 lines 134-134:  run 0xc0ffee::m::test_u16 --args 500u16
+return values: 1
+task 8 lines 136-136:  run 0xc0ffee::m::test_u16 --args 1000u16
+return values: 2
+task 9 lines 138-138:  run 0xc0ffee::m::test_u16 --args 3000u16
+return values: 2
+task 10 lines 140-140:  run 0xc0ffee::m::test_u16 --args 10000u16
+return values: 3
+task 11 lines 142-142:  run 0xc0ffee::m::test_u32 --args 0u32
+return values: 1
+task 12 lines 144-144:  run 0xc0ffee::m::test_u32 --args 1000u32
+return values: 2
+task 13 lines 146-146:  run 0xc0ffee::m::test_u32 --args 5000u32
+return values: 2
+task 14 lines 148-148:  run 0xc0ffee::m::test_u32 --args 10000u32
+return values: 3
+task 15 lines 150-150:  run 0xc0ffee::m::test_u64 --args 0u64
+return values: 1
+task 16 lines 152-152:  run 0xc0ffee::m::test_u64 --args 1000u64
+return values: 2
+task 17 lines 154-154:  run 0xc0ffee::m::test_u64 --args 5000u64
+return values: 2
+task 18 lines 156-156:  run 0xc0ffee::m::test_u64 --args 10000u64
+return values: 3
+task 19 lines 158-158:  run 0xc0ffee::m::test_u128 --args 0u128
+return values: 1
+task 20 lines 160-160:  run 0xc0ffee::m::test_u128 --args 1000u128
+return values: 2
+task 21 lines 162-162:  run 0xc0ffee::m::test_u128 --args 5000u128
+return values: 2
+task 22 lines 164-164:  run 0xc0ffee::m::test_u256 --args 0u256
+return values: 1
+task 23 lines 166-166:  run 0xc0ffee::m::test_u256 --args 1000u256
+return values: 2
+task 24 lines 168-168:  run 0xc0ffee::m::test_u256 --args 5000u256
+return values: 2

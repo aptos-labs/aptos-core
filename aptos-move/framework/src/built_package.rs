@@ -67,7 +67,7 @@ pub const APTOS_PACKAGES: [&str; 6] = [
 ];
 
 /// Represents a set of options for building artifacts from Move.
-#[derive(Debug, Clone, Parser, Serialize, Deserialize)]
+#[derive(Debug, Clone, Hash, Eq, PartialEq, Parser, Serialize, Deserialize)]
 pub struct BuildOptions {
     /// Enables dev mode, which uses all dev-addresses and dev-dependencies
     ///
@@ -92,6 +92,10 @@ pub struct BuildOptions {
     pub install_dir: Option<PathBuf>,
     #[clap(skip)] // TODO: have a parser for this; there is one in the CLI buts its  downstream
     pub named_addresses: BTreeMap<String, AccountAddress>,
+    /// Named addresses that unconditionally win over conflicting package-level assignments.
+    /// Used by `aptos move replay --named-address`.
+    #[clap(skip)]
+    pub forced_named_addresses: BTreeMap<String, AccountAddress>,
     /// Whether to override the standard library with the given version.
     #[clap(long, value_parser)]
     pub override_std: Option<StdVersion>,
@@ -109,6 +113,9 @@ pub struct BuildOptions {
     pub skip_attribute_checks: bool,
     #[clap(long)]
     pub check_test_code: bool,
+    /// When true, compiles with test mode enabled, including #[test_only] code in the bytecode.
+    #[clap(long)]
+    pub with_test_mode: bool,
     #[clap(skip)]
     pub known_attributes: BTreeSet<String>,
     #[clap(skip)]
@@ -128,6 +135,7 @@ impl Default for BuildOptions {
             with_docs: false,
             install_dir: None,
             named_addresses: Default::default(),
+            forced_named_addresses: Default::default(),
             override_std: None,
             docgen_options: None,
             // This is false by default, because it could accidentally pull new dependencies
@@ -138,6 +146,7 @@ impl Default for BuildOptions {
             language_version: None,
             skip_attribute_checks: false,
             check_test_code: true,
+            with_test_mode: false,
             known_attributes: extended_checks::get_all_attribute_names().clone(),
             experiments: vec![],
         }
@@ -205,6 +214,7 @@ pub fn build_model(
     known_attributes: BTreeSet<String>,
     experiments: Vec<String>,
     with_bytecode: bool,
+    all_files_as_targets: bool,
 ) -> anyhow::Result<GlobalEnv> {
     let build_config = make_model_build_config(
         dev_mode,
@@ -222,7 +232,7 @@ pub fn build_model(
     let language_version = language_version.unwrap_or_default();
     let env = build_config.move_model_for_package(package_path, ModelConfig {
         target_filter,
-        all_files_as_targets: false,
+        all_files_as_targets,
         compiler_version,
         language_version,
         with_bytecode,
@@ -253,12 +263,10 @@ fn make_model_build_config(
             .unwrap_or_default()
             .infer_bytecode_version(bytecode_version),
     );
-    let cv = compiler_version.unwrap_or_default();
-    let lv = language_version.unwrap_or_default();
-    cv.check_language_support(lv)?;
     Ok(BuildConfig {
         dev_mode,
         additional_named_addresses,
+        forced_named_addresses: BTreeMap::new(),
         generate_abis: false,
         generate_docs: false,
         generate_move_model: false,
@@ -277,7 +285,7 @@ fn make_model_build_config(
             skip_attribute_checks,
             known_attributes,
             experiments,
-            print_errors: true,
+            print_errors: Some(true),
         },
     })
 }
@@ -318,13 +326,14 @@ impl BuiltPackage {
         Ok(BuildConfig {
             dev_mode: options.dev,
             additional_named_addresses: options.named_addresses.clone(),
+            forced_named_addresses: options.forced_named_addresses.clone(),
             generate_abis: options.with_abis,
             generate_docs: false,
             generate_move_model: true,
             full_model_generation: options.check_test_code,
             install_dir: options.install_dir.clone(),
-            test_mode: false,
             verify_mode: false,
+            test_mode: options.with_test_mode,
             override_std: options.override_std.clone(),
             force_recompilation: false,
             fetch_deps_only: false,
@@ -336,7 +345,7 @@ impl BuiltPackage {
                 skip_attribute_checks,
                 known_attributes: options.known_attributes.clone(),
                 experiments: options.experiments.clone(),
-                print_errors: true,
+                print_errors: Some(true),
             },
         })
     }
@@ -510,7 +519,6 @@ impl BuiltPackage {
             )?;
             writer.reset()?;
         }
-        effective_compiler_version.check_language_support(effective_language_version)?;
         Ok(())
     }
 

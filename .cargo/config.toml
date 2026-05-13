@@ -21,14 +21,13 @@ xclippy = [
   "-Aclippy::upper_case_acronyms",
 ]
 x = "run --package aptos-cargo-cli --bin aptos-cargo-cli --"
+build-perf = ["build", "--profile", "performance", "--config", ".cargo/performance.toml"]
 
 [build]
 rustflags = ["--cfg", "tokio_unstable", "-C", "force-frame-pointers=yes", "-C", "force-unwind-tables=yes"]
 
 [target.x86_64-unknown-linux-gnu]
-# We also need to include `-C linker-plugin-lto` for performance builds to take
-# full advantage of LTO, but we cannot add it here because it would affect dev
-# and release builds as well, so we add it only when building docker images.
+linker = "clang"
 rustflags = [
   "--cfg",
   "tokio_unstable",

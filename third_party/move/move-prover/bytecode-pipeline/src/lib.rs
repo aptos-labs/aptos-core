@@ -1,6 +1,5 @@
-// Copyright © Aptos Foundation
-// Parts of the project are originally copyright © Meta Platforms, Inc.
-// SPDX-License-Identifier: Apache-2.0
+// Copyright (c) Aptos Foundation
+// Licensed pursuant to the Innovation-Enabling Source Code License, available at https://github.com/aptos-labs/aptos-core/blob/main/LICENSE
 pub mod clean_and_optimize;
 pub mod data_invariant_instrumentation;
 pub mod eliminate_imm_refs;
@@ -11,6 +10,7 @@ pub mod loop_analysis;
 pub mod memory_instrumentation;
 pub mod mono_analysis;
 pub mod mut_ref_instrumentation;
+pub mod normalize_exits;
 pub mod number_operation;
 pub mod number_operation_analysis;
 pub mod options;

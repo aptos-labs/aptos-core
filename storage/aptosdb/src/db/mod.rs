@@ -25,6 +25,7 @@ pub mod test_helper;
 /// access to the core Aptos data structures.
 pub struct AptosDB {
     pub(crate) ledger_db: Arc<LedgerDb>,
+    pub(crate) hot_state_kv_db: Option<Arc<StateKvDb>>,
     pub(crate) state_kv_db: Arc<StateKvDb>,
     pub(crate) event_store: Arc<EventStore>,
     pub(crate) state_store: Arc<StateStore>,

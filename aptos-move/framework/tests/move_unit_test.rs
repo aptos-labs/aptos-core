@@ -28,7 +28,7 @@ fn run_tests_for_pkg(path_to_pkg: impl Into<String>, use_latest_language: bool) 
     let pkg_path = path_in_crate(path_to_pkg);
     let compiler_config = CompilerConfig {
         known_attributes: extended_checks::get_all_attribute_names().clone(),
-        print_errors: true,
+        print_errors: Some(true),
         ..Default::default()
     };
     let mut build_config = move_package::BuildConfig {

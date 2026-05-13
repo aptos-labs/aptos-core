@@ -1,5 +1,5 @@
-// Copyright © Aptos Foundation
-// SPDX-License-Identifier: Apache-2.0
+// Copyright (c) Aptos Foundation
+// Licensed pursuant to the Innovation-Enabling Source Code License, available at https://github.com/aptos-labs/aptos-core/blob/main/LICENSE
 
 //! Implements an environment pipeline which checks for unused type parameters in struct definitions.
 //! Precondition: struct fields have valid types.
@@ -66,7 +66,11 @@ fn used_type_parameters_in_ty(ty: &Type) -> BTreeSet<u16> {
             .flat_map(|t| used_type_parameters_in_ty(t))
             .collect(),
         Type::Reference(_, t) => used_type_parameters_in_ty(t),
-        Type::TypeDomain(..) | Type::ResourceDomain(..) | Type::Error | Type::Var(..) => {
+        Type::TypeDomain(..)
+        | Type::ResourceDomain(..)
+        | Type::StateDomain
+        | Type::Error
+        | Type::Var(..) => {
             unreachable!("unexpected type")
         },
     }

@@ -263,7 +263,7 @@ fn test_account_not_exist_out_of_gas_with_fee_payer() {
     let beef = h.new_account_at(AccountAddress::from_hex_literal("0xbeef").unwrap());
 
     // Load the code
-    assert_success!(h.publish_package_cache_building(
+    assert_success!(h.publish_package(
         &beef,
         &common::test_dir_path("infinite_loop.data/empty_loop"),
     ));
@@ -304,10 +304,7 @@ fn test_account_not_exist_move_abort_with_fee_payer_out_of_gas() {
     let alice = Account::new();
     let cafe = h.new_account_at(AccountAddress::from_hex_literal("0xcafe").unwrap());
 
-    assert_success!(h.publish_package_cache_building(
-        &cafe,
-        &common::test_dir_path("storage_refund.data/pack"),
-    ));
+    assert_success!(h.publish_package(&cafe, &common::test_dir_path("storage_refund.data/pack"),));
 
     // This function allocates plenty of storage slots and will go out of gas if max_gas_amount isn't huge
     let MemberId {

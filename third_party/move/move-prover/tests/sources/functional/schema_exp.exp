@@ -28,5 +28,4 @@ error: post-condition does not hold
    =         i = <redacted>
    =     at tests/sources/functional/schema_exp.move:54: baz_incorrect
    =         result = <redacted>
-   =     at tests/sources/functional/schema_exp.move:55: baz_incorrect
    =     at tests/sources/functional/schema_exp.move:47

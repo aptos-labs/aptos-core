@@ -1,0 +1,106 @@
+//**** Cross-compiled for `move` syntax from `tests/no-v1-comparison/match_extensions/range_adjacent.move`
+
+//# publish
+module 0xc0ffee::m {
+    public fun test_adjacent(p0: u64): u64 {
+        let _v0;
+        let _v1;
+        if (p0 >= 0) _v1 = p0 < 5 else _v1 = false;
+        loop {
+            if (!_v1) {
+                let _v2;
+                if (p0 >= 5) _v2 = p0 < 10 else _v2 = false;
+                if (_v2) {
+                    _v0 = 2;
+                    break
+                };
+                _v0 = 3;
+                break
+            };
+            return 1
+        };
+        _v0
+    }
+    public fun test_exact_coverage(p0: u8): u64 {
+        let _v0;
+        if (p0 >= 0u8) _v0 = p0 < 64u8 else _v0 = false;
+        'l1: loop {
+            'l0: loop {
+                loop {
+                    if (!_v0) {
+                        let _v1;
+                        let _v2;
+                        if (p0 >= 64u8) _v1 = p0 < 128u8 else _v1 = false;
+                        if (_v1) break;
+                        if (p0 >= 128u8) _v2 = p0 < 192u8 else _v2 = false;
+                        if (_v2) break 'l0;
+                        if (p0 >= 192u8) break 'l1;
+                        abort 14566554180833181697
+                    };
+                    return 1
+                };
+                return 2
+            };
+            return 3
+        };
+        4
+    }
+    public fun test_overlapping(p0: u64): u64 {
+        let _v0;
+        let _v1;
+        if (p0 >= 0) _v1 = p0 < 10 else _v1 = false;
+        loop {
+            if (!_v1) {
+                let _v2;
+                if (p0 >= 5) _v2 = p0 < 15 else _v2 = false;
+                if (_v2) {
+                    _v0 = 2;
+                    break
+                };
+                _v0 = 3;
+                break
+            };
+            return 1
+        };
+        _v0
+    }
+}
+
+
+//# run 0xc0ffee::m::test_adjacent --args 0u64
+
+//# run 0xc0ffee::m::test_adjacent --args 4u64
+
+//# run 0xc0ffee::m::test_adjacent --args 5u64
+
+//# run 0xc0ffee::m::test_adjacent --args 9u64
+
+//# run 0xc0ffee::m::test_adjacent --args 10u64
+
+//# run 0xc0ffee::m::test_overlapping --args 0u64
+
+//# run 0xc0ffee::m::test_overlapping --args 5u64
+
+//# run 0xc0ffee::m::test_overlapping --args 7u64
+
+//# run 0xc0ffee::m::test_overlapping --args 10u64
+
+//# run 0xc0ffee::m::test_overlapping --args 14u64
+
+//# run 0xc0ffee::m::test_overlapping --args 15u64
+
+//# run 0xc0ffee::m::test_exact_coverage --args 0u8
+
+//# run 0xc0ffee::m::test_exact_coverage --args 63u8
+
+//# run 0xc0ffee::m::test_exact_coverage --args 64u8
+
+//# run 0xc0ffee::m::test_exact_coverage --args 127u8
+
+//# run 0xc0ffee::m::test_exact_coverage --args 128u8
+
+//# run 0xc0ffee::m::test_exact_coverage --args 191u8
+
+//# run 0xc0ffee::m::test_exact_coverage --args 192u8
+
+//# run 0xc0ffee::m::test_exact_coverage --args 255u8

@@ -19,6 +19,7 @@ use aptos_types::{
 use aptos_vm_types::module_and_script_storage::module_storage::AptosModuleStorage;
 #[cfg(test)]
 use fail::fail_point;
+use hashbrown::Equivalent;
 use move_binary_format::{
     errors::{Location, PartialVMResult, VMResult},
     file_format::CompiledScript,
@@ -35,7 +36,7 @@ use move_vm_types::code::{
     ambassador_impl_ScriptCache, Code, ModuleCache, ModuleCode, ModuleCodeBuilder, ScriptCache,
     WithBytes,
 };
-use std::sync::Arc;
+use std::{hash::Hash, sync::Arc};
 
 impl<T: Transaction, S: TStateView<Key = T::Key>> WithRuntimeEnvironment for LatestView<'_, T, S> {
     fn runtime_environment(&self) -> &RuntimeEnvironment {
@@ -130,9 +131,9 @@ impl<T: Transaction, S: TStateView<Key = T::Key>> ModuleCache for LatestView<'_,
         }
     }
 
-    fn get_module_or_build_with(
+    fn get_module_or_build_with<Q>(
         &self,
-        key: &Self::Key,
+        key: &Q,
         builder: &dyn ModuleCodeBuilder<
             Key = Self::Key,
             Deserialized = Self::Deserialized,
@@ -144,7 +145,11 @@ impl<T: Transaction, S: TStateView<Key = T::Key>> ModuleCache for LatestView<'_,
             Arc<ModuleCode<Self::Deserialized, Self::Verified, Self::Extension>>,
             Self::Version,
         )>,
-    > {
+    >
+    where
+        Q: Hash + Equivalent<Self::Key>,
+        Self::Key: for<'a> From<&'a Q>,
+    {
         match &self.latest_view {
             ViewState::Sync(state) => {
                 // Check the transaction-level cache with already read modules first.
@@ -157,7 +162,7 @@ impl<T: Transaction, S: TStateView<Key = T::Key>> ModuleCache for LatestView<'_,
                     state
                         .captured_reads
                         .borrow_mut()
-                        .capture_global_cache_read(key.clone(), module.clone());
+                        .capture_global_cache_read(Self::Key::from(key), module.clone());
                     return Ok(Some((module, Self::Version::default())));
                 }
 
@@ -170,12 +175,15 @@ impl<T: Transaction, S: TStateView<Key = T::Key>> ModuleCache for LatestView<'_,
                 state
                     .captured_reads
                     .borrow_mut()
-                    .capture_per_block_cache_read(key.clone(), read.clone());
+                    .capture_per_block_cache_read(Self::Key::from(key), read.clone());
                 Ok(read)
             },
             ViewState::Unsync(state) => {
                 if let Some(module) = self.global_module_cache.get(key) {
-                    state.read_set.borrow_mut().capture_module_read(key.clone());
+                    state
+                        .read_set
+                        .borrow_mut()
+                        .capture_module_read(Self::Key::from(key));
                     return Ok(Some((module, Self::Version::default())));
                 }
 
@@ -184,7 +192,10 @@ impl<T: Transaction, S: TStateView<Key = T::Key>> ModuleCache for LatestView<'_,
                     .unsync_map
                     .module_cache()
                     .get_module_or_build_with(key, builder)?;
-                state.read_set.borrow_mut().capture_module_read(key.clone());
+                state
+                    .read_set
+                    .borrow_mut()
+                    .capture_module_read(Self::Key::from(key));
                 Ok(read)
             },
         }
@@ -201,9 +212,8 @@ impl<T: Transaction, S: TStateView<Key = T::Key>> AptosModuleStorage for LatestV
         address: &AccountAddress,
         module_name: &IdentStr,
     ) -> PartialVMResult<Option<StateValueMetadata>> {
-        let id = ModuleId::new(*address, module_name.to_owned());
         let result = self
-            .get_module_or_build_with(&id, self)
+            .get_module_or_build_with(&(address, module_name), self)
             .map_err(|err| err.to_partial())?;
 
         // In order to test the module cache with combinatorial tests, we embed the version

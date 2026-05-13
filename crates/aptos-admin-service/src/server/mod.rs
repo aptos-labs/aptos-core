@@ -190,7 +190,9 @@ impl AdminService {
                 malloc::handle_malloc_stats_request(context.config.malloc_stats_max_len)
             },
             #[cfg(unix)]
-            (hyper::Method::GET, "/malloc/dump_profile") => malloc::handle_dump_profile_request(),
+            (hyper::Method::GET, "/malloc/dump_profile") => {
+                malloc::handle_dump_profile_request(req)
+            },
             (hyper::Method::GET, "/debug/consensus/consensusdb") => {
                 let consensus_db = context.consensus_db.read().clone();
                 if let Some(consensus_db) = consensus_db {

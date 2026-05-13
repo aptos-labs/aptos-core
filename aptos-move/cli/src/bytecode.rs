@@ -15,7 +15,7 @@ use move_binary_format::{file_format::CompiledScript, CompiledModule};
 use move_command_line_common::files::MOVE_COMPILED_EXTENSION;
 use move_coverage::coverage_map::CoverageMap;
 use move_decompiler::{Decompiler, Options as DecompilerOptions};
-use move_model::metadata::{CompilationMetadata, CompilerVersion, LanguageVersion};
+use move_model::metadata::CompilationMetadata;
 use serde::{Deserialize, Serialize};
 use std::{
     path::{Path, PathBuf},
@@ -218,25 +218,22 @@ impl BytecodeCommand {
     fn print_metadata(&self, bytecode_path: &Path) -> Result<String, CliError> {
         let bytecode_bytes = read_from_file(bytecode_path)?;
 
-        let v1_metadata = CompilationMetadata {
+        // Fallback for bytecode compiled before v2 compiler started embedding metadata.
+        let legacy_compiler_metadata = CompilationMetadata {
             unstable: false,
-            compiler_version: CompilerVersion::V1.to_string(),
-            language_version: LanguageVersion::V1.to_string(),
+            compiler_version: "1".to_string(),
+            language_version: "1".to_string(),
         };
         let metadata = if self.is_script {
             let script = CompiledScript::deserialize(&bytecode_bytes).context(format!(
                 "Script blob at {} can't be deserialized",
                 bytecode_path.display()
             ))?;
-            if let Some(data) = get_compilation_metadata(&script) {
-                serde_json::to_string_pretty(&data).expect("expect compilation metadata")
-            } else {
-                serde_json::to_string_pretty(&v1_metadata).expect("expect compilation metadata")
-            };
             BytecodeMetadata {
                 aptos_metadata: get_metadata_from_compiled_code(&script),
                 bytecode_version: script.version,
-                compilation_metadata: get_compilation_metadata(&script).unwrap_or(v1_metadata),
+                compilation_metadata: get_compilation_metadata(&script)
+                    .unwrap_or(legacy_compiler_metadata),
             }
         } else {
             let module = CompiledModule::deserialize(&bytecode_bytes).context(format!(
@@ -246,7 +243,8 @@ impl BytecodeCommand {
             BytecodeMetadata {
                 aptos_metadata: get_metadata_from_compiled_code(&module),
                 bytecode_version: module.version,
-                compilation_metadata: get_compilation_metadata(&module).unwrap_or(v1_metadata),
+                compilation_metadata: get_compilation_metadata(&module)
+                    .unwrap_or(legacy_compiler_metadata),
             }
         };
         println!(

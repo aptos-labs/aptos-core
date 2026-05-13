@@ -15,6 +15,7 @@ use crate::{
 };
 use anyhow::{anyhow, bail, format_err};
 use aptos_config::config::{NodeConfig, OverrideNodeConfig};
+use aptos_rest_client::{AptosBaseUrl, Client as RestClient};
 use aptos_retrier::fixed_retry_strategy;
 use aptos_sdk::{
     crypto::ed25519::Ed25519PrivateKey,
@@ -32,6 +33,7 @@ use prometheus_http_query::{
     Client as PrometheusClient,
 };
 use regex::Regex;
+use reqwest::Url;
 use std::{
     collections::{BTreeMap, HashMap, HashSet},
     convert::TryFrom,
@@ -43,6 +45,10 @@ use tokio::{
     task::block_in_place,
     time::Duration,
 };
+
+// Useful PFN constants
+const PFN_STS_LABEL: &str = "app.kubernetes.io/part-of=aptos-fullnode";
+const PFN_STS_METADATA_NAME_PREFIX: &str = "pfn-";
 
 pub struct K8sSwarm {
     validators: HashMap<PeerId, K8sNode>,
@@ -158,6 +164,32 @@ impl K8sSwarm {
     #[allow(dead_code)]
     fn get_kube_client(&self) -> K8sClient {
         self.kube_client.clone()
+    }
+
+    /// Returns all PFN stateful sets in the namespace.
+    /// Note: PFNs are deployed externally (via the forge-pfn-deployer).
+    async fn get_pfn_stateful_sets(&self) -> Result<Vec<StatefulSet>> {
+        // Get all fullnode stateful sets
+        let all_stateful_sets: Api<StatefulSet> =
+            Api::namespaced(self.kube_client.clone(), &self.kube_namespace);
+        let fullnode_sts_list = all_stateful_sets
+            .list(&ListParams::default().labels(PFN_STS_LABEL))
+            .await?;
+
+        // Get all PFN stateful sets
+        let pfn_sts_list = fullnode_sts_list
+            .items
+            .into_iter()
+            .filter(|sts| {
+                sts.metadata
+                    .name
+                    .as_deref()
+                    .unwrap_or_default()
+                    .starts_with(PFN_STS_METADATA_NAME_PREFIX)
+            })
+            .collect();
+
+        Ok(pfn_sts_list)
     }
 }
 
@@ -344,6 +376,61 @@ impl Swarm for K8sSwarm {
         }
         info!("Found no fullnode restarts");
         Ok(())
+    }
+
+    async fn ensure_no_pfn_restart(&self) -> Result<()> {
+        // Get all PFN stateful sets
+        let pfn_sts_list = self.get_pfn_stateful_sets().await?;
+
+        // If there are no PFN stateful sets, skip the check
+        if pfn_sts_list.is_empty() {
+            info!("No PFN stateful sets found, skipping PFN restart check!");
+            return Ok(());
+        }
+        info!(
+            "Found {} PFN stateful sets, checking for restarts!",
+            pfn_sts_list.len()
+        );
+
+        for sts in &pfn_sts_list {
+            let sts_name = sts.metadata.name.as_deref().unwrap_or_default();
+            check_for_container_restart(&self.kube_client, &self.kube_namespace, sts_name).await?;
+        }
+
+        info!("Found no PFN restarts!");
+        Ok(())
+    }
+
+    async fn get_pfn_rest_clients(&self, client_timeout: Duration) -> Vec<RestClient> {
+        // Get all PFN stateful sets
+        let pfn_sts_list = match self.get_pfn_stateful_sets().await {
+            Ok(pfn_sts_list) => pfn_sts_list,
+            Err(error) => {
+                // No stateful sets were found, return an empty list
+                warn!("Failed to list PFN stateful sets! Error: {}", error);
+                return vec![];
+            },
+        };
+
+        // For each PFN stateful set, construct a rest client to its REST API
+        pfn_sts_list
+            .iter()
+            .filter_map(|sts| {
+                let sts_name = sts.metadata.name.as_deref()?;
+                let service_name = format!("{}-lb.{}.svc", sts_name, self.kube_namespace);
+                let url: Url = format!(
+                    "http://{}:{}/v1",
+                    service_name, REST_API_HAPROXY_SERVICE_PORT
+                )
+                .parse()
+                .ok()?;
+                Some(
+                    RestClient::builder(AptosBaseUrl::Custom(url))
+                        .timeout(client_timeout)
+                        .build(),
+                )
+            })
+            .collect()
     }
 
     async fn query_metrics(

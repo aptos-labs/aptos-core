@@ -6,7 +6,7 @@ module 0x42::test {
         f: u64,
     }
     fun eq_with<T0: drop>(p0: T0): |T0|(bool) {
-        |arg0| lambda__1__eq_with<T0>(p0, arg0)
+        |x| lambda__1__eq_with<T0>(p0, x)
     }
     fun lambda__1__eq_with<T0: drop>(p0: T0, p1: T0): bool {
         p0 == p1

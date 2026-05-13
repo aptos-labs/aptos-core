@@ -1,0 +1,799 @@
+//**** Cross-compiled for `move` syntax from `tests/no-v1-comparison/match_extensions/ref_enum_nested_literals.move`
+
+//# publish
+module 0xc0ffee::m {
+    enum E has copy, drop {
+        V1 {
+            _0: u64,
+        }
+        V2,
+    }
+    enum Generic<T0> has copy, drop {
+        V1 {
+            _0: T0,
+        }
+        V2,
+    }
+    enum GenericPair<T0, T1> has copy, drop {
+        P {
+            _0: T0,
+            _1: T1,
+        }
+        Q,
+    }
+    enum Inner has copy, drop {
+        A {
+            _0: u64,
+        }
+        B,
+    }
+    enum Outer has copy, drop {
+        W {
+            _0: Inner,
+        }
+        X,
+    }
+    enum Pair has copy, drop {
+        P {
+            _0: u64,
+            _1: u64,
+        }
+        Q,
+    }
+    enum Wrapper has copy, drop {
+        S {
+            _0: vector<u8>,
+        }
+        T,
+    }
+    public fun test_all_ref_tuple_hit(): u64 {
+        let _v0;
+        let _v1;
+        let _v2 = 1;
+        let _v3 = &_v2;
+        let _v4 = 2;
+        let _v5 = &_v4;
+        if (*_v3 == 1) _v1 = *_v5 == 2 else _v1 = false;
+        loop {
+            if (!_v1) {
+                if (*_v3 == 1) {
+                    _v0 = 20;
+                    break
+                };
+                _v0 = 30;
+                break
+            };
+            return 10
+        };
+        _v0
+    }
+    public fun test_all_ref_tuple_miss(): u64 {
+        let _v0;
+        let _v1;
+        let _v2 = 42;
+        let _v3 = &_v2;
+        let _v4 = 2;
+        let _v5 = &_v4;
+        if (*_v3 == 1) _v1 = *_v5 == 2 else _v1 = false;
+        loop {
+            if (!_v1) {
+                if (*_v3 == 1) {
+                    _v0 = 20;
+                    break
+                };
+                _v0 = 30;
+                break
+            };
+            return 10
+        };
+        _v0
+    }
+    public fun test_all_ref_tuple_partial(): u64 {
+        let _v0;
+        let _v1;
+        let _v2 = 1;
+        let _v3 = &_v2;
+        let _v4 = 99;
+        let _v5 = &_v4;
+        if (*_v3 == 1) _v1 = *_v5 == 2 else _v1 = false;
+        loop {
+            if (!_v1) {
+                if (*_v3 == 1) {
+                    _v0 = 20;
+                    break
+                };
+                _v0 = 30;
+                break
+            };
+            return 10
+        };
+        _v0
+    }
+    public fun test_all_ref_tuple_var_hit(): u64 {
+        let _v0 = 5;
+        let _v1 = &_v0;
+        let _v2 = 2;
+        if (*&_v2 == 2) return *_v1 + 100;
+        0
+    }
+    public fun test_all_ref_tuple_var_miss(): u64 {
+        let _v0 = 5;
+        let _v1 = &_v0;
+        let _v2 = 99;
+        if (*&_v2 == 2) return *_v1 + 100;
+        0
+    }
+    public fun test_mixed_ref_enum_hit(): u64 {
+        let _v0 = E::V1{_0: 1};
+        let _v1 = &_v0;
+        loop {
+            if (_v1 is V1) {
+                if (*&_v1._0 == 1) break};
+            loop {
+                if (!(_v1 is V1)) {
+                    if (_v1 is V2) break;
+                    abort 14566554180833181697
+                };
+                return 20
+            };
+            return 30
+        };
+        10
+    }
+    public fun test_mixed_ref_enum_miss(): u64 {
+        let _v0 = E::V1{_0: 42};
+        let _v1 = &_v0;
+        loop {
+            if (_v1 is V1) {
+                if (*&_v1._0 == 1) break};
+            loop {
+                if (!(_v1 is V1)) {
+                    if (_v1 is V2) break;
+                    abort 14566554180833181697
+                };
+                return 20
+            };
+            return 30
+        };
+        10
+    }
+    public fun test_mixed_ref_prim_hit(): u64 {
+        let _v0 = 1;
+        let _v1 = &_v0;
+        let _v2 = E::V1{_0: 2};
+        let _v3 = &_v2;
+        loop {
+            if (_v3 is V1) {
+                let _v4;
+                let _v5 = &_v3._0;
+                if (*_v1 == 1) _v4 = *_v5 == 2 else _v4 = false;
+                if (_v4) break
+            };
+            loop {
+                if (!(_v3 is V1)) {
+                    if (_v3 is V2) break;
+                    abort 14566554180833181697
+                };
+                let E::V1{_0: _v6} = _v2;
+                return _v6
+            };
+            let E::V2{} = _v2;
+            return 99
+        };
+        let E::V1{_0: _v7} = _v2;
+        10
+    }
+    public fun test_mixed_ref_prim_miss(): u64 {
+        let _v0 = 99;
+        let _v1 = &_v0;
+        let _v2 = E::V1{_0: 2};
+        let _v3 = &_v2;
+        loop {
+            if (_v3 is V1) {
+                let _v4;
+                let _v5 = &_v3._0;
+                if (*_v1 == 1) _v4 = *_v5 == 2 else _v4 = false;
+                if (_v4) break
+            };
+            loop {
+                if (!(_v3 is V1)) {
+                    if (_v3 is V2) break;
+                    abort 14566554180833181697
+                };
+                let E::V1{_0: _v6} = _v2;
+                return _v6
+            };
+            let E::V2{} = _v2;
+            return 99
+        };
+        let E::V1{_0: _v7} = _v2;
+        10
+    }
+    public fun test_ref_bool_hit(): u64 {
+        let _v0 = true;
+        let _v1 = &_v0;
+        let _v2 = *_v1;
+        loop {
+            if (!(_v2 == true)) {
+                if (*_v1 == false) break;
+                abort 14566554180833181697
+            };
+            return 1
+        };
+        0
+    }
+    public fun test_ref_bool_miss(): u64 {
+        let _v0 = false;
+        let _v1 = &_v0;
+        let _v2 = *_v1;
+        loop {
+            if (!(_v2 == true)) {
+                if (*_v1 == false) break;
+                abort 14566554180833181697
+            };
+            return 1
+        };
+        0
+    }
+    public fun test_ref_bytes_hit(): u64 {
+        let _v0 = vector[104u8, 105u8];
+        if (*&_v0 == vector[104u8, 105u8]) return 1;
+        0
+    }
+    public fun test_ref_bytes_miss(): u64 {
+        let _v0 = vector[98u8, 121u8, 101u8];
+        if (*&_v0 == vector[104u8, 105u8]) return 1;
+        0
+    }
+    public fun test_ref_bytestring_hit(): u64 {
+        let _v0 = Wrapper::S{_0: vector[104u8, 101u8, 108u8, 108u8, 111u8]};
+        let _v1 = &_v0;
+        loop {
+            if (_v1 is S) {
+                if (*&_v1._0 == vector[104u8, 101u8, 108u8, 108u8, 111u8]) break};
+            loop {
+                if (!(_v1 is S)) {
+                    if (_v1 is T) break;
+                    abort 14566554180833181697
+                };
+                return 2
+            };
+            return 3
+        };
+        1
+    }
+    public fun test_ref_bytestring_miss(): u64 {
+        let _v0 = Wrapper::S{_0: vector[119u8, 111u8, 114u8, 108u8, 100u8]};
+        let _v1 = &_v0;
+        loop {
+            if (_v1 is S) {
+                if (*&_v1._0 == vector[104u8, 101u8, 108u8, 108u8, 111u8]) break};
+            loop {
+                if (!(_v1 is S)) {
+                    if (_v1 is T) break;
+                    abort 14566554180833181697
+                };
+                return 2
+            };
+            return 3
+        };
+        1
+    }
+    public fun test_ref_enum_hit(): u64 {
+        let _v0 = E::V1{_0: 1};
+        let _v1 = &_v0;
+        loop {
+            if (_v1 is V1) {
+                if (*&_v1._0 == 1) break};
+            loop {
+                if (!(_v1 is V1)) {
+                    if (_v1 is V2) break;
+                    abort 14566554180833181697
+                };
+                return 2
+            };
+            return 3
+        };
+        1
+    }
+    public fun test_ref_enum_miss(): u64 {
+        let _v0 = E::V1{_0: 42};
+        let _v1 = &_v0;
+        loop {
+            if (_v1 is V1) {
+                if (*&_v1._0 == 1) break};
+            loop {
+                if (!(_v1 is V1)) {
+                    if (_v1 is V2) break;
+                    abort 14566554180833181697
+                };
+                return 2
+            };
+            return 3
+        };
+        1
+    }
+    public fun test_ref_enum_no_literal(): u64 {
+        let _v0 = E::V1{_0: 42};
+        let _v1 = &_v0;
+        loop {
+            if (!(_v1 is V1)) {
+                if (_v1 is V2) break;
+                abort 14566554180833181697
+            };
+            return *&_v1._0
+        };
+        0
+    }
+    public fun test_ref_enum_no_literal_v2(): u64 {
+        let _v0 = E::V2{};
+        let _v1 = &_v0;
+        loop {
+            if (!(_v1 is V1)) {
+                if (_v1 is V2) break;
+                abort 14566554180833181697
+            };
+            return *&_v1._0
+        };
+        0
+    }
+    public fun test_ref_enum_other_variant(): u64 {
+        let _v0 = E::V2{};
+        let _v1 = &_v0;
+        loop {
+            if (_v1 is V1) {
+                if (*&_v1._0 == 1) break};
+            loop {
+                if (!(_v1 is V1)) {
+                    if (_v1 is V2) break;
+                    abort 14566554180833181697
+                };
+                return 2
+            };
+            return 3
+        };
+        1
+    }
+    public fun test_ref_generic_hit(): u64 {
+        let _v0 = Generic::V1<u64>{_0: 1};
+        let _v1 = &_v0;
+        loop {
+            if (_v1 is V1) {
+                if (*&_v1._0 == 1) break};
+            loop {
+                if (!(_v1 is V1)) {
+                    if (_v1 is V2) break;
+                    abort 14566554180833181697
+                };
+                return 20
+            };
+            return 30
+        };
+        10
+    }
+    public fun test_ref_generic_miss(): u64 {
+        let _v0 = Generic::V1<u64>{_0: 42};
+        let _v1 = &_v0;
+        loop {
+            if (_v1 is V1) {
+                if (*&_v1._0 == 1) break};
+            loop {
+                if (!(_v1 is V1)) {
+                    if (_v1 is V2) break;
+                    abort 14566554180833181697
+                };
+                return 20
+            };
+            return 30
+        };
+        10
+    }
+    public fun test_ref_generic_other_variant(): u64 {
+        let _v0 = Generic::V2<u64>{};
+        let _v1 = &_v0;
+        loop {
+            if (_v1 is V1) {
+                if (*&_v1._0 == 1) break};
+            loop {
+                if (!(_v1 is V1)) {
+                    if (_v1 is V2) break;
+                    abort 14566554180833181697
+                };
+                return 20
+            };
+            return 30
+        };
+        10
+    }
+    public fun test_ref_generic_pair_hit(): u64 {
+        let _v0 = GenericPair::P<u64, bool>{_0: 1, _1: true};
+        let _v1 = &_v0;
+        loop {
+            if (_v1 is P) {
+                let _v2;
+                let _v3 = &_v1._0;
+                let _v4 = &_v1._1;
+                if (*_v3 == 1) _v2 = *_v4 == true else _v2 = false;
+                if (_v2) break
+            };
+            loop {
+                if (!(_v1 is P)) {
+                    if (_v1 is Q) break;
+                    abort 14566554180833181697
+                };
+                return 20
+            };
+            return 30
+        };
+        10
+    }
+    public fun test_ref_generic_pair_partial(): u64 {
+        let _v0 = GenericPair::P<u64, bool>{_0: 1, _1: false};
+        let _v1 = &_v0;
+        loop {
+            if (_v1 is P) {
+                let _v2;
+                let _v3 = &_v1._0;
+                let _v4 = &_v1._1;
+                if (*_v3 == 1) _v2 = *_v4 == true else _v2 = false;
+                if (_v2) break
+            };
+            loop {
+                if (!(_v1 is P)) {
+                    if (_v1 is Q) break;
+                    abort 14566554180833181697
+                };
+                return 20
+            };
+            return 30
+        };
+        10
+    }
+    public fun test_ref_generic_var_lit(): u64 {
+        let _v0 = Generic::V1<u64>{_0: 5};
+        let _v1 = &_v0;
+        loop {
+            if (_v1 is V1) {
+                if (*&_v1._0 == 5) break};
+            loop {
+                if (!(_v1 is V1)) {
+                    if (_v1 is V2) break;
+                    abort 14566554180833181697
+                };
+                return *&_v1._0
+            };
+            return 0
+        };
+        100
+    }
+    public fun test_ref_generic_var_lit_fallthrough(): u64 {
+        let _v0 = Generic::V1<u64>{_0: 99};
+        let _v1 = &_v0;
+        loop {
+            if (_v1 is V1) {
+                if (*&_v1._0 == 5) break};
+            loop {
+                if (!(_v1 is V1)) {
+                    if (_v1 is V2) break;
+                    abort 14566554180833181697
+                };
+                return *&_v1._0
+            };
+            return 0
+        };
+        100
+    }
+    public fun test_ref_guard_fail(): u64 {
+        let _v0 = E::V1{_0: 1};
+        let _v1 = &_v0;
+        loop {
+            if (_v1 is V1) {
+                let _v2;
+                if (*&_v1._0 == 1) _v2 = false else _v2 = false;
+                if (_v2) break
+            };
+            loop {
+                if (!(_v1 is V1)) {
+                    if (_v1 is V2) break;
+                    abort 14566554180833181697
+                };
+                return 60
+            };
+            return 70
+        };
+        50
+    }
+    public fun test_ref_guard_pass(): u64 {
+        let _v0 = E::V1{_0: 1};
+        let _v1 = &_v0;
+        loop {
+            if (_v1 is V1) {
+                let _v2;
+                if (*&_v1._0 == 1) _v2 = true else _v2 = false;
+                if (_v2) break
+            };
+            loop {
+                if (!(_v1 is V1)) {
+                    if (_v1 is V2) break;
+                    abort 14566554180833181697
+                };
+                return 60
+            };
+            return 70
+        };
+        50
+    }
+    public fun test_ref_mix_var(): u64 {
+        let _v0;
+        let _v1 = Pair::P{_0: 5, _1: 2};
+        let _v2 = &_v1;
+        loop {
+            if (_v2 is P) {
+                _v0 = &_v2._0;
+                if (*&_v2._1 == 2) break
+            };
+            loop {
+                if (!(_v2 is P)) {
+                    if (_v2 is Q) break;
+                    abort 14566554180833181697
+                };
+                return 20
+            };
+            return 30
+        };
+        *_v0 + 100
+    }
+    public fun test_ref_mix_var_miss(): u64 {
+        let _v0;
+        let _v1 = Pair::P{_0: 5, _1: 99};
+        let _v2 = &_v1;
+        loop {
+            if (_v2 is P) {
+                _v0 = &_v2._0;
+                if (*&_v2._1 == 2) break
+            };
+            loop {
+                if (!(_v2 is P)) {
+                    if (_v2 is Q) break;
+                    abort 14566554180833181697
+                };
+                return 20
+            };
+            return 30
+        };
+        *_v0 + 100
+    }
+    public fun test_ref_multi_hit(): u64 {
+        let _v0 = Pair::P{_0: 1, _1: 2};
+        let _v1 = &_v0;
+        loop {
+            if (_v1 is P) {
+                let _v2;
+                let _v3 = &_v1._0;
+                let _v4 = &_v1._1;
+                if (*_v3 == 1) _v2 = *_v4 == 2 else _v2 = false;
+                if (_v2) break
+            };
+            loop {
+                if (!(_v1 is P)) {
+                    if (_v1 is Q) break;
+                    abort 14566554180833181697
+                };
+                return 20
+            };
+            return 30
+        };
+        10
+    }
+    public fun test_ref_multi_partial(): u64 {
+        let _v0 = Pair::P{_0: 1, _1: 99};
+        let _v1 = &_v0;
+        loop {
+            if (_v1 is P) {
+                let _v2;
+                let _v3 = &_v1._0;
+                let _v4 = &_v1._1;
+                if (*_v3 == 1) _v2 = *_v4 == 2 else _v2 = false;
+                if (_v2) break
+            };
+            loop {
+                if (!(_v1 is P)) {
+                    if (_v1 is Q) break;
+                    abort 14566554180833181697
+                };
+                return 20
+            };
+            return 30
+        };
+        10
+    }
+    public fun test_ref_mut_hit(): u64 {
+        let _v0 = E::V1{_0: 1};
+        let _v1 = &mut _v0;
+        loop {
+            if (_v1 is V1) {
+                if (*&mut _v1._0 == 1) break};
+            loop {
+                if (!(_v1 is V1)) {
+                    if (_v1 is V2) break;
+                    abort 14566554180833181697
+                };
+                return 2
+            };
+            return 3
+        };
+        1
+    }
+    public fun test_ref_mut_miss(): u64 {
+        let _v0 = E::V1{_0: 42};
+        let _v1 = &mut _v0;
+        loop {
+            if (_v1 is V1) {
+                if (*&mut _v1._0 == 1) break};
+            loop {
+                if (!(_v1 is V1)) {
+                    if (_v1 is V2) break;
+                    abort 14566554180833181697
+                };
+                return 2
+            };
+            return 3
+        };
+        1
+    }
+    public fun test_ref_nested_hit(): u64 {
+        let _v0 = Outer::W{_0: Inner::A{_0: 1}};
+        let _v1 = &_v0;
+        loop {
+            if (_v1 is W) {
+                let _v2 = &_v1._0;
+                if (_v2 is A) {
+                    if (*&_v2._0 == 1) break}
+            };
+            if (!((_v1 is W) && (&_v1._0 is A))) {
+                if (!((_v1 is W) && (&_v1._0 is B))) {
+                    assert!(_v1 is X, 14566554180833181697);
+                    return 400
+                };
+                return 300
+            };
+            return 200
+        };
+        100
+    }
+    public fun test_ref_nested_miss(): u64 {
+        let _v0 = Outer::W{_0: Inner::A{_0: 42}};
+        let _v1 = &_v0;
+        loop {
+            if (_v1 is W) {
+                let _v2 = &_v1._0;
+                if (_v2 is A) {
+                    if (*&_v2._0 == 1) break}
+            };
+            if (!((_v1 is W) && (&_v1._0 is A))) {
+                if (!((_v1 is W) && (&_v1._0 is B))) {
+                    assert!(_v1 is X, 14566554180833181697);
+                    return 400
+                };
+                return 300
+            };
+            return 200
+        };
+        100
+    }
+    public fun test_ref_top_level_hit(): u64 {
+        let _v0;
+        let _v1 = 1;
+        let _v2 = &_v1;
+        let _v3 = *_v2;
+        loop {
+            if (!(_v3 == 1)) {
+                if (*_v2 == 2) {
+                    _v0 = 20;
+                    break
+                };
+                _v0 = 0;
+                break
+            };
+            return 10
+        };
+        _v0
+    }
+    public fun test_ref_top_level_miss(): u64 {
+        let _v0;
+        let _v1 = 99;
+        let _v2 = &_v1;
+        let _v3 = *_v2;
+        loop {
+            if (!(_v3 == 1)) {
+                if (*_v2 == 2) {
+                    _v0 = 20;
+                    break
+                };
+                _v0 = 0;
+                break
+            };
+            return 10
+        };
+        _v0
+    }
+}
+
+
+//# run 0xc0ffee::m::test_ref_enum_hit
+
+//# run 0xc0ffee::m::test_ref_enum_miss
+
+//# run 0xc0ffee::m::test_ref_enum_other_variant
+
+//# run 0xc0ffee::m::test_ref_multi_hit
+
+//# run 0xc0ffee::m::test_ref_multi_partial
+
+//# run 0xc0ffee::m::test_ref_mix_var
+
+//# run 0xc0ffee::m::test_ref_mix_var_miss
+
+//# run 0xc0ffee::m::test_ref_guard_pass
+
+//# run 0xc0ffee::m::test_ref_guard_fail
+
+//# run 0xc0ffee::m::test_ref_nested_hit
+
+//# run 0xc0ffee::m::test_ref_nested_miss
+
+//# run 0xc0ffee::m::test_ref_mut_hit
+
+//# run 0xc0ffee::m::test_ref_mut_miss
+
+//# run 0xc0ffee::m::test_ref_bytestring_hit
+
+//# run 0xc0ffee::m::test_ref_bytestring_miss
+
+//# run 0xc0ffee::m::test_ref_top_level_hit
+
+//# run 0xc0ffee::m::test_ref_top_level_miss
+
+//# run 0xc0ffee::m::test_mixed_ref_enum_hit
+
+//# run 0xc0ffee::m::test_mixed_ref_enum_miss
+
+//# run 0xc0ffee::m::test_mixed_ref_prim_hit
+
+//# run 0xc0ffee::m::test_mixed_ref_prim_miss
+
+//# run 0xc0ffee::m::test_ref_bool_hit
+
+//# run 0xc0ffee::m::test_ref_bool_miss
+
+//# run 0xc0ffee::m::test_ref_bytes_hit
+
+//# run 0xc0ffee::m::test_ref_bytes_miss
+
+//# run 0xc0ffee::m::test_all_ref_tuple_hit
+
+//# run 0xc0ffee::m::test_all_ref_tuple_partial
+
+//# run 0xc0ffee::m::test_all_ref_tuple_miss
+
+//# run 0xc0ffee::m::test_all_ref_tuple_var_hit
+
+//# run 0xc0ffee::m::test_all_ref_tuple_var_miss
+
+//# run 0xc0ffee::m::test_ref_generic_hit
+
+//# run 0xc0ffee::m::test_ref_generic_miss
+
+//# run 0xc0ffee::m::test_ref_generic_other_variant
+
+//# run 0xc0ffee::m::test_ref_generic_pair_hit
+
+//# run 0xc0ffee::m::test_ref_generic_pair_partial
+
+//# run 0xc0ffee::m::test_ref_generic_var_lit
+
+//# run 0xc0ffee::m::test_ref_generic_var_lit_fallthrough
+
+//# run 0xc0ffee::m::test_ref_enum_no_literal
+
+//# run 0xc0ffee::m::test_ref_enum_no_literal_v2

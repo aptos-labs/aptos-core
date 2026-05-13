@@ -1,0 +1,48 @@
+\documentclass[letterpaper,conference]{IEEEtran}
+\usepackage{hyperref}
+
+\input{prelude.tex}
+
+\begin{document}
+
+\title{Formal Verification of Imperative \\First-Class Functions in Move}
+
+\author{%
+	\IEEEauthorblockN{Wolfgang Grieskamp\IEEEauthorrefmark{1} and Teng Zhang
+	 and Vineeth Kashyap and Jake Silverman}
+	\IEEEauthorblockA{Aptos Labs, Palo Alto, USA\\
+		\IEEEauthorrefmark{1}Corresponding author: \texttt{wg@aptoslabs.com}}
+}
+
+\maketitle
+
+
+\begin{abstract}
+	The Move Prover (\MVP) is a formal verifier for smart contracts written in the Move programming language.
+	Recently, Move on Aptos was extended with \emph{higher-order functions}: imperative functions as first-class values that can be passed around, stored in data structs, and kept in persistent storage, enabling \emph{dynamic dispatch}.
+	This paper describes the representation of function values in the Move specification language and their implementation in \MVP.
+	We introduce \emph{behavioral predicates} which characterize Move functions (aborts and pre/post conditions) by single-state or two-state predicates.
+	We also introduce \emph{state labels} for naming intermediate memory states in which expressions are evaluated and which allow to compose behavioral predicates to describe sequences of state transitions.
+	On SMT level, function values are encoded by discriminating over the possible function values reaching a call site: when the concrete function is known, its effect is accounted for directly; when it is unknown (for example, a function parameter, or a closure loaded from storage), its behavioral predicates describe the effect.
+    Our approach goes beyond, for example, Dafny, by supporting imperative first-class functions which can modify state via Rust-style references and global variables, and leads to more efficient SMT encodings than separation logic because of the static separation of memory enabled by Move.
+	We further extend \MVP's \emph{specification inference} tool to work with function values: given arbitrary higher-order Move code, weakest-precondition analysis semi-automatically derives behavioral-predicate-based specifications, reducing the annotation burden and providing a validation pipeline for the new specification constructs.
+\end{abstract}
+
+\input{intro}
+\input{move}
+\input{encoding}
+\input{validation}
+\input{conclusion}
+
+\newpage
+\bibliographystyle{IEEEtran}
+\bibliography{biblio}
+
+%\input{appendix}
+
+\end{document}
+
+%%% Local Variables:
+%%% mode: latex
+%%% TeX-master: t
+%%% End:

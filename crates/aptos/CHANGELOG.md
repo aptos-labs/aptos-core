@@ -3,6 +3,15 @@
 All notable changes to the Aptos CLI will be captured in this file. This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html) and the format set out by [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 # Unreleased
+
+- _No changes yet._
+
+## [9.2.0]
+- Update boogie from 3.5.1 to 3.5.6.
+- Update z3 from 4.11.2 to 4.13.0.
+
+## [9.1.0]
+- Added support for confidential transactions locally
 - Updated default formatter version to 1.5.1.
 
 ## [9.0.0]

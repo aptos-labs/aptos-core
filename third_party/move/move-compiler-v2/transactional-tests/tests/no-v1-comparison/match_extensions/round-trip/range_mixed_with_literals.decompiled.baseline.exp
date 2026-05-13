@@ -1,0 +1,22 @@
+processed 11 tasks
+task 0 lines 3-46:  publish [module 0xc0ffee::m {]
+task 1 lines 49-49:  run 0xc0ffee::m::test_mixed --args 0u64
+return values: 1
+task 2 lines 51-51:  run 0xc0ffee::m::test_mixed --args 1u64
+return values: 2
+task 3 lines 53-53:  run 0xc0ffee::m::test_mixed --args 5u64
+return values: 2
+task 4 lines 55-55:  run 0xc0ffee::m::test_mixed --args 9u64
+return values: 2
+task 5 lines 57-57:  run 0xc0ffee::m::test_mixed --args 10u64
+return values: 3
+task 6 lines 59-59:  run 0xc0ffee::m::test_mixed --args 50u64
+return values: 4
+task 7 lines 61-61:  run 0xc0ffee::m::test_mixed --args 100u64
+return values: 5
+task 8 lines 63-63:  run 0xc0ffee::m::test_literal_sandwich --args 0u8
+return values: 1
+task 9 lines 65-65:  run 0xc0ffee::m::test_literal_sandwich --args 128u8
+return values: 2
+task 10 lines 67-67:  run 0xc0ffee::m::test_literal_sandwich --args 255u8
+return values: 3

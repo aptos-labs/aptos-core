@@ -1,6 +1,7 @@
-// Copyright (c) The Diem Core Contributors
-// Copyright (c) The Move Contributors
-// SPDX-License-Identifier: Apache-2.0
+// Parts of the file are Copyright (c) The Diem Core Contributors
+// Parts of the file are Copyright (c) The Move Contributors
+// Parts of the file are Copyright (c) Aptos Foundation
+// All Aptos Foundation code and content is licensed pursuant to the Innovation-Enabling Source Code License, available at https://github.com/aptos-labs/aptos-core/blob/main/LICENSE
 
 //! Constants for the binary format.
 //!
@@ -582,8 +583,7 @@ pub const VERSION_DEFAULT: u32 = VERSION_9;
 /// In general, these are used to set up the default bytecode version for language versions higher than the default.
 pub const VERSION_DEFAULT_LANG_V2_4: u32 = VERSION_10;
 
-/// Mark which version is the default version if compiling with language version 2.5
-/// temporarily set to VERSION_10
+/// Mark which version is the default version if compiling with language version 2.5.
 pub const VERSION_DEFAULT_LANG_V2_5: u32 = VERSION_10;
 
 pub(crate) mod versioned_data {

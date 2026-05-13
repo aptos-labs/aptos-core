@@ -1,0 +1,66 @@
+// -- Model dump before first bytecode pipeline
+module 0xc0ffee::m {
+    enum Color {
+        RGB {
+            0: u8,
+            1: u8,
+            2: u8,
+        }
+        Grayscale {
+            0: u8,
+        }
+        Named,
+    }
+    private fun mixed_range_tuple(c: Color,x: u64): u64 {
+        {
+          let _$np_0: Color = c;
+          {
+            let _$prim_0: u64 = x;
+            match (_$np_0) {
+              m::Color::RGB{ 0: _$nlit_0, 1: _$nlit_1, 2: _$nlit_2 } if And(And(Ge(_$prim_0, 88), Lt(_$prim_0, 99)), And(And(And(Ge(_$nlit_0, 0), Lt(_$nlit_0, 25)), Eq(_$nlit_1, 28)), And(Ge(_$nlit_2, 55), Lt(_$nlit_2, 66)))) => {
+                1
+              }
+              m::Color::RGB{ 0: _, 1: _, 2: _ } => {
+                2
+              }
+              m::Color::Grayscale{ 0: _$nlit_0 } if And(And(Ge(_$prim_0, 0), Lt(_$prim_0, 50)), And(Ge(_$nlit_0, 128), Le(_$nlit_0, 255))) => {
+                3
+              }
+              m::Color::Grayscale{ 0: _ } => {
+                4
+              }
+              m::Color::Named => {
+                5
+              }
+            }
+
+          }
+        }
+    }
+} // end 0xc0ffee::m
+
+// -- Sourcified model before first bytecode pipeline
+module 0xc0ffee::m {
+    enum Color has drop {
+        RGB {
+            0: u8,
+            1: u8,
+            2: u8,
+        }
+        Grayscale {
+            0: u8,
+        }
+        Named,
+    }
+    fun mixed_range_tuple(c: Color, x: u64): u64 {
+        let __np_0 = c;
+        let __prim_0 = x;
+        match (__np_0) {
+            Color::RGB(__nlit_0, __nlit_1, __nlit_2) if __prim_0 >= 88 && __prim_0 < 99 && (__nlit_0 >= 0u8 && __nlit_0 < 25u8 && __nlit_1 == 28u8 && (__nlit_2 >= 55u8 && __nlit_2 < 66u8)) => 1,
+            Color::RGB(_, _, _) => 2,
+            Color::Grayscale(__nlit_0) if __prim_0 >= 0 && __prim_0 < 50 && (__nlit_0 >= 128u8 && __nlit_0 <= MAX_U8) => 3,
+            Color::Grayscale(_) => 4,
+            Color::Named{} => 5,
+        }
+    }
+}

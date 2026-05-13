@@ -1,5 +1,5 @@
-// Copyright © Aptos Foundation
-// SPDX-License-Identifier: Apache-2.0
+// Copyright (c) Aptos Foundation
+// Licensed pursuant to the Innovation-Enabling Source Code License, available at https://github.com/aptos-labs/aptos-core/blob/main/LICENSE
 
 use std::collections::{BTreeMap, HashSet};
 
@@ -48,6 +48,14 @@ impl Default for NativeRuntimeRefChecksModel {
         // It is the only return value that is a reference.
         let single_return_derived_from_first_ref_param = vec![0];
         let models = BTreeMap::from([
+            (
+                ("storage_slot", "borrow_storage_slot_resource"),
+                single_return_derived_from_first_ref_param.clone(),
+            ),
+            (
+                ("storage_slot", "borrow_storage_slot_resource_mut"),
+                single_return_derived_from_first_ref_param.clone(),
+            ),
             (
                 ("signer", "borrow_address"),
                 single_return_derived_from_first_ref_param.clone(),

@@ -26,7 +26,9 @@ module 0x42::structs {
         Point { x, y }
     }
     spec make_point(x: u64, y: u64): Point {
+        pragma opaque = true;
         ensures [inferred] result == Point{x: x, y: y};
+        aborts_if [inferred] false;
     }
 
 
@@ -36,6 +38,7 @@ module 0x42::structs {
         x + y
     }
     spec point_sum(p: Point): u64 {
+        pragma opaque = true;
         ensures [inferred] result == p.x + p.y;
         aborts_if [inferred] p.x + p.y > MAX_U64;
     }
@@ -49,7 +52,9 @@ module 0x42::structs {
         }
     }
     spec make_rect(x1: u64, y1: u64, x2: u64, y2: u64): Rectangle {
+        pragma opaque = true;
         ensures [inferred] result == Rectangle{top_left: Point{x: x1, y: y1}, bottom_right: Point{x: x2, y: y2}};
+        aborts_if [inferred] false;
     }
 
 
@@ -58,7 +63,9 @@ module 0x42::structs {
         Color::RGB { r, g, b }
     }
     spec make_rgb(r: u8, g: u8, b: u8): Color {
+        pragma opaque = true;
         ensures [inferred] result == Color::RGB{r: r, g: g, b: b};
+        aborts_if [inferred] false;
     }
 
 
@@ -67,7 +74,9 @@ module 0x42::structs {
         Color::Red
     }
     spec make_red(): Color {
+        pragma opaque = true;
         ensures [inferred] result == Color::Red{};
+        aborts_if [inferred] false;
     }
 
 }

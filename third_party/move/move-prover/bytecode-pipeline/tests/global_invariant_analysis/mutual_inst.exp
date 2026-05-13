@@ -89,6 +89,20 @@ public fun A::good($t0|account1: signer, $t1|account2: signer) {
 
 ============ after pipeline `global_invariant_analysis` ================
 
+[variant baseline]
+public fun S::publish_u64_bool($t0|account: signer, $t1|x: u64, $t2|y: bool) {
+     var $t3: u8
+     var $t4: 0x2::S::Storage<u64, bool>
+     var $t5: num
+  0: $t3 := 0
+  1: $t4 := pack 0x2::S::Storage<u64, bool>($t1, $t2, $t3)
+  2: move_to<0x2::S::Storage<u64, bool>>($t0, $t4) on_abort goto 4 with $t5
+  3: return ()
+  4: label L1
+  5: abort($t5)
+}
+
+
 [variant verification]
 public fun S::publish_u64_bool($t0|account: signer, $t1|x: u64, $t2|y: bool) {
      var $t3: u8
@@ -96,11 +110,24 @@ public fun S::publish_u64_bool($t0|account: signer, $t1|x: u64, $t2|y: bool) {
      var $t5: num
   0: $t3 := 0
   1: $t4 := pack 0x2::S::Storage<u64, bool>($t1, $t2, $t3)
-  2: move_to<0x2::S::Storage<u64, bool>>($t0, $t4) on_abort goto 5 with $t5
-  3: label L1
-  4: return ()
-  5: label L2
-  6: abort($t5)
+  2: move_to<0x2::S::Storage<u64, bool>>($t0, $t4) on_abort goto 4 with $t5
+  3: return ()
+  4: label L1
+  5: abort($t5)
+}
+
+
+[variant baseline]
+public fun S::publish_u64_y<#0>($t0|account: signer, $t1|x: u64, $t2|y: #0) {
+     var $t3: u8
+     var $t4: 0x2::S::Storage<u64, #0>
+     var $t5: num
+  0: $t3 := 1
+  1: $t4 := pack 0x2::S::Storage<u64, #0>($t1, $t2, $t3)
+  2: move_to<0x2::S::Storage<u64, #0>>($t0, $t4) on_abort goto 4 with $t5
+  3: return ()
+  4: label L1
+  5: abort($t5)
 }
 
 
@@ -111,11 +138,24 @@ public fun S::publish_u64_y<#0>($t0|account: signer, $t1|x: u64, $t2|y: #0) {
      var $t5: num
   0: $t3 := 1
   1: $t4 := pack 0x2::S::Storage<u64, #0>($t1, $t2, $t3)
-  2: move_to<0x2::S::Storage<u64, #0>>($t0, $t4) on_abort goto 5 with $t5
-  3: label L1
-  4: return ()
-  5: label L2
-  6: abort($t5)
+  2: move_to<0x2::S::Storage<u64, #0>>($t0, $t4) on_abort goto 4 with $t5
+  3: return ()
+  4: label L1
+  5: abort($t5)
+}
+
+
+[variant baseline]
+public fun S::publish_x_bool<#0>($t0|account: signer, $t1|x: #0, $t2|y: bool) {
+     var $t3: u8
+     var $t4: 0x2::S::Storage<#0, bool>
+     var $t5: num
+  0: $t3 := 2
+  1: $t4 := pack 0x2::S::Storage<#0, bool>($t1, $t2, $t3)
+  2: move_to<0x2::S::Storage<#0, bool>>($t0, $t4) on_abort goto 4 with $t5
+  3: return ()
+  4: label L1
+  5: abort($t5)
 }
 
 
@@ -126,11 +166,10 @@ public fun S::publish_x_bool<#0>($t0|account: signer, $t1|x: #0, $t2|y: bool) {
      var $t5: num
   0: $t3 := 2
   1: $t4 := pack 0x2::S::Storage<#0, bool>($t1, $t2, $t3)
-  2: move_to<0x2::S::Storage<#0, bool>>($t0, $t4) on_abort goto 5 with $t5
-  3: label L1
-  4: return ()
-  5: label L2
-  6: abort($t5)
+  2: move_to<0x2::S::Storage<#0, bool>>($t0, $t4) on_abort goto 4 with $t5
+  3: return ()
+  4: label L1
+  5: abort($t5)
 }
 
 
@@ -141,11 +180,10 @@ public fun S::publish_x_y<#0, #1>($t0|account: signer, $t1|x: #0, $t2|y: #1) {
      var $t5: num
   0: $t3 := 3
   1: $t4 := pack 0x2::S::Storage<#0, #1>($t1, $t2, $t3)
-  2: move_to<0x2::S::Storage<#0, #1>>($t0, $t4) on_abort goto 5 with $t5
-  3: label L1
-  4: return ()
-  5: label L2
-  6: abort($t5)
+  2: move_to<0x2::S::Storage<#0, #1>>($t0, $t4) on_abort goto 4 with $t5
+  3: return ()
+  4: label L1
+  5: abort($t5)
 }
 
 
@@ -156,11 +194,29 @@ public fun S::publish_x_y<#0, #1>($t0|account: signer, $t1|x: #0, $t2|y: #1) {
      var $t5: num
   0: $t3 := 3
   1: $t4 := pack 0x2::S::Storage<#0, #1>($t1, $t2, $t3)
-  2: move_to<0x2::S::Storage<#0, #1>>($t0, $t4) on_abort goto 5 with $t5
-  3: label L1
-  4: return ()
-  5: label L2
-  6: abort($t5)
+  2: move_to<0x2::S::Storage<#0, #1>>($t0, $t4) on_abort goto 4 with $t5
+  3: return ()
+  4: label L1
+  5: abort($t5)
+}
+
+
+[variant baseline]
+public fun A::good($t0|account1: signer, $t1|account2: signer) {
+     var $t2: u64
+     var $t3: bool
+     var $t4: num
+     var $t5: u64
+     var $t6: bool
+  0: $t2 := 1
+  1: $t3 := true
+  2: S::publish_x_y<u64, bool>($t0, $t2, $t3) on_abort goto 7 with $t4
+  3: $t5 := 1
+  4: $t6 := true
+  5: S::publish_x_y<u64, bool>($t1, $t5, $t6) on_abort goto 7 with $t4
+  6: return ()
+  7: label L1
+  8: abort($t4)
 }
 
 
@@ -173,14 +229,13 @@ public fun A::good($t0|account1: signer, $t1|account2: signer) {
      var $t6: bool
   0: $t2 := 1
   1: $t3 := true
-  2: S::publish_x_y<u64, bool>($t0, $t2, $t3) on_abort goto 8 with $t4
+  2: S::publish_x_y<u64, bool>($t0, $t2, $t3) on_abort goto 7 with $t4
   3: $t5 := 1
   4: $t6 := true
-  5: S::publish_x_y<u64, bool>($t1, $t5, $t6) on_abort goto 8 with $t4
-  6: label L1
-  7: return ()
-  8: label L2
-  9: abort($t4)
+  5: S::publish_x_y<u64, bool>($t1, $t5, $t6) on_abort goto 7 with $t4
+  6: return ()
+  7: label L1
+  8: abort($t4)
 }
 
 
@@ -209,7 +264,7 @@ S::publish_u64_bool: [
       ]
     ]
   }
-  2: move_to<0x2::S::Storage<u64, bool>>($t0, $t4) on_abort goto L2 with $t5 {
+  2: move_to<0x2::S::Storage<u64, bool>>($t0, $t4) on_abort goto L1 with $t5 {
     assert @0 = [
       <> -> [
         <>
@@ -256,7 +311,7 @@ S::publish_u64_y: [
       ]
     ]
   }
-  2: move_to<0x2::S::Storage<u64, #0>>($t0, $t4) on_abort goto L2 with $t5 {
+  2: move_to<0x2::S::Storage<u64, #0>>($t0, $t4) on_abort goto L1 with $t5 {
     assert @0 = [
       <bool> -> [
         <>
@@ -303,7 +358,7 @@ S::publish_x_bool: [
       ]
     ]
   }
-  2: move_to<0x2::S::Storage<#0, bool>>($t0, $t4) on_abort goto L2 with $t5 {
+  2: move_to<0x2::S::Storage<#0, bool>>($t0, $t4) on_abort goto L1 with $t5 {
     assert @0 = [
       <u64> -> [
         <>
@@ -350,7 +405,7 @@ S::publish_x_y: [
       ]
     ]
   }
-  2: move_to<0x2::S::Storage<#0, #1>>($t0, $t4) on_abort goto L2 with $t5 {
+  2: move_to<0x2::S::Storage<#0, #1>>($t0, $t4) on_abort goto L1 with $t5 {
     assert @0 = [
       <u64, bool> -> [
         <>
@@ -397,8 +452,8 @@ A::good: [
       ]
     ]
   }
-  2: S::publish_x_y<u64, bool>($t0, $t2, $t3) on_abort goto L2 with $t4 {}
-  5: S::publish_x_y<u64, bool>($t1, $t5, $t6) on_abort goto L2 with $t4 {}
+  2: S::publish_x_y<u64, bool>($t0, $t2, $t3) on_abort goto L1 with $t4 {}
+  5: S::publish_x_y<u64, bool>($t1, $t5, $t6) on_abort goto L1 with $t4 {}
   exitpoint {}
 ]
 

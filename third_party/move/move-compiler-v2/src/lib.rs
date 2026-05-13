@@ -1,6 +1,7 @@
-// Copyright (c) Aptos Foundation
-// Parts of the project are originally copyright (c) Meta Platforms, Inc.
-// SPDX-License-Identifier: Apache-2.0
+// Parts of the file are Copyright (c) The Diem Core Contributors
+// Parts of the file are Copyright (c) The Move Contributors
+// Parts of the file are Copyright (c) Aptos Foundation
+// All Aptos Foundation code and content is licensed pursuant to the Innovation-Enabling Source Code License, available at https://github.com/aptos-labs/aptos-core/blob/main/LICENSE
 
 mod bytecode_generator;
 pub mod diagnostics;
@@ -20,9 +21,8 @@ use crate::{
         acquires_checker, ast_simplifier, closure_checker, cmp_rewriter,
         cyclic_instantiation_checker, flow_insensitive_checkers, function_checker, inliner,
         inlining_optimization, lambda_lifter, lambda_lifter::LambdaLiftingOptions, model_ast_lints,
-        recursive_struct_checker, rewrite_target::RewritingScope, seqs_in_binop_checker,
-        spec_checker, spec_rewriter, struct_usage_collector, unused_params_checker,
-        EnvProcessorPipeline,
+        recursive_struct_checker, rewrite_target::RewritingScope, spec_checker, spec_rewriter,
+        struct_usage_collector, unused_params_checker, EnvProcessorPipeline,
     },
     pipeline::{
         ability_processor::AbilityProcessor,
@@ -290,8 +290,6 @@ pub fn run_checker(options: Options) -> anyhow::Result<GlobalEnv> {
             &options.known_attributes
         },
         options.language_version.unwrap_or_default(),
-        options.warn_deprecated,
-        options.warn_of_deprecation_use_in_aptos_libs,
         options.compile_test_code,
         options.compile_verify_code,
     )?;
@@ -369,7 +367,7 @@ pub fn run_stackless_bytecode_gen(env: &GlobalEnv) -> FunctionTargetsHolder {
             for fun in module.get_functions() {
                 let id = fun.get_qualified_id();
                 // Skip inline functions because invoke and lambda are not supported in the current code generator
-                if !fun.is_inline() {
+                if !fun.is_inline() && !fun.is_lemma() {
                     todo.insert(id);
                 }
             }
@@ -437,18 +435,6 @@ pub fn env_check_and_transform_pipeline<'a, 'b>(options: &'a Options) -> EnvProc
     if options.experiment_on(Experiment::ACCESS_CHECK) {
         env_pipeline.add("access check before inlining", |env: &mut GlobalEnv| {
             function_checker::check_access_before_inlining(env)
-        });
-    }
-
-    let check_seqs_in_binops = !options
-        .language_version
-        .unwrap_or_default()
-        .is_at_least(LanguageVersion::V2_0)
-        && options.experiment_on(Experiment::SEQS_IN_BINOPS_CHECK);
-    if check_seqs_in_binops {
-        env_pipeline.add("binop side effect check", |env| {
-            // This check should be done before inlining.
-            seqs_in_binop_checker::checker(env)
         });
     }
 
@@ -639,6 +625,8 @@ pub fn stackless_bytecode_check_pipeline(options: &Options) -> FunctionTargetPip
     if options.experiment_on(Experiment::LINT_CHECKS) {
         // Some lint checks need live variable analysis.
         pipeline.add_processor(Box::new(LiveVarAnalysisProcessor::new(false)));
+        // Some lint checks need reachability annotations.
+        pipeline.add_processor(Box::new(UnreachableCodeProcessor {}));
         pipeline.add_processor(Box::new(LintProcessor {}));
     }
 

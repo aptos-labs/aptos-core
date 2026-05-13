@@ -18,7 +18,14 @@ runs:
   steps:
     - if: ${{inputs.macos != 'true'}}
       name: Linux - Setup dependencies
-      run: sudo apt-get update && sudo apt-get install build-essential ca-certificates clang curl git libpq-dev libssl-dev pkg-config lsof lld --no-install-recommends --assume-yes
+      run: |
+        sudo apt-get update
+        sudo apt-get install build-essential ca-certificates curl git gnupg libpq-dev libssl-dev lsb-release lsof pkg-config software-properties-common wget --no-install-recommends --assume-yes
+        sudo bash -c "$(wget -O - https://apt.llvm.org/llvm.sh)" llvm.sh 21
+        sudo update-alternatives --install /usr/bin/clang clang /usr/bin/clang-21 100
+        sudo update-alternatives --install /usr/bin/clang++ clang++ /usr/bin/clang++-21 100
+        sudo update-alternatives --install /usr/bin/lld lld /usr/bin/lld-21 100
+        sudo update-alternatives --install /usr/bin/ld.lld ld.lld /usr/bin/ld.lld-21 100
       shell: bash
 
     - uses: dsherret/rust-toolchain-file@v1
@@ -26,7 +33,7 @@ runs:
     # rust-cache action will cache ~/.cargo and ./target
     # https://github.com/Swatinem/rust-cache#cache-details
     - name: Run cargo cache
-      uses: Swatinem/rust-cache@9d47c6ad4b02e050fd481d890b2ea34778fd09d6 # pin@v2.7.8
+      uses: Swatinem/rust-cache@c19371144df3bb44fab255c43d04cbc2ab54d1c4 # pin@v2.9.1
       with:
         key: ${{ inputs.ADDITIONAL_KEY }}
 

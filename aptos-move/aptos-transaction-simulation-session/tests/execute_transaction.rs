@@ -48,7 +48,7 @@ fn test_execute_transfer() -> Result<()> {
         .store_and_fund_account(sender.clone(), 1_000_000_000, 0)?;
 
     let txn = transfer_txn(&sender, *recipient.address(), 1_000);
-    let (vm_status, output) = session.execute_transaction(txn, false)?;
+    let (vm_status, output) = session.execute_transaction(txn, false, false)?;
 
     assert_eq!(vm_status, VMStatus::Executed, "transfer should succeed");
     assert!(output.gas_used() > 0, "should use some gas");
@@ -67,7 +67,7 @@ fn test_execute_transaction_increments_sequence_number() -> Result<()> {
         .store_and_fund_account(sender.clone(), 1_000_000_000, 0)?;
 
     let txn = transfer_txn(&sender, *sender.address(), 100);
-    session.execute_transaction(txn, false)?;
+    session.execute_transaction(txn, false, false)?;
 
     // After one transaction, sequence number should be 1.
     let account_resource: AccountResource = session
@@ -93,7 +93,7 @@ fn test_execute_transaction_with_gas_profiling() -> Result<()> {
         .store_and_fund_account(sender.clone(), 1_000_000_000, 0)?;
 
     let txn = transfer_txn(&sender, *recipient.address(), 1_000);
-    let (vm_status, output) = session.execute_transaction(txn, true)?;
+    let (vm_status, output) = session.execute_transaction(txn, true, false)?;
 
     assert_eq!(vm_status, VMStatus::Executed, "transfer should succeed");
     assert!(output.gas_used() > 0, "should use some gas");

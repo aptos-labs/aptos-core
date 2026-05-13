@@ -14,12 +14,14 @@ rust-version = { workspace = true }
 
 [features]
 default = ["micro-op", "move-bytecode", "testing"]
-micro-op = ["mono-move-runtime"]
+micro-op = ["mono-move-alloc", "mono-move-core", "mono-move-runtime", "move-core-types"]
 move-bytecode = ["move-compiler-v2", "legacy-move-compiler", "move-binary-format", "tempfile"]
 testing = ["move-bytecode", "move-core-types", "move-vm-runtime", "move-vm-test-utils", "move-vm-types"]
 
 [dependencies]
 legacy-move-compiler = { workspace = true, optional = true }
+mono-move-alloc = { workspace = true, optional = true }
+mono-move-core = { workspace = true, optional = true }
 mono-move-runtime = { workspace = true, optional = true }
 move-binary-format = { workspace = true, optional = true }
 move-compiler-v2 = { workspace = true, optional = true }
@@ -32,6 +34,7 @@ tempfile = { workspace = true, optional = true }
 
 [dev-dependencies]
 criterion = { workspace = true }
+mono-move-gas = { workspace = true }
 
 [[bench]]
 name = "fib"
@@ -47,4 +50,8 @@ harness = false
 
 [[bench]]
 name = "bst"
+harness = false
+
+[[bench]]
+name = "match_sum"
 harness = false

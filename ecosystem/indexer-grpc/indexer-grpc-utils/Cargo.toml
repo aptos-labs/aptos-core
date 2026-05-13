@@ -29,6 +29,7 @@ futures = { workspace = true }
 itertools = { workspace = true }
 lz4 = { workspace = true }
 once_cell = { workspace = true }
+opentelemetry = { workspace = true }
 prometheus = { workspace = true }
 prost = { workspace = true }
 redis = { workspace = true }
@@ -40,6 +41,7 @@ tokio = { workspace = true }
 tokio-util = { workspace = true }
 tonic = { workspace = true }
 tracing = { workspace = true }
+tracing-opentelemetry = { workspace = true }
 url = { workspace = true }
 uuid = { workspace = true }
 warp = { workspace = true }

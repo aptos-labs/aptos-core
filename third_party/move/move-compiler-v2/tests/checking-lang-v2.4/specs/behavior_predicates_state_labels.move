@@ -14,9 +14,9 @@ module 0x42::M {
 
     spec apply_simple_chain {
         // First predicate defines post-state "s1"
-        ensures ensures_of<f>(x, result)@s1;
+        ensures ..s1 |~ ensures_of<f>(x, result);
         // Second predicate reads from "s1" (must reference s1 so it's not orphaned)
-        ensures s1@ensures_of<f>(x, result);
+        ensures s1.. |~ ensures_of<f>(x, result);
     }
 
     // Test a longer chain: s1 -> s2 -> end
@@ -26,11 +26,11 @@ module 0x42::M {
 
     spec apply_longer_chain {
         // First predicate defines post-state "s1"
-        ensures ensures_of<f>(x, result)@s1;
+        ensures ..s1 |~ ensures_of<f>(x, result);
         // Second predicate reads from "s1" and defines "s2"
-        ensures s1@ensures_of<f>(x, result)@s2;
+        ensures s1..s2 |~ ensures_of<f>(x, result);
         // Third predicate reads from "s2"
-        ensures s2@ensures_of<f>(x, result);
+        ensures s2.. |~ ensures_of<f>(x, result);
     }
 
     // Test result_of with state labels
@@ -40,8 +40,8 @@ module 0x42::M {
 
     spec apply_result_chain {
         // First predicate defines post-state "r1"
-        ensures result_of<f>(x)@r1 == result;
+        ensures (..r1 |~ result_of<f>(x)) == result;
         // Second predicate reads from "r1"
-        ensures r1@result_of<f>(x) == result;
+        ensures (r1.. |~ result_of<f>(x)) == result;
     }
 }

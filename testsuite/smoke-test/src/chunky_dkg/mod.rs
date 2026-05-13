@@ -5,8 +5,12 @@ use crate::{smoke_test_environment::SwarmBuilder, utils};
 use aptos_forge::LocalSwarm;
 use aptos_rest_client::Client;
 use aptos_types::{
+    chain_id::ChainId,
     decryption::PerEpochEncryptionKeyResource,
-    dkg::chunky_dkg::{AggregatedSubtranscript, ChunkyDKG, ChunkyDKGSessionState, ChunkyDKGState},
+    dkg::chunky_dkg::{
+        initialize_public_parameters, AggregatedSubtranscript, ChunkyDKGSession,
+        ChunkyDKGSessionState, ChunkyDKGState,
+    },
     on_chain_config::{FeatureFlag, Features, OnChainChunkyDKGConfig, OnChainRandomnessConfig},
 };
 use move_core_types::{language_storage::CORE_CODE_ADDRESS, move_resource::MoveStructType};
@@ -15,6 +19,9 @@ use tokio::time::Instant;
 
 mod correctness;
 mod enable_feature;
+mod governance_recovery;
+mod shadow_mode;
+mod stall_recovery;
 mod with_validator_down;
 
 /// Poll on-chain `ChunkyDKGState` until we see a completed session.
@@ -52,16 +59,19 @@ async fn wait_for_chunky_dkg_finish(
 /// Returns the deserialized `AggregatedSubtranscript`.
 #[allow(dead_code)]
 fn verify_chunky_dkg_transcript(session: &ChunkyDKGSessionState) -> AggregatedSubtranscript {
+    // Ensure test PublicParameters are available for ChunkyDKGSession::new().
+    let _ = initialize_public_parameters(ChainId::test());
+
     let subtranscript: AggregatedSubtranscript =
         bcs::from_bytes(&session.transcript).expect("Failed to deserialize transcript bytes");
 
     assert!(
-        !subtranscript.dealers.is_empty(),
+        subtranscript.dealer_bitmask.count_ones() > 0,
         "Transcript should have at least one dealer"
     );
 
     // Validate metadata consistency by generating a config from the session metadata.
-    let _config = ChunkyDKG::generate_config(&session.metadata);
+    let _config = ChunkyDKGSession::new(&session.metadata);
 
     subtranscript
 }

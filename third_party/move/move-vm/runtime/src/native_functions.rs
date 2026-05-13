@@ -1,6 +1,7 @@
-// Copyright (c) The Diem Core Contributors
-// Copyright (c) The Move Contributors
-// SPDX-License-Identifier: Apache-2.0
+// Parts of the file are Copyright (c) The Diem Core Contributors
+// Parts of the file are Copyright (c) The Move Contributors
+// Parts of the file are Copyright (c) Aptos Foundation
+// All Aptos Foundation code and content is licensed pursuant to the Innovation-Enabling Source Code License, available at https://github.com/aptos-labs/aptos-core/blob/main/LICENSE
 
 use crate::{
     ambassador_impl_ModuleStorage, ambassador_impl_WithRuntimeEnvironment,
@@ -154,6 +155,32 @@ impl<'b, 'c> NativeContext<'_, 'b, 'c> {
         ty: &Type,
     ) -> PartialVMResult<(bool, Option<NumBytes>)> {
         self.data_cache.native_check_resource_exists(
+            self.gas_meter,
+            self.traversal_context,
+            &address,
+            ty,
+        )
+    }
+
+    /// Borrows an immutable reference to a resource in global storage.
+    /// Returns the reference value and the number of bytes loaded.
+    pub fn borrow_resource(
+        &mut self,
+        address: AccountAddress,
+        ty: &Type,
+    ) -> PartialVMResult<(Value, Option<NumBytes>)> {
+        self.data_cache
+            .native_borrow_resource(self.gas_meter, self.traversal_context, &address, ty)
+    }
+
+    /// Borrows a mutable reference to a resource in global storage.
+    /// Returns the reference value and the number of bytes loaded.
+    pub fn borrow_resource_mut(
+        &mut self,
+        address: AccountAddress,
+        ty: &Type,
+    ) -> PartialVMResult<(Value, Option<NumBytes>)> {
+        self.data_cache.native_borrow_resource_mut(
             self.gas_meter,
             self.traversal_context,
             &address,
@@ -351,7 +378,6 @@ impl<'a, 'b> LoaderContext<'a, 'b> {
                 &mut self.gas_meter,
                 self.traversal_context,
                 ty,
-                false,
             )
         })
     }

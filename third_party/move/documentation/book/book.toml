@@ -1,12 +1,18 @@
 [book]
-title = "The Move Book"
-description = "Move book maintained by the Move core team."
+title = "The Move on Aptos Book"
+description = "Move book maintained by the Move team at Aptos."
 authors = ["The Move Contributors"]
 language = "en"
-multilingual = false
 src = "src"
 
+[build]
+build-dir = "html"                # the directory where the output is placed
+create-missing = true             # whether or not to create missing pages
+use-default-preprocessors = true  # use the default preprocessors
+extra-watch-dirs = []             # directories to watch for triggering builds
+
 [output.html]
-git-repository-url = "https://github.com/move-language/move"
-git-repository-icon = "fa-github"
-edit-url-template = "https://github.com/move-language/move/edit/main/language/documentation/book/{path}"
+git-repository-url = "https://github.com/aptos-labs/aptos-core"
+edit-url-template = "https://github.com/aptos-labs/aptos-core/edit/main/third_party/move/documentation/book/{path}"
+additional-js = ["theme/build-stamp.js"]
+additional-css = ["theme/build-stamp.css", "theme/content-width.css"]

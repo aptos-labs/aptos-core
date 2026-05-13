@@ -1,5 +1,5 @@
 // Copyright (c) Aptos Foundation
-// SPDX-License-Identifier: Apache-2.0
+// Licensed pursuant to the Innovation-Enabling Source Code License, available at https://github.com/aptos-labs/aptos-core/blob/main/LICENSE
 
 //! This module contains the interface for externally specified checks
 //! that can be run by the Move compiler.
@@ -31,6 +31,9 @@ pub trait ExternalChecks {
 
     /// Get all the function checkers.
     fn get_function_checkers(&self) -> Vec<Box<dyn FunctionChecker>>;
+
+    /// Get the names of all known checkers across all categories.
+    fn get_all_checker_names(&self) -> BTreeSet<String>;
 }
 
 impl fmt::Debug for dyn ExternalChecks {
@@ -154,21 +157,7 @@ pub trait StacklessBytecodeChecker {
 pub fn known_checker_names(external_checkers: &Vec<Arc<dyn ExternalChecks>>) -> BTreeSet<String> {
     let mut names = BTreeSet::new();
     for checkers in external_checkers {
-        for checker in checkers.get_exp_checkers() {
-            names.insert(checker.get_name());
-        }
-        for checker in checkers.get_stackless_bytecode_checkers() {
-            names.insert(checker.get_name());
-        }
-        for checker in checkers.get_constant_checkers() {
-            names.insert(checker.get_name());
-        }
-        for checker in checkers.get_struct_checkers() {
-            names.insert(checker.get_name());
-        }
-        for checker in checkers.get_function_checkers() {
-            names.insert(checker.get_name());
-        }
+        names.extend(checkers.get_all_checker_names());
     }
     names
 }

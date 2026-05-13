@@ -1,6 +1,7 @@
-// Copyright (c) The Diem Core Contributors
-// Copyright (c) The Move Contributors
-// SPDX-License-Identifier: Apache-2.0
+// Parts of the file are Copyright (c) The Diem Core Contributors
+// Parts of the file are Copyright (c) The Move Contributors
+// Parts of the file are Copyright (c) Aptos Foundation
+// All Aptos Foundation code and content is licensed pursuant to the Innovation-Enabling Source Code License, available at https://github.com/aptos-labs/aptos-core/blob/main/LICENSE
 
 //! Transformation which injects data invariants into the bytecode.
 //!
@@ -16,7 +17,6 @@ use move_model::{
     ast,
     ast::{ConditionKind, Exp, ExpData, QuantKind, RewriteResult, TempIndex},
     exp_generator::ExpGenerator,
-    metadata::LanguageVersion,
     model::{FunctionEnv, Loc, NodeId, StructEnv},
     pragmas::{INTRINSIC_FUN_MAP_SPEC_GET, INTRINSIC_TYPE_MAP},
     ty::Type,
@@ -47,7 +47,7 @@ impl FunctionTargetProcessor for DataInvariantInstrumentationProcessor {
         data: FunctionData,
         _scc_opt: Option<&[FunctionEnv]>,
     ) -> FunctionData {
-        if fun_env.is_native() || fun_env.is_intrinsic() {
+        if fun_env.no_verified_bytecode() {
             // Nothing to do.
             return data;
         }
@@ -258,11 +258,6 @@ impl<'a> Instrumenter<'a> {
         use ast::Operation::*;
         use ExpData::*;
 
-        let lang_ver_ge_2 = self
-            .builder
-            .global_env()
-            .language_version()
-            .is_at_least(LanguageVersion::V2_0);
         // First generate a conjunction for all invariants on this struct.
         let mut result = vec![];
         for cond in struct_env
@@ -275,11 +270,10 @@ impl<'a> Instrumenter<'a> {
             // target, as any other `Select` will have exactly one argument.
             let exp_rewriter = &mut |e: Exp| match e.as_ref() {
                 LocalVar(_, var) => {
-                    if lang_ver_ge_2
-                        && var
-                            .display(self.builder.global_env().symbol_pool())
-                            .to_string()
-                            == well_known::RECEIVER_PARAM_NAME
+                    if var
+                        .display(self.builder.global_env().symbol_pool())
+                        .to_string()
+                        == well_known::RECEIVER_PARAM_NAME
                     {
                         RewriteResult::Rewritten(value.clone())
                     } else {

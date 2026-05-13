@@ -74,7 +74,7 @@ fn initialize_harness(
         ]);
     }
     let account = harness.new_account_at(AccountAddress::ONE);
-    assert_success!(harness.publish_package_cache_building(&account, &path));
+    assert_success!(harness.publish_package(&account, &path));
     (harness, account)
 }
 

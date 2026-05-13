@@ -10,10 +10,11 @@ use crate::{
 };
 use aptos_crypto_derive::{BCSCryptoHash, CryptoHasher};
 use serde::{Deserialize, Serialize};
+use std::{borrow::Cow, sync::Arc};
 use tiny_keccak::{Hasher, Sha3};
 
 // The expected use case.
-#[derive(Serialize, Deserialize, CryptoHasher, BCSCryptoHash)]
+#[derive(Clone, Serialize, Deserialize, CryptoHasher, BCSCryptoHash)]
 pub struct Foo {
     a: u64,
     b: u32,
@@ -125,4 +126,27 @@ fn test_cryptohasher_salt_access() {
         <Duplo<usize, u8> as CryptoHash>::Hasher::seed(),
         &prefixed_sha3(b"Duplo")
     );
+}
+
+#[test]
+fn test_cow_crypto_hash_matches_inner() {
+    let value = Foo { a: 42, b: 7 };
+    let direct_hash = CryptoHash::hash(&value);
+
+    // Cow::Borrowed should produce the same hash.
+    let borrowed: Cow<'_, Foo> = Cow::Borrowed(&value);
+    assert_eq!(CryptoHash::hash(&borrowed), direct_hash);
+
+    // Cow::Owned should produce the same hash.
+    let owned: Cow<'_, Foo> = Cow::Owned(Foo { a: 42, b: 7 });
+    assert_eq!(CryptoHash::hash(&owned), direct_hash);
+}
+
+#[test]
+fn test_arc_crypto_hash_matches_inner() {
+    let value = Foo { a: 42, b: 7 };
+    let direct_hash = CryptoHash::hash(&value);
+
+    let arc_value = Arc::new(Foo { a: 42, b: 7 });
+    assert_eq!(CryptoHash::hash(&arc_value), direct_hash);
 }

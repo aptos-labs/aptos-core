@@ -1,5 +1,7 @@
-// Copyright (c) The Move Contributors
-// SPDX-License-Identifier: Apache-2.0
+// Parts of the file are Copyright (c) The Diem Core Contributors
+// Parts of the file are Copyright (c) The Move Contributors
+// Parts of the file are Copyright (c) Aptos Foundation
+// All Aptos Foundation code and content is licensed pursuant to the Innovation-Enabling Source Code License, available at https://github.com/aptos-labs/aptos-core/blob/main/LICENSE
 
 use crate::{
     test_reporter::{UnitTestFactory, UnitTestFactoryWithCostTable},
@@ -16,7 +18,7 @@ use move_compiler_v2::plan_builder as plan_builder_v2;
 use move_core_types::effects::ChangeSet;
 use move_coverage::coverage_map::{output_map_to_file, CoverageMap};
 use move_package::compilation::{
-    build_plan::BuildPlan, compiled_package::build_and_report_no_exit_v2_driver,
+    build_plan::BuildPlan, compiled_package::make_no_exit_v2_driver_to,
 };
 use move_vm_runtime::{native_functions::NativeFunctionTable, tracing};
 use move_vm_test_utils::gas_schedule::CostTable;
@@ -121,20 +123,21 @@ pub fn run_move_unit_tests_with_factory<W: Write + Send, F: UnitTestFactory + Se
     // Move package system, to first grab the compilation env, construct the test plan from it, and
     // then save it, before resuming the rest of the compilation and returning the results and
     // control back to the Move package system.
-    let (compiled_package, model_opt) = build_plan.compile_with_driver(
-        writer,
-        &build_config.compiler_config,
-        vec![],
-        |options| {
-            let (files, units, env) = build_and_report_no_exit_v2_driver(options)?;
+    let (mut diag_writer, diag_buffer) = build_config.compiler_config.error_writer();
+    let compile_result =
+        build_plan.compile_with_driver(writer, &build_config.compiler_config, vec![], |options| {
+            let (files, units, env) = make_no_exit_v2_driver_to(&mut diag_writer)(options)?;
             let root_package_in_model = env.symbol_pool().make(root_package.deref());
             let built_test_plan =
                 plan_builder_v2::construct_test_plan(&env, Some(root_package_in_model));
 
             test_plan = Some((built_test_plan, files.clone(), units.clone()));
             Ok((files, units, env))
-        },
-    )?;
+        });
+    if let Some(buf) = &diag_buffer {
+        writer.write_all(buf.lock().unwrap().as_slice())?;
+    }
+    let (compiled_package, model_opt) = compile_result?;
 
     // If configured, run extra validation
     if test_validation::needs_validation() {

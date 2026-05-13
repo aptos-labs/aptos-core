@@ -59,17 +59,20 @@ pub fn native_nested_loop(n: u64) -> u64 {
 ///   [32] tmp
 #[cfg(feature = "micro-op")]
 mod micro_op {
-    use mono_move_runtime::{
-        CodeOffset as CO, FrameOffset as FO, Function, MicroOp::*, ObjectDescriptor,
+    use mono_move_alloc::GlobalArenaPtr;
+    use mono_move_core::{
+        Code, CodeOffset as CO, FrameLayoutInfo, FrameOffset as FO, Function, FunctionPtr,
+        MicroOp::*, SortedSafePointEntries,
     };
+    use mono_move_runtime::ObjectDescriptorTable;
 
-    pub fn program() -> (Vec<Function>, Vec<ObjectDescriptor>) {
+    pub fn program() -> (Vec<FunctionPtr>, ObjectDescriptorTable) {
         let n = 0u32;
         let sum = 8u32;
         let i = 16u32;
         let j = 24u32;
         let tmp = 32u32;
-        let args_and_locals_size = 40u32;
+        let param_and_local_sizes_sum = 40u32;
 
         #[rustfmt::skip]
         let code = vec![
@@ -85,7 +88,7 @@ mod micro_op {
             JumpLessU64 { target: CO(7), lhs: FO(j), rhs: FO(n) }, // 5
             Jump { target: CO(11) },                                // 6: goto INNER_END
             // INNER_BODY: sum += i ^ j; j += 1
-            XorU64 { dst: FO(tmp), lhs: FO(i), rhs: FO(j) },      // 7
+            BitXorU64 { dst: FO(tmp), lhs: FO(i), rhs: FO(j) },   // 7
             AddU64 { dst: FO(sum), lhs: FO(sum), rhs: FO(tmp) },   // 8
             AddU64Imm { dst: FO(j), src: FO(j), imm: 1 },          // 9
             Jump { target: CO(5) },                                 // 10: goto INNER_LOOP
@@ -97,17 +100,20 @@ mod micro_op {
             Return,                                                 // 14
         ];
 
-        let func = Function {
-            code,
-            args_size: 8,
-            args_and_locals_size: args_and_locals_size as usize,
-            extended_frame_size: args_and_locals_size as usize
-                + mono_move_runtime::FRAME_METADATA_SIZE,
+        let func_ptr = FunctionPtr::new(Box::new(Function {
+            name: GlobalArenaPtr::from_static("nested_loop"),
+            code: Code::from_vec(code),
+            param_sizes: vec![],
+            param_sizes_sum: 8,
+            param_and_local_sizes_sum: param_and_local_sizes_sum as usize,
+            extended_frame_size: param_and_local_sizes_sum as usize
+                + mono_move_core::FRAME_METADATA_SIZE,
             zero_frame: false,
-            pointer_offsets: vec![],
-        };
+            frame_layout: FrameLayoutInfo::empty(),
+            safe_point_layouts: SortedSafePointEntries::empty(),
+        }));
 
-        (vec![func], vec![ObjectDescriptor::Trivial])
+        (vec![func_ptr], ObjectDescriptorTable::new())
     }
 }
 

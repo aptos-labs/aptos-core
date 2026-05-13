@@ -56,8 +56,28 @@ impl FlowSession {
             .collect()
     }
 
+    /// Returns (name, description) pairs for all registered MCP tools.
+    /// Used by the plugin renderer to generate the README.
+    pub(crate) fn tool_descriptions() -> Vec<(String, String)> {
+        Self::all_tool_routers()
+            .list_all()
+            .into_iter()
+            .map(|t| {
+                (
+                    t.name.to_string(),
+                    t.description.as_deref().unwrap_or("").to_string(),
+                )
+            })
+            .collect()
+    }
+
     pub(crate) fn args(&self) -> &McpArgs {
         &self.args
+    }
+
+    /// Configured tool timeout as a `Duration`.
+    pub(crate) fn tool_timeout(&self) -> std::time::Duration {
+        std::time::Duration::from_secs(self.args.tool_timeout)
     }
 
     pub(crate) fn temp_dir(&self) -> &Path {
@@ -87,6 +107,24 @@ impl FlowSession {
             file_watcher,
             tool_router: Self::all_tool_routers(),
             temp_dir,
+        }
+    }
+
+    /// Invalidate the cache entry for a package.
+    ///
+    /// Called after a tool timeout to ensure the next call gets a fresh
+    /// `PackageData` with its own mutex, rather than deadlocking on the
+    /// mutex still held by the timed-out `spawn_blocking` task.
+    pub(crate) fn invalidate_package(&self, package_path: &str) {
+        let key = self.resolve_package_path(package_path);
+        if self
+            .package_cache
+            .lock()
+            .expect("package_cache lock poisoned")
+            .remove(&key)
+            .is_some()
+        {
+            log::info!("invalidating cache for `{}` after timeout", key);
         }
     }
 

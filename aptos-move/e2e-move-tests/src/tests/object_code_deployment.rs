@@ -17,7 +17,6 @@ use aptos_types::{
     transaction::{ExecutionStatus, TransactionStatus},
 };
 use move_core_types::{parser::parse_struct_tag, vm_status::StatusCode};
-use rstest::rstest;
 use serde::{de::DeserializeOwned, Deserialize, Serialize};
 
 /// This tests the `object_code_deployment.move` module under the `aptos-framework` package.
@@ -130,19 +129,14 @@ const MODULE_ADDRESS_NAME: &str = "object";
 const MUT_DEPS_MODULE_ADDRESS_NAME: &str = "object_mutable_deps";
 const IMMUT_DEPS_MODULE_ADDRESS_NAME: &str = "object_immutable_deps";
 const PACKAGE_REGISTRY_ACCESS_PATH: &str = "0x1::code::PackageRegistry";
-const EOBJECT_CODE_DEPLOYMENT_NOT_SUPPORTED: &str = "EOBJECT_CODE_DEPLOYMENT_NOT_SUPPORTED";
 const ENOT_CODE_OBJECT_OWNER: &str = "ENOT_CODE_OBJECT_OWNER";
 const ENOT_PACKAGE_OWNER: &str = "ENOT_PACKAGE_OWNER";
 const EDEP_WEAKER_POLICY: &str = "EDEP_WEAKER_POLICY";
 
-/// Tests the `publish` object code deployment function with feature flags enabled/disabled.
-/// Deployment should only happen when feature is enabled.
-#[rstest(enabled, disabled,
-    case(vec![], vec![FeatureFlag::OBJECT_CODE_DEPLOYMENT]),
-    case(vec![FeatureFlag::OBJECT_CODE_DEPLOYMENT], vec![]),
-)]
-fn object_code_deployment_publish_package(enabled: Vec<FeatureFlag>, disabled: Vec<FeatureFlag>) {
-    let mut context = TestContext::new(Some(enabled.clone()), Some(disabled));
+/// Tests the `publish` object code deployment function.
+#[test]
+fn object_code_deployment_publish_package() {
+    let mut context = TestContext::new(None, None);
     let acc = context.account.clone();
 
     let status = context.execute_object_code_action(
@@ -151,46 +145,42 @@ fn object_code_deployment_publish_package(enabled: Vec<FeatureFlag>, disabled: V
         ObjectCodeAction::Deploy,
     );
 
-    if enabled.contains(&FeatureFlag::OBJECT_CODE_DEPLOYMENT) {
-        assert_success!(status);
+    assert_success!(status);
 
-        let registry = context
-            .read_resource::<PackageRegistry>(&context.object_address, PACKAGE_REGISTRY_ACCESS_PATH)
-            .unwrap();
-        assert_eq!(registry.packages.len(), 1);
-        assert_eq!(registry.packages[0].name, "test_package");
-        assert_eq!(registry.packages[0].modules.len(), 1);
-        assert_eq!(registry.packages[0].modules[0].name, "test");
+    let registry = context
+        .read_resource::<PackageRegistry>(&context.object_address, PACKAGE_REGISTRY_ACCESS_PATH)
+        .unwrap();
+    assert_eq!(registry.packages.len(), 1);
+    assert_eq!(registry.packages[0].name, "test_package");
+    assert_eq!(registry.packages[0].modules.len(), 1);
+    assert_eq!(registry.packages[0].modules[0].name, "test");
 
-        let code_object: ManagingRefs = context
-            .harness
-            .read_resource_from_resource_group(
-                &context.object_address,
-                parse_struct_tag("0x1::object::ObjectGroup").unwrap(),
-                parse_struct_tag("0x1::object_code_deployment::ManagingRefs").unwrap(),
-            )
-            .unwrap();
-        // Verify the object created owns the `ManagingRefs`
-        assert_eq!(code_object, ManagingRefs::new(context.object_address));
+    let code_object: ManagingRefs = context
+        .harness
+        .read_resource_from_resource_group(
+            &context.object_address,
+            parse_struct_tag("0x1::object::ObjectGroup").unwrap(),
+            parse_struct_tag("0x1::object_code_deployment::ManagingRefs").unwrap(),
+        )
+        .unwrap();
+    // Verify the object created owns the `ManagingRefs`
+    assert_eq!(code_object, ManagingRefs::new(context.object_address));
 
-        let module_address = context.object_address.to_string();
-        assert_success!(context.harness.run_entry_function(
-            &context.account,
-            str::parse(&format!("{}::test::hello", module_address)).unwrap(),
-            vec![],
-            vec![bcs::to_bytes::<u64>(&42).unwrap()]
-        ));
+    let module_address = context.object_address.to_string();
+    assert_success!(context.harness.run_entry_function(
+        &context.account,
+        str::parse(&format!("{}::test::hello", module_address)).unwrap(),
+        vec![],
+        vec![bcs::to_bytes::<u64>(&42).unwrap()]
+    ));
 
-        let state = context
-            .read_resource::<State>(
-                context.account.address(),
-                &format!("{}::test::State", module_address),
-            )
-            .unwrap();
-        assert_eq!(state.value, 42);
-    } else {
-        context.assert_feature_flag_error(status, EOBJECT_CODE_DEPLOYMENT_NOT_SUPPORTED);
-    }
+    let state = context
+        .read_resource::<State>(
+            context.account.address(),
+            &format!("{}::test::State", module_address),
+        )
+        .unwrap();
+    assert_eq!(state.value, 42);
 }
 
 /// Tests the `upgrade` object code deployment function after `publish`ing a package prior calling.

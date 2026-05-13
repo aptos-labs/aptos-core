@@ -1,0 +1,36 @@
+Move prover returns: exiting with compilation errors
+error: function argument accesses resource `access_of_errors::Config` which is not declared in `modifies_of`/`reads_of` for `f`
+   ┌─ tests/sources/functional/state_labels/access_of_errors.move:59:9
+   │
+59 │ ╭         apply_narrow_read(|a| { // error: function argument accesses resource
+60 │ │             if (Config[a].active) { Counter[a].value } else { 0 }
+61 │ │         } spec {
+62 │ │             ensures Config[a].active ==> result == Counter[a].value;
+63 │ │             ensures !Config[a].active ==> result == 0;
+64 │ │         }, addr)
+   │ ╰────────────────^
+
+error: function argument writes resource `access_of_errors::Counter` but only `reads_of` (not `modifies_of`) is declared for `f`
+   ┌─ tests/sources/functional/state_labels/access_of_errors.move:82:9
+   │
+82 │ ╭         apply_reads_only(|a| write_counter(a) spec { // error: function argument writes resource
+83 │ │             modifies Counter[a];
+84 │ │             ensures Counter[a].value == old(Counter[a].value) + 1;
+85 │ │             aborts_if !exists<Counter>(a);
+86 │ │         }, addr);
+   │ ╰────────────────^
+
+error: function argument accesses resource `access_of_errors::Config` which is not declared in `modifies_of`/`reads_of` for `f`
+    ┌─ tests/sources/functional/state_labels/access_of_errors.move:104:9
+    │
+104 │         apply_counter_only(g, x) // error: function argument accesses resource
+    │         ^^^^^^^^^^^^^^^^^^^^^^^^
+
+error: function argument accesses resource `access_of_errors::Counter` which is not declared in `modifies_of`/`reads_of` for `f`
+    ┌─ tests/sources/functional/state_labels/access_of_errors.move:128:9
+    │
+128 │ ╭         apply_pure(|a| read_counter(a) spec { // error: closure accesses memory but param is pure
+129 │ │             ensures result == Counter[a].value;
+130 │ │             aborts_if !exists<Counter>(a);
+131 │ │         }, addr)
+    │ ╰────────────────^

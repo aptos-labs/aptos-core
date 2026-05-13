@@ -1,6 +1,7 @@
-// Copyright (c) The Diem Core Contributors
-// Copyright (c) The Move Contributors
-// SPDX-License-Identifier: Apache-2.0
+// Parts of the file are Copyright (c) The Diem Core Contributors
+// Parts of the file are Copyright (c) The Move Contributors
+// Parts of the file are Copyright (c) Aptos Foundation
+// All Aptos Foundation code and content is licensed pursuant to the Innovation-Enabling Source Code License, available at https://github.com/aptos-labs/aptos-core/blob/main/LICENSE
 
 //! Helpers for emitting Boogie code.
 
@@ -29,6 +30,7 @@ use move_stackless_bytecode::{function_target::FunctionTarget, stackless_bytecod
 use num::BigUint;
 use once_cell::sync::Lazy;
 use regex::Regex;
+use std::collections::BTreeSet;
 
 pub const MAX_MAKE_VEC_ARGS: usize = 4;
 pub const MAX_TUPLE_SIZE: usize = 8;
@@ -368,7 +370,7 @@ pub fn boogie_type(env: &GlobalEnv, ty: &Type, bv_flag: bool) -> String {
         TypeParameter(idx) => boogie_type_param(env, *idx),
         Fun(param, result, abilities) => fun_type(env, param, result, *abilities),
         Tuple(elems) => boogie_tuple_type(ty, elems, |t| boogie_type(env, t, bv_flag)),
-        TypeDomain(..) | ResourceDomain(..) | Error | Var(..) => {
+        TypeDomain(..) | ResourceDomain(..) | StateDomain | Error | Var(..) => {
             format!("<<unsupported: {:?}>>", ty)
         },
     }
@@ -569,7 +571,7 @@ pub fn boogie_type_suffix(env: &GlobalEnv, ty: &Type, bv_flag: bool) -> String {
                 format!("$tup{}'{}'", n, suffixes)
             }
         },
-        TypeDomain(..) | ResourceDomain(..) | Error | Var(..) => {
+        TypeDomain(..) | ResourceDomain(..) | StateDomain | Error | Var(..) => {
             format!("<<unsupported {:?}>>", ty)
         },
     }
@@ -789,10 +791,12 @@ fn boogie_debug_track(
     ty: &Type,
     bv_flag: bool,
 ) -> String {
-    let fun_def_idx = fun_target
-        .func_env
-        .get_def_idx()
-        .expect(COMPILED_MODULE_AVAILABLE);
+    // Functions without a def_idx (e.g. intrinsics) skip debug tracking.
+    // Note: lemma functions now get synthetic def_idx assigned in attach_compiled_module.
+    let fun_def_idx = match fun_target.func_env.get_def_idx() {
+        Some(idx) => idx,
+        None => return String::new(),
+    };
     let value = format!("$t{}", idx);
     if ty.is_reference() {
         let temp_name = boogie_temp(fun_target.global_env(), ty.skip_reference(), 0, bv_flag);
@@ -1029,7 +1033,8 @@ fn type_name_to_ident_tokens(
         | Type::Primitive(PrimitiveType::EventStore)
         | Type::Fun(..)
         | Type::TypeDomain(..)
-        | Type::ResourceDomain(..) => {
+        | Type::ResourceDomain(..)
+        | Type::StateDomain => {
             unreachable!("Unexpected spec-only type in type_name call");
         },
         // temporary types
@@ -1127,7 +1132,8 @@ fn type_name_to_info_pack(env: &GlobalEnv, ty: &Type) -> Option<TypeInfoPack> {
         | Type::Primitive(PrimitiveType::EventStore)
         | Type::Fun(..)
         | Type::TypeDomain(..)
-        | Type::ResourceDomain(..) => {
+        | Type::ResourceDomain(..)
+        | Type::StateDomain => {
             unreachable!("Unexpected spec-only type in type_name call");
         },
         // temporary types
@@ -1281,14 +1287,190 @@ pub fn boogie_behavioral_result_fun_name(
     )
 }
 
+/// Return name of the datatype constructor for a struct field variant.
+/// These variants represent storable function-typed fields in structs.
+/// Format: `$struct_field'StructName$field'`
+pub fn boogie_struct_field_name(
+    env: &GlobalEnv,
+    struct_id: &QualifiedInstId<StructId>,
+    field_sym: Symbol,
+) -> String {
+    let struct_env = env.get_struct_qid(struct_id.to_qualified_id());
+    let struct_name = boogie_struct_name(&struct_env, &struct_id.inst, false);
+    let field_name = field_sym.display(env.symbol_pool());
+    format!("$struct_field'{}${}'", struct_name, field_name)
+}
+
+/// Return name of a behavioral predicate spec function for a struct field variant.
+/// These are uninterpreted functions parameterized by instance id `n`.
+/// Format: `${module}_$sf_{kind}${struct}${field}${suffix}`
+pub fn boogie_struct_field_spec_fun_name(
+    env: &GlobalEnv,
+    struct_id: &QualifiedInstId<StructId>,
+    field_sym: Symbol,
+    kind: BehaviorKind,
+    inst: &[Type],
+) -> String {
+    let struct_env = env.get_struct_qid(struct_id.to_qualified_id());
+    let module_name = boogie_module_name(&struct_env.module_env);
+    let struct_name_sym = struct_env.get_name();
+    let struct_name = struct_name_sym.display(env.symbol_pool());
+    let field_name = field_sym.display(env.symbol_pool());
+    format!(
+        "${}_$sf_{}${}${}{}",
+        module_name,
+        kind,
+        struct_name,
+        field_name,
+        boogie_inst_suffix(env, inst, &[])
+    )
+}
+
+/// Return name of a behavioral predicate result function for a struct field variant.
+/// Format: `${module}_$sf_ensures_of_result(s?)${struct}${field}${suffix}`
+pub fn boogie_struct_field_result_fun_name(
+    env: &GlobalEnv,
+    struct_id: &QualifiedInstId<StructId>,
+    field_sym: Symbol,
+    inst: &[Type],
+    multi_result: bool,
+) -> String {
+    let struct_env = env.get_struct_qid(struct_id.to_qualified_id());
+    let module_name = boogie_module_name(&struct_env.module_env);
+    let struct_name_sym = struct_env.get_name();
+    let struct_name = struct_name_sym.display(env.symbol_pool());
+    let field_name = field_sym.display(env.symbol_pool());
+    let plural = if multi_result { "s" } else { "" };
+    format!(
+        "${}_$sf_ensures_of_result{}${}${}{}",
+        module_name,
+        plural,
+        struct_name,
+        field_name,
+        boogie_inst_suffix(env, inst, &[])
+    )
+}
+
 /// Return name of the behavioral predicate evaluation function for a function type.
 /// These inline functions dispatch on closure variants to evaluate behavioral predicates.
 /// Format: `${kind}'${type_suffix}'`
-/// For example: `$ensures_of'$fun_u64_u64'`
 pub fn boogie_behavioral_eval_fun_name(
     env: &GlobalEnv,
     fun_type: &Type,
     kind: BehaviorKind,
 ) -> String {
     format!("${}'{}'", kind, boogie_type_suffix(env, fun_type, false))
+}
+
+/// Return name of a per-function behavioral spec function for a closure target function.
+/// These inline functions have concrete bodies derived from the function's spec.
+/// Format: `$bp_{kind}'{fun_name}'`
+/// For example: `$bp_ensures_of'$1_m_callee'`
+pub fn boogie_behavioral_fun_spec_name(
+    env: &GlobalEnv,
+    fun: &QualifiedInstId<FunId>,
+    kind: BehaviorKind,
+) -> String {
+    let fun_env = env.get_function(fun.to_qualified_id());
+    let fun_name = boogie_function_name(&fun_env, &fun.inst, &[]);
+    format!("$bp_{}'{}'", kind, fun_name)
+}
+
+/// Return name of a per-function behavioral result function for a closure target function.
+/// This is an uninterpreted function that returns the result value(s) for given inputs.
+/// Format: `$bp_ensures_of_result'{fun_name}'` (single) or `$bp_ensures_of_results'{fun_name}'` (multi)
+pub fn boogie_behavioral_fun_result_name(
+    env: &GlobalEnv,
+    fun: &QualifiedInstId<FunId>,
+    multi_result: bool,
+) -> String {
+    let fun_env = env.get_function(fun.to_qualified_id());
+    let fun_name = boogie_function_name(&fun_env, &fun.inst, &[]);
+    let plural = if multi_result { "s" } else { "" };
+    format!("$bp_ensures_of_result{}'{}'", plural, fun_name)
+}
+
+/// Compute the union of (used_memory, old_memory) for all closure/param/field
+/// variants matching the given function type in MonoInfo.
+/// This is used by the Boogie code generator for emitting memory arguments in
+/// behavioral predicate evaluators and by the label analysis for discovering
+/// which (label, memory) pairs need Boogie variable declarations.
+pub fn compute_evaluator_memory_union(
+    env: &GlobalEnv,
+    fun_type: &Type,
+) -> (
+    BTreeSet<QualifiedInstId<StructId>>,
+    BTreeSet<QualifiedInstId<StructId>>,
+) {
+    use move_prover_bytecode_pipeline::mono_analysis;
+
+    let mono_info = mono_analysis::get_info(env);
+    let boogie_name = boogie_type(env, fun_type, false);
+
+    let mut union_used_memory = BTreeSet::new();
+    let mut union_old_memory = BTreeSet::new();
+
+    // From closures
+    for (ty, closure_infos) in &mono_info.fun_infos {
+        if boogie_type(env, ty, false) != boogie_name {
+            continue;
+        }
+        for info in closure_infos {
+            let fun_env = env.get_function(info.fun.to_qualified_id());
+            for mem in fun_env.get_spec_used_memory() {
+                union_used_memory.insert(mem.clone().instantiate(&info.fun.inst));
+            }
+            for mem in fun_env.get_spec_old_memory() {
+                union_old_memory.insert(mem.clone().instantiate(&info.fun.inst));
+            }
+        }
+    }
+
+    // From function parameters
+    for (ty, param_infos) in &mono_info.fun_param_infos {
+        if boogie_type(env, ty, false) != boogie_name {
+            continue;
+        }
+        for info in param_infos {
+            let fun_env = env.get_function(info.fun.to_qualified_id());
+            for access in fun_env.get_fun_param_access_of() {
+                if access.fun_param == info.param_sym {
+                    for mem in &access.used_memory {
+                        union_used_memory.insert(mem.clone().instantiate(&info.fun.inst));
+                    }
+                    for mem in &access.old_memory {
+                        union_old_memory.insert(mem.clone().instantiate(&info.fun.inst));
+                    }
+                    break;
+                }
+            }
+        }
+    }
+
+    // From struct fields (with wildcard modifies_all/reads_all handling)
+    for (ty, field_infos) in &mono_info.fun_struct_field_infos {
+        if boogie_type(env, ty, false) != boogie_name {
+            continue;
+        }
+        for info in field_infos {
+            let struct_env = env.get_struct_qid(info.struct_id.to_qualified_id());
+            for access in struct_env.get_field_access_of() {
+                if access.fun_param == info.field_sym {
+                    if access.frame_spec.modifies_all || access.frame_spec.reads_all {
+                        for qid in mono_info.all_memory_qids(env) {
+                            union_used_memory.insert(qid.clone());
+                            if access.frame_spec.modifies_all {
+                                union_old_memory.insert(qid);
+                            }
+                        }
+                    } else {
+                        union_used_memory.extend(access.used_memory.iter().cloned());
+                        union_old_memory.extend(access.old_memory.iter().cloned());
+                    }
+                }
+            }
+        }
+    }
+
+    (union_used_memory, union_old_memory)
 }

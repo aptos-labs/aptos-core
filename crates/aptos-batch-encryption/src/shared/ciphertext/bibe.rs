@@ -100,8 +100,10 @@ impl InnerCiphertext for BIBECiphertext {
         digest: &Digest,
         eval_proof: &EvalProof,
     ) -> PreparedBIBECiphertext {
-        let pairing_output = PairingSetting::pairing(digest.as_g1(), self.ct_g2[0])
-            + PairingSetting::pairing(**eval_proof, self.ct_g2[1]);
+        let pairing_output = PairingSetting::multi_pairing([digest.as_g1(), **eval_proof], [
+            self.ct_g2[0],
+            self.ct_g2[1],
+        ]);
 
         PreparedBIBECiphertext {
             id: self.id,

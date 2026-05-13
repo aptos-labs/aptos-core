@@ -5,6 +5,7 @@ pub use aptos_gas_schedule::LATEST_GAS_FEATURE_VERSION;
 use aptos_gas_schedule::{
     gas_feature_versions::{
         RELEASE_V1_15, RELEASE_V1_30, RELEASE_V1_34, RELEASE_V1_38, RELEASE_V1_41, RELEASE_V1_42,
+        RELEASE_V1_45,
     },
     AptosGasParameters,
 };
@@ -256,8 +257,6 @@ pub fn aptos_prod_vm_config(
     // shallow while the value can be deeply nested, thanks to captured arguments not visible in a
     // type. Hence, depth checks have been adjusted to operate on values.
     let enable_depth_checks = features.is_enabled(FeatureFlag::ENABLE_FUNCTION_VALUES);
-    let enable_capture_option = !timed_features.is_enabled(TimedFeatureFlag::DisabledCaptureOption)
-        || features.is_enabled(FeatureFlag::ENABLE_CAPTURE_OPTION);
     let enable_closure_depth_check = timed_features.is_enabled(TimedFeatureFlag::ClosureDepthCheck);
 
     // Some feature gating was missed, so for native dynamic dispatch the feature is always on for
@@ -288,7 +287,6 @@ pub fn aptos_prod_vm_config(
         enable_depth_checks,
         optimize_trusted_code: features.is_trusted_code_enabled(),
         paranoid_ref_checks,
-        enable_capture_option,
         enable_enum_option,
         enable_layout_caches,
         propagate_dependency_limit_error: gas_feature_version >= RELEASE_V1_38,
@@ -299,6 +297,7 @@ pub fn aptos_prod_vm_config(
         enable_struct_layout_local_cache: gas_feature_version >= RELEASE_V1_41,
         check_depth_on_type_counts: gas_feature_version >= RELEASE_V1_41,
         enable_public_struct_args: features.is_enabled(FeatureFlag::PUBLIC_STRUCT_ENUM_ARGS),
+        include_closure_mask_in_cmp: gas_feature_version >= RELEASE_V1_45,
     };
 
     // Note: if max_value_nest_depth changed, make sure the constant is in-sync. Do not remove this

@@ -1,7 +1,7 @@
 // Copyright (c) Aptos Foundation
 // Licensed pursuant to the Innovation-Enabling Source Code License, available at https://github.com/aptos-labs/aptos-core/blob/main/LICENSE
 
-use super::super::session::FlowSession;
+use super::super::{package_data::DiagnosticSource, session::FlowSession};
 use rmcp::{
     handler::server::wrapper::Parameters,
     model::{CallToolResult, Content},
@@ -29,12 +29,16 @@ impl FlowSession {
         let data = pkg
             .lock()
             .map_err(|_| rmcp::ErrorData::internal_error("package lock poisoned", None))?;
-        let has_errors = data.env().has_errors();
-        let (messages, source) = data.diagnostics();
+        let has_errors = data.has_compilation_errors();
+        let messages = data.diagnostics(DiagnosticSource::Compiler);
         let content = if messages.is_empty() {
-            "no errors or warnings".to_string()
+            if has_errors {
+                "package has errors (run move_package_status again after editing)".to_string()
+            } else {
+                "no errors or warnings".to_string()
+            }
         } else {
-            format!("{}\n(from {})", messages.join("\n"), source)
+            messages.join("\n")
         };
         let num_messages = messages.len();
         drop(data);

@@ -1,5 +1,5 @@
-// Copyright © Aptos Foundation
-// SPDX-License-Identifier: Apache-2.0
+// Copyright (c) Aptos Foundation
+// Licensed pursuant to the Innovation-Enabling Source Code License, available at https://github.com/aptos-labs/aptos-core/blob/main/LICENSE
 
 //! The ability processor checks conformance to Move's ability system as well as transforms
 //! the bytecode inserting ability related operations of copy and drop.
@@ -200,7 +200,34 @@ impl TransferFunctions for CopyDropAnalysis<'_> {
                 }
             },
             Ret(_, srcs) => state.moved.extend(srcs.iter().cloned()),
-            _ => {},
+            Branch(_, _, _, cond) => {
+                if temp_needs_copy(cond, instr) {
+                    state.needs_copy.insert(*cond);
+                } else {
+                    state.moved.insert(*cond);
+                }
+            },
+            Abort(_, code, msg_opt) => {
+                if temp_needs_copy(code, instr) {
+                    state.needs_copy.insert(*code);
+                } else {
+                    state.moved.insert(*code);
+                }
+                if let Some(msg) = msg_opt {
+                    if temp_needs_copy(msg, instr) {
+                        state.needs_copy.insert(*msg);
+                    } else {
+                        state.moved.insert(*msg);
+                    }
+                }
+            },
+            // Explicit copies/stores don't need copy inference (the Transformer always
+            // emits AssignKind::Copy for these). The remaining variants have no source
+            // temps, so no copy/move decision is needed.
+            Assign(_, _, _, AssignKind::Copy | AssignKind::Store) => {},
+            Load(..) | Jump(..) | Label(..) | Nop(..) => {},
+            // Spec-only instructions are not executed.
+            SpecBlock(..) | SaveMem(..) | SaveSpecVar(..) | Prop(..) => {},
         }
 
         // Clear information about re-assigned locals
@@ -289,7 +316,19 @@ impl Transformer<'_> {
                 let new_srcs = self.copy_args_if_needed(code_offset, id, srcs);
                 self.check_and_emit_bytecode(code_offset, Call(id, dests, op, new_srcs, ai))
             },
-            _ => self.check_and_emit_bytecode(code_offset, bc.clone()),
+            Branch(id, if_true, if_false, cond) => {
+                let new_cond = self.copy_arg_if_needed(code_offset, id, cond);
+                self.check_and_emit_bytecode(code_offset, Branch(id, if_true, if_false, new_cond))
+            },
+            Abort(id, code, msg_opt) => {
+                let new_code = self.copy_arg_if_needed(code_offset, id, code);
+                let new_msg = msg_opt.map(|m| self.copy_arg_if_needed(code_offset, id, m));
+                self.check_and_emit_bytecode(code_offset, Abort(id, new_code, new_msg))
+            },
+            // These variants either have no source temps or are handled by
+            // check_and_emit_bytecode without needing copy insertion.
+            Ret(..) | Load(..) | Jump(..) | Label(..) | Nop(..) | SpecBlock(..) | SaveMem(..)
+            | SaveSpecVar(..) | Prop(..) => self.check_and_emit_bytecode(code_offset, bc.clone()),
         }
         // Insert/check any drops needed after this program point
         self.check_and_add_implicit_drops(code_offset, &bc, false)
@@ -349,6 +388,31 @@ impl Transformer<'_> {
         self.check_copy(id, src, || ("explicitly copied here".to_string(), vec![]));
     }
 
+    /// If `src` needs a copy (per the copy-drop analysis), checks copy ability and,
+    /// when the source is also borrowed, emits a physical `Assign(Copy)` to a fresh
+    /// temp — because the file-format generator cannot distinguish borrow-induced
+    /// copies from live-var ones.  Returns the (possibly new) temp to use in place of
+    /// `src`.
+    fn copy_arg_if_needed(
+        &mut self,
+        code_offset: CodeOffset,
+        id: AttrId,
+        src: TempIndex,
+    ) -> TempIndex {
+        let copy_drop_at = self.copy_drop.get(&code_offset).expect("copy drop");
+        if copy_drop_at.needs_copy.contains(&src) {
+            self.check_implicit_copy(code_offset, id, src);
+            if self.lifetime.get_info_at(code_offset).is_borrowed(src) {
+                let ty = self.builder.get_local_type(src);
+                let temp = self.builder.new_temp(ty);
+                self.builder
+                    .emit(Bytecode::Assign(id, temp, src, AssignKind::Copy));
+                return temp;
+            }
+        }
+        src
+    }
+
     /// Walks over the argument list and inserts copies if needed.
     fn copy_args_if_needed(
         &mut self,
@@ -356,28 +420,9 @@ impl Transformer<'_> {
         id: AttrId,
         srcs: Vec<TempIndex>,
     ) -> Vec<TempIndex> {
-        use Bytecode::*;
-        let copy_drop_at = self.copy_drop.get(&code_offset).expect("copy drop");
-        let mut new_srcs = vec![];
-        for src in srcs.iter() {
-            if copy_drop_at.needs_copy.contains(src) {
-                self.check_implicit_copy(code_offset, id, *src);
-                // Only need to perform the actual copy if src is borrowed, as this
-                // information cannot be determined from live-var analysis in later
-                // phases.
-                if self.lifetime.get_info_at(code_offset).is_borrowed(*src) {
-                    let ty = self.builder.get_local_type(*src);
-                    let temp = self.builder.new_temp(ty);
-                    self.builder.emit(Assign(id, temp, *src, AssignKind::Copy));
-                    new_srcs.push(temp)
-                } else {
-                    new_srcs.push(*src)
-                }
-            } else {
-                new_srcs.push(*src)
-            }
-        }
-        new_srcs
+        srcs.iter()
+            .map(|src| self.copy_arg_if_needed(code_offset, id, *src))
+            .collect()
     }
 
     /// Checks whether the given temp has copy ability, add diagnostics if not

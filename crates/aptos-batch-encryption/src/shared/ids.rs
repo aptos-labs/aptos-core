@@ -44,10 +44,13 @@ impl Id {
     ) -> Self {
         // using empty domain separator b/c this is a test implementation
 
-        let mut bytes = Vec::from(vk.to_bytes());
-        bytes.extend_from_slice(
-            &bcs::to_bytes(associated_data).expect("Serialization should never fail"),
-        );
+        let vk_bytes = vk.to_bytes();
+        let associated_data_bytes =
+            bcs::to_bytes(associated_data).expect("Serialization should never fail");
+
+        let mut bytes = Vec::with_capacity(vk_bytes.len() + associated_data_bytes.len());
+        bytes.extend_from_slice(&vk_bytes);
+        bytes.extend_from_slice(&associated_data_bytes);
 
         let field_hasher = <DefaultFieldHasher<Sha256> as HashToField<Fr>>::new(ID_HASH_DST);
         let field_element: [Fr; 1] = field_hasher.hash_to_field::<1>(&bytes);

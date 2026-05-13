@@ -231,7 +231,7 @@ module aptos_framework::code {
         let code_object_addr = code_object.object_address();
         assert!(exists<PackageRegistry>(code_object_addr), error::not_found(ECODE_OBJECT_DOES_NOT_EXIST));
         assert!(
-            code_object.is_owner(signer::address_of(publisher)),
+            object::is_owner(code_object, signer::address_of(publisher)),
             error::permission_denied(ENOT_PACKAGE_OWNER)
         );
 

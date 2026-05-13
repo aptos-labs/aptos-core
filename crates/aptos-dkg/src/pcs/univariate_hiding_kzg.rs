@@ -17,7 +17,7 @@ use aptos_crypto::{
     arkworks::{
         msm::MsmInput,
         random::{sample_field_element, unsafe_random_point},
-        srs::{lagrange_basis, powers_of_tau, SrsBasis, SrsType},
+        srs::{convert_to_lagrange_basis, lagrange_basis, powers_of_tau, SrsBasis, SrsType},
         GroupGenerators,
     },
     utils,
@@ -126,6 +126,48 @@ impl<E: Pairing> Trapdoor<E> {
 }
 
 pub fn setup<E: Pairing>(
+    powers_of_tau: &[E::G1Affine],
+    tau_g2: E::G2Affine,
+    xi_g1: E::G1Affine,
+    xi_g2: E::G2Affine,
+) -> (VerificationKey<E>, CommitmentKey<E>) {
+    let m = powers_of_tau.len();
+    utils::assert_power_of_two(m as u64);
+
+    let group_generators = GroupGenerators {
+        g1: E::G1Affine::generator(),
+        g2: E::G2Affine::generator(),
+    };
+
+    let eval_dom = ark_poly::Radix2EvaluationDomain::<E::ScalarField>::new(m)
+        .expect("Could not construct evaluation domain");
+
+    let msm_basis = SrsBasis::Lagrange {
+        lagr: convert_to_lagrange_basis::<E::G1>(powers_of_tau, eval_dom),
+    };
+
+    let roots_of_unity_in_eval_dom = eval_dom.elements().collect();
+    let m_inv = E::ScalarField::from(m as u64).inverse().unwrap();
+
+    (
+        VerificationKey {
+            xi_2: xi_g2,
+            tau_2: tau_g2,
+            group_generators,
+        },
+        CommitmentKey {
+            xi_1: xi_g1,
+            tau_1: powers_of_tau[1],
+            msm_basis,
+            eval_dom,
+            roots_of_unity_in_eval_dom,
+            g1: group_generators.g1,
+            m_inv,
+        },
+    )
+}
+
+pub fn setup_with_trapdoor<E: Pairing>(
     m: usize, // maximum polynomial degree, assumed to be power of 2
     basis_type: SrsType,
     group_generators: GroupGenerators<E>,
@@ -185,7 +227,7 @@ pub fn setup_extra<E: Pairing>(
     );
     let tau = trapdoor.tau;
 
-    let (vk, ck) = setup(m, basis_type, group_generators, trapdoor);
+    let (vk, ck) = setup_with_trapdoor(m, basis_type, group_generators, trapdoor);
 
     let g2_powers = powers_of_tau::<E::G2>(vk.group_generators.g2.into(), tau, m);
 
@@ -472,7 +514,7 @@ impl<'a, E: Pairing> sigma_protocol::CurveGroupTrait for CommitmentHomomorphism<
 mod tests {
     use super::*;
     use aptos_crypto::arkworks::random::{sample_field_element, sample_field_elements};
-    use ark_ec::pairing::Pairing;
+    use ark_ec::{pairing::Pairing, PrimeGroup as _};
     use ark_poly::{univariate::DensePolynomial, Polynomial};
     use rand::thread_rng;
 
@@ -487,7 +529,8 @@ mod tests {
         let m = 64;
         let xi = sample_field_element(&mut rng);
         let tau = sample_field_element(&mut rng);
-        let (vk, ck) = setup::<E>(m, SrsType::Lagrange, group_data, Trapdoor { xi, tau });
+        let (vk, ck) =
+            setup_with_trapdoor::<E>(m, SrsType::Lagrange, group_data, Trapdoor { xi, tau });
 
         let f_coeffs: Vec<Fr<E>> = sample_field_elements(m, &mut rng);
         let poly = DensePolynomial::<Fr<E>> { coeffs: f_coeffs };
@@ -534,4 +577,34 @@ mod tests {
         assert_kzg_opening_correctness_for_bls12_381,
         ark_bls12_381::Bls12_381
     );
+
+    use ark_bls12_381::{Bls12_381, Fr, G1Affine, G1Projective, G2Affine};
+
+    #[test]
+    fn test_setup_equivalence() {
+        let m = 4;
+
+        let mut rng = thread_rng();
+
+        let tau: Fr = sample_field_element(&mut rng);
+        let xi: Fr = sample_field_element(&mut rng);
+        let powers_of_tau = powers_of_tau(G1Projective::generator(), tau, m);
+        println!("{}", powers_of_tau.len());
+        let tau_g2 = (G2Affine::generator() * tau).into_affine();
+        let xi_g1 = (G1Affine::generator() * xi).into_affine();
+        let xi_g2 = (G2Affine::generator() * xi).into_affine();
+
+        let s1 = setup::<Bls12_381>(&powers_of_tau, tau_g2, xi_g1, xi_g2);
+        let s2 = setup_with_trapdoor::<Bls12_381>(
+            m,
+            SrsType::Lagrange,
+            GroupGenerators {
+                g1: G1Affine::generator(),
+                g2: G2Affine::generator(),
+            },
+            Trapdoor { xi, tau },
+        );
+
+        assert_eq!(s1, s2);
+    }
 }

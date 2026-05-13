@@ -8,11 +8,11 @@ module aptos_framework::simple_token_pfs_tests {
         ensure_primary_store_exists
     };
     use aptos_framework::object;
-    use 0xcafe::simple_token;
+    use aptos_framework::simple_token;
     use std::signer;
 
     // Copied from primary_fungible_store tests.
-    #[test(user_1 = @0xcafe, user_2 = @0xface)]
+    #[test(user_1 = @aptos_framework, user_2 = @0xface)]
     fun test_transfer_to_burnt_store(
         user_1: &signer,
         user_2: &signer,
@@ -38,7 +38,7 @@ module aptos_framework::simple_token_pfs_tests {
         assert!(balance(user_2_address, metadata) == 10, 0);
     }
 
-    #[test(user_1 = @0xcafe, user_2 = @0xface)]
+    #[test(user_1 = @aptos_framework, user_2 = @0xface)]
     fun test_withdraw_from_burnt_store(
         user_1: &signer,
         user_2: &signer,
@@ -61,7 +61,7 @@ module aptos_framework::simple_token_pfs_tests {
         deposit(user_2_address, coins);
     }
 
-    #[test(creator = @0xcafe, aaron = @0xface)]
+    #[test(creator = @aptos_framework, aaron = @0xface)]
     fun test_default_behavior(creator: &signer, aaron: &signer) {
         let (creator_ref, metadata) = create_test_token(creator);
         init_test_metadata_with_primary_store_enabled(&creator_ref);
@@ -81,7 +81,7 @@ module aptos_framework::simple_token_pfs_tests {
         assert!(primary_store_exists(aaron_address, metadata), 8);
     }
 
-    #[test(creator = @0xcafe, aaron = @0xface)]
+    #[test(creator = @aptos_framework, aaron = @0xface)]
     fun test_basic_flow(
         creator: &signer,
         aaron: &signer,
@@ -111,7 +111,7 @@ module aptos_framework::simple_token_pfs_tests {
         assert!(balance(aaron_address, metadata) == 0, 7);
     }
 
-    #[test(creator = @0xcafe, aaron = @0xface)]
+    #[test(creator = @aptos_framework, aaron = @0xface)]
     fun test_basic_flow_with_min_balance(
         creator: &signer,
         aaron: &signer,

@@ -1,0 +1,21 @@
+//# publish --print-bytecode
+module 0x66::test_pack_variant_wrong_enum_ownership
+
+enum Either has drop
+  Left
+    value: u64
+  Right
+    value: u64
+
+enum EitherClone has drop
+  Left
+    value: u64
+  Right
+    value: u64
+
+// Invalid: pack$Either$Left packs EitherClone's Left variant instead of Either's.
+// The variant name and field type match, but the variant handle belongs to the wrong enum.
+#[pack_variant(0)] public fun pack$Either$Left(l0: u64): Either
+    move_loc l0
+    pack_variant EitherClone, Left
+    ret

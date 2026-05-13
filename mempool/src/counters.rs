@@ -173,6 +173,15 @@ pub fn core_mempool_timeline_index_size(bucket_min_size_pairs: Vec<(String, usiz
     }
 }
 
+/// Counter tracking number of inbound transactions dropped due to the rate limit
+pub static INBOUND_TRANSACTIONS_RATE_LIMITED: Lazy<IntCounter> = Lazy::new(|| {
+    register_int_counter!(
+        "aptos_mempool_inbound_transactions_rate_limited",
+        "Number of inbound transactions dropped due to the inbound rate limit"
+    )
+    .unwrap()
+});
+
 /// Counter tracking number of txns removed from core mempool
 pub static CORE_MEMPOOL_REMOVED_TXNS: Lazy<IntCounter> = Lazy::new(|| {
     register_int_counter!(

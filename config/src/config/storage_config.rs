@@ -253,6 +253,8 @@ pub struct HotStateConfig {
     pub compute_root_hash: bool,
     /// Whether to persist hotness data alongside write sets in write set DB.
     pub persist_hotness_in_write_set: bool,
+    /// Whether to embed the per-block hot-state promotions into the epilogue transactions.
+    pub persist_hotness_in_epilogue: bool,
 }
 
 impl Default for HotStateConfig {
@@ -263,6 +265,7 @@ impl Default for HotStateConfig {
             delete_on_restart: true,
             compute_root_hash: true,
             persist_hotness_in_write_set: true,
+            persist_hotness_in_epilogue: false,
         }
     }
 }
@@ -679,14 +682,6 @@ impl ConfigOptimizer for StorageConfig {
             }
             if chain_id.is_testnet() && config_yaml["assert_rlimit_nofile"].is_null() {
                 config.assert_rlimit_nofile = true;
-                modified_config = true;
-            }
-            // TODO(HotState): Hot state root hash computation is off by default in Mainnet unless
-            // explicitly enabled.
-            if chain_id.is_mainnet()
-                && config_yaml["hot_state_config"]["compute_root_hash"].as_bool() != Some(true)
-            {
-                config.hot_state_config.compute_root_hash = false;
                 modified_config = true;
             }
             // TODO(HotState): Hotness persistence in write sets is disabled on mainnet and testnet

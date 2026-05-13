@@ -1,0 +1,13 @@
+
+Diagnostics:
+error: constant `0x42::M::PKG_CONST` cannot be used here due to visibility constraints
+   ┌─ tests/checking-lang-v2.4/package_const_in_public_inline_rejected.move:19:9
+   │
+19 │         M::PKG_CONST
+   │         ^^^^^^^^^^^^
+
+error: constant `0x42::M::PKG_CONST` cannot be used here due to visibility constraints
+   ┌─ tests/checking-lang-v2.4/package_const_in_public_inline_rejected.move:34:9
+   │
+34 │         M::PKG_CONST
+   │         ^^^^^^^^^^^^

@@ -31,6 +31,7 @@ aptos-sdk = { workspace = true }
 aptos-transaction-simulation = { workspace = true }
 aptos-transaction-simulation-session = { workspace = true }
 aptos-types = { workspace = true }
+aptos-validator-interface = { workspace = true }
 aptos-vm = { workspace = true }
 aptos-vm-environment = { workspace = true }
 aptos-vm-logging = { workspace = true }
@@ -46,6 +47,7 @@ itertools = { workspace = true }
 legacy-move-compiler = { workspace = true }
 move-asm = { workspace = true }
 move-binary-format = { workspace = true }
+move-bytecode-source-map = { workspace = true }
 move-command-line-common = { workspace = true }
 move-compiler-v2 = { workspace = true }
 move-core-types = { workspace = true }

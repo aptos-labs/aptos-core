@@ -1,3 +1,4 @@
+// @checks=experimental
 module 0xc0ffee::m {
 
     const TRUE_CONST: bool = true;

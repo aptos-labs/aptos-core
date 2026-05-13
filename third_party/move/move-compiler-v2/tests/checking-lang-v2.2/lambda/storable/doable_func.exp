@@ -214,31 +214,31 @@ module 0x42::test {
         z * (x + y)
     }
     fun choose_function1(key: u64, x: u64): u64 {
-        let f = if (key == 0) |arg0| mod2::double(arg0) else if (key == 1) |arg0| mod1::triple(arg0) else if (key == 2) |arg0| mod3::multiply(4, arg0) else if (key == 3) {
+        let f = if (key == 0) |x| mod2::double(x) else if (key == 1) |x| mod1::triple(x) else if (key == 2) |x| mod3::multiply(4, x) else if (key == 3) {
             let x = 5;
-            |arg0| mod4::alt_multiply(x, arg0)
+            |x_1| mod4::alt_multiply(x, x_1)
         } else if (key == 4) {
             let x = 6;
-            |arg0| mod3::multiply(x, arg0)
-        } else if (key == 5) |arg0| multiply3(3, 2, arg0) else if (key == 6) |arg0| mod3::multiply(7, arg0) else if (key == 7) |arg0| multiply3(4, 2, arg0) else if (key == 8) |arg0| multiply3(3, 3, arg0) else if (key == 9) {
+            |x_1| mod3::multiply(x, x_1)
+        } else if (key == 5) |x| multiply3(3, 2, x) else if (key == 6) |x| mod3::multiply(7, x) else if (key == 7) |x| multiply3(4, 2, x) else if (key == 8) |x| multiply3(3, 3, x) else if (key == 9) {
             let x = 2;
             let y = 5;
-            |arg0| lambda__1__choose_function1(x, y, arg0)
+            |x_1| lambda__1__choose_function1(x, y, x_1)
         } else if (key == 10) {
             let z = 11;
-            |arg0| mod4::alt_multiply(z, arg0)
+            |x| mod4::alt_multiply(z, x)
         } else if (key == 11) {
-            let g = |arg0,arg1| mod3::multiply(arg0, arg1);
-            |arg0| lambda__2__choose_function1(g, arg0)
+            let g = |x,y| mod3::multiply(x, y);
+            |x| lambda__2__choose_function1(g, x)
         } else if (key == 12) {
-            let h = |arg0| mod3::multiply(12, arg0);
-            |arg0| lambda__3__choose_function1(h, arg0)
+            let h = |x| mod3::multiply(12, x);
+            |x| lambda__3__choose_function1(h, x)
         } else if (key == 14) {
-            let i = |arg0| multiply3(2, 2, arg0);
-            |arg0| lambda__4__choose_function1(i, arg0)
+            let i = |x| multiply3(2, 2, x);
+            |x| lambda__4__choose_function1(i, x)
         } else {
-            let i = |arg0,arg1| lambda__5__choose_function1(arg0, arg1);
-            |arg0| lambda__6__choose_function1(i, arg0)
+            let i = |x,y| lambda__5__choose_function1(x, y);
+            |x| lambda__6__choose_function1(i, x)
         };
         f(x)
     }

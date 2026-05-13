@@ -2,7 +2,10 @@
 // Licensed pursuant to the Innovation-Enabling Source Code License, available at https://github.com/aptos-labs/aptos-core/blob/main/LICENSE
 
 use crate::{
-    state_store::{state_slot::StateSlot, state_value::StateValue},
+    state_store::{
+        state_slot::{StateSlot, StateSlotKind},
+        state_value::StateValue,
+    },
     transaction::Version,
 };
 use aptos_crypto::{
@@ -57,14 +60,22 @@ impl HotStateValue {
         }
     }
 
+    pub fn hot_since_version(&self) -> Version {
+        self.hot_since_version
+    }
+
+    pub fn value_opt(&self) -> Option<&StateValue> {
+        self.value.as_ref()
+    }
+
     pub fn clone_from_slot(slot: &StateSlot) -> Self {
-        match slot {
-            StateSlot::HotOccupied {
+        match slot.kind() {
+            StateSlotKind::HotOccupied {
                 value,
                 hot_since_version,
                 ..
             } => Self::new(Some(value.clone()), *hot_since_version),
-            StateSlot::HotVacant {
+            StateSlotKind::HotVacant {
                 hot_since_version, ..
             } => Self::new(None, *hot_since_version),
             _ => panic!("Must be hot slot"),
@@ -89,13 +100,13 @@ impl<'a> HotStateValueRef<'a> {
     }
 
     pub fn from_slot(slot: &'a StateSlot) -> Self {
-        match slot {
-            StateSlot::HotOccupied {
+        match slot.kind() {
+            StateSlotKind::HotOccupied {
                 value,
                 hot_since_version,
                 ..
             } => Self::new(Some(value), *hot_since_version),
-            StateSlot::HotVacant {
+            StateSlotKind::HotVacant {
                 hot_since_version, ..
             } => Self::new(None, *hot_since_version),
             _ => panic!("Must be hot slot"),

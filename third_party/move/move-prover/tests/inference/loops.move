@@ -110,6 +110,10 @@ module 0x42::loops {
                 *r = *r + 1;
             };
             i = i + 1;
+        } spec {
+            invariant i <= n;
+            invariant do_inc ==> r == old(r) + i;
+            invariant !do_inc ==> r == old(r);
         };
     }
 

@@ -93,8 +93,10 @@ async fn test_proof_queue_sorting() {
     }
 
     // Expect: [600, 300]
+    let excluded = hashset![];
+    let mut session = proof_queue.create_pull_session(&excluded);
     let (pulled, _, num_unique_txns, _, _) = proof_queue.pull_proofs(
-        &hashset![],
+        &mut session,
         PayloadTxnsSize::new(4, 10),
         2,
         2,
@@ -123,8 +125,10 @@ async fn test_proof_queue_sorting() {
     assert_eq!(num_unique_txns, 2);
 
     // Expect: [600, 500, 300, 100]
+    let excluded = hashset![];
+    let mut session = proof_queue.create_pull_session(&excluded);
     let (pulled, _, num_unique_txns, _, _) = proof_queue.pull_proofs(
-        &hashset![],
+        &mut session,
         PayloadTxnsSize::new(6, 10),
         4,
         4,
@@ -546,8 +550,10 @@ async fn test_proof_pull_proofs_with_duplicates() {
     }
     assert_eq!(proof_queue.remaining_txns_and_proofs(), (4, 8));
 
+    let excluded = hashset![];
+    let mut session = proof_queue.create_pull_session(&excluded);
     let result = proof_queue.pull_proofs(
-        &hashset![],
+        &mut session,
         PayloadTxnsSize::new(8, 400),
         4,
         4,
@@ -573,8 +579,10 @@ async fn test_proof_pull_proofs_with_duplicates() {
     }
     assert_eq!(pulled_txns.len(), 4);
 
+    let excluded = hashset![info_0.clone()];
+    let mut session = proof_queue.create_pull_session(&excluded);
     let result = proof_queue.pull_proofs(
-        &hashset![info_0.clone()],
+        &mut session,
         PayloadTxnsSize::new(8, 400),
         4,
         4,
@@ -588,8 +596,10 @@ async fn test_proof_pull_proofs_with_duplicates() {
 
     proof_queue.handle_updated_block_timestamp(now_in_usecs + 500_000);
     // Nothing changes
+    let excluded = hashset![];
+    let mut session = proof_queue.create_pull_session(&excluded);
     let result = proof_queue.pull_proofs(
-        &hashset![],
+        &mut session,
         PayloadTxnsSize::new(8, 400),
         5,
         5,
@@ -601,8 +611,10 @@ async fn test_proof_pull_proofs_with_duplicates() {
 
     proof_queue.handle_updated_block_timestamp(now_in_usecs + 1_000_000);
     // txn_1 expired
+    let excluded = hashset![];
+    let mut session = proof_queue.create_pull_session(&excluded);
     let result = proof_queue.pull_proofs(
-        &hashset![],
+        &mut session,
         PayloadTxnsSize::new(8, 400),
         5,
         5,
@@ -615,8 +627,10 @@ async fn test_proof_pull_proofs_with_duplicates() {
 
     proof_queue.handle_updated_block_timestamp(now_in_usecs + 1_200_000);
     // author_0_batches[0] is removed. txn_1 expired.
+    let excluded = hashset![];
+    let mut session = proof_queue.create_pull_session(&excluded);
     let result = proof_queue.pull_proofs(
-        &hashset![],
+        &mut session,
         PayloadTxnsSize::new(8, 400),
         4,
         4,
@@ -629,8 +643,10 @@ async fn test_proof_pull_proofs_with_duplicates() {
 
     proof_queue.handle_updated_block_timestamp(now_in_usecs + 2_000_000);
     // author_0_batches[0] is removed. txn_0, txn_1 are expired.
+    let excluded = hashset![];
+    let mut session = proof_queue.create_pull_session(&excluded);
     let result = proof_queue.pull_proofs(
-        &hashset![],
+        &mut session,
         PayloadTxnsSize::new(8, 400),
         4,
         4,
@@ -643,8 +659,10 @@ async fn test_proof_pull_proofs_with_duplicates() {
 
     proof_queue.handle_updated_block_timestamp(now_in_usecs + 2_500_000);
     // author_0_batches[0], author_1_batches[1] is removed. txn_0, txn_1 is expired.
+    let excluded = hashset![];
+    let mut session = proof_queue.create_pull_session(&excluded);
     let result = proof_queue.pull_proofs(
-        &hashset![],
+        &mut session,
         PayloadTxnsSize::new(8, 400),
         4,
         4,
@@ -655,8 +673,10 @@ async fn test_proof_pull_proofs_with_duplicates() {
     assert_eq!(result.0.len(), 6);
     assert_eq!(result.2, 2);
 
+    let excluded = hashset![info_7];
+    let mut session = proof_queue.create_pull_session(&excluded);
     let result = proof_queue.pull_proofs(
-        &hashset![info_7],
+        &mut session,
         PayloadTxnsSize::new(8, 400),
         4,
         4,
@@ -669,8 +689,10 @@ async fn test_proof_pull_proofs_with_duplicates() {
     assert_eq!(result.2, 1);
 
     proof_queue.handle_updated_block_timestamp(now_in_usecs + 3_000_000);
+    let excluded = hashset![];
+    let mut session = proof_queue.create_pull_session(&excluded);
     let result = proof_queue.pull_proofs(
-        &hashset![],
+        &mut session,
         PayloadTxnsSize::new(8, 400),
         8,
         8,
@@ -683,8 +705,10 @@ async fn test_proof_pull_proofs_with_duplicates() {
     assert_eq!(result.2, 1);
 
     proof_queue.handle_updated_block_timestamp(now_in_usecs + 3_500_000);
+    let excluded = hashset![];
+    let mut session = proof_queue.create_pull_session(&excluded);
     let result = proof_queue.pull_proofs(
-        &hashset![],
+        &mut session,
         PayloadTxnsSize::new(8, 400),
         4,
         4,
@@ -697,8 +721,10 @@ async fn test_proof_pull_proofs_with_duplicates() {
     assert_eq!(result.2, 0);
 
     proof_queue.handle_updated_block_timestamp(now_in_usecs + 4_000_000);
+    let excluded = hashset![];
+    let mut session = proof_queue.create_pull_session(&excluded);
     let result = proof_queue.pull_proofs(
-        &hashset![],
+        &mut session,
         PayloadTxnsSize::new(8, 400),
         4,
         4,
@@ -732,8 +758,10 @@ async fn test_proof_queue_soft_limit() {
         proof_queue.insert_proof(batch);
     }
 
+    let excluded = hashset![];
+    let mut session = proof_queue.create_pull_session(&excluded);
     let (pulled, _, num_unique_txns, _, _) = proof_queue.pull_proofs(
-        &hashset![],
+        &mut session,
         PayloadTxnsSize::new(100, 100),
         12,
         12,
@@ -745,8 +773,10 @@ async fn test_proof_queue_soft_limit() {
     assert_eq!(pulled.len(), 1);
     assert_eq!(num_unique_txns, 10);
 
+    let excluded = hashset![];
+    let mut session = proof_queue.create_pull_session(&excluded);
     let (pulled, _, num_unique_txns, _, _) = proof_queue.pull_proofs(
-        &hashset![],
+        &mut session,
         PayloadTxnsSize::new(100, 100),
         30,
         12,
@@ -813,9 +843,11 @@ async fn test_proof_queue_pull_full_utilization() {
     assert_eq!(remaining_proofs, 3);
 
     let now_in_secs = aptos_infallible::duration_since_epoch();
+    let excluded = HashSet::new();
+    let mut session = proof_queue.create_pull_session(&excluded);
     let (proof_block, txns_with_proof_size, cur_unique_txns, proof_queue_fully_utilized, _) =
         proof_queue.pull_proofs(
-            &HashSet::new(),
+            &mut session,
             PayloadTxnsSize::new(10, 10),
             10,
             10,
@@ -830,9 +862,11 @@ async fn test_proof_queue_pull_full_utilization() {
     assert!(!proof_queue_fully_utilized);
 
     let now_in_secs = aptos_infallible::duration_since_epoch();
+    let excluded = HashSet::new();
+    let mut session = proof_queue.create_pull_session(&excluded);
     let (proof_block, txns_with_proof_size, cur_unique_txns, proof_queue_fully_utilized, _) =
         proof_queue.pull_proofs(
-            &HashSet::new(),
+            &mut session,
             PayloadTxnsSize::new(50, 50),
             50,
             50,

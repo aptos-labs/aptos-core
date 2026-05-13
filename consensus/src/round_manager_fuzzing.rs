@@ -93,10 +93,12 @@ fn build_empty_store(
         10, // max pruned blocks in mem
         Arc::new(SimulatedTimeService::new()),
         10,
+        60,
         Arc::from(DirectMempoolPayloadManager::new()),
         false,
         DEFAULT_ENABLED_WINDOW_SIZE,
         Arc::new(Mutex::new(PendingBlocks::new())),
+        None,
         None,
     ))
 }

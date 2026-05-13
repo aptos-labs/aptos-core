@@ -1,3 +1,4 @@
+// @checks=experimental
 #[lint::skip(while_true)]
 module 0xc0ffee::m {
     #[lint::skip(blocks_in_conditions)]

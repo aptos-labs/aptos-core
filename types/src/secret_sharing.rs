@@ -17,7 +17,7 @@ pub type EncryptionKey = <FPTXWeighted as BatchThresholdEncryption>::EncryptionK
 pub type DigestKey = <FPTXWeighted as BatchThresholdEncryption>::DigestKey;
 pub type Ciphertext = <FPTXWeighted as BatchThresholdEncryption>::Ciphertext;
 pub type Id = <FPTXWeighted as BatchThresholdEncryption>::Id;
-pub type Round = <FPTXWeighted as BatchThresholdEncryption>::Round;
+pub type Round = u64;
 pub type Digest = <FPTXWeighted as BatchThresholdEncryption>::Digest;
 pub type EvalProofsPromise = <FPTXWeighted as BatchThresholdEncryption>::EvalProofsPromise;
 pub type EvalProof = <FPTXWeighted as BatchThresholdEncryption>::EvalProof;
@@ -154,7 +154,7 @@ pub struct SecretShareConfig {
 impl SecretShareConfig {
     pub fn new(
         validator: Arc<ValidatorVerifier>,
-        digest_key: DigestKey,
+        digest_key: Arc<DigestKey>,
         msk_share: MasterSecretKeyShare,
         verification_keys: Vec<VerificationKey>,
         config: <FPTXWeighted as BatchThresholdEncryption>::ThresholdConfig,
@@ -164,13 +164,15 @@ impl SecretShareConfig {
             .address_to_validator_index()
             .iter()
             .map(|(author, &index)| {
-                let weight = config.get_player_weight(&Player { id: index });
+                let weight = config
+                    .get_player_weight(&Player { id: index })
+                    .expect("validator index maps to player id in config");
                 (*author, weight as u64)
             })
             .collect();
         Self {
             validator,
-            digest_key: Arc::new(digest_key),
+            digest_key,
             msk_share,
             verification_keys,
             config,

@@ -111,6 +111,10 @@ pub enum TransactionTypeArg {
     FibonacciRecursive20,
     FibonacciTailRecursive20,
     FibonacciIterative20,
+
+    // Encrypted variants
+    EncryptedCoinTransfer,
+    EncryptedAptFaTransfer,
 }
 
 impl TransactionTypeArg {
@@ -509,6 +513,20 @@ impl TransactionTypeArg {
                     n: 20,
                     function_type: FibonacciFunctionType::Iterative,
                 })
+            },
+            TransactionTypeArg::EncryptedCoinTransfer => TransactionType::Encrypted {
+                inner: Box::new(TransactionTypeArg::CoinTransfer.materialize(
+                    module_working_set_size,
+                    sender_use_account_pool,
+                    workflow_progress_type,
+                )),
+            },
+            TransactionTypeArg::EncryptedAptFaTransfer => TransactionType::Encrypted {
+                inner: Box::new(TransactionTypeArg::AptFaTransfer.materialize(
+                    module_working_set_size,
+                    sender_use_account_pool,
+                    workflow_progress_type,
+                )),
             },
         }
     }

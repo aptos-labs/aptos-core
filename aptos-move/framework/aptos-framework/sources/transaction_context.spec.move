@@ -109,6 +109,10 @@ spec aptos_framework::transaction_context {
         pragma opaque;
     }
 
+    spec is_encrypted_txn_internal(): bool {
+        pragma opaque;
+    }
+
     spec monotonically_increasing_counter_internal(timestamp_us: u64): u128 {
         //TODO: temporary mockup
         pragma opaque;

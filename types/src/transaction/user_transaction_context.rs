@@ -30,6 +30,7 @@ pub struct UserTransactionContext {
     multisig_payload: Option<MultisigPayload>,
     /// The transaction index context for the monotonically increasing counter.
     transaction_index_kind: TransactionIndexKind,
+    is_encrypted_txn: bool,
 }
 
 impl UserTransactionContext {
@@ -43,6 +44,7 @@ impl UserTransactionContext {
         entry_function_payload: Option<EntryFunctionPayload>,
         multisig_payload: Option<MultisigPayload>,
         transaction_index_kind: TransactionIndexKind,
+        is_encrypted_txn: bool,
     ) -> Self {
         Self {
             sender,
@@ -54,6 +56,7 @@ impl UserTransactionContext {
             entry_function_payload,
             multisig_payload,
             transaction_index_kind,
+            is_encrypted_txn,
         }
     }
 
@@ -91,6 +94,10 @@ impl UserTransactionContext {
 
     pub fn transaction_index_kind(&self) -> TransactionIndexKind {
         self.transaction_index_kind
+    }
+
+    pub fn is_encrypted_txn(&self) -> bool {
+        self.is_encrypted_txn
     }
 }
 

@@ -1,6 +1,7 @@
-// Copyright (c) The Diem Core Contributors
-// Copyright (c) The Move Contributors
-// SPDX-License-Identifier: Apache-2.0
+// Parts of the file are Copyright (c) The Diem Core Contributors
+// Parts of the file are Copyright (c) The Move Contributors
+// Parts of the file are Copyright (c) Aptos Foundation
+// All Aptos Foundation code and content is licensed pursuant to the Innovation-Enabling Source Code License, available at https://github.com/aptos-labs/aptos-core/blob/main/LICENSE
 
 #![forbid(unsafe_code)]
 
@@ -11,6 +12,7 @@ use itertools::Itertools;
 #[allow(unused_imports)]
 use log::{debug, info, warn};
 use log::{log_enabled, Level};
+use move_compiler_v2::Experiment;
 use move_model::{
     code_writer::CodeWriter, metadata::LATEST_STABLE_COMPILER_VERSION_VALUE, model::GlobalEnv,
 };
@@ -42,9 +44,12 @@ pub fn run_move_prover_errors_to_stderr(options: Options) -> anyhow::Result<()> 
 pub fn run_move_prover_v2<W: WriteColor>(
     error_writer: &mut W,
     options: Options,
-    experiments: Vec<String>,
+    mut experiments: Vec<String>,
 ) -> anyhow::Result<()> {
     let now = Instant::now();
+    if options.inference.inference {
+        experiments.push(Experiment::SPEC_REWRITE_PURE_FUNS.to_string());
+    }
     let mut env = create_move_prover_v2_model(error_writer, options.clone(), experiments)?;
     if options.inference.inference {
         inference::run_spec_inference_with_model(&mut env, error_writer, options, now)
@@ -58,9 +63,10 @@ pub fn run_move_prover_v2<W: WriteColor>(
 pub fn run_inference_with_bytecode_dump<W: WriteColor>(
     error_writer: &mut W,
     options: Options,
-    experiments: Vec<String>,
+    mut experiments: Vec<String>,
 ) -> anyhow::Result<String> {
     let now = Instant::now();
+    experiments.push(Experiment::SPEC_REWRITE_PURE_FUNS.to_string());
     let mut env = create_move_prover_v2_model(error_writer, options.clone(), experiments)?;
     inference::run_spec_inference_with_model_and_dump(&mut env, error_writer, options, now)
 }
@@ -83,8 +89,6 @@ pub fn create_move_prover_v2_model<W: WriteColor>(
         experiment_cache: Default::default(),
         sources: options.move_sources,
         sources_deps: vec![],
-        warn_deprecated: false,
-        warn_of_deprecation_use_in_aptos_libs: false,
         whole_program: false,
         compile_test_code: false,
         compile_verify_code: true,

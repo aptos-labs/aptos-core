@@ -1,6 +1,7 @@
-// Copyright (c) The Diem Core Contributors
-// Copyright (c) The Move Contributors
-// SPDX-License-Identifier: Apache-2.0
+// Parts of the file are Copyright (c) The Diem Core Contributors
+// Parts of the file are Copyright (c) The Move Contributors
+// Parts of the file are Copyright (c) Aptos Foundation
+// All Aptos Foundation code and content is licensed pursuant to the Innovation-Enabling Source Code License, available at https://github.com/aptos-labs/aptos-core/blob/main/LICENSE
 
 use crate::function_target::FunctionTarget;
 use ethnum::{I256, U256};
@@ -1007,6 +1008,26 @@ impl Bytecode {
             },
             _ => (vec![], vec![]),
         }
+    }
+
+    /// Returns true if this bytecode is a state-transition operation that changes global
+    /// memory state. These are: function calls, invoke (dynamic calls), MoveFrom, MoveTo,
+    /// and WriteBack to global root.
+    pub fn is_global_state_transition(&self) -> bool {
+        matches!(
+            self,
+            Bytecode::Call(
+                _,
+                _,
+                Operation::Function(..)
+                    | Operation::Invoke
+                    | Operation::MoveFrom(..)
+                    | Operation::MoveTo(..)
+                    | Operation::WriteBack(BorrowNode::GlobalRoot(..), ..),
+                _,
+                _,
+            )
+        )
     }
 }
 

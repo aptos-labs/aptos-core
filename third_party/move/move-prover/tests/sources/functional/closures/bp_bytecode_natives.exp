@@ -1,0 +1,96 @@
+Move prover returns: exiting with compilation errors
+error: behavioral predicates are not supported on `std::vector::empty` — use the spec language directly (e.g. write `len(v)` instead of `result_of<vector::length>(v)`, `v[i]` instead of `result_of<vector::borrow>(v, i)`, `!in_range(v, i)` instead of `aborts_of<vector::borrow>(v, i)`)
+   ┌─ tests/sources/functional/closures/bp_bytecode_natives.move:19:19
+   │
+19 │         aborts_if aborts_of<vector::empty<T>>();
+   │                   ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+error: behavioral predicates are not supported on `std::vector::length` — use the spec language directly (e.g. write `len(v)` instead of `result_of<vector::length>(v)`, `v[i]` instead of `result_of<vector::borrow>(v, i)`, `!in_range(v, i)` instead of `aborts_of<vector::borrow>(v, i)`)
+   ┌─ tests/sources/functional/closures/bp_bytecode_natives.move:30:19
+   │
+30 │         aborts_if aborts_of<vector::length<T>>(v);
+   │                   ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+error: behavioral predicates are not supported on `std::vector::length` — use the spec language directly (e.g. write `len(v)` instead of `result_of<vector::length>(v)`, `v[i]` instead of `result_of<vector::borrow>(v, i)`, `!in_range(v, i)` instead of `aborts_of<vector::borrow>(v, i)`)
+   ┌─ tests/sources/functional/closures/bp_bytecode_natives.move:38:27
+   │
+38 │         ensures result == result_of<vector::length<T>>(v);
+   │                           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+error: behavioral predicates are not supported on `std::vector::borrow` — use the spec language directly (e.g. write `len(v)` instead of `result_of<vector::length>(v)`, `v[i]` instead of `result_of<vector::borrow>(v, i)`, `!in_range(v, i)` instead of `aborts_of<vector::borrow>(v, i)`)
+   ┌─ tests/sources/functional/closures/bp_bytecode_natives.move:49:19
+   │
+49 │         aborts_if aborts_of<vector::borrow<T>>(v, i);
+   │                   ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+error: behavioral predicates are not supported on `std::vector::borrow` — use the spec language directly (e.g. write `len(v)` instead of `result_of<vector::length>(v)`, `v[i]` instead of `result_of<vector::borrow>(v, i)`, `!in_range(v, i)` instead of `aborts_of<vector::borrow>(v, i)`)
+   ┌─ tests/sources/functional/closures/bp_bytecode_natives.move:56:19
+   │
+56 │         requires !aborts_of<vector::borrow<T>>(v, i);
+   │                   ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+error: behavioral predicates are not supported on `std::vector::borrow_mut` — use the spec language directly (e.g. write `len(v)` instead of `result_of<vector::length>(v)`, `v[i]` instead of `result_of<vector::borrow>(v, i)`, `!in_range(v, i)` instead of `aborts_of<vector::borrow>(v, i)`)
+   ┌─ tests/sources/functional/closures/bp_bytecode_natives.move:68:19
+   │
+68 │         aborts_if aborts_of<vector::borrow_mut<T>>(v, i);
+   │                   ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+error: behavioral predicates are not supported on `std::vector::push_back` — use the spec language directly (e.g. write `len(v)` instead of `result_of<vector::length>(v)`, `v[i]` instead of `result_of<vector::borrow>(v, i)`, `!in_range(v, i)` instead of `aborts_of<vector::borrow>(v, i)`)
+   ┌─ tests/sources/functional/closures/bp_bytecode_natives.move:79:19
+   │
+79 │         aborts_if aborts_of<vector::push_back<T>>(v, e);
+   │                   ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+error: behavioral predicates are not supported on `std::vector::push_back` — use the spec language directly (e.g. write `len(v)` instead of `result_of<vector::length>(v)`, `v[i]` instead of `result_of<vector::borrow>(v, i)`, `!in_range(v, i)` instead of `aborts_of<vector::borrow>(v, i)`)
+   ┌─ tests/sources/functional/closures/bp_bytecode_natives.move:90:17
+   │
+90 │         ensures ensures_of<vector::push_back<T>>(old(v), e, v);
+   │                 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+error: behavioral predicates are not supported on `std::vector::pop_back` — use the spec language directly (e.g. write `len(v)` instead of `result_of<vector::length>(v)`, `v[i]` instead of `result_of<vector::borrow>(v, i)`, `!in_range(v, i)` instead of `aborts_of<vector::borrow>(v, i)`)
+    ┌─ tests/sources/functional/closures/bp_bytecode_natives.move:101:19
+    │
+101 │         aborts_if aborts_of<vector::pop_back<T>>(v);
+    │                   ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+error: behavioral predicates are not supported on `std::vector::pop_back` — use the spec language directly (e.g. write `len(v)` instead of `result_of<vector::length>(v)`, `v[i]` instead of `result_of<vector::borrow>(v, i)`, `!in_range(v, i)` instead of `aborts_of<vector::borrow>(v, i)`)
+    ┌─ tests/sources/functional/closures/bp_bytecode_natives.move:108:19
+    │
+108 │         requires !aborts_of<vector::pop_back<T>>(v);
+    │                   ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+error: behavioral predicates are not supported on `std::vector::destroy_empty` — use the spec language directly (e.g. write `len(v)` instead of `result_of<vector::length>(v)`, `v[i]` instead of `result_of<vector::borrow>(v, i)`, `!in_range(v, i)` instead of `aborts_of<vector::borrow>(v, i)`)
+    ┌─ tests/sources/functional/closures/bp_bytecode_natives.move:120:19
+    │
+120 │         aborts_if aborts_of<vector::destroy_empty<T>>(v);
+    │                   ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+error: behavioral predicates are not supported on `std::vector::swap` — use the spec language directly (e.g. write `len(v)` instead of `result_of<vector::length>(v)`, `v[i]` instead of `result_of<vector::borrow>(v, i)`, `!in_range(v, i)` instead of `aborts_of<vector::borrow>(v, i)`)
+    ┌─ tests/sources/functional/closures/bp_bytecode_natives.move:131:19
+    │
+131 │         aborts_if aborts_of<vector::swap<T>>(v, i, j);
+    │                   ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+error: behavioral predicates are not supported on `std::vector::singleton` — use the spec language directly (e.g. write `len(v)` instead of `result_of<vector::length>(v)`, `v[i]` instead of `result_of<vector::borrow>(v, i)`, `!in_range(v, i)` instead of `aborts_of<vector::borrow>(v, i)`)
+    ┌─ tests/sources/functional/closures/bp_bytecode_natives.move:142:19
+    │
+142 │         aborts_if aborts_of<vector::singleton<T>>(e);
+    │                   ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+error: behavioral predicates are not supported on `std::vector::singleton` — use the spec language directly (e.g. write `len(v)` instead of `result_of<vector::length>(v)`, `v[i]` instead of `result_of<vector::borrow>(v, i)`, `!in_range(v, i)` instead of `aborts_of<vector::borrow>(v, i)`)
+    ┌─ tests/sources/functional/closures/bp_bytecode_natives.move:143:27
+    │
+143 │         ensures result == result_of<vector::singleton<T>>(e);
+    │                           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+error: behavioral predicates are not supported on `std::vector::contains` — use the spec language directly (e.g. write `len(v)` instead of `result_of<vector::length>(v)`, `v[i]` instead of `result_of<vector::borrow>(v, i)`, `!in_range(v, i)` instead of `aborts_of<vector::borrow>(v, i)`)
+    ┌─ tests/sources/functional/closures/bp_bytecode_natives.move:154:19
+    │
+154 │         aborts_if aborts_of<vector::contains<T>>(v, e);
+    │                   ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+error: behavioral predicates are not supported on `std::vector::contains` — use the spec language directly (e.g. write `len(v)` instead of `result_of<vector::length>(v)`, `v[i]` instead of `result_of<vector::borrow>(v, i)`, `!in_range(v, i)` instead of `aborts_of<vector::borrow>(v, i)`)
+    ┌─ tests/sources/functional/closures/bp_bytecode_natives.move:155:27
+    │
+155 │         ensures result == result_of<vector::contains<T>>(v, e);
+    │                           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^

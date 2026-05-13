@@ -1,0 +1,647 @@
+============ initial translation from Move ================
+
+[variant baseline]
+fun TestConditionalSplit::abs_max($t0|a: u64, $t1|b: u64): u64 {
+     var $t2|$t4: bool
+     var $t3|$t5: u64
+     var $t4: u64
+     var $t5: u64
+     var $t6: bool
+     var $t7: u64
+     var $t8: u64
+     var $t9: bool
+     var $t10: bool
+     var $t11: u64
+     var $t12: u64
+     var $t13: u64
+     var $t14: u64
+     var $t15: bool
+     var $t16: u64
+     var $t17: u64
+     var $t18: bool
+  0: $t4 := copy($t0)
+  1: $t5 := 0
+  2: $t6 := ==($t4, $t5)
+  3: if ($t6) goto 4 else goto 32
+  4: label L1
+  5: $t7 := copy($t1)
+  6: $t8 := 0
+  7: $t9 := ==($t7, $t8)
+  8: $t2 := $t9
+  9: goto 10
+ 10: label L7
+ 11: $t10 := move($t2)
+ 12: if ($t10) goto 13 else goto 19
+ 13: label L3
+ 14: $t11 := 0
+ 15: return $t11
+ 16: label L6
+ 17: $t12 := move($t3)
+ 18: return $t12
+ 19: label L2
+ 20: $t13 := copy($t0)
+ 21: $t14 := copy($t1)
+ 22: $t15 := >=($t13, $t14)
+ 23: if ($t15) goto 24 else goto 28
+ 24: label L5
+ 25: $t16 := move($t0)
+ 26: $t3 := $t16
+ 27: goto 16
+ 28: label L4
+ 29: $t17 := move($t1)
+ 30: $t3 := $t17
+ 31: goto 16
+ 32: label L0
+ 33: $t18 := false
+ 34: $t2 := $t18
+ 35: goto 10
+}
+
+
+[variant baseline]
+fun TestConditionalSplit::color_or_default($t0|c: 0x42::TestConditionalSplit::Color, $t1|use_default: bool): u64 {
+     var $t2|$t3: &0x42::TestConditionalSplit::Color
+     var $t3: bool
+     var $t4: u64
+     var $t5: &0x42::TestConditionalSplit::Color
+     var $t6: &0x42::TestConditionalSplit::Color
+     var $t7: bool
+     var $t8: &0x42::TestConditionalSplit::Color
+     var $t9: 0x42::TestConditionalSplit::Color
+     var $t10: u64
+     var $t11: &0x42::TestConditionalSplit::Color
+     var $t12: bool
+     var $t13: &0x42::TestConditionalSplit::Color
+     var $t14: 0x42::TestConditionalSplit::Color
+     var $t15: u64
+     var $t16: &0x42::TestConditionalSplit::Color
+     var $t17: bool
+     var $t18: 0x42::TestConditionalSplit::Color
+     var $t19: u64
+     var $t20: u64
+  0: $t3 := move($t1)
+  1: if ($t3) goto 2 else goto 5
+  2: label L1
+  3: $t4 := 0
+  4: return $t4
+  5: label L0
+  6: $t5 := borrow_local($t0)
+  7: $t2 := $t5
+  8: $t6 := copy($t2)
+  9: $t7 := test_variant 0x42::TestConditionalSplit::Color::Red($t6)
+ 10: if ($t7) goto 11 else goto 18
+ 11: label L3
+ 12: $t8 := move($t2)
+ 13: drop($t8)
+ 14: $t9 := move($t0)
+ 15: unpack_variant 0x42::TestConditionalSplit::Color::Red($t9)
+ 16: $t10 := 1
+ 17: return $t10
+ 18: label L2
+ 19: $t11 := copy($t2)
+ 20: $t12 := test_variant 0x42::TestConditionalSplit::Color::Green($t11)
+ 21: if ($t12) goto 22 else goto 29
+ 22: label L5
+ 23: $t13 := move($t2)
+ 24: drop($t13)
+ 25: $t14 := move($t0)
+ 26: unpack_variant 0x42::TestConditionalSplit::Color::Green($t14)
+ 27: $t15 := 2
+ 28: return $t15
+ 29: label L4
+ 30: $t16 := move($t2)
+ 31: $t17 := test_variant 0x42::TestConditionalSplit::Color::Blue($t16)
+ 32: if ($t17) goto 33 else goto 38
+ 33: label L7
+ 34: $t18 := move($t0)
+ 35: unpack_variant 0x42::TestConditionalSplit::Color::Blue($t18)
+ 36: $t19 := 3
+ 37: return $t19
+ 38: label L6
+ 39: $t20 := 14566554180833181697
+ 40: abort($t20)
+}
+
+============ after pipeline `proofs` ================
+
+[variant baseline]
+fun TestConditionalSplit::abs_max($t0|a: u64, $t1|b: u64): u64 {
+     var $t2|$t4: bool
+     var $t3|$t5: u64
+     var $t4: u64
+     var $t5: bool
+     var $t6: u64
+     var $t7: u64
+     var $t8: u64
+     var $t9: bool
+     var $t10: bool
+  0: nop
+  1: $t4 := 0
+  2: $t5 := ==($t0, $t4)
+  3: if ($t5) goto 4 else goto 25
+  4: label L1
+  5: $t6 := 0
+  6: $t2 := ==($t1, $t6)
+  7: label L7
+  8: if ($t2) goto 9 else goto 16
+  9: label L3
+ 10: $t7 := 0
+ 11: $t8 := move($t7)
+ 12: goto 29
+ 13: label L6
+ 14: $t8 := move($t3)
+ 15: goto 29
+ 16: label L2
+ 17: $t9 := >=($t0, $t1)
+ 18: if ($t9) goto 19 else goto 22
+ 19: label L5
+ 20: $t3 := $t0
+ 21: goto 13
+ 22: label L4
+ 23: $t3 := $t1
+ 24: goto 13
+ 25: label L0
+ 26: $t10 := false
+ 27: $t2 := $t10
+ 28: goto 7
+ 29: label L8
+ 30: return $t8
+}
+
+
+[variant verification[split_0]]
+fun TestConditionalSplit::abs_max($t0|a: u64, $t1|b: u64): u64 {
+     var $t2|$t4: bool
+     var $t3|$t5: u64
+     var $t4: u64
+     var $t5: bool
+     var $t6: u64
+     var $t7: u64
+     var $t8: u64
+     var $t9: bool
+     var $t10: bool
+  0: assume And(Or(Gt($t0, 0), Gt($t1, 0)), Ge($t0, $t1))
+  1: $t4 := 0
+  2: $t5 := ==($t0, $t4)
+  3: if ($t5) goto 4 else goto 25
+  4: label L1
+  5: $t6 := 0
+  6: $t2 := ==($t1, $t6)
+  7: label L7
+  8: if ($t2) goto 9 else goto 16
+  9: label L3
+ 10: $t7 := 0
+ 11: $t8 := move($t7)
+ 12: goto 29
+ 13: label L6
+ 14: $t8 := move($t3)
+ 15: goto 29
+ 16: label L2
+ 17: $t9 := >=($t0, $t1)
+ 18: if ($t9) goto 19 else goto 22
+ 19: label L5
+ 20: $t3 := $t0
+ 21: goto 13
+ 22: label L4
+ 23: $t3 := $t1
+ 24: goto 13
+ 25: label L0
+ 26: $t10 := false
+ 27: $t2 := $t10
+ 28: goto 7
+ 29: label L8
+     # VC: post-condition does not hold at tests/spec_instrumentation/proofs/conditional_split.move:16:9+20
+ 30: assert Ge($t8, $t0)
+     # VC: post-condition does not hold at tests/spec_instrumentation/proofs/conditional_split.move:17:9+20
+ 31: assert Ge($t8, $t1)
+ 32: return $t8
+}
+
+
+[variant verification[split_1]]
+fun TestConditionalSplit::abs_max($t0|a: u64, $t1|b: u64): u64 {
+     var $t2|$t4: bool
+     var $t3|$t5: u64
+     var $t4: u64
+     var $t5: bool
+     var $t6: u64
+     var $t7: u64
+     var $t8: u64
+     var $t9: bool
+     var $t10: bool
+  0: assume And(Or(Gt($t0, 0), Gt($t1, 0)), Not(Ge($t0, $t1)))
+  1: $t4 := 0
+  2: $t5 := ==($t0, $t4)
+  3: if ($t5) goto 4 else goto 25
+  4: label L1
+  5: $t6 := 0
+  6: $t2 := ==($t1, $t6)
+  7: label L7
+  8: if ($t2) goto 9 else goto 16
+  9: label L3
+ 10: $t7 := 0
+ 11: $t8 := move($t7)
+ 12: goto 29
+ 13: label L6
+ 14: $t8 := move($t3)
+ 15: goto 29
+ 16: label L2
+ 17: $t9 := >=($t0, $t1)
+ 18: if ($t9) goto 19 else goto 22
+ 19: label L5
+ 20: $t3 := $t0
+ 21: goto 13
+ 22: label L4
+ 23: $t3 := $t1
+ 24: goto 13
+ 25: label L0
+ 26: $t10 := false
+ 27: $t2 := $t10
+ 28: goto 7
+ 29: label L8
+     # VC: post-condition does not hold at tests/spec_instrumentation/proofs/conditional_split.move:16:9+20
+ 30: assert Ge($t8, $t0)
+     # VC: post-condition does not hold at tests/spec_instrumentation/proofs/conditional_split.move:17:9+20
+ 31: assert Ge($t8, $t1)
+ 32: return $t8
+}
+
+
+[variant verification[split_2]]
+fun TestConditionalSplit::abs_max($t0|a: u64, $t1|b: u64): u64 {
+     var $t2|$t4: bool
+     var $t3|$t5: u64
+     var $t4: u64
+     var $t5: bool
+     var $t6: u64
+     var $t7: u64
+     var $t8: u64
+     var $t9: bool
+     var $t10: bool
+  0: assume Not(Or(Gt($t0, 0), Gt($t1, 0)))
+  1: $t4 := 0
+  2: $t5 := ==($t0, $t4)
+  3: if ($t5) goto 4 else goto 25
+  4: label L1
+  5: $t6 := 0
+  6: $t2 := ==($t1, $t6)
+  7: label L7
+  8: if ($t2) goto 9 else goto 16
+  9: label L3
+ 10: $t7 := 0
+ 11: $t8 := move($t7)
+ 12: goto 29
+ 13: label L6
+ 14: $t8 := move($t3)
+ 15: goto 29
+ 16: label L2
+ 17: $t9 := >=($t0, $t1)
+ 18: if ($t9) goto 19 else goto 22
+ 19: label L5
+ 20: $t3 := $t0
+ 21: goto 13
+ 22: label L4
+ 23: $t3 := $t1
+ 24: goto 13
+ 25: label L0
+ 26: $t10 := false
+ 27: $t2 := $t10
+ 28: goto 7
+ 29: label L8
+     # VC: post-condition does not hold at tests/spec_instrumentation/proofs/conditional_split.move:16:9+20
+ 30: assert Ge($t8, $t0)
+     # VC: post-condition does not hold at tests/spec_instrumentation/proofs/conditional_split.move:17:9+20
+ 31: assert Ge($t8, $t1)
+ 32: return $t8
+}
+
+
+[variant baseline]
+fun TestConditionalSplit::color_or_default($t0|c: 0x42::TestConditionalSplit::Color, $t1|use_default: bool): u64 {
+     var $t2|$t3: 0x42::TestConditionalSplit::Color [unused]
+     var $t3: u64
+     var $t4: u64
+     var $t5: bool
+     var $t6: num
+     var $t7: u64
+     var $t8: bool
+     var $t9: u64
+     var $t10: bool
+     var $t11: u64
+     var $t12: u64
+  0: nop
+  1: if ($t1) goto 2 else goto 6
+  2: label L1
+  3: $t3 := 0
+  4: $t4 := move($t3)
+  5: goto 34
+  6: label L0
+  7: $t5 := test_variant 0x42::TestConditionalSplit::Color::Red($t0)
+  8: if ($t5) goto 9 else goto 14
+  9: label L3
+ 10: unpack_variant 0x42::TestConditionalSplit::Color::Red($t0) on_abort goto 36 with $t6
+ 11: $t7 := 1
+ 12: $t4 := move($t7)
+ 13: goto 34
+ 14: label L2
+ 15: $t8 := test_variant 0x42::TestConditionalSplit::Color::Green($t0)
+ 16: if ($t8) goto 17 else goto 22
+ 17: label L5
+ 18: unpack_variant 0x42::TestConditionalSplit::Color::Green($t0) on_abort goto 36 with $t6
+ 19: $t9 := 2
+ 20: $t4 := move($t9)
+ 21: goto 34
+ 22: label L4
+ 23: $t10 := test_variant 0x42::TestConditionalSplit::Color::Blue($t0)
+ 24: if ($t10) goto 25 else goto 30
+ 25: label L7
+ 26: unpack_variant 0x42::TestConditionalSplit::Color::Blue($t0) on_abort goto 36 with $t6
+ 27: $t11 := 3
+ 28: $t4 := move($t11)
+ 29: goto 34
+ 30: label L6
+ 31: $t12 := 14566554180833181697
+ 32: $t6 := move($t12)
+ 33: goto 36
+ 34: label L8
+ 35: return $t4
+ 36: label L9
+ 37: abort($t6)
+}
+
+
+[variant verification[split_0]]
+fun TestConditionalSplit::color_or_default($t0|c: 0x42::TestConditionalSplit::Color, $t1|use_default: bool): u64 {
+     var $t2|$t3: 0x42::TestConditionalSplit::Color
+     var $t3: u64
+     var $t4: u64
+     var $t5: bool
+     var $t6: num
+     var $t7: u64
+     var $t8: bool
+     var $t9: u64
+     var $t10: bool
+     var $t11: u64
+     var $t12: u64
+  0: assume And(Not($t1), test_variants TestConditionalSplit::Color::Red($t0))
+  1: if ($t1) goto 2 else goto 6
+  2: label L1
+  3: $t3 := 0
+  4: $t4 := move($t3)
+  5: goto 34
+  6: label L0
+  7: $t5 := test_variant 0x42::TestConditionalSplit::Color::Red($t0)
+  8: if ($t5) goto 9 else goto 14
+  9: label L3
+ 10: unpack_variant 0x42::TestConditionalSplit::Color::Red($t0) on_abort goto 37 with $t6
+ 11: $t7 := 1
+ 12: $t4 := move($t7)
+ 13: goto 34
+ 14: label L2
+ 15: $t8 := test_variant 0x42::TestConditionalSplit::Color::Green($t0)
+ 16: if ($t8) goto 17 else goto 22
+ 17: label L5
+ 18: unpack_variant 0x42::TestConditionalSplit::Color::Green($t0) on_abort goto 37 with $t6
+ 19: $t9 := 2
+ 20: $t4 := move($t9)
+ 21: goto 34
+ 22: label L4
+ 23: $t10 := test_variant 0x42::TestConditionalSplit::Color::Blue($t0)
+ 24: if ($t10) goto 25 else goto 30
+ 25: label L7
+ 26: unpack_variant 0x42::TestConditionalSplit::Color::Blue($t0) on_abort goto 37 with $t6
+ 27: $t11 := 3
+ 28: $t4 := move($t11)
+ 29: goto 34
+ 30: label L6
+ 31: $t12 := 14566554180833181697
+ 32: $t6 := move($t12)
+ 33: goto 37
+ 34: label L8
+     # VC: post-condition does not hold at tests/spec_instrumentation/proofs/conditional_split.move:44:9+20
+ 35: assert Le($t4, 3)
+ 36: return $t4
+ 37: label L9
+ 38: abort($t6)
+}
+
+
+[variant verification[split_1]]
+fun TestConditionalSplit::color_or_default($t0|c: 0x42::TestConditionalSplit::Color, $t1|use_default: bool): u64 {
+     var $t2|$t3: 0x42::TestConditionalSplit::Color
+     var $t3: u64
+     var $t4: u64
+     var $t5: bool
+     var $t6: num
+     var $t7: u64
+     var $t8: bool
+     var $t9: u64
+     var $t10: bool
+     var $t11: u64
+     var $t12: u64
+  0: assume And(Not($t1), test_variants TestConditionalSplit::Color::Green($t0))
+  1: if ($t1) goto 2 else goto 6
+  2: label L1
+  3: $t3 := 0
+  4: $t4 := move($t3)
+  5: goto 34
+  6: label L0
+  7: $t5 := test_variant 0x42::TestConditionalSplit::Color::Red($t0)
+  8: if ($t5) goto 9 else goto 14
+  9: label L3
+ 10: unpack_variant 0x42::TestConditionalSplit::Color::Red($t0) on_abort goto 37 with $t6
+ 11: $t7 := 1
+ 12: $t4 := move($t7)
+ 13: goto 34
+ 14: label L2
+ 15: $t8 := test_variant 0x42::TestConditionalSplit::Color::Green($t0)
+ 16: if ($t8) goto 17 else goto 22
+ 17: label L5
+ 18: unpack_variant 0x42::TestConditionalSplit::Color::Green($t0) on_abort goto 37 with $t6
+ 19: $t9 := 2
+ 20: $t4 := move($t9)
+ 21: goto 34
+ 22: label L4
+ 23: $t10 := test_variant 0x42::TestConditionalSplit::Color::Blue($t0)
+ 24: if ($t10) goto 25 else goto 30
+ 25: label L7
+ 26: unpack_variant 0x42::TestConditionalSplit::Color::Blue($t0) on_abort goto 37 with $t6
+ 27: $t11 := 3
+ 28: $t4 := move($t11)
+ 29: goto 34
+ 30: label L6
+ 31: $t12 := 14566554180833181697
+ 32: $t6 := move($t12)
+ 33: goto 37
+ 34: label L8
+     # VC: post-condition does not hold at tests/spec_instrumentation/proofs/conditional_split.move:44:9+20
+ 35: assert Le($t4, 3)
+ 36: return $t4
+ 37: label L9
+ 38: abort($t6)
+}
+
+
+[variant verification[split_2]]
+fun TestConditionalSplit::color_or_default($t0|c: 0x42::TestConditionalSplit::Color, $t1|use_default: bool): u64 {
+     var $t2|$t3: 0x42::TestConditionalSplit::Color
+     var $t3: u64
+     var $t4: u64
+     var $t5: bool
+     var $t6: num
+     var $t7: u64
+     var $t8: bool
+     var $t9: u64
+     var $t10: bool
+     var $t11: u64
+     var $t12: u64
+  0: assume And(Not($t1), test_variants TestConditionalSplit::Color::Blue($t0))
+  1: if ($t1) goto 2 else goto 6
+  2: label L1
+  3: $t3 := 0
+  4: $t4 := move($t3)
+  5: goto 34
+  6: label L0
+  7: $t5 := test_variant 0x42::TestConditionalSplit::Color::Red($t0)
+  8: if ($t5) goto 9 else goto 14
+  9: label L3
+ 10: unpack_variant 0x42::TestConditionalSplit::Color::Red($t0) on_abort goto 37 with $t6
+ 11: $t7 := 1
+ 12: $t4 := move($t7)
+ 13: goto 34
+ 14: label L2
+ 15: $t8 := test_variant 0x42::TestConditionalSplit::Color::Green($t0)
+ 16: if ($t8) goto 17 else goto 22
+ 17: label L5
+ 18: unpack_variant 0x42::TestConditionalSplit::Color::Green($t0) on_abort goto 37 with $t6
+ 19: $t9 := 2
+ 20: $t4 := move($t9)
+ 21: goto 34
+ 22: label L4
+ 23: $t10 := test_variant 0x42::TestConditionalSplit::Color::Blue($t0)
+ 24: if ($t10) goto 25 else goto 30
+ 25: label L7
+ 26: unpack_variant 0x42::TestConditionalSplit::Color::Blue($t0) on_abort goto 37 with $t6
+ 27: $t11 := 3
+ 28: $t4 := move($t11)
+ 29: goto 34
+ 30: label L6
+ 31: $t12 := 14566554180833181697
+ 32: $t6 := move($t12)
+ 33: goto 37
+ 34: label L8
+     # VC: post-condition does not hold at tests/spec_instrumentation/proofs/conditional_split.move:44:9+20
+ 35: assert Le($t4, 3)
+ 36: return $t4
+ 37: label L9
+ 38: abort($t6)
+}
+
+
+[variant verification[split_3]]
+fun TestConditionalSplit::color_or_default($t0|c: 0x42::TestConditionalSplit::Color, $t1|use_default: bool): u64 {
+     var $t2|$t3: 0x42::TestConditionalSplit::Color
+     var $t3: u64
+     var $t4: u64
+     var $t5: bool
+     var $t6: num
+     var $t7: u64
+     var $t8: bool
+     var $t9: u64
+     var $t10: bool
+     var $t11: u64
+     var $t12: u64
+  0: assume Not(Not($t1))
+  1: if ($t1) goto 2 else goto 6
+  2: label L1
+  3: $t3 := 0
+  4: $t4 := move($t3)
+  5: goto 34
+  6: label L0
+  7: $t5 := test_variant 0x42::TestConditionalSplit::Color::Red($t0)
+  8: if ($t5) goto 9 else goto 14
+  9: label L3
+ 10: unpack_variant 0x42::TestConditionalSplit::Color::Red($t0) on_abort goto 37 with $t6
+ 11: $t7 := 1
+ 12: $t4 := move($t7)
+ 13: goto 34
+ 14: label L2
+ 15: $t8 := test_variant 0x42::TestConditionalSplit::Color::Green($t0)
+ 16: if ($t8) goto 17 else goto 22
+ 17: label L5
+ 18: unpack_variant 0x42::TestConditionalSplit::Color::Green($t0) on_abort goto 37 with $t6
+ 19: $t9 := 2
+ 20: $t4 := move($t9)
+ 21: goto 34
+ 22: label L4
+ 23: $t10 := test_variant 0x42::TestConditionalSplit::Color::Blue($t0)
+ 24: if ($t10) goto 25 else goto 30
+ 25: label L7
+ 26: unpack_variant 0x42::TestConditionalSplit::Color::Blue($t0) on_abort goto 37 with $t6
+ 27: $t11 := 3
+ 28: $t4 := move($t11)
+ 29: goto 34
+ 30: label L6
+ 31: $t12 := 14566554180833181697
+ 32: $t6 := move($t12)
+ 33: goto 37
+ 34: label L8
+     # VC: post-condition does not hold at tests/spec_instrumentation/proofs/conditional_split.move:44:9+20
+ 35: assert Le($t4, 3)
+ 36: return $t4
+ 37: label L9
+ 38: abort($t6)
+}
+
+
+
+==== spec-instrumenter input specs ====
+
+fun TestConditionalSplit::abs_max[baseline]
+spec {
+  ensures Ge(result0(), $t0);
+  ensures Ge(result0(), $t1);
+}
+
+fun TestConditionalSplit::abs_max[verification[split_0]]
+spec {
+  ensures Ge(result0(), $t0);
+  ensures Ge(result0(), $t1);
+}
+
+fun TestConditionalSplit::abs_max[verification[split_1]]
+spec {
+  ensures Ge(result0(), $t0);
+  ensures Ge(result0(), $t1);
+}
+
+fun TestConditionalSplit::abs_max[verification[split_2]]
+spec {
+  ensures Ge(result0(), $t0);
+  ensures Ge(result0(), $t1);
+}
+
+fun TestConditionalSplit::color_or_default[baseline]
+spec {
+  ensures Le(result0(), 3);
+}
+
+fun TestConditionalSplit::color_or_default[verification[split_0]]
+spec {
+  ensures Le(result0(), 3);
+}
+
+fun TestConditionalSplit::color_or_default[verification[split_1]]
+spec {
+  ensures Le(result0(), 3);
+}
+
+fun TestConditionalSplit::color_or_default[verification[split_2]]
+spec {
+  ensures Le(result0(), 3);
+}
+
+fun TestConditionalSplit::color_or_default[verification[split_3]]
+spec {
+  ensures Le(result0(), 3);
+}

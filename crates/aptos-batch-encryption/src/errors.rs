@@ -69,4 +69,8 @@ pub enum DigestKeyInitError {
     BatchSizeMustBePowerOfTwo,
     #[error("Failed to initialize FK domain")]
     FKDomainInitFailure,
+    #[error("Number of rounds must be nonzero")]
+    NumRoundsMustBeNonzero,
+    #[error("Randomized powers of tau has a malformed shape.")]
+    RandomizedTauPowersMalformedShape,
 }

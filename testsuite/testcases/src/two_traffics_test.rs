@@ -7,7 +7,8 @@ use crate::{
 };
 use aptos_forge::{
     success_criteria::{SuccessCriteria, SuccessCriteriaChecker},
-    EmitJobRequest, NetworkContextSynchronizer, NetworkTest, Result, Swarm, Test, TestReport,
+    EmitJobRequest, NetworkContext, NetworkContextSynchronizer, NetworkTest, Result, Swarm, Test,
+    TestReport,
 };
 use async_trait::async_trait;
 use log::info;
@@ -26,6 +27,10 @@ impl Test for TwoTrafficsTest {
 
 #[async_trait]
 impl NetworkLoadTest for TwoTrafficsTest {
+    async fn setup<'a>(&self, _ctx: &mut NetworkContext<'a>) -> Result<LoadDestination> {
+        Ok(LoadDestination::PfnsOtherwiseFullnodesOtherwiseValidators)
+    }
+
     async fn test(
         &self,
         swarm: Arc<tokio::sync::RwLock<Box<dyn Swarm>>>,
@@ -36,13 +41,14 @@ impl NetworkLoadTest for TwoTrafficsTest {
             "Running TwoTrafficsTest test for duration {}s",
             duration.as_secs_f32()
         );
-        let nodes_to_send_load_to = LoadDestination::FullnodesOtherwiseValidators
-            .get_destination_nodes(swarm.clone())
+
+        let clients_to_send_load_to = LoadDestination::PfnsOtherwiseFullnodesOtherwiseValidators
+            .get_destination_clients(swarm.clone())
             .await;
 
         let stats_by_phase = create_buffered_load(
             swarm,
-            &nodes_to_send_load_to,
+            clients_to_send_load_to,
             self.inner_traffic.clone(),
             duration,
             WARMUP_DURATION_FRACTION,

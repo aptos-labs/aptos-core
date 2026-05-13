@@ -1,0 +1,15 @@
+Move prover returns: exiting with verification errors
+error: lemma requirement not satisfied
+   ┌─ tests/sources/functional/proof/monotonicity.move:88:9
+   │
+88 │         apply add_mono(x, y, offset);  // error: x <= y not guaranteed
+   │         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+   │
+   =     at tests/sources/functional/proof/monotonicity.move:79: add_unchecked
+   =     at tests/sources/functional/proof/monotonicity.move:84: add_unchecked (spec)
+   =     at tests/sources/functional/proof/monotonicity.move:85: add_unchecked (spec)
+   =     at tests/sources/functional/proof/monotonicity.move:79: add_unchecked
+   =         x = <redacted>
+   =         y = <redacted>
+   =         offset = <redacted>
+   =     at tests/sources/functional/proof/monotonicity.move:88: add_unchecked (spec)

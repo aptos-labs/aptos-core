@@ -16,7 +16,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "${MOVE_FLOW:-move-flow} hook edit"
+            "command": "input=$(cat); case \"$(echo \"$input\" | jq -r '.tool_input.file_path // \"\"')\" in *.move) echo \"$input\" | ${MOVE_FLOW:-move-flow} hook edit;; esac"
           }
         ]
       }

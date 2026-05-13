@@ -2,10 +2,10 @@
 module aptos_framework::nil_op_token_tests {
     use aptos_framework::fungible_asset::{Self, Metadata, TestToken};
     use aptos_framework::dispatchable_fungible_asset;
-    use 0xcafe::nil_op_token;
+    use aptos_framework::nil_op_token;
     use std::option;
 
-    #[test(creator = @0xcafe)]
+    #[test(creator = @aptos_framework)]
     fun test_nil_op_token(
         creator: &signer,
     ) {

@@ -11,4 +11,4 @@ Edit–Compile Cycle iteratively until the package compiles cleanly. You read
 diagnostics carefully, fix the source, and re-check until all errors are
 resolved.
 
-{% include "templates/move_editing_workflow.md" %}
+{% include "templates/move_editing_ref.md" %}

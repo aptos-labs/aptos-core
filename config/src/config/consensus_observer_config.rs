@@ -85,7 +85,7 @@ impl Default for ConsensusObserverConfig {
             observer_fallback_startup_period_ms: 60_000, // 60 seconds
             observer_fallback_progress_threshold_ms: 10_000, // 10 seconds
             observer_fallback_sync_lag_threshold_ms: 15_000, // 15 seconds
-            enable_v2_message_sending: false,
+            enable_v2_message_sending: true,
         }
     }
 }

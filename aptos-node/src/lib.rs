@@ -26,6 +26,7 @@ use aptos_build_info::build_information;
 use aptos_config::config::{merge_node_config, NodeConfig, PersistableConfig};
 use aptos_framework::ReleaseBundle;
 use aptos_genesis::builder::GenesisConfiguration;
+use aptos_inspection_service::server::InspectionServiceComponents;
 use aptos_logger::{prelude::*, telemetry_log_writer::TelemetryLog, Level, LoggerFilterUpdater};
 use aptos_state_sync_driver::driver_factory::StateSyncRuntime;
 use aptos_types::{
@@ -701,6 +702,39 @@ pub fn setup_environment_and_start_node(
     // Starts the admin service
     let mut admin_service = services::start_admin_service(&node_config);
 
+    // Start the inspection service (port 9101) early — before RocksDB — so that
+    // Prometheus metrics are scrapeable from the very first moments of startup.
+    // Components that require a fully-initialised node (peer information) will
+    // return 503 until `inspection_components.set(...)` is called below.
+    let inspection_components = Arc::new(InspectionServiceComponents::new());
+    let inspection_service_runtime =
+        services::start_node_inspection_service(&node_config, inspection_components.clone());
+
+    // Initialize transaction tracing from config
+    {
+        let tracing_cfg = &node_config.transaction_tracing;
+        if tracing_cfg.enabled && !tracing_cfg.filter.sender_allowlist.is_empty() {
+            let filter = aptos_transaction_tracing::filter::TransactionFilter::new(
+                true,
+                tracing_cfg
+                    .filter
+                    .sender_allowlist
+                    .iter()
+                    .copied()
+                    .collect(),
+                tracing_cfg.batch_sample_rate,
+                tracing_cfg.txn_sample_rate,
+            );
+            aptos_transaction_tracing::store::TransactionTraceStore::global().update_filter(filter);
+            aptos_logger::info!(
+                "Transaction tracing enabled for {} sender(s), batch_sample_rate={}, txn_sample_rate={}",
+                tracing_cfg.filter.sender_allowlist.len(),
+                tracing_cfg.batch_sample_rate,
+                tracing_cfg.txn_sample_rate,
+            );
+        }
+    }
+
     // Set up the storage database and any RocksDB checkpoints
     let (db_rw, backup_service, genesis_waypoint, indexer_db_opt, update_receiver) =
         storage::initialize_database_and_checkpoints(&mut node_config)?;
@@ -715,6 +749,17 @@ pub fn setup_environment_and_start_node(
 
     // Set the chain_id in global AptosNodeIdentity
     aptos_node_identity::set_chain_id(chain_id)?;
+
+    // Initialize the DigestKey and PublicParameters for chunky DKG
+    aptos_dkg_runtime::initialize_digest_key_with_counters(
+        node_config.consensus.digest_key_blob_path.as_ref(),
+        chain_id,
+        node_config.base.role.is_validator(),
+    );
+    aptos_dkg_runtime::initialize_public_parameters_with_counters(
+        node_config.consensus.public_parameters_blob_path.as_ref(),
+        chain_id,
+    );
 
     // Start the telemetry service (as early as possible and before any blocking calls)
     let telemetry_runtime = services::start_telemetry_service(
@@ -769,12 +814,9 @@ pub fn setup_environment_and_start_node(
             db_rw.clone(),
         )?;
 
-    // Start the node inspection service
-    let inspection_service_runtime = services::start_node_inspection_service(
-        &node_config,
-        aptos_data_client,
-        peers_and_metadata.clone(),
-    );
+    // Inject the now-available components into the already-running inspection service.
+    // This unblocks /peer_information (and any other endpoints that need these values).
+    inspection_components.set(aptos_data_client, peers_and_metadata.clone());
 
     // Bootstrap the API and transaction streaming services
     let (

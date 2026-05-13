@@ -5,6 +5,7 @@ use aptos_cached_packages::aptos_stdlib;
 use aptos_framework::{natives::code::PackageMetadata, BuildOptions, BuiltPackage};
 use aptos_gas_profiling::TransactionGasLog;
 use aptos_gas_schedule::{AptosGasParameters, FromOnChainGasSchedule, ToOnChainGasSchedule};
+pub use aptos_language_e2e_tests::SerializedReturnValues;
 use aptos_language_e2e_tests::{
     account::{Account, TransactionBuilder},
     executor::FakeExecutorImpl,
@@ -55,8 +56,19 @@ pub const SUCCESS: u64 = 0;
 
 const DEFAULT_GAS_UNIT_PRICE: u64 = 100;
 
-static CACHED_BUILT_PACKAGES: Lazy<Mutex<HashMap<PathBuf, Arc<anyhow::Result<BuiltPackage>>>>> =
-    Lazy::new(|| Mutex::new(HashMap::new()));
+static CACHED_BUILT_PACKAGES: Lazy<
+    Mutex<HashMap<(PathBuf, BuildOptions), Arc<anyhow::Result<BuiltPackage>>>>,
+> = Lazy::new(|| Mutex::new(HashMap::new()));
+
+fn build_package_cached(path: &Path, options: BuildOptions) -> Arc<anyhow::Result<BuiltPackage>> {
+    let key = (path.to_owned(), options.clone());
+    let mut cache = CACHED_BUILT_PACKAGES.lock().unwrap();
+    Arc::clone(
+        cache
+            .entry(key)
+            .or_insert_with(|| Arc::new(BuiltPackage::build(path.to_owned(), options))),
+    )
+}
 
 /// A simple test harness for defining Move e2e tests.
 ///
@@ -433,6 +445,37 @@ impl<O: OutputLogger> MoveHarnessImpl<O> {
         txn: SignedTransaction,
         auxiliary_info: &AuxiliaryInfo,
     ) -> (TransactionGasLog, u64, Option<FeeStatement>) {
+        let (_, gas_log, gas_used, fee_statement) =
+            self.evaluate_gas_with_profiler_and_status_signed(txn, auxiliary_info);
+        (gas_log, gas_used, fee_statement)
+    }
+
+    /// Runs a transaction with the gas profiler and returns the transaction status.
+    pub fn evaluate_gas_with_profiler_and_status(
+        &mut self,
+        account: &Account,
+        payload: TransactionPayload,
+    ) -> (
+        TransactionStatus,
+        TransactionGasLog,
+        u64,
+        Option<FeeStatement>,
+    ) {
+        let txn = self.create_transaction_payload(account, payload);
+        self.evaluate_gas_with_profiler_and_status_signed(txn, &AuxiliaryInfo::default())
+    }
+
+    /// Runs a transaction with the gas profiler and returns the transaction status.
+    pub fn evaluate_gas_with_profiler_and_status_signed(
+        &mut self,
+        txn: SignedTransaction,
+        auxiliary_info: &AuxiliaryInfo,
+    ) -> (
+        TransactionStatus,
+        TransactionGasLog,
+        u64,
+        Option<FeeStatement>,
+    ) {
         let (output, gas_log) = self
             .executor
             .execute_transaction_with_gas_profiler(txn, auxiliary_info)
@@ -441,6 +484,7 @@ impl<O: OutputLogger> MoveHarnessImpl<O> {
             self.executor.apply_write_set(output.write_set());
         }
         (
+            output.status().clone(),
             gas_log,
             output.gas_used(),
             output.try_extract_fee_statement().unwrap(),
@@ -622,9 +666,12 @@ impl<O: OutputLogger> MoveHarnessImpl<O> {
         options: Option<BuildOptions>,
         patch_metadata: impl FnMut(&mut PackageMetadata),
     ) -> SignedTransaction {
-        let package = BuiltPackage::build(path.to_owned(), options.unwrap_or_default())
+        let package_arc = build_package_cached(path, options.unwrap_or_default());
+        let package = package_arc
+            .as_ref()
+            .as_ref()
             .expect("building package must succeed");
-        self.create_publish_built_package(account, &package, patch_metadata)
+        self.create_publish_built_package(account, package, patch_metadata)
     }
 
     pub fn create_object_code_upgrade_package(
@@ -635,14 +682,12 @@ impl<O: OutputLogger> MoveHarnessImpl<O> {
         patch_metadata: impl FnMut(&mut PackageMetadata),
         code_object: AccountAddress,
     ) -> SignedTransaction {
-        let package =
-            BuiltPackage::build(path.to_owned(), options).expect("building package must succeed");
-        self.create_object_code_upgrade_built_package(
-            account,
-            &package,
-            patch_metadata,
-            code_object,
-        )
+        let package_arc = build_package_cached(path, options);
+        let package = package_arc
+            .as_ref()
+            .as_ref()
+            .expect("building package must succeed");
+        self.create_object_code_upgrade_built_package(account, package, patch_metadata, code_object)
     }
 
     pub fn create_object_code_deployment_package(
@@ -652,42 +697,12 @@ impl<O: OutputLogger> MoveHarnessImpl<O> {
         options: BuildOptions,
         patch_metadata: impl FnMut(&mut PackageMetadata),
     ) -> SignedTransaction {
-        let package =
-            BuiltPackage::build(path.to_owned(), options).expect("building package must succeed");
-        self.create_object_code_deployment_built_package(account, &package, patch_metadata)
-    }
-
-    pub fn create_publish_package_cache_building(
-        &mut self,
-        account: &Account,
-        path: &Path,
-        patch_metadata: impl FnMut(&mut PackageMetadata),
-    ) -> SignedTransaction {
-        let package_arc = {
-            let mut cache = CACHED_BUILT_PACKAGES.lock().unwrap();
-
-            Arc::clone(cache.entry(path.to_owned()).or_insert_with(|| {
-                Arc::new(BuiltPackage::build(
-                    path.to_owned(),
-                    BuildOptions::default(),
-                ))
-            }))
-        };
-        let package_ref = package_arc
+        let package_arc = build_package_cached(path, options);
+        let package = package_arc
             .as_ref()
             .as_ref()
             .expect("building package must succeed");
-        self.create_publish_built_package(account, package_ref, patch_metadata)
-    }
-
-    /// Runs transaction which publishes the Move Package.
-    pub fn publish_package_cache_building(
-        &mut self,
-        account: &Account,
-        path: &Path,
-    ) -> TransactionStatus {
-        let txn = self.create_publish_package_cache_building(account, path, |_| {});
-        self.run(txn)
+        self.create_object_code_deployment_built_package(account, package, patch_metadata)
     }
 
     /// Runs transaction which publishes the Move Package.
@@ -1043,6 +1058,35 @@ impl<O: OutputLogger> MoveHarnessImpl<O> {
     ) -> ViewFunctionOutput {
         self.executor
             .execute_view_function(fun, type_args, arguments)
+    }
+
+    /// Execute a Move function bypassing visibility checks and return the serialized return values.
+    /// This allows calling private functions from tests.
+    ///
+    /// # Arguments
+    /// * `module_address` - The address where the module is deployed
+    /// * `module_name` - The module name (e.g., "confidential_asset")
+    /// * `function_name` - Function name to call
+    /// * `type_params` - Type parameters for the function
+    /// * `args` - BCS-serialized arguments
+    ///
+    /// # Returns
+    /// The serialized return values from the function, or an error if execution failed.
+    pub fn exec_function_bypass_visibility(
+        &mut self,
+        module_address: AccountAddress,
+        module_name: &str,
+        function_name: &str,
+        type_params: Vec<TypeTag>,
+        args: Vec<Vec<u8>>,
+    ) -> Result<SerializedReturnValues, aptos_types::vm_status::VMStatus> {
+        self.executor.exec_with_return_values(
+            module_address,
+            module_name,
+            function_name,
+            type_params,
+            args,
+        )
     }
 
     /// Splits transactions into blocks based on passed `block_split``, and

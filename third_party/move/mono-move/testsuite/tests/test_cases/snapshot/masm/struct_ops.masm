@@ -1,0 +1,16 @@
+module 0x66::test
+
+struct S has drop+copy
+  _1: u64
+  _2: u8
+
+fun pack_and_unpack(): u64
+    local s: S
+    ld_u64 3
+    ld_u8 2
+    pack S
+    st_loc s
+    move_loc s
+    unpack S
+    pop
+    ret

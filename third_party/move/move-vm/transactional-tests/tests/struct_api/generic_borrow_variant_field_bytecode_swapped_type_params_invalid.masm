@@ -1,0 +1,15 @@
+//# publish --print-bytecode
+module 0x66::test_generic_borrow_variant_field_bytecode_swapped_type_params
+
+enum Either<A, B> has drop
+  Left
+    value: A
+  Right
+    value: B
+
+// Invalid: borrow$Either$0$0 uses ImmBorrowVariantFieldGeneric with swapped instantiation
+// Either<T1, T0>. The generic instantiation signature must be canonical [T0, T1].
+#[borrow(0)] public fun borrow$Either$0$0<A, B>(l0: &Either<A, B>): &A
+    move_loc l0
+    borrow_variant_field Either<B, A>, Left::value
+    ret

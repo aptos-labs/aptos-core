@@ -18,6 +18,7 @@ use crate::{
         db_metadata::{DbMetadataKey, DbMetadataSchema, DbMetadataValue},
         transaction_accumulator_root_hash::TransactionAccumulatorRootHashSchema,
     },
+    state_store::StateStore,
 };
 use aptos_crypto::HashValue;
 use aptos_experimental_runtimes::thread_manager::THREAD_MANAGER;
@@ -67,6 +68,7 @@ impl DbWriter for AptosDB {
 
             self.state_store.buffered_state().lock().update(
                 chunk.result_ledger_state_with_summary(),
+                chunk.hot_state_updates.clone(),
                 chunk.estimated_total_state_updates(),
                 sync_commit || chunk.is_reconfig,
             )?;
@@ -327,6 +329,16 @@ impl AptosDB {
             &mut sharded_state_kv_batches,
         )?;
 
+        let hot_state_kv_db = self
+            .hot_state_kv_db
+            .as_ref()
+            .expect("hot_state_kv_db must exist on the write path");
+        let mut sharded_hot_state_kv_batches = hot_state_kv_db.new_sharded_native_batches();
+        StateStore::put_hot_state_updates(
+            chunk.hot_state_updates,
+            &mut sharded_hot_state_kv_batches,
+        )?;
+
         // Write block index.
         for (i, txn_out) in chunk.transaction_outputs.iter().enumerate() {
             for event in txn_out.events() {
@@ -362,6 +374,15 @@ impl AptosDB {
             s.spawn(|_| {
                 self.state_kv_db
                     .commit(chunk.expect_last_version(), None, sharded_state_kv_batches)
+                    .unwrap();
+            });
+            s.spawn(|_| {
+                hot_state_kv_db
+                    .commit(
+                        chunk.expect_last_version(),
+                        None,
+                        sharded_hot_state_kv_batches,
+                    )
                     .unwrap();
             });
         });
@@ -616,6 +637,9 @@ impl AptosDB {
                 .state_pruner
                 .state_kv_pruner
                 .maybe_set_pruner_target_db_version(version);
+            if let Some(pruner) = &self.state_store.state_pruner.hot_state_kv_pruner {
+                pruner.maybe_set_pruner_target_db_version(version);
+            }
         }
 
         // Once everything is successfully persisted, update the latest in-memory ledger info.

@@ -11,7 +11,7 @@ module 0xc0ffee::m {
     }
     public fun test10(): vector<u64> {
         let _v0 = vector[1, 2, 3];
-        let _v1 = |arg0| lambda__1__test10(4, arg0);
+        let _v1 = |x| lambda__1__test10(4, x);
         let _v2 = &mut _v0;
         _v1(_v2);
         _v0
@@ -83,11 +83,11 @@ module 0xc0ffee::m {
         apply<u64>(|| lambda__1__test5())
     }
     public fun test6(): vector<u64> {
-        let _v0 = |arg0| vector::singleton<u64>(arg0);
+        let _v0 = |x| vector::singleton<u64>(x);
         _v0(42)
     }
     public fun test7() {
-        let _v0 = |arg0| lambda__1__test7(arg0);
+        let _v0 = |x| lambda__1__test7(x);
         let _v1 = vector::empty<Resource>();
         _v0(_v1);
     }
@@ -95,7 +95,7 @@ module 0xc0ffee::m {
         vector::destroy_empty<Resource>(p0);
     }
     public fun test8(): u64 {
-        let _v0 = |arg0| lambda__1__test8(arg0);
+        let _v0 = |x| lambda__1__test8(x);
         let _v1 = vector[1, 2, 3];
         let _v2 = &_v1;
         _v0(_v2)
@@ -105,7 +105,7 @@ module 0xc0ffee::m {
     }
     public fun test9a(): vector<u64> {
         let _v0 = vector[1, 2, 3];
-        let _v1 = |arg0,arg1,arg2| lambda__1__test9a(arg0, arg1, arg2);
+        let _v1 = |x,y,z| lambda__1__test9a(x, y, z);
         let _v2 = &mut _v0;
         _v1(_v2, 0, 2);
         _v0
@@ -115,7 +115,7 @@ module 0xc0ffee::m {
     }
     public fun test9b(): vector<u64> {
         let _v0 = vector[1, 2, 3];
-        let _v1 = |arg0,arg1,arg2| lambda__1__test9b(arg0, arg1, arg2);
+        let _v1 = |x,y,z| lambda__1__test9b(x, y, z);
         let _v2 = &mut _v0;
         _v1(_v2, 0, 2);
         _v0

@@ -40,8 +40,8 @@ pub const PING_TIMEOUT_MS: u64 = 20_000;
 pub const PING_FAILURES_TOLERATED: u64 = 3;
 pub const CONNECTIVITY_CHECK_INTERVAL_MS: u64 = 5000;
 pub const MAX_CONNECTION_DELAY_MS: u64 = 60_000; /* 1 minute */
-pub const MAX_FULLNODE_OUTBOUND_CONNECTIONS: usize = 6;
-pub const MAX_INBOUND_CONNECTIONS: usize = 100;
+pub const MAX_FULLNODE_OUTBOUND_CONNECTIONS: usize = 5;
+pub const MAX_INBOUND_CONNECTIONS: usize = 50;
 pub const MAX_MESSAGE_METADATA_SIZE: usize = 128 * 1024; /* 128 KiB: a buffer for metadata that might be added to messages by networking */
 pub const MESSAGE_PADDING_SIZE: usize = 2 * 1024 * 1024; /* 2 MiB: a safety buffer to allow messages to get larger during serialization */
 pub const MAX_APPLICATION_MESSAGE_SIZE: usize =
@@ -72,6 +72,16 @@ impl AccessControlPolicy {
             AccessControlPolicy::BlockList(blocked_peers) => !blocked_peers.contains(peer_id),
         }
     }
+}
+
+/// Rate limiting configuration for inbound network traffic
+#[derive(Clone, Debug, Default, Deserialize, PartialEq, Serialize)]
+#[serde(default, deny_unknown_fields)]
+pub struct RateLimitConfig {
+    /// Max inbound bytes/sec per peer. None = unlimited.
+    pub inbound_bytes_per_second: Option<u64>,
+    /// Max inbound messages/sec per peer. None = unlimited.
+    pub inbound_messages_per_second: Option<u64>,
 }
 
 #[derive(Clone, Debug, Deserialize, PartialEq, Serialize)]
@@ -148,6 +158,9 @@ pub struct NetworkConfig {
     pub access_control_policy: Option<AccessControlPolicy>,
     /// Priority inbound peers that can bypass connection limits
     pub priority_inbound_peers: Vec<PeerId>,
+    /// Rate limiting configuration for inbound network traffic (per peer).
+    /// If None, inbound rate limiting is disabled.
+    pub inbound_rate_limit_config: Option<RateLimitConfig>,
 }
 
 impl Default for NetworkConfig {
@@ -194,6 +207,7 @@ impl NetworkConfig {
             enable_latency_aware_dialing: true,
             access_control_policy: None,
             priority_inbound_peers: Vec::new(),
+            inbound_rate_limit_config: None,
         };
 
         // Configure the number of parallel deserialization tasks
@@ -635,5 +649,104 @@ mod tests {
 
         // Peer in the block list should be blocked
         assert!(!access_control_policy.is_peer_allowed(&peer_3));
+    }
+
+    #[test]
+    fn test_discovery_methods_singular_field() {
+        // When only `discovery_method` is set (backwards compat), it should be returned
+        let config = NetworkConfig {
+            discovery_method: DiscoveryMethod::Onchain,
+            discovery_methods: Vec::new(),
+            ..NetworkConfig::default()
+        };
+        let methods = config.discovery_methods();
+        assert_eq!(methods.len(), 1);
+        assert_eq!(methods[0], &DiscoveryMethod::Onchain);
+    }
+
+    #[test]
+    fn test_discovery_methods_plural_field() {
+        // When `discovery_methods` is set (modern path), they are returned with None filtered out
+        let config = NetworkConfig {
+            discovery_method: DiscoveryMethod::None,
+            discovery_methods: vec![
+                DiscoveryMethod::Onchain,
+                DiscoveryMethod::None,
+                DiscoveryMethod::File(FileDiscovery {
+                    path: PathBuf::from("/tmp/test"),
+                    interval_secs: 1,
+                }),
+            ],
+            ..NetworkConfig::default()
+        };
+        let methods = config.discovery_methods();
+        assert_eq!(methods.len(), 2);
+        assert_eq!(methods[0], &DiscoveryMethod::Onchain);
+        assert!(matches!(methods[1], &DiscoveryMethod::File(_)));
+    }
+
+    #[test]
+    #[should_panic(expected = "Can't specify discovery_method and discovery_methods")]
+    fn test_discovery_methods_both_fields_panics() {
+        // Setting both singular and plural should panic
+        let config = NetworkConfig {
+            discovery_method: DiscoveryMethod::Onchain,
+            discovery_methods: vec![DiscoveryMethod::Onchain],
+            ..NetworkConfig::default()
+        };
+        let _ = config.discovery_methods();
+    }
+
+    #[test]
+    fn test_discovery_methods_all_none_returns_empty() {
+        // When both fields are effectively None, returns empty
+        let config = NetworkConfig {
+            discovery_method: DiscoveryMethod::None,
+            discovery_methods: vec![DiscoveryMethod::None, DiscoveryMethod::None],
+            ..NetworkConfig::default()
+        };
+        let methods = config.discovery_methods();
+        assert!(methods.is_empty());
+    }
+
+    #[test]
+    fn test_max_inbound_connections_default() {
+        let config = NetworkConfig::default();
+        assert_eq!(config.max_inbound_connections, MAX_INBOUND_CONNECTIONS);
+    }
+
+    #[test]
+    fn test_max_inbound_connections_zero() {
+        // A config with max_inbound_connections=0 should be constructible
+        // (used by smoke test_connection_limiting to reject all unknown inbound)
+        let config = NetworkConfig {
+            max_inbound_connections: 0,
+            ..NetworkConfig::default()
+        };
+        assert_eq!(config.max_inbound_connections, 0);
+    }
+
+    #[test]
+    fn test_rest_discovery_serialization() {
+        // Verify RestDiscovery round-trips through YAML
+        let rest_discovery = RestDiscovery {
+            url: "http://localhost:8080".parse().unwrap(),
+            interval_secs: 5,
+        };
+        let yaml = serde_yaml::to_string(&rest_discovery).unwrap();
+        let deserialized: RestDiscovery = serde_yaml::from_str(&yaml).unwrap();
+        assert_eq!(rest_discovery, deserialized);
+    }
+
+    #[test]
+    fn test_file_discovery_serialization() {
+        // Verify FileDiscovery round-trips through YAML
+        let file_discovery = FileDiscovery {
+            path: PathBuf::from("/tmp/peers.yaml"),
+            interval_secs: 1,
+        };
+        let yaml = serde_yaml::to_string(&file_discovery).unwrap();
+        let deserialized: FileDiscovery = serde_yaml::from_str(&yaml).unwrap();
+        assert_eq!(file_discovery, deserialized);
     }
 }

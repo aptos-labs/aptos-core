@@ -36,16 +36,6 @@ MAX_TIME_BETWEEN_SYNC_INCREASES_SECS = 1800 # The number of seconds after which 
 NUMBER_OF_HISTORICAL_TRANSACTIONS_TO_SYNC = 2000000 # The number of historical transactions to sync (when syncing from genesis)
 SYNCING_DELTA_VERSIONS = 20000 # The number of versions to sync beyond the highest known at the job start
 
-# Testnet seed peer constants
-TESTNET_SEED_PEERS = {
-  "9D5AF3FFDFF04F7CD51AA9F902253067A40594C7831BF1265503220D585B4D20": {
-    "addresses": [
-      "/dns4/pfn0.euwe4-seed.fullnode.testnet.aptoslabs.com/tcp/6182/noise-ik/9D5AF3FFDFF04F7CD51AA9F902253067A40594C7831BF1265503220D585B4D20/handshake/0"
-    ],
-    "role": "Upstream",
-  },
-}
-
 # Mainnet seed peer constants
 MAINNET_SEED_PEERS = {
   "A118B9BBBB8670D026C59C494317F7B6AA449A8E1B6AE0F9A6D434478AD1CC35": {
@@ -329,12 +319,9 @@ def setup_fullnode_config(network, bootstrapping_mode, continuous_syncing_mode, 
   # Enable storage sharding (AIP-97)
   fullnode_config['storage']['rocksdb_configs'] = {"enable_storage_sharding": True}
 
-  # If we're syncing historical data, we need to add seed peers
-  if syncing_historical_data:
-    if network == MAINNET_STRING:
-      add_seed_peers(fullnode_config, MAINNET_SEED_PEERS)
-    elif network == TESTNET_STRING:
-      add_seed_peers(fullnode_config, TESTNET_SEED_PEERS)
+  # If we're syncing historical data on mainnet, we need to add seed peers
+  if syncing_historical_data and network == MAINNET_STRING:
+    add_seed_peers(fullnode_config, MAINNET_SEED_PEERS)
 
   # Write the config file back to disk
   with open(FULLNODE_CONFIG_NAME, "w") as file:

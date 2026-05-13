@@ -169,7 +169,7 @@ impl<const N: usize, P: FpConfig<N>, E: Pairing<ScalarField = Fp<P, N>>> traits:
         pp: &Self::PublicParameters,
         rng: &mut R,
     ) -> Self {
-        let num_chunks_per_share = num_chunks_per_scalar::<E::ScalarField>(pp.ell) as usize;
+        let num_chunks_per_share = num_chunks_per_scalar::<E::ScalarField>(pp.ell);
 
         Transcript {
             dealer: sc.get_player(0),
@@ -305,7 +305,7 @@ impl<const N: usize, P: FpConfig<N>, E: Pairing<ScalarField = Fp<P, N>>>
             // Verify the range proof
             if let Err(err) = self.sharing_proof.range_proof.verify(
                 &pp.pk_range_proof.vk,
-                sc.get_total_weight() * num_chunks_per_scalar::<E::ScalarField>(pp.ell) as usize,
+                sc.get_total_weight() * num_chunks_per_scalar::<E::ScalarField>(pp.ell),
                 pp.ell,
                 &self.sharing_proof.range_proof_commitment,
                 rng,

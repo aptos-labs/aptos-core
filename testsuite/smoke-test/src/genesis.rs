@@ -50,7 +50,7 @@ use std::{
 /// 7. Verify that the VFNs are able to sync with the rest of the network.
 async fn test_fullnode_genesis_transaction_flow() {
     println!("0. Building the Aptos CLI and debugger!");
-    let aptos_debugger = workspace_builder::get_bin("aptos-debugger");
+    workspace_builder::get_bin("aptos-debugger");
     let aptos_cli = workspace_builder::get_bin("aptos");
 
     println!("1. Starting a 4 node validator network with 2 VFNs!");
@@ -96,7 +96,7 @@ async fn test_fullnode_genesis_transaction_flow() {
     println!("6. Applying the genesis transaction to the first validator!");
     let first_validator_config = swarm.validators_mut().next().unwrap().config().clone();
     let first_validator_storage_dir = first_validator_config.storage.dir();
-    let output = Command::new(aptos_debugger.as_path())
+    let output = workspace_builder::get_aptos_debugger_command()
         .current_dir(workspace_root())
         .args(vec![
             "aptos-db",
@@ -195,7 +195,7 @@ async fn test_fullnode_genesis_transaction_flow() {
 /// 7. Verify that a failed validator node is able to db-restore and rejoin the network.
 async fn test_validator_genesis_transaction_and_db_restore_flow() {
     println!("0. Building the Aptos CLI and debugger!");
-    let aptos_debugger = workspace_builder::get_bin("aptos-debugger");
+    workspace_builder::get_bin("aptos-debugger");
     let aptos_cli = workspace_builder::get_bin("aptos");
 
     println!("1. Starting a 5 node validator network!");
@@ -233,7 +233,7 @@ async fn test_validator_genesis_transaction_and_db_restore_flow() {
     println!("7. Applying the genesis transaction to the first validator!");
     let first_validator_config = swarm.validators_mut().next().unwrap().config().clone();
     let first_validator_storage_dir = first_validator_config.storage.dir();
-    let output = Command::new(aptos_debugger.as_path())
+    let output = workspace_builder::get_aptos_debugger_command()
         .current_dir(workspace_root())
         .args(vec![
             "aptos-db",

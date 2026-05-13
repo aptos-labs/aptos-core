@@ -1,3 +1,4 @@
+// @checks=experimental
 module 0xc0ffee::m {
     struct A(bool) has key, drop;
     struct B(bool) has key, drop;
@@ -8,7 +9,7 @@ module 0xc0ffee::m {
     }
 
     public fun no_warn_2(): bool {
-        borrow_global<A>(@0xc0ffee).0 && borrow_global<B>(@0xc0ffee).0
+        A[@0xc0ffee].0 && B[@0xc0ffee].0
     }
 
     public fun no_warn_3(): bool {
@@ -20,7 +21,7 @@ module 0xc0ffee::m {
     }
 
     public fun warn_2(): bool {
-        borrow_global<A>(@0xc0ffee).0 && borrow_global<A>(@0xc0ffee).0
+        A[@0xc0ffee].0 && A[@0xc0ffee].0
     }
 
     public fun warn_3(): bool {

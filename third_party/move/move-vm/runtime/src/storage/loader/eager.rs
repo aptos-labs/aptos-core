@@ -1,5 +1,7 @@
-// Copyright (c) The Move Contributors
-// SPDX-License-Identifier: Apache-2.0
+// Parts of the file are Copyright (c) The Diem Core Contributors
+// Parts of the file are Copyright (c) The Move Contributors
+// Parts of the file are Copyright (c) Aptos Foundation
+// All Aptos Foundation code and content is licensed pursuant to the Innovation-Enabling Source Code License, available at https://github.com/aptos-labs/aptos-core/blob/main/LICENSE
 
 use crate::{
     check_dependencies_and_charge_gas,
@@ -157,13 +159,13 @@ where
         false
     }
 
-    fn unmetered_get_module_hash(
+    fn unmetered_get_module_hash_and_size(
         &self,
         address: &AccountAddress,
         module_name: &IdentStr,
-    ) -> VMResult<[u8; 32]> {
+    ) -> VMResult<([u8; 32], usize)> {
         self.module_storage
-            .unmetered_get_existing_module_hash(address, module_name)
+            .unmetered_get_existing_module_hash_and_size(address, module_name)
     }
 
     fn load_struct_definition(

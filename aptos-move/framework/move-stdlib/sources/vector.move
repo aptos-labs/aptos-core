@@ -96,6 +96,20 @@ module std::vector {
         ensures result == vec(e);
     }
 
+    /// Returns a reference to last element in the vector, or aborts if the vector is empty.
+    public fun last<Element>(self: &vector<Element>): &Element {
+        assert!(self.length() > 0, EINDEX_OUT_OF_BOUNDS);
+
+        &self[self.length() - 1]
+    }
+
+    /// Returns a mutable reference to the last element in the vector, or aborts if the vector is empty.
+    public fun last_mut<Element>(self: &mut vector<Element>): &mut Element {
+        assert!(self.length() > 0, EINDEX_OUT_OF_BOUNDS);
+        let len = self.length();
+        &mut self[len - 1]
+    }
+
     /// Reverses the order of the elements in the vector `self` in place.
     public fun reverse<Element>(self: &mut vector<Element>) {
         let len = self.length();

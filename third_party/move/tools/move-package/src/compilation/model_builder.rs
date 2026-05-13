@@ -1,10 +1,11 @@
-// Copyright (c) The Diem Core Contributors
-// Copyright (c) The Move Contributors
-// SPDX-License-Identifier: Apache-2.0
+// Parts of the file are Copyright (c) The Diem Core Contributors
+// Parts of the file are Copyright (c) The Move Contributors
+// Parts of the file are Copyright (c) Aptos Foundation
+// All Aptos Foundation code and content is licensed pursuant to the Innovation-Enabling Source Code License, available at https://github.com/aptos-labs/aptos-core/blob/main/LICENSE
 
 use crate::{
     compilation::compiled_package::make_source_and_deps_for_compiler,
-    resolution::resolution_graph::ResolvedGraph, CompilerVersion, ModelConfig,
+    resolution::resolution_graph::ResolvedGraph, ModelConfig,
 };
 use anyhow::Result;
 use itertools::Itertools;
@@ -134,30 +135,25 @@ impl ModelBuilder {
             .build_options
             .compiler_config
             .known_attributes;
-        match self.model_config.compiler_version {
-            CompilerVersion::V1 => anyhow::bail!("Compiler v1 is no longer supported"),
-            CompilerVersion::V2_0 | CompilerVersion::V2_1 => {
-                let mut options = make_options_for_v2_compiler(all_targets, all_deps);
-                options.language_version = self
-                    .resolution_graph
-                    .build_options
-                    .compiler_config
-                    .language_version;
-                options.compiler_version = Some(self.model_config.compiler_version);
-                options.known_attributes.clone_from(known_attributes);
-                options.skip_attribute_checks = skip_attribute_checks;
-                options.compile_test_code = self.resolution_graph.build_options.test_mode;
-                options.compile_verify_code = self.resolution_graph.build_options.verify_mode;
-                options.experiments.clone_from(
-                    &self
-                        .resolution_graph
-                        .build_options
-                        .compiler_config
-                        .experiments,
-                );
-                Ok(options)
-            },
-        }
+        let mut options = make_options_for_v2_compiler(all_targets, all_deps);
+        options.language_version = self
+            .resolution_graph
+            .build_options
+            .compiler_config
+            .language_version;
+        options.compiler_version = Some(self.model_config.compiler_version);
+        options.known_attributes.clone_from(known_attributes);
+        options.skip_attribute_checks = skip_attribute_checks;
+        options.compile_test_code = self.resolution_graph.build_options.test_mode;
+        options.compile_verify_code = self.resolution_graph.build_options.verify_mode;
+        options.experiments.clone_from(
+            &self
+                .resolution_graph
+                .build_options
+                .compiler_config
+                .experiments,
+        );
+        Ok(options)
     }
 }
 

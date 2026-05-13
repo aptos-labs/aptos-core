@@ -1,38 +1,42 @@
-// Copyright (c) The Diem Core Contributors
-// Copyright (c) The Move Contributors
-// SPDX-License-Identifier: Apache-2.0
+// Parts of the file are Copyright (c) The Diem Core Contributors
+// Parts of the file are Copyright (c) The Move Contributors
+// Parts of the file are Copyright (c) Aptos Foundation
+// All Aptos Foundation code and content is licensed pursuant to the Innovation-Enabling Source Code License, available at https://github.com/aptos-labs/aptos-core/blob/main/LICENSE
 
 //! This module translates specification conditions to Boogie code.
 
 use crate::{
     boogie_helpers::{
-        boogie_address, boogie_address_blob, boogie_behavioral_eval_fun_name, boogie_byte_blob,
-        boogie_choice_fun_name, boogie_closure_pack_name, boogie_declare_global, boogie_field_sel,
+        boogie_address, boogie_address_blob, boogie_behavioral_eval_fun_name,
+        boogie_behavioral_fun_result_name, boogie_byte_blob, boogie_choice_fun_name,
+        boogie_closure_pack_name, boogie_declare_global, boogie_field_sel, boogie_field_update,
         boogie_inst_suffix, boogie_modifies_memory_name, boogie_num_type_base,
         boogie_reflection_type_info, boogie_reflection_type_is_struct, boogie_reflection_type_name,
         boogie_resource_memory_name, boogie_spec_fun_name, boogie_spec_var_name,
         boogie_struct_name, boogie_struct_variant_name, boogie_type, boogie_type_suffix,
-        boogie_value_blob, boogie_well_formed_expr, MAX_TUPLE_SIZE,
+        boogie_value_blob, boogie_variant_field_update, boogie_well_formed_expr,
+        compute_evaluator_memory_union, MAX_TUPLE_SIZE,
     },
     options::BoogieOptions,
 };
 use itertools::Itertools;
 #[allow(unused_imports)]
 use log::{debug, info, warn};
+use move_core_types::function::ClosureMask;
 use move_model::{
     ast::{
-        BehaviorKind, Condition, ConditionKind, Exp, ExpData, MemoryLabel, Operation, Pattern,
-        QuantKind, SpecFunDecl, SpecVarDecl, TempIndex, Value,
+        BehaviorKind, Condition, ConditionKind, Exp, ExpData, MemoryLabel, MemoryRange, Operation,
+        Pattern, QuantKind, SpecFunDecl, SpecVarDecl, TempIndex, Value,
     },
     code_writer::CodeWriter,
     emit, emitln,
     model::{
-        FieldId, GlobalEnv, Loc, ModuleEnv, ModuleId, NodeId, Parameter, QualifiedInstId,
+        FieldId, FunId, GlobalEnv, Loc, ModuleEnv, ModuleId, NodeId, Parameter, QualifiedInstId,
         SpecFunId, SpecVarId, StructId,
     },
     pragmas::INTRINSIC_TYPE_MAP,
     symbol::Symbol,
-    ty::{PrimitiveType, Type},
+    ty::{PrimitiveType, ReferenceKind, Type},
     well_known::{TYPE_INFO_SPEC, TYPE_NAME_GET_SPEC, TYPE_NAME_SPEC, TYPE_SPEC_IS_STRUCT},
 };
 use move_prover_bytecode_pipeline::{
@@ -41,9 +45,19 @@ use move_prover_bytecode_pipeline::{
 };
 use std::{
     cell::RefCell,
-    collections::{BTreeSet, HashMap},
+    collections::{BTreeMap, BTreeSet, HashMap},
     rc::Rc,
 };
+
+/// Information about a state label defined by a two-state operation.
+/// Used to resolve which resource types are actually modified at each label.
+#[derive(Clone, Default, Debug)]
+pub struct LabelInfo {
+    /// The pre-state of this label's defining operation.
+    pub pre: Option<MemoryLabel>,
+    /// Resource types modified at this label.
+    pub modified_types: BTreeSet<QualifiedInstId<StructId>>,
+}
 
 #[derive(Clone)]
 pub struct SpecTranslator<'env> {
@@ -57,6 +71,12 @@ pub struct SpecTranslator<'env> {
     type_inst: Vec<Type>,
     /// Counter for creating new variables.
     fresh_var_count: RefCell<usize>,
+    /// Whether we are inside `old()` within a spec fun body that uses old.
+    in_old_context: RefCell<bool>,
+    /// The set of old-context memory for the spec fun currently being translated (if any).
+    fun_old_memory: Option<BTreeSet<QualifiedInstId<StructId>>>,
+    /// The set of &mut parameter names for the spec fun being translated.
+    fun_mut_params: BTreeSet<Symbol>,
     /// Information about lifted choice expressions. Each choice expression in the
     /// original program is uniquely identified by the choice expression AST (verbatim),
     /// which includes the node id of the expression.
@@ -70,6 +90,26 @@ pub struct SpecTranslator<'env> {
     /// function declarations. Each arbitrary value at a unique source location gets its own
     /// uninterpreted function to ensure soundness. The bool indicates whether the arbitrary value is of bv type.
     arbitrary_values: Rc<RefCell<BTreeSet<(NodeId, Type, bool)>>>,
+    /// The qualified instantiated ID of the function currently being verified, if any.
+    /// Used to resolve behavioral predicates on function-typed parameters.
+    current_fun_qid: RefCell<Option<QualifiedInstId<FunId>>>,
+    /// Map from state labels to their defining operation info.
+    /// Used to resolve memory references at labeled states.
+    label_info: RefCell<BTreeMap<MemoryLabel, LabelInfo>>,
+    /// Set of Boogie `var` names that are declared in the enclosing procedure
+    /// (including memory snapshot variables like `$M_$memory#3`). Used to
+    /// verify that BP memory-arg emissions only reference declared variables.
+    declared_mem_names: RefCell<BTreeSet<String>>,
+    /// Value-typed state variables introduced by `exists S in *` when the body
+    /// uses `..S |~` / `S.. |~` with `|&mut T|` closure parameters rather than
+    /// global memory. Maps `MemoryLabel → (boogie_var_name, T)`.
+    value_state_vars: RefCell<BTreeMap<MemoryLabel, (String, Type)>>,
+    /// True while translating the argument of a behavioral predicate
+    /// (`ensures_of` / `result_of` / etc.). In this context, a `&mut x.foo`
+    /// borrow expression is treated as a value-yielding selector rather than
+    /// a runtime borrow operation: the inner field path is translated and the
+    /// surrounding `in_old_context` flag selects pre- vs post-state.
+    in_behavior_pred_arg: RefCell<bool>,
 }
 
 /// A struct which contains information about a lifted choice expression (like `some x:int: p(x)`).
@@ -101,9 +141,88 @@ impl<'env> SpecTranslator<'env> {
             writer,
             type_inst: vec![],
             fresh_var_count: Default::default(),
+            in_old_context: RefCell::new(false),
+            fun_old_memory: None,
+            fun_mut_params: BTreeSet::new(),
             lifted_choice_infos: Default::default(),
             arbitrary_values: Default::default(),
+            current_fun_qid: RefCell::new(None),
+            label_info: RefCell::new(BTreeMap::new()),
+            declared_mem_names: RefCell::new(BTreeSet::new()),
+            value_state_vars: RefCell::new(BTreeMap::new()),
+            in_behavior_pred_arg: RefCell::new(false),
         }
+    }
+
+    /// Sets the current function being verified, for resolving behavioral predicate memory.
+    pub fn set_current_fun_qid(&self, fun_qid: QualifiedInstId<FunId>) {
+        *self.current_fun_qid.borrow_mut() = Some(fun_qid);
+    }
+
+    /// Clears the current function being verified.
+    pub fn clear_current_fun_qid(&self) {
+        *self.current_fun_qid.borrow_mut() = None;
+    }
+
+    /// Sets the label info map for resolving memory references at labeled states.
+    pub fn set_label_info(&self, info: BTreeMap<MemoryLabel, LabelInfo>) {
+        *self.label_info.borrow_mut() = info;
+    }
+
+    /// Sets the set of Boogie `var` names declared in the enclosing procedure.
+    pub fn set_declared_mem_names(&self, names: BTreeSet<String>) {
+        *self.declared_mem_names.borrow_mut() = names;
+    }
+
+    /// Resolve the effective memory label for a resource type at a given state label.
+    /// If the type is modified at this label, returns Some(label).
+    /// Otherwise, walks back through the chain via pre-states until finding where
+    /// the type was modified, or returns None (old/entry state).
+    fn resolve_label_for_memory(
+        &self,
+        label: MemoryLabel,
+        memory: &QualifiedInstId<StructId>,
+    ) -> Option<MemoryLabel> {
+        let mut visited = BTreeSet::new();
+        self.resolve_label_for_memory_inner(label, memory, &mut visited)
+    }
+
+    fn resolve_label_for_memory_inner(
+        &self,
+        label: MemoryLabel,
+        memory: &QualifiedInstId<StructId>,
+        visited: &mut BTreeSet<MemoryLabel>,
+    ) -> Option<MemoryLabel> {
+        if !visited.insert(label) {
+            return None; // cycle detected — treat as entry state
+        }
+        let label_info = self.label_info.borrow();
+        if let Some(info) = label_info.get(&label) {
+            if info.modified_types.contains(memory) {
+                Some(label)
+            } else if let Some(pre) = info.pre {
+                drop(label_info); // must drop before recursive call
+                self.resolve_label_for_memory_inner(pre, memory, visited)
+            } else {
+                None // old/entry state
+            }
+        } else {
+            // Label not in label_info (e.g., SaveMem labels from opaque calls).
+            // Preserve as-is — the label has a corresponding Boogie variable
+            // from SaveMem. Resolving to None would incorrectly use old() (function
+            // entry state) instead of the saved pre-call state.
+            Some(label)
+        }
+    }
+
+    /// Sets the old-memory context for translating spec function bodies that use old().
+    pub fn set_fun_old_memory(&mut self, memory: BTreeSet<QualifiedInstId<StructId>>) {
+        self.fun_old_memory = Some(memory);
+    }
+
+    /// Sets the mutable parameter names for old-context translation.
+    pub fn set_fun_mut_params(&mut self, params: BTreeSet<Symbol>) {
+        self.fun_mut_params = params;
     }
 
     /// Emits a translation error.
@@ -260,7 +379,7 @@ impl SpecTranslator<'_> {
         }
     }
 
-    /// Generates axioms for uninterpreted spec function.
+    /// Generates axioms for uninterpreted spec function from its attached spec conditions.
     fn generate_spec_function_axioms(
         &self,
         fun: &SpecFunDecl,
@@ -442,29 +561,44 @@ impl SpecTranslator<'_> {
             vec![]
         };
         let result_type = boogie_type(self.env, &self.inst(&fun.result_type), bv_flag_result);
+        let old_memory: BTreeSet<_> = fun
+            .old_memory
+            .iter()
+            .map(|m| m.clone().instantiate(&self.type_inst))
+            .collect();
         // it is possible that the spec fun may refer to the same memory after monomorphization,
         // (e.g., one via concrete type and the other via type parameter being instantiated).
         // In this case, we mark the other parameter as unused
         let mut mem_inst_seen = BTreeSet::new();
-        let mem_params = fun.used_memory.iter().map(|memory| {
-            let memory = memory.to_owned().instantiate(&self.type_inst);
-            let struct_env = &self.env.get_struct_qid(memory.to_qualified_id());
-            let param_repr = format!(
-                "{}: $Memory {}",
-                boogie_resource_memory_name(self.env, &memory, &None),
-                boogie_struct_name(struct_env, &memory.inst, false)
-            );
-            if mem_inst_seen.insert(memory) {
-                param_repr
-            } else {
-                format!("__unused_{}", param_repr)
-            }
-        });
+        let mem_params = fun
+            .used_memory
+            .iter()
+            .flat_map(|memory| {
+                let memory = memory.to_owned().instantiate(&self.type_inst);
+                let struct_env = &self.env.get_struct_qid(memory.to_qualified_id());
+                let mem_type = format!(
+                    "$Memory {}",
+                    boogie_struct_name(struct_env, &memory.inst, false)
+                );
+                let name = boogie_resource_memory_name(self.env, &memory, &None);
+                let is_dup = !mem_inst_seen.insert(memory.clone());
+                let prefix = if is_dup { "__unused_" } else { "" };
+                if fun.uses_old && old_memory.contains(&memory) {
+                    // Dual params for resources accessed in old() context
+                    vec![
+                        format!("{}old_{}: {}", prefix, name, mem_type),
+                        format!("{}{}: {}", prefix, name, mem_type),
+                    ]
+                } else {
+                    vec![format!("{}{}: {}", prefix, name, mem_type)]
+                }
+            })
+            .collect_vec();
         let params = fun
             .params
             .iter()
             .enumerate()
-            .map(|(i, Parameter(name, ty, _))| {
+            .flat_map(|(i, Parameter(name, ty, _))| {
                 let bv_flag = if global_state
                     .spec_fun_operation_map
                     .contains_key(&(module_env.get_id(), id))
@@ -478,19 +612,30 @@ impl SpecTranslator<'_> {
                 } else {
                     false
                 };
-                format!(
-                    "{}: {}",
-                    name.display(module_env.symbol_pool()),
-                    boogie_type(self.env, &self.inst(ty), bv_flag)
-                )
-            });
+                let name_str = name.display(module_env.symbol_pool()).to_string();
+                if fun.uses_old && ty.is_mutable_reference() {
+                    // Dual params for &mut references in old-aware spec funs
+                    let inner_ty = boogie_type(self.env, &self.inst(ty.skip_reference()), bv_flag);
+                    vec![
+                        format!("old_{}: {}", name_str, inner_ty),
+                        format!("{}: {}", name_str, inner_ty),
+                    ]
+                } else {
+                    let ty_str = boogie_type(self.env, &self.inst(ty), bv_flag);
+                    vec![format!("{}: {}", name_str, ty_str)]
+                }
+            })
+            .collect_vec();
         self.writer.set_location(&fun.loc);
         let boogie_name = boogie_spec_fun_name(module_env, id, &self.type_inst, bv_flag_result);
         let param_list = type_info_params
             .into_iter()
-            .chain(mem_params.chain(params))
+            .chain(mem_params.into_iter().chain(params))
             .join(", ");
         let attrs = if fun.uninterpreted || recursive {
+            // Uninterpreted functions have no body; recursive functions cannot be inlined.
+            // Both use the default trigger (the function application pattern), which bounds
+            // e-matching instantiation depth via smt.qi.max_instances.
             ""
         } else {
             "{:inline}"
@@ -542,7 +687,62 @@ impl SpecTranslator<'_> {
         } else {
             emitln!(self.writer, " {");
             self.writer.indent();
-            self.translate_exp(fun.body.as_ref().unwrap());
+
+            // Collect intermediate state labels in the body that need existential binding.
+            // Only truly intermediate labels (those that resolve to themselves via
+            // label resolution) need wrapping. Labels resolving to None (pre/post state)
+            // are handled by old_aware_memory_name mapping to function parameters.
+            // Labels explicitly quantified by StateDomain ranges are excluded — they are
+            // bound by the user's forall/exists, not by our implicit existential.
+            let body = fun.body.as_ref().unwrap();
+            let all_labels = self.collect_intermediate_labels_from_exp(body);
+            let quant_bound = self.collect_quant_bound_state_labels(body);
+            let intermediate_labels: BTreeSet<_> = all_labels
+                .into_iter()
+                .filter(|(label, mem)| {
+                    self.resolve_label_for_memory(*label, mem) == Some(*label)
+                        && !quant_bound.contains(label)
+                })
+                .collect();
+
+            // Emit existential prefix if there are intermediate labels
+            if !intermediate_labels.is_empty() {
+                emit!(self.writer, "(exists ");
+                for (i, (label, mem)) in intermediate_labels.iter().enumerate() {
+                    if i > 0 {
+                        emit!(self.writer, ", ");
+                    }
+                    let name = boogie_resource_memory_name(self.env, mem, &Some(*label));
+                    let ty = boogie_struct_name(
+                        &self.env.get_struct_qid(mem.to_qualified_id()),
+                        &mem.inst,
+                        false,
+                    );
+                    emit!(self.writer, "{}: $Memory {}", name, ty);
+                }
+                emit!(self.writer, " :: ");
+            }
+
+            if fun.uses_old {
+                // Set up old-aware context for body translation
+                let mut trans = self.clone();
+                trans.fun_old_memory = Some(old_memory);
+                trans.fun_mut_params = fun
+                    .params
+                    .iter()
+                    .filter(|Parameter(_, ty, _)| ty.is_mutable_reference())
+                    .map(|Parameter(name, _, _)| *name)
+                    .collect();
+                trans.translate_exp(body);
+            } else {
+                self.translate_exp(body);
+            }
+
+            // Close existential
+            if !intermediate_labels.is_empty() {
+                emit!(self.writer, ")");
+            }
+
             emitln!(self.writer);
             self.writer.unindent();
             emitln!(self.writer, "}");
@@ -671,6 +871,7 @@ impl SpecTranslator<'_> {
                 | Type::Fun(..)
                 | Type::TypeDomain(_)
                 | Type::ResourceDomain(_, _, _)
+                | Type::StateDomain
                 | Type::Error
                 | Type::Var(_) => {},
             }
@@ -973,18 +1174,41 @@ impl SpecTranslator<'_> {
     }
 
     fn translate_local_var(&self, _node_id: NodeId, name: Symbol) {
-        emit!(self.writer, "{}", name.display(self.env.symbol_pool()));
+        if *self.in_old_context.borrow() && self.fun_mut_params.contains(&name) {
+            emit!(self.writer, "old_{}", name.display(self.env.symbol_pool()));
+        } else {
+            emit!(self.writer, "{}", name.display(self.env.symbol_pool()));
+        }
     }
 
     fn translate_temporary(&self, node_id: NodeId, idx: TempIndex) {
         let ty = self.get_node_type(node_id);
         let mut_ref = ty.is_mutable_reference();
+        let old_mut_ref_param = *self.in_old_context.borrow()
+            && self
+                .current_fun_qid
+                .borrow()
+                .as_ref()
+                .is_some_and(|fun_qid| {
+                    let fun_env = self.env.get_function(fun_qid.to_qualified_id());
+                    idx < fun_env.get_parameter_count()
+                        && fun_env
+                            .get_local_type(idx)
+                            .as_ref()
+                            .is_some_and(Type::is_mutable_reference)
+                });
+        if old_mut_ref_param {
+            emit!(self.writer, "old(");
+        }
         if mut_ref {
             emit!(self.writer, "$Dereference(");
         }
         emit!(self.writer, "$t{}", idx);
         if mut_ref {
             emit!(self.writer, ")")
+        }
+        if old_mut_ref_param {
+            emit!(self.writer, ")");
         }
     }
 
@@ -1104,8 +1328,8 @@ impl SpecTranslator<'_> {
             Operation::EventStoreIncludedIn => self.translate_event_store_included_in(args),
 
             // Regular expressions
-            Operation::SpecFunction(module_id, fun_id, memory_labels) => {
-                self.translate_spec_fun_call(node_id, *module_id, *fun_id, args, memory_labels)
+            Operation::SpecFunction(module_id, fun_id, range) => {
+                self.translate_spec_fun_call(node_id, *module_id, *fun_id, args, range)
             },
             Operation::Pack(mid, sid, Some(variant)) => {
                 self.translate_pack_variant(node_id, *mid, *sid, variant, args)
@@ -1230,10 +1454,11 @@ impl SpecTranslator<'_> {
             Operation::CanModify => self.translate_can_modify(node_id, args),
             Operation::Len => self.translate_primitive_call("LenVec", args),
             Operation::TypeValue => self.translate_type_value(node_id),
-            Operation::TypeDomain | Operation::ResourceDomain => self.error(
-                &loc,
-                "domain functions can only be used as the range of a quantifier",
-            ),
+            Operation::TypeDomain | Operation::ResourceDomain | Operation::StateDomain => self
+                .error(
+                    &loc,
+                    "domain functions can only be used as the range of a quantifier",
+                ),
             Operation::UpdateVec => self.translate_primitive_call("UpdateVec", args),
             Operation::ConcatVec => self.translate_primitive_call("ConcatVec", args),
             Operation::EmptyVec => self.translate_primitive_inst_call(node_id, "$EmptyVec", args),
@@ -1304,7 +1529,7 @@ impl SpecTranslator<'_> {
                     )
                 );
             },
-            Operation::Behavior(kind, _state) => {
+            Operation::Behavior(kind, range) => {
                 // args[0] is the function expression (Temporary or Closure)
                 // args[1..] are the predicate arguments
                 if args.is_empty() {
@@ -1317,51 +1542,36 @@ impl SpecTranslator<'_> {
                 let fun_exp = &args[0];
                 let pred_args = &args[1..];
 
-                // Get the function type from the expression and instantiate
-                let fun_type = self.env.get_node_type(fun_exp.node_id());
-                let inst_fun_type = fun_type.instantiate(&self.type_inst);
-                let eval_fun_name =
-                    boogie_behavioral_eval_fun_name(self.env, &inst_fun_type, *kind);
-
-                emit!(self.writer, "{}(", eval_fun_name);
-                // Translate the function expression - Closure is only allowed here
                 match fun_exp.as_ref() {
-                    ExpData::Temporary(_, temp_idx) => {
-                        emit!(self.writer, "$t{}", temp_idx);
-                    },
-                    ExpData::LocalVar(_, name) => {
-                        // For spec function parameters
-                        emit!(self.writer, "{}", name.display(self.env.symbol_pool()));
-                    },
                     ExpData::Call(closure_id, Operation::Closure(mid, fid, mask), closure_args) => {
-                        // Translate closure to a packed function value
-                        let inst = self.env.get_node_instantiation(*closure_id);
-                        let inst = Type::instantiate_slice(&inst, &self.type_inst);
-                        let fun_qid = mid.qualified_inst(*fid, inst);
-                        let ctor_name = boogie_closure_pack_name(self.env, &fun_qid, *mask);
-                        emit!(self.writer, "{}(", ctor_name);
-                        let mut first = true;
-                        for arg in closure_args {
-                            if !first {
-                                emit!(self.writer, ", ");
-                            }
-                            first = false;
-                            self.translate_exp(arg);
-                        }
-                        emit!(self.writer, ")");
+                        // Closure: use per-function behavioral spec function
+                        self.translate_behavior_for_closure(
+                            node_id,
+                            *kind,
+                            *closure_id,
+                            *mid,
+                            *fid,
+                            *mask,
+                            closure_args,
+                            pred_args,
+                            range,
+                        );
+                    },
+                    ExpData::Temporary(..) | ExpData::LocalVar(..) => {
+                        // Runtime function value (e.g., substituted at call site):
+                        // use the per-type evaluator dispatch function
+                        self.translate_behavior_via_evaluator(
+                            node_id, *kind, fun_exp, pred_args, range,
+                        );
                     },
                     _ => {
-                        self.env.error(
-                            &self.env.get_node_loc(fun_exp.node_id()),
-                            "bug: Operation::Behavior expects Temporary, LocalVar, or Closure as first arg",
+                        // Arbitrary expression evaluating to a function value (e.g., struct
+                        // field access after data invariant rewriting): use evaluator dispatch
+                        self.translate_behavior_via_evaluator(
+                            node_id, *kind, fun_exp, pred_args, range,
                         );
                     },
                 }
-                for arg in pred_args {
-                    emit!(self.writer, ", ");
-                    self.translate_exp(arg);
-                }
-                emit!(self.writer, ")");
             },
             Operation::Closure(mid, fid, mask) => {
                 // Translate closure construction to a Boogie pack constructor.
@@ -1388,14 +1598,90 @@ impl SpecTranslator<'_> {
             // corresponding Boogie saved-memory variable declarations would need
             // to be emitted alongside the evaluator function.
             Operation::Old => {
+                if self.fun_old_memory.is_some() {
+                    // In old-aware spec fun body: set flag so Global/LocalVar use old_ prefix
+                    let prev = self.in_old_context.replace(true);
+                    self.translate_exp(&args[0]);
+                    self.in_old_context.replace(prev);
+                } else {
+                    self.env.error(
+                        &self.env.get_node_loc(node_id),
+                        "old() in function specifications used by behavioral predicates \
+                         (ensures_of/aborts_of) is not yet supported in the verification pipeline",
+                    );
+                }
+            },
+            Operation::SpecPublish(range) => {
+                // publish<R>(addr, value): post_mem == ResourceUpdate(pre_mem, addr, value)
+                //                          && !ResourceExists(pre_mem, addr)
+                let memory = &self.get_memory_inst_from_node(node_id);
+                let (pre_mem, post_mem) = self.mutation_pre_post_memory(memory, range);
+                emit!(
+                    self.writer,
+                    "({} == $ResourceUpdate({}, ",
+                    post_mem,
+                    pre_mem
+                );
+                self.translate_exp(&args[0]); // addr
+                emit!(self.writer, ", ");
+                self.translate_exp(&args[1]); // value
+                emit!(self.writer, ") && !$ResourceExists({}, ", pre_mem);
+                self.translate_exp(&args[0]); // addr
+                emit!(self.writer, "))");
+            },
+            Operation::SpecRemove(range) => {
+                // remove<R>(addr): post_mem == ResourceRemove(pre_mem, addr)
+                //                  && ResourceExists(pre_mem, addr)
+                let memory = &self.get_memory_inst_from_node(node_id);
+                let (pre_mem, post_mem) = self.mutation_pre_post_memory(memory, range);
+                emit!(
+                    self.writer,
+                    "({} == $ResourceRemove({}, ",
+                    post_mem,
+                    pre_mem
+                );
+                self.translate_exp(&args[0]); // addr
+                emit!(self.writer, ") && $ResourceExists({}, ", pre_mem);
+                self.translate_exp(&args[0]); // addr
+                emit!(self.writer, "))");
+            },
+            Operation::SpecUpdate(range) => {
+                // update<R>(addr, value): post_mem == ResourceUpdate(pre_mem, addr, value)
+                //                         && ResourceExists(pre_mem, addr)
+                let memory = &self.get_memory_inst_from_node(node_id);
+                let (pre_mem, post_mem) = self.mutation_pre_post_memory(memory, range);
+                emit!(
+                    self.writer,
+                    "({} == $ResourceUpdate({}, ",
+                    post_mem,
+                    pre_mem
+                );
+                self.translate_exp(&args[0]); // addr
+                emit!(self.writer, ", ");
+                self.translate_exp(&args[1]); // value
+                emit!(self.writer, ") && $ResourceExists({}, ", pre_mem);
+                self.translate_exp(&args[0]); // addr
+                emit!(self.writer, "))");
+            },
+            Operation::MoveFunction(mid, fid) => {
+                let fun_env = self.env.get_function(mid.qualified(*fid));
                 self.env.error(
                     &self.env.get_node_loc(node_id),
-                    "old() in function specifications used by behavioral predicates \
-                     (ensures_of/aborts_of) is not yet supported in the verification pipeline",
+                    &format!(
+                        "Move function `{}` cannot be called in specifications; \
+                         use a spec function instead",
+                        fun_env.get_full_name_str()
+                    ),
                 );
             },
-            Operation::MoveFunction(_, _)
-            | Operation::BorrowGlobal(_)
+            Operation::Borrow(ReferenceKind::Mutable) if *self.in_behavior_pred_arg.borrow() => {
+                // `&mut x.foo` (and similar selector chains) inside a behavioral
+                // predicate argument: drop the borrow wrapper and translate the
+                // inner expression. The enclosing `in_old_context` flag chooses
+                // pre- vs post-state of the selected field.
+                self.translate_exp(&args[0]);
+            },
+            Operation::BorrowGlobal(_)
             | Operation::Borrow(..)
             | Operation::Deref
             | Operation::MoveTo
@@ -1403,12 +1689,349 @@ impl SpecTranslator<'_> {
                 self.env.error(
                     &self.env.get_node_loc(node_id),
                     &format!(
-                        "bug: operation {} is not supported in the current context",
+                        "runtime operation `{}` cannot be used in specifications",
                         oper.display(self.env, node_id)
                     ),
                 );
             },
         }
+    }
+
+    /// Translate a behavioral-predicate argument expression. The
+    /// `in_behavior_pred_arg` flag enables special-case handling of
+    /// `&mut x.foo` selector borrows in the inner expression.
+    fn translate_behavior_arg(&self, arg: &Exp) {
+        let prev = self.in_behavior_pred_arg.replace(true);
+        self.translate_exp(arg);
+        self.in_behavior_pred_arg.replace(prev);
+    }
+
+    /// Translate a behavioral predicate using the per-type evaluator dispatch function.
+    /// Used for runtime function values (e.g., function-typed parameters after substitution).
+    ///
+    /// `pred_args` arrive in canonical 3-arg shape (input slots followed by
+    /// explicit-result + post-state slots for `EnsuresOf`). State-label
+    /// substitutions (`..S |~` and `S.. |~`) replace the post-state of the
+    /// *last* mut-ref param and the pre-state of the *first* mut-ref param,
+    /// respectively, matching the prior semantics for single-mut-ref closures.
+    fn translate_behavior_via_evaluator(
+        &self,
+        node_id: NodeId,
+        kind: BehaviorKind,
+        fun_exp: &Exp,
+        pred_args: &[Exp],
+        range: &MemoryRange,
+    ) {
+        let fun_type = self.env.get_node_type(fun_exp.node_id());
+        let inst_fun_type = fun_type.instantiate(&self.type_inst);
+        let eval_fun_name = boogie_behavioral_eval_fun_name(self.env, &inst_fun_type, kind);
+        emit!(self.writer, "{}(", eval_fun_name);
+        let has_mem =
+            self.emit_evaluator_memory_args(node_id, &inst_fun_type, kind, &range.pre, &range.post);
+        if has_mem {
+            emit!(self.writer, ", ");
+        }
+        self.translate_exp(fun_exp);
+
+        // For value-typed state labels (|&mut T| closures with no global memory):
+        // substitute the state variable S_val into the appropriate pred_arg position.
+        //   ..S |~ ensures_of<f>(old_x, x)  →  ensures_of<f>(old_x, S_val)   [post label: replace last]
+        //   S.. |~ ensures_of<g>(old_x, x)  →  ensures_of<g>(S_val, x)       [pre label: replace first &mut input]
+        let post_sub = range.post.and_then(|label| {
+            self.value_state_vars
+                .borrow()
+                .get(&label)
+                .map(|(v, _)| v.clone())
+        });
+        let (pre_sub, mut_input_pos) = if let Some(label) = range.pre {
+            let sub = self
+                .value_state_vars
+                .borrow()
+                .get(&label)
+                .map(|(v, _)| v.clone());
+            let pos = sub
+                .as_ref()
+                .and_then(|_| Self::find_mut_ref_input_position(&inst_fun_type));
+            (sub, pos)
+        } else {
+            (None, None)
+        };
+        let last_idx = pred_args.len().saturating_sub(1);
+        for (i, arg) in pred_args.iter().enumerate() {
+            emit!(self.writer, ", ");
+            if let Some(ref var) = post_sub {
+                if i == last_idx {
+                    emit!(self.writer, "{}", var);
+                    continue;
+                }
+            }
+            if let Some(ref var) = pre_sub {
+                if Some(i) == mut_input_pos {
+                    emit!(self.writer, "{}", var);
+                    continue;
+                }
+            }
+            self.translate_behavior_arg(arg);
+        }
+        emit!(self.writer, ")");
+    }
+
+    /// Position of the first `&mut T` parameter in a function type — used by
+    /// the `S.. |~` state-label substitution path in
+    /// `translate_behavior_via_evaluator`.
+    fn find_mut_ref_input_position(fun_type: &Type) -> Option<usize> {
+        if let Type::Fun(arg_ty, _, _) = fun_type {
+            arg_ty
+                .clone()
+                .flatten()
+                .iter()
+                .position(|ty| ty.is_mutable_reference())
+        } else {
+            None
+        }
+    }
+
+    /// Emit memory arguments for an evaluator call by computing the memory union
+    /// from all closure and param variants of the given function type.
+    fn emit_evaluator_memory_args(
+        &self,
+        node_id: NodeId,
+        fun_type: &Type,
+        kind: BehaviorKind,
+        pre: &Option<MemoryLabel>,
+        post: &Option<MemoryLabel>,
+    ) -> bool {
+        let (union_used_memory, union_old_memory) =
+            compute_evaluator_memory_union(self.env, fun_type);
+
+        // Emit memory args following the same dual-state pattern as build_memory_params.
+        // Use resolve_memory_name to resolve labels through the label chain — when a
+        // resource type was not modified at a label, its memory resolves to the predecessor.
+        let uses_old = !union_old_memory.is_empty();
+        let current = match kind {
+            BehaviorKind::RequiresOf | BehaviorKind::AbortsOf => pre,
+            BehaviorKind::EnsuresOf | BehaviorKind::ResultOf => post,
+        };
+        let mut first = true;
+        for memory in &union_used_memory {
+            if uses_old && union_old_memory.contains(memory) {
+                // Check that the pre-state memory reference will be declared.
+                if !self.check_name_declared(node_id, kind, *pre, memory) {
+                    return !first;
+                }
+                if !first {
+                    emit!(self.writer, ", ");
+                }
+                first = false;
+                let pre_name = self.resolve_memory_name(memory, *pre);
+                emit!(self.writer, &pre_name);
+                emit!(self.writer, ", ");
+                let current_name = self.resolve_memory_name(memory, *current);
+                emit!(self.writer, &current_name);
+            } else {
+                if !first {
+                    emit!(self.writer, ", ");
+                }
+                first = false;
+                let mem_name = self.resolve_memory_name(memory, *current);
+                emit!(self.writer, &mem_name);
+            }
+        }
+        !first // true if we emitted at least one arg
+    }
+
+    /// Translate a behavioral predicate for a closure expression.
+    ///
+    /// Calls the per-function behavioral spec function (or `result_of` function)
+    /// directly. The `pred_args` arrive already augmented with the canonical
+    /// 3-arg shape produced by `translate_behavior_predicate` (and the
+    /// inference engine): input args wrapped in `old(...)` for `&mut`
+    /// parameters, then for `EnsuresOf`, the explicit-result args followed by
+    /// the (un-wrapped) post-state clones of each `&mut` input.
+    #[allow(clippy::too_many_arguments)]
+    fn translate_behavior_for_closure(
+        &self,
+        node_id: NodeId,
+        kind: BehaviorKind,
+        closure_id: NodeId,
+        mid: ModuleId,
+        fid: FunId,
+        mask: ClosureMask,
+        closure_args: &[Exp],
+        pred_args: &[Exp],
+        range: &MemoryRange,
+    ) {
+        use crate::boogie_helpers::boogie_behavioral_fun_spec_name;
+
+        let inst = self.env.get_node_instantiation(closure_id);
+        let inst = Type::instantiate_slice(&inst, &self.type_inst);
+        let fun_qid = mid.qualified_inst(fid, inst);
+        let fun_env = self.env.get_function(fun_qid.to_qualified_id());
+        let num_params = fun_env.get_parameter_count();
+
+        let fun_name = if kind == BehaviorKind::ResultOf {
+            let multi_result = fun_env.get_return_count()
+                + fun_env
+                    .get_parameter_types()
+                    .iter()
+                    .filter(|ty| ty.is_mutable_reference())
+                    .count()
+                != 1;
+            boogie_behavioral_fun_result_name(self.env, &fun_qid, multi_result)
+        } else {
+            boogie_behavioral_fun_spec_name(self.env, &fun_qid, kind)
+        };
+        emit!(self.writer, "{}(", fun_name);
+
+        // Emit memory args, then interleave captured + non-captured params
+        let mut has_args = self.emit_fun_spec_memory_args(node_id, &fun_qid, kind, range);
+        let mut captured_pos = 0;
+        let mut non_captured_pos = 0;
+        for i in 0..num_params {
+            if has_args {
+                emit!(self.writer, ", ");
+            }
+            has_args = true;
+            if mask.is_captured(i) {
+                self.translate_behavior_arg(&closure_args[captured_pos]);
+                captured_pos += 1;
+            } else {
+                self.translate_behavior_arg(&pred_args[non_captured_pos]);
+                non_captured_pos += 1;
+            }
+        }
+
+        // For `EnsuresOf`: emit result args + post-state slots from remaining
+        // pred_args (already in canonical order: explicit_results, post_states).
+        if kind == BehaviorKind::EnsuresOf {
+            for arg in &pred_args[non_captured_pos..] {
+                emit!(self.writer, ", ");
+                self.translate_behavior_arg(arg);
+            }
+        }
+        emit!(self.writer, ")");
+    }
+
+    /// Emit memory arguments for a function's spec memory in proper state order.
+    /// Returns true if any memory args were emitted.
+    fn emit_fun_spec_memory_args(
+        &self,
+        node_id: NodeId,
+        fun_qid: &QualifiedInstId<FunId>,
+        kind: BehaviorKind,
+        range: &MemoryRange,
+    ) -> bool {
+        let pre = range.pre;
+        let post = range.post;
+        let fun_env = self.env.get_function(fun_qid.to_qualified_id());
+        let used_memory = fun_env.get_spec_used_memory();
+        let old_memory: BTreeSet<_> = fun_env
+            .get_spec_old_memory()
+            .iter()
+            .map(|m| m.clone().instantiate(&fun_qid.inst))
+            .collect();
+        let uses_old = !old_memory.is_empty();
+        let current = match kind {
+            BehaviorKind::RequiresOf | BehaviorKind::AbortsOf => pre,
+            BehaviorKind::EnsuresOf | BehaviorKind::ResultOf => post,
+        };
+        let mut first = true;
+        for memory in used_memory {
+            let memory = &memory.clone().instantiate(&fun_qid.inst);
+            if uses_old && old_memory.contains(memory) {
+                // Check that the pre-state memory reference will be declared.
+                if !self.check_name_declared(node_id, kind, pre, memory) {
+                    return !first;
+                }
+                if !first {
+                    emit!(self.writer, ", ");
+                }
+                first = false;
+                // When pre is None (no explicit label) and we're in a procedure context
+                // (not a spec function body), use old() to reference entry state;
+                // without old(), the unlabeled memory name is the exit state in ensures.
+                // When pre is Some, resolve through label chain for non-modified types.
+                let pre_name = if pre.is_none() && self.fun_old_memory.is_none() {
+                    format!(
+                        "old({})",
+                        boogie_resource_memory_name(self.env, memory, &pre)
+                    )
+                } else {
+                    self.resolve_memory_name(memory, pre)
+                };
+                emit!(self.writer, &pre_name);
+                emit!(self.writer, ", ");
+                let current_name = self.resolve_memory_name(memory, current);
+                emit!(self.writer, &current_name);
+            } else {
+                if !first {
+                    emit!(self.writer, ", ");
+                }
+                first = false;
+                let mem_name = self.resolve_memory_name(memory, current);
+                emit!(self.writer, &mem_name);
+            }
+        }
+        !first // true if we emitted at least one arg
+    }
+
+    /// Verifies that the resolved Boogie memory variable name that would be emitted
+    /// for the pre-state of a dual-state BP arg is actually declared in the
+    /// enclosing procedure. If not, emits a Move-level error pointing the user
+    /// toward `reads_of`/`modifies_of` or state quantification. Returns `false`
+    /// on error so the caller can skip emission.
+    fn check_name_declared(
+        &self,
+        node_id: NodeId,
+        kind: BehaviorKind,
+        pre: Option<MemoryLabel>,
+        memory: &QualifiedInstId<StructId>,
+    ) -> bool {
+        if self.fun_old_memory.is_some() {
+            return true; // spec function body — pre maps to old_ param
+        }
+        let declared = self.declared_mem_names.borrow();
+        if declared.is_empty() {
+            return true; // no declarations tracked (e.g., top-level spec fun translation)
+        }
+        // Resolve the label chain the same way emission will.
+        let resolved = match pre {
+            Some(l) if !self.label_info.borrow().is_empty() => {
+                self.resolve_label_for_memory(l, memory)
+            },
+            other => other,
+        };
+        // If the resolved label is None, emission will use the base memory variable
+        // wrapped in `old(...)` — the base variable is declared globally.
+        let Some(resolved_label) = resolved else {
+            return true;
+        };
+        let name = boogie_resource_memory_name(self.env, memory, &Some(resolved_label));
+        if declared.contains(&name) {
+            return true;
+        }
+        // Mismatch: the Boogie variable we would reference is not declared.
+        let loc = self.env.get_node_loc(node_id);
+        let kind_name = match kind {
+            BehaviorKind::RequiresOf => "requires_of",
+            BehaviorKind::AbortsOf => "aborts_of",
+            BehaviorKind::EnsuresOf => "ensures_of",
+            BehaviorKind::ResultOf => "result_of",
+        };
+        let struct_env = self.env.get_struct_qid(memory.to_qualified_id());
+        let mem_display = struct_env.get_full_name_with_address().to_string();
+        self.env.error(
+            &loc,
+            &format!(
+                "`{}` references resource `{}` used by the target function, but the \
+                 enclosing function does not save a pre-state for it; either declare \
+                 the access via `reads_of`/`modifies_of` on the target, or use state \
+                 quantification, e.g., `forall S in *, ...: S.. |~ {}<f>(...)`",
+                kind_name, mem_display, kind_name
+            ),
+        );
+        emit!(self.writer, "/* undeclared-memory */ ");
+        false
     }
 
     fn translate_event_store_includes(&self, args: &[Exp]) {
@@ -1501,7 +2124,7 @@ impl SpecTranslator<'_> {
         module_id: ModuleId,
         fun_id: SpecFunId,
         args: &[Exp],
-        memory_labels: &Option<Vec<MemoryLabel>>,
+        range: &MemoryRange,
     ) {
         let inst = &self.get_node_instantiation(node_id);
         let module_env = &self.env.get_module(module_id);
@@ -1543,16 +2166,67 @@ impl SpecTranslator<'_> {
             }
         }
         // Add memory parameters.
-        let label_at = |i| memory_labels.as_ref().map(|labels| labels[i]);
-        let mut i = 0;
-        for memory in &fun_decl.used_memory {
-            let memory = &memory.to_owned().instantiate(inst);
-            maybe_comma();
-            let memory = boogie_resource_memory_name(self.env, memory, &label_at(i));
-            emit!(self.writer, &memory);
-            i = usize::saturating_add(i, 1);
+        // For spec functions with uses_old, memory in old_memory gets both pre and post
+        // state parameters; non-old memory gets only the current (post) state.
+        // For non-uses_old spec functions, prefer post (current state), falling back
+        // to pre (for calls inside old() context).
+        let effective_label = range.post.or(range.pre);
+        if fun_decl.uses_old {
+            let inst_old: BTreeSet<_> = fun_decl
+                .old_memory
+                .iter()
+                .map(|m| m.clone().instantiate(inst))
+                .collect();
+            for memory in &fun_decl.used_memory {
+                let memory = &memory.to_owned().instantiate(inst);
+                if inst_old.contains(memory) {
+                    // Old-context resource: pass pre-state then post-state.
+                    // Resolve labels through the predecessor chain so resources
+                    // not modified at a label get the correct earlier snapshot.
+                    maybe_comma();
+                    let pre_name = if range.pre.is_none() {
+                        // Unlabeled pre: entry state — needs old() or old_ prefix.
+                        if self.fun_old_memory.is_some() {
+                            format!(
+                                "old_{}",
+                                boogie_resource_memory_name(self.env, memory, &None)
+                            )
+                        } else {
+                            format!(
+                                "old({})",
+                                boogie_resource_memory_name(self.env, memory, &None)
+                            )
+                        }
+                    } else {
+                        self.resolve_memory_name(memory, range.pre)
+                    };
+                    emit!(self.writer, &pre_name);
+                    maybe_comma();
+                    let post_name = self.resolve_memory_name(memory, range.post);
+                    emit!(self.writer, &post_name);
+                } else {
+                    // Non-old resource: pass current (post) state, resolved.
+                    maybe_comma();
+                    let mem_name = self.resolve_memory_name(memory, range.post);
+                    emit!(self.writer, &mem_name);
+                }
+            }
+        } else {
+            for memory in &fun_decl.used_memory {
+                let memory = &memory.to_owned().instantiate(inst);
+                maybe_comma();
+                let mem_name = self.resolve_memory_name(memory, effective_label);
+                emit!(self.writer, &mem_name);
+            }
         }
-        // Finally add argument expressions
+        // Finally add argument expressions.
+        // The global number-operation analysis (GlobalNumberOperationState) propagates bv-mode
+        // consistently through spec expressions, ensuring each argument's Boogie type already
+        // matches its parameter's declared type.  Inserting explicit $bv2int/$int2bv conversions
+        // here based on call-site bv_flag or node num_oper misfires on intermediate expressions
+        // (e.g. `e - int2bv(1)` inside a bv spec function has the right Boogie type but its
+        // node num_oper may not be Bitwise) and on calls whose result is bv but some parameters
+        // are int — in both cases the conversion creates a type error rather than fixing one.
         for exp in args {
             maybe_comma();
             self.translate_exp(exp);
@@ -1729,7 +2403,7 @@ impl SpecTranslator<'_> {
 
     fn translate_update_field(
         &self,
-        node_id: NodeId,
+        _node_id: NodeId,
         module_id: ModuleId,
         struct_id: StructId,
         field_id: FieldId,
@@ -1737,13 +2411,18 @@ impl SpecTranslator<'_> {
     ) {
         let struct_env = &self.env.get_module(module_id).into_struct(struct_id);
         let field_env = struct_env.get_field(field_id);
-        let suffix = boogie_inst_suffix(self.env, &self.get_node_instantiation(node_id), &[]);
-        emit!(
-            self.writer,
-            "$Update{}_{}(",
-            suffix,
-            field_env.get_name().display(self.env.symbol_pool())
-        );
+        let receiver_type = self.get_node_type(args[0].node_id());
+        let struct_inst = receiver_type.skip_reference().require_struct().2;
+        let update_fun = if struct_env.has_variants() {
+            boogie_variant_field_update(
+                &field_env,
+                boogie_type(self.env, &field_env.get_type(), false),
+                struct_inst,
+            )
+        } else {
+            boogie_field_update(&field_env, struct_inst)
+        };
+        emit!(self.writer, "{}(", update_fun);
         self.translate_exp(&args[0]);
         emit!(self.writer, ", ");
         self.translate_exp(&args[1]);
@@ -1756,6 +2435,199 @@ impl SpecTranslator<'_> {
             .error(loc, "type values not supported by this backend");
     }
 
+    /// Collect (label, memory_type) pairs from an expression for labels that need
+    /// existential quantification in Boogie function bodies.
+    pub fn collect_intermediate_labels_from_exp(
+        &self,
+        exp: &Exp,
+    ) -> BTreeSet<(MemoryLabel, QualifiedInstId<StructId>)> {
+        let env = self.env;
+        let type_inst = &self.type_inst;
+        let mut result = BTreeSet::new();
+        exp.visit_pre_order(&mut |e| {
+            if let ExpData::Call(node_id, op, args) = e {
+                match op {
+                    Operation::Global(Some(label)) | Operation::Exists(Some(label)) => {
+                        let node_inst = env.get_node_instantiation(*node_id);
+                        let node_inst = Type::instantiate_slice(&node_inst, type_inst);
+                        let mem_ty = &node_inst[0];
+                        let (mid, sid, inst) = mem_ty.require_struct();
+                        result.insert((*label, mid.qualified_inst(sid, inst.to_owned())));
+                    },
+                    Operation::SpecPublish(range)
+                    | Operation::SpecRemove(range)
+                    | Operation::SpecUpdate(range) => {
+                        let node_inst = env.get_node_instantiation(*node_id);
+                        let node_inst = Type::instantiate_slice(&node_inst, type_inst);
+                        let mem_ty = &node_inst[0];
+                        let (mid, sid, inst) = mem_ty.require_struct();
+                        let mem = mid.qualified_inst(sid, inst.to_owned());
+                        for label in range.labels() {
+                            result.insert((label, mem.clone()));
+                        }
+                    },
+                    Operation::SpecFunction(mid, fid, range) if !range.is_default() => {
+                        let inst = env.get_node_instantiation(*node_id);
+                        let inst = Type::instantiate_slice(&inst, type_inst);
+                        let module = env.get_module(*mid);
+                        let fun = module.get_spec_fun(*fid);
+                        for mem in fun.used_memory.iter() {
+                            let mem = mem.clone().instantiate(&inst);
+                            for label in range.labels() {
+                                result.insert((label, mem.clone()));
+                            }
+                        }
+                    },
+                    Operation::Behavior(_, range) if !range.is_default() => {
+                        // Resolve the closure (first arg) to get the function's memory usage.
+                        if let Some(ExpData::Call(closure_id, Operation::Closure(mid, fid, _), _)) =
+                            args.first().map(|a| a.as_ref())
+                        {
+                            let inst = env.get_node_instantiation(*closure_id);
+                            let inst = Type::instantiate_slice(&inst, type_inst);
+                            let fun_env = env.get_function(mid.qualified(*fid));
+                            for mem in fun_env.get_spec_used_memory() {
+                                let mem = mem.clone().instantiate(&inst);
+                                for label in range.labels() {
+                                    result.insert((label, mem.clone()));
+                                }
+                            }
+                            for mem in fun_env.get_spec_old_memory() {
+                                let mem = mem.clone().instantiate(&inst);
+                                for label in range.labels() {
+                                    result.insert((label, mem.clone()));
+                                }
+                            }
+                        }
+                    },
+                    _ => {},
+                }
+            }
+            true
+        });
+        result
+    }
+
+    /// Core implementation for resolving a memory label and producing a Boogie variable name.
+    /// Resolves labels through the defining operation chain, and applies old()/old_ prefix
+    /// when the resolved label indicates function entry state.
+    ///
+    /// `in_old_context`: whether we're inside an explicit old() context (for Global/Exists).
+    /// For range-based operations (Behavior, SpecFunction), pass `false`.
+    fn resolve_memory_name_impl(
+        &self,
+        memory: &QualifiedInstId<StructId>,
+        label: Option<MemoryLabel>,
+        in_old_context: bool,
+    ) -> String {
+        let resolved = match label {
+            Some(l) if !self.label_info.borrow().is_empty() => {
+                self.resolve_label_for_memory(l, memory)
+            },
+            other => other,
+        };
+        // Need old() prefix when the label resolved to None (entry state) and either:
+        // - we're inside an old() context (Global/Exists in spec function bodies), or
+        // - the label was explicitly provided but resolved away (resource not modified)
+        let needs_old = resolved.is_none() && (in_old_context || label.is_some());
+        let base = boogie_resource_memory_name(self.env, memory, &resolved);
+        if needs_old {
+            if self.fun_old_memory.is_some() {
+                format!("old_{}", base)
+            } else {
+                format!("old({})", base)
+            }
+        } else {
+            base
+        }
+    }
+
+    /// Collects all `MemoryLabel`s that are explicitly bound by `StateDomain` quantifier
+    /// ranges within the given expression tree. These labels should NOT be wrapped in
+    /// the implicit existential quantification.
+    pub fn collect_quant_bound_state_labels(&self, exp: &Exp) -> BTreeSet<MemoryLabel> {
+        let env = self.env;
+        let mut result = BTreeSet::new();
+        exp.visit_pre_order(&mut |e| {
+            if let ExpData::Quant(_, _, ranges, _, _, _) = e {
+                let label_names = env.get_memory_label_names();
+                for (pat, range) in ranges {
+                    let range_ty = env.get_node_type(range.node_id());
+                    if matches!(range_ty, Type::StateDomain) {
+                        if let Pattern::Var(_, sym) = pat {
+                            // Find all MemoryLabels with this symbol name
+                            for (label, name) in &label_names {
+                                if name == sym {
+                                    result.insert(*label);
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+            true
+        });
+        result
+    }
+
+    /// Returns the Boogie memory variable name, accounting for old() context in spec funs.
+    fn old_aware_memory_name(
+        &self,
+        memory: &QualifiedInstId<StructId>,
+        memory_label: &Option<MemoryLabel>,
+    ) -> String {
+        self.resolve_memory_name_impl(memory, *memory_label, *self.in_old_context.borrow())
+    }
+
+    /// Resolve a memory label from a MemoryRange pre/post field, returning the Boogie name.
+    fn resolve_memory_name(
+        &self,
+        memory: &QualifiedInstId<StructId>,
+        label: Option<MemoryLabel>,
+    ) -> String {
+        self.resolve_memory_name_impl(memory, label, false)
+    }
+
+    /// Resolve pre/post memory names for mutation builtins.
+    /// Mutations are two-state predicates: pre is the state before the mutation,
+    /// post is the state after. When unlabeled (None):
+    /// - pre: uses old() / old_ prefix (the function's entry state)
+    /// - post: uses current memory (the function's exit state)
+    /// When labeled: uses the labeled memory variable.
+    fn mutation_pre_post_memory(
+        &self,
+        memory: &QualifiedInstId<StructId>,
+        range: &MemoryRange,
+    ) -> (String, String) {
+        // Resolve pre-label through the label chain for this resource type.
+        // The mutation's pre-state might reference a label where this resource
+        // type wasn't modified, in which case it resolves further back.
+        let resolved_pre = match range.pre {
+            Some(label) if !self.label_info.borrow().is_empty() => {
+                self.resolve_label_for_memory(label, memory)
+            },
+            other => other,
+        };
+        let pre_mem = if resolved_pre.is_some() {
+            // Labeled pre-state (after resolution)
+            boogie_resource_memory_name(self.env, memory, &resolved_pre)
+        } else if self.fun_old_memory.is_some() {
+            // In spec function body: use old_ parameter name
+            format!(
+                "old_{}",
+                boogie_resource_memory_name(self.env, memory, &None)
+            )
+        } else {
+            // In procedure body: use old() wrapper
+            format!(
+                "old({})",
+                boogie_resource_memory_name(self.env, memory, &None)
+            )
+        };
+        let post_mem = boogie_resource_memory_name(self.env, memory, &range.post);
+        (pre_mem, post_mem)
+    }
+
     fn translate_resource_access(
         &self,
         node_id: NodeId,
@@ -1766,7 +2638,7 @@ impl SpecTranslator<'_> {
         emit!(
             self.writer,
             "$ResourceValue({}, ",
-            boogie_resource_memory_name(self.env, memory, memory_label),
+            self.old_aware_memory_name(memory, memory_label),
         );
         self.translate_exp(&args[0]);
         emit!(self.writer, ")");
@@ -1788,7 +2660,7 @@ impl SpecTranslator<'_> {
         emit!(
             self.writer,
             "$ResourceExists({}, ",
-            boogie_resource_memory_name(self.env, memory, memory_label),
+            self.old_aware_memory_name(memory, memory_label),
         );
         self.translate_exp(&args[0]);
         emit!(self.writer, ")");
@@ -1873,6 +2745,52 @@ impl SpecTranslator<'_> {
         );
     }
 
+    /// For a `StateDomain` quantifier variable with name `label_name`, scan `exp` for
+    /// `Behavior(EnsuresOf, range)` operations where `range.pre` or `range.post` maps to
+    /// `label_name` AND the closure has `|&mut T|`-style parameters with no global memory.
+    /// Returns `(MemoryLabel, T)` — the label and the value type to use for the state variable.
+    fn find_value_state_for_label(
+        &self,
+        exp: &Exp,
+        label_name: Symbol,
+    ) -> Option<(MemoryLabel, Type)> {
+        let label_names = self.env.get_memory_label_names();
+        let mut result: Option<(MemoryLabel, Type)> = None;
+        exp.visit_pre_order(&mut |e| {
+            if result.is_some() {
+                return false;
+            }
+            if let ExpData::Call(_, Operation::Behavior(BehaviorKind::EnsuresOf, range), args) = e {
+                let matching_label = range
+                    .pre
+                    .into_iter()
+                    .chain(range.post)
+                    .find(|label| label_names.get(label).copied() == Some(label_name));
+                if let Some(label) = matching_label {
+                    if let Some(fun_arg) = args.first() {
+                        let fun_type = self.env.get_node_type(fun_arg.node_id());
+                        let inst_fun_type = fun_type.instantiate(&self.type_inst);
+                        let (union_used, _) =
+                            compute_evaluator_memory_union(self.env, &inst_fun_type);
+                        if union_used.is_empty() {
+                            // No global memory — check for &mut T params
+                            if let Type::Fun(arg_ty, _, _) = &inst_fun_type {
+                                for ty in arg_ty.clone().flatten() {
+                                    if ty.is_mutable_reference() {
+                                        result = Some((label, ty.skip_reference().clone()));
+                                        return false;
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+            true
+        });
+        result
+    }
+
     fn translate_quant(
         &self,
         _node_id: NodeId,
@@ -1905,6 +2823,7 @@ impl SpecTranslator<'_> {
                 | Type::Fun(..)
                 | Type::TypeDomain(_)
                 | Type::ResourceDomain(_, _, _)
+                | Type::StateDomain
                 | Type::Error
                 | Type::Var(_) => false,
             };
@@ -1916,6 +2835,34 @@ impl SpecTranslator<'_> {
                 range_tmps.insert(var_name, range_tmp);
             }
         }
+        // Collect state-domain quantifier info: for each state-domain range variable,
+        // find the MemoryLabel and the affected memory types from the body.
+        let all_body_labels = self.collect_intermediate_labels_from_exp(body);
+        let mut state_domain_labels: BTreeMap<
+            Symbol,
+            BTreeSet<(MemoryLabel, QualifiedInstId<StructId>)>,
+        > = BTreeMap::new();
+        for (var, range) in ranges {
+            let quant_ty = self.get_node_type(range.node_id());
+            if matches!(quant_ty.skip_reference(), Type::StateDomain) {
+                let (_, var_name) = self.require_range_var(var);
+                // Find the MemoryLabel for this variable name by reverse lookup
+                let label_names = self.env.get_memory_label_names();
+                let mut affected = BTreeSet::new();
+                for (label, mem) in &all_body_labels {
+                    if let Some(name) = label_names.get(label) {
+                        if *name == var_name {
+                            affected.insert((*label, mem.clone()));
+                        }
+                    }
+                }
+                state_domain_labels.insert(var_name, affected);
+            }
+        }
+        // Snapshot value_state_vars before variable emission so we can
+        // restore it after the body, preventing leakage across quantifiers.
+        let pre_vs_keys: BTreeSet<MemoryLabel> =
+            self.value_state_vars.borrow().keys().copied().collect();
         // Translate quantified variables.
         emit!(self.writer, "({} ", kind);
         let mut quant_vars = HashMap::new();
@@ -1950,6 +2897,46 @@ impl SpecTranslator<'_> {
                     let addr_quant_var = self.fresh_var_name("a");
                     emit!(self.writer, "{}{}: int", comma, addr_quant_var);
                     resource_vars.insert(var_name, addr_quant_var);
+                },
+                Type::StateDomain => {
+                    // Emit one Boogie memory variable per affected (label, memory_type) pair.
+                    if let Some(affected) = state_domain_labels.get(&var_name) {
+                        if !affected.is_empty() {
+                            for (label, mem) in affected {
+                                let name =
+                                    boogie_resource_memory_name(self.env, mem, &Some(*label));
+                                let ty = boogie_struct_name(
+                                    &self.env.get_struct_qid(mem.to_qualified_id()),
+                                    &mem.inst,
+                                    false,
+                                );
+                                emit!(self.writer, "{}{}: $Memory {}", comma, name, ty);
+                                comma = ", ";
+                            }
+                        } else {
+                            // No global memory labels — check for value-typed state variables
+                            // arising from `|&mut T|` closure parameters.
+                            if let Some((label, val_ty)) =
+                                self.find_value_state_for_label(body, var_name)
+                            {
+                                let boogie_var = format!("{}_val", var_name_str);
+                                let bv_flag = false;
+                                emit!(
+                                    self.writer,
+                                    "{}{}: {}",
+                                    comma,
+                                    boogie_var,
+                                    boogie_type(self.env, &val_ty, bv_flag)
+                                );
+                                comma = ", ";
+                                self.value_state_vars
+                                    .borrow_mut()
+                                    .insert(label, (boogie_var, val_ty));
+                            }
+                        }
+                    }
+                    // Skip incrementing comma at the end — already done above
+                    continue;
                 },
                 _ => {
                     let quant_var = self.fresh_var_name("i");
@@ -2015,8 +3002,8 @@ impl SpecTranslator<'_> {
                     }
                     emit!(self.writer, "{}{}", separator, type_check);
                 },
-                Type::ResourceDomain(..) => {
-                    // currently does not generate a constraint
+                Type::ResourceDomain(..) | Type::StateDomain => {
+                    // No range constraint needed.
                     continue;
                 },
                 Type::Vector(..) => {
@@ -2088,6 +3075,10 @@ impl SpecTranslator<'_> {
             self.writer,
             &")".repeat(quant_vars.len().checked_add(1).unwrap())
         );
+        // Restore value_state_vars to pre-quantifier state to prevent leakage.
+        self.value_state_vars
+            .borrow_mut()
+            .retain(|k, _| pre_vs_keys.contains(k));
     }
 
     /// Translate a `some x: T: P[x]` expression. This saves information about the axiomatized

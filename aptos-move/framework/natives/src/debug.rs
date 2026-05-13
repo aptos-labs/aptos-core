@@ -26,14 +26,16 @@ use std::collections::VecDeque;
  **************************************************************************************************/
 #[inline]
 fn native_print(
-    _: &mut SafeNativeContext,
+    _context: &mut SafeNativeContext,
     ty_args: &[Type],
     mut args: VecDeque<Value>,
 ) -> SafeNativeResult<SmallVec<[Value; 1]>> {
     debug_assert!(ty_args.is_empty());
     debug_assert!(args.len() == 1);
 
-    if cfg!(feature = "testing") {
+    let should_print = cfg!(feature = "testing");
+
+    if should_print {
         let val = safely_pop_arg!(args, Struct);
         let bytes = val.unpack()?.next().unwrap();
 
@@ -50,7 +52,6 @@ fn native_print(
  * native fun print_stack_trace
  *
  **************************************************************************************************/
-#[allow(unused_variables)]
 #[inline]
 fn native_stack_trace(
     context: &mut SafeNativeContext,
@@ -62,7 +63,9 @@ fn native_stack_trace(
 
     let mut s = String::new();
 
-    if cfg!(feature = "testing") {
+    let should_print = cfg!(feature = "testing");
+
+    if should_print {
         context.print_stack_trace(&mut s)?;
     }
 
@@ -76,7 +79,9 @@ fn native_old_debug_print(
     ty_args: &[Type],
     mut args: VecDeque<Value>,
 ) -> SafeNativeResult<SmallVec<[Value; 1]>> {
-    if cfg!(feature = "testing") {
+    let should_print = cfg!(feature = "testing");
+
+    if should_print {
         let x = safely_pop_arg!(args, Reference);
         let val = x.read_ref().map_err(SafeNativeError::InvariantViolation)?;
 
@@ -97,7 +102,9 @@ fn native_old_print_stacktrace(
     debug_assert!(ty_args.is_empty());
     debug_assert!(args.is_empty());
 
-    if cfg!(feature = "testing") {
+    let should_print = cfg!(feature = "testing");
+
+    if should_print {
         let mut s = String::new();
         context.print_stack_trace(&mut s)?;
         println!("{}", s);

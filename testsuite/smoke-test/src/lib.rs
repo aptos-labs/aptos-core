@@ -64,6 +64,8 @@ mod transaction;
 #[cfg(test)]
 mod transaction_filter;
 #[cfg(test)]
+mod transaction_tracing;
+#[cfg(test)]
 mod txn_broadcast;
 #[cfg(test)]
 mod txn_emitter;

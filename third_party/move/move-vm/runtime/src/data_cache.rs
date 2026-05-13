@@ -1,6 +1,7 @@
-// Copyright (c) The Diem Core Contributors
-// Copyright (c) The Move Contributors
-// SPDX-License-Identifier: Apache-2.0
+// Parts of the file are Copyright (c) The Diem Core Contributors
+// Parts of the file are Copyright (c) The Move Contributors
+// Parts of the file are Copyright (c) Aptos Foundation
+// All Aptos Foundation code and content is licensed pursuant to the Innovation-Enabling Source Code License, available at https://github.com/aptos-labs/aptos-core/blob/main/LICENSE
 
 use crate::{
     module_traversal::TraversalContext,
@@ -44,6 +45,26 @@ pub trait NativeContextMoveVmDataCache {
         addr: &AccountAddress,
         ty: &Type,
     ) -> PartialVMResult<(bool, Option<NumBytes>)>;
+
+    /// Loads resource from global storage and borrows an immutable reference to it.
+    /// Returns the borrowed value and the number of bytes loaded (if any).
+    fn native_borrow_resource(
+        &mut self,
+        gas_meter: &mut dyn DependencyGasMeter,
+        traversal_context: &mut TraversalContext,
+        addr: &AccountAddress,
+        ty: &Type,
+    ) -> PartialVMResult<(Value, Option<NumBytes>)>;
+
+    /// Loads resource from global storage and borrows a mutable reference to it.
+    /// Returns the borrowed value and the number of bytes loaded (if any).
+    fn native_borrow_resource_mut(
+        &mut self,
+        gas_meter: &mut dyn DependencyGasMeter,
+        traversal_context: &mut TraversalContext,
+        addr: &AccountAddress,
+        ty: &Type,
+    ) -> PartialVMResult<(Value, Option<NumBytes>)>;
 }
 
 /// Provides access to global storage for Move VM.
@@ -98,6 +119,33 @@ where
         let (gv, bytes_loaded) = self.load_resource(&mut gas_meter, traversal_context, addr, ty)?;
         let exists = gv.exists();
         Ok((exists, bytes_loaded))
+    }
+
+    fn native_borrow_resource(
+        &mut self,
+        gas_meter: &mut dyn DependencyGasMeter,
+        traversal_context: &mut TraversalContext,
+        addr: &AccountAddress,
+        ty: &Type,
+    ) -> PartialVMResult<(Value, Option<NumBytes>)> {
+        let mut gas_meter = DependencyGasMeterWrapper::new(gas_meter);
+        let (gv, bytes_loaded) = self.load_resource(&mut gas_meter, traversal_context, addr, ty)?;
+        let ref_val = gv.borrow_global()?;
+        Ok((ref_val, bytes_loaded))
+    }
+
+    fn native_borrow_resource_mut(
+        &mut self,
+        gas_meter: &mut dyn DependencyGasMeter,
+        traversal_context: &mut TraversalContext,
+        addr: &AccountAddress,
+        ty: &Type,
+    ) -> PartialVMResult<(Value, Option<NumBytes>)> {
+        let mut gas_meter = DependencyGasMeterWrapper::new(gas_meter);
+        let (gv, bytes_loaded) =
+            self.load_resource_mut(&mut gas_meter, traversal_context, addr, ty)?;
+        let ref_val = gv.borrow_global()?;
+        Ok((ref_val, bytes_loaded))
     }
 }
 
@@ -285,7 +333,6 @@ impl TransactionDataCache {
             gas_meter,
             traversal_context,
             ty,
-            false,
         )?;
 
         let (data, bytes_loaded) = {

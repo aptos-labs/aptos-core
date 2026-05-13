@@ -22,10 +22,12 @@ use aptos_logger::info;
 use aptos_metrics_core::TimerHelper;
 use aptos_scratchpad::SparseMerkleTree;
 use aptos_storage_interface::{
-    jmt_update_refs, state_store::state_with_summary::StateWithSummary, Result,
+    jmt_update_refs,
+    state_store::{state_with_summary::StateWithSummary, HotStateShardUpdates},
+    Result,
 };
 use aptos_types::{
-    state_store::{hot_state::HotStateValueRef, state_key::StateKey, NUM_STATE_SHARDS},
+    state_store::{state_key::StateKey, NUM_STATE_SHARDS},
     transaction::Version,
 };
 use rayon::prelude::*;
@@ -38,11 +40,17 @@ use std::{
     thread::JoinHandle,
 };
 
+/// Payload sent to the state snapshot committer thread.
+pub(crate) struct SnapshotToCommit {
+    pub snapshot: StateWithSummary,
+    pub hot_state_updates: [HotStateShardUpdates; NUM_STATE_SHARDS],
+}
+
 pub(crate) struct StateSnapshotCommitter {
     state_db: Arc<StateDb>,
     /// Last snapshot merklized and sent for persistence, not guaranteed to have committed already.
     last_snapshot: StateWithSummary,
-    state_snapshot_commit_receiver: Receiver<CommitMessage<StateWithSummary>>,
+    state_snapshot_commit_receiver: Receiver<CommitMessage<SnapshotToCommit>>,
     state_merkle_batch_commit_sender: SyncSender<CommitMessage<StateMerkleCommit>>,
     join_handle: Option<JoinHandle<()>>,
 }
@@ -52,7 +60,7 @@ impl StateSnapshotCommitter {
 
     pub fn new(
         state_db: Arc<StateDb>,
-        state_snapshot_commit_receiver: Receiver<CommitMessage<StateWithSummary>>,
+        state_snapshot_commit_receiver: Receiver<CommitMessage<SnapshotToCommit>>,
         last_snapshot: StateWithSummary,
         persisted_state: PersistedState,
     ) -> Self {
@@ -87,7 +95,10 @@ impl StateSnapshotCommitter {
     pub fn run(mut self) {
         while let Ok(msg) = self.state_snapshot_commit_receiver.recv() {
             match msg {
-                CommitMessage::Data(snapshot) => {
+                CommitMessage::Data(SnapshotToCommit {
+                    snapshot,
+                    hot_state_updates,
+                }) => {
                     let version = snapshot.version().expect("Cannot be empty");
                     let base_version = self.last_snapshot.version();
                     let previous_epoch_ending_version = self
@@ -100,33 +111,33 @@ impl StateSnapshotCommitter {
                     let min_version = self.last_snapshot.next_version();
 
                     // Element format: (key_hash, Option<(value_hash, key)>)
-                    let (hot_updates, all_updates): (Vec<_>, Vec<_>) = snapshot
+                    let all_updates: Vec<_> = snapshot
                         .make_delta(&self.last_snapshot)
                         .shards
                         .iter()
                         .map(|updates| {
                             let _timer = OTHER_TIMERS_SECONDS.timer_with(&["hash_jmt_updates"]);
-                            let mut hot_updates = Vec::new();
-                            let mut all_updates = Vec::new();
-                            for (key, slot) in updates.iter() {
-                                if slot.is_hot() {
-                                    hot_updates.push((
-                                        CryptoHash::hash(&key),
-                                        Some((
-                                            HotStateValueRef::from_slot(&slot).hash(),
-                                            key.clone(),
-                                        )),
-                                    ));
-                                } else {
-                                    hot_updates.push((CryptoHash::hash(&key), None));
-                                }
-                                if let Some(value) = slot.maybe_update_jmt(key, min_version) {
-                                    all_updates.push(value);
-                                }
-                            }
-                            (hot_updates, all_updates)
+                            updates
+                                .iter()
+                                .filter_map(|(_key_hash, slot)| slot.maybe_update_jmt(min_version))
+                                .collect::<Vec<_>>()
                         })
-                        .unzip();
+                        .collect();
+
+                    let hot_updates: Vec<_> = hot_state_updates
+                        .into_iter()
+                        .map(|shard| {
+                            let _timer = OTHER_TIMERS_SECONDS.timer_with(&["hash_hot_jmt_updates"]);
+                            shard
+                                .insertions
+                                .into_iter()
+                                .map(|(key_hash, op)| {
+                                    (key_hash, Some((op.value.hash(), op.state_key)))
+                                })
+                                .chain(shard.evictions.into_keys().map(|key_hash| (key_hash, None)))
+                                .collect()
+                        })
+                        .collect();
 
                     // TODO(HotState): for now we use `is_descendant_of` to determine if hot state
                     // summary is computed at all. When it's not enabled everything is

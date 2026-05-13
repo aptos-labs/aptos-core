@@ -36,7 +36,7 @@ module 0x42::Test {
 
     fun call_inline_1(y: u64) {
         let z = 3 + y;
-        inline_1(y, |x| x > 2, |x| x > z, |x| { while(z < y) {let _x = x;}; x > 5 } spec {
+        inline_1(y, |x| x > 2, |x| x > z, |x| { while(z < y) {let _x = x;}; x > 5 } spec { // error: imperative expressions not supported in specs
             ensures result == (x > 5);
             ensures result != !(x > 5);
         });
@@ -47,7 +47,7 @@ module 0x42::Test {
             let w = e(x);
             spec {
                 assert x > 0;
-                assert w == e(x); // e is translated into an uninterpreted spec fun
+                assert w == e(x);
             };
             true
         } else {
@@ -57,7 +57,7 @@ module 0x42::Test {
 
     fun call_inline_2(y: u64) {
         let z = 3 + y;
-        inline_2(y, |x| { while(z < y) {let _x = x;}; x > 5 } spec {
+        inline_2(y, |x| { while(z < y) {let _x = x;}; x > 5 } spec { // error: imperative expressions not supported in specs
             pragma opaque;
             requires x > 0;
             ensures result == (x > 5);
@@ -66,7 +66,7 @@ module 0x42::Test {
     }
 
     fun call_inline_2_aborts_if(y: u64) {
-        inline_2(y, |x| { if (x == 0) { abort 1; }; x > 5  } spec {
+        inline_2(y, |x| { if (x == 0) { abort 1; }; x > 5  } spec { // error: imperative expressions not supported in specs
             aborts_if !(x > 0);
             ensures result == (x > 5);
             ensures result != !(x > 5);
@@ -75,7 +75,7 @@ module 0x42::Test {
 
     fun call_inline_fail_1(y: u64) {
         let z = 3 + y;
-        inline_1(y, |x| x > 2, |x| x > z, |x| { while(z < y) {let _x = x;}; x > 5 } spec {
+        inline_1(y, |x| x > 2, |x| x > z, |x| { while(z < y) {let _x = x;}; x > 5 } spec { // error: imperative expressions not supported in specs
             aborts_if x > 0; // This does not verify
             ensures result == (x > 5);
             ensures result != !(x > 5);
@@ -84,7 +84,7 @@ module 0x42::Test {
 
     fun call_inline_fail_2(y: u64) {
         let z = 3 + y;
-        inline_1(y, |x| x > 2, |x| x > z, |x| { while(z < y) {let _x = x;}; x > 5 } spec
+        inline_1(y, |x| x > 2, |x| x > z, |x| { while(z < y) {let _x = x;}; x > 5 } spec // error: imperative expressions not supported in specs
         {
             aborts_if false; // This verifies
             requires x > 0; // This does not verify at the call site

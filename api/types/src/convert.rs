@@ -3,7 +3,7 @@
 
 use crate::{
     transaction::{
-        BlockEpilogueTransaction, BlockMetadataTransaction, DecodedTableData,
+        BlockEpilogueTransaction, BlockMetadataTransaction, ClaimedEntryFunction, DecodedTableData,
         DecryptedPayload as ApiDecryptedPayload, DeleteModule, DeleteResource, DeleteTableItem,
         DeletedTableData, EncryptedPayload as ApiEncryptedPayload,
         EncryptedTransactionInnerPayload, EncryptedTransactionPayload,
@@ -373,6 +373,21 @@ impl<'a, S: StateView> MoveConverter<'a, S> {
             })
         };
 
+        let into_api_claimed_entry_function = |claim: Option<
+            aptos_types::transaction::encrypted_payload::ClaimedEntryFunction,
+        >|
+         -> Option<ClaimedEntryFunction> {
+            let aptos_types::transaction::encrypted_payload::ClaimedEntryFunction {
+                module,
+                function: name,
+            } = claim?;
+
+            Some(ClaimedEntryFunction {
+                module: module.into(),
+                name: name.map(|n| n.into()),
+            })
+        };
+
         let ret = match payload {
             Script(s) => TransactionPayload::ScriptPayload(try_into_script_payload(s)?),
             EntryFunction(fun) => {
@@ -390,6 +405,10 @@ impl<'a, S: StateView> MoveConverter<'a, S> {
                                 entry_function_payload,
                             ))
                         },
+                        aptos_types::transaction::MultisigTransactionPayload::Script(script) => {
+                            let script_payload = try_into_script_payload(script)?;
+                            Some(MultisigTransactionPayload::ScriptPayload(script_payload))
+                        },
                     }
                 } else {
                     None
@@ -402,53 +421,56 @@ impl<'a, S: StateView> MoveConverter<'a, S> {
             Payload(aptos_types::transaction::TransactionPayloadInner::V1 {
                 executable,
                 extra_config,
-            }) => match extra_config {
-                aptos_types::transaction::TransactionExtraConfig::V1 {
-                    multisig_address,
-                    replay_protection_nonce: _,
-                } => {
-                    if let Some(multisig_address) = multisig_address {
-                        match executable {
-                            aptos_types::transaction::TransactionExecutable::EntryFunction(
-                                entry_function,
-                            ) => TransactionPayload::MultisigPayload(MultisigPayload {
-                                multisig_address: multisig_address.into(),
+            }) => {
+                let multisig_address = extra_config.multisig_address().map(Address::from);
+                if let Some(multisig_address) = multisig_address {
+                    match executable {
+                        aptos_types::transaction::TransactionExecutable::EntryFunction(
+                            entry_function,
+                        ) => TransactionPayload::MultisigPayload(MultisigPayload {
+                            multisig_address,
+                            transaction_payload: Some(
+                                MultisigTransactionPayload::EntryFunctionPayload(
+                                    try_into_entry_function_payload(entry_function)?,
+                                ),
+                            ),
+                        }),
+                        aptos_types::transaction::TransactionExecutable::Encrypted => {
+                            bail!("Encrypted executable is not supported for multisig transactions")
+                        },
+                        aptos_types::transaction::TransactionExecutable::Script(script) => {
+                            TransactionPayload::MultisigPayload(MultisigPayload {
+                                multisig_address,
                                 transaction_payload: Some(
-                                    MultisigTransactionPayload::EntryFunctionPayload(
-                                        try_into_entry_function_payload(entry_function)?,
+                                    MultisigTransactionPayload::ScriptPayload(
+                                        try_into_script_payload(script)?,
                                     ),
                                 ),
-                            }),
-                            aptos_types::transaction::TransactionExecutable::Script(_)
-                            | aptos_types::transaction::TransactionExecutable::Encrypted => {
-                                bail!(
-                                    "Script/encrypted executable is not supported for multisig transactions"
-                                )
-                            },
-                            aptos_types::transaction::TransactionExecutable::Empty => {
-                                TransactionPayload::MultisigPayload(MultisigPayload {
-                                    multisig_address: multisig_address.into(),
-                                    transaction_payload: None,
-                                })
-                            },
-                        }
-                    } else {
-                        match executable {
-                            aptos_types::transaction::TransactionExecutable::EntryFunction(
-                                entry_function,
-                            ) => TransactionPayload::EntryFunctionPayload(
-                                try_into_entry_function_payload(entry_function)?,
-                            ),
-                            aptos_types::transaction::TransactionExecutable::Script(script) => {
-                                TransactionPayload::ScriptPayload(try_into_script_payload(script)?)
-                            },
-                            aptos_types::transaction::TransactionExecutable::Empty
-                            | aptos_types::transaction::TransactionExecutable::Encrypted => {
-                                bail!("Empty/encrypted executable is not supported for non-multisig transactions")
-                            },
-                        }
+                            })
+                        },
+                        aptos_types::transaction::TransactionExecutable::Empty => {
+                            TransactionPayload::MultisigPayload(MultisigPayload {
+                                multisig_address,
+                                transaction_payload: None,
+                            })
+                        },
                     }
-                },
+                } else {
+                    match executable {
+                        aptos_types::transaction::TransactionExecutable::EntryFunction(
+                            entry_function,
+                        ) => TransactionPayload::EntryFunctionPayload(
+                            try_into_entry_function_payload(entry_function)?,
+                        ),
+                        aptos_types::transaction::TransactionExecutable::Script(script) => {
+                            TransactionPayload::ScriptPayload(try_into_script_payload(script)?)
+                        },
+                        aptos_types::transaction::TransactionExecutable::Empty
+                        | aptos_types::transaction::TransactionExecutable::Encrypted => {
+                            bail!("Empty/encrypted executable is not supported for non-multisig transactions")
+                        },
+                    }
+                }
             },
             // Deprecated.
             ModuleBundle(_) => bail!("Module bundle payload has been removed"),
@@ -461,31 +483,36 @@ impl<'a, S: StateView> MoveConverter<'a, S> {
                 let ciphertext = HexEncodedBytes::from(bcs::to_bytes(encrypted.ciphertext())?);
 
                 match encrypted {
-                    EP::Encrypted { payload_hash, .. } => {
-                        TransactionPayload::EncryptedTransactionPayload(
-                            EncryptedTransactionPayload::Encrypted(ApiEncryptedPayload {
-                                payload_hash: crate::HashValue::from(payload_hash),
-                                ciphertext: ciphertext.clone(),
-                            }),
-                        )
-                    },
-                    EP::FailedDecryption { payload_hash, .. } => {
+                    EP::Encrypted(inner) => TransactionPayload::EncryptedTransactionPayload(
+                        EncryptedTransactionPayload::Encrypted(ApiEncryptedPayload {
+                            payload_hash: crate::HashValue::from(inner.payload_hash),
+                            ciphertext: ciphertext.clone(),
+                            encryption_epoch: U64::from(inner.encryption_epoch),
+                            claimed_entry_fun: into_api_claimed_entry_function(
+                                inner.claimed_entry_fun.clone(),
+                            ),
+                        }),
+                    ),
+                    EP::FailedDecryption { original, .. } => {
                         TransactionPayload::EncryptedTransactionPayload(
                             EncryptedTransactionPayload::FailedDecryption(
                                 ApiFailedDecryptionPayload {
-                                    payload_hash: crate::HashValue::from(payload_hash),
+                                    payload_hash: crate::HashValue::from(original.payload_hash),
                                     ciphertext: ciphertext.clone(),
+                                    encryption_epoch: U64::from(original.encryption_epoch),
+                                    claimed_entry_fun: into_api_claimed_entry_function(
+                                        original.claimed_entry_fun.clone(),
+                                    ),
                                 },
                             ),
                         )
                     },
                     EP::Decrypted {
-                        payload_hash,
-                        executable,
-                        decryption_nonce,
+                        original,
+                        decrypted,
                         ..
                     } => {
-                        let inner = match executable {
+                        let inner = match decrypted.executable() {
                             aptos_types::transaction::TransactionExecutable::EntryFunction(
                                 entry_function,
                             ) if multisig_address.is_some() => {
@@ -516,10 +543,16 @@ impl<'a, S: StateView> MoveConverter<'a, S> {
                         };
                         TransactionPayload::EncryptedTransactionPayload(
                             EncryptedTransactionPayload::Decrypted(ApiDecryptedPayload {
-                                payload_hash: crate::HashValue::from(payload_hash),
+                                payload_hash: crate::HashValue::from(original.payload_hash),
                                 ciphertext,
+                                encryption_epoch: U64::from(original.encryption_epoch),
                                 decrypted_payload: inner,
-                                decryption_nonce: U64::from(decryption_nonce),
+                                decryption_nonce: HexEncodedBytes::from(
+                                    decrypted.decryption_nonce().to_vec(),
+                                ),
+                                claimed_entry_fun: into_api_claimed_entry_function(
+                                    original.claimed_entry_fun.clone(),
+                                ),
                             }),
                         )
                     },
@@ -854,6 +887,19 @@ impl<'a, S: StateView> MoveConverter<'a, S> {
                 ))
             };
 
+        let into_claimed_entry_fun = |claim: Option<ClaimedEntryFunction>| -> Option<
+            aptos_types::transaction::encrypted_payload::ClaimedEntryFunction,
+        > {
+            let ClaimedEntryFunction { module, name } = claim?;
+
+            Some(
+                aptos_types::transaction::encrypted_payload::ClaimedEntryFunction {
+                    module: module.into(),
+                    function: name.map(|n| n.into()),
+                },
+            )
+        };
+
         let try_into_script_payload = |script: ScriptPayload| -> Result<Script> {
             let ScriptPayload {
                 code,
@@ -909,7 +955,6 @@ impl<'a, S: StateView> MoveConverter<'a, S> {
                     Target::Script(try_into_script_payload(script)?)
                 }
             },
-
             TransactionPayload::MultisigPayload(multisig) => {
                 if let Some(nonce) = nonce {
                     let executable = if let Some(payload) = multisig.transaction_payload {
@@ -919,6 +964,9 @@ impl<'a, S: StateView> MoveConverter<'a, S> {
                             ) => Executable::EntryFunction(try_into_entry_function(
                                 entry_func_payload,
                             )?),
+                            MultisigTransactionPayload::ScriptPayload(script) => {
+                                Executable::Script(try_into_script_payload(script)?)
+                            },
                         }
                     } else {
                         Executable::Empty
@@ -946,6 +994,14 @@ impl<'a, S: StateView> MoveConverter<'a, S> {
                                     ),
                                 )
                             },
+                            MultisigTransactionPayload::ScriptPayload(script) => {
+                                let script = try_into_script_payload(script)?;
+                                Some(
+                                    aptos_types::transaction::MultisigTransactionPayload::Script(
+                                        script,
+                                    ),
+                                )
+                            },
                         }
                     } else {
                         None
@@ -958,21 +1014,31 @@ impl<'a, S: StateView> MoveConverter<'a, S> {
             },
             TransactionPayload::EncryptedTransactionPayload(encrypted) => {
                 // Only the Encrypted variant can be submitted; VerifyInput enforces this.
-                let (payload_hash, ciphertext_bytes) = match encrypted {
-                    EncryptedTransactionPayload::Encrypted(p) => (p.payload_hash, p.ciphertext),
-                    _ => bail!("Only encrypted state payloads can be submitted"),
-                };
+                let (payload_hash, ciphertext_bytes, encryption_epoch, claimed_entry_fun) =
+                    match encrypted {
+                        EncryptedTransactionPayload::Encrypted(p) => (
+                            p.payload_hash,
+                            p.ciphertext,
+                            p.encryption_epoch,
+                            p.claimed_entry_fun,
+                        ),
+                        _ => bail!("Only encrypted state payloads can be submitted"),
+                    };
                 let ciphertext: Ciphertext = bcs::from_bytes(&ciphertext_bytes.0)
                     .context("Failed to BCS-deserialize ciphertext")?;
                 let extra_config = ExtraConfig::V1 {
                     multisig_address: None,
                     replay_protection_nonce: nonce,
                 };
-                Target::EncryptedPayload(EncryptedPayload::Encrypted {
-                    ciphertext,
-                    extra_config,
-                    payload_hash: payload_hash.into(),
-                })
+                Target::EncryptedPayload(EncryptedPayload::Encrypted(
+                    aptos_types::transaction::encrypted_payload::EncryptedInner {
+                        ciphertext,
+                        extra_config,
+                        payload_hash: payload_hash.into(),
+                        encryption_epoch: encryption_epoch.into(),
+                        claimed_entry_fun: into_claimed_entry_fun(claimed_entry_fun),
+                    },
+                ))
             },
             // Deprecated.
             TransactionPayload::ModuleBundlePayload(_) => {

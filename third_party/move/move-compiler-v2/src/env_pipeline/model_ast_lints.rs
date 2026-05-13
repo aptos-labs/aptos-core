@@ -1,5 +1,5 @@
 // Copyright (c) Aptos Foundation
-// SPDX-License-Identifier: Apache-2.0
+// Licensed pursuant to the Innovation-Enabling Source Code License, available at https://github.com/aptos-labs/aptos-core/blob/main/LICENSE
 
 //! This module exercises externally provided model-AST-based lint checks.
 
@@ -39,42 +39,54 @@ pub fn checker(env: &mut GlobalEnv) {
         .flat_map(|c| c.get_function_checkers())
         .collect::<Vec<_>>();
     for module in env.get_modules() {
-        if module.is_primary_target() {
-            let module_lint_skips =
-                lint_skips_from_attributes(env, module.get_attributes(), &known_checker_names);
-            for const_env in module.get_named_constants() {
-                check_constant(
-                    &const_env,
-                    &constant_checkers,
-                    &module_lint_skips,
-                    &known_checker_names,
-                );
+        // Test/verify-only modules are kept in the model so their callers
+        // are visible to lints, but their items are not themselves linted.
+        if !module.is_primary_target() || module.is_test_or_verify_only() {
+            continue;
+        }
+        let module_lint_skips =
+            lint_skips_from_attributes(env, module.get_attributes(), &known_checker_names);
+        for const_env in module.get_named_constants() {
+            if const_env.is_test_or_verify_only() {
+                continue;
             }
-            for struct_env in module.get_structs() {
-                check_struct(
-                    &struct_env,
-                    &struct_checkers,
-                    &module_lint_skips,
-                    &known_checker_names,
-                );
+            check_constant(
+                &const_env,
+                &constant_checkers,
+                &module_lint_skips,
+                &known_checker_names,
+            );
+        }
+        for struct_env in module.get_structs() {
+            if struct_env.is_test_or_verify_only() {
+                continue;
             }
-            for function in module.get_functions() {
-                check_function(
-                    &function,
-                    &function_checkers,
-                    &module_lint_skips,
-                    &known_checker_names,
-                );
-                if function.is_native() {
-                    continue;
-                }
-                check_exp(
-                    &function,
-                    external_checks,
-                    &module_lint_skips,
-                    &known_checker_names,
-                );
+            check_struct(
+                &struct_env,
+                &struct_checkers,
+                &module_lint_skips,
+                &known_checker_names,
+            );
+        }
+        for function in module.get_functions() {
+            if function.is_test_or_verify_only() {
+                continue;
             }
+            check_function(
+                &function,
+                &function_checkers,
+                &module_lint_skips,
+                &known_checker_names,
+            );
+            if function.is_native() {
+                continue;
+            }
+            check_exp(
+                &function,
+                external_checks,
+                &module_lint_skips,
+                &known_checker_names,
+            );
         }
     }
 }

@@ -1,7 +1,7 @@
 [
   {
     "name": "move_package_coverage",
-    "description": "Get uncovered source lines for a package, optionally scoped to a function. Uses existing coverage map if available, otherwise runs tests first. Use this to identify which code paths need test coverage.",
+    "description": "Get uncovered source lines for a package",
     "inputSchema": {
       "$schema": "https://json-schema.org/draft/2020-12/schema",
       "title": "MovePackageCoverageParams",
@@ -60,101 +60,51 @@
         "package_path": {
           "description": "Path to the Move package directory.",
           "type": "string"
-        }
-      },
-      "required": [
-        "package_path"
-      ],
-      "oneOf": [
-        {
-          "description": "Returns a map from each module to the modules it depends on.",
-          "type": "object",
-          "properties": {
-            "query": {
-              "type": "string",
-              "const": "dep_graph"
-            }
-          },
-          "required": [
-            "query"
-          ]
         },
-        {
-          "description": "Returns a summary of each module's constants, structs, and functions.",
-          "type": "object",
-          "properties": {
-            "query": {
-              "type": "string",
-              "const": "module_summary"
-            }
-          },
-          "required": [
-            "query"
-          ]
+        "query": {
+          "description": "Query type.",
+          "$ref": "#/$defs/QueryType"
         },
-        {
-          "description": "Returns a function-level call graph as a map from each function to the functions it calls.",
-          "type": "object",
-          "properties": {
-            "query": {
-              "type": "string",
-              "const": "call_graph"
-            }
-          },
-          "required": [
-            "query"
-          ]
-        },
-        {
-          "description": "Returns direct and transitive calls/uses by a given function.\n\"called\" = direct calls; \"used\" = direct calls + closure captures.",
-          "type": "object",
-          "properties": {
-            "function": {
-              "description": "Function to query, in the form \"module_name::function_name\".",
-              "type": "string"
-            },
-            "query": {
-              "type": "string",
-              "const": "function_usage"
-            }
-          },
-          "required": [
-            "query",
-            "function"
-          ]
-        }
-      ]
-    },
-    "annotations": {
-      "readOnlyHint": false,
-      "destructiveHint": false
-    }
-  },
-  {
-    "name": "move_package_spec_infer",
-    "description": "Low-level WP inference tool — not for direct use. Requires multi-phase workflow context (loop-invariant synthesis, simplification, verification) that is only available through subagent delegation.",
-    "inputSchema": {
-      "$schema": "https://json-schema.org/draft/2020-12/schema",
-      "title": "MovePackageSpecInferParams",
-      "type": "object",
-      "properties": {
-        "package_path": {
-          "description": "Path to the Move package directory.",
-          "type": "string"
-        },
-        "filter": {
-          "description": "Optional filter: `module_name` or `module_name::function_name`.\nWhen omitted, all target modules are inferred.",
+        "function": {
+          "description": "Function to query (required for \"function_usage\"), in the form \"module_name::function_name\".",
           "type": "string",
           "nullable": true
         }
       },
       "required": [
-        "package_path"
-      ]
+        "package_path",
+        "query"
+      ],
+      "$defs": {
+        "QueryType": {
+          "oneOf": [
+            {
+              "description": "Returns a map from each module to the modules it depends on.",
+              "type": "string",
+              "const": "dep_graph"
+            },
+            {
+              "description": "Returns a summary of each module's constants, structs, and functions.",
+              "type": "string",
+              "const": "module_summary"
+            },
+            {
+              "description": "Returns a function-level call graph as a map from each function to the functions it calls.",
+              "type": "string",
+              "const": "call_graph"
+            },
+            {
+              "description": "Returns direct and transitive calls/uses by a given function.\n\"called\" = direct calls; \"used\" = direct calls + closure captures.",
+              "type": "string",
+              "const": "function_usage"
+            }
+          ]
+        }
+      }
     },
     "annotations": {
       "readOnlyHint": false,
-      "destructiveHint": true
+      "destructiveHint": false
     }
   },
   {
@@ -181,7 +131,7 @@
   },
   {
     "name": "move_package_test",
-    "description": "Run Move unit tests for a package. Set establish_baseline=true to save current coverage as baseline (use before generating new tests). Without establish_baseline, returns lines newly covered since baseline. Returns newly_covered=null if no baseline exists — call with establish_baseline first.",
+    "description": "Run Move unit tests for a package",
     "inputSchema": {
       "$schema": "https://json-schema.org/draft/2020-12/schema",
       "title": "MovePackageTestParams",
@@ -209,7 +159,7 @@
   },
   {
     "name": "move_package_verify",
-    "description": "Low-level prover tool — not for direct use. Requires phased verification workflow context (timeout handling, diagnostic interpretation) that is only available through subagent delegation.",
+    "description": "Verify Move specifications using the Move Prover",
     "inputSchema": {
       "$schema": "https://json-schema.org/draft/2020-12/schema",
       "title": "MovePackageVerifyParams",
@@ -233,7 +183,19 @@
           "nullable": true
         },
         "timeout": {
-          "description": "Solver timeout per verification condition, in seconds. Default: 10. Maximum: 10.",
+          "description": "Solver timeout per verification condition, in seconds. Default: 10. Maximum: 60.",
+          "type": "integer",
+          "format": "uint",
+          "minimum": 0,
+          "nullable": true
+        },
+        "split_vcs_by_assert": {
+          "description": "If set, generate an independent verification condition for each\nassertion in a function instead of a single combined condition. Can\nhelp when a function mixes provable-but-hard asserts with asserts\nthat produce counterexamples; useful for diagnosing per-function\ntimeouts.",
+          "type": "boolean",
+          "nullable": true
+        },
+        "error_limit": {
+          "description": "Maximum number of counterexamples reported per verification\ncondition.",
           "type": "integer",
           "format": "uint",
           "minimum": 0,
@@ -247,6 +209,54 @@
     "annotations": {
       "readOnlyHint": false,
       "destructiveHint": false
+    }
+  },
+  {
+    "name": "move_package_wp",
+    "description": "Raw WP engine — output requires loop-invariant synthesis and simplification that only the /move-inf skill workflow provides. Do not call directly.",
+    "inputSchema": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "title": "MovePackageSpecInferParams",
+      "type": "object",
+      "properties": {
+        "package_path": {
+          "description": "Path to the Move package directory.",
+          "type": "string"
+        },
+        "filter": {
+          "description": "Optional filter: `module_name` or `module_name::function_name`.\nWhen omitted, all target modules are inferred.",
+          "type": "string",
+          "nullable": true
+        },
+        "spec_output": {
+          "description": "Where to write inferred specifications. Defaults to `inline` (inject into\nsource files). Set to `file` to write separate `.spec.move` files instead,\nkeeping original sources untouched.",
+          "$ref": "#/$defs/SpecOutput"
+        }
+      },
+      "required": [
+        "package_path"
+      ],
+      "$defs": {
+        "SpecOutput": {
+          "description": "Controls where inferred specs are written.",
+          "oneOf": [
+            {
+              "description": "Inject inferred specs inline into the original source files (default).",
+              "type": "string",
+              "const": "inline"
+            },
+            {
+              "description": "Write inferred specs to separate `.spec.move` files alongside the sources,\nleaving the original source files untouched.",
+              "type": "string",
+              "const": "file"
+            }
+          ]
+        }
+      }
+    },
+    "annotations": {
+      "readOnlyHint": false,
+      "destructiveHint": true
     }
   }
 ]

@@ -15,7 +15,7 @@ use crate::emitter::{
     },
     metrics::update_tps_gauges,
     stats::{DynamicStatsTracking, TxnStats},
-    submission_worker::{EncryptionKeyRotator, SubmissionWorker},
+    submission_worker::SubmissionWorker,
     transaction_executor::RestApiReliableTransactionSubmitter,
 };
 use again::RetryPolicy;
@@ -791,8 +791,13 @@ impl TxnEmitter {
 
         // Set the encryption key on the traffic factory upfront.
         // init_txn_factory has its own independent Arc so it won't be affected.
-        let encrypt_transactions = req.encrypt_transactions;
-        if encrypt_transactions {
+        let has_per_workload_encryption = req.transaction_mix_per_phase.iter().any(|phase| {
+            phase
+                .iter()
+                .any(|(tt, _)| matches!(tt, TransactionType::Encrypted { .. }))
+        });
+        let needs_encryption = req.encrypt_transactions || has_per_workload_encryption;
+        if needs_encryption {
             let state = self.rest_cli.get_ledger_information().await?.into_inner();
             txn_factory
                 .update_encryption_key_state(state.epoch, state.encryption_key.as_deref())?;
@@ -897,13 +902,48 @@ impl TxnEmitter {
         // Creating workers is slow with many workers (TODO check why)
         // so we create them all first, before starting them - so they start at the right time for
         // traffic pattern to be correct.
-        let rotator = if encrypt_transactions {
-            Some(Arc::new(EncryptionKeyRotator::new(
-                txn_factory.encryption_key_handle(),
-            )))
-        } else {
-            None
-        };
+        // Spawn a background task that polls for the encryption key periodically.
+        // This is faster than waiting for submit response headers, which can take
+        // a full worker loop cycle (~txn_expiration_time_secs) to propagate.
+        if needs_encryption {
+            let poll_client = self.rest_cli.clone();
+            let encryption_key_handle = txn_factory.encryption_key_handle();
+            let poll_stop = stop.clone();
+            tokio_handle.spawn(async move {
+                let mut poll_interval = time::interval(Duration::from_secs(5));
+                loop {
+                    poll_interval.tick().await;
+                    if poll_stop.load(Ordering::Relaxed) {
+                        break;
+                    }
+                    if let Ok(resp) = poll_client.get_ledger_information().await {
+                        let state = resp.into_inner();
+                        let mut guard = encryption_key_handle.write().unwrap();
+                        if state.epoch > guard.epoch {
+                            let new_key = state.encryption_key.as_deref().map(bcs::from_bytes);
+                            match new_key {
+                                Some(Ok(key)) => {
+                                    guard.epoch = state.epoch;
+                                    guard.key = Some(key);
+                                    info!(
+                                        "Encryption key poller: rotated key for epoch {}",
+                                        state.epoch
+                                    );
+                                },
+                                None => {
+                                    guard.epoch = state.epoch;
+                                    guard.key = None;
+                                },
+                                Some(Err(_)) => {
+                                    // Key bytes present but deserialization failed;
+                                    // don't advance epoch so we retry next tick.
+                                },
+                            }
+                        }
+                    }
+                }
+            });
+        }
 
         info!("Tx emitter creating workers");
         let mut submission_workers = Vec::with_capacity(num_accounts);
@@ -928,7 +968,6 @@ impl TxnEmitter {
                 all_start_sleep_durations[worker_index],
                 check_account_sequence_only_once_for.contains(&worker_index),
                 self.from_rng(),
-                rotator.clone(),
             );
             submission_workers.push(worker);
         }

@@ -387,7 +387,10 @@ async fn verify_jwt_signature(
     // Validate the JWT signature.
     // TODO: can we avoid decoding the JWT twice?
     let mut validation_with_sig_verification = Validation::new(RS256);
-    validation_with_sig_verification.validate_exp = false; // Don't validate the exp time
+    // We intentionally skip JWT `exp` validation here: pepper access
+    // is still time-bounded by EPK expiration checks and nonce binding,
+    // so a leaked JWT alone does not grant indefinite pepper access.
+    validation_with_sig_verification.validate_exp = false;
     jsonwebtoken::decode::<Claims>(jwt, &jwk_decoding_key, &validation_with_sig_verification) // Signature verification happens here
         .map_err(|e| {
             PepperServiceError::BadRequest(format!("JWT signature verification failed: {e}"))

@@ -230,6 +230,11 @@ pub enum TransactionShufflerType {
         platform_use_case_spread_factor: usize,
         user_use_case_spread_factor: usize,
     },
+    UseCaseAndEncryptedTxnsAware {
+        sender_spread_factor: usize,
+        platform_use_case_spread_factor: usize,
+        user_use_case_spread_factor: usize,
+    },
 }
 
 impl TransactionShufflerType {
@@ -248,6 +253,10 @@ impl TransactionShufflerType {
             | Self::SenderAwareV2(_)
             | Self::DeprecatedFairness => None,
             Self::UseCaseAware {
+                user_use_case_spread_factor,
+                ..
+            }
+            | Self::UseCaseAndEncryptedTxnsAware {
                 user_use_case_spread_factor,
                 ..
             } => Some(*user_use_case_spread_factor),

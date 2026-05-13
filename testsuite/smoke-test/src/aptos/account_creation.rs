@@ -6,6 +6,7 @@ use aptos_cached_packages::aptos_stdlib;
 use aptos_forge::Swarm;
 use aptos_types::CoinType;
 
+#[ignore] // Already automatic, no longer need to test
 #[tokio::test(flavor = "multi_thread", worker_threads = 1)]
 async fn test_account_auto_creation() {
     let swarm = new_local_swarm_with_aptos(1).await;

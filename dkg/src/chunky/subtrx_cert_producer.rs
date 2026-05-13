@@ -11,7 +11,7 @@ use crate::{
 use anyhow::{anyhow, ensure, Context};
 use aptos_channels::aptos_channel::Sender;
 use aptos_consensus_types::common::Author;
-use aptos_crypto::{bls12381::Signature, hash::CryptoHash, Signature as _};
+use aptos_crypto::{bls12381::Signature, hash::CryptoHash, HashValue, Signature as _};
 use aptos_infallible::Mutex;
 use aptos_logger::info;
 use aptos_reliable_broadcast::{BroadcastStatus, ReliableBroadcast};
@@ -22,16 +22,17 @@ use aptos_types::{
 use futures::future::AbortHandle;
 use futures_util::future::Abortable;
 use move_core_types::account_address::AccountAddress;
+use rand::Rng;
 use std::{collections::BTreeMap, sync::Arc, time::Duration};
 use tokio_retry::strategy::ExponentialBackoff;
 
-#[allow(dead_code)]
 pub fn start_chunky_subtranscript_certification(
     reliable_broadcast: Arc<ReliableBroadcast<DKGMessage, ExponentialBackoff>>,
     start_time: Duration,
     my_addr: AccountAddress,
     epoch_state: Arc<EpochState>,
-    aggregated_subtranscript: AggregatedSubtranscript,
+    aggregated_subtranscript: Arc<AggregatedSubtranscript>,
+    dealer_transcript_hashes: Vec<HashValue>,
     certified_agg_subtx_tx: Option<Sender<(), CertifiedAggregatedSubtranscript>>,
 ) -> AbortHandle {
     let epoch = epoch_state.epoch;
@@ -39,15 +40,24 @@ pub fn start_chunky_subtranscript_certification(
     let req = ChunkyDKGSubtranscriptSignatureRequest::new(
         epoch,
         aggregated_subtranscript.hash(),
-        aggregated_subtranscript.dealers.clone(),
+        aggregated_subtranscript.dealer_bitmask.clone(),
+        dealer_transcript_hashes,
     );
     let validation_state = Arc::new(ChunkySubtranscriptCertificationState::new(
         start_time,
         my_addr,
         epoch_state.clone(),
-        aggregated_subtranscript,
+        aggregated_subtranscript.clone(),
     ));
     let task = async move {
+        // Stagger certification broadcasts across validators to avoid
+        // all ~100 validators hitting each other simultaneously.
+        const MAX_CERT_JITTER: Duration = Duration::from_secs(5);
+        let jitter = Duration::from_millis(
+            rand::thread_rng().gen_range(0, MAX_CERT_JITTER.as_millis() as u64),
+        );
+        tokio::time::sleep(jitter).await;
+
         let validated_trx = rb
             .broadcast(req, validation_state)
             .await
@@ -85,7 +95,8 @@ pub struct ChunkySubtranscriptCertificationState {
     my_addr: AccountAddress,
     sig_aggregator: Mutex<ChunkySubtranscriptSignatureAggregator>,
     epoch_state: Arc<EpochState>,
-    aggregated_subtranscript: AggregatedSubtranscript,
+    aggregated_subtranscript: Arc<AggregatedSubtranscript>,
+    expected_subtranscript_hash: HashValue,
 }
 
 impl ChunkySubtranscriptCertificationState {
@@ -93,14 +104,16 @@ impl ChunkySubtranscriptCertificationState {
         start_time: Duration,
         my_addr: AccountAddress,
         epoch_state: Arc<EpochState>,
-        aggregated_subtranscript: AggregatedSubtranscript,
+        aggregated_subtranscript: Arc<AggregatedSubtranscript>,
     ) -> Self {
+        let expected_subtranscript_hash = aggregated_subtranscript.hash();
         Self {
             start_time,
             my_addr,
             sig_aggregator: Mutex::new(ChunkySubtranscriptSignatureAggregator::default()),
             epoch_state,
             aggregated_subtranscript,
+            expected_subtranscript_hash,
         }
     }
 }
@@ -123,10 +136,24 @@ impl BroadcastStatus<DKGMessage> for Arc<ChunkySubtranscriptCertificationState> 
         validation_response: ChunkyDKGSubtranscriptSignatureResponse,
     ) -> anyhow::Result<Option<Self::Aggregated>> {
         let ChunkyDKGSubtranscriptSignatureResponse {
-            dealer_epoch: _,
-            subtranscript_hash: _,
+            dealer_epoch,
+            subtranscript_hash,
             signature,
         } = validation_response;
+
+        // Defense-in-depth: validate response metadata matches what we requested.
+        // While BLS signature verification would catch mismatched content, checking
+        // these fields provides better error messages and catches honest bugs early.
+        ensure!(
+            dealer_epoch == self.epoch_state.epoch,
+            "[ChunkyDKG] signature response epoch {} does not match expected {}",
+            dealer_epoch,
+            self.epoch_state.epoch,
+        );
+        ensure!(
+            subtranscript_hash == self.expected_subtranscript_hash,
+            "[ChunkyDKG] signature response hash does not match local aggregated subtranscript hash",
+        );
 
         let peer_power = self.epoch_state.verifier.get_voting_power(&sender);
         ensure!(
@@ -220,6 +247,7 @@ mod tests {
     use crate::chunky::test_utils::ChunkyTestSetup;
     use aptos_crypto::{hash::CryptoHash, SigningKey, Uniform};
     use aptos_infallible::duration_since_epoch;
+    use std::sync::Arc;
 
     fn make_cert_state(
         setup: &ChunkyTestSetup,
@@ -229,7 +257,7 @@ mod tests {
             duration_since_epoch(),
             setup.addrs[0],
             setup.epoch_state.clone(),
-            agg_subtrx,
+            Arc::new(agg_subtrx),
         ))
     }
 
@@ -310,6 +338,34 @@ mod tests {
             wrong_sig,
         );
         let result = BroadcastStatus::add(&state, setup.addrs[0], wrong_resp);
+        assert!(result.is_err());
+    }
+
+    #[tokio::test]
+    async fn test_certification_rejects_wrong_epoch_signature() {
+        let setup = ChunkyTestSetup::new_uniform(4);
+        let agg_subtrx = setup.aggregate_subtranscripts(&[0, 1, 2]);
+        let state = make_cert_state(&setup, agg_subtrx);
+
+        // Sign a different AggregatedSubtranscript with a wrong epoch.
+        let mut wrong_epoch_agg = setup.aggregate_subtranscripts(&[0, 1, 2]);
+        wrong_epoch_agg.dealer_epoch = 998;
+        let stale_sig = setup.private_keys[0].sign(&wrong_epoch_agg).unwrap();
+        let stale_resp =
+            ChunkyDKGSubtranscriptSignatureResponse::new(998, wrong_epoch_agg.hash(), stale_sig);
+        // Epoch mismatch is caught in metadata checks.
+        let result = BroadcastStatus::add(&state, setup.addrs[0], stale_resp);
+        assert!(result.is_err());
+
+        // Even if the response claims the right epoch, the signature is over the wrong data
+        // (different epoch in AggregatedSubtranscript changes the hash).
+        let stale_sig2 = setup.private_keys[0].sign(&wrong_epoch_agg).unwrap();
+        let spoofed_resp = ChunkyDKGSubtranscriptSignatureResponse::new(
+            999,
+            state.aggregated_subtranscript().hash(),
+            stale_sig2,
+        );
+        let result = BroadcastStatus::add(&state, setup.addrs[0], spoofed_resp);
         assert!(result.is_err());
     }
 

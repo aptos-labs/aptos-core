@@ -17,6 +17,7 @@ use aptos_types::{
     },
     state_proof::StateProof,
     state_store::{
+        hot_state::HotStateValue,
         state_key::StateKey,
         state_storage_usage::StateStorageUsage,
         state_value::{StateValue, StateValueChunkWithProof},
@@ -356,11 +357,19 @@ pub trait DbReader: Send + Sync {
         /// This is used by aptos core (executor) internally.
         fn get_state_value_with_proof_by_version_ext(
             &self,
-            key_hash: &HashValue,
+            key_hash: HashValue,
             version: Version,
             root_depth: usize,
-            use_hot_state: bool,
         ) -> Result<(Option<StateValue>, SparseMerkleProofExt)>;
+
+        /// Returns the live `HotStateValue` at `version` together with a proof against the hot
+        /// state root. `None` means the key was never hot, or was evicted at or before `version`.
+        fn get_hot_state_value_with_proof_by_version_ext(
+            &self,
+            key_hash: HashValue,
+            version: Version,
+            root_depth: usize,
+        ) -> Result<(Option<HotStateValue>, SparseMerkleProofExt)>;
 
         /// Gets the latest LedgerView no matter if db has been bootstrapped.
         /// Used by the Db-bootstrapper.
@@ -497,10 +506,9 @@ pub trait DbReader: Send + Sync {
     ) -> Result<(Option<StateValue>, SparseMerkleProof)> {
         // TODO(HotState): check all callers and possibly query hot state first
         self.get_state_value_with_proof_by_version_ext(
-            state_key.crypto_hash_ref(),
+            *state_key.crypto_hash_ref(),
             version,
             /* root_depth = */ 0,
-            /* use_hot_state = */ false,
         )
         .map(|(value, proof_ext)| (value, proof_ext.into()))
     }

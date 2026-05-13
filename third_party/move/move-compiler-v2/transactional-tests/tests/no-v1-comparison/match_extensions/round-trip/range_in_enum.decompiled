@@ -1,0 +1,207 @@
+//**** Cross-compiled for `move` syntax from `tests/no-v1-comparison/match_extensions/range_in_enum.move`
+
+//# publish
+module 0xc0ffee::m {
+    enum Color has drop {
+        RGB {
+            _0: u8,
+            _1: u8,
+            _2: u8,
+        }
+        Named {
+            _0: u8,
+        }
+    }
+    enum E has drop {
+        V1 {
+            _0: u64,
+        }
+        V2 {
+            _0: u64,
+            _1: u64,
+        }
+        V3,
+    }
+    fun classify_color(p0: Color): u64 {
+        let _v0 = &p0;
+        loop {
+            if (_v0 is RGB) {
+                let _v1;
+                let _v2;
+                let _v3;
+                let _v4 = &_v0._0;
+                let _v5 = &_v0._1;
+                let _v6 = &_v0._2;
+                if (*_v4 >= 0u8) _v3 = *_v4 < 128u8 else _v3 = false;
+                if (_v3) if (*_v5 >= 0u8) _v2 = *_v5 < 128u8 else _v2 = false else _v2 = false;
+                if (_v2) if (*_v6 >= 0u8) _v1 = *_v6 < 128u8 else _v1 = false else _v1 = false;
+                if (_v1) break
+            };
+            loop {
+                if (!(_v0 is RGB)) {
+                    if (_v0 is Named) break;
+                    abort 14566554180833181697
+                };
+                let Color::RGB{_0: _v7, _1: _v8, _2: _v9} = p0;
+                return 2
+            };
+            let Color::Named{_0: _v10} = p0;
+            return 3
+        };
+        let Color::RGB{_0: _v11, _1: _v12, _2: _v13} = p0;
+        1
+    }
+    fun mixed_patterns(p0: E): u64 {
+        let _v0 = &p0;
+        loop {
+            let _v1;
+            let _v2;
+            if (_v0 is V1) {
+                _v2 = &_v0._0;
+                if (*_v2 >= 0) _v1 = *_v2 < 100 else _v1 = false;
+                if (_v1) break
+            };
+            'l0: loop {
+                'l1: loop {
+                    loop {
+                        if (!(_v0 is V1)) {
+                            if (_v0 is V2) {
+                                let _v3;
+                                _v2 = &_v0._0;
+                                let _v4 = &_v0._1;
+                                if (*_v2 >= 0) _v3 = *_v2 < 50 else _v3 = false;
+                                if (_v3) _v1 = *_v4 == 42 else _v1 = false;
+                                if (_v1) break 'l0
+                            };
+                            if (_v0 is V2) break;
+                            if (_v0 is V3) break 'l1;
+                            abort 14566554180833181697
+                        };
+                        let E::V1{_0: _v5} = p0;
+                        return 2
+                    };
+                    let E::V2{_0: _v6, _1: _v7} = p0;
+                    return 4
+                };
+                let E::V3{} = p0;
+                return 5
+            };
+            let E::V2{_0: _v8, _1: _v9} = p0;
+            return 3
+        };
+        let E::V1{_0: _v10} = p0;
+        1
+    }
+    fun multi_variant_range(p0: E): u64 {
+        let _v0 = &p0;
+        loop {
+            let _v1;
+            let _v2;
+            if (_v0 is V1) {
+                _v2 = &_v0._0;
+                if (*_v2 >= 1) _v1 = *_v2 <= 10 else _v1 = false;
+                if (_v1) break
+            };
+            'l0: loop {
+                'l1: loop {
+                    loop {
+                        if (!(_v0 is V1)) {
+                            if (_v0 is V2) {
+                                let _v3;
+                                _v2 = &_v0._0;
+                                let _v4 = &_v0._1;
+                                if (*_v2 >= 0) _v3 = *_v2 < 100 else _v3 = false;
+                                if (_v3) if (*_v4 >= 0) _v1 = *_v4 < 100 else _v1 = false else _v1 = false;
+                                if (_v1) break 'l0
+                            };
+                            if (_v0 is V2) break;
+                            if (_v0 is V3) break 'l1;
+                            abort 14566554180833181697
+                        };
+                        let E::V1{_0: _v5} = p0;
+                        return 2
+                    };
+                    let E::V2{_0: _v6, _1: _v7} = p0;
+                    return 4
+                };
+                let E::V3{} = p0;
+                return 5
+            };
+            let E::V2{_0: _v8, _1: _v9} = p0;
+            return 3
+        };
+        let E::V1{_0: _v10} = p0;
+        1
+    }
+    public fun test_bright_color(): u64 {
+        classify_color(Color::RGB{_0: 200u8, _1: 200u8, _2: 200u8})
+    }
+    public fun test_dark_color(): u64 {
+        classify_color(Color::RGB{_0: 50u8, _1: 50u8, _2: 50u8})
+    }
+    public fun test_mixed_color(): u64 {
+        classify_color(Color::RGB{_0: 50u8, _1: 200u8, _2: 50u8})
+    }
+    public fun test_multi_v1_in(): u64 {
+        multi_variant_range(E::V1{_0: 5})
+    }
+    public fun test_multi_v1_out(): u64 {
+        multi_variant_range(E::V1{_0: 50})
+    }
+    public fun test_multi_v2_in(): u64 {
+        multi_variant_range(E::V2{_0: 50, _1: 50})
+    }
+    public fun test_multi_v2_out(): u64 {
+        multi_variant_range(E::V2{_0: 200, _1: 200})
+    }
+    public fun test_multi_v3(): u64 {
+        multi_variant_range(E::V3{})
+    }
+    public fun test_named_color(): u64 {
+        classify_color(Color::Named{_0: 1u8})
+    }
+    public fun test_v1_in_range(): u64 {
+        mixed_patterns(E::V1{_0: 50})
+    }
+    public fun test_v1_out_range(): u64 {
+        mixed_patterns(E::V1{_0: 200})
+    }
+    public fun test_v2_both_match(): u64 {
+        mixed_patterns(E::V2{_0: 25, _1: 42})
+    }
+    public fun test_v2_range_only(): u64 {
+        mixed_patterns(E::V2{_0: 25, _1: 99})
+    }
+    public fun test_v3(): u64 {
+        mixed_patterns(E::V3{})
+    }
+}
+
+
+//# run 0xc0ffee::m::test_dark_color
+
+//# run 0xc0ffee::m::test_bright_color
+
+//# run 0xc0ffee::m::test_mixed_color
+
+//# run 0xc0ffee::m::test_named_color
+
+//# run 0xc0ffee::m::test_v1_in_range
+
+//# run 0xc0ffee::m::test_v1_out_range
+
+//# run 0xc0ffee::m::test_v2_both_match
+
+//# run 0xc0ffee::m::test_v2_range_only
+
+//# run 0xc0ffee::m::test_v3
+
+//# run 0xc0ffee::m::test_multi_v1_in
+
+//# run 0xc0ffee::m::test_multi_v1_out
+
+//# run 0xc0ffee::m::test_multi_v2_in
+
+//# run 0xc0ffee::m::test_multi_v2_out
+
+//# run 0xc0ffee::m::test_multi_v3

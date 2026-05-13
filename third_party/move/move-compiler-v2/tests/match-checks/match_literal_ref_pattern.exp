@@ -1,0 +1,10 @@
+
+Diagnostics:
+error: unexpected token
+  ┌─ tests/match-checks/match_literal_ref_pattern.move:9:19
+  │
+9 │             E::V1(&true) => 1,
+  │                   ^
+  │                   │
+  │                   Unexpected '&'
+  │                   Expected a variable or struct or variant name

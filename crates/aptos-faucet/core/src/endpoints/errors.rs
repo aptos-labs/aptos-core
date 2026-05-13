@@ -164,6 +164,9 @@ pub enum AptosTapErrorCode {
     /// Unexpected internal problem.
     InternalError = 58,
 
+    /// The requested asset is disabled and cannot be minted.
+    AssetDisabled = 59,
+
     /// Error from the web framework.
     WebFrameworkError = 60,
 }
@@ -174,6 +177,7 @@ impl AptosTapErrorCode {
             AptosTapErrorCode::InvalidRequest
             | AptosTapErrorCode::AccountDoesNotExist
             | AptosTapErrorCode::EndpointNotEnabled => StatusCode::BAD_REQUEST,
+            AptosTapErrorCode::AssetDisabled => StatusCode::GONE,
             AptosTapErrorCode::Rejected
             | AptosTapErrorCode::SourceIpMissing
             | AptosTapErrorCode::TransactionFailed

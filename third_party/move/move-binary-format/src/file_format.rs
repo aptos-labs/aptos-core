@@ -1,6 +1,7 @@
-// Copyright (c) The Diem Core Contributors
-// Copyright (c) The Move Contributors
-// SPDX-License-Identifier: Apache-2.0
+// Parts of the file are Copyright (c) The Diem Core Contributors
+// Parts of the file are Copyright (c) The Move Contributors
+// Parts of the file are Copyright (c) Aptos Foundation
+// All Aptos Foundation code and content is licensed pursuant to the Innovation-Enabling Source Code License, available at https://github.com/aptos-labs/aptos-core/blob/main/LICENSE
 
 #![allow(clippy::arc_with_non_send_sync)]
 
@@ -1237,6 +1238,18 @@ impl SignatureToken {
             | Reference(_)
             | MutableReference(_)
             | TypeParameter(_) => false,
+        }
+    }
+
+    /// Returns struct handle index and type argument list if this token is a struct.
+    pub fn struct_idx_and_ty_args(&self) -> Option<(&StructHandleIndex, &[SignatureToken])> {
+        use SignatureToken::*;
+        match self {
+            Struct(idx) => Some((idx, &[])),
+            StructInstantiation(idx, ty_args) => Some((idx, ty_args.as_slice())),
+            Bool | U8 | U16 | U32 | U64 | U128 | U256 | I8 | I16 | I32 | I64 | I128 | I256
+            | Address | Signer | Vector(_) | Function(..) | Reference(_) | MutableReference(_)
+            | TypeParameter(_) => None,
         }
     }
 

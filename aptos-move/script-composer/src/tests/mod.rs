@@ -241,7 +241,7 @@ fn test_module() {
         .join("src")
         .join("tests")
         .join("test_modules");
-    h.publish_package_cache_building(&account, &module_path);
+    h.publish_package(&account, &module_path);
 
     let mut run_txn = |batch_builder: TransactionComposer, h: &mut MoveHarness| {
         let script = batch_builder.generate_batched_calls(true).unwrap();

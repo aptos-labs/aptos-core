@@ -11,6 +11,7 @@ pub struct BatchStage;
 
 impl BatchStage {
     pub const POS_FORMED: &'static str = "pos";
+    pub const PROOF_RECEIVED: &'static str = "proof_received";
     pub const RECEIVED: &'static str = "received";
     pub const SIGNED: &'static str = "signed";
 }

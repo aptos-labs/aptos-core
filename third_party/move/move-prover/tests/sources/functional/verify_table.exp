@@ -16,7 +16,6 @@ error: post-condition does not hold
    =     at tests/sources/functional/verify_table.move:28: add_fail
    =     at tests/sources/functional/verify_table.move:23: add_fail
    =         result = <redacted>
-   =     at tests/sources/functional/verify_table.move:29: add_fail
    =     at tests/sources/functional/verify_table.move:31: add_fail (spec)
 
 error: post-condition does not hold
@@ -37,9 +36,6 @@ error: post-condition does not hold
     =     at tests/sources/functional/verify_table.move:110: make_R
     =     at tests/sources/functional/verify_table.move:106: make_R
     =         result = <redacted>
-    =     at tests/sources/functional/verify_table.move:111: make_R
-    =         result = <redacted>
-    =     at tests/sources/functional/verify_table.move:127: add_R_fail
     =     at tests/sources/functional/verify_table.move:131: add_R_fail (spec)
     =     at tests/sources/functional/verify_table.move:132: add_R_fail (spec)
     =     at tests/sources/functional/verify_table.move:133: add_R_fail (spec)

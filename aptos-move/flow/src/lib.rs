@@ -7,6 +7,7 @@ pub mod plugin;
 
 use anyhow::Result;
 use clap::{Args, Parser, Subcommand, ValueEnum};
+use mcp::supervisor::{run_supervised, RESTART_ENV_VAR};
 use std::path::PathBuf;
 
 /// MoveFlow: AI-assisted Move development tooling (plugin generator, MCP server, hooks).
@@ -70,7 +71,10 @@ impl FlowCli {
     pub async fn run(&self) -> Result<()> {
         match &self.command {
             FlowCommand::Plugin(args) => plugin::run(args, &self.global),
-            FlowCommand::Mcp(args) => mcp::run(args, &self.global).await,
+            FlowCommand::Mcp(args) => match std::env::var_os(RESTART_ENV_VAR) {
+                None => run_supervised().await,
+                Some(v) => mcp::run(args, &self.global, v == "1").await,
+            },
             FlowCommand::Hook(cmd) => hooks::run(cmd),
         }
     }

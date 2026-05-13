@@ -107,6 +107,8 @@ async fn test_full_node_basic_flow() {
     assert_balance(&pfn_client, &account_1, 13).await;
 }
 
+// VFNs are gone
+#[ignore]
 #[tokio::test]
 async fn test_vfn_failover() {
     // VFN failover happens when validator is down even for default_failovers = 0
@@ -174,6 +176,8 @@ async fn test_vfn_failover() {
     assert_balance(&vfn_client, &account_1, 12).await;
 }
 
+// Full node test covers everything in this test
+#[ignore]
 #[tokio::test]
 async fn test_private_full_node() {
     let mut swarm = local_swarm_with_fullnodes(4, 1).await;

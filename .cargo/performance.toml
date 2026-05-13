@@ -1,0 +1,9 @@
+# Extra rustflags for performance builds, merged into the base flags in
+# `config.toml` via `--config .cargo/performance.toml`.
+#
+# `-C linker-plugin-lto` must be an explicit rustflag — not just the profile's
+# `lto = "thin"` — so that it appears in CARGO_ENCODED_RUSTFLAGS where the
+# `cc` crate can detect it and apply `-flto=thin` to C/C++ code for
+# cross-language LTO.
+[target.x86_64-unknown-linux-gnu]
+rustflags = ["-C", "linker-plugin-lto"]

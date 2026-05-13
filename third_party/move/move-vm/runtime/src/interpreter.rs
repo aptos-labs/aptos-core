@@ -1,6 +1,7 @@
-// Copyright (c) The Diem Core Contributors
-// Copyright (c) The Move Contributors
-// SPDX-License-Identifier: Apache-2.0
+// Parts of the file are Copyright (c) The Diem Core Contributors
+// Parts of the file are Copyright (c) The Move Contributors
+// Parts of the file are Copyright (c) Aptos Foundation
+// All Aptos Foundation code and content is licensed pursuant to the Innovation-Enabling Source Code License, available at https://github.com/aptos-labs/aptos-core/blob/main/LICENSE
 
 use crate::{
     access_control::AccessControlState,
@@ -20,6 +21,7 @@ use crate::{
         check_function_type_count_and_depth, verify_pack_closure, FullRuntimeTypeCheck,
         NoRuntimeTypeCheck, RuntimeTypeCheck, UntrustedOnlyRuntimeTypeCheck,
     },
+    source_locator,
     storage::{
         loader::traits::Loader, ty_depth_checker::TypeDepthChecker,
         ty_layout_converter::LayoutConverter,
@@ -1706,6 +1708,15 @@ where
         }
         debug_writeln!(buf)?;
 
+        // Print source location if available.
+        if let Some(module_id) = function.module_id() {
+            if let Some(loc) =
+                source_locator::get_bytecode_source_location(module_id, function.index(), frame.pc)
+            {
+                debug_writeln!(buf, "          at {}", loc)?;
+            }
+        }
+
         // Print out the current instruction.
         debug_writeln!(buf)?;
         debug_writeln!(buf, "        Code:")?;
@@ -1723,12 +1734,18 @@ where
 
         // Print out the locals.
         debug_writeln!(buf)?;
-        debug_writeln!(buf, "        Locals:")?;
-        if !function.local_tys().is_empty() {
-            values::debug::print_locals(buf, &frame.locals, true)?;
-            debug_writeln!(buf)?;
-        } else {
+        if function.local_tys().is_empty() {
+            debug_writeln!(buf, "        Locals:")?;
             debug_writeln!(buf, "            (none)")?;
+        } else {
+            source_locator::print_locals_enriched(
+                buf,
+                function,
+                &frame.locals,
+                runtime_environment,
+                true,
+            )?;
+            debug_writeln!(buf)?;
         }
 
         debug_writeln!(buf)?;
@@ -2078,10 +2095,20 @@ impl Frame {
             };
             if is_tracing_for!(TraceCategory::VMError) {
                 let mut str = String::new();
+                let abort_idx = interpreter.call_stack.0.len();
                 if let Err(print_err) = interpreter
                     .debug_print_stack_trace(&mut str, interpreter.loader.runtime_environment())
                 {
                     str = format!("<while printing stack trace>: {}", print_err);
+                } else {
+                    // debug_print_stack_trace only covers parent frames; print the
+                    // aborting frame (self) separately as the innermost entry.
+                    let _ = interpreter.debug_print_frame(
+                        &mut str,
+                        interpreter.loader.runtime_environment(),
+                        abort_idx,
+                        self,
+                    );
                 }
                 eprintln!("trace vm_error {}:\n{}", e, str)
             }
@@ -2964,17 +2991,29 @@ impl Frame {
                         let lhs = interpreter.operand_stack.pop()?;
                         let rhs = interpreter.operand_stack.pop()?;
                         gas_meter.charge_eq(&lhs, &rhs)?;
+                        let check_mask = interpreter.vm_config.include_closure_mask_in_cmp;
                         interpreter
                             .operand_stack
-                            .push(Value::bool(lhs.equals(&rhs)?))?;
+                            .push(Value::bool(lhs.equals_with_depth(
+                                &rhs,
+                                1,
+                                interpreter.vm_config.max_value_nest_depth,
+                                check_mask,
+                            )?))?;
                     },
                     Instruction::Neq => {
                         let lhs = interpreter.operand_stack.pop()?;
                         let rhs = interpreter.operand_stack.pop()?;
                         gas_meter.charge_neq(&lhs, &rhs)?;
+                        let check_mask = interpreter.vm_config.include_closure_mask_in_cmp;
                         interpreter
                             .operand_stack
-                            .push(Value::bool(!lhs.equals(&rhs)?))?;
+                            .push(Value::bool(!lhs.equals_with_depth(
+                                &rhs,
+                                1,
+                                interpreter.vm_config.max_value_nest_depth,
+                                check_mask,
+                            )?))?;
                     },
                     Instruction::MutBorrowGlobal(sd_idx) | Instruction::ImmBorrowGlobal(sd_idx) => {
                         let is_mut = matches!(instruction, Instruction::MutBorrowGlobal(_));

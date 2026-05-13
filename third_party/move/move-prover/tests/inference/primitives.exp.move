@@ -8,6 +8,7 @@ module 0x42::primitives {
         x + y
     }
     spec test_add(x: u64, y: u64): u64 {
+        pragma opaque = true;
         ensures [inferred] result == x + y;
         aborts_if [inferred] x + y > MAX_U64;
     }
@@ -18,6 +19,7 @@ module 0x42::primitives {
         x - y
     }
     spec test_sub(x: u64, y: u64): u64 {
+        pragma opaque = true;
         ensures [inferred] result == x - y;
         aborts_if [inferred] x - y < 0;
     }
@@ -28,6 +30,7 @@ module 0x42::primitives {
         x * y
     }
     spec test_mul(x: u64, y: u64): u64 {
+        pragma opaque = true;
         ensures [inferred] result == x * y;
         aborts_if [inferred] x * y > MAX_U64;
     }
@@ -38,6 +41,7 @@ module 0x42::primitives {
         x / y
     }
     spec test_div(x: u64, y: u64): u64 {
+        pragma opaque = true;
         ensures [inferred] result == x / y;
         aborts_if [inferred] y == 0;
     }
@@ -48,6 +52,7 @@ module 0x42::primitives {
         x % y
     }
     spec test_mod(x: u64, y: u64): u64 {
+        pragma opaque = true;
         ensures [inferred] result == x % y;
         aborts_if [inferred] y == 0;
     }
@@ -59,6 +64,7 @@ module 0x42::primitives {
         sum * 2
     }
     spec test_chain_arith(x: u64, y: u64): u64 {
+        pragma opaque = true;
         ensures [inferred] result == (x + y) * 2;
         aborts_if [inferred] (x + y) * 2 > MAX_U64;
         aborts_if [inferred] x + y > MAX_U64;
@@ -72,7 +78,9 @@ module 0x42::primitives {
         x == y
     }
     spec test_eq(x: u64, y: u64): bool {
+        pragma opaque = true;
         ensures [inferred] result == (x == y);
+        aborts_if [inferred] false;
     }
 
 
@@ -81,7 +89,9 @@ module 0x42::primitives {
         x != y
     }
     spec test_neq(x: u64, y: u64): bool {
+        pragma opaque = true;
         ensures [inferred] result == (x != y);
+        aborts_if [inferred] false;
     }
 
 
@@ -90,7 +100,9 @@ module 0x42::primitives {
         x < y
     }
     spec test_lt(x: u64, y: u64): bool {
+        pragma opaque = true;
         ensures [inferred] result == (x < y);
+        aborts_if [inferred] false;
     }
 
 
@@ -99,7 +111,9 @@ module 0x42::primitives {
         x <= y
     }
     spec test_le(x: u64, y: u64): bool {
+        pragma opaque = true;
         ensures [inferred] result == (x <= y);
+        aborts_if [inferred] false;
     }
 
 
@@ -108,7 +122,9 @@ module 0x42::primitives {
         x > y
     }
     spec test_gt(x: u64, y: u64): bool {
+        pragma opaque = true;
         ensures [inferred] result == (x > y);
+        aborts_if [inferred] false;
     }
 
 
@@ -117,7 +133,9 @@ module 0x42::primitives {
         x >= y
     }
     spec test_ge(x: u64, y: u64): bool {
+        pragma opaque = true;
         ensures [inferred] result == (x >= y);
+        aborts_if [inferred] false;
     }
 
 
@@ -128,8 +146,10 @@ module 0x42::primitives {
         a && b
     }
     spec test_and(a: bool, b: bool): bool {
+        pragma opaque = true;
         ensures [inferred] a ==> result == b;
         ensures [inferred] !a ==> result == false;
+        aborts_if [inferred] false;
     }
 
 
@@ -138,8 +158,10 @@ module 0x42::primitives {
         a || b
     }
     spec test_or(a: bool, b: bool): bool {
+        pragma opaque = true;
         ensures [inferred] a ==> result == true;
         ensures [inferred] !a ==> result == b;
+        aborts_if [inferred] false;
     }
 
 
@@ -148,7 +170,9 @@ module 0x42::primitives {
         !a
     }
     spec test_not(a: bool): bool {
+        pragma opaque = true;
         ensures [inferred] result == !a;
+        aborts_if [inferred] false;
     }
 
 
@@ -159,7 +183,9 @@ module 0x42::primitives {
         x | y
     }
     spec test_bit_or(x: u64, y: u64): u64 {
+        pragma opaque = true;
         ensures [inferred] result == x | y;
+        aborts_if [inferred] false;
     }
 
 
@@ -168,7 +194,9 @@ module 0x42::primitives {
         x & y
     }
     spec test_bit_and(x: u64, y: u64): u64 {
+        pragma opaque = true;
         ensures [inferred] result == x & y;
+        aborts_if [inferred] false;
     }
 
 
@@ -177,7 +205,9 @@ module 0x42::primitives {
         x ^ y
     }
     spec test_xor(x: u64, y: u64): u64 {
+        pragma opaque = true;
         ensures [inferred] result == x ^ y;
+        aborts_if [inferred] false;
     }
 
 
@@ -186,6 +216,7 @@ module 0x42::primitives {
         x << n
     }
     spec test_shl(x: u64, n: u8): u64 {
+        pragma opaque = true;
         ensures [inferred] result == x << n;
         aborts_if [inferred] n >= 64;
     }
@@ -196,6 +227,7 @@ module 0x42::primitives {
         x >> n
     }
     spec test_shr(x: u64, n: u8): u64 {
+        pragma opaque = true;
         ensures [inferred] result == x >> n;
         aborts_if [inferred] n >= 64;
     }
@@ -208,6 +240,7 @@ module 0x42::primitives {
         (x as u8)
     }
     spec test_cast_u8(x: u64): u8 {
+        pragma opaque = true;
         ensures [inferred] result == (x as u8);
         aborts_if [inferred] x > MAX_U8;
     }
@@ -218,6 +251,7 @@ module 0x42::primitives {
         (x as u16)
     }
     spec test_cast_u16(x: u64): u16 {
+        pragma opaque = true;
         ensures [inferred] result == (x as u16);
         aborts_if [inferred] x > MAX_U16;
     }
@@ -228,6 +262,7 @@ module 0x42::primitives {
         (x as u32)
     }
     spec test_cast_u32(x: u64): u32 {
+        pragma opaque = true;
         ensures [inferred] result == (x as u32);
         aborts_if [inferred] x > MAX_U32;
     }
@@ -238,7 +273,9 @@ module 0x42::primitives {
         (x as u64)
     }
     spec test_cast_u64(x: u8): u64 {
+        pragma opaque = true;
         ensures [inferred] result == (x as u64);
+        aborts_if [inferred] false;
     }
 
 
@@ -247,7 +284,9 @@ module 0x42::primitives {
         (x as u128)
     }
     spec test_cast_u128(x: u64): u128 {
+        pragma opaque = true;
         ensures [inferred] result == (x as u128);
+        aborts_if [inferred] false;
     }
 
 
@@ -256,7 +295,9 @@ module 0x42::primitives {
         (x as u256)
     }
     spec test_cast_u256(x: u64): u256 {
+        pragma opaque = true;
         ensures [inferred] result == (x as u256);
+        aborts_if [inferred] false;
     }
 
 }

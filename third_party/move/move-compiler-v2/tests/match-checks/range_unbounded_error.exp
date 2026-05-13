@@ -1,0 +1,7 @@
+
+Diagnostics:
+error: unbounded range pattern `..` is not allowed; use `_` instead
+  ┌─ tests/match-checks/range_unbounded_error.move:5:13
+  │
+5 │             .. => 1,
+  │             ^^

@@ -161,6 +161,11 @@ pub enum FeatureFlag {
     SlhDsaSha2_128sSignature,
     EncryptedTransactions,
     PublicStructEnumArgs,
+    MultisigScript,
+    TransactionLimits,
+    VersionedTransactionValidation,
+    StorageSlotNatives,
+    AllowFriendEntryVisibilityDowngrade,
 }
 
 fn generate_features_blob(writer: &CodeWriter, data: &[u64]) {
@@ -411,7 +416,7 @@ impl From<FeatureFlag> for AptosFeatureFlag {
             FeatureFlag::MonotonicallyIncreasingCounter => {
                 AptosFeatureFlag::MONOTONICALLY_INCREASING_COUNTER
             },
-            FeatureFlag::EnableCaptureOption => AptosFeatureFlag::ENABLE_CAPTURE_OPTION,
+            FeatureFlag::EnableCaptureOption => AptosFeatureFlag::_ENABLE_CAPTURE_OPTION,
             FeatureFlag::EnableTrustedCode => AptosFeatureFlag::ENABLE_TRUSTED_CODE,
             FeatureFlag::EnableEnumOption => AptosFeatureFlag::ENABLE_ENUM_OPTION,
             FeatureFlag::VMBinaryFormatV9 => AptosFeatureFlag::VM_BINARY_FORMAT_V9,
@@ -421,6 +426,15 @@ impl From<FeatureFlag> for AptosFeatureFlag {
             FeatureFlag::VMBinaryFormatV10 => AptosFeatureFlag::VM_BINARY_FORMAT_V10,
             FeatureFlag::EncryptedTransactions => AptosFeatureFlag::ENCRYPTED_TRANSACTIONS,
             FeatureFlag::PublicStructEnumArgs => AptosFeatureFlag::PUBLIC_STRUCT_ENUM_ARGS,
+            FeatureFlag::MultisigScript => AptosFeatureFlag::MULTISIG_SCRIPT,
+            FeatureFlag::TransactionLimits => AptosFeatureFlag::TRANSACTION_LIMITS,
+            FeatureFlag::VersionedTransactionValidation => {
+                AptosFeatureFlag::VERSIONED_TRANSACTION_VALIDATION
+            },
+            FeatureFlag::StorageSlotNatives => AptosFeatureFlag::STORAGE_SLOT_NATIVES,
+            FeatureFlag::AllowFriendEntryVisibilityDowngrade => {
+                AptosFeatureFlag::ALLOW_FRIEND_ENTRY_VISIBILITY_DOWNGRADE
+            },
         }
     }
 }
@@ -598,7 +612,7 @@ impl From<AptosFeatureFlag> for FeatureFlag {
             AptosFeatureFlag::MONOTONICALLY_INCREASING_COUNTER => {
                 FeatureFlag::MonotonicallyIncreasingCounter
             },
-            AptosFeatureFlag::ENABLE_CAPTURE_OPTION => FeatureFlag::EnableCaptureOption,
+            AptosFeatureFlag::_ENABLE_CAPTURE_OPTION => FeatureFlag::EnableCaptureOption,
             AptosFeatureFlag::ENABLE_TRUSTED_CODE => FeatureFlag::EnableTrustedCode,
             AptosFeatureFlag::ENABLE_ENUM_OPTION => FeatureFlag::EnableEnumOption,
             AptosFeatureFlag::VM_BINARY_FORMAT_V9 => FeatureFlag::VMBinaryFormatV9,
@@ -608,6 +622,15 @@ impl From<AptosFeatureFlag> for FeatureFlag {
             AptosFeatureFlag::VM_BINARY_FORMAT_V10 => FeatureFlag::VMBinaryFormatV10,
             AptosFeatureFlag::ENCRYPTED_TRANSACTIONS => FeatureFlag::EncryptedTransactions,
             AptosFeatureFlag::PUBLIC_STRUCT_ENUM_ARGS => FeatureFlag::PublicStructEnumArgs,
+            AptosFeatureFlag::MULTISIG_SCRIPT => FeatureFlag::MultisigScript,
+            AptosFeatureFlag::TRANSACTION_LIMITS => FeatureFlag::TransactionLimits,
+            AptosFeatureFlag::VERSIONED_TRANSACTION_VALIDATION => {
+                FeatureFlag::VersionedTransactionValidation
+            },
+            AptosFeatureFlag::STORAGE_SLOT_NATIVES => FeatureFlag::StorageSlotNatives,
+            AptosFeatureFlag::ALLOW_FRIEND_ENTRY_VISIBILITY_DOWNGRADE => {
+                FeatureFlag::AllowFriendEntryVisibilityDowngrade
+            },
         }
     }
 }

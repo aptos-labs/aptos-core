@@ -1,5 +1,5 @@
-// Copyright © Aptos Foundation
-// SPDX-License-Identifier: Apache-2.0
+// Copyright (c) Aptos Foundation
+// Licensed pursuant to the Innovation-Enabling Source Code License, available at https://github.com/aptos-labs/aptos-core/blob/main/LICENSE
 
 //! This module contains a set of transformers and analyzers of global environment.
 //! Those can be arranged in a pipeline and executed in sequence.
@@ -24,7 +24,6 @@ pub mod match_transforms;
 pub mod model_ast_lints;
 pub mod recursive_struct_checker;
 pub mod rewrite_target;
-pub mod seqs_in_binop_checker;
 pub mod spec_checker;
 pub mod spec_rewriter;
 pub mod struct_usage_collector;

@@ -41,7 +41,6 @@ impl BatchThresholdEncryption for FPTXSuccinct {
     type Id = Id;
     type MasterSecretKeyShare = BIBEMasterSecretKeyShare;
     type PreparedCiphertext = PreparedCiphertext;
-    type Round = u64;
     type SubTranscript = aptos_dkg::pvss::chunky::WeightedSubtranscript<Pairing>;
     type ThresholdConfig = aptos_crypto::arkworks::shamir::ShamirThresholdConfig<Fr>;
     type VerificationKey = BIBEVerificationKey;
@@ -108,7 +107,7 @@ impl BatchThresholdEncryption for FPTXSuccinct {
     fn digest(
         digest_key: &Self::DigestKey,
         cts: &[Self::Ciphertext],
-        round: Self::Round,
+        round: u64,
     ) -> anyhow::Result<(Self::Digest, Self::EvalProofsPromise)> {
         let mut ids: IdSet<UncomputedCoeffs> =
             IdSet::from_slice(&cts.iter().map(|ct| ct.id()).collect::<Vec<Id>>());

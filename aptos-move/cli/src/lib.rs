@@ -21,6 +21,7 @@ mod resource_account;
 mod script_compile;
 mod show;
 mod sim;
+pub mod source_locator;
 pub mod stored_package;
 pub(crate) mod struct_arg_parser;
 mod tool_paths;
@@ -41,7 +42,7 @@ use aptos_types::{
     },
     transaction::{
         AuxiliaryInfo, PersistedAuxiliaryInfo, SignedTransaction, Transaction, TransactionInfo,
-        TransactionPayload, Version,
+        TransactionOutput, TransactionPayload, Version,
     },
 };
 use aptos_vm_types::output::VMOutput;
@@ -232,6 +233,18 @@ pub trait MoveDebugger: Send + Sync + 'static {
     /// Get a state view at a specific chain version (for local VM execution).
     fn state_view_at_version(&self, version: u64) -> DynStateView;
 
+    /// Like [`state_view_at_version`] but with local module overrides applied.
+    ///
+    /// The default implementation ignores the overrides; the full
+    /// `AptosDebugger` implementation respects them.
+    fn state_view_at_version_with_overrides(
+        &self,
+        version: u64,
+        _overrides: std::sync::Arc<aptos_validator_interface::LocalModuleOverrides>,
+    ) -> DynStateView {
+        self.state_view_at_version(version)
+    }
+
     /// Execute a transaction with gas profiling enabled.
     fn execute_transaction_at_version_with_gas_profiler(
         &self,
@@ -239,6 +252,21 @@ pub trait MoveDebugger: Send + Sync + 'static {
         txn: SignedTransaction,
         auxiliary_info: AuxiliaryInfo,
     ) -> anyhow::Result<(VMStatus, VMOutput, TransactionGasLog)>;
+
+    /// Execute any committed transaction at a given version through the
+    /// block-executor path, returning its materialized output.
+    ///
+    /// Unlike `execute_transaction_at_version_with_gas_profiler` (which only
+    /// accepts `SignedTransaction`, i.e. user transactions), this method
+    /// takes the full `Transaction` enum and supports system transactions —
+    /// `BlockMetadata`, `BlockMetadataExt`, `BlockEpilogue`, `StateCheckpoint`,
+    /// `ValidatorTransaction`, etc.
+    fn execute_transaction_at_version(
+        &self,
+        version: u64,
+        transaction: Transaction,
+        auxiliary_info: PersistedAuxiliaryInfo,
+    ) -> anyhow::Result<TransactionOutput>;
 
     /// Fetch a committed transaction at a specific version from the chain.
     async fn get_committed_transaction_at_version(

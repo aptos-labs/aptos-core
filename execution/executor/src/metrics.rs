@@ -186,7 +186,7 @@ pub static PROCESSED_USER_TXNS_BY_PAYLOAD: Lazy<IntCounterVec> = Lazy::new(|| {
     register_int_counter_vec!(
         "aptos_processed_user_transactions_by_payload",
         "Counter of processed user transactions by payload type",
-        &["process", "payload_type", "state"]
+        &["process", "payload_type", "state", "encrypted"]
     )
     .unwrap()
 });
@@ -429,6 +429,11 @@ pub fn update_counters_for_processed_chunk<T>(
                     .observe_with(&[process_type], signature_count as f64);
             }
 
+            let encrypted_label = if user_txn.payload().is_encrypted_variant() {
+                "true"
+            } else {
+                "false"
+            };
             let payload_type = if user_txn.payload().is_multisig() {
                 "multisig"
             } else {
@@ -446,11 +451,12 @@ pub fn update_counters_for_processed_chunk<T>(
                         process_type,
                         &(payload_type.to_string() + "_orderless"),
                         state,
+                        encrypted_label,
                     ])
                     .inc();
             } else {
                 PROCESSED_USER_TXNS_BY_PAYLOAD
-                    .with_label_values(&[process_type, payload_type, state])
+                    .with_label_values(&[process_type, payload_type, state, encrypted_label])
                     .inc();
             }
 

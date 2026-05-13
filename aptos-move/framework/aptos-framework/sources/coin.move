@@ -416,7 +416,7 @@ module aptos_framework::coin {
         fungible_asset: FungibleAsset
     ): Coin<CoinType> acquires CoinInfo, PairedCoinType {
         let metadata_addr =
-            fungible_asset.metadata_from_asset().object_address();
+            fungible_asset.asset_metadata().object_address();
         assert!(
             object::object_exists<PairedCoinType>(metadata_addr),
             error::not_found(EPAIRED_COIN)

@@ -1,6 +1,7 @@
-// Copyright (c) The Diem Core Contributors
-// Copyright (c) The Move Contributors
-// SPDX-License-Identifier: Apache-2.0
+// Parts of the file are Copyright (c) The Diem Core Contributors
+// Parts of the file are Copyright (c) The Move Contributors
+// Parts of the file are Copyright (c) Aptos Foundation
+// All Aptos Foundation code and content is licensed pursuant to the Innovation-Enabling Source Code License, available at https://github.com/aptos-labs/aptos-core/blob/main/LICENSE
 
 //! Translates and validates specification language fragments as they are output from the Move
 //! compiler's expansion phase and adds them to the environment (which was initialized from the
@@ -8,12 +9,13 @@
 //! system, as well as type checking it and translating it to the spec language ast.
 
 use crate::{
-    ast::{Attribute, FriendDecl, ModuleName, Operation, QualifiedSymbol, Spec, Value},
+    ast::{Attribute, ExpData, FriendDecl, ModuleName, Operation, QualifiedSymbol, Spec, Value},
     builder::builtins,
     intrinsics::IntrinsicDecl,
     model::{
-        FieldData, FunId, FunctionKind, GlobalEnv, Loc, ModuleId, Parameter, QualifiedId,
-        QualifiedInstId, SpecFunId, SpecVarId, StructId, TypeParameter, UserId,
+        FieldData, FieldId, FunId, FunctionKind, GlobalEnv, Loc, ModuleId, NamedConstantId,
+        Parameter, QualifiedId, QualifiedInstId, SpecFunId, SpecVarId, StructId, TypeParameter,
+        UserId,
     },
     symbol::Symbol,
     ty::{Constraint, PrimitiveType, Type, TypeDisplayContext},
@@ -49,6 +51,7 @@ impl BuiltinReceiverType {
             Type::Reference(..) => None,
             Type::Fun(..) => None,
             Type::ResourceDomain(..) => None,
+            Type::StateDomain => None,
         }
     }
 
@@ -96,6 +99,10 @@ pub(crate) struct ModelBuilder<'env> {
     pub intrinsics: Vec<IntrinsicDecl>,
     /// A module lookup table from names to their ids.
     pub module_table: BTreeMap<ModuleName, ModuleId>,
+    /// A global lemma lookup table mapping qualified names to (ModuleId, index, params).
+    /// Pre-populated during a first scan so cross-module references resolve regardless
+    /// of module processing order.
+    pub lemma_decl_table: BTreeMap<QualifiedSymbol, (ModuleId, usize, Vec<Parameter>)>,
 }
 
 /// A declaration of a specification function or operator in the builders state.
@@ -255,8 +262,23 @@ pub(crate) struct ConstEntry {
     pub ty: Type,
     pub value: Value,
     pub visibility: EntryVisibility,
+    /// File-format visibility (`Public`/`Friend`/`Private`). The Move-source
+    /// `package` modifier is encoded as `Friend` + `has_package_visibility = true`.
+    pub move_visibility: Visibility,
+    /// True iff declared with `package`. Implies `move_visibility = Friend`.
+    pub has_package_visibility: bool,
     pub users: BTreeSet<UserId>,
     pub attributes: Vec<Attribute>,
+}
+
+/// Snapshot of a non-private constant used by `inject_const_accessor_functions`.
+struct PublicConstInfo {
+    name: Symbol,
+    loc: Loc,
+    ty: Type,
+    value: Value,
+    visibility: Visibility,
+    has_package_visibility: bool,
 }
 
 impl<'env> ModelBuilder<'env> {
@@ -275,6 +297,7 @@ impl<'env> ModelBuilder<'env> {
             const_table: BTreeMap::new(),
             intrinsics: Vec::new(),
             module_table: BTreeMap::new(),
+            lemma_decl_table: BTreeMap::new(),
         };
         builtins::declare_builtins(&mut translator);
         translator
@@ -559,6 +582,61 @@ impl<'env> ModelBuilder<'env> {
         self.const_table.insert(name, entry);
     }
 
+    /// Injects a `const$<NAME>` accessor function for every non-private constant in every module.
+    /// Must run after `populate_env()` and before `add_friend_decl_for_package_visibility()`.
+    pub fn inject_const_accessor_functions(&mut self) {
+        if !self
+            .env
+            .language_version()
+            .language_version_for_public_const()
+        {
+            return;
+        }
+        // Include dependency modules: target modules may reference their constants.
+        let module_ids: Vec<ModuleId> = self.env.get_modules().map(|m| m.get_id()).collect();
+
+        for module_id in module_ids {
+            let const_infos: Vec<PublicConstInfo> = self
+                .env
+                .get_module(module_id)
+                .get_named_constants()
+                .filter(|c| c.get_visibility() != Visibility::Private)
+                .map(|c| PublicConstInfo {
+                    name: c.get_name(),
+                    loc: c.get_loc(),
+                    ty: c.get_type(),
+                    value: c.get_value(),
+                    visibility: c.get_visibility(),
+                    has_package_visibility: c.has_package_visibility(),
+                })
+                .collect();
+
+            for info in const_infos {
+                let accessor_name = format!(
+                    "{}{}{}",
+                    move_core_types::language_storage::CONST,
+                    move_core_types::language_storage::DOLLAR_SIGN_DELIMITER,
+                    self.env.symbol_pool().string(info.name)
+                );
+                let accessor_sym = self.env.symbol_pool().make(&accessor_name);
+                let node_id = self.env.new_node(info.loc.clone(), info.ty.clone());
+                let body = ExpData::Value(node_id, info.value).into_exp();
+                self.env.add_function_def(
+                    module_id,
+                    accessor_sym,
+                    info.loc,
+                    info.visibility,
+                    info.has_package_visibility,
+                    vec![],
+                    vec![],
+                    info.ty,
+                    body,
+                    None,
+                );
+            }
+        }
+    }
+
     /// Adds friend declarations for package visibility.
     /// This should only be called when all modules are loaded.
     pub fn add_friend_decl_for_package_visibility(&mut self) {
@@ -626,6 +704,40 @@ impl<'env> ModelBuilder<'env> {
                 );
                 Type::Error
             })
+    }
+
+    /// Looks up a field in a specific variant of an enum. Returns the variant-qualified
+    /// FieldId and instantiated field type if found.
+    pub fn lookup_variant_field_decl(
+        &self,
+        id: &QualifiedInstId<StructId>,
+        variant_name: Symbol,
+        field_name: Symbol,
+    ) -> Option<(FieldId, Type)> {
+        let entry = self.lookup_struct_entry(id.to_qualified_id());
+        if let StructLayout::Variants(variants) = &entry.layout {
+            if let Some(variant) = variants.iter().find(|v| v.name == variant_name) {
+                if let Some(field_data) = variant.fields.get(&field_name) {
+                    let pool = self.env.symbol_pool();
+                    let fid = FieldId::new(pool.make(&FieldId::make_variant_field_id_str(
+                        pool.string(variant_name).as_str(),
+                        pool.string(field_name).as_str(),
+                    )));
+                    return Some((fid, field_data.ty.instantiate(&id.inst)));
+                }
+            }
+        }
+        None
+    }
+
+    /// Checks whether the given name is a variant of the struct.
+    pub fn is_variant_name(&self, id: &QualifiedId<StructId>, name: Symbol) -> bool {
+        let entry = self.lookup_struct_entry(*id);
+        if let StructLayout::Variants(variants) = &entry.layout {
+            variants.iter().any(|v| v.name == name)
+        } else {
+            false
+        }
     }
 
     /// Looks up field declaration, returning a list of optional variant name and type of the field
@@ -774,7 +886,7 @@ impl<'env> ModelBuilder<'env> {
 
     /// Adds a spec function to used_spec_funs set.
     pub fn add_used_spec_fun(&mut self, qid: QualifiedId<SpecFunId>) {
-        self.env.used_spec_funs.insert(qid);
+        self.env.used_spec_funs.borrow_mut().insert(qid);
     }
 
     /// Pass model-level information to the global env
@@ -782,6 +894,29 @@ impl<'env> ModelBuilder<'env> {
         // register all intrinsic declarations
         for decl in &self.intrinsics {
             self.env.intrinsics.add_decl(decl);
+        }
+    }
+
+    /// Propagate cross-module constant users from `const_table` into `GlobalEnv`.
+    ///
+    /// Each module's `NamedConstantData` is finalized when that module is translated, before
+    /// later modules' function bodies are translated. Users recorded by `track_constant_usage`
+    /// for cross-module references therefore arrive in `const_table` after the defining module
+    /// has already been finalized. This pass syncs those late-arriving users back into the env.
+    pub fn sync_const_users(&mut self) {
+        for (sym, entry) in &self.const_table {
+            if entry.users.is_empty() {
+                continue;
+            }
+            if let Some(module_env) = self.env.find_module(&sym.module_name) {
+                let module_id = module_env.get_id();
+                let const_id = NamedConstantId::new(sym.symbol);
+                if let Some(module_data) = self.env.module_data.get_mut(module_id.to_usize()) {
+                    if let Some(const_data) = module_data.named_constants.get_mut(&const_id) {
+                        const_data.users.extend(entry.users.iter().cloned());
+                    }
+                }
+            }
         }
     }
 }

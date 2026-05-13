@@ -293,7 +293,7 @@ message WriteTableItem {
   WriteTableData data = 4;
 }
 
-// Question: Not sure if this is the correct way to add extra config in protobuf here. 
+// Question: Not sure if this is the correct way to add extra config in protobuf here.
 // Not sure about the numbering as well. Please double check.
 message TransactionPayload {
   enum Type {
@@ -334,8 +334,7 @@ message EncryptedTransactionPayload {
   }
 }
 
-message FailedDecryptionPayloadState {
-}
+message FailedDecryptionPayloadState {}
 
 message DecryptedPayloadState {
   oneof decrypted_payload {
@@ -372,12 +371,14 @@ message MultisigTransactionPayload {
   enum Type {
     TYPE_UNSPECIFIED = 0;
     TYPE_ENTRY_FUNCTION_PAYLOAD = 1;
+    TYPE_SCRIPT_PAYLOAD = 2;
   }
 
   Type type = 1;
 
   oneof payload {
     EntryFunctionPayload entry_function_payload = 2;
+    ScriptPayload script_payload = 3;
   }
 }
 

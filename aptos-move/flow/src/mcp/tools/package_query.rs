@@ -19,29 +19,24 @@ use std::collections::{BTreeMap, BTreeSet};
 struct MovePackageQueryParams {
     /// Path to the Move package directory.
     package_path: String,
-    #[serde(flatten)]
-    query: MovePackageQuery,
+    /// Query type.
+    query: QueryType,
+    /// Function to query (required for "function_usage"), in the form "module_name::function_name".
+    function: Option<String>,
 }
 
 #[derive(Debug, serde::Deserialize, schemars::JsonSchema)]
-#[serde(tag = "query")]
-enum MovePackageQuery {
+#[serde(rename_all = "snake_case")]
+enum QueryType {
     /// Returns a map from each module to the modules it depends on.
-    #[serde(rename = "dep_graph")]
     DepGraph,
     /// Returns a summary of each module's constants, structs, and functions.
-    #[serde(rename = "module_summary")]
     ModuleSummary,
     /// Returns a function-level call graph as a map from each function to the functions it calls.
-    #[serde(rename = "call_graph")]
     CallGraph,
     /// Returns direct and transitive calls/uses by a given function.
     /// "called" = direct calls; "used" = direct calls + closure captures.
-    #[serde(rename = "function_usage")]
-    FunctionUsage {
-        /// Function to query, in the form "module_name::function_name".
-        function: String,
-    },
+    FunctionUsage,
 }
 
 // ========== MCP Tool ==========
@@ -73,12 +68,12 @@ impl FlowSession {
         let data = pkg.lock().map_err(|_| mcp_err("package lock poisoned"))?;
 
         match params.query {
-            MovePackageQuery::DepGraph => {
+            QueryType::DepGraph => {
                 let result = build_dep_graph(data.env());
                 log::info!("move_package_query dep_graph: {} module(s)", result.len());
                 Ok(into_call_tool_result(&result))
             },
-            MovePackageQuery::ModuleSummary => {
+            QueryType::ModuleSummary => {
                 let result = build_module_summary(data.env());
                 log::info!(
                     "move_package_query module_summary: {} module(s)",
@@ -86,7 +81,7 @@ impl FlowSession {
                 );
                 Ok(into_call_tool_result(&result))
             },
-            MovePackageQuery::CallGraph => {
+            QueryType::CallGraph => {
                 let result = build_call_graph(data.env());
                 log::info!(
                     "move_package_query call_graph: {} function(s)",
@@ -94,7 +89,10 @@ impl FlowSession {
                 );
                 Ok(into_call_tool_result(&result))
             },
-            MovePackageQuery::FunctionUsage { function } => {
+            QueryType::FunctionUsage => {
+                let function = params.function.ok_or_else(|| {
+                    mcp_err("\"function\" parameter is required for function_usage query")
+                })?;
                 let result = build_function_usage(data.env(), &function)?;
                 log::info!("move_package_query function_usage({})", function);
                 Ok(into_call_tool_result(&result))
@@ -256,8 +254,8 @@ fn build_function_usage(env: &GlobalEnv, function: &str) -> Result<FunctionUsage
 
     let called = func.get_called_functions().cloned().unwrap_or_default();
     let used = func.get_used_functions().cloned().unwrap_or_default();
-    // These methods document that they panic if any function in the closure
-    // lacks call info. Guard against that to avoid crashing the server.
+    // These methods panic if any function in the BFS lacks call info.
+    // Guard with try_call to return a clean error instead of crashing.
     let called_transitive = try_call("failed to compute transitive called functions", || {
         func.get_transitive_closure_of_called_functions()
     })?;

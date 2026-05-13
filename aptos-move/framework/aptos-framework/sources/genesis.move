@@ -18,6 +18,7 @@ module aptos_framework::genesis {
     use aptos_framework::execution_config;
     use aptos_framework::create_signer::create_signer;
     use aptos_framework::gas_schedule;
+    use aptos_framework::transaction_limits;
     use aptos_framework::nonce_validation;
     use aptos_framework::reconfiguration;
     use aptos_framework::stake;
@@ -100,7 +101,7 @@ module aptos_framework::genesis {
         // put reserved framework reserved accounts under aptos governance
         let framework_reserved_addresses = vector<address>[@0x2, @0x3, @0x4, @0x5, @0x6, @0x7, @0x8, @0x9, @0xa];
         while (!framework_reserved_addresses.is_empty()) {
-            let address = framework_reserved_addresses.pop_back<address>();
+            let address = framework_reserved_addresses.pop_back();
             let (_, framework_signer_cap) = account::create_framework_reserved_account(address);
             aptos_governance::store_signer_cap(&aptos_framework_account, address, framework_signer_cap);
         };
@@ -132,6 +133,28 @@ module aptos_framework::genesis {
         block::initialize(&aptos_framework_account, epoch_interval_microsecs);
         state_storage::initialize(&aptos_framework_account);
         nonce_validation::initialize(&aptos_framework_account);
+
+        transaction_limits::initialize(
+            &aptos_framework_account,
+            // Execution tiers:
+            //   2x: 1M APT
+            //   4x: 5M APT
+            //   8x: 10M APT
+            vector[
+                transaction_limits::new_tier(1_000_000_0000_0000, 200),
+                transaction_limits::new_tier(5_000_000_0000_0000, 400),
+                transaction_limits::new_tier(10_000_000_0000_0000, 800),
+            ],
+            // IO tiers:
+            //   2x: 5M APT
+            //   4x: 10M APT
+            //   8x: 20M APT
+            vector[
+                transaction_limits::new_tier(5_000_000_0000_0000, 200),
+                transaction_limits::new_tier(10_000_000_0000_0000, 400),
+                transaction_limits::new_tier(20_000_000_0000_0000, 800),
+            ],
+        );
     }
 
     /// Genesis step 2: Initialize Aptos coin.
@@ -532,10 +555,6 @@ module aptos_framework::genesis {
         use aptos_framework::object;
         use aptos_framework::primary_fungible_store;
         use aptos_framework::fungible_asset::Metadata;
-        use std::features;
-
-        let feature = features::get_new_accounts_default_to_fa_apt_store_feature();
-        features::change_feature_flags_for_testing(aptos_framework, vector[feature], vector[]);
 
         aggregator_factory::initialize_aggregator_factory_for_test(aptos_framework);
 

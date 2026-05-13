@@ -20,6 +20,14 @@ on:
         required: false
         type: string
         description: Optional version to end replaying. If not specified, replay-verify will determine end version itself.
+      START_TIME:
+        required: false
+        type: string
+        description: 'Optional start time (e.g. "2 hours ago", "2026-03-19", "2026-03-19 10:00"). UTC assumed. Mutually exclusive with START_VERSION.'
+      END_TIME:
+        required: false
+        type: string
+        description: 'Optional end time. Same formats as START_TIME. Mutually exclusive with END_VERSION.'
       DRY_RUN:
         required: false
         type: boolean
@@ -53,4 +61,6 @@ jobs:
       IMAGE_TAG: ${{ inputs.IMAGE_TAG }}
       START_VERSION: ${{ inputs.START_VERSION }}
       END_VERSION: ${{ inputs.END_VERSION }}
+      START_TIME: ${{ inputs.START_TIME }}
+      END_TIME: ${{ inputs.END_TIME }}
       DRY_RUN: ${{ inputs.DRY_RUN || false }}

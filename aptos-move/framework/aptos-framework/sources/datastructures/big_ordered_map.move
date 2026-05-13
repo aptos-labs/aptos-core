@@ -588,7 +588,7 @@ module aptos_framework::big_ordered_map {
         }
     }
 
-    public inline fun get_and_map<K: drop + copy + store, V: copy + store, R>(self: &BigOrderedMap<K, V>, key: &K, f: |&V|R has drop): Option<R> {
+    public inline fun get_and_map<K: drop + copy + store, V: store, R>(self: &BigOrderedMap<K, V>, key: &K, f: |&V|R has drop): Option<R> {
         let iter = self.internal_find(key);
         if (iter.iter_is_end(self)) {
             option::none()
@@ -673,7 +673,7 @@ module aptos_framework::big_ordered_map {
     ///
     /// For a large enough BigOrderedMap this function will fail due to execution gas limits,
     /// use iterartor or next_key/prev_key to iterate over across portion of the map.
-    public fun keys<K: store + copy + drop, V: store + copy>(self: &BigOrderedMap<K, V>): vector<K> {
+    public fun keys<K: store + copy + drop, V: store>(self: &BigOrderedMap<K, V>): vector<K> {
         let result = vector[];
         self.for_each_ref(|k, _v| {
             result.push_back(*k);
@@ -811,7 +811,7 @@ module aptos_framework::big_ordered_map {
     /// For direct usage of this method, check Warning at the top of the file corresponding to iterators.
     ///
     /// Returns the end iterator.
-    public fun internal_new_end_iter<K: copy + store, V: store>(self: &BigOrderedMap<K, V>): IteratorPtr<K> {
+    public fun internal_new_end_iter<K: store, V: store>(self: &BigOrderedMap<K, V>): IteratorPtr<K> {
         IteratorPtr::End
     }
 
@@ -1172,7 +1172,7 @@ module aptos_framework::big_ordered_map {
     /// Find leaf where the given key would fall in.
     /// So the largest leaf with its `max_key <= key`.
     /// return NULL_INDEX if `key` is larger than any key currently stored in the map.
-    fun find_leaf<K: drop + copy + store, V: store>(self: &BigOrderedMap<K, V>, key: &K): u64 {
+    fun find_leaf<K: store, V: store>(self: &BigOrderedMap<K, V>, key: &K): u64 {
         let current = ROOT_INDEX;
         loop {
             let node = self.borrow_node(current);
@@ -1193,7 +1193,7 @@ module aptos_framework::big_ordered_map {
     /// So the largest leaf with it's `max_key <= key`.
     /// Returns the path from root to that leaf (including the leaf itself)
     /// Returns empty path if `key` is larger than any key currently stored in the map.
-    fun find_leaf_path<K: drop + copy + store, V: store>(self: &BigOrderedMap<K, V>, key: &K): vector<u64> {
+    fun find_leaf_path<K: store, V: store>(self: &BigOrderedMap<K, V>, key: &K): vector<u64> {
         let vec = vector::empty();
 
         let current = ROOT_INDEX;
