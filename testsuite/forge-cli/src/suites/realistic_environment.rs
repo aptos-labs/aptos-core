@@ -600,6 +600,7 @@ pub(crate) fn realistic_env_max_load_all_validators_test(
         num_validators,
         num_vfns,
         /*enable_fast_batches=*/ false,
+        /*tx_only_for_validator_index=*/ None,
     )
 }
 
@@ -626,6 +627,31 @@ pub(crate) fn realistic_env_max_load_with_fast_batches_test(
         num_validators,
         num_vfns,
         /*enable_fast_batches=*/ true,
+        /*tx_only_for_validator_index=*/ None,
+    )
+}
+
+/// Same as `realistic_env_max_load_with_fast_batches_test` but `_tx=true`
+/// only fires on the single validator at position `1` in the PeerId-sorted
+/// validator set — which is the Asian (`gcp--as-southeast1`) validator in
+/// the 7-validator forge setup (PeerId `2772eb68…` is second-lowest).
+///
+/// Simulates a targeted production rollout (only apne1-0 with `_tx=true`)
+/// inside a uniform-override forge test.
+pub(crate) fn realistic_env_max_load_fast_batches_asian_only_test(
+    duration: Duration,
+    test_cmd: &TestCommand,
+    num_validators: usize,
+    num_vfns: usize,
+    _num_pfns: usize,
+) -> ForgeConfig {
+    all_validators_direct_routing_config(
+        duration,
+        test_cmd,
+        num_validators,
+        num_vfns,
+        /*enable_fast_batches=*/ true,
+        /*tx_only_for_validator_index=*/ Some(1),
     )
 }
 
@@ -635,6 +661,7 @@ fn all_validators_direct_routing_config(
     num_validators: usize,
     num_vfns: usize,
     enable_fast_batches: bool,
+    tx_only_for_validator_index: Option<usize>,
 ) -> ForgeConfig {
     let ha_proxy = if let TestCommand::K8sSwarm(k8s) = test_cmd {
         k8s.enable_haproxy
@@ -716,6 +743,10 @@ fn all_validators_direct_routing_config(
             config.base.enable_validator_pfn_connections = true;
             config.consensus.quorum_store.enable_fast_batches_rx = enable_fast_batches;
             config.consensus.quorum_store.enable_fast_batches_tx = enable_fast_batches;
+            config
+                .consensus
+                .quorum_store
+                .fast_batches_tx_only_for_validator_index = tx_only_for_validator_index;
         }))
         .with_emit_job(
             EmitJobRequest::default()

@@ -4,7 +4,8 @@
 use super::ungrouped::mixed_compatible_emit_job;
 use crate::{
     suites::realistic_environment::{
-        realistic_env_max_load_all_validators_test, realistic_env_max_load_test,
+        realistic_env_max_load_all_validators_test,
+        realistic_env_max_load_fast_batches_asian_only_test, realistic_env_max_load_test,
         realistic_env_max_load_with_fast_batches_test,
     },
     TestCommand,
@@ -41,6 +42,9 @@ pub(crate) fn get_land_blocking_test(
         },
         "realistic_env_max_load_with_fast_batches" => {
             realistic_env_max_load_with_fast_batches_test(duration, test_cmd, 7, 0, 0)
+        },
+        "realistic_env_max_load_fast_batches_asian_only" => {
+            realistic_env_max_load_fast_batches_asian_only_test(duration, test_cmd, 7, 0, 0)
         },
         "compat" => compat(),
         "framework_upgrade" => framework_upgrade(),

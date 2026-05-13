@@ -130,6 +130,13 @@ pub struct QuorumStoreConfig {
     /// Static list of PeerIds this validator will use as FastProof aggregators
     /// (first `fast_batch_num_aggregators` entries selected per batch).
     pub fast_batch_aggregators: Vec<AccountAddress>,
+    /// **Forge-only experimental knob — do not land.** When `Some(i)`, only the
+    /// validator whose position in the PeerId-sorted validator set equals `i`
+    /// will actually emit `BatchKind::FastProof` batches; everyone else stays
+    /// on Normal regardless of `enable_fast_batches_tx`. Lets us simulate a
+    /// targeted production rollout (only apne1-0 with `_tx=true`) inside a
+    /// chain-wide uniform forge override.
+    pub fast_batches_tx_only_for_validator_index: Option<usize>,
 }
 
 impl Default for QuorumStoreConfig {
@@ -182,6 +189,7 @@ impl Default for QuorumStoreConfig {
             enable_fast_batches_rx: false,
             fast_batch_num_aggregators: 2,
             fast_batch_aggregators: vec![],
+            fast_batches_tx_only_for_validator_index: None,
         }
     }
 }

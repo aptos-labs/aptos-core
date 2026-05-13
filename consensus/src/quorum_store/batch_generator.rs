@@ -185,8 +185,18 @@ impl BatchGenerator {
         let tracing_bucket_boundaries = std::sync::Arc::new(config.batch_buckets.clone());
 
         // Pre-compute FastProof params for this epoch.
-        let (fast_proof_aggregators, fast_proof_threshold) = if config.enable_fast_batches_tx {
-            let validator_set = validator_verifier.address_to_validator_index();
+        // Forge-only experimental gate: if `fast_batches_tx_only_for_validator_index`
+        // is set, only the validator at that position in the (sorted) validator
+        // set actually emits FastProof. Lets a uniform forge override simulate a
+        // single-validator production rollout.
+        let validator_set = validator_verifier.address_to_validator_index();
+        let tx_gated_off = match config.fast_batches_tx_only_for_validator_index {
+            None => false,
+            Some(target) => validator_set.get(&my_peer_id) != Some(&target),
+        };
+        let (fast_proof_aggregators, fast_proof_threshold) = if config.enable_fast_batches_tx
+            && !tx_gated_off
+        {
             let num_aggregators = config
                 .fast_batch_num_aggregators
                 .min(MAX_K_FAST_PROOF_AGGREGATORS);
