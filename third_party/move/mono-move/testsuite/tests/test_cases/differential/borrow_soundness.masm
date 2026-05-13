@@ -1,0 +1,56 @@
+// RUN: publish --print(stackless,micro-ops)
+module 0x66::borrow_soundness
+
+// borrow_loc source must not be substituted across copy.
+fun borrow_loc_no_source_subst(x: u64): u64
+    local y: u64
+    copy_loc x
+    st_loc y
+    borrow_loc y
+    read_ref
+    ret
+
+// Value uses can propagate through copy; only borrow_loc source is protected.
+fun imm_borrow_value_prop(x: u64): u64
+    local y: u64
+    copy_loc x
+    st_loc y
+    borrow_loc y
+    read_ref
+    move_loc y
+    add
+    ret
+
+// mut_borrow_loc must kill subst for the borrowed register.
+fun mut_borrow_kills_subst(x: u64): u64
+    local y: u64
+    copy_loc x
+    st_loc y
+    ld_u64 42
+    mut_borrow_loc y
+    write_ref
+    move_loc y
+    ret
+
+// Reverse direction: subst {tmp -> y} killed when y is mut-borrowed.
+fun mut_borrow_kills_reverse(y: u64): u64
+    local tmp: u64
+    copy_loc y
+    st_loc tmp
+    ld_u64 99
+    mut_borrow_loc y
+    write_ref
+    move_loc tmp
+    ret
+
+// RUN: execute 0x66::borrow_soundness::borrow_loc_no_source_subst --args 7
+// CHECK: results: 7
+
+// RUN: execute 0x66::borrow_soundness::imm_borrow_value_prop --args 7
+// CHECK: results: 14
+
+// RUN: execute 0x66::borrow_soundness::mut_borrow_kills_subst --args 7
+// CHECK: results: 42
+
+// RUN: execute 0x66::borrow_soundness::mut_borrow_kills_reverse --args 7
+// CHECK: results: 7

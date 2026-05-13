@@ -177,6 +177,10 @@ pub enum FeatureFlag {
     VERSIONED_TRANSACTION_VALIDATION = 112,
     /// Whether storage_slot move natives are enabled.
     STORAGE_SLOT_NATIVES = 113,
+    /// If enabled, a module upgrade may downgrade the visibility of an `entry` function
+    /// from `friend/package` to private, while keeping the `entry` modifier. The `entry`
+    /// modifier itself still cannot be removed. See issue #19650.
+    ALLOW_FRIEND_ENTRY_VISIBILITY_DOWNGRADE = 114,
 }
 
 impl FeatureFlag {
@@ -290,6 +294,7 @@ impl FeatureFlag {
             Self::TRANSACTION_LIMITS,
             Self::VERSIONED_TRANSACTION_VALIDATION,
             Self::STORAGE_SLOT_NATIVES,
+            Self::ALLOW_FRIEND_ENTRY_VISIBILITY_DOWNGRADE,
         ]
     }
 }

@@ -66,4 +66,37 @@ pub trait Interner {
 
     /// Returns an interned string identifier.
     fn identifier_of(&self, identifier: &IdentStr) -> InternedIdentifier;
+
+    /// Substitutes type parameters in the given type using type arguments as
+    /// the substitution (indexed by indices in type param nodes). Returns an
+    /// error if substitution fails.
+    ///
+    /// # Invariants
+    ///
+    /// 1. Every type as index `i` in type argument list corresponds to type
+    ///    parameter `i` in the generic type.
+    /// 2. Size of the type argument list can be greater than the largest type
+    ///    parameter `i` in the generic type. It should never be smaller. If
+    ///    so, then substitution fails.
+    fn subst_type(
+        &self,
+        ty: InternedType,
+        ty_args: InternedTypeList,
+    ) -> anyhow::Result<InternedType>;
+
+    /// Substitutes type parameters in every element of the given type list.
+    /// Returns an error if substitution fails.
+    ///
+    /// # Invariants
+    ///
+    /// 1. Every type as index `i` in type argument list corresponds to type
+    ///    parameter `i` in the generic type list.
+    /// 2. Size of the type argument list can be greater than the largest type
+    ///    parameter `i` in the generic type list. It should never be smaller.
+    ///    If so, then substitution fails.
+    fn subst_type_list(
+        &self,
+        tys: InternedTypeList,
+        ty_args: InternedTypeList,
+    ) -> anyhow::Result<InternedTypeList>;
 }

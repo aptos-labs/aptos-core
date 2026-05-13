@@ -123,3 +123,91 @@ pub unsafe fn vec_elem_ptr(vec_ptr: *const u8, idx: u64, elem_size: u32) -> *con
     // SAFETY: caller must uphold the documented pointer requirements.
     unsafe { vec_ptr.add(VEC_DATA_OFFSET + idx as usize * elem_size as usize) }
 }
+
+// ---------------------------------------------------------------------------
+// Heap object header access (negative offsets)
+// ---------------------------------------------------------------------------
+//
+// A heap object pointer (`obj_ptr`) points at the first byte of the object's
+// data region. The 8-byte `[desc_id: u32 | size: u32]` header sits in the
+// 8 bytes immediately preceding `obj_ptr` (i.e., at offsets -8 and -4). When
+// `MAX_ALIGN > 8`, the allocator reserves `OBJECT_HEADER_SIZE = MAX_ALIGN`
+// bytes before each data region so that the data start stays MAX_ALIGN-aligned;
+// the descriptor+size pair always lives at the last 8 bytes of that reservation
+// (i.e., adjacent to the data — good for cache locality, and the negative
+// offsets stay invariant across MAX_ALIGN values).
+
+/// Byte offset of `descriptor_id` (u32) from `obj_ptr`. Always `-8`.
+const HEADER_DESCRIPTOR_NEG_OFFSET: isize = -8;
+/// Byte offset of `size_in_bytes` (u32) from `obj_ptr`. Always `-4`.
+const HEADER_SIZE_NEG_OFFSET: isize = -4;
+
+/// Read the descriptor id from an object's header.
+///
+/// # Safety
+/// `obj_ptr` must point to the data region of a valid heap object whose
+/// header lies at `obj_ptr - 8`.
+#[inline(always)]
+pub(crate) unsafe fn read_descriptor(obj_ptr: *const u8) -> u32 {
+    // SAFETY: caller must uphold the documented pointer requirements.
+    unsafe { (obj_ptr.offset(HEADER_DESCRIPTOR_NEG_OFFSET) as *const u32).read() }
+}
+
+/// Write the descriptor id into an object's header.
+///
+/// # Safety
+/// `obj_ptr` must point to the data region of a writable heap object whose
+/// header lies at `obj_ptr - 8`.
+#[inline(always)]
+pub(crate) unsafe fn write_descriptor(obj_ptr: *mut u8, descriptor_id: u32) {
+    // SAFETY: caller must uphold the documented pointer requirements.
+    unsafe { (obj_ptr.offset(HEADER_DESCRIPTOR_NEG_OFFSET) as *mut u32).write(descriptor_id) }
+}
+
+/// Read the total object size (header + aligned payload) from the header.
+///
+/// # Safety
+/// `obj_ptr` must point to the data region of a valid heap object whose
+/// header lies at `obj_ptr - 8`.
+#[inline(always)]
+pub(crate) unsafe fn read_obj_size(obj_ptr: *const u8) -> u32 {
+    // SAFETY: caller must uphold the documented pointer requirements.
+    unsafe { (obj_ptr.offset(HEADER_SIZE_NEG_OFFSET) as *const u32).read() }
+}
+
+/// Write the total object size (header + aligned payload) into the header.
+///
+/// # Safety
+/// `obj_ptr` must point to the data region of a writable heap object whose
+/// header lies at `obj_ptr - 8`.
+#[inline(always)]
+pub(crate) unsafe fn write_obj_size(obj_ptr: *mut u8, size: u32) {
+    // SAFETY: caller must uphold the documented pointer requirements.
+    unsafe { (obj_ptr.offset(HEADER_SIZE_NEG_OFFSET) as *mut u32).write(size) }
+}
+
+/// Read the forwarding pointer that the GC writes into a forwarded-from-space
+/// object's first 8 data bytes.
+///
+/// # Safety
+/// `obj_ptr` must point to the data region of a forwarded heap object (i.e.,
+/// `read_descriptor(obj_ptr) == FORWARDED_MARKER`), with at least 8 bytes of
+/// data region.
+#[inline(always)]
+pub(crate) unsafe fn read_forwarding(obj_ptr: *const u8) -> *mut u8 {
+    // SAFETY: caller must uphold the documented pointer requirements.
+    unsafe { (obj_ptr as *const *mut u8).read() }
+}
+
+/// Write a forwarding pointer into a from-space object's first 8 data bytes.
+/// Used together with `write_descriptor(obj_ptr, FORWARDED_MARKER)` to mark
+/// an object as forwarded during GC.
+///
+/// # Safety
+/// `obj_ptr` must point to the data region of a writable heap object with
+/// at least 8 bytes of data region.
+#[inline(always)]
+pub(crate) unsafe fn write_forwarding(obj_ptr: *mut u8, new_ptr: *mut u8) {
+    // SAFETY: caller must uphold the documented pointer requirements.
+    unsafe { (obj_ptr as *mut *mut u8).write(new_ptr) }
+}

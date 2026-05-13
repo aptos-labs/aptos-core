@@ -535,6 +535,22 @@ impl ModuleBuilder<'_, '_> {
                 &format!("duplicate declaration of const `{}`", &name.value()),
             )
         }
+        let (move_visibility, has_package_visibility) = match def.visibility {
+            EA::Visibility::Public(_) => (Visibility::Public, false),
+            EA::Visibility::Friend(loc) => {
+                if self.friend_visibility_loc.is_none() {
+                    self.friend_visibility_loc = Some(loc);
+                }
+                (Visibility::Friend, false)
+            },
+            EA::Visibility::Internal => (Visibility::Private, false),
+            EA::Visibility::Package(loc) => {
+                if self.package_fun_loc.is_none() {
+                    self.package_fun_loc = Some(loc);
+                }
+                (Visibility::Friend, true)
+            },
+        };
         let attributes = self.translate_attributes(&def.attributes);
         let mut et = ExpTranslator::new(self);
         et.set_translate_move_fun();
@@ -545,6 +561,8 @@ impl ModuleBuilder<'_, '_> {
             ty,
             value: Value::Bool(false), // dummy value, actual will be assigned in def_ana
             visibility: EntryVisibility::SpecAndImpl,
+            move_visibility,
+            has_package_visibility,
             users: BTreeSet::new(),
             attributes,
         });
@@ -1388,7 +1406,12 @@ impl ModuleBuilder<'_, '_> {
                 );
                 ok = false;
             }
-            if ok {
+            // Suppress the folder when the translated expression already contains an
+            // `Invalid` placeholder: that means an upstream translator error fired
+            // (e.g. a rejected cross-module const reference), and the folder would
+            // only stack a redundant "not foldable" diagnostic on top.
+            let has_invalid_subexp = exp.as_ref().any(&mut |e| matches!(e, ExpData::Invalid(_)));
+            if ok && !has_invalid_subexp {
                 let mut folder = ConstantFolder::new(self.parent.env, true);
                 let rewritten = folder.rewrite_exp(exp);
                 if let ExpData::Value(_, value) = rewritten.as_ref() {
@@ -4905,6 +4928,8 @@ impl ModuleBuilder<'_, '_> {
                 value,
                 ty,
                 visibility: _,
+                move_visibility,
+                has_package_visibility,
                 users,
                 attributes,
             } = const_entry.clone();
@@ -4913,6 +4938,8 @@ impl ModuleBuilder<'_, '_> {
                 loc,
                 type_: ty,
                 value,
+                visibility: move_visibility,
+                has_package_visibility,
                 attributes,
                 users,
             };

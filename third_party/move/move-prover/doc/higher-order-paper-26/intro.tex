@@ -22,7 +22,7 @@ This paper describes the extension of \MVP to support higher-order Move, and the
 
     \item We describe how \MVP implements invocation of function values on top of SMT~\cite{SMTLib2010,z3} by discriminating over the function-value variants flowing into the call site: if $f$ is known, the invocation is replaced by the effect of the concrete function; otherwise (e.g., a function-typed parameter or a closure loaded from storage), the behavioral predicates of $f$ describe its effect.
 
-    \item We extend \MVP's \emph{specification inference} tool to function-valued code.
+    \item We extend \MVP's \emph{specification inference} tool \cite{GrieskampEtAl26Inf} to function-valued code.
     The tool computes weakest preconditions over Move bytecode with closures and dynamic dispatch, automatically producing behavioral-predicate-based specifications.
     This both reduces the annotation burden and yields a validation pipeline confirming the encoding is internally consistent.
 \end{Itemize}

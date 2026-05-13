@@ -86,11 +86,11 @@ struct FunctionVerifier<'a> {
 
 impl FunctionVerifier<'_> {
     fn verify(&mut self) {
-        // SAFETY: The function's code is allocated in an executable arena that
-        // is alive for the duration of verification.
-        let code = unsafe { self.func.code.as_ref_unchecked() };
-        let base_offsets = unsafe { self.func.frame_layout.heap_ptr_offsets.as_ref_unchecked() };
-        let safe_point_layouts = unsafe { self.func.safe_point_layouts.entries() };
+        let code_guard = self.func.code.load();
+        let code = code_guard.as_slice();
+
+        let base_offsets = &self.func.frame_layout.heap_ptr_offsets;
+        let safe_point_layouts = self.func.safe_point_layouts.entries();
 
         // --- Function-level sanity ---
         // Code must be non-empty (at minimum a Return).
@@ -119,6 +119,20 @@ impl FunctionVerifier<'_> {
                 format!(
                     "param_sizes_sum ({}) must be <= param_and_local_sizes_sum ({})",
                     self.func.param_sizes_sum, self.func.param_and_local_sizes_sum
+                ),
+            );
+        }
+        // param_and_local_sizes_sum must be 8-byte aligned. The runtime writes
+        // frame metadata (saved pc/fp/func_ptr) at `fp + param_and_local_sizes_sum`
+        // via `write_u64`, which requires 8-byte alignment, and the callee
+        // frame pointer (`fp + param_and_local_sizes_sum + FRAME_METADATA_SIZE`)
+        // inherits this alignment for the callee's slot accesses.
+        if !self.func.param_and_local_sizes_sum.is_multiple_of(8) {
+            self.err(
+                None,
+                format!(
+                    "param_and_local_sizes_sum ({}) must be 8-byte aligned",
+                    self.func.param_and_local_sizes_sum
                 ),
             );
         }
@@ -159,7 +173,7 @@ impl FunctionVerifier<'_> {
                 );
             }
 
-            let sp_offsets = unsafe { entry.layout.heap_ptr_offsets.as_ref_unchecked() };
+            let sp_offsets = &entry.layout.heap_ptr_offsets;
             self.check_pointer_offsets(Some(co as usize), sp_offsets);
 
             for &off in sp_offsets {
@@ -337,11 +351,6 @@ impl FunctionVerifier<'_> {
 
             MicroOp::Return | MicroOp::ForceGC => {},
 
-            MicroOp::CallFunc { .. } => {
-                // TODO: Verify that func_id is a valid function handle
-                // index. Requires passing the function table (or its length)
-                // into the verifier so we can bounds-check the callee index.
-            },
             MicroOp::CallIndirect { .. } | MicroOp::CallDirect { .. } => {},
 
             // ----- VecNew -----
@@ -597,7 +606,7 @@ impl FunctionVerifier<'_> {
         match &op.func_ref {
             ClosureFuncRef::Resolved(func_ptr) => {
                 let callee = unsafe { func_ptr.as_ref_unchecked() };
-                let param_count = unsafe { callee.param_sizes.as_ref_unchecked() }.len();
+                let param_count = callee.param_sizes.len();
                 if param_count > 64 {
                     self.err(
                         Some(pc),
@@ -619,9 +628,8 @@ impl FunctionVerifier<'_> {
                 // Each captured slot's size must match the corresponding
                 // callee parameter's size. The captured list is in
                 // mask-bit-set order through the param list.
-                let param_sizes = unsafe { callee.param_sizes.as_ref_unchecked() };
                 let mut k = 0usize;
-                for (i, &param_size) in param_sizes.iter().enumerate() {
+                for (i, &param_size) in callee.param_sizes.iter().enumerate() {
                     if (op.mask >> i) & 1 != 0 {
                         if let Some(slot) = op.captured.get(k) {
                             if slot.size != param_size {
@@ -742,15 +750,14 @@ impl FunctionVerifier<'_> {
     }
 
     fn check_jump(&mut self, pc: usize, target: CodeOffset) {
-        // SAFETY: code arena pointer is valid during verification.
-        let code = unsafe { self.func.code.as_ref_unchecked() };
-        if (target.0 as usize) >= code.len() {
+        // TODO: avoid reloading code.
+        let code_len = self.func.code.load().len();
+        if (target.0 as usize) >= code_len {
             self.err(
                 Some(pc),
                 format!(
                     "jump target {} out of bounds (code length {})",
-                    target.0,
-                    code.len()
+                    target.0, code_len,
                 ),
             );
         }

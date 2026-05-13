@@ -18,6 +18,11 @@ module 0xc0ffee::other {
         value: u64,
     }
 
+    #[deprecated]
+    public const CROSS_DEPRECATED_CONST: u64 = 7;
+
+    public const CROSS_GOOD_CONST: u64 = 8;
+
     public fun cross_good_fun(): u64 { 1 }
 }
 
@@ -264,5 +269,15 @@ module 0xc0ffee::m {
     // Using a non-deprecated constant -> NO warn
     public fun test_use_good_const(): u64 {
         GOOD_CONST
+    }
+
+    // Cross-module: using a deprecated public constant -> warn
+    public fun test_cross_module_deprecated_const(): u64 {
+        0xc0ffee::other::CROSS_DEPRECATED_CONST
+    }
+
+    // Cross-module: using a non-deprecated public constant -> NO warn
+    public fun test_cross_module_good_const(): u64 {
+        0xc0ffee::other::CROSS_GOOD_CONST
     }
 }

@@ -1658,12 +1658,18 @@ impl AptosVM {
             .is_enabled(FeatureFlag::TREAT_FRIEND_AS_PRIVATE);
         // TODO(#17171): remove this once 1.34 is in production.
         let function_compat_bug = self.gas_feature_version() < gas_feature_versions::RELEASE_V1_34;
+        // Allow downgrading the visibility of an `entry` function from
+        // `friend/package` to private during an upgrade.
+        let allow_friend_entry_visibility_downgrade = self
+            .features()
+            .is_enabled(FeatureFlag::ALLOW_FRIEND_ENTRY_VISIBILITY_DOWNGRADE);
         let compatibility_checks = Compatibility::new(
             check_struct_layout,
             check_friend_linking,
             self.timed_features()
                 .is_enabled(TimedFeatureFlag::EntryCompatibility),
             function_compat_bug,
+            allow_friend_entry_visibility_downgrade,
         );
 
         session.finish_with_module_publishing_and_initialization(

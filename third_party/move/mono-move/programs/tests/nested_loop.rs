@@ -17,14 +17,22 @@ mod micro_op {
     use mono_move_runtime::InterpreterContext;
 
     fn run(n: u64) -> u64 {
-        let (functions, descriptors, _arena) = micro_op_nested_loop();
+        let (functions, descriptors) = micro_op_nested_loop();
         let mut exec_ctx = LocalExecutionContext::with_max_budget();
         let mut ctx = InterpreterContext::new(&mut exec_ctx, &descriptors, unsafe {
             functions[0].as_ref_unchecked()
         });
         ctx.set_root_arg(0, &n.to_le_bytes());
         ctx.run().unwrap();
-        ctx.root_result()
+        let result = ctx.root_result();
+
+        drop(ctx);
+        for ptr in functions {
+            // SAFETY: The interpreter context has been dropped, so the
+            // function pointers it referenced are no longer in use.
+            unsafe { ptr.free_unchecked() };
+        }
+        result
     }
 
     #[test]

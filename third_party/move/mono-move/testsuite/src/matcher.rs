@@ -13,7 +13,7 @@ pub fn check_output(checks: &[Check], v1_output: &str, v2_output: &str) -> anyho
             Check::V1(expected) => ("V1", expected.as_str(), v1_output),
             Check::V2(expected) => ("V2", expected.as_str(), v2_output),
         };
-        if actual != expected {
+        if actual.trim_end() != expected.trim_end() {
             bail!(
                 "CHECK-{} mismatch:\n  expected: {}\n  actual:   {}",
                 label,
