@@ -3,19 +3,40 @@
 
 //! Interning APIs.
 
-use crate::{
-    types::{InternedType, InternedTypeList},
-    ExecutableId,
-};
+use crate::types::{InternedType, InternedTypeList};
 use mono_move_alloc::GlobalArenaPtr;
 use move_core_types::{ability::AbilitySet, account_address::AccountAddress, identifier::IdentStr};
 
 /// Pointer to interned Move identifier allocated in global arena.
 pub type InternedIdentifier = GlobalArenaPtr<str>;
 
+/// Identifies an executable (module or script) by its address and name.
+///   - For modules, constructed from module address and name.
+///   - For scripts: TODO
+pub struct ModuleId {
+    address: AccountAddress,
+    name: InternedIdentifier,
+}
+
+impl ModuleId {
+    /// Creates a new module ID.
+    pub const fn new(address: AccountAddress, name: InternedIdentifier) -> Self {
+        Self { address, name }
+    }
+
+    /// Returns the account address of this module.
+    pub fn address(&self) -> &AccountAddress {
+        &self.address
+    }
+
+    /// Returns the arena pointer to the name.
+    pub fn name(&self) -> InternedIdentifier {
+        self.name
+    }
+}
+
 /// Pointer to interned module ID allocated in global arena.
-// TODO: rename ExecutableId to ModuleID
-pub type InternedModuleId = GlobalArenaPtr<ExecutableId>;
+pub type InternedModuleId = GlobalArenaPtr<ModuleId>;
 
 /// Interns Move file format types into efficient pointer-based implementation
 /// where data is allocated in arena.

@@ -8,18 +8,18 @@ use crate::{
     stackless_exec_ir::ModuleIR,
 };
 use anyhow::Result;
-use mono_move_core::{MicroOpGasSchedule, FRAME_METADATA_SIZE};
+use mono_move_core::{types::EMPTY_TYPE_LIST, Interner, MicroOpGasSchedule, FRAME_METADATA_SIZE};
 use mono_move_gas::GasInstrumentor;
 
 /// Lower an already-destacked [`ModuleIR`] into a [`LoweredModule`].
 // TODO: extend with additional passes (e.g., monomorphization, GC safe-point layout).
-pub fn lower_module(module_ir: &ModuleIR) -> Result<LoweredModule> {
+pub fn lower_module(module_ir: &ModuleIR, interner: &impl Interner) -> Result<LoweredModule> {
     let mut functions = Vec::with_capacity(module_ir.functions.len());
     for func_ir in &module_ir.functions {
         let Some(func_ir) = func_ir else {
             continue;
         };
-        let Some(ctx) = try_build_context(module_ir, func_ir)? else {
+        let Some(ctx) = try_build_context(module_ir, func_ir, EMPTY_TYPE_LIST, interner)? else {
             continue;
         };
         let micro_ops = lower_function(func_ir, &ctx)?;

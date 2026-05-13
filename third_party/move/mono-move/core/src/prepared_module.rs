@@ -5,15 +5,16 @@
 
 use crate::{
     interner::{InternedIdentifier, InternedModuleId, Interner},
-    types::{InternedType, EMPTY_TYPE_LIST},
+    types::{InternedType, InternedTypeList, EMPTY_TYPE_LIST},
 };
 use anyhow::{bail, Result};
 use move_binary_format::{
     access::ModuleAccess,
     file_format::{
-        ConstantPoolIndex, FieldHandleIndex, IdentifierIndex, ModuleHandleIndex, SignatureIndex,
-        SignatureToken, StructDefinitionIndex, StructFieldInformation, StructHandle,
-        StructHandleIndex, VariantFieldHandleIndex, VariantIndex,
+        ConstantPoolIndex, FieldHandleIndex, FunctionHandleIndex, FunctionInstantiationIndex,
+        IdentifierIndex, ModuleHandleIndex, SignatureIndex, SignatureToken, StructDefinitionIndex,
+        StructFieldInformation, StructHandle, StructHandleIndex, VariantFieldHandleIndex,
+        VariantIndex,
     },
     CompiledModule,
 };
@@ -60,6 +61,16 @@ pub struct PreparedModule {
     /// Indexed by [`ModuleHandleIndex`]. Self-handle resolves to the same id
     /// as [`Self::id`].
     module_ids: Vec<InternedModuleId>,
+    /// Parameter and return types for every function in the module.
+    ///
+    /// Indexed by [`FunctionHandleIndex`].
+    function_signatures: Vec<(InternedTypeList, InternedTypeList)>,
+    /// Parameter and return types, as well as type arguments, for every
+    /// function instantiation in this module. Parameter and return types
+    /// have been substituted with type arguments already.
+    ///
+    /// Indexed by [`FunctionInstantiationIndex`].
+    function_instantiation_signatures: Vec<(InternedTypeList, InternedTypeList, InternedTypeList)>,
 }
 
 /// Field types of any struct or enum definition in this module.
@@ -186,6 +197,24 @@ impl PreparedModule {
         self.interned_identifiers[idx.0 as usize]
     }
 
+    /// Returns parameter and return types for the given function handle.
+    pub fn function_signature_at(
+        &self,
+        idx: FunctionHandleIndex,
+    ) -> (InternedTypeList, InternedTypeList) {
+        self.function_signatures[idx.0 as usize]
+    }
+
+    /// Returns parameter and return types, as well as type argument for the
+    /// given function instantiation. Parameters and returns have already
+    /// been substituted under type arguments.
+    pub fn function_instantiation_signature_at(
+        &self,
+        idx: FunctionInstantiationIndex,
+    ) -> (InternedTypeList, InternedTypeList, InternedTypeList) {
+        self.function_instantiation_signatures[idx.0 as usize]
+    }
+
     /// Builds resolved module from compiled one, interning all signatures,
     /// field and constant types.
     pub fn build(module: CompiledModule, interner: &impl Interner) -> Result<Self> {
@@ -284,6 +313,29 @@ impl PreparedModule {
             .map(|c| intern_sig_token(&c.type_, &module, interner))
             .collect::<Result<Vec<_>>>()?;
 
+        let function_signatures = module
+            .function_handles()
+            .iter()
+            .map(|h| {
+                (
+                    interner.type_list_of(&signatures[h.parameters.0 as usize]),
+                    interner.type_list_of(&signatures[h.return_.0 as usize]),
+                )
+            })
+            .collect::<Vec<_>>();
+
+        let function_instantiation_signatures = module
+            .function_instantiations()
+            .iter()
+            .map(|inst| {
+                let (params, returns) = function_signatures[inst.handle.0 as usize];
+                let ty_args = interner.type_list_of(&signatures[inst.type_parameters.0 as usize]);
+                let params = interner.subst_type_list(params, ty_args)?;
+                let returns = interner.subst_type_list(returns, ty_args)?;
+                Ok((params, returns, ty_args))
+            })
+            .collect::<Result<Vec<_>>>()?;
+
         Ok(Self {
             module,
             id,
@@ -294,6 +346,8 @@ impl PreparedModule {
             constant_types,
             interned_identifiers,
             module_ids,
+            function_signatures,
+            function_instantiation_signatures,
         })
     }
 }

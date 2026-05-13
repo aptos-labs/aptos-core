@@ -9,8 +9,10 @@ use anyhow::{anyhow, bail};
 use mono_move_alloc::{LeakedBoxPtr, VersionedLeakedBoxPtr};
 use mono_move_core::{
     interner::{InternedIdentifier, InternedModuleId},
+    types::InternedTypeList,
     Function, FunctionPtr,
 };
+use parking_lot::Mutex;
 use shared_dsa::UnorderedMap;
 use specializer::{FunctionIR, ModuleIR};
 use std::sync::{Arc, OnceLock};
@@ -116,6 +118,7 @@ impl ModuleMandatoryDependencies {
 
 pub struct FunctionSlot {
     pub function: FunctionPtr,
+    // TODO: consider making these a pointer (or Arc) instead.
     pub mandatory_dependencies: Vec<LoadedModuleSlot>,
 }
 
@@ -143,6 +146,11 @@ pub struct LoadedModule {
     functions: UnorderedMap<InternedIdentifier, OnceLock<FunctionSlot>>,
     /// Maps function's name to its index in file format (to query its IR).
     function_indices: UnorderedMap<InternedIdentifier, usize>,
+    /// Lowered functions per generic instantiation. Type argument list is
+    /// never empty here.
+    // TODO: revisit data structure used for actual monomorphized function storage.
+    instantiated_functions:
+        Mutex<UnorderedMap<(InternedIdentifier, InternedTypeList), FunctionSlot>>,
 }
 
 impl LoadedModule {
@@ -172,6 +180,7 @@ impl LoadedModule {
             mandatory_dependencies,
             functions,
             function_indices,
+            instantiated_functions: Mutex::new(UnorderedMap::new()),
         })
     }
 
@@ -227,6 +236,39 @@ impl LoadedModule {
             .and_then(|slot| slot.as_ref())
             .ok_or_else(|| anyhow!("Linker error: function IR missing"))
     }
+
+    /// Returns the function and its mandatory dependencies for the given
+    /// instantiation. If the function has not been monomorphized yet, returns
+    /// [`None`].
+    pub fn get_instantiated_function_ptr(
+        &self,
+        name: InternedIdentifier,
+        ty_args: InternedTypeList,
+    ) -> Option<(FunctionPtr, Vec<LoadedModuleSlot>)> {
+        self.instantiated_functions
+            .lock()
+            .get(&(name, ty_args))
+            .map(|f| (f.function, f.mandatory_dependencies.clone()))
+    }
+
+    /// Inserts monomorphized function into instantiation cache, returning the
+    /// pointer to the inserted function. If the slot for the function is
+    /// occupied (concurrent insertion), is a no-op and returns the existing
+    /// pointer.
+    pub fn set_instantiated_function(
+        &self,
+        name: InternedIdentifier,
+        ty_args: InternedTypeList,
+        function: Function,
+        function_ms: Vec<LoadedModuleSlot>,
+    ) -> FunctionPtr {
+        match self.instantiated_functions.lock().entry((name, ty_args)) {
+            shared_dsa::Entry::Occupied(e) => e.get().function,
+            shared_dsa::Entry::Vacant(e) => {
+                e.insert(FunctionSlot::new(function, function_ms)).function
+            },
+        }
+    }
 }
 
 impl Drop for LoadedModule {
@@ -249,6 +291,10 @@ impl Drop for LoadedModule {
                 unsafe { slot.function.free_unchecked() };
             }
             false
+        });
+        self.instantiated_functions.lock().for_each(|slot| {
+            // SAFETY: see impl-level comment — no aliases at drop time.
+            unsafe { slot.function.free_unchecked() };
         });
     }
 }

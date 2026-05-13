@@ -24,13 +24,13 @@
 use crate::{context::ArenaRef, ExecutionGuard};
 use dashmap::Equivalent;
 use mono_move_alloc::GlobalArenaPtr;
-use mono_move_core::ExecutableId;
+use mono_move_core::ModuleId;
 use move_core_types::{
-    account_address::AccountAddress, identifier::IdentStr, language_storage::ModuleId,
+    account_address::AccountAddress, identifier::IdentStr, language_storage as FF,
 };
 use std::hash::{Hash, Hasher};
 
-impl<'guard> ArenaRef<'guard, ExecutableId> {
+impl<'guard> ArenaRef<'guard, ModuleId> {
     /// Returns the account address of this module.
     pub fn address(&self) -> &'guard AccountAddress {
         // SAFETY: The lifetime on this reference guarantees that the execution
@@ -55,7 +55,7 @@ impl<'guard> ArenaRef<'guard, ExecutableId> {
 
 #[allow(private_interfaces)]
 impl<'ctx> ExecutionGuard<'ctx> {
-    /// Interns [`ModuleId`] as an arena-allocated module ID and returns a
+    /// Interns [`FF::ModuleId`] as an arena-allocated module ID and returns a
     /// reference to it, with lifetime scoped to the lifetime of the execution
     /// guard.
     ///
@@ -74,8 +74,8 @@ impl<'ctx> ExecutionGuard<'ctx> {
     /// During global arena reset, identifiers map must be cleared as well.
     pub fn intern_module_id<'guard>(
         &'guard self,
-        module_id: &ModuleId,
-    ) -> ArenaRef<'guard, ExecutableId>
+        module_id: &FF::ModuleId,
+    ) -> ArenaRef<'guard, ModuleId>
     where
         'ctx: 'guard,
     {
@@ -103,7 +103,7 @@ impl<'ctx> ExecutionGuard<'ctx> {
         &'guard self,
         address: &AccountAddress,
         name: &IdentStr,
-    ) -> ArenaRef<'guard, ExecutableId>
+    ) -> ArenaRef<'guard, ModuleId>
     where
         'ctx: 'guard,
     {
@@ -129,7 +129,7 @@ impl<'ctx> ExecutionGuard<'ctx> {
         &self,
         address: AccountAddress,
         name: &IdentStr,
-    ) -> GlobalArenaPtr<ExecutableId> {
+    ) -> GlobalArenaPtr<ModuleId> {
         // SAFETY: All existing keys/values are valid pointers because the map
         // is guaranteed to be cleared on arena's reset.
         if let Some(entry) = self.ctx.module_ids.get(&(&address, name)) {
@@ -139,10 +139,7 @@ impl<'ctx> ExecutionGuard<'ctx> {
         // SAFETY: Name pointer has been just interned - it is valid and can be
         // used safely for ID construction.
         let name = self.intern_identifier_internal(name);
-        // SAFETY: Name pointer has been just interned - it is valid.
-        let ptr = self
-            .global_arena
-            .alloc(unsafe { ExecutableId::new(address, name) });
+        let ptr = self.global_arena.alloc(ModuleId::new(address, name));
 
         // SAFETY: We have just allocated the pointer, hence it is safe to wrap
         // it as a key and compute hash / equality. All existing keys are also
@@ -162,7 +159,7 @@ impl<'ctx> ExecutionGuard<'ctx> {
 ///
 /// Constructor must enforce the pointer points to the valid data and can be
 /// safely dereferenced.
-pub(super) struct ExecutableIdInternerKey(GlobalArenaPtr<ExecutableId>);
+pub(super) struct ExecutableIdInternerKey(GlobalArenaPtr<ModuleId>);
 
 impl Hash for ExecutableIdInternerKey {
     fn hash<H: Hasher>(&self, state: &mut H) {

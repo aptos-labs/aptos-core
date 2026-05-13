@@ -53,6 +53,13 @@ fun identity(r0): _0 {
 
 fun call_bool(): skipped (context: return slot: slot align 1 < 8 not yet supported (u64-aligned types only))
 
-fun call_u64(): skipped (not all types are concrete)
+fun call_u64() {
+  frame_data_size: 8
+  code:
+    0: StoreImm8 [32] <- #7
+    1: CallIndirect 0x42::generic_call::identity<u64>
+    2: Move8 [0] <- [32]
+    3: Return
+}
 
 fun identity(): skipped (not all types are concrete)

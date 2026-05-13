@@ -10,7 +10,7 @@ use super::{
 use crate::stackless_exec_ir::{BinaryOp, CmpOp, FunctionIR, ImmValue, Instr, Label, Slot};
 use anyhow::{bail, Context, Result};
 use mono_move_core::{
-    types::{strip_ref, view_type, InternedType, Type, EMPTY_TYPE_LIST},
+    types::{strip_ref, view_type, InternedType, Type},
     CodeOffset, FrameOffset, MicroOp,
 };
 
@@ -578,8 +578,7 @@ impl<'a> LoweringState<'a> {
         self.emit(MicroOp::CallIndirect {
             module_id: cs.callee_module_id,
             func_name: cs.callee_func_name,
-            // TODO: connect this to use non-empty lists for generics.
-            ty_args: EMPTY_TYPE_LIST,
+            ty_args: cs.ty_args,
         });
         self.call_site_cursor += 1;
 
