@@ -7,11 +7,14 @@
 use super::super::session::FlowSession;
 use rmcp::{handler::server::router::tool::ToolRouter, tool_router};
 
+use aptos_framework::{BuildOptions, BuiltPackage};
+use aptos_move_cli::source_locator::AptosSourceLocator;
 use aptos_move_cli::MoveDebugger;
 use aptos_move_debugger::aptos_debugger::AptosDebugger;
 use aptos_rest_client::{AptosBaseUrl, Client};
 use aptos_types::transaction::{ExecutionStatus, TransactionStatus};
 use aptos_types::vm_status::AbortLocation;
+use aptos_validator_interface::LocalModuleOverrides;
 use move_core_types::account_address::AccountAddress;
 use rmcp::schemars;
 use std::collections::BTreeMap;
@@ -206,6 +209,56 @@ fn build_debugger(
     let debugger = AptosDebugger::rest_client(client)
         .map_err(|e| format!("failed to construct debugger: {}", e))?;
     Ok(Box::new(debugger))
+}
+
+/// Compile each local Move package and collect the resulting modules into a
+/// [`LocalModuleOverrides`] map plus an [`AptosSourceLocator`] populated with
+/// the source maps. Used to swap on-chain modules for locally-compiled
+/// versions during replay.
+fn build_local_overrides(
+    package_paths: &[PathBuf],
+    named_addresses: &BTreeMap<String, AccountAddress>,
+) -> Result<(LocalModuleOverrides, AptosSourceLocator), String> {
+    let mut overrides = LocalModuleOverrides::new();
+    let mut locator = AptosSourceLocator::new();
+
+    for pkg_path in package_paths {
+        let built = BuiltPackage::build(pkg_path.clone(), BuildOptions {
+            with_srcs: true,
+            with_source_maps: true,
+            forced_named_addresses: named_addresses.clone(),
+            ..BuildOptions::default()
+        })
+        .map_err(|e| {
+            format!(
+                "failed to build local package at {}: {}",
+                pkg_path.display(),
+                e
+            )
+        })?;
+
+        for unit in built.package.root_modules() {
+            if let legacy_move_compiler::compiled_unit::CompiledUnit::Module(ref named) =
+                unit.unit
+            {
+                let module = &named.module;
+                let mut bytes = vec![];
+                module.serialize(&mut bytes).map_err(|e| {
+                    format!("failed to serialize module {}: {}", module.self_id(), e)
+                })?;
+                let module_id = module.self_id();
+                overrides.add_module(&module_id, bytes);
+
+                let sm_bytes = unit.unit.serialize_source_map();
+                let source_text =
+                    std::fs::read_to_string(&unit.source_path).unwrap_or_default();
+                let filename = unit.source_path.to_string_lossy().into_owned();
+                let _ = locator.add_local_module(module, &sm_bytes, &source_text, &filename);
+            }
+        }
+    }
+
+    Ok((overrides, locator))
 }
 
 #[tool_router(router = replay_transaction_router, vis = "pub(crate)")]
@@ -411,5 +464,18 @@ mod tests {
         m.insert("bad".to_string(), "not an address".to_string());
         let err = validate_named_addresses(&m).unwrap_err();
         assert!(err.contains("bad"), "got: {}", err);
+    }
+
+    #[test]
+    fn build_local_overrides_produces_module() {
+        let manifest_dir = std::env::var("CARGO_MANIFEST_DIR").unwrap();
+        let pkg = std::path::PathBuf::from(manifest_dir)
+            .join("src/tests/move_replay_transaction/fixtures/empty_pkg");
+        let paths = vec![pkg];
+        let named = std::collections::BTreeMap::new();
+        let result = build_local_overrides(&paths, &named);
+        assert!(result.is_ok(), "should build overrides: {:?}", result.err());
+        let (overrides, _locator) = result.unwrap();
+        assert!(!overrides.is_empty(), "overrides should contain at least one module");
     }
 }
