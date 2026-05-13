@@ -7,7 +7,7 @@
 //! All lookups are O(1) via indexed Vecs — no maps.
 
 use crate::{
-    lower::lower_function,
+    lower::{gc_layout::derive_frame_layout, lower_function},
     stackless_exec_ir::{FunctionIR, Instr, ModuleIR},
 };
 use anyhow::{bail, Result};
@@ -18,8 +18,8 @@ use mono_move_core::{
         view_name, view_type, view_type_list, Alignment, FieldLayout, InternedType,
         InternedTypeList, Size, Type, EMPTY_TYPE_LIST,
     },
-    Code, FieldTypes, FrameLayoutInfo, FrameOffset, Function, Interner, MicroOp,
-    MicroOpGasSchedule, SortedSafePointEntries, FRAME_METADATA_SIZE,
+    Code, FieldTypes, FrameLayoutInfo, FrameOffset, Function, Interner, MicroOpGasSchedule,
+    SortedSafePointEntries, FRAME_METADATA_SIZE,
 };
 use mono_move_gas::GasInstrumentor;
 use move_binary_format::access::ModuleAccess;
@@ -403,31 +403,20 @@ pub fn try_lower_function(
     let code = lower_function(func_ir, &ctx)?;
     let code = GasInstrumentor::new(MicroOpGasSchedule).run(code);
 
-    // Defense-in-depth guard for ops the gc_layout pass doesn't yet
-    // cover. `frame_layout` derivation handles non-allocating heap-
-    // pointer-producing ops via home-slot types, but allocating ops
-    // (`HeapNew`/`VecPushBack`/`PackClosure`/`ForceGC`) and
-    // `CallClosure` trigger GC under their own contracts that need
-    // top-frame `safe_point_layouts` — not yet emitted. Bail until
-    // that lands.
+    // Defense-in-depth guard for allocating ops — they trigger GC at
+    // their own PC and need top-frame `safe_point_layouts` (not yet
+    // emitted by gc_layout) to keep callee-region pointers alive.
     //
-    // TODO: drop these once allocating-op safe-points and closure-call
-    // safe-points are derived.
+    // TODO: drop this guard once allocating-op safe points are
+    // derived.
     for op in &code {
-        match op {
-            MicroOp::HeapNew { .. }
-            | MicroOp::VecPushBack { .. }
-            | MicroOp::PackClosure(..)
-            | MicroOp::CallClosure(..)
-            | MicroOp::ForceGC => {
-                bail!(
-                    "function `{}` lowers a heap-pointer-producing op but \
-                     safe_point_layouts is not yet derived from the lowering context — \
-                     GC would not see the resulting slot",
-                    view_name(name),
-                );
-            },
-            _ => {},
+        if op.is_allocating() {
+            bail!(
+                "function `{}` lowers allocating op `{}` but `safe_point_layouts` is not yet \
+                 derived from the lowering context — GC would not see callee-region pointers",
+                view_name(name),
+                op,
+            );
         }
     }
 
@@ -454,11 +443,7 @@ pub fn try_lower_function(
     // into `Function::safe_point_layouts`. Today they stay empty.
     let home_list = interner.type_list_of(&func_ir.home_slot_types);
     let home_list = interner.subst_type_list(home_list, ty_args)?;
-    let derived = crate::lower::gc_layout::derive_frame_layout(
-        &ctx,
-        view_type_list(home_list),
-        func_ir.num_params,
-    )?;
+    let derived = derive_frame_layout(&ctx, view_type_list(home_list), func_ir.num_params)?;
 
     Ok(Function {
         name,
