@@ -11,15 +11,19 @@ use crate::{
 };
 use aptos_config::config::{MempoolConfig, NodeConfig};
 use aptos_consensus_types::common::{TransactionInProgress, TransactionSummary};
-use aptos_crypto::HashValue;
+use aptos_crypto::{ed25519::Ed25519PrivateKey, HashValue, PrivateKey, Uniform as _};
 use aptos_types::{
-    account_address::AccountAddress,
+    account_address::{self, AccountAddress},
+    chain_id::ChainId,
     mempool_status::MempoolStatusCode,
-    transaction::{ReplayProtector, SignedTransaction},
+    transaction::{
+        RawTransaction, ReplayProtector, Script, SignedTransaction, TransactionExecutable,
+    },
     vm_status::DiscardedVMStatus,
 };
 use itertools::Itertools;
 use maplit::btreemap;
+use rand::{rngs::StdRng, SeedableRng};
 use std::time::{Duration, Instant, SystemTime};
 
 #[test]
@@ -1757,4 +1761,413 @@ fn test_include_gas_upgraded() {
         high_gas_txn => TransactionInProgress::new(high_gas_price)
     });
     assert_eq!(batch.len(), 0);
+}
+
+#[test]
+fn test_fee_payer_cap_rejects_when_full() {
+    // Create a mempool with the specified fee payer capacity
+    let fee_payer_txn_capacity = 3;
+    let mut mempool = create_mempool_with_fee_payer_capacity(fee_payer_txn_capacity);
+
+    // Create a fee payer account
+    let fee_payer_key = generate_private_key_from_seed(0);
+    let fee_payer_addr = account_address::from_public_key(&fee_payer_key.public_key());
+
+    // Add exactly `fee_payer_txn_capacity` sponsored transactions from distinct senders (all should be accepted)
+    for i in 0..fee_payer_txn_capacity {
+        let sender_key = generate_private_key_from_seed(1 + i as u64);
+        let txn = make_fee_payer_txn(
+            &sender_key,
+            ReplayProtector::SequenceNumber(0),
+            (i + 1) as u64,
+            fee_payer_addr,
+            &fee_payer_key,
+        );
+        assert_eq!(
+            add_fee_payer_txn(&mut mempool, txn),
+            MempoolStatusCode::Accepted,
+        );
+    }
+
+    // One more sponsored txn for the same fee payer should be rejected
+    let sender_key = generate_private_key_from_seed(1 + fee_payer_txn_capacity as u64);
+    let txn = make_fee_payer_txn(
+        &sender_key,
+        ReplayProtector::SequenceNumber(0),
+        1,
+        fee_payer_addr,
+        &fee_payer_key,
+    );
+    assert_eq!(
+        add_fee_payer_txn(&mut mempool, txn),
+        MempoolStatusCode::TooManyTransactions,
+    );
+}
+
+#[test]
+fn test_fee_payer_cap_independent_per_fee_payer() {
+    // Create a mempool with the specified fee payer capacity
+    let fee_payer_txn_capacity = 3;
+    let mut mempool = create_mempool_with_fee_payer_capacity(fee_payer_txn_capacity);
+
+    // Create two fee payer accounts
+    let fee_payer_key_a = generate_private_key_from_seed(0);
+    let fee_payer_address_a = account_address::from_public_key(&fee_payer_key_a.public_key());
+    let fee_payer_key_b = generate_private_key_from_seed(1);
+    let fee_payer_address_b = account_address::from_public_key(&fee_payer_key_b.public_key());
+
+    // Fill fee payer A to capacity
+    for i in 0..fee_payer_txn_capacity {
+        let sender_key = generate_private_key_from_seed(10 + i as u64);
+        let txn = make_fee_payer_txn(
+            &sender_key,
+            ReplayProtector::SequenceNumber(0),
+            (i + 1) as u64,
+            fee_payer_address_a,
+            &fee_payer_key_a,
+        );
+        assert_eq!(
+            add_fee_payer_txn(&mut mempool, txn),
+            MempoolStatusCode::Accepted
+        );
+    }
+
+    // Fee payer B should still have room
+    let sender_key = generate_private_key_from_seed(20);
+    let txn_b = make_fee_payer_txn(
+        &sender_key,
+        ReplayProtector::SequenceNumber(0),
+        1,
+        fee_payer_address_b,
+        &fee_payer_key_b,
+    );
+    assert_eq!(
+        add_fee_payer_txn(&mut mempool, txn_b),
+        MempoolStatusCode::Accepted,
+    );
+}
+
+#[test]
+fn test_non_sponsored_txn_unaffected_by_fee_payer_cap() {
+    // Create a mempool with the specified fee payer capacity
+    let fee_payer_txn_capacity = 0;
+    let mut mempool = create_mempool_with_fee_payer_capacity(fee_payer_txn_capacity);
+
+    // A normal (non-fee-payer) transaction should be admitted regardless
+    let txn = TestTransaction::new(0, ReplayProtector::SequenceNumber(0), 1);
+    assert!(add_txn(&mut mempool, txn).is_ok(),);
+}
+
+#[test]
+fn test_fee_payer_cap_slot_released_on_reject() {
+    // Create a mempool with the specified fee payer capacity
+    let fee_payer_txn_capacity = 1;
+    let mut mempool = create_mempool_with_fee_payer_capacity(fee_payer_txn_capacity);
+
+    // Create a fee payer account
+    let fee_payer_key = generate_private_key_from_seed(0);
+    let fee_payer_addr = account_address::from_public_key(&fee_payer_key.public_key());
+
+    // Insert one sponsored txn to fill the capacity
+    let sender_key = generate_private_key_from_seed(1);
+    let txn = make_fee_payer_txn(
+        &sender_key,
+        ReplayProtector::SequenceNumber(0),
+        1,
+        fee_payer_addr,
+        &fee_payer_key,
+    );
+    assert_eq!(
+        add_fee_payer_txn(&mut mempool, txn.clone()),
+        MempoolStatusCode::Accepted
+    );
+
+    // Reject the transaction (this should release the fee payer slot)
+    mempool.reject_transaction(
+        &txn.sender(),
+        txn.replay_protector(),
+        &txn.committed_hash(),
+        &DiscardedVMStatus::MALFORMED,
+    );
+
+    // Now a new sponsored txn for the same fee payer should be allowed
+    let sender_key2 = generate_private_key_from_seed(2);
+    let txn2 = make_fee_payer_txn(
+        &sender_key2,
+        ReplayProtector::SequenceNumber(0),
+        1,
+        fee_payer_addr,
+        &fee_payer_key,
+    );
+    assert_eq!(
+        add_fee_payer_txn(&mut mempool, txn2),
+        MempoolStatusCode::Accepted,
+    );
+}
+
+#[test]
+fn test_fee_payer_cap_slot_released_on_gc() {
+    // Create a mempool with the specified fee payer capacity, and a short TTL
+    // to ensure that GC will evict the transaction and release the fee payer slot.
+    let fee_payer_txn_capacity = 1;
+    let mut node_config = NodeConfig::generate_random_config();
+    node_config.mempool.fee_payer_txn_capacity = fee_payer_txn_capacity;
+    node_config.mempool.system_transaction_timeout_secs = 0; // Set TTL to 0 seconds for immediate expiration
+    let mut mempool = CoreMempool::new(&node_config);
+
+    // Create a fee payer account
+    let fee_payer_key = generate_private_key_from_seed(0);
+    let fee_payer_addr = account_address::from_public_key(&fee_payer_key.public_key());
+
+    // Insert one sponsored txn to fill the capacity
+    let sender_key = generate_private_key_from_seed(1);
+    let txn = make_fee_payer_txn(
+        &sender_key,
+        ReplayProtector::SequenceNumber(0),
+        1,
+        fee_payer_addr,
+        &fee_payer_key,
+    );
+    assert_eq!(
+        add_fee_payer_txn(&mut mempool, txn),
+        MempoolStatusCode::Accepted
+    );
+
+    // Verify that the fee payer slot is currently occupied (capacity should be 1)
+    let sender_key = generate_private_key_from_seed(2);
+    let txn = make_fee_payer_txn(
+        &sender_key,
+        ReplayProtector::SequenceNumber(0),
+        1,
+        fee_payer_addr,
+        &fee_payer_key,
+    );
+    assert_eq!(
+        add_fee_payer_txn(&mut mempool, txn),
+        MempoolStatusCode::TooManyTransactions,
+    );
+
+    // GC should evict the expired txn and release its fee payer slot
+    mempool.gc();
+
+    // Now a new sponsored txn for the same fee payer should be allowed
+    let sender_key = generate_private_key_from_seed(3);
+    let txn = make_fee_payer_txn(
+        &sender_key,
+        ReplayProtector::SequenceNumber(0),
+        1,
+        fee_payer_addr,
+        &fee_payer_key,
+    );
+    assert_eq!(
+        add_fee_payer_txn(&mut mempool, txn),
+        MempoolStatusCode::Accepted,
+    );
+}
+
+#[test]
+fn test_fee_payer_cap_gas_upgrade_does_not_double_count() {
+    // Create a mempool with the specified fee payer capacity
+    let fee_payer_txn_capacity = 1;
+    let mut mempool = create_mempool_with_fee_payer_capacity(fee_payer_txn_capacity);
+
+    // Create a fee payer account
+    let fee_payer_key = generate_private_key_from_seed(0);
+    let fee_payer_addr = account_address::from_public_key(&fee_payer_key.public_key());
+
+    // Insert the initial sponsored txn (gas price 1)
+    let sender_key = generate_private_key_from_seed(1);
+    let txn_low = make_fee_payer_txn(
+        &sender_key,
+        ReplayProtector::SequenceNumber(0),
+        1,
+        fee_payer_addr,
+        &fee_payer_key,
+    );
+    assert_eq!(
+        add_fee_payer_txn(&mut mempool, txn_low),
+        MempoolStatusCode::Accepted
+    );
+
+    // Re-submit the same txn with a higher gas price (the update should succeed)
+    let txn_high = make_fee_payer_txn(
+        &sender_key,
+        ReplayProtector::SequenceNumber(0),
+        10,
+        fee_payer_addr,
+        &fee_payer_key,
+    );
+    assert_eq!(
+        add_fee_payer_txn(&mut mempool, txn_high),
+        MempoolStatusCode::Accepted,
+    );
+
+    // A new sponsored txn from a different sender should now be rejected
+    let other_sender_key = generate_private_key_from_seed(2);
+    let other_txn = make_fee_payer_txn(
+        &other_sender_key,
+        ReplayProtector::SequenceNumber(0),
+        1,
+        fee_payer_addr,
+        &fee_payer_key,
+    );
+    assert_eq!(
+        add_fee_payer_txn(&mut mempool, other_txn),
+        MempoolStatusCode::TooManyTransactions,
+    );
+}
+
+#[test]
+fn test_fee_payer_cap_slot_released_on_commit() {
+    // Create a mempool with the specified fee payer capacity
+    let fee_payer_txn_capacity = 1;
+    let mut mempool = create_mempool_with_fee_payer_capacity(fee_payer_txn_capacity);
+
+    // Create a fee payer account
+    let fee_payer_key = generate_private_key_from_seed(0);
+    let fee_payer_addr = account_address::from_public_key(&fee_payer_key.public_key());
+
+    // Insert one sponsored txn to fill the capacity
+    let sender_key = generate_private_key_from_seed(1);
+    let txn = make_fee_payer_txn(
+        &sender_key,
+        ReplayProtector::SequenceNumber(0),
+        1,
+        fee_payer_addr,
+        &fee_payer_key,
+    );
+    assert_eq!(
+        add_fee_payer_txn(&mut mempool, txn.clone()),
+        MempoolStatusCode::Accepted
+    );
+
+    // Verify that the fee payer slot is currently occupied (capacity should be 1)
+    let sender_key_2 = generate_private_key_from_seed(2);
+    let txn_2 = make_fee_payer_txn(
+        &sender_key_2,
+        ReplayProtector::SequenceNumber(0),
+        1,
+        fee_payer_addr,
+        &fee_payer_key,
+    );
+    assert_eq!(
+        add_fee_payer_txn(&mut mempool, txn_2),
+        MempoolStatusCode::TooManyTransactions,
+    );
+
+    // Commit the transaction (this should release the fee payer slot)
+    mempool.commit_transaction(&txn.sender(), ReplayProtector::SequenceNumber(0));
+
+    // A new sponsored txn for the same fee payer should now be accepted
+    let sender_key2 = generate_private_key_from_seed(3);
+    let txn2 = make_fee_payer_txn(
+        &sender_key2,
+        ReplayProtector::SequenceNumber(0),
+        1,
+        fee_payer_addr,
+        &fee_payer_key,
+    );
+    assert_eq!(
+        add_fee_payer_txn(&mut mempool, txn2),
+        MempoolStatusCode::Accepted,
+    );
+}
+
+#[test]
+fn test_fee_payer_cap_idempotent_resubmission_does_not_consume_extra_slot() {
+    // Create a mempool with the specified fee payer capacity
+    let fee_payer_txn_capacity = 1;
+    let mut mempool = create_mempool_with_fee_payer_capacity(fee_payer_txn_capacity);
+
+    // Create a fee payer account
+    let fee_payer_key = generate_private_key_from_seed(0);
+    let fee_payer_addr = account_address::from_public_key(&fee_payer_key.public_key());
+
+    // Insert one sponsored txn to fill the capacity
+    let sender_key = generate_private_key_from_seed(1);
+    let txn = make_fee_payer_txn(
+        &sender_key,
+        ReplayProtector::SequenceNumber(0),
+        1,
+        fee_payer_addr,
+        &fee_payer_key,
+    );
+    assert_eq!(
+        add_fee_payer_txn(&mut mempool, txn.clone()),
+        MempoolStatusCode::Accepted
+    );
+
+    // Re-submit the same txn, and verify that it is accepted
+    assert_eq!(
+        add_fee_payer_txn(&mut mempool, txn),
+        MempoolStatusCode::Accepted,
+    );
+
+    // Verify that the fee payer slot is still occupied by trying to add another txn (should be rejected)
+    let other_sender_key = generate_private_key_from_seed(2);
+    let other_txn = make_fee_payer_txn(
+        &other_sender_key,
+        ReplayProtector::SequenceNumber(0),
+        1,
+        fee_payer_addr,
+        &fee_payer_key,
+    );
+    assert_eq!(
+        add_fee_payer_txn(&mut mempool, other_txn),
+        MempoolStatusCode::TooManyTransactions,
+    );
+}
+
+/// Adds a sponsored (fee-payer) transaction to mempool
+fn add_fee_payer_txn(pool: &mut CoreMempool, txn: SignedTransaction) -> MempoolStatusCode {
+    pool.add_txn(
+        txn,
+        1,
+        Some(0), // Fresh sender (on-chain seq num is 0)
+        TimelineState::NotReady,
+        false,
+        None,
+        Some(BroadcastPeerPriority::Primary),
+    )
+    .code
+}
+
+/// Creates a mempool with the specified fee payer capacity
+fn create_mempool_with_fee_payer_capacity(fee_payer_txn_capacity: usize) -> CoreMempool {
+    let mut config = NodeConfig::generate_random_config();
+    config.mempool.fee_payer_txn_capacity = fee_payer_txn_capacity;
+    CoreMempool::new(&config)
+}
+
+/// Generates a unique Ed25519 private key from a u64 seed
+fn generate_private_key_from_seed(seed_value: u64) -> Ed25519PrivateKey {
+    let mut seed = [0u8; 32];
+    seed[..8].copy_from_slice(&seed_value.to_le_bytes());
+    let mut rng = StdRng::from_seed(seed);
+    Ed25519PrivateKey::generate(&mut rng)
+}
+
+/// Creates a sponsored (fee-payer) transaction
+fn make_fee_payer_txn(
+    sender_key: &Ed25519PrivateKey,
+    replay_protector: ReplayProtector,
+    gas_price: u64,
+    fee_payer_addr: AccountAddress,
+    fee_payer_key: &Ed25519PrivateKey,
+) -> SignedTransaction {
+    let sender_addr = account_address::from_public_key(&sender_key.public_key());
+    let raw_txn = RawTransaction::new_txn(
+        sender_addr,
+        replay_protector,
+        TransactionExecutable::Script(Script::new(vec![], vec![], vec![])),
+        None,
+        100,
+        gas_price,
+        u64::MAX,
+        ChainId::test(),
+    );
+    raw_txn
+        .sign_fee_payer(sender_key, vec![], vec![], fee_payer_addr, fee_payer_key)
+        .unwrap()
+        .into_inner()
 }

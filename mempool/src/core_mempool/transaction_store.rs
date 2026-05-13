@@ -37,7 +37,8 @@ use std::{
 pub const TXN_INDEX_ESTIMATED_BYTES: usize = size_of::<crate::core_mempool::index::OrderedQueueKey>() // priority_index
     + size_of::<crate::core_mempool::index::TTLOrderingKey>() * 2 // expiration_time_index + system_ttl_index
     + (size_of::<u64>() * 3 + size_of::<AccountAddress>()) // timeline_index
-    + (size_of::<HashValue>() + size_of::<u64>() + size_of::<AccountAddress>()); // hash_index
+    + (size_of::<HashValue>() + size_of::<u64>() + size_of::<AccountAddress>()) // hash_index
+    + (size_of::<AccountAddress>() + size_of::<usize>()); // fee_payer_txn_counts (worst case: one map entry per txn)
 
 pub fn sender_bucket(
     address: &AccountAddress,
@@ -93,7 +94,12 @@ pub struct TransactionStore {
     capacity_per_user: usize,
     // Maximum number of orderless transactions allowed in the Mempool per user
     orderless_txn_capacity_per_user: usize,
+    // Maximum number of sponsored (fee payer) transactions allowed per fee payer account
+    fee_payer_txn_capacity: usize,
     max_batch_bytes: u64,
+
+    // Counts of pending sponsored transactions keyed by fee payer address
+    fee_payer_txn_counts: HashMap<AccountAddress, usize>,
 
     // eager expiration
     eager_expire_threshold: Option<Duration>,
@@ -132,7 +138,10 @@ impl TransactionStore {
             capacity_bytes: config.capacity_bytes,
             capacity_per_user: config.capacity_per_user,
             orderless_txn_capacity_per_user: config.orderless_txn_capacity_per_user,
+            fee_payer_txn_capacity: config.fee_payer_txn_capacity,
             max_batch_bytes: config.shared_mempool_max_batch_bytes,
+
+            fee_payer_txn_counts: HashMap::new(),
 
             // eager expiration
             eager_expire_threshold: config.eager_expire_threshold_ms.map(Duration::from_millis),
@@ -250,6 +259,7 @@ impl TransactionStore {
     ) -> MempoolStatus {
         let address = txn.get_sender();
         let txn_replay_protector = txn.get_replay_protector();
+        let fee_payer_address = txn.txn.authenticator_ref().fee_payer_address();
 
         let account_sequence_number = account_sequence_number.map(|seq_num| {
             max(
@@ -326,6 +336,25 @@ impl TransactionStore {
             ));
         }
 
+        // Fee payer capacity check for sponsored transactions
+        if let Some(fee_payer) = fee_payer_address {
+            let count = self
+                .fee_payer_txn_counts
+                .get(&fee_payer)
+                .copied()
+                .unwrap_or(0);
+            if count >= self.fee_payer_txn_capacity {
+                return MempoolStatus::new(MempoolStatusCode::TooManyTransactions).with_message(
+                    format!(
+                        "Mempool over capacity for fee payer: {}. Number of sponsored transactions from fee payer: {} Capacity per fee payer: {}",
+                        fee_payer.to_standard_string(),
+                        count,
+                        self.fee_payer_txn_capacity,
+                    ),
+                );
+            }
+        }
+
         self.transactions.entry(address).or_default();
         if let Some(txns) = self.transactions.get_mut(&address) {
             // capacity check
@@ -363,6 +392,9 @@ impl TransactionStore {
             }
             self.size_bytes += txn.get_estimated_bytes();
             txns.insert(txn);
+            if let Some(fee_payer) = fee_payer_address {
+                *self.fee_payer_txn_counts.entry(fee_payer).or_insert(0) += 1;
+            }
             self.track_indices();
         }
 
@@ -753,6 +785,18 @@ impl TransactionStore {
     /// Removes transaction from all indexes. Only call after removing from main transactions DS.
     fn index_remove(&mut self, txn: &MempoolTransaction) {
         counters::CORE_MEMPOOL_REMOVED_TXNS.inc();
+        // Decrement the per-fee-payer count for sponsored transactions.
+        if let Some(fee_payer) = txn.txn.authenticator_ref().fee_payer_address() {
+            match self.fee_payer_txn_counts.get_mut(&fee_payer) {
+                Some(count) if *count <= 1 => {
+                    self.fee_payer_txn_counts.remove(&fee_payer);
+                },
+                Some(count) => {
+                    *count = count.saturating_sub(1);
+                },
+                None => {},
+            }
+        }
         self.system_ttl_index.remove(txn);
         self.expiration_time_index.remove(txn);
         self.priority_index.remove(txn);

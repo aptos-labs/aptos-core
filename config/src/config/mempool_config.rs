@@ -106,6 +106,8 @@ pub struct MempoolConfig {
     /// Maximum rate of inbound transactions (TPS) per peer (note: client
     /// submission is not affected). If None, no rate limit is applied.
     pub inbound_rate_limit_tps_per_peer: Option<u64>,
+    /// Maximum number of sponsored (fee payer) transactions in mempool, per fee payer account
+    pub fee_payer_txn_capacity: usize,
 }
 
 impl Default for MempoolConfig {
@@ -173,6 +175,7 @@ impl Default for MempoolConfig {
             enable_max_load_balancing_at_any_load: false,
             orderless_txn_capacity_per_user: 5000,
             inbound_rate_limit_tps_per_peer: None,
+            fee_payer_txn_capacity: 5000,
         }
     }
 }
