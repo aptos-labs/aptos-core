@@ -8,7 +8,7 @@ use super::super::session::FlowSession;
 use rmcp::{handler::server::router::tool::ToolRouter, tool_router};
 
 use aptos_rest_client::AptosBaseUrl;
-use aptos_types::transaction::ExecutionStatus;
+use aptos_types::transaction::{ExecutionStatus, TransactionStatus};
 use aptos_types::vm_status::AbortLocation;
 use rmcp::schemars;
 use std::collections::BTreeMap;
@@ -145,6 +145,13 @@ fn execution_failure_details_from(status: &ExecutionStatus) -> Option<ExecutionF
     }
 }
 
+fn success_from(status: &TransactionStatus) -> Option<bool> {
+    match status {
+        TransactionStatus::Keep(exec) => Some(exec.is_success()),
+        TransactionStatus::Discard(_) | TransactionStatus::Retry => None,
+    }
+}
+
 #[tool_router(router = replay_transaction_router, vis = "pub(crate)")]
 impl FlowSession {}
 
@@ -276,5 +283,35 @@ mod tests {
     fn execution_failure_details_none_for_other_status() {
         let status = ExecutionStatus::Success;
         assert!(execution_failure_details_from(&status).is_none());
+    }
+
+    #[test]
+    fn success_from_keep_success() {
+        let status = aptos_types::transaction::TransactionStatus::Keep(ExecutionStatus::Success);
+        assert_eq!(success_from(&status), Some(true));
+    }
+
+    #[test]
+    fn success_from_keep_failure_variants() {
+        let oog = aptos_types::transaction::TransactionStatus::Keep(ExecutionStatus::OutOfGas);
+        assert_eq!(success_from(&oog), Some(false));
+
+        let abort = aptos_types::transaction::TransactionStatus::Keep(ExecutionStatus::MoveAbort {
+            location: AbortLocation::Script,
+            code: 0,
+            info: None,
+        });
+        assert_eq!(success_from(&abort), Some(false));
+    }
+
+    #[test]
+    fn success_from_discard_or_retry() {
+        let discard = aptos_types::transaction::TransactionStatus::Discard(
+            aptos_types::vm_status::StatusCode::INVALID_SIGNATURE,
+        );
+        assert_eq!(success_from(&discard), None);
+
+        let retry = aptos_types::transaction::TransactionStatus::Retry;
+        assert_eq!(success_from(&retry), None);
     }
 }
