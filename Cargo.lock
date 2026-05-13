@@ -1615,6 +1615,7 @@ dependencies = [
  "aptos-metrics-core",
  "aptos-mvhashmap",
  "aptos-node-resource-metrics",
+ "aptos-position-natives",
  "aptos-profiler 0.1.0",
  "aptos-protos 1.3.1",
  "aptos-push-metrics",

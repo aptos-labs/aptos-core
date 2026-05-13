@@ -49,6 +49,9 @@ mod pruner;
 mod sharded_jmt_merkle_db;
 mod sharded_kv_db;
 
+#[cfg(test)]
+mod native_storage_tests;
+
 pub use native_state_committer::{MerkleLeafUpdate, NativeMerkleLeafUpdates, NativeStateCommitter};
 pub use native_state_reader::{InMemoryNativeStateReader, NativeStateReader};
 pub use native_state_store::{
