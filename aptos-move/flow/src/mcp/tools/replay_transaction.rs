@@ -104,6 +104,29 @@ fn format_abort_location(loc: &AbortLocation) -> String {
     }
 }
 
+use aptos_types::transaction::ExecutionStatus;
+
+fn abort_details_from(status: &ExecutionStatus) -> Option<AbortDetails> {
+    match status {
+        ExecutionStatus::MoveAbort { location, code, info } => {
+            let (reason, description) = match info {
+                Some(i) => (
+                    (!i.reason_name.is_empty()).then(|| i.reason_name.clone()),
+                    (!i.description.is_empty()).then(|| i.description.clone()),
+                ),
+                None => (None, None),
+            };
+            Some(AbortDetails {
+                location: format_abort_location(location),
+                code: *code,
+                reason,
+                description,
+            })
+        }
+        _ => None,
+    }
+}
+
 #[tool_router(router = replay_transaction_router, vis = "pub(crate)")]
 impl FlowSession {}
 
@@ -153,5 +176,65 @@ mod tests {
     #[test]
     fn parse_network_rejects_garbage() {
         assert!(parse_network("not a url").is_err());
+    }
+
+    #[test]
+    fn abort_details_with_info() {
+        let info = aptos_types::transaction::AbortInfo {
+            reason_name: "EINSUFFICIENT_BALANCE".to_string(),
+            description: "Not enough balance to withdraw".to_string(),
+        };
+        let status = aptos_types::transaction::ExecutionStatus::MoveAbort {
+            location: AbortLocation::Module(ModuleId::new(
+                AccountAddress::ONE,
+                Identifier::new("coin").unwrap(),
+            )),
+            code: 65540,
+            info: Some(info),
+        };
+        let details = abort_details_from(&status).expect("expected Some for MoveAbort");
+        assert_eq!(details.location, "0x1::coin");
+        assert_eq!(details.code, 65540);
+        assert_eq!(details.reason.as_deref(), Some("EINSUFFICIENT_BALANCE"));
+        assert_eq!(details.description.as_deref(), Some("Not enough balance to withdraw"));
+    }
+
+    #[test]
+    fn abort_details_without_info() {
+        let status = aptos_types::transaction::ExecutionStatus::MoveAbort {
+            location: AbortLocation::Script,
+            code: 13,
+            info: None,
+        };
+        let details = abort_details_from(&status).expect("expected Some for MoveAbort");
+        assert_eq!(details.location, "script");
+        assert_eq!(details.code, 13);
+        assert!(details.reason.is_none());
+        assert!(details.description.is_none());
+    }
+
+    #[test]
+    fn abort_details_with_empty_info_drops_fields() {
+        let info = aptos_types::transaction::AbortInfo {
+            reason_name: String::new(),
+            description: String::new(),
+        };
+        let status = aptos_types::transaction::ExecutionStatus::MoveAbort {
+            location: AbortLocation::Script,
+            code: 7,
+            info: Some(info),
+        };
+        let details = abort_details_from(&status).expect("expected Some for MoveAbort");
+        assert!(details.reason.is_none());
+        assert!(details.description.is_none());
+    }
+
+    #[test]
+    fn abort_details_none_for_non_abort() {
+        let status = aptos_types::transaction::ExecutionStatus::Success;
+        assert!(abort_details_from(&status).is_none());
+
+        let status = aptos_types::transaction::ExecutionStatus::OutOfGas;
+        assert!(abort_details_from(&status).is_none());
     }
 }
