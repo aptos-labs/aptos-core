@@ -8,30 +8,30 @@ use super::super::{
     common::{mcp_err, tool_error},
     session::{into_call_tool_result, FlowSession},
 };
-use rmcp::{
-    handler::server::wrapper::Parameters, model::CallToolResult, tool, tool_router,
-};
-
 use aptos_cli_common::format_txn_status;
 use aptos_framework::{BuildOptions, BuiltPackage};
-use aptos_move_cli::source_locator::AptosSourceLocator;
-use aptos_move_cli::MoveDebugger;
+use aptos_move_cli::{source_locator::AptosSourceLocator, MoveDebugger};
 use aptos_move_debugger::aptos_debugger::AptosDebugger;
 use aptos_rest_client::{AptosBaseUrl, Client};
-use aptos_types::transaction::{
-    ExecutionStatus, ReplayProtector, SignedTransaction, Transaction, TransactionOutput,
-    TransactionStatus,
+use aptos_types::{
+    transaction::{
+        ExecutionStatus, ReplayProtector, SignedTransaction, Transaction, TransactionOutput,
+        TransactionStatus,
+    },
+    vm_status::AbortLocation,
 };
-use aptos_types::vm_status::AbortLocation;
 use aptos_validator_interface::LocalModuleOverrides;
 use aptos_vm::data_cache::AsMoveResolver;
-use move_core_types::account_address::AccountAddress;
-use move_core_types::vm_status::VMStatus;
-use rmcp::schemars;
-use std::collections::BTreeMap;
-use std::path::{Path, PathBuf};
-use std::str::FromStr;
-use std::sync::Arc;
+use move_core_types::{account_address::AccountAddress, vm_status::VMStatus};
+use rmcp::{
+    handler::server::wrapper::Parameters, model::CallToolResult, schemars, tool, tool_router,
+};
+use std::{
+    collections::BTreeMap,
+    path::{Path, PathBuf},
+    str::FromStr,
+    sync::Arc,
+};
 use url::Url;
 
 /// Parse the `network` parameter into a base URL. Accepts the well-known names
@@ -127,7 +127,11 @@ fn format_abort_location(loc: &AbortLocation) -> String {
 
 fn abort_details_from(status: &ExecutionStatus) -> Option<AbortDetails> {
     match status {
-        ExecutionStatus::MoveAbort { location, code, info } => {
+        ExecutionStatus::MoveAbort {
+            location,
+            code,
+            info,
+        } => {
             let (reason, description) = match info {
                 Some(i) => (
                     (!i.reason_name.is_empty()).then(|| i.reason_name.clone()),
@@ -141,7 +145,7 @@ fn abort_details_from(status: &ExecutionStatus) -> Option<AbortDetails> {
                 reason,
                 description,
             })
-        }
+        },
         ExecutionStatus::Success
         | ExecutionStatus::OutOfGas
         | ExecutionStatus::ExecutionFailure { .. }
@@ -151,13 +155,15 @@ fn abort_details_from(status: &ExecutionStatus) -> Option<AbortDetails> {
 
 fn execution_failure_details_from(status: &ExecutionStatus) -> Option<ExecutionFailureDetails> {
     match status {
-        ExecutionStatus::ExecutionFailure { location, function, code_offset } => {
-            Some(ExecutionFailureDetails {
-                location: format_abort_location(location),
-                function: *function,
-                code_offset: *code_offset,
-            })
-        }
+        ExecutionStatus::ExecutionFailure {
+            location,
+            function,
+            code_offset,
+        } => Some(ExecutionFailureDetails {
+            location: format_abort_location(location),
+            function: *function,
+            code_offset: *code_offset,
+        }),
         ExecutionStatus::Success
         | ExecutionStatus::OutOfGas
         | ExecutionStatus::MoveAbort { .. }
@@ -250,8 +256,7 @@ fn build_local_overrides(
         })?;
 
         for unit in built.package.root_modules() {
-            if let legacy_move_compiler::compiled_unit::CompiledUnit::Module(ref named) =
-                unit.unit
+            if let legacy_move_compiler::compiled_unit::CompiledUnit::Module(ref named) = unit.unit
             {
                 let module = &named.module;
                 let mut bytes = vec![];
@@ -274,8 +279,7 @@ fn build_local_overrides(
                     },
                 };
                 let filename = unit.source_path.to_string_lossy().into_owned();
-                if let Err(e) =
-                    locator.add_local_module(module, &sm_bytes, &source_text, &filename)
+                if let Err(e) = locator.add_local_module(module, &sm_bytes, &source_text, &filename)
                 {
                     log::warn!(
                         "could not load source map for module {}: {}",
@@ -365,8 +369,8 @@ impl FlowSession {
         let named = validate_named_addresses(&params.named_addresses).map_err(mcp_err)?;
 
         // Build the debugger up here so connection errors surface before we touch the VM.
-        let debugger = build_debugger(&params.network, params.node_api_key.as_deref())
-            .map_err(mcp_err)?;
+        let debugger =
+            build_debugger(&params.network, params.node_api_key.as_deref()).map_err(mcp_err)?;
 
         // Fetch the transaction (async, network I/O).
         let txn_id = params.txn_id;
@@ -468,9 +472,9 @@ mod tests {
     use super::*;
     use aptos_rest_client::AptosBaseUrl;
     use aptos_types::vm_status::AbortLocation;
-    use move_core_types::account_address::AccountAddress;
-    use move_core_types::identifier::Identifier;
-    use move_core_types::language_storage::ModuleId;
+    use move_core_types::{
+        account_address::AccountAddress, identifier::Identifier, language_storage::ModuleId,
+    };
 
     #[test]
     fn abort_location_module() {
@@ -486,8 +490,14 @@ mod tests {
 
     #[test]
     fn parse_network_known_names() {
-        assert!(matches!(parse_network("mainnet"), Ok(AptosBaseUrl::Mainnet)));
-        assert!(matches!(parse_network("testnet"), Ok(AptosBaseUrl::Testnet)));
+        assert!(matches!(
+            parse_network("mainnet"),
+            Ok(AptosBaseUrl::Mainnet)
+        ));
+        assert!(matches!(
+            parse_network("testnet"),
+            Ok(AptosBaseUrl::Testnet)
+        ));
         assert!(matches!(parse_network("devnet"), Ok(AptosBaseUrl::Devnet)));
     }
 
@@ -529,7 +539,10 @@ mod tests {
         assert_eq!(details.location, "0x1::coin");
         assert_eq!(details.code, 65540);
         assert_eq!(details.reason.as_deref(), Some("EINSUFFICIENT_BALANCE"));
-        assert_eq!(details.description.as_deref(), Some("Not enough balance to withdraw"));
+        assert_eq!(
+            details.description.as_deref(),
+            Some("Not enough balance to withdraw")
+        );
     }
 
     #[test]
@@ -685,6 +698,9 @@ mod tests {
         let result = build_local_overrides(&paths, &named);
         assert!(result.is_ok(), "should build overrides: {:?}", result.err());
         let (overrides, _locator) = result.unwrap();
-        assert!(!overrides.is_empty(), "overrides should contain at least one module");
+        assert!(
+            !overrides.is_empty(),
+            "overrides should contain at least one module"
+        );
     }
 }
