@@ -5,6 +5,7 @@
 //! - `assert!`
 //! - `assert_eq!`
 //! - `assert_ne!`
+//! - `debug_assert!`
 //!
 //! These macros are expanded to the input AST before type checking.
 //!
@@ -21,13 +22,20 @@
 //! - `assert_eq!(left, right, fmt, arg1, ..., argN)` - aborts with formatted message (1 ≤ N ≤ 4)
 //! - `assert_ne!` supports the same forms as `assert_eq!`
 //!
+//! ## `debug_assert!` macro
+//! Same forms as `assert!`. Active only when compiling with `--compile-test-code`;
+//! otherwise expands to `()` without evaluating its arguments.
+//!
 //! ## Version requirements
 //! - `assert!(cond)` requires Move 2
 //! - `assert!(cond, fmt, arg1, ..., argN)` requires Move 2.4
 //! - `assert_eq!` and `assert_ne!` require Move 2.4
+//! - `debug_assert!` requires Move 2.5
 
 use crate::{
     builder::exp_builder::ExpTranslator,
+    metadata::lang_feature_versions::LANGUAGE_VERSION_FOR_DEBUG_ASSERT,
+    options::ModelBuilderOptions,
     well_known::{
         INTO_BYTES_FUNCTION_NAME, STRING_MODULE, STRING_UTILS_MODULE, UNSPECIFIED_ABORT_CODE,
         UTF8_FUNCTION_NAME,
@@ -81,6 +89,7 @@ impl ExpTranslator<'_, '_, '_> {
             "assert" => self.expand_assert(loc, args),
             "assert_eq" => self.expand_assert_eq(loc, args),
             "assert_ne" => self.expand_assert_ne(loc, args),
+            "debug_assert" => self.expand_debug_assert(loc, args),
             _ => {
                 self.error(&self.to_loc(&loc), &format!("unknown macro `{}`", name));
                 Exp_::UnresolvedError
@@ -193,6 +202,26 @@ impl ExpTranslator<'_, '_, '_> {
             Box::new(sp(loc, Exp_::Unit { trailing: false })),
             Box::new(sp(loc, Exp_::Abort(Box::new(abort_arg)))),
         )
+    }
+
+    /// Expands `debug_assert!`: delegates to `expand_assert` when compiling
+    /// in test mode, expands to `()` (without evaluating arguments) otherwise.
+    /// See `expand_assert` for the supported forms.
+    fn expand_debug_assert(&self, loc: Loc, args: &Spanned<Vec<Exp>>) -> Exp_ {
+        self.check_language_version(
+            &self.to_loc(&loc),
+            "`debug_assert!` macro",
+            LANGUAGE_VERSION_FOR_DEBUG_ASSERT,
+        );
+        let testing = self
+            .env()
+            .get_extension::<ModelBuilderOptions>()
+            .is_some_and(|opts| opts.compile_for_testing);
+        if testing {
+            self.expand_assert(loc, args)
+        } else {
+            Exp_::Unit { trailing: false }
+        }
     }
 
     /// The macro `assert_eq!` has the following forms:

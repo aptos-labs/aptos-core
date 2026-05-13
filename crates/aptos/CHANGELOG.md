@@ -5,6 +5,7 @@ All notable changes to the Aptos CLI will be captured in this file. This project
 # Unreleased
 
 - Point `aptos update movefmt` at the new `aptos-labs/movefmt` repo and bump default movefmt version to 1.5.3.
+- Added `debug_assert!` macro to the Move v2 compiler (requires Move 2.5). Same forms as `assert!`; active only with `--compile-test-code` and otherwise expands to `()` without evaluating its arguments.
 
 ## [9.4.0]
 - Set language version 2.4 and bytecode version v10 as default.

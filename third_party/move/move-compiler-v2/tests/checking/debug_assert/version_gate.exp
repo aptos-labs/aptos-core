@@ -1,0 +1,7 @@
+
+Diagnostics:
+error: not supported before language version `2.5-unstable`: `debug_assert!` macro
+  ┌─ tests/checking/debug_assert/version_gate.move:6:9
+  │
+6 │         debug_assert!(true);
+  │         ^^^^^^^^^^^^

@@ -1,0 +1,7 @@
+
+Diagnostics:
+error: undeclared `not_defined`
+  ┌─ tests/checking/debug_assert/bad_arg.move:6:28
+  │
+6 │         debug_assert!(x == not_defined);
+  │                            ^^^^^^^^^^^
