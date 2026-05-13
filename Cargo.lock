@@ -13619,6 +13619,7 @@ dependencies = [
  "bytes",
  "cfg-if",
  "claims",
+ "crossbeam-channel",
  "fail",
  "fxhash",
  "hashbrown 0.14.3",
