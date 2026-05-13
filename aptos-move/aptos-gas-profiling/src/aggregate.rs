@@ -117,7 +117,16 @@ impl ExecutionAndIOCosts {
                     format!("table_item<{},{}>", Render(handle), TableKey { bytes: key },)
                 },
                 Raw(..) => panic!("not supported"),
-                TradingNative(..) => panic!("not supported"),
+                TradingNative(key) => {
+                    use aptos_types::state_store::state_key::inner::TradingNativeKey;
+                    match key {
+                        TradingNativeKey::Position {
+                            exchange,
+                            account,
+                            market,
+                        } => format!("position<{},{},{}>", exchange, account, market),
+                    }
+                },
             };
 
             insert_or_add(&mut storage_writes, key, write.cost);
