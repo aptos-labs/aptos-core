@@ -31,6 +31,7 @@ use move_vm_types::loaded_data::{
     runtime_types::StructIdentifier, struct_name_indexing::StructNameIndex,
 };
 use move_vm_types::loaded_data::{runtime_types::Type, struct_name_indexing::StructNameIndexMap};
+use sha3::{Digest, Sha3_256};
 use std::sync::Arc;
 
 /// [MoveVM] runtime environment encapsulating different configurations. Shared between the VM and
@@ -58,6 +59,20 @@ pub struct RuntimeEnvironment {
     /// Caches struct tags for instantiated types. This cache can be used concurrently and
     /// speculatively because type tag information does not change with module publishes.
     ty_tag_cache: Arc<TypeTagCache>,
+
+    /// SHA3-256 digest of the BCS-serialized [VerifierConfig] from `vm_config`. Precomputed at
+    /// construction time so it can be combined with the module hash to form the
+    /// [VERIFIED_MODULES_V2] cache key without re-hashing the config on every lookup.
+    ///
+    /// Why this exists: the verified-module cache is a process-global LRU shared across all
+    /// runtime environments. Without a per-config component in the key, two threads using
+    /// different verifier configurations (e.g. straddling an epoch boundary where the config
+    /// changed) would treat each other's cached entries as their own — a module accepted under
+    /// a more permissive config could be skipped under a stricter one.
+    /// 
+    /// Invariant: must stay in line with `vm_config.verifier_config`. Any mutation of `vm_config.verifier_config` must
+    /// recompute this digest.
+    verifier_config_digest: [u8; 32],
 }
 
 impl RuntimeEnvironment {
@@ -82,11 +97,13 @@ impl RuntimeEnvironment {
     ) -> Self {
         let natives = NativeFunctions::new(natives)
             .unwrap_or_else(|e| panic!("Failed to create native functions: {}", e));
+        let verifier_config_digest = digest_verifier_config(&vm_config);
         Self {
             vm_config,
             natives,
             struct_name_index_map: Arc::new(StructNameIndexMap::empty()),
             ty_tag_cache: Arc::new(TypeTagCache::empty()),
+            verifier_config_digest,
         }
     }
 
@@ -96,6 +113,9 @@ impl RuntimeEnvironment {
     }
 
     /// Enables delayed field optimization for this environment.
+    ///
+    /// Note: this does not change the verifier config, so [Self::verifier_config_digest] is
+    /// preserved.
     pub fn enable_delayed_field_optimization(&mut self) {
         self.vm_config.delayed_field_optimization_enabled = true;
     }
@@ -140,21 +160,22 @@ impl RuntimeEnvironment {
         module_size: usize,
         module_hash: &[u8; 32],
     ) -> VMResult<LocallyVerifiedModule> {
-        if !VERIFIED_MODULES_V2.contains(module_hash) {
+        if !VERIFIED_MODULES_V2.contains(module_hash, &self.verifier_config_digest) {
             let _timer = VM_TIMER.timer_with_label(
                 "LoaderV2::build_locally_verified_module [verification cache miss]",
             );
 
             // For regular execution, we cache already verified modules. Note that this even caches
-            // verification for the published modules. This should be ok because as long as the
-            // hash is the same, the deployed bytecode and any dependencies are the same, and so
-            // the cached verification result can be used.
+            // verification for the published modules. This should be ok because as long as both
+            // the module hash and the verifier-config digest match, the deployed bytecode, its
+            // dependencies, and the rules used to verify them are the same, and so the cached
+            // verification result can be reused.
             move_bytecode_verifier::verify_module_with_config(
                 &self.vm_config().verifier_config,
                 compiled_module.as_ref(),
             )?;
             check_natives(compiled_module.as_ref())?;
-            VERIFIED_MODULES_V2.put(*module_hash);
+            VERIFIED_MODULES_V2.put(*module_hash, self.verifier_config_digest);
         }
 
         Ok(LocallyVerifiedModule(compiled_module, module_size))
@@ -327,8 +348,21 @@ impl Clone for RuntimeEnvironment {
             natives: self.natives.clone(),
             struct_name_index_map: Arc::clone(&self.struct_name_index_map),
             ty_tag_cache: Arc::clone(&self.ty_tag_cache),
+            verifier_config_digest: self.verifier_config_digest,
         }
     }
+}
+
+/// Hashes the BCS-serialized verifier configuration of `vm_config` with SHA3-256.
+///
+/// Used as the per-environment component of the verified-module cache key (see
+/// [RuntimeEnvironment::verifier_config_digest] for the reasoning).
+fn digest_verifier_config(vm_config: &VMConfig) -> [u8; 32] {
+    let serialized = bcs::to_bytes(&vm_config.verifier_config)
+        .expect("VerifierConfig must be BCS-serializable");
+    let mut hasher = Sha3_256::new();
+    hasher.update(&serialized);
+    hasher.finalize().into()
 }
 
 /// Represents any type that contains a [RuntimeEnvironment].
@@ -380,4 +414,59 @@ fn check_natives(module: &CompiledModule) -> VMResult<()> {
         }
     }
     Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use move_bytecode_verifier::VerifierConfig;
+
+    fn config_with_loop_depth(max_loop_depth: Option<usize>) -> VMConfig {
+        VMConfig {
+            verifier_config: VerifierConfig {
+                max_loop_depth,
+                ..VerifierConfig::default()
+            },
+            ..VMConfig::default()
+        }
+    }
+
+    #[test]
+    fn verifier_config_digest_is_stable_for_equal_configs() {
+        let env_a = RuntimeEnvironment::new_with_config(vec![], VMConfig::default());
+        let env_b = RuntimeEnvironment::new_with_config(vec![], VMConfig::default());
+        assert_eq!(env_a.verifier_config_digest, env_b.verifier_config_digest);
+    }
+
+    #[test]
+    fn verifier_config_digest_changes_with_config() {
+        let env_a =
+            RuntimeEnvironment::new_with_config(vec![], config_with_loop_depth(Some(8)));
+        let env_b =
+            RuntimeEnvironment::new_with_config(vec![], config_with_loop_depth(Some(16)));
+        assert_ne!(
+            env_a.verifier_config_digest, env_b.verifier_config_digest,
+            "different verifier configs must yield different cache-key digests, otherwise a \
+             module verified under one config could be reused under another"
+        );
+    }
+
+    #[test]
+    fn verifier_config_digest_preserved_across_clone() {
+        let env = RuntimeEnvironment::new_with_config(vec![], config_with_loop_depth(Some(4)));
+        let clone = env.clone();
+        assert_eq!(env.verifier_config_digest, clone.verifier_config_digest);
+    }
+
+    #[test]
+    fn verifier_config_digest_preserved_when_enabling_delayed_fields() {
+        let mut env =
+            RuntimeEnvironment::new_with_config(vec![], config_with_loop_depth(Some(4)));
+        let before = env.verifier_config_digest;
+        env.enable_delayed_field_optimization();
+        assert_eq!(
+            before, env.verifier_config_digest,
+            "delayed-field toggle must not affect the verifier-config digest"
+        );
+    }
 }

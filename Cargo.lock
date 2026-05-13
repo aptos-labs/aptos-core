@@ -12539,6 +12539,7 @@ version = "0.1.0"
 dependencies = [
  "ambassador",
  "anyhow",
+ "bcs 0.1.4",
  "better_any",
  "bytes",
  "claims",
@@ -12559,6 +12560,7 @@ dependencies = [
  "parking_lot 0.12.1",
  "proptest",
  "serde",
+ "sha3 0.9.1",
  "smallbitvec",
  "triomphe",
  "typed-arena",
