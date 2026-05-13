@@ -579,6 +579,30 @@ impl NetworkTest for AllValidatorsTwoTrafficsTest {
     }
 }
 
+/// Direct-to-validators variant of `realistic_env_max_load_test`. Sets
+/// `num_pfns=0` and sends traffic to every validator's REST API so every
+/// validator's mempool stays populated and all 7 validators participate as
+/// batch authors (including the single Asian validator at the last index).
+///
+/// Used as the apples-to-apples **baseline** against
+/// `realistic_env_max_load_with_fast_batches_test` so that the only
+/// difference between the two is the FastProof feature flags.
+pub(crate) fn realistic_env_max_load_all_validators_test(
+    duration: Duration,
+    test_cmd: &TestCommand,
+    num_validators: usize,
+    num_vfns: usize,
+    _num_pfns: usize,
+) -> ForgeConfig {
+    all_validators_direct_routing_config(
+        duration,
+        test_cmd,
+        num_validators,
+        num_vfns,
+        /*enable_fast_batches=*/ false,
+    )
+}
+
 /// Variant of `realistic_env_max_load_test` with QS fast batches enabled
 /// end-to-end and traffic sent directly to all validators (no PFNs).
 ///
@@ -595,6 +619,22 @@ pub(crate) fn realistic_env_max_load_with_fast_batches_test(
     num_validators: usize,
     num_vfns: usize,
     _num_pfns: usize,
+) -> ForgeConfig {
+    all_validators_direct_routing_config(
+        duration,
+        test_cmd,
+        num_validators,
+        num_vfns,
+        /*enable_fast_batches=*/ true,
+    )
+}
+
+fn all_validators_direct_routing_config(
+    duration: Duration,
+    test_cmd: &TestCommand,
+    num_validators: usize,
+    num_vfns: usize,
+    enable_fast_batches: bool,
 ) -> ForgeConfig {
     let ha_proxy = if let TestCommand::K8sSwarm(k8s) = test_cmd {
         k8s.enable_haproxy
@@ -672,10 +712,10 @@ pub(crate) fn realistic_env_max_load_with_fast_batches_test(
                 serde_yaml::to_value(OnChainExecutionConfig::default_for_genesis())
                     .expect("must serialize");
         }))
-        .with_validator_override_node_config_fn(Arc::new(|config, _| {
+        .with_validator_override_node_config_fn(Arc::new(move |config, _| {
             config.base.enable_validator_pfn_connections = true;
-            config.consensus.quorum_store.enable_fast_batches_rx = true;
-            config.consensus.quorum_store.enable_fast_batches_tx = true;
+            config.consensus.quorum_store.enable_fast_batches_rx = enable_fast_batches;
+            config.consensus.quorum_store.enable_fast_batches_tx = enable_fast_batches;
         }))
         .with_emit_job(
             EmitJobRequest::default()
