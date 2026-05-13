@@ -7,7 +7,9 @@
 use super::super::session::FlowSession;
 use rmcp::{handler::server::router::tool::ToolRouter, tool_router};
 
-use aptos_rest_client::AptosBaseUrl;
+use aptos_move_cli::MoveDebugger;
+use aptos_move_debugger::aptos_debugger::AptosDebugger;
+use aptos_rest_client::{AptosBaseUrl, Client};
 use aptos_types::transaction::{ExecutionStatus, TransactionStatus};
 use aptos_types::vm_status::AbortLocation;
 use move_core_types::account_address::AccountAddress;
@@ -187,6 +189,23 @@ fn validate_named_addresses(
                 .map_err(|e| format!("invalid named address `{}={}`: {}", k, v, e))
         })
         .collect()
+}
+
+fn build_debugger(
+    network: &str,
+    node_api_key: Option<&str>,
+) -> Result<Box<dyn MoveDebugger>, String> {
+    let base_url = parse_network(network)?;
+    let mut builder = Client::builder(base_url);
+    if let Some(key) = node_api_key {
+        builder = builder
+            .api_key(key)
+            .map_err(|e| format!("invalid node_api_key: {}", e))?;
+    }
+    let client = builder.build();
+    let debugger = AptosDebugger::rest_client(client)
+        .map_err(|e| format!("failed to construct debugger: {}", e))?;
+    Ok(Box::new(debugger))
 }
 
 #[tool_router(router = replay_transaction_router, vis = "pub(crate)")]
