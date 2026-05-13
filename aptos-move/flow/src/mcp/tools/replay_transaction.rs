@@ -4,8 +4,15 @@
 //! Replay a committed on-chain Aptos transaction locally, optionally with
 //! local Move package module overrides.
 
-use super::super::session::FlowSession;
-use rmcp::{handler::server::router::tool::ToolRouter, tool_router};
+use super::super::{
+    common::{mcp_err, tool_error},
+    session::{into_call_tool_result, FlowSession},
+};
+use rmcp::{
+    handler::server::wrapper::Parameters,
+    model::{CallToolResult, Content},
+    tool, tool_router,
+};
 
 use aptos_framework::{BuildOptions, BuiltPackage};
 use aptos_move_cli::source_locator::AptosSourceLocator;
@@ -279,7 +286,53 @@ fn build_local_overrides(
 }
 
 #[tool_router(router = replay_transaction_router, vis = "pub(crate)")]
-impl FlowSession {}
+impl FlowSession {
+    /// Replay a committed on-chain transaction locally to debug its outcome.
+    /// Supports optional local Move package overrides for testing patches.
+    #[tool(
+        description = "Replay a committed on-chain transaction locally to debug its outcome. Supports optional local Move package overrides.",
+        annotations(read_only_hint = true, destructive_hint = false)
+    )]
+    async fn move_replay_transaction(
+        &self,
+        Parameters(params): Parameters<MoveReplayTransactionParams>,
+    ) -> Result<CallToolResult, rmcp::ErrorData> {
+        Ok(self
+            .move_replay_transaction_impl(params)
+            .await
+            .unwrap_or_else(tool_error))
+    }
+}
+
+impl FlowSession {
+    async fn move_replay_transaction_impl(
+        &self,
+        params: MoveReplayTransactionParams,
+    ) -> Result<CallToolResult, rmcp::ErrorData> {
+        log::info!(
+            "move_replay_transaction: txn_id={} network=`{}` local_packages={}",
+            params.txn_id,
+            params.network,
+            params.local_package_paths.len()
+        );
+
+        // Validate inputs up front so errors are clear and cheap.
+        let _base = parse_network(&params.network).map_err(mcp_err)?;
+        let pkg_paths = validate_package_paths(&params.local_package_paths).map_err(mcp_err)?;
+        let named = validate_named_addresses(&params.named_addresses).map_err(mcp_err)?;
+
+        // Build the debugger up here so connection errors surface before we touch the VM.
+        let _debugger = build_debugger(&params.network, params.node_api_key.as_deref())
+            .map_err(mcp_err)?;
+
+        // VM execution path is wired in Task 13.
+        let _ = (pkg_paths, named);
+        Err(rmcp::ErrorData::internal_error(
+            "replay execution not yet implemented",
+            None,
+        ))
+    }
+}
 
 #[cfg(test)]
 mod tests {
@@ -481,6 +534,16 @@ mod tests {
         m.insert("bad".to_string(), "not an address".to_string());
         let err = validate_named_addresses(&m).unwrap_err();
         assert!(err.contains("bad"), "got: {}", err);
+    }
+
+    #[test]
+    fn tool_is_registered() {
+        let names = FlowSession::tool_names();
+        assert!(
+            names.iter().any(|n| n == "move_replay_transaction"),
+            "expected move_replay_transaction in {:?}",
+            names
+        );
     }
 
     #[test]
