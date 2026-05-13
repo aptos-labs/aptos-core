@@ -4,7 +4,10 @@
 use crate::log::{FrameName, WriteOpType};
 use aptos_types::{
     access_path::Path,
-    state_store::{state_key::StateKey, table::TableHandle},
+    state_store::{
+        state_key::{inner::TradingNativeKey, StateKey},
+        table::TableHandle,
+    },
 };
 use move_core_types::{
     account_address::AccountAddress,
@@ -118,7 +121,13 @@ impl Display for Render<'_, StateKey> {
                 },)
             },
             Raw(..) => panic!("not supported"),
-            TradingNative(..) => panic!("not supported"),
+            TradingNative(key) => match key {
+                TradingNativeKey::Position {
+                    exchange,
+                    account,
+                    market,
+                } => write!(f, "position<{},{},{}>", exchange, account, market),
+            },
         }
     }
 }
