@@ -68,3 +68,7 @@ fun add_refs() {
     3: Move8 [0] <- [40]
     4: Return
 }
+=== frame-layout ===
+// module 0xc0ffee::refs
+fun add: frame_layout=[] zero_frame=false
+fun add_refs: frame_layout=[0, 16] zero_frame=false

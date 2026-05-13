@@ -102,8 +102,8 @@ fun unpack_left(r0): u64 {
 === micro-ops ===
 // module 0x42::generic_pack_unpack
 
-fun pack_left(): skipped (lowering: instruction PackVariantGeneric not yet lowered)
+fun pack_left(): skipped (nominal type not yet supported)
 
-fun unpack_box(): skipped (lowering: instruction UnpackGeneric not yet lowered)
+fun unpack_box(): skipped (nominal type not yet supported)
 
-fun unpack_left(): skipped (context: home slot: slot align 1 < 8 not yet supported (u64-aligned types only))
+fun unpack_left(): skipped (nominal type not yet supported)

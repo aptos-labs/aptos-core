@@ -92,6 +92,10 @@ pub enum PrintSection {
     Bytecode,
     Stackless,
     MicroOps,
+    /// Per-function `frame_layout` and `zero_frame` as derived by
+    /// `gc_layout::derive_frame_layout`. Selected by
+    /// `--print(frame-layout)`.
+    FrameLayout,
 }
 
 /// A single step in a differential test.
@@ -203,6 +207,7 @@ fn parse_publish_modifiers(rest: &str) -> anyhow::Result<Vec<PrintSection>> {
             "bytecode" => PrintSection::Bytecode,
             "stackless" => PrintSection::Stackless,
             "micro-ops" => PrintSection::MicroOps,
+            "frame-layout" => PrintSection::FrameLayout,
             _ => bail!("Unknown print section: {:?}", token),
         };
         if sections.contains(&section) {
