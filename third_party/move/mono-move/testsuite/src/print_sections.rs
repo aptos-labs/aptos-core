@@ -106,6 +106,7 @@ pub fn format_micro_ops(guard: &ExecutionGuard<'_>, module_ir: &ModuleIR) -> Str
                 "\nfun {}(): skipped (cannot set lowering requirements: {})\n",
                 func_name, e
             ));
+            continue;
         }
         match try_build_context(module_ir, func_ir) {
             Err(e) => {

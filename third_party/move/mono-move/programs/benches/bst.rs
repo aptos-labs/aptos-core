@@ -67,6 +67,12 @@ fn bench_bst(c: &mut Criterion) {
         });
 
         group.finish();
+
+        for ptr in functions.into_iter().chain(functions_gas) {
+            // SAFETY: All bench measurements have completed; no interpreter
+            // context references these function pointers anymore.
+            unsafe { ptr.free_unchecked() };
+        }
     }
 
     // -- move_vm -----------------------------------------------------------

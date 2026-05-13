@@ -33,9 +33,17 @@ mod micro_op {
         ctx.run().unwrap();
 
         let heap_ptr = ctx.root_heap_ptr(0);
-        (0..n)
+        let result: Vec<u64> = (0..n)
             .map(|i| unsafe { read_u64(heap_ptr, VEC_DATA_OFFSET + i as usize * 8) })
-            .collect()
+            .collect();
+
+        drop(ctx);
+        for ptr in functions {
+            // SAFETY: The interpreter context has been dropped, so the
+            // function pointers it referenced are no longer in use.
+            unsafe { ptr.free_unchecked() };
+        }
+        result
     }
 
     #[test]

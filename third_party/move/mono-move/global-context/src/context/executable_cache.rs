@@ -1,7 +1,7 @@
 // Copyright (c) Aptos Foundation
 // Licensed pursuant to the Innovation-Enabling Source Code License, available at https://github.com/aptos-labs/aptos-core/blob/main/LICENSE
 
-//! Cache of loaded modules, keyed by executable IDs.
+//! Cache of loaded modules, keyed by module IDs.
 //!
 //! Each entry is a stable pointer to a slot which stores multiple versions
 //! of loaded modules. A slot can be:
@@ -27,13 +27,13 @@ use mono_move_core::interner::InternedModuleId;
 // TODO:
 //   1. Support speculative writes for Zaptos optimistic pipeline.
 //   2. Support lock-free hot tier?
-pub(super) struct ExecutableCache {
+pub(super) struct ModuleCache {
     // Uses fxhash because the keys are already well-distributed arena
     // pointers, so a simple, fast hash is sufficient.
     inner: DashMap<InternedModuleId, LoadedModuleSlot, fxhash::FxBuildHasher>,
 }
 
-impl ExecutableCache {
+impl ModuleCache {
     /// Creates an empty cache.
     pub(super) fn new() -> Self {
         Self {

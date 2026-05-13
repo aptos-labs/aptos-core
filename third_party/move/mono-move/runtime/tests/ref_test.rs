@@ -165,6 +165,7 @@ fn ref_cross_frame() {
         frame_layout: FrameLayoutInfo::new(vec![FO(c_ref_base)]),
         safe_point_layouts: SortedSafePointEntries::empty(),
     }));
+    let function_ptrs = vec![callee_ptr];
 
     // -- Function 0: main --
     let m_result: u32 = 0;
@@ -220,6 +221,13 @@ fn ref_cross_frame() {
     assert_eq!(elem1, 77, "vec[1] should be 77 after WriteRef");
     assert_eq!(elem2, 30, "vec[2] should be untouched");
     assert_eq!(ctx.gc_count(), 1, "ForceGC should have run exactly once");
+
+    drop(ctx);
+    for ptr in function_ptrs {
+        // SAFETY: The interpreter context has been dropped and main_func is
+        // about to go out of scope. No live references to the callee remain.
+        unsafe { ptr.free_unchecked() };
+    }
 }
 
 #[test]

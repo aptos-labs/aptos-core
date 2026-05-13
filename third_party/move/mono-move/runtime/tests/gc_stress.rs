@@ -320,4 +320,11 @@ fn gc_stress() {
     let flat: Vec<u64> = vm_values.iter().map(|e| e.0).collect();
     println!("final outer_vec keys: {:?}", flat);
     assert!(gc_runs > 0, "expected at least one GC collection");
+
+    drop(ctx);
+    for ptr in functions {
+        // SAFETY: The interpreter context has been dropped, so the function
+        // pointers it referenced through micro-ops are no longer in use.
+        unsafe { ptr.free_unchecked() };
+    }
 }

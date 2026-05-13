@@ -1,10 +1,8 @@
 // Copyright (c) Aptos Foundation
 // Licensed pursuant to the Innovation-Enabling Source Code License, available at https://github.com/aptos-labs/aptos-core/blob/main/LICENSE
 
-//! Loaded module — what the executable cache stores.
-//!
-//! [`LoadedModule`] wraps the polymorphic [`ModuleIR`] with the monomorphic
-//! [`Executable`] and a [`ModuleMandatoryDependencies`] descriptor.
+//! Loaded module — what the module cache stores. Stores the polymorphic IR
+//! with the lowered monomorphic functions and generic function instantiations.
 
 use crate::context::ExecutionGuard;
 use anyhow::{anyhow, bail};
@@ -117,7 +115,6 @@ impl ModuleMandatoryDependencies {
 }
 
 pub struct FunctionSlot {
-    // TODO: Freeing this is safe if direct callers are freed at the same time.
     pub function: FunctionPtr,
     pub mandatory_dependencies: Vec<LoadedModuleSlot>,
 }
@@ -229,5 +226,29 @@ impl LoadedModule {
             .get(idx)
             .and_then(|slot| slot.as_ref())
             .ok_or_else(|| anyhow!("Linker error: function IR missing"))
+    }
+}
+
+impl Drop for LoadedModule {
+    // SAFETY: A module is only dropped on two paths, both of which exclude
+    // live aliases to its lowered function allocations:
+    //   1. Maintenance mode clearing module cache. The maintenance guard
+    //      guarantees there are no execution guards, so no interpreter is
+    //      mid-call and no function pointer alias exists other than in the
+    //      cache.
+    //   2. When inserting module into cache and losing the race, the loser
+    //      is dropped. In this case just-leaked box was never published into
+    //      any slot, so it has no aliases by construction.
+    //
+    // TODO: `FunctionPtr`s in other modules' `CallDirect` ops are only sound
+    //   if callers are evicted with direct callees. (or their code is de-optimized).
+    fn drop(&mut self) {
+        self.functions.retain(|_, cell| {
+            if let Some(slot) = cell.take() {
+                // SAFETY: see impl-level comment — no aliases at drop time.
+                unsafe { slot.function.free_unchecked() };
+            }
+            false
+        });
     }
 }

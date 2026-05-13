@@ -2,7 +2,7 @@
 // Licensed pursuant to the Innovation-Enabling Source Code License, available at https://github.com/aptos-labs/aptos-core/blob/main/LICENSE
 
 //! This submodule defines APIs to intern Move module IDs as arena-allocated
-//! executable IDs.
+//! IDs.
 //!
 //! # Safety model
 //!
@@ -31,7 +31,7 @@ use move_core_types::{
 use std::hash::{Hash, Hasher};
 
 impl<'guard> ArenaRef<'guard, ExecutableId> {
-    /// Returns the account address of this executable.
+    /// Returns the account address of this module.
     pub fn address(&self) -> &'guard AccountAddress {
         // SAFETY: The lifetime on this reference guarantees that the execution
         // guard is still alive, which guarantees that the arena allocation is
@@ -39,7 +39,7 @@ impl<'guard> ArenaRef<'guard, ExecutableId> {
         unsafe { self.ptr.as_ref_unchecked().address() }
     }
 
-    /// Returns the name of this executable.
+    /// Returns the name of this module.
     pub fn name(&self) -> &'guard str {
         // SAFETY: The guard guarantees that we are still in execution phase
         // and the pointer to ID is still valid. Because the name was arena
@@ -55,7 +55,7 @@ impl<'guard> ArenaRef<'guard, ExecutableId> {
 
 #[allow(private_interfaces)]
 impl<'ctx> ExecutionGuard<'ctx> {
-    /// Interns [`ModuleId`] as an arena-allocated executable ID and returns a
+    /// Interns [`ModuleId`] as an arena-allocated module ID and returns a
     /// reference to it, with lifetime scoped to the lifetime of the execution
     /// guard.
     ///
@@ -83,7 +83,7 @@ impl<'ctx> ExecutionGuard<'ctx> {
     }
 
     /// Interns [`AccountAddress`]-[`IdentStr`] pair as an arena-allocated
-    /// executable ID and returns a reference to it, with lifetime scoped to
+    /// module ID and returns a reference to it, with lifetime scoped to
     /// the lifetime of the execution guard.
     ///
     /// On cache hit, returns a canonical pointer interned previously.
@@ -132,7 +132,7 @@ impl<'ctx> ExecutionGuard<'ctx> {
     ) -> GlobalArenaPtr<ExecutableId> {
         // SAFETY: All existing keys/values are valid pointers because the map
         // is guaranteed to be cleared on arena's reset.
-        if let Some(entry) = self.ctx.executable_ids.get(&(&address, name)) {
+        if let Some(entry) = self.ctx.module_ids.get(&(&address, name)) {
             return *entry.value();
         }
 
@@ -149,13 +149,13 @@ impl<'ctx> ExecutionGuard<'ctx> {
         // valid pointers because the map is cleared on arena's reset.
         *self
             .ctx
-            .executable_ids
+            .module_ids
             .entry(ExecutableIdInternerKey(ptr))
             .or_insert(ptr)
     }
 }
 
-/// Wraps allocated executable ID pointer to implement structural hash and
+/// Wraps allocated module ID pointer to implement structural hash and
 /// equality.
 ///
 /// # Safety

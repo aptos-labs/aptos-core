@@ -16,8 +16,7 @@
 //!
 //! - **Fixed-size micro-ops**: each [`MicroOp`] variant should fit in a fixed
 //!   number of bytes so side-tables (e.g. source maps, gas tables) can be
-//!   indexed by program counter without indirection. Current size is 24 bytes;
-//!   we should aim to bring this down to 16.
+//!   indexed by program counter without indirection.
 //!
 //! - **Variable-size frame slots**: frame slots are variable-sized. Each
 //!   micro-op makes the width explicit — either baked into the opcode name
@@ -46,10 +45,9 @@
 //!   ```
 //!
 //!   **Call**: the compiler emits explicit micro-ops to place arguments
-//!   into the callee's parameter region. The `CallFunc`/`CallIndirect`/`CallDirect`
-//!   instruction itself implicitly writes the metadata `(pc, fp,
-//!   func_ptr)` at the end of the caller frame and sets `fp` to the
-//!   callee frame.
+//!   into the callee's parameter region. Call instructions ([`CallIndirect`],
+//!   [`CallDirect`]) implicitly write the metadata `(pc, fp, func_ptr)` at
+//!   the end of the caller frame and sets `fp` to the callee frame.
 //!   **Return**: the compiler emits explicit micro-ops to write return
 //!   values at the start of the callee's frame (potentially overwriting
 //!   parameter slots). The `Return` instruction itself implicitly restores

@@ -238,7 +238,8 @@ fn identity_no_captures() {
     let callee_arg0 = FO((args_and_locals + FRAME_METADATA_SIZE) as u32);
 
     let descs = test_descriptors();
-    let identity = Box::new(make_identity());
+    let identity_ptr = FunctionPtr::new(Box::new(make_identity()));
+    let function_ptrs = vec![identity_ptr];
 
     let main = Function {
         name: GlobalArenaPtr::from_static("main"),
@@ -249,7 +250,7 @@ fn identity_no_captures() {
             },
             MicroOp::PackClosure(Box::new(PackClosureOp {
                 dst: closure,
-                func_ref: ClosureFuncRef::Resolved(FunctionPtr::new(identity)),
+                func_ref: ClosureFuncRef::Resolved(identity_ptr),
                 mask: 0,
                 captured_data_descriptor_id: None,
                 captured: vec![],
@@ -278,6 +279,13 @@ fn identity_no_captures() {
 
     let result = run_main_and_get_u64_result(&main, &descs.table);
     assert_eq!(result, 42);
+
+    for ptr in function_ptrs {
+        // SAFETY: The interpreter context has been dropped and the main
+        // function (which referenced these pointers via its micro-ops) is
+        // about to go out of scope. No live references remain.
+        unsafe { ptr.free_unchecked() };
+    }
 }
 
 // ---------------------------------------------------------------------------
@@ -307,7 +315,8 @@ fn add_captured_a_provided_b() {
     let callee_arg0 = FO((args_and_locals + FRAME_METADATA_SIZE) as u32);
 
     let descs = test_descriptors();
-    let add = Box::new(make_add_u64());
+    let add_ptr = FunctionPtr::new(Box::new(make_add_u64()));
+    let function_ptrs = vec![add_ptr];
 
     let main = Function {
         name: GlobalArenaPtr::from_static("main"),
@@ -316,7 +325,7 @@ fn add_captured_a_provided_b() {
             StoreImm8 { dst: b, imm: 32 },
             MicroOp::PackClosure(Box::new(PackClosureOp {
                 dst: closure,
-                func_ref: ClosureFuncRef::Resolved(FunctionPtr::new(add)),
+                func_ref: ClosureFuncRef::Resolved(add_ptr),
                 mask: 0b01, // capture position 0
                 captured_data_descriptor_id: Some(descs.desc_captured_1_u64),
                 captured: vec![SizedSlot { offset: a, size: 8 }],
@@ -342,6 +351,13 @@ fn add_captured_a_provided_b() {
 
     let result = run_main_and_get_u64_result(&main, &descs.table);
     assert_eq!(result, 42);
+
+    for ptr in function_ptrs {
+        // SAFETY: The interpreter context has been dropped and the main
+        // function (which referenced these pointers via its micro-ops) is
+        // about to go out of scope. No live references remain.
+        unsafe { ptr.free_unchecked() };
+    }
 }
 
 // ---------------------------------------------------------------------------
@@ -364,7 +380,8 @@ fn add_provided_a_captured_b() {
     let callee_arg0 = FO((args_and_locals + FRAME_METADATA_SIZE) as u32);
 
     let descs = test_descriptors();
-    let add = Box::new(make_add_u64());
+    let add_ptr = FunctionPtr::new(Box::new(make_add_u64()));
+    let function_ptrs = vec![add_ptr];
 
     let main = Function {
         name: GlobalArenaPtr::from_static("main"),
@@ -373,7 +390,7 @@ fn add_provided_a_captured_b() {
             StoreImm8 { dst: b, imm: 35 },
             MicroOp::PackClosure(Box::new(PackClosureOp {
                 dst: closure,
-                func_ref: ClosureFuncRef::Resolved(FunctionPtr::new(add)),
+                func_ref: ClosureFuncRef::Resolved(add_ptr),
                 mask: 0b10, // capture position 1
                 captured_data_descriptor_id: Some(descs.desc_captured_1_u64),
                 captured: vec![SizedSlot { offset: b, size: 8 }],
@@ -399,6 +416,13 @@ fn add_provided_a_captured_b() {
 
     let result = run_main_and_get_u64_result(&main, &descs.table);
     assert_eq!(result, 42);
+
+    for ptr in function_ptrs {
+        // SAFETY: The interpreter context has been dropped and the main
+        // function (which referenced these pointers via its micro-ops) is
+        // about to go out of scope. No live references remain.
+        unsafe { ptr.free_unchecked() };
+    }
 }
 
 // ---------------------------------------------------------------------------
@@ -421,7 +445,8 @@ fn add_all_captured() {
     let callee_arg0 = FO((args_and_locals + FRAME_METADATA_SIZE) as u32);
 
     let descs = test_descriptors();
-    let add = Box::new(make_add_u64());
+    let add_ptr = FunctionPtr::new(Box::new(make_add_u64()));
+    let function_ptrs = vec![add_ptr];
 
     let main = Function {
         name: GlobalArenaPtr::from_static("main"),
@@ -430,7 +455,7 @@ fn add_all_captured() {
             StoreImm8 { dst: b, imm: 27 },
             MicroOp::PackClosure(Box::new(PackClosureOp {
                 dst: closure,
-                func_ref: ClosureFuncRef::Resolved(FunctionPtr::new(add)),
+                func_ref: ClosureFuncRef::Resolved(add_ptr),
                 mask: 0b11,
                 captured_data_descriptor_id: Some(descs.desc_captured_2_u64),
                 captured: vec![SizedSlot { offset: a, size: 8 }, SizedSlot {
@@ -459,6 +484,13 @@ fn add_all_captured() {
 
     let result = run_main_and_get_u64_result(&main, &descs.table);
     assert_eq!(result, 42);
+
+    for ptr in function_ptrs {
+        // SAFETY: The interpreter context has been dropped and the main
+        // function (which referenced these pointers via its micro-ops) is
+        // about to go out of scope. No live references remain.
+        unsafe { ptr.free_unchecked() };
+    }
 }
 
 // ---------------------------------------------------------------------------
@@ -507,8 +539,9 @@ fn vector_map_add_captured() {
     let y_val: u64 = 10;
 
     let descs = test_descriptors();
-    let add = Box::new(make_add_u64());
-    let vector_map = Box::new(make_vector_map());
+    let add_ptr = FunctionPtr::new(Box::new(make_add_u64()));
+    let vector_map_ptr = FunctionPtr::new(Box::new(make_vector_map()));
+    let function_ptrs = vec![add_ptr, vector_map_ptr];
 
     let main = Function {
         name: GlobalArenaPtr::from_static("main"),
@@ -549,7 +582,7 @@ fn vector_map_add_captured() {
             // pc 9: pack with mask=0b10 (capture position 1 = `b`)
             MicroOp::PackClosure(Box::new(PackClosureOp {
                 dst: closure,
-                func_ref: ClosureFuncRef::Resolved(FunctionPtr::new(add)),
+                func_ref: ClosureFuncRef::Resolved(add_ptr),
                 mask: 0b10,
                 captured_data_descriptor_id: Some(descs.desc_captured_1_u64),
                 captured: vec![SizedSlot { offset: y, size: 8 }],
@@ -570,7 +603,7 @@ fn vector_map_add_captured() {
             },
             // pc 13: call vector_map
             CallDirect {
-                ptr: FunctionPtr::new(vector_map),
+                ptr: vector_map_ptr,
             },
             // === Sum loop: result = sum(vec) ===
             // pc 14: result = 0
@@ -623,4 +656,11 @@ fn vector_map_add_captured() {
 
     let result = run_main_and_get_u64_result(&main, &descs.table);
     assert_eq!(result, (2 + y_val) + (3 + y_val) + (4 + y_val));
+
+    for ptr in function_ptrs {
+        // SAFETY: The interpreter context has been dropped and the main
+        // function (which referenced these pointers via its micro-ops) is
+        // about to go out of scope. No live references remain.
+        unsafe { ptr.free_unchecked() };
+    }
 }

@@ -24,7 +24,15 @@ mod micro_op {
         });
         ctx.set_root_arg(0, &n.to_le_bytes());
         ctx.run().unwrap();
-        ctx.root_result()
+        let result = ctx.root_result();
+
+        drop(ctx);
+        for ptr in functions {
+            // SAFETY: The interpreter context has been dropped, so the
+            // function pointers it referenced are no longer in use.
+            unsafe { ptr.free_unchecked() };
+        }
+        result
     }
 
     #[test]

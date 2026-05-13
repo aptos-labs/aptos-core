@@ -48,7 +48,8 @@ pub struct InterpreterContext<'a, T: ExecutionContext> {
     /// Pointer to the currently executing function.
     pub(crate) current_func: NonNull<Function>,
     /// Absolute pointer into the linear stack memory. Operand accesses are a
-    /// single addition (`fp + offset`). Recomputed only on `CallFunc` and `Return`.
+    /// single addition (`fp + offset`).
+    /// Recomputed only during calls and returns.
     pub(crate) frame_ptr: *mut u8,
 
     pub(crate) stack: MemoryRegion,
@@ -334,6 +335,10 @@ impl<T: ExecutionContext> InterpreterContext<'_, T> {
         // executing a call instruction, which stores a valid pointer.
         let func = unsafe { self.current_func.as_ref() };
 
+        // TODO:
+        //  1. Hoist this out and see effects on performance
+        //  2. See if swapping code does not need to be seen by same txn, and
+        //     only its future re-executions see new code.
         let code_guard = func.code.load();
         let code = code_guard.as_slice();
 
@@ -369,9 +374,8 @@ impl<T: ExecutionContext> InterpreterContext<'_, T> {
                     //   4. Patching:
                     //      If can patch caller, try it.
                     let target = self.exec_ctx.load_function(executable_id, func_name)?;
-                    // SAFETY: `target` points to a `Function` allocated in a
-                    // `LoadedModule`'s arena, which is held alive by the
-                    // global executable cache for the lifetime of `exec_ctx`.
+                    // SAFETY: `target` points to a `Function`, which is not reclaimed during
+                    // execution as guaranteed by the execution guard.
                     return self.call(func, fp, target.as_ref_unchecked());
                 },
                 MicroOp::CallDirect { ptr } => {

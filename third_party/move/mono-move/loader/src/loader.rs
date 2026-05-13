@@ -14,12 +14,12 @@
 //!
 //! 2. **Translate (on cache miss only).**
 //! For every cache miss, modules are fetched from storage, deserialized,
-//! verified and translated into stackless execution IR. Transalted modules are
+//! verified and translated into stackless execution IR. Translated modules are
 //! then inserted into cache.
 
 use crate::{
     module_provider::ModuleProvider,
-    read_set::{ModuleRead, ModuleReadSet, State},
+    read_set::{ModuleRead, ModuleReadSet, ModuleState},
 };
 use anyhow::{anyhow, bail};
 use mono_move_core::{
@@ -143,16 +143,16 @@ impl<'guard, 'ctx> Loader<'guard, 'ctx> {
         module_id: InternedModuleId,
         func_name: InternedIdentifier,
     ) -> anyhow::Result<FunctionPtr> {
-        let id = self.guard.arena_ref_for_executable_id(module_id);
+        let id = self.guard.arena_ref_for_module_id(module_id);
 
         let module = match read_set.get(id) {
             Some(ModuleRead::Loaded { module, state }) => match state {
-                State::ReadyForLowering => module,
-                State::Metered => {
+                ModuleState::ReadyForLowering => module,
+                ModuleState::Metered => {
                     self.ensure_ready_for_lowering(read_set, gas_meter, id, module)?;
                     module
                 },
-                State::Unmetered => {
+                ModuleState::Unmetered => {
                     bail!("All modules in the read-set must be metered");
                 },
             },
@@ -242,7 +242,65 @@ impl<'guard, 'ctx> Loader<'guard, 'ctx> {
     ) -> anyhow::Result<&'guard LoadedModule> {
         let package = match self.guard.get_module(id) {
             Some(module) => module.mandatory_dependencies().clone(),
-            None => {
+            None => self.build_mandatory_dependencies_for_id(id)?,
+        };
+
+        // If cache hit, we need to go over slots, record them in the read-set,
+        // and charge gas. If cache miss, we do the same but also fetch modules
+        // from storage on read-set cache miss and insert them into slots and
+        // read-set.
+        self.record_loaded_and_charge_slots(
+            read_set,
+            gas_meter,
+            package.slots(),
+            |read_set, slot| {
+                let id = self.guard.arena_ref_for_module_id(slot.id());
+                read_set.record_pending_loading(id)?;
+                let module = match slot.get(self.guard) {
+                    Some(module) => module,
+                    None => self.build_and_insert_module_ir(id, package.clone())?,
+                };
+                read_set.record_ready_for_lowering(id, module)?;
+                Ok(module)
+            },
+        )?;
+
+        // Promote any package member that was already in the read-set as
+        // metered (e.g., a layout-only side-load earlier in this transaction).
+        for slot in package.slots() {
+            let slot_id = self
+                .guard
+                .arena_ref_for_module_id(self.module_slot(slot).id());
+            if matches!(
+                read_set.get(slot_id),
+                Some(ModuleRead::Loaded {
+                    state: ModuleState::Metered,
+                    ..
+                })
+            ) {
+                read_set.mark_ready_for_lowering(slot_id)?;
+            }
+        }
+
+        if let Some(ModuleRead::Loaded { module, state }) = read_set.get(id) {
+            if !matches!(state, ModuleState::ReadyForLowering) {
+                bail!("Target module is not metered and ready");
+            }
+            Ok(module)
+        } else {
+            bail!("Target module is not loaded")
+        }
+    }
+
+    /// Builds mandatory module dependencies to add to a module that have just
+    /// been loaded.
+    fn build_mandatory_dependencies_for_id(
+        &self,
+        id: ArenaRef<'guard, ExecutableId>,
+    ) -> anyhow::Result<ModuleMandatoryDependencies> {
+        match &self.policy {
+            LoadingPolicy::Lazy(_) => Ok(ModuleMandatoryDependencies::lazy_unset()),
+            LoadingPolicy::Package => {
                 let module_names = self
                     .module_provider
                     .get_same_package_modules(id.address(), id.name())?;
@@ -255,37 +313,8 @@ impl<'guard, 'ctx> Loader<'guard, 'ctx> {
                         self.guard.get_or_create_module_slot(module_id)
                     })
                     .collect::<Vec<_>>();
-                ModuleMandatoryDependencies::package(package_slots)
+                Ok(ModuleMandatoryDependencies::package(package_slots))
             },
-        };
-
-        // If cache hit, we need to go over slots, record them in the read-set,
-        // and charge gas. If cache miss, we do the same but also fetch modules
-        // from storage on read-set cache miss and insert them into slots and
-        // read-set.
-        self.record_loaded_and_charge_slots(
-            read_set,
-            gas_meter,
-            package.slots(),
-            |read_set, slot| {
-                let id = self.guard.arena_ref_for_executable_id(slot.id());
-                read_set.record_pending_loading(id)?;
-                let module = match slot.get(self.guard) {
-                    Some(module) => module,
-                    None => self.build_and_insert_module_ir(id, package.clone())?,
-                };
-                read_set.record_ready_for_lowering(id, module)?;
-                Ok(module)
-            },
-        )?;
-
-        if let Some(ModuleRead::Loaded { module, state }) = read_set.get(id) {
-            if !matches!(state, State::ReadyForLowering) {
-                bail!("Target module is not metered and ready");
-            }
-            Ok(module)
-        } else {
-            bail!("Target module is not loaded")
         }
     }
 
@@ -349,8 +378,10 @@ impl<'guard, 'ctx> Loader<'guard, 'ctx> {
                 }
             },
             LoadingPolicy::Package => {
-                // Package always promotes members to ready state.
-                bail!("Package member should already be ready for lowering");
+                // The metered state can arise from a layout-only side-load
+                // earlier in the transaction. Load the full package now to
+                // charge any missing siblings and promote them to ready.
+                self.load_package(read_set, gas_meter, id)?;
             },
         }
         Ok(())
@@ -475,11 +506,11 @@ impl<'guard, 'ctx> Loader<'guard, 'ctx> {
     {
         let mut loading_cost = 0u64;
         for slot in slots.iter().map(|s| self.module_slot(s)) {
-            let id = self.guard.arena_ref_for_executable_id(slot.id());
+            let id = self.guard.arena_ref_for_module_id(slot.id());
             match read_set.get(id) {
                 Some(ModuleRead::Loaded { module, state }) => match state {
-                    State::ReadyForLowering | State::Metered => continue,
-                    State::Unmetered => {
+                    ModuleState::ReadyForLowering | ModuleState::Metered => continue,
+                    ModuleState::Unmetered => {
                         loading_cost = loading_cost.saturating_add(module.cost());
                         read_set.mark_metered(id)?;
                     },
@@ -504,7 +535,7 @@ impl<'guard, 'ctx> Loader<'guard, 'ctx> {
         slots: &[LoadedModuleSlot],
     ) -> anyhow::Result<()> {
         self.record_loaded_and_charge_slots(read_set, gas_meter, slots, |read_set, slot| {
-            let id = self.guard.arena_ref_for_executable_id(slot.id());
+            let id = self.guard.arena_ref_for_module_id(slot.id());
             read_set.record_pending_loading(id)?;
             let module = match slot.get(self.guard) {
                 Some(module) => module,
@@ -552,7 +583,7 @@ impl SpecializerContext for LoweringContext<'_, '_, '_> {
         module_id: &InternedModuleId,
         nominal_name: &InternedIdentifier,
     ) -> anyhow::Result<Option<FieldTypes>> {
-        let id = self.loader.guard.arena_ref_for_executable_id(*module_id);
+        let id = self.loader.guard.arena_ref_for_module_id(*module_id);
 
         // Every module needs to be in the read-set.
         let module = match self.read_set.get(id) {
@@ -562,10 +593,10 @@ impl SpecializerContext for LoweringContext<'_, '_, '_> {
                 self.read_set.record_pending_loading(id)?;
                 let module = match self.loader.guard.get_module(id) {
                     Some(module) => module,
-                    None => self.loader.build_and_insert_module_ir(
-                        id,
-                        ModuleMandatoryDependencies::lazy_unset(),
-                    )?,
+                    None => {
+                        let deps = self.loader.build_mandatory_dependencies_for_id(id)?;
+                        self.loader.build_and_insert_module_ir(id, deps)?
+                    },
                 };
                 self.read_set.record_unmetered(id, module)?;
                 module

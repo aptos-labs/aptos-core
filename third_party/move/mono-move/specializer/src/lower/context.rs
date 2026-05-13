@@ -274,7 +274,8 @@ fn layout_slots(base: u32, types: &[InternedType]) -> Option<Vec<SlotInfo>> {
 }
 
 /// Provides context to specializer so it can obtain external information
-/// about types (e.g., their sizes, fields of structs if available).
+/// about types (e.g., their sizes, fields of structs if available) as well
+/// as publish new information about types discovered to the context.
 pub trait SpecializerContext {
     /// Returns fields of a struct or variants with fields of an enum. If
     /// this information is not available in context, returns [`None`].
@@ -465,6 +466,7 @@ fn try_set_lowering_requirements_for_function_impl(
 ///
 /// TODO: For fields, we need to check borrow instructions to make sure the
 ///       offsets are calculated for them.
+/// TODO: Make this not recursive.
 fn walk_and_size(
     ctx: &mut impl SpecializerContext,
     ty: InternedType,

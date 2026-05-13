@@ -20,6 +20,10 @@ impl Code {
     }
 
     /// Snapshot of the current micro-ops.
+    ///
+    /// TODO: decide on if using ArcSwap is good enough for perf and
+    ///   what is the best way to update code and any other relevant
+    ///   information in the function.
     pub fn load(&self) -> arc_swap::Guard<Arc<Vec<MicroOp>>> {
         self.inner.load()
     }
@@ -155,8 +159,8 @@ pub struct Function {
     pub param_sizes: Vec<u32>,
     /// Size of the parameter region at the start of the frame.
     /// The caller writes the corresponding arguments into this region
-    /// before `CallFunc`; when `zero_frame` is true, the runtime zeroes
-    /// everything beyond the parameter region
+    /// before the call instruction; when `zero_frame` is true, the runtime
+    /// zeroes everything beyond the parameter region
     /// (`param_sizes_sum..extended_frame_size`) at frame creation to
     /// ensure pointer slots start as null.
     pub param_sizes_sum: usize,

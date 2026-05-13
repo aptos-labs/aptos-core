@@ -424,9 +424,9 @@ pub(crate) fn grow_vec_ref(
 /// interpreter and the micro-op verifier:
 ///
 /// - **Frame metadata integrity**: each frame's saved `fp`, `func_ptr`,
-///   and `pc` are written by `CallFunc`/`Return` and never modified by
-///   user-visible micro-ops. A corrupted saved `fp` leads to
-///   out-of-bounds stack reads (UB).
+///   and `pc` are written by [`MicroOp::Return`], [`MicroOp::CallDirect`],
+///   [`MicroOp::CallIndirect`] and never modified by user-visible micro-ops.
+///   A corrupted saved `fp` leads to out-of-bounds stack reads (UB).
 /// - **Pointer-slot accuracy**: `Function::frame_layout` (and the
 ///   matching `safe_point_layouts` entry, if any) together list every
 ///   frame offset that may hold a live heap pointer, and *only* those
@@ -466,17 +466,17 @@ pub(crate) fn gc_collect(
     //
     // PC tracking: the topmost frame uses `pc_top`. For caller frames,
     // the saved PC is read from the callee's frame metadata (the return
-    // address stored by `CallFunc`).
+    // address stored when returning from a call).
     let mut fp = frame_ptr;
     let mut func_ptr = current_func;
     let mut pc = pc_top;
 
     loop {
-        // SAFETY: func_ptr is a valid, non-null pointer — set from
-        // `self.functions[]` or from `CallLocalFunc`, and saved/restored
-        // via frame metadata. Arena pointers are valid for the lifetime
-        // of the executable. `fp.sub` retrieves saved metadata written
-        // by the call protocol.
+        // SAFETY: func_ptr is a valid, non-null pointer — set by the call
+        // instruction and saved/restored via frame metadata. These pointers
+        // are valid for the lifetime of the module and not freed during
+        // execution. `fp.sub` retrieves saved metadata written by the call
+        // protocol.
         let func = unsafe { func_ptr.as_ref() };
         unsafe {
             // Scan base pointer offsets (always active).

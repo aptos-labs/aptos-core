@@ -204,7 +204,7 @@ Stale pointers (logically dead but not yet overwritten) in the pointer region ca
 1. `frame_layout: FrameLayoutInfo` — frame offsets that always hold heap pointers, scanned at every PC (Approach B).
 2. `safe_point_layouts: SortedSafePointEntries` — additional per-safe-point pointer offsets, scanned only when the frame's PC matches a safe-point entry (Approach A).
 
-At any given safe point, the GC scans the union of both. When `zero_frame` is true, the runtime zeroes the region beyond args (`param_sizes_sum..extended_frame_size`) at `CallFunc` time so pointer slots start as null. Safe points are allocating instructions (at their own PC) and call return sites (`call_pc + 1`).
+At any given safe point, the GC scans the union of both. When `zero_frame` is true, the runtime zeroes the region beyond args (`param_sizes_sum..extended_frame_size`) at when executing the call instruction so pointer slots start as null. Safe points are allocating instructions (at their own PC) and call return sites (`call_pc + 1`).
 
 This hybrid keeps the common case simple — stable pointer slots use `frame_layout` with no per-PC overhead — while supporting slots that change type across call boundaries (e.g., shared arg/return regions, different callee arg layouts). The specializer is free to use either mechanism: `frame_layout` for slots with a fixed pointer/scalar designation, `safe_point_layouts` for slots whose type varies by PC.
 

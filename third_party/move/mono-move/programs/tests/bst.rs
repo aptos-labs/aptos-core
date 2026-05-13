@@ -199,6 +199,13 @@ mod micro_op {
                 _ => {},
             }
         }
+
+        drop(ctx);
+        for ptr in functions {
+            // SAFETY: The interpreter context has been dropped, so the
+            // function pointers it referenced are no longer in use.
+            unsafe { ptr.free_unchecked() };
+        }
         results
     }
 
