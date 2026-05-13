@@ -6,6 +6,11 @@
 //! finalize. The `Position` Move value is unpacked positionally via
 //! `Struct::unpack_with_tag()`, so the field order here must match the
 //! Move `Position` declaration.
+//!
+//! TODO[native_position](metering): these natives charge no gas. Add gas
+//! parameters (base + per serialized byte, calibrated) and charge them here
+//! once the position gas schedule lands. Until then the only bound on
+//! position writes is `MAX_POSITION_WRITE_OPS_PER_TRANSACTION`.
 
 use crate::context::NativePositionContext;
 use aptos_native_interface::{
