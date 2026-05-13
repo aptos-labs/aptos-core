@@ -7,6 +7,7 @@ mod package_spec_infer;
 mod package_status;
 pub(crate) mod package_test;
 mod package_verify;
+mod replay_transaction;
 
 use super::package_data::VerifiedScope;
 use move_model::model::{GlobalEnv, VerificationScope};

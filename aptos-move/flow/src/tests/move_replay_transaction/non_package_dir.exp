@@ -1,0 +1,2 @@
+is_error: true
+local package path `<TMPDIR>` is not a Move package (no Move.toml)
