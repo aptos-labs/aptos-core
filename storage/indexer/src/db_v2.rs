@@ -250,6 +250,9 @@ impl<'a, R: StateView> TableInfoParser<'a, R> {
                     self.collect_table_info_from_table_item(*handle, bytes)?
                 },
                 StateKeyInner::Raw(_) => (),
+                // TradingNative keys are out of scope for the
+                // indexer's table-info collection; the native
+                // trading subsystem surfaces its own events.
                 StateKeyInner::TradingNative(_) => (),
             }
         }

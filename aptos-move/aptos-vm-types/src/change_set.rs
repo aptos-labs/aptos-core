@@ -89,6 +89,13 @@ pub struct VMChangeSet {
     // TODO[agg_v1](cleanup) deprecate aggregator_v1 fields.
     aggregator_v1_write_set: BTreeMap<StateKey, WriteOp>,
     aggregator_v1_delta_set: BTreeMap<StateKey, DeltaOp>,
+
+    /// Native-position writes (`StateKeyInner::TradingNative` keys
+    /// with the `Position` sub-variant). NEVER enter the flat
+    /// `WriteSet` — the commit applier reads them via
+    /// `TransactionOutput::native_writes()` and dispatches to
+    /// `position_db` + the in-memory `NativeStateStore`.
+    position_write_set: BTreeMap<StateKey, WriteOp>,
 }
 
 macro_rules! squash_writes_pair {
@@ -113,6 +120,7 @@ impl VMChangeSet {
             delayed_field_change_set: BTreeMap::new(),
             aggregator_v1_write_set: BTreeMap::new(),
             aggregator_v1_delta_set: BTreeMap::new(),
+            position_write_set: BTreeMap::new(),
         }
     }
 
@@ -129,7 +137,40 @@ impl VMChangeSet {
             delayed_field_change_set,
             aggregator_v1_write_set,
             aggregator_v1_delta_set,
+            position_write_set: BTreeMap::new(),
         }
+    }
+
+    /// Accessor for the Position writes bucket. See the struct-level
+    /// docs for semantics.
+    pub fn position_write_set(&self) -> &BTreeMap<StateKey, WriteOp> {
+        &self.position_write_set
+    }
+
+    /// Replace the Position bucket. Used by the session-finalize
+    /// wiring once the `NativePositionContext` is drained into the
+    /// change set.
+    pub fn set_position_bucket(
+        &mut self,
+        position_writes: BTreeMap<StateKey, WriteOp>,
+    ) -> PartialVMResult<()> {
+        use aptos_types::state_store::state_key::inner::{StateKeyInner, TradingNativeKey};
+        for key in position_writes.keys() {
+            if !matches!(
+                key.inner(),
+                StateKeyInner::TradingNative(TradingNativeKey::Position { .. })
+            ) {
+                return Err(
+                    PartialVMError::new(StatusCode::UNKNOWN_INVARIANT_VIOLATION_ERROR)
+                        .with_message(
+                            "position_write_set bucket received a non-Position StateKey"
+                                .to_string(),
+                        ),
+                );
+            }
+        }
+        self.position_write_set = position_writes;
+        Ok(())
     }
 
     // TODO[agg_v2](cleanup) see if we can remove in favor of `new`.
@@ -231,6 +272,7 @@ impl VMChangeSet {
             aggregator_v1_delta_set,
             delayed_field_change_set,
             events,
+            position_write_set,
         } = self;
 
         if !aggregator_v1_delta_set.is_empty() {
@@ -262,6 +304,12 @@ impl VMChangeSet {
         );
         write_set_mut.extend(module_write_set.into_write_ops());
         write_set_mut.extend(aggregator_v1_write_set);
+        // Position writes are NOT materialized into the flat WriteSet.
+        // They ride in `WriteSet.native_positions` (the sibling bucket
+        // installed by the materialization step). The commit path reads
+        // that bucket directly and dispatches to position_db /
+        // position_merkle_db.
+        let _ = position_write_set;
 
         let events = events.into_iter().map(|(e, _)| e).collect();
         let write_set = write_set_mut
@@ -746,6 +794,7 @@ impl VMChangeSet {
             aggregator_v1_delta_set: additional_aggregator_delta_set,
             delayed_field_change_set: additional_delayed_field_change_set,
             events: additional_events,
+            position_write_set: additional_position_write_set,
         } = additional_change_set;
 
         Self::squash_additional_aggregator_v1_changes(
@@ -762,6 +811,13 @@ impl VMChangeSet {
             &mut self.delayed_field_change_set,
             additional_delayed_field_change_set,
         )?;
+        // Position buckets: later writes win (last-wins squash). This
+        // matches per-TX semantics — two Position writes to the same
+        // key inside one TX always resolve to the later one. Cross-TX
+        // squashing is handled by MVHashMap at the block layer.
+        for (key, op) in additional_position_write_set {
+            self.position_write_set.insert(key, op);
+        }
         self.events.extend(additional_events);
         Ok(())
     }

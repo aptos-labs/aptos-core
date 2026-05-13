@@ -5092,6 +5092,7 @@ dependencies = [
  "aptos-metrics-core",
  "aptos-mvhashmap",
  "aptos-native-interface",
+ "aptos-position-natives",
  "aptos-table-natives",
  "aptos-transaction-simulation",
  "aptos-types",

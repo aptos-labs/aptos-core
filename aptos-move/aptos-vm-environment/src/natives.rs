@@ -2,9 +2,17 @@
 // Licensed pursuant to the Innovation-Enabling Source Code License, available at https://github.com/aptos-labs/aptos-core/blob/main/LICENSE
 
 use aptos_native_interface::SafeNativeBuilder;
-use move_core_types::language_storage::CORE_CODE_ADDRESS;
-use move_vm_runtime::native_functions::NativeFunctionTable;
+use move_core_types::{account_address::AccountAddress, language_storage::CORE_CODE_ADDRESS};
+use move_vm_runtime::native_functions::{make_table_from_iter, NativeFunctionTable};
 use std::collections::HashSet;
+
+/// Address of the `aptos_experimental` framework package. `native_position`
+/// and any other experimental natives live here; they must be registered
+/// at this address (0x7), not at `aptos_framework` (0x1), so the VM
+/// resolves `0x7::native_position::native_register` etc.
+const APTOS_EXPERIMENTAL_ADDRESS: AccountAddress = AccountAddress::new([
+    0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 7,
+]);
 
 /// Builds and returns all Aptos native functions.
 pub fn aptos_natives_with_builder(
@@ -41,6 +49,14 @@ pub fn aptos_natives_with_builder(
         .chain(aptos_table_natives::table_natives(
             CORE_CODE_ADDRESS,
             builder,
+        ))
+        .chain(make_table_from_iter(
+            APTOS_EXPERIMENTAL_ADDRESS,
+            aptos_position_natives::all_natives(builder)
+                .into_iter()
+                .map(|(func_name, func)| {
+                    ("native_position".to_string(), func_name, func)
+                }),
         ))
         .collect()
 }

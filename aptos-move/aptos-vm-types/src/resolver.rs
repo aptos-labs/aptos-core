@@ -15,7 +15,10 @@ use aptos_types::{
 };
 use bytes::Bytes;
 use move_binary_format::errors::{PartialVMError, PartialVMResult};
-use move_core_types::{language_storage::StructTag, value::MoveTypeLayout, vm_status::StatusCode};
+use move_core_types::{
+    account_address::AccountAddress, language_storage::StructTag, value::MoveTypeLayout,
+    vm_status::StatusCode,
+};
 use move_vm_types::delayed_values::delayed_field_id::DelayedFieldID;
 use std::collections::{BTreeMap, HashMap};
 

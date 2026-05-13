@@ -15,7 +15,7 @@ use aptos_types::{
     fee_statement::FeeStatement,
     state_store::state_key::StateKey,
     transaction::{TransactionAuxiliaryData, TransactionOutput, TransactionStatus},
-    write_set::WriteOp,
+    write_set::{NativePositionOp, WriteOp},
 };
 use derivative::Derivative;
 use move_core_types::{
@@ -206,9 +206,25 @@ impl VMOutput {
             ));
         }
 
-        let (write_set, events) = change_set
+        // Snapshot the native-position bucket before materialization
+        // drops it. Position writes never enter the value bucket of
+        // the WriteSet — they ride in the WriteSet's
+        // `native_positions` sibling bucket, which the storage
+        // commit applier consumes via
+        // `WriteSet::native_position_iter()` and routes into the
+        // dedicated in-memory store and `position_db` CF.
+        let native_positions: BTreeMap<StateKey, NativePositionOp> = change_set
+            .position_write_set()
+            .iter()
+            .map(|(k, op)| (k.clone(), NativePositionOp::from_write_op(op.clone())))
+            .collect();
+
+        let (mut write_set, events) = change_set
             .try_combine_into_storage_change_set(module_write_set)?
             .into_inner();
+        if !native_positions.is_empty() {
+            write_set.add_native_positions(native_positions);
+        }
         Ok(TransactionOutput::new(
             write_set,
             events,

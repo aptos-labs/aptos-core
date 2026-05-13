@@ -615,11 +615,26 @@ impl<'a, S: StateView> MoveConverter<'a, S> {
                 "Can't convert account raw key {:?} to WriteSetChange",
                 state_key
             )),
-            StateKeyInner::TradingNative(_) => Err(format_err!(
-                "Can't convert trading-native key {:?} to WriteSetChange",
-                state_key
-            )),
+            StateKeyInner::TradingNative(_) => {
+                // Native-trading keys aren't exposed through the
+                // legacy REST WriteSetChange surface. They ride in
+                // `TransactionOutput.write_set` for state-sync +
+                // replay, but API consumers query them through
+                // dedicated trading-native endpoints. Indexers that
+                // want position data must subscribe to the position
+                // event stream.
+                Ok(vec![])
+            },
         }
+    }
+
+    /// Whether a StateKey's write would appear in the REST API's
+    /// WriteSetChange surface. Native-trading writes currently do
+    /// not; indexers that care about them should subscribe to the
+    /// event stream or query trading-native endpoints directly.
+    pub fn state_key_is_visible_in_rest_write_set(state_key: &StateKey) -> bool {
+        use aptos_types::state_store::state_key::inner::StateKeyInner;
+        !matches!(state_key.inner(), StateKeyInner::TradingNative(_))
     }
 
     pub fn try_access_path_into_write_set_changes(

@@ -229,9 +229,18 @@ where
         let event_context: NativeEventContext = extensions.remove();
         let events = event_context.legacy_into_events();
 
+        // Drain the native-position session extension. Dirty writes
+        // staged via `stage_create` / `stage_update` / `stage_remove`
+        // are converted into VMChangeSet buckets. Lifecycle events
+        // (register / deny / reenable) are pure Move now — they
+        // mutate the `ExchangeRegistry` resource directly, so there
+        // is no separate flush channel.
+        let position_context: aptos_position_natives::NativePositionContext = extensions.remove();
+        let position_writes_map = position_context.into_change_maps();
+
         let woc = WriteOpConverter::new(resolver, is_storage_slot_metadata_enabled);
 
-        let change_set = Self::convert_change_set(
+        let mut change_set = Self::convert_change_set(
             &woc,
             change_set,
             resource_group_change_set,
@@ -241,6 +250,11 @@ where
             configs.legacy_resource_creation_as_modification(),
         )
         .map_err(|e| e.finish(Location::Undefined))?;
+
+        let position_bucket = build_position_writeset(&position_writes_map);
+        change_set
+            .set_position_bucket(position_bucket)
+            .map_err(|e| e.finish(Location::Undefined))?;
 
         Ok(change_set)
     }
@@ -580,5 +594,48 @@ where
     extensions.add(NativeStateStorageContext::new(data_view));
     extensions.add(NativeEventContext::default());
     extensions.add(NativeObjectContext::default());
+
+    // Native-position subsystem. Holds only the per-TX write-staging
+    // map; Move-side reads from the in-memory store are deferred to
+    // milestone 2.
+    extensions.add(aptos_position_natives::NativePositionContext::new());
+
     extensions
+}
+
+// ---------------------------------------------------------------------
+// Native-position drainage helpers
+// ---------------------------------------------------------------------
+
+/// Convert a `PositionKey -> Option<NativePosition>` map into a
+/// `StateKey -> WriteOp` map suitable for `VMChangeSet::position_write_set`.
+/// A `None` value encodes a tombstone; a `Some` value is serialized into
+/// the compact-binary payload and wrapped in a `StateValue`.
+///
+/// Uses legacy creation/deletion for now — the session extension does
+/// not currently track whether a key was previously-present, so we
+/// default to `legacy_creation` / `legacy_deletion` for staged writes
+/// and let the commit applier (or a later refinement) distinguish
+/// Creation vs Modification when that distinction matters for storage
+/// deposit accounting.
+fn build_position_writeset(
+    writes: &std::collections::BTreeMap<
+        aptos_position_natives::PositionKey,
+        Option<aptos_position_natives::NativePosition>,
+    >,
+) -> std::collections::BTreeMap<
+    aptos_types::state_store::state_key::StateKey,
+    aptos_types::write_set::WriteOp,
+> {
+    use aptos_types::{state_store::state_key::StateKey, write_set::WriteOp};
+    let mut out = std::collections::BTreeMap::new();
+    for (key, maybe_position) in writes {
+        let state_key = StateKey::position(key.exchange, key.account, key.market);
+        let op = match maybe_position {
+            Some(pos) => WriteOp::legacy_creation(pos.serialize().into()),
+            None => WriteOp::legacy_deletion(),
+        };
+        out.insert(state_key, op);
+    }
+    out
 }
