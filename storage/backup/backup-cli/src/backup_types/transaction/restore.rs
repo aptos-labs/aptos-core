@@ -567,6 +567,16 @@ impl TransactionRestoreBatchController {
         let (first_version, _) = self.replay_from_version.unwrap();
         restore_handler.force_state_version_for_kv_restore(first_version.checked_sub(1))?;
 
+        // Used to split each chunk at epoch boundaries so VersionData is written at every
+        // epoch end (otherwise only the chunk tail gets it, breaking replay-verify on
+        // archive). Empty when `--skip-epoch-endings` is set.
+        let epoch_end_versions: Arc<Vec<Version>> = Arc::new(
+            self.epoch_history
+                .as_ref()
+                .map(|h| h.epoch_endings.iter().map(|li| li.version()).collect())
+                .unwrap_or_default(),
+        );
+
         let mut base_version = first_version;
         let mut offset = 0u64;
         let replay_start = Instant::now();
@@ -576,30 +586,51 @@ impl TransactionRestoreBatchController {
             .try_chunks(BATCH_SIZE)
             .err_into::<anyhow::Error>()
             .map_ok(|chunk| {
-                let (txns, persisted_aux_info, txn_infos, write_sets, events): (
-                    Vec<_>,
-                    Vec<_>,
-                    Vec<_>,
-                    Vec<_>,
-                    Vec<_>,
+                let (txns, persisted_aux_info, txn_infos, mut write_sets, events): (
+                    Vec<Transaction>,
+                    Vec<PersistedAuxiliaryInfo>,
+                    Vec<TransactionInfo>,
+                    Vec<WriteSet>,
+                    Vec<Vec<ContractEvent>>,
                 ) = chunk.into_iter().multiunzip();
                 let handler = arc_restore_handler.clone();
+                let epoch_end_versions = Arc::clone(&epoch_end_versions);
                 base_version += offset;
                 offset = txns.len() as u64;
+                let chunk_first_version = base_version;
                 async move {
                     let _timer = OTHER_TIMERS_SECONDS.timer_with(&["replay_txn_chunk_kv_only"]);
                     tokio::task::spawn_blocking(move || {
-                        // we directly save transaction and kvs to DB without involving chunk executor
-                        handler.save_transactions_and_replay_kv(
-                            base_version,
-                            &txns,
-                            &persisted_aux_info,
-                            &txn_infos,
-                            &events,
-                            write_sets,
-                        )?;
+                        // Sub-chunk boundaries: epoch-ends in this chunk plus the tail.
+                        let chunk_last_version = chunk_first_version + offset - 1;
+                        let lo = epoch_end_versions.partition_point(|&v| v < chunk_first_version);
+                        let hi = epoch_end_versions.partition_point(|&v| v <= chunk_last_version);
+                        let mut sub_ends: Vec<usize> = epoch_end_versions[lo..hi]
+                            .iter()
+                            .map(|&v| (v - chunk_first_version + 1) as usize)
+                            .collect();
+                        if sub_ends.last().copied() != Some(events.len()) {
+                            sub_ends.push(events.len());
+                        }
+
+                        let mut sub_first = chunk_first_version;
+                        let mut consumed = 0usize;
+                        for sub_end in sub_ends {
+                            let n = sub_end - consumed;
+                            let sub_ws: Vec<WriteSet> = write_sets.drain(..n).collect();
+                            handler.save_transactions_and_replay_kv(
+                                sub_first,
+                                &txns[consumed..sub_end],
+                                &persisted_aux_info[consumed..sub_end],
+                                &txn_infos[consumed..sub_end],
+                                &events[consumed..sub_end],
+                                sub_ws,
+                            )?;
+                            sub_first += n as u64;
+                            consumed = sub_end;
+                        }
                         // return the last version after the replaying
-                        Ok(base_version + offset - 1)
+                        Ok(chunk_first_version + offset - 1)
                     })
                     .err_into::<anyhow::Error>()
                     .await
