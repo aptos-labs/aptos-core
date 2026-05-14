@@ -176,10 +176,11 @@ pub trait SimulationStateStore: TStateView<Key = StateKey> {
         Self: Sized,
     {
         let features = self.get_features()?;
-        let deserializer_config = DeserializerConfig::new(
-            features.get_max_binary_format_version(),
-            features.get_max_identifier_size(),
-        );
+        let deserializer_config = DeserializerConfig {
+            max_binary_format_version: features.get_max_binary_format_version(),
+            max_identifier_size: features.get_max_identifier_size(),
+            ..DeserializerConfig::default()
+        };
 
         let blob = match self.get_state_value_bytes(&StateKey::module_id(module_id))? {
             Some(bytes) => bytes,

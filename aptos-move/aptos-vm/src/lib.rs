@@ -119,6 +119,7 @@ pub mod sharded_block_executor;
 pub mod system_module_names;
 pub mod testing;
 pub mod transaction_metadata;
+mod transaction_payload_validation;
 mod transaction_validation;
 mod transaction_validation_versioned;
 pub mod validator_txns;

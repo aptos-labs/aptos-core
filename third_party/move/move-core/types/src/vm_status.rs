@@ -682,11 +682,14 @@ pub enum StatusCode {
 
     // Encrypted transaction gas unit price is below the minimum required.
     ENCRYPTED_TXN_GAS_UNIT_PRICE_BELOW_MIN_BOUND = 54,
+    // Transaction payload failed structural validation (identifier lengths, type arg
+    // count, type tag node count, or disallowed type tag variants).
+    MALFORMED_TRANSACTION_PAYLOAD = 55,
 
     // Reserved error code for future use
-    RESERVED_VALIDATION_ERROR_2 = 55,
-    RESERVED_VALIDATION_ERROR_3 = 56,
-    RESERVED_VALIDATION_ERROR_4 = 57,
+    RESERVED_VALIDATION_ERROR_2 = 56,
+    RESERVED_VALIDATION_ERROR_3 = 57,
+    RESERVED_VALIDATION_ERROR_4 = 58,
 
 
     // When a code module/script is published it is verified. These are the

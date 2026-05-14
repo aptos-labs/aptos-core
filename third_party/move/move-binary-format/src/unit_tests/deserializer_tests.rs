@@ -231,10 +231,11 @@ fn max_version_lower_than_hardcoded() {
     binary.push(10); // table count
     binary.push(0); // rest of binary
 
-    let config = DeserializerConfig::new(
-        VERSION_MAX.checked_sub(1).unwrap(),
-        LEGACY_IDENTIFIER_SIZE_MAX,
-    );
+    let config = DeserializerConfig {
+        max_binary_format_version: VERSION_MAX.checked_sub(1).unwrap(),
+        max_identifier_size: LEGACY_IDENTIFIER_SIZE_MAX,
+        ..DeserializerConfig::default()
+    };
     let res = CompiledScript::deserialize_with_config(&binary, &config);
     assert_eq!(
         res.expect_err("Expected unknown version").major_status(),
@@ -269,11 +270,19 @@ static TOO_LONG_IDENTIFIER: &[u8] = include_bytes!("tool_long_identifier.mv");
 #[test]
 fn deserialize_too_long_identifiers() {
     // The deserialization with the legacy limit succeeds.
-    let legacy_config = DeserializerConfig::new(VERSION_MAX, LEGACY_IDENTIFIER_SIZE_MAX);
+    let legacy_config = DeserializerConfig {
+        max_binary_format_version: VERSION_MAX,
+        max_identifier_size: LEGACY_IDENTIFIER_SIZE_MAX,
+        ..DeserializerConfig::default()
+    };
     assert!(CompiledModule::deserialize_with_config(TOO_LONG_IDENTIFIER, &legacy_config).is_ok());
 
     // The deserialization with the reduced limit should fail.
-    let config = DeserializerConfig::new(VERSION_MAX, IDENTIFIER_SIZE_MAX);
+    let config = DeserializerConfig {
+        max_binary_format_version: VERSION_MAX,
+        max_identifier_size: IDENTIFIER_SIZE_MAX,
+        ..DeserializerConfig::default()
+    };
     assert_eq!(
         CompiledModule::deserialize_with_config(TOO_LONG_IDENTIFIER, &config)
             .unwrap_err()
