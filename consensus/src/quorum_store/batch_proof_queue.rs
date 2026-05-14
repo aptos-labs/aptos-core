@@ -58,6 +58,19 @@ impl QueueItem {
         self.txn_summaries = None;
         self.batch_insertion_time = None;
     }
+
+    /// Returns the earliest local Instant at which this leader observed any reference to
+    /// this batch (either the batch itself or its proof). Used as a tail-bounded ordering
+    /// key for age-based pull. Falls back to `Instant::now()` if neither timestamp is set;
+    /// in practice this never triggers because committed items are filtered out upstream.
+    fn age_key(&self) -> Instant {
+        match (self.batch_insertion_time, self.proof_insertion_time) {
+            (Some(b), Some(p)) => b.min(p),
+            (Some(b), None) => b,
+            (None, Some(p)) => p,
+            (None, None) => Instant::now(),
+        }
+    }
 }
 
 /// Accumulates state across the 3 sequential pulls (proofs, opt-batches, inline-batches)
@@ -187,6 +200,8 @@ pub struct BatchProofQueue {
     num_proofs_without_summary_count: u64,
     num_proofs_with_summary_count: u64,
     remaining_proof_txns_without_summary: u64,
+
+    enable_age_based_pull: bool,
 }
 
 impl BatchProofQueue {
@@ -194,6 +209,7 @@ impl BatchProofQueue {
         my_peer_id: PeerId,
         batch_store: Arc<BatchStore>,
         batch_expiry_gap_when_init_usecs: u64,
+        enable_age_based_pull: bool,
     ) -> Self {
         Self {
             my_peer_id,
@@ -213,6 +229,7 @@ impl BatchProofQueue {
             num_proofs_without_summary_count: 0,
             num_proofs_with_summary_count: 0,
             remaining_proof_txns_without_summary: 0,
+            enable_age_based_pull,
         }
     }
 
@@ -798,110 +815,154 @@ impl BatchProofQueue {
         let items = &self.items;
         let batch_expiry_gap = self.batch_expiry_gap_when_init_usecs;
 
-        let mut iters = vec![];
-        for (_, batches) in author_map
-            .iter()
-            .filter(|(author, _)| !exclude_authors.contains(author))
-        {
-            let batch_iter = batches.iter().rev().filter_map(|(sort_key, _info)| {
-                if let Some(item) = items.get(&sort_key.batch_key) {
-                    let batch_create_ts_usecs =
-                        item.info.expiration().saturating_sub(batch_expiry_gap);
-
-                    if max_batch_creation_ts_usecs
-                        .is_some_and(|max_create_ts| batch_create_ts_usecs > max_create_ts)
-                    {
-                        counters::BATCH_SKIPPED_TOO_YOUNG
-                            .with_label_values(&[item.info.author().short_str().as_str()])
-                            .inc();
-                        return None;
+        // Inner accept logic shared between age-based and round-robin paths.
+        // Updates accumulators in place; sets `full = true` when block limits are hit.
+        let try_accept = |batch: &BatchInfoExt,
+                          item: &'a QueueItem,
+                          result: &mut Vec<&'a QueueItem>,
+                          cur_unique_txns: &mut u64,
+                          cur_all_txns: &mut PayloadTxnsSize,
+                          excluded_txns: &mut u64,
+                          full: &mut bool,
+                          cur_txns_per_kind: &mut HashMap<BatchKind, u64>,
+                          pending_filtered_txns: &mut HashSet<&'a TxnSummaryWithExpiration>|
+         -> bool {
+            if session
+                .excluded_batch_keys
+                .contains(&BatchKey::from_info(batch))
+            {
+                *excluded_txns += batch.num_txns();
+                return true;
+            }
+            if let Some(kind) = batch.batch_kind() {
+                if let Some(max) = per_kind_txn_limits.get(&kind) {
+                    let cur = cur_txns_per_kind.get(&kind).copied().unwrap_or(0);
+                    if cur + batch.num_txns() > max {
+                        return true;
                     }
-
-                    return Some((&item.info, item));
                 }
-                None
+            }
+            let new_unique = item
+                .txn_summaries
+                .as_ref()
+                .map_or(batch.num_txns(), |summaries| {
+                    summaries
+                        .iter()
+                        .filter(|txn_summary| {
+                            !session.filtered_txns.contains(txn_summary)
+                                && !pending_filtered_txns.contains(txn_summary)
+                                && block_timestamp.as_secs() < txn_summary.expiration_timestamp_secs
+                        })
+                        .count() as u64
+                });
+            let unique_txns = *cur_unique_txns + new_unique;
+            if *cur_all_txns + batch.size() > max_txns || unique_txns > max_txns_after_filtering {
+                *full = true;
+                return true;
+            }
+            *cur_all_txns += batch.size();
+            if let Some(kind) = batch.batch_kind() {
+                *cur_txns_per_kind.entry(kind).or_insert(0) += batch.num_txns();
+            }
+            *cur_unique_txns += new_unique;
+            if let Some(ref summaries) = item.txn_summaries {
+                pending_filtered_txns.extend(summaries.iter());
+            }
+            assert!(item.proof.is_none() == batches_without_proofs);
+            result.push(item);
+            if *cur_all_txns == max_txns
+                || *cur_unique_txns == max_txns_after_filtering
+                || *cur_unique_txns >= soft_max_txns_after_filtering
+            {
+                *full = true;
+            }
+            true
+        };
+
+        // Per-author iterator with the too-young filter inlined.
+        let make_author_iter = |batches: &'a BTreeMap<BatchSortKey, BatchInfoExt>| {
+            batches.iter().rev().filter_map(move |(sort_key, _info)| {
+                let item = items.get(&sort_key.batch_key)?;
+                let batch_create_ts_usecs = item.info.expiration().saturating_sub(batch_expiry_gap);
+                if max_batch_creation_ts_usecs
+                    .is_some_and(|max_create_ts| batch_create_ts_usecs > max_create_ts)
+                {
+                    counters::BATCH_SKIPPED_TOO_YOUNG
+                        .with_label_values(&[item.info.author().short_str().as_str()])
+                        .inc();
+                    return None;
+                }
+                Some((&item.info, item))
+            })
+        };
+
+        if self.enable_age_based_pull {
+            // Flat list across authors, sorted by (gas_bucket DESC, age ASC). Age uses the
+            // leader's local monotonic Instant so it's safe against batch-author clock skew
+            // (only this leader's clock is consulted). Bounds tail latency: any batch waits
+            // at most `block_size` of higher-or-equal-priority items before being pulled.
+            let mut candidates: Vec<(&BatchInfoExt, &QueueItem)> = author_map
+                .iter()
+                .filter(|(author, _)| !exclude_authors.contains(author))
+                .flat_map(|(_, batches)| make_author_iter(batches))
+                .collect();
+            candidates.sort_by(|(a_info, a_item), (b_info, b_item)| {
+                b_info
+                    .gas_bucket_start()
+                    .cmp(&a_info.gas_bucket_start())
+                    .then_with(|| a_item.age_key().cmp(&b_item.age_key()))
             });
-            iters.push(batch_iter);
-        }
+            for (batch, item) in candidates {
+                if full {
+                    break;
+                }
+                try_accept(
+                    batch,
+                    item,
+                    &mut result,
+                    &mut cur_unique_txns,
+                    &mut cur_all_txns,
+                    &mut excluded_txns,
+                    &mut full,
+                    &mut cur_txns_per_kind,
+                    &mut pending_filtered_txns,
+                );
+            }
+        } else {
+            let mut iters: Vec<_> = author_map
+                .iter()
+                .filter(|(author, _)| !exclude_authors.contains(author))
+                .map(|(_, batches)| make_author_iter(batches))
+                .collect();
 
-        // Single shuffle then round-robin
-        iters.shuffle(&mut thread_rng());
-        let mut idx = 0;
-        while !iters.is_empty() && !full {
-            match iters[idx].next() {
-                Some((batch, item)) => {
-                    if session
-                        .excluded_batch_keys
-                        .contains(&BatchKey::from_info(batch))
-                    {
-                        excluded_txns += batch.num_txns();
-                    } else {
-                        // Check per-kind txn limit
-                        if let Some(kind) = batch.batch_kind() {
-                            if let Some(max) = per_kind_txn_limits.get(&kind) {
-                                let cur = cur_txns_per_kind.get(&kind).copied().unwrap_or(0);
-                                if cur + batch.num_txns() > max {
-                                    // Skip this batch — would exceed per-kind limit.
-                                    idx = (idx + 1) % iters.len();
-                                    continue;
-                                }
-                            }
+            // Single shuffle then round-robin
+            iters.shuffle(&mut thread_rng());
+            let mut idx = 0;
+            while !iters.is_empty() && !full {
+                match iters[idx].next() {
+                    Some((batch, item)) => {
+                        try_accept(
+                            batch,
+                            item,
+                            &mut result,
+                            &mut cur_unique_txns,
+                            &mut cur_all_txns,
+                            &mut excluded_txns,
+                            &mut full,
+                            &mut cur_txns_per_kind,
+                            &mut pending_filtered_txns,
+                        );
+                        if !iters.is_empty() {
+                            idx = (idx + 1) % iters.len();
                         }
-
-                        // Calculate unique txns (Optimization 5: single pass)
-                        let new_unique =
-                            item.txn_summaries
-                                .as_ref()
-                                .map_or(batch.num_txns(), |summaries| {
-                                    summaries
-                                        .iter()
-                                        .filter(|txn_summary| {
-                                            !session.filtered_txns.contains(txn_summary)
-                                                && !pending_filtered_txns.contains(txn_summary)
-                                                && block_timestamp.as_secs()
-                                                    < txn_summary.expiration_timestamp_secs
-                                        })
-                                        .count() as u64
-                                });
-
-                        let unique_txns = cur_unique_txns + new_unique;
-                        if cur_all_txns + batch.size() > max_txns
-                            || unique_txns > max_txns_after_filtering
-                        {
-                            // Exceeded the limit for requested bytes or number of transactions.
-                            full = true;
-                            continue;
+                    },
+                    None => {
+                        let _ = iters.swap_remove(idx);
+                        if !iters.is_empty() {
+                            idx %= iters.len();
                         }
-                        cur_all_txns += batch.size();
-                        // Update per-kind counter
-                        if let Some(kind) = batch.batch_kind() {
-                            *cur_txns_per_kind.entry(kind).or_insert(0) += batch.num_txns();
-                        }
-
-                        // Accept — bulk insert summaries into pending set (deferred)
-                        cur_unique_txns += new_unique;
-                        if let Some(ref summaries) = item.txn_summaries {
-                            pending_filtered_txns.extend(summaries.iter());
-                        }
-
-                        assert!(item.proof.is_none() == batches_without_proofs);
-                        result.push(item);
-                        if cur_all_txns == max_txns
-                            || cur_unique_txns == max_txns_after_filtering
-                            || cur_unique_txns >= soft_max_txns_after_filtering
-                        {
-                            full = true;
-                            continue;
-                        }
-                    }
-                    idx = (idx + 1) % iters.len();
-                },
-                None => {
-                    let _ = iters.swap_remove(idx);
-                    if !iters.is_empty() {
-                        idx %= iters.len();
-                    }
-                },
+                    },
+                }
             }
         }
         debug!(

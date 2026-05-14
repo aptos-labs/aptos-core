@@ -378,6 +378,7 @@ impl InnerBuilder {
             self.batch_store.clone().unwrap(),
             self.config.allow_batches_without_pos_in_proposal,
             self.config.batch_expiry_gap_when_init_usecs,
+            self.config.enable_age_based_pull,
         );
         spawn_named!(
             "proof_manager",
