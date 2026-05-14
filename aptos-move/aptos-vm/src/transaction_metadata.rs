@@ -79,16 +79,27 @@ impl TransactionMetadata {
                 (vec![], false)
             };
 
+        let extra_config = txn.extra_config();
+        let txn_limits_request = extra_config.txn_limits_request();
+        if txn_limits_request.is_some() && !vm.features().is_transaction_limits_enabled() {
+            return Err(VMStatus::error(
+                StatusCode::FEATURE_UNDER_GATING,
+                Some("Transaction limits feature is not yet supported".to_string()),
+            ));
+        }
+
         let txn_limits = if is_approved_gov_script {
-            Some(TxnLimitsRequest::ApprovedGovernanceScript)
-        } else if let Some(request) = txn.extra_config().txn_limits_request() {
-            if !vm.features().is_transaction_limits_enabled() {
+            if txn_limits_request.is_some() {
                 return Err(VMStatus::error(
-                    StatusCode::FEATURE_UNDER_GATING,
-                    Some("Transaction limits feature is not yet supported".to_string()),
+                    StatusCode::TXN_LIMITS_REQUEST_NOT_ALLOWED_FOR_GOVERNANCE_SCRIPT,
+                    Some(
+                        "Higher transaction limits cannot be requested for governance proposals"
+                            .to_string(),
+                    ),
                 ));
             }
-
+            Some(TxnLimitsRequest::ApprovedGovernanceScript)
+        } else if let Some(request) = txn_limits_request {
             // This runs before the prologue & gas meter creation, preventing the
             // meter from operating with a 0, nonsensical, or overflowing limit. The
             // Move prologue additionally validates that the multiplier exists in the
@@ -96,14 +107,14 @@ impl TransactionMetadata {
             //
             // INVARIANT: these bounds must match Move constants defined in
             // transaction_limits.move.
-            const MIN_MULTIPLIER_BPS: u64 = 100;
-            const MAX_MULTIPLIER_BPS: u64 = 10000;
+            const MIN_MULTIPLIER_PERCENT: u64 = 100; // 1x
+            const MAX_MULTIPLIER_PERCENT: u64 = 10000; // 100x
 
             let m = request.multipliers();
-            if m.execution_bps() <= MIN_MULTIPLIER_BPS
-                || MAX_MULTIPLIER_BPS < m.execution_bps()
-                || m.io_bps() <= MIN_MULTIPLIER_BPS
-                || MAX_MULTIPLIER_BPS < m.io_bps()
+            if m.execution_multiplier_percent() <= MIN_MULTIPLIER_PERCENT
+                || MAX_MULTIPLIER_PERCENT < m.execution_multiplier_percent()
+                || m.io_multiplier_percent() <= MIN_MULTIPLIER_PERCENT
+                || MAX_MULTIPLIER_PERCENT < m.io_multiplier_percent()
             {
                 return Err(VMStatus::error(
                     StatusCode::INVALID_HIGH_TXN_LIMITS_MULTIPLIER,

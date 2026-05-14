@@ -7,12 +7,15 @@ Manages configuration and validation for higher transaction limits based on
 staking.
 
 Users can request multipliers to transaction limits (e..g, execution limit
-or IO limit) if they prove they control a significant stake:
+or IO limit) if they prove they control a significant stake in a stake pool
+that is currently in the active validator set:
 - as a stake pool owner,
 - as a delegated voter,
 - as a delegation pool delegator.
 For example, one can request 2.5x on execution limits and 5x on IO limits.
-Multipliers are in basis points where 1 maps to 100, to support fractions.
+
+Multipliers are expressed as percent of the base limit where 100 is 1x,
+250 is 2.5x.
 
 The on-chain config stores a vector of tiers. Each tier maps multiplier to
 the required minimum stake threshold. A smallest multiplier that is greater
@@ -68,7 +71,7 @@ it unlocks.
 
 </dd>
 <dt>
-<code>multiplier_bps: u64</code>
+<code>multiplier_percent: u64</code>
 </dt>
 <dd>
 
@@ -130,8 +133,7 @@ monotonically by both minimum stakes and multipliers.
 
 ## Enum `RequestedMultipliers`
 
-Multipliers requested by the user, expressed in basis points (That is,
-1x is 100, 2.5x is 250).
+Multipliers requested by the user.
 
 INVARIANT: must match Rust enum for BCS serialization.
 
@@ -155,16 +157,16 @@ INVARIANT: must match Rust enum for BCS serialization.
 
 <dl>
 <dt>
-<code>execution_bps: u64</code>
+<code>execution_multiplier_percent: u64</code>
 </dt>
 <dd>
-
+ Execution-gas multiplier (100 is 1x).
 </dd>
 <dt>
-<code>io_bps: u64</code>
+<code>io_multiplier_percent: u64</code>
 </dt>
 <dd>
-
+ IO-gas multiplier (100 is 1x).
 </dd>
 </dl>
 
@@ -311,7 +313,7 @@ Committed stake is insufficient for the requested multiplier tier.
 
 <a id="0x1_transaction_limits_EINVALID_MULTIPLIER"></a>
 
-Multiplier must be > 100 bps (> 1x).
+Multiplier must be > 100 (> 1x).
 
 
 <pre><code><b>const</b> <a href="transaction_limits.md#0x1_transaction_limits_EINVALID_MULTIPLIER">EINVALID_MULTIPLIER</a>: u64 = 7;
@@ -335,6 +337,16 @@ Fee payer is not the owner of the specified stake pool.
 
 
 <pre><code><b>const</b> <a href="transaction_limits.md#0x1_transaction_limits_ENOT_STAKE_POOL_OWNER">ENOT_STAKE_POOL_OWNER</a>: u64 = 2;
+</code></pre>
+
+
+
+<a id="0x1_transaction_limits_EPOOL_NOT_IN_VALIDATOR_SET"></a>
+
+Stake pool is not in the current-epoch validator set.
+
+
+<pre><code><b>const</b> <a href="transaction_limits.md#0x1_transaction_limits_EPOOL_NOT_IN_VALIDATOR_SET">EPOOL_NOT_IN_VALIDATOR_SET</a>: u64 = 9;
 </code></pre>
 
 
@@ -364,31 +376,31 @@ Config tiers are not monotonically ordered.
 Min-stakes and multipliers vectors have different lengths.
 
 
-<pre><code><b>const</b> <a href="transaction_limits.md#0x1_transaction_limits_EVECTOR_LENGTH_MISMATCH">EVECTOR_LENGTH_MISMATCH</a>: u64 = 9;
+<pre><code><b>const</b> <a href="transaction_limits.md#0x1_transaction_limits_EVECTOR_LENGTH_MISMATCH">EVECTOR_LENGTH_MISMATCH</a>: u64 = 10;
 </code></pre>
 
 
 
-<a id="0x1_transaction_limits_MAX_MULTIPLIER_BPS"></a>
+<a id="0x1_transaction_limits_MAX_MULTIPLIER_PERCENT"></a>
 
 Every multiplier must be less than or equal to this maximum (100x).
 
 INVARIANT: must match Rust version checked by VM.
 
 
-<pre><code><b>const</b> <a href="transaction_limits.md#0x1_transaction_limits_MAX_MULTIPLIER_BPS">MAX_MULTIPLIER_BPS</a>: u64 = 10000;
+<pre><code><b>const</b> <a href="transaction_limits.md#0x1_transaction_limits_MAX_MULTIPLIER_PERCENT">MAX_MULTIPLIER_PERCENT</a>: u64 = 10000;
 </code></pre>
 
 
 
-<a id="0x1_transaction_limits_MIN_MULTIPLIER_BPS"></a>
+<a id="0x1_transaction_limits_MIN_MULTIPLIER_PERCENT"></a>
 
 Every multiplier must be greater than this minimum (1x).
 
 INVARIANT: must match Rust version checked by VM.
 
 
-<pre><code><b>const</b> <a href="transaction_limits.md#0x1_transaction_limits_MIN_MULTIPLIER_BPS">MIN_MULTIPLIER_BPS</a>: u64 = 100;
+<pre><code><b>const</b> <a href="transaction_limits.md#0x1_transaction_limits_MIN_MULTIPLIER_PERCENT">MIN_MULTIPLIER_PERCENT</a>: u64 = 100;
 </code></pre>
 
 
@@ -397,10 +409,10 @@ INVARIANT: must match Rust version checked by VM.
 
 ## Function `new_tier`
 
-Creates a new tier. Aborts if multiplier is not in (100, 10000] bps.
+Creates a new tier. Aborts if multiplier is not in (100, 10000].
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="transaction_limits.md#0x1_transaction_limits_new_tier">new_tier</a>(min_stake: u64, multiplier_bps: u64): <a href="transaction_limits.md#0x1_transaction_limits_TxnLimitTier">transaction_limits::TxnLimitTier</a>
+<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="transaction_limits.md#0x1_transaction_limits_new_tier">new_tier</a>(min_stake: u64, multiplier_percent: u64): <a href="transaction_limits.md#0x1_transaction_limits_TxnLimitTier">transaction_limits::TxnLimitTier</a>
 </code></pre>
 
 
@@ -409,12 +421,13 @@ Creates a new tier. Aborts if multiplier is not in (100, 10000] bps.
 <summary>Implementation</summary>
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="transaction_limits.md#0x1_transaction_limits_new_tier">new_tier</a>(min_stake: u64, multiplier_bps: u64): <a href="transaction_limits.md#0x1_transaction_limits_TxnLimitTier">TxnLimitTier</a> {
+<pre><code><b>friend</b> <b>fun</b> <a href="transaction_limits.md#0x1_transaction_limits_new_tier">new_tier</a>(min_stake: u64, multiplier_percent: u64): <a href="transaction_limits.md#0x1_transaction_limits_TxnLimitTier">TxnLimitTier</a> {
     <b>assert</b>!(
-        multiplier_bps &gt; <a href="transaction_limits.md#0x1_transaction_limits_MIN_MULTIPLIER_BPS">MIN_MULTIPLIER_BPS</a> && multiplier_bps &lt;= <a href="transaction_limits.md#0x1_transaction_limits_MAX_MULTIPLIER_BPS">MAX_MULTIPLIER_BPS</a>,
+        multiplier_percent &gt; <a href="transaction_limits.md#0x1_transaction_limits_MIN_MULTIPLIER_PERCENT">MIN_MULTIPLIER_PERCENT</a>
+            && multiplier_percent &lt;= <a href="transaction_limits.md#0x1_transaction_limits_MAX_MULTIPLIER_PERCENT">MAX_MULTIPLIER_PERCENT</a>,
         <a href="../../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error_invalid_argument">error::invalid_argument</a>(<a href="transaction_limits.md#0x1_transaction_limits_EINVALID_MULTIPLIER">EINVALID_MULTIPLIER</a>)
     );
-    <a href="transaction_limits.md#0x1_transaction_limits_TxnLimitTier">TxnLimitTier</a> { min_stake, multiplier_bps }
+    <a href="transaction_limits.md#0x1_transaction_limits_TxnLimitTier">TxnLimitTier</a> { min_stake, multiplier_percent }
 }
 </code></pre>
 
@@ -449,7 +462,7 @@ Aborts if:
         <b>let</b> curr = &tiers[i];
         <b>assert</b>!(
             curr.min_stake &gt;= prev.min_stake
-                && curr.multiplier_bps &gt; prev.multiplier_bps,
+                && curr.multiplier_percent &gt; prev.multiplier_percent,
             <a href="../../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error_invalid_argument">error::invalid_argument</a>(<a href="transaction_limits.md#0x1_transaction_limits_ETHRESHOLDS_NOT_MONOTONIC">ETHRESHOLDS_NOT_MONOTONIC</a>)
         );
         i += 1;
@@ -474,7 +487,7 @@ increasing.
 - Multiplier is not valid (1x or below).
 
 
-<pre><code><b>fun</b> <a href="transaction_limits.md#0x1_transaction_limits_new_tiers">new_tiers</a>(min_stakes: <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u64&gt;, multipliers_bps: <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u64&gt;): <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;<a href="transaction_limits.md#0x1_transaction_limits_TxnLimitTier">transaction_limits::TxnLimitTier</a>&gt;
+<pre><code><b>fun</b> <a href="transaction_limits.md#0x1_transaction_limits_new_tiers">new_tiers</a>(min_stakes: <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u64&gt;, multipliers_percent: <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u64&gt;): <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;<a href="transaction_limits.md#0x1_transaction_limits_TxnLimitTier">transaction_limits::TxnLimitTier</a>&gt;
 </code></pre>
 
 
@@ -483,18 +496,18 @@ increasing.
 <summary>Implementation</summary>
 
 
-<pre><code><b>fun</b> <a href="transaction_limits.md#0x1_transaction_limits_new_tiers">new_tiers</a>(min_stakes: <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u64&gt;, multipliers_bps: <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u64&gt;)
+<pre><code><b>fun</b> <a href="transaction_limits.md#0x1_transaction_limits_new_tiers">new_tiers</a>(min_stakes: <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u64&gt;, multipliers_percent: <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u64&gt;)
     : <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;<a href="transaction_limits.md#0x1_transaction_limits_TxnLimitTier">TxnLimitTier</a>&gt; {
     <b>let</b> len = min_stakes.length();
     <b>assert</b>!(
-        len == multipliers_bps.length(),
+        len == multipliers_percent.length(),
         <a href="../../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error_invalid_argument">error::invalid_argument</a>(<a href="transaction_limits.md#0x1_transaction_limits_EVECTOR_LENGTH_MISMATCH">EVECTOR_LENGTH_MISMATCH</a>)
     );
 
     <b>let</b> tiers = <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>[];
     <b>let</b> i = 0;
     <b>while</b> (i &lt; len) {
-        tiers.push_back(<a href="transaction_limits.md#0x1_transaction_limits_new_tier">new_tier</a>(min_stakes[i], multipliers_bps[i]));
+        tiers.push_back(<a href="transaction_limits.md#0x1_transaction_limits_new_tier">new_tier</a>(min_stakes[i], multipliers_percent[i]));
         i += 1;
     };
     <a href="transaction_limits.md#0x1_transaction_limits_validate_tiers">validate_tiers</a>(&tiers);
@@ -517,8 +530,12 @@ tier.
 
 Aborts if no tier can cover the request.
 
+Implemnetation note: Tier count is small in practice, so using linear
+search here, which is cheaper and currently faster than a binary search
+in Move bytecode.
 
-<pre><code><b>fun</b> <a href="transaction_limits.md#0x1_transaction_limits_find_min_stake_required">find_min_stake_required</a>(tiers: &<a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;<a href="transaction_limits.md#0x1_transaction_limits_TxnLimitTier">transaction_limits::TxnLimitTier</a>&gt;, multiplier_bps: u64): u64
+
+<pre><code><b>fun</b> <a href="transaction_limits.md#0x1_transaction_limits_find_min_stake_required">find_min_stake_required</a>(tiers: &<a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;<a href="transaction_limits.md#0x1_transaction_limits_TxnLimitTier">transaction_limits::TxnLimitTier</a>&gt;, multiplier_percent: u64): u64
 </code></pre>
 
 
@@ -528,9 +545,9 @@ Aborts if no tier can cover the request.
 
 
 <pre><code><b>fun</b> <a href="transaction_limits.md#0x1_transaction_limits_find_min_stake_required">find_min_stake_required</a>(
-    tiers: &<a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;<a href="transaction_limits.md#0x1_transaction_limits_TxnLimitTier">TxnLimitTier</a>&gt;, multiplier_bps: u64
+    tiers: &<a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;<a href="transaction_limits.md#0x1_transaction_limits_TxnLimitTier">TxnLimitTier</a>&gt;, multiplier_percent: u64
 ): u64 {
-    <b>let</b> (found, i) = tiers.find(|t| t.multiplier_bps &gt;= multiplier_bps);
+    <b>let</b> (found, i) = tiers.find(|t| t.multiplier_percent &gt;= multiplier_percent);
     <b>assert</b>!(found, <a href="../../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error_invalid_argument">error::invalid_argument</a>(<a href="transaction_limits.md#0x1_transaction_limits_EMULTIPLIER_NOT_AVAILABLE">EMULTIPLIER_NOT_AVAILABLE</a>));
     tiers[i].min_stake
 }
@@ -583,7 +600,7 @@ Only called during genesis.
 Governance-only: update stake thresholds and multipliers.
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="transaction_limits.md#0x1_transaction_limits_update_config">update_config</a>(aptos_framework: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>, execution_min_stakes: <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u64&gt;, execution_multipliers_bps: <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u64&gt;, io_min_stakes: <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u64&gt;, io_multipliers_bps: <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u64&gt;)
+<pre><code><b>public</b> <b>fun</b> <a href="transaction_limits.md#0x1_transaction_limits_update_config">update_config</a>(aptos_framework: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>, execution_min_stakes: <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u64&gt;, execution_multipliers_percent: <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u64&gt;, io_min_stakes: <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u64&gt;, io_multipliers_percent: <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u64&gt;)
 </code></pre>
 
 
@@ -595,16 +612,16 @@ Governance-only: update stake thresholds and multipliers.
 <pre><code><b>public</b> <b>fun</b> <a href="transaction_limits.md#0x1_transaction_limits_update_config">update_config</a>(
     aptos_framework: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>,
     execution_min_stakes: <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u64&gt;,
-    execution_multipliers_bps: <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u64&gt;,
+    execution_multipliers_percent: <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u64&gt;,
     io_min_stakes: <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u64&gt;,
-    io_multipliers_bps: <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u64&gt;
-) <b>acquires</b> <a href="transaction_limits.md#0x1_transaction_limits_TxnLimitsConfig">TxnLimitsConfig</a> {
+    io_multipliers_percent: <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u64&gt;
+) {
     <a href="system_addresses.md#0x1_system_addresses_assert_aptos_framework">system_addresses::assert_aptos_framework</a>(aptos_framework);
 
     <b>let</b> execution_tiers = <a href="transaction_limits.md#0x1_transaction_limits_new_tiers">new_tiers</a>(
-        execution_min_stakes, execution_multipliers_bps
+        execution_min_stakes, execution_multipliers_percent
     );
-    <b>let</b> io_tiers = <a href="transaction_limits.md#0x1_transaction_limits_new_tiers">new_tiers</a>(io_min_stakes, io_multipliers_bps);
+    <b>let</b> io_tiers = <a href="transaction_limits.md#0x1_transaction_limits_new_tiers">new_tiers</a>(io_min_stakes, io_multipliers_percent);
 
     <b>if</b> (!<b>exists</b>&lt;<a href="transaction_limits.md#0x1_transaction_limits_TxnLimitsConfig">TxnLimitsConfig</a>&gt;(@aptos_framework)) {
         <b>move_to</b>(
@@ -645,24 +662,30 @@ matching the requested multipliers.
 
 <pre><code><b>fun</b> <a href="transaction_limits.md#0x1_transaction_limits_validate_enough_stake">validate_enough_stake</a>(
     stake_amount: u64, multipliers: <a href="transaction_limits.md#0x1_transaction_limits_RequestedMultipliers">RequestedMultipliers</a>
-) <b>acquires</b> <a href="transaction_limits.md#0x1_transaction_limits_TxnLimitsConfig">TxnLimitsConfig</a> {
-    <b>let</b> (execution_bps, io_bps) =
+) {
+    <b>let</b> (execution_multiplier_percent, io_multiplier_percent) =
         match(multipliers) {
-            RequestedMultipliers::V1 { execution_bps, io_bps } =&gt; (execution_bps, io_bps)
+            RequestedMultipliers::V1 {
+                execution_multiplier_percent,
+                io_multiplier_percent
+            } =&gt; (execution_multiplier_percent, io_multiplier_percent)
         };
     <b>assert</b>!(
-        execution_bps &gt; <a href="transaction_limits.md#0x1_transaction_limits_MIN_MULTIPLIER_BPS">MIN_MULTIPLIER_BPS</a> && execution_bps &lt;= <a href="transaction_limits.md#0x1_transaction_limits_MAX_MULTIPLIER_BPS">MAX_MULTIPLIER_BPS</a>,
+        execution_multiplier_percent &gt; <a href="transaction_limits.md#0x1_transaction_limits_MIN_MULTIPLIER_PERCENT">MIN_MULTIPLIER_PERCENT</a>
+            && execution_multiplier_percent &lt;= <a href="transaction_limits.md#0x1_transaction_limits_MAX_MULTIPLIER_PERCENT">MAX_MULTIPLIER_PERCENT</a>,
         <a href="../../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error_invalid_argument">error::invalid_argument</a>(<a href="transaction_limits.md#0x1_transaction_limits_EINVALID_MULTIPLIER">EINVALID_MULTIPLIER</a>)
     );
     <b>assert</b>!(
-        io_bps &gt; <a href="transaction_limits.md#0x1_transaction_limits_MIN_MULTIPLIER_BPS">MIN_MULTIPLIER_BPS</a> && io_bps &lt;= <a href="transaction_limits.md#0x1_transaction_limits_MAX_MULTIPLIER_BPS">MAX_MULTIPLIER_BPS</a>,
+        io_multiplier_percent &gt; <a href="transaction_limits.md#0x1_transaction_limits_MIN_MULTIPLIER_PERCENT">MIN_MULTIPLIER_PERCENT</a>
+            && io_multiplier_percent &lt;= <a href="transaction_limits.md#0x1_transaction_limits_MAX_MULTIPLIER_PERCENT">MAX_MULTIPLIER_PERCENT</a>,
         <a href="../../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error_invalid_argument">error::invalid_argument</a>(<a href="transaction_limits.md#0x1_transaction_limits_EINVALID_MULTIPLIER">EINVALID_MULTIPLIER</a>)
     );
 
     <b>let</b> config = &<a href="transaction_limits.md#0x1_transaction_limits_TxnLimitsConfig">TxnLimitsConfig</a>[@aptos_framework];
     <b>let</b> execution_threshold =
-        <a href="transaction_limits.md#0x1_transaction_limits_find_min_stake_required">find_min_stake_required</a>(&config.execution_tiers, execution_bps);
-    <b>let</b> io_threshold = <a href="transaction_limits.md#0x1_transaction_limits_find_min_stake_required">find_min_stake_required</a>(&config.io_tiers, io_bps);
+        <a href="transaction_limits.md#0x1_transaction_limits_find_min_stake_required">find_min_stake_required</a>(&config.execution_tiers, execution_multiplier_percent);
+    <b>let</b> io_threshold =
+        <a href="transaction_limits.md#0x1_transaction_limits_find_min_stake_required">find_min_stake_required</a>(&config.io_tiers, io_multiplier_percent);
 
     <b>assert</b>!(
         stake_amount &gt;= execution_threshold,
@@ -697,7 +720,7 @@ for the requested limit multipliers.
 
 <pre><code><b>friend</b> <b>fun</b> <a href="transaction_limits.md#0x1_transaction_limits_validate_high_txn_limits">validate_high_txn_limits</a>(
     fee_payer: <b>address</b>, request: <a href="transaction_limits.md#0x1_transaction_limits_UserTxnLimitsRequest">UserTxnLimitsRequest</a>
-) <b>acquires</b> <a href="transaction_limits.md#0x1_transaction_limits_TxnLimitsConfig">TxnLimitsConfig</a> {
+) {
     match(request) {
         StakePoolOwner { multipliers } =&gt; {
             <b>assert</b>!(
@@ -705,6 +728,10 @@ for the requested limit multipliers.
                 <a href="../../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error_permission_denied">error::permission_denied</a>(<a href="transaction_limits.md#0x1_transaction_limits_ENOT_STAKE_POOL_OWNER">ENOT_STAKE_POOL_OWNER</a>)
             );
             <b>let</b> pool_address = <a href="stake.md#0x1_stake_get_pool_address_for_owner">stake::get_pool_address_for_owner</a>(fee_payer);
+            <b>assert</b>!(
+                <a href="stake.md#0x1_stake_is_current_epoch_validator">stake::is_current_epoch_validator</a>(pool_address),
+                <a href="../../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error_permission_denied">error::permission_denied</a>(<a href="transaction_limits.md#0x1_transaction_limits_EPOOL_NOT_IN_VALIDATOR_SET">EPOOL_NOT_IN_VALIDATOR_SET</a>)
+            );
             <b>let</b> stake_amount = <a href="aptos_governance.md#0x1_aptos_governance_get_voting_power">aptos_governance::get_voting_power</a>(pool_address);
             <a href="transaction_limits.md#0x1_transaction_limits_validate_enough_stake">validate_enough_stake</a>(stake_amount, multipliers);
         },
@@ -717,6 +744,10 @@ for the requested limit multipliers.
                 fee_payer == <a href="stake.md#0x1_stake_get_delegated_voter">stake::get_delegated_voter</a>(pool_address),
                 <a href="../../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error_permission_denied">error::permission_denied</a>(<a href="transaction_limits.md#0x1_transaction_limits_ENOT_DELEGATED_VOTER">ENOT_DELEGATED_VOTER</a>)
             );
+            <b>assert</b>!(
+                <a href="stake.md#0x1_stake_is_current_epoch_validator">stake::is_current_epoch_validator</a>(pool_address),
+                <a href="../../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error_permission_denied">error::permission_denied</a>(<a href="transaction_limits.md#0x1_transaction_limits_EPOOL_NOT_IN_VALIDATOR_SET">EPOOL_NOT_IN_VALIDATOR_SET</a>)
+            );
             <b>let</b> stake_amount = <a href="aptos_governance.md#0x1_aptos_governance_get_voting_power">aptos_governance::get_voting_power</a>(pool_address);
             <a href="transaction_limits.md#0x1_transaction_limits_validate_enough_stake">validate_enough_stake</a>(stake_amount, multipliers);
         },
@@ -724,6 +755,10 @@ for the requested limit multipliers.
             <b>assert</b>!(
                 <a href="delegation_pool.md#0x1_delegation_pool_delegation_pool_exists">delegation_pool::delegation_pool_exists</a>(pool_address),
                 <a href="../../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error_not_found">error::not_found</a>(<a href="transaction_limits.md#0x1_transaction_limits_EDELEGATION_POOL_NOT_FOUND">EDELEGATION_POOL_NOT_FOUND</a>)
+            );
+            <b>assert</b>!(
+                <a href="stake.md#0x1_stake_is_current_epoch_validator">stake::is_current_epoch_validator</a>(pool_address),
+                <a href="../../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error_permission_denied">error::permission_denied</a>(<a href="transaction_limits.md#0x1_transaction_limits_EPOOL_NOT_IN_VALIDATOR_SET">EPOOL_NOT_IN_VALIDATOR_SET</a>)
             );
             <b>let</b> (active, _, pending_inactive) = <a href="delegation_pool.md#0x1_delegation_pool_get_stake">delegation_pool::get_stake</a>(
                 pool_address, fee_payer
