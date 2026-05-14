@@ -1014,6 +1014,65 @@ async fn test_proof_queue_rejects_batch_key_collision_proof_first() {
     assert!(proof_queue.is_empty());
 }
 
+/// `mark_committed` is driven by the *committed block*'s PoS, which can disagree
+/// with what the local queue holds for the same (author, batch_id) if a colliding
+/// BatchInfo gathered 2f+1 signatures over the network. Accounting must come from
+/// the queue's stored info, not the incoming committed BatchInfo, otherwise
+/// remaining_txns_with_duplicates underflows.
+#[tokio::test]
+async fn test_mark_committed_with_colliding_info_uses_stored_num_txns() {
+    let my_peer_id = PeerId::random();
+    let batch_store = batch_store_for_test(5 * 1024 * 1024);
+    let mut proof_queue = BatchProofQueue::new(my_peer_id, batch_store, 1);
+    let now_in_usecs = aptos_infallible::duration_since_epoch().as_micros() as u64;
+
+    let attacker = PeerId::random();
+    let batch_id = BatchId::new_for_test(11);
+    let expiration = now_in_usecs + 100_000;
+
+    // Local queue has a proof for A with num_txns=1.
+    let proof_a: ProofOfStore<BatchInfoExt> = ProofOfStore::new(
+        BatchInfo::new(
+            attacker,
+            batch_id,
+            0,
+            expiration,
+            HashValue::random(),
+            1,
+            1,
+            0,
+        )
+        .into(),
+        AggregateSignature::empty(),
+    );
+    proof_queue.insert_proof(proof_a);
+    assert_eq!(proof_queue.remaining_txns_and_proofs(), (1, 1));
+
+    // Network commits a colliding PoS_B with num_txns=5 (different digest, gas
+    // bucket, and tx count). With the old code, dec_remaining_proofs would use
+    // batch.num_txns()=5 here, underflowing the counter that was only incremented
+    // by 1 at insert_proof time.
+    let info_b: BatchInfoExt = BatchInfo::new(
+        attacker,
+        batch_id,
+        0,
+        expiration,
+        HashValue::random(),
+        5,
+        5,
+        1,
+    )
+    .into();
+    proof_queue.mark_committed(vec![info_b]);
+
+    // No underflow. Accounting reflects the stored info_A, not info_B.
+    assert_eq!(proof_queue.remaining_txns_and_proofs(), (0, 0));
+
+    // Expiration cleans up cleanly.
+    proof_queue.handle_updated_block_timestamp(expiration);
+    assert!(proof_queue.is_empty());
+}
+
 /// A re-send of the exact same BatchInfo (same digest + metadata) must still be
 /// accepted as an idempotent retransmit, both for proof and summary paths.
 #[tokio::test]

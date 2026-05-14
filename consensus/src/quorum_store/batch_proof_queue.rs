@@ -1152,12 +1152,16 @@ impl BatchProofQueue {
                 let is_committed = item.is_committed();
                 let gas_bucket = item.proof.as_ref().map(|p| p.gas_bucket_start());
                 let insertion_elapsed = item.proof_insertion_time.map(|t| t.elapsed());
+                let stored_num_txns = item.info.num_txns();
+                let stored_sort_key = BatchSortKey::from_info(&item.info);
                 (
                     had_proof,
                     had_summaries,
                     is_committed,
                     gas_bucket,
                     insertion_elapsed,
+                    stored_num_txns,
+                    stored_sort_key,
                 )
             });
 
@@ -1168,12 +1172,14 @@ impl BatchProofQueue {
                     is_already_committed,
                     gas_bucket,
                     insertion_elapsed,
+                    stored_num_txns,
+                    stored_sort_key,
                 )) => {
                     if had_proof {
                         if let (Some(bucket), Some(elapsed)) = (gas_bucket, insertion_elapsed) {
                             counters::pos_to_commit(bucket, elapsed.as_secs_f64());
                         }
-                        self.dec_remaining_proofs(&batch.author(), batch.num_txns());
+                        self.dec_remaining_proofs(&batch.author(), stored_num_txns);
                         counters::GARBAGE_COLLECTED_IN_PROOF_QUEUE_COUNTER
                             .with_label_values(&["committed_proof"])
                             .inc();
@@ -1207,15 +1213,14 @@ impl BatchProofQueue {
                     item.mark_committed();
 
                     // Remove from whichever author map it's in (committed items no longer in author maps)
-                    let batch_sort_key = BatchSortKey::from_info(&batch);
                     if let Some(q) = self.author_to_proof_batches.get_mut(&batch.author()) {
-                        q.remove(&batch_sort_key);
+                        q.remove(&stored_sort_key);
                         if q.is_empty() {
                             self.author_to_proof_batches.remove(&batch.author());
                         }
                     }
                     if let Some(q) = self.author_to_non_proof_batches.get_mut(&batch.author()) {
-                        q.remove(&batch_sort_key);
+                        q.remove(&stored_sort_key);
                         if q.is_empty() {
                             self.author_to_non_proof_batches.remove(&batch.author());
                         }
@@ -1227,7 +1232,7 @@ impl BatchProofQueue {
                             self.num_proofs_with_summary_count -= 1;
                         } else if had_proof {
                             self.num_proofs_without_summary_count -= 1;
-                            self.remaining_proof_txns_without_summary -= batch.num_txns();
+                            self.remaining_proof_txns_without_summary -= stored_num_txns;
                         } else {
                             self.num_batches_without_proof_count -= 1;
                         }
