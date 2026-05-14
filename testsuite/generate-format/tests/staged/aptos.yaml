@@ -657,8 +657,8 @@ RequestedMultipliers:
     0:
       V1:
         STRUCT:
-          - execution_bps: U64
-          - io_bps: U64
+          - execution_multiplier_percent: U64
+          - io_multiplier_percent: U64
 Script:
   STRUCT:
     - code: BYTES
