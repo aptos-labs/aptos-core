@@ -52,7 +52,7 @@
 \SubSection{How it Works}
 \label{sec:validation-overview}
 
-\MVP's \emph{specification inference} based on weakest-precondition (\WP) analysis~\cite{dijkstra1975wp,BL05} is made feasible and modular via behavioral predicates.
+\MVP's \emph{specification inference} \cite{GrieskampEtAl26Inf} based on weakest-precondition (\WP) analysis~\cite{dijkstra1975wp,BL05} is made feasible and modular via behavioral predicates.
 \WP inference takes arbitrary Move code and, for each function, computes conditions that are both necessary and sufficient for the implementation's behavior.
 Spec inference uses behavioral predicates to express the effect of calling out to another function, whether through a function value or a direct call.
 It reverses the translation seen for $invoke_\tau$ in Sec.~\ref{sec:enc-invoke}, introducing the behavioral predicates into the \WP to express the call. Without this modular abstraction, inferred specs would be impractically large.

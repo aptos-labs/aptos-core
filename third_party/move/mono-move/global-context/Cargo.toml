@@ -21,4 +21,5 @@ mono-move-core = { workspace = true }
 move-binary-format = { workspace = true }
 move-core-types = { workspace = true }
 parking_lot = { workspace = true }
+shared-dsa = { workspace = true }
 specializer = { workspace = true }

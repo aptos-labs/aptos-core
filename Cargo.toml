@@ -679,6 +679,7 @@ jemallocator = { package = "tikv-jemallocator", version = "0.6.1", features = [
 ] }
 jemalloc-ctl = { package = "tikv-jemalloc-ctl", version = "0.6.1" }
 jemalloc-sys = { package = "tikv-jemalloc-sys", version = "0.6.1" }
+jemalloc_pprof = { version = "0.8", features = ["symbolize"] }
 json-patch = "0.2.6"
 jsonwebtoken = "8.1"
 jwt = "0.16.0"

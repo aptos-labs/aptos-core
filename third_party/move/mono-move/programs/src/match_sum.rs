@@ -80,19 +80,14 @@ pub fn native_match_sum(n: u64) -> u64 {
 /// four predecessors — the "wide diamond" this benchmark is designed to test.
 #[cfg(feature = "micro-op")]
 mod micro_op {
-    use mono_move_alloc::{ExecutableArena, ExecutableArenaPtr, GlobalArenaPtr};
+    use mono_move_alloc::GlobalArenaPtr;
     use mono_move_core::{
-        CodeOffset as CO, FrameLayoutInfo, FrameOffset as FO, Function, MicroOp::*,
-        SortedSafePointEntries,
+        Code, CodeOffset as CO, FrameLayoutInfo, FrameOffset as FO, Function, FunctionPtr,
+        MicroOp::*, SortedSafePointEntries,
     };
     use mono_move_runtime::ObjectDescriptorTable;
 
-    pub fn program() -> (
-        Vec<ExecutableArenaPtr<Function>>,
-        ObjectDescriptorTable,
-        ExecutableArena,
-    ) {
-        let arena = ExecutableArena::new();
+    pub fn program() -> (Vec<FunctionPtr>, ObjectDescriptorTable) {
         let n = 0u32;
         let sum = 8u32;
         let i = 16u32;
@@ -140,12 +135,10 @@ mod micro_op {
             Jump { target: CO(3) },                            // 18
         ];
 
-        let code = arena.alloc_slice_fill_iter(code);
-
-        let func = arena.alloc(Function {
+        let func_ptr = FunctionPtr::new(Box::new(Function {
             name: GlobalArenaPtr::from_static("match_sum"),
-            code,
-            param_sizes: ExecutableArenaPtr::empty_slice(),
+            code: Code::from_vec(code),
+            param_sizes: vec![],
             param_sizes_sum: 8,
             param_and_local_sizes_sum: param_and_local_sizes_sum as usize,
             extended_frame_size: param_and_local_sizes_sum as usize
@@ -153,9 +146,9 @@ mod micro_op {
             zero_frame: false,
             frame_layout: FrameLayoutInfo::empty(),
             safe_point_layouts: SortedSafePointEntries::empty(),
-        });
+        }));
 
-        (vec![func], ObjectDescriptorTable::new(), arena)
+        (vec![func_ptr], ObjectDescriptorTable::new())
     }
 }
 

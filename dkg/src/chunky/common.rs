@@ -24,6 +24,14 @@ pub fn deserialize_chunky_transcript_and_verify(
     signing_pubkeys: &[DealerPublicKey],
     epoch_state: &EpochState,
 ) -> anyhow::Result<ChunkyTranscriptWithHash> {
+    let session_max = dkg_config.expected_max_transcript_size();
+    ensure!(
+        transcript_bytes.len() <= session_max,
+        "[ChunkyDKG] transcript size {} exceeds max {}",
+        transcript_bytes.len(),
+        session_max,
+    );
+
     // Hash the canonical BCS wire bytes once up front to avoid repeated re-serialization.
     // Safe because BCS is strictly canonical: deserialize(serialize(x)) == x byte-for-byte.
     let hash = monitor!(

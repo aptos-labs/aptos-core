@@ -517,3 +517,101 @@ pub async fn get_highest_synced_version_and_epoch(
     }
     Ok(latest_version_and_epoch)
 }
+
+/// Wait until each of `clients` is ready to land transactions.
+///
+/// "Ready" means: REST endpoint replies, ledger version is within `max_lag_versions` of the
+/// highest version among the set, and ledger timestamp is within `max_timestamp_lag` of wall
+/// clock now. This is a transactional readiness probe — a client that just restarted or hasn't
+/// finished state-syncing yet will report a stale ledger timestamp and we wait for it to catch
+/// up before letting the emitter target it. Without this, the emitter sends txns that expire
+/// before the node's mempool sees them ("Transaction expired, without being seen in mempool")
+/// or that hit the 60s `DEFAULT_MAX_SERVER_LAG_WAIT_DURATION` ceiling in the rest client.
+pub async fn wait_for_clients_to_be_txn_ready(
+    clients: &[RestClient],
+    max_lag_versions: u64,
+    max_timestamp_lag: Duration,
+    timeout: Duration,
+) -> Result<()> {
+    if clients.is_empty() {
+        return Ok(());
+    }
+    let start = Instant::now();
+    loop {
+        let infos = join_all(clients.iter().map(|c| c.get_ledger_information())).await;
+        let mut last_status: Vec<(String, String)> = Vec::with_capacity(clients.len());
+        let mut max_version: u64 = 0;
+        let mut all_ok = true;
+        let now_usecs = aptos_infallible::duration_since_epoch().as_micros() as u64;
+        let max_ts_lag_usecs = max_timestamp_lag.as_micros() as u64;
+        for (client, info) in clients.iter().zip(infos.iter()) {
+            match info {
+                Ok(resp) => {
+                    let inner = resp.inner();
+                    max_version = max_version.max(inner.version);
+                    let ts_lag_usecs = now_usecs.saturating_sub(inner.timestamp_usecs);
+                    if ts_lag_usecs > max_ts_lag_usecs {
+                        all_ok = false;
+                        last_status.push((
+                            client.path_prefix_string(),
+                            format!(
+                                "ledger timestamp lags wall clock by {}s (limit {}s), version {}",
+                                ts_lag_usecs / 1_000_000,
+                                max_timestamp_lag.as_secs(),
+                                inner.version,
+                            ),
+                        ));
+                    } else {
+                        last_status.push((
+                            client.path_prefix_string(),
+                            format!("ok at version {}", inner.version),
+                        ));
+                    }
+                },
+                Err(err) => {
+                    all_ok = false;
+                    last_status.push((client.path_prefix_string(), format!("error: {}", err)));
+                },
+            }
+        }
+        if all_ok {
+            // Re-check version skew now that we know max_version.
+            let mut version_ok = true;
+            for (client, info) in clients.iter().zip(infos.iter()) {
+                if let Ok(resp) = info {
+                    let v = resp.inner().version;
+                    if max_version.saturating_sub(v) > max_lag_versions {
+                        version_ok = false;
+                        last_status.push((
+                            client.path_prefix_string(),
+                            format!(
+                                "version {} is {} behind max {} (limit {})",
+                                v,
+                                max_version - v,
+                                max_version,
+                                max_lag_versions,
+                            ),
+                        ));
+                    }
+                }
+            }
+            if version_ok {
+                info!(
+                    "All {} clients are txn-ready in {}s",
+                    clients.len(),
+                    start.elapsed().as_secs()
+                );
+                return Ok(());
+            }
+        }
+
+        if start.elapsed() > timeout {
+            return Err(anyhow!(
+                "wait_for_clients_to_be_txn_ready timed out after {}s; status: {:?}",
+                start.elapsed().as_secs(),
+                last_status,
+            ));
+        }
+        tokio::time::sleep(Duration::from_millis(500)).await;
+    }
+}

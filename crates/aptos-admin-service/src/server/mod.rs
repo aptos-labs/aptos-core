@@ -191,7 +191,7 @@ impl AdminService {
             },
             #[cfg(unix)]
             (hyper::Method::GET, "/malloc/dump_profile") => {
-                malloc::handle_dump_profile_request(req)
+                malloc::handle_dump_profile_request(req).await
             },
             (hyper::Method::GET, "/debug/consensus/consensusdb") => {
                 let consensus_db = context.consensus_db.read().clone();

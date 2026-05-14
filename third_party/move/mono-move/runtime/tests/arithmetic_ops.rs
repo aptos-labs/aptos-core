@@ -15,9 +15,9 @@
 //! belong here regardless; others (the happy-path arithmetic checks)
 //! could move. Check with @vineethk before migrating.
 
-use mono_move_alloc::{ExecutableArena, ExecutableArenaPtr, GlobalArenaPtr};
+use mono_move_alloc::GlobalArenaPtr;
 use mono_move_core::{
-    FrameLayoutInfo, FrameOffset as FO, Function, LocalExecutionContext, MicroOp,
+    Code, FrameLayoutInfo, FrameOffset as FO, Function, LocalExecutionContext, MicroOp,
     SortedSafePointEntries, FRAME_METADATA_SIZE,
 };
 use mono_move_runtime::{InterpreterContext, ObjectDescriptor};
@@ -40,30 +40,27 @@ const FRAME_SIZE: u32 = 24;
 // Helpers
 // ---------------------------------------------------------------------------
 
-fn make_func(arena: &ExecutableArena, op: MicroOp) -> ExecutableArenaPtr<Function> {
-    arena.alloc(Function {
+fn make_func(op: MicroOp) -> Function {
+    Function {
         name: GlobalArenaPtr::from_static("op"),
-        code: arena.alloc_slice_fill_iter([op, MicroOp::Return]),
-        param_sizes: ExecutableArenaPtr::empty_slice(),
+        code: Code::from_vec(vec![op, MicroOp::Return]),
+        param_sizes: vec![],
         param_sizes_sum: 0,
         param_and_local_sizes_sum: FRAME_SIZE as usize,
         extended_frame_size: FRAME_SIZE as usize + FRAME_METADATA_SIZE,
         zero_frame: false,
         frame_layout: FrameLayoutInfo::empty(),
         safe_point_layouts: SortedSafePointEntries::empty(),
-    })
+    }
 }
 
 /// Run a reg-reg binary u64 op: writes `lhs` and `rhs` into the input
 /// slots, runs the op + Return, returns the value at `SLOT_DST` (or err).
 fn run_binary_u64_op(op: MicroOp, lhs: u64, rhs: u64) -> Result<u64, anyhow::Error> {
-    let arena = ExecutableArena::new();
-    let func = make_func(&arena, op);
+    let func = make_func(op);
     let descriptors: Vec<ObjectDescriptor> = vec![];
     let mut exec_ctx = LocalExecutionContext::with_max_budget();
-    let mut ctx = InterpreterContext::new(&mut exec_ctx, &descriptors, unsafe {
-        func.as_ref_unchecked()
-    });
+    let mut ctx = InterpreterContext::new(&mut exec_ctx, &descriptors, &func);
     ctx.set_root_arg(SLOT_LHS, &lhs.to_ne_bytes());
     ctx.set_root_arg(SLOT_RHS, &rhs.to_ne_bytes());
     ctx.run()?;
@@ -74,13 +71,10 @@ fn run_binary_u64_op(op: MicroOp, lhs: u64, rhs: u64) -> Result<u64, anyhow::Err
 /// writes `src` into `SLOT_SRC`, runs the op + Return, returns the value
 /// at `SLOT_DST` (or err).
 fn run_unary_u64_op(op: MicroOp, src: u64) -> Result<u64, anyhow::Error> {
-    let arena = ExecutableArena::new();
-    let func = make_func(&arena, op);
+    let func = make_func(op);
     let descriptors: Vec<ObjectDescriptor> = vec![];
     let mut exec_ctx = LocalExecutionContext::with_max_budget();
-    let mut ctx = InterpreterContext::new(&mut exec_ctx, &descriptors, unsafe {
-        func.as_ref_unchecked()
-    });
+    let mut ctx = InterpreterContext::new(&mut exec_ctx, &descriptors, &func);
     ctx.set_root_arg(SLOT_SRC, &src.to_ne_bytes());
     ctx.run()?;
     Ok(ctx.root_result())

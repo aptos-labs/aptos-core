@@ -25,7 +25,7 @@ use crate::{
     model::{
         FieldData, FieldId, FunId, FunctionKind, GlobalEnv, Loc, ModuleId, NodeId, Parameter,
         QualifiedId, QualifiedInstId, SpecFunId, StructId, SurfaceSyntax, TypeParameter,
-        TypeParameterKind, UserId,
+        TypeParameterKind, UserId, Visibility,
     },
     symbol::{Symbol, SymbolPool},
     ty::{
@@ -4096,8 +4096,11 @@ impl ExpTranslator<'_, '_, '_> {
         ExpData::Lambda(id, pattern, body, LambdaCaptureKind::Default, None)
     }
 
-    /// Creates an expression for a constant, checking the expected type.
-    /// Reports an error if the constant is not visible.
+    /// Translates a constant reference. Same-module/spec accesses emit the value
+    /// directly; cross-module impl access emits a `const$NAME` accessor call.
+    /// Rejects two cases here (the rest go through `function_checker`): private
+    /// cross-module access, and pre-V2.4 cross-module access — in both cases the
+    /// accessor isn't injected.
     fn translate_constant(
         &mut self,
         loc: &Loc,
@@ -4106,30 +4109,77 @@ impl ExpTranslator<'_, '_, '_> {
         context: &ErrorMessageContext,
         sym: &QualifiedSymbol,
     ) -> ExpData {
-        // Constants are always visible in specs. Builtin constants are visible everywhere.
-        if self.mode != ExpTranslationMode::Spec
-            && sym.module_name != self.parent.module_name
-            && sym.module_name != ModuleName::builtin_module(self.env())
-        {
-            self.error(
-                loc,
-                &format!(
-                    "constant `{}` cannot be used here because it is private to the module `{}`",
-                    sym.display_full(self.env()),
-                    sym.module_name.display_full(self.env())
-                ),
-            );
-            self.new_error_exp()
-        } else {
-            // Record constant usage.
-            // Why tracking constants on the fly:
-            // - they are replaced by values after translation!
-            if let Some(user_id) = &self.constant_use_context {
-                self.track_constant_usage(loc, sym, user_id.clone());
+        let is_cross_module = sym.module_name != self.parent.module_name
+            && sym.module_name != ModuleName::builtin_module(self.env());
+        if self.mode != ExpTranslationMode::Spec && is_cross_module {
+            // Private const: reject. Also covers pre-V2.4 since non-private const
+            // syntax is gated to V2.4+.
+            if entry.move_visibility == Visibility::Private {
+                self.error(
+                    loc,
+                    &format!(
+                        "constant `{}` cannot be used here because it is private to the module `{}`",
+                        sym.display_full(self.env()),
+                        sym.module_name.display_full(self.env()),
+                    ),
+                );
+                return self.new_error_exp();
             }
-            let ConstEntry { ty, value, .. } = entry;
-            let ty = self.check_type(loc, &ty, expected_type, context);
-            let id = self.new_node_id_with_type_loc(&ty, loc);
+            // Defensive: non-private cross-module ref pre-V2.4 — the accessor
+            // wasn't injected, so a `Call(const$NAME)` would not resolve.
+            let lang_version = self.parent.parent.env.language_version();
+            if !lang_version.language_version_for_public_const() {
+                self.error(
+                    loc,
+                    &format!(
+                        "constant `{}` cannot be used here due to visibility constraints",
+                        sym.display_full(self.env()),
+                    ),
+                );
+                return self.new_error_exp();
+            }
+            // A const initializer cannot contain a function call; catch the
+            // cross-module case here for a targeted message instead of the
+            // generic "Invalid call or operation in constant" from constant
+            // folding. (`constant_use_context` also fires for function bodies,
+            // so match on `Constant` specifically.)
+            if matches!(self.constant_use_context, Some(UserId::Constant(_))) {
+                self.error(
+                    loc,
+                    &format!(
+                        "cross-module constant `{}` cannot be used in another constant's initializer",
+                        sym.display_full(self.env()),
+                    ),
+                );
+                return self.new_error_exp();
+            }
+        }
+        // Track usage here: same-module constants are replaced by values during translation
+        // and would be invisible to a post-pass.
+        if let Some(user_id) = &self.constant_use_context {
+            self.track_constant_usage(loc, sym, user_id.clone());
+        }
+        let ConstEntry { ty, value, .. } = entry;
+        let ty = self.check_type(loc, &ty, expected_type, context);
+        let id = self.new_node_id_with_type_loc(&ty, loc);
+        if self.mode != ExpTranslationMode::Spec && is_cross_module {
+            // Cross-module in impl mode: call the `const$NAME` accessor.
+            let module_id = self
+                .env()
+                .find_module(&sym.module_name)
+                .expect("defining module must exist when cross-module access is permitted")
+                .get_id();
+            let accessor_name = format!(
+                "{}{}{}",
+                move_core_types::language_storage::CONST,
+                move_core_types::language_storage::DOLLAR_SIGN_DELIMITER,
+                self.env().symbol_pool().string(sym.symbol)
+            );
+            let accessor_sym = self.env().symbol_pool().make(&accessor_name);
+            let fun_id = crate::model::FunId::new(accessor_sym);
+            ExpData::Call(id, Operation::MoveFunction(module_id, fun_id), vec![])
+        } else {
+            // Same-module or spec mode: inline the value as before.
             ExpData::Value(id, value)
         }
     }

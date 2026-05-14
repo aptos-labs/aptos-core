@@ -65,7 +65,7 @@ use move_binary_format::{
 };
 use move_core_types::{
     language_storage::{
-        BORROW, BORROW_MUT, PACK, PACK_VARIANT, PUBLIC_STRUCT_DELIMITER, TEST_VARIANT, UNPACK,
+        BORROW, BORROW_MUT, DOLLAR_SIGN_DELIMITER, PACK, PACK_VARIANT, TEST_VARIANT, UNPACK,
         UNPACK_VARIANT,
     },
     vm_status::StatusCode,
@@ -444,7 +444,7 @@ fn parse_struct_api_name(
     ctx: &StructApiContext,
     expect_variant_in_name: bool,
 ) -> Option<ParsedApiData> {
-    let parts: Vec<&str> = function_name.split(PUBLIC_STRUCT_DELIMITER).collect();
+    let parts: Vec<&str> = function_name.split(DOLLAR_SIGN_DELIMITER).collect();
 
     // Need at least 2 parts for any struct API function (e.g., "pack$S")
     if parts.len() < 2 {
@@ -473,7 +473,7 @@ fn parse_struct_api_name(
     let mut struct_handle_idx = None;
     for (i, part) in parts.iter().enumerate().skip(1) {
         if i > 1 {
-            candidate.push_str(PUBLIC_STRUCT_DELIMITER);
+            candidate.push_str(DOLLAR_SIGN_DELIMITER);
         }
         candidate.push_str(part);
         if let Some(h) = ctx.get_struct_handle(&candidate) {
@@ -506,7 +506,7 @@ fn parse_struct_api_name(
                 (None, None, None)
             } else {
                 // pack$S$Variant / unpack$S$Variant (variant name may itself contain '$')
-                (Some(remaining.join(PUBLIC_STRUCT_DELIMITER)), None, None)
+                (Some(remaining.join(DOLLAR_SIGN_DELIMITER)), None, None)
             }
         },
         NamePrefix::TestVariant => {
@@ -514,7 +514,7 @@ fn parse_struct_api_name(
                 // test_variant requires a variant name — not a struct API function
                 return None;
             }
-            (Some(remaining.join(PUBLIC_STRUCT_DELIMITER)), None, None)
+            (Some(remaining.join(DOLLAR_SIGN_DELIMITER)), None, None)
         },
         NamePrefix::Borrow => {
             // Offsets and type_orders are numeric and cannot contain '$', so
