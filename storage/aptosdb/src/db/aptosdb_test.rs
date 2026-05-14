@@ -126,6 +126,7 @@ fn test_pruner_config() {
                 user_pruning_window_offset: 0,
             },
             None,
+            None,
         );
         assert_eq!(ledger_pruner.is_pruner_enabled(), enable);
         assert_eq!(ledger_pruner.get_prune_window(), 100);

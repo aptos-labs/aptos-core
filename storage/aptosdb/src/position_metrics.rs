@@ -25,6 +25,14 @@ pub static POSITION_COLD_LOAD_SECONDS: Lazy<Histogram> = Lazy::new(|| {
     .unwrap()
 });
 
+pub static POSITION_PRUNE_ROWS: Lazy<IntCounter> = Lazy::new(|| {
+    register_int_counter!(
+        "aptos_position_prune_rows_total",
+        "Number of stale rows pruned from position_db"
+    )
+    .unwrap()
+});
+
 pub static POSITION_DECODE_ERRORS: Lazy<IntCounter> = Lazy::new(|| {
     register_int_counter!(
         "aptos_position_decode_errors_total",

@@ -235,6 +235,13 @@ impl PositionDb {
         )
     }
 
+    pub fn write_pruner_progress(&self, version: Version) -> Result<()> {
+        self.metadata_db().put::<DbMetadataSchema>(
+            &DbMetadataKey::PositionPrunerProgress,
+            &DbMetadataValue::Version(version),
+        )
+    }
+
     pub fn find_prior_version(
         &self,
         state_key_hash: HashValue,

@@ -7,6 +7,7 @@ use crate::{
     position_buffered_state::{new_empty_position_state, position_state_at_version},
     position_db::{PositionDb, NUM_NATIVE_VALUE_SHARDS},
     position_merkle_db::PositionMerkleDb,
+    position_pruner::PositionPruner,
     position_state_store::PositionStateStore,
     utils::truncation_helper::{
         get_position_commit_progress, get_position_merkle_commit_progress,
@@ -31,6 +32,11 @@ pub struct PositionBundle {
 impl AptosDB {
     pub fn position(&self) -> Option<&Arc<PositionBundle>> {
         self.position.as_ref()
+    }
+
+    pub fn position_pruner(&self) -> Option<PositionPruner> {
+        let bundle = self.position.as_ref()?;
+        Some(PositionPruner::new(bundle.kv_db.clone()))
     }
 
     pub fn native_state_committer(&self) -> Option<NativeStateCommitter> {
@@ -81,6 +87,9 @@ impl AptosDB {
         };
         let kv_db = Arc::new(position_db);
         let merkle_db = Arc::new(merkle_db);
+
+        self.ledger_pruner
+            .attach_native_pruners(Arc::clone(&kv_db));
 
         let state_store = if readonly {
             None

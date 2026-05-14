@@ -91,6 +91,7 @@ impl AptosDB {
             Arc::clone(&ledger_db),
             pruner_config.ledger_pruner_config,
             internal_indexer_db,
+            None,
         );
 
         AptosDB {
