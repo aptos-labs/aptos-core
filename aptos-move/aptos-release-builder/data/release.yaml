@@ -2,14 +2,34 @@
 remote_endpoint: https://fullnode.testnet.aptoslabs.com
 # replace with below for actual release, compat test needs concrete URL above:
 # remote_endpoint: ~
-name: "v1.44.1"
+name: "enable_per_block_gas_limit"
 proposals:
-  - name: proposal_1_upgrade_framework
+  - name: enable_per_block_gas_limit
     metadata:
-      title: "Multi-step proposal to upgrade testnet framework, version v1.44.1"
-      description: "This includes changes in https://github.com/aptos-labs/aptos-core/releases/tag/aptos-framework-v1.44.1"
+      title: "Enable per-block gas limit"
+      description: "Enable per-block gas limit"
     execution_mode: MultiStep
     update_sequence:
-      - Framework:
-          bytecode_version: 8
-          git_hash: ~
+      - Execution:
+          V7:
+            transaction_shuffler_type:
+              use_case_aware:
+                sender_spread_factor: 32
+                platform_use_case_spread_factor: 0
+                user_use_case_spread_factor: 4
+            block_gas_limit_type:
+              complex_limit_v1:
+                effective_block_gas_limit: 300000
+                execution_gas_effective_multiplier: 1
+                io_gas_effective_multiplier: 1
+                conflict_penalty_window: 9
+                use_granular_resource_group_conflicts: false
+                use_module_publishing_block_conflict: true
+                block_output_limit: 5242880
+                include_user_txn_size_in_block_output: true
+                add_block_limit_outcome_onchain: true
+            enable_per_block_gas_limit: true
+            transaction_deduper_type: txn_hash_and_authenticator_v1
+            gas_price_to_burn: 90
+            persisted_auxiliary_info_version: 1
+
