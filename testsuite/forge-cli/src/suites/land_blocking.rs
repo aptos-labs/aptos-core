@@ -50,9 +50,13 @@ pub(crate) fn compat() -> ForgeConfig {
             helm_values["chain"]["epoch_duration_secs"] =
                 SimpleValidatorUpgrade::EPOCH_DURATION_SECS.into();
             // Move ABI for versioned_prologue changed after v1.45; disable the
-            // flag so genesis stays on the pre-versioned prologue path.
+            // flag so genesis stays on the pre-versioned prologue path. Also
+            // clear post-v1.45 flags whose indices v1.45's into_flag_vec
+            // doesn't recognize.
             let mut features = Features::default();
             features.disable(FeatureFlag::VERSIONED_TRANSACTION_VALIDATION);
+            features.disable(FeatureFlag::STORAGE_SLOT_NATIVES);
+            features.disable(FeatureFlag::ALLOW_FRIEND_ENTRY_VISIBILITY_DOWNGRADE);
             helm_values["chain"]["initial_features_override"] =
                 serde_yaml::to_value(features).expect("must serialize");
         }))
@@ -67,9 +71,13 @@ pub(crate) fn framework_upgrade() -> ForgeConfig {
             helm_values["chain"]["epoch_duration_secs"] =
                 FrameworkUpgrade::EPOCH_DURATION_SECS.into();
             // Move ABI for versioned_prologue changed after v1.45; disable the
-            // flag so genesis stays on the pre-versioned prologue path.
+            // flag so genesis stays on the pre-versioned prologue path. Also
+            // clear post-v1.45 flags whose indices v1.45's into_flag_vec
+            // doesn't recognize.
             let mut features = Features::default();
             features.disable(FeatureFlag::VERSIONED_TRANSACTION_VALIDATION);
+            features.disable(FeatureFlag::STORAGE_SLOT_NATIVES);
+            features.disable(FeatureFlag::ALLOW_FRIEND_ENTRY_VISIBILITY_DOWNGRADE);
             helm_values["chain"]["initial_features_override"] =
                 serde_yaml::to_value(features).expect("must serialize");
         }))
