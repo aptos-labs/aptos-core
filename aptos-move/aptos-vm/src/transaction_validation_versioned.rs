@@ -63,9 +63,13 @@ pub(crate) struct PrologueBuilder {
 }
 
 impl PrologueBuilder {
-    pub fn new(txn_data: &TransactionMetadata, is_simulation: bool) -> Self {
+    pub fn new(
+        serialized_signers: &SerializedSigners,
+        txn_data: &TransactionMetadata,
+        is_simulation: bool,
+    ) -> Self {
         Self {
-            needs_fee_payer_auth_check: txn_data.fee_payer.is_some(),
+            needs_fee_payer_auth_check: serialized_signers.fee_payer().is_some(),
             txn_sender_public_key: txn_data.authentication_proof().optional_auth_key(),
             fee_payer_public_key_hash: txn_data
                 .fee_payer_authentication_proof
@@ -120,7 +124,7 @@ pub(crate) fn run_prologue(
     traversal_context: &mut TraversalContext,
     is_simulation: bool,
 ) -> Result<(), move_core_types::vm_status::VMStatus> {
-    let builder = PrologueBuilder::new(txn_data, is_simulation);
+    let builder = PrologueBuilder::new(serialized_signers, txn_data, is_simulation);
     let sender = serialized_signers.sender();
     let fee_payer = serialized_signers
         .fee_payer()
