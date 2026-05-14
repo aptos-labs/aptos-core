@@ -14,5 +14,5 @@ extra-watch-dirs = []
 [output.html]
 git-repository-url = "https://github.com/aptos-labs/aptos-core"
 edit-url-template = "https://github.com/aptos-labs/aptos-core/edit/main/third_party/move/documentation/framework-book/{path}"
-additional-js = ["theme/build-stamp.js"]
+additional-js = ["theme/build-stamp.js", "theme/highlightjs-move.js", "theme/move-init.js"]
 additional-css = ["theme/code-wrap.css", "theme/build-stamp.css"]
