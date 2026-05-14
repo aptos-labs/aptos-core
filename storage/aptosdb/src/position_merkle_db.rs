@@ -5,16 +5,23 @@
 
 use crate::{
     db_options::gen_position_merkle_cfds,
+    position_db::PositionDb,
     sharded_jmt_merkle_db::{LeafNode, Node as ShardedNode, ShardedJmtMerkleDb},
 };
 use aptos_config::config::{RocksdbConfig, StorageDirPaths};
-use aptos_jellyfish_merkle::{node_type::NodeKey, TreeReader, TreeWriter};
+use aptos_crypto::{
+    hash::{CryptoHash, SPARSE_MERKLE_PLACEHOLDER_HASH},
+    HashValue,
+};
+use aptos_jellyfish_merkle::{
+    iterator::JellyfishMerkleIterator, node_type::NodeKey, TreeReader, TreeWriter,
+};
 use aptos_logger::info;
 use aptos_rocksdb_options::gen_rocksdb_options;
 use aptos_schemadb::{Cache, Env, DB};
 use aptos_storage_interface::{AptosDbError, Result};
 use aptos_types::{
-    state_store::{state_key::StateKey, NUM_STATE_SHARDS},
+    state_store::{state_key::StateKey, state_value::StateValue, NUM_STATE_SHARDS},
     transaction::Version,
 };
 use rayon::prelude::*;
@@ -122,6 +129,79 @@ impl PositionMerkleDb {
         Ok(())
     }
 
+    pub fn get_root_hash(&self, version: Version) -> Result<HashValue> {
+        let tree = aptos_jellyfish_merkle::JellyfishMerkleTree::new(&self.inner);
+        match tree.get_root_hash_option(version) {
+            Ok(Some(h)) => Ok(h),
+            Ok(None) => Ok(*SPARSE_MERKLE_PLACEHOLDER_HASH),
+            Err(e) => Err(AptosDbError::Other(format!(
+                "position_merkle_db get_root_hash: {e}"
+            ))),
+        }
+    }
+
+    pub fn iter_active_leaves(
+        self: &Arc<Self>,
+        version: Version,
+    ) -> Result<impl Iterator<Item = Result<(StateKey, HashValue)>>> {
+        let iter = JellyfishMerkleIterator::<Self, StateKey>::new(
+            Arc::clone(self),
+            version,
+            HashValue::zero(),
+        )?;
+        Ok(iter.map(|res| res.map(|(key_hash, (state_key, _leaf_version))| (state_key, key_hash))))
+    }
+
+    /// JMT-walk + KV-CF value join: yields `(StateKey, StateValue)` for
+    /// every live position leaf at `version`, starting at JMT index
+    /// `start_idx`. Mirrors `StateStore::get_state_key_and_value_iter`.
+    ///
+    /// The join is a point lookup against `position_db` keyed by the
+    /// leaf's recorded write-version, not the snapshot version — so it
+    /// resolves to the exact row referenced by the JMT leaf without an
+    /// extra `seek` scan.
+    pub fn iter_active_leaves_with_values(
+        self: &Arc<Self>,
+        position_db: Arc<PositionDb>,
+        version: Version,
+        start_idx: usize,
+    ) -> Result<impl Iterator<Item = Result<(StateKey, StateValue)>> + Send + Sync + use<>> {
+        Ok(
+            JellyfishMerkleIterator::new_by_index(Arc::clone(self), version, start_idx)?.map(
+                move |res| {
+                    res.and_then(|(_hashed_key, (state_key, leaf_version))| {
+                        let key_hash = state_key.hash();
+                        let (_v, value) = position_db
+                            .get_position_value(key_hash, leaf_version)?
+                            .ok_or_else(|| {
+                            AptosDbError::Other(format!(
+                                "iter_active_leaves_with_values: JMT leaf at v={version} \
+                                     references missing position_value row \
+                                     (state_key_hash={key_hash}, leaf_version={leaf_version})"
+                            ))
+                        })?;
+                        Ok((state_key, value))
+                    })
+                },
+            ),
+        )
+    }
+
+    /// Bounded variant of [`Self::iter_active_leaves_with_values`] —
+    /// takes at most `chunk_size` leaves starting at `first_index`.
+    /// Mirrors `StateStore::get_value_chunk_iter`.
+    pub fn iter_active_leaves_chunk(
+        self: &Arc<Self>,
+        position_db: Arc<PositionDb>,
+        version: Version,
+        first_index: usize,
+        chunk_size: usize,
+    ) -> Result<impl Iterator<Item = Result<(StateKey, StateValue)>> + Send + Sync + use<>> {
+        Ok(self
+            .iter_active_leaves_with_values(position_db, version, first_index)?
+            .take(chunk_size))
+    }
+
     #[cfg(any(test, feature = "fuzzing"))]
     pub fn new_uniform_for_test(db: Arc<DB>) -> Self {
         let shards: [Arc<DB>; NUM_POSITION_MERKLE_SHARDS] =
@@ -200,4 +280,13 @@ impl TreeWriter<StateKey> for PositionMerkleDb {
     ) -> Result<()> {
         self.inner.write_node_batch(node_batch)
     }
+}
+
+pub const COMPOSITE_STATE_ROOT_DOMAIN: &[u8] = b"APTOS::StateRoot";
+
+pub fn compose_state_root(main_state_root: HashValue, position_root: HashValue) -> HashValue {
+    let mut hasher = aptos_crypto::hash::DefaultHasher::new(COMPOSITE_STATE_ROOT_DOMAIN);
+    hasher.update(main_state_root.as_ref());
+    hasher.update(position_root.as_ref());
+    hasher.finish()
 }

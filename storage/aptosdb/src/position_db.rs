@@ -16,9 +16,12 @@ use aptos_crypto::HashValue;
 use aptos_experimental_runtimes::thread_manager::THREAD_MANAGER;
 use aptos_logger::info;
 use aptos_rocksdb_options::gen_rocksdb_options;
-use aptos_schemadb::{batch::SchemaBatch, Cache, Env, DB};
+use aptos_schemadb::{batch::SchemaBatch, Cache, Env, ReadOptions, DB};
 use aptos_storage_interface::{AptosDbError, Result};
-use aptos_types::{state_store::NUM_STATE_SHARDS, transaction::Version};
+use aptos_types::{
+    state_store::{state_value::StateValue, NUM_STATE_SHARDS},
+    transaction::Version,
+};
 use rayon::prelude::*;
 use std::{
     ops::Deref,
@@ -240,6 +243,45 @@ impl PositionDb {
             &DbMetadataKey::PositionPrunerProgress,
             &DbMetadataValue::Version(version),
         )
+    }
+
+    pub fn get_position_value(
+        &self,
+        state_key_hash: HashValue,
+        version: Version,
+    ) -> Result<Option<(Version, StateValue)>> {
+        let mut read_opts = ReadOptions::default();
+        // We want `None` if the key changes during iteration.
+        read_opts.set_prefix_same_as_start(true);
+        let shard = ShardedKvDb::shard_of_hash(state_key_hash);
+        let mut iter = self
+            .shard(shard)
+            .iter_with_opts::<PositionValueSchema>(read_opts)?;
+        iter.seek(&(state_key_hash, version))?;
+        Ok(iter
+            .next()
+            .transpose()?
+            .and_then(|((_, version), value_opt)| value_opt.map(|value| (version, value))))
+    }
+
+    pub fn write_position_batch(
+        &self,
+        version: Version,
+        writes: impl IntoIterator<Item = (HashValue, Option<StateValue>)>,
+    ) -> Result<()> {
+        let mut per_shard: [Option<SchemaBatch>; NUM_NATIVE_VALUE_SHARDS] =
+            std::array::from_fn(|_| None);
+        for (state_key_hash, maybe_value) in writes {
+            let shard = ShardedKvDb::shard_of_hash(state_key_hash);
+            let batch = per_shard[shard].get_or_insert_with(SchemaBatch::new);
+            batch.put::<PositionValueSchema>(&(state_key_hash, version), &maybe_value)?;
+        }
+        for (shard, maybe_batch) in per_shard.into_iter().enumerate() {
+            if let Some(batch) = maybe_batch {
+                self.shard(shard).write_schemas(batch)?;
+            }
+        }
+        Ok(())
     }
 
     pub fn find_prior_version(
