@@ -156,6 +156,7 @@ impl DoGetExecutionOutput {
         //
         // TODO(HotState): it might be better to do this in AptosVM::execute_single_transaction,
         // but we need to figure out how to properly construct `VMOutput` from block end info.
+        let persist_hotness_in_write_set = parent_state.persist_hotness_in_write_set();
         for (transaction, output) in transactions.iter().zip_eq(transaction_outputs.iter_mut()) {
             if let Transaction::BlockEpilogue(payload) = transaction {
                 assert!(output.status().is_kept(), "Block epilogue must be kept");
@@ -167,6 +168,7 @@ impl DoGetExecutionOutput {
                         .into_iter()
                         .map(|key| (key, HotStateOp::make_hot()))
                         .collect(),
+                    persist_hotness_in_write_set,
                 );
             }
         }

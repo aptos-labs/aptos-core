@@ -2199,8 +2199,12 @@ impl TransactionOutput {
         self.write_set.state_update_refs()
     }
 
-    pub fn add_hotness(&mut self, hotness: BTreeMap<StateKey, HotStateOp>) {
-        self.write_set.add_hotness(hotness);
+    pub fn add_hotness(
+        &mut self,
+        hotness: BTreeMap<StateKey, HotStateOp>,
+        persist_in_write_set: bool,
+    ) {
+        self.write_set.add_hotness(hotness, persist_in_write_set);
     }
 }
 

@@ -139,6 +139,10 @@ impl State {
         self.usage
     }
 
+    pub fn persist_hotness_in_write_set(&self) -> bool {
+        self.hot_state_config.persist_hotness_in_write_set
+    }
+
     pub fn shards(&self) -> &[MapLayer<HashValue, StateSlot>; NUM_STATE_SHARDS] {
         &self.shards
     }

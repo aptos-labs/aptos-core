@@ -505,6 +505,10 @@ impl Debug for WriteOp {
 #[serde(rename = "WriteSet")]
 pub enum ValueWriteSet {
     V0(WriteSetV0),
+    /// V1 carries hotness inline, so it travels via standard serde and reaches
+    /// nodes catching up via apply-outputs state-sync. Produced when
+    /// `HotStateConfig::persist_hotness_in_write_set` is enabled.
+    V1(WriteSetV1),
 }
 
 impl Default for ValueWriteSet {
@@ -513,8 +517,38 @@ impl Default for ValueWriteSet {
     }
 }
 
+impl ValueWriteSet {
+    fn write_ops(&self) -> &BTreeMap<StateKey, WriteOp> {
+        match self {
+            ValueWriteSet::V0(v0) => &v0.0.write_set,
+            ValueWriteSet::V1(v1) => &v1.write_set,
+        }
+    }
+
+    fn write_ops_mut(&mut self) -> &mut BTreeMap<StateKey, WriteOp> {
+        match self {
+            ValueWriteSet::V0(v0) => &mut v0.0.write_set,
+            ValueWriteSet::V1(v1) => &mut v1.write_set,
+        }
+    }
+
+    fn into_write_ops(self) -> BTreeMap<StateKey, WriteOp> {
+        match self {
+            ValueWriteSet::V0(v0) => v0.0.write_set,
+            ValueWriteSet::V1(v1) => v1.write_set,
+        }
+    }
+
+    fn inline_hotness(&self) -> Option<&BTreeMap<StateKey, HotStateOp>> {
+        match self {
+            ValueWriteSet::V0(_) => None,
+            ValueWriteSet::V1(v1) => Some(&v1.hotness),
+        }
+    }
+}
+
 // TODO(HotState): revisit when the hot state is deterministic.
-/// Represents a hotness only change, not persisted for now.
+/// Represents a hotness only change.
 #[derive(Clone, Eq, PartialEq)]
 pub struct HotStateOp(BaseStateOp);
 
@@ -541,6 +575,37 @@ impl Debug for HotStateOp {
             Creation(_) | Modification(_) | Deletion(_) => {
                 unreachable!("malformed hot state op")
             },
+        }
+    }
+}
+
+#[derive(Serialize, Deserialize)]
+#[serde(rename = "HotStateOp")]
+enum PersistedHotStateOp {
+    MakeHot,
+}
+
+impl Serialize for HotStateOp {
+    fn serialize<S>(&self, serializer: S) -> std::result::Result<S::Ok, S::Error>
+    where
+        S: Serializer,
+    {
+        match &self.0 {
+            BaseStateOp::MakeHot => PersistedHotStateOp::MakeHot.serialize(serializer),
+            BaseStateOp::Creation(_) | BaseStateOp::Modification(_) | BaseStateOp::Deletion(_) => {
+                unreachable!("malformed hot state op")
+            },
+        }
+    }
+}
+
+impl<'de> Deserialize<'de> for HotStateOp {
+    fn deserialize<D>(deserializer: D) -> std::result::Result<Self, D::Error>
+    where
+        D: Deserializer<'de>,
+    {
+        match PersistedHotStateOp::deserialize(deserializer)? {
+            PersistedHotStateOp::MakeHot => Ok(Self(BaseStateOp::MakeHot)),
         }
     }
 }
@@ -576,26 +641,22 @@ impl<'de> Deserialize<'de> for WriteSet {
 }
 
 impl WriteSet {
-    fn into_v0(self) -> WriteSetV0 {
-        match self.value {
-            ValueWriteSet::V0(ws) => ws,
-        }
-    }
-
+    /// Returns the V0 inner. Panics if the WriteSet is V1.
     pub fn as_v0(&self) -> &WriteSetV0 {
         match &self.value {
             ValueWriteSet::V0(ws) => ws,
-        }
-    }
-
-    fn as_v0_mut(&mut self) -> &mut WriteSetV0 {
-        match &mut self.value {
-            ValueWriteSet::V0(ws) => ws,
+            ValueWriteSet::V1(_) => unreachable!("as_v0 called on V1 write set"),
         }
     }
 
     pub fn into_mut(self) -> WriteSetMut {
-        self.into_v0().0
+        WriteSetMut {
+            write_set: self.value.into_write_ops(),
+        }
+    }
+
+    fn hotness_map(&self) -> &BTreeMap<StateKey, HotStateOp> {
+        self.value.inline_hotness().unwrap_or(&self.hotness)
     }
 
     pub fn new_from_value(value: ValueWriteSet) -> Self {
@@ -629,7 +690,8 @@ impl WriteSet {
     }
 
     pub fn state_update_refs(&self) -> impl Iterator<Item = (&StateKey, Option<&StateValue>)> + '_ {
-        self.as_v0()
+        self.value
+            .write_ops()
             .iter()
             .map(|(key, op)| (key, op.as_state_value_opt()))
     }
@@ -642,43 +704,58 @@ impl WriteSet {
     }
 
     pub fn update_total_supply(&mut self, value: u128) {
-        self.as_v0_mut().update_total_supply(value);
+        let write_set = self.value.write_ops_mut();
+        assert!(write_set
+            .insert(
+                TOTAL_SUPPLY_STATE_KEY.clone(),
+                WriteOp::legacy_modification(bcs::to_bytes(&value).unwrap().into())
+            )
+            .is_some());
     }
 
     pub fn get_write_op(&self, state_key: &StateKey) -> Option<&WriteOp> {
-        self.as_v0().get(state_key)
+        self.value.write_ops().get(state_key)
     }
 
     pub fn get_total_supply(&self) -> Option<u128> {
-        self.as_v0().get_total_supply()
+        let value = self
+            .value
+            .write_ops()
+            .get(&TOTAL_SUPPLY_STATE_KEY)
+            .and_then(|op| op.bytes())
+            .map(|bytes| bcs::from_bytes::<u128>(bytes));
+        value.transpose().map_err(anyhow::Error::msg).unwrap()
     }
 
     pub fn is_empty(&self) -> bool {
-        self.as_v0().is_empty() && self.hotness.is_empty()
+        self.value.write_ops().is_empty() && self.hotness_map().is_empty()
     }
 
     pub fn expect_into_write_op_iter(self) -> impl IntoIterator<Item = (StateKey, WriteOp)> {
-        self.into_v0().0.write_set
+        self.value.into_write_ops()
     }
 
     pub fn expect_write_op_iter(&self) -> impl Iterator<Item = (&StateKey, &WriteOp)> {
-        self.as_v0().0.write_set.iter()
+        self.value.write_ops().iter()
     }
 
     pub fn write_op_iter(&self) -> impl Iterator<Item = (&StateKey, &WriteOp)> {
-        self.as_v0().iter()
+        self.value.write_ops().iter()
     }
 
     pub fn into_write_op_iter(self) -> impl Iterator<Item = (StateKey, WriteOp)> {
-        self.into_v0().into_write_op_iter()
+        self.value.into_write_ops().into_iter()
     }
 
     pub fn base_op_iter(&self) -> impl Iterator<Item = (&StateKey, &BaseStateOp)> {
-        self.as_v0()
+        self.value
+            .write_ops()
             .iter()
             .map(|(key, op)| (key, op.as_base_op()))
             .merge_join_by(
-                self.hotness.iter().map(|(key, op)| (key, op.as_base_op())),
+                self.hotness_map()
+                    .iter()
+                    .map(|(key, op)| (key, op.as_base_op())),
                 |a, b| a.0.cmp(b.0),
             )
             .map(|entry| {
@@ -693,15 +770,29 @@ impl WriteSet {
     }
 
     pub fn hotness_keys(&self) -> impl Iterator<Item = &StateKey> {
-        self.hotness.keys()
+        self.hotness_map().keys()
     }
 
-    pub fn add_hotness(&mut self, hotness: BTreeMap<StateKey, HotStateOp>) {
+    /// When `persist_in_write_set` is true, promote the value to V1 with hotness inline so that
+    /// state-sync (apply-outputs) carries hotness through standard serde. Otherwise hotness is
+    /// stored in the side field, which is not serialized.
+    pub fn add_hotness(
+        &mut self,
+        hotness: BTreeMap<StateKey, HotStateOp>,
+        persist_in_write_set: bool,
+    ) {
         assert!(
-            self.hotness.is_empty(),
+            self.hotness.is_empty() && self.value.inline_hotness().is_none(),
             "hotness should only be initialized once."
         );
-        self.hotness = hotness;
+        if persist_in_write_set {
+            // Take ownership of the existing value so we can move its write_ops into V1.
+            let prev = std::mem::take(&mut self.value);
+            let write_set = prev.into_write_ops();
+            self.value = ValueWriteSet::V1(WriteSetV1 { write_set, hotness });
+        } else {
+            self.hotness = hotness;
+        }
     }
 }
 
@@ -715,11 +806,6 @@ pub struct WriteSetV0(WriteSetMut);
 
 impl WriteSetV0 {
     #[inline]
-    fn is_empty(&self) -> bool {
-        self.0.is_empty()
-    }
-
-    #[inline]
     pub fn iter(&self) -> btree_map::Iter<'_, StateKey, WriteOp> {
         self.0.write_set.iter()
     }
@@ -732,30 +818,16 @@ impl WriteSetV0 {
     pub fn get(&self, key: &StateKey) -> Option<&WriteOp> {
         self.0.get(key)
     }
+}
 
-    fn get_total_supply(&self) -> Option<u128> {
-        let value = self
-            .0
-            .get(&TOTAL_SUPPLY_STATE_KEY)
-            .and_then(|op| op.bytes())
-            .map(|bytes| bcs::from_bytes::<u128>(bytes));
-        value.transpose().map_err(anyhow::Error::msg).unwrap()
-    }
-
-    // This is a temporary method to update the total supply in the write set.
-    // TODO: get rid of this func() and use WriteSetMut instead; for that we need to change
-    //       VM execution such that to 'TransactionOutput' is materialized after updating
-    //       total_supply.
-    fn update_total_supply(&mut self, value: u128) {
-        assert!(self
-            .0
-            .write_set
-            .insert(
-                TOTAL_SUPPLY_STATE_KEY.clone(),
-                WriteOp::legacy_modification(bcs::to_bytes(&value).unwrap().into())
-            )
-            .is_some());
-    }
+/// V1 of the on-wire write set: like V0, but also carries the hot state promotions inline so
+/// they survive standard serde and reach catching-up nodes via state-sync.
+#[derive(
+    BCSCryptoHash, Clone, CryptoHasher, Debug, Default, Eq, PartialEq, Serialize, Deserialize,
+)]
+pub struct WriteSetV1 {
+    write_set: BTreeMap<StateKey, WriteOp>,
+    hotness: BTreeMap<StateKey, HotStateOp>,
 }
 
 /// A mutable version of `WriteSet`.
