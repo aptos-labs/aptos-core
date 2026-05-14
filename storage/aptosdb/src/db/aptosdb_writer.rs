@@ -770,6 +770,18 @@ impl AptosDB {
             if let Some(pruner) = &self.state_store.state_pruner.hot_state_kv_pruner {
                 pruner.maybe_set_pruner_target_db_version(version);
             }
+            // Activate the native-position value pruner here too, after
+            // the commit is durable — same point as `state_kv_pruner`.
+            // (The merkle pruners are driven when snapshots persist.)
+            if let Some(position_pruner) = self
+                .position
+                .as_ref()
+                .and_then(|bundle| bundle.position_pruner.as_ref())
+            {
+                position_pruner
+                    .value_pruner
+                    .maybe_set_pruner_target_db_version(version);
+            }
         }
 
         // Once everything is successfully persisted, update the latest in-memory ledger info.

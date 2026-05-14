@@ -293,10 +293,6 @@ impl StateKvDb {
         self.inner.shard(shard_id)
     }
 
-    pub(crate) fn db_shard_arc(&self, shard_id: usize) -> Arc<DB> {
-        Arc::clone(self.inner.shard(shard_id))
-    }
-
     pub(crate) fn num_shards(&self) -> usize {
         NUM_STATE_SHARDS
     }

@@ -2,7 +2,7 @@
 // Licensed pursuant to the Innovation-Enabling Source Code License, available at https://github.com/aptos-labs/aptos-core/blob/main/LICENSE
 
 use crate::{
-    pruner::state_merkle_pruner::{generics::StaleNodeIndexSchemaTrait, StateMerklePruner},
+    pruner::state_merkle_pruner::{generics::MerklePrunerSchema, StateMerklePruner},
     schema::{
         db_metadata::{DbMetadataSchema, DbMetadataValue},
         jellyfish_merkle_node::JellyfishMerkleNodeSchema,
@@ -19,15 +19,15 @@ use std::{
     sync::{atomic::Ordering, Arc},
 };
 
-pub(in crate::pruner) struct StateMerkleMetadataPruner<S> {
+pub(in crate::pruner) struct StateMerkleMetadataPruner<M> {
     metadata_db: Arc<DB>,
     next_version: AtomicVersion,
-    _phantom: PhantomData<S>,
+    _phantom: PhantomData<M>,
 }
 
-impl<S: StaleNodeIndexSchemaTrait> StateMerkleMetadataPruner<S>
+impl<M: MerklePrunerSchema> StateMerkleMetadataPruner<M>
 where
-    StaleNodeIndex: KeyCodec<S>,
+    StaleNodeIndex: KeyCodec<M::StaleIndexSchema>,
 {
     pub(in crate::pruner) fn new(metadata_db: Arc<DB>) -> Self {
         Self {
@@ -50,7 +50,7 @@ where
         }
 
         // When next_version is not initialized, this call is used to initialize it.
-        let (indices, next_version) = StateMerklePruner::get_stale_node_indices(
+        let (indices, next_version) = StateMerklePruner::<M>::get_stale_node_indices(
             &self.metadata_db,
             current_progress,
             target_version_for_this_round,
@@ -60,11 +60,11 @@ where
         let mut batch = SchemaBatch::new();
         indices.into_iter().try_for_each(|index| {
             batch.delete::<JellyfishMerkleNodeSchema>(&index.node_key)?;
-            batch.delete::<S>(&index)
+            batch.delete::<M::StaleIndexSchema>(&index)
         })?;
 
         batch.put::<DbMetadataSchema>(
-            &S::progress_metadata_key(None),
+            &M::pruner_progress_key(),
             &DbMetadataValue::Version(target_version_for_this_round),
         )?;
 
@@ -79,6 +79,6 @@ where
     }
 
     pub(in crate::pruner) fn progress(&self) -> Result<Version> {
-        Ok(get_progress(&self.metadata_db, &S::progress_metadata_key(None))?.unwrap_or(0))
+        Ok(get_progress(&self.metadata_db, &M::pruner_progress_key())?.unwrap_or(0))
     }
 }

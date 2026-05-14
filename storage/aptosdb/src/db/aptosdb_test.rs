@@ -10,7 +10,7 @@ use crate::{
         },
         AptosDB,
     },
-    pruner::{LedgerPrunerManager, PrunerManager, StateMerklePrunerManager},
+    pruner::{LedgerPrunerManager, PrunerManager, StateMerkle, StateMerklePrunerManager},
     schema::{
         epoch_by_version::EpochByVersionSchema, jellyfish_merkle_node::JellyfishMerkleNodeSchema,
         ledger_info::LedgerInfoSchema, stale_node_index::StaleNodeIndexSchema,
@@ -106,7 +106,7 @@ fn test_pruner_config() {
     let tmp_dir = TempPath::new();
     let aptos_db = AptosDB::new_for_test(&tmp_dir);
     for enable in [false, true] {
-        let state_merkle_pruner = StateMerklePrunerManager::<StaleNodeIndexSchema>::new(
+        let state_merkle_pruner = StateMerklePrunerManager::<StateMerkle>::new(
             Arc::clone(&aptos_db.state_merkle_db()),
             StateMerklePrunerConfig {
                 enable,
