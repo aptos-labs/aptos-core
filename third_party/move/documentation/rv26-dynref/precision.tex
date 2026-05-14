@@ -1,0 +1,48 @@
+\section{Precision against the Trace}\label{sec:precision}
+
+The rules in Sect.~\ref{sec:semantics} are checked against the
+program's actual execution, not against a join over the program's
+possible executions. This is the discipline's main precision
+advantage over the corresponding static check, and the reason we
+expect a runtime model in this setting to be useful at all.
+
+\paragraph{What the runtime knows that static analysis does not.}
+The simplest illustration is a program with a conditional move:
+\begin{lstlisting}
+let x = ...;
+let r = &x.f;
+if rare_condition() { move x }   // invalidates subtree(x) only here
+*r                               // safe whenever rare_condition() is false
+\end{lstlisting}
+A sound static analysis sees the move on one branch and has to
+conclude that \texttt{r} may be invalid by the time \texttt{*r} runs;
+it joins the two branches and reports the union. The discipline
+sees something more specific. By the time control reaches \texttt{*r},
+\texttt{rare\_condition()} has either evaluated to true or to false,
+and the runtime knows which. On the branch where the move did not
+happen, \texttt{r} is still attached to its node, no event has
+poisoned it, and the read succeeds. The discipline accepts a
+strictly larger set of executions than the static check, by
+construction.
+
+\paragraph{Relation to static checking.}
+We are not trying to port a static borrow checker to runtime. The
+rules in Sect.~\ref{sec:semantics} were calibrated so that each rule
+poisons a reference only on cases that the corresponding static
+analysis would also reject when reached on every branch; this is the
+sense in which the discipline is meant to be at least as permissive
+as its static counterpart along a concrete trace. We do not prove
+that here. The natural proof obligation, for each static rule, is to
+identify a runtime invariant strong enough to rule out the same
+unsafe events. This is the most important open piece of the work,
+discussed further in Sect.~\ref{sec:discussion}.
+
+\paragraph{Where the cost is worth it.}
+Per-instruction shadow-state updates are not free. The discipline
+pays its way in contexts where static checking is unavailable or
+untrusted---bytecode that bypasses the verifier (fuzzing harnesses,
+mutated bytecode, dynamic-dispatch boundaries), and effects whose
+body is opaque to the bytecode language (native code). On
+verifier-protected execution paths, the discipline can be turned off
+entirely, or shifted into a trace-and-replay mode that records the
+relevant events during execution and checks them offline.

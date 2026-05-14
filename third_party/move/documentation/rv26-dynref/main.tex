@@ -1,0 +1,71 @@
+% Submission to RV 2026 (short paper, up to 8 pages excl. references).
+% LNCS class.
+\documentclass[runningheads]{llncs}
+
+\input{prelude.tex}
+
+\begin{document}
+
+\title{Runtime Reference Safety via Access Path Invalidation}
+\titlerunning{Runtime Reference Safety via Access Path Invalidation}
+
+\author{Vineeth Kashyap\thanks{Corresponding author.}\inst{1} \and
+        Wolfgang Grieskamp\inst{1} \and
+        Teng Zhang\inst{1}}
+\authorrunning{V. Kashyap et al.}
+\institute{Aptos Labs, Palo Alto, USA\\
+\email{vineeth@aptoslabs.com}}
+
+\maketitle
+
+\begin{abstract}
+Move's bytecode verifier statically enforces a small set of reference
+safety rules: references should not dangle, reads through an
+immutable reference should not observe a value that has been changed
+through another handle, and mutable references at function call
+boundaries should not alias. In several contexts the static check is
+unavailable, untrusted, or unnecessarily conservative: bytecode that
+bypasses the verifier (in fuzzing or mutated-bytecode harnesses,
+behind dynamic dispatch), operations whose body lives outside the
+bytecode language (native code), and programs the verifier rejects
+even though the executions they actually take would not violate any
+rule. We describe a runtime discipline that enforces Move's
+reference-safety rules during execution. The core data structure is
+the \emph{Access Path Tree} (\apt): a forest, built lazily during
+execution, whose nodes record the access paths along which each live
+reference was derived. A single invalidation rule poisons references
+whose paths have been disturbed by destructive events; the rule
+covers destructive writes, moves, freezes, variant mutations, calls,
+returns, and opaque effects uniformly, and call boundaries
+additionally lock subtrees so that mutable arguments do not overlap.
+The discipline is path-sensitive---it runs against the actual
+execution trace, rather than against a join over branches---and is
+designed to accept every trace the static check would.  We describe
+the model, sketch its small-step rules, and discuss its relation to
+per-location dynamic alias models such as Stacked Borrows and Tree
+Borrows.
+\keywords{Runtime verification \and Reference safety \and Aliasing
+  \and Access paths \and Move.}
+\end{abstract}
+
+\input{intro}
+\input{examples}
+\input{model}
+\input{precision}
+\input{discussion}
+\input{conclusion}
+
+\begin{credits}
+\subsubsection{\discintname}
+The authors have no competing interests relevant to this article.
+\end{credits}
+
+\bibliographystyle{splncs04}
+\bibliography{biblio}
+
+\end{document}
+
+%%% Local Variables:
+%%% mode: latex
+%%% TeX-master: t
+%%% End:

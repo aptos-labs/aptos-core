@@ -1,0 +1,14 @@
+\section{Conclusion}\label{sec:conclusion}
+
+Move's static reference-safety rules can be enforced at execution
+time using a small runtime discipline. The runtime records the
+access paths through which each live reference was derived, and
+applies a single invalidation rule when destructive events disturb
+those paths; the rule covers writes, moves, freezes, variant
+mutations, calls, returns, and opaque effects uniformly, and call
+boundaries lock subtrees to keep mutable arguments disjoint. The
+discipline catches a class of unsafe uses that lifetime-based static
+analysis can only reject conservatively, and provides a uniform
+handle on opaque effects at the boundary with native code. The most
+important open work is a formal soundness proof against an
+operational semantics; the model is designed to admit one.
