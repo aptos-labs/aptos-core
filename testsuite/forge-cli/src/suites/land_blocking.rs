@@ -11,7 +11,9 @@ use aptos_forge::{
     },
     EmitJobMode, EmitJobRequest, ForgeConfig, NodeResourceOverride,
 };
-use aptos_sdk::types::on_chain_config::{OnChainConsensusConfig, OnChainExecutionConfig};
+use aptos_sdk::types::on_chain_config::{
+    FeatureFlag, Features, OnChainConsensusConfig, OnChainExecutionConfig,
+};
 use aptos_testcases::{
     compatibility_test::SimpleValidatorUpgrade, framework_upgrade::FrameworkUpgrade,
     multi_region_network_test::MultiRegionNetworkEmulationTest, transaction_tracing_test,
@@ -47,6 +49,12 @@ pub(crate) fn compat() -> ForgeConfig {
         .with_genesis_helm_config_fn(Arc::new(|helm_values| {
             helm_values["chain"]["epoch_duration_secs"] =
                 SimpleValidatorUpgrade::EPOCH_DURATION_SECS.into();
+            // Move ABI for versioned_prologue changed after v1.45; disable the
+            // flag so genesis stays on the pre-versioned prologue path.
+            let mut features = Features::default();
+            features.disable(FeatureFlag::VERSIONED_TRANSACTION_VALIDATION);
+            helm_values["chain"]["initial_features_override"] =
+                serde_yaml::to_value(features).expect("must serialize");
         }))
 }
 
@@ -58,6 +66,12 @@ pub(crate) fn framework_upgrade() -> ForgeConfig {
         .with_genesis_helm_config_fn(Arc::new(|helm_values| {
             helm_values["chain"]["epoch_duration_secs"] =
                 FrameworkUpgrade::EPOCH_DURATION_SECS.into();
+            // Move ABI for versioned_prologue changed after v1.45; disable the
+            // flag so genesis stays on the pre-versioned prologue path.
+            let mut features = Features::default();
+            features.disable(FeatureFlag::VERSIONED_TRANSACTION_VALIDATION);
+            helm_values["chain"]["initial_features_override"] =
+                serde_yaml::to_value(features).expect("must serialize");
         }))
         .with_emit_job(mixed_compatible_emit_job())
 }

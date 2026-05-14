@@ -143,7 +143,7 @@ pub(crate) fn run_prologue(
 #[derive(Serialize)]
 enum EpilogueArgs {
     V1 {
-        account: MoveValue,
+        sender: MoveValue,
         fee_payer: MoveValue,
         fee_statement: FeeStatement,
         txn_gas_price: u64,
@@ -157,7 +157,7 @@ enum EpilogueArgs {
 /// Builder that collects epilogue arguments and selects the appropriate enum
 /// variant based on feature flags.
 pub(crate) struct EpilogueBuilder {
-    account: AccountAddress,
+    sender: AccountAddress,
     fee_payer: AccountAddress,
     fee_statement: FeeStatement,
     txn_gas_price: u64,
@@ -175,7 +175,7 @@ impl EpilogueBuilder {
         is_simulation: bool,
     ) -> Self {
         Self {
-            account: txn_data.sender(),
+            sender: txn_data.sender(),
             fee_payer: txn_data.fee_payer.unwrap_or_else(|| txn_data.sender()),
             fee_statement,
             txn_gas_price: txn_data.gas_unit_price().into(),
@@ -190,7 +190,7 @@ impl EpilogueBuilder {
     /// Currently only V1 exists.
     pub fn build(self) -> Vec<u8> {
         let args = EpilogueArgs::V1 {
-            account: MoveValue::Signer(self.account),
+            sender: MoveValue::Signer(self.sender),
             fee_payer: MoveValue::Signer(self.fee_payer),
             fee_statement: self.fee_statement,
             txn_gas_price: self.txn_gas_price,

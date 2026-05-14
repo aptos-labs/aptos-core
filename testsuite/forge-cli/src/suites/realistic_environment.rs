@@ -470,6 +470,12 @@ pub(crate) fn realistic_env_max_load_test(
             helm_values["chain"]["on_chain_execution_config"] =
                 serde_yaml::to_value(OnChainExecutionConfig::default_for_genesis())
                     .expect("must serialize");
+            // Move ABI for versioned_prologue changed after v1.45; disable the
+            // flag so genesis stays on the pre-versioned prologue path.
+            let mut features = Features::default();
+            features.disable(FeatureFlag::VERSIONED_TRANSACTION_VALIDATION);
+            helm_values["chain"]["initial_features_override"] =
+                serde_yaml::to_value(features).expect("must serialize");
         }))
         .with_validator_override_node_config_fn(Arc::new(|config, _| {
             // Allow validator-PFN connections
