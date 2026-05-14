@@ -4,6 +4,7 @@
 use crate::{
     ledger_db::LedgerDb,
     metrics::{PRUNER_BATCH_SIZE, PRUNER_VERSIONS, PRUNER_WINDOW},
+    position_db::PositionDb,
     pruner::{
         ledger_pruner::LedgerPruner, pruner_manager::PrunerManager, pruner_utils,
         pruner_worker::PrunerWorker,
@@ -32,6 +33,9 @@ pub(crate) struct LedgerPrunerManager {
     user_pruning_window_offset: u64,
     /// The minimal readable version for the ledger data.
     min_readable_version: AtomicVersion,
+    /// Cached for rebuilding the underlying pruner when native DBs
+    /// attach later via `attach_native_pruners`.
+    internal_indexer_db: Option<InternalIndexerDB>,
 }
 
 impl PrunerManager for LedgerPrunerManager {
@@ -110,12 +114,14 @@ impl LedgerPrunerManager {
         ledger_db: Arc<LedgerDb>,
         ledger_pruner_config: LedgerPrunerConfig,
         internal_indexer_db: Option<InternalIndexerDB>,
+        position_db: Option<Arc<PositionDb>>,
     ) -> Self {
         let pruner_worker = if ledger_pruner_config.enable {
             Some(Self::init_pruner(
                 Arc::clone(&ledger_db),
                 ledger_pruner_config,
-                internal_indexer_db,
+                internal_indexer_db.clone(),
+                position_db,
             ))
         } else {
             None
@@ -136,6 +142,7 @@ impl LedgerPrunerManager {
             latest_version: Arc::new(Mutex::new(min_readable_version)),
             user_pruning_window_offset: ledger_pruner_config.user_pruning_window_offset,
             min_readable_version: AtomicVersion::new(min_readable_version),
+            internal_indexer_db,
         }
     }
 
@@ -143,9 +150,10 @@ impl LedgerPrunerManager {
         ledger_db: Arc<LedgerDb>,
         ledger_pruner_config: LedgerPrunerConfig,
         internal_indexer_db: Option<InternalIndexerDB>,
+        position_db: Option<Arc<PositionDb>>,
     ) -> PrunerWorker {
         let pruner = Arc::new(
-            LedgerPruner::new(ledger_db, internal_indexer_db)
+            LedgerPruner::new(ledger_db, internal_indexer_db, position_db)
                 .expect("Failed to create ledger pruner."),
         );
 
@@ -158,6 +166,29 @@ impl LedgerPrunerManager {
             .set(ledger_pruner_config.batch_size as i64);
 
         PrunerWorker::new(pruner, ledger_pruner_config.batch_size, "ledger")
+    }
+
+    /// Reattach the underlying `LedgerPruner` so it includes the
+    /// native-position value-CF pruner. Called once
+    /// `AptosDB::init_native_position` has opened the DB. No-op when
+    /// this manager is running in disabled mode.
+    pub fn attach_native_pruners(&mut self, position_db: Arc<PositionDb>) {
+        if self.pruner_worker.is_none() {
+            return;
+        }
+        // Drop the existing worker first so its background thread is
+        // joined cleanly before we rebuild.
+        self.pruner_worker = None;
+
+        let pruner = Arc::new(
+            LedgerPruner::new(
+                Arc::clone(&self.ledger_db),
+                self.internal_indexer_db.clone(),
+                Some(position_db),
+            )
+            .expect("Failed to rebuild ledger pruner with native DBs."),
+        );
+        self.pruner_worker = Some(PrunerWorker::new(pruner, self.pruning_batch_size, "ledger"));
     }
 
     fn set_pruner_target_db_version(&self, latest_version: Version) {

@@ -4,6 +4,7 @@
 mod event_store_pruner;
 mod ledger_metadata_pruner;
 pub(crate) mod ledger_pruner_manager;
+mod native_value_pruner;
 mod persisted_auxiliary_info_pruner;
 mod transaction_accumulator_pruner;
 mod transaction_auxiliary_data_pruner;
@@ -14,11 +15,13 @@ mod write_set_pruner;
 use crate::{
     ledger_db::LedgerDb,
     metrics::PRUNER_VERSIONS,
+    position_db::PositionDb,
     pruner::{
         db_pruner::DBPruner,
         db_sub_pruner::DBSubPruner,
         ledger_pruner::{
             event_store_pruner::EventStorePruner, ledger_metadata_pruner::LedgerMetadataPruner,
+            native_value_pruner::PositionValuePruner,
             persisted_auxiliary_info_pruner::PersistedAuxiliaryInfoPruner,
             transaction_accumulator_pruner::TransactionAccumulatorPruner,
             transaction_auxiliary_data_pruner::TransactionAuxiliaryDataPruner,
@@ -118,6 +121,7 @@ impl LedgerPruner {
     pub fn new(
         ledger_db: Arc<LedgerDb>,
         internal_indexer_db: Option<InternalIndexerDB>,
+        position_db: Option<Arc<PositionDb>>,
     ) -> Result<Self> {
         info!(name = LEDGER_PRUNER_NAME, "Initializing...");
 
@@ -169,19 +173,28 @@ impl LedgerPruner {
             metadata_progress,
         )?);
 
+        let mut sub_pruners: Vec<Box<dyn DBSubPruner + Send + Sync>> = vec![
+            event_store_pruner,
+            persisted_auxiliary_info_pruner,
+            transaction_accumulator_pruner,
+            transaction_auxiliary_data_pruner,
+            transaction_info_pruner,
+            transaction_pruner,
+            write_set_pruner,
+        ];
+
+        if let Some(pos_db) = position_db {
+            sub_pruners.push(Box::new(PositionValuePruner::new(
+                pos_db,
+                metadata_progress,
+            )?));
+        }
+
         let pruner = LedgerPruner {
             target_version: AtomicVersion::new(metadata_progress),
             progress: AtomicVersion::new(metadata_progress),
             ledger_metadata_pruner,
-            sub_pruners: vec![
-                event_store_pruner,
-                persisted_auxiliary_info_pruner,
-                transaction_accumulator_pruner,
-                transaction_auxiliary_data_pruner,
-                transaction_info_pruner,
-                transaction_pruner,
-                write_set_pruner,
-            ],
+            sub_pruners,
         };
 
         info!(

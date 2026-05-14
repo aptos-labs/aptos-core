@@ -49,12 +49,18 @@ fn verify_write_set_pruner(write_sets: Vec<WriteSet>) {
     let transaction_store = &aptos_db.transaction_store;
     let num_write_sets = write_sets.len();
 
-    let pruner = LedgerPrunerManager::new(Arc::clone(&aptos_db.ledger_db), LedgerPrunerConfig {
-        enable: true,
-        prune_window: 0,
-        batch_size: 1,
-        user_pruning_window_offset: 0,
-    });
+    let pruner = LedgerPrunerManager::new(
+        Arc::clone(&aptos_db.ledger_db),
+        LedgerPrunerConfig {
+            enable: true,
+            prune_window: 0,
+            batch_size: 1,
+            user_pruning_window_offset: 0,
+        },
+        None,
+        None,
+        None,
+    );
 
     // write sets
     let mut batch = SchemaBatch::new();
@@ -121,13 +127,18 @@ fn verify_txn_store_pruner(
     for i in (0..=num_transaction).step_by(step_size) {
         // Initialize a pruner in every iteration to test the min_readable_version initialization
         // logic.
-        let pruner =
-            LedgerPrunerManager::new(Arc::clone(&aptos_db.ledger_db), LedgerPrunerConfig {
+        let pruner = LedgerPrunerManager::new(
+            Arc::clone(&aptos_db.ledger_db),
+            LedgerPrunerConfig {
                 enable: true,
                 prune_window: 0,
                 batch_size: 1,
                 user_pruning_window_offset: 0,
-            });
+            },
+            None,
+            None,
+            None,
+        );
         pruner
             .wake_and_wait_pruner(i as u64 /* latest_version */)
             .unwrap();
