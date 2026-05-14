@@ -26,7 +26,7 @@ MonoMove starts from a clean slate, so the error system can be redesigned around
 
 1. **Small, stable public surface.** A caller can branch on a small number of categories with full coverage of the failure space. Adding a new error site inside the VM should not add a new public category.
 
-2. **Messages are persisted and deterministic.** Every error carries a message that is saved alongside the transaction outcome. The message is deterministic for a given internal variant and payload — the same error in the same context produces the same bytes. Messages are not i18n-translated and never will be. Phrasing changes are a soft contract: possible across major versions but reviewed the way protocol constants are. Downstream consumers that need *programmatic* access to a value should rely on the public category and any structured payload it carries ([§10.1](#101-structured-payloads-on-vmerrorkind-variants)), not parse the message string.
+2. **Messages are surfaceable and deterministic.** Every error carries a message that can be surfaced when needed (e.g. for debugging). The message is deterministic for a given internal variant and payload — the same error in the same context produces the same bytes. Messages are not i18n-translated and never will be. Phrasing changes are a soft contract: possible across major versions but reviewed the way protocol constants are. Downstream consumers that need *programmatic* access to a value should rely on the public category and any structured payload it carries ([§10.1](#101-structured-payloads-on-vmerrorkind-variants)), not parse the message string.
 
 3. **Exhaustive internal taxonomy.** Every error site is a variant of a typed internal enum carrying structured payload (indices, types, addresses — whatever is useful for diagnosis). There is no untyped catch-all variant and no `with_message("...")` escape hatch. This lets tests match on variants and fields directly, rather than on numeric codes or message substrings.
 
@@ -206,7 +206,7 @@ The seven `ExecutionErrorKind` variants, with the rough class of internal errors
 | `LinkError` | A referenced module, function, or struct could not be resolved or had an incompatible signature. | `ModuleNotFound`, `FunctionNotFound`, `StructNotFound`, `SignatureMismatch`, `UpgradeIncompatible` |
 | `InvariantViolation` | A condition that should never occur — a VM bug. | `MissingFrame`, `LoaderInconsistency`, `ParanoidCheckFailed` |
 
-`InvariantViolation` is operationally distinct from the rest: it indicates a VM bug, not a program bug. Production deployments should alert on it; users should never see it surface as a transaction failure with diagnostic detail. Keeping it as a category (rather than panicking) lets the orchestrator translate the transaction outcome cleanly without unwinding.
+`InvariantViolation` is operationally distinct from the rest: it indicates a VM bug, not a program bug. Production deployments should alert on it; users should never see it surface as a transaction failure with diagnostic detail. Keeping it as a category (rather than panicking) lets the orchestrator translate the transaction outcome cleanly without unwinding. These can also be raised speculatively (e.g. from a parallel re-execution that read inconsistent state), so alerts should fire only on non-speculative failures.
 
 `Aborted` is *not* in this list because it lives at the `ExecutionResult` level (§6), not inside `ExecutionError`.
 
