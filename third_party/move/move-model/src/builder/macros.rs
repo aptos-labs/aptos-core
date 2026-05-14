@@ -118,8 +118,22 @@ impl ExpTranslator<'_, '_, '_> {
         // Currently, there are only built-in macros, and no user definable ones.
         let expansion_ = match name {
             "assert" => self.expand_assert(loc, args, AssertMacro::Assert),
-            "assert_eq" => self.expand_assert_cmp(loc, args, AssertMacro::AssertEq),
-            "assert_ne" => self.expand_assert_cmp(loc, args, AssertMacro::AssertNe),
+            "assert_eq" => {
+                self.check_language_version(
+                    &self.to_loc(&loc),
+                    &format!("`{}` macro", AssertMacro::AssertEq),
+                    LanguageVersion::V2_4,
+                );
+                self.expand_assert_cmp(loc, args, AssertMacro::AssertEq)
+            },
+            "assert_ne" => {
+                self.check_language_version(
+                    &self.to_loc(&loc),
+                    &format!("`{}` macro", AssertMacro::AssertNe),
+                    LanguageVersion::V2_4,
+                );
+                self.expand_assert_cmp(loc, args, AssertMacro::AssertNe)
+            },
             "debug_assert" => self.expand_debug_macro(loc, args, AssertMacro::DebugAssert),
             "debug_assert_eq" => self.expand_debug_macro(loc, args, AssertMacro::DebugAssertEq),
             "debug_assert_ne" => self.expand_debug_macro(loc, args, AssertMacro::DebugAssertNe),
@@ -320,11 +334,6 @@ impl ExpTranslator<'_, '_, '_> {
         macro_kind: AssertMacro,
     ) -> Exp_ {
         let kind = macro_kind.comparison_kind();
-        self.check_language_version(
-            &self.to_loc(&loc),
-            &format!("`{}` macro", macro_kind),
-            LanguageVersion::V2_4,
-        );
 
         if args.value.len() < 2 {
             self.error(
