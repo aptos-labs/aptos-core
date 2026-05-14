@@ -336,6 +336,7 @@ dependencies = [
  "backoff",
  "base64 0.13.1",
  "bcs 0.1.4",
+ "blake3",
  "bollard",
  "chrono",
  "clap 4.5.60",
@@ -362,7 +363,6 @@ dependencies = [
  "serde_json",
  "serde_yaml 0.8.26",
  "set_env",
- "sha2 0.9.9",
  "shadow-rs",
  "tempfile",
  "thiserror 1.0.69",
@@ -6522,6 +6522,7 @@ dependencies = [
  "constant_time_eq 0.4.2",
  "cpufeatures 0.3.0",
  "memmap2 0.9.9",
+ "rayon-core",
 ]
 
 [[package]]
