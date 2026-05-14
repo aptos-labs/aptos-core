@@ -1,23 +1,8 @@
 // Copyright (c) Aptos Foundation
 // Licensed pursuant to the Innovation-Enabling Source Code License, available at https://github.com/aptos-labs/aptos-core/blob/main/LICENSE
 
-//! Sharded RocksDB tier for native-position value storage.
-//!
-//! 16 shards keyed by `state_key.get_shard_id()` (the leading nibble
-//! of the StateKey hash, matching `state_kv_db` and the JMT internal
-//! shard convention), plus a separate per-DB metadata DB. The shard
-//! DBs hold the per-key CFs (`position_value`,
-//! `stale_position_value_index`); the metadata DB holds the
-//! `db_metadata` CF (pruner-progress bookkeeping). Same layout main
-//! state's `state_kv_db` uses (shards + metadata DB) — no metadata is
-//! ever written to a shard DB.
-//!
-//! Lifecycle metadata (exchange-id allocations, deny-list) lives in
-//! the `aptos_experimental::native_position::ExchangeRegistry` Move
-//! resource at `@aptos_framework`, not here. There is no
-//! `position_metadata` CF.
-//!
-//! See `PLAN_native_position.md` for design rationale.
+//! Sharded RocksDB tier for native-position value storage. See bottom
+//! commit doc-comment.
 
 #![forbid(unsafe_code)]
 
@@ -36,7 +21,10 @@ use aptos_logger::info;
 use aptos_rocksdb_options::gen_rocksdb_options;
 use aptos_schemadb::{batch::SchemaBatch, Cache, Env, DB};
 use aptos_storage_interface::{AptosDbError, Result};
-use aptos_types::{state_store::NUM_STATE_SHARDS, transaction::Version};
+use aptos_types::{
+    state_store::{state_value::StateValue, NUM_STATE_SHARDS},
+    transaction::Version,
+};
 use rayon::prelude::*;
 use std::{
     ops::Deref,
@@ -153,8 +141,6 @@ impl PositionDb {
         res.map_err(|e| AptosDbError::Other(format!("failed to open {name}: {e}")))
     }
 
-    /// Commit per-shard batches in parallel with progress stamps.
-    /// Mirrors `StateKvDb::commit`.
     pub fn commit(
         &self,
         version: Version,
@@ -205,8 +191,42 @@ impl PositionDb {
         )
     }
 
-    /// Most recent prior version `< at_version` at which
-    /// `state_key_hash` was written.
+    pub fn get_position_value(
+        &self,
+        state_key_hash: HashValue,
+        version: Version,
+    ) -> Result<Option<StateValue>> {
+        let shard = ShardedKvDb::shard_of_hash(state_key_hash);
+        let mut iter = self.shard(shard).iter::<PositionValueSchema>()?;
+        iter.seek(&(state_key_hash, version))?;
+        if let Some(Ok((key_pair, value_opt))) = iter.next() {
+            if key_pair.0 == state_key_hash {
+                return Ok(value_opt);
+            }
+        }
+        Ok(None)
+    }
+
+    pub fn write_position_batch(
+        &self,
+        version: Version,
+        writes: impl IntoIterator<Item = (HashValue, Option<StateValue>)>,
+    ) -> Result<()> {
+        let mut per_shard: [Option<SchemaBatch>; NUM_NATIVE_VALUE_SHARDS] =
+            std::array::from_fn(|_| None);
+        for (state_key_hash, maybe_value) in writes {
+            let shard = ShardedKvDb::shard_of_hash(state_key_hash);
+            let batch = per_shard[shard].get_or_insert_with(SchemaBatch::new);
+            batch.put::<PositionValueSchema>(&(state_key_hash, version), &maybe_value)?;
+        }
+        for (shard, maybe_batch) in per_shard.into_iter().enumerate() {
+            if let Some(batch) = maybe_batch {
+                self.shard(shard).write_schemas(batch)?;
+            }
+        }
+        Ok(())
+    }
+
     pub fn find_prior_version(
         &self,
         state_key_hash: HashValue,

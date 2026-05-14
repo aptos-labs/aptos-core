@@ -1,17 +1,7 @@
 // Copyright (c) Aptos Foundation
 // Licensed pursuant to the Innovation-Enabling Source Code License, available at https://github.com/aptos-labs/aptos-core/blob/main/LICENSE
 
-//! Dedicated JMT for native-position keys. Thin wrapper around the
-//! shared [`crate::sharded_jmt_merkle_db::ShardedJmtMerkleDb`] substrate
-//! — same shape as [`crate::state_merkle_db::StateMerkleDb`] minus the
-//! hot/cold split. 16 sharded RocksDB instances for the per-key JMT
-//! subtrees plus a separate metadata DB for the top-level (non-sharded)
-//! JMT nodes and commit-progress bookkeeping.
-//!
-//! Reuses the existing `state_merkle_db` schemas
-//! (`jellyfish_merkle_node`, `stale_node_index`,
-//! `stale_node_index_cross_epoch`). `AptosDB::init_native_position`
-//! opens the underlying RocksDB instances.
+//! Dedicated JMT for native-position keys. See bottom commit doc-comment.
 
 #![forbid(unsafe_code)]
 
@@ -20,7 +10,10 @@ use crate::{
     sharded_jmt_merkle_db::{LeafNode, Node as ShardedNode, ShardedJmtMerkleDb},
 };
 use aptos_config::config::RocksdbConfig;
-use aptos_jellyfish_merkle::{node_type::NodeKey, TreeReader, TreeWriter};
+use aptos_crypto::{hash::SPARSE_MERKLE_PLACEHOLDER_HASH, HashValue};
+use aptos_jellyfish_merkle::{
+    iterator::JellyfishMerkleIterator, node_type::NodeKey, TreeReader, TreeWriter,
+};
 use aptos_logger::info;
 use aptos_rocksdb_options::gen_rocksdb_options;
 use aptos_schemadb::{Cache, Env, DB};
@@ -36,11 +29,8 @@ use std::{
     sync::Arc,
 };
 
-/// Number of position merkle DB shards. Same as `aptos_types::state_store::NUM_STATE_SHARDS`.
 pub const NUM_POSITION_MERKLE_SHARDS: usize = NUM_STATE_SHARDS;
 
-/// Sharded position merkle DB. Mirrors `StateMerkleDb` minus
-/// hot/cold split.
 #[derive(Debug)]
 pub struct PositionMerkleDb {
     inner: ShardedJmtMerkleDb,
@@ -55,9 +45,6 @@ impl Deref for PositionMerkleDb {
 }
 
 impl PositionMerkleDb {
-    /// Open a sharded `position_merkle_db` rooted at `path`. Mirrors
-    /// `StateMerkleDb::new` — opens the metadata DB at
-    /// `<path>/metadata/` and 16 shard DBs at `<path>/shard_<i>/`.
     pub fn new(
         path: &Path,
         rocksdb_config: RocksdbConfig,
@@ -102,9 +89,6 @@ impl PositionMerkleDb {
         Ok(Self { inner })
     }
 
-    /// Test-only: build a `PositionMerkleDb` whose 16 shards +
-    /// metadata slot all point at one `Arc<DB>`. Defeats per-shard
-    /// parallelism but avoids opening 17 RocksDB instances per test.
     #[cfg(any(test, feature = "fuzzing"))]
     pub fn new_uniform_for_test(db: Arc<DB>) -> Self {
         let shards: [Arc<DB>; NUM_POSITION_MERKLE_SHARDS] =
@@ -143,6 +127,29 @@ impl PositionMerkleDb {
         };
         res.map_err(|e| AptosDbError::Other(format!("failed to open {name}: {e}")))
     }
+
+    pub fn get_root_hash(&self, version: Version) -> Result<HashValue> {
+        let tree = aptos_jellyfish_merkle::JellyfishMerkleTree::new(&self.inner);
+        match tree.get_root_hash_option(version) {
+            Ok(Some(h)) => Ok(h),
+            Ok(None) => Ok(*SPARSE_MERKLE_PLACEHOLDER_HASH),
+            Err(e) => Err(AptosDbError::Other(format!(
+                "position_merkle_db get_root_hash: {e}"
+            ))),
+        }
+    }
+
+    pub fn iter_active_leaves(
+        self: &Arc<Self>,
+        version: Version,
+    ) -> Result<impl Iterator<Item = Result<(StateKey, HashValue)>>> {
+        let iter = JellyfishMerkleIterator::<Self, StateKey>::new(
+            Arc::clone(self),
+            version,
+            HashValue::zero(),
+        )?;
+        Ok(iter.map(|res| res.map(|(key_hash, (state_key, _leaf_version))| (state_key, key_hash))))
+    }
 }
 
 impl TreeReader<StateKey> for PositionMerkleDb {
@@ -162,4 +169,13 @@ impl TreeWriter<StateKey> for PositionMerkleDb {
     ) -> Result<()> {
         self.inner.write_node_batch(node_batch)
     }
+}
+
+pub const COMPOSITE_STATE_ROOT_DOMAIN: &[u8] = b"APTOS::StateRoot";
+
+pub fn compose_state_root(main_state_root: HashValue, position_root: HashValue) -> HashValue {
+    let mut hasher = aptos_crypto::hash::DefaultHasher::new(COMPOSITE_STATE_ROOT_DOMAIN);
+    hasher.update(main_state_root.as_ref());
+    hasher.update(position_root.as_ref());
+    hasher.finish()
 }
