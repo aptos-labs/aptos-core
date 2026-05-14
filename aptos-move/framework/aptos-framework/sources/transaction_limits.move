@@ -104,7 +104,7 @@ module aptos_framework::transaction_limits {
     }
 
     /// Creates a new tier. Aborts if multiplier is not in (100, 10000].
-    public fun new_tier(min_stake: u64, multiplier_percent: u64): TxnLimitTier {
+    friend fun new_tier(min_stake: u64, multiplier_percent: u64): TxnLimitTier {
         assert!(
             multiplier_percent > MIN_MULTIPLIER_PERCENT
                 && multiplier_percent <= MAX_MULTIPLIER_PERCENT,
