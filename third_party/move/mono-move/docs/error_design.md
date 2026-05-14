@@ -94,7 +94,7 @@ pub struct ExecutionError {
 
 pub enum ExecutionErrorKind {
     OutOfGas,
-    LimitExceeded,
+    RuntimeLimitExceeded,
     InvalidOperation,
     VerificationFailed,
     DeserializationFailed,
@@ -123,7 +123,7 @@ impl From<RuntimeError> for ExecutionError {
             TypeMismatch { .. }           => ExecutionErrorKind::InvalidOperation,
             DivisionByZero                => ExecutionErrorKind::InvalidOperation,
             ArithmeticOverflow { .. }     => ExecutionErrorKind::InvalidOperation,
-            CallStackTooDeep { .. }       => ExecutionErrorKind::LimitExceeded,
+            CallStackTooDeep { .. }       => ExecutionErrorKind::RuntimeLimitExceeded,
             // ...
         };
         ExecutionError { kind, message: err.to_string(), location: None }
@@ -199,7 +199,7 @@ The seven `ExecutionErrorKind` variants, with the rough class of internal errors
 | Kind | Meaning | Examples of internal variants |
 | --- | --- | --- |
 | `OutOfGas` | Gas budget exhausted. | `GasExhausted { used, limit }` |
-| `LimitExceeded` | A static or dynamic structural limit was hit. | `CallStackTooDeep`, `ValueDepthTooDeep`, `TypeDepthTooDeep` |
+| `RuntimeLimitExceeded` | A static or dynamic structural limit was hit. | `CallStackTooDeep`, `ValueDepthTooDeep`, `TypeDepthTooDeep` |
 | `InvalidOperation` | Program attempted an operation that failed at runtime. | `VectorIndexOutOfBounds`, `PopFromEmptyVector`, `ResourceNotFound`, `ResourceAlreadyExists`, `TypeMismatch`, `BadCast`, `DivisionByZero`, `ArithmeticOverflow`, `ArithmeticUnderflow`, `ShiftAmountOutOfRange` |
 | `VerificationFailed` | Bytecode verifier rejected a module before execution. | All variants of `VerifierError` (control-flow, type safety, bounds, ability checks). |
 | `DeserializationFailed` | A binary blob (module, script, value) was malformed. | `BadMagic`, `UnknownOpcode`, `TruncatedInput`, `InvalidUtf8`, `BadFieldEncoding` |
@@ -216,9 +216,9 @@ The seven `ExecutionErrorKind` variants, with the rough class of internal errors
 
 The categories are chosen by **what action a caller takes when they see one**, not by where in the VM the error originated. Two error sites that the caller handles identically should map to the same kind; two error sites that demand different handling should not.
 
-Conversely, a single subsystem typically produces errors across multiple categories. The loader, for instance, raises `DeserializationFailed` (malformed module bytes), `VerificationFailed` (verifier rejection during load), `LinkError` (missing or incompatible dependency), and occasionally `InvariantViolation` (cache corruption). The specializer leans toward `LimitExceeded` (depth and instantiation caps) and `InvariantViolation` (since its input is already verified, most failures genuinely shouldn't happen). The runtime spans almost every category. The classification is variant-level, not subsystem-level — each subsystem's internal enum is mapped variant-by-variant to a public category by its `From` impl.
+Conversely, a single subsystem typically produces errors across multiple categories. The loader, for instance, raises `DeserializationFailed` (malformed module bytes), `VerificationFailed` (verifier rejection during load), `LinkError` (missing or incompatible dependency), and occasionally `InvariantViolation` (cache corruption). The specializer leans toward `RuntimeLimitExceeded` (depth and instantiation caps) and `InvariantViolation` (since its input is already verified, most failures genuinely shouldn't happen). The runtime spans almost every category. The classification is variant-level, not subsystem-level — each subsystem's internal enum is mapped variant-by-variant to a public category by its `From` impl.
 
-- `OutOfGas` vs. `LimitExceeded`: both are "you asked for too much," but the caller's response differs. `OutOfGas` is fixable by raising the gas budget; `LimitExceeded` is not (raising gas does nothing for a 200-deep call stack).
+- `OutOfGas` vs. `RuntimeLimitExceeded`: both are "you asked for too much," but the caller's response differs. `OutOfGas` is fixable by raising the gas budget; `RuntimeLimitExceeded` is not (raising gas does nothing for a 200-deep call stack).
 - `VerificationFailed` vs. `DeserializationFailed` vs. `LinkError`: all are pre-execution module-loading failures, but the caller's response differs. Verification failures mean the module is invalid; deserialisation failures mean the bytes are corrupted; link errors mean a dependency is missing or incompatible (and may be fixable by publishing the dependency).
 - `InvariantViolation` vs. all others: invariant violations require operational alerting; everything else is a normal failure mode.
 
@@ -258,7 +258,7 @@ Arguments for: downstream consumers (indexer, gas profiler, CLI) sometimes need 
 
 Arguments against: every additional structured field is a versioning commitment, and the internal error type already carries the data.
 
-Pragmatic middle ground: keep variants as units by default, and promote a field to structured payload only when every downstream consumer would otherwise have to parse it out of the message. Candidates worth considering: `LimitExceeded` (which limit, and the value), `InvalidOperation` (operation kind), `LinkError` (the missing module/function name).
+Pragmatic middle ground: keep variants as units by default, and promote a field to structured payload only when every downstream consumer would otherwise have to parse it out of the message. Candidates worth considering: `RuntimeLimitExceeded` (which limit, and the value), `InvalidOperation` (operation kind), `LinkError` (the missing module/function name).
 
 ### 10.2 Error chaining
 
