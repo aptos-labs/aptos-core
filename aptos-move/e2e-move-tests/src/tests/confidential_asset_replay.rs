@@ -44,7 +44,7 @@ use aptos_types::{
 use move_core_types::{ident_str, identifier::Identifier, language_storage::ModuleId};
 use serde::Deserialize;
 use std::{
-    collections::HashMap,
+    collections::{HashMap, HashSet},
     fs::File,
     io::{BufRead, BufReader},
 };
@@ -707,6 +707,7 @@ fn replay_mainnet_audit_window() {
     bootstrap_apt_confidentiality(&mut h);
 
     let mut accounts: HashMap<AccountAddress, Account> = HashMap::new();
+    let mut registered: HashSet<AccountAddress> = HashSet::new();
     let mut script_payloads_seen: u32 = 0;
     let mut entry_fn_replayed: u64 = 0;
 
@@ -786,6 +787,9 @@ fn replay_mainnet_audit_window() {
                         efp.entry_function_id_str,
                         status
                     );
+                    if efp.entry_function_id_str == "0x1::confidential_asset::register_raw" {
+                        registered.insert(sender);
+                    }
                     entry_fn_replayed += 1;
                 },
                 other => panic!(
@@ -805,4 +809,14 @@ fn replay_mainnet_audit_window() {
         "[replay] OK: {} txn(s) in audit window = {} entry-function replayed + {} governance script(s) skipped",
         total, entry_fn_replayed, script_payloads_seen
     );
+
+    let mut registered_sorted: Vec<AccountAddress> = registered.into_iter().collect();
+    registered_sorted.sort();
+    eprintln!(
+        "[replay] {} address(es) registered for confidential assets:",
+        registered_sorted.len()
+    );
+    for addr in &registered_sorted {
+        eprintln!("  0x{}", addr.to_hex());
+    }
 }
