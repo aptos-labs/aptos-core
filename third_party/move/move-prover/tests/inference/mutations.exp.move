@@ -342,8 +342,8 @@ module 0x42::mutations {
     }
     spec pass_ref_to_fn(p: &mut Point, val: u64) {
         pragma opaque = true;
-        ensures [inferred] p == update_field(old(p), x, result_of<write_to_ref>(old(p).x, val));
-        ensures [inferred] ensures_of<write_to_ref>(old(p).x, val, result_of<write_to_ref>(old(p).x, val));
+        ensures [inferred] p == update_field(old(p), x, p.x);
+        ensures [inferred] ensures_of<write_to_ref>(p.x, val, p.x);
         aborts_if [inferred] aborts_of<write_to_ref>(p.x, val);
     }
 
@@ -357,8 +357,8 @@ module 0x42::mutations {
     }
     spec create_pass_continue(p: Point, val: u64): Point {
         pragma opaque = true;
-        ensures [inferred] result == update_field(p, x, result_of<write_to_ref>(p.x, val));
-        ensures [inferred] ensures_of<write_to_ref>(p.x, val, result_of<write_to_ref>(p.x, val));
+        ensures [inferred] result == update_field(p, x, result.x);
+        ensures [inferred] ensures_of<write_to_ref>(p.x, val, result.x);
         aborts_if [inferred] aborts_of<write_to_ref>(p.x, val);
     }
 
@@ -385,14 +385,8 @@ module 0x42::mutations {
     }
     spec call_replace(r: &mut u64): u64 {
         pragma opaque = true;
-        ensures [inferred] result == {
-            let (_t0,_t1) = result_of<replace_ref>(old(r), 99);
-            _t0
-        };
-        ensures [inferred] r == {
-            let (_t0,_t1) = result_of<replace_ref>(old(r), 99);
-            _t1
-        };
+        ensures [inferred] result == result_of<replace_ref>(old(r), 99);
+        ensures [inferred] ensures_of<replace_ref>(r, 99, result, r);
         aborts_if [inferred] aborts_of<replace_ref>(r, 99);
     }
 
@@ -556,7 +550,10 @@ module 0x42::mutations {
             let a = update_field(old(Counter[addr]), value, old(Counter[addr]).value + 1);
             ..S1 |~ update<Counter>(addr, a)
         };
-        aborts_if [inferred] (S1 |~ global<Counter>(addr)).value == MAX_U64;
+        aborts_if [inferred] {
+            let a = S1 |~ global<Counter>(addr);
+            a.value == MAX_U64
+        };
         aborts_if [inferred] S1 |~ !exists<Counter>(addr);
         aborts_if [inferred] Counter[addr].value == MAX_U64;
         aborts_if [inferred] !exists<Counter>(addr);
@@ -653,8 +650,14 @@ module 0x42::mutations {
             let a = update_field(old(Counter[a2]), value, v1);
             ..S1 |~ update<Counter>(a2, a)
         };
-        aborts_if [inferred] S1 |~ cond && !exists<Counter>(a2);
-        aborts_if [inferred] S1 |~ !cond && !exists<Counter>(a1);
+        aborts_if [inferred] {
+            let a = S1 |~ exists<Counter>(a2);
+            cond && !a
+        };
+        aborts_if [inferred] {
+            let a = S1 |~ exists<Counter>(a1);
+            !cond && !a
+        };
         aborts_if [inferred] cond && !exists<Counter>(a1);
         aborts_if [inferred] !cond && !exists<Counter>(a2);
     }
@@ -689,10 +692,22 @@ module 0x42::mutations {
             let a = update_field(old(Counter[a2]), value, old(Counter[a2]).value + v1);
             ..S1 |~ update<Counter>(a2, a)
         };
-        aborts_if [inferred] cond && (S1 |~ global<Counter>(a2)).value + v2 > MAX_U64;
-        aborts_if [inferred] S1 |~ cond && !exists<Counter>(a2);
-        aborts_if [inferred] !cond && (S1 |~ global<Counter>(a1)).value + v2 > MAX_U64;
-        aborts_if [inferred] S1 |~ !cond && !exists<Counter>(a1);
+        aborts_if [inferred] {
+            let a = S1 |~ global<Counter>(a2);
+            cond && a.value + v2 > MAX_U64
+        };
+        aborts_if [inferred] {
+            let a = S1 |~ exists<Counter>(a2);
+            cond && !a
+        };
+        aborts_if [inferred] {
+            let a = S1 |~ global<Counter>(a1);
+            !cond && a.value + v2 > MAX_U64
+        };
+        aborts_if [inferred] {
+            let a = S1 |~ exists<Counter>(a1);
+            !cond && !a
+        };
         aborts_if [inferred] cond && Counter[a1].value + v1 > MAX_U64;
         aborts_if [inferred] cond && !exists<Counter>(a1);
         aborts_if [inferred] !cond && Counter[a2].value + v1 > MAX_U64;

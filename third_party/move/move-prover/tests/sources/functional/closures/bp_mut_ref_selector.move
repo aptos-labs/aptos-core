@@ -15,9 +15,11 @@ module 0x42::bp_mut_ref_selector {
     // Apply `f` to a field of `p` via a `&mut` field borrow.
     fun apply_to_x(f: |&mut u64|, p: &mut Point) { f(&mut p.x) }
     spec apply_to_x {
-        // The post-state of `p.x` equals f's post-state of its &mut argument
-        // applied to the pre-state of `p.x`.
-        ensures p.x == result_of<f>(&mut p.x);
+        // `f` is void; the only output is the `&mut` post-state. Use
+        // `ensures_of` (relational) to constrain it — `result_of` is
+        // invalid on void callees. The selector `&mut p.x` carries pre-
+        // and post-state of the field through the BP call.
+        ensures ensures_of<f>(&mut p.x);
         // p.y is unchanged by the call.
         ensures p.y == old(p).y;
     }

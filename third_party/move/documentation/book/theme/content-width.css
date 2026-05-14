@@ -10,3 +10,14 @@
 .content main {
     max-width: 100ch;
 }
+
+/* Tables tagged with `signature-table` give more room to the first
+ * column, which typically holds long function signatures. */
+.signature-table table {
+    table-layout: fixed;
+    width: 100%;
+}
+.signature-table th:first-child,
+.signature-table td:first-child {
+    width: 40%;
+}

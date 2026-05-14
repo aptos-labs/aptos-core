@@ -64,7 +64,10 @@ module 0x42::chained_opaque {
             let a = ..S1 |~ result_of<f1>(self, x);
             S1.. |~ result_of<f2>(self, a)
         };
-        aborts_if [inferred] S1 |~ aborts_of<f2>(self, ..S1 |~ result_of<f1>(self, x));
+        aborts_if [inferred] S1 |~ {
+            let a = ..S1 |~ result_of<f1>(self, x);
+            aborts_of<f2>(self, a)
+        };
         aborts_if [inferred] aborts_of<f1>(self, x);
     }
 

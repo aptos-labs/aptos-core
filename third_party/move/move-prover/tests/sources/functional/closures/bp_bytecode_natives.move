@@ -79,15 +79,16 @@ module 0x42::bp_bytecode_natives {
         aborts_if aborts_of<vector::push_back<T>>(v, e);
     }
 
-    /// `ensures_of` over push_back captures the post-state via the
-    /// in/out-param convention: `ensures_of<push_back>(v, e, v_post)`
-    /// rewrites to `v_post == concat(v, vec(e))`.
+    /// `ensures_of` over push_back relates the pre/post state of the
+    /// `&mut` argument: the user writes the call with `v` appearing once;
+    /// the model rewriter and Boogie backend together produce the canonical
+    /// `(pre_v, e, post_v)` form.
     fun push_back_ensures<T: drop>(v: &mut vector<T>, e: T) {
         vector::push_back(v, e)
     }
     spec push_back_ensures {
         aborts_if false;
-        ensures ensures_of<vector::push_back<T>>(old(v), e, v);
+        ensures ensures_of<vector::push_back<T>>(v, e);
     }
 
     // ====================================================================

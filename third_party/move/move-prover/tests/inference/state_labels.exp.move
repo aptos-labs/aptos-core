@@ -312,7 +312,10 @@ module 0x42::state_labels {
         pragma opaque = true;
         modifies Resource[addr1];
         ensures [inferred] result == (S1.. |~ result_of<read_resource>(addr2));
-        ensures [inferred] ..S1 |~ ensures_of<remove_resource>(addr1, ..S1 |~ result_of<remove_resource>(addr1));
+        ensures [inferred] ..S1 |~ {
+            let a = ..S1 |~ result_of<remove_resource>(addr1);
+            ensures_of<remove_resource>(addr1, a)
+        };
         aborts_if [inferred] S1 |~ aborts_of<read_resource>(addr2);
         aborts_if [inferred] aborts_of<remove_resource>(addr1);
     }
@@ -402,11 +405,17 @@ module 0x42::state_labels {
             };
             S2.. |~ result_of<swap_value>(a3, a)
         };
-        aborts_if [inferred] S2 |~ aborts_of<swap_value>(a3, {
+        aborts_if [inferred] S2 |~ {
+            let a = {
+                let b = ..S1 |~ result_of<swap_value>(a1, 0);
+                S1..S2 |~ result_of<swap_value>(a2, b)
+            };
+            aborts_of<swap_value>(a3, a)
+        };
+        aborts_if [inferred] S1 |~ {
             let a = ..S1 |~ result_of<swap_value>(a1, 0);
-            S1..S2 |~ result_of<swap_value>(a2, a)
-        });
-        aborts_if [inferred] S1 |~ aborts_of<swap_value>(a2, ..S1 |~ result_of<swap_value>(a1, 0));
+            aborts_of<swap_value>(a2, a)
+        };
         aborts_if [inferred] aborts_of<swap_value>(a1, 0);
     }
 

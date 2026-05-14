@@ -30,9 +30,8 @@ module 0x42::spec_companion {
     }
     spec caller(self: &mut Counter): u64 {
         pragma opaque = true;
-        ensures [inferred] result == result_of<increment>(old(self)).value;
-        ensures [inferred] self == result_of<increment>(old(self));
-        ensures [inferred] ensures_of<increment>(old(self), result_of<increment>(old(self)));
+        ensures [inferred] result == self.value;
+        ensures [inferred] ensures_of<increment>(self, self);
         aborts_if [inferred] aborts_of<increment>(self);
     }
 
