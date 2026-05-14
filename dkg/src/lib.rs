@@ -18,7 +18,8 @@ use aptos_config::config::{ReliableBroadcastConfig, SafetyRulesConfig};
 use aptos_event_notifications::{
     DbBackedOnChainConfig, EventNotificationListener, ReconfigNotificationListener,
 };
-use aptos_metrics_core::IntGauge;
+use aptos_logger::{info, warn};
+use aptos_metrics_core::{IntGauge, IntGaugeVec};
 use aptos_network::application::interface::{NetworkClient, NetworkServiceEvents};
 use aptos_types::{
     chain_id::ChainId,
@@ -30,7 +31,11 @@ use aptos_types::{
 };
 use aptos_validator_transaction_pool::VTxnPoolState;
 use move_core_types::account_address::AccountAddress;
-use std::{path::PathBuf, time::Instant};
+use std::{
+    io,
+    path::{Path, PathBuf},
+    time::Instant,
+};
 use tokio::runtime::Runtime;
 pub use types::DKGMessage;
 
@@ -79,17 +84,18 @@ pub fn initialize_digest_key_with_counters(
         set_digest_key_path(path.clone());
     }
     let source = initialize_digest_key(chain_id, is_validator);
-    match &source {
-        DigestKeySource::WillLoadFromFile { file_size } => {
-            counters::DIGEST_KEY_FILE_SIZE_BYTES.set(*file_size as i64);
+    match source {
+        DigestKeySource::WillLoadFromFile { path, file_size } => {
+            counters::DIGEST_KEY_FILE_SIZE_BYTES.set(file_size as i64);
             counters::DIGEST_KEY_SOURCE
                 .with_label_values(&["file"])
                 .set(1);
             // Eagerly load the key in a background thread so the metric is available on all nodes.
-            std::thread::spawn(|| {
+            std::thread::spawn(move || {
                 let start = Instant::now();
                 let _ = &*DIGEST_KEY;
                 counters::DIGEST_KEY_LOAD_DURATION_SECONDS.observe(start.elapsed().as_secs_f64());
+                publish_blake3(&path, &counters::DIGEST_KEY_BLAKE3, "DigestKey");
             });
         },
         DigestKeySource::TestKeyFallback => {
@@ -112,17 +118,18 @@ pub fn initialize_public_parameters_with_counters(blob_path: Option<&PathBuf>, c
         set_public_parameters_path(path.clone());
     }
     let source = initialize_public_parameters(chain_id);
-    match &source {
-        PublicParametersSource::WillLoadFromFile { file_size } => {
-            counters::PUBLIC_PARAMS_FILE_SIZE_BYTES.set(*file_size as i64);
+    match source {
+        PublicParametersSource::WillLoadFromFile { path, file_size } => {
+            counters::PUBLIC_PARAMS_FILE_SIZE_BYTES.set(file_size as i64);
             counters::PUBLIC_PARAMS_SOURCE
                 .with_label_values(&["file"])
                 .set(1);
-            std::thread::spawn(|| {
+            std::thread::spawn(move || {
                 let start = Instant::now();
                 let _ = &*PUBLIC_PARAMETERS;
                 counters::PUBLIC_PARAMS_LOAD_DURATION_SECONDS
                     .observe(start.elapsed().as_secs_f64());
+                publish_blake3(&path, &counters::PUBLIC_PARAMS_BLAKE3, "PublicParameters");
             });
         },
         PublicParametersSource::TestKeyFallback => {
@@ -134,6 +141,35 @@ pub fn initialize_public_parameters_with_counters(blob_path: Option<&PathBuf>, c
             counters::PUBLIC_PARAMS_SOURCE
                 .with_label_values(&["none"])
                 .set(1);
+        },
+    }
+}
+
+fn hash_file_blake3(path: &Path) -> io::Result<blake3::Hash> {
+    let mut hasher = blake3::Hasher::new();
+    hasher.update_mmap(path)?;
+    Ok(hasher.finalize())
+}
+
+fn publish_blake3(path: &Path, gauge: &IntGaugeVec, kind: &str) {
+    match hash_file_blake3(path) {
+        Ok(hash) => {
+            let hex = hash.to_hex();
+            gauge.with_label_values(&[hex.as_str()]).set(1);
+            info!(
+                "{} blake3 hash for {}: {}",
+                kind,
+                path.display(),
+                hex.as_str()
+            );
+        },
+        Err(e) => {
+            warn!(
+                "Failed to compute {} blake3 hash for {}: {}",
+                kind,
+                path.display(),
+                e
+            );
         },
     }
 }

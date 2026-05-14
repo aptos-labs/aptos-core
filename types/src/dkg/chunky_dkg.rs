@@ -152,7 +152,7 @@ pub fn set_public_parameters(pp: Arc<ChunkyDKGPublicParameters>) {
 #[derive(Debug)]
 pub enum PublicParametersSource {
     /// A blob file exists and will be lazily read on first access.
-    WillLoadFromFile { file_size: u64 },
+    WillLoadFromFile { path: PathBuf, file_size: u64 },
     /// Will fall back to the built-in test parameters on first access.
     TestKeyFallback,
     /// No PublicParameters available (no path configured, not a test chain).
@@ -167,6 +167,7 @@ pub fn initialize_public_parameters(chain_id: ChainId) -> PublicParametersSource
     if let Some(path) = PUBLIC_PARAMETERS_PATH.get() {
         match std::fs::metadata(path) {
             Ok(meta) => PublicParametersSource::WillLoadFromFile {
+                path: path.clone(),
                 file_size: meta.len(),
             },
             Err(_) => PublicParametersSource::NotAvailable,
@@ -243,7 +244,7 @@ pub fn set_digest_key(key: Arc<DigestKey>) {
 #[derive(Debug)]
 pub enum DigestKeySource {
     /// A blob file exists and will be lazily read on first access.
-    WillLoadFromFile { file_size: u64 },
+    WillLoadFromFile { path: PathBuf, file_size: u64 },
     /// Fell back to the built-in test key.
     TestKeyFallback,
     /// No DigestKey is available (no path configured, not a test chain).
@@ -258,6 +259,7 @@ pub fn initialize_digest_key(chain_id: ChainId, is_validator: bool) -> DigestKey
     if let Some(path) = DIGEST_KEY_PATH.get() {
         match std::fs::metadata(path) {
             Ok(meta) => DigestKeySource::WillLoadFromFile {
+                path: path.clone(),
                 file_size: meta.len(),
             },
             Err(_) => DigestKeySource::NotAvailable,
