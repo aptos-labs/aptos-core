@@ -37,8 +37,8 @@ use move_vm_runtime::{
     move_vm::MoveVM,
     native_extensions::NativeContextExtensions,
     native_functions::NativeFunctionTable,
-    AsFunctionValueExtension, AsUnsyncModuleStorage, InstantiatedFunctionLoader,
-    LegacyLoaderConfig, RuntimeEnvironment,
+    source_locator, tracing, AsFunctionValueExtension, AsUnsyncModuleStorage,
+    InstantiatedFunctionLoader, LegacyLoaderConfig, RuntimeEnvironment,
 };
 use move_vm_test_utils::InMemoryStorage;
 use rayon::prelude::*;
@@ -205,8 +205,18 @@ impl TestRunner {
         writer: &Mutex<W>,
         options: &Mutex<F>,
     ) -> Result<TestResults> {
+        let parent_locator = source_locator::get_source_locator();
+        let parent_debugging = tracing::is_debugging_enabled();
         rayon::ThreadPoolBuilder::new()
             .num_threads(self.num_threads)
+            .start_handler(move |_| {
+                if parent_debugging {
+                    tracing::set_debugging_enabled(true);
+                }
+                if let Some(loc) = parent_locator.clone() {
+                    source_locator::set_source_locator(loc);
+                }
+            })
             .build()
             .unwrap()
             .install(|| {
