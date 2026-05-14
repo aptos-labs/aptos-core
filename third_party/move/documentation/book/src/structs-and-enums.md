@@ -797,6 +797,109 @@ assert!(v == 1);
 
 Notice that in the above example, the last match clause (`_`) covers both patterns `Ok(Err(_))` and `Err(_)`. Although at execution time, the earlier clauses match `Ok(Err(c))` for all values of `c`, the compiler cannot be sure all cases are covered due to the conditionals: conditions in match expressions are not considered when tracking coverage. Thus the first two clauses in the match expression above are not sufficient for match completeness, and an additional clause is required to avoid a compiler error.
 
+### Match Expression Extensions
+
+_Since language version 2.4_
+
+In addition to the general-purpose `match` extensions (primitive discriminators, range patterns, and matching through references to primitive values) documented under [Match Expressions](./conditionals-and-loops.md#match-expressions), Move 2.4 adds further extensions that apply specifically to struct and enum patterns:
+
+- literal and range patterns nested inside struct and enum variant patterns;
+- matching through `&` or `&mut` references to struct and enum values, including nested literals;
+- mixed-tuple matches: a tuple match in which some positions are primitive and others are not.
+
+#### Literals and Ranges Nested in Struct and Enum Patterns
+
+Primitive literals and range patterns may appear nested inside struct patterns and inside enum variant patterns, mixed freely with variable bindings and `_` wildcards. This is true for both named-field and positional variants:
+
+```move
+enum Inner has drop { A(u64), B }
+enum Outer has drop { W(Inner), X }
+
+fun deep(o: Outer): u64 {
+    match (o) {
+        Outer::W(Inner::A(1)) => 100,
+        Outer::W(Inner::A(_)) => 200,
+        Outer::W(Inner::B)    => 300,
+        Outer::X              => 400,
+    }
+}
+
+struct S has drop { x: u64, y: u64 }
+
+fun split(s: S): u64 {
+    match (s) {
+        S { x: 1, y }    => y + 100,
+        S { x: _, y: _ } => 0,
+    }
+}
+
+enum Pair has drop { P(u64, u64), Q }
+
+fun pair_match(p: Pair): u64 {
+    match (p) {
+        Pair::P(1, 2)    => 10,
+        Pair::P(x, 2)    => x + 100,
+        Pair::P(_, _)    => 20,
+        Pair::Q          => 30,
+    }
+}
+```
+
+[Range patterns](./conditionals-and-loops.md#range-patterns) work in the same positions:
+
+```move
+enum E has drop { V1(u64), V2 }
+
+fun bucket(e: E): u64 {
+    match (e) {
+        E::V1(0..100)    => 1,
+        E::V1(100..=999) => 2,
+        E::V1(_)         => 3,
+        E::V2            => 4,
+    }
+}
+```
+
+#### Matching Through References to Structs and Enums
+
+A `match` expression may take an immutable or mutable reference to a struct or enum value as its discriminator. The variant or field patterns may include nested literals and ranges. Variable bindings inside such a pattern capture references to the inner fields, so arm bodies dereference them as usual:
+
+```move
+enum Pair has drop { P(u64, u64), Q }
+
+fun ref_match(p: &Pair): u64 {
+    match (p) {
+        Pair::P(1, 2)    => 10,
+        Pair::P(x, 2)    => *x + 100, // x: &u64
+        Pair::P(_, _)    => 20,
+        Pair::Q          => 30,
+    }
+}
+```
+
+`&mut` discriminators are supported in the same way.
+
+#### Mixed-Tuple Discriminators
+
+Discriminators can now be tuples in which some positions are primitive and others are not, i.e., a _mixed-tuple match_.
+
+```move
+enum Data has drop { V1(u8), V2(u8) }
+
+fun make_pair(x: u8): (Data, u8) {
+    (Data::V1(x), x)
+}
+
+fun classify(x: u8): u8 {
+    match (make_pair(x)) {
+        (Data::V1(a), 1)          => a + 10,
+        (Data::V2(a), 2)          => a + 20,
+        (Data::V1(a), y) if y > 3 => a + y,
+        _                         => 99,
+    }
+}
+```
+
 ### Testing Enum Variants
 
 With the `is` operator, one can examine whether a given enum value is of a given variant:
