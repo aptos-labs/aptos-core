@@ -24,7 +24,7 @@ MonoMove starts from a clean slate, so the error system can be redesigned around
 
 ## 2. Goals
 
-1. **Small, stable public surface.** A caller can branch on a small number of categories (≈9) with full coverage of the failure space. Adding a new error site inside the VM should not add a new public category.
+1. **Small, stable public surface.** A caller can branch on a small number of categories with full coverage of the failure space. Adding a new error site inside the VM should not add a new public category.
 
 2. **Messages are persisted and deterministic.** Every error carries a message that is saved alongside the transaction outcome. The message is deterministic for a given internal variant and payload — the same error in the same context produces the same bytes. Messages are not i18n-translated and never will be. Phrasing changes are a soft contract: possible across major versions but reviewed the way protocol constants are. Downstream consumers that need *programmatic* access to a value should rely on the public category and any structured payload it carries ([§10.1](#101-structured-payloads-on-vmerrorkind-variants)), not parse the message string.
 
@@ -53,7 +53,7 @@ MonoMove starts from a clean slate, so the error system can be redesigned around
 | --- | --- |
 | **ExecutionResult** | The top-level result of executing a transaction or script: success, user abort, or VM failure. Replaces the same-named type from VM 1.0. |
 | **ExecutionError** | The public error type returned for non-success, non-abort outcomes. Carries a small `kind` enum, a message, and an optional location. |
-| **ExecutionErrorKind** | The small public category enum (≈9 variants). The set of values callers can meaningfully branch on. |
+| **ExecutionErrorKind** | The small public category enum. The set of values callers can meaningfully branch on. |
 | **Internal error** | A fully-typed internal enum (e.g. `RuntimeError`, `VerifierError`) with one variant per real error site. Used inside the VM crates and in tests. |
 | **Conversion** | The `From` impl that maps an internal error to a `ExecutionError`, formatting the message and selecting the public category. |
 
@@ -95,7 +95,6 @@ pub struct ExecutionError {
 pub enum ExecutionErrorKind {
     OutOfGas,
     LimitExceeded,
-    Arithmetic,
     InvalidOperation,
     VerificationFailed,
     DeserializationFailed,
@@ -122,8 +121,8 @@ impl From<RuntimeError> for ExecutionError {
             ResourceNotFound { .. }       => ExecutionErrorKind::InvalidOperation,
             ResourceAlreadyExists { .. }  => ExecutionErrorKind::InvalidOperation,
             TypeMismatch { .. }           => ExecutionErrorKind::InvalidOperation,
-            DivisionByZero                => ExecutionErrorKind::Arithmetic,
-            ArithmeticOverflow { .. }     => ExecutionErrorKind::Arithmetic,
+            DivisionByZero                => ExecutionErrorKind::InvalidOperation,
+            ArithmeticOverflow { .. }     => ExecutionErrorKind::InvalidOperation,
             CallStackTooDeep { .. }       => ExecutionErrorKind::LimitExceeded,
             // ...
         };
@@ -195,14 +194,13 @@ match interpreter.run() {
 
 ## 7. Public Categories
 
-The eight `ExecutionErrorKind` variants, with the rough class of internal errors that map into each:
+The seven `ExecutionErrorKind` variants, with the rough class of internal errors that map into each:
 
 | Kind | Meaning | Examples of internal variants |
 | --- | --- | --- |
 | `OutOfGas` | Gas budget exhausted. | `GasExhausted { used, limit }` |
 | `LimitExceeded` | A static or dynamic structural limit was hit. | `CallStackTooDeep`, `ValueDepthTooDeep`, `TypeDepthTooDeep` |
-| `Arithmetic` | Numeric operation produced an undefined result. | `DivisionByZero`, `ArithmeticOverflow`, `ArithmeticUnderflow`, `ShiftAmountOutOfRange` |
-| `InvalidOperation` | Program attempted a runtime-illegal operation. | `VectorIndexOutOfBounds`, `PopFromEmptyVector`, `ResourceNotFound`, `ResourceAlreadyExists`, `TypeMismatch`, `BadCast` |
+| `InvalidOperation` | Program attempted an operation that failed at runtime. | `VectorIndexOutOfBounds`, `PopFromEmptyVector`, `ResourceNotFound`, `ResourceAlreadyExists`, `TypeMismatch`, `BadCast`, `DivisionByZero`, `ArithmeticOverflow`, `ArithmeticUnderflow`, `ShiftAmountOutOfRange` |
 | `VerificationFailed` | Bytecode verifier rejected a module before execution. | All variants of `VerifierError` (control-flow, type safety, bounds, ability checks). |
 | `DeserializationFailed` | A binary blob (module, script, value) was malformed. | `BadMagic`, `UnknownOpcode`, `TruncatedInput`, `InvalidUtf8`, `BadFieldEncoding` |
 | `LinkError` | A referenced module, function, or struct could not be resolved or had an incompatible signature. | `ModuleNotFound`, `FunctionNotFound`, `StructNotFound`, `SignatureMismatch`, `UpgradeIncompatible` |
@@ -221,7 +219,6 @@ The categories are chosen by **what action a caller takes when they see one**, n
 Conversely, a single subsystem typically produces errors across multiple categories. The loader, for instance, raises `DeserializationFailed` (malformed module bytes), `VerificationFailed` (verifier rejection during load), `LinkError` (missing or incompatible dependency), and occasionally `InvariantViolation` (cache corruption). The specializer leans toward `LimitExceeded` (depth and instantiation caps) and `InvariantViolation` (since its input is already verified, most failures genuinely shouldn't happen). The runtime spans almost every category. The classification is variant-level, not subsystem-level — each subsystem's internal enum is mapped variant-by-variant to a public category by its `From` impl.
 
 - `OutOfGas` vs. `LimitExceeded`: both are "you asked for too much," but the caller's response differs. `OutOfGas` is fixable by raising the gas budget; `LimitExceeded` is not (raising gas does nothing for a 200-deep call stack).
-- `Arithmetic` vs. `InvalidOperation`: both are program bugs, but arithmetic failures (overflow, underflow, div-by-zero, shift out of range) are common and semantically distinct enough that downstream observability typically wants them as their own metric. Folding them into `InvalidOperation` would force callers to parse message substrings to distinguish.
 - `VerificationFailed` vs. `DeserializationFailed` vs. `LinkError`: all are pre-execution module-loading failures, but the caller's response differs. Verification failures mean the module is invalid; deserialisation failures mean the bytes are corrupted; link errors mean a dependency is missing or incompatible (and may be fixable by publishing the dependency).
 - `InvariantViolation` vs. all others: invariant violations require operational alerting; everything else is a normal failure mode.
 
@@ -261,7 +258,7 @@ Arguments for: downstream consumers (indexer, gas profiler, CLI) sometimes need 
 
 Arguments against: every additional structured field is a versioning commitment, and the internal error type already carries the data.
 
-Pragmatic middle ground: keep variants as units by default, and promote a field to structured payload only when every downstream consumer would otherwise have to parse it out of the message. Candidates worth considering: `LimitExceeded` (which limit, and the value), `Arithmetic` (operation kind), `LinkError` (the missing module/function name).
+Pragmatic middle ground: keep variants as units by default, and promote a field to structured payload only when every downstream consumer would otherwise have to parse it out of the message. Candidates worth considering: `LimitExceeded` (which limit, and the value), `InvalidOperation` (operation kind), `LinkError` (the missing module/function name).
 
 ### 10.2 Error chaining
 
