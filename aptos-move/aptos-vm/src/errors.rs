@@ -237,14 +237,12 @@ pub fn convert_prologue_error(
             ..
         } => e,
         status @ VMStatus::ExecutionFailure { .. } | status @ VMStatus::Error { .. } => {
-            speculative_error!(
-                log_context,
-                format!("[aptos_vm] Unexpected prologue error: {:?}", status),
-            );
+            let err_msg = format!("[aptos_vm] Unexpected prologue error: {:?}", status);
+            speculative_error!(log_context, err_msg.clone());
             VMStatus::Error {
                 status_code: StatusCode::UNEXPECTED_ERROR_FROM_KNOWN_MOVE_FUNCTION,
                 sub_status: status.sub_status(),
-                message: None,
+                message: Some(err_msg),
             }
         },
     })
