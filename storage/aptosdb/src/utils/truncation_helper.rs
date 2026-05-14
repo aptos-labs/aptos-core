@@ -6,14 +6,17 @@ use crate::{
         ledger_metadata_db::LedgerMetadataDb, transaction_db::TransactionDb, LedgerDb,
         LedgerDbSchemaBatches,
     },
+    position_db::{PositionDb, NUM_NATIVE_VALUE_SHARDS},
     schema::{
         db_metadata::{DbMetadataKey, DbMetadataSchema, DbMetadataValue},
         epoch_by_version::EpochByVersionSchema,
         hot_state_value_by_key_hash::HotStateValueByKeyHashSchema,
         jellyfish_merkle_node::JellyfishMerkleNodeSchema,
         ledger_info::LedgerInfoSchema,
+        position_value::PositionValueSchema,
         stale_node_index::StaleNodeIndexSchema,
         stale_node_index_cross_epoch::StaleNodeIndexCrossEpochSchema,
+        stale_position_value_index::StalePositionValueIndexSchema,
         stale_state_value_index_by_key_hash::StaleStateValueIndexByKeyHashSchema,
         state_value_by_key_hash::StateValueByKeyHashSchema,
         transaction::TransactionSchema,
@@ -65,6 +68,65 @@ pub(crate) fn get_state_merkle_commit_progress(
         state_merkle_db.metadata_db(),
         &DbMetadataKey::StateMerkleCommitProgress,
     )
+}
+
+/// Reads `PositionCommitProgress` from the position metadata DB.
+/// Mirrors `get_state_kv_commit_progress`. Returns `None` if no
+/// commit has ever landed.
+pub(crate) fn get_position_commit_progress(position_db: &PositionDb) -> Result<Option<Version>> {
+    get_progress(
+        position_db.metadata_db(),
+        &DbMetadataKey::PositionCommitProgress,
+    )
+}
+
+/// Drop every `position_value` and `stale_position_value_index` row at
+/// `> target_version` across all 16 shards. Mirrors
+/// `truncate_state_kv_db_shards`. Used on startup to roll back
+/// partial commits.
+pub(crate) fn truncate_position_db_shards(
+    position_db: &PositionDb,
+    target_version: Version,
+) -> Result<()> {
+    (0..NUM_NATIVE_VALUE_SHARDS)
+        .into_par_iter()
+        .try_for_each(|shard_id| {
+            truncate_position_db_single_shard(position_db, shard_id, target_version)
+        })
+}
+
+fn truncate_position_db_single_shard(
+    position_db: &PositionDb,
+    shard_id: usize,
+    target_version: Version,
+) -> Result<()> {
+    let mut batch = SchemaBatch::new();
+    delete_position_value_and_index(position_db.shard(shard_id), target_version + 1, &mut batch)?;
+    position_db.commit_single_shard(target_version, shard_id, Some(batch))
+}
+
+fn delete_position_value_and_index(
+    db_shard: &DB,
+    start_version: Version,
+    batch: &mut SchemaBatch,
+) -> Result<()> {
+    let mut iter = db_shard.iter::<PositionValueSchema>()?;
+    iter.seek_to_first();
+    for row in iter {
+        let ((key_hash, version), _) = row?;
+        if version >= start_version {
+            batch.delete::<PositionValueSchema>(&(key_hash, version))?;
+        }
+    }
+    let mut stale_iter = db_shard.iter::<StalePositionValueIndexSchema>()?;
+    stale_iter.seek_to_first();
+    for row in stale_iter {
+        let (index, _) = row?;
+        if index.stale_since_version >= start_version {
+            batch.delete::<StalePositionValueIndexSchema>(&index)?;
+        }
+    }
+    Ok(())
 }
 
 pub(crate) fn truncate_ledger_db(ledger_db: Arc<LedgerDb>, target_version: Version) -> Result<()> {

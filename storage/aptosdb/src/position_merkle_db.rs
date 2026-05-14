@@ -1,7 +1,7 @@
 // Copyright (c) Aptos Foundation
 // Licensed pursuant to the Innovation-Enabling Source Code License, available at https://github.com/aptos-labs/aptos-core/blob/main/LICENSE
 
-//! Dedicated JMT for native-position keys. See bottom commit doc-comment.
+//! Dedicated JMT for native-position keys.
 
 #![forbid(unsafe_code)]
 
@@ -70,10 +70,11 @@ impl PositionMerkleDb {
         let shards: [Arc<DB>; NUM_POSITION_MERKLE_SHARDS] = (0..NUM_POSITION_MERKLE_SHARDS)
             .into_par_iter()
             .map(|shard_id| {
-                let db = Self::open_shard(path, shard_id, &rocksdb_config, env, block_cache, readonly)
-                    .unwrap_or_else(|e| {
-                        panic!("Failed to open position_merkle_db shard {shard_id}: {e:?}.")
-                    });
+                let db =
+                    Self::open_shard(path, shard_id, &rocksdb_config, env, block_cache, readonly)
+                        .unwrap_or_else(|e| {
+                            panic!("Failed to open position_merkle_db shard {shard_id}: {e:?}.")
+                        });
                 Arc::new(db)
             })
             .collect::<Vec<_>>()
@@ -107,7 +108,14 @@ impl PositionMerkleDb {
     ) -> Result<DB> {
         let shard_path = db_root_path.as_ref().join(format!("shard_{shard_id}"));
         let name = format!("position_merkle_db_shard_{shard_id}");
-        Self::open_db(shard_path, &name, rocksdb_config, env, block_cache, readonly)
+        Self::open_db(
+            shard_path,
+            &name,
+            rocksdb_config,
+            env,
+            block_cache,
+            readonly,
+        )
     }
 
     fn open_db(
@@ -126,6 +134,20 @@ impl PositionMerkleDb {
             DB::open_cf(rocksdb_opts, path.as_path(), name, cfds)
         };
         res.map_err(|e| AptosDbError::Other(format!("failed to open {name}: {e}")))
+    }
+
+    pub fn create_checkpoint(&self, cp_root_path: &Path) -> Result<()> {
+        let target = cp_root_path.join("position_merkle_db");
+        std::fs::remove_dir_all(&target).unwrap_or(());
+        std::fs::create_dir_all(&target)
+            .map_err(|e| AptosDbError::Other(format!("create_checkpoint mkdir {target:?}: {e}")))?;
+        self.metadata_db()
+            .create_checkpoint(target.join("metadata"))?;
+        for shard_id in 0..NUM_POSITION_MERKLE_SHARDS {
+            self.db_shard(shard_id)
+                .create_checkpoint(target.join(format!("shard_{shard_id}")))?;
+        }
+        Ok(())
     }
 
     pub fn get_root_hash(&self, version: Version) -> Result<HashValue> {
@@ -169,13 +191,4 @@ impl TreeWriter<StateKey> for PositionMerkleDb {
     ) -> Result<()> {
         self.inner.write_node_batch(node_batch)
     }
-}
-
-pub const COMPOSITE_STATE_ROOT_DOMAIN: &[u8] = b"APTOS::StateRoot";
-
-pub fn compose_state_root(main_state_root: HashValue, position_root: HashValue) -> HashValue {
-    let mut hasher = aptos_crypto::hash::DefaultHasher::new(COMPOSITE_STATE_ROOT_DOMAIN);
-    hasher.update(main_state_root.as_ref());
-    hasher.update(position_root.as_ref());
-    hasher.finish()
 }

@@ -227,6 +227,20 @@ impl PositionDb {
         Ok(())
     }
 
+    pub fn create_checkpoint(&self, cp_root_path: &Path) -> Result<()> {
+        let target = cp_root_path.join("position_db");
+        std::fs::remove_dir_all(&target).unwrap_or(());
+        std::fs::create_dir_all(&target)
+            .map_err(|e| AptosDbError::Other(format!("create_checkpoint mkdir {target:?}: {e}")))?;
+        self.metadata_db()
+            .create_checkpoint(target.join("metadata"))?;
+        for shard_id in 0..NUM_NATIVE_VALUE_SHARDS {
+            self.shard(shard_id)
+                .create_checkpoint(target.join(format!("shard_{shard_id}")))?;
+        }
+        Ok(())
+    }
+
     pub fn find_prior_version(
         &self,
         state_key_hash: HashValue,

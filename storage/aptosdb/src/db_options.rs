@@ -251,7 +251,6 @@ fn state_key_extractor(state_value_raw_key: &[u8]) -> &[u8] {
 /// filter. Hash-scattered CFs do not get `with_no_compaction_stalling`
 /// — that helper is for sequential-key append-only CFs (see its
 /// docstring), and these CFs need real compaction work.
-#[allow(dead_code)]
 pub(crate) fn gen_position_cfds(
     rocksdb_config: &RocksdbConfig,
     block_cache: Option<&Cache>,
@@ -267,7 +266,6 @@ pub(crate) fn gen_position_cfds(
 
 /// CF descriptors for the `position_db` metadata DB (pruner-progress
 /// bookkeeping). Only the `db_metadata` CF; no per-CF post-processing.
-#[allow(dead_code)]
 pub(crate) fn gen_position_metadata_cfds(
     rocksdb_config: &RocksdbConfig,
     block_cache: Option<&Cache>,
@@ -279,7 +277,6 @@ pub(crate) fn gen_position_metadata_cfds(
 /// CF descriptors for `position_merkle_db`. Mirrors
 /// `gen_state_merkle_cfds`: no per-CF post-processing. The JMT CFs
 /// are hash-scattered and need real compaction.
-#[allow(dead_code)]
 pub(crate) fn gen_position_merkle_cfds(
     rocksdb_config: &RocksdbConfig,
     block_cache: Option<&Cache>,

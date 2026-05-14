@@ -84,10 +84,14 @@ impl AptosDB {
             hot_state_config,
         ));
 
+        // The native-position DB isn't open here; it attaches later
+        // via `AptosDB::init_native_position`, which re-binds the
+        // pruner via `LedgerPrunerManager::attach_native_pruners`.
         let ledger_pruner = LedgerPrunerManager::new(
             Arc::clone(&ledger_db),
             pruner_config.ledger_pruner_config,
             internal_indexer_db,
+            None,
         );
 
         AptosDB {
@@ -106,6 +110,10 @@ impl AptosDB {
             pre_commit_lock: std::sync::Mutex::new(()),
             commit_lock: std::sync::Mutex::new(()),
             update_subscriber: None,
+            position_db: None,
+            position_merkle_db: None,
+            native_state: None,
+            position_state_store: None,
         }
     }
 

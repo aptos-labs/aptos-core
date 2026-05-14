@@ -310,9 +310,136 @@ impl AptosDB {
                     .commit_transaction_accumulator(chunk.first_version, chunk.transaction_infos)
                     .unwrap()
             });
+            // Native-position subsystem: dispatch Position writes
+            // from each TransactionOutput's `native_writes()`
+            // side-channel to `position_db` + in-memory store + the
+            // position JMT. Gated on `position_db.is_some()` so
+            // baselines that never called `init_native_position`
+            // skip the spawn entirely — no rayon scheduling cost.
+            if self.position_db.is_some() {
+                s.spawn(|_| self.commit_native_position(chunk).unwrap());
+            }
         });
 
         Ok(new_root_hash)
+    }
+
+    /// Dispatch every Position write in the block's
+    /// `TransactionOutput`s to [`NativeStateCommitter`]. No-op if the
+    /// native-position subsystem has not been initialized on this
+    /// AptosDB instance (i.e. `init_native_position` wasn't called at
+    /// node open).
+    ///
+    /// For each `output.write_set().native_position_iter()`:
+    /// 1. `NativeStateCommitter::apply` writes the Position rows to
+    ///    `position_db` (per-shard fan-out) and mirrors them into the
+    ///    in-memory `NativeStateStore`. It returns a list of
+    ///    [`crate::native_state_committer::MerkleLeafUpdate`]s for the
+    ///    position JMT.
+    /// 2. If the position async pipeline is attached,
+    ///    [`crate::position_buffered_state::PositionBufferedState::apply`]
+    ///    updates the scratchpad SMT (eager `position_root`) and
+    ///    forwards the leaf updates to the snapshot/batch committer
+    ///    threads for the actual JMT write — the same two-stage shape
+    ///    as main state's `BufferedState`.
+    fn commit_native_position(&self, chunk: &ChunkToCommit) -> Result<()> {
+        let _timer = OTHER_TIMERS_SECONDS.timer_with(&["commit_native_position"]);
+        let Some(committer) = self.native_state_committer() else {
+            return Ok(());
+        };
+
+        // The chunk's `state.last_checkpoint().version()` is the chain-
+        // level checkpoint marker — same signal main state's
+        // `StateStore::update` uses. If it falls inside this chunk,
+        // the position chain's `last_checkpoint` must advance to the
+        // position state at that exact version. If it doesn't, we
+        // carry the prior `last_checkpoint` forward.
+        let chunk_first = chunk.first_version;
+        let chunk_last = chunk_first + chunk.len() as Version;
+        let chunk_checkpoint_version = chunk.state.last_checkpoint().version();
+        let checkpoint_within_chunk =
+            chunk_checkpoint_version.filter(|v| (chunk_first..chunk_last).contains(v));
+
+        // Snapshot the prior position state once; per-version `extend`
+        // builds the chain locally. We hand the final state to
+        // `update()` at chunk end (per-chunk granularity, matching
+        // main state).
+        let store_opt = self.position_state_store.as_ref();
+        let mut chain_state = store_opt.map(|s| s.current_state().lock().latest().clone());
+        let mut chain_checkpoint =
+            store_opt.map(|s| s.current_state().lock().last_checkpoint().clone());
+
+        let mut version = chunk_first;
+        for output in chunk.transaction_outputs {
+            // Native-position writes ride in the WriteSet's
+            // `native_positions` sibling bucket — value/hotness
+            // iterators on the same WriteSet naturally skip them, so
+            // no main-state path ever sees them.
+            let position_writes: Vec<_> = output
+                .write_set()
+                .native_position_iter()
+                .map(|(k, op)| (k.clone(), op.as_write_op().clone()))
+                .collect();
+            let merkle_updates_position = if !position_writes.is_empty() {
+                committer
+                    .apply(version, position_writes)
+                    .map_err(|e| AptosDbError::Other(format!("native commit: {e}")))?
+                    .position
+            } else {
+                Vec::new()
+            };
+
+            // Advance the per-version chain. `extend` runs the
+            // scratchpad SMT update; the `last_checkpoint` is
+            // captured below if this is the chunk's checkpoint
+            // version.
+            if let (Some(store), Some(prior_latest)) = (store_opt, chain_state.as_ref()) {
+                let position_merkle_db = self
+                    .position_merkle_db
+                    .as_ref()
+                    .expect("position_state_store set ⇒ position_merkle_db set");
+                let proof_reader = crate::position_buffered_state::PositionProofReader {
+                    merkle_db: position_merkle_db.clone(),
+                    version: store
+                        .current_state()
+                        .lock()
+                        .latest()
+                        .version()
+                        .unwrap_or(version),
+                };
+                let position_updates: Vec<_> = merkle_updates_position
+                    .into_iter()
+                    .map(|u| {
+                        (u.state_key_hash, crate::position_state::PositionSlot {
+                            state_key: u.state_key,
+                            value_hash: u.value_hash,
+                            value: None,
+                        })
+                    })
+                    .collect();
+                let new_latest = prior_latest.extend(version, position_updates, &proof_reader)?;
+                if Some(version) == checkpoint_within_chunk {
+                    chain_checkpoint = Some(new_latest.clone());
+                }
+                chain_state = Some(new_latest);
+            }
+            version += 1;
+        }
+
+        // Hand the final per-chunk state to the buffered state.
+        // `update()` enqueues a snapshot flush only if
+        // `last_checkpoint` actually advanced — matching main state.
+        if let Some(store) = store_opt {
+            let new_state =
+                crate::position_buffered_state::PositionLedgerStateWithSummary::from_latest_and_last_checkpoint(
+                    chain_state.expect("chain_state set when store is set"),
+                    chain_checkpoint.expect("chain_checkpoint set when store is set"),
+                );
+            let estimated_items = chunk.transaction_outputs.len();
+            let mut bufstate = store.buffered_state_locked();
+            bufstate.update(new_state, (), estimated_items, /* sync_commit */ false)?;
+        }
+        Ok(())
     }
 
     fn commit_state_kv_and_ledger_metadata(&self, chunk: &ChunkToCommit) -> Result<()> {
