@@ -873,8 +873,7 @@ module aptos_framework::transaction_validation {
     ///   against the framework version that shipped them and are not reached from this code.
     enum PrologueArgs {
         V1 {
-            sender: signer,
-            fee_payer: Option<signer>,
+            needs_fee_payer_auth_check: bool,
             txn_sender_public_key: Option<vector<u8>>,
             fee_payer_public_key_hash: Option<vector<u8>>,
             replay_protector: ReplayProtector,
@@ -889,11 +888,10 @@ module aptos_framework::transaction_validation {
         },
     }
 
-    fun versioned_prologue(args: PrologueArgs) {
+    fun versioned_prologue(sender: signer, fee_payer: signer, args: PrologueArgs) {
         match (args) {
             V1 {
-                sender,
-                fee_payer,
+                needs_fee_payer_auth_check,
                 txn_sender_public_key,
                 fee_payer_public_key_hash,
                 replay_protector,
@@ -908,11 +906,7 @@ module aptos_framework::transaction_validation {
             } => {
                 prologue_common(
                     &sender,
-                    if (fee_payer.is_some()) {
-                        fee_payer.borrow()
-                    } else {
-                        &sender
-                    },
+                    &fee_payer,
                     replay_protector,
                     txn_sender_public_key,
                     txn_gas_price,
@@ -928,8 +922,7 @@ module aptos_framework::transaction_validation {
                     is_simulation,
                 );
 
-                if (fee_payer.is_some()) {
-                    let fee_payer = fee_payer.destroy_some();
+                if (needs_fee_payer_auth_check) {
                     let fee_payer_address = signer::address_of(&fee_payer);
                     if (!skip_auth_key_check(is_simulation, &fee_payer_public_key_hash)) {
                         if (fee_payer_public_key_hash.is_some()) {
@@ -957,8 +950,6 @@ module aptos_framework::transaction_validation {
     ///   against the framework version that shipped them and are not reached from this code.
     enum EpilogueArgs {
         V1 {
-            sender: signer,
-            fee_payer: signer,
             fee_statement: FeeStatement,
             txn_gas_price: u64,
             txn_max_gas_units: u64,
@@ -968,11 +959,9 @@ module aptos_framework::transaction_validation {
         },
     }
 
-    fun versioned_epilogue(args: EpilogueArgs) {
+    fun versioned_epilogue(sender: signer, fee_payer: signer, args: EpilogueArgs) {
         match (args) {
             V1 {
-                sender,
-                fee_payer,
                 fee_statement,
                 txn_gas_price,
                 txn_max_gas_units,
