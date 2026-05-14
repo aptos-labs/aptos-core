@@ -15,12 +15,16 @@ use rand_core::{CryptoRng, RngCore};
 use serde::{Deserialize, Serialize};
 
 /// A generic transformation from a non-malleable PVSS to a signed and non-malleable PVSS.
+///
+/// MaxBcsSize(T=UnsignedWeightedTranscript<Bls12_381>): 818 + 32·n + 120·W + 24·max_w + 128·(W + max_w)·c + 80·ell.
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq)]
 
 /// The transcript after applying this transform, will consist of the original transcript plus a BLS12-381 signature
 /// of its dealt pub key and session id
 pub struct GenericSigning<T> {
+    /// MaxBcsSize(T=UnsignedWeightedTranscript<Bls12_381>): 706 + 32·n + 120·W + 24·max_w + 128·(W + max_w)·c + 80·ell.
     trs: T,
+    /// MaxBcsSize: 112.
     sig: bls12381::Signature,
 }
 
