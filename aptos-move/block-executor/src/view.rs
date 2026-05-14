@@ -2021,7 +2021,9 @@ mod test {
     use move_vm_types::{
         delayed_values::{
             delayed_field_id::DelayedFieldID,
-            derived_string_snapshot::{bytes_and_width_to_derived_string_struct, to_utf8_bytes},
+            derived_string_snapshot::{
+                bytes_and_width_to_derived_string_struct, to_utf8_bytes_for_test,
+            },
         },
         values::{Struct, Value},
     };
@@ -2649,7 +2651,7 @@ mod test {
     }
 
     fn create_derived_value(value: impl ToString, width: usize) -> Value {
-        bytes_and_width_to_derived_string_struct(to_utf8_bytes(value), width).unwrap()
+        bytes_and_width_to_derived_string_struct(to_utf8_bytes_for_test(value), width).unwrap()
     }
 
     fn create_struct_value(inner: Value) -> Value {

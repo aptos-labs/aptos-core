@@ -1,7 +1,9 @@
 // Copyright (c) Aptos Foundation
 // Licensed pursuant to the Innovation-Enabling Source Code License, available at https://github.com/aptos-labs/aptos-core/blob/main/LICENSE
 
-use crate::values::{DeserializationSeed, SerializationReadyValue, VMValueCast, Value};
+use crate::values::{
+    DepthDisplay, DeserializationSeed, SerializationReadyValue, VMValueCast, Value,
+};
 use better_any::Tid;
 use move_binary_format::errors::{PartialVMError, PartialVMResult};
 use move_core_types::{
@@ -96,13 +98,20 @@ impl Debug for Closure {
     }
 }
 
+pub(crate) fn fmt_closure(c: &Closure, f: &mut Formatter<'_>, depth: usize) -> fmt::Result {
+    let Closure(fun, captured) = c;
+    let captured = fun.closure_mask().format_arguments(
+        captured
+            .iter()
+            .map(|v| DepthDisplay(v, depth + 1).to_string())
+            .collect(),
+    );
+    write!(f, "{}({})", fun.to_canonical_string(), captured.join(", "))
+}
+
 impl Display for Closure {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
-        let Self(fun, captured) = self;
-        let captured = fun
-            .closure_mask()
-            .format_arguments(captured.iter().map(|v| v.to_string()).collect());
-        write!(f, "{}({})", fun.to_canonical_string(), captured.join(", "))
+        fmt_closure(self, f, 0)
     }
 }
 
