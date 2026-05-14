@@ -360,7 +360,14 @@ impl Features {
             .flat_map(|byte| (0..8).map(move |bit_idx| byte & (1 << bit_idx) != 0))
             .enumerate()
             .filter(|(_feature_idx, enabled)| *enabled)
-            .map(|(feature_idx, _)| FeatureFlag::from_repr(feature_idx).unwrap())
+            .map(|(feature_idx, _)| {
+                FeatureFlag::from_repr(feature_idx).unwrap_or_else(|| {
+                    panic!(
+                        "unknown FeatureFlag index {feature_idx} in features bitmap; \
+                         a newer-binary override likely set a flag this binary does not know"
+                    )
+                })
+            })
             .collect()
     }
 
