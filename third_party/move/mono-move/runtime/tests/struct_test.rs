@@ -5,12 +5,11 @@
 
 use mono_move_alloc::GlobalArenaPtr;
 use mono_move_core::{
-    Code, FrameLayoutInfo, FrameOffset as FO, Function, LocalExecutionContext, MicroOp,
-    SortedSafePointEntries,
+    Code, FrameLayoutInfo, FrameOffset as FO, Function, MicroOp, SortedSafePointEntries,
 };
 use mono_move_runtime::{
-    read_ptr, read_u64, InterpreterContext, ObjectDescriptor, ObjectDescriptorTable,
-    VEC_DATA_OFFSET, VEC_LENGTH_OFFSET,
+    read_ptr, read_u64, InterpreterContext, LocalRuntimeContext, ObjectDescriptor,
+    ObjectDescriptorTable, VEC_DATA_OFFSET, VEC_LENGTH_OFFSET,
 };
 
 // ---------------------------------------------------------------------------
@@ -44,8 +43,8 @@ fn struct_inline() {
         safe_point_layouts: SortedSafePointEntries::empty(),
     }];
     let descriptors = ObjectDescriptorTable::new();
-    let mut exec_ctx = LocalExecutionContext::with_max_budget();
-    let mut ctx = InterpreterContext::new(&mut exec_ctx, &descriptors, &functions[0]);
+    let mut exec_ctx = LocalRuntimeContext::with_max_budget(descriptors);
+    let mut ctx = InterpreterContext::new(&mut exec_ctx, &functions[0]);
     ctx.run().unwrap();
 
     assert_eq!(ctx.root_result(), 30, "result should be 10 + 20 = 30");
@@ -87,8 +86,8 @@ fn struct_inline_borrow() {
         safe_point_layouts: SortedSafePointEntries::empty(),
     }];
     let descriptors = ObjectDescriptorTable::new();
-    let mut exec_ctx = LocalExecutionContext::with_max_budget();
-    let mut ctx = InterpreterContext::new(&mut exec_ctx, &descriptors, &functions[0]);
+    let mut exec_ctx = LocalRuntimeContext::with_max_budget(descriptors);
+    let mut ctx = InterpreterContext::new(&mut exec_ctx, &functions[0]);
     ctx.run().unwrap();
 
     assert_eq!(ctx.root_result(), 99, "pair.b should be 99 after WriteRef");
@@ -132,8 +131,8 @@ fn struct_heap_basic() {
         frame_layout: FrameLayoutInfo::new(vec![FO(entry)]),
         safe_point_layouts: SortedSafePointEntries::empty(),
     }];
-    let mut exec_ctx = LocalExecutionContext::with_max_budget();
-    let mut ctx = InterpreterContext::new(&mut exec_ctx, &descriptors, &functions[0]);
+    let mut exec_ctx = LocalRuntimeContext::with_max_budget(descriptors);
+    let mut ctx = InterpreterContext::new(&mut exec_ctx, &functions[0]);
     ctx.run().unwrap();
 
     assert_eq!(ctx.root_result(), 142, "result should be 42 + 100 = 142");
@@ -178,8 +177,8 @@ fn struct_heap_survives_gc() {
         frame_layout: FrameLayoutInfo::new(vec![FO(entry)]),
         safe_point_layouts: SortedSafePointEntries::empty(),
     }];
-    let mut exec_ctx = LocalExecutionContext::with_max_budget();
-    let mut ctx = InterpreterContext::new(&mut exec_ctx, &descriptors, &functions[0]);
+    let mut exec_ctx = LocalRuntimeContext::with_max_budget(descriptors);
+    let mut ctx = InterpreterContext::new(&mut exec_ctx, &functions[0]);
     ctx.run().unwrap();
 
     assert_eq!(
@@ -241,8 +240,8 @@ fn struct_with_vector_field() {
         frame_layout: FrameLayoutInfo::new(vec![FO(ctr), FO(items), FO(vec_ref), FO(ctr_ref)]),
         safe_point_layouts: SortedSafePointEntries::empty(),
     }];
-    let mut exec_ctx = LocalExecutionContext::with_max_budget();
-    let mut ctx = InterpreterContext::new(&mut exec_ctx, &descriptors, &functions[0]);
+    let mut exec_ctx = LocalRuntimeContext::with_max_budget(descriptors);
+    let mut ctx = InterpreterContext::new(&mut exec_ctx, &functions[0]);
     ctx.run().unwrap();
 
     assert_eq!(ctx.root_result(), 999, "ctr.tag should be 999 after GC");
@@ -302,8 +301,8 @@ fn struct_borrow_field() {
         frame_layout: FrameLayoutInfo::new(vec![FO(entry), FO(r#ref), FO(entry_ref)]),
         safe_point_layouts: SortedSafePointEntries::empty(),
     }];
-    let mut exec_ctx = LocalExecutionContext::with_max_budget();
-    let mut ctx = InterpreterContext::new(&mut exec_ctx, &descriptors, &functions[0]);
+    let mut exec_ctx = LocalRuntimeContext::with_max_budget(descriptors);
+    let mut ctx = InterpreterContext::new(&mut exec_ctx, &functions[0]);
     ctx.run().unwrap();
 
     assert_eq!(
@@ -354,8 +353,8 @@ fn struct_borrow_survives_gc() {
         frame_layout: FrameLayoutInfo::new(vec![FO(entry), FO(ref_base), FO(entry_ref)]),
         safe_point_layouts: SortedSafePointEntries::empty(),
     }];
-    let mut exec_ctx = LocalExecutionContext::with_max_budget();
-    let mut ctx = InterpreterContext::new(&mut exec_ctx, &descriptors, &functions[0]);
+    let mut exec_ctx = LocalRuntimeContext::with_max_budget(descriptors);
+    let mut ctx = InterpreterContext::new(&mut exec_ctx, &functions[0]);
     ctx.run().unwrap();
 
     assert_eq!(ctx.root_result(), 200, "entry.value should be 200 after GC");

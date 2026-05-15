@@ -1,15 +1,18 @@
 // Copyright (c) Aptos Foundation
 // Licensed pursuant to the Innovation-Enabling Source Code License, available at https://github.com/aptos-labs/aptos-core/blob/main/LICENSE
 
-//! New VM runtime PoC with unified stack, bump-allocated heap, and copying GC.
+//! MonoVM runtime implementation.
 
+mod descriptor_provider;
 mod error;
 pub(crate) mod heap;
 mod interpreter;
+mod local_runtime_context;
 pub(crate) mod memory;
 mod types;
 mod verifier;
 
+pub use descriptor_provider::DescriptorProvider;
 pub use error::{RuntimeError, RuntimeStatus};
 pub use heap::{
     object_descriptor::{
@@ -18,6 +21,7 @@ pub use heap::{
     pinned_roots::{PinGuard, PinnedRoots},
 };
 pub use interpreter::InterpreterContext;
+pub use local_runtime_context::LocalRuntimeContext;
 pub use memory::{
     read_ptr, read_u32, read_u64, vec_elem_ptr, write_ptr, write_u32, write_u64, MemoryRegion,
 };

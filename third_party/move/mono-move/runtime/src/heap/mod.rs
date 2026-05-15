@@ -68,7 +68,7 @@ pub(crate) mod macros {
         ($ctx:ident, $fp:expr, $descriptor_id:expr $(,)?) => {
             $crate::heap::alloc_obj(
                 &mut $ctx.heap,
-                $ctx.descriptors,
+                <_ as $crate::DescriptorProvider>::descriptors($ctx.exec_ctx),
                 &$ctx.pinned_roots,
                 $fp,
                 $ctx.current_func,
@@ -91,7 +91,7 @@ pub(crate) mod macros {
         ) => {
             $crate::heap::alloc_vec(
                 &mut $ctx.heap,
-                $ctx.descriptors,
+                <_ as $crate::DescriptorProvider>::descriptors($ctx.exec_ctx),
                 &$ctx.pinned_roots,
                 $fp,
                 $ctx.current_func,
@@ -116,7 +116,7 @@ pub(crate) mod macros {
         ) => {
             $crate::heap::grow_vec_ref(
                 &mut $ctx.heap,
-                $ctx.descriptors,
+                <_ as $crate::DescriptorProvider>::descriptors($ctx.exec_ctx),
                 &$ctx.pinned_roots,
                 $ctx.current_func,
                 $ctx.pc,
@@ -134,7 +134,7 @@ pub(crate) mod macros {
         ($ctx:ident $(,)?) => {
             $crate::heap::gc_collect(
                 &mut $ctx.heap,
-                $ctx.descriptors,
+                <_ as $crate::DescriptorProvider>::descriptors($ctx.exec_ctx),
                 &$ctx.pinned_roots,
                 $ctx.frame_ptr,
                 $ctx.current_func,

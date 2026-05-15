@@ -4,7 +4,7 @@
 //! Lowers stackless exec IR to micro-ops.
 
 use super::{
-    context::{LoweringContext, SlotInfo, TypedSlot},
+    context::{concrete_type_size, LoweringContext, SlotInfo, TypedSlot},
     parallel_copy,
 };
 use crate::stackless_exec_ir::{
@@ -113,27 +113,27 @@ impl<'a> LoweringState<'a> {
         self.out_buf.push(op);
     }
 
-    fn slot_type(&self, slot: Slot) -> Result<&Type> {
-        let ptr = match slot {
+    /// Interned-type corresponding to `slot`.
+    fn slot_interned_type(&self, slot: Slot) -> Result<InternedType> {
+        Ok(match slot {
             Slot::Home(i) => self.home_slot_types[i as usize],
             Slot::Xfer(j) => self.xfer_binding(j)?.ty,
             Slot::Vid(i) => bail!("Vid({}) in post-allocation IR", i),
-        };
-        Ok(view_type(ptr))
+        })
+    }
+
+    /// Canonical [`Type`] variant of `slot`. Use [`Self::slot_interned_type`]
+    /// when an interned pointer is needed instead.
+    fn slot_type(&self, slot: Slot) -> Result<&Type> {
+        Ok(view_type(self.slot_interned_type(slot)?))
     }
 
     /// Size in bytes of `ref_slot`'s pointee.
     fn ref_pointee_size(&self, ref_slot: Slot) -> Result<u32> {
-        let ref_ty = match ref_slot {
-            Slot::Home(i) => self.home_slot_types[i as usize],
-            Slot::Xfer(j) => self.xfer_binding(j)?.ty,
-            Slot::Vid(i) => bail!("Vid({}) in post-allocation IR", i),
-        };
-        let pointee = strip_ref(ref_ty)?;
-        let (size, _) = view_type(pointee)
-            .size_and_align()
-            .ok_or_else(|| anyhow::anyhow!("ref pointee type has no concrete size"))?;
-        Ok(size)
+        concrete_type_size(
+            strip_ref(self.slot_interned_type(ref_slot)?)?,
+            "ref pointee type",
+        )
     }
 
     /// Returns true if the type is exactly 8 bytes wide. Used to gate the
@@ -683,11 +683,7 @@ impl<'a> LoweringState<'a> {
                         width: src.size,
                     });
                 }
-                parallel_copy::emit_parallel_copy(
-                    &mut self.out_buf,
-                    &copies,
-                    self.ctx.scratch_offset,
-                );
+                parallel_copy::emit_parallel_copy(&mut self.out_buf, &copies, self.ctx.scratch)?;
                 self.emit(MicroOp::Return);
             },
 
@@ -702,6 +698,64 @@ impl<'a> LoweringState<'a> {
                 self.emit(MicroOp::AbortMsg {
                     code: code.offset,
                     message: message.offset,
+                });
+            },
+
+            // --- Vector ---
+            Instr::VecLen(dst, _elem_ty, vec_ref) => {
+                let vec_ref_info = self.slot(*vec_ref)?;
+                let dst_info = self.def_slot(*dst)?;
+                self.emit(MicroOp::VecLen {
+                    dst: dst_info.offset,
+                    vec_ref: vec_ref_info.offset,
+                });
+            },
+            Instr::VecImmBorrow(dst, elem_ty, vec_ref, idx)
+            | Instr::VecMutBorrow(dst, elem_ty, vec_ref, idx) => {
+                let elem_size = concrete_type_size(*elem_ty, "vector elem type")?;
+                let vec_ref_info = self.slot(*vec_ref)?;
+                let idx_info = self.slot(*idx)?;
+                let dst_info = self.def_slot(*dst)?;
+                // The fat pointer does not distinguish between mutable and immutable borrow.
+                self.emit(MicroOp::VecBorrow {
+                    dst: dst_info.offset,
+                    vec_ref: vec_ref_info.offset,
+                    idx: idx_info.offset,
+                    elem_size,
+                });
+            },
+            Instr::VecPopBack(dst, elem_ty, vec_ref) => {
+                let elem_size = concrete_type_size(*elem_ty, "vector elem type")?;
+                let vec_ref_info = self.slot(*vec_ref)?;
+                let dst_info = self.def_slot(*dst)?;
+                self.emit(MicroOp::VecPopBack {
+                    dst: dst_info.offset,
+                    vec_ref: vec_ref_info.offset,
+                    elem_size,
+                });
+            },
+            Instr::VecPack(dst, _elem_ty, _count, elems) => {
+                if !elems.is_empty() {
+                    bail!("VecPack with elements not yet lowered");
+                }
+                let dst_info = self.def_slot(*dst)?;
+                self.emit(MicroOp::VecNew {
+                    dst: dst_info.offset,
+                });
+            },
+            Instr::VecPushBack(elem_ty, vec_ref, val) => {
+                let elem_size = concrete_type_size(*elem_ty, "vector elem type")?;
+                let vec_ty = strip_ref(self.slot_interned_type(*vec_ref)?)?;
+                let descriptor_id = self.ctx.vec_descriptor_id(vec_ty).ok_or_else(|| {
+                    anyhow::anyhow!("VecPushBack: descriptor for vector type not published")
+                })?;
+                let vec_ref_info = self.slot(*vec_ref)?;
+                let val_info = self.slot(*val)?;
+                self.emit(MicroOp::VecPushBack {
+                    vec_ref: vec_ref_info.offset,
+                    elem: val_info.offset,
+                    elem_size,
+                    descriptor_id,
                 });
             },
 

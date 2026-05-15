@@ -7,6 +7,6 @@ pub use context::{
     struct_info_at, try_as_primitive_type, view_name, view_type, view_type_list, ArenaRef,
     ExecutionGuard, FieldLayout, FunctionSlot, GlobalContext, InternedType, InternedTypeList,
     LoadedModule, LoadedModuleSlot, MaintenanceGuard, ModuleMandatoryDependencies, ModuleSlot,
-    Type,
+    Type, VecDescriptorRecord,
 };
 pub mod maintenance_config;

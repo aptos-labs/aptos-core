@@ -254,8 +254,7 @@ fn execute_function_v2(
         },
     };
 
-    // TODO: Set object descriptor table when supported.
-    let mut interpreter = InterpreterContext::new(&mut txn_ctx, &[], function);
+    let mut interpreter = InterpreterContext::new(&mut txn_ctx, function);
 
     let mut offset: u32 = 0;
     for (arg, kind) in args.iter().zip(arg_kinds.iter()) {

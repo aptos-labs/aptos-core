@@ -17,6 +17,7 @@ bytes = { workspace = true }
 mono-move-core = { workspace = true }
 mono-move-gas = { workspace = true }
 mono-move-global-context = { workspace = true }
+mono-move-runtime = { workspace = true }
 move-binary-format = { workspace = true }
 move-core-types = { workspace = true }
 shared-dsa = { workspace = true }

@@ -3,11 +3,11 @@
 
 //! Integration tests for gas metering through the full pipeline.
 
-use mono_move_core::{types::EMPTY_TYPE_LIST, ExecutionContext, LocalExecutionContext};
+use mono_move_core::{types::EMPTY_TYPE_LIST, ExecutionContext};
 use mono_move_gas::SimpleGasMeter;
 use mono_move_global_context::GlobalContext;
 use mono_move_loader::{Loader, LoadingPolicy, LoweringPolicy, ModuleReadSet, TransactionContext};
-use mono_move_runtime::{InterpreterContext, RuntimeError};
+use mono_move_runtime::{InterpreterContext, LocalRuntimeContext, RuntimeError};
 use mono_move_testsuite::InMemoryModuleProvider;
 use move_core_types::{account_address::AccountAddress, ident_str};
 
@@ -50,8 +50,8 @@ module 0x1::test {
     // SAFETY: `fib` is held alive by the executable cache via `guard`.
     let fib = unsafe { fib.as_ref_unchecked() };
 
-    let mut exec_ctx = LocalExecutionContext::with_budget(10);
-    let mut interpreter = InterpreterContext::new(&mut exec_ctx, &[], fib);
+    let mut exec_ctx = LocalRuntimeContext::with_budget(10);
+    let mut interpreter = InterpreterContext::new(&mut exec_ctx, fib);
     interpreter.set_root_arg(0, &10u64.to_le_bytes());
     let err = interpreter.run().unwrap_err();
     assert!(matches!(err, RuntimeError::GasExhausted(_)));

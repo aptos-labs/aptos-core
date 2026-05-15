@@ -5,10 +5,11 @@
 //! and a bump-allocated heap with copying GC.
 
 use crate::{
+    descriptor_provider::DescriptorProvider,
     error::{ArithOp, RuntimeError, RuntimeResult, RuntimeStatus, Signedness, VecOp},
     heap::{
         macros::{alloc_obj, alloc_vec, gc_collect, grow_vec_ref},
-        object_descriptor::{ObjectDescriptor, CLOSURE_DESCRIPTOR_ID},
+        object_descriptor::CLOSURE_DESCRIPTOR_ID,
         pinned_roots::PinnedRoots,
         Heap,
     },
@@ -41,11 +42,10 @@ use std::ptr::{null, NonNull};
 // ---------------------------------------------------------------------------
 
 /// Interpreter context with a unified call stack and a GC-managed heap.
-pub struct InterpreterContext<'a, T: ExecutionContext> {
-    /// Per-transaction context (function resolution, gas counters, etc.).
+pub struct InterpreterContext<'a, T: ExecutionContext + DescriptorProvider> {
+    /// Per-transaction context (function resolution, gas counters,
+    /// descriptor table, etc.).
     pub(crate) exec_ctx: &'a mut T,
-    /// Externally-provided object layout descriptors (will be replaced by execution context).
-    pub(crate) descriptors: &'a [ObjectDescriptor],
 
     pub(crate) pc: usize,
     /// Pointer to the currently executing function.
@@ -64,19 +64,14 @@ pub struct InterpreterContext<'a, T: ExecutionContext> {
     rng: StdRng,
 }
 
-impl<'a, T: ExecutionContext> InterpreterContext<'a, T> {
-    pub fn new(exec_ctx: &'a mut T, descriptors: &'a [ObjectDescriptor], entry: &Function) -> Self {
-        Self::with_heap_size(exec_ctx, descriptors, entry, DEFAULT_HEAP_SIZE)
+impl<'a, T: ExecutionContext + DescriptorProvider> InterpreterContext<'a, T> {
+    pub fn new(exec_ctx: &'a mut T, entry: &Function) -> Self {
+        Self::with_heap_size(exec_ctx, entry, DEFAULT_HEAP_SIZE)
     }
 
     /// Create a new context with a custom heap size (for testing GC pressure).
-    pub fn with_heap_size(
-        exec_ctx: &'a mut T,
-        descriptors: &'a [ObjectDescriptor],
-        entry: &Function,
-        heap_size: usize,
-    ) -> Self {
-        let verification_errors = crate::verifier::verify_function(entry, descriptors);
+    pub fn with_heap_size(exec_ctx: &'a mut T, entry: &Function, heap_size: usize) -> Self {
+        let verification_errors = crate::verifier::verify_function(entry, exec_ctx.descriptors());
         assert!(
             verification_errors.is_empty(),
             "verification failed:\n{}",
@@ -99,7 +94,6 @@ impl<'a, T: ExecutionContext> InterpreterContext<'a, T> {
 
         Self {
             exec_ctx,
-            descriptors,
             pc: 0,
             current_func: NonNull::from(entry),
             frame_ptr,
@@ -637,7 +631,7 @@ unsafe fn exec_int_negate(fp: *mut u8, op: &IntNegateOp) -> RuntimeResult<()> {
 // Interpreter loop
 // ---------------------------------------------------------------------------
 
-impl<T: ExecutionContext> InterpreterContext<'_, T> {
+impl<T: ExecutionContext + DescriptorProvider> InterpreterContext<'_, T> {
     #[inline(always)]
     pub fn step(&mut self) -> RuntimeResult<StepResult> {
         // SAFETY: Current function is always a valid, non-null pointer because
