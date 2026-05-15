@@ -1656,9 +1656,15 @@ where
         }
 
         // We do not consider speculative invariant violations.
+        // The Display walk over `current_frame.locals` / operand stack inside
+        // `internal_state_str` is unbounded — a deeply nested Move value can
+        // recurse past the executor thread's stack guard page (SIGABRT). The
+        // dump is a diagnostic affordance, so gate it on `enable_debugging`;
+        // production validators run with this off and never reach the walk.
         if err.status_type() == StatusType::InvariantViolation
             && err.major_status() != StatusCode::SPECULATIVE_EXECUTION_ABORT_ERROR
             && !errors::is_stable_test_display()
+            && self.vm_config.enable_debugging
         {
             let location = err.location().clone();
             let state = self.internal_state_str(current_frame);
