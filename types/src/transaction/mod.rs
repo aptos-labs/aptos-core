@@ -2913,6 +2913,11 @@ fn verify_events_against_root_hash(
 #[derive(Clone, Debug, Eq, PartialEq, Deserialize, Serialize)]
 pub enum TransactionOutputListWithProofV2 {
     TransactionOutputListWithAuxiliaryInfos(TransactionOutputListWithAuxiliaryInfos),
+    /// Carries per-output hot state keys as a sidecar; `WriteSet::Serialize` would
+    /// otherwise drop them. Unverified — same trust model as `PersistedWriteSet::V1`.
+    TransactionOutputListWithAuxiliaryInfosAndHotness(
+        TransactionOutputListWithAuxiliaryInfosAndHotness,
+    ),
 }
 
 impl TransactionOutputListWithProofV2 {
@@ -2920,6 +2925,10 @@ impl TransactionOutputListWithProofV2 {
         transaction_output_list_with_auxiliary_infos: TransactionOutputListWithAuxiliaryInfos,
     ) -> Self {
         Self::TransactionOutputListWithAuxiliaryInfos(transaction_output_list_with_auxiliary_infos)
+    }
+
+    pub fn new_with_hotness(inner: TransactionOutputListWithAuxiliaryInfosAndHotness) -> Self {
+        Self::TransactionOutputListWithAuxiliaryInfosAndHotness(inner)
     }
 
     /// A convenience function to create an empty proof. Mostly used for tests.
@@ -2938,42 +2947,40 @@ impl TransactionOutputListWithProofV2 {
         )
     }
 
-    /// Consumes and returns the inner transaction output list
+    /// Consumes and returns the inner transaction output list. Sidecar hotness, if any,
+    /// is spliced into the inner `WriteSet`s first.
     pub fn consume_output_list_with_proof(self) -> TransactionOutputListWithProof {
         match self {
             Self::TransactionOutputListWithAuxiliaryInfos(output_list_with_auxiliary_infos) => {
                 output_list_with_auxiliary_infos.transaction_output_list_with_proof
+            },
+            Self::TransactionOutputListWithAuxiliaryInfosAndHotness(inner) => {
+                let mut output_list = inner.transaction_output_list_with_proof;
+                splice_hotness_into_outputs(&mut output_list, inner.hotness);
+                output_list
             },
         }
     }
 
     /// Returns the first version in the transaction output list
     pub fn get_first_output_version(&self) -> Option<Version> {
-        match self {
-            Self::TransactionOutputListWithAuxiliaryInfos(output_list_with_auxiliary_infos) => {
-                output_list_with_auxiliary_infos
-                    .transaction_output_list_with_proof
-                    .get_first_output_version()
-            },
-        }
+        self.get_output_list_with_proof().get_first_output_version()
     }
 
     /// Returns the number of outputs in the transaction output list
     pub fn get_num_outputs(&self) -> usize {
-        match self {
-            Self::TransactionOutputListWithAuxiliaryInfos(output_list_with_auxiliary_infos) => {
-                output_list_with_auxiliary_infos
-                    .transaction_output_list_with_proof
-                    .get_num_outputs()
-            },
-        }
+        self.get_output_list_with_proof().get_num_outputs()
     }
 
-    /// Returns a reference to the inner transaction output list with proof
+    /// Returns a reference to the inner transaction output list with proof. The returned
+    /// `WriteSet`s never contain hotness; consume the wrapper to get them spliced in.
     pub fn get_output_list_with_proof(&self) -> &TransactionOutputListWithProof {
         match self {
             Self::TransactionOutputListWithAuxiliaryInfos(output_list_with_auxiliary_infos) => {
                 &output_list_with_auxiliary_infos.transaction_output_list_with_proof
+            },
+            Self::TransactionOutputListWithAuxiliaryInfosAndHotness(inner) => {
+                &inner.transaction_output_list_with_proof
             },
         }
     }
@@ -2984,20 +2991,30 @@ impl TransactionOutputListWithProofV2 {
             Self::TransactionOutputListWithAuxiliaryInfos(output_list_with_auxiliary_infos) => {
                 &output_list_with_auxiliary_infos.persisted_auxiliary_infos
             },
+            Self::TransactionOutputListWithAuxiliaryInfosAndHotness(inner) => {
+                &inner.persisted_auxiliary_infos
+            },
         }
     }
 
-    /// Splits the transaction output list with proof v2 into its components
+    /// Splits the transaction output list with proof v2 into its components. Sidecar
+    /// hotness, if any, is spliced into the inner `WriteSet`s first.
     pub fn into_parts(self) -> (TransactionOutputListWithProof, Vec<PersistedAuxiliaryInfo>) {
         match self {
             Self::TransactionOutputListWithAuxiliaryInfos(output_list_with_auxiliary_infos) => (
                 output_list_with_auxiliary_infos.transaction_output_list_with_proof,
                 output_list_with_auxiliary_infos.persisted_auxiliary_infos,
             ),
+            Self::TransactionOutputListWithAuxiliaryInfosAndHotness(inner) => {
+                let mut output_list = inner.transaction_output_list_with_proof;
+                splice_hotness_into_outputs(&mut output_list, inner.hotness);
+                (output_list, inner.persisted_auxiliary_infos)
+            },
         }
     }
 
-    /// Verifies the transaction output list with proof v2 against the given ledger info
+    /// Verifies the transaction output list with proof v2 against the given ledger info.
+    /// Hotness, if present, is not verified.
     pub fn verify(
         &self,
         ledger_info: &LedgerInfo,
@@ -3007,6 +3024,25 @@ impl TransactionOutputListWithProofV2 {
             Self::TransactionOutputListWithAuxiliaryInfos(inner) => {
                 inner.verify(ledger_info, first_transaction_output_version)
             },
+            Self::TransactionOutputListWithAuxiliaryInfosAndHotness(inner) => {
+                inner.verify(ledger_info, first_transaction_output_version)
+            },
+        }
+    }
+}
+
+/// Splices per-output hotness keys into `list`'s `WriteSet`s; out-of-range indices are dropped.
+fn splice_hotness_into_outputs(
+    list: &mut TransactionOutputListWithProof,
+    hotness: BTreeMap<u32, BTreeSet<StateKey>>,
+) {
+    for (idx, keys) in hotness {
+        if let Some((_, output)) = list.transactions_and_outputs.get_mut(idx as usize) {
+            output.add_hotness(
+                keys.into_iter()
+                    .map(|key| (key, HotStateOp::make_hot()))
+                    .collect(),
+            );
         }
     }
 }
@@ -3061,6 +3097,47 @@ impl TransactionOutputListWithAuxiliaryInfos {
             .verify(ledger_info, first_transaction_output_version)?;
 
         // Verify the auxiliary infos against the transaction infos
+        verify_auxiliary_infos_against_transaction_infos(
+            &self.persisted_auxiliary_infos,
+            &self
+                .transaction_output_list_with_proof
+                .proof
+                .transaction_infos,
+        )
+    }
+}
+
+/// Like `TransactionOutputListWithAuxiliaryInfos`, plus a sparse sidecar map (output_index →
+/// hot state keys) that survives BCS where in-`WriteSet` hotness wouldn't.
+#[derive(Clone, Debug, Eq, PartialEq, Deserialize, Serialize)]
+pub struct TransactionOutputListWithAuxiliaryInfosAndHotness {
+    pub transaction_output_list_with_proof: TransactionOutputListWithProof,
+    pub persisted_auxiliary_infos: Vec<PersistedAuxiliaryInfo>,
+    pub hotness: BTreeMap<u32, BTreeSet<StateKey>>,
+}
+
+impl TransactionOutputListWithAuxiliaryInfosAndHotness {
+    pub fn new(
+        transaction_output_list_with_proof: TransactionOutputListWithProof,
+        persisted_auxiliary_infos: Vec<PersistedAuxiliaryInfo>,
+        hotness: BTreeMap<u32, BTreeSet<StateKey>>,
+    ) -> Self {
+        Self {
+            transaction_output_list_with_proof,
+            persisted_auxiliary_infos,
+            hotness,
+        }
+    }
+
+    /// Verifies the inner output list + aux infos. Hotness is not verified.
+    pub fn verify(
+        &self,
+        ledger_info: &LedgerInfo,
+        first_transaction_output_version: Option<Version>,
+    ) -> Result<()> {
+        self.transaction_output_list_with_proof
+            .verify(ledger_info, first_transaction_output_version)?;
+
         verify_auxiliary_infos_against_transaction_infos(
             &self.persisted_auxiliary_infos,
             &self
