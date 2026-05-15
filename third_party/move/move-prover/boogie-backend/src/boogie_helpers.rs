@@ -1354,12 +1354,27 @@ pub fn boogie_struct_field_result_fun_name(
 /// Return name of the behavioral predicate evaluation function for a function type.
 /// These inline functions dispatch on closure variants to evaluate behavioral predicates.
 /// Format: `${kind}'${type_suffix}'`
+///
+/// `ResultOf` and `WriteOf(j)` share a single tuple-returning Skolem symbol:
+/// the Skolem returns `Tuple<declared..., post_states...>` and callers project
+/// the appropriate slice. Sharing the symbol is what keeps `ensures_of` and
+/// `result_of` mutually consistent — the alternative (separate `write_of_j`
+/// Skolems pinned by a functionality axiom) is unsound when combined with a
+/// universal axiom over post-state inputs.
 pub fn boogie_behavioral_eval_fun_name(
     env: &GlobalEnv,
     fun_type: &Type,
     kind: BehaviorKind,
 ) -> String {
-    format!("${}'{}'", kind, boogie_type_suffix(env, fun_type, false))
+    let kind_name = match kind {
+        BehaviorKind::ResultOf | BehaviorKind::WriteOf(_) => "result_of".to_string(),
+        _ => kind.to_string(),
+    };
+    format!(
+        "${}'{}'",
+        kind_name,
+        boogie_type_suffix(env, fun_type, false)
+    )
 }
 
 /// Return name of a per-function behavioral spec function for a closure target function.

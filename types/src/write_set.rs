@@ -545,12 +545,49 @@ impl Debug for HotStateOp {
     }
 }
 
+/// Native-position write produced by a transaction. Type-distinct
+/// from [`WriteOp`] so the compiler refuses to mix native-position
+/// entries into the main-state bucket (`ValueWriteSet`). Wraps the
+/// same `BaseStateOp` payload variants as `WriteOp` (Creation /
+/// Modification / Deletion) — `MakeHot` is rejected at construction.
+///
+/// Carried by [`WriteSet::native_positions`]; skipped from the
+/// WriteSet's serde representation, so `TransactionInfo` hashes and
+/// on-disk WriteSet bytes are unaffected. The storage commit applier
+/// (in `aptos-db`) consumes it via [`WriteSet::native_position_iter`].
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct NativePositionOp(BaseStateOp);
+
+impl NativePositionOp {
+    pub fn from_write_op(op: WriteOp) -> Self {
+        Self(op.into_base_op())
+    }
+
+    pub fn as_base_op(&self) -> &BaseStateOp {
+        &self.0
+    }
+
+    /// Borrow as a `WriteOp`. Always succeeds because the only
+    /// constructor takes a `WriteOp`.
+    pub fn as_write_op(&self) -> &WriteOp {
+        self.0
+            .as_write_op_opt()
+            .expect("NativePositionOp must wrap a WriteOp variant")
+    }
+}
+
 #[derive(BCSCryptoHash, Clone, CryptoHasher, Debug, Default, Eq, PartialEq)]
 pub struct WriteSet {
     value: ValueWriteSet,
     /// Hot state promotions, non-empty only in block epilogues.
     /// TODO(HotState): not hashed into `TransactionInfo` for now.
     hotness: BTreeMap<StateKey, HotStateOp>,
+    /// Native-position writes staged by the transaction. Routed
+    /// to the dedicated `position_db` + in-memory `NativeStateStore`
+    /// by the storage commit applier; never enters main state.
+    /// Skipped from serde so `TransactionInfo` hashes and the
+    /// on-disk WriteSet format are unaffected.
+    native_positions: BTreeMap<StateKey, NativePositionOp>,
 }
 
 impl Serialize for WriteSet {
@@ -571,6 +608,7 @@ impl<'de> Deserialize<'de> for WriteSet {
         Ok(Self {
             value,
             hotness: BTreeMap::new(),
+            native_positions: BTreeMap::new(),
         })
     }
 }
@@ -602,6 +640,7 @@ impl WriteSet {
         Self {
             value,
             hotness: BTreeMap::new(),
+            native_positions: BTreeMap::new(),
         }
     }
 
@@ -609,7 +648,11 @@ impl WriteSet {
         value: ValueWriteSet,
         hotness: BTreeMap<StateKey, HotStateOp>,
     ) -> Self {
-        Self { value, hotness }
+        Self {
+            value,
+            hotness,
+            native_positions: BTreeMap::new(),
+        }
     }
 
     pub fn new(write_ops: impl IntoIterator<Item = (StateKey, WriteOp)>) -> Result<Self> {
@@ -654,7 +697,7 @@ impl WriteSet {
     }
 
     pub fn is_empty(&self) -> bool {
-        self.as_v0().is_empty() && self.hotness.is_empty()
+        self.as_v0().is_empty() && self.hotness.is_empty() && self.native_positions.is_empty()
     }
 
     pub fn expect_into_write_op_iter(self) -> impl IntoIterator<Item = (StateKey, WriteOp)> {
@@ -702,6 +745,31 @@ impl WriteSet {
             "hotness should only be initialized once."
         );
         self.hotness = hotness;
+    }
+
+    /// Iterate the native-position bucket. Used by the storage
+    /// commit applier; main-state consumers never see these entries.
+    pub fn native_position_iter(&self) -> impl Iterator<Item = (&StateKey, &NativePositionOp)> {
+        self.native_positions.iter()
+    }
+
+    pub fn native_position_keys(&self) -> impl Iterator<Item = &StateKey> {
+        self.native_positions.keys()
+    }
+
+    pub fn has_native_positions(&self) -> bool {
+        !self.native_positions.is_empty()
+    }
+
+    /// Install the native-position bucket. Mirrors [`add_hotness`]:
+    /// expected to be called once per WriteSet, at VM-output
+    /// materialization time.
+    pub fn add_native_positions(&mut self, native_positions: BTreeMap<StateKey, NativePositionOp>) {
+        assert!(
+            self.native_positions.is_empty(),
+            "native_positions should only be initialized once."
+        );
+        self.native_positions = native_positions;
     }
 }
 
@@ -804,6 +872,7 @@ impl WriteSetMut {
         Ok(WriteSet {
             value: ValueWriteSet::V0(WriteSetV0(self)),
             hotness: BTreeMap::new(),
+            native_positions: BTreeMap::new(),
         })
     }
 

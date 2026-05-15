@@ -2053,14 +2053,27 @@ impl<'env> BoogieTranslator<'env> {
 
     /// Generate the uninterpreted `result_of` function and its connecting axiom.
     ///
-    /// The Skolem takes `(memory, fun, params, &mut post-state slots)` as
-    /// inputs and returns the declared return type only. The axiom ties it
-    /// to `ensures_of` by splatting the Skolem output into the result slots:
+    /// The Skolem takes only `(memory, fun, params)` and returns a tuple
+    /// `(declared_results..., &mut post-states...)`. `BehaviorKind::ResultOf`
+    /// and `BehaviorKind::WriteOf(j)` share this symbol — callers project the
+    /// declared-result slice or the j-th post-state slot, respectively. The
+    /// axiom ties it to `ensures_of` by splatting the Skolem's tuple
+    /// components into the corresponding `ensures_of` slots:
     ///
     /// ```text
-    /// axiom forall mem, f, p_*, q_* ::
-    ///     ensures_of(mem, f, p_*, result_of(mem, f, p_*, q_*), q_*)
+    /// axiom forall mem, f, p_* ::
+    ///     (var _r := result_of(mem, f, p_*);
+    ///      ensures_of(mem, f, p_*, _r->$0, ..., _r->$<N+K-1>))
     /// ```
+    ///
+    /// Earlier versions of this generator made the `&mut` post-state slots
+    /// `q_*` *inputs* to `result_of` and universally quantified the axiom over
+    /// them, plus emitted separate `write_of_j` Skolems with functionality
+    /// axioms saying `ensures_of(..., q_*) ==> q_j == write_of_j(inputs)`. The
+    /// two together implied `forall q_j: q_j == write_of_j(inputs)`, which is
+    /// inconsistent for inhabited types. Using a single tuple Skolem keyed on
+    /// inputs alone — matching the per-function Skolem path — eliminates that
+    /// inconsistency at the source.
     fn generate_result_of_function_and_axiom(
         &self,
         fun_type: &Type,
@@ -2080,7 +2093,8 @@ impl<'env> BoogieTranslator<'env> {
             .collect();
         let post_state_types = Self::behavioral_post_state_types(&params_flat);
 
-        if declared_results.is_empty() {
+        // Nothing to Skolemize when there are no observable outputs.
+        if declared_results.is_empty() && post_state_types.is_empty() {
             return;
         }
 
@@ -2096,7 +2110,7 @@ impl<'env> BoogieTranslator<'env> {
         let ensures_of_name =
             boogie_behavioral_eval_fun_name(env, fun_type, BehaviorKind::EnsuresOf);
 
-        // Inputs: memory, fun, p0..pN, q0..qK (post-state slots).
+        // Inputs: memory, fun, p0..pN. No post-state inputs.
         let mut param_decls: Vec<String> = eval_mem_decls;
         param_decls.push(format!("f: {}", fun_ty_boogie_name));
         let mut input_args: Vec<String> = eval_mem_args;
@@ -2109,21 +2123,18 @@ impl<'env> BoogieTranslator<'env> {
             ));
             input_args.push(format!("p{}", pos));
         }
-        let mut post_args: Vec<String> = Vec::with_capacity(post_state_types.len());
-        for (pos, ty) in post_state_types.iter().enumerate() {
-            param_decls.push(format!("q{}: {}", pos, boogie_type(env, ty, false)));
-            post_args.push(format!("q{}", pos));
-        }
-        let all_call_args = {
-            let mut v = input_args.clone();
-            v.extend(post_args.iter().cloned());
-            v
-        };
 
-        let result_type = if declared_results.len() == 1 {
-            boogie_type(env, &declared_results[0], false)
+        // Output tuple: declared results followed by `&mut` post-states.
+        // References are stripped — spec predicates work on values.
+        let output_types: Vec<Type> = declared_results
+            .iter()
+            .chain(post_state_types.iter())
+            .cloned()
+            .collect();
+        let result_type = if output_types.len() == 1 {
+            boogie_type(env, &output_types[0], false)
         } else {
-            boogie_type(env, &Type::Tuple(declared_results.clone()), false)
+            boogie_type(env, &Type::Tuple(output_types.clone()), false)
         };
 
         emitln!(
@@ -2134,13 +2145,12 @@ impl<'env> BoogieTranslator<'env> {
             result_type
         );
 
-        let result_of_call = format!("{}({})", result_of_name, all_call_args.join(", "));
+        let result_of_call = format!("{}({})", result_of_name, input_args.join(", "));
 
-        // ensures_of takes: input_args, then result slots (declared + post-state).
+        // ensures_of takes: input_args, then output slots (declared + post-state).
         let mut ensures_args = input_args.clone();
-        if declared_results.len() == 1 {
+        if output_types.len() == 1 {
             ensures_args.push(result_of_call.clone());
-            ensures_args.extend(post_args.iter().cloned());
             let body = format!("{}({})", ensures_of_name, ensures_args.join(", "));
             emitln!(
                 self.writer,
@@ -2150,11 +2160,10 @@ impl<'env> BoogieTranslator<'env> {
                 body
             );
         } else {
-            let tuple_projections: Vec<String> = (0..declared_results.len())
+            let tuple_projections: Vec<String> = (0..output_types.len())
                 .map(|i| format!("_r->${}", i))
                 .collect();
             ensures_args.extend(tuple_projections);
-            ensures_args.extend(post_args.iter().cloned());
             let body = format!(
                 "(var _r := {}; {}({}))",
                 result_of_call,
@@ -2167,61 +2176,6 @@ impl<'env> BoogieTranslator<'env> {
                 param_decls.join(", "),
                 result_of_call,
                 body
-            );
-        }
-
-        // Per-`&mut`-parameter functionality projections. `write_of_<j>`
-        // takes only the input slots (no post-state) and returns the j-th
-        // `&mut` post-state. The functionality axiom says: whenever
-        // `ensures_of(..., q_*)` holds, `q_j == write_of_<j>(inputs)`.
-        // Together with the `result_of` axiom this lets the verifier derive
-        // that all outputs of a deterministic `f` are functions of inputs.
-        let input_decls: Vec<String> = param_decls
-            .iter()
-            .take(param_decls.len() - post_state_types.len())
-            .cloned()
-            .collect();
-        for (j, ty) in post_state_types.iter().enumerate() {
-            let write_of_name =
-                boogie_behavioral_eval_fun_name(env, fun_type, BehaviorKind::WriteOf(j));
-            let write_of_call = format!("{}({})", write_of_name, input_args.join(", "));
-            emitln!(
-                self.writer,
-                "function {}({}): {};",
-                write_of_name,
-                input_decls.join(", "),
-                boogie_type(env, ty, false)
-            );
-            // Quantifier vars: inputs + remaining q's (for ensures_of's tail).
-            let q_decls: Vec<String> = post_state_types
-                .iter()
-                .enumerate()
-                .map(|(i, ty)| format!("q{}: {}", i, boogie_type(env, ty, false)))
-                .collect();
-            let r_decls: Vec<String> = declared_results
-                .iter()
-                .enumerate()
-                .map(|(i, ty)| format!("r{}: {}", i, boogie_type(env, ty, false)))
-                .collect();
-            let r_args: Vec<String> = (0..declared_results.len())
-                .map(|i| format!("r{}", i))
-                .collect();
-            let mut all_quant = input_decls.clone();
-            all_quant.extend(r_decls);
-            all_quant.extend(q_decls);
-            let mut ensures_call_args = input_args.clone();
-            ensures_call_args.extend(r_args);
-            ensures_call_args.extend(post_args.iter().cloned());
-            let ensures_call = format!("{}({})", ensures_of_name, ensures_call_args.join(", "));
-            emitln!(
-                self.writer,
-                "axiom (forall {} :: {{{}, {}}} {} ==> q{} == {});",
-                all_quant.join(", "),
-                ensures_call,
-                write_of_call,
-                ensures_call,
-                j,
-                write_of_call
             );
         }
     }

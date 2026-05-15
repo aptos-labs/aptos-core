@@ -544,6 +544,7 @@ bigdecimal = { version = "0.4.0", features = ["serde"] }
 version-compare = "0.1.1"
 bitvec = "1.0.1"
 blake2 = "0.10.4"
+blake3 = { version = "1.5.4", features = ["mmap", "rayon"] }
 blake2-rfc = "0.2.18"
 bls12_381 = "0.8.0"
 blst = "0.3.15"

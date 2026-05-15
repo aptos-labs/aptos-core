@@ -783,6 +783,10 @@ StateKey:
     2:
       Raw:
         NEWTYPE: BYTES
+    3:
+      TradingNative:
+        NEWTYPE:
+          TYPENAME: TradingNativeKey
 StateValueMetadata:
   ENUM:
     0:
@@ -817,6 +821,17 @@ SymmetricCiphertext:
 TableHandle:
   NEWTYPESTRUCT:
     TYPENAME: AccountAddress
+TradingNativeKey:
+  ENUM:
+    0:
+      Position:
+        STRUCT:
+          - exchange:
+              TYPENAME: AccountAddress
+          - account:
+              TYPENAME: AccountAddress
+          - market:
+              TYPENAME: AccountAddress
 Transaction:
   ENUM:
     0:

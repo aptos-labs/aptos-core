@@ -38,6 +38,7 @@ aptos-validator-transaction-pool = { workspace = true }
 ark-std = { workspace = true }
 async-trait = { workspace = true }
 bcs = { workspace = true }
+blake3 = { workspace = true }
 bytes = { workspace = true }
 fail = { workspace = true }
 futures = { workspace = true }

@@ -4,7 +4,7 @@ All notable changes to the Aptos CLI will be captured in this file. This project
 
 # Unreleased
 
-- _No changes yet._
+- Replaced `aptos node verify-digest-key` with two commands: `aptos node validate-digest-key` and `aptos node validate-public-parameters`. Both compute and report a blake3 checksum (instead of SHA-256) along with the file size, and verify that the blob deserializes to the corresponding type. The JSON output field is renamed from `sha256` to `blake3`.
 
 ## [9.2.0]
 - Update boogie from 3.5.1 to 3.5.6.
