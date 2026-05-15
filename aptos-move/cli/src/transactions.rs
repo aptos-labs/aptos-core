@@ -621,9 +621,6 @@ mod tests {
             first.get("type").and_then(|v| v.as_str()),
             Some("delete_module")
         );
-        assert_eq!(
-            first.get("address").and_then(|v| v.as_str()),
-            Some("0x1")
-        );
+        assert_eq!(first.get("address").and_then(|v| v.as_str()), Some("0x1"));
     }
 }

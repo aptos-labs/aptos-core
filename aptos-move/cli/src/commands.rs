@@ -2672,6 +2672,8 @@ impl CliCommand<TransactionSummary> for Replay {
                     version: Some(self.txn_id),
                     vm_status: Some(format!("{:?}", txn_output.status())),
                     deployed_object_address: None,
+                    events: None,
+                    changes: None,
                 });
             },
         };
