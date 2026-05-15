@@ -92,6 +92,24 @@ pub static EXCEED_PER_BLOCK_OUTPUT_LIMIT_COUNT: Lazy<IntCounterVec> = Lazy::new(
     .unwrap()
 });
 
+/// Histogram of txns cut when BlockSTM early-halts due to a per-block limit.
+/// Label `reason`: `gas` (effective block gas limit) or `output_size` (block output limit).
+/// Only recorded when an early halt occurred; observations of 0 indicate the halt fired on the
+/// last txn (no remaining input txns to cut).
+pub static BLOCK_TXNS_CUT_BY_LIMIT: Lazy<HistogramVec> = Lazy::new(|| {
+    register_histogram_vec!(
+        "aptos_execution_block_txns_cut_by_limit",
+        "Histogram of txns cut when BlockSTM early-halts due to a per-block gas or output limit.",
+        &["reason", "mode"],
+        // Most halts cut a modest tail; cover 1..8k with doubling buckets.
+        vec![
+            1.0, 2.0, 4.0, 8.0, 16.0, 32.0, 64.0, 128.0, 256.0, 512.0, 1024.0, 2048.0, 4096.0,
+            8192.0
+        ],
+    )
+    .unwrap()
+});
+
 pub static PARALLEL_EXECUTION_SECONDS: Lazy<Histogram> = Lazy::new(|| {
     register_histogram!(
         // metric name
