@@ -2913,6 +2913,7 @@ fn verify_events_against_root_hash(
 #[derive(Clone, Debug, Eq, PartialEq, Deserialize, Serialize)]
 pub enum TransactionOutputListWithProofV2 {
     TransactionOutputListWithAuxiliaryInfos(TransactionOutputListWithAuxiliaryInfos),
+    TransactionOutputListWithExtensions(TransactionOutputListWithExtensions),
 }
 
 impl TransactionOutputListWithProofV2 {
@@ -2920,6 +2921,10 @@ impl TransactionOutputListWithProofV2 {
         transaction_output_list_with_auxiliary_infos: TransactionOutputListWithAuxiliaryInfos,
     ) -> Self {
         Self::TransactionOutputListWithAuxiliaryInfos(transaction_output_list_with_auxiliary_infos)
+    }
+
+    pub fn new_with_extensions(inner: TransactionOutputListWithExtensions) -> Self {
+        Self::TransactionOutputListWithExtensions(inner)
     }
 
     /// A convenience function to create an empty proof. Mostly used for tests.
@@ -2938,42 +2943,39 @@ impl TransactionOutputListWithProofV2 {
         )
     }
 
-    /// Consumes and returns the inner transaction output list
+    /// Consumes and returns the inner transaction output list. Extensions, if any,
+    /// are applied to the inner `WriteSet`s first.
     pub fn consume_output_list_with_proof(self) -> TransactionOutputListWithProof {
         match self {
             Self::TransactionOutputListWithAuxiliaryInfos(output_list_with_auxiliary_infos) => {
                 output_list_with_auxiliary_infos.transaction_output_list_with_proof
+            },
+            Self::TransactionOutputListWithExtensions(inner) => {
+                let (output_list, _) = inner.into_parts();
+                output_list
             },
         }
     }
 
     /// Returns the first version in the transaction output list
     pub fn get_first_output_version(&self) -> Option<Version> {
-        match self {
-            Self::TransactionOutputListWithAuxiliaryInfos(output_list_with_auxiliary_infos) => {
-                output_list_with_auxiliary_infos
-                    .transaction_output_list_with_proof
-                    .get_first_output_version()
-            },
-        }
+        self.get_output_list_with_proof().get_first_output_version()
     }
 
     /// Returns the number of outputs in the transaction output list
     pub fn get_num_outputs(&self) -> usize {
-        match self {
-            Self::TransactionOutputListWithAuxiliaryInfos(output_list_with_auxiliary_infos) => {
-                output_list_with_auxiliary_infos
-                    .transaction_output_list_with_proof
-                    .get_num_outputs()
-            },
-        }
+        self.get_output_list_with_proof().get_num_outputs()
     }
 
-    /// Returns a reference to the inner transaction output list with proof
+    /// Returns a reference to the inner transaction output list with proof. The returned
+    /// `WriteSet`s may not include extension data; consume the wrapper to apply extensions.
     pub fn get_output_list_with_proof(&self) -> &TransactionOutputListWithProof {
         match self {
             Self::TransactionOutputListWithAuxiliaryInfos(output_list_with_auxiliary_infos) => {
                 &output_list_with_auxiliary_infos.transaction_output_list_with_proof
+            },
+            Self::TransactionOutputListWithExtensions(inner) => {
+                &inner.transaction_output_list_with_proof
             },
         }
     }
@@ -2984,20 +2986,24 @@ impl TransactionOutputListWithProofV2 {
             Self::TransactionOutputListWithAuxiliaryInfos(output_list_with_auxiliary_infos) => {
                 &output_list_with_auxiliary_infos.persisted_auxiliary_infos
             },
+            Self::TransactionOutputListWithExtensions(inner) => &inner.persisted_auxiliary_infos,
         }
     }
 
-    /// Splits the transaction output list with proof v2 into its components
+    /// Splits the transaction output list with proof v2 into its components. Extensions,
+    /// if any, are applied to the inner `WriteSet`s first.
     pub fn into_parts(self) -> (TransactionOutputListWithProof, Vec<PersistedAuxiliaryInfo>) {
         match self {
             Self::TransactionOutputListWithAuxiliaryInfos(output_list_with_auxiliary_infos) => (
                 output_list_with_auxiliary_infos.transaction_output_list_with_proof,
                 output_list_with_auxiliary_infos.persisted_auxiliary_infos,
             ),
+            Self::TransactionOutputListWithExtensions(inner) => inner.into_parts(),
         }
     }
 
-    /// Verifies the transaction output list with proof v2 against the given ledger info
+    /// Verifies the transaction output list with proof v2 against the given ledger info.
+    /// Extension payloads are not verified, but duplicate extension variants are rejected.
     pub fn verify(
         &self,
         ledger_info: &LedgerInfo,
@@ -3005,6 +3011,9 @@ impl TransactionOutputListWithProofV2 {
     ) -> Result<()> {
         match self {
             Self::TransactionOutputListWithAuxiliaryInfos(inner) => {
+                inner.verify(ledger_info, first_transaction_output_version)
+            },
+            Self::TransactionOutputListWithExtensions(inner) => {
                 inner.verify(ledger_info, first_transaction_output_version)
             },
         }
@@ -3061,6 +3070,114 @@ impl TransactionOutputListWithAuxiliaryInfos {
             .verify(ledger_info, first_transaction_output_version)?;
 
         // Verify the auxiliary infos against the transaction infos
+        verify_auxiliary_infos_against_transaction_infos(
+            &self.persisted_auxiliary_infos,
+            &self
+                .transaction_output_list_with_proof
+                .proof
+                .transaction_infos,
+        )
+    }
+}
+
+/// Extensions carried alongside a transaction output list.
+#[derive(Clone, Debug, Eq, PartialEq, Deserialize, Serialize)]
+pub enum TransactionOutputExtension {
+    /// Carries per-output hot state keys as a sidecar; `WriteSet::Serialize` would
+    /// otherwise drop them. Unverified — same trust model as `PersistedWriteSet::V1`.
+    Hotness(BTreeMap<u32, BTreeSet<StateKey>>),
+}
+
+/// Like `TransactionOutputListWithAuxiliaryInfos`, plus optional extension payloads
+/// that survive BCS where in-`WriteSet` side data may not.
+#[derive(Clone, Debug, Eq, PartialEq, Deserialize, Serialize)]
+pub struct TransactionOutputListWithExtensions {
+    pub transaction_output_list_with_proof: TransactionOutputListWithProof,
+    pub persisted_auxiliary_infos: Vec<PersistedAuxiliaryInfo>,
+    pub extensions: Vec<TransactionOutputExtension>,
+}
+
+impl TransactionOutputListWithExtensions {
+    pub fn new(
+        transaction_output_list_with_proof: TransactionOutputListWithProof,
+        persisted_auxiliary_infos: Vec<PersistedAuxiliaryInfo>,
+        extensions: Vec<TransactionOutputExtension>,
+    ) -> Self {
+        Self {
+            transaction_output_list_with_proof,
+            persisted_auxiliary_infos,
+            extensions,
+        }
+    }
+
+    /// Splits the transaction output list and auxiliary infos. Extensions, if any,
+    /// are applied to the inner `WriteSet`s first. Out-of-range indices are dropped.
+    pub fn into_parts(self) -> (TransactionOutputListWithProof, Vec<PersistedAuxiliaryInfo>) {
+        let Self {
+            mut transaction_output_list_with_proof,
+            persisted_auxiliary_infos,
+            extensions,
+        } = self;
+
+        for extension in extensions {
+            match extension {
+                TransactionOutputExtension::Hotness(hotness) => {
+                    Self::apply_hotness_extension(&mut transaction_output_list_with_proof, hotness);
+                },
+            }
+        }
+
+        (
+            transaction_output_list_with_proof,
+            persisted_auxiliary_infos,
+        )
+    }
+
+    fn apply_hotness_extension(
+        transaction_output_list_with_proof: &mut TransactionOutputListWithProof,
+        hotness: BTreeMap<u32, BTreeSet<StateKey>>,
+    ) {
+        for (idx, keys) in hotness {
+            if let Some((_, output)) = transaction_output_list_with_proof
+                .transactions_and_outputs
+                .get_mut(idx as usize)
+            {
+                output.add_hotness(
+                    keys.into_iter()
+                        .map(|key| (key, HotStateOp::make_hot()))
+                        .collect(),
+                );
+            }
+        }
+    }
+
+    fn verify_extension_variants_are_unique(&self) -> Result<()> {
+        let mut seen_hotness = false;
+        for extension in &self.extensions {
+            match extension {
+                TransactionOutputExtension::Hotness(_) => {
+                    ensure!(
+                        !seen_hotness,
+                        "Found duplicate transaction output extension: Hotness"
+                    );
+                    seen_hotness = true;
+                },
+            }
+        }
+        Ok(())
+    }
+
+    /// Verifies the inner output list + aux infos. Extension payloads are not
+    /// verified, but duplicate extension variants are rejected.
+    pub fn verify(
+        &self,
+        ledger_info: &LedgerInfo,
+        first_transaction_output_version: Option<Version>,
+    ) -> Result<()> {
+        self.verify_extension_variants_are_unique()?;
+        self.transaction_output_list_with_proof
+            .verify(ledger_info, first_transaction_output_version)?;
+
         verify_auxiliary_infos_against_transaction_infos(
             &self.persisted_auxiliary_infos,
             &self

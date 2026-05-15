@@ -176,6 +176,8 @@ pub struct StorageServiceConfig {
     pub enable_size_and_time_aware_chunking: bool,
     /// Whether transaction data v2 is enabled
     pub enable_transaction_data_v2: bool,
+    /// Whether to carry per-output hot state keys alongside v2 output responses
+    pub enable_hotness_in_state_sync: bool,
     /// Maximum number of epoch ending ledger infos per chunk
     pub max_epoch_chunk_size: u64,
     /// Maximum number of invalid requests per peer
@@ -219,6 +221,7 @@ impl Default for StorageServiceConfig {
         Self {
             enable_size_and_time_aware_chunking: true,
             enable_transaction_data_v2: true,
+            enable_hotness_in_state_sync: true,
             max_epoch_chunk_size: MAX_EPOCH_CHUNK_SIZE,
             max_invalid_requests_per_peer: 500,
             max_requests_per_second_per_peer: None,
@@ -561,7 +564,13 @@ impl ConfigOptimizer for StateSyncConfig {
             chain_id,
         )?;
 
-        Ok(modified_driver_config || modified_data_streaming_config)
+        // Optimize the storage service
+        let modified_storage_service_config =
+            StorageServiceConfig::optimize(node_config, local_config_yaml, node_type, chain_id)?;
+
+        Ok(modified_driver_config
+            || modified_data_streaming_config
+            || modified_storage_service_config)
     }
 }
 
@@ -585,6 +594,33 @@ impl ConfigOptimizer for StateSyncDriverConfig {
             {
                 state_sync_driver_config.bootstrapping_mode =
                     BootstrappingMode::DownloadLatestStates;
+                modified_config = true;
+            }
+        }
+
+        Ok(modified_config)
+    }
+}
+
+impl ConfigOptimizer for StorageServiceConfig {
+    fn optimize(
+        node_config: &mut NodeConfig,
+        local_config_yaml: &Value,
+        _node_type: NodeType,
+        chain_id: Option<ChainId>,
+    ) -> Result<bool, Error> {
+        let storage_service_config = &mut node_config.state_sync.storage_service;
+        let local_storage_service_config_yaml = &local_config_yaml["state_sync"]["storage_service"];
+
+        let mut modified_config = false;
+        if let Some(chain_id) = chain_id {
+            // TODO(HotState): Hotness in state sync is disabled on mainnet and testnet
+            // unless explicitly enabled.
+            if (chain_id.is_mainnet() || chain_id.is_testnet())
+                && local_storage_service_config_yaml["enable_hotness_in_state_sync"].as_bool()
+                    != Some(true)
+            {
+                storage_service_config.enable_hotness_in_state_sync = false;
                 modified_config = true;
             }
         }
