@@ -25,6 +25,7 @@ pub const SIZE_BYTES_LABEL: &str = "size_bytes";
 pub const BROADCAST_RECEIVED_LABEL: &str = "broadcast_received";
 pub const COMMIT_ACCEPTED_LABEL: &str = "commit_accepted";
 pub const COMMIT_ACCEPTED_BLOCK_LABEL: &str = "commit_accepted_block";
+pub const COMMIT_ACCEPTED_PREV_BLOCK_LABEL: &str = "commit_accepted_prev_block";
 pub const COMMIT_REJECTED_LABEL: &str = "commit_rejected";
 pub const COMMIT_REJECTED_DUPLICATE_LABEL: &str = "commit_rejected_duplicate";
 pub const COMMIT_IGNORED_LABEL: &str = "commit_ignored";
@@ -215,14 +216,29 @@ pub fn core_mempool_txn_commit_latency(
     bucket: &str,
     latency: Duration,
     priority: &str,
+    pull_count: usize,
 ) {
+    let pull_count = pull_count_label(pull_count);
     CORE_MEMPOOL_TXN_COMMIT_LATENCY
-        .with_label_values(&[stage, submitted_by, bucket])
+        .with_label_values(&[stage, submitted_by, bucket, pull_count])
         .observe(latency.as_secs_f64());
 
     CORE_MEMPOOL_TXN_LATENCIES
-        .with_label_values(&[stage, submitted_by, bucket, priority])
+        .with_label_values(&[stage, submitted_by, bucket, priority, pull_count])
         .observe(latency.as_secs_f64());
+}
+
+/// Bucket a raw consensus pull count into a low-cardinality label.
+pub fn pull_count_label(pull_count: usize) -> &'static str {
+    match pull_count {
+        0 => "0",
+        1 => "1",
+        2 => "2",
+        3 => "3",
+        4..=5 => "4-5",
+        6..=10 => "6-10",
+        _ => "11+",
+    }
 }
 
 /// Counter tracking latency of txns reaching various stages in committing
@@ -231,7 +247,7 @@ static CORE_MEMPOOL_TXN_COMMIT_LATENCY: Lazy<HistogramVec> = Lazy::new(|| {
     register_histogram_vec!(
         "aptos_core_mempool_txn_commit_latency",
         "Latency of txn reaching various stages in core mempool after insertion",
-        &["stage", "submitted_by", "bucket"],
+        &["stage", "submitted_by", "bucket", "pull_count"],
         MEMPOOL_LATENCY_BUCKETS.to_vec()
     )
     .unwrap()
@@ -243,7 +259,7 @@ static CORE_MEMPOOL_TXN_LATENCIES: Lazy<HistogramVec> = Lazy::new(|| {
     register_histogram_vec!(
         "aptos_core_mempool_txn_latencies",
         "Latency of txn reaching various stages in mempool",
-        &["stage", "submitted_by", "bucket", "priority"],
+        &["stage", "submitted_by", "bucket", "priority", "pull_count"],
         MEMPOOL_LATENCY_BUCKETS.to_vec()
     )
     .unwrap()

@@ -805,6 +805,7 @@ pub(crate) fn process_committed_transactions(
 ) {
     let mut pool = mempool.lock();
     let block_timestamp = Duration::from_micros(block_timestamp_usecs);
+    let prev_block_timestamp = pool.prev_commit_block_timestamp();
 
     let tracking_usecases = {
         let mut history = use_case_history.lock();
@@ -833,12 +834,14 @@ pub(crate) fn process_committed_transactions(
                 .get(&transaction.use_case)
                 .map(|name| (transaction.use_case.clone(), name)),
             block_timestamp,
+            prev_block_timestamp,
         );
         pool.commit_transaction(&transaction.sender, transaction.replay_protector);
     }
 
     if block_timestamp_usecs > 0 {
         pool.gc_by_expiration_time(block_timestamp);
+        pool.set_prev_commit_block_timestamp(block_timestamp);
     }
 
     // Release mempool lock, then finalize traces (which may trigger GC).
