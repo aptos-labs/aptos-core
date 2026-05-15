@@ -81,7 +81,8 @@ pub enum NodeTool {
     RunLocalnet(RunLocalnet),
     UpdateConsensusKey(UpdateConsensusKey),
     UpdateValidatorNetworkAddresses(UpdateValidatorNetworkAddresses),
-    VerifyDigestKey(VerifyDigestKey),
+    ValidateDigestKey(ValidateDigestKey),
+    ValidatePublicParameters(ValidatePublicParameters),
 }
 
 impl NodeTool {
@@ -109,7 +110,8 @@ impl NodeTool {
                 .map(|_| "".to_string()),
             UpdateConsensusKey(tool) => tool.execute_serialized().await,
             UpdateValidatorNetworkAddresses(tool) => tool.execute_serialized().await,
-            VerifyDigestKey(tool) => tool.execute_serialized().await,
+            ValidateDigestKey(tool) => tool.execute_serialized().await,
+            ValidatePublicParameters(tool) => tool.execute_serialized().await,
         }
     }
 }
@@ -1492,49 +1494,55 @@ impl Time {
     }
 }
 
-/// Verify a BCS-serialized DigestKey blob file
+#[derive(Serialize)]
+pub struct BlobValidationResult {
+    pub file_size_bytes: u64,
+    pub blake3: String,
+}
+
+fn file_size_and_blake3(file: &PathBuf) -> CliTypedResult<(u64, String)> {
+    use std::time::Instant;
+
+    println!("Reading file {}...", file.display());
+    let file_size_bytes = std::fs::metadata(file)
+        .map_err(|e| CliError::IO(format!("Failed to stat {}: {}", file.display(), e), e))?
+        .len();
+
+    println!("Computing blake3...");
+    let t = Instant::now();
+    let mut hasher = blake3::Hasher::new();
+    hasher
+        .update_mmap_rayon(file)
+        .map_err(|e| CliError::IO(format!("Failed to read {}: {}", file.display(), e), e))?;
+    let blake3 = hasher.finalize().to_hex().to_string();
+    println!("blake3: {} in {:.2?}", blake3, t.elapsed());
+
+    Ok((file_size_bytes, blake3))
+}
+
+/// Validate a BCS-serialized DigestKey blob file
 ///
-/// Reads the file, attempts BCS deserialization, and prints the file size
-/// and SHA-256 checksum.
+/// Reads the file, computes the file size and blake3 checksum, and verifies
+/// that the contents are a valid BCS-serialized DigestKey.
 #[derive(Parser)]
-pub struct VerifyDigestKey {
+pub struct ValidateDigestKey {
     /// Path to the BCS-serialized DigestKey blob file
     #[clap(value_parser)]
     pub file: PathBuf,
 }
 
-#[derive(Serialize)]
-pub struct VerifyDigestKeyResult {
-    pub file_size_bytes: u64,
-    pub sha256: String,
-}
-
 #[async_trait]
-impl CliCommand<VerifyDigestKeyResult> for VerifyDigestKey {
+impl CliCommand<BlobValidationResult> for ValidateDigestKey {
     fn command_name(&self) -> &'static str {
-        "VerifyDigestKey"
+        "ValidateDigestKey"
     }
 
-    async fn execute(self) -> CliTypedResult<VerifyDigestKeyResult> {
+    async fn execute(self) -> CliTypedResult<BlobValidationResult> {
         use aptos_batch_encryption::shared::digest_key_file;
         use aptos_types::secret_sharing::DigestKey;
-        use sha2::{Digest, Sha256};
         use std::time::Instant;
 
-        println!("Reading file {}...", self.file.display());
-        let t = Instant::now();
-        let bytes = std::fs::read(&self.file).map_err(|e| {
-            CliError::IO(format!("Failed to read {}: {}", self.file.display(), e), e)
-        })?;
-        let file_size_bytes = bytes.len() as u64;
-        println!("Read {} bytes in {:.2?}", file_size_bytes, t.elapsed());
-
-        println!("Computing SHA-256...");
-        let t = Instant::now();
-        let sha256 = hex::encode(Sha256::digest(&bytes));
-        println!("SHA-256: {} in {:.2?}", sha256, t.elapsed());
-
-        drop(bytes);
+        let (file_size_bytes, blake3) = file_size_and_blake3(&self.file)?;
 
         println!("Deserializing DigestKey...");
         let t = Instant::now();
@@ -1546,9 +1554,55 @@ impl CliCommand<VerifyDigestKeyResult> for VerifyDigestKey {
         })?;
         println!("DigestKey is valid. Deserialized in {:.2?}", t.elapsed());
 
-        Ok(VerifyDigestKeyResult {
+        Ok(BlobValidationResult {
             file_size_bytes,
-            sha256,
+            blake3,
+        })
+    }
+}
+
+/// Validate a BCS-serialized PublicParameters blob file
+///
+/// Reads the file, computes the file size and blake3 checksum, and verifies
+/// that the contents are a valid BCS-serialized PublicParameters.
+#[derive(Parser)]
+pub struct ValidatePublicParameters {
+    /// Path to the BCS-serialized PublicParameters blob file
+    #[clap(value_parser)]
+    pub file: PathBuf,
+}
+
+#[async_trait]
+impl CliCommand<BlobValidationResult> for ValidatePublicParameters {
+    fn command_name(&self) -> &'static str {
+        "ValidatePublicParameters"
+    }
+
+    async fn execute(self) -> CliTypedResult<BlobValidationResult> {
+        use aptos_types::dkg::chunky_dkg::ChunkyDKGPublicParameters;
+        use std::time::Instant;
+
+        let (file_size_bytes, blake3) = file_size_and_blake3(&self.file)?;
+
+        println!("Deserializing PublicParameters...");
+        let t = Instant::now();
+        let bytes = std::fs::read(&self.file).map_err(|e| {
+            CliError::IO(format!("Failed to read {}: {}", self.file.display(), e), e)
+        })?;
+        let _pp: ChunkyDKGPublicParameters = bcs::from_bytes(&bytes).map_err(|e| {
+            CliError::UnexpectedError(format!(
+                "Failed to deserialize PublicParameters ({} bytes): {}",
+                file_size_bytes, e
+            ))
+        })?;
+        println!(
+            "PublicParameters is valid. Deserialized in {:.2?}",
+            t.elapsed()
+        );
+
+        Ok(BlobValidationResult {
+            file_size_bytes,
+            blake3,
         })
     }
 }
