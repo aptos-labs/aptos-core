@@ -5,9 +5,14 @@ set -e
 export VECTOR_SELF_POD_NAME=my-vector-agent
 export K8S_CLUSTER=forge-0
 
-jq -c -M < ./testing/test1.json | vector --quiet --config ./files/vector-transforms.yaml --config ./testing/vector-test-config.yaml | jq
-jq -c -M < ./testing/test2.json | vector --quiet --config ./files/vector-transforms.yaml --config ./testing/vector-test-config.yaml | jq
-jq -c -M < ./testing/test3.json | vector --quiet --config ./files/vector-transforms.yaml --config ./testing/vector-test-config.yaml | jq
+if [ -n "$1" ]; then
+  # If filename provided, only process that file
+  jq -c -M < "$1" | vector --quiet --config ./files/vector-transforms.yaml --config ./testing/vector-test-config.yaml | jq
+  exit 0
+fi
 
-jq -c -M < ./testing/log-level-filter-retained.json | vector --quiet --config ./files/vector-transforms.yaml --config ./testing/vector-test-config.yaml | jq
-jq -c -M < ./testing/log-level-filter-filtered.json | vector --quiet --config ./files/vector-transforms.yaml --config ./testing/vector-test-config.yaml | jq
+# Otherwise process all test*.json files
+for testfile in ./testing/*.json; do
+  echo "Processing $testfile..."
+  jq -c -M < "$testfile" | vector --quiet --config ./files/vector-transforms.yaml --config ./testing/vector-test-config.yaml | jq
+done
