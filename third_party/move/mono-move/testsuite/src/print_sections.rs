@@ -124,7 +124,7 @@ pub fn format_micro_ops(guard: &ExecutionGuard<'_>, module_ir: &ModuleIR) -> Str
             Ok(map) => map,
             Err(e) => {
                 out.push_str(&format!(
-                    "\nfun {}(): skipped (cannot set lowering requirements: {})\n",
+                    "\nfun {}(): skipped (cannot discover types: {})\n",
                     func_name, e
                 ));
                 continue;
@@ -194,7 +194,7 @@ pub fn format_frame_layout(guard: &ExecutionGuard<'_>, module_ir: &ModuleIR) -> 
             Ok(map) => map,
             Err(e) => {
                 out.push_str(&format!(
-                    "fun {}: skipped (cannot set lowering requirements: {})\n",
+                    "fun {}: skipped (cannot discover types: {})\n",
                     func_name, e
                 ));
                 continue;
