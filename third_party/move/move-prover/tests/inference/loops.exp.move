@@ -193,12 +193,30 @@ module 0x42::loops {
             let a = update_field(old(Counter[addr]), value, old(Counter[addr]).value + 1);
             ..S1 |~ update<Counter>(addr, a)
         };
-        aborts_if [inferred] 3 < n && (S3 |~ global<Counter>(addr)).value == MAX_U64;
-        aborts_if [inferred] S3 |~ 3 < n && !exists<Counter>(addr);
-        aborts_if [inferred] 2 < n && (S2 |~ global<Counter>(addr)).value == MAX_U64;
-        aborts_if [inferred] S2 |~ 2 < n && !exists<Counter>(addr);
-        aborts_if [inferred] 1 < n && (S1 |~ global<Counter>(addr)).value == MAX_U64;
-        aborts_if [inferred] S1 |~ 1 < n && !exists<Counter>(addr);
+        aborts_if [inferred] {
+            let a = S3 |~ global<Counter>(addr);
+            3 < n && a.value == MAX_U64
+        };
+        aborts_if [inferred] {
+            let a = S3 |~ exists<Counter>(addr);
+            3 < n && !a
+        };
+        aborts_if [inferred] {
+            let a = S2 |~ global<Counter>(addr);
+            2 < n && a.value == MAX_U64
+        };
+        aborts_if [inferred] {
+            let a = S2 |~ exists<Counter>(addr);
+            2 < n && !a
+        };
+        aborts_if [inferred] {
+            let a = S1 |~ global<Counter>(addr);
+            1 < n && a.value == MAX_U64
+        };
+        aborts_if [inferred] {
+            let a = S1 |~ exists<Counter>(addr);
+            1 < n && !a
+        };
         aborts_if [inferred] 0 < n && Counter[addr].value == MAX_U64;
         aborts_if [inferred] 0 < n && !exists<Counter>(addr);
     }

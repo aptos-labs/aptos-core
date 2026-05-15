@@ -176,6 +176,10 @@ pub struct StorageServiceConfig {
     pub enable_size_and_time_aware_chunking: bool,
     /// Whether transaction data v2 is enabled
     pub enable_transaction_data_v2: bool,
+    /// Whether to carry per-output hot state keys alongside v2 output responses. The
+    /// hotness sidecar is unverified by the proof; clients splice it back into the
+    /// `WriteSet`s on consume so the commit path can persist hotness.
+    pub enable_hotness_in_state_sync: bool,
     /// Maximum number of epoch ending ledger infos per chunk
     pub max_epoch_chunk_size: u64,
     /// Maximum number of invalid requests per peer
@@ -219,6 +223,7 @@ impl Default for StorageServiceConfig {
         Self {
             enable_size_and_time_aware_chunking: true,
             enable_transaction_data_v2: true,
+            enable_hotness_in_state_sync: false,
             max_epoch_chunk_size: MAX_EPOCH_CHUNK_SIZE,
             max_invalid_requests_per_peer: 500,
             max_requests_per_second_per_peer: None,

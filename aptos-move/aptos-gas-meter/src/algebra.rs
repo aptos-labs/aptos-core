@@ -82,12 +82,15 @@ where
                 )
             },
             Some(TxnLimitsRequest::Staking(request)) => {
+                // Multipliers are expressed as percent of the base limit
+                // (100 = 1x).
                 let m = request.multipliers();
                 let max_execution_gas = u64::from(vm_gas_params.txn.max_execution_gas)
-                    .saturating_mul(m.execution_bps())
+                    .saturating_mul(m.execution_multiplier_percent())
                     / 100;
-                let max_io_gas =
-                    u64::from(vm_gas_params.txn.max_io_gas).saturating_mul(m.io_bps()) / 100;
+                let max_io_gas = u64::from(vm_gas_params.txn.max_io_gas)
+                    .saturating_mul(m.io_multiplier_percent())
+                    / 100;
 
                 (
                     InternalGas::new(max_execution_gas),

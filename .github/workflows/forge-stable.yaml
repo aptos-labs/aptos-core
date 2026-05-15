@@ -139,7 +139,9 @@ jobs:
               { TEST_NAME: 'changing-working-quorum-test', FORGE_RUNNER_DURATION_SECS: 1200, FORGE_TEST_SUITE: 'changing_working_quorum_test', FORGE_ENABLE_FAILPOINTS: true },
               { TEST_NAME: 'realistic-env-max-load-long', FORGE_RUNNER_DURATION_SECS: 7200, FORGE_TEST_SUITE: 'realistic_env_max_load_large' },
               { TEST_NAME: 'realistic-env-max-load-encrypted', FORGE_RUNNER_DURATION_SECS: 480, FORGE_TEST_SUITE: 'realistic_env_max_load_encrypted' },
-              { TEST_NAME: 'etna', FORGE_RUNNER_DURATION_SECS: 7200, FORGE_TEST_SUITE: 'etna', FORGE_IMAGE_NAME: 'etna-rust', GIT_SHA: '4e3b3ac2f88f7db927048edc1c006361cd908e33' }
+              // Pin to the aptos-core SHA that the etna-rust image is built from, so the forge
+              // test runner matches the etna binary under test.
+              { TEST_NAME: 'etna', FORGE_RUNNER_DURATION_SECS: 7200, FORGE_TEST_SUITE: 'etna', FORGE_IMAGE_NAME: 'etna-rust', GIT_SHA: 'c66dbf952b692bc017b459e3e6e44cc2a43d6958' }
             ];
 
             const matrix = testName != "all" ? tests.filter(test => test.TEST_NAME === testName) : tests;

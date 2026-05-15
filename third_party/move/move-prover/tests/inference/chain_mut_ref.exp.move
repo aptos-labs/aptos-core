@@ -85,23 +85,17 @@ module 0x42::chain_mut_ref {
     spec chain(self: &mut Pool, x: u64): u64 {
         pragma opaque = true;
         ensures [inferred] result == {
-            let (_t0,_t1) = {
-                let a = update_field(old(self), total, old(self).total + (..S1 |~ result_of<compute>(old(self), x)));
-                let b = ..S1 |~ result_of<compute>(old(self), x);
-                S1.. |~ result_of<update>(a, b)
-            };
-            _t0
+            let a = ..S1 |~ result_of<compute>(old(self), x);
+            S1.. |~ result_of<update>(update_field(old(self), total, old(self).total + a), a)
         };
-        ensures [inferred] self == {
-            let (_t0,_t1) = {
-                let a = update_field(old(self), total, old(self).total + (..S1 |~ result_of<compute>(old(self), x)));
-                let b = ..S1 |~ result_of<compute>(old(self), x);
-                S1.. |~ result_of<update>(a, b)
-            };
-            _t1
+        aborts_if [inferred] S1 |~ {
+            let a = ..S1 |~ result_of<compute>(self, x);
+            aborts_of<update>(update_field(self, total, self.total + a), a)
         };
-        aborts_if [inferred] S1 |~ aborts_of<update>(update_field(self, total, self.total + (..S1 |~ result_of<compute>(self, x))), ..S1 |~ result_of<compute>(self, x));
-        aborts_if [inferred] self.total + (..S1 |~ result_of<compute>(self, x)) > MAX_U64;
+        aborts_if [inferred] {
+            let a = ..S1 |~ result_of<compute>(self, x);
+            self.total + a > MAX_U64
+        };
         aborts_if [inferred] aborts_of<compute>(self, x);
     }
 

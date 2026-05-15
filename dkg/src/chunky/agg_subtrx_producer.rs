@@ -463,6 +463,33 @@ mod tests {
     }
 
     #[tokio::test]
+    async fn test_aggregation_rejects_oversized_transcript_bytes() {
+        let setup = ChunkyTestSetup::new_uniform(4);
+        let (state, _rx) = make_agg_state(&setup, 0);
+
+        let session_bound = setup.dkg_config.expected_max_transcript_size();
+        // One byte over the per-session bound — the size gate should reject it.
+        let oversized = ChunkyDKGTranscript::new(
+            setup.dkg_config.session_metadata.dealer_epoch,
+            setup.addrs[0],
+            vec![0u8; session_bound + 1],
+        );
+        let start = std::time::Instant::now();
+        let result = BroadcastStatus::add(&state, setup.addrs[0], oversized);
+        let elapsed = start.elapsed();
+        assert!(result.is_err());
+        let err_msg = format!("{:#}", result.unwrap_err());
+        assert!(
+            err_msg.contains("exceeds max"),
+            "expected size-gate rejection, got: {err_msg}"
+        );
+        assert!(
+            elapsed < std::time::Duration::from_secs(1),
+            "rejection took {elapsed:?}; expected sub-second"
+        );
+    }
+
+    #[tokio::test]
     async fn test_aggregation_unequal_voting_power() {
         // Validator 3 has power 7, total = 10, quorum = 7.
         let setup = ChunkyTestSetup::new(4, vec![1, 1, 1, 7]);

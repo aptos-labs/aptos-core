@@ -27,13 +27,19 @@ use aptos_types::{
     transaction::{
         PersistedAuxiliaryInfo, Transaction, TransactionAuxiliaryData, TransactionInfo,
         TransactionListWithAuxiliaryInfos, TransactionListWithProof, TransactionListWithProofV2,
-        TransactionOutput, TransactionOutputListWithAuxiliaryInfos, TransactionOutputListWithProof,
+        TransactionOutput, TransactionOutputListWithAuxiliaryInfos,
+        TransactionOutputListWithAuxiliaryInfosAndHotness, TransactionOutputListWithProof,
         TransactionOutputListWithProofV2, Version,
     },
     write_set::WriteSet,
 };
 use serde::Serialize;
-use std::{cmp::min, sync::Arc, time::Instant};
+use std::{
+    cmp::min,
+    collections::{BTreeMap, BTreeSet},
+    sync::Arc,
+    time::Instant,
+};
 
 /// The interface into local storage (e.g., the Aptos DB) used by the storage
 /// server to handle client requests and responses.
@@ -725,6 +731,10 @@ impl StorageReader {
                 transaction_output_list_with_proof,
                 persisted_auxiliary_infos,
             ));
+        let output_list_with_proof_v2 = attach_hotness_if_enabled(
+            output_list_with_proof_v2,
+            self.config.enable_hotness_in_state_sync,
+        );
         let response = TransactionDataWithProofResponse {
             transaction_data_response_type: TransactionDataResponseType::TransactionOutputData,
             transaction_list_with_proof: None,
@@ -750,6 +760,10 @@ impl StorageReader {
                 num_outputs_to_fetch,
                 proof_version,
             )?;
+            let output_list_with_proof = attach_hotness_if_enabled(
+                output_list_with_proof,
+                self.config.enable_hotness_in_state_sync,
+            );
             let response = TransactionDataWithProofResponse {
                 transaction_data_response_type: TransactionDataResponseType::TransactionOutputData,
                 transaction_list_with_proof: None,
@@ -859,6 +873,10 @@ impl StorageReader {
                 num_outputs_to_fetch,
                 proof_version,
             )?;
+            let output_list_with_proof = attach_hotness_if_enabled(
+                output_list_with_proof,
+                self.config.enable_hotness_in_state_sync,
+            );
             let response = TransactionDataWithProofResponse {
                 transaction_data_response_type: TransactionDataResponseType::TransactionOutputData,
                 transaction_list_with_proof: None,
@@ -1514,4 +1532,53 @@ fn get_num_serialized_bytes<T: ?Sized + Serialize>(
     let num_serialized_bytes = bcs::serialized_size(data)
         .map_err(|error| Error::UnexpectedErrorEncountered(error.to_string()))?;
     Ok(num_serialized_bytes as u64)
+}
+
+/// Collects per-output hot state keys from the given output list. The result is sparse —
+/// outputs without hot state changes are omitted. The inner `WriteSet`s are left untouched;
+/// callers will typically copy hotness into the side-channel and let `WriteSet::Serialize`
+/// drop the in-WriteSet copy during BCS encoding.
+fn extract_per_output_hotness(
+    output_list: &TransactionOutputListWithProof,
+) -> BTreeMap<u32, BTreeSet<StateKey>> {
+    let mut hotness = BTreeMap::new();
+    for (idx, (_, output)) in output_list.transactions_and_outputs.iter().enumerate() {
+        let keys: BTreeSet<StateKey> = output.write_set().hotness_keys().cloned().collect();
+        if !keys.is_empty() {
+            hotness.insert(idx as u32, keys);
+        }
+    }
+    hotness
+}
+
+/// If `enable_hotness` is set and any output carries hot state keys, rewrap `output_list`
+/// into the hotness-carrying V2 variant so the keys survive the wire (they'd otherwise be
+/// dropped by `WriteSet::Serialize`). Returns the input unchanged in all other cases.
+fn attach_hotness_if_enabled(
+    output_list: TransactionOutputListWithProofV2,
+    enable_hotness: bool,
+) -> TransactionOutputListWithProofV2 {
+    if !enable_hotness {
+        return output_list;
+    }
+    match output_list {
+        TransactionOutputListWithProofV2::TransactionOutputListWithAuxiliaryInfos(inner) => {
+            let hotness = extract_per_output_hotness(&inner.transaction_output_list_with_proof);
+            if hotness.is_empty() {
+                TransactionOutputListWithProofV2::TransactionOutputListWithAuxiliaryInfos(inner)
+            } else {
+                TransactionOutputListWithProofV2::new_with_hotness(
+                    TransactionOutputListWithAuxiliaryInfosAndHotness::new(
+                        inner.transaction_output_list_with_proof,
+                        inner.persisted_auxiliary_infos,
+                        hotness,
+                    ),
+                )
+            }
+        },
+        already_with_hotness
+        @ TransactionOutputListWithProofV2::TransactionOutputListWithAuxiliaryInfosAndHotness(
+            _,
+        ) => already_with_hotness,
+    }
 }

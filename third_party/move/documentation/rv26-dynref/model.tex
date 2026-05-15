@@ -1,0 +1,187 @@
+\section{Access Path Trees}\label{sec:apt}
+
+An access path describes how the program reached a particular
+substructure of Move's state: it starts at some named entry
+point---a local of the current frame, a globally-stored resource, or
+a reference parameter passed in by the caller---and follows a
+sequence of field projections, variant projections, and indexings.
+Every borrow in the program produces a reference that can be
+described by its access path. The runtime records these paths
+explicitly: it groups them into a forest of trees, one per entry
+point, and attaches each live reference to the node at the end of
+its path.
+
+A reference is \emph{valid} when the path it represents still leads
+to a reachable, type-compatible substructure of the current state.
+The runtime approximates this by marking references invalid when
+destructive events happen along their paths; the rules in
+Sect.~\ref{sec:semantics} spell out which events invalidate which
+references.
+
+\paragraph{Derivation.}
+A reference $\refn{2}$ is \emph{derived from} $\refn{1}$ when its
+access path is built by extending the path of $\refn{1}$ through one
+of the language's borrowing operations: field projection, variant
+projection, indexing, freezing, or being passed across a function
+call as a reference parameter. In the access path tree this comes
+out simply: $\refn{2}$ is derived from $\refn{1}$ exactly when its
+node lies in the subtree below $\refn{1}$'s. The full derivation
+order is the reflexive-transitive closure.
+
+\paragraph{Roots and edges.}
+Each tree's root is one of the named entry points mentioned above.
+There are three kinds:
+\begin{itemize}
+\item $\local{i}$, the $i$-th local of the current frame;
+\item $\glob{\tau}$, the global resource of type $\tau$ (we abstract
+addresses);
+\item $\param{i}$, the abstract value behind the $i$-th reference
+parameter passed in by the caller.
+\end{itemize}
+Edges carry labels: a field offset for record fields, a variant
+field for variant projections, and a single distinguished label $0$
+for vector elements. The vector label is an over-approximation: rather
+than track each index, we collapse all of them. This costs precision
+on element-wise borrows but keeps the trees small.
+
+Trees are built lazily. The runtime never materializes a node until
+the program actually borrows through it.
+
+\paragraph{State.}
+A runtime state is a tuple $\sigma = (T, R, S, F)$.
+\begin{itemize}
+\item $T : \mathrm{Root} \rightharpoonup \mathrm{APT}$ maps each root
+to its tree. The map is partial: roots that have not been borrowed
+have no tree.
+\item $R$ assigns each live reference identifier a triple $(\mu, \pi,
+n)$. Here $\mu \in \{\mut, \imm\}$ is the mutability, $\pi \in
+\{\Live, \Pois\}$ is the validity flag (we call $\Pois$ \emph{poisoned}
+for short), and $n = \node{\mathrm{root}}{\mathrm{id}}$ is the
+reference's \emph{qualified node}---the tree node it is attached to.
+\item $S$ is a shadow stack mirroring the machine's operand stack.
+Each entry is either a non-reference token or a reference identifier.
+\item $F$ is the per-frame stack. Each frame carries its own $T$ and
+$R$, a vector of shadow locals, and a map from this frame's
+reference-parameter indices back to qualified nodes in the caller,
+which is what return transport uses.
+\end{itemize}
+
+\paragraph{Aliasing as a tree relation.}
+Two references alias when one's node is an ancestor or descendant of
+the other's. The runtime decides this by walking parent pointers, in
+time linear in the depth of the tree. Each node also holds the set of
+references attached to it, so an invalidation walk only has to visit
+the affected subtree---it does not have to scan the whole reference
+table.
+
+\section{Invalidation Rules}\label{sec:semantics}
+
+We give the rules as a small-step relation $\sigma \to \sigma'$
+indexed by the bytecode instruction being executed. Rules for
+operations that do not touch the shadow state---constants,
+arithmetic, stack reshuffles---are omitted.
+
+Every non-trivial rule has the same shape. An event destructively
+changes the substructure reachable through some node $n$, and the
+runtime walks the tree from $n$ to poison every reference attached to
+nodes related to $n$. Different events pick different sets of
+related nodes (self, ancestors, descendants, or unions) and different
+mutability filters. We write $\mathrm{invalidate}(N, \phi)$ for the
+operation that poisons every reference attached to some node in
+$N$, filtered by $\phi \in \{\mut, \imm, \mathsf{all}\}$. A poisoned
+reference cannot be borrowed from, read, written, frozen, or passed
+as a call argument; any such attempt is a runtime safety violation.
+
+\paragraph{Borrow, read, freeze.}
+Borrowing a local $i$ creates a fresh reference attached to
+$\local{i}$, materializing $T(\local{i})$ if it does not yet exist. A
+field borrow with label $\ell$ from a reference $\refn{}$ at node $n$
+consumes $\refn{}$ and creates a fresh reference at the child
+$n.\ell$. \texttt{ReadRef} pops the top reference after a validity
+check; the node is unchanged. \texttt{FreezeRef} on a live $(\mut, n)$
+reference consumes it and produces a fresh $(\imm, n)$ reference at
+the same node---an immutable re-view of the same path. None of these
+events invalidates anything.
+
+\paragraph{Destructive write.}
+\texttt{WriteRef} through a mutable reference at $n$ overwrites the
+value at $n$, which affects both its ancestors (whose contents have
+changed) and its descendants (which may have been replaced). The rule
+is:
+\[
+\mathrm{invalidate}\bigl(\{n\} \cup \Desc(n) \cup \Anc(n),\ \imm\bigr),\qquad
+\mathrm{invalidate}\bigl(\Desc(n),\ \mut\bigr).
+\]
+The first line poisons every immutable view of $n$, of any ancestor,
+and of any descendant. The second poisons every mutable view of a
+descendant. Mutable views of $n$ itself are deliberately spared: a
+program that consumes one mutable view and immediately reborrows from
+$n$ stays accepted, which matches static borrow checking.
+
+\paragraph{Move, overwrite, variant mutation.}
+Moving or storing over local $i$ replaces the value at $\local{i}$
+outright, so we invalidate every reference reaching through it,
+regardless of mutability:
+$\mathrm{invalidate}(\{r_i\} \cup \Desc(r_i),\ \mathsf{all})$.
+Variant mutation is the same rule applied at the discriminator:
+references derived from the prior variant's projection sit in
+descendant nodes, and the change to the discriminator poisons them.
+The enum example from Sect.~\ref{sec:intro} falls out of this case.
+
+\paragraph{Calls.}
+A call $f(\overline{a})$ with reference arguments
+$a_{i_1}, \ldots, a_{i_k}$, each at node $n_j$ with mutability
+$\mu_j$, proceeds in four steps.
+\begin{enumerate}
+\item Check each $\refn{j}$ is live. Then lock the subtree at $n_j$:
+exclusively if $\mu_j = \mut$, shared otherwise. An exclusive lock
+conflicts with any other lock on a related node; a shared lock
+conflicts only with an exclusive one. Any conflict is a violation.
+This is what catches overlapping mutable arguments from
+Sect.~\ref{sec:examples}.
+\item For each mutable argument, apply the destructive-write rule at
+$n_j$. The callee may write through the reference, so the discipline
+treats the call itself as a write.
+\item Allocate a new frame. The callee's reference parameters become
+fresh references attached to parameter roots $\param{j}$. The new
+frame records, for each $j$, the qualified node $n_j$ in the
+caller---this is what return transport (below) uses.
+\item Release the locks on the caller's subtrees.
+\end{enumerate}
+Fig.~\ref{fig:lock} illustrates a conflicting pair.
+\begin{figure}[h]
+\centering
+\begin{minipage}{0.92\textwidth}\small
+Calling \texttt{foo(r1, r2)} with $r_1 = \&\mut x$, $r_2 = \&\mut x.g$:
+\begin{verbatim}
+  root                       r1 takes exclusive lock on subtree(x).
+   +-- x     <-- locked      r2 takes exclusive lock on subtree(x.g),
+        +-- f                which is a descendant of x: lock conflict
+        +-- g  <-- locked    ==> runtime safety violation.
+\end{verbatim}
+\end{minipage}
+\caption{Call-boundary subtree locking.}\label{fig:lock}
+\end{figure}
+
+\paragraph{Returns.}
+On return, every reference on the shadow stack must trace back to a
+reference parameter of the current frame. Walking the parent pointers
+of its qualified node should land on some $\param{j}$. A reference
+rooted at a local or a global would dangle past the frame's lifetime
+and is rejected. Each surviving reference is then transported into
+the caller: starting from the caller's qualified node for parameter
+$j$, the runtime walks the same labels and attaches a fresh reference
+at the resulting node. Returning two mutable references that share a
+subtree is caught by the same exclusive-lock pass used at calls.
+
+\paragraph{Opaque effects.}
+Some operations have bodies the runtime cannot see: native functions
+implemented outside the bytecode language, closure captures, and
+dynamic-dispatch targets. We handle them through a small interface:
+each opaque operation declares, per returned reference, which input
+reference argument it derives from. At a call site, the runtime
+conjures a fresh child of that argument's node and attaches the
+returned reference to it; ordinary call-boundary checks still apply.
+The interface is part of the trusted base---an incorrect declaration
+silently weakens the guarantees. We return to this in
+Sect.~\ref{sec:discussion}.

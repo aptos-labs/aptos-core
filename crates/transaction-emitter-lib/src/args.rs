@@ -191,6 +191,9 @@ pub struct EmitArgs {
 
     #[clap(long, default_value = "false", hide = true)]
     pub encrypt_transactions: bool,
+
+    #[clap(long)]
+    pub encrypted_gas_price_multiplier: Option<u64>,
 }
 
 #[derive(Clone, Debug, Default, Deserialize, Parser, Serialize)]

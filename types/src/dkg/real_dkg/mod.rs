@@ -407,6 +407,28 @@ impl DKGTrait for RealDKG {
             .map(|x| x.id as u64)
             .collect()
     }
+
+    /// BCS wire-size upper bound for a single-dealer `Transcripts` (main + optional fast).
+    /// A single WTrx at total weight `W` contains:
+    ///   soks: 1 × SoK (Player + G1 + BLS sig + (G1, Scalar)) ≈ 232 B
+    ///   R, V, C: G1 vectors of length W (and W+1 for V) → 3 × W × 48 B (+48)
+    ///   R_hat, V_hat: G2 vectors of length W (and W+1 for V_hat) → 2 × W × 96 B (+96)
+    /// Plus length prefixes and Option/struct overhead in the Transcripts wrapper.
+    fn expected_max_transcript_size(params: &Self::PublicParams) -> usize {
+        const G1: usize = 48;
+        const G2: usize = 96;
+        const SOK: usize = 8 /* Player */ + G1 + 96 /* BLS sig */ + G1 + 32 /* Scalar */;
+        let wtrx_bound = |w: usize| SOK + w * (3 * G1 + 2 * G2) + (G1 + G2);
+        let main = wtrx_bound(params.pvss_config.wconfig.get_total_weight());
+        let fast = params
+            .pvss_config
+            .fast_wconfig
+            .as_ref()
+            .map(|wc| wtrx_bound(wc.get_total_weight()))
+            .unwrap_or(0);
+        // 4 KiB slack: BCS uleb128 length prefixes, Option tag, struct overhead.
+        main + fast + 4096
+    }
 }
 
 impl RealDKG {

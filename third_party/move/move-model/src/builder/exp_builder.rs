@@ -6086,7 +6086,8 @@ impl ExpTranslator<'_, '_, '_> {
         expected_type: &Type,
         context: &ErrorMessageContext,
     ) -> ExpData {
-        // Convert parser BehaviorKind to model BehaviorKind
+        // Model has a `WriteOf` variant too, but it's internal to spec
+        // inference and never produced by the parser.
         let model_kind = match kind {
             PA::BehaviorKind::RequiresOf => BehaviorKind::RequiresOf,
             PA::BehaviorKind::AbortsOf => BehaviorKind::AbortsOf,
@@ -6118,11 +6119,6 @@ impl ExpTranslator<'_, '_, '_> {
             return self.new_error_exp();
         };
 
-        // Translate arguments and check types. Both the user-facing minimum
-        // arity (inputs + explicit results for `EnsuresOf`) and the canonical
-        // augmented arity (with post-state slots for `&mut` params) are
-        // accepted; `augment_behavior_call` in the spec rewriter normalizes
-        // the minimum form to the canonical form automatically.
         let translated_args =
             self.translate_and_check_behavior_args(loc, args, &arg_ty, &result_ty, &model_kind);
 
@@ -6163,9 +6159,6 @@ impl ExpTranslator<'_, '_, '_> {
             return self.new_error_exp();
         }
 
-        // Build args with function expression as first argument. The
-        // user-facing 2-arg form is canonicalized to the internal 3-arg form
-        // by `SpecTranslator::augment_behavior_call` during spec rewriting.
         let mut all_args = vec![fun_exp];
         all_args.extend(translated_args);
 
@@ -6364,16 +6357,9 @@ impl ExpTranslator<'_, '_, '_> {
         result
     }
 
-    /// Computes the expected argument types for a behavior predicate based on kind.
-    ///
-    /// Input parameter types are stripped of all references — spec language
-    /// treats references transparently. For `EnsuresOf`, explicit result types
-    /// are appended after inputs (the user-facing "minimum" form). When the
-    /// caller writes the canonical form (with explicit post-state slots for
-    /// each `&mut` parameter), `compute_behavior_arg_types_canonical` returns
-    /// the extended type list. `translate_and_check_behavior_args` accepts
-    /// either arity.
-    fn compute_behavior_arg_types_minimum(
+    /// Minimum-form expected argument types: input types (references
+    /// stripped), and for `EnsuresOf` a slot per return value.
+    fn compute_behavior_arg_types(
         &self,
         arg_ty: &Type,
         result_ty: &Type,
@@ -6391,17 +6377,18 @@ impl ExpTranslator<'_, '_, '_> {
         types
     }
 
-    /// The canonical (augmented) expected argument types for a behavior
-    /// predicate. For `EnsuresOf`, the inputs and explicit results are
-    /// followed by the post-state value type for each `&mut T` parameter.
-    /// For other kinds, this matches the minimum form.
+    /// Canonical form for `EnsuresOf`: minimum form plus an explicit
+    /// post-state slot for each `&mut` parameter. `ResultOf`'s `&mut`
+    /// post-state slots are appended later by `wrap_mut_ref_bp_inputs` in
+    /// the model-rewrite pass; at parse time `result_of` accepts only the
+    /// minimum form so the user-facing signature matches `f`'s arity.
     fn compute_behavior_arg_types_canonical(
         &self,
         arg_ty: &Type,
         result_ty: &Type,
         kind: &BehaviorKind,
     ) -> Vec<Type> {
-        let mut types = self.compute_behavior_arg_types_minimum(arg_ty, result_ty, kind);
+        let mut types = self.compute_behavior_arg_types(arg_ty, result_ty, kind);
         if matches!(kind, BehaviorKind::EnsuresOf) {
             for ty in arg_ty.clone().flatten() {
                 if ty.is_mutable_reference() {
@@ -6412,10 +6399,9 @@ impl ExpTranslator<'_, '_, '_> {
         types
     }
 
-    /// Computes the result type for a behavior predicate based on the kind.
-    /// - `ResultOf` returns the function's result type (including modified mut ref values)
-    /// - All other behavior predicates return bool
-    /// Returns `None` if the result type cannot be computed (e.g., result_of on void function).
+    /// Result type for a behavior predicate. `ResultOf` returns the
+    /// function's return type and is rejected for void callees; others
+    /// return `bool`. Returns `None` on rejection.
     fn compute_behavior_result_type(
         &mut self,
         loc: &Loc,
@@ -6426,44 +6412,24 @@ impl ExpTranslator<'_, '_, '_> {
             return Some(BOOL_TYPE);
         }
 
-        // For ResultOf, compute result type from function type
-        let Type::Fun(params, result, _abilities) = fun_type else {
-            // Should not happen if resolve_behavior_target succeeded
+        let Type::Fun(_, result, _abilities) = fun_type else {
             return Some(Type::Error);
         };
 
-        // Compute result types: explicit results + modified mut ref values
-        let result_types: Vec<_> = result
-            .clone()
-            .flatten()
-            .into_iter()
-            .chain(
-                params
-                    .clone()
-                    .flatten()
-                    .into_iter()
-                    .filter(|ty| ty.is_mutable_reference())
-                    .map(|ty| ty.skip_reference().clone()),
-            )
-            .collect();
-
-        // Error only if there are NO outputs at all
-        if result_types.is_empty() {
+        if result.clone().flatten().is_empty() {
             self.error(
                 loc,
-                "`result_of` cannot be used with functions that have no outputs",
+                "`result_of` cannot be used with functions that have no return value; \
+                 use `ensures_of` to constrain the post-state of `&mut` arguments instead",
             );
             return None;
         }
 
-        Some(Type::tuple(result_types))
+        Some((**result).clone())
     }
 
-    /// Translates and type-checks behavior predicate arguments. Accepts
-    /// either the user-facing minimum arity or the canonical augmented arity
-    /// (which includes post-state slots for `&mut T` parameters in
-    /// `EnsuresOf`). The model spec rewriter normalizes the minimum form to
-    /// the canonical form via `augment_behavior_call`.
+    /// Translates and type-checks behavior predicate arguments against the
+    /// expected types computed by `compute_behavior_arg_types`.
     fn translate_and_check_behavior_args(
         &mut self,
         loc: &Loc,
@@ -6472,7 +6438,7 @@ impl ExpTranslator<'_, '_, '_> {
         result_ty: &Type,
         kind: &BehaviorKind,
     ) -> Vec<Exp> {
-        let minimum = self.compute_behavior_arg_types_minimum(arg_ty, result_ty, kind);
+        let minimum = self.compute_behavior_arg_types(arg_ty, result_ty, kind);
         let canonical = self.compute_behavior_arg_types_canonical(arg_ty, result_ty, kind);
         let expected_types: &[Type] =
             if args.len() == canonical.len() && canonical.len() != minimum.len() {
@@ -6482,8 +6448,6 @@ impl ExpTranslator<'_, '_, '_> {
             };
 
         if args.len() != expected_types.len() {
-            // Report against the minimum-arity (the user-facing default);
-            // also mention the canonical arity if it differs.
             let msg = if minimum.len() == canonical.len() {
                 format!(
                     "expected {} argument(s) for {} but {} were provided",
@@ -6493,7 +6457,7 @@ impl ExpTranslator<'_, '_, '_> {
                 )
             } else {
                 format!(
-                    "expected {} argument(s) for {} (or {} for the canonical form including post-state slots), but {} were provided",
+                    "expected {} argument(s) for {} (or {} for the canonical form including post-state slots) but {} were provided",
                     minimum.len(),
                     kind,
                     canonical.len(),

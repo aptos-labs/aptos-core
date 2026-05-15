@@ -103,7 +103,7 @@ use move_model::{
         Pattern, PropertyValue, QuantKind, RewriteResult, TempIndex, Value,
     },
     exp_generator::{ExpGenerator, RangeCheckKind},
-    exp_rewriter::{ExpRewriter, ExpRewriterFunctions, RewriteTarget},
+    exp_rewriter::{strip_all_olds, ExpRewriter, ExpRewriterFunctions, RewriteTarget},
     exp_simplifier::{flatten_conjunction_owned, ExpSimplifier},
     memory_labels::MemoryLabelInfo,
     model::{
@@ -688,6 +688,10 @@ impl FunctionTargetProcessor for SpecInferenceProcessor {
                         .collect();
                 }
 
+                // Eliminate WP-internal `WriteOf` carriers before simplification
+                // so any tautologies it produces are folded away.
+                analyzer.eliminate_write_of(&mut state);
+
                 // Simplify conditions: constant folding, arithmetic/boolean
                 // identities, and assumption-based redundancy elimination.
                 // Multiple passes allow multi-step simplification chains to complete
@@ -1061,7 +1065,7 @@ fn is_cse_candidate(exp: &ExpData) -> bool {
 }
 
 /// Generates a readable name for a CSE binding based on expression structure.
-fn cse_name_for(env: &GlobalEnv, exp: &ExpData, index: usize) -> String {
+fn cse_name_for(env: &GlobalEnv, exp: &ExpData) -> String {
     let name = match exp {
         ExpData::Call(_, AstOp::MoveFunction(mid, fid), _)
         | ExpData::Call(_, AstOp::Closure(mid, fid, _), _) => {
@@ -1076,12 +1080,14 @@ fn cse_name_for(env: &GlobalEnv, exp: &ExpData, index: usize) -> String {
         ExpData::Call(_, AstOp::Select(_, _, field_id), _) => {
             field_id.symbol().display(env.symbol_pool()).to_string()
         },
-        _ => format!("cse_{}", index),
+        _ => "cse".to_string(),
     };
-    // Strip internal `$` prefix used for auto-generated spec function names
+    // Strip internal `$` prefix used for auto-generated spec function names.
     let name = name.strip_prefix('$').unwrap_or(&name);
-    // Append index to avoid collision with imported function names
-    format!("{}_{}", name, index)
+    // Always append a trailing underscore to avoid collision with the
+    // imported function/field name; further collisions are resolved by
+    // appending more underscores at the call site.
+    format!("{}_", name)
 }
 
 /// Performs common sub-expression elimination on inferred spec conditions.
@@ -1181,19 +1187,12 @@ fn cse_inferred_conditions(fun_env: &FunctionEnv) {
     }
 
     // Process each candidate: create a let binding and rewrite all conditions
-    for (cse_idx, (candidate_exp, _count)) in candidates.iter().enumerate() {
-        // Generate a unique name
-        let mut name = cse_name_for(env, candidate_exp.as_ref(), cse_idx);
-        if used_names.contains(&name) {
-            let base = name.clone();
-            let mut suffix = 1;
-            loop {
-                name = format!("{}_{}", base, suffix);
-                if !used_names.contains(&name) {
-                    break;
-                }
-                suffix += 1;
-            }
+    for (candidate_exp, _count) in candidates.iter() {
+        // Generate a unique name. The base name ends with `_`; resolve
+        // collisions by appending additional underscores.
+        let mut name = cse_name_for(env, candidate_exp.as_ref());
+        while used_names.contains(&name) {
+            name.push('_');
         }
         used_names.insert(name.clone());
         let name_sym = pool.make(&name);
@@ -1445,6 +1444,213 @@ fn entities_match(a: &DeterminedEntity, b: &DeterminedEntity) -> bool {
 /// Check if an expression is a trivial boolean `false` literal
 fn is_trivial_false(exp: &Exp) -> bool {
     matches!(exp.as_ref(), ExpData::Value(_, Value::Bool(false)))
+}
+
+/// Match `lhs == result_of<f>(args)` (single-return) or the multi-return
+/// destructure `lhs == { let (..._t_i...) = result_of<f>(args); _t_i }`.
+/// Returns `(lhs, output_idx, fun_exp, args, range)`.
+fn extract_result_of_clause(exp: &Exp) -> Option<(Exp, usize, Exp, Vec<Exp>, MemoryRange)> {
+    use move_model::ast::BehaviorKind;
+    let ExpData::Call(_, AstOp::Eq, eq_args) = exp.as_ref() else {
+        return None;
+    };
+    if eq_args.len() != 2 {
+        return None;
+    }
+    let lhs = eq_args[0].clone();
+    let rhs = &eq_args[1];
+
+    if let ExpData::Call(_, AstOp::Behavior(BehaviorKind::ResultOf, range), bp_args) = rhs.as_ref()
+    {
+        if bp_args.is_empty() {
+            return None;
+        }
+        let fun_exp = bp_args[0].clone();
+        let args = bp_args[1..].to_vec();
+        return Some((lhs, 0, fun_exp, args, range.clone()));
+    }
+
+    if let ExpData::Block(_, pat, Some(binding), body) = rhs.as_ref() {
+        let Pattern::Tuple(_, pat_elems) = pat else {
+            return None;
+        };
+        let ExpData::Call(_, AstOp::Behavior(BehaviorKind::ResultOf, range), bp_args) =
+            binding.as_ref()
+        else {
+            return None;
+        };
+        let ExpData::LocalVar(_, body_sym) = body.as_ref() else {
+            return None;
+        };
+        let body_sym = *body_sym;
+        for (i, pe) in pat_elems.iter().enumerate() {
+            if let Pattern::Var(_, sym) = pe {
+                if *sym == body_sym {
+                    if bp_args.is_empty() {
+                        return None;
+                    }
+                    let fun_exp = bp_args[0].clone();
+                    let args = bp_args[1..].to_vec();
+                    return Some((lhs, i, fun_exp, args, range.clone()));
+                }
+            }
+        }
+    }
+
+    None
+}
+
+/// Match `ensures_of<f>(args, …)` at the clause top; return `(fun_exp, args_after_fun, range)`.
+fn extract_top_ensures_of_clause(exp: &Exp) -> Option<(Exp, Vec<Exp>, MemoryRange)> {
+    use move_model::ast::BehaviorKind;
+    let ExpData::Call(_, AstOp::Behavior(BehaviorKind::EnsuresOf, range), bp_args) = exp.as_ref()
+    else {
+        return None;
+    };
+    if bp_args.is_empty() {
+        return None;
+    }
+    let fun_exp = bp_args[0].clone();
+    let args = bp_args[1..].to_vec();
+    Some((fun_exp, args, range.clone()))
+}
+
+/// Structural equality of the (function, args) pair identifying a call site.
+fn calls_match(fun1: &Exp, args1: &[Exp], fun2: &Exp, args2: &[Exp]) -> bool {
+    if !fun1.structural_eq(fun2) {
+        return false;
+    }
+    if args1.len() != args2.len() {
+        return false;
+    }
+    args1
+        .iter()
+        .zip(args2.iter())
+        .all(|(a, b)| a.structural_eq(b))
+}
+
+/// Collect `(write_of_call, L_path)` from each `Eq(L, R)` where `R` is
+/// `write_of(...)` or `update_field(B, f, write_of(...))` (possibly nested).
+/// Each `update_field` layer extends `L_path` with a `Select` step, so the
+/// path names the procedure-level `&mut` post-state even when WP
+/// propagated the body-borrow source through `let` bindings (e.g.
+/// `Eq(result, update_field(p, x, write_of(...)))` → `write_of ↦ result.x`).
+fn collect_write_of_bindings(env: &GlobalEnv, exps: &[Exp]) -> Vec<(Exp, Exp)> {
+    let mut result: Vec<(Exp, Exp)> = Vec::new();
+    for exp in exps {
+        exp.visit_pre_order(&mut |sub| {
+            if let ExpData::Call(_, AstOp::Eq, args) = sub {
+                if args.len() == 2 && is_procedure_level_path(&args[0]) {
+                    decompose_write_of_binding(env, &args[0], &args[1], &mut result);
+                }
+            }
+            true
+        });
+    }
+    result
+}
+
+/// True if `exp` is a `Temporary`, the procedure result, or a `Select` /
+/// `SelectVariants` chain rooted at one. Guards binding collection: a
+/// quantifier-bound `LocalVar` LHS would leak out of scope after
+/// substitution.
+fn is_procedure_level_path(exp: &Exp) -> bool {
+    match exp.as_ref() {
+        ExpData::Temporary(..) => true,
+        ExpData::Call(_, AstOp::Result(..), _) => true,
+        ExpData::Call(_, AstOp::Select(..), args) if args.len() == 1 => {
+            is_procedure_level_path(&args[0])
+        },
+        ExpData::Call(_, AstOp::SelectVariants(..), args) if args.len() == 1 => {
+            is_procedure_level_path(&args[0])
+        },
+        _ => false,
+    }
+}
+
+/// Peel `update_field` wrappers off `rhs`, extending `l` by a `Select`
+/// step per layer; on reaching `write_of`, record `(write_of, l)`.
+/// Both the *value* arm (this update's RHS) and the *base* arm (the
+/// remaining struct, which may itself be a nested `update_field` chain
+/// for sibling fields) are searched.
+fn decompose_write_of_binding(env: &GlobalEnv, l: &Exp, rhs: &Exp, out: &mut Vec<(Exp, Exp)>) {
+    use move_model::ast::BehaviorKind;
+    match rhs.as_ref() {
+        ExpData::Call(_, AstOp::Behavior(BehaviorKind::WriteOf(_), _), _) => {
+            out.push((rhs.clone(), l.clone()));
+        },
+        ExpData::Call(_, AstOp::UpdateField(mid, sid, fid), uf_args) if uf_args.len() == 2 => {
+            let base = &uf_args[0];
+            let value = &uf_args[1];
+            let value_ty = env.get_node_type(value.node_id());
+            let l_loc = env.get_node_loc(l.node_id());
+            let new_l_id = env.new_node(l_loc, value_ty);
+            let new_l = ExpData::Call(new_l_id, AstOp::Select(*mid, *sid, *fid), vec![l.clone()])
+                .into_exp();
+            decompose_write_of_binding(env, &new_l, value, out);
+            // Sibling-field updates live in the base arm.
+            decompose_write_of_binding(env, l, base, out);
+        },
+        _ => {},
+    }
+}
+
+/// Replace each `write_of<f, j>(args)` with the bound `lhs` from `bindings`;
+/// when no binding matches (body-borrow case), fall back to
+/// `strip_all_olds(args[mut_param_pos(j)])`.
+fn substitute_write_of_with_natural(env: &GlobalEnv, exp: &Exp, bindings: &[(Exp, Exp)]) -> Exp {
+    use move_model::ast::BehaviorKind;
+    struct Sub<'a> {
+        env: &'a GlobalEnv,
+        bindings: &'a [(Exp, Exp)],
+    }
+    impl ExpRewriterFunctions for Sub<'_> {
+        fn rewrite_call(&mut self, id: NodeId, oper: &AstOp, args: &[Exp]) -> Option<Exp> {
+            let AstOp::Behavior(BehaviorKind::WriteOf(j), _) = oper else {
+                return None;
+            };
+            // Match against the original (pre-recursion) form: bindings come from the same clause-set.
+            let original = ExpData::Call(id, oper.clone(), args.to_vec()).into_exp();
+            for (wo, lhs) in self.bindings {
+                if wo.as_ref().structural_eq(&original) {
+                    return Some(lhs.clone());
+                }
+            }
+            let new_args: Vec<Exp> = args.iter().map(|a| self.rewrite_exp(a.clone())).collect();
+            if new_args.is_empty() {
+                return None;
+            }
+            let fun_exp = &new_args[0];
+            let fun_type = self.env.get_node_type(fun_exp.node_id());
+            let Type::Fun(arg_ty, _, _) = fun_type else {
+                return None;
+            };
+            let flat = arg_ty.flatten();
+            let mut_pos = flat
+                .iter()
+                .enumerate()
+                .filter(|(_, t)| t.is_mutable_reference())
+                .nth(*j)
+                .map(|(pos, _)| pos)?;
+            let mut_arg = new_args.get(1 + mut_pos)?;
+            Some(strip_all_olds(mut_arg))
+        }
+    }
+    Sub { env, bindings }.rewrite_exp(exp.clone())
+}
+
+/// True for `true`, `Eq(x, x)`, `Implies(_, true_body)`, conjunctions of
+/// these, and `Forall x. true_body`. Used to drop tautologies left behind
+/// by `write_of → lhs` substitution.
+fn is_trivially_true(exp: &Exp) -> bool {
+    match exp.as_ref() {
+        ExpData::Value(_, Value::Bool(true)) => true,
+        ExpData::Call(_, AstOp::Eq, args) if args.len() == 2 => args[0].structural_eq(&args[1]),
+        ExpData::Call(_, AstOp::Implies, args) if args.len() == 2 => is_trivially_true(&args[1]),
+        ExpData::Call(_, AstOp::And, args) => args.iter().all(is_trivially_true),
+        ExpData::Quant(_, QuantKind::Forall, _, _, _, body) => is_trivially_true(body),
+        _ => false,
+    }
 }
 
 /// Strip all memory labels from Global, Exists, Behavior, and SpecFunction operations.
@@ -3281,11 +3487,10 @@ impl<'env> SpecInferenceAnalyzer<'env> {
     }
 
     /// Shared WP logic for function calls (direct) and closure invocations.
-    ///
-    /// Handles: pre-label creation, intermediate labels for captured globals,
-    /// behavioral state setup, extended result type computation, simultaneous
-    /// substitution of dests and &mut post-values, captured_mut_params tracking,
-    /// ensures_of for void calls, aborts_of emission, and post-state update.
+    /// Substitutes `dest_i ↦ result_of<f>(args)[i]` and
+    /// `&mut src_j ↦ write_of<f, j>(args)`. For caller-`&mut`-param
+    /// chaining, `write_of` flows through `substitute_old_param_in_state`.
+    /// For void callees, emits an `ensures_of<f>(args)` state-chain anchor.
     fn wp_function_call(
         &self,
         state: &mut WPState,
@@ -3296,87 +3501,61 @@ impl<'env> SpecInferenceAnalyzer<'env> {
         dests: &[TempIndex],
         mut_ref_srcs: &[(usize, TempIndex)],
     ) {
-        // Pre-label from forward analysis; post from backward WP state.
         let pre_label = self.forward_label_at(offset);
         let call_post = state.post;
 
-        // Create state labels for the behavioral predicates:
-        // - result_of uses pre_label as pre-state and call_post as post-state
-        // - aborts_of uses only pre_label (no post-state: aborts don't produce state)
+        // `aborts_of` has no post-state — aborts don't produce state.
         let behavior_pre = Some(pre_label);
         let behavior_post = Some(call_post);
         let aborts_pre = Some(pre_label);
         let aborts_post: Option<MemoryLabel> = None;
 
-        // Compute extended result type: explicit results + &mut post-values
-        let extended_result_type = if mut_ref_srcs.is_empty() {
-            result_type.clone()
-        } else {
-            let mut all_outputs: Vec<Type> = result_type.clone().flatten();
-            for (_, idx) in mut_ref_srcs {
-                all_outputs.push(self.get_local_type(*idx).skip_reference().clone());
-            }
-            if all_outputs.len() == 1 {
-                all_outputs.into_iter().next().unwrap()
-            } else {
-                Type::Tuple(all_outputs)
-            }
-        };
-        let num_all_outputs = extended_result_type.clone().flatten().len();
+        let num_declared_results = result_type.clone().flatten().len();
 
-        // Collect ALL substitutions (explicit dests + &mut post-values)
-        // and apply them simultaneously to avoid double-nesting of result_of
-        // expressions. Sequential substitution would replace &mut src temps
-        // inside already-substituted result_of args, producing incorrect
-        // nested result_of expressions.
-        let num_explicit = dests.len();
+        let mk_write_of_for = |me: &Self, j: usize| -> Exp {
+            let mut_ref_value_type = me
+                .get_local_type(mut_ref_srcs[j].1)
+                .skip_reference()
+                .clone();
+            me.mk_write_of_with_state(
+                fun_exp.clone(),
+                args.clone(),
+                &mut_ref_value_type,
+                j,
+                behavior_pre,
+                behavior_post,
+            )
+        };
+
+        // Collect all substitutions and apply simultaneously: sequential
+        // substitution would re-substitute inside already-substituted args.
         let mut all_subs: Vec<(TempIndex, Exp)> = Vec::new();
 
-        // Explicit dests: dest_i ↦ result_of<f>(args)[i]
         for (i, &dest) in dests.iter().enumerate() {
             let result_exp = self.mk_result_of_at_with_state(
                 fun_exp.clone(),
                 args.clone(),
-                &extended_result_type,
+                result_type,
                 i,
-                num_all_outputs,
+                num_declared_results,
                 behavior_pre,
                 behavior_post,
             );
             all_subs.push((dest, result_exp));
         }
 
-        // &mut src post-values: src_j ↦ result_of<f>(args)[num_explicit + j]
-        //
-        // For &mut params that are ALREADY in captured_mut_params, do NOT add them
-        // to all_subs. Their old(param) pattern will be replaced by
-        // substitute_old_param_in_state below. Adding them here would cause
-        // substitute_multiple_temps_in_state to also replace `param` inside
-        // `old(param)` in the state (turning it into `old(result_of<...>)`),
-        // and then substitute_old_param_in_state would find another `old(param)`
-        // inside the substitution value and replace it again, producing a
-        // doubly-applied result_of — e.g. result_of<f>(result_of<f>(c, a), a)
-        // instead of the correct result_of<f>(c, a).
-        for (j, (_, idx)) in mut_ref_srcs.iter().enumerate() {
-            if self.is_mut_ref_param(*idx) && state.captured_mut_params.contains(idx) {
-                // Already captured: handled exclusively by substitute_old_param_in_state.
+        // Skip already-captured caller-`&mut`-params: their `old(param)`
+        // gets handled by `substitute_old_param_in_state` below; adding a
+        // direct substitution here would cause double-application.
+        for (j, &(_, idx)) in mut_ref_srcs.iter().enumerate() {
+            if self.is_mut_ref_param(idx) && state.captured_mut_params.contains(&idx) {
                 continue;
             }
-            let result_exp = self.mk_result_of_at_with_state(
-                fun_exp.clone(),
-                args.clone(),
-                &extended_result_type,
-                num_explicit + j,
-                num_all_outputs,
-                behavior_pre,
-                behavior_post,
-            );
-            all_subs.push((*idx, result_exp));
+            all_subs.push((idx, mk_write_of_for(self, j)));
         }
 
-        // Check if any dest temp is referenced in the state before substitution.
-        // If not, result_of will vanish (return value discarded) and we'll need
-        // ensures_of as a fallback to preserve the post-label for state chaining.
+        // If no dest is referenced downstream, the result is discarded —
+        // emit `ensures_of` as a state-chain anchor instead.
         let any_dest_referenced = dests.iter().any(|&d| {
             state.ensures.iter().chain(state.aborts.iter()).any(|e| {
                 let mut found = false;
@@ -3392,54 +3571,32 @@ impl<'env> SpecInferenceAnalyzer<'env> {
             })
         });
 
-        // Apply all substitutions simultaneously
         *state = self.substitute_multiple_temps_in_state(state, &all_subs);
 
-        // For &mut srcs that are params of the current function:
-        // add ensures and mark as captured, mirroring WriteRef handling.
-        for (j, (_, idx)) in mut_ref_srcs.iter().enumerate() {
-            if self.is_mut_ref_param(*idx) {
-                if !state.captured_mut_params.contains(idx) {
-                    // First capture (last write in execution order):
-                    // add ensures param == result_of<f>(args)[num_explicit + j]
+        // For caller-`&mut`-params: on first encounter, add the binding
+        // `Eq(param, write_of(...))` and mark captured. On subsequent
+        // calls, substitute `old(param)` with the chained write_of.
+        for (j, &(_, idx)) in mut_ref_srcs.iter().enumerate() {
+            if self.is_mut_ref_param(idx) {
+                if !state.captured_mut_params.contains(&idx) {
                     if state.is_normal_return {
-                        let param_exp = self.mk_temporary(*idx);
-                        let result_exp = self.mk_result_of_at_with_state(
-                            fun_exp.clone(),
-                            args.clone(),
-                            &extended_result_type,
-                            num_explicit + j,
-                            num_all_outputs,
-                            behavior_pre,
-                            behavior_post,
-                        );
-                        state.add_ensures(self.mk_eq(param_exp, result_exp));
+                        let param_exp = self.mk_temporary(idx);
+                        let write_exp = mk_write_of_for(self, j);
+                        state.add_ensures(self.mk_eq(param_exp, write_exp));
                     }
-                    state.captured_mut_params.insert(*idx);
+                    state.captured_mut_params.insert(idx);
                 } else {
-                    // Already captured: substitute old(param) with the
-                    // call's post-value (chains through earlier writes).
-                    let result_exp = self.mk_result_of_at_with_state(
-                        fun_exp.clone(),
-                        args.clone(),
-                        &extended_result_type,
-                        num_explicit + j,
-                        num_all_outputs,
-                        behavior_pre,
-                        behavior_post,
-                    );
-                    *state = self.substitute_old_param_in_state(state, *idx, &result_exp);
+                    let write_exp = mk_write_of_for(self, j);
+                    *state = self.substitute_old_param_in_state(state, idx, &write_exp);
                 }
             }
         }
 
-        // Emit ensures_of for state chaining in two cases:
-        // 1. Void calls (no dests, no &mut): ensures_of is the only postcondition
-        // 2. Non-void calls where result_of vanished (return value discarded):
-        //    ensures_of<f>(args, result_of<f>(args)) preserves the post-label
-        //    so downstream behavioral predicates can reference the intermediate state.
-        if dests.is_empty() && mut_ref_srcs.is_empty() {
-            // Void call: ensures_of<f>(args)
+        // For void callees: `ensures_of<f>(args)` is the only postcondition.
+        // For non-void with discarded result: anchor with `ensures_of<f>(args,
+        // result_of<f>(args)...)` so downstream predicates can reference
+        // the intermediate state.
+        if num_declared_results == 0 {
             let ensures_of = self.mk_ensures_of_with_state(
                 fun_exp.clone(),
                 args.clone(),
@@ -3448,32 +3605,25 @@ impl<'env> SpecInferenceAnalyzer<'env> {
             );
             state.add_ensures(ensures_of);
         } else if !any_dest_referenced {
-            {
-                // Result discarded: emit `ensures_of<f>(args, result_of<f>(args)...)`.
-                // The trailing slots cover both explicit results and post-states of
-                // any `&mut` inputs — together they form the canonical ensures-of
-                // shape. The model-level rewriter (`augment_behavior_call`) leaves
-                // this canonical form unchanged.
-                let mut ensures_args = args.clone();
-                for i in 0..num_all_outputs {
-                    ensures_args.push(self.mk_result_of_at_with_state(
-                        fun_exp.clone(),
-                        args.clone(),
-                        &extended_result_type,
-                        i,
-                        num_all_outputs,
-                        behavior_pre,
-                        behavior_post,
-                    ));
-                }
-                let ensures_of = self.mk_ensures_of_with_state(
+            let mut ensures_args = args.clone();
+            for i in 0..num_declared_results {
+                ensures_args.push(self.mk_result_of_at_with_state(
                     fun_exp.clone(),
-                    ensures_args,
+                    args.clone(),
+                    result_type,
+                    i,
+                    num_declared_results,
                     behavior_pre,
                     behavior_post,
-                );
-                state.add_ensures(ensures_of);
+                ));
             }
+            let ensures_of = self.mk_ensures_of_with_state(
+                fun_exp.clone(),
+                ensures_args,
+                behavior_pre,
+                behavior_post,
+            );
+            state.add_ensures(ensures_of);
         }
 
         let aborts = self.mk_aborts_of_with_state(fun_exp, args, aborts_pre, aborts_post);
@@ -3865,6 +4015,200 @@ impl<'env> SpecInferenceAnalyzer<'env> {
 
             StripOldLabels.rewrite_exp(e.clone())
         })
+    }
+
+    /// Rewrite the WP-internal `WriteOf(j)` carrier into user-facing
+    /// behavioral predicates. WP emits two shapes:
+    ///   (a) `Eq(lhs, write_of(...))` (possibly wrapped in
+    ///       `Implies(WellFormed, ...)`) for each caller-`&mut` captured on
+    ///       a normal return — `lhs` is the procedure-level post-state name.
+    ///   (b) `write_of(...)` nested inside other expressions (body-borrow
+    ///       `&mut` sources).
+    ///
+    /// Phases:
+    ///   1. Collect `(write_of, lhs_path)` bindings (sees through
+    ///      `update_field` layers).
+    ///   2. For each call site with a binding for every `&mut` slot, emit
+    ///      `ensures_of<f>(args, ..dests, ..post_state_slots)` in canonical
+    ///      form. Sites missing a binding are skipped (the substitution
+    ///      below is still sound but loses the `&mut` post-state binding).
+    ///   3. Substitute remaining `write_of`s with the bound `lhs` (or
+    ///      `strip_olds(args[mut_pos(j)])` as a fallback) and drop
+    ///      tautologies.
+    fn eliminate_write_of(&self, state: &mut WPState) {
+        let env = self.global_env();
+
+        let bindings = collect_write_of_bindings(env, &state.ensures);
+
+        let mut sites: Vec<(Exp, Vec<Exp>, MemoryRange)> = Vec::new();
+        for (write_of_call, _lhs) in &bindings {
+            let ExpData::Call(_, AstOp::Behavior(_, range), bp_args) = write_of_call.as_ref()
+            else {
+                continue;
+            };
+            if bp_args.is_empty() {
+                continue;
+            }
+            let fun_exp = bp_args[0].clone();
+            let args = &bp_args[1..];
+            let args_natural: Vec<Exp> = args.iter().map(strip_all_olds).collect();
+            if !sites
+                .iter()
+                .any(|(f, a, _)| calls_match(f, a, &fun_exp, &args_natural))
+            {
+                sites.push((fun_exp, args_natural, range.clone()));
+            }
+        }
+
+        let mut to_remove: BTreeSet<usize> = BTreeSet::new();
+        let mut to_add: Vec<Exp> = Vec::new();
+
+        for (fun_exp, args_natural, range) in &sites {
+            let num_inputs = args_natural.len();
+            let fun_type = env.get_node_type(fun_exp.node_id());
+            let Type::Fun(arg_ty_box, result_ty, _) = fun_type else {
+                continue;
+            };
+            let arg_types: Vec<Type> = arg_ty_box.flatten();
+            let result_type: Type = (*result_ty).clone();
+            let declared_result_types: Vec<Type> = result_type.clone().flatten();
+            let num_declared_results = declared_result_types.len();
+            let is_void = num_declared_results == 0;
+
+            // One binding-LHS per `&mut` slot — otherwise we can't fill
+            // the canonical's post-state slots.
+            let mut post_state_slots: Vec<Option<Exp>> = Vec::new();
+            for (k, t) in arg_types.iter().enumerate() {
+                if !t.is_mutable_reference() {
+                    continue;
+                }
+                let mut_ref_idx = arg_types[..k]
+                    .iter()
+                    .filter(|ty| ty.is_mutable_reference())
+                    .count();
+                let lhs = bindings.iter().find_map(|(wo_call, lhs)| {
+                    use move_model::ast::BehaviorKind;
+                    let ExpData::Call(_, AstOp::Behavior(BehaviorKind::WriteOf(j), _), bp_args) =
+                        wo_call.as_ref()
+                    else {
+                        return None;
+                    };
+                    if *j != mut_ref_idx {
+                        return None;
+                    }
+                    if bp_args.is_empty() {
+                        return None;
+                    }
+                    let wo_fun = &bp_args[0];
+                    let wo_args_natural: Vec<Exp> =
+                        bp_args[1..].iter().map(strip_all_olds).collect();
+                    if !calls_match(fun_exp, args_natural, wo_fun, &wo_args_natural) {
+                        return None;
+                    }
+                    Some(lhs.clone())
+                });
+                post_state_slots.push(lhs);
+            }
+            if post_state_slots.iter().any(Option::is_none) {
+                continue;
+            }
+            let post_state_slots: Vec<Exp> =
+                post_state_slots.into_iter().map(Option::unwrap).collect();
+
+            // Walk clauses once, collecting both (a) explicit `dest`s from
+            // sibling `result_of` clauses and (b) any void state-anchor
+            // candidates for this site. Removal is committed only below,
+            // *after* we have decided to build a replacement canonical —
+            // never leave an anchor removed without a replacement.
+            let mut dests_by_idx: BTreeMap<usize, Exp> = BTreeMap::new();
+            let mut anchors_for_site: Vec<usize> = Vec::new();
+            for (idx, clause) in state.ensures.iter().enumerate() {
+                if let Some((dest, output_idx, fun2, args2, _)) = extract_result_of_clause(clause) {
+                    let args2_natural: Vec<Exp> = args2.iter().map(strip_all_olds).collect();
+                    if calls_match(fun_exp, args_natural, &fun2, &args2_natural) {
+                        dests_by_idx.insert(output_idx, dest);
+                    }
+                } else if let Some((fun2, args2, _)) = extract_top_ensures_of_clause(clause) {
+                    let args2_natural: Vec<Exp> = args2.iter().map(strip_all_olds).collect();
+                    if calls_match(fun_exp, args_natural, &fun2, &args2_natural)
+                        && args2.len() == num_inputs
+                    {
+                        anchors_for_site.push(idx);
+                    }
+                }
+            }
+
+            // Non-void calls need at least one captured `dest` to anchor
+            // on; otherwise leave any discarded-result anchor in place.
+            let has_result_of = !dests_by_idx.is_empty();
+            if !is_void && !has_result_of {
+                continue;
+            }
+
+            // Fill every declared result slot — uncaptured ones become
+            // synthesized `result_of<f>(...)` projections so the canonical
+            // keeps the full declared-result arity.
+            let mut dests: Vec<Exp> = Vec::with_capacity(num_declared_results);
+            for i in 0..num_declared_results {
+                if let Some(d) = dests_by_idx.remove(&i) {
+                    dests.push(d);
+                } else {
+                    dests.push(self.mk_result_of_at_with_state(
+                        fun_exp.clone(),
+                        args_natural.clone(),
+                        &result_type,
+                        i,
+                        num_declared_results,
+                        range.pre,
+                        range.post,
+                    ));
+                }
+            }
+
+            let mut canonical_args: Vec<Exp> =
+                Vec::with_capacity(1 + args_natural.len() + dests.len() + post_state_slots.len());
+            canonical_args.push(fun_exp.clone());
+            canonical_args.extend(args_natural.iter().cloned());
+            canonical_args.extend(dests);
+            canonical_args.extend(post_state_slots);
+            let bool_ty = Type::Primitive(PrimitiveType::Bool);
+            let new_id = self.new_node(bool_ty, None);
+            let canonical = ExpData::Call(
+                new_id,
+                AstOp::Behavior(move_model::ast::BehaviorKind::EnsuresOf, range.clone()),
+                canonical_args,
+            )
+            .into_exp();
+            to_add.push(canonical);
+            to_remove.extend(anchors_for_site);
+        }
+
+        let mut new_ensures: Vec<Exp> = Vec::new();
+        for (idx, clause) in std::mem::take(&mut state.ensures).into_iter().enumerate() {
+            if !to_remove.contains(&idx) {
+                new_ensures.push(clause);
+            }
+        }
+        new_ensures.extend(to_add);
+        state.ensures = new_ensures;
+
+        state.ensures = state
+            .ensures
+            .iter()
+            .map(|e| substitute_write_of_with_natural(env, e, &bindings))
+            .collect();
+        state.aborts = state
+            .aborts
+            .iter()
+            .map(|e| substitute_write_of_with_natural(env, e, &bindings))
+            .collect();
+        state.direct_modifies = state
+            .direct_modifies
+            .iter()
+            .map(|e| substitute_write_of_with_natural(env, e, &bindings))
+            .collect();
+
+        state.ensures.retain(|e| !is_trivially_true(e));
     }
 
     /// Substitute memory labels in an expression.
