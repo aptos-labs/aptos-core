@@ -4628,6 +4628,9 @@ dependencies = [
  "log",
  "rand 0.7.3",
  "reqwest 0.11.23",
+ "serde",
+ "serde_json",
+ "tempfile",
  "tokio",
 ]
 

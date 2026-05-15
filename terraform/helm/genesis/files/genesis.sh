@@ -38,6 +38,20 @@ if ! [[ $(declare -p MULTICLUSTER_DOMAIN_SUFFIXES) =~ "declare -a" ]]; then
   exit 1
 fi
 
+# Optional per-validator stake amounts (comma-separated decimal octa values).
+# When non-empty, overrides STAKE_AMOUNT / LARGER_STAKE_AMOUNT and assigns
+# stake_amounts[i] to validator i. Used by the mainnet-mirror forge suite.
+STAKE_AMOUNTS_STRING=${STAKE_AMOUNTS_STRING:-""}
+declare -a STAKE_AMOUNTS_ARRAY=()
+if [[ -n "${STAKE_AMOUNTS_STRING}" ]]; then
+  IFS=',' read -r -a STAKE_AMOUNTS_ARRAY <<< "${STAKE_AMOUNTS_STRING}"
+  echo "STAKE_AMOUNTS_ARRAY length=${#STAKE_AMOUNTS_ARRAY[@]}"
+  if [ ${#STAKE_AMOUNTS_ARRAY[@]} -lt $NUM_VALIDATORS ]; then
+    echo "STAKE_AMOUNTS_STRING has ${#STAKE_AMOUNTS_ARRAY[@]} entries but NUM_VALIDATORS=${NUM_VALIDATORS}"
+    exit 1
+  fi
+fi
+
 if [[ "${ENABLE_MULTICLUSTER_DOMAIN_SUFFIX}" == "true" ]]; then
   if [ -z ${NAMESPACE} ]; then
     echo "NAMESPACE must be set"
@@ -101,7 +115,9 @@ for i in $(seq 0 $(($NUM_VALIDATORS - 1))); do
     validator_host="${username}-${VALIDATOR_INTERNAL_HOST_SUFFIX}:6180"
   fi
 
-  if [ $i -lt $NUM_VALIDATORS_WITH_LARGER_STAKE ]; then
+  if [ ${#STAKE_AMOUNTS_ARRAY[@]} -gt 0 ]; then
+    CUR_STAKE_AMOUNT=${STAKE_AMOUNTS_ARRAY[$i]}
+  elif [ $i -lt $NUM_VALIDATORS_WITH_LARGER_STAKE ]; then
     CUR_STAKE_AMOUNT=$LARGER_STAKE_AMOUNT
   else
     CUR_STAKE_AMOUNT=$STAKE_AMOUNT
