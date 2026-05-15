@@ -166,6 +166,7 @@ impl SecretShareManager {
                 if let Some(item) = self.block_queue.item_mut(round) {
                     item.resolve_round_without_key(round);
                 }
+                self.secret_share_store.lock().mark_round_skipped(round);
                 return;
             },
             Err(e) => {
@@ -267,7 +268,8 @@ impl SecretShareManager {
                         .filter(|author| !existing.contains(author))
                         .collect();
                     if !targets.is_empty() {
-                        let guard = self.spawn_share_requester_for_targets(metadata, targets, 0);
+                        let guard =
+                            self.spawn_share_requester_for_targets(metadata, Some(targets), 0);
                         if let Some(item) = self.block_queue.item_mut(round) {
                             item.push_share_requester_handle(guard);
                         }
@@ -326,30 +328,17 @@ impl SecretShareManager {
     }
 
     fn spawn_share_requester_task(&self, metadata: SecretShareMetadata) -> DropGuard {
-        let secret_share_store = self.secret_share_store.clone();
-        let existing_shares = secret_share_store.lock().get_all_shares_authors(&metadata);
-        let targets: Vec<Author> = match existing_shares {
-            Some(existing) => self
-                .epoch_state
-                .verifier
-                .get_ordered_account_addresses_iter()
-                .filter(|author| !existing.contains(author))
-                .collect(),
-            None => return DropGuard::new(AbortHandle::new_pair().0),
-        };
-        self.spawn_share_requester_for_targets(
-            metadata,
-            targets,
-            self.secret_share_request_delay_ms,
-        )
+        self.spawn_share_requester_for_targets(metadata, None, self.secret_share_request_delay_ms)
     }
 
     fn spawn_share_requester_for_targets(
         &self,
         metadata: SecretShareMetadata,
-        targets: Vec<Author>,
+        targets: Option<Vec<Author>>,
         delay_ms: u64,
     ) -> DropGuard {
+        let secret_share_store = self.secret_share_store.clone();
+        let epoch_state = self.epoch_state.clone();
         let rb = self.reliable_broadcast.clone();
         let aggregate_state = Arc::new(SecretShareAggregateState::new(
             self.secret_share_store.clone(),
@@ -360,6 +349,24 @@ impl SecretShareManager {
         let task = async move {
             if delay_ms > 0 {
                 tokio::time::sleep(Duration::from_millis(delay_ms)).await;
+            }
+            let targets: Vec<Author> = match targets {
+                Some(t) => t,
+                None => {
+                    let existing_shares =
+                        secret_share_store.lock().get_all_shares_authors(&metadata);
+                    match existing_shares {
+                        Some(existing) => epoch_state
+                            .verifier
+                            .get_ordered_account_addresses_iter()
+                            .filter(|author| !existing.contains(author))
+                            .collect(),
+                        None => return,
+                    }
+                },
+            };
+            if targets.is_empty() {
+                return;
             }
             info!(
                 epoch = epoch,

@@ -52,23 +52,15 @@ use utils::{
 static VM: Lazy<WriteSet> = Lazy::new(|| GENESIS_CHANGE_SET_HEAD.write_set().clone());
 
 const FUZZER_CONCURRENCY_LEVEL: usize = 1;
-static TP: Lazy<Arc<rayon::ThreadPool>> = Lazy::new(|| {
-    Arc::new(
-        rayon::ThreadPoolBuilder::new()
-            .num_threads(FUZZER_CONCURRENCY_LEVEL)
-            .build()
-            .unwrap(),
-    )
-});
 
 fn run_case(input: TransactionState) -> Result<(), Corpus> {
     tdbg!(&input);
 
     AptosVM::set_concurrency_level_once(FUZZER_CONCURRENCY_LEVEL);
-    let mut vm = FakeExecutor::from_genesis_with_existing_thread_pool(
+    let mut vm = FakeExecutor::from_genesis_with_module_cache_manager(
         &VM,
         ChainId::mainnet(),
-        Arc::clone(&TP),
+        FUZZER_CONCURRENCY_LEVEL,
         None,
     )
     .set_not_parallel();

@@ -117,6 +117,7 @@ impl ExecutionAndIOCosts {
                     format!("table_item<{},{}>", Render(handle), TableKey { bytes: key },)
                 },
                 Raw(..) => panic!("not supported"),
+                TradingNative(..) => panic!("not supported"),
             };
 
             insert_or_add(&mut storage_writes, key, write.cost);

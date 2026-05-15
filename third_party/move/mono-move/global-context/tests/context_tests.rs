@@ -186,9 +186,9 @@ fn test_global_arena_reset() {
 
     let mut guard = ctx.try_maintenance_context().unwrap();
     assert_eq!(guard.interned_identifiers_count(), 2);
-    assert_eq!(guard.interned_executable_ids_count(), 1);
+    assert_eq!(guard.interned_module_ids_count(), 1);
 
     guard.reset_arena_pool();
     assert_eq!(guard.interned_identifiers_count(), 0);
-    assert_eq!(guard.interned_executable_ids_count(), 0);
+    assert_eq!(guard.interned_module_ids_count(), 0);
 }

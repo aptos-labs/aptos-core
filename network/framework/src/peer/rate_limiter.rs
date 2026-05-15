@@ -97,13 +97,8 @@ impl InboundMessageRateLimiter {
 
 /// Returns the message count and bytes for the given multiplex message
 fn get_message_count_and_bytes(message: &Result<MultiplexMessage, ReadError>) -> (u64, u64) {
-    // Calculate the number of messages (required to handle stream messages)
-    let message_count: u64 = match message {
-        Ok(MultiplexMessage::Message(_)) => 1,
-        Ok(MultiplexMessage::Stream(StreamMessage::Header(_))) => 1,
-        Ok(MultiplexMessage::Stream(StreamMessage::Fragment(_))) => 0,
-        Err(_) => 0,
-    };
+    // We count all messages and fragments as a single message (given that they all require processing)
+    let message_count = 1;
 
     // Calculate the number of bytes in the message
     let message_bytes: u64 = match message {
@@ -114,7 +109,9 @@ fn get_message_count_and_bytes(message: &Result<MultiplexMessage, ReadError>) ->
         Ok(MultiplexMessage::Stream(StreamMessage::Fragment(fragment))) => {
             fragment.raw_data.len() as u64
         },
-        Err(_) => 0,
+        Err(_) => {
+            0 // We don't count error message bytes (for rate limiting purposes)
+        },
     };
 
     (message_count, message_bytes)
@@ -188,16 +185,15 @@ mod tests {
     fn test_get_message_count_and_bytes_stream_fragment() {
         let msg = create_stream_fragment(15);
         let (count, bytes) = get_message_count_and_bytes(&msg);
-        assert_eq!(count, 0);
+        assert_eq!(count, 1);
         assert_eq!(bytes, 15);
     }
 
     #[test]
     fn test_get_message_count_and_bytes_error_message() {
-        // Error messages should contribute 0 to both counts
         let io_err = io::Error::other("test error");
         let (count, bytes) = get_message_count_and_bytes(&Err(ReadError::IoError(io_err)));
-        assert_eq!(count, 0);
+        assert_eq!(count, 1);
         assert_eq!(bytes, 0);
     }
 
@@ -318,19 +314,18 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn test_stream_fragment_does_not_count_as_message() {
+    async fn test_stream_fragment_counts_as_message() {
         // Create an inbound message rate limiter
         let messages_per_sec = 0; // Don't allow any messages
         let bytes_per_sec = 1000;
         let (mut rate_limiter, _) = create_rate_limiter(messages_per_sec, bytes_per_sec);
 
-        // Multiple fragments should pass without consuming message tokens
-        for _ in 0..10 {
-            rate_limiter
-                .throttle(&create_stream_fragment(0))
-                .await
-                .unwrap();
-        }
+        // A fragment should be rejected when the message bucket is exhausted
+        let result = rate_limiter.throttle(&create_stream_fragment(0)).await;
+        assert!(matches!(
+            result,
+            Err(PeerManagerError::RateLimitCapacityExceeded)
+        ));
     }
 
     #[tokio::test]

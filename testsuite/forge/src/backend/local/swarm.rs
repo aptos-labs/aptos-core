@@ -155,6 +155,9 @@ impl LocalSwarm {
             .with_init_config(Some(Arc::new(move |index, config, base| {
                 config.execution.concurrency_level = concurrency_level;
 
+                // Enable BlockSTM v2 for all forge runs.
+                config.execution.blockstm_v2_enabled = true;
+
                 // Single node orders blocks too fast which would trigger backpressure and stall for 1 sec
                 // which cause flakiness in tests.
                 if number_of_validators.get() == 1 {

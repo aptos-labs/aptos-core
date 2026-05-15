@@ -80,3 +80,13 @@ pub static TRANSACTION_FEE_MODULE: Lazy<ModuleId> = Lazy::new(|| {
 });
 
 pub const EMIT_FEE_STATEMENT: &IdentStr = ident_str!("emit_fee_statement");
+
+pub static TRANSACTION_VALIDATION_MODULE: Lazy<ModuleId> = Lazy::new(|| {
+    ModuleId::new(
+        account_config::CORE_CODE_ADDRESS,
+        ident_str!("transaction_validation").to_owned(),
+    )
+});
+
+pub const VERSIONED_PROLOGUE_NAME: &IdentStr = ident_str!("versioned_prologue");
+pub const VERSIONED_EPILOGUE_NAME: &IdentStr = ident_str!("versioned_epilogue");

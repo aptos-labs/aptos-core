@@ -1013,6 +1013,7 @@ impl Generator<'_> {
             | Operation::TypeValue
             | Operation::TypeDomain
             | Operation::ResourceDomain
+            | Operation::StateDomain
             | Operation::Global(_)
             | Operation::CanModify
             | Operation::Old

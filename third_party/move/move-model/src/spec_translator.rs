@@ -13,7 +13,9 @@ use crate::{
         TraceKind,
     },
     exp_generator::ExpGenerator,
-    exp_rewriter::{ExpRewriter, ExpRewriterFunctions, MemoryLabelFreshener, RewriteTarget},
+    exp_rewriter::{
+        strip_all_olds, ExpRewriter, ExpRewriterFunctions, MemoryLabelFreshener, RewriteTarget,
+    },
     model::{
         FunctionEnv, GlobalEnv, GlobalId, Loc, NodeId, Parameter, QualifiedId, QualifiedInstId,
         SpecVarId, StructId,
@@ -1003,10 +1005,161 @@ impl<'a, 'b, T: ExpGenerator<'a>> SpecTranslator<'a, 'b, T> {
             saved
         }
     }
+
+    /// Bridge the user-facing behavioral-predicate syntax to the canonical
+    /// form the Boogie backend consumes. Each stateful `&mut T` input gets
+    /// `Old(...)`-wrapped (triggering `save_param` for the captured pre-state
+    /// temp). For `EnsuresOf` and `ResultOf`, a live post-state clone of each
+    /// wrapped `&mut T` arg is appended after the existing user-provided
+    /// trailing args (the result slot, if any). Idempotent.
+    fn wrap_mut_ref_bp_inputs(&self, exp: &Exp) -> Exp {
+        let env = self.builder.global_env();
+        let ExpData::Call(node_id, Operation::Behavior(kind, range), args) = exp.as_ref() else {
+            return exp.clone();
+        };
+        let Some(fun_exp) = args.first() else {
+            return exp.clone();
+        };
+        let fun_type = env.get_node_type(fun_exp.node_id());
+        let Type::Fun(arg_ty_box, result_ty_box, _) = fun_type else {
+            return exp.clone();
+        };
+        let arg_types: Vec<Type> = (*arg_ty_box).flatten();
+        let num_inputs = arg_types.len();
+        let num_explicit_results = (*result_ty_box).flatten().len();
+        if args.len() < 1 + num_inputs {
+            return exp.clone();
+        }
+
+        // Wrap `&mut` slots whose arg is stateful (ref-typed, `Borrow(Mut,
+        // ...)`, `Old(...)`, or a `Temporary` of a `&mut`-typed local).
+        let wrap_mask: Vec<bool> = (0..num_inputs)
+            .map(|k| {
+                if !arg_types[k].is_mutable_reference() {
+                    return false;
+                }
+                let Some(arg) = args.get(k + 1) else {
+                    return false;
+                };
+                self.is_stateful_mut_ref(arg)
+            })
+            .collect();
+        let post_state_slot_count = wrap_mask.iter().filter(|b| **b).count();
+        if post_state_slot_count == 0 {
+            return exp.clone();
+        }
+
+        // `EnsuresOf` and `ResultOf` carry trailing post-state clones.
+        // `EnsuresOf` also has explicit result slots between inputs and post.
+        let has_post_slots = matches!(kind, BehaviorKind::EnsuresOf | BehaviorKind::ResultOf);
+        let result_slots = if matches!(kind, BehaviorKind::EnsuresOf) {
+            num_explicit_results
+        } else {
+            0
+        };
+        let augmented_arity = 1
+            + num_inputs
+            + if has_post_slots {
+                result_slots + post_state_slot_count
+            } else {
+                0
+            };
+        let needs_post_state = has_post_slots && args.len() < augmented_arity;
+
+        // Idempotent short-circuit when canonical form is already present.
+        let all_wrapped = wrap_mask.iter().enumerate().all(|(k, needs_wrap)| {
+            if !needs_wrap {
+                return true;
+            }
+            matches!(
+                args.get(k + 1).map(|a| a.as_ref()),
+                Some(ExpData::Call(_, Operation::Old, _))
+            )
+        });
+        if all_wrapped && !needs_post_state {
+            return exp.clone();
+        }
+
+        let mut new_args: Vec<Exp> = Vec::with_capacity(augmented_arity);
+        new_args.push(fun_exp.clone());
+        let mut post_state_clones: Vec<Exp> = Vec::new();
+        for k in 0..num_inputs {
+            let arg = args[k + 1].clone();
+            if wrap_mask[k] {
+                // Live form (all `Old` wrappers stripped at every level):
+                // `old(p).x → p.x`, `old(Select(p, x)) → p.x`, …
+                let live = strip_all_olds(&arg);
+                if needs_post_state {
+                    post_state_clones.push(live.clone());
+                }
+                if matches!(arg.as_ref(), ExpData::Call(_, Operation::Old, _)) {
+                    new_args.push(arg);
+                } else {
+                    // `in_old` propagates through `Select`/`SelectVariants`
+                    // so the inner `Temporary`'s `save_param` still fires.
+                    let arg_ty = env.get_node_type(arg.node_id());
+                    let arg_loc = env.get_node_loc(arg.node_id());
+                    let new_id = env.new_node(arg_loc, arg_ty);
+                    new_args.push(ExpData::Call(new_id, Operation::Old, vec![arg]).into_exp());
+                }
+            } else {
+                new_args.push(arg);
+            }
+        }
+        if has_post_slots {
+            for arg in args.iter().skip(1 + num_inputs) {
+                new_args.push(arg.clone());
+            }
+            new_args.extend(post_state_clones);
+        }
+        ExpData::Call(
+            *node_id,
+            Operation::Behavior(*kind, range.clone()),
+            new_args,
+        )
+        .into_exp()
+    }
+
+    /// True if `arg` is a stateful `&mut`-source shape: a ref-typed
+    /// expression, `Borrow(Mut, ...)`, `Old(...)` of a stateful inner,
+    /// a `Select`/`SelectVariants` rooted in a stateful inner, or a
+    /// `Temporary` of a `&mut`-typed local.
+    fn is_stateful_mut_ref(&self, arg: &Exp) -> bool {
+        let env = self.builder.global_env();
+        if env.get_node_type(arg.node_id()).is_reference() {
+            return true;
+        }
+        match arg.as_ref() {
+            ExpData::Call(_, Operation::Borrow(crate::ty::ReferenceKind::Mutable), _) => true,
+            ExpData::Call(_, Operation::Old, inner) if inner.len() == 1 => {
+                self.is_stateful_mut_ref(&inner[0])
+            },
+            ExpData::Call(_, Operation::Select(..), inner) if inner.len() == 1 => {
+                self.is_stateful_mut_ref(&inner[0])
+            },
+            ExpData::Call(_, Operation::SelectVariants(..), inner) if inner.len() == 1 => {
+                self.is_stateful_mut_ref(&inner[0])
+            },
+            ExpData::Temporary(_, idx) => self
+                .fun_env
+                .get_local_type(*idx)
+                .as_ref()
+                .is_some_and(Type::is_reference),
+            _ => false,
+        }
+    }
 }
 
 impl<'a, T: ExpGenerator<'a>> ExpRewriterFunctions for SpecTranslator<'a, '_, T> {
     fn rewrite_exp(&mut self, exp: Exp) -> Exp {
+        // `Old`-wrap stateful `&mut` BP args so `save_param` routes their
+        // pre-state through captured temps.
+        let exp = if let ExpData::Call(_, Operation::Behavior(_, _), _) = exp.as_ref() {
+            self.wrap_mut_ref_bp_inputs(&exp)
+        } else {
+            exp
+        };
+
         // Do some pre-processing of the expression before actual rewrite, reporting
         // errors.
         let env = self.builder.global_env();
@@ -1201,23 +1354,45 @@ impl<'a, T: ExpGenerator<'a>> ExpRewriterFunctions for SpecTranslator<'a, '_, T>
             Behavior(_, range) if !range.is_default() => None,
             // Behavior that needs pre-state label
             Behavior(kind, range) if needs_pre_label(kind, self.in_old) => {
+                let env = self.builder.global_env();
                 if let Some(ExpData::Call(closure_id, Operation::Closure(mid, fid, _), _)) =
                     args.first().map(|a| a.as_ref())
                 {
-                    let fun_env = self.builder.global_env().get_function(mid.qualified(*fid));
+                    let fun_env = env.get_function(mid.qualified(*fid));
                     let used_memory = fun_env.get_spec_used_memory().clone();
-                    let inst = self
-                        .builder
-                        .global_env()
-                        .get_node_instantiation(*closure_id);
+                    let inst = env.get_node_instantiation(*closure_id);
                     let label = self.save_memory_shared(&used_memory, &inst);
                     let new_range = MemoryRange {
                         pre: Some(label),
                         post: range.post,
                     };
                     Some(Call(id, Behavior(*kind, new_range), args.to_owned()).into_exp())
+                } else if let Some(ExpData::Call(_, Operation::Select(smid, sid, field_id), _)) =
+                    args.first().map(|a| a.as_ref())
+                {
+                    // Struct-field function value (e.g. `pool.pricing.0`):
+                    // the closure's memory footprint is declared by the
+                    // struct's field spec (`reads_of<f> …` / `modifies_of<f> …`).
+                    // Using `self.fun_env.get_spec_used_memory()` here would miss
+                    // these resources, leaving the pre-state label unsaved at
+                    // procedure entry.
+                    let struct_env = env.get_module(*smid).into_struct(*sid);
+                    let field_sym = field_id.symbol();
+                    let memory = collect_field_access_memory(env, &struct_env, field_sym);
+                    let label = self.save_memory_shared(&memory, self.type_args);
+                    let new_range = MemoryRange {
+                        pre: Some(label),
+                        post: range.post,
+                    };
+                    Some(Call(id, Behavior(*kind, new_range), args.to_owned()).into_exp())
                 } else {
-                    // Temporary/LocalVar: use enclosing function's spec_used_memory
+                    // Temporary (function parameter), let-bound local, etc.:
+                    // fall back to the enclosing function's spec_used_memory.
+                    // For function-typed parameters with `modifies_of` /
+                    // `reads_of` declarations, the env_pipeline spec rewriter
+                    // already propagates the parameter's access_of memory into
+                    // the function's spec_used_memory / spec_old_memory, so
+                    // this fallback covers the fun-param case too.
                     let used_memory = self.fun_env.get_spec_used_memory().clone();
                     let label = self.save_memory_shared(&used_memory, self.type_args);
                     let new_range = MemoryRange {
@@ -1268,8 +1443,46 @@ impl<'a, T: ExpGenerator<'a>> ExpRewriterFunctions for SpecTranslator<'a, '_, T>
 }
 
 /// Returns true if a behavioral predicate of given kind needs a pre-state memory label.
-/// `ensures_of` and `result_of` always need pre-state (they compare pre vs post).
+/// `ensures_of`, `result_of`, and `write_of` always need pre-state (they compare pre vs post).
 /// `aborts_of` and `requires_of` only need pre-state if inside `old()`.
 fn needs_pre_label(kind: &BehaviorKind, in_old: bool) -> bool {
-    in_old || matches!(kind, BehaviorKind::EnsuresOf | BehaviorKind::ResultOf)
+    in_old || kind.is_two_state()
+}
+
+/// Memory accessed by a struct field's function value, as declared by the
+/// struct's `reads_of<f> …` / `modifies_of<f> …` specs. Used to populate
+/// `saved_memory` when a behavioral predicate like `result_of<s.f>(…)` needs
+/// a pre-state label: without this the Boogie evaluator's `old_*` memory
+/// slot would reference an unsaved snapshot variable.
+///
+/// Wildcard (`*`) is approximated by all `key` structs reachable from the
+/// current `GlobalEnv`. Mono-based exact expansion isn't available here
+/// (the spec translator runs before `mono_analysis`), so over-saving is
+/// acceptable: extra saved memory only adds a cheap `SaveMem` at procedure
+/// entry without affecting verification soundness.
+fn collect_field_access_memory(
+    env: &crate::model::GlobalEnv,
+    struct_env: &crate::model::StructEnv,
+    field_sym: Symbol,
+) -> BTreeSet<QualifiedInstId<StructId>> {
+    let mut memory: BTreeSet<QualifiedInstId<StructId>> = BTreeSet::new();
+    for access in struct_env.get_field_access_of() {
+        if access.fun_param != field_sym {
+            continue;
+        }
+        if access.frame_spec.modifies_all || access.frame_spec.reads_all {
+            for module in env.get_modules() {
+                for s in module.get_structs() {
+                    if s.get_abilities().has_key() {
+                        memory.insert(s.get_qualified_id().instantiate(vec![]));
+                    }
+                }
+            }
+        } else {
+            memory.extend(access.used_memory.iter().cloned());
+            memory.extend(access.old_memory.iter().cloned());
+        }
+        break;
+    }
+    memory
 }

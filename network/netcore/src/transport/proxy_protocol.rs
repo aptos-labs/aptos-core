@@ -47,6 +47,19 @@ const UDP_UNIX: u8 = 0x32;
 const IPV4_SIZE: u16 = 12;
 const IPV6_SIZE: u16 = 36;
 
+async fn discard_bytes<T: AsyncRead + std::marker::Unpin>(
+    stream: &mut T,
+    mut bytes_to_discard: usize,
+) -> io::Result<()> {
+    let mut discard_buffer = [0u8; 512];
+    while bytes_to_discard > 0 {
+        let chunk_size = bytes_to_discard.min(discard_buffer.len());
+        stream.read_exact(&mut discard_buffer[..chunk_size]).await?;
+        bytes_to_discard -= chunk_size;
+    }
+    Ok(())
+}
+
 /// Read a proxy protocol event and unwrap the address information associated.
 pub async fn read_header<T: AsyncRead + std::marker::Unpin>(
     original_addr: &NetworkAddress,
@@ -81,24 +94,27 @@ pub async fn read_header<T: AsyncRead + std::marker::Unpin>(
     let address_size: [u8; 2] = header[14..16].try_into().unwrap();
     let address_size = u16::from_be_bytes(address_size);
 
-    let mut address_bytes: Vec<u8> = vec![0; address_size as usize];
-    stream.read_exact(&mut address_bytes).await?;
-
     let source_address = match family_and_protocol {
         // TODO: Support UDP in the future
         LOCAL_PROTOCOL | UDP_IPV4 | UDP_IPV6 | TCP_UNIX | UDP_UNIX => {
             // UNSPEC, UDP, and UNIX Steam/datagram
             // Accept connection but ignore address info as per spec
+            discard_bytes(stream, address_size as usize).await?;
             original_addr.clone()
         },
         TCP_IPV4 => {
             // This is not mentioned in the spec, but if it doesn't match we might not read correctly
             if address_size < IPV4_SIZE {
+                discard_bytes(stream, address_size as usize).await?;
                 return Err(io::Error::new(
                     io::ErrorKind::InvalidInput,
                     "ProxyProtocol: Header size doesn't match expected address type",
                 ));
             }
+
+            let mut address_bytes = [0u8; IPV4_SIZE as usize];
+            stream.read_exact(&mut address_bytes).await?;
+            discard_bytes(stream, (address_size - IPV4_SIZE) as usize).await?;
 
             let src_addr = u32::from_be_bytes(address_bytes[0..4].try_into().unwrap());
             let src_port = u16::from_be_bytes(address_bytes[8..10].try_into().unwrap());
@@ -108,11 +124,16 @@ pub async fn read_header<T: AsyncRead + std::marker::Unpin>(
         TCP_IPV6 => {
             // This is not mentioned in the spec, but if it doesn't match we might not read correctly
             if address_size < IPV6_SIZE {
+                discard_bytes(stream, address_size as usize).await?;
                 return Err(io::Error::new(
                     io::ErrorKind::InvalidInput,
                     "ProxyProtocol: Header size doesn't match expected address type",
                 ));
             }
+
+            let mut address_bytes = [0u8; IPV6_SIZE as usize];
+            stream.read_exact(&mut address_bytes).await?;
+            discard_bytes(stream, (address_size - IPV6_SIZE) as usize).await?;
 
             let src_addr = u128::from_be_bytes(address_bytes[0..16].try_into().unwrap());
             let src_port = u16::from_be_bytes(address_bytes[32..34].try_into().unwrap());
@@ -121,6 +142,7 @@ pub async fn read_header<T: AsyncRead + std::marker::Unpin>(
             NetworkAddress::from(socket_addr)
         },
         _ => {
+            discard_bytes(stream, address_size as usize).await?;
             return Err(io::Error::new(
                 io::ErrorKind::InvalidInput,
                 "ProxyProtocol: Unsupported Address Family or Protocol",
@@ -135,8 +157,16 @@ pub async fn read_header<T: AsyncRead + std::marker::Unpin>(
 mod test {
     use super::*;
     use aptos_memsocket::MemorySocket;
-    use futures::{executor::block_on, future::join, io::AsyncWriteExt};
-    use std::net::ToSocketAddrs;
+    use futures::{
+        executor::block_on,
+        future::join,
+        io::{AsyncWriteExt, Cursor},
+    };
+    use std::{
+        net::ToSocketAddrs,
+        pin::Pin,
+        task::{Context, Poll},
+    };
 
     const TEST_DATA: &[u8; 4] = &[0xDE, 0xAD, 0xBE, 0xEF];
     const IPV4_ADDR_1: &[u8; 4] = &[0x00, 0x00, 0x00, 0x01];
@@ -152,6 +182,48 @@ mod test {
     const PORT_80: &[u8; 2] = &[0x00, 80];
     const IPV4_ADDR_SIZE: &[u8; 2] = &[0x00, IPV4_SIZE as u8];
     const IPV6_ADDR_SIZE: &[u8; 2] = &[0x00, IPV6_SIZE as u8];
+
+    struct GuardedReadStream {
+        inner: Cursor<Vec<u8>>,
+        max_allowed_read_len: usize,
+        max_observed_read_len: usize,
+    }
+
+    impl GuardedReadStream {
+        fn new(data: Vec<u8>, max_allowed_read_len: usize) -> Self {
+            Self {
+                inner: Cursor::new(data),
+                max_allowed_read_len,
+                max_observed_read_len: 0,
+            }
+        }
+
+        fn max_observed_read_len(&self) -> usize {
+            self.max_observed_read_len
+        }
+    }
+
+    impl AsyncRead for GuardedReadStream {
+        fn poll_read(
+            mut self: Pin<&mut Self>,
+            _cx: &mut Context<'_>,
+            buf: &mut [u8],
+        ) -> Poll<io::Result<usize>> {
+            self.max_observed_read_len = self.max_observed_read_len.max(buf.len());
+
+            if buf.len() > self.max_allowed_read_len {
+                return Poll::Ready(Err(io::Error::new(
+                    io::ErrorKind::InvalidData,
+                    format!(
+                        "oversized read request from untrusted length field: {}",
+                        buf.len()
+                    ),
+                )));
+            }
+
+            Pin::new(&mut self.inner).poll_read(_cx, buf)
+        }
+    }
 
     async fn send_v4(sender: &mut MemorySocket) -> io::Result<()> {
         sender.write_all(&PPV2_SIGNATURE).await?; // V2 signature
@@ -289,6 +361,28 @@ mod test {
         };
 
         block_on(check_data);
+    }
+
+    #[test]
+    fn test_large_untrusted_length_uses_bounded_read_chunks() {
+        let original_addr = NetworkAddress::mock();
+        let mut input = Vec::new();
+        input.extend_from_slice(&PPV2_SIGNATURE);
+        input.push(PPV2_PROXY);
+        input.push(LOCAL_PROTOCOL);
+        input.extend_from_slice(&u16::MAX.to_be_bytes());
+
+        let max_allowed_read_len = 1024;
+        let mut stream = GuardedReadStream::new(input, max_allowed_read_len);
+
+        let err = block_on(read_header(&original_addr, &mut stream))
+            .expect_err("incomplete payload should fail");
+        assert_eq!(err.kind(), io::ErrorKind::UnexpectedEof);
+        assert!(
+            stream.max_observed_read_len() <= max_allowed_read_len,
+            "requested oversized read chunk: {}",
+            stream.max_observed_read_len()
+        );
     }
 
     #[test]

@@ -30,8 +30,7 @@ public fun Test::test_pack(): 0x42::Test::R {
   1: $t2 := pack 0x42::Test::S($t1)
   2: $t3 := 3
   3: $t4 := pack 0x42::Test::R($t3, $t2)
-  4: label L1
-  5: return $t4
+  4: return $t4
 }
 
 
@@ -52,6 +51,5 @@ public fun Test::test_pack(): 0x42::Test::R {
      # data invariant at tests/data_invariant_instrumentation/pack.move:12:9+18
      # VC: data invariant does not hold at tests/data_invariant_instrumentation/pack.move:12:9+18
   5: assert Gt(select Test::R.x($t4), select Test::S.y<0x42::Test::S>(select Test::R.s($t4)))
-  6: label L1
-  7: return $t4
+  6: return $t4
 }

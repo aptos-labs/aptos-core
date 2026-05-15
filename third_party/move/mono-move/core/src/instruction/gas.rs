@@ -31,6 +31,8 @@ impl HasCfgInfo for MicroOp {
             | MicroOp::JumpNotZeroU64 { target, .. }
             | MicroOp::JumpGreaterEqualU64Imm { target, .. }
             | MicroOp::JumpLessU64Imm { target, .. }
+            | MicroOp::JumpGreaterU64Imm { target, .. }
+            | MicroOp::JumpLessEqualU64Imm { target, .. }
             | MicroOp::JumpLessU64 { target, .. }
             | MicroOp::JumpGreaterEqualU64 { target, .. }
             | MicroOp::JumpNotEqualU64 { target, .. } => Some(target.0 as usize),
@@ -39,14 +41,25 @@ impl HasCfgInfo for MicroOp {
             | MicroOp::Move { .. }
             | MicroOp::AddU64 { .. }
             | MicroOp::AddU64Imm { .. }
+            | MicroOp::SubU64 { .. }
             | MicroOp::SubU64Imm { .. }
             | MicroOp::RSubU64Imm { .. }
-            | MicroOp::XorU64 { .. }
-            | MicroOp::ShrU64Imm { .. }
+            | MicroOp::MulU64 { .. }
+            | MicroOp::MulU64Imm { .. }
+            | MicroOp::DivU64 { .. }
+            | MicroOp::DivU64Imm { .. }
             | MicroOp::ModU64 { .. }
+            | MicroOp::ModU64Imm { .. }
+            | MicroOp::BitAndU64 { .. }
+            | MicroOp::BitOrU64 { .. }
+            | MicroOp::BitXorU64 { .. }
+            | MicroOp::ShlU64 { .. }
+            | MicroOp::ShlU64Imm { .. }
+            | MicroOp::ShrU64 { .. }
+            | MicroOp::ShrU64Imm { .. }
             | MicroOp::Return
-            | MicroOp::CallFunc { .. }
-            | MicroOp::CallLocalFunc { .. }
+            | MicroOp::CallIndirect { .. }
+            | MicroOp::CallDirect { .. }
             | MicroOp::VecNew { .. }
             | MicroOp::VecLen { .. }
             | MicroOp::VecPushBack { .. }
@@ -66,7 +79,9 @@ impl HasCfgInfo for MicroOp {
             | MicroOp::HeapMoveTo { .. }
             | MicroOp::Charge { .. }
             | MicroOp::StoreRandomU64 { .. }
-            | MicroOp::ForceGC => None,
+            | MicroOp::ForceGC
+            | MicroOp::PackClosure(_)
+            | MicroOp::CallClosure(_) => None,
         }
     }
 }
@@ -101,6 +116,16 @@ impl RemapTargets for MicroOp {
                 src,
                 imm,
             },
+            MicroOp::JumpGreaterU64Imm { target, src, imm } => MicroOp::JumpGreaterU64Imm {
+                target: co(target),
+                src,
+                imm,
+            },
+            MicroOp::JumpLessEqualU64Imm { target, src, imm } => MicroOp::JumpLessEqualU64Imm {
+                target: co(target),
+                src,
+                imm,
+            },
             MicroOp::JumpGreaterEqualU64 { target, lhs, rhs } => MicroOp::JumpGreaterEqualU64 {
                 target: co(target),
                 lhs,
@@ -116,14 +141,25 @@ impl RemapTargets for MicroOp {
             | MicroOp::Move { .. }
             | MicroOp::AddU64 { .. }
             | MicroOp::AddU64Imm { .. }
+            | MicroOp::SubU64 { .. }
             | MicroOp::SubU64Imm { .. }
             | MicroOp::RSubU64Imm { .. }
-            | MicroOp::XorU64 { .. }
-            | MicroOp::ShrU64Imm { .. }
+            | MicroOp::MulU64 { .. }
+            | MicroOp::MulU64Imm { .. }
+            | MicroOp::DivU64 { .. }
+            | MicroOp::DivU64Imm { .. }
             | MicroOp::ModU64 { .. }
+            | MicroOp::ModU64Imm { .. }
+            | MicroOp::BitAndU64 { .. }
+            | MicroOp::BitOrU64 { .. }
+            | MicroOp::BitXorU64 { .. }
+            | MicroOp::ShlU64 { .. }
+            | MicroOp::ShlU64Imm { .. }
+            | MicroOp::ShrU64 { .. }
+            | MicroOp::ShrU64Imm { .. }
             | MicroOp::Return
-            | MicroOp::CallFunc { .. }
-            | MicroOp::CallLocalFunc { .. }
+            | MicroOp::CallIndirect { .. }
+            | MicroOp::CallDirect { .. }
             | MicroOp::VecNew { .. }
             | MicroOp::VecLen { .. }
             | MicroOp::VecPushBack { .. }
@@ -143,7 +179,9 @@ impl RemapTargets for MicroOp {
             | MicroOp::HeapMoveTo { .. }
             | MicroOp::Charge { .. }
             | MicroOp::StoreRandomU64 { .. }
-            | MicroOp::ForceGC) => op,
+            | MicroOp::ForceGC
+            | MicroOp::PackClosure(_)
+            | MicroOp::CallClosure(_)) => op,
         }
     }
 }
@@ -168,19 +206,31 @@ impl GasSchedule<MicroOp> for MicroOpGasSchedule {
             // --- Arithmetic ---
             MicroOp::AddU64 { .. }
             | MicroOp::AddU64Imm { .. }
+            | MicroOp::SubU64 { .. }
             | MicroOp::SubU64Imm { .. }
             | MicroOp::RSubU64Imm { .. }
-            | MicroOp::XorU64 { .. }
+            | MicroOp::BitAndU64 { .. }
+            | MicroOp::BitOrU64 { .. }
+            | MicroOp::BitXorU64 { .. }
+            | MicroOp::ShlU64 { .. }
+            | MicroOp::ShlU64Imm { .. }
+            | MicroOp::ShrU64 { .. }
             | MicroOp::ShrU64Imm { .. } => 3,
-            MicroOp::ModU64 { .. } => 5,
+            MicroOp::MulU64 { .. } | MicroOp::MulU64Imm { .. } => 4,
+            MicroOp::DivU64 { .. }
+            | MicroOp::DivU64Imm { .. }
+            | MicroOp::ModU64 { .. }
+            | MicroOp::ModU64Imm { .. } => 5,
 
             // --- Control flow ---
-            MicroOp::CallFunc { .. } | MicroOp::CallLocalFunc { .. } => 10,
+            MicroOp::CallIndirect { .. } | MicroOp::CallDirect { .. } => 10,
             MicroOp::Return => 2,
             MicroOp::Jump { .. } => 2,
             MicroOp::JumpNotZeroU64 { .. }
             | MicroOp::JumpGreaterEqualU64Imm { .. }
             | MicroOp::JumpLessU64Imm { .. }
+            | MicroOp::JumpGreaterU64Imm { .. }
+            | MicroOp::JumpLessEqualU64Imm { .. }
             | MicroOp::JumpLessU64 { .. }
             | MicroOp::JumpGreaterEqualU64 { .. }
             | MicroOp::JumpNotEqualU64 { .. } => 3,
@@ -214,6 +264,10 @@ impl GasSchedule<MicroOp> for MicroOpGasSchedule {
             // --- Debug ---
             MicroOp::StoreRandomU64 { .. } => 1,
             MicroOp::ForceGC => 100,
+
+            // --- Closures ---
+            MicroOp::PackClosure(_) => 20,
+            MicroOp::CallClosure(_) => 15,
         })
     }
 }

@@ -39,24 +39,24 @@ const MAINNET_SEED_PEERS: [(&str, &str, &str); 1] = [(
 // of (account address, public key, network address).
 const TESTNET_SEED_PEERS: [(&str, &str, &str); 4] = [
     (
-        "31e55012a7d439dcd16fee0509cd5855c1fbdc62057ba7fac3f7c88f5453dd8e",
-        "0x87bb19b02580b7e2a91a8e9342ec77ffd8f3ad967f54e77b22aaf558c5c11755",
-        "/dns/seed0.testnet.aptoslabs.com/tcp/6182/noise-ik/0x87bb19b02580b7e2a91a8e9342ec77ffd8f3ad967f54e77b22aaf558c5c11755/handshake/0",
+        "9d5af3ffdff04f7cd51aa9f902253067a40594c7831bf1265503220d585b4d20",
+        "0x9d5af3ffdff04f7cd51aa9f902253067a40594c7831bf1265503220d585b4d20",
+        "/dns/pfn0.euwe4-seed.fullnode.testnet.aptoslabs.com/tcp/6182/noise-ik/0x9d5af3ffdff04f7cd51aa9f902253067a40594c7831bf1265503220d585b4d20/handshake/0",
     ),
     (
-        "116176e2af223a8b7f8db80dc52f7a423b4d7f8c0553a1747e92ef58849aff4f",
-        "0xc2f24389f31c9c18d2ceb69d153ad9299e0ea7bbd66f457e0a28ef41c77c2b64",
-        "/dns/seed1.testnet.aptoslabs.com/tcp/6182/noise-ik/0xc2f24389f31c9c18d2ceb69d153ad9299e0ea7bbd66f457e0a28ef41c77c2b64/handshake/0",
+        "64d807a57c289fb26aab73bfe1f192cdc0baa25c0ec72f707aefeff97300d434",
+        "0x64d807a57c289fb26aab73bfe1f192cdc0baa25c0ec72f707aefeff97300d434",
+        "/dns/pfn0.usce1.fullnode.testnet.aptoslabs.com/tcp/6182/noise-ik/0x64d807a57c289fb26aab73bfe1f192cdc0baa25c0ec72f707aefeff97300d434/handshake/0",
     ),
     (
-        "12000330d7cd8a748f46c25e6ce5d236a27e13d0b510d4516ac84ecc5fddd002",
-        "0x171c661e5b785283978a74eafc52a906e68c73ae78119737b92f93507c753933",
-        "/dns/seed2.testnet.aptoslabs.com/tcp/6182/noise-ik/0x171c661e5b785283978a74eafc52a906e68c73ae78119737b92f93507c753933/handshake/0",
+        "0058220de6ba1af4c4a803e8727d9ed372104d2e60057cb16d6a99e646512826",
+        "0x0058220de6ba1af4c4a803e8727d9ed372104d2e60057cb16d6a99e646512826",
+        "/dns/pfn0.euwe4.fullnode.testnet.aptoslabs.com/tcp/6182/noise-ik/0x0058220de6ba1af4c4a803e8727d9ed372104d2e60057cb16d6a99e646512826/handshake/0",
     ),
     (
-        "03c04549114877c55f45649aba48ac0a4ff086ab7bdce3b8cc8d3d9947bc0d99",
-        "0xafc38bf177bd825326a1c314748612137d2b35dae6472932806806a32c23174a",
-        "/dns/seed3.testnet.aptoslabs.com/tcp/6182/noise-ik/0xafc38bf177bd825326a1c314748612137d2b35dae6472932806806a32c23174a/handshake/0",
+        "18fe71c4253468e40c540e31e5127d1e341e20494bc0de8b4e4d434c14b54608",
+        "0x18fe71c4253468e40c540e31e5127d1e341e20494bc0de8b4e4d434c14b54608",
+        "/dns/pfn0.apne1.fullnode.testnet.aptoslabs.com/tcp/6182/noise-ik/0x18fe71c4253468e40c540e31e5127d1e341e20494bc0de8b4e4d434c14b54608/handshake/0",
     ),
 ];
 

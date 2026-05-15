@@ -1471,6 +1471,7 @@ impl ModelValue {
             | Type::Primitive(_)
             | Type::TypeDomain(_)
             | Type::ResourceDomain(_, _, _)
+            | Type::StateDomain
             | Type::Error
             | Type::Var(_) => None,
         }

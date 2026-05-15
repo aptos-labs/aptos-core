@@ -319,9 +319,23 @@ pub enum BehaviorKind {
     AbortsOf,
     /// `ensures_of<f>(args)` - the postcondition of function `f`
     EnsuresOf,
-    /// `result_of<f>(args)` - deterministic result selector based on `ensures_of`
-    /// Semantics: `result_of<f>(x) == choose y where ensures_of<f>(x, y)`
+    /// `result_of<f>(args)` — `choose r where ensures_of<f>(args, r, ...)`.
     ResultOf,
+    /// `write_of<f, j>(args)` — WP-internal selector for the post-state of
+    /// the j-th `&mut` parameter (counted among `&mut` parameters). Not
+    /// surface syntax; emitted by spec inference and translated by the
+    /// Boogie backend to a Skolem axiomatized against `ensures_of`.
+    WriteOf(usize),
+}
+
+impl BehaviorKind {
+    /// True for predicates whose semantics span pre- and post-memory.
+    pub fn is_two_state(&self) -> bool {
+        matches!(
+            self,
+            BehaviorKind::EnsuresOf | BehaviorKind::ResultOf | BehaviorKind::WriteOf(_)
+        )
+    }
 }
 
 impl fmt::Display for BehaviorKind {
@@ -332,6 +346,7 @@ impl fmt::Display for BehaviorKind {
             AbortsOf => write!(f, "aborts_of"),
             EnsuresOf => write!(f, "ensures_of"),
             ResultOf => write!(f, "result_of"),
+            WriteOf(j) => write!(f, "write_of_{}", j),
         }
     }
 }
@@ -560,6 +575,12 @@ impl Spec {
             && self.properties.is_empty()
             && self.update_map.is_empty()
             && self.proof.is_none()
+            && self.frame_spec.as_ref().is_none_or(|fs| {
+                fs.modifies_targets.is_empty()
+                    && fs.reads_targets.is_empty()
+                    && !fs.modifies_all
+                    && !fs.reads_all
+            })
     }
 
     pub fn filter<P>(&self, pred: P) -> impl Iterator<Item = &Condition>
@@ -612,6 +633,11 @@ impl Spec {
         for exp in self.proof_exps() {
             result.append(&mut exp.used_funs_with_uses())
         }
+        if let Some(fs) = &self.frame_spec {
+            for target in &fs.modifies_targets {
+                result.append(&mut target.used_funs_with_uses())
+            }
+        }
         result
     }
 
@@ -629,6 +655,11 @@ impl Spec {
         }
         for exp in self.proof_exps() {
             result.append(&mut exp.called_funs_with_callsites())
+        }
+        if let Some(fs) = &self.frame_spec {
+            for target in &fs.modifies_targets {
+                result.append(&mut target.called_funs_with_callsites())
+            }
         }
         result
     }
@@ -2387,8 +2418,8 @@ impl ExpData {
                         | Shr | And | Or | Eq | Neq | Lt | Gt | Le | Ge | Copy | Move | Not
                         | Cast | Negate | Exists(..) | BorrowGlobal(..) | Borrow(..) | Deref
                         | MoveTo | MoveFrom | Freeze(..) | Abort(..) | Vector | Len | TypeValue
-                        | TypeDomain | ResourceDomain | Global(..) | CanModify | Old
-                        | Trace(..) | SpecPublish(..) | SpecRemove(..) | SpecUpdate(..)
+                        | TypeDomain | ResourceDomain | StateDomain | Global(..) | CanModify
+                        | Old | Trace(..) | SpecPublish(..) | SpecRemove(..) | SpecUpdate(..)
                         | EmptyVec | SingleVec | UpdateVec | ConcatVec | IndexOfVec
                         | ContainsVec | InRangeRange | InRangeVec | RangeVec | MaxU8 | MaxU16
                         | MaxU32 | MaxU64 | MaxU128 | MaxU256 | Bv2Int | Int2Bv | AbortFlag
@@ -2628,6 +2659,7 @@ pub enum Operation {
     TypeValue,
     TypeDomain,
     ResourceDomain,
+    StateDomain,
     Global(Option<MemoryLabel>),
     CanModify,
     Old,
@@ -3478,6 +3510,17 @@ impl fmt::Display for EnvDisplay<'_, PropertyBag> {
 /// # Purity of Expressions
 
 impl Operation {
+    /// Returns all `MemoryLabel` values embedded in this operation.
+    pub fn memory_labels(&self) -> Vec<MemoryLabel> {
+        use Operation::*;
+        match self {
+            Global(Some(l)) | Exists(Some(l)) => vec![*l],
+            Behavior(_, range) | SpecFunction(_, _, range) => range.labels().collect(),
+            SpecPublish(range) | SpecRemove(range) | SpecUpdate(range) => range.labels().collect(),
+            _ => vec![],
+        }
+    }
+
     /// Determines whether this operation depends on global memory
     pub fn uses_no_memory<F>(&self, check_pure: &F) -> bool
     where
@@ -3636,6 +3679,7 @@ impl Operation {
             // Operation with no effect
             TestVariants(..) => true, // Cannot abort
             NoOp => true,
+            StateDomain => true, // Spec domain, not runtime
         }
     }
 

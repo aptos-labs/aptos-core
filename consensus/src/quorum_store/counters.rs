@@ -26,6 +26,13 @@ pub const CALLBACK_SUCCESS_LABEL: &str = "callback_success";
 
 pub const POS_EXPIRED_LABEL: &str = "expired";
 pub const POS_DUPLICATE_LABEL: &str = "duplicate";
+pub const POS_COLLISION_LABEL: &str = "collision";
+
+pub const BATCH_COLLISION_LABEL: &str = "collision";
+
+pub fn inc_rejected_batch_count(reason: &str) {
+    REJECTED_BATCH_COUNT.with_label_values(&[reason]).inc();
+}
 
 static TRANSACTION_COUNT_BUCKETS: Lazy<Vec<f64>> = Lazy::new(|| {
     exponential_buckets(
@@ -166,7 +173,7 @@ pub static BATCH_NUM_PER_BLOCK: Lazy<HistogramVec> = Lazy::new(|| {
         "quorum_store_batch_num_per_block",
         "Histogram for the number of batches per (committed) blocks.",
         &["type"],
-        TRANSACTION_COUNT_BUCKETS.clone(),
+        PROOF_COUNT_BUCKETS.clone(),
     )
     .unwrap()
 });
@@ -389,7 +396,7 @@ pub static NUM_BATCHES_WITHOUT_PROOF_OF_STORE: Lazy<Histogram> = Lazy::new(|| {
     register_histogram!(
         "num_batches_without_proof_of_store",
         "Histogram for the number of batches without proof of store in proof manager",
-        TRANSACTION_COUNT_BUCKETS.clone(),
+        PROOF_COUNT_BUCKETS.clone(),
     )
     .unwrap()
 });
@@ -418,7 +425,7 @@ pub static PROOF_SIZE_WHEN_PULL: Lazy<Histogram> = Lazy::new(|| {
     register_histogram!(
         "quorum_store_proof_size_when_pull",
         "Histogram for the number of proof-of-store per block when pulled for consensus.",
-        TRANSACTION_COUNT_BUCKETS.clone(),
+        PROOF_COUNT_BUCKETS.clone(),
     )
     .unwrap()
 });
@@ -765,6 +772,15 @@ static REJECTED_POS_COUNT: Lazy<IntCounterVec> = Lazy::new(|| {
 pub fn inc_rejected_pos_count(reason: &str) {
     REJECTED_POS_COUNT.with_label_values(&[reason]).inc();
 }
+
+static REJECTED_BATCH_COUNT: Lazy<IntCounterVec> = Lazy::new(|| {
+    register_int_counter_vec!(
+        "quorum_store_rejected_batch_count",
+        "Count of batches rejected by the proof queue, grouped by reason.",
+        &["reason"]
+    )
+    .unwrap()
+});
 
 /// Count of the received batches since last restart.
 pub static RECEIVED_REMOTE_BATCH_COUNT: Lazy<IntCounter> = Lazy::new(|| {

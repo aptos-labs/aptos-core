@@ -18,6 +18,7 @@ use crate::{
         db_metadata::{DbMetadataKey, DbMetadataSchema, DbMetadataValue},
         transaction_accumulator_root_hash::TransactionAccumulatorRootHashSchema,
     },
+    state_store::StateStore,
 };
 use aptos_crypto::HashValue;
 use aptos_experimental_runtimes::thread_manager::THREAD_MANAGER;
@@ -67,6 +68,7 @@ impl DbWriter for AptosDB {
 
             self.state_store.buffered_state().lock().update(
                 chunk.result_ledger_state_with_summary(),
+                chunk.hot_state_updates.clone(),
                 chunk.estimated_total_state_updates(),
                 sync_commit || chunk.is_reconfig,
             )?;
@@ -332,8 +334,10 @@ impl AptosDB {
             .as_ref()
             .expect("hot_state_kv_db must exist on the write path");
         let mut sharded_hot_state_kv_batches = hot_state_kv_db.new_sharded_native_batches();
-        self.state_store
-            .put_hot_state_updates(chunk.hot_state_updates, &mut sharded_hot_state_kv_batches)?;
+        StateStore::put_hot_state_updates(
+            chunk.hot_state_updates,
+            &mut sharded_hot_state_kv_batches,
+        )?;
 
         // Write block index.
         for (i, txn_out) in chunk.transaction_outputs.iter().enumerate() {

@@ -137,6 +137,7 @@ pub struct ExecutionAndIOCosts {
     pub intrinsic_cost: InternalGas,
     pub keyless_cost: InternalGas,
     pub slh_dsa_sha2_128s_cost: InternalGas,
+    pub encrypted_txn_decryption_cost: InternalGas,
     pub dependencies: Vec<Dependency>,
     pub call_graph: CallFrame,
     pub transaction_transient: Option<InternalGas>,
@@ -224,8 +225,17 @@ impl CallFrame {
     }
 }
 
+/// Returns a boilerplate message that callers append to consistency errors
+/// returned from `check_consistency`. The message is intentionally generic --
+/// user-facing tools (e.g. CLIs) add any tool-specific guidance separately.
+const LIKELY_BUG_NOTE: &str = "This very likely indicates a bug in the gas profiler. \
+    Please report at https://github.com/aptos-labs/aptos-core/issues.";
+
 impl StorageFees {
-    pub(crate) fn assert_consistency(&self) {
+    /// Returns `Ok(())` if the recorded storage fees and refunds sum to the
+    /// totals reported by the gas meter, otherwise returns the first detected
+    /// inconsistency.
+    pub fn check_consistency(&self) -> anyhow::Result<()> {
         let mut total = Fee::zero();
         let mut total_refund = Fee::zero();
 
@@ -241,16 +251,27 @@ impl StorageFees {
         total += self.txn_storage;
 
         if total != self.total {
-            panic!(
-                "Storage fees do not add up. Check if the gas meter & the gas profiler have been implemented correctly. From gas meter: {}. Calculated: {}.",
-                self.total, total
-            );
+            return Err(anyhow::anyhow!(
+                "Storage fees do not add up (gas meter: {}, calculated: {}). {LIKELY_BUG_NOTE}",
+                self.total,
+                total,
+            ));
         }
         if total_refund != self.total_refund {
-            panic!(
-                "Storage refunds do not add up. Check if the gas meter & the gas profiler have been implemented correctly. From gas meter: {}. Calculated: {}.",
-                self.total_refund, total
-            );
+            return Err(anyhow::anyhow!(
+                "Storage refunds do not add up (gas meter: {}, calculated: {}). {LIKELY_BUG_NOTE}",
+                self.total_refund,
+                total_refund,
+            ));
+        }
+        Ok(())
+    }
+
+    /// Panics if [`Self::check_consistency`] fails. Used by callers that
+    /// expect strict behavior (tests, internal tools).
+    pub(crate) fn assert_consistency(&self) {
+        if let Err(err) = self.check_consistency() {
+            panic!("{}", err);
         }
     }
 }
@@ -268,7 +289,10 @@ impl ExecutionAndIOCosts {
         }
     }
 
-    pub(crate) fn assert_consistency(&self) {
+    /// Returns `Ok(())` if the itemized execution and IO costs recorded by the
+    /// profiler sum to the totals reported by the gas meter, otherwise returns
+    /// an error describing the discrepancy.
+    pub fn check_consistency(&self) -> anyhow::Result<()> {
         use ExecutionGasEvent::{Bytecode, Call, CallNative, CreateTy, LoadResource, Loc};
 
         let mut total = InternalGas::zero();
@@ -276,6 +300,7 @@ impl ExecutionAndIOCosts {
         total += self.intrinsic_cost;
         total += self.keyless_cost;
         total += self.slh_dsa_sha2_128s_cost;
+        total += self.encrypted_txn_decryption_cost;
 
         for dep in &self.dependencies {
             total += dep.cost;
@@ -304,10 +329,20 @@ impl ExecutionAndIOCosts {
         }
 
         if total != self.total() {
-            panic!(
-                "Execution & IO costs do not add up. Check if the gas meter & the gas profiler have been implemented correctly. From gas meter: {}. Calculated: {}.",
-                self.total(), total
-            );
+            return Err(anyhow::anyhow!(
+                "Execution & IO costs do not add up (gas meter: {}, calculated: {}). {LIKELY_BUG_NOTE}",
+                self.total(),
+                total,
+            ));
+        }
+        Ok(())
+    }
+
+    /// Panics if [`Self::check_consistency`] fails. Used by callers that
+    /// expect strict behavior (tests, internal tools).
+    pub(crate) fn assert_consistency(&self) {
+        if let Err(err) = self.check_consistency() {
+            panic!("{}", err);
         }
     }
 }

@@ -23,7 +23,7 @@ use aptos_types::{
     jwks::{
         jwk::{JWKMoveStruct, JWK},
         patch::{IssuerJWK, PatchJWKMoveStruct, PatchUpsertJWK},
-        secure_test_rsa_jwk,
+        secure_test_rsa_jwk, OIDCProvider as JwksOidcProvider,
     },
     keyless::{
         self, test_utils::get_sample_iss, Groth16VerificationKey, KEYLESS_ACCOUNT_MODULE_NAME,
@@ -78,7 +78,6 @@ const GENESIS_MODULE_NAME: &str = "genesis";
 const GOVERNANCE_MODULE_NAME: &str = "aptos_governance";
 const CODE_MODULE_NAME: &str = "code";
 const VERSION_MODULE_NAME: &str = "version";
-const JWK_CONSENSUS_CONFIG_MODULE_NAME: &str = "jwk_consensus_config";
 const JWKS_MODULE_NAME: &str = "jwks";
 const CONFIG_BUFFER_MODULE_NAME: &str = "config_buffer";
 const DKG_MODULE_NAME: &str = "dkg";
@@ -367,23 +366,17 @@ pub fn encode_genesis_change_set(
     if genesis_config.is_test {
         allow_core_resources_to_set_version(&mut session, &module_storage, &mut traversal_context);
     }
-    let jwk_consensus_config = genesis_config
-        .jwk_consensus_config_override
-        .clone()
-        .unwrap_or_else(OnChainJWKConsensusConfig::default_for_genesis);
-    initialize_jwk_consensus_config(
-        &mut session,
-        &module_storage,
-        &mut traversal_context,
-        &jwk_consensus_config,
-    );
-    initialize_jwks_resources(&mut session, &module_storage, &mut traversal_context);
-    initialize_keyless_accounts(
+    initialize_jwks_with_defaults(
         &mut session,
         &module_storage,
         &mut traversal_context,
         chain_id,
-        genesis_config.initial_jwks.clone(),
+        genesis_config,
+    );
+    initialize_keyless_accounts(
+        &mut session,
+        &module_storage,
+        &mut traversal_context,
         genesis_config.keyless_groth16_vk.clone(),
     );
     initialize_confidential_asset(
@@ -872,39 +865,63 @@ fn initialize_reconfiguration_state(
     );
 }
 
-fn initialize_jwk_consensus_config(
-    session: &mut SessionExt<impl AptosMoveResolver>,
-    module_storage: &impl AptosModuleStorage,
-    traversal_context: &mut TraversalContext,
-    jwk_consensus_config: &OnChainJWKConsensusConfig,
-) {
-    exec_function(
-        session,
-        module_storage,
-        traversal_context,
-        JWK_CONSENSUS_CONFIG_MODULE_NAME,
-        "initialize",
-        vec![],
-        serialize_values(&vec![
-            MoveValue::Signer(CORE_CODE_ADDRESS),
-            jwk_consensus_config.as_move_value(),
-        ]),
-    );
+fn genesis_jwk_initial_patches(
+    chain_id: ChainId,
+    mut initial_jwks: Vec<IssuerJWK>,
+) -> Vec<PatchJWKMoveStruct> {
+    if chain_id.is_mainnet() {
+        return vec![];
+    }
+    let additional_jwk_patch = IssuerJWK {
+        issuer: get_sample_iss(),
+        jwk: JWK::RSA(secure_test_rsa_jwk()),
+    };
+    initial_jwks.insert(0, additional_jwk_patch);
+    initial_jwks
+        .into_iter()
+        .map(|issuer_jwk| {
+            let IssuerJWK { issuer, jwk } = issuer_jwk;
+            let upsert_patch = PatchUpsertJWK {
+                issuer,
+                jwk: JWKMoveStruct::from(jwk),
+            };
+            PatchJWKMoveStruct::from(upsert_patch)
+        })
+        .collect()
 }
 
-fn initialize_jwks_resources(
+fn initialize_jwks_with_defaults(
     session: &mut SessionExt<impl AptosMoveResolver>,
     module_storage: &impl AptosModuleStorage,
     traversal_context: &mut TraversalContext,
+    chain_id: ChainId,
+    genesis_config: &GenesisConfiguration,
 ) {
+    let cfg = genesis_config
+        .jwk_consensus_config_override
+        .clone()
+        .unwrap_or_else(OnChainJWKConsensusConfig::default_for_genesis);
+    let providers = match cfg {
+        OnChainJWKConsensusConfig::Off => vec![],
+        OnChainJWKConsensusConfig::V1(v1) => v1
+            .oidc_providers
+            .into_iter()
+            .map(JwksOidcProvider::from)
+            .collect(),
+    };
+    let patches = genesis_jwk_initial_patches(chain_id, genesis_config.initial_jwks.clone());
     exec_function(
         session,
         module_storage,
         traversal_context,
         JWKS_MODULE_NAME,
-        "initialize",
+        "initialize_with_defaults",
         vec![],
-        serialize_values(&vec![MoveValue::Signer(CORE_CODE_ADDRESS)]),
+        serialize_values(&vec![
+            MoveValue::Signer(CORE_CODE_ADDRESS),
+            providers.as_move_value(),
+            patches.as_move_value(),
+        ]),
     );
 }
 
@@ -972,8 +989,6 @@ fn initialize_keyless_accounts(
     session: &mut SessionExt<impl AptosMoveResolver>,
     module_storage: &impl AptosModuleStorage,
     traversal_context: &mut TraversalContext,
-    chain_id: ChainId,
-    mut initial_jwks: Vec<IssuerJWK>,
     vk: Option<Groth16VerificationKey>,
 ) {
     let config = keyless::Configuration::new_for_devnet();
@@ -1001,38 +1016,6 @@ fn initialize_keyless_accounts(
             serialize_values(&vec![
                 MoveValue::Signer(CORE_CODE_ADDRESS),
                 vk_value.as_move_value(),
-            ]),
-        );
-    }
-    if !chain_id.is_mainnet() {
-        let additional_jwk_patch = IssuerJWK {
-            issuer: get_sample_iss(),
-            jwk: JWK::RSA(secure_test_rsa_jwk()),
-        };
-        initial_jwks.insert(0, additional_jwk_patch);
-
-        let jwk_patches: Vec<PatchJWKMoveStruct> = initial_jwks
-            .into_iter()
-            .map(|issuer_jwk| {
-                let IssuerJWK { issuer, jwk } = issuer_jwk;
-                let upsert_patch = PatchUpsertJWK {
-                    issuer,
-                    jwk: JWKMoveStruct::from(jwk),
-                };
-                PatchJWKMoveStruct::from(upsert_patch)
-            })
-            .collect();
-
-        exec_function(
-            session,
-            module_storage,
-            traversal_context,
-            JWKS_MODULE_NAME,
-            "set_patches",
-            vec![],
-            serialize_values(&vec![
-                MoveValue::Signer(CORE_CODE_ADDRESS),
-                jwk_patches.as_move_value(),
             ]),
         );
     }

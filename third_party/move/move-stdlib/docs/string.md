@@ -1,7 +1,4 @@
-
-<a id="0x1_string"></a>
-
-# Module `0x1::string`
+# Module `0x1::string` <a id="0x1_string"></a>
 
 The <code><a href="string.md#0x1_string">string</a></code> module defines the <code><a href="string.md#0x1_string_String">String</a></code> type which represents UTF8 encoded strings.
 
@@ -30,10 +27,7 @@ The <code><a href="string.md#0x1_string">string</a></code> module defines the <c
 </code></pre>
 
 
-
-<a id="0x1_string_String"></a>
-
-## Struct `String`
+## Struct `String` <a id="0x1_string_String"></a>
 
 A <code><a href="string.md#0x1_string_String">String</a></code> holds a sequence of bytes which is guaranteed to be in utf8 format.
 
@@ -59,9 +53,7 @@ A <code><a href="string.md#0x1_string_String">String</a></code> holds a sequence
 
 </details>
 
-<a id="@Constants_0"></a>
-
-## Constants
+## Constants <a id="@Constants_0"></a>
 
 
 <a id="0x1_string_EINVALID_INDEX"></a>
@@ -83,10 +75,7 @@ An invalid UTF8 encoding.
 </code></pre>
 
 
-
-<a id="0x1_string_utf8"></a>
-
-## Function `utf8`
+## Function `utf8` <a id="0x1_string_utf8"></a>
 
 Creates a new string from a sequence of bytes. Aborts if the bytes do not represent valid utf8.
 
@@ -110,9 +99,7 @@ Creates a new string from a sequence of bytes. Aborts if the bytes do not repres
 
 </details>
 
-<a id="0x1_string_try_utf8"></a>
-
-## Function `try_utf8`
+## Function `try_utf8` <a id="0x1_string_try_utf8"></a>
 
 Tries to create a new string from a sequence of bytes.
 
@@ -139,9 +126,7 @@ Tries to create a new string from a sequence of bytes.
 
 </details>
 
-<a id="0x1_string_bytes"></a>
-
-## Function `bytes`
+## Function `bytes` <a id="0x1_string_bytes"></a>
 
 Returns a reference to the underlying byte vector.
 
@@ -164,9 +149,7 @@ Returns a reference to the underlying byte vector.
 
 </details>
 
-<a id="0x1_string_into_bytes"></a>
-
-## Function `into_bytes`
+## Function `into_bytes` <a id="0x1_string_into_bytes"></a>
 
 Returns the underlying byte vector.
 
@@ -190,9 +173,7 @@ Returns the underlying byte vector.
 
 </details>
 
-<a id="0x1_string_is_empty"></a>
-
-## Function `is_empty`
+## Function `is_empty` <a id="0x1_string_is_empty"></a>
 
 Checks whether this string is empty.
 
@@ -215,9 +196,7 @@ Checks whether this string is empty.
 
 </details>
 
-<a id="0x1_string_length"></a>
-
-## Function `length`
+## Function `length` <a id="0x1_string_length"></a>
 
 Returns the length of this string, in bytes.
 
@@ -240,9 +219,7 @@ Returns the length of this string, in bytes.
 
 </details>
 
-<a id="0x1_string_append"></a>
-
-## Function `append`
+## Function `append` <a id="0x1_string_append"></a>
 
 Appends a string.
 
@@ -265,9 +242,7 @@ Appends a string.
 
 </details>
 
-<a id="0x1_string_append_utf8"></a>
-
-## Function `append_utf8`
+## Function `append_utf8` <a id="0x1_string_append_utf8"></a>
 
 Appends bytes which must be in valid utf8 format.
 
@@ -290,9 +265,7 @@ Appends bytes which must be in valid utf8 format.
 
 </details>
 
-<a id="0x1_string_insert"></a>
-
-## Function `insert`
+## Function `insert` <a id="0x1_string_insert"></a>
 
 Insert the other string at the byte index in given string. The index must be at a valid utf8 char
 boundary.
@@ -323,9 +296,7 @@ boundary.
 
 </details>
 
-<a id="0x1_string_sub_string"></a>
-
-## Function `sub_string`
+## Function `sub_string` <a id="0x1_string_sub_string"></a>
 
 Returns a sub-string using the given byte indices, where <code>i</code> is the first byte position and <code>j</code> is the start
 of the first byte not included (or the length of the string). The indices must be at valid utf8 char boundaries,
@@ -356,9 +327,7 @@ guaranteeing that the result is valid utf8.
 
 </details>
 
-<a id="0x1_string_index_of"></a>
-
-## Function `index_of`
+## Function `index_of` <a id="0x1_string_index_of"></a>
 
 Computes the index of the first occurrence of a string. Returns <code><a href="string.md#0x1_string_length">length</a>(s)</code> if no occurrence found.
 
@@ -381,9 +350,7 @@ Computes the index of the first occurrence of a string. Returns <code><a href="s
 
 </details>
 
-<a id="0x1_string_internal_check_utf8"></a>
-
-## Function `internal_check_utf8`
+## Function `internal_check_utf8` <a id="0x1_string_internal_check_utf8"></a>
 
 
 
@@ -403,9 +370,7 @@ Computes the index of the first occurrence of a string. Returns <code><a href="s
 
 </details>
 
-<a id="0x1_string_internal_is_char_boundary"></a>
-
-## Function `internal_is_char_boundary`
+## Function `internal_is_char_boundary` <a id="0x1_string_internal_is_char_boundary"></a>
 
 
 
@@ -425,9 +390,7 @@ Computes the index of the first occurrence of a string. Returns <code><a href="s
 
 </details>
 
-<a id="0x1_string_internal_sub_string"></a>
-
-## Function `internal_sub_string`
+## Function `internal_sub_string` <a id="0x1_string_internal_sub_string"></a>
 
 
 
@@ -447,9 +410,7 @@ Computes the index of the first occurrence of a string. Returns <code><a href="s
 
 </details>
 
-<a id="0x1_string_internal_index_of"></a>
-
-## Function `internal_index_of`
+## Function `internal_index_of` <a id="0x1_string_internal_index_of"></a>
 
 
 

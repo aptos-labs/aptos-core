@@ -4,10 +4,15 @@
 use super::new_test_context;
 use crate::tests::{new_test_context_with_config, new_test_context_with_orderless_flags};
 use aptos_api_test_context::{assert_json, current_function_name, pretty, TestContext};
+use aptos_api_types::{AsConverter, UserTransactionRequest};
+use aptos_batch_encryption::{
+    schemes::fptx_weighted::FPTXWeighted, traits::BatchThresholdEncryption,
+};
 use aptos_config::config::{GasEstimationStaticOverride, NodeConfig, TransactionFilterConfig};
 use aptos_crypto::{
     ed25519::{Ed25519PrivateKey, Ed25519Signature},
     multi_ed25519::{MultiEd25519PrivateKey, MultiEd25519PublicKey},
+    weighted_config::WeightedConfigArkworks,
     PrivateKey, SigningKey, Uniform,
 };
 use aptos_sdk::types::{AccountKey, LocalAccount};
@@ -31,6 +36,57 @@ use rstest::rstest;
 use serde_json::{json, Value};
 use std::{path::PathBuf, time::Duration};
 use tokio::time::sleep;
+
+fn build_submit_transaction_request(
+    context: &TestContext,
+    txn: &SignedTransaction,
+) -> UserTransactionRequest {
+    let state_view = context.latest_state_view();
+    let converter = state_view.as_converter(context.db.clone(), None);
+    let payload = converter
+        .try_into_transaction_payload(txn.payload().clone())
+        .unwrap();
+    UserTransactionRequest::from((txn, payload))
+}
+
+fn build_json_encrypted_request_with_mismatched_authenticator(context: &mut TestContext) -> Value {
+    let threshold_config = WeightedConfigArkworks::new(1, vec![1]).unwrap();
+    let (encryption_key, _, _, _) =
+        FPTXWeighted::setup_for_testing(context.rng.r#gen(), 8, 1, &threshold_config).unwrap();
+    let encryption_key_bytes = bcs::to_bytes(&encryption_key).unwrap();
+
+    let transaction_factory = context.transaction_factory();
+    transaction_factory
+        .update_encryption_key_state(0, Some(&encryption_key_bytes))
+        .unwrap();
+
+    let sender_key = AccountKey::generate(&mut context.rng);
+    let sender_auth_key = AuthenticationKey::ed25519(sender_key.public_key());
+    let wrong_signer = AccountKey::generate(&mut context.rng);
+
+    let raw_txn = transaction_factory
+        .account_transfer(AccountAddress::ONE, 1)
+        .sender(sender_auth_key.account_address())
+        .auth_key(Some(sender_auth_key))
+        .sequence_number(0)
+        .expiration_timestamp_secs(context.get_expiration_time())
+        .upgrade_payload_with_rng(
+            &mut context.rng,
+            context.use_txn_payload_v2_format,
+            context.use_orderless_transactions,
+        )
+        .build();
+
+    let signed_txn = raw_txn
+        .sign(
+            wrong_signer.private_key(),
+            wrong_signer.public_key().clone(),
+        )
+        .unwrap()
+        .into_inner();
+
+    serde_json::to_value(build_submit_transaction_request(context, &signed_txn)).unwrap()
+}
 
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
 async fn test_deserialize_genesis_transaction() {
@@ -260,6 +316,39 @@ async fn test_post_invalid_signature_transaction(
     case(true, false),
     case(true, true)
 )]
+async fn test_post_json_encrypted_transaction_rejects_auth_key_mismatch(
+    use_txn_payload_v2_format: bool,
+    use_orderless_transactions: bool,
+) {
+    let mut node_config = NodeConfig::default();
+    node_config.api.allow_encrypted_txns_submission = true;
+    let mut context = new_test_context_with_config(
+        current_function_name!(),
+        node_config,
+        use_txn_payload_v2_format,
+        use_orderless_transactions,
+    );
+
+    let request = build_json_encrypted_request_with_mismatched_authenticator(&mut context);
+    let response = context
+        .expect_status_code(400)
+        .post("/transactions", request)
+        .await;
+
+    assert!(response["message"]
+        .as_str()
+        .unwrap()
+        .contains("Encrypted transaction payload could not be verified"));
+}
+
+#[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+#[rstest(
+    use_txn_payload_v2_format,
+    use_orderless_transactions,
+    case(false, false),
+    case(true, false),
+    case(true, true)
+)]
 async fn test_post_transaction_rejected_by_mempool(
     use_txn_payload_v2_format: bool,
     use_orderless_transactions: bool,
@@ -380,6 +469,39 @@ async fn test_post_invalid_signature_transaction_batch(
         .post_bcs_txn("/transactions/batch", &body)
         .await;
     context.check_golden_output(resp);
+}
+
+#[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+#[rstest(
+    use_txn_payload_v2_format,
+    use_orderless_transactions,
+    case(false, false),
+    case(true, false),
+    case(true, true)
+)]
+async fn test_post_json_encrypted_transaction_batch_rejects_auth_key_mismatch(
+    use_txn_payload_v2_format: bool,
+    use_orderless_transactions: bool,
+) {
+    let mut node_config = NodeConfig::default();
+    node_config.api.allow_encrypted_txns_submission = true;
+    let mut context = new_test_context_with_config(
+        current_function_name!(),
+        node_config,
+        use_txn_payload_v2_format,
+        use_orderless_transactions,
+    );
+
+    let request = build_json_encrypted_request_with_mismatched_authenticator(&mut context);
+    let response = context
+        .expect_status_code(400)
+        .post("/transactions/batch", json!([request]))
+        .await;
+
+    assert!(response["message"]
+        .as_str()
+        .unwrap()
+        .contains("Encrypted transaction payload could not be verified"));
 }
 
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]

@@ -1,3 +1,4 @@
+// @checks=experimental
 module 0xc0ffee::m {
     fun get_vector_1(): vector<u8> {
         vector[1, 2, 3]

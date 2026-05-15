@@ -743,12 +743,12 @@ if __name__ == "__main__":
 
     if network == "testnet":
         source_cluster_id = "general-usce1-0"
-        source_namespace = "testnet-pfn-usce1-backup"
+        source_namespace = "testnet-pfn-0"
         snapshot_name = TESTNET_SNAPSHOT_NAME
         new_pv_prefix = TESTNET_SNAPSHOT_NAME
     else:
         source_cluster_id = "mainnet-usce1-0"
-        source_namespace = "mainnet-pfn-usce1-backup"
+        source_namespace = "mainnet-pfn-0"
         snapshot_name = MAINNET_SNAPSHOT_NAME
         new_pv_prefix = MAINNET_SNAPSHOT_NAME
     # create OG snapshot

@@ -25,7 +25,7 @@ use crate::{
     model::{
         FieldData, FieldId, FunId, FunctionKind, GlobalEnv, Loc, ModuleId, NodeId, Parameter,
         QualifiedId, QualifiedInstId, SpecFunId, StructId, SurfaceSyntax, TypeParameter,
-        TypeParameterKind, UserId,
+        TypeParameterKind, UserId, Visibility,
     },
     symbol::{Symbol, SymbolPool},
     ty::{
@@ -121,6 +121,12 @@ pub(crate) struct ExpTranslator<'env, 'translator, 'module_translator> {
     /// Map from state label names to their GlobalId, ensuring the same label name
     /// always resolves to the same MemoryLabel across behavior predicates.
     pub state_label_map: BTreeMap<Symbol, MemoryLabel>,
+    /// True while translating an argument expression of a behavioral predicate
+    /// (`ensures_of` / `result_of` / etc.). In this context, `&mut x.foo`
+    /// selector borrows are accepted in spec mode (the spec rewriter and
+    /// Boogie translator interpret them as field-path expressions over the
+    /// underlying mut-ref param).
+    pub in_behavior_pred_arg: bool,
 }
 
 #[derive(Debug)]
@@ -194,6 +200,7 @@ impl<'env, 'translator, 'module_translator> ExpTranslator<'env, 'translator, 'mo
             insert_freeze: true,
             loop_stack: vec![],
             state_label_map: BTreeMap::new(),
+            in_behavior_pred_arg: false,
         }
     }
 
@@ -1966,7 +1973,12 @@ impl ExpTranslator<'_, '_, '_> {
                 ExpData::Call(id, Operation::Deref, vec![target_exp.into_exp()])
             },
             EA::Exp_::Borrow(mutable, exp) => {
-                self.require_impl_language(&loc);
+                // Behavioral predicate arguments accept `&mut x.foo` selector
+                // borrows even in spec mode — the model spec rewriter / Boogie
+                // translator interpret them as field-path expressions.
+                if !self.in_behavior_pred_arg {
+                    self.require_impl_language(&loc);
+                }
                 let ref_kind = ReferenceKind::from_is_mut(*mutable);
                 let target_ty = self.fresh_type_var();
                 let ty = Type::Reference(ref_kind, Box::new(target_ty.clone()));
@@ -3995,8 +4007,15 @@ impl ExpTranslator<'_, '_, '_> {
             let id = self.env().new_node(loc.clone(), fun_type.clone());
             self.env().set_node_instantiation(id, instantiation.clone());
 
-            // Special-case handling for functions that are bytecode instructions in the `std::vector` module.
-            if global_var_sym.module_name.addr() == &self.env().get_stdlib_address()
+            // Special-case handling for functions that are bytecode instructions in the
+            // `std::vector` module. The Move VM cannot dispatch a closure to a function that
+            // has been lowered to a bytecode primitive, so for runtime contexts we wrap the
+            // reference in a lambda the file-format generator can compile. Spec contexts are
+            // exempt: the prover's behavioural predicates work directly off the function's
+            // declared semantics, and the Boogie backend already emits a procedure for native
+            // vector intrinsics.
+            if !self.is_spec_mode()
+                && global_var_sym.module_name.addr() == &self.env().get_stdlib_address()
                 && global_var_sym.module_name.name() == self.symbol_pool().make(VECTOR_MODULE)
             {
                 let function_name = global_var_sym
@@ -4077,8 +4096,11 @@ impl ExpTranslator<'_, '_, '_> {
         ExpData::Lambda(id, pattern, body, LambdaCaptureKind::Default, None)
     }
 
-    /// Creates an expression for a constant, checking the expected type.
-    /// Reports an error if the constant is not visible.
+    /// Translates a constant reference. Same-module/spec accesses emit the value
+    /// directly; cross-module impl access emits a `const$NAME` accessor call.
+    /// Rejects two cases here (the rest go through `function_checker`): private
+    /// cross-module access, and pre-V2.4 cross-module access — in both cases the
+    /// accessor isn't injected.
     fn translate_constant(
         &mut self,
         loc: &Loc,
@@ -4087,30 +4109,77 @@ impl ExpTranslator<'_, '_, '_> {
         context: &ErrorMessageContext,
         sym: &QualifiedSymbol,
     ) -> ExpData {
-        // Constants are always visible in specs. Builtin constants are visible everywhere.
-        if self.mode != ExpTranslationMode::Spec
-            && sym.module_name != self.parent.module_name
-            && sym.module_name != ModuleName::builtin_module(self.env())
-        {
-            self.error(
-                loc,
-                &format!(
-                    "constant `{}` cannot be used here because it is private to the module `{}`",
-                    sym.display_full(self.env()),
-                    sym.module_name.display_full(self.env())
-                ),
-            );
-            self.new_error_exp()
-        } else {
-            // Record constant usage.
-            // Why tracking constants on the fly:
-            // - they are replaced by values after translation!
-            if let Some(user_id) = &self.constant_use_context {
-                self.track_constant_usage(loc, sym, user_id.clone());
+        let is_cross_module = sym.module_name != self.parent.module_name
+            && sym.module_name != ModuleName::builtin_module(self.env());
+        if self.mode != ExpTranslationMode::Spec && is_cross_module {
+            // Private const: reject. Also covers pre-V2.4 since non-private const
+            // syntax is gated to V2.4+.
+            if entry.move_visibility == Visibility::Private {
+                self.error(
+                    loc,
+                    &format!(
+                        "constant `{}` cannot be used here because it is private to the module `{}`",
+                        sym.display_full(self.env()),
+                        sym.module_name.display_full(self.env()),
+                    ),
+                );
+                return self.new_error_exp();
             }
-            let ConstEntry { ty, value, .. } = entry;
-            let ty = self.check_type(loc, &ty, expected_type, context);
-            let id = self.new_node_id_with_type_loc(&ty, loc);
+            // Defensive: non-private cross-module ref pre-V2.4 — the accessor
+            // wasn't injected, so a `Call(const$NAME)` would not resolve.
+            let lang_version = self.parent.parent.env.language_version();
+            if !lang_version.language_version_for_public_const() {
+                self.error(
+                    loc,
+                    &format!(
+                        "constant `{}` cannot be used here due to visibility constraints",
+                        sym.display_full(self.env()),
+                    ),
+                );
+                return self.new_error_exp();
+            }
+            // A const initializer cannot contain a function call; catch the
+            // cross-module case here for a targeted message instead of the
+            // generic "Invalid call or operation in constant" from constant
+            // folding. (`constant_use_context` also fires for function bodies,
+            // so match on `Constant` specifically.)
+            if matches!(self.constant_use_context, Some(UserId::Constant(_))) {
+                self.error(
+                    loc,
+                    &format!(
+                        "cross-module constant `{}` cannot be used in another constant's initializer",
+                        sym.display_full(self.env()),
+                    ),
+                );
+                return self.new_error_exp();
+            }
+        }
+        // Track usage here: same-module constants are replaced by values during translation
+        // and would be invisible to a post-pass.
+        if let Some(user_id) = &self.constant_use_context {
+            self.track_constant_usage(loc, sym, user_id.clone());
+        }
+        let ConstEntry { ty, value, .. } = entry;
+        let ty = self.check_type(loc, &ty, expected_type, context);
+        let id = self.new_node_id_with_type_loc(&ty, loc);
+        if self.mode != ExpTranslationMode::Spec && is_cross_module {
+            // Cross-module in impl mode: call the `const$NAME` accessor.
+            let module_id = self
+                .env()
+                .find_module(&sym.module_name)
+                .expect("defining module must exist when cross-module access is permitted")
+                .get_id();
+            let accessor_name = format!(
+                "{}{}{}",
+                move_core_types::language_storage::CONST,
+                move_core_types::language_storage::DOLLAR_SIGN_DELIMITER,
+                self.env().symbol_pool().string(sym.symbol)
+            );
+            let accessor_sym = self.env().symbol_pool().make(&accessor_name);
+            let fun_id = crate::model::FunId::new(accessor_sym);
+            ExpData::Call(id, Operation::MoveFunction(module_id, fun_id), vec![])
+        } else {
+            // Same-module or spec mode: inline the value as before.
             ExpData::Value(id, value)
         }
     }
@@ -5875,6 +5944,7 @@ impl ExpTranslator<'_, '_, '_> {
             let (exp_ty, rdomain_exp) = self.translate_exp_free(domain_exp);
             let elem_ty = self.fresh_type_var();
             let exp_ty = self.subs.specialize(&exp_ty);
+            let is_state_domain = matches!(&exp_ty, Type::StateDomain);
             match &exp_ty {
                 Type::Vector(..) => {
                     self.check_type(
@@ -5900,8 +5970,18 @@ impl ExpTranslator<'_, '_, '_> {
                         &ErrorMessageContext::General,
                     );
                 },
+                Type::StateDomain => {
+                    // State domain: variable is a state label, not a normal local.
+                    // Unify elem_ty with StateDomain so the pattern has a concrete type.
+                    self.check_type(
+                        &loc,
+                        &elem_ty,
+                        &Type::StateDomain,
+                        &ErrorMessageContext::General,
+                    );
+                },
                 _ => {
-                    self.error(&loc, "quantified variables must range over a vector, a type domain, or a number range");
+                    self.error(&loc, "quantified variables must range over a vector, a type domain, a number range, or a state domain");
                     return self.new_error_exp();
                 },
             }
@@ -5913,7 +5993,11 @@ impl ExpTranslator<'_, '_, '_> {
                 false, /*allow_wildcard_for_tuple*/
                 &ErrorMessageContext::Binding,
             );
-            self.define_locals_of_pat(&rpat);
+            if !is_state_domain {
+                // State domain variables are not added to the local scope;
+                // they are resolved as state labels in |~ expressions.
+                self.define_locals_of_pat(&rpat);
+            }
             rranges.push((rpat, rdomain_exp.into_exp()));
         }
         let rtriggers = triggers
@@ -5929,6 +6013,8 @@ impl ExpTranslator<'_, '_, '_> {
         let rcondition = condition
             .as_ref()
             .map(|cond| self.translate_exp(cond, &BOOL_TYPE).into_exp());
+        // Validate that state-domain quantified variables are used as state labels in the body.
+        self.validate_state_domain_usage(&rranges, &rbody);
         self.exit_scope();
         let quant_ty = if rkind.is_choice() {
             self.env().get_node_type(rranges[0].0.node_id())
@@ -5938,6 +6024,56 @@ impl ExpTranslator<'_, '_, '_> {
         self.check_type(loc, &quant_ty, expected_type, context);
         let id = self.new_node_id_with_type_loc(&quant_ty, loc);
         ExpData::Quant(id, rkind, rranges, rtriggers, rcondition, rbody.into_exp())
+    }
+
+    /// Validates that each state-domain quantifier variable is used as a state label
+    /// (`|~`) somewhere in the body of the quantifier.
+    fn validate_state_domain_usage(&self, rranges: &[(Pattern, Exp)], body: &ExpData) {
+        use std::collections::BTreeSet;
+        // Collect symbol names of state-domain quantifier variables
+        let mut state_domain_vars: Vec<(Symbol, Loc)> = Vec::new();
+        for (pat, range) in rranges.iter() {
+            let range_ty = self.env().get_node_type(range.node_id());
+            if matches!(range_ty, Type::StateDomain) {
+                if let Pattern::Var(id, sym) = pat {
+                    let loc = self.env().get_node_loc(*id);
+                    state_domain_vars.push((*sym, loc));
+                }
+            }
+        }
+        if state_domain_vars.is_empty() {
+            return;
+        }
+        // Collect all MemoryLabel values used in the body
+        let mut used_labels = BTreeSet::new();
+        body.visit_pre_order(&mut |e| {
+            if let ExpData::Call(_, op, _) = e {
+                for label in op.memory_labels() {
+                    used_labels.insert(label);
+                }
+            }
+            true
+        });
+        // Map labels back to symbol names
+        let mut used_label_names = BTreeSet::new();
+        for label in &used_labels {
+            if let Some(name) = self.env().get_memory_label_name(*label) {
+                used_label_names.insert(name);
+            }
+        }
+        // Check that each state-domain variable is used as a state label
+        for (sym, loc) in &state_domain_vars {
+            if !used_label_names.contains(sym) {
+                self.error(
+                    loc,
+                    &format!(
+                        "unused quantified state label `{}`; \
+                         state domain variables must be used as state labels (`|~`) in the body",
+                        self.symbol_pool().string(*sym)
+                    ),
+                );
+            }
+        }
     }
 
     /// Translates a behavior predicate expression (requires_of, aborts_of, ensures_of, result_of).
@@ -5950,7 +6086,8 @@ impl ExpTranslator<'_, '_, '_> {
         expected_type: &Type,
         context: &ErrorMessageContext,
     ) -> ExpData {
-        // Convert parser BehaviorKind to model BehaviorKind
+        // Model has a `WriteOf` variant too, but it's internal to spec
+        // inference and never produced by the parser.
         let model_kind = match kind {
             PA::BehaviorKind::RequiresOf => BehaviorKind::RequiresOf,
             PA::BehaviorKind::AbortsOf => BehaviorKind::AbortsOf,
@@ -5982,15 +6119,15 @@ impl ExpTranslator<'_, '_, '_> {
             return self.new_error_exp();
         };
 
-        // Compute expected argument types based on behavior kind and function signature
-        let expected_arg_types = self.compute_behavior_arg_types(&arg_ty, &result_ty, &model_kind);
-
-        // Translate arguments and check types
         let translated_args =
-            self.translate_and_check_behavior_args(loc, args, &expected_arg_types, &model_kind);
+            self.translate_and_check_behavior_args(loc, args, &arg_ty, &result_ty, &model_kind);
 
         // Determine the result type based on the behavior kind
-        let fun_type = Type::Fun(Box::new(arg_ty), Box::new(result_ty), AbilitySet::EMPTY);
+        let fun_type = Type::Fun(
+            Box::new(arg_ty.clone()),
+            Box::new(result_ty),
+            AbilitySet::EMPTY,
+        );
         let Some(computed_result_ty) =
             self.compute_behavior_result_type(loc, &model_kind, &fun_type)
         else {
@@ -5999,7 +6136,29 @@ impl ExpTranslator<'_, '_, '_> {
         let result_ty = self.check_type(loc, &computed_result_ty, expected_type, context);
         let id = self.new_node_id_with_type_loc(&result_ty, loc);
 
-        // Build args with function expression as first argument
+        // Reject BPs over `std::vector` bytecode-instruction natives (and
+        // `singleton` / `contains`): these functions have direct spec-language
+        // equivalents (e.g. `len(v)`, `v[i]`, `concat(v, vec(e))`,
+        // `contains(v, e)`) which the user should write instead.  Allowing
+        // BPs here would create two equivalent ways to spell the same fact
+        // and would carry no information that is not already expressible.
+        if let Some((fun_name, _inst)) =
+            crate::well_known::match_special_vector_bp_target(self.env(), &fun_exp)
+        {
+            self.error(
+                loc,
+                &format!(
+                    "behavioral predicates are not supported on `std::vector::{}` — \
+                     use the spec language directly (e.g. write `len(v)` instead of \
+                     `result_of<vector::length>(v)`, `v[i]` instead of \
+                     `result_of<vector::borrow>(v, i)`, `!in_range(v, i)` instead of \
+                     `aborts_of<vector::borrow>(v, i)`)",
+                    fun_name
+                ),
+            );
+            return self.new_error_exp();
+        }
+
         let mut all_args = vec![fun_exp];
         all_args.extend(translated_args);
 
@@ -6198,37 +6357,51 @@ impl ExpTranslator<'_, '_, '_> {
         result
     }
 
-    /// Computes the expected argument types for a behavior predicate based on kind.
+    /// Minimum-form expected argument types: input types (references
+    /// stripped), and for `EnsuresOf` a slot per return value.
     fn compute_behavior_arg_types(
         &self,
         arg_ty: &Type,
         result_ty: &Type,
         kind: &BehaviorKind,
     ) -> Vec<Type> {
-        match kind {
-            BehaviorKind::RequiresOf | BehaviorKind::AbortsOf | BehaviorKind::ResultOf => {
-                // requires_of, aborts_of, and result_of take only input parameters
-                arg_ty.clone().flatten()
-            },
-            BehaviorKind::EnsuresOf => {
-                // ensures_of takes input parameters + result + modified mut ref values
-                let mut types = arg_ty.clone().flatten();
-                types.extend(result_ty.clone().flatten());
-                // Add mutable reference parameters as outputs (their modified values)
-                for ty in arg_ty.clone().flatten() {
-                    if ty.is_mutable_reference() {
-                        types.push(ty.skip_reference().clone());
-                    }
-                }
-                types
-            },
+        let mut types: Vec<Type> = arg_ty
+            .clone()
+            .flatten()
+            .into_iter()
+            .map(|ty| ty.skip_reference().clone())
+            .collect();
+        if matches!(kind, BehaviorKind::EnsuresOf) {
+            types.extend(result_ty.clone().flatten());
         }
+        types
     }
 
-    /// Computes the result type for a behavior predicate based on the kind.
-    /// - `ResultOf` returns the function's result type (including modified mut ref values)
-    /// - All other behavior predicates return bool
-    /// Returns `None` if the result type cannot be computed (e.g., result_of on void function).
+    /// Canonical form for `EnsuresOf`: minimum form plus an explicit
+    /// post-state slot for each `&mut` parameter. `ResultOf`'s `&mut`
+    /// post-state slots are appended later by `wrap_mut_ref_bp_inputs` in
+    /// the model-rewrite pass; at parse time `result_of` accepts only the
+    /// minimum form so the user-facing signature matches `f`'s arity.
+    fn compute_behavior_arg_types_canonical(
+        &self,
+        arg_ty: &Type,
+        result_ty: &Type,
+        kind: &BehaviorKind,
+    ) -> Vec<Type> {
+        let mut types = self.compute_behavior_arg_types(arg_ty, result_ty, kind);
+        if matches!(kind, BehaviorKind::EnsuresOf) {
+            for ty in arg_ty.clone().flatten() {
+                if ty.is_mutable_reference() {
+                    types.push(ty.skip_reference().clone());
+                }
+            }
+        }
+        types
+    }
+
+    /// Result type for a behavior predicate. `ResultOf` returns the
+    /// function's return type and is rejected for void callees; others
+    /// return `bool`. Returns `None` on rejection.
     fn compute_behavior_result_type(
         &mut self,
         loc: &Loc,
@@ -6239,70 +6412,76 @@ impl ExpTranslator<'_, '_, '_> {
             return Some(BOOL_TYPE);
         }
 
-        // For ResultOf, compute result type from function type
-        let Type::Fun(params, result, _abilities) = fun_type else {
-            // Should not happen if resolve_behavior_target succeeded
+        let Type::Fun(_, result, _abilities) = fun_type else {
             return Some(Type::Error);
         };
 
-        // Compute result types: explicit results + modified mut ref values
-        let result_types: Vec<_> = result
-            .clone()
-            .flatten()
-            .into_iter()
-            .chain(
-                params
-                    .clone()
-                    .flatten()
-                    .into_iter()
-                    .filter(|ty| ty.is_mutable_reference())
-                    .map(|ty| ty.skip_reference().clone()),
-            )
-            .collect();
-
-        // Error only if there are NO outputs at all
-        if result_types.is_empty() {
+        if result.clone().flatten().is_empty() {
             self.error(
                 loc,
-                "`result_of` cannot be used with functions that have no outputs",
+                "`result_of` cannot be used with functions that have no return value; \
+                 use `ensures_of` to constrain the post-state of `&mut` arguments instead",
             );
             return None;
         }
 
-        Some(Type::tuple(result_types))
+        Some((**result).clone())
     }
 
-    /// Translates and type-checks behavior predicate arguments.
+    /// Translates and type-checks behavior predicate arguments against the
+    /// expected types computed by `compute_behavior_arg_types`.
     fn translate_and_check_behavior_args(
         &mut self,
         loc: &Loc,
         args: &[EA::Exp],
-        expected_types: &[Type],
+        arg_ty: &Type,
+        result_ty: &Type,
         kind: &BehaviorKind,
     ) -> Vec<Exp> {
-        // Check arity for behavior kinds
+        let minimum = self.compute_behavior_arg_types(arg_ty, result_ty, kind);
+        let canonical = self.compute_behavior_arg_types_canonical(arg_ty, result_ty, kind);
+        let expected_types: &[Type] =
+            if args.len() == canonical.len() && canonical.len() != minimum.len() {
+                &canonical
+            } else {
+                &minimum
+            };
+
         if args.len() != expected_types.len() {
-            self.error(
-                loc,
-                &format!(
+            let msg = if minimum.len() == canonical.len() {
+                format!(
                     "expected {} argument(s) for {} but {} were provided",
-                    expected_types.len(),
+                    minimum.len(),
                     kind,
                     args.len()
-                ),
-            );
-            // Still translate arguments to provide better error messages
-            return args
+                )
+            } else {
+                format!(
+                    "expected {} argument(s) for {} (or {} for the canonical form including post-state slots) but {} were provided",
+                    minimum.len(),
+                    kind,
+                    canonical.len(),
+                    args.len()
+                )
+            };
+            self.error(loc, &msg);
+            let prev = std::mem::replace(&mut self.in_behavior_pred_arg, true);
+            let translated = args
                 .iter()
                 .map(|arg| self.translate_exp_free(arg).1.into_exp())
                 .collect();
+            self.in_behavior_pred_arg = prev;
+            return translated;
         }
 
-        // Translate each argument with expected type
-        args.iter()
+        let prev = std::mem::replace(&mut self.in_behavior_pred_arg, true);
+        let translated = args
+            .iter()
             .zip(expected_types.iter())
             .map(|(arg, expected_ty)| self.translate_exp(arg, expected_ty).into_exp())
-            .collect()
+            .collect();
+        self.in_behavior_pred_arg = prev;
+        translated
     }
 
     /// Unify types with order `LeftToRight` and shallow variance

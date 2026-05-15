@@ -361,6 +361,14 @@ pub static BLOCKSTM_VERSION_NUMBER: Lazy<IntGauge> = Lazy::new(|| {
     .unwrap()
 });
 
+pub static PAR_EXEC_POOL_SIZE: Lazy<IntGauge> = Lazy::new(|| {
+    register_int_gauge!(
+        "par_exec_pool_size",
+        "Number of worker threads currently spawned in the BlockSTM worker pool"
+    )
+    .unwrap()
+});
+
 pub static GLOBAL_MODULE_CACHE_SIZE_IN_BYTES: Lazy<IntGauge> = Lazy::new(|| {
     register_int_gauge!(
         "global_module_cache_size_in_bytes",

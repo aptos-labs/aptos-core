@@ -24,6 +24,7 @@ fn test_view_function_get_sequence_number() -> Result<()> {
         vec![],
         vec![bcs::to_bytes(account.address())?],
         false,
+        false,
     )?;
 
     assert_eq!(result.len(), 1);
@@ -43,6 +44,7 @@ fn test_view_function_nonexistent_module() -> Result<()> {
         Identifier::new("some_function")?,
         vec![],
         vec![],
+        false,
         false,
     );
 
@@ -67,6 +69,7 @@ fn test_view_function_with_gas_profiling() -> Result<()> {
         vec![],
         vec![bcs::to_bytes(account.address())?],
         true,
+        false,
     )?;
 
     // The view function should still return correct results when profiling.

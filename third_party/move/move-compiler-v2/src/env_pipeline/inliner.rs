@@ -155,7 +155,7 @@ pub fn run_inlining(
                 }
             }
         }
-        env.filter_functions(|fun_id: &QualifiedFunId| !inline_funs.contains(fun_id));
+        env.retain_functions(|fun_id: &QualifiedFunId| !inline_funs.contains(fun_id));
     }
 }
 

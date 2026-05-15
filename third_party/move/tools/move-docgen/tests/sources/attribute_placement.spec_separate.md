@@ -1,7 +1,4 @@
-
-<a id="0x42_N"></a>
-
-# Module `0x42::N`
+# Module `0x42::N` <a id="0x42_N"></a>
 
 
 
@@ -16,10 +13,7 @@
 <pre><code></code></pre>
 
 
-
-<a id="0x42_N_bar"></a>
-
-## Function `bar`
+## Function `bar` <a id="0x42_N_bar"></a>
 
 
 
@@ -41,10 +35,7 @@
 </details>
 
 
-
-<a id="0x42_M"></a>
-
-# Module `0x42::M`
+# Module `0x42::M` <a id="0x42_M"></a>
 
 
 
@@ -66,10 +57,7 @@
 </code></pre>
 
 
-
-<a id="0x42_M_S"></a>
-
-## Struct `S`
+## Struct `S` <a id="0x42_M_S"></a>
 
 
 
@@ -95,9 +83,7 @@
 
 </details>
 
-<a id="0x42_M_T"></a>
-
-## Struct `T`
+## Struct `T` <a id="0x42_M_T"></a>
 
 
 
@@ -124,9 +110,7 @@
 
 </details>
 
-<a id="@Constants_0"></a>
-
-## Constants
+## Constants <a id="@Constants_0"></a>
 
 
 <a id="0x42_M_C"></a>
@@ -137,10 +121,7 @@
 </code></pre>
 
 
-
-<a id="0x42_M_foo"></a>
-
-## Function `foo`
+## Function `foo` <a id="0x42_M_foo"></a>
 
 
 
@@ -162,14 +143,9 @@
 
 </details>
 
-<a id="@Specification_1"></a>
+## Specification <a id="@Specification_1"></a>
 
-## Specification
-
-
-<a id="@Specification_1_foo"></a>
-
-### Function `foo`
+### Function `foo` <a id="@Specification_1_foo"></a>
 
 
 <pre><code>#[attr6]
@@ -178,10 +154,7 @@
 </code></pre>
 
 
-
-<a id="<SELF>_0"></a>
-
-# Script `<SELF>_0`
+# Script `<SELF>_0` <a id="<SELF>_0"></a>
 
 
 
@@ -199,10 +172,7 @@
 </code></pre>
 
 
-
-<a id="@Constants_0"></a>
-
-## Constants
+## Constants <a id="@Constants_0"></a>
 
 
 <a id="<SELF>_0_C"></a>
@@ -234,14 +204,9 @@
 
 </details>
 
-<a id="@Specification_1"></a>
+## Specification <a id="@Specification_1"></a>
 
-## Specification
-
-
-<a id="@Specification_1_main"></a>
-
-### Function `main`
+### Function `main` <a id="@Specification_1_main"></a>
 
 
 <pre><code>#[attr14]

@@ -2,7 +2,37 @@
 // Licensed pursuant to the Innovation-Enabling Source Code License, available at https://github.com/aptos-labs/aptos-core/blob/main/LICENSE
 
 use crate::instruction::{CodeOffset, FrameOffset, MicroOp, FRAME_METADATA_SIZE};
-use mono_move_alloc::{ExecutableArena, ExecutableArenaPtr, GlobalArenaPtr};
+use arc_swap::ArcSwap;
+use mono_move_alloc::{GlobalArenaPtr, LeakedBoxPtr};
+use std::{ptr::NonNull, sync::Arc};
+
+/// Function's micro-ops.
+pub struct Code {
+    inner: ArcSwap<Vec<MicroOp>>,
+}
+
+impl Code {
+    /// Builds code from a vector of micro-ops.
+    pub fn from_vec(ops: Vec<MicroOp>) -> Self {
+        Self {
+            inner: ArcSwap::from_pointee(ops),
+        }
+    }
+
+    /// Snapshot of the current micro-ops.
+    ///
+    /// TODO: decide on if using ArcSwap is good enough for perf and
+    ///   what is the best way to update code and any other relevant
+    ///   information in the function.
+    pub fn load(&self) -> arc_swap::Guard<Arc<Vec<MicroOp>>> {
+        self.inner.load()
+    }
+
+    /// Replaces the micro-ops atomically.
+    pub fn store(&self, ops: Vec<MicroOp>) {
+        self.inner.store(Arc::new(ops));
+    }
+}
 
 /// ---------------------------------------------------------------------------
 // Function representation
@@ -27,26 +57,21 @@ pub struct FrameLayoutInfo {
     /// offset and is not listed.
     ///
     /// Offsets must not fall in the metadata segment
-    /// (`args_and_locals_size..args_and_locals_size + FRAME_METADATA_SIZE`).
-    pub heap_ptr_offsets: ExecutableArenaPtr<[FrameOffset]>,
+    /// (`param_and_local_sizes_sum..param_and_local_sizes_sum + FRAME_METADATA_SIZE`).
+    pub heap_ptr_offsets: Vec<FrameOffset>,
 }
 
 impl FrameLayoutInfo {
-    /// Create a `FrameLayoutInfo` from an iterator of pointer offsets,
-    /// allocating into the given arena.
-    pub fn new<I>(arena: &ExecutableArena, offsets: I) -> Self
-    where
-        I: IntoIterator<Item = FrameOffset>,
-        I::IntoIter: ExactSizeIterator,
-    {
-        Self {
-            heap_ptr_offsets: arena.alloc_slice_fill_iter(offsets),
-        }
+    /// Creates frame layout information from a vector of pointer offsets.
+    pub fn new(heap_ptr_offsets: Vec<FrameOffset>) -> Self {
+        Self { heap_ptr_offsets }
     }
 
-    /// Create an empty `FrameLayoutInfo` (no pointer offsets).
-    pub fn empty(arena: &ExecutableArena) -> Self {
-        Self::new(arena, std::iter::empty::<FrameOffset>())
+    /// Creates empty frame layout information.
+    pub fn empty() -> Self {
+        Self {
+            heap_ptr_offsets: vec![],
+        }
     }
 }
 
@@ -60,7 +85,7 @@ impl FrameLayoutInfo {
 /// - **Call return sites**: when a callee triggers GC, the caller's
 ///   saved PC is `call_pc + 1`. The safe point for a caller frame is
 ///   the instruction *after* the call — at that point, the shared
-///   arg/return region holds return values, not args.
+///   arg/return region holds return values, not arguments.
 pub struct SafePointEntry {
     pub code_offset: CodeOffset,
     pub layout: FrameLayoutInfo,
@@ -68,111 +93,111 @@ pub struct SafePointEntry {
 
 /// A sorted collection of per-safe-point frame layouts.
 ///
-/// Wraps `ExecutableArenaPtr<[SafePointEntry]>` and provides O(log n)
-/// lookup by code offset. Entries must be strictly sorted by
+/// Provides O(log n) lookup by code offset. Entries must be strictly sorted by
 /// `code_offset`.
 pub struct SortedSafePointEntries {
-    entries: ExecutableArenaPtr<[SafePointEntry]>,
+    entries: Vec<SafePointEntry>,
 }
 
 impl SortedSafePointEntries {
-    /// Create a `SortedSafePointEntries` from an iterator of entries,
-    /// allocating into the given arena.
+    /// Creates safe point entries.
     ///
     /// The caller must ensure entries are strictly sorted by `code_offset`
     /// and that pointer offsets are disjoint from `frame_layout`.
-    pub fn new<I>(arena: &ExecutableArena, entries: I) -> Self
-    where
-        I: IntoIterator<Item = SafePointEntry>,
-        I::IntoIter: ExactSizeIterator,
-    {
-        Self {
-            entries: arena.alloc_slice_fill_iter(entries),
-        }
+    pub fn new(entries: Vec<SafePointEntry>) -> Self {
+        Self { entries }
     }
 
-    /// Create an empty `SortedSafePointEntries`.
-    pub fn empty(arena: &ExecutableArena) -> Self {
-        Self::new(arena, std::iter::empty::<SafePointEntry>())
+    /// Creates empty safe point entries.
+    pub fn empty() -> Self {
+        Self { entries: vec![] }
     }
 
     /// Look up the safe-point layout for a given code offset, if one exists.
-    ///
-    /// # Safety
-    ///
-    /// `entries` must be a valid arena pointer.
-    pub unsafe fn layout_at(&self, pc: usize) -> Option<&FrameLayoutInfo> {
-        let entries = unsafe { self.entries.as_ref_unchecked() };
-        if entries.is_empty() {
+    pub fn layout_at(&self, pc: usize) -> Option<&FrameLayoutInfo> {
+        if self.entries.is_empty() {
             return None;
         }
         let pc = pc as u32;
-        entries
+        self.entries
             .binary_search_by_key(&pc, |e| e.code_offset.0)
             .ok()
-            .map(|idx| &entries[idx].layout)
+            .map(|idx| &self.entries[idx].layout)
     }
 
     /// Access the underlying entries slice.
-    ///
-    /// # Safety
-    ///
-    /// `entries` must be a valid arena pointer.
-    pub unsafe fn entries(&self) -> &[SafePointEntry] {
-        unsafe { self.entries.as_ref_unchecked() }
+    pub fn entries(&self) -> &[SafePointEntry] {
+        &self.entries
     }
 }
 
 /// Frame layout (fp-relative):
 ///
 /// ```text
-///   [0 .. args_size)                    arguments (written by caller)
-///   [args_size .. args_and_locals_size)          locals
-///   [args_and_locals_size .. args_and_locals_size+24)     metadata (saved_pc, saved_fp, saved_func_id)
-///   [args_and_locals_size+24 .. extended_frame_size)  callee arg/return slots
+///   [0 .. param_sizes_sum)                    parameters (written by caller as arguments)
+///   [param_sizes_sum .. param_and_local_sizes_sum)          locals
+///   [param_and_local_sizes_sum .. param_and_local_sizes_sum+24)     metadata (saved_pc, saved_fp, saved_func_id)
+///   [param_and_local_sizes_sum+24 .. extended_frame_size)  callee arg/return slots
 /// ```
 ///
-/// `extended_frame_size` == `args_and_locals_size + FRAME_METADATA_SIZE` for leaf
+/// `extended_frame_size` == `param_and_local_sizes_sum + FRAME_METADATA_SIZE` for leaf
 /// functions (no callee region).
 pub struct Function {
     pub name: GlobalArenaPtr<str>,
-    pub code: ExecutableArenaPtr<[MicroOp]>,
-    /// Size of the argument region at the start of the frame.
-    /// Arguments are placed by the caller before `CallFunc`; when
-    /// `zero_frame` is true, the runtime zeroes everything beyond args
-    /// (`args_size..extended_frame_size`) at frame creation to ensure
-    /// pointer slots start as null.
-    pub args_size: usize,
-    /// Size of the arguments + locals region. Frame metadata is stored
-    /// immediately after this region at offset `args_and_locals_size`.
-    pub args_and_locals_size: usize,
+    pub code: Code,
+    /// Byte size of each parameter, in declaration order.
+    ///
+    /// Used by `CallClosure` (together with the closure's `ClosureMask`) to
+    /// compute each parameter's offset in the callee's parameter region and
+    /// to advance through the packed captured values. The sum of these sizes
+    /// must equal `param_sizes_sum`.
+    //
+    // TODO: this only captures sizes, not alignment. Once the layout admits
+    // non-8-byte fields, the closure-call interleaver will need per-param
+    // alignment (either encoded alongside `size` here, or as a sibling
+    // `param_alignments` slice).
+    pub param_sizes: Vec<u32>,
+    /// Size of the parameter region at the start of the frame.
+    /// The caller writes the corresponding arguments into this region
+    /// before the call instruction; when `zero_frame` is true, the runtime
+    /// zeroes everything beyond the parameter region
+    /// (`param_sizes_sum..extended_frame_size`) at frame creation to
+    /// ensure pointer slots start as null.
+    pub param_sizes_sum: usize,
+    /// Size of the parameters + locals region. Frame metadata is stored
+    /// immediately after this region at offset `param_and_local_sizes_sum`.
+    pub param_and_local_sizes_sum: usize,
     /// Total frame footprint including metadata and callee slots.
-    /// Must be >= `frame_size()` (i.e., `args_and_locals_size + FRAME_METADATA_SIZE`).
+    /// Must be >= `frame_size()` (i.e., `param_and_local_sizes_sum + FRAME_METADATA_SIZE`).
     /// For leaf functions this equals `frame_size()`; for calling functions
     /// it additionally includes callee argument / return value slots
-    /// (sized to fit the largest callee's args or return values).
+    /// (sized to fit the largest callee's arguments or return values).
     pub extended_frame_size: usize,
-    /// Whether the runtime must zero-initialize the region beyond args
-    /// (`args_size..extended_frame_size`) when a new frame is created.
-    /// This is required when `frame_layout` has pointer slots so the GC
-    /// sees null instead of garbage. Functions with no heap pointer slots
-    /// in `frame_layout` (beyond args) can set this to `false` to skip
-    /// the memset. Not needed if the function uses only per-PC layouts
-    /// and the specializer ensures slots are written before becoming
-    /// visible as pointers.
+    /// Whether the runtime must zero-initialize the region beyond
+    /// parameters (`param_sizes_sum..extended_frame_size`) when a new
+    /// frame is created. This is required when `frame_layout` has
+    /// pointer slots so the GC sees null instead of garbage. Functions
+    /// with no heap pointer slots in `frame_layout` (beyond parameters)
+    /// can set this to `false` to skip the memset. Not needed if the
+    /// function uses only per-PC layouts and the specializer ensures
+    /// slots are written before becoming visible as pointers.
+    //
+    // TODO: derive from `frame_layout` instead of taking as input.
+    // `safe_point_layouts` doesn't need zeroing — each entry already
+    // pins which slots hold valid pointers at that PC.
     pub zero_frame: bool,
     /// Base frame layout — pointer offsets that are valid at every point
     /// in the function's execution. The GC always scans these.
     ///
     /// Offsets span `[0..extended_frame_size)` — they may reference the
-    /// data segment AND the callee argument/return region beyond the
+    /// data segment AND the callee arg/return region beyond the
     /// metadata, but must NOT fall in the metadata segment itself.
     ///
     /// Invariants:
     ///
     /// - **Zeroed at frame creation**: when `zero_frame` is true, the
-    ///   runtime zeroes `args_size..extended_frame_size` when a frame
-    ///   is created, so all non-argument pointer slots (including the
+    ///   runtime zeroes `param_sizes_sum..extended_frame_size` when a frame
+    ///   is created, so all non-parameter pointer slots (including the
     ///   callee arg/return region) start as null.
     /// - **Pointer-only writes**: a pointer slot may only be
     ///   overwritten with another valid heap pointer (or null). The
@@ -205,51 +230,54 @@ pub struct Function {
 }
 
 impl Function {
-    /// The frame size including metadata: `args_and_locals_size + FRAME_METADATA_SIZE`.
-    /// This is the offset where callee arguments begin.
+    /// The frame size including metadata: `param_and_local_sizes_sum + FRAME_METADATA_SIZE`.
+    /// This is the offset where the callee arg region begins.
     pub fn frame_size(&self) -> usize {
-        self.args_and_locals_size + FRAME_METADATA_SIZE
+        self.param_and_local_sizes_sum + FRAME_METADATA_SIZE
     }
 
     /// Look up the safe-point layout for a given code offset, if one exists.
     ///
     /// Returns `None` if there is no entry for this exact code offset.
-    ///
-    /// # Safety
-    ///
-    /// Arena pointers in `safe_point_layouts` must be valid.
-    pub unsafe fn safe_point_layout_at(&self, pc: usize) -> Option<&FrameLayoutInfo> {
-        unsafe { self.safe_point_layouts.layout_at(pc) }
+    pub fn safe_point_layout_at(&self, pc: usize) -> Option<&FrameLayoutInfo> {
+        self.safe_point_layouts.layout_at(pc)
+    }
+}
+
+/// Pointer to lowered function. See [`LeakedBoxPtr`] for safety contract.
+#[repr(transparent)]
+#[derive(Copy, Clone)]
+pub struct FunctionPtr(LeakedBoxPtr<Function>);
+
+impl FunctionPtr {
+    /// Leaks the box and returns a stable pointer to the function.
+    pub fn new(function: Box<Function>) -> Self {
+        Self(LeakedBoxPtr::from_box(function))
     }
 
-    /// Replaces every [`MicroOp::CallFunc`] (index-based dispatch) with
-    /// [`MicroOp::CallLocalFunc`] (direct pointer dispatch).
-    ///
-    /// `func_ptrs` is indexed by definition index and may contain `None`
-    /// for functions that were not lowered (e.g. generic functions).
+    /// Returns the underlying non-null pointer.
+    pub fn as_non_null(&self) -> NonNull<Function> {
+        self.0.as_non_null()
+    }
+
+    /// Frees allocated data.
     ///
     /// # Safety
     ///
-    /// The caller must have exclusive access to the functions and their
-    /// arena-allocated code. The arena must outlive all uses of the patched
-    /// code.
-    pub unsafe fn resolve_calls(func_ptrs: &[Option<ExecutableArenaPtr<Function>>]) {
-        for func_ptr in func_ptrs {
-            let Some(mut func_ptr) = *func_ptr else {
-                continue;
-            };
-            // SAFETY: We have exclusive access during build — no concurrent
-            // readers exist yet. The arena is alive because the caller owns it.
-            let func = unsafe { func_ptr.as_mut_unchecked() };
-            let code = unsafe { func.code.as_mut_unchecked() };
-            for op in code.iter_mut() {
-                if let MicroOp::CallFunc { func_id } = *op {
-                    *op = MicroOp::CallLocalFunc {
-                        ptr: func_ptrs[func_id as usize]
-                            .expect("CallFunc target must be a lowered function"),
-                    };
-                }
-            }
-        }
+    /// The caller must ensure that no other references to the data exist and
+    /// that this method is called at most once per pointer.
+    pub unsafe fn free_unchecked(self) {
+        unsafe { self.0.free_unchecked() }
+    }
+
+    /// Returns a shared reference to the pointee with an explicit lifetime.
+    ///
+    /// # Safety
+    ///
+    /// The caller must ensure the pointer has not been freed and that the
+    /// returned reference does not outlive the actual allocation.
+    pub unsafe fn as_ref_unchecked<'a>(&self) -> &'a Function {
+        // SAFETY: The caller guarantees the pointer is still valid.
+        unsafe { self.0.as_ref_unchecked() }
     }
 }

@@ -13,9 +13,36 @@ use hyper::{
 use std::{
     convert::Infallible,
     net::{SocketAddr, ToSocketAddrs},
-    sync::Arc,
+    sync::{Arc, OnceLock},
 };
 use tokio::runtime::Runtime;
+
+/// Holds the components that are injected into the inspection service after it starts.
+/// Uses `OnceLock<T>` so the service can start before these are available.
+#[derive(Default)]
+pub struct InspectionServiceComponents {
+    pub data_client: OnceLock<AptosDataClient>,
+    pub peers_and_metadata: OnceLock<Arc<PeersAndMetadata>>,
+}
+
+impl InspectionServiceComponents {
+    pub fn new() -> Self {
+        Self {
+            data_client: OnceLock::new(),
+            peers_and_metadata: OnceLock::new(),
+        }
+    }
+
+    /// Inject both components once they are available.
+    pub fn set(&self, data_client: AptosDataClient, peers_and_metadata: Arc<PeersAndMetadata>) {
+        self.data_client
+            .set(data_client)
+            .expect("data_client already set");
+        self.peers_and_metadata
+            .set(peers_and_metadata)
+            .expect("peers_and_metadata already set");
+    }
+}
 
 mod configuration;
 mod identity_information;
@@ -48,10 +75,14 @@ pub const UNEXPECTED_ERROR_MESSAGE: &str = "An unexpected error was encountered!
 /// Starts the inspection service that listens on the configured
 /// address and handles various endpoint requests. Returns the
 /// runtime so the caller can keep it alive.
+///
+/// `components` is an `Arc<InspectionServiceComponents>` whose fields start as
+/// `None` and are filled in via `components.set(...)` once the rest of the node
+/// has finished initialising. Until then, endpoints that require those values
+/// (e.g. `/peer_information`) will return 503.
 pub fn start_inspection_service(
     node_config: NodeConfig,
-    aptos_data_client: AptosDataClient,
-    peers_and_metadata: Arc<PeersAndMetadata>,
+    components: Arc<InspectionServiceComponents>,
 ) -> Runtime {
     // Fetch the service port and address
     let service_port = node_config.inspection_service.port;
@@ -80,16 +111,10 @@ pub fn start_inspection_service(
         // Create the service function that handles the endpoint requests
         let make_service = make_service_fn(move |_conn| {
             let node_config = node_config.clone();
-            let aptos_data_client = aptos_data_client.clone();
-            let peers_and_metadata = peers_and_metadata.clone();
+            let components = components.clone();
             async move {
                 Ok::<_, Infallible>(service_fn(move |request| {
-                    serve_requests(
-                        request,
-                        node_config.clone(),
-                        aptos_data_client.clone(),
-                        peers_and_metadata.clone(),
-                    )
+                    serve_requests(request, node_config.clone(), components.clone())
                 }))
             }
         });
@@ -106,9 +131,12 @@ pub fn start_inspection_service(
 async fn serve_requests(
     req: Request<Body>,
     node_config: NodeConfig,
-    aptos_data_client: AptosDataClient,
-    peers_and_metadata: Arc<PeersAndMetadata>,
+    components: Arc<InspectionServiceComponents>,
 ) -> Result<Response<Body>, hyper::Error> {
+    // Read the optional components (may be None during early startup)
+    let aptos_data_client = components.data_client.get().cloned();
+    let peers_and_metadata = components.peers_and_metadata.get().cloned();
+
     // Process the request and get the response components
     let (status_code, body, content_type) = match req.uri().path() {
         CONFIGURATION_PATH => {

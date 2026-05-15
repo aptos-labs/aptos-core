@@ -70,7 +70,7 @@ async fn secret_share_rpc_path() {
         &mut swarm,
         &all_validators,
         Duration::from_secs(20),
-        100,
+        200,
         vec![vec![(TransactionType::default(), 1)]],
         true,
         Some(EmitJobMode::MaxLoad {

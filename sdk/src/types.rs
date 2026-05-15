@@ -351,20 +351,22 @@ impl LocalAccount {
         self.auth.sign_transaction(txn)
     }
 
-    pub fn sign_with_transaction_builder(&self, builder: TransactionBuilder) -> SignedTransaction {
-        let raw_txn = if builder.has_nonce() {
+    fn build_raw_transaction(&self, builder: TransactionBuilder) -> RawTransaction {
+        let sequence_number = if builder.has_nonce() {
             // Do not increment sequence number for orderless transactions.
-            builder
-                .sender(self.address())
-                .sequence_number(u64::MAX)
-                .build()
+            u64::MAX
         } else {
-            builder
-                .sender(self.address())
-                .sequence_number(self.increment_sequence_number())
-                .build()
+            self.increment_sequence_number()
         };
-        self.sign_transaction(raw_txn)
+        builder
+            .auth_key(self.optional_authentication_key())
+            .sender(self.address())
+            .sequence_number(sequence_number)
+            .build()
+    }
+
+    pub fn sign_with_transaction_builder(&self, builder: TransactionBuilder) -> SignedTransaction {
+        self.sign_transaction(self.build_raw_transaction(builder))
     }
 
     pub fn sign_multi_agent_with_transaction_builder(
@@ -372,7 +374,7 @@ impl LocalAccount {
         secondary_signers: Vec<&Self>,
         builder: TransactionBuilder,
     ) -> SignedTransaction {
-        let secondary_signer_addresses = secondary_signers
+        let secondary_signer_addresses: Vec<_> = secondary_signers
             .iter()
             .map(|signer| signer.address())
             .collect();
@@ -380,19 +382,15 @@ impl LocalAccount {
             .iter()
             .map(|signer| signer.private_key())
             .collect();
-
-        let raw_txn = if builder.has_nonce() {
-            // Do not increment sequence number for orderless transactions.
-            builder
-                .sender(self.address())
-                .sequence_number(u64::MAX)
-                .build()
-        } else {
-            builder
-                .sender(self.address())
-                .sequence_number(self.increment_sequence_number())
-                .build()
-        };
+        let additional_auth_keys = secondary_signers
+            .iter()
+            .filter_map(|s| {
+                s.optional_authentication_key()
+                    .map(|key| (s.address(), key))
+            })
+            .collect();
+        let raw_txn =
+            self.build_raw_transaction(builder.additional_signer_auth_keys(additional_auth_keys));
         raw_txn
             .sign_multi_agent(
                 self.private_key(),
@@ -409,7 +407,7 @@ impl LocalAccount {
         fee_payer_signer: &Self,
         builder: TransactionBuilder,
     ) -> SignedTransaction {
-        let secondary_signer_addresses = secondary_signers
+        let secondary_signer_addresses: Vec<_> = secondary_signers
             .iter()
             .map(|signer| signer.address())
             .collect();
@@ -417,18 +415,18 @@ impl LocalAccount {
             .iter()
             .map(|signer| signer.private_key())
             .collect();
-        let raw_txn = if builder.has_nonce() {
-            // Do not increment sequence number for orderless transactions.
-            builder
-                .sender(self.address())
-                .sequence_number(u64::MAX)
-                .build()
-        } else {
-            builder
-                .sender(self.address())
-                .sequence_number(self.increment_sequence_number())
-                .build()
-        };
+        let mut additional_auth_keys: Vec<_> = secondary_signers
+            .iter()
+            .filter_map(|s| {
+                s.optional_authentication_key()
+                    .map(|key| (s.address(), key))
+            })
+            .collect();
+        if let Some(key) = fee_payer_signer.optional_authentication_key() {
+            additional_auth_keys.push((fee_payer_signer.address(), key));
+        }
+        let raw_txn =
+            self.build_raw_transaction(builder.additional_signer_auth_keys(additional_auth_keys));
         raw_txn
             .sign_fee_payer(
                 self.private_key(),
@@ -452,17 +450,7 @@ impl LocalAccount {
             .map(|signer| signer.address())
             .collect();
         let secondary_signer_auths = secondary_signers.iter().map(|a| a.auth()).collect();
-        let raw_txn = if builder.has_nonce() {
-            builder
-                .sender(self.address())
-                .sequence_number(u64::MAX)
-                .build()
-        } else {
-            builder
-                .sender(self.address())
-                .sequence_number(self.increment_sequence_number())
-                .build()
-        };
+        let raw_txn = self.build_raw_transaction(builder);
         raw_txn
             .sign_aa_transaction(
                 self.auth(),
@@ -509,6 +497,25 @@ impl LocalAccount {
             },
             LocalAccountAuthenticator::Abstraction(..) => todo!(),
             LocalAccountAuthenticator::DerivableAbstraction(..) => todo!(),
+        }
+    }
+
+    fn optional_authentication_key(&self) -> Option<AuthenticationKey> {
+        match &self.auth {
+            LocalAccountAuthenticator::PrivateKey(key) => Some(key.authentication_key()),
+            LocalAccountAuthenticator::Keyless(keyless_account) => {
+                Some(keyless_account.authentication_key())
+            },
+            LocalAccountAuthenticator::FederatedKeyless(federated_keyless_account) => {
+                Some(federated_keyless_account.authentication_key())
+            },
+            LocalAccountAuthenticator::Abstraction(..) => None,
+            LocalAccountAuthenticator::DerivableAbstraction(account) => {
+                Some(AuthenticationKey::domain_abstraction_address(
+                    bcs::to_bytes(&account.function_info).expect("FunctionInfo must serialize"),
+                    &account.account_identity,
+                ))
+            },
         }
     }
 
@@ -634,6 +641,7 @@ impl TransactionSigner for HardwareWalletAccount {
             .sender(self.address())
             .sequence_number(sequence_number)
             .expiration_timestamp_secs(seconds)
+            .auth_key(Some(AuthenticationKey::ed25519(self.public_key())))
             .build();
 
         if !orderless {
@@ -1270,6 +1278,32 @@ mod tests {
 
         // Test invalid private key hex literal.
         assert!(LocalAccount::from_private_key("invalid_private_key", 0).is_err());
+    }
+
+    #[test]
+    fn test_domain_aa_optional_authentication_key_matches_account_address() {
+        let function_info = FunctionInfo::new(
+            AccountAddress::ONE,
+            "test_module".to_owned(),
+            "test_function".to_owned(),
+        );
+        let account_identity = b"domain-aa-identity".to_vec();
+        let expected_auth_key = AuthenticationKey::domain_abstraction_address(
+            bcs::to_bytes(&function_info).unwrap(),
+            &account_identity,
+        );
+        let account = LocalAccount::new_domain_aa(
+            function_info,
+            account_identity,
+            Arc::new(|message| message.to_vec()),
+            0,
+        );
+
+        assert_eq!(
+            account.optional_authentication_key(),
+            Some(expected_auth_key)
+        );
+        assert_eq!(account.address(), expected_auth_key.account_address());
     }
 
     #[ignore]

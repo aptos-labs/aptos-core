@@ -21,6 +21,7 @@ use move_model::{
     },
     symbol::Symbol,
     ty::{PrimitiveType, ReferenceKind, Type},
+    well_known,
 };
 use move_stackless_bytecode::{
     function_target::{FunctionData, FunctionTarget},
@@ -291,6 +292,7 @@ impl ExtendedChecker<'_> {
             | Reference(_, _)
             | TypeDomain(_)
             | ResourceDomain(_, _, _)
+            | StateDomain
             | Error
             | Var(_) => false,
         }
@@ -860,7 +862,8 @@ impl ExtendedChecker<'_> {
         callee: QualifiedId<FunId>,
         type_inst: &[Type],
     ) {
-        if !self.is_function(callee, "0x1::event::emit") {
+        if !self.is_framework_function(callee) || !self.is_function(callee, well_known::EVENT_EMIT)
+        {
             return;
         }
         // We are looking at `0x1::event::emit<T>` and extracting the `T`
@@ -969,7 +972,7 @@ impl<'a> ExtendedChecker<'a> {
 
     fn is_function(&self, id: QualifiedId<FunId>, full_name_str: &str) -> bool {
         let fun = &self.env.get_function(id);
-        fun.get_full_name_with_address() == full_name_str
+        fun.get_full_name_str() == full_name_str
     }
 
     fn is_framework_function(&self, id: QualifiedId<FunId>) -> bool {

@@ -162,6 +162,10 @@ pub enum FeatureFlag {
     EncryptedTransactions,
     PublicStructEnumArgs,
     MultisigScript,
+    TransactionLimits,
+    VersionedTransactionValidation,
+    StorageSlotNatives,
+    AllowFriendEntryVisibilityDowngrade,
 }
 
 fn generate_features_blob(writer: &CodeWriter, data: &[u64]) {
@@ -423,6 +427,14 @@ impl From<FeatureFlag> for AptosFeatureFlag {
             FeatureFlag::EncryptedTransactions => AptosFeatureFlag::ENCRYPTED_TRANSACTIONS,
             FeatureFlag::PublicStructEnumArgs => AptosFeatureFlag::PUBLIC_STRUCT_ENUM_ARGS,
             FeatureFlag::MultisigScript => AptosFeatureFlag::MULTISIG_SCRIPT,
+            FeatureFlag::TransactionLimits => AptosFeatureFlag::TRANSACTION_LIMITS,
+            FeatureFlag::VersionedTransactionValidation => {
+                AptosFeatureFlag::VERSIONED_TRANSACTION_VALIDATION
+            },
+            FeatureFlag::StorageSlotNatives => AptosFeatureFlag::STORAGE_SLOT_NATIVES,
+            FeatureFlag::AllowFriendEntryVisibilityDowngrade => {
+                AptosFeatureFlag::ALLOW_FRIEND_ENTRY_VISIBILITY_DOWNGRADE
+            },
         }
     }
 }
@@ -611,6 +623,14 @@ impl From<AptosFeatureFlag> for FeatureFlag {
             AptosFeatureFlag::ENCRYPTED_TRANSACTIONS => FeatureFlag::EncryptedTransactions,
             AptosFeatureFlag::PUBLIC_STRUCT_ENUM_ARGS => FeatureFlag::PublicStructEnumArgs,
             AptosFeatureFlag::MULTISIG_SCRIPT => FeatureFlag::MultisigScript,
+            AptosFeatureFlag::TRANSACTION_LIMITS => FeatureFlag::TransactionLimits,
+            AptosFeatureFlag::VERSIONED_TRANSACTION_VALIDATION => {
+                FeatureFlag::VersionedTransactionValidation
+            },
+            AptosFeatureFlag::STORAGE_SLOT_NATIVES => FeatureFlag::StorageSlotNatives,
+            AptosFeatureFlag::ALLOW_FRIEND_ENTRY_VISIBILITY_DOWNGRADE => {
+                FeatureFlag::AllowFriendEntryVisibilityDowngrade
+            },
         }
     }
 }

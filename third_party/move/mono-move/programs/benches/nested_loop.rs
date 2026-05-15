@@ -1,12 +1,15 @@
 // Copyright (c) Aptos Foundation
 // Licensed pursuant to the Innovation-Enabling Source Code License, available at https://github.com/aptos-labs/aptos-core/blob/main/LICENSE
 
-use criterion::{black_box, criterion_group, criterion_main, BatchSize, Criterion};
+use criterion::{black_box, criterion_group, criterion_main, Criterion};
+
+#[path = "helpers.rs"]
+mod helpers;
 
 const N: u64 = 1000;
 
 fn bench_nested_loop(c: &mut Criterion) {
-    use mono_move_gas::SimpleGasMeter;
+    use mono_move_core::LocalExecutionContext;
     use mono_move_programs::{
         nested_loop::{micro_op_nested_loop, move_bytecode_nested_loop, native_nested_loop},
         testing,
@@ -24,25 +27,44 @@ fn bench_nested_loop(c: &mut Criterion) {
             b.iter(|| black_box(native_nested_loop(N)));
         });
 
-        let (functions, descriptors, _arena) = micro_op_nested_loop();
+        // plain (no gas instrumentation)
+        let (functions, descriptors) = micro_op_nested_loop();
+        let mut exec_ctx = LocalExecutionContext::unmetered();
+        // TODO: hoist interpreter context setup out of the timed body.
         group.bench_function("micro_op", |b| {
-            b.iter_batched(
-                || {
-                    let gas_meter = SimpleGasMeter::new(u64::MAX);
-                    let mut ctx = InterpreterContext::new(&descriptors, gas_meter, unsafe {
-                        functions[0].as_ref_unchecked()
-                    });
-                    ctx.set_root_arg(0, &N.to_le_bytes());
-                    ctx
-                },
-                |mut ctx| {
-                    ctx.run().unwrap();
-                    black_box(ctx.root_result())
-                },
-                BatchSize::SmallInput,
-            );
+            b.iter(|| {
+                let mut ctx = InterpreterContext::new(&mut exec_ctx, &descriptors, unsafe {
+                    functions[0].as_ref_unchecked()
+                });
+                ctx.set_root_arg(0, &N.to_le_bytes());
+                ctx.run().unwrap();
+                black_box(ctx.root_result());
+            });
         });
+
+        // with gas instrumentation
+        let (functions_gas, _) = micro_op_nested_loop();
+        helpers::gas_instrument(&functions_gas);
+        let mut exec_ctx = LocalExecutionContext::with_max_budget();
+        // TODO: hoist interpreter context setup out of the timed body.
+        group.bench_function("micro_op/gas", |b| {
+            b.iter(|| {
+                let mut ctx = InterpreterContext::new(&mut exec_ctx, &descriptors, unsafe {
+                    functions_gas[0].as_ref_unchecked()
+                });
+                ctx.set_root_arg(0, &N.to_le_bytes());
+                ctx.run().unwrap();
+                black_box(ctx.root_result());
+            });
+        });
+
         group.finish();
+
+        for ptr in functions.into_iter().chain(functions_gas) {
+            // SAFETY: All bench measurements have completed; no interpreter
+            // context references these function pointers anymore.
+            unsafe { ptr.free_unchecked() };
+        }
     }
 
     // -- move_vm -----------------------------------------------------------

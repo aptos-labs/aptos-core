@@ -1,0 +1,101 @@
+\begin{WideTable}
+    \caption{Inference test categories that exercise behavioral predicates.}
+    \label{tab:inference-tests}
+    \centering
+    \small
+    \begin{tabularx}{\linewidth}{l X}
+      \hline
+      \textbf{Category} & \textbf{Representative cases} \\
+      \hline
+      Direct calls &
+        Single and chained calls to a spec'd helper; inferred specs use
+        \texttt{ensures\_of} and \texttt{aborts\_of} to abstract over the
+        callee's effect rather than inlining its body. \\
+      \hline
+      Mutual recursion &
+        Mutually recursive \texttt{is\_even}/\texttt{is\_odd}; inference
+        breaks the cycle by phrasing each spec in terms of the other's
+        behavioral predicate. \\
+      \hline
+      Higher-order parameters &
+        A function that takes a closure and applies it; the inferred spec
+        abstracts the closure via \texttt{ensures\_of}/\texttt{aborts\_of}
+        on the parameter, with no commitment to a particular implementation. \\
+      \hline
+      Stored-closure dispatch (enum) &
+        Calculator with an enum variant carrying a closure field;
+        dispatch through the variant is summarized by behavioral
+        predicates on that field. \\
+      \hline
+      Stored-closure dispatch (struct field) &
+        Vault with a \texttt{Strategy} closure stored in a struct field on
+        Aptos framework types; inference emits \texttt{modifies\_of} for
+        the field together with the field-form behavioral predicates. \\
+      \hline
+      Pre/post state labels &
+        \texttt{move\_to}, \texttt{move\_from}, mutable resource indexing;
+        inferred specs distinguish \texttt{@pre} from post-state on the
+        memory the predicate observes. \\
+      \hline
+      Intermediate state labels &
+        Sequenced state-modifying calls (e.g.\ remove-then-publish);
+        inferred specs introduce existentially quantified intermediate
+        labels and pin them to defining behavioral predicates. \\
+      \hline
+    \end{tabularx}
+\end{WideTable}
+
+
+\Section{Specification Inference}
+\label{sec:inference}
+
+\SubSection{How it Works}
+\label{sec:validation-overview}
+
+\MVP's \emph{specification inference} \cite{GrieskampEtAl26Inf} based on weakest-precondition (\WP) analysis~\cite{dijkstra1975wp,BL05} is made feasible and modular via behavioral predicates.
+\WP inference takes arbitrary Move code and, for each function, computes conditions that are both necessary and sufficient for the implementation's behavior.
+Spec inference uses behavioral predicates to express the effect of calling out to another function, whether through a function value or a direct call.
+It reverses the translation seen for $invoke_\tau$ in Sec.~\ref{sec:enc-invoke}, introducing the behavioral predicates into the \WP to express the call. Without this modular abstraction, inferred specs would be impractically large.
+
+A full description of \MVP's \WP analysis is out of scope of this paper. What is important is that, besides the notorious loop invariant problem for \WP, specification inference for Move is precise and complete.
+This serves two purposes for this work, demonstrated in the following subsections: reducing the specification burden for compliance checking of function values (Sec.~\ref{sec:validation-amm}), and providing a validation pipeline that confirms the encoding is internally consistent (Sec.~\ref{sec:validation-tests}).
+
+\SubSection{Compliance Checking}
+\label{sec:validation-amm}
+
+Recall from Sec.~\ref{sec:amm} that the !Pool! struct carries a !pricing! closure constrained by a no-abort invariant: the pricing function must not abort for any inputs in any state.
+Two concrete pricing implementations were shown: !product!, which is compliant (it never aborts), and !with_fee!, which is not (it aborts when the owner's !Fee! resource is absent).
+Spec inference makes this compliance distinction machine-readable without any manual annotation.
+
+Given the implementation of !with_fee!, \WP inference easily derives the aborts conditions (we leave out the ensures, which it also determines):
+
+% @formatter:off
+\begin{MoveBox}
+  spec with_fee {
+    aborts_if [inferred] !exists<Fee>(owner);
+    aborts_if [inferred] Fee[owner].bps > 10000;
+    ...
+  }
+\end{MoveBox}
+% @formatter:on
+
+Similarly, for the lambda example in Sec.~\ref{sec:find}, we were required to attach a spec to a trivial lambda expression of the form !|x| x == 0!.
+Obviously, inference can help to avoid this.
+We are currently investigating relaxing the requirement of spec blocks for compliance-checked functions in those cases where they can be reliably inferred (no recursion and no loops); however, this is orthogonal to the work in this paper.
+
+
+\SubSection{Validation Pipeline and Test Coverage}
+\label{sec:validation-tests}
+
+Inferred conditions are labeled \texttt{[inferred]} and feed directly back into \MVP for verification, creating a pipeline: code $\leadsto$ code+specs $\leadsto$ VC, with verification expected to succeed.
+Tab.~\ref{tab:inference-tests} summarizes the inference test suite exercising behavioral predicates across all HOF patterns introduced in this paper.
+All categories pass end-to-end, confirming that the encoding of behavioral predicates and state labels is internally consistent and that inferred specifications are tight enough for the verifier to discharge.
+The full inference test suite can be found at~\cite{InferenceTestsuite}.
+
+
+
+
+%%% Local Variables:
+%%% mode: latex
+%%% TeX-master: "main"
+%%% End:

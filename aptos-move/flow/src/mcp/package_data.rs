@@ -100,7 +100,8 @@ impl PackageData {
             false,
             aptos_framework::extended_checks::get_all_attribute_names().clone(),
             args.experiments.clone(),
-            true, // always build with bytecode
+            true,  // always build with bytecode
+            false, // all_files_as_targets
         )?;
         let compilation_diagnostics = render_diagnostics(&env);
         let has_compilation_errors = env.has_errors();

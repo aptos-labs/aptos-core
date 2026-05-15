@@ -1,1 +1,1 @@
-# Moved to aptos-move/framework/aptos-experimental/doc/large_packages.md
+# Moved to https://aptos-labs.github.io/framework-book/aptos-experimental/large_packages.html

@@ -20,6 +20,7 @@ use crate::{
     well_known::{BORROW_GLOBAL, BORROW_GLOBAL_MUT},
 };
 use legacy_move_compiler::parser::ast as PA;
+use move_binary_format::file_format::Visibility;
 use move_core_types::{
     ability::{Ability, AbilitySet},
     int256::{I256, U256},
@@ -57,6 +58,8 @@ pub(crate) fn declare_builtins(trans: &mut ModelBuilder) {
         ty: ty.clone(),
         value: Value::Number(value),
         visibility,
+        move_visibility: Visibility::Private,
+        has_package_visibility: false,
         users: BTreeSet::new(),
         attributes: vec![],
     };
@@ -69,6 +72,8 @@ pub(crate) fn declare_builtins(trans: &mut ModelBuilder) {
         ty: bool_t.clone(),
         value: Value::Bool(value),
         visibility,
+        move_visibility: Visibility::Private,
+        has_package_visibility: false,
         users: BTreeSet::new(),
         attributes: vec![],
     };
@@ -967,6 +972,20 @@ pub(crate) fn declare_builtins(trans: &mut ModelBuilder) {
                 type_param_constraints: BTreeMap::default(),
                 params: vec![],
                 result_type: domain_t.clone(),
+                visibility: Spec,
+            },
+        );
+
+        // State domain (for quantifying over state labels: `forall S in *:`)
+        trans.define_spec_or_builtin_fun(
+            trans.builtin_qualified_symbol("$spec_state_domain"),
+            SpecOrBuiltinFunEntry {
+                loc: loc.clone(),
+                oper: Operation::StateDomain,
+                type_params: vec![],
+                type_param_constraints: BTreeMap::default(),
+                params: vec![],
+                result_type: Type::StateDomain,
                 visibility: Spec,
             },
         );

@@ -1,7 +1,7 @@
 Aborting with compilation errors:
 exiting with env checking errors
 error: no lint checks are specified to be skipped
-  ┌─ tests/model_ast_lints/bad_lint_attribute_02.move:2:7
+  ┌─ tests/model_ast_lints/bad_lint_attribute_02.move:3:7
   │
-2 │     #[lint::skip]
+3 │     #[lint::skip]
   │       ^^^^^^^^^^

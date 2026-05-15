@@ -170,3 +170,65 @@ fn test_transcript_aggregation_state() {
     });
     assert!(matches!(result, Ok(Some(_))));
 }
+
+#[test]
+fn test_oversized_transcript_rejected_before_deserialize() {
+    let num_validators = 5;
+    let epoch = 999;
+    let addrs: Vec<AccountAddress> = (0..num_validators)
+        .map(|_| AccountAddress::random())
+        .collect();
+    let private_keys: Vec<bls12381_keys::PrivateKey> = (0..num_validators)
+        .map(|_| bls12381_keys::PrivateKey::generate_for_testing())
+        .collect();
+    let public_keys: Vec<bls12381_keys::PublicKey> = (0..num_validators)
+        .map(|i| bls12381_keys::PublicKey::from(&private_keys[i]))
+        .collect();
+    let voting_powers = [1, 1, 1, 6, 6];
+    let validator_infos: Vec<ValidatorConsensusInfo> = (0..num_validators)
+        .map(|i| ValidatorConsensusInfo::new(addrs[i], public_keys[i].clone(), voting_powers[i]))
+        .collect();
+    let validator_consensus_info_move_structs = validator_infos
+        .clone()
+        .into_iter()
+        .map(ValidatorConsensusInfoMoveStruct::from)
+        .collect::<Vec<_>>();
+    let verifier = ValidatorVerifier::new(validator_infos);
+    let randomness_config = OnChainRandomnessConfig::default_enabled();
+    let pub_params = RealDKG::new_public_params(&DKGSessionMetadata {
+        dealer_epoch: 999,
+        randomness_config: randomness_config.into(),
+        dealer_validator_set: validator_consensus_info_move_structs.clone(),
+        target_validator_set: validator_consensus_info_move_structs,
+    });
+    let session_bound = RealDKG::expected_max_transcript_size(&pub_params);
+    let epoch_state = Arc::new(EpochState::new(epoch, verifier));
+    let trx_agg_state = Arc::new(TranscriptAggregationState::<RealDKG>::new(
+        duration_since_epoch(),
+        addrs[0],
+        pub_params,
+        epoch_state,
+    ));
+
+    // One byte over the per-session bound — the size gate should reject it.
+    let oversized = vec![0u8; session_bound + 1];
+    let start = std::time::Instant::now();
+    let result = trx_agg_state.add(addrs[0], DKGTranscript {
+        metadata: DKGTranscriptMetadata {
+            epoch: 999,
+            author: addrs[0],
+        },
+        transcript_bytes: oversized,
+    });
+    let elapsed = start.elapsed();
+    assert!(result.is_err());
+    let err_msg = format!("{:#}", result.unwrap_err());
+    assert!(
+        err_msg.contains("exceeds max"),
+        "expected size-gate rejection, got: {err_msg}"
+    );
+    assert!(
+        elapsed < std::time::Duration::from_secs(1),
+        "rejection took {elapsed:?}; expected sub-second"
+    );
+}

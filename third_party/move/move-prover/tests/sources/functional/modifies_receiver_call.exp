@@ -1,0 +1,19 @@
+Move prover returns: exiting with verification errors
+error: abort not covered by any of the `aborts_if` clauses
+   ┌─ tests/sources/functional/modifies_receiver_call.move:16:5
+   │
+14 │           s.value = s.value + 1;
+   │                     ----------- abort happened here with execution failure
+15 │       }
+16 │ ╭     spec increment {
+17 │ │         aborts_if !exists<State>(handle.addr_of());
+18 │ │         modifies global<State>(handle.addr_of());
+19 │ │     }
+   │ ╰─────^
+   │
+   =     at tests/sources/functional/modifies_receiver_call.move:12: increment
+   =         handle = <redacted>
+   =     at tests/sources/functional/modifies_receiver_call.move:13: increment
+   =         s = <redacted>
+   =     at tests/sources/functional/modifies_receiver_call.move:14: increment
+   =         ABORTED

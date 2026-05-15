@@ -58,6 +58,7 @@ module 0x42::function_calls {
         }
     }
     spec factorial {
+        pragma verify = false; // timeout, but still can be inferred
         pragma opaque;
     }
 

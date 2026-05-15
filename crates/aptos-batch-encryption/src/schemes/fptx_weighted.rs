@@ -71,7 +71,12 @@ impl WeightedBIBEMasterSecretKeyShare {
         &self,
         tc: &WeightedConfigArkworks<Fr>,
     ) -> Vec<BIBEMasterSecretKeyShare> {
+        // TODO: propagate Result so a deserialized weighted_player with an
+        // out-of-bounds id cannot panic. Safe today because instances are
+        // only constructed locally via FPTXWeighted::setup, not decoded from
+        // untrusted input.
         tc.get_all_virtual_players(&self.weighted_player)
+            .expect("weighted_player id is in bounds")
             .into_iter()
             .enumerate()
             .map(|(i, virt_player)| BIBEMasterSecretKeyShare {
@@ -135,7 +140,12 @@ impl WeightedBIBEVerificationKey {
     }
 
     pub fn virtualized_vks(&self, tc: &WeightedConfigArkworks<Fr>) -> Vec<BIBEVerificationKey> {
+        // TODO: propagate Result so a deserialized weighted_player with an
+        // out-of-bounds id cannot panic. Safe today because instances are
+        // only constructed locally via FPTXWeighted::setup, not decoded from
+        // untrusted input.
         tc.get_all_virtual_players(&self.weighted_player)
+            .expect("weighted_player id is in bounds")
             .into_iter()
             .enumerate()
             .map(|(i, virt_player)| BIBEVerificationKey {

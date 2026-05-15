@@ -10,5 +10,4 @@ error: post-condition does not hold
   =         x = <redacted>
   =     at <TEMPDIR>/bad_spec.move:3: double
   =         result = <redacted>
-  =     at <TEMPDIR>/bad_spec.move:4: double
   =     at <TEMPDIR>/bad_spec.move:6: double (spec)

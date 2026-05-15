@@ -145,18 +145,19 @@ impl StateSlot {
         }
     }
 
-    /// When committing speculative state to the DB, determine if to make changes to the JMT.
+    /// When committing speculative state to the DB, determine if to make changes to the cold JMT.
     pub fn maybe_update_jmt(
         &self,
         min_version: Version,
     ) -> Option<(HashValue, Option<(HashValue, StateKey)>)> {
+        // Filter out the slots that carry no cold JMT change, including slots that are only changed
+        // because of LRU pointer updates.
+        let value_opt = self.maybe_update_cold_state(min_version)?;
         let state_key = self.expect_state_key();
-        self.maybe_update_cold_state(min_version).map(|value_opt| {
-            (
-                *state_key.crypto_hash_ref(),
-                value_opt.map(|v| (CryptoHash::hash(v), state_key.clone())),
-            )
-        })
+        Some((
+            *state_key.crypto_hash_ref(),
+            value_opt.map(|v| (CryptoHash::hash(v), state_key.clone())),
+        ))
     }
 
     // TODO(HotState): db returns cold slot directly

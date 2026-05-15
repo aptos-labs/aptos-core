@@ -15,10 +15,9 @@ use crate::{
     player::Player,
     traits::{self, TSecretSharingConfig as _, ThresholdConfig},
 };
-use anyhow::anyhow;
+use anyhow::{anyhow, ensure};
 use ark_ec::CurveGroup;
 use ark_ff::FftField;
-use more_asserts::assert_lt;
 use rand::Rng;
 use rand_core::{CryptoRng, RngCore};
 use serde::{Deserialize, Serialize};
@@ -160,8 +159,16 @@ impl<TC: ThresholdConfig> WeightedConfig<TC> {
     }
 
     /// Returns the weight of a specific player.
-    pub fn get_player_weight(&self, player: &Player) -> usize {
-        self.weights[player.id]
+    ///
+    /// Returns an error if `player.id` is out of bounds.
+    pub fn get_player_weight(&self, player: &Player) -> anyhow::Result<usize> {
+        self.weights.get(player.id).copied().ok_or_else(|| {
+            anyhow!(
+                "get_player_weight: player id {} out of bounds (num_players={})",
+                player.id,
+                self.num_players
+            )
+        })
     }
 
     /// Returns the starting index of a player's shares in the flattened vector of all weighted shares.
@@ -174,22 +181,43 @@ impl<TC: ThresholdConfig> WeightedConfig<TC> {
     /// share per "virtual player."
     ///
     /// This function returns the "virtual" player associated with the $i$th sub-share of this player.
-    pub fn get_virtual_player(&self, player: &Player, j: usize) -> Player {
-        // println!("WeightedConfig::get_virtual_player({player}, {i})");
-        assert_lt!(j, self.weights[player.id]);
-
-        let id = self.get_share_index(player.id, j).unwrap();
-
-        Player { id }
+    ///
+    /// Returns an error if `player.id` is out of bounds or if `j` is greater than
+    /// or equal to `player`'s weight. This makes the function safe to call with
+    /// untrusted input (e.g. attacker-controlled `Player` ids or share vector
+    /// lengths) without panicking the process.
+    pub fn get_virtual_player(&self, player: &Player, j: usize) -> anyhow::Result<Player> {
+        let weight = self.weights.get(player.id).copied().ok_or_else(|| {
+            anyhow!(
+                "get_virtual_player: player id {} out of bounds (num_players={})",
+                player.id,
+                self.num_players
+            )
+        })?;
+        ensure!(
+            j < weight,
+            "get_virtual_player: share index {} out of bounds for player {} (weight={})",
+            j,
+            player.id,
+            weight
+        );
+        Ok(Player {
+            id: self.starting_index[player.id] + j,
+        })
     }
 
     /// Returns all "virtual" players corresponding to a given player based on their weight.
-    pub fn get_all_virtual_players(&self, player: &Player) -> Vec<Player> {
-        let w = self.get_player_weight(player);
+    ///
+    /// Returns an error if `player.id` is out of bounds.
+    pub fn get_all_virtual_players(&self, player: &Player) -> anyhow::Result<Vec<Player>> {
+        let w = self.get_player_weight(player)?;
 
-        (0..w)
-            .map(|i| self.get_virtual_player(player, i))
-            .collect::<Vec<Player>>()
+        Ok((0..w)
+            .map(|i| {
+                self.get_virtual_player(player, i)
+                    .expect("j < weight holds by construction")
+            })
+            .collect::<Vec<Player>>())
     }
 
     /// `i` is the player's index, from 0 to `self.tc.n`
@@ -280,6 +308,7 @@ impl<TC: ThresholdConfig> WeightedConfig<TC> {
             .into_iter()
             .map(|player| {
                 self.get_all_virtual_players(&player)
+                    .expect("player is from get_players() so id is in bounds")
                     .into_iter()
                     .map(|virt_player| items[virt_player.get_id()].clone())
                     .collect::<Vec<T>>()
@@ -389,8 +418,16 @@ impl<SK: Reconstructable<ThresholdConfigBlstrs>> Reconstructable<WeightedConfigB
             //     "Flattening {} share(s) for player {player}",
             //     sub_shares.len()
             // );
+            let expected_weight = sc.get_player_weight(player)?;
+            ensure!(
+                sub_shares.len() == expected_weight,
+                "reconstruct: player {} has {} sub-shares but expected weight {}",
+                player.id,
+                sub_shares.len(),
+                expected_weight
+            );
             for (pos, share) in sub_shares.iter().enumerate() {
-                let virtual_player = sc.get_virtual_player(player, pos);
+                let virtual_player = sc.get_virtual_player(player, pos)?;
 
                 // println!(
                 //     " + Adding share {pos} as virtual player {virtual_player}: {:?}",
@@ -425,8 +462,16 @@ impl<F: FftField, SK: Reconstructable<ShamirThresholdConfig<F>>>
             //     "Flattening {} share(s) for player {player}",
             //     sub_shares.len()
             // );
+            let expected_weight = sc.get_player_weight(player)?;
+            ensure!(
+                sub_shares.len() == expected_weight,
+                "reconstruct: player {} has {} sub-shares but expected weight {}",
+                player.id,
+                sub_shares.len(),
+                expected_weight
+            );
             for (pos, share) in sub_shares.iter().enumerate() {
-                let virtual_player = sc.get_virtual_player(player, pos);
+                let virtual_player = sc.get_virtual_player(player, pos)?;
 
                 // println!(
                 //     " + Adding share {pos} as virtual player {virtual_player}: {:?}",
@@ -453,22 +498,22 @@ mod test {
         let wc = WeightedConfigBlstrs::new(1, vec![1]).unwrap();
         assert_eq!(wc.starting_index.len(), 1);
         assert_eq!(wc.starting_index[0], 0);
-        assert_eq!(wc.get_virtual_player(&wc.get_player(0), 0).id, 0);
+        assert_eq!(wc.get_virtual_player(&wc.get_player(0), 0).unwrap().id, 0);
 
         // 1-out-of-2, weights 2
         let wc = WeightedConfigBlstrs::new(1, vec![2]).unwrap();
         assert_eq!(wc.starting_index.len(), 1);
         assert_eq!(wc.starting_index[0], 0);
-        assert_eq!(wc.get_virtual_player(&wc.get_player(0), 0).id, 0);
-        assert_eq!(wc.get_virtual_player(&wc.get_player(0), 1).id, 1);
+        assert_eq!(wc.get_virtual_player(&wc.get_player(0), 0).unwrap().id, 0);
+        assert_eq!(wc.get_virtual_player(&wc.get_player(0), 1).unwrap().id, 1);
 
         // 1-out-of-2, weights 1, 1
         let wc = WeightedConfigBlstrs::new(1, vec![1, 1]).unwrap();
         assert_eq!(wc.starting_index.len(), 2);
         assert_eq!(wc.starting_index[0], 0);
         assert_eq!(wc.starting_index[1], 1);
-        assert_eq!(wc.get_virtual_player(&wc.get_player(0), 0).id, 0);
-        assert_eq!(wc.get_virtual_player(&wc.get_player(1), 0).id, 1);
+        assert_eq!(wc.get_virtual_player(&wc.get_player(0), 0).unwrap().id, 0);
+        assert_eq!(wc.get_virtual_player(&wc.get_player(1), 0).unwrap().id, 1);
 
         // 3-out-of-5, some weights are 0.
         let wc = WeightedConfigBlstrs::new(1, vec![0, 0, 0, 2, 2, 2, 0, 0, 0, 3, 3, 3, 0, 0, 0])
@@ -477,20 +522,47 @@ mod test {
             vec![0, 0, 0, 0, 2, 4, 6, 6, 6, 6, 9, 12, 15, 15, 15],
             wc.starting_index
         );
-        assert_eq!(wc.get_virtual_player(&wc.get_player(3), 0).id, 0);
-        assert_eq!(wc.get_virtual_player(&wc.get_player(3), 1).id, 1);
-        assert_eq!(wc.get_virtual_player(&wc.get_player(4), 0).id, 2);
-        assert_eq!(wc.get_virtual_player(&wc.get_player(4), 1).id, 3);
-        assert_eq!(wc.get_virtual_player(&wc.get_player(5), 0).id, 4);
-        assert_eq!(wc.get_virtual_player(&wc.get_player(5), 1).id, 5);
-        assert_eq!(wc.get_virtual_player(&wc.get_player(9), 0).id, 6);
-        assert_eq!(wc.get_virtual_player(&wc.get_player(9), 1).id, 7);
-        assert_eq!(wc.get_virtual_player(&wc.get_player(9), 2).id, 8);
-        assert_eq!(wc.get_virtual_player(&wc.get_player(10), 0).id, 9);
-        assert_eq!(wc.get_virtual_player(&wc.get_player(10), 1).id, 10);
-        assert_eq!(wc.get_virtual_player(&wc.get_player(10), 2).id, 11);
-        assert_eq!(wc.get_virtual_player(&wc.get_player(11), 0).id, 12);
-        assert_eq!(wc.get_virtual_player(&wc.get_player(11), 1).id, 13);
-        assert_eq!(wc.get_virtual_player(&wc.get_player(11), 2).id, 14);
+        assert_eq!(wc.get_virtual_player(&wc.get_player(3), 0).unwrap().id, 0);
+        assert_eq!(wc.get_virtual_player(&wc.get_player(3), 1).unwrap().id, 1);
+        assert_eq!(wc.get_virtual_player(&wc.get_player(4), 0).unwrap().id, 2);
+        assert_eq!(wc.get_virtual_player(&wc.get_player(4), 1).unwrap().id, 3);
+        assert_eq!(wc.get_virtual_player(&wc.get_player(5), 0).unwrap().id, 4);
+        assert_eq!(wc.get_virtual_player(&wc.get_player(5), 1).unwrap().id, 5);
+        assert_eq!(wc.get_virtual_player(&wc.get_player(9), 0).unwrap().id, 6);
+        assert_eq!(wc.get_virtual_player(&wc.get_player(9), 1).unwrap().id, 7);
+        assert_eq!(wc.get_virtual_player(&wc.get_player(9), 2).unwrap().id, 8);
+        assert_eq!(wc.get_virtual_player(&wc.get_player(10), 0).unwrap().id, 9);
+        assert_eq!(wc.get_virtual_player(&wc.get_player(10), 1).unwrap().id, 10);
+        assert_eq!(wc.get_virtual_player(&wc.get_player(10), 2).unwrap().id, 11);
+        assert_eq!(wc.get_virtual_player(&wc.get_player(11), 0).unwrap().id, 12);
+        assert_eq!(wc.get_virtual_player(&wc.get_player(11), 1).unwrap().id, 13);
+        assert_eq!(wc.get_virtual_player(&wc.get_player(11), 2).unwrap().id, 14);
+    }
+
+    #[test]
+    fn test_get_virtual_player_j_out_of_bounds() {
+        // weight of player 0 is 2, so j=2 should return Err
+        let wc = WeightedConfigBlstrs::new(1, vec![2, 3]).unwrap();
+        let player0 = wc.get_player(0);
+        assert!(wc.get_virtual_player(&player0, 0).is_ok());
+        assert!(wc.get_virtual_player(&player0, 1).is_ok());
+        let err = wc.get_virtual_player(&player0, 2).unwrap_err();
+        let msg = format!("{err}");
+        assert!(
+            msg.contains("out of bounds"),
+            "unexpected error message: {msg}"
+        );
+    }
+
+    #[test]
+    fn test_get_virtual_player_player_id_out_of_bounds() {
+        let wc = WeightedConfigBlstrs::new(1, vec![2, 3]).unwrap();
+        let bogus_player = Player { id: 99 };
+        let err = wc.get_virtual_player(&bogus_player, 0).unwrap_err();
+        let msg = format!("{err}");
+        assert!(
+            msg.contains("out of bounds"),
+            "unexpected error message: {msg}"
+        );
     }
 }

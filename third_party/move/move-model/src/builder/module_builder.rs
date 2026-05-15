@@ -535,6 +535,22 @@ impl ModuleBuilder<'_, '_> {
                 &format!("duplicate declaration of const `{}`", &name.value()),
             )
         }
+        let (move_visibility, has_package_visibility) = match def.visibility {
+            EA::Visibility::Public(_) => (Visibility::Public, false),
+            EA::Visibility::Friend(loc) => {
+                if self.friend_visibility_loc.is_none() {
+                    self.friend_visibility_loc = Some(loc);
+                }
+                (Visibility::Friend, false)
+            },
+            EA::Visibility::Internal => (Visibility::Private, false),
+            EA::Visibility::Package(loc) => {
+                if self.package_fun_loc.is_none() {
+                    self.package_fun_loc = Some(loc);
+                }
+                (Visibility::Friend, true)
+            },
+        };
         let attributes = self.translate_attributes(&def.attributes);
         let mut et = ExpTranslator::new(self);
         et.set_translate_move_fun();
@@ -545,6 +561,8 @@ impl ModuleBuilder<'_, '_> {
             ty,
             value: Value::Bool(false), // dummy value, actual will be assigned in def_ana
             visibility: EntryVisibility::SpecAndImpl,
+            move_visibility,
+            has_package_visibility,
             users: BTreeSet::new(),
             attributes,
         });
@@ -1388,7 +1406,12 @@ impl ModuleBuilder<'_, '_> {
                 );
                 ok = false;
             }
-            if ok {
+            // Suppress the folder when the translated expression already contains an
+            // `Invalid` placeholder: that means an upstream translator error fired
+            // (e.g. a rejected cross-module const reference), and the folder would
+            // only stack a redundant "not foldable" diagnostic on top.
+            let has_invalid_subexp = exp.as_ref().any(&mut |e| matches!(e, ExpData::Invalid(_)));
+            if ok && !has_invalid_subexp {
                 let mut folder = ConstantFolder::new(self.parent.env, true);
                 let rewritten = folder.rewrite_exp(exp);
                 if let ExpData::Value(_, value) = rewritten.as_ref() {
@@ -2752,6 +2775,11 @@ impl<'env, 'translator> ModuleBuilder<'env, 'translator> {
 
                 let mut et = ExpTranslator::new_with_old(self, allows_old);
                 et.define_type_params(loc, &entry.type_params, false);
+                // Build the self type with proper type parameter instantiation.
+                // Type params were just defined as TypeParameter(0), TypeParameter(1), ...
+                let self_type_args: Vec<Type> = (0..entry.type_params.len())
+                    .map(|i| Type::TypeParameter(i as u16))
+                    .collect();
                 if let StructLayout::Singleton(fields, _is_positional) = &entry.layout {
                     et.enter_scope();
                     for f in fields.values() {
@@ -2776,13 +2804,15 @@ impl<'env, 'translator> ModuleBuilder<'env, 'translator> {
                     }
                     let receiver_param_name =
                         et.symbol_pool().make(well_known::RECEIVER_PARAM_NAME);
-                    let struct_type = Type::Struct(entry.module_id, entry.struct_id, vec![]);
+                    let struct_type =
+                        Type::Struct(entry.module_id, entry.struct_id, self_type_args);
                     et.define_local(loc, receiver_param_name, struct_type, None, None);
                 } else if let StructLayout::Variants(_) = &entry.layout {
                     et.enter_scope();
                     let receiver_param_name =
                         et.symbol_pool().make(well_known::RECEIVER_PARAM_NAME);
-                    let struct_type = Type::Struct(entry.module_id, entry.struct_id, vec![]);
+                    let struct_type =
+                        Type::Struct(entry.module_id, entry.struct_id, self_type_args);
                     et.define_local(loc, receiver_param_name, struct_type, None, None);
                 }
 
@@ -3367,7 +3397,10 @@ impl ModuleBuilder<'_, '_> {
             }
             let translated_modifies: Vec<Exp> = modifies
                 .iter()
-                .map(|target| et.translate_modify_target(target).into_exp())
+                .map(|target| {
+                    let exp = et.translate_modify_target(target).into_exp();
+                    et.post_process_body(exp)
+                })
                 .collect();
             // Translate reads types to QualifiedInstId<StructId>
             let mut reads_targets = BTreeSet::new();
@@ -3484,7 +3517,10 @@ impl ModuleBuilder<'_, '_> {
             .collect();
         let translated_targets: Vec<Exp> = targets
             .iter()
-            .map(|target| et.translate_modify_target(target).into_exp())
+            .map(|target| {
+                let exp = et.translate_modify_target(target).into_exp();
+                et.post_process_body(exp)
+            })
             .collect();
         et.finalize_types(true);
         // Find or create entry for this parameter/field
@@ -3644,22 +3680,20 @@ impl ModuleBuilder<'_, '_> {
     }
 
     fn def_ana_modifies(&mut self, loc: &Loc, context: &SpecBlockContext, targets: &[EA::Exp]) {
-        // Use AbortsIf as the condition kind for scope setup — gives function params
-        // in scope without result variables.
         let mut et = self.exp_translator_for_context(loc, context, &ConditionKind::AbortsIf);
-        let translated: Vec<Exp> = targets
-            .iter()
-            .filter_map(|target| {
-                let (_, exp) = et.translate_exp_free(target);
-                match &exp {
-                    ExpData::Call(_, Operation::Global(_), _) => Some(exp.into_exp()),
-                    _ => {
-                        et.error(&et.to_loc(&target.loc), "global resource access expected");
-                        None
-                    },
-                }
-            })
-            .collect();
+        let mut translated: Vec<Exp> = vec![];
+        for target in targets {
+            let (_, exp) = et.translate_exp_free(target);
+            match &exp {
+                ExpData::Call(_, Operation::Global(_), _) => {
+                    let exp = et.post_process_body(exp.into_exp());
+                    translated.push(exp);
+                },
+                _ => {
+                    et.error(&et.to_loc(&target.loc), "global resource access expected");
+                },
+            }
+        }
         et.finalize_types(true);
         self.update_spec(context, |spec| {
             let frame = spec.frame_spec.get_or_insert_with(FrameSpec::default);
@@ -4838,13 +4872,7 @@ impl ModuleBuilder<'_, '_> {
                 spec: spec.into(),
                 def,
                 called_funs,
-                calling_funs: RefCell::default(),
-                transitive_closure_of_called_funs: RefCell::default(),
                 used_funs,
-                using_funs: RefCell::default(),
-                transitive_closure_of_used_funs: RefCell::default(),
-                used_functions_with_transitive_inline: RefCell::default(),
-                used_structs: RefCell::default(),
             };
             function_data.insert(fun_id, data);
         }
@@ -4884,13 +4912,7 @@ impl ModuleBuilder<'_, '_> {
                 spec: spec.into(),
                 def: None,
                 called_funs: Some(Default::default()),
-                calling_funs: RefCell::default(),
-                transitive_closure_of_called_funs: RefCell::default(),
                 used_funs: Some(Default::default()),
-                using_funs: RefCell::default(),
-                transitive_closure_of_used_funs: RefCell::default(),
-                used_functions_with_transitive_inline: RefCell::default(),
-                used_structs: RefCell::default(),
             };
             function_data.insert(fun_id, data);
         }
@@ -4906,6 +4928,8 @@ impl ModuleBuilder<'_, '_> {
                 value,
                 ty,
                 visibility: _,
+                move_visibility,
+                has_package_visibility,
                 users,
                 attributes,
             } = const_entry.clone();
@@ -4914,6 +4938,8 @@ impl ModuleBuilder<'_, '_> {
                 loc,
                 type_: ty,
                 value,
+                visibility: move_visibility,
+                has_package_visibility,
                 attributes,
                 users,
             };

@@ -206,11 +206,14 @@ members = [
     "testsuite/generate-format",
     "testsuite/smoke-test",
     "testsuite/testcases",
+    "third_party/move/documentation/framework-book/builder",
     "third_party/move/extensions/move-table-extension",
     "third_party/move/mono-move/alloc",
     "third_party/move/mono-move/core",
     "third_party/move/mono-move/gas",
     "third_party/move/mono-move/global-context",
+    "third_party/move/mono-move/loader",
+    "third_party/move/mono-move/orchestrator",
     "third_party/move/mono-move/programs",
     "third_party/move/mono-move/runtime",
     "third_party/move/mono-move/specializer",
@@ -238,6 +241,7 @@ members = [
     "third_party/move/move-prover",
     "third_party/move/move-prover/boogie-backend",
     "third_party/move/move-prover/bytecode-pipeline",
+    "third_party/move/move-prover/e2e-tests",
     "third_party/move/move-prover/lab",
     "third_party/move/move-prover/test-utils",
     "third_party/move/move-symbol-pool",
@@ -540,6 +544,7 @@ bigdecimal = { version = "0.4.0", features = ["serde"] }
 version-compare = "0.1.1"
 bitvec = "1.0.1"
 blake2 = "0.10.4"
+blake3 = { version = "1.5.4", features = ["mmap", "rayon"] }
 blake2-rfc = "0.2.18"
 bls12_381 = "0.8.0"
 blst = "0.3.15"
@@ -675,6 +680,7 @@ jemallocator = { package = "tikv-jemallocator", version = "0.6.1", features = [
 ] }
 jemalloc-ctl = { package = "tikv-jemalloc-ctl", version = "0.6.1" }
 jemalloc-sys = { package = "tikv-jemalloc-sys", version = "0.6.1" }
+jemalloc_pprof = { version = "0.8", features = ["symbolize"] }
 json-patch = "0.2.6"
 jsonwebtoken = "8.1"
 jwt = "0.16.0"
@@ -835,7 +841,11 @@ tiny-keccak = { version = "2.0.2", features = ["keccak", "sha3"] }
 tracing = "0.1.37"
 tracing-log = "0.2.0"
 tracing-opentelemetry = "0.28.0"
-tracing-subscriber = { version = "0.3.17", features = ["json", "env-filter", "registry"] }
+tracing-subscriber = { version = "0.3.17", features = [
+    "json",
+    "env-filter",
+    "registry",
+] }
 triomphe = "0.1.14"
 trybuild = "1.0.80"
 try_match = "0.4.2"
@@ -882,9 +892,11 @@ z3tracer = "0.8.0"
 
 # MOVE DEPENDENCIES
 mono-move-alloc = { path = "third_party/move/mono-move/alloc" }
+mono-move-orchestrator = { path = "third_party/move/mono-move/orchestrator" }
 mono-move-core = { path = "third_party/move/mono-move/core" }
 mono-move-gas = { path = "third_party/move/mono-move/gas" }
 mono-move-global-context = { path = "third_party/move/mono-move/global-context" }
+mono-move-loader = { path = "third_party/move/mono-move/loader" }
 mono-move-programs = { path = "third_party/move/mono-move/programs" }
 mono-move-runtime = { path = "third_party/move/mono-move/runtime" }
 mono-move-testsuite = { path = "third_party/move/mono-move/testsuite" }

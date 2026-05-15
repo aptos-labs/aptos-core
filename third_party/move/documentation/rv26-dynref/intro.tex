@@ -1,0 +1,82 @@
+\section{Introduction}\label{sec:intro}
+
+Move is a bytecode language with first-class references over local
+and globally-stored values. Each function's bytecode passes through
+a static reference-safety verifier, which approves the function only
+if, on every reachable execution path, references stay in scope, do
+not violate type safety through reads or writes, do not overlap as
+mutable arguments at call boundaries, and do not allow an immutable
+view to observe a value rewritten through another handle. The
+verifier rejects bytecode that violates these rules.
+
+We are interested in enforcing the same rules \emph{at execution
+time}. There are several reasons one would want this:
+\begin{itemize}
+\item Fuzzing and mutated-bytecode harnesses deliberately exercise
+inputs the verifier would reject, to find bugs in everything
+downstream.
+\item Dynamic dispatch and native code escape static analysis: the
+verifier cannot see what happens through a dispatched function
+pointer or inside a Rust-implemented native, but the reference
+rules still need to hold across those boundaries.
+\item The static check has to be sound, so it sometimes rejects
+programs that would not actually violate any rule on the executions
+they take. A runtime check sees the executions and can be more
+precise.
+\end{itemize}
+
+The following Move fragment illustrates the kind of subtle case at
+stake:
+\begin{lstlisting}
+enum E { V1(T1), V2(T2) }
+let v: E = ...;
+let inner: &mut T1 = match &mut v { V1(p) => p };
+... // some path mutates v to be V2
+*inner    // unsafe
+\end{lstlisting}
+The reference \texttt{inner} is in scope. Its lifetime has not ended.
+Its declared type is unchanged. But the program has switched
+\texttt{v} from \texttt{V1} to \texttt{V2}, so the substructure that
+\texttt{inner} pointed into is no longer there. Dereferencing
+\texttt{inner} now reads memory that has been recycled into a value
+of an unrelated type.
+
+A sound static analysis catches this only conservatively: it does
+not know which branch will run, so it must assume the worst. By the
+time \texttt{*inner} executes, the runtime has already observed which
+branch ran, which mutation occurred, and which reference was derived
+from which. With the right slice of that information recorded, we
+can answer ``is this reference still safe to use?'' precisely. The
+challenge is to find a representation that is small enough to be
+cheap to maintain, and uniform enough to cover the various events
+that can affect a reference.
+
+\paragraph{This paper.}
+We organize live references by the path of borrows that produced
+them, using a hierarchical structure we call an \emph{Access Path
+Tree} (\apt). Each live reference is attached to a node of some APT,
+with edges labelled by field projections, variant projections, and
+a single label for vector indices. A single rule decides when a
+reference becomes unusable: when an event destructively changes the
+substructure reachable through some node, every reference attached
+to a related node is marked \emph{poisoned} for the rest of the
+execution. Destructive writes, moves and overwrites, freezes,
+variant mutations, calls, returns, and opaque effects all fit this
+pattern; what varies between them is which set of related nodes is
+affected and which mutability filter applies. Calls additionally
+lock subtrees so that two mutable arguments cannot overlap.
+
+\paragraph{Contributions.}
+\begin{itemize}
+\item A runtime discipline for Move's reference-safety rules,
+  organized around access path trees and one invalidation rule
+  (Sects.~\ref{sec:apt}, \ref{sec:semantics}).
+\item A small-step presentation in which the various
+  reference-affecting events are instances of the same rule
+  (Sect.~\ref{sec:semantics}).
+\item A discussion of what the runtime trace buys over a join-based
+  static check (Sect.~\ref{sec:precision}) and how the discipline
+  relates to per-location dynamic alias models such as Stacked
+  Borrows and Tree Borrows~\cite{stackedborrows,treeborrows}
+  (Sect.~\ref{sec:related}).
+\end{itemize}

@@ -18,6 +18,7 @@ use aptos_batch_encryption::{
     group::{Fr, G2Affine, Pairing},
     shared::{digest::DigestKey, digest_key_file, encryption_key::EncryptionKey},
 };
+use aptos_bitvec::BitVec;
 use aptos_crypto::{bls12381, weighted_config::WeightedConfigArkworks};
 use aptos_crypto_derive::{BCSCryptoHash, CryptoHasher};
 use aptos_dkg::pvss::{
@@ -25,8 +26,7 @@ use aptos_dkg::pvss::{
         DecryptPrivKey, EncryptPubKey, InputSecret, PublicParameters, SignedWeightedTranscript,
         WeightedSubtranscript,
     },
-    traits::{transcript::Transcript, TranscriptCore},
-    Player,
+    traits::TranscriptCore,
 };
 use ark_ec::AffineRepr;
 use fixed::types::U64F64;
@@ -35,7 +35,7 @@ use move_core_types::{
     move_resource::MoveStructType,
 };
 use once_cell::sync::Lazy;
-use rand::{rngs::StdRng, CryptoRng, RngCore, SeedableRng};
+use rand::{rngs::StdRng, SeedableRng};
 use serde::{Deserialize, Serialize};
 use std::{
     cmp::max,
@@ -152,7 +152,7 @@ pub fn set_public_parameters(pp: Arc<ChunkyDKGPublicParameters>) {
 #[derive(Debug)]
 pub enum PublicParametersSource {
     /// A blob file exists and will be lazily read on first access.
-    WillLoadFromFile { file_size: u64 },
+    WillLoadFromFile { path: PathBuf, file_size: u64 },
     /// Will fall back to the built-in test parameters on first access.
     TestKeyFallback,
     /// No PublicParameters available (no path configured, not a test chain).
@@ -167,6 +167,7 @@ pub fn initialize_public_parameters(chain_id: ChainId) -> PublicParametersSource
     if let Some(path) = PUBLIC_PARAMETERS_PATH.get() {
         match std::fs::metadata(path) {
             Ok(meta) => PublicParametersSource::WillLoadFromFile {
+                path: path.clone(),
                 file_size: meta.len(),
             },
             Err(_) => PublicParametersSource::NotAvailable,
@@ -243,7 +244,7 @@ pub fn set_digest_key(key: Arc<DigestKey>) {
 #[derive(Debug)]
 pub enum DigestKeySource {
     /// A blob file exists and will be lazily read on first access.
-    WillLoadFromFile { file_size: u64 },
+    WillLoadFromFile { path: PathBuf, file_size: u64 },
     /// Fell back to the built-in test key.
     TestKeyFallback,
     /// No DigestKey is available (no path configured, not a test chain).
@@ -258,6 +259,7 @@ pub fn initialize_digest_key(chain_id: ChainId, is_validator: bool) -> DigestKey
     if let Some(path) = DIGEST_KEY_PATH.get() {
         match std::fs::metadata(path) {
             Ok(meta) => DigestKeySource::WillLoadFromFile {
+                path: path.clone(),
                 file_size: meta.len(),
             },
             Err(_) => DigestKeySource::NotAvailable,
@@ -270,11 +272,15 @@ pub fn initialize_digest_key(chain_id: ChainId, is_validator: bool) -> DigestKey
     }
 }
 
-/// An aggregated transcript with the list of dealers who contributed to it.
+/// An aggregated transcript with the set of dealers who contributed to it.
+///
+/// Dealers are represented as a `BitVec` bitmask over validator indices,
+/// which inherently prevents duplicates and ensures canonical ordering.
 #[derive(Clone, Debug, Serialize, Deserialize, CryptoHasher, BCSCryptoHash)]
 pub struct AggregatedSubtranscript {
+    pub dealer_epoch: u64,
     pub subtranscript: ChunkySubtranscript,
-    pub dealers: Vec<Player>,
+    pub dealer_bitmask: BitVec,
 }
 
 impl AggregatedSubtranscript {
@@ -333,28 +339,6 @@ pub struct ChunkyDKGSession {
 }
 
 impl ChunkyDKGSession {
-    pub fn deal<A: Serialize + Clone, R: RngCore + CryptoRng>(
-        &self,
-        ssk: &DealerPrivateKey,
-        spk: &DealerPublicKey,
-        s: &ChunkyInputSecret,
-        sid: &A,
-        dealer: &Player,
-        rng: &mut R,
-    ) -> ChunkyTranscript {
-        ChunkyTranscript::deal(
-            &self.threshold_config,
-            &self.public_parameters,
-            ssk,
-            spk,
-            &self.eks,
-            s,
-            sid,
-            dealer,
-            rng,
-        )
-    }
-
     /// Create a new DKG session from on-chain session metadata.
     pub fn new(dkg_session_metadata: &ChunkyDKGSessionMetadata) -> Arc<ChunkyDKGSession> {
         let onchain_config = dkg_session_metadata
@@ -414,6 +398,40 @@ impl ChunkyDKGSession {
             session_metadata: dkg_session_metadata.clone(),
             eks,
         })
+    }
+
+    /// BCS wire-size upper bound for an inbound `ChunkyTranscript` for this session,
+    /// derived from the session's wire shape. Used as a structural validation gate before
+    /// deserialization.
+    ///
+    /// `ChunkyTranscript = SignedWeightedTranscript = sig(96B) + UnsignedWeightedTranscript`,
+    /// where `UnsignedWeightedTranscript = Subtranscript + SharingProof`. The `Subtranscript`
+    /// holds:
+    ///   V0:  1 G2
+    ///   Vs:  W G2 (Vec<Vec<G2>> with N outer entries summing to W)
+    ///   Cs:  W * num_chunks G1
+    ///   Rs:  max_weight * num_chunks G1
+    /// `SharingProof` (sigma proof + range proof + KZG commitment) is bounded by a generous
+    /// static slack since its contents are sublinear in W and bounded by protocol constants.
+    pub fn expected_max_transcript_size(&self) -> usize {
+        const G1: usize = 48;
+        const G2: usize = 96;
+        const BLS_SIG: usize = 96;
+        // BLS12-381 scalar field bit size; num_chunks = ceil(MODULUS_BIT_SIZE / ell).
+        const FR_BITS: usize = 255;
+        const SHARING_PROOF_SLACK: usize = 256 * 1024; // generous; proof internals are kilobytes
+        let n = self.eks.len();
+        let w = self.threshold_config.get_total_weight();
+        let max_w = self.threshold_config.get_max_weight();
+        let ell = self.public_parameters.ell.max(1);
+        let num_chunks = FR_BITS.div_ceil(ell);
+        let subtrs = G2                              // V0
+            + w * G2                                  // Vs (flattened)
+            + w * num_chunks * G1                     // Cs (flattened)
+            + max_w * num_chunks * G1; // Rs (flattened)
+                                       // BCS uleb128 length prefixes per nested Vec; ~4 bytes per outer/middle vec entry is generous.
+        let length_prefix_overhead = 8 * (n + max_w) + 4 * 16;
+        BLS_SIG + subtrs + SHARING_PROOF_SLACK + length_prefix_overhead
     }
 }
 

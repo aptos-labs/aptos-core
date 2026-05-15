@@ -519,12 +519,16 @@ impl TransactionStore {
         insertion_info.ready_time = SystemTime::now();
         if let Ok(time_delta) = SystemTime::now().duration_since(insertion_info.insertion_time) {
             let submitted_by = insertion_info.submitted_by_label();
+            let pull_count = insertion_info
+                .consensus_pulled_counter
+                .load(std::sync::atomic::Ordering::Relaxed);
             counters::core_mempool_txn_commit_latency(
                 CONSENSUS_READY_LABEL,
                 submitted_by,
                 bucket,
                 time_delta,
                 priority,
+                pull_count,
             );
 
             if ready_for_mempool_broadcast {
@@ -534,6 +538,7 @@ impl TransactionStore {
                     bucket,
                     time_delta,
                     priority,
+                    pull_count,
                 );
             }
         }

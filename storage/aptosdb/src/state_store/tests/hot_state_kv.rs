@@ -9,12 +9,13 @@ use crate::{
         stale_state_value_index_by_key_hash::StaleStateValueIndexByKeyHashSchema,
     },
     state_kv_db::{LoadedHotStateShard, StateKvDb},
+    state_store::StateStore,
 };
 use aptos_config::config::{RocksdbConfig, StorageDirPaths};
 use aptos_crypto::{hash::CryptoHash, HashValue};
 use aptos_schemadb::batch::WriteBatch;
 use aptos_storage_interface::state_store::{
-    HotEvictionOp, HotInsertionOp, HotStateShardUpdates, HotStateUpdates,
+    empty_hot_state_updates, HotEvictionOp, HotInsertionOp, HotStateUpdates,
 };
 use aptos_temppath::TempPath;
 use aptos_types::{
@@ -27,11 +28,6 @@ use aptos_types::{
     },
     transaction::Version,
 };
-use std::collections::HashMap;
-
-fn new_empty_shard_updates() -> [HotStateShardUpdates; NUM_STATE_SHARDS] {
-    std::array::from_fn(|_| HotStateShardUpdates::new(HashMap::new(), HashMap::new()))
-}
 
 fn create_hot_state_kv_db(path: &TempPath) -> StateKvDb {
     StateKvDb::new(
@@ -130,7 +126,7 @@ fn test_eviction_write_read() {
 
     // The latest entry should be the eviction.
     let (found_version, found_value) = db
-        .get_hot_state_entry_by_version(&key, Version::MAX)
+        .get_hot_state_entry_by_version(*key.crypto_hash_ref(), Version::MAX)
         .unwrap()
         .unwrap();
     assert_eq!(found_version, 20);
@@ -159,14 +155,17 @@ fn test_multiple_versions() {
 
     // Querying at Version::MAX should return the latest (V2).
     let (latest_version, latest_entry) = db
-        .get_hot_state_entry_by_version(&key, Version::MAX)
+        .get_hot_state_entry_by_version(*key.crypto_hash_ref(), Version::MAX)
         .unwrap()
         .unwrap();
     assert_eq!(latest_version, 2);
     assert_eq!(latest_entry, expected_entry);
 
     // Querying at V1 should return the older entry.
-    let (older_version, older_entry) = db.get_hot_state_entry_by_version(&key, 1).unwrap().unwrap();
+    let (older_version, older_entry) = db
+        .get_hot_state_entry_by_version(*key.crypto_hash_ref(), 1)
+        .unwrap()
+        .unwrap();
     assert_eq!(older_version, 1);
     assert_eq!(older_entry, expected_entry);
 }
@@ -510,12 +509,13 @@ fn test_load_write_then_load_roundtrip() {
     let val1 = make_state_value(10);
     let key2 = make_state_key(20);
 
-    let mut shards = new_empty_shard_updates();
+    let mut shards = empty_hot_state_updates();
 
     // key1: occupied at hot_since_version=100, value_version=50
     shards[key1.get_shard_id()]
         .insertions
         .insert(*key1.crypto_hash_ref(), HotInsertionOp {
+            state_key: key1.clone(),
             value: HotStateValue::new(Some(val1.clone()), 100),
             value_version: Some(50),
             superseded_version: None,
@@ -525,6 +525,7 @@ fn test_load_write_then_load_roundtrip() {
     shards[key2.get_shard_id()]
         .insertions
         .insert(*key2.crypto_hash_ref(), HotInsertionOp {
+            state_key: key2.clone(),
             value: HotStateValue::new(None, 200),
             value_version: None,
             superseded_version: None,
@@ -536,10 +537,7 @@ fn test_load_write_then_load_roundtrip() {
     };
 
     let mut sharded_batches = hot_state_kv_db.new_sharded_native_batches();
-    aptos_db
-        .state_store
-        .put_hot_state_updates(&hot_state_updates, &mut sharded_batches)
-        .unwrap();
+    StateStore::put_hot_state_updates(&hot_state_updates, &mut sharded_batches).unwrap();
     hot_state_kv_db.commit(999, None, sharded_batches).unwrap();
 
     // Load back.
@@ -633,12 +631,13 @@ fn test_put_hot_state_updates_values_and_stale_indices() {
     let key2 = make_state_key(20);
     let key3 = make_state_key(30);
 
-    let mut shards = new_empty_shard_updates();
+    let mut shards = empty_hot_state_updates();
 
     // key1: first write (no superseded version) at hot_since_version=100
     shards[key1.get_shard_id()]
         .insertions
         .insert(*key1.crypto_hash_ref(), HotInsertionOp {
+            state_key: key1.clone(),
             value: HotStateValue::new(Some(val1.clone()), 100),
             value_version: Some(50),
             superseded_version: None,
@@ -648,6 +647,7 @@ fn test_put_hot_state_updates_values_and_stale_indices() {
     shards[key2.get_shard_id()]
         .insertions
         .insert(*key2.crypto_hash_ref(), HotInsertionOp {
+            state_key: key2.clone(),
             value: HotStateValue::new(None, 200),
             value_version: None,
             superseded_version: Some(80),
@@ -667,10 +667,7 @@ fn test_put_hot_state_updates_values_and_stale_indices() {
     };
 
     let mut sharded_batches = hot_state_kv_db.new_sharded_native_batches();
-    aptos_db
-        .state_store
-        .put_hot_state_updates(&hot_state_updates, &mut sharded_batches)
-        .unwrap();
+    StateStore::put_hot_state_updates(&hot_state_updates, &mut sharded_batches).unwrap();
     hot_state_kv_db.commit(999, None, sharded_batches).unwrap();
 
     // -- Verify value entries --
@@ -780,10 +777,11 @@ fn test_hot_state_kv_pruner_deletes_old_entries() {
     let val_new = make_state_value(2);
 
     // First batch: write old entry at hot_since=100
-    let mut shards = new_empty_shard_updates();
+    let mut shards = empty_hot_state_updates();
     shards[key1.get_shard_id()]
         .insertions
         .insert(*key1.crypto_hash_ref(), HotInsertionOp {
+            state_key: key1.clone(),
             value: HotStateValue::new(Some(val_old.clone()), 100),
             value_version: Some(100),
             superseded_version: None,
@@ -793,17 +791,15 @@ fn test_hot_state_kv_pruner_deletes_old_entries() {
         for_latest: None,
     };
     let mut batches = hot_state_kv_db.new_sharded_native_batches();
-    aptos_db
-        .state_store
-        .put_hot_state_updates(&updates1, &mut batches)
-        .unwrap();
+    StateStore::put_hot_state_updates(&updates1, &mut batches).unwrap();
     hot_state_kv_db.commit(100, None, batches).unwrap();
 
     // Second batch: write new entry at hot_since=200 superseding 100
-    let mut shards2 = new_empty_shard_updates();
+    let mut shards2 = empty_hot_state_updates();
     shards2[key1.get_shard_id()]
         .insertions
         .insert(*key1.crypto_hash_ref(), HotInsertionOp {
+            state_key: key1.clone(),
             value: HotStateValue::new(Some(val_new.clone()), 200),
             value_version: Some(200),
             superseded_version: Some(100),
@@ -813,10 +809,7 @@ fn test_hot_state_kv_pruner_deletes_old_entries() {
         for_latest: None,
     };
     let mut batches2 = hot_state_kv_db.new_sharded_native_batches();
-    aptos_db
-        .state_store
-        .put_hot_state_updates(&updates2, &mut batches2)
-        .unwrap();
+    StateStore::put_hot_state_updates(&updates2, &mut batches2).unwrap();
     hot_state_kv_db.commit(200, None, batches2).unwrap();
 
     // Both entries exist before pruning

@@ -250,6 +250,7 @@ impl<'a, R: StateView> TableInfoParser<'a, R> {
                     self.collect_table_info_from_table_item(*handle, bytes)?
                 },
                 StateKeyInner::Raw(_) => (),
+                StateKeyInner::TradingNative(_) => (),
             }
         }
         Ok(())

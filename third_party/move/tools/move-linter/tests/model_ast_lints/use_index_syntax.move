@@ -1,3 +1,4 @@
+// @checks=experimental
 // Tests for the use_index_syntax lint.
 // Detects vector::borrow/borrow_mut calls that can use index syntax v[i],
 // and borrow_global/borrow_global_mut calls that can use index syntax T[addr].

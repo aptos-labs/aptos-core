@@ -215,7 +215,7 @@ fn code_publishing_upgrade_fail_overlapping_module() {
 /// This test verifies that the cache incoherence bug on module upgrade is fixed. This bug
 /// exposes itself by that after module upgrade the old version of the module stays
 /// active until the MoveVM terminates. In order to workaround this until there is a better
-/// fix, we flush the cache in `MoveVmExt::new_session`. One can verify the fix by commenting
+/// fix, we flush the cache in `AptosVM::new_session`. One can verify the fix by commenting
 /// the flush operation out, then this test fails.
 ///
 /// TODO: for some reason this test did not capture a serious bug in `code::check_coexistence`.

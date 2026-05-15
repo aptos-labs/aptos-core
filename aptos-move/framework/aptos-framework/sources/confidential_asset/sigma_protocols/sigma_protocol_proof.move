@@ -66,6 +66,10 @@ module aptos_framework::sigma_protocol_proof {
         &self.comm_A
     }
 
+    public(friend) fun get_response(self: &Proof): &vector<Scalar> {
+        &self.resp_sigma
+    }
+
     public(friend) fun get_compressed_commitment(self: &Proof): &vector<CompressedRistretto> {
         &self.compressed_comm_A
     }

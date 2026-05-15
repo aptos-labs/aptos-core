@@ -369,6 +369,17 @@ pub(crate) struct ExecutionQueueManager {
     /// Stores the minimum transaction index that has not yet been popped from the
     /// `execution_queue`. This serves as an upper bound for transactions that have not
     /// been executed yet and provides an indication of scheduling progress.
+    ///
+    /// ***IMPORTANT***: Both reads and writes of this field must be performed while
+    /// holding the `execution_queue` lock. The lock provides the happens-before
+    /// relationship required for correctness: `record_validation_requirements` reads
+    /// this value to determine which transactions need cold validation (those already
+    /// scheduled). Without the lock, a stale read could miss a transaction that was
+    /// already popped and is executing with an outdated module.
+    ///
+    /// We re-use the `execution_queue` lock (rather than introducing a dedicated one)
+    /// because `pop_next` already acquires it, so the write is naturally protected
+    /// without adding lock overhead on the hot scheduling path.
     min_never_scheduled_idx: CachePadded<AtomicU32>,
     /// Holds the indices of transactions currently scheduled for execution.
     /// Using a `BTreeSet` ensures that transactions are generally processed in an
@@ -389,15 +400,21 @@ impl ExecutionQueueManager {
     }
 
     fn pop_next(&self) -> Option<TxnIndex> {
-        let ret = self.execution_queue.lock().pop_first();
+        let mut guard = self.execution_queue.lock();
+        let ret = guard.pop_first();
         if let Some(idx) = ret {
             self.min_never_scheduled_idx
                 .fetch_max(idx + 1, Ordering::Relaxed);
         }
+        drop(guard);
         ret
     }
 
+    /// Acquires the `execution_queue` lock before reading `min_never_scheduled_idx`.
+    /// The lock provides a happens-before relationship with all prior `pop_next` calls,
+    /// ensuring the returned value reflects all transactions that have been popped.
     fn min_never_scheduled_idx(&self) -> TxnIndex {
+        let _guard = self.execution_queue.lock();
         self.min_never_scheduled_idx.load(Ordering::Relaxed)
     }
 
@@ -764,7 +781,10 @@ impl SchedulerV2 {
     /// This provides an indication of how far along the scheduler is in dispatching
     /// initial execution tasks.
     ///
-    /// The value is retrieved from [ExecutionQueueManager::min_never_scheduled_idx].
+    /// The value is retrieved from [ExecutionQueueManager::min_never_scheduled_idx],
+    /// which acquires the `execution_queue` lock to ensure a happens-before relationship
+    /// with all prior pops — guaranteeing the returned value reflects all transactions
+    /// that have already been scheduled for execution.
     ///
     /// Returns `Err(PanicError)` if the value read is inconsistent (e.g., greater
     /// than `num_txns`).

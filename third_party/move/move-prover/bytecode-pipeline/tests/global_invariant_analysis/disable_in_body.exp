@@ -21,11 +21,10 @@ fun DisableInv::foo($t0|s: signer) {
      var $t3: num
   0: $t1 := false
   1: $t2 := pack 0x1::DisableInv::R2($t1)
-  2: move_to<0x1::DisableInv::R2>($t0, $t2) on_abort goto 5 with $t3
-  3: label L1
-  4: return ()
-  5: label L2
-  6: abort($t3)
+  2: move_to<0x1::DisableInv::R2>($t0, $t2) on_abort goto 4 with $t3
+  3: return ()
+  4: label L1
+  5: abort($t3)
 }
 
 
@@ -36,11 +35,10 @@ fun DisableInv::foo($t0|s: signer) {
      var $t3: num
   0: $t1 := false
   1: $t2 := pack 0x1::DisableInv::R2($t1)
-  2: move_to<0x1::DisableInv::R2>($t0, $t2) on_abort goto 5 with $t3
-  3: label L1
-  4: return ()
-  5: label L2
-  6: abort($t3)
+  2: move_to<0x1::DisableInv::R2>($t0, $t2) on_abort goto 4 with $t3
+  3: return ()
+  4: label L1
+  5: abort($t3)
 }
 
 
@@ -54,7 +52,7 @@ DisableInv::foo: [
       ]
     ]
   }
-  2: move_to<0x1::DisableInv::R2>($t0, $t2) on_abort goto L2 with $t3 {}
+  2: move_to<0x1::DisableInv::R2>($t0, $t2) on_abort goto L1 with $t3 {}
   exitpoint {
     assert @0 = [
       <> -> [

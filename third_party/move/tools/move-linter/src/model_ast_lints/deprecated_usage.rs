@@ -131,8 +131,8 @@ fn check_type_for_deprecated(
             check_type_for_deprecated(env, args, loc, report_fn);
             check_type_for_deprecated(env, result, loc, report_fn);
         },
-        // TypeDomain and ResourceDomain only appear in specifications; skip deprecation checks.
-        Type::TypeDomain(..) | Type::ResourceDomain(..) => {},
+        // TypeDomain, ResourceDomain, and StateDomain only appear in specifications; skip deprecation checks.
+        Type::TypeDomain(..) | Type::ResourceDomain(..) | Type::StateDomain => {},
         Type::Primitive(_) | Type::TypeParameter(_) | Type::Error | Type::Var(_) => {},
     }
 }

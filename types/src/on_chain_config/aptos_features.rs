@@ -171,6 +171,16 @@ pub enum FeatureFlag {
     PUBLIC_STRUCT_ENUM_ARGS = 109,
     /// Whether multisig script payloads are enabled
     MULTISIG_SCRIPT = 110,
+    /// Enables higher transaction execution/IO limits backed by staking voting power.
+    TRANSACTION_LIMITS = 111,
+    /// Whether versioned enum-based transaction validation is enabled.
+    VERSIONED_TRANSACTION_VALIDATION = 112,
+    /// Whether storage_slot move natives are enabled.
+    STORAGE_SLOT_NATIVES = 113,
+    /// If enabled, a module upgrade may downgrade the visibility of an `entry` function
+    /// from `friend/package` to private, while keeping the `entry` modifier. The `entry`
+    /// modifier itself still cannot be removed. See issue #19650.
+    ALLOW_FRIEND_ENTRY_VISIBILITY_DOWNGRADE = 114,
 }
 
 impl FeatureFlag {
@@ -281,6 +291,10 @@ impl FeatureFlag {
             Self::SLH_DSA_SHA2_128S_SIGNATURE,
             Self::PUBLIC_STRUCT_ENUM_ARGS,
             Self::MULTISIG_SCRIPT,
+            Self::TRANSACTION_LIMITS,
+            Self::VERSIONED_TRANSACTION_VALIDATION,
+            Self::STORAGE_SLOT_NATIVES,
+            Self::ALLOW_FRIEND_ENTRY_VISIBILITY_DOWNGRADE,
         ]
     }
 }
@@ -346,7 +360,14 @@ impl Features {
             .flat_map(|byte| (0..8).map(move |bit_idx| byte & (1 << bit_idx) != 0))
             .enumerate()
             .filter(|(_feature_idx, enabled)| *enabled)
-            .map(|(feature_idx, _)| FeatureFlag::from_repr(feature_idx).unwrap())
+            .map(|(feature_idx, _)| {
+                FeatureFlag::from_repr(feature_idx).unwrap_or_else(|| {
+                    panic!(
+                        "unknown FeatureFlag index {feature_idx} in features bitmap; \
+                         a newer-binary override likely set a flag this binary does not know"
+                    )
+                })
+            })
             .collect()
     }
 
@@ -488,6 +509,17 @@ impl Features {
 
     pub fn is_multisig_script_enabled(&self) -> bool {
         self.is_enabled(FeatureFlag::MULTISIG_SCRIPT)
+    }
+
+    pub fn is_transaction_limits_enabled(&self) -> bool {
+        // Transaction limits are enforced only through the versioned prologue path
+        // (via PrologueArgs::V1.txn_limits_request), so both flags must be on.
+        self.is_enabled(FeatureFlag::TRANSACTION_LIMITS)
+            && self.is_enabled(FeatureFlag::VERSIONED_TRANSACTION_VALIDATION)
+    }
+
+    pub fn is_versioned_transaction_validation_enabled(&self) -> bool {
+        self.is_enabled(FeatureFlag::VERSIONED_TRANSACTION_VALIDATION)
     }
 
     pub fn get_max_identifier_size(&self) -> u64 {

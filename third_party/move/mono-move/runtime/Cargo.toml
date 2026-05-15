@@ -19,3 +19,6 @@ mono-move-core = { workspace = true }
 mono-move-gas = { workspace = true }
 rand = { workspace = true }
 thiserror = { workspace = true }
+
+[dev-dependencies]
+move-core-types = { workspace = true }

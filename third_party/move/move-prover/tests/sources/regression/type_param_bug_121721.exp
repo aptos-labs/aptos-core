@@ -13,7 +13,6 @@ error: global memory invariant does not hold
     =         s = <redacted>
     =     at ../move-stdlib/sources/signer.move:27: address_of
     =         result = <redacted>
-    =     at ../move-stdlib/sources/signer.move:28: address_of
     =         ballot_address = <redacted>
     =     at tests/sources/regression/type_param_bug_121721.move:86: create_ballot
     =     at tests/sources/regression/type_param_bug_121721.move:88: create_ballot

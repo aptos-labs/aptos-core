@@ -253,6 +253,8 @@ pub struct HotStateConfig {
     pub compute_root_hash: bool,
     /// Whether to persist hotness data alongside write sets in write set DB.
     pub persist_hotness_in_write_set: bool,
+    /// Whether to embed the per-block hot-state promotions into the epilogue transactions.
+    pub persist_hotness_in_epilogue: bool,
 }
 
 impl Default for HotStateConfig {
@@ -263,6 +265,7 @@ impl Default for HotStateConfig {
             delete_on_restart: true,
             compute_root_hash: true,
             persist_hotness_in_write_set: true,
+            persist_hotness_in_epilogue: false,
         }
     }
 }

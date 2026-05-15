@@ -1003,6 +1003,11 @@ impl<T: Transaction> ResourceGroupState<T> for SequentialState<'_, T> {
 
                 match GroupReadResult::from_value::<T>(value, &target_kind) {
                     Ok(group_read_result) => {
+                        // Only record Value reads into the read set to keep sequential
+                        // and parallel ReadWriteSummary consistent. In the parallel path,
+                        // get_read_summary() filters group_reads to DataRead::Versioned
+                        // only, excluding Exists/Metadata. The sequential read set has no
+                        // DataRead variants, so we filter at the recording site instead.
                         if target_kind == ReadKind::Value {
                             self.read_set
                                 .borrow_mut()
@@ -1027,12 +1032,14 @@ impl<T: Transaction> ResourceGroupState<T> for SequentialState<'_, T> {
                     TriompheArc::<T::Value>::new(TransactionWrite::from_state_value(None)),
                     None,
                 );
-                self.read_set
-                    .borrow_mut()
-                    .group_reads
-                    .entry(group_key.clone())
-                    .or_default()
-                    .insert(resource_tag.clone());
+                if target_kind == ReadKind::Value {
+                    self.read_set
+                        .borrow_mut()
+                        .group_reads
+                        .entry(group_key.clone())
+                        .or_default()
+                        .insert(resource_tag.clone());
+                }
                 Ok(GroupReadResult::from_data_read(
                     empty_data_read
                         .convert_to(&target_kind)

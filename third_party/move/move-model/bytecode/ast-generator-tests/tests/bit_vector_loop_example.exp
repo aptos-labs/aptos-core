@@ -788,6 +788,10 @@ module 0x1::m {
         length: u64,
         bit_field: vector<bool>,
     }
+    const EINDEX: u64 = 131072;
+    const ELENGTH: u64 = 131073;
+    const MAX_SIZE: u64 = 1024;
+    const WORD_SIZE: u64 = 1;
     public fun is_index_set(self: &BitVector, bit_index: u64): bool {
         let _v0 = 0x1::vector::length<bool>(&self.bit_field);
         assert!(bit_index < _v0, 131072);

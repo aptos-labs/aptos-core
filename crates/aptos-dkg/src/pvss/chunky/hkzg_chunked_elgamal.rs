@@ -204,7 +204,9 @@ impl<'a, E: Pairing> Proof<'a, E> {
                 chunked_elgamal::CodomainShape {
                     chunks: (0..sc.get_total_num_players())
                         .map(|i| {
-                            let w = sc.get_player_weight(&sc.get_player(i)); // TODO: combine these functions...
+                            let w = sc
+                                .get_player_weight(&sc.get_player(i))
+                                .expect("player id from sc.get_player is in bounds"); // TODO: combine these functions...
                             (0..w)
                                 .map(|_| unsafe_random_points(number_of_chunks_per_share, rng))
                                 .collect()
@@ -221,7 +223,9 @@ impl<'a, E: Pairing> Proof<'a, E> {
                     univariate_hiding_kzg::CommitmentRandomness::<E::ScalarField>::rand(rng),
                 chunked_plaintexts: (0..sc.get_total_num_players())
                     .map(|i| {
-                        let w = sc.get_player_weight(&sc.get_player(i)); // TODO: combine these functions...
+                        let w = sc
+                            .get_player_weight(&sc.get_player(i))
+                            .expect("player id from sc.get_player is in bounds"); // TODO: combine these functions...
                         (0..w)
                             .map(|_| {
                                 Scalar::vec_from_inner(sample_field_elements(
