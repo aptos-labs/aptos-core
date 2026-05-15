@@ -27,13 +27,19 @@ use aptos_types::{
     transaction::{
         PersistedAuxiliaryInfo, Transaction, TransactionAuxiliaryData, TransactionInfo,
         TransactionListWithAuxiliaryInfos, TransactionListWithProof, TransactionListWithProofV2,
-        TransactionOutput, TransactionOutputListWithAuxiliaryInfos, TransactionOutputListWithProof,
+        TransactionOutput, TransactionOutputListWithAuxiliaryInfos,
+        TransactionOutputListWithAuxiliaryInfosAndHotness, TransactionOutputListWithProof,
         TransactionOutputListWithProofV2, Version,
     },
     write_set::WriteSet,
 };
 use serde::Serialize;
-use std::{cmp::min, sync::Arc, time::Instant};
+use std::{
+    cmp::min,
+    collections::{BTreeMap, BTreeSet},
+    sync::Arc,
+    time::Instant,
+};
 
 /// The interface into local storage (e.g., the Aptos DB) used by the storage
 /// server to handle client requests and responses.
@@ -656,12 +662,23 @@ impl StorageReader {
                         get_num_serialized_bytes(&persisted_auxiliary_info).map_err(|error| {
                             Error::UnexpectedErrorEncountered(error.to_string())
                         })?;
+                    // `WriteSet::Serialize` strips in-place hotness, so it isn't counted by
+                    // `get_num_serialized_bytes(&output)`. Reserve room for the sidecar entry
+                    // the V2 entry point will attach. Slightly conservative on V1 paths (which
+                    // never attach the sidecar), but hotness lives only in block epilogues, so
+                    // most outputs contribute zero.
+                    let num_hotness_sidecar_bytes = if self.config.enable_hotness_in_state_sync {
+                        hotness_sidecar_size_for_output(&output)?
+                    } else {
+                        0
+                    };
 
                     // Add the data items to the lists
                     let total_serialized_bytes = num_transaction_bytes
                         + num_info_bytes
                         + num_output_bytes
-                        + num_auxiliary_info_bytes;
+                        + num_auxiliary_info_bytes
+                        + num_hotness_sidecar_bytes;
                     if response_progress_tracker.data_items_fits_in_response(
                         !is_transaction_or_output_request,
                         total_serialized_bytes,
@@ -719,7 +736,9 @@ impl StorageReader {
             DataResponse::get_transaction_outputs_with_proof_v2_label(),
         );
 
-        // Create the transaction data with proof response
+        // Create the transaction data with proof response. The hotness sidecar is
+        // attached later, in the V2 protocol entry point only — V1 responses strip
+        // the wrapper and cannot carry hotness.
         let output_list_with_proof_v2 =
             TransactionOutputListWithProofV2::new(TransactionOutputListWithAuxiliaryInfos::new(
                 transaction_output_list_with_proof,
@@ -1153,7 +1172,7 @@ impl StorageReaderInterface for StorageReader {
         );
 
         // Fetch the transaction data based on the request type
-        match transaction_data_with_proof_request.transaction_data_request_type {
+        let mut response = match transaction_data_with_proof_request.transaction_data_request_type {
             TransactionDataRequestType::TransactionData(request) => {
                 // Get the transaction list with proof
                 self.get_transactions_with_proof_by_size(
@@ -1163,7 +1182,7 @@ impl StorageReaderInterface for StorageReader {
                     request.include_events,
                     max_response_bytes,
                     self.config.enable_size_and_time_aware_chunking,
-                )
+                )?
             },
             TransactionDataRequestType::TransactionOutputData => {
                 // Get the transaction output list with proof
@@ -1174,7 +1193,7 @@ impl StorageReaderInterface for StorageReader {
                     max_response_bytes,
                     false,
                     self.config.enable_size_and_time_aware_chunking,
-                )
+                )?
             },
             TransactionDataRequestType::TransactionOrOutputData(request) => {
                 // Get the transaction or output list with proof
@@ -1186,9 +1205,22 @@ impl StorageReaderInterface for StorageReader {
                     0, // Fetch all outputs, or return transactions
                     max_response_bytes,
                     self.config.enable_size_and_time_aware_chunking,
-                )
+                )?
             },
+        };
+
+        // Attach the hotness sidecar for V2 protocol responses. The V1 legacy paths
+        // (`get_transaction_outputs_with_proof` and `get_transactions_or_outputs_with_proof`)
+        // strip the wrapper before returning, so attaching there is both wasted and unsafe —
+        // `consume_output_list_with_proof` would re-splice into WriteSets that already carry
+        // in-place hotness from storage and trip `WriteSet::add_hotness`'s assertion.
+        if let Some(output_list) = response.transaction_output_list_with_proof {
+            response.transaction_output_list_with_proof = Some(attach_hotness_if_enabled(
+                output_list,
+                self.config.enable_hotness_in_state_sync,
+            ));
         }
+        Ok(response)
     }
 
     fn get_number_of_states(
@@ -1514,4 +1546,62 @@ fn get_num_serialized_bytes<T: ?Sized + Serialize>(
     let num_serialized_bytes = bcs::serialized_size(data)
         .map_err(|error| Error::UnexpectedErrorEncountered(error.to_string()))?;
     Ok(num_serialized_bytes as u64)
+}
+
+/// Collects per-output hot state keys; sparse — outputs with no hotness are omitted.
+fn extract_per_output_hotness(
+    output_list: &TransactionOutputListWithProof,
+) -> BTreeMap<u32, BTreeSet<StateKey>> {
+    let mut hotness = BTreeMap::new();
+    for (idx, (_, output)) in output_list.transactions_and_outputs.iter().enumerate() {
+        let keys: BTreeSet<StateKey> = output.write_set().hotness_keys().cloned().collect();
+        if !keys.is_empty() {
+            hotness.insert(idx as u32, keys);
+        }
+    }
+    hotness
+}
+
+/// Estimates the bytes this output contributes to the hotness sidecar `BTreeMap` entry
+/// (output index + per-output `BTreeSet<StateKey>`). Returns 0 when the output has no
+/// hotness. The outer map's length prefix (1-2 varint bytes) is not counted.
+fn hotness_sidecar_size_for_output(
+    output: &TransactionOutput,
+) -> aptos_storage_service_types::Result<u64, Error> {
+    let keys: BTreeSet<&StateKey> = output.write_set().hotness_keys().collect();
+    if keys.is_empty() {
+        return Ok(0);
+    }
+    let key_set_bytes = bcs::serialized_size(&keys)
+        .map_err(|error| Error::UnexpectedErrorEncountered(error.to_string()))?;
+    Ok((std::mem::size_of::<u32>() + key_set_bytes) as u64)
+}
+
+/// Rewraps into the hotness-carrying V2 variant when enabled and there's any hotness to carry.
+fn attach_hotness_if_enabled(
+    output_list: TransactionOutputListWithProofV2,
+    enable_hotness: bool,
+) -> TransactionOutputListWithProofV2 {
+    if !enable_hotness {
+        return output_list;
+    }
+    let inner = match output_list {
+        TransactionOutputListWithProofV2::TransactionOutputListWithAuxiliaryInfos(inner) => inner,
+        already
+        @ TransactionOutputListWithProofV2::TransactionOutputListWithAuxiliaryInfosAndHotness(_) => {
+            return already;
+        },
+    };
+    let hotness = extract_per_output_hotness(&inner.transaction_output_list_with_proof);
+    if hotness.is_empty() {
+        TransactionOutputListWithProofV2::new(inner)
+    } else {
+        TransactionOutputListWithProofV2::new_with_hotness(
+            TransactionOutputListWithAuxiliaryInfosAndHotness::new(
+                inner.transaction_output_list_with_proof,
+                inner.persisted_auxiliary_infos,
+                hotness,
+            ),
+        )
+    }
 }
