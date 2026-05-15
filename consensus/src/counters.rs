@@ -1351,6 +1351,37 @@ pub static TXNS_IN_BLOCK: Lazy<HistogramVec> = Lazy::new(|| {
     .unwrap()
 });
 
+/// Histogram of seconds between a block and its parent, observed at ordering time.
+/// NIL blocks (which share their parent's timestamp) are excluded.
+pub static BLOCK_ORDERING_INTERVAL_SECONDS: Lazy<Histogram> = Lazy::new(|| {
+    register_histogram!(
+        "aptos_consensus_block_ordering_interval_seconds",
+        "Histogram of seconds between a block and its parent, observed at ordering time.",
+        // Fine resolution 10-300 ms (where most healthy block intervals live)
+        // and tail out to ~12 s for timeout-recovery blocks.
+        exponential_buckets(/*start=*/ 0.010, /*factor=*/ 1.4, /*count=*/ 22).unwrap(),
+    )
+    .unwrap()
+});
+
+/// Histogram for the number of txns cut at each step of `BlockPreparer::prepare_block`.
+/// Label `reason`: `filter` (transaction-filter rules), `dedup` (duplicate suppression),
+/// `truncate` (`max_txns_from_block_to_execute` cap).
+pub static TXNS_CUT_BY_BLOCK_PREPARER: Lazy<HistogramVec> = Lazy::new(|| {
+    register_histogram_vec!(
+        "aptos_consensus_txns_cut_by_block_preparer",
+        "Histogram of txns cut at each step of block preparation (filter, dedup, truncate).",
+        &["reason"],
+        // Most blocks observe 0 (lands in the implicit <1 bucket); separate dedup-scale
+        // cuts (1-32) from truncate-scale cuts (256-8k).
+        vec![
+            1.0, 2.0, 4.0, 8.0, 16.0, 32.0, 64.0, 128.0, 256.0, 512.0, 1024.0, 2048.0, 4096.0,
+            8192.0
+        ],
+    )
+    .unwrap()
+});
+
 /// Histogram for the number of txns to be executed in a block.
 pub static MAX_TXNS_FROM_BLOCK_TO_EXECUTE: Lazy<Histogram> = Lazy::new(|| {
     register_histogram!(
