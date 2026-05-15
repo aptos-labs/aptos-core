@@ -170,7 +170,9 @@ impl Mempool {
                 bucket,
                 time_delta,
                 priority,
-                insertion_info.consensus_pulled_counter.load(Ordering::Relaxed),
+                insertion_info
+                    .consensus_pulled_counter
+                    .load(Ordering::Relaxed),
             );
         }
     }
@@ -219,7 +221,9 @@ impl Mempool {
         priority: &str,
         tracked_use_case: Option<(UseCaseKey, &String)>,
     ) {
-        let pull_count = insertion_info.consensus_pulled_counter.load(Ordering::Relaxed);
+        let pull_count = insertion_info
+            .consensus_pulled_counter
+            .load(Ordering::Relaxed);
         let parked_duration = if let Some(park_time) = insertion_info.park_time {
             let parked_duration = insertion_info
                 .ready_time
@@ -297,28 +301,31 @@ impl Mempool {
 
             let insertion_timestamp =
                 aptos_infallible::duration_since_epoch_at(&insertion_info.insertion_time);
-            let pull_count = insertion_info.consensus_pulled_counter.load(Ordering::Relaxed);
-            if let Some(insertion_to_block) = block_timestamp.checked_sub(insertion_timestamp) {
-                counters::core_mempool_txn_commit_latency(
+            let pull_count = insertion_info
+                .consensus_pulled_counter
+                .load(Ordering::Relaxed);
+            let submitted_by = insertion_info.submitted_by_label();
+            let priority_str = priority.to_string();
+            for (stage, latency) in [
+                (
                     counters::COMMIT_ACCEPTED_BLOCK_LABEL,
-                    insertion_info.submitted_by_label(),
-                    bucket.as_str(),
-                    insertion_to_block,
-                    priority.to_string().as_str(),
-                    pull_count,
-                );
-            }
-            if let Some(insertion_to_prev_block) = prev_block_timestamp
-                .and_then(|prev| prev.checked_sub(insertion_timestamp))
-            {
-                counters::core_mempool_txn_commit_latency(
+                    block_timestamp.checked_sub(insertion_timestamp),
+                ),
+                (
                     counters::COMMIT_ACCEPTED_PREV_BLOCK_LABEL,
-                    insertion_info.submitted_by_label(),
-                    bucket.as_str(),
-                    insertion_to_prev_block,
-                    priority.to_string().as_str(),
-                    pull_count,
-                );
+                    prev_block_timestamp.and_then(|prev| prev.checked_sub(insertion_timestamp)),
+                ),
+            ] {
+                if let Some(latency) = latency {
+                    counters::core_mempool_txn_commit_latency(
+                        stage,
+                        submitted_by,
+                        bucket.as_str(),
+                        latency,
+                        priority_str.as_str(),
+                        pull_count,
+                    );
+                }
             }
         }
     }
