@@ -42,55 +42,55 @@ error: behavioral predicates are not supported on `std::vector::push_back` — u
    │                   ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
 error: behavioral predicates are not supported on `std::vector::push_back` — use the spec language directly (e.g. write `len(v)` instead of `result_of<vector::length>(v)`, `v[i]` instead of `result_of<vector::borrow>(v, i)`, `!in_range(v, i)` instead of `aborts_of<vector::borrow>(v, i)`)
-   ┌─ tests/sources/functional/closures/bp_bytecode_natives.move:90:17
+   ┌─ tests/sources/functional/closures/bp_bytecode_natives.move:91:17
    │
-90 │         ensures ensures_of<vector::push_back<T>>(old(v), e, v);
-   │                 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+91 │         ensures ensures_of<vector::push_back<T>>(v, e);
+   │                 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
 error: behavioral predicates are not supported on `std::vector::pop_back` — use the spec language directly (e.g. write `len(v)` instead of `result_of<vector::length>(v)`, `v[i]` instead of `result_of<vector::borrow>(v, i)`, `!in_range(v, i)` instead of `aborts_of<vector::borrow>(v, i)`)
-    ┌─ tests/sources/functional/closures/bp_bytecode_natives.move:101:19
+    ┌─ tests/sources/functional/closures/bp_bytecode_natives.move:102:19
     │
-101 │         aborts_if aborts_of<vector::pop_back<T>>(v);
+102 │         aborts_if aborts_of<vector::pop_back<T>>(v);
     │                   ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
 error: behavioral predicates are not supported on `std::vector::pop_back` — use the spec language directly (e.g. write `len(v)` instead of `result_of<vector::length>(v)`, `v[i]` instead of `result_of<vector::borrow>(v, i)`, `!in_range(v, i)` instead of `aborts_of<vector::borrow>(v, i)`)
-    ┌─ tests/sources/functional/closures/bp_bytecode_natives.move:108:19
+    ┌─ tests/sources/functional/closures/bp_bytecode_natives.move:109:19
     │
-108 │         requires !aborts_of<vector::pop_back<T>>(v);
+109 │         requires !aborts_of<vector::pop_back<T>>(v);
     │                   ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
 error: behavioral predicates are not supported on `std::vector::destroy_empty` — use the spec language directly (e.g. write `len(v)` instead of `result_of<vector::length>(v)`, `v[i]` instead of `result_of<vector::borrow>(v, i)`, `!in_range(v, i)` instead of `aborts_of<vector::borrow>(v, i)`)
-    ┌─ tests/sources/functional/closures/bp_bytecode_natives.move:120:19
+    ┌─ tests/sources/functional/closures/bp_bytecode_natives.move:121:19
     │
-120 │         aborts_if aborts_of<vector::destroy_empty<T>>(v);
+121 │         aborts_if aborts_of<vector::destroy_empty<T>>(v);
     │                   ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
 error: behavioral predicates are not supported on `std::vector::swap` — use the spec language directly (e.g. write `len(v)` instead of `result_of<vector::length>(v)`, `v[i]` instead of `result_of<vector::borrow>(v, i)`, `!in_range(v, i)` instead of `aborts_of<vector::borrow>(v, i)`)
-    ┌─ tests/sources/functional/closures/bp_bytecode_natives.move:131:19
+    ┌─ tests/sources/functional/closures/bp_bytecode_natives.move:132:19
     │
-131 │         aborts_if aborts_of<vector::swap<T>>(v, i, j);
+132 │         aborts_if aborts_of<vector::swap<T>>(v, i, j);
     │                   ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
 error: behavioral predicates are not supported on `std::vector::singleton` — use the spec language directly (e.g. write `len(v)` instead of `result_of<vector::length>(v)`, `v[i]` instead of `result_of<vector::borrow>(v, i)`, `!in_range(v, i)` instead of `aborts_of<vector::borrow>(v, i)`)
-    ┌─ tests/sources/functional/closures/bp_bytecode_natives.move:142:19
+    ┌─ tests/sources/functional/closures/bp_bytecode_natives.move:143:19
     │
-142 │         aborts_if aborts_of<vector::singleton<T>>(e);
+143 │         aborts_if aborts_of<vector::singleton<T>>(e);
     │                   ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
 error: behavioral predicates are not supported on `std::vector::singleton` — use the spec language directly (e.g. write `len(v)` instead of `result_of<vector::length>(v)`, `v[i]` instead of `result_of<vector::borrow>(v, i)`, `!in_range(v, i)` instead of `aborts_of<vector::borrow>(v, i)`)
-    ┌─ tests/sources/functional/closures/bp_bytecode_natives.move:143:27
+    ┌─ tests/sources/functional/closures/bp_bytecode_natives.move:144:27
     │
-143 │         ensures result == result_of<vector::singleton<T>>(e);
+144 │         ensures result == result_of<vector::singleton<T>>(e);
     │                           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
 error: behavioral predicates are not supported on `std::vector::contains` — use the spec language directly (e.g. write `len(v)` instead of `result_of<vector::length>(v)`, `v[i]` instead of `result_of<vector::borrow>(v, i)`, `!in_range(v, i)` instead of `aborts_of<vector::borrow>(v, i)`)
-    ┌─ tests/sources/functional/closures/bp_bytecode_natives.move:154:19
+    ┌─ tests/sources/functional/closures/bp_bytecode_natives.move:155:19
     │
-154 │         aborts_if aborts_of<vector::contains<T>>(v, e);
+155 │         aborts_if aborts_of<vector::contains<T>>(v, e);
     │                   ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
 error: behavioral predicates are not supported on `std::vector::contains` — use the spec language directly (e.g. write `len(v)` instead of `result_of<vector::length>(v)`, `v[i]` instead of `result_of<vector::borrow>(v, i)`, `!in_range(v, i)` instead of `aborts_of<vector::borrow>(v, i)`)
-    ┌─ tests/sources/functional/closures/bp_bytecode_natives.move:155:27
+    ┌─ tests/sources/functional/closures/bp_bytecode_natives.move:156:27
     │
-155 │         ensures result == result_of<vector::contains<T>>(v, e);
+156 │         ensures result == result_of<vector::contains<T>>(v, e);
     │                           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^

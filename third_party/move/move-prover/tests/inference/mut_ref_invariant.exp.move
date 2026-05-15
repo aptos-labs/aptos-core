@@ -46,14 +46,7 @@ module 0x42::mut_ref_invariant {
     }
     spec caller(self: &mut Pool, x: u64): u64 {
         pragma opaque = true;
-        ensures [inferred] result == {
-            let (_t0,_t1) = result_of<f>(old(self), x);
-            _t0
-        };
-        ensures [inferred] self == {
-            let (_t0,_t1) = result_of<f>(old(self), x);
-            _t1
-        };
+        ensures [inferred] result == result_of<f>(old(self), x);
         aborts_if [inferred] aborts_of<f>(self, x);
     }
 

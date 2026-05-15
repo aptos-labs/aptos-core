@@ -128,6 +128,17 @@ struct LiftedChoiceInfo {
     condition: Exp,
 }
 
+/// Projection of an extended-tuple Skolem output, used by
+/// `translate_behavior_for_closure` for the closure-direct path where the
+/// per-function Skolem still returns `(declared..., post_state...)`.
+#[derive(Clone, Copy)]
+enum ProjKind {
+    /// `(SKOLEM_CALL)->$idx`.
+    Single(usize),
+    /// `(var _r := SKOLEM_CALL; $TupleN(_r->$0, ..., _r->$(n-1)))`.
+    Truncate(usize),
+}
+
 impl<'env> SpecTranslator<'env> {
     /// Creates a translator.
     pub fn new(
@@ -1706,14 +1717,8 @@ impl SpecTranslator<'_> {
         self.in_behavior_pred_arg.replace(prev);
     }
 
-    /// Translate a behavioral predicate using the per-type evaluator dispatch function.
-    /// Used for runtime function values (e.g., function-typed parameters after substitution).
-    ///
-    /// `pred_args` arrive in canonical 3-arg shape (input slots followed by
-    /// explicit-result + post-state slots for `EnsuresOf`). State-label
-    /// substitutions (`..S |~` and `S.. |~`) replace the post-state of the
-    /// *last* mut-ref param and the pre-state of the *first* mut-ref param,
-    /// respectively, matching the prior semantics for single-mut-ref closures.
+    /// Translate a behavioral predicate via the per-type evaluator dispatch
+    /// function (used for runtime function values).
     fn translate_behavior_via_evaluator(
         &self,
         node_id: NodeId,
@@ -1724,7 +1729,9 @@ impl SpecTranslator<'_> {
     ) {
         let fun_type = self.env.get_node_type(fun_exp.node_id());
         let inst_fun_type = fun_type.instantiate(&self.type_inst);
+
         let eval_fun_name = boogie_behavioral_eval_fun_name(self.env, &inst_fun_type, kind);
+
         emit!(self.writer, "{}(", eval_fun_name);
         let has_mem =
             self.emit_evaluator_memory_args(node_id, &inst_fun_type, kind, &range.pre, &range.post);
@@ -1733,10 +1740,8 @@ impl SpecTranslator<'_> {
         }
         self.translate_exp(fun_exp);
 
-        // For value-typed state labels (|&mut T| closures with no global memory):
-        // substitute the state variable S_val into the appropriate pred_arg position.
-        //   ..S |~ ensures_of<f>(old_x, x)  →  ensures_of<f>(old_x, S_val)   [post label: replace last]
-        //   S.. |~ ensures_of<g>(old_x, x)  →  ensures_of<g>(S_val, x)       [pre label: replace first &mut input]
+        // Value-typed state-label substitutions: replace specific arg slots
+        // with the bound state variable when present.
         let post_sub = range.post.and_then(|label| {
             self.value_state_vars
                 .borrow()
@@ -1810,7 +1815,7 @@ impl SpecTranslator<'_> {
         let uses_old = !union_old_memory.is_empty();
         let current = match kind {
             BehaviorKind::RequiresOf | BehaviorKind::AbortsOf => pre,
-            BehaviorKind::EnsuresOf | BehaviorKind::ResultOf => post,
+            BehaviorKind::EnsuresOf | BehaviorKind::ResultOf | BehaviorKind::WriteOf(_) => post,
         };
         let mut first = true;
         for memory in &union_used_memory {
@@ -1841,13 +1846,9 @@ impl SpecTranslator<'_> {
     }
 
     /// Translate a behavioral predicate for a closure expression.
-    ///
-    /// Calls the per-function behavioral spec function (or `result_of` function)
-    /// directly. The `pred_args` arrive already augmented with the canonical
-    /// 3-arg shape produced by `translate_behavior_predicate` (and the
-    /// inference engine): input args wrapped in `old(...)` for `&mut`
-    /// parameters, then for `EnsuresOf`, the explicit-result args followed by
-    /// the (un-wrapped) post-state clones of each `&mut` input.
+    /// `pred_args` is in canonical form: `&mut T` input slots are
+    /// `Old(...)`-wrapped (so they reference the captured pre-state temp),
+    /// and `EnsuresOf` carries trailing post-state clones for each `&mut`.
     #[allow(clippy::too_many_arguments)]
     fn translate_behavior_for_closure(
         &self,
@@ -1868,22 +1869,56 @@ impl SpecTranslator<'_> {
         let fun_qid = mid.qualified_inst(fid, inst);
         let fun_env = self.env.get_function(fun_qid.to_qualified_id());
         let num_params = fun_env.get_parameter_count();
+        let num_explicit_results = fun_env.get_return_count();
+        let num_mut_refs = fun_env
+            .get_parameter_types()
+            .iter()
+            .filter(|ty| ty.is_mutable_reference())
+            .count();
+        let total_outputs = num_explicit_results + num_mut_refs;
 
-        let fun_name = if kind == BehaviorKind::ResultOf {
-            let multi_result = fun_env.get_return_count()
-                + fun_env
-                    .get_parameter_types()
-                    .iter()
-                    .filter(|ty| ty.is_mutable_reference())
-                    .count()
-                != 1;
-            boogie_behavioral_fun_result_name(self.env, &fun_qid, multi_result)
-        } else {
-            boogie_behavioral_fun_spec_name(self.env, &fun_qid, kind)
+        // The Skolem shape depends on `total_outputs = num_explicit_results
+        // + num_mut_refs`: with `total_outputs == 1` we call the scalar
+        // Skolem (no projection); with `total_outputs > 1` we call the
+        // multi-result Skolem returning `(declared..., post...)` and project
+        // out the requested slice. Both `ResultOf` and `WriteOf` agree with
+        // the procedure-side dispatcher's choice of Skolem
+        // (`multi_in_boogie == total_outputs > 1`).
+        let multi_in_boogie = total_outputs > 1;
+        let projection = match kind {
+            // ResultOf: take the declared-result slice. Only needed when
+            // post-state slots are appended past it.
+            BehaviorKind::ResultOf if multi_in_boogie && total_outputs > num_explicit_results => {
+                if num_explicit_results == 1 {
+                    Some(ProjKind::Single(0))
+                } else {
+                    Some(ProjKind::Truncate(num_explicit_results))
+                }
+            },
+            // WriteOf(j): take the j-th `&mut` post-state slot. Only needed
+            // when the multi Skolem is in play; with `total_outputs == 1`
+            // the scalar Skolem already returns that slot directly.
+            BehaviorKind::WriteOf(j) if multi_in_boogie => {
+                Some(ProjKind::Single(num_explicit_results + j))
+            },
+            _ => None,
         };
+
+        let fun_name = match kind {
+            BehaviorKind::ResultOf | BehaviorKind::WriteOf(_) => {
+                boogie_behavioral_fun_result_name(self.env, &fun_qid, multi_in_boogie)
+            },
+            _ => boogie_behavioral_fun_spec_name(self.env, &fun_qid, kind),
+        };
+
+        match projection {
+            Some(ProjKind::Single(_)) => emit!(self.writer, "("),
+            Some(ProjKind::Truncate(_)) => emit!(self.writer, "(var _r := "),
+            None => {},
+        }
         emit!(self.writer, "{}(", fun_name);
 
-        // Emit memory args, then interleave captured + non-captured params
+        // Memory args, then interleave captured + non-captured input args.
         let mut has_args = self.emit_fun_spec_memory_args(node_id, &fun_qid, kind, range);
         let mut captured_pos = 0;
         let mut non_captured_pos = 0;
@@ -1901,15 +1936,31 @@ impl SpecTranslator<'_> {
             }
         }
 
-        // For `EnsuresOf`: emit result args + post-state slots from remaining
-        // pred_args (already in canonical order: explicit_results, post_states).
+        // `EnsuresOf` carries trailing post-state clones after the input
+        // slots — emit them. `ResultOf` also carries them in `pred_args`, but
+        // the per-function Skolem doesn't take them (post-state is in its
+        // output tuple instead); skip them here.
         if kind == BehaviorKind::EnsuresOf {
             for arg in &pred_args[non_captured_pos..] {
                 emit!(self.writer, ", ");
                 self.translate_behavior_arg(arg);
             }
         }
+
         emit!(self.writer, ")");
+        match projection {
+            Some(ProjKind::Single(idx)) => emit!(self.writer, ")->${}", idx),
+            Some(ProjKind::Truncate(n)) => {
+                emit!(self.writer, "; $Tuple{}(", n);
+                let mut sep = "";
+                for i in 0..n {
+                    emit!(self.writer, "{}_r->${}", sep, i);
+                    sep = ", ";
+                }
+                emit!(self.writer, "))");
+            },
+            None => {},
+        }
     }
 
     /// Emit memory arguments for a function's spec memory in proper state order.
@@ -1933,7 +1984,7 @@ impl SpecTranslator<'_> {
         let uses_old = !old_memory.is_empty();
         let current = match kind {
             BehaviorKind::RequiresOf | BehaviorKind::AbortsOf => pre,
-            BehaviorKind::EnsuresOf | BehaviorKind::ResultOf => post,
+            BehaviorKind::EnsuresOf | BehaviorKind::ResultOf | BehaviorKind::WriteOf(_) => post,
         };
         let mut first = true;
         for memory in used_memory {
@@ -2017,6 +2068,7 @@ impl SpecTranslator<'_> {
             BehaviorKind::AbortsOf => "aborts_of",
             BehaviorKind::EnsuresOf => "ensures_of",
             BehaviorKind::ResultOf => "result_of",
+            BehaviorKind::WriteOf(_) => "write_of",
         };
         let struct_env = self.env.get_struct_qid(memory.to_qualified_id());
         let mem_display = struct_env.get_full_name_with_address().to_string();

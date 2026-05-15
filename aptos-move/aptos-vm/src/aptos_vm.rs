@@ -72,7 +72,9 @@ use aptos_types::{
     randomness::{PerBlockRandomness, Randomness},
     state_store::{state_key::StateKey, StateView, TStateView},
     transaction::{
-        authenticator::{AbstractAuthenticationData, AnySignature, AuthenticationProof},
+        authenticator::{
+            AbstractAuthenticationData, AnySignature, AuthenticationProof, TransactionAuthenticator,
+        },
         block_epilogue::{BlockEpiloguePayload, FeeDistribution},
         encrypted_payload::DecryptionFailureReason,
         signature_verified_transaction::SignatureVerifiedTransaction,
@@ -419,6 +421,44 @@ impl AptosVM {
                 | Ok(TransactionExecutableRef::Encrypted)
                 | Err(_) => false,
             }
+    }
+
+    /// Rejects authenticator/signature variants whose feature flag is not yet
+    /// enabled. Called from both mempool validation and the execution paths.
+    fn check_authenticator_features(
+        &self,
+        authenticator: &TransactionAuthenticator,
+    ) -> Result<(), VMStatus> {
+        if !self
+            .features()
+            .is_enabled(FeatureFlag::SINGLE_SENDER_AUTHENTICATOR)
+        {
+            if let TransactionAuthenticator::SingleSender { .. } = authenticator {
+                return Err(VMStatus::error(StatusCode::FEATURE_UNDER_GATING, None));
+            }
+        }
+
+        let webauthn_enabled = self.features().is_enabled(FeatureFlag::WEBAUTHN_SIGNATURE);
+        let slh_dsa_enabled = self
+            .features()
+            .is_enabled(FeatureFlag::SLH_DSA_SHA2_128S_SIGNATURE);
+        if !webauthn_enabled || !slh_dsa_enabled {
+            let sk_authenticators = authenticator
+                .to_single_key_authenticators()
+                .map_err(|_| VMStatus::error(StatusCode::INVALID_SIGNATURE, None))?;
+            for auth in &sk_authenticators {
+                if !webauthn_enabled && matches!(auth.signature(), AnySignature::WebAuthn { .. }) {
+                    return Err(VMStatus::error(StatusCode::FEATURE_UNDER_GATING, None));
+                }
+                if !slh_dsa_enabled
+                    && matches!(auth.signature(), AnySignature::SlhDsa_Sha2_128s { .. })
+                {
+                    return Err(VMStatus::error(StatusCode::FEATURE_UNDER_GATING, None));
+                }
+            }
+        }
+
+        Ok(())
     }
 
     /// Sets execution concurrency level when invoked the first time.
@@ -2305,6 +2345,7 @@ impl AptosVM {
             &'a C,
         ) -> G,
     {
+        self.check_authenticator_features(txn.authenticator_ref())?;
         let txn_metadata = TransactionMetadata::new(self, resolver, txn, auxiliary_info)?;
 
         let vm_params = self.gas_params(log_context)?.vm.clone();
@@ -3440,46 +3481,8 @@ impl VMValidator for AptosVM {
         let _timer = TXN_VALIDATION_SECONDS.start_timer();
         let log_context = AdapterLogSchema::new(state_view.id(), 0);
 
-        if !self
-            .features()
-            .is_enabled(FeatureFlag::SINGLE_SENDER_AUTHENTICATOR)
-        {
-            if let aptos_types::transaction::authenticator::TransactionAuthenticator::SingleSender{ .. } = transaction.authenticator_ref() {
-                return VMValidatorResult::error(StatusCode::FEATURE_UNDER_GATING);
-            }
-        }
-
-        if !self.features().is_enabled(FeatureFlag::WEBAUTHN_SIGNATURE) {
-            if let Ok(sk_authenticators) = transaction
-                .authenticator_ref()
-                .to_single_key_authenticators()
-            {
-                for authenticator in sk_authenticators {
-                    if let AnySignature::WebAuthn { .. } = authenticator.signature() {
-                        return VMValidatorResult::error(StatusCode::FEATURE_UNDER_GATING);
-                    }
-                }
-            } else {
-                return VMValidatorResult::error(StatusCode::INVALID_SIGNATURE);
-            }
-        }
-
-        if !self
-            .features()
-            .is_enabled(FeatureFlag::SLH_DSA_SHA2_128S_SIGNATURE)
-        {
-            if let Ok(sk_authenticators) = transaction
-                .authenticator_ref()
-                .to_single_key_authenticators()
-            {
-                for authenticator in sk_authenticators {
-                    if let AnySignature::SlhDsa_Sha2_128s { .. } = authenticator.signature() {
-                        return VMValidatorResult::error(StatusCode::FEATURE_UNDER_GATING);
-                    }
-                }
-            } else {
-                return VMValidatorResult::error(StatusCode::INVALID_SIGNATURE);
-            }
+        if let Err(err) = self.check_authenticator_features(transaction.authenticator_ref()) {
+            return VMValidatorResult::error(err.status_code());
         }
 
         if !self
@@ -3503,11 +3506,8 @@ impl VMValidator for AptosVM {
             return VMValidatorResult::error(StatusCode::FEATURE_UNDER_GATING);
         }
 
-        let txn = match transaction.check_signature() {
-            Ok(t) => t,
-            _ => {
-                return VMValidatorResult::error(StatusCode::INVALID_SIGNATURE);
-            },
+        let Ok(txn) = transaction.check_signature() else {
+            return VMValidatorResult::error(StatusCode::INVALID_SIGNATURE);
         };
         let auxiliary_info = AuxiliaryInfo::new_timestamp_not_yet_assigned(0);
         let resolver = self.as_move_resolver(&state_view);

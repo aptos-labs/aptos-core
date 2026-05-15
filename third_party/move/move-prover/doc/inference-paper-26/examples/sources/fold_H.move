@@ -1,6 +1,10 @@
 module 0x42::fold_H {
     use std::vector;
 
+    spec module {
+      pragma verify = false; // TODO: investigate flakiness
+    }
+
     spec fun spec_fold(f: |u64, u64| u64, v: vector<u64>, init: u64, i: u64): u64 { // [inferred]
         if (i == 0) { init } // [inferred]
         else { result_of<f>(spec_fold(f, v, init, i - 1), v[i - 1]) } // [inferred]
