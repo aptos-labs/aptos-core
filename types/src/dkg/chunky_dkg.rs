@@ -414,8 +414,7 @@ impl ChunkyDKGSession {
         let max_w = self.threshold_config.get_max_weight();
         let ell = self.public_parameters.ell.max(1);
         let c = FR_BITS.div_ceil(ell);
-        let max_bcs_size =
-            818 + 32 * n + 120 * w + 24 * max_w + 128 * (w + max_w) * c + 80 * ell;
+        let max_bcs_size = 818 + 32 * n + 120 * w + 24 * max_w + 128 * (w + max_w) * c + 80 * ell;
         const FIXED_SLACK: usize = 4 * 1024;
         max_bcs_size + FIXED_SLACK
     }
@@ -561,7 +560,7 @@ mod transcript_size_bound_tests {
             .collect();
         let eks: Vec<ChunkyEncryptPubKey> = dks
             .iter()
-            .map(|dk| dk.to(&pp.get_encryption_public_params()))
+            .map(|dk| dk.to(pp.get_encryption_public_params()))
             .collect();
         let ssk: DealerPrivateKey = Uniform::generate(&mut thread_rng());
         let spk: DealerPublicKey = ssk.verifying_key();
