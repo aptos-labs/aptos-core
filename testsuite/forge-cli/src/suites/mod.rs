@@ -5,6 +5,7 @@ pub mod dag;
 pub mod db;
 pub mod indexer;
 pub mod land_blocking;
+pub mod mainnet_mirror;
 pub mod multi_region;
 pub mod pfn;
 pub mod realistic_environment;
