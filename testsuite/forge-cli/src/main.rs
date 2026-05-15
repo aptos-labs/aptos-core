@@ -16,6 +16,7 @@ use suites::{
     dag::get_dag_test,
     indexer::get_indexer_test,
     land_blocking::get_land_blocking_test,
+    mainnet_mirror::get_mainnet_mirror_test,
     multi_region::get_multi_region_test,
     pfn::get_pfn_test,
     realistic_environment::get_realistic_env_test,
@@ -558,6 +559,7 @@ fn get_test_suite(
     let named_test_suites = [
         boxed!(|| get_land_blocking_test(test_name, duration, test_cmd))
             as Box<dyn Fn() -> Option<ForgeConfig>>,
+        boxed!(|| get_mainnet_mirror_test(test_name, duration)),
         boxed!(|| get_multi_region_test(test_name)),
         boxed!(|| get_pfn_test(test_name, duration)),
         boxed!(|| get_realistic_env_test(test_name, duration, test_cmd)),

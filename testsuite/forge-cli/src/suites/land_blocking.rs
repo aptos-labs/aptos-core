@@ -1,8 +1,10 @@
 // Copyright (c) Aptos Foundation
 // Licensed pursuant to the Innovation-Enabling Source Code License, available at https://github.com/aptos-labs/aptos-core/blob/main/LICENSE
 
-use super::ungrouped::mixed_compatible_emit_job;
-use crate::{suites::realistic_environment::realistic_env_max_load_test, TestCommand};
+use super::{
+    realistic_environment::realistic_env_max_load_test, ungrouped::mixed_compatible_emit_job,
+};
+use crate::TestCommand;
 use aptos_forge::{
     prometheus_metrics::LatencyBreakdownSlice,
     success_criteria::{

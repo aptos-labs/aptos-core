@@ -3,7 +3,7 @@ gcp--us-central1,aws--eu-west-1,300000000,103.435
 gcp--us-central1,aws--ap-northeast-1,300000000,133.996
 gcp--us-central1,aws--sa-east-1,300000000,145.483
 gcp--us-central1,aws--eu-central1,300000000,107.671
-gcp--us-central1,gcp--ca-central1,300000000,29.748
+gcp--us-central1,gcp--ca-central-1,300000000,29.748
 aws--sa-east-1,gcp--us-central1,300000000,145.703
 aws--sa-east-1,aws--eu-west-1,300000000,176.894
 aws--sa-east-1,aws--ap-northeast-1,300000000,255.289
