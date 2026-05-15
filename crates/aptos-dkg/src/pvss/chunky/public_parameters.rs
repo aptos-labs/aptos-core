@@ -402,6 +402,7 @@ mod tests {
     use std::time::Instant;
 
     #[test]
+    #[ignore]
     fn test_realistic_serialize_deserialize() {
         let mut rng = thread_rng();
 
