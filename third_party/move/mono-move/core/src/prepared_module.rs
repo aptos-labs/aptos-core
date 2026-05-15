@@ -64,13 +64,30 @@ pub struct PreparedModule {
     /// Parameter and return types for every function in the module.
     ///
     /// Indexed by [`FunctionHandleIndex`].
-    function_signatures: Vec<(InternedTypeList, InternedTypeList)>,
+    function_signatures: Vec<FunctionSignature>,
     /// Parameter and return types, as well as type arguments, for every
     /// function instantiation in this module. Parameter and return types
     /// have been substituted with type arguments already.
     ///
     /// Indexed by [`FunctionInstantiationIndex`].
-    function_instantiation_signatures: Vec<(InternedTypeList, InternedTypeList, InternedTypeList)>,
+    function_instantiation_signatures: Vec<FunctionInstantiationSignature>,
+}
+
+/// Parameter and return types of a function handle, interned.
+#[derive(Clone, Copy)]
+pub struct FunctionSignature {
+    pub params: InternedTypeList,
+    pub returns: InternedTypeList,
+}
+
+/// Parameter and return types of a function instantiation, together with the
+/// type arguments. Parameter and return types have already been substituted
+/// with the type arguments.
+#[derive(Clone, Copy)]
+pub struct FunctionInstantiationSignature {
+    pub params: InternedTypeList,
+    pub returns: InternedTypeList,
+    pub ty_args: InternedTypeList,
 }
 
 /// Field types of any struct or enum definition in this module.
@@ -198,10 +215,7 @@ impl PreparedModule {
     }
 
     /// Returns parameter and return types for the given function handle.
-    pub fn function_signature_at(
-        &self,
-        idx: FunctionHandleIndex,
-    ) -> (InternedTypeList, InternedTypeList) {
+    pub fn function_signature_at(&self, idx: FunctionHandleIndex) -> FunctionSignature {
         self.function_signatures[idx.0 as usize]
     }
 
@@ -211,7 +225,7 @@ impl PreparedModule {
     pub fn function_instantiation_signature_at(
         &self,
         idx: FunctionInstantiationIndex,
-    ) -> (InternedTypeList, InternedTypeList, InternedTypeList) {
+    ) -> FunctionInstantiationSignature {
         self.function_instantiation_signatures[idx.0 as usize]
     }
 
@@ -316,11 +330,9 @@ impl PreparedModule {
         let function_signatures = module
             .function_handles()
             .iter()
-            .map(|h| {
-                (
-                    interner.type_list_of(&signatures[h.parameters.0 as usize]),
-                    interner.type_list_of(&signatures[h.return_.0 as usize]),
-                )
+            .map(|h| FunctionSignature {
+                params: interner.type_list_of(&signatures[h.parameters.0 as usize]),
+                returns: interner.type_list_of(&signatures[h.return_.0 as usize]),
             })
             .collect::<Vec<_>>();
 
@@ -328,11 +340,15 @@ impl PreparedModule {
             .function_instantiations()
             .iter()
             .map(|inst| {
-                let (params, returns) = function_signatures[inst.handle.0 as usize];
+                let handle_sig = function_signatures[inst.handle.0 as usize];
                 let ty_args = interner.type_list_of(&signatures[inst.type_parameters.0 as usize]);
-                let params = interner.subst_type_list(params, ty_args)?;
-                let returns = interner.subst_type_list(returns, ty_args)?;
-                Ok((params, returns, ty_args))
+                let params = interner.subst_type_list(handle_sig.params, ty_args)?;
+                let returns = interner.subst_type_list(handle_sig.returns, ty_args)?;
+                Ok(FunctionInstantiationSignature {
+                    params,
+                    returns,
+                    ty_args,
+                })
             })
             .collect::<Result<Vec<_>>>()?;
 

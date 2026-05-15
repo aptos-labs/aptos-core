@@ -40,6 +40,7 @@ use specializer::{
     },
     ModuleIR,
 };
+use std::sync::Arc;
 
 /// Describes the lowering policy for converting execution IR to micro-ops.
 pub enum LoweringPolicy {
@@ -191,7 +192,12 @@ impl<'guard, 'ctx> Loader<'guard, 'ctx> {
         }
 
         // Otherwise this function is generic. Need to lookup in a separate
-        // cache.
+        // cache. The hot path performs a single hashtable lookup (and a
+        // single lock acquisition) and returns. On the rare cache miss we
+        // run the lowering pipeline without the lock held, then take the
+        // lock a second time to publish the result. Splitting the read and
+        // the install keeps the lock window short for the common hit case
+        // and avoids holding it across lowering work.
         if let Some((function, function_ms)) =
             module.get_instantiated_function_ptr(func_name, ty_args)
         {
@@ -215,7 +221,7 @@ impl<'guard, 'ctx> Loader<'guard, 'ctx> {
         module: &LoadedModule,
         func_name: InternedIdentifier,
         ty_args: InternedTypeList,
-    ) -> anyhow::Result<(Function, Vec<LoadedModuleSlot>)> {
+    ) -> anyhow::Result<(Function, Arc<[LoadedModuleSlot]>)> {
         let func_ir = module.get_function_ir(func_name)?;
         let mut loading_ctx = LoweringContext::new(self, read_set);
         try_set_lowering_requirements_for_function(
@@ -234,7 +240,7 @@ impl<'guard, 'ctx> Loader<'guard, 'ctx> {
         loading_ctx
             .discovered
             .retain(|slot| !parent_ms_ids.contains(&self.module_slot(slot).id()));
-        let function_ms = loading_ctx.discovered;
+        let function_ms = Arc::<[LoadedModuleSlot]>::from(loading_ctx.discovered);
 
         self.record_loaded_and_charge_slots(read_set, gas_meter, &function_ms, |_, _| {
             bail!("All modules are in the read-set");

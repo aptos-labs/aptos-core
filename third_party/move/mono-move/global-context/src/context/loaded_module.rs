@@ -118,14 +118,13 @@ impl ModuleMandatoryDependencies {
 
 pub struct FunctionSlot {
     pub function: FunctionPtr,
-    // TODO: consider making these a pointer (or Arc) instead.
-    pub mandatory_dependencies: Vec<LoadedModuleSlot>,
+    pub mandatory_dependencies: Arc<[LoadedModuleSlot]>,
 }
 
 impl FunctionSlot {
     /// Returns a new slot owning the monomorphic function with its mandatory
     /// dependencies.
-    pub fn new(function: Function, mandatory_dependencies: Vec<LoadedModuleSlot>) -> Self {
+    pub fn new(function: Function, mandatory_dependencies: Arc<[LoadedModuleSlot]>) -> Self {
         Self {
             function: FunctionPtr::new(Box::new(function)),
             mandatory_dependencies,
@@ -244,7 +243,7 @@ impl LoadedModule {
         &self,
         name: InternedIdentifier,
         ty_args: InternedTypeList,
-    ) -> Option<(FunctionPtr, Vec<LoadedModuleSlot>)> {
+    ) -> Option<(FunctionPtr, Arc<[LoadedModuleSlot]>)> {
         self.instantiated_functions
             .lock()
             .get(&(name, ty_args))
@@ -260,7 +259,7 @@ impl LoadedModule {
         name: InternedIdentifier,
         ty_args: InternedTypeList,
         function: Function,
-        function_ms: Vec<LoadedModuleSlot>,
+        function_ms: Arc<[LoadedModuleSlot]>,
     ) -> FunctionPtr {
         match self.instantiated_functions.lock().entry((name, ty_args)) {
             shared_dsa::Entry::Occupied(e) => e.get().function,

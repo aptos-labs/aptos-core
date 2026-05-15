@@ -25,5 +25,7 @@ pub use instruction::{
     FUNC_REF_TAG_OFFSET, FUNC_REF_TAG_RESOLVED, OBJECT_HEADER_SIZE,
 };
 pub use interner::{Interner, ModuleId};
-pub use prepared_module::{FieldTypes, PreparedModule};
+pub use prepared_module::{
+    FieldTypes, FunctionInstantiationSignature, FunctionSignature, PreparedModule,
+};
 pub use types::{convert_mut_to_immut_ref, strip_ref};

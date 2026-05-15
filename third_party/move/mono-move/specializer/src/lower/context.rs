@@ -210,16 +210,15 @@ pub fn try_build_context(
     for instr in func_ir.instrs() {
         let (handle_idx, param_list, ret_list, call_ty_args) = match instr {
             Instr::Call(_, idx, _) => {
-                let (params, returns) = module_ir.module.function_signature_at(*idx);
-                (*idx, params, returns, EMPTY_TYPE_LIST)
+                let sig = module_ir.module.function_signature_at(*idx);
+                (*idx, sig.params, sig.returns, EMPTY_TYPE_LIST)
             },
             Instr::CallGeneric(_, idx, _) => {
                 let inst = module_ir.module.function_instantiation_at(*idx);
-                let (params, returns, call_ty_args) =
-                    module_ir.module.function_instantiation_signature_at(*idx);
-                let params = interner.subst_type_list(params, ty_args)?;
-                let returns = interner.subst_type_list(returns, ty_args)?;
-                let call_ty_args = interner.subst_type_list(call_ty_args, ty_args)?;
+                let sig = module_ir.module.function_instantiation_signature_at(*idx);
+                let params = interner.subst_type_list(sig.params, ty_args)?;
+                let returns = interner.subst_type_list(sig.returns, ty_args)?;
+                let call_ty_args = interner.subst_type_list(sig.ty_args, ty_args)?;
                 (inst.handle, params, returns, call_ty_args)
             },
             _ => continue,
@@ -485,11 +484,13 @@ fn try_set_lowering_requirements_for_function_impl(
     }
     for instr in func_ir.instrs() {
         let (params, returns) = match instr {
-            Instr::Call(_, idx, _) => module_ir.module.function_signature_at(*idx),
+            Instr::Call(_, idx, _) => {
+                let sig = module_ir.module.function_signature_at(*idx);
+                (sig.params, sig.returns)
+            },
             Instr::CallGeneric(_, idx, _) => {
-                let (params, returns, _) =
-                    module_ir.module.function_instantiation_signature_at(*idx);
-                (params, returns)
+                let sig = module_ir.module.function_instantiation_signature_at(*idx);
+                (sig.params, sig.returns)
             },
             // TODO: Home slots and callee params/returns are not exhaustive.
             //       Instructions can reference types whose layouts lowering
