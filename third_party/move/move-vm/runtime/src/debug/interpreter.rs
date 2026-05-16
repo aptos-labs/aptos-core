@@ -17,7 +17,6 @@ use std::{cmp::min, fmt::Write, sync::Arc};
 
 pub(crate) trait InterpreterDebugInterface {
     fn get_stack_frames(&self, count: usize) -> ExecutionState;
-    #[allow(unused)]
     fn get_stack_depth(&self) -> usize;
     fn debug_print_stack_trace(
         &self,

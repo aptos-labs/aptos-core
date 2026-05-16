@@ -1685,7 +1685,7 @@ where
         internal_state.push_str(
             format!(
                 "*frame #{}: {} [pc = {}]:\n",
-                self.call_stack.0.len(),
+                self.get_stack_depth(),
                 current_frame.function.name_as_pretty_string(),
                 current_frame.pc,
             )
@@ -1957,7 +1957,7 @@ impl Frame {
             };
             if is_tracing_for!(TraceCategory::VMError) {
                 let mut str = String::new();
-                let abort_idx = interpreter.call_stack.0.len();
+                let abort_idx = interpreter.get_stack_depth();
                 if let Err(print_err) = interpreter
                     .debug_print_stack_trace(&mut str, interpreter.loader.runtime_environment())
                 {
