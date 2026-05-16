@@ -14,6 +14,8 @@ use std::{
     str::FromStr,
 };
 
+pub mod interpreter;
+
 // ── Batch-command queue ───────────────────
 
 thread_local! {
@@ -336,6 +338,7 @@ impl DebugContext {
                                     function,
                                     locals,
                                     runtime_environment,
+                                    interpreter,
                                     false,
                                 )
                                 .unwrap();
