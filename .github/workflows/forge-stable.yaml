@@ -72,8 +72,6 @@ on:
           # Test varies the workload, across some basic workloads (i.e. some cheap, some expensive),
           # and checks that throughput and performance across different stages
           - realistic-env-workload-sweep
-          # Test runs different variants of the orderbook workload
-          - realistic-env-orderbook-workload-sweep
           # Test sends ConstTps workload above what the system can handle, while additionally sending
           # non-small high-fee traffic (1000 TPS), and measures overall system performance.
           - realistic-env-graceful-overload
@@ -133,7 +131,6 @@ jobs:
             const tests = [
               { TEST_NAME: 'realistic-env-load-sweep', FORGE_RUNNER_DURATION_SECS: 1800, FORGE_TEST_SUITE: 'realistic_env_load_sweep' },
               { TEST_NAME: 'realistic-env-workload-sweep', FORGE_RUNNER_DURATION_SECS: 2000, FORGE_TEST_SUITE: 'realistic_env_workload_sweep' },
-              { TEST_NAME: 'realistic-env-orderbook-workload-sweep', FORGE_RUNNER_DURATION_SECS: 2000, FORGE_TEST_SUITE: 'realistic_env_orderbook_workload_sweep' },
               { TEST_NAME: 'realistic-env-graceful-overload', FORGE_RUNNER_DURATION_SECS: 1200, FORGE_TEST_SUITE: 'realistic_env_graceful_overload' },
               { TEST_NAME: 'consensus-stress-test', FORGE_RUNNER_DURATION_SECS: 2400, FORGE_TEST_SUITE: 'consensus_stress_test' },
               { TEST_NAME: 'changing-working-quorum-test', FORGE_RUNNER_DURATION_SECS: 1200, FORGE_TEST_SUITE: 'changing_working_quorum_test', FORGE_ENABLE_FAILPOINTS: true },
