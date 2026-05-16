@@ -78,9 +78,13 @@ pub(crate) fn realistic_env_sweep_wrap(
             config.execution.processed_transactions_detailed_counters = true;
         }))
         .add_network_test(wrap_with_realistic_env(num_validators, test))
-        // Test inherits the main EmitJobRequest, so update here for more precise latency measurements
+        // Test inherits the main EmitJobRequest, so update here for more precise latency measurements.
+        // mint_to_root allows the framework account to auto-refill its own balance between workloads
+        // (needed because the 10x gas cost increase makes multi-workload sweeps exhaust the source account).
         .with_emit_job(
-            EmitJobRequest::default().latency_polling_interval(Duration::from_millis(100)),
+            EmitJobRequest::default()
+                .latency_polling_interval(Duration::from_millis(100))
+                .set_mint_to_root(),
         )
         .with_genesis_helm_config_fn(Arc::new(|helm_values| {
             // no epoch change.
