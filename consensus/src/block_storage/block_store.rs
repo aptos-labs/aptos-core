@@ -56,12 +56,17 @@ pub mod sync_manager;
 
 fn update_counters_for_ordered_blocks(ordered_blocks: &[Arc<PipelinedBlock>]) {
     for block in ordered_blocks {
-        observe_block(block.block().timestamp_usecs(), BlockStage::ORDERED);
-        if block.block().is_opt_block() {
-            observe_block(
-                block.block().timestamp_usecs(),
-                BlockStage::ORDERED_OPT_BLOCK,
-            );
+        let inner = block.block();
+        observe_block(inner.timestamp_usecs(), BlockStage::ORDERED);
+        if inner.is_opt_block() {
+            observe_block(inner.timestamp_usecs(), BlockStage::ORDERED_OPT_BLOCK);
+        }
+        // NIL blocks share their parent's timestamp (block.rs:498-503); skip them.
+        if !inner.is_nil_block() {
+            let parent_ts_usecs = inner.quorum_cert().certified_block().timestamp_usecs();
+            let interval_usecs = inner.timestamp_usecs().saturating_sub(parent_ts_usecs);
+            counters::BLOCK_ORDERING_INTERVAL_SECONDS
+                .observe((interval_usecs as f64) / 1_000_000.0);
         }
     }
 }

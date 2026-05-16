@@ -2319,6 +2319,11 @@ where
         );
 
         let mut block_epilogue_txn = None;
+        // Counts user-txn `accumulate_fee_statement` calls. Incremented alongside each
+        // accumulate so any loop-exit path (including the bcs-fallback `continue`) keeps
+        // this in sync. Passed as `num_committed` to `finish_*` so block-level counters
+        // (`BLOCK_COMMITTED_TXNS`, `BLOCK_TXNS_CUT_BY_LIMIT`) report user-txn counts only.
+        let mut num_committed_user_txns: u32 = 0;
         let mut idx = 0;
         while idx <= num_txns {
             let txn = if idx != num_txns {
@@ -2412,6 +2417,12 @@ where
                         read_write_summary,
                         approx_output_size,
                     );
+                    if idx < num_txns {
+                        // Exclude the block-epilogue (idx == num_txns) so num_committed_user_txns
+                        // tracks only user txns. Includes bcs-fallback discards (which accumulate
+                        // a fee statement before being discarded), consistent with the accumulator.
+                        num_committed_user_txns += 1;
+                    }
 
                     // Drop to acquire a write lock, then re-assign the output_before_guard.
                     drop(output_before_guard);
@@ -2639,8 +2650,8 @@ where
         }
 
         block_limit_processor.finish_sequential_update_counters_and_log_info(
-            ret.len() as u32,
-            num_txns as u32 + block_epilogue_txn.as_ref().map_or(0, |_| 1),
+            num_committed_user_txns,
+            num_txns as u32,
         );
 
         counters::update_state_counters(unsync_map.stats(), false);

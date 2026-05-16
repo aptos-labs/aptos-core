@@ -1732,6 +1732,57 @@ impl SpecTranslator<'_> {
 
         let eval_fun_name = boogie_behavioral_eval_fun_name(self.env, &inst_fun_type, kind);
 
+        // The `ResultOf`/`WriteOf(j)` evaluator shares a single tuple Skolem
+        // returning `(declared..., post_states...)`. Compute the projection
+        // needed at this call site — matches `translate_behavior_for_closure`.
+        let (num_explicit_results, num_mut_refs) = match &inst_fun_type {
+            Type::Fun(arg_ty, result_ty, _) => {
+                let n_args = arg_ty
+                    .clone()
+                    .flatten()
+                    .iter()
+                    .filter(|ty| ty.is_mutable_reference())
+                    .count();
+                ((*result_ty).clone().flatten().len(), n_args)
+            },
+            _ => (0, 0),
+        };
+        let total_outputs = num_explicit_results + num_mut_refs;
+        let multi_in_boogie = total_outputs > 1;
+        let projection = match kind {
+            BehaviorKind::ResultOf if multi_in_boogie && total_outputs > num_explicit_results => {
+                if num_explicit_results == 1 {
+                    Some(ProjKind::Single(0))
+                } else {
+                    Some(ProjKind::Truncate(num_explicit_results))
+                }
+            },
+            BehaviorKind::WriteOf(j) if multi_in_boogie => {
+                Some(ProjKind::Single(num_explicit_results + j))
+            },
+            _ => None,
+        };
+
+        // For `ResultOf`, `wrap_mut_ref_bp_inputs` appends trailing post-state
+        // clones to `pred_args`. The tuple Skolem doesn't take them — the
+        // post-state is in its output tuple instead — so skip them here.
+        // `WriteOf(j)` never has trailing post-state clones.
+        let emit_arg_count = match kind {
+            BehaviorKind::ResultOf => {
+                let num_inputs = match &inst_fun_type {
+                    Type::Fun(arg_ty, _, _) => arg_ty.clone().flatten().len(),
+                    _ => pred_args.len(),
+                };
+                num_inputs.min(pred_args.len())
+            },
+            _ => pred_args.len(),
+        };
+
+        match projection {
+            Some(ProjKind::Single(_)) => emit!(self.writer, "("),
+            Some(ProjKind::Truncate(_)) => emit!(self.writer, "(var _r := "),
+            None => {},
+        }
         emit!(self.writer, "{}(", eval_fun_name);
         let has_mem =
             self.emit_evaluator_memory_args(node_id, &inst_fun_type, kind, &range.pre, &range.post);
@@ -1761,11 +1812,19 @@ impl SpecTranslator<'_> {
         } else {
             (None, None)
         };
-        let last_idx = pred_args.len().saturating_sub(1);
-        for (i, arg) in pred_args.iter().enumerate() {
+        // `post_sub` substitutes the last `pred_args` slot — that's the trailing
+        // post-state clone for `EnsuresOf`. For `ResultOf` we've truncated away
+        // that slot, so the substitution would land on an input by mistake; gate
+        // it accordingly.
+        let post_sub_idx = if matches!(kind, BehaviorKind::ResultOf) {
+            None
+        } else {
+            Some(pred_args.len().saturating_sub(1))
+        };
+        for (i, arg) in pred_args.iter().take(emit_arg_count).enumerate() {
             emit!(self.writer, ", ");
             if let Some(ref var) = post_sub {
-                if i == last_idx {
+                if Some(i) == post_sub_idx {
                     emit!(self.writer, "{}", var);
                     continue;
                 }
@@ -1779,6 +1838,19 @@ impl SpecTranslator<'_> {
             self.translate_behavior_arg(arg);
         }
         emit!(self.writer, ")");
+        match projection {
+            Some(ProjKind::Single(idx)) => emit!(self.writer, ")->${}", idx),
+            Some(ProjKind::Truncate(n)) => {
+                emit!(self.writer, "; $Tuple{}(", n);
+                let mut sep = "";
+                for i in 0..n {
+                    emit!(self.writer, "{}_r->${}", sep, i);
+                    sep = ", ";
+                }
+                emit!(self.writer, "))");
+            },
+            None => {},
+        }
     }
 
     /// Position of the first `&mut T` parameter in a function type — used by
