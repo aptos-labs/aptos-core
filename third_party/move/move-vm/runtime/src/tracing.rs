@@ -36,7 +36,7 @@ thread_local! {
         env::var(MOVE_VM_STEPPING_ENV_VAR_NAME).is_ok()
             || env::var(MOVE_VM_STEP_COMMANDS_ENV_VAR_NAME).is_ok()
     );
-    static DEBUG_CONTEXT: RefCell<DebugContext> = RefCell::new(DebugContext::new());
+    static DEBUG_CONTEXT: RefCell<DebugContext> = RefCell::new(DebugContext::new_stdin());
 }
 
 /// Turn tracing on or off, saving info to the path.
