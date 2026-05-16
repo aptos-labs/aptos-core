@@ -5,6 +5,17 @@ base:
     from_file: "/opt/aptos/genesis/waypoint.txt"
 
 consensus:
+  # ----------------------------------------------------------------------
+  # Trusted setup files for chunky DKG / batch encryption.
+  # Required for validators on non-test chains.
+  #
+  # To enable:
+  #   1. Mount `digest_key.bin` and `pp.bin` into the validator container
+  #      (uncomment the matching bind mounts in docker-compose.yaml).
+  #   2. Uncomment the two lines immediately below.
+  # ----------------------------------------------------------------------
+  # digest_key_blob_path: /opt/aptos/genesis/digest_key.bin
+  # public_parameters_blob_path: /opt/aptos/genesis/pp.bin
   safety_rules:
     service:
       type: "local"

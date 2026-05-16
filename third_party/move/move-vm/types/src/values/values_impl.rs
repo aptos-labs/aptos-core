@@ -4728,37 +4728,61 @@ impl Debug for Value {
 *
 **************************************************************************************/
 
+/// Cap recursive `Display` of a `Value` so deeply nested values cannot blow the
+/// formatting thread's stack. Every recursive path (Value↔Container, Locals→Value,
+/// Closure→Value) flows through `fmt_value`, so a single check at its entry is
+/// sufficient; intermediate `fmt_*` helpers just thread `depth + 1` through.
+const MAX_DISPLAY_DEPTH: usize = 8;
+
+/// Adapter that re-enters depth-bounded `Display` on a `&Value`. Lets call sites
+/// that build up `format!` / `Vec<String>` plumbing (e.g. `Locals`, `Closure`)
+/// keep their existing shape while still participating in depth bounding.
+pub(crate) struct DepthDisplay<'a>(pub &'a Value, pub usize);
+
+impl<'a> Display for DepthDisplay<'a> {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        fmt_value(self.0, f, self.1)
+    }
+}
+
+fn fmt_value(v: &Value, f: &mut fmt::Formatter, depth: usize) -> fmt::Result {
+    if depth > MAX_DISPLAY_DEPTH {
+        return write!(f, "...");
+    }
+    match v {
+        Value::Invalid => write!(f, "Invalid"),
+
+        Value::U8(x) => write!(f, "U8({})", x),
+        Value::U16(x) => write!(f, "U16({})", x),
+        Value::U32(x) => write!(f, "U32({})", x),
+        Value::U64(x) => write!(f, "U64({})", x),
+        Value::U128(x) => write!(f, "U128({})", x),
+        Value::U256(x) => write!(f, "U256({})", x),
+        Value::I8(x) => write!(f, "I8({})", x),
+        Value::I16(x) => write!(f, "I16({})", x),
+        Value::I32(x) => write!(f, "I32({})", x),
+        Value::I64(x) => write!(f, "I64({})", x),
+        Value::I128(x) => write!(f, "I128({})", x),
+        Value::I256(x) => write!(f, "I256({})", x),
+        Value::Bool(x) => write!(f, "{}", x),
+        Value::Address(addr) => write!(f, "Address({})", addr.short_str_lossless()),
+
+        Value::Container(r) => fmt_container(r, f, depth + 1),
+
+        Value::ContainerRef(r) => write!(f, "{}", r),
+        Value::IndexedRef(r) => write!(f, "{}", r),
+
+        Value::ClosureValue(c) => super::function_values_impl::fmt_closure(c, f, depth + 1),
+
+        // Display information must be deterministic, so we cannot print
+        // inner fields.
+        Value::DelayedFieldID { .. } => write!(f, "Delayed(?)"),
+    }
+}
+
 impl Display for Value {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        match self {
-            Self::Invalid => write!(f, "Invalid"),
-
-            Self::U8(x) => write!(f, "U8({})", x),
-            Self::U16(x) => write!(f, "U16({})", x),
-            Self::U32(x) => write!(f, "U32({})", x),
-            Self::U64(x) => write!(f, "U64({})", x),
-            Self::U128(x) => write!(f, "U128({})", x),
-            Self::U256(x) => write!(f, "U256({})", x),
-            Self::I8(x) => write!(f, "I8({})", x),
-            Self::I16(x) => write!(f, "I16({})", x),
-            Self::I32(x) => write!(f, "I32({})", x),
-            Self::I64(x) => write!(f, "I64({})", x),
-            Self::I128(x) => write!(f, "I128({})", x),
-            Self::I256(x) => write!(f, "I256({})", x),
-            Self::Bool(x) => write!(f, "{}", x),
-            Self::Address(addr) => write!(f, "Address({})", addr.short_str_lossless()),
-
-            Self::Container(r) => write!(f, "{}", r),
-
-            Self::ContainerRef(r) => write!(f, "{}", r),
-            Self::IndexedRef(r) => write!(f, "{}", r),
-
-            Self::ClosureValue(c) => write!(f, "{}", c),
-
-            // Display information must be deterministic, so we cannot print
-            // inner fields.
-            Self::DelayedFieldID { .. } => write!(f, "Delayed(?)"),
-        }
+        fmt_value(self, f, 0)
     }
 }
 
@@ -4796,47 +4820,54 @@ impl Display for IndexedRef {
     }
 }
 
+fn fmt_container(c: &Container, f: &mut fmt::Formatter, depth: usize) -> fmt::Result {
+    write!(f, "(container: ")?;
+
+    match c {
+        Container::Locals(r) | Container::Vec(r) | Container::Struct(r) => {
+            display_list_of_items(r.borrow().iter().map(|v| DepthDisplay(v, depth + 1)), f)
+        },
+        Container::VecU8(r) => display_list_of_items(r.borrow().iter(), f),
+        Container::VecU16(r) => display_list_of_items(r.borrow().iter(), f),
+        Container::VecU32(r) => display_list_of_items(r.borrow().iter(), f),
+        Container::VecU64(r) => display_list_of_items(r.borrow().iter(), f),
+        Container::VecU128(r) => display_list_of_items(r.borrow().iter(), f),
+        Container::VecU256(r) => display_list_of_items(r.borrow().iter(), f),
+        Container::VecI8(r) => display_list_of_items(r.borrow().iter(), f),
+        Container::VecI16(r) => display_list_of_items(r.borrow().iter(), f),
+        Container::VecI32(r) => display_list_of_items(r.borrow().iter(), f),
+        Container::VecI64(r) => display_list_of_items(r.borrow().iter(), f),
+        Container::VecI128(r) => display_list_of_items(r.borrow().iter(), f),
+        Container::VecI256(r) => display_list_of_items(r.borrow().iter(), f),
+        Container::VecBool(r) => display_list_of_items(r.borrow().iter(), f),
+        Container::VecAddress(r) => display_list_of_items(r.borrow().iter(), f),
+    }?;
+
+    write!(f, ")")
+}
+
 impl Display for Container {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        write!(f, "(container: ")?;
-
-        match self {
-            Self::Locals(r) | Self::Vec(r) | Self::Struct(r) => {
-                display_list_of_items(r.borrow().iter(), f)
-            },
-            Self::VecU8(r) => display_list_of_items(r.borrow().iter(), f),
-            Self::VecU16(r) => display_list_of_items(r.borrow().iter(), f),
-            Self::VecU32(r) => display_list_of_items(r.borrow().iter(), f),
-            Self::VecU64(r) => display_list_of_items(r.borrow().iter(), f),
-            Self::VecU128(r) => display_list_of_items(r.borrow().iter(), f),
-            Self::VecU256(r) => display_list_of_items(r.borrow().iter(), f),
-            Self::VecI8(r) => display_list_of_items(r.borrow().iter(), f),
-            Self::VecI16(r) => display_list_of_items(r.borrow().iter(), f),
-            Self::VecI32(r) => display_list_of_items(r.borrow().iter(), f),
-            Self::VecI64(r) => display_list_of_items(r.borrow().iter(), f),
-            Self::VecI128(r) => display_list_of_items(r.borrow().iter(), f),
-            Self::VecI256(r) => display_list_of_items(r.borrow().iter(), f),
-            Self::VecBool(r) => display_list_of_items(r.borrow().iter(), f),
-            Self::VecAddress(r) => display_list_of_items(r.borrow().iter(), f),
-        }?;
-
-        write!(f, ")")
+        fmt_container(self, f, 0)
     }
+}
+
+fn fmt_locals(l: &Locals, f: &mut fmt::Formatter, depth: usize) -> fmt::Result {
+    write!(
+        f,
+        "{}",
+        l.0.borrow()
+            .iter()
+            .enumerate()
+            .map(|(idx, val)| format!("[{}] {}", idx, DepthDisplay(val, depth + 1)))
+            .collect::<Vec<_>>()
+            .join("\n")
+    )
 }
 
 impl Display for Locals {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        write!(
-            f,
-            "{}",
-            self.0
-                .borrow()
-                .iter()
-                .enumerate()
-                .map(|(idx, val)| format!("[{}] {}", idx, val))
-                .collect::<Vec<_>>()
-                .join("\n")
-        )
+        fmt_locals(self, f, 0)
     }
 }
 
