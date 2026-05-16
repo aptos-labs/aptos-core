@@ -1,0 +1,9 @@
+
+Diagnostics:
+warning: [lint] constant `INTERNAL` is unused
+  ┌─ tests/model_ast_lints/unused/truly_unused/public_const_no_warning.move:8:5
+  │
+8 │     const INTERNAL: u64 = 42;
+  │     ^^^^^^^^^^^^^^^^^^^^^^^^^
+  │
+  = Remove it, or suppress this warning with `#[test_only]` (if for test-only) or `#[lint::skip(unused_constant)]` (if for spec-only or otherwise needed).

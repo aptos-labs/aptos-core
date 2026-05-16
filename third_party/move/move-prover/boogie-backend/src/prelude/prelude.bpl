@@ -484,6 +484,18 @@ datatype $Tuple8<T1, T2, T3, T4, T5, T6, T7, T8> {
     $Tuple8($0: T1, $1: T2, $2: T3, $3: T4, $4: T5, $5: T6, $6: T7, $7: T8)
 }
 
+datatype $Tuple9<T1, T2, T3, T4, T5, T6, T7, T8, T9> {
+    $Tuple9($0: T1, $1: T2, $2: T3, $3: T4, $4: T5, $5: T6, $6: T7, $7: T8, $8: T9)
+}
+
+datatype $Tuple10<T1, T2, T3, T4, T5, T6, T7, T8, T9, T10> {
+    $Tuple10($0: T1, $1: T2, $2: T3, $3: T4, $4: T5, $5: T6, $6: T7, $7: T8, $8: T9, $9: T10)
+}
+
+datatype $Tuple11<T1, T2, T3, T4, T5, T6, T7, T8, T9, T10, T11> {
+    $Tuple11($0: T1, $1: T2, $2: T3, $3: T4, $4: T5, $5: T6, $6: T7, $7: T8, $8: T9, $9: T10, $10: T11)
+}
+
 {%- for tuple in tuple_instances %}
 
 function {:inline} $IsValid'$tup{{tuple.arity}}'{{tuple.suffix}}''(t: $Tuple{{tuple.arity}}{% for e in tuple.elements %} ({{e.name}}){% endfor %}): bool {

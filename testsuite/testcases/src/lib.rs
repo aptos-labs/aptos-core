@@ -29,8 +29,9 @@ pub mod validator_reboot_stress_test;
 use anyhow::Context;
 use aptos_forge::{
     prometheus_metrics::{fetch_latency_breakdown, LatencyBreakdown},
-    EmitJob, EmitJobRequest, NetworkContext, NetworkContextSynchronizer, NetworkTest, NodeExt,
-    Result, Swarm, SwarmExt, Test, TestReport, TxnEmitter, TxnStats, Version,
+    wait_for_clients_to_be_txn_ready, EmitJob, EmitJobRequest, NetworkContext,
+    NetworkContextSynchronizer, NetworkTest, NodeExt, Result, Swarm, SwarmExt, Test, TestReport,
+    TxnEmitter, TxnStats, Version,
 };
 use aptos_logger::warn;
 use aptos_rest_client::Client as RestClient;
@@ -51,6 +52,14 @@ use tokio::runtime::{Handle, Runtime};
 const DEFAULT_REST_CLIENT_TIMEOUT_SECS: u64 = 30;
 pub const WARMUP_DURATION_FRACTION: f32 = 0.07;
 pub const COOLDOWN_DURATION_FRACTION: f32 = 0.04;
+
+/// Bounds for the txn-ready probe used before emitting load against a chosen client set.
+/// The timestamp bound is the load-bearing check (catches PFNs that haven't peered or
+/// validators that just restarted); the version bound is a sanity check that the chosen
+/// clients agree with each other. The overall timeout caps how long we'll wait.
+const TXN_READY_MAX_LAG_VERSIONS: u64 = 1_000;
+const TXN_READY_MAX_TIMESTAMP_LAG: Duration = Duration::from_secs(30);
+const TXN_READY_TIMEOUT: Duration = Duration::from_secs(120);
 
 async fn batch_update(
     ctx: &mut NetworkContext<'_>,
@@ -172,6 +181,14 @@ pub async fn generate_traffic(
         .read()
         .await
         .get_clients_for_peers(nodes, Duration::from_secs(DEFAULT_REST_CLIENT_TIMEOUT_SECS));
+    wait_for_clients_to_be_txn_ready(
+        &clients,
+        TXN_READY_MAX_LAG_VERSIONS,
+        TXN_READY_MAX_TIMESTAMP_LAG,
+        TXN_READY_TIMEOUT,
+    )
+    .await
+    .context("wait for traffic clients to be txn-ready")?;
     let (emitter, emit_job_request) =
         create_emitter_and_request(ctx.swarm.clone(), emit_job_request, clients, rng).await?;
 
@@ -390,6 +407,14 @@ pub async fn create_buffered_load(
 ) -> Result<Vec<LoadTestPhaseStats>> {
     // Generate some traffic
     let clients = clients_to_send_load_to.clone();
+    wait_for_clients_to_be_txn_ready(
+        &clients,
+        TXN_READY_MAX_LAG_VERSIONS,
+        TXN_READY_MAX_TIMESTAMP_LAG,
+        TXN_READY_TIMEOUT,
+    )
+    .await
+    .context("wait for load clients to be txn-ready")?;
     let (mut emitter, emit_job_request) = create_emitter_and_request(
         swarm.clone(),
         emit_job_request,

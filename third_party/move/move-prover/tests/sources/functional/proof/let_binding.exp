@@ -12,5 +12,4 @@ error: proof assertion not satisfied
    =         x = <redacted>
    =     at tests/sources/functional/proof/let_binding.move:65: offset_by_two
    =         result = <redacted>
-   =     at tests/sources/functional/proof/let_binding.move:66: offset_by_two
    =     at tests/sources/functional/proof/let_binding.move:72: offset_by_two (spec)

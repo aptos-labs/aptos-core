@@ -4,19 +4,12 @@
 //! Defines the [`ExecutionContext`] trait the interpreter calls into,
 //! and a minimal [`LocalExecutionContext`] impl for tests and benchmarks.
 
-use crate::{ExecutableId, Function};
-use mono_move_alloc::{ExecutableArenaPtr, GlobalArenaPtr};
+use crate::{
+    interner::{InternedIdentifier, InternedModuleId},
+    types::InternedTypeList,
+    FunctionPtr,
+};
 use mono_move_gas::{GasMeter, NoOpGasMeter, SimpleGasMeter};
-
-pub trait FunctionResolver {
-    /// Resolves a cross-module function reference. Returns [`None`] if
-    /// the module or function isn't loaded.
-    fn resolve_function(
-        &self,
-        executable_id: GlobalArenaPtr<ExecutableId>,
-        name: GlobalArenaPtr<str>,
-    ) -> Option<ExecutableArenaPtr<Function>>;
-}
 
 /// Runtime context consulted by the interpreter during execution: gas
 /// charging and cross-module function resolution.
@@ -25,12 +18,14 @@ pub trait ExecutionContext {
     fn gas_meter(&mut self) -> &mut impl GasMeter;
 
     /// Resolve a runtime function call.
-    /// May trigger lazy module loading and gas charge on a cache miss.
+    /// May trigger lazy module loading, gas charge on a cache miss, and
+    /// lowering of the function's code.
     fn load_function(
         &mut self,
-        executable_id: GlobalArenaPtr<ExecutableId>,
-        name: GlobalArenaPtr<str>,
-    ) -> anyhow::Result<ExecutableArenaPtr<Function>>;
+        module_id: InternedModuleId,
+        name: InternedIdentifier,
+        ty_args: InternedTypeList,
+    ) -> anyhow::Result<FunctionPtr>;
 }
 
 /// A [`ExecutionContext`] that supports only local execution within a
@@ -74,9 +69,10 @@ impl<G: GasMeter> ExecutionContext for LocalExecutionContext<G> {
 
     fn load_function(
         &mut self,
-        _executable_id: GlobalArenaPtr<ExecutableId>,
-        _name: GlobalArenaPtr<str>,
-    ) -> anyhow::Result<ExecutableArenaPtr<Function>> {
+        _module_id: InternedModuleId,
+        _name: InternedIdentifier,
+        _ty_args: InternedTypeList,
+    ) -> anyhow::Result<FunctionPtr> {
         anyhow::bail!("LocalExecutionContext: load_function not supported")
     }
 }

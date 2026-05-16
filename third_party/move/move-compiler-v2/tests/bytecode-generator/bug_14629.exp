@@ -34,6 +34,7 @@ module 0x8675309::M {
     struct X<T> has drop, key {
         r: T,
     }
+    const MAX_U64: u128 = 18446744073709551615u128;
     fun t0() {
         let y = R<X<u64>>{r: X<u64>{r: 0}};
         let R<X<u64>>{r: _r} = y;

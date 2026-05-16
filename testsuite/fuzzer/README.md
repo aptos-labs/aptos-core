@@ -174,7 +174,7 @@ This command is selective, so only the specified, comma-separated statuses will 
 - [Rust Fuzz Book](https://rust-fuzz.github.io/book/)
 - [Google OSS-Fuzz](https://google.github.io/oss-fuzz/)
 - [Arbitrary](https://docs.rs/arbitrary/latest/arbitrary/)
-- [Native Functions](https://aptos.dev/en/build/smart-contracts/move-reference?branch=mainnet&page=move-stdlib%2Fdoc%2Fmem.md)
+- [Native Functions](https://aptos-labs.github.io/framework-book/move-stdlib/mem.html)
 
 ## Contribute
 Contributions to enhance the `fuzz.sh` script and the fuzz testing suite are welcome.

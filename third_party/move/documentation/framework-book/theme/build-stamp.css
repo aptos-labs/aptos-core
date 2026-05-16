@@ -1,0 +1,8 @@
+.build-stamp {
+  margin-top: 4em;
+  padding-top: 1em;
+  border-top: 1px solid rgba(127, 127, 127, 0.2);
+  text-align: center;
+  font-size: 0.85em;
+  opacity: 0.6;
+}

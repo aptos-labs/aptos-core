@@ -1,0 +1,27 @@
+// RUN: publish --print(stackless,micro-ops)
+module 0x66::ret_non_monotonic
+
+fun A(): (u64, u64)
+    ld_u64 1
+    ld_u64 2
+    ret
+
+fun B(_a: u64, _b: u64, _c: u64): u64
+    ld_u64 0
+    ret
+
+fun caller(h0: u64, h1: u64): u64
+    move_loc h0
+    move_loc h1
+    call A
+    ld_u64 1
+    add
+    pop
+    call B
+    ret
+
+// RUN: execute 0x66::ret_non_monotonic::caller --args 0, 0
+// CHECK: results: 0
+
+// RUN: execute 0x66::ret_non_monotonic::caller --args 5, 7
+// CHECK: results: 0

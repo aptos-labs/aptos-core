@@ -61,19 +61,15 @@ pub fn native_merge_sort(v: &mut [u64]) {
 /// and pseudocode.
 #[cfg(feature = "micro-op")]
 mod micro_op {
-    use mono_move_alloc::{ExecutableArena, ExecutableArenaPtr, GlobalArenaPtr};
+    use mono_move_alloc::GlobalArenaPtr;
     use mono_move_core::{
-        CodeOffset as CO, FrameLayoutInfo, FrameOffset as FO, Function, MicroOp::*,
-        SortedSafePointEntries, FRAME_METADATA_SIZE,
+        Code, CodeOffset as CO, FrameLayoutInfo, FrameOffset as FO, Function, FunctionPtr,
+        MicroOp::*, SortedSafePointEntries, FRAME_METADATA_SIZE,
     };
     use mono_move_runtime::{ObjectDescriptor, ObjectDescriptorTable};
 
-    pub fn program() -> (
-        Vec<Option<ExecutableArenaPtr<Function>>>,
-        ObjectDescriptorTable,
-        ExecutableArena,
-    ) {
-        let arena = ExecutableArena::new();
+    #[rustfmt::skip]
+    pub fn program() -> (Vec<FunctionPtr>, ObjectDescriptorTable) {
         let meta = FRAME_METADATA_SIZE as u32;
 
         let mut descriptors = ObjectDescriptorTable::new();
@@ -91,39 +87,24 @@ mod micro_op {
         //   [32] metadata (24 bytes)
         //   [56] callee: vec  [64] callee: lo  [72] callee: hi
         // =================================================================
-        let func_merge_sort = {
-            let vec = 0u32;
-            let len = 8u32;
-            let vec_ref = 16u32;
-            let param_and_local_sizes_sum = 32u32;
-            let callee_vec = param_and_local_sizes_sum + meta;
-            let callee_lo = callee_vec + 8;
-            let callee_hi = callee_lo + 8;
+        let ms_vec = 0u32;
+        let ms_vec_ref = 16u32;
+        let ms_param_and_local_sizes_sum = 32u32;
+        let ms_callee_vec = ms_param_and_local_sizes_sum + meta;
+        let ms_callee_lo = ms_callee_vec + 8;
+        let ms_callee_hi = ms_callee_lo + 8;
 
-            #[rustfmt::skip]
-            let code = [
-                SlotBorrow { dst: FO(vec_ref), local: FO(vec) },
-                VecLen { dst: FO(len), vec_ref: FO(vec_ref) },
-                Move8 { dst: FO(callee_vec), src: FO(vec) },
-                StoreImm8 { dst: FO(callee_lo), imm: 0 },
-                Move8 { dst: FO(callee_hi), src: FO(len) },
-                CallFunc { func_id: 1 },
-                Return,
-            ];
-
-            let code = arena.alloc_slice_fill_iter(code);
-            arena.alloc(Function {
-                name: GlobalArenaPtr::from_static("merge_sort"),
-                code,
-                param_sizes: ExecutableArenaPtr::empty_slice(),
-                param_sizes_sum: 8,
-                param_and_local_sizes_sum: param_and_local_sizes_sum as usize,
-                extended_frame_size: (callee_hi + 8) as usize,
-                zero_frame: true,
-                frame_layout: FrameLayoutInfo::new(&arena, [FO(vec), FO(vec_ref)]),
-                safe_point_layouts: SortedSafePointEntries::empty(),
-            })
-        };
+        let merge_sort_ptr = FunctionPtr::new(Box::new(Function {
+            name: GlobalArenaPtr::from_static("merge_sort"),
+            code: Code::from_vec(vec![]),
+            param_sizes: vec![],
+            param_sizes_sum: 8,
+            param_and_local_sizes_sum: ms_param_and_local_sizes_sum as usize,
+            extended_frame_size: (ms_callee_hi + 8) as usize,
+            zero_frame: true,
+            frame_layout: FrameLayoutInfo::new(vec![FO(ms_vec), FO(ms_vec_ref)]),
+            safe_point_layouts: SortedSafePointEntries::empty(),
+        }));
 
         // =================================================================
         // Function 1 — merge_sort_range(vec, lo, hi)
@@ -140,59 +121,21 @@ mod micro_op {
         //   [40] metadata (24 bytes)
         //   [64] callee_0  [72] callee_1  [80] callee_2  [88] callee_3
         // =================================================================
-        let func_merge_sort_range = {
-            let vec = 0u32;
-            let lo = 8u32;
-            let hi = 16u32;
-            let mid = 24u32;
-            let tmp = 32u32;
-            let param_and_local_sizes_sum = 40u32;
-            let callee_0 = param_and_local_sizes_sum + meta;
-            let callee_1 = callee_0 + 8;
-            let callee_2 = callee_1 + 8;
-            let callee_3 = callee_2 + 8;
+        let msr_vec = 0u32;
+        let msr_param_and_local_sizes_sum = 40u32;
+        let msr_callee_3 = msr_param_and_local_sizes_sum + meta + 24;
 
-            #[rustfmt::skip]
-            let code = [
-                // if lo + 1 < hi, continue; else return
-                AddU64Imm { dst: FO(tmp), src: FO(lo), imm: 1 },
-                JumpLessU64 { target: CO(3), lhs: FO(tmp), rhs: FO(hi) },
-                Return,
-                // mid = (lo + hi) / 2
-                AddU64 { dst: FO(mid), lhs: FO(lo), rhs: FO(hi) },
-                ShrU64Imm { dst: FO(mid), src: FO(mid), imm: 1 },
-                // merge_sort_range(vec, lo, mid)
-                Move8 { dst: FO(callee_0), src: FO(vec) },
-                Move8 { dst: FO(callee_1), src: FO(lo) },
-                Move8 { dst: FO(callee_2), src: FO(mid) },
-                CallFunc { func_id: 1 },
-                // merge_sort_range(vec, mid, hi)
-                Move8 { dst: FO(callee_0), src: FO(vec) },
-                Move8 { dst: FO(callee_1), src: FO(mid) },
-                Move8 { dst: FO(callee_2), src: FO(hi) },
-                CallFunc { func_id: 1 },
-                // merge(vec, lo, mid, hi)
-                Move8 { dst: FO(callee_0), src: FO(vec) },
-                Move8 { dst: FO(callee_1), src: FO(lo) },
-                Move8 { dst: FO(callee_2), src: FO(mid) },
-                Move8 { dst: FO(callee_3), src: FO(hi) },
-                CallFunc { func_id: 2 },
-                Return,
-            ];
-
-            let code = arena.alloc_slice_fill_iter(code);
-            arena.alloc(Function {
-                name: GlobalArenaPtr::from_static("merge_sort_range"),
-                code,
-                param_sizes: ExecutableArenaPtr::empty_slice(),
-                param_sizes_sum: 24,
-                param_and_local_sizes_sum: param_and_local_sizes_sum as usize,
-                extended_frame_size: (callee_3 + 8) as usize,
-                zero_frame: true,
-                frame_layout: FrameLayoutInfo::new(&arena, [FO(vec)]),
-                safe_point_layouts: SortedSafePointEntries::empty(),
-            })
-        };
+        let merge_sort_range_ptr = FunctionPtr::new(Box::new(Function {
+            name: GlobalArenaPtr::from_static("merge_sort_range"),
+            code: Code::from_vec(vec![]),
+            param_sizes: vec![],
+            param_sizes_sum: 24,
+            param_and_local_sizes_sum: msr_param_and_local_sizes_sum as usize,
+            extended_frame_size: (msr_callee_3 + 8) as usize,
+            zero_frame: true,
+            frame_layout: FrameLayoutInfo::new(vec![FO(msr_vec)]),
+            safe_point_layouts: SortedSafePointEntries::empty(),
+        }));
 
         // =================================================================
         // Function 2 — merge(vec, lo, mid, hi)
@@ -212,113 +155,163 @@ mod micro_op {
         //   [56] elem_a   [64] elem_b   [72] k        [80] tmp_idx
         //   [88] vec_ref (16 bytes)     [104] tmp_ref (16 bytes)
         // =================================================================
-        let func_merge = {
-            let vec = 0u32;
+        let m_vec = 0u32;
+        let m_tmp = 32u32;
+        let m_vec_ref = 88u32;
+        let m_tmp_ref = 104u32;
+
+        let merge_ptr = FunctionPtr::new(Box::new(Function {
+            name: GlobalArenaPtr::from_static("merge"),
+            code: Code::from_vec(vec![]),
+            param_sizes: vec![],
+            param_sizes_sum: 32,
+            param_and_local_sizes_sum: 120,
+            extended_frame_size: 144,
+            zero_frame: true,
+            frame_layout: FrameLayoutInfo::new(vec![
+                FO(m_vec),
+                FO(m_tmp),
+                FO(m_vec_ref),
+                FO(m_tmp_ref),
+            ]),
+            safe_point_layouts: SortedSafePointEntries::empty(),
+        }));
+
+        let merge_sort_code = {
+            let vec = ms_vec;
+            let len = 8u32;
+            let vec_ref = ms_vec_ref;
+            let callee_vec = ms_callee_vec;
+            let callee_lo = ms_callee_lo;
+            let callee_hi = ms_callee_hi;
+
+            vec![
+                SlotBorrow { dst: FO(vec_ref), local: FO(vec) },
+                VecLen { dst: FO(len), vec_ref: FO(vec_ref) },
+                Move8 { dst: FO(callee_vec), src: FO(vec) },
+                StoreImm8 { dst: FO(callee_lo), imm: 0 },
+                Move8 { dst: FO(callee_hi), src: FO(len) },
+                CallDirect { ptr: merge_sort_range_ptr },
+                Return,
+            ]
+        };
+
+        let merge_sort_range_code = {
+            let vec = msr_vec;
+            let lo = 8u32;
+            let hi = 16u32;
+            let mid = 24u32;
+            let tmp = 32u32;
+            let callee_0 = msr_param_and_local_sizes_sum + meta;
+            let callee_1 = callee_0 + 8;
+            let callee_2 = callee_1 + 8;
+            let callee_3 = callee_2 + 8;
+
+            vec![
+                AddU64Imm { dst: FO(tmp), src: FO(lo), imm: 1 },
+                JumpLessU64 { target: CO(3), lhs: FO(tmp), rhs: FO(hi) },
+                Return,
+                AddU64 { dst: FO(mid), lhs: FO(lo), rhs: FO(hi) },
+                ShrU64Imm { dst: FO(mid), src: FO(mid), imm: 1 },
+                Move8 { dst: FO(callee_0), src: FO(vec) },
+                Move8 { dst: FO(callee_1), src: FO(lo) },
+                Move8 { dst: FO(callee_2), src: FO(mid) },
+                CallDirect { ptr: merge_sort_range_ptr },
+                Move8 { dst: FO(callee_0), src: FO(vec) },
+                Move8 { dst: FO(callee_1), src: FO(mid) },
+                Move8 { dst: FO(callee_2), src: FO(hi) },
+                CallDirect { ptr: merge_sort_range_ptr },
+                Move8 { dst: FO(callee_0), src: FO(vec) },
+                Move8 { dst: FO(callee_1), src: FO(lo) },
+                Move8 { dst: FO(callee_2), src: FO(mid) },
+                Move8 { dst: FO(callee_3), src: FO(hi) },
+                CallDirect { ptr: merge_ptr },
+                Return,
+            ]
+        };
+
+        let merge_code = {
+            let vec = m_vec;
             let lo = 8u32;
             let mid = 16u32;
             let hi = 24u32;
-            let tmp = 32u32;
+            let tmp = m_tmp;
             let i = 40u32;
             let j = 48u32;
             let elem_a = 56u32;
             let elem_b = 64u32;
             let k = 72u32;
             let tmp_idx = 80u32;
-            let vec_ref = 88u32;
-            let tmp_ref = 104u32;
+            let vec_ref = m_vec_ref;
+            let tmp_ref = m_tmp_ref;
 
-            #[rustfmt::skip]
-            let code = [
-                // i = lo; j = mid; tmp = new vec
+            vec![
                 Move8 { dst: FO(i), src: FO(lo) },                              // 0
                 Move8 { dst: FO(j), src: FO(mid) },                             // 1
-                VecNew { dst: FO(tmp) },                                          // 2
-                SlotBorrow { dst: FO(vec_ref), local: FO(vec) },                 // 3
-                SlotBorrow { dst: FO(tmp_ref), local: FO(tmp) },                 // 4
+                VecNew { dst: FO(tmp) },                                        // 2
+                SlotBorrow { dst: FO(vec_ref), local: FO(vec) },                // 3
+                SlotBorrow { dst: FO(tmp_ref), local: FO(tmp) },                // 4
 
-                // MERGE_LOOP (5): both halves have elements?
                 JumpLessU64 { target: CO(8), lhs: FO(i), rhs: FO(mid) },        // 5
-                JumpLessU64 { target: CO(25), lhs: FO(j), rhs: FO(hi) },        // 6: drain right
-                Jump { target: CO(31) },                                         // 7: copy back
+                JumpLessU64 { target: CO(25), lhs: FO(j), rhs: FO(hi) },        // 6
+                Jump { target: CO(31) },                                        // 7
                 JumpLessU64 { target: CO(10), lhs: FO(j), rhs: FO(hi) },        // 8
-                Jump { target: CO(19) },                                         // 9: drain left
+                Jump { target: CO(19) },                                        // 9
 
-                // COMPARE (10): both i and j valid
                 VecLoadElem { dst: FO(elem_a), vec_ref: FO(vec_ref),
                               idx: FO(i), elem_size: 8 },                       // 10
                 VecLoadElem { dst: FO(elem_b), vec_ref: FO(vec_ref),
                               idx: FO(j), elem_size: 8 },                       // 11
                 JumpLessU64 { target: CO(16), lhs: FO(elem_a), rhs: FO(elem_b) }, // 12
-                // a >= b: push b
                 VecPushBack { vec_ref: FO(tmp_ref), elem: FO(elem_b), elem_size: 8, descriptor_id: desc_vec_u64 }, // 13
-                AddU64Imm { dst: FO(j), src: FO(j), imm: 1 },                  // 14
-                Jump { target: CO(5) },                                          // 15
+                AddU64Imm { dst: FO(j), src: FO(j), imm: 1 },                   // 14
+                Jump { target: CO(5) },                                         // 15
 
-                // PUSH_LEFT (16): a < b, push a
                 VecPushBack { vec_ref: FO(tmp_ref), elem: FO(elem_a), elem_size: 8, descriptor_id: desc_vec_u64 }, // 16
-                AddU64Imm { dst: FO(i), src: FO(i), imm: 1 },                  // 17
-                Jump { target: CO(5) },                                          // 18
+                AddU64Imm { dst: FO(i), src: FO(i), imm: 1 },                   // 17
+                Jump { target: CO(5) },                                         // 18
 
-                // DRAIN_LEFT (19): right exhausted
                 JumpLessU64 { target: CO(21), lhs: FO(i), rhs: FO(mid) },       // 19
-                Jump { target: CO(31) },                                         // 20
+                Jump { target: CO(31) },                                        // 20
                 VecLoadElem { dst: FO(elem_a), vec_ref: FO(vec_ref),
                               idx: FO(i), elem_size: 8 },                       // 21
                 VecPushBack { vec_ref: FO(tmp_ref), elem: FO(elem_a), elem_size: 8, descriptor_id: desc_vec_u64 }, // 22
-                AddU64Imm { dst: FO(i), src: FO(i), imm: 1 },                  // 23
-                Jump { target: CO(19) },                                         // 24
+                AddU64Imm { dst: FO(i), src: FO(i), imm: 1 },                   // 23
+                Jump { target: CO(19) },                                        // 24
 
-                // DRAIN_RIGHT (25): left exhausted
                 JumpLessU64 { target: CO(27), lhs: FO(j), rhs: FO(hi) },        // 25
-                Jump { target: CO(31) },                                         // 26
+                Jump { target: CO(31) },                                        // 26
                 VecLoadElem { dst: FO(elem_b), vec_ref: FO(vec_ref),
                               idx: FO(j), elem_size: 8 },                       // 27
                 VecPushBack { vec_ref: FO(tmp_ref), elem: FO(elem_b), elem_size: 8, descriptor_id: desc_vec_u64 }, // 28
-                AddU64Imm { dst: FO(j), src: FO(j), imm: 1 },                  // 29
-                Jump { target: CO(25) },                                         // 30
+                AddU64Imm { dst: FO(j), src: FO(j), imm: 1 },                   // 29
+                Jump { target: CO(25) },                                        // 30
 
-                // COPY_BACK (31): copy tmp back into vec[lo..hi)
                 Move8 { dst: FO(k), src: FO(lo) },                              // 31
                 StoreImm8 { dst: FO(tmp_idx), imm: 0 },                         // 32
-                // COPY_LOOP (33)
                 JumpLessU64 { target: CO(35), lhs: FO(k), rhs: FO(hi) },        // 33
                 Return,                                                          // 34
                 VecLoadElem { dst: FO(elem_a), vec_ref: FO(tmp_ref),
                               idx: FO(tmp_idx), elem_size: 8 },                 // 35
                 VecStoreElem { vec_ref: FO(vec_ref), idx: FO(k),
                                src: FO(elem_a), elem_size: 8 },                 // 36
-                AddU64Imm { dst: FO(k), src: FO(k), imm: 1 },                  // 37
-                AddU64Imm { dst: FO(tmp_idx), src: FO(tmp_idx), imm: 1 },      // 38
-                Jump { target: CO(33) },                                         // 39
-            ];
-
-            let code = arena.alloc_slice_fill_iter(code);
-            arena.alloc(Function {
-                name: GlobalArenaPtr::from_static("merge"),
-                code,
-                param_sizes: ExecutableArenaPtr::empty_slice(),
-                param_sizes_sum: 32,
-                param_and_local_sizes_sum: 120,
-                extended_frame_size: 144,
-                zero_frame: true,
-                frame_layout: FrameLayoutInfo::new(&arena, [
-                    FO(vec),
-                    FO(tmp),
-                    FO(vec_ref),
-                    FO(tmp_ref),
-                ]),
-                safe_point_layouts: SortedSafePointEntries::empty(),
-            })
+                AddU64Imm { dst: FO(k), src: FO(k), imm: 1 },                   // 37
+                AddU64Imm { dst: FO(tmp_idx), src: FO(tmp_idx), imm: 1 },       // 38
+                Jump { target: CO(33) },                                        // 39
+            ]
         };
 
+        unsafe { merge_sort_ptr.as_ref_unchecked() }
+            .code
+            .store(merge_sort_code);
+        unsafe { merge_sort_range_ptr.as_ref_unchecked() }
+            .code
+            .store(merge_sort_range_code);
+        unsafe { merge_ptr.as_ref_unchecked() }.code.store(merge_code);
+
         (
-            vec![
-                Some(func_merge_sort),
-                Some(func_merge_sort_range),
-                Some(func_merge),
-            ],
+            vec![merge_sort_ptr, merge_sort_range_ptr, merge_ptr],
             descriptors,
-            arena,
         )
     }
 }

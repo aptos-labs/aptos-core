@@ -1,9 +1,9 @@
 Aborting with compilation errors:
 exiting with context checking errors
 error: duplicate declaration, item, or annotation
-  ┌─ tests/model_ast_lints/bad_lint_attribute_07.move:2:30
+  ┌─ tests/model_ast_lints/bad_lint_attribute_07.move:3:30
   │
-2 │     #[lint::skip(while_true, while_true)]
+3 │     #[lint::skip(while_true, while_true)]
   │                  ----------  ^^^^^^^^^^ Duplicate attribute 'while_true' attached to the same item
   │                  │
   │                  Attribute previously given here

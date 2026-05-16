@@ -92,6 +92,11 @@ pub trait DKGTrait: std::fmt::Debug {
         player_share_pairs: Vec<(u64, Self::DealtSecretShare)>,
     ) -> anyhow::Result<Self::DealtSecret>;
     fn get_dealers(transcript: &Self::Transcript) -> BTreeSet<u64>;
+
+    /// Upper bound on the BCS wire size of a single inbound transcript for this session,
+    /// derived from the session's wire shape. Used as a structural validation gate before
+    /// deserialization.
+    fn expected_max_transcript_size(params: &Self::PublicParams) -> usize;
 }
 
 #[derive(Clone, Serialize, Deserialize, Debug, PartialEq, Eq, CryptoHasher, BCSCryptoHash)]

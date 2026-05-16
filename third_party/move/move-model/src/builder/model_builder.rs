@@ -9,12 +9,13 @@
 //! system, as well as type checking it and translating it to the spec language ast.
 
 use crate::{
-    ast::{Attribute, FriendDecl, ModuleName, Operation, QualifiedSymbol, Spec, Value},
+    ast::{Attribute, ExpData, FriendDecl, ModuleName, Operation, QualifiedSymbol, Spec, Value},
     builder::builtins,
     intrinsics::IntrinsicDecl,
     model::{
-        FieldData, FieldId, FunId, FunctionKind, GlobalEnv, Loc, ModuleId, Parameter, QualifiedId,
-        QualifiedInstId, SpecFunId, SpecVarId, StructId, TypeParameter, UserId,
+        FieldData, FieldId, FunId, FunctionKind, GlobalEnv, Loc, ModuleId, NamedConstantId,
+        Parameter, QualifiedId, QualifiedInstId, SpecFunId, SpecVarId, StructId, TypeParameter,
+        UserId,
     },
     symbol::Symbol,
     ty::{Constraint, PrimitiveType, Type, TypeDisplayContext},
@@ -261,8 +262,23 @@ pub(crate) struct ConstEntry {
     pub ty: Type,
     pub value: Value,
     pub visibility: EntryVisibility,
+    /// File-format visibility (`Public`/`Friend`/`Private`). The Move-source
+    /// `package` modifier is encoded as `Friend` + `has_package_visibility = true`.
+    pub move_visibility: Visibility,
+    /// True iff declared with `package`. Implies `move_visibility = Friend`.
+    pub has_package_visibility: bool,
     pub users: BTreeSet<UserId>,
     pub attributes: Vec<Attribute>,
+}
+
+/// Snapshot of a non-private constant used by `inject_const_accessor_functions`.
+struct PublicConstInfo {
+    name: Symbol,
+    loc: Loc,
+    ty: Type,
+    value: Value,
+    visibility: Visibility,
+    has_package_visibility: bool,
 }
 
 impl<'env> ModelBuilder<'env> {
@@ -566,6 +582,61 @@ impl<'env> ModelBuilder<'env> {
         self.const_table.insert(name, entry);
     }
 
+    /// Injects a `const$<NAME>` accessor function for every non-private constant in every module.
+    /// Must run after `populate_env()` and before `add_friend_decl_for_package_visibility()`.
+    pub fn inject_const_accessor_functions(&mut self) {
+        if !self
+            .env
+            .language_version()
+            .language_version_for_public_const()
+        {
+            return;
+        }
+        // Include dependency modules: target modules may reference their constants.
+        let module_ids: Vec<ModuleId> = self.env.get_modules().map(|m| m.get_id()).collect();
+
+        for module_id in module_ids {
+            let const_infos: Vec<PublicConstInfo> = self
+                .env
+                .get_module(module_id)
+                .get_named_constants()
+                .filter(|c| c.get_visibility() != Visibility::Private)
+                .map(|c| PublicConstInfo {
+                    name: c.get_name(),
+                    loc: c.get_loc(),
+                    ty: c.get_type(),
+                    value: c.get_value(),
+                    visibility: c.get_visibility(),
+                    has_package_visibility: c.has_package_visibility(),
+                })
+                .collect();
+
+            for info in const_infos {
+                let accessor_name = format!(
+                    "{}{}{}",
+                    move_core_types::language_storage::CONST,
+                    move_core_types::language_storage::DOLLAR_SIGN_DELIMITER,
+                    self.env.symbol_pool().string(info.name)
+                );
+                let accessor_sym = self.env.symbol_pool().make(&accessor_name);
+                let node_id = self.env.new_node(info.loc.clone(), info.ty.clone());
+                let body = ExpData::Value(node_id, info.value).into_exp();
+                self.env.add_function_def(
+                    module_id,
+                    accessor_sym,
+                    info.loc,
+                    info.visibility,
+                    info.has_package_visibility,
+                    vec![],
+                    vec![],
+                    info.ty,
+                    body,
+                    None,
+                );
+            }
+        }
+    }
+
     /// Adds friend declarations for package visibility.
     /// This should only be called when all modules are loaded.
     pub fn add_friend_decl_for_package_visibility(&mut self) {
@@ -823,6 +894,29 @@ impl<'env> ModelBuilder<'env> {
         // register all intrinsic declarations
         for decl in &self.intrinsics {
             self.env.intrinsics.add_decl(decl);
+        }
+    }
+
+    /// Propagate cross-module constant users from `const_table` into `GlobalEnv`.
+    ///
+    /// Each module's `NamedConstantData` is finalized when that module is translated, before
+    /// later modules' function bodies are translated. Users recorded by `track_constant_usage`
+    /// for cross-module references therefore arrive in `const_table` after the defining module
+    /// has already been finalized. This pass syncs those late-arriving users back into the env.
+    pub fn sync_const_users(&mut self) {
+        for (sym, entry) in &self.const_table {
+            if entry.users.is_empty() {
+                continue;
+            }
+            if let Some(module_env) = self.env.find_module(&sym.module_name) {
+                let module_id = module_env.get_id();
+                let const_id = NamedConstantId::new(sym.symbol);
+                if let Some(module_data) = self.env.module_data.get_mut(module_id.to_usize()) {
+                    if let Some(const_data) = module_data.named_constants.get_mut(&const_id) {
+                        const_data.users.extend(entry.users.iter().cloned());
+                    }
+                }
+            }
         }
     }
 }

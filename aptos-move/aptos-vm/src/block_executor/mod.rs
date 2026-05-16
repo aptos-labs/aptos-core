@@ -19,7 +19,6 @@ use aptos_block_executor::{
     txn_provider::TxnProvider,
     types::InputOutputKey,
 };
-use aptos_logger::info;
 use aptos_types::{
     block_executor::{
         config::BlockExecutorConfig, transaction_slice_metadata::TransactionSliceMetadata,
@@ -50,19 +49,9 @@ use once_cell::sync::OnceCell;
 use std::{
     collections::{BTreeMap, HashMap, HashSet},
     marker::PhantomData,
-    sync::{Arc, Mutex},
 };
 use triomphe::Arc as TriompheArc;
 use vm_wrapper::AptosExecutorTask;
-
-/// Thread pool used by `execute_block` for parallel transaction execution.
-///
-/// Stores `(pool, num_threads)` so we can detect when the requested concurrency level
-/// changes and recreate the pool. In production the concurrency level is set once at
-/// startup, so the pool is created once and the mutex is uncontended thereafter.
-/// Benchmarking and debugging tools may iterate over multiple concurrency levels in the
-/// same process, which requires replacing the pool.
-static RAYON_EXEC_POOL: Mutex<Option<(Arc<rayon::ThreadPool>, usize)>> = Mutex::new(None);
 
 /// Output type wrapper used by block executor. VM output is stored first, then
 /// transformed into TransactionOutput type that is returned.
@@ -512,12 +501,11 @@ impl<
         >,
     > AptosBlockExecutorWrapper<E>
 {
-    pub fn execute_block_on_thread_pool<
+    pub fn execute_block<
         S: StateView + Sync,
         L: TransactionCommitHook,
         TP: TxnProvider<SignatureVerifiedTransaction, AuxiliaryInfo> + Sync,
     >(
-        executor_thread_pool: Arc<rayon::ThreadPool>,
         signature_verified_block: &TP,
         state_view: &S,
         module_cache_manager: &AptosModuleCacheManager,
@@ -545,7 +533,6 @@ impl<
         let executor =
             BlockExecutor::<SignatureVerifiedTransaction, E, S, L, TP, AuxiliaryInfo>::new(
                 config,
-                executor_thread_pool,
                 transaction_commit_listener,
             );
 
@@ -583,46 +570,6 @@ impl<
             }),
             Err(BlockExecutionError::FatalVMError(err)) => Err(err),
         }
-    }
-
-    /// Uses shared thread pool to execute blocks.
-    pub(crate) fn execute_block<
-        S: StateView + Sync,
-        L: TransactionCommitHook,
-        TP: TxnProvider<SignatureVerifiedTransaction, AuxiliaryInfo> + Sync,
-    >(
-        signature_verified_block: &TP,
-        state_view: &S,
-        module_cache_manager: &AptosModuleCacheManager,
-        config: BlockExecutorConfig,
-        transaction_slice_metadata: TransactionSliceMetadata,
-        transaction_commit_listener: Option<L>,
-    ) -> Result<BlockOutput<SignatureVerifiedTransaction, TransactionOutput>, VMStatus> {
-        let num_threads = std::cmp::min(config.local.concurrency_level, num_cpus::get());
-        let pool = match &mut *RAYON_EXEC_POOL.lock().unwrap() {
-            Some((pool, n)) if *n == num_threads => Arc::clone(pool),
-            slot => {
-                info!(num_threads = num_threads, "Creating par_exec thread pool");
-                let pool = Arc::new(
-                    rayon::ThreadPoolBuilder::new()
-                        .num_threads(num_threads)
-                        .thread_name(|index| format!("par_exec-{}", index))
-                        .build()
-                        .unwrap(),
-                );
-                *slot = Some((Arc::clone(&pool), num_threads));
-                pool
-            },
-        };
-        Self::execute_block_on_thread_pool::<S, L, TP>(
-            pool,
-            signature_verified_block,
-            state_view,
-            module_cache_manager,
-            config,
-            transaction_slice_metadata,
-            transaction_commit_listener,
-        )
     }
 }
 

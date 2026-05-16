@@ -11,6 +11,7 @@
 \usepackage{caption}
 \usepackage{bbding}
 \usepackage{tabularx}
+\usepackage{enumitem}
 
 \hypersetup{colorlinks=true,linkcolor=blue,citecolor=blue,urlcolor=blue}
 \def\UrlFont{\rmfamily}
@@ -20,6 +21,11 @@
 \newcommand{\Section}[1]{\section{#1}}
 \newcommand{\SubSection}[1]{\subsection{#1}}
 \newcommand{\Paragraph}[1]{\vspace{0.5ex}\noindent\textbf{#1.}\xspace}
+
+% Bulleted list with an em-dash marker flush against the left text margin.
+% Use as \begin{Itemize} \item ... \item ... \end{Itemize}.
+\newlist{Itemize}{itemize}{1}
+\setlist[Itemize]{label=--, leftmargin=1em, labelindent=0pt, labelsep=0.5em, itemsep=0.5ex, topsep=0.5ex}
 
 \newcommand{\TODO}[2]{%
     \noindent\textcolor{gray}{%

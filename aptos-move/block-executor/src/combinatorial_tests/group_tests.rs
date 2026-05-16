@@ -6,9 +6,7 @@ use crate::{
     combinatorial_tests::{
         baseline::BaselineOutput,
         mock_executor::{MockEvent, MockTask},
-        resource_tests::{
-            create_executor_thread_pool, execute_block_parallel, get_gas_limit_variants,
-        },
+        resource_tests::{execute_block_parallel, get_gas_limit_variants},
         types::{
             KeyType, MockTransaction, NonEmptyGroupDataView, TransactionGen, TransactionGenParams,
         },
@@ -26,7 +24,6 @@ use aptos_types::{
     transaction::AuxiliaryInfo,
 };
 use proptest::{collection::vec, prelude::*, strategy::ValueTree, test_runner::TestRunner};
-use std::sync::Arc;
 use test_case::test_case;
 
 /// Create a data view for testing with non-empty groups
@@ -46,7 +43,6 @@ pub(crate) fn create_non_empty_group_data_view(
 
 /// Run both parallel and sequential execution tests for a transaction provider
 pub(crate) fn run_tests_with_groups(
-    executor_thread_pool: Arc<rayon::ThreadPool>,
     gas_limits: Vec<Option<u64>>,
     transactions: Vec<MockTransaction<KeyType<[u8; 32]>, MockEvent>>,
     data_view: &NonEmptyGroupDataView<KeyType<[u8; 32]>>,
@@ -71,7 +67,6 @@ pub(crate) fn run_tests_with_groups(
                         AuxiliaryInfo,
                     >,
                 >(
-                    executor_thread_pool.clone(),
                     *maybe_block_gas_limit,
                     &txn_provider,
                     data_view,
@@ -98,7 +93,6 @@ pub(crate) fn run_tests_with_groups(
             AuxiliaryInfo,
         >::new(
             BlockExecutorConfig::new_no_block_limit(num_cpus::get()),
-            executor_thread_pool.clone(),
             None,
         )
         .execute_transactions_sequential(
@@ -169,11 +163,9 @@ fn non_empty_group_transaction_tests(
         .collect();
 
     let data_view = create_non_empty_group_data_view(&key_universe, universe_size, false);
-    let executor_thread_pool = create_executor_thread_pool();
     let gas_limits = get_gas_limit_variants(use_gas_limit, transaction_count);
 
     run_tests_with_groups(
-        executor_thread_pool,
         gas_limits,
         transactions,
         &data_view,

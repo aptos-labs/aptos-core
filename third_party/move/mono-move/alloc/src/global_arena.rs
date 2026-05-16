@@ -5,7 +5,6 @@ use bumpalo::Bump;
 use crossbeam_utils::CachePadded;
 use parking_lot::{Mutex, MutexGuard};
 use std::{
-    fmt,
     hash::{Hash, Hasher},
     ptr::NonNull,
 };
@@ -79,14 +78,6 @@ impl<T: ?Sized> Copy for GlobalArenaPtr<T> {}
 impl<T: ?Sized> Clone for GlobalArenaPtr<T> {
     fn clone(&self) -> Self {
         *self
-    }
-}
-
-// TODO: Only needed because MicroOp derives Debug. Remove once MicroOp
-// uses a manual Debug impl or no longer stores GlobalArenaPtr fields.
-impl<T: ?Sized> fmt::Debug for GlobalArenaPtr<T> {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "GlobalArenaPtr({:p})", self.0)
     }
 }
 

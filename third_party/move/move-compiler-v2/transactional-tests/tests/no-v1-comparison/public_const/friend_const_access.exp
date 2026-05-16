@@ -1,0 +1,5 @@
+processed 4 tasks
+task 0 lines 2-3:  publish [module 0x42::consumer {}]
+task 1 lines 5-9:  publish [module 0x42::provider {]
+task 2 lines 11-18:  publish [module 0x42::consumer {]
+task 3 lines 20-26:  run [script {]

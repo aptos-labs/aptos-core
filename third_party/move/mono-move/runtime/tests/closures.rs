@@ -11,11 +11,11 @@
 //! where the closure is `|x| x + y` with `y` captured — applied in a loop
 //! to each vector element.
 
-use mono_move_alloc::{ExecutableArena, ExecutableArenaPtr, GlobalArenaPtr};
+use mono_move_alloc::GlobalArenaPtr;
 use mono_move_core::{
-    CallClosureOp, ClosureFuncRef, CodeOffset as CO, DescriptorId, FrameLayoutInfo,
-    FrameOffset as FO, Function, LocalExecutionContext, MicroOp, PackClosureOp, SizedSlot,
-    SortedSafePointEntries, FRAME_METADATA_SIZE,
+    CallClosureOp, ClosureFuncRef, Code, CodeOffset as CO, DescriptorId, FrameLayoutInfo,
+    FrameOffset as FO, Function, FunctionPtr, LocalExecutionContext, MicroOp, PackClosureOp,
+    SizedSlot, SortedSafePointEntries, FRAME_METADATA_SIZE,
 };
 use mono_move_runtime::{InterpreterContext, ObjectDescriptor, ObjectDescriptorTable};
 
@@ -67,34 +67,34 @@ fn test_descriptors() -> TestDescriptors {
 ///
 /// Returns `x` by relying on the calling convention (return value lives at
 /// callee frame offset 0, which already holds the first arg).
-fn make_identity(arena: &ExecutableArena) -> ExecutableArenaPtr<Function> {
+fn make_identity() -> Function {
     use MicroOp::*;
-    arena.alloc(Function {
+    Function {
         name: GlobalArenaPtr::from_static("identity"),
-        code: arena.alloc_slice_fill_iter([Return]),
-        param_sizes: arena.alloc_slice_fill_iter([8u32]),
+        code: Code::from_vec(vec![Return]),
+        param_sizes: vec![8u32],
         param_sizes_sum: 8,
         param_and_local_sizes_sum: 8,
         extended_frame_size: 8 + FRAME_METADATA_SIZE,
         zero_frame: false,
         frame_layout: FrameLayoutInfo::empty(),
         safe_point_layouts: SortedSafePointEntries::empty(),
-    })
+    }
 }
 
 /// Callee: `add_u64(a: u64, b: u64) -> u64`.
 ///
 /// Writes `a + b` to callee frame offset 0 (overlapping `a`'s arg slot) and
 /// returns.
-fn make_add_u64(arena: &ExecutableArena) -> ExecutableArenaPtr<Function> {
+fn make_add_u64() -> Function {
     use MicroOp::*;
 
     let a = FO(0);
     let b = FO(8);
 
-    arena.alloc(Function {
+    Function {
         name: GlobalArenaPtr::from_static("add_u64"),
-        code: arena.alloc_slice_fill_iter([
+        code: Code::from_vec(vec![
             AddU64 {
                 dst: a,
                 lhs: a,
@@ -102,14 +102,14 @@ fn make_add_u64(arena: &ExecutableArena) -> ExecutableArenaPtr<Function> {
             },
             Return,
         ]),
-        param_sizes: arena.alloc_slice_fill_iter([8u32, 8u32]),
+        param_sizes: vec![8u32, 8u32],
         param_sizes_sum: 16,
         param_and_local_sizes_sum: 16,
         extended_frame_size: 16 + FRAME_METADATA_SIZE,
         zero_frame: false,
         frame_layout: FrameLayoutInfo::empty(),
         safe_point_layouts: SortedSafePointEntries::empty(),
-    })
+    }
 }
 
 /// Callee: `vector_map(vec: heap_ptr, closure: heap_ptr, n: u64)`.
@@ -125,7 +125,7 @@ fn make_add_u64(arena: &ExecutableArena) -> ExecutableArenaPtr<Function> {
 ///   [24..32) i            (local)
 ///   [32..40) elem         (local — scratch for vec[i])
 ///   [40..56) vec_ref      (local — fat pointer to the `vec` slot)
-fn make_vector_map(arena: &ExecutableArena) -> ExecutableArenaPtr<Function> {
+fn make_vector_map() -> Function {
     use MicroOp::*;
 
     let vec = FO(0);
@@ -137,9 +137,9 @@ fn make_vector_map(arena: &ExecutableArena) -> ExecutableArenaPtr<Function> {
     let args_and_locals: usize = 56;
     let callee_arg0 = FO((args_and_locals + FRAME_METADATA_SIZE) as u32);
 
-    arena.alloc(Function {
+    Function {
         name: GlobalArenaPtr::from_static("vector_map"),
-        code: arena.alloc_slice_fill_iter([
+        code: Code::from_vec(vec![
             // pc 0: vec_ref = &vec (fat pointer to the `vec` heap-ptr slot)
             SlotBorrow {
                 dst: vec_ref,
@@ -191,7 +191,7 @@ fn make_vector_map(arena: &ExecutableArena) -> ExecutableArenaPtr<Function> {
             // pc 9:
             Return,
         ]),
-        param_sizes: arena.alloc_slice_fill_iter([8u32, 8u32, 8u32]),
+        param_sizes: vec![8u32, 8u32, 8u32],
         param_sizes_sum: 24,
         param_and_local_sizes_sum: args_and_locals,
         // Needs room for the closure's callee arg region. `exec_call_closure`
@@ -202,9 +202,9 @@ fn make_vector_map(arena: &ExecutableArena) -> ExecutableArenaPtr<Function> {
         extended_frame_size: args_and_locals + FRAME_METADATA_SIZE + 16,
         zero_frame: true,
         // Heap pointers: vec (arg 0), closure (arg 1), vec_ref base.
-        frame_layout: FrameLayoutInfo::new(arena, [vec, closure, vec_ref]),
+        frame_layout: FrameLayoutInfo::new(vec![vec, closure, vec_ref]),
         safe_point_layouts: SortedSafePointEntries::empty(),
-    })
+    }
 }
 
 fn run_main_and_get_u64_result(main: &Function, descriptors: &[ObjectDescriptor]) -> u64 {
@@ -238,19 +238,19 @@ fn identity_no_captures() {
     let callee_arg0 = FO((args_and_locals + FRAME_METADATA_SIZE) as u32);
 
     let descs = test_descriptors();
-    let arena = ExecutableArena::new();
-    let identity = make_identity(&arena);
+    let identity_ptr = FunctionPtr::new(Box::new(make_identity()));
+    let function_ptrs = vec![identity_ptr];
 
-    let main = arena.alloc(Function {
+    let main = Function {
         name: GlobalArenaPtr::from_static("main"),
-        code: arena.alloc_slice_fill_iter(vec![
+        code: Code::from_vec(vec![
             StoreImm8 {
                 dst: input,
                 imm: 42,
             },
             MicroOp::PackClosure(Box::new(PackClosureOp {
                 dst: closure,
-                func_ref: ClosureFuncRef::Resolved(identity),
+                func_ref: ClosureFuncRef::Resolved(identity_ptr),
                 mask: 0,
                 captured_data_descriptor_id: None,
                 captured: vec![],
@@ -268,17 +268,24 @@ fn identity_no_captures() {
             },
             Return,
         ]),
-        param_sizes: ExecutableArenaPtr::empty_slice(),
+        param_sizes: vec![],
         param_sizes_sum: 0,
         param_and_local_sizes_sum: args_and_locals,
         extended_frame_size: args_and_locals + FRAME_METADATA_SIZE + 8,
         zero_frame: true,
-        frame_layout: FrameLayoutInfo::new(&arena, [closure]),
+        frame_layout: FrameLayoutInfo::new(vec![closure]),
         safe_point_layouts: SortedSafePointEntries::empty(),
-    });
+    };
 
-    let result = run_main_and_get_u64_result(unsafe { main.as_ref_unchecked() }, &descs.table);
+    let result = run_main_and_get_u64_result(&main, &descs.table);
     assert_eq!(result, 42);
+
+    for ptr in function_ptrs {
+        // SAFETY: The interpreter context has been dropped and the main
+        // function (which referenced these pointers via its micro-ops) is
+        // about to go out of scope. No live references remain.
+        unsafe { ptr.free_unchecked() };
+    }
 }
 
 // ---------------------------------------------------------------------------
@@ -308,17 +315,17 @@ fn add_captured_a_provided_b() {
     let callee_arg0 = FO((args_and_locals + FRAME_METADATA_SIZE) as u32);
 
     let descs = test_descriptors();
-    let arena = ExecutableArena::new();
-    let add = make_add_u64(&arena);
+    let add_ptr = FunctionPtr::new(Box::new(make_add_u64()));
+    let function_ptrs = vec![add_ptr];
 
-    let main = arena.alloc(Function {
+    let main = Function {
         name: GlobalArenaPtr::from_static("main"),
-        code: arena.alloc_slice_fill_iter(vec![
+        code: Code::from_vec(vec![
             StoreImm8 { dst: a, imm: 10 },
             StoreImm8 { dst: b, imm: 32 },
             MicroOp::PackClosure(Box::new(PackClosureOp {
                 dst: closure,
-                func_ref: ClosureFuncRef::Resolved(add),
+                func_ref: ClosureFuncRef::Resolved(add_ptr),
                 mask: 0b01, // capture position 0
                 captured_data_descriptor_id: Some(descs.desc_captured_1_u64),
                 captured: vec![SizedSlot { offset: a, size: 8 }],
@@ -333,17 +340,24 @@ fn add_captured_a_provided_b() {
             },
             Return,
         ]),
-        param_sizes: ExecutableArenaPtr::empty_slice(),
+        param_sizes: vec![],
         param_sizes_sum: 0,
         param_and_local_sizes_sum: args_and_locals,
         extended_frame_size: args_and_locals + FRAME_METADATA_SIZE + 16,
         zero_frame: true,
-        frame_layout: FrameLayoutInfo::new(&arena, [closure]),
+        frame_layout: FrameLayoutInfo::new(vec![closure]),
         safe_point_layouts: SortedSafePointEntries::empty(),
-    });
+    };
 
-    let result = run_main_and_get_u64_result(unsafe { main.as_ref_unchecked() }, &descs.table);
+    let result = run_main_and_get_u64_result(&main, &descs.table);
     assert_eq!(result, 42);
+
+    for ptr in function_ptrs {
+        // SAFETY: The interpreter context has been dropped and the main
+        // function (which referenced these pointers via its micro-ops) is
+        // about to go out of scope. No live references remain.
+        unsafe { ptr.free_unchecked() };
+    }
 }
 
 // ---------------------------------------------------------------------------
@@ -366,17 +380,17 @@ fn add_provided_a_captured_b() {
     let callee_arg0 = FO((args_and_locals + FRAME_METADATA_SIZE) as u32);
 
     let descs = test_descriptors();
-    let arena = ExecutableArena::new();
-    let add = make_add_u64(&arena);
+    let add_ptr = FunctionPtr::new(Box::new(make_add_u64()));
+    let function_ptrs = vec![add_ptr];
 
-    let main = arena.alloc(Function {
+    let main = Function {
         name: GlobalArenaPtr::from_static("main"),
-        code: arena.alloc_slice_fill_iter(vec![
+        code: Code::from_vec(vec![
             StoreImm8 { dst: a, imm: 7 },
             StoreImm8 { dst: b, imm: 35 },
             MicroOp::PackClosure(Box::new(PackClosureOp {
                 dst: closure,
-                func_ref: ClosureFuncRef::Resolved(add),
+                func_ref: ClosureFuncRef::Resolved(add_ptr),
                 mask: 0b10, // capture position 1
                 captured_data_descriptor_id: Some(descs.desc_captured_1_u64),
                 captured: vec![SizedSlot { offset: b, size: 8 }],
@@ -391,17 +405,24 @@ fn add_provided_a_captured_b() {
             },
             Return,
         ]),
-        param_sizes: ExecutableArenaPtr::empty_slice(),
+        param_sizes: vec![],
         param_sizes_sum: 0,
         param_and_local_sizes_sum: args_and_locals,
         extended_frame_size: args_and_locals + FRAME_METADATA_SIZE + 16,
         zero_frame: true,
-        frame_layout: FrameLayoutInfo::new(&arena, [closure]),
+        frame_layout: FrameLayoutInfo::new(vec![closure]),
         safe_point_layouts: SortedSafePointEntries::empty(),
-    });
+    };
 
-    let result = run_main_and_get_u64_result(unsafe { main.as_ref_unchecked() }, &descs.table);
+    let result = run_main_and_get_u64_result(&main, &descs.table);
     assert_eq!(result, 42);
+
+    for ptr in function_ptrs {
+        // SAFETY: The interpreter context has been dropped and the main
+        // function (which referenced these pointers via its micro-ops) is
+        // about to go out of scope. No live references remain.
+        unsafe { ptr.free_unchecked() };
+    }
 }
 
 // ---------------------------------------------------------------------------
@@ -424,17 +445,17 @@ fn add_all_captured() {
     let callee_arg0 = FO((args_and_locals + FRAME_METADATA_SIZE) as u32);
 
     let descs = test_descriptors();
-    let arena = ExecutableArena::new();
-    let add = make_add_u64(&arena);
+    let add_ptr = FunctionPtr::new(Box::new(make_add_u64()));
+    let function_ptrs = vec![add_ptr];
 
-    let main = arena.alloc(Function {
+    let main = Function {
         name: GlobalArenaPtr::from_static("main"),
-        code: arena.alloc_slice_fill_iter(vec![
+        code: Code::from_vec(vec![
             StoreImm8 { dst: a, imm: 15 },
             StoreImm8 { dst: b, imm: 27 },
             MicroOp::PackClosure(Box::new(PackClosureOp {
                 dst: closure,
-                func_ref: ClosureFuncRef::Resolved(add),
+                func_ref: ClosureFuncRef::Resolved(add_ptr),
                 mask: 0b11,
                 captured_data_descriptor_id: Some(descs.desc_captured_2_u64),
                 captured: vec![SizedSlot { offset: a, size: 8 }, SizedSlot {
@@ -452,17 +473,24 @@ fn add_all_captured() {
             },
             Return,
         ]),
-        param_sizes: ExecutableArenaPtr::empty_slice(),
+        param_sizes: vec![],
         param_sizes_sum: 0,
         param_and_local_sizes_sum: args_and_locals,
         extended_frame_size: args_and_locals + FRAME_METADATA_SIZE + 16,
         zero_frame: true,
-        frame_layout: FrameLayoutInfo::new(&arena, [closure]),
+        frame_layout: FrameLayoutInfo::new(vec![closure]),
         safe_point_layouts: SortedSafePointEntries::empty(),
-    });
+    };
 
-    let result = run_main_and_get_u64_result(unsafe { main.as_ref_unchecked() }, &descs.table);
+    let result = run_main_and_get_u64_result(&main, &descs.table);
     assert_eq!(result, 42);
+
+    for ptr in function_ptrs {
+        // SAFETY: The interpreter context has been dropped and the main
+        // function (which referenced these pointers via its micro-ops) is
+        // about to go out of scope. No live references remain.
+        unsafe { ptr.free_unchecked() };
+    }
 }
 
 // ---------------------------------------------------------------------------
@@ -511,13 +539,13 @@ fn vector_map_add_captured() {
     let y_val: u64 = 10;
 
     let descs = test_descriptors();
-    let arena = ExecutableArena::new();
-    let add = make_add_u64(&arena);
-    let vector_map = make_vector_map(&arena);
+    let add_ptr = FunctionPtr::new(Box::new(make_add_u64()));
+    let vector_map_ptr = FunctionPtr::new(Box::new(make_vector_map()));
+    let function_ptrs = vec![add_ptr, vector_map_ptr];
 
-    let main = arena.alloc(Function {
+    let main = Function {
         name: GlobalArenaPtr::from_static("main"),
-        code: arena.alloc_slice_fill_iter(vec![
+        code: Code::from_vec(vec![
             // === Build vector [2, 3, 4] ===
             // pc 0: vec = new
             VecNew { dst: vec },
@@ -554,7 +582,7 @@ fn vector_map_add_captured() {
             // pc 9: pack with mask=0b10 (capture position 1 = `b`)
             MicroOp::PackClosure(Box::new(PackClosureOp {
                 dst: closure,
-                func_ref: ClosureFuncRef::Resolved(add),
+                func_ref: ClosureFuncRef::Resolved(add_ptr),
                 mask: 0b10,
                 captured_data_descriptor_id: Some(descs.desc_captured_1_u64),
                 captured: vec![SizedSlot { offset: y, size: 8 }],
@@ -574,7 +602,9 @@ fn vector_map_add_captured() {
                 imm: n,
             },
             // pc 13: call vector_map
-            CallDirect { ptr: vector_map },
+            CallDirect {
+                ptr: vector_map_ptr,
+            },
             // === Sum loop: result = sum(vec) ===
             // pc 14: result = 0
             StoreImm8 {
@@ -613,17 +643,24 @@ fn vector_map_add_captured() {
             // pc 21: Return
             Return,
         ]),
-        param_sizes: ExecutableArenaPtr::empty_slice(),
+        param_sizes: vec![],
         param_sizes_sum: 0,
         param_and_local_sizes_sum: args_and_locals,
         extended_frame_size: args_and_locals + FRAME_METADATA_SIZE + 24,
         zero_frame: true,
         // Heap pointers held across safe points: closure object, vec, and
         // the base of vec_ref.
-        frame_layout: FrameLayoutInfo::new(&arena, [closure, vec, vec_ref]),
+        frame_layout: FrameLayoutInfo::new(vec![closure, vec, vec_ref]),
         safe_point_layouts: SortedSafePointEntries::empty(),
-    });
+    };
 
-    let result = run_main_and_get_u64_result(unsafe { main.as_ref_unchecked() }, &descs.table);
+    let result = run_main_and_get_u64_result(&main, &descs.table);
     assert_eq!(result, (2 + y_val) + (3 + y_val) + (4 + y_val));
+
+    for ptr in function_ptrs {
+        // SAFETY: The interpreter context has been dropped and the main
+        // function (which referenced these pointers via its micro-ops) is
+        // about to go out of scope. No live references remain.
+        unsafe { ptr.free_unchecked() };
+    }
 }

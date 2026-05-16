@@ -28,15 +28,13 @@ fn bench_fib(c: &mut Criterion) {
         });
 
         // plain (no gas instrumentation)
-        let (functions, descriptors, _arena) = micro_op_fib();
-        // SAFETY: Exclusive access during bench setup; arena is alive.
-        unsafe { mono_move_core::Function::resolve_calls(&functions) };
+        let (functions, descriptors) = micro_op_fib();
         let mut exec_ctx = LocalExecutionContext::unmetered();
         // TODO: hoist interpreter context setup out of the timed body.
         group.bench_function("micro_op", |b| {
             b.iter(|| {
                 let mut ctx = InterpreterContext::new(&mut exec_ctx, &descriptors, unsafe {
-                    functions[0].unwrap().as_ref_unchecked()
+                    functions[0].as_ref_unchecked()
                 });
                 ctx.set_root_arg(0, &N.to_le_bytes());
                 ctx.run().unwrap();
@@ -45,17 +43,14 @@ fn bench_fib(c: &mut Criterion) {
         });
 
         // with gas instrumentation
-        let (functions, _, _arena) = micro_op_fib();
-        // SAFETY: Exclusive access during bench setup; arena is alive.
-        let (functions_gas, _arena) = unsafe { helpers::gas_instrument(&functions) };
-        // SAFETY: Exclusive access during bench setup; arena is alive.
-        unsafe { mono_move_core::Function::resolve_calls(&functions_gas) };
+        let (functions_gas, _) = micro_op_fib();
+        helpers::gas_instrument(&functions_gas);
         let mut exec_ctx = LocalExecutionContext::with_max_budget();
         // TODO: hoist interpreter context setup out of the timed body.
         group.bench_function("micro_op/gas", |b| {
             b.iter(|| {
                 let mut ctx = InterpreterContext::new(&mut exec_ctx, &descriptors, unsafe {
-                    functions_gas[0].unwrap().as_ref_unchecked()
+                    functions_gas[0].as_ref_unchecked()
                 });
                 ctx.set_root_arg(0, &N.to_le_bytes());
                 ctx.run().unwrap();
@@ -64,6 +59,12 @@ fn bench_fib(c: &mut Criterion) {
         });
 
         group.finish();
+
+        for ptr in functions.into_iter().chain(functions_gas) {
+            // SAFETY: All bench measurements have completed; no interpreter
+            // context references these function pointers anymore.
+            unsafe { ptr.free_unchecked() };
+        }
     }
 
     // -- move_vm (slow) ---------------------------------------------------

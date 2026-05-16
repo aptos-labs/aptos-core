@@ -1,0 +1,231 @@
+\Section{Step-by-Step Example}
+\label{sec:example}
+
+We illustrate the workflow through a number of examples; both they and the tool are publicly available \cite{InferenceExamples, MoveFlow}.
+
+\SubSection{Higher-Order Vector Search}
+\label{sec:find}
+
+We start with a simple function that finds an element in a vector matching a predicate:
+
+\begin{MoveBox}
+  fun find<T>(v: &vector<T>,
+              pred: |&T|bool has copy + drop): u64 {
+    let i = 0;
+    let n = v.length();
+    while (i < n) {
+      if (pred(&v[i])) return i;
+      i = i + 1;
+    }
+    n
+  }
+\end{MoveBox}
+
+We ask Claude Code (\CC) to infer specs for this function; this loads a skill that creates a list of tasks:
+
+\begin{claude}
+> infer specs for the functions in this package
+● Skill(move-flow:move-inf)
+  ⎿ Successfully loaded skill
+✽ Zigzagging…
+  ⎿ ◻ Synthesize loop invariants
+    ◻ Infer weakest preconditions
+    ◻ Simplify inferred specs
+    ◻ Full-scope verification run
+    ◻ Fix logical errors
+    ◻ Resolve timeouts
+\end{claude}
+
+\noindent The tasks are listed in the suggested execution order but operate on independent snapshots of the package; \CC may interleave them with edits that the user can monitor or override.
+
+\Paragraph{Synthesizing Loop Invariants}
+For this task, \CC infers loop invariants for loops that do not yet have any.
+The skill defines Move-specific guidelines for this. For !find!, the resulting code is:
+
+\begin{MoveBox}
+  public fun find<T>(..)
+    ..
+    while (i < n) {
+      if (pred(vector::borrow(v, i))) return i;
+      i = i + 1;
+    } spec {
+      invariant i <= n;
+      invariant n == len(v);
+      invariant forall j in 0..i: !result_of<pred>(v[j]);
+      invariant forall j in 0..i: !aborts_of<pred>(v[j]);
+    };
+    n
+  }
+\end{MoveBox}
+
+\noindent Notice the behavioral predicates !result_of! and !aborts_of! accessing the specification of another function --- here the runtime value !pred! \footnote{Specifications with function values are described in \cite{GrieskampEtAl26HO}}. Behavioral predicates are key for inference: we can refer to what other functions compute while abstracting away how, localizing inference to intra-function analysis.
+
+\Paragraph{Inferring Weakest Preconditions}
+For this task, \CC calls \MVP's \WP algorithm via its MCP service, producing:
+
+\begin{MoveBox}
+  spec find {
+    pragma opaque = true;
+    ensures
+      (forall x: u64: x < len(v)
+                      ==> !result_of<pred>(v[x]))
+        ==> result == len(v);
+    ensures
+      forall y: u64: (forall x: u64:
+                 x < y ==> !result_of<pred>(v[x]))
+        && (y < len(v) && result_of<pred>(v[y]))
+        ==> result == y;
+    // aborts_if omitted
+  }
+\end{MoveBox}
+%    aborts_if  exists y: u64: (forall x: u64: x < y ==> !result_of<pred>(v[x])) && ((forall x: u64: x < y ==> !aborts_of<pred>(v[x])) && (y < len(v) && aborts_of<pred>(v[y])));
+%    aborts_if  exists y: u64: (forall x: u64: x < y ==> !result_of<pred>(v[x])) && ((forall x: u64: x < y ==> !aborts_of<pred>(v[x])) && (y < len(v) && !in_range(v, y)));
+
+\noindent The !aborts_if! clauses have been omitted for brevity.
+
+
+\Paragraph{Simplification of Inferred Specs}
+\WP derives semantically correct but not always ideal specifications.
+With loop invariants from \CC and \WP-derived specs from the Move Prover, we now ask \CC to simplify the result.
+
+\begin{MoveBox}
+  spec find {
+    pragma opaque = true;
+    ensures result <= len(v);
+    ensures forall j: u64 where j < result:
+              !result_of<pred>(v[j]);
+    ensures result < len(v)
+              ==> result_of<pred>(v[result]);
+    // aborts_if omitted
+  }
+\end{MoveBox}
+
+%    aborts_if
+%        exists j: u64 where j < len(v):
+%          aborts_of<pred>(v[j])
+%          && (forall k: u64 where k < j:
+%                !result_of<pred>(v[k]));
+
+\noindent This specification is more compact than the \WP baseline. In general, \CC frequently rewrites \WP-generated specs into more compact and readable form, despite significant term simplification already in the \WP engine.
+
+\Paragraph{Verification}
+The remaining three tasks are verification-driven: a fast full-scope run surfaces logical errors, which are fixed iteratively; timeouts are then resolved by lemmas, proof hints, and helper functions (Sec.~\ref{sec:skills}). In this example, verification immediately succeeds.
+
+\SubSection{Exponentiation}
+\label{sec:pow}
+
+Next, an example in the arithmetic domain.
+
+\begin{MoveBox}
+  fun pow(base: u64, exp: u64): u64 {
+    let result = 1;
+    let i = 0;
+    while (i < exp) {
+      result = result * base;
+      i = i + 1;
+    }
+    result
+  }
+\end{MoveBox}
+
+In the first step, \CC derives loop invariants, introducing a recursive helper function:
+
+\begin{MoveBox}
+  fun pow(base: u64, exp: u64): u64 {
+    ..
+    while (i < exp) {
+      ..
+    } spec {
+      invariant i <= exp;
+      invariant result == pow_spec(base, i);
+    }
+    result
+  }
+  spec fun pow_spec(base: u64, exp: u64): u64 {
+    if (exp == 0) 1
+    else base * pow_spec(base, exp - 1)
+  }
+\end{MoveBox}
+
+\WP analysis then adds:
+
+\begin{MoveBox}
+  spec pow {
+    ensures result == pow_spec(base, exp);
+    aborts_if exp > 0
+      && pow_spec(base, exp - 1) * base > MAX_U64;
+  }
+\end{MoveBox}
+
+ \noindent \CC-based simplification does not find anything to improve here. However, as is to be expected with non-linear arithmetic, verification times out.
+
+Following the timeout-resolution instructions, \CC introduces a monotonicity lemma via Move's proof-hint system.
+The lemma is required for the !aborts_if! condition: if multiplication aborts with overflow earlier in the loop, then by monotonicity it also aborts later.
+Below, !num! is Move's unbounded-precision signed integer type, available in specifications:
+
+\begin{MoveBox}
+  spec pow {
+    .. // function spec above
+  } proof {
+    // Apply lemma with trigger
+    forall x: num, y: num
+      {pow_spec(base, x), pow_spec(base, y)}
+      apply pow_mono(base, x, y);
+  }
+  spec lemma pow_mono(base: num, x: num, y: num) {
+    requires base >= 1 && 0 <= x && x <= y;
+    ensures pow_spec(base, x) <= pow_spec(base, y);
+  } proof {
+      if (x < y) {
+          assert pow_spec(base, y - 1)
+                   <= pow_spec(base, y);
+          apply pow_mono(base, x, y - 1);
+      }
+  }
+\end{MoveBox}
+
+\SubSection{State-Dependent Inference}
+
+As a final example, we look at a function that modifies global storage at multiple addresses in sequence, illustrating state-dependent specifications.
+
+\begin{MoveBox}
+  struct Balance has key { v: u64 }
+  fun split_balance(
+        dst1: &signer, dst2: &signer,
+        src: address): u64 {
+    let Balance { v } = move_from<Balance>(src);
+    let half = v / 2;
+    move_to(dst1, Balance { v: half });
+    move_to(dst2, Balance { v: v - half });
+    half
+  }
+\end{MoveBox}
+
+\noindent After running spec inference and simplification, we obtain:
+
+\begin{MoveBox}
+  spec split_balance(
+         dst1: &signer, dst2: &signer,
+         src: address): u64 {
+    pragma opaque = true;
+    modifies Balance[src];
+    modifies Balance[signer::address_of(dst1)];
+    modifies Balance[signer::address_of(dst2)];
+    ensures result == old(Balance[src]).v / 2;
+    ensures ..S1 |~ remove<Balance>(src);
+    ensures S1..S2 |~
+      publish<Balance>(signer::address_of(dst1),
+                       Balance{v: old(Balance[src]).v / 2});
+    ensures S2.. |~
+      publish<Balance>(signer::address_of(dst2),
+                       Balance{v: old(Balance[src]).v
+                                  - old(Balance[src]).v / 2});
+    aborts_if !exists<Balance>(src);
+    aborts_if S1 |~
+      exists<Balance>(signer::address_of(dst1));
+    aborts_if S2 |~
+      exists<Balance>(signer::address_of(dst2));
+  }
+\end{MoveBox}
+
+\noindent !S1! and !S2! are state labels naming intermediate memory states --- here, the memory between the !move_from! and the first !move_to!, and between the two !move_to!s, respectively.  The modality !..S1 |~ e!, !S1..S2 |~ e!, !S2.. |~ e! evaluates !e! over the named memory range, while !S |~ e! evaluates at the single state !S!.  The global-memory operators are !publish<R>(addr, val)!, which asserts that resource !R! at !addr! equals !val!, !remove<R>(addr)!, which asserts that no resource of type !R! is present at !addr!, and !exists<R>(addr)!, the standard Move resource existence predicate.

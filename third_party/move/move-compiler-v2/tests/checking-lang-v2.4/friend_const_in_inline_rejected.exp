@@ -1,0 +1,7 @@
+
+Diagnostics:
+error: constant `0x42::M::FRIEND_CONST` cannot be used here due to visibility constraints
+   ┌─ tests/checking-lang-v2.4/friend_const_in_inline_rejected.move:21:9
+   │
+21 │         M::FRIEND_CONST
+   │         ^^^^^^^^^^^^^^^

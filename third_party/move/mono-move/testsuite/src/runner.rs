@@ -12,7 +12,7 @@ use crate::{
     print_sections,
 };
 use anyhow::{anyhow, bail};
-use mono_move_core::ExecutionContext;
+use mono_move_core::{types::EMPTY_TYPE_LIST, ExecutionContext};
 use mono_move_gas::SimpleGasMeter;
 use mono_move_global_context::{ExecutionGuard, GlobalContext};
 use mono_move_loader::{Loader, LoadingPolicy, LoweringPolicy, TransactionContext};
@@ -209,7 +209,7 @@ fn execute_function_v2(
         module_provider,
         LoadingPolicy::Lazy(LoweringPolicy::Lazy),
     );
-    let mut txn_ctx = TransactionContext::new(guard, loader, SimpleGasMeter::new(u64::MAX));
+    let mut txn_ctx = TransactionContext::new(loader, SimpleGasMeter::new(u64::MAX));
 
     // Resolve the entry function via load_function so the entry module is
     // lazily loaded into the read-set and gas is charged for the load.
@@ -223,7 +223,7 @@ fn execute_function_v2(
     // SAFETY: the pointer lives in a `LoadedModule`'s arena. While `guard`
     // is held, the global executable cache cannot enter the maintenance
     // phase, so no arena reset can happen for the duration of this step.
-    let function = match txn_ctx.load_function(id, function_name) {
+    let function = match txn_ctx.load_function(id, function_name, EMPTY_TYPE_LIST) {
         Ok(p) => unsafe { p.as_ref_unchecked() },
         Err(err) => {
             return Output {
@@ -250,20 +250,12 @@ fn execute_function_v2(
             num_returns: 0,
         },
         Ok(()) => {
-            if num_returns == 0 {
-                // TODO: Check frame contents?
-                Output {
-                    display: "results:".to_string(),
-                    num_returns: 0,
-                }
-            } else {
-                let vals = (0..num_returns)
-                    .map(|i| interpreter.root_result_at((i * 8) as u32).to_string())
-                    .collect::<Vec<_>>();
-                Output {
-                    display: format!("results: {}", vals.join(", ")),
-                    num_returns,
-                }
+            let vals = (0..num_returns)
+                .map(|i| interpreter.root_result_at((i * 8) as u32).to_string())
+                .collect::<Vec<_>>();
+            Output {
+                display: format!("results: {}", vals.join(", ")),
+                num_returns,
             }
         },
     }

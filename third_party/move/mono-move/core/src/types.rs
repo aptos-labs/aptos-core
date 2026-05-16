@@ -33,26 +33,30 @@
 //! References are arena-allocated composite types with their inner
 //! pointee types interned recursively.
 //!
-//! Size of references is 16 bytes (fat pointers). Alignment is also 16 bytes.
+//! Size of references is 16 bytes (fat pointers). Alignment is 8 bytes —
+//! each half (`base_ptr` and `byte_offset`) is an 8-byte word.
 //!
 //! ## Fully-instantiated structs and enums
 //!
-//! Struct and enum types are arena-allocated, and store executable ID, name
+//! Struct and enum types are arena-allocated, and store module ID, name
 //! and type arguments that uniquely identify the type. Both can carry an
 //! optional layout slot. The slot stores size and alignment of this type. For
 //! structs, per-field offsets in flat memory are also recorded. Note that enum
 //! field offsets are not cached in the type graph because enum definitions
 //! can change on module upgrade (new variants added); per-variant field
-//! layouts are stored per-executable and resolved at runtime.
+//! layouts are stored per-module and resolved at runtime.
 //!
 //! ## Generic structs
 //!
 //! TODO: support substitution
 
-use crate::{ExecutableId, Interner};
+use crate::{
+    interner::{InternedIdentifier, InternedModuleId},
+    Interner,
+};
 use mono_move_alloc::GlobalArenaPtr;
 use move_core_types::ability::AbilitySet;
-use std::sync::OnceLock;
+use std::{cmp::PartialEq, fmt, sync::OnceLock};
 
 // ================================================================================================
 // Layout types
@@ -76,7 +80,21 @@ pub type InternedType = GlobalArenaPtr<Type>;
 /// Pointer to an arena-interned list of [`InternedType`]s (e.g., function
 /// parameter/return types, generic type arguments). The list itself is also
 /// interned and deduplicated.
-pub type InternedTypeList = GlobalArenaPtr<[InternedType]>;
+#[repr(transparent)]
+#[derive(Copy, Clone, Eq, PartialEq, Hash)]
+pub struct InternedTypeList(GlobalArenaPtr<[InternedType]>);
+
+impl InternedTypeList {
+    /// Returns a new arena-interned type list.
+    pub fn new(tys: GlobalArenaPtr<[InternedType]>) -> Self {
+        Self(tys)
+    }
+
+    /// Returns true if this type list is empty.
+    pub fn is_empty(&self) -> bool {
+        self == &EMPTY_TYPE_LIST
+    }
+}
 
 // ================================================================================================
 // View helpers for arena-interned pointers
@@ -126,11 +144,11 @@ pub fn view_type(ptr: InternedType) -> &'static Type {
 /// behind `ptr`.
 pub fn view_type_list(ptr: InternedTypeList) -> &'static [InternedType] {
     // SAFETY: see module-level contract above.
-    unsafe { ptr.as_ref_unchecked() }
+    unsafe { ptr.0.as_ref_unchecked() }
 }
 
 /// Returns a reference to the arena-interned identifier string behind `ptr`.
-pub fn view_name(ptr: GlobalArenaPtr<str>) -> &'static str {
+pub fn view_name(ptr: InternedIdentifier) -> &'static str {
     // SAFETY: see module-level contract above.
     unsafe { ptr.as_ref_unchecked() }
 }
@@ -283,8 +301,8 @@ pub enum Type {
     /// memory - keep it that way.
     Nominal {
         // TODO: Make this a pointer to a named-type struct holding these pointers.
-        executable_id: GlobalArenaPtr<ExecutableId>,
-        name: GlobalArenaPtr<str>,
+        module_id: InternedModuleId,
+        name: InternedIdentifier,
         ty_args: InternedTypeList,
         layout: OnceLock<NominalLayout>,
     },
@@ -326,15 +344,15 @@ impl Type {
             Type::U16 | Type::I16 => (2, 2),
             Type::U32 | Type::I32 => (4, 4),
             Type::U64 | Type::I64 => (8, 8),
-            Type::U128 | Type::I128 => (16, 16),
-            Type::U256 | Type::I256 | Type::Address | Type::Signer => (32, 32),
+            Type::U128 | Type::I128 => (16, 8),
+            Type::U256 | Type::I256 | Type::Address | Type::Signer => (32, 8),
 
             // Vectors: pointer to the heap which stores vector metadata such
             // as length, capacity.
             Type::Vector { .. } => (8, 8),
 
-            // References are 16-byte fat pointers.
-            Type::ImmutRef { .. } | Type::MutRef { .. } => (16, 16),
+            // References are 16-byte fat pointers, 8-byte aligned.
+            Type::ImmutRef { .. } | Type::MutRef { .. } => (16, 8),
 
             // Function values - TODO: for now use heap pointer values.
             Type::Function { .. } => (8, 8),
@@ -404,7 +422,6 @@ pub static I256: Type = Type::I256;
 pub static ADDRESS: Type = Type::Address;
 pub static SIGNER: Type = Type::Signer;
 
-// TODO: placeholder.
 pub static EMPTY_LIST: [InternedType; 0] = [];
 
 // ================================================================================================
@@ -430,16 +447,77 @@ pub const I256_TY: InternedType = GlobalArenaPtr::from_static(&I256);
 pub const ADDRESS_TY: InternedType = GlobalArenaPtr::from_static(&ADDRESS);
 pub const SIGNER_TY: InternedType = GlobalArenaPtr::from_static(&SIGNER);
 
-pub const EMPTY_TYPE_LIST: InternedTypeList = GlobalArenaPtr::from_static(&EMPTY_LIST);
+pub const EMPTY_TYPE_LIST: InternedTypeList =
+    InternedTypeList(GlobalArenaPtr::from_static(&EMPTY_LIST));
 
-// ================================================================================================
-// Alignment utility
-// ================================================================================================
+/// Writes a textual representation of an interned type. Nominals print
+/// just their name — IR variants that carry `ty_args` show them
+/// separately. Inherits the arena safety contract on [`view_type`].
+pub fn display_type(f: &mut fmt::Formatter<'_>, ty: InternedType) -> fmt::Result {
+    match view_type(ty) {
+        Type::Bool => write!(f, "bool"),
+        Type::U8 => write!(f, "u8"),
+        Type::U16 => write!(f, "u16"),
+        Type::U32 => write!(f, "u32"),
+        Type::U64 => write!(f, "u64"),
+        Type::U128 => write!(f, "u128"),
+        Type::U256 => write!(f, "u256"),
+        Type::I8 => write!(f, "i8"),
+        Type::I16 => write!(f, "i16"),
+        Type::I32 => write!(f, "i32"),
+        Type::I64 => write!(f, "i64"),
+        Type::I128 => write!(f, "i128"),
+        Type::I256 => write!(f, "i256"),
+        Type::Address => write!(f, "address"),
+        Type::Signer => write!(f, "signer"),
+        Type::TypeParam { idx } => write!(f, "_{}", idx),
+        Type::Vector { elem } => {
+            write!(f, "vector<")?;
+            display_type(f, *elem)?;
+            write!(f, ">")
+        },
+        Type::ImmutRef { inner } => {
+            write!(f, "&")?;
+            display_type(f, *inner)
+        },
+        Type::MutRef { inner } => {
+            write!(f, "&mut ")?;
+            display_type(f, *inner)
+        },
+        Type::Nominal {
+            module_id,
+            name,
+            ty_args,
+            ..
+        } => {
+            let module_id = unsafe { module_id.as_ref_unchecked() };
+            let addr = module_id.address().short_str_lossless();
+            let module_name = view_name(module_id.name());
+            write!(f, "0x{}::{}::{}", addr, module_name, view_name(*name))?;
+            if !ty_args.is_empty() {
+                write!(f, "<")?;
+                display_type_list(f, *ty_args)?;
+                write!(f, ">")?;
+            }
+            Ok(())
+        },
+        Type::Function { args, results, .. } => {
+            write!(f, "|")?;
+            display_type_list(f, *args)?;
+            write!(f, "|")?;
+            display_type_list(f, *results)?;
+            Ok(())
+        },
+    }
+}
 
-/// Rounds a byte offset up to the next multiple of `align`.
-///
-/// **Pre-condition:** `align` is non-zero and is a power of two.
-pub fn align_up(offset: u32, align: u32) -> u32 {
-    debug_assert!(align > 0 && align.is_power_of_two());
-    (offset + align - 1) & !(align - 1)
+/// Writes an interned type list as `T0, T1, ...`.
+pub fn display_type_list(f: &mut fmt::Formatter<'_>, types: InternedTypeList) -> fmt::Result {
+    for (i, ty) in view_type_list(types).iter().enumerate() {
+        if i > 0 {
+            write!(f, ", ")?;
+        }
+        display_type(f, *ty)?;
+    }
+    Ok(())
 }

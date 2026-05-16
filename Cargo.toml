@@ -206,6 +206,7 @@ members = [
     "testsuite/generate-format",
     "testsuite/smoke-test",
     "testsuite/testcases",
+    "third_party/move/documentation/framework-book/builder",
     "third_party/move/extensions/move-table-extension",
     "third_party/move/mono-move/alloc",
     "third_party/move/mono-move/core",
@@ -240,6 +241,7 @@ members = [
     "third_party/move/move-prover",
     "third_party/move/move-prover/boogie-backend",
     "third_party/move/move-prover/bytecode-pipeline",
+    "third_party/move/move-prover/e2e-tests",
     "third_party/move/move-prover/lab",
     "third_party/move/move-prover/test-utils",
     "third_party/move/move-symbol-pool",
@@ -542,6 +544,7 @@ bigdecimal = { version = "0.4.0", features = ["serde"] }
 version-compare = "0.1.1"
 bitvec = "1.0.1"
 blake2 = "0.10.4"
+blake3 = { version = "1.5.4", features = ["mmap", "rayon"] }
 blake2-rfc = "0.2.18"
 bls12_381 = "0.8.0"
 blst = "0.3.15"
@@ -677,6 +680,7 @@ jemallocator = { package = "tikv-jemallocator", version = "0.6.1", features = [
 ] }
 jemalloc-ctl = { package = "tikv-jemalloc-ctl", version = "0.6.1" }
 jemalloc-sys = { package = "tikv-jemalloc-sys", version = "0.6.1" }
+jemalloc_pprof = { version = "0.8", features = ["symbolize"] }
 json-patch = "0.2.6"
 jsonwebtoken = "8.1"
 jwt = "0.16.0"

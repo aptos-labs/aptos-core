@@ -27,6 +27,7 @@ use crate::{
     txn_provider::TxnProvider,
     types::ReadWriteSummary,
     view::{LatestView, ParallelState, SequentialState, ViewState},
+    worker_pool::WorkerPool,
 };
 use aptos_aggregator::{
     delayed_change::{ApplyBase, DelayedChange},
@@ -67,15 +68,12 @@ use move_core_types::{language_storage::ModuleId, value::MoveTypeLayout, vm_stat
 use move_vm_runtime::{Module, RuntimeEnvironment, TypeChecker, WithRuntimeEnvironment};
 use move_vm_types::delayed_values::delayed_field_id::DelayedFieldID;
 use num_cpus;
-use rayon::ThreadPool;
+use once_cell::sync::Lazy;
 use std::{
     cell::RefCell,
     collections::{BTreeMap, BTreeSet, HashMap, HashSet},
     marker::{PhantomData, Sync},
-    sync::{
-        atomic::{AtomicBool, AtomicU32, Ordering},
-        Arc,
-    },
+    sync::atomic::{AtomicBool, AtomicU32, Ordering},
 };
 use triomphe::Arc as TriompheArc;
 
@@ -98,11 +96,11 @@ where
     maybe_block_epilogue_txn_idx: &'a ExplicitSyncWrapper<Option<TxnIndex>>,
 }
 
+/// BlockSTM worker pool.
+static WORKER_POOL: Lazy<WorkerPool> = Lazy::new(WorkerPool::new);
+
 pub struct BlockExecutor<T, E, S, L, TP, A> {
-    // Number of active concurrent tasks, corresponding to the maximum number of rayon
-    // threads that may be concurrently participating in parallel execution.
     config: BlockExecutorConfig,
-    executor_thread_pool: Arc<rayon::ThreadPool>,
     transaction_commit_hook: Option<L>,
     phantom: PhantomData<fn() -> (T, E, S, L, TP, A)>,
 }
@@ -118,11 +116,7 @@ where
 {
     /// The caller needs to ensure that concurrency_level > 1 (0 is illegal and 1 should
     /// be handled by sequential execution) and that concurrency_level <= num_cpus.
-    pub fn new(
-        config: BlockExecutorConfig,
-        executor_thread_pool: Arc<ThreadPool>,
-        transaction_commit_hook: Option<L>,
-    ) -> Self {
+    pub fn new(config: BlockExecutorConfig, transaction_commit_hook: Option<L>) -> Self {
         let num_cpus = num_cpus::get();
         assert!(
             config.local.concurrency_level > 0 && config.local.concurrency_level <= num_cpus,
@@ -132,7 +126,6 @@ where
         );
         Self {
             config,
-            executor_thread_pool,
             transaction_commit_hook,
             phantom: PhantomData,
         }
@@ -467,9 +460,19 @@ where
             // Recording in order to check the invariant that the final, committed incarnation
             // of each transaction is not a speculative failure.
             last_input_output.record_speculative_failure(idx_to_execute);
-            // Ignoring module validation requirements since speculative failure
-            // anyway requires re-execution.
-            let _ = scheduler.finish_execution(abort_manager)?;
+            // Unblock the commit path if deferred module validation requirements exist.
+            // The speculative failure guarantees re-execution, but re-execution may only
+            // be triggered by the commit worker (via validate_and_commit_delayed_fields
+            // returning false). The commit worker checks deferred requirements first
+            // (is_commit_blocked), so we must mark them completed to avoid a deadlock.
+            if scheduler.finish_execution(abort_manager)?.is_some() {
+                scheduler.finish_cold_validation_requirement(
+                    worker_id,
+                    idx_to_execute,
+                    incarnation,
+                    true,
+                )?;
+            }
             return Ok(());
         }
 
@@ -783,23 +786,26 @@ where
         // 2. The only possible time to take the read-set from txn_last_input_output
         // is in prepare_and_queue_commit_ready_txn (applying module publishing output).
         // However, required module validation necessarily occurs before the commit.
-        let (read_set, is_speculative_failure) =
-            last_input_output.read_set(idx_to_validate).ok_or_else(|| {
-                code_invariant_error(format!(
-                    "Prior read-set of txn {} incarnation {} not recorded for module verification",
-                    idx_to_validate, incarnation_to_validate
-                ))
-            })?;
+        if last_input_output.is_speculative_failure(idx_to_validate) {
+            // No need to validate — the incarnation resulted in a speculative failure
+            // and will be re-executed.
+            return Ok(true);
+        }
+        let read_set = last_input_output.read_set(idx_to_validate).ok_or_else(|| {
+            code_invariant_error(format!(
+                "Prior read-set of txn {} incarnation {} not recorded for module verification",
+                idx_to_validate, incarnation_to_validate
+            ))
+        })?;
         // Perform invariant checks or return early based on read set's incarnation.
         let blockstm_v2_incarnation = read_set.blockstm_v2_incarnation().ok_or_else(|| {
             code_invariant_error(
                 "BlockSTMv2 must be enabled in CapturedReads when validating module reads",
             )
         })?;
-        if blockstm_v2_incarnation > incarnation_to_validate || is_speculative_failure {
+        if blockstm_v2_incarnation > incarnation_to_validate {
             // No need to validate as a newer incarnation has already been executed
-            // and recorded its output, or the incarnation has resulted in a speculative
-            // failure, which means there will be a further re-execution.
+            // and recorded its output.
             return Ok(true);
         }
         if blockstm_v2_incarnation < incarnation_to_validate {
@@ -834,13 +840,12 @@ where
         skip_module_reads_validation: bool,
     ) -> bool {
         let _timer = TASK_VALIDATE_SECONDS.start_timer();
-        let (read_set, is_speculative_failure) = last_input_output
-            .read_set(idx_to_validate)
-            .expect("[BlockSTM]: Prior read-set must be recorded");
-
-        if is_speculative_failure {
+        if last_input_output.is_speculative_failure(idx_to_validate) {
             return false;
         }
+        let read_set = last_input_output
+            .read_set(idx_to_validate)
+            .expect("[BlockSTM]: Prior read-set must be recorded");
 
         assert!(
             !read_set.is_incorrect_use(),
@@ -898,13 +903,12 @@ where
         last_input_output: &TxnLastInputOutput<T, E::Output>,
         is_v2: bool,
     ) -> Result<bool, PanicError> {
-        let (read_set, is_speculative_failure) = last_input_output
-            .read_set(txn_idx)
-            .ok_or_else(|| code_invariant_error("Read set must be recorded"))?;
-
-        if is_speculative_failure {
+        if last_input_output.is_speculative_failure(txn_idx) {
             return Ok(false);
         }
+        let read_set = last_input_output
+            .read_set(txn_idx)
+            .ok_or_else(|| code_invariant_error("Read set must be recorded"))?;
 
         if !read_set.validate_delayed_field_reads(versioned_cache.delayed_fields(), txn_idx)?
             || (is_v2
@@ -1288,7 +1292,7 @@ where
             // Retrieve the read-set that was captured during execution. This contains the snapshot
             // of all modules accessed at execution time. It is important to use this view so that
             // replay does not see potentially different newer state.
-            let (read_set, _) = last_input_output.read_set(txn_idx).ok_or_else(|| {
+            let read_set = last_input_output.read_set(txn_idx).ok_or_else(|| {
                 code_invariant_error("Read set must be recorded for trace replay")
             })?;
 
@@ -1852,48 +1856,44 @@ where
         );
 
         let timer = RAYON_EXECUTION_SECONDS.start_timer();
-        let worker_ids: Vec<u32> = (0..num_workers).collect();
         let maybe_executor = ExplicitSyncWrapper::new(None);
-        self.executor_thread_pool.scope(|s| {
-            for worker_id in &worker_ids {
-                s.spawn(|_| {
-                    let environment = module_cache_manager_guard.environment();
-                    let executor = {
-                        let _init_timer = VM_INIT_SECONDS.start_timer();
-                        E::init(
-                            &environment.clone(),
-                            shared_sync_params.base_view,
-                            async_runtime_checks_enabled,
-                        )
-                    };
+        WORKER_POOL.scope(num_workers as usize, |worker_id| {
+            let worker_id = worker_id as u32;
+            let environment = module_cache_manager_guard.environment();
+            let executor = {
+                let _init_timer = VM_INIT_SECONDS.start_timer();
+                E::init(
+                    &environment.clone(),
+                    shared_sync_params.base_view,
+                    async_runtime_checks_enabled,
+                )
+            };
 
-                    if let Err(err) = self.worker_loop_v2(
-                        &executor,
-                        signature_verified_block,
-                        environment,
-                        *worker_id,
-                        num_workers,
-                        &scheduler,
-                        &shared_sync_params,
-                    ) {
-                        // If there are multiple errors, they all get logged: FatalVMError is
-                        // logged at construction, below we log CodeInvariantErrors.
-                        if let PanicOr::CodeInvariantError(err_msg) = err {
-                            alert!(
-                                "[BlockSTMv2] worker loop: CodeInvariantError({:?})",
-                                err_msg
-                            );
-                        }
-                        shared_maybe_error.store(true, Ordering::SeqCst);
+            if let Err(err) = self.worker_loop_v2(
+                &executor,
+                signature_verified_block,
+                environment,
+                worker_id,
+                num_workers,
+                &scheduler,
+                &shared_sync_params,
+            ) {
+                // If there are multiple errors, they all get logged: FatalVMError is
+                // logged at construction, below we log CodeInvariantErrors.
+                if let PanicOr::CodeInvariantError(err_msg) = err {
+                    alert!(
+                        "[BlockSTMv2] worker loop: CodeInvariantError({:?})",
+                        err_msg
+                    );
+                }
+                shared_maybe_error.store(true, Ordering::SeqCst);
 
-                        // Make sure to halt the scheduler if it hasn't already been halted.
-                        scheduler.halt();
-                    }
+                // Make sure to halt the scheduler if it hasn't already been halted.
+                scheduler.halt();
+            }
 
-                    if *worker_id == 0 {
-                        maybe_executor.acquire().replace(executor);
-                    }
-                });
+            if worker_id == 0 {
+                maybe_executor.acquire().replace(executor);
             }
         });
         drop(timer);
@@ -2003,7 +2003,6 @@ where
         let scheduler = Scheduler::new(num_txns);
 
         let timer = RAYON_EXECUTION_SECONDS.start_timer();
-        let worker_ids: Vec<u32> = (0..num_workers as u32).collect();
         let maybe_executor = ExplicitSyncWrapper::new(None);
 
         let shared_sync_params: SharedSyncParams<'_, T, E, S> = SharedSyncParams {
@@ -2021,47 +2020,44 @@ where
         let async_runtime_checks_enabled = should_perform_async_runtime_checks_for_block(
             module_cache_manager_guard.environment(),
             num_txns,
-            worker_ids.len() as u32,
+            num_workers as u32,
         );
 
-        self.executor_thread_pool.scope(|s| {
-            for worker_id in &worker_ids {
-                s.spawn(|_| {
-                    let environment = module_cache_manager_guard.environment();
-                    let executor = {
-                        let _init_timer = VM_INIT_SECONDS.start_timer();
-                        E::init(
-                            &environment.clone(),
-                            base_view,
-                            async_runtime_checks_enabled,
-                        )
-                    };
+        WORKER_POOL.scope(num_workers, |worker_id| {
+            let worker_id = worker_id as u32;
+            let environment = module_cache_manager_guard.environment();
+            let executor = {
+                let _init_timer = VM_INIT_SECONDS.start_timer();
+                E::init(
+                    &environment.clone(),
+                    base_view,
+                    async_runtime_checks_enabled,
+                )
+            };
 
-                    if let Err(err) = self.worker_loop(
-                        &executor,
-                        environment,
-                        signature_verified_block,
-                        &scheduler,
-                        &skip_module_reads_validation,
-                        &shared_sync_params,
-                        num_workers,
-                    ) {
-                        // If there are multiple errors, they all get logged:
-                        // ModulePathReadWriteError and FatalVMError variant is logged at construction,
-                        // and below we log CodeInvariantErrors.
-                        if let PanicOr::CodeInvariantError(err_msg) = err {
-                            alert!("[BlockSTM] worker loop: CodeInvariantError({:?})", err_msg);
-                        }
-                        shared_maybe_error.store(true, Ordering::SeqCst);
+            if let Err(err) = self.worker_loop(
+                &executor,
+                environment,
+                signature_verified_block,
+                &scheduler,
+                &skip_module_reads_validation,
+                &shared_sync_params,
+                num_workers,
+            ) {
+                // If there are multiple errors, they all get logged:
+                // ModulePathReadWriteError and FatalVMError variant is logged at construction,
+                // and below we log CodeInvariantErrors.
+                if let PanicOr::CodeInvariantError(err_msg) = err {
+                    alert!("[BlockSTM] worker loop: CodeInvariantError({:?})", err_msg);
+                }
+                shared_maybe_error.store(true, Ordering::SeqCst);
 
-                        // Make sure to halt the scheduler if it hasn't already been halted.
-                        scheduler.halt();
-                    }
+                // Make sure to halt the scheduler if it hasn't already been halted.
+                scheduler.halt();
+            }
 
-                    if *worker_id == 0 {
-                        maybe_executor.acquire().replace(executor);
-                    }
-                });
+            if worker_id == 0 {
+                maybe_executor.acquire().replace(executor);
             }
         });
         drop(timer);
@@ -2323,6 +2319,11 @@ where
         );
 
         let mut block_epilogue_txn = None;
+        // Counts user-txn `accumulate_fee_statement` calls. Incremented alongside each
+        // accumulate so any loop-exit path (including the bcs-fallback `continue`) keeps
+        // this in sync. Passed as `num_committed` to `finish_*` so block-level counters
+        // (`BLOCK_COMMITTED_TXNS`, `BLOCK_TXNS_CUT_BY_LIMIT`) report user-txn counts only.
+        let mut num_committed_user_txns: u32 = 0;
         let mut idx = 0;
         while idx <= num_txns {
             let txn = if idx != num_txns {
@@ -2416,6 +2417,12 @@ where
                         read_write_summary,
                         approx_output_size,
                     );
+                    if idx < num_txns {
+                        // Exclude the block-epilogue (idx == num_txns) so num_committed_user_txns
+                        // tracks only user txns. Includes bcs-fallback discards (which accumulate
+                        // a fee statement before being discarded), consistent with the accumulator.
+                        num_committed_user_txns += 1;
+                    }
 
                     // Drop to acquire a write lock, then re-assign the output_before_guard.
                     drop(output_before_guard);
@@ -2643,8 +2650,8 @@ where
         }
 
         block_limit_processor.finish_sequential_update_counters_and_log_info(
-            ret.len() as u32,
-            num_txns as u32 + block_epilogue_txn.as_ref().map_or(0, |_| 1),
+            num_committed_user_txns,
+            num_txns as u32,
         );
 
         counters::update_state_counters(unsync_map.stats(), false);

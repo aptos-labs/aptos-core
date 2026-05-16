@@ -14,6 +14,7 @@ Ok(
                     ),
                 ),
                 hotness: {},
+                native_positions: {},
             },
             events: [
                 ModuleEvent { type: Struct(StructTag { address: 0000000000000000000000000000000000000000000000000000000000000001, module: Identifier("transaction_fee"), name: Identifier("FeeStatement"), type_args: [] }), event_data: "03000000000000000300000000000000000000000000000000000000000000000000000000000000" },

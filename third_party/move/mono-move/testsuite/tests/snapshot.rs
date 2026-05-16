@@ -33,9 +33,9 @@ fn masm_runner(path: &Path) -> datatest_stable::Result<()> {
     let guard = ctx.try_execution_context(0).unwrap();
 
     let ir = destack(module, &guard).map_err(|e| format!("{:#}", e))?;
-    let mut output = format!("{}", ir);
+    let mut output = format!("{}", &ir);
     output.push_str("\n=== micro-ops ===\n");
-    output.push_str(&format_micro_ops(&ir));
+    output.push_str(&format_micro_ops(&guard, &ir));
 
     let baseline_path = path.with_extension(EXP_EXT);
     move_prover_test_utils::baseline_test::verify_or_update_baseline(
@@ -61,7 +61,7 @@ fn move_runner(path: &Path) -> datatest_stable::Result<()> {
         output.push_str("\n=== specializer ===\n");
         output.push_str(&module_ir.to_string());
         output.push_str("\n=== micro-ops ===\n");
-        output.push_str(&format_micro_ops(&module_ir));
+        output.push_str(&format_micro_ops(&guard, &module_ir));
     }
     let baseline_path = path.with_extension(EXP_EXT);
     move_prover_test_utils::baseline_test::verify_or_update_baseline(

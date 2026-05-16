@@ -45,7 +45,6 @@ error: post-condition does not hold
    =     at tests/sources/functional/choice.move:83: test_not_using_min_incorrect
    =     at tests/sources/functional/choice.move:75: test_not_using_min_incorrect
    =         result = <redacted>
-   =     at tests/sources/functional/choice.move:84: test_not_using_min_incorrect
    =     at tests/sources/functional/choice.move:87: test_not_using_min_incorrect (spec)
    =         `TRACE(choose i in 0..len(result) where result[i] == 2)` = <redacted>
 
@@ -59,7 +58,6 @@ error: post-condition does not hold
     =         x = <redacted>
     =     at tests/sources/functional/choice.move:96: test_choice_dup_expected_fail
     =         result = <redacted>
-    =     at tests/sources/functional/choice.move:97: test_choice_dup_expected_fail
     =     at tests/sources/functional/choice.move:100: test_choice_dup_expected_fail (spec)
     =         `TRACE(choose y: u64 where y > x)` = <redacted>
 
@@ -71,7 +69,6 @@ error: post-condition does not hold
     │
     =     at tests/sources/functional/choice.move:156: test_different_choice_via_let (spec)
     =     at tests/sources/functional/choice.move:157: test_different_choice_via_let (spec)
-    =     at tests/sources/functional/choice.move:154: test_different_choice_via_let
     =     at tests/sources/functional/choice.move:158: test_different_choice_via_let (spec)
 
 error: post-condition does not hold
@@ -80,7 +77,6 @@ error: post-condition does not hold
 182 │         ensures choose_some_positive_u64() == choose_another_positive_u64();
     │         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
     │
-    =     at tests/sources/functional/choice.move:180: test_different_choice_via_spec_fun
     =     at tests/sources/functional/choice.move:182: test_different_choice_via_spec_fun (spec)
 
 error: post-condition does not hold
@@ -106,7 +102,6 @@ error: post-condition does not hold
     │
     =     at tests/sources/functional/choice.move:236: test_same_choice_different_args_via_schema_2
     =         result = <redacted>
-    =     at tests/sources/functional/choice.move:237: test_same_choice_different_args_via_schema_2
     =     at tests/sources/functional/choice.move:219
 
 error: post-condition does not hold
@@ -126,8 +121,6 @@ error: post-condition does not hold
     =         counter = <redacted>
     =     at tests/sources/functional/choice.move:275: new_ballot_id
     =         result = <redacted>
-    =     at tests/sources/functional/choice.move:278: new_ballot_id
     =     at tests/sources/functional/choice.move:282: create_ballot
     =         result = <redacted>
-    =     at tests/sources/functional/choice.move:288: create_ballot
     =     at tests/sources/functional/choice.move:302: create_ballot (spec)

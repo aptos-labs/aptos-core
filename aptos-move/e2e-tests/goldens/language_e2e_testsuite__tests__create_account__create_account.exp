@@ -15,6 +15,7 @@ Ok(
                     ),
                 ),
                 hotness: {},
+                native_positions: {},
             },
             events: [
                 ModuleEvent { type: Struct(StructTag { address: 0000000000000000000000000000000000000000000000000000000000000001, module: Identifier("fungible_asset"), name: Identifier("Withdraw"), type_args: [] }), event_data: "b26af11b4f332a7794398554b6313a38c6a102c74c5ba9a12629ae3a492acb2f0100000000000000" },

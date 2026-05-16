@@ -214,6 +214,7 @@ pub fn build_model(
     known_attributes: BTreeSet<String>,
     experiments: Vec<String>,
     with_bytecode: bool,
+    all_files_as_targets: bool,
 ) -> anyhow::Result<GlobalEnv> {
     let build_config = make_model_build_config(
         dev_mode,
@@ -231,7 +232,7 @@ pub fn build_model(
     let language_version = language_version.unwrap_or_default();
     let env = build_config.move_model_for_package(package_path, ModelConfig {
         target_filter,
-        all_files_as_targets: false,
+        all_files_as_targets,
         compiler_version,
         language_version,
         with_bytecode,

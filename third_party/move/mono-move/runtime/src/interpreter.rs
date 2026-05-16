@@ -13,11 +13,13 @@ use crate::{
         pinned_roots::PinnedRoots,
         Heap,
     },
-    memory::{read_ptr, read_u32, read_u64, vec_elem_ptr, write_ptr, write_u64, MemoryRegion},
+    memory::{
+        read_obj_size, read_ptr, read_u64, read_u8, vec_elem_ptr, write_ptr, write_u64,
+        MemoryRegion,
+    },
     types::{
-        StepResult, DEFAULT_HEAP_SIZE, DEFAULT_STACK_SIZE, HEADER_SIZE_OFFSET,
-        META_SAVED_FP_OFFSET, META_SAVED_FUNC_PTR_OFFSET, META_SAVED_PC_OFFSET, VEC_DATA_OFFSET,
-        VEC_LENGTH_OFFSET,
+        StepResult, DEFAULT_HEAP_SIZE, DEFAULT_STACK_SIZE, META_SAVED_FP_OFFSET,
+        META_SAVED_FUNC_PTR_OFFSET, META_SAVED_PC_OFFSET, VEC_DATA_OFFSET, VEC_LENGTH_OFFSET,
     },
 };
 use mono_move_core::{
@@ -25,7 +27,7 @@ use mono_move_core::{
     PackClosureOp, SizedSlot, CAPTURED_DATA_TAG_MATERIALIZED, CAPTURED_DATA_TAG_OFFSET,
     CAPTURED_DATA_VALUES_OFFSET, CLOSURE_CAPTURED_DATA_PTR_OFFSET, CLOSURE_FUNC_REF_OFFSET,
     CLOSURE_MASK_OFFSET, FRAME_METADATA_SIZE, FUNC_REF_PAYLOAD_OFFSET, FUNC_REF_TAG_OFFSET,
-    FUNC_REF_TAG_RESOLVED,
+    FUNC_REF_TAG_RESOLVED, OBJECT_HEADER_SIZE,
 };
 use mono_move_gas::GasMeter;
 use rand::{rngs::StdRng, Rng, SeedableRng};
@@ -46,7 +48,8 @@ pub struct InterpreterContext<'a, T: ExecutionContext> {
     /// Pointer to the currently executing function.
     pub(crate) current_func: NonNull<Function>,
     /// Absolute pointer into the linear stack memory. Operand accesses are a
-    /// single addition (`fp + offset`). Recomputed only on `CallFunc` and `Return`.
+    /// single addition (`fp + offset`).
+    /// Recomputed only during calls and returns.
     pub(crate) frame_ptr: *mut u8,
 
     pub(crate) stack: MemoryRegion,
@@ -295,7 +298,8 @@ unsafe fn checked_imm_op_u64<F: FnOnce(u64, u64) -> Option<u64>>(
 }
 
 /// `dst <- op(lhs_slot, rhs_slot_as_shift)`. Bail if shift `>= 64`.
-/// `op_name` is used to format the error message.
+/// `op_name` is used to format the error message. The shift amount lives in
+/// a 1-byte slot (Move bytecode invariant); only that byte is read.
 #[inline(always)]
 unsafe fn shift_u64<F: FnOnce(u64, u64) -> u64>(
     fp: *mut u8,
@@ -305,10 +309,11 @@ unsafe fn shift_u64<F: FnOnce(u64, u64) -> u64>(
     op: F,
     op_name: &'static str,
 ) -> ExecutionResult<()> {
-    // SAFETY: `fp` is the current frame pointer and `lhs`/`rhs`/`dst` are
-    // in-bounds 8-byte slots within that frame (enforced by the verifier).
+    // SAFETY: `fp` is the current frame pointer; `lhs`/`dst` are in-bounds
+    // 8-byte slots and `rhs` is an in-bounds 1-byte slot within that frame
+    // (enforced by the verifier).
     unsafe {
-        let shift = read_u64(fp, rhs);
+        let shift = read_u8(fp, rhs) as u64;
         if shift >= 64 {
             bail!("{}: shift amount {} exceeds 63", op_name, shift);
         }
@@ -329,9 +334,14 @@ impl<T: ExecutionContext> InterpreterContext<'_, T> {
         // it is derived from function reference (e.g., entrypoint) or when
         // executing a call instruction, which stores a valid pointer.
         let func = unsafe { self.current_func.as_ref() };
-        // SAFETY: The function's code is allocated in an executable arena that
-        // is alive for the duration of execution.
-        let code = unsafe { func.code.as_ref_unchecked() };
+
+        // TODO:
+        //  1. Hoist this out and see effects on performance
+        //  2. See if swapping code does not need to be seen by same txn, and
+        //     only its future re-executions see new code.
+        let code_guard = func.code.load();
+        let code = code_guard.as_slice();
+
         if self.pc >= code.len() {
             bail!(
                 "pc out of bounds: pc={} but function {} has {} instructions",
@@ -350,20 +360,23 @@ impl<T: ExecutionContext> InterpreterContext<'_, T> {
         unsafe {
             match *instr {
                 // ----- Control flow (set pc explicitly, return early) -----
-                MicroOp::CallFunc { .. } => {
-                    bail!("CallFunc must be resolved before execution");
-                },
                 MicroOp::CallIndirect {
-                    executable_id,
+                    module_id,
                     func_name,
+                    ty_args,
                 } => {
-                    // Cross-module slow path: dispatches through the
-                    // transaction context, which triggers lazy module
-                    // loading on a cache miss.
-                    let target = self.exec_ctx.load_function(executable_id, func_name)?;
-                    // SAFETY: `target` points to a `Function` allocated in a
-                    // `LoadedModule`'s arena, which is held alive by the
-                    // global executable cache for the lifetime of `exec_ctx`.
+                    // TODO: full flow should be like this:
+                    //
+                    //   1. IC lookup:
+                    //      - Hit:  return pointer,
+                    //      - Miss: goto 2.
+                    //   2. target = load_function(...)
+                    //   3. IC insert target
+                    //   4. Patching:
+                    //      If can patch caller, try it.
+                    let target = self.exec_ctx.load_function(module_id, func_name, ty_args)?;
+                    // SAFETY: `target` points to a `Function`, which is not reclaimed during
+                    // execution as guaranteed by the execution guard.
                     return self.call(func, fp, target.as_ref_unchecked());
                 },
                 MicroOp::CallDirect { ptr } => {
@@ -552,7 +565,7 @@ impl<T: ExecutionContext> InterpreterContext<'_, T> {
                 // defensive check.
                 MicroOp::ShlU64Imm { dst, src, imm } => {
                     debug_assert!(imm < 64, "ShlU64Imm: imm must be < 64 (verifier invariant)");
-                    imm_op_u64(fp, dst, src, imm, |s, i| s << i)
+                    imm_op_u64(fp, dst, src, imm as u64, |s, i| s << i)
                 },
                 MicroOp::ShrU64 { dst, lhs, rhs } => {
                     shift_u64(fp, dst, lhs, rhs, |v, s| v >> s, "ShrU64")?
@@ -562,7 +575,7 @@ impl<T: ExecutionContext> InterpreterContext<'_, T> {
                 // defensive check.
                 MicroOp::ShrU64Imm { dst, src, imm } => {
                     debug_assert!(imm < 64, "ShrU64Imm: imm must be < 64 (verifier invariant)");
-                    imm_op_u64(fp, dst, src, imm, |s, i| s >> i)
+                    imm_op_u64(fp, dst, src, imm as u64, |s, i| s >> i)
                 },
 
                 MicroOp::StoreRandomU64 { dst } => {
@@ -619,10 +632,11 @@ impl<T: ExecutionContext> InterpreterContext<'_, T> {
                     }
 
                     let len = read_u64(vec_ptr, VEC_LENGTH_OFFSET);
-                    let size = read_u32(vec_ptr, HEADER_SIZE_OFFSET) as usize;
-                    let cap = ((size - VEC_DATA_OFFSET) / elem_size as usize) as u64;
+                    let total = read_obj_size(vec_ptr) as usize;
+                    let cap_in_elems = ((total - OBJECT_HEADER_SIZE - VEC_DATA_OFFSET)
+                        / elem_size as usize) as u64;
 
-                    if len >= cap {
+                    if len >= cap_in_elems {
                         vec_ptr = grow_vec_ref!(self, fp, vec_ref.into(), elem_size, len + 1)?;
                     }
 
@@ -746,14 +760,16 @@ impl<T: ExecutionContext> InterpreterContext<'_, T> {
                     let base = read_ptr(fp, ref_ptr);
                     let offset = read_u64(fp, ref_ptr + 8);
                     let target = base.add(offset as usize);
-                    std::ptr::copy_nonoverlapping(target, fp.add(dst.into()), size as usize);
+                    // Overlap-safe `copy`: `dst` and `*ref` may alias.
+                    std::ptr::copy(target, fp.add(dst.into()), size as usize);
                 },
 
                 MicroOp::WriteRef { ref_ptr, src, size } => {
                     let base = read_ptr(fp, ref_ptr);
                     let offset = read_u64(fp, ref_ptr + 8);
                     let target = base.add(offset as usize);
-                    std::ptr::copy_nonoverlapping(fp.add(src.into()), target, size as usize);
+                    // Overlap-safe `copy`: `src` and `*ref` may alias.
+                    std::ptr::copy(fp.add(src.into()), target, size as usize);
                 },
 
                 // ----- Heap object instructions (structs and enums) -----
@@ -1019,11 +1035,10 @@ impl<T: ExecutionContext> InterpreterContext<'_, T> {
             // any copies (every iteration is a no-op move-in-place),
             // and unifies closure call codegen with direct call codegen.
             // See George's pseudocode in PR #19519 review thread.
-            let param_sizes = callee.param_sizes.as_ref_unchecked();
-            if param_sizes.len() > 64 {
+            if callee.param_sizes.len() > 64 {
                 bail!(
                     "CallClosure: callee has {} params, exceeds 64-bit mask capacity",
-                    param_sizes.len()
+                    callee.param_sizes.len()
                 );
             }
 
@@ -1052,7 +1067,7 @@ impl<T: ExecutionContext> InterpreterContext<'_, T> {
             let mut captured_value_offset = CAPTURED_DATA_VALUES_OFFSET;
             let mut provided_idx = 0usize;
             let mut param_offset_in_callee = 0usize;
-            for (i, &param_size) in param_sizes.iter().enumerate() {
+            for (i, &param_size) in callee.param_sizes.iter().enumerate() {
                 let is_captured = (mask >> i) & 1 != 0;
                 if is_captured {
                     std::ptr::copy_nonoverlapping(

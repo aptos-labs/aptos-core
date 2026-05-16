@@ -12,11 +12,19 @@
 
 use crate::parser::PrintSection;
 use anyhow::{anyhow, Result};
+use mono_move_core::{
+    interner::{InternedIdentifier, InternedModuleId},
+    types::{FieldLayout, InternedType},
+    FieldTypes,
+};
 use mono_move_global_context::ExecutionGuard;
 use move_binary_format::{access::ModuleAccess, CompiledModule};
 use specializer::{
     destack,
-    lower::{lower_function, try_build_context, MicroOpsFunctionDisplay},
+    lower::{
+        context::{try_set_lowering_requirements_for_function, SpecializerContext},
+        lower_function, try_build_context, MicroOpsFunctionDisplay,
+    },
     stackless_exec_ir::ModuleIR,
 };
 
@@ -45,7 +53,7 @@ pub fn render(
                 push_section(
                     &mut out,
                     "=== micro-ops ===\n",
-                    &format_micro_ops(&module_ir),
+                    &format_micro_ops(guard, &module_ir),
                 );
             }
         }
@@ -69,7 +77,12 @@ fn format_bytecode(module: &CompiledModule) -> Result<String> {
 /// Format the micro-ops for every function in `module_ir`, with a
 /// `// module ...` banner and a stanza per function (or a
 /// `skipped (...)` line when lowering is not yet supported).
-pub fn format_micro_ops(module_ir: &ModuleIR) -> String {
+///
+/// Sizes types per-function via `try_build_context_v2` before invoking
+/// `try_build_context`, so the second call's `type_size_and_align`
+/// lookups all hit when the function only references types from the
+/// module itself.
+pub fn format_micro_ops(guard: &ExecutionGuard<'_>, module_ir: &ModuleIR) -> String {
     let module = &module_ir.module;
     let self_handle = module.module_handle_at(module.self_module_handle_idx);
     let addr = module.address_identifier_at(self_handle.address);
@@ -82,8 +95,19 @@ pub fn format_micro_ops(module_ir: &ModuleIR) -> String {
         mod_name
     ));
 
+    let mut loader_ctx = SnapshotLoaderContext { guard, module_ir };
+
     for func_ir in module_ir.functions.iter().flatten() {
         let func_name = module.identifier_at(func_ir.name_idx).to_string();
+        if let Err(e) =
+            try_set_lowering_requirements_for_function(&mut loader_ctx, module_ir, func_ir)
+        {
+            out.push_str(&format!(
+                "\nfun {}(): skipped (cannot set lowering requirements: {})\n",
+                func_name, e
+            ));
+            continue;
+        }
         match try_build_context(module_ir, func_ir) {
             Err(e) => {
                 out.push_str(&format!(
@@ -119,4 +143,40 @@ pub fn format_micro_ops(module_ir: &ModuleIR) -> String {
         }
     }
     out
+}
+
+/// `LoaderContext` shim for snapshot rendering. Treats the module being
+/// inspected as the only "in-scope" module — cross-module nominals are
+/// reported as unresolved, mirroring what `try_build_context` would see
+/// today. Layout publishing forwards to the supplied execution guard.
+struct SnapshotLoaderContext<'a, 'guard, 'ctx> {
+    guard: &'guard ExecutionGuard<'ctx>,
+    module_ir: &'a ModuleIR,
+}
+
+impl SpecializerContext for SnapshotLoaderContext<'_, '_, '_> {
+    fn get_fields(
+        &mut self,
+        module_id: &InternedModuleId,
+        nominal_name: &InternedIdentifier,
+    ) -> Result<Option<FieldTypes>> {
+        if *module_id != self.module_ir.module.id() {
+            return Ok(None);
+        }
+        Ok(self
+            .module_ir
+            .module
+            .interned_field_types(*nominal_name)
+            .cloned())
+    }
+
+    fn set_nominal_layout(
+        &self,
+        ty: InternedType,
+        size: u32,
+        align: u32,
+        fields: Option<&[FieldLayout]>,
+    ) -> Result<()> {
+        self.guard.set_nominal_layout(ty, size, align, fields)
+    }
 }

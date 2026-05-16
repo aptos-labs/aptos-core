@@ -3385,6 +3385,11 @@ impl<'env> ModuleEnv<'env> {
         })
     }
 
+    /// Checks whether this item is only used in tests or verification.
+    pub fn is_test_or_verify_only(&self) -> bool {
+        self.is_test_only() || self.is_verify_only()
+    }
+
     /// Returns the use declarations of this module.
     pub fn get_use_decls(&self) -> &[UseDecl] {
         &self.data.use_decls
@@ -3552,7 +3557,7 @@ impl<'env> ModuleEnv<'env> {
     }
 
     /// Returns true if functions in the current module can call a public(package) function in the given module.
-    fn can_call_package_fun_in(&self, other: &Self) -> bool {
+    pub(crate) fn can_call_package_fun_in(&self, other: &Self) -> bool {
         !self.is_script_module()
             && !other.is_script_module()
             // TODO(#13745): fix this when we have a way to check if
@@ -4620,6 +4625,10 @@ pub struct NamedConstantData {
     /// The value of this constant, if known.
     pub(crate) value: Value,
 
+    pub(crate) visibility: Visibility,
+    /// `package` visibility flag; when true, `visibility` is `Friend`.
+    pub(crate) has_package_visibility: bool,
+
     /// Attributes attached to this constant.
     pub(crate) attributes: Vec<Attribute>,
 
@@ -4659,6 +4668,14 @@ impl NamedConstantEnv<'_> {
     /// Returns the type of the constant
     pub fn get_type(&self) -> Type {
         self.data.type_.clone()
+    }
+
+    pub fn get_visibility(&self) -> Visibility {
+        self.data.visibility
+    }
+
+    pub fn has_package_visibility(&self) -> bool {
+        self.data.has_package_visibility
     }
 
     /// Returns the value of this constant
@@ -5207,6 +5224,18 @@ impl<'env> FunctionEnv<'env> {
     /// `unpack_variant$S$V`). These are synthetic wrappers with no user-written body or spec.
     pub fn is_struct_api(&self) -> bool {
         self.data.is_struct_api
+    }
+
+    /// Returns `true` for synthetic `const$<NAME>` accessors injected by
+    /// `inject_const_accessor_functions`. Hide from decompiled source and skip
+    /// lints that target the underlying constant.
+    pub fn is_const_accessor(&self) -> bool {
+        let name = self.symbol_pool().string(self.get_name());
+        name.starts_with(&format!(
+            "{}{}",
+            language_storage::CONST,
+            language_storage::DOLLAR_SIGN_DELIMITER
+        ))
     }
 
     /// Returns `true` for functions that have no independently-processed bytecode target in the

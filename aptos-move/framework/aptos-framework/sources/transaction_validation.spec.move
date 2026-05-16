@@ -448,7 +448,7 @@ spec aptos_framework::transaction_validation {
         pragma verify = false;
     }
 
-    spec versioned_epilogue(account: signer, fee_payer: signer, args: EpilogueArgs) {
+    spec versioned_epilogue(sender: signer, fee_payer: signer, args: EpilogueArgs) {
         // TODO: temporary mockup
         pragma verify = false;
     }

@@ -14,7 +14,7 @@ rust-version = { workspace = true }
 
 [features]
 default = ["micro-op", "move-bytecode", "testing"]
-micro-op = ["mono-move-alloc", "mono-move-core", "mono-move-runtime"]
+micro-op = ["mono-move-alloc", "mono-move-core", "mono-move-runtime", "move-core-types"]
 move-bytecode = ["move-compiler-v2", "legacy-move-compiler", "move-binary-format", "tempfile"]
 testing = ["move-bytecode", "move-core-types", "move-vm-runtime", "move-vm-test-utils", "move-vm-types"]
 

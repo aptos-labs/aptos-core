@@ -197,19 +197,7 @@ where
                 } else {
                     StatusCode::INTERNAL_TYPE_ERROR
                 };
-                // Note: When enable_closure_depth_check is enabled, do not format
-                // `value` here - deeply nested closures can cause stack overflow
-                // during Display formatting.
-                let enable_closure_depth_check = module_storage
-                    .runtime_environment()
-                    .vm_config()
-                    .enable_closure_depth_check;
-                let message = if enable_closure_depth_check {
-                    "Error when serializing resource.".to_string()
-                } else {
-                    format!("Error when serializing resource {}.", value)
-                };
-                PartialVMError::new(status_code).with_message(message)
+                PartialVMError::new(status_code).with_message("Error when serializing resource.")
             })
         };
 

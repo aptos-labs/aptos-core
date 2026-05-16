@@ -20,7 +20,7 @@ use shared_dsa::UnorderedMap;
 pub(crate) struct AllocatedFunction {
     pub blocks: Vec<BasicBlock>,
     pub num_home_slots: u16,
-    pub num_xfer_slots: u16,
+    pub num_xfer_positions: u16,
     pub home_slot_types: Vec<InternedType>,
 }
 
@@ -132,12 +132,12 @@ impl SlotTable {
 pub(crate) fn allocate_slots(ssa: SSAFunction) -> Result<AllocatedFunction> {
     let mut table = SlotTable::new(&ssa.local_types);
     let mut result_blocks = Vec::with_capacity(ssa.blocks.len());
-    let mut global_num_xfer_slots: u16 = 0;
+    let mut global_num_xfer_positions: u16 = 0;
     let mut free_pool: UnorderedMap<InternedType, Vec<Slot>> = UnorderedMap::new();
 
     for mut block in ssa.blocks {
         let analysis = BlockAnalysis::analyze(&block.instrs);
-        let (block_xfer_slots, returned_pool) = allocate_block_in_place(
+        let (block_xfer_positions, returned_pool) = allocate_block_in_place(
             &mut block.instrs,
             &mut table,
             free_pool,
@@ -145,8 +145,8 @@ pub(crate) fn allocate_slots(ssa: SSAFunction) -> Result<AllocatedFunction> {
             &analysis,
         )?;
         free_pool = returned_pool;
-        if block_xfer_slots > global_num_xfer_slots {
-            global_num_xfer_slots = block_xfer_slots;
+        if block_xfer_positions > global_num_xfer_positions {
+            global_num_xfer_positions = block_xfer_positions;
         }
         result_blocks.push(block);
     }
@@ -157,7 +157,7 @@ pub(crate) fn allocate_slots(ssa: SSAFunction) -> Result<AllocatedFunction> {
     Ok(AllocatedFunction {
         blocks: result_blocks,
         num_home_slots,
-        num_xfer_slots: global_num_xfer_slots,
+        num_xfer_positions: global_num_xfer_positions,
         home_slot_types,
     })
 }
@@ -199,7 +199,7 @@ fn allocate_block_in_place(
         // Safe because sources are read before destinations are written.
         for r in &uses {
             if r.is_vid()
-                && analysis.last_use.get(r) == Some(&i)
+                && analysis.live_end.get(r) == Some(&i)
                 && !defs.contains(r)
                 && let Some((real, ty)) = table.lookup(*r)
                 && table.is_poolable(real)
@@ -232,10 +232,10 @@ fn allocate_block_in_place(
         // Phase 3: Rewrite the instruction with real slots — in-place.
         remap_all_slots_with(instr, |s| table.real_of(s));
 
-        // Phase 4: Free slots for defs that are never used (last_use == def site).
+        // Phase 4: Free slots for defs that are never used (live_end == def site).
         for d in &defs {
             if d.is_vid()
-                && analysis.last_use.get(d) == Some(&i)
+                && analysis.live_end.get(d) == Some(&i)
                 && !uses.contains(d)
                 && let Some((real, ty)) = table.lookup(*d)
                 && table.is_poolable(real)
@@ -245,5 +245,5 @@ fn allocate_block_in_place(
         }
     }
 
-    Ok((analysis.max_xfer_width, free_pool))
+    Ok((analysis.max_xfer_positions, free_pool))
 }

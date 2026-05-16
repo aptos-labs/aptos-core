@@ -15,7 +15,7 @@ use crate::{
     on_chain_config::OnChainConfig,
     state_store::{
         state_key::{
-            inner::{StateKeyDecodeErr, StateKeyTag},
+            inner::{StateKeyDecodeErr, StateKeyTag, TradingNativeKey, TradingNativeKeyTag},
             registry::{Entry, REGISTRY},
         },
         table::TableHandle,
@@ -90,6 +90,41 @@ impl StateKey {
                 Self::table_item(&handle, &val[1 + HANDLE_SIZE..])
             },
             StateKeyTag::Raw => Self::raw(&val[1..]),
+            StateKeyTag::TradingNative => {
+                // Expected: [tag:1][sub_tag:1][...payload]
+                if val.len() < 2 {
+                    return Err(StateKeyDecodeErr::NotEnoughBytes {
+                        tag,
+                        num_bytes: val.len(),
+                    });
+                }
+                let sub_tag = val[1];
+                let sub = TradingNativeKeyTag::from_u8(sub_tag).ok_or(
+                    StateKeyDecodeErr::UnknownTradingNativeSubTag {
+                        unknown_sub_tag: sub_tag,
+                    },
+                )?;
+                match sub {
+                    TradingNativeKeyTag::Position => {
+                        // [tag:1][sub_tag:1][exchange:32][account:32][market:32]
+                        const ADDR: usize = AccountAddress::LENGTH;
+                        const POS_LEN: usize = 2 + ADDR * 3;
+                        if val.len() != POS_LEN {
+                            return Err(StateKeyDecodeErr::NotEnoughBytes {
+                                tag,
+                                num_bytes: val.len(),
+                            });
+                        }
+                        let exchange = AccountAddress::from_bytes(&val[2..2 + ADDR])
+                            .map_err(|e| StateKeyDecodeErr::AnyHow(e.into()))?;
+                        let account = AccountAddress::from_bytes(&val[2 + ADDR..2 + ADDR * 2])
+                            .map_err(|e| StateKeyDecodeErr::AnyHow(e.into()))?;
+                        let market = AccountAddress::from_bytes(&val[2 + ADDR * 2..POS_LEN])
+                            .map_err(|e| StateKeyDecodeErr::AnyHow(e.into()))?;
+                        Self::position(exchange, account, market)
+                    },
+                }
+            },
         };
         Ok(myself)
     }
@@ -103,6 +138,16 @@ impl StateKey {
             StateKeyInner::AccessPath(access_path) => access_path.size(),
             StateKeyInner::TableItem { handle, key } => handle.size() + key.len(),
             StateKeyInner::Raw(bytes) => bytes.len(),
+            StateKeyInner::TradingNative(key) => match key {
+                TradingNativeKey::Position { .. } => {
+                    // sub_tag (1) + exchange (32) + account (32) + market (32).
+                    // Umbrella tag byte is uniform across all StateKey variants
+                    // and excluded by convention (see AccessPath/TableItem/Raw
+                    // size() impls); the sub-tag is payload-specific to
+                    // TradingNative variants and counted here.
+                    1 + AccountAddress::LENGTH * 3
+                },
+            },
         }
     }
 
@@ -131,9 +176,36 @@ impl StateKey {
             },
             StateKeyInner::TableItem { handle, key } => Self::table_item(&handle, &key),
             StateKeyInner::Raw(bytes) => Self::raw(&bytes),
+            StateKeyInner::TradingNative(key) => match key {
+                TradingNativeKey::Position {
+                    exchange,
+                    account,
+                    market,
+                } => Self::position(exchange, account, market),
+            },
         };
 
         Ok(myself)
+    }
+
+    /// Construct a persisted Position state key.
+    pub fn position(
+        exchange: AccountAddress,
+        account: AccountAddress,
+        market: AccountAddress,
+    ) -> Self {
+        Self(
+            REGISTRY
+                .position((exchange, account), &market)
+                .get_or_add(&(exchange, account), &market, || {
+                    Ok(StateKeyInner::TradingNative(TradingNativeKey::Position {
+                        exchange,
+                        account,
+                        market,
+                    }))
+                })
+                .expect("Position StateKey encode is infallible"),
+        )
     }
 
     pub fn resource(address: &AccountAddress, struct_tag: &StructTag) -> Result<Self> {

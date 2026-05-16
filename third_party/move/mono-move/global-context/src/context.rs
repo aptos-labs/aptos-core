@@ -48,13 +48,14 @@ use std::{
 // Submodules: to split implementation into smaller pieces.
 mod identifiers;
 use identifiers::IdentifierInternerKey;
-mod executable_ids;
-use executable_ids::ExecutableIdInternerKey;
-pub use mono_move_core::Executable;
+mod module_ids;
+use module_ids::ExecutableIdInternerKey;
 mod loaded_module;
-pub use loaded_module::{LoadedModule, LoadedModuleSlot, MandatoryDependencies};
-mod executable_cache;
-use executable_cache::ExecutableCache;
+pub use loaded_module::{
+    FunctionSlot, LoadedModule, LoadedModuleSlot, ModuleMandatoryDependencies, ModuleSlot,
+};
+mod module_cache;
+use module_cache::ModuleCache;
 use mono_move_core::interner::{InternedIdentifier, InternedModuleId};
 use move_core_types::{account_address::AccountAddress, identifier::IdentStr};
 
@@ -80,7 +81,7 @@ use types::{TypeInternerKey, TypeListInternerKey};
 ///    execution phases, e.g., between blocks of transactions) such as cache
 ///    cleanup or data deallocation.
 pub struct GlobalContext {
-    /// Shared caches storing interned data, executables.
+    /// Shared caches storing interned data, modules.
     ctx: Context,
     /// Pool of arenas (assigned per execution worker). Each worker gets
     /// exclusive access to their arena to avoid contention.
@@ -96,12 +97,11 @@ pub struct GlobalContext {
 /// Shared context containing interned data structures. Global arena where the
 /// data is allocated is kept separately.
 struct Context {
-    identifiers: DashMap<IdentifierInternerKey, GlobalArenaPtr<str>, ahash::RandomState>,
-    executable_ids:
-        DashMap<ExecutableIdInternerKey, GlobalArenaPtr<ExecutableId>, ahash::RandomState>,
+    identifiers: DashMap<IdentifierInternerKey, InternedIdentifier, ahash::RandomState>,
+    module_ids: DashMap<ExecutableIdInternerKey, InternedModuleId, ahash::RandomState>,
     types: DashMap<TypeInternerKey, InternedType, ahash::RandomState>,
     type_lists: DashMap<TypeListInternerKey, InternedTypeList, ahash::RandomState>,
-    executable_cache: ExecutableCache,
+    module_cache: ModuleCache,
 }
 
 /// RAII guard for the maintenance phase providing exclusive write access.
@@ -190,10 +190,10 @@ impl GlobalContext {
         Self {
             ctx: Context {
                 identifiers: DashMap::default(),
-                executable_ids: DashMap::default(),
+                module_ids: DashMap::default(),
                 types: DashMap::default(),
                 type_lists: DashMap::default(),
-                executable_cache: ExecutableCache::new(),
+                module_cache: ModuleCache::new(),
             },
             global_arena: GlobalArenaPool::with_num_arenas(num_workers),
             maintenance_config,
@@ -258,9 +258,9 @@ impl<'ctx> MaintenanceGuard<'ctx> {
         self.ctx.identifiers.len()
     }
 
-    /// Returns the number of entries in interner's map for executable IDs.
-    pub fn interned_executable_ids_count(&self) -> usize {
-        self.ctx.executable_ids.len()
+    /// Returns the number of entries in interner's map for module IDs.
+    pub fn interned_module_ids_count(&self) -> usize {
+        self.ctx.module_ids.len()
     }
 
     /// Returns the number of entries in interner's map for types.
@@ -297,8 +297,8 @@ impl<'ctx> ExecutionGuard<'ctx> {
     /// Returns an error only if the cache detects an invariant violation
     /// during install. Under normal operation this method always returns
     /// `Ok`.
-    pub fn insert_loaded_module(&self, loaded: Box<LoadedModule>) -> Result<&LoadedModule> {
-        let ptr = self.ctx.executable_cache.insert(loaded.id(), loaded)?;
+    pub fn insert_module(&self, module: Box<LoadedModule>) -> Result<&LoadedModule> {
+        let ptr = self.ctx.module_cache.insert(module)?;
 
         // SAFETY: The pointer is valid since it was created by leaking a box,
         // and can only be freed during the maintenance phase, while we are in
@@ -310,11 +310,11 @@ impl<'ctx> ExecutionGuard<'ctx> {
 
     /// Looks up a cached loaded module by its interned ID and returns a
     /// reference tied to the guard's lifetime, if found.
-    pub fn get_loaded_module<'guard>(
+    pub fn get_module<'guard>(
         &'guard self,
         key: ArenaRef<'guard, ExecutableId>,
     ) -> Option<&'guard LoadedModule> {
-        let ptr = self.ctx.executable_cache.get(key.into_global_arena_ptr())?;
+        let ptr = self.ctx.module_cache.get(key.into_global_arena_ptr())?;
 
         // SAFETY: The pointer is valid since it was created by leaking a box,
         // and can only be freed during the maintenance phase, while we are in
@@ -325,20 +325,20 @@ impl<'ctx> ExecutionGuard<'ctx> {
     /// Returns the stable slot for `key`, creating an empty one if absent.
     /// The returned pointer is valid for the cache's lifetime. Takes a
     /// shard write lock on the create path.
-    pub fn get_or_create_slot<'guard>(
+    pub fn get_or_create_module_slot<'guard>(
         &'guard self,
         key: ArenaRef<'guard, ExecutableId>,
     ) -> LoadedModuleSlot {
         self.ctx
-            .executable_cache
+            .module_cache
             .get_or_create_slot(key.into_global_arena_ptr())
     }
 
-    /// Wraps an [`Executable::id`] pointer in a guard-scoped [`ArenaRef`],
-    /// matching the key shape used by the executable cache.
-    pub fn arena_ref_for_executable_id<'guard>(
+    /// Wraps module ID pointer in a guard-scoped [`ArenaRef`], matching the
+    /// key shape used by the module cache.
+    pub fn arena_ref_for_module_id<'guard>(
         &'guard self,
-        ptr: GlobalArenaPtr<ExecutableId>,
+        ptr: InternedModuleId,
     ) -> ArenaRef<'guard, ExecutableId>
     where
         'ctx: 'guard,
@@ -370,12 +370,12 @@ impl<'ctx> ExecutionGuard<'ctx> {
     /// until a layout-population pass runs.
     pub fn intern_nominal(
         &self,
-        executable_id: GlobalArenaPtr<ExecutableId>,
+        module_id: InternedModuleId,
         name: GlobalArenaPtr<str>,
         ty_args: InternedTypeList,
     ) -> InternedType {
         let ty = self.global_arena.alloc(Type::Nominal {
-            executable_id,
+            module_id,
             name,
             ty_args,
             layout: OnceLock::new(),
@@ -520,17 +520,17 @@ impl<'ctx> Interner for ExecutionGuard<'ctx> {
             return types::EMPTY_TYPE_LIST;
         }
         let ptr = self.global_arena.alloc_slice_copy(types);
-        self.insert_allocated_type_list_internal(ptr)
+        self.insert_allocated_type_list_internal(InternedTypeList::new(ptr))
     }
 
     fn nominal_of(
         &self,
-        executable_id: InternedModuleId,
+        module_id: InternedModuleId,
         name: InternedIdentifier,
         ty_args: InternedTypeList,
     ) -> InternedType {
         let ty = self.global_arena.alloc(Type::Nominal {
-            executable_id,
+            module_id,
             name,
             ty_args,
             layout: OnceLock::new(),
@@ -544,6 +544,124 @@ impl<'ctx> Interner for ExecutionGuard<'ctx> {
 
     fn identifier_of(&self, identifier: &IdentStr) -> InternedIdentifier {
         self.intern_identifier_internal(identifier)
+    }
+
+    // TODO:
+    //   1. Non-recursive implementation.
+    //   2. Current implementation is O(N^2) because hashes of inner types are
+    //      not cached, and have to be recomputed on insertion.
+    fn subst_type(
+        &self,
+        ty: InternedType,
+        ty_args: InternedTypeList,
+    ) -> anyhow::Result<InternedType> {
+        if ty_args.is_empty() {
+            return Ok(ty);
+        }
+
+        Ok(match view_type(ty) {
+            Type::Bool
+            | Type::U8
+            | Type::U16
+            | Type::U32
+            | Type::U64
+            | Type::U128
+            | Type::U256
+            | Type::I8
+            | Type::I16
+            | Type::I32
+            | Type::I64
+            | Type::I128
+            | Type::I256
+            | Type::Address
+            | Type::Signer => ty,
+
+            Type::Vector { elem } => {
+                let new_elem = self.subst_type(*elem, ty_args)?;
+                if new_elem == *elem {
+                    ty
+                } else {
+                    self.vector_of(new_elem)
+                }
+            },
+            Type::ImmutRef { inner } => {
+                let new_inner = self.subst_type(*inner, ty_args)?;
+                if new_inner == *inner {
+                    ty
+                } else {
+                    self.immut_ref_of(new_inner)
+                }
+            },
+            Type::MutRef { inner } => {
+                let new_inner = self.subst_type(*inner, ty_args)?;
+                if new_inner == *inner {
+                    ty
+                } else {
+                    self.mut_ref_of(new_inner)
+                }
+            },
+            Type::Nominal {
+                module_id,
+                name,
+                ty_args: inner_args,
+                layout,
+            } => {
+                let new_inner_args = self.subst_type_list(*inner_args, ty_args)?;
+                if new_inner_args == *inner_args {
+                    ty
+                } else {
+                    debug_assert!(layout.get().is_none(), "Layout cannot be set for generics");
+                    self.nominal_of(*module_id, *name, new_inner_args)
+                }
+            },
+            Type::Function {
+                args,
+                results,
+                abilities,
+            } => {
+                let new_args = self.subst_type_list(*args, ty_args)?;
+                let new_results = self.subst_type_list(*results, ty_args)?;
+                if new_args == *args && new_results == *results {
+                    ty
+                } else {
+                    self.function_of(new_args, new_results, *abilities)
+                }
+            },
+            Type::TypeParam { idx } => {
+                let table = view_type_list(ty_args);
+                *table.get(*idx as usize).ok_or_else(|| {
+                    anyhow::anyhow!(
+                        "type parameter index {idx} out of bounds: substitution table has {} entries",
+                        table.len(),
+                    )
+                })?
+            },
+        })
+    }
+
+    fn subst_type_list(
+        &self,
+        tys: InternedTypeList,
+        ty_args: InternedTypeList,
+    ) -> anyhow::Result<InternedTypeList> {
+        if ty_args.is_empty() || tys.is_empty() {
+            return Ok(tys);
+        }
+
+        let slice = view_type_list(tys);
+        let mut changed = false;
+        let mut new_tys = Vec::with_capacity(slice.len());
+        for &ty in slice {
+            let new_ty = self.subst_type(ty, ty_args)?;
+            if new_ty != ty {
+                changed = true;
+            }
+            new_tys.push(new_ty);
+        }
+        if !changed {
+            return Ok(tys);
+        }
+        Ok(self.type_list_of(&new_tys))
     }
 }
 
@@ -568,22 +686,22 @@ impl<'ctx> MaintenanceGuard<'ctx> {
         // is important to ensure these caches are cleared before that.
         let Context {
             identifiers,
-            executable_ids,
+            module_ids,
             types,
             type_lists,
-            executable_cache,
+            module_cache,
         } = self.ctx;
 
         identifiers.clear();
-        executable_ids.clear();
+        module_ids.clear();
         types.clear();
         type_lists.clear();
 
         // SAFETY: We are in maintenance phase, and therefore there are no
-        // execution guards alive. Hence, there are no pointers to executables
+        // execution guards alive. Hence, there are no pointers to modules
         // alive, and it is safe to free the allocation behind the box.
         unsafe {
-            executable_cache.clear();
+            module_cache.clear();
         }
     }
 }

@@ -1,3 +1,4 @@
+// @checks=experimental
 module 0x42::view_function_safety {
     struct State has key {
         val: u64
