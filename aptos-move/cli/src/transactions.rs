@@ -183,6 +183,12 @@ fn local_write_set_to_json(
                     },
                 }
             },
+            StateKeyInner::TradingNative(_) => {
+                return Err(CliError::UnexpectedError(format!(
+                    "Can't convert trading-native key {:?} to WriteSetChange",
+                    state_key.inner()
+                )));
+            },
             StateKeyInner::Raw(_) => {},
         }
     }
@@ -622,5 +628,20 @@ mod tests {
             Some("delete_module")
         );
         assert_eq!(first.get("address").and_then(|v| v.as_str()), Some("0x1"));
+    }
+
+    #[test]
+    fn local_changes_reject_trading_native_entries() {
+        let state_view = EmptyStateView;
+        let address = AccountAddress::from_hex_literal("0x1").unwrap();
+        let state_key = StateKey::position(address, address, address);
+        let write_set = WriteSet::new([(
+            state_key,
+            WriteOp::legacy_modification(vec![1u8, 2u8, 3u8].into()),
+        )])
+        .unwrap();
+
+        let err = local_write_set_to_json(&state_view, &write_set).unwrap_err();
+        assert!(err.to_string().contains("TradingNative"));
     }
 }
