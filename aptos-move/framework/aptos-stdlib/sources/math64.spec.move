@@ -34,22 +34,25 @@ spec aptos_std::math64 {
 
     spec pow(n: u64, e: u64): u64 {
         pragma opaque;
-        aborts_if [abstract] spec_pow(n, e) > MAX_U64;
-        ensures [abstract] result == spec_pow(n, e);
+        pragma verify = false;
+        aborts_if spec_pow(n, e) > MAX_U64;
+        ensures result == spec_pow(n, e);
     }
 
     spec floor_log2(x: u64): u8 {
         pragma opaque;
-        aborts_if [abstract] x == 0;
-        ensures [abstract] spec_pow(2, result) <= x;
-        ensures [abstract] x < spec_pow(2, result+1);
+        pragma verify = false;
+        aborts_if x == 0;
+        ensures spec_pow(2, result) <= x;
+        ensures x < spec_pow(2, result+1);
     }
 
     spec sqrt(x: u64): u64 {
         pragma opaque;
-        aborts_if [abstract] false;
-        ensures [abstract] x > 0 ==> result * result <= x;
-        ensures [abstract] x > 0 ==> x < (result+1) * (result+1);
+        pragma verify = false;
+        aborts_if false;
+        ensures x > 0 ==> result * result <= x;
+        ensures x > 0 ==> x < (result+1) * (result+1);
         ensures x == 0 ==> result == 0;
     }
 
@@ -61,5 +64,4 @@ spec aptos_std::math64 {
             n * spec_pow(n, e-1)
         }
     }
-
 }

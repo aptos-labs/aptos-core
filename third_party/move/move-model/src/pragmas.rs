@@ -189,89 +189,129 @@ pub const INTRINSIC_FUN_MAP_SPEC_ABORTS_DEL: &str = "map_spec_aborts_del";
 /// `[spec] fun map_spec_aborts_borrow<K, V>(m: Map<K, V>, k: K): bool`
 pub const INTRINSIC_FUN_MAP_SPEC_ABORTS_BORROW: &str = "map_spec_aborts_borrow";
 
-/// Maps Move intrinsic function names to their corresponding spec intrinsic function names
-/// for intrinsic map types. Used by spec inference to substitute intrinsic Move function
-/// calls with their axiomatized spec equivalents as pure spec calls.
+/// Definition of an intrinsic function associated with an intrinsic type.
 ///
-/// Only read-only functions are listed:
-/// - Mutating functions (e.g. map_add_no_override) are excluded because their &mut params
-///   already cause try_as_pure_spec_call to return None at check 1.
-pub static INTRINSIC_TYPE_MAP_MOVE_TO_SPEC_FUN: Lazy<BTreeMap<&'static str, &'static str>> =
-    Lazy::new(|| {
-        BTreeMap::from([
-            (INTRINSIC_FUN_MAP_NEW, INTRINSIC_FUN_MAP_SPEC_NEW),
-            (INTRINSIC_FUN_MAP_HAS_KEY, INTRINSIC_FUN_MAP_SPEC_HAS_KEY),
-            (INTRINSIC_FUN_MAP_LEN, INTRINSIC_FUN_MAP_SPEC_LEN),
-            (INTRINSIC_FUN_MAP_IS_EMPTY, INTRINSIC_FUN_MAP_SPEC_IS_EMPTY),
-            (INTRINSIC_FUN_MAP_BORROW, INTRINSIC_FUN_MAP_SPEC_GET),
-            (
-                INTRINSIC_FUN_MAP_BORROW_WITH_DEFAULT,
-                INTRINSIC_FUN_MAP_SPEC_GET,
-            ),
-        ])
-    });
+/// For Move functions, `spec_fun` and `abort_spec_fun` encode the counterpart spec function names
+/// directly, eliminating the need for separate static lookup tables.
+pub struct IntrinsicFunDef {
+    /// Whether this is a Move-level function (`true`) or a spec-only function (`false`).
+    pub is_move_fun: bool,
+    /// For Move functions only: the name of the spec counterpart used for pure spec calls.
+    pub spec_fun: Option<&'static str>,
+    /// For Move functions only: the name of the abort-condition spec function.
+    pub abort_spec_fun: Option<&'static str>,
+}
 
-/// Maps Move intrinsic function names to their corresponding abort-condition spec function names.
-/// Used by the Boogie backend to generate correct `$bp_AbortsOf` bodies for intrinsic functions
-/// that have abort conditions defined in the Boogie template but no Move-level `aborts_if` spec.
-pub static INTRINSIC_TYPE_MAP_MOVE_TO_ABORT_SPEC_FUN: Lazy<BTreeMap<&'static str, &'static str>> =
+impl IntrinsicFunDef {
+    /// Construct a definition for a Move-level intrinsic function.
+    pub fn move_fun(spec: Option<&'static str>, abort: Option<&'static str>) -> Self {
+        Self {
+            is_move_fun: true,
+            spec_fun: spec,
+            abort_spec_fun: abort,
+        }
+    }
+
+    /// Construct a definition for a spec-only intrinsic function.
+    pub fn spec_fun() -> Self {
+        Self {
+            is_move_fun: false,
+            spec_fun: None,
+            abort_spec_fun: None,
+        }
+    }
+}
+
+/// All intrinsic functions associated with the map type.
+///
+/// Each Move function entry encodes its spec counterpart (`spec_fun`) and abort-condition
+/// spec counterpart (`abort_spec_fun`) directly, replacing the former separate static tables
+/// `INTRINSIC_TYPE_MAP_MOVE_TO_SPEC_FUN` and `INTRINSIC_TYPE_MAP_MOVE_TO_ABORT_SPEC_FUN`.
+///
+/// Notes on spec_fun pairings (read-only functions only):
+/// - Mutating functions (e.g. `map_add_no_override`) are excluded from spec_fun because their
+///   `&mut` params already cause `try_as_pure_spec_call` to return `None` at check 1.
+pub static INTRINSIC_TYPE_MAP_ASSOC_FUNCTIONS: Lazy<BTreeMap<&'static str, IntrinsicFunDef>> =
     Lazy::new(|| {
         BTreeMap::from([
+            (
+                INTRINSIC_FUN_MAP_NEW,
+                IntrinsicFunDef::move_fun(Some(INTRINSIC_FUN_MAP_SPEC_NEW), None),
+            ),
+            (INTRINSIC_FUN_MAP_SPEC_NEW, IntrinsicFunDef::spec_fun()),
+            (INTRINSIC_FUN_MAP_SPEC_GET, IntrinsicFunDef::spec_fun()),
+            (INTRINSIC_FUN_MAP_SPEC_SET, IntrinsicFunDef::spec_fun()),
+            (INTRINSIC_FUN_MAP_SPEC_DEL, IntrinsicFunDef::spec_fun()),
+            (INTRINSIC_FUN_MAP_SPEC_LEN, IntrinsicFunDef::spec_fun()),
+            (INTRINSIC_FUN_MAP_SPEC_IS_EMPTY, IntrinsicFunDef::spec_fun()),
+            (INTRINSIC_FUN_MAP_SPEC_HAS_KEY, IntrinsicFunDef::spec_fun()),
+            (
+                INTRINSIC_FUN_MAP_LEN,
+                IntrinsicFunDef::move_fun(Some(INTRINSIC_FUN_MAP_SPEC_LEN), None),
+            ),
+            (
+                INTRINSIC_FUN_MAP_IS_EMPTY,
+                IntrinsicFunDef::move_fun(Some(INTRINSIC_FUN_MAP_SPEC_IS_EMPTY), None),
+            ),
+            (
+                INTRINSIC_FUN_MAP_HAS_KEY,
+                IntrinsicFunDef::move_fun(Some(INTRINSIC_FUN_MAP_SPEC_HAS_KEY), None),
+            ),
             (
                 INTRINSIC_FUN_MAP_DESTROY_EMPTY,
-                INTRINSIC_FUN_MAP_SPEC_ABORTS_DESTROY_EMPTY,
+                IntrinsicFunDef::move_fun(None, Some(INTRINSIC_FUN_MAP_SPEC_ABORTS_DESTROY_EMPTY)),
             ),
             (
                 INTRINSIC_FUN_MAP_ADD_NO_OVERRIDE,
-                INTRINSIC_FUN_MAP_SPEC_ABORTS_ADD,
+                IntrinsicFunDef::move_fun(None, Some(INTRINSIC_FUN_MAP_SPEC_ABORTS_ADD)),
+            ),
+            (
+                INTRINSIC_FUN_MAP_ADD_OVERRIDE_IF_EXISTS,
+                IntrinsicFunDef::move_fun(None, None),
             ),
             (
                 INTRINSIC_FUN_MAP_DEL_MUST_EXIST,
-                INTRINSIC_FUN_MAP_SPEC_ABORTS_DEL,
+                IntrinsicFunDef::move_fun(None, Some(INTRINSIC_FUN_MAP_SPEC_ABORTS_DEL)),
             ),
             (
                 INTRINSIC_FUN_MAP_DEL_RETURN_KEY,
-                INTRINSIC_FUN_MAP_SPEC_ABORTS_DEL,
+                IntrinsicFunDef::move_fun(None, Some(INTRINSIC_FUN_MAP_SPEC_ABORTS_DEL)),
             ),
             (
                 INTRINSIC_FUN_MAP_BORROW,
-                INTRINSIC_FUN_MAP_SPEC_ABORTS_BORROW,
+                IntrinsicFunDef::move_fun(
+                    Some(INTRINSIC_FUN_MAP_SPEC_GET),
+                    Some(INTRINSIC_FUN_MAP_SPEC_ABORTS_BORROW),
+                ),
             ),
             (
                 INTRINSIC_FUN_MAP_BORROW_MUT,
-                INTRINSIC_FUN_MAP_SPEC_ABORTS_BORROW,
+                IntrinsicFunDef::move_fun(None, Some(INTRINSIC_FUN_MAP_SPEC_ABORTS_BORROW)),
             ),
-        ])
-    });
-
-/// All intrinsic functions associated with the map type
-pub static INTRINSIC_TYPE_MAP_ASSOC_FUNCTIONS: Lazy<BTreeMap<&'static str, bool>> =
-    Lazy::new(|| {
-        BTreeMap::from([
-            (INTRINSIC_FUN_MAP_NEW, true),
-            (INTRINSIC_FUN_MAP_SPEC_NEW, false),
-            (INTRINSIC_FUN_MAP_SPEC_GET, false),
-            (INTRINSIC_FUN_MAP_SPEC_SET, false),
-            (INTRINSIC_FUN_MAP_SPEC_DEL, false),
-            (INTRINSIC_FUN_MAP_SPEC_LEN, false),
-            (INTRINSIC_FUN_MAP_SPEC_IS_EMPTY, false),
-            (INTRINSIC_FUN_MAP_SPEC_HAS_KEY, false),
-            (INTRINSIC_FUN_MAP_LEN, true),
-            (INTRINSIC_FUN_MAP_IS_EMPTY, true),
-            (INTRINSIC_FUN_MAP_HAS_KEY, true),
-            (INTRINSIC_FUN_MAP_DESTROY_EMPTY, true),
-            (INTRINSIC_FUN_MAP_ADD_NO_OVERRIDE, true),
-            (INTRINSIC_FUN_MAP_ADD_OVERRIDE_IF_EXISTS, true),
-            (INTRINSIC_FUN_MAP_DEL_MUST_EXIST, true),
-            (INTRINSIC_FUN_MAP_DEL_RETURN_KEY, true),
-            (INTRINSIC_FUN_MAP_BORROW, true),
-            (INTRINSIC_FUN_MAP_BORROW_MUT, true),
-            (INTRINSIC_FUN_MAP_BORROW_MUT_WITH_DEFAULT, true),
-            (INTRINSIC_FUN_MAP_BORROW_WITH_DEFAULT, true),
-            (INTRINSIC_FUN_MAP_SPEC_ABORTS_DESTROY_EMPTY, false),
-            (INTRINSIC_FUN_MAP_SPEC_ABORTS_ADD, false),
-            (INTRINSIC_FUN_MAP_SPEC_ABORTS_DEL, false),
-            (INTRINSIC_FUN_MAP_SPEC_ABORTS_BORROW, false),
+            (
+                INTRINSIC_FUN_MAP_BORROW_MUT_WITH_DEFAULT,
+                IntrinsicFunDef::move_fun(None, None),
+            ),
+            (
+                INTRINSIC_FUN_MAP_BORROW_WITH_DEFAULT,
+                IntrinsicFunDef::move_fun(Some(INTRINSIC_FUN_MAP_SPEC_GET), None),
+            ),
+            (
+                INTRINSIC_FUN_MAP_SPEC_ABORTS_DESTROY_EMPTY,
+                IntrinsicFunDef::spec_fun(),
+            ),
+            (
+                INTRINSIC_FUN_MAP_SPEC_ABORTS_ADD,
+                IntrinsicFunDef::spec_fun(),
+            ),
+            (
+                INTRINSIC_FUN_MAP_SPEC_ABORTS_DEL,
+                IntrinsicFunDef::spec_fun(),
+            ),
+            (
+                INTRINSIC_FUN_MAP_SPEC_ABORTS_BORROW,
+                IntrinsicFunDef::spec_fun(),
+            ),
         ])
     });
 

@@ -2325,11 +2325,7 @@ impl<'env> BoogieTranslator<'env> {
                     && mem_param_decls.is_empty();
                 let native_spec_call = if is_native_no_spec {
                     let spec_name = boogie_native_spec_fun_name(&fun_env, &info.fun.inst);
-                    let call = if input_args.is_empty() {
-                        format!("{}()", spec_name)
-                    } else {
-                        format!("{}({})", spec_name, input_args.join(", "))
-                    };
+                    let call = format!("{}({})", spec_name, input_args.join(", "));
                     Some(call)
                 } else {
                     None
@@ -2517,7 +2513,7 @@ impl<'env> BoogieTranslator<'env> {
                 if let Some(abort_spec_qid) = self
                     .env
                     .get_intrinsics()
-                    .get_abort_spec_fun_for_move_fun(self.env, &fun_env.get_qualified_id())
+                    .get_abort_spec_fun_for_move_fun(&fun_env.get_qualified_id())
                 {
                     let spec_mod_env = self.env.get_module(abort_spec_qid.module_id);
                     let boogie_name =

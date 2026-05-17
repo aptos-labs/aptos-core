@@ -4064,7 +4064,7 @@ impl<'env> SpecInferenceAnalyzer<'env> {
         if let Some(spec_qid) = self
             .global_env()
             .get_intrinsics()
-            .get_spec_fun_for_move_fun(self.global_env(), &callee_qid)
+            .get_spec_fun_for_move_fun(&callee_qid)
         {
             // Use the spec function's return type, not the Move function's (which may be &V).
             let mod_env = self.global_env().get_module(spec_qid.module_id);

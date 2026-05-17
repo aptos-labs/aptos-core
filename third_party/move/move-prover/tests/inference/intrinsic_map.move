@@ -35,10 +35,10 @@ module 0x42::intrinsic_map {
         simple_map::destroy_empty(m)
     }
 
-    // Wraps borrow — inference should inline spec_get (via intrinsic pairing in
-    // INTRINSIC_TYPE_MAP_MOVE_TO_SPEC_FUN), not produce result_of<borrow>.
-    // Also tests that aborts_of<borrow> delegates to spec_aborts_borrow via
-    // INTRINSIC_TYPE_MAP_MOVE_TO_ABORT_SPEC_FUN.
+    // Wraps borrow — inference should inline spec_get (via the spec_fun pairing in
+    // IntrinsicFunDef / INTRINSIC_TYPE_MAP_ASSOC_FUNCTIONS), not produce result_of<borrow>.
+    // Also tests that aborts_of<borrow> delegates to spec_aborts_borrow via the
+    // abort_spec_fun pairing in IntrinsicFunDef.
     fun get_value(m: &SimpleMap<u64, u64>, k: u64): u64 {
         *simple_map::borrow(m, &k)
     }
