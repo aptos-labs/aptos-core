@@ -41,6 +41,8 @@ use std::{borrow::Cow, fmt::Debug};
 pub type Commitment<E> = CodomainShape<<E as Pairing>::G1>;
 
 /// Newtype wrapper so we can implement `From<Commitment<E>>` without coherence issues.
+///
+/// ArkSize(E=Bls12_381): 48.
 #[derive(CanonicalSerialize, CanonicalDeserialize, Debug, Clone, PartialEq, Eq)]
 pub struct CommitmentNormalised<E: Pairing>(pub E::G1Affine);
 
@@ -68,9 +70,12 @@ impl<E: Pairing> From<OpeningProofProjective<E>> for OpeningProof<E> {
     }
 }
 
+/// ArkSize(E=Bls12_381): 96.
 #[derive(CanonicalSerialize, CanonicalDeserialize, Debug, PartialEq, Eq, Clone)]
 pub struct OpeningProof<E: Pairing> {
+    /// ArkSize(E=Bls12_381): 48.
     pub(crate) pi_1: E::G1Affine,
+    /// ArkSize(E=Bls12_381): 48.
     pub(crate) pi_2: E::G1Affine,
 }
 
