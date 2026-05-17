@@ -1,0 +1,70 @@
+[
+  {
+    "kubernetes": {
+      "container_name": "decibel-ws",
+      "namespace": "decibel-ws-mainnet-prod",
+      "pod_name": "decibel-ws-0",
+      "pod_node_name": "gke-node-1",
+      "node_labels": {
+        "node.kubernetes.io/instance-type": "n2-standard-8",
+        "topology.gke.io/zone": "us-central1-a"
+      },
+      "labels": {},
+      "annotations": {}
+    },
+    "message": "{\"level\":\"error\",\"message\":\"Client 10.0.0.1:12345 channel closed while sending subscription response\",\"timestamp\":\"2026-03-03T10:00:00Z\"}",
+    "source_type": "kubernetes_logs",
+    "stream": "stderr"
+  },
+  {
+    "kubernetes": {
+      "container_name": "decibel-ws",
+      "namespace": "decibel-ws-mainnet-prod",
+      "pod_name": "decibel-ws-0",
+      "pod_node_name": "gke-node-1",
+      "node_labels": {
+        "node.kubernetes.io/instance-type": "n2-standard-8",
+        "topology.gke.io/zone": "us-central1-a"
+      },
+      "labels": {},
+      "annotations": {}
+    },
+    "message": "{\"level\":\"error\",\"message\":\"Failed to send unsubscribe response\",\"timestamp\":\"2026-03-03T10:00:01Z\"}",
+    "source_type": "kubernetes_logs",
+    "stream": "stderr"
+  },
+  {
+    "kubernetes": {
+      "container_name": "decibel-ws",
+      "namespace": "decibel-ws-mainnet-prod",
+      "pod_name": "decibel-ws-0",
+      "pod_node_name": "gke-node-1",
+      "node_labels": {
+        "node.kubernetes.io/instance-type": "n2-standard-8",
+        "topology.gke.io/zone": "us-central1-a"
+      },
+      "labels": {},
+      "annotations": {}
+    },
+    "message": "{\"level\":\"warn\",\"message\":\"Failed to build snapshot from state for topic 'user_active_twaps:0xabc123'\",\"timestamp\":\"2026-03-03T10:00:02Z\"}",
+    "source_type": "kubernetes_logs",
+    "stream": "stderr"
+  },
+  {
+    "kubernetes": {
+      "container_name": "decibel-ws",
+      "namespace": "decibel-ws-mainnet-prod",
+      "pod_name": "decibel-ws-0",
+      "pod_node_name": "gke-node-1",
+      "node_labels": {
+        "node.kubernetes.io/instance-type": "n2-standard-8",
+        "topology.gke.io/zone": "us-central1-a"
+      },
+      "labels": {},
+      "annotations": {}
+    },
+    "message": "{\"level\":\"info\",\"message\":\"Server started on port 8080\",\"timestamp\":\"2026-03-03T10:00:03Z\"}",
+    "source_type": "kubernetes_logs",
+    "stream": "stderr"
+  }
+]

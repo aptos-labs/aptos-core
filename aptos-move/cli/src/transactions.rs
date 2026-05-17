@@ -11,22 +11,200 @@ use aptos_cli_common::{
     GasOptions, PrivateKeyInputOptions, ProfileOptions, PromptOptions, RestOptions,
     TransactionSummary, ACCEPTED_CLOCK_SKEW_US, US_IN_SECS,
 };
-use aptos_crypto::{ed25519::Ed25519PrivateKey, hash::CryptoHash};
+use aptos_crypto::{
+    ed25519::{Ed25519PrivateKey, Ed25519Signature},
+    hash::CryptoHash,
+    PrivateKey,
+};
+use aptos_resource_viewer::AptosValueAnnotator;
 use aptos_rest_client::Client;
 use aptos_sdk::{transaction_builder::TransactionFactory, types::LocalAccount};
 use aptos_types::{
+    access_path::Path,
     account_address::AccountAddress,
     chain_id::ChainId,
+    contract_event::ContractEvent,
+    state_store::state_key::inner::StateKeyInner,
     transaction::{
-        authenticator::{AccountAuthenticator, TransactionAuthenticator},
-        PersistedAuxiliaryInfo, ReplayProtector, SignedTransaction, TransactionPayload,
-        TransactionStatus,
+        PersistedAuxiliaryInfo, ReplayProtector, SignedTransaction, TransactionOutput,
+        TransactionPayload, TransactionStatus,
     },
+    write_set::WriteSet,
 };
+use aptos_vm::data_cache::AsMoveResolver;
 use aptos_vm_types::output::VMOutput;
 use clap::Parser;
+#[cfg(test)]
+use move_core_types::value::MoveTypeLayout;
 use move_core_types::vm_status::VMStatus;
-use std::time::{SystemTime, UNIX_EPOCH};
+use serde::Serialize;
+use std::{
+    collections::BTreeMap,
+    time::{SystemTime, UNIX_EPOCH},
+};
+
+fn serialize_as_json<T: Serialize>(value: &T) -> CliTypedResult<serde_json::Value> {
+    serde_json::to_value(value).map_err(|err| CliError::UnexpectedError(err.to_string()))
+}
+
+#[cfg(test)]
+fn local_events_to_json(
+    state_view: &impl aptos_types::state_store::StateView,
+    events: &[(ContractEvent, Option<MoveTypeLayout>)],
+) -> CliTypedResult<serde_json::Value> {
+    let events = events
+        .iter()
+        .map(|(event, _layout)| event.clone())
+        .collect::<Vec<_>>();
+    local_contract_events_to_json(state_view, &events)
+}
+
+fn local_contract_events_to_json(
+    state_view: &impl aptos_types::state_store::StateView,
+    events: &[ContractEvent],
+) -> CliTypedResult<serde_json::Value> {
+    let annotator = AptosValueAnnotator::new(state_view);
+    let parsed_events = events
+        .iter()
+        .map(|event| {
+            let data = annotator.view_value(event.type_tag(), event.event_data())?;
+            let data = aptos_api_types::MoveValue::try_from(data)?.json()?;
+            Ok::<_, anyhow::Error>(aptos_api_types::Event::from((event, data)))
+        })
+        .collect::<anyhow::Result<Vec<_>>>()
+        .map_err(|err| CliError::UnexpectedError(err.to_string()))?;
+    serialize_as_json(&parsed_events)
+}
+
+fn local_write_set_to_json(
+    state_view: &impl aptos_types::state_store::StateView,
+    write_set: &WriteSet,
+) -> CliTypedResult<serde_json::Value> {
+    let annotator = AptosValueAnnotator::new(state_view);
+    let mut changes = Vec::with_capacity(write_set.write_op_iter().size_hint().0);
+
+    for (state_key, op) in write_set.write_op_iter() {
+        let state_key_hash = state_key.hash().to_hex_literal();
+        match state_key.inner() {
+            StateKeyInner::AccessPath(access_path) => match op.bytes() {
+                None => match access_path.get_path() {
+                    Path::Code(module_id) => {
+                        // User-submitted transactions usually do not delete modules, but we keep
+                        // this branch for output completeness and consistency with API conversion.
+                        changes.push(aptos_api_types::WriteSetChange::DeleteModule(
+                            aptos_api_types::DeleteModule {
+                                address: access_path.address.into(),
+                                state_key_hash,
+                                module: module_id.into(),
+                            },
+                        ));
+                    },
+                    Path::Resource(typ) | Path::ResourceGroup(typ) => {
+                        changes.push(aptos_api_types::WriteSetChange::DeleteResource(
+                            aptos_api_types::DeleteResource {
+                                address: access_path.address.into(),
+                                state_key_hash,
+                                resource: typ.into(),
+                            },
+                        ));
+                    },
+                },
+                Some(bytes) => match access_path.get_path() {
+                    Path::Code(_) => {
+                        let data = aptos_api_types::MoveModuleBytecode::new(bytes.to_vec())
+                            .try_parse_abi()
+                            .map_err(|err| CliError::UnexpectedError(err.to_string()))?;
+                        changes.push(aptos_api_types::WriteSetChange::WriteModule(
+                            aptos_api_types::WriteModule {
+                                address: access_path.address.into(),
+                                state_key_hash,
+                                data,
+                            },
+                        ));
+                    },
+                    Path::Resource(typ) => {
+                        let data = annotator
+                            .view_resource(&typ, bytes)
+                            .and_then(aptos_api_types::MoveResource::try_from)
+                            .map_err(|err| CliError::UnexpectedError(err.to_string()))?;
+                        changes.push(aptos_api_types::WriteSetChange::WriteResource(
+                            aptos_api_types::WriteResource {
+                                address: access_path.address.into(),
+                                state_key_hash,
+                                data,
+                            },
+                        ));
+                    },
+                    Path::ResourceGroup(_) => {
+                        let group: BTreeMap<move_core_types::language_storage::StructTag, Vec<u8>> =
+                            bcs::from_bytes(bytes)
+                                .map_err(|err| CliError::UnexpectedError(err.to_string()))?;
+                        for (tag, value) in group {
+                            let resource = annotator.view_resource(&tag, &value);
+                            let resource = resource
+                                .map_err(|err| CliError::UnexpectedError(err.to_string()))?;
+                            let data = aptos_api_types::MoveResource::try_from(resource)
+                                .map_err(|err| CliError::UnexpectedError(err.to_string()))?;
+                            changes.push(aptos_api_types::WriteSetChange::WriteResource(
+                                aptos_api_types::WriteResource {
+                                    address: access_path.address.into(),
+                                    state_key_hash: state_key_hash.clone(),
+                                    data,
+                                },
+                            ));
+                        }
+                    },
+                },
+            },
+            StateKeyInner::TableItem { handle, key } => {
+                let handle = handle.0.to_vec().into();
+                let key: aptos_api_types::HexEncodedBytes = key.clone().into();
+                match op.bytes() {
+                    None => {
+                        changes.push(aptos_api_types::WriteSetChange::DeleteTableItem(
+                            aptos_api_types::DeleteTableItem {
+                                state_key_hash,
+                                handle,
+                                key,
+                                data: None,
+                            },
+                        ));
+                    },
+                    Some(bytes) => {
+                        changes.push(aptos_api_types::WriteSetChange::WriteTableItem(
+                            aptos_api_types::WriteTableItem {
+                                state_key_hash,
+                                handle,
+                                key,
+                                value: bytes.to_vec().into(),
+                                data: None,
+                            },
+                        ));
+                    },
+                }
+            },
+            StateKeyInner::TradingNative(_) => {
+                return Err(CliError::UnexpectedError(format!(
+                    "Can't convert trading-native key {:?} to WriteSetChange",
+                    state_key.inner()
+                )));
+            },
+            StateKeyInner::Raw(_) => {},
+        }
+    }
+
+    serialize_as_json(&changes)
+}
+
+fn local_materialize_output(
+    state_view: &impl aptos_types::state_store::StateView,
+    vm_output: VMOutput,
+) -> CliTypedResult<TransactionOutput> {
+    let resolver = state_view.as_move_resolver();
+    vm_output
+        .try_materialize_into_transaction_output(&resolver)
+        .map_err(|err| CliError::UnexpectedError(err.to_string()))
+}
 
 /// Transaction options for the `Simulate` and `Replay` commands.
 ///
@@ -91,9 +269,12 @@ impl TxnOptions {
         &self,
         rng: &mut rand::rngs::StdRng,
         payload: TransactionPayload,
+        show_details: bool,
     ) -> CliTypedResult<TransactionSummary> {
         let client = self.rest_client()?;
         let sender_address = self.get_address()?;
+        let (sender_private_key, _) = self.get_key_and_address()?;
+        let sender_public_key = sender_private_key.public_key();
 
         let gas_unit_price = if let Some(gas_unit_price) = self.gas_options.gas_unit_price {
             gas_unit_price
@@ -134,39 +315,52 @@ impl TxnOptions {
         }
         let unsigned_transaction = txn_builder.build();
 
-        // TODO: Support other transaction authenticator types, like multi-agent and fee-payer
-        let signed_transaction = SignedTransaction::new_signed_transaction(
+        let signed_transaction = SignedTransaction::new(
             unsigned_transaction,
-            TransactionAuthenticator::SingleSender {
-                sender: AccountAuthenticator::NoAccountAuthenticator,
-            },
+            sender_public_key,
+            Ed25519Signature::try_from([0u8; 64].as_ref()).unwrap(),
         );
 
         let simulated_txn = client
-            .simulate_bcs_with_gas_estimation(&signed_transaction, true, false)
+            .simulate_with_gas_estimation(&signed_transaction, true, false)
             .await?
-            .into_inner();
+            .into_inner()
+            .into_iter()
+            .next()
+            .ok_or_else(|| {
+                CliError::UnexpectedError(
+                    "Simulation returned an empty transaction list".to_string(),
+                )
+            })?;
 
-        let user_txn = simulated_txn.transaction.try_as_signed_user_txn().unwrap();
+        let replay_protector = simulated_txn.request.replay_protector();
+        let sequence_number = match &replay_protector {
+            ReplayProtector::SequenceNumber(sequence_number) => Some(*sequence_number),
+            _ => None,
+        };
 
-        // TODO: add events and outputs
-        Ok(TransactionSummary {
-            transaction_hash: simulated_txn.info.hash().into(),
-            gas_used: Some(simulated_txn.info.gas_used()),
-            gas_unit_price: Some(user_txn.gas_unit_price()),
+        let mut summary = TransactionSummary {
+            transaction_hash: simulated_txn.info.hash,
+            gas_used: Some(simulated_txn.info.gas_used.0),
+            gas_unit_price: Some(simulated_txn.request.gas_unit_price.0),
             pending: None,
-            sender: Some(user_txn.sender()),
-            replay_protector: Some(user_txn.replay_protector()),
-            sequence_number: match user_txn.replay_protector() {
-                ReplayProtector::SequenceNumber(sequence_number) => Some(sequence_number),
-                _ => None,
-            },
-            success: Some(simulated_txn.info.status().is_success()),
+            sender: Some(*simulated_txn.request.sender.inner()),
+            replay_protector: Some(replay_protector),
+            sequence_number,
+            success: Some(simulated_txn.info.success),
             timestamp_us: None,
-            version: Some(simulated_txn.version),
-            vm_status: Some(format!("{:?}", simulated_txn.info.status())), // TODO: add proper status
+            version: Some(simulated_txn.info.version.0),
+            vm_status: Some(simulated_txn.info.vm_status.clone()),
             deployed_object_address: None,
-        })
+            events: None,
+            changes: None,
+        };
+        if show_details {
+            summary.events = Some(serialize_as_json(&simulated_txn.events)?);
+            summary.changes = Some(serialize_as_json(&simulated_txn.info.changes)?);
+        }
+
+        Ok(summary)
     }
 
     /// Simulates a transaction locally, using the debugger to fetch required data from remote.
@@ -174,6 +368,7 @@ impl TxnOptions {
         &self,
         payload: TransactionPayload,
         env: &MoveEnv,
+        show_details: bool,
         execute: F,
     ) -> CliTypedResult<TransactionSummary>
     where
@@ -239,7 +434,7 @@ impl TxnOptions {
             TransactionStatus::Discard(_) | TransactionStatus::Retry => None,
         };
 
-        Ok(TransactionSummary {
+        let mut summary = TransactionSummary {
             transaction_hash: hash.into(),
             gas_used: Some(vm_output.gas_used()),
             gas_unit_price: Some(gas_unit_price),
@@ -252,7 +447,23 @@ impl TxnOptions {
             version: Some(version), // The transaction is not committed so there is no new version.
             vm_status: Some(format_txn_status(vm_output.status(), &vm_status)),
             deployed_object_address: None,
-        })
+            events: None,
+            changes: None,
+        };
+        if show_details {
+            let state_view = debugger.state_view_at_version(version);
+            let transaction_output = local_materialize_output(&state_view, vm_output)?;
+            summary.events = Some(local_contract_events_to_json(
+                &state_view,
+                transaction_output.events(),
+            )?);
+            summary.changes = Some(local_write_set_to_json(
+                &state_view,
+                transaction_output.write_set(),
+            )?);
+        }
+
+        Ok(summary)
     }
 
     /// Simulates a transaction locally.
@@ -260,6 +471,7 @@ impl TxnOptions {
         &self,
         payload: TransactionPayload,
         env: &MoveEnv,
+        show_details: bool,
     ) -> CliTypedResult<TransactionSummary> {
         println!();
         println!("Simulating transaction locally...");
@@ -267,8 +479,169 @@ impl TxnOptions {
         self.simulate_using_debugger(
             payload,
             env,
+            show_details,
             local_simulation::run_transaction_using_debugger,
         )
         .await
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::{local_events_to_json, local_write_set_to_json, serialize_as_json};
+    use aptos_cli_common::TransactionSummary;
+    use aptos_crypto::HashValue;
+    use aptos_transaction_simulation::EmptyStateView;
+    use aptos_types::{
+        account_address::AccountAddress,
+        event::EventKey,
+        state_store::{state_key::StateKey, table::TableHandle},
+        write_set::{WriteOp, WriteSet},
+    };
+    use move_core_types::{ident_str, language_storage::TypeTag};
+
+    #[test]
+    fn simulation_summary_omits_optional_fields_by_default() {
+        let summary = TransactionSummary {
+            transaction_hash: HashValue::zero().into(),
+            gas_used: None,
+            gas_unit_price: None,
+            pending: None,
+            sender: None,
+            sequence_number: None,
+            replay_protector: None,
+            success: None,
+            timestamp_us: None,
+            version: None,
+            vm_status: None,
+            deployed_object_address: None,
+            events: None,
+            changes: None,
+        };
+        let value = serde_json::to_value(summary).unwrap();
+        assert!(value.get("events").is_none());
+        assert!(value.get("changes").is_none());
+    }
+
+    #[test]
+    fn simulation_summary_includes_requested_details_only() {
+        let summary = TransactionSummary {
+            transaction_hash: HashValue::zero().into(),
+            gas_used: None,
+            gas_unit_price: None,
+            pending: None,
+            sender: None,
+            sequence_number: None,
+            replay_protector: None,
+            success: None,
+            timestamp_us: None,
+            version: None,
+            vm_status: None,
+            deployed_object_address: None,
+            events: None,
+            changes: None,
+        };
+        let mut with_events = summary.clone();
+        with_events.events = Some(serde_json::json!([{"k": 1}]));
+        let value = serde_json::to_value(with_events).unwrap();
+        assert!(value.get("events").is_some());
+        assert!(value.get("changes").is_none());
+
+        let mut with_changes = summary;
+        with_changes.changes = Some(serde_json::json!([{"c": 2}]));
+        let value = serde_json::to_value(with_changes).unwrap();
+        assert!(value.get("events").is_none());
+        assert!(value.get("changes").is_some());
+    }
+
+    #[test]
+    fn local_events_use_api_event_shape() {
+        let key = EventKey::new(9, AccountAddress::from_hex_literal("0x1").unwrap());
+        let event = aptos_types::contract_event::ContractEvent::new_v1(
+            key,
+            7,
+            TypeTag::U64,
+            bcs::to_bytes(&42u64).unwrap(),
+        )
+        .unwrap();
+
+        let state_view = EmptyStateView;
+        let json = local_events_to_json(&state_view, &[(event, None)]).unwrap();
+        let first = json.as_array().unwrap().first().unwrap();
+        assert!(first.get("guid").is_some());
+        assert_eq!(first.get("sequence_number").unwrap().as_str(), Some("7"));
+        assert_eq!(first.get("type").unwrap().as_str(), Some("u64"));
+        assert_eq!(first.get("data").unwrap().as_str(), Some("42"));
+        assert!(first.get("raw_data_hex").is_none());
+    }
+
+    #[test]
+    fn serialize_as_json_preserves_shape() {
+        let raw = serde_json::json!({
+            "events": [{"amount": "1"}],
+            "changes": [{"type": "write_resource"}]
+        });
+        let encoded = serialize_as_json(&raw).unwrap();
+        assert_eq!(encoded, raw);
+    }
+
+    #[test]
+    fn local_changes_use_api_writeset_change_shape() {
+        let state_view = EmptyStateView;
+        let handle = TableHandle(AccountAddress::from_hex_literal("0x1").unwrap());
+        let key = b"hello".to_vec();
+        let state_key = StateKey::table_item(&handle, &key);
+        let write_set = WriteSet::new([(
+            state_key.clone(),
+            WriteOp::legacy_modification(vec![1u8, 2u8, 3u8].into()),
+        )])
+        .unwrap();
+
+        let json = local_write_set_to_json(&state_view, &write_set).unwrap();
+        let first = json.as_array().unwrap().first().unwrap();
+        assert_eq!(
+            first.get("type").and_then(|v| v.as_str()),
+            Some("write_table_item")
+        );
+        assert_eq!(
+            first.get("key").and_then(|v| v.as_str()),
+            Some("0x68656c6c6f")
+        );
+        assert_eq!(
+            first.get("value").and_then(|v| v.as_str()),
+            Some("0x010203")
+        );
+        assert!(first.get("state_key_hash").is_some());
+    }
+
+    #[test]
+    fn local_changes_preserve_delete_module_entries() {
+        let state_view = EmptyStateView;
+        let address = AccountAddress::from_hex_literal("0x1").unwrap();
+        let state_key = StateKey::module(&address, ident_str!("test_module"));
+        let write_set = WriteSet::new([(state_key, WriteOp::legacy_deletion())]).unwrap();
+
+        let json = local_write_set_to_json(&state_view, &write_set).unwrap();
+        let first = json.as_array().unwrap().first().unwrap();
+        assert_eq!(
+            first.get("type").and_then(|v| v.as_str()),
+            Some("delete_module")
+        );
+        assert_eq!(first.get("address").and_then(|v| v.as_str()), Some("0x1"));
+    }
+
+    #[test]
+    fn local_changes_reject_trading_native_entries() {
+        let state_view = EmptyStateView;
+        let address = AccountAddress::from_hex_literal("0x1").unwrap();
+        let state_key = StateKey::position(address, address, address);
+        let write_set = WriteSet::new([(
+            state_key,
+            WriteOp::legacy_modification(vec![1u8, 2u8, 3u8].into()),
+        )])
+        .unwrap();
+
+        let err = local_write_set_to_json(&state_view, &write_set).unwrap_err();
+        assert!(err.to_string().contains("TradingNative"));
     }
 }

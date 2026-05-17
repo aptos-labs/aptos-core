@@ -3171,6 +3171,7 @@ dependencies = [
  "aptos-gas-profiling",
  "aptos-gas-schedule",
  "aptos-package-builder",
+ "aptos-resource-viewer",
  "aptos-rest-client",
  "aptos-sdk",
  "aptos-transaction-simulation",
