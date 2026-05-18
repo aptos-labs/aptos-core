@@ -20,13 +20,16 @@ use std::{cmp::Ordering, collections::HashSet, sync::Arc};
 pub fn choose_peers_to_dial_randomly(
     mut eligible_peers: Vec<(PeerId, DiscoveredPeer)>,
     num_peers_to_dial: usize,
+    num_dials_before_backoff: usize,
 ) -> Vec<(PeerId, DiscoveredPeer)> {
     // Shuffle the peers (so that we don't always dial the same ones first)
     eligible_peers.shuffle(&mut ::rand_latest::thread_rng());
 
     // Sort the peers by priority (this takes into account last dial times)
-    eligible_peers
-        .sort_by(|(_, peer), (_, other)| peer.partial_cmp(other).unwrap_or(Ordering::Equal));
+    eligible_peers.sort_by(|(_, peer), (_, other)| {
+        peer.compare_dial_priority(other, num_dials_before_backoff)
+            .unwrap_or(Ordering::Equal)
+    });
 
     // Select the peers to dial
     eligible_peers.into_iter().take(num_peers_to_dial).collect()
@@ -38,6 +41,7 @@ pub fn choose_random_peers_by_ping_latency(
     eligible_peers: Vec<(PeerId, DiscoveredPeer)>,
     num_peers_to_choose: usize,
     discovered_peers: Arc<RwLock<DiscoveredPeerSet>>,
+    num_dials_before_backoff: usize,
 ) -> Vec<(PeerId, DiscoveredPeer)> {
     // Get all eligible peer IDs
     let eligible_peer_ids = eligible_peers
@@ -48,7 +52,7 @@ pub fn choose_random_peers_by_ping_latency(
     // Identify the peer IDs that haven't been dialed recently
     let non_recently_dialed_peer_ids = eligible_peers
         .iter()
-        .filter(|(_, peer)| !peer.has_dialed_recently())
+        .filter(|(_, peer)| !peer.has_dialed_recently(num_dials_before_backoff))
         .map(|(peer_id, _)| *peer_id)
         .collect::<HashSet<_>>();
 
@@ -237,7 +241,7 @@ mod test {
         let eligible_peers = vec![];
 
         // Choose several peers randomly and verify none are selected
-        let selected_peers = choose_peers_to_dial_randomly(eligible_peers, 5);
+        let selected_peers = choose_peers_to_dial_randomly(eligible_peers, 5, 2);
         assert!(selected_peers.is_empty());
 
         // Create a large set of eligible peers
@@ -245,7 +249,7 @@ mod test {
 
         // Choose several peers randomly and verify the number of selected peers
         let num_peers_to_dial = 5;
-        let selected_peers = choose_peers_to_dial_randomly(eligible_peers, num_peers_to_dial);
+        let selected_peers = choose_peers_to_dial_randomly(eligible_peers, num_peers_to_dial, 2);
         assert_eq!(selected_peers.len(), num_peers_to_dial);
 
         // Create a small set of eligible peers
@@ -253,7 +257,7 @@ mod test {
         let eligible_peers = create_eligible_peers(num_eligible_peers);
 
         // Choose many peers randomly and verify the number of selected peers
-        let selected_peers = choose_peers_to_dial_randomly(eligible_peers, 20);
+        let selected_peers = choose_peers_to_dial_randomly(eligible_peers, 20, 2);
         assert_eq!(selected_peers.len(), num_eligible_peers);
     }
 
@@ -265,11 +269,11 @@ mod test {
 
         // Choose all the peers randomly and verify the number of selected peers
         let selected_peers_1 =
-            choose_peers_to_dial_randomly(eligible_peers.clone(), num_eligible_peers);
+            choose_peers_to_dial_randomly(eligible_peers.clone(), num_eligible_peers, 2);
         assert_eq!(selected_peers_1.len(), num_eligible_peers);
 
         // Choose all the peers randomly again and verify the number of selected peers
-        let selected_peers_2 = choose_peers_to_dial_randomly(eligible_peers, num_eligible_peers);
+        let selected_peers_2 = choose_peers_to_dial_randomly(eligible_peers, num_eligible_peers, 2);
         assert_eq!(selected_peers_2.len(), num_eligible_peers);
 
         // Verify the selected peer sets are identical
@@ -298,7 +302,7 @@ mod test {
         for num_peers_to_dial in 1..=num_non_dialed_peers {
             // Choose peers randomly and verify the number of selected peers
             let selected_peers =
-                choose_peers_to_dial_randomly(eligible_peers.clone(), num_peers_to_dial);
+                choose_peers_to_dial_randomly(eligible_peers.clone(), num_peers_to_dial, 2);
             assert_eq!(selected_peers.len(), num_peers_to_dial);
 
             // Verify that all of the selected peers were not dialed recently
@@ -315,7 +319,7 @@ mod test {
         for num_peers_to_dial in num_non_dialed_peers + 1..=total_num_peers {
             // Choose peers randomly and verify the number of selected peers
             let selected_peers =
-                choose_peers_to_dial_randomly(eligible_peers.clone(), num_peers_to_dial);
+                choose_peers_to_dial_randomly(eligible_peers.clone(), num_peers_to_dial, 2);
             assert_eq!(selected_peers.len(), num_peers_to_dial);
 
             // Update the selected peer flags
@@ -358,6 +362,7 @@ mod test {
                 eligible_peers.clone(),
                 num_peers_to_dial,
                 discovered_peers.clone(),
+                2,
             );
             assert_eq!(selected_peers.len(), num_peers_to_dial);
 
@@ -377,6 +382,7 @@ mod test {
                 eligible_peers.clone(),
                 num_peers_to_dial,
                 discovered_peers.clone(),
+                2,
             );
             assert_eq!(selected_peers.len(), num_peers_to_dial);
 
@@ -413,6 +419,7 @@ mod test {
             eligible_peers.clone(),
             5,
             discovered_peers.clone(),
+            2,
         );
         assert!(selected_peers.is_empty());
 
@@ -430,6 +437,7 @@ mod test {
             eligible_peers.clone(),
             num_peers_to_choose,
             discovered_peers.clone(),
+            2,
         );
         assert_eq!(selected_peers.len(), num_peers_to_choose);
 
@@ -439,6 +447,7 @@ mod test {
             eligible_peers.clone(),
             num_non_dialed_peers,
             discovered_peers.clone(),
+            2,
         );
         assert_eq!(selected_peers.len(), num_non_dialed_peers);
 
@@ -448,6 +457,7 @@ mod test {
             eligible_peers.clone(),
             num_non_dialed_peers + 1,
             discovered_peers.clone(),
+            2,
         );
         assert_eq!(selected_peers.len(), num_non_dialed_peers);
 
@@ -465,6 +475,7 @@ mod test {
             eligible_peers.clone(),
             num_peers_to_choose,
             discovered_peers.clone(),
+            2,
         );
         assert_eq!(selected_peers.len(), num_peers_to_choose);
 
@@ -475,6 +486,7 @@ mod test {
             eligible_peers.clone(),
             num_peers_to_choose,
             discovered_peers.clone(),
+            2,
         );
         assert_eq!(selected_peers.len(), num_peers_to_choose);
 
@@ -485,6 +497,7 @@ mod test {
             eligible_peers.clone(),
             num_total_peers + 10,
             discovered_peers.clone(),
+            2,
         );
         assert_eq!(selected_peers.len(), num_total_peers);
     }
@@ -515,6 +528,7 @@ mod test {
                 eligible_peers.clone(),
                 num_peers_to_dial,
                 discovered_peers.clone(),
+                2,
             );
             assert_eq!(selected_peers.len(), num_peers_to_dial);
 
@@ -560,6 +574,7 @@ mod test {
                 eligible_peers.clone(),
                 num_peers_to_dial,
                 discovered_peers.clone(),
+                2,
             );
             assert_eq!(selected_peers.len(), num_peers_to_dial);
 
@@ -688,7 +703,8 @@ mod test {
             let mut peer = DiscoveredPeer::new(PeerRole::PreferredUpstream);
             dialed_peers.insert(peer_id);
 
-            // Set the last dial time to be recent
+            // Set the last dial time to be recent (dial twice to meet num_dials_before_backoff = 2)
+            peer.update_last_dial_time();
             peer.update_last_dial_time();
 
             // Add the peer to the eligible peers
