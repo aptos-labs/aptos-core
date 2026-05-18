@@ -10,9 +10,7 @@ use move_core_types::{ability::AbilitySet, account_address::AccountAddress, iden
 /// Pointer to interned Move identifier allocated in global arena.
 pub type InternedIdentifier = GlobalArenaPtr<str>;
 
-/// Identifies an executable (module or script) by its address and name.
-///   - For modules, constructed from module address and name.
-///   - For scripts: TODO
+/// Identifies a module or script by its address and name.
 pub struct ModuleId {
     address: AccountAddress,
     name: InternedIdentifier,

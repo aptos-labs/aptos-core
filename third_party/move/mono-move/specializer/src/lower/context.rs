@@ -133,7 +133,13 @@ pub fn try_build_context(
     // TODO: consider a smarter packing (e.g. sort by descending
     // alignment, or bin-pack smaller slots into padding holes) to
     // shrink frame size.
-    // TODO: Expose substitution API which return/take non-canonicalized vectors/slices.
+    // TODO: Expose a substitution API that takes and returns non-canonicalized
+    // slices of `InternedType`. Today `subst_type_list` operates on
+    // `InternedTypeList`, so we have to round-trip `func_ir.home_slot_types`
+    // through `type_list_of` to intern it just so substitution accepts it.
+    // The intermediate list is only used to feed substitution and then
+    // immediately viewed back as a slice via `view_type_list`, so the
+    // canonicalization step is pure overhead for this caller.
     let home_list = interner.type_list_of(&func_ir.home_slot_types);
     let home_list = interner.subst_type_list(home_list, ty_args)?;
     let Some(home_slots) = layout_slots(0, view_type_list(home_list)) else {
@@ -557,7 +563,7 @@ fn walk_and_size(
         Type::Nominal {
             module_id,
             name,
-            ty_args,
+            ty_args: nominal_ty_args,
             ..
         } => {
             match ctx.get_fields(module_id, name)? {
@@ -569,7 +575,7 @@ fn walk_and_size(
                 Some(FieldTypes::Struct(fields)) => {
                     let fields = fields
                         .iter()
-                        .map(|f| ctx.subst_type(*f, *ty_args))
+                        .map(|f| ctx.subst_type(*f, *nominal_ty_args))
                         .collect::<Result<Vec<_>>>()?;
 
                     // We have to recurse unconditionally because if size is
@@ -581,7 +587,7 @@ fn walk_and_size(
                     for &ft in &fields {
                         // At this point we have already substituted fields, so
                         // all types inside must be instantiated. Even if we
-                        // encounter soe nominal, its type arguments would be
+                        // encounter some nominal, its type arguments would be
                         // substituted as well.
                         walk_and_size(ctx, ft, EMPTY_TYPE_LIST, visited)?;
                     }

@@ -61,19 +61,27 @@ pub struct PreparedModule {
     /// Indexed by [`ModuleHandleIndex`]. Self-handle resolves to the same id
     /// as [`Self::id`].
     module_ids: Vec<InternedModuleId>,
-    /// Parameter and return types for every function in the module.
+    /// Parameter and return types for every function handle referenced in
+    /// the module. For a generic function, these may contain [`Type::TypeParam`]
+    /// nodes referencing the function's own type parameters — they are not
+    /// guaranteed to be fully concrete.
     ///
     /// Indexed by [`FunctionHandleIndex`].
     function_signatures: Vec<FunctionSignature>,
     /// Parameter and return types, as well as type arguments, for every
-    /// function instantiation in this module. Parameter and return types
-    /// have been substituted with type arguments already.
+    /// function instantiation in this module. The type arguments have been
+    /// applied to the underlying handle's params/returns. They may still
+    /// contain [`Type::TypeParam`] nodes referencing type parameters of the
+    /// *enclosing* (caller) function — substitution here only resolves the
+    /// call site's own type arguments, not the caller's free type parameters.
     ///
     /// Indexed by [`FunctionInstantiationIndex`].
     function_instantiation_signatures: Vec<FunctionInstantiationSignature>,
 }
 
-/// Parameter and return types of a function handle, interned.
+/// Parameter and return types of a function handle, interned. Note that for a
+/// generic function these may contain free type parameters of the function
+/// itself, and are therefore not necessarily fully concrete.
 #[derive(Clone, Copy)]
 pub struct FunctionSignature {
     pub params: InternedTypeList,
@@ -81,8 +89,10 @@ pub struct FunctionSignature {
 }
 
 /// Parameter and return types of a function instantiation, together with the
-/// type arguments. Parameter and return types have already been substituted
-/// with the type arguments.
+/// type arguments applied at the call site. The type arguments have already
+/// been substituted into `params` and `returns`. The result may still contain
+/// free type parameters of the enclosing function, so this is not guaranteed
+/// to be fully concrete either.
 #[derive(Clone, Copy)]
 pub struct FunctionInstantiationSignature {
     pub params: InternedTypeList,
@@ -219,7 +229,7 @@ impl PreparedModule {
         self.function_signatures[idx.0 as usize]
     }
 
-    /// Returns parameter and return types, as well as type argument for the
+    /// Returns parameter and return types, as well as type arguments for the
     /// given function instantiation. Parameters and returns have already
     /// been substituted under type arguments.
     pub fn function_instantiation_signature_at(

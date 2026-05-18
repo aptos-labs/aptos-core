@@ -49,7 +49,7 @@ use std::{
 mod identifiers;
 use identifiers::IdentifierInternerKey;
 mod module_ids;
-use module_ids::ExecutableIdInternerKey;
+use module_ids::ModuleIdInternerKey;
 mod loaded_module;
 pub use loaded_module::{
     FunctionSlot, LoadedModule, LoadedModuleSlot, ModuleMandatoryDependencies, ModuleSlot,
@@ -98,7 +98,7 @@ pub struct GlobalContext {
 /// data is allocated is kept separately.
 struct Context {
     identifiers: DashMap<IdentifierInternerKey, InternedIdentifier, ahash::RandomState>,
-    module_ids: DashMap<ExecutableIdInternerKey, InternedModuleId, ahash::RandomState>,
+    module_ids: DashMap<ModuleIdInternerKey, InternedModuleId, ahash::RandomState>,
     types: DashMap<TypeInternerKey, InternedType, ahash::RandomState>,
     type_lists: DashMap<TypeListInternerKey, InternedTypeList, ahash::RandomState>,
     module_cache: ModuleCache,

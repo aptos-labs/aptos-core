@@ -147,7 +147,7 @@ impl<'ctx> ExecutionGuard<'ctx> {
         *self
             .ctx
             .module_ids
-            .entry(ExecutableIdInternerKey(ptr))
+            .entry(ModuleIdInternerKey(ptr))
             .or_insert(ptr)
     }
 }
@@ -159,9 +159,9 @@ impl<'ctx> ExecutionGuard<'ctx> {
 ///
 /// Constructor must enforce the pointer points to the valid data and can be
 /// safely dereferenced.
-pub(super) struct ExecutableIdInternerKey(GlobalArenaPtr<ModuleId>);
+pub(super) struct ModuleIdInternerKey(GlobalArenaPtr<ModuleId>);
 
-impl Hash for ExecutableIdInternerKey {
+impl Hash for ModuleIdInternerKey {
     fn hash<H: Hasher>(&self, state: &mut H) {
         // SAFETY: It is safe to dereference the pointer because the caller
         // ensures it remains valid during the lifetime of the key.
@@ -173,7 +173,7 @@ impl Hash for ExecutableIdInternerKey {
     }
 }
 
-impl PartialEq for ExecutableIdInternerKey {
+impl PartialEq for ModuleIdInternerKey {
     fn eq(&self, other: &Self) -> bool {
         // SAFETY: It is safe to dereference the pointer because the caller
         // ensures it remains valid during the lifetime of the key.
@@ -188,10 +188,10 @@ impl PartialEq for ExecutableIdInternerKey {
 }
 
 // PartialEq implementation above is a full equivalence relation.
-impl Eq for ExecutableIdInternerKey {}
+impl Eq for ModuleIdInternerKey {}
 
-impl Equivalent<ExecutableIdInternerKey> for (&AccountAddress, &IdentStr) {
-    fn equivalent(&self, key: &ExecutableIdInternerKey) -> bool {
+impl Equivalent<ModuleIdInternerKey> for (&AccountAddress, &IdentStr) {
+    fn equivalent(&self, key: &ModuleIdInternerKey) -> bool {
         // SAFETY: It is safe to dereference the pointer because the caller
         // ensures it remains valid during the lifetime of the key.
         unsafe {

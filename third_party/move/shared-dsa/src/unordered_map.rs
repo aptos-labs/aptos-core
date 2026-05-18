@@ -126,7 +126,7 @@ impl<K: Hash + Eq, V> UnorderedMap<K, V> {
     /// The predicate is applied in an arbitrary order — callers must ensure
     /// that `f` does not depend on the order in which key-value pairs are visited.
     #[inline]
-    pub fn for_each(&mut self, mut f: impl FnMut(&mut V)) {
+    pub fn for_each_value(&mut self, mut f: impl FnMut(&mut V)) {
         self.inner.iter_mut().for_each(|(_, v)| f(v));
     }
 
