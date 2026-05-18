@@ -264,14 +264,21 @@ def main():
     unparseable = 0
 
     for new_row in parsed:
-        key = tuple(new_row[c] for c in columns[:key_columns_count])
+        try:
+            key = tuple(new_row[c] for c in columns[:key_columns_count])
+            executor_type = new_row["executor_type"]
+        except KeyError as e:
+            print(f"Row missing required column {e}; "
+                  f"treating as unparseable.")
+            unparseable += 1
+            needs_update = True
+            continue
 
         # Non-blocking executor types are warning-only in the perf gate, so
         # their drift must not be the reason a calibration PR opens. They
         # are still refreshed alongside production rows when a write does
         # happen.
-        if (not args.move_e2e
-                and new_row["executor_type"] in NON_BLOCKING_EXECUTOR_TYPES):
+        if not args.move_e2e and executor_type in NON_BLOCKING_EXECUTOR_TYPES:
             experimental_skipped += 1
             continue
 
@@ -287,7 +294,7 @@ def main():
             old_min_ratio = float(old[-3])
             old_max_ratio = float(old[-2])
             new_median = float(new_row["median"])
-        except (ValueError, IndexError) as e:
+        except (ValueError, IndexError, KeyError) as e:
             print(f"Could not parse band inputs for {key}: {e}; "
                   f"treating as out-of-band.")
             unparseable += 1
