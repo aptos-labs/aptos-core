@@ -752,7 +752,7 @@ module aptos_framework::stake {
         };
 
         let (_, maximum_stake) = staking_config::get_required_stake(&staking_config::get());
-        let voting_power = get_next_epoch_voting_power(stake_pool);
+        let voting_power = get_voting_power(stake_pool);
         assert!(voting_power <= maximum_stake, error::invalid_argument(ESTAKE_EXCEEDS_MAX));
 
         if (std::features::module_event_migration_enabled()) {
@@ -982,7 +982,12 @@ module aptos_framework::stake {
 
         let config = staking_config::get();
         let (minimum_stake, maximum_stake) = staking_config::get_required_stake(&config);
-        let voting_power = get_next_epoch_voting_power(stake_pool);
+        // The pool was inactive while held outside the validator set; its `pending_inactive`
+        // is never touched by the per-epoch update routine. Settle any expired stake here so
+        // the min/max-stake check (and the published voting power on join) reflect the
+        // post-sweep view.
+        settle_expired_pending_inactive(stake_pool, timestamp::now_seconds());
+        let voting_power = get_voting_power(stake_pool);
         assert!(voting_power >= minimum_stake, error::invalid_argument(ESTAKE_TOO_LOW));
         assert!(voting_power <= maximum_stake, error::invalid_argument(ESTAKE_TOO_HIGH));
 
@@ -1148,7 +1153,7 @@ module aptos_framework::stake {
             // Decrease the voting power increase as the pending validator's voting power was added when they requested
             // to join. Now that they changed their mind, their voting power should not affect the joining limit of this
             // epoch.
-            let validator_stake = (get_next_epoch_voting_power(stake_pool) as u128);
+            let validator_stake = (get_voting_power(stake_pool) as u128);
             // total_joining_power should be larger than validator_stake but just in case there has been a small
             // rounding error somewhere that can lead to an underflow, we still want to allow this transaction to
             // succeed.
@@ -1268,6 +1273,19 @@ module aptos_framework::stake {
         vector::for_each_ref(&validator_set.pending_inactive, |validator| {
             let validator: &ValidatorInfo = validator;
             update_stake_pool(validator_perf, validator.addr, &config);
+        });
+
+        // Settle expired `pending_inactive` on each pending_active pool before it is activated.
+        // The per-validator update routine above runs only over active and leaving-pending_inactive
+        // validators, so a pool joining this epoch with an expired lockup would otherwise carry
+        // its unswept `pending_inactive` into the published next-epoch voting power and diverge
+        // from DKG's recomputation. Use the reconfig start time so all sweeps in this
+        // reconfiguration agree on a single comparison clock.
+        let reconfig_start_secs = get_reconfig_start_time_secs();
+        vector::for_each_ref(&validator_set.pending_active, |validator| {
+            let validator: &ValidatorInfo = validator;
+            let pending_active_pool = borrow_global_mut<StakePool>(validator.addr);
+            settle_expired_pending_inactive(pending_active_pool, reconfig_start_secs);
         });
 
         // Activate currently pending_active validators.
@@ -1611,9 +1629,13 @@ module aptos_framework::stake {
         };
     }
 
-    /// Assuming we are in a middle of a reconfiguration (no matter it is immediate or async), get its start time.
+    /// Get the reconfiguration start time when one is in progress; otherwise fall back to the
+    /// current wall-clock time. Note: `reconfiguration_state::is_initialized()` is permanently
+    /// true after framework genesis, so we must gate on `is_in_progress()` to avoid returning the
+    /// previous reconfig's start time outside any active reconfig (which would also abort here
+    /// since `start_time_secs()` requires the state to be active).
     fun get_reconfig_start_time_secs(): u64 {
-        if (reconfiguration_state::is_initialized()) {
+        if (reconfiguration_state::is_in_progress()) {
             reconfiguration_state::start_time_secs()
         } else {
             timestamp::now_seconds()
@@ -1716,7 +1738,7 @@ module aptos_framework::stake {
     }
 
     fun generate_validator_info(addr: address, stake_pool: &StakePool, config: ValidatorConfig): ValidatorInfo {
-        let voting_power = get_next_epoch_voting_power(stake_pool);
+        let voting_power = get_voting_power(stake_pool);
         ValidatorInfo {
             addr,
             voting_power,
@@ -1724,8 +1746,13 @@ module aptos_framework::stake {
         }
     }
 
-    /// Returns validator's next epoch voting power, including pending_active, active, and pending_inactive stake.
-    fun get_next_epoch_voting_power(stake_pool: &StakePool): u64 {
+    /// Returns the sum of a stake pool's non-inactive coin buckets
+    /// (`pending_active` + `active` + `pending_inactive`). This equals the validator's
+    /// next-epoch voting power **only** when callers have already settled any expired
+    /// `pending_inactive` into `inactive` via `settle_expired_pending_inactive`. Calling
+    /// this on a pool with unswept expired stake will overstate voting power and diverge
+    /// from the post-sweep view DKG independently recomputes from the same buckets.
+    fun get_voting_power(stake_pool: &StakePool): u64 {
         let value_pending_active = coin::value(&stake_pool.pending_active);
         let value_active = coin::value(&stake_pool.active);
         let value_pending_inactive = coin::value(&stake_pool.pending_inactive);
@@ -1733,6 +1760,24 @@ module aptos_framework::stake {
             assume value_pending_active + value_active + value_pending_inactive <= MAX_U64;
         };
         value_pending_active + value_active + value_pending_inactive
+    }
+
+    /// Move a stake pool's `pending_inactive` stake into `inactive` if its lockup has elapsed
+    /// by the supplied `cmp_time_secs`. The `locked_until_secs > 0` guard skips pools whose
+    /// lockup has not yet been initialized (e.g. a freshly created pool), which would
+    /// otherwise be considered "expired" against any positive timestamp.
+    ///
+    /// Used at sites that read voting power on pools the per-epoch update routine does not
+    /// touch — joiners (`pending_active` validators) and inactive pools — to keep the
+    /// framework-published voting power in agreement with DKG's post-sweep view.
+    fun settle_expired_pending_inactive(stake_pool: &mut StakePool, cmp_time_secs: u64) {
+        if (stake_pool.locked_until_secs > 0
+            && cmp_time_secs >= stake_pool.locked_until_secs) {
+            coin::merge(
+                &mut stake_pool.inactive,
+                coin::extract_all(&mut stake_pool.pending_inactive),
+            );
+        };
     }
 
     fun update_voting_power_increase(increase_amount: u64) acquires ValidatorSet {
@@ -2260,6 +2305,193 @@ module aptos_framework::stake {
         assert!(get_validator_state(validator_address) == VALIDATOR_STATUS_ACTIVE, 2);
         assert!(get_remaining_lockup_secs(validator_address) == LOCKUP_CYCLE_SECONDS / 2 - EPOCH_DURATION, 3);
         assert_validator_state(validator_address, 100, 0, 0, 0, 0);
+    }
+
+    // When a stake pool re-enters the validator set with `pending_inactive` stake whose lockup
+    // has already expired, that stake must be settled to `inactive` by the end of the rejoining
+    // epoch — so that the voting power emitted to the validator set excludes the expired bucket
+    // and matches the view DKG independently recomputes from the same pool buckets.
+    #[test(aptos_framework = @aptos_framework, validator = @0x123, validator_2 = @0x234)]
+    public entry fun test_pending_active_with_expired_pending_inactive_settles_at_epoch(
+        aptos_framework: &signer,
+        validator: &signer,
+        validator_2: &signer,
+    ) acquires AllowedValidators, AptosCoinCapabilities, OwnerCapability, StakePool, ValidatorConfig, ValidatorPerformance, ValidatorSet {
+        // Zero rewards rate so bucket arithmetic is exact (no per-epoch +1% obscures the assertions).
+        initialize_for_test_custom(
+            aptos_framework, 100, 10000, LOCKUP_CYCLE_SECONDS, true, 0, 100, 1000000
+        );
+        let (_sk_1, pk_1, pop_1) = generate_identity();
+        let (_sk_2, pk_2, pop_2) = generate_identity();
+        // First validator joins with 200 stake; second validator exists so the first can leave
+        // (the set is never allowed to drain to zero).
+        initialize_test_validator(&pk_1, &pop_1, validator, 200, true, false);
+        initialize_test_validator(&pk_2, &pop_2, validator_2, 100, true, true);
+
+        let validator_address = signer::address_of(validator);
+        // Move 100 of the validator's active stake to pending_inactive while the lockup is still
+        // in the future. Resulting buckets: active=100, pending_inactive=100.
+        unlock(validator, 100);
+        assert_stake_pool(validator_address, 100, 0, 0, 100);
+
+        // Validator leaves. End epoch: the per-epoch update routine processes the pool from its
+        // leaving `pending_inactive` validator-set slot, but the lockup is not yet expired so
+        // `pending_inactive` is left untouched.
+        leave_validator_set(validator, validator_address);
+        end_epoch();
+        assert!(get_validator_state(validator_address) == VALIDATOR_STATUS_INACTIVE, 1);
+        assert_stake_pool(validator_address, 100, 0, 0, 100);
+
+        // Time advances past the lockup expiration. Pool is INACTIVE so no per-epoch routine
+        // runs against it; pending_inactive remains 100.
+        timestamp::fast_forward_seconds(LOCKUP_CYCLE_SECONDS);
+        assert_stake_pool(validator_address, 100, 0, 0, 100);
+
+        // Validator re-joins. After the next epoch completes, expired pending_inactive has been
+        // settled to inactive: voting power emitted to the validator set is `active` (=100) only,
+        // not `active + pending_inactive` (=200), and the inactive bucket holds the previously-
+        // pending 100.
+        join_validator_set(validator, validator_address);
+        end_epoch();
+        assert!(get_validator_state(validator_address) == VALIDATOR_STATUS_ACTIVE, 2);
+        assert_stake_pool(validator_address, 100, 100, 0, 0);
+    }
+
+    // The voting power emitted by the framework into the validator set must equal the voting
+    // power that DKG independently recomputes from the same pool buckets. Otherwise the epoch
+    // manager — which receives the framework set and indexes into it using DKG-derived weights —
+    // sees mismatched stakes and panics at the reconfiguration boundary.
+    //
+    // This test exercises the most subtle case: a validator joining as `pending_active` with
+    // expired `pending_inactive` stake, where DKG sees the post-sweep view (stake excluded) and
+    // the framework, without an explicit sweep before generating validator info, sees the
+    // pre-sweep view (stake counted).
+    #[test(aptos_framework = @aptos_framework, validator = @0x123, validator_2 = @0x234)]
+    public entry fun test_pending_active_voting_power_matches_dkg_view(
+        aptos_framework: &signer,
+        validator: &signer,
+        validator_2: &signer,
+    ) acquires AllowedValidators, AptosCoinCapabilities, OwnerCapability, StakePool, ValidatorConfig, ValidatorPerformance, ValidatorSet {
+        // Zero rewards rate so bucket arithmetic is exact.
+        initialize_for_test_custom(
+            aptos_framework, 100, 10000, LOCKUP_CYCLE_SECONDS, true, 0, 100, 1000000
+        );
+        let (_sk_1, pk_1, pop_1) = generate_identity();
+        let (_sk_2, pk_2, pop_2) = generate_identity();
+        initialize_test_validator(&pk_1, &pop_1, validator, 200, true, false);
+        initialize_test_validator(&pk_2, &pop_2, validator_2, 100, true, true);
+
+        let validator_address = signer::address_of(validator);
+        unlock(validator, 100);
+        leave_validator_set(validator, validator_address);
+        end_epoch();
+        timestamp::fast_forward_seconds(LOCKUP_CYCLE_SECONDS);
+        join_validator_set(validator, validator_address);
+
+        // Validator now sits in `pending_active` with active=100, pending_inactive=100 (lockup
+        // expired). Capture DKG's view inside a reconfig window — that's the timing in which
+        // `next_validator_consensus_infos` is called in production. DKG excludes the expired
+        // bucket and reports voting power = 100.
+        reconfiguration_state::on_reconfig_start();
+        let dkg_voting_power = lookup_validator_voting_power(
+            &next_validator_consensus_infos(), validator_address
+        );
+        reconfiguration_state::on_reconfig_finish();
+
+        // Drive the reconfiguration. Framework writes validator-set entries for the new epoch;
+        // each entry's `voting_power` is what the epoch manager indexes by.
+        end_epoch();
+
+        let framework_voting_power = lookup_validator_voting_power(
+            &cur_validator_consensus_infos(), validator_address
+        );
+
+        // The two views must agree, and the agreed voting power must reflect the post-sweep
+        // bucket sum (active=100), excluding the expired pending_inactive (100).
+        assert!(framework_voting_power == dkg_voting_power, framework_voting_power);
+        assert!(framework_voting_power == 100, framework_voting_power);
+    }
+
+    #[test_only]
+    fun lookup_validator_voting_power(
+        infos: &vector<ValidatorConsensusInfo>, addr: address
+    ): u64 {
+        let i = 0;
+        let len = vector::length(infos);
+        while (i < len) {
+            let vci = vector::borrow(infos, i);
+            if (validator_consensus_info::get_addr(vci) == addr) {
+                return validator_consensus_info::get_voting_power(vci)
+            };
+            i = i + 1;
+        };
+        // Validator absent from the set — caller asserts on the returned value, which won't
+        // match the expected post-sweep voting power, surfacing the absence as a failure.
+        0
+    }
+
+    // The min/max-stake gate in `join_validator_set_internal` must be evaluated against the
+    // post-settlement view of the pool. A pool whose only path to clearing the minimum is its
+    // already-expired `pending_inactive` (which is unspendable as voting weight) must be
+    // rejected. Setup: minimum_stake = 100, validator's settled stake = 99 (active) once the
+    // expired 2 in pending_inactive is moved to inactive. Expected: ESTAKE_TOO_LOW.
+    //
+    // Folds in T1 from the report: under contract (a) the helper read remains a pure sum;
+    // the real failure surface is here at the call site that consults it.
+    #[test(aptos_framework = @aptos_framework, validator = @0x123, validator_2 = @0x234)]
+    #[expected_failure(abort_code = 0x10002, location = Self)]
+    public entry fun test_join_validator_set_rejects_admission_on_expired_pending_inactive(
+        aptos_framework: &signer,
+        validator: &signer,
+        validator_2: &signer,
+    ) acquires AllowedValidators, AptosCoinCapabilities, OwnerCapability, StakePool, ValidatorConfig, ValidatorPerformance, ValidatorSet {
+        // Zero rewards rate so bucket arithmetic at the boundary is exact.
+        initialize_for_test_custom(
+            aptos_framework, 100, 10000, LOCKUP_CYCLE_SECONDS, true, 0, 100, 1000000
+        );
+        let (_sk_1, pk_1, pop_1) = generate_identity();
+        let (_sk_2, pk_2, pop_2) = generate_identity();
+        // Validator joins with 101 stake (= minimum + 1); second validator exists so the first
+        // can leave (the set may not drain to zero).
+        initialize_test_validator(&pk_1, &pop_1, validator, 101, true, false);
+        initialize_test_validator(&pk_2, &pop_2, validator_2, 100, true, true);
+
+        let validator_address = signer::address_of(validator);
+        // Move 2 of the validator's active stake to pending_inactive. Pre-sweep sum
+        // (active 99 + pending_inactive 2) = 101 still clears the minimum, but the
+        // post-sweep voting power is 99, below the minimum.
+        unlock(validator, 2);
+
+        // Validator leaves the set. The end-epoch update routine processes the pool from its
+        // leaving slot, but the lockup is not yet expired so pending_inactive is preserved.
+        leave_validator_set(validator, validator_address);
+        end_epoch();
+
+        // Advance past the lockup. Pool is INACTIVE so no per-epoch routine touches it; the
+        // pending_inactive is now expired but still sits in pending_inactive on-chain.
+        timestamp::fast_forward_seconds(LOCKUP_CYCLE_SECONDS);
+
+        // Re-joining must settle expired pending_inactive before the min/max-stake gate.
+        // Settled buckets: active=99, inactive=2 — voting power = 99 < 100 = minimum_stake,
+        // so the call must abort with ESTAKE_TOO_LOW.
+        join_validator_set(validator, validator_address);
+    }
+
+    // `get_reconfig_start_time_secs()` is called outside an active reconfiguration in some
+    // call paths (e.g. queries, view functions, or future callers). When no reconfig is in
+    // progress it must return wall-clock time, not abort. The buggy predicate gates on
+    // `reconfiguration_state::is_initialized()` (true since framework genesis), so the helper
+    // falls through to `start_time_secs()` which aborts on the inactive variant. After the
+    // fix, the predicate is `is_in_progress()` and the helper returns `now_seconds()`.
+    #[test(aptos_framework = @aptos_framework)]
+    fun test_get_reconfig_start_time_secs_returns_now_when_no_reconfig_active(
+        aptos_framework: &signer,
+    ) acquires AptosCoinCapabilities {
+        // initialize_for_test installs the State resource (StateInactive variant) but does not
+        // start a reconfig.
+        initialize_for_test(aptos_framework);
+        let now = timestamp::now_seconds();
+        assert!(get_reconfig_start_time_secs() == now, 0);
     }
 
     #[test(aptos_framework = @aptos_framework, validator = @0x123)]

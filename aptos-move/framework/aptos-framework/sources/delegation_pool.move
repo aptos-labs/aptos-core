@@ -3367,29 +3367,39 @@ module aptos_framework::delegation_pool {
         end_aptos_epoch();
 
         assert!(stake::get_validator_state(pool_address) == VALIDATOR_STATUS_ACTIVE, 0);
-        // no rewards have been produced yet and no stake inactivated as lockup has been refreshed
-        stake::assert_stake_pool(pool_address, 103030100001, 20000000001, 0, 10000000002);
+        // No rewards have been produced yet. The expired pending_inactive (10000000002) is
+        // settled into inactive at join time, so the rejoining stake pool now has
+        // inactive = 20000000001 + 10000000002 = 30000000003 and pending_inactive = 0.
+        stake::assert_stake_pool(pool_address, 103030100001, 30000000003, 0, 0);
 
         synchronize_delegation_pool(pool_address);
+        // The settled-on-rejoin stake (10000000002 from pending_inactive → inactive) shows up
+        // here as new inactive stake on the stake pool, so synchronize_delegation_pool advances
+        // the OLC and the delegator's prior-cycle withdrawal is now inactive (withdrawable).
         assert_pending_withdrawal(validator_address, pool_address, true, 0, true, 20000000001);
-        assert_pending_withdrawal(delegator_address, pool_address, true, 1, false, 10000000002);
-        assert!(observed_lockup_cycle(pool_address) == observed_lockup_cycle, 0);
+        assert_pending_withdrawal(delegator_address, pool_address, true, 1, true, 10000000002);
+        assert!(observed_lockup_cycle(pool_address) == observed_lockup_cycle + 1, 0);
 
-        // cannot withdraw pending_inactive stake anymore
+        // delegator's pending withdrawal is already inactive — it's now withdrawable.
         withdraw(delegator, pool_address, 10000000002);
-        assert_pending_withdrawal(delegator_address, pool_address, true, 1, false, 10000000002);
+        assert_pending_withdrawal(delegator_address, pool_address, false, 0, false, 0);
 
         // earning rewards is resumed from this epoch on
         end_aptos_epoch();
-        stake::assert_stake_pool(pool_address, 104060401001, 20000000001, 0, 10100000002);
+        stake::assert_stake_pool(pool_address, 104060401001, 20000000001, 0, 0);
 
-        // new pending_inactive stake earns rewards but so does the old one
+        // Validator unlocks its full active stake. The delegator no longer has any
+        // pending_inactive stake (their prior cycle was withdrawn above), so the new
+        // pending_inactive lives in the freshly-started OLC and is owned entirely by the
+        // validator. Validator's own prior-cycle inactive (OLC 0, 20000000001) gets executed
+        // and withdrawn as part of `buy_in_pending_inactive_shares`.
         unlock(validator, pool_address, 104060401001);
-        assert_pending_withdrawal(validator_address, pool_address, true, 1, false, 104060401000);
-        assert_pending_withdrawal(delegator_address, pool_address, true, 1, false, 10100000002);
+        assert_pending_withdrawal(validator_address, pool_address, true, observed_lockup_cycle + 1, false, 104060401001);
+        assert_pending_withdrawal(delegator_address, pool_address, false, 0, false, 0);
         end_aptos_epoch();
-        assert_pending_withdrawal(validator_address, pool_address, true, 1, false, 105101005010);
-        assert_pending_withdrawal(delegator_address, pool_address, true, 1, false, 10201000002);
+        // Only the validator's pending_inactive earns rewards here (delegator has none).
+        assert_pending_withdrawal(validator_address, pool_address, true, observed_lockup_cycle + 1, false, 105101005011);
+        assert_pending_withdrawal(delegator_address, pool_address, false, 0, false, 0);
     }
 
     #[test(aptos_framework = @aptos_framework, validator = @0x123)]
