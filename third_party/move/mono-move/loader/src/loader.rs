@@ -24,8 +24,8 @@ use crate::{
 use anyhow::{anyhow, bail};
 use mono_move_core::{
     interner::{InternedIdentifier, InternedModuleId},
-    types::{InternedType, InternedTypeList},
-    ExecutableId, FieldTypes, FunctionPtr,
+    types::{InternedType, InternedTypeList, EMPTY_TYPE_LIST},
+    FieldTypes, Function, FunctionPtr, Interner, ModuleId,
 };
 use mono_move_gas::GasMeter;
 use mono_move_global_context::{
@@ -40,6 +40,7 @@ use specializer::{
     },
     ModuleIR,
 };
+use std::sync::Arc;
 
 /// Describes the lowering policy for converting execution IR to micro-ops.
 pub enum LoweringPolicy {
@@ -122,7 +123,7 @@ impl<'guard, 'ctx> Loader<'guard, 'ctx> {
         &self,
         read_set: &mut ModuleReadSet<'guard>,
         gas_meter: &mut impl GasMeter,
-        id: ArenaRef<'guard, ExecutableId>,
+        id: ArenaRef<'guard, ModuleId>,
     ) -> anyhow::Result<&'guard LoadedModule> {
         match &self.policy {
             LoadingPolicy::Lazy(lowering) => {
@@ -142,10 +143,7 @@ impl<'guard, 'ctx> Loader<'guard, 'ctx> {
         gas_meter: &mut impl GasMeter,
         module_id: InternedModuleId,
         func_name: InternedIdentifier,
-        // TODO: connect with monomorphization:
-        //   1. Build monomoprhic IR -> lower, or
-        //   2. Lower under type args context.
-        _ty_args: InternedTypeList,
+        ty_args: InternedTypeList,
     ) -> anyhow::Result<FunctionPtr> {
         let id = self.guard.arena_ref_for_module_id(module_id);
 
@@ -164,19 +162,74 @@ impl<'guard, 'ctx> Loader<'guard, 'ctx> {
             None => self.load_module(read_set, gas_meter, id)?,
         };
 
-        // If cache hit, all we need to do is to charge gas for function's
-        // mandatory dependencies.
-        let slot = module.get_function_slot(func_name)?;
-        if let Some(loaded) = slot.get() {
-            self.charge_non_read_set_slots(read_set, gas_meter, &loaded.mandatory_dependencies)?;
-            return Ok(loaded.function);
+        // Non-generic call.
+        if ty_args.is_empty() {
+            let slot = module.get_function_slot(func_name)?;
+            if let Some(loaded) = slot.get() {
+                self.charge_non_read_set_slots(
+                    read_set,
+                    gas_meter,
+                    &loaded.mandatory_dependencies,
+                )?;
+                return Ok(loaded.function);
+            }
+            let (function, function_ms) = self.lower_function_with_ty_args(
+                read_set,
+                gas_meter,
+                module,
+                func_name,
+                EMPTY_TYPE_LIST,
+            )?;
+            if let Err(loser) = slot.set(FunctionSlot::new(function, function_ms)) {
+                // SAFETY: There are no aliases and this is a unique pointer
+                // because it lost the race: safe to free.
+                unsafe { loser.function.free_unchecked() };
+            }
+            return slot
+                .get()
+                .ok_or_else(|| anyhow!("Function slot has just been set"))
+                .map(|f| f.function);
         }
 
-        // Cache miss - this function has not been lowered yet. We need to
-        // compute its mandatory set.
+        // Otherwise this function is generic. Need to lookup in a separate
+        // cache. The hot path performs a single hashtable lookup (and a
+        // single lock acquisition) and returns. On the rare cache miss we
+        // run the lowering pipeline without the lock held, then take the
+        // lock a second time to publish the result. Splitting the read and
+        // the install keeps the lock window short for the common hit case
+        // and avoids holding it across lowering work.
+        if let Some((function, function_ms)) =
+            module.get_instantiated_function_ptr(func_name, ty_args)
+        {
+            self.charge_non_read_set_slots(read_set, gas_meter, &function_ms)?;
+            return Ok(function);
+        }
+
+        // Cache miss: monomorphize & lower, charging gas.
+        let (function, function_ms) =
+            self.lower_function_with_ty_args(read_set, gas_meter, module, func_name, ty_args)?;
+        Ok(module.set_instantiated_function(func_name, ty_args, function, function_ms))
+    }
+
+    /// Runs the lowering pipeline for a single function with the given
+    /// substitution table. Returns a fresh `FunctionSlot` containing the
+    /// lowered code and its mandatory-dependency set.
+    fn lower_function_with_ty_args(
+        &self,
+        read_set: &mut ModuleReadSet<'guard>,
+        gas_meter: &mut impl GasMeter,
+        module: &LoadedModule,
+        func_name: InternedIdentifier,
+        ty_args: InternedTypeList,
+    ) -> anyhow::Result<(Function, Arc<[LoadedModuleSlot]>)> {
         let func_ir = module.get_function_ir(func_name)?;
         let mut loading_ctx = LoweringContext::new(self, read_set);
-        try_set_lowering_requirements_for_function(&mut loading_ctx, module.ir(), func_ir)?;
+        try_set_lowering_requirements_for_function(
+            &mut loading_ctx,
+            module.ir(),
+            func_ir,
+            ty_args,
+        )?;
 
         let parent_ms_ids = module
             .mandatory_dependencies()
@@ -187,25 +240,14 @@ impl<'guard, 'ctx> Loader<'guard, 'ctx> {
         loading_ctx
             .discovered
             .retain(|slot| !parent_ms_ids.contains(&self.module_slot(slot).id()));
-        let function_ms = loading_ctx.discovered;
+        let function_ms = Arc::<[LoadedModuleSlot]>::from(loading_ctx.discovered);
 
-        // Meter MS(f) post-walk. Modules are already in the read-set as
-        // `Loaded { ms_walked: false }` (placed there by the walker);
-        // just bill cost.
         self.record_loaded_and_charge_slots(read_set, gas_meter, &function_ms, |_, _| {
             bail!("All modules are in the read-set");
         })?;
 
-        let function = try_lower_function(module.ir(), func_ir)?;
-        if let Err(loser) = slot.set(FunctionSlot::new(function, function_ms)) {
-            // Another thread set the slot first. Free our box and keep
-            // the canonical entry.
-            unsafe { loser.function.free_unchecked() };
-        };
-
-        slot.get()
-            .ok_or_else(|| anyhow!("Function slot has just been set"))
-            .map(|slot| slot.function)
+        let function = try_lower_function(module.ir(), func_ir, ty_args, self.guard)?;
+        Ok((function, function_ms))
     }
 }
 
@@ -220,7 +262,7 @@ impl<'guard, 'ctx> Loader<'guard, 'ctx> {
         &self,
         read_set: &mut ModuleReadSet<'guard>,
         gas_meter: &mut impl GasMeter,
-        id: ArenaRef<'guard, ExecutableId>,
+        id: ArenaRef<'guard, ModuleId>,
     ) -> anyhow::Result<&'guard LoadedModule> {
         read_set.record_pending_loading(id)?;
         let module = match self.guard.get_module(id) {
@@ -242,7 +284,7 @@ impl<'guard, 'ctx> Loader<'guard, 'ctx> {
         &self,
         read_set: &mut ModuleReadSet<'guard>,
         gas_meter: &mut impl GasMeter,
-        id: ArenaRef<'guard, ExecutableId>,
+        id: ArenaRef<'guard, ModuleId>,
     ) -> anyhow::Result<&'guard LoadedModule> {
         let package = match self.guard.get_module(id) {
             Some(module) => module.mandatory_dependencies().clone(),
@@ -300,7 +342,7 @@ impl<'guard, 'ctx> Loader<'guard, 'ctx> {
     /// been loaded.
     fn build_mandatory_dependencies_for_id(
         &self,
-        id: ArenaRef<'guard, ExecutableId>,
+        id: ArenaRef<'guard, ModuleId>,
     ) -> anyhow::Result<ModuleMandatoryDependencies> {
         match &self.policy {
             LoadingPolicy::Lazy(_) => Ok(ModuleMandatoryDependencies::lazy_unset()),
@@ -329,7 +371,7 @@ impl<'guard, 'ctx> Loader<'guard, 'ctx> {
         &self,
         read_set: &mut ModuleReadSet<'guard>,
         gas_meter: &mut impl GasMeter,
-        id: ArenaRef<'guard, ExecutableId>,
+        id: ArenaRef<'guard, ModuleId>,
     ) -> anyhow::Result<&'guard LoadedModule> {
         let module = match self.guard.get_module(id) {
             None => {
@@ -366,7 +408,7 @@ impl<'guard, 'ctx> Loader<'guard, 'ctx> {
         &self,
         read_set: &mut ModuleReadSet<'guard>,
         gas_meter: &mut impl GasMeter,
-        id: ArenaRef<'guard, ExecutableId>,
+        id: ArenaRef<'guard, ModuleId>,
         module: &'guard LoadedModule,
     ) -> anyhow::Result<()> {
         match &self.policy {
@@ -397,7 +439,7 @@ impl<'guard, 'ctx> Loader<'guard, 'ctx> {
         &self,
         read_set: &mut ModuleReadSet<'guard>,
         gas_meter: &mut impl GasMeter,
-        id: ArenaRef<'guard, ExecutableId>,
+        id: ArenaRef<'guard, ModuleId>,
         module: &'guard LoadedModule,
     ) -> anyhow::Result<()> {
         let slots = module
@@ -423,7 +465,7 @@ impl<'guard, 'ctx> Loader<'guard, 'ctx> {
         &self,
         read_set: &mut ModuleReadSet<'guard>,
         gas_meter: &mut impl GasMeter,
-        id: ArenaRef<'guard, ExecutableId>,
+        id: ArenaRef<'guard, ModuleId>,
         module: &'guard LoadedModule,
     ) -> anyhow::Result<()> {
         let mut walker = LoweringContext::new(self, read_set);
@@ -459,7 +501,7 @@ impl<'guard, 'ctx> Loader<'guard, 'ctx> {
     /// it alongside its deterministic cost (byte length).
     fn get_verified_module_from_storage(
         &self,
-        id: ArenaRef<'guard, ExecutableId>,
+        id: ArenaRef<'guard, ModuleId>,
     ) -> anyhow::Result<(ModuleIR, u64)> {
         let bytes = self
             .module_provider
@@ -488,7 +530,7 @@ impl<'guard, 'ctx> Loader<'guard, 'ctx> {
     /// module reference.
     fn build_and_insert_module_ir(
         &self,
-        id: ArenaRef<'guard, ExecutableId>,
+        id: ArenaRef<'guard, ModuleId>,
         deps: ModuleMandatoryDependencies,
     ) -> anyhow::Result<&'guard LoadedModule> {
         let (module_ir, cost) = self.get_verified_module_from_storage(id)?;
@@ -631,5 +673,13 @@ impl SpecializerContext for LoweringContext<'_, '_, '_> {
         self.loader
             .guard
             .set_nominal_layout(ty, size, align, fields)
+    }
+
+    fn subst_type(
+        &self,
+        ty: InternedType,
+        ty_args: InternedTypeList,
+    ) -> anyhow::Result<InternedType> {
+        self.loader.guard.subst_type(ty, ty_args)
     }
 }

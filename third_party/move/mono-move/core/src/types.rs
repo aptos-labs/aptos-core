@@ -19,7 +19,6 @@
 //! Type parameters are interned and allocated in arena as [`GlobalArenaPtr`].
 //! During type substitution, pointers are replaced, and the whole type is re-
 //! canonicalized.
-//! TODO: This is currently not supported.
 //!
 //! ## Vectors
 //!

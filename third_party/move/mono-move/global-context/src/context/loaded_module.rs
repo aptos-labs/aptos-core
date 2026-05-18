@@ -9,9 +9,11 @@ use anyhow::{anyhow, bail};
 use mono_move_alloc::{LeakedBoxPtr, VersionedLeakedBoxPtr};
 use mono_move_core::{
     interner::{InternedIdentifier, InternedModuleId},
+    types::InternedTypeList,
     Function, FunctionPtr,
 };
-use shared_dsa::UnorderedMap;
+use parking_lot::Mutex;
+use shared_dsa::{Entry, UnorderedMap};
 use specializer::{FunctionIR, ModuleIR};
 use std::sync::{Arc, OnceLock};
 
@@ -116,13 +118,13 @@ impl ModuleMandatoryDependencies {
 
 pub struct FunctionSlot {
     pub function: FunctionPtr,
-    pub mandatory_dependencies: Vec<LoadedModuleSlot>,
+    pub mandatory_dependencies: Arc<[LoadedModuleSlot]>,
 }
 
 impl FunctionSlot {
     /// Returns a new slot owning the monomorphic function with its mandatory
     /// dependencies.
-    pub fn new(function: Function, mandatory_dependencies: Vec<LoadedModuleSlot>) -> Self {
+    pub fn new(function: Function, mandatory_dependencies: Arc<[LoadedModuleSlot]>) -> Self {
         Self {
             function: FunctionPtr::new(Box::new(function)),
             mandatory_dependencies,
@@ -139,10 +141,29 @@ pub struct LoadedModule {
     /// Mandatory-dependency descriptor produced by the loader's policy. These
     /// are all modules that have to be loaded together with this module.
     mandatory_dependencies: ModuleMandatoryDependencies,
-    /// Per-name slot for the lazily lowered monomorphic functions.
+    /// Lowered code for the module's non-generic functions, one slot per
+    /// function name. Filled on first call.
+    ///
+    /// # Invariants
+    ///
+    /// 1. One entry per non-generic function defined in this module.
+    /// 2. Generic functions never appear here — they live in
+    ///    [`Self::instantiated_functions`].
     functions: UnorderedMap<InternedIdentifier, OnceLock<FunctionSlot>>,
     /// Maps function's name to its index in file format (to query its IR).
     function_indices: UnorderedMap<InternedIdentifier, usize>,
+    /// Lowered code for generic functions, one slot per (name, type
+    /// arguments) pair. Filled on first call with that instantiation.
+    ///
+    /// # Invariants
+    ///
+    /// 1. The type argument list in each key is non-empty. Non-generic
+    ///    functions are stored in [`Self::functions`].
+    /// 2. The type arguments are fully concrete — they're the actual
+    ///    runtime types the function was monomorphized for.
+    // TODO: revisit data structure used for actual monomorphized function storage.
+    instantiated_functions:
+        Mutex<UnorderedMap<(InternedIdentifier, InternedTypeList), FunctionSlot>>,
 }
 
 impl LoadedModule {
@@ -172,6 +193,7 @@ impl LoadedModule {
             mandatory_dependencies,
             functions,
             function_indices,
+            instantiated_functions: Mutex::new(UnorderedMap::new()),
         })
     }
 
@@ -227,6 +249,37 @@ impl LoadedModule {
             .and_then(|slot| slot.as_ref())
             .ok_or_else(|| anyhow!("Linker error: function IR missing"))
     }
+
+    /// Returns the function and its mandatory dependencies for the given
+    /// instantiation. If the function has not been monomorphized yet, returns
+    /// [`None`].
+    pub fn get_instantiated_function_ptr(
+        &self,
+        name: InternedIdentifier,
+        ty_args: InternedTypeList,
+    ) -> Option<(FunctionPtr, Arc<[LoadedModuleSlot]>)> {
+        self.instantiated_functions
+            .lock()
+            .get(&(name, ty_args))
+            .map(|f| (f.function, f.mandatory_dependencies.clone()))
+    }
+
+    /// Inserts monomorphized function into instantiation cache, returning the
+    /// pointer to the inserted function. If the slot for the function is
+    /// occupied (concurrent insertion), is a no-op and returns the existing
+    /// pointer.
+    pub fn set_instantiated_function(
+        &self,
+        name: InternedIdentifier,
+        ty_args: InternedTypeList,
+        function: Function,
+        function_ms: Arc<[LoadedModuleSlot]>,
+    ) -> FunctionPtr {
+        match self.instantiated_functions.lock().entry((name, ty_args)) {
+            Entry::Occupied(e) => e.get().function,
+            Entry::Vacant(e) => e.insert(FunctionSlot::new(function, function_ms)).function,
+        }
+    }
 }
 
 impl Drop for LoadedModule {
@@ -249,6 +302,10 @@ impl Drop for LoadedModule {
                 unsafe { slot.function.free_unchecked() };
             }
             false
+        });
+        self.instantiated_functions.lock().for_each_value(|slot| {
+            // SAFETY: see impl-level comment — no aliases at drop time.
+            unsafe { slot.function.free_unchecked() };
         });
     }
 }
