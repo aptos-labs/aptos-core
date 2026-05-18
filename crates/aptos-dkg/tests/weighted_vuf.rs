@@ -25,6 +25,86 @@ fn test_wvuf_basic_viability() {
     weighted_wvuf_bvt::<pvss::das::WeightedTranscript, PinkasWUF>();
 }
 
+/// Boundary case: when every player in the APK vector contributes a share, the
+/// aggregated proof has one entry per APK (`proof.len() == apks.len()`). The
+/// bounds-check preflight in `verify_proof` must accept this configuration.
+///
+/// The crate has two WVUF impls: PinkasWUF (src/weighted_vuf/pinkas/mod.rs) and
+/// BlsWUF (src/weighted_vuf/bls/mod.rs). The bounds check this test exercises
+/// only exists in PinkasWUF — BlsWUF::verify_proof doesn't have one.
+#[test]
+fn test_wvuf_verify_proof_accepts_full_participation() {
+    type T = pvss::das::WeightedTranscript;
+    type WVUF = PinkasWUF;
+
+    let mut rng = thread_rng();
+    let seed = random_scalar(&mut rng);
+    let mut rng = StdRng::from_seed(seed.to_bytes_le());
+
+    let (wc, d, trx) = weighted_pvss::<T>(&mut rng);
+
+    let vuf_pp = <WVUF as WeightedVUF>::PublicParameters::from(&d.pp);
+    let msg = b"some msg";
+
+    // Decrypt each player's `(sk_share, pk_share)` from the PVSS transcript.
+    // Reverse `sks` so the next loop can `pop()` them in player order — moving
+    // out of a `Vec` by index isn't allowed.
+    let (mut sks, pks): (
+        Vec<<WVUF as WeightedVUF>::SecretKeyShare>,
+        Vec<<WVUF as WeightedVUF>::PubKeyShare>,
+    ) = (0..wc.get_total_num_players())
+        .map(|p| trx.decrypt_own_share(&wc, &wc.get_player(p), &d.dks[p]))
+        .collect::<Vec<_>>()
+        .into_iter()
+        .unzip();
+    sks.reverse();
+
+    // Augment each PVSS key pair with the WVUF randomization delta, producing
+    // per-player augmented secret/public key shares (`ASK` / `APK`).
+    let augmented_key_pairs = (0..wc.get_total_num_players())
+        .map(|p| {
+            let sk = sks.pop().unwrap();
+            let pk = pks[p].clone();
+            WVUF::augment_key_pair(&vuf_pp, sk, pk, &mut rng)
+        })
+        .collect::<Vec<_>>();
+
+    // The APK vector that `verify_proof` consumes — one entry per player.
+    let apks = augmented_key_pairs
+        .iter()
+        .map(|(_, apk)| Some(apk.clone()))
+        .collect::<Vec<Option<<WVUF as WeightedVUF>::AugmentedPubKeyShare>>>();
+
+    // Full participation: every player produces a share.
+    let apks_and_proofs = (0..wc.get_total_num_players())
+        .map(|p| {
+            let player = wc.get_player(p);
+            let ask = &augmented_key_pairs[p].0;
+            let apk = augmented_key_pairs[p].1.clone();
+            let proof_share = WVUF::create_share(ask, msg);
+            WVUF::verify_share(&vuf_pp, &apk, msg, &proof_share)
+                .expect("per-share verification should succeed");
+            (player, apk, proof_share)
+        })
+        .collect::<Vec<_>>();
+
+    // `aggregate_shares` produces one `(Player, ProofShare)` per input, so
+    // `proof.len() == apks_and_proofs.len() == apks.len()`.
+    let proof = WVUF::aggregate_shares(&wc, &apks_and_proofs);
+
+    // Load-bearing for future maintainers: if `aggregate_shares` ever changes
+    // shape so this no longer holds, the test stops probing the boundary it
+    // was written for, and this assert fires first.
+    assert_eq!(
+        proof.len(),
+        apks.len(),
+        "boundary precondition: proof must have one entry per APK"
+    );
+
+    WVUF::verify_proof(&vuf_pp, &d.dpk, &apks[..], msg, &proof)
+        .expect("verify_proof must accept the full-participation aggregated proof");
+}
+
 fn weighted_wvuf_bvt<
     T: Transcript<SecretSharingConfig = WeightedConfig>,
     WVUF: WeightedVUF<

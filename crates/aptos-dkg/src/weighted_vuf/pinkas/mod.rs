@@ -217,7 +217,7 @@ impl WeightedVUF for PinkasWUF {
         msg: &[u8],
         proof: &Self::Proof,
     ) -> anyhow::Result<()> {
-        if proof.len() >= apks.len() {
+        if proof.len() > apks.len() {
             bail!("Number of proof shares ({}) exceeds number of APKs ({}) when verifying aggregated WVUF proof", proof.len(), apks.len());
         }
 
