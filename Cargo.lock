@@ -616,6 +616,7 @@ dependencies = [
  "itertools 0.13.0",
  "move-binary-format",
  "move-bytecode-verifier",
+ "move-core-types",
  "num_cpus",
  "once_cell",
  "pin-project 1.1.3",

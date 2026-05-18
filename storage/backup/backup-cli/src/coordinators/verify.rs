@@ -15,12 +15,63 @@ use crate::{
     storage::BackupStorage,
     utils::{unix_timestamp_sec, GlobalRestoreOptions, RestoreRunMode, TrustedWaypointOpt},
 };
-use anyhow::Result;
+use anyhow::{bail, Result};
 use aptos_db::state_restore::StateSnapshotRestoreMode;
 use aptos_executor_types::VerifyExecutionMode;
 use aptos_logger::prelude::*;
-use aptos_types::transaction::Version;
-use std::{path::PathBuf, sync::Arc};
+use aptos_types::{
+    account_address::AccountAddress, contract_event::ContractEvent, transaction::Version,
+};
+use move_core_types::{
+    identifier::Identifier,
+    language_storage::{StructTag, TypeTag},
+};
+use std::{
+    path::PathBuf,
+    str::FromStr,
+    sync::{
+        atomic::{AtomicUsize, Ordering},
+        Arc,
+    },
+};
+
+/// Filter matching `ContractEvent`s whose struct type lives in a given Move module.
+///
+/// Used by `VerifyCoordinator` to count events of interest while walking the
+/// cryptographically verified transaction stream.
+#[derive(Clone, Debug)]
+pub struct EventModuleFilter {
+    pub address: AccountAddress,
+    pub module: Identifier,
+}
+
+impl EventModuleFilter {
+    pub fn matches(&self, ev: &ContractEvent) -> bool {
+        if let TypeTag::Struct(s) = ev.type_tag() {
+            let StructTag {
+                address, module, ..
+            } = s.as_ref();
+            *address == self.address && module == &self.module
+        } else {
+            false
+        }
+    }
+}
+
+impl FromStr for EventModuleFilter {
+    type Err = anyhow::Error;
+
+    /// Parses `<address>::<module>` (e.g. `0x1::confidential_asset`).
+    fn from_str(s: &str) -> Result<Self> {
+        let Some((addr, module)) = s.split_once("::") else {
+            bail!("expected <address>::<module>, got {:?}", s);
+        };
+        Ok(Self {
+            address: AccountAddress::from_str_strict(addr)?,
+            module: Identifier::new(module)?,
+        })
+    }
+}
 
 pub struct VerifyCoordinator {
     storage: Arc<dyn BackupStorage>,
@@ -33,6 +84,8 @@ pub struct VerifyCoordinator {
     skip_epoch_endings: bool,
     validate_modules: bool,
     output_transaction_analysis: Option<PathBuf>,
+    event_filter: Option<EventModuleFilter>,
+    event_match_count: Arc<AtomicUsize>,
 }
 
 impl VerifyCoordinator {
@@ -47,6 +100,7 @@ impl VerifyCoordinator {
         skip_epoch_endings: bool,
         validate_modules: bool,
         output_transaction_analysis: Option<PathBuf>,
+        event_filter: Option<EventModuleFilter>,
     ) -> Result<Self> {
         Ok(Self {
             storage,
@@ -59,7 +113,15 @@ impl VerifyCoordinator {
             skip_epoch_endings,
             validate_modules,
             output_transaction_analysis,
+            event_filter,
+            event_match_count: Arc::new(AtomicUsize::new(0)),
         })
+    }
+
+    /// Handle to the running counter of events matching `event_filter`. Reads
+    /// `0` if no filter was configured. Stable after `run()` returns.
+    pub fn event_match_count_handle(&self) -> Arc<AtomicUsize> {
+        Arc::clone(&self.event_match_count)
     }
 
     pub async fn run(self) -> Result<()> {
@@ -142,7 +204,7 @@ impl VerifyCoordinator {
         }
 
         let txn_manifests = transactions.into_iter().map(|b| b.manifest).collect();
-        TransactionRestoreBatchController::new(
+        let mut controller = TransactionRestoreBatchController::new(
             global_opt,
             self.storage,
             txn_manifests,
@@ -151,9 +213,24 @@ impl VerifyCoordinator {
             epoch_history,
             VerifyExecutionMode::NoVerify,
             self.output_transaction_analysis,
-        )
-        .run()
-        .await?;
+        );
+        if let Some(filter) = self.event_filter.clone() {
+            controller =
+                controller.with_event_counting(filter, Arc::clone(&self.event_match_count));
+        }
+        controller.run().await?;
+
+        if let Some(filter) = &self.event_filter {
+            let count = self.event_match_count.load(Ordering::Relaxed);
+            info!(
+                "Verified events matching {}::{}: {} found in [{}, {}].",
+                filter.address.to_hex_literal(),
+                filter.module,
+                count,
+                self.start_version,
+                self.end_version,
+            );
+        }
 
         Ok(())
     }

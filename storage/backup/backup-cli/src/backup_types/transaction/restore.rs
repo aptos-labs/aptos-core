@@ -9,6 +9,7 @@ use crate::{
             manifest::{TransactionBackup, TransactionChunk, TransactionChunkFormat},
         },
     },
+    coordinators::verify::EventModuleFilter,
     metrics::{
         restore::{TRANSACTION_REPLAY_VERSION, TRANSACTION_SAVE_VERSION},
         verify::VERIFY_TRANSACTION_VERSION,
@@ -54,7 +55,10 @@ use std::{
     cmp::{max, min},
     path::PathBuf,
     pin::Pin,
-    sync::Arc,
+    sync::{
+        atomic::{AtomicUsize, Ordering},
+        Arc,
+    },
     time::Instant,
 };
 use tokio::io::BufReader;
@@ -258,6 +262,8 @@ pub struct TransactionRestoreBatchController {
     verify_execution_mode: VerifyExecutionMode,
     output_transaction_analysis: Option<PathBuf>,
     first_version: Option<Version>,
+    event_filter: Option<EventModuleFilter>,
+    event_match_count: Option<Arc<AtomicUsize>>,
 }
 
 impl TransactionRestoreBatchController {
@@ -280,7 +286,22 @@ impl TransactionRestoreBatchController {
             verify_execution_mode,
             output_transaction_analysis,
             first_version,
+            event_filter: None,
+            event_match_count: None,
         }
+    }
+
+    /// While walking cryptographically verified chunks, increment `counter` once
+    /// for each `ContractEvent` whose struct type matches `filter`. Only takes
+    /// effect on the verify-only path (`go_through_verified_chunks`).
+    pub fn with_event_counting(
+        mut self,
+        filter: EventModuleFilter,
+        counter: Arc<AtomicUsize>,
+    ) -> Self {
+        self.event_filter = Some(filter);
+        self.event_match_count = Some(counter);
+        self
     }
 
     pub async fn run(self) -> Result<()> {
@@ -753,37 +774,51 @@ impl TransactionRestoreBatchController {
             .as_ref()
             .map(|dir| TransactionAnalysis::new(dir))
             .transpose()?;
+        let event_filter = self.event_filter.clone();
+        let event_match_count = self.event_match_count.clone();
         let start = Instant::now();
         loaded_chunk_stream
-            .try_fold(analysis, |mut analysis, chunk| async move {
-                let mut version = chunk.manifest.first_version;
-                let last_version = chunk.manifest.last_version;
+            .try_fold(analysis, |mut analysis, chunk| {
+                let event_filter = event_filter.clone();
+                let event_match_count = event_match_count.clone();
+                async move {
+                    let mut version = chunk.manifest.first_version;
+                    let last_version = chunk.manifest.last_version;
 
-                for (txn, persisted_aux_info, txn_info, events, write_set) in
-                    itertools::multizip(chunk.unpack())
-                {
-                    if let Some(analysis) = &mut analysis {
-                        analysis.add_transaction(
-                            version,
-                            &txn,
-                            &persisted_aux_info,
-                            &txn_info,
-                            &events,
-                            &write_set,
-                        )?;
+                    for (txn, persisted_aux_info, txn_info, events, write_set) in
+                        itertools::multizip(chunk.unpack())
+                    {
+                        if let Some(analysis) = &mut analysis {
+                            analysis.add_transaction(
+                                version,
+                                &txn,
+                                &persisted_aux_info,
+                                &txn_info,
+                                &events,
+                                &write_set,
+                            )?;
+                        }
+                        if let (Some(filter), Some(counter)) =
+                            (event_filter.as_ref(), event_match_count.as_ref())
+                        {
+                            let n = events.iter().filter(|ev| filter.matches(ev)).count();
+                            if n > 0 {
+                                counter.fetch_add(n, Ordering::Relaxed);
+                            }
+                        }
+                        version += 1;
                     }
-                    version += 1;
-                }
 
-                VERIFY_TRANSACTION_VERSION.set(last_version as i64);
-                info!(
-                    version = last_version,
-                    accumulative_tps = ((last_version - first_version + 1) as f64
-                        / start.elapsed().as_secs_f64())
-                        as u64,
-                    "Transactions verified."
-                );
-                Ok(analysis)
+                    VERIFY_TRANSACTION_VERSION.set(last_version as i64);
+                    info!(
+                        version = last_version,
+                        accumulative_tps = ((last_version - first_version + 1) as f64
+                            / start.elapsed().as_secs_f64())
+                            as u64,
+                        "Transactions verified."
+                    );
+                    Ok(analysis)
+                }
             })
             .await?;
         Ok(())

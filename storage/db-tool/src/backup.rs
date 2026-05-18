@@ -11,7 +11,7 @@ use aptos_backup_cli::{
     },
     coordinators::{
         backup::{BackupCoordinator, BackupCoordinatorOpt},
-        verify::VerifyCoordinator,
+        verify::{EventModuleFilter, VerifyCoordinator},
     },
     metadata::{cache, cache::MetadataCacheOpt},
     storage::DBToolStorageOpt,
@@ -163,6 +163,19 @@ pub struct VerifyOpt {
         help = "Optionally, while verifying transactions, output analysis files to specified dir."
     )]
     output_transaction_analysis: Option<PathBuf>,
+    #[clap(
+        long,
+        help = "Count ContractEvents whose struct type lives in the given Move module, e.g. \
+        `0x1::confidential_asset`. Reported (and asserted, if --assert-event-count is set) \
+        only over the cryptographically verified txn range."
+    )]
+    count_events_in_module: Option<EventModuleFilter>,
+    #[clap(
+        long,
+        help = "If set together with --count-events-in-module, exit non-zero unless the \
+        counted total exactly matches this value."
+    )]
+    assert_event_count: Option<usize>,
 }
 
 impl Command {
@@ -235,7 +248,14 @@ impl Command {
                 },
             },
             Command::Verify(opt) => {
-                VerifyCoordinator::new(
+                let assert_count = opt.assert_event_count;
+                let has_filter = opt.count_events_in_module.is_some();
+                if assert_count.is_some() && !has_filter {
+                    anyhow::bail!(
+                        "--assert-event-count requires --count-events-in-module to be set"
+                    );
+                }
+                let coordinator = VerifyCoordinator::new(
                     opt.storage.init_storage().await?,
                     opt.metadata_cache_opt,
                     opt.trusted_waypoints_opt,
@@ -246,9 +266,20 @@ impl Command {
                     opt.skip_epoch_endings,
                     opt.validate_modules,
                     opt.output_transaction_analysis,
-                )?
-                .run()
-                .await?
+                    opt.count_events_in_module,
+                )?;
+                let count_handle = coordinator.event_match_count_handle();
+                coordinator.run().await?;
+                if let Some(expected) = assert_count {
+                    let actual = count_handle.load(std::sync::atomic::Ordering::Relaxed);
+                    anyhow::ensure!(
+                        actual == expected,
+                        "Event count mismatch: counted {} events matching the filter, \
+                         expected {}.",
+                        actual,
+                        expected,
+                    );
+                }
             },
         }
         Ok(())
