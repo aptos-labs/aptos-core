@@ -208,6 +208,11 @@ The seven `ExecutionErrorKind` variants, with the rough class of internal errors
 
 `InvariantViolation` is operationally distinct from the rest: it indicates a VM bug, not a program bug. Production deployments should alert on it; users should never see it surface as a transaction failure with diagnostic detail. Keeping it as a category (rather than panicking) lets the orchestrator translate the transaction outcome cleanly without unwinding. These can also be raised speculatively (e.g. from a parallel re-execution that read inconsistent state), so alerts should fire only on non-speculative failures.
 
+Note: speculative aborts should be folded into this same handling.
+Block-STM today sees a speculative abort and early-halts execution (or waits).
+Conceptually it can do the same on every `InvariantViolation`: we do not have a consistent way to say *this violation can only be speculative*, *this may or may not be speculative*, or *this can only happen due to a bug and never due to speculation*.
+So ideally any such violation is an early-halt / wait signal, with alerting gated on whether the failure ultimately commits.
+
 `Aborted` is *not* in this list because it lives at the `ExecutionResult` level (§6), not inside `ExecutionError`.
 
 ---
