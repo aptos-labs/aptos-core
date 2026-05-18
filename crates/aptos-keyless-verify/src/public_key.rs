@@ -13,7 +13,11 @@ use serde::{Deserialize, Deserializer, Serialize, Serializer};
 /// a keyless account address. Length is fixed to
 /// `poseidon_bn254::BYTES_PACKED_PER_SCALAR`.
 #[derive(Clone, Debug, Eq, PartialEq, Hash)]
-pub struct Pepper(pub(crate) [u8; Pepper::NUM_BYTES]);
+#[cfg_attr(feature = "fuzzing", derive(arbitrary::Arbitrary))]
+// Inner byte array is `pub` so callers can construct test fixtures or
+// build small mutations without going through the newtype constructor.
+// Length is enforced by the type; that's the only invariant.
+pub struct Pepper(pub [u8; Pepper::NUM_BYTES]);
 
 impl Pepper {
     /// 31 bytes — one BN254 scalar packs at most 31 bytes.

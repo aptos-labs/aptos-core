@@ -401,6 +401,7 @@ aptos-jemalloc = { path = "crates/aptos-jemalloc" }
 aptos-jwk-consensus = { path = "crates/aptos-jwk-consensus" }
 aptos-jwk-utils = { path = "crates/jwk-utils" }
 aptos-keygen = { path = "crates/aptos-keygen" }
+aptos-keyless-verify = { path = "crates/aptos-keyless-verify" }
 aptos-language-e2e-tests = { path = "aptos-move/e2e-tests" }
 aptos-ledger = { path = "crates/aptos-ledger" }
 aptos-localnet = { path = "crates/aptos-localnet" }

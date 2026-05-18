@@ -21,6 +21,7 @@ rust-version = { workspace = true }
 # wire-compatible basis. See README for the migration plan in aptos-types.
 [dependencies]
 anyhow = { workspace = true }
+arbitrary = { workspace = true, optional = true }
 ark-bn254 = { workspace = true }
 ark-ec = { workspace = true }
 ark-ff = { workspace = true }
@@ -47,6 +48,10 @@ thiserror = { workspace = true }
 
 [features]
 default = []
+# Used by `aptos-types` (and other aptos-core internal consumers) to opt into
+# `arbitrary::Arbitrary` derives for fuzzing. Downstream off-chain consumers
+# leave this feature off and don't pull in `arbitrary`.
+fuzzing = ["dep:arbitrary"]
 # Exports SAMPLE_* test fixtures (test JWT, ephemeral SK, Groth16 proof) for
 # downstream consumers that want to integration-test their own keyless code.
 test-utils = ["dep:rsa"]

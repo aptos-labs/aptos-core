@@ -27,7 +27,7 @@ use move_core_types::{
     move_resource::{MoveResource, MoveStructType},
 };
 use once_cell::sync::Lazy;
-use serde::{de::DeserializeOwned, Deserialize, Deserializer, Serialize, Serializer};
+use serde::{de::DeserializeOwned, Deserialize, Serialize};
 use std::{
     collections::BTreeMap,
     str,
@@ -46,6 +46,11 @@ pub mod test_utils;
 mod zkp_sig;
 
 use crate::state_store::StateView;
+// Re-exports from `aptos-keyless-verify`, the canonical home of the keyless
+// wire types. Existing callers can keep using `aptos_types::keyless::Pepper`
+// etc. unchanged.
+pub use aptos_keyless_verify::Pepper;
+
 pub use bn254_circom::{
     g1_projective_str_to_affine, g2_projective_str_to_affine, get_public_inputs_hash, G1Bytes,
     G2Bytes, G1_PROJECTIVE_COMPRESSED_NUM_BYTES, G2_PROJECTIVE_COMPRESSED_NUM_BYTES,
@@ -212,77 +217,9 @@ impl KeylessSignature {
     }
 }
 
-/// The pepper is used to create a _hiding_ identity commitment (IDC) when deriving a keyless address.
-/// We fix its size at `poseidon_bn254::keyless::BYTES_PACKED_PER_SCALAR` to avoid extra hashing work when
-/// computing the public inputs hash.
-///
-/// This value should **NOT* be changed since on-chain addresses are based on it (e.g.,
-/// hashing with a larger pepper would lead to a different address).
-#[derive(Clone, Debug, Eq, PartialEq, Hash)]
-#[cfg_attr(feature = "fuzzing", derive(arbitrary::Arbitrary))]
-pub struct Pepper(pub(crate) [u8; poseidon_bn254::keyless::BYTES_PACKED_PER_SCALAR]);
-
-impl Pepper {
-    pub const NUM_BYTES: usize = poseidon_bn254::keyless::BYTES_PACKED_PER_SCALAR;
-
-    pub fn new(bytes: [u8; Self::NUM_BYTES]) -> Self {
-        Self(bytes)
-    }
-
-    pub fn to_bytes(&self) -> &[u8; Self::NUM_BYTES] {
-        &self.0
-    }
-
-    // Used for testing. #[cfg(test)] doesn't seem to allow for use in smoke tests.
-    pub fn from_number(num: u128) -> Self {
-        let big_int = num_bigint::BigUint::from(num);
-        let bytes: Vec<u8> = big_int.to_bytes_le();
-        let mut extended_bytes = [0u8; Self::NUM_BYTES];
-        extended_bytes[..bytes.len()].copy_from_slice(&bytes);
-        Self(extended_bytes)
-    }
-}
-
-impl<'de> Deserialize<'de> for Pepper {
-    fn deserialize<D>(deserializer: D) -> std::result::Result<Self, D::Error>
-    where
-        D: Deserializer<'de>,
-    {
-        if deserializer.is_human_readable() {
-            let s = <String>::deserialize(deserializer)?;
-            let bytes = hex::decode(s)
-                .map_err(serde::de::Error::custom)?
-                .try_into()
-                .map_err(|e| serde::de::Error::custom(format!("{:?}", e)))?;
-
-            Ok(Pepper::new(bytes))
-        } else {
-            // In order to preserve the Serde data model and help analysis tools,
-            // make sure to wrap our value in a container with the same name
-            // as the original type.
-            #[derive(::serde::Deserialize)]
-            #[serde(rename = "Pepper")]
-            struct Value([u8; Pepper::NUM_BYTES]);
-
-            let value = Value::deserialize(deserializer)?;
-            Ok(Pepper::new(value.0))
-        }
-    }
-}
-
-impl Serialize for Pepper {
-    fn serialize<S>(&self, serializer: S) -> std::result::Result<S::Ok, S::Error>
-    where
-        S: Serializer,
-    {
-        if serializer.is_human_readable() {
-            hex::encode(self.0).serialize(serializer)
-        } else {
-            // See comment in deserialize.
-            serializer.serialize_newtype_struct("Pepper", &self.0)
-        }
-    }
-}
+// `Pepper` has been moved to the `aptos-keyless-verify` crate. We re-export
+// it here so existing callers (e.g. `aptos_types::keyless::Pepper`) keep
+// working unchanged. See `pub use` near the top of this module.
 
 #[derive(Clone, Debug, Eq, PartialEq, Hash, Serialize, Deserialize)]
 #[cfg_attr(feature = "fuzzing", derive(arbitrary::Arbitrary))]
