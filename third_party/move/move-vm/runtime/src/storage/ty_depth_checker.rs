@@ -197,7 +197,8 @@ where
                     .collect::<PartialVMResult<Vec<_>>>()?;
 
                 let formula = visit_struct!(idx);
-                check_depth!(formula.solve(&ty_arg_depths)?)
+                let depth = formula.solve(&ty_arg_depths)?;
+                check_depth!(depth)
             },
             Type::TyParam(_) => {
                 return Err(
