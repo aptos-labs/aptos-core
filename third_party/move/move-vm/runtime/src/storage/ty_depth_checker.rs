@@ -179,8 +179,7 @@ where
             )?,
             Type::Struct { idx, .. } => {
                 let formula = visit_struct!(idx);
-                let depth = formula.solve(&[])?;
-                check_depth!(depth)
+                check_depth!(formula.solve(&[]))
             },
             Type::StructInstantiation { idx, ty_args, .. } => {
                 let ty_arg_depths = ty_args
@@ -197,8 +196,7 @@ where
                     .collect::<PartialVMResult<Vec<_>>>()?;
 
                 let formula = visit_struct!(idx);
-                let depth = formula.solve(&ty_arg_depths)?;
-                check_depth!(depth)
+                check_depth!(formula.solve(&ty_arg_depths))
             },
             Type::TyParam(_) => {
                 return Err(
