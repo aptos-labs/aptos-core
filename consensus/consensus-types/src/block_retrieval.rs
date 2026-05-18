@@ -268,14 +268,14 @@ impl BlockRetrievalResponse {
         self.blocks
             .iter()
             .try_fold(retrieval_request.block_id(), |expected_id, block| {
-                block.validate_signature(sig_verifier)?;
-                block.verify_well_formed()?;
                 ensure!(
                     block.id() == expected_id,
                     "blocks doesn't form a chain: expect {}, get {}",
                     expected_id,
                     block.id()
                 );
+                block.validate_signature(sig_verifier)?;
+                block.verify_well_formed()?;
                 Ok(block.parent_id())
             })
             .map(|_| ())
@@ -301,5 +301,52 @@ impl fmt::Display for BlockRetrievalResponse {
             },
             _ => write!(f, "[BlockRetrievalResponse: status: {:?}]", self.status()),
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::{
+        block::{block_test_utils::certificate_for_genesis, Block},
+        common::Payload,
+    };
+    use aptos_types::{
+        validator_signer::ValidatorSigner, validator_verifier::random_validator_verifier,
+    };
+
+    /// The chain check (`block.id() == expected_id`, one hash compare) must run
+    /// before BLS signature verification (CPU-heavy). Otherwise a peer can stuff
+    /// unrelated blocks into a retrieval response and force the receiver to spend
+    /// BLS work on blocks that the cheap check would have rejected anyway.
+    #[test]
+    fn verify_rejects_chain_mismatch_before_signature_work() {
+        let outsider = ValidatorSigner::random(None);
+        let qc = certificate_for_genesis();
+        let block = Block::new_proposal(
+            Payload::empty(false, true),
+            1,
+            aptos_infallible::duration_since_epoch().as_micros() as u64,
+            qc,
+            &outsider,
+            Vec::new(),
+        )
+        .unwrap();
+
+        let expected_id = HashValue::zero();
+        assert_ne!(expected_id, block.id());
+
+        let (_signers, verifier) = random_validator_verifier(1, None, false);
+
+        let req = BlockRetrievalRequest::V1(BlockRetrievalRequestV1::new(expected_id, 1));
+        let response =
+            BlockRetrievalResponse::new(BlockRetrievalStatus::Succeeded, vec![block]);
+
+        let err = response.verify(req, &verifier).unwrap_err();
+        let msg = format!("{err:#}");
+        assert!(
+            msg.contains("doesn't form a chain"),
+            "chain-mismatch must be detected before signature validation; got: {msg}"
+        );
     }
 }

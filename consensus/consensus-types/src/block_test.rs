@@ -314,3 +314,22 @@ fn test_failed_authors_well_formed() {
         .verify_well_formed()
         .is_err());
 }
+
+/// `verify_well_formed` must not panic on a nil block whose round is at u64::MAX:
+/// `self.round() + u64::from(self.is_nil_block())` would otherwise overflow.
+#[test]
+fn test_nil_block_at_max_round_does_not_panic() {
+    let qc = certificate_for_genesis();
+    let nil = Block::new_nil(u64::MAX, qc, vec![]);
+    let result = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
+        nil.verify_well_formed()
+    }));
+    assert!(
+        result.is_ok(),
+        "verify_well_formed must not panic on extreme rounds"
+    );
+    assert!(
+        result.unwrap().is_err(),
+        "verify_well_formed must reject a nil block at u64::MAX"
+    );
+}
