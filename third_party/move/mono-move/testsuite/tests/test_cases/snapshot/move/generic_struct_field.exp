@@ -46,4 +46,4 @@ fun make_u64(r0): Box<u64> {
 
 fun get_u64(): skipped (lowering: instruction ReadFieldGeneric not yet lowered)
 
-fun make_u64(): skipped (not all types are concrete)
+fun make_u64(): skipped (lowering: instruction PackGeneric not yet lowered)

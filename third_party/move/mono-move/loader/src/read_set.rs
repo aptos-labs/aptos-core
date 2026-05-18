@@ -1,11 +1,11 @@
 // Copyright (c) Aptos Foundation
 // Licensed pursuant to the Innovation-Enabling Source Code License, available at https://github.com/aptos-labs/aptos-core/blob/main/LICENSE
 
-//! Per-transaction set of executables recorded by the loader, pinning one
+//! Per-transaction set of modules recorded by the loader, pinning one
 //! version per module for the duration of the transaction.
 
 use anyhow::{bail, Result};
-use mono_move_core::ExecutableId;
+use mono_move_core::ModuleId;
 use mono_move_global_context::{ArenaRef, LoadedModule};
 use shared_dsa::UnorderedMap;
 
@@ -62,11 +62,11 @@ impl<'guard> ModuleRead<'guard> {
     }
 }
 
-/// Maps from executable ID to the version the transaction is using for the
+/// Maps from module ID to the version the transaction is using for the
 /// duration of this transaction.
 #[derive(Default)]
 pub struct ModuleReadSet<'guard> {
-    inner: UnorderedMap<ArenaRef<'guard, ExecutableId>, ModuleRead<'guard>>,
+    inner: UnorderedMap<ArenaRef<'guard, ModuleId>, ModuleRead<'guard>>,
 }
 
 impl<'guard> ModuleReadSet<'guard> {
@@ -78,13 +78,13 @@ impl<'guard> ModuleReadSet<'guard> {
     }
 
     /// Returns the recorded read, or [`None`] if absent.
-    pub fn get(&self, id: ArenaRef<'guard, ExecutableId>) -> Option<ModuleRead<'guard>> {
+    pub fn get(&self, id: ArenaRef<'guard, ModuleId>) -> Option<ModuleRead<'guard>> {
         self.inner.get(&id).copied()
     }
 
     /// Records a module that is about to be loaded. Used so a load that fails
     /// due to deserialization / verification still leaves the read in the set.
-    pub fn record_pending_loading(&mut self, id: ArenaRef<'guard, ExecutableId>) -> Result<()> {
+    pub fn record_pending_loading(&mut self, id: ArenaRef<'guard, ModuleId>) -> Result<()> {
         if self.inner.insert(id, ModuleRead::Pending).is_some() {
             bail!("Invariant violated: there should be no entry when marked as pending")
         }
@@ -94,7 +94,7 @@ impl<'guard> ModuleReadSet<'guard> {
     /// Records loaded module in the read-set as unmetered.
     pub fn record_unmetered(
         &mut self,
-        id: ArenaRef<'guard, ExecutableId>,
+        id: ArenaRef<'guard, ModuleId>,
         module: &'guard LoadedModule,
     ) -> Result<()> {
         let read = ModuleRead::Loaded {
@@ -111,7 +111,7 @@ impl<'guard> ModuleReadSet<'guard> {
     /// Records loaded module in the read-set as metered.
     pub fn record_metered(
         &mut self,
-        id: ArenaRef<'guard, ExecutableId>,
+        id: ArenaRef<'guard, ModuleId>,
         module: &'guard LoadedModule,
     ) -> Result<()> {
         let read = ModuleRead::Loaded {
@@ -129,7 +129,7 @@ impl<'guard> ModuleReadSet<'guard> {
     /// are ready for lowering (i.e., its mandatory dependency is known).
     pub fn record_ready_for_lowering(
         &mut self,
-        id: ArenaRef<'guard, ExecutableId>,
+        id: ArenaRef<'guard, ModuleId>,
         module: &'guard LoadedModule,
     ) -> Result<()> {
         match self.inner.get(&id) {
@@ -146,7 +146,7 @@ impl<'guard> ModuleReadSet<'guard> {
     }
 
     /// Transitions an existing loaded module from unmetered to metered state.
-    pub fn mark_metered(&mut self, id: ArenaRef<'guard, ExecutableId>) -> Result<()> {
+    pub fn mark_metered(&mut self, id: ArenaRef<'guard, ModuleId>) -> Result<()> {
         match self.inner.get_mut(&id) {
             Some(ModuleRead::Loaded { state, .. }) => match state {
                 ModuleState::Unmetered => {
@@ -163,7 +163,7 @@ impl<'guard> ModuleReadSet<'guard> {
 
     /// Records that existing loaded module has satisfied the lowering
     /// requirements (i.e., its mandatory dependency set has been computed).
-    pub fn mark_ready_for_lowering(&mut self, id: ArenaRef<'guard, ExecutableId>) -> Result<()> {
+    pub fn mark_ready_for_lowering(&mut self, id: ArenaRef<'guard, ModuleId>) -> Result<()> {
         match self.inner.get_mut(&id) {
             Some(ModuleRead::Loaded { state, .. }) => match state {
                 ModuleState::Unmetered => bail!("Module must be metered"),

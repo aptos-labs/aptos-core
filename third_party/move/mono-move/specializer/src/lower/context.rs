@@ -14,9 +14,12 @@ use anyhow::{anyhow, bail, Result};
 use mono_move_core::{
     align_up_u32,
     interner::{InternedIdentifier, InternedModuleId},
-    types::{view_name, view_type, Alignment, FieldLayout, InternedType, Size, Type},
-    Code, FieldTypes, FrameLayoutInfo, FrameOffset, Function, MicroOp, MicroOpGasSchedule,
-    SortedSafePointEntries, FRAME_METADATA_SIZE,
+    types::{
+        view_name, view_type, view_type_list, Alignment, FieldLayout, InternedType,
+        InternedTypeList, Size, Type, EMPTY_TYPE_LIST,
+    },
+    Code, FieldTypes, FrameLayoutInfo, FrameOffset, Function, Interner, MicroOp,
+    MicroOpGasSchedule, SortedSafePointEntries, FRAME_METADATA_SIZE,
 };
 use mono_move_gas::GasInstrumentor;
 use move_binary_format::access::ModuleAccess;
@@ -79,6 +82,8 @@ pub struct CallSiteInfo {
     pub callee_func_name: InternedIdentifier,
     pub arg_slots: Vec<TypedSlot>,
     pub ret_slots: Vec<TypedSlot>,
+    /// Empty for non-generic calls.
+    pub ty_args: InternedTypeList,
 }
 
 /// Frame layout for one function.
@@ -116,6 +121,8 @@ pub struct LoweringContext {
 pub fn try_build_context(
     module_ir: &ModuleIR,
     func_ir: &FunctionIR,
+    ty_args: InternedTypeList,
+    interner: &impl Interner,
 ) -> Result<Option<LoweringContext>> {
     // 1. Compute home slot layout with natural alignment padding.
     //
@@ -126,7 +133,16 @@ pub fn try_build_context(
     // TODO: consider a smarter packing (e.g. sort by descending
     // alignment, or bin-pack smaller slots into padding holes) to
     // shrink frame size.
-    let Some(home_slots) = layout_slots(0, &func_ir.home_slot_types) else {
+    // TODO: Expose a substitution API that takes and returns non-canonicalized
+    // slices of `InternedType`. Today `subst_type_list` operates on
+    // `InternedTypeList`, so we have to round-trip `func_ir.home_slot_types`
+    // through `type_list_of` to intern it just so substitution accepts it.
+    // The intermediate list is only used to feed substitution and then
+    // immediately viewed back as a slice via `view_type_list`, so the
+    // canonicalization step is pure overhead for this caller.
+    let home_list = interner.type_list_of(&func_ir.home_slot_types);
+    let home_list = interner.subst_type_list(home_list, ty_args)?;
+    let Some(home_slots) = layout_slots(0, view_type_list(home_list)) else {
         return Ok(None);
     };
     check_supported_alignment(&home_slots, |s| s.align, "home slot")?;
@@ -141,8 +157,10 @@ pub fn try_build_context(
 
     // 2. Build `return_slots` from this function's own signature.
     let own_handle = module_ir.module.function_handle_at(func_ir.handle_idx);
-    let own_ret_types = module_ir.module.interned_types_at(own_handle.return_);
-    let Some(return_slots) = layout_slots(0, own_ret_types) else {
+    let own_ret_list =
+        interner.type_list_of(module_ir.module.interned_types_at(own_handle.return_));
+    let own_ret_list = interner.subst_type_list(own_ret_list, ty_args)?;
+    let Some(return_slots) = layout_slots(0, view_type_list(own_ret_list)) else {
         return Ok(None);
     };
     check_supported_alignment(&return_slots, |s| s.align, "return slot")?;
@@ -196,16 +214,24 @@ pub fn try_build_context(
     let callee_base = frame_data_size + FRAME_METADATA_SIZE as u32;
     let mut call_sites = Vec::new();
     for instr in func_ir.instrs() {
-        let callee_handle = match instr {
-            Instr::Call(_, idx, _) => module_ir.module.function_handle_at(*idx),
+        let (handle_idx, param_list, ret_list, call_ty_args) = match instr {
+            Instr::Call(_, idx, _) => {
+                let sig = module_ir.module.function_signature_at(*idx);
+                (*idx, sig.params, sig.returns, EMPTY_TYPE_LIST)
+            },
             Instr::CallGeneric(_, idx, _) => {
                 let inst = module_ir.module.function_instantiation_at(*idx);
-                module_ir.module.function_handle_at(inst.handle)
+                let sig = module_ir.module.function_instantiation_signature_at(*idx);
+                let params = interner.subst_type_list(sig.params, ty_args)?;
+                let returns = interner.subst_type_list(sig.returns, ty_args)?;
+                let call_ty_args = interner.subst_type_list(sig.ty_args, ty_args)?;
+                (inst.handle, params, returns, call_ty_args)
             },
             _ => continue,
         };
-        let param_types = module_ir.module.interned_types_at(callee_handle.parameters);
-        let ret_types = module_ir.module.interned_types_at(callee_handle.return_);
+
+        let param_types = view_type_list(param_list);
+        let ret_types = view_type_list(ret_list);
         let Some(arg_slots) = layout_typed_slots_contiguously(callee_base, param_types) else {
             return Ok(None);
         };
@@ -215,6 +241,7 @@ pub fn try_build_context(
         check_supported_alignment(&arg_slots, |s| s.slot.align, "callee arg")?;
         check_supported_alignment(&ret_slots, |s| s.slot.align, "callee ret")?;
 
+        let callee_handle = module_ir.module.function_handle_at(handle_idx);
         let callee_module_id = module_ir.module.module_id_at(callee_handle.module);
         let callee_func_name = module_ir.module.interned_identifier_at(callee_handle.name);
         call_sites.push(CallSiteInfo {
@@ -222,6 +249,7 @@ pub fn try_build_context(
             callee_func_name,
             arg_slots,
             ret_slots,
+            ty_args: call_ty_args,
         });
     }
 
@@ -293,13 +321,31 @@ pub trait SpecializerContext {
         align: u32,
         fields: Option<&[FieldLayout]>,
     ) -> Result<()>;
+
+    /// Substitutes type parameters in the given type using type arguments as
+    /// the substitution (indexed by indices in type param nodes). Returns an
+    /// error if substitution fails.
+    ///
+    /// # Invariants
+    ///
+    /// 1. Every type as index `i` in type argument list corresponds to type
+    ///    parameter `i` in the generic type.
+    /// 2. Size of the type argument list can be greater than the largest type
+    ///    parameter `i` in the generic type. It should never be smaller. If
+    ///    so, then substitution fails.
+    fn subst_type(&self, ty: InternedType, ty_args: InternedTypeList) -> Result<InternedType>;
 }
 
 /// Attempts to lower a function, and returns an error if lowering failed. The
 /// caller must ensure this is not the case by ensuring that all lowering
 /// requirements are satisfied (e.g., type sizes known).
-pub fn try_lower_function(module_ir: &ModuleIR, func_ir: &FunctionIR) -> Result<Function> {
-    let ctx = try_build_context(module_ir, func_ir)?
+pub fn try_lower_function(
+    module_ir: &ModuleIR,
+    func_ir: &FunctionIR,
+    ty_args: InternedTypeList,
+    interner: &impl Interner,
+) -> Result<Function> {
+    let ctx = try_build_context(module_ir, func_ir, ty_args, interner)?
         .ok_or_else(|| anyhow!("Failed to create lowering context: not all types are concrete"))?;
 
     let name = module_ir.module.interned_identifier_at(func_ir.name_idx);
@@ -400,7 +446,13 @@ pub fn try_set_lowering_requirements(
 ) -> Result<()> {
     let mut visited = UnorderedSet::new();
     for func_ir in module_ir.functions.iter().filter_map(|f| f.as_ref()) {
-        try_set_lowering_requirements_for_function_impl(ctx, module_ir, func_ir, &mut visited)?;
+        try_set_lowering_requirements_for_function_impl(
+            ctx,
+            module_ir,
+            func_ir,
+            EMPTY_TYPE_LIST,
+            &mut visited,
+        )?;
     }
     Ok(())
 }
@@ -416,29 +468,35 @@ pub fn try_set_lowering_requirements_for_function(
     ctx: &mut impl SpecializerContext,
     module_ir: &ModuleIR,
     func_ir: &FunctionIR,
+    ty_args: InternedTypeList,
 ) -> Result<()> {
     let mut visited = UnorderedSet::new();
-    try_set_lowering_requirements_for_function_impl(ctx, module_ir, func_ir, &mut visited)
+    try_set_lowering_requirements_for_function_impl(ctx, module_ir, func_ir, ty_args, &mut visited)
 }
 
 fn try_set_lowering_requirements_for_function_impl(
     ctx: &mut impl SpecializerContext,
     module_ir: &ModuleIR,
     func_ir: &FunctionIR,
+    ty_args: InternedTypeList,
     visited: &mut UnorderedSet<InternedType>,
 ) -> Result<()> {
     for &ty in func_ir.home_slot_types.iter() {
-        walk_and_size(ctx, ty, visited)?;
+        walk_and_size(ctx, ty, ty_args, visited)?;
     }
     let own_handle = module_ir.module.function_handle_at(func_ir.handle_idx);
     for &ty in module_ir.module.interned_types_at(own_handle.return_) {
-        walk_and_size(ctx, ty, visited)?;
+        walk_and_size(ctx, ty, ty_args, visited)?;
     }
     for instr in func_ir.instrs() {
-        let handle_idx = match instr {
-            Instr::Call(_, idx, _) => *idx,
+        let (params, returns) = match instr {
+            Instr::Call(_, idx, _) => {
+                let sig = module_ir.module.function_signature_at(*idx);
+                (sig.params, sig.returns)
+            },
             Instr::CallGeneric(_, idx, _) => {
-                module_ir.module.function_instantiation_at(*idx).handle
+                let sig = module_ir.module.function_instantiation_signature_at(*idx);
+                (sig.params, sig.returns)
             },
             // TODO: Home slots and callee params/returns are not exhaustive.
             //       Instructions can reference types whose layouts lowering
@@ -446,12 +504,11 @@ fn try_set_lowering_requirements_for_function_impl(
             _ => continue,
         };
 
-        let callee_handle = module_ir.module.function_handle_at(handle_idx);
-        for &ty in module_ir.module.interned_types_at(callee_handle.parameters) {
-            walk_and_size(ctx, ty, visited)?;
+        for &ty in view_type_list(params) {
+            walk_and_size(ctx, ty, ty_args, visited)?;
         }
-        for &ty in module_ir.module.interned_types_at(callee_handle.return_) {
-            walk_and_size(ctx, ty, visited)?;
+        for &ty in view_type_list(returns) {
+            walk_and_size(ctx, ty, ty_args, visited)?;
         }
     }
 
@@ -470,8 +527,10 @@ fn try_set_lowering_requirements_for_function_impl(
 fn walk_and_size(
     ctx: &mut impl SpecializerContext,
     ty: InternedType,
+    ty_args: InternedTypeList,
     visited: &mut UnorderedSet<InternedType>,
 ) -> Result<()> {
+    let ty = ctx.subst_type(ty, ty_args)?;
     if !visited.insert(ty) {
         return Ok(());
     }
@@ -502,35 +561,44 @@ fn walk_and_size(
             // size - just continue.
         },
         Type::Nominal {
-            module_id: executable_id,
+            module_id,
             name,
+            ty_args: nominal_ty_args,
             ..
         } => {
-            // TODO: Walk type-args of the nominal so generic instantiations
-            // like `Coin<USDC>` discover USDC as an extra root when its
-            // module is outside the allowed scope.
-            match ctx.get_fields(executable_id, name)? {
+            match ctx.get_fields(module_id, name)? {
                 None => {
                     // The context does not have field information for this
                     // nominal (e.g., the module has not been loaded). Treat
                     // like a generic type parameter: skip.
                 },
-                Some(FieldTypes::Struct(field_tys)) => {
+                Some(FieldTypes::Struct(fields)) => {
+                    let fields = fields
+                        .iter()
+                        .map(|f| ctx.subst_type(*f, *nominal_ty_args))
+                        .collect::<Result<Vec<_>>>()?;
+
                     // We have to recurse unconditionally because if size is
                     // set, it does not mean that all modules used have been
                     // resolved. Other thread can set struct's size so this
-                    // traversal is needed.
-                    for &ft in &field_tys {
-                        walk_and_size(ctx, ft, visited)?;
+                    // traversal is needed. Recursing on the substituted
+                    // fields also surfaces transitively-referenced nominals
+                    // (e.g., `Coin<USDC>` field - `USDC` as a root).
+                    for &ft in &fields {
+                        // At this point we have already substituted fields, so
+                        // all types inside must be instantiated. Even if we
+                        // encounter some nominal, its type arguments would be
+                        // substituted as well.
+                        walk_and_size(ctx, ft, EMPTY_TYPE_LIST, visited)?;
                     }
 
                     // Best-effort layout computation. If any field is still
                     // not sized, so is the nominal type.
                     let mut offset = 0u32;
                     let mut max_align = 1u32;
-                    let mut layout = Vec::with_capacity(field_tys.len());
+                    let mut layout = Vec::with_capacity(fields.len());
                     let mut all_sized = true;
-                    for &ft in &field_tys {
+                    for &ft in &fields {
                         let Some((sz, al)) = view_type(ft).size_and_align() else {
                             all_sized = false;
                             break;
