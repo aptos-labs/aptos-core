@@ -89,8 +89,8 @@ const MAX_SOCKET_ADDRESSES_TO_PING: usize = 2;
 
 /// The amount of time to try other peers until dialing this peer again.
 ///
-/// It's currently set to 5 minutes to ensure rotation through all (or most) peers
-const TRY_DIAL_BACKOFF_TIME: Duration = Duration::from_secs(300);
+/// It's currently set to 3 minutes to ensure rotation through all (or most) peers
+const TRY_DIAL_BACKOFF_TIME: Duration = Duration::from_secs(180);
 
 /// The ConnectivityManager actor.
 pub struct ConnectivityManager<TBackoff> {
