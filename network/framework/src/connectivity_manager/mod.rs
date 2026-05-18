@@ -286,7 +286,7 @@ impl DiscoveredPeer {
 
     /// Returns true iff this peer should be considered "recently dialed" for backoff purposes.
     /// A peer is only put into backoff mode after it has been dialed at least
-    /// `num_dials_before_backoff` times, ensuring we try all addresses before backing off.
+    /// `num_dials_before_backoff` times, ensuring we try a few addresses before backing off.
     pub fn has_dialed_recently(&self, num_dials_before_backoff: usize) -> bool {
         if self.dial_count < num_dials_before_backoff {
             return false;
@@ -1425,5 +1425,97 @@ where
         let jitter = jitter(MAX_CONNECTION_DELAY_JITTER);
 
         min(max_delay, self.backoff.next().unwrap_or(max_delay)) + jitter
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use aptos_config::config::PeerRole;
+
+    #[test]
+    fn test_has_dialed_recently_below_threshold() {
+        // A peer dialed once with num_dials_before_backoff=2 should not be in backoff
+        let peer = create_peer_dialed_n_times(1);
+        assert!(!peer.has_dialed_recently(2));
+    }
+
+    #[test]
+    fn test_has_dialed_recently_at_threshold() {
+        // A peer dialed exactly num_dials_before_backoff times should be in backoff
+        let peer = create_peer_dialed_n_times(2);
+        assert!(peer.has_dialed_recently(2));
+    }
+
+    #[test]
+    fn test_has_dialed_recently_above_threshold() {
+        // A peer dialed more than num_dials_before_backoff times should still be in backoff
+        let peer = create_peer_dialed_n_times(5);
+        assert!(peer.has_dialed_recently(2));
+    }
+
+    #[test]
+    fn test_has_dialed_recently_zero_dials() {
+        // A peer that has never been dialed should never be in backoff
+        let peer = DiscoveredPeer::new(PeerRole::ValidatorFullNode);
+        assert!(!peer.has_dialed_recently(1));
+        assert!(!peer.has_dialed_recently(2));
+    }
+
+    #[test]
+    fn test_has_dialed_recently_threshold_one() {
+        // With num_dials_before_backoff=1, a single dial should trigger backoff
+        let peer = create_peer_dialed_n_times(1);
+        assert!(peer.has_dialed_recently(1));
+    }
+
+    #[test]
+    fn test_compare_dial_priority_below_threshold_not_deprioritized() {
+        // A peer dialed once (below threshold=2) should not be deprioritized vs a fresh peer
+        let dialed_once_peer = create_peer_dialed_n_times(1);
+        let fresh_peer = DiscoveredPeer::new(PeerRole::ValidatorFullNode);
+
+        // Neither is in backoff, so ordering falls back to role comparison (equal here)
+        assert_eq!(
+            dialed_once_peer.compare_dial_priority(&fresh_peer, 2),
+            Some(Ordering::Equal)
+        );
+    }
+
+    #[test]
+    fn test_compare_dial_priority_at_threshold_is_deprioritized() {
+        // A peer that has hit the threshold should be ordered Greater (lower priority) than a fresh peer
+        let dialed_twice_peer = create_peer_dialed_n_times(2);
+        let fresh_peer = DiscoveredPeer::new(PeerRole::ValidatorFullNode);
+
+        assert_eq!(
+            dialed_twice_peer.compare_dial_priority(&fresh_peer, 2),
+            Some(Ordering::Greater)
+        );
+        assert_eq!(
+            fresh_peer.compare_dial_priority(&dialed_twice_peer, 2),
+            Some(Ordering::Less)
+        );
+    }
+
+    #[test]
+    fn test_dial_count_increments_on_update() {
+        let mut peer = DiscoveredPeer::new(PeerRole::ValidatorFullNode);
+        assert_eq!(peer.dial_count, 0);
+
+        peer.update_last_dial_time();
+        assert_eq!(peer.dial_count, 1);
+
+        peer.update_last_dial_time();
+        assert_eq!(peer.dial_count, 2);
+    }
+
+    /// Creates a `DiscoveredPeer` that has been dialed `n` times (with a recent dial time)
+    fn create_peer_dialed_n_times(n: usize) -> DiscoveredPeer {
+        let mut peer = DiscoveredPeer::new(PeerRole::ValidatorFullNode);
+        for _ in 0..n {
+            peer.update_last_dial_time();
+        }
+        peer
     }
 }
