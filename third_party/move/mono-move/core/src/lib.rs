@@ -17,8 +17,9 @@ pub use function::{
     Code, FrameLayoutInfo, Function, FunctionPtr, SafePointEntry, SortedSafePointEntries,
 };
 pub use instruction::{
-    CallClosureOp, ClosureFuncRef, CodeOffset, DescriptorId, FrameOffset, MicroOp,
-    MicroOpGasSchedule, PackClosureOp, SizedSlot, CAPTURED_DATA_TAG_MATERIALIZED,
+    CallClosureOp, ClosureFuncRef, CodeOffset, DescriptorId, FrameOffset, IntBinaryOp, IntNegateOp,
+    IntOperand, IntShiftOp, MicroOp, MicroOpGasSchedule, PackClosureOp, ShiftOperand, SizedSlot,
+    UnspecializedSignedIntTy, UnspecializedUnsignedIntTy, CAPTURED_DATA_TAG_MATERIALIZED,
     CAPTURED_DATA_TAG_OFFSET, CAPTURED_DATA_VALUES_OFFSET, CLOSURE_CAPTURED_DATA_PTR_OFFSET,
     CLOSURE_DATA_SIZE, CLOSURE_FUNC_REF_OFFSET, CLOSURE_FUNC_REF_SIZE, CLOSURE_MASK_OFFSET,
     ENUM_DATA_OFFSET, ENUM_TAG_OFFSET, FRAME_METADATA_SIZE, FUNC_REF_PAYLOAD_OFFSET,

@@ -23,13 +23,16 @@ use crate::{
     },
 };
 use mono_move_core::{
-    CallClosureOp, ClosureFuncRef, DescriptorId, ExecutionContext, FrameOffset, Function, MicroOp,
-    PackClosureOp, SizedSlot, CAPTURED_DATA_TAG_MATERIALIZED, CAPTURED_DATA_TAG_OFFSET,
-    CAPTURED_DATA_VALUES_OFFSET, CLOSURE_CAPTURED_DATA_PTR_OFFSET, CLOSURE_FUNC_REF_OFFSET,
-    CLOSURE_MASK_OFFSET, FRAME_METADATA_SIZE, FUNC_REF_PAYLOAD_OFFSET, FUNC_REF_TAG_OFFSET,
-    FUNC_REF_TAG_RESOLVED, OBJECT_HEADER_SIZE,
+    CallClosureOp, ClosureFuncRef, DescriptorId, ExecutionContext, FrameOffset, Function,
+    IntBinaryOp, IntNegateOp, IntOperand, IntShiftOp, MicroOp, PackClosureOp, ShiftOperand,
+    SizedSlot, UnspecializedSignedIntTy, UnspecializedUnsignedIntTy,
+    CAPTURED_DATA_TAG_MATERIALIZED, CAPTURED_DATA_TAG_OFFSET, CAPTURED_DATA_VALUES_OFFSET,
+    CLOSURE_CAPTURED_DATA_PTR_OFFSET, CLOSURE_FUNC_REF_OFFSET, CLOSURE_MASK_OFFSET,
+    FRAME_METADATA_SIZE, FUNC_REF_PAYLOAD_OFFSET, FUNC_REF_TAG_OFFSET, FUNC_REF_TAG_RESOLVED,
+    MAX_ALIGN, OBJECT_HEADER_SIZE,
 };
 use mono_move_gas::GasMeter;
+use move_core_types::int256::{I256, U256};
 use rand::{rngs::StdRng, Rng, SeedableRng};
 use std::ptr::{null, NonNull};
 
@@ -319,6 +322,222 @@ unsafe fn shift_u64<F: FnOnce(u64, u64) -> u64>(
         }
         let v = read_u64(fp, lhs);
         write_u64(fp, dst, op(v, shift));
+        Ok(())
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Unspecialized integer op dispatchers
+// ---------------------------------------------------------------------------
+
+/// Read a `T`-sized value from `base + byte_offset`. Aligned access for
+/// `T` whose alignment fits the VM's [`MAX_ALIGN`] cap, unaligned otherwise.
+///
+/// # Safety
+/// `base.add(byte_offset)` must be valid for a read of `size_of::<T>()`
+/// bytes, with the appropriate alignment when `align_of::<T>() <= MAX_ALIGN`.
+#[inline(always)]
+unsafe fn read_int<T: Copy>(base: *const u8, byte_offset: impl Into<usize>) -> T {
+    let ptr = unsafe { base.add(byte_offset.into()) as *const T };
+    unsafe {
+        if std::mem::align_of::<T>() <= MAX_ALIGN {
+            ptr.read()
+        } else {
+            ptr.read_unaligned()
+        }
+    }
+}
+
+/// Mirror of [`read_int`] for writes.
+#[inline(always)]
+unsafe fn write_int<T: Copy>(base: *mut u8, byte_offset: impl Into<usize>, val: T) {
+    let ptr = unsafe { base.add(byte_offset.into()) as *mut T };
+    unsafe {
+        if std::mem::align_of::<T>() <= MAX_ALIGN {
+            ptr.write(val)
+        } else {
+            ptr.write_unaligned(val)
+        }
+    }
+}
+
+/// [`U256`]'s `Shl`/`Shr` trait impls require `Self` as the rhs.
+#[inline(always)]
+fn u256_from_u8(x: u8) -> U256 {
+    let mut bytes = [0u8; 32];
+    bytes[0] = x;
+    U256::from_le_bytes(bytes)
+}
+
+macro_rules! dispatch_int_operand {
+    ($fp:expr, $rhs:expr, $action:ident) => {
+        match $rhs {
+            IntOperand::RegU8(off) => $action!(u8, unsigned, read_int::<u8>($fp, *off)),
+            IntOperand::RegU16(off) => $action!(u16, unsigned, read_int::<u16>($fp, *off)),
+            IntOperand::RegU32(off) => $action!(u32, unsigned, read_int::<u32>($fp, *off)),
+            IntOperand::RegU64(off) => $action!(u64, unsigned, read_int::<u64>($fp, *off)),
+            IntOperand::RegU128(off) => $action!(u128, unsigned, read_int::<u128>($fp, *off)),
+            IntOperand::RegU256(off) => $action!(U256, unsigned, read_int::<U256>($fp, *off)),
+            IntOperand::RegI8(off) => $action!(i8, signed, read_int::<i8>($fp, *off)),
+            IntOperand::RegI16(off) => $action!(i16, signed, read_int::<i16>($fp, *off)),
+            IntOperand::RegI32(off) => $action!(i32, signed, read_int::<i32>($fp, *off)),
+            IntOperand::RegI64(off) => $action!(i64, signed, read_int::<i64>($fp, *off)),
+            IntOperand::RegI128(off) => $action!(i128, signed, read_int::<i128>($fp, *off)),
+            IntOperand::RegI256(off) => $action!(I256, signed, read_int::<I256>($fp, *off)),
+            IntOperand::ImmU8(v) => $action!(u8, unsigned, *v),
+            IntOperand::ImmU16(v) => $action!(u16, unsigned, *v),
+            IntOperand::ImmU32(v) => $action!(u32, unsigned, *v),
+            IntOperand::ImmU64(v) => $action!(u64, unsigned, *v),
+            IntOperand::ImmI8(v) => $action!(i8, signed, *v),
+            IntOperand::ImmI16(v) => $action!(i16, signed, *v),
+            IntOperand::ImmI32(v) => $action!(i32, signed, *v),
+            IntOperand::ImmI64(v) => $action!(i64, signed, *v),
+            IntOperand::ImmU128(b) => $action!(u128, unsigned, **b),
+            IntOperand::ImmU256(b) => $action!(U256, unsigned, **b),
+            IntOperand::ImmI128(b) => $action!(i128, signed, **b),
+            IntOperand::ImmI256(b) => $action!(I256, signed, **b),
+        }
+    };
+}
+
+macro_rules! dispatch_unspec_signed_int_ty {
+    ($tag:expr, $action:ident) => {
+        match $tag {
+            UnspecializedSignedIntTy::I8 => $action!(i8),
+            UnspecializedSignedIntTy::I16 => $action!(i16),
+            UnspecializedSignedIntTy::I32 => $action!(i32),
+            UnspecializedSignedIntTy::I64 => $action!(i64),
+            UnspecializedSignedIntTy::I128 => $action!(i128),
+            UnspecializedSignedIntTy::I256 => $action!(I256),
+        }
+    };
+}
+
+macro_rules! impl_int_arith {
+    ($fn_name:ident, $op_label:literal, $method:ident) => {
+        #[inline(never)]
+        unsafe fn $fn_name(fp: *mut u8, op: &IntBinaryOp) -> ExecutionResult<()> {
+            unsafe {
+                macro_rules! exec {
+                    ($ty: ty,$_sign: tt,$rhs: expr) => {{
+                        let a: $ty = read_int::<$ty>(fp, op.lhs);
+                        let b: $ty = $rhs;
+                        let r: $ty =
+                            <$ty>::$method(a, b).ok_or_else(|| anyhow::anyhow!($op_label))?;
+                        write_int::<$ty>(fp, op.dst, r);
+                    }};
+                }
+                dispatch_int_operand!(fp, &op.rhs, exec);
+                Ok(())
+            }
+        }
+    };
+}
+
+impl_int_arith!(exec_int_add, "IntAdd: overflow", checked_add);
+impl_int_arith!(exec_int_sub, "IntSub: under/overflow", checked_sub);
+impl_int_arith!(exec_int_mul, "IntMul: overflow", checked_mul);
+impl_int_arith!(exec_int_div, "IntDiv: by zero or overflow", checked_div);
+impl_int_arith!(exec_int_mod, "IntMod: by zero or overflow", checked_rem);
+
+macro_rules! impl_int_bitwise {
+    ($fn_name:ident, $op_label:literal, $bop:tt) => {
+        #[inline(never)]
+        unsafe fn $fn_name(fp: *mut u8, op: &IntBinaryOp) -> ExecutionResult<()> {
+            unsafe {
+                macro_rules! exec {
+                            ($ty:ty, unsigned, $rhs:expr) => {{
+                                let a: $ty = read_int::<$ty>(fp, op.lhs);
+                                let b: $ty = $rhs;
+                                let r: $ty = a $bop b;
+                                write_int::<$ty>(fp, op.dst, r);
+                            }};
+                            ($ty:ty, signed, $rhs:expr) => {{
+                                let _ = $rhs;
+                                bail!(concat!($op_label, ": signed bitwise rejected by verifier"))
+                            }};
+                        }
+                dispatch_int_operand!(fp, &op.rhs, exec);
+                Ok(())
+            }
+        }
+    };
+}
+
+impl_int_bitwise!(exec_int_bit_and, "IntBitAnd", &);
+impl_int_bitwise!(exec_int_bit_or, "IntBitOr", |);
+impl_int_bitwise!(exec_int_bit_xor, "IntBitXor", ^);
+
+macro_rules! impl_int_shift {
+    ($fn_name:ident, $op_label:literal, $bop:tt) => {
+        #[inline(never)]
+        unsafe fn $fn_name(fp: *mut u8, op: &IntShiftOp) -> ExecutionResult<()> {
+            // SAFETY: see [`exec_int_add`].
+            unsafe {
+                let shift_u8: u8 = match &op.rhs {
+                    ShiftOperand::RegU8(off) => read_u8(fp, *off),
+                    ShiftOperand::ImmU8(v) => *v,
+                };
+                let bit_width = op.ty.bit_width();
+                if (shift_u8 as u32) >= bit_width {
+                    bail!(
+                        concat!($op_label, ".{}: shift amount {} >= bit width {}"),
+                        op.ty,
+                        shift_u8,
+                        bit_width
+                    );
+                }
+                let shift_u32 = shift_u8 as u32;
+                match op.ty {
+                    UnspecializedUnsignedIntTy::U8 => {
+                        let a: u8 = read_int::<u8>(fp, op.lhs);
+                        let r: u8 = a $bop shift_u32;
+                        write_int::<u8>(fp, op.dst, r);
+                    },
+                    UnspecializedUnsignedIntTy::U16 => {
+                        let a: u16 = read_int::<u16>(fp, op.lhs);
+                        let r: u16 = a $bop shift_u32;
+                        write_int::<u16>(fp, op.dst, r);
+                    },
+                    UnspecializedUnsignedIntTy::U32 => {
+                        let a: u32 = read_int::<u32>(fp, op.lhs);
+                        let r: u32 = a $bop shift_u32;
+                        write_int::<u32>(fp, op.dst, r);
+                    },
+                    UnspecializedUnsignedIntTy::U128 => {
+                        let a: u128 = read_int::<u128>(fp, op.lhs);
+                        let r: u128 = a $bop shift_u32;
+                        write_int::<u128>(fp, op.dst, r);
+                    },
+                    UnspecializedUnsignedIntTy::U256 => {
+                        let a: U256 = read_int::<U256>(fp, op.lhs);
+                        let s = u256_from_u8(shift_u8);
+                        let r: U256 = a $bop s;
+                        write_int::<U256>(fp, op.dst, r);
+                    },
+                }
+                Ok(())
+            }
+        }
+    };
+}
+
+impl_int_shift!(exec_int_shl, "IntShl", <<);
+impl_int_shift!(exec_int_shr, "IntShr", >>);
+
+#[inline(never)]
+unsafe fn exec_int_negate(fp: *mut u8, op: &IntNegateOp) -> ExecutionResult<()> {
+    unsafe {
+        macro_rules! exec {
+            ($ty:ty) => {{
+                let a: $ty = read_int::<$ty>(fp, op.src);
+                let r: $ty = <$ty>::checked_neg(a).ok_or_else(|| {
+                    anyhow::anyhow!("IntNegate.{}: Negate of MIN overflows", op.ty)
+                })?;
+                write_int::<$ty>(fp, op.dst, r);
+            }};
+        }
+        dispatch_unspec_signed_int_ty!(op.ty, exec);
         Ok(())
     }
 }
@@ -860,6 +1079,18 @@ impl<T: ExecutionContext> InterpreterContext<'_, T> {
                 MicroOp::CallClosure(ref op) => {
                     return self.exec_call_closure(func, fp, op);
                 },
+
+                MicroOp::IntAdd(ref op) => exec_int_add(fp, op)?,
+                MicroOp::IntSub(ref op) => exec_int_sub(fp, op)?,
+                MicroOp::IntMul(ref op) => exec_int_mul(fp, op)?,
+                MicroOp::IntDiv(ref op) => exec_int_div(fp, op)?,
+                MicroOp::IntMod(ref op) => exec_int_mod(fp, op)?,
+                MicroOp::IntBitAnd(ref op) => exec_int_bit_and(fp, op)?,
+                MicroOp::IntBitOr(ref op) => exec_int_bit_or(fp, op)?,
+                MicroOp::IntBitXor(ref op) => exec_int_bit_xor(fp, op)?,
+                MicroOp::IntShl(ref op) => exec_int_shl(fp, op)?,
+                MicroOp::IntShr(ref op) => exec_int_shr(fp, op)?,
+                MicroOp::IntNegate(ref op) => exec_int_negate(fp, op)?,
             }
         }
 

@@ -16,8 +16,8 @@ use crate::heap::object_descriptor::{
     ObjectDescriptor, ObjectDescriptorInner, CLOSURE_DESCRIPTOR_ID,
 };
 use mono_move_core::{
-    CallClosureOp, ClosureFuncRef, CodeOffset, DescriptorId, FrameOffset, Function, MicroOp,
-    PackClosureOp, FRAME_METADATA_SIZE,
+    CallClosureOp, ClosureFuncRef, CodeOffset, DescriptorId, FrameOffset, Function, IntBinaryOp,
+    MicroOp, PackClosureOp, ShiftOperand, FRAME_METADATA_SIZE,
 };
 use std::fmt;
 
@@ -288,6 +288,66 @@ impl FunctionVerifier<'_> {
                 self.check_frame_access_8(pc, lhs);
                 self.check_frame_access_1(pc, rhs);
                 self.check_frame_access_8(pc, dst);
+            },
+
+            // Unspecialized integer binary ops. Operand width comes from
+            // the rhs's [`IntOperand`] variant; lhs / dst must point at
+            // slots of the same width. Bitwise additionally rejects signed
+            // operands — [`IntOperand`] can't exclude that combination
+            // on its own since arith and bitwise share its encoding.
+            //
+            // TODO: a previous revision also statically rejected
+            // `IntDiv`/`IntMod` with an imm-zero rhs. Revisit once we have
+            // a clearer policy on what the specializer is allowed to reject
+            // statically.
+            MicroOp::IntAdd(ref op)
+            | MicroOp::IntSub(ref op)
+            | MicroOp::IntMul(ref op)
+            | MicroOp::IntDiv(ref op)
+            | MicroOp::IntMod(ref op) => {
+                self.check_int_binop_frame_access(pc, op);
+            },
+            MicroOp::IntBitAnd(ref op) | MicroOp::IntBitOr(ref op) | MicroOp::IntBitXor(ref op) => {
+                self.check_int_binop_frame_access(pc, op);
+                if op.rhs.is_signed() {
+                    self.err(Some(pc), "bitwise on signed type");
+                }
+            },
+
+            // Shifts: lhs is `op.ty.byte_width()`; rhs is either a 1-byte
+            // slot or an inline u8. For the imm form, reject
+            // `imm >= ty.bit_width()` statically (same policy as
+            // `ShlU64Imm` / `ShrU64Imm`).
+            MicroOp::IntShl(op) | MicroOp::IntShr(op) => {
+                let size = op.ty.byte_width();
+                self.check_frame_access(Some(pc), op.lhs, size);
+                self.check_frame_access(Some(pc), op.dst, size);
+                match op.rhs {
+                    ShiftOperand::RegU8(rhs) => self.check_frame_access_1(pc, rhs),
+                    ShiftOperand::ImmU8(imm) => {
+                        if (imm as u32) >= op.ty.bit_width() {
+                            self.err(
+                                Some(pc),
+                                format!(
+                                    "shift amount {} exceeds bit width {} (imm)",
+                                    imm,
+                                    op.ty.bit_width()
+                                ),
+                            );
+                        }
+                    },
+                }
+            },
+
+            // [`MicroOp::IntNegate`] is signed-only at the type level
+            // ([`UnspecializedSignedIntTy`] excludes unsigned widths and
+            // u64), so the only legality check left here is frame access.
+            // The `src == MIN` overflow case is enforced at runtime —
+            // statically deciding it would require const-prop on `src`.
+            MicroOp::IntNegate(op) => {
+                let size = op.ty.byte_width();
+                self.check_frame_access(Some(pc), op.src, size);
+                self.check_frame_access(Some(pc), op.dst, size);
             },
 
             MicroOp::Move { dst, src, size } => {
@@ -738,6 +798,17 @@ impl FunctionVerifier<'_> {
 
     fn check_frame_access_1(&mut self, pc: usize, offset: FrameOffset) {
         self.check_frame_access(Some(pc), offset, 1);
+    }
+
+    /// Verify an [`IntBinaryOp`]: dst and lhs are slots of width
+    /// `op.rhs.byte_width()`; if rhs is a Reg arm, its slot is checked too.
+    fn check_int_binop_frame_access(&mut self, pc: usize, op: &IntBinaryOp) {
+        let size = op.rhs.byte_width();
+        self.check_frame_access(Some(pc), op.lhs, size);
+        self.check_frame_access(Some(pc), op.dst, size);
+        if let Some(rhs_off) = op.rhs.reg_offset() {
+            self.check_frame_access(Some(pc), rhs_off, size);
+        }
     }
 
     fn check_descriptor(&mut self, pc: usize, descriptor_id: DescriptorId) {

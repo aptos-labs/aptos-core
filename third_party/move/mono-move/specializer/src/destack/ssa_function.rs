@@ -136,13 +136,13 @@ fn try_fuse_compare_branch(first: &Instr, second: &Instr) -> Option<Instr> {
         (Instr::BinaryOpImm(dst, BinaryOp::Cmp(cmp), src, imm), Instr::BrTrue(label, cond))
             if *dst == *cond =>
         {
-            Some(Instr::BrCmpImm(*label, *cmp, *src, *imm))
+            Some(Instr::BrCmpImm(*label, *cmp, *src, imm.clone()))
         },
         // BinaryOpImm(dst, Cmp(cmp), src, imm) + BrFalse(label, dst)
         (Instr::BinaryOpImm(dst, BinaryOp::Cmp(cmp), src, imm), Instr::BrFalse(label, cond))
             if *dst == *cond =>
         {
-            Some(Instr::BrCmpImm(*label, cmp.negate(), *src, *imm))
+            Some(Instr::BrCmpImm(*label, cmp.negate(), *src, imm.clone()))
         },
         _ => None,
     }

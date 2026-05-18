@@ -105,17 +105,16 @@ pub(crate) fn extract_imm_value(instr: &Instr) -> Option<(Slot, ImmValue)> {
         Instr::LdU16(dst, val) => Some((*dst, ImmValue::U16(*val))),
         Instr::LdU32(dst, val) => Some((*dst, ImmValue::U32(*val))),
         Instr::LdU64(dst, val) => Some((*dst, ImmValue::U64(*val))),
+        Instr::LdU128(dst, val) => Some((*dst, ImmValue::U128(Box::new(*val)))),
+        Instr::LdU256(dst, val) => Some((*dst, ImmValue::U256(Box::new(*val)))),
         Instr::LdI8(dst, val) => Some((*dst, ImmValue::I8(*val))),
         Instr::LdI16(dst, val) => Some((*dst, ImmValue::I16(*val))),
         Instr::LdI32(dst, val) => Some((*dst, ImmValue::I32(*val))),
         Instr::LdI64(dst, val) => Some((*dst, ImmValue::I64(*val))),
+        Instr::LdI128(dst, val) => Some((*dst, ImmValue::I128(Box::new(*val)))),
+        Instr::LdI256(dst, val) => Some((*dst, ImmValue::I256(Box::new(*val)))),
 
-        // Too large or non-numeric — not fusible into BinaryOpImm.
-        Instr::LdU128(_, _)
-        | Instr::LdU256(_, _)
-        | Instr::LdI128(_, _)
-        | Instr::LdI256(_, _)
-        | Instr::LdConst(_, _) => None,
+        Instr::LdConst(_, _) => None,
 
         // Non-load instructions.
         Instr::Copy(_, _)
