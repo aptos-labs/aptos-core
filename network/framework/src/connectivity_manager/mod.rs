@@ -132,6 +132,8 @@ pub struct ConnectivityManager<TBackoff> {
     enable_latency_aware_dialing: bool,
     /// Access control policy for peer connections
     access_control_policy: Option<Arc<AccessControlPolicy>>,
+    /// The minimum number of dial attempts before a peer is put into backoff mode
+    num_dials_before_backoff: usize,
 }
 
 /// Different sources for peer addresses, ordered by priority (Onchain=highest,
@@ -238,6 +240,8 @@ struct DiscoveredPeer {
     keys: PublicKeys,
     /// The last time the node was dialed
     last_dial_time: SystemTime,
+    /// The number of times we have dialed this peer
+    dial_count: usize,
     /// The calculated peer ping latency (secs)
     ping_latency_secs: Option<f64>,
 }
@@ -249,6 +253,7 @@ impl DiscoveredPeer {
             addrs: Addresses::default(),
             keys: PublicKeys::default(),
             last_dial_time: SystemTime::UNIX_EPOCH,
+            dial_count: 0,
             ping_latency_secs: None,
         }
     }
@@ -268,9 +273,10 @@ impl DiscoveredPeer {
         self.addrs.is_empty() && self.keys.is_empty()
     }
 
-    /// Updates the last time we tried to connect to this node
+    /// Updates the last time we tried to connect to this node and increments the dial count
     pub fn update_last_dial_time(&mut self) {
         self.last_dial_time = SystemTime::now();
+        self.dial_count = self.dial_count.saturating_add(1);
     }
 
     /// Updates the ping latency for this peer
@@ -278,8 +284,13 @@ impl DiscoveredPeer {
         self.ping_latency_secs = Some(latency_secs);
     }
 
-    /// Based on input, backoff on amount of time to dial a peer again
-    pub fn has_dialed_recently(&self) -> bool {
+    /// Returns true iff this peer should be considered "recently dialed" for backoff purposes.
+    /// A peer is only put into backoff mode after it has been dialed at least
+    /// `num_dials_before_backoff` times, ensuring we try all addresses before backing off.
+    pub fn has_dialed_recently(&self, num_dials_before_backoff: usize) -> bool {
+        if self.dial_count < num_dials_before_backoff {
+            return false;
+        }
         if let Ok(duration_since_last_dial) = self.last_dial_time.elapsed() {
             duration_since_last_dial < TRY_DIAL_BACKOFF_TIME
         } else {
@@ -288,10 +299,16 @@ impl DiscoveredPeer {
     }
 }
 
-impl PartialOrd for DiscoveredPeer {
-    fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
-        let self_dialed_recently = self.has_dialed_recently();
-        let other_dialed_recently = other.has_dialed_recently();
+impl DiscoveredPeer {
+    /// Compares this peer to another for dial prioritization. Peers that
+    /// haven't been dialed recently are prioritized (i.e., ordered as Less).
+    pub fn compare_dial_priority(
+        &self,
+        other: &Self,
+        num_dials_before_backoff: usize,
+    ) -> Option<Ordering> {
+        let self_dialed_recently = self.has_dialed_recently(num_dials_before_backoff);
+        let other_dialed_recently = other.has_dialed_recently(num_dials_before_backoff);
 
         // Less recently dialed is prioritized over recently dialed
         if !self_dialed_recently && other_dialed_recently {
@@ -347,6 +364,7 @@ where
     TBackoff: Iterator<Item = Duration> + Clone,
 {
     /// Creates a new instance of the [`ConnectivityManager`] actor.
+    #[allow(clippy::too_many_arguments)]
     pub fn new(
         network_context: NetworkContext,
         time_service: TimeService,
@@ -362,6 +380,7 @@ where
         mutual_authentication: bool,
         enable_latency_aware_dialing: bool,
         access_control_policy: Option<Arc<AccessControlPolicy>>,
+        num_dials_before_backoff: usize,
     ) -> Self {
         // Verify that the trusted peers set exists and that it is empty
         let trusted_peers = peers_and_metadata
@@ -399,6 +418,7 @@ where
             mutual_authentication,
             enable_latency_aware_dialing,
             access_control_policy,
+            num_dials_before_backoff,
         };
 
         // Set the initial seed config addresses and public keys
@@ -657,10 +677,15 @@ where
                 eligible_peers,
                 num_peers_to_dial,
                 self.discovered_peers.clone(),
+                self.num_dials_before_backoff,
             )
         } else {
             // Choose the peers randomly
-            selection::choose_peers_to_dial_randomly(eligible_peers, num_peers_to_dial)
+            selection::choose_peers_to_dial_randomly(
+                eligible_peers,
+                num_peers_to_dial,
+                self.num_dials_before_backoff,
+            )
         }
     }
 
