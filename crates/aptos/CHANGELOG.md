@@ -13,6 +13,7 @@ All notable changes to the Aptos CLI will be captured in this file. This project
 ## [9.1.0]
 - Added support for confidential transactions locally
 - Updated default formatter version to 1.5.1.
+- `aptos move simulate` now supports `--show-details` to include both `events` and `changes` in simulation output.
 
 ## [9.0.0]
 - Add linter rules `unused_function`, `unused_struct`, and `unused_constant` to detect unused items.

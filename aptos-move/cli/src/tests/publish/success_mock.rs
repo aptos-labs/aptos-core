@@ -18,6 +18,8 @@ fn fake_summary() -> TransactionSummary {
         version: None,
         vm_status: None,
         deployed_object_address: None,
+        events: None,
+        changes: None,
     }
 }
 

@@ -2307,6 +2307,10 @@ pub struct Simulate {
     #[clap(long)]
     local: bool,
 
+    /// Include simulated events and state changes in the output.
+    #[clap(long)]
+    show_details: bool,
+
     #[clap(skip)]
     pub env: Arc<MoveEnv>,
 }
@@ -2326,11 +2330,63 @@ impl CliCommand<TransactionSummary> for Simulate {
         let payload = TransactionPayload::EntryFunction(entry_function);
 
         if self.local {
-            self.txn_options.simulate_locally(payload, &self.env).await
+            self.txn_options
+                .simulate_locally(payload, &self.env, self.show_details)
+                .await
         } else {
             let mut rng = rand::rngs::StdRng::from_entropy();
-            self.txn_options.simulate_remotely(&mut rng, payload).await
+            self.txn_options
+                .simulate_remotely(&mut rng, payload, self.show_details)
+                .await
         }
+    }
+}
+
+#[cfg(test)]
+mod simulate_flag_tests {
+    use super::{MoveTool, Simulate};
+    use clap::Parser;
+
+    #[derive(Parser)]
+    struct TestCli {
+        #[clap(subcommand)]
+        tool: MoveTool,
+    }
+
+    fn parse_simulate(args: &[&str]) -> Simulate {
+        let cli = TestCli::try_parse_from(std::iter::once("test").chain(args.iter().copied()))
+            .expect("simulate args should parse");
+        match cli.tool {
+            MoveTool::Simulate(simulate) => simulate,
+            _ => panic!("expected MoveTool::Simulate"),
+        }
+    }
+
+    #[test]
+    fn simulate_flags_default_to_false() {
+        let simulate = parse_simulate(&[
+            "simulate",
+            "--function-id",
+            "0x1::aptos_account::transfer",
+            "--args",
+            "address:0x1",
+            "u64:1",
+        ]);
+        assert!(!simulate.show_details);
+    }
+
+    #[test]
+    fn simulate_flags_parse_when_provided() {
+        let simulate = parse_simulate(&[
+            "simulate",
+            "--function-id",
+            "0x1::aptos_account::transfer",
+            "--args",
+            "address:0x1",
+            "u64:1",
+            "--show-details",
+        ]);
+        assert!(simulate.show_details);
     }
 }
 
@@ -2616,6 +2672,8 @@ impl CliCommand<TransactionSummary> for Replay {
                     version: Some(self.txn_id),
                     vm_status: Some(format!("{:?}", txn_output.status())),
                     deployed_object_address: None,
+                    events: None,
+                    changes: None,
                 });
             },
         };
@@ -2782,6 +2840,8 @@ impl CliCommand<TransactionSummary> for Replay {
             version: Some(self.txn_id),
             vm_status: Some(format_txn_status(txn_output.status(), &vm_status)),
             deployed_object_address: None,
+            events: None,
+            changes: None,
         };
 
         Ok(summary)

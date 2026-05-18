@@ -232,6 +232,8 @@ where
         version: Some(version),
         vm_status: Some(format_txn_status(vm_output.status(), &vm_status)),
         deployed_object_address: None,
+        events: None,
+        changes: None,
     })
 }
 
@@ -298,6 +300,8 @@ async fn simulate_using_session(
         version: None,
         vm_status: Some(format_txn_status(txn_output.status(), &vm_status)),
         deployed_object_address: None,
+        events: None,
+        changes: None,
     })
 }
 
