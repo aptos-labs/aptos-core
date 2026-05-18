@@ -30,6 +30,7 @@ use aptos_vm_environment::prod_configs::{
     set_async_runtime_checks, set_layout_caches, set_paranoid_type_checks,
 };
 use clap::Parser;
+use move_core_types::language_storage::{TypeTag, CORE_CODE_ADDRESS};
 use rayon::{iter::ParallelIterator, prelude::IntoParallelIterator};
 use std::{
     panic,
@@ -252,6 +253,7 @@ impl Verifier {
         let mut expected_txn_infos = Vec::with_capacity(limit as usize);
         let mut chunk_start_version = start;
         let executor = AptosVMBlockExecutor::new();
+        let mut next_version = start;
         for item in txn_iter {
             // timeout check
             if let Some(duration) = self.timeout_secs {
@@ -273,6 +275,27 @@ impl Verifier {
                 expected_writeset,
             ) = item?;
             let is_epoch_ending = expected_event.iter().any(ContractEvent::is_new_epoch_event);
+            let txn_version = next_version;
+            next_version += 1;
+            let confidential_asset_event_names: Vec<&str> = expected_event
+                .iter()
+                .filter_map(|event| {
+                    if let TypeTag::Struct(struct_tag) = event.type_tag() {
+                        if struct_tag.address == CORE_CODE_ADDRESS
+                            && struct_tag.module.as_str() == "confidential_asset"
+                        {
+                            return Some(struct_tag.name.as_str());
+                        }
+                    }
+                    None
+                })
+                .collect();
+            if !confidential_asset_event_names.is_empty() {
+                info!(
+                    "Txn version {} has events from 0x1::confidential_asset: {:?}. {}",
+                    txn_version, confidential_asset_event_names, expected_txn_info,
+                );
+            }
             cur_txns.push(input_txn);
             cur_persisted_aux_info.push(persisted_aux_info);
             expected_txn_infos.push(expected_txn_info);

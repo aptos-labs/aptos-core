@@ -1373,6 +1373,7 @@ dependencies = [
  "bcs 0.1.4",
  "clap 4.5.60",
  "itertools 0.13.0",
+ "move-core-types",
  "rayon",
  "serde_json",
  "tokio",
