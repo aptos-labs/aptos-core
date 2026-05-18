@@ -1,0 +1,56 @@
+# Copyright (c) Aptos Foundation
+# Licensed pursuant to the Innovation-Enabling Source Code License, available at https://github.com/aptos-labs/aptos-core/blob/main/LICENSE
+
+[package]
+name = "aptos-keyless-verify"
+description = "Standalone keyless signature verification for off-chain consumers"
+version = "0.1.0"
+authors = { workspace = true }
+edition = { workspace = true }
+homepage = { workspace = true }
+license = { workspace = true }
+publish = { workspace = true }
+repository = { workspace = true }
+rust-version = { workspace = true }
+
+# Self-contained: no aptos-* deps so downstream consumers can pull this crate
+# without inheriting aptos-core's workspace [patch.crates-io] block, the
+# tokio_unstable cfg, or the slh-dsa / merlin / aptos-runtimes transitive load.
+#
+# Types and verification logic mirror aptos-core/types/src/keyless/ on a BCS
+# wire-compatible basis. See README for the migration plan in aptos-types.
+[dependencies]
+anyhow = { workspace = true }
+ark-bn254 = { workspace = true }
+ark-ec = { workspace = true }
+ark-ff = { workspace = true }
+ark-groth16 = { workspace = true }
+ark-serialize = { workspace = true }
+ark-std = { workspace = true }
+base64 = { workspace = true }
+bcs = { workspace = true }
+ed25519-dalek = { workspace = true }
+hex = { workspace = true }
+jsonwebtoken = { workspace = true }
+num-bigint = { workspace = true }
+once_cell = { workspace = true }
+p256 = { workspace = true }
+ring = { workspace = true }
+serde = { workspace = true }
+serde-big-array = { workspace = true }
+serde_bytes = { workspace = true }
+serde_json = { workspace = true }
+serde_with = { workspace = true }
+sha2 = { workspace = true }
+sha3 = { workspace = true }
+thiserror = { workspace = true }
+
+[features]
+default = []
+# Exports SAMPLE_* test fixtures (test JWT, ephemeral SK, Groth16 proof) for
+# downstream consumers that want to integration-test their own keyless code.
+test-utils = ["dep:rsa"]
+
+[dependencies.rsa]
+workspace = true
+optional = true

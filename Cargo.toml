@@ -86,6 +86,7 @@ members = [
     "crates/aptos-jemalloc",
     "crates/aptos-jwk-consensus",
     "crates/aptos-keygen",
+    "crates/aptos-keyless-verify",
     "crates/aptos-ledger",
     "crates/aptos-localnet",
     "crates/aptos-log-derive",
