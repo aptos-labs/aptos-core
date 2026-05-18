@@ -95,6 +95,7 @@ mod dbtool_tests {
         waypoint::Waypoint,
     };
     use clap::Parser;
+    use serial_test::serial;
     use std::{
         default::Default,
         fs,
@@ -119,6 +120,7 @@ mod dbtool_tests {
     }
 
     #[test]
+    #[serial]
     fn test_backup_compaction() {
         let db = test_execution_with_storage_impl();
         let backup_dir = TempPath::new();
@@ -663,6 +665,7 @@ mod dbtool_tests {
     //   - block 3 ends at version 29, no reconfig (final LedgerInfo in epoch 3)
     // So LedgerInfos exist at versions 0, 11, 13, and 29; 30 total versions.
     #[test]
+    #[serial]
     fn test_restore_db_with_trusted_waypoint_smoke() {
         let backup_dir = TempPath::new();
         backup_dir.create_as_dir().unwrap();
@@ -796,6 +799,7 @@ mod dbtool_tests {
     }
 
     #[test]
+    #[serial]
     fn test_restore_db_with_replay() {
         let backup_dir = TempPath::new();
         backup_dir.create_as_dir().unwrap();
@@ -821,6 +825,7 @@ mod dbtool_tests {
         rt.shutdown_timeout(Duration::from_secs(1));
     }
     #[test]
+    #[serial]
     fn test_restore_archive_db() {
         let backup_dir = TempPath::new();
         backup_dir.create_as_dir().unwrap();
@@ -839,6 +844,7 @@ mod dbtool_tests {
     }
 
     #[test]
+    #[serial]
     fn test_resume_db_from_kv_replay() {
         let backup_dir = TempPath::new();
         backup_dir.create_as_dir().unwrap();
@@ -878,6 +884,7 @@ mod dbtool_tests {
     }
 
     #[test]
+    #[serial]
     fn test_restore_with_sharded_db() {
         let backup_dir = TempPath::new();
         backup_dir.create_as_dir().unwrap();
