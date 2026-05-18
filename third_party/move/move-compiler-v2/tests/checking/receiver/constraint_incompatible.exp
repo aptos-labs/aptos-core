@@ -1,0 +1,13 @@
+
+Diagnostics:
+error: unable to infer instantiation of type `&fun self.get_nav(&..):u64 + struct{is_isolated}` (consider providing type arguments or annotating the type)
+   ┌─ tests/checking/receiver/constraint_incompatible.move:19:16
+   │
+19 │         apply(|x| {
+   │                ^
+
+error: unable to infer instantiation of type `_` (consider providing type arguments or annotating the type)
+   ┌─ tests/checking/receiver/constraint_incompatible.move:20:21
+   │
+20 │             let _ = x.is_isolated;
+   │                     ^^^^^^^^^^^^^

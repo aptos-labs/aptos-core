@@ -26,8 +26,8 @@ module 0xc0ffee::m {
         42
     }
     fun test2(): u64 {
-        let _v0 = Func2::V1{bar: |arg0| lambda__1__test2(arg0)};
-        let _v1 = Func2::V2{bar: |arg0| lambda__2__test2(arg0), x: 44};
+        let _v0 = Func2::V1{bar: |x| lambda__1__test2(x)};
+        let _v1 = Func2::V2{bar: |x| lambda__2__test2(x), x: 44};
         let _v2 = *&(&_v0).bar;
         let _v3 = _v2(42);
         let _v4 = *&(&_v1).x;

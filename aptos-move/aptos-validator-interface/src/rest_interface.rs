@@ -246,15 +246,7 @@ impl AptosValidatorInterface for RestDebuggerInterface {
             println!("Got {}/{} txns from RestApi.", txns.len(), limit);
         }
 
-        // Get auxiliary info from REST client
-        let auxiliary_infos = self
-            .0
-            .get_persisted_auxiliary_infos(start, limit)
-            .await
-            .unwrap_or_else(|_e| {
-                // Instead of returning an error, return a Vec filled with PersistedAuxiliaryInfo::None
-                (0..limit).map(|_| PersistedAuxiliaryInfo::None).collect()
-            });
+        let auxiliary_infos = self.get_persisted_auxiliary_infos(start, limit).await?;
 
         Ok((txns, txn_infos, auxiliary_infos))
     }
@@ -373,17 +365,28 @@ impl AptosValidatorInterface for RestDebuggerInterface {
         start: Version,
         limit: u64,
     ) -> Result<Vec<PersistedAuxiliaryInfo>> {
-        // TODO: Once testnet and mainnet are upgraded to v1.37, return error when the REST API fails.
-        // self.0
-        //  .get_persisted_auxiliary_infos(start, limit)
-        //  .await
-        //  .map_err(|e| anyhow!(e))
-        match self.0.get_persisted_auxiliary_infos(start, limit).await {
-            Ok(auxiliary_infos) => Ok(auxiliary_infos),
-            Err(_) => {
-                // Fallback to empty auxiliary info when REST API fails
-                Ok(vec![PersistedAuxiliaryInfo::None; limit as usize])
-            },
+        let mut auxiliary_infos = Vec::with_capacity(limit as usize);
+        while auxiliary_infos.len() < limit as usize {
+            let batch_start = start + auxiliary_infos.len() as u64;
+            let batch_limit = limit - auxiliary_infos.len() as u64;
+            match self
+                .0
+                .get_persisted_auxiliary_infos(batch_start, batch_limit)
+                .await
+            {
+                Ok(batch) => {
+                    if batch.is_empty() {
+                        break;
+                    }
+                    auxiliary_infos.extend(batch);
+                },
+                Err(_) => {
+                    // Fallback to empty auxiliary info when REST API fails
+                    auxiliary_infos.resize(limit as usize, PersistedAuxiliaryInfo::None);
+                    break;
+                },
+            }
         }
+        Ok(auxiliary_infos)
     }
 }

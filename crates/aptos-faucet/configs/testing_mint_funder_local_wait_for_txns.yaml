@@ -12,13 +12,13 @@ funder_config:
   node_url: "http://127.0.0.1:8080"
   chain_id: 4
   wait_for_transactions: true
-  maximum_amount: 100
-  maximum_amount_with_bypass: 10000
   assets:
     apt:
       do_not_delegate: false
       key_file_path: "/tmp/mint.key"
       mint_account_address: "0xA550C18"
+      maximum_amount: 100
+      maximum_amount_with_bypass: 10000
 handler_config:
   use_helpful_errors: true
   return_rejections_early: false

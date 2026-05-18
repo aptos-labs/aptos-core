@@ -1,3 +1,4 @@
+// @checks=experimental
 module 0xc0ffee::m {
   use std::vector;
 
@@ -105,6 +106,7 @@ module 0xc0ffee::m {
     B { x: u64 },
   }
 
+  #[lint::skip(unused_function)]
   fun enum_variant_swap() {
     let e = E::A { x: 5 };
     let f : u64;

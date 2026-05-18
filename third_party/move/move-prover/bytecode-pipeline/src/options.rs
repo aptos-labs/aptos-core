@@ -1,6 +1,7 @@
-// Copyright (c) The Diem Core Contributors
-// Copyright (c) The Move Contributors
-// SPDX-License-Identifier: Apache-2.0
+// Parts of the file are Copyright (c) The Diem Core Contributors
+// Parts of the file are Copyright (c) The Move Contributors
+// Parts of the file are Copyright (c) Aptos Foundation
+// All Aptos Foundation code and content is licensed pursuant to the Innovation-Enabling Source Code License, available at https://github.com/aptos-labs/aptos-core/blob/main/LICENSE
 
 use codespan_reporting::diagnostic::Severity;
 use move_model::model::{GlobalEnv, VerificationScope};
@@ -74,10 +75,24 @@ pub struct ProverOptions {
     /// Whether to skip loop analysis.
     #[arg(skip)]
     pub skip_loop_analysis: bool,
+    /// Whether to run spec inference instead of verification.
+    #[arg(skip)]
+    pub inference: bool,
+    /// Do not add `pragma opaque` to inferred specs.
+    #[arg(long)]
+    pub no_inference_opaque: bool,
     /// Optional names of native methods (qualified with module name, e.g., m::foo) implementing
     /// mutable borrow semantics
     #[arg(skip)]
     pub borrow_natives: Vec<String>,
+    /// Targets to exclude from verification. Each entry must be
+    /// `VerificationScope::Only(name)` or `VerificationScope::OnlyModule(name)`.
+    #[arg(skip)]
+    pub verify_exclude: Vec<VerificationScope>,
+    /// Inline spec let bindings by substituting the expression directly into conditions,
+    /// instead of creating Identical temps.
+    #[arg(long, default_value_t = false)]
+    pub inline_spec_lets: bool,
 }
 
 // add custom struct for mutation options
@@ -98,7 +113,11 @@ impl Default for ProverOptions {
             unconditional_abort_as_inconsistency: false,
             for_interpretation: false,
             skip_loop_analysis: false,
+            inference: false,
+            no_inference_opaque: false,
             borrow_natives: vec![],
+            verify_exclude: vec![],
+            inline_spec_lets: false,
         }
     }
 }

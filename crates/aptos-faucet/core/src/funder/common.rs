@@ -7,7 +7,7 @@ use aptos_config::keys::ConfigKey;
 use aptos_logger::{info, warn};
 use aptos_sdk::{
     crypto::ed25519::Ed25519PrivateKey,
-    rest_client::Client,
+    rest_client::{AptosBaseUrl, Client},
     types::{account_address::AccountAddress, chain_id::ChainId, transaction::SignedTransaction},
 };
 use clap::Parser;
@@ -79,16 +79,6 @@ impl ApiConnectionConfig {
 
 #[derive(Clone, Debug, Deserialize, Serialize)]
 pub struct TransactionSubmissionConfig {
-    /// Maximum amount of OCTA to give an account.
-    maximum_amount: Option<u64>,
-
-    /// With this it is possible to set a different maximum amount for requests that
-    /// were allowed to skip the Checkers by a Bypasser. This can be helpful for CI,
-    /// where we might need to mint a greater amount than is normally required in the
-    /// standard case. If not given, maximum_amount is used whether the request
-    /// bypassed the checks or not.
-    maximum_amount_with_bypass: Option<u64>,
-
     /// How long to wait between fetching updated gas unit prices.
     #[serde(default = "TransactionSubmissionConfig::default_gas_unit_price_ttl_secs")]
     gas_unit_price_ttl_secs: u16,
@@ -116,8 +106,6 @@ pub struct TransactionSubmissionConfig {
 
 impl TransactionSubmissionConfig {
     pub fn new(
-        maximum_amount: Option<u64>,
-        maximum_amount_with_bypass: Option<u64>,
         gas_unit_price_ttl_secs: u16,
         gas_unit_price_override: Option<u64>,
         max_gas_amount: u64,
@@ -126,8 +114,6 @@ impl TransactionSubmissionConfig {
         wait_for_transactions: bool,
     ) -> Self {
         Self {
-            maximum_amount,
-            maximum_amount_with_bypass,
             gas_unit_price_ttl_secs,
             gas_unit_price_override,
             max_gas_amount,
@@ -155,20 +141,6 @@ impl TransactionSubmissionConfig {
 
     pub fn get_gas_unit_price_ttl_secs(&self) -> Duration {
         Duration::from_secs(self.gas_unit_price_ttl_secs.into())
-    }
-
-    /// If a Bypasser let the request bypass the Checkers and
-    /// maximum_amount_with_bypass is set, this function will return
-    /// that. Otherwise it will return maximum_amount.
-    pub fn get_maximum_amount(
-        &self,
-        // True if a Bypasser let the request bypass the Checkers.
-        did_bypass_checkers: bool,
-    ) -> Option<u64> {
-        match (self.maximum_amount_with_bypass, did_bypass_checkers) {
-            (Some(max), true) => Some(max),
-            _ => self.maximum_amount,
-        }
     }
 }
 
@@ -238,9 +210,26 @@ pub struct GasUnitPriceManager {
 }
 
 impl GasUnitPriceManager {
-    pub fn new(node_url: Url, cache_ttl: Duration) -> Self {
+    pub fn new(
+        node_url: Url,
+        cache_ttl: Duration,
+        api_key: Option<String>,
+        additional_headers: Option<&HashMap<String, String>>,
+    ) -> Self {
+        let mut builder = Client::builder(AptosBaseUrl::Custom(node_url));
+
+        if let Some(api_key) = api_key {
+            builder = builder.api_key(&api_key).expect("Failed to set API key");
+        }
+
+        if let Some(headers) = additional_headers {
+            for (key, value) in headers {
+                builder = builder.header(key, value).expect("Failed to set header");
+            }
+        }
+
         Self {
-            api_client: aptos_sdk::rest_client::Client::new(node_url),
+            api_client: builder.build(),
             gas_unit_price: AtomicU64::new(0),
             last_updated: Arc::new(RwLock::new(None)),
             cache_ttl,

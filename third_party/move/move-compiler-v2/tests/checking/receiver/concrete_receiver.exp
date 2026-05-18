@@ -1,0 +1,144 @@
+// -- Model dump before first bytecode pipeline
+module 0x42::m {
+    struct G<T,R> {
+        x: T,
+        y: R,
+    }
+    struct Inner {
+        val: u64,
+    }
+    private fun consume(self: G<u64, bool>): u64 {
+        select m::G.x<G<u64, bool>>(self)
+    }
+    private fun get_inner_val(self: &G<Inner, u64>): u64 {
+        select m::Inner.val<Inner>(select m::G.x<&G<Inner, u64>>(self))
+    }
+    private fun get_x(self: &G<u64, bool>): u64 {
+        select m::G.x<&G<u64, bool>>(self)
+    }
+    private fun get_y(self: &G<u64, bool>): bool {
+        select m::G.y<&G<u64, bool>>(self)
+    }
+    private fun set_x(self: &mut G<u64, bool>,v: u64) {
+        select m::G.x<&mut G<u64, bool>>(self) = v
+    }
+    private fun sum_first(self: &G<vector<u64>, bool>): u64 {
+        Deref(vector::borrow<u64>(Borrow(Immutable)(select m::G.x<&G<vector<u64>, bool>>(self)), 0))
+    }
+    private fun test_basic_call() {
+        {
+          let g: G<u64, bool> = pack m::G<u64, bool>(42, true);
+          if Eq<u64>(m::get_x(Borrow(Immutable)(g)), 42) {
+            Tuple()
+          } else {
+            Abort(0)
+          };
+          if Eq<bool>(m::get_y(Borrow(Immutable)(g)), true) {
+            Tuple()
+          } else {
+            Abort(1)
+          };
+          Tuple()
+        }
+    }
+    private fun test_consume_call() {
+        {
+          let g: G<u64, bool> = pack m::G<u64, bool>(42, true);
+          if Eq<u64>(m::consume(g), 42) {
+            Tuple()
+          } else {
+            Abort(0)
+          };
+          Tuple()
+        }
+    }
+    private fun test_mut_ref_call() {
+        {
+          let g: G<u64, bool> = pack m::G<u64, bool>(42, true);
+          m::set_x(Borrow(Mutable)(g), 99);
+          if Eq<u64>(m::get_x(Borrow(Immutable)(g)), 99) {
+            Tuple()
+          } else {
+            Abort(0)
+          };
+          Tuple()
+        }
+    }
+    private fun test_nested_type_arg() {
+        {
+          let g: G<Inner, u64> = pack m::G<Inner, u64>(pack m::Inner(10), 20);
+          if Eq<u64>(m::get_inner_val(Borrow(Immutable)(g)), 10) {
+            Tuple()
+          } else {
+            Abort(0)
+          };
+          Tuple()
+        }
+    }
+    private fun test_ref_call() {
+        {
+          let g: G<u64, bool> = pack m::G<u64, bool>(42, true);
+          {
+            let r: &G<u64, bool> = Borrow(Immutable)(g);
+            if Eq<u64>(m::get_x(r), 42) {
+              Tuple()
+            } else {
+              Abort(0)
+            };
+            Tuple()
+          }
+        }
+    }
+} // end 0x42::m
+
+// -- Sourcified model before first bytecode pipeline
+module 0x42::m {
+    struct G<T, R> has copy, drop {
+        x: T,
+        y: R,
+    }
+    struct Inner has copy, drop {
+        val: u64,
+    }
+    fun consume(self: G<u64, bool>): u64 {
+        self.x
+    }
+    fun get_inner_val(self: &G<Inner, u64>): u64 {
+        self.x.val
+    }
+    fun get_x(self: &G<u64, bool>): u64 {
+        self.x
+    }
+    fun get_y(self: &G<u64, bool>): bool {
+        self.y
+    }
+    fun set_x(self: &mut G<u64, bool>, v: u64) {
+        self.x = v
+    }
+    fun sum_first(self: &G<vector<u64>, bool>): u64 {
+        *0x1::vector::borrow<u64>(&self.x, 0)
+    }
+    fun test_basic_call() {
+        let g = G<u64, bool>{x: 42, y: true};
+        if (get_x(&g) == 42) () else abort 0;
+        if (get_y(&g) == true) () else abort 1;
+    }
+    fun test_consume_call() {
+        let g = G<u64, bool>{x: 42, y: true};
+        if (consume(g) == 42) () else abort 0;
+    }
+    fun test_mut_ref_call() {
+        let g = G<u64, bool>{x: 42, y: true};
+        set_x(&mut g, 99);
+        if (get_x(&g) == 99) () else abort 0;
+    }
+    fun test_nested_type_arg() {
+        let g = G<Inner, u64>{x: Inner{val: 10}, y: 20};
+        if (get_inner_val(&g) == 10) () else abort 0;
+    }
+    fun test_ref_call() {
+        let g = G<u64, bool>{x: 42, y: true};
+        let r = &g;
+        if (get_x(r) == 42) () else abort 0;
+    }
+}

@@ -1,0 +1,9 @@
+[package]
+name = "public_struct_enum_test"
+version = "0.0.0"
+
+[addresses]
+account = "_"
+
+[dependencies]
+MoveStdlib = { local = "../../../../../aptos-move/framework/move-stdlib" }

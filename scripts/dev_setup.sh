@@ -16,17 +16,18 @@
 # fast fail.
 set -eo pipefail
 
-NODE_MAJOR_VERSION=20
+NODE_MAJOR_VERSION=24
+PNPM_VERSION=10.32.1
 SHELLCHECK_VERSION=0.7.1
 GRCOV_VERSION=0.8.2
-KUBECTL_VERSION=1.18.6
-TERRAFORM_VERSION=0.12.26
-HELM_VERSION=3.2.4
+KUBECTL_VERSION=1.35.1
+TERRAFORM_VERSION=1.14.7
+HELM_VERSION=4.1.3
 VAULT_VERSION=1.5.0
-Z3_VERSION=4.11.2
+Z3_VERSION=4.13.0
 CVC5_VERSION=0.0.3
 DOTNET_VERSION=8.0
-BOOGIE_VERSION=3.5.1
+BOOGIE_VERSION=3.5.6
 ALLURE_VERSION=2.15.pr1135
 # this is 3.21.4; the "3" is silent
 PROTOC_VERSION=21.4
@@ -120,18 +121,30 @@ function install_build_essentials {
   #fi
 }
 
-function install_clang {
+function install_clang_lld {
   PACKAGE_MANAGER=$1
   VERSION=${2:-21}
 
   if [[ "$PACKAGE_MANAGER" == "apt-get" ]]; then
-    "${PRE_COMMAND[@]}" apt-get install -y gnupg lsb-release software-properties-common wget
-    "${PRE_COMMAND[@]}" bash -c "$(wget -O - https://apt.llvm.org/llvm.sh)" llvm.sh "${VERSION}"
+    # Skip installation entirely if the desired clang version is already
+    # present and functional.  CI AMIs ship with clang pre-installed and
+    # the LLVM nightly apt repo frequently rotates out old .deb files,
+    # which causes apt-get install/upgrade to 404.
+    if command -v "clang-${VERSION}" &>/dev/null; then
+      echo "clang-${VERSION} already installed, skipping."
+    else
+      "${PRE_COMMAND[@]}" apt-get install -y gnupg lsb-release software-properties-common wget
+      "${PRE_COMMAND[@]}" bash -c "$(wget -O - https://apt.llvm.org/llvm.sh)" llvm.sh "${VERSION}"
+    fi
     "${PRE_COMMAND[@]}" update-alternatives --install /usr/bin/clang clang "/usr/bin/clang-${VERSION}" 100
     "${PRE_COMMAND[@]}" update-alternatives --install /usr/bin/clang++ clang++ "/usr/bin/clang++-${VERSION}" 100
+    "${PRE_COMMAND[@]}" update-alternatives --install /usr/bin/lld lld "/usr/bin/lld-${VERSION}" 100
   else
     install_pkg clang "$PACKAGE_MANAGER"
     install_pkg llvm "$PACKAGE_MANAGER"
+    if [[ "$(uname)" == "Linux" ]]; then
+      install_pkg lld "$PACKAGE_MANAGER"
+    fi
   fi
 }
 
@@ -266,20 +279,23 @@ function install_terraform {
 }
 
 function install_kubectl {
-  VERSION=$(kubectl version client --short=true | head -1 || true)
+  VERSION=$(kubectl version --client | grep -e '^Client Version: v' || true)
   if [[ "$VERSION" != "Client Version: v${KUBECTL_VERSION}" ]]; then
     if [[ $(uname -s) == "Darwin" ]]; then
       install_pkg kubectl brew
     else
-      MACHINE=$(uname -m)
+      # shellcheck disable=SC2155
+      local MACHINE=$(uname -m)
       if [[ $MACHINE == "x86_64" ]]; then
         MACHINE="amd64"
       fi
-      curl -sL -o "${INSTALL_DIR}"/kubectl "https://storage.googleapis.com/kubernetes-release/release/v${KUBECTL_VERSION}/bin/$(uname -s | tr '[:upper:]' '[:lower:]')/${MACHINE}/kubectl"
+      # shellcheck disable=SC2155
+      local OS=$(uname -s | tr '[:upper:]' '[:lower:]')
+      curl -sL -o "${INSTALL_DIR}"/kubectl "https://dl.k8s.io/v${KUBECTL_VERSION}/bin/${OS}/${MACHINE}/kubectl"
       chmod +x "${INSTALL_DIR}"/kubectl
     fi
   fi
-  kubectl version client --short=true | head -1 || true
+  kubectl version --client | grep -e '^Client Version:' || true
 }
 
 function install_awscli {
@@ -519,7 +535,7 @@ function install_cargo_machete {
 
 function install_cargo_nextest {
   if ! command -v cargo-nextest &>/dev/null; then
-    cargo install cargo-nextest --locked --version 0.9.85
+    cargo install cargo-nextest --locked --version 0.9.130
   fi
 }
 
@@ -592,7 +608,7 @@ function install_z3 {
     if [[ "$(uname -m)" == "arm64" ]]; then
       Z3_PKG="z3-$Z3_VERSION-arm64-osx-11.0"
     else
-      Z3_PKG="z3-$Z3_VERSION-x64-osx-10.16"
+      Z3_PKG="z3-$Z3_VERSION-x64-osx-11.7.0"
     fi
   else
     echo "Z3 support not configured for this platform (uname=$(uname))"
@@ -682,7 +698,7 @@ function install_nodejs {
 }
 
 function install_pnpm {
-  curl -fsSL https://get.pnpm.io/install.sh | env PNPM_VERSION=8.2.0 SHELL="$(which bash)" bash -
+  curl -fsSL https://get.pnpm.io/install.sh | env PNPM_VERSION="${PNPM_VERSION}" SHELL="$(which bash)" bash -
 }
 
 function install_python3 {
@@ -709,13 +725,6 @@ function install_postgres {
   fi
   if [[ "$PACKAGE_MANAGER" == "brew" ]]; then
     install_pkg postgresql "$PACKAGE_MANAGER"
-  fi
-}
-
-function install_lld {
-  # Right now, only install lld for linux
-  if [[ "$(uname)" == "Linux" ]]; then
-    install_pkg lld "$PACKAGE_MANAGER"
   fi
 }
 
@@ -991,12 +1000,11 @@ install_pkg wget "$PACKAGE_MANAGER"
 if [[ "$INSTALL_BUILD_TOOLS" == "true" ]]; then
   install_build_essentials "$PACKAGE_MANAGER"
   install_pkg cmake "$PACKAGE_MANAGER"
-  install_clang "$PACKAGE_MANAGER"
+  install_clang_lld "$PACKAGE_MANAGER"
 
   install_openssl_dev "$PACKAGE_MANAGER"
   install_pkg_config "$PACKAGE_MANAGER"
 
-  install_lld
   install_libdw
 
   install_rustup "$BATCH_MODE"

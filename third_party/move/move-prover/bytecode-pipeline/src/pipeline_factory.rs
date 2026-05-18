@@ -1,6 +1,7 @@
-// Copyright (c) The Diem Core Contributors
-// Copyright (c) The Move Contributors
-// SPDX-License-Identifier: Apache-2.0
+// Parts of the file are Copyright (c) The Diem Core Contributors
+// Parts of the file are Copyright (c) The Move Contributors
+// Parts of the file are Copyright (c) Aptos Foundation
+// All Aptos Foundation code and content is licensed pursuant to the Innovation-Enabling Source Code License, available at https://github.com/aptos-labs/aptos-core/blob/main/LICENSE
 
 use crate::{
     clean_and_optimize::CleanAndOptimizeProcessor,
@@ -10,9 +11,9 @@ use crate::{
     global_invariant_instrumentation::GlobalInvariantInstrumentationProcessor,
     inconsistency_check::InconsistencyCheckInstrumenter, loop_analysis::LoopAnalysisProcessor,
     memory_instrumentation::MemoryInstrumentationProcessor, mono_analysis::MonoAnalysisProcessor,
-    mut_ref_instrumentation::MutRefInstrumenter,
+    mut_ref_instrumentation::MutRefInstrumenter, normalize_exits::NormalizeExitsProcessor,
     number_operation_analysis::NumberOperationProcessor, options::ProverOptions,
-    spec_instrumentation::SpecInstrumentationProcessor,
+    spec_inference::SpecInferenceProcessor, spec_instrumentation::SpecInstrumentationProcessor,
     verification_analysis::VerificationAnalysisProcessor,
     well_formed_instrumentation::WellFormedInstrumentationProcessor,
 };
@@ -36,10 +37,15 @@ pub fn default_pipeline_with_options(options: &ProverOptions) -> FunctionTargetP
         LiveVarAnalysisProcessor::new(),
         BorrowAnalysisProcessor::new_borrow_natives(options.borrow_natives.clone()),
         MemoryInstrumentationProcessor::new(),
+    ];
+
+    processors.append(&mut vec![
         CleanAndOptimizeProcessor::new(),
         UsageProcessor::new(),
         VerificationAnalysisProcessor::new(),
-    ];
+    ]);
+
+    processors.push(NormalizeExitsProcessor::new());
 
     if !options.skip_loop_analysis {
         processors.push(LoopAnalysisProcessor::new());
@@ -52,17 +58,21 @@ pub fn default_pipeline_with_options(options: &ProverOptions) -> FunctionTargetP
         GlobalInvariantInstrumentationProcessor::new(),
         WellFormedInstrumentationProcessor::new(),
         DataInvariantInstrumentationProcessor::new(),
-        // monomorphization
-        MonoAnalysisProcessor::new(),
     ]);
 
-    // inconsistency check instrumentation should be the last one in the pipeline
-    if options.check_inconsistency {
-        processors.push(InconsistencyCheckInstrumenter::new());
-    }
+    if options.inference {
+        processors.push(SpecInferenceProcessor::new(options.stable_test_output));
+    } else {
+        // monomorphization
+        processors.push(MonoAnalysisProcessor::new());
 
-    if !options.for_interpretation {
-        processors.push(NumberOperationProcessor::new());
+        if options.check_inconsistency {
+            processors.push(InconsistencyCheckInstrumenter::new());
+        }
+
+        if !options.for_interpretation {
+            processors.push(NumberOperationProcessor::new());
+        }
     }
 
     let mut res = FunctionTargetPipeline::default();
@@ -91,6 +101,7 @@ pub fn experimental_pipeline() -> FunctionTargetPipeline {
         CleanAndOptimizeProcessor::new(),
         UsageProcessor::new(),
         VerificationAnalysisProcessor::new(),
+        NormalizeExitsProcessor::new(),
         LoopAnalysisProcessor::new(),
         // spec instrumentation
         SpecInstrumentationProcessor::new(),

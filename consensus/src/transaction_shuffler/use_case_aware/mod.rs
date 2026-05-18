@@ -14,6 +14,7 @@ pub(crate) mod types;
 pub(crate) mod utils;
 
 pub(crate) mod delayed_queue;
+pub(crate) mod encrypted_txns_aware;
 #[cfg(test)]
 mod tests;
 

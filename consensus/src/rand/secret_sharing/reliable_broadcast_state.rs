@@ -5,7 +5,7 @@ use crate::{
     logging::{LogEvent, LogSchema},
     rand::secret_sharing::{
         network_messages::SecretShareMessage, secret_share_store::SecretShareStore,
-        types::RequestSecretShare,
+        types::RequestSecretShare, verifier::SecretShareVerifier,
     },
 };
 use anyhow::ensure;
@@ -13,25 +13,25 @@ use aptos_consensus_types::common::Author;
 use aptos_infallible::Mutex;
 use aptos_logger::info;
 use aptos_reliable_broadcast::BroadcastStatus;
-use aptos_types::secret_sharing::{SecretShare, SecretShareConfig, SecretShareMetadata};
+use aptos_types::secret_sharing::{SecretShare, SecretShareMetadata};
 use std::sync::Arc;
 
 pub struct SecretShareAggregateState {
     secret_share_metadata: SecretShareMetadata,
     secret_share_store: Arc<Mutex<SecretShareStore>>,
-    secret_share_config: SecretShareConfig,
+    verifier: Arc<SecretShareVerifier>,
 }
 
 impl SecretShareAggregateState {
     pub fn new(
         secret_share_store: Arc<Mutex<SecretShareStore>>,
         secret_share_metadata: SecretShareMetadata,
-        secret_share_config: SecretShareConfig,
+        verifier: Arc<SecretShareVerifier>,
     ) -> Self {
         Self {
             secret_share_store,
             secret_share_metadata,
-            secret_share_config,
+            verifier,
         }
     }
 }
@@ -49,7 +49,7 @@ impl BroadcastStatus<SecretShareMessage, SecretShareMessage> for Arc<SecretShare
             self.secret_share_metadata,
             share.metadata()
         );
-        share.verify(&self.secret_share_config)?;
+        self.verifier.optimistic_verify(&share, &peer)?;
         info!(LogSchema::new(LogEvent::ReceiveReactiveSecretShare)
             .epoch(share.epoch())
             .round(share.metadata().round)
@@ -57,5 +57,88 @@ impl BroadcastStatus<SecretShareMessage, SecretShareMessage> for Arc<SecretShare
         let mut store = self.secret_share_store.lock();
         let aggregated = store.add_share(share)?.then_some(());
         Ok(aggregated)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::rand::secret_sharing::{
+        secret_share_store::{SecretShareAggregationResult, SecretShareStore},
+        test_utils::{create_metadata, create_secret_share, TestContext},
+        verifier::SecretShareVerifier,
+    };
+    use futures_channel::mpsc::{unbounded, UnboundedReceiver};
+
+    fn make_state(
+        ctx: &TestContext,
+        metadata: &SecretShareMetadata,
+    ) -> (
+        Arc<SecretShareAggregateState>,
+        UnboundedReceiver<SecretShareAggregationResult>,
+    ) {
+        let (tx, rx) = unbounded();
+        let verifier = Arc::new(SecretShareVerifier::new(
+            ctx.secret_share_config.clone(),
+            true,
+        ));
+        let mut store = SecretShareStore::new(ctx.epoch, ctx.authors[0], verifier.clone(), tx);
+        store.update_highest_known_round(metadata.round);
+
+        // Add self share so the store is in PendingDecision state
+        let self_share = create_secret_share(ctx, 0, metadata);
+        store.add_self_share(self_share).unwrap();
+
+        let state = Arc::new(SecretShareAggregateState::new(
+            Arc::new(Mutex::new(store)),
+            metadata.clone(),
+            verifier,
+        ));
+        (state, rx)
+    }
+
+    #[test]
+    fn test_broadcast_add_happy_path() {
+        let ctx = TestContext::new(vec![1, 1, 1, 1]);
+        let metadata = create_metadata(ctx.epoch, 5);
+        let (state, _rx) = make_state(&ctx, &metadata);
+
+        // Valid share accepted, returns Ok(None) when below threshold
+        let share = create_secret_share(&ctx, 1, &metadata);
+        let result = state.add(ctx.authors[1], share);
+        assert!(result.is_ok());
+        assert!(result.unwrap().is_none());
+    }
+
+    #[tokio::test]
+    async fn test_broadcast_add_triggers_aggregation() {
+        let ctx = TestContext::new(vec![1, 1, 1, 1]);
+        let metadata = create_metadata(ctx.epoch, 5);
+        let (state, mut rx) = make_state(&ctx, &metadata);
+
+        // Add enough shares to trigger aggregation
+        // With 4 validators weight 1 each and threshold 3, we need 3 shares total.
+        // Self share (weight 1) is already in the store. We need 2 more peer shares.
+        for i in 1..=2 {
+            let share = create_secret_share(&ctx, i, &metadata);
+            let result = state.add(ctx.authors[i], share).unwrap();
+            if i < 2 {
+                assert!(result.is_none());
+            } else {
+                // Threshold met, state transitions to Aggregating
+                assert!(result.is_some());
+            }
+        }
+
+        // Verify decision arrives on channel
+        use futures::StreamExt;
+        let result = tokio::time::timeout(std::time::Duration::from_secs(5), rx.next())
+            .await
+            .expect("Timed out waiting for decision")
+            .expect("Channel closed unexpectedly");
+        match result {
+            SecretShareAggregationResult::Success(key) => assert_eq!(key.metadata, metadata),
+            SecretShareAggregationResult::Failure { .. } => panic!("Expected success"),
+        }
     }
 }

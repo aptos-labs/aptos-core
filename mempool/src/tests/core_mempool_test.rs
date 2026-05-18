@@ -574,7 +574,6 @@ fn test_reset_sequence_number_on_failure() {
     ];
     let hashes: Vec<_> = txns
         .iter()
-        .cloned()
         .map(|txn| txn.make_signed_transaction().committed_hash())
         .collect();
     // Add two transactions for account.
@@ -1270,7 +1269,7 @@ fn test_parking_lot_eviction_benchmark() {
     add_signed_txn(&mut pool, huge_signed_txn).unwrap();
     let time_to_evict_ms = now.elapsed().as_millis();
 
-    let has_remainder = huge_txn_size % small_txn_size != 0;
+    let has_remainder = !huge_txn_size.is_multiple_of(small_txn_size);
     let num_expected_evicted = num_small_txns / 2 + has_remainder as usize;
     assert_eq!(
         pool.get_parking_lot_size(),

@@ -1,6 +1,7 @@
-// Copyright (c) The Diem Core Contributors
-// Copyright (c) The Move Contributors
-// SPDX-License-Identifier: Apache-2.0
+// Parts of the file are Copyright (c) The Diem Core Contributors
+// Parts of the file are Copyright (c) The Move Contributors
+// Parts of the file are Copyright (c) Aptos Foundation
+// All Aptos Foundation code and content is licensed pursuant to the Innovation-Enabling Source Code License, available at https://github.com/aptos-labs/aptos-core/blob/main/LICENSE
 
 #![forbid(unsafe_code)]
 
@@ -17,11 +18,9 @@ use either::Either;
 use legacy_move_compiler::{compiled_unit::AnnotatedCompiledUnit, shared::NumericalAddress};
 use move_asm::assembler;
 use move_binary_format::{
-    binary_views::BinaryIndexedView,
     file_format::{CompiledModule, CompiledScript},
     file_format_common::VERSION_MAX,
 };
-use move_bytecode_source_map::mapping::SourceMapping;
 use move_command_line_common::{
     address::ParsedAddress,
     files::{DECOMPILED_EXTENSION, DISASSEMBLED_EXTENSION, MOVE_ASM_EXTENSION, MOVE_EXTENSION},
@@ -36,8 +35,6 @@ use move_core_types::{
     language_storage::{ModuleId, StructTag, TypeTag},
     value::MoveTypeLayout,
 };
-use move_disassembler::disassembler::{Disassembler, DisassemblerOptions};
-use move_ir_types::location::Spanned;
 use move_model::{metadata::LanguageVersion, model::GlobalEnv};
 use move_symbol_pool::Symbol;
 use move_vm_runtime::move_vm::SerializedReturnValues;
@@ -376,12 +373,7 @@ pub trait MoveTestAdapter<'a>: Sized {
                         self.cross_compile_task(&source);
                         self.cross_compile_script(&script)
                             .unwrap_or_else(|e| panic!("cross-compilation failed: {}", e));
-                        if self.run_config().using_masm() {
-                            move_asm::disassembler::disassemble_script(String::new(), &script)?
-                        } else {
-                            disassembler_for_view(BinaryIndexedView::Script(&script))
-                                .disassemble()?
-                        }
+                        move_asm::disassembler::disassemble_script(String::new(), &script)?
                     },
                     PrintBytecodeInputChoice::Module => {
                         let (_data, _named_addr_opt, module, _warnings_opt) =
@@ -389,16 +381,7 @@ pub trait MoveTestAdapter<'a>: Sized {
                         self.cross_compile_task(&source);
                         self.cross_compile_module(&module)
                             .unwrap_or_else(|e| panic!("cross-compilation failed: {}", e));
-                        if self.run_config().using_masm() {
-                            move_asm::disassembler::disassemble_module(
-                                String::new(),
-                                &module,
-                                false,
-                            )?
-                        } else {
-                            disassembler_for_view(BinaryIndexedView::Module(&module))
-                                .disassemble()?
-                        }
+                        move_asm::disassembler::disassemble_module(String::new(), &module)?
                     },
                 };
                 Ok(Some(result))
@@ -417,11 +400,7 @@ pub trait MoveTestAdapter<'a>: Sized {
                 self.register_temp_filename(&data);
                 // If bytecode printing is enabled, call the disassembler.
                 let printed = if print_bytecode {
-                    let out = if self.run_config().using_masm() {
-                        move_asm::disassembler::disassemble_module(String::new(), &module, false)?
-                    } else {
-                        disassembler_for_view(BinaryIndexedView::Module(&module)).disassemble()?
-                    };
+                    let out = move_asm::disassembler::disassemble_module(String::new(), &module)?;
                     Some(format!(
                         "\n== BEGIN Bytecode ==\n{}\n== END Bytecode ==",
                         out
@@ -466,11 +445,7 @@ pub trait MoveTestAdapter<'a>: Sized {
                 let (script, warning_opt) =
                     self.compile_script(syntax, data, start_line, command_lines_stop)?;
                 let printed = if print_bytecode {
-                    let out = if self.run_config().using_masm() {
-                        move_asm::disassembler::disassemble_script(String::new(), &script)?
-                    } else {
-                        disassembler_for_view(BinaryIndexedView::Script(&script)).disassemble()?
-                    };
+                    let out = move_asm::disassembler::disassemble_script(String::new(), &script)?;
                     Some(format!(
                         "\n== BEGIN Bytecode ==\n{}\n== END Bytecode ==",
                         out
@@ -602,7 +577,7 @@ pub trait MoveTestAdapter<'a>: Sized {
                 },
                 SyntaxChoice::ASM => {
                     let mut out = String::new();
-                    move_asm::disassembler::disassemble_module(&mut out, module, false)?;
+                    move_asm::disassembler::disassemble_module(&mut out, module)?;
                     out
                 },
             };
@@ -722,11 +697,6 @@ pub trait MoveTestAdapter<'a>: Sized {
             Some(output.join("\n"))
         }
     }
-}
-fn disassembler_for_view(view: BinaryIndexedView) -> Disassembler {
-    let source_mapping =
-        SourceMapping::new_from_view(view, Spanned::unsafe_no_loc(()).loc).expect("source mapping");
-    Disassembler::new(source_mapping, DisassemblerOptions::new())
 }
 
 impl<'a> CompiledState<'a> {

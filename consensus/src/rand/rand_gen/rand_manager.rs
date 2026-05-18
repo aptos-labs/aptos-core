@@ -10,12 +10,12 @@ use crate::{
         aug_data_store::AugDataStore,
         block_queue::{BlockQueue, QueueItem},
         network_messages::{RandMessage, RpcRequest},
-        rand_store::RandStore,
+        rand_store::{AggregationResult, RandCheckFuture, RandStore},
         reliable_broadcast_state::{
             AugDataCertBuilder, CertifiedAugDataAckState, ShareAggregateState,
         },
         storage::interface::RandStorage,
-        types::{FastShare, PathType, RandConfig, RequestShare, TAugmentedData, TShare},
+        types::{RandConfig, RequestShare, TAugmentedData, TShare},
     },
 };
 use aptos_bounded_executor::BoundedExecutor;
@@ -23,7 +23,7 @@ use aptos_channels::aptos_channel;
 use aptos_config::config::ReliableBroadcastConfig;
 use aptos_consensus_types::common::{Author, Round};
 use aptos_infallible::Mutex;
-use aptos_logger::{error, info, spawn_named, trace, warn};
+use aptos_logger::{debug, error, info, spawn_named, trace, warn};
 use aptos_network::{protocols::network::RpcError, ProtocolId};
 use aptos_reliable_broadcast::{DropGuard, ReliableBroadcast};
 use aptos_time_service::TimeService;
@@ -56,8 +56,8 @@ pub struct RandManager<S: TShare, D: TAugmentedData> {
     reliable_broadcast: Arc<ReliableBroadcast<RandMessage<S, D>, ExponentialBackoff>>,
     network_sender: Arc<NetworkSender>,
 
-    // local channel received from rand_store
-    decision_rx: Receiver<Randomness>,
+    // local channel received from rand_store for aggregation results
+    decision_rx: Receiver<AggregationResult>,
     // downstream channels
     outgoing_blocks: Sender<OrderedBlocks>,
     // local state
@@ -65,8 +65,8 @@ pub struct RandManager<S: TShare, D: TAugmentedData> {
     aug_data_store: AugDataStore<D>,
     block_queue: BlockQueue,
 
-    // for randomness fast path
-    fast_config: Option<RandConfig>,
+    // sender for aggregation results, shared with rand_store and skip listeners
+    decision_tx: Sender<AggregationResult>,
 }
 
 impl<S: TShare, D: TAugmentedData> RandManager<S, D> {
@@ -75,7 +75,6 @@ impl<S: TShare, D: TAugmentedData> RandManager<S, D> {
         epoch_state: Arc<EpochState>,
         signer: Arc<ValidatorSigner>,
         config: RandConfig,
-        fast_config: Option<RandConfig>,
         outgoing_blocks: Sender<OrderedBlocks>,
         network_sender: Arc<NetworkSender>,
         db: Arc<dyn RandStorage<D>>,
@@ -86,6 +85,7 @@ impl<S: TShare, D: TAugmentedData> RandManager<S, D> {
             .factor(rb_config.backoff_policy_factor)
             .max_delay(Duration::from_millis(rb_config.backoff_policy_max_delay_ms));
         let reliable_broadcast = Arc::new(ReliableBroadcast::new(
+            "rand_manager",
             author,
             epoch_state.verifier.get_ordered_account_addresses(),
             network_sender.clone(),
@@ -99,16 +99,9 @@ impl<S: TShare, D: TAugmentedData> RandManager<S, D> {
             epoch_state.epoch,
             author,
             config.clone(),
-            fast_config.clone(),
-            decision_tx,
+            decision_tx.clone(),
         )));
-        let aug_data_store = AugDataStore::new(
-            epoch_state.epoch,
-            signer,
-            config.clone(),
-            fast_config.clone(),
-            db,
-        );
+        let aug_data_store = AugDataStore::new(epoch_state.epoch, signer, config.clone(), db);
 
         Self {
             author,
@@ -125,44 +118,72 @@ impl<S: TShare, D: TAugmentedData> RandManager<S, D> {
             aug_data_store,
             block_queue: BlockQueue::new(),
 
-            fast_config,
+            decision_tx,
         }
     }
 
     fn process_incoming_blocks(&mut self, blocks: OrderedBlocks) {
         let rounds: Vec<u64> = blocks.ordered_blocks.iter().map(|b| b.round()).collect();
-        info!(rounds = rounds, "Processing incoming blocks.");
+        debug!(rounds = rounds, "Processing incoming blocks.");
+
+        // Create rand_check shared futures from the pipeline's has_rand_txns_fut.
+        // Uses has_rand_txns_fut which resolves early (before randomness aggregation)
+        // to avoid deadlock: rand_check_fut waits for randomness, but aggregation
+        // waits for rand_check_fut to know if randomness is needed.
         let broadcast_handles: Vec<_> = blocks
             .ordered_blocks
             .iter()
-            .map(|block| FullRandMetadata::from(block.block()))
-            .map(|metadata| self.process_incoming_metadata(metadata))
+            .map(|block| {
+                let rand_check_future = block.pipeline_futs().map(|futs| {
+                    let round = block.round();
+                    let has_rand_txns = futs.has_rand_txns_fut.clone();
+                    let decision_tx = self.decision_tx.clone();
+                    let shared_future = async move {
+                        let need_rand = match has_rand_txns.await {
+                            Ok(need_rand) => need_rand,
+                            Err(e) => {
+                                warn!("has_rand_txns_fut failed for round {}: {e}, defaulting to needs_randomness=true", round);
+                                true
+                            },
+                        };
+                        // If the block doesn't need randomness, send Skip to unblock it
+                        // before the share threshold is reached.
+                        if !need_rand {
+                            let _ = decision_tx
+                                .unbounded_send(AggregationResult::Skip { round });
+                        }
+                        need_rand
+                    }
+                    .boxed()
+                    .shared();
+                    tokio::spawn(shared_future.clone());
+                    shared_future
+                });
+                let metadata = FullRandMetadata::from(block.block());
+                self.process_incoming_metadata(metadata, rand_check_future)
+            })
             .collect();
         let queue_item = QueueItem::new(blocks, Some(broadcast_handles));
         self.block_queue.push_back(queue_item);
     }
 
-    fn process_incoming_metadata(&self, metadata: FullRandMetadata) -> DropGuard {
+    fn process_incoming_metadata(
+        &self,
+        metadata: FullRandMetadata,
+        rand_check_future: Option<RandCheckFuture>,
+    ) -> DropGuard {
         let self_share = S::generate(&self.config, metadata.metadata.clone());
-        info!(LogSchema::new(LogEvent::BroadcastRandShare)
+        debug!(LogSchema::new(LogEvent::BroadcastRandShare)
             .epoch(self.epoch_state.epoch)
             .author(self.author)
             .round(metadata.round()));
         let mut rand_store = self.rand_store.lock();
         rand_store.update_highest_known_round(metadata.round());
         rand_store
-            .add_share(self_share.clone(), PathType::Slow)
+            .add_share(self_share.clone())
             .expect("Add self share should succeed");
 
-        if let Some(fast_config) = &self.fast_config {
-            let self_fast_share =
-                FastShare::new(S::generate(fast_config, metadata.metadata.clone()));
-            rand_store
-                .add_share(self_fast_share.rand_share(), PathType::Fast)
-                .expect("Add self share for fast path should succeed");
-        }
-
-        rand_store.add_rand_metadata(metadata.clone());
+        rand_store.add_rand_metadata(metadata.clone(), rand_check_future);
         self.network_sender
             .broadcast_without_self(RandMessage::<S, D>::Share(self_share).into_network_message());
         self.spawn_aggregate_shares_task(metadata.metadata)
@@ -174,7 +195,7 @@ impl<S: TShare, D: TAugmentedData> RandManager<S, D> {
             .flat_map(|b| b.ordered_blocks.iter().map(|b3| b3.round()))
             .collect();
         fail_point!("rand_manager::process_ready_blocks", |_| {});
-        info!(rounds = rounds, "Processing rand-ready blocks.");
+        debug!(rounds = rounds, "Processing rand-ready blocks.");
 
         for blocks in ready_blocks {
             let _ = self.outgoing_blocks.unbounded_send(blocks);
@@ -189,6 +210,10 @@ impl<S: TShare, D: TAugmentedData> RandManager<S, D> {
         };
         self.block_queue = BlockQueue::new();
         self.rand_store.lock().reset(target_round);
+        // Drain stale decision messages (Success/Skip) from previously spawned
+        // aggregation tasks and shared futures to prevent them from affecting
+        // new blocks that may arrive at the same rounds after reset.
+        while matches!(self.decision_rx.try_next(), Ok(Some(_))) {}
         self.stop = matches!(signal, ResetSignal::Stop);
         let _ = tx.send(ResetAck::default());
     }
@@ -223,29 +248,23 @@ impl<S: TShare, D: TAugmentedData> RandManager<S, D> {
         mut incoming_rpc_request: aptos_channel::Receiver<Author, IncomingRandGenRequest>,
         verified_msg_tx: UnboundedSender<RpcRequest<S, D>>,
         rand_config: RandConfig,
-        fast_rand_config: Option<RandConfig>,
         bounded_executor: BoundedExecutor,
     ) {
         while let Some(rand_gen_msg) = incoming_rpc_request.next().await {
             let tx = verified_msg_tx.clone();
             let epoch_state_clone = epoch_state.clone();
             let config_clone = rand_config.clone();
-            let fast_config_clone = fast_rand_config.clone();
             bounded_executor
                 .spawn_blocking(move || {
                     match bcs::from_bytes::<RandMessage<S, D>>(rand_gen_msg.req.data()) {
                         Ok(msg) => {
                             if msg
-                                .verify(
-                                    &epoch_state_clone,
-                                    &config_clone,
-                                    &fast_config_clone,
-                                    rand_gen_msg.sender,
-                                )
+                                .verify(&epoch_state_clone, &config_clone, rand_gen_msg.sender)
                                 .is_ok()
                             {
                                 let _ = tx.unbounded_send(RpcRequest {
                                     req: msg,
+                                    sender: rand_gen_msg.sender,
                                     protocol: rand_gen_msg.protocol,
                                     response_sender: rand_gen_msg.response_sender,
                                 });
@@ -306,7 +325,7 @@ impl<S: TShare, D: TAugmentedData> RandManager<S, D> {
         let data = self
             .aug_data_store
             .get_my_aug_data()
-            .unwrap_or_else(|| D::generate(&self.config, &self.fast_config));
+            .unwrap_or_else(|| D::generate(&self.config));
         // Add it synchronously to avoid race that it sends to others but panics before it persists locally.
         self.aug_data_store
             .add_aug_data(data.clone())
@@ -357,7 +376,6 @@ impl<S: TShare, D: TAugmentedData> RandManager<S, D> {
         let (verified_msg_tx, mut verified_msg_rx) = unbounded();
         let epoch_state = self.epoch_state.clone();
         let rand_config = self.config.clone();
-        let fast_rand_config = self.fast_config.clone();
         self.rand_store
             .lock()
             .update_highest_known_round(highest_known_round);
@@ -368,7 +386,6 @@ impl<S: TShare, D: TAugmentedData> RandManager<S, D> {
                 incoming_rpc_request,
                 verified_msg_tx,
                 rand_config,
-                fast_rand_config,
                 bounded_executor,
             )
         );
@@ -384,12 +401,22 @@ impl<S: TShare, D: TAugmentedData> RandManager<S, D> {
                     while matches!(incoming_blocks.try_next(), Ok(Some(_))) {}
                     self.process_reset(reset);
                 }
-                Some(randomness) = self.decision_rx.next()  => {
-                    self.process_randomness(randomness);
+                Some(result) = self.decision_rx.next() => {
+                    match result {
+                        AggregationResult::Success { randomness, .. } => {
+                            self.process_randomness(randomness);
+                        },
+                        AggregationResult::Skip { round, .. } => {
+                            if let Some(item) = self.block_queue.item_mut(round) {
+                                item.set_randomness(round, Randomness::default());
+                            }
+                        },
+                    }
                 }
                 Some(request) = verified_msg_rx.next() => {
                     let RpcRequest {
                         req: rand_gen_msg,
+                        sender,
                         protocol,
                         response_sender,
                     } = request;
@@ -401,7 +428,7 @@ impl<S: TShare, D: TAugmentedData> RandManager<S, D> {
                                     let share = maybe_share.unwrap_or_else(|| {
                                         // reproduce previous share if not found
                                         let share = S::generate(&self.config, request.rand_metadata().clone());
-                                        self.rand_store.lock().add_share(share.clone(), PathType::Slow).expect("Add self share should succeed");
+                                        self.rand_store.lock().add_share(share.clone()).expect("Add self share should succeed");
                                         share
                                     });
                                     self.process_response(protocol, response_sender, RandMessage::Share(share));
@@ -418,19 +445,14 @@ impl<S: TShare, D: TAugmentedData> RandManager<S, D> {
                                 .round(share.metadata().round)
                                 .remote_peer(*share.author()));
 
-                            if let Err(e) = self.rand_store.lock().add_share(share, PathType::Slow) {
+                            if share.author() != &sender {
+                                warn!(
+                                    "[RandManager] Share author {:?} does not match sender {:?}, dropping",
+                                    share.author(),
+                                    sender,
+                                );
+                            } else if let Err(e) = self.rand_store.lock().add_share(share) {
                                 warn!("[RandManager] Failed to add share: {}", e);
-                            }
-                        }
-                        RandMessage::FastShare(share) => {
-                            trace!(LogSchema::new(LogEvent::ReceiveRandShareFastPath)
-                                .author(self.author)
-                                .epoch(share.epoch())
-                                .round(share.metadata().round)
-                                .remote_peer(*share.share.author()));
-
-                            if let Err(e) = self.rand_store.lock().add_share(share.rand_share(), PathType::Fast) {
-                                warn!("[RandManager] Failed to add share for fast path: {}", e);
                             }
                         }
                         RandMessage::AugData(aug_data) => {

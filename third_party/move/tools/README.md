@@ -10,8 +10,7 @@ Move has a number of tools associated with it. This directory contains all,
 or almost all of them. The following crates in this directory are libraries
 that are used by the [`move-cli`](./move-cli) `package` subcommand:
 
-* `move-bytecode-viewer`
-* `move-disassembler`
+* `move-asm`
 * `move-unit-test`
 * `move-package`
 * `move-coverage`
@@ -30,9 +29,7 @@ or how a normal Move user would interact with these tools, you should first
 look at the Move CLI (specifically the `package` subdirectory/command) as
 that is responsible for stitching everything together. If you are looking
 for where the logic for a specific tool is defined, this is most likely in
-the specific crate for that tool (e.g., if you want to see how TUIs are
-handled for the `move-bytecode-viewer` that's defined in the
-`move-bytecode-viewer` crate, and not the `move-cli` crate).
+the specific crate for that tool.
 
 Some of the crates mentioned above are also binaries at the moment, however
 they should all be able to be made libaries only, with the possible

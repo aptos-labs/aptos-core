@@ -545,10 +545,33 @@ impl RuntimeModuleMetadataV1 {
             && self.struct_attributes.is_empty()
     }
 
-    pub fn extract_abort_info(&self, code: u64) -> Option<AbortInfo> {
+    pub fn extract_abort_info_legacy(&self, code: u64) -> Option<AbortInfo> {
         self.error_map
             .get(&(code & 0xFFF))
             .or_else(|| self.error_map.get(&code))
+            .map(|descr| AbortInfo {
+                reason_name: descr.code_name.clone(),
+                description: descr.code_description.clone(),
+            })
+    }
+
+    /// Returns the abort info for the given abort code, if any. Tries the full code first, then
+    /// falls back to the lower 2 bytes (the reason) if the upper 5 bytes are zero.
+    ///
+    /// This skips compiler-generated codes such as `UNSPECIFIED_ABORT_CODE`, which have a
+    /// non-zero upper 5 bytes and are not associated with any user-defined error.
+    pub fn extract_abort_info(&self, code: u64) -> Option<AbortInfo> {
+        self.error_map
+            .get(&code)
+            .or_else(|| {
+                // Only extract the reason for canonical std::error codes (upper 5 bytes zero).
+                if code >> 24 == 0 {
+                    let reason = code & 0xFFFF;
+                    self.error_map.get(&reason)
+                } else {
+                    None
+                }
+            })
             .map(|descr| AbortInfo {
                 reason_name: descr.code_name.clone(),
                 description: descr.code_description.clone(),

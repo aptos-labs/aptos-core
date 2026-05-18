@@ -1,0 +1,21 @@
+//# publish --print-bytecode
+module 0x66::test_borrow_variant_field_wrong_enum_ownership
+
+enum Either has drop
+  Left
+    value: u64
+  Right
+    value: u64
+
+enum EitherClone has drop
+  Left
+    value: u64
+  Right
+    value: u64
+
+// Invalid: borrow$Either$0 borrows from EitherClone's variant field handle.
+// The field type, offset, and variant name match, but the handle belongs to the wrong enum.
+#[borrow(0)] public fun borrow$Either$0(l0: &Either): &u64
+    move_loc l0
+    borrow_variant_field EitherClone, Left::value
+    ret

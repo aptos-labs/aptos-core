@@ -8,9 +8,10 @@ use aptos_temppath::TempPath;
 use aptos_types::{
     account_address::AccountAddress,
     account_config::events::new_block::{new_block_event_key, NewBlockEvent},
+    aggregate_signature::AggregateSignature,
     contract_event::ContractEvent,
     ledger_info::LedgerInfoWithSignatures,
-    proptest_types::{AccountInfoUniverse, LedgerInfoWithSignaturesGen},
+    proptest_types::{AccountInfoUniverse, LedgerInfoGen},
     state_store::state_storage_usage::StateStorageUsage,
     transaction::Version,
 };
@@ -25,13 +26,16 @@ use std::path::Path;
 fn arb_ledger_infos_with_sigs() -> impl Strategy<Value = Vec<LedgerInfoWithSignatures>> {
     (
         any_with::<AccountInfoUniverse>(3),
-        vec((any::<LedgerInfoWithSignaturesGen>(), 1..50usize), 1..50),
+        vec((any::<LedgerInfoGen>(), 1..50usize), 1..50),
     )
         .prop_map(|(mut universe, gens)| {
             let ledger_infos_with_sigs: Vec<_> = gens
                 .into_iter()
                 .map(|(ledger_info_gen, block_size)| {
-                    ledger_info_gen.materialize(&mut universe, block_size)
+                    let ledger_info = ledger_info_gen.materialize(&mut universe, block_size);
+                    // Skip expensive BLS signing — these tests verify DB operations, not signature
+                    // validity.
+                    LedgerInfoWithSignatures::new(ledger_info, AggregateSignature::empty())
                 })
                 .collect();
             assert_eq!(get_first_epoch(&ledger_infos_with_sigs), 0);

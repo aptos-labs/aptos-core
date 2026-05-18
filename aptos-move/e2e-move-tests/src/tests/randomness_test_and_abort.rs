@@ -38,7 +38,7 @@ fn test_and_abort_defense_is_sound_and_correct() {
     set_randomness_seed(&mut h);
 
     h.set_default_gas_unit_price(100);
-    h.set_max_gas_per_txn(10000); // Should match the default required gas amount.
+    h.set_max_gas_per_txn(100_000); // Should match the default required gas amount.
 
     // This is a safe call that the randomness API should allow through.
     let status = run_entry_func(
@@ -86,7 +86,7 @@ fn test_unbiasable_annotation() {
     set_randomness_seed(&mut h);
 
     h.set_default_gas_unit_price(100);
-    h.set_max_gas_per_txn(10000); // Should match the default required gas amount.
+    h.set_max_gas_per_txn(100_000); // Should match the default required gas amount.
 
     let should_succeed = [
         "0x1::test::ok_if_not_annotated_and_not_using_randomness",

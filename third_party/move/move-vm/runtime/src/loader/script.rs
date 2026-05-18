@@ -1,5 +1,7 @@
-// Copyright (c) The Move Contributors
-// SPDX-License-Identifier: Apache-2.0
+// Parts of the file are Copyright (c) The Diem Core Contributors
+// Parts of the file are Copyright (c) The Move Contributors
+// Parts of the file are Copyright (c) Aptos Foundation
+// All Aptos Foundation code and content is licensed pursuant to the Innovation-Enabling Source Code License, available at https://github.com/aptos-labs/aptos-core/blob/main/LICENSE
 
 use super::{
     convert_tok_to_type, single_signature_loader::load_single_signatures_for_script, Function,
@@ -17,6 +19,7 @@ use move_core_types::{
     language_storage::{pseudo_script_module_id, ModuleId},
 };
 use move_vm_types::{
+    instr::Instruction,
     loaded_data::{
         runtime_access_specifier::AccessSpecifier,
         runtime_types::{StructIdentifier, Type},
@@ -103,7 +106,12 @@ impl Script {
             });
         }
 
-        let code = script.code.code.iter().map(|b| b.clone().into()).collect();
+        let code = script
+            .code
+            .code
+            .iter()
+            .map(|b| Instruction::try_from(b.clone()))
+            .collect::<PartialVMResult<Vec<_>>>()?;
         let parameters = script.signature_at(script.parameters).clone();
 
         let param_tys = parameters
@@ -139,6 +147,7 @@ impl Script {
             is_persistent: false,
             has_module_reentrancy_lock: false,
             is_trusted: false,
+            struct_api: None,
         });
 
         let single_signature_token_map = load_single_signatures_for_script(&script, &struct_names)?;

@@ -83,6 +83,25 @@ pub fn connections_rejected(
     ])
 }
 
+static APTOS_PRIORITY_PEER_EVICTIONS: Lazy<IntCounterVec> = Lazy::new(|| {
+    register_int_counter_vec!(
+        "aptos_priority_peer_evictions",
+        "Number of non-priority peers evicted to make room for priority peers",
+        &["role_type", "network_id"]
+    )
+    .unwrap()
+});
+
+/// Updates the counter for priority peer evictions
+pub fn update_priority_peer_evictions(network_context: &NetworkContext) {
+    APTOS_PRIORITY_PEER_EVICTIONS
+        .with_label_values(&[
+            network_context.role().as_str(),
+            network_context.network_id().as_str(),
+        ])
+        .inc();
+}
+
 pub static APTOS_NETWORK_PEER_CONNECTED: Lazy<IntGaugeVec> = Lazy::new(|| {
     register_int_gauge_vec!(
         "aptos_network_peer_connected",
@@ -539,6 +558,42 @@ pub static PENDING_PEER_NETWORK_NOTIFICATIONS: Lazy<IntGauge> = Lazy::new(|| {
     )
     .unwrap()
 });
+
+/// Number of inbound messages throttled (delayed) by the per-peer rate limiter
+pub static APTOS_NETWORK_INBOUND_RATE_LIMITER_THROTTLED_COUNT: Lazy<IntCounterVec> =
+    Lazy::new(|| {
+        register_int_counter_vec!(
+            "aptos_network_inbound_rate_limiter_throttled_count",
+            "Number of inbound messages throttled by the rate limiter per bucket type",
+            &["bucket"]
+        )
+        .unwrap()
+    });
+
+/// Increments the throttled-message counter for the given bucket type
+pub fn inc_inbound_rate_limiter_throttled(bucket_label: &str) {
+    APTOS_NETWORK_INBOUND_RATE_LIMITER_THROTTLED_COUNT
+        .with_label_values(&[bucket_label])
+        .inc();
+}
+
+/// Number of inbound messages rejected because they exceed the bucket's maximum capacity
+pub static APTOS_NETWORK_INBOUND_RATE_LIMITER_CAPACITY_EXCEEDED_COUNT: Lazy<IntCounterVec> =
+    Lazy::new(|| {
+        register_int_counter_vec!(
+            "aptos_network_inbound_rate_limiter_capacity_exceeded_count",
+            "Number of inbound messages rejected because they exceed the bucket capacity",
+            &["bucket"]
+        )
+        .unwrap()
+    });
+
+/// Increments the capacity-exceeded counter for the given bucket type
+pub fn inc_inbound_rate_limiter_capacity_exceeded(bucket_label: &str) {
+    APTOS_NETWORK_INBOUND_RATE_LIMITER_CAPACITY_EXCEEDED_COUNT
+        .with_label_values(&[bucket_label])
+        .inc();
+}
 
 pub static NETWORK_RATE_LIMIT_METRICS: Lazy<HistogramVec> = Lazy::new(|| {
     register_histogram_vec!(

@@ -82,6 +82,8 @@ async fn test_impl(block_gas_limit: u64, concurrency_level: u16) {
                 20,
             ),
         ]],
+        false,
+        None,
     )
     .await
     .unwrap();

@@ -1,0 +1,9 @@
+
+Diagnostics:
+error: match not exhaustive
+  ┌─ tests/match-checks/range_full_domain_witness.move:3:16
+  │
+3 │         match ((x, b)) {
+  │                ^^^^^^
+  │
+  = missing at least `(_, false)`

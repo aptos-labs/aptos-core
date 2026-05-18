@@ -1,7 +1,9 @@
 // Copyright (c) Aptos Foundation
 // Licensed pursuant to the Innovation-Enabling Source Code License, available at https://github.com/aptos-labs/aptos-core/blob/main/LICENSE
 use aptos_batch_encryption::{
-    schemes::fptx::FPTX, shared::key_derivation::BIBEDecryptionKeyShare,
+    schemes::fptx::FPTX,
+    shared::key_derivation::BIBEDecryptionKeyShare,
+    tests::{decrypt_all, prepare_all},
     traits::BatchThresholdEncryption,
 };
 use aptos_crypto::arkworks::shamir::ShamirThresholdConfig;
@@ -232,6 +234,35 @@ pub fn reconstruct_decryption_key(c: &mut Criterion) {
     }
 }
 
+pub fn prepare(c: &mut Criterion) {
+    let mut group = c.benchmark_group("FPTX::prepare (full batch, all cts)");
+
+    for batch_size in [32, 128, 512, 2048] {
+        let mut rng = thread_rng();
+        let tc = ShamirThresholdConfig::new(1, 1);
+        let (ek, dk, _, _) = FPTX::setup_for_testing(rng.r#gen(), batch_size, 1, &tc).unwrap();
+
+        let msg: String = String::from("hi");
+        let associated_data = String::from("");
+
+        let cts: Vec<<FPTX as BatchThresholdEncryption>::Ciphertext> = (0..batch_size)
+            .map(|_| FPTX::encrypt(&ek, &mut rng, &msg, &associated_data).unwrap())
+            .collect();
+
+        let (d, pfs_promise) = FPTX::digest(&dk, &cts, 0).unwrap();
+
+        let pfs = FPTX::eval_proofs_compute_all(&pfs_promise, &dk);
+
+        group.bench_with_input(
+            BenchmarkId::from_parameter(batch_size),
+            &(cts, d, pfs),
+            |b, input| {
+                b.iter(|| prepare_all::<FPTX, String>(&input.0, &input.1, &input.2).unwrap());
+            },
+        );
+    }
+}
+
 pub fn decrypt(c: &mut Criterion) {
     let mut group = c.benchmark_group("FPTX::decrypt (full batch, all cts)");
 
@@ -264,7 +295,7 @@ pub fn decrypt(c: &mut Criterion) {
             BenchmarkId::from_parameter(batch_size),
             &(dk, prepared_cts),
             |b, input| {
-                b.iter(|| FPTX::decrypt::<String>(&input.0, &input.1).unwrap());
+                b.iter(|| decrypt_all::<FPTX, String>(&input.0, &input.1).unwrap());
             },
         );
     }
@@ -280,6 +311,7 @@ criterion_group!(
     derive_decryption_key_share,
     verify_decryption_key_share,
     reconstruct_decryption_key,
+    prepare,
     decrypt
 );
 criterion_main!(benches);

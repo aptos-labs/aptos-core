@@ -71,6 +71,11 @@ pub struct RedisRatelimitCheckerConfig {
     /// The password of the given user, if necessary.
     pub database_password: Option<String>,
 
+    /// Optional prefix for all Redis keys. This allows multiple faucets to share
+    /// a single Redis instance without key collisions.
+    #[serde(default)]
+    pub key_prefix: Option<String>,
+
     /// Max number of requests per key per day. 500s are not counted, because they are
     /// not the user's fault, but everything else is.
     pub max_requests_per_day: u32,
@@ -182,7 +187,6 @@ impl RedisRatelimitChecker {
         })
     }
 
-    // Returns the key and the seconds until the next day.
     fn get_key_and_secs_until_next_day(
         &self,
         ratelimit_key_prefix: &str,
@@ -190,12 +194,21 @@ impl RedisRatelimitChecker {
     ) -> (String, u64) {
         let now_secs = get_current_time_secs();
         let seconds_until_next_day = seconds_until_next_day(now_secs);
-        let key = format!(
-            "{}:{}:{}",
-            ratelimit_key_prefix,
-            ratelimit_key_value,
-            days_since_tap_epoch(now_secs)
-        );
+        let key = match &self.args.key_prefix {
+            Some(prefix) => format!(
+                "{}:{}:{}:{}",
+                prefix,
+                ratelimit_key_prefix,
+                ratelimit_key_value,
+                days_since_tap_epoch(now_secs)
+            ),
+            None => format!(
+                "{}:{}:{}",
+                ratelimit_key_prefix,
+                ratelimit_key_value,
+                days_since_tap_epoch(now_secs)
+            ),
+        };
         (key, seconds_until_next_day)
     }
 

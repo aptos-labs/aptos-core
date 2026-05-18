@@ -13,9 +13,6 @@ Follow instructions on how to run a fullnode against an existing network.
 * Get genesis, waypoint, and fullnode.yaml
 * Add following to fullnode.yaml
   * ```
-    storage:
-      enable_indexer: true
-    
     indexer_grpc:
       enabled: true
       address: 0.0.0.0:50051

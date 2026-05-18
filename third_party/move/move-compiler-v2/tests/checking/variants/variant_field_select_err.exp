@@ -1,0 +1,13 @@
+
+Diagnostics:
+error: field `0` not found in variant `Empty` of `&State`
+   ┌─ tests/checking/variants/variant_field_select_err.move:13:9
+   │
+13 │         s.Empty.0
+   │         ^^^^^^^^^
+
+error: field `Foo` not declared in any of the variants of enum `State`
+   ┌─ tests/checking/variants/variant_field_select_err.move:18:9
+   │
+18 │         s.Foo.0
+   │         ^

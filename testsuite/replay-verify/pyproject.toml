@@ -14,6 +14,7 @@ google-cloud-container = "^2.53.0"
 google-cloud-storage = "^2.18.2"
 psutil = "^6.1.0"
 tenacity = "^9.0.0"
+dateparser = "^1.2.0"
 
 
 [tool.poetry.group.dev.dependencies]

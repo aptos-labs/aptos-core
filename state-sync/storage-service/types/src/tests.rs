@@ -620,7 +620,7 @@ fn create_optimistic_fetch_request(
     let random_number = get_random_u64();
 
     // Determine the data request type based on the random number
-    let data_request = if random_number % 3 == 0 {
+    let data_request = if random_number.is_multiple_of(3) {
         DataRequest::GetNewTransactionsWithProof(NewTransactionsWithProofRequest {
             known_version,
             known_epoch: get_random_u64(),
@@ -653,7 +653,7 @@ fn create_optimistic_fetch_request_v2(
     let random_number = get_random_u64();
 
     // Determine the data request type based on the random number
-    let data_request = if random_number % 3 == 0 {
+    let data_request = if random_number.is_multiple_of(3) {
         DataRequest::get_new_transaction_data_with_proof(
             known_version,
             get_random_u64(),
@@ -722,7 +722,7 @@ fn create_subscription_request(known_version: u64, use_compression: bool) -> Sto
     let random_number = get_random_u64();
 
     // Determine the data request type based on the random number
-    let data_request = if random_number % 3 == 0 {
+    let data_request = if random_number.is_multiple_of(3) {
         DataRequest::SubscribeTransactionsWithProof(SubscribeTransactionsWithProofRequest {
             subscription_stream_metadata,
             include_events: false,
@@ -764,7 +764,7 @@ fn create_subscription_request_v2(
     let random_number = get_random_u64();
 
     // Determine the data request type based on the random number
-    let data_request = if random_number % 3 == 0 {
+    let data_request = if random_number.is_multiple_of(3) {
         DataRequest::subscribe_transaction_data_with_proof(
             subscription_stream_metadata,
             get_random_u64(),

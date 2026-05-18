@@ -70,8 +70,8 @@ use aptos_types::{
     epoch_state::EpochState,
     ledger_info::LedgerInfo,
     on_chain_config::{
-        ConsensusAlgorithmConfig, OnChainConsensusConfig, OnChainJWKConsensusConfig,
-        OnChainRandomnessConfig,
+        ConsensusAlgorithmConfig, OnChainChunkyDKGConfig, OnChainConsensusConfig,
+        OnChainJWKConsensusConfig, OnChainRandomnessConfig,
     },
     transaction::SignedTransaction,
     validator_signer::ValidatorSigner,
@@ -399,7 +399,6 @@ impl NodeSetup {
                 None,
                 vec![],
                 hashmap![],
-                false,
             ))
         } else {
             Arc::new(DirectMempoolPayloadManager::new())
@@ -413,10 +412,12 @@ impl NodeSetup {
             10, // max pruned blocks in mem
             time_service.clone(),
             10,
+            60,
             payload_manager,
             false,
             window_size,
             Arc::new(Mutex::new(PendingBlocks::new())),
+            None,
             None,
         ));
         let block_store_clone = Arc::clone(&block_store);
@@ -475,7 +476,7 @@ impl NodeSetup {
             local_config,
             onchain_randomness_config.clone(),
             onchain_jwk_consensus_config.clone(),
-            None,
+            OnChainChunkyDKGConfig::default_disabled(),
             Arc::new(MockPastProposalStatusTracker {}),
             opt_proposal_loopback_tx,
         );

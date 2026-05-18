@@ -14,16 +14,24 @@ use crate::{
     },
 };
 use anyhow::ensure;
+use aptos_channels::aptos_channel;
 use aptos_config::config::BatchTransactionFilterConfig;
-use aptos_consensus_types::proof_of_store::{BatchInfoExt, TBatchInfo};
+use aptos_consensus_types::{
+    common::verify_batch_info_limits,
+    proof_of_store::{BatchInfoExt, BatchKind, TBatchInfo},
+};
 use aptos_logger::prelude::*;
 use aptos_short_hex_str::AsShortHexStr;
 use aptos_types::PeerId;
+use futures::StreamExt;
 use std::sync::Arc;
-use tokio::sync::{
-    mpsc::{Receiver, Sender},
-    oneshot,
-};
+use tokio::sync::{mpsc::Sender, oneshot};
+
+#[derive(Clone, Debug, Eq, Hash, PartialEq)]
+pub enum BatchCoordinatorQueueKey {
+    Author(PeerId),
+    Control,
+}
 
 #[derive(Debug)]
 pub enum BatchCoordinatorCommand {
@@ -39,6 +47,7 @@ pub struct BatchCoordinator {
     sender_to_batch_generator: Arc<Sender<BatchGeneratorCommand>>,
     batch_store: Arc<BatchStore>,
     max_batch_txns: u64,
+    max_encrypted_batch_txns: u64,
     max_batch_bytes: u64,
     max_total_txns: u64,
     max_total_bytes: u64,
@@ -54,6 +63,7 @@ impl BatchCoordinator {
         sender_to_batch_generator: Sender<BatchGeneratorCommand>,
         batch_store: Arc<BatchStore>,
         max_batch_txns: u64,
+        max_encrypted_batch_txns: u64,
         max_batch_bytes: u64,
         max_total_txns: u64,
         max_total_bytes: u64,
@@ -67,6 +77,7 @@ impl BatchCoordinator {
             sender_to_batch_generator: Arc::new(sender_to_batch_generator),
             batch_store,
             max_batch_txns,
+            max_encrypted_batch_txns,
             max_batch_bytes,
             max_total_txns,
             max_total_bytes,
@@ -99,11 +110,17 @@ impl BatchCoordinator {
                 })
                 .collect();
 
-            if persist_requests[0].batch_info().is_v2() {
+            let first_batch_info = persist_requests[0].batch_info().clone();
+            if first_batch_info.is_v2() {
                 let signed_batch_infos = batch_store.persist(persist_requests);
                 if !signed_batch_infos.is_empty() {
                     if approx_created_ts_usecs > 0 {
-                        observe_batch(approx_created_ts_usecs, peer_id, BatchStage::SIGNED);
+                        observe_batch(
+                            approx_created_ts_usecs,
+                            peer_id,
+                            BatchStage::SIGNED,
+                            &first_batch_info,
+                        );
                     }
                     network_sender
                         .send_signed_batch_info_msg_v2(signed_batch_infos, vec![peer_id])
@@ -117,7 +134,12 @@ impl BatchCoordinator {
                         .expect("must not be empty")
                         .is_v2());
                     if approx_created_ts_usecs > 0 {
-                        observe_batch(approx_created_ts_usecs, peer_id, BatchStage::SIGNED);
+                        observe_batch(
+                            approx_created_ts_usecs,
+                            peer_id,
+                            BatchStage::SIGNED,
+                            &first_batch_info,
+                        );
                     }
                     let signed_batch_infos = signed_batch_infos
                         .into_iter()
@@ -138,18 +160,19 @@ impl BatchCoordinator {
         let mut total_txns = 0;
         let mut total_bytes = 0;
         for batch in batches.iter() {
-            ensure!(
-                batch.num_txns() <= self.max_batch_txns,
-                "Exceeds batch txn limit {} > {}",
-                batch.num_txns(),
+            verify_batch_info_limits(
+                batch.batch_info(),
                 self.max_batch_txns,
-            );
-            ensure!(
-                batch.num_bytes() <= self.max_batch_bytes,
-                "Exceeds batch bytes limit {} > {}",
-                batch.num_bytes(),
                 self.max_batch_bytes,
-            );
+            )?;
+            if batch.batch_info().batch_kind() == Some(BatchKind::Encrypted) {
+                ensure!(
+                    batch.num_txns() <= self.max_encrypted_batch_txns,
+                    "Exceeds encrypted batch txn limit {} > {}",
+                    batch.num_txns(),
+                    self.max_encrypted_batch_txns,
+                );
+            }
 
             total_txns += batch.num_txns();
             total_bytes += batch.num_bytes();
@@ -222,6 +245,7 @@ impl BatchCoordinator {
                 approx_created_ts_usecs,
                 batch.author(),
                 BatchStage::RECEIVED,
+                batch.batch_info(),
             );
         }
 
@@ -244,8 +268,11 @@ impl BatchCoordinator {
         self.persist_and_send_digests(persist_requests, approx_created_ts_usecs);
     }
 
-    pub(crate) async fn start(mut self, mut command_rx: Receiver<BatchCoordinatorCommand>) {
-        while let Some(command) = command_rx.recv().await {
+    pub(crate) async fn start(
+        mut self,
+        mut command_rx: aptos_channel::Receiver<BatchCoordinatorQueueKey, BatchCoordinatorCommand>,
+    ) {
+        while let Some(command) = command_rx.next().await {
             match command {
                 BatchCoordinatorCommand::Shutdown(ack_tx) => {
                     ack_tx

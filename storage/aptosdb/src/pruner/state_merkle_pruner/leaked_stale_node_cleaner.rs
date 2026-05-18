@@ -100,7 +100,7 @@ fn run_cleanup(
     epoch_target_version: u64,
     batch_size: usize,
 ) -> Result<()> {
-    let num_shards = state_merkle_db.hack_num_real_shards();
+    let num_shards = state_merkle_db.num_shards();
 
     // Clean shard DBs first.
     for shard_id in 0..num_shards {

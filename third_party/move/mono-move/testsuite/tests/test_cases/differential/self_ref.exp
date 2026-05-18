@@ -1,0 +1,23 @@
+=== stackless ===
+// module 0xc0ffee::self_ref
+
+fun overlap(r0): u64 {
+  slots: params(1), locals(0), temps(1)
+    r0: u64
+    r1: &u64
+  code:
+  L0:
+    0: r1 := imm_borrow_loc r0
+    1: r0 := read_ref r1
+    2: ret [r0]
+}
+=== micro-ops ===
+// module 0xc0ffee::self_ref
+
+fun overlap() {
+  frame_data_size: 24
+  code:
+    0: SlotBorrow [8] <- &[0]
+    1: ReadRef [0] <- *[8] (size=8)
+    2: Return
+}

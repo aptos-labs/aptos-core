@@ -1,6 +1,7 @@
-// Copyright (c) The Diem Core Contributors
-// Copyright (c) The Move Contributors
-// SPDX-License-Identifier: Apache-2.0
+// Parts of the file are Copyright (c) The Diem Core Contributors
+// Parts of the file are Copyright (c) The Move Contributors
+// Parts of the file are Copyright (c) Aptos Foundation
+// All Aptos Foundation code and content is licensed pursuant to the Innovation-Enabling Source Code License, available at https://github.com/aptos-labs/aptos-core/blob/main/LICENSE
 
 use super::layout::SourcePackageLayout;
 use crate::{package_hooks, source_package::parsed_manifest as PM};
@@ -141,7 +142,7 @@ pub fn parse_package_info(tval: TV) -> Result<PM::PackageInfo> {
                                 .ok_or_else(|| {
                                     format_err!(
                                         "Invalid author '{}' of type {} found. Expected a string.",
-                                        tval.to_string(),
+                                        tval,
                                         tval.type_str()
                                     )
                                 })

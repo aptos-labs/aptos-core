@@ -11,6 +11,7 @@ pub mod scrape;
 pub mod serialization;
 pub mod shamir;
 pub mod srs;
+//pub mod sumcheck;
 pub mod vanishing_poly;
 pub mod weighted_sum;
 
@@ -48,10 +49,10 @@ pub fn powers_of_two<F: Field>(ell: usize) -> Vec<F> {
 /// with each scalar.
 ///
 /// Equivalent to `[base * s for s in scalars]`.
-pub fn batch_mul<P: CurveGroup + ark_ec::ScalarMul>(
-    table: &BatchMulPreprocessing<P>,
-    scalars: &[P::ScalarField],
-) -> Vec<P> {
+pub fn batch_mul<C: CurveGroup + ark_ec::ScalarMul>(
+    table: &BatchMulPreprocessing<C>,
+    scalars: &[C::ScalarField],
+) -> Vec<C> {
     scalars.iter().map(|e| windowed_mul(table, e)).collect()
 }
 

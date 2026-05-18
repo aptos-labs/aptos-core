@@ -41,7 +41,7 @@ module aptos_framework::multisig_account {
     use aptos_framework::chain_id;
     use aptos_framework::create_signer::create_signer;
     use aptos_framework::coin;
-    use aptos_framework::event::{EventHandle, emit_event, emit};
+    use aptos_framework::event::{EventHandle, emit};
     use aptos_framework::timestamp::now_seconds;
     use aptos_std::simple_map::{Self, SimpleMap};
     use aptos_std::table::{Self, Table};
@@ -928,23 +928,13 @@ module aptos_framework::multisig_account {
         };
 
         if (emit_event) {
-            if (std::features::module_event_migration_enabled()) {
-                emit(
-                    MetadataUpdated {
-                        multisig_account: multisig_address,
-                        old_metadata,
-                        new_metadata: multisig_account_resource.metadata,
-                    }
-                )
-            } else {
-                emit_event(
-                    &mut multisig_account_resource.metadata_updated_events,
-                    MetadataUpdatedEvent {
-                        old_metadata,
-                        new_metadata: multisig_account_resource.metadata,
-                    }
-                );
-            };
+            emit(
+                MetadataUpdated {
+                    multisig_account: multisig_address,
+                    old_metadata,
+                    new_metadata: multisig_account_resource.metadata,
+                }
+            )
         };
     }
 
@@ -1032,25 +1022,14 @@ module aptos_framework::multisig_account {
             votes.add(owner_addr, approved);
         };
 
-        if (std::features::module_event_migration_enabled()) {
-            emit(
-                Vote {
-                    multisig_account,
-                    owner: owner_addr,
-                    sequence_number,
-                    approved,
-                }
-            );
-        } else {
-            emit_event(
-                &mut multisig_account_resource.vote_events,
-                VoteEvent {
-                    owner: owner_addr,
-                    sequence_number,
-                    approved,
-                }
-            );
-        };
+        emit(
+            Vote {
+                multisig_account,
+                owner: owner_addr,
+                sequence_number,
+                approved,
+            }
+        );
     }
 
     /// Generic function that can be used to either approve or reject a multisig transaction
@@ -1095,25 +1074,14 @@ module aptos_framework::multisig_account {
             error::invalid_state(ENOT_ENOUGH_REJECTIONS),
         );
 
-        if (std::features::module_event_migration_enabled()) {
-            emit(
-                ExecuteRejectedTransaction {
-                    multisig_account,
-                    sequence_number,
-                    num_rejections,
-                    executor: address_of(owner),
-                }
-            );
-        } else {
-            emit_event(
-                &mut multisig_account_resource.execute_rejected_transaction_events,
-                ExecuteRejectedTransactionEvent {
-                    sequence_number,
-                    num_rejections,
-                    executor: owner_addr,
-                }
-            );
-        };
+        emit(
+            ExecuteRejectedTransaction {
+                multisig_account,
+                sequence_number,
+                num_rejections,
+                executor: address_of(owner),
+            }
+        );
     }
 
     /// Remove the next transactions until the final_sequence_number if they have sufficient owner rejections.
@@ -1191,27 +1159,15 @@ module aptos_framework::multisig_account {
     ) acquires MultisigAccount {
         let num_approvals = transaction_execution_cleanup_common(executor, multisig_account);
         let multisig_account_resource = borrow_global_mut<MultisigAccount>(multisig_account);
-        if (std::features::module_event_migration_enabled()) {
-            emit(
-                TransactionExecutionSucceeded {
-                    multisig_account,
-                    sequence_number: multisig_account_resource.last_executed_sequence_number,
-                    transaction_payload,
-                    num_approvals,
-                    executor,
-                }
-            );
-        } else {
-            emit_event(
-                &mut multisig_account_resource.execute_transaction_events,
-                TransactionExecutionSucceededEvent {
-                    sequence_number: multisig_account_resource.last_executed_sequence_number,
-                    transaction_payload,
-                    num_approvals,
-                    executor,
-                }
-            );
-        };
+        emit(
+            TransactionExecutionSucceeded {
+                multisig_account,
+                sequence_number: multisig_account_resource.last_executed_sequence_number,
+                transaction_payload,
+                num_approvals,
+                executor,
+            }
+        );
     }
 
     /// Post-execution cleanup for a failed multisig transaction execution.
@@ -1224,29 +1180,16 @@ module aptos_framework::multisig_account {
     ) acquires MultisigAccount {
         let num_approvals = transaction_execution_cleanup_common(executor, multisig_account);
         let multisig_account_resource = borrow_global_mut<MultisigAccount>(multisig_account);
-        if (std::features::module_event_migration_enabled()) {
-            emit(
-                TransactionExecutionFailed {
-                    multisig_account,
-                    executor,
-                    sequence_number: multisig_account_resource.last_executed_sequence_number,
-                    transaction_payload,
-                    num_approvals,
-                    execution_error,
-                }
-            );
-        } else {
-            emit_event(
-                &mut multisig_account_resource.transaction_execution_failed_events,
-                TransactionExecutionFailedEvent {
-                    executor,
-                    sequence_number: multisig_account_resource.last_executed_sequence_number,
-                    transaction_payload,
-                    num_approvals,
-                    execution_error,
-                }
-            );
-        };
+        emit(
+            TransactionExecutionFailed {
+                multisig_account,
+                executor,
+                sequence_number: multisig_account_resource.last_executed_sequence_number,
+                transaction_payload,
+                num_approvals,
+                execution_error,
+            }
+        );
     }
 
     ////////////////////////// Private functions ///////////////////////////////
@@ -1259,25 +1202,14 @@ module aptos_framework::multisig_account {
         let (num_approvals, _) = remove_executed_transaction(multisig_account_resource);
 
         if (features::multisig_v2_enhancement_feature_enabled() && implicit_approval) {
-            if (std::features::module_event_migration_enabled()) {
-                emit(
-                    Vote {
-                        multisig_account,
-                        owner: executor,
-                        sequence_number,
-                        approved: true,
-                    }
-                );
-            } else {
-                emit_event(
-                    &mut multisig_account_resource.vote_events,
-                    VoteEvent {
-                        owner: executor,
-                        sequence_number,
-                        approved: true,
-                    }
-                );
-            };
+            emit(
+                Vote {
+                    multisig_account,
+                    owner: executor,
+                    sequence_number,
+                    approved: true,
+                }
+            );
             num_approvals += 1;
         };
 
@@ -1312,16 +1244,9 @@ module aptos_framework::multisig_account {
         let sequence_number = multisig_account_resource.next_sequence_number;
         multisig_account_resource.next_sequence_number = sequence_number + 1;
         multisig_account_resource.transactions.add(sequence_number, transaction);
-        if (std::features::module_event_migration_enabled()) {
-            emit(
-                CreateTransaction { multisig_account: multisig_account, creator, sequence_number, transaction }
-            );
-        } else {
-            emit_event(
-                &mut multisig_account_resource.create_transaction_events,
-                CreateTransactionEvent { creator, sequence_number, transaction },
-            );
-        };
+        emit(
+            CreateTransaction { multisig_account: multisig_account, creator, sequence_number, transaction }
+        );
     }
 
     fun create_multisig_account(owner: &signer): (signer, SignerCapability) {
@@ -1447,14 +1372,7 @@ module aptos_framework::multisig_account {
                 &multisig_account_ref_mut.owners,
                 multisig_address
             );
-            if (std::features::module_event_migration_enabled()) {
-                emit(AddOwners { multisig_account: multisig_address, owners_added: new_owners });
-            } else {
-                emit_event(
-                    &mut multisig_account_ref_mut.add_owners_events,
-                    AddOwnersEvent { owners_added: new_owners }
-                );
-            };
+            emit(AddOwners { multisig_account: multisig_address, owners_added: new_owners });
         };
         // If owners to remove provided, try to remove them.
         if (owners_to_remove.length() > 0) {
@@ -1472,16 +1390,9 @@ module aptos_framework::multisig_account {
             });
             // Only emit event if owner(s) actually removed.
             if (owners_removed.length() > 0) {
-                if (std::features::module_event_migration_enabled()) {
-                    emit(
-                        RemoveOwners { multisig_account: multisig_address, owners_removed }
-                    );
-                } else {
-                    emit_event(
-                        &mut multisig_account_ref_mut.remove_owners_events,
-                        RemoveOwnersEvent { owners_removed }
-                    );
-                };
+                emit(
+                    RemoveOwners { multisig_account: multisig_address, owners_removed }
+                );
             }
         };
         // If new signature count provided, try to update count.
@@ -1498,23 +1409,13 @@ module aptos_framework::multisig_account {
             if (new_num_signatures_required != old_num_signatures_required) {
                 multisig_account_ref_mut.num_signatures_required =
                     new_num_signatures_required;
-                if (std::features::module_event_migration_enabled()) {
-                    emit(
-                        UpdateSignaturesRequired {
-                            multisig_account: multisig_address,
-                            old_num_signatures_required,
-                            new_num_signatures_required,
-                        }
-                    );
-                } else {
-                    emit_event(
-                        &mut multisig_account_ref_mut.update_signature_required_events,
-                        UpdateSignaturesRequiredEvent {
-                            old_num_signatures_required,
-                            new_num_signatures_required,
-                        }
-                    );
-                }
+                emit(
+                    UpdateSignaturesRequired {
+                        multisig_account: multisig_address,
+                        old_num_signatures_required,
+                        new_num_signatures_required,
+                    }
+                );
             }
         };
         // Verify number of owners.

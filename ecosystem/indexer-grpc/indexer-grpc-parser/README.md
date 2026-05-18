@@ -8,7 +8,7 @@ Indexer GRPC parser is to indexer data processor that leverages the indexer grpc
 
 ## Tutorial
 ### Prerequisite
-* A running PostgreSQL instance, with a valid database. More tutorial can be found [here](https://github.com/aptos-labs/aptos-core/tree/main/crates/indexer#postgres)
+* A running PostgreSQL instance, with a valid database.
 
 * A config YAML file
   * For exmaple, `config.yaml`

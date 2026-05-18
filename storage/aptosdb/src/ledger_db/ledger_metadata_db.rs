@@ -13,7 +13,7 @@ use crate::{
     utils::{get_progress, iterators::EpochEndingLedgerInfoIter},
 };
 use anyhow::anyhow;
-use aptos_schemadb::{batch::SchemaBatch, DB};
+use aptos_schemadb::{batch::SchemaBatch, ReadOptions, DB};
 use aptos_storage_interface::{block_info::BlockInfo, db_ensure as ensure, AptosDbError, Result};
 use aptos_types::{
     account_config::NewBlockEvent, block_info::BlockHeight, contract_event::ContractEvent,
@@ -97,12 +97,6 @@ impl LedgerMetadataDb {
         ledger_info.clone()
     }
 
-    pub(crate) fn get_committed_version(&self) -> Option<Version> {
-        let ledger_info_ptr = self.latest_ledger_info.load();
-        let ledger_info: &Option<_> = ledger_info_ptr.deref();
-        ledger_info.as_ref().map(|li| li.ledger_info().version())
-    }
-
     /// Returns the latest ledger info, or NOT_FOUND if it doesn't exist.
     pub(crate) fn get_latest_ledger_info(&self) -> Result<LedgerInfoWithSignatures> {
         self.get_latest_ledger_info_option()
@@ -126,7 +120,21 @@ impl LedgerMetadataDb {
         start_epoch: u64,
         end_epoch: u64,
     ) -> Result<EpochEndingLedgerInfoIter<'_>> {
-        let mut iter = self.db.iter::<LedgerInfoSchema>()?;
+        self.get_epoch_ending_ledger_info_iter_with_opts(
+            start_epoch,
+            end_epoch,
+            ReadOptions::default(),
+        )
+    }
+
+    /// Same as `get_epoch_ending_ledger_info_iter`, but with custom `ReadOptions`.
+    pub(crate) fn get_epoch_ending_ledger_info_iter_with_opts(
+        &self,
+        start_epoch: u64,
+        end_epoch: u64,
+        opts: ReadOptions,
+    ) -> Result<EpochEndingLedgerInfoIter<'_>> {
+        let mut iter = self.db.iter_with_opts::<LedgerInfoSchema>(opts)?;
         iter.seek(&start_epoch)?;
         Ok(EpochEndingLedgerInfoIter::new(iter, start_epoch, end_epoch))
     }
@@ -324,6 +332,7 @@ impl LedgerMetadataDb {
         self.db.put::<VersionDataSchema>(&version, &usage.into())
     }
 
+    #[cfg(feature = "db-debugger")]
     pub(crate) fn get_usage_before_or_at(
         &self,
         version: Version,

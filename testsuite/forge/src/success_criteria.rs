@@ -492,6 +492,14 @@ impl SuccessCriteriaChecker {
                     .await
                     .context("Failed ensuring no fullnode restarted")
             });
+
+            results.add_result("Check no PFN restart", CheckType::Hard, {
+                let swarm_read = swarm.read().await;
+                swarm_read
+                    .ensure_no_pfn_restart()
+                    .await
+                    .context("Failed ensuring no PFN restarted")
+            });
         }
 
         if success_criteria.check_no_errors {

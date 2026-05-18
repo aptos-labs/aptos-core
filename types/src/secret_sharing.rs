@@ -9,7 +9,7 @@ use crate::{account_address::AccountAddress, validator_verifier::ValidatorVerifi
 use aptos_batch_encryption::{
     schemes::fptx_weighted::FPTXWeighted, traits::BatchThresholdEncryption,
 };
-use aptos_crypto::hash::HashValue;
+use aptos_crypto::{hash::HashValue, player::Player};
 use serde::{Deserialize, Serialize};
 use std::{collections::HashMap, sync::Arc};
 
@@ -17,7 +17,7 @@ pub type EncryptionKey = <FPTXWeighted as BatchThresholdEncryption>::EncryptionK
 pub type DigestKey = <FPTXWeighted as BatchThresholdEncryption>::DigestKey;
 pub type Ciphertext = <FPTXWeighted as BatchThresholdEncryption>::Ciphertext;
 pub type Id = <FPTXWeighted as BatchThresholdEncryption>::Id;
-pub type Round = <FPTXWeighted as BatchThresholdEncryption>::Round;
+pub type Round = u64;
 pub type Digest = <FPTXWeighted as BatchThresholdEncryption>::Digest;
 pub type EvalProofsPromise = <FPTXWeighted as BatchThresholdEncryption>::EvalProofsPromise;
 pub type EvalProof = <FPTXWeighted as BatchThresholdEncryption>::EvalProof;
@@ -73,10 +73,18 @@ impl SecretShare {
     }
 
     pub fn verify(&self, config: &SecretShareConfig) -> anyhow::Result<()> {
-        let index = config.get_id(self.author());
+        let index = config.get_id(self.author())?;
         let decryption_key_share = self.share().clone();
-        // TODO(ibalajiarun): Check index out of bounds
-        config.verification_keys[index]
+        config
+            .verification_keys
+            .get(index)
+            .ok_or_else(|| {
+                anyhow::anyhow!(
+                    "Verification key index {} out of bounds (len {})",
+                    index,
+                    config.verification_keys.len()
+                )
+            })?
             .verify_decryption_key_share(&self.metadata.digest, &decryption_key_share)?;
         Ok(())
     }
@@ -134,10 +142,8 @@ impl SecretSharedKey {
 /// This is temporary and meant to change in future PRs
 #[derive(Clone)]
 pub struct SecretShareConfig {
-    _author: Author,
-    _epoch: u64,
     validator: Arc<ValidatorVerifier>,
-    digest_key: DigestKey,
+    digest_key: Arc<DigestKey>,
     msk_share: MasterSecretKeyShare,
     verification_keys: Vec<VerificationKey>,
     config: <FPTXWeighted as BatchThresholdEncryption>::ThresholdConfig,
@@ -147,38 +153,48 @@ pub struct SecretShareConfig {
 
 impl SecretShareConfig {
     pub fn new(
-        author: Author,
-        epoch: u64,
         validator: Arc<ValidatorVerifier>,
-        digest_key: DigestKey,
+        digest_key: Arc<DigestKey>,
         msk_share: MasterSecretKeyShare,
         verification_keys: Vec<VerificationKey>,
         config: <FPTXWeighted as BatchThresholdEncryption>::ThresholdConfig,
         encryption_key: EncryptionKey,
     ) -> Self {
+        let weights = validator
+            .address_to_validator_index()
+            .iter()
+            .map(|(author, &index)| {
+                let weight = config
+                    .get_player_weight(&Player { id: index })
+                    .expect("validator index maps to player id in config");
+                (*author, weight as u64)
+            })
+            .collect();
         Self {
-            _author: author,
-            _epoch: epoch,
             validator,
             digest_key,
             msk_share,
             verification_keys,
             config,
             encryption_key,
-            weights: HashMap::new(),
+            weights,
         }
     }
 
-    pub fn get_id(&self, peer: &Author) -> usize {
-        *self
-            .validator
+    pub fn get_id(&self, peer: &Author) -> anyhow::Result<usize> {
+        self.validator
             .address_to_validator_index()
             .get(peer)
-            .expect("Peer should be in the index!")
+            .copied()
+            .ok_or_else(|| anyhow::anyhow!("Peer {} not found in validator index", peer))
     }
 
     pub fn digest_key(&self) -> &DigestKey {
         &self.digest_key
+    }
+
+    pub fn digest_key_arc(&self) -> Arc<DigestKey> {
+        Arc::clone(&self.digest_key)
     }
 
     pub fn msk_share(&self) -> &MasterSecretKeyShare {
@@ -193,8 +209,11 @@ impl SecretShareConfig {
         self.config.get_threshold_config().n as u64
     }
 
-    pub fn get_peer_weight(&self, _peer: &Author) -> u64 {
-        1
+    pub fn get_peer_weight(&self, peer: &Author) -> anyhow::Result<u64> {
+        self.weights
+            .get(peer)
+            .copied()
+            .ok_or_else(|| anyhow::anyhow!("Peer {} not found in validator index", peer))
     }
 
     pub fn get_peer_weights(&self) -> &HashMap<Author, u64> {

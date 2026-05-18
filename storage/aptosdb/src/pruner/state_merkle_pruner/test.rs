@@ -9,7 +9,6 @@ use crate::{
     pruner::{PrunerManager, StateKvPrunerManager, StateMerklePrunerManager},
     schema::{
         stale_node_index::StaleNodeIndexSchema,
-        stale_state_value_index::StaleStateValueIndexSchema,
         stale_state_value_index_by_key_hash::StaleStateValueIndexByKeyHashSchema,
     },
     state_merkle_db::StateMerkleDb,
@@ -22,7 +21,7 @@ use aptos_temppath::TempPath;
 use aptos_types::{
     state_store::{
         state_key::StateKey,
-        state_value::{StaleStateValueByKeyHashIndex, StaleStateValueIndex, StateValue},
+        state_value::{StaleStateValueByKeyHashIndex, StateValue},
         NUM_STATE_SHARDS,
     },
     transaction::Version,
@@ -234,18 +233,16 @@ fn test_state_store_pruner_partial_version() {
         0
     );
 
-    if aptos_db.state_merkle_db().sharding_enabled() {
-        for i in 0..NUM_STATE_SHARDS {
-            assert_eq!(
-                aptos_db
-                    .state_merkle_db()
-                    .db_shard(i)
-                    .iter::<StaleNodeIndexSchema>()
-                    .unwrap()
-                    .count(),
-                0
-            );
-        }
+    for i in 0..NUM_STATE_SHARDS {
+        assert_eq!(
+            aptos_db
+                .state_merkle_db()
+                .db_shard(i)
+                .iter::<StaleNodeIndexSchema>()
+                .unwrap()
+                .count(),
+            0
+        );
     }
 }
 
@@ -358,31 +355,17 @@ fn verify_state_value<'a, I: Iterator<Item = (&'a StateKey, &'a (Version, Option
     for (k, (old_version, v)) in kvs {
         let v_from_db = state_store.get_state_value_by_version(k, version).unwrap();
         assert_eq!(&v_from_db, if pruned { &None } else { v });
-        let enable_sharding = state_store.state_kv_db.enabled_sharding();
         if pruned {
-            if !enable_sharding {
-                assert!(state_store
-                    .state_kv_db
-                    .db_shard(k.get_shard_id())
-                    .get::<StaleStateValueIndexSchema>(&StaleStateValueIndex {
-                        stale_since_version: version,
-                        version: *old_version,
-                        state_key: k.clone()
-                    })
-                    .unwrap()
-                    .is_none());
-            } else {
-                assert!(state_store
-                    .state_kv_db
-                    .db_shard(k.get_shard_id())
-                    .get::<StaleStateValueIndexByKeyHashSchema>(&StaleStateValueByKeyHashIndex {
-                        stale_since_version: version,
-                        version: *old_version,
-                        state_key_hash: k.hash()
-                    })
-                    .unwrap()
-                    .is_none());
-            }
+            assert!(state_store
+                .state_kv_db
+                .db_shard(k.get_shard_id())
+                .get::<StaleStateValueIndexByKeyHashSchema>(&StaleStateValueByKeyHashIndex {
+                    stale_since_version: version,
+                    version: *old_version,
+                    state_key_hash: k.hash()
+                })
+                .unwrap()
+                .is_none());
         }
     }
 }

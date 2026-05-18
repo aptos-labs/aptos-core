@@ -43,10 +43,7 @@ use std::{
     },
     time::Instant,
 };
-use tokio::{
-    runtime::{Handle, Runtime},
-    task::JoinHandle,
-};
+use tokio::{runtime::Handle, task::JoinHandle};
 
 /// Synchronizes the storage of the node by verifying and storing new data
 /// (e.g., transactions and outputs).
@@ -209,7 +206,7 @@ impl<
         >,
         metadata_storage: MetadataStorage,
         storage: DbReaderWriter,
-        runtime: Option<&Runtime>,
+        runtime: Option<Handle>,
     ) -> (Self, StorageSynchronizerHandles) {
         // Create a channel to notify the executor when data chunks are ready
         let max_pending_data_chunks = driver_config.max_pending_data_chunks as usize;
@@ -228,9 +225,6 @@ impl<
 
         // Create a shared pending data chunk counter
         let pending_data_chunks = Arc::new(AtomicU64::new(0));
-
-        // Spawn the executor that executes/applies storage data chunks
-        let runtime = runtime.map(|runtime| runtime.handle().clone());
         let executor_handle = spawn_executor(
             chunk_executor.clone(),
             error_notification_sender.clone(),

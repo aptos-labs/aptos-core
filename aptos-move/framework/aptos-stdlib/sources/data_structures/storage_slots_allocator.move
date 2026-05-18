@@ -226,7 +226,4 @@ module aptos_std::storage_slots_allocator {
         self.slots.borrow_mut().remove(slot_index)
     }
 
-    spec module {
-        pragma verify = false;
-    }
 }

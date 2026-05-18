@@ -1,0 +1,19 @@
+
+Diagnostics:
+error: match not exhaustive
+  ┌─ tests/match-checks/bytestring_witness_display.move:5:16
+  │
+5 │         match ((x, y)) {
+  │                ^^^^^^
+  │
+  = missing `(b"hello", false)`
+  = missing `(_, _)`
+
+error: match not exhaustive
+   ┌─ tests/match-checks/bytestring_witness_display.move:13:16
+   │
+13 │         match ((x, y)) {
+   │                ^^^^^^
+   │
+   = missing `(x"deadbeef", false)`
+   = missing `(_, _)`

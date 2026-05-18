@@ -1,0 +1,13 @@
+
+Diagnostics:
+error: literal and range patterns inside struct/enum variants require language version 2.4-unstable or later
+   ┌─ tests/checking-lang-v2.2/struct_literal_not_supported.move:11:19
+   │
+11 │             E::V1(1) => 1,
+   │                   ^
+
+error: literal and range patterns inside struct/enum variants require language version 2.4-unstable or later
+   ┌─ tests/checking-lang-v2.2/struct_literal_not_supported.move:19:20
+   │
+19 │             S { x: 42 } => 1,
+   │                    ^^

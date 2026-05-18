@@ -108,11 +108,85 @@ use rand::{distributions::Standard, prelude::Distribution, rngs::OsRng, Rng};
 use serde::{de, ser, Deserialize, Serialize};
 use std::{
     self,
+    borrow::Cow,
     convert::{AsRef, TryFrom},
     fmt,
+    ops::Deref,
     str::FromStr,
+    sync::Arc,
 };
 use tiny_keccak::{Hasher, Sha3};
+
+/// SHA3-256 rate in bytes: 200 - 2*32 = 136.
+const SHA3_256_RATE: usize = 136;
+
+/// Computes `SHA3-256(seed || h1 || h2)` using a single Keccak-f[1600] permutation.
+///
+/// This is an optimized specialization for the common case of hashing exactly two
+/// 32-byte hash values with a 32-byte domain separator seed. The total input
+/// (96 bytes) fits within the SHA3-256 rate (136 bytes), so only one permutation
+/// is needed. This avoids the overhead of the generic hasher (cloning state,
+/// multiple update calls with loop/branch overhead, etc.).
+#[inline]
+#[allow(clippy::needless_range_loop)]
+fn hash_sha3_256_two_x32b(seed: &[u8; 32], h1: &[u8; 32], h2: &[u8; 32]) -> HashValue {
+    // SHA3-256 parameters:
+    //   state  = 1600 bits = 200 bytes = 25 u64 words
+    //   rate   = 1088 bits = 136 bytes = 17 u64 words
+    //   capacity = 512 bits = 64 bytes = 8 u64 words
+    //   delimiter = 0x06
+    //
+    // Input layout in the state (as byte offsets):
+    //   [0..32)   = seed   -> words [0..4)
+    //   [32..64)  = h1     -> words [4..8)
+    //   [64..96)  = h2     -> words [8..12)
+    //   [96]      = 0x06   (SHA3 delimiter) -> word 12, byte 0
+    //   [135]     = 0x80   (final pad bit)  -> word 16, byte 7
+    //
+    // Total: 96 bytes < 136 bytes (rate), so exactly one keccak-f permutation.
+
+    #[inline(always)]
+    fn load_u64_le(bytes: &[u8; 32], word_idx: usize) -> u64 {
+        let o = word_idx * 8;
+        u64::from_le_bytes([
+            bytes[o],
+            bytes[o + 1],
+            bytes[o + 2],
+            bytes[o + 3],
+            bytes[o + 4],
+            bytes[o + 5],
+            bytes[o + 6],
+            bytes[o + 7],
+        ])
+    }
+
+    let mut state = [0u64; 25];
+
+    // Load seed, h1, h2 into state as little-endian u64 words.
+    // Since state starts as all-zero, XOR is equivalent to assignment.
+    for i in 0..4 {
+        state[i] = load_u64_le(seed, i);
+    }
+    for i in 0..4 {
+        state[4 + i] = load_u64_le(h1, i);
+    }
+    for i in 0..4 {
+        state[8 + i] = load_u64_le(h2, i);
+    }
+
+    // SHA3-256 multi-rate padding: 0x06 at byte 96, 0x80 at byte 135.
+    state[12] = 0x06;
+    state[SHA3_256_RATE / 8 - 1] = 0x80u64 << 56; // byte 135 = word 16, MSB
+
+    tiny_keccak::keccakf(&mut state);
+
+    // Extract the first 32 bytes (4 u64 LE words) as the hash output.
+    let mut output = [0u8; 32];
+    for i in 0..4 {
+        output[i * 8..i * 8 + 8].copy_from_slice(&state[i].to_le_bytes());
+    }
+    HashValue::new(output)
+}
 
 /// A prefix used to begin the salt of every hashable structure. The salt
 /// consists in this global prefix, concatenated with the specified
@@ -213,7 +287,7 @@ impl HashValue {
     pub fn nibble(&self, index: usize) -> u8 {
         debug_assert!(index < Self::LENGTH * 2); // assumed precondition
         let pos = index / 2;
-        let shift = if index % 2 == 0 { 4 } else { 0 };
+        let shift = if index.is_multiple_of(2) { 4 } else { 0 };
         (self.hash[pos] >> shift) & 0x0F
     }
 
@@ -488,6 +562,28 @@ pub trait CryptoHash {
     fn hash(&self) -> HashValue;
 }
 
+impl<T> CryptoHash for Arc<T>
+where
+    T: CryptoHash,
+{
+    type Hasher = T::Hasher;
+
+    fn hash(&self) -> HashValue {
+        self.as_ref().hash()
+    }
+}
+
+impl<T> CryptoHash for Cow<'_, T>
+where
+    T: CryptoHash + Clone,
+{
+    type Hasher = T::Hasher;
+
+    fn hash(&self) -> HashValue {
+        self.deref().hash()
+    }
+}
+
 /// A trait for representing the state of a cryptographic hasher.
 pub trait CryptoHasher: Default + std::io::Write {
     /// the seed used to initialize hashing `Self` before the serialization bytes of the actual value
@@ -504,6 +600,13 @@ pub trait CryptoHasher: Default + std::io::Write {
         let mut hasher = Self::default();
         hasher.update(bytes);
         hasher.finish()
+    }
+
+    /// Optimized method to hash exactly two 32-byte values (e.g. child hashes in
+    /// a Merkle tree node). Uses a single Keccak-f permutation since the total
+    /// input (32-byte seed + 32 + 32 = 96 bytes) fits within the SHA3-256 rate.
+    fn hash_two_children(h1: &HashValue, h2: &HashValue) -> HashValue {
+        hash_sha3_256_two_x32b(Self::seed(), h1.as_ref(), h2.as_ref())
     }
 }
 
@@ -594,6 +697,20 @@ macro_rules! define_hasher {
 
             fn finish(self) -> HashValue {
                 self.0.finish()
+            }
+
+            fn hash_two_children(h1: &HashValue, h2: &HashValue) -> HashValue {
+                // When salt is empty (only TestOnlyHasher), no seed is absorbed
+                // into the hasher state, so we fall back to the generic path.
+                // The compiler will constant-fold this check away.
+                if ($salt as &[u8]).is_empty() {
+                    let mut state = Self::default();
+                    state.update(h1.as_ref());
+                    state.update(h2.as_ref());
+                    state.finish()
+                } else {
+                    hash_sha3_256_two_x32b(Self::seed(), h1.as_ref(), h2.as_ref())
+                }
             }
         }
 
@@ -723,5 +840,62 @@ impl<T: ser::Serialize + ?Sized> TestOnlyHash for T {
         let mut hasher = TestOnlyHasher::default();
         hasher.update(&bytes);
         hasher.finish()
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use proptest::prelude::*;
+
+    /// Reference implementation using the generic hasher path.
+    fn hash_two_children_reference<H: CryptoHasher>(h1: &HashValue, h2: &HashValue) -> HashValue {
+        let mut state = H::default();
+        state.update(h1.as_ref());
+        state.update(h2.as_ref());
+        state.finish()
+    }
+
+    proptest! {
+        #[test]
+        fn hash_two_children_matches_reference_sparse_merkle_internal(
+            h1 in any::<HashValue>(),
+            h2 in any::<HashValue>(),
+        ) {
+            let optimized = SparseMerkleInternalHasher::hash_two_children(&h1, &h2);
+            let reference = hash_two_children_reference::<SparseMerkleInternalHasher>(&h1, &h2);
+            prop_assert_eq!(optimized, reference);
+        }
+
+        #[test]
+        fn hash_two_children_matches_reference_transaction_accumulator(
+            h1 in any::<HashValue>(),
+            h2 in any::<HashValue>(),
+        ) {
+            let optimized = TransactionAccumulatorHasher::hash_two_children(&h1, &h2);
+            let reference = hash_two_children_reference::<TransactionAccumulatorHasher>(&h1, &h2);
+            prop_assert_eq!(optimized, reference);
+        }
+
+        #[test]
+        fn hash_two_children_matches_reference_event_accumulator(
+            h1 in any::<HashValue>(),
+            h2 in any::<HashValue>(),
+        ) {
+            let optimized = EventAccumulatorHasher::hash_two_children(&h1, &h2);
+            let reference = hash_two_children_reference::<EventAccumulatorHasher>(&h1, &h2);
+            prop_assert_eq!(optimized, reference);
+        }
+
+        #[test]
+        fn hash_two_children_matches_reference_test_only(
+            h1 in any::<HashValue>(),
+            h2 in any::<HashValue>(),
+        ) {
+            let optimized = TestOnlyHasher::hash_two_children(&h1, &h2);
+            let reference = hash_two_children_reference::<TestOnlyHasher>(&h1, &h2);
+            prop_assert_eq!(optimized, reference);
+        }
+
     }
 }

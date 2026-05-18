@@ -1,0 +1,15 @@
+
+Diagnostics:
+warning: [lint] enum `MessageHolder` is unused
+   ┌─ tests/model_ast_lints/unused/truly_unused/unused_enum.move:5:5
+   │
+ 5 │ ╭     enum MessageHolder has key, drop {
+ 6 │ │         Empty,
+ 7 │ │         Message{
+ 8 │ │             message: string::String,
+   · │
+12 │ │         }
+13 │ │     }
+   │ ╰─────^
+   │
+   = Remove it (if not published), or suppress this warning with `#[test_only]` (if for test-only) or `#[lint::skip(unused_struct)]` (if for spec-only or otherwise needed).

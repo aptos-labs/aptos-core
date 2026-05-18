@@ -1,0 +1,20 @@
+//# publish --print-bytecode
+module 0x66::test_borrow_variant_field_wrong_type_group
+
+// Enum with two type groups at offset 0:
+//   type_order 0 -> u64 (variants: Left)
+//   type_order 1 -> u32 (variants: Right)
+enum Either has drop
+  Left
+    value: u64
+  Right
+    value: u32
+
+// Invalid: signature says return &u64 (type_order 0, Left's type), which is correctly
+// validated against the struct definition. But the bytecode borrows from Right::value
+// whose field type is u32 (type_order 1). The completeness check rejects this because
+// the type derived from the bytecode (u32) does not match the validated return type (u64).
+#[borrow(0)] public fun borrow$Either$0$0(l0: &Either): &u64
+    move_loc l0
+    borrow_variant_field Either, Right::value
+    ret

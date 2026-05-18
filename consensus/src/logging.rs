@@ -43,6 +43,7 @@ pub enum LogEvent {
     ReceiveOrderVote,
     RetrieveBlock,
     StateSync,
+    StateSyncTrigger,
     Timeout,
     Vote,
     VoteNIL,
@@ -54,9 +55,6 @@ pub enum LogEvent {
     ReceiveAugData,
     BroadcastCertifiedAugData,
     ReceiveCertifiedAugData,
-    // randomness fast path
-    BroadcastRandShareFastPath,
-    ReceiveRandShareFastPath,
     // optimistic proposal
     OptPropose,
     NetworkReceiveOptProposal,

@@ -4,8 +4,10 @@
 #![allow(unexpected_cfgs)]
 #![forbid(unsafe_code)]
 
+#[cfg(any(feature = "testing", feature = "fuzzing"))]
+compile_error!("Testing features shouldn't be compiled for production aptos-node");
+
 mod consensus;
-mod indexer;
 mod logger;
 mod network;
 mod services;
@@ -24,8 +26,9 @@ use aptos_build_info::build_information;
 use aptos_config::config::{merge_node_config, NodeConfig, PersistableConfig};
 use aptos_framework::ReleaseBundle;
 use aptos_genesis::builder::GenesisConfiguration;
+use aptos_inspection_service::server::InspectionServiceComponents;
 use aptos_logger::{prelude::*, telemetry_log_writer::TelemetryLog, Level, LoggerFilterUpdater};
-use aptos_state_sync_driver::driver_factory::StateSyncRuntimes;
+use aptos_state_sync_driver::driver_factory::StateSyncRuntime;
 use aptos_types::{
     chain_id::ChainId, keyless::Groth16VerificationKey, on_chain_config::OnChainJWKConsensusConfig,
 };
@@ -203,13 +206,13 @@ pub struct AptosHandle {
     _consensus_runtime: Option<Runtime>,
     _dkg_runtime: Option<Runtime>,
     _indexer_grpc_runtime: Option<Runtime>,
-    _indexer_runtime: Option<Runtime>,
     _indexer_table_info_runtime: Option<Runtime>,
+    _inspection_service_runtime: Runtime,
     _jwk_consensus_runtime: Option<Runtime>,
     _mempool_runtime: Runtime,
     _network_runtimes: Vec<Runtime>,
     _peer_monitoring_service_runtime: Runtime,
-    _state_sync_runtimes: StateSyncRuntimes,
+    _state_sync_runtime: StateSyncRuntime,
     _telemetry_runtime: Option<Runtime>,
     _indexer_db_runtime: Option<Runtime>,
 }
@@ -246,11 +249,6 @@ pub fn start_and_report_ports(
     ensure_max_open_files_limit(
         config.storage.ensure_rlimit_nofile,
         config.storage.assert_rlimit_nofile,
-    );
-
-    assert!(
-        !cfg!(feature = "testing") && !cfg!(feature = "fuzzing"),
-        "Testing features shouldn't be compiled"
     );
 
     // Ensure failpoints are configured correctly
@@ -704,6 +702,39 @@ pub fn setup_environment_and_start_node(
     // Starts the admin service
     let mut admin_service = services::start_admin_service(&node_config);
 
+    // Start the inspection service (port 9101) early — before RocksDB — so that
+    // Prometheus metrics are scrapeable from the very first moments of startup.
+    // Components that require a fully-initialised node (peer information) will
+    // return 503 until `inspection_components.set(...)` is called below.
+    let inspection_components = Arc::new(InspectionServiceComponents::new());
+    let inspection_service_runtime =
+        services::start_node_inspection_service(&node_config, inspection_components.clone());
+
+    // Initialize transaction tracing from config
+    {
+        let tracing_cfg = &node_config.transaction_tracing;
+        if tracing_cfg.enabled && !tracing_cfg.filter.sender_allowlist.is_empty() {
+            let filter = aptos_transaction_tracing::filter::TransactionFilter::new(
+                true,
+                tracing_cfg
+                    .filter
+                    .sender_allowlist
+                    .iter()
+                    .copied()
+                    .collect(),
+                tracing_cfg.batch_sample_rate,
+                tracing_cfg.txn_sample_rate,
+            );
+            aptos_transaction_tracing::store::TransactionTraceStore::global().update_filter(filter);
+            aptos_logger::info!(
+                "Transaction tracing enabled for {} sender(s), batch_sample_rate={}, txn_sample_rate={}",
+                tracing_cfg.filter.sender_allowlist.len(),
+                tracing_cfg.batch_sample_rate,
+                tracing_cfg.txn_sample_rate,
+            );
+        }
+    }
+
     // Set up the storage database and any RocksDB checkpoints
     let (db_rw, backup_service, genesis_waypoint, indexer_db_opt, update_receiver) =
         storage::initialize_database_and_checkpoints(&mut node_config)?;
@@ -718,6 +749,17 @@ pub fn setup_environment_and_start_node(
 
     // Set the chain_id in global AptosNodeIdentity
     aptos_node_identity::set_chain_id(chain_id)?;
+
+    // Initialize the DigestKey and PublicParameters for chunky DKG
+    aptos_dkg_runtime::initialize_digest_key_with_counters(
+        node_config.consensus.digest_key_blob_path.as_ref(),
+        chain_id,
+        node_config.base.role.is_validator(),
+    );
+    aptos_dkg_runtime::initialize_public_parameters_with_counters(
+        node_config.consensus.public_parameters_blob_path.as_ref(),
+        chain_id,
+    );
 
     // Start the telemetry service (as early as possible and before any blocking calls)
     let telemetry_runtime = services::start_telemetry_service(
@@ -763,7 +805,7 @@ pub fn setup_environment_and_start_node(
     );
 
     // Start state sync and get the notification endpoints for mempool and consensus
-    let (aptos_data_client, state_sync_runtimes, mempool_listener, consensus_notifier) =
+    let (aptos_data_client, state_sync_runtime, mempool_listener, consensus_notifier) =
         state_sync::start_state_sync_and_get_notification_handles(
             &node_config,
             storage_service_network_interfaces,
@@ -772,23 +814,19 @@ pub fn setup_environment_and_start_node(
             db_rw.clone(),
         )?;
 
-    // Start the node inspection service
-    services::start_node_inspection_service(
-        &node_config,
-        aptos_data_client,
-        peers_and_metadata.clone(),
-    );
+    // Inject the now-available components into the already-running inspection service.
+    // This unblocks /peer_information (and any other endpoints that need these values).
+    inspection_components.set(aptos_data_client, peers_and_metadata.clone());
 
-    // Bootstrap the API and indexer
+    // Bootstrap the API and transaction streaming services
     let (
         mempool_client_receiver,
         api_runtime,
         indexer_table_info_runtime,
-        indexer_runtime,
         indexer_grpc_runtime,
         internal_indexer_db_runtime,
         mempool_client_sender,
-    ) = services::bootstrap_api_and_indexer(
+    ) = services::bootstrap_api_and_streaming(
         &node_config,
         db_rw.clone(),
         chain_id,
@@ -827,7 +865,7 @@ pub fn setup_environment_and_start_node(
 
     // Wait until state sync has been initialized
     debug!("Waiting until state sync is initialized!");
-    state_sync_runtimes.block_until_initialized();
+    state_sync_runtime.block_until_initialized();
     debug!("State sync initialization complete.");
 
     // Create the consensus observer and publisher (if enabled)
@@ -863,13 +901,13 @@ pub fn setup_environment_and_start_node(
         _consensus_runtime: consensus_runtime,
         _dkg_runtime: dkg_runtime,
         _indexer_grpc_runtime: indexer_grpc_runtime,
-        _indexer_runtime: indexer_runtime,
         _indexer_table_info_runtime: indexer_table_info_runtime,
+        _inspection_service_runtime: inspection_service_runtime,
         _jwk_consensus_runtime: jwk_consensus_runtime,
         _mempool_runtime: mempool_runtime,
         _network_runtimes: network_runtimes,
         _peer_monitoring_service_runtime: peer_monitoring_service_runtime,
-        _state_sync_runtimes: state_sync_runtimes,
+        _state_sync_runtime: state_sync_runtime,
         _telemetry_runtime: telemetry_runtime,
         _indexer_db_runtime: internal_indexer_db_runtime,
     })

@@ -94,29 +94,11 @@ pub fn extract_txns_from_block<'a>(
             Payload::DirectMempool(_) => {
                 bail!("DirectMempool is not supported.");
             },
-            Payload::InQuorumStore(proof_with_data) => extract_txns_from_quorum_store(
-                proof_with_data.proofs.iter().map(|proof| *proof.digest()),
-                all_batches,
-            ),
-            Payload::InQuorumStoreWithLimit(proof_with_data) => extract_txns_from_quorum_store(
-                proof_with_data
-                    .proof_with_data
-                    .proofs
-                    .iter()
-                    .map(|proof| *proof.digest()),
-                all_batches,
-            ),
-            Payload::QuorumStoreInlineHybrid(inline_batches, proof_with_data, _)
-            | Payload::QuorumStoreInlineHybridV2(inline_batches, proof_with_data, _) => {
-                let mut all_txns = extract_txns_from_quorum_store(
-                    proof_with_data.proofs.iter().map(|proof| *proof.digest()),
-                    all_batches,
-                )
-                .unwrap();
-                for (_, txns) in inline_batches {
-                    all_txns.extend(txns);
-                }
-                Ok(all_txns)
+            Payload::DeprecatedInQuorumStore(_)
+            | Payload::DeprecatedInQuorumStoreWithLimit(_)
+            | Payload::DeprecatedQuorumStoreInlineHybrid(..)
+            | Payload::DeprecatedQuorumStoreInlineHybridV2(..) => {
+                bail!("Deprecated payload variants are not supported.");
             },
             Payload::OptQuorumStore(OptQuorumStorePayload::V1(p)) => {
                 let mut all_txns = extract_txns_from_quorum_store(

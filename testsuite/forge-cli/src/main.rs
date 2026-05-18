@@ -10,14 +10,13 @@ use clap::{Parser, Subcommand};
 use futures::{future, FutureExt};
 use rand::{rngs::ThreadRng, seq::SliceRandom, Rng};
 use serde_json::{json, Value};
-use std::{self, num::NonZeroUsize, process, time::Duration};
+use std::{self, num::NonZeroUsize, path::PathBuf, process, time::Duration};
 use sugars::{boxed, hmap};
 use suites::{
     dag::get_dag_test,
     indexer::get_indexer_test,
     land_blocking::get_land_blocking_test,
     multi_region::get_multi_region_test,
-    netbench::get_netbench_test,
     pfn::get_pfn_test,
     realistic_environment::get_realistic_env_test,
     state_sync::get_state_sync_test,
@@ -29,10 +28,6 @@ use suites::{
 use tokio::runtime::Runtime;
 
 mod suites;
-
-// Useful constants
-const KILOBYTE: usize = 1000;
-const MEGABYTE: usize = KILOBYTE * 1000;
 
 #[cfg(unix)]
 #[global_allocator]
@@ -92,6 +87,29 @@ enum OperatorCommand {
 struct LocalSwarm {
     #[clap(long, help = "directory to build local swarm under")]
     swarmdir: Option<String>,
+    #[clap(
+        long,
+        help = "Per-node CPU affinity (colon-separated). E.g. '0-5,7-8:10-20,23' pins node 0 to CPUs 0-5,7-8 and node 1 to CPUs 10-20,23"
+    )]
+    cpu_affinity: Option<String>,
+    #[clap(
+        long,
+        help = "Per-node NUMA memory binding (colon-separated). E.g. '0:1-2:1,3' binds node 0 to NUMA node 0, node 1 to 1-2, node 2 to 1,3"
+    )]
+    mem_bind: Option<String>,
+    #[clap(
+        long,
+        help = "Execution concurrency level for each node",
+        default_value_t = 1
+    )]
+    concurrency_level: u16,
+    #[clap(
+        long,
+        help = "Path to a pre-built aptos-node binary (skips cargo build)"
+    )]
+    aptos_node_binary: Option<String>,
+    #[clap(long, help = "Automatically restart crashed validator nodes")]
+    auto_restart: bool,
 }
 
 #[derive(Parser, Debug)]
@@ -139,6 +157,11 @@ struct K8sSwarm {
     retain_debug_logs: bool,
     #[clap(long, help = "If set, spins up an indexer stack alongside the testnet")]
     enable_indexer: bool,
+    #[clap(
+        long,
+        help = "Number of public full nodes (PFNs) to deploy alongside the testnet (0 to disable). Overrides the test suite default if set."
+    )]
+    num_pfns: Option<usize>,
     #[clap(
         long,
         help = "The deployer profile used to spin up and configure forge infrastructure",
@@ -212,6 +235,12 @@ struct Create {
     indexer_image_tag: Option<String>,
     #[clap(
         long,
+        help = "Number of public full nodes (PFNs) to deploy alongside the testnet (0 to disable)",
+        default_value = "0"
+    )]
+    num_pfns: usize,
+    #[clap(
+        long,
         help = "The deployer profile used to spin up and configure forge infrastructure",
         default_value = &DEFAULT_FORGE_DEPLOYER_PROFILE,
 
@@ -278,15 +307,31 @@ fn main() -> Result<()> {
                             mempool_backlog: 5000,
                         }));
                     let swarm_dir = local_cfg.swarmdir.clone();
-                    let forge = Forge::new(
-                        &args.options,
-                        test_suite,
-                        duration,
-                        LocalFactory::from_workspace(swarm_dir)?,
-                    );
+                    let cpu_affinities = local_cfg
+                        .cpu_affinity
+                        .as_deref()
+                        .map(|s| s.split(':').map(String::from).collect())
+                        .unwrap_or_default();
+                    let mem_binds = local_cfg
+                        .mem_bind
+                        .as_deref()
+                        .map(|s| s.split(':').map(String::from).collect())
+                        .unwrap_or_default();
+                    let factory = if let Some(ref binary) = local_cfg.aptos_node_binary {
+                        LocalFactory::from_binary(PathBuf::from(binary), swarm_dir)?
+                    } else {
+                        LocalFactory::from_workspace(swarm_dir)?
+                    }
+                    .with_node_affinities(cpu_affinities, mem_binds)
+                    .with_concurrency_level(local_cfg.concurrency_level)
+                    .with_auto_restart(local_cfg.auto_restart);
+                    let forge = Forge::new(&args.options, test_suite, duration, factory);
                     run_forge(forge, &args.options)
                 },
                 TestCommand::K8sSwarm(k8s) => {
+                    if let Some(num_pfns) = k8s.num_pfns {
+                        test_suite = test_suite.with_num_pfns(num_pfns);
+                    }
                     if let Some(move_modules_dir) = &k8s.move_modules_dir {
                         test_suite = test_suite.with_genesis_modules_path(move_modules_dir.clone());
                     }
@@ -309,6 +354,8 @@ fn main() -> Result<()> {
                     };
                     let forge_runner_mode =
                         ForgeRunnerMode::try_from_env().unwrap_or(ForgeRunnerMode::K8s);
+                    let pfn_deployment_configs = test_suite.build_pfn_deployment_configs();
+                    let pfn_base_node_config = test_suite.build_pfn_base_node_config();
                     let forge = Forge::new(
                         &args.options,
                         test_suite,
@@ -323,6 +370,8 @@ fn main() -> Result<()> {
                             k8s.keep,
                             k8s.enable_haproxy,
                             k8s.enable_indexer,
+                            pfn_deployment_configs,
+                            pfn_base_node_config,
                             k8s.deployer_profile.clone(),
                         )?,
                     );
@@ -368,6 +417,14 @@ fn main() -> Result<()> {
                     },
                 }))?;
 
+                // Clone values needed by multiple deployer futures before they move
+                let pfn_kube_client = kube_client.clone();
+                let pfn_namespace = create.namespace.clone();
+                let pfn_era = era.clone();
+                let pfn_image_tag = create.validator_image_tag.clone();
+                let pfn_profile = create.deployer_profile.clone();
+                let num_pfns = create.num_pfns;
+
                 let deploy_testnet_fut = async {
                     install_testnet_resources(
                         era.clone(),
@@ -377,7 +434,7 @@ fn main() -> Result<()> {
                         create.validator_image_tag,
                         create.testnet_image_tag,
                         create.move_modules_dir,
-                        false, // since we skip_collecting_running_nodes, we don't connect directly to the nodes to validatet their health
+                        false, // since we skip_collecting_running_nodes, we don't connect directly to the nodes to validate their health
                         create.enable_haproxy,
                         create.enable_indexer,
                         create.deployer_profile,
@@ -405,7 +462,48 @@ fn main() -> Result<()> {
                 }
                 .boxed();
 
-                runtime.block_on(future::try_join(deploy_testnet_fut, deploy_indexer_fut))?;
+                let deploy_pfn_fut = async move {
+                    if num_pfns > 0 {
+                        let genesis_bucket_path = format!(
+                            "{}/{}/{}",
+                            FORGE_GENESIS_SHARED_BUCKET, pfn_namespace, pfn_era
+                        );
+                        let pfn_deployment_configs: Vec<Value> = (0..num_pfns)
+                            .map(|i| json!({ "helmReleaseName": format!("pfn-{}", i) }))
+                            .collect();
+                        let pfn_config: Value = serde_json::from_value(json!({
+                            "profile": pfn_profile,
+                            "era": pfn_era,
+                            "namespace": pfn_namespace,
+                            "pfn-deployments": pfn_deployment_configs,
+                            "pfn-values": {
+                                "imageTag": pfn_image_tag,
+                                "genesis_bucket_path": genesis_bucket_path,
+                                "chain": {
+                                    "era": pfn_era,
+                                    "name": "ephemeral",
+                                },
+                            },
+                        }))?;
+                        let pfn_deployer = ForgeDeployerManager::new(
+                            pfn_kube_client,
+                            pfn_namespace.clone(),
+                            FORGE_PFN_DEPLOYER_DOCKER_IMAGE_REPO.to_string(),
+                            None,
+                        );
+                        pfn_deployer.start(pfn_config).await?;
+                        pfn_deployer.wait_completed().await
+                    } else {
+                        Ok(())
+                    }
+                }
+                .boxed();
+
+                runtime.block_on(future::try_join3(
+                    deploy_testnet_fut,
+                    deploy_indexer_fut,
+                    deploy_pfn_fut,
+                ))?;
                 Ok(())
             },
         },
@@ -461,7 +559,6 @@ fn get_test_suite(
         boxed!(|| get_land_blocking_test(test_name, duration, test_cmd))
             as Box<dyn Fn() -> Option<ForgeConfig>>,
         boxed!(|| get_multi_region_test(test_name)),
-        boxed!(|| get_netbench_test(test_name)),
         boxed!(|| get_pfn_test(test_name, duration)),
         boxed!(|| get_realistic_env_test(test_name, duration, test_cmd)),
         boxed!(|| get_state_sync_test(test_name)),

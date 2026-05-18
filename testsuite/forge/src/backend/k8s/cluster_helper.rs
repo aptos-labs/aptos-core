@@ -855,6 +855,13 @@ where
 {
     if let Err(KubeError::Api(api_err)) = api.create(&PostParams::default(), &resource).await {
         if api_err.code == 409 {
+            if api_err.message.contains("object is being deleted") {
+                return Err(ApiError::RetryableError(format!(
+                    "Resource {:?}, {} is being deleted (Terminating), will retry",
+                    std::any::type_name::<T>(),
+                    resource.name()
+                )));
+            }
             info!(
                 "Resource {:?}, {} already exists, continuing with it",
                 std::any::type_name::<T>(),
@@ -890,6 +897,12 @@ pub async fn create_namespace(
         .await
     {
         if api_err.code == 409 {
+            if api_err.message.contains("object is being deleted") {
+                return Err(ApiError::RetryableError(format!(
+                    "Namespace {} is being deleted (Terminating), will retry",
+                    &kube_namespace_name
+                )));
+            }
             info!(
                 "Namespace {} already exists, continuing with it",
                 &kube_namespace_name
@@ -923,7 +936,8 @@ pub async fn create_management_configmap(
     // * if it errors with 409, the namespace exists already and we should use it
     // * if it errors with 403, the namespace is likely in the process of being terminated, so try again
     RetryPolicy::exponential(Duration::from_millis(1000))
-        .with_max_delay(Duration::from_millis(10 * 60 * 1000))
+        .with_max_delay(Duration::from_secs(30))
+        .with_max_retries(20)
         .retry_if(
             move || create_namespace(namespaces_api.clone(), other_kube_namespace.clone()),
             |e: &ApiError| matches!(e, ApiError::RetryableError(_)),

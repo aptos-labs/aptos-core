@@ -1,5 +1,5 @@
 name: Wait for Docker images used in CI
-description: Wait for Docker images used in CI to be available in the GCP artifact registry.
+description: Wait for Docker images used in CI to be available in the GCP artifact registry (no AWS/ECR).
 inputs:
   GIT_SHA:
     description: "The git SHA to use for the images"

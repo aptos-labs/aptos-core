@@ -1,5 +1,5 @@
-// Copyright © Aptos Foundation
-// SPDX-License-Identifier: Apache-2.0
+// Copyright (c) Aptos Foundation
+// Licensed pursuant to the Innovation-Enabling Source Code License, available at https://github.com/aptos-labs/aptos-core/blob/main/LICENSE
 
 //! AST Simplifier
 //!
@@ -338,11 +338,11 @@ fn find_possibly_modified_vars(
                             _ => {},
                         }
                     },
-                    Operation::Select(..) => {
-                        // Variable appearing in Select argument may be borrowed if it occurs in
-                        // a Borrow parameter, so leave modifying state alone.  Note that other
-                        // modification contexts (e.g., MoveFrom) cannot have a `Select` in their
-                        // subexpressions.
+                    Operation::Select(..) | Operation::SelectVariants(..) => {
+                        // Variable appearing in Select/SelectVariants argument may be borrowed
+                        // if it occurs in a Borrow parameter, so leave modifying state alone.
+                        // Note that other modification contexts (e.g., MoveFrom) cannot have a
+                        // `Select`/`SelectVariants` in their subexpressions.
                     },
                     _ => {
                         // Other operations don't modify argument variables, so turn off `modifying`
@@ -712,7 +712,7 @@ impl ExpRewriterFunctions for SimplifierRewriter<'_> {
                 match op {
                     Operation::Borrow(ReferenceKind::Mutable) => IsMutableBorrow,
                     // Leave in_mut_borrow alone
-                    Operation::Select(..) => TransparentToBorrow,
+                    Operation::Select(..) | Operation::SelectVariants(..) => TransparentToBorrow,
                     // Other Call operations escape from the borrow
                     _ => NotBorrowable,
                 }
@@ -783,19 +783,8 @@ impl ExpRewriterFunctions for SimplifierRewriter<'_> {
                     // If we turned it into one, then wrap it in a `Sequence` to generate a temp value
                     // to be borrowed.
                     if rexp.is_directly_borrowable() {
-                        use ExpData::*;
-                        match rexp.as_ref() {
-                            LocalVar(id, ..)
-                            | Temporary(id, ..)
-                            | Call(id, Operation::Select(..), _) => {
-                                let cloned_id = self.env().clone_node(*id);
-                                Sequence(cloned_id, vec![rexp]).into_exp()
-                            },
-                            _ => {
-                                // Nothing to do.
-                                rexp
-                            },
-                        }
+                        let cloned_id = self.env().clone_node(rexp.node_id());
+                        ExpData::Sequence(cloned_id, vec![rexp]).into_exp()
                     } else {
                         rexp
                     }

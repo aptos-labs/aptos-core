@@ -1,5 +1,7 @@
-// Copyright (c) The Move Contributors
-// SPDX-License-Identifier: Apache-2.0
+// Parts of the file are Copyright (c) The Diem Core Contributors
+// Parts of the file are Copyright (c) The Move Contributors
+// Parts of the file are Copyright (c) Aptos Foundation
+// All Aptos Foundation code and content is licensed pursuant to the Innovation-Enabling Source Code License, available at https://github.com/aptos-labs/aptos-core/blob/main/LICENSE
 
 use crate::run_move_prover_with_model_v2;
 use anyhow::bail;
@@ -115,6 +117,11 @@ pub fn run_move_prover(
 ) -> anyhow::Result<()> {
     // Always run the prover in dev mode, so addresses get default assignments
     config.dev_mode = true;
+    // Prover needs #[verify_only] code (specifications).
+    // test_mode must be off: test_mode and verify_mode cannot both be true
+    // (causes name clashes in std::cmp).
+    config.verify_mode = true;
+    config.test_mode = false;
 
     if !options.move_sources.is_empty() {
         bail!(
@@ -149,7 +156,9 @@ pub fn run_move_prover(
         target_filter: target_filter.clone(),
         compiler_version,
         language_version,
+        with_bytecode: true, // prover needs FileFormat bytecode
     })?;
+    model.check_errors("in compilation")?;
     let _temp_dir_holder = if for_test {
         // Need to ensure a distinct output.bpl file for concurrent execution. In non-test
         // mode, we actually want to use the static output.bpl for debugging purposes

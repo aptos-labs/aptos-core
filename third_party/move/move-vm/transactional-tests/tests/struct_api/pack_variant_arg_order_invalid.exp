@@ -1,0 +1,9 @@
+processed 1 task
+task 0 lines 1-17:  publish --print-bytecode [// Test that a pack_variant function which moves locals out of order is rejected.]
+Error: Unable to publish module '0000000000000000000000000000000000000000000000000000000000000066::test_pack_variant_arg_order_invalid'. Got VMError: {
+    major_status: INVALID_STRUCT_API_CODE,
+    sub_status: None,
+    location: 0x66::test_pack_variant_arg_order_invalid,
+    indices: [(FunctionDefinition, 0)],
+    offsets: [],
+}

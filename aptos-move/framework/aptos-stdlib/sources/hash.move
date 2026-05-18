@@ -43,6 +43,12 @@ module aptos_std::aptos_hash {
         sha2_512_internal(bytes)
     }
 
+    public fun sha2_512_value<T>(val: &T): vector<u8> {
+        let bytes = bcs::to_bytes(val);
+
+        sha2_512(bytes)
+    }
+
     /// Returns the SHA3-512 hash of `bytes`.
     public fun sha3_512(bytes: vector<u8>): vector<u8> {
         if(!features::sha_512_and_ripemd_160_enabled()) {

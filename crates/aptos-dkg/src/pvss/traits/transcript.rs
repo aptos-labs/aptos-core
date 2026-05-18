@@ -125,6 +125,10 @@ pub trait TranscriptCore: Debug + ValidCryptoMaterial + Clone + PartialEq + Eq {
 ///    reconstruct the secret (but no fewer can)
 /// 2. Weighted $w$-out-of-$W$ PVSS protocols where any players with combined weight $\ge w$ can
 ///    reconstruct the secret (but players with combined weight $< w$ cannot)
+///
+/// TODO: instead of `Transcript: TranscriptCore` there should be an associated type
+/// `type TranscriptCore = TranscriptCore`, so we can get rid of reimplementing / delegating
+/// the TranscriptCore methods
 pub trait Transcript: TranscriptCore {
     type SigningSecretKey: Uniform + SigningKey<VerifyingKeyMaterial = Self::SigningPubKey>;
     type SigningPubKey: VerifyingKey<SigningKeyMaterial = Self::SigningSecretKey>;
@@ -282,7 +286,7 @@ macro_rules! delegate_transcript_core_to_subtrs {
             type DecryptPrivKey = keys::DecryptPrivKey<E>;
             type EncryptPubKey = keys::EncryptPubKey<E>;
             type PublicParameters = PublicParameters<E>;
-            type SecretSharingConfig = SecretSharingConfig<E>;
+            type SecretSharingConfig = SecretSharingConfig<E::ScalarField>;
 
             fn get_public_key_share(
                 &self,
@@ -324,10 +328,12 @@ pub trait MalleableTranscript: Transcript {
 
 /// This is needed instead of Default because `max_n` influences the public parameters of the DeKARTv2 range proof, and hence the public parameters of `chunky`
 pub trait WithMaxNumShares {
-    fn with_max_num_shares(n: u32) -> Self;
+    fn with_max_num_shares(n: usize) -> Self;
 
-    fn with_max_num_shares_and_bit_size(n: u32, ell: u8) -> Self;
+    // TODO: rethink this function and the next one
+    fn with_max_num_shares_and_bit_size(n: usize, ell: usize) -> Self;
 
     /// This is a modified function which might create public parameters that are fairly nonsensical, but which are sufficient for `generate()`
-    fn with_max_num_shares_for_generate(n: u32) -> Self;
+    /// TODO: Not sure we need `n` here
+    fn with_max_num_shares_for_generate(n: usize) -> Self;
 }

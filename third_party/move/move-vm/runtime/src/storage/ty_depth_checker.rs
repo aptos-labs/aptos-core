@@ -1,5 +1,7 @@
-// Copyright (c) The Move Contributors
-// SPDX-License-Identifier: Apache-2.0
+// Parts of the file are Copyright (c) The Diem Core Contributors
+// Parts of the file are Copyright (c) The Move Contributors
+// Parts of the file are Copyright (c) Aptos Foundation
+// All Aptos Foundation code and content is licensed pursuant to the Innovation-Enabling Source Code License, available at https://github.com/aptos-labs/aptos-core/blob/main/LICENSE
 
 use crate::{module_traversal::TraversalContext, storage::loader::traits::StructDefinitionLoader};
 use move_binary_format::{
@@ -177,7 +179,8 @@ where
             )?,
             Type::Struct { idx, .. } => {
                 let formula = visit_struct!(idx);
-                check_depth!(formula.solve(&[]))
+                let depth = formula.solve(&[])?;
+                check_depth!(depth)
             },
             Type::StructInstantiation { idx, ty_args, .. } => {
                 let ty_arg_depths = ty_args
@@ -194,7 +197,8 @@ where
                     .collect::<PartialVMResult<Vec<_>>>()?;
 
                 let formula = visit_struct!(idx);
-                check_depth!(formula.solve(&ty_arg_depths))
+                let depth = formula.solve(&ty_arg_depths)?;
+                check_depth!(depth)
             },
             Type::TyParam(_) => {
                 return Err(

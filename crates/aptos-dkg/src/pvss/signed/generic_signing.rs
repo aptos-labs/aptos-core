@@ -5,6 +5,7 @@ use crate::pvss::{
     test_utils::NoAux,
     traits::{transcript::HasAggregatableSubtranscript, Transcript, TranscriptCore},
 };
+use anyhow::{anyhow, Result};
 use aptos_crypto::{
     bls12381, player::Player, CryptoMaterialError, Signature, SigningKey, Uniform,
     ValidCryptoMaterial,
@@ -14,12 +15,16 @@ use rand_core::{CryptoRng, RngCore};
 use serde::{Deserialize, Serialize};
 
 /// A generic transformation from a non-malleable PVSS to a signed and non-malleable PVSS.
+///
+/// MaxBcsSize(T=UnsignedWeightedTranscript<Bls12_381>): 818 + 32·n + 120·W + 24·max_w + 128·(W + max_w)·c + 80·ell.
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq)]
 
 /// The transcript after applying this transform, will consist of the original transcript plus a BLS12-381 signature
 /// of its dealt pub key and session id
 pub struct GenericSigning<T> {
+    /// MaxBcsSize(T=UnsignedWeightedTranscript<Bls12_381>): 706 + 32·n + 120·W + 24·max_w + 128·(W + max_w)·c + 80·ell.
     trs: T,
+    /// MaxBcsSize: 112.
     sig: bls12381::Signature,
 }
 
@@ -172,13 +177,25 @@ impl<
         eks: &[Self::EncryptPubKey],
         sid: &A,
         rng: &mut R,
-    ) -> anyhow::Result<()> {
+    ) -> Result<()> {
+        let dealers = self.get_dealers();
+        let dealer = dealers
+            .first()
+            .ok_or_else(|| anyhow!("signed transcript has no dealers"))?;
+        let idx = dealer.id;
+        let spk = spks.get(idx).ok_or_else(|| {
+            anyhow!(
+                "dealer index {} out of range for spks (len {})",
+                idx,
+                spks.len()
+            )
+        })?;
         self.sig.verify(
             &SessionContribution {
                 contrib: self.trs.get_dealt_public_key(),
                 sid,
             },
-            &spks[self.get_dealers()[0].id],
+            spk,
         )?;
 
         T::verify(&self.trs, sc, pp, spks, eks, sid, rng)

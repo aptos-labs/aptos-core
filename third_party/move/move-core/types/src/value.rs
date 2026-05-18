@@ -1,11 +1,12 @@
-// Copyright (c) The Diem Core Contributors
-// Copyright (c) The Move Contributors
-// SPDX-License-Identifier: Apache-2.0
+// Parts of the file are Copyright (c) The Diem Core Contributors
+// Parts of the file are Copyright (c) The Move Contributors
+// Parts of the file are Copyright (c) Aptos Foundation
+// All Aptos Foundation code and content is licensed pursuant to the Innovation-Enabling Source Code License, available at https://github.com/aptos-labs/aptos-core/blob/main/LICENSE
 
 // The below is to deal with a strange problem with derive(Dearbitrary), which creates warnings
-// of unused variables in derived code which cannot be turned off by applying the attribute
-// just at the type in question. (Here, MoveStructLayout.)
-#![allow(unused_variables)]
+// of unused variables and unused assignments in derived code which cannot be turned off by
+// applying the attribute just at the type in question. (Here, MoveStructLayout.)
+#![allow(unused_variables, unused_assignments)]
 
 use crate::{
     account_address::AccountAddress,
@@ -23,10 +24,9 @@ use serde::{
     Deserialize, Serialize,
 };
 use std::{
-    collections::{btree_map::Entry, BTreeMap},
     convert::TryInto,
     fmt::{self, Debug},
-    sync::{Arc, Mutex},
+    sync::Arc,
 };
 
 /// The maximal number of enum variants which are supported in values. This must align with
@@ -52,32 +52,19 @@ pub const MOVE_VARIANT_NAME: &str = "variant";
 pub const MOVE_VARIANT_NAME_FIELD: &str = "name";
 
 /// In order to serialize enums with serde, we have to provide `&'static str` names for
-/// variants. This static cache is used to generate those names, and contains
-/// signatures of the form `["0", "1", "2", ..]`. The size of this cache
-/// is bound by `VARIANT_COUNT_MAX * VARIANT_COUNT_MAX / 2` (8064 with max 127)
-static VARIANT_NAME_PLACEHOLDER_CACHE: Lazy<Mutex<BTreeMap<usize, &'static [&'static str]>>> =
-    Lazy::new(|| Mutex::new(Default::default()));
+/// variants. This static is used to generate those names, and contains signatures of
+/// the form `["0", "1", "2", ..]`.
+static VARIANT_NAME_PLACEHOLDERS: Lazy<[&'static str; VARIANT_COUNT_MAX as usize]> =
+    Lazy::new(|| {
+        std::array::from_fn(|i| Box::leak(format!("{i}").into_boxed_str()) as &'static str)
+    });
 
 /// Returns variant name placeholders for providing dummy names in serde serialization.
 pub fn variant_name_placeholder(len: usize) -> Result<&'static [&'static str], anyhow::Error> {
     if len > VARIANT_COUNT_MAX as usize {
         bail!("variant count is restricted to {}", VARIANT_COUNT_MAX);
     }
-    let mutex = &VARIANT_NAME_PLACEHOLDER_CACHE;
-    let mut lock = mutex.lock().expect("acquire index name lock");
-    match lock.entry(len) {
-        Entry::Vacant(e) => {
-            let signature = Box::new(
-                (0..len)
-                    .map(|idx| Box::new(format!("{}", idx)).leak() as &str)
-                    .collect::<Vec<_>>(),
-            )
-            .leak();
-            e.insert(signature);
-            Ok(signature)
-        },
-        Entry::Occupied(e) => Ok(e.get()),
-    }
+    Ok(&VARIANT_NAME_PLACEHOLDERS[..len])
 }
 
 /// enum signer {
@@ -191,7 +178,11 @@ pub enum MoveStructLayout {
         fields: Vec<MoveFieldLayout>,
     },
     /// A decorated representation of struct variants, containing variant and field names.
-    WithVariants(Vec<MoveVariantLayout>),
+    /// Like WithTypes, this carries the type tag for proper type identification.
+    WithVariants {
+        type_: StructTag,
+        variants: Vec<MoveVariantLayout>,
+    },
 }
 
 /// Used to distinguish between aggregators ans snapshots.
@@ -415,9 +406,10 @@ impl MoveStruct {
                         .collect(),
                 }
             },
-            (MoveStruct::RuntimeVariant(tag, vals), MoveStructLayout::WithVariants(variants))
-                if (tag as usize) < variants.len() =>
-            {
+            (
+                MoveStruct::RuntimeVariant(tag, vals),
+                MoveStructLayout::WithVariants { variants, .. },
+            ) if (tag as usize) < variants.len() => {
                 let MoveVariantLayout { name, fields } = &variants[tag as usize];
                 MoveStruct::WithVariantFields(
                     name.clone(),
@@ -510,8 +502,8 @@ impl MoveStructLayout {
         Self::WithTypes { type_, fields }
     }
 
-    pub fn with_variants(variants: Vec<MoveVariantLayout>) -> Self {
-        Self::WithVariants(variants)
+    pub fn with_variants(type_: StructTag, variants: Vec<MoveVariantLayout>) -> Self {
+        Self::WithVariants { type_, variants }
     }
 
     pub fn fields(&self, variant: Option<usize>) -> &[MoveTypeLayout] {
@@ -524,7 +516,7 @@ impl MoveStructLayout {
                     &[]
                 },
             },
-            Self::WithFields(_) | Self::WithTypes { .. } | Self::WithVariants(_) => {
+            Self::WithFields(_) | Self::WithTypes { .. } | Self::WithVariants { .. } => {
                 // It's not possible to implement this without changing the return type, and some
                 // performance-critical VM serialization code uses the Runtime case of this.
                 // panicking is the best move
@@ -548,7 +540,7 @@ impl MoveStructLayout {
             Self::WithFields(fields) | Self::WithTypes { fields, .. } => {
                 fields.into_iter().map(|f| f.layout).collect()
             },
-            Self::WithVariants(mut variants) => match variant {
+            Self::WithVariants { mut variants, .. } => match variant {
                 Some(idx) if idx < variants.len() => variants
                     .remove(idx)
                     .fields
@@ -772,7 +764,10 @@ impl<'d> serde::de::DeserializeSeed<'d> for &MoveStructLayout {
                     _fields: fields,
                 })
             },
-            MoveStructLayout::WithVariants(decorated_variants) => {
+            MoveStructLayout::WithVariants {
+                variants: decorated_variants,
+                ..
+            } => {
                 // Downgrade the decorated variants to simple layouts to deserialize the fields.
                 let variant_names = variant_name_placeholder(decorated_variants.len())
                     .map_err(|e| D::Error::custom(format!("{}", e)))?;
@@ -978,7 +973,7 @@ impl fmt::Display for MoveStructLayout {
                     write!(f, "{}, ", field)?
                 }
             },
-            Self::WithVariants(variants) => {
+            Self::WithVariants { variants, .. } => {
                 for v in variants {
                     write!(f, "{}{{", v.name)?;
                     for layout in &v.fields {
@@ -1034,10 +1029,10 @@ impl TryInto<StructTag> for &MoveStructLayout {
     fn try_into(self) -> Result<StructTag, Self::Error> {
         use MoveStructLayout::*;
         match self {
-            Runtime(..) | RuntimeVariants(..) | WithFields(..) | WithVariants(..) => bail!(
-                "Invalid MoveTypeLayout -> StructTag conversion--needed MoveLayoutType::WithTypes"
+            Runtime(..) | RuntimeVariants(..) | WithFields(..) => bail!(
+                "Invalid MoveTypeLayout -> StructTag conversion--needed MoveLayoutType::WithTypes or WithVariants"
             ),
-            WithTypes { type_, .. } => Ok(type_.clone()),
+            WithTypes { type_, .. } | WithVariants { type_, .. } => Ok(type_.clone()),
         }
     }
 }

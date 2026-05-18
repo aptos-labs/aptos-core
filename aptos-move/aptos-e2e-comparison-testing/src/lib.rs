@@ -388,8 +388,8 @@ pub(crate) struct PackageInfo {
 impl fmt::Display for PackageInfo {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         let mut name = format!("{}.{}", self.package_name, self.address);
-        if self.upgrade_number.is_some() {
-            name = format!("{}.{}", name, self.upgrade_number.unwrap());
+        if let Some(upgrade_number) = self.upgrade_number {
+            name = format!("{}.{}", name, upgrade_number);
         }
         write!(f, "{}", name)?;
         Ok(())

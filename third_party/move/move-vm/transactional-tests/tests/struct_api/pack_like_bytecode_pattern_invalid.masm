@@ -1,0 +1,31 @@
+//# publish --print-bytecode
+// Test 1: fewer than 2 bytecode instructions (just Ret, no pack_variant instruction)
+module 0x66::test_pack_variant_too_few_instructions
+
+enum E has drop
+  V
+
+#[pack_variant(0)] public fun pack$E$V(): E
+    ret
+
+//# publish --print-bytecode
+// Test 2: bytecode does not end with Ret (pack_variant followed by ld_u64)
+module 0x66::test_pack_variant_not_ending_with_ret
+
+enum E has drop
+  V
+
+#[pack_variant(0)] public fun pack$E$V(): E
+    pack_variant E, V
+    ld_u64 0
+
+//# publish --print-bytecode
+// Test 3: second-to-last instruction is not the expected operation (ld_u64 instead of pack_variant)
+module 0x66::test_pack_variant_wrong_second_to_last
+
+enum E has drop
+  V
+
+#[pack_variant(0)] public fun pack$E$V(): E
+    ld_u64 0
+    ret

@@ -149,6 +149,7 @@ async fn test_reliable_broadcast() {
     let failures = HashMap::from([(validators[0], 1), (validators[2], 3)]);
     let sender = Arc::new(TestRBSender::<TestRBMessage>::new(failures));
     let rb = ReliableBroadcast::new(
+        "test",
         self_author,
         validators.clone(),
         sender,
@@ -174,6 +175,7 @@ async fn test_chaining_reliable_broadcast() {
     let failures = HashMap::from([(validators[0], 1), (validators[2], 3)]);
     let sender = Arc::new(TestRBSender::<TestRBMessage>::new(failures));
     let rb = Arc::new(ReliableBroadcast::new(
+        "test",
         self_author,
         validators.clone(),
         sender,
@@ -210,6 +212,7 @@ async fn test_abort_reliable_broadcast() {
     let failures = HashMap::from([(validators[0], 1), (validators[2], 3)]);
     let sender = Arc::new(TestRBSender::<TestRBMessage>::new(failures));
     let rb = Arc::new(ReliableBroadcast::new(
+        "test",
         self_author,
         validators.clone(),
         sender,

@@ -1,5 +1,5 @@
 // Copyright (c) Aptos Foundation
-// SPDX-License-Identifier: Apache-2.0
+// Licensed pursuant to the Innovation-Enabling Source Code License, available at https://github.com/aptos-labs/aptos-core/blob/main/LICENSE
 
 //! # Move Package Cache
 //!
@@ -40,7 +40,7 @@
 //! that the tool is still actively progressing.
 
 mod canonical;
-mod file_lock;
+pub mod file_lock;
 mod listener;
 mod package_cache;
 

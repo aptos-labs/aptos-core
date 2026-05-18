@@ -11,10 +11,10 @@
 //! long as the latter is in its trusted peers set.
 use aptos_config::{
     config::{
-        AccessControlPolicy, DiscoveryMethod, NetworkConfig, Peer, PeerRole, PeerSet, RoleType,
-        CONNECTION_BACKOFF_BASE, CONNECTIVITY_CHECK_INTERVAL_MS, MAX_CONNECTION_DELAY_MS,
-        MAX_FRAME_SIZE, MAX_FULLNODE_OUTBOUND_CONNECTIONS, MAX_INBOUND_CONNECTIONS,
-        NETWORK_CHANNEL_SIZE,
+        AccessControlPolicy, BaseConfig, DiscoveryMethod, NetworkConfig, NodeType, Peer, PeerRole,
+        PeerSet, RateLimitConfig, RoleType, CONNECTION_BACKOFF_BASE,
+        CONNECTIVITY_CHECK_INTERVAL_MS, MAX_CONNECTION_DELAY_MS, MAX_FRAME_SIZE,
+        MAX_FULLNODE_OUTBOUND_CONNECTIONS, MAX_INBOUND_CONNECTIONS, NETWORK_CHANNEL_SIZE,
     },
     network_id::NetworkContext,
 };
@@ -40,7 +40,7 @@ use aptos_network::{
 };
 use aptos_network_discovery::DiscoveryChangeListener;
 use aptos_time_service::TimeService;
-use aptos_types::{chain_id::ChainId, network_address::NetworkAddress};
+use aptos_types::{chain_id::ChainId, network_address::NetworkAddress, PeerId};
 use std::{clone::Clone, collections::HashSet, sync::Arc, time::Duration};
 use tokio::runtime::Handle;
 
@@ -86,6 +86,8 @@ impl NetworkBuilder {
         inbound_connection_limit: usize,
         tcp_buffer_cfg: TCPBufferCfg,
         access_control_policy: Option<Arc<AccessControlPolicy>>,
+        priority_inbound_peers: Vec<PeerId>,
+        inbound_rate_limit_config: Option<RateLimitConfig>,
     ) -> Self {
         // A network cannot exist without a PeerManager
         // TODO:  construct this in create and pass it to new() as a parameter. The complication is manual construction of NetworkBuilder in various tests.
@@ -103,6 +105,8 @@ impl NetworkBuilder {
             inbound_connection_limit,
             tcp_buffer_cfg,
             access_control_policy,
+            priority_inbound_peers,
+            inbound_rate_limit_config,
         );
 
         NetworkBuilder {
@@ -142,7 +146,9 @@ impl NetworkBuilder {
             NETWORK_CHANNEL_SIZE,
             MAX_INBOUND_CONNECTIONS,
             TCPBufferCfg::default(),
-            None, /* access_control_policy */
+            None,       /* access_control_policy */
+            Vec::new(), /* priority_inbound_peers */
+            None,       /* inbound_rate_limit_config */
         );
 
         builder.add_connectivity_manager(
@@ -169,6 +175,8 @@ impl NetworkBuilder {
         time_service: TimeService,
         reconfig_subscription_service: Option<&mut EventSubscriptionService>,
         peers_and_metadata: Arc<PeersAndMetadata>,
+        node_type: NodeType,
+        base_config: &BaseConfig,
     ) -> NetworkBuilder {
         let peer_id = config.peer_id();
         let identity_key = config.identity_key();
@@ -203,12 +211,15 @@ impl NetworkBuilder {
                 config.outbound_tx_buffer_size_bytes,
             ),
             access_control_policy.clone(),
+            config.priority_inbound_peers.clone(),
+            config.inbound_rate_limit_config.clone(),
         );
 
         network_builder.add_connection_monitoring(
             config.ping_interval_ms,
             config.ping_timeout_ms,
             config.ping_failures_tolerated,
+            config.disconnect_on_health_check_failure,
             config.max_parallel_deserialization_tasks,
         );
 
@@ -229,7 +240,12 @@ impl NetworkBuilder {
         );
 
         network_builder.discovery_listeners = Some(Vec::new());
-        network_builder.setup_discovery(config, reconfig_subscription_service);
+        network_builder.setup_discovery(
+            config,
+            reconfig_subscription_service,
+            node_type,
+            base_config,
+        );
 
         // Ensure there are no duplicate source types
         let set: HashSet<_> = network_builder
@@ -303,7 +319,7 @@ impl NetworkBuilder {
             .map(|conn_mgr_builder| conn_mgr_builder.conn_mgr_reqs_tx())
     }
 
-    pub fn listen_address(&self) -> NetworkAddress {
+    pub fn listen_address(&self) -> &NetworkAddress {
         self.peer_manager_builder.listen_address()
     }
 
@@ -360,6 +376,8 @@ impl NetworkBuilder {
         &mut self,
         config: &NetworkConfig,
         mut reconfig_subscription_service: Option<&mut EventSubscriptionService>,
+        node_type: NodeType,
+        base_config: &BaseConfig,
     ) {
         let conn_mgr_reqs_tx = self
             .conn_mgr_reqs_tx()
@@ -379,6 +397,8 @@ impl NetworkBuilder {
                         conn_mgr_reqs_tx.clone(),
                         pubkey,
                         reconfig_events,
+                        node_type,
+                        base_config.clone(),
                     )
                 },
                 DiscoveryMethod::File(file_discovery) => DiscoveryChangeListener::file(
@@ -394,6 +414,8 @@ impl NetworkBuilder {
                     rest_discovery.url.clone(),
                     Duration::from_secs(rest_discovery.interval_secs),
                     self.time_service.clone(),
+                    node_type,
+                    base_config.clone(),
                 ),
                 DiscoveryMethod::None => {
                     continue;
@@ -412,6 +434,7 @@ impl NetworkBuilder {
         ping_interval_ms: u64,
         ping_timeout_ms: u64,
         ping_failures_tolerated: u64,
+        disconnect_on_failure: bool,
         max_parallel_deserialization_tasks: Option<usize>,
     ) -> &mut Self {
         // Initialize and start HealthChecker.
@@ -426,6 +449,7 @@ impl NetworkBuilder {
             ping_interval_ms,
             ping_timeout_ms,
             ping_failures_tolerated,
+            disconnect_on_failure,
             hc_network_tx,
             hc_network_rx,
             self.peers_and_metadata.clone(),

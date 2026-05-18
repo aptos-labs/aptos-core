@@ -1,29 +1,28 @@
-// Copyright © Aptos Foundation
-// Parts of the project are originally copyright © Meta Platforms, Inc.
-// SPDX-License-Identifier: Apache-2.0
+// Copyright (c) Aptos Foundation
+// Licensed pursuant to the Innovation-Enabling Source Code License, available at https://github.com/aptos-labs/aptos-core/blob/main/LICENSE
 
 use crate::{
     ast::{
         AbortKind, AccessSpecifierKind, AddressSpecifier, Condition, ConditionKind, Exp, ExpData,
-        LambdaCaptureKind, Operation, Pattern, PropertyBag, PropertyValue, QuantKind,
-        ResourceSpecifier, Spec, SpecVarDecl, TempIndex, Value,
+        FrameSpec, LambdaCaptureKind, MemoryRange, Operation, Pattern, PropertyBag, PropertyValue,
+        QuantKind, ResourceSpecifier, Spec, SpecVarDecl, TempIndex, Value,
     },
     code_writer::CodeWriter,
     emit, emitln,
     exp_builder::ExpBuilder,
     model::{
-        FieldEnv, FunId, FunctionEnv, GlobalEnv, ModuleId, NodeId, Parameter, QualifiedId,
-        QualifiedInstId, SpecVarId, StructEnv, StructId, TypeParameter, Visibility,
+        FieldEnv, FunId, FunctionEnv, GlobalEnv, ModuleId, NamedConstantEnv, NodeId, Parameter,
+        QualifiedId, QualifiedInstId, SpecVarId, StructEnv, StructId, TypeParameter, Visibility,
     },
     symbol::Symbol,
     ty::{PrimitiveType, ReferenceKind, Type, TypeDisplayContext},
-    well_known::UNSPECIFIED_ABORT_CODE,
+    well_known::{BORROW_GLOBAL, BORROW_GLOBAL_MUT, UNSPECIFIED_ABORT_CODE},
 };
 use itertools::Itertools;
 use move_core_types::ability::AbilitySet;
-use num::BigInt;
+use num::{BigInt, Zero};
 use std::{
-    cell::RefCell,
+    cell::{Cell, RefCell},
     collections::{BTreeMap, BTreeSet},
 };
 //
@@ -39,6 +38,247 @@ pub struct Sourcifier<'a> {
     sym_alias_map: RefCell<BTreeMap<Symbol, String>>,
     // whether to amend the displayed results to be recompilable (e.g., remove `__` from lambda names) and more readable (e.g., local var names starting from `_v0`)
     amend: bool,
+    /// When set, state labels matching this label are suppressed during rendering.
+    /// Used to avoid redundant nested labels like `S1 |~ global<T>(..S1 |~ ...)`.
+    enclosing_state_label: Cell<Option<crate::ast::MemoryLabel>>,
+    /// Names of `let`-bindings in the user-written spec that is currently being
+    /// augmented with inferred conditions.  Set by the caller before invoking
+    /// `print_fun_spec` and cleared afterwards.  Consulted by `for_fun_spec`
+    /// (via `ExpSourcifier::spec_let_names`) so that `print_behavior_target`
+    /// can emit the fully-qualified form when the bare function name would
+    /// otherwise be shadowed by one of these bindings.
+    context_let_names: RefCell<BTreeSet<Symbol>>,
+}
+
+/// Returns true if a quantifier is "simple" — all ranges use TypeDomain with
+/// empty args (renders as `x: Type`), no triggers, and no where clause.
+/// Such quantifiers have no expressions in their header, so hoisting a state
+/// label from the body through them is safe.
+fn is_simple_quant(
+    ranges: &[(Pattern, Exp)],
+    triggers: &[Vec<Exp>],
+    where_clause: &Option<Exp>,
+) -> bool {
+    triggers.is_empty() && where_clause.is_none() && ranges.iter().all(|(_, range)| {
+        matches!(range.as_ref(), ExpData::Call(_, Operation::TypeDomain, args) if args.is_empty())
+            || matches!(range.as_ref(), ExpData::Call(_, Operation::StateDomain, _))
+    })
+}
+
+// NOTE: has_any_state_label was removed — replaced by is_state_neutral which also
+// catches unlabeled Global(None)/Exists(None) references that would be corrupted by hoisting.
+
+/// Returns true if the expression has a single state label that can be hoisted
+/// out of an enclosing operation for readability. Looks through Not, binary
+/// ops (where the other side has no labels), and quantifiers.
+fn has_hoistable_label(exp: &Exp) -> bool {
+    match exp.as_ref() {
+        ExpData::Call(_, Operation::Global(Some(_)), _)
+        | ExpData::Call(_, Operation::Exists(Some(_)), _) => true,
+        ExpData::Call(_, Operation::Behavior(_, range), _) => {
+            range.pre.is_some() || range.post.is_some()
+        },
+        // Look through Not
+        ExpData::Call(_, Operation::Not, args) if args.len() == 1 => has_hoistable_label(&args[0]),
+        // Look through hoistable binary ops — but only if the other operand is
+        // state-neutral (no global/exists accesses that would be corrupted by hoisting).
+        ExpData::Call(_, op, args) if args.len() == 2 && hoistable_bin_op_info(op).is_some() => {
+            (has_hoistable_label(&args[0]) && is_state_neutral(&args[1]))
+                || (has_hoistable_label(&args[1]) && is_state_neutral(&args[0]))
+        },
+        // Look through simple quantifiers (type-domain ranges only, no triggers/where)
+        ExpData::Quant(_, _, ranges, triggers, where_clause, body)
+            if is_simple_quant(ranges, triggers, where_clause) =>
+        {
+            has_hoistable_label(body)
+        },
+        _ => false,
+    }
+}
+
+/// Returns true if the expression contains no state-sensitive operations — neither explicit
+/// labels nor unlabeled global/exists accesses. An expression is state-neutral when hoisting
+/// a label over it would not change its meaning after a sourcify → parse round-trip.
+///
+/// This subsumes and replaces `!has_any_state_label(exp)` for the hoisting check:
+/// Delegates to `ExpData::is_state_neutral`.
+fn is_state_neutral(exp: &Exp) -> bool {
+    exp.as_ref().is_state_neutral()
+}
+
+/// Returns true if the expression contains no subexpression that would print
+/// with a state-label prefix (`... |~ ...`) — i.e., no labeled Global/Exists
+/// and no labeled Behavior/SpecFunction/SpecPublish/SpecRemove/SpecUpdate.
+///
+/// Used to decide whether an argument of a state-labeled Behavior call needs
+/// to be hoisted into a let binding to avoid visually nested labels. Unlike
+/// `is_state_neutral`, this treats `old(...)`, `result(_)`, and unlabeled
+/// `global<R>(addr)` as harmless: their printed form contains no `|~`, so
+/// leaving them inside an outer `S |~ ...` doesn't create a nested label.
+fn prints_without_label_prefix(exp: &Exp) -> bool {
+    !exp.as_ref().any(&mut |e| match e {
+        ExpData::Call(_, Operation::Global(Some(_)), _)
+        | ExpData::Call(_, Operation::Exists(Some(_)), _) => true,
+        ExpData::Call(
+            _,
+            Operation::Behavior(_, range)
+            | Operation::SpecFunction(_, _, range)
+            | Operation::SpecPublish(range)
+            | Operation::SpecRemove(range)
+            | Operation::SpecUpdate(range),
+            _,
+        ) => range.pre.is_some() || range.post.is_some(),
+        _ => false,
+    })
+}
+
+/// True if `e` itself carries a state label (labeled Behavior/SpecFunction/
+/// SpecPublish/SpecRemove/SpecUpdate call or labeled Global/Exists).
+fn has_label_at_top(e: &ExpData) -> bool {
+    match e {
+        ExpData::Call(_, Operation::Global(Some(_)), _)
+        | ExpData::Call(_, Operation::Exists(Some(_)), _) => true,
+        ExpData::Call(
+            _,
+            Operation::Behavior(_, range)
+            | Operation::SpecFunction(_, _, range)
+            | Operation::SpecPublish(range)
+            | Operation::SpecRemove(range)
+            | Operation::SpecUpdate(range),
+            _,
+        ) => range.pre.is_some() || range.post.is_some(),
+        _ => false,
+    }
+}
+
+/// True if any direct child of `e` is labeled at top; guards the clause-
+/// level CSE — a directly labeled child is already handled by the
+/// label-prefix hoist or `hoist_nested_labels`.
+fn has_labeled_direct_child(e: &ExpData) -> bool {
+    let mut found = false;
+    let mut check = |child: &ExpData| {
+        if has_label_at_top(child) {
+            found = true;
+        }
+    };
+    match e {
+        ExpData::Call(_, _, args) => {
+            for a in args {
+                check(a.as_ref());
+            }
+        },
+        ExpData::Block(_, _, binding, body) => {
+            if let Some(b) = binding {
+                check(b.as_ref());
+            }
+            check(body.as_ref());
+        },
+        ExpData::IfElse(_, cond, on_true, on_false) => {
+            check(cond.as_ref());
+            check(on_true.as_ref());
+            check(on_false.as_ref());
+        },
+        ExpData::Sequence(_, exps) => {
+            for x in exps {
+                check(x.as_ref());
+            }
+        },
+        ExpData::Quant(_, _, _, _, _, body) => check(body.as_ref()),
+        _ => {},
+    }
+    found
+}
+
+/// Collect unique labeled subexpressions (dedup by structural equality).
+/// Stops at each labeled top — nested labels within get hoisted when the
+/// let-binding RHS is later printed. Skips quantifier bodies so bindings
+/// referencing the bound variable don't escape scope.
+fn collect_labeled_subexprs(e: &ExpData, out: &mut Vec<Exp>) {
+    if has_label_at_top(e) {
+        let e_exp = ExpData::into_exp(e.clone());
+        if !out.iter().any(|x| x.as_ref().structural_eq(&e_exp)) {
+            out.push(e_exp);
+        }
+        return;
+    }
+    match e {
+        ExpData::Call(_, _, args) => {
+            for a in args {
+                collect_labeled_subexprs(a.as_ref(), out);
+            }
+        },
+        ExpData::Block(_, _, binding, body) => {
+            if let Some(b) = binding {
+                collect_labeled_subexprs(b.as_ref(), out);
+            }
+            collect_labeled_subexprs(body.as_ref(), out);
+        },
+        ExpData::IfElse(_, cond, on_true, on_false) => {
+            collect_labeled_subexprs(cond.as_ref(), out);
+            collect_labeled_subexprs(on_true.as_ref(), out);
+            collect_labeled_subexprs(on_false.as_ref(), out);
+        },
+        ExpData::Sequence(_, exps) => {
+            for x in exps {
+                collect_labeled_subexprs(x.as_ref(), out);
+            }
+        },
+        // Quantifier bodies may reference the bound variable; hoisting
+        // out would leak scope.
+        ExpData::Quant(..) => {},
+        _ => {},
+    }
+}
+
+/// AST node count. Used to sort labeled subexprs smallest-first so outer
+/// ones reference inner let-binding names.
+fn node_count(exp: &ExpData) -> usize {
+    let mut count = 0;
+    exp.visit_pre_order(&mut |_| {
+        count += 1;
+        true
+    });
+    count
+}
+
+/// Replace every subexpression of `exp` structurally equal to `target`
+/// with `replacement`.
+fn substitute_structural(exp: &Exp, target: &Exp, replacement: &Exp) -> Exp {
+    use crate::exp_rewriter::ExpRewriterFunctions;
+    struct Sub<'a> {
+        target: &'a Exp,
+        replacement: &'a Exp,
+    }
+    impl ExpRewriterFunctions for Sub<'_> {
+        fn rewrite_exp(&mut self, exp: Exp) -> Exp {
+            if exp.as_ref().structural_eq(self.target) {
+                return self.replacement.clone();
+            }
+            self.rewrite_exp_descent(exp)
+        }
+    }
+    Sub {
+        target,
+        replacement,
+    }
+    .rewrite_exp(exp.clone())
+}
+
+/// Returns the priority and operator string for binary ops that support label hoisting.
+fn hoistable_bin_op_info(op: &Operation) -> Option<(Priority, &'static str)> {
+    match op {
+        Operation::And => Some((Prio::LogicalAnd, "&&")),
+        Operation::Or => Some((Prio::LogicalOr, "||")),
+        Operation::Eq => Some((Prio::Relations, "==")),
+        Operation::Neq => Some((Prio::Relations, "!=")),
+        Operation::Lt => Some((Prio::Relations, "<")),
+        Operation::Gt => Some((Prio::Relations, ">")),
+        Operation::Le => Some((Prio::Relations, "<=")),
+        Operation::Ge => Some((Prio::Relations, ">=")),
+        Operation::Implies => Some((Prio::LogicalRelations, "==>")),
+        Operation::Iff => Some((Prio::LogicalRelations, "<==>")),
+        _ => None,
+    }
 }
 
 impl<'a> Sourcifier<'a> {
@@ -50,7 +290,21 @@ impl<'a> Sourcifier<'a> {
             writer: CodeWriter::new(env.unknown_loc()),
             amend,
             sym_alias_map: RefCell::new(BTreeMap::new()),
+            enclosing_state_label: Cell::new(None),
+            context_let_names: RefCell::new(BTreeSet::new()),
         }
+    }
+
+    /// Sets the user-written `let`-binding names for the spec currently being
+    /// printed.  Must be cleared with `clear_context_let_names` after the call
+    /// to `print_fun_spec` completes.
+    pub fn set_context_let_names(&self, names: BTreeSet<Symbol>) {
+        *self.context_let_names.borrow_mut() = names;
+    }
+
+    /// Clears the context let-binding names set by `set_context_let_names`.
+    pub fn clear_context_let_names(&self) {
+        self.context_let_names.borrow_mut().clear();
     }
 
     pub fn env(&self) -> &GlobalEnv {
@@ -102,8 +356,29 @@ impl<'a> Sourcifier<'a> {
                 }
             }
         }
+        if module_env.get_named_constant_count() > 0 {
+            for const_env in module_env.get_named_constants() {
+                self.print_named_constant(&const_env);
+            }
+        }
         if module_env.get_function_count() > 0 {
             for fun_env in module_env.get_functions() {
+                // Skip auto-generated struct API wrappers (pack$S, unpack$S, borrow$S$N, …).
+                // They are reconstructed by the compiler from the public struct declaration
+                // and must not appear in decompiled source.
+                if fun_env.is_struct_api() {
+                    debug_assert!(
+                        fun_env.get_def().is_none(),
+                        "struct API wrapper `{}` should never have a def; \
+                         lift_to_stackless_bytecode must have excluded it",
+                        fun_env.get_name_string()
+                    );
+                    continue;
+                }
+                // Skip `const$NAME` accessors — covered by `print_named_constant` above.
+                if fun_env.is_const_accessor() {
+                    continue;
+                }
                 self.print_fun(fun_env.get_qualified_id(), fun_env.get_def())
             }
         }
@@ -318,6 +593,13 @@ impl<'a> Sourcifier<'a> {
                         return;
                     }
                 }
+                // Try MAX - k or MIN + k for small offsets (spec context only)
+                if for_spec {
+                    if let Some(s) = self.near_bound_name(ty, int) {
+                        emit!(self.writer, "{}", s);
+                        return;
+                    }
+                }
                 emit!(self.writer, "{}", int);
                 // Only print type suffix when not in spec context (specs use arbitrary precision)
                 if !for_spec {
@@ -420,6 +702,58 @@ impl<'a> Sourcifier<'a> {
         None
     }
 
+    /// Returns a display string for a value near a type bound, e.g. `MAX_U64 - 1`.
+    /// Only used for small offsets (≤ 32) and when the value's decimal representation
+    /// is long enough that the bound expression is more readable (≥ 5 digits).
+    fn near_bound_name(&self, ty: Option<&Type>, value: &BigInt) -> Option<String> {
+        // Only use offset notation for values large enough to be unreadable as decimal
+        let decimal_str = value.to_string();
+        let decimal_len = if decimal_str.starts_with('-') {
+            decimal_str.len() - 1
+        } else {
+            decimal_str.len()
+        };
+        if decimal_len < 5 {
+            return None;
+        }
+        let try_prim = |prim: &PrimitiveType, value: &BigInt| -> Option<String> {
+            if let Some(max) = prim.get_max_value() {
+                let diff = &max - value;
+                if diff > BigInt::zero() && diff <= BigInt::from(32) {
+                    if let Some(name) = self.min_max_const_name(prim, &max) {
+                        return Some(format!("{} - {}", name, diff));
+                    }
+                }
+            }
+            if let Some(min) = prim.get_min_value() {
+                let diff = value - &min;
+                if diff > BigInt::zero() && diff <= BigInt::from(32) {
+                    if let Some(name) = self.min_max_const_name(prim, &min) {
+                        return Some(format!("{} + {}", name, diff));
+                    }
+                }
+            }
+            None
+        };
+        let try_all = || {
+            PrimitiveType::all_unsigned_int_types()
+                .iter()
+                .chain(PrimitiveType::all_signed_int_types().iter())
+                .find_map(|t| try_prim(t, value))
+        };
+        match ty {
+            Some(Type::Primitive(prim)) => {
+                if *prim == PrimitiveType::Num {
+                    try_all()
+                } else {
+                    try_prim(prim, value).or_else(try_all)
+                }
+            },
+            // For non-primitive types (e.g., Num from reference erasure), try all integer types
+            _ => try_all(),
+        }
+    }
+
     /// Prints a struct (or enum) declaration.
     pub fn print_struct(&self, struct_id: QualifiedId<StructId>) {
         let struct_env = self.env().get_struct(struct_id);
@@ -430,10 +764,16 @@ impl<'a> Sourcifier<'a> {
             "".to_string()
         };
         let type_param_str = self.type_params(struct_env.get_type_parameters());
+        let vis_prefix = match struct_env.get_visibility() {
+            Visibility::Public => "public ",
+            Visibility::Friend => "friend ",
+            Visibility::Private => "",
+        };
         if struct_env.has_variants() {
             emitln!(
                 self.writer,
-                "enum {}{}{} {{",
+                "{}enum {}{}{} {{",
+                vis_prefix,
                 self.sym(struct_env.get_name()),
                 type_param_str,
                 ability_str
@@ -457,7 +797,8 @@ impl<'a> Sourcifier<'a> {
         } else {
             emitln!(
                 self.writer,
-                "struct {}{}{} {{",
+                "{}struct {}{}{} {{",
+                vis_prefix,
                 self.sym(struct_env.get_name()),
                 type_param_str,
                 ability_str
@@ -478,6 +819,26 @@ impl<'a> Sourcifier<'a> {
 
         // Print struct spec if present
         self.print_struct_spec(&struct_env);
+    }
+
+    /// Print a `const` declaration: `<vis> const NAME: TYPE = VALUE;`.
+    pub fn print_named_constant(&self, const_env: &NamedConstantEnv) {
+        let vis_prefix = match const_env.get_visibility() {
+            Visibility::Private => "",
+            Visibility::Public => "public ",
+            Visibility::Friend if const_env.has_package_visibility() => "package ",
+            Visibility::Friend => "friend ",
+        };
+        let tctx = const_env.get_type_display_ctx();
+        emit!(
+            self.writer,
+            "{}const {}: {} = ",
+            vis_prefix,
+            self.sym(const_env.get_name()),
+            const_env.get_type().display(&tctx)
+        );
+        self.print_value(&const_env.get_value(), Some(&const_env.get_type()), false);
+        emitln!(self.writer, ";");
     }
 
     /// Check for dummy field the compiler introduces for empty structs
@@ -721,6 +1082,9 @@ impl<'a> Sourcifier<'a> {
             self.print_list("[", ", ", "] ", props.iter(), |(key, value)| {
                 emit!(self.writer, "{}", key.display(self.env().symbol_pool()));
                 match value {
+                    PropertyValue::Value(Value::Bool(true)) => {
+                        // Omit "= true", it's implied for boolean properties
+                    },
                     PropertyValue::Value(v) => {
                         emit!(self.writer, " = ");
                         self.print_value(v, None, false);
@@ -743,6 +1107,10 @@ impl<'a> Sourcifier<'a> {
 
     /// Prints a single spec condition using the given expression sourcifier.
     fn print_condition(&self, cond: &Condition, exp_sourcifier: &ExpSourcifier) {
+        // Each condition is a separate scope — reset the let-binding name counter
+        // so identical extractions across conditions get the same names (enabling
+        // structural equality comparison in the instrumentation pass).
+        exp_sourcifier.let_counter.set(0);
         use ConditionKind::*;
         match &cond.kind {
             LetPre(name, _) => {
@@ -772,13 +1140,13 @@ impl<'a> Sourcifier<'a> {
             Ensures => {
                 emit!(self.writer, "ensures ");
                 self.print_properties(&cond.properties);
-                exp_sourcifier.print_exp(Prio::General, false, &cond.exp);
+                exp_sourcifier.print_exp_hoisting_label(&cond.exp);
                 emitln!(self.writer, ";");
             },
             AbortsIf => {
                 emit!(self.writer, "aborts_if ");
                 self.print_properties(&cond.properties);
-                exp_sourcifier.print_exp(Prio::General, false, &cond.exp);
+                exp_sourcifier.print_exp_hoisting_label(&cond.exp);
                 // Check for abort code in additional_exps
                 if !cond.additional_exps.is_empty() {
                     emit!(self.writer, " with ");
@@ -802,12 +1170,6 @@ impl<'a> Sourcifier<'a> {
             },
             SucceedsIf => {
                 emit!(self.writer, "succeeds_if ");
-                self.print_properties(&cond.properties);
-                exp_sourcifier.print_exp(Prio::General, false, &cond.exp);
-                emitln!(self.writer, ";");
-            },
-            Modifies => {
-                emit!(self.writer, "modifies ");
                 self.print_properties(&cond.properties);
                 exp_sourcifier.print_exp(Prio::General, false, &cond.exp);
                 emitln!(self.writer, ";");
@@ -941,10 +1303,117 @@ impl<'a> Sourcifier<'a> {
         emitln!(self.writer, ";");
     }
 
+    /// Prints pragma declarations from a spec's PropertyBag.
+    /// Prints frame spec (modifies/reads) if present.
+    fn print_frame_spec(&self, frame_spec: &Option<FrameSpec>, exp_sourcifier: &ExpSourcifier) {
+        if let Some(frame) = frame_spec {
+            for target in &frame.modifies_targets {
+                emit!(self.writer, "modifies ");
+                exp_sourcifier.print_exp(Prio::General, false, target);
+                emitln!(self.writer, ";");
+            }
+            if !frame.reads_targets.is_empty() {
+                emit!(self.writer, "reads ");
+                let names: Vec<_> = frame
+                    .reads_targets
+                    .iter()
+                    .map(|qid| self.env().display(qid).to_string())
+                    .collect();
+                emitln!(self.writer, "{};", names.join(", "));
+            }
+        }
+    }
+
+    fn print_pragmas(&self, properties: &PropertyBag) {
+        if properties.is_empty() {
+            return;
+        }
+        emit!(self.writer, "pragma ");
+        let mut first = true;
+        for (key, value) in properties {
+            if !first {
+                emit!(self.writer, ", ");
+            }
+            first = false;
+            let key_str = key.display(self.env().symbol_pool());
+            emit!(self.writer, "{} = {}", key_str, self.env().display(value));
+        }
+        emitln!(self.writer, ";");
+    }
+
+    /// Print `use` declarations inside a spec block for external modules
+    /// referenced by SpecFunction calls that don't already have a module-level
+    /// import in the enclosing module.
+    fn print_spec_use_decls(
+        &self,
+        fun_env: &FunctionEnv,
+        spec: &Spec,
+        tctx: &mut TypeDisplayContext,
+    ) {
+        use crate::ast::Operation;
+        let current_mid = fun_env.module_env.get_id();
+        // Modules with module-level imports: `use m;`, `use m as n;`, or
+        // `use m::{Self, ...}` — all make the module qualifier available.
+        let pool = fun_env.module_env.env.symbol_pool();
+        let self_sym = pool.make("Self");
+        let env = self.env();
+        let imported_names: BTreeSet<Symbol> = fun_env
+            .module_env
+            .get_use_decls()
+            .iter()
+            .filter(|u| {
+                u.members.is_empty()
+                    || u.alias.is_some()
+                    || u.members.iter().any(|(_, sym, _)| *sym == self_sym)
+            })
+            .map(|u| u.module_name.name())
+            .collect();
+        let mut needed: BTreeSet<ModuleId> = BTreeSet::new();
+        let mut check_mid = |mid: &ModuleId| {
+            if *mid != current_mid
+                && !imported_names.contains(&env.get_module(*mid).get_name().name())
+            {
+                needed.insert(*mid);
+            }
+        };
+        for cond in &spec.conditions {
+            cond.exp.as_ref().visit_pre_order(&mut |e: &ExpData| {
+                if let ExpData::Call(_, Operation::SpecFunction(mid, _, _), _) = e {
+                    check_mid(mid);
+                }
+                true
+            });
+        }
+        if let Some(frame) = &spec.frame_spec {
+            for target in &frame.modifies_targets {
+                target.as_ref().visit_pre_order(&mut |e: &ExpData| {
+                    if let ExpData::Call(_, Operation::SpecFunction(mid, _, _), _) = e {
+                        check_mid(mid);
+                    }
+                    true
+                });
+            }
+        }
+        for mid in &needed {
+            let module_env = self.env().get_module(*mid);
+            emitln!(self.writer, "use {};", module_env.get_full_name_str());
+        }
+        // Add these modules to tctx so module_qualifier uses short names
+        tctx.used_modules.extend(needed);
+    }
+
     /// Prints a spec block for a function, including the repeated signature.
     pub fn print_fun_spec(&self, fun_env: &FunctionEnv) {
         let spec = fun_env.get_spec();
-        if spec.conditions.is_empty() {
+        let has_frame = spec
+            .frame_spec
+            .as_ref()
+            .is_some_and(|f| !f.modifies_targets.is_empty() || !f.reads_targets.is_empty());
+        if spec.conditions.is_empty()
+            && spec.properties.is_empty()
+            && !has_frame
+            && spec.proof.is_none()
+        {
             return;
         }
 
@@ -954,7 +1423,21 @@ impl<'a> Sourcifier<'a> {
         emitln!(self.writer, " {");
 
         self.writer.indent();
-        let tctx = fun_env.get_type_display_ctx();
+        let mut tctx = fun_env.get_type_display_ctx();
+
+        // Print use declarations for external modules referenced by SpecFunction
+        // calls in the spec conditions (e.g., `use 0x1::signer;`).
+        // Also add these modules to tctx so module_qualifier uses short names.
+        self.print_spec_use_decls(fun_env, &spec, &mut tctx);
+
+        self.print_pragmas(&spec.properties);
+
+        // Print frame spec (modifies/reads)
+        {
+            let exp_sourcifier =
+                ExpSourcifier::for_fun_spec(self, fun_env, tctx.clone(), self.amend);
+            self.print_frame_spec(&spec.frame_spec, &exp_sourcifier);
+        }
 
         // Print spec variable declarations that are referenced in this spec
         let spec_var_ids = self.collect_spec_var_refs(&spec);
@@ -970,7 +1453,14 @@ impl<'a> Sourcifier<'a> {
         }
         self.writer.unindent();
 
-        emitln!(self.writer, "}");
+        // The `proof { ... }` clause is a sibling of the `spec { ... }` block in
+        // source syntax, not a member, so emit it after the closing brace.
+        if let Some(proof) = &spec.proof {
+            emit!(self.writer, "} ");
+            self.print_proof(proof, &exp_sourcifier);
+        } else {
+            emitln!(self.writer, "}");
+        }
         emitln!(self.writer);
     }
 
@@ -1002,7 +1492,7 @@ impl<'a> Sourcifier<'a> {
     /// Prints a spec block for a struct.
     pub fn print_struct_spec(&self, struct_env: &StructEnv) {
         let spec = struct_env.get_spec();
-        if spec.conditions.is_empty() {
+        if spec.conditions.is_empty() && spec.properties.is_empty() {
             return;
         }
 
@@ -1010,6 +1500,7 @@ impl<'a> Sourcifier<'a> {
         emitln!(self.writer, "spec {} {{", self.sym(struct_env.get_name()));
 
         self.writer.indent();
+        self.print_pragmas(&spec.properties);
         let tctx = struct_env.get_type_display_ctx();
         let exp_sourcifier = ExpSourcifier::for_spec(self, tctx, self.amend);
         for cond in &spec.conditions {
@@ -1023,7 +1514,15 @@ impl<'a> Sourcifier<'a> {
 
     /// Prints a spec block directly from a Spec object with the given header.
     pub fn print_spec(&self, spec: &Spec, header: &str, tctx: TypeDisplayContext) {
-        if spec.conditions.is_empty() {
+        let has_frame = spec
+            .frame_spec
+            .as_ref()
+            .is_some_and(|f| !f.modifies_targets.is_empty() || !f.reads_targets.is_empty());
+        if spec.conditions.is_empty()
+            && spec.properties.is_empty()
+            && !has_frame
+            && spec.proof.is_none()
+        {
             return;
         }
 
@@ -1031,14 +1530,163 @@ impl<'a> Sourcifier<'a> {
         emitln!(self.writer, "spec {} {{", header);
 
         self.writer.indent();
+        self.print_pragmas(&spec.properties);
+        // Print frame spec (modifies/reads)
+        {
+            let exp_sourcifier = ExpSourcifier::for_spec(self, tctx.clone(), self.amend);
+            self.print_frame_spec(&spec.frame_spec, &exp_sourcifier);
+        }
         let exp_sourcifier = ExpSourcifier::for_spec(self, tctx, self.amend);
         for cond in &spec.conditions {
             self.print_condition(cond, &exp_sourcifier);
         }
         self.writer.unindent();
 
-        emitln!(self.writer, "}");
+        // The `proof { ... }` clause is a sibling of the `spec { ... }` block in
+        // source syntax, not a member, so emit it after the closing brace.
+        if let Some(proof) = &spec.proof {
+            emit!(self.writer, "} ");
+            self.print_proof(proof, &exp_sourcifier);
+        } else {
+            emitln!(self.writer, "}");
+        }
         emitln!(self.writer);
+    }
+
+    fn print_proof(&self, proof: &crate::ast::Proof, exp_sourcifier: &ExpSourcifier) {
+        emitln!(self.writer, "proof {");
+        self.writer.indent();
+        self.print_proof_body(proof, exp_sourcifier);
+        self.writer.unindent();
+        emitln!(self.writer, "}");
+    }
+
+    fn print_proof_body(&self, proof: &crate::ast::Proof, exp_sourcifier: &ExpSourcifier) {
+        use crate::ast::Proof;
+        match proof {
+            Proof::Let(_, sym, exp) => {
+                let env = exp_sourcifier.env();
+                emit!(self.writer, "let {} = ", sym.display(env.symbol_pool()));
+                exp_sourcifier.print_exp(Prio::General, false, exp);
+                emitln!(self.writer, ";");
+            },
+            Proof::IfElse(_, cond, then_branch, else_branch) => {
+                emit!(self.writer, "if (");
+                exp_sourcifier.print_exp(Prio::General, false, cond);
+                emitln!(self.writer, ") {");
+                self.writer.indent();
+                self.print_proof_body(then_branch, exp_sourcifier);
+                self.writer.unindent();
+                if let Some(eb) = else_branch {
+                    emitln!(self.writer, "} else {");
+                    self.writer.indent();
+                    self.print_proof_body(eb, exp_sourcifier);
+                    self.writer.unindent();
+                }
+                emitln!(self.writer, "}");
+            },
+            Proof::Block(_, stmts) => {
+                for stmt in stmts {
+                    self.print_proof_body(stmt, exp_sourcifier);
+                }
+            },
+            Proof::Assert(_, exp) => {
+                emit!(self.writer, "assert ");
+                exp_sourcifier.print_exp(Prio::General, false, exp);
+                emitln!(self.writer, ";");
+            },
+            Proof::Assume(_, exp) => {
+                emit!(self.writer, "assume [trusted] ");
+                exp_sourcifier.print_exp(Prio::General, false, exp);
+                emitln!(self.writer, ";");
+            },
+            Proof::Apply(_, lemma_qid, args) => {
+                let env = exp_sourcifier.env();
+                let module_env = env.get_module(lemma_qid.module_id);
+                let lemma = module_env.get_lemma(lemma_qid.id);
+                let lemma_name = lemma.name.display(env.symbol_pool());
+                emit!(self.writer, "apply {}(", lemma_name);
+                let mut comma = "";
+                for arg in args {
+                    emit!(self.writer, "{}", comma);
+                    exp_sourcifier.print_exp(Prio::General, false, arg);
+                    comma = ", ";
+                }
+                emitln!(self.writer, ");");
+            },
+            Proof::ForallApply(_, binds, patterns, lemma_qid, args) => {
+                let env = exp_sourcifier.env();
+                let module_env = env.get_module(lemma_qid.module_id);
+                let lemma = module_env.get_lemma(lemma_qid.id);
+                let lemma_name = lemma.name.display(env.symbol_pool());
+                emit!(self.writer, "forall ");
+                let mut comma = "";
+                for (sym, ty) in binds {
+                    let tctx = crate::ty::TypeDisplayContext::new(env);
+                    emit!(
+                        self.writer,
+                        "{}{}: {}",
+                        comma,
+                        sym.display(env.symbol_pool()),
+                        ty.display(&tctx),
+                    );
+                    comma = ", ";
+                }
+                if !patterns.is_empty() {
+                    emit!(self.writer, " [");
+                    let mut sep = "";
+                    for group in patterns {
+                        emit!(self.writer, "{}", sep);
+                        let mut inner_sep = "";
+                        for p in group {
+                            emit!(self.writer, "{}", inner_sep);
+                            exp_sourcifier.print_exp(Prio::General, false, p);
+                            inner_sep = ", ";
+                        }
+                        sep = "; ";
+                    }
+                    emit!(self.writer, "]");
+                }
+                emit!(self.writer, " apply {}(", lemma_name);
+                comma = "";
+                for arg in args {
+                    emit!(self.writer, "{}", comma);
+                    exp_sourcifier.print_exp(Prio::General, false, arg);
+                    comma = ", ";
+                }
+                emitln!(self.writer, ");");
+            },
+            Proof::Calc(_, steps) => {
+                emit!(self.writer, "calc(");
+                for (lhs, op, _rhs) in steps {
+                    exp_sourcifier.print_exp(Prio::General, false, lhs);
+                    let op_str = match op {
+                        crate::ast::Operation::Eq => "==",
+                        crate::ast::Operation::Neq => "!=",
+                        crate::ast::Operation::Lt => "<",
+                        crate::ast::Operation::Gt => ">",
+                        crate::ast::Operation::Le => "<=",
+                        crate::ast::Operation::Ge => ">=",
+                        _ => "==",
+                    };
+                    emit!(self.writer, " {} ", op_str);
+                }
+                // Print the last rhs
+                if let Some((_, _, rhs)) = steps.last() {
+                    exp_sourcifier.print_exp(Prio::General, false, rhs);
+                }
+                emitln!(self.writer, ");");
+            },
+            Proof::Post(_, inner) => {
+                emit!(self.writer, "post ");
+                self.print_proof_body(inner, exp_sourcifier);
+            },
+            Proof::Split(_, exp) => {
+                emit!(self.writer, "split ");
+                exp_sourcifier.print_exp(Prio::General, false, exp);
+                emitln!(self.writer, ";");
+            },
+        }
     }
 }
 
@@ -1060,6 +1708,16 @@ pub struct ExpSourcifier<'a> {
     // Whether we are printing spec expressions (affects number suffix printing)
     for_spec: bool,
     amend: bool,
+    // Shared counter for let-binding names, ensuring nested extractions don't clash.
+    let_counter: Cell<usize>,
+    /// Names bound by `let` conditions in the enclosing spec block.
+    /// Used by `print_behavior_target` to detect name shadowing: if a spec has
+    /// `let f = 0u64` and also emits `result_of<f>(...)`, the bare name `f`
+    /// would resolve to the let-binding rather than the function, causing a
+    /// "behavior predicate target must have function type" error.  When the
+    /// function's bare name is in this set, we emit the fully-qualified
+    /// `addr::module::fun` form to bypass the shadowing.
+    spec_let_names: BTreeSet<Symbol>,
 }
 
 /// Helper type to split blocks and sequences into vector of items
@@ -1096,6 +1754,11 @@ mod Prio {
 }
 
 impl<'a> ExpSourcifier<'a> {
+    /// Base names for let-bound variables.
+    const LET_BIND_NAMES: &'static [&'static str] = &["a", "b", "c", "d", "e", "f"];
+    /// Base names for lambda/closure parameters.
+    const PARAM_NAMES: &'static [&'static str] = &["x", "y", "z", "w", "v", "u"];
+
     /// Creates a sourcifier for the given expression in the context of the function
     pub fn for_fun(
         parent: &'a Sourcifier<'a>,
@@ -1129,6 +1792,8 @@ impl<'a> ExpSourcifier<'a> {
             result_count: 0,
             for_spec: true,
             amend,
+            let_counter: Cell::new(0),
+            spec_let_names: BTreeSet::new(),
         }
     }
 
@@ -1142,6 +1807,22 @@ impl<'a> ExpSourcifier<'a> {
         let temp_names = (0..fun_env.get_parameter_count())
             .map(|i| (i, fun_env.get_local_name(i)))
             .collect();
+        // Collect names bound by `let` conditions so print_behavior_target can
+        // detect when a bare function name would be shadowed and emit the fully-
+        // qualified form instead.  We check both the current spec (which when
+        // called from inference contains only inferred conditions) and the
+        // context_let_names set by the caller (which holds user-written let
+        // bindings that were temporarily stripped before printing).
+        let mut spec_let_names: BTreeSet<Symbol> = fun_env
+            .get_spec()
+            .conditions
+            .iter()
+            .filter_map(|c| match &c.kind {
+                ConditionKind::LetPre(sym, _) | ConditionKind::LetPost(sym, _) => Some(*sym),
+                _ => None,
+            })
+            .collect();
+        spec_let_names.extend(parent.context_let_names.borrow().iter().copied());
         Self {
             parent,
             type_display_context: tctx,
@@ -1151,6 +1832,8 @@ impl<'a> ExpSourcifier<'a> {
             result_count: fun_env.get_return_count(),
             for_spec: true,
             amend,
+            let_counter: Cell::new(0),
+            spec_let_names,
         }
     }
 
@@ -1165,6 +1848,8 @@ impl<'a> ExpSourcifier<'a> {
             result_count: self.result_count,
             for_spec: true,
             amend: self.amend,
+            let_counter: Cell::new(0),
+            spec_let_names: self.spec_let_names.clone(),
         }
     }
 
@@ -1209,6 +1894,8 @@ impl<'a> ExpSourcifier<'a> {
             result_count,
             for_spec,
             amend,
+            let_counter: Cell::new(0),
+            spec_let_names: BTreeSet::new(),
         }
     }
 
@@ -1368,6 +2055,42 @@ impl<'a> ExpSourcifier<'a> {
                         _ => self.print_exp(Prio::General, false, loop_body),
                     }
                 };
+                // Extract spec blocks from a while condition. Returns (actual_cond, spec_blocks).
+                // The compiler puts loop invariants into the condition as:
+                //   Sequence([SpecBlock(...), ..., actual_cond])
+                let extract_spec_blocks = |cond: &Exp| -> (Exp, Vec<Exp>) {
+                    match cond.as_ref() {
+                        Sequence(_, stms) if stms.len() >= 2 => {
+                            let specs: Vec<Exp> = stms
+                                .iter()
+                                .filter(|e| matches!(e.as_ref(), SpecBlock(..)))
+                                .cloned()
+                                .collect();
+                            if !specs.is_empty() {
+                                let actual: Vec<Exp> = stms
+                                    .iter()
+                                    .filter(|e| !matches!(e.as_ref(), SpecBlock(..)))
+                                    .cloned()
+                                    .collect();
+                                let actual_cond = if actual.len() == 1 {
+                                    actual.into_iter().next().unwrap()
+                                } else {
+                                    Sequence(stms[0].as_ref().node_id(), actual).into_exp()
+                                };
+                                return (actual_cond, specs);
+                            }
+                            (cond.clone(), vec![])
+                        },
+                        _ => (cond.clone(), vec![]),
+                    }
+                };
+                // Print spec blocks after the loop body
+                let print_trailing_specs = |specs: &[Exp]| {
+                    for spec_exp in specs {
+                        emit!(self.wr(), " ");
+                        self.print_exp(Prio::General, false, spec_exp);
+                    }
+                };
                 let general_loop = || {
                     emit!(self.wr(), "loop ");
                     print_loop_body(body)
@@ -1377,21 +2100,21 @@ impl<'a> ExpSourcifier<'a> {
                 match body.as_ref() {
                     // Pattern 1: loop { if (c) e else break }
                     IfElse(_, cond, if_true, if_false) if if_false.is_loop_cont(Some(0), false) => {
+                        let (actual_cond, specs) = extract_spec_blocks(cond);
                         emit!(self.wr(), "while (");
-                        self.print_exp(Prio::General, false, cond);
+                        self.print_exp(Prio::General, false, &actual_cond);
                         emit!(self.wr(), ") ");
-                        print_loop_body(if_true)
+                        print_loop_body(if_true);
+                        print_trailing_specs(&specs);
                     },
                     // Pattern 2: loop { if (c) break else e }
                     IfElse(_, cond, if_true, if_false) if if_true.is_loop_cont(Some(0), false) => {
+                        let (actual_cond, specs) = extract_spec_blocks(cond);
                         emit!(self.wr(), "while (");
-                        self.print_exp(
-                            Prio::General,
-                            false,
-                            &self.parent.builder.not(cond.clone()),
-                        );
+                        self.print_exp(Prio::General, false, &self.parent.builder.not(actual_cond));
                         emit!(self.wr(), ") ");
-                        print_loop_body(if_false)
+                        print_loop_body(if_false);
+                        print_trailing_specs(&specs);
                     },
                     // Pattern 3: loop { if (c) e; break }
                     Sequence(_, stms)
@@ -1399,10 +2122,12 @@ impl<'a> ExpSourcifier<'a> {
                     {
                         match stms[0].as_ref() {
                             IfElse(_, cond, if_true, if_false) if if_false.is_unit_exp() => {
+                                let (actual_cond, specs) = extract_spec_blocks(cond);
                                 emit!(self.wr(), "while (");
-                                self.print_exp(Prio::General, false, cond);
+                                self.print_exp(Prio::General, false, &actual_cond);
                                 emit!(self.wr(), ") ");
-                                print_loop_body(if_true)
+                                print_loop_body(if_true);
+                                print_trailing_specs(&specs);
                             },
                             _ => general_loop(),
                         }
@@ -1412,10 +2137,13 @@ impl<'a> ExpSourcifier<'a> {
                         if let Some((cond, rest)) =
                             self.parent.builder.match_if_break_list(body.clone())
                         {
+                            let not_cond = self.parent.builder.not(cond);
+                            let (actual_cond, specs) = extract_spec_blocks(&not_cond);
                             emit!(self.wr(), "while (");
-                            self.print_exp(Prio::General, false, &self.parent.builder.not(cond));
+                            self.print_exp(Prio::General, false, &actual_cond);
                             emit!(self.wr(), ") ");
-                            print_loop_body(&rest)
+                            print_loop_body(&rest);
+                            print_trailing_specs(&specs);
                         } else {
                             general_loop()
                         }
@@ -1485,49 +2213,68 @@ impl<'a> ExpSourcifier<'a> {
             },
             Quant(_, kind, ranges, triggers, where_clause, body) => {
                 self.parenthesize(context_prio, Prio::General, || {
-                    // Print quantifier keyword
-                    let keyword = match kind {
-                        QuantKind::Forall => "forall",
-                        QuantKind::Exists => "exists",
-                        QuantKind::Choose => "choose",
-                        QuantKind::ChooseMin => "choose min",
-                    };
-                    emit!(self.wr(), "{} ", keyword);
-
-                    // Print ranges: x in range, y in range, ...
-                    for (i, (pat, range)) in ranges.iter().enumerate() {
-                        if i > 0 {
-                            emit!(self.wr(), ", ");
-                        }
-                        self.print_pat(pat, false, true);
-                        emit!(self.wr(), " in ");
-                        self.print_exp(Prio::General, false, range);
-                    }
-
-                    // Print triggers if present: {trigger1, trigger2}
-                    for trigger in triggers {
-                        emit!(self.wr(), " {");
-                        for (i, t) in trigger.iter().enumerate() {
-                            if i > 0 {
-                                emit!(self.wr(), ", ");
-                            }
-                            self.print_exp(Prio::General, false, t);
-                        }
-                        emit!(self.wr(), "}");
-                    }
-
-                    // Print where clause if present
-                    if let Some(where_exp) = where_clause {
-                        emit!(self.wr(), " where ");
-                        self.print_exp(Prio::General, false, where_exp);
-                    }
-
-                    // Print body
-                    emit!(self.wr(), ": ");
+                    self.print_quant_header(kind, ranges, triggers, where_clause);
                     self.print_exp(Prio::General, false, body);
                 })
             },
         }
+    }
+
+    /// Print quantifier header (keyword, ranges, triggers, where clause, and trailing `: `).
+    fn print_quant_header(
+        &self,
+        kind: &QuantKind,
+        ranges: &[(Pattern, Exp)],
+        triggers: &[Vec<Exp>],
+        where_clause: &Option<Exp>,
+    ) {
+        let keyword = match kind {
+            QuantKind::Forall => "forall",
+            QuantKind::Exists => "exists",
+            QuantKind::Choose => "choose",
+            QuantKind::ChooseMin => "choose min",
+        };
+        emit!(self.wr(), "{} ", keyword);
+        for (i, (pat, range)) in ranges.iter().enumerate() {
+            if i > 0 {
+                emit!(self.wr(), ", ");
+            }
+            self.print_pat(pat, false, true);
+            if let ExpData::Call(range_id, Operation::TypeDomain, args) = range.as_ref() {
+                if args.is_empty() {
+                    let inst = self.env().get_node_instantiation(*range_id);
+                    if let Some(ty) = inst.first() {
+                        emit!(self.wr(), ": {}", self.ty(ty));
+                    } else {
+                        emit!(self.wr(), " in ");
+                        self.print_exp(Prio::General, false, range);
+                    }
+                } else {
+                    emit!(self.wr(), " in ");
+                    self.print_exp(Prio::General, false, range);
+                }
+            } else if matches!(range.as_ref(), ExpData::Call(_, Operation::StateDomain, _)) {
+                emit!(self.wr(), " in *");
+            } else {
+                emit!(self.wr(), " in ");
+                self.print_exp(Prio::General, false, range);
+            }
+        }
+        for trigger in triggers {
+            emit!(self.wr(), " {");
+            for (i, t) in trigger.iter().enumerate() {
+                if i > 0 {
+                    emit!(self.wr(), ", ");
+                }
+                self.print_exp(Prio::General, false, t);
+            }
+            emit!(self.wr(), "}");
+        }
+        if let Some(where_exp) = where_clause {
+            emit!(self.wr(), " where ");
+            self.print_exp(Prio::General, false, where_exp);
+        }
+        emit!(self.wr(), ": ");
     }
 
     /// Print a memory label with its name (from GlobalEnv) or fallback to numeric ID.
@@ -1570,24 +2317,52 @@ impl<'a> ExpSourcifier<'a> {
                     // We need to generate `|t| f(captured, t)` to represent the closure.
                     // For that, we first create the closure expression, then call
                     // sourcifier again.
+                    // Captured arguments are evaluated eagerly when the closure is
+                    // created, so complex captured expressions (e.g. containing
+                    // `old()`) must be hoisted into `let` bindings outside the lambda
+                    // to avoid unsupported constructs inside the lambda body.
                     let loc = self.env().get_node_loc(id);
                     let ty = self.env().get_node_type(id);
                     let Type::Fun(arg_ty, res_ty, _) = ty else {
                         emit!(self.wr(), "<<wrongly typed closure expression>>");
                         return;
                     };
+                    // Hoist non-trivial captured args into let bindings.
+                    let mut let_bindings: Vec<(Pattern, Exp)> = vec![];
+                    let captured_args: Vec<Exp> = args
+                        .iter()
+                        .map(|arg| {
+                            if matches!(
+                                arg.as_ref(),
+                                ExpData::LocalVar(..) | ExpData::Value(..) | ExpData::Temporary(..)
+                            ) {
+                                arg.clone()
+                            } else {
+                                let (pat, var_exp) = self.let_bind_exp(arg, args);
+                                let_bindings.push((pat, arg.clone()));
+                                var_exp
+                            }
+                        })
+                        .collect();
                     let mut lambda_params = vec![];
                     let mut lambda_param_tys = vec![];
                     let mut lambda_param_exps = vec![];
                     for (i, ty) in arg_ty.flatten().into_iter().enumerate() {
-                        let name = self.new_unique_name(args, &format!("arg{}", i));
+                        let base = Self::PARAM_NAMES[i % Self::PARAM_NAMES.len()];
+                        // Include already-chosen lambda params in the scope to avoid
+                        // duplicate names when there are more params than PARAM_NAMES.
+                        let scope: Vec<Exp> = args
+                            .iter()
+                            .cloned()
+                            .chain(lambda_param_exps.iter().cloned())
+                            .collect();
+                        let name = self.new_unique_name(&scope, base);
                         let local_id = self.env().new_node(loc.clone(), ty.clone());
                         lambda_params.push(Pattern::Var(local_id, name));
                         lambda_param_exps.push(ExpData::LocalVar(local_id, name).into_exp());
                         lambda_param_tys.push(ty);
                     }
-                    let Some(all_args) = mask.compose(args.iter().cloned(), lambda_param_exps)
-                    else {
+                    let Some(all_args) = mask.compose(captured_args, lambda_param_exps) else {
                         emit!(self.wr(), "<<inconsistent closure mask>>");
                         return;
                     };
@@ -1608,18 +2383,21 @@ impl<'a> ExpSourcifier<'a> {
                     } else {
                         lambda_params.pop().unwrap()
                     };
-                    self.print_exp(
-                        context_prio,
-                        false,
-                        &ExpData::Lambda(
-                            id,
-                            lambda_pat,
-                            call_exp,
-                            LambdaCaptureKind::Default,
-                            None,
-                        )
-                        .into_exp(),
-                    )
+                    let lambda_exp =
+                        ExpData::Lambda(id, lambda_pat, call_exp, LambdaCaptureKind::Default, None)
+                            .into_exp();
+                    // Wrap in let bindings for hoisted captured args.
+                    let result_exp =
+                        let_bindings
+                            .into_iter()
+                            .rev()
+                            .fold(lambda_exp, |body, (pat, binding)| {
+                                let block_id = self
+                                    .env()
+                                    .new_node(loc.clone(), self.env().get_node_type(id));
+                                ExpData::Block(block_id, pat, Some(binding), body).into_exp()
+                            });
+                    self.print_exp(context_prio, false, &result_exp)
                 })
             },
             Operation::Pack(mid, sid, variant) => {
@@ -1673,15 +2451,31 @@ impl<'a> ExpSourcifier<'a> {
             },
             Operation::SelectVariants(mid, sid, fids) => {
                 let struct_env = self.env().get_module(*mid).into_struct(*sid);
-                // All field names are the same, so we can choose one representative
-                // on source level.
                 let fid = fids[0];
                 let field_env = struct_env.get_field(fid);
+                let field_name = field_env.get_name();
                 let result_ty = self.env().get_node_type(id);
+                // Check if the field name is ambiguous (different types across variants),
+                // requiring variant qualification in the output.
+                let needs_variant_qualification = struct_env.has_variants() && {
+                    let types: Vec<_> = struct_env
+                        .get_fields()
+                        .filter(|f| f.get_name() == field_name)
+                        .map(|f| f.get_type())
+                        .collect();
+                    types.len() > 1 && types.windows(2).any(|w| w[0] != w[1])
+                };
+                let variant_prefix = if needs_variant_qualification {
+                    field_env
+                        .get_variant()
+                        .map(|v| format!("{}.", self.sym(v)))
+                        .unwrap_or_default()
+                } else {
+                    String::new()
+                };
                 // In spec contexts, SelectVariants may have no receiver
                 if args.is_empty() {
-                    // Just print the field name
-                    emit!(self.wr(), "{}", self.sym(field_env.get_name()))
+                    emit!(self.wr(), "{}{}", variant_prefix, self.sym(field_name))
                 } else {
                     let given_prio = if result_ty.is_reference() {
                         Prio::Prefix
@@ -1695,7 +2489,7 @@ impl<'a> ExpSourcifier<'a> {
                             emit!(self.wr(), "&mut ");
                         }
                         self.print_exp(Prio::Postfix, false, &args[0]);
-                        emit!(self.wr(), ".{}", self.sym(field_env.get_name()))
+                        emit!(self.wr(), ".{}{}", variant_prefix, self.sym(field_name))
                     })
                 }
             },
@@ -1718,14 +2512,30 @@ impl<'a> ExpSourcifier<'a> {
             Operation::Xor => self.print_bin(context_prio, Prio::BitXor, "^", args),
             Operation::Shl => self.print_bin(context_prio, Prio::BitShift, "<<", args),
             Operation::Shr => self.print_bin(context_prio, Prio::BitShift, ">>", args),
-            Operation::And => self.print_bin(context_prio, Prio::LogicalAnd, "&&", args),
-            Operation::Or => self.print_bin(context_prio, Prio::LogicalOr, "||", args),
-            Operation::Eq => self.print_bin(context_prio, Prio::Relations, "==", args),
-            Operation::Neq => self.print_bin(context_prio, Prio::Relations, "!=", args),
-            Operation::Lt => self.print_bin(context_prio, Prio::Relations, "<", args),
-            Operation::Gt => self.print_bin(context_prio, Prio::Relations, ">", args),
-            Operation::Le => self.print_bin(context_prio, Prio::Relations, "<=", args),
-            Operation::Ge => self.print_bin(context_prio, Prio::Relations, ">=", args),
+            Operation::And => {
+                self.print_bin_with_label_hoisting(context_prio, Prio::LogicalAnd, "&&", args)
+            },
+            Operation::Or => {
+                self.print_bin_with_label_hoisting(context_prio, Prio::LogicalOr, "||", args)
+            },
+            Operation::Eq => {
+                self.print_bin_with_label_hoisting(context_prio, Prio::Relations, "==", args)
+            },
+            Operation::Neq => {
+                self.print_bin_with_label_hoisting(context_prio, Prio::Relations, "!=", args)
+            },
+            Operation::Lt => {
+                self.print_bin_with_label_hoisting(context_prio, Prio::Relations, "<", args)
+            },
+            Operation::Gt => {
+                self.print_bin_with_label_hoisting(context_prio, Prio::Relations, ">", args)
+            },
+            Operation::Le => {
+                self.print_bin_with_label_hoisting(context_prio, Prio::Relations, "<=", args)
+            },
+            Operation::Ge => {
+                self.print_bin_with_label_hoisting(context_prio, Prio::Relations, ">=", args)
+            },
             Operation::Copy => self.parenthesize(context_prio, Prio::General, || {
                 emit!(self.wr(), "copy ");
                 self.print_exp(Prio::General, false, &args[0])
@@ -1761,10 +2571,20 @@ impl<'a> ExpSourcifier<'a> {
                     self.print_exp(context_prio, false, &args[0]);
                 }
             },
-            Operation::Not => self.parenthesize(context_prio, Prio::Prefix, || {
-                emit!(self.wr(), "!");
-                self.print_exp(Prio::Prefix, false, &args[0])
-            }),
+            Operation::Not => {
+                if has_hoistable_label(&args[0]) {
+                    self.parenthesize(context_prio, Prio::General, || {
+                        self.print_hoisted_label_prefix(&args[0]);
+                        emit!(self.wr(), "!");
+                        self.print_exp_without_label(Prio::Prefix, &args[0])
+                    })
+                } else {
+                    self.parenthesize(context_prio, Prio::Prefix, || {
+                        emit!(self.wr(), "!");
+                        self.print_exp(Prio::Prefix, false, &args[0])
+                    })
+                }
+            },
             Operation::Negate => self.parenthesize(context_prio, Prio::Prefix, || {
                 emit!(self.wr(), "-");
                 self.print_exp(Prio::Prefix, false, &args[0])
@@ -1775,16 +2595,107 @@ impl<'a> ExpSourcifier<'a> {
                 let ty = self.env().get_node_type(id);
                 emit!(self.wr(), " as {}", self.ty(&ty))
             }),
-            Operation::Exists(_) => self.parenthesize(context_prio, Prio::Postfix, || {
-                emit!(self.wr(), "exists");
-                self.print_node_inst(id);
-                self.print_exp_list("(", ")", args)
-            }),
+            Operation::Exists(memory_label) => {
+                if let Some(label) = memory_label {
+                    if self
+                        .parent
+                        .enclosing_state_label
+                        .get()
+                        .is_some_and(|ctx| ctx == *label)
+                    {
+                        // Suppress — matches enclosing context
+                        self.parenthesize(context_prio, Prio::Postfix, || {
+                            emit!(self.wr(), "exists");
+                            self.print_node_inst(id);
+                            self.print_exp_list("(", ")", args)
+                        })
+                    } else {
+                        self.parenthesize(context_prio, Prio::General, || {
+                            self.print_memory_label(label);
+                            emit!(self.wr(), " |~ exists");
+                            self.print_node_inst(id);
+                            let prev = self.parent.enclosing_state_label.replace(Some(*label));
+                            self.print_exp_list("(", ")", args);
+                            self.parent.enclosing_state_label.set(prev);
+                        })
+                    }
+                } else {
+                    self.parenthesize(context_prio, Prio::Postfix, || {
+                        emit!(self.wr(), "exists");
+                        self.print_node_inst(id);
+                        self.print_exp_list("(", ")", args)
+                    })
+                }
+            },
+            Operation::SpecPublish(range)
+            | Operation::SpecRemove(range)
+            | Operation::SpecUpdate(range) => {
+                let has_range = range.pre.is_some() || range.post.is_some();
+                // When the operation has a state label range, check if any argument
+                // is state-dependent. If so, extract it into a let-binding so the
+                // label doesn't incorrectly scope over it after round-trip.
+                let needs_let = has_range && args.iter().any(|a| !is_state_neutral(a));
+                if needs_let {
+                    let mut let_bindings = vec![];
+                    let new_args: Vec<Exp> = args
+                        .iter()
+                        .map(|arg| {
+                            if is_state_neutral(arg) {
+                                arg.clone()
+                            } else {
+                                let (pat, var_exp) = self.let_bind_exp(arg, args);
+                                let_bindings.push((pat, arg.clone()));
+                                var_exp
+                            }
+                        })
+                        .collect();
+                    // Rebuild the operation with substituted args, wrap in lets
+                    let new_call = ExpData::Call(id, oper.clone(), new_args).into_exp();
+                    let wrapped = self.wrap_in_lets(let_bindings, new_call);
+                    self.print_exp(context_prio, true, &wrapped);
+                } else {
+                    // No let-extraction needed — print normally
+                    let prio = if has_range {
+                        Prio::General
+                    } else {
+                        Prio::Postfix
+                    };
+                    self.parenthesize(context_prio, prio, || {
+                        match (range.pre, range.post) {
+                            (None, Some(post)) => {
+                                emit!(self.wr(), "..");
+                                self.print_memory_label(&post);
+                                emit!(self.wr(), " |~ ");
+                            },
+                            (Some(pre), None) => {
+                                self.print_memory_label(&pre);
+                                emit!(self.wr(), ".. |~ ");
+                            },
+                            (Some(pre), Some(post)) => {
+                                self.print_memory_label(&pre);
+                                emit!(self.wr(), "..");
+                                self.print_memory_label(&post);
+                                emit!(self.wr(), " |~ ");
+                            },
+                            (None, None) => {},
+                        }
+                        let name = match oper {
+                            Operation::SpecPublish(_) => "publish",
+                            Operation::SpecRemove(_) => "remove",
+                            Operation::SpecUpdate(_) => "update",
+                            _ => unreachable!(),
+                        };
+                        emit!(self.wr(), "{}", name);
+                        self.print_node_inst(id);
+                        self.print_exp_list("(", ")", args);
+                    })
+                }
+            },
             Operation::BorrowGlobal(kind) => self.parenthesize(context_prio, Prio::Postfix, || {
                 if *kind == ReferenceKind::Mutable {
-                    emit!(self.wr(), "borrow_global_mut")
+                    emit!(self.wr(), BORROW_GLOBAL_MUT)
                 } else {
-                    emit!(self.wr(), "borrow_global")
+                    emit!(self.wr(), BORROW_GLOBAL)
                 }
                 self.print_node_inst(id);
                 self.print_exp_list("(", ")", args)
@@ -1829,21 +2740,67 @@ impl<'a> ExpSourcifier<'a> {
                 emit!(self.wr(), ")")
             }),
             Operation::Global(memory_label) => {
-                self.parenthesize(context_prio, Prio::Postfix, || {
-                    emit!(self.wr(), "global");
-                    self.print_node_inst(id);
-                    if let Some(label) = memory_label {
-                        emit!(self.wr(), "[@");
-                        self.print_memory_label(label);
-                        emit!(self.wr(), "]");
+                if let Some(label) = memory_label {
+                    // Check if this label matches the enclosing context — if so,
+                    // suppress it and render as unlabeled (Move-2 index syntax).
+                    if self
+                        .parent
+                        .enclosing_state_label
+                        .get()
+                        .is_some_and(|ctx| ctx == *label)
+                    {
+                        self.parenthesize(context_prio, Prio::Postfix, || {
+                            if let Some(inst) = self.env().get_node_instantiation_opt(id) {
+                                if let Some(ty) = inst.first() {
+                                    emit!(self.wr(), "{}", self.ty(ty));
+                                }
+                            }
+                            emit!(self.wr(), "[");
+                            // Set this label as context for children
+                            let prev = self.parent.enclosing_state_label.replace(Some(*label));
+                            self.print_exp(Prio::General, false, &args[0]);
+                            self.parent.enclosing_state_label.set(prev);
+                            emit!(self.wr(), "]")
+                        })
+                    } else {
+                        self.parenthesize(context_prio, Prio::General, || {
+                            self.print_memory_label(label);
+                            emit!(self.wr(), " |~ global");
+                            self.print_node_inst(id);
+                            emit!(self.wr(), "(");
+                            // Set this label as context for children
+                            let prev = self.parent.enclosing_state_label.replace(Some(*label));
+                            self.print_exp(Prio::General, false, &args[0]);
+                            self.parent.enclosing_state_label.set(prev);
+                            emit!(self.wr(), ")")
+                        })
                     }
-                    emit!(self.wr(), "(");
-                    self.print_exp(Prio::General, false, &args[0]);
-                    emit!(self.wr(), ")")
-                })
+                } else {
+                    // Print as Move-2 index syntax: Type[addr]
+                    self.parenthesize(context_prio, Prio::Postfix, || {
+                        if let Some(inst) = self.env().get_node_instantiation_opt(id) {
+                            if let Some(ty) = inst.first() {
+                                emit!(self.wr(), "{}", self.ty(ty));
+                            }
+                        }
+                        emit!(self.wr(), "[");
+                        self.print_exp(Prio::General, false, &args[0]);
+                        emit!(self.wr(), "]")
+                    })
+                }
             },
-            Operation::Implies => self.print_bin(context_prio, Prio::LogicalRelations, "==>", args),
-            Operation::Iff => self.print_bin(context_prio, Prio::LogicalRelations, "<==>", args),
+            Operation::Implies => self.print_bin_with_label_hoisting(
+                context_prio,
+                Prio::LogicalRelations,
+                "==>",
+                args,
+            ),
+            Operation::Iff => self.print_bin_with_label_hoisting(
+                context_prio,
+                Prio::LogicalRelations,
+                "<==>",
+                args,
+            ),
             Operation::Identical => self.print_bin(context_prio, Prio::Relations, "===", args),
             Operation::Range => self.parenthesize(context_prio, Prio::Range, || {
                 self.print_exp(Prio::Range, false, &args[0]);
@@ -1851,10 +2808,22 @@ impl<'a> ExpSourcifier<'a> {
                 self.print_exp(Prio::Range + 1, false, &args[1])
             }),
             Operation::Index => self.parenthesize(context_prio, Prio::Postfix, || {
-                self.print_exp(Prio::Postfix, false, &args[0]);
-                emit!(self.wr(), "[");
-                self.print_exp(Prio::General, false, &args[1]);
-                emit!(self.wr(), "]")
+                let base_ty = self.env().get_node_type(args[0].node_id());
+                if let Type::Tuple(_) = &base_ty {
+                    // Tuple element selection: print `.N` instead of `[N]`
+                    self.print_exp(Prio::Postfix, false, &args[0]);
+                    if let ExpData::Value(_, Value::Number(n)) = args[1].as_ref() {
+                        emit!(self.wr(), ".{}", n)
+                    } else {
+                        emit!(self.wr(), ".");
+                        self.print_exp(Prio::Postfix, false, &args[1])
+                    }
+                } else {
+                    self.print_exp(Prio::Postfix, false, &args[0]);
+                    emit!(self.wr(), "[");
+                    self.print_exp(Prio::General, false, &args[1]);
+                    emit!(self.wr(), "]")
+                }
             }),
             Operation::Slice => self.parenthesize(context_prio, Prio::Postfix, || {
                 self.print_exp(Prio::Postfix, false, &args[0]);
@@ -1979,6 +2948,7 @@ impl<'a> ExpSourcifier<'a> {
                 self.print_node_inst(id);
                 emit!(self.wr(), "()")
             }),
+            Operation::StateDomain => emit!(self.wr(), "*"),
             Operation::MaxU8 => emit!(self.wr(), "MAX_U8"),
             Operation::MaxU16 => emit!(self.wr(), "MAX_U16"),
             Operation::MaxU32 => emit!(self.wr(), "MAX_U32"),
@@ -2020,35 +2990,64 @@ impl<'a> ExpSourcifier<'a> {
                 self.print_exp(Prio::General, false, &args[0]);
                 emit!(self.wr(), ")")
             }),
-            Operation::Behavior(kind, state) => {
-                let kind_str = match kind {
-                    crate::ast::BehaviorKind::AbortsOf => "aborts_of",
-                    crate::ast::BehaviorKind::EnsuresOf => "ensures_of",
-                    crate::ast::BehaviorKind::RequiresOf => "requires_of",
-                    crate::ast::BehaviorKind::ModifiesOf => "modifies_of",
-                    crate::ast::BehaviorKind::ResultOf => "result_of",
+            Operation::Behavior(kind, range) => {
+                // `WriteOf(j)` is WP-internal and is expected to be eliminated
+                // before sourcification; if it leaks here we still render via
+                // its `Display` (`write_of_{j}`) rather than panicking, so the
+                // baseline shows the offending shape for diagnosis.
+                let kind_str = kind.to_string();
+                let has_labels = range.pre.is_some() || range.post.is_some();
+
+                // If args carry their own labels, hoist them out into
+                // `let` bindings to avoid visually nested labels.
+                // `args[0]` is the function target and never hoisted.
+                let needs_let =
+                    has_labels && args.iter().skip(1).any(|a| !prints_without_label_prefix(a));
+                if needs_let {
+                    let wrapped =
+                        self.hoist_nested_labels(id, oper, args, /*keep_outer_label=*/ true);
+                    self.print_exp(context_prio, true, &wrapped);
+                    return;
+                }
+
+                let print_behavior = |this: &Self| {
+                    this.parenthesize(context_prio, Prio::Postfix, || {
+                        emit!(this.wr(), "{}", kind_str);
+                        emit!(this.wr(), "<");
+                        this.print_behavior_target(&args[0]);
+                        emit!(this.wr(), ">");
+                        this.print_exp_list("(", ")", &args[1..]);
+                    })
                 };
-                self.parenthesize(context_prio, Prio::Postfix, || {
-                    // Print pre-label if present
-                    if let Some(pre) = &state.pre {
-                        self.print_memory_label(pre);
-                        emit!(self.wr(), "@");
-                    }
-                    emit!(self.wr(), "{}", kind_str);
-                    // First argument is the target (function parameter or closure)
-                    // Special case: if it's a lambda that just forwards to a function,
-                    // print the function name directly instead of the lambda
-                    emit!(self.wr(), "<");
-                    self.print_behavior_target(&args[0]);
-                    emit!(self.wr(), ">");
-                    // Remaining arguments are the actual parameters
-                    self.print_exp_list("(", ")", &args[1..]);
-                    // Print post-label after arguments
-                    if let Some(post) = &state.post {
-                        emit!(self.wr(), "@");
-                        self.print_memory_label(post);
-                    }
-                })
+                if has_labels {
+                    // aborts_of/requires_of only take a pre-state (single state form),
+                    // ensures_of/result_of/write_of can have pre..post ranges.
+                    let is_single_state = matches!(
+                        kind,
+                        crate::ast::BehaviorKind::AbortsOf | crate::ast::BehaviorKind::RequiresOf
+                    ) && range.post.is_none();
+                    self.parenthesize(context_prio, Prio::General, || {
+                        if is_single_state {
+                            // Single state: `label |~ behavior<f>(args)`
+                            if let Some(pre) = &range.pre {
+                                self.print_memory_label(pre);
+                            }
+                        } else {
+                            // Range: `[pre]..[post] |~ behavior<f>(args)`
+                            if let Some(pre) = &range.pre {
+                                self.print_memory_label(pre);
+                            }
+                            emit!(self.wr(), "..");
+                            if let Some(post) = &range.post {
+                                self.print_memory_label(post);
+                            }
+                        }
+                        emit!(self.wr(), " |~ ");
+                        print_behavior(self);
+                    })
+                } else {
+                    print_behavior(self);
+                }
             },
 
             // Operations that are less commonly used in user-written specs
@@ -2145,6 +3144,249 @@ impl<'a> ExpSourcifier<'a> {
         })
     }
 
+    /// Print an expression at the top level of a spec condition, hoisting any
+    /// state label prefix out if the entire expression has a single hoistable label.
+    ///
+    /// This is a readability normalization: in the AST, labels are tightly scoped
+    /// around individual memory operations (e.g., `(S |~ global<R>(a)) == x`).
+    /// Hoisting produces `S |~ global<R>(a) == x`, where the label provides context
+    /// for the entire relation — a more natural reading for humans.
+    fn print_exp_hoisting_label(&self, exp: &Exp) {
+        let preprocessed = self.hoist_clause_level_labels(exp);
+        let exp = &preprocessed;
+        if has_hoistable_label(exp) {
+            self.print_hoisted_label_prefix(exp);
+            self.print_exp_without_label(Prio::General, exp);
+        } else {
+            self.print_exp(Prio::General, false, exp);
+        }
+    }
+
+    /// Lift labeled subexpressions buried in non-hoistable positions (e.g.
+    /// inside arithmetic) into a clause-level `let` chain. Returns `exp`
+    /// unchanged when the label-prefix hoist or `hoist_nested_labels`
+    /// already handles all labels.
+    fn hoist_clause_level_labels(&self, exp: &Exp) -> Exp {
+        if has_label_at_top(exp.as_ref()) || has_labeled_direct_child(exp.as_ref()) {
+            return exp.clone();
+        }
+
+        let mut labeled: Vec<Exp> = Vec::new();
+        collect_labeled_subexprs(exp.as_ref(), &mut labeled);
+        if labeled.is_empty() {
+            return exp.clone();
+        }
+
+        labeled.sort_by_key(|e| node_count(e.as_ref()));
+
+        // Pass the clause as scope so generated names don't shadow free
+        // vars or temp display names in scope.
+        let scope = std::slice::from_ref(exp);
+        let mut let_bindings: Vec<(Pattern, Exp)> = Vec::new();
+        let mut substitutions: Vec<(Exp, Exp)> = Vec::new();
+        for sub in &labeled {
+            let mut sub_substituted = sub.clone();
+            for (target, repl) in &substitutions {
+                sub_substituted = substitute_structural(&sub_substituted, target, repl);
+            }
+            let (pat, var_exp) = self.let_bind_exp(&sub_substituted, scope);
+            let_bindings.push((pat, sub_substituted));
+            substitutions.push((sub.clone(), var_exp));
+        }
+        let mut new_exp = exp.clone();
+        for (target, repl) in &substitutions {
+            new_exp = substitute_structural(&new_exp, target, repl);
+        }
+        self.wrap_in_lets(let_bindings, new_exp)
+    }
+
+    /// Print a binary operator, hoisting a state label out if possible.
+    fn print_bin_with_label_hoisting(
+        &self,
+        context_prio: Priority,
+        prio: Priority,
+        repr: &str,
+        args: &[Exp],
+    ) {
+        if !self.try_print_label_hoisted_bin(context_prio, prio, repr, args) {
+            self.print_bin(context_prio, prio, repr, args)
+        }
+    }
+
+    /// Try to hoist a state label out of a binary operation for readability.
+    /// If exactly one operand has a hoistable label and the other has no state labels,
+    /// renders `label |~ lhs op rhs` (with the label stripped from the labeled operand).
+    /// Returns true if hoisting was performed.
+    fn try_print_label_hoisted_bin(
+        &self,
+        context_prio: Priority,
+        prio: Priority,
+        repr: &str,
+        args: &[Exp],
+    ) -> bool {
+        if args.len() != 2 {
+            return false;
+        }
+        let lhs_labeled = has_hoistable_label(&args[0]);
+        let rhs_labeled = has_hoistable_label(&args[1]);
+        if lhs_labeled && is_state_neutral(&args[1]) {
+            self.parenthesize(context_prio, Prio::General, || {
+                self.print_hoisted_label_prefix(&args[0]);
+                self.parenthesize(Prio::General, prio, || {
+                    self.print_exp_without_label(prio, &args[0]);
+                    emit!(self.wr(), " {} ", repr);
+                    self.print_exp(prio + 1, false, &args[1]);
+                });
+            });
+            true
+        } else if rhs_labeled && is_state_neutral(&args[0]) {
+            self.parenthesize(context_prio, Prio::General, || {
+                self.print_hoisted_label_prefix(&args[1]);
+                self.parenthesize(Prio::General, prio, || {
+                    self.print_exp(prio, false, &args[0]);
+                    emit!(self.wr(), " {} ", repr);
+                    self.print_exp_without_label(prio + 1, &args[1]);
+                });
+            });
+            true
+        } else {
+            false
+        }
+    }
+
+    /// Print the label/range prefix (e.g., `S |~ `) extracted from a labeled expression.
+    fn print_hoisted_label_prefix(&self, exp: &Exp) {
+        match exp.as_ref() {
+            ExpData::Call(_, Operation::Global(Some(label)), _)
+            | ExpData::Call(_, Operation::Exists(Some(label)), _) => {
+                self.print_memory_label(label);
+                emit!(self.wr(), " |~ ");
+            },
+            ExpData::Call(_, Operation::Behavior(kind, range), _) => {
+                let is_single_state = matches!(
+                    kind,
+                    crate::ast::BehaviorKind::AbortsOf | crate::ast::BehaviorKind::RequiresOf
+                ) && range.post.is_none();
+                if is_single_state {
+                    if let Some(pre) = &range.pre {
+                        self.print_memory_label(pre);
+                    }
+                } else {
+                    if let Some(pre) = &range.pre {
+                        self.print_memory_label(pre);
+                    }
+                    emit!(self.wr(), "..");
+                    if let Some(post) = &range.post {
+                        self.print_memory_label(post);
+                    }
+                }
+                emit!(self.wr(), " |~ ");
+            },
+            // Look through Not
+            ExpData::Call(_, Operation::Not, args) if args.len() == 1 => {
+                self.print_hoisted_label_prefix(&args[0])
+            },
+            // Look through binary ops
+            ExpData::Call(_, op, args)
+                if args.len() == 2 && hoistable_bin_op_info(op).is_some() =>
+            {
+                if has_hoistable_label(&args[0]) {
+                    self.print_hoisted_label_prefix(&args[0])
+                } else {
+                    self.print_hoisted_label_prefix(&args[1])
+                }
+            },
+            // Look through simple quantifiers
+            ExpData::Quant(_, _, _, _, _, body) => self.print_hoisted_label_prefix(body),
+            _ => {},
+        }
+    }
+
+    /// Print a labeled expression as if it had no label.
+    fn print_exp_without_label(&self, prio: Priority, exp: &Exp) {
+        match exp.as_ref() {
+            ExpData::Call(id, Operation::Global(Some(label)), args) => {
+                self.parenthesize(prio, Prio::Postfix, || {
+                    emit!(self.wr(), "global");
+                    self.print_node_inst(*id);
+                    emit!(self.wr(), "(");
+                    let prev = self.parent.enclosing_state_label.replace(Some(*label));
+                    self.print_exp(Prio::General, false, &args[0]);
+                    self.parent.enclosing_state_label.set(prev);
+                    emit!(self.wr(), ")")
+                })
+            },
+            ExpData::Call(id, Operation::Exists(Some(label)), args) => {
+                self.parenthesize(prio, Prio::Postfix, || {
+                    emit!(self.wr(), "exists");
+                    self.print_node_inst(*id);
+                    let prev = self.parent.enclosing_state_label.replace(Some(*label));
+                    self.print_exp_list("(", ")", args);
+                    self.parent.enclosing_state_label.set(prev);
+                })
+            },
+            ExpData::Call(id, oper @ Operation::Behavior(kind, _range), args) => {
+                // See note above on `WriteOf` rendering.
+                let kind_str = kind.to_string();
+                // Caller already emitted the outer label, but args may
+                // still carry labels: hoist them so labels don't visually
+                // nest.
+                let nested_label = args.iter().skip(1).any(|a| !prints_without_label_prefix(a));
+                if nested_label {
+                    let wrapped =
+                        self.hoist_nested_labels(*id, oper, args, /*keep_outer_label=*/ false);
+                    self.print_exp(prio, false, &wrapped);
+                    return;
+                }
+                self.parenthesize(prio, Prio::Postfix, || {
+                    emit!(self.wr(), "{}", kind_str);
+                    emit!(self.wr(), "<");
+                    self.print_behavior_target(&args[0]);
+                    emit!(self.wr(), ">");
+                    self.print_exp_list("(", ")", &args[1..]);
+                })
+            },
+            // Look through Not: print `!` then the inner without label
+            ExpData::Call(_, Operation::Not, args) if args.len() == 1 => {
+                self.parenthesize(prio, Prio::Prefix, || {
+                    emit!(self.wr(), "!");
+                    self.print_exp_without_label(Prio::Prefix, &args[0])
+                })
+            },
+            // Look through binary ops: strip label from the labeled side
+            ExpData::Call(_, op, args)
+                if args.len() == 2 && hoistable_bin_op_info(op).is_some() =>
+            {
+                let (op_prio, op_str) = hoistable_bin_op_info(op).unwrap();
+                if has_hoistable_label(&args[0]) && is_state_neutral(&args[1]) {
+                    self.parenthesize(prio, op_prio, || {
+                        self.print_exp_without_label(op_prio, &args[0]);
+                        emit!(self.wr(), " {} ", op_str);
+                        self.print_exp(op_prio + 1, false, &args[1]);
+                    })
+                } else if has_hoistable_label(&args[1]) && is_state_neutral(&args[0]) {
+                    self.parenthesize(prio, op_prio, || {
+                        self.print_exp(op_prio, false, &args[0]);
+                        emit!(self.wr(), " {} ", op_str);
+                        self.print_exp_without_label(op_prio + 1, &args[1]);
+                    })
+                } else {
+                    self.print_exp(prio, false, exp)
+                }
+            },
+            // Look through simple quantifiers
+            ExpData::Quant(_, kind, ranges, triggers, where_clause, body)
+                if is_simple_quant(ranges, triggers, where_clause) =>
+            {
+                self.parenthesize(prio, Prio::General, || {
+                    self.print_quant_header(kind, ranges, triggers, where_clause);
+                    self.print_exp_without_label(Prio::General, body);
+                })
+            },
+            _ => self.print_exp(prio, false, exp),
+        }
+    }
+
     fn print_node_inst(&self, id: NodeId) {
         if let Some(inst) = self.env().get_node_instantiation_opt(id) {
             self.print_inst(&inst)
@@ -2175,6 +3417,8 @@ impl<'a> ExpSourcifier<'a> {
     /// Print the target of a behavior predicate. If it's a simple function reference
     /// (a closure with no captures, or a lambda that just forwards to a function),
     /// print the function name directly. Otherwise, print the expression as-is.
+    /// Returns true if the expression can be printed directly inside `<...>` of
+    /// a behavior predicate (i.e. it produces a simple name).
     fn print_behavior_target(&self, exp: &Exp) {
         use ExpData::*;
 
@@ -2187,13 +3431,24 @@ impl<'a> ExpSourcifier<'a> {
             // sourcifier would generate `|arg| f(arg)`.
             if args.is_empty() && mask.captured_count() == 0 {
                 let fun_env = self.env().get_module(*mid).into_function(*fid);
-                emit!(
-                    self.wr(),
-                    "{}{}",
-                    self.parent
-                        .module_qualifier(&self.type_display_context, *mid),
-                    self.sym(fun_env.get_name())
-                );
+                let fun_name = fun_env.get_name();
+                // If the bare function name is shadowed by a `let` binding in the
+                // enclosing spec block, the re-parsed expression would resolve to
+                // the binding instead of the function ("behavior predicate target must
+                // have function type, found u64").  Emit the fully-qualified
+                // `addr::module::fun` form only in that case; otherwise use
+                // module_qualifier (which emits "" for same-module, keeping output concise).
+                if self.spec_let_names.contains(&fun_name) {
+                    emit!(self.wr(), "{}", fun_env.get_full_name_with_address());
+                } else {
+                    emit!(
+                        self.wr(),
+                        "{}{}",
+                        self.parent
+                            .module_qualifier(&self.type_display_context, *mid),
+                        self.sym(fun_name)
+                    );
+                }
                 // Print type arguments if any
                 if let Some(inst) = self.env().get_node_instantiation_opt(*node_id) {
                     if !inst.is_empty() {
@@ -2243,6 +3498,26 @@ impl<'a> ExpSourcifier<'a> {
                     self.print_pat(p, no_parenthesize, no_type)
                 })
             },
+            Pattern::LiteralValue(node_id, val) => {
+                let ty = self.env().get_node_type(*node_id);
+                let ty = ty.skip_reference();
+                self.parent.print_value(val, Some(ty), self.for_spec);
+            },
+            Pattern::Range(node_id, lo, hi, inclusive) => {
+                let ty = self.env().get_node_type(*node_id);
+                let ty = ty.skip_reference();
+                if let Some(l) = lo {
+                    self.parent.print_value(l, Some(ty), self.for_spec);
+                }
+                if *inclusive {
+                    emit!(self.wr(), "..=");
+                } else {
+                    emit!(self.wr(), "..");
+                }
+                if let Some(h) = hi {
+                    self.parent.print_value(h, Some(ty), self.for_spec);
+                }
+            },
             Pattern::Error(_) => emit!(self.wr(), "*error*"),
         }
     }
@@ -2290,6 +3565,24 @@ impl<'a> ExpSourcifier<'a> {
         let spool = self.env().symbol_pool();
         for e in for_scope {
             free_vars.append(&mut e.free_vars());
+            // Collect bound variables and Temporary display names so we don't
+            // shadow them when choosing fresh names.
+            e.as_ref().visit_pre_order(&mut |ed| {
+                match ed {
+                    ExpData::Block(_, pat, _, _) | ExpData::Lambda(_, pat, _, _, _) => {
+                        pat.vars().iter().for_each(|(_, sym)| {
+                            free_vars.insert(*sym);
+                        });
+                    },
+                    ExpData::Temporary(_, idx) => {
+                        if let Some(name) = self.temp_names.get(idx) {
+                            free_vars.insert(*name);
+                        }
+                    },
+                    _ => {},
+                }
+                true
+            });
         }
         for i in 0..256 {
             let name = if i > 0 {
@@ -2302,6 +3595,105 @@ impl<'a> ExpSourcifier<'a> {
             }
         }
         panic!("too many fruitless attempts to generate unique name")
+    }
+
+    /// Extract `exp` into a let-binding with a fresh variable name.
+    /// Returns `(pattern, var_exp)` — the caller accumulates let-bindings and wraps
+    /// in a flat Block for printing. Uses the shared `let_counter` to ensure nested
+    /// extractions produce distinct names.
+    fn let_bind_exp(&self, exp: &Exp, scope: &[Exp]) -> (Pattern, Exp) {
+        let count = self.let_counter.get();
+        let base = Self::LET_BIND_NAMES[count % Self::LET_BIND_NAMES.len()];
+        self.let_counter.set(count + 1);
+        let name = self.new_unique_name(scope, base);
+        let ty = self.env().get_node_type(exp.node_id());
+        let loc = self.env().get_node_loc(exp.node_id());
+        let local_id = self.env().new_node(loc, ty);
+        let pat = Pattern::Var(local_id, name);
+        let var_exp = ExpData::LocalVar(local_id, name).into_exp();
+        (pat, var_exp)
+    }
+
+    /// Wrap `body` in a flat block with the given let-bindings.
+    /// Produces `{ let x = e1; let y = e2; body }` as a single Block chain.
+    fn wrap_in_lets(&self, let_bindings: Vec<(Pattern, Exp)>, body: Exp) -> Exp {
+        let_bindings
+            .into_iter()
+            .rev()
+            .fold(body, |acc, (pat, binding)| {
+                let block_id = self.env().new_node(
+                    self.env().get_node_loc(acc.node_id()),
+                    self.env().get_node_type(acc.node_id()),
+                );
+                ExpData::Block(block_id, pat, Some(binding), acc).into_exp()
+            })
+    }
+
+    /// Lift labeled subexpressions in `args[1..]` into a `let` chain wrapping
+    /// the call. Smaller subexprs are bound first so outer ones can reference
+    /// inner names. `keep_outer_label = false` strips the call's range when
+    /// the caller already emitted the prefix (i.e. via
+    /// `print_exp_without_label`).
+    fn hoist_nested_labels(
+        &self,
+        id: NodeId,
+        oper: &Operation,
+        args: &[Exp],
+        keep_outer_label: bool,
+    ) -> Exp {
+        let mut labeled: Vec<Exp> = Vec::new();
+        for arg in args.iter().skip(1) {
+            arg.as_ref().visit_pre_order(&mut |e: &ExpData| {
+                if has_label_at_top(e) {
+                    let e_exp = ExpData::into_exp(e.clone());
+                    if !labeled.iter().any(|x| x.as_ref().structural_eq(&e_exp)) {
+                        labeled.push(e_exp);
+                    }
+                    false
+                } else {
+                    true
+                }
+            });
+        }
+        labeled.sort_by_key(|e| node_count(e.as_ref()));
+
+        let mut let_bindings: Vec<(Pattern, Exp)> = Vec::new();
+        let mut substitutions: Vec<(Exp, Exp)> = Vec::new();
+        for sub in &labeled {
+            let mut sub_substituted = sub.clone();
+            for (target, repl) in &substitutions {
+                sub_substituted = substitute_structural(&sub_substituted, target, repl);
+            }
+            let (pat, var_exp) = self.let_bind_exp(&sub_substituted, args);
+            let_bindings.push((pat, sub_substituted));
+            substitutions.push((sub.clone(), var_exp));
+        }
+
+        let new_args: Vec<Exp> = args
+            .iter()
+            .enumerate()
+            .map(|(i, arg)| {
+                if i == 0 {
+                    arg.clone()
+                } else {
+                    let mut current = arg.clone();
+                    for (target, repl) in &substitutions {
+                        current = substitute_structural(&current, target, repl);
+                    }
+                    current
+                }
+            })
+            .collect();
+
+        let inner_oper = if keep_outer_label {
+            oper.clone()
+        } else if let Operation::Behavior(kind, _) = oper {
+            Operation::Behavior(*kind, MemoryRange::default())
+        } else {
+            oper.clone()
+        };
+        let new_call = ExpData::Call(id, inner_oper, new_args).into_exp();
+        self.wrap_in_lets(let_bindings, new_call)
     }
 
     fn is_unspecified_abort_code(exp: &Exp) -> bool {

@@ -3,19 +3,19 @@
 //# publish
 module 0xc0ffee::m {
     fun make_func_1(): |u64|(|u64|(u64)) has copy + drop {
-        |arg0| lambda__2__make_func_1(arg0)
+        |x| lambda__2__make_func_1(x)
     }
     fun lambda__2__make_func_1(p0: u64): |u64|(u64) {
-        |arg0| lambda__1__make_func_1(p0, arg0)
+        |x| lambda__1__make_func_1(p0, x)
     }
     fun make_func_2(): |u64, u64|(||(u64)) has copy + drop {
-        |arg0,arg1| lambda__2__make_func_2(arg0, arg1)
+        |x,y| lambda__2__make_func_2(x, y)
     }
     fun lambda__2__make_func_2(p0: u64, p1: u64): ||(u64) {
         || lambda__1__make_func_2(p0, p1)
     }
     fun make_func_3(): |u64, u64|(||(u64, u64)) has copy + drop {
-        |arg0,arg1| lambda__2__make_func_3(arg0, arg1)
+        |x,y| lambda__2__make_func_3(x, y)
     }
     fun lambda__2__make_func_3(p0: u64, p1: u64): ||(u64, u64) {
         || lambda__1__make_func_3(p0, p1)

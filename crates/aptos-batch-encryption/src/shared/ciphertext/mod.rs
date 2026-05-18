@@ -5,7 +5,7 @@ use super::{
     key_derivation::BIBEDecryptionKey,
 };
 use crate::{
-    errors::{BatchEncryptionError, CTVerifyError},
+    errors::{BatchEncryptionError, CTVerifyError, MissingEvalProofError},
     shared::{ciphertext::bibe_succinct::BIBESuccinctCiphertext, digest::EvalProof, ids::Id},
     traits::{AssociatedData, Plaintext},
 };
@@ -40,6 +40,12 @@ pub struct PreparedCiphertext {
     signature: Signature,
 }
 
+impl PreparedCiphertext {
+    pub fn id(&self) -> Id {
+        self.bibe_ct.id
+    }
+}
+
 impl<PCT: InnerCiphertext> Hash for Ciphertext<PCT> {
     fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
         self.vk.hash(state);
@@ -59,9 +65,6 @@ pub trait CTEncrypt<PCT: InnerCiphertext> {
 }
 
 pub trait CTDecrypt<P: Plaintext> {
-    /// convenience method; will look up ct's id in EvalProofs, and
-    /// will use it to decrypt the ct's underlying bibe_ct
-    /// TODO is this still true? Doesn't seem to look up ID anymore
     fn decrypt(&self, ct: &PreparedCiphertext) -> Result<P>;
 }
 
@@ -78,7 +81,7 @@ impl<EK: BIBECTEncrypt> CTEncrypt<EK::CT> for EK {
 
         let signing_key: SigningKey = SigningKey::from_bytes(&signing_key_bytes);
         let vk = signing_key.verifying_key();
-        let hashed_id = Id::from_verifying_key(&vk);
+        let hashed_id = Id::from_verifying_key_and_ad(&vk, associated_data);
         let bibe_ct = self.bibe_encrypt(rng, plaintext, hashed_id)?;
 
         // So that Ciphertext doesn't have to be generic over some AD: AssociatedData
@@ -97,28 +100,18 @@ impl<EK: BIBECTEncrypt> CTEncrypt<EK::CT> for EK {
 }
 
 impl<PCT: InnerCiphertext> Ciphertext<PCT> {
-    pub fn random() -> Self {
-        use ark_std::rand::thread_rng;
-
-        let mut rng = thread_rng();
-        let enc_key = PCT::EncryptionKey::for_testing();
-
-        enc_key
-            .encrypt(&mut rng, &String::from("random"), &String::from("data"))
-            .unwrap()
-    }
-
     pub fn verify(&self, associated_data: &impl AssociatedData) -> Result<()> {
-        let hashed_id = Id::from_verifying_key(&self.vk);
+        let hashed_id = Id::from_verifying_key_and_ad(&self.vk, associated_data);
 
-        (self.bibe_ct.id() == hashed_id).then_some(()).ok_or(
-            BatchEncryptionError::CTVerifyError(CTVerifyError::IdDoesNotMatchHashedVK),
-        )?;
         (self.associated_data_bytes == bcs::to_bytes(associated_data)?)
             .then_some(())
             .ok_or(BatchEncryptionError::CTVerifyError(
                 CTVerifyError::AssociatedDataDoesNotMatch,
             ))?;
+
+        (self.bibe_ct.id() == hashed_id).then_some(()).ok_or(
+            BatchEncryptionError::CTVerifyError(CTVerifyError::IdDoesNotMatchHashedVKAndAD),
+        )?;
 
         let to_verify = (&self.bibe_ct, &self.associated_data_bytes);
 
@@ -135,7 +128,11 @@ impl<PCT: InnerCiphertext> Ciphertext<PCT> {
         self.bibe_ct.id()
     }
 
-    pub fn prepare(&self, digest: &Digest, eval_proofs: &EvalProofs) -> Result<PreparedCiphertext> {
+    pub fn prepare(
+        &self,
+        digest: &Digest,
+        eval_proofs: &EvalProofs,
+    ) -> std::result::Result<PreparedCiphertext, MissingEvalProofError> {
         Ok(PreparedCiphertext {
             vk: self.vk,
             bibe_ct: self.bibe_ct.prepare(digest, eval_proofs)?,
@@ -147,18 +144,32 @@ impl<PCT: InnerCiphertext> Ciphertext<PCT> {
         &self,
         digest: &Digest,
         eval_proof: &EvalProof,
-    ) -> Result<PreparedCiphertext> {
-        Ok(PreparedCiphertext {
+    ) -> PreparedCiphertext {
+        PreparedCiphertext {
             vk: self.vk,
-            bibe_ct: self.bibe_ct.prepare_individual(digest, eval_proof)?,
+            bibe_ct: self.bibe_ct.prepare_individual(digest, eval_proof),
             signature: self.signature,
-        })
+        }
     }
 }
 
 impl<P: Plaintext> CTDecrypt<P> for BIBEDecryptionKey {
     fn decrypt(&self, ct: &PreparedCiphertext) -> Result<P> {
         self.bibe_decrypt(&ct.bibe_ct)
+    }
+}
+
+impl<PCT: InnerCiphertext> Ciphertext<PCT> {
+    /// Only used for testing.
+    pub fn random() -> Self {
+        use ark_std::rand::thread_rng;
+
+        let mut rng = thread_rng();
+        let enc_key = PCT::EncryptionKey::for_testing();
+
+        enc_key
+            .encrypt(&mut rng, &String::from("random"), &String::from("data"))
+            .unwrap()
     }
 }
 
@@ -173,7 +184,7 @@ pub mod tests {
             ciphertext::{CTDecrypt, CTEncrypt, StandardCiphertext, SuccinctCiphertext},
             digest::DigestKey,
             encryption_key::AugmentedEncryptionKey,
-            ids::IdSet,
+            ids::{Id, IdSet},
             key_derivation::{self, BIBEDecryptionKey},
         },
         traits::BatchThresholdEncryption as _,
@@ -193,7 +204,7 @@ pub mod tests {
         let associated_data = String::from("");
         let ct: StandardCiphertext = ek.encrypt(&mut rng, &plaintext, &associated_data).unwrap();
 
-        let mut ids = IdSet::with_capacity(dk.capacity()).unwrap();
+        let mut ids = IdSet::with_capacity(dk.max_batch_size());
         ids.add(&ct.id());
 
         ids.compute_poly_coeffs();
@@ -225,7 +236,7 @@ pub mod tests {
         let associated_data = String::from("");
         let ct: SuccinctCiphertext = ek.encrypt(&mut rng, &plaintext, &associated_data).unwrap();
 
-        let mut ids = IdSet::with_capacity(dk.capacity()).unwrap();
+        let mut ids = IdSet::with_capacity(dk.max_batch_size());
         ids.add(&ct.id());
 
         ids.compute_poly_coeffs();
@@ -250,6 +261,7 @@ pub mod tests {
 
         let plaintext = String::from("hi");
         let associated_data = String::from("associated data");
+        let fake_associated_data = String::from("fake_associated data");
         let mut ct: StandardCiphertext =
             ek.encrypt(&mut rng, &plaintext, &associated_data).unwrap();
 
@@ -259,7 +271,7 @@ pub mod tests {
         // The CT itself contains a byte encoding of the associated data. Verification with
         // incorrect associated data returns an error indicating as such.
         let e: BatchEncryptionError = ct
-            .verify(&String::from("fake associated data"))
+            .verify(&fake_associated_data)
             .unwrap_err()
             .downcast()
             .unwrap();
@@ -271,9 +283,10 @@ pub mod tests {
         // Even if the CT itself is modified to contain a byte encoding of incorrect associated
         // data, verification should fail, this time with an error message indicating that the
         // signature verification failed.
-        ct.associated_data_bytes = bcs::to_bytes(&String::from("fake associated data")).unwrap();
+        ct.associated_data_bytes = bcs::to_bytes(&fake_associated_data).unwrap();
+        ct.bibe_ct.id = Id::from_verifying_key_and_ad(&ct.vk, &fake_associated_data);
         let e: BatchEncryptionError = ct
-            .verify(&String::from("fake associated data"))
+            .verify(&fake_associated_data)
             .unwrap_err()
             .downcast()
             .unwrap();

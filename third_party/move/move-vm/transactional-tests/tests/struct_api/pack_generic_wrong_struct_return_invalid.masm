@@ -1,0 +1,15 @@
+//# publish --print-bytecode
+module 0x66::test_pack_generic_wrong_struct_return
+
+struct S
+    x: u64
+
+struct Box<T>
+    value: T
+
+// Invalid: pack$S must return S, not Box<u64>.
+// The return type is a StructInstantiation with the wrong struct index.
+#[pack] public fun pack$S(l0: u64): Box<u64>
+    move_loc l0
+    pack Box<u64>
+    ret

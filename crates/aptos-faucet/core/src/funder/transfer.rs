@@ -130,8 +130,12 @@ impl TransferFunder {
         transaction_expiration_secs: u64,
         wait_for_transactions: bool,
     ) -> Self {
-        let gas_unit_price_manager =
-            GasUnitPriceManager::new(node_url.clone(), gas_unit_price_ttl_secs);
+        let gas_unit_price_manager = GasUnitPriceManager::new(
+            node_url.clone(),
+            gas_unit_price_ttl_secs,
+            node_api_key.clone(),
+            node_additional_headers.as_ref(),
+        );
 
         Self {
             faucet_account,
@@ -214,6 +218,13 @@ impl TransferFunder {
         .await
     }
 
+    fn get_amount(&self, amount: Option<u64>) -> u64 {
+        match amount {
+            Some(amount) => std::cmp::min(amount, self.amount_to_fund.0),
+            None => self.amount_to_fund.0,
+        }
+    }
+
     async fn is_healthy_as_result(&self) -> Result<(), AptosTapError> {
         let funder_health = self.is_healthy().await;
         if !funder_health.can_process_requests {
@@ -249,7 +260,7 @@ impl FunderTrait for TransferFunder {
         receiver_address: AccountAddress,
         _asset: Option<String>,
         check_only: bool,
-        did_bypass_checkers: bool,
+        _did_bypass_checkers: bool,
     ) -> Result<Vec<SignedTransaction>, AptosTapError> {
         // Confirm the funder has sufficient balance, return a 500 if not. This
         // will only happen briefly, soon after we get into this state the LB
@@ -260,7 +271,7 @@ impl FunderTrait for TransferFunder {
         let client = self.get_api_client();
 
         // Determine amount to fund.
-        let amount = self.get_amount(amount, did_bypass_checkers);
+        let amount = self.get_amount(amount);
 
         // Check if the receiver account already exists.
         let receiver_exists = client.get_account(receiver_address).await.is_ok();
@@ -299,19 +310,6 @@ impl FunderTrait for TransferFunder {
         };
 
         Ok(transactions)
-    }
-
-    fn get_amount(
-        &self,
-        amount: Option<u64>,
-        // Ignored for now with TransferFunder, since generally we don't use Bypassers
-        // when using the TransferFunder.
-        _did_bypass_checkers: bool,
-    ) -> u64 {
-        match amount {
-            Some(amount) => std::cmp::min(amount, self.amount_to_fund.0),
-            None => self.amount_to_fund.0,
-        }
     }
 
     /// Assert funder account actually exists and has the minimum funds.

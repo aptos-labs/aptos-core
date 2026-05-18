@@ -1,0 +1,11 @@
+Move prover returns: exiting with verification errors
+error: unknown assertion failed
+   ┌─ tests/sources/functional/arbitrary.move:26:13
+   │
+26 │             assert arbitrary_u8_1(range) == arbitrary_u8_2(range);
+   │             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+   │
+   =     at tests/sources/functional/arbitrary.move:20: call_arbitrary_u8
+   =         range = <redacted>
+   =     at tests/sources/functional/arbitrary.move:21: call_arbitrary_u8
+   =     at tests/sources/functional/arbitrary.move:26: call_arbitrary_u8

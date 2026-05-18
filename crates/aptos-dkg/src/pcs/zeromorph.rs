@@ -14,8 +14,10 @@ use crate::{
     sigma_protocol::homomorphism::TrivialShape,
     Scalar,
 };
+use anyhow::Result;
 use aptos_crypto::{
     arkworks::{
+        msm::MsmInput,
         random::{sample_field_element, sample_field_elements},
         srs::SrsType,
         GroupGenerators,
@@ -55,17 +57,78 @@ pub struct ZeromorphVerifierKey<P: Pairing> {
 #[derive(Debug, PartialEq, CanonicalSerialize, CanonicalDeserialize, Clone)]
 pub struct ZeromorphCommitment<P: Pairing>(P::G1);
 
+impl<P: Pairing> ZeromorphCommitment<P> {
+    /// Reference to the inner G1 element (e.g. for combining in batch verify).
+    pub fn as_inner(&self) -> &P::G1 {
+        &self.0
+    }
+
+    /// Build a commitment from a G1 element (e.g. combined commitment in batch verify).
+    pub fn from_g1(g: P::G1) -> Self {
+        Self(g)
+    }
+}
+
 impl<P: Pairing> Default for ZeromorphCommitment<P> {
     fn default() -> Self {
         Self(P::G1::zero())
     }
 }
 
+/// Verifier input type; same as commitment for Zeromorph (no MSM merging).
+#[derive(Clone, Debug, PartialEq, CanonicalSerialize, CanonicalDeserialize)]
+pub struct ZeromorphVerifierCommitment<P: Pairing>(pub ZeromorphCommitment<P>);
+
+impl<P: Pairing> From<ZeromorphCommitment<P>> for ZeromorphVerifierCommitment<P> {
+    fn from(c: ZeromorphCommitment<P>) -> Self {
+        Self(c)
+    }
+}
+
+#[derive(Clone, CanonicalSerialize, CanonicalDeserialize, Debug)]
+pub struct ZeromorphProofProjective<P: Pairing> {
+    pub pi: univariate_hiding_kzg::OpeningProofProjective<P>,
+    pub q_hat_com: univariate_hiding_kzg::Commitment<P>, // KZG commitment to the batched, lifted-degree poly constructed out of the q_k
+    pub q_k_com: Vec<univariate_hiding_kzg::Commitment<P>>, // has type Vec<P::G1>, this is a vector of KZG commitments for the q_k
+}
+
 #[derive(Clone, CanonicalSerialize, CanonicalDeserialize, Debug)]
 pub struct ZeromorphProof<P: Pairing> {
     pub pi: univariate_hiding_kzg::OpeningProof<P>,
-    pub q_hat_com: univariate_hiding_kzg::Commitment<P>, // KZG commitment to the batched, lifted-degree poly constructed out of the q_k
-    pub q_k_com: Vec<univariate_hiding_kzg::Commitment<P>>, // has type Vec<P::G1>, this is a vector of KZG commitments for the q_k
+    pub q_hat_com: univariate_hiding_kzg::CommitmentNormalised<P>,
+    pub q_k_com: Vec<univariate_hiding_kzg::CommitmentNormalised<P>>,
+}
+
+impl<P: Pairing> From<ZeromorphProofProjective<P>> for ZeromorphProof<P> {
+    fn from(p: ZeromorphProofProjective<P>) -> Self {
+        let mut batch = vec![p.pi.pi_1.0, p.pi.pi_2];
+        batch.push(p.q_hat_com.0);
+        batch.extend(p.q_k_com.iter().map(|c| c.0));
+        let normalized = P::G1::normalize_batch(&batch);
+        Self {
+            pi: univariate_hiding_kzg::OpeningProof {
+                pi_1: normalized[0],
+                pi_2: normalized[1],
+            },
+            q_hat_com: univariate_hiding_kzg::CommitmentNormalised(normalized[2]),
+            q_k_com: normalized[3..]
+                .iter()
+                .map(|&a| univariate_hiding_kzg::CommitmentNormalised(a))
+                .collect(),
+        }
+    }
+}
+
+/// Batched instance produced by Zeromorph opening: the univariate polynomial `f`, opening point,
+/// claimed value, and randomness. Can be opened with `open_batched_instance_with_hkzg`, or combined
+/// with other instances before a single univariate KZG open.
+#[derive(Clone, Debug)]
+pub struct ZeromorphBatchedOpeningInstance<P: Pairing> {
+    pub f_coeffs: Vec<P::ScalarField>,
+    pub rho: P::ScalarField,
+    pub x: P::ScalarField,
+    pub y: P::ScalarField,
+    pub s: CommitmentRandomness<P::ScalarField>,
 }
 
 /// Computes the multilinear quotient polynomials for a given polynomial and evaluation point.
@@ -169,7 +232,69 @@ fn compute_batched_lifted_degree_quotient<P: Pairing>(
     (UniPoly::from_coefficients_vec(q_hat), 1 << (num_vars - 1))
 }
 
-fn eval_and_quotient_scalars<P: Pairing>(
+/// Replay the Zeromorph verifier transcript to obtain challenges (y, x, z).
+/// Used by [`Zeromorph::verify`] and by higher-level protocols (e.g. Dekart) that batch Zeromorph with other openings.
+pub fn replay_challenges<P: Pairing>(
+    trs: &mut merlin::Transcript,
+    q_k_com: &[P::G1Affine],
+    q_hat_com: &P::G1Affine,
+) -> (P::ScalarField, P::ScalarField, P::ScalarField) {
+    trs.append_sep(Zeromorph::<P>::protocol_name());
+    for c in q_k_com {
+        trs.append_point(c);
+    }
+    let y_challenge = trs.challenge_scalar();
+    trs.append_point(q_hat_com);
+    let x_challenge = trs.challenge_scalar();
+    let z_challenge = trs.challenge_scalar();
+    (y_challenge, x_challenge, z_challenge)
+}
+
+/// Compute the zeta_z commitment for Zeromorph verification as an MSM input.
+/// `combined_comm` is the (possibly batched) commitment to the polynomial being opened as an MSM input;
+/// `eval` is its evaluation at the point. The layout matches the original single-point version:
+/// (q_hat_com, 1), (combined_comm terms scaled by z_challenge), (g1, eval_scalar*eval), (q_k_com, q_scalars).
+/// Used by [`Zeromorph::verify`] and by Dekart when it uses Zeromorph in a batched setting.
+pub fn zeta_z_com<P: Pairing>(
+    q_hat_com: P::G1Affine,
+    combined_comm: MsmInput<P::G1Affine, P::ScalarField>,
+    g1: P::G1Affine,
+    q_k_com: &[P::G1Affine],
+    y_challenge: P::ScalarField,
+    x_challenge: P::ScalarField,
+    z_challenge: P::ScalarField,
+    point_reversed: &[P::ScalarField],
+    eval: P::ScalarField,
+) -> MsmInput<P::G1Affine, P::ScalarField> {
+    let (eval_scalar, (mut q_scalars, zmpoly_q_scalars)) =
+        eval_and_quotient_scalars::<P>(y_challenge, x_challenge, z_challenge, point_reversed);
+    q_scalars
+        .iter_mut()
+        .zip(zmpoly_q_scalars)
+        .for_each(|(s, zm)| *s += zm);
+    // Original layout: (q_hat_com, 1), (combined_comm, z_challenge), (g1, eval_scalar*eval), (q_k_com, q_scalars).
+    // With expanded combined_comm: each base gets (scalar * z_challenge); no standalone z_challenge.
+    let combined_scalars: Vec<P::ScalarField> = combined_comm
+        .scalars()
+        .iter()
+        .map(|s| *s * z_challenge)
+        .collect();
+    let scalars: Vec<P::ScalarField> = [
+        vec![P::ScalarField::one()],
+        combined_scalars,
+        vec![eval_scalar * eval],
+        q_scalars,
+    ]
+    .concat();
+    let mut bases = vec![q_hat_com];
+    bases.extend(combined_comm.bases().iter().copied());
+    bases.push(g1);
+    bases.extend(q_k_com.iter().copied());
+    MsmInput::new(bases, scalars).expect("Zeromorph zeta_z MSM input")
+}
+
+/// Used by Dekart multivariate verifier to replay Zeromorph and form zeta_z_com.
+pub(crate) fn eval_and_quotient_scalars<P: Pairing>(
     y_challenge: P::ScalarField,
     x_challenge: P::ScalarField,
     z_challenge: P::ScalarField,
@@ -274,16 +399,23 @@ where
         )
     }
 
-    pub fn open<R: RngCore + CryptoRng>(
+    /// Produces the batched opening instance (and commitments) that would be opened by univariate
+    /// hiding KZG. Call `open_batched_instance_with_hkzg` to get the opening proof, or batch this
+    /// instance with others first.
+    pub fn open_to_batched_instance<R: RngCore + CryptoRng>(
         pp: &ZeromorphProverKey<P>,
         poly: &DenseMultilinearExtension<P::ScalarField>,
         point: &[P::ScalarField],
-        eval: P::ScalarField, // Can be calculated
+        eval: P::ScalarField,
         s: CommitmentRandomness<P::ScalarField>,
         rng: &mut R,
-        transcript: &mut merlin::Transcript,
-    ) -> ZeromorphProof<P> {
-        transcript.append_sep(Self::protocol_name());
+        trs: &mut merlin::Transcript,
+    ) -> (
+        ZeromorphBatchedOpeningInstance<P>,
+        univariate_hiding_kzg::Commitment<P>,
+        Vec<univariate_hiding_kzg::Commitment<P>>,
+    ) {
+        trs.append_sep(Self::protocol_name());
 
         // TODO: PUT THIS BACK IN
         // if pp.commit_pp.msm_basis.len() < poly.len() {
@@ -321,8 +453,10 @@ where
             .collect();
 
         // Step 2: verifier challenge to aggregate degree bound proofs
-        q_k_com.iter().for_each(|c| transcript.append_point(&c.0));
-        let y_challenge: P::ScalarField = transcript.challenge_scalar();
+        q_k_com
+            .iter()
+            .for_each(|c| trs.append_point(&c.0.into_affine()));
+        let y_challenge: P::ScalarField = trs.challenge_scalar();
 
         // Step 3: Aggregate shifted q_k into \hat{q} and compute commitment
 
@@ -338,11 +472,11 @@ where
             &r,
             offset,
         );
-        transcript.append_point(&q_hat_com.0);
+        trs.append_point(&q_hat_com.0.into_affine());
 
         // Step 4/6: Obtain x challenge to evaluate the polynomial, and z challenge to aggregate two challenges
-        let x_challenge = transcript.challenge_scalar();
-        let z_challenge = transcript.challenge_scalar();
+        let x_challenge = trs.challenge_scalar();
+        let z_challenge = trs.challenge_scalar();
 
         // Step 5/7: Compute this batched poly
 
@@ -390,21 +524,48 @@ where
             "batched polynomial f must vanish at x_challenge"
         );
 
-        // Compute and send proof commitment pi. Use s_combined so the opening proof's blinding matches zeta_z_com's blinding.
-        // HKZG verify requires rho = s for the blinding terms to cancel, so set rho = s_combined.
         let s_combined_scalar = Scalar(s_combined);
+        let batched_instance = ZeromorphBatchedOpeningInstance {
+            f_coeffs: f.coeffs,
+            rho: s_combined,
+            x: x_challenge,
+            y: P::ScalarField::zero(),
+            s: s_combined_scalar,
+        };
 
-        let pi = univariate_hiding_kzg::CommitmentHomomorphism::open(
+        (batched_instance, q_hat_com, q_k_com)
+    }
+
+    /// Run univariate hiding KZG open on a batched instance (e.g. from `open_to_batched_instance`).
+    /// Use this to complete a single Zeromorph open or to open after batching with more instances.
+    pub fn open_batched_instance_with_hkzg(
+        pp: &ZeromorphProverKey<P>,
+        instance: &ZeromorphBatchedOpeningInstance<P>,
+    ) -> univariate_hiding_kzg::OpeningProofProjective<P> {
+        univariate_hiding_kzg::CommitmentHomomorphism::open(
             &pp.hiding_kzg_pp,
-            f.coeffs,
-            s_combined,
-            x_challenge,
-            P::ScalarField::zero(),
-            &s_combined_scalar,
+            instance.f_coeffs.clone(),
+            instance.rho,
+            instance.x,
+            instance.y,
+            &instance.s,
             pp.open_offset,
-        );
+        )
+    }
 
-        ZeromorphProof {
+    pub fn open<R: RngCore + CryptoRng>(
+        pp: &ZeromorphProverKey<P>,
+        poly: &DenseMultilinearExtension<P::ScalarField>,
+        point: &[P::ScalarField],
+        eval: P::ScalarField, // Can be calculated
+        s: CommitmentRandomness<P::ScalarField>,
+        rng: &mut R,
+        trs: &mut merlin::Transcript,
+    ) -> ZeromorphProofProjective<P> {
+        let (batched_instance, q_hat_com, q_k_com) =
+            Self::open_to_batched_instance(pp, poly, point, eval, s, rng, trs);
+        let pi = Self::open_batched_instance_with_hkzg(pp, &batched_instance);
+        ZeromorphProofProjective {
             pi,
             q_hat_com,
             q_k_com,
@@ -417,63 +578,40 @@ where
         point: &[P::ScalarField],
         eval: &P::ScalarField,
         proof: &ZeromorphProof<P>,
-        transcript: &mut merlin::Transcript,
+        trs: &mut merlin::Transcript,
+        batch: bool,
     ) -> anyhow::Result<()> {
-        transcript.append_sep(Self::protocol_name());
-
-        //let q_comms: Vec<P::G1> = proof.q_k_com.iter().map(|c| c.into_group()).collect();
-        proof
-            .q_k_com
-            .iter()
-            .for_each(|c| transcript.append_point(&c.0));
-
-        // Challenge y
-        let y_challenge: P::ScalarField = transcript.challenge_scalar();
-
-        // Receive commitment C_q_hat
-        transcript.append_point(&proof.q_hat_com.0);
-
-        // Get x and z challenges
-        let x_challenge = transcript.challenge_scalar();
-        let z_challenge = transcript.challenge_scalar();
+        // Use the caller's transcript so verification is bound to the same protocol context as the
+        // prover; otherwise proofs could be replayed across contexts sharing the same DST.
+        if batch {
+            let _gamma: P::ScalarField = trs.challenge_scalar(); // consume gamma so state matches batch_open
+        }
+        let q_k_affine: Vec<P::G1Affine> = proof.q_k_com.iter().map(|c| c.0).collect();
+        let q_hat_affine = proof.q_hat_com.0; // TODO: this is a bit verbose now
+        let (y_challenge, x_challenge, z_challenge) =
+            replay_challenges::<P>(trs, &q_k_affine, &q_hat_affine);
 
         // Must match prover: use point in reversed order so q_scalars[k] aligns with quotients[k].
         let point_reversed_for_scalars: Vec<P::ScalarField> = point.iter().rev().cloned().collect();
-        let (eval_scalar, (mut q_scalars, zmpoly_q_scalars)): (
-            P::ScalarField,
-            (Vec<P::ScalarField>, Vec<P::ScalarField>),
-        ) = eval_and_quotient_scalars::<P>(
+        let combined_comm = MsmInput::new(vec![comm.0.into_affine()], vec![P::ScalarField::one()])
+            .expect("Zeromorph single commitment MSM input");
+        let zeta_z_msm = zeta_z_com::<P>(
+            q_hat_affine,
+            combined_comm,
+            vk.hkzg_vk.group_generators.g1,
+            &q_k_affine,
             y_challenge,
             x_challenge,
             z_challenge,
             &point_reversed_for_scalars,
+            *eval,
         );
-        q_scalars
-            .iter_mut()
-            .zip(zmpoly_q_scalars)
-            .for_each(|(scalar, zm_poly_q_scalar)| {
-                *scalar += zm_poly_q_scalar;
-            });
-        let scalars = [
-            vec![P::ScalarField::one(), z_challenge, eval_scalar * *eval],
-            q_scalars,
-        ]
-        .concat();
-
-        let mut bases_proj = Vec::with_capacity(3 + proof.q_k_com.len());
-
-        bases_proj.push(proof.q_hat_com.0);
-        bases_proj.push(comm.0);
-        bases_proj.push(vk.hkzg_vk.group_generators.g1.into_group()); // Not so ideal to include this in `normalize_batch` but the effect should be negligible
-        bases_proj.extend(proof.q_k_com.iter().map(|w| w.0));
-
-        let bases = P::G1::normalize_batch(&bases_proj);
-
-        let zeta_z_com = <P::G1 as VariableBaseMSM>::msm(&bases, &scalars)
-            .expect("MSM failed in ZeroMorph")
+        let zeta_z_com = P::G1::msm(&zeta_z_msm.bases, &zeta_z_msm.scalars)
+            .expect("Zeromorph zeta_z MSM")
             .into_affine();
 
         // Delegate to standard hiding KZG verify: e(C - y*[1]_1, [1]_2) + e(-pi_1, [τ-x]_2) + e(-pi_2, ξ_2) = 0.
+        // TODO: when the offset is nonzero we need to account for it here...
         // Commitment type is TrivialShape<P::G1>; y = 0 since the batched polynomial vanishes at x.
         let zeta_z_commitment = TrivialShape(zeta_z_com.into_group());
         univariate_hiding_kzg::CommitmentHomomorphism::verify(
@@ -481,7 +619,7 @@ where
             zeta_z_commitment,
             x_challenge,
             P::ScalarField::zero(),
-            proof.pi.clone(),
+            proof.pi.clone().into(),
         )?;
 
         Ok(())
@@ -494,8 +632,10 @@ where
 {
     type Commitment = ZeromorphCommitment<P>;
     type CommitmentKey = ZeromorphProverKey<P>;
+    type CommitmentNormalised = ZeromorphVerifierCommitment<P>;
+    type OpeningProof = ZeromorphProof<P>;
+    type OpeningProofProjective = ZeromorphProofProjective<P>;
     type Polynomial = DenseMultilinearExtension<P::ScalarField>;
-    type Proof = ZeromorphProof<P>;
     type VerificationKey = ZeromorphVerifierKey<P>;
     type WitnessField = P::ScalarField;
 
@@ -529,7 +669,7 @@ where
         // setup_extra requires m to be a power of 2. number_of_coefficients is already a power of 2.
         // Use m = N so that offset = 0 and tau_N_max_sub_2_N = g2_powers[0] = [1]_2, giving the
         // standard hiding KZG check: e(zeta_z_com, [1]_2) = e(pi_1, [τ-x]_2) * e(pi_2, xi_2).
-        let m = number_of_coefficients;
+        let m = number_of_coefficients; // will be the size of the SRS... in practice might not agree with number_of_coefficients
         let (hkzg_vk_pp, hkzg_commit_pp) = univariate_hiding_kzg::setup_extra(
             m,
             SrsType::PowersOfTau,
@@ -537,7 +677,7 @@ where
             trapdoor,
         );
 
-        let offset = m - number_of_coefficients; // 0 when m = N
+        let offset = m - number_of_coefficients; // this is 0; the point is that we're setting up the powers-of-tau with the exact max_degree
         let prover_key = ZeromorphProverKey {
             hiding_kzg_pp: hkzg_commit_pp,
             open_offset: offset,
@@ -566,7 +706,7 @@ where
         r: Option<Self::WitnessField>,
         rng: &mut R,
         trs: &mut merlin::Transcript,
-    ) -> Self::Proof {
+    ) -> Self::OpeningProofProjective {
         let s = Scalar(r.expect("open(): expected randomness r, got None"));
 
         let eval = Self::evaluate_point(&poly, &challenge);
@@ -582,8 +722,9 @@ where
         rs: Option<Vec<Self::WitnessField>>,
         rng: &mut R,
         trs: &mut merlin::Transcript,
-    ) -> Self::Proof {
+    ) -> Self::OpeningProofProjective {
         let rs = rs.expect("rs must be present");
+        debug_assert_eq!(rs.len(), polys.len(), "rs must have same length as polys");
 
         let gamma = trs.challenge_scalar();
         let gammas = powers(gamma, polys.len());
@@ -608,13 +749,15 @@ where
 
     fn verify(
         vk: &Self::VerificationKey,
-        com: Self::Commitment,
+        com: impl Into<Self::CommitmentNormalised>,
         challenge: Vec<Self::WitnessField>,
         eval: Self::WitnessField,
-        proof: Self::Proof,
+        proof: Self::OpeningProof,
         trs: &mut merlin::Transcript,
+        batch: bool,
     ) -> anyhow::Result<()> {
-        Zeromorph::verify(&vk, &com, &challenge, &eval, &proof, trs)
+        let com = com.into();
+        Zeromorph::verify(&vk, &com.0, &challenge, &eval, &proof, trs, batch)
     }
 
     fn random_witness<R: RngCore + CryptoRng>(rng: &mut R) -> Self::WitnessField {
@@ -948,7 +1091,9 @@ mod test {
             let r = <Bn254 as Pairing>::ScalarField::rand(&mut ark_rng);
             let commitment = Zeromorph::<Bn254>::commit(&pk, &poly, r);
 
-            let mut prover_transcript = merlin::Transcript::new(b"TestEval");
+            // Use the same DST as verify() when batch=false, so challenges match.
+            let dst = <Zeromorph<Bn254> as crate::pcs::traits::PolynomialCommitmentScheme>::transcript_dst_for_single_open();
+            let mut prover_transcript = merlin::Transcript::new(dst);
             let s = Scalar(r);
             let proof = Zeromorph::<Bn254>::open(
                 &pk,
@@ -959,24 +1104,19 @@ mod test {
                 &mut rng,
                 &mut prover_transcript,
             );
-            let p_transcript_squeeze: <Bn254 as Pairing>::ScalarField =
-                prover_transcript.challenge_scalar();
 
-            // Verify proof.
-            let mut verifier_transcript = merlin::Transcript::new(b"TestEval");
+            // Verify proof (verifier derives challenges from an internal transcript with the same DST).
+            let mut verifier_transcript = merlin::Transcript::new(dst);
             Zeromorph::<Bn254>::verify(
                 &vk,
                 &commitment,
                 &point,
                 &eval,
-                &proof,
+                &proof.clone().into(),
                 &mut verifier_transcript,
+                false,
             )
             .unwrap();
-            let v_transcript_squeeze: <Bn254 as Pairing>::ScalarField =
-                verifier_transcript.challenge_scalar();
-
-            assert_eq!(p_transcript_squeeze, v_transcript_squeeze);
 
             // evaluate bad proof for soundness
             let altered_verifier_point = point
@@ -984,14 +1124,15 @@ mod test {
                 .map(|s| *s + <Bn254 as Pairing>::ScalarField::one())
                 .collect::<Vec<_>>();
             let altered_verifier_eval = poly.evaluate(&altered_verifier_point);
-            let mut verifier_transcript = merlin::Transcript::new(b"TestEval");
+            let mut verifier_transcript = merlin::Transcript::new(dst);
             assert!(Zeromorph::<Bn254>::verify(
                 &vk,
                 &commitment,
                 &altered_verifier_point,
                 &altered_verifier_eval,
-                &proof,
+                &proof.into(),
                 &mut verifier_transcript,
+                false,
             )
             .is_err())
         }

@@ -72,6 +72,11 @@ impl NetworkInfoState {
     pub fn get_latest_network_info_response(&self) -> Option<NetworkInformationResponse> {
         self.recorded_network_info_response.clone()
     }
+
+    /// Returns true iff this node is configured to allow validator-PFN connections
+    fn validator_pfn_connections_enabled(&self) -> bool {
+        self.base_config.enable_validator_pfn_connections
+    }
 }
 
 impl StateValueInterface for NetworkInfoState {
@@ -117,22 +122,26 @@ impl StateValueInterface for NetworkInfoState {
         let network_id = peer_network_id.network_id();
         let is_valid_depth = match network_info_response.distance_from_validators {
             0 => {
-                // Verify the peer is a validator and has the correct network id
+                // Verify the peer is a validator, and has the correct network id
                 let peer_is_validator = peer_metadata.get_connection_metadata().role.is_validator();
                 let peer_has_correct_network = match self.base_config.role {
                     RoleType::Validator => network_id.is_validator_network(), // We're a validator
-                    RoleType::FullNode => network_id.is_vfn_network(),        // We're a VFN
+                    RoleType::FullNode => {
+                        if self.validator_pfn_connections_enabled() {
+                            network_id.is_public_network() // We're a PFN connected to validators
+                        } else {
+                            network_id.is_vfn_network() // We're a VFN connected to a validator
+                        }
+                    },
                 };
                 peer_is_validator && peer_has_correct_network
             },
             1 => {
-                // Verify the peer is a VFN and has the correct network id
-                let peer_is_vfn = peer_metadata.get_connection_metadata().role.is_vfn();
-                let peer_has_correct_network = match self.base_config.role {
-                    RoleType::Validator => network_id.is_vfn_network(), // We're a validator
-                    RoleType::FullNode => network_id.is_public_network(), // We're a VFN or PFN
-                };
-                peer_is_vfn && peer_has_correct_network
+                // Verify the peer is not a validator, and has the correct network id
+                let peer_is_not_validator =
+                    !peer_metadata.get_connection_metadata().role.is_validator();
+                let peer_has_correct_network = !network_id.is_validator_network();
+                peer_is_not_validator && peer_has_correct_network
             },
             distance_from_validators => {
                 // The distance must be less than or equal to the max
@@ -306,16 +315,6 @@ mod test {
         verify_empty_network_response(&network_info_state);
 
         // Attempt to store a network response with an invalid depth of
-        // 1 (the peer is a validator).
-        handle_response_and_verify_distance(
-            &mut network_info_state,
-            NetworkId::Validator,
-            PeerRole::Validator,
-            1,
-            None,
-        );
-
-        // Attempt to store a network response with an invalid depth of
         // 0 (the peer is a PFN, not a validator).
         handle_response_and_verify_distance(
             &mut network_info_state,
@@ -326,13 +325,23 @@ mod test {
         );
 
         // Attempt to store a network response with an invalid depth of
-        // 1 (the peer is a VFN, but VFNs can't connect to other VFN networks).
+        // 1 (the peer is a validator on the validator network).
+        handle_response_and_verify_distance(
+            &mut network_info_state,
+            NetworkId::Validator,
+            PeerRole::Validator,
+            1,
+            None,
+        );
+
+        // Attempt to store a network response with a valid depth of
+        // 1 (the peer is a VFN on the VFN network).
         handle_response_and_verify_distance(
             &mut network_info_state,
             NetworkId::Vfn,
             PeerRole::ValidatorFullNode,
             1,
-            None,
+            Some(1),
         );
 
         // Attempt to store a network response with a valid depth of
@@ -384,14 +393,14 @@ mod test {
             None,
         );
 
-        // Attempt to store a network response with an invalid depth of
-        // 1 (the peer is a PFN, not a VFN).
+        // Attempt to store a network response with a valid depth of
+        // 1 (the peer is a PFN).
         handle_response_and_verify_distance(
             &mut network_info_state,
             NetworkId::Public,
             PeerRole::PreferredUpstream,
             1,
-            None,
+            Some(1),
         );
 
         // Attempt to store a network response with a valid depth of

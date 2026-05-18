@@ -1,0 +1,80 @@
+\section{Discussion and Future Work}\label{sec:discussion}
+
+\paragraph{Formal soundness.}
+The most important open piece is a small-step operational semantics
+with a soundness theorem: if a program never uses a poisoned
+reference, never has two overlapping mutable arguments at a call,
+and never returns a reference that does not trace back to a
+parameter, then its reference operations preserve type and memory
+safety. The rules in Sect.~\ref{sec:semantics} are designed to make
+this provable.
+
+\paragraph{Opaque effects.}
+The interface for native functions, closure captures, and
+dynamic-dispatch targets is small but part of the trusted base. An
+opaque operation declares which of its reference arguments each
+returned reference is derived from; the runtime treats the operation
+as a black-box step that produces a fresh child node under that
+argument. This is enough to keep the discipline working at the
+boundary, but correctness then depends on the declared model. A
+natural follow-up is a unified treatment of all three cases together
+with the soundness condition an opaque model must satisfy.
+
+\paragraph{Deployment modes.}
+Because invalidation is a one-way bit, the discipline can be deployed
+in several modes. The most aggressive is \emph{always-on}, useful as
+defense in depth on bytecode whose verifier outcome is not trusted.
+A natural relaxation is \emph{trace-and-replay}: record the relevant
+events during execution and run the check on the recorded trace
+later, in parallel with other work. Production deployments will
+likely mix the two depending on the trust they place in the static
+verifier on each code path.
+
+\paragraph{Limitations.}
+Trusted models can silently break the guarantees if they misdescribe
+an opaque effect. Vector indices collapse to a single abstract label,
+so the discipline cannot distinguish two references into different
+elements of the same vector. And when a violation is detected, the
+runtime reports the event but does not yet emit a derivation trace
+explaining which earlier operation poisoned the reference; such a
+trace would help in debugging.
+
+\section{Related Work}\label{sec:related}
+
+\paragraph{Rust-style static borrow checking.}
+The closest static relative is Rust's borrow checker, whose
+metatheory was given by RustBelt~\cite{rustbelt}. Both target
+stack-allocated state, with no first-class notion of globally-stored
+mutable resources, and the only dynamic borrow check in mainstream
+Rust is \texttt{RefCell}'s local check on a single cell. Move's
+reference-safety rules, in contrast, span locals, globals, and
+mutable cross-frame arguments; our discipline enforces them at
+execution time.
+
+\paragraph{Per-location dynamic alias models.}
+The closest dynamic neighbors are Stacked Borrows~\cite{stackedborrows}
+and Tree Borrows~\cite{treeborrows}. Stacked and Tree Borrows model
+aliasing at memory locations: each location carries a stack or tree
+of borrow tags, and the Miri interpreter checks reads and writes
+against this metadata to detect undefined behavior in Rust. Our
+model tracks references by their access paths rather than by the
+addresses they happen to land on, which matters because Move's
+reference rules include events the per-location view does not
+naturally express---in particular variant mutation, where a write
+to a discriminator invalidates references derived from the prior
+variant's projection. We also treat call boundaries as a first-class
+construct, with subtree locking and parameter-root transport doing
+the work that the static borrow checker does at compile time in
+Rust.
+
+\paragraph{Capabilities, separation, runtime verification.}
+Capability systems~\cite{capabilities} read naturally onto our model:
+a node identity is the capability, and an invalidation is a
+revocation. Access paths play the role of a runtime footprint in the
+sense of separation logic~\cite{seplogic}, though we do not develop
+the logical reading here. The RV literature on monitoring mutable
+state~\cite{rvsurvey} provides the broader backdrop; we specialize
+to one specific monitor, over the hierarchy of reference derivation.
+Move ships with a static reference-safety checker performing abstract
+interpretation over a borrow graph, which the runtime discipline is
+designed to interoperate with.

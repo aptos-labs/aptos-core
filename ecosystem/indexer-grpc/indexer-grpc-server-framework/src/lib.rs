@@ -10,13 +10,14 @@ use figment::{
     providers::{Env, Format, Yaml},
     Figment,
 };
+use opentelemetry::trace::TracerProvider;
 use prometheus::{Encoder, TextEncoder};
 use serde::{de::DeserializeOwned, Deserialize, Serialize};
 #[cfg(target_os = "linux")]
 use std::convert::Infallible;
 use std::{panic::PanicHookInfo, path::PathBuf, process};
 use tracing::error;
-use tracing_subscriber::EnvFilter;
+use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt, EnvFilter, Layer};
 use warp::{http::Response, reply::Reply, Filter};
 
 /// ServerArgs bootstraps a server with all common pieces. And then triggers the run method for
@@ -171,25 +172,81 @@ fn handle_panic(panic_info: &PanicHookInfo<'_>) {
 /// just logs to stdout. This can be overridden using the `make_writer` parameter.
 /// This can be helpful for custom logging, e.g. logging to different files based on
 /// the origin of the logging.
+///
+/// When `OTEL_EXPORTER_OTLP_ENDPOINT` is set, an OpenTelemetry tracing layer is
+/// added that exports spans to the configured OTLP collector (e.g. Jaeger). The
+/// service name is read from `OTEL_SERVICE_NAME`.
 pub fn setup_logging(make_writer: Option<Box<dyn Fn() -> Box<dyn std::io::Write> + Send + Sync>>) {
+    // Apply EnvFilter only to the fmt layer so RUST_LOG controls log verbosity
+    // without suppressing spans from the OpenTelemetry exporter.
     let env_filter = EnvFilter::try_from_default_env()
         .or_else(|_| EnvFilter::try_new("info"))
         .unwrap();
 
-    let subscriber = tracing_subscriber::fmt()
-        .json()
-        .flatten_event(true)
-        .with_file(true)
-        .with_line_number(true)
-        .with_thread_ids(true)
-        .with_target(false)
-        .with_thread_names(true)
-        .with_env_filter(env_filter);
+    let otel_layer = try_init_otel_layer();
+    let registry = tracing_subscriber::registry().with(otel_layer);
 
     match make_writer {
-        Some(w) => subscriber.with_writer(w).init(),
-        None => subscriber.init(),
+        Some(w) => {
+            let fmt_layer = tracing_subscriber::fmt::layer()
+                .json()
+                .flatten_event(true)
+                .with_file(true)
+                .with_line_number(true)
+                .with_thread_ids(true)
+                .with_target(false)
+                .with_thread_names(true)
+                .with_writer(w)
+                .with_filter(env_filter);
+            registry.with(fmt_layer).init();
+        },
+        None => {
+            let fmt_layer = tracing_subscriber::fmt::layer()
+                .json()
+                .flatten_event(true)
+                .with_file(true)
+                .with_line_number(true)
+                .with_thread_ids(true)
+                .with_target(false)
+                .with_thread_names(true)
+                .with_filter(env_filter);
+            registry.with(fmt_layer).init();
+        },
     }
+}
+
+/// Attempt to initialise an OpenTelemetry OTLP exporter layer. Returns `None`
+/// when `OTEL_EXPORTER_OTLP_ENDPOINT` is not set or the pipeline fails to
+/// initialise, so callers can treat OTLP export as opt-in.
+fn try_init_otel_layer() -> Option<
+    tracing_opentelemetry::OpenTelemetryLayer<
+        tracing_subscriber::Registry,
+        opentelemetry_sdk::trace::Tracer,
+    >,
+> {
+    if std::env::var("OTEL_EXPORTER_OTLP_ENDPOINT").is_err() {
+        return None;
+    }
+
+    let exporter = opentelemetry_otlp::SpanExporter::builder()
+        .with_tonic()
+        .build()
+        .ok()?;
+
+    let service_name = std::env::var("OTEL_SERVICE_NAME").unwrap_or_else(|_| "unknown".to_string());
+
+    let provider = opentelemetry_sdk::trace::TracerProvider::builder()
+        .with_batch_exporter(exporter, opentelemetry_sdk::runtime::Tokio)
+        .with_resource(opentelemetry_sdk::Resource::new(vec![
+            opentelemetry::KeyValue::new("service.name", service_name),
+        ]))
+        .build();
+
+    let tracer = provider.tracer("indexer-grpc");
+    // Keep the provider alive for the lifetime of the process so spans are flushed.
+    std::mem::forget(provider);
+
+    Some(tracing_opentelemetry::layer().with_tracer(tracer))
 }
 
 /// Register readiness and liveness probes and set up metrics endpoint.

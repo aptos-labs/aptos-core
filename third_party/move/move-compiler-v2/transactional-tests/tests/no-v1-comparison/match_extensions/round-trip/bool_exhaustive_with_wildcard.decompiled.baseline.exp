@@ -1,0 +1,17 @@
+processed 5 tasks
+task 0 lines 3-12:  publish [module 0xc0ffee::m {]
+warning: Unused value of parameter `p0`. Consider removing the parameter, or prefixing with an underscore (e.g., `_p0`), or binding to `_`
+  ┌─ TEMPFILE:9:35
+  │
+9 │     public fun test_only_wildcard(p0: bool): u8 {
+  │                                   ^^
+
+
+task 1 lines 15-15:  run 0xc0ffee::m::test_bool_wildcard --args true
+return values: 1
+task 2 lines 17-17:  run 0xc0ffee::m::test_bool_wildcard --args false
+return values: 0
+task 3 lines 19-19:  run 0xc0ffee::m::test_only_wildcard --args true
+return values: 42
+task 4 lines 21-21:  run 0xc0ffee::m::test_only_wildcard --args false
+return values: 42

@@ -8,7 +8,7 @@ use crate::{
     gas_schedule::VMGasParameters,
     ver::gas_feature_versions::{
         RELEASE_V1_10, RELEASE_V1_11, RELEASE_V1_12, RELEASE_V1_13, RELEASE_V1_15, RELEASE_V1_26,
-        RELEASE_V1_41,
+        RELEASE_V1_41, RELEASE_V1_45,
     },
 };
 use aptos_gas_algebra::{
@@ -32,7 +32,7 @@ crate::gas_schedule::macros::define_gas_parameters!(
         [
             min_transaction_gas_units: InternalGas,
             "min_transaction_gas_units",
-            2_760_000
+            27_600_000
         ],
         // Any transaction over this size will be charged an additional amount per byte.
         [
@@ -45,11 +45,9 @@ crate::gas_schedule::macros::define_gas_parameters!(
         [
             intrinsic_gas_per_byte: InternalGasPerByte,
             "intrinsic_gas_per_byte",
-            1_158
+            11_580
         ],
-        // ~5 microseconds should equal one unit of computational gas. We bound the maximum
-        // computational time of any given transaction at roughly 20 seconds. We want this number and
-        // `MAX_PRICE_PER_GAS_UNIT` to always satisfy the inequality that
+        // We want this number and `MAX_PRICE_PER_GAS_UNIT` to always satisfy the inequality that
         // MAXIMUM_NUMBER_OF_GAS_UNITS * MAX_PRICE_PER_GAS_UNIT < min(u64::MAX, GasUnits<GasCarrier>::MAX)
         [
             maximum_number_of_gas_units: Gas,
@@ -62,6 +60,12 @@ crate::gas_schedule::macros::define_gas_parameters!(
             min_price_per_gas_unit: FeePerGasUnit,
             "min_price_per_gas_unit",
             aptos_global_constants::GAS_UNIT_PRICE
+        ],
+        [
+            high_limit_txn_min_price_per_gas_unit: FeePerGasUnit,
+            { RELEASE_V1_45.. => "high_limit_txn_min_price_per_gas_unit" },
+            // 10x of the min_price_per_gas_unit (100).
+            1000
         ],
         // The maximum gas unit price that a transaction can be submitted with.
         [
@@ -92,7 +96,7 @@ crate::gas_schedule::macros::define_gas_parameters!(
             // in cache, hence target charging 1-2 4k-sized pages for each read. Notice the cost
             // of seeking for the leaf node is covered by the first page of the "value size fee"
             // (storage_io_per_state_byte_read) defined below.
-            302_385,
+            3_023_850,
         ],
         [
             storage_io_per_state_byte_read: InternalGasPerByte,
@@ -100,7 +104,7 @@ crate::gas_schedule::macros::define_gas_parameters!(
             // Notice in the latest IoPricing, bytes are charged at 4k intervals (even the smallest
             // read will be charged for 4KB) to reflect the assumption that every roughly 4k bytes
             // might require a separate random IO upon the FS.
-            151,
+            1510,
         ],
         [load_data_failure: InternalGas, "load_data.failure", 0],
         // Gas parameters for writing data to storage.
@@ -112,32 +116,32 @@ crate::gas_schedule::macros::define_gas_parameters!(
             // to each transactions assuming they don't touch exactly the same leaves. It's fair to
             // target roughly 1-2 full internal JMT nodes (about 0.5-1KB in total) worth of writes
             // for each write op.
-            89_568,
+            895_680,
         ],
         [
             legacy_write_data_per_new_item: InternalGasPerArg,
             {0..=9 => "write_data.new_item"},
-            1_280_000,
+            12_800_000,
         ],
         [
             storage_io_per_state_byte_write: InternalGasPerByte,
             { 0..=9 => "write_data.per_byte_in_key", 10.. => "storage_io_per_state_byte_write"},
-            89,
+            890,
         ],
         [
             legacy_write_data_per_byte_in_val: InternalGasPerByte,
             { 0..=9 => "write_data.per_byte_in_val" },
-            10_000
+            100_000
         ],
         [
             storage_io_per_event_byte_write: InternalGasPerByte,
             { RELEASE_V1_11.. => "storage_io_per_event_byte_write" },
-            89,
+            890,
         ],
         [
             storage_io_per_transaction_byte_write: InternalGasPerByte,
             { RELEASE_V1_11.. => "storage_io_per_transaction_byte_write" },
-            89,
+            890,
         ],
         [memory_quota: AbstractValueSize, { 1.. => "memory_quota" }, 10_000_000],
         [
@@ -178,74 +182,74 @@ crate::gas_schedule::macros::define_gas_parameters!(
         [
             legacy_storage_fee_per_state_slot_create: FeePerSlot,
             { 7..=13 => "storage_fee_per_state_slot_create", 14.. => "legacy_storage_fee_per_state_slot_create" },
-            50000,
+            500000,
         ],
         [
             storage_fee_per_state_slot: FeePerSlot,
             { 14.. => "storage_fee_per_state_slot" },
-            // 0.8 million APT for 2 billion state slots
-            40_000,
+            // 8 million APT for 2 billion state slots
+            400_000,
         ],
         [
             legacy_storage_fee_per_excess_state_byte: FeePerByte,
             { 7..=13 => "storage_fee_per_excess_state_byte", 14.. => "legacy_storage_fee_per_excess_state_byte" },
-            50,
+            500,
         ],
         [
             storage_fee_per_state_byte: FeePerByte,
             { 14.. => "storage_fee_per_state_byte" },
-            // 0.8 million APT for 2 TB state bytes
-            40,
+            // 8 million APT for 2 TB state bytes
+            400,
         ],
         [
             legacy_storage_fee_per_event_byte: FeePerByte,
             { 7..=13 => "storage_fee_per_event_byte", 14.. => "legacy_storage_fee_per_event_byte" },
-            20,
+            200,
         ],
         [
             legacy_storage_fee_per_transaction_byte: FeePerByte,
             { 7..=13 => "storage_fee_per_transaction_byte", 14.. => "legacy_storage_fee_per_transaction_byte" },
-            20,
+            200,
         ],
         [
             max_execution_gas: InternalGas,
             { 7.. => "max_execution_gas" },
-            920_000_000, // 92ms of execution at 10k gas per ms
+            9_200_000_000, // 92ms of execution at 100k gas per ms
         ],
         [
             max_execution_gas_gov: InternalGas,
             { RELEASE_V1_13.. => "max_execution_gas.gov" },
-            4_000_000_000,
+            40_000_000_000,
         ],
         [
             max_io_gas: InternalGas,
             { 7.. => "max_io_gas" },
-            1_000_000_000, // 100ms of IO at 10k gas per ms
+            10_000_000_000, // 100ms of IO at 100k gas per ms
         ],
         [
             max_io_gas_gov: InternalGas,
             { RELEASE_V1_13.. => "max_io_gas.gov" },
-            2_000_000_000,
+            20_000_000_000,
         ],
         [
             max_storage_fee: Fee,
             { 7.. => "max_storage_fee" },
-            2_0000_0000, // 2 APT
+            20_0000_0000, // 20 APT
         ],
         [
             max_storage_fee_gov: Fee,
             { RELEASE_V1_13.. => "max_storage_fee.gov" },
-            2_0000_0000,
+            20_0000_0000,
         ],
         [
             dependency_per_module: InternalGas,
             { RELEASE_V1_10.. => "dependency_per_module" },
-            74460,
+            744600,
         ],
         [
             dependency_per_byte: InternalGasPerByte,
             { RELEASE_V1_10.. => "dependency_per_byte" },
-            42,
+            420,
         ],
         [
             max_num_dependencies: NumModules,
@@ -260,7 +264,7 @@ crate::gas_schedule::macros::define_gas_parameters!(
         [
             keyless_base_cost: InternalGas,
             { RELEASE_V1_12.. => "keyless.base" },
-            32_000_000,
+            320_000_000,
         ],
         [
             max_ty_size: NumTypeNodes,
@@ -275,12 +279,24 @@ crate::gas_schedule::macros::define_gas_parameters!(
         [
             max_aa_gas: Gas,
             { RELEASE_V1_26.. => "max_aa_gas" },
-            60,
+            600,
         ],
         [
             slh_dsa_sha2_128s_base_cost: InternalGas,
             { RELEASE_V1_41.. => "slh_dsa_sha2_128s.base" },
-            13_800_000,
+            138_000_000,
+        ],
+        [
+            encrypted_txn_decryption_base_cost: InternalGas,
+            { RELEASE_V1_45.. => "encrypted_txn_decryption.base" },
+            // 120ms e2e decryption latency amortized over 32 txns * 100M internal gas/ms.
+            // The per-block max is 64 encrypted txns, so we assume a half-full block.
+            375_000_000,
+        ],
+        [
+            encrypted_txn_min_price_per_gas_unit: FeePerGasUnit,
+            { RELEASE_V1_45.. => "encrypted_txn_min_price_per_gas_unit" },
+            200,  // 2x the current min_price_per_gas_unit (100)
         ],
     ]
 );
@@ -313,5 +329,37 @@ impl TransactionGasParameters {
 impl ToUnitWithParams<TransactionGasParameters, InternalGasUnit> for GasUnit {
     fn multiplier(params: &TransactionGasParameters) -> u64 {
         params.scaling_factor().into()
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::InitialGasSchedule;
+
+    /// Encrypted transactions must pay at least 2x the base minimum gas unit price
+    /// to reflect their block priority. If governance raises `min_price_per_gas_unit`
+    /// without bumping `encrypted_txn_min_price_per_gas_unit` proportionally, the
+    /// encrypted premium collapses.
+    ///
+    /// In test builds `aptos_global_constants::GAS_UNIT_PRICE` is `0`, so comparing against
+    /// `TransactionGasParameters::initial().min_price_per_gas_unit` directly would make this
+    /// check trivially pass. Instead we simulate mainnet by overriding `min_price_per_gas_unit`
+    /// with its prod value (100) and verify the invariant.
+    #[test]
+    fn encrypted_min_price_is_at_least_2x_base_min_price() {
+        const MAINNET_MIN_PRICE_PER_GAS_UNIT: u64 = 100;
+
+        let mut params = TransactionGasParameters::initial();
+        params.min_price_per_gas_unit = MAINNET_MIN_PRICE_PER_GAS_UNIT.into();
+
+        let base: u64 = u64::from(params.min_price_per_gas_unit);
+        let encrypted: u64 = u64::from(params.encrypted_txn_min_price_per_gas_unit);
+        assert!(
+            encrypted >= base.saturating_mul(2),
+            "encrypted_txn_min_price_per_gas_unit ({}) must be at least 2x min_price_per_gas_unit ({})",
+            encrypted,
+            base,
+        );
     }
 }

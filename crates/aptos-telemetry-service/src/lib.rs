@@ -210,6 +210,7 @@ impl AptosTelemetryServiceArgs {
                     bigquery_client: cc_bigquery_client,
                     peer_identities: cc_config.peer_identities.clone(),
                     blacklist_peers: cc_config.blacklist_peers.clone(),
+                    extra_labels: cc_config.extra_labels.clone(),
                 });
             }
 
@@ -921,6 +922,12 @@ pub struct CustomContractConfig {
     /// Applies to metrics, logs, and events endpoints for this contract.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub blacklist_peers: Option<HashSet<PeerId>>,
+
+    /// Extra labels to attach to all telemetry from this contract.
+    /// Maps label name to label value (e.g., chain_name: "testnet").
+    /// These are appended to metrics extra_labels, log tags, and BigQuery event params.
+    #[serde(default, skip_serializing_if = "HashMap::is_empty")]
+    pub extra_labels: HashMap<String, String>,
 }
 
 impl CustomContractConfig {

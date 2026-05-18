@@ -6,6 +6,7 @@ use crate::{
         common::{
             error::Error,
             logging::{LogEntry, LogSchema},
+            metrics,
         },
         network::observer_message::{BlockPayload, CommitDecision, OrderedBlock},
         observer::{
@@ -25,7 +26,7 @@ use aptos_consensus_types::{
 };
 use aptos_executor_types::state_compute_result::StateComputeResult;
 use aptos_infallible::Mutex;
-use aptos_logger::{info, warn};
+use aptos_logger::{debug, warn};
 use aptos_storage_interface::DbReader;
 use aptos_types::{
     block_info::{BlockInfo, Round},
@@ -205,15 +206,21 @@ impl ObserverBlockData {
         // the new ledger info round is greater than the current root
         // round. Otherwise, this can race with the state sync process.
         if ledger_info.commit_info().round() > root_commit_info.round() {
-            info!(
-            LogSchema::new(LogEntry::ConsensusObserver).message(&format!(
-                "Updating the root ledger info! Old root: (epoch: {:?}, round: {:?}). New root: (epoch: {:?}, round: {:?})",
-                root_commit_info.epoch(),
-                root_commit_info.round(),
-                ledger_info.commit_info().epoch(),
-                ledger_info.commit_info().round(),
-            ))
-        );
+            let new_commit_info = ledger_info.commit_info();
+            debug!(
+                LogSchema::new(LogEntry::ConsensusObserver).message(&format!(
+                    "Updating the root ledger info! Old root: (epoch: {:?}, round: {:?}). New root: (epoch: {:?}, round: {:?})",
+                    root_commit_info.epoch(),
+                    root_commit_info.round(),
+                    new_commit_info.epoch(),
+                    new_commit_info.round(),
+                ))
+            );
+            metrics::set_gauge_with_label(
+                &metrics::OBSERVER_ROOT_LEDGER_INFO_ROUND,
+                metrics::COMMITTED_BLOCKS_LABEL,
+                new_commit_info.round(),
+            );
             self.root = ledger_info;
         }
     }

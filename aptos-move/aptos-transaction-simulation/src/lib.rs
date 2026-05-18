@@ -31,9 +31,7 @@ mod state_store;
 pub use account::{
     Account, AccountData, AccountPublicKey, CoinStore, FungibleStore, TransactionBuilder,
 };
-pub use genesis::{
-    GENESIS_CHANGE_SET_HEAD, GENESIS_CHANGE_SET_MAINNET, GENESIS_CHANGE_SET_TESTNET,
-};
+pub use genesis::GENESIS_CHANGE_SET_HEAD;
 pub use state_store::{
     DeltaStateStore, EitherStateView, EmptyStateView, InMemoryStateStore, SimulationStateStore,
 };

@@ -8,10 +8,7 @@ use crate::{
         metadata::{ConnectionState, PeerMetadata},
         storage::PeersAndMetadata,
     },
-    peer_manager::{
-        ConnectionNotification, ConnectionRequestSender, PeerManagerRequest,
-        PeerManagerRequestSender,
-    },
+    peer_manager::{ConnectionRequestSender, PeerManagerRequest, PeerManagerRequestSender},
     protocols::{
         network::{
             Event, NetworkEvents, NetworkSender, NewNetworkEvents, NewNetworkSender,
@@ -38,11 +35,10 @@ use std::{
     collections::{HashMap, HashSet},
     fmt::Debug,
     hash::Hash,
-    ops::Deref,
     sync::Arc,
     time::Duration,
 };
-use tokio::{sync::mpsc::error::TryRecvError, time::timeout};
+use tokio::time::timeout;
 
 // Useful test constants for timeouts
 const MAX_CHANNEL_TIMEOUT_SECS: u64 = 1;
@@ -436,107 +432,66 @@ fn test_peers_and_metadata_caching() {
 }
 
 #[tokio::test]
-async fn test_peers_and_metadata_subscriptions() {
+async fn test_peers_and_metadata_connection_tracking() {
     // Create the peers and metadata container
     let network_ids = vec![NetworkId::Validator, NetworkId::Vfn];
     let peers_and_metadata = PeersAndMetadata::new(&network_ids);
 
-    let mut connection_events = peers_and_metadata.subscribe();
+    // Initially no peers
+    let connected = peers_and_metadata
+        .get_connected_peers_and_metadata()
+        .unwrap();
+    assert!(connected.is_empty());
 
-    match connection_events.try_recv() {
-        Ok(unwanted_event) => {
-            panic!(
-                "connection_events should be empty but got {:?}",
-                unwanted_event,
-            )
-        },
-        Err(tre) => match tre {
-            TryRecvError::Empty => {
-                // ok
-            },
-            TryRecvError::Disconnected => {
-                panic!("connection_events disconnected early")
-            },
-        },
-    }
-
+    // Add a peer
     let (peer_network_id_1, connection_1) = create_peer_and_connection(
         NetworkId::Validator,
         vec![ProtocolId::MempoolDirectSend, ProtocolId::StorageServiceRpc],
         peers_and_metadata.clone(),
     );
-    match tokio::time::timeout(Duration::from_secs(1), connection_events.recv()).await {
-        Ok(msg) => match msg {
-            None => {
-                panic!("no pending connection event")
-            },
-            Some(notif) => match notif {
-                ConnectionNotification::NewPeer(conn_meta, network_id) => {
-                    assert_eq!(network_id, NetworkId::Validator);
-                    assert_eq!(conn_meta, connection_1);
-                },
-                ConnectionNotification::LostPeer(_, _) => {
-                    panic!("should get connect but got lost")
-                },
-            },
-        },
-        Err(te) => {
-            panic!("timeout waiting for connection event: {:?}", te);
-        },
-    }
 
-    // new subscripton should immediately get notified of existing connection
-    let mut sub2 = peers_and_metadata.subscribe();
-    match sub2.try_recv() {
-        Ok(notif) => match notif {
-            ConnectionNotification::NewPeer(conn_meta, network_id) => {
-                assert_eq!(network_id, NetworkId::Validator);
-                assert_eq!(conn_meta, connection_1);
-            },
-            ConnectionNotification::LostPeer(_, _) => {
-                panic!("should get connect but got lost");
-            },
-        },
-        Err(_) => {
-            panic!("should have pending NewPeer");
-        },
-    }
-    // but not more than that
-    match sub2.try_recv() {
-        Ok(unwanted_event) => {
-            panic!(
-                "connection_events should be empty but got {:?}",
-                unwanted_event,
-            )
-        },
-        Err(tre) => match tre {
-            TryRecvError::Empty => {
-                // ok
-            },
-            TryRecvError::Disconnected => {
-                panic!("connection_events disconnected early")
-            },
-        },
-    }
-    sub2.close();
+    // Verify peer is now connected
+    let connected = peers_and_metadata
+        .get_connected_peers_and_metadata()
+        .unwrap();
+    assert_eq!(connected.len(), 1);
+    assert!(connected.contains_key(&peer_network_id_1));
+    assert_eq!(
+        connected
+            .get(&peer_network_id_1)
+            .unwrap()
+            .get_connection_metadata()
+            .clone(),
+        connection_1
+    );
 
+    // Add another peer
+    let (peer_network_id_2, _) = create_peer_and_connection(
+        NetworkId::Vfn,
+        vec![ProtocolId::StorageServiceRpc],
+        peers_and_metadata.clone(),
+    );
+
+    // Verify both peers are connected
+    let connected = peers_and_metadata
+        .get_connected_peers_and_metadata()
+        .unwrap();
+    assert_eq!(connected.len(), 2);
+    assert!(connected.contains_key(&peer_network_id_1));
+    assert!(connected.contains_key(&peer_network_id_2));
+
+    // Remove first peer
     peers_and_metadata
         .remove_peer_metadata(peer_network_id_1, connection_1.connection_id)
         .unwrap();
-    match connection_events.try_recv() {
-        Ok(notif) => match notif {
-            ConnectionNotification::NewPeer(_, _) => {
-                panic!("expecting lost but got new")
-            },
-            ConnectionNotification::LostPeer(conn_meta, network_id) => {
-                assert_eq!(network_id, NetworkId::Validator);
-                assert_eq!(conn_meta, connection_1);
-            },
-        },
-        Err(_tre) => {
-            panic!("no pending connection event")
-        },
-    }
+
+    // Verify only second peer remains
+    let connected = peers_and_metadata
+        .get_connected_peers_and_metadata()
+        .unwrap();
+    assert_eq!(connected.len(), 1);
+    assert!(connected.contains_key(&peer_network_id_2));
+    assert!(!connected.contains_key(&peer_network_id_1));
 }
 
 #[test]
@@ -1149,24 +1104,36 @@ fn verify_internal_map_states(
     let (peers_and_metadata, trusted_peers, cached_peers_and_metadata) =
         peers_and_metadata.get_all_internal_maps();
 
+    // Convert expected maps to Arc-wrapped versions for comparison
+    let expected_arc_peers: HashMap<PeerId, std::sync::Arc<PeerMetadata>> =
+        expected_peers_and_metadata
+            .into_iter()
+            .map(|(k, v)| (k, std::sync::Arc::new(v)))
+            .collect();
+    let expected_arc_cached: HashMap<PeerId, std::sync::Arc<PeerMetadata>> =
+        expected_cached_peers_and_metadata
+            .into_iter()
+            .map(|(k, v)| (k, std::sync::Arc::new(v)))
+            .collect();
+
     // Verify the states of the internal maps
     for network_id in network_ids {
         // Verify the peers and metadata
         assert_eq!(
             peers_and_metadata.get(network_id).unwrap(),
-            &expected_peers_and_metadata
+            &expected_arc_peers
         );
 
         // Verify the trusted peers
         let trusted_peers_for_network = trusted_peers.get(network_id).unwrap();
-        let trusted_peers = trusted_peers_for_network.load().clone().deref().clone();
+        let trusted_peers = (**trusted_peers_for_network.load()).clone();
         assert_eq!(trusted_peers, expected_trusted_peers.clone());
 
         // Verify the cached peers and metadata
-        let cached_peers_and_metadata = cached_peers_and_metadata.load().clone().deref().clone();
+        let cached_peers_and_metadata = (**cached_peers_and_metadata.load()).clone();
         assert_eq!(
             cached_peers_and_metadata.get(network_id).unwrap(),
-            &expected_cached_peers_and_metadata,
+            &expected_arc_cached,
         );
     }
 }

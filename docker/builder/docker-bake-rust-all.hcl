@@ -22,13 +22,18 @@ variable "BUILT_VIA_BUILDKIT" {}
 
 variable "GCP_DOCKER_ARTIFACT_REPO" {}
 
-variable "AWS_ECR_ACCOUNT_NUM" {}
+// NOTE: AWS ECR publishing has been disabled. Variables kept for reference.
+variable "AWS_ECR_ACCOUNT_NUM" {
+  default = ""
+}
 
 variable "TARGET_REGISTRY" {
   // must be "gcp" | "local" | "remote-all" | "remote" (deprecated, but kept for backwards compatibility. Same as "gcp"), informs which docker tags are being generated
+  // NOTE: "remote-all" no longer publishes to ECR (now behaves same as "gcp"/"remote")
   default = CI == "true" ? "remote" : "local"
 }
 
+// ECR base URL kept for reference (no longer used)
 variable "ecr_base" {
   default = "${AWS_ECR_ACCOUNT_NUM}.dkr.ecr.us-west-2.amazonaws.com/aptos"
 }
@@ -68,7 +73,7 @@ target "debian-base" {
   dockerfile = "docker/builder/debian-base.Dockerfile"
   contexts = {
     # Run `docker buildx imagetools inspect debian:trixie` to find the latest multi-platform hash
-    debian = "docker-image://debian:trixie@sha256:2c91e484d93f0830a7e05a2b9d92a7b102be7cab562198b984a84fdbc7806d91"
+    debian = "docker-image://debian:trixie@sha256:3352c2e13876c8a5c5873ef20870e1939e73cb9a3c1aeba5e3e72172a85ce9ed"
   }
 }
 
@@ -77,8 +82,8 @@ target "builder-base" {
   target     = "builder-base"
   context    = "."
   contexts = {
-    # Run `docker buildx imagetools inspect rust:1.91.0-trixie` to find the latest multi-platform hash
-    rust = "docker-image://rust:1.91.0-trixie@sha256:a0dba1c1b2c90585fc44421b55ddf8063323760dc644ba1d35f5b389ad3e8e14"
+    # Run `docker buildx imagetools inspect rust:1.93.1-trixie` to find the latest multi-platform hash
+    rust = "docker-image://rust:1.93.1-trixie@sha256:ecbe59a8408895edd02d9ef422504b8501dd9fa1526de27a45b73406d734d659"
   }
   args = {
     PROFILE            = "${PROFILE}"
@@ -230,18 +235,15 @@ target "nft-metadata-crawler" {
 
 function "generate_tags" {
   params = [target]
-  result = TARGET_REGISTRY == "remote-all" ? [
+  // NOTE: ECR publishing has been disabled. "remote-all" now behaves same as "gcp"/"remote".
+  // ECR tags kept as reference (previously included when TARGET_REGISTRY == "remote-all"):
+  //   "${ecr_base}/${target}:${IMAGE_TAG_PREFIX}${GIT_SHA}",
+  //   "${ecr_base}/${target}:${IMAGE_TAG_PREFIX}${NORMALIZED_GIT_BRANCH_OR_PR}",
+  result = TARGET_REGISTRY == "remote-all" || TARGET_REGISTRY == "gcp" || TARGET_REGISTRY == "remote" ? [
     "${GCP_DOCKER_ARTIFACT_REPO}/${target}:${IMAGE_TAG_PREFIX}${GIT_SHA}",
     "${GCP_DOCKER_ARTIFACT_REPO}/${target}:${IMAGE_TAG_PREFIX}${NORMALIZED_GIT_BRANCH_OR_PR}",
-    "${ecr_base}/${target}:${IMAGE_TAG_PREFIX}${GIT_SHA}",
-    "${ecr_base}/${target}:${IMAGE_TAG_PREFIX}${NORMALIZED_GIT_BRANCH_OR_PR}",
-    ] : (
-    TARGET_REGISTRY == "gcp" || TARGET_REGISTRY == "remote" ? [
-      "${GCP_DOCKER_ARTIFACT_REPO}/${target}:${IMAGE_TAG_PREFIX}${GIT_SHA}",
-      "${GCP_DOCKER_ARTIFACT_REPO}/${target}:${IMAGE_TAG_PREFIX}${NORMALIZED_GIT_BRANCH_OR_PR}",
-      ] : [ // "local" or any other value
-      "aptos-core/${target}:${IMAGE_TAG_PREFIX}${GIT_SHA}-from-local",
-      "aptos-core/${target}:${IMAGE_TAG_PREFIX}from-local",
-    ]
-  )
+    ] : [ // "local" or any other value
+    "aptos-core/${target}:${IMAGE_TAG_PREFIX}${GIT_SHA}-from-local",
+    "aptos-core/${target}:${IMAGE_TAG_PREFIX}from-local",
+  ]
 }

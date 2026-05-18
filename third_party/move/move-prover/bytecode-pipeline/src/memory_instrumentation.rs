@@ -1,6 +1,7 @@
-// Copyright (c) The Diem Core Contributors
-// Copyright (c) The Move Contributors
-// SPDX-License-Identifier: Apache-2.0
+// Parts of the file are Copyright (c) The Diem Core Contributors
+// Parts of the file are Copyright (c) The Move Contributors
+// Parts of the file are Copyright (c) Aptos Foundation
+// All Aptos Foundation code and content is licensed pursuant to the Innovation-Enabling Source Code License, available at https://github.com/aptos-labs/aptos-core/blob/main/LICENSE
 
 use move_binary_format::file_format::CodeOffset;
 use move_model::{
@@ -38,7 +39,7 @@ impl FunctionTargetProcessor for MemoryInstrumentationProcessor {
         mut data: FunctionData,
         _scc_opt: Option<&[FunctionEnv]>,
     ) -> FunctionData {
-        if func_env.is_native_or_intrinsic() {
+        if func_env.no_verified_bytecode() {
             return data;
         }
         let borrow_annotation = data
@@ -215,6 +216,7 @@ impl<'a> Instrumenter<'a> {
             | Fun(..)
             | TypeDomain(_)
             | ResourceDomain(_, _, _)
+            | StateDomain
             | Error
             | Var(_) => false,
         }

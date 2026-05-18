@@ -81,22 +81,9 @@ fn log_config_and_build_information(node_config: &NodeConfig) {
         "consensus-only-perf-test",
         "default",
         "failpoints",
-        "indexer",
         "tokio-console"
     );
 
     // Log the node config
-    let mut config = node_config;
-    let mut masked_config;
-    if let Some(u) = &node_config.indexer.postgres_uri {
-        let mut parsed_url = url::Url::parse(u).expect("Invalid postgres uri");
-        if parsed_url.password().is_some() {
-            masked_config = node_config.clone();
-            parsed_url.set_password(Some("*")).unwrap();
-            masked_config.indexer.postgres_uri = Some(parsed_url.to_string());
-            config = &masked_config;
-        }
-    }
-
-    info!("Loaded node config: {:?}", config);
+    info!("Loaded node config: {:?}", node_config);
 }

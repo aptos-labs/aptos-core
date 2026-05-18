@@ -1,0 +1,795 @@
+//**** Cross-compiled for `move` syntax from `tests/no-v1-comparison/match_extensions/literals_within_enum_patterns.move`
+
+//# publish
+module 0xc0ffee::m {
+    enum E1 has drop {
+        V1 {
+            _0: u64,
+        }
+        V2,
+    }
+    enum E2 has drop {
+        V1 {
+            x: u64,
+        }
+        V2,
+    }
+    enum Inner has drop {
+        A {
+            _0: u64,
+        }
+        B,
+    }
+    enum Outer has drop {
+        W {
+            _0: Inner,
+        }
+        X,
+    }
+    enum Pair has drop {
+        P {
+            _0: u64,
+            _1: u64,
+        }
+        Q,
+    }
+    enum PairNamed has drop {
+        P {
+            a: u64,
+            b: u64,
+        }
+        Q,
+    }
+    struct S has drop {
+        x: u64,
+        y: u64,
+    }
+    struct Wrap has drop {
+        inner: Inner,
+        tag: u64,
+    }
+    public fun test_deep_nested_hit(): u64 {
+        let _v0 = Outer::W{_0: Inner::A{_0: 1}};
+        let _v1 = &_v0;
+        loop {
+            if (_v1 is W) {
+                let _v2 = &_v1._0;
+                if (_v2 is A) {
+                    if (*&_v2._0 == 1) break}
+            };
+            loop {
+                if (!(_v1 is W)) {
+                    if (_v1 is X) break;
+                    abort 14566554180833181697
+                };
+                let Outer::W{_0: _v3} = _v0;
+                return 20
+            };
+            let Outer::X{} = _v0;
+            return 30
+        };
+        let Outer::W{_0: _v4} = _v0;
+        let Inner::A{_0: _v5} = _v4;
+        10
+    }
+    public fun test_deep_nested_inner_miss(): u64 {
+        let _v0 = Outer::W{_0: Inner::A{_0: 99}};
+        let _v1 = &_v0;
+        loop {
+            if (_v1 is W) {
+                let _v2 = &_v1._0;
+                if (_v2 is A) {
+                    if (*&_v2._0 == 1) break}
+            };
+            loop {
+                if (!(_v1 is W)) {
+                    if (_v1 is X) break;
+                    abort 14566554180833181697
+                };
+                let Outer::W{_0: _v3} = _v0;
+                return 20
+            };
+            let Outer::X{} = _v0;
+            return 30
+        };
+        let Outer::W{_0: _v4} = _v0;
+        let Inner::A{_0: _v5} = _v4;
+        10
+    }
+    public fun test_deep_struct_hit(): u64 {
+        let _v0 = Wrap{inner: Inner::A{_0: 1}, tag: 42};
+        let _v1 = &_v0;
+        let _v2 = &_v1.inner;
+        let _v3 = &_v1.tag;
+        loop {
+            if (_v2 is A) {
+                let _v4;
+                if (*&_v2._0 == 1) _v4 = *_v3 == 42 else _v4 = false;
+                if (_v4) break
+            };
+            let _v5 = &_v1.inner is A;
+            loop {
+                if (!_v5) {
+                    if (&_v1.inner is B) break;
+                    abort 14566554180833181697
+                };
+                let Wrap{inner: _v6, tag: _v7} = _v0;
+                let Inner::A{_0: _v8} = _v6;
+                return 200
+            };
+            let Wrap{inner: _v9, tag: _v10} = _v0;
+            let Inner::B{} = _v9;
+            return 300
+        };
+        let Wrap{inner: _v11, tag: _v12} = _v0;
+        let Inner::A{_0: _v13} = _v11;
+        100
+    }
+    public fun test_deep_struct_miss_inner(): u64 {
+        let _v0 = Wrap{inner: Inner::A{_0: 99}, tag: 42};
+        let _v1 = &_v0;
+        let _v2 = &_v1.inner;
+        let _v3 = &_v1.tag;
+        loop {
+            if (_v2 is A) {
+                let _v4;
+                if (*&_v2._0 == 1) _v4 = *_v3 == 42 else _v4 = false;
+                if (_v4) break
+            };
+            let _v5 = &_v1.inner is A;
+            loop {
+                if (!_v5) {
+                    if (&_v1.inner is B) break;
+                    abort 14566554180833181697
+                };
+                let Wrap{inner: _v6, tag: _v7} = _v0;
+                let Inner::A{_0: _v8} = _v6;
+                return 200
+            };
+            let Wrap{inner: _v9, tag: _v10} = _v0;
+            let Inner::B{} = _v9;
+            return 300
+        };
+        let Wrap{inner: _v11, tag: _v12} = _v0;
+        let Inner::A{_0: _v13} = _v11;
+        100
+    }
+    public fun test_deep_struct_miss_tag(): u64 {
+        let _v0 = Wrap{inner: Inner::A{_0: 1}, tag: 99};
+        let _v1 = &_v0;
+        let _v2 = &_v1.inner;
+        let _v3 = &_v1.tag;
+        loop {
+            if (_v2 is A) {
+                let _v4;
+                if (*&_v2._0 == 1) _v4 = *_v3 == 42 else _v4 = false;
+                if (_v4) break
+            };
+            let _v5 = &_v1.inner is A;
+            loop {
+                if (!_v5) {
+                    if (&_v1.inner is B) break;
+                    abort 14566554180833181697
+                };
+                let Wrap{inner: _v6, tag: _v7} = _v0;
+                let Inner::A{_0: _v8} = _v6;
+                return 200
+            };
+            let Wrap{inner: _v9, tag: _v10} = _v0;
+            let Inner::B{} = _v9;
+            return 300
+        };
+        let Wrap{inner: _v11, tag: _v12} = _v0;
+        let Inner::A{_0: _v13} = _v11;
+        100
+    }
+    public fun test_guard_named_fail(): u64 {
+        let _v0 = E2::V1{x: 1};
+        let _v1 = &_v0;
+        loop {
+            if (_v1 is V1) {
+                let _v2;
+                if (*&_v1.x == 1) _v2 = false else _v2 = false;
+                if (_v2) break
+            };
+            loop {
+                if (!(_v1 is V1)) {
+                    if (_v1 is V2) break;
+                    abort 14566554180833181697
+                };
+                let E2::V1{x: _v3} = _v0;
+                return 60
+            };
+            let E2::V2{} = _v0;
+            return 70
+        };
+        let E2::V1{x: _v4} = _v0;
+        50
+    }
+    public fun test_guard_named_pass(): u64 {
+        let _v0 = E2::V1{x: 1};
+        let _v1 = &_v0;
+        loop {
+            if (_v1 is V1) {
+                let _v2;
+                if (*&_v1.x == 1) _v2 = true else _v2 = false;
+                if (_v2) break
+            };
+            loop {
+                if (!(_v1 is V1)) {
+                    if (_v1 is V2) break;
+                    abort 14566554180833181697
+                };
+                let E2::V1{x: _v3} = _v0;
+                return 60
+            };
+            let E2::V2{} = _v0;
+            return 70
+        };
+        let E2::V1{x: _v4} = _v0;
+        50
+    }
+    public fun test_guard_pos_fail(): u64 {
+        let _v0 = E1::V1{_0: 1};
+        let _v1 = &_v0;
+        loop {
+            if (_v1 is V1) {
+                let _v2;
+                if (*&_v1._0 == 1) _v2 = false else _v2 = false;
+                if (_v2) break
+            };
+            loop {
+                if (!(_v1 is V1)) {
+                    if (_v1 is V2) break;
+                    abort 14566554180833181697
+                };
+                let E1::V1{_0: _v3} = _v0;
+                return 60
+            };
+            let E1::V2{} = _v0;
+            return 70
+        };
+        let E1::V1{_0: _v4} = _v0;
+        50
+    }
+    public fun test_guard_pos_pass(): u64 {
+        let _v0 = E1::V1{_0: 1};
+        let _v1 = &_v0;
+        loop {
+            if (_v1 is V1) {
+                let _v2;
+                if (*&_v1._0 == 1) _v2 = true else _v2 = false;
+                if (_v2) break
+            };
+            loop {
+                if (!(_v1 is V1)) {
+                    if (_v1 is V2) break;
+                    abort 14566554180833181697
+                };
+                let E1::V1{_0: _v3} = _v0;
+                return 60
+            };
+            let E1::V2{} = _v0;
+            return 70
+        };
+        let E1::V1{_0: _v4} = _v0;
+        50
+    }
+    public fun test_mix_named(): u64 {
+        let _v0 = PairNamed::P{a: 5, b: 2};
+        let _v1 = &_v0;
+        loop {
+            if (_v1 is P) {
+                if (*&_v1.b == 2) break};
+            loop {
+                if (!(_v1 is P)) {
+                    if (_v1 is Q) break;
+                    abort 14566554180833181697
+                };
+                let PairNamed::P{a: _v2, b: _v3} = _v0;
+                return 20
+            };
+            let PairNamed::Q{} = _v0;
+            return 30
+        };
+        let PairNamed::P{a: _v4, b: _v5} = _v0;
+        _v4 + 100
+    }
+    public fun test_mix_named_miss(): u64 {
+        let _v0 = PairNamed::P{a: 5, b: 99};
+        let _v1 = &_v0;
+        loop {
+            if (_v1 is P) {
+                if (*&_v1.b == 2) break};
+            loop {
+                if (!(_v1 is P)) {
+                    if (_v1 is Q) break;
+                    abort 14566554180833181697
+                };
+                let PairNamed::P{a: _v2, b: _v3} = _v0;
+                return 20
+            };
+            let PairNamed::Q{} = _v0;
+            return 30
+        };
+        let PairNamed::P{a: _v4, b: _v5} = _v0;
+        _v4 + 100
+    }
+    public fun test_mix_pos(): u64 {
+        let _v0 = Pair::P{_0: 5, _1: 2};
+        let _v1 = &_v0;
+        loop {
+            if (_v1 is P) {
+                if (*&_v1._1 == 2) break};
+            loop {
+                if (!(_v1 is P)) {
+                    if (_v1 is Q) break;
+                    abort 14566554180833181697
+                };
+                let Pair::P{_0: _v2, _1: _v3} = _v0;
+                return 20
+            };
+            let Pair::Q{} = _v0;
+            return 30
+        };
+        let Pair::P{_0: _v4, _1: _v5} = _v0;
+        _v4 + 100
+    }
+    public fun test_mix_pos_miss(): u64 {
+        let _v0 = Pair::P{_0: 5, _1: 99};
+        let _v1 = &_v0;
+        loop {
+            if (_v1 is P) {
+                if (*&_v1._1 == 2) break};
+            loop {
+                if (!(_v1 is P)) {
+                    if (_v1 is Q) break;
+                    abort 14566554180833181697
+                };
+                let Pair::P{_0: _v2, _1: _v3} = _v0;
+                return 20
+            };
+            let Pair::Q{} = _v0;
+            return 30
+        };
+        let Pair::P{_0: _v4, _1: _v5} = _v0;
+        _v4 + 100
+    }
+    public fun test_mixed_tuple_enum_hit(): u64 {
+        let _v0 = E1::V1{_0: 1};
+        let _v1 = &_v0;
+        loop {
+            if (_v1 is V1) {
+                if (*&_v1._0 == 1) break};
+            loop {
+                if (!(_v1 is V1)) {
+                    if (_v1 is V2) break;
+                    abort 14566554180833181697
+                };
+                let E1::V1{_0: _v2} = _v0;
+                return 20
+            };
+            let E1::V2{} = _v0;
+            return 30
+        };
+        let E1::V1{_0: _v3} = _v0;
+        10
+    }
+    public fun test_mixed_tuple_enum_miss_prim(): u64 {
+        let _v0 = E1::V1{_0: 1};
+        let _v1 = &_v0;
+        loop {
+            if (_v1 is V1) {
+                let _v2 = &_v1._0;
+                if (false) break
+            };
+            loop {
+                if (!(_v1 is V1)) {
+                    if (_v1 is V2) break;
+                    abort 14566554180833181697
+                };
+                let E1::V1{_0: _v3} = _v0;
+                return 20
+            };
+            let E1::V2{} = _v0;
+            return 30
+        };
+        let E1::V1{_0: _v4} = _v0;
+        10
+    }
+    public fun test_mixed_tuple_enum_miss_slit(): u64 {
+        let _v0 = E1::V1{_0: 42};
+        let _v1 = &_v0;
+        loop {
+            if (_v1 is V1) {
+                if (*&_v1._0 == 1) break};
+            loop {
+                if (!(_v1 is V1)) {
+                    if (_v1 is V2) break;
+                    abort 14566554180833181697
+                };
+                let E1::V1{_0: _v2} = _v0;
+                return 20
+            };
+            let E1::V2{} = _v0;
+            return 30
+        };
+        let E1::V1{_0: _v3} = _v0;
+        10
+    }
+    public fun test_mixed_tuple_struct_hit(): u64 {
+        let _v0 = S{x: 1, y: 5};
+        if (*&(&_v0).x == 1) {
+            let S{x: _v1, y: _v2} = _v0;
+            return _v2 + 100
+        };
+        let S{x: _v3, y: _v4} = _v0;
+        0
+    }
+    public fun test_mixed_tuple_struct_miss(): u64 {
+        let _v0 = S{x: 99, y: 5};
+        if (*&(&_v0).x == 1) {
+            let S{x: _v1, y: _v2} = _v0;
+            return _v2 + 100
+        };
+        let S{x: _v3, y: _v4} = _v0;
+        0
+    }
+    public fun test_multi_named_hit(): u64 {
+        let _v0 = PairNamed::P{a: 1, b: 2};
+        let _v1 = &_v0;
+        loop {
+            if (_v1 is P) {
+                let _v2;
+                let _v3 = &_v1.a;
+                let _v4 = &_v1.b;
+                if (*_v3 == 1) _v2 = *_v4 == 2 else _v2 = false;
+                if (_v2) break
+            };
+            loop {
+                if (!(_v1 is P)) {
+                    if (_v1 is Q) break;
+                    abort 14566554180833181697
+                };
+                let PairNamed::P{a: _v5, b: _v6} = _v0;
+                return 20
+            };
+            let PairNamed::Q{} = _v0;
+            return 30
+        };
+        let PairNamed::P{a: _v7, b: _v8} = _v0;
+        10
+    }
+    public fun test_multi_named_partial(): u64 {
+        let _v0 = PairNamed::P{a: 1, b: 99};
+        let _v1 = &_v0;
+        loop {
+            if (_v1 is P) {
+                let _v2;
+                let _v3 = &_v1.a;
+                let _v4 = &_v1.b;
+                if (*_v3 == 1) _v2 = *_v4 == 2 else _v2 = false;
+                if (_v2) break
+            };
+            loop {
+                if (!(_v1 is P)) {
+                    if (_v1 is Q) break;
+                    abort 14566554180833181697
+                };
+                let PairNamed::P{a: _v5, b: _v6} = _v0;
+                return 20
+            };
+            let PairNamed::Q{} = _v0;
+            return 30
+        };
+        let PairNamed::P{a: _v7, b: _v8} = _v0;
+        10
+    }
+    public fun test_multi_pos_hit(): u64 {
+        let _v0 = Pair::P{_0: 1, _1: 2};
+        let _v1 = &_v0;
+        loop {
+            if (_v1 is P) {
+                let _v2;
+                let _v3 = &_v1._0;
+                let _v4 = &_v1._1;
+                if (*_v3 == 1) _v2 = *_v4 == 2 else _v2 = false;
+                if (_v2) break
+            };
+            loop {
+                if (!(_v1 is P)) {
+                    if (_v1 is Q) break;
+                    abort 14566554180833181697
+                };
+                let Pair::P{_0: _v5, _1: _v6} = _v0;
+                return 20
+            };
+            let Pair::Q{} = _v0;
+            return 30
+        };
+        let Pair::P{_0: _v7, _1: _v8} = _v0;
+        10
+    }
+    public fun test_multi_pos_partial(): u64 {
+        let _v0 = Pair::P{_0: 1, _1: 99};
+        let _v1 = &_v0;
+        loop {
+            if (_v1 is P) {
+                let _v2;
+                let _v3 = &_v1._0;
+                let _v4 = &_v1._1;
+                if (*_v3 == 1) _v2 = *_v4 == 2 else _v2 = false;
+                if (_v2) break
+            };
+            loop {
+                if (!(_v1 is P)) {
+                    if (_v1 is Q) break;
+                    abort 14566554180833181697
+                };
+                let Pair::P{_0: _v5, _1: _v6} = _v0;
+                return 20
+            };
+            let Pair::Q{} = _v0;
+            return 30
+        };
+        let Pair::P{_0: _v7, _1: _v8} = _v0;
+        10
+    }
+    public fun test_named_fallthrough(): u64 {
+        let _v0 = E2::V1{x: 42};
+        let _v1 = &_v0;
+        loop {
+            if (_v1 is V1) {
+                if (*&_v1.x == 1) break};
+            loop {
+                if (!(_v1 is V1)) {
+                    if (_v1 is V2) break;
+                    abort 14566554180833181697
+                };
+                let E2::V1{x: _v2} = _v0;
+                return 2
+            };
+            let E2::V2{} = _v0;
+            return 3
+        };
+        let E2::V1{x: _v3} = _v0;
+        1
+    }
+    public fun test_named_hit(): u64 {
+        let _v0 = E2::V1{x: 1};
+        let _v1 = &_v0;
+        loop {
+            if (_v1 is V1) {
+                if (*&_v1.x == 1) break};
+            loop {
+                if (!(_v1 is V1)) {
+                    if (_v1 is V2) break;
+                    abort 14566554180833181697
+                };
+                let E2::V1{x: _v2} = _v0;
+                return 2
+            };
+            let E2::V2{} = _v0;
+            return 3
+        };
+        let E2::V1{x: _v3} = _v0;
+        1
+    }
+    public fun test_named_other_variant(): u64 {
+        let _v0 = E2::V2{};
+        let _v1 = &_v0;
+        loop {
+            if (_v1 is V1) {
+                if (*&_v1.x == 1) break};
+            loop {
+                if (!(_v1 is V1)) {
+                    if (_v1 is V2) break;
+                    abort 14566554180833181697
+                };
+                let E2::V1{x: _v2} = _v0;
+                return 2
+            };
+            let E2::V2{} = _v0;
+            return 3
+        };
+        let E2::V1{x: _v3} = _v0;
+        1
+    }
+    public fun test_nested_hit(): u64 {
+        let _v0 = Outer::W{_0: Inner::A{_0: 1}};
+        let _v1 = &_v0;
+        loop {
+            if (_v1 is W) {
+                let _v2 = &_v1._0;
+                if (_v2 is A) {
+                    if (*&_v2._0 == 1) break}
+            };
+            if (!((_v1 is W) && (&_v1._0 is A))) {
+                if (!((_v1 is W) && (&_v1._0 is B))) {
+                    assert!(_v1 is X, 14566554180833181697);
+                    let Outer::X{} = _v0;
+                    return 400
+                };
+                let Outer::W{_0: _v3} = _v0;
+                let Inner::B{} = _v3;
+                return 300
+            };
+            let Outer::W{_0: _v4} = _v0;
+            let Inner::A{_0: _v5} = _v4;
+            return 200
+        };
+        let Outer::W{_0: _v6} = _v0;
+        let Inner::A{_0: _v7} = _v6;
+        100
+    }
+    public fun test_nested_miss(): u64 {
+        let _v0 = Outer::W{_0: Inner::A{_0: 42}};
+        let _v1 = &_v0;
+        loop {
+            if (_v1 is W) {
+                let _v2 = &_v1._0;
+                if (_v2 is A) {
+                    if (*&_v2._0 == 1) break}
+            };
+            if (!((_v1 is W) && (&_v1._0 is A))) {
+                if (!((_v1 is W) && (&_v1._0 is B))) {
+                    assert!(_v1 is X, 14566554180833181697);
+                    let Outer::X{} = _v0;
+                    return 400
+                };
+                let Outer::W{_0: _v3} = _v0;
+                let Inner::B{} = _v3;
+                return 300
+            };
+            let Outer::W{_0: _v4} = _v0;
+            let Inner::A{_0: _v5} = _v4;
+            return 200
+        };
+        let Outer::W{_0: _v6} = _v0;
+        let Inner::A{_0: _v7} = _v6;
+        100
+    }
+    public fun test_positional_fallthrough(): u64 {
+        let _v0 = E1::V1{_0: 42};
+        let _v1 = &_v0;
+        loop {
+            if (_v1 is V1) {
+                if (*&_v1._0 == 1) break};
+            loop {
+                if (!(_v1 is V1)) {
+                    if (_v1 is V2) break;
+                    abort 14566554180833181697
+                };
+                let E1::V1{_0: _v2} = _v0;
+                return 2
+            };
+            let E1::V2{} = _v0;
+            return 3
+        };
+        let E1::V1{_0: _v3} = _v0;
+        1
+    }
+    public fun test_positional_hit(): u64 {
+        let _v0 = E1::V1{_0: 1};
+        let _v1 = &_v0;
+        loop {
+            if (_v1 is V1) {
+                if (*&_v1._0 == 1) break};
+            loop {
+                if (!(_v1 is V1)) {
+                    if (_v1 is V2) break;
+                    abort 14566554180833181697
+                };
+                let E1::V1{_0: _v2} = _v0;
+                return 2
+            };
+            let E1::V2{} = _v0;
+            return 3
+        };
+        let E1::V1{_0: _v3} = _v0;
+        1
+    }
+    public fun test_positional_other_variant(): u64 {
+        let _v0 = E1::V2{};
+        let _v1 = &_v0;
+        loop {
+            if (_v1 is V1) {
+                if (*&_v1._0 == 1) break};
+            loop {
+                if (!(_v1 is V1)) {
+                    if (_v1 is V2) break;
+                    abort 14566554180833181697
+                };
+                let E1::V1{_0: _v2} = _v0;
+                return 2
+            };
+            let E1::V2{} = _v0;
+            return 3
+        };
+        let E1::V1{_0: _v3} = _v0;
+        1
+    }
+    public fun test_struct_hit(): u64 {
+        let _v0 = S{x: 1, y: 42};
+        if (*&(&_v0).x == 1) {
+            let S{x: _v1, y: _v2} = _v0;
+            return _v2 + 100
+        };
+        let S{x: _v3, y: _v4} = _v0;
+        0
+    }
+    public fun test_struct_miss(): u64 {
+        let _v0 = S{x: 99, y: 42};
+        if (*&(&_v0).x == 1) {
+            let S{x: _v1, y: _v2} = _v0;
+            return _v2 + 100
+        };
+        let S{x: _v3, y: _v4} = _v0;
+        0
+    }
+}
+
+
+//# run 0xc0ffee::m::test_positional_hit
+
+//# run 0xc0ffee::m::test_positional_fallthrough
+
+//# run 0xc0ffee::m::test_positional_other_variant
+
+//# run 0xc0ffee::m::test_named_hit
+
+//# run 0xc0ffee::m::test_named_fallthrough
+
+//# run 0xc0ffee::m::test_named_other_variant
+
+//# run 0xc0ffee::m::test_multi_pos_hit
+
+//# run 0xc0ffee::m::test_multi_pos_partial
+
+//# run 0xc0ffee::m::test_multi_named_hit
+
+//# run 0xc0ffee::m::test_multi_named_partial
+
+//# run 0xc0ffee::m::test_mix_pos
+
+//# run 0xc0ffee::m::test_mix_pos_miss
+
+//# run 0xc0ffee::m::test_mix_named
+
+//# run 0xc0ffee::m::test_mix_named_miss
+
+//# run 0xc0ffee::m::test_guard_pos_pass
+
+//# run 0xc0ffee::m::test_guard_pos_fail
+
+//# run 0xc0ffee::m::test_guard_named_pass
+
+//# run 0xc0ffee::m::test_guard_named_fail
+
+//# run 0xc0ffee::m::test_nested_hit
+
+//# run 0xc0ffee::m::test_nested_miss
+
+//# run 0xc0ffee::m::test_deep_nested_hit
+
+//# run 0xc0ffee::m::test_deep_nested_inner_miss
+
+//# run 0xc0ffee::m::test_deep_struct_hit
+
+//# run 0xc0ffee::m::test_deep_struct_miss_inner
+
+//# run 0xc0ffee::m::test_deep_struct_miss_tag
+
+//# run 0xc0ffee::m::test_struct_hit
+
+//# run 0xc0ffee::m::test_struct_miss
+
+//# run 0xc0ffee::m::test_mixed_tuple_enum_hit
+
+//# run 0xc0ffee::m::test_mixed_tuple_enum_miss_prim
+
+//# run 0xc0ffee::m::test_mixed_tuple_enum_miss_slit
+
+//# run 0xc0ffee::m::test_mixed_tuple_struct_hit
+
+//# run 0xc0ffee::m::test_mixed_tuple_struct_miss

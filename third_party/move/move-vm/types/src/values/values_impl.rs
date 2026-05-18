@@ -1,6 +1,7 @@
-// Copyright (c) The Diem Core Contributors
-// Copyright (c) The Move Contributors
-// SPDX-License-Identifier: Apache-2.0
+// Parts of the file are Copyright (c) The Diem Core Contributors
+// Parts of the file are Copyright (c) The Move Contributors
+// Parts of the file are Copyright (c) Aptos Foundation
+// All Aptos Foundation code and content is licensed pursuant to the Innovation-Enabling Source Code License, available at https://github.com/aptos-labs/aptos-core/blob/main/LICENSE
 
 #![allow(clippy::arc_with_non_send_sync)]
 
@@ -124,6 +125,163 @@ pub enum Value {
     ClosureValue(Closure),
 }
 
+/// A heap-shared, mutable, recursively-droppable collection of Move values.
+///
+/// Wraps `Rc<RefCell<Vec<Value>>>` and carries a custom `Drop` that drains a deeply-nested
+/// value iteratively (via a heap work-stack) instead of using the compiler's recursive drop.
+/// This prevents a stack overflow when a deep Value chain is dropped via RAII.
+///
+/// Deref to `Rc<RefCell<Vec<Value>>>` keeps the common `.borrow()`/`.borrow_mut()` call
+/// sites unchanged. To move the inner Rc out (e.g., for `take_unique_ownership`), call
+/// [`NestedValues::into_rc`]. To clone (share), use `.clone()`.
+#[derive(Debug)]
+pub(crate) struct NestedValues(Rc<RefCell<Vec<Value>>>);
+
+impl NestedValues {
+    #[inline]
+    pub(crate) fn new(vals: Vec<Value>) -> Self {
+        Self(Rc::new(RefCell::new(vals)))
+    }
+
+    #[inline]
+    pub(crate) fn from_rc(rc: Rc<RefCell<Vec<Value>>>) -> Self {
+        Self(rc)
+    }
+
+    /// Extracts the inner `Rc` without running the custom `Drop`.
+    ///
+    /// Bypasses `Drop` (which would otherwise drain the contents) so we avoid both the
+    /// work and the sentinel Rc allocation on every value cast / pack unwrap. Uses the
+    /// standard `ManuallyDrop` + `ptr::read` destructuring idiom (see the `ManuallyDrop`
+    /// docs and `Box::into_raw` / `Pin::into_inner_unchecked` in std).
+    ///
+    /// NOTE (maintainers): this leaves no per-field `Drop` running on `self`. It is
+    /// sound only because `self.0` is `Rc<...>` which is trivially bitwise-movable, and
+    /// because `NestedValues` has exactly one field. If another non-trivial field is
+    /// added, this function must be updated to drop that field (e.g. via
+    /// `std::ptr::drop_in_place` on that field) or leak it.
+    #[inline]
+    pub(crate) fn into_rc(self) -> Rc<RefCell<Vec<Value>>> {
+        let this = std::mem::ManuallyDrop::new(self);
+        // SAFETY: `this` is `ManuallyDrop`, so its `Drop` (which would recurse/drain the
+        // inner Vec) never runs. The bits of `this.0` are therefore never re-observed
+        // after this read — in particular, they are never decremented again — and the
+        // returned `Rc` is the sole owner of the refcount that `this.0` previously held.
+        // No panic is possible between the `ManuallyDrop::new` and the return, so there
+        // is no unwinding window.
+        unsafe { std::ptr::read(&this.0) }
+    }
+}
+
+impl Clone for NestedValues {
+    #[inline]
+    fn clone(&self) -> Self {
+        Self(Rc::clone(&self.0))
+    }
+}
+
+impl std::ops::Deref for NestedValues {
+    type Target = Rc<RefCell<Vec<Value>>>;
+
+    #[inline]
+    fn deref(&self) -> &Self::Target {
+        &self.0
+    }
+}
+
+/// Iterative drop: walk nested `Value::Container(Container::{Locals,Vec,Struct})` via a
+/// heap work-stack rather than the Rust call stack. Only uniquely-owned Rcs are decomposed;
+/// shared containers (refcount > 1) fall through to the default Rc drop (refcount decrement).
+///
+/// For nested children we use `into_rc` + `Rc::try_unwrap` to claim the inner `Vec<Value>`
+/// without re-entering this `Drop` on the consumed `NestedValues`. The work stack holds
+/// owned `Vec<Value>`s rather than `Rc<...>`s, so the only possible heap allocation is the
+/// stack itself, which stays at `Vec::new()` capacity 0 until the first push.
+impl Drop for NestedValues {
+    fn drop(&mut self) {
+        // Drain the root level in place: if we hold the sole reference, take the inner
+        // `Vec<Value>` out, leaving the `RefCell<Vec>` containing an empty Vec.  The
+        // `Rc` then drops normally (refcount 1 → 0, frees the RcBox) at the end of
+        // this function. No sentinel allocation.
+        let Some(cell) = Rc::get_mut(&mut self.0) else {
+            // Shared: other holders still reference this container; their view of
+            // the contents must be preserved. The Rc's default drop will just
+            // decrement the refcount.
+            return;
+        };
+        let mut cur_vec = std::mem::take(cell.get_mut());
+
+        // Lazy work stack: no heap until we actually queue a nested level. Shallow
+        // values never push, so this stays at capacity 0.
+        let mut stack: Vec<Vec<Value>> = vec![];
+        loop {
+            stack.reserve(cur_vec.len());
+            for v in cur_vec {
+                match v {
+                    Value::Container(c) => match c {
+                        Container::Locals(nv) | Container::Vec(nv) | Container::Struct(nv) => {
+                            // Claim sole ownership of the inner `RefCell<Vec<Value>>`
+                            // if unique. On the unique path we extract the `Vec` directly.
+                            // On the shared path the returned `Rc` drops normally — just a
+                            // refcount decrement.
+                            if let Ok(inner_cell) = Rc::try_unwrap(nv.into_rc()) {
+                                let inner = inner_cell.into_inner();
+                                if !inner.is_empty() {
+                                    stack.push(inner);
+                                }
+                            }
+                        },
+                        // Primitive-vec variants cannot hold further `Value`s — their
+                        // default drop is non-recursive and bounded.
+                        Container::VecU8(_)
+                        | Container::VecU16(_)
+                        | Container::VecU32(_)
+                        | Container::VecU64(_)
+                        | Container::VecU128(_)
+                        | Container::VecU256(_)
+                        | Container::VecI8(_)
+                        | Container::VecI16(_)
+                        | Container::VecI32(_)
+                        | Container::VecI64(_)
+                        | Container::VecI128(_)
+                        | Container::VecI256(_)
+                        | Container::VecBool(_)
+                        | Container::VecAddress(_) => {},
+                    },
+                    // Non-container Values drop in O(1) or bounded size. Closures'
+                    // captured args are `Value`s inside a `Vec` owned by the closure; if
+                    // they are containers, their default drop invokes *this* `Drop`
+                    // iteratively on each, not recursively.
+                    Value::Invalid
+                    | Value::U8(_)
+                    | Value::U16(_)
+                    | Value::U32(_)
+                    | Value::U64(_)
+                    | Value::U128(_)
+                    | Value::U256(_)
+                    | Value::I8(_)
+                    | Value::I16(_)
+                    | Value::I32(_)
+                    | Value::I64(_)
+                    | Value::I128(_)
+                    | Value::I256(_)
+                    | Value::Bool(_)
+                    | Value::Address(_)
+                    | Value::ContainerRef(_)
+                    | Value::IndexedRef(_)
+                    | Value::DelayedFieldID { .. }
+                    | Value::ClosureValue(_) => {},
+                }
+            }
+
+            cur_vec = match stack.pop() {
+                Some(v) => v,
+                None => break,
+            };
+        }
+    }
+}
+
 /// A container is a collection of values. It is used to represent data structures like a
 /// Move vector or struct.
 ///
@@ -135,9 +293,9 @@ pub enum Value {
 /// making it possible to be shared by references.
 #[derive(Debug)]
 pub(crate) enum Container {
-    Locals(Rc<RefCell<Vec<Value>>>),
-    Vec(Rc<RefCell<Vec<Value>>>),
-    Struct(Rc<RefCell<Vec<Value>>>),
+    Locals(NestedValues),
+    Vec(NestedValues),
+    Struct(NestedValues),
     VecU8(Rc<RefCell<Vec<u8>>>),
     VecU64(Rc<RefCell<Vec<u64>>>),
     VecU128(Rc<RefCell<Vec<u128>>>),
@@ -438,10 +596,10 @@ impl Container {
     }
 
     fn master_signer(x: AccountAddress) -> Self {
-        Container::Struct(Rc::new(RefCell::new(vec![
+        Container::Struct(NestedValues::new(vec![
             Value::U16(MASTER_SIGNER_VARIANT),
             Value::Address(Box::new(x)),
-        ])))
+        ]))
     }
 }
 
@@ -627,22 +785,22 @@ impl Value {
 
 impl Container {
     fn copy_value(&self, depth: u64, max_depth: Option<u64>) -> PartialVMResult<Self> {
-        fn copy_rc_ref_vec_val(
-            r: &Rc<RefCell<Vec<Value>>>,
+        fn copy_nested_values(
+            r: &NestedValues,
             depth: u64,
             max_depth: Option<u64>,
-        ) -> PartialVMResult<Rc<RefCell<Vec<Value>>>> {
+        ) -> PartialVMResult<NestedValues> {
             let vals = r.borrow();
             let mut copied_vals = Vec::with_capacity(vals.len());
             for val in vals.iter() {
                 copied_vals.push(val.copy_value(depth + 1, max_depth)?);
             }
-            Ok(Rc::new(RefCell::new(copied_vals)))
+            Ok(NestedValues::new(copied_vals))
         }
 
         Ok(match self {
-            Self::Vec(r) => Self::Vec(copy_rc_ref_vec_val(r, depth, max_depth)?),
-            Self::Struct(r) => Self::Struct(copy_rc_ref_vec_val(r, depth, max_depth)?),
+            Self::Vec(r) => Self::Vec(copy_nested_values(r, depth, max_depth)?),
+            Self::Struct(r) => Self::Struct(copy_nested_values(r, depth, max_depth)?),
 
             Self::VecU8(r) => Self::VecU8(Rc::new(RefCell::new(r.borrow().clone()))),
             Self::VecU16(r) => Self::VecU16(Rc::new(RefCell::new(r.borrow().clone()))),
@@ -671,8 +829,8 @@ impl Container {
     // Note(inline): expensive to inline, +10s compile time
     fn copy_by_ref(&self) -> Self {
         match self {
-            Self::Vec(r) => Self::Vec(Rc::clone(r)),
-            Self::Struct(r) => Self::Struct(Rc::clone(r)),
+            Self::Vec(r) => Self::Vec(r.clone()),
+            Self::Struct(r) => Self::Struct(r.clone()),
 
             Self::VecU8(r) => Self::VecU8(Rc::clone(r)),
             Self::VecU16(r) => Self::VecU16(Rc::clone(r)),
@@ -689,7 +847,7 @@ impl Container {
             Self::VecBool(r) => Self::VecBool(Rc::clone(r)),
             Self::VecAddress(r) => Self::VecAddress(Rc::clone(r)),
 
-            Self::Locals(r) => Self::Locals(Rc::clone(r)),
+            Self::Locals(r) => Self::Locals(r.clone()),
         }
     }
 }
@@ -847,20 +1005,26 @@ impl Value {
 impl Value {
     #[cfg_attr(feature = "force-inline", inline(always))]
     pub fn equals(&self, other: &Self) -> PartialVMResult<bool> {
-        self.equals_with_depth(other, 1, Some(DEFAULT_MAX_VM_VALUE_NESTED_DEPTH))
+        self.equals_with_depth(other, 1, Some(DEFAULT_MAX_VM_VALUE_NESTED_DEPTH), true)
     }
 
     #[cfg_attr(feature = "force-inline", inline(always))]
     pub fn compare(&self, other: &Self) -> PartialVMResult<Ordering> {
-        self.compare_with_depth(other, 1, Some(DEFAULT_MAX_VM_VALUE_NESTED_DEPTH))
+        self.compare_with_depth(other, 1, Some(DEFAULT_MAX_VM_VALUE_NESTED_DEPTH), true)
     }
 
+    /// Returns true if two Move values are equal.
+    ///
+    /// Additional parameters:
+    ///   - Maximum allowed depth of the traversal of value trees.
+    ///   - Whether to include closure mask in closure comparison or not.
     #[cfg_attr(feature = "force-inline", inline(always))]
     pub fn equals_with_depth(
         &self,
         other: &Self,
         depth: u64,
         max_depth: Option<u64>,
+        include_closure_mask: bool,
     ) -> PartialVMResult<bool> {
         use Value::*;
 
@@ -881,11 +1045,15 @@ impl Value {
             (Bool(l), Bool(r)) => l == r,
             (Address(l), Address(r)) => l == r,
 
-            (Container(l), Container(r)) => l.equals(r, depth, max_depth)?,
+            (Container(l), Container(r)) => l.equals(r, depth, max_depth, include_closure_mask)?,
 
             // We count references as +1 in nesting, hence increasing the depth.
-            (ContainerRef(l), ContainerRef(r)) => l.equals(r, depth + 1, max_depth)?,
-            (IndexedRef(l), IndexedRef(r)) => l.equals(r, depth + 1, max_depth)?,
+            (ContainerRef(l), ContainerRef(r)) => {
+                l.equals(r, depth + 1, max_depth, include_closure_mask)?
+            },
+            (IndexedRef(l), IndexedRef(r)) => {
+                l.equals(r, depth + 1, max_depth, include_closure_mask)?
+            },
 
             // Disallow equality for delayed values. The rationale behind this
             // semantics is that identifiers might not be deterministic, and
@@ -899,10 +1067,11 @@ impl Value {
 
             (ClosureValue(Closure(fun1, captured1)), ClosureValue(Closure(fun2, captured2))) => {
                 if fun1.cmp_dyn(fun2.as_ref())? == Ordering::Equal
+                    && (!include_closure_mask || fun1.closure_mask() == fun2.closure_mask())
                     && captured1.len() == captured2.len()
                 {
                     for (v1, v2) in captured1.iter().zip(captured2.iter()) {
-                        if !v1.equals_with_depth(v2, depth + 1, max_depth)? {
+                        if !v1.equals_with_depth(v2, depth + 1, max_depth, include_closure_mask)? {
                             return Ok(false);
                         }
                     }
@@ -944,11 +1113,17 @@ impl Value {
         Ok(res)
     }
 
+    /// Compares two Move values.
+    ///
+    /// Additional parameters:
+    ///   - Maximum allowed depth of the traversal of value trees.
+    ///   - Whether to include closure mask in closure comparison or not.
     pub fn compare_with_depth(
         &self,
         other: &Self,
         depth: u64,
         max_depth: Option<u64>,
+        include_closure_mask: bool,
     ) -> PartialVMResult<Ordering> {
         use Value::*;
 
@@ -969,11 +1144,15 @@ impl Value {
             (Bool(l), Bool(r)) => l.cmp(r),
             (Address(l), Address(r)) => l.cmp(r),
 
-            (Container(l), Container(r)) => l.compare(r, depth, max_depth)?,
+            (Container(l), Container(r)) => l.compare(r, depth, max_depth, include_closure_mask)?,
 
             // We count references as +1 in nesting, hence increasing the depth.
-            (ContainerRef(l), ContainerRef(r)) => l.compare(r, depth + 1, max_depth)?,
-            (IndexedRef(l), IndexedRef(r)) => l.compare(r, depth + 1, max_depth)?,
+            (ContainerRef(l), ContainerRef(r)) => {
+                l.compare(r, depth + 1, max_depth, include_closure_mask)?
+            },
+            (IndexedRef(l), IndexedRef(r)) => {
+                l.compare(r, depth + 1, max_depth, include_closure_mask)?
+            },
 
             // Disallow comparison for delayed values.
             // (see `ValueImpl::equals` above for details on reasoning behind it)
@@ -983,10 +1162,14 @@ impl Value {
             },
 
             (ClosureValue(Closure(fun1, captured1)), ClosureValue(Closure(fun2, captured2))) => {
-                let o = fun1.cmp_dyn(fun2.as_ref())?;
+                let mut o = fun1.cmp_dyn(fun2.as_ref())?;
+                if include_closure_mask {
+                    o = o.then_with(|| fun1.closure_mask().cmp(&fun2.closure_mask()));
+                }
                 if o == Ordering::Equal {
                     for (v1, v2) in captured1.iter().zip(captured2.iter()) {
-                        let o = v1.compare_with_depth(v2, depth + 1, max_depth)?;
+                        let o =
+                            v1.compare_with_depth(v2, depth + 1, max_depth, include_closure_mask)?;
                         if o != Ordering::Equal {
                             return Ok(o);
                         }
@@ -1036,7 +1219,7 @@ impl Value {
         other: &Self,
         max_depth: u64,
     ) -> PartialVMResult<bool> {
-        self.equals_with_depth(other, 1, Some(max_depth))
+        self.equals_with_depth(other, 1, Some(max_depth), true)
     }
 
     // Test-only API to test depth checks.
@@ -1046,12 +1229,18 @@ impl Value {
         other: &Self,
         max_depth: u64,
     ) -> PartialVMResult<Ordering> {
-        self.compare_with_depth(other, 1, Some(max_depth))
+        self.compare_with_depth(other, 1, Some(max_depth), true)
     }
 }
 
 impl Container {
-    fn equals(&self, other: &Self, depth: u64, max_depth: Option<u64>) -> PartialVMResult<bool> {
+    fn equals(
+        &self,
+        other: &Self,
+        depth: u64,
+        max_depth: Option<u64>,
+        include_closure_mask: bool,
+    ) -> PartialVMResult<bool> {
         use Container::*;
 
         let res = match (self, other) {
@@ -1063,7 +1252,7 @@ impl Container {
                     return Ok(false);
                 }
                 for (v1, v2) in l.iter().zip(r.iter()) {
-                    if !v1.equals_with_depth(v2, depth + 1, max_depth)? {
+                    if !v1.equals_with_depth(v2, depth + 1, max_depth, include_closure_mask)? {
                         return Ok(false);
                     }
                 }
@@ -1118,6 +1307,7 @@ impl Container {
         other: &Self,
         depth: u64,
         max_depth: Option<u64>,
+        include_closure_mask: bool,
     ) -> PartialVMResult<Ordering> {
         use Container::*;
 
@@ -1127,7 +1317,8 @@ impl Container {
                 let r = &r.borrow();
 
                 for (v1, v2) in l.iter().zip(r.iter()) {
-                    let value_cmp = v1.compare_with_depth(v2, depth + 1, max_depth)?;
+                    let value_cmp =
+                        v1.compare_with_depth(v2, depth + 1, max_depth, include_closure_mask)?;
                     if value_cmp.is_ne() {
                         return Ok(value_cmp);
                     }
@@ -1182,10 +1373,17 @@ impl Container {
 
 impl ContainerRef {
     #[cfg_attr(feature = "force-inline", inline(always))]
-    fn equals(&self, other: &Self, depth: u64, max_depth: Option<u64>) -> PartialVMResult<bool> {
+    fn equals(
+        &self,
+        other: &Self,
+        depth: u64,
+        max_depth: Option<u64>,
+        include_closure_mask: bool,
+    ) -> PartialVMResult<bool> {
         // Note: the depth passed in accounts for the container.
         check_depth(depth, max_depth)?;
-        self.container().equals(other.container(), depth, max_depth)
+        self.container()
+            .equals(other.container(), depth, max_depth, include_closure_mask)
     }
 
     fn compare(
@@ -1193,17 +1391,24 @@ impl ContainerRef {
         other: &Self,
         depth: u64,
         max_depth: Option<u64>,
+        include_closure_mask: bool,
     ) -> PartialVMResult<Ordering> {
         // Note: the depth passed in accounts for the container.
         check_depth(depth, max_depth)?;
         self.container()
-            .compare(other.container(), depth, max_depth)
+            .compare(other.container(), depth, max_depth, include_closure_mask)
     }
 }
 
 impl IndexedRef {
     // note(inline): do not inline, too big
-    fn equals(&self, other: &Self, depth: u64, max_depth: Option<u64>) -> PartialVMResult<bool> {
+    fn equals(
+        &self,
+        other: &Self,
+        depth: u64,
+        max_depth: Option<u64>,
+        include_closure_mask: bool,
+    ) -> PartialVMResult<bool> {
         use Container::*;
 
         self.check_tag()?;
@@ -1228,6 +1433,7 @@ impl IndexedRef {
                 &r2.borrow()[other_index],
                 depth + 1,
                 max_depth,
+                include_closure_mask,
             )?,
 
             (VecU8(r1), VecU8(r2)) => r1.borrow()[self_index] == r2.borrow()[other_index],
@@ -1376,6 +1582,7 @@ impl IndexedRef {
         other: &Self,
         depth: u64,
         max_depth: Option<u64>,
+        include_closure_mask: bool,
     ) -> PartialVMResult<Ordering> {
         use Container::*;
 
@@ -1401,6 +1608,7 @@ impl IndexedRef {
                 &r2.borrow()[other_index],
                 depth + 1,
                 max_depth,
+                include_closure_mask,
             )?,
 
             (VecU8(r1), VecU8(r2)) => r1.borrow()[self_index].cmp(&r2.borrow()[other_index]),
@@ -1650,10 +1858,29 @@ impl ContainerRef {
                         *$r1.borrow_mut() = take_unique_ownership(r)?;
                     }};
                 }
+                // Variant of `assign!` for `NestedValues`-carrying variants (Struct/Vec).
+                // Unwraps the Rc from `NestedValues` before delegating to `take_unique_ownership`.
+                macro_rules! assign_nested {
+                    ($r1:expr, $tc:ident) => {{
+                        let r = match c {
+                            Container::$tc(v) => v.into_rc(),
+                            _ => {
+                                return Err(PartialVMError::new(
+                                    StatusCode::UNKNOWN_INVARIANT_VIOLATION_ERROR,
+                                )
+                                .with_message(
+                                    "failed to write_ref: container type mismatch".to_string(),
+                                )
+                                .with_sub_status(move_core_types::vm_status::sub_status::unknown_invariant_violation::EPARANOID_FAILURE))
+                            },
+                        };
+                        *$r1.borrow_mut() = take_unique_ownership(r)?;
+                    }};
+                }
 
                 match self.container() {
-                    Container::Struct(r) => assign!(r, Struct),
-                    Container::Vec(r) => assign!(r, Vec),
+                    Container::Struct(r) => assign_nested!(r, Struct),
+                    Container::Vec(r) => assign_nested!(r, Vec),
                     Container::VecU8(r) => assign!(r, VecU8),
                     Container::VecU16(r) => assign!(r, VecU16),
                     Container::VecU32(r) => assign!(r, VecU32),
@@ -2266,7 +2493,9 @@ impl Locals {
             | Value::ClosureValue(_)
             | Value::DelayedFieldID { .. } => Ok(Value::IndexedRef(IndexedRef {
                 idx: idx as u32,
-                container_ref: ContainerRef::Local(Container::Locals(Rc::clone(&self.0))),
+                container_ref: ContainerRef::Local(Container::Locals(NestedValues::from_rc(
+                    Rc::clone(&self.0),
+                ))),
                 tag: None,
             })),
 
@@ -2514,7 +2743,7 @@ impl Value {
 
     #[cfg_attr(feature = "force-inline", inline(always))]
     pub fn struct_(s: Struct) -> Self {
-        Value::Container(Container::Struct(Rc::new(RefCell::new(s.fields))))
+        Value::Container(Container::Struct(NestedValues::new(s.fields)))
     }
 
     #[cfg_attr(feature = "force-inline", inline(always))]
@@ -2629,9 +2858,7 @@ impl Value {
                 Ok(v)
             })
             .collect::<PartialVMResult<Vec<_>>>()?;
-        Ok(Self::Container(Container::Vec(Rc::new(RefCell::new(
-            values,
-        )))))
+        Ok(Self::Container(Container::Vec(NestedValues::new(values))))
     }
 
     pub fn closure(
@@ -2770,7 +2997,7 @@ impl VMValueCast<Struct> for Value {
     fn cast(self) -> PartialVMResult<Struct> {
         match self {
             Value::Container(Container::Struct(r)) => Ok(Struct {
-                fields: take_unique_ownership(r)?,
+                fields: take_unique_ownership(r.into_rc())?,
             }),
             v => Err(PartialVMError::new(StatusCode::INTERNAL_TYPE_ERROR)
                 .with_message(format!("cannot cast {:?} to struct", v,))),
@@ -2812,7 +3039,7 @@ impl VMValueCast<Vec<Value>> for Value {
     fn cast(self) -> PartialVMResult<Vec<Value>> {
         match self {
             Value::Container(Container::Vec(c)) => {
-                Ok(take_unique_ownership(c)?.into_iter().collect())
+                Ok(take_unique_ownership(c.into_rc())?.into_iter().collect())
             },
             Value::Address(_)
             | Value::Bool(_)
@@ -3709,7 +3936,15 @@ impl VectorRef {
             Container::VecBool(r) => r.borrow().len(),
             Container::VecAddress(r) => r.borrow().len(),
             Container::Vec(r) => r.borrow().len(),
-            Container::Locals(_) | Container::Struct(_) => unreachable!(),
+            Container::Locals(_) | Container::Struct(_) => {
+                return Err(
+                    PartialVMError::new(StatusCode::UNKNOWN_INVARIANT_VIOLATION_ERROR)
+                        .with_message(
+                            "length_as_usize called on non-vector container (Locals or Struct)"
+                                .to_string(),
+                        ),
+                );
+            },
         };
         Ok(len)
     }
@@ -3739,7 +3974,15 @@ impl VectorRef {
             Container::VecBool(r) => r.borrow_mut().push(e.value_as()?),
             Container::VecAddress(r) => r.borrow_mut().push(e.value_as()?),
             Container::Vec(r) => r.borrow_mut().push(e),
-            Container::Locals(_) | Container::Struct(_) => unreachable!(),
+            Container::Locals(_) | Container::Struct(_) => {
+                return Err(
+                    PartialVMError::new(StatusCode::UNKNOWN_INVARIANT_VIOLATION_ERROR)
+                        .with_message(
+                            "push_back called on non-vector container (Locals or Struct)"
+                                .to_string(),
+                        ),
+                );
+            },
         }
 
         self.0.mark_dirty();
@@ -3757,11 +4000,13 @@ impl VectorRef {
     }
 
     /// Returns a RefCell reference to the underlying vector of a `&vector<u8>` value.
-    pub fn as_bytes_ref(&self) -> std::cell::Ref<'_, Vec<u8>> {
-        let c = self.0.container();
-        match c {
-            Container::VecU8(r) => r.borrow(),
-            _ => panic!("can only be called on vector<u8>"),
+    pub fn as_bytes_ref(&self) -> PartialVMResult<std::cell::Ref<'_, Vec<u8>>> {
+        if let Container::VecU8(r) = self.0.container() {
+            Ok(r.borrow())
+        } else {
+            Err(PartialVMError::new_invariant_violation(
+                "can only be called on vector<u8>",
+            ))
         }
     }
 
@@ -3837,7 +4082,14 @@ impl VectorRef {
                 Some(x) => x,
                 None => err_pop_empty_vec!(),
             },
-            Container::Locals(_) | Container::Struct(_) => unreachable!(),
+            Container::Locals(_) | Container::Struct(_) => {
+                return Err(
+                    PartialVMError::new(StatusCode::UNKNOWN_INVARIANT_VIOLATION_ERROR)
+                        .with_message(
+                            "pop called on non-vector container (Locals or Struct)".to_string(),
+                        ),
+                );
+            },
         };
 
         self.0.mark_dirty();
@@ -3874,7 +4126,14 @@ impl VectorRef {
             Container::VecBool(r) => swap!(r),
             Container::VecAddress(r) => swap!(r),
             Container::Vec(r) => swap!(r),
-            Container::Locals(_) | Container::Struct(_) => unreachable!(),
+            Container::Locals(_) | Container::Struct(_) => {
+                return Err(
+                    PartialVMError::new(StatusCode::UNKNOWN_INVARIANT_VIOLATION_ERROR)
+                        .with_message(
+                            "swap called on non-vector container (Locals or Struct)".to_string(),
+                        ),
+                );
+            },
         }
 
         self.0.mark_dirty();
@@ -3951,7 +4210,15 @@ impl VectorRef {
                 move_range!(from_r, to_r)
             },
             (Container::Vec(from_r), Container::Vec(to_r)) => move_range!(from_r, to_r),
-            (_, _) => unreachable!(),
+            (_, _) => {
+                return Err(
+                    PartialVMError::new(StatusCode::UNKNOWN_INVARIANT_VIOLATION_ERROR)
+                        .with_message(
+                            "move_range called with mismatched or non-vector container types"
+                                .to_string(),
+                        ),
+                );
+            },
         }
 
         from_self.0.mark_dirty();
@@ -4054,7 +4321,7 @@ impl Vector {
             | Type::Struct { .. }
             | Type::StructInstantiation { .. }
             | Type::Function { .. } => {
-                Value::Container(Container::Vec(Rc::new(RefCell::new(elements))))
+                Value::Container(Container::Vec(NestedValues::new(elements)))
             },
 
             Type::Reference(_) | Type::MutableReference(_) | Type::TyParam(_) => {
@@ -4126,7 +4393,7 @@ impl Vector {
                 .into_iter()
                 .map(Value::address)
                 .collect(),
-            Container::Vec(r) => take_unique_ownership(r)?.into_iter().collect(),
+            Container::Vec(r) => take_unique_ownership(r.into_rc())?.into_iter().collect(),
             Container::Locals(_) | Container::Struct(_) => {
                 return Err(PartialVMError::new_invariant_violation(
                     "Unexpected non-vector container",
@@ -4229,7 +4496,7 @@ impl Struct {
  **************************************************************************************/
 #[allow(clippy::unnecessary_wraps)]
 impl GlobalValueImpl {
-    fn expect_struct_fields(value: &Value) -> &Rc<RefCell<Vec<Value>>> {
+    fn expect_struct_fields(value: &Value) -> &NestedValues {
         match value {
             Value::Container(Container::Struct(fields)) => fields,
             _ => unreachable!("Global values must be structs"),
@@ -4266,13 +4533,17 @@ impl GlobalValueImpl {
             Self::None | Self::Deleted => {
                 return Err(PartialVMError::new(StatusCode::MISSING_DATA))
             },
-            Self::Fresh { .. } => match mem::replace(self, Self::None) {
-                Self::Fresh { value } => value,
-                _ => unreachable!(),
+            Self::Fresh { .. } => {
+                let Self::Fresh { value } = mem::replace(self, Self::None) else {
+                    unreachable!("Value has been checked to be fresh")
+                };
+                value
             },
-            Self::Cached { .. } => match mem::replace(self, Self::Deleted) {
-                Self::Cached { value, .. } => value,
-                _ => unreachable!(),
+            Self::Cached { .. } => {
+                let Self::Cached { value, .. } = mem::replace(self, Self::Deleted) else {
+                    unreachable!("Value has been checked to be cached")
+                };
+                value
             },
         };
         let fields = Self::expect_struct_fields(&value);
@@ -4313,13 +4584,13 @@ impl GlobalValueImpl {
             Self::Fresh { value } => {
                 let fields = Self::expect_struct_fields(value);
                 Ok(Value::ContainerRef(ContainerRef::Local(Container::Struct(
-                    Rc::clone(fields),
+                    fields.clone(),
                 ))))
             },
             Self::Cached { value, status } => {
                 let fields = Self::expect_struct_fields(value);
                 Ok(Value::ContainerRef(ContainerRef::Global {
-                    container: Container::Struct(Rc::clone(fields)),
+                    container: Container::Struct(fields.clone()),
                     status: Rc::clone(status),
                 }))
             },
@@ -4457,37 +4728,61 @@ impl Debug for Value {
 *
 **************************************************************************************/
 
+/// Cap recursive `Display` of a `Value` so deeply nested values cannot blow the
+/// formatting thread's stack. Every recursive path (Value↔Container, Locals→Value,
+/// Closure→Value) flows through `fmt_value`, so a single check at its entry is
+/// sufficient; intermediate `fmt_*` helpers just thread `depth + 1` through.
+const MAX_DISPLAY_DEPTH: usize = 8;
+
+/// Adapter that re-enters depth-bounded `Display` on a `&Value`. Lets call sites
+/// that build up `format!` / `Vec<String>` plumbing (e.g. `Locals`, `Closure`)
+/// keep their existing shape while still participating in depth bounding.
+pub(crate) struct DepthDisplay<'a>(pub &'a Value, pub usize);
+
+impl<'a> Display for DepthDisplay<'a> {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        fmt_value(self.0, f, self.1)
+    }
+}
+
+fn fmt_value(v: &Value, f: &mut fmt::Formatter, depth: usize) -> fmt::Result {
+    if depth > MAX_DISPLAY_DEPTH {
+        return write!(f, "...");
+    }
+    match v {
+        Value::Invalid => write!(f, "Invalid"),
+
+        Value::U8(x) => write!(f, "U8({})", x),
+        Value::U16(x) => write!(f, "U16({})", x),
+        Value::U32(x) => write!(f, "U32({})", x),
+        Value::U64(x) => write!(f, "U64({})", x),
+        Value::U128(x) => write!(f, "U128({})", x),
+        Value::U256(x) => write!(f, "U256({})", x),
+        Value::I8(x) => write!(f, "I8({})", x),
+        Value::I16(x) => write!(f, "I16({})", x),
+        Value::I32(x) => write!(f, "I32({})", x),
+        Value::I64(x) => write!(f, "I64({})", x),
+        Value::I128(x) => write!(f, "I128({})", x),
+        Value::I256(x) => write!(f, "I256({})", x),
+        Value::Bool(x) => write!(f, "{}", x),
+        Value::Address(addr) => write!(f, "Address({})", addr.short_str_lossless()),
+
+        Value::Container(r) => fmt_container(r, f, depth + 1),
+
+        Value::ContainerRef(r) => write!(f, "{}", r),
+        Value::IndexedRef(r) => write!(f, "{}", r),
+
+        Value::ClosureValue(c) => super::function_values_impl::fmt_closure(c, f, depth + 1),
+
+        // Display information must be deterministic, so we cannot print
+        // inner fields.
+        Value::DelayedFieldID { .. } => write!(f, "Delayed(?)"),
+    }
+}
+
 impl Display for Value {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        match self {
-            Self::Invalid => write!(f, "Invalid"),
-
-            Self::U8(x) => write!(f, "U8({})", x),
-            Self::U16(x) => write!(f, "U16({})", x),
-            Self::U32(x) => write!(f, "U32({})", x),
-            Self::U64(x) => write!(f, "U64({})", x),
-            Self::U128(x) => write!(f, "U128({})", x),
-            Self::U256(x) => write!(f, "U256({})", x),
-            Self::I8(x) => write!(f, "I8({})", x),
-            Self::I16(x) => write!(f, "I16({})", x),
-            Self::I32(x) => write!(f, "I32({})", x),
-            Self::I64(x) => write!(f, "I64({})", x),
-            Self::I128(x) => write!(f, "I128({})", x),
-            Self::I256(x) => write!(f, "I256({})", x),
-            Self::Bool(x) => write!(f, "{}", x),
-            Self::Address(addr) => write!(f, "Address({})", addr.short_str_lossless()),
-
-            Self::Container(r) => write!(f, "{}", r),
-
-            Self::ContainerRef(r) => write!(f, "{}", r),
-            Self::IndexedRef(r) => write!(f, "{}", r),
-
-            Self::ClosureValue(c) => write!(f, "{}", c),
-
-            // Display information must be deterministic, so we cannot print
-            // inner fields.
-            Self::DelayedFieldID { .. } => write!(f, "Delayed(?)"),
-        }
+        fmt_value(self, f, 0)
     }
 }
 
@@ -4525,48 +4820,66 @@ impl Display for IndexedRef {
     }
 }
 
+fn fmt_container(c: &Container, f: &mut fmt::Formatter, depth: usize) -> fmt::Result {
+    write!(f, "(container: ")?;
+
+    match c {
+        Container::Locals(r) | Container::Vec(r) | Container::Struct(r) => {
+            display_list_of_items(r.borrow().iter().map(|v| DepthDisplay(v, depth + 1)), f)
+        },
+        Container::VecU8(r) => display_list_of_items(r.borrow().iter(), f),
+        Container::VecU16(r) => display_list_of_items(r.borrow().iter(), f),
+        Container::VecU32(r) => display_list_of_items(r.borrow().iter(), f),
+        Container::VecU64(r) => display_list_of_items(r.borrow().iter(), f),
+        Container::VecU128(r) => display_list_of_items(r.borrow().iter(), f),
+        Container::VecU256(r) => display_list_of_items(r.borrow().iter(), f),
+        Container::VecI8(r) => display_list_of_items(r.borrow().iter(), f),
+        Container::VecI16(r) => display_list_of_items(r.borrow().iter(), f),
+        Container::VecI32(r) => display_list_of_items(r.borrow().iter(), f),
+        Container::VecI64(r) => display_list_of_items(r.borrow().iter(), f),
+        Container::VecI128(r) => display_list_of_items(r.borrow().iter(), f),
+        Container::VecI256(r) => display_list_of_items(r.borrow().iter(), f),
+        Container::VecBool(r) => display_list_of_items(r.borrow().iter(), f),
+        Container::VecAddress(r) => display_list_of_items(r.borrow().iter(), f),
+    }?;
+
+    write!(f, ")")
+}
+
 impl Display for Container {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        write!(f, "(container: ")?;
-
-        match self {
-            Self::Locals(r) | Self::Vec(r) | Self::Struct(r) => {
-                display_list_of_items(r.borrow().iter(), f)
-            },
-            Self::VecU8(r) => display_list_of_items(r.borrow().iter(), f),
-            Self::VecU16(r) => display_list_of_items(r.borrow().iter(), f),
-            Self::VecU32(r) => display_list_of_items(r.borrow().iter(), f),
-            Self::VecU64(r) => display_list_of_items(r.borrow().iter(), f),
-            Self::VecU128(r) => display_list_of_items(r.borrow().iter(), f),
-            Self::VecU256(r) => display_list_of_items(r.borrow().iter(), f),
-            Self::VecI8(r) => display_list_of_items(r.borrow().iter(), f),
-            Self::VecI16(r) => display_list_of_items(r.borrow().iter(), f),
-            Self::VecI32(r) => display_list_of_items(r.borrow().iter(), f),
-            Self::VecI64(r) => display_list_of_items(r.borrow().iter(), f),
-            Self::VecI128(r) => display_list_of_items(r.borrow().iter(), f),
-            Self::VecI256(r) => display_list_of_items(r.borrow().iter(), f),
-            Self::VecBool(r) => display_list_of_items(r.borrow().iter(), f),
-            Self::VecAddress(r) => display_list_of_items(r.borrow().iter(), f),
-        }?;
-
-        write!(f, ")")
+        fmt_container(self, f, 0)
     }
+}
+
+fn fmt_locals(l: &Locals, f: &mut fmt::Formatter, depth: usize) -> fmt::Result {
+    write!(
+        f,
+        "{}",
+        l.0.borrow()
+            .iter()
+            .enumerate()
+            .map(|(idx, val)| format!("[{}] {}", idx, DepthDisplay(val, depth + 1)))
+            .collect::<Vec<_>>()
+            .join("\n")
+    )
 }
 
 impl Display for Locals {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        write!(
-            f,
-            "{}",
-            self.0
-                .borrow()
-                .iter()
-                .enumerate()
-                .map(|(idx, val)| format!("[{}] {}", idx, val))
-                .collect::<Vec<_>>()
-                .join("\n")
-        )
+        fmt_locals(self, f, 0)
     }
+}
+
+/// Type-level field information for annotated local-variable display in the
+/// debugger.  Passed per-local to [`debug::print_locals_with_info`].
+pub enum LocalTypeInfo {
+    /// Regular struct: field names in declaration order.
+    Struct(Vec<String>),
+    /// Enum: `(variant_name, field_names)` indexed by variant tag (0-based).
+    /// The runtime stores enum values as `[u16_tag, field0, field1, …]`, so
+    /// index 0 here corresponds to tag value `0`.
+    Enum(Vec<(String, Vec<String>)>),
 }
 
 #[allow(dead_code)]
@@ -4786,6 +5099,135 @@ pub mod debug {
             debug_writeln!(buf)?;
         }
         Ok(())
+    }
+
+    /// Extended locals printer that shows separate Parameters / Locals sections
+    /// with optional variable names and optional per-local type information.
+    ///
+    /// * `param_count` – how many of the first locals are parameters.
+    /// * `names`       – combined parameter + local names (may be shorter than
+    ///                   the actual local count; missing entries fall back to `_`).
+    /// * `type_info`   – for each local index, optional [`LocalTypeInfo`] that
+    ///                   annotates struct fields or enum variants in the output.
+    ///                   Pass `None` to skip annotation for all locals.
+    pub fn print_locals_with_info<B: Write>(
+        buf: &mut B,
+        locals: &Locals,
+        compact: bool,
+        param_count: usize,
+        names: Option<&[String]>,
+        type_info: Option<&[Option<LocalTypeInfo>]>,
+    ) -> PartialVMResult<()> {
+        let locals_ref = locals.0.borrow();
+        let total = locals_ref.len();
+
+        // ── Parameters section ────────────────────────────────────────────────
+        let mut printed_header = false;
+        for idx in 0..param_count.min(total) {
+            let val = &locals_ref[idx];
+            if compact && matches!(val, Value::Invalid) {
+                continue;
+            }
+            if !printed_header {
+                debug_writeln!(buf, "        Parameters:")?;
+                printed_header = true;
+            }
+            let name = names
+                .and_then(|n| n.get(idx))
+                .map(|s| s.as_str())
+                .unwrap_or("_");
+            debug_write!(buf, "            [{}] {}: ", idx, name)?;
+            print_value_with_type_info(
+                buf,
+                val,
+                type_info.and_then(|t| t.get(idx)).and_then(|o| o.as_ref()),
+            )?;
+            debug_writeln!(buf)?;
+        }
+
+        // ── Locals section ────────────────────────────────────────────────────
+        printed_header = false;
+        for idx in param_count..total {
+            let val = &locals_ref[idx];
+            if compact && matches!(val, Value::Invalid) {
+                continue;
+            }
+            if !printed_header {
+                debug_writeln!(buf, "        Locals:")?;
+                printed_header = true;
+            }
+            let name = names
+                .and_then(|n| n.get(idx))
+                .map(|s| s.as_str())
+                .unwrap_or("_");
+            debug_write!(buf, "            [{}] {}: ", idx, name)?;
+            print_value_with_type_info(
+                buf,
+                val,
+                type_info.and_then(|t| t.get(idx)).and_then(|o| o.as_ref()),
+            )?;
+            debug_writeln!(buf)?;
+        }
+
+        Ok(())
+    }
+
+    /// Print `val` with optional [`LocalTypeInfo`] for annotating struct fields
+    /// or enum variants.  Nested values are still printed positionally.
+    fn print_value_with_type_info<B: Write>(
+        buf: &mut B,
+        val: &Value,
+        info: Option<&LocalTypeInfo>,
+    ) -> PartialVMResult<()> {
+        match (val, info) {
+            // ── Struct with named fields ──────────────────────────────────────
+            (Value::Container(Container::Struct(r)), Some(LocalTypeInfo::Struct(names)))
+                if !names.is_empty() =>
+            {
+                debug_write!(buf, "{{ ")?;
+                let fields = r.borrow();
+                for (i, field_val) in fields.iter().enumerate() {
+                    if i > 0 {
+                        debug_write!(buf, ", ")?;
+                    }
+                    let fname = names.get(i).map(|s| s.as_str()).unwrap_or("_");
+                    debug_write!(buf, "{}: ", fname)?;
+                    print_value_impl(buf, field_val)?;
+                }
+                debug_write!(buf, " }}")
+            },
+            // ── Enum variant: [u16_tag, field0, field1, …] ───────────────────
+            (Value::Container(Container::Struct(r)), Some(LocalTypeInfo::Enum(variants)))
+                if !variants.is_empty() =>
+            {
+                let fields = r.borrow();
+                let tag = match fields.first() {
+                    Some(Value::U16(t)) => *t as usize,
+                    _ => return print_value_impl(buf, val),
+                };
+                match variants.get(tag) {
+                    Some((variant_name, field_names)) => {
+                        debug_write!(buf, "{}", variant_name)?;
+                        let payload = &fields[1..];
+                        if !payload.is_empty() {
+                            debug_write!(buf, " {{ ")?;
+                            for (i, field_val) in payload.iter().enumerate() {
+                                if i > 0 {
+                                    debug_write!(buf, ", ")?;
+                                }
+                                let fname = field_names.get(i).map(|s| s.as_str()).unwrap_or("_");
+                                debug_write!(buf, "{}: ", fname)?;
+                                print_value_impl(buf, field_val)?;
+                            }
+                            debug_write!(buf, " }}")?;
+                        }
+                        Ok(())
+                    },
+                    None => print_value_impl(buf, val),
+                }
+            },
+            _ => print_value_impl(buf, val),
+        }
     }
 
     pub fn print_value<B: Write>(buf: &mut B, val: &Value) -> PartialVMResult<()> {
@@ -5159,7 +5601,7 @@ impl<'d> serde::de::DeserializeSeed<'d> for DeserializationSeed<'_, &MoveTypeLay
                         layout,
                     };
                     let vector = deserializer.deserialize_seq(VectorElementVisitor(seed))?;
-                    Value::Container(Container::Vec(Rc::new(RefCell::new(vector))))
+                    Value::Container(Container::Vec(NestedValues::new(vector)))
                 },
             }),
 
@@ -5252,7 +5694,7 @@ impl<'d> serde::de::DeserializeSeed<'d> for DeserializationSeed<'_, &MoveStructL
             },
             MoveStructLayout::WithFields(_)
             | MoveStructLayout::WithTypes { .. }
-            | MoveStructLayout::WithVariants(_) => {
+            | MoveStructLayout::WithVariants { .. } => {
                 Err(D::Error::custom("cannot deserialize from decorated type"))
             },
         }
@@ -5906,7 +6348,7 @@ pub mod prop {
                     })
                     .boxed(),
                 layout => vec(value_strategy_with_layout(layout), 0..10)
-                    .prop_map(|vals| Value::Container(Container::Vec(Rc::new(RefCell::new(vals)))))
+                    .prop_map(|vals| Value::Container(Container::Vec(NestedValues::new(vals))))
                     .boxed(),
             },
             L::Struct(struct_layout) => match struct_layout.as_ref() {

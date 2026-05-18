@@ -1,0 +1,35 @@
+
+Diagnostics:
+warning: [lint] function `unused_fun` is unused
+  ┌─ tests/model_ast_lints/unused/truly_unused/unused_items.move:3:9
+  │
+3 │     fun unused_fun(): u64 {
+  │         ^^^^^^^^^^
+  │
+  = Remove it, or suppress this warning with `#[test_only]` (if for test-only) or `#[lint::skip(unused_function)]` (if for spec-only or otherwise needed).
+
+warning: [lint] function `self_recursive` is unused
+  ┌─ tests/model_ast_lints/unused/truly_unused/unused_items.move:8:9
+  │
+8 │     fun self_recursive(n: u64): u64 {
+  │         ^^^^^^^^^^^^^^
+  │
+  = Remove it, or suppress this warning with `#[test_only]` (if for test-only) or `#[lint::skip(unused_function)]` (if for spec-only or otherwise needed).
+
+warning: [lint] constant `UNUSED_CONST` is unused
+   ┌─ tests/model_ast_lints/unused/truly_unused/unused_items.move:14:5
+   │
+14 │     const UNUSED_CONST: u64 = 100;
+   │     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+   │
+   = Remove it, or suppress this warning with `#[test_only]` (if for test-only) or `#[lint::skip(unused_constant)]` (if for spec-only or otherwise needed).
+
+warning: [lint] struct `UnusedStruct` is unused
+   ┌─ tests/model_ast_lints/unused/truly_unused/unused_items.move:17:5
+   │
+17 │ ╭     struct UnusedStruct has drop {
+18 │ │         x: u64
+19 │ │     }
+   │ ╰─────^
+   │
+   = Remove it (if not published), or suppress this warning with `#[test_only]` (if for test-only) or `#[lint::skip(unused_struct)]` (if for spec-only or otherwise needed).

@@ -4,6 +4,7 @@
 use aptos_gas_algebra::GasQuantity;
 use aptos_gas_profiling::TransactionGasLog;
 use aptos_language_e2e_tests::account::Account;
+use aptos_move_e2e_test_harness::MoveHarnessSend;
 use aptos_sdk::{
     transaction_builder::TransactionFactory,
     types::{AccountKey, LocalAccount},
@@ -24,7 +25,6 @@ use aptos_types::{
     fee_statement::FeeStatement,
     transaction::{AuxiliaryInfo, SignedTransaction, TransactionExecutableRef},
 };
-use e2e_move_tests::MoveHarnessSend;
 use std::{
     collections::HashMap,
     path::Path,
@@ -519,6 +519,7 @@ mod tests {
     };
     use aptos_cached_packages::{aptos_stdlib, aptos_token_sdk_builder};
     use aptos_crypto::{bls12381, PrivateKey, Uniform};
+    use aptos_move_e2e_test_harness::MoveHarnessSend;
     use aptos_sdk::move_types::{identifier::Identifier, language_storage::ModuleId};
     use aptos_transaction_generator_lib::{
         entry_point_trait::EntryPointTrait, publishing::publish_util::PackageHandler,
@@ -531,7 +532,6 @@ mod tests {
         transaction::{EntryFunction, TransactionPayload},
     };
     use aptos_vm_environment::prod_configs::{set_layout_caches, set_paranoid_type_checks};
-    use e2e_move_tests::MoveHarnessSend;
     use rand::{rngs::StdRng, SeedableRng};
     use std::path::PathBuf;
 

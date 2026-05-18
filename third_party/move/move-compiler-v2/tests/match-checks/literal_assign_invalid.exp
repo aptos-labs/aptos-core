@@ -1,0 +1,19 @@
+
+Diagnostics:
+error: invalid assignment
+   ┌─ tests/match-checks/literal_assign_invalid.move:13:16
+   │
+13 │         S { x: 1 } = s;
+   │                ^ Invalid assignment syntax. Expected: a local, a field write, or a deconstructing assignment
+
+error: invalid assignment
+   ┌─ tests/match-checks/literal_assign_invalid.move:19:9
+   │
+19 │         P(1) = p;
+   │         ^^^^ Invalid assignment syntax. Expected: a local, a field write, or a deconstructing assignment
+
+error: invalid assignment
+   ┌─ tests/match-checks/literal_assign_invalid.move:25:9
+   │
+25 │         1 = x;
+   │         ^ Invalid assignment syntax. Expected: a local, a field write, or a deconstructing assignment

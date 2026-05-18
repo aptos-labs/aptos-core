@@ -5,7 +5,7 @@ use crate::{
     combinatorial_tests::{
         group_tests::{create_non_empty_group_data_view, run_tests_with_groups},
         mock_executor::{MockEvent, MockTask},
-        resource_tests::{create_executor_thread_pool, get_gas_limit_variants},
+        resource_tests::get_gas_limit_variants,
         types::{KeyType, MockTransaction, TransactionGen, TransactionGenParams},
     },
     task::ExecutorTask,
@@ -65,12 +65,9 @@ fn delayed_field_transaction_tests(
 
     let data_view = create_non_empty_group_data_view(&key_universe, universe_size, true);
 
-    let executor_thread_pool = create_executor_thread_pool();
-
     let gas_limits = get_gas_limit_variants(use_gas_limit, transaction_count);
 
     run_tests_with_groups(
-        executor_thread_pool,
         gas_limits,
         transactions,
         &data_view,

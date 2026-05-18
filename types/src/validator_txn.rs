@@ -4,7 +4,7 @@
 #[cfg(any(test, feature = "fuzzing"))]
 use crate::dkg::DKGTranscriptMetadata;
 use crate::{
-    dkg::{chunky_dkg::CertifiedAggregatedChunkySubtranscript, DKGTranscript},
+    dkg::{chunky_dkg::CertifiedChunkyDKGOutput, DKGTranscript},
     jwks,
     validator_verifier::ValidatorVerifier,
 };
@@ -19,7 +19,7 @@ use std::fmt::Debug;
 pub enum ValidatorTransaction {
     DKGResult(DKGTranscript),
     ObservedJWKUpdate(jwks::QuorumCertifiedUpdate),
-    ChunkyDKGResult(CertifiedAggregatedChunkySubtranscript),
+    ChunkyDKGResult(CertifiedChunkyDKGOutput),
 }
 
 impl ValidatorTransaction {

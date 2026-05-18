@@ -202,6 +202,7 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
                 self.self_sender.clone(),
             );
             let rb = ReliableBroadcast::new(
+                "jwk_consensus",
                 self.my_addr,
                 epoch_state.verifier.get_ordered_account_addresses(),
                 Arc::new(network_sender),

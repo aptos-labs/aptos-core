@@ -196,7 +196,7 @@ module rewards_pool::rewards_pool {
         let reward_stores = &rewards_data.reward_stores;
         vector::for_each(fungible_assets, |fa| {
             let amount = fungible_asset::amount(&fa);
-            let reward_token = fungible_asset::metadata_from_asset(&fa);
+            let reward_token = fungible_asset::asset_metadata(&fa);
             assert!(simple_map::contains_key(reward_stores, &reward_token), EREWARD_TOKEN_NOT_SUPPORTED);
 
             // Deposit the rewards into the corresponding store.

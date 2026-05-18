@@ -1,0 +1,76 @@
+//**** Cross-compiled for `move` syntax from `tests/no-v1-comparison/concrete_receiver.move`
+
+//# publish
+module 0x42::concrete_test {
+    struct Pair<T0, T1> has copy, drop, store, key {
+        first: T0,
+        second: T1,
+    }
+    struct Wrapper<T0> has copy, drop {
+        inner: T0,
+    }
+    fun describe(p0: &Pair<u64, bool>): u64 {
+        if (*&p0.second) return *&p0.first;
+        0
+    }
+    fun flip(p0: &mut Pair<u64, bool>) {
+        let _v0 = !*&p0.second;
+        let _v1 = &mut p0.second;
+        *_v1 = _v0;
+    }
+    fun into_first(p0: Pair<u64, bool>): u64 {
+        *&(&p0).first
+    }
+    fun test_basic() {
+        let _v0 = Pair<u64, bool>{first: 42, second: true};
+        assert!(describe(&_v0) == 42, 0);
+    }
+    fun test_chain() {
+        let _v0 = unwrap<Pair<u64, bool>>(Wrapper<Pair<u64, bool>>{inner: Pair<u64, bool>{first: 7, second: true}});
+        assert!(describe(&_v0) == 7, 0);
+    }
+    fun unwrap<T0: copy + drop>(p0: Wrapper<T0>): T0 {
+        *&(&p0).inner
+    }
+    fun test_consume_receiver() {
+        assert!(into_first(Pair<u64, bool>{first: 99, second: true}) == 99, 0);
+    }
+    fun test_mut_receiver() {
+        let _v0 = Pair<u64, bool>{first: 42, second: true};
+        assert!(describe(&_v0) == 42, 0);
+        flip(&mut _v0);
+        assert!(describe(&_v0) == 0, 1);
+    }
+    fun test_mut_through_vector() {
+        let _v0 = Pair<u64, bool>{first: 5, second: false};
+        let _v1 = 0x1::vector::empty<Pair<u64, bool>>();
+        0x1::vector::push_back<Pair<u64, bool>>(&mut _v1, _v0);
+        let _v2 = _v1;
+        flip(0x1::vector::borrow_mut<Pair<u64, bool>>(&mut _v2, 0));
+        assert!(describe(0x1::vector::borrow<Pair<u64, bool>>(&_v2, 0)) == 5, 0);
+    }
+    fun test_vector_index() {
+        let _v0 = Pair<u64, bool>{first: 10, second: true};
+        let _v1 = Pair<u64, bool>{first: 20, second: false};
+        let _v2 = 0x1::vector::empty<Pair<u64, bool>>();
+        let _v3 = &mut _v2;
+        0x1::vector::push_back<Pair<u64, bool>>(_v3, _v0);
+        0x1::vector::push_back<Pair<u64, bool>>(_v3, _v1);
+        let _v4 = _v2;
+        assert!(describe(0x1::vector::borrow<Pair<u64, bool>>(&_v4, 0)) == 10, 0);
+        assert!(describe(0x1::vector::borrow<Pair<u64, bool>>(&_v4, 1)) == 0, 1);
+    }
+}
+
+
+//# run --verbose -- 0x42::concrete_test::test_basic
+
+//# run --verbose -- 0x42::concrete_test::test_mut_receiver
+
+//# run --verbose -- 0x42::concrete_test::test_consume_receiver
+
+//# run --verbose -- 0x42::concrete_test::test_chain
+
+//# run --verbose -- 0x42::concrete_test::test_vector_index
+
+//# run --verbose -- 0x42::concrete_test::test_mut_through_vector

@@ -22,14 +22,14 @@ pub fn open_db<P: AsRef<Path>>(
             db_path,
             TABLE_INFO_DB_NAME,
             column_families(),
-            &gen_rocksdb_options(rocksdb_config, env, readonly),
+            gen_rocksdb_options(rocksdb_config, env, readonly),
         )?)
     } else {
         Ok(DB::open(
             db_path,
             TABLE_INFO_DB_NAME,
             column_families(),
-            &gen_rocksdb_options(rocksdb_config, env, readonly),
+            gen_rocksdb_options(rocksdb_config, env, readonly),
         )?)
     }
 }
@@ -43,7 +43,7 @@ pub fn open_internal_indexer_db<P: AsRef<Path>>(
         db_path,
         INTERNAL_INDEXER_DB_NAME,
         internal_indexer_column_families(),
-        &gen_rocksdb_options(rocksdb_config, env, false),
+        gen_rocksdb_options(rocksdb_config, env, false),
     )?)
 }
 

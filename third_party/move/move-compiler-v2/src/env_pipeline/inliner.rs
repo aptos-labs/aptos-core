@@ -1,5 +1,5 @@
-// Copyright © Aptos Foundation
-// SPDX-License-Identifier: Apache-2.0
+// Copyright (c) Aptos Foundation
+// Licensed pursuant to the Innovation-Enabling Source Code License, available at https://github.com/aptos-labs/aptos-core/blob/main/LICENSE
 
 //! Inlining Overview:
 //! - We visit function calling inline functions reachable from compilation targets in a bottom-up
@@ -50,7 +50,10 @@ use codespan_reporting::diagnostic::Severity;
 use itertools::Itertools;
 use log::trace;
 use move_model::{
-    ast::{Exp, ExpData, Operation, Pattern, Spec, SpecBlockTarget, SpecFunDecl, TempIndex},
+    ast::{
+        Exp, ExpData, MemoryRange, Operation, Pattern, Spec, SpecBlockTarget, SpecFunDecl,
+        TempIndex,
+    },
     exp_rewriter::ExpRewriterFunctions,
     metadata::LanguageVersion,
     model::{FunId, GlobalEnv, Loc, NodeId, Parameter, QualifiedId, SpecFunId},
@@ -152,7 +155,7 @@ pub fn run_inlining(
                 }
             }
         }
-        env.filter_functions(|fun_id: &QualifiedFunId| !inline_funs.contains(fun_id));
+        env.retain_functions(|fun_id: &QualifiedFunId| !inline_funs.contains(fun_id));
     }
 }
 
@@ -775,8 +778,11 @@ impl<'env, 'rewriter> InlinedRewriter<'env, 'rewriter> {
                     )),
                 );
                 let closure_exp = lifter.rewrite_exp(lambda.clone().clone());
-                // Only one lift function should be generated.
-                assert_eq!(lifter.lifted_len(), 1);
+                // Lifting may fail (e.g., modified captured variable in lambda).
+                // Skip this lambda and fall back to non-lifted inlining.
+                if lifter.lifted_len() != 1 {
+                    continue;
+                }
                 let func_data = lifter.get_lifted_at(0).unwrap().generate_function_data(env);
                 sym_param_map.insert(para.1 .0, para.0);
                 function_value_map.insert(para.0, closure_exp.clone());
@@ -1387,7 +1393,7 @@ impl ExpRewriterFunctions for InlinedRewriter<'_, '_> {
                                     Operation::SpecFunction(
                                         spec_fun_id.module_id,
                                         spec_fun_id.id,
-                                        None,
+                                        MemoryRange::default(),
                                     ),
                                     new_args.clone(),
                                 )
@@ -1472,6 +1478,10 @@ impl ExpRewriterFunctions for InlinedRewriter<'_, '_> {
                 ))
             },
             Pattern::Wildcard(_) => Some(Pattern::Wildcard(new_id)),
+            Pattern::LiteralValue(_, val) => Some(Pattern::LiteralValue(new_id, val.clone())),
+            Pattern::Range(_, lo, hi, inc) => {
+                Some(Pattern::Range(new_id, lo.clone(), hi.clone(), *inc))
+            },
             Pattern::Error(_) => None,
         }
     }

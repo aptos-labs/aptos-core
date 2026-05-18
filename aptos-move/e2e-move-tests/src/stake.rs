@@ -1,10 +1,10 @@
 // Copyright (c) Aptos Foundation
 // Licensed pursuant to the Innovation-Enabling Source Code License, available at https://github.com/aptos-labs/aptos-core/blob/main/LICENSE
 
-use crate::harness::MoveHarness;
 use aptos_cached_packages::aptos_stdlib;
 use aptos_crypto::{bls12381, PrivateKey, Uniform};
 use aptos_language_e2e_tests::account::Account;
+use aptos_move_e2e_test_harness::MoveHarness;
 use aptos_types::{
     account_address::AccountAddress, account_config::CORE_CODE_ADDRESS,
     on_chain_config::ValidatorSet, stake_pool::StakePool, transaction::TransactionStatus,

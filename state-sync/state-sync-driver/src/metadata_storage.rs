@@ -76,7 +76,7 @@ impl PersistentMetadataStorage {
             state_sync_db_path.clone(),
             "state_sync",
             vec![METADATA_CF_NAME],
-            &options,
+            options,
         )
         .unwrap_or_else(|error| {
             panic!(

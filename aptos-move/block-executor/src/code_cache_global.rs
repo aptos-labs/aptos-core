@@ -9,7 +9,7 @@ use aptos_types::{
 };
 use aptos_vm_types::module_write_set::ModuleWrite;
 use dashmap::DashMap;
-use hashbrown::HashMap;
+use hashbrown::{Equivalent, HashMap};
 use move_binary_format::{errors::PartialVMResult, CompiledModule};
 use move_core_types::language_storage::ModuleId;
 use move_vm_runtime::{LayoutCacheEntry, Module, RuntimeEnvironment, StructKey};
@@ -129,7 +129,10 @@ where
 
     /// Returns the module stored in cache. If the module has not been cached, or it exists but is
     /// overridden, [None] is returned.
-    pub fn get(&self, key: &K) -> Option<Arc<ModuleCode<D, V, E>>> {
+    pub fn get<Q>(&self, key: &Q) -> Option<Arc<ModuleCode<D, V, E>>>
+    where
+        Q: Hash + Equivalent<K>,
+    {
         self.module_cache.get(key).and_then(|entry| {
             entry
                 .is_not_overridden()
@@ -153,17 +156,15 @@ where
     }
 
     /// Flushes all caches.
-    pub fn flush(&mut self) {
+    pub fn flush_all_caches(&mut self) {
         self.module_cache.clear();
         self.size = 0;
         self.struct_layouts.clear();
     }
 
-    /// Flushes only layout caches.
+    /// Flushes only layout caches. Used for memory management only (flush when
+    /// cache size gets too large).
     pub fn flush_layout_cache(&self) {
-        // TODO(layouts):
-        //   Flushing is only needed because of enums. Once we refactor layouts to store a single
-        //   variant instead, this can be removed.
         self.struct_layouts.clear();
     }
 
@@ -187,6 +188,10 @@ where
             e.insert(entry);
         }
         Ok(())
+    }
+
+    pub(crate) fn remove_struct_layout_entry(&self, key: &StructKey) {
+        self.struct_layouts.remove(key);
     }
 
     /// Inserts modules into the cache.
@@ -375,7 +380,7 @@ mod test {
         assert_eq!(cache.num_modules(), 2);
         assert_eq!(cache.size_in_bytes(), 24);
 
-        cache.flush();
+        cache.flush_all_caches();
         assert_eq!(cache.num_modules(), 0);
         assert_eq!(cache.size_in_bytes(), 0);
     }

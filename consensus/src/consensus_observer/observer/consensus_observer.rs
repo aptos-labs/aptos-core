@@ -229,6 +229,11 @@ impl ConsensusObserver {
             );
         }
 
+        // Clear the pipeline builder's module cache so that the stale CachedStateView is released.
+        if let Some(ref builder) = self.pipeline_builder {
+            builder.clear_module_cache();
+        }
+
         // Increment the cleared block state counter
         metrics::increment_counter_without_labels(&metrics::OBSERVER_CLEARED_BLOCK_STATE);
     }
@@ -247,11 +252,17 @@ impl ConsensusObserver {
 
     /// Finalizes the ordered block by sending it to the execution pipeline
     async fn finalize_ordered_block(&mut self, ordered_block: OrderedBlock) {
-        info!(
+        let proof_block_info = ordered_block.proof_block_info();
+        debug!(
             LogSchema::new(LogEntry::ConsensusObserver).message(&format!(
                 "Forwarding ordered blocks to the execution pipeline: {}",
-                ordered_block.proof_block_info()
+                proof_block_info
             ))
+        );
+        metrics::set_gauge_with_label(
+            &metrics::OBSERVER_FORWARDED_BLOCK_ROUND,
+            metrics::ORDERED_BLOCK_LABEL,
+            proof_block_info.round(),
         );
 
         let block = ordered_block.first_block();
@@ -553,11 +564,17 @@ impl ConsensusObserver {
 
                 // If state sync is not syncing to a commit, forward the commit decision to the execution pipeline
                 if !self.state_sync_manager.is_syncing_to_commit() {
-                    info!(
+                    let proof_block_info = commit_decision.proof_block_info();
+                    debug!(
                         LogSchema::new(LogEntry::ConsensusObserver).message(&format!(
                             "Forwarding commit decision to the execution pipeline: {}",
-                            commit_decision.proof_block_info()
+                            proof_block_info
                         ))
+                    );
+                    metrics::set_gauge_with_label(
+                        &metrics::OBSERVER_FORWARDED_BLOCK_ROUND,
+                        metrics::COMMIT_DECISION_LABEL,
+                        proof_block_info.round(),
                     );
                     self.forward_commit_decision(commit_decision.clone());
                 }
@@ -626,6 +643,14 @@ impl ConsensusObserver {
                     peer_network_id,
                     message_received_time,
                     ordered_block_with_window,
+                )
+                .await;
+            },
+            ConsensusObserverDirectSend::OrderedBlockV2(ordered_block_v2) => {
+                self.process_ordered_block_message(
+                    peer_network_id,
+                    message_received_time,
+                    ordered_block_v2.into_ordered_block(),
                 )
                 .await;
             },
@@ -1065,7 +1090,13 @@ impl ConsensusObserver {
     async fn wait_for_epoch_start(&mut self) {
         // Wait for the epoch state to update
         let block_payloads = self.observer_block_data.lock().get_block_payloads();
-        let (payload_manager, consensus_config, execution_config, randomness_config) = self
+        let (
+            payload_manager,
+            consensus_config,
+            execution_config,
+            randomness_config,
+            chunky_dkg_config,
+        ) = self
             .observer_epoch_state
             .wait_for_epoch_start(block_payloads)
             .await;
@@ -1092,6 +1123,7 @@ impl ConsensusObserver {
                 &consensus_config,
                 &execution_config,
                 &randomness_config,
+                &chunky_dkg_config,
                 None,
                 None,
                 rand_msg_rx,

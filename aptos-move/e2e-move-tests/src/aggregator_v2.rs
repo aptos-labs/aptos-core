@@ -1,11 +1,11 @@
 // Copyright (c) Aptos Foundation
 // Licensed pursuant to the Innovation-Enabling Source Code License, available at https://github.com/aptos-labs/aptos-core/blob/main/LICENSE
 
-use crate::{assert_success, harness::MoveHarness, BlockSplit};
 use aptos_language_e2e_tests::{
     account::Account,
     executor::{assert_outputs_equal, ExecutorMode, FakeExecutor},
 };
+use aptos_move_e2e_test_harness::{assert_success, BlockSplit, MoveHarness};
 use aptos_types::{
     account_address::AccountAddress,
     on_chain_config::FeatureFlag,
@@ -101,7 +101,7 @@ fn initialize_harness(
         ]);
     }
     let account = harness.new_account_at(AccountAddress::ONE);
-    assert_success!(harness.publish_package_cache_building(&account, &path));
+    assert_success!(harness.publish_package(&account, &path));
     (harness, account)
 }
 
@@ -286,7 +286,7 @@ impl AggV2TestHarness {
 
     pub fn republish(&mut self) -> SignedTransaction {
         self.harness
-            .create_publish_package_cache_building(&self.account, &self.path, |_| {})
+            .create_publish_package(&self.account, &self.path, None, |_| {})
     }
 
     fn create_entry_agg_func_with_args(

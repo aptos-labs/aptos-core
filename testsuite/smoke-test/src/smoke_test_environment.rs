@@ -13,7 +13,7 @@ use aptos_logger::prelude::*;
 use aptos_types::chain_id::ChainId;
 use once_cell::sync::Lazy;
 use rand::rngs::OsRng;
-use std::{num::NonZeroUsize, sync::Arc};
+use std::{env, num::NonZeroUsize, path::PathBuf, sync::Arc};
 use tokio::task::JoinHandle;
 
 const SWARM_BUILD_NUM_RETRIES: u8 = 3;
@@ -53,11 +53,6 @@ impl SwarmBuilder {
         self
     }
 
-    pub fn with_aptos_testnet(mut self) -> Self {
-        self.genesis_framework = Some(aptos_framework::testnet_release_bundle().clone());
-        self
-    }
-
     pub fn with_init_config(mut self, init_config: InitConfigFn) -> Self {
         self.init_config = Some(init_config);
         self
@@ -90,8 +85,15 @@ impl SwarmBuilder {
         // TODO change to return Swarm trait
         // Add support for forge
         assert!(self.local);
-        static FACTORY: Lazy<LocalFactory> =
-            Lazy::new(|| LocalFactory::from_workspace(None).unwrap());
+        static FACTORY: Lazy<LocalFactory> = Lazy::new(|| {
+            if let Ok(bin_dir) = env::var("SMOKE_TEST_BIN_DIR") {
+                let binary_path = PathBuf::from(bin_dir).join("aptos-node");
+                info!("Using pre-built aptos-node binary: {:?}", binary_path);
+                LocalFactory::from_binary(binary_path, None).unwrap()
+            } else {
+                LocalFactory::from_workspace(None).unwrap()
+            }
+        });
         let version = FACTORY.versions().max().unwrap();
         info!("Node finished compiling");
 

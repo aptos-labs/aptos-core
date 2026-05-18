@@ -31,7 +31,10 @@ impl ThreadService {
         let listen_addr = SocketAddr::new(IpAddr::V4(Ipv4Addr::LOCALHOST), listen_port);
         let server_addr = listen_addr;
 
-        let child = thread::spawn(move || remote_service::execute(storage, listen_addr, timeout));
+        let child = thread::Builder::new()
+            .name("safety-rules".into())
+            .spawn(move || remote_service::execute(storage, listen_addr, timeout))
+            .expect("failed to spawn safety-rules thread");
 
         Self {
             _child: child,

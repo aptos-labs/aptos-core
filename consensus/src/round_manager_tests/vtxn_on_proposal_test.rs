@@ -18,7 +18,7 @@ use aptos_types::{
     on_chain_config::{
         ConsensusAlgorithmConfig, ConsensusConfigV1, OnChainConsensusConfig,
         OnChainJWKConsensusConfig, OnChainRandomnessConfig, RandomnessConfigMoveStruct,
-        RandomnessConfigV2, ValidatorTxnConfig, DEFAULT_WINDOW_SIZE,
+        ValidatorTxnConfig, DEFAULT_WINDOW_SIZE,
     },
     validator_signer::ValidatorSigner,
     validator_txn::ValidatorTransaction,
@@ -121,19 +121,6 @@ fn no_vote_on_proposal_with_uncertified_dkg_result() {
         1,
         RealDKG::sample_secret_and_generate_transcript,
         false,
-    );
-}
-
-#[test]
-fn no_vote_on_proposal_with_inconsistent_secret_dkg_result() {
-    // This test requires V2 config since it tests fast-path secret consistency.
-    let v2_config = OnChainRandomnessConfig::V2(RandomnessConfigV2::default());
-    test_dkg_result_handling_with_config(
-        &[10_000_000, 70_000_000, 10_000_000, 10_000_000],
-        1,
-        RealDKG::generate_transcript_for_inconsistent_secrets,
-        false,
-        v2_config,
     );
 }
 

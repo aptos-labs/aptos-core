@@ -1,168 +1,168 @@
 
 Diagnostics:
 warning: [lint] Needless pair of `*` and `&mut` operators: consider removing them
-    ┌─ tests/stackless_bytecode_lints/needless_mutable_reference_warn.move:200:9
+    ┌─ tests/stackless_bytecode_lints/needless_mutable_reference_warn.move:216:9
     │
-200 │         *&mut s.x
+216 │         *&mut s.x
     │         ^^^^^^^^^
     │
     = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(needless_deref_ref)]`.
     = For more information, see https://aptos.dev/en/build/smart-contracts/linter#needless_deref_ref.
 
 warning: [lint] Needless pair of `*` and `&mut` operators: consider removing them
-    ┌─ tests/stackless_bytecode_lints/needless_mutable_reference_warn.move:204:9
+    ┌─ tests/stackless_bytecode_lints/needless_mutable_reference_warn.move:221:9
     │
-204 │         *&mut s
+221 │         *&mut s
     │         ^^^^^^^
     │
     = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(needless_deref_ref)]`.
     = For more information, see https://aptos.dev/en/build/smart-contracts/linter#needless_deref_ref.
 
 warning: [lint] Needless pair of `*` and `&mut` operators: consider removing them
-    ┌─ tests/stackless_bytecode_lints/needless_mutable_reference_warn.move:212:9
+    ┌─ tests/stackless_bytecode_lints/needless_mutable_reference_warn.move:230:9
     │
-212 │         *&mut u
+230 │         *&mut u
     │         ^^^^^^^
     │
     = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(needless_deref_ref)]`.
     = For more information, see https://aptos.dev/en/build/smart-contracts/linter#needless_deref_ref.
 
 warning: [lint] Needless mutable reference or borrow: consider using immutable reference or borrow instead
-   ┌─ tests/stackless_bytecode_lints/needless_mutable_reference_warn.move:14:17
+   ┌─ tests/stackless_bytecode_lints/needless_mutable_reference_warn.move:17:17
    │
-14 │         let y = &mut x;
+17 │         let y = &mut x;
    │                 ^^^^^^
    │
    = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(needless_mutable_reference)]`.
    = For more information, see https://aptos.dev/en/build/smart-contracts/linter#needless_mutable_reference.
 
 warning: [lint] Needless mutable reference or borrow: consider using immutable reference or borrow instead
-   ┌─ tests/stackless_bytecode_lints/needless_mutable_reference_warn.move:24:17
+   ┌─ tests/stackless_bytecode_lints/needless_mutable_reference_warn.move:29:17
    │
-24 │         let y = &mut x;
+29 │         let y = &mut x;
    │                 ^^^^^^
    │
    = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(needless_mutable_reference)]`.
    = For more information, see https://aptos.dev/en/build/smart-contracts/linter#needless_mutable_reference.
 
 warning: [lint] Needless mutable reference or borrow: consider using immutable reference or borrow instead
-   ┌─ tests/stackless_bytecode_lints/needless_mutable_reference_warn.move:41:20
+   ┌─ tests/stackless_bytecode_lints/needless_mutable_reference_warn.move:48:20
    │
-41 │     fun test3_warn(s: &mut S): u64 {
+48 │     fun test3_warn(s: &mut S): u64 {
    │                    ^
    │
    = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(needless_mutable_reference)]`.
    = For more information, see https://aptos.dev/en/build/smart-contracts/linter#needless_mutable_reference.
 
 warning: [lint] Needless mutable reference or borrow: consider using immutable reference or borrow instead
-    ┌─ tests/stackless_bytecode_lints/needless_mutable_reference_warn.move:109:17
+    ┌─ tests/stackless_bytecode_lints/needless_mutable_reference_warn.move:119:17
     │
-109 │         let r = borrow_global_mut<R>(addr);
-    │                 ^^^^^^^^^^^^^^^^^^^^^^^^^^
-    │
-    = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(needless_mutable_reference)]`.
-    = For more information, see https://aptos.dev/en/build/smart-contracts/linter#needless_mutable_reference.
-
-warning: [lint] Needless mutable reference or borrow: consider using immutable reference or borrow instead
-    ┌─ tests/stackless_bytecode_lints/needless_mutable_reference_warn.move:114:17
-    │
-114 │         let r = borrow_global_mut<R>(addr);
-    │                 ^^^^^^^^^^^^^^^^^^^^^^^^^^
+119 │         let r = &mut R[addr];
+    │                 ^^^^^^^^^^^^
     │
     = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(needless_mutable_reference)]`.
     = For more information, see https://aptos.dev/en/build/smart-contracts/linter#needless_mutable_reference.
 
 warning: [lint] Needless mutable reference or borrow: consider using immutable reference or borrow instead
-    ┌─ tests/stackless_bytecode_lints/needless_mutable_reference_warn.move:119:21
+    ┌─ tests/stackless_bytecode_lints/needless_mutable_reference_warn.move:124:17
     │
-119 │     fun test_warn_3(s: &mut S, p: bool, addr: address): u64 acquires S {
+124 │         let r = &mut R[addr];
+    │                 ^^^^^^^^^^^^
+    │
+    = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(needless_mutable_reference)]`.
+    = For more information, see https://aptos.dev/en/build/smart-contracts/linter#needless_mutable_reference.
+
+warning: [lint] Needless mutable reference or borrow: consider using immutable reference or borrow instead
+    ┌─ tests/stackless_bytecode_lints/needless_mutable_reference_warn.move:130:21
+    │
+130 │     fun test_warn_3(s: &mut S, p: bool, addr: address): u64 acquires S {
     │                     ^
     │
     = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(needless_mutable_reference)]`.
     = For more information, see https://aptos.dev/en/build/smart-contracts/linter#needless_mutable_reference.
 
 warning: [lint] Needless mutable reference or borrow: consider using immutable reference or borrow instead
-    ┌─ tests/stackless_bytecode_lints/needless_mutable_reference_warn.move:120:19
+    ┌─ tests/stackless_bytecode_lints/needless_mutable_reference_warn.move:131:19
     │
-120 │         let ref = borrow_global_mut<S>(addr);
-    │                   ^^^^^^^^^^^^^^^^^^^^^^^^^^
+131 │         let ref = &mut S[addr];
+    │                   ^^^^^^^^^^^^
     │
     = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(needless_mutable_reference)]`.
     = For more information, see https://aptos.dev/en/build/smart-contracts/linter#needless_mutable_reference.
 
 warning: [lint] Needless mutable reference or borrow: consider using immutable reference or borrow instead
-    ┌─ tests/stackless_bytecode_lints/needless_mutable_reference_warn.move:153:22
+    ┌─ tests/stackless_bytecode_lints/needless_mutable_reference_warn.move:167:22
     │
-153 │             a = &mut e1.0;
+167 │             a = &mut e1.0;
     │                      ^^
     │
     = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(needless_mutable_reference)]`.
     = For more information, see https://aptos.dev/en/build/smart-contracts/linter#needless_mutable_reference.
 
 warning: [lint] Needless mutable reference or borrow: consider using immutable reference or borrow instead
-    ┌─ tests/stackless_bytecode_lints/needless_mutable_reference_warn.move:155:22
+    ┌─ tests/stackless_bytecode_lints/needless_mutable_reference_warn.move:169:22
     │
-155 │             a = &mut e2.0;
+169 │             a = &mut e2.0;
     │                      ^^
     │
     = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(needless_mutable_reference)]`.
     = For more information, see https://aptos.dev/en/build/smart-contracts/linter#needless_mutable_reference.
 
 warning: [lint] Needless mutable reference or borrow: consider using immutable reference or borrow instead
-    ┌─ tests/stackless_bytecode_lints/needless_mutable_reference_warn.move:160:21
+    ┌─ tests/stackless_bytecode_lints/needless_mutable_reference_warn.move:175:21
     │
-160 │     fun test_warn_2(a: &mut E, b: &mut E) {
+175 │     fun test_warn_2(a: &mut E, b: &mut E) {
     │                     ^
     │
     = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(needless_mutable_reference)]`.
     = For more information, see https://aptos.dev/en/build/smart-contracts/linter#needless_mutable_reference.
 
 warning: [lint] Needless mutable reference or borrow: consider using immutable reference or borrow instead
-    ┌─ tests/stackless_bytecode_lints/needless_mutable_reference_warn.move:160:32
+    ┌─ tests/stackless_bytecode_lints/needless_mutable_reference_warn.move:175:32
     │
-160 │     fun test_warn_2(a: &mut E, b: &mut E) {
+175 │     fun test_warn_2(a: &mut E, b: &mut E) {
     │                                ^
     │
     = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(needless_mutable_reference)]`.
     = For more information, see https://aptos.dev/en/build/smart-contracts/linter#needless_mutable_reference.
 
 warning: [lint] Needless mutable reference or borrow: consider using immutable reference or borrow instead
-    ┌─ tests/stackless_bytecode_lints/needless_mutable_reference_warn.move:173:28
+    ┌─ tests/stackless_bytecode_lints/needless_mutable_reference_warn.move:188:28
     │
-173 │     public fun test_warn_3(x: &mut u64) {
+188 │     public fun test_warn_3(x: &mut u64) {
     │                            ^
     │
     = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(needless_mutable_reference)]`.
     = For more information, see https://aptos.dev/en/build/smart-contracts/linter#needless_mutable_reference.
 
 warning: This assignment/binding to the left-hand-side variable `x` is unused. Consider removing this assignment/binding, or prefixing the left-hand-side variable with an underscore (e.g., `_x`), or renaming to `_`
-    ┌─ tests/stackless_bytecode_lints/needless_mutable_reference_warn.move:175:9
+    ┌─ tests/stackless_bytecode_lints/needless_mutable_reference_warn.move:190:9
     │
-175 │         x = y; // Produces a cycle in the `derived_edges`.
+190 │         x = y; // Produces a cycle in the `derived_edges`.
     │         ^^^^^
 
 warning: [lint] Needless mutable reference or borrow: consider using immutable reference or borrow instead
-    ┌─ tests/stackless_bytecode_lints/needless_mutable_reference_warn.move:242:17
+    ┌─ tests/stackless_bytecode_lints/needless_mutable_reference_warn.move:263:17
     │
-242 │         let u = &mut s;
+263 │         let u = &mut s;
     │                 ^^^^^^
     │
     = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(needless_mutable_reference)]`.
     = For more information, see https://aptos.dev/en/build/smart-contracts/linter#needless_mutable_reference.
 
 warning: [lint] Needless mutable reference or borrow: consider using immutable reference or borrow instead
-    ┌─ tests/stackless_bytecode_lints/needless_mutable_reference_warn.move:252:17
+    ┌─ tests/stackless_bytecode_lints/needless_mutable_reference_warn.move:275:17
     │
-252 │         let u = &mut s;
+275 │         let u = &mut s;
     │                 ^^^^^^
     │
     = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(needless_mutable_reference)]`.
     = For more information, see https://aptos.dev/en/build/smart-contracts/linter#needless_mutable_reference.
 
 warning: [lint] Needless mutable reference or borrow: consider using immutable reference or borrow instead
-    ┌─ tests/stackless_bytecode_lints/needless_mutable_reference_warn.move:277:24
+    ┌─ tests/stackless_bytecode_lints/needless_mutable_reference_warn.move:301:24
     │
-277 │     public fun warn_01(x: &mut u64): &u64 {
+301 │     public fun warn_01(x: &mut u64): &u64 {
     │                        ^
     │
     = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(needless_mutable_reference)]`.

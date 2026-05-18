@@ -141,14 +141,7 @@ module aptos_framework::block {
         let old_epoch_interval = block_resource.epoch_interval;
         block_resource.epoch_interval = new_epoch_interval;
 
-        if (std::features::module_event_migration_enabled()) {
-            event::emit(UpdateEpochInterval { old_epoch_interval, new_epoch_interval });
-        } else {
-            event::emit_event<UpdateEpochIntervalEvent>(
-                &mut block_resource.update_epoch_interval_events,
-                UpdateEpochIntervalEvent { old_epoch_interval, new_epoch_interval }
-            );
-        };
+        event::emit(UpdateEpochInterval { old_epoch_interval, new_epoch_interval });
     }
 
     #[view]
@@ -265,6 +258,7 @@ module aptos_framework::block {
 
         if (timestamp - reconfiguration::last_reconfiguration_time() >= epoch_interval) {
             reconfiguration_with_dkg::try_start();
+            reconfiguration_with_dkg::try_advance_reconfig();
         };
     }
 
@@ -298,6 +292,7 @@ module aptos_framework::block {
 
         if (timestamp - reconfiguration::last_reconfiguration_time() >= epoch_interval) {
             reconfiguration_with_dkg::try_start_with_chunky_dkg();
+            reconfiguration_with_dkg::try_advance_reconfig();
         };
     }
 

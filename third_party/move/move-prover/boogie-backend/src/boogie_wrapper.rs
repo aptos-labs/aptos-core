@@ -1,6 +1,7 @@
-// Copyright (c) The Diem Core Contributors
-// Copyright (c) The Move Contributors
-// SPDX-License-Identifier: Apache-2.0
+// Parts of the file are Copyright (c) The Diem Core Contributors
+// Parts of the file are Copyright (c) The Move Contributors
+// Parts of the file are Copyright (c) Aptos Foundation
+// All Aptos Foundation code and content is licensed pursuant to the Innovation-Enabling Source Code License, available at https://github.com/aptos-labs/aptos-core/blob/main/LICENSE
 
 //! Wrapper around the boogie program. Allows to call boogie and analyze the output.
 
@@ -1470,6 +1471,7 @@ impl ModelValue {
             | Type::Primitive(_)
             | Type::TypeDomain(_)
             | Type::ResourceDomain(_, _, _)
+            | Type::StateDomain
             | Type::Error
             | Type::Var(_) => None,
         }
@@ -1538,7 +1540,7 @@ impl ModelValue {
         struct_env: &StructEnv,
         inst: &[Type],
     ) -> Option<PrettyDoc> {
-        let struct_name = &boogie_struct_name(struct_env, inst);
+        let struct_name = &boogie_struct_name(struct_env, inst, false);
         let mut ctor_name = struct_env
             .get_name()
             .display(struct_env.symbol_pool())
@@ -1622,7 +1624,7 @@ impl ModelValue {
         // function table of $EncodeKey and turns into a map from int to encoded ModelValue.
         let encoding_key = format!(
             "$EncodeKey{}",
-            boogie_inst_suffix(wrapper.env, std::slice::from_ref(key_ty))
+            boogie_inst_suffix(wrapper.env, std::slice::from_ref(key_ty), &[])
         );
         let encoding_map = model
             .vars
@@ -1668,7 +1670,12 @@ impl ModelValue {
         let mut entries = vec![];
         for idx in values.values.keys().sorted() {
             let mut p = values.values.get(idx)?.pretty_or_raw(wrapper, model, param);
-            p = PrettyDoc::text(format!("Address({}): ", idx)).append(p);
+            let addr_prefix = if wrapper.options.stable_test_output {
+                "Address(<redacted>): ".to_string()
+            } else {
+                format!("Address({}): ", idx)
+            };
+            p = PrettyDoc::text(addr_prefix).append(p);
             entries.push(p);
         }
         let default = if values.default == ModelValue::error() {

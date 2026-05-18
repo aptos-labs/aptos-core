@@ -3,7 +3,11 @@
 
 use aptos_bounded_executor::BoundedExecutor;
 use aptos_consensus_types::common::Author;
-use aptos_logger::{debug, sample, sample::SampleRate, warn};
+use aptos_logger::{
+    debug,
+    sample::{SampleRate, Sampling},
+    warn,
+};
 use aptos_time_service::{TimeService, TimeServiceTrait};
 use async_trait::async_trait;
 use bytes::Bytes;
@@ -54,6 +58,7 @@ pub trait BroadcastStatus<Req: RBMessage, Res: RBMessage = Req>: Send + Sync + C
 }
 
 pub struct ReliableBroadcast<Req: RBMessage, TBackoff, Res: RBMessage = Req> {
+    name: &'static str,
     self_author: Author,
     validators: Vec<Author>,
     network_sender: Arc<dyn RBNetworkSender<Req, Res>>,
@@ -61,6 +66,7 @@ pub struct ReliableBroadcast<Req: RBMessage, TBackoff, Res: RBMessage = Req> {
     time_service: TimeService,
     rpc_timeout_duration: Duration,
     executor: BoundedExecutor,
+    sampling: Arc<Sampling>,
 }
 
 impl<Req, TBackoff, Res> ReliableBroadcast<Req, TBackoff, Res>
@@ -70,6 +76,7 @@ where
     Res: RBMessage + 'static,
 {
     pub fn new(
+        name: &'static str,
         self_author: Author,
         validators: Vec<Author>,
         network_sender: Arc<dyn RBNetworkSender<Req, Res>>,
@@ -79,6 +86,7 @@ where
         executor: BoundedExecutor,
     ) -> Self {
         Self {
+            name,
             self_author,
             validators,
             network_sender,
@@ -86,6 +94,7 @@ where
             time_service,
             rpc_timeout_duration,
             executor,
+            sampling: Arc::new(Sampling::new(SampleRate::Duration(Duration::from_secs(30)))),
         }
     }
 
@@ -110,6 +119,8 @@ where
     where
         <<S as BroadcastStatus<Req, Res>>::Response as TryFrom<Res>>::Error: Debug,
     {
+        let name = self.name;
+        let sampling = self.sampling.clone();
         let network_sender = self.network_sender.clone();
         let time_service = self.time_service.clone();
         let rpc_timeout_duration = self.rpc_timeout_duration;
@@ -189,7 +200,7 @@ where
                                 }
                             },
                             Err(e) => {
-                                log_rpc_failure(e, receiver);
+                                log_rpc_failure(name, &sampling, e, receiver);
 
                                 let backoff_strategy = backoff_policies
                                     .get_mut(&receiver)
@@ -207,16 +218,20 @@ where
     }
 }
 
-fn log_rpc_failure(error: anyhow::Error, receiver: Author) {
-    // Log a sampled warning (to prevent spam)
-    sample!(
-        SampleRate::Duration(Duration::from_secs(30)),
-        warn!("[sampled] rpc to {} failed, error {:#}", receiver, error)
-    );
+fn log_rpc_failure(name: &str, sampling: &Sampling, error: anyhow::Error, receiver: Author) {
+    // Log a sampled warning (to prevent spam).
+    // Each ReliableBroadcast instance has its own Sampling, so
+    // different consumers sample independently.
+    if sampling.sample() {
+        warn!(
+            "[sampled] [{}] rpc to {} failed, error {:#}",
+            name, receiver, error
+        );
+    }
 
     // Log at the debug level (this is useful for debugging
     // and won't spam the logs in a production environment).
-    debug!("rpc to {} failed, error {:#}", receiver, error);
+    debug!("[{}] rpc to {} failed, error {:#}", name, receiver, error);
 }
 
 pub struct DropGuard {

@@ -4,6 +4,7 @@
 use crate::{
     agg_trx_producer::AggTranscriptProducer,
     chunky::dkg_manager::ChunkyDKGManager,
+    counters,
     dkg_manager::DKGManager,
     network::{IncomingRpcRequest, NetworkReceivers, NetworkSender},
     network_interface::DKGNetworkClient,
@@ -29,9 +30,9 @@ use aptos_types::{
     },
     epoch_state::EpochState,
     on_chain_config::{
-        ChunkyDKGConfigMoveStruct, OnChainChunkyDKGConfig, OnChainConfigPayload,
-        OnChainConfigProvider, OnChainConsensusConfig, OnChainRandomnessConfig,
-        RandomnessConfigMoveStruct, RandomnessConfigSeqNum, ValidatorSet,
+        ChunkyDKGConfigMoveStruct, ChunkyDKGConfigSeqNum, OnChainChunkyDKGConfig,
+        OnChainConfigPayload, OnChainConfigProvider, OnChainConsensusConfig,
+        OnChainRandomnessConfig, RandomnessConfigMoveStruct, RandomnessConfigSeqNum, ValidatorSet,
     },
 };
 use aptos_validator_transaction_pool::VTxnPoolState;
@@ -73,6 +74,9 @@ pub struct EpochManager<P: OnChainConfigProvider> {
     // Randomness overriding.
     randomness_override_seq_num: u64,
 
+    // ChunkyDKG overriding.
+    chunky_dkg_override_seq_num: u64,
+
     key_storage: PersistentSafetyStorage,
 }
 
@@ -87,6 +91,7 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
         vtxn_pool: VTxnPoolState,
         rb_config: ReliableBroadcastConfig,
         randomness_override_seq_num: u64,
+        chunky_dkg_override_seq_num: u64,
     ) -> Self {
         Self {
             my_addr,
@@ -104,6 +109,7 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
             chunky_dkg_start_event_tx: None,
             rb_config,
             randomness_override_seq_num,
+            chunky_dkg_override_seq_num,
             key_storage: storage(safety_rules_config),
         }
     }
@@ -153,7 +159,6 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
                     if let Some(tx) = self.dkg_start_event_tx.as_ref() {
                         if let Ok(dkg_start_event) = DKGStartEvent::try_from(&event) {
                             let _ = tx.push((), dkg_start_event);
-                            return Ok(());
                         } else {
                             error!("[DKG] on_dkg_start_notification: failed in converting a contract event to a DKGStartEvent!");
                         }
@@ -165,7 +170,6 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
                         match ChunkyDKGStartEvent::try_from(&event) {
                             Ok(dkg_start_event) => {
                                 let _ = tx.push((), dkg_start_event);
-                                return Ok(());
                             },
                             Err(e) => {
                                 error!("[DKG] Failed conversion to ChunkyDKGStartEvent: {}", e);
@@ -257,9 +261,31 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
         );
 
         let chunky_dkg_config_move_struct = payload.get::<ChunkyDKGConfigMoveStruct>();
+        let onchain_chunky_dkg_config_seq_num = payload
+            .get::<ChunkyDKGConfigSeqNum>()
+            .unwrap_or_else(|_| ChunkyDKGConfigSeqNum::default_if_missing());
 
-        let onchain_chunky_dkg_config =
-            OnChainChunkyDKGConfig::from_configs(chunky_dkg_config_move_struct.ok());
+        info!(
+            epoch = epoch_state.epoch,
+            local = self.chunky_dkg_override_seq_num,
+            onchain = onchain_chunky_dkg_config_seq_num.seq_num,
+            "Checking chunky DKG config override."
+        );
+        if self.chunky_dkg_override_seq_num > onchain_chunky_dkg_config_seq_num.seq_num {
+            warn!("ChunkyDKG will be force-disabled by local config!");
+        }
+
+        let onchain_chunky_dkg_config = OnChainChunkyDKGConfig::from_configs(
+            self.chunky_dkg_override_seq_num,
+            onchain_chunky_dkg_config_seq_num.seq_num,
+            chunky_dkg_config_move_struct.ok(),
+        );
+
+        counters::CHUNKY_DKG_CONFIG_MODE.set(match &onchain_chunky_dkg_config {
+            OnChainChunkyDKGConfig::Off => 0,
+            OnChainChunkyDKGConfig::ShadowV1(_) => 1,
+            OnChainChunkyDKGConfig::V1(_) => 2,
+        });
 
         let onchain_consensus_config = payload
             .get::<OnChainConsensusConfig>()
@@ -268,27 +294,31 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
             })
             .unwrap_or_default();
 
-        // Create shared network sender and reliable broadcast for both DKG managers
+        // Create shared network sender for both DKG managers
         let network_sender = Arc::new(self.create_network_sender());
-        let rb = Arc::new(ReliableBroadcast::new(
-            self.my_addr,
-            epoch_state.verifier.get_ordered_account_addresses(),
-            network_sender.clone(),
-            ExponentialBackoff::from_millis(self.rb_config.backoff_policy_base_ms)
-                .factor(self.rb_config.backoff_policy_factor)
-                .max_delay(Duration::from_millis(
-                    self.rb_config.backoff_policy_max_delay_ms,
-                )),
-            aptos_time_service::TimeService::real(),
-            Duration::from_millis(self.rb_config.rpc_timeout_ms),
-            BoundedExecutor::new(8, tokio::runtime::Handle::current()),
-        ));
+        let rb_config = self.rb_config.clone();
+
+        let rb_backoff_policy = || {
+            ExponentialBackoff::from_millis(rb_config.backoff_policy_base_ms)
+                .factor(rb_config.backoff_policy_factor)
+                .max_delay(Duration::from_millis(rb_config.backoff_policy_max_delay_ms))
+        };
 
         // Check both validator txn and randomness features are enabled
         if onchain_consensus_config.is_vtxn_enabled()
             && onchain_randomness_config.randomness_enabled()
         {
-            self.start_dkg_manager(epoch_state.clone(), my_index, &payload, rb.clone())
+            let rb = Arc::new(ReliableBroadcast::new(
+                "dkg",
+                self.my_addr,
+                epoch_state.verifier.get_ordered_account_addresses(),
+                network_sender.clone(),
+                rb_backoff_policy(),
+                aptos_time_service::TimeService::real(),
+                Duration::from_millis(rb_config.rpc_timeout_ms),
+                BoundedExecutor::new(8, tokio::runtime::Handle::current()),
+            ));
+            self.start_dkg_manager(epoch_state.clone(), my_index, &payload, rb)
                 .await?;
         }
 
@@ -296,11 +326,21 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
         if onchain_consensus_config.is_vtxn_enabled()
             && onchain_chunky_dkg_config.chunky_dkg_enabled()
         {
+            let rb = Arc::new(ReliableBroadcast::new(
+                "chunky_dkg",
+                self.my_addr,
+                epoch_state.verifier.get_ordered_account_addresses(),
+                network_sender.clone(),
+                rb_backoff_policy(),
+                aptos_time_service::TimeService::real(),
+                Duration::from_millis(rb_config.rpc_timeout_ms),
+                BoundedExecutor::new(8, tokio::runtime::Handle::current()),
+            ));
             self.start_chunky_dkg_manager(
                 epoch_state.clone(),
                 my_index,
                 &payload,
-                rb.clone(),
+                rb,
                 network_sender,
             )
             .await?;

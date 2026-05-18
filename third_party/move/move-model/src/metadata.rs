@@ -1,9 +1,11 @@
 // Copyright (c) Aptos Foundation
-// SPDX-License-Identifier: Apache-2.0
+// Licensed pursuant to the Innovation-Enabling Source Code License, available at https://github.com/aptos-labs/aptos-core/blob/main/LICENSE
 
 use anyhow::bail;
 use legacy_move_compiler::shared::LanguageVersion as CompilerLanguageVersion;
-use move_binary_format::file_format_common::{VERSION_DEFAULT, VERSION_DEFAULT_LANG_V2_4};
+use move_binary_format::file_format_common::{
+    VERSION_DEFAULT, VERSION_DEFAULT_LANG_V2_4, VERSION_DEFAULT_LANG_V2_5,
+};
 use move_command_line_common::env;
 use serde::{Deserialize, Serialize};
 use std::{
@@ -33,6 +35,13 @@ pub mod lang_feature_versions {
     pub const LANGUAGE_VERSION_FOR_COMPILE_FOR_TESTING: LanguageVersion = LanguageVersion::V2_2;
     pub const LANGUAGE_VERSION_FOR_SINT: LanguageVersion = LanguageVersion::V2_3;
     pub const LANGUAGE_VERSION_FOR_PUBLIC_STRUCT: LanguageVersion = LanguageVersion::V2_4;
+    /// This version guards checks for unused private functions, private structs, and constants.
+    pub const LANGUAGE_VERSION_FOR_UNUSED_CHECK: LanguageVersion = LanguageVersion::V2_4;
+    /// This version guards proof blocks, lemma declarations, and behavioral predicates.
+    pub const LANGUAGE_VERSION_FOR_PROOFS: LanguageVersion = LanguageVersion::V2_4;
+    /// This version guards match support for primitive types.
+    pub const LANGUAGE_VERSION_FOR_PRIMITIVE_MATCH: LanguageVersion = LanguageVersion::V2_4;
+    pub const LANGUAGE_VERSION_FOR_PUBLIC_CONST: LanguageVersion = LanguageVersion::V2_4;
     pub const LANGUAGE_VERSION_FOR_RAC: LanguageVersion =
         crate::metadata::LATEST_LANGUAGE_VERSION_VALUE;
 }
@@ -92,10 +101,8 @@ impl CompilationMetadata {
 /// The versioning scheme is `major.minor`, where for `major = 1` we do not
 /// distinguish a minor version. A major version change represents
 /// a different/largely refactored compiler. This we have versions `1, 2.0, 2.1, 2.2, .., `.
-#[derive(Clone, Copy, Debug, Serialize, Deserialize, Eq, PartialEq, PartialOrd, Ord)]
+#[derive(Clone, Copy, Debug, Hash, Serialize, Deserialize, Eq, PartialEq, PartialOrd, Ord)]
 pub enum CompilerVersion {
-    /// The legacy v1 Move compiler, no longer supported.
-    V1,
     /// The v2 compiler, starting with 2.0-unstable. Each new released version of the compiler
     /// should get an enum entry here.
     V2_0,
@@ -118,12 +125,11 @@ impl FromStr for CompilerVersion {
         // Strip unstable marker as it is not relevant for parsing.
         let s1 = s.replace(UNSTABLE_MARKER, "");
         match s1.as_str() {
-            // For legacy reasons, also support v1 and v2
-            "1" | "v1" => Ok(Self::V1),
+            "1" | "v1" => bail!("compiler version 1 is no longer supported"),
             "2" | "v2" | "2.0" => Ok(Self::V2_0),
             "2.1" => Ok(Self::V2_1),
             _ => bail!(
-                "unrecognized compiler version `{}` (supported versions: `1`, `2`, `2.0`)",
+                "unrecognized compiler version `{}` (supported versions: `2`, `2.0`, `2.1`)",
                 s
             ),
         }
@@ -136,7 +142,6 @@ impl Display for CompilerVersion {
             f,
             "{}{}",
             match self {
-                CompilerVersion::V1 => "1",
                 CompilerVersion::V2_0 => "2.0",
                 CompilerVersion::V2_1 => "2.1",
             },
@@ -150,7 +155,6 @@ impl CompilerVersion {
     /// should not be allowed on production networks.
     pub fn unstable(self) -> bool {
         match self {
-            CompilerVersion::V1 => false,
             CompilerVersion::V2_0 => false,
             CompilerVersion::V2_1 => true,
         }
@@ -166,20 +170,8 @@ impl CompilerVersion {
         LATEST_STABLE_COMPILER_VERSION_VALUE
     }
 
-    /// Check whether the compiler version supports the given language version,
-    /// generates an error if not.
-    pub fn check_language_support(self, _version: LanguageVersion) -> anyhow::Result<()> {
-        match self {
-            CompilerVersion::V1 => {
-                bail!("compiler v1 is no longer supported")
-            },
-            _ => Ok(()),
-        }
-    }
-
     pub const fn to_str(&self) -> &'static str {
         match self {
-            CompilerVersion::V1 => "1",
             CompilerVersion::V2_0 => "2.0",
             CompilerVersion::V2_1 => "2.1",
         }
@@ -196,13 +188,8 @@ impl CompilerVersion {
 /// Typically, a major version change is given with an addition of larger new language
 /// features. There are no breaking changes expected with major version changes,
 /// however, there maybe some isolated exceptions.
-#[derive(Clone, Copy, Debug, Eq, PartialEq, PartialOrd, Ord)]
+#[derive(Clone, Copy, Debug, Hash, Eq, PartialEq, PartialOrd, Ord)]
 pub enum LanguageVersion {
-    /// The version of Move at around the genesis of the Aptos network end
-    /// of '22. This is the original Diem Move plus the extension of inline
-    /// functions with lambda parameters, as well as a simple form of `for`
-    /// loops.
-    V1,
     /// The 2.0 version of Move.
     V2_0,
     /// The 2.1 version of Move,
@@ -253,7 +240,7 @@ impl FromStr for LanguageVersion {
         // Strip unstable marker as it is not relevant for parsing.
         let s1 = s.replace(UNSTABLE_MARKER, "");
         match s1.as_str() {
-            "1" => Ok(Self::V1),
+            "1" => bail!("language version 1 is no longer supported"),
             "2.0" => Ok(Self::V2_0),
             "2" | "2.1" => Ok(Self::V2_1),
             "2.2" => Ok(Self::V2_2),
@@ -261,7 +248,7 @@ impl FromStr for LanguageVersion {
             "2.4" => Ok(Self::V2_4),
             "2.5" => Ok(Self::V2_5),
             _ => bail!(
-                "unrecognized language version \"{}\" (supported versions: \"1\", \"2\", \"2.0-2.5\")",
+                "unrecognized language version \"{}\" (supported versions: \"2\", \"2.0\"-\"2.5\")",
                 s
             ),
         }
@@ -271,7 +258,6 @@ impl FromStr for LanguageVersion {
 impl From<LanguageVersion> for CompilerLanguageVersion {
     fn from(val: LanguageVersion) -> Self {
         match val {
-            LanguageVersion::V1 => CompilerLanguageVersion::V1,
             LanguageVersion::V2_0 => CompilerLanguageVersion::V2_0,
             LanguageVersion::V2_1 => CompilerLanguageVersion::V2_1,
             LanguageVersion::V2_2 => CompilerLanguageVersion::V2_2,
@@ -288,7 +274,7 @@ impl LanguageVersion {
     pub const fn unstable(self) -> bool {
         use LanguageVersion::*;
         match self {
-            V1 | V2_0 | V2_1 | V2_2 | V2_3 => false,
+            V2_0 | V2_1 | V2_2 | V2_3 => false,
             V2_4 | V2_5 => true,
         }
     }
@@ -312,22 +298,25 @@ impl LanguageVersion {
         self.is_at_least(lang_feature_versions::LANGUAGE_VERSION_FOR_PUBLIC_STRUCT)
     }
 
+    pub fn language_version_for_public_const(&self) -> bool {
+        self.is_at_least(lang_feature_versions::LANGUAGE_VERSION_FOR_PUBLIC_CONST)
+    }
+
     /// If the bytecode version is not specified, infer it from the language version. For
     /// debugging purposes, respects the MOVE_BYTECODE_VERSION env var as an override.
     pub fn infer_bytecode_version(&self, version: Option<u32>) -> u32 {
         env::get_bytecode_version_from_env(version).unwrap_or(match self {
-            LanguageVersion::V1 => VERSION_DEFAULT,
             LanguageVersion::V2_0
             | LanguageVersion::V2_1
             | LanguageVersion::V2_2
             | LanguageVersion::V2_3 => VERSION_DEFAULT,
-            LanguageVersion::V2_4 | LanguageVersion::V2_5 => VERSION_DEFAULT_LANG_V2_4,
+            LanguageVersion::V2_4 => VERSION_DEFAULT_LANG_V2_4,
+            LanguageVersion::V2_5 => VERSION_DEFAULT_LANG_V2_5,
         })
     }
 
     pub const fn to_str(&self) -> &'static str {
         match self {
-            LanguageVersion::V1 => "1",
             LanguageVersion::V2_0 => "2.0",
             LanguageVersion::V2_1 => "2.1",
             LanguageVersion::V2_2 => "2.2",
@@ -344,7 +333,6 @@ impl Display for LanguageVersion {
             f,
             "{}{}",
             match self {
-                LanguageVersion::V1 => "1",
                 LanguageVersion::V2_0 => "2.0",
                 LanguageVersion::V2_1 => "2.1",
                 LanguageVersion::V2_2 => "2.2",

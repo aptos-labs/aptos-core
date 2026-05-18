@@ -1,0 +1,118 @@
+
+Diagnostics:
+warning: [lint] this function call can be written as `<arg>.get_value()` using receiver-style syntax.
+   ┌─ tests/model_ast_lints/use_receiver_style.move:58:9
+   │
+58 │         get_value(&s)
+   │         ^^^^^^^^^^^^^
+   │
+   = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(use_receiver_style)]`.
+   = For more information, see https://aptos.dev/en/build/smart-contracts/linter#use_receiver_style.
+
+warning: [lint] this function call can be written as `<first_arg>.set_value(<rest_args>)` using receiver-style syntax.
+   ┌─ tests/model_ast_lints/use_receiver_style.move:63:9
+   │
+63 │         set_value(s, 42);
+   │         ^^^^^^^^^^^^^^^^
+   │
+   = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(use_receiver_style)]`.
+   = For more information, see https://aptos.dev/en/build/smart-contracts/linter#use_receiver_style.
+
+warning: [lint] this function call can be written as `<arg>.consume()` using receiver-style syntax.
+   ┌─ tests/model_ast_lints/use_receiver_style.move:68:9
+   │
+68 │         consume(s)
+   │         ^^^^^^^^^^
+   │
+   = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(use_receiver_style)]`.
+   = For more information, see https://aptos.dev/en/build/smart-contracts/linter#use_receiver_style.
+
+warning: [lint] this function call can be written as `<first_arg>.set_value(<rest_args>)` using receiver-style syntax.
+   ┌─ tests/model_ast_lints/use_receiver_style.move:73:9
+   │
+73 │         set_value(s, 100);
+   │         ^^^^^^^^^^^^^^^^^
+   │
+   = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(use_receiver_style)]`.
+   = For more information, see https://aptos.dev/en/build/smart-contracts/linter#use_receiver_style.
+
+warning: [lint] this function call can be written as `<arg>.is_empty()` using receiver-style syntax.
+   ┌─ tests/model_ast_lints/use_receiver_style.move:78:13
+   │
+78 │         if (is_empty(&s)) { 0 } else { get_value(&s) }
+   │             ^^^^^^^^^^^^
+   │
+   = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(use_receiver_style)]`.
+   = For more information, see https://aptos.dev/en/build/smart-contracts/linter#use_receiver_style.
+
+warning: [lint] this function call can be written as `<arg>.get_value()` using receiver-style syntax.
+   ┌─ tests/model_ast_lints/use_receiver_style.move:78:40
+   │
+78 │         if (is_empty(&s)) { 0 } else { get_value(&s) }
+   │                                        ^^^^^^^^^^^^^
+   │
+   = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(use_receiver_style)]`.
+   = For more information, see https://aptos.dev/en/build/smart-contracts/linter#use_receiver_style.
+
+warning: [lint] this function call can be written as `<arg>.get_item()` using receiver-style syntax.
+   ┌─ tests/model_ast_lints/use_receiver_style.move:83:9
+   │
+83 │         get_item(c)
+   │         ^^^^^^^^^^^
+   │
+   = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(use_receiver_style)]`.
+   = For more information, see https://aptos.dev/en/build/smart-contracts/linter#use_receiver_style.
+
+warning: [lint] this function call can be written as `<arg>.get_value()` using receiver-style syntax.
+    ┌─ tests/model_ast_lints/use_receiver_style.move:131:9
+    │
+131 │         provider::get_value(&s)
+    │         ^^^^^^^^^^^^^^^^^^^^^^^
+    │
+    = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(use_receiver_style)]`.
+    = For more information, see https://aptos.dev/en/build/smart-contracts/linter#use_receiver_style.
+
+warning: [lint] this function call can be written as `<first_arg>.set_value(<rest_args>)` using receiver-style syntax.
+    ┌─ tests/model_ast_lints/use_receiver_style.move:137:9
+    │
+137 │         provider::set_value(&mut s, 42);
+    │         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    │
+    = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(use_receiver_style)]`.
+    = For more information, see https://aptos.dev/en/build/smart-contracts/linter#use_receiver_style.
+
+warning: [lint] this function call can be written as `<arg>.consume()` using receiver-style syntax.
+    ┌─ tests/model_ast_lints/use_receiver_style.move:143:9
+    │
+143 │         provider::consume(s)
+    │         ^^^^^^^^^^^^^^^^^^^^
+    │
+    = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(use_receiver_style)]`.
+    = For more information, see https://aptos.dev/en/build/smart-contracts/linter#use_receiver_style.
+
+warning: [lint] this function call can be written as `<arg>.is_empty()` using receiver-style syntax.
+    ┌─ tests/model_ast_lints/use_receiver_style.move:149:13
+    │
+149 │         if (provider::is_empty(&s)) { 0 } else { provider::get_value(&s) }
+    │             ^^^^^^^^^^^^^^^^^^^^^^
+    │
+    = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(use_receiver_style)]`.
+    = For more information, see https://aptos.dev/en/build/smart-contracts/linter#use_receiver_style.
+
+warning: [lint] this function call can be written as `<arg>.get_value()` using receiver-style syntax.
+    ┌─ tests/model_ast_lints/use_receiver_style.move:149:50
+    │
+149 │         if (provider::is_empty(&s)) { 0 } else { provider::get_value(&s) }
+    │                                                  ^^^^^^^^^^^^^^^^^^^^^^^
+    │
+    = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(use_receiver_style)]`.
+    = For more information, see https://aptos.dev/en/build/smart-contracts/linter#use_receiver_style.
+
+warning: [lint] this function call can be written as `<arg>.get_item()` using receiver-style syntax.
+    ┌─ tests/model_ast_lints/use_receiver_style.move:154:9
+    │
+154 │         provider::get_item(c)
+    │         ^^^^^^^^^^^^^^^^^^^^^
+    │
+    = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(use_receiver_style)]`.
+    = For more information, see https://aptos.dev/en/build/smart-contracts/linter#use_receiver_style.

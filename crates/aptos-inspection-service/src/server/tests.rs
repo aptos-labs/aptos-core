@@ -7,6 +7,7 @@ use crate::{
         identity_information::IDENTITY_INFO_DISABLED_MESSAGE,
         peer_information::PEER_INFO_DISABLED_MESSAGE, serve_requests,
         system_information::SYS_INFO_DISABLED_MESSAGE, utils::get_all_metrics,
+        InspectionServiceComponents,
     },
     CONFIGURATION_PATH, FORGE_METRICS_PATH, IDENTITY_INFORMATION_PATH, INDEX_PATH,
     JSON_METRICS_PATH, METRICS_PATH, PEER_INFORMATION_PATH, SYSTEM_INFORMATION_PATH,
@@ -280,7 +281,9 @@ fn test_publish_metrics() {
     assert_approx_eq!(1.0, metrics.first().unwrap().get_counter().get_value());
 }
 
-// Exercise the serve_requests() handler with a GET request to the given path
+// Exercise the serve_requests() handler with a GET request to the given path.
+// Components are pre-populated with live values so all endpoints behave as they
+// would on a fully-initialised node.
 async fn send_get_request_to_path(config: &NodeConfig, endpoint: &str) -> Response<Body> {
     // Build the URI
     let uri = format!("http://127.0.0.1:9201{}", endpoint);
@@ -300,6 +303,10 @@ async fn send_get_request_to_path(config: &NodeConfig, endpoint: &str) -> Respon
         None,
     );
 
+    // Build fully-populated inspection components
+    let components = Arc::new(InspectionServiceComponents::new());
+    components.set(aptos_data_client, peers_and_metadata);
+
     // Serve the request
     serve_requests(
         Request::builder()
@@ -308,8 +315,7 @@ async fn send_get_request_to_path(config: &NodeConfig, endpoint: &str) -> Respon
             .body(Body::from(""))
             .unwrap(),
         config.clone(),
-        aptos_data_client,
-        peers_and_metadata,
+        components,
     )
     .await
     .unwrap()

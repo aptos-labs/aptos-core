@@ -96,7 +96,7 @@ jobs:
       - uses: runs-on/snapshot@7f35246a1fc848ef9daef2e4a5c7e52345077c40 # pin v1.0.4
         with:
           path: /var/lib/docker
-          volume_size: 1000
+          volume_size: 1500
 
       - uses: aptos-labs/aptos-core/.github/actions/docker-setup@main
         with:

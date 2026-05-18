@@ -8,9 +8,9 @@ use aptos_aggregator::{bounded_math::SignedU128, types::DelayedFieldsSpeculative
 #[cfg(feature = "testing")]
 use aptos_aggregator::{resolver::TDelayedFieldView, types::DelayedFieldValue};
 #[cfg(feature = "testing")]
-use aptos_framework::natives::randomness::RandomnessContext;
+use aptos_framework_natives::randomness::RandomnessContext;
 #[cfg(feature = "testing")]
-use aptos_framework::natives::{cryptography::algebra::AlgebraContext, event::NativeEventContext};
+use aptos_framework_natives::{cryptography::algebra::AlgebraContext, event::NativeEventContext};
 use aptos_gas_schedule::{MiscGasParameters, NativeGasParameters, LATEST_GAS_FEATURE_VERSION};
 use aptos_native_interface::SafeNativeBuilder;
 #[cfg(feature = "testing")]
@@ -41,7 +41,7 @@ use std::collections::{BTreeMap, HashSet};
 use triomphe::Arc as TriompheArc;
 #[cfg(feature = "testing")]
 use {
-    aptos_framework::natives::{
+    aptos_framework_natives::{
         aggregator_natives::NativeAggregatorContext, code::NativeCodeContext,
         cryptography::ristretto255_point::NativeRistrettoPointContext,
         transaction_context::NativeTransactionContext,
@@ -197,7 +197,7 @@ pub fn configure_for_unit_test() {
 
 #[cfg(feature = "testing")]
 fn unit_test_extensions_hook(exts: &mut NativeContextExtensions) {
-    use aptos_framework::natives::object::NativeObjectContext;
+    use aptos_framework_natives::object::NativeObjectContext;
     use aptos_table_natives::NativeTableContext;
 
     exts.add(NativeTableContext::new([0u8; 32], &*DUMMY_RESOLVER));
@@ -223,4 +223,39 @@ fn unit_test_extensions_hook(exts: &mut NativeContextExtensions) {
     let mut randomness_ctx = RandomnessContext::new();
     randomness_ctx.mark_unbiasable();
     exts.add(randomness_ctx);
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[cfg(not(feature = "testing"))]
+    #[test]
+    fn default_native_table_has_no_test_only_natives() {
+        assert_no_test_natives(
+            "default native function table unexpectedly includes test-only natives",
+        );
+    }
+
+    #[cfg(feature = "testing")]
+    #[test]
+    fn testing_feature_registers_unit_test_create_signers_native() {
+        let has_create_signers_native = aptos_natives(
+            LATEST_GAS_FEATURE_VERSION,
+            NativeGasParameters::zeros(),
+            MiscGasParameters::zeros(),
+            TimedFeaturesBuilder::enable_all().build(),
+            Features::default(),
+        )
+        .into_iter()
+        .any(|(_, module_name, func_name, _)| {
+            module_name.as_str() == "unit_test"
+                && func_name.as_str() == "create_signers_for_testing"
+        });
+
+        assert!(
+            has_create_signers_native,
+            "testing feature must register unit_test::create_signers_for_testing native",
+        );
+    }
 }

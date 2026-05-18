@@ -3,6 +3,7 @@
 
 use crate::{
     emitter::{
+        metrics::{record_commit_stats, record_latency_ms, record_submission_stats},
         stats::{DynamicStatsTracking, StatsAccumulator},
         wait_for_accounts_sequence, wait_for_orderless_txns,
     },
@@ -334,6 +335,9 @@ impl SubmissionWorker {
             failed_orderless_txns,
         );
 
+        // Record Prometheus metrics for commit stats
+        record_commit_stats(num_committed as u64, num_expired as u64);
+
         if num_expired > 0 {
             loop_stats
                 .expired
@@ -371,6 +375,9 @@ impl SubmissionWorker {
                 loop_stats
                     .latencies
                     .record_data_point(avg_latency, num_committed as u64);
+
+                // Record Prometheus latency metric (once per committed txn for accurate percentiles)
+                record_latency_ms(avg_latency, num_committed as u64);
             }
         }
     }
@@ -486,7 +493,7 @@ fn count_committed_expired_stats(
     )
 }
 
-pub async fn submit_transactions(
+pub(crate) async fn submit_transactions(
     client: &RestClient,
     txns: &[SignedTransaction],
     loop_start_time: Instant,
@@ -499,15 +506,19 @@ pub async fn submit_transactions(
         txns.len() as u64 * offset.as_millis() as u64,
         Ordering::Relaxed,
     );
+    let submitted_count = txns.len() as u64;
     stats
         .submitted
-        .fetch_add(txns.len() as u64, Ordering::Relaxed);
+        .fetch_add(submitted_count, Ordering::Relaxed);
 
     match client.submit_batch_bcs(txns).await {
         Err(e) => {
+            let failed_count = txns.len() as u64;
             stats
                 .failed_submission
-                .fetch_add(txns.len() as u64, Ordering::Relaxed);
+                .fetch_add(failed_count, Ordering::Relaxed);
+            // Record Prometheus metrics
+            record_submission_stats(submitted_count, failed_count);
             sample!(
                 SampleRate::Duration(Duration::from_secs(60)),
                 warn!(
@@ -519,10 +530,14 @@ pub async fn submit_transactions(
         },
         Ok(v) => {
             let failures = v.into_inner().transaction_failures;
+            let failed_count = failures.len() as u64;
 
             stats
                 .failed_submission
-                .fetch_add(failures.len() as u64, Ordering::Relaxed);
+                .fetch_add(failed_count, Ordering::Relaxed);
+
+            // Record Prometheus metrics
+            record_submission_stats(submitted_count, failed_count);
 
             let by_error = failures
                 .iter()
@@ -580,5 +595,5 @@ pub async fn submit_transactions(
                 });
             }
         },
-    };
+    }
 }

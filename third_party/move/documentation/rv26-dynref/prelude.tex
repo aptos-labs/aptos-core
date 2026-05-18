@@ -1,0 +1,41 @@
+% Packages and macros shared across all sections.
+
+\usepackage[T1]{fontenc}
+\usepackage{graphicx}
+\usepackage{amsmath,amssymb}
+\usepackage{mathpartir}
+\usepackage{xcolor}
+\usepackage{listings}
+\usepackage{hyperref}
+\renewcommand\UrlFont{\color{blue}\rmfamily}
+\urlstyle{rm}
+
+\lstdefinelanguage{move}{
+  morekeywords={module,struct,enum,fun,public,let,mut,if,else,match,return,
+                use,as,vector,move,copy,native,has,drop,key,store,copy},
+  morecomment=[l]{//},
+  sensitive=true,
+}
+\lstset{
+  language=move,
+  basicstyle=\ttfamily\small,
+  keywordstyle=\bfseries,
+  commentstyle=\itshape\color{gray!60!black},
+  showstringspaces=false,
+  columns=fullflexible,
+  numbers=none,
+  xleftmargin=1em,
+}
+
+\newcommand{\apt}{\textsc{apt}}
+\newcommand{\local}[1]{\mathrm{loc}(#1)}
+\newcommand{\glob}[1]{\mathrm{glb}(#1)}
+\newcommand{\param}[1]{\mathrm{par}(#1)}
+\newcommand{\node}[2]{\langle #1, #2 \rangle}
+\newcommand{\Live}{\checkmark}
+\newcommand{\Pois}{\dagger}
+\newcommand{\refn}[1]{\rho_{#1}}
+\newcommand{\mut}{\mathsf{mut}}
+\newcommand{\imm}{\mathsf{imm}}
+\newcommand{\Anc}{\mathcal{A}}
+\newcommand{\Desc}{\mathcal{D}}

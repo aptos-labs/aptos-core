@@ -4,13 +4,13 @@ task 2 lines 36-36:  run --signers Alice --show-events -- Alice::hello_world::in
 Events:
 {
     type:    0x1::transaction_fee::FeeStatement
-    data:    "620000000000000004000000000000000100000000000000386c0100000000000000000000000000"
+    data:    "cb030000000000001f000000000000000900000000000000303a0e00000000000000000000000000"
 }
 task 3 lines 38-38:  run --signers Alice --args x"68656C6C6F20776F726C64" --show-events -- Alice::hello_world::hi
 Events:
 {
     type:    0x1::transaction_fee::FeeStatement
-    data:    "05000000000000000300000000000000020000000000000018010000000000000000000000000000"
+    data:    "2a000000000000001d000000000000000b00000000000000f00a0000000000000000000000000000"
 }
 task 4 lines 40-40:  view --address Alice --resource Alice::hello_world::ModuleData
 store key 0xf75daa73fc071f93593335eb9033da804777eb94491650dd3f095ce6f778acb6::hello_world::ModuleData {

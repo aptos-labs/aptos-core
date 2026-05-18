@@ -60,6 +60,7 @@ impl ManagedNode {
             true,
             DEFAULT_GRPC_STREAM_PORT,
             false,
+            false,
         )
         .context("Failed to start node service manager")?;
 

@@ -1,6 +1,7 @@
-// Copyright (c) The Diem Core Contributors
-// Copyright (c) The Move Contributors
-// SPDX-License-Identifier: Apache-2.0
+// Parts of the file are Copyright (c) The Diem Core Contributors
+// Parts of the file are Copyright (c) The Move Contributors
+// Parts of the file are Copyright (c) Aptos Foundation
+// All Aptos Foundation code and content is licensed pursuant to the Innovation-Enabling Source Code License, available at https://github.com/aptos-labs/aptos-core/blob/main/LICENSE
 
 #![forbid(unsafe_code)]
 
@@ -11,6 +12,7 @@ use itertools::Itertools;
 #[allow(unused_imports)]
 use log::{debug, info, warn};
 use log::{log_enabled, Level};
+use move_compiler_v2::Experiment;
 use move_model::{
     code_writer::CodeWriter, metadata::LATEST_STABLE_COMPILER_VERSION_VALUE, model::GlobalEnv,
 };
@@ -28,6 +30,7 @@ use std::{
 };
 
 pub mod cli;
+pub mod inference;
 pub mod package_prove;
 
 // =================================================================================================
@@ -41,11 +44,31 @@ pub fn run_move_prover_errors_to_stderr(options: Options) -> anyhow::Result<()> 
 pub fn run_move_prover_v2<W: WriteColor>(
     error_writer: &mut W,
     options: Options,
-    experiments: Vec<String>,
+    mut experiments: Vec<String>,
 ) -> anyhow::Result<()> {
     let now = Instant::now();
+    if options.inference.inference {
+        experiments.push(Experiment::SPEC_REWRITE_PURE_FUNS.to_string());
+    }
     let mut env = create_move_prover_v2_model(error_writer, options.clone(), experiments)?;
-    run_move_prover_with_model_v2(&mut env, error_writer, options, now)
+    if options.inference.inference {
+        inference::run_spec_inference_with_model(&mut env, error_writer, options, now)
+    } else {
+        run_move_prover_with_model_v2(&mut env, error_writer, options, now)
+    }
+}
+
+/// Like `run_move_prover_v2` for inference, but also returns a bytecode dump
+/// with WP annotations for debugging test baselines.
+pub fn run_inference_with_bytecode_dump<W: WriteColor>(
+    error_writer: &mut W,
+    options: Options,
+    mut experiments: Vec<String>,
+) -> anyhow::Result<String> {
+    let now = Instant::now();
+    experiments.push(Experiment::SPEC_REWRITE_PURE_FUNS.to_string());
+    let mut env = create_move_prover_v2_model(error_writer, options.clone(), experiments)?;
+    inference::run_spec_inference_with_model_and_dump(&mut env, error_writer, options, now)
 }
 
 pub fn create_move_prover_v2_model<W: WriteColor>(
@@ -66,9 +89,6 @@ pub fn create_move_prover_v2_model<W: WriteColor>(
         experiment_cache: Default::default(),
         sources: options.move_sources,
         sources_deps: vec![],
-        warn_deprecated: false,
-        warn_of_deprecation_use_in_aptos_libs: false,
-        warn_unused: false,
         whole_program: false,
         compile_test_code: false,
         compile_verify_code: true,
@@ -87,7 +107,7 @@ pub fn create_init_num_operation_state(env: &GlobalEnv) {
             global_state.create_initial_struct_oper_state(&struct_env);
         }
         for fun_env in module_env.get_functions() {
-            if !fun_env.is_inline() {
+            if !fun_env.is_not_prover_target() {
                 global_state.create_initial_func_oper_state(&fun_env);
             }
         }
@@ -261,6 +281,11 @@ pub fn create_and_process_bytecode(options: &Options, env: &GlobalEnv) -> Functi
             }
         }
         for func_env in module_env.get_functions() {
+            if func_env.is_struct_api() {
+                // Struct API wrappers have no user-written specs; skip them to avoid
+                // spurious invariant failures from DataInvariantInstrumentationProcessor.
+                continue;
+            }
             targets.add_target(&func_env)
         }
     }

@@ -1,6 +1,7 @@
-// Copyright (c) The Diem Core Contributors
-// Copyright (c) The Move Contributors
-// SPDX-License-Identifier: Apache-2.0
+// Parts of the file are Copyright (c) The Diem Core Contributors
+// Parts of the file are Copyright (c) The Move Contributors
+// Parts of the file are Copyright (c) Aptos Foundation
+// All Aptos Foundation code and content is licensed pursuant to the Innovation-Enabling Source Code License, available at https://github.com/aptos-labs/aptos-core/blob/main/LICENSE
 
 use crate::{
     function_target::FunctionData,
@@ -16,7 +17,7 @@ use itertools::Itertools;
 use move_binary_format::{
     access::ModuleAccess,
     file_format::{
-        Bytecode as MoveBytecode, CodeOffset, CompiledModule, FieldHandleIndex,
+        Bytecode as MoveBytecode, CodeOffset, CompiledModule, FieldHandleIndex, FunctionAttribute,
         FunctionHandleIndex, SignatureIndex, SignatureToken, VariantFieldHandleIndex,
     },
     views::{FunctionHandleView, ModuleView, ViewInternals},
@@ -879,15 +880,20 @@ impl<'a> StacklessBytecodeGenerator<'a> {
                     .module_env
                     .get_used_function(*idx)
                     .expect(COMPILED_MODULE_AVAILABLE);
-                self.code.push(mk_call(
-                    Operation::Function(
-                        callee_env.module_env.get_id(),
-                        callee_env.get_id(),
-                        vec![],
-                    ),
-                    return_temp_indices,
-                    arg_temp_indices,
-                ))
+                // Convert struct API wrapper calls to native operations so that all
+                // downstream consumers (prover, decompiler, etc.) see Pack/BorrowField/…
+                // rather than calls to compiler-generated wrappers.
+                let op = self
+                    .struct_api_operation(&function_handle_view, &callee_env, &[])
+                    .unwrap_or_else(|| {
+                        Operation::Function(
+                            callee_env.module_env.get_id(),
+                            callee_env.get_id(),
+                            vec![],
+                        )
+                    });
+                self.code
+                    .push(mk_call(op, return_temp_indices, arg_temp_indices))
             },
             MoveBytecode::CallGeneric(idx) => {
                 let func_instantiation = self.module.function_instantiation_at(*idx);
@@ -919,15 +925,17 @@ impl<'a> StacklessBytecodeGenerator<'a> {
                     .module_env
                     .get_used_function(func_instantiation.handle)
                     .expect(COMPILED_MODULE_AVAILABLE);
-                self.code.push(mk_call(
-                    Operation::Function(
-                        callee_env.module_env.get_id(),
-                        callee_env.get_id(),
-                        type_sigs,
-                    ),
-                    return_temp_indices,
-                    arg_temp_indices,
-                ))
+                let op = self
+                    .struct_api_operation(&function_handle_view, &callee_env, &type_sigs)
+                    .unwrap_or_else(|| {
+                        Operation::Function(
+                            callee_env.module_env.get_id(),
+                            callee_env.get_id(),
+                            type_sigs,
+                        )
+                    });
+                self.code
+                    .push(mk_call(op, return_temp_indices, arg_temp_indices))
             },
 
             MoveBytecode::CallClosure(sidx) => self.call_closure(attr_id, *sidx),
@@ -2025,6 +2033,78 @@ impl<'a> StacklessBytecodeGenerator<'a> {
             .module_env
             .globalize_signature(token)
             .expect(COMPILED_MODULE_AVAILABLE)
+    }
+
+    /// If `callee_env` is a struct API wrapper, return the equivalent native `Operation`.
+    /// The `FunctionAttribute` tags in the binary are the authoritative source.
+    fn struct_api_operation(
+        &self,
+        fhv: &FunctionHandleView<CompiledModule>,
+        callee_env: &move_model::model::FunctionEnv,
+        type_args: &[Type],
+    ) -> Option<Operation> {
+        let (mid, sid) = callee_env.get_struct_api_struct()?;
+
+        for attr in fhv.attributes() {
+            match attr {
+                FunctionAttribute::Pack => {
+                    return Some(Operation::Pack(mid, sid, type_args.to_vec()));
+                },
+                FunctionAttribute::Unpack => {
+                    return Some(Operation::Unpack(mid, sid, type_args.to_vec()));
+                },
+                FunctionAttribute::PackVariant(variant_idx) => {
+                    let variant = callee_env
+                        .module_env
+                        .env
+                        .get_struct(mid.qualified(sid))
+                        .get_variant_name_by_idx(*variant_idx)?;
+                    return Some(Operation::PackVariant(
+                        mid,
+                        sid,
+                        variant,
+                        type_args.to_vec(),
+                    ));
+                },
+                FunctionAttribute::UnpackVariant(variant_idx) => {
+                    let variant = callee_env
+                        .module_env
+                        .env
+                        .get_struct(mid.qualified(sid))
+                        .get_variant_name_by_idx(*variant_idx)?;
+                    return Some(Operation::UnpackVariant(
+                        mid,
+                        sid,
+                        variant,
+                        type_args.to_vec(),
+                    ));
+                },
+                FunctionAttribute::TestVariant(variant_idx) => {
+                    let variant = callee_env
+                        .module_env
+                        .env
+                        .get_struct(mid.qualified(sid))
+                        .get_variant_name_by_idx(*variant_idx)?;
+                    return Some(Operation::TestVariant(
+                        mid,
+                        sid,
+                        variant,
+                        type_args.to_vec(),
+                    ));
+                },
+                FunctionAttribute::BorrowFieldImmutable(offset)
+                | FunctionAttribute::BorrowFieldMutable(offset) => {
+                    return Some(Operation::BorrowField(
+                        mid,
+                        sid,
+                        type_args.to_vec(),
+                        *offset as usize,
+                    ));
+                },
+                FunctionAttribute::Persistent | FunctionAttribute::ModuleLock => {},
+            }
+        }
+        None
     }
 
     fn new_temp(&mut self, ty: Type) -> TempIndex {

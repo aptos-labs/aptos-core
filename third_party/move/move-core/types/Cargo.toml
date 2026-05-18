@@ -28,6 +28,7 @@ rand = { version = "0.8.5" }
 ref-cast = { workspace = true }
 serde = { workspace = true }
 serde_bytes = { workspace = true }
+termcolor = { workspace = true }
 thiserror = { workspace = true }
 
 [dev-dependencies]

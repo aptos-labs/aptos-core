@@ -1,0 +1,21 @@
+//# publish
+module 0x22::test
+
+public fun constant_below_limit()
+    // Nested 19 vectors.
+    ld_const<vector<vector<vector<vector<vector<vector<vector<vector<vector<vector<vector<vector<vector<vector<vector<vector<vector<vector<vector<u8>>>>>>>>>>>>>>>>>>>> []
+    pop
+    ret
+
+//# publish
+module 0x23::test
+
+public fun constant_above_limit()
+    // Constant with 20 nodes depth.
+    ld_const<vector<vector<vector<vector<vector<vector<vector<vector<vector<vector<vector<vector<vector<vector<vector<vector<vector<vector<vector<vector<u8>>>>>>>>>>>>>>>>>>>>> []
+    pop
+    ret
+
+//# run --verbose 0x22::test::constant_below_limit
+
+//# run --verbose 0x23::test::constant_above_limit

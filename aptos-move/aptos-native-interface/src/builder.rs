@@ -10,7 +10,8 @@ use aptos_gas_schedule::{MiscGasParameters, NativeGasParameters};
 use aptos_types::on_chain_config::{Features, TimedFeatures};
 use move_vm_runtime::native_functions::{NativeContext, NativeFunction};
 use move_vm_types::{
-    loaded_data::runtime_types::Type, natives::function::NativeResult, values::Value,
+    limits::check_abort_message_limit, loaded_data::runtime_types::Type,
+    natives::function::NativeResult, values::Value,
 };
 use smallvec::SmallVec;
 use std::{collections::VecDeque, sync::Arc};
@@ -134,11 +135,16 @@ impl SafeNativeBuilder {
                     Abort {
                         abort_code,
                         abort_message,
-                    } => Ok(NativeResult::Abort {
-                        cost: context.legacy_gas_used,
-                        abort_code,
-                        abort_message,
-                    }),
+                    } => {
+                        if let Some(abort_message) = abort_message.as_ref() {
+                            check_abort_message_limit(abort_message.len())?;
+                        }
+                        Ok(NativeResult::Abort {
+                            cost: context.legacy_gas_used,
+                            abort_code,
+                            abort_message,
+                        })
+                    },
                     LimitExceeded(err) => match err {
                         LimitExceededError::LegacyOutOfGas => {
                             assert!(!context.has_direct_gas_meter_access_in_native_context());

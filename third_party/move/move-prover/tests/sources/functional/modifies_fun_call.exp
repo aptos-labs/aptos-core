@@ -1,0 +1,23 @@
+Move prover returns: exiting with verification errors
+error: abort not covered by any of the `aborts_if` clauses
+   ┌─ tests/sources/functional/modifies_fun_call.move:10:5
+   │
+ 8 │           d.x = d.x + 1;
+   │                 ------- abort happened here with execution failure
+ 9 │       }
+10 │ ╭     spec mutate {
+11 │ │         let a = get_addr(addr);
+12 │ │         aborts_if !exists<Data>(a);
+13 │ │         modifies global<Data>(get_addr(addr));
+14 │ │         ensures global<Data>(addr).x == old(global<Data>(addr).x) + 1;
+15 │ │     }
+   │ ╰─────^
+   │
+   =     at tests/sources/functional/modifies_fun_call.move:6: mutate
+   =     at tests/sources/functional/modifies_fun_call.move:11: mutate (spec)
+   =     at tests/sources/functional/modifies_fun_call.move:6: mutate
+   =         addr = <redacted>
+   =     at tests/sources/functional/modifies_fun_call.move:7: mutate
+   =         d = <redacted>
+   =     at tests/sources/functional/modifies_fun_call.move:8: mutate
+   =         ABORTED

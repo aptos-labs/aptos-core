@@ -7,6 +7,7 @@ CompiledPackageInfo {
     build_flags: BuildConfig {
         dev_mode: true,
         test_mode: false,
+        verify_mode: false,
         override_std: None,
         generate_docs: false,
         generate_abis: false,
@@ -17,6 +18,7 @@ CompiledPackageInfo {
         ),
         force_recompilation: false,
         additional_named_addresses: {},
+        forced_named_addresses: {},
         fetch_deps_only: false,
         skip_fetch_latest_git_deps: false,
         compiler_config: CompilerConfig {
@@ -39,7 +41,7 @@ CompiledPackageInfo {
             ),
             language_version: None,
             experiments: [],
-            print_errors: false,
+            print_errors: None,
         },
     },
 }

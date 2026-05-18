@@ -1,0 +1,113 @@
+//**** Cross-compiled for `move` syntax from `tests/no-v1-comparison/match_extensions/guard_eval_order.move`
+
+//# publish
+module 0xc0ffee::m {
+    enum Color has drop {
+        Red,
+        Blue,
+    }
+    fun make_color(): Color {
+        Color::Red{}
+    }
+    fun next(p0: &mut u64): u64 {
+        let _v0 = *p0;
+        *p0 = _v0 + 1;
+        _v0
+    }
+    public fun test_disc_before_guards() {
+        let _v0;
+        let _v1;
+        let _v2 = 0;
+        if (next(&mut _v2) == 0) {
+            _v2 = _v2 + 10;
+            _v0 = true
+        } else _v0 = false;
+        if (_v0) _v1 = 1 else _v1 = 2;
+        assert!(_v2 == 11, 14566554180833181696);
+        assert!(_v1 == 1, 14566554180833181696);
+    }
+    public fun test_mixed_guard_skipped_on_prim_mismatch() {
+        let _v0;
+        let _v1 = 0;
+        let _v2 = make_color();
+        let _v3 = &_v2;
+        'l0: loop {
+            if (_v3 is Red) {
+                if (false) {
+                    let Color::Red{} = _v2;
+                    _v0 = 1;
+                    break
+                }};
+            loop {
+                if (_v3 is Red) {
+                    if (next(&mut _v1) == 0) break};
+                _v0 = 3;
+                break 'l0
+            };
+            let Color::Red{} = _v2;
+            _v0 = 2;
+            break
+        };
+        assert!(_v1 == 1, 14566554180833181696);
+        assert!(_v0 == 2, 14566554180833181696);
+    }
+    public fun test_mixed_guard_top_to_bottom() {
+        let _v0;
+        let _v1 = 0;
+        let _v2 = make_color();
+        let _v3 = &_v2;
+        'l0: loop {
+            if (_v3 is Red) {
+                if (next(&mut _v1) == 5) {
+                    let Color::Red{} = _v2;
+                    _v0 = 1;
+                    break
+                }};
+            loop {
+                if (_v3 is Red) {
+                    if (next(&mut _v1) == 1) break};
+                _v0 = 3;
+                break 'l0
+            };
+            let Color::Red{} = _v2;
+            _v0 = 2;
+            break
+        };
+        assert!(_v1 == 2, 14566554180833181696);
+        assert!(_v0 == 2, 14566554180833181696);
+    }
+    public fun test_scalar_guard_short_circuit() {
+        let _v0;
+        let _v1 = 0;
+        if (false) _v0 = 1 else if (next(&mut _v1) == 0) _v0 = 2 else _v0 = 3;
+        assert!(_v1 == 1, 14566554180833181696);
+        assert!(_v0 == 2, 14566554180833181696);
+    }
+    public fun test_scalar_guard_top_to_bottom() {
+        let _v0;
+        let _v1 = 0;
+        if (next(&mut _v1) == 5) _v0 = 1 else if (next(&mut _v1) == 5) _v0 = 2 else _v0 = 3;
+        assert!(_v1 == 2, 14566554180833181696);
+        assert!(_v0 == 3, 14566554180833181696);
+    }
+    public fun test_tuple_guard_order() {
+        let _v0;
+        let _v1 = 0;
+        if (next(&mut _v1) == 5) _v0 = 1 else if (next(&mut _v1) == 1) _v0 = 2 else _v0 = 3;
+        assert!(_v1 == 2, 14566554180833181696);
+        assert!(_v0 == 2, 14566554180833181696);
+    }
+}
+
+
+//# run 0xc0ffee::m::test_scalar_guard_top_to_bottom
+
+//# run 0xc0ffee::m::test_scalar_guard_short_circuit
+
+//# run 0xc0ffee::m::test_tuple_guard_order
+
+//# run 0xc0ffee::m::test_mixed_guard_top_to_bottom
+
+//# run 0xc0ffee::m::test_mixed_guard_skipped_on_prim_mismatch
+
+//# run 0xc0ffee::m::test_disc_before_guards

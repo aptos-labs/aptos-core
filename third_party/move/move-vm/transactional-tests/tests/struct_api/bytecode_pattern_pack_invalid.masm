@@ -1,0 +1,15 @@
+//# publish --print-bytecode
+module 0x66::test_bytecode_pattern_pack
+
+struct S
+    x: u64
+    y: u64
+
+// Invalid: pack function has extra instruction (ld_u64) before pack
+#[pack] public fun pack$S(l0: u64, l1: u64): S
+    move_loc l0
+    move_loc l1
+    ld_u64 999
+    pop
+    pack S
+    ret

@@ -17,7 +17,7 @@ use move_core_types::{
 
 fn publish_test_package(h: &mut MoveHarness, aptos_framework_account: &Account) {
     let path_buf = common::test_dir_path("aggregator_v2.data/pack");
-    assert_success!(h.publish_package_cache_building(aptos_framework_account, path_buf.as_path()));
+    assert_success!(h.publish_package(aptos_framework_account, path_buf.as_path()));
 }
 
 fn create_test_txn(
@@ -33,24 +33,15 @@ fn create_test_txn(
     )
 }
 
-fn run_entry_functions<F: Fn(ExecutionStatus)>(func_names: Vec<&str>, check_status: F) {
-    let mut h = MoveHarness::new();
-    let aptos_framework_account = h.aptos_framework_account();
-    publish_test_package(&mut h, &aptos_framework_account);
-
-    // Make sure aggregators are enabled, so that we can test
-    h.enable_features(
-        vec![
-            FeatureFlag::AGGREGATOR_V2_API,
-            FeatureFlag::AGGREGATOR_V2_DELAYED_FIELDS,
-            FeatureFlag::RESOURCE_GROUPS_SPLIT_IN_VM_CHANGE_SET,
-        ],
-        vec![],
-    );
-
+fn run_entry_functions<F: Fn(ExecutionStatus)>(
+    h: &mut MoveHarness,
+    acc: &Account,
+    func_names: Vec<&str>,
+    check_status: F,
+) {
     let txns = func_names
         .into_iter()
-        .map(|name| create_test_txn(&mut h, &aptos_framework_account, name))
+        .map(|name| create_test_txn(h, acc, name))
         .collect();
 
     let statuses = h.run_block(txns);
@@ -60,8 +51,7 @@ fn run_entry_functions<F: Fn(ExecutionStatus)>(func_names: Vec<&str>, check_stat
     }
 }
 
-#[test]
-fn test_equality() {
+fn test_equality(h: &mut MoveHarness, acc: &Account) {
     let func_names = vec![
         // Aggregators.
         "0x1::runtime_checks::test_equality_with_aggregators_I",
@@ -76,13 +66,12 @@ fn test_equality() {
         "0x1::runtime_checks::test_equality_with_derived_string_snapshots_II",
         "0x1::runtime_checks::test_equality_with_derived_string_snapshots_III",
     ];
-    run_entry_functions(func_names, |status: ExecutionStatus| {
+    run_entry_functions(h, acc, func_names, |status: ExecutionStatus| {
         assert_matches!(status, ExecutionStatus::ExecutionFailure { .. });
     });
 }
 
-#[test]
-fn test_serialization() {
+fn test_serialization(h: &mut MoveHarness, acc: &Account) {
     let func_names = vec![
         "0x1::runtime_checks::test_serialization_with_aggregators",
         "0x1::runtime_checks::test_serialization_with_snapshots",
@@ -92,7 +81,7 @@ fn test_serialization() {
         AccountAddress::ONE,
         ident_str!("bcs").to_owned(),
     ));
-    run_entry_functions(func_names, |status: ExecutionStatus| {
+    run_entry_functions(h, acc, func_names, |status: ExecutionStatus| {
         assert_eq!(status, ExecutionStatus::MoveAbort {
             location: bcs_location.clone(),
             code: NFE_BCS_SERIALIZATION_FAILURE,
@@ -101,8 +90,7 @@ fn test_serialization() {
     });
 }
 
-#[test]
-fn test_serialized_size() {
+fn test_serialized_size(h: &mut MoveHarness, acc: &Account) {
     let func_names = vec![
         "0x1::runtime_checks::test_serialized_size_with_aggregators",
         "0x1::runtime_checks::test_serialized_size_with_snapshots",
@@ -111,13 +99,12 @@ fn test_serialized_size() {
 
     // Serialized size of delayed values is deterministic and fixed, so running
     // these functions should succeed, unlike regular serialization.
-    run_entry_functions(func_names, |status: ExecutionStatus| {
+    run_entry_functions(h, acc, func_names, |status: ExecutionStatus| {
         assert_eq!(status, ExecutionStatus::Success);
     });
 }
 
-#[test]
-fn test_string_utils() {
+fn test_string_utils(h: &mut MoveHarness, acc: &Account) {
     let func_names = vec![
         // Aggregators.
         "0x1::runtime_checks::test_to_string_with_aggregators",
@@ -138,7 +125,7 @@ fn test_string_utils() {
     ];
 
     let string_utils_id = ModuleId::new(AccountAddress::ONE, ident_str!("string_utils").to_owned());
-    run_entry_functions(func_names, |status: ExecutionStatus| {
+    run_entry_functions(h, acc, func_names, |status: ExecutionStatus| {
         if let ExecutionStatus::MoveAbort {
             location: AbortLocation::Module(id),
             code: 3, // EUNABLE_TO_FORMAT_DELAYED_FIELD
@@ -150,4 +137,26 @@ fn test_string_utils() {
             unreachable!("Expected Move abort, got {:?}", status)
         }
     });
+}
+
+#[test]
+fn run_all_tests() {
+    let mut h = MoveHarness::new();
+    let acc = h.aptos_framework_account();
+    publish_test_package(&mut h, &acc);
+
+    // Make sure aggregators are enabled, so that we can test
+    h.enable_features(
+        vec![
+            FeatureFlag::AGGREGATOR_V2_API,
+            FeatureFlag::AGGREGATOR_V2_DELAYED_FIELDS,
+            FeatureFlag::RESOURCE_GROUPS_SPLIT_IN_VM_CHANGE_SET,
+        ],
+        vec![],
+    );
+
+    test_equality(&mut h, &acc);
+    test_serialization(&mut h, &acc);
+    test_serialized_size(&mut h, &acc);
+    test_string_utils(&mut h, &acc);
 }

@@ -47,7 +47,7 @@ impl Cmd {
         println!("Epoch Ending State Merkle Pruner progress: {p2}");
 
         // Step 2: Collect DB handles.
-        let num_shards = state_merkle_db.hack_num_real_shards();
+        let num_shards = state_merkle_db.num_shards();
         let mut dbs: Vec<(String, &DB)> =
             vec![("metadata".to_string(), state_merkle_db.metadata_db())];
         for shard_id in 0..num_shards {

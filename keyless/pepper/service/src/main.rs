@@ -22,7 +22,9 @@ use aptos_keyless_pepper_service::{
     metrics::DEFAULT_METRICS_SERVER_PORT,
     request_handler,
     request_handler::DEFAULT_PEPPER_SERVICE_PORT,
-    utils, vuf_keypair,
+    utils,
+    utils::HttpHeader,
+    vuf_keypair,
     vuf_keypair::VUFKeypair,
 };
 use aptos_logger::{error, info, warn};
@@ -121,6 +123,16 @@ struct Args {
     #[arg(long, default_value_t = DEFAULT_PEPPER_SERVICE_PORT)]
     pepper_service_port: u16,
 
+    /// Additional HTTP headers to attach to resource fetch requests (e.g., on-chain
+    /// Groth16 VK and keyless config). Useful for internal auth when using an internal
+    /// API gateway URL instead of the public endpoint.
+    ///
+    /// For example:
+    /// --resource-fetch-headers="x-internal-application-id my-app-id"
+    /// --resource-fetch-headers="authorization Bearer my-token"
+    #[arg(long)]
+    resource_fetch_headers: Vec<HttpHeader>,
+
     /// The hex-encoded VUF private key (used directly if provided, otherwise derived from the seed)
     #[arg(
         long,
@@ -188,10 +200,55 @@ async fn main() {
     let account_recovery_managers =
         Arc::new(AccountRecoveryManagers::new(args.account_recovery_managers));
 
+    // Build the default headers for resource fetch requests.
+    // Start with any headers passed via CLI args, then merge in headers from env vars
+    // (INTERNAL_NODE_API_HEADER_<i>_NAME / INTERNAL_NODE_API_HEADER_<i>_VALUE).
+    let mut resource_fetch_headers = args.resource_fetch_headers;
+    {
+        let mut i = 0usize;
+        loop {
+            let name = std::env::var(format!("INTERNAL_NODE_API_HEADER_{i}_NAME")).ok();
+            let value = std::env::var(format!("INTERNAL_NODE_API_HEADER_{i}_VALUE")).ok();
+            match (name, value) {
+                (Some(name), Some(value)) if !name.is_empty() && !value.is_empty() => {
+                    resource_fetch_headers.push(HttpHeader { name, value });
+                    i += 1;
+                },
+                _ => break,
+            }
+        }
+    }
+    let resource_fetch_header_map = utils::http_headers_to_header_map(&resource_fetch_headers);
+
+    // If INTERNAL_NODE_API is set, use it as the base URL for on-chain resource fetching
+    // (overrides the --on-chain-groth16-vk-url / --on-chain-keyless-config-url args).
+    const GROTH16_VK_PATH: &str =
+        "/v1/accounts/0x1/resource/0x1::keyless_account::Groth16VerificationKey";
+    const KEYLESS_CONFIG_PATH: &str =
+        "/v1/accounts/0x1/resource/0x1::keyless_account::Configuration";
+    let (on_chain_groth16_vk_url, on_chain_keyless_config_url) =
+        if let Ok(internal_node_api) = std::env::var("INTERNAL_NODE_API") {
+            let base = internal_node_api.trim_end_matches('/');
+            info!(
+            "INTERNAL_NODE_API is set; using it as the base URL for on-chain resource fetching: {}",
+            base
+        );
+            (
+                Some(format!("{}{}", base, GROTH16_VK_PATH)),
+                Some(format!("{}{}", base, KEYLESS_CONFIG_PATH)),
+            )
+        } else {
+            (
+                args.on_chain_groth16_vk_url,
+                args.on_chain_keyless_config_url,
+            )
+        };
+
     // Start the cached resource fetcher
     let cached_resources = resource_fetcher::start_cached_resource_fetcher(
-        args.on_chain_groth16_vk_url,
-        args.on_chain_keyless_config_url,
+        on_chain_groth16_vk_url,
+        on_chain_keyless_config_url,
+        resource_fetch_header_map,
     );
 
     // Create the account recovery database

@@ -83,6 +83,7 @@ where
             .write_pruner_progress(&S::progress_metadata_key(None), min_readable_version)
     }
 
+    #[cfg(test)]
     fn is_pruning_pending(&self) -> bool {
         self.pruner_worker
             .as_ref()

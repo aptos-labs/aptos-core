@@ -1,22 +1,39 @@
-// Copyright (c) The Diem Core Contributors
-// Copyright (c) The Move Contributors
-// SPDX-License-Identifier: Apache-2.0
+// Parts of the file are Copyright (c) The Diem Core Contributors
+// Parts of the file are Copyright (c) The Move Contributors
+// Parts of the file are Copyright (c) Aptos Foundation
+// All Aptos Foundation code and content is licensed pursuant to the Innovation-Enabling Source Code License, available at https://github.com/aptos-labs/aptos-core/blob/main/LICENSE
 
 use crate::{
-    ast::{Address, Exp, ExpData, Operation, Pattern, QuantKind, TempIndex, Value},
+    ast::{
+        Address, BehaviorKind, Exp, ExpData, MemoryLabel, MemoryRange, Operation, Pattern,
+        QuantKind, TempIndex, Value,
+    },
     model::{
-        FieldEnv, FunctionEnv, GlobalEnv, Loc, NodeId, QualifiedId, QualifiedInstId, SpecFunId,
-        StructEnv, StructId,
+        FieldEnv, FunId, FunctionEnv, GlobalEnv, Loc, ModuleId, NodeId, QualifiedId,
+        QualifiedInstId, SpecFunId, StructEnv, StructId,
     },
     symbol::Symbol,
     ty::{PrimitiveType, Type, BOOL_TYPE, NUM_TYPE},
 };
 use itertools::Itertools;
-use move_core_types::account_address::AccountAddress;
+use move_core_types::{
+    ability::AbilitySet, account_address::AccountAddress, function::ClosureMask,
+};
+use num::{BigInt, Zero};
+
+/// Indicates which bound(s) to check for an out-of-range condition.
+pub enum RangeCheckKind {
+    /// value > MAX (overflow only)
+    Overflow,
+    /// value < MIN (underflow only)
+    Underflow,
+    /// value < MIN || value > MAX (both)
+    Both,
+}
 
 /// A trait that defines a generator for `Exp`.
 pub trait ExpGenerator<'env> {
-    /// Get the functional environment
+    /// Get the function environment
     fn function_env(&self) -> &FunctionEnv<'env>;
 
     /// Get the current location
@@ -106,7 +123,20 @@ pub trait ExpGenerator<'env> {
 
     /// Make a boolean not expression.
     fn mk_not(&self, arg: Exp) -> Exp {
+        // Not(Not(x)) → x
+        if let ExpData::Call(_, Operation::Not, inner) = arg.as_ref() {
+            if inner.len() == 1 {
+                return inner[0].clone();
+            }
+        }
         self.mk_bool_call(Operation::Not, vec![arg])
+    }
+
+    /// Make an old(exp) expression for specs.
+    /// Wraps the argument in `old()` to reference the pre-state value.
+    fn mk_old(&self, arg: Exp) -> Exp {
+        let ty = self.global_env().get_node_type(arg.node_id());
+        self.mk_call(&ty, Operation::Old, vec![arg])
     }
 
     /// Make an equality expression.
@@ -130,6 +160,12 @@ pub trait ExpGenerator<'env> {
         self.mk_bool_call(Operation::Or, vec![arg1, arg2])
     }
 
+    /// Check if two boolean expressions are complementary (one is the negation of the other).
+    /// Uses `ExpData::structural_eq` for comparison, ignoring `NodeId`s.
+    fn is_complementary(&self, a: &Exp, b: &Exp) -> bool {
+        crate::exp_simplifier::is_complementary(a, b)
+    }
+
     /// Make an implies expression.
     fn mk_implies(&self, arg1: Exp, arg2: Exp) -> Exp {
         self.mk_bool_call(Operation::Implies, vec![arg1, arg2])
@@ -140,18 +176,41 @@ pub trait ExpGenerator<'env> {
         self.mk_bool_call(Operation::Iff, vec![arg1, arg2])
     }
 
+    /// Creates an n-ary conjunction (AND) of the given expressions.
+    /// Returns true if the list is empty.
+    fn mk_and_n(&self, args: Vec<Exp>) -> Exp {
+        if args.is_empty() {
+            self.mk_bool_const(true)
+        } else {
+            args.into_iter().reduce(|a, b| self.mk_and(a, b)).unwrap()
+        }
+    }
+
+    /// Creates an n-ary disjunction (OR) of the given expressions.
+    /// Returns false if the list is empty.
+    fn mk_or_n(&self, args: Vec<Exp>) -> Exp {
+        if args.is_empty() {
+            self.mk_bool_const(false)
+        } else {
+            args.into_iter().reduce(|a, b| self.mk_or(a, b)).unwrap()
+        }
+    }
+
     /// Make a numerical expression for some of the builtin constants.
+    /// Produces a `Value::Number` literal instead of a `Call(MaxU*, [])` node,
+    /// so the value is immediately available for constant folding and comparison
+    /// simplification.
     fn mk_builtin_num_const(&self, oper: Operation) -> Exp {
-        assert!(matches!(
-            oper,
-            Operation::MaxU8
-                | Operation::MaxU16
-                | Operation::MaxU32
-                | Operation::MaxU64
-                | Operation::MaxU128
-                | Operation::MaxU256
-        ));
-        self.mk_call(&NUM_TYPE, oper, vec![])
+        let prim = match oper {
+            Operation::MaxU8 => PrimitiveType::U8,
+            Operation::MaxU16 => PrimitiveType::U16,
+            Operation::MaxU32 => PrimitiveType::U32,
+            Operation::MaxU64 => PrimitiveType::U64,
+            Operation::MaxU128 => PrimitiveType::U128,
+            Operation::MaxU256 => PrimitiveType::U256,
+            _ => panic!("mk_builtin_num_const: unsupported operation {:?}", oper),
+        };
+        self.mk_num_const(prim.get_max_value().unwrap())
     }
 
     /// Join an iterator of boolean expressions with a boolean binary operator.
@@ -237,7 +296,11 @@ pub trait ExpGenerator<'env> {
         let val = self.mk_call_with_inst(
             val_ty,
             vec![key_ty.clone(), val_ty.clone()],
-            Operation::SpecFunction(spec_fun_get.module_id, spec_fun_get.id, None),
+            Operation::SpecFunction(
+                spec_fun_get.module_id,
+                spec_fun_get.id,
+                MemoryRange::default(),
+            ),
             vec![map.clone(), key.clone()],
         );
         if let Some(body) = self.mk_join_opt_bool(Operation::And, f(key), f(val)) {
@@ -365,14 +428,40 @@ pub trait ExpGenerator<'env> {
     fn mk_field_select(&self, field_env: &FieldEnv<'_>, targs: &[Type], exp: Exp) -> Exp {
         let ty = field_env.get_type().instantiate(targs);
         let node_id = self.new_node(ty, None);
+        let mid = field_env.struct_env.module_env.get_id();
+        let sid = field_env.struct_env.get_id();
+        let fid = field_env.get_id();
+        let op = if field_env.get_variant().is_some() {
+            Operation::SelectVariants(mid, sid, vec![fid])
+        } else {
+            Operation::Select(mid, sid, fid)
+        };
+        ExpData::Call(node_id, op, vec![exp]).into_exp()
+    }
+
+    /// Makes an expression which updates a field in a struct.
+    /// Returns `UpdateField(module_id, struct_id, field_id)(struct_exp, new_value)`
+    fn mk_field_update(
+        &self,
+        field_env: &FieldEnv<'_>,
+        targs: &[Type],
+        struct_exp: Exp,
+        new_value: Exp,
+    ) -> Exp {
+        let struct_ty = Type::Struct(
+            field_env.struct_env.module_env.get_id(),
+            field_env.struct_env.get_id(),
+            targs.to_vec(),
+        );
+        let node_id = self.new_node(struct_ty, None);
         ExpData::Call(
             node_id,
-            Operation::Select(
+            Operation::UpdateField(
                 field_env.struct_env.module_env.get_id(),
                 field_env.struct_env.get_id(),
                 field_env.get_id(),
             ),
-            vec![exp],
+            vec![struct_exp, new_value],
         )
         .into_exp()
     }
@@ -390,6 +479,53 @@ pub trait ExpGenerator<'env> {
         .into_exp()
     }
 
+    /// Makes an expression which tests whether a value is one of several variants.
+    fn mk_variant_tests(&self, struct_env: &StructEnv, variants: &[Symbol], exp: Exp) -> Exp {
+        let node_id = self.new_node(Type::Primitive(PrimitiveType::Bool), None);
+        ExpData::Call(
+            node_id,
+            Operation::TestVariants(
+                struct_env.module_env.get_id(),
+                struct_env.get_id(),
+                variants.to_vec(),
+            ),
+            vec![exp],
+        )
+        .into_exp()
+    }
+
+    /// Makes a Pack expression for a struct (non-variant).
+    fn mk_pack(
+        &self,
+        module_id: crate::model::ModuleId,
+        struct_id: StructId,
+        type_args: &[Type],
+        fields: Vec<Exp>,
+    ) -> Exp {
+        let struct_ty = Type::Struct(module_id, struct_id, type_args.to_vec());
+        let node_id = self.new_node(struct_ty, Some(type_args.to_vec()));
+        ExpData::Call(node_id, Operation::Pack(module_id, struct_id, None), fields).into_exp()
+    }
+
+    /// Makes a Pack expression for an enum variant.
+    fn mk_pack_variant(
+        &self,
+        module_id: crate::model::ModuleId,
+        struct_id: StructId,
+        variant: Symbol,
+        type_args: &[Type],
+        fields: Vec<Exp>,
+    ) -> Exp {
+        let struct_ty = Type::Struct(module_id, struct_id, type_args.to_vec());
+        let node_id = self.new_node(struct_ty, Some(type_args.to_vec()));
+        ExpData::Call(
+            node_id,
+            Operation::Pack(module_id, struct_id, Some(variant)),
+            fields,
+        )
+        .into_exp()
+    }
+
     /// Makes an expression for a temporary.
     fn mk_temporary(&self, temp: TempIndex) -> Exp {
         let ty = self.get_local_type(temp);
@@ -397,10 +533,22 @@ pub trait ExpGenerator<'env> {
         ExpData::Temporary(node_id, temp).into_exp()
     }
 
+    /// Makes a result expression for a function return value at the given index.
+    fn mk_result(&self, idx: usize, ty: &Type) -> Exp {
+        let node_id = self.new_node(ty.clone(), None);
+        ExpData::Call(node_id, Operation::Result(idx), vec![]).into_exp()
+    }
+
     /// Makes an expression for a named local.
     fn mk_local(&self, name: &str, ty: Type) -> Exp {
         let node_id = self.new_node(ty, None);
         let sym = self.mk_symbol(name);
+        ExpData::LocalVar(node_id, sym).into_exp()
+    }
+
+    /// Makes an expression for a local with an existing symbol.
+    fn mk_local_by_sym(&self, sym: Symbol, ty: Type) -> Exp {
+        let node_id = self.new_node(ty, None);
         ExpData::LocalVar(node_id, sym).into_exp()
     }
 
@@ -411,5 +559,640 @@ pub trait ExpGenerator<'env> {
         let rty = &self.global_env().get_node_instantiation(node_id)[0];
         let (mid, sid, inst) = rty.require_struct();
         mid.qualified_inst(sid, inst.to_owned())
+    }
+
+    /// Create `exists<R>(@address)` expression.
+    /// Returns a boolean expression checking if resource R exists at the given address.
+    fn mk_exists(&self, struct_env: &StructEnv, type_args: &[Type], addr: Exp) -> Exp {
+        self.mk_exists_with_label(struct_env, type_args, addr, None)
+    }
+
+    /// Create `exists<R, @label>(@address)` expression with optional memory label.
+    /// The label distinguishes pre-state (`Some(label)`) from post-state (`None`).
+    fn mk_exists_with_label(
+        &self,
+        struct_env: &StructEnv,
+        type_args: &[Type],
+        addr: Exp,
+        label: Option<MemoryLabel>,
+    ) -> Exp {
+        let struct_type = Type::Struct(
+            struct_env.module_env.get_id(),
+            struct_env.get_id(),
+            type_args.to_vec(),
+        );
+        let node_id = self.new_node(BOOL_TYPE.clone(), Some(vec![struct_type]));
+        ExpData::Call(node_id, Operation::Exists(label), vec![addr]).into_exp()
+    }
+
+    /// Create `global<R>(@address)` expression.
+    /// Returns the resource value at the given address.
+    fn mk_global(&self, struct_env: &StructEnv, type_args: &[Type], addr: Exp) -> Exp {
+        self.mk_global_with_label(struct_env, type_args, addr, None)
+    }
+
+    /// Create `global<R, @label>(@address)` expression with optional memory label.
+    /// The label distinguishes pre-state (`Some(label)`) from post-state (`None`).
+    fn mk_global_with_label(
+        &self,
+        struct_env: &StructEnv,
+        type_args: &[Type],
+        addr: Exp,
+        label: Option<MemoryLabel>,
+    ) -> Exp {
+        let struct_type = Type::Struct(
+            struct_env.module_env.get_id(),
+            struct_env.get_id(),
+            type_args.to_vec(),
+        );
+        let node_id = self.new_node(struct_type.clone(), Some(vec![struct_type]));
+        ExpData::Call(node_id, Operation::Global(label), vec![addr]).into_exp()
+    }
+
+    // =================================================================================================
+    // Spec Mutation Builtin Helpers
+
+    /// Create `publish<R>(addr, value)` with given memory range.
+    /// Semantics: resource R is published at addr with the given value,
+    /// transitioning from the pre-state to the post-state in the range.
+    fn mk_spec_publish(
+        &self,
+        struct_env: &StructEnv,
+        type_args: &[Type],
+        addr: Exp,
+        value: Exp,
+        range: MemoryRange,
+    ) -> Exp {
+        let struct_type = Type::Struct(
+            struct_env.module_env.get_id(),
+            struct_env.get_id(),
+            type_args.to_vec(),
+        );
+        let node_id = self.new_node(BOOL_TYPE.clone(), Some(vec![struct_type]));
+        ExpData::Call(node_id, Operation::SpecPublish(range), vec![addr, value]).into_exp()
+    }
+
+    /// Create `remove<R>(addr)` with given memory range.
+    /// Semantics: resource R is removed from addr,
+    /// transitioning from the pre-state to the post-state in the range.
+    fn mk_spec_remove(
+        &self,
+        struct_env: &StructEnv,
+        type_args: &[Type],
+        addr: Exp,
+        range: MemoryRange,
+    ) -> Exp {
+        let struct_type = Type::Struct(
+            struct_env.module_env.get_id(),
+            struct_env.get_id(),
+            type_args.to_vec(),
+        );
+        let node_id = self.new_node(BOOL_TYPE.clone(), Some(vec![struct_type]));
+        ExpData::Call(node_id, Operation::SpecRemove(range), vec![addr]).into_exp()
+    }
+
+    /// Create `update<R>(addr, value)` with given memory range.
+    /// Semantics: resource R at addr is updated to value,
+    /// transitioning from the pre-state to the post-state in the range.
+    fn mk_spec_update(
+        &self,
+        struct_env: &StructEnv,
+        type_args: &[Type],
+        addr: Exp,
+        value: Exp,
+        range: MemoryRange,
+    ) -> Exp {
+        let struct_type = Type::Struct(
+            struct_env.module_env.get_id(),
+            struct_env.get_id(),
+            type_args.to_vec(),
+        );
+        let node_id = self.new_node(BOOL_TYPE.clone(), Some(vec![struct_type]));
+        ExpData::Call(node_id, Operation::SpecUpdate(range), vec![addr, value]).into_exp()
+    }
+
+    // =================================================================================================
+    // Numeric Expression Helpers
+
+    /// Make a numeric constant expression with NUM_TYPE (spec arbitrary precision).
+    fn mk_num_const(&self, value: BigInt) -> Exp {
+        let node_id = self.new_node(NUM_TYPE.clone(), None);
+        ExpData::Value(node_id, Value::Number(value)).into_exp()
+    }
+
+    /// Make a NUM_TYPE constant for the minimum value of a primitive integer type.
+    /// Returns None for non-integer types or unbounded types (Num).
+    fn mk_num_min(&self, ty: &PrimitiveType) -> Option<Exp> {
+        let value = ty.get_min_value()?;
+        Some(self.mk_num_const(value))
+    }
+
+    /// Make a NUM_TYPE constant for the maximum value of a primitive integer type.
+    /// Returns None for non-integer types or unbounded types (Num).
+    fn mk_num_max(&self, ty: &PrimitiveType) -> Option<Exp> {
+        let value = ty.get_max_value()?;
+        Some(self.mk_num_const(value))
+    }
+
+    /// Check if a value is out of range for the given primitive type.
+    /// Dispatches on `kind` to emit only the relevant bound check:
+    /// - `Overflow` → `value > MAX`
+    /// - `Underflow` → `value < MIN`
+    /// - `Both` → `value < MIN || value > MAX`
+    /// Returns None for non-integer types or unbounded types.
+    fn mk_range_check(&self, ty: &PrimitiveType, kind: RangeCheckKind, value: Exp) -> Option<Exp> {
+        match kind {
+            RangeCheckKind::Overflow => {
+                let max = self.mk_num_max(ty)?;
+                Some(self.mk_bool_call(Operation::Gt, vec![value, max]))
+            },
+            RangeCheckKind::Underflow => {
+                let min = self.mk_num_min(ty)?;
+                Some(self.mk_bool_call(Operation::Lt, vec![value, min]))
+            },
+            RangeCheckKind::Both => {
+                let min = self.mk_num_min(ty)?;
+                let max = self.mk_num_max(ty)?;
+                let lt_min = self.mk_bool_call(Operation::Lt, vec![value.clone(), min]);
+                let gt_max = self.mk_bool_call(Operation::Gt, vec![value, max]);
+                Some(self.mk_or(lt_min, gt_max))
+            },
+        }
+    }
+
+    /// Make an addition expression using NUM_TYPE (spec arbitrary precision).
+    fn mk_num_add(&self, e1: Exp, e2: Exp) -> Exp {
+        self.mk_call(&NUM_TYPE, Operation::Add, vec![e1, e2])
+    }
+
+    /// Make a subtraction expression using NUM_TYPE (spec arbitrary precision).
+    fn mk_num_sub(&self, e1: Exp, e2: Exp) -> Exp {
+        self.mk_call(&NUM_TYPE, Operation::Sub, vec![e1, e2])
+    }
+
+    /// Make a multiplication expression using NUM_TYPE (spec arbitrary precision).
+    fn mk_num_mul(&self, e1: Exp, e2: Exp) -> Exp {
+        self.mk_call(&NUM_TYPE, Operation::Mul, vec![e1, e2])
+    }
+
+    /// Make a division expression using NUM_TYPE (spec arbitrary precision).
+    fn mk_num_div(&self, e1: Exp, e2: Exp) -> Exp {
+        self.mk_call(&NUM_TYPE, Operation::Div, vec![e1, e2])
+    }
+
+    /// Make a modulo expression using NUM_TYPE (spec arbitrary precision).
+    fn mk_num_mod(&self, e1: Exp, e2: Exp) -> Exp {
+        self.mk_call(&NUM_TYPE, Operation::Mod, vec![e1, e2])
+    }
+
+    /// Make a bitwise OR expression using NUM_TYPE.
+    fn mk_bit_or(&self, e1: Exp, e2: Exp) -> Exp {
+        self.mk_call(&NUM_TYPE, Operation::BitOr, vec![e1, e2])
+    }
+
+    /// Make a bitwise AND expression using NUM_TYPE.
+    fn mk_bit_and(&self, e1: Exp, e2: Exp) -> Exp {
+        self.mk_call(&NUM_TYPE, Operation::BitAnd, vec![e1, e2])
+    }
+
+    /// Make a bitwise XOR expression using NUM_TYPE.
+    fn mk_xor(&self, e1: Exp, e2: Exp) -> Exp {
+        self.mk_call(&NUM_TYPE, Operation::Xor, vec![e1, e2])
+    }
+
+    /// Make a left shift expression using NUM_TYPE.
+    fn mk_shl(&self, e1: Exp, e2: Exp) -> Exp {
+        self.mk_call(&NUM_TYPE, Operation::Shl, vec![e1, e2])
+    }
+
+    /// Make a right shift expression using NUM_TYPE.
+    fn mk_shr(&self, e1: Exp, e2: Exp) -> Exp {
+        self.mk_call(&NUM_TYPE, Operation::Shr, vec![e1, e2])
+    }
+
+    /// Make a negation expression using NUM_TYPE.
+    fn mk_negate(&self, e: Exp) -> Exp {
+        self.mk_call(&NUM_TYPE, Operation::Sub, vec![
+            self.mk_num_const(BigInt::zero()),
+            e,
+        ])
+    }
+
+    /// Make a cast expression to the target type.
+    fn mk_cast(&self, target_ty: Type, e: Exp) -> Exp {
+        self.mk_call(&target_ty, Operation::Cast, vec![e])
+    }
+
+    // =================================================================================================
+    // Spec Vector Helpers
+
+    /// `len(v)` — element count, `Type::Num`.
+    fn mk_len(&self, v: Exp) -> Exp {
+        self.mk_call(&NUM_TYPE, Operation::Len, vec![v])
+    }
+
+    /// `v[i]` — element access, result type `elem_ty`.
+    fn mk_index(&self, v: Exp, i: Exp, elem_ty: &Type) -> Exp {
+        self.mk_call(elem_ty, Operation::Index, vec![v, i])
+    }
+
+    /// `v[from..to]` — range slice, result type `vec_ty`.
+    fn mk_slice(&self, v: Exp, from: Exp, to: Exp, vec_ty: &Type) -> Exp {
+        self.mk_call(vec_ty, Operation::Slice, vec![v, from, to])
+    }
+
+    /// `in_range(v, i)` — bounds-check predicate.
+    fn mk_in_range_vec(&self, v: Exp, i: Exp) -> Exp {
+        self.mk_bool_call(Operation::InRangeVec, vec![v, i])
+    }
+
+    /// `vec()` — empty vector with element type `elem_ty`.
+    fn mk_empty_vec(&self, elem_ty: &Type) -> Exp {
+        let vec_ty = Type::Vector(Box::new(elem_ty.clone()));
+        self.mk_call_with_inst(&vec_ty, vec![elem_ty.clone()], Operation::EmptyVec, vec![])
+    }
+
+    /// `vec(e)` — singleton vector with element type `elem_ty`.
+    fn mk_single_vec(&self, e: Exp, elem_ty: &Type) -> Exp {
+        let vec_ty = Type::Vector(Box::new(elem_ty.clone()));
+        self.mk_call_with_inst(&vec_ty, vec![elem_ty.clone()], Operation::SingleVec, vec![
+            e,
+        ])
+    }
+
+    /// `concat(a, b)` — vector concatenation.
+    fn mk_concat_vec(&self, a: Exp, b: Exp, vec_ty: &Type) -> Exp {
+        self.mk_call(vec_ty, Operation::ConcatVec, vec![a, b])
+    }
+
+    /// `update(v, i, e)` — functional update.
+    fn mk_update_vec(&self, v: Exp, i: Exp, e: Exp, vec_ty: &Type) -> Exp {
+        self.mk_call(vec_ty, Operation::UpdateVec, vec![v, i, e])
+    }
+
+    /// `contains(v, e)` — membership predicate.
+    ///
+    /// `Operation::ContainsVec` is translated by `spec_translator` via
+    /// `translate_primitive_inst_call`, which uses the node's type
+    /// instantiation to compute the per-element-type suffix
+    /// (e.g. `$ContainsVec'#0'`). Without an explicit instantiation the
+    /// emitted Boogie name has no suffix and fails name resolution.
+    fn mk_contains_vec(&self, v: Exp, e: Exp, elem_ty: &Type) -> Exp {
+        self.mk_call_with_inst(
+            &BOOL_TYPE,
+            vec![elem_ty.clone()],
+            Operation::ContainsVec,
+            vec![v, e],
+        )
+    }
+
+    /// `update(update(v, i, v[j]), j, v[i])` — the post-state vector after
+    /// `vector::swap(v, i, j)`.
+    fn mk_swap_post(&self, v: Exp, i: Exp, j: Exp, elem_ty: &Type, vec_ty: &Type) -> Exp {
+        let v_at_j = self.mk_index(v.clone(), j.clone(), elem_ty);
+        let v_at_i = self.mk_index(v.clone(), i.clone(), elem_ty);
+        let inner = self.mk_update_vec(v, i.clone(), v_at_j, vec_ty);
+        self.mk_update_vec(inner, j, v_at_i, vec_ty)
+    }
+
+    // =================================================================================================
+    // Function Values
+
+    /// Create a closure expression for a function reference.
+    /// Returns the closure expression and the function's result type.
+    /// When `mask` and `captured_args` are provided, the closure represents a
+    /// partial application where captured arguments are baked in and only the
+    /// remaining (non-captured) parameters form the closure's function type.
+    fn mk_closure(
+        &self,
+        module_id: ModuleId,
+        fun_id: FunId,
+        type_inst: &[Type],
+        mask: ClosureMask,
+        captured_args: Vec<Exp>,
+    ) -> (Exp, Type) {
+        let fun_env = self
+            .global_env()
+            .get_module(module_id)
+            .into_function(fun_id);
+        let all_param_types: Vec<Type> = fun_env
+            .get_parameters()
+            .iter()
+            .map(|p| p.1.instantiate(type_inst))
+            .collect();
+        // Only non-captured parameters appear in the closure's function type.
+        let provided_param_types: Vec<Type> = all_param_types
+            .iter()
+            .enumerate()
+            .filter(|(i, _)| !mask.is_captured(*i))
+            .map(|(_, ty)| ty.clone())
+            .collect();
+        let result_type = fun_env.get_result_type().instantiate(type_inst);
+        let fun_type = Type::Fun(
+            Box::new(Type::tuple(provided_param_types)),
+            Box::new(result_type.clone()),
+            AbilitySet::EMPTY,
+        );
+        let node_id = self.new_node(fun_type, Some(type_inst.to_vec()));
+        let exp = ExpData::Call(
+            node_id,
+            Operation::Closure(module_id, fun_id, mask),
+            captured_args,
+        )
+        .into_exp();
+        (exp, result_type)
+    }
+
+    /// Convert a signer expression to an address expression by wrapping it in
+    /// `signer::address_of(exp)`. Returns the expression unchanged if it is not
+    /// a signer type.
+    fn signer_to_address(&self, exp: Exp) -> Exp {
+        let env = self.global_env();
+        let ty = env.get_node_type(exp.node_id());
+        if !ty.skip_reference().is_signer() {
+            return exp;
+        }
+        // Look up `signer::address_of` in the stdlib.
+        let signer_sym = env.symbol_pool().make("signer");
+        let Some(signer_module) = env.find_module_by_name(signer_sym) else {
+            env.error(
+                &env.get_node_loc(exp.node_id()),
+                "bug: signer module must be available for signer-to-address conversion",
+            );
+            return exp;
+        };
+        let address_of_sym = env.symbol_pool().make("address_of");
+        let Some(address_of_fun) = signer_module.find_function(address_of_sym) else {
+            env.error(
+                &env.get_node_loc(exp.node_id()),
+                "bug: signer::address_of must be available",
+            );
+            return exp;
+        };
+        let mid = signer_module.get_id();
+        let fid = address_of_fun.get_id();
+        let addr_ty = Type::Primitive(PrimitiveType::Address);
+        // Use SpecFunction if the spec function exists (prover context),
+        // fall back to MoveFunction otherwise.
+        if let Some((spec_fun_id, _)) = address_of_fun.find_spec_fun() {
+            self.mk_call(
+                &addr_ty,
+                Operation::SpecFunction(mid, spec_fun_id, MemoryRange::default()),
+                vec![exp],
+            )
+        } else {
+            self.mk_call(&addr_ty, Operation::MoveFunction(mid, fid), vec![exp])
+        }
+    }
+
+    // =================================================================================================
+    // Function Call Behavioral Predicates
+
+    /// Create a result expression for a function call using behavioral predicates.
+    /// Create `result_of<f>(args)` expression without state label.
+    /// Returns the full result type which may be a tuple for multiple returns.
+    fn mk_result_of(&self, fun_exp: Exp, args: Vec<Exp>, result_type: &Type) -> Exp {
+        self.mk_result_of_with_label(fun_exp, args, result_type, None)
+    }
+
+    /// Create `result_of<f, @label>(args)` expression with optional post memory label.
+    fn mk_result_of_with_label(
+        &self,
+        fun_exp: Exp,
+        args: Vec<Exp>,
+        result_type: &Type,
+        label: Option<MemoryLabel>,
+    ) -> Exp {
+        let mut all_args = vec![fun_exp];
+        all_args.extend(args);
+        let range = MemoryRange {
+            pre: None,
+            post: label,
+        };
+        self.mk_call(
+            result_type,
+            Operation::Behavior(BehaviorKind::ResultOf, range),
+            all_args,
+        )
+    }
+
+    /// Create a result expression for a function call, extracting the nth component.
+    fn mk_result_of_at(
+        &self,
+        fun_exp: Exp,
+        args: Vec<Exp>,
+        result_type: &Type,
+        result_index: usize,
+        num_results: usize,
+    ) -> Exp {
+        self.mk_result_of_at_with_label(fun_exp, args, result_type, result_index, num_results, None)
+    }
+
+    /// Create a result expression with state label, extracting the nth component.
+    fn mk_result_of_at_with_label(
+        &self,
+        fun_exp: Exp,
+        args: Vec<Exp>,
+        result_type: &Type,
+        result_index: usize,
+        num_results: usize,
+        label: Option<MemoryLabel>,
+    ) -> Exp {
+        let result_exp = self.mk_result_of_with_label(fun_exp, args, result_type, label);
+
+        // For multiple returns, extract the nth component
+        if num_results > 1 {
+            let component_type = if let Type::Tuple(types) = result_type {
+                types.get(result_index).cloned().unwrap_or(Type::Error)
+            } else {
+                result_type.clone()
+            };
+            let index_exp = self.mk_num_const(BigInt::from(result_index));
+            let select_node = self.new_node(component_type, None);
+            ExpData::Call(select_node, Operation::Index, vec![result_exp, index_exp]).into_exp()
+        } else {
+            result_exp
+        }
+    }
+
+    /// Build aborts_of<f>(args) predicate without state label.
+    fn mk_aborts_of(&self, fun_exp: Exp, args: Vec<Exp>) -> Exp {
+        self.mk_aborts_of_with_label(fun_exp, args, None)
+    }
+
+    /// Build aborts_of<f, @label>(args) predicate with optional post memory label.
+    fn mk_aborts_of_with_label(
+        &self,
+        fun_exp: Exp,
+        args: Vec<Exp>,
+        label: Option<MemoryLabel>,
+    ) -> Exp {
+        let mut all_args = vec![fun_exp];
+        all_args.extend(args);
+        let range = MemoryRange {
+            pre: None,
+            post: label,
+        };
+        self.mk_bool_call(Operation::Behavior(BehaviorKind::AbortsOf, range), all_args)
+    }
+
+    /// Create `result_of<f>(args)` expression with pre and post state labels.
+    fn mk_result_of_with_state(
+        &self,
+        fun_exp: Exp,
+        args: Vec<Exp>,
+        result_type: &Type,
+        pre: Option<MemoryLabel>,
+        post: Option<MemoryLabel>,
+    ) -> Exp {
+        let mut all_args = vec![fun_exp];
+        all_args.extend(args);
+        let range = MemoryRange { pre, post };
+        self.mk_call(
+            result_type,
+            Operation::Behavior(BehaviorKind::ResultOf, range),
+            all_args,
+        )
+    }
+
+    /// Create a result expression with pre/post state, extracting the nth component.
+    fn mk_result_of_at_with_state(
+        &self,
+        fun_exp: Exp,
+        args: Vec<Exp>,
+        result_type: &Type,
+        result_index: usize,
+        num_results: usize,
+        pre: Option<MemoryLabel>,
+        post: Option<MemoryLabel>,
+    ) -> Exp {
+        let result_exp = self.mk_result_of_with_state(fun_exp, args, result_type, pre, post);
+
+        // For multiple returns, extract the nth component via let-binding deconstruction
+        if num_results > 1 {
+            let elem_types: Vec<Type> = if let Type::Tuple(types) = result_type {
+                types.clone()
+            } else {
+                vec![result_type.clone(); num_results]
+            };
+            let mut pat_elems = Vec::with_capacity(num_results);
+            let mut selected_sym = None;
+            let mut selected_ty = Type::Error;
+            for (i, ty) in elem_types.iter().enumerate() {
+                let sym = self.mk_symbol(&format!("_t{}", i));
+                let pat = self.mk_decl(sym, ty.clone());
+                pat_elems.push(pat);
+                if i == result_index {
+                    selected_sym = Some(sym);
+                    selected_ty = ty.clone();
+                }
+            }
+            let Some(sym) = selected_sym else {
+                let index_exp = self.mk_num_const(BigInt::from(result_index));
+                let select_node = self.new_node(Type::Error, None);
+                return ExpData::Call(select_node, Operation::Index, vec![result_exp, index_exp])
+                    .into_exp();
+            };
+            let tuple_pat_node = self.new_node(result_type.clone(), None);
+            let pattern = Pattern::Tuple(tuple_pat_node, pat_elems);
+            let body = self.mk_local_by_sym(sym, selected_ty.clone());
+            let block_node = self.new_node(selected_ty, None);
+            ExpData::Block(block_node, pattern, Some(result_exp), body).into_exp()
+        } else {
+            result_exp
+        }
+    }
+
+    /// Build aborts_of<f>(args) predicate with pre/post state labels.
+    fn mk_aborts_of_with_state(
+        &self,
+        fun_exp: Exp,
+        args: Vec<Exp>,
+        pre: Option<MemoryLabel>,
+        post: Option<MemoryLabel>,
+    ) -> Exp {
+        let mut all_args = vec![fun_exp];
+        all_args.extend(args);
+        let range = MemoryRange { pre, post };
+        self.mk_bool_call(Operation::Behavior(BehaviorKind::AbortsOf, range), all_args)
+    }
+
+    /// Build ensures_of<f>(args) predicate with pre/post state labels.
+    fn mk_ensures_of_with_state(
+        &self,
+        fun_exp: Exp,
+        args: Vec<Exp>,
+        pre: Option<MemoryLabel>,
+        post: Option<MemoryLabel>,
+    ) -> Exp {
+        let mut all_args = vec![fun_exp];
+        all_args.extend(args);
+        let range = MemoryRange { pre, post };
+        self.mk_bool_call(
+            Operation::Behavior(BehaviorKind::EnsuresOf, range),
+            all_args,
+        )
+    }
+
+    /// Build `write_of<f, j>(args)` with pre/post state labels.
+    /// `mut_ref_idx` indexes the targeted `&mut` parameter among the
+    /// callee's `&mut` parameters only.
+    fn mk_write_of_with_state(
+        &self,
+        fun_exp: Exp,
+        args: Vec<Exp>,
+        mut_ref_value_type: &Type,
+        mut_ref_idx: usize,
+        pre: Option<MemoryLabel>,
+        post: Option<MemoryLabel>,
+    ) -> Exp {
+        let mut all_args = vec![fun_exp];
+        all_args.extend(args);
+        let range = MemoryRange { pre, post };
+        self.mk_call(
+            mut_ref_value_type,
+            Operation::Behavior(BehaviorKind::WriteOf(mut_ref_idx), range),
+            all_args,
+        )
+    }
+}
+
+// =================================================================================================
+// FunExpGenerator
+
+/// Lightweight `ExpGenerator` wrapping a `FunctionEnv` and a `Loc`.
+/// Use when you need an `ExpGenerator` but don't have a `FunctionDataBuilder`.
+pub struct FunExpGenerator<'env> {
+    fun_env: FunctionEnv<'env>,
+    loc: Loc,
+}
+
+impl<'env> FunExpGenerator<'env> {
+    pub fn new(fun_env: FunctionEnv<'env>, loc: Loc) -> Self {
+        Self { fun_env, loc }
+    }
+}
+
+impl<'env> ExpGenerator<'env> for FunExpGenerator<'env> {
+    fn function_env(&self) -> &FunctionEnv<'env> {
+        &self.fun_env
+    }
+
+    fn get_current_loc(&self) -> Loc {
+        self.loc.clone()
+    }
+
+    fn set_loc(&mut self, loc: Loc) {
+        self.loc = loc;
+    }
+
+    fn add_local(&mut self, _: Type) -> TempIndex {
+        panic!("FunExpGenerator does not support add_local")
+    }
+
+    fn get_local_type(&self, temp: TempIndex) -> Type {
+        self.fun_env
+            .get_local_type(temp)
+            .unwrap_or_else(|| panic!("undefined temp {}", temp))
     }
 }

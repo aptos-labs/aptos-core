@@ -10,7 +10,9 @@ use move_docgen::OutputFormat;
 use move_model::model::GlobalEnv;
 use std::{path::PathBuf, sync::Mutex};
 
-#[derive(Debug, Clone, clap::Parser, serde::Serialize, serde::Deserialize, Default)]
+#[derive(
+    Debug, Clone, Hash, Eq, PartialEq, clap::Parser, serde::Serialize, serde::Deserialize, Default,
+)]
 pub struct DocgenOptions {
     /// Whether to include private declarations and implementations into the generated
     /// documentation. Defaults to false.
@@ -100,6 +102,7 @@ impl DocgenOptions {
             include_call_diagrams: false,
             compile_relative_to_output_dir: false,
             output_format: self.output_format,
+            index_link_style: move_docgen::IndexLinkStyle::Anchored,
             ensure_unix_paths: true,
         };
         let output = move_docgen::Docgen::new(model, &options).r#gen();

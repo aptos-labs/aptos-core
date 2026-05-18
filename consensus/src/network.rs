@@ -14,10 +14,7 @@ use crate::{
     pipeline::commit_reliable_broadcast::CommitMessage,
     quorum_store::types::{Batch, BatchMsg, BatchRequest, BatchResponse},
     rand::{
-        rand_gen::{
-            network_messages::{RandGenMessage, RandMessage},
-            types::{AugmentedData, FastShare, Share},
-        },
+        rand_gen::network_messages::RandGenMessage,
         secret_sharing::network_messages::SecretShareNetworkMessage,
     },
 };
@@ -384,6 +381,11 @@ impl NetworkSender {
         self.broadcast_without_self(msg);
     }
 
+    pub fn broadcast_secret_share(&self, msg: ConsensusMsg) {
+        fail_point!("consensus::send::broadcast_secret_share", |_| ());
+        self.broadcast_without_self(msg);
+    }
+
     pub fn broadcast_without_self(&self, msg: ConsensusMsg) {
         fail_point!("consensus::send::any", |_| ());
 
@@ -496,16 +498,6 @@ impl NetworkSender {
     pub async fn broadcast_commit_vote(&self, commit_vote_msg: CommitVote) {
         fail_point!("consensus::send::commit_vote", |_| ());
         let msg = ConsensusMsg::CommitVoteMsg(Box::new(commit_vote_msg));
-        self.broadcast(msg).await
-    }
-
-    pub async fn broadcast_fast_share(&self, share: FastShare<Share>) {
-        fail_point!("consensus::send::broadcast_share", |_| ());
-        let msg = tokio::task::spawn_blocking(|| {
-            RandMessage::<Share, AugmentedData>::FastShare(share).into_network_message()
-        })
-        .await
-        .expect("task cannot fail to execute");
         self.broadcast(msg).await
     }
 
@@ -899,7 +891,7 @@ impl NetworkTask {
                                     proposal.timestamp_usecs(),
                                     BlockStage::NETWORK_RECEIVED_OPT_PROPOSAL,
                                 );
-                                info!(
+                                debug!(
                                     LogSchema::new(LogEvent::NetworkReceiveOptProposal)
                                         .remote_peer(peer_id),
                                     block_author = proposal.proposer(),
@@ -944,7 +936,15 @@ impl NetworkTask {
                                 warn!(error = ?e, "aptos channel closed");
                             };
                         },
-                        _ => {
+                        // RPC-only and response variants — unexpected as direct sends.
+                        ConsensusMsg::DeprecatedBlockRetrievalRequest(_)
+                        | ConsensusMsg::BlockRetrievalResponse(_)
+                        | ConsensusMsg::BlockRetrievalRequest(_)
+                        | ConsensusMsg::BatchRequestMsg(_)
+                        | ConsensusMsg::BatchResponse(_)
+                        | ConsensusMsg::BatchResponseV2(_)
+                        | ConsensusMsg::DAGMessage(_)
+                        | ConsensusMsg::CommitMessage(_) => {
                             warn!(remote_peer = peer_id, "Unexpected direct send msg");
                             continue;
                         },
@@ -1022,8 +1022,35 @@ impl NetworkTask {
                                 response_sender: callback,
                             })
                         },
-                        _ => {
-                            warn!(remote_peer = peer_id, "Unexpected msg: {:?}", msg);
+                        ConsensusMsg::SecretShareMsg(req) => {
+                            IncomingRpcRequest::SecretShareRequest(IncomingSecretShareRequest {
+                                req,
+                                sender: peer_id,
+                                protocol,
+                                response_sender: callback,
+                            })
+                        },
+                        // Direct-send-only and response variants — unexpected as RPCs.
+                        ConsensusMsg::ProposalMsg(_)
+                        | ConsensusMsg::OptProposalMsg(_)
+                        | ConsensusMsg::VoteMsg(_)
+                        | ConsensusMsg::OrderVoteMsg(_)
+                        | ConsensusMsg::RoundTimeoutMsg(_)
+                        | ConsensusMsg::SyncInfo(_)
+                        | ConsensusMsg::EpochRetrievalRequest(_)
+                        | ConsensusMsg::EpochChangeProof(_)
+                        | ConsensusMsg::CommitVoteMsg(_)
+                        | ConsensusMsg::CommitDecisionMsg(_)
+                        | ConsensusMsg::SignedBatchInfo(_)
+                        | ConsensusMsg::SignedBatchInfoMsgV2(_)
+                        | ConsensusMsg::BatchMsg(_)
+                        | ConsensusMsg::BatchMsgV2(_)
+                        | ConsensusMsg::ProofOfStoreMsg(_)
+                        | ConsensusMsg::ProofOfStoreMsgV2(_)
+                        | ConsensusMsg::BlockRetrievalResponse(_)
+                        | ConsensusMsg::BatchResponse(_)
+                        | ConsensusMsg::BatchResponseV2(_) => {
+                            warn!(remote_peer = peer_id, "Unexpected RPC msg: {:?}", msg);
                             continue;
                         },
                     };

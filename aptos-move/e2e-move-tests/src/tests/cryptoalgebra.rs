@@ -20,13 +20,6 @@ fn crypto_algebra_type_tag_limit_exceeded(harness: &mut MoveHarness) -> Transact
 }
 
 #[test]
-#[should_panic]
-fn crypto_algebra_type_tag_limit_exceeded_not_handled() {
-    let mut h = MoveHarness::new();
-    crypto_algebra_type_tag_limit_exceeded(&mut h);
-}
-
-#[test]
 fn crypto_algebra_type_tag_limit_exceeded_handled() {
     let mut h = MoveHarness::new();
     h.new_epoch();

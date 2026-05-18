@@ -30,13 +30,31 @@ const MAX_TRANSACTION_OUTPUT_CHUNK_SIZE: u64 = 3000;
 const MAX_CONCURRENT_REQUESTS: u64 = 6;
 const MAX_CONCURRENT_STATE_REQUESTS: u64 = 6;
 
-#[derive(Clone, Copy, Debug, Default, Deserialize, PartialEq, Eq, Serialize)]
+// The default number of threads for the state sync runtime
+const DEFAULT_STATE_SYNC_RUNTIME_THREADS: usize = 16;
+
+#[derive(Clone, Copy, Debug, Deserialize, PartialEq, Eq, Serialize)]
 #[serde(default, deny_unknown_fields)]
 pub struct StateSyncConfig {
     pub data_streaming_service: DataStreamingServiceConfig,
     pub aptos_data_client: AptosDataClientConfig,
     pub state_sync_driver: StateSyncDriverConfig,
     pub storage_service: StorageServiceConfig,
+    /// Number of worker threads for the shared state sync runtime.
+    /// Defaults to 16. Set to `None` to use the tokio default (num_cpus).
+    pub num_runtime_threads: Option<usize>,
+}
+
+impl Default for StateSyncConfig {
+    fn default() -> Self {
+        Self {
+            data_streaming_service: DataStreamingServiceConfig::default(),
+            aptos_data_client: AptosDataClientConfig::default(),
+            state_sync_driver: StateSyncDriverConfig::default(),
+            storage_service: StorageServiceConfig::default(),
+            num_runtime_threads: Some(DEFAULT_STATE_SYNC_RUNTIME_THREADS),
+        }
+    }
 }
 
 /// The bootstrapping mode determines how the node will bootstrap to the latest
@@ -162,6 +180,9 @@ pub struct StorageServiceConfig {
     pub max_epoch_chunk_size: u64,
     /// Maximum number of invalid requests per peer
     pub max_invalid_requests_per_peer: u64,
+    /// Maximum number of requests per second per peer (if None, then no rate limiting is applied).
+    /// Note: this currently only applies for peers on the public network.
+    pub max_requests_per_second_per_peer: Option<u64>,
     /// Maximum number of items in the lru cache before eviction
     pub max_lru_cache_size: u64,
     /// Maximum number of pending network messages
@@ -184,7 +205,8 @@ pub struct StorageServiceConfig {
     pub max_transaction_chunk_size: u64,
     /// Maximum number of transaction outputs per chunk
     pub max_transaction_output_chunk_size: u64,
-    /// Minimum time (secs) to ignore peers after too many invalid requests
+    /// Minimum time (secs) to ignore peers after too many invalid requests.
+    /// Note: this currently only applies for peers on the public network.
     pub min_time_to_ignore_peers_secs: u64,
     /// The interval (ms) to refresh the request moderator state
     pub request_moderator_refresh_interval_ms: u64,
@@ -199,6 +221,7 @@ impl Default for StorageServiceConfig {
             enable_transaction_data_v2: true,
             max_epoch_chunk_size: MAX_EPOCH_CHUNK_SIZE,
             max_invalid_requests_per_peer: 500,
+            max_requests_per_second_per_peer: None,
             max_lru_cache_size: 500, // At ~0.6MiB per chunk, this should take no more than 0.5GiB
             max_network_channel_size: 4000,
             max_network_chunk_bytes: SERVER_MAX_MESSAGE_SIZE as u64,

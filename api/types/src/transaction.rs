@@ -2,7 +2,7 @@
 // Licensed pursuant to the Innovation-Enabling Source Code License, available at https://github.com/aptos-labs/aptos-core/blob/main/LICENSE
 
 use crate::{
-    Address, AptosError, EntryFunctionId, EventGuid, HashValue, HexEncodedBytes,
+    Address, AptosError, EntryFunctionId, EventGuid, HashValue, HexEncodedBytes, IdentifierWrapper,
     MoveModuleBytecode, MoveModuleId, MoveResource, MoveScriptBytecode, MoveStructTag, MoveType,
     MoveValue, VerifyInput, VerifyInputWithRecursion, U64,
 };
@@ -490,7 +490,11 @@ pub struct UserTransactionRequestInner {
 
 impl VerifyInput for UserTransactionRequestInner {
     fn verify(&self) -> anyhow::Result<()> {
-        self.payload.verify()
+        self.payload.verify()?;
+        // Ciphertext verification for encrypted payloads is done in
+        // `validate_signed_transaction_payload` which has access to the full
+        // SignedTransaction (needed to extract the authenticator's auth_key).
+        Ok(())
     }
 }
 
@@ -778,12 +782,13 @@ impl
                 timestamp: U64::from(timestamp),
                 quorum_certified_update: quorum_certified_update.into(),
             }),
-            aptos_types::validator_txn::ValidatorTransaction::ChunkyDKGResult(certified_subtrx) => {
+            aptos_types::validator_txn::ValidatorTransaction::ChunkyDKGResult(dkg_output) => {
                 Self::ChunkyDKGResult(ChunkyDKGResultTransaction {
                     info,
                     events,
                     timestamp: U64::from(timestamp),
-                    certified_subtrx: certified_subtrx.into(),
+                    certified_subtrx: dkg_output.certified_transcript.into(),
+                    encryption_key: HexEncodedBytes::from(dkg_output.encryption_key),
                 })
             },
         }
@@ -902,6 +907,7 @@ pub struct ChunkyDKGResultTransaction {
     pub events: Vec<Event>,
     pub timestamp: U64,
     pub certified_subtrx: ExportedCertifiedAggregatedChunkySubtranscript,
+    pub encryption_key: HexEncodedBytes,
 }
 
 /// A more API-friendly representation of the on-chain
@@ -1021,6 +1027,7 @@ pub enum TransactionPayload {
     // ordering, unfortunately.
     ModuleBundlePayload(DeprecatedModuleBundlePayload),
     MultisigPayload(MultisigPayload),
+    EncryptedTransactionPayload(EncryptedTransactionPayload),
 }
 
 impl VerifyInput for TransactionPayload {
@@ -1029,6 +1036,8 @@ impl VerifyInput for TransactionPayload {
             TransactionPayload::EntryFunctionPayload(inner) => inner.verify(),
             TransactionPayload::ScriptPayload(inner) => inner.verify(),
             TransactionPayload::MultisigPayload(inner) => inner.verify(),
+
+            TransactionPayload::EncryptedTransactionPayload(inner) => inner.verify(),
 
             // Deprecated.
             TransactionPayload::ModuleBundlePayload(_) => {
@@ -1098,13 +1107,13 @@ impl TryFrom<Script> for ScriptPayload {
     }
 }
 
-// We use an enum here for extensibility so we can add Script payload support
-// in the future for example.
+/// Enum for multisig transaction payloads, supporting both entry functions and scripts.
 #[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize, Union)]
 #[serde(tag = "type", rename_all = "snake_case")]
 #[oai(one_of, discriminator_name = "type", rename_all = "snake_case")]
 pub enum MultisigTransactionPayload {
     EntryFunctionPayload(EntryFunctionPayload),
+    ScriptPayload(ScriptPayload),
 }
 
 /// A multisig transaction that allows an owner of a multisig account to execute a pre-approved
@@ -1129,10 +1138,99 @@ impl VerifyInput for MultisigPayload {
                         type_arg.verify(0)?;
                     }
                 },
+                MultisigTransactionPayload::ScriptPayload(script_payload) => {
+                    script_payload.verify()?;
+                },
             }
         }
 
         Ok(())
+    }
+}
+
+/// The inner payload of an encrypted transaction, present only when decrypted.
+#[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize, Union)]
+#[serde(tag = "type", rename_all = "snake_case")]
+#[oai(one_of, discriminator_name = "type", rename_all = "snake_case")]
+pub enum EncryptedTransactionInnerPayload {
+    EntryFunctionPayload(EntryFunctionPayload),
+    ScriptPayload(ScriptPayload),
+    MultisigPayload(MultisigPayload),
+}
+
+/// An encrypted transaction payload, discriminated by encrypted_state.
+///
+/// NOTE: multisig_address and replay_protection_nonce are not surfaced here.
+/// They are part of extra_config and already exposed on UserTransactionRequest.
+/// For Decrypted state, multisig_address is embedded in the MultisigPayload variant
+/// of decrypted_payload.
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, Union)]
+#[serde(tag = "encrypted_state", rename_all = "snake_case")]
+#[oai(
+    one_of,
+    discriminator_name = "encrypted_state",
+    rename_all = "snake_case"
+)]
+pub enum EncryptedTransactionPayload {
+    Encrypted(EncryptedPayload),
+    FailedDecryption(FailedDecryptionPayload),
+    Decrypted(DecryptedPayload),
+}
+
+/// An encrypted payload's claim about the entry function. Specifies at least the module address,
+/// and optionally the specific entry funtion.
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, Object)]
+pub struct ClaimedEntryFunction {
+    pub module: MoveModuleId,
+    pub name: Option<IdentifierWrapper>,
+}
+
+/// Payload is still encrypted and cannot be read.
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, Object)]
+pub struct EncryptedPayload {
+    pub payload_hash: HashValue,
+    /// BCS-serialized ciphertext bytes, hex-encoded.
+    pub ciphertext: HexEncodedBytes,
+    pub encryption_epoch: U64,
+    pub claimed_entry_fun: Option<ClaimedEntryFunction>,
+}
+
+/// Decryption was attempted but failed.
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, Object)]
+pub struct FailedDecryptionPayload {
+    pub payload_hash: HashValue,
+    /// BCS-serialized ciphertext bytes, hex-encoded.
+    pub ciphertext: HexEncodedBytes,
+    pub encryption_epoch: U64,
+    pub claimed_entry_fun: Option<ClaimedEntryFunction>,
+}
+
+/// Payload has been successfully decrypted.
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, Object)]
+pub struct DecryptedPayload {
+    pub payload_hash: HashValue,
+    /// BCS-serialized ciphertext bytes, hex-encoded.
+    pub ciphertext: HexEncodedBytes,
+    pub encryption_epoch: U64,
+    pub claimed_entry_fun: Option<ClaimedEntryFunction>,
+    pub decrypted_payload: EncryptedTransactionInnerPayload,
+    pub decryption_nonce: HexEncodedBytes,
+}
+
+impl VerifyInput for EncryptedTransactionPayload {
+    /// Basic structural checks. Full ciphertext verification happens in
+    /// `validate_signed_transaction_payload`, after JSON or BCS requests are
+    /// converted into a `SignedTransaction`.
+    fn verify(&self) -> anyhow::Result<()> {
+        match self {
+            EncryptedTransactionPayload::Encrypted(_) => Ok(()),
+            EncryptedTransactionPayload::FailedDecryption(_) => {
+                bail!("Cannot submit a failed decryption payload")
+            },
+            EncryptedTransactionPayload::Decrypted(_) => {
+                bail!("Cannot submit a decrypted payload")
+            },
+        }
     }
 }
 

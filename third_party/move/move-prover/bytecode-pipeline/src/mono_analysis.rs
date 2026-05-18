@@ -1,6 +1,7 @@
-// Copyright (c) The Diem Core Contributors
-// Copyright (c) The Move Contributors
-// SPDX-License-Identifier: Apache-2.0
+// Parts of the file are Copyright (c) The Diem Core Contributors
+// Parts of the file are Copyright (c) The Move Contributors
+// Parts of the file are Copyright (c) Aptos Foundation
+// All Aptos Foundation code and content is licensed pursuant to the Innovation-Enabling Source Code License, available at https://github.com/aptos-labs/aptos-core/blob/main/LICENSE
 
 //! Analysis which computes information needed in backends for monomorphization. This
 //! computes the distinct type instantiations in the model for structs and inlined functions.
@@ -11,8 +12,8 @@ use move_model::{
     ast,
     ast::{Condition, ConditionKind, ExpData},
     model::{
-        FunId, GlobalEnv, ModuleId, Parameter, QualifiedId, QualifiedInstId, SpecFunId, SpecVarId,
-        StructEnv, StructId,
+        FieldEnv, FunId, GlobalEnv, ModuleId, Parameter, QualifiedId, QualifiedInstId, SpecFunId,
+        SpecVarId, StructEnv, StructId,
     },
     pragmas::INTRINSIC_TYPE_MAP,
     symbol::Symbol,
@@ -55,6 +56,28 @@ pub struct MonoInfo {
     /// A map from function types to function-typed parameters of verification target functions.
     /// This enables the Boogie backend to generate parameter variants in the function type datatype.
     pub fun_param_infos: BTreeMap<Type, BTreeSet<FunParamInfo>>,
+    /// A map from function types to struct fields containing storable function values.
+    /// This enables the Boogie backend to generate struct field variants in the function type
+    /// datatype with uninterpreted behavioral predicates.
+    pub fun_struct_field_infos: BTreeMap<Type, BTreeSet<StructFieldInfo>>,
+}
+
+impl MonoInfo {
+    /// Returns the set of all resource (key-ability) struct instantiations.
+    /// This is the set of memory types that the Boogie backend will translate,
+    /// and the correct scope for wildcard `reads_of<f> *` / `modifies_of<f> *`.
+    pub fn all_memory_qids(&self, env: &GlobalEnv) -> BTreeSet<QualifiedInstId<StructId>> {
+        let mut result = BTreeSet::new();
+        for (sid, insts) in &self.structs {
+            let struct_env = env.get_struct(*sid);
+            if struct_env.has_memory() {
+                for inst in insts {
+                    result.insert(sid.instantiate(inst.clone()));
+                }
+            }
+        }
+        result
+    }
 }
 
 #[derive(Clone, Debug, PartialOrd, PartialEq, Ord, Eq)]
@@ -74,6 +97,17 @@ pub struct FunParamInfo {
     pub fun: QualifiedInstId<FunId>,
     /// The parameter name/symbol.
     pub param_sym: Symbol,
+}
+
+/// Information about a struct field that has a storable function type.
+/// This is used to track function-valued fields in structs so the Boogie backend
+/// can generate appropriate datatype variants with uninterpreted behavioral predicates.
+#[derive(Clone, Debug, PartialOrd, PartialEq, Ord, Eq)]
+pub struct StructFieldInfo {
+    /// The instantiated struct containing this function-typed field.
+    pub struct_id: QualifiedInstId<StructId>,
+    /// The field name.
+    pub field_sym: Symbol,
 }
 
 /// Get the information computed by this analysis.
@@ -222,7 +256,7 @@ impl Analyzer<'_> {
         // in self.todo_targets for later analysis. During this phase, self.inst_opt is None.
         for module in self.env.get_modules() {
             for fun in module.get_functions() {
-                if fun.is_inline() {
+                if fun.is_not_prover_target() {
                     continue;
                 }
                 for (variant, target) in self.targets.get_targets(&fun) {
@@ -235,7 +269,7 @@ impl Analyzer<'_> {
                     // included in the bytecode.
                     for (_, exps) in target.get_modify_ids_and_exps() {
                         for exp in exps {
-                            self.analyze_exp(exp);
+                            self.analyze_exp(&exp);
                         }
                     }
                 }
@@ -340,6 +374,18 @@ impl Analyzer<'_> {
                 self.analyze_bytecode(&target, bc);
             }
         }
+        // Analyze spec conditions and proof hints for closures and types.
+        {
+            let spec = target.get_spec();
+            for cond in spec.conditions.iter() {
+                for exp in cond.all_exps() {
+                    self.analyze_exp(exp);
+                }
+            }
+            for exp in spec.proof_exps() {
+                self.analyze_exp(exp);
+            }
+        }
         // Analyze instantiations (when this function is a verification target)
         if self.inst_opt.is_none() {
             // Collect function-typed parameters for behavioral predicate support.
@@ -377,13 +423,7 @@ impl Analyzer<'_> {
                     let all_outputs: Vec<Type> = results_flat
                         .into_iter()
                         .chain(mut_ref_outputs)
-                        .map(|ty| {
-                            if ty.is_mutable_reference() {
-                                ty.skip_reference().clone()
-                            } else {
-                                ty
-                            }
-                        })
+                        .map(|ty| ty.skip_reference().clone())
                         .collect();
                     if all_outputs.len() >= 2 {
                         self.info.tuple_inst.insert(all_outputs);
@@ -481,8 +521,11 @@ impl Analyzer<'_> {
                         .entry(callee_env.module_env.get_id())
                         .or_default()
                         .insert(actuals);
-                } else if !callee_env.is_opaque() {
+                } else if !callee_env.is_opaque() && !callee_env.is_struct_api() {
                     // This call needs to be inlined, with targs instantiated by self.inst_opt.
+                    // Struct API wrappers are excluded: their call sites are translated to native
+                    // ops (Pack, BorrowField, etc.) in stackless_bytecode_generator, so there is
+                    // no independent bytecode target to schedule for monomorphization.
                     // Schedule for later processing if this instance has not been processed yet.
                     let entry = (mid.qualified(*fid), FunctionVariant::Baseline, actuals);
                     if !self.done_funs.contains(&entry) {
@@ -496,6 +539,7 @@ impl Analyzer<'_> {
                     let fun_type =
                         self.normalize_fun_ty(self.instantiate(target.get_local_type(dests[0])));
                     let fun = mid.qualified_inst(*fid, self.instantiate_vec(targs));
+                    self.add_closure_spec_memory(&fun);
                     self.info
                         .fun_infos
                         .entry(fun_type)
@@ -552,6 +596,27 @@ impl Analyzer<'_> {
         }
     }
 
+    /// When a closure value targeting `fun` is recorded, register the resource
+    /// memory accessed by `fun`'s spec. Behavioral predicates (`aborts_of`,
+    /// `ensures_of`, `result_of`) evaluate the target's spec, so its memory
+    /// must be in `structs` for Boogie to emit the `_$memory` declarations —
+    /// even when the closure is never called directly under the current
+    /// verification filter.
+    fn add_closure_spec_memory(&mut self, fun: &QualifiedInstId<FunId>) {
+        let fun_env = self.env.get_function(fun.to_qualified_id());
+        let mems: Vec<_> = fun_env
+            .get_spec_used_memory()
+            .iter()
+            .chain(fun_env.get_spec_old_memory().iter())
+            .cloned()
+            .collect();
+        for mem in mems {
+            let mem = mem.instantiate(&fun.inst);
+            let struct_env = self.env.get_struct_qid(mem.to_qualified_id());
+            self.add_struct(struct_env, &mem.inst);
+        }
+    }
+
     fn instantiate_mem(&self, mem: QualifiedInstId<StructId>) -> QualifiedInstId<StructId> {
         if let Some(inst) = &self.inst_opt {
             mem.instantiate(inst)
@@ -585,14 +650,35 @@ impl Analyzer<'_> {
             // Handle Closure operations in spec expressions
             if let ExpData::Call(node_id, ast::Operation::Closure(mid, fid, mask), _) = e {
                 let inst = self.instantiate_vec(&self.env.get_node_instantiation(*node_id));
-                let fun = mid.qualified_inst(*fid, inst);
+                let fun = mid.qualified_inst(*fid, inst.clone());
                 let fun_type =
                     self.normalize_fun_ty(self.instantiate(&self.env.get_node_type(*node_id)));
+                self.add_closure_spec_memory(&fun);
                 self.info
                     .fun_infos
                     .entry(fun_type)
                     .or_default()
-                    .insert(ClosureInfo { fun, mask: *mask });
+                    .insert(ClosureInfo {
+                        fun: fun.clone(),
+                        mask: *mask,
+                    });
+                // Schedule the closure target for monomorphization so the
+                // Boogie backend emits a Baseline procedure declaration. The
+                // apply procedure for the closure type calls this declaration.
+                // Without this, behavioural predicates over a function that
+                // appears only in specs (no bytecode-level closure pack) would
+                // produce an undeclared-procedure call.
+                if let Some(callee_env) = self.env.get_function_opt(fun.to_qualified_id()) {
+                    if !callee_env.is_native_or_intrinsic()
+                        && !callee_env.is_opaque()
+                        && !callee_env.is_struct_api()
+                    {
+                        let entry = (fun.to_qualified_id(), FunctionVariant::Baseline, inst);
+                        if !self.done_funs.contains(&entry) {
+                            self.todo_funs.push(entry);
+                        }
+                    }
+                }
             }
             if let ExpData::Call(node_id, ast::Operation::SpecFunction(mid, fid, _), _) = e {
                 let actuals = self.instantiate_vec(&self.env.get_node_instantiation(*node_id));
@@ -671,7 +757,9 @@ impl Analyzer<'_> {
             },
             Type::Tuple(elems) if elems.len() >= 2 => {
                 // Only collect proper tuples, tuples of size 0 and 1 do not exist.
-                self.info.tuple_inst.insert(elems.clone());
+                // Strip references since Boogie tuple types work with values only.
+                let elems: Vec<Type> = elems.iter().map(|ty| ty.skip_reference().clone()).collect();
+                self.info.tuple_inst.insert(elems);
             },
             Type::Struct(mid, sid, targs) => {
                 self.add_struct(self.env.get_module(*mid).into_struct(*sid), targs)
@@ -705,13 +793,44 @@ impl Analyzer<'_> {
             if struct_.has_variants() {
                 for variant in struct_.get_variants() {
                     for field in struct_.get_fields_of_variant(variant) {
-                        self.add_type(&field.get_type().instantiate(targs));
+                        let field_ty = field.get_type().instantiate(targs);
+                        self.add_type(&field_ty);
+                        self.check_struct_fun_field(&struct_, &field, &field_ty, targs);
                     }
                 }
             } else {
                 for field in struct_.get_fields() {
-                    self.add_type(&field.get_type().instantiate(targs));
+                    let field_ty = field.get_type().instantiate(targs);
+                    self.add_type(&field_ty);
+                    self.check_struct_fun_field(&struct_, &field, &field_ty, targs);
                 }
+            }
+        }
+    }
+
+    /// Check if a struct field has a storable function type and register it in
+    /// `fun_struct_field_infos` if so.
+    fn check_struct_fun_field(
+        &mut self,
+        struct_env: &StructEnv<'_>,
+        field: &FieldEnv<'_>,
+        field_ty: &Type,
+        targs: &[Type],
+    ) {
+        if let Type::Fun(_, _, abilities) = field_ty {
+            if abilities.has_store() {
+                let normalized = self.normalize_fun_ty(field_ty.clone());
+                let info = StructFieldInfo {
+                    struct_id: struct_env.get_qualified_id().instantiate(targs.to_vec()),
+                    field_sym: field.get_name(),
+                };
+                self.info
+                    .fun_struct_field_infos
+                    .entry(normalized.clone())
+                    .or_default()
+                    .insert(info);
+                // Ensure the function type is also registered in fun_infos
+                self.info.fun_infos.entry(normalized).or_default();
             }
         }
     }

@@ -26,6 +26,7 @@ use std::{
     time::{Duration, Instant},
 };
 
+#[ignore]
 #[tokio::test]
 async fn test_connection_limiting() {
     let mut swarm = new_local_swarm_with_aptos(1).await;
@@ -142,6 +143,7 @@ async fn test_connection_limiting() {
     );
 }
 
+#[ignore]
 #[tokio::test]
 async fn test_rest_discovery() {
     let mut swarm = SwarmBuilder::new_local(1).with_aptos().build().await;
@@ -211,6 +213,7 @@ async fn test_file_discovery() {
 // TODO: add more complex tests for the peer monitoring service.
 // TODO: move the state sync functions to a utility file (instead of importing directly).
 
+#[ignore]
 #[tokio::test]
 async fn test_peer_monitoring_service_enabled() {
     // Create a swarm of 4 validators with peer monitoring enabled

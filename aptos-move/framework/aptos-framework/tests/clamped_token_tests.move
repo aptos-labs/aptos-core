@@ -2,10 +2,10 @@
 module aptos_framework::clamped_token_tests {
     use aptos_framework::fungible_asset::{Self, Metadata, TestToken};
     use aptos_framework::dispatchable_fungible_asset;
-    use 0xcafe::clamped_token;
+    use aptos_framework::clamped_token;
     use std::option;
 
-    #[test(creator = @0xcafe)]
+    #[test(creator = @aptos_framework)]
     fun test_clamped(
         creator: &signer,
     ) {
@@ -29,8 +29,8 @@ module aptos_framework::clamped_token_tests {
         dispatchable_fungible_asset::deposit(creator_store, fa);
     }
 
-    #[test(creator = @0xcafe)]
-    #[expected_failure(abort_code = 0, location = 0xcafe::clamped_token)]
+    #[test(creator = @aptos_framework)]
+    #[expected_failure(abort_code = 0, location = aptos_framework::clamped_token)]
     fun test_clamped_aborted(
         creator: &signer,
     ) {

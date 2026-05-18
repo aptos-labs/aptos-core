@@ -4,56 +4,230 @@ title: Consensus
 custom_edit_url: https://github.com/aptos-labs/aptos-core/edit/main/consensus/README.md
 ---
 
-
 The consensus component supports state machine replication using the AptosBFT consensus protocol.
 
 ## Overview
 
-A consensus protocol allows a set of validators to create the logical appearance of a single database. The consensus protocol replicates submitted transactions among the validators, executes potential transactions against the current database, and then agrees on a binding commitment to the ordering of transactions and resulting execution. As a result, all validators can maintain an identical database for a given version number following the [state machine replication paradigm](https://dl.acm.org/citation.cfm?id=98167). The Aptos protocol uses a variant of the [Jolteon consensus protocol](https://arxiv.org/pdf/2106.10362.pdf), a recent Byzantine fault-tolerant ([BFT](https://en.wikipedia.org/wiki/Byzantine_fault)) consensus protocol, called AptosBFT. It provides safety (all honest validators agree on commits and execution) and liveness (commits are continually produced) in the partial synchrony model defined in the paper "Consensus in the Presence of Partial Synchrony" by Dwork, Lynch, and Stockmeyer ([DLS](https://groups.csail.mit.edu/tds/papers/Lynch/jacm88.pdf)) and mentioned in the paper ["Practical Byzantine Fault Tolerance" (PBFT)](http://pmg.csail.mit.edu/papers/osdi99.pdf) by Castro and Liskov, as well as newer protocols such as [Tendermint](https://arxiv.org/abs/1807.04938). In this document, we present a high-level description of the AptosBFT protocol and discuss how the code is organized. For details on the specifications and proofs of AptosBFT, read the full [technical report](../developer-docs-site/static/papers/aptos-consensus-state-machine-replication-in-the-aptos-blockchain/).
+AptosBFT is a BFT state machine replication protocol for n = 3f+1 validators, tolerating up to f Byzantine faults. It provides safety always and liveness during periods of synchrony (partial synchrony model). The protocol incorporates ideas from [Jolteon](https://arxiv.org/pdf/2106.10362.pdf) (2-chain commit), order votes ([AIP-89](https://github.com/aptos-foundation/AIPs/blob/main/aips/aip-89.md)), and optimistic proposals ([AIP-131](https://github.com/aptos-foundation/AIPs/blob/main/aips/aip-131.md)).
 
-Agreement on the database state must be reached between validators, even if
-there are Byzantine faults. The Byzantine failures model allows some validators
-to arbitrarily deviate from the protocol without constraint, with the exception
-of being computationally bound (and thus not able to break cryptographic assumptions). Byzantine faults are worst-case errors where validators collude and behave maliciously to try to sabotage system behavior. A consensus protocol that tolerates Byzantine faults caused by malicious or hacked validators can also mitigate arbitrary hardware and software failures.
+## AptosBFT Protocol
 
-AptosBFT assumes that a set of 3f + 1 votes is distributed among a set of validators that may be honest or Byzantine. AptosBFT remains safe, preventing attacks such as double spends and forks when at most f votes are controlled by Byzantine validators &mdash; also implying that at least 2f+1 votes are honest.  AptosBFT remains live, committing transactions from clients, as long as there exists a global stabilization time (GST), after which all messages between honest validators are delivered to other honest validators within a maximal network delay $\Delta$ (this is the partial synchrony model introduced in [DLS](https://groups.csail.mit.edu/tds/papers/Lynch/jacm88.pdf)). In addition to traditional guarantees, AptosBFT maintains safety when validators crash and restart — even if all validators restart at the same time.
+### Rounds and Proposals
 
-### AptosBFT Overview
+Consensus proceeds in rounds. Each round has a designated leader who proposes a block. In the **happy path**, a leader can send an **optimistic proposal** extending the parent block *before* the parent's QC arrives — the leader only needs to have seen the parent proposal and trust it will be certified. This reduces block time to a single network hop.
 
-In AptosBFT, validators receive transactions from clients and share them with each other through a shared mempool protocol. The AptosBFT protocol then proceeds in a sequence of rounds. In each round, a validator takes the role of leader and proposes a block of transactions to extend a certified sequence of blocks (see quorum certificates below) that contain the full previous transaction history. A validator receives the proposed block and checks their voting rules to determine if it should vote for certifying this block. These simple rules ensure the safety of AptosBFT — and their implementation can be cleanly separated and audited. If the validator intends to vote for this block, it executes the block’s transactions speculatively and without external effect. This results in the computation of an authenticator for the database that results from the execution of the block. The validator then sends a signed vote for the block and the database authenticator to the leader. The leader gathers these votes to form a quorum certificate that provides evidence of $\ge$ 2f + 1 votes for this block and broadcasts the quorum certificate to all validators.
+An optimistic proposal contains a `grandparent_qc` (QC of block r-2) instead of the usual parent QC, since the parent QC doesn't exist yet. Validators buffer optimistic proposals until the parent QC arrives, then convert to a regular proposal and apply standard safety rules.
 
-A block is committed when a contiguous 3-chain commit rule is met. A block at round k is committed if it has a quorum certificate and is confirmed by two more blocks and quorum certificates at rounds k + 1 and k + 2. The commit rule eventually allows honest validators to commit a block. AptosBFT guarantees that all honest validators will eventually commit the block (and proceeding sequence of blocks linked from it). Once a sequence of blocks has committed, the state resulting from executing their transactions can be persisted and forms a replicated database.
+When optimistic proposals are not possible (e.g. under backpressure, or after a timeout), the leader falls back to a **regular proposal** that includes the parent QC directly.
 
-### Advantages of Jolteon 
+### Voting and QC Formation
 
-We evaluated several BFT-based protocols against the dimensions of performance, reliability, security, ease of robust implementation, and operational overhead for validators. Our goal was to choose a protocol that would initially support at least 100 validators and would be able to evolve over time to support 500–1,000 validators. The initial AptosBFT protocol was based on HotStuff for the following reasons: (i) simplicity and modularity; (ii) ability to easily integrate consensus with execution; and (iii) promising performance in early experiments. Later we switched to Jolteon as it reduces latency by 33% without sacrificing throughput.
+Validators vote on proposals after checking safety rules (voting rules are cleanly separated for auditability). With decoupled execution, votes are on the proposed block itself — not on execution results. Execution happens asynchronously after ordering. 2f+1 votes form a **Quorum Certificate** (QC), which proves a supermajority agreed on a block.
 
-The AptosBFT protocol decomposes into modules for safety (voting and commit rules) and liveness (round_state). This decoupling provides the ability to develop and experiment independently and on different modules in parallel. Due to the simple voting and commit rules, protocol safety is easy to implement and verify. It is straightforward to integrate execution as a part of consensus to avoid forking issues that arise from non-deterministic execution in a leader-based protocol. We did not consider proof-of-work based protocols, such as [Bitcoin](https://bitcoin.org/bitcoin.pdf), due to their poor performance and high energy (and environmental) costs.
+### Ordering via Order Votes
 
-### Extensions and Modifications
+After forming QC(r), validators immediately broadcast an **order vote** on that QC to all validators. When 2f+1 order votes are collected, block r is ordered. This achieves the theoretical minimum of 3 network hops for BFT ordering under partial synchrony:
 
-We reformulate the safety conditions and provide extended proofs of safety, liveness, and optimistic responsiveness. We also implement a number of additional features. First, we make the protocol more resistant to non-determinism bugs, by having validators collectively sign the resulting state of a block rather than just the sequence of transactions. This also allows clients to use quorum certificates to authenticate reads from the database. Second, we design a round_state that emits explicit timeouts, and validators rely on a quorum of those to move to the next round — without requiring synchronized clocks. Third, we intend to design an unpredictable leader election mechanism in which the leader of a round is determined by the proposer of the latest committed block using a verifiable random function [VRF](https://people.csail.mit.edu/silvio/Selected%20Scientific%20Papers/Pseudo%20Randomness/Verifiable_Random_Functions.pdf). This mechanism limits the window of time in which an adversary can launch an effective denial-of-service attack against a leader. Fourth, we use aggregate signatures that preserve the identity of validators who sign quorum certificates. This allows us to provide incentives to validators that contribute to quorum certificates. Aggregate signatures also do not require a complex [threshold key setup](https://www.cypherpunks.ca/~iang/pubs/DKG.pdf).
+1. Leader proposes block B(r) (optimistically, without waiting for parent QC)
+2. Validators vote on B(r)
+3. QC(r) forms; validators broadcast order votes on QC(r)
+4. 2f+1 order votes → block r is ordered
+
+The order vote safety rule (`safe_for_order_vote`) prevents a validator from order-voting for a round if it has already timed out at that round (tracked via `highest_timeout_round`). This prevents conflicting ordering decisions across forks.
+
+2f+1 order votes form a `WrappedLedgerInfo` — a commit certificate.
+
+Without order votes, the **2-chain commit rule** applies as fallback: B(r) is committed when B(r) has a QC and its direct child B(r+1) also has a QC.
+
+### Timeout and View-Change
+
+When a round times out without a QC:
+
+- Validators broadcast a `RoundTimeout` message containing their highest QC and a timeout signature.
+- Receiving f+1 timeout messages from other validators triggers a local timeout, accelerating round advancement without waiting for the full timeout duration.
+- 2f+1 timeout signatures form a `TwoChainTimeoutCertificate` (TC).
+- The TC allows the next leader to propose without the previous round's QC, ensuring liveness.
+
+### Round State
+
+The `RoundState` drives round advancement. A `NewRoundEvent` is triggered either by receiving a QC (happy path) or a TC (unhappy path). Timeouts use exponential backoff: `base_ms * exponent_base^min(round_index, max_exponent)`.
+
+### Leader Election
+
+Multiple strategies are supported — round-robin rotation and reputation-based (where validators that fail to produce blocks are penalized).
+
+### Safety Rules (persisted across restarts)
+
+- `last_voted_round`: prevents voting twice in the same round (no equivocation)
+- `preferred_round`: only vote for blocks whose parent QC round >= preferred_round (the round of the highest 2-chain head seen), preventing votes on forks that could conflict with committed blocks
+- `highest_timeout_round`: prevents order-voting after timeout in the same round
+
+### Liveness
+
+Requires two consecutive honest leaders to order a block after GST (because the first leader sends an optimistic proposal that the second leader builds on). Without optimistic proposals, one honest leader suffices.
+
+### Epoch Boundaries
+
+Consensus operates within epochs. An epoch defines the validator set and configuration. When a reconfiguration transaction is committed, the current epoch ends and a new one begins. All consensus state (rounds, QCs, block tree) is reset at epoch boundaries.
+
+## Architecture
+
+```
+                         Network Layer
+                             |
+                    +--------v---------+
+                    |   EpochManager   |  Lifecycle: epoch init, validator set, channels
+                    +--------+---------+
+                             |
+                    +--------v---------+
+                    |  RoundManager    |  Core event loop: proposals, votes, timeouts
+                    +--------+---------+
+                             |
+          +------------------+------------------+
+          |                  |                  |
+  +-------v------+  +-------v-------+  +-------v--------+
+  |  BlockStore  |  | SafetyRules   |  |  RoundState    |
+  | (block tree) |  | (vote rules,  |  |  (timeouts,    |
+  |              |  |  persistence) |  |   round mgmt)  |
+  +--------------+  +---------------+  +----------------+
+                                                |
+  +--------------+                     +--------v--------+
+  | PendingVotes |                     | ProposalGen +   |
+  | + OrderVotes |                     | ProposerElect   |
+  | (aggregation)|                     | (leader duty)   |
+  +--------------+                     +-----------------+
+```
+
+### Consensus Message Types
+
+| Message           | Purpose                                | Happy-path sender → receiver   |
+| ----------------- | -------------------------------------- | ------------------------------ |
+| `ProposalMsg`     | Block proposal with parent QC          | Leader → all validators        |
+| `OptProposalMsg`  | Optimistic proposal (no parent QC yet) | Leader → all validators        |
+| `VoteMsg`         | Vote on a proposal                     | Validator → all validators     |
+| `OrderVoteMsg`    | Order vote on a QC                     | Validator → all validators     |
+| `RoundTimeoutMsg` | Timeout vote with highest QC           | Validator → all validators     |
+| `SyncInfo`        | Sync metadata (highest QC, TC, commit) | Piggybacked on other messages  |
 
 ## Implementation Details
 
-The consensus component is mostly implemented in the [Actor](https://en.wikipedia.org/wiki/Actor_model) programming model &mdash; i.e., it uses message-passing to communicate between different subcomponents with the [tokio](https://tokio.rs/) framework used as the task runtime. The primary exception to the actor model (as it is accessed in parallel by several subcomponents) is the consensus data structure *BlockStore* which manages the blocks, execution, quorum certificates, and other shared data structures. The major subcomponents in the consensus component are:
+The consensus component is mostly implemented in the [Actor](https://en.wikipedia.org/wiki/Actor_model) programming model — i.e., it uses message-passing to communicate between different subcomponents with the [tokio](https://tokio.rs/) framework used as the task runtime. The primary exception to the actor model (as it is accessed in parallel by several subcomponents) is the consensus data structure *BlockStore* which manages the blocks, execution, quorum certificates, and other shared data structures. The major subcomponents in the consensus component are:
 
-* **PayloadClient** is the interface to the mempool component and supports the pulling of transactions as well as removing committed transactions. A proposer uses on-demand pull transactions from mempool to form a proposal block.
-* **StateComputer** is the interface for accessing the execution component. It can execute blocks, commit blocks, and can synchronize state.
+* **EpochManager** manages epoch lifecycle, validator set initialization, and channel wiring between subcomponents.
+* **RoundManager** is the core event processor — it handles all consensus messages (proposals, votes, timeouts) and drives the protocol.
 * **BlockStore** maintains the tree of proposal blocks, block execution, votes, quorum certificates, and persistent storage. It is responsible for maintaining the consistency of the combination of these data structures and can be concurrently accessed by other subcomponents.
-* **RoundManager** is responsible for processing the individual events (e.g., process_new_round, process_proposal, process_vote). It exposes the async processing functions for each event type and drives the protocol.
 * **RoundState** is responsible for the liveness of the consensus protocol. It changes rounds due to timeout certificates or quorum certificates and proposes blocks when it is the proposer for the current round.
-* **SafetyRules** is responsible for the safety of the consensus protocol. It processes quorum certificates and LedgerInfo to learn about new commits and guarantees that the two voting rules are followed &mdash; even in the case of restart (since all safety data is persisted to local storage).
+* **SafetyRules** is responsible for the safety of the consensus protocol. It processes quorum certificates and LedgerInfo to learn about new commits and guarantees that the voting rules are followed — even in the case of restart (since all safety data is persisted to local storage).
+* **PendingVotes / PendingOrderVotes** aggregate votes and order votes into QCs, TCs, and commit certificates.
 
 All consensus messages are signed by their creators and verified by their receivers. Message verification occurs closest to the network layer to avoid invalid or unnecessary data from entering the consensus protocol.
 
+## Safety Invariants
+
+1. **No equivocation**: A validator votes at most once per round. Enforced by persisting `last_voted_round` in SafetyRules.
+
+2. **Preferred round**: A validator only votes for a block whose parent QC round >= its `preferred_round`. This prevents voting on forks that could conflict with the committed chain.
+
+3. **Order vote safety**: A validator must not order-vote for a round where it has timed out (`highest_timeout_round` check). This prevents conflicting ordering decisions across forks.
+
+4. **Deterministic execution**: All validators must produce identical execution results for the same ordered block sequence. Corollary: use deterministic data structures (`BTreeMap`, not `HashMap`) when iteration order affects serialization.
+
+5. **Rolling deployment safety**: During rolling upgrades, all nodes must produce identical `BlockMetadataTransaction`s regardless of code version. Gate new behavior on on-chain feature flags.
+
+## Configuration
+
+Key parameters (in `ConsensusConfig` and on-chain `OnChainConsensusConfig`):
+
+| Parameter                             | Purpose                                     |
+| ------------------------------------- | ------------------------------------------- |
+| `max_block_txns`                      | Max transactions per proposed block         |
+| `max_receiving_block_txns`            | Max transactions accepted in received block |
+| `round_initial_timeout_ms`            | Base timeout for rounds                     |
+| `round_timeout_backoff_exponent_base` | Exponential backoff multiplier              |
+| `round_timeout_backoff_max_exponent`  | Max exponent for timeout backoff            |
+| `enable_optimistic_proposal_rx`       | Accept optimistic proposals                 |
+| `enable_optimistic_proposal_tx`       | Send optimistic proposals                   |
+| `order_vote_enabled`                  | Enable 3-hop ordering via order votes       |
+
 ## How is this module organized?
 
-    consensus
-    ├── src
-    │   ├── block_storage          # In-memory storage of blocks and related data structures
-    │   ├── consensusdb            # Database interaction to persist consensus data for safety and liveness
-    │   ├── liveness               # RoundState, proposer, and other liveness related code
-    │   └── test_utils             # Mock implementations that are used for testing only
-    ├── consensus-types            # Consensus data types (i.e. quorum certificates)
-    └── safety-rules               # Safety (voting) rules
+### Core Consensus
+
+| File                                   | Purpose                                               |
+| -------------------------------------- | ----------------------------------------------------- |
+| `consensus/src/round_manager.rs`       | Core event processor — handles all consensus messages |
+| `consensus/src/epoch_manager.rs`       | Epoch lifecycle, validator set init, channel wiring   |
+| `consensus/src/network.rs`             | Network message sending/receiving                     |
+| `consensus/src/pending_votes.rs`       | Vote aggregation → QC/TC formation                    |
+| `consensus/src/pending_order_votes.rs` | Order vote aggregation                                |
+| `consensus/src/state_computer.rs`      | Execution interface                                   |
+
+### Block Storage
+
+| File                                          | Purpose                                  |
+| --------------------------------------------- | ---------------------------------------- |
+| `consensus/src/block_storage/block_store.rs`  | Block tree, QC tracking, execution state |
+| `consensus/src/block_storage/block_tree.rs`   | Tree structure with parent/QC links      |
+| `consensus/src/block_storage/sync_manager.rs` | Missing block synchronization            |
+
+### Liveness
+
+| File                                           | Purpose                                 |
+| ---------------------------------------------- | --------------------------------------- |
+| `consensus/src/liveness/round_state.rs`        | Pacemaker — round progression, timeouts |
+| `consensus/src/liveness/proposal_generator.rs` | Block proposal generation, backpressure |
+| `consensus/src/liveness/proposer_election.rs`  | Leader election trait                   |
+| `consensus/src/liveness/leader_reputation.rs`  | Reputation-based leader selection       |
+
+### Safety
+
+| File                                                | Purpose                              |
+| --------------------------------------------------- | ------------------------------------ |
+| `consensus/safety-rules/src/safety_rules.rs`        | Voting rules — prevents equivocation |
+| `consensus/safety-rules/src/safety_rules_2chain.rs` | 2-chain timeout rules                |
+| `consensus/safety-rules/src/consensus_state.rs`     | Persistent safety state              |
+
+### Consensus Types
+
+| File                                                   | Purpose                                          |
+| ------------------------------------------------------ | ------------------------------------------------ |
+| `consensus/consensus-types/src/block.rs`               | Block structure                                  |
+| `consensus/consensus-types/src/quorum_cert.rs`         | QuorumCert (2f+1 vote signatures)                |
+| `consensus/consensus-types/src/vote.rs`                | Vote message                                     |
+| `consensus/consensus-types/src/order_vote.rs`          | Order vote for 3-hop ordering                    |
+| `consensus/consensus-types/src/wrapped_ledger_info.rs` | Commit cert from order votes                     |
+| `consensus/consensus-types/src/timeout_2chain.rs`      | Timeout certificate                              |
+| `consensus/consensus-types/src/opt_proposal_msg.rs`    | Optimistic proposal message                      |
+| `consensus/consensus-types/src/safety_data.rs`         | Persistent safety state                          |
+| `consensus/consensus-types/src/payload.rs`             | Payload types (DirectMempool, QuorumStore, etc.) |
+
+### Related Subsystems
+
+See separate READMEs for:
+- `consensus/src/pipeline/` — Decoupled execution pipeline (execute, sign, persist, broadcast)
+- `consensus/src/quorum_store/` — QuorumStore for data dissemination
+
+### Directory Structure
+
+```
+consensus
+├── src
+│   ├── block_storage          # In-memory storage of blocks and related data structures
+│   ├── consensusdb            # Database interaction to persist consensus data for safety and liveness
+│   ├── liveness               # RoundState, proposer, and other liveness related code
+│   ├── pipeline               # Decoupled execution pipeline
+│   ├── quorum_store           # QuorumStore for data dissemination
+│   └── test_utils             # Mock implementations that are used for testing only
+├── consensus-types            # Consensus data types (i.e. quorum certificates)
+└── safety-rules               # Safety (voting) rules
+```
+
+## Testing
+
+```bash
+cargo test -p aptos-consensus          # Consensus unit tests
+cargo test -p aptos-consensus-types    # Type tests
+cargo test -p aptos-safety-rules       # Safety rules tests
+cargo test -p smoke-test               # E2E smoke tests
+# Forge tests: see testsuite/forge-cli/src/suites/
+```

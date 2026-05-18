@@ -1,5 +1,5 @@
 // Copyright (c) Aptos Foundation
-// SPDX-License-Identifier: Apache-2.0
+// Licensed pursuant to the Innovation-Enabling Source Code License, available at https://github.com/aptos-labs/aptos-core/blob/main/LICENSE
 
 //! This module exercises externally provided stackless-bytecode-based lint checks.
 //! Live variable analysis is a prerequisite for this lint processor.
@@ -32,7 +32,13 @@ impl FunctionTargetProcessor for LintProcessor {
             return data;
         }
         let target = FunctionTarget::new(func_env, &data);
-        if !target.module_env().is_primary_target() {
+        let module_env = target.module_env();
+        if !module_env.is_primary_target() {
+            return data;
+        }
+        // Test/verify-only items are kept in the model so their callers are
+        // visible to lints, but the items are not themselves linted.
+        if module_env.is_test_or_verify_only() || func_env.is_test_or_verify_only() {
             return data;
         }
         let linters = Self::get_applicable_linter_pipeline(&target);

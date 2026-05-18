@@ -13,7 +13,7 @@ use crate::{
         TPayloadManager,
     },
     quorum_store::{
-        batch_coordinator::{BatchCoordinator, BatchCoordinatorCommand},
+        batch_coordinator::{BatchCoordinator, BatchCoordinatorCommand, BatchCoordinatorQueueKey},
         batch_generator::{BackPressure, BatchGenerator, BatchGeneratorCommand},
         batch_requester::BatchRequester,
         batch_store::{BatchReader, BatchReaderImpl, BatchStore},
@@ -148,8 +148,10 @@ pub struct InnerBuilder {
     quorum_store_storage: Arc<dyn QuorumStoreStorage>,
     quorum_store_msg_tx: aptos_channel::Sender<AccountAddress, (Author, VerifiedEvent)>,
     quorum_store_msg_rx: Option<aptos_channel::Receiver<AccountAddress, (Author, VerifiedEvent)>>,
-    remote_batch_coordinator_cmd_tx: Vec<tokio::sync::mpsc::Sender<BatchCoordinatorCommand>>,
-    remote_batch_coordinator_cmd_rx: Vec<tokio::sync::mpsc::Receiver<BatchCoordinatorCommand>>,
+    remote_batch_coordinator_cmd_tx:
+        Vec<aptos_channel::Sender<BatchCoordinatorQueueKey, BatchCoordinatorCommand>>,
+    remote_batch_coordinator_cmd_rx:
+        Vec<aptos_channel::Receiver<BatchCoordinatorQueueKey, BatchCoordinatorCommand>>,
     batch_store: Option<Arc<BatchStore>>,
     batch_reader: Option<Arc<dyn BatchReader>>,
     broadcast_proofs: bool,
@@ -192,8 +194,11 @@ impl InnerBuilder {
         let mut remote_batch_coordinator_cmd_tx = Vec::new();
         let mut remote_batch_coordinator_cmd_rx = Vec::new();
         for _ in 0..config.num_workers_for_remote_batches {
-            let (batch_coordinator_cmd_tx, batch_coordinator_cmd_rx) =
-                tokio::sync::mpsc::channel(config.channel_size);
+            let (batch_coordinator_cmd_tx, batch_coordinator_cmd_rx) = aptos_channel::new(
+                QueueStyle::FIFO,
+                config.remote_batch_coordinator_channel_size,
+                None,
+            );
             remote_batch_coordinator_cmd_tx.push(batch_coordinator_cmd_tx);
             remote_batch_coordinator_cmd_rx.push(batch_coordinator_cmd_rx);
         }
@@ -253,7 +258,7 @@ impl InnerBuilder {
             self.network_sender.clone(),
             self.verifier.clone(),
         );
-        let batch_store = Arc::new(BatchStore::new(
+        let batch_store = BatchStore::new(
             self.epoch,
             is_new_epoch,
             last_committed_timestamp,
@@ -263,7 +268,7 @@ impl InnerBuilder {
             self.config.batch_quota,
             signer,
             Duration::from_secs(60).as_micros() as u64,
-        ));
+        );
         self.batch_store = Some(batch_store.clone());
         let batch_reader = Arc::new(BatchReaderImpl::new(batch_store.clone(), batch_requester));
         self.batch_reader = Some(batch_reader.clone());
@@ -328,6 +333,7 @@ impl InnerBuilder {
                 self.batch_generator_cmd_tx.clone(),
                 self.batch_store.clone().unwrap(),
                 self.config.receiver_max_batch_txns as u64,
+                self.config.receiver_max_encrypted_batch_txns as u64,
                 self.config.receiver_max_batch_bytes as u64,
                 self.config.receiver_max_total_txns as u64,
                 self.config.receiver_max_total_bytes as u64,
@@ -460,7 +466,6 @@ impl InnerBuilder {
                 consensus_publisher,
                 self.verifier.get_ordered_account_addresses(),
                 self.verifier.address_to_validator_index().clone(),
-                self.config.enable_payload_v2,
             )),
             Some(self.quorum_store_msg_tx.clone()),
         )

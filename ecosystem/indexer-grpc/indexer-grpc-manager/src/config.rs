@@ -39,6 +39,12 @@ pub struct IndexerGrpcManagerConfig {
     pub(crate) fullnode_addresses: Vec<GrpcAddress>,
     pub(crate) is_master: bool,
     pub(crate) allow_fn_fallback: bool,
+    #[serde(default = "default_http2_ping_interval_secs")]
+    pub(crate) http2_ping_interval_secs: u64,
+    #[serde(default = "default_http2_ping_timeout_secs")]
+    pub(crate) http2_ping_timeout_secs: u64,
+    #[serde(default = "default_service_staleness_threshold_secs")]
+    pub(crate) service_staleness_threshold_secs: u64,
 }
 
 const fn default_cache_config() -> CacheConfig {
@@ -46,6 +52,18 @@ const fn default_cache_config() -> CacheConfig {
         max_cache_size: 5 * (1 << 30),
         target_cache_size: 4 * (1 << 30),
     }
+}
+
+const fn default_http2_ping_interval_secs() -> u64 {
+    60
+}
+
+const fn default_http2_ping_timeout_secs() -> u64 {
+    10
+}
+
+const fn default_service_staleness_threshold_secs() -> u64 {
+    20
 }
 
 #[async_trait::async_trait]

@@ -70,12 +70,33 @@ pub type TaskResult<T> = Result<T, TaskError>;
 pub type TaskFuture<T> = Shared<BoxFuture<'static, TaskResult<T>>>;
 
 pub type MaterializeResult = (Vec<SignedTransaction>, Option<u64>, Option<u64>);
-pub type DecryptionResult = (
-    Vec<SignedTransaction>,
-    Option<u64>,
-    Option<u64>,
-    Option<Option<BlockTxnDecryptionKey>>,
-);
+
+#[derive(Clone, Debug)]
+pub struct DecryptionResult {
+    pub decrypted_txns: Vec<SignedTransaction>,
+    pub regular_txns: Vec<SignedTransaction>,
+    pub max_txns_from_block_to_execute: Option<u64>,
+    pub block_gas_limit: Option<u64>,
+    pub decryption_key: Option<Option<BlockTxnDecryptionKey>>,
+}
+
+impl DecryptionResult {
+    pub fn passthrough(
+        regular_txns: Vec<SignedTransaction>,
+        max_txns_from_block_to_execute: Option<u64>,
+        block_gas_limit: Option<u64>,
+        decryption_key: Option<Option<BlockTxnDecryptionKey>>,
+    ) -> Self {
+        Self {
+            decrypted_txns: Vec::new(),
+            regular_txns,
+            max_txns_from_block_to_execute,
+            block_gas_limit,
+            decryption_key,
+        }
+    }
+}
+
 pub type PrepareResult = (
     Arc<Vec<SignatureVerifiedTransaction>>,
     Option<u64>,
@@ -96,10 +117,13 @@ pub type SecretShareResult = Option<SecretShare>;
 
 #[derive(Clone)]
 pub struct PipelineFutures {
+    pub decryption_fut: TaskFuture<DecryptionResult>,
     pub prepare_fut: TaskFuture<PrepareResult>,
+    pub has_rand_txns_fut: TaskFuture<bool>,
     pub rand_check_fut: TaskFuture<RandResult>,
     pub execute_fut: TaskFuture<ExecuteResult>,
     pub ledger_update_fut: TaskFuture<LedgerUpdateResult>,
+    pub observer_publish_fut: TaskFuture<()>,
     pub post_ledger_update_fut: TaskFuture<PostLedgerUpdateResult>,
     pub commit_vote_fut: TaskFuture<CommitVoteResult>,
     pub pre_commit_fut: TaskFuture<PreCommitResult>,
@@ -128,6 +152,7 @@ pub struct PipelineInputTx {
     pub rand_tx: Option<oneshot::Sender<Option<Randomness>>>,
     pub order_vote_tx: Option<oneshot::Sender<()>>,
     pub order_proof_tx: Option<oneshot::Sender<WrappedLedgerInfo>>,
+    pub ordered_blocks_for_observer_tx: Option<oneshot::Sender<OrderedBlocksForObserver>>,
     pub commit_proof_tx: Option<oneshot::Sender<LedgerInfoWithSignatures>>,
     pub secret_shared_key_tx: Option<oneshot::Sender<Option<SecretSharedKey>>>,
 }
@@ -137,8 +162,81 @@ pub struct PipelineInputRx {
     pub rand_rx: oneshot::Receiver<Option<Randomness>>,
     pub order_vote_rx: oneshot::Receiver<()>,
     pub order_proof_fut: TaskFuture<WrappedLedgerInfo>,
+    pub ordered_blocks_for_observer_fut: TaskFuture<OrderedBlocksForObserver>,
     pub commit_proof_fut: TaskFuture<LedgerInfoWithSignatures>,
     pub secret_shared_key_rx: oneshot::Receiver<Option<SecretSharedKey>>,
+}
+
+#[derive(Clone)]
+pub struct OrderedBlocksForObserver {
+    /// `block_id` (HashValue) helps with logging if a block is dropped before observer publishing.
+    blocks: Vec<(HashValue, Weak<PipelinedBlock>)>,
+}
+
+impl OrderedBlocksForObserver {
+    pub fn new(blocks: &[Arc<PipelinedBlock>]) -> Self {
+        Self {
+            blocks: blocks
+                .iter()
+                .map(|block| (block.id(), Arc::downgrade(block)))
+                .collect(),
+        }
+    }
+
+    pub fn pipelined_blocks(&self) -> Result<Vec<Arc<PipelinedBlock>>, HashValue> {
+        self.blocks
+            .iter()
+            .map(|(block_id, block)| block.upgrade().ok_or(*block_id))
+            .collect()
+    }
+
+    pub fn pipelined_block(
+        &self,
+        target_block_id: HashValue,
+    ) -> Result<Option<Arc<PipelinedBlock>>, HashValue> {
+        for (block_id, block) in &self.blocks {
+            if *block_id == target_block_id {
+                return block.upgrade().map(Some).ok_or(*block_id);
+            }
+        }
+        Ok(None)
+    }
+
+    pub fn last_block_id(&self) -> Option<HashValue> {
+        self.blocks.last().map(|(block_id, _)| *block_id)
+    }
+
+    pub fn block_ids(&self) -> Vec<HashValue> {
+        self.blocks.iter().map(|(block_id, _)| *block_id).collect()
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn ordered_blocks_for_observer_does_not_keep_blocks_alive() {
+        let block = Arc::new(PipelinedBlock::new_ordered(
+            Block::make_genesis_block(),
+            OrderedBlockWindow::empty(),
+        ));
+        let block_id = block.id();
+
+        let ordered_blocks = OrderedBlocksForObserver::new(std::slice::from_ref(&block));
+        assert_eq!(Arc::strong_count(&block), 1);
+
+        {
+            let upgraded_blocks = ordered_blocks.pipelined_blocks().unwrap();
+            assert_eq!(upgraded_blocks.len(), 1);
+            assert_eq!(upgraded_blocks[0].id(), block_id);
+        }
+
+        assert_eq!(Arc::strong_count(&block), 1);
+
+        drop(block);
+        assert_eq!(ordered_blocks.pipelined_blocks().unwrap_err(), block_id);
+    }
 }
 
 /// A window of blocks that are needed for execution with the execution pool, EXCLUDING the current block
@@ -217,8 +315,11 @@ pub struct PipelinedBlock {
     /// pending blocks upon restart.
     state_compute_result: Mutex<StateComputeResult>,
     randomness: OnceCell<Randomness>,
+    secret_shared_key: OnceCell<SecretSharedKey>,
     pipeline_insertion_time: OnceCell<Instant>,
     execution_summary: OnceCell<ExecutionSummary>,
+    /// Decrypted transactions that were originally encrypted, for observer publishing.
+    decrypted_txns: OnceCell<Vec<SignedTransaction>>,
     /// pipeline related fields
     pipeline_futs: Mutex<Option<PipelineFutures>>,
     pipeline_tx: Mutex<Option<PipelineInputTx>>,
@@ -231,6 +332,7 @@ impl PartialEq for PipelinedBlock {
         self.block == other.block
             && self.input_transactions == other.input_transactions
             && self.randomness.get() == other.randomness.get()
+            && self.secret_shared_key.get() == other.secret_shared_key.get()
     }
 }
 impl Eq for PipelinedBlock {}
@@ -339,8 +441,33 @@ impl PipelinedBlock {
         }
     }
 
+    /// Stores the randomness on the block and eagerly sends it via the pipeline channel
+    /// to unblock the execution phase as early as possible. Without this, later blocks
+    /// in the same ordering batch deadlock: their has_rand_txns_fut waits for earlier
+    /// blocks' execute_fut, which waits for rand_rx. The execution_schedule_phase also
+    /// sends via this channel as a fallback (using take(), so only one send actually occurs).
     pub fn set_randomness(&self, randomness: Randomness) {
-        assert!(self.randomness.set(randomness.clone()).is_ok());
+        assert!(self.randomness.set(randomness).is_ok());
+        if let Some(tx) = self.pipeline_tx().lock().as_mut() {
+            let _ = tx
+                .rand_tx
+                .take()
+                .map(|tx| tx.send(self.randomness().cloned()));
+        }
+    }
+
+    /// Stores the decryption key on the block and eagerly sends it via the pipeline channel
+    /// to unblock the decryption phase as early as possible. The execution_schedule_phase also
+    /// sends via this channel as a fallback (using take(), so only one send actually occurs).
+    pub fn set_decryption_key(&self, key: SecretSharedKey) {
+        assert!(self.secret_shared_key.set(key.clone()).is_ok());
+        if let Some(tx) = self.pipeline_tx().lock().as_mut() {
+            tx.secret_shared_key_tx.take().map(|tx| tx.send(Some(key)));
+        }
+    }
+
+    pub fn secret_shared_key(&self) -> Option<&SecretSharedKey> {
+        self.secret_shared_key.get()
     }
 
     pub fn set_insertion_time(&self) {
@@ -386,8 +513,10 @@ impl PipelinedBlock {
             input_transactions,
             state_compute_result: Mutex::new(state_compute_result),
             randomness: OnceCell::new(),
+            secret_shared_key: OnceCell::new(),
             pipeline_insertion_time: OnceCell::new(),
             execution_summary: OnceCell::new(),
+            decrypted_txns: OnceCell::new(),
             pipeline_futs: Mutex::new(None),
             pipeline_tx: Mutex::new(None),
             pipeline_abort_handle: Mutex::new(None),
@@ -510,6 +639,16 @@ impl PipelinedBlock {
 
     pub fn qc(&self) -> Option<Arc<QuorumCert>> {
         self.block_qc.lock().clone()
+    }
+
+    pub fn decrypted_txns(&self) -> Option<Vec<SignedTransaction>> {
+        self.decrypted_txns.get().cloned()
+    }
+
+    pub fn set_decrypted_txns(&self, txns: Vec<SignedTransaction>) {
+        self.decrypted_txns
+            .set(txns)
+            .expect("decrypted_txns already set");
     }
 }
 

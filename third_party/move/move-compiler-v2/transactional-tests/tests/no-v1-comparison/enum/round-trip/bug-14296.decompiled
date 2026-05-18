@@ -24,7 +24,7 @@ module 0x42::test {
                 if (p0 is V2) break;
                 abort 14566554180833181697
             };
-            return *&(&p0.y).x
+            return *&(&p0.V1.y).x
         };
         1u8
     }

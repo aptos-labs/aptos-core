@@ -1,6 +1,7 @@
-// Copyright (c) The Diem Core Contributors
-// Copyright (c) The Move Contributors
-// SPDX-License-Identifier: Apache-2.0
+// Parts of the file are Copyright (c) The Diem Core Contributors
+// Parts of the file are Copyright (c) The Move Contributors
+// Parts of the file are Copyright (c) Aptos Foundation
+// All Aptos Foundation code and content is licensed pursuant to the Innovation-Enabling Source Code License, available at https://github.com/aptos-labs/aptos-core/blob/main/LICENSE
 
 use crate::{
     diagnostics::{codes::*, Diagnostic},
@@ -591,11 +592,11 @@ fn exp(context: &mut Context, sp!(_loc, e_): &E::Exp) {
             eopt.iter().for_each(|e| exp(context, e));
             exp(context, e)
         },
-        E::Behavior(_, _, fn_name, type_args, sp!(_, args), _) => {
-            module_access(context, fn_name);
-            types_opt(context, type_args);
+        E::Behavior(_, target, sp!(_, args)) => {
+            exp(context, target);
             args.iter().for_each(|e| exp(context, e))
         },
+        E::StateLabeled(_, inner, _) => exp(context, inner),
     }
 }
 
@@ -670,6 +671,68 @@ fn spec_block_member(context: &mut Context, sp!(_, sbm_): &E::SpecBlockMember) {
                 }
             }
         },
-        M::Variable { .. } => (),
+        M::Variable { .. }
+        | M::ModifiesOf { .. }
+        | M::ReadsOf { .. }
+        | M::Modifies { .. }
+        | M::Reads { .. } => (),
+        M::Proof { body } => proof_exps(context, body),
+        M::Lemma {
+            spec_members,
+            proof,
+            ..
+        } => {
+            for m in spec_members {
+                spec_block_member(context, m);
+            }
+            if let Some(p) = proof {
+                proof_exps(context, p);
+            }
+        },
+    }
+}
+
+fn proof_exps(context: &mut Context, sp!(_, proof_): &E::Proof) {
+    match proof_ {
+        E::Proof_::Let(_, e) | E::Proof_::Assert(e) => exp(context, e),
+        E::Proof_::Assume(_, e) => exp(context, e),
+        E::Proof_::IfElse(cond, then_branch, else_branch) => {
+            exp(context, cond);
+            proof_exps(context, then_branch);
+            if let Some(eb) = else_branch {
+                proof_exps(context, eb);
+            }
+        },
+        E::Proof_::Block(stmts) => {
+            for s in stmts {
+                proof_exps(context, s);
+            }
+        },
+        E::Proof_::Apply(lemma, args) => {
+            module_access(context, lemma);
+            args.iter().for_each(|e| exp(context, e));
+        },
+        E::Proof_::ForallApply {
+            bindings,
+            patterns,
+            lemma,
+            args,
+        } => {
+            lvalues_with_range(context, bindings);
+            module_access(context, lemma);
+            for group in patterns {
+                for e in group {
+                    exp(context, e);
+                }
+            }
+            args.iter().for_each(|e| exp(context, e));
+        },
+        E::Proof_::Calc(steps) => {
+            for (e, _) in steps {
+                exp(context, e);
+            }
+        },
+        E::Proof_::Post(inner) => proof_exps(context, inner),
+        E::Proof_::Split(e) => exp(context, e),
     }
 }

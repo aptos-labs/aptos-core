@@ -1,0 +1,40 @@
+processed 20 tasks
+task 0 lines 3-67:  publish [module 0xc0ffee::m {]
+task 1 lines 70-70:  run 0xc0ffee::m::test_adjacent --args 0u64
+return values: 1
+task 2 lines 72-72:  run 0xc0ffee::m::test_adjacent --args 4u64
+return values: 1
+task 3 lines 74-74:  run 0xc0ffee::m::test_adjacent --args 5u64
+return values: 2
+task 4 lines 76-76:  run 0xc0ffee::m::test_adjacent --args 9u64
+return values: 2
+task 5 lines 78-78:  run 0xc0ffee::m::test_adjacent --args 10u64
+return values: 3
+task 6 lines 80-80:  run 0xc0ffee::m::test_overlapping --args 0u64
+return values: 1
+task 7 lines 82-82:  run 0xc0ffee::m::test_overlapping --args 5u64
+return values: 1
+task 8 lines 84-84:  run 0xc0ffee::m::test_overlapping --args 7u64
+return values: 1
+task 9 lines 86-86:  run 0xc0ffee::m::test_overlapping --args 10u64
+return values: 2
+task 10 lines 88-88:  run 0xc0ffee::m::test_overlapping --args 14u64
+return values: 2
+task 11 lines 90-90:  run 0xc0ffee::m::test_overlapping --args 15u64
+return values: 3
+task 12 lines 92-92:  run 0xc0ffee::m::test_exact_coverage --args 0u8
+return values: 1
+task 13 lines 94-94:  run 0xc0ffee::m::test_exact_coverage --args 63u8
+return values: 1
+task 14 lines 96-96:  run 0xc0ffee::m::test_exact_coverage --args 64u8
+return values: 2
+task 15 lines 98-98:  run 0xc0ffee::m::test_exact_coverage --args 127u8
+return values: 2
+task 16 lines 100-100:  run 0xc0ffee::m::test_exact_coverage --args 128u8
+return values: 3
+task 17 lines 102-102:  run 0xc0ffee::m::test_exact_coverage --args 191u8
+return values: 3
+task 18 lines 104-104:  run 0xc0ffee::m::test_exact_coverage --args 192u8
+return values: 4
+task 19 lines 106-106:  run 0xc0ffee::m::test_exact_coverage --args 255u8
+return values: 4

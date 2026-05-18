@@ -2,7 +2,10 @@
 // Licensed pursuant to the Innovation-Enabling Source Code License, available at https://github.com/aptos-labs/aptos-core/blob/main/LICENSE
 
 use crate::{validator_set::extract_validator_set_updates, DiscoveryError};
-use aptos_config::{config::PeerSet, network_id::NetworkContext};
+use aptos_config::{
+    config::{BaseConfig, NodeType, PeerSet},
+    network_id::NetworkContext,
+};
 use aptos_logger::info;
 use aptos_time_service::{Interval, TimeService, TimeServiceTrait};
 use aptos_types::{account_address::AccountAddress, on_chain_config::ValidatorSet};
@@ -19,6 +22,8 @@ pub struct RestStream {
     network_context: NetworkContext,
     rest_client: aptos_rest_client::Client,
     interval: Pin<Box<Interval>>,
+    node_type: NodeType,
+    base_config: BaseConfig,
 }
 
 impl RestStream {
@@ -27,11 +32,15 @@ impl RestStream {
         rest_url: url::Url,
         interval_duration: Duration,
         time_service: TimeService,
+        node_type: NodeType,
+        base_config: BaseConfig,
     ) -> Self {
         RestStream {
             network_context,
             rest_client: aptos_rest_client::Client::new(rest_url),
             interval: Box::pin(time_service.interval(interval_duration)),
+            node_type,
+            base_config,
         }
     }
 }
@@ -55,6 +64,8 @@ impl Stream for RestStream {
                 Some(Ok(extract_validator_set_updates(
                     self.network_context,
                     validator_set,
+                    self.node_type,
+                    &self.base_config,
                 )))
             },
             Err(err) => {

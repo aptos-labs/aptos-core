@@ -1,0 +1,44 @@
+error: `assume` in proof block requires `[trusted]` annotation
+   ┌─ tests/spec_instrumentation/proofs/errors.move:15:9
+   │
+15 │         assume x > 0;
+   │         ^^^^^^^^^^^^^
+
+error: nested `post` is not allowed
+   ┌─ tests/spec_instrumentation/proofs/errors.move:25:14
+   │
+25 │         post post assert result == x;
+   │              ^^^^^^^^^^^^^^^^^^^^^^^^
+
+error: `post` is not allowed in lemma proofs (lemmas have no return value)
+   ┌─ tests/spec_instrumentation/proofs/errors.move:35:13
+   │
+35 │             post assert a + 0 == a;
+   │             ^^^^^^^^^^^^^^^^^^^^^^^
+
+error: proof block is only allowed in function spec blocks
+   ┌─ tests/spec_instrumentation/proofs/errors.move:43:7
+   │
+43 │       } proof {
+   │ ╭───────^
+44 │ │         assert true;
+45 │ │     }
+   │ ╰─────^
+
+error: lemma `arity_lemma` expects 2 argument(s), but 1 were provided
+   ┌─ tests/spec_instrumentation/proofs/errors.move:60:9
+   │
+60 │         apply arity_lemma(x); // error: expects 2, got 1
+   │         ^^^^^^^^^^^^^^^^^^^^^
+
+error: lemma `arity_lemma` expects 2 argument(s), but 3 were provided
+   ┌─ tests/spec_instrumentation/proofs/errors.move:67:9
+   │
+67 │         apply arity_lemma(x, x, x); // error: expects 2, got 3
+   │         ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+error: undeclared `y`
+   ┌─ tests/spec_instrumentation/proofs/errors.move:83:16
+   │
+83 │         assert y > 0; // error: y is not in scope
+   │                ^

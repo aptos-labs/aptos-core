@@ -1,9 +1,5 @@
----
-name: prover
-description: Information how to develop and extend the Move Prover
----
-
-The Move Prover is a formal verification tool for Move smart contracts. It translates Move code and specifications to Boogie, which then uses SMT solvers (Z3 or CVC5) to verify correctness.
+The Move Prover is a formal verification tool for Move smart contracts. It translates Move code and specifications to
+Boogie, which then uses SMT solvers (Z3 or CVC5) to verify correctness.
 
 Code is at `third_party/move/move-prover`.
 
@@ -138,6 +134,7 @@ trait FunctionTargetProcessor {
 ## Prelude Templates
 
 Located in `boogie-backend/src/prelude/`:
+
 - `prelude.bpl` - Core Boogie definitions
 - `native.bpl` - Native function stubs
 - `vector-*-theory.bpl` - Vector encoding (5 variants)
@@ -145,14 +142,17 @@ Located in `boogie-backend/src/prelude/`:
 ## Move to Boogie Mapping
 
 **Types:**
+
 - Primitives (u8-u256, bool, address) → Boogie types
 - Structs → Boogie datatypes
 - References → dereferenced at function boundaries
 
 **Memory:**
+
 - Global state: `memory(ModuleAddress, ResourceType) → Value`
 
 **Specs:**
+
 - `requires` → Function preconditions
 - `ensures` → Function postconditions
 - `aborts_if` → Abort condition assertions
@@ -163,6 +163,7 @@ Located in `boogie-backend/src/prelude/`:
 ## Monomorphization
 
 The prover computes all type instantiations needed:
+
 ```rust
 pub struct MonoInfo {
     pub structs: BTreeMap<QualifiedId<StructId>, BTreeSet<Vec<Type>>>,
@@ -217,15 +218,132 @@ pub struct ProverOptions {
 
 - Do always look into move-model helper functions before creating new functions on common data types like expressions.
 
+# Spec Inference Is a Separate Tool
+
+**IMPORTANT: Spec inference is COMPLETELY ORTHOGONAL to specification and verification in the Move Prover. It is an
+independent tool that happens to share some infrastructure.**
+
+Do NOT confuse, conflate, or mix up spec inference with the prover's specification language or verification pipeline.
+They are separate concerns:
+
+These two tools are never combined in one session. The inference test suite (in `tests/inference/`) first runs inference
+to produce `.exp.move` files, then runs the prover in verification mode on those files as a completely separate
+invocation with a separate `GlobalEnv` instance — no state carries over.
+
 # Debugging
 
-- To run the Move Prover directly on test files from the command line, use alias `mvp <source.move>`
-- In order to inspect generated Boogie, use `mvp --keep <source.move>`. The following output will be generated:
-  - `output.bpl` with the Boogie narrowed to verify given function
-  - `output.bpl.log` the model as returned by Boogie to the Move Prover. The prover prints error messages derived from this to console
-- In order to inspect generated smtlib file and the z3 log for a *given function*, use `mvp --generate-smt --z3-trace=<function> <source.move>`. The following output will be produced, assuming that source contains a function `<addr>::<module>::<function>`:
-  - a file `_<addr>_<module>_<function>.smt` containing the smtlib input for Z3 as generated from the Boogie
-  - a file `<function>.z3log` containing Z3 log during verifying the function.
+## Running the Prover on Standalone Files
+
+Pass `--language-version 2.4` (or use a config file with `language_version = "2.4"`), otherwise newer syntax features
+(e.g., `@` state labels) won't parse. Use `--aptos` when verifying Aptos framework files.
+
+```
+cargo run -p move-prover -- \
+    --language-version 2.4 \
+    --aptos \
+    -d <root>/third_party/move/move-stdlib/sources \
+    -a std=0x1 \
+    <source-files>
+```
+
+To verify files that depend on multiple packages, provide each package's sources directory as a separate `-d` flag.
+For example, to verify a file in `aptos-stdlib`:
+
+```
+cargo run -p move-prover -- \
+    --language-version 2.4 \
+    --aptos \
+    -d aptos-move/framework/move-stdlib/sources \
+    -d aptos-move/framework/aptos-stdlib/sources \
+    -a std=0x1 aptos_std=0x1 \
+    -- <source-files-or-directory>
+```
+
+## Running the Prover on a Move Package
+
+To run the prover on a Move package (e.g. `aptos-stdlib`), use the Move CLI:
+
+```
+cargo run -p aptos-move-cli --features="binary" -- prove --package-dir aptos-move/framework/aptos-stdlib
+```
+
+The `prove` accepts multiple options, among those:
+
+```
+      --language-version <LANGUAGE_VERSION>
+          ...or --language LANGUAGE_VERSION
+          Specify the language version to be supported.
+          Defaults to the latest stable language version.
+          
+          [default: 2.3]
+
+  -v, --verbosity <VERBOSITY>
+          Verbosity level
+
+  -f, --filter <FILTER>
+          Filters targets out from the package. Any module with a matching file name will be a target, similar as with `cargo test`
+
+  -o, --only <ONLY>
+          Scopes verification to the specified function. This can either be a name of the form "mod::func" or simply "func", in the later case every matching function is taken
+
+  -t, --trace
+          Whether to display additional information in error reports. This may help debugging but also can make verification slower
+
+      --random-seed <RANDOM_SEED>
+          A seed for the prover
+
+      --proc-cores <PROC_CORES>
+          The number of cores to use for parallel processing of verification conditions
+
+      --shards <SHARDS>
+          The number of shards to split the verification problem into. Shards are processed sequentially. This can be used to ease memory pressure for verification of large packages
+
+      --only-shard <ONLY_SHARD>
+          If there are multiple shards, the shard to which verification shall be narrowed
+
+      --vc-timeout <VC_TIMEOUT>
+          A (soft) timeout for the solver, per verification condition, in seconds
+
+      --check-inconsistency
+          Whether to check consistency of specs by injecting impossible assertions
+
+      --keep-loops
+          Whether to keep loops as they are and pass them on to the underlying solver
+
+      --loop-unroll <LOOP_UNROLL>
+          Number of iterations to unroll loops
+
+      --stable-test-output
+          Whether output for e.g. diagnosis shall be stable/redacted so it can be used in test output
+
+      --dump
+          Whether to dump intermediate step results to files
+
+      --benchmark
+          Whether to benchmark verification. If selected, each verification target in the current package will be verified independently with timing recorded. This attempts to detect timeouts. A benchmark report will be written to `prover_benchmark.fun_data` in the package directory. The command also writes a `prover_benchmark.svg` graphic, which is build from the data in the file above, comparing with any other `*.fun_data` files in the package directory. Thus, you can rename the data file to something like
+          `prover_benchmark_v1.fun_data` and in the next run, compare benchmarks in the `.svg` file from multiple runs
+
+      --skip-instance-check
+          Whether to skip verification of type instantiations of functions. This may miss some verification conditions if different type instantiations can create different behavior via type reflection or storage access, but can speed up verification
+```
+
+
+## Inspecting Boogie and SMT Output
+
+- Use `--keep` to inspect generated Boogie:
+    - `output.bpl` with the Boogie narrowed to verify given function
+    - `output.bpl.log` the model as returned by Boogie to the Move Prover. The prover prints error messages derived from
+      this to console
+- Use `--generate-smt --z3-trace=<function>` to inspect the smtlib file and z3 log for a *given function*. Assuming the
+  source contains `<addr>::<module>::<function>`:
+    - `_<addr>_<module>_<function>.smt` containing the smtlib input for Z3
+    - `<function>.z3log` containing Z3 log during verification
+
+## Avoid Repeated Prover Runs
+
+Do NOT run the prover many times just to grep a single detail from its output — prover runs can take
+a long time. Instead, save the output to a file on the first run, then analyze that saved output for
+whatever you need.
 
 # Testing
 
@@ -251,10 +369,42 @@ MVP_TEST_FLAGS="-T=20" cargo test           # Custom flags
 
 ## Important
 
-
-- Do MUST NOT automatically try to fix verification failures
-- You can fix Rust or Boogie compilation failures
+- **No tests fail on `main`.** The repo has strict CI branch protection. If tests fail on a feature branch, they were
+  broken by commits on that branch — never dismiss them as "pre-existing on main."
 - For verification failures consult me before proceeding
+- **Baseline tests (`UB=1`) passing (exit 0) does NOT mean the test succeeded.**
+  The `UB=1` flag auto-updates `.exp` files, so tests always pass. You MUST
+  compare the resulting `.exp` changes against the parent of the PR to judge
+  correctness. Some `.exp` changes are expected (e.g. fewer errors after a fix),
+  others represent regressions or bugs.
+
+## Framework Testing
+
+To use the Aptos framework specifications as an integration test, run
+
+```
+cargo test -p aptos-framework \
+        move_stdlib_prover_tests \
+        move_aptos_stdlib_prover_tests \
+        move_framework_prover_tests \
+```
+
+## Inference Tests
+
+The inference test suite (`tests/inference/`) runs spec inference on Move source, produces enriched `.exp.move` files,
+then runs the prover on those files. The verification result is appended as a comment at the end of each `.exp.move`
+file.
+
+The `.exp.move` files ARE the enriched source — they are ordinary Move source files (with inferred specs inserted) that
+could have been written by a user. There is no separate "enriched" format; the `.exp.move` file is directly compiled and
+verified by the prover as regular Move code.
+
+**The verification result is ALWAYS expected to be `Verification Succeeded` with no errors or warnings.** Inferred specs
+are expected to verify. If verification fails, there is a bug in either inference or the verification pipeline. Any
+errors, warnings, or Boogie compilation failures in the appended output indicate a problem that must be fixed.
+
+The duality of these tests (inference produces specs, verification checks them) makes them a strong benchmark for
+AI-generated code quality.
 
 # Documentation
 

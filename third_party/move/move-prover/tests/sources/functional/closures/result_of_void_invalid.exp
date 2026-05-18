@@ -1,0 +1,18 @@
+Move prover returns: exiting with compilation errors
+error: `result_of` cannot be used with functions that have no return value; use `ensures_of` to constrain the post-state of `&mut` arguments instead
+   ┌─ tests/sources/functional/closures/result_of_void_invalid.move:14:17
+   │
+14 │         ensures result_of<f>(x) == 0;
+   │                 ^^^^^^^^^^^^^^^
+
+error: `result_of` cannot be used with functions that have no return value; use `ensures_of` to constrain the post-state of `&mut` arguments instead
+   ┌─ tests/sources/functional/closures/result_of_void_invalid.move:21:17
+   │
+21 │         ensures result_of<f>(x) == 0;
+   │                 ^^^^^^^^^^^^^^^
+
+error: expected 1 argument(s) for result_of but 2 were provided
+   ┌─ tests/sources/functional/closures/result_of_void_invalid.move:28:27
+   │
+28 │         ensures result == result_of<f>(old(x), x);
+   │                           ^^^^^^^^^^^^^^^^^^^^^^^

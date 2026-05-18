@@ -2,6 +2,10 @@
 // Licensed pursuant to the Innovation-Enabling Source Code License, available at https://github.com/aptos-labs/aptos-core/blob/main/LICENSE
 
 use crate::pvss::{
+    chunky::{
+        PublicParameters, SignedWeightedTranscript, SignedWeightedTranscriptv2,
+        UnsignedWeightedTranscript, UnsignedWeightedTranscriptv2,
+    },
     traits::{
         transcript::{Transcript, TranscriptCore, WithMaxNumShares},
         Convert, HasEncryptionPublicParams,
@@ -14,9 +18,11 @@ use aptos_crypto::{
     weighted_config::{WeightedConfig, WeightedConfigArkworks},
     SigningKey, Uniform,
 };
-use ark_ff::FftField;
+use ark_ec::pairing::Pairing;
+use ark_ff::{FftField, Fp, FpConfig};
 use num_traits::Zero;
 use rand::{prelude::ThreadRng, thread_rng};
+use rand_core::{CryptoRng, RngCore};
 use serde::Serialize;
 use std::ops::AddAssign;
 
@@ -47,9 +53,9 @@ pub struct DealingArgs<T: Transcript> {
 ///  - a vector of `n` input secrets, denoted by `iss`
 ///  - the aggregated dealt secret key from `\sum_i iss[i]`
 /// Useful in tests and benchmarks when wanting to quickly deal & verify a transcript.
-pub fn setup_dealing<T: Transcript, R: rand_core::RngCore + rand_core::CryptoRng>(
+pub fn setup_dealing<T: Transcript, R: RngCore + CryptoRng>(
     sc: &T::SecretSharingConfig,
-    ell: Option<u8>,
+    ell: Option<usize>,
     mut rng: &mut R,
 ) -> DealingArgs<T> {
     println!(
@@ -85,7 +91,7 @@ pub fn setup_dealing<T: Transcript, R: rand_core::RngCore + rand_core::CryptoRng
     }
 }
 
-// TODO: I think this can be deleted
+// TODO: Not dead code yet but I think this can be merged/deleted
 pub fn setup_dealing_weighted<
     F: FftField,
     T: Transcript<SecretSharingConfig = WeightedConfigArkworks<F>>,
@@ -116,6 +122,136 @@ pub fn setup_dealing_weighted<
         dsk,
         dpk,
     }
+}
+
+/// Setup dealing for both unsigned chunky transcript variants (v1 and v2).
+/// Public parameters (incl. table and dekart) are created once and reused; keys and secrets
+/// are generated separately for each variant (key types are not cloneable).
+pub fn setup_dealing_chunky_both<const N: usize, P, E, R>(
+    sc: &WeightedConfigArkworks<E::ScalarField>,
+    ell: Option<usize>,
+    rng: &mut R,
+) -> (
+    DealingArgs<UnsignedWeightedTranscript<E>>,
+    DealingArgs<UnsignedWeightedTranscriptv2<E>>,
+)
+where
+    P: FpConfig<N>,
+    E: Pairing<ScalarField = Fp<P, N>>,
+    R: RngCore + CryptoRng,
+{
+    let bit_size_msg = match ell {
+        Some(b) => format!(" and bit-size {b}"),
+        None => String::new(),
+    };
+    println!(
+        "Setting up dealing for both chunky PVSSs (shared PP), with {}{bit_size_msg}",
+        sc
+    );
+    let n = sc.get_total_weight().try_into().unwrap();
+    let pp = match ell {
+        None => PublicParameters::<E>::with_max_num_shares(n),
+        Some(bit_size) => PublicParameters::<E>::with_max_num_shares_and_bit_size(n, bit_size),
+    };
+    let (ssks1, spks1, dks1, eks1, iss1, s1, dsk1, dpk1) =
+        generate_keys_and_secrets::<UnsignedWeightedTranscript<E>, R>(sc, &pp, rng);
+    let d1 = DealingArgs {
+        pp: pp.clone(),
+        ssks: ssks1,
+        spks: spks1,
+        dks: dks1,
+        eks: eks1,
+        iss: iss1,
+        s: s1,
+        dsk: dsk1,
+        dpk: dpk1,
+    };
+    let (ssks2, spks2, dks2, eks2, iss2, s2, dsk2, dpk2) =
+        generate_keys_and_secrets::<UnsignedWeightedTranscriptv2<E>, R>(sc, &pp, rng);
+    let d2 = DealingArgs {
+        pp,
+        ssks: ssks2,
+        spks: spks2,
+        dks: dks2,
+        eks: eks2,
+        iss: iss2,
+        s: s2,
+        dsk: dsk2,
+        dpk: dpk2,
+    };
+    (d1, d2)
+}
+
+/// Setup dealing for all four chunky weighted transcript variants (unsigned v1/v2, signed v1/v2)
+/// using **pre-built** public parameters (e.g. to reuse one dlog table across multiple configs).
+pub fn setup_dealing_chunky_all_four_with_pp<const N: usize, P, E, R>(
+    sc: &WeightedConfigArkworks<E::ScalarField>,
+    pp: &PublicParameters<E>,
+    rng: &mut R,
+) -> (
+    DealingArgs<UnsignedWeightedTranscript<E>>,
+    DealingArgs<UnsignedWeightedTranscriptv2<E>>,
+    DealingArgs<SignedWeightedTranscript<E>>,
+    DealingArgs<SignedWeightedTranscriptv2<E>>,
+)
+where
+    P: FpConfig<N>,
+    E: Pairing<ScalarField = Fp<P, N>>,
+    R: RngCore + CryptoRng,
+{
+    let (ssks1, spks1, dks1, eks1, iss1, s1, dsk1, dpk1) =
+        generate_keys_and_secrets::<UnsignedWeightedTranscript<E>, R>(sc, pp, rng);
+    let d1 = DealingArgs {
+        pp: pp.clone(),
+        ssks: ssks1,
+        spks: spks1,
+        dks: dks1,
+        eks: eks1,
+        iss: iss1,
+        s: s1,
+        dsk: dsk1,
+        dpk: dpk1,
+    };
+    let (ssks2, spks2, dks2, eks2, iss2, s2, dsk2, dpk2) =
+        generate_keys_and_secrets::<UnsignedWeightedTranscriptv2<E>, R>(sc, pp, rng);
+    let d2 = DealingArgs {
+        pp: pp.clone(),
+        ssks: ssks2,
+        spks: spks2,
+        dks: dks2,
+        eks: eks2,
+        iss: iss2,
+        s: s2,
+        dsk: dsk2,
+        dpk: dpk2,
+    };
+    let (ssks3, spks3, dks3, eks3, iss3, s3, dsk3, dpk3) =
+        generate_keys_and_secrets::<SignedWeightedTranscript<E>, R>(sc, pp, rng);
+    let d3 = DealingArgs {
+        pp: pp.clone(),
+        ssks: ssks3,
+        spks: spks3,
+        dks: dks3,
+        eks: eks3,
+        iss: iss3,
+        s: s3,
+        dsk: dsk3,
+        dpk: dpk3,
+    };
+    let (ssks4, spks4, dks4, eks4, iss4, s4, dsk4, dpk4) =
+        generate_keys_and_secrets::<SignedWeightedTranscriptv2<E>, R>(sc, pp, rng);
+    let d4 = DealingArgs {
+        pp: pp.clone(),
+        ssks: ssks4,
+        spks: spks4,
+        dks: dks4,
+        eks: eks4,
+        iss: iss4,
+        s: s4,
+        dsk: dsk4,
+        dpk: dpk4,
+    };
+    (d1, d2, d3, d4)
 }
 
 pub fn generate_keys_and_secrets<T: Transcript, R: rand_core::RngCore + rand_core::CryptoRng>(
@@ -338,7 +474,7 @@ pub fn get_weighted_configs_for_benchmarking<T: traits::ThresholdConfig>() -> Ve
     wcs
 }
 
-pub fn reconstruct_dealt_secret_key_randomly<R, T: Transcript>(
+pub fn reconstruct_dealt_secret_key_randomly<R, T: TranscriptCore>(
     sc: &<T as TranscriptCore>::SecretSharingConfig,
     rng: &mut R,
     dks: &Vec<<T as TranscriptCore>::DecryptPrivKey>,
@@ -362,30 +498,4 @@ where
         .collect::<Vec<(Player, T::DealtSecretKeyShare)>>();
 
     T::DealtSecretKey::reconstruct(sc, &players_and_shares).unwrap()
-}
-
-pub fn reconstruct_dealt_secret_key_randomly_subtranscript<R, T: TranscriptCore>(
-    sc: &<T as TranscriptCore>::SecretSharingConfig,
-    rng: &mut R,
-    dks: &Vec<<T as TranscriptCore>::DecryptPrivKey>,
-    trx: T,
-    pp: &<T as TranscriptCore>::PublicParameters,
-) -> <T as TranscriptCore>::DealtSecretKey
-where
-    R: rand_core::RngCore,
-{
-    // Test reconstruction from t random shares
-    let players_and_shares = sc
-        .get_random_eligible_subset_of_players(rng)
-        .into_iter()
-        .map(|p| {
-            let (sk, pk) = trx.decrypt_own_share(sc, &p, &dks[p.get_id()], pp);
-
-            assert_eq!(pk, trx.get_public_key_share(sc, &p));
-
-            (p, sk)
-        })
-        .collect::<Vec<(Player, T::DealtSecretKeyShare)>>();
-
-    <T as TranscriptCore>::DealtSecretKey::reconstruct(sc, &players_and_shares).unwrap()
 }

@@ -1,0 +1,94 @@
+// -- Model dump before first bytecode pipeline
+module 0x1::event {
+    public fun emit<T>(_msg: T) {
+        Tuple()
+    }
+} // end 0x1::event
+module 0x1::wrapper {
+    friend fun emit_wrapper<T>(e: T) {
+        event::emit<T>(e)
+    }
+} // end 0x1::wrapper
+module 0x1::caller {
+    struct E {
+        v: u64,
+    }
+    public fun trigger(e: E) {
+        wrapper::emit_wrapper<E>(e);
+        Tuple()
+    }
+} // end 0x1::caller
+
+// -- Sourcified model before first bytecode pipeline
+module 0x1::event {
+    public fun emit<T: drop + store>(_msg: T) {
+    }
+}
+module 0x1::wrapper {
+    friend 0x1::caller;
+    friend fun emit_wrapper<T: drop + store>(e: T) {
+        0x1::event::emit<T>(e)
+    }
+}
+module 0x1::caller {
+    struct E has drop, store {
+        v: u64,
+    }
+    public fun trigger(e: E) {
+        0x1::wrapper::emit_wrapper<E>(e);
+    }
+}
+
+// -- Model dump before second bytecode pipeline
+module 0x1::event {
+    public fun emit<T>(_msg: T) {
+        Tuple()
+    }
+} // end 0x1::event
+module 0x1::wrapper {
+    friend fun emit_wrapper<T>(e: T) {
+        {
+          let (_msg: T): (T) = Tuple(e);
+          Tuple()
+        }
+    }
+} // end 0x1::wrapper
+module 0x1::caller {
+    struct E {
+        v: u64,
+    }
+    public fun trigger(e: E) {
+        wrapper::emit_wrapper<E>(e);
+        Tuple()
+    }
+} // end 0x1::caller
+
+
+============ disassembled file-format ==================
+// Bytecode version v10
+module 0x1::event
+// Function definition at index 0
+#[persistent] public fun emit<T0: drop + store>(l0: T0)
+    ret
+
+// Bytecode version v10
+module 0x1::wrapper
+friend 0x1::caller
+// Function definition at index 0
+friend fun emit_wrapper<T0: drop + store>(l0: T0)
+    ret
+
+// Bytecode version v10
+module 0x1::caller
+use 0x1::wrapper
+struct E has drop + store
+  v: u64
+
+// Function definition at index 0
+#[persistent] public fun trigger(l0: E)
+    move_loc l0
+    call wrapper::emit_wrapper<E>
+    ret
+
+
+============ bytecode verification succeeded ========

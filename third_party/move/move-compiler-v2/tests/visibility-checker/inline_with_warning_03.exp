@@ -1,24 +1,24 @@
 
 Diagnostics:
-warning: friend inline function `foo` cannot be called from all locations it is accessible
+warning: friend inline function `foo` calls `m::secret` which may not be accessible when expanded
    ┌─ tests/visibility-checker/inline_with_warning_03.move:12:31
    │
  9 │         secret() + secret()
-   │         -------- inline expansion calls private function that may not be accessible in all locations that `m::foo` can be called
+   │         -------- private function may not be accessible in all contexts where `foo` can be called
    ·
 12 │     public(friend) inline fun foo(): u64 {
-   │                               ^^^ if called from a location where `m::secret` is not accessible, such as in a friend module of `0xc0ffee::m`
+   │                               ^^^ contains calls that may be inaccessible when expanded, such as in a friend module of `0xc0ffee::m`
 13 │         blah() + blah()
    │         ------ from a call inlined at this callsite
 
-warning: friend inline function `foo` cannot be called from all locations it is accessible
+warning: friend inline function `foo` calls `o::secret` which may not be accessible when expanded
    ┌─ tests/visibility-checker/inline_with_warning_03.move:32:31
    │
 29 │         secret() + secret()
-   │         -------- inline expansion calls private function that may not be accessible in all locations that `o::foo` can be called
+   │         -------- private function may not be accessible in all contexts where `foo` can be called
    ·
 32 │     public(friend) inline fun foo(): u64 {
-   │                               ^^^ if called from a location where `o::secret` is not accessible, such as in a (future) friend module of `0xc0ffee::o`
+   │                               ^^^ contains calls that may be inaccessible when expanded, such as in a (future) friend module of `0xc0ffee::o`
 33 │         blah() + blah()
    │         ------ from a call inlined at this callsite
 

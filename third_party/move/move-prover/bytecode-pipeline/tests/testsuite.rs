@@ -1,6 +1,7 @@
-// Copyright (c) The Diem Core Contributors
-// Copyright (c) The Move Contributors
-// SPDX-License-Identifier: Apache-2.0
+// Parts of the file are Copyright (c) The Diem Core Contributors
+// Parts of the file are Copyright (c) The Move Contributors
+// Parts of the file are Copyright (c) Aptos Foundation
+// All Aptos Foundation code and content is licensed pursuant to the Innovation-Enabling Source Code License, available at https://github.com/aptos-labs/aptos-core/blob/main/LICENSE
 
 use anyhow::anyhow;
 use move_prover_bytecode_pipeline::{
@@ -10,7 +11,7 @@ use move_prover_bytecode_pipeline::{
     global_invariant_analysis::GlobalInvariantAnalysisProcessor,
     global_invariant_instrumentation::GlobalInvariantInstrumentationProcessor,
     memory_instrumentation::MemoryInstrumentationProcessor, mono_analysis::MonoAnalysisProcessor,
-    mut_ref_instrumentation::MutRefInstrumenter,
+    mut_ref_instrumentation::MutRefInstrumenter, normalize_exits::NormalizeExitsProcessor,
     spec_instrumentation::SpecInstrumentationProcessor,
     verification_analysis::VerificationAnalysisProcessor,
     well_formed_instrumentation::WellFormedInstrumentationProcessor,
@@ -82,6 +83,7 @@ fn get_tested_transformation_pipeline(
             pipeline.add_processor(CleanAndOptimizeProcessor::new());
             pipeline.add_processor(UsageProcessor::new());
             pipeline.add_processor(VerificationAnalysisProcessor::new());
+            pipeline.add_processor(NormalizeExitsProcessor::new());
             pipeline.add_processor(SpecInstrumentationProcessor::new());
             Ok(Some(pipeline))
         },
@@ -96,6 +98,7 @@ fn get_tested_transformation_pipeline(
             pipeline.add_processor(CleanAndOptimizeProcessor::new());
             pipeline.add_processor(UsageProcessor::new());
             pipeline.add_processor(VerificationAnalysisProcessor::new());
+            pipeline.add_processor(NormalizeExitsProcessor::new());
             pipeline.add_processor(SpecInstrumentationProcessor::new());
             pipeline.add_processor(GlobalInvariantAnalysisProcessor::new());
             pipeline.add_processor(WellFormedInstrumentationProcessor::new());
@@ -113,6 +116,7 @@ fn get_tested_transformation_pipeline(
             pipeline.add_processor(CleanAndOptimizeProcessor::new());
             pipeline.add_processor(UsageProcessor::new());
             pipeline.add_processor(VerificationAnalysisProcessor::new());
+            pipeline.add_processor(NormalizeExitsProcessor::new());
             pipeline.add_processor(SpecInstrumentationProcessor::new());
             pipeline.add_processor(GlobalInvariantAnalysisProcessor::new());
             Ok(Some(pipeline))
@@ -128,6 +132,7 @@ fn get_tested_transformation_pipeline(
             pipeline.add_processor(CleanAndOptimizeProcessor::new());
             pipeline.add_processor(UsageProcessor::new());
             pipeline.add_processor(VerificationAnalysisProcessor::new());
+            pipeline.add_processor(NormalizeExitsProcessor::new());
             pipeline.add_processor(SpecInstrumentationProcessor::new());
             pipeline.add_processor(GlobalInvariantAnalysisProcessor::new());
             pipeline.add_processor(GlobalInvariantInstrumentationProcessor::new());
@@ -137,6 +142,7 @@ fn get_tested_transformation_pipeline(
             let mut pipeline = FunctionTargetPipeline::default();
             pipeline.add_processor(UsageProcessor::new());
             pipeline.add_processor(VerificationAnalysisProcessor::new());
+            pipeline.add_processor(NormalizeExitsProcessor::new());
             pipeline.add_processor(SpecInstrumentationProcessor::new());
             pipeline.add_processor(GlobalInvariantAnalysisProcessor::new());
             pipeline.add_processor(WellFormedInstrumentationProcessor::new());
@@ -157,8 +163,27 @@ fn test_runner(path: &Path) -> datatest_stable::Result<()> {
         .and_then(|p| p.file_name())
         .and_then(|p| p.to_str())
         .ok_or_else(|| anyhow!("bad file name"))?;
-    let pipeline_opt = get_tested_transformation_pipeline(dir_name)?;
-    move_stackless_bytecode_test_utils::test_runner(path, pipeline_opt)?;
+    // For nested subdirectories (e.g. spec_instrumentation/proofs/),
+    // fall back to the grandparent directory name.
+    let pipeline_opt = match get_tested_transformation_pipeline(dir_name) {
+        Ok(p) => p,
+        Err(_) => {
+            let parent_dir = path
+                .parent()
+                .and_then(|p| p.parent())
+                .and_then(|p| p.file_name())
+                .and_then(|p| p.to_str())
+                .ok_or_else(|| anyhow!("bad file name"))?;
+            get_tested_transformation_pipeline(parent_dir)?
+        },
+    };
+    move_stackless_bytecode_test_utils::test_runner_with_annotations(
+        path,
+        pipeline_opt,
+        |target| {
+            target.register_annotation_formatters_for_test();
+        },
+    )?;
     Ok(())
 }
 

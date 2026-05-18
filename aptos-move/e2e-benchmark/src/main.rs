@@ -395,12 +395,10 @@ fn main() {
             &package,
             publisher.address(),
             &mut executor,
-            if expected_time_micros > 10000.0 {
-                6
-            } else if expected_time_micros > 1000.0 {
-                10
-            } else {
+            if expected_time_micros > 1000.0 {
                 100
+            } else {
+                500
             },
         );
         assert!(

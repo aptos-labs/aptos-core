@@ -7,5 +7,4 @@ pub mod schemes;
 pub mod shared;
 pub mod traits;
 
-#[cfg(test)]
 pub mod tests;

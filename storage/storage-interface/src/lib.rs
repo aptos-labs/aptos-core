@@ -10,7 +10,6 @@ use aptos_types::{
     contract_event::{ContractEvent, EventWithVersion},
     epoch_change::EpochChangeProof,
     epoch_state::EpochState,
-    event::EventKey,
     ledger_info::LedgerInfoWithSignatures,
     proof::{
         AccumulatorConsistencyProof, SparseMerkleProof, SparseMerkleProofExt,
@@ -18,15 +17,15 @@ use aptos_types::{
     },
     state_proof::StateProof,
     state_store::{
+        hot_state::HotStateValue,
         state_key::StateKey,
         state_storage_usage::StateStorageUsage,
         state_value::{StateValue, StateValueChunkWithProof},
-        table::{TableHandle, TableInfo},
     },
     transaction::{
-        AccountOrderedTransactionsWithProof, IndexedTransactionSummary, PersistedAuxiliaryInfo,
-        Transaction, TransactionAuxiliaryData, TransactionInfo, TransactionListWithProofV2,
-        TransactionOutputListWithProofV2, TransactionToCommit, TransactionWithProof, Version,
+        IndexedTransactionSummary, PersistedAuxiliaryInfo, Transaction, TransactionAuxiliaryData,
+        TransactionInfo, TransactionListWithProofV2, TransactionOutputListWithProofV2,
+        TransactionToCommit, TransactionWithProof, Version,
     },
     write_set::WriteSet,
 };
@@ -48,7 +47,6 @@ use crate::{
     state_store::{state::State, state_summary::StateSummary},
 };
 pub use aptos_types::block_info::BlockHeight;
-use aptos_types::state_store::state_key::prefix::StateKeyPrefix;
 pub use errors::AptosDbError;
 pub use ledger_summary::LedgerSummary;
 
@@ -204,16 +202,6 @@ pub trait DbReader: Send + Sync {
             ledger_version: Version,
         ) -> Result<TransactionOutputListWithProofV2>;
 
-        /// Returns events by given event key
-        fn get_events(
-            &self,
-            event_key: &EventKey,
-            start: u64,
-            order: Order,
-            limit: u64,
-            ledger_version: Version,
-        ) -> Result<Vec<EventWithVersion>>;
-
         fn get_transaction_iterator(
             &self,
             start_version: Version,
@@ -280,16 +268,6 @@ pub trait DbReader: Send + Sync {
         /// Gets the latest epoch state currently held in storage.
         fn get_latest_epoch_state(&self) -> Result<EpochState>;
 
-        /// Returns the (key, value) iterator for a particular state key prefix at at desired version. This
-        /// API can be used to get all resources of an account by passing the account address as the
-        /// key prefix.
-        fn get_prefixed_state_value_iterator(
-            &self,
-            key_prefix: &StateKeyPrefix,
-            cursor: Option<&StateKey>,
-            version: Version,
-        ) -> Result<Box<dyn Iterator<Item = Result<(StateKey, StateValue)>> + '_>>;
-
         /// Returns the latest ledger info, if any.
         fn get_latest_ledger_info_option(&self) -> Result<Option<LedgerInfoWithSignatures>>;
 
@@ -309,30 +287,6 @@ pub trait DbReader: Send + Sync {
             &self,
             next_version: Version,
         ) -> Result<Option<(Version, HashValue)>>;
-
-        /// Returns a transaction that is the `sequence_number`-th one associated with the given account. If
-        /// the transaction with given `sequence_number` doesn't exist, returns `None`.
-        fn get_account_ordered_transaction(
-            &self,
-            address: AccountAddress,
-            seq_num: u64,
-            include_events: bool,
-            ledger_version: Version,
-        ) -> Result<Option<TransactionWithProof>>;
-
-        /// Returns the list of ordered transactions (transactions that include a sequence number)
-        /// sent by an account with `address` starting
-        /// at sequence number `seq_num`. Will return no more than `limit` transactions.
-        /// Will ignore transactions with `txn.version > ledger_version`. Optionally
-        /// fetch events for each transaction when `fetch_events` is `true`.
-        fn get_account_ordered_transactions(
-            &self,
-            address: AccountAddress,
-            seq_num: u64,
-            limit: u64,
-            include_events: bool,
-            ledger_version: Version,
-        ) -> Result<AccountOrderedTransactionsWithProof>;
 
         /// Returns the list of summaries of transactions committed by an account.
         /// Each transaction summary contains the sender address, transaction hash, version, replay protector
@@ -403,11 +357,19 @@ pub trait DbReader: Send + Sync {
         /// This is used by aptos core (executor) internally.
         fn get_state_value_with_proof_by_version_ext(
             &self,
-            key_hash: &HashValue,
+            key_hash: HashValue,
             version: Version,
             root_depth: usize,
-            use_hot_state: bool,
         ) -> Result<(Option<StateValue>, SparseMerkleProofExt)>;
+
+        /// Returns the live `HotStateValue` at `version` together with a proof against the hot
+        /// state root. `None` means the key was never hot, or was evicted at or before `version`.
+        fn get_hot_state_value_with_proof_by_version_ext(
+            &self,
+            key_hash: HashValue,
+            version: Version,
+            root_depth: usize,
+        ) -> Result<(Option<HotStateValue>, SparseMerkleProofExt)>;
 
         /// Gets the latest LedgerView no matter if db has been bootstrapped.
         /// Used by the Db-bootstrapper.
@@ -506,12 +468,6 @@ pub trait DbReader: Send + Sync {
         /// Get the ledger prune window config value.
         fn get_ledger_prune_window(&self) -> Result<usize>;
 
-        /// Get table info from the internal indexer.
-        fn get_table_info(&self, handle: TableHandle) -> Result<TableInfo>;
-
-        /// Returns whether the internal indexer DB has been enabled or not
-        fn indexer_enabled(&self) -> bool;
-
         /// Returns state storage usage at the end of an epoch.
         fn get_state_storage_usage(&self, version: Option<Version>) -> Result<StateStorageUsage>;
 
@@ -550,10 +506,9 @@ pub trait DbReader: Send + Sync {
     ) -> Result<(Option<StateValue>, SparseMerkleProof)> {
         // TODO(HotState): check all callers and possibly query hot state first
         self.get_state_value_with_proof_by_version_ext(
-            state_key.crypto_hash_ref(),
+            *state_key.crypto_hash_ref(),
             version,
             /* root_depth = */ 0,
-            /* use_hot_state = */ false,
         )
         .map(|(value, proof_ext)| (value, proof_ext.into()))
     }

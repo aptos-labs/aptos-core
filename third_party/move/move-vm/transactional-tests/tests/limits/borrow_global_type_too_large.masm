@@ -1,0 +1,42 @@
+//# publish
+module 0x22::test
+
+struct A<phantom T> has key + drop
+    value: u64
+
+public fun entry_below_limit(s: &signer) acquires A
+    move_loc s
+    ld_u64 1
+    // Type depth of this struct is 19, succeeds.
+    pack A<vector<vector<vector<vector<vector<vector<vector<vector<vector<vector<vector<vector<vector<vector<vector<vector<vector<u8>>>>>>>>>>>>>>>>>>
+    move_to A<vector<vector<vector<vector<vector<vector<vector<vector<vector<vector<vector<vector<vector<vector<vector<vector<vector<u8>>>>>>>>>>>>>>>>>>
+    ld_const<address> 0x22
+    borrow_global A<vector<vector<vector<vector<vector<vector<vector<vector<vector<vector<vector<vector<vector<vector<vector<vector<vector<u8>>>>>>>>>>>>>>>>>>
+    pop
+    ret
+
+public fun entry_at_limit(s: &signer) acquires A
+    move_loc s
+    ld_u64 1
+    // Type depth of this struct is 20, succeeds.
+    pack A<vector<vector<vector<vector<vector<vector<vector<vector<vector<vector<vector<vector<vector<vector<vector<vector<vector<vector<u8>>>>>>>>>>>>>>>>>>>
+    move_to A<vector<vector<vector<vector<vector<vector<vector<vector<vector<vector<vector<vector<vector<vector<vector<vector<vector<vector<u8>>>>>>>>>>>>>>>>>>>
+
+    // This creates a reference to resource, so depth is now 21, but we allow this.
+    ld_const<address> 0x22
+    borrow_global A<vector<vector<vector<vector<vector<vector<vector<vector<vector<vector<vector<vector<vector<vector<vector<vector<vector<vector<u8>>>>>>>>>>>>>>>>>>>
+    pop
+    ret
+
+public fun entry_above_limit()
+    ld_u64 1
+    // Type depth of this struct is 21, fails. So not even possible to do any borrows.
+    pack A<vector<vector<vector<vector<vector<vector<vector<vector<vector<vector<vector<vector<vector<vector<vector<vector<vector<vector<vector<u8>>>>>>>>>>>>>>>>>>>>
+    pop
+    ret
+
+//# run 0x22::test::entry_below_limit --signers 0x22
+
+//# run 0x22::test::entry_at_limit --signers 0x22
+
+//# run 0x22::test::entry_above_limit

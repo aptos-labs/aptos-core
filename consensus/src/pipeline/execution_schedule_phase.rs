@@ -64,6 +64,9 @@ impl StatelessPipeline for ExecutionSchedulePhase {
         for b in &ordered_blocks {
             if let Some(tx) = b.pipeline_tx().lock().as_mut() {
                 tx.rand_tx.take().map(|tx| tx.send(b.randomness().cloned()));
+                tx.secret_shared_key_tx
+                    .take()
+                    .map(|tx| tx.send(b.secret_shared_key().cloned()));
             }
         }
 

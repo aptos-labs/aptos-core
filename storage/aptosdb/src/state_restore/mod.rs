@@ -13,21 +13,11 @@ use aptos_types::{
     proof::SparseMerkleRangeProof, state_store::state_storage_usage::StateStorageUsage,
     transaction::Version,
 };
-use once_cell::sync::Lazy;
-use rayon::{ThreadPool, ThreadPoolBuilder};
 use serde::{Deserialize, Serialize};
 use std::{collections::HashMap, hash::Hash, str::FromStr, sync::Arc};
 
 #[cfg(test)]
 mod restore_test;
-
-pub static IO_POOL: Lazy<ThreadPool> = Lazy::new(|| {
-    ThreadPoolBuilder::new()
-        .num_threads(32)
-        .thread_name(|index| format!("jmt-io-{}", index))
-        .build()
-        .unwrap()
-});
 
 /// Key-Value batch that will be written into db atomically with other batches.
 pub type StateValueBatch<K, V> = HashMap<(K, Version), V>;
@@ -221,31 +211,41 @@ impl<K: Key + CryptoHash + Hash + Eq, V: Value> StateSnapshotReceiver<K, V>
     for StateSnapshotRestore<K, V>
 {
     fn add_chunk(&mut self, chunk: Vec<(K, V)>, proof: SparseMerkleRangeProof) -> Result<()> {
-        let kv_fn = || {
-            let _timer = OTHER_TIMERS_SECONDS.timer_with(&["state_value_add_chunk"]);
-            self.kv_restore
-                .lock()
-                .as_mut()
-                .unwrap()
-                .add_chunk(chunk.clone())
-        };
-
-        let tree_fn = || {
-            let _timer = OTHER_TIMERS_SECONDS.timer_with(&["jmt_add_chunk"]);
-            self.tree_restore
-                .lock()
-                .as_mut()
-                .unwrap()
-                .add_chunk_impl(chunk.iter().map(|(k, v)| (k, v.hash())).collect(), proof)
-        };
         match self.restore_mode {
-            StateSnapshotRestoreMode::KvOnly => kv_fn()?,
-            StateSnapshotRestoreMode::TreeOnly => tree_fn()?,
+            StateSnapshotRestoreMode::KvOnly => {
+                let _timer = OTHER_TIMERS_SECONDS.timer_with(&["state_value_add_chunk"]);
+                self.kv_restore.lock().as_mut().unwrap().add_chunk(chunk)?;
+            },
+            StateSnapshotRestoreMode::TreeOnly => {
+                let _timer = OTHER_TIMERS_SECONDS.timer_with(&["jmt_add_chunk"]);
+                self.tree_restore
+                    .lock()
+                    .as_mut()
+                    .unwrap()
+                    .add_chunk_impl(chunk.iter().map(|(k, v)| (k, v.hash())).collect(), proof)?;
+            },
             StateSnapshotRestoreMode::Default => {
-                // We run kv_fn with TreeOnly to restore the usage of DB
-                let (r1, r2) = IO_POOL.join(kv_fn, tree_fn);
-                r1?;
-                r2?;
+                // Sequence: verify proof -> write state_kv_db -> write state_merkle_db.
+                // This keeps state_kv_db at or ahead of state_merkle_db on disk at every
+                // crash point. Were merkle ever ahead, the resume path (which feeds chunks
+                // from min(kv_progress, tree_progress)) would land bytes in (kv_progress,
+                // tree_progress] that the tree side skips and therefore does not re-verify.
+                {
+                    let _timer = OTHER_TIMERS_SECONDS.timer_with(&["jmt_verify_chunk"]);
+                    self.tree_restore
+                        .lock()
+                        .as_mut()
+                        .unwrap()
+                        .verify_chunk(chunk.iter().map(|(k, v)| (k, v.hash())).collect(), proof)?;
+                }
+                {
+                    let _timer = OTHER_TIMERS_SECONDS.timer_with(&["state_value_add_chunk"]);
+                    self.kv_restore.lock().as_mut().unwrap().add_chunk(chunk)?;
+                }
+                {
+                    let _timer = OTHER_TIMERS_SECONDS.timer_with(&["jmt_commit_chunk"]);
+                    self.tree_restore.lock().as_mut().unwrap().commit_chunk()?;
+                }
             },
         }
 

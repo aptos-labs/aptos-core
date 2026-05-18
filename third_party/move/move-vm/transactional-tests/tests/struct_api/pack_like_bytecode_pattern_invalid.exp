@@ -1,0 +1,25 @@
+processed 3 tasks
+task 0 lines 1-9:  publish --print-bytecode [// Test 1: fewer than 2 bytecode instructions (just Ret, no pack_variant instruction)]
+Error: Unable to publish module '0000000000000000000000000000000000000000000000000000000000000066::test_pack_variant_too_few_instructions'. Got VMError: {
+    major_status: INVALID_STRUCT_API_CODE,
+    sub_status: None,
+    location: 0x66::test_pack_variant_too_few_instructions,
+    indices: [(FunctionDefinition, 0)],
+    offsets: [],
+}
+task 1 lines 11-20:  publish --print-bytecode [// Test 2: bytecode does not end with Ret (pack_variant followed by ld_u64)]
+Error: Unable to publish module '0000000000000000000000000000000000000000000000000000000000000066::test_pack_variant_not_ending_with_ret'. Got VMError: {
+    major_status: INVALID_STRUCT_API_CODE,
+    sub_status: None,
+    location: 0x66::test_pack_variant_not_ending_with_ret,
+    indices: [(FunctionDefinition, 0)],
+    offsets: [],
+}
+task 2 lines 22-31:  publish --print-bytecode [// Test 3: second-to-last instruction is not the expected operation (ld_u64 instead of pack_variant)]
+Error: Unable to publish module '0000000000000000000000000000000000000000000000000000000000000066::test_pack_variant_wrong_second_to_last'. Got VMError: {
+    major_status: INVALID_STRUCT_API_CODE,
+    sub_status: None,
+    location: 0x66::test_pack_variant_wrong_second_to_last,
+    indices: [(FunctionDefinition, 0)],
+    offsets: [],
+}

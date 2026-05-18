@@ -22,13 +22,12 @@
 
 use crate::aptos_framework_path;
 use anyhow::{anyhow, bail, Context, Result};
-use aptos::{
-    common::types::PromptOptions, governance::compile_in_temp_dir, move_tool::FrameworkPackageArgs,
-};
+use aptos_cli_common::PromptOptions;
 use aptos_crypto::HashValue;
 use aptos_gas_profiling::GasProfiler;
 use aptos_gas_schedule::{AptosGasParameters, FromOnChainGasSchedule};
 use aptos_language_e2e_tests::account::AccountData;
+use aptos_move_cli::{compile_in_temp_dir, FrameworkPackageArgs};
 use aptos_move_debugger::aptos_debugger::AptosDebugger;
 use aptos_rest_client::{AptosBaseUrl, Client};
 use aptos_transaction_simulation::{DeltaStateStore, SimulationStateStore};
@@ -57,6 +56,7 @@ use move_binary_format::{
     CompiledModule,
 };
 use move_core_types::{
+    diag_writer::DiagWriter,
     identifier::{IdentStr, Identifier},
     language_storage::ModuleId,
     value::MoveValue,
@@ -384,6 +384,7 @@ pub async fn simulate_multistep_proposal(
         )?;
 
         let (blob, hash) = compile_in_temp_dir(
+            &DiagWriter::stderr(),
             "script",
             path,
             &framework_package_args,
@@ -414,7 +415,7 @@ pub async fn simulate_multistep_proposal(
     print!("Creating and funding sender account.. ");
     std::io::stdout().flush()?;
     let mut rng = aptos_keygen::KeyGen::from_seed([0; 32]);
-    let balance = 100 * 1_0000_0000; // 100 APT
+    let balance = 1000 * 1_0000_0000; // 1000 APT
     let account = AccountData::new_from_seed(&mut rng, balance, 0);
     state_view.apply_write_set(&account.to_writeset())?;
     // TODO: should update coin info (total supply)
@@ -483,7 +484,7 @@ pub async fn simulate_multistep_proposal(
             .chain_id(chain_id.chain_id())
             .sequence_number(script_idx as u64)
             .gas_unit_price(gas_params.vm.txn.min_price_per_gas_unit.into())
-            .max_gas_amount(100000)
+            .max_gas_amount(5_000_000) // 5 million gas units => 5 APT max at 100 Octa/gas unit
             .ttl(u64::MAX)
             .sign();
 

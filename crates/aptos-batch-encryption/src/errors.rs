@@ -1,5 +1,6 @@
 // Copyright (c) Aptos Foundation
 // Licensed pursuant to the Innovation-Enabling Source Code License, available at https://github.com/aptos-labs/aptos-core/blob/main/LICENSE
+use crate::shared::ids::Id;
 use thiserror::Error;
 
 #[derive(Debug, Error)]
@@ -28,8 +29,6 @@ pub enum BatchEncryptionError {
     DecryptionKeyShareVerifyError,
     #[error("Decryption key verification error")]
     DecryptionKeyVerifyError,
-    #[error("Tried to decrypt a ciphertext whose eval proof wasn't yet computed")]
-    UncomputedEvalProofError,
     #[error("Tried to compute eval proofs for an id set whose coefficients weren't computed yet")]
     EvalProofsWithUncomputedCoefficients,
     #[error("Hash2Curve failed: couldn't find a quadratic residue, or couldn't map to subgroup")]
@@ -37,9 +36,15 @@ pub enum BatchEncryptionError {
 }
 
 #[derive(Debug, Error)]
+#[error("Tried to decrypt a ciphertext whose eval proof wasn't yet computed")]
+pub struct MissingEvalProofError(pub Id);
+
+#[derive(Debug, Error)]
 pub enum CTVerifyError {
-    #[error("The ID of the ciphertext does not match the hashed verification key")]
-    IdDoesNotMatchHashedVK,
+    #[error(
+        "The ID of the ciphertext does not match the hashed verification key + associated data"
+    )]
+    IdDoesNotMatchHashedVKAndAD,
     #[error(
         "The associated data of the CT does not match what was input to the verification function"
     )]
@@ -64,4 +69,8 @@ pub enum DigestKeyInitError {
     BatchSizeMustBePowerOfTwo,
     #[error("Failed to initialize FK domain")]
     FKDomainInitFailure,
+    #[error("Number of rounds must be nonzero")]
+    NumRoundsMustBeNonzero,
+    #[error("Randomized powers of tau has a malformed shape.")]
+    RandomizedTauPowersMalformedShape,
 }

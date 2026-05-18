@@ -17,7 +17,7 @@ autoscaler:
   scaleDownDelayAfterAdd: 5m
   image:
     repo: registry.k8s.io/autoscaling/cluster-autoscaler
-    tag: v1.25.1
+    tag: v1.34.3
   resources:
     requests:
       cpu: 1

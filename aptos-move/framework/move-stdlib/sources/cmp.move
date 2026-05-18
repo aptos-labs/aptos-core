@@ -310,4 +310,25 @@ module std::cmp {
         };
     }
 
+    #[test_only]
+    fun f_two_args(a: u64, b: u64): u64 {
+        a * 100 + b
+    }
+
+    #[test]
+    fun test_compare_closures() {
+        let val: u64 = 42;
+
+        // Different masks: capture pos 0 vs capture pos 1.
+        let closure_a: |u64|u64 has drop = |b| f_two_args(val, b);
+        let closure_b: |u64|u64 has drop = |a| f_two_args(a, val);
+
+        // Must not be equal because different masks mean different behavior.
+        assert!(compare(&closure_a, &closure_b).is_ne(), 0);
+
+        // Identical closures (same function, same mask, same captured value) must be equal.
+        let closure_c: |u64|u64 has drop = |b| f_two_args(val, b);
+        assert!(compare(&closure_a, &closure_c).is_eq(), 1);
+    }
+
 }

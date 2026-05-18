@@ -162,7 +162,7 @@ jobs:
     permissions:
       contents: "write"
       pull-requests: "read"
-    if: ${{ inputs.dry_run }} == 'false'
+    if: ${{ !inputs.dry_run }}
     steps:
       - name: Download prebuilt binaries
         uses: actions/download-artifact@v4

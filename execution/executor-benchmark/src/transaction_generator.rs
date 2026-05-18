@@ -6,7 +6,7 @@ use crate::{
     metrics::{NUM_TXNS, TIMER},
 };
 use aptos_crypto::{ed25519::Ed25519PrivateKey, HashValue, PrivateKey, Uniform};
-use aptos_logger::info;
+use aptos_logger::{debug, info};
 use aptos_metrics_core::{IntCounterVecHelper, TimerHelper};
 use aptos_sdk::{
     transaction_builder::{aptos_stdlib, TransactionFactory},
@@ -17,10 +17,12 @@ use aptos_storage_interface::{
 };
 use aptos_types::{
     account_address::AccountAddress,
-    account_config::{aptos_test_root_address, AccountResource},
+    account_config::{aptos_test_root_address, AccountResource, BlockResource, CORE_CODE_ADDRESS},
     block_metadata::BlockMetadata,
     chain_id::ChainId,
+    on_chain_config::ConfigurationResource,
     state_store::MoveResourceExt,
+    timestamp::TimestampResource,
     transaction::{
         authenticator::AuthenticationKey, EntryFunction, Transaction, TransactionPayload,
     },
@@ -31,12 +33,10 @@ use itertools::Itertools;
 use move_core_types::{ident_str, language_storage::ModuleId};
 use rand::{rngs::StdRng, seq::SliceRandom, thread_rng, Rng, SeedableRng};
 use rayon::{
-    iter::{IntoParallelRefIterator, ParallelIterator},
+    iter::{IntoParallelRefIterator, IntoParallelRefMutIterator, ParallelIterator},
     ThreadPool, ThreadPoolBuilder,
 };
 use serde::{Deserialize, Serialize};
-#[cfg(test)]
-use std::collections::HashSet;
 use std::{
     cell::RefCell,
     collections::{BTreeMap, HashMap},
@@ -44,7 +44,7 @@ use std::{
     io::{Read, Write},
     path::Path,
     sync::{
-        atomic::{AtomicUsize, Ordering},
+        atomic::{AtomicU64, AtomicUsize, Ordering},
         mpsc, Arc, Mutex,
     },
 };
@@ -101,51 +101,140 @@ fn get_genesis_validator_address(db: &DbReaderWriter) -> AccountAddress {
     validator_address()
 }
 
-pub(crate) fn create_block_metadata_transaction(epoch: u64, db: &DbReaderWriter) -> Transaction {
-    // Use incremental timestamps to avoid triggering epoch reconfigurations
-    // Large real timestamps cause immediate epoch changes since last_reconfiguration_time is small
-    use std::sync::atomic::{AtomicU64, Ordering};
-    static ROUND_COUNTER: AtomicU64 = AtomicU64::new(0);
-    static LAST_TIMESTAMP: AtomicU64 = AtomicU64::new(0);
-    static LAST_EPOCH: AtomicU64 = AtomicU64::new(0);
+/// Manages blockchain timestamps for the executor benchmark.
+///
+/// Derives all timestamps from the DB state instead of wall-clock time,
+/// preventing epoch reconfiguration issues when the benchmark is run long
+/// after the DB was created.
+pub struct BenchmarkTimestamp {
+    /// DB's CurrentTimeMicroseconds at construction time.
+    base_usecs: u64,
+    /// Incremented per block to produce strictly increasing timestamps.
+    next_offset: AtomicU64,
+    /// Current epoch from ConfigurationResource.
+    epoch: u64,
+}
 
-    // Check if epoch has changed and reset round counter if needed
-    let last_epoch = LAST_EPOCH.load(Ordering::SeqCst);
-    if last_epoch != epoch {
-        ROUND_COUNTER.store(0, Ordering::SeqCst);
-        LAST_EPOCH.store(epoch, Ordering::SeqCst);
+impl BenchmarkTimestamp {
+    /// Reads `TimestampResource` and `ConfigurationResource` from the DB
+    /// to initialize timestamp state.
+    pub fn from_db(db: &DbReaderWriter) -> Self {
+        let state_view = db.reader.latest_state_checkpoint_view().unwrap();
+
+        let ts = TimestampResource::fetch_move_resource(&state_view, &CORE_CODE_ADDRESS)
+            .expect("failed to read TimestampResource")
+            .expect("TimestampResource not found");
+
+        let config = ConfigurationResource::fetch_move_resource(&state_view, &CORE_CODE_ADDRESS)
+            .expect("failed to read ConfigurationResource")
+            .expect("ConfigurationResource not found");
+
+        info!(
+            "BenchmarkTimestamp::from_db: base_usecs={}, epoch={}",
+            ts.timestamp.microseconds,
+            config.epoch()
+        );
+
+        Self {
+            base_usecs: ts.timestamp.microseconds,
+            next_offset: AtomicU64::new(1),
+            epoch: config.epoch(),
+        }
     }
 
-    let round = ROUND_COUNTER.fetch_add(1, Ordering::SeqCst);
+    /// Returns a `(round, timestamp)` pair for the next block.
+    ///
+    /// Timestamps are strictly increasing: `base_usecs + 1`, `+2`, `+3`, ...
+    /// Rounds are 0-indexed and correspond one-to-one with offsets.
+    fn next_round_and_timestamp(&self) -> (u64, u64) {
+        let offset = self.next_offset.fetch_add(1, Ordering::SeqCst);
+        let round = offset - 1; // offset starts at 1, round starts at 0
+        (round, self.base_usecs + offset)
+    }
 
-    // Get current real time to keep blockchain time close to real time for orderless transactions
-    let current_time_usecs = std::time::SystemTime::now()
-        .duration_since(std::time::UNIX_EPOCH)
-        .unwrap()
-        .as_micros() as u64;
+    pub fn epoch(&self) -> u64 {
+        self.epoch
+    }
 
-    // Ensure strictly increasing timestamps by comparing with last used timestamp
-    let last_timestamp = LAST_TIMESTAMP.load(Ordering::SeqCst);
-    let timestamp_usecs = if current_time_usecs > last_timestamp {
-        current_time_usecs
-    } else {
-        // If current time is not greater, increment by 1 microsecond to maintain strict ordering
-        last_timestamp + 1
-    };
+    /// Returns a transaction expiration timestamp in seconds.
+    /// Uses `base_usecs/1_000_000 + 60` (60-second window).
+    ///
+    /// This must be within `MAX_EXP_TIME_SECONDS_FOR_ORDERLESS_TXNS` (100s)
+    /// of the current blockchain time for orderless transactions, and well
+    /// beyond any benchmark duration for normal transactions. Since block
+    /// timestamps only advance by 1 microsecond per block, 60 seconds is
+    /// sufficient for both.
+    pub fn txn_expiration_timestamp_secs(&self) -> u64 {
+        self.base_usecs / 1_000_000 + 60
+    }
 
-    // Update the last timestamp atomically
-    LAST_TIMESTAMP.store(timestamp_usecs, Ordering::SeqCst);
-    info!("block metadata timestamp: {}", timestamp_usecs);
+    /// Creates a `BlockMetadata` transaction for the next block, using a
+    /// strictly increasing timestamp derived from this `BenchmarkTimestamp`.
+    pub fn next_block_metadata_txn(&self, db: &DbReaderWriter) -> Transaction {
+        let (round, timestamp_usecs) = self.next_round_and_timestamp();
 
-    Transaction::BlockMetadata(BlockMetadata::new(
-        HashValue::random(),
-        epoch,                             // use provided epoch
-        round, // proper incrementing round number (resets on epoch change)
-        get_genesis_validator_address(db), // use actual validator from genesis
-        vec![],
-        vec![],
-        timestamp_usecs, // real time with strict ordering guarantee
-    ))
+        debug!(
+            "block metadata: epoch={}, round={}, timestamp={}",
+            self.epoch(),
+            round,
+            timestamp_usecs
+        );
+
+        Transaction::BlockMetadata(BlockMetadata::new(
+            HashValue::random(),
+            self.epoch(),
+            round,
+            get_genesis_validator_address(db),
+            vec![],
+            vec![],
+            timestamp_usecs,
+        ))
+    }
+
+    /// Creates a single-transaction epoch-change block.
+    ///
+    /// Reads `BlockResource` and `ConfigurationResource` from the DB,
+    /// computes a timestamp that triggers reconfiguration
+    /// (`last_reconfig_time + epoch_interval + 1`), and returns the
+    /// block (a `Vec<Transaction>` with one `BlockMetadata` entry).
+    ///
+    /// After committing this block, callers should use
+    /// `BenchmarkTimestamp::from_db()` to get a fresh timestamp state
+    /// that reflects the new epoch.
+    pub fn epoch_change_block(db: &DbReaderWriter) -> Vec<Transaction> {
+        let state_view = db.reader.latest_state_checkpoint_view().unwrap();
+
+        let block_resource = BlockResource::fetch_move_resource(&state_view, &CORE_CODE_ADDRESS)
+            .expect("failed to read BlockResource")
+            .expect("BlockResource not found");
+
+        let config = ConfigurationResource::fetch_move_resource(&state_view, &CORE_CODE_ADDRESS)
+            .expect("failed to read ConfigurationResource")
+            .expect("ConfigurationResource not found");
+
+        let epoch_interval = block_resource.epoch_interval();
+        let last_reconfig_time = config.last_reconfiguration_time_micros();
+        let epoch_change_timestamp = last_reconfig_time + epoch_interval + 1;
+
+        info!(
+            "epoch_change_block: last_reconfig_time={}, epoch_interval={}, \
+             epoch_change_timestamp={}, current_epoch={}",
+            last_reconfig_time,
+            epoch_interval,
+            epoch_change_timestamp,
+            config.epoch()
+        );
+
+        vec![Transaction::BlockMetadata(BlockMetadata::new(
+            HashValue::random(),
+            config.epoch(),
+            0, // round 0 for epoch change block
+            get_genesis_validator_address(db),
+            vec![],
+            vec![],
+            epoch_change_timestamp,
+        ))]
+    }
 }
 
 pub(crate) fn get_progress_bar(num_accounts: usize) -> ProgressBar {
@@ -214,6 +303,9 @@ pub struct TransactionGenerator {
 
     /// Database reader-writer for accessing validator information
     db: DbReaderWriter,
+
+    /// Benchmark timestamp state derived from the DB
+    ts: Arc<BenchmarkTimestamp>,
 }
 
 impl TransactionGenerator {
@@ -236,14 +328,19 @@ impl TransactionGenerator {
         mut accounts: AccountCache,
         name: &str,
     ) -> AccountCache {
-        let mut updated = 0;
-        for account in &mut accounts.accounts {
-            let seq_num = get_sequence_number(account.address(), reader.clone());
-            if seq_num > 0 {
-                updated += 1;
-                account.set_sequence_number(seq_num);
-            }
-        }
+        let updated = AtomicUsize::new(0);
+        accounts
+            .accounts
+            .make_contiguous()
+            .par_iter_mut()
+            .for_each(|account| {
+                let seq_num = get_sequence_number(account.address(), Arc::clone(&reader));
+                if seq_num > 0 {
+                    updated.fetch_add(1, Ordering::Relaxed);
+                    account.set_sequence_number(seq_num);
+                }
+            });
+        let updated = updated.load(Ordering::Relaxed);
         if updated > 0 {
             println!(
                 "Updated {} seq numbers out of {} {} accounts",
@@ -296,6 +393,7 @@ impl TransactionGenerator {
         num_main_signer_accounts: Option<usize>,
         num_workers: usize,
         is_keyless: bool,
+        ts: Arc<BenchmarkTimestamp>,
     ) -> Self {
         let num_existing_accounts = TransactionGenerator::read_meta(&db_dir);
 
@@ -309,21 +407,20 @@ impl TransactionGenerator {
             }),
             num_existing_accounts,
             block_sender: Some(block_sender),
-            transaction_factory: Self::create_transaction_factory(),
+            transaction_factory: Self::create_transaction_factory(&ts),
             num_workers,
             worker_pool: ThreadPoolBuilder::new()
                 .num_threads(num_workers)
                 .build()
                 .unwrap(),
             db,
+            ts,
         }
     }
 
-    pub fn create_transaction_factory() -> TransactionFactory {
+    pub fn create_transaction_factory(ts: &BenchmarkTimestamp) -> TransactionFactory {
         TransactionFactory::new(ChainId::test())
-            // Use relative expiration: current time + 60 seconds
-            // This ensures transactions have reasonable expiration window regardless of blockchain time
-            .with_transaction_expiration_time(60)
+            .with_absolute_transaction_expiration_timestamp(ts.txn_expiration_timestamp_secs())
             .with_gas_unit_price(100)
     }
 
@@ -373,13 +470,17 @@ impl TransactionGenerator {
         is_keyless: bool,
     ) {
         assert!(self.block_sender.is_some());
-        // Ensure that seed accounts have enough balance to transfer money to at least 10000 account with
-        // balance init_account_balance.
+        // Compute seed account balance based on the actual number of accounts
+        // each seed account needs to create, with 50% margin for gas fees and
+        // random distribution variance across seed accounts.
+        let num_seed_accounts = (num_new_accounts / 1000).clamp(1, 100_000);
+        let accounts_per_seed = num_new_accounts.div_ceil(num_seed_accounts);
+        let seed_account_balance = init_account_balance * (accounts_per_seed as u64) * 3 / 2;
         self.create_seed_accounts(
             reader,
-            num_new_accounts,
+            num_seed_accounts,
             block_size,
-            init_account_balance * 10_000,
+            seed_account_balance,
             is_keyless,
         );
         self.create_and_fund_accounts(
@@ -464,14 +565,13 @@ impl TransactionGenerator {
     pub fn create_seed_accounts(
         &mut self,
         reader: Arc<dyn DbReader>,
-        num_new_accounts: usize,
+        num_seed_accounts: usize,
         block_size: usize,
         seed_account_balance: u64,
         is_keyless: bool,
     ) {
         // We don't store the # of existing seed accounts now. Thus here we just blindly re-create
         // and re-mint seed accounts here.
-        let num_seed_accounts = (num_new_accounts / 1000).clamp(1, 100000);
         let seed_accounts_cache =
             Self::gen_seed_account_cache(reader.clone(), num_seed_accounts, is_keyless);
 
@@ -489,11 +589,6 @@ impl TransactionGenerator {
             .collect::<Vec<_>>()
             .chunks(block_size)
         {
-            // Refresh root account sequence number once per block from database
-            // This ensures we stay in sync even if BlockMetadata or other transactions affected the account
-            let current_seq_num = get_sequence_number(self.root_account.address(), reader.clone());
-            self.root_account.set_sequence_number(current_seq_num);
-
             let transactions: Vec<_> = chunk
                 .iter()
                 .map(|new_account| {
@@ -509,7 +604,7 @@ impl TransactionGenerator {
             bar.inc(transactions.len() as u64 - 1);
             if let Some(sender) = &self.block_sender {
                 // Add BlockMetadata transaction at the beginning of the block
-                let mut block_transactions = vec![create_block_metadata_transaction(1, &self.db)];
+                let mut block_transactions = vec![self.ts.next_block_metadata_txn(&self.db)];
                 block_transactions.extend(transactions);
                 sender.send(block_transactions).unwrap();
             }
@@ -819,7 +914,7 @@ impl TransactionGenerator {
         }
 
         let mut transactions = Vec::new();
-        transactions.push(create_block_metadata_transaction(1, &self.db));
+        transactions.push(self.ts.next_block_metadata_txn(&self.db));
 
         let init_size = transactions.len();
         for i in 0..block_size {
@@ -949,58 +1044,149 @@ fn rand_with_hotspot<R: Rng>(rng: &mut R, n: usize, h: usize) -> usize {
     }
 }
 
-#[test]
-fn test_get_conflicting_grps_transfer_indices() {
-    let mut rng = StdRng::from_entropy();
+#[cfg(test)]
+mod tests {
+    use super::{BenchmarkTimestamp, TransactionGenerator};
+    use crate::{db_generator::bootstrap_with_genesis, default_benchmark_features, init_db};
+    use aptos_config::config::NO_OP_STORAGE_PRUNER_CONFIG;
+    use aptos_temppath::TempPath;
+    use aptos_types::{account_config::aptos_test_root_address, transaction::Transaction};
+    use rand::{rngs::StdRng, SeedableRng};
+    use std::{
+        collections::{HashMap, HashSet},
+        fs,
+        sync::{mpsc, Arc},
+    };
 
-    fn dfs(node: usize, adj_list: &HashMap<usize, HashSet<usize>>, visited: &mut HashSet<usize>) {
-        visited.insert(node);
-        for &n in adj_list.get(&node).unwrap() {
-            if !visited.contains(&n) {
-                dfs(n, adj_list, visited);
+    #[test]
+    fn test_get_conflicting_grps_transfer_indices() {
+        let mut rng = StdRng::from_entropy();
+
+        fn dfs(
+            node: usize,
+            adj_list: &HashMap<usize, HashSet<usize>>,
+            visited: &mut HashSet<usize>,
+        ) {
+            visited.insert(node);
+            for &n in adj_list.get(&node).unwrap() {
+                if !visited.contains(&n) {
+                    dfs(n, adj_list, visited);
+                }
+            }
+        }
+
+        fn get_num_connected_components(adj_list: &HashMap<usize, HashSet<usize>>) -> usize {
+            let mut visited = HashSet::new();
+            let mut num_connected_components = 0;
+            for node in adj_list.keys() {
+                if !visited.contains(node) {
+                    dfs(*node, adj_list, &mut visited);
+                    num_connected_components += 1;
+                }
+            }
+            num_connected_components
+        }
+
+        {
+            let block_size = 100;
+            let num_signer_accounts = 1000;
+            // we check for (i) block_size not divisible by connected_txn_grps (ii) when divisible
+            // (iii) when all txns in the block are independent (iv) all txns are dependent
+            for connected_txn_grps in [3, block_size / 10, block_size, 1] {
+                let transfer_indices = TransactionGenerator::get_conflicting_grps_transfer_indices(
+                    &mut rng,
+                    num_signer_accounts,
+                    block_size,
+                    connected_txn_grps,
+                    true,
+                );
+
+                let mut adj_list: HashMap<usize, HashSet<usize>> = HashMap::new();
+                assert_eq!(
+                    transfer_indices.len(),
+                    (block_size / connected_txn_grps) * connected_txn_grps
+                );
+                for (sender_idx, receiver_idx) in transfer_indices {
+                    assert!(sender_idx < num_signer_accounts);
+                    assert!(receiver_idx < num_signer_accounts);
+                    adj_list.entry(sender_idx).or_default().insert(receiver_idx);
+                    adj_list.entry(receiver_idx).or_default().insert(sender_idx);
+                }
+
+                assert_eq!(get_num_connected_components(&adj_list), connected_txn_grps);
             }
         }
     }
 
-    fn get_num_connected_components(adj_list: &HashMap<usize, HashSet<usize>>) -> usize {
-        let mut visited = HashSet::new();
-        let mut num_connected_components = 0;
-        for node in adj_list.keys() {
-            if !visited.contains(node) {
-                dfs(*node, adj_list, &mut visited);
-                num_connected_components += 1;
+    /// Verifies that `create_seed_accounts` produces strictly increasing sequence
+    /// numbers for the root account even when seed accounts span multiple blocks.
+    ///
+    /// This is a regression test for a bug where the root account's sequence number
+    /// was re-read from the DB at the start of each block. Because previously
+    /// generated blocks hadn't been committed yet, the DB returned a stale value,
+    /// resetting the sequence counter and causing SEQUENCE_NUMBER_TOO_OLD discards.
+    #[test]
+    fn test_create_seed_accounts_multi_block_seq_numbers() {
+        let db_dir = TempPath::new();
+        fs::create_dir_all(db_dir.as_ref()).unwrap();
+
+        let features = default_benchmark_features();
+        bootstrap_with_genesis(&db_dir, features);
+
+        let (mut config, genesis_key) = aptos_genesis::test_utils::test_config_with_custom_features(
+            default_benchmark_features(),
+        );
+        config.storage.dir = db_dir.as_ref().to_path_buf();
+        config.storage.storage_pruner_config = NO_OP_STORAGE_PRUNER_CONFIG;
+
+        let db = init_db(&config);
+        let ts = Arc::new(BenchmarkTimestamp::from_db(&db));
+        let root_account = TransactionGenerator::read_root_account(genesis_key, &db);
+        let initial_seq_num = root_account.sequence_number();
+
+        let (block_sender, block_receiver) = mpsc::sync_channel::<Vec<Transaction>>(50);
+
+        let mut generator = TransactionGenerator::new_with_existing_db(
+            db.clone(),
+            root_account,
+            block_sender,
+            db_dir.as_ref(),
+            None,
+            1,
+            false,
+            ts,
+        );
+
+        // block_size=5, num_seed_accounts=12 → 3 blocks (5+5+2)
+        let block_size = 5;
+        let num_seed_accounts = 12;
+        generator.create_seed_accounts(
+            db.reader.clone(),
+            num_seed_accounts,
+            block_size,
+            1_000_000_000,
+            false,
+        );
+        generator.drop_sender();
+
+        // Collect root-account sequence numbers from all generated blocks.
+        let mut all_seq_nums = Vec::new();
+        while let Ok(block) = block_receiver.recv() {
+            for txn in &block {
+                if let Transaction::UserTransaction(signed_txn) = txn {
+                    if signed_txn.sender() == aptos_test_root_address() {
+                        all_seq_nums.push(signed_txn.sequence_number());
+                    }
+                }
             }
         }
-        num_connected_components
-    }
 
-    {
-        let block_size = 100;
-        let num_signer_accounts = 1000;
-        // we check for (i) block_size not divisible by connected_txn_grps (ii) when divisible
-        // (iii) when all txns in the block are independent (iv) all txns are dependent
-        for connected_txn_grps in [3, block_size / 10, block_size, 1] {
-            let transfer_indices = TransactionGenerator::get_conflicting_grps_transfer_indices(
-                &mut rng,
-                num_signer_accounts,
-                block_size,
-                connected_txn_grps,
-                true,
-            );
-
-            let mut adj_list: HashMap<usize, HashSet<usize>> = HashMap::new();
-            assert_eq!(
-                transfer_indices.len(),
-                (block_size / connected_txn_grps) * connected_txn_grps
-            );
-            for (sender_idx, receiver_idx) in transfer_indices {
-                assert!(sender_idx < num_signer_accounts);
-                assert!(receiver_idx < num_signer_accounts);
-                adj_list.entry(sender_idx).or_default().insert(receiver_idx);
-                adj_list.entry(receiver_idx).or_default().insert(sender_idx);
-            }
-
-            assert_eq!(get_num_connected_components(&adj_list), connected_txn_grps);
-        }
+        assert_eq!(all_seq_nums.len(), num_seed_accounts);
+        let expected: Vec<u64> =
+            (initial_seq_num..initial_seq_num + num_seed_accounts as u64).collect();
+        assert_eq!(
+            all_seq_nums, expected,
+            "Sequence numbers must be strictly increasing across all seed account blocks"
+        );
     }
 }

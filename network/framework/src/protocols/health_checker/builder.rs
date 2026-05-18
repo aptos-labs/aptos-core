@@ -30,6 +30,7 @@ impl HealthCheckerBuilder {
         ping_interval_ms: u64,
         ping_timeout_ms: u64,
         ping_failures_tolerated: u64,
+        disconnect_on_failure: bool,
         network_sender: NetworkSender<HealthCheckerMsg>,
         network_rx: HealthCheckerNetworkEvents,
         peers_and_metadata: Arc<PeersAndMetadata>,
@@ -48,6 +49,7 @@ impl HealthCheckerBuilder {
             Duration::from_millis(ping_interval_ms),
             Duration::from_millis(ping_timeout_ms),
             ping_failures_tolerated,
+            disconnect_on_failure,
         );
         Self {
             service: Some(service),

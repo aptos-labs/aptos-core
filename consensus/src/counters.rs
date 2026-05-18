@@ -342,6 +342,34 @@ pub static WAIT_FOR_FULL_BLOCKS_TRIGGERED: Lazy<Histogram> = Lazy::new(|| {
     )
 });
 
+/// Duration of the full pull loop (outer loop with retries) in seconds.
+/// Custom buckets cover 0–1s so the 250–500ms default-bucket gap doesn't
+/// hide the 300ms poll ceiling.
+pub static PULL_LOOP_DURATION: Lazy<Histogram> = Lazy::new(|| {
+    register_histogram!(
+        "aptos_consensus_pull_loop_duration_seconds",
+        "Duration of the full payload pull loop including retries",
+        // Sub-ms to 10ms for fast path, then 30ms steps (matching NO_TXN_DELAY)
+        // up to 330ms, then coarser up to 1s for non-default configs.
+        vec![
+            0.001, 0.002, 0.005, 0.01, 0.03, 0.06, 0.09, 0.12, 0.15, 0.18, 0.21, 0.24, 0.27, 0.30,
+            0.33, 0.5, 0.75, 1.0,
+        ],
+    )
+    .unwrap()
+});
+
+/// Number of empty retries in the pull loop before getting a payload.
+/// Buckets cover up to 34 retries (enough for 1000ms non-default poll time).
+pub static PULL_LOOP_EMPTY_RETRIES: Lazy<Histogram> = Lazy::new(|| {
+    register_histogram!(
+        "aptos_consensus_pull_loop_empty_retries",
+        "Number of empty retries in the pull loop",
+        vec![0.0, 1.0, 2.0, 3.0, 4.0, 5.0, 6.0, 7.0, 8.0, 9.0, 10.0, 15.0, 20.0, 25.0, 30.0, 35.0,],
+    )
+    .unwrap()
+});
+
 /// Counts when pipeline backpressure is triggered
 pub static PIPELINE_BACKPRESSURE_ON_PROPOSAL_TRIGGERED: Lazy<Histogram> = Lazy::new(|| {
     register_avg_counter(
@@ -377,12 +405,13 @@ pub static CONSENSUS_PROPOSAL_PENDING_DURATION: Lazy<DurationHistogram> = Lazy::
     )
 });
 
-/// Amount of time (in seconds) proposal is delayed due to backpressure/backoff
 pub static PROPOSER_DELAY_PROPOSAL: Lazy<Histogram> = Lazy::new(|| {
-    register_avg_counter(
-        "aptos_proposer_delay_proposal",
+    register_histogram!(
+        "aptos_proposer_delay_proposal_seconds",
         "Amount of time (in seconds) proposal is delayed due to backpressure/backoff",
+        vec![0.001, 0.005, 0.01, 0.025, 0.05, 0.1, 0.25, 0.5, 1.0, 2.5, 5.0]
     )
+    .unwrap()
 });
 
 /// Histogram for max number of transactions (after filtering for dedup, expirations, etc) proposer uses when creating block.
@@ -725,6 +754,16 @@ pub static SYNC_TO_HIGHEST_QC: Lazy<IntCounter> = Lazy::new(|| {
     .unwrap()
 });
 
+/// Count of state syncs skipped, by reason (pending_blocks, small_gap)
+pub static STATE_SYNC_SKIPPED: Lazy<IntCounterVec> = Lazy::new(|| {
+    register_int_counter_vec!(
+        "aptos_consensus_state_sync_skipped",
+        "Count of state syncs skipped by reason",
+        &["reason"]
+    )
+    .unwrap()
+});
+
 pub static ORDER_VOTE_ADDED: Lazy<IntCounter> = Lazy::new(|| {
     register_int_counter!(
         "aptos_consensus_order_vote_added",
@@ -806,6 +845,28 @@ pub static BLOCKS_FETCHED_FROM_NETWORK_WHILE_FAST_FORWARD_SYNC: Lazy<IntCounter>
         )
         .unwrap()
     });
+
+/// State sync trigger counter with reason and commit_gap labels.
+/// reason: block_not_received, opt_block_pending, regular_block_pending, commit_gap_only
+/// commit_gap: true/false — whether the commit round gap also exceeds the threshold
+pub static STATE_SYNC_TRIGGER: Lazy<IntCounterVec> = Lazy::new(|| {
+    register_int_counter_vec!(
+        "aptos_consensus_state_sync_trigger",
+        "State sync trigger with reason and commit_gap labels",
+        &["reason", "commit_gap"]
+    )
+    .unwrap()
+});
+
+/// Gap between commit round and ordered root round when state sync triggers
+pub static STATE_SYNC_TRIGGER_GAP: Lazy<Histogram> = Lazy::new(|| {
+    register_histogram!(
+        "aptos_consensus_state_sync_trigger_gap",
+        "Gap between commit round and ordered root round when state sync triggers",
+        vec![1.0, 2.0, 3.0, 5.0, 10.0, 20.0, 50.0, 100.0, 200.0, 500.0, 1000.0]
+    )
+    .unwrap()
+});
 
 //////////////////////
 // RECONFIGURATION COUNTERS
@@ -1290,6 +1351,37 @@ pub static TXNS_IN_BLOCK: Lazy<HistogramVec> = Lazy::new(|| {
     .unwrap()
 });
 
+/// Histogram of seconds between a block and its parent, observed at ordering time.
+/// NIL blocks (which share their parent's timestamp) are excluded.
+pub static BLOCK_ORDERING_INTERVAL_SECONDS: Lazy<Histogram> = Lazy::new(|| {
+    register_histogram!(
+        "aptos_consensus_block_ordering_interval_seconds",
+        "Histogram of seconds between a block and its parent, observed at ordering time.",
+        // Fine resolution 10-300 ms (where most healthy block intervals live)
+        // and tail out to ~12 s for timeout-recovery blocks.
+        exponential_buckets(/*start=*/ 0.010, /*factor=*/ 1.4, /*count=*/ 22).unwrap(),
+    )
+    .unwrap()
+});
+
+/// Histogram for the number of txns cut at each step of `BlockPreparer::prepare_block`.
+/// Label `reason`: `filter` (transaction-filter rules), `dedup` (duplicate suppression),
+/// `truncate` (`max_txns_from_block_to_execute` cap).
+pub static TXNS_CUT_BY_BLOCK_PREPARER: Lazy<HistogramVec> = Lazy::new(|| {
+    register_histogram_vec!(
+        "aptos_consensus_txns_cut_by_block_preparer",
+        "Histogram of txns cut at each step of block preparation (filter, dedup, truncate).",
+        &["reason"],
+        // Most blocks observe 0 (lands in the implicit <1 bucket); separate dedup-scale
+        // cuts (1-32) from truncate-scale cuts (256-8k).
+        vec![
+            1.0, 2.0, 4.0, 8.0, 16.0, 32.0, 64.0, 128.0, 256.0, 512.0, 1024.0, 2048.0, 4096.0,
+            8192.0
+        ],
+    )
+    .unwrap()
+});
+
 /// Histogram for the number of txns to be executed in a block.
 pub static MAX_TXNS_FROM_BLOCK_TO_EXECUTE: Lazy<Histogram> = Lazy::new(|| {
     register_histogram!(
@@ -1443,6 +1535,15 @@ pub static RAND_AGGREGATION_DURATION: Lazy<DurationHistogram> = Lazy::new(|| {
     )
 });
 
+pub static SECRET_SHARE_BAD_SHARES: Lazy<IntCounterVec> = Lazy::new(|| {
+    register_int_counter_vec!(
+        "aptos_consensus_secret_share_bad_shares_count",
+        "Number of bad secret shares detected during post-aggregate fallback verification.",
+        &["author"]
+    )
+    .unwrap()
+});
+
 pub static CONSENSUS_PROPOSAL_PAYLOAD_AVAILABILITY: Lazy<IntCounterVec> = Lazy::new(|| {
     register_int_counter_vec!(
         "aptos_consensus_proposal_payload_availability_count",
@@ -1486,4 +1587,13 @@ pub static OPTQS_LAST_CONSECUTIVE_SUCCESS_COUNT: Lazy<Histogram> = Lazy::new(|| 
         "aptos_optqs_last_consecutive_successes",
         "The number of last consecutive successes capped at window length",
     )
+});
+
+pub static DECRYPTION_PIPELINE_TXNS_COUNT: Lazy<IntCounterVec> = Lazy::new(|| {
+    register_int_counter_vec!(
+        "aptos_consensus_decryption_pipeline_txns_count",
+        "Count of transactions processed by the decryption pipeline by category.",
+        &["category"]
+    )
+    .unwrap()
 });

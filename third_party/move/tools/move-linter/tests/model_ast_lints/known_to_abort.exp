@@ -1,387 +1,387 @@
 
 Diagnostics:
 warning: [lint] Division by zero will abort
-  ┌─ tests/model_ast_lints/known_to_abort.move:8:9
+  ┌─ tests/model_ast_lints/known_to_abort.move:9:9
   │
-8 │         x / 0
+9 │         x / 0
   │         ^^^^^
   │
   = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(known_to_abort)]`.
   = For more information, see https://aptos.dev/en/build/smart-contracts/linter#known_to_abort.
 
 warning: [lint] Modulo by zero will abort
-   ┌─ tests/model_ast_lints/known_to_abort.move:12:9
+   ┌─ tests/model_ast_lints/known_to_abort.move:13:9
    │
-12 │         x % 0
+13 │         x % 0
    │         ^^^^^
    │
    = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(known_to_abort)]`.
    = For more information, see https://aptos.dev/en/build/smart-contracts/linter#known_to_abort.
 
 warning: [lint] Cast operation will abort because the value is outside the target type's range
-   ┌─ tests/model_ast_lints/known_to_abort.move:16:9
+   ┌─ tests/model_ast_lints/known_to_abort.move:17:9
    │
-16 │         256u16 as u8
+17 │         256u16 as u8
    │         ^^^^^^^^^^^^
    │
    = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(known_to_abort)]`.
    = For more information, see https://aptos.dev/en/build/smart-contracts/linter#known_to_abort.
 
 warning: [lint] Cast operation will abort because the value is outside the target type's range
-   ┌─ tests/model_ast_lints/known_to_abort.move:20:9
+   ┌─ tests/model_ast_lints/known_to_abort.move:21:9
    │
-20 │         65_536u32 as u16
+21 │         65_536u32 as u16
    │         ^^^^^^^^^^^^^^^^
    │
    = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(known_to_abort)]`.
    = For more information, see https://aptos.dev/en/build/smart-contracts/linter#known_to_abort.
 
 warning: [lint] Cast operation will abort because the value is outside the target type's range
-   ┌─ tests/model_ast_lints/known_to_abort.move:24:9
+   ┌─ tests/model_ast_lints/known_to_abort.move:25:9
    │
-24 │         4_294_967_296u64 as u32
+25 │         4_294_967_296u64 as u32
    │         ^^^^^^^^^^^^^^^^^^^^^^^
    │
    = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(known_to_abort)]`.
    = For more information, see https://aptos.dev/en/build/smart-contracts/linter#known_to_abort.
 
 warning: [lint] Cast operation will abort because the value is outside the target type's range
-   ┌─ tests/model_ast_lints/known_to_abort.move:28:9
+   ┌─ tests/model_ast_lints/known_to_abort.move:29:9
    │
-28 │         18_446_744_073_709_551_616u128 as u64
+29 │         18_446_744_073_709_551_616u128 as u64
    │         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
    │
    = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(known_to_abort)]`.
    = For more information, see https://aptos.dev/en/build/smart-contracts/linter#known_to_abort.
 
 warning: [lint] Cast operation will abort because the value is outside the target type's range
-   ┌─ tests/model_ast_lints/known_to_abort.move:32:9
+   ┌─ tests/model_ast_lints/known_to_abort.move:33:9
    │
-32 │         340_282_366_920_938_463_463_374_607_431_768_211_456u256 as u128
+33 │         340_282_366_920_938_463_463_374_607_431_768_211_456u256 as u128
    │         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
    │
    = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(known_to_abort)]`.
    = For more information, see https://aptos.dev/en/build/smart-contracts/linter#known_to_abort.
 
 warning: [lint] Cast operation will abort because the value is outside the target type's range
-   ┌─ tests/model_ast_lints/known_to_abort.move:36:9
+   ┌─ tests/model_ast_lints/known_to_abort.move:37:9
    │
-36 │         OVERFLOW_VALUE as u8
+37 │         OVERFLOW_VALUE as u8
    │         ^^^^^^^^^^^^^^^^^^^^
    │
    = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(known_to_abort)]`.
    = For more information, see https://aptos.dev/en/build/smart-contracts/linter#known_to_abort.
 
 warning: [lint] Cast operation will abort because the value is outside the target type's range
-   ┌─ tests/model_ast_lints/known_to_abort.move:40:9
+   ┌─ tests/model_ast_lints/known_to_abort.move:41:9
    │
-40 │         LARGE_U32 as u32
+41 │         LARGE_U32 as u32
    │         ^^^^^^^^^^^^^^^^
    │
    = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(known_to_abort)]`.
    = For more information, see https://aptos.dev/en/build/smart-contracts/linter#known_to_abort.
 
 warning: [lint] Cast operation will abort because the value is outside the target type's range
-   ┌─ tests/model_ast_lints/known_to_abort.move:44:9
+   ┌─ tests/model_ast_lints/known_to_abort.move:45:9
    │
-44 │         (255u16 + 1u16) as u8
+45 │         (255u16 + 1u16) as u8
    │         ^^^^^^^^^^^^^^^^^^^^^
    │
    = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(known_to_abort)]`.
    = For more information, see https://aptos.dev/en/build/smart-contracts/linter#known_to_abort.
 
 warning: [lint] Cast operation will abort because the value is outside the target type's range
-   ┌─ tests/model_ast_lints/known_to_abort.move:48:9
+   ┌─ tests/model_ast_lints/known_to_abort.move:49:9
    │
-48 │         (65535u32 + 1u32) as u16
+49 │         (65535u32 + 1u32) as u16
    │         ^^^^^^^^^^^^^^^^^^^^^^^^
    │
    = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(known_to_abort)]`.
    = For more information, see https://aptos.dev/en/build/smart-contracts/linter#known_to_abort.
 
 warning: [lint] Cast operation will abort because the value is outside the target type's range
-   ┌─ tests/model_ast_lints/known_to_abort.move:52:9
+   ┌─ tests/model_ast_lints/known_to_abort.move:53:9
    │
-52 │         (4_294_967_295u64 + 1u64) as u32
+53 │         (4_294_967_295u64 + 1u64) as u32
    │         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
    │
    = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(known_to_abort)]`.
    = For more information, see https://aptos.dev/en/build/smart-contracts/linter#known_to_abort.
 
 warning: [lint] Cast operation will abort because the value is outside the target type's range
-   ┌─ tests/model_ast_lints/known_to_abort.move:56:9
+   ┌─ tests/model_ast_lints/known_to_abort.move:57:9
    │
-56 │         (128u8 * 2) as u8
+57 │         (128u8 * 2) as u8
    │         ^^^^^^^^^^^^^^^^^
    │
    = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(known_to_abort)]`.
    = For more information, see https://aptos.dev/en/build/smart-contracts/linter#known_to_abort.
 
 warning: [lint] Unnecessary cast: the expression is already of the target type. Consider removing the cast for better readability.
-   ┌─ tests/model_ast_lints/known_to_abort.move:56:9
+   ┌─ tests/model_ast_lints/known_to_abort.move:57:9
    │
-56 │         (128u8 * 2) as u8
+57 │         (128u8 * 2) as u8
    │         ^^^^^^^^^^^^^^^^^
    │
    = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(unnecessary_cast)]`.
    = For more information, see https://aptos.dev/en/build/smart-contracts/linter#unnecessary_cast.
 
 warning: [lint] Cast operation will abort because the value is outside the target type's range
-   ┌─ tests/model_ast_lints/known_to_abort.move:60:9
+   ┌─ tests/model_ast_lints/known_to_abort.move:61:9
    │
-60 │         (32768u16 * 2) as u16
+61 │         (32768u16 * 2) as u16
    │         ^^^^^^^^^^^^^^^^^^^^^
    │
    = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(known_to_abort)]`.
    = For more information, see https://aptos.dev/en/build/smart-contracts/linter#known_to_abort.
 
 warning: [lint] Unnecessary cast: the expression is already of the target type. Consider removing the cast for better readability.
-   ┌─ tests/model_ast_lints/known_to_abort.move:60:9
+   ┌─ tests/model_ast_lints/known_to_abort.move:61:9
    │
-60 │         (32768u16 * 2) as u16
+61 │         (32768u16 * 2) as u16
    │         ^^^^^^^^^^^^^^^^^^^^^
    │
    = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(unnecessary_cast)]`.
    = For more information, see https://aptos.dev/en/build/smart-contracts/linter#unnecessary_cast.
 
 warning: [lint] Cast operation will abort because the value is outside the target type's range
-   ┌─ tests/model_ast_lints/known_to_abort.move:64:9
+   ┌─ tests/model_ast_lints/known_to_abort.move:65:9
    │
-64 │         (128u8 + 128u8) as u8  // 256, overflows u8
+65 │         (128u8 + 128u8) as u8  // 256, overflows u8
    │         ^^^^^^^^^^^^^^^^^^^^^
    │
    = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(known_to_abort)]`.
    = For more information, see https://aptos.dev/en/build/smart-contracts/linter#known_to_abort.
 
 warning: [lint] Unnecessary cast: the expression is already of the target type. Consider removing the cast for better readability.
-   ┌─ tests/model_ast_lints/known_to_abort.move:64:9
+   ┌─ tests/model_ast_lints/known_to_abort.move:65:9
    │
-64 │         (128u8 + 128u8) as u8  // 256, overflows u8
+65 │         (128u8 + 128u8) as u8  // 256, overflows u8
    │         ^^^^^^^^^^^^^^^^^^^^^
    │
    = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(unnecessary_cast)]`.
    = For more information, see https://aptos.dev/en/build/smart-contracts/linter#unnecessary_cast.
 
 warning: [lint] Cast operation will abort because the value is outside the target type's range
-   ┌─ tests/model_ast_lints/known_to_abort.move:68:9
+   ┌─ tests/model_ast_lints/known_to_abort.move:69:9
    │
-68 │         (32768u16 * 2 + 1u16) as u16  // 65537, overflows u16
+69 │         (32768u16 * 2 + 1u16) as u16  // 65537, overflows u16
    │         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
    │
    = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(known_to_abort)]`.
    = For more information, see https://aptos.dev/en/build/smart-contracts/linter#known_to_abort.
 
 warning: [lint] Unnecessary cast: the expression is already of the target type. Consider removing the cast for better readability.
-   ┌─ tests/model_ast_lints/known_to_abort.move:68:9
+   ┌─ tests/model_ast_lints/known_to_abort.move:69:9
    │
-68 │         (32768u16 * 2 + 1u16) as u16  // 65537, overflows u16
+69 │         (32768u16 * 2 + 1u16) as u16  // 65537, overflows u16
    │         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
    │
    = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(unnecessary_cast)]`.
    = For more information, see https://aptos.dev/en/build/smart-contracts/linter#unnecessary_cast.
 
 warning: [lint] Cast operation will abort because the value is outside the target type's range
-   ┌─ tests/model_ast_lints/known_to_abort.move:72:9
+   ┌─ tests/model_ast_lints/known_to_abort.move:73:9
    │
-72 │         (64u8 * 2 * 2) as u8  // 256, overflows u8
+73 │         (64u8 * 2 * 2) as u8  // 256, overflows u8
    │         ^^^^^^^^^^^^^^^^^^^^
    │
    = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(known_to_abort)]`.
    = For more information, see https://aptos.dev/en/build/smart-contracts/linter#known_to_abort.
 
 warning: [lint] Unnecessary cast: the expression is already of the target type. Consider removing the cast for better readability.
-   ┌─ tests/model_ast_lints/known_to_abort.move:72:9
+   ┌─ tests/model_ast_lints/known_to_abort.move:73:9
    │
-72 │         (64u8 * 2 * 2) as u8  // 256, overflows u8
+73 │         (64u8 * 2 * 2) as u8  // 256, overflows u8
    │         ^^^^^^^^^^^^^^^^^^^^
    │
    = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(unnecessary_cast)]`.
    = For more information, see https://aptos.dev/en/build/smart-contracts/linter#unnecessary_cast.
 
 warning: [lint] Cast operation will abort because the value is outside the target type's range
-   ┌─ tests/model_ast_lints/known_to_abort.move:77:13
+   ┌─ tests/model_ast_lints/known_to_abort.move:78:13
    │
-77 │             256u16 as u8  // This should be caught
+78 │             256u16 as u8  // This should be caught
    │             ^^^^^^^^^^^^
    │
    = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(known_to_abort)]`.
    = For more information, see https://aptos.dev/en/build/smart-contracts/linter#known_to_abort.
 
 warning: [lint] Shift by an amount greater than or equal to the type's bit width will abort
-   ┌─ tests/model_ast_lints/known_to_abort.move:84:9
+   ┌─ tests/model_ast_lints/known_to_abort.move:85:9
    │
-84 │         x << 8
+85 │         x << 8
    │         ^^^^^^
    │
    = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(known_to_abort)]`.
    = For more information, see https://aptos.dev/en/build/smart-contracts/linter#known_to_abort.
 
 warning: [lint] Shift by an amount greater than or equal to the type's bit width will abort
-   ┌─ tests/model_ast_lints/known_to_abort.move:88:9
+   ┌─ tests/model_ast_lints/known_to_abort.move:89:9
    │
-88 │         x << 16
+89 │         x << 16
    │         ^^^^^^^
    │
    = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(known_to_abort)]`.
    = For more information, see https://aptos.dev/en/build/smart-contracts/linter#known_to_abort.
 
 warning: [lint] Shift by an amount greater than or equal to the type's bit width will abort
-   ┌─ tests/model_ast_lints/known_to_abort.move:92:9
+   ┌─ tests/model_ast_lints/known_to_abort.move:93:9
    │
-92 │         x << 32
+93 │         x << 32
    │         ^^^^^^^
    │
    = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(known_to_abort)]`.
    = For more information, see https://aptos.dev/en/build/smart-contracts/linter#known_to_abort.
 
 warning: [lint] Shift by an amount greater than or equal to the type's bit width will abort
-   ┌─ tests/model_ast_lints/known_to_abort.move:96:9
+   ┌─ tests/model_ast_lints/known_to_abort.move:97:9
    │
-96 │         x << 64
+97 │         x << 64
    │         ^^^^^^^
    │
    = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(known_to_abort)]`.
    = For more information, see https://aptos.dev/en/build/smart-contracts/linter#known_to_abort.
 
 warning: [lint] Shift by an amount greater than or equal to the type's bit width will abort
-    ┌─ tests/model_ast_lints/known_to_abort.move:100:9
+    ┌─ tests/model_ast_lints/known_to_abort.move:101:9
     │
-100 │         x << 128
+101 │         x << 128
     │         ^^^^^^^^
     │
     = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(known_to_abort)]`.
     = For more information, see https://aptos.dev/en/build/smart-contracts/linter#known_to_abort.
 
 warning: [lint] Shift by an amount greater than or equal to the type's bit width will abort
-    ┌─ tests/model_ast_lints/known_to_abort.move:104:9
+    ┌─ tests/model_ast_lints/known_to_abort.move:105:9
     │
-104 │         x << SHIFT_AMOUNT
+105 │         x << SHIFT_AMOUNT
     │         ^^^^^^^^^^^^^^^^^
     │
     = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(known_to_abort)]`.
     = For more information, see https://aptos.dev/en/build/smart-contracts/linter#known_to_abort.
 
 warning: [lint] Shift by an amount greater than or equal to the type's bit width will abort
-    ┌─ tests/model_ast_lints/known_to_abort.move:108:9
+    ┌─ tests/model_ast_lints/known_to_abort.move:109:9
     │
-108 │         x >> 8
+109 │         x >> 8
     │         ^^^^^^
     │
     = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(known_to_abort)]`.
     = For more information, see https://aptos.dev/en/build/smart-contracts/linter#known_to_abort.
 
 warning: [lint] Shift by an amount greater than or equal to the type's bit width will abort
-    ┌─ tests/model_ast_lints/known_to_abort.move:112:9
+    ┌─ tests/model_ast_lints/known_to_abort.move:113:9
     │
-112 │         x >> 16
+113 │         x >> 16
     │         ^^^^^^^
     │
     = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(known_to_abort)]`.
     = For more information, see https://aptos.dev/en/build/smart-contracts/linter#known_to_abort.
 
 warning: [lint] Shift by an amount greater than or equal to the type's bit width will abort
-    ┌─ tests/model_ast_lints/known_to_abort.move:116:9
+    ┌─ tests/model_ast_lints/known_to_abort.move:117:9
     │
-116 │         x >> 32
+117 │         x >> 32
     │         ^^^^^^^
     │
     = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(known_to_abort)]`.
     = For more information, see https://aptos.dev/en/build/smart-contracts/linter#known_to_abort.
 
 warning: [lint] Shift by an amount greater than or equal to the type's bit width will abort
-    ┌─ tests/model_ast_lints/known_to_abort.move:120:9
+    ┌─ tests/model_ast_lints/known_to_abort.move:121:9
     │
-120 │         x >> 64
+121 │         x >> 64
     │         ^^^^^^^
     │
     = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(known_to_abort)]`.
     = For more information, see https://aptos.dev/en/build/smart-contracts/linter#known_to_abort.
 
 warning: [lint] Shift by an amount greater than or equal to the type's bit width will abort
-    ┌─ tests/model_ast_lints/known_to_abort.move:124:9
+    ┌─ tests/model_ast_lints/known_to_abort.move:125:9
     │
-124 │         x >> 128
+125 │         x >> 128
     │         ^^^^^^^^
     │
     = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(known_to_abort)]`.
     = For more information, see https://aptos.dev/en/build/smart-contracts/linter#known_to_abort.
 
 warning: [lint] Unnecessary cast: the expression is already of the target type. Consider removing the cast for better readability.
-    ┌─ tests/model_ast_lints/known_to_abort.move:152:9
+    ┌─ tests/model_ast_lints/known_to_abort.move:153:9
     │
-152 │         ((x + 1) * 2) as u8
+153 │         ((x + 1) * 2) as u8
     │         ^^^^^^^^^^^^^^^^^^^
     │
     = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(unnecessary_cast)]`.
     = For more information, see https://aptos.dev/en/build/smart-contracts/linter#unnecessary_cast.
 
 warning: [lint] Unnecessary cast: the expression is already of the target type. Consider removing the cast for better readability.
-    ┌─ tests/model_ast_lints/known_to_abort.move:172:9
+    ┌─ tests/model_ast_lints/known_to_abort.move:173:9
     │
-172 │         (64u8 * 2 + 32) as u8  // 160, within u8 range
+173 │         (64u8 * 2 + 32) as u8  // 160, within u8 range
     │         ^^^^^^^^^^^^^^^^^^^^^
     │
     = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(unnecessary_cast)]`.
     = For more information, see https://aptos.dev/en/build/smart-contracts/linter#unnecessary_cast.
 
 warning: [lint] Unnecessary cast: the expression is already of the target type. Consider removing the cast for better readability.
-    ┌─ tests/model_ast_lints/known_to_abort.move:176:9
+    ┌─ tests/model_ast_lints/known_to_abort.move:177:9
     │
-176 │         (16u8 * 4 * 2) as u8  // 128, within u8 range
+177 │         (16u8 * 4 * 2) as u8  // 128, within u8 range
     │         ^^^^^^^^^^^^^^^^^^^^
     │
     = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(unnecessary_cast)]`.
     = For more information, see https://aptos.dev/en/build/smart-contracts/linter#unnecessary_cast.
 
 warning: [lint] Unnecessary cast: the expression is already of the target type. Consider removing the cast for better readability.
-    ┌─ tests/model_ast_lints/known_to_abort.move:180:9
+    ┌─ tests/model_ast_lints/known_to_abort.move:181:9
     │
-180 │         (32767u16 + 1 - 1) as u16  // 32767, within u16 range
+181 │         (32767u16 + 1 - 1) as u16  // 32767, within u16 range
     │         ^^^^^^^^^^^^^^^^^^^^^^^^^
     │
     = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(unnecessary_cast)]`.
     = For more information, see https://aptos.dev/en/build/smart-contracts/linter#unnecessary_cast.
 
 warning: [lint] Unnecessary cast: the expression is already of the target type. Consider removing the cast for better readability.
-    ┌─ tests/model_ast_lints/known_to_abort.move:185:13
+    ┌─ tests/model_ast_lints/known_to_abort.move:186:13
     │
-185 │             (x * 2) as u8
+186 │             (x * 2) as u8
     │             ^^^^^^^^^^^^^
     │
     = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(unnecessary_cast)]`.
     = For more information, see https://aptos.dev/en/build/smart-contracts/linter#unnecessary_cast.
 
 warning: [lint] Unnecessary cast: the expression is already of the target type. Consider removing the cast for better readability.
-    ┌─ tests/model_ast_lints/known_to_abort.move:187:13
+    ┌─ tests/model_ast_lints/known_to_abort.move:188:13
     │
-187 │             (y * 2) as u8
+188 │             (y * 2) as u8
     │             ^^^^^^^^^^^^^
     │
     = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(unnecessary_cast)]`.
     = For more information, see https://aptos.dev/en/build/smart-contracts/linter#unnecessary_cast.
 
 warning: [lint] Unnecessary cast: the expression is already of the target type. Consider removing the cast for better readability.
-    ┌─ tests/model_ast_lints/known_to_abort.move:194:17
+    ┌─ tests/model_ast_lints/known_to_abort.move:195:17
     │
-194 │                 (x + y) as u8
+195 │                 (x + y) as u8
     │                 ^^^^^^^^^^^^^
     │
     = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(unnecessary_cast)]`.
     = For more information, see https://aptos.dev/en/build/smart-contracts/linter#unnecessary_cast.
 
 warning: [lint] Unnecessary cast: the expression is already of the target type. Consider removing the cast for better readability.
-    ┌─ tests/model_ast_lints/known_to_abort.move:196:17
+    ┌─ tests/model_ast_lints/known_to_abort.move:197:17
     │
-196 │                 (x + z) as u8
+197 │                 (x + z) as u8
     │                 ^^^^^^^^^^^^^
     │
     = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(unnecessary_cast)]`.
     = For more information, see https://aptos.dev/en/build/smart-contracts/linter#unnecessary_cast.
 
 warning: [lint] Unnecessary cast: the expression is already of the target type. Consider removing the cast for better readability.
-    ┌─ tests/model_ast_lints/known_to_abort.move:199:13
+    ┌─ tests/model_ast_lints/known_to_abort.move:200:13
     │
-199 │             (y + z) as u8
+200 │             (y + z) as u8
     │             ^^^^^^^^^^^^^
     │
     = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(unnecessary_cast)]`.

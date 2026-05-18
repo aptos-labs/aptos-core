@@ -1,0 +1,27 @@
+// RUN: publish --print(stackless,micro-ops)
+module 0x66::test
+
+// Regression: same VID position with different types must get distinct registers.
+fun vid_type_mismatch(x: u64): u64
+    copy_loc x
+    ld_u64 10
+    gt
+    br_false l1
+    copy_loc x
+    ret
+l1: copy_loc x
+    ld_u64 1
+    add
+    ret
+
+// RUN: execute 0x66::test::vid_type_mismatch --args 5
+// CHECK: results: 6
+
+// RUN: execute 0x66::test::vid_type_mismatch --args 15
+// CHECK: results: 15
+
+// RUN: execute 0x66::test::vid_type_mismatch --args 11
+// CHECK: results: 11
+
+// RUN: execute 0x66::test::vid_type_mismatch --args 10
+// CHECK: results: 11

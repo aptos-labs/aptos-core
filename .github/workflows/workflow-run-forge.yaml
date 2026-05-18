@@ -88,6 +88,10 @@ on:
         required: false
         type: boolean
         description: Whether to use indexer
+      FORGE_NUM_PFNS:
+        required: false
+        type: string
+        description: Number of public full nodes (PFNs) to deploy alongside the testnet (0 or empty to disable)
       FORGE_DEPLOYER_PROFILE:
         required: false
         type: string
@@ -124,6 +128,7 @@ env:
   FORGE_NAMESPACE: ${{ inputs.FORGE_NAMESPACE }}
   FORGE_ENABLE_HAPROXY: ${{ inputs.FORGE_ENABLE_HAPROXY }}
   FORGE_ENABLE_INDEXER: ${{ inputs.FORGE_ENABLE_INDEXER }}
+  FORGE_NUM_PFNS: ${{ inputs.FORGE_NUM_PFNS }}
   FORGE_DEPLOYER_PROFILE: ${{ inputs.FORGE_DEPLOYER_PROFILE }}
   FORGE_TEST_SUITE: ${{ inputs.FORGE_TEST_SUITE }}
   POST_TO_SLACK: ${{ inputs.POST_TO_SLACK }}

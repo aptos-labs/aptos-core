@@ -1,6 +1,7 @@
-// Copyright (c) Aptos Foundation
-// Parts of the project are originally copyright (c) Meta Platforms, Inc.
-// SPDX-License-Identifier: Apache-2.0
+// Parts of the file are Copyright (c) The Diem Core Contributors
+// Parts of the file are Copyright (c) The Move Contributors
+// Parts of the file are Copyright (c) Aptos Foundation
+// All Aptos Foundation code and content is licensed pursuant to the Innovation-Enabling Source Code License, available at https://github.com/aptos-labs/aptos-core/blob/main/LICENSE
 
 mod bytecode_generator;
 pub mod diagnostics;
@@ -20,8 +21,8 @@ use crate::{
         acquires_checker, ast_simplifier, closure_checker, cmp_rewriter,
         cyclic_instantiation_checker, flow_insensitive_checkers, function_checker, inliner,
         inlining_optimization, lambda_lifter, lambda_lifter::LambdaLiftingOptions, model_ast_lints,
-        recursive_struct_checker, rewrite_target::RewritingScope, seqs_in_binop_checker,
-        spec_checker, spec_rewriter, unused_params_checker, EnvProcessorPipeline,
+        recursive_struct_checker, rewrite_target::RewritingScope, spec_checker, spec_rewriter,
+        struct_usage_collector, unused_params_checker, EnvProcessorPipeline,
     },
     pipeline::{
         ability_processor::AbilityProcessor,
@@ -173,14 +174,92 @@ where
 /// to the model.
 pub fn run_move_compiler_for_analysis(
     error_writer: &mut impl WriteColor,
-    mut options: Options,
+    options: Options,
 ) -> anyhow::Result<GlobalEnv> {
-    options.whole_program = true; // will set `treat_everything_as_target`
+    let env = run_move_compiler_to_model(options)?;
+    let opts = env.get_extension::<Options>().unwrap_or_default();
+    let mut emitter = opts.error_emitter(error_writer);
+    emitter.report_diag(&env, opts.report_severity());
+    emitter.check_diag(&env, opts.report_severity(), "compilation errors")?;
+    Ok(env)
+}
+
+/// Run the full compiler pipeline for analysis, collecting all diagnostics
+/// in `GlobalEnv` without emitting them.
+///
+/// Unlike [`run_move_compiler_for_analysis`], this function does not require
+/// an error writer — diagnostics are stored in the returned environment and
+/// can be inspected programmatically via `env.has_errors()` / `env.diag_count()`.
+///
+/// Each pipeline phase checks for errors and returns early, so the caller
+/// always receives the model up to the first failing phase.
+pub fn run_move_compiler_to_model(mut options: Options) -> anyhow::Result<GlobalEnv> {
+    options.whole_program = true;
     options = options.set_experiment(Experiment::SPEC_REWRITE, true);
     options = options.set_experiment(Experiment::ATTACH_COMPILED_MODULE, true);
-    let mut emitter = options.error_emitter(error_writer);
-    let (env, _units) = run_move_compiler(emitter.as_mut(), options)?;
-    // Reset for subsequent analysis
+
+    // Type checking + AST transforms.
+    let mut env = run_checker_and_rewriters(options.clone())?;
+    if env.has_errors() {
+        env.treat_everything_as_target(false);
+        return Ok(env);
+    }
+
+    // Stackless bytecode generation.
+    let mut targets = run_stackless_bytecode_gen(&env);
+    if env.has_errors() {
+        env.treat_everything_as_target(false);
+        return Ok(env);
+    }
+
+    // Stackless bytecode checks.
+    run_stackless_bytecode_pipeline(
+        &env,
+        stackless_bytecode_check_pipeline(&options),
+        &mut targets,
+    );
+    if env.has_errors() {
+        env.treat_everything_as_target(false);
+        return Ok(env);
+    }
+
+    // AST optimization pipeline.
+    env_optimization_pipeline(&options).run(&mut env);
+    if env.has_errors() {
+        env.treat_everything_as_target(false);
+        return Ok(env);
+    }
+
+    // Regenerate stackless bytecode after AST optimizations.
+    let mut targets = run_stackless_bytecode_gen(&env);
+    if env.has_errors() {
+        env.treat_everything_as_target(false);
+        return Ok(env);
+    }
+
+    // Stackless bytecode optimization pipeline.
+    run_stackless_bytecode_pipeline(
+        &env,
+        stackless_bytecode_optimization_pipeline(&options),
+        &mut targets,
+    );
+    if env.has_errors() {
+        env.treat_everything_as_target(false);
+        return Ok(env);
+    }
+
+    // File format bytecode generation.
+    let modules_and_scripts = run_file_format_gen(&mut env, &targets);
+    if env.has_errors() {
+        env.treat_everything_as_target(false);
+        return Ok(env);
+    }
+
+    // Bytecode verification.
+    let annotated_units = annotate_units(modules_and_scripts);
+    run_bytecode_verifier(&annotated_units, &mut env);
+
+    env.set_compiler_v2(true);
     env.treat_everything_as_target(false);
     Ok(env)
 }
@@ -211,8 +290,6 @@ pub fn run_checker(options: Options) -> anyhow::Result<GlobalEnv> {
             &options.known_attributes
         },
         options.language_version.unwrap_or_default(),
-        options.warn_deprecated,
-        options.warn_of_deprecation_use_in_aptos_libs,
         options.compile_test_code,
         options.compile_verify_code,
     )?;
@@ -290,7 +367,7 @@ pub fn run_stackless_bytecode_gen(env: &GlobalEnv) -> FunctionTargetsHolder {
             for fun in module.get_functions() {
                 let id = fun.get_qualified_id();
                 // Skip inline functions because invoke and lambda are not supported in the current code generator
-                if !fun.is_inline() {
+                if !fun.is_inline() && !fun.is_lemma() {
                     todo.insert(id);
                 }
             }
@@ -356,25 +433,17 @@ pub fn env_check_and_transform_pipeline<'a, 'b>(options: &'a Options) -> EnvProc
     }
 
     if options.experiment_on(Experiment::ACCESS_CHECK) {
-        env_pipeline.add(
-            "access and use check before inlining",
-            |env: &mut GlobalEnv| function_checker::check_access_and_use(env, true),
-        );
-    }
-
-    let check_seqs_in_binops = !options
-        .language_version
-        .unwrap_or_default()
-        .is_at_least(LanguageVersion::V2_0)
-        && options.experiment_on(Experiment::SEQS_IN_BINOPS_CHECK);
-    if check_seqs_in_binops {
-        env_pipeline.add("binop side effect check", |env| {
-            // This check should be done before inlining.
-            seqs_in_binop_checker::checker(env)
+        env_pipeline.add("access check before inlining", |env: &mut GlobalEnv| {
+            function_checker::check_access_before_inlining(env)
         });
     }
 
     if options.experiment_on(Experiment::LINT_CHECKS) {
+        // collect_struct_usage must run before lint checks for unused struct detection
+        env_pipeline.add(
+            "collect struct usage",
+            struct_usage_collector::collect_struct_usage,
+        );
         // Perform all the model AST lint checks before inlining, to be closer "in form"
         // to the user code.
         env_pipeline.add("model AST lints", model_ast_lints::checker);
@@ -394,6 +463,22 @@ pub fn env_check_and_transform_pipeline<'a, 'b>(options: &'a Options) -> EnvProc
         });
     }
 
+    // Check literal patterns appear only in valid positions.
+    env_pipeline.add("literal pattern check", |env: &mut GlobalEnv| {
+        env_pipeline::literal_pattern_checker::check(env)
+    });
+
+    // Check match exhaustiveness / unreachable arms and transform primitive pattern
+    // matches to if-else statements. This runs before inlining to avoid repeated
+    // transformation of inlined code, and after lint checks so that the lints get
+    // access to the original pattern match structure.
+    env_pipeline.add("match coverage checks", |env: &mut GlobalEnv| {
+        env_pipeline::match_coverage_checks::check(env)
+    });
+    env_pipeline.add("match transforms", |env: &mut GlobalEnv| {
+        env_pipeline::match_transforms::transform(env)
+    });
+
     if options.experiment_on(Experiment::INLINING) {
         let rewriting_scope = if options.whole_program {
             RewritingScope::Everything
@@ -410,10 +495,9 @@ pub fn env_check_and_transform_pipeline<'a, 'b>(options: &'a Options) -> EnvProc
     }
 
     if options.experiment_on(Experiment::ACCESS_CHECK) {
-        env_pipeline.add(
-            "access and use check after inlining",
-            |env: &mut GlobalEnv| function_checker::check_access_and_use(env, false),
-        );
+        env_pipeline.add("access check after inlining", |env: &mut GlobalEnv| {
+            function_checker::check_access_after_inlining(env)
+        });
     }
 
     if options.experiment_on(Experiment::ACQUIRES_CHECK) {
@@ -541,6 +625,8 @@ pub fn stackless_bytecode_check_pipeline(options: &Options) -> FunctionTargetPip
     if options.experiment_on(Experiment::LINT_CHECKS) {
         // Some lint checks need live variable analysis.
         pipeline.add_processor(Box::new(LiveVarAnalysisProcessor::new(false)));
+        // Some lint checks need reachability annotations.
+        pipeline.add_processor(Box::new(UnreachableCodeProcessor {}));
         pipeline.add_processor(Box::new(LintProcessor {}));
     }
 
@@ -626,7 +712,7 @@ pub fn disassemble_compiled_units(units: &[CompiledUnit]) -> anyhow::Result<Stri
         .iter()
         .map(|unit| match unit {
             CompiledUnit::Module(module) => {
-                move_asm::disassembler::disassemble_module(String::new(), &module.module, false)
+                move_asm::disassembler::disassemble_module(String::new(), &module.module)
             },
             CompiledUnit::Script(script) => {
                 move_asm::disassembler::disassemble_script(String::new(), &script.script)

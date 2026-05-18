@@ -1,0 +1,47 @@
+module 0x42::defs {
+    public enum Color has copy, drop {
+        Red,
+        Green {
+            intensity: u64,
+        }
+        Blue,
+    }
+    public struct Point has copy, drop {
+        x: u64,
+        y: u64,
+    }
+}
+module 0x42::consumer {
+    use 0x42::defs;
+    fun get_green_intensity(c: defs::Color): u64 {
+        if (&c is Green) {
+            let defs::Color::Green{intensity: _v0} = c;
+            return _v0
+        };
+        0
+    }
+    fun get_x(p: &defs::Point): u64 {
+        *&p.x
+    }
+    fun is_red(c: &defs::Color): bool {
+        c is Red
+    }
+    fun make_green(intensity: u64): defs::Color {
+        defs::Color::Green{intensity: intensity}
+    }
+    fun make_point(x: u64, y: u64): defs::Point {
+        defs::Point{x: x, y: y}
+    }
+    fun round_trip(): u64 {
+        let _v0 = make_point(3, 4);
+        let _v1 = get_x(&_v0);
+        let _v2 = sum_coords(_v0);
+        _v1 + _v2
+    }
+    fun sum_coords(p: defs::Point): u64 {
+        let defs::Point{x: _v0, y: _v1} = p;
+        _v0 + _v1
+    }
+}
+
+============ recompilation succeeded ========

@@ -251,17 +251,6 @@ module 0x42::test {
         }
 
     }
-    private fun simple_4_ref(x: &E1): &u8 {
-        match (x) {
-          test::E1::A{ 0: x, 1: _ } => {
-            x
-          }
-          test::E1::B{ 0: x } => {
-            x
-          }
-        }
-
-    }
     private fun simple_5(x: E1): u8 {
         match (x) {
           test::E1::A{ 0: _, 1: y } => {
@@ -438,12 +427,6 @@ module 0x42::test {
             E1::C{x: x, y: _} => x,
         }
     }
-    fun simple_4_ref(x: &E1): &u8 {
-        match (x) {
-            E1::A(x, _) => x,
-            E1::B(x) => x,
-        }
-    }
     fun simple_5(x: E1): u8 {
         match (x) {
             E1::A(_, y) => if (y) 1u8 else 0u8,
@@ -462,13 +445,3 @@ module 0x42::test {
         x
     }
 }
-
-
-Diagnostics:
-error: match not exhaustive
-    ┌─ tests/checking/dotdot/dotdot_valid.move:142:16
-    │
-142 │         match (x) {
-    │                ^
-    │
-    = missing `E1::C{..}`

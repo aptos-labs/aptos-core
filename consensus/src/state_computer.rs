@@ -2,10 +2,12 @@
 // Licensed pursuant to the Innovation-Enabling Source Code License, available at https://github.com/aptos-labs/aptos-core/blob/main/LICENSE
 
 use crate::{
-    block_preparer::BlockPreparer, error::StateSyncError, monitor, network::NetworkSender,
-    payload_manager::TPayloadManager, pipeline::pipeline_builder::PipelineBuilder,
-    state_replication::StateComputer, transaction_deduper::TransactionDeduper,
-    transaction_shuffler::TransactionShuffler, txn_notifier::TxnNotifier,
+    block_preparer::BlockPreparer,
+    consensus_observer::publisher::consensus_publisher::ConsensusPublisher, error::StateSyncError,
+    monitor, network::NetworkSender, payload_manager::TPayloadManager,
+    pipeline::pipeline_builder::PipelineBuilder, state_replication::StateComputer,
+    transaction_deduper::TransactionDeduper, transaction_shuffler::TransactionShuffler,
+    txn_notifier::TxnNotifier,
 };
 use anyhow::Result;
 use aptos_config::config::BlockTransactionFilterConfig;
@@ -44,9 +46,13 @@ struct MutableState {
     block_executor_onchain_config: BlockExecutorConfigFromOnchain,
     transaction_deduper: Arc<dyn TransactionDeduper>,
     is_randomness_enabled: bool,
+    is_decryption_enabled: bool,
     consensus_onchain_config: OnChainConsensusConfig,
     persisted_auxiliary_info_version: u8,
     network_sender: Arc<NetworkSender>,
+    secret_share_config: Option<SecretShareConfig>,
+    consensus_publisher: Option<Arc<ConsensusPublisher>>,
+    enable_v2_observer_messages: bool,
 }
 
 /// Basic communication with the Execution module;
@@ -59,7 +65,6 @@ pub struct ExecutionProxy {
     txn_filter_config: Arc<BlockTransactionFilterConfig>,
     state: RwLock<Option<MutableState>>,
     enable_pre_commit: bool,
-    secret_share_config: Option<SecretShareConfig>,
 }
 
 impl ExecutionProxy {
@@ -69,7 +74,6 @@ impl ExecutionProxy {
         state_sync_notifier: Arc<dyn ConsensusNotificationSender>,
         txn_filter_config: BlockTransactionFilterConfig,
         enable_pre_commit: bool,
-        secret_share_config: Option<SecretShareConfig>,
     ) -> Self {
         Self {
             executor,
@@ -79,7 +83,6 @@ impl ExecutionProxy {
             txn_filter_config: Arc::new(txn_filter_config),
             state: RwLock::new(None),
             enable_pre_commit,
-            secret_share_config,
         }
     }
 
@@ -91,9 +94,13 @@ impl ExecutionProxy {
             block_executor_onchain_config,
             transaction_deduper,
             is_randomness_enabled,
+            is_decryption_enabled,
             consensus_onchain_config,
             persisted_auxiliary_info_version,
             network_sender,
+            secret_share_config,
+            consensus_publisher,
+            enable_v2_observer_messages,
         } = self
             .state
             .read()
@@ -113,6 +120,7 @@ impl ExecutionProxy {
             validators,
             block_executor_onchain_config,
             is_randomness_enabled,
+            is_decryption_enabled,
             commit_signer,
             self.state_sync_notifier.clone(),
             payload_manager,
@@ -121,7 +129,9 @@ impl ExecutionProxy {
             &consensus_onchain_config,
             persisted_auxiliary_info_version,
             network_sender,
-            self.secret_share_config.clone(),
+            secret_share_config,
+            consensus_publisher,
+            enable_v2_observer_messages,
         )
     }
 }
@@ -240,9 +250,13 @@ impl StateComputer for ExecutionProxy {
         block_executor_onchain_config: BlockExecutorConfigFromOnchain,
         transaction_deduper: Arc<dyn TransactionDeduper>,
         randomness_enabled: bool,
+        decryption_enabled: bool,
         consensus_onchain_config: OnChainConsensusConfig,
         persisted_auxiliary_info_version: u8,
         network_sender: Arc<NetworkSender>,
+        secret_share_config: Option<SecretShareConfig>,
+        consensus_publisher: Option<Arc<ConsensusPublisher>>,
+        enable_v2_observer_messages: bool,
     ) {
         *self.state.write() = Some(MutableState {
             validators: epoch_state
@@ -255,9 +269,13 @@ impl StateComputer for ExecutionProxy {
             block_executor_onchain_config,
             transaction_deduper,
             is_randomness_enabled: randomness_enabled,
+            is_decryption_enabled: decryption_enabled,
             consensus_onchain_config,
             persisted_auxiliary_info_version,
             network_sender,
+            secret_share_config,
+            consensus_publisher,
+            enable_v2_observer_messages,
         });
     }
 

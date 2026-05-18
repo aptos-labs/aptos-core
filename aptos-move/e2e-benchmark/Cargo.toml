@@ -19,6 +19,7 @@ aptos-gas-algebra = { workspace = true }
 aptos-gas-profiling = { workspace = true }
 aptos-language-e2e-tests = { workspace = true }
 aptos-logger = { workspace = true }
+aptos-move-e2e-test-harness = { workspace = true }
 aptos-sdk = { workspace = true }
 aptos-transaction-generator-lib = { workspace = true }
 aptos-transaction-workloads-lib = { workspace = true }
@@ -26,11 +27,10 @@ aptos-types = { workspace = true }
 aptos-vm-environment = { workspace = true }
 async-trait = { workspace = true }
 clap = { workspace = true }
-e2e-move-tests = { path = "../e2e-move-tests" }
 rand = { workspace = true }
 serde_json = { workspace = true }
 tokio = { workspace = true }
 
 [features]
 default = []
-profiling = ["e2e-move-tests/profiling"]
+profiling = ["aptos-vm-environment/profiling"]

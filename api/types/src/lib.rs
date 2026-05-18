@@ -36,23 +36,24 @@ pub use move_types::{
     verify_field_identifier, verify_function_identifier, verify_module_identifier, EntryFunctionId,
     HexEncodedBytes, MoveAbility, MoveFunction, MoveFunctionGenericTypeParam,
     MoveFunctionVisibility, MoveModule, MoveModuleBytecode, MoveModuleId, MoveResource,
-    MoveScriptBytecode, MoveStruct, MoveStructField, MoveStructTag, MoveType, MoveValue,
-    ResourceGroup, I128, I256, I64, MAX_RECURSIVE_TYPES_ALLOWED, U128, U256, U64,
+    MoveScriptBytecode, MoveStruct, MoveStructField, MoveStructTag, MoveStructVariant, MoveType,
+    MoveValue, ResourceGroup, I128, I256, I64, MAX_RECURSIVE_TYPES_ALLOWED, U128, U256, U64,
 };
 use serde::{Deserialize, Deserializer};
 pub use state::RawStateValueRequest;
 use std::str::FromStr;
 pub use table::{RawTableItemRequest, TableItemRequest};
 pub use transaction::{
-    AbstractSignature, AccountSignature, BlockMetadataTransaction, DeleteModule, DeleteResource,
-    DeleteTableItem, DirectWriteSet, Ed25519Signature, EncodeSubmissionRequest,
-    EntryFunctionPayload, Event, FeePayerSignature, GasEstimation, GasEstimationBcs,
-    GenesisPayload, GenesisTransaction, MultiAgentSignature, MultiEd25519Signature,
-    MultiKeySignature, MultisigPayload, MultisigTransactionPayload, NoAccountSignature,
-    PendingTransaction, PublicKey, ScriptPayload, ScriptWriteSet, Signature, SingleKeySignature,
-    SubmitTransactionRequest, Transaction, TransactionData, TransactionId, TransactionInfo,
-    TransactionOnChainData, TransactionPayload, TransactionSignature, TransactionSigningMessage,
-    TransactionSummary, TransactionsBatchSingleSubmissionFailure,
+    AbstractSignature, AccountSignature, BlockMetadataTransaction, DecryptedPayload, DeleteModule,
+    DeleteResource, DeleteTableItem, DirectWriteSet, Ed25519Signature, EncodeSubmissionRequest,
+    EncryptedPayload, EncryptedTransactionInnerPayload, EncryptedTransactionPayload,
+    EntryFunctionPayload, Event, FailedDecryptionPayload, FeePayerSignature, GasEstimation,
+    GasEstimationBcs, GenesisPayload, GenesisTransaction, MultiAgentSignature,
+    MultiEd25519Signature, MultiKeySignature, MultisigPayload, MultisigTransactionPayload,
+    NoAccountSignature, PendingTransaction, PublicKey, ScriptPayload, ScriptWriteSet, Signature,
+    SingleKeySignature, SubmitTransactionRequest, Transaction, TransactionData, TransactionId,
+    TransactionInfo, TransactionOnChainData, TransactionPayload, TransactionSignature,
+    TransactionSigningMessage, TransactionSummary, TransactionsBatchSingleSubmissionFailure,
     TransactionsBatchSubmissionResult, UserCreateSigningMessageRequest, UserTransaction,
     UserTransactionRequest, VersionedEvent, WriteModule, WriteResource, WriteSet, WriteSetChange,
     WriteSetPayload, WriteTableItem,

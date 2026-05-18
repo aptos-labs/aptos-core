@@ -1,0 +1,13 @@
+//# publish
+module 0x22::test
+
+public fun entry()
+    local v: vector<vector<vector<vector<vector<vector<vector<vector<vector<vector<vector<vector<vector<vector<vector<vector<vector<vector<vector<u8>>>>>>>>>>>>>>>>>>>
+    vec_pack <vector<vector<vector<vector<vector<vector<vector<vector<vector<vector<vector<vector<vector<vector<vector<vector<vector<vector<u8>>>>>>>>>>>>>>>>>>>, 0
+    st_loc v
+    borrow_loc v
+    call 0x1::bcs::to_bytes<vector<vector<vector<vector<vector<vector<vector<vector<vector<vector<vector<vector<vector<vector<vector<vector<vector<vector<vector<u8>>>>>>>>>>>>>>>>>>>>
+    pop
+    ret
+
+//# run --verbose 0x22::test::entry

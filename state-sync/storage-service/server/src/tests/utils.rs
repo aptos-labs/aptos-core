@@ -755,7 +755,7 @@ pub async fn force_cache_update_notification(
     // a state sync notification. Otherwise, advance enough time
     // to refresh the storage cache manually.
     let random_number: u8 = OsRng.r#gen();
-    if always_advance_time || random_number % 2 != 0 {
+    if always_advance_time || !random_number.is_multiple_of(2) {
         // Advance the storage refresh time manually
         advance_storage_refresh_time(mock_time).await;
     } else {

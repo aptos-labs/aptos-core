@@ -7,4 +7,4 @@ mod session;
 mod state_store;
 mod txn_output;
 
-pub use session::Session;
+pub use session::{BlockTimestamp, NewBlockResult, Session};

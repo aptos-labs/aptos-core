@@ -12,6 +12,14 @@ use aptos_config::config::{
 use aptos_framework::ReleaseBundle;
 use std::{num::NonZeroUsize, sync::Arc};
 
+/// A PFN deployment configuration. Each entry maps to one helm release via the PFN deployer.
+pub struct PfnDeployment {
+    /// The helm release name for this PFN (e.g. "pfn-0", "pfn-1")
+    pub name: String,
+    /// Optional per-PFN node config override. Deep-merged on top of the shared PFN base config.
+    pub node_config_override_fn: Option<OverrideNodeConfigFn>,
+}
+
 pub struct ForgeConfig {
     suite_name: Option<String>,
 
@@ -24,6 +32,9 @@ pub struct ForgeConfig {
 
     /// The initial number of fullnodes to spawn when the test harness creates a swarm
     pub initial_fullnode_count: usize,
+
+    /// PFN deployments to create via the PFN deployer (empty to disable)
+    pub pfn_deployments: Vec<PfnDeployment>,
 
     /// The initial version to use when the test harness creates a swarm
     pub initial_version: InitialVersion,
@@ -39,6 +50,9 @@ pub struct ForgeConfig {
 
     /// Optional fullnode node config override function
     pub fullnode_override_node_config_fn: Option<OverrideNodeConfigFn>,
+
+    /// Optional PFN node config override function (applied to pfn-values.fullnode.config)
+    pub pfn_override_node_config_fn: Option<OverrideNodeConfigFn>,
 
     pub multi_region_config: bool,
 
@@ -57,6 +71,12 @@ pub struct ForgeConfig {
 
     /// Retain debug logs and above for all nodes instead of just the first 5 nodes
     pub retain_debug_logs: bool,
+
+    /// URL to download the chunky DKG digest key blob into the validator init-container
+    pub digest_key_blob_url: Option<String>,
+
+    /// URL to download the chunky DKG public parameters blob into the validator init-container
+    pub public_parameters_blob_url: Option<String>,
 }
 
 impl ForgeConfig {
@@ -113,6 +133,22 @@ impl ForgeConfig {
         self
     }
 
+    /// Creates N PFN deployments with default names (pfn-0, pfn-1, ...) and no per-PFN overrides.
+    pub fn with_num_pfns(mut self, num_pfns: usize) -> Self {
+        self.pfn_deployments = (0..num_pfns)
+            .map(|i| PfnDeployment {
+                name: format!("pfn-{}", i),
+                node_config_override_fn: None,
+            })
+            .collect();
+        self
+    }
+
+    pub fn with_pfn_deployments(mut self, pfn_deployments: Vec<PfnDeployment>) -> Self {
+        self.pfn_deployments = pfn_deployments;
+        self
+    }
+
     pub fn with_genesis_helm_config_fn(mut self, genesis_helm_config_fn: GenesisConfigFn) -> Self {
         self.genesis_helm_config_fn = Some(genesis_helm_config_fn);
         self
@@ -125,6 +161,49 @@ impl ForgeConfig {
 
     pub fn with_fullnode_override_node_config_fn(mut self, f: OverrideNodeConfigFn) -> Self {
         self.fullnode_override_node_config_fn = Some(f);
+        self
+    }
+
+    pub fn with_pfn_override_node_config_fn(mut self, f: OverrideNodeConfigFn) -> Self {
+        self.pfn_override_node_config_fn = Some(f);
+        self
+    }
+
+    /// Builds the shared PFN base node config as a serde_json::Value for injection into pfn-values.fullnode.config.
+    /// Returns None if no shared PFN override config function is set.
+    pub fn build_pfn_base_node_config(&self) -> Option<serde_json::Value> {
+        self.pfn_override_node_config_fn.clone().map(|config_fn| {
+            let override_config = Self::override_node_config_from_fn(config_fn);
+            let yaml_value = override_config.get_yaml().unwrap();
+            serde_json::to_value(yaml_value).unwrap()
+        })
+    }
+
+    /// Builds the pfn-deployments JSON array entries. Each entry has a helmReleaseName and
+    /// optionally per-PFN values (deep-merged on top of pfn-values by the deployer).
+    pub fn build_pfn_deployment_configs(&self) -> Vec<serde_json::Value> {
+        self.pfn_deployments
+            .iter()
+            .map(|pfn| {
+                let mut entry = serde_json::json!({ "helmReleaseName": pfn.name });
+                if let Some(config_fn) = &pfn.node_config_override_fn {
+                    let override_config = Self::override_node_config_from_fn(config_fn.clone());
+                    let yaml_value = override_config.get_yaml().unwrap();
+                    let json_value = serde_json::to_value(yaml_value).unwrap();
+                    entry["values"]["fullnode"]["config"] = json_value;
+                }
+                entry
+            })
+            .collect()
+    }
+
+    pub fn with_digest_key_blob_url(mut self, url: impl Into<String>) -> Self {
+        self.digest_key_blob_url = Some(url.into());
+        self
+    }
+
+    pub fn with_public_parameters_blob_url(mut self, url: impl Into<String>) -> Self {
+        self.public_parameters_blob_url = Some(url.into());
         self
     }
 
@@ -172,6 +251,8 @@ impl ForgeConfig {
         let existing_db_tag = self.existing_db_tag.clone();
         let validator_resource_override = self.validator_resource_override;
         let fullnode_resource_override = self.fullnode_resource_override;
+        let digest_key_blob_url = self.digest_key_blob_url.clone();
+        let public_parameters_blob_url = self.public_parameters_blob_url.clone();
 
         // Override specific helm values. See reference: terraform/helm/aptos-node/values.yaml
         Some(Arc::new(move |helm_values: &mut serde_yaml::Value| {
@@ -241,6 +322,9 @@ impl ForgeConfig {
             helm_values["validator"]["config"]["indexer_db_config"]["enable_event"] = true.into();
             helm_values["fullnode"]["config"]["indexer_db_config"]["enable_event"] = true.into();
 
+            // Enable BlockSTM v2 on validators for all forge runs.
+            helm_values["validator"]["config"]["execution"]["blockstm_v2_enabled"] = true.into();
+
             // override consensus observer refresh latency
             helm_values["fullnode"]["config"]["consensus_observer"]
                 ["subscription_peer_change_interval_ms"] = 5_000.into();
@@ -257,6 +341,13 @@ impl ForgeConfig {
                 ["txn_limit"] = serde_yaml::to_value(&txn_limit_backpressure).unwrap();
             helm_values["validator"]["config"]["consensus"]["execution_backpressure"]
                 ["gas_limit"] = serde_yaml::to_value(&gas_limit_backpressure).unwrap();
+
+            if let Some(url) = &digest_key_blob_url {
+                helm_values["digest_key_blob_url"] = url.clone().into();
+            }
+            if let Some(url) = &public_parameters_blob_url {
+                helm_values["public_parameters_blob_url"] = url.clone().into();
+            }
         }))
     }
 
@@ -342,11 +433,13 @@ impl Default for ForgeConfig {
             network_tests: vec![],
             initial_validator_count: NonZeroUsize::new(1).unwrap(),
             initial_fullnode_count: 0,
+            pfn_deployments: vec![],
             initial_version: InitialVersion::Oldest,
             genesis_config: None,
             genesis_helm_config_fn: None,
             validator_override_node_config_fn: None,
             fullnode_override_node_config_fn: None,
+            pfn_override_node_config_fn: None,
             multi_region_config: false,
             emit_job_request: EmitJobRequest::default().mode(EmitJobMode::MaxLoad {
                 mempool_backlog: 40000,
@@ -356,6 +449,8 @@ impl Default for ForgeConfig {
             validator_resource_override: NodeResourceOverride::default(),
             fullnode_resource_override: NodeResourceOverride::default(),
             retain_debug_logs: false,
+            digest_key_blob_url: None,
+            public_parameters_blob_url: None,
         }
     }
 }

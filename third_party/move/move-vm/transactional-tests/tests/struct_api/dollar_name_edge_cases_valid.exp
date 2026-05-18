@@ -1,0 +1,36 @@
+processed 1 task
+task 0 lines 1-35:  publish --print-bytecode [module 0x66::test_dollar_name_edge_cases]
+
+== BEGIN Bytecode ==
+// Bytecode version v9
+module 0x66::test_dollar_name_edge_cases
+struct S
+  x: u64
+
+// Function definition at index 0
+public fun helper$S(l0: u64): u64
+    move_loc l0
+    ret
+
+// Function definition at index 1
+public fun test_variant$S(l0: u64): u64
+    move_loc l0
+    ret
+
+// Function definition at index 2
+public fun borrow$S$abc(l0: u64): u64
+    move_loc l0
+    ret
+
+// Function definition at index 3
+public fun borrow$S$0$abc(l0: u64): u64
+    move_loc l0
+    ret
+
+// Function definition at index 4
+public fun borrow$S$0$1$extra(l0: u64): u64
+    move_loc l0
+    ret
+
+
+== END Bytecode ==

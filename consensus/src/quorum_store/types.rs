@@ -140,6 +140,34 @@ mod tests {
             config::BATCH_PADDING_BYTES
         );
     }
+
+    #[test]
+    fn verify_v2_rejects_v1_batch_in_batch_msg_v2() {
+        use super::*;
+        use aptos_consensus_types::proof_of_store::BatchKind;
+        use aptos_types::quorum_store::BatchId;
+
+        let author = PeerId::random();
+        let v1 = Batch::<BatchInfoExt>::new_v1(BatchId::new_for_test(1), vec![], 1, 1, author, 0);
+        let v2 = Batch::<BatchInfoExt>::new_v2(
+            BatchId::new_for_test(2),
+            vec![],
+            1,
+            u64::MAX,
+            author,
+            0,
+            BatchKind::Normal,
+        );
+        // Mirrors the disclosed crafted message: V1 first, V2 second.
+        let msg = BatchMsg::new(vec![v1, v2]);
+        let err = msg
+            .verify_v2(author, 10, &ValidatorVerifier::new(vec![]))
+            .expect_err("must reject V1 entry in BatchMsgV2");
+        assert!(
+            err.to_string().contains("Non-V2 batch in BatchMsgV2"),
+            "unexpected error: {err}"
+        );
+    }
 }
 
 #[derive(Clone, Debug, Deserialize, Serialize)]
@@ -283,35 +311,10 @@ impl<T: TBatchInfo> Batch<T> {
             );
         }
 
-        // For V2 batches, validate that BatchKind matches the transaction types
-        if let Some(batch_kind) = self.batch_info.batch_kind() {
-            match batch_kind {
-                BatchKind::Encrypted => {
-                    for txn in self.payload.txns() {
-                        ensure!(
-                            txn.is_encrypted_txn(),
-                            "Encrypted batch contains non-encrypted transaction"
-                        );
-                    }
-                },
-                BatchKind::Normal => {
-                    for txn in self.payload.txns() {
-                        ensure!(
-                            !txn.is_encrypted_txn(),
-                            "Normal batch contains encrypted transaction"
-                        );
-                    }
-                },
-            }
-        } else {
-            // V1 batches do not support encrypted transactions
-            for txn in self.payload.txns() {
-                ensure!(
-                    !txn.is_encrypted_txn(),
-                    "V1 batch contains encrypted transaction (only supported in V2)"
-                );
-            }
-        }
+        aptos_consensus_types::common::verify_batch_kind_transactions(
+            self.batch_info.batch_kind(),
+            self.payload.txns(),
+        )?;
 
         Ok(())
     }
@@ -457,7 +460,9 @@ impl<T: TBatchInfo> BatchMsg<T> {
         Self { batches }
     }
 
-    pub fn verify(
+    /// Per-batch verification shared by V1 (`verify`) and V2 (`verify_v2`).
+    /// Variant-specific gating is layered on by the concrete impls.
+    fn verify_inner(
         &self,
         peer_id: PeerId,
         max_num_batches: usize,
@@ -487,6 +492,12 @@ impl<T: TBatchInfo> BatchMsg<T> {
         Ok(())
     }
 
+    pub fn has_encrypted_batches(&self) -> bool {
+        self.batches
+            .iter()
+            .any(|b| b.batch_info().batch_kind() == Some(BatchKind::Encrypted))
+    }
+
     pub fn epoch(&self) -> anyhow::Result<u64> {
         ensure!(!self.batches.is_empty(), "Empty message");
         let epoch = self.batches[0].epoch();
@@ -507,6 +518,31 @@ impl<T: TBatchInfo> BatchMsg<T> {
 
     pub fn take(self) -> Vec<Batch<T>> {
         self.batches
+    }
+}
+
+impl BatchMsg<BatchInfo> {
+    pub fn verify(
+        &self,
+        peer_id: PeerId,
+        max_num_batches: usize,
+        verifier: &ValidatorVerifier,
+    ) -> anyhow::Result<()> {
+        self.verify_inner(peer_id, max_num_batches, verifier)
+    }
+}
+
+impl BatchMsg<BatchInfoExt> {
+    pub fn verify_v2(
+        &self,
+        peer_id: PeerId,
+        max_num_batches: usize,
+        verifier: &ValidatorVerifier,
+    ) -> anyhow::Result<()> {
+        for batch in self.batches.iter() {
+            ensure!(batch.batch_info().is_v2(), "Non-V2 batch in BatchMsgV2");
+        }
+        self.verify_inner(peer_id, max_num_batches, verifier)
     }
 }
 

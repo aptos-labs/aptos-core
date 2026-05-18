@@ -1,6 +1,5 @@
-// Copyright © Aptos Foundation
-// Parts of the project are originally copyright © Meta Platforms, Inc.
-// SPDX-License-Identifier: Apache-2.0
+// Copyright (c) Aptos Foundation
+// Licensed pursuant to the Innovation-Enabling Source Code License, available at https://github.com/aptos-labs/aptos-core/blob/main/LICENSE
 
 //! Converts stackless bytecode into Model AST.
 //!
@@ -1054,13 +1053,19 @@ impl Generator {
     ) {
         use BytecodeOperation::*;
         match oper {
-            Function(mid, fid, inst) => self.gen_call_stm(
-                ctx,
-                Some(inst),
-                dests,
-                Operation::MoveFunction(*mid, *fid),
-                srcs,
-            ),
+            Function(mid, fid, inst) => {
+                debug_assert!(
+                    !ctx.env().get_function(mid.qualified(*fid)).is_struct_api(),
+                    "struct API wrapper should have been translated in stackless_bytecode_generator"
+                );
+                self.gen_call_stm(
+                    ctx,
+                    Some(inst),
+                    dests,
+                    Operation::MoveFunction(*mid, *fid),
+                    srcs,
+                )
+            },
             Closure(mid, fid, inst, closure_mask) => self.gen_call_stm(
                 ctx,
                 Some(inst),
@@ -2392,7 +2397,11 @@ impl AssignTransformer<'_> {
                 | Operation::EventStoreIncludes
                 | Operation::ExtendEventStore
                 | Operation::Behavior(..)
-                | Operation::NoOp => false,
+                | Operation::SpecPublish(..)
+                | Operation::SpecRemove(..)
+                | Operation::SpecUpdate(..)
+                | Operation::NoOp
+                | Operation::StateDomain => false,
             },
             ExpData::Value(..)
             | ExpData::Temporary(..)

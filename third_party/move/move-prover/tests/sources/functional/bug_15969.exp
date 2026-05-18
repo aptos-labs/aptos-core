@@ -12,7 +12,4 @@ error: post-condition does not hold
    =         self = <redacted>
    =     at tests/sources/functional/bug_15969.move:10: empty
    =         result = <redacted>
-   =     at tests/sources/functional/bug_15969.move:11: empty
-   =         result = <redacted>
-   =     at tests/sources/functional/bug_15969.move:20: test_empty
    =     at tests/sources/functional/bug_15969.move:23: test_empty (spec)

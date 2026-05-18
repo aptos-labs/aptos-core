@@ -41,13 +41,7 @@ Notice that the whole "Execution" block is outside of this folder but highly rel
 As part of the Aptos Node config, these are specific for the storage components.
 Notice that to use the default configs one doesn't need to put in anything in
 the config file. Only when one needs to overwrite a certain config value she
-needs put in something. For example, to enable the internal indexer, one can
-put in this piece into the node config file:
-
-```yaml
-storage:
-    enable_indexer: true
-```
+needs put in something.
 
 Now here's the full set of configs, with their default values and explanations.
 The default values should work in most cases and generally speaking don't need
@@ -146,8 +140,6 @@ storage:
       block_cache_size: 8388608
       block_size: 4096
       cache_index_and_filter_blocks: false
-  # The internal indexer is experimental, and should be kept disabled.
-  enable_indexer: false
 ```
 
 ## Internal Indexer

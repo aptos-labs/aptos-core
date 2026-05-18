@@ -1,8 +1,8 @@
 // Copyright (c) Aptos Foundation
 // Licensed pursuant to the Innovation-Enabling Source Code License, available at https://github.com/aptos-labs/aptos-core/blob/main/LICENSE
 
-use crate::{db_debugger::ShardingConfig, AptosDB};
-use aptos_config::config::{RocksdbConfigs, StorageDirPaths};
+use crate::AptosDB;
+use aptos_config::config::{HotStateConfig, RocksdbConfigs, StorageDirPaths};
 use aptos_storage_interface::Result;
 use clap::Parser;
 use std::path::PathBuf;
@@ -13,30 +13,28 @@ pub struct Cmd {
     #[clap(long, value_parser)]
     db_dir: PathBuf,
 
-    #[clap(flatten)]
-    sharding_config: ShardingConfig,
-
     #[clap(long)]
     version: u64,
 }
 
 impl Cmd {
     pub fn run(self) -> Result<()> {
-        let rocksdb_config = RocksdbConfigs {
-            enable_storage_sharding: self.sharding_config.enable_storage_sharding,
-            ..Default::default()
-        };
+        let rocksdb_config = RocksdbConfigs::default();
         let env = None;
         let block_cache = None;
 
-        let (ledger_db, _, _, _) = AptosDB::open_dbs(
+        let (ledger_db, _, _, _, _) = AptosDB::open_dbs(
             &StorageDirPaths::from_path(&self.db_dir),
             rocksdb_config,
             env,
             block_cache,
             /*readonly=*/ true,
             /*max_num_nodes_per_lru_cache_shard=*/ 0,
-            /*reset_hot_state=*/ false,
+            HotStateConfig {
+                delete_on_restart: false,
+                persist_hotness_in_write_set: false,
+                ..HotStateConfig::default()
+            },
         )?;
 
         println!(

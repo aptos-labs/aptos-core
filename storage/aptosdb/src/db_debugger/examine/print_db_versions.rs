@@ -2,7 +2,6 @@
 // Licensed pursuant to the Innovation-Enabling Source Code License, available at https://github.com/aptos-labs/aptos-core/blob/main/LICENSE
 
 use crate::{
-    db_debugger::ShardingConfig,
     schema::{
         db_metadata::{DbMetadataKey, DbMetadataSchema},
         epoch_by_version::EpochByVersionSchema,
@@ -18,7 +17,7 @@ use crate::{
     },
     AptosDB,
 };
-use aptos_config::config::{RocksdbConfigs, StorageDirPaths};
+use aptos_config::config::{HotStateConfig, RocksdbConfigs, StorageDirPaths};
 use aptos_schemadb::{schema::Schema, DB};
 use aptos_storage_interface::Result;
 use aptos_types::{state_store::NUM_STATE_SHARDS, transaction::Version};
@@ -30,29 +29,28 @@ use std::path::PathBuf;
 pub struct Cmd {
     #[clap(long, value_parser)]
     db_dir: PathBuf,
-
-    #[clap(flatten)]
-    sharding_config: ShardingConfig,
 }
 
 impl Cmd {
     pub fn run(self) -> Result<()> {
-        let rocksdb_config = RocksdbConfigs {
-            enable_storage_sharding: self.sharding_config.enable_storage_sharding,
-            ..Default::default()
-        };
+        let rocksdb_config = RocksdbConfigs::default();
         let env = None;
         let block_cache = None;
-        // TODO(HotState): handle hot state merkle db.
-        let (ledger_db, _hot_state_merkle_db, state_merkle_db, state_kv_db) = AptosDB::open_dbs(
-            &StorageDirPaths::from_path(&self.db_dir),
-            rocksdb_config,
-            env,
-            block_cache,
-            /*readonly=*/ true,
-            /*max_num_nodes_per_lru_cache_shard=*/ 0,
-            /*reset_hot_state=*/ false,
-        )?;
+        // TODO(HotState): handle hot state merkle db and hot state kv db.
+        let (ledger_db, _hot_state_merkle_db, state_merkle_db, _hot_state_kv_db, state_kv_db) =
+            AptosDB::open_dbs(
+                &StorageDirPaths::from_path(&self.db_dir),
+                rocksdb_config,
+                env,
+                block_cache,
+                /*readonly=*/ true,
+                /*max_num_nodes_per_lru_cache_shard=*/ 0,
+                HotStateConfig {
+                    delete_on_restart: false,
+                    persist_hotness_in_write_set: false,
+                    ..HotStateConfig::default()
+                },
+            )?;
 
         println!(
             "Overall Progress: {:?}",

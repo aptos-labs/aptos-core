@@ -99,11 +99,13 @@ fn build_empty_tree_inner(
         max_pruned_blocks_in_mem, // max pruned blocks in mem
         Arc::new(SimulatedTimeService::new()),
         10,
+        60,
         Arc::from(DirectMempoolPayloadManager::new()),
         false,
         window_size,
         Arc::new(Mutex::new(PendingBlocks::new())),
         pipeline_builder,
+        None,
     )
 }
 

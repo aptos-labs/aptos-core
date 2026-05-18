@@ -7,7 +7,7 @@ module 0x99::test_struct {
         fv: |T0|(u64) has copy + drop + store,
     }
     public fun init(p0: &signer) {
-        let _v0 = Wrapper<||(u64) has drop + store>{fv: |arg0: ||(u64) has drop + store| test(arg0)};
+        let _v0 = Wrapper<||(u64) has drop + store>{fv: |x: ||(u64) has drop + store| test(x)};
         move_to<Wrapper<||(u64) has drop + store>>(p0, _v0);
     }
     #[persistent]
@@ -110,7 +110,7 @@ module 0x99::test_enum {
         }
     }
     public fun init(p0: &signer) {
-        let _v0 = Wrapper::V1<||(u64) has drop + store>{fv1: |arg0: ||(u64) has drop + store| test(arg0)};
+        let _v0 = Wrapper::V1<||(u64) has drop + store>{fv1: |x: ||(u64) has drop + store| test(x)};
         move_to<Wrapper<||(u64) has drop + store>>(p0, _v0);
     }
     #[persistent]
@@ -119,7 +119,7 @@ module 0x99::test_enum {
         2
     }
     public fun bad_init(p0: &signer) {
-        let _v0 = Wrapper::V2<||(u64) has drop + store>{fv1: |arg0: ||(u64) has drop + store| test(arg0)};
+        let _v0 = Wrapper::V2<||(u64) has drop + store>{fv1: |x: ||(u64) has drop + store| test(x)};
         move_to<Wrapper<||(u64) has drop + store>>(p0, _v0);
     }
     #[persistent]
@@ -161,12 +161,12 @@ module 0x99::test_enum {
         let _v1 = signer::address_of(p0);
         let _v2 = borrow_global<Wrapper<||(u64) has drop + store>>(_v1);
         if (_v2 is V1) {
-            let _v3 = &_v2.fv1;
+            let _v3 = &_v2.V1.fv1;
             let _v4: ||u64 has copy + drop = || test1();
             let _v5 = *_v3;
             _v0 = _v5(_v4)
         } else if (_v2 is V2) {
-            let _v6 = &_v2.fv1;
+            let _v6 = &_v2.V2.fv1;
             let _v7: ||u64 has copy + drop = || test2();
             let _v8 = *_v6;
             _v0 = _v8(_v7)

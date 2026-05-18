@@ -5,7 +5,7 @@ use crate::{
     log::{CallFrame, ExecutionAndIOCosts, ExecutionGasEvent, StorageFees},
     render::Render,
 };
-use inferno::flamegraph::{Options, TextTruncateDirection};
+use inferno::flamegraph::{color::BasicPalette, Options, Palette, TextTruncateDirection};
 use move_core_types::gas_algebra::InternalGas;
 use regex::Captures;
 
@@ -14,7 +14,8 @@ fn flamegraph_options(title: String) -> Options<'static> {
     let mut options = Options::default();
     options.flame_chart = true;
     options.text_truncate_direction = TextTruncateDirection::Right;
-    options.color_diffusion = true;
+    options.color_diffusion = false;
+    options.colors = Palette::Basic(BasicPalette::Aqua);
     options.title = title;
     options
 }
@@ -116,6 +117,11 @@ impl ExecutionAndIOCosts {
         lines.push("keyless", self.keyless_cost);
 
         lines.push("slh_dsa_sha2_128s", self.slh_dsa_sha2_128s_cost);
+
+        lines.push(
+            "encrypted_txn_decryption",
+            self.encrypted_txn_decryption_cost,
+        );
 
         let mut path = vec![];
 

@@ -1,5 +1,7 @@
-// Copyright (c) The Move Contributors
-// SPDX-License-Identifier: Apache-2.0
+// Parts of the file are Copyright (c) The Diem Core Contributors
+// Parts of the file are Copyright (c) The Move Contributors
+// Parts of the file are Copyright (c) Aptos Foundation
+// All Aptos Foundation code and content is licensed pursuant to the Innovation-Enabling Source Code License, available at https://github.com/aptos-labs/aptos-core/blob/main/LICENSE
 
 use move_binary_format::deserializer::DeserializerConfig;
 use move_bytecode_verifier::VerifierConfig;
@@ -45,7 +47,6 @@ pub struct VMConfig {
     /// reference safety is maintained during execution. Note that the checks might be delayed and
     /// instead execution trace can be recorded (so that checks are done based on the trace later).
     pub paranoid_ref_checks: bool,
-    pub enable_capture_option: bool,
     pub enable_enum_option: bool,
     /// If true, Move VM will try to fetch layout from remote cache.
     pub enable_layout_caches: bool,
@@ -71,6 +72,14 @@ pub struct VMConfig {
     /// execution when types are not created (e.g., local types when there are no runtime type
     /// checks).
     pub check_depth_on_type_counts: bool,
+    /// Whether this VM should support public copy structs/enums as transaction arguments.
+    /// When enabled, non-private structs and enums with the copy ability can be used as
+    /// transaction arguments if they have public pack functions with the Pack attribute.
+    pub enable_public_struct_args: bool,
+    /// When enabled, closure equality and comparison include the closure mask.
+    /// Without this, two closures over the same function with different masks but identical
+    /// captured values are incorrectly treated as equal.
+    pub include_closure_mask_in_cmp: bool,
 }
 
 impl Default for VMConfig {
@@ -87,13 +96,12 @@ impl Default for VMConfig {
             type_base_cost: 0,
             type_byte_cost: 0,
             delayed_field_optimization_enabled: false,
-            ty_builder: TypeBuilder::with_limits(128, 20),
+            ty_builder: TypeBuilder::with_limits(128, 20, true),
             enable_function_caches: true,
             enable_lazy_loading: true,
             enable_depth_checks: true,
             optimize_trusted_code: false,
             paranoid_ref_checks: false,
-            enable_capture_option: true,
             enable_enum_option: true,
             enable_layout_caches: true,
             propagate_dependency_limit_error: true,
@@ -103,6 +111,8 @@ impl Default for VMConfig {
             enable_closure_depth_check: true,
             enable_struct_layout_local_cache: true,
             check_depth_on_type_counts: true,
+            enable_public_struct_args: true,
+            include_closure_mask_in_cmp: true,
         }
     }
 }

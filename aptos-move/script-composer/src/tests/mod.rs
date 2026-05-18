@@ -2,11 +2,11 @@
 // Licensed pursuant to the Innovation-Enabling Source Code License, available at https://github.com/aptos-labs/aptos-core/blob/main/LICENSE
 
 use crate::{CallArgument, TransactionComposer};
+use aptos_move_e2e_test_harness::MoveHarness;
 use aptos_types::{
     state_store::state_key::StateKey,
     transaction::{ExecutionStatus, TransactionStatus},
 };
-use e2e_move_tests::MoveHarness;
 use move_binary_format::CompiledModule;
 use move_core_types::{
     account_address::AccountAddress, language_storage::ModuleId, value::MoveValue,
@@ -241,7 +241,7 @@ fn test_module() {
         .join("src")
         .join("tests")
         .join("test_modules");
-    h.publish_package_cache_building(&account, &module_path);
+    h.publish_package(&account, &module_path);
 
     let mut run_txn = |batch_builder: TransactionComposer, h: &mut MoveHarness| {
         let script = batch_builder.generate_batched_calls(true).unwrap();

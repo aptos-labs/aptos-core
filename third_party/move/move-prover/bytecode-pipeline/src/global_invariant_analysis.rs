@@ -1,6 +1,7 @@
-// Copyright (c) The Diem Core Contributors
-// Copyright (c) The Move Contributors
-// SPDX-License-Identifier: Apache-2.0
+// Parts of the file are Copyright (c) The Diem Core Contributors
+// Parts of the file are Copyright (c) The Move Contributors
+// Parts of the file are Copyright (c) Aptos Foundation
+// All Aptos Foundation code and content is licensed pursuant to the Innovation-Enabling Source Code License, available at https://github.com/aptos-labs/aptos-core/blob/main/LICENSE
 
 // Analysis pass which analyzes how to injects global invariants into the bytecode.
 
@@ -89,7 +90,7 @@ impl FunctionTargetProcessor for GlobalInvariantAnalysisProcessor {
         mut data: FunctionData,
         _scc_opt: Option<&[FunctionEnv]>,
     ) -> FunctionData {
-        if fun_env.is_native() || fun_env.is_intrinsic() {
+        if fun_env.no_verified_bytecode() {
             // Nothing to do
             return data;
         }
@@ -538,6 +539,11 @@ fn get_callee_memory_usage_for_invariant_instrumentation(
         .expect("Verification analysis not performed");
 
     let callee_env = env.get_function(callee_fid);
+    if callee_env.is_struct_api() {
+        // Compiler-generated struct API wrappers are excluded from FunctionTargetsHolder.
+        // They don't access any global memory, so return empty sets.
+        return (BTreeSet::new(), BTreeSet::new());
+    }
     let callee_target = targets.get_target(&callee_env, &FunctionVariant::Baseline);
     let callee_usage = usage_analysis::get_memory_usage(&callee_target);
 

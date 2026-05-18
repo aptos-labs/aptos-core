@@ -22,7 +22,7 @@ use aptos_network::{
         },
     },
 };
-use aptos_storage_interface::{DbReader, LedgerSummary, Order};
+use aptos_storage_interface::{DbReader, LedgerSummary};
 use aptos_storage_service_notifications::StorageServiceNotifier;
 use aptos_storage_service_types::{
     requests::StorageServiceRequest, responses::StorageServiceResponse, StorageServiceError,
@@ -31,9 +31,8 @@ use aptos_storage_service_types::{
 use aptos_time_service::{MockTimeService, TimeService};
 use aptos_types::{
     account_address::AccountAddress,
-    contract_event::{ContractEvent, EventWithVersion},
+    contract_event::ContractEvent,
     epoch_change::EpochChangeProof,
-    event::EventKey,
     ledger_info::LedgerInfoWithSignatures,
     proof::{
         AccumulatorConsistencyProof, SparseMerkleProof, TransactionAccumulatorRangeProof,
@@ -45,9 +44,8 @@ use aptos_types::{
         state_value::{StateValue, StateValueChunkWithProof},
     },
     transaction::{
-        AccountOrderedTransactionsWithProof, PersistedAuxiliaryInfo, Transaction, TransactionInfo,
-        TransactionListWithProofV2, TransactionOutputListWithProofV2, TransactionWithProof,
-        Version,
+        PersistedAuxiliaryInfo, Transaction, TransactionInfo, TransactionListWithProofV2,
+        TransactionOutputListWithProofV2, TransactionWithProof, Version,
     },
     write_set::WriteSet,
     PeerId,
@@ -273,15 +271,6 @@ mock! {
             ledger_version: Version,
         ) -> aptos_storage_interface::Result<TransactionOutputListWithProofV2>;
 
-        fn get_events(
-            &self,
-            event_key: &EventKey,
-            start: u64,
-            order: Order,
-            limit: u64,
-            ledger_version: Version,
-        ) -> aptos_storage_interface::Result<Vec<EventWithVersion>>;
-
         fn get_block_timestamp(&self, version: u64) -> aptos_storage_interface::Result<u64>;
 
         fn get_last_version_before_timestamp(
@@ -299,23 +288,6 @@ mock! {
         fn get_latest_ledger_info_version(&self) -> aptos_storage_interface::Result<Version>;
 
         fn get_latest_commit_metadata(&self) -> aptos_storage_interface::Result<(Version, u64)>;
-
-        fn get_account_ordered_transaction(
-            &self,
-            address: AccountAddress,
-            seq_num: u64,
-            include_events: bool,
-            ledger_version: Version,
-        ) -> aptos_storage_interface::Result<Option<TransactionWithProof>>;
-
-        fn get_account_ordered_transactions(
-            &self,
-            address: AccountAddress,
-            seq_num: u64,
-            limit: u64,
-            include_events: bool,
-            ledger_version: Version,
-        ) -> aptos_storage_interface::Result<AccountOrderedTransactionsWithProof>;
 
         fn get_state_proof_with_ledger_info(
             &self,

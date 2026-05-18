@@ -1,6 +1,7 @@
 // Copyright (c) Aptos Foundation
 // Licensed pursuant to the Innovation-Enabling Source Code License, available at https://github.com/aptos-labs/aptos-core/blob/main/LICENSE
 use crate::{
+    errors::MissingEvalProofError,
     group::*,
     shared::{
         ciphertext::{CTDecrypt, CTEncrypt, PreparedCiphertext, StandardCiphertext},
@@ -14,14 +15,13 @@ use crate::{
     },
     traits::{AssociatedData, BatchThresholdEncryption, Plaintext},
 };
-use anyhow::{anyhow, Result};
+use anyhow::Result;
 use aptos_dkg::pvss::{
     traits::{Reconstructable as _, TranscriptCore},
     Player,
 };
 use ark_ff::UniformRand as _;
 use ark_std::rand::{rngs::StdRng, CryptoRng, RngCore, SeedableRng};
-use rayon::iter::{IntoParallelIterator, ParallelIterator as _};
 
 pub struct FPTX {}
 
@@ -38,7 +38,6 @@ impl BatchThresholdEncryption for FPTX {
     type Id = Id;
     type MasterSecretKeyShare = BIBEMasterSecretKeyShare;
     type PreparedCiphertext = PreparedCiphertext;
-    type Round = u64;
     // This is essentially a placeholder, since there is no PVSS scheme right now that works
     // with the unweighted `SmairThresholdConfig`
     type SubTranscript = aptos_dkg::pvss::chunky::WeightedSubtranscript<Pairing>;
@@ -87,10 +86,7 @@ impl BatchThresholdEncryption for FPTX {
         let (mpk, vks, msk_shares) =
             key_derivation::gen_msk_shares(msk, &mut rng, threshold_config);
 
-        let ek = EncryptionKey {
-            sig_mpk_g2: mpk,
-            tau_g2: digest_key.tau_g2,
-        };
+        let ek = EncryptionKey::new(mpk, digest_key.tau_g2);
 
         Ok((ek, digest_key, vks, msk_shares))
     }
@@ -107,11 +103,10 @@ impl BatchThresholdEncryption for FPTX {
     fn digest(
         digest_key: &Self::DigestKey,
         cts: &[Self::Ciphertext],
-        round: Self::Round,
+        round: u64,
     ) -> anyhow::Result<(Self::Digest, Self::EvalProofsPromise)> {
         let mut ids: IdSet<UncomputedCoeffs> =
-            IdSet::from_slice(&cts.iter().map(|ct| ct.id()).collect::<Vec<Id>>())
-                .ok_or(anyhow!(""))?;
+            IdSet::from_slice(&cts.iter().map(|ct| ct.id()).collect::<Vec<Id>>());
 
         digest_key.digest(&mut ids, round)
     }
@@ -138,7 +133,7 @@ impl BatchThresholdEncryption for FPTX {
         proofs: &Self::EvalProofsPromise,
         digest_key: &DigestKey,
     ) -> Self::EvalProofs {
-        proofs.compute_all_vgzz_multi_point_eval(digest_key)
+        proofs.compute_all_vzgg_multi_point_eval(digest_key)
     }
 
     fn eval_proof_for_ct(
@@ -162,26 +157,19 @@ impl BatchThresholdEncryption for FPTX {
         BIBEDecryptionKey::reconstruct(config, shares)
     }
 
-    fn prepare_cts(
-        cts: &[Self::Ciphertext],
+    fn prepare_ct(
+        ct: &Self::Ciphertext,
         digest: &Self::Digest,
         eval_proofs: &Self::EvalProofs,
-    ) -> Result<Vec<Self::PreparedCiphertext>> {
-        cts.into_par_iter()
-            .map(|ct| ct.prepare(digest, eval_proofs))
-            .collect::<anyhow::Result<Vec<Self::PreparedCiphertext>>>()
+    ) -> std::result::Result<Self::PreparedCiphertext, MissingEvalProofError> {
+        ct.prepare(digest, eval_proofs)
     }
 
     fn decrypt<'a, P: Plaintext>(
         decryption_key: &Self::DecryptionKey,
-        cts: &[Self::PreparedCiphertext],
-    ) -> anyhow::Result<Vec<P>> {
-        cts.into_par_iter()
-            .map(|ct| {
-                let plaintext: Result<P> = decryption_key.decrypt(ct);
-                plaintext
-            })
-            .collect::<anyhow::Result<Vec<P>>>()
+        ct: &Self::PreparedCiphertext,
+    ) -> anyhow::Result<P> {
+        decryption_key.decrypt(ct)
     }
 
     fn verify_decryption_key_share(
@@ -200,12 +188,12 @@ impl BatchThresholdEncryption for FPTX {
         encryption_key.verify_decryption_key(digest, decryption_key)
     }
 
-    fn decrypt_individual<P: Plaintext>(
+    fn decrypt_slow<P: Plaintext>(
         decryption_key: &Self::DecryptionKey,
         ct: &Self::Ciphertext,
         digest: &Self::Digest,
         eval_proof: &Self::EvalProof,
     ) -> Result<P> {
-        decryption_key.decrypt(&ct.prepare_individual(digest, eval_proof)?)
+        decryption_key.decrypt(&ct.prepare_individual(digest, eval_proof))
     }
 }

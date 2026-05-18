@@ -1,5 +1,7 @@
-// Copyright (c) The Move Contributors
-// SPDX-License-Identifier: Apache-2.0
+// Parts of the file are Copyright (c) The Diem Core Contributors
+// Parts of the file are Copyright (c) The Move Contributors
+// Parts of the file are Copyright (c) Aptos Foundation
+// All Aptos Foundation code and content is licensed pursuant to the Innovation-Enabling Source Code License, available at https://github.com/aptos-labs/aptos-core/blob/main/LICENSE
 
 use crate::{config::VMConfig, RuntimeEnvironment};
 use hashbrown::{hash_map::Entry, HashMap};
@@ -147,7 +149,7 @@ pub(crate) struct PricedStructTag {
 /// ```
 /// If thread 3 reads the tag of this enum, the read result is always **deterministic** for the
 /// fixed type parameters used by thread 3.
-pub(crate) struct TypeTagCache {
+pub struct TypeTagCache {
     cache: RwLock<HashMap<StructKey, PricedStructTag>>,
 }
 
@@ -162,6 +164,11 @@ impl TypeTagCache {
     /// Removes all entries from the cache.
     pub(crate) fn flush(&self) {
         self.cache.write().clear();
+    }
+
+    /// Returns the number of entries in the cache.
+    pub fn len(&self) -> usize {
+        self.cache.read().len()
     }
 
     /// Returns cached struct tag and its pseudo-gas cost if it exists, and [None] otherwise.
@@ -473,7 +480,7 @@ mod tests {
 
     #[test]
     fn test_ty_to_ty_tag() {
-        let ty_builder = TypeBuilder::with_limits(10, 10);
+        let ty_builder = TypeBuilder::with_limits(10, 10, true);
 
         let runtime_environment = RuntimeEnvironment::new(vec![]);
         let ty_tag_converter = TypeTagConverter::new(&runtime_environment);
@@ -570,7 +577,7 @@ mod tests {
 
     #[test]
     fn test_ty_to_ty_tag_too_complex() {
-        let ty_builder = TypeBuilder::with_limits(10, 10);
+        let ty_builder = TypeBuilder::with_limits(10, 10, true);
 
         let vm_config = VMConfig {
             type_base_cost: 1,

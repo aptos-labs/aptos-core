@@ -1,6 +1,5 @@
-// Copyright © Aptos Foundation
-// Parts of the project are originally copyright © Meta Platforms, Inc.
-// SPDX-License-Identifier: Apache-2.0
+// Copyright (c) Aptos Foundation
+// Licensed pursuant to the Innovation-Enabling Source Code License, available at https://github.com/aptos-labs/aptos-core/blob/main/LICENSE
 
 //! A helper for building expressions
 
@@ -68,26 +67,6 @@ impl<'a> ExpBuilder<'a> {
     pub fn bool_const(&self, loc: &Loc, val: bool) -> Exp {
         let id = self.new_node_id(loc.clone(), Type::Primitive(PrimitiveType::Bool));
         ExpData::Value(id, Value::Bool(val)).into_exp()
-    }
-
-    /// Creates an n-ary conjunction (AND) of the given expressions.
-    /// Returns true if the list is empty.
-    pub fn and_n(&self, loc: &Loc, exprs: Vec<Exp>) -> Exp {
-        if exprs.is_empty() {
-            self.bool_const(loc, true)
-        } else {
-            exprs.into_iter().reduce(|a, b| self.and(a, b)).unwrap()
-        }
-    }
-
-    /// Creates an n-ary disjunction (OR) of the given expressions.
-    /// Returns false if the list is empty.
-    pub fn or_n(&self, loc: &Loc, exprs: Vec<Exp>) -> Exp {
-        if exprs.is_empty() {
-            self.bool_const(loc, false)
-        } else {
-            exprs.into_iter().reduce(|a, b| self.or(a, b)).unwrap()
-        }
     }
 
     pub fn if_else(&self, cond: Exp, if_true: Exp, if_false: Exp) -> Exp {

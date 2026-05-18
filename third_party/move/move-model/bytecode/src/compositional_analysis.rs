@@ -1,6 +1,7 @@
-// Copyright (c) The Diem Core Contributors
-// Copyright (c) The Move Contributors
-// SPDX-License-Identifier: Apache-2.0
+// Parts of the file are Copyright (c) The Diem Core Contributors
+// Parts of the file are Copyright (c) The Move Contributors
+// Parts of the file are Copyright (c) Aptos Foundation
+// All Aptos Foundation code and content is licensed pursuant to the Innovation-Enabling Source Code License, available at https://github.com/aptos-labs/aptos-core/blob/main/LICENSE
 
 use crate::{
     dataflow_analysis::DataflowAnalysis,
@@ -36,7 +37,7 @@ impl<'a> SummaryCache<'a> {
         self.targets
             .get_data(&fun_id, variant)
             .and_then(|fun_data| {
-                if fun_env.is_native_or_intrinsic() {
+                if fun_env.no_verified_bytecode() {
                     None
                 } else {
                     fun_data.annotations.get::<Summary>()

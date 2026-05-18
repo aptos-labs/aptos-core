@@ -1,0 +1,11 @@
+//# publish --print-bytecode
+module 0x66::test_borrow_param_mutability_mismatch
+
+struct S
+    x: u64
+
+// Invalid: #[borrow(0)] (immutable) requires &S parameter, not &mut S
+#[borrow(0)] public fun borrow$S$0(l0: &mut S): &u64
+    move_loc l0
+    borrow_field S, x
+    ret

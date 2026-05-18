@@ -2,10 +2,10 @@
 // Licensed pursuant to the Innovation-Enabling Source Code License, available at https://github.com/aptos-labs/aptos-core/blob/main/LICENSE
 
 use crate::smoke_test_environment::SwarmBuilder;
-use aptos::move_tool::MemberId;
 use aptos_cached_packages::aptos_stdlib;
 use aptos_crypto::SigningKey;
 use aptos_forge::Swarm;
+use aptos_move_cli::MemberId;
 use aptos_types::function_info::FunctionInfo;
 use move_core_types::account_address::AccountAddress;
 use std::{str::FromStr, sync::Arc};
@@ -49,7 +49,7 @@ async fn test_permissioned_delegation() {
     );
     account1.increment_sequence_number();
 
-    // Setup permissions: 10 APT allowance, and 0.1 APT gas.
+    // Setup permissions: 10 APT allowance, and 10 APT gas.
     let script = format!(
         r#"
     script {{
@@ -63,7 +63,7 @@ async fn test_permissioned_delegation() {
         let key = permissioned_delegation::gen_ed25519_key(ed25519::new_unvalidated_public_key_from_bytes(x"{}"));
         let permissioned_signer = permissioned_delegation::add_permissioned_handle(sender, key, std::option::none(), {});
         primary_fungible_store::grant_apt_permission(sender, &permissioned_signer, 1000000000); // 10 apt
-        transaction_validation::grant_gas_permission(sender, &permissioned_signer, 100000000); // 1 apt because that is the max_gas
+        transaction_validation::grant_gas_permission(sender, &permissioned_signer, 1000000000); // 10 apt because that is the max_gas
     }}
     }}
     "#,

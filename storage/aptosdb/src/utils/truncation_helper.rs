@@ -1,8 +1,6 @@
 // Copyright (c) Aptos Foundation
 // Licensed pursuant to the Innovation-Enabling Source Code License, available at https://github.com/aptos-labs/aptos-core/blob/main/LICENSE
 
-#![allow(dead_code)]
-
 use crate::{
     ledger_db::{
         ledger_metadata_db::LedgerMetadataDb, transaction_db::TransactionDb, LedgerDb,
@@ -11,13 +9,12 @@ use crate::{
     schema::{
         db_metadata::{DbMetadataKey, DbMetadataSchema, DbMetadataValue},
         epoch_by_version::EpochByVersionSchema,
+        hot_state_value_by_key_hash::HotStateValueByKeyHashSchema,
         jellyfish_merkle_node::JellyfishMerkleNodeSchema,
         ledger_info::LedgerInfoSchema,
         stale_node_index::StaleNodeIndexSchema,
         stale_node_index_cross_epoch::StaleNodeIndexCrossEpochSchema,
-        stale_state_value_index::StaleStateValueIndexSchema,
         stale_state_value_index_by_key_hash::StaleStateValueIndexByKeyHashSchema,
-        state_value::StateValueSchema,
         state_value_by_key_hash::StateValueByKeyHashSchema,
         transaction::TransactionSchema,
         transaction_accumulator::TransactionAccumulatorSchema,
@@ -118,7 +115,7 @@ pub(crate) fn truncate_state_kv_db_shards(
     state_kv_db: &StateKvDb,
     target_version: Version,
 ) -> Result<()> {
-    (0..state_kv_db.hack_num_real_shards())
+    (0..state_kv_db.num_shards())
         .into_par_iter()
         .try_for_each(|shard_id| {
             truncate_state_kv_db_single_shard(state_kv_db, shard_id, target_version)
@@ -135,7 +132,7 @@ pub(crate) fn truncate_state_kv_db_single_shard(
         state_kv_db.db_shard(shard_id),
         target_version + 1,
         &mut batch,
-        state_kv_db.enabled_sharding(),
+        state_kv_db.is_hot(),
     )?;
     state_kv_db.commit_single_shard(target_version, shard_id, batch)
 }
@@ -182,7 +179,7 @@ pub(crate) fn truncate_state_merkle_db_shards(
     state_merkle_db: &StateMerkleDb,
     target_version: Version,
 ) -> Result<()> {
-    (0..state_merkle_db.hack_num_real_shards())
+    (0..state_merkle_db.num_shards())
         .into_par_iter()
         .try_for_each(|shard_id| {
             truncate_state_merkle_db_single_shard(state_merkle_db, shard_id, target_version)
@@ -263,7 +260,7 @@ pub(crate) fn get_max_version_in_state_merkle_db(
     state_merkle_db: &StateMerkleDb,
 ) -> Result<Option<Version>> {
     let mut version = get_current_version_in_state_merkle_db(state_merkle_db)?;
-    let num_real_shards = state_merkle_db.hack_num_real_shards();
+    let num_real_shards = state_merkle_db.num_shards();
     if num_real_shards > 1 {
         for shard_id in 0..num_real_shards {
             let shard_version = find_closest_node_version_at_or_before(
@@ -554,28 +551,19 @@ fn delete_state_value_and_index(
     state_kv_db_shard: &DB,
     start_version: Version,
     batch: &mut SchemaBatch,
-    enable_sharding: bool,
+    is_hot: bool,
 ) -> Result<()> {
-    if enable_sharding {
-        let mut iter = state_kv_db_shard.iter::<StaleStateValueIndexByKeyHashSchema>()?;
-        iter.seek(&start_version)?;
+    let mut iter = state_kv_db_shard.iter::<StaleStateValueIndexByKeyHashSchema>()?;
+    iter.seek(&start_version)?;
 
-        for item in iter {
-            let (index, _) = item?;
-            batch.delete::<StaleStateValueIndexByKeyHashSchema>(&index)?;
-            batch.delete::<StateValueByKeyHashSchema>(&(
-                index.state_key_hash,
-                index.stale_since_version,
-            ))?;
-        }
-    } else {
-        let mut iter = state_kv_db_shard.iter::<StaleStateValueIndexSchema>()?;
-        iter.seek(&start_version)?;
-
-        for item in iter {
-            let (index, _) = item?;
-            batch.delete::<StaleStateValueIndexSchema>(&index)?;
-            batch.delete::<StateValueSchema>(&(index.state_key, index.stale_since_version))?;
+    for item in iter {
+        let (index, _) = item?;
+        batch.delete::<StaleStateValueIndexByKeyHashSchema>(&index)?;
+        let db_key = (index.state_key_hash, index.stale_since_version);
+        if is_hot {
+            batch.delete::<HotStateValueByKeyHashSchema>(&db_key)?;
+        } else {
+            batch.delete::<StateValueByKeyHashSchema>(&db_key)?;
         }
     }
 

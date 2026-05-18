@@ -774,23 +774,12 @@ module aptos_token_objects::token {
     public fun set_description(mutator_ref: &MutatorRef, description: String) acquires Token {
         assert!(description.length() <= MAX_DESCRIPTION_LENGTH, error::out_of_range(EDESCRIPTION_TOO_LONG));
         let token = borrow_mut(mutator_ref);
-        if (std::features::module_event_migration_enabled()) {
-            event::emit(Mutation {
-                token_address: mutator_ref.self,
-                mutated_field_name: string::utf8(b"description"),
-                old_value: token.description,
-                new_value: description
-            })
-        } else {
-            event::emit_event(
-                &mut token.mutation_events,
-                MutationEvent {
-                    mutated_field_name: string::utf8(b"description"),
-                    old_value: token.description,
-                    new_value: description
-                },
-            );
-        };
+        event::emit(Mutation {
+            token_address: mutator_ref.self,
+            mutated_field_name: string::utf8(b"description"),
+            old_value: token.description,
+            new_value: description
+        });
         token.description = description;
     }
 
@@ -810,45 +799,23 @@ module aptos_token_objects::token {
             old_name
         };
 
-        if (std::features::module_event_migration_enabled()) {
-            event::emit(Mutation {
-                token_address: mutator_ref.self,
-                mutated_field_name: string::utf8(b"name"),
-                old_value: old_name,
-                new_value: name
-            })
-        } else {
-            event::emit_event(
-                &mut token.mutation_events,
-                MutationEvent {
-                    mutated_field_name: string::utf8(b"name"),
-                    old_value: old_name,
-                    new_value: name
-                },
-            );
-        };
+        event::emit(Mutation {
+            token_address: mutator_ref.self,
+            mutated_field_name: string::utf8(b"name"),
+            old_value: old_name,
+            new_value: name
+        });
     }
 
     public fun set_uri(mutator_ref: &MutatorRef, uri: String) acquires Token {
         assert!(uri.length() <= MAX_URI_LENGTH, error::out_of_range(EURI_TOO_LONG));
         let token = borrow_mut(mutator_ref);
-        if (std::features::module_event_migration_enabled()) {
-            event::emit(Mutation {
-                token_address: mutator_ref.self,
-                mutated_field_name: string::utf8(b"uri"),
-                old_value: token.uri,
-                new_value: uri,
-            })
-        } else {
-            event::emit_event(
-                &mut token.mutation_events,
-                MutationEvent {
-                    mutated_field_name: string::utf8(b"uri"),
-                    old_value: token.uri,
-                    new_value: uri,
-                },
-            );
-        };
+        event::emit(Mutation {
+            token_address: mutator_ref.self,
+            mutated_field_name: string::utf8(b"uri"),
+            old_value: token.uri,
+            new_value: uri,
+        });
         token.uri = uri;
     }
 

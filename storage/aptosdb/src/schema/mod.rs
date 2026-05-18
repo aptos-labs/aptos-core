@@ -16,11 +16,11 @@ pub(crate) mod hot_state_value_by_key_hash;
 pub(crate) mod jellyfish_merkle_node;
 pub(crate) mod ledger_info;
 pub(crate) mod persisted_auxiliary_info;
+pub(crate) mod position_value;
 pub(crate) mod stale_node_index;
 pub(crate) mod stale_node_index_cross_epoch;
-pub(crate) mod stale_state_value_index;
+pub(crate) mod stale_position_value_index;
 pub(crate) mod stale_state_value_index_by_key_hash;
-pub(crate) mod state_value;
 pub(crate) mod state_value_by_key_hash;
 pub(crate) mod transaction;
 pub(crate) mod transaction_accumulator;
@@ -47,12 +47,12 @@ pub const HOT_STATE_VALUE_BY_KEY_HASH_CF_NAME: ColumnFamilyName = "hot_state_val
 pub const JELLYFISH_MERKLE_NODE_CF_NAME: ColumnFamilyName = "jellyfish_merkle_node";
 pub const LEDGER_INFO_CF_NAME: ColumnFamilyName = "ledger_info";
 pub const PERSISTED_AUXILIARY_INFO_CF_NAME: ColumnFamilyName = "persisted_auxiliary_info";
+pub const POSITION_VALUE_CF_NAME: ColumnFamilyName = "position_value";
 pub const STALE_NODE_INDEX_CF_NAME: ColumnFamilyName = "stale_node_index";
+pub const STALE_POSITION_VALUE_INDEX_CF_NAME: ColumnFamilyName = "stale_position_value_index";
 pub const STALE_NODE_INDEX_CROSS_EPOCH_CF_NAME: ColumnFamilyName = "stale_node_index_cross_epoch";
-pub const STALE_STATE_VALUE_INDEX_CF_NAME: ColumnFamilyName = "stale_state_value_index";
 pub const STALE_STATE_VALUE_INDEX_BY_KEY_HASH_CF_NAME: ColumnFamilyName =
     "stale_state_value_index_by_key_hash";
-pub const STATE_VALUE_CF_NAME: ColumnFamilyName = "state_value";
 pub const STATE_VALUE_BY_KEY_HASH_CF_NAME: ColumnFamilyName = "state_value_by_key_hash";
 pub const STATE_VALUE_INDEX_CF_NAME: ColumnFamilyName = "state_value_index";
 pub const TRANSACTION_CF_NAME: ColumnFamilyName = "transaction";
@@ -108,17 +108,17 @@ pub mod fuzzing {
             assert_no_panic_decoding::<super::persisted_auxiliary_info::PersistedAuxiliaryInfoSchema>(
                 data,
             );
+            assert_no_panic_decoding::<super::position_value::PositionValueSchema>(data);
             assert_no_panic_decoding::<super::stale_node_index::StaleNodeIndexSchema>(data);
             assert_no_panic_decoding::<
                 super::stale_node_index_cross_epoch::StaleNodeIndexCrossEpochSchema,
             >(data);
             assert_no_panic_decoding::<
+                super::stale_position_value_index::StalePositionValueIndexSchema,
+            >(data);
+            assert_no_panic_decoding::<
                 super::stale_state_value_index_by_key_hash::StaleStateValueIndexByKeyHashSchema,
             >(data);
-            assert_no_panic_decoding::<super::stale_state_value_index::StaleStateValueIndexSchema>(
-                data,
-            );
-            assert_no_panic_decoding::<super::state_value::StateValueSchema>(data);
             assert_no_panic_decoding::<super::state_value_by_key_hash::StateValueByKeyHashSchema>(
                 data,
             );

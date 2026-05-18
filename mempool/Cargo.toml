@@ -31,10 +31,13 @@ aptos-runtimes = { workspace = true }
 aptos-short-hex-str = { workspace = true }
 aptos-storage-interface = { workspace = true }
 aptos-time-service = { workspace = true }
+aptos-token-bucket = { workspace = true }
 aptos-transaction-filters = { workspace = true }
+aptos-transaction-tracing = { workspace = true }
 aptos-types = { workspace = true }
 aptos-vm-validator = { workspace = true }
 bcs = { workspace = true }
+dashmap = { workspace = true }
 fail = { workspace = true }
 futures = { workspace = true }
 itertools = { workspace = true }
@@ -43,7 +46,6 @@ num_cpus = { workspace = true }
 once_cell = { workspace = true }
 proptest = { workspace = true, optional = true }
 rand = { workspace = true }
-rayon = { workspace = true }
 serde = { workspace = true }
 thiserror = { workspace = true }
 tokio = { workspace = true }

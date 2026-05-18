@@ -225,12 +225,9 @@ module std::fixed_point32 {
         ensures result == spec_floor(self);
     }
     spec fun spec_floor(self: FixedPoint32): u64 {
-        let fractional = self.value % (1 << 32);
-        if (fractional == 0) {
-            self.value >> 32
-        } else {
-            (self.value - fractional) >> 32
-        }
+        // Right-shifting discards the lower 32 bits unconditionally;
+        // the original conditional was redundant since both branches equal self.value >> 32.
+        self.value >> 32
     }
 
     /// Rounds up the given FixedPoint32 to the next largest integer.
@@ -243,18 +240,19 @@ module std::fixed_point32 {
         (val >> 32 as u64)
     }
     spec ceil {
-        pragma verify_duration_estimate = 120;
         pragma opaque;
         aborts_if false;
         ensures result == spec_ceil(self);
     }
     spec fun spec_ceil(self: FixedPoint32): u64 {
-        let fractional = self.value % (1 << 32);
-        let one = 1 << 32;
-        if (fractional == 0) {
-            self.value >> 32
+        // Expressed in terms of floor_val to avoid modulo: the else branch
+        // (self.value - fractional + 2^32) >> 32 = floor_val + 1, and
+        // fractional == 0 iff self.value == floor_val << 32.
+        let floor_val = self.value >> 32;
+        if (self.value == floor_val << 32) {
+            floor_val
         } else {
-            (self.value - fractional + one) >> 32
+            floor_val + 1
         }
     }
 
@@ -269,19 +267,19 @@ module std::fixed_point32 {
         }
     }
     spec round {
-        pragma verify_duration_estimate = 120;
         pragma opaque;
         aborts_if false;
         ensures result == spec_round(self);
     }
     spec fun spec_round(self: FixedPoint32): u64 {
-        let fractional = self.value % (1 << 32);
-        let boundary = (1 << 32) / 2;
-        let one = 1 << 32;
-        if (fractional < boundary) {
-            (self.value - fractional) >> 32
+        // Expressed in terms of floor_val to avoid modulo: both result branches
+        // equal floor_val or floor_val + 1, and the boundary condition
+        // fractional < 2^31 is equivalent to self.value < floor_val<<32 + 2^31.
+        let floor_val = self.value >> 32;
+        if (self.value < (floor_val << 32) + (1 << 31)) {
+            floor_val
         } else {
-            (self.value - fractional + one) >> 32
+            floor_val + 1
         }
     }
 

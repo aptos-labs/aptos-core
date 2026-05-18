@@ -12,7 +12,6 @@ use prometheus::{
 use std::{collections::BTreeMap, sync::Arc};
 use sysinfo::{RefreshKind, System, SystemExt};
 
-const BASIC_NODE_INFO_METRICS_COUNT: usize = 2;
 const RELEASE_GIT_HASH_LABEL: &str = "release_git_hash";
 const RELEASE_VERSION_LABEL: &str = "release_version";
 const NODE_HOSTNAME_LABEL: &str = "hostname";
@@ -20,6 +19,7 @@ const NODE_HOSTNAME_LABEL: &str = "hostname";
 const GIT_HASH_LABEL: &str = "git_hash";
 const VERSION_LABEL: &str = "version";
 const HOSTNAME_LABEL: &str = "name";
+const PROFILE_LABEL: &str = "profile";
 
 const UNKNOW_LABEL: &str = "unknown";
 
@@ -49,7 +49,7 @@ impl BasicNodeInfoCollector {
             .unwrap();
         let release_version_desc = Opts::new(RELEASE_VERSION_LABEL, "Release version")
             .namespace(NAMESPACE)
-            .variable_label(VERSION_LABEL)
+            .variable_labels(vec![VERSION_LABEL.into(), PROFILE_LABEL.into()])
             .describe()
             .unwrap();
         let hostname_desc = Opts::new(NODE_HOSTNAME_LABEL, "Hostname.")
@@ -69,8 +69,16 @@ impl BasicNodeInfoCollector {
             .get(aptos_build_info::BUILD_PKG_VERSION)
             .cloned()
             .unwrap_or_else(|| String::from(UNKNOW_LABEL));
-        let version_metric =
-            ConstMetric::new_gauge(release_version_desc, 1.0, Some(&[node_version])).unwrap();
+        let build_profile = build_info
+            .get(aptos_build_info::BUILD_PROFILE_NAME)
+            .cloned()
+            .unwrap_or_else(|| String::from(UNKNOW_LABEL));
+        let version_metric = ConstMetric::new_gauge(
+            release_version_desc,
+            1.0,
+            Some(&[node_version, build_profile]),
+        )
+        .unwrap();
 
         let hostname = system
             .lock()
@@ -99,7 +107,7 @@ impl Collector for BasicNodeInfoCollector {
     }
 
     fn collect(&self) -> Vec<MetricFamily> {
-        let mut mfs = Vec::with_capacity(BASIC_NODE_INFO_METRICS_COUNT);
+        let mut mfs = Vec::new();
         mfs.extend(self.hostname_metric.collect());
         mfs.extend(self.release_metric.collect());
         mfs.extend(self.version_metric.collect());

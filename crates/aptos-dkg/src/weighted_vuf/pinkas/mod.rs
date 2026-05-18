@@ -41,6 +41,23 @@ pub struct RandomizedPKs {
     rks: Vec<G1Projective>, // g^{r \sk_i}, for all shares i
 }
 
+impl RandomizedPKs {
+    /// Construct from already-decompressed group elements. Callers must ensure
+    /// that `pi` and `rks` are valid subgroup elements (e.g., obtained from a
+    /// successful `G1Affine::from_compressed` decode).
+    pub fn from_decompressed(pi: G1Projective, rks: Vec<G1Projective>) -> Self {
+        Self { pi, rks }
+    }
+
+    pub fn pi(&self) -> &G1Projective {
+        &self.pi
+    }
+
+    pub fn rks(&self) -> &[G1Projective] {
+        &self.rks
+    }
+}
+
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct PublicParameters {
     g: G1Projective,
@@ -216,7 +233,7 @@ impl WeightedVUF for PinkasWUF {
         proof: &Self::Proof,
         thread_pool: &ThreadPool,
     ) -> anyhow::Result<()> {
-        if proof.len() >= apks.len() {
+        if proof.len() > apks.len() {
             bail!("Number of proof shares ({}) exceeds number of APKs ({}) when verifying aggregated WVUF proof", proof.len(), apks.len());
         }
 
@@ -296,8 +313,13 @@ impl PinkasWUF {
 
         let mut k = 0;
         for (player, share) in proof {
-            for j in 0..wc.get_player_weight(player) {
-                sub_player_ids.push(wc.get_virtual_player(player, j).id);
+            let w = wc.get_player_weight(player)?;
+            for j in 0..w {
+                sub_player_ids.push(
+                    wc.get_virtual_player(player, j)
+                        .expect("j < weight holds by construction")
+                        .id,
+                );
             }
 
             let apk = apks[player.id]
@@ -307,7 +329,6 @@ impl PinkasWUF {
             rks.push(&apk.0.rks);
             shares.push(share);
 
-            let w = wc.get_player_weight(player);
             ranges.push(k..k + w);
             k += w;
         }

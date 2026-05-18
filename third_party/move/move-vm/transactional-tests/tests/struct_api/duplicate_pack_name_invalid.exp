@@ -1,0 +1,9 @@
+processed 1 task
+task 0 lines 1-25:  publish --print-bytecode [// Test that struct Foo$Bar and enum Foo with variant Bar cannot both have]
+Error: error: duplicate function definition `pack$Foo$Bar`
+   ┌─ test:18:31
+   │
+18 │ #[pack_variant(0)] public fun pack$Foo$Bar(l0: u64): Foo
+   │                               ^^^^^^^^^^^^
+
+

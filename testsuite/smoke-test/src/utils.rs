@@ -119,14 +119,12 @@ pub async fn execute_transactions(
     }
 
     // Always ensure that at least one reconfiguration transaction is executed
-    if !execute_epoch_changes {
-        aptos_forge::reconfig(
-            client,
-            &transaction_factory,
-            swarm.chain_info().root_account,
-        )
-        .await;
-    }
+    aptos_forge::reconfig(
+        client,
+        &transaction_factory,
+        swarm.chain_info().root_account,
+    )
+    .await;
 }
 
 /// Executes transactions and waits for all nodes to catch up
@@ -181,7 +179,7 @@ pub async fn transfer_and_maybe_reconfig(
 ) {
     for _ in 0..num_transfers {
         // Reconfigurations have a 20% chance of being executed
-        if random::<u16>() % 5 == 0 {
+        if random::<u16>().is_multiple_of(5) {
             reconfig(client, transaction_factory, root_account.clone()).await;
         }
 

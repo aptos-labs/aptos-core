@@ -7,7 +7,7 @@ use crate::config::{
     utils::{are_failpoints_enabled, get_config_name},
     AdminServiceConfig, ApiConfig, BaseConfig, ConsensusConfig, DagConsensusConfig, Error,
     ExecutionConfig, IndexerGrpcConfig, InspectionServiceConfig, LoggerConfig, MempoolConfig,
-    NetbenchConfig, NodeConfig, StateSyncConfig, StorageConfig,
+    NodeConfig, StateSyncConfig, StorageConfig,
 };
 use aptos_types::chain_id::ChainId;
 use std::collections::HashSet;
@@ -60,7 +60,6 @@ impl ConfigSanitizer for NodeConfig {
         InspectionServiceConfig::sanitize(node_config, node_type, chain_id)?;
         LoggerConfig::sanitize(node_config, node_type, chain_id)?;
         MempoolConfig::sanitize(node_config, node_type, chain_id)?;
-        NetbenchConfig::sanitize(node_config, node_type, chain_id)?;
         StateSyncConfig::sanitize(node_config, node_type, chain_id)?;
         StorageConfig::sanitize(node_config, node_type, chain_id)?;
         InternalIndexerDBConfig::sanitize(node_config, node_type, chain_id)?;

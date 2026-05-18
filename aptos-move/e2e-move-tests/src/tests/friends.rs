@@ -15,12 +15,10 @@ fn cannot_publish_cross_package_friends(enable_lazy_loading: bool) {
     let mut h = MoveHarness::new_with_lazy_loading(enable_lazy_loading);
     let acc = h.new_account_at(AccountAddress::from_hex_literal("0xcafe").unwrap());
 
-    assert_success!(
-        h.publish_package_cache_building(&acc, &common::test_dir_path("friends.data/p1"))
-    );
+    assert_success!(h.publish_package(&acc, &common::test_dir_path("friends.data/p1")));
 
     // Module in p2 declares a module in p1 a friend. With lazy loading this is not allowed.
-    let res = h.publish_package_cache_building(&acc, &common::test_dir_path("friends.data/p2"));
+    let res = h.publish_package(&acc, &common::test_dir_path("friends.data/p2"));
     if enable_lazy_loading {
         assert!(matches!(
             res,

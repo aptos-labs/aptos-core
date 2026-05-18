@@ -118,10 +118,16 @@ impl<K: ArcAsyncDrop, V: ArcAsyncDrop> MapLayer<K, V> {
         self.inner.parent.upgrade().map(Self::new)
     }
 
-    pub fn into_layers_view_after(self, base_layer: MapLayer<K, V>) -> LayeredMap<K, V> {
-        assert!(base_layer.is_family(&self));
-        assert!(base_layer.inner.layer >= self.inner.base_layer);
-        assert!(base_layer.inner.layer <= self.inner.layer);
+    pub fn into_layers_view_after(self, base_layer: Self) -> LayeredMap<K, V> {
+        assert!(
+            self.can_view_after(&base_layer),
+            "incompatible layers: base(family={}, layer={}) top(family={}, layer={}, base_layer={})",
+            base_layer.inner.family,
+            base_layer.inner.layer,
+            self.inner.family,
+            self.inner.layer,
+            self.inner.base_layer,
+        );
 
         self.log_layer("view");
         base_layer.log_layer("as_view_base");
@@ -129,7 +135,7 @@ impl<K: ArcAsyncDrop, V: ArcAsyncDrop> MapLayer<K, V> {
         LayeredMap::new(base_layer, self)
     }
 
-    pub fn view_layers_after(&self, base_layer: &MapLayer<K, V>) -> LayeredMap<K, V> {
+    pub fn view_layers_after(&self, base_layer: &Self) -> LayeredMap<K, V> {
         self.clone().into_layers_view_after(base_layer.clone())
     }
 
@@ -143,6 +149,13 @@ impl<K: ArcAsyncDrop, V: ArcAsyncDrop> MapLayer<K, V> {
 
     pub fn is_the_same(&self, other: &Self) -> bool {
         Arc::ptr_eq(&self.inner, &other.inner)
+    }
+
+    /// Returns true if `base` can be used as the base layer for viewing layers up to `self`.
+    pub fn can_view_after(&self, base: &Self) -> bool {
+        self.is_family(base)
+            && base.inner.layer >= self.inner.base_layer
+            && base.inner.layer <= self.inner.layer
     }
 
     pub fn is_descendant_of(&self, other: &Self) -> bool {

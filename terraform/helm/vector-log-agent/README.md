@@ -46,6 +46,8 @@ This is useful to iterate on the parser, especially the remap transforms and see
 - `./testing/test-transforms.sh` - pipes test1.json and test2.json files to vector and prints the transformed output to stdout
 - `./testing/validate.sh` - runs `vector validate` to statically verify the correctness of the configuration
 
+4/10/2025 -- Rustie's pro tip: to add new test cases, you can pull logs directly from the source/k8s/groundcover, and export as JSON
+
 - quick local rendering (bypassing terraform):
 
 ```bash

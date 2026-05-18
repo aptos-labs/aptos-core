@@ -25,7 +25,7 @@ module 0x2::M {
 }
 
 --- unable to recompile the decompiled code:
-exiting with context checking errors
+exiting with compilation errors
 error: cannot return nothing from a function with result type `X::R`
    ┌─ loop_result_type.move:11:9
    │

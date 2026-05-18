@@ -1,13 +1,12 @@
 // Copyright (c) Aptos Foundation
 // Licensed pursuant to the Innovation-Enabling Source Code License, available at https://github.com/aptos-labs/aptos-core/blob/main/LICENSE
 
-use crate::{
-    schema::{
-        db_metadata::{DbMetadataKey, DbMetadataSchema, DbMetadataValue},
-        transaction_auxiliary_data::TransactionAuxiliaryDataSchema,
-    },
-    utils::iterators::ExpectContinuousVersions,
+use crate::schema::{
+    db_metadata::{DbMetadataKey, DbMetadataSchema, DbMetadataValue},
+    transaction_auxiliary_data::TransactionAuxiliaryDataSchema,
 };
+#[cfg(test)]
+use crate::utils::iterators::ExpectContinuousVersions;
 use aptos_schemadb::{batch::SchemaBatch, DB};
 use aptos_storage_interface::Result;
 use aptos_types::transaction::{TransactionAuxiliaryData, Version};
@@ -51,6 +50,7 @@ impl TransactionAuxiliaryDataDb {
 
     /// Returns an iterator that yields `num_transaction_infos` transaction infos starting from
     /// `start_version`.
+    #[cfg(test)]
     pub(crate) fn get_transaction_auxiliary_data_iter(
         &self,
         start_version: Version,
@@ -62,6 +62,7 @@ impl TransactionAuxiliaryDataDb {
     }
 
     /// Saves transaction inf at `version`.
+    #[cfg(any(test, feature = "fuzzing"))]
     pub(crate) fn put_transaction_auxiliary_data(
         version: Version,
         transaction_auxiliary_data: &TransactionAuxiliaryData,

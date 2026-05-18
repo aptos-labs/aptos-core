@@ -1,7 +1,10 @@
 // Copyright (c) Aptos Foundation
 // Licensed pursuant to the Innovation-Enabling Source Code License, available at https://github.com/aptos-labs/aptos-core/blob/main/LICENSE
 
-use crate::governance::{utils::*, *};
+use crate::{
+    common::types::TransactionOptionsExt,
+    governance::{utils::*, *},
+};
 use clap::Subcommand;
 
 /// Tool for on-chain governance from delegation pools

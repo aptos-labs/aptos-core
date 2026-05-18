@@ -110,8 +110,10 @@ pub fn get_registry() -> Result<Registry> {
     tracer.trace_type::<transaction::TransactionPayload>(&samples)?;
     tracer.trace_type::<transaction::TransactionPayloadInner>(&samples)?;
     tracer.trace_type::<transaction::encrypted_payload::EncryptedPayload>(&samples)?;
+    tracer.trace_type::<transaction::encrypted_payload::DecryptionFailureReason>(&samples)?;
     tracer.trace_type::<transaction::TransactionExecutable>(&samples)?;
     tracer.trace_type::<transaction::TransactionExtraConfig>(&samples)?;
+    tracer.trace_type::<transaction::UserTxnLimitsRequest>(&samples)?;
     tracer.trace_type::<transaction::WriteSetPayload>(&samples)?;
     tracer.trace_type::<transaction::BlockEpiloguePayload>(&samples)?;
     tracer.trace_type::<transaction::authenticator::AccountAuthenticator>(&samples)?;
@@ -124,6 +126,7 @@ pub fn get_registry() -> Result<Registry> {
     tracer.trace_type::<aptos_types::keyless::EphemeralCertificate>(&samples)?;
     tracer.trace_type::<write_set::WriteOp>(&samples)?;
     tracer.trace_type::<PersistedStateValueMetadata>(&samples)?;
+    tracer.trace_type::<transaction::MultisigTransactionPayload>(&samples)?;
 
     tracer.trace_type::<StateKey>(&samples)?;
     tracer.trace_type::<aptos_consensus_types::proof_of_store::BatchInfoExt>(&samples)?;

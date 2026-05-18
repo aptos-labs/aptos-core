@@ -1,0 +1,26 @@
+Move prover returns: exiting with verification errors
+warning: proof uses trusted assumption
+   ┌─ tests/sources/functional/proof/loop_with_lemma.move:16:13
+   │
+16 │             assume [trusted] true;
+   │             ^^^^^^^^^^^^^^^^^^^^^^
+
+error: proof assertion not satisfied
+   ┌─ tests/sources/functional/proof/loop_with_lemma.move:54:14
+   │
+54 │         post assert result > n;  // error: result == n, not > n
+   │              ^^^^^^^^^^^^^^^^^^
+   │
+   =     at tests/sources/functional/proof/loop_with_lemma.move:42: count_up
+   =         n = <redacted>
+   =     at tests/sources/functional/proof/loop_with_lemma.move:43: count_up
+   =         i = <redacted>
+   =     at tests/sources/functional/proof/loop_with_lemma.move:46: count_up
+   =     at tests/sources/functional/proof/loop_with_lemma.move:47: count_up
+   =     enter loop, variable(s) i havocked and reassigned
+   =         i = <redacted>
+   =     loop invariant holds at current state
+   =     at tests/sources/functional/proof/loop_with_lemma.move:44: count_up
+   =     at tests/sources/functional/proof/loop_with_lemma.move:42: count_up
+   =         result = <redacted>
+   =     at tests/sources/functional/proof/loop_with_lemma.move:54: count_up (spec)

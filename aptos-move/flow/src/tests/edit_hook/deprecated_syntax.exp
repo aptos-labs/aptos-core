@@ -1,0 +1,29 @@
+warning[W00001]: DEPRECATED. will be removed
+  ┌─ deprecated_syntax.move:6:36
+  │
+6 │     fun get(addr: address): &Token acquires Token {
+  │                                    ^^^^^^^^ deprecated Move 1 syntax: `acquires`; acquires annotations are no longer needed
+
+warning[W00001]: DEPRECATED. will be removed
+  ┌─ deprecated_syntax.move:7:9
+  │
+7 │         borrow_global<Token>(addr)
+  │         ^^^^^^^^^^^^^^ deprecated Move 1 syntax: `borrow_global<`; use `&T[addr]` instead
+
+warning[W00001]: DEPRECATED. will be removed
+   ┌─ deprecated_syntax.move:10:44
+   │
+10 │     fun get_mut(addr: address): &mut Token acquires Token {
+   │                                            ^^^^^^^^ deprecated Move 1 syntax: `acquires`; acquires annotations are no longer needed
+
+warning[W00001]: DEPRECATED. will be removed
+   ┌─ deprecated_syntax.move:11:9
+   │
+11 │         borrow_global_mut<Token>(addr)
+   │         ^^^^^^^^^^^^^^^^^^ deprecated Move 1 syntax: `borrow_global_mut<`; use `&mut T[addr]` instead
+
+warning[W00001]: DEPRECATED. will be removed
+   ┌─ deprecated_syntax.move:14:38
+   │
+14 │     fun remove(addr: address): Token acquires Token {
+   │                                      ^^^^^^^^ deprecated Move 1 syntax: `acquires`; acquires annotations are no longer needed

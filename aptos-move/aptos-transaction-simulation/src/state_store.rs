@@ -450,7 +450,7 @@ where
 
     fn get_state_slot(&self, state_key: &Self::Key) -> StateViewResult<StateSlot> {
         let value_opt = self.get_state_value(state_key)?.map(|value| (0, value));
-        Ok(StateSlot::from_db_get(value_opt))
+        Ok(StateSlot::from_db_get(state_key.clone(), value_opt))
     }
 
     fn get_state_value(&self, state_key: &Self::Key) -> StateViewResult<Option<StateValue>> {

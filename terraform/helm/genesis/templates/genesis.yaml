@@ -34,6 +34,15 @@ data:
     {{- with .Values.chain.jwk_consensus_config_override }}
     jwk_consensus_config_override: {{ . | toJson }}
     {{- end}}
+    {{- with .Values.chain.randomness_config_override }}
+    randomness_config_override: {{ . | toJson }}
+    {{- end}}
+    {{- with .Values.chain.chunky_dkg_config_override }}
+    chunky_dkg_config_override: {{ . | toJson }}
+    {{- end}}
+    {{- with .Values.chain.initial_features_override }}
+    initial_features_override: {{ . | toJson }}
+    {{- end}}
 ---
 
 apiVersion: v1
@@ -107,6 +116,8 @@ spec:
         resources:
           {{- toYaml .Values.genesis.resources | nindent 10 }}
         env:
+        - name: HOME
+          value: /tmp
         - name: RUST_BACKTRACE
           value: "1"
         - name: NUM_VALIDATORS
@@ -145,6 +156,8 @@ spec:
           value: {{ .Values.genesis.multicluster.domain_suffixes | quote }}
         - name: GENESIS_BLOB_UPLOAD_URL
           value: {{ .Values.genesis.genesis_blob_upload_url | quote }}
+        - name: GENESIS_BLOB_UPLOAD_BUCKET
+          value: {{ .Values.genesis.genesis_blob_upload_bucket | quote }}
         - name: CLUSTER_NAME
           value: {{ .Values.genesis.cluster_name | quote }}
         volumeMounts:

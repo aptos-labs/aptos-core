@@ -1,8 +1,13 @@
 // Copyright (c) Aptos Foundation
 // Licensed pursuant to the Innovation-Enabling Source Code License, available at https://github.com/aptos-labs/aptos-core/blob/main/LICENSE
 
+pub use aptos_types::dkg::chunky_dkg::{DIGEST_KEY, PUBLIC_PARAMETERS};
+
 pub mod agg_subtrx_producer;
+pub mod common;
 pub mod dkg_manager;
 pub mod missing_transcript_fetcher;
 pub mod subtrx_cert_producer;
+#[cfg(test)]
+pub(crate) mod test_utils;
 pub mod types;

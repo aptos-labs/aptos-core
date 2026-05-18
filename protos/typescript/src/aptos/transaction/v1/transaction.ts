@@ -845,6 +845,7 @@ export interface MoveStruct {
   abilities?: MoveAbility[] | undefined;
   genericTypeParams?: MoveStructGenericTypeParam[] | undefined;
   fields?: MoveStructField[] | undefined;
+  variants?: MoveStructVariant[] | undefined;
 }
 
 export interface MoveStructGenericTypeParam {
@@ -855,6 +856,11 @@ export interface MoveStructGenericTypeParam {
 export interface MoveStructField {
   name?: string | undefined;
   type?: MoveType | undefined;
+}
+
+export interface MoveStructVariant {
+  name?: string | undefined;
+  fields?: MoveStructField[] | undefined;
 }
 
 export interface MoveFunctionGenericTypeParam {
@@ -7451,7 +7457,16 @@ export const MoveFunction = {
 };
 
 function createBaseMoveStruct(): MoveStruct {
-  return { name: "", isNative: false, isEvent: false, isEnum: false, abilities: [], genericTypeParams: [], fields: [] };
+  return {
+    name: "",
+    isNative: false,
+    isEvent: false,
+    isEnum: false,
+    abilities: [],
+    genericTypeParams: [],
+    fields: [],
+    variants: [],
+  };
 }
 
 export const MoveStruct = {
@@ -7483,6 +7498,11 @@ export const MoveStruct = {
     if (message.fields !== undefined && message.fields.length !== 0) {
       for (const v of message.fields) {
         MoveStructField.encode(v!, writer.uint32(42).fork()).ldelim();
+      }
+    }
+    if (message.variants !== undefined && message.variants.length !== 0) {
+      for (const v of message.variants) {
+        MoveStructVariant.encode(v!, writer.uint32(66).fork()).ldelim();
       }
     }
     return writer;
@@ -7554,6 +7574,13 @@ export const MoveStruct = {
 
           message.fields!.push(MoveStructField.decode(reader, reader.uint32()));
           continue;
+        case 8:
+          if (tag !== 66) {
+            break;
+          }
+
+          message.variants!.push(MoveStructVariant.decode(reader, reader.uint32()));
+          continue;
       }
       if ((tag & 7) === 4 || tag === 0) {
         break;
@@ -7610,6 +7637,9 @@ export const MoveStruct = {
       fields: globalThis.Array.isArray(object?.fields)
         ? object.fields.map((e: any) => MoveStructField.fromJSON(e))
         : [],
+      variants: globalThis.Array.isArray(object?.variants)
+        ? object.variants.map((e: any) => MoveStructVariant.fromJSON(e))
+        : [],
     };
   },
 
@@ -7636,6 +7666,9 @@ export const MoveStruct = {
     if (message.fields?.length) {
       obj.fields = message.fields.map((e) => MoveStructField.toJSON(e));
     }
+    if (message.variants?.length) {
+      obj.variants = message.variants.map((e) => MoveStructVariant.toJSON(e));
+    }
     return obj;
   },
 
@@ -7651,6 +7684,7 @@ export const MoveStruct = {
     message.abilities = object.abilities?.map((e) => e) || [];
     message.genericTypeParams = object.genericTypeParams?.map((e) => MoveStructGenericTypeParam.fromPartial(e)) || [];
     message.fields = object.fields?.map((e) => MoveStructField.fromPartial(e)) || [];
+    message.variants = object.variants?.map((e) => MoveStructVariant.fromPartial(e)) || [];
     return message;
   },
 };
@@ -7881,6 +7915,116 @@ export const MoveStructField = {
     const message = createBaseMoveStructField();
     message.name = object.name ?? "";
     message.type = (object.type !== undefined && object.type !== null) ? MoveType.fromPartial(object.type) : undefined;
+    return message;
+  },
+};
+
+function createBaseMoveStructVariant(): MoveStructVariant {
+  return { name: "", fields: [] };
+}
+
+export const MoveStructVariant = {
+  encode(message: MoveStructVariant, writer: _m0.Writer = _m0.Writer.create()): _m0.Writer {
+    if (message.name !== undefined && message.name !== "") {
+      writer.uint32(10).string(message.name);
+    }
+    if (message.fields !== undefined && message.fields.length !== 0) {
+      for (const v of message.fields) {
+        MoveStructField.encode(v!, writer.uint32(18).fork()).ldelim();
+      }
+    }
+    return writer;
+  },
+
+  decode(input: _m0.Reader | Uint8Array, length?: number): MoveStructVariant {
+    const reader = input instanceof _m0.Reader ? input : _m0.Reader.create(input);
+    let end = length === undefined ? reader.len : reader.pos + length;
+    const message = createBaseMoveStructVariant();
+    while (reader.pos < end) {
+      const tag = reader.uint32();
+      switch (tag >>> 3) {
+        case 1:
+          if (tag !== 10) {
+            break;
+          }
+
+          message.name = reader.string();
+          continue;
+        case 2:
+          if (tag !== 18) {
+            break;
+          }
+
+          message.fields!.push(MoveStructField.decode(reader, reader.uint32()));
+          continue;
+      }
+      if ((tag & 7) === 4 || tag === 0) {
+        break;
+      }
+      reader.skipType(tag & 7);
+    }
+    return message;
+  },
+
+  // encodeTransform encodes a source of message objects.
+  // Transform<MoveStructVariant, Uint8Array>
+  async *encodeTransform(
+    source: AsyncIterable<MoveStructVariant | MoveStructVariant[]> | Iterable<MoveStructVariant | MoveStructVariant[]>,
+  ): AsyncIterable<Uint8Array> {
+    for await (const pkt of source) {
+      if (globalThis.Array.isArray(pkt)) {
+        for (const p of (pkt as any)) {
+          yield* [MoveStructVariant.encode(p).finish()];
+        }
+      } else {
+        yield* [MoveStructVariant.encode(pkt as any).finish()];
+      }
+    }
+  },
+
+  // decodeTransform decodes a source of encoded messages.
+  // Transform<Uint8Array, MoveStructVariant>
+  async *decodeTransform(
+    source: AsyncIterable<Uint8Array | Uint8Array[]> | Iterable<Uint8Array | Uint8Array[]>,
+  ): AsyncIterable<MoveStructVariant> {
+    for await (const pkt of source) {
+      if (globalThis.Array.isArray(pkt)) {
+        for (const p of (pkt as any)) {
+          yield* [MoveStructVariant.decode(p)];
+        }
+      } else {
+        yield* [MoveStructVariant.decode(pkt as any)];
+      }
+    }
+  },
+
+  fromJSON(object: any): MoveStructVariant {
+    return {
+      name: isSet(object.name) ? globalThis.String(object.name) : "",
+      fields: globalThis.Array.isArray(object?.fields)
+        ? object.fields.map((e: any) => MoveStructField.fromJSON(e))
+        : [],
+    };
+  },
+
+  toJSON(message: MoveStructVariant): unknown {
+    const obj: any = {};
+    if (message.name !== undefined && message.name !== "") {
+      obj.name = message.name;
+    }
+    if (message.fields?.length) {
+      obj.fields = message.fields.map((e) => MoveStructField.toJSON(e));
+    }
+    return obj;
+  },
+
+  create(base?: DeepPartial<MoveStructVariant>): MoveStructVariant {
+    return MoveStructVariant.fromPartial(base ?? {});
+  },
+  fromPartial(object: DeepPartial<MoveStructVariant>): MoveStructVariant {
+    const message = createBaseMoveStructVariant();
+    message.name = object.name ?? "";
+    message.fields = object.fields?.map((e) => MoveStructField.fromPartial(e)) || [];
     return message;
   },
 };

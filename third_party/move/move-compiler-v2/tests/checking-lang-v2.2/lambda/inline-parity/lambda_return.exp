@@ -25,7 +25,7 @@ module 0x42::LambdaReturn {
         f(b)
     }
     fun test_lambda_symbol_param() {
-        let a = inline_apply2(|arg0| lambda__1__test_lambda_symbol_param(arg0), 3);
+        let a = inline_apply2(|x| lambda__1__test_lambda_symbol_param(x), 3);
         if (a == 3) () else abort 0;
     }
     fun lambda__1__test_lambda_symbol_param(x: u64): u64 {

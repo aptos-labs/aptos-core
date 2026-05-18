@@ -58,9 +58,17 @@ impl StateComputer for RandomComputeResultStateComputer {
         _: BlockExecutorConfigFromOnchain,
         _: Arc<dyn TransactionDeduper>,
         _: bool,
+        _: bool,
         _: OnChainConsensusConfig,
         _: u8,
         _: Arc<crate::network::NetworkSender>,
+        _: Option<aptos_types::secret_sharing::SecretShareConfig>,
+        _: Option<
+            std::sync::Arc<
+                crate::consensus_observer::publisher::consensus_publisher::ConsensusPublisher,
+            >,
+        >,
+        _: bool,
     ) {
     }
 

@@ -18,7 +18,6 @@ pub struct AugDataStore<D> {
     epoch: u64,
     signer: Arc<ValidatorSigner>,
     config: RandConfig,
-    fast_config: Option<RandConfig>,
     data: HashMap<Author, AugData<D>>,
     certified_data: HashMap<Author, CertifiedAugData<D>>,
     db: Arc<dyn RandStorage<D>>,
@@ -45,7 +44,6 @@ impl<D: TAugmentedData> AugDataStore<D> {
         epoch: u64,
         signer: Arc<ValidatorSigner>,
         config: RandConfig,
-        fast_config: Option<RandConfig>,
         db: Arc<dyn RandStorage<D>>,
     ) -> Self {
         let all_data = db.get_all_aug_data().unwrap_or_default();
@@ -67,14 +65,13 @@ impl<D: TAugmentedData> AugDataStore<D> {
         for (_, certified_data) in &certified_data {
             certified_data
                 .data()
-                .augment(&config, &fast_config, certified_data.author());
+                .augment(&config, certified_data.author());
         }
 
         Self {
             epoch,
             signer,
             config,
-            fast_config,
             data: aug_data
                 .into_iter()
                 .map(|(id, data)| (id.author(), data))
@@ -124,7 +121,7 @@ impl<D: TAugmentedData> AugDataStore<D> {
         self.db.save_certified_aug_data(&certified_data)?;
         certified_data
             .data()
-            .augment(&self.config, &self.fast_config, certified_data.author());
+            .augment(&self.config, certified_data.author());
         self.certified_data
             .insert(*certified_data.author(), certified_data);
         Ok(CertifiedAugDataAck::new(self.epoch))

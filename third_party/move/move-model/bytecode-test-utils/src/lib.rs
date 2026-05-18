@@ -1,6 +1,5 @@
-// Copyright © Aptos Foundation
-// Parts of the project are originally copyright © Meta Platforms, Inc.
-// SPDX-License-Identifier: Apache-2.0
+// Copyright (c) Aptos Foundation
+// Licensed pursuant to the Innovation-Enabling Source Code License, available at https://github.com/aptos-labs/aptos-core/blob/main/LICENSE
 
 use anyhow::anyhow;
 use codespan_reporting::{diagnostic::Severity, term::termcolor::Buffer};
@@ -13,7 +12,7 @@ use move_stackless_bytecode::{
     function_target_pipeline::{
         FunctionTargetPipeline, FunctionTargetsHolder, ProcessorResultDisplay,
     },
-    print_targets_for_test,
+    print_targets_with_annotations_for_test,
 };
 use std::path::Path;
 
@@ -27,6 +26,19 @@ pub fn test_runner(
     path: &Path,
     pipeline_opt: Option<FunctionTargetPipeline>,
 ) -> anyhow::Result<()> {
+    test_runner_with_annotations(path, pipeline_opt, |target| {
+        target.register_annotation_formatters_for_test();
+    })
+}
+
+/// Like `test_runner`, but allows custom annotation registration.
+/// The `register_annotations` closure is called for each function target to register
+/// annotation formatters before printing.
+pub fn test_runner_with_annotations(
+    path: &Path,
+    pipeline_opt: Option<FunctionTargetPipeline>,
+    register_annotations: impl Fn(&move_stackless_bytecode::function_target::FunctionTarget),
+) -> anyhow::Result<()> {
     let options = Options {
         sources_deps: extract_test_directives(path, "// dep:")?,
         sources: vec![path.to_string_lossy().to_string()],
@@ -39,7 +51,17 @@ pub fn test_runner(
         ..Options::default()
     };
     let mut error_writer = Buffer::no_color();
-    let env = run_move_compiler_for_analysis(&mut error_writer, options)?;
+    let env = match run_move_compiler_for_analysis(&mut error_writer, options) {
+        Ok(env) => env,
+        Err(_) => {
+            // Compilation failed. Capture the errors as baseline output so that
+            // error-case tests (e.g. invalid proof constructs) can be tested.
+            let errors = String::from_utf8_lossy(&error_writer.into_inner()).to_string();
+            let baseline_path = path.with_extension(get_compiler_exp_extension());
+            verify_or_update_baseline(baseline_path.as_path(), &errors)?;
+            return Ok(());
+        },
+    };
     let out = if env.has_errors() {
         let mut error_writer = Buffer::no_color();
         env.report_diag(&mut error_writer, Severity::Error);
@@ -56,20 +78,32 @@ pub fn test_runner(
         let mut targets = FunctionTargetsHolder::default();
         for module_env in env.get_modules() {
             for func_env in module_env.get_functions() {
+                // Lemma functions are not subject to transformation in the
+                // pipeline; skip them.
+                if func_env.is_lemma() {
+                    continue;
+                }
                 targets.add_target(&func_env);
             }
         }
-        text += &print_targets_for_test(&env, "initial translation from Move", &targets, false);
+        text += &print_targets_with_annotations_for_test(
+            &env,
+            "initial translation from Move",
+            &targets,
+            &register_annotations,
+            false,
+        );
 
         // Run pipeline if any
         if let Some(pipeline) = pipeline_opt {
             pipeline.run(&env, &mut targets);
             let processor = pipeline.last_processor();
             if !processor.is_single_run() {
-                text += &print_targets_for_test(
+                text += &print_targets_with_annotations_for_test(
                     &env,
                     &format!("after pipeline `{}`", dir_name),
                     &targets,
+                    &register_annotations,
                     false,
                 );
             }

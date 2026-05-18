@@ -227,6 +227,19 @@ class RunHelper:
         path = "metrics" if not json else "json_metrics"
         return f"http://127.0.0.1:{METRICS_PORT}/{path}"
 
+    def host_to_container_path(self, host_path: str) -> str:
+        """Convert a host path (inside host_working_directory) to the path the CLI sees.
+
+        When running via Docker the host_working_directory is bind-mounted as
+        WORKING_DIR_IN_CONTAINER ("/tmp"), so any file created there must be
+        referenced using the container-side path.  For local CLI runs there is no
+        Docker layer, so the original host path is used unchanged.
+        """
+        if self.image_tag:
+            rel = os.path.relpath(host_path, self.host_working_directory)
+            return os.path.join(WORKING_DIR_IN_CONTAINER, rel)
+        return host_path
+
 
 # This function helps with writing the stdout / stderr of a subprocess to files.
 def write_subprocess_out(out_path, file_name, command_output):

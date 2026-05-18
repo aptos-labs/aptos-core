@@ -118,7 +118,7 @@ impl OnChainExecutionConfig {
         Self::V7(ExecutionConfigV7 {
             transaction_shuffler_type: TransactionShufflerType::default_for_genesis(),
             block_gas_limit_type: BlockGasLimitType::default_for_genesis(),
-            enable_per_block_gas_limit: false,
+            enable_per_block_gas_limit: true,
             transaction_deduper_type: TransactionDeduperType::TxnHashAndAuthenticatorV1,
             gas_price_to_burn: 90,
             persisted_auxiliary_info_version: 1,
@@ -135,7 +135,7 @@ impl OnChainExecutionConfig {
 impl BlockGasLimitType {
     pub fn default_for_genesis() -> Self {
         Self::ComplexLimitV1 {
-            effective_block_gas_limit: 20000,
+            effective_block_gas_limit: 200000,
             execution_gas_effective_multiplier: 1,
             io_gas_effective_multiplier: 1,
             conflict_penalty_window: 9,
@@ -230,6 +230,11 @@ pub enum TransactionShufflerType {
         platform_use_case_spread_factor: usize,
         user_use_case_spread_factor: usize,
     },
+    UseCaseAndEncryptedTxnsAware {
+        sender_spread_factor: usize,
+        platform_use_case_spread_factor: usize,
+        user_use_case_spread_factor: usize,
+    },
 }
 
 impl TransactionShufflerType {
@@ -248,6 +253,10 @@ impl TransactionShufflerType {
             | Self::SenderAwareV2(_)
             | Self::DeprecatedFairness => None,
             Self::UseCaseAware {
+                user_use_case_spread_factor,
+                ..
+            }
+            | Self::UseCaseAndEncryptedTxnsAware {
                 user_use_case_spread_factor,
                 ..
             } => Some(*user_use_case_spread_factor),

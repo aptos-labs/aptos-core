@@ -1,0 +1,20 @@
+//# publish
+module 0x22::test
+
+struct Big<T00, T01, T02, T03, T04, T05, T06, T07, T08, T09, T10, T11, T12, T13, T14, T15>
+    x: T00
+
+fun huge_result<T>(): Big<T, T, T, T, T, T, T, T, T, T, T, T, T, T, T, T>
+    ld_u64 0
+    abort
+
+fun make_closure<U>()
+    pack_closure huge_result<U>, 0
+    pop
+    ret
+
+public fun entry()
+    call make_closure<vector<vector<vector<vector<vector<vector<vector<u8>>>>>>>>
+    ret
+
+//# run --verbose 0x22::test::entry

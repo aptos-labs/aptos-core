@@ -29,9 +29,9 @@ pub fn build_consensus_only_node() -> bool {
     option_env!("CONSENSUS_ONLY_PERF_TEST").is_some()
 }
 
-/// at forge _run_ time, compile `aptos-node` without indexer
-pub fn build_aptos_node_without_indexer() -> bool {
-    std::env::var("FORGE_BUILD_WITHOUT_INDEXER").is_ok()
+/// at _forge_ compile time, override the features used to build `aptos-node`
+fn custom_node_features() -> Option<&'static str> {
+    option_env!("LOCAL_SWARM_NODE_FEATURES")
 }
 
 pub fn metadata() -> Result<Metadata> {
@@ -48,14 +48,21 @@ pub fn metadata() -> Result<Metadata> {
 /// Get the aptos node binary from the current working directory
 pub fn get_aptos_node_binary_from_worktree() -> Result<(String, PathBuf)> {
     let metadata = metadata()?;
-    let mut revision = git_rev_parse(&metadata, "HEAD")?;
-    if git_is_worktree_dirty()? {
-        revision.push_str("-dirty");
-    }
-
+    let revision = get_worktree_revision(&metadata);
     let bin_path = cargo_build_aptos_node(&metadata.workspace_root, &metadata.target_directory)?;
 
     Ok((revision, bin_path))
+}
+
+/// Best-effort revision detection. Falls back to "workspace" for non-git repos (e.g. Sapling).
+fn get_worktree_revision(metadata: &Metadata) -> String {
+    if let Ok(mut rev) = git_rev_parse(metadata, "HEAD") {
+        if git_is_worktree_dirty().unwrap_or(false) {
+            rev.push_str("-dirty");
+        }
+        return rev;
+    }
+    "workspace".to_string()
 }
 
 /// This function will attempt to build the aptos-node binary at an arbitrary revision.
@@ -164,13 +171,17 @@ pub fn git_merge_base<R: AsRef<str>>(rev: R) -> Result<String> {
 }
 
 pub fn cargo_build_common_args() -> Vec<&'static str> {
-    let mut args = if build_aptos_node_without_indexer() {
-        vec!["build", "--features=failpoints,smoke-test"]
+    let mut args = vec!["build"];
+    if let Some(features) = custom_node_features() {
+        if !features.is_empty() {
+            args.push("--features");
+            args.push(features);
+        }
     } else {
-        vec!["build", "--features=failpoints,indexer,smoke-test"]
-    };
-    if build_consensus_only_node() {
-        args.push("--features=consensus-only-perf-test");
+        args.push("--features=failpoints,smoke-test");
+        if build_consensus_only_node() {
+            args.push("--features=consensus-only-perf-test");
+        }
     }
     if use_release() {
         args.push("--release");

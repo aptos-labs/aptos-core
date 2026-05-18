@@ -158,7 +158,7 @@ def create_snapshot_with_gcloud(
             f"Snapshot {e} {target_project} {snapshot_name} does not exist. Creating a new one."
         )
 
-    # Construct the gcloud command to create the snapshot in the target project
+    # Create the snapshot asynchronously, then poll until complete
     source_disk_link = f"https://www.googleapis.com/compute/v1/projects/{source_project}/zones/{source_zone}/disks/{source_volume}"
     command = [
         "gcloud",
@@ -172,19 +172,39 @@ def create_snapshot_with_gcloud(
         target_project,
         "--storage-location",
         get_region_from_zone(source_zone),
+        "--async",
     ]
 
     try:
-        print(
+        logger.info(
             f"Creating snapshot '{snapshot_name}' in project '{target_project}' from disk '{source_disk_link}'..."
         )
         subprocess.run(command, check=True)
-        print(
-            f"Snapshot '{snapshot_name}' created successfully in project '{target_project}'!"
-        )
     except subprocess.CalledProcessError as e:
-        print(f"Error creating snapshot: {e}")
         raise Exception(f"Error creating snapshot: {e}")
+
+    # Poll until the snapshot is READY
+    logger.info(f"Waiting for snapshot '{snapshot_name}' to be ready...")
+    start_time = time.time()
+    timeout = 5400  # 1.5 hour timeout
+    while True:
+        if time.time() - start_time > timeout:
+            raise TimeoutError(
+                f"Snapshot '{snapshot_name}' did not become ready after {timeout} seconds"
+            )
+        try:
+            snapshot = snapshot_client.get(project=target_project, snapshot=snapshot_name)
+        except Exception as e:
+            logger.warning(f"Transient error polling snapshot status: {e}, retrying...")
+            time.sleep(60)
+            continue
+        if snapshot.status == "READY":
+            logger.info(f"Snapshot '{snapshot_name}' created successfully!")
+            break
+        elif snapshot.status == "FAILED":
+            raise Exception(f"Snapshot '{snapshot_name}' failed to create.")
+        logger.info(f"Snapshot status: {snapshot.status}, waiting...")
+        time.sleep(60)
 
 
 def delete_disk(
@@ -723,12 +743,12 @@ if __name__ == "__main__":
 
     if network == "testnet":
         source_cluster_id = "general-usce1-0"
-        source_namespace = "testnet-pfn-usce1-backup"
+        source_namespace = "testnet-pfn-0"
         snapshot_name = TESTNET_SNAPSHOT_NAME
         new_pv_prefix = TESTNET_SNAPSHOT_NAME
     else:
         source_cluster_id = "mainnet-usce1-0"
-        source_namespace = "mainnet-pfn-usce1-backup"
+        source_namespace = "mainnet-pfn-0"
         snapshot_name = MAINNET_SNAPSHOT_NAME
         new_pv_prefix = MAINNET_SNAPSHOT_NAME
     # create OG snapshot

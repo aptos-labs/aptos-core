@@ -2,7 +2,9 @@
 // Licensed pursuant to the Innovation-Enabling Source Code License, available at https://github.com/aptos-labs/aptos-core/blob/main/LICENSE
 
 use anyhow::anyhow;
-use aptos_config::config::{NodeConfig, DEFAULT_EXECUTION_CONCURRENCY_LEVEL};
+use aptos_config::config::{
+    NodeConfig, DEFAULT_EXECUTION_CONCURRENCY_LEVEL, DEFAULT_NATIVE_RAYON_THREAD_PER_EXEC_THREAD,
+};
 #[cfg(unix)]
 use aptos_logger::prelude::*;
 use aptos_storage_interface::{
@@ -60,12 +62,26 @@ pub fn set_aptos_vm_configurations(node_config: &NodeConfig) {
         node_config.execution.concurrency_level
     };
     AptosVM::set_concurrency_level_once(effective_concurrency_level as usize);
+
+    let native_rayon_threads = if node_config.execution.native_rayon_thread_per_exec_thread == 0 {
+        DEFAULT_NATIVE_RAYON_THREAD_PER_EXEC_THREAD
+    } else {
+        node_config.execution.native_rayon_thread_per_exec_thread
+    };
+    AptosVM::init_native_rayon_pool_once(native_rayon_threads as usize);
+
     AptosVM::set_discard_failed_blocks(node_config.execution.discard_failed_blocks);
     AptosVM::set_num_proof_reading_threads_once(
         node_config.execution.num_proof_reading_threads as usize,
     );
     AptosVM::set_blockstm_v2_enabled_once(node_config.execution.blockstm_v2_enabled);
     AptosVM::set_enable_pre_write_once(node_config.execution.enable_pre_write);
+    AptosVM::set_persist_hotness_in_epilogue_once(
+        node_config
+            .storage
+            .hot_state_config
+            .persist_hotness_in_epilogue,
+    );
 
     if node_config
         .execution

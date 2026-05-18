@@ -20,7 +20,15 @@ on:
         required: false
         type: string
         description: Optional version to end replaying. If not specified, replay-verify will determines end version itself.
-      DRY_RUN: 
+      START_TIME:
+        required: false
+        type: string
+        description: 'Optional start time (e.g. "2 hours ago", "2026-03-19", "2026-03-19 10:00"). UTC assumed. Mutually exclusive with START_VERSION.'
+      END_TIME:
+        required: false
+        type: string
+        description: 'Optional end time. Same formats as START_TIME. Mutually exclusive with END_VERSION.'
+      DRY_RUN:
         required: false
         type: boolean
         description: If true, the workflow will not run replay verify.
@@ -44,13 +52,36 @@ on:
         required: false
         type: string
         description: The end version to use for the backup. If not specified, it will use the latest version.
-      DRY_RUN: 
+      START_TIME:
+        required: false
+        type: string
+        description: 'Optional start time (e.g. "2 hours ago", "2026-03-19", "2026-03-19 10:00"). UTC assumed. Mutually exclusive with START_VERSION.'
+      END_TIME:
+        required: false
+        type: string
+        description: 'Optional end time. Same formats as START_TIME. Mutually exclusive with END_VERSION.'
+      DRY_RUN:
         required: false
         type: boolean
         description: If true, the workflow will not run replay verify.
         default: false
 jobs:
+  validate-inputs:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Validate mutually exclusive inputs
+        run: |
+          if [ -n "${{ inputs.START_VERSION }}" ] && [ -n "${{ inputs.START_TIME }}" ]; then
+            echo "::error::START_VERSION and START_TIME are mutually exclusive. Please specify only one."
+            exit 1
+          fi
+          if [ -n "${{ inputs.END_VERSION }}" ] && [ -n "${{ inputs.END_TIME }}" ]; then
+            echo "::error::END_VERSION and END_TIME are mutually exclusive. Please specify only one."
+            exit 1
+          fi
+
   build-images:
+    needs: validate-inputs
     secrets: inherit
     uses: aptos-labs/aptos-core/.github/workflows/workflow-run-docker-rust-build.yaml@main
     with:
@@ -122,8 +153,14 @@ jobs:
           if [ -n "${{ inputs.START_VERSION }}" ]; then  
             CMD="$CMD --start ${{ inputs.START_VERSION }}"  
           fi  
-          if [ -n "${{ inputs.END_VERSION }}" ]; then  
-            CMD="$CMD --end ${{ inputs.END_VERSION }}"  
+          if [ -n "${{ inputs.END_VERSION }}" ]; then
+            CMD="$CMD --end ${{ inputs.END_VERSION }}"
+          fi
+          if [ -n "${{ inputs.START_TIME }}" ]; then
+            CMD="$CMD --start-time '${{ inputs.START_TIME }}'"
+          fi
+          if [ -n "${{ inputs.END_TIME }}" ]; then
+            CMD="$CMD --end-time '${{ inputs.END_TIME }}'"
           fi
 
           if [ -n "${{ inputs.IMAGE_TAG }}" ]; then  

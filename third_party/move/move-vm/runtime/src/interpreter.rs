@@ -1,6 +1,7 @@
-// Copyright (c) The Diem Core Contributors
-// Copyright (c) The Move Contributors
-// SPDX-License-Identifier: Apache-2.0
+// Parts of the file are Copyright (c) The Diem Core Contributors
+// Parts of the file are Copyright (c) The Move Contributors
+// Parts of the file are Copyright (c) Aptos Foundation
+// All Aptos Foundation code and content is licensed pursuant to the Innovation-Enabling Source Code License, available at https://github.com/aptos-labs/aptos-core/blob/main/LICENSE
 
 use crate::{
     access_control::AccessControlState,
@@ -17,9 +18,10 @@ use crate::{
     reentrancy_checker::{CallType, ReentrancyChecker},
     runtime_ref_checks::{FullRuntimeRefCheck, NoRuntimeRefCheck, RefCheckState, RuntimeRefCheck},
     runtime_type_checks::{
-        verify_pack_closure, FullRuntimeTypeCheck, NoRuntimeTypeCheck, RuntimeTypeCheck,
-        UntrustedOnlyRuntimeTypeCheck,
+        check_function_type_count_and_depth, verify_pack_closure, FullRuntimeTypeCheck,
+        NoRuntimeTypeCheck, RuntimeTypeCheck, UntrustedOnlyRuntimeTypeCheck,
     },
+    source_locator,
     storage::{
         loader::traits::Loader, ty_depth_checker::TypeDepthChecker,
         ty_layout_converter::LayoutConverter,
@@ -29,8 +31,7 @@ use crate::{
 use fail::fail_point;
 use itertools::Itertools;
 use move_binary_format::{
-    errors,
-    errors::*,
+    errors::{self, *},
     file_format::{AccessKind, FunctionHandleIndex, FunctionInstantiationIndex, SignatureIndex},
 };
 use move_core_types::{
@@ -47,6 +48,7 @@ use move_vm_types::{
     debug_write, debug_writeln,
     gas::{GasMeter, SimpleInstruction},
     instr::Instruction,
+    limits::check_abort_message_limit,
     loaded_data::{runtime_access_specifier::AccessInstance, runtime_types::Type},
     natives::function::NativeResult,
     ty_interner::InternedTypePool,
@@ -1273,13 +1275,12 @@ where
                     CallType::NativeDynamicDispatch,
                 )?;
 
-                // Checking type of the dispatch target function
-                //
-                // MoveVM will check that the native function that performs the dispatch will have the same
-                // type signature as the dispatch target function except the native function will have an extra argument
-                // in the end to determine which function to jump to. The native function shouldn't switch ordering of arguments.
-                //
-                // Runtime will use such convention to reconstruct the type stack required to perform paranoid mode checks.
+                if function.param_tys().is_empty() {
+                    return Err(PartialVMError::new_invariant_violation(
+                        "Dispatch functions have at least 1 argument (function information)",
+                    ));
+                }
+
                 if function.ty_param_abilities() != target_func.ty_param_abilities()
                     || function.return_tys() != target_func.return_tys()
                     || &function.param_tys()[0..function.param_tys().len() - 1]
@@ -1606,7 +1607,8 @@ where
                         ty,
                         runtime_environment,
                     },
-                    gv.view().unwrap(),
+                    gv.view()
+                        .expect("After successful move_to, global value is set"),
                     true,
                 )?;
                 self.check_access(runtime_environment, AccessKind::Writes, ty, addr)?;
@@ -1654,9 +1656,15 @@ where
         }
 
         // We do not consider speculative invariant violations.
+        // The Display walk over `current_frame.locals` / operand stack inside
+        // `internal_state_str` is unbounded — a deeply nested Move value can
+        // recurse past the executor thread's stack guard page (SIGABRT). The
+        // dump is a diagnostic affordance, so gate it on `enable_debugging`;
+        // production validators run with this off and never reach the walk.
         if err.status_type() == StatusType::InvariantViolation
             && err.major_status() != StatusCode::SPECULATIVE_EXECUTION_ABORT_ERROR
             && !errors::is_stable_test_display()
+            && self.vm_config.enable_debugging
         {
             let location = err.location().clone();
             let state = self.internal_state_str(current_frame);
@@ -1706,6 +1714,15 @@ where
         }
         debug_writeln!(buf)?;
 
+        // Print source location if available.
+        if let Some(module_id) = function.module_id() {
+            if let Some(loc) =
+                source_locator::get_bytecode_source_location(module_id, function.index(), frame.pc)
+            {
+                debug_writeln!(buf, "          at {}", loc)?;
+            }
+        }
+
         // Print out the current instruction.
         debug_writeln!(buf)?;
         debug_writeln!(buf, "        Code:")?;
@@ -1723,12 +1740,18 @@ where
 
         // Print out the locals.
         debug_writeln!(buf)?;
-        debug_writeln!(buf, "        Locals:")?;
-        if !function.local_tys().is_empty() {
-            values::debug::print_locals(buf, &frame.locals, true)?;
-            debug_writeln!(buf)?;
-        } else {
+        if function.local_tys().is_empty() {
+            debug_writeln!(buf, "        Locals:")?;
             debug_writeln!(buf, "            (none)")?;
+        } else {
+            source_locator::print_locals_enriched(
+                buf,
+                function,
+                &frame.locals,
+                runtime_environment,
+                true,
+            )?;
+            debug_writeln!(buf)?;
         }
 
         debug_writeln!(buf)?;
@@ -1867,8 +1890,6 @@ where
 const OPERAND_STACK_SIZE_LIMIT: usize = 1024;
 const CALL_STACK_SIZE_LIMIT: usize = 1024;
 pub(crate) const ACCESS_STACK_SIZE_LIMIT: usize = 256;
-
-const ABORT_MESSAGE_SIZE_LIMIT: usize = 1024;
 
 /// The operand and runtime-type stacks.
 pub(crate) struct Stack {
@@ -2080,10 +2101,20 @@ impl Frame {
             };
             if is_tracing_for!(TraceCategory::VMError) {
                 let mut str = String::new();
+                let abort_idx = interpreter.call_stack.0.len();
                 if let Err(print_err) = interpreter
                     .debug_print_stack_trace(&mut str, interpreter.loader.runtime_environment())
                 {
                     str = format!("<while printing stack trace>: {}", print_err);
+                } else {
+                    // debug_print_stack_trace only covers parent frames; print the
+                    // aborting frame (self) separately as the innermost entry.
+                    let _ = interpreter.debug_print_frame(
+                        &mut str,
+                        interpreter.loader.runtime_environment(),
+                        abort_idx,
+                        self,
+                    );
                 }
                 eprintln!("trace vm_error {}:\n{}", e, str)
             }
@@ -2238,10 +2269,16 @@ impl Frame {
                     },
                     Instruction::LdConst(idx) => {
                         let constant = self.constant_at(*idx);
+                        let num_nodes = if self.ty_builder.check_depth_on_type_counts_v2 {
+                            let (num_nodes, depth) = constant.type_.num_nodes_with_max_depth();
+                            self.ty_builder
+                                .check_final_size_and_depth(num_nodes as u64, depth as u64)?;
+                            num_nodes
+                        } else {
+                            constant.type_.num_nodes()
+                        };
 
-                        gas_meter.charge_create_ty(NumTypeNodes::new(
-                            constant.type_.num_nodes() as u64,
-                        ))?;
+                        gas_meter.charge_create_ty(NumTypeNodes::new(num_nodes as u64))?;
                         gas_meter.charge_ld_const(NumBytes::new(constant.data.len() as u64))?;
 
                         let val = Value::deserialize_constant(constant).ok_or_else(|| {
@@ -2648,7 +2685,17 @@ impl Frame {
                                 &function,
                                 *mask,
                             )?;
+                        } else if trace_recorder.is_enabled() {
+                            // Otherwise, we run checks async: check the depth of the type.
+                            // This is wasteful but prevents async checks to fail on type
+                            // size limits.
+                            check_function_type_count_and_depth(
+                                self.ty_builder(),
+                                &function,
+                                *mask,
+                            )?;
                         }
+
                         let captured = interpreter.operand_stack.popn(mask.captured_count())?;
                         interpreter.check_depth_of_closure_captured_values(&captured)?;
                         let lazy_function = LazyLoadedFunction::new_resolved(
@@ -2686,6 +2733,23 @@ impl Frame {
                             )
                             .map(Rc::new)?;
                         RTTCheck::check_pack_closure_visibility(&self.function, &function)?;
+                        if RTTCheck::should_perform_checks(&self.function.function) {
+                            verify_pack_closure(
+                                self.ty_builder(),
+                                &mut interpreter.operand_stack,
+                                &function,
+                                *mask,
+                            )?;
+                        } else if trace_recorder.is_enabled() {
+                            // Otherwise, we run checks async: check the depth of the type.
+                            // This is wasteful but prevents async checks to fail on type
+                            // size limits.
+                            check_function_type_count_and_depth(
+                                self.ty_builder(),
+                                &function,
+                                *mask,
+                            )?;
+                        }
 
                         let captured = interpreter.operand_stack.popn(mask.captured_count())?;
                         interpreter.check_depth_of_closure_captured_values(&captured)?;
@@ -2699,15 +2763,6 @@ impl Frame {
                         interpreter
                             .operand_stack
                             .push(Value::closure(Box::new(lazy_function), captured))?;
-
-                        if RTTCheck::should_perform_checks(&self.function.function) {
-                            verify_pack_closure(
-                                self.ty_builder(),
-                                &mut interpreter.operand_stack,
-                                &function,
-                                *mask,
-                            )?;
-                        }
                     },
                     Instruction::ReadRef => {
                         let reference = interpreter.operand_stack.pop_as::<Reference>()?;
@@ -2909,16 +2964,7 @@ impl Frame {
                         // Gas is charged per byte to account for the cost of UTF-8 validation.
                         gas_meter.charge_abort_message(&bytes)?;
 
-                        if bytes.len() > ABORT_MESSAGE_SIZE_LIMIT {
-                            return Err(PartialVMError::new(
-                                StatusCode::ABORT_MESSAGE_LIMIT_EXCEEDED,
-                            )
-                            .with_message(format!(
-                                "Expected at most {} bytes, got {} bytes",
-                                ABORT_MESSAGE_SIZE_LIMIT,
-                                bytes.len()
-                            )));
-                        }
+                        check_abort_message_limit(bytes.len())?;
 
                         let error_message = String::from_utf8(bytes).map_err(|err| {
                             PartialVMError::new(StatusCode::INVALID_ABORT_MESSAGE)
@@ -2951,17 +2997,29 @@ impl Frame {
                         let lhs = interpreter.operand_stack.pop()?;
                         let rhs = interpreter.operand_stack.pop()?;
                         gas_meter.charge_eq(&lhs, &rhs)?;
+                        let check_mask = interpreter.vm_config.include_closure_mask_in_cmp;
                         interpreter
                             .operand_stack
-                            .push(Value::bool(lhs.equals(&rhs)?))?;
+                            .push(Value::bool(lhs.equals_with_depth(
+                                &rhs,
+                                1,
+                                interpreter.vm_config.max_value_nest_depth,
+                                check_mask,
+                            )?))?;
                     },
                     Instruction::Neq => {
                         let lhs = interpreter.operand_stack.pop()?;
                         let rhs = interpreter.operand_stack.pop()?;
                         gas_meter.charge_neq(&lhs, &rhs)?;
+                        let check_mask = interpreter.vm_config.include_closure_mask_in_cmp;
                         interpreter
                             .operand_stack
-                            .push(Value::bool(!lhs.equals(&rhs)?))?;
+                            .push(Value::bool(!lhs.equals_with_depth(
+                                &rhs,
+                                1,
+                                interpreter.vm_config.max_value_nest_depth,
+                                check_mask,
+                            )?))?;
                     },
                     Instruction::MutBorrowGlobal(sd_idx) | Instruction::ImmBorrowGlobal(sd_idx) => {
                         let is_mut = matches!(instruction, Instruction::MutBorrowGlobal(_));
@@ -3096,7 +3154,15 @@ impl Frame {
                         gas_meter.charge_simple_instr(S::Nop)?;
                     },
                     Instruction::VecPack(si, num) => {
-                        let (ty, ty_count) = frame_cache.get_signature_index_type(*si, self)?;
+                        let (ty, ty_count, depth) =
+                            frame_cache.get_signature_index_type(*si, self)?;
+                        if self.ty_builder.check_depth_on_type_counts_v2 {
+                            // Account for new vector node.
+                            self.ty_builder.check_final_size_and_depth(
+                                u64::from(ty_count) + 1,
+                                depth as u64 + 1,
+                            )?;
+                        }
                         gas_meter.charge_create_ty(ty_count)?;
                         interpreter.ty_depth_checker.check_depth_of_type(
                             gas_meter,
@@ -3105,13 +3171,13 @@ impl Frame {
                         )?;
                         gas_meter
                             .charge_vec_pack(interpreter.operand_stack.last_n(*num as usize)?)?;
-                        let elements = interpreter.operand_stack.popn(*num as u16)?;
+                        let elements = interpreter.operand_stack.popn(*num)?;
                         let value = Vector::pack(ty, elements)?;
                         interpreter.operand_stack.push(value)?;
                     },
                     Instruction::VecLen(si) => {
                         let vec_ref = interpreter.operand_stack.pop_as::<VectorRef>()?;
-                        let (_, ty_count) = frame_cache.get_signature_index_type(*si, self)?;
+                        let (_, ty_count, _) = frame_cache.get_signature_index_type(*si, self)?;
                         gas_meter.charge_create_ty(ty_count)?;
                         gas_meter.charge_vec_len()?;
                         let value = vec_ref.len()?;
@@ -3120,7 +3186,7 @@ impl Frame {
                     Instruction::VecImmBorrow(si) => {
                         let idx = interpreter.operand_stack.pop_as::<u64>()? as usize;
                         let vec_ref = interpreter.operand_stack.pop_as::<VectorRef>()?;
-                        let (_, ty_count) = frame_cache.get_signature_index_type(*si, self)?;
+                        let (_, ty_count, _) = frame_cache.get_signature_index_type(*si, self)?;
                         gas_meter.charge_create_ty(ty_count)?;
                         gas_meter.charge_vec_borrow(false)?;
                         let elem = vec_ref.borrow_elem(idx)?;
@@ -3129,7 +3195,7 @@ impl Frame {
                     Instruction::VecMutBorrow(si) => {
                         let idx = interpreter.operand_stack.pop_as::<u64>()? as usize;
                         let vec_ref = interpreter.operand_stack.pop_as::<VectorRef>()?;
-                        let (_, ty_count) = frame_cache.get_signature_index_type(*si, self)?;
+                        let (_, ty_count, _) = frame_cache.get_signature_index_type(*si, self)?;
                         gas_meter.charge_create_ty(ty_count)?;
                         gas_meter.charge_vec_borrow(true)?;
                         let elem = vec_ref.borrow_elem(idx)?;
@@ -3138,14 +3204,14 @@ impl Frame {
                     Instruction::VecPushBack(si) => {
                         let elem = interpreter.operand_stack.pop()?;
                         let vec_ref = interpreter.operand_stack.pop_as::<VectorRef>()?;
-                        let (_, ty_count) = frame_cache.get_signature_index_type(*si, self)?;
+                        let (_, ty_count, _) = frame_cache.get_signature_index_type(*si, self)?;
                         gas_meter.charge_create_ty(ty_count)?;
                         gas_meter.charge_vec_push_back(&elem)?;
                         vec_ref.push_back(elem)?;
                     },
                     Instruction::VecPopBack(si) => {
                         let vec_ref = interpreter.operand_stack.pop_as::<VectorRef>()?;
-                        let (_, ty_count) = frame_cache.get_signature_index_type(*si, self)?;
+                        let (_, ty_count, _) = frame_cache.get_signature_index_type(*si, self)?;
                         gas_meter.charge_create_ty(ty_count)?;
                         let res = vec_ref.pop();
                         gas_meter.charge_vec_pop_back(res.as_ref().ok())?;
@@ -3153,7 +3219,7 @@ impl Frame {
                     },
                     Instruction::VecUnpack(si, num) => {
                         let vec_val = interpreter.operand_stack.pop_as::<Vector>()?;
-                        let (_, ty_count) = frame_cache.get_signature_index_type(*si, self)?;
+                        let (_, ty_count, _) = frame_cache.get_signature_index_type(*si, self)?;
                         gas_meter.charge_create_ty(ty_count)?;
                         gas_meter.charge_vec_unpack(NumArgs::new(*num), vec_val.elem_views())?;
                         let elements = vec_val.unpack(*num)?;
@@ -3165,7 +3231,7 @@ impl Frame {
                         let idx2 = interpreter.operand_stack.pop_as::<u64>()? as usize;
                         let idx1 = interpreter.operand_stack.pop_as::<u64>()? as usize;
                         let vec_ref = interpreter.operand_stack.pop_as::<VectorRef>()?;
-                        let (_, ty_count) = frame_cache.get_signature_index_type(*si, self)?;
+                        let (_, ty_count, _) = frame_cache.get_signature_index_type(*si, self)?;
                         gas_meter.charge_create_ty(ty_count)?;
                         gas_meter.charge_vec_swap()?;
                         vec_ref.swap(idx1, idx2)?;

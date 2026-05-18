@@ -88,6 +88,7 @@ impl PrunerManager for LedgerPrunerManager {
         self.ledger_db.write_pruner_progress(min_readable_version)
     }
 
+    #[cfg(test)]
     fn is_pruning_pending(&self) -> bool {
         self.pruner_worker
             .as_ref()

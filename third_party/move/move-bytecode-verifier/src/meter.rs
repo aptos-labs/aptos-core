@@ -1,5 +1,7 @@
-// Copyright (c) The Move Contributors
-// SPDX-License-Identifier: Apache-2.0
+// Parts of the file are Copyright (c) The Diem Core Contributors
+// Parts of the file are Copyright (c) The Move Contributors
+// Parts of the file are Copyright (c) Aptos Foundation
+// All Aptos Foundation code and content is licensed pursuant to the Innovation-Enabling Source Code License, available at https://github.com/aptos-labs/aptos-core/blob/main/LICENSE
 
 use crate::VerifierConfig;
 use move_binary_format::errors::{PartialVMError, PartialVMResult};
@@ -112,7 +114,7 @@ impl BoundMeter {
             mod_bounds: Bounds {
                 name: "<unknown>".to_string(),
                 units: 0,
-                max: config.max_per_fun_meter_units,
+                max: config.max_per_mod_meter_units,
             },
             fun_bounds: Bounds {
                 name: "<unknown>".to_string(),

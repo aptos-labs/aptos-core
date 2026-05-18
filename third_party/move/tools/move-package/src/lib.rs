@@ -1,6 +1,7 @@
-// Copyright (c) The Diem Core Contributors
-// Copyright (c) The Move Contributors
-// SPDX-License-Identifier: Apache-2.0
+// Parts of the file are Copyright (c) The Diem Core Contributors
+// Parts of the file are Copyright (c) The Move Contributors
+// Parts of the file are Copyright (c) Aptos Foundation
+// All Aptos Foundation code and content is licensed pursuant to the Innovation-Enabling Source Code License, available at https://github.com/aptos-labs/aptos-core/blob/main/LICENSE
 
 mod package_lock;
 
@@ -11,7 +12,9 @@ pub mod source_package;
 
 use crate::{
     compilation::{
-        build_plan::BuildPlan, compiled_package::CompiledPackage, model_builder::ModelBuilder,
+        build_plan::{BuildPlan, CompilerDriverResult},
+        compiled_package::CompiledPackage,
+        model_builder::ModelBuilder,
     },
     package_lock::PackageLock,
     resolution::resolution_graph::{ResolutionGraph, ResolvedGraph},
@@ -23,7 +26,10 @@ use legacy_move_compiler::{
     command_line::SKIP_ATTRIBUTE_CHECKS, shared::known_attributes::KnownAttribute,
 };
 use move_compiler_v2::external_checks::ExternalChecks;
-use move_core_types::account_address::AccountAddress;
+use move_core_types::{
+    account_address::AccountAddress,
+    diag_writer::{Buffer, DiagWriter},
+};
 use move_model::{
     metadata::{CompilerVersion, LanguageVersion},
     model,
@@ -34,7 +40,7 @@ use std::{
     collections::{BTreeMap, BTreeSet},
     io::Write,
     path::{Path, PathBuf},
-    sync::Arc,
+    sync::{Arc, Mutex},
 };
 
 #[derive(Debug, Parser, Clone, Serialize, Deserialize, Eq, PartialEq, PartialOrd, Default)]
@@ -50,6 +56,10 @@ pub struct BuildConfig {
     /// along with any code in the 'tests' directory.
     #[clap(name = "test-mode", long = "test", global = true)]
     pub test_mode: bool,
+
+    /// Compile in 'verify' mode. The '#[verify_only]' code will be included.
+    #[clap(name = "verify-mode", long = "verify", global = true)]
+    pub verify_mode: bool,
 
     /// Whether to override the standard library with the given version.
     #[clap(long = "override-std", global = true, value_parser)]
@@ -82,6 +92,12 @@ pub struct BuildConfig {
     /// Additional named address mapping. Useful for tools in rust
     #[clap(skip)]
     pub additional_named_addresses: BTreeMap<String, AccountAddress>,
+
+    /// Named addresses that unconditionally override any conflicting package-level
+    /// assignment.  Unlike `additional_named_addresses` (which errors on conflict),
+    /// entries here always win.  Populated by the `--named-address` replay flag.
+    #[clap(skip)]
+    pub forced_named_addresses: BTreeMap<String, AccountAddress>,
 
     /// Only fetch dependency repos to MOVE_HOME
     #[clap(long = "fetch-deps-only", global = true)]
@@ -121,9 +137,28 @@ pub struct CompilerConfig {
     #[clap(long, global = true)]
     pub experiments: Vec<String>,
 
-    /// Whether to print errors to stderr as they are reported.
-    #[clap(long, default_value = "true")]
-    pub print_errors: bool,
+    /// Controls where compiler diagnostics are written.
+    /// `Some(true)`: stderr (default for CLI). `Some(false)`: discard.
+    /// `None`: caller is responsible for capturing diagnostics.
+    #[clap(skip)]
+    pub print_errors: Option<bool>,
+}
+
+impl CompilerConfig {
+    /// Create a diagnostics writer based on [`Self::print_errors`].
+    /// `Some(true)`: stderr. `Some(false)`: discard. `None`: in-memory buffer.
+    /// The buffer handle is `Some` only for `None`, allowing the caller to
+    /// flush captured diagnostics.
+    pub fn error_writer(&self) -> (DiagWriter, Option<Arc<Mutex<Buffer>>>) {
+        match self.print_errors {
+            Some(true) => (DiagWriter::stderr(), None),
+            Some(false) => (DiagWriter::sink(), None),
+            None => {
+                let (w, b) = DiagWriter::new_buffer();
+                (w, Some(b))
+            },
+        }
+    }
 }
 
 #[derive(Debug, Clone, Eq, PartialEq, PartialOrd)]
@@ -137,6 +172,11 @@ pub struct ModelConfig {
     pub compiler_version: CompilerVersion,
     /// The language version used to build the model
     pub language_version: LanguageVersion,
+    /// If set, the full compiler pipeline including bytecode generation is run.
+    /// Required by the prover which operates on FileFormat bytecode.
+    /// When false (default for most uses), only the type checker and AST
+    /// transforms are executed.
+    pub with_bytecode: bool,
 }
 
 impl BuildConfig {
@@ -168,11 +208,40 @@ impl BuildConfig {
         ret
     }
 
+    /// Like [`compile_package_no_exit`](Self::compile_package_no_exit) but accepts a custom
+    /// compiler driver, allowing callers to control where compiler diagnostics are written.
+    pub fn compile_package_no_exit_with_driver<W: Write>(
+        self,
+        resolved_graph: ResolvedGraph,
+        external_checks: Vec<Arc<dyn ExternalChecks>>,
+        writer: &mut W,
+        driver: impl FnMut(move_compiler_v2::Options) -> CompilerDriverResult,
+    ) -> Result<(CompiledPackage, Option<model::GlobalEnv>)> {
+        let config = self.compiler_config.clone();
+        let mutx = PackageLock::lock();
+        let ret = BuildPlan::create(resolved_graph)?.compile_with_driver(
+            writer,
+            &config,
+            external_checks,
+            driver,
+        );
+        mutx.unlock();
+        ret
+    }
+
     // NOTE: If there are no renamings, then the root package has the global resolution of all named
     // addresses in the package graph in scope. So we can simply grab all of the source files
     // across all packages and build the Move model from that.
     // TODO: In the future we will need a better way to do this to support renaming in packages
     // where we want to support building a Move model.
+
+    /// Build the Move model for the package at `path`.
+    ///
+    /// Only fails on I/O errors; all compilation errors and warnings are stored
+    /// in the returned `GlobalEnv`. Use `env.check_errors(msg)?` at call sites
+    /// where compilation errors should be fatal.
+    ///
+    /// See [`ModelConfig::with_bytecode`] for the effect of that flag.
     pub fn move_model_for_package(
         self,
         path: &Path,

@@ -208,7 +208,7 @@ module aptos_framework::primary_fungible_store {
             fungible_asset::amount(&fa),
             primary_store_address_inlined(
                 signer::address_of(owner),
-                fa.metadata_from_asset(),
+                fa.asset_metadata(),
             )
         );
         let metadata = fa.asset_metadata();

@@ -2,11 +2,15 @@
 // Licensed pursuant to the Innovation-Enabling Source Code License, available at https://github.com/aptos-labs/aptos-core/blob/main/LICENSE
 
 use crate::{
-    assert_success, get_stake_pool, get_validator_config, get_validator_set, initialize_staking,
-    join_validator_set, leave_validator_set, rotate_consensus_key, setup_staking, tests::common,
-    unlock_stake, withdraw_stake, MoveHarness,
+    stake::{
+        get_stake_pool, get_validator_config, get_validator_set, initialize_staking,
+        join_validator_set, leave_validator_set, rotate_consensus_key, setup_staking, unlock_stake,
+        withdraw_stake,
+    },
+    tests::common,
 };
 use aptos_cached_packages::aptos_stdlib;
+use aptos_move_e2e_test_harness::{assert_success, MoveHarness};
 use aptos_types::account_address::{default_stake_pool_address, AccountAddress};
 use once_cell::sync::Lazy;
 use std::collections::BTreeMap;

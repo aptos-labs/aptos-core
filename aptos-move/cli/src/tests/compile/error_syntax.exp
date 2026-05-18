@@ -1,0 +1,13 @@
+BUILDING broken
+error: unexpected token
+  ┌─ <TEMPDIR>/broken.move:2:5
+  │
+2 │     pub fun oops( { }
+  │     ^^^
+  │     │
+  │     Unexpected 'pub'
+  │     Expected a module member: 'spec', 'use', 'friend', 'const', 'fun', 'inline', or 'struct'
+
+{
+  "Error": "Move compilation failed: exiting with context checking errors"
+}

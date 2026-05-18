@@ -1,6 +1,7 @@
-// Copyright (c) The Diem Core Contributors
-// Copyright (c) The Move Contributors
-// SPDX-License-Identifier: Apache-2.0
+// Parts of the file are Copyright (c) The Diem Core Contributors
+// Parts of the file are Copyright (c) The Move Contributors
+// Parts of the file are Copyright (c) Aptos Foundation
+// All Aptos Foundation code and content is licensed pursuant to the Innovation-Enabling Source Code License, available at https://github.com/aptos-labs/aptos-core/blob/main/LICENSE
 
 use crate::{
     compilation::{build_plan::CompilerDriverResult, package_layout::CompiledPackageLayout},
@@ -9,7 +10,7 @@ use crate::{
         layout::{SourcePackageLayout, REFERENCE_TEMPLATE_FILENAME},
         parsed_manifest::{FileName, PackageDigest, PackageName},
     },
-    BuildConfig, CompilerConfig, CompilerVersion,
+    BuildConfig, CompilerConfig,
 };
 use anyhow::{bail, ensure, Context, Result};
 use colored::Colorize;
@@ -606,70 +607,64 @@ impl CompiledPackage {
             .partition_map(|(p, b)| if b { Either::Left(p) } else { Either::Right(p) });
 
         // invoke the compiler
-        let effective_compiler_version = config.compiler_version.unwrap_or_default();
         let effective_language_version = config.language_version.unwrap_or_default();
-        effective_compiler_version.check_language_support(effective_language_version)?;
-
+        let version = config.compiler_version.unwrap_or_default();
         let (file_map, all_compiled_units, model) =
-            match config.compiler_version.unwrap_or_default() {
-                CompilerVersion::V1 => anyhow::bail!("Compiler v1 is no longer supported"),
-                version @ CompilerVersion::V2_0 | version @ CompilerVersion::V2_1 => {
-                    let to_str_vec = |ps: &[Symbol]| {
-                        ps.iter()
-                            .map(move |s| s.as_str().to_owned())
-                            .collect::<Vec<_>>()
-                    };
-                    let mut global_address_map = BTreeMap::new();
-                    for pack in std::iter::once(&sources_package_paths)
-                        .chain(src_deps.iter())
-                        .chain(bytecode_deps.iter())
-                    {
-                        for (name, val) in &pack.named_address_map {
-                            if let Some(old) =
-                                global_address_map.insert(name.as_str().to_owned(), *val)
-                            {
-                                if old != *val {
-                                    let pack_name = pack
-                                        .name
-                                        .map(|s| s.as_str().to_owned())
-                                        .unwrap_or_else(|| "<unnamed>".to_owned());
-                                    bail!(
-                                    "found remapped address alias `{}` (`{} != {}`) in package `{}`\
-                                    , please use unique address aliases across dependencies",
-                                    name, old, val, pack_name
-                                )
-                                }
+            {
+                let to_str_vec = |ps: &[Symbol]| {
+                    ps.iter()
+                        .map(move |s| s.as_str().to_owned())
+                        .collect::<Vec<_>>()
+                };
+                let mut global_address_map = BTreeMap::new();
+                for pack in std::iter::once(&sources_package_paths)
+                    .chain(src_deps.iter())
+                    .chain(bytecode_deps.iter())
+                {
+                    for (name, val) in &pack.named_address_map {
+                        if let Some(old) = global_address_map.insert(name.as_str().to_owned(), *val)
+                        {
+                            if old != *val {
+                                let pack_name = pack
+                                    .name
+                                    .map(|s| s.as_str().to_owned())
+                                    .unwrap_or_else(|| "<unnamed>".to_owned());
+                                bail!(
+                            "found remapped address alias `{}` (`{} != {}`) in package `{}`\
+                            , please use unique address aliases across dependencies",
+                            name, old, val, pack_name
+                        )
                             }
                         }
                     }
-                    let mut options = move_compiler_v2::Options {
-                        sources: sources_package_paths
-                            .paths
-                            .iter()
-                            .map(|path| path.as_str().to_owned())
-                            .collect(),
-                        sources_deps: src_deps.iter().flat_map(|x| to_str_vec(&x.paths)).collect(),
-                        dependencies: bytecode_deps
-                            .iter()
-                            .flat_map(|x| to_str_vec(&x.paths))
-                            .collect(),
-                        named_address_mapping: global_address_map
-                            .into_iter()
-                            .map(|(k, v)| format!("{}={}", k, v))
-                            .collect(),
-                        skip_attribute_checks,
-                        known_attributes: known_attributes.clone(),
-                        language_version: Some(effective_language_version),
-                        compiler_version: Some(version),
-                        compile_test_code: flags.keep_testing_functions(),
-                        experiments: config.experiments.clone(),
-                        external_checks,
-                        print_errors: config.print_errors,
-                        ..Default::default()
-                    };
-                    options = options.set_experiment(Experiment::ATTACH_COMPILED_MODULE, true);
-                    compiler_driver(options)?
-                },
+                }
+                let mut options = move_compiler_v2::Options {
+                    sources: sources_package_paths
+                        .paths
+                        .iter()
+                        .map(|path| path.as_str().to_owned())
+                        .collect(),
+                    sources_deps: src_deps.iter().flat_map(|x| to_str_vec(&x.paths)).collect(),
+                    dependencies: bytecode_deps
+                        .iter()
+                        .flat_map(|x| to_str_vec(&x.paths))
+                        .collect(),
+                    named_address_mapping: global_address_map
+                        .into_iter()
+                        .map(|(k, v)| format!("{}={}", k, v))
+                        .collect(),
+                    skip_attribute_checks,
+                    known_attributes: known_attributes.clone(),
+                    language_version: Some(effective_language_version),
+                    compiler_version: Some(version),
+                    compile_test_code: flags.keep_testing_functions(),
+                    experiments: config.experiments.clone(),
+                    external_checks,
+                    print_errors: config.print_errors.unwrap_or(true),
+                    ..Default::default()
+                };
+                options = options.set_experiment(Experiment::ATTACH_COMPILED_MODULE, true);
+                compiler_driver(options)?
             };
         let mut root_compiled_units = vec![];
         let mut deps_compiled_units = vec![];
@@ -1106,6 +1101,18 @@ pub fn build_and_report_no_exit_v2_driver(
     let mut emitter = options.error_emitter(&mut writer);
     let (env, units) = move_compiler_v2::run_move_compiler(emitter.as_mut(), options)?;
     Ok((move_compiler_v2::make_files_source_text(&env), units, env))
+}
+
+/// Returns a compiler driver that reports errors to the given shared writer
+/// instead of creating its own `StandardStream::stderr()`.
+pub fn make_no_exit_v2_driver_to(
+    writer: &mut move_core_types::diag_writer::DiagWriter,
+) -> impl FnMut(move_compiler_v2::Options) -> CompilerDriverResult + '_ {
+    move |options| {
+        let mut emitter = options.error_emitter(writer);
+        let (env, units) = move_compiler_v2::run_move_compiler(emitter.as_mut(), options)?;
+        Ok((move_compiler_v2::make_files_source_text(&env), units, env))
+    }
 }
 
 /// Returns the deserialized module from the bytecode file

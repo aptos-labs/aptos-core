@@ -1,24 +1,31 @@
-// Copyright (c) The Diem Core Contributors
-// Copyright (c) The Move Contributors
-// SPDX-License-Identifier: Apache-2.0
+// Parts of the file are Copyright (c) The Diem Core Contributors
+// Parts of the file are Copyright (c) The Move Contributors
+// Parts of the file are Copyright (c) Aptos Foundation
+// All Aptos Foundation code and content is licensed pursuant to the Innovation-Enabling Source Code License, available at https://github.com/aptos-labs/aptos-core/blob/main/LICENSE
 
 //! This module supports translations of specifications as found in the move-model to
 //! expressions which can be used in assumes/asserts in bytecode.
 
 use crate::{
     ast::{
-        Condition, ConditionKind, Exp, ExpData, GlobalInvariant, MemoryLabel, Operation,
-        RewriteResult, Spec, TempIndex, TraceKind,
+        BehaviorKind, Condition, ConditionKind, Exp, ExpData, GlobalInvariant, MemoryLabel,
+        MemoryRange, Operation, Pattern, Proof, QuantKind, RewriteResult, Spec, TempIndex,
+        TraceKind,
     },
     exp_generator::ExpGenerator,
-    exp_rewriter::ExpRewriterFunctions,
-    model::{FunctionEnv, GlobalId, Loc, NodeId, QualifiedInstId, SpecVarId, StructId},
+    exp_rewriter::{
+        strip_all_olds, ExpRewriter, ExpRewriterFunctions, MemoryLabelFreshener, RewriteTarget,
+    },
+    model::{
+        FunctionEnv, GlobalEnv, GlobalId, Loc, NodeId, Parameter, QualifiedId, QualifiedInstId,
+        SpecVarId, StructId,
+    },
     pragmas::{
         ABORTS_IF_IS_STRICT_PRAGMA, CONDITION_ABSTRACT_PROP, CONDITION_CONCRETE_PROP,
         CONDITION_EXPORT_PROP, CONDITION_INJECTED_PROP,
     },
     symbol::Symbol,
-    ty::{PrimitiveType, Type},
+    ty::{PrimitiveType, Type, BOOL_TYPE},
 };
 use codespan_reporting::diagnostic::Severity;
 use itertools::Itertools;
@@ -50,6 +57,43 @@ pub struct SpecTranslator<'a, 'b, T: ExpGenerator<'a>> {
     result: TranslatedSpec,
     /// Whether we are in "old" (pre-state) context
     in_old: bool,
+    /// Shared label for all `old()` memory saves within this translator.
+    /// All `old()` references in a single SpecTranslator refer to the same program point
+    /// (function entry), so all saved memories can share one label. Using a single label
+    /// avoids conflicts when multiple invariants/conditions reference overlapping memory types.
+    shared_old_label: Option<MemoryLabel>,
+}
+
+/// A flattened proof action produced by translating a structured `Proof` tree.
+/// Each action has already had its expressions rewritten (old(), result, params, etc.)
+/// and been guarded with any path conditions from enclosing `if/else` proof blocks.
+#[derive(Debug, Clone)]
+pub enum ProofAction {
+    /// Assert an expression with a VC error message.
+    Assert(Exp, String),
+    /// Assume an expression (e.g., lemma ensures, trusted assumption).
+    Assume(Exp),
+    /// Case-split on a boolean/enum, creating verification variants.
+    /// The optional second expression is a guard (path condition): when present,
+    /// an extra verification variant is created for `!guard`, and the base cases
+    /// are conjuncted with `guard`.
+    Split(Exp, Option<Exp>),
+}
+
+impl ProofAction {
+    /// Freshen memory labels in this proof action's expressions.
+    pub fn freshen_labels(&mut self, freshener: &mut MemoryLabelFreshener) {
+        match self {
+            ProofAction::Assert(exp, _) => *exp = freshener.rewrite_exp(exp.clone()),
+            ProofAction::Assume(exp) => *exp = freshener.rewrite_exp(exp.clone()),
+            ProofAction::Split(exp, opt_exp) => {
+                *exp = freshener.rewrite_exp(exp.clone());
+                if let Some(e) = opt_exp {
+                    *e = freshener.rewrite_exp(e.clone());
+                }
+            },
+        }
+    }
 }
 
 /// Represents a translated spec.
@@ -68,6 +112,8 @@ pub struct TranslatedSpec {
     pub invariants: Vec<(Loc, GlobalId, Exp)>,
     pub lets: Vec<(Loc, bool, TempIndex, Exp)>,
     pub updates: Vec<(Loc, Exp, Exp)>,
+    pub pre_proof: Vec<(Loc, ProofAction)>,
+    pub post_proof: Vec<(Loc, ProofAction)>,
 }
 
 impl TranslatedSpec {
@@ -186,6 +232,73 @@ impl TranslatedSpec {
             Self::build_event_store(builder, extend_exp, &emits[1..])
         }
     }
+
+    /// Freshen all memory labels in this translated spec by replacing them with
+    /// deterministic new labels starting from `counter`. The counter is advanced
+    /// past all allocated labels and returned so that subsequent freshenings can
+    /// continue from a non-colliding value.
+    pub fn freshen_labels(&mut self, counter: &mut usize) {
+        let mut freshener = MemoryLabelFreshener::new(*counter);
+        for (_, exp) in &mut self.post {
+            *exp = freshener.rewrite_exp(exp.clone());
+        }
+        for (_, exp, code_exp) in &mut self.aborts {
+            *exp = freshener.rewrite_exp(exp.clone());
+            if let Some(c) = code_exp {
+                *c = freshener.rewrite_exp(c.clone());
+            }
+        }
+        for (_, exp) in &mut self.modifies {
+            *exp = freshener.rewrite_exp(exp.clone());
+        }
+        for (_, exps) in &mut self.aborts_with {
+            for exp in exps {
+                *exp = freshener.rewrite_exp(exp.clone());
+            }
+        }
+        for (_, exp, exp2, opt_exp) in &mut self.emits {
+            *exp = freshener.rewrite_exp(exp.clone());
+            *exp2 = freshener.rewrite_exp(exp2.clone());
+            if let Some(e) = opt_exp {
+                *e = freshener.rewrite_exp(e.clone());
+            }
+        }
+        for (_, exp, exp2) in &mut self.updates {
+            *exp = freshener.rewrite_exp(exp.clone());
+            *exp2 = freshener.rewrite_exp(exp2.clone());
+        }
+        for (_, exp) in &mut self.pre {
+            *exp = freshener.rewrite_exp(exp.clone());
+        }
+        for (_, action) in &mut self.pre_proof {
+            action.freshen_labels(&mut freshener);
+        }
+        for (_, action) in &mut self.post_proof {
+            action.freshen_labels(&mut freshener);
+        }
+        for (_, _, _, exp) in &mut self.lets {
+            *exp = freshener.rewrite_exp(exp.clone());
+        }
+        for (_, _, exp) in &mut self.invariants {
+            *exp = freshener.rewrite_exp(exp.clone());
+        }
+        for (_, _, exp) in &mut self.debug_traces {
+            *exp = freshener.rewrite_exp(exp.clone());
+        }
+        // Freshen labels in saved_memory and saved_spec_vars
+        let map = freshener.label_map();
+        self.saved_memory = self
+            .saved_memory
+            .iter()
+            .map(|(k, v)| (k.clone(), map.get(v).copied().unwrap_or(*v)))
+            .collect();
+        self.saved_spec_vars = self
+            .saved_spec_vars
+            .iter()
+            .map(|(k, v)| (k.clone(), map.get(v).copied().unwrap_or(*v)))
+            .collect();
+        *counter = freshener.next_counter();
+    }
 }
 
 impl<'a, 'b, T: ExpGenerator<'a>> SpecTranslator<'a, 'b, T> {
@@ -219,6 +332,7 @@ impl<'a, 'b, T: ExpGenerator<'a>> SpecTranslator<'a, 'b, T> {
             result: Default::default(),
             let_locals: Default::default(),
             in_old: false,
+            shared_old_label: None,
         };
         translator.translate_spec(for_call);
         translator.result
@@ -244,6 +358,7 @@ impl<'a, 'b, T: ExpGenerator<'a>> SpecTranslator<'a, 'b, T> {
             result: Default::default(),
             let_locals: Default::default(),
             in_old: false,
+            shared_old_label: None,
         };
         // Clone invariants so `inst` lives for the entire loop
         let invariants = invariants.collect_vec();
@@ -279,6 +394,7 @@ impl<'a, 'b, T: ExpGenerator<'a>> SpecTranslator<'a, 'b, T> {
             result: Default::default(),
             let_locals: Default::default(),
             in_old: false,
+            shared_old_label: None,
         };
 
         // Handle updating of global spec variables
@@ -412,25 +528,26 @@ impl<'a, 'b, T: ExpGenerator<'a>> SpecTranslator<'a, 'b, T> {
             ));
         }
 
-        // Translate modifies.
-        for cond in spec
-            .filter_kind(ConditionKind::Modifies)
-            .filter(is_applicable)
+        // Translate modifies targets from function's frame spec.
         {
             self.in_post_state = false;
-            for exp in cond.all_exps() {
+            let fun_env = self.fun_env;
+            let modifies_targets: Vec<Exp> = fun_env
+                .get_frame_spec()
+                .map(|fs| fs.modifies_targets.clone())
+                .unwrap_or_default();
+            for target in modifies_targets.iter() {
+                let loc = self.fun_env.get_loc();
                 // Auto trace the inner address expression.
-                let exp = match exp.as_ref() {
-                    ExpData::Call(id, oper, args) if args.len() == 1 => ExpData::Call(
-                        *id,
-                        oper.clone(),
-                        vec![self.auto_trace(&cond.loc, &args[0])],
-                    )
-                    .into_exp(),
-                    _ => cond.exp.to_owned(),
+                let exp = match target.as_ref() {
+                    ExpData::Call(id, oper, args) if args.len() == 1 => {
+                        ExpData::Call(*id, oper.clone(), vec![self.auto_trace(&loc, &args[0])])
+                            .into_exp()
+                    },
+                    _ => target.clone(),
                 };
                 let exp = self.translate_exp(&exp, false);
-                self.result.modifies.push((cond.loc.clone(), exp));
+                self.result.modifies.push((loc, exp));
             }
         }
 
@@ -445,6 +562,14 @@ impl<'a, 'b, T: ExpGenerator<'a>> SpecTranslator<'a, 'b, T> {
             self.in_post_state = true;
             let exp = self.translate_exp(&self.auto_trace(&cond.loc, &cond.exp), false);
             self.result.post.push((cond.loc.clone(), exp));
+        }
+
+        // Translate proof block for verification context: flatten into pre_proof/post_proof.
+        if !for_call {
+            if let Some(proof) = spec.proof.clone() {
+                self.in_post_state = false;
+                self.translate_proof(&proof, None);
+            }
         }
 
         // Translate emits.
@@ -563,13 +688,310 @@ impl<'a, 'b, T: ExpGenerator<'a>> SpecTranslator<'a, 'b, T> {
         }
     }
 
+    /// Returns the shared label for all `old()` saves in this translator,
+    /// creating one on first use.
+    fn get_or_create_old_label(&mut self) -> MemoryLabel {
+        if let Some(label) = self.shared_old_label {
+            label
+        } else {
+            let label = MemoryLabel::new(self.builder.global_env().new_global_id().as_usize());
+            self.shared_old_label = Some(label);
+            label
+        }
+    }
+
     fn save_memory(&mut self, qid: QualifiedInstId<StructId>) -> MemoryLabel {
-        let builder = &mut self.builder;
-        *self
-            .result
-            .saved_memory
-            .entry(qid)
-            .or_insert_with(|| builder.global_env().new_global_id())
+        let label = self.get_or_create_old_label();
+        *self.result.saved_memory.entry(qid).or_insert(label)
+    }
+
+    /// Save memory for multiple resources using the shared old label.
+    fn save_memory_shared<'c>(
+        &mut self,
+        used_memory: impl IntoIterator<Item = &'c QualifiedInstId<StructId>>,
+        inst: &[Type],
+    ) -> MemoryLabel {
+        let label = self.get_or_create_old_label();
+        let mems: Vec<_> = used_memory
+            .into_iter()
+            .map(|m| m.to_owned().instantiate(inst))
+            .collect();
+        for mem in mems {
+            self.result.saved_memory.entry(mem).or_insert(label);
+        }
+        label
+    }
+
+    /// Walks a `Proof` tree, rewrites all embedded expressions via `translate_exp`,
+    /// and flattens the tree into `result.pre_proof` / `result.post_proof` vectors.
+    /// Path conditions from enclosing `if/else` blocks are accumulated and applied
+    /// as `Implies` guards on each leaf action.
+    fn translate_proof(&mut self, proof: &Proof, path_cond: Option<Exp>) {
+        match proof {
+            Proof::Let(loc, sym, exp) => {
+                let exp = self.translate_exp(exp, false);
+                let ty = self.builder.global_env().get_node_type(exp.node_id());
+                let temp = self.builder.add_local(ty.skip_reference().clone());
+                self.let_locals.insert(*sym, temp);
+                self.result
+                    .lets
+                    .push((loc.clone(), self.in_post_state, temp, exp));
+                // No proof action emitted for Let — it's already in result.lets.
+            },
+            Proof::Assert(loc, exp) => {
+                let exp = self.translate_exp(exp, false);
+                let guarded = self.guard_proof_exp(exp, &path_cond);
+                self.push_proof_action(
+                    loc.clone(),
+                    ProofAction::Assert(guarded, "proof assertion not satisfied".to_string()),
+                );
+            },
+            Proof::Assume(loc, exp) => {
+                let exp = self.translate_exp(exp, false);
+                let guarded = self.guard_proof_exp(exp, &path_cond);
+                self.push_proof_action(loc.clone(), ProofAction::Assume(guarded));
+            },
+            Proof::Split(loc, exp) => {
+                let exp = self.translate_exp(exp, false);
+                // Don't wrap with `==>`: for splits the guard is handled separately
+                // by the instrumentation to preserve the split expression's type and
+                // to produce correct case-split semantics.
+                self.push_proof_action(loc.clone(), ProofAction::Split(exp, path_cond.clone()));
+            },
+            Proof::IfElse(_loc, cond, then_p, else_p) => {
+                let cond = self.translate_exp(cond, false);
+                let then_cond = match &path_cond {
+                    Some(pc) => self
+                        .builder
+                        .mk_bool_call(Operation::And, vec![pc.clone(), cond.clone()]),
+                    None => cond.clone(),
+                };
+                // Save/restore let_locals per branch so bindings don't leak.
+                let saved = self.let_locals.clone();
+                self.translate_proof(then_p, Some(then_cond));
+                self.let_locals = saved.clone();
+                if let Some(eb) = else_p {
+                    let not_cond = self.builder.mk_not(cond);
+                    let else_cond = match &path_cond {
+                        Some(pc) => self
+                            .builder
+                            .mk_bool_call(Operation::And, vec![pc.clone(), not_cond]),
+                        None => not_cond,
+                    };
+                    self.translate_proof(eb, Some(else_cond));
+                    self.let_locals = saved;
+                }
+            },
+            Proof::Block(_loc, stmts) => {
+                let saved_let_locals = self.let_locals.clone();
+                for stmt in stmts {
+                    self.translate_proof(stmt, path_cond.clone());
+                }
+                self.let_locals = saved_let_locals;
+            },
+            Proof::Post(_loc, inner) => {
+                let saved = self.in_post_state;
+                self.in_post_state = true;
+                self.translate_proof(inner, path_cond);
+                self.in_post_state = saved;
+            },
+            Proof::Apply(loc, qid, args) => {
+                let args: Vec<Exp> = args.iter().map(|a| self.translate_exp(a, false)).collect();
+                self.expand_lemma_apply(loc, *qid, &args, &path_cond);
+            },
+            Proof::ForallApply(loc, binds, pats, qid, args) => {
+                let args: Vec<Exp> = args.iter().map(|a| self.translate_exp(a, false)).collect();
+                let pats: Vec<Vec<Exp>> = pats
+                    .iter()
+                    .map(|pat_vec| {
+                        pat_vec
+                            .iter()
+                            .map(|p| self.translate_exp(p, false))
+                            .collect()
+                    })
+                    .collect();
+                self.expand_forall_lemma_apply(loc, binds, &pats, *qid, &args, &path_cond);
+            },
+            Proof::Calc(loc, steps) => {
+                let env = self.builder.global_env();
+                for (lhs, op, rhs) in steps {
+                    let lhs = self.translate_exp(lhs, false);
+                    let rhs = self.translate_exp(rhs, false);
+                    let cmp_node_id = env.new_node(loc.clone(), BOOL_TYPE.clone());
+                    let cmp_exp = ExpData::Call(cmp_node_id, op.clone(), vec![lhs, rhs]).into_exp();
+                    let guarded = self.guard_proof_exp(cmp_exp, &path_cond);
+                    self.push_proof_action(
+                        loc.clone(),
+                        ProofAction::Assert(guarded, "calc step not satisfied".to_string()),
+                    );
+                }
+            },
+        }
+    }
+
+    /// Push a proof action to the appropriate vector based on `in_post_state`.
+    fn push_proof_action(&mut self, loc: Loc, action: ProofAction) {
+        if self.in_post_state {
+            self.result.post_proof.push((loc, action));
+        } else {
+            self.result.pre_proof.push((loc, action));
+        }
+    }
+
+    /// If there's a path condition, wrap `exp` as `path_cond ==> exp`.
+    fn guard_proof_exp(&self, exp: Exp, path_cond: &Option<Exp>) -> Exp {
+        match path_cond {
+            Some(cond) => self
+                .builder
+                .mk_bool_call(Operation::Implies, vec![cond.clone(), exp]),
+            None => exp,
+        }
+    }
+
+    /// Substitute lemma parameters with argument expressions in a condition expression.
+    fn substitute_lemma_params(
+        env: &GlobalEnv,
+        params: &[Parameter],
+        args: &[Exp],
+        exp: &Exp,
+    ) -> Exp {
+        let mut replacer = |_node_id: NodeId, target: RewriteTarget| -> Option<Exp> {
+            match target {
+                RewriteTarget::LocalVar(sym) => {
+                    for (i, Parameter(param_name, _, _)) in params.iter().enumerate() {
+                        if sym == *param_name {
+                            return args.get(i).cloned();
+                        }
+                    }
+                    None
+                },
+                RewriteTarget::Temporary(idx) => args.get(idx).cloned(),
+            }
+        };
+        ExpRewriter::new(env, &mut replacer).rewrite_exp(exp.clone())
+    }
+
+    /// Expand `apply lemma(args)`: assert each requires, assume each ensures.
+    fn expand_lemma_apply(
+        &mut self,
+        loc: &Loc,
+        qid: QualifiedId<crate::ast::LemmaId>,
+        args: &[Exp],
+        path_cond: &Option<Exp>,
+    ) {
+        // Clone lemma data upfront to avoid borrow conflict with &mut self.
+        let env = self.builder.global_env();
+        let module_env = env.get_module(qid.module_id);
+        let lemma = module_env.get_lemma(qid.id);
+        let params = lemma.params.clone();
+        let conditions = lemma.conditions.clone();
+
+        // Process requires first (assert), then ensures (assume), to avoid
+        // assuming conclusions before checking premises when conditions are
+        // declared out of order.
+        for cond in conditions
+            .iter()
+            .filter(|c| c.kind == ConditionKind::Requires)
+        {
+            let env = self.builder.global_env();
+            let subst_exp = Self::substitute_lemma_params(env, &params, args, &cond.exp);
+            let guarded = self.guard_proof_exp(subst_exp, path_cond);
+            self.push_proof_action(
+                loc.clone(),
+                ProofAction::Assert(guarded, "lemma requirement not satisfied".to_string()),
+            );
+        }
+        for cond in conditions
+            .iter()
+            .filter(|c| c.kind == ConditionKind::Ensures)
+        {
+            let env = self.builder.global_env();
+            let subst_exp = Self::substitute_lemma_params(env, &params, args, &cond.exp);
+            let guarded = self.guard_proof_exp(subst_exp, path_cond);
+            self.push_proof_action(loc.clone(), ProofAction::Assume(guarded));
+        }
+    }
+
+    /// Expand `forall binds [triggers] apply lemma(args)`:
+    /// Build `assume forall binds :: {triggers} (conj(requires) ==> conj(ensures))`
+    fn expand_forall_lemma_apply(
+        &mut self,
+        loc: &Loc,
+        binds: &[(Symbol, Type)],
+        patterns: &[Vec<Exp>],
+        qid: QualifiedId<crate::ast::LemmaId>,
+        args: &[Exp],
+        path_cond: &Option<Exp>,
+    ) {
+        // Clone lemma data upfront to avoid borrow conflict.
+        let env = self.builder.global_env();
+        let module_env = env.get_module(qid.module_id);
+        let lemma = module_env.get_lemma(qid.id);
+        let params = lemma.params.clone();
+        let conditions = lemma.conditions.clone();
+
+        let env = self.builder.global_env();
+
+        // Build substituted requires and ensures conjunctions.
+        let requires: Vec<Exp> = conditions
+            .iter()
+            .filter(|c| matches!(c.kind, ConditionKind::Requires))
+            .map(|c| Self::substitute_lemma_params(env, &params, args, &c.exp))
+            .collect();
+        let ensures: Vec<Exp> = conditions
+            .iter()
+            .filter(|c| matches!(c.kind, ConditionKind::Ensures))
+            .map(|c| Self::substitute_lemma_params(env, &params, args, &c.exp))
+            .collect();
+
+        // Build: conj(requires) ==> conj(ensures)
+        let req_conj = self
+            .builder
+            .mk_join_bool(Operation::And, requires.into_iter());
+        let ens_conj = self
+            .builder
+            .mk_join_bool(Operation::And, ensures.into_iter());
+        let body = if let Some(req) = req_conj {
+            if let Some(ens) = ens_conj {
+                self.builder
+                    .mk_bool_call(Operation::Implies, vec![req, ens])
+            } else {
+                return; // no ensures, nothing to assume
+            }
+        } else if let Some(ens) = ens_conj {
+            ens
+        } else {
+            return;
+        };
+
+        // Build quantifier ranges.
+        let env = self.builder.global_env();
+        let ranges: Vec<(Pattern, Exp)> = binds
+            .iter()
+            .map(|(sym, ty)| {
+                let var_node_id = env.new_node(loc.clone(), Type::TypeDomain(Box::new(ty.clone())));
+                let range_exp =
+                    ExpData::Call(var_node_id, Operation::TypeDomain, vec![]).into_exp();
+                let pat_node_id = env.new_node(loc.clone(), ty.clone());
+                let pat = Pattern::Var(pat_node_id, *sym);
+                (pat, range_exp)
+            })
+            .collect();
+
+        // Build forall expression.
+        let quant_node_id = env.new_node(loc.clone(), BOOL_TYPE.clone());
+        let quant_exp = ExpData::Quant(
+            quant_node_id,
+            QuantKind::Forall,
+            ranges,
+            patterns.to_vec(),
+            None,
+            body,
+        )
+        .into_exp();
+
+        let guarded = self.guard_proof_exp(quant_exp, path_cond);
+        self.push_proof_action(loc.clone(), ProofAction::Assume(guarded));
     }
 
     fn save_param(&mut self, idx: TempIndex) -> TempIndex {
@@ -583,10 +1005,161 @@ impl<'a, 'b, T: ExpGenerator<'a>> SpecTranslator<'a, 'b, T> {
             saved
         }
     }
+
+    /// Bridge the user-facing behavioral-predicate syntax to the canonical
+    /// form the Boogie backend consumes. Each stateful `&mut T` input gets
+    /// `Old(...)`-wrapped (triggering `save_param` for the captured pre-state
+    /// temp). For `EnsuresOf` and `ResultOf`, a live post-state clone of each
+    /// wrapped `&mut T` arg is appended after the existing user-provided
+    /// trailing args (the result slot, if any). Idempotent.
+    fn wrap_mut_ref_bp_inputs(&self, exp: &Exp) -> Exp {
+        let env = self.builder.global_env();
+        let ExpData::Call(node_id, Operation::Behavior(kind, range), args) = exp.as_ref() else {
+            return exp.clone();
+        };
+        let Some(fun_exp) = args.first() else {
+            return exp.clone();
+        };
+        let fun_type = env.get_node_type(fun_exp.node_id());
+        let Type::Fun(arg_ty_box, result_ty_box, _) = fun_type else {
+            return exp.clone();
+        };
+        let arg_types: Vec<Type> = (*arg_ty_box).flatten();
+        let num_inputs = arg_types.len();
+        let num_explicit_results = (*result_ty_box).flatten().len();
+        if args.len() < 1 + num_inputs {
+            return exp.clone();
+        }
+
+        // Wrap `&mut` slots whose arg is stateful (ref-typed, `Borrow(Mut,
+        // ...)`, `Old(...)`, or a `Temporary` of a `&mut`-typed local).
+        let wrap_mask: Vec<bool> = (0..num_inputs)
+            .map(|k| {
+                if !arg_types[k].is_mutable_reference() {
+                    return false;
+                }
+                let Some(arg) = args.get(k + 1) else {
+                    return false;
+                };
+                self.is_stateful_mut_ref(arg)
+            })
+            .collect();
+        let post_state_slot_count = wrap_mask.iter().filter(|b| **b).count();
+        if post_state_slot_count == 0 {
+            return exp.clone();
+        }
+
+        // `EnsuresOf` and `ResultOf` carry trailing post-state clones.
+        // `EnsuresOf` also has explicit result slots between inputs and post.
+        let has_post_slots = matches!(kind, BehaviorKind::EnsuresOf | BehaviorKind::ResultOf);
+        let result_slots = if matches!(kind, BehaviorKind::EnsuresOf) {
+            num_explicit_results
+        } else {
+            0
+        };
+        let augmented_arity = 1
+            + num_inputs
+            + if has_post_slots {
+                result_slots + post_state_slot_count
+            } else {
+                0
+            };
+        let needs_post_state = has_post_slots && args.len() < augmented_arity;
+
+        // Idempotent short-circuit when canonical form is already present.
+        let all_wrapped = wrap_mask.iter().enumerate().all(|(k, needs_wrap)| {
+            if !needs_wrap {
+                return true;
+            }
+            matches!(
+                args.get(k + 1).map(|a| a.as_ref()),
+                Some(ExpData::Call(_, Operation::Old, _))
+            )
+        });
+        if all_wrapped && !needs_post_state {
+            return exp.clone();
+        }
+
+        let mut new_args: Vec<Exp> = Vec::with_capacity(augmented_arity);
+        new_args.push(fun_exp.clone());
+        let mut post_state_clones: Vec<Exp> = Vec::new();
+        for k in 0..num_inputs {
+            let arg = args[k + 1].clone();
+            if wrap_mask[k] {
+                // Live form (all `Old` wrappers stripped at every level):
+                // `old(p).x → p.x`, `old(Select(p, x)) → p.x`, …
+                let live = strip_all_olds(&arg);
+                if needs_post_state {
+                    post_state_clones.push(live.clone());
+                }
+                if matches!(arg.as_ref(), ExpData::Call(_, Operation::Old, _)) {
+                    new_args.push(arg);
+                } else {
+                    // `in_old` propagates through `Select`/`SelectVariants`
+                    // so the inner `Temporary`'s `save_param` still fires.
+                    let arg_ty = env.get_node_type(arg.node_id());
+                    let arg_loc = env.get_node_loc(arg.node_id());
+                    let new_id = env.new_node(arg_loc, arg_ty);
+                    new_args.push(ExpData::Call(new_id, Operation::Old, vec![arg]).into_exp());
+                }
+            } else {
+                new_args.push(arg);
+            }
+        }
+        if has_post_slots {
+            for arg in args.iter().skip(1 + num_inputs) {
+                new_args.push(arg.clone());
+            }
+            new_args.extend(post_state_clones);
+        }
+        ExpData::Call(
+            *node_id,
+            Operation::Behavior(*kind, range.clone()),
+            new_args,
+        )
+        .into_exp()
+    }
+
+    /// True if `arg` is a stateful `&mut`-source shape: a ref-typed
+    /// expression, `Borrow(Mut, ...)`, `Old(...)` of a stateful inner,
+    /// a `Select`/`SelectVariants` rooted in a stateful inner, or a
+    /// `Temporary` of a `&mut`-typed local.
+    fn is_stateful_mut_ref(&self, arg: &Exp) -> bool {
+        let env = self.builder.global_env();
+        if env.get_node_type(arg.node_id()).is_reference() {
+            return true;
+        }
+        match arg.as_ref() {
+            ExpData::Call(_, Operation::Borrow(crate::ty::ReferenceKind::Mutable), _) => true,
+            ExpData::Call(_, Operation::Old, inner) if inner.len() == 1 => {
+                self.is_stateful_mut_ref(&inner[0])
+            },
+            ExpData::Call(_, Operation::Select(..), inner) if inner.len() == 1 => {
+                self.is_stateful_mut_ref(&inner[0])
+            },
+            ExpData::Call(_, Operation::SelectVariants(..), inner) if inner.len() == 1 => {
+                self.is_stateful_mut_ref(&inner[0])
+            },
+            ExpData::Temporary(_, idx) => self
+                .fun_env
+                .get_local_type(*idx)
+                .as_ref()
+                .is_some_and(Type::is_reference),
+            _ => false,
+        }
+    }
 }
 
 impl<'a, T: ExpGenerator<'a>> ExpRewriterFunctions for SpecTranslator<'a, '_, T> {
     fn rewrite_exp(&mut self, exp: Exp) -> Exp {
+        // `Old`-wrap stateful `&mut` BP args so `save_param` routes their
+        // pre-state through captured temps.
+        let exp = if let ExpData::Call(_, Operation::Behavior(_, _), _) = exp.as_ref() {
+            self.wrap_mut_ref_bp_inputs(&exp)
+        } else {
+            exp
+        };
+
         // Do some pre-processing of the expression before actual rewrite, reporting
         // errors.
         let env = self.builder.global_env();
@@ -696,6 +1269,7 @@ impl<'a, T: ExpGenerator<'a>> ExpRewriterFunctions for SpecTranslator<'a, '_, T>
         use ExpData::*;
         use Operation::*;
         match oper {
+            // Global(None): fall back to save_memory when in old context
             Global(None) if self.in_old => Some(
                 Call(
                     id,
@@ -712,21 +1286,121 @@ impl<'a, T: ExpGenerator<'a>> ExpRewriterFunctions for SpecTranslator<'a, '_, T>
                 )
                 .into_exp(),
             ),
-            SpecFunction(mid, fid, None) if self.in_old => {
+            // SpecFunction with labels from state labels: still may need pre-state SaveMem
+            SpecFunction(mid, fid, range) if !range.is_default() => {
+                // If the spec fun uses old() and has no pre-label, save memory
+                // for the pre-state. This happens with `..S |~ spec_fun(a)` where
+                // post=S but pre=None (function entry).
+                let (uses_old, has_old_memory, used_memory) = {
+                    let module_env = self.builder.global_env().get_module(*mid);
+                    let decl = module_env.get_spec_fun(*fid);
+                    (
+                        decl.uses_old,
+                        !decl.old_memory.is_empty(),
+                        decl.used_memory.clone(),
+                    )
+                };
+                if uses_old && has_old_memory && range.pre.is_none() {
+                    let inst = self.builder.global_env().get_node_instantiation(id);
+                    let label = self.save_memory_shared(&used_memory, &inst);
+                    let new_range = MemoryRange {
+                        pre: Some(label),
+                        post: range.post,
+                    };
+                    Some(Call(id, SpecFunction(*mid, *fid, new_range), args.to_owned()).into_exp())
+                } else {
+                    None
+                }
+            },
+            // SpecFunction in old context: save memory for pre-state
+            SpecFunction(mid, fid, range) if self.in_old => {
                 let used_memory = {
                     let module_env = self.builder.global_env().get_module(*mid);
                     let decl = module_env.get_spec_fun(*fid);
-                    // Unfortunately, the below clones are necessary, as we cannot borrow decl
-                    // and at the same time mutate self later.
                     decl.used_memory.clone()
                 };
                 let inst = self.builder.global_env().get_node_instantiation(id);
-                let mut labels = vec![];
-                for mem in used_memory {
-                    let mem = mem.instantiate(&inst);
-                    labels.push(self.save_memory(mem));
+                let label = self.save_memory_shared(&used_memory, &inst);
+                let new_range = MemoryRange {
+                    pre: Some(label),
+                    post: range.post,
+                };
+                Some(Call(id, SpecFunction(*mid, *fid, new_range), args.to_owned()).into_exp())
+            },
+            // SpecFunction outside old but uses_old: save memory for pre-state
+            SpecFunction(mid, fid, range) if !self.in_old => {
+                let (uses_old, has_old_memory, used_memory) = {
+                    let module_env = self.builder.global_env().get_module(*mid);
+                    let decl = module_env.get_spec_fun(*fid);
+                    (
+                        decl.uses_old,
+                        !decl.old_memory.is_empty(),
+                        decl.used_memory.clone(),
+                    )
+                };
+                if uses_old && has_old_memory {
+                    let inst = self.builder.global_env().get_node_instantiation(id);
+                    let label = self.save_memory_shared(&used_memory, &inst);
+                    let new_range = MemoryRange {
+                        pre: Some(label),
+                        post: range.post,
+                    };
+                    Some(Call(id, SpecFunction(*mid, *fid, new_range), args.to_owned()).into_exp())
+                } else {
+                    None
                 }
-                Some(Call(id, SpecFunction(*mid, *fid, Some(labels)), args.to_owned()).into_exp())
+            },
+            // Behavior with labels already set: leave as-is
+            Behavior(_, range) if !range.is_default() => None,
+            // Behavior that needs pre-state label
+            Behavior(kind, range) if needs_pre_label(kind, self.in_old) => {
+                let env = self.builder.global_env();
+                if let Some(ExpData::Call(closure_id, Operation::Closure(mid, fid, _), _)) =
+                    args.first().map(|a| a.as_ref())
+                {
+                    let fun_env = env.get_function(mid.qualified(*fid));
+                    let used_memory = fun_env.get_spec_used_memory().clone();
+                    let inst = env.get_node_instantiation(*closure_id);
+                    let label = self.save_memory_shared(&used_memory, &inst);
+                    let new_range = MemoryRange {
+                        pre: Some(label),
+                        post: range.post,
+                    };
+                    Some(Call(id, Behavior(*kind, new_range), args.to_owned()).into_exp())
+                } else if let Some(ExpData::Call(_, Operation::Select(smid, sid, field_id), _)) =
+                    args.first().map(|a| a.as_ref())
+                {
+                    // Struct-field function value (e.g. `pool.pricing.0`):
+                    // the closure's memory footprint is declared by the
+                    // struct's field spec (`reads_of<f> …` / `modifies_of<f> …`).
+                    // Using `self.fun_env.get_spec_used_memory()` here would miss
+                    // these resources, leaving the pre-state label unsaved at
+                    // procedure entry.
+                    let struct_env = env.get_module(*smid).into_struct(*sid);
+                    let field_sym = field_id.symbol();
+                    let memory = collect_field_access_memory(env, &struct_env, field_sym);
+                    let label = self.save_memory_shared(&memory, self.type_args);
+                    let new_range = MemoryRange {
+                        pre: Some(label),
+                        post: range.post,
+                    };
+                    Some(Call(id, Behavior(*kind, new_range), args.to_owned()).into_exp())
+                } else {
+                    // Temporary (function parameter), let-bound local, etc.:
+                    // fall back to the enclosing function's spec_used_memory.
+                    // For function-typed parameters with `modifies_of` /
+                    // `reads_of` declarations, the env_pipeline spec rewriter
+                    // already propagates the parameter's access_of memory into
+                    // the function's spec_used_memory / spec_old_memory, so
+                    // this fallback covers the fun-param case too.
+                    let used_memory = self.fun_env.get_spec_used_memory().clone();
+                    let label = self.save_memory_shared(&used_memory, self.type_args);
+                    let new_range = MemoryRange {
+                        pre: Some(label),
+                        post: range.post,
+                    };
+                    Some(Call(id, Behavior(*kind, new_range), args.to_owned()).into_exp())
+                }
             },
             Old => Some(args[0].to_owned()),
             Result(n) => {
@@ -766,4 +1440,49 @@ impl<'a, T: ExpGenerator<'a>> ExpRewriterFunctions for SpecTranslator<'a, '_, T>
     fn rewrite_exit_scope(&mut self, _id: NodeId) {
         self.shadowed.pop();
     }
+}
+
+/// Returns true if a behavioral predicate of given kind needs a pre-state memory label.
+/// `ensures_of`, `result_of`, and `write_of` always need pre-state (they compare pre vs post).
+/// `aborts_of` and `requires_of` only need pre-state if inside `old()`.
+fn needs_pre_label(kind: &BehaviorKind, in_old: bool) -> bool {
+    in_old || kind.is_two_state()
+}
+
+/// Memory accessed by a struct field's function value, as declared by the
+/// struct's `reads_of<f> …` / `modifies_of<f> …` specs. Used to populate
+/// `saved_memory` when a behavioral predicate like `result_of<s.f>(…)` needs
+/// a pre-state label: without this the Boogie evaluator's `old_*` memory
+/// slot would reference an unsaved snapshot variable.
+///
+/// Wildcard (`*`) is approximated by all `key` structs reachable from the
+/// current `GlobalEnv`. Mono-based exact expansion isn't available here
+/// (the spec translator runs before `mono_analysis`), so over-saving is
+/// acceptable: extra saved memory only adds a cheap `SaveMem` at procedure
+/// entry without affecting verification soundness.
+fn collect_field_access_memory(
+    env: &crate::model::GlobalEnv,
+    struct_env: &crate::model::StructEnv,
+    field_sym: Symbol,
+) -> BTreeSet<QualifiedInstId<StructId>> {
+    let mut memory: BTreeSet<QualifiedInstId<StructId>> = BTreeSet::new();
+    for access in struct_env.get_field_access_of() {
+        if access.fun_param != field_sym {
+            continue;
+        }
+        if access.frame_spec.modifies_all || access.frame_spec.reads_all {
+            for module in env.get_modules() {
+                for s in module.get_structs() {
+                    if s.get_abilities().has_key() {
+                        memory.insert(s.get_qualified_id().instantiate(vec![]));
+                    }
+                }
+            }
+        } else {
+            memory.extend(access.used_memory.iter().cloned());
+            memory.extend(access.old_memory.iter().cloned());
+        }
+        break;
+    }
+    memory
 }

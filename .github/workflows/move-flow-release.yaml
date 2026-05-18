@@ -1,0 +1,47 @@
+# This defines a workflow to build and release move-flow.
+# In order to trigger it go to the Actions Tab of the Repo, click "Release move-flow" and then "Run Workflow".
+
+name: "Release move-flow"
+
+on:
+  workflow_dispatch:
+    inputs:
+      release_version:
+        type: string
+        required: true
+        description: "The release version. E.g. '0.1.0':"
+      source_git_ref_override:
+        type: string
+        required: false
+        description: "GIT_SHA_OVERRIDE: Use this to override the Git SHA1, branch name (e.g. devnet) or tag to build the binaries from. Defaults to the workflow Git REV:"
+      release_title:
+        type: string
+        required: false
+        description: "Optional custom release title. Defaults to 'move-flow v<version>':"
+      dry_run:
+        type: boolean
+        required: false
+        default: true
+        description: "Dry run - If checked, the release will not be created"
+      skip_checks:
+        type: boolean
+        required: false
+        default: false
+        description: "Skip checks - If checked, the release will skip version checks"
+
+jobs:
+  release-move-flow:
+    name: "Release move-flow"
+    permissions:
+      contents: write
+      pull-requests: read
+    uses: ./.github/workflows/binary-release.yaml
+    with:
+      binary_name: move-flow
+      crate_name: aptos-move-flow
+      build_profile: tool
+      release_version: ${{ inputs.release_version }}
+      source_git_ref_override: ${{ inputs.source_git_ref_override }}
+      release_title: ${{ inputs.release_title || format('move-flow v{0}', inputs.release_version) }}
+      dry_run: ${{ inputs.dry_run }}
+      skip_checks: ${{ inputs.skip_checks }}

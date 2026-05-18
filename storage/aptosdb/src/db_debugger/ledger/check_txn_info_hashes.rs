@@ -50,7 +50,7 @@ impl Cmd {
                 leaf_hash,
             );
 
-            if version % 10_000 == 0 {
+            if version.is_multiple_of(10_000) {
                 println!("Good until version {}.", version);
             }
 

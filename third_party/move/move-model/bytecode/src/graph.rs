@@ -1,6 +1,7 @@
-// Copyright (c) The Diem Core Contributors
-// Copyright (c) The Move Contributors
-// SPDX-License-Identifier: Apache-2.0
+// Parts of the file are Copyright (c) The Diem Core Contributors
+// Parts of the file are Copyright (c) The Move Contributors
+// Parts of the file are Copyright (c) Aptos Foundation
+// All Aptos Foundation code and content is licensed pursuant to the Innovation-Enabling Source Code License, available at https://github.com/aptos-labs/aptos-core/blob/main/LICENSE
 
 // This module implements a technique to compute the natural loops of a graph.
 // The implementation is based on the computation of the dominance relation
@@ -137,7 +138,7 @@ impl<T: Ord + Copy + Debug> Graph<T> {
     }
 }
 
-struct DomRelation<T: Ord + Copy + Debug> {
+pub struct DomRelation<T: Ord + Copy + Debug> {
     node_to_postorder_num: BTreeMap<T, usize>,
     postorder_num_to_node: Vec<T>,
     idom_tree: BTreeMap<usize, usize>,
@@ -160,6 +161,17 @@ impl<T: Ord + Copy + Debug> DomRelation<T> {
     /// This function returns true iff `x` is reachable from the entry node of the graph.
     pub fn is_reachable(&self, x: T) -> bool {
         self.node_to_postorder_num.contains_key(&x)
+    }
+
+    /// Returns the immediate dominator of `x`, or `None` if `x` is the entry node
+    /// or unreachable.
+    pub fn immediate_dominator(&self, x: T) -> Option<T> {
+        let x_num = *self.node_to_postorder_num.get(&x)?;
+        if x_num == self.entry_num() {
+            return None; // entry has no immediate dominator
+        }
+        let idom_num = *self.idom_tree.get(&x_num)?;
+        Some(self.postorder_num_to_node[idom_num])
     }
 
     /// This function returns true iff `x` is dominated by `y`.

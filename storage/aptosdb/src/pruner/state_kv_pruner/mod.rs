@@ -28,26 +28,24 @@ use std::{
     sync::{atomic::Ordering, Arc},
 };
 
-pub const STATE_KV_PRUNER_NAME: &str = "state_kv_pruner";
-
 /// Responsible for pruning state kv db.
 pub(crate) struct StateKvPruner {
     /// Keeps track of the target version that the pruner needs to achieve.
     target_version: AtomicVersion,
     progress: AtomicVersion,
+    name: &'static str,
 
     metadata_pruner: StateKvMetadataPruner,
-    // Non-empty iff sharding is enabled.
     shard_pruners: Vec<StateKvShardPruner>,
 }
 
 impl DBPruner for StateKvPruner {
     fn name(&self) -> &'static str {
-        STATE_KV_PRUNER_NAME
+        self.name
     }
 
     fn prune(&self, max_versions: usize) -> Result<Version> {
-        let _timer = OTHER_TIMERS_SECONDS.timer_with(&["state_kv_pruner__prune"]);
+        let _timer = OTHER_TIMERS_SECONDS.timer_with(&[&format!("{}__prune", self.name)]);
 
         let mut progress = self.progress();
         let target_version = self.target_version();
@@ -59,10 +57,10 @@ impl DBPruner for StateKvPruner {
             info!(
                 progress = progress,
                 target_version = current_batch_target_version,
+                name = self.name,
                 "Pruning state kv data."
             );
-            self.metadata_pruner
-                .prune(progress, current_batch_target_version)?;
+            self.metadata_pruner.prune(current_batch_target_version)?;
 
             THREAD_MANAGER.get_background_pool().install(|| {
                 self.shard_pruners.par_iter().try_for_each(|shard_pruner| {
@@ -79,7 +77,11 @@ impl DBPruner for StateKvPruner {
 
             progress = current_batch_target_version;
             self.record_progress(progress);
-            info!(progress = progress, "Pruning state kv data is done.");
+            info!(
+                progress = progress,
+                name = self.name,
+                "Pruning state kv data is done."
+            );
         }
 
         Ok(target_version)
@@ -92,7 +94,7 @@ impl DBPruner for StateKvPruner {
     fn set_target_version(&self, target_version: Version) {
         self.target_version.store(target_version, Ordering::SeqCst);
         PRUNER_VERSIONS
-            .with_label_values(&["state_kv_pruner", "target"])
+            .with_label_values(&[self.name, "target"])
             .set(target_version as i64);
     }
 
@@ -103,14 +105,19 @@ impl DBPruner for StateKvPruner {
     fn record_progress(&self, progress: Version) {
         self.progress.store(progress, Ordering::SeqCst);
         PRUNER_VERSIONS
-            .with_label_values(&["state_kv_pruner", "progress"])
+            .with_label_values(&[self.name, "progress"])
             .set(progress as i64);
     }
 }
 
 impl StateKvPruner {
     pub fn new(state_kv_db: Arc<StateKvDb>) -> Result<Self> {
-        info!(name = STATE_KV_PRUNER_NAME, "Initializing...");
+        let name = if state_kv_db.is_hot() {
+            "hot_state_kv_pruner"
+        } else {
+            "state_kv_pruner"
+        };
+        info!(name = name, "Initializing...");
 
         let metadata_pruner = StateKvMetadataPruner::new(Arc::clone(&state_kv_db));
 
@@ -118,27 +125,25 @@ impl StateKvPruner {
 
         info!(
             metadata_progress = metadata_progress,
+            name = name,
             "Created state kv metadata pruner, start catching up all shards."
         );
 
-        let shard_pruners = if state_kv_db.enabled_sharding() {
-            let num_shards = state_kv_db.num_shards();
-            let mut shard_pruners = Vec::with_capacity(num_shards);
-            for shard_id in 0..num_shards {
-                shard_pruners.push(StateKvShardPruner::new(
-                    shard_id,
-                    state_kv_db.db_shard_arc(shard_id),
-                    metadata_progress,
-                )?);
-            }
-            shard_pruners
-        } else {
-            Vec::new()
-        };
+        let num_shards = state_kv_db.num_shards();
+        let mut shard_pruners = Vec::with_capacity(num_shards);
+        for shard_id in 0..num_shards {
+            shard_pruners.push(StateKvShardPruner::new(
+                shard_id,
+                state_kv_db.db_shard_arc(shard_id),
+                metadata_progress,
+                state_kv_db.is_hot(),
+            )?);
+        }
 
         let pruner = StateKvPruner {
             target_version: AtomicVersion::new(metadata_progress),
             progress: AtomicVersion::new(metadata_progress),
+            name,
             metadata_pruner,
             shard_pruners,
         };

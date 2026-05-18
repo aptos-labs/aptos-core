@@ -44,8 +44,8 @@ use aptos_types::{
     epoch_state::EpochState,
     ledger_info::{LedgerInfo, LedgerInfoWithSignatures},
     on_chain_config::{
-        OnChainConsensusConfig, OnChainJWKConsensusConfig, OnChainRandomnessConfig, ValidatorSet,
-        ValidatorTxnConfig, DEFAULT_ENABLED_WINDOW_SIZE,
+        OnChainChunkyDKGConfig, OnChainConsensusConfig, OnChainJWKConsensusConfig,
+        OnChainRandomnessConfig, ValidatorSet, ValidatorTxnConfig, DEFAULT_ENABLED_WINDOW_SIZE,
     },
     validator_info::ValidatorInfo,
     validator_signer::ValidatorSigner,
@@ -93,10 +93,12 @@ fn build_empty_store(
         10, // max pruned blocks in mem
         Arc::new(SimulatedTimeService::new()),
         10,
+        60,
         Arc::from(DirectMempoolPayloadManager::new()),
         false,
         DEFAULT_ENABLED_WINDOW_SIZE,
         Arc::new(Mutex::new(PendingBlocks::new())),
+        None,
         None,
     ))
 }
@@ -220,7 +222,7 @@ fn create_node_for_fuzzing() -> RoundManager {
         ConsensusConfig::default(),
         OnChainRandomnessConfig::default_enabled(),
         OnChainJWKConsensusConfig::default_enabled(),
-        None,
+        OnChainChunkyDKGConfig::default_disabled(),
         Arc::new(MockPastProposalStatusTracker {}),
         opt_proposal_loopback_tx,
     )

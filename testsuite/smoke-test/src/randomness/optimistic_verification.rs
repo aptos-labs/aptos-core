@@ -33,7 +33,6 @@ async fn optimistic_verification() {
             conf.epoch_duration_secs = epoch_duration_secs;
             conf.consensus_config.enable_validator_txns();
             conf.consensus_config.disable_rand_check();
-            // Use V1 (no fast path) so the slow path is always exercised.
             conf.randomness_config_override = Some(OnChainRandomnessConfig::new_v1(50, 66));
         }))
         .build_with_cli(0)

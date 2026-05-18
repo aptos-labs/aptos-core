@@ -55,8 +55,8 @@ fn function_value_registry() {
     "#;
     builder.add_source("registry.move", source);
     builder.add_local_dep(
-        "AptosFramework",
-        &common::framework_dir_path("aptos-framework").to_string_lossy(),
+        "MoveStdlib",
+        &common::framework_dir_path("move-stdlib").to_string_lossy(),
     );
     let path = builder.write_to_temp().unwrap();
 
@@ -142,8 +142,8 @@ module 0x66::work {
     "#;
     builder.add_source("persistent.move", source);
     builder.add_local_dep(
-        "AptosFramework",
-        &common::framework_dir_path("aptos-framework").to_string_lossy(),
+        "MoveStdlib",
+        &common::framework_dir_path("move-stdlib").to_string_lossy(),
     );
     let path = builder.write_to_temp().unwrap();
 

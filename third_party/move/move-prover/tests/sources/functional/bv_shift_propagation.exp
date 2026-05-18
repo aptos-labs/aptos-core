@@ -1,0 +1,60 @@
+Move prover returns: exiting with verification errors
+error: abort not covered by any of the `aborts_if` clauses
+   ┌─ tests/sources/functional/bv_shift_propagation.move:19:5
+   │
+17 │           Flags { bits: f.bits | ((1 as u64) << pos) }
+   │                                  ------------------- abort happened here with execution failure
+18 │       }
+19 │ ╭     spec set_bit {
+20 │ │         pragma bv = b"0,1";
+21 │ │         pragma bv_ret = b"0";
+22 │ │         aborts_if false;
+23 │ │         ensures result.bits == (f.bits | ((1 as u64) << pos));
+24 │ │     }
+   │ ╰─────^
+   │
+   =     at tests/sources/functional/bv_shift_propagation.move:16: set_bit
+   =         f = <redacted>
+   =         pos = <redacted>
+   =     at tests/sources/functional/bv_shift_propagation.move:17: set_bit
+   =         ABORTED
+
+error: abort not covered by any of the `aborts_if` clauses
+   ┌─ tests/sources/functional/bv_shift_propagation.move:30:5
+   │
+28 │           (f.bits >> pos) & 1 != 0
+   │           --------------- abort happened here with execution failure
+29 │       }
+30 │ ╭     spec test_bit {
+31 │ │         pragma bv = b"0,1";
+32 │ │         aborts_if false;
+33 │ │         ensures result == ((f.bits >> pos) & (1 as u64) != (0 as u64));
+34 │ │     }
+   │ ╰─────^
+   │
+   =     at tests/sources/functional/bv_shift_propagation.move:27: test_bit
+   =         f = <redacted>
+   =         pos = <redacted>
+   =     at tests/sources/functional/bv_shift_propagation.move:28: test_bit
+   =         ABORTED
+
+error: abort not covered by any of the `aborts_if` clauses
+   ┌─ tests/sources/functional/bv_shift_propagation.move:41:5
+   │
+38 │           let mask = ((1 as u64) << width) - 1;
+   │                      --------------------- abort happened here with execution failure
+   ·
+41 │ ╭     spec apply_mask {
+42 │ │         pragma bv = b"0,1,2";
+43 │ │         pragma bv_ret = b"0";
+44 │ │         aborts_if false;
+45 │ │         ensures result.bits == (f.bits | ((((1 as u64) << width) - (1 as u64)) << bit_pos));
+46 │ │     }
+   │ ╰─────^
+   │
+   =     at tests/sources/functional/bv_shift_propagation.move:37: apply_mask
+   =         f = <redacted>
+   =         bit_pos = <redacted>
+   =         width = <redacted>
+   =     at tests/sources/functional/bv_shift_propagation.move:38: apply_mask
+   =         ABORTED

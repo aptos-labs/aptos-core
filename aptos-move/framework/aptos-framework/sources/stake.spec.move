@@ -215,7 +215,7 @@ spec aptos_framework::stake {
             );
 
         let config = staking_config::get();
-        let voting_power = get_next_epoch_voting_power(stake_pool);
+        let voting_power = get_voting_power(stake_pool);
 
         let minimum_stake = config.minimum_stake;
         let maximum_stake = config.maximum_stake;
@@ -349,7 +349,7 @@ spec aptos_framework::stake {
             && vector::length(validator_set.pending_active)
                 <= option::borrow(spec_find_validator(pending_active, pool_address));
         let post p_validator_set = global<ValidatorSet>(@aptos_framework);
-        let validator_stake = (get_next_epoch_voting_power(stake_pool) as u128);
+        let validator_stake = (get_voting_power(stake_pool) as u128);
         ensures validator_find_bool
             && validator_set.total_joining_power > validator_stake ==>
             p_validator_set.total_joining_power
@@ -509,6 +509,12 @@ spec aptos_framework::stake {
         // This function should never abort.
         /// [high-level-req-4]
         aborts_if false;
+        // Invariant: the precomputed cache is consumed (resource destroyed) so the next epoch starts fresh.
+        ensures !exists<PrecomputedValidatorSet>(@aptos_framework);
+        // Invariant: if a precomputed validator set was present, it becomes the active set.
+        ensures old(exists<PrecomputedValidatorSet>(@aptos_framework)) ==>
+            global<ValidatorSet>(@aptos_framework).active_validators
+                == old(global<PrecomputedValidatorSet>(@aptos_framework)).validator_set.active_validators;
     }
 
     spec update_performance_statistics {
@@ -551,7 +557,7 @@ spec aptos_framework::stake {
         ensures result_2.voting_power == result_1;
     }
 
-    spec next_validator_consensus_infos {
+    spec next_validator_consensus_infos_v2 {
         // TODO: set because of timeout (property proved)
         pragma verify_duration_estimate = 300;
         aborts_if false;
@@ -559,6 +565,9 @@ spec aptos_framework::stake {
         include GetReconfigStartTimeRequirement;
         include features::spec_periodical_reward_rate_decrease_enabled() ==>
             staking_config::StakingRewardsConfigEnabledRequirement;
+        // Proof support for I2 in `reconfiguration_with_dkg::try_start*`:
+        // the cache is created on first call and preserved on subsequent ones.
+        ensures exists<PrecomputedValidatorSet>(@aptos_framework);
     }
 
     spec update_stake_pool {

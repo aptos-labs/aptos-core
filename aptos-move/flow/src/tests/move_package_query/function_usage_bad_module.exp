@@ -1,0 +1,2 @@
+is_error: true
+no module `nonexistent` found in the target package

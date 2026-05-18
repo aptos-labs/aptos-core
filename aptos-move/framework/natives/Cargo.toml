@@ -1,0 +1,73 @@
+[package]
+name = "aptos-framework-natives"
+description = "Native function implementations for the Aptos Framework"
+version = "0.1.0"
+
+# Workspace inherited keys
+authors = { workspace = true }
+edition = { workspace = true }
+homepage = { workspace = true }
+license = { workspace = true }
+publish = { workspace = true }
+repository = { workspace = true }
+rust-version = { workspace = true }
+
+[dependencies]
+anyhow = { workspace = true }
+aptos-aggregator = { workspace = true }
+aptos-crypto = { workspace = true }
+aptos-gas-algebra = { workspace = true }
+aptos-gas-schedule = { workspace = true }
+aptos-native-interface = { workspace = true }
+aptos-types = { workspace = true }
+aptos-vm-types = { workspace = true }
+ark-bls12-381 = { workspace = true }
+ark-bn254 = { workspace = true }
+ark-ec = { workspace = true }
+ark-ff = { workspace = true }
+ark-serialize = { workspace = true }
+ark-std = { workspace = true }
+bcs = { workspace = true }
+better_any = { workspace = true }
+blake2-rfc = { workspace = true }
+bulletproofs = { workspace = true }
+byteorder = { workspace = true }
+curve25519-dalek = { package = "curve25519-dalek-ng", version = "4" }
+either = { workspace = true }
+flate2 = { workspace = true }
+hex = { workspace = true }
+itertools = { workspace = true }
+libsecp256k1 = { workspace = true }
+merlin = { workspace = true }
+move-binary-format = { workspace = true }
+move-core-types = { workspace = true }
+move-vm-runtime = { workspace = true }
+move-vm-types = { workspace = true }
+num-traits = { workspace = true }
+once_cell = { workspace = true }
+rand = { workspace = true }
+rand_core = { workspace = true }
+ripemd = { workspace = true }
+serde = { workspace = true }
+serde_bytes = { workspace = true }
+sha2 = { workspace = true }
+sha2_0_10_6 = { workspace = true }
+sha3 = { workspace = true }
+siphasher = { workspace = true }
+smallvec = { workspace = true }
+tiny-keccak = { workspace = true }
+triomphe = { workspace = true }
+
+[dev-dependencies]
+claims = { workspace = true }
+
+[features]
+default = []
+fuzzing = ["aptos-types/fuzzing"]
+testing = ["aptos-crypto/fuzzing"]
+
+[lib]
+doctest = false
+
+[package.metadata.cargo-machete]
+ignored = ["serde_bytes"]

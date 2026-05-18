@@ -22,7 +22,10 @@ use crate::{
 use aptos_types::{chain_id::ChainId, PeerId};
 use flate2::read::GzDecoder;
 use gcp_bigquery_client::model::table_data_insert_all_request::TableDataInsertAllRequest;
-use std::{collections::HashMap, io::Read};
+use std::{
+    collections::{HashMap, HashSet},
+    io::Read,
+};
 use uuid::Uuid;
 use warp::{filters::BoxedFilter, hyper::body::Bytes, reject, reply, Filter, Rejection, Reply};
 
@@ -171,13 +174,19 @@ async fn handle_metrics_ingest(
         format!("kubernetes_pod_name=peer_id:{}", peer_id.to_hex_literal())
     };
 
-    let extra_labels = vec![
+    let mut extra_labels = vec![
         format!("peer_id={}", peer_id),
         format!("node_type={}", node_type),
         format!("contract_name={}", contract_name),
         format!("trust_status={}", trust_label),
         pod_name,
     ];
+    extra_labels.extend(
+        instance
+            .extra_labels
+            .iter()
+            .map(|(k, v)| format!("{}={}", k, v)),
+    );
 
     // Determine encoding
     let encoding = content_encoding.unwrap_or_else(|| "identity".to_string());
@@ -415,6 +424,9 @@ async fn handle_log_ingest(
     tags.insert(PEER_ROLE_TAG_NAME.into(), node_type.as_str());
     tags.insert("contract_name".into(), contract_name.clone());
     tags.insert("trust_status".into(), trust_label.into());
+    for (key, value) in &instance.extra_labels {
+        tags.insert(key.clone(), value.clone());
+    }
 
     let unstructured_log = UnstructuredLog {
         fields,
@@ -634,11 +646,19 @@ async fn handle_custom_event_ingest(
         // Convert events to BigQuery rows and build insert request
         let mut insert_request = TableDataInsertAllRequest::new();
 
+        // Collect server-side reserved keys so client params with the same
+        // names are dropped (server-side labels take precedence).
+        let mut reserved_keys: HashSet<&str> = HashSet::from(["contract_name", "trust_status"]);
+        for key in instance.extra_labels.keys() {
+            reserved_keys.insert(key.as_str());
+        }
+
         for event in body.events {
-            // Add contract_name and trust_status to event params
+            // Add client event params, filtering out any that conflict with server-side labels
             let mut event_params: Vec<serde_json::Value> = event
                 .params
                 .into_iter()
+                .filter(|(key, _)| !reserved_keys.contains(key.as_str()))
                 .map(|(key, value)| {
                     serde_json::json!({
                         "key": key,
@@ -646,7 +666,7 @@ async fn handle_custom_event_ingest(
                     })
                 })
                 .collect();
-            // Append contract_name and trust_status as additional parameters
+            // Append server-side parameters (these take precedence)
             event_params.push(serde_json::json!({
                 "key": "contract_name",
                 "value": {"string_value": contract_name.clone()}
@@ -655,6 +675,12 @@ async fn handle_custom_event_ingest(
                 "key": "trust_status",
                 "value": {"string_value": trust_label}
             }));
+            for (key, value) in &instance.extra_labels {
+                event_params.push(serde_json::json!({
+                    "key": key,
+                    "value": {"string_value": value}
+                }));
+            }
 
             let row = BigQueryRow {
                 event_identity: event_identity.clone(),

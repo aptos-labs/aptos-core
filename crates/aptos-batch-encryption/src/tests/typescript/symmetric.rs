@@ -33,7 +33,10 @@ fn test_hash_to_fr() {
     for i in [1, 2, 7, 8, 31, 32, 33, 63, 64, 65] {
         let mut input = vec![0u8; i];
         rand::thread_rng().fill_bytes(&mut input);
-        let field_hasher = <DefaultFieldHasher<Sha256> as HashToField<Fr>>::new(&[]);
+        let dst = b"dst";
+        let field_hasher = <DefaultFieldHasher<Sha256> as HashToField<Fr>>::new(dst);
+        println!("{:?}", dst);
+        println!("{:?}", input);
         let [fr]: [Fr; 1] = field_hasher.hash_to_field::<1>(&input);
         let rust_result = fr.into_bigint().to_bytes_le();
         let ts_result = run_ts("hash_to_fr", &input).unwrap();

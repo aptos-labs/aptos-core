@@ -15,7 +15,9 @@ rust-version = { workspace = true }
 [dependencies]
 anyhow = { workspace = true }
 aptos = { workspace = true, features = ["fuzzing"] }
+aptos-cached-packages = { workspace = true }
 aptos-config = { workspace = true }
+aptos-crypto = { workspace = true }
 aptos-forge = { workspace = true }
 aptos-global-constants = { workspace = true }
 aptos-keygen = { workspace = true }

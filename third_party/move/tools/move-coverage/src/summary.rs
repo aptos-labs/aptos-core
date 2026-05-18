@@ -1,11 +1,13 @@
-// Copyright (c) The Diem Core Contributors
-// Copyright (c) The Move Contributors
-// SPDX-License-Identifier: Apache-2.0
+// Parts of the file are Copyright (c) The Diem Core Contributors
+// Parts of the file are Copyright (c) The Move Contributors
+// Parts of the file are Copyright (c) Aptos Foundation
+// All Aptos Foundation code and content is licensed pursuant to the Innovation-Enabling Source Code License, available at https://github.com/aptos-labs/aptos-core/blob/main/LICENSE
 
 #![forbid(unsafe_code)]
 
-use crate::coverage_map::{
-    ExecCoverageMap, ExecCoverageMapWithModules, ModuleCoverageMap, TraceMap,
+use crate::{
+    coverage_map::{ExecCoverageMap, ExecCoverageMapWithModules, ModuleCoverageMap, TraceMap},
+    coverage_percentage,
 };
 use move_binary_format::{
     access::ModuleAccess,
@@ -103,24 +105,18 @@ impl ModuleSummary {
                 writeln!(
                     summary_writer,
                     "\t\t% coverage: {:.2}",
-                    fn_summary.percent_coverage()
+                    coverage_percentage(fn_summary.covered, fn_summary.total)
                 )?;
             }
         }
 
-        let covered_percentage = (all_covered as f64) / (all_total as f64) * 100f64;
+        let covered_percentage = coverage_percentage(all_covered, all_total);
         writeln!(
             summary_writer,
             ">>> % Module coverage: {:.2}",
             covered_percentage
         )?;
         Ok((all_total, all_covered))
-    }
-}
-
-impl FunctionSummary {
-    pub fn percent_coverage(&self) -> f64 {
-        (self.covered as f64) / (self.total as f64) * 100f64
     }
 }
 

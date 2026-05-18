@@ -1,0 +1,14 @@
+//# publish --print-bytecode
+module 0x66::test_unpack_wrong_struct_ownership
+
+struct A
+    x: u64
+
+struct B
+    x: u64
+
+// Invalid: unpack$A claims to unpack struct A, but bytecode unpacks struct B instead.
+#[unpack] public fun unpack$A(l0: A): u64
+    move_loc l0
+    unpack B
+    ret

@@ -1,8 +1,7 @@
 // Copyright (c) Aptos Foundation
 // Licensed pursuant to the Innovation-Enabling Source Code License, available at https://github.com/aptos-labs/aptos-core/blob/main/LICENSE
 
-// Note: We make use of the self_update crate, but as you can see in the case of
-// Revela, this can also be used to install / update other binaries.
+// Note: We make use of the self_update crate to install / update additional binaries.
 
 mod aptos;
 mod helpers;
@@ -10,7 +9,6 @@ mod move_mutation_test;
 mod movefmt;
 mod prover_dependencies;
 mod prover_dependency_installer;
-mod revela;
 mod tool;
 mod update_helper;
 
@@ -18,7 +16,6 @@ use crate::common::types::CliTypedResult;
 use anyhow::{anyhow, Context, Result};
 pub use helpers::get_additional_binaries_dir;
 pub use movefmt::get_movefmt_path;
-pub use revela::get_revela_path;
 use self_update::{update::ReleaseUpdate, version::bump_is_greater, Status};
 pub use tool::UpdateTool;
 
@@ -36,8 +33,7 @@ trait BinaryUpdater {
     /// Build the updater from the self_update crate.
     fn build_updater(&self, info: &UpdateRequiredInfo) -> Result<Box<dyn ReleaseUpdate>>;
 
-    /// Update the binary. Install if not present, in the case of additional binaries
-    /// such as Revela.
+    /// Update the binary. Install if not present, in the case of additional binaries.
     fn update(&self) -> CliTypedResult<String> {
         // Confirm that we need to update.
         let info = self

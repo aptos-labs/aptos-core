@@ -11,14 +11,12 @@ module aptos_framework::transaction_context {
     /// The transaction context extension feature is not enabled.
     const ETRANSACTION_CONTEXT_EXTENSION_NOT_ENABLED: u64 = 2;
 
-    /// The monotonically increasing counter is not enabled.
-    const EMONOTONICALLY_INCREASING_COUNTER_NOT_ENABLED: u64 = 3;
-
     /// The monotonically increasing counter has overflowed (too many calls in a single session).
     const EMONOTONICALLY_INCREASING_COUNTER_OVERFLOW: u64 = 4;
 
     /// Transaction index is not avaulable in this execution context.
     const ETRANSACTION_INDEX_NOT_AVAILABLE: u64 = 5;
+
 
     /// A wrapper denoting aptos unique identifer (AUID)
     /// for storing an address
@@ -192,6 +190,13 @@ module aptos_framework::transaction_context {
         payload.entry_function_payload
     }
 
+    /// Returns whether the current transaction is an encrypted transaction.
+    /// This function aborts if called outside of the transaction prologue, execution, or epilogue phases.
+    public fun is_encrypted_txn(): bool {
+        is_encrypted_txn_internal()
+    }
+    native fun is_encrypted_txn_internal(): bool;
+
     /// Returns a monotonically increasing counter value that combines timestamp, transaction index,
     /// session counter, and local counter into a 128-bit value.
     /// Format: `<reserved_byte (8 bits)> || timestamp_us (64 bits) || transaction_index (32 bits) || session_counter (8 bits) || local_counter (16 bits)`
@@ -201,7 +206,6 @@ module aptos_framework::transaction_context {
         if (__COMPILE_FOR_TESTING__) {
             monotonically_increasing_counter_internal_for_test_only()
         } else {
-            assert!(features::is_monotonically_increasing_counter_enabled(), error::invalid_state(EMONOTONICALLY_INCREASING_COUNTER_NOT_ENABLED));
             monotonically_increasing_counter_internal(timestamp::now_microseconds())
         }
     }

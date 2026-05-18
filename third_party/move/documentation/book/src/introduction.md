@@ -1,27 +1,40 @@
-# Introduction
+# The Move on Aptos Book
 
-Welcome to Move, a next generation language for secure, sandboxed, and formally verified programming. Its first use case is for the Diem blockchain, where Move provides the foundation for its implementation. Move allows developers to write programs that flexibly manage and transfer assets, while providing the security and protections against attacks on those assets. However, Move has been developed with use cases in mind outside a blockchain context as well.
+Welcome to Move on Aptos, a next-generation language and runtime 
+environment for secure, sandboxed, and formally
+verified programming. Move allows developers to write programs
+that flexibly manage and transfer assets, while providing the security and
+protections against attacks on those assets.
 
-Move takes its cue from [Rust](https://www.rust-lang.org/) by using resource types with move (hence the name) semantics as an explicit representation of digital assets, such as currency.
+Move takes its cue from [Rust](https://www.rust-lang.org/) adding resource
+types representing persistent, mutable data in storage, with move (hence the name) semantics
+as an explicit representation of digital assets, such as currency.
 
-## Who is Move for?
+## Who is the Aptos Move Book for?
 
-Move was designed and created as a secure, verified, yet flexible programming language. The first use of Move is for the implementation of the Diem blockchain. That said, the language is still evolving. Move has the potential to be a language for other blockchains, and even non-blockchain use cases as well.
+This book covers reference material around the language and the tools available 
+for writing Move code on Aptos. The main **Aptos Developer Documentation** is
+[http://aptos.dev](https://aptos.dev) and provides more task oriented documentation.
 
-The early Move Developer is one with some programming experience, who wants to begin understanding the core programming language and see examples of its usage.
-
-### Hobbyists
-
-Understanding that the capability to create custom modules on the Diem Payment Network will not be available at launch, the hobbyist Move Developer is interested in learning the intricacies of the language. She will understand the basic syntax, the standard libraries available, and write example code that can be executed using the Move CLI. The Move Developer may even want to dig into understanding how the Move Virtual Machine executes the code she writes.
-
-### Core Contributor
-
-Beyond a hobbyist wanting to stay ahead of the curve for the core programming language is someone who may want to [contribute](https://diem.com/en-US/cla-sign/) directly to Move. Whether this includes submitting language improvements or even, in the future, adding core modules available on the Diem Payment Network, the core contributor will understand Move at a deep level.
-
-### Who Move is currently not targeting
-
-Currently, Move is not targeting developers who wish to create custom modules and contracts for use on the Diem Payment Network. We are also not targeting novice developers who expect a completely polished developer experience even in testing the language.
+This book is suitable for developers with some programming experience
+and who want to understand the core programming language and its
+tools.
 
 ## Where Do I Start?
 
-Begin with understanding [modules and scripts](./modules-and-scripts.md) and then work through the [Move Tutorial](./creating-coins.md).
+Begin by working through the
+[Move Core Language Tutorial](https://github.com/aptos-labs/aptos-core/tree/main/aptos-move/move-examples/move-tutorial).
+The [Primitive Types](./primitive-types.md) and [Basic Concepts](./variables.md)
+sections then walk through the language feature by feature, including
+[modules and scripts](./modules-and-packages.md). For an overview of what each
+release of the language adds, see [Language Versions](./move-versions.md).
+
+## Other References
+
+- **[Aptos Framework Book](https://aptos-labs.github.io/framework-book/)** —
+  reference documentation for every on-chain Move module: the Move standard
+  library, the Aptos standard library, and the framework packages.
+- **[Aptos developer docs](https://aptos.dev/)** — getting started, tutorials,
+  tooling, and ecosystem.
+- **[aptos-core on GitHub](https://github.com/aptos-labs/aptos-core)** —
+  source code for the framework, the Move toolchain, and the node.

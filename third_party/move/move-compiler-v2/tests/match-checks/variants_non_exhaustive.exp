@@ -1,0 +1,9 @@
+
+Diagnostics:
+error: match not exhaustive
+   ┌─ tests/match-checks/variants_non_exhaustive.move:10:16
+   │
+10 │         match (c) { Red => abort 1, Blue => abort 2 }
+   │                ^
+   │
+   = missing `Color::RGB{..}`

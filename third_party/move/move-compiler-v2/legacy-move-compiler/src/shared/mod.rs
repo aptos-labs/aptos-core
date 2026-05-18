@@ -1,6 +1,7 @@
-// Copyright (c) The Diem Core Contributors
-// Copyright (c) The Move Contributors
-// SPDX-License-Identifier: Apache-2.0
+// Parts of the file are Copyright (c) The Diem Core Contributors
+// Parts of the file are Copyright (c) The Move Contributors
+// Parts of the file are Copyright (c) Aptos Foundation
+// All Aptos Foundation code and content is licensed pursuant to the Innovation-Enabling Source Code License, available at https://github.com/aptos-labs/aptos-core/blob/main/LICENSE
 
 use crate::{
     command_line as cli,
@@ -316,18 +317,6 @@ pub fn debug_compiler_env_var() -> bool {
     *DEBUG_COMPILER
 }
 
-pub fn move_compiler_warn_of_deprecation_use_env_var() -> bool {
-    static WARN_OF_DEPRECATION: Lazy<bool> =
-        Lazy::new(|| read_bool_env_var(cli::MOVE_COMPILER_WARN_OF_DEPRECATION_USE));
-    *WARN_OF_DEPRECATION
-}
-
-pub fn warn_of_deprecation_use_in_aptos_libs_env_var() -> bool {
-    static WARN_OF_DEPRECATION: Lazy<bool> =
-        Lazy::new(|| read_bool_env_var(cli::WARN_OF_DEPRECATION_USE_IN_APTOS_LIBS));
-    *WARN_OF_DEPRECATION
-}
-
 #[derive(Clone, Debug, Eq, PartialEq, Parser)]
 pub struct Flags {
     /// Compile in test mode
@@ -368,26 +357,10 @@ pub struct Flags {
     #[clap(long = cli::DEBUG_FLAG, default_value=bool_to_str(debug_compiler_env_var()))]
     debug: bool,
 
-    /// Show warnings about use of deprecated functions, modules, constants, etc.
-    /// Note that current value of this constant is "Wdeprecation"
-    #[clap(long = cli::MOVE_COMPILER_WARN_OF_DEPRECATION_USE_FLAG,
-           default_value=bool_to_str(move_compiler_warn_of_deprecation_use_env_var()))]
-    warn_of_deprecation_use: bool,
-
-    /// Show warnings about use of deprecated usage in the Aptos libraries,
-    /// which we should generally not bother users with.
-    /// Note that current value of this constant is "Wdeprecation-aptos"
-    #[clap(long = cli::WARN_OF_DEPRECATION_USE_IN_APTOS_LIBS_FLAG, default_value=bool_to_str(warn_of_deprecation_use_in_aptos_libs_env_var()))]
-    warn_of_deprecation_use_in_aptos_libs: bool,
-
     /// Show warnings about unused functions, fields, constants, etc.
     /// Note that the current value of this constant is "Wunused"
     #[clap(long = cli::WARN_UNUSED_FLAG, default_value="false")]
     warn_unused: bool,
-
-    /// Support Move 2 language features (up to expansion phase)
-    #[clap(long = cli::LANG_V2_FLAG)]
-    lang_v2: bool,
 
     /// Language version
     #[clap(long = cli::LANGUAGE_VERSION)]
@@ -403,11 +376,8 @@ impl Flags {
             keep_testing_functions: false,
             skip_attribute_checks: false,
             debug: debug_compiler_env_var(),
-            warn_of_deprecation_use: move_compiler_warn_of_deprecation_use_env_var(),
-            warn_of_deprecation_use_in_aptos_libs: warn_of_deprecation_use_in_aptos_libs_env_var(),
             warn_unused: false,
-            lang_v2: false,
-            language_version: LanguageVersion::V1,
+            language_version: LanguageVersion::V2_0,
         }
     }
 
@@ -441,7 +411,6 @@ impl Flags {
             verify: true,
             shadow: true, // allows overlapping between sources and deps
             keep_testing_functions: true,
-            lang_v2: true,
             ..Self::empty()
         }
     }
@@ -498,28 +467,6 @@ impl Flags {
         }
     }
 
-    pub fn warn_of_deprecation_use(&self) -> bool {
-        self.warn_of_deprecation_use
-    }
-
-    pub fn set_warn_of_deprecation_use(self, new_value: bool) -> Self {
-        Self {
-            warn_of_deprecation_use: new_value,
-            ..self
-        }
-    }
-
-    pub fn warn_of_deprecation_use_in_aptos_libs(&self) -> bool {
-        self.warn_of_deprecation_use_in_aptos_libs
-    }
-
-    pub fn set_warn_of_deprecation_use_in_aptos_libs(self, new_value: bool) -> Self {
-        Self {
-            warn_of_deprecation_use_in_aptos_libs: new_value,
-            ..self
-        }
-    }
-
     pub fn warn_unused(&self) -> bool {
         self.warn_unused
     }
@@ -535,10 +482,6 @@ impl Flags {
         self.debug
     }
 
-    pub fn lang_v2(&self) -> bool {
-        self.lang_v2
-    }
-
     pub fn language_version(&self) -> LanguageVersion {
         self.language_version
     }
@@ -546,7 +489,6 @@ impl Flags {
     pub fn set_language_version(self, language_version: LanguageVersion) -> Self {
         Self {
             language_version,
-            lang_v2: language_version >= LanguageVersion::V2_0,
             ..self
         }
     }
@@ -554,8 +496,6 @@ impl Flags {
 
 #[derive(Clone, Copy, Debug, ValueEnum)]
 pub enum LanguageVersion {
-    #[value(name = "1")]
-    V1,
     #[value(name = "2")]
     V2, /* V2 is the same as V2_1, here for the parser */
     #[value(name = "2.0")]
@@ -576,7 +516,6 @@ impl LanguageVersion {
     fn to_ordinal(self) -> usize {
         use LanguageVersion::*;
         match self {
-            V1 => 0,
             V2_0 => 1,
             V2 | V2_1 => 2,
             V2_2 => 3,
@@ -610,7 +549,6 @@ impl Ord for LanguageVersion {
 impl std::fmt::Display for LanguageVersion {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(f, "{}", match self {
-            LanguageVersion::V1 => "1",
             LanguageVersion::V2 => "2",
             LanguageVersion::V2_0 => "2.0",
             LanguageVersion::V2_1 => "2.1",
@@ -974,8 +912,13 @@ pub mod known_attributes {
 
         fn expected_positions(&self) -> &'static BTreeSet<AttributePosition> {
             static ALLOW_POSITIONS: Lazy<BTreeSet<AttributePosition>> = Lazy::new(|| {
-                IntoIterator::into_iter([AttributePosition::Module, AttributePosition::Function])
-                    .collect()
+                IntoIterator::into_iter([
+                    AttributePosition::Module,
+                    AttributePosition::Function,
+                    AttributePosition::Struct,
+                    AttributePosition::Constant,
+                ])
+                .collect()
             });
             match self {
                 Self::Allow => &ALLOW_POSITIONS,

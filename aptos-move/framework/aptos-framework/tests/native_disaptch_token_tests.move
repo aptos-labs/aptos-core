@@ -1,9 +1,9 @@
 #[test_only]
 module aptos_framework::native_dispatch_token_tests {
     use aptos_framework::fungible_asset;
-    use 0xcafe::native_dispatch_token;
+    use aptos_framework::native_dispatch_token;
 
-    #[test(creator = @0xcafe)]
+    #[test(creator = @aptos_framework)]
     #[expected_failure(abort_code=0x10019, location=aptos_framework::fungible_asset)]
     fun test_native_dispatch_token(
         creator: &signer,

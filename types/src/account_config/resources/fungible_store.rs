@@ -35,6 +35,10 @@ impl FungibleStoreResource {
         }
     }
 
+    pub fn new_apt(balance: u64, frozen: bool) -> Self {
+        Self::new(AccountAddress::TEN, balance, frozen)
+    }
+
     pub fn metadata(&self) -> AccountAddress {
         self.metadata
     }

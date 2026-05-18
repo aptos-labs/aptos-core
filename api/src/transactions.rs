@@ -1248,6 +1248,10 @@ impl TransactionsApi {
                         AptosErrorCode::InvalidInput,
                         ledger_info,
                     )
+                })
+                .and_then(|signed_transaction| {
+                    self.validate_signed_transaction_payload(ledger_info, &signed_transaction)?;
+                    Ok(signed_transaction)
                 }),
         }
     }
@@ -1277,6 +1281,9 @@ impl TransactionsApi {
                                 entry_function,
                             )?;
                         },
+                        MultisigTransactionPayload::Script(script) => {
+                            TransactionsApi::validate_script(ledger_info, script)?;
+                        },
                     }
                 }
             },
@@ -1296,13 +1303,6 @@ impl TransactionsApi {
             }) => match executable {
                 TransactionExecutable::Script(script) => {
                     TransactionsApi::validate_script(ledger_info, script)?;
-                    if extra_config.is_multisig() {
-                        return Err(SubmitTransactionError::bad_request_with_code(
-                            "Script transaction payload must not be a multisig transaction",
-                            AptosErrorCode::InvalidInput,
-                            ledger_info,
-                        ));
-                    }
                 },
                 TransactionExecutable::EntryFunction(entry_function) => {
                     TransactionsApi::validate_entry_function_payload_format(
@@ -1318,6 +1318,13 @@ impl TransactionsApi {
                             ledger_info,
                         ));
                     }
+                },
+                TransactionExecutable::Encrypted => {
+                    return Err(SubmitTransactionError::bad_request_with_code(
+                        "Encrypted executable is not supported in PayloadV1",
+                        AptosErrorCode::InvalidInput,
+                        ledger_info,
+                    ));
                 },
             },
             TransactionPayload::EncryptedPayload(payload) => {
@@ -1337,7 +1344,26 @@ impl TransactionsApi {
                     ));
                 }
 
-                if let Err(e) = payload.verify(signed_transaction.sender()) {
+                if payload.extra_config().is_multisig() {
+                    return Err(SubmitTransactionError::bad_request_with_code(
+                        "Encrypted transactions do not support multisig",
+                        AptosErrorCode::InvalidInput,
+                        ledger_info,
+                    ));
+                }
+
+                let signer_auth_keys = signed_transaction
+                    .authenticator()
+                    .all_signer_auth_keys(signed_transaction.sender())
+                    .ok_or_else(|| {
+                        SubmitTransactionError::bad_request_with_code(
+                            "Encrypted transactions are not supported with this authenticator type",
+                            AptosErrorCode::InvalidInput,
+                            ledger_info,
+                        )
+                    })?;
+
+                if let Err(e) = payload.verify(signed_transaction.sender(), signer_auth_keys) {
                     return Err(SubmitTransactionError::bad_request_with_code(
                         e.context("Encrypted transaction payload could not be verified"),
                         AptosErrorCode::InvalidInput,
@@ -1429,6 +1455,10 @@ impl TransactionsApi {
                                 ledger_info,
                             )
                         })
+                        .and_then(|signed_transaction| {
+                            self.validate_signed_transaction_payload(ledger_info, &signed_transaction)?;
+                            Ok(signed_transaction)
+                        })
                 })
                 .collect(),
         }
@@ -1486,6 +1516,10 @@ impl TransactionsApi {
             MempoolStatusCode::RejectedByFilter => Err(AptosError::new_with_error_code(
                 mempool_status.message,
                 AptosErrorCode::RejectedByFilter,
+            )),
+            MempoolStatusCode::RateLimited => Err(AptosError::new_with_error_code(
+                mempool_status.message,
+                AptosErrorCode::RateLimited,
             )),
         }
     }
@@ -1665,6 +1699,9 @@ impl TransactionsApi {
                                 entry_function.module(),
                                 &entry_function.function().into(),
                             )
+                        },
+                        MultisigTransactionPayload::Script(_) => {
+                            format!("Multisig::Script::{}", txn.committed_hash()).to_string()
                         },
                     }
                 } else {

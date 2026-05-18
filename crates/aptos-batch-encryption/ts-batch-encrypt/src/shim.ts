@@ -40,7 +40,10 @@ class TestEd25519 extends Serializable {
 
 const functions = {
   'hmac_kdf': hmac_kdf,
-  'hash_to_fr': function(x: Uint8Array) { return bigintToLEBytesFr(hash_to_fr(x)) },
+  'hash_to_fr': function(x: Uint8Array) { 
+  let dst = Uint8Array.from("dst".split("").map(x => x.charCodeAt(0)));
+    return bigintToLEBytesFr(hash_to_fr(x, dst))
+  },
   'hash_to_fq': function(x: Uint8Array) { return bigintToLEBytesFq(hash_to_fq(x)) },
   "symmetric_key_serialize":  function(x: Uint8Array) {
     const key = new SymmetricKey(x);

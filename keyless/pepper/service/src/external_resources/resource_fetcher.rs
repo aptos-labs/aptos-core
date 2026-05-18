@@ -11,6 +11,7 @@ use crate::{
 use aptos_infallible::RwLock;
 use aptos_logger::{info, warn};
 use aptos_time_service::{TimeService, TimeServiceTrait};
+use reqwest::header::HeaderMap;
 use serde::de::DeserializeOwned;
 use std::{sync::Arc, time::Duration};
 use tokio::time::Instant;
@@ -44,11 +45,16 @@ pub trait ExternalResourceInterface<T: DeserializeOwned + Send + Sync + 'static>
 struct ExternalResource {
     name: String,
     url: String,
+    default_headers: HeaderMap,
 }
 
 impl ExternalResource {
-    pub fn new(name: String, url: String) -> ExternalResource {
-        ExternalResource { name, url }
+    pub fn new(name: String, url: String, default_headers: HeaderMap) -> ExternalResource {
+        ExternalResource {
+            name,
+            url,
+            default_headers,
+        }
     }
 }
 
@@ -67,7 +73,7 @@ impl<T: DeserializeOwned + Send + Sync + 'static> ExternalResourceInterface<T>
     async fn fetch_resource(&self) -> Result<T, PepperServiceError> {
         // Fetch the resource from the URL
         let url = self.url.clone();
-        let client = utils::create_request_client();
+        let client = utils::create_request_client(self.default_headers.clone());
         let fetch_result = client.get(url.clone()).send().await;
 
         // Parse the response into the expected resource type
@@ -117,6 +123,7 @@ impl CachedResources {
         &self,
         on_chain_groth16_vk_url: Option<String>,
         on_chain_keyless_config_url: Option<String>,
+        default_headers: HeaderMap,
     ) {
         // Start the Groth16 VK fetcher
         match on_chain_groth16_vk_url {
@@ -124,6 +131,7 @@ impl CachedResources {
                 let external_resource = Arc::new(ExternalResource::new(
                     ON_CHAIN_GROTH16_VK_RESOURCE_NAME.into(),
                     url.clone(),
+                    default_headers.clone(),
                 ));
                 start_external_resource_refresh_loop(
                     external_resource,
@@ -142,6 +150,7 @@ impl CachedResources {
                 let external_resource = Arc::new(ExternalResource::new(
                     ON_CHAIN_KEYLESS_CONFIG_RESOURCE_NAME.into(),
                     url.clone(),
+                    default_headers,
                 ));
                 start_external_resource_refresh_loop(
                     external_resource,
@@ -240,7 +249,7 @@ pub fn start_external_resource_refresh_loop<T: DeserializeOwned + Send + Sync + 
             match fetch_result {
                 Ok(resource) => {
                     // Log the successful fetch
-                    if loop_iteration_counter % RESOURCE_REFRESH_LOOP_LOG_FREQUENCY == 0 {
+                    if loop_iteration_counter.is_multiple_of(RESOURCE_REFRESH_LOOP_LOG_FREQUENCY) {
                         info!(
                             "Successfully fetched resource {} from {} in {:?}",
                             resource_name, resource_url, fetch_time
@@ -268,8 +277,13 @@ pub fn start_external_resource_refresh_loop<T: DeserializeOwned + Send + Sync + 
 pub fn start_cached_resource_fetcher(
     on_chain_groth16_vk_url: Option<String>,
     on_chain_keyless_config_url: Option<String>,
+    default_headers: HeaderMap,
 ) -> CachedResources {
     let cached_resources = CachedResources::new(TimeService::real());
-    cached_resources.start_resource_fetcher(on_chain_groth16_vk_url, on_chain_keyless_config_url);
+    cached_resources.start_resource_fetcher(
+        on_chain_groth16_vk_url,
+        on_chain_keyless_config_url,
+        default_headers,
+    );
     cached_resources
 }

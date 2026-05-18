@@ -132,6 +132,56 @@ fn test_is_descendant_of() {
     assert!(!other_root.is_descendant_of(&child1));
 }
 
+#[test]
+fn test_can_view_after() {
+    //  Build a chain with an advancing base:
+    //
+    //       root (layer 0)
+    //        |
+    //      child1 (layer 1, base_layer=0)  -- spawned from LayeredMap(root, root)
+    //        |
+    //      child2 (layer 2, base_layer=0)  -- spawned from LayeredMap(root, child1)
+    //        |
+    //      child3 (layer 3, base_layer=1)  -- spawned from LayeredMap(child1, child2)
+    //        |
+    //      child4 (layer 4, base_layer=2)  -- spawned from LayeredMap(child2, child3)
+    //
+    let root = MapLayer::<u8, u8>::new_family("test");
+    let child1 = root.view_layers_after(&root).new_layer(&[(1, 10)]);
+    let child2 = child1.view_layers_after(&root).new_layer(&[(2, 20)]);
+    let child3 = child2.view_layers_after(&child1).new_layer(&[(3, 30)]);
+    let child4 = child3.view_layers_after(&child2).new_layer(&[(4, 40)]);
+
+    // A layer can always be viewed after itself.
+    assert!(root.can_view_after(&root));
+    assert!(child3.can_view_after(&child3));
+
+    // child1 and child2 have base_layer=0, so root (layer 0) is a valid base.
+    assert!(child1.can_view_after(&root));
+    assert!(child2.can_view_after(&root));
+
+    // child3 has base_layer=1, so child1 (layer 1) is the earliest valid base.
+    assert!(child3.can_view_after(&child1));
+    assert!(child3.can_view_after(&child2));
+    // root (layer 0) is too old for child3.
+    assert!(!child3.can_view_after(&root));
+
+    // child4 has base_layer=2, so child2 (layer 2) is the earliest valid base.
+    assert!(child4.can_view_after(&child2));
+    assert!(child4.can_view_after(&child3));
+    assert!(!child4.can_view_after(&root));
+    assert!(!child4.can_view_after(&child1));
+
+    // A base cannot be newer than the top layer.
+    assert!(!root.can_view_after(&child1));
+    assert!(!child1.can_view_after(&child2));
+
+    // Different family is always invalid.
+    let other = MapLayer::<u8, u8>::new_family("other");
+    assert!(!child1.can_view_after(&other));
+    assert!(!other.can_view_after(&child1));
+}
+
 proptest! {
     #[test]
     fn test_layered_map_get(

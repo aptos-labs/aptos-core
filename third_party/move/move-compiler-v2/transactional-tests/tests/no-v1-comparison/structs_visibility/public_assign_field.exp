@@ -1,84 +1,17 @@
 processed 9 tasks
 task 0 lines 2-19:  publish [module 0x42::test {]
 task 1 lines 21-131:  publish [module 0x42::test_assign_field {]
-Error: compilation errors:
- bug: bytecode verification failed with unexpected status code `CALL_BORROWED_MUTABLE_REFERENCE_ERROR`:
-Error message: none
-   ┌─ TEMPFILE1:62:13
-   │
-62 │             E::V1(x, y) => {
-   │             ^^^^^^^^^^^
-   │
-   = please consider reporting this issue (see https://aptos.dev/en/build/smart-contracts/compiler_v2#reporting-an-issue)
-
-
 task 2 lines 133-133:  run --verbose -- 0x42::test_assign_field::test_simple
-Error: Function execution failed with VMError: {
-    message: Linker Error: Module 0000000000000000000000000000000000000000000000000000000000000042::test_assign_field doesn't exist,
-    major_status: LINKER_ERROR,
-    sub_status: None,
-    location: undefined,
-    indices: [],
-    offsets: [],
-    exec_state: None,
-}
+return values: { 42, true }
 task 3 lines 135-135:  run --verbose -- 0x42::test_assign_field::test_simple_ref
-Error: Function execution failed with VMError: {
-    message: Linker Error: Module 0000000000000000000000000000000000000000000000000000000000000042::test_assign_field doesn't exist,
-    major_status: LINKER_ERROR,
-    sub_status: None,
-    location: undefined,
-    indices: [],
-    offsets: [],
-    exec_state: None,
-}
+return values: { 42, true }
 task 4 lines 137-137:  run --verbose -- 0x42::test_assign_field::test_assign0
-Error: Function execution failed with VMError: {
-    message: Linker Error: Module 0000000000000000000000000000000000000000000000000000000000000042::test_assign_field doesn't exist,
-    major_status: LINKER_ERROR,
-    sub_status: None,
-    location: undefined,
-    indices: [],
-    offsets: [],
-    exec_state: None,
-}
+return values: { 0, false }
 task 5 lines 139-139:  run --verbose -- 0x42::test_assign_field::test_assign1
-Error: Function execution failed with VMError: {
-    message: Linker Error: Module 0000000000000000000000000000000000000000000000000000000000000042::test_assign_field doesn't exist,
-    major_status: LINKER_ERROR,
-    sub_status: None,
-    location: undefined,
-    indices: [],
-    offsets: [],
-    exec_state: None,
-}
+return values: 4
 task 6 lines 141-141:  run --verbose -- 0x42::test_assign_field::test_assign_chained
-Error: Function execution failed with VMError: {
-    message: Linker Error: Module 0000000000000000000000000000000000000000000000000000000000000042::test_assign_field doesn't exist,
-    major_status: LINKER_ERROR,
-    sub_status: None,
-    location: undefined,
-    indices: [],
-    offsets: [],
-    exec_state: None,
-}
+return values: { { { 0 }, 42 }, { 1 }, { { 2 }, 42 } }
 task 7 lines 143-143:  run --verbose -- 0x42::test_assign_field::test_assign_enum_1
-Error: Function execution failed with VMError: {
-    message: Linker Error: Module 0000000000000000000000000000000000000000000000000000000000000042::test_assign_field doesn't exist,
-    major_status: LINKER_ERROR,
-    sub_status: None,
-    location: undefined,
-    indices: [],
-    offsets: [],
-    exec_state: None,
-}
+return values: true
 task 8 lines 145-145:  run --verbose -- 0x42::test_assign_field::test_assign_enum_2
-Error: Function execution failed with VMError: {
-    message: Linker Error: Module 0000000000000000000000000000000000000000000000000000000000000042::test_assign_field doesn't exist,
-    major_status: LINKER_ERROR,
-    sub_status: None,
-    location: undefined,
-    indices: [],
-    offsets: [],
-    exec_state: None,
-}
+return values: true

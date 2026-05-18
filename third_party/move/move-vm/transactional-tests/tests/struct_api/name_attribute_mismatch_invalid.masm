@@ -1,0 +1,19 @@
+//# publish --print-bytecode
+module 0x66::test_name_attribute_mismatch
+
+struct Point
+    x: u64
+    y: u64
+
+enum Color has drop
+    Red
+    Green
+    Blue
+
+// Test 1: Function has Pack attribute but name doesn't match struct API pattern
+// The name "create_point" doesn't match the pack$S pattern
+#[pack] public fun create_point(l0: u64, l1: u64): Point
+    move_loc l0
+    move_loc l1
+    pack Point
+    ret

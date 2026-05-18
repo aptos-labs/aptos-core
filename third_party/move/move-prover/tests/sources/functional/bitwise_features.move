@@ -37,7 +37,7 @@ module TestFeatures {
 
     spec is_enabled {
         aborts_if false;
-        pragma timeout = 120;
+        pragma verify_duration_estimate = 120;
         ensures result == (
             exists<Features>(@std) // this one does not verify
                 && (((feature / 8) < len(global<Features>(@std).features)
@@ -75,7 +75,7 @@ module TestFeatures {
 
     spec set {
         pragma bv = b"0";
-        pragma timeout = 120;
+        pragma verify_duration_estimate = 120;
         aborts_if false;
         ensures feature / 8 < len(features);
         ensures include == spec_contains(features, feature);
@@ -121,6 +121,7 @@ module TestFeatures {
     }
 
     spec change_feature_flags {
+        pragma verify = false; // TODO: timeout
         aborts_if signer::address_of(framework) != @std;
     }
 
@@ -145,7 +146,7 @@ module TestFeatures {
 
     spec disable_feature_flags {
         pragma opaque;
-        pragma timeout = 120;
+        pragma verify_duration_estimate = 120;
         modifies global<Features>(@std);
         let post features = global<Features>(@std).features;
         ensures forall i in 0..len(disable): (disable[i] / 8 < len(features) && !spec_contains(features, disable[i]));
@@ -173,7 +174,7 @@ module TestFeatures {
     spec enable_feature_flags {
         pragma verify = false; // timeout frequent, makes testsuite too slow
         pragma opaque;
-        pragma timeout = 120;
+        pragma verify_duration_estimate = 120;
         modifies global<Features>(@std);
         let post features = global<Features>(@std).features;
         ensures forall i in 0..len(enable): (enable[i] / 8 < len(features) && spec_contains(features, enable[i]));

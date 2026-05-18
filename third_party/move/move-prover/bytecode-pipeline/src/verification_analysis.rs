@@ -1,6 +1,7 @@
-// Copyright (c) The Diem Core Contributors
-// Copyright (c) The Move Contributors
-// SPDX-License-Identifier: Apache-2.0
+// Parts of the file are Copyright (c) The Diem Core Contributors
+// Parts of the file are Copyright (c) The Move Contributors
+// Parts of the file are Copyright (c) Aptos Foundation
+// All Aptos Foundation code and content is licensed pursuant to the Innovation-Enabling Source Code License, available at https://github.com/aptos-labs/aptos-core/blob/main/LICENSE
 
 //! Analysis which computes an annotation for each function on whether this function should be
 //! verified or inlined. It also calculates the set of global invariants that are applicable to
@@ -91,7 +92,10 @@ impl FunctionTargetProcessor for VerificationAnalysisProcessor {
         // This function implements the logic to decide whether to verify this function
 
         // Rule 1: never verify if "pragma verify = false;"
-        if !fun_env.is_pragma_true(VERIFY_PRAGMA, || true) {
+        // In inference mode, ignore this pragma — we still need the verification
+        // variant as input to spec inference.
+        let options = ProverOptions::get(fun_env.module_env.env);
+        if !options.inference && !fun_env.is_pragma_true(VERIFY_PRAGMA, || true) {
             return data;
         }
 
@@ -230,33 +234,62 @@ impl FunctionTargetProcessor for VerificationAnalysisProcessor {
 
         // If we are verifying only one function or module, check that this indeed exists.
         match &options.verify_scope {
-            VerificationScope::Only(name) | VerificationScope::OnlyModule(name) => {
-                let for_module = matches!(&options.verify_scope, VerificationScope::OnlyModule(_));
-                let mut target_exists = false;
-                for module in env.get_modules() {
-                    if module.is_target() {
-                        if for_module {
-                            target_exists = module.matches_name(name)
-                        } else {
-                            target_exists = module.get_functions().any(|f| f.matches_name(name));
-                        }
-                        if target_exists {
-                            break;
-                        }
-                    }
+            VerificationScope::OnlyModule(name) => {
+                let sym = env.symbol_pool().make(name);
+                if !env.find_module_by_name(sym).is_some_and(|m| m.is_target()) {
+                    env.error(
+                        &env.unknown_loc(),
+                        &format!("module target {} does not exist in target modules", name),
+                    )
                 }
+            },
+            VerificationScope::Only(name) => {
+                let target_exists = env
+                    .get_modules()
+                    .filter(|m| m.is_target())
+                    .any(|m| m.get_functions().any(|f| f.matches_name(name)));
                 if !target_exists {
                     env.error(
                         &env.unknown_loc(),
-                        &format!(
-                            "{} target {} does not exist in target modules",
-                            if for_module { "module" } else { "function" },
-                            name
-                        ),
+                        &format!("function target {} does not exist in target modules", name),
                     )
                 }
             },
             _ => {},
+        }
+
+        // Validate that exclusion targets exist.
+        for excl in &options.verify_exclude {
+            match excl {
+                VerificationScope::OnlyModule(name) => {
+                    let sym = env.symbol_pool().make(name);
+                    if !env.find_module_by_name(sym).is_some_and(|m| m.is_target()) {
+                        env.error(
+                            &env.unknown_loc(),
+                            &format!(
+                                "exclusion module target `{}` does not exist in target modules",
+                                name
+                            ),
+                        )
+                    }
+                },
+                VerificationScope::Only(name) => {
+                    let target_exists = env
+                        .get_modules()
+                        .filter(|m| m.is_target())
+                        .any(|m| m.get_functions().any(|f| f.matches_name(name)));
+                    if !target_exists {
+                        env.error(
+                            &env.unknown_loc(),
+                            &format!(
+                                "exclusion function target `{}` does not exist in target modules",
+                                name
+                            ),
+                        )
+                    }
+                },
+                _ => {},
+            }
         }
 
         // Collect information for global invariant instrumentation
@@ -350,23 +383,38 @@ impl FunctionTargetProcessor for VerificationAnalysisProcessor {
 impl VerificationAnalysisProcessor {
     /// Check whether the function falls within the verification scope given in the options
     fn is_within_verification_scope(fun_env: &FunctionEnv) -> bool {
+        // All lemma functions are always verified.
+        if fun_env.is_lemma() {
+            return true;
+        }
         if fun_env.is_test_only()
             || fun_env.is_intrinsic()
             || fun_env.is_native()
             || fun_env.is_inline()
+            || fun_env.is_struct_api()
         {
             // do not verify any of these function types
             return false;
         }
         let env = fun_env.module_env.env;
         let options = ProverOptions::get(env);
-        match &options.verify_scope {
+        let in_scope = match &options.verify_scope {
             VerificationScope::Public => fun_env.is_exposed(),
             VerificationScope::All => true,
             VerificationScope::Only(name) => fun_env.matches_name(name),
             VerificationScope::OnlyModule(name) => fun_env.module_env.matches_name(name),
             VerificationScope::None => false,
-        }
+        };
+        in_scope && !Self::is_excluded_from_verification(fun_env, &options)
+    }
+
+    /// Check whether the function matches any entry in the exclusion list.
+    fn is_excluded_from_verification(fun_env: &FunctionEnv, options: &ProverOptions) -> bool {
+        options.verify_exclude.iter().any(|excl| match excl {
+            VerificationScope::Only(name) => fun_env.matches_name(name),
+            VerificationScope::OnlyModule(name) => fun_env.module_env.matches_name(name),
+            _ => false,
+        })
     }
 
     /// Mark that this function should be verified, and as a result, mark that all its callees
@@ -382,6 +430,10 @@ impl VerificationAnalysisProcessor {
             .get_or_default_mut::<VerificationInfo>(true);
         if !info.verified {
             info.verified = true;
+            // Also mark inlined: during processing, the function's own data is removed
+            // from targets, so mark_callees_inlined cannot reach it for self-recursive
+            // functions. Setting inlined here ensures the body is available.
+            info.inlined = true;
             Self::mark_callees_inlined(fun_env, targets);
         }
     }
@@ -391,11 +443,18 @@ impl VerificationAnalysisProcessor {
     ///
     /// NOTE: This does not apply to opaque, native, or intrinsic functions.
     fn mark_inlined(fun_env: &FunctionEnv, targets: &mut FunctionTargetsHolder) {
-        if fun_env.is_opaque() || fun_env.is_native() || fun_env.is_intrinsic() {
+        if fun_env.is_opaque() || fun_env.no_verified_bytecode() {
             return;
         }
 
-        // at this time, we only have the `baseline` variant in the targets
+        // At this time, we only have the `baseline` variant in the targets.
+        // For self-recursive (or mutually recursive) functions, the baseline data of
+        // the function currently being processed is temporarily removed by the pipeline
+        // (function_target_pipeline.rs:298). When mark_callees_inlined traverses back
+        // to the function being processed, its data is absent. This is safe because
+        // mark_verified already set inlined=true on the data copy that will be restored
+        // after processing. The prover's Boogie backend handles recursion via bounded
+        // inlining, so we no longer require recursive functions to be marked opaque.
         let variant = FunctionVariant::Baseline;
         if let Some(data) = targets.get_data_mut(&fun_env.get_qualified_id(), &variant) {
             // TODO(mengxu): re-check the treatment of fixedpoint here
@@ -406,16 +465,6 @@ impl VerificationAnalysisProcessor {
                 info.inlined = true;
                 Self::mark_callees_inlined(fun_env, targets);
             }
-        } else {
-            fun_env.module_env.env.error(
-                &fun_env.get_loc(),
-                &format!(
-                    "function `{}` is a recursive function \
-                       (or part of a mutually recursive function group) \
-                       and should be marked as opaque",
-                    fun_env.get_full_name_str()
-                ),
-            );
         }
     }
 

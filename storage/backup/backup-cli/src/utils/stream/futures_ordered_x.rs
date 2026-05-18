@@ -97,7 +97,7 @@ impl<Fut: Future> FuturesOrderedX<Fut> {
     }
 
     /// Returns `true` if the queue contains no futures
-    #[allow(dead_code)]
+    #[cfg(test)]
     pub fn is_empty(&self) -> bool {
         self.in_progress_queue.is_empty() && self.queued_outputs.is_empty()
     }

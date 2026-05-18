@@ -1,0 +1,13 @@
+processed 5 tasks
+task 0 lines 1-25:  publish [module 0x22::test]
+task 1 lines 27-41:  publish [module 0x23::test]
+task 2 lines 43-43:  run 0x22::test::entry_below_limit
+task 3 lines 45-45:  run 0x22::test::entry_at_limit
+task 4 lines 47-47:  run 0x23::test::entry_above_limit
+Error: Function execution failed with VMError: {
+    major_status: VM_MAX_TYPE_DEPTH_REACHED,
+    sub_status: None,
+    location: 0x23::test,
+    indices: [],
+    offsets: [(FunctionDefinitionIndex(0), 1)],
+}

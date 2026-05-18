@@ -33,7 +33,30 @@ where
     D: serde::de::Deserializer<'de>,
 {
     let s: Bytes = serde::de::Deserialize::deserialize(data)?;
-    let a = A::deserialize_with_mode(s.reader(), Compress::Yes, Validate::Yes);
+    let a = A::deserialize_with_mode(s.reader(), Compress::Yes, Validate::No);
+    a.map_err(serde::de::Error::custom)
+}
+
+/// Serialize without compression
+pub fn ark_se_uncompressed<S, A: CanonicalSerialize>(a: &A, s: S) -> Result<S::Ok, S::Error>
+where
+    S: serde::Serializer,
+{
+    let mut bytes = vec![];
+    a.serialize_with_mode(&mut bytes, Compress::No)
+        .map_err(serde::ser::Error::custom)?;
+    s.serialize_bytes(&bytes)
+}
+
+/// Serialize without compression or validation
+pub fn ark_de_uncompressed_no_validate<'de, D, A: CanonicalDeserialize>(
+    data: D,
+) -> Result<A, D::Error>
+where
+    D: serde::de::Deserializer<'de>,
+{
+    let s: Bytes = serde::de::Deserialize::deserialize(data)?;
+    let a = A::deserialize_with_mode(s.reader(), Compress::No, Validate::No);
     a.map_err(serde::de::Error::custom)
 }
 

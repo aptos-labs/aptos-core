@@ -1,3 +1,4 @@
+// @checks=experimental
 module 0xc0ffee::m {
 
     use std::option::{Option, none, some};
@@ -53,6 +54,7 @@ module 0xc0ffee::m {
         (1, 2) // Should not warn here.
     }
 
+    #[lint::skip(unused_function)]
     fun explicit_return_if(x: u64, b: bool): u64 {
         if (b) {
             return x + 1 // Should warn here.
@@ -62,6 +64,7 @@ module 0xc0ffee::m {
     }
 
 
+    #[lint::skip(unused_function)]
     fun explicit_return_if_else(x: u64, b: bool): u64 {
         if (b) {
             return x + 1 // Should warn here.
@@ -70,6 +73,7 @@ module 0xc0ffee::m {
         }
     }
 
+    #[lint::skip(unused_function)]
     fun explicit_return_if_else_void_semicolon(b: bool) {
         if (b) {
             return; // Should warn here.
@@ -78,6 +82,7 @@ module 0xc0ffee::m {
         }
     }
 
+    #[lint::skip(unused_function)]
     fun ok_function(b: bool): u64 {
         if (b) {
             1
@@ -91,7 +96,7 @@ module 0xc0ffee::m {
         ()
     }
 
-    #[lint::skip(needless_return)]
+    #[lint::skip(needless_return, unused_function)]
     fun test_skip(): bool {
         return true
     }

@@ -24,20 +24,6 @@ options provided to the prover.
 {% include "custom-natives" %}
 {%- endif %}
 
-
-// Uninterpreted function for all types
-
-{% for instance in uninterpreted_instances %}
-
-{%- set S = "'" ~ instance.suffix ~ "'" -%}
-{%- set T = instance.name -%}
-
-{%-if S != "'$1_cmp_Ordering'" %}
-function $Arbitrary_value_of{{S}}(): {{T}};
-{% endif %}
-
-{% endfor %}
-
 // ============================================================================================
 // Integer Types
 
@@ -389,6 +375,13 @@ procedure {:inline 1} $bv2int{{impl.base}}(src: bv{{impl.base}}) returns (dst: i
 
 function {:builtin "(_ int2bv {{impl.base}})"} $int2bv.{{impl.base}}(i: int) returns (bv{{impl.base}});
 function {:builtin "bv2nat"} $bv2int.{{impl.base}}(i: bv{{impl.base}}) returns (int);
+axiom (forall n: int :: {$int2bv.{{impl.base}}(n)}
+    n >= 0 && n <= {{impl.max}} ==>
+    $bv2int.{{impl.base}}($int2bv.{{impl.base}}(n)) == n);
+// Bitvector right-shift by 1 equals integer div 2 (unsigned right shift semantic).
+// This axiom bridges the bitvector-theory and integer-theory worlds for the prover.
+axiom (forall n: bv{{impl.base}} :: {$bv2int.{{impl.base}}($Shr'Bv{{impl.base}}'(n, 1bv{{impl.base}}))}
+    $bv2int.{{impl.base}}($Shr'Bv{{impl.base}}'(n, 1bv{{impl.base}})) == $bv2int.{{impl.base}}(n) div 2);
 
 {%- endfor %}
 
@@ -489,6 +482,18 @@ datatype $Tuple7<T1, T2, T3, T4, T5, T6, T7> {
 
 datatype $Tuple8<T1, T2, T3, T4, T5, T6, T7, T8> {
     $Tuple8($0: T1, $1: T2, $2: T3, $3: T4, $4: T5, $5: T6, $6: T7, $7: T8)
+}
+
+datatype $Tuple9<T1, T2, T3, T4, T5, T6, T7, T8, T9> {
+    $Tuple9($0: T1, $1: T2, $2: T3, $3: T4, $4: T5, $5: T6, $6: T7, $7: T8, $8: T9)
+}
+
+datatype $Tuple10<T1, T2, T3, T4, T5, T6, T7, T8, T9, T10> {
+    $Tuple10($0: T1, $1: T2, $2: T3, $3: T4, $4: T5, $5: T6, $6: T7, $7: T8, $8: T9, $9: T10)
+}
+
+datatype $Tuple11<T1, T2, T3, T4, T5, T6, T7, T8, T9, T10, T11> {
+    $Tuple11($0: T1, $1: T2, $2: T3, $3: T4, $4: T5, $5: T6, $6: T7, $7: T8, $8: T9, $9: T10, $10: T11)
 }
 
 {%- for tuple in tuple_instances %}
@@ -674,24 +679,6 @@ procedure {:inline 1} $CastBv{{instance}}to{{impl.base}}(src: bv{{instance}}) re
     dst := 0bv{{base_diff}} ++ src;
     {%- endif %}
 }
-
-{% if impl.base in bv_in_all_types and instance in  bv_in_all_types %}
-function $castBv{{instance}}to{{impl.base}}(src: bv{{instance}}) returns (bv{{impl.base}})
-{
-    {%- if base_diff < 0 %}
-    if ($Gt'Bv{{instance}}'(src, {{impl.max}}bv{{instance}})) then
-        $Arbitrary_value_of'bv{{impl.base}}'()
-    {%- endif %}
-    {%- if base_diff < 0 %}
-    else
-    src[{{impl.base}}:0]
-    {%- elif base_diff == 0 %}
-    src
-    {%- else %}
-    0bv{{base_diff}} ++ src
-    {%- endif %}
-}
-{% endif %}
 
 function $shlBv{{impl.base}}From{{instance}}(src1: bv{{impl.base}}, src2: bv{{instance}}) returns (bv{{impl.base}})
 {

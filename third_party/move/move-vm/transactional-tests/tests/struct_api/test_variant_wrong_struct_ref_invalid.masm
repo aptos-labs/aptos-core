@@ -1,0 +1,16 @@
+//# publish --print-bytecode
+module 0x66::test_test_variant_wrong_struct_ref
+
+struct Point
+    x: u64
+
+enum Color has drop
+  Red
+    value: u64
+
+// Invalid: test_variant$Color$Red should take &Color, not &Point.
+// The parameter is a reference but to the wrong struct (inner type mismatch).
+#[test_variant(0)] public fun test_variant$Color$Red(l0: &Point): bool
+    move_loc l0
+    test_variant Color, Red
+    ret

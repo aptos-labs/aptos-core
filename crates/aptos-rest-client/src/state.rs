@@ -4,10 +4,10 @@
 use aptos_api_types::{
     X_APTOS_BLOCK_HEIGHT, X_APTOS_CHAIN_ID, X_APTOS_CURSOR, X_APTOS_EPOCH,
     X_APTOS_LEDGER_OLDEST_VERSION, X_APTOS_LEDGER_TIMESTAMP, X_APTOS_LEDGER_VERSION,
-    X_APTOS_OLDEST_BLOCK_HEIGHT,
+    X_APTOS_OLDEST_BLOCK_HEIGHT, X_APTOS_TXN_ENCRYPTION_KEY,
 };
 
-#[derive(Debug, Clone, Eq, PartialEq, Ord, PartialOrd)]
+#[derive(Debug, Clone, Eq, PartialEq)]
 pub struct State {
     pub chain_id: u8,
     pub epoch: u64,
@@ -17,6 +17,7 @@ pub struct State {
     pub oldest_block_height: u64,
     pub block_height: u64,
     pub cursor: Option<String>,
+    pub encryption_key: Option<Vec<u8>>,
 }
 
 impl State {
@@ -53,6 +54,10 @@ impl State {
             .get(X_APTOS_CURSOR)
             .and_then(|h| h.to_str().ok())
             .map(|s| s.to_string());
+        let encryption_key = headers
+            .get(X_APTOS_TXN_ENCRYPTION_KEY)
+            .and_then(|h| h.to_str().ok())
+            .and_then(|s| hex::decode(s).ok());
 
         let state = if let (
             Some(chain_id),
@@ -82,6 +87,7 @@ impl State {
                 block_height,
                 oldest_block_height,
                 cursor,
+                encryption_key,
             }
         } else {
             anyhow::bail!(

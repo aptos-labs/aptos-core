@@ -82,7 +82,11 @@ impl<'a> LiveDataService<'a> {
                 let known_latest_version = self.get_known_latest_version();
                 let starting_version = request.starting_version.unwrap_or(known_latest_version);
 
-                info!("Received request: {request:?}.");
+                info!(
+                    stream_id = %id,
+                    starting_version = starting_version,
+                    "Received live data service request"
+                );
                 if starting_version > known_latest_version + 10000 {
                     let err = Err(Status::failed_precondition(
                         "starting_version cannot be set to a far future version.",
@@ -122,7 +126,7 @@ impl<'a> LiveDataService<'a> {
 
                 let ending_version = request
                     .transactions_count
-                    .map(|count| starting_version + count);
+                    .map(|count| starting_version.saturating_add(count));
 
                 scope.spawn(async move {
                     self.start_streaming(
@@ -163,7 +167,10 @@ impl<'a> LiveDataService<'a> {
         COUNTER
             .with_label_values(&["live_data_service_new_stream"])
             .inc();
-        info!(stream_id = id, "Start streaming, starting_version: {starting_version}, ending_version: {ending_version:?}.");
+        info!(
+            stream_id = %id,
+            "Start streaming, starting_version: {starting_version}, ending_version: {ending_version:?}."
+        );
         self.connection_manager
             .insert_active_stream(&id, starting_version, ending_version);
         let mut next_version = starting_version;
@@ -177,7 +184,10 @@ impl<'a> LiveDataService<'a> {
                 .update_stream_progress(&id, next_version, size_bytes);
             let known_latest_version = self.get_known_latest_version();
             if next_version > known_latest_version {
-                info!(stream_id = id, "next_version {next_version} is larger than known_latest_version {known_latest_version}");
+                info!(
+                    stream_id = %id,
+                    "next_version {next_version} is larger than known_latest_version {known_latest_version}"
+                );
                 tokio::time::sleep(Duration::from_millis(100)).await;
                 continue;
             }
@@ -204,7 +214,6 @@ impl<'a> LiveDataService<'a> {
                         last_version: last_processed_version,
                     }),
                 };
-                // Record bytes ready to transfer after stripping for billing.
                 let bytes_ready_to_transfer_after_stripping = response
                     .transactions
                     .iter()
@@ -216,7 +225,7 @@ impl<'a> LiveDataService<'a> {
                 next_version = last_processed_version + 1;
                 size_bytes += batch_size_bytes as u64;
                 if response_sender.send(Ok(response)).await.is_err() {
-                    info!(stream_id = id, "Client dropped.");
+                    info!(stream_id = %id, "Client dropped.");
                     COUNTER
                         .with_label_values(&["live_data_service_client_dropped"])
                         .inc();
@@ -224,7 +233,7 @@ impl<'a> LiveDataService<'a> {
                 }
             } else {
                 let err = Err(Status::not_found("Requested data is too old."));
-                info!(stream_id = id, "Client error: {err:?}.");
+                info!(stream_id = %id, "Client error: {err:?}.");
                 let _ = response_sender.send(err).await;
                 COUNTER
                     .with_label_values(&["terminate_requested_data_too_old"])

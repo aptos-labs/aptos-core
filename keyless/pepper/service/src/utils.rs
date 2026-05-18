@@ -1,10 +1,11 @@
 // Copyright (c) Aptos Foundation
 // Licensed pursuant to the Innovation-Enabling Source Code License, available at https://github.com/aptos-labs/aptos-core/blob/main/LICENSE
 
+use crate::error::PepperServiceError;
 use anyhow::{anyhow, ensure};
 use hyper::{Body, Request};
-use reqwest::Client;
-use std::time::Duration;
+use reqwest::{header::HeaderMap, Client};
+use std::{str::FromStr, time::Duration};
 
 // Timeout for client requests
 const CLIENT_REQUEST_TIMEOUT_SECS: u64 = 15;
@@ -13,10 +14,55 @@ const CLIENT_REQUEST_TIMEOUT_SECS: u64 = 15;
 const MISSING_ORIGIN_STRING: &str = ""; // Default to empty string if origin header is missing
 const ORIGIN_HEADER: &str = "origin";
 
-/// Creates and returns a reqwest HTTP client with a timeout
-pub fn create_request_client() -> Client {
+/// An HTTP header key-value pair, parsed from CLI args in the format "name value".
+#[derive(Clone, Debug)]
+pub struct HttpHeader {
+    pub name: String,
+    pub value: String,
+}
+
+impl FromStr for HttpHeader {
+    type Err = PepperServiceError;
+
+    /// Parses a header from the format "header-name header-value".
+    fn from_str(string: &str) -> Result<Self, Self::Err> {
+        let mut iterator = string.splitn(2, ' ');
+
+        let name = iterator
+            .next()
+            .ok_or(PepperServiceError::UnexpectedError(
+                "Failed to parse HTTP header name".into(),
+            ))?
+            .to_string();
+        let value = iterator
+            .next()
+            .ok_or(PepperServiceError::UnexpectedError(
+                "Failed to parse HTTP header value".into(),
+            ))?
+            .to_string();
+
+        Ok(HttpHeader { name, value })
+    }
+}
+
+/// Converts a list of `HttpHeader` into a `reqwest::header::HeaderMap`.
+pub fn http_headers_to_header_map(headers: &[HttpHeader]) -> HeaderMap {
+    let mut header_map = HeaderMap::new();
+    for header in headers {
+        let name = reqwest::header::HeaderName::from_bytes(header.name.as_bytes())
+            .unwrap_or_else(|e| panic!("Invalid header name '{}': {}", header.name, e));
+        let value = reqwest::header::HeaderValue::from_str(&header.value)
+            .unwrap_or_else(|e| panic!("Invalid value for header '{}': {}", header.name, e));
+        header_map.insert(name, value);
+    }
+    header_map
+}
+
+/// Creates and returns a reqwest HTTP client with a timeout and the given default headers.
+pub fn create_request_client(default_headers: HeaderMap) -> Client {
     Client::builder()
         .timeout(Duration::from_secs(CLIENT_REQUEST_TIMEOUT_SECS))
+        .default_headers(default_headers)
         .build()
         .expect("Failed to build the request client!")
 }
@@ -50,7 +96,8 @@ pub fn unhexlify_api_bytes(api_output: &str) -> anyhow::Result<Vec<u8>> {
 
 #[cfg(test)]
 mod tests {
-    use crate::utils::unhexlify_api_bytes;
+    use crate::utils::{unhexlify_api_bytes, HttpHeader};
+    use std::str::FromStr;
 
     #[test]
     fn test_unhexlify_api_bytes() {
@@ -71,5 +118,21 @@ mod tests {
         assert!(unhexlify_api_bytes("000").is_err());
         assert!(unhexlify_api_bytes("0").is_err());
         assert!(unhexlify_api_bytes("").is_err());
+    }
+
+    #[test]
+    fn test_http_header_from_str() {
+        // Test valid header
+        let header = HttpHeader::from_str("x-internal-application-id my-app-123").unwrap();
+        assert_eq!(header.name, "x-internal-application-id");
+        assert_eq!(header.value, "my-app-123");
+
+        // Test header with spaces in value
+        let header = HttpHeader::from_str("authorization Bearer some-token-value").unwrap();
+        assert_eq!(header.name, "authorization");
+        assert_eq!(header.value, "Bearer some-token-value");
+
+        // Test missing value
+        assert!(HttpHeader::from_str("just-a-name").is_err());
     }
 }

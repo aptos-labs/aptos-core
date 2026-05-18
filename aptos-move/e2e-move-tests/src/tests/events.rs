@@ -13,9 +13,7 @@ fn test_events_ty_tag_size_too_large() {
     let mut h = MoveHarness::new();
     let acc = h.new_account_at(AccountAddress::from_hex_literal("0x815").unwrap());
 
-    assert_success!(
-        h.publish_package_cache_building(&acc, &common::test_dir_path("events.data/pack"))
-    );
+    assert_success!(h.publish_package(&acc, &common::test_dir_path("events.data/pack")));
 
     assert_success!(h.run_entry_function(
         &acc,

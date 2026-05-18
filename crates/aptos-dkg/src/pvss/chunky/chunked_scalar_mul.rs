@@ -10,10 +10,8 @@ use crate::{
     },
     Scalar,
 };
-use aptos_crypto::arkworks::{
-    self,
-    msm::{IsMsmInput, MsmInput},
-};
+use anyhow::{anyhow, Result};
+use aptos_crypto::arkworks::{self, msm::MsmInput};
 use aptos_crypto_derive::SigmaProtocolWitness;
 use ark_ec::{scalar_mul::BatchMulPreprocessing, CurveGroup};
 use ark_ff::PrimeField;
@@ -37,7 +35,7 @@ pub const DST: &[u8; 34] = b"APTOS_CHUNKED_COMMIT_HOM_SIGMA_DST";
 pub struct Homomorphism<'a, C: CurveGroup> {
     pub base: C::Affine,
     pub table: &'a BatchMulPreprocessing<C>, // TODO: use Arc instead?
-    pub ell: u8,
+    pub ell: usize,
 }
 
 impl<'a, C: CurveGroup> Clone for Homomorphism<'a, C> {
@@ -98,12 +96,14 @@ where
     where
         U: CanonicalSerialize + CanonicalDeserialize + Clone + Debug + Eq;
 
-    fn map<U, F>(self, f: F) -> Self::Output<U>
+    fn try_map<U, E, F>(self, f: F) -> Result<Self::Output<U>, E>
     where
-        F: FnMut(T) -> U,
+        F: FnMut(T) -> Result<U, E>,
         U: CanonicalSerialize + CanonicalDeserialize + Clone + Debug + Eq,
     {
-        CodomainShape(self.0.into_iter().map(f).collect())
+        Ok(CodomainShape(
+            self.0.into_iter().map(f).collect::<Result<Vec<_>, _>>()?,
+        ))
     }
 }
 
@@ -132,7 +132,7 @@ impl<'a, C: CurveGroup> homomorphism::Trait for Homomorphism<'a, C> {
     type CodomainNormalized = CodomainShape<C::Affine>;
     type Domain = Witness<C::ScalarField>;
 
-    fn apply(&self, input: &Self::Domain) -> Self::Codomain {
+    fn apply(&self, input: &Self::Domain) -> Result<Self::Codomain> {
         // Convert each chunked value to a scalar entrywise
         let scalars: Vec<C::ScalarField> = input
             .chunked_values
@@ -143,7 +143,7 @@ impl<'a, C: CurveGroup> homomorphism::Trait for Homomorphism<'a, C> {
         // Batch multiply using the base element
         let outputs = arkworks::batch_mul(&self.table, &scalars);
 
-        CodomainShape(outputs)
+        Ok(CodomainShape(outputs))
     }
 
     fn normalize(&self, value: Self::Codomain) -> Self::CodomainNormalized {
@@ -152,15 +152,18 @@ impl<'a, C: CurveGroup> homomorphism::Trait for Homomorphism<'a, C> {
 }
 
 impl<'a, C: CurveGroup> fixed_base_msms::Trait for Homomorphism<'a, C> {
+    type Base = C::Affine;
     type CodomainShape<T>
         = CodomainShape<T>
     where
         T: CanonicalSerialize + CanonicalDeserialize + Clone + Debug + Eq;
-    type MsmInput = MsmInput<C::Affine, C::ScalarField>;
     type MsmOutput = C;
     type Scalar = C::ScalarField;
 
-    fn msm_terms(&self, input: &Self::Domain) -> Self::CodomainShape<Self::MsmInput> {
+    fn msm_terms(
+        &self,
+        input: &Self::Domain,
+    ) -> Result<Self::CodomainShape<MsmInput<Self::Base, Self::Scalar>>> {
         let mut terms = Vec::new();
 
         for chunks in &input.chunked_values {
@@ -173,21 +176,22 @@ impl<'a, C: CurveGroup> fixed_base_msms::Trait for Homomorphism<'a, C> {
             });
         }
 
-        CodomainShape(terms)
+        Ok(CodomainShape(terms))
     }
 
-    fn msm_eval(input: Self::MsmInput) -> Self::MsmOutput {
-        C::msm(input.bases(), input.scalars()).expect("MSM failed in Schnorr") // TODO: custom MSM here, because only length 1 MSM except during verification
+    fn msm_eval(input: MsmInput<Self::Base, Self::Scalar>) -> Result<Self::MsmOutput> {
+        C::msm(input.bases(), input.scalars())
+            .map_err(|e| anyhow!("MSM failed: length mismatch (min length {})", e))
     }
 
-    fn batch_normalize(
-        msm_output: Vec<Self::MsmOutput>,
-    ) -> Vec<<Self::MsmInput as IsMsmInput>::Base> {
+    fn batch_normalize(msm_output: Vec<Self::MsmOutput>) -> Vec<Self::Base> {
         C::normalize_batch(&msm_output)
     }
 }
 
-impl<'a, C: CurveGroup> sigma_protocol::Trait<C> for Homomorphism<'a, C> {
+impl<'a, C: CurveGroup> sigma_protocol::CurveGroupTrait for Homomorphism<'a, C> {
+    type Group = C;
+
     fn dst(&self) -> Vec<u8> {
         DST.to_vec()
     }
@@ -201,7 +205,7 @@ mod tests {
         sigma_protocol::homomorphism::Trait as _,
     };
     use aptos_crypto::arkworks::random::{sample_field_elements, unsafe_random_point};
-    use ark_bls12_381::G1Projective;
+    use ark_bls12_381::{G1Affine, G1Projective};
     use rand::thread_rng;
 
     #[test]
@@ -210,11 +214,11 @@ mod tests {
         let mut rng = thread_rng();
 
         // Parameters
-        let ell: u8 = 16;
+        let ell = 16;
         let num_scalars = 8;
 
         // Random base
-        let base = unsafe_random_point::<G1Projective, _>(&mut rng);
+        let base = unsafe_random_point::<G1Affine, _>(&mut rng);
 
         // Create random scalars
         let scalars = sample_field_elements(num_scalars, &mut rng);
@@ -243,7 +247,7 @@ mod tests {
         };
 
         // Apply the homomorphism
-        let CodomainShape(outputs) = hom.apply(&witness);
+        let CodomainShape(outputs) = hom.apply(&witness).expect("apply");
 
         // Check correctness:
         // base * unchunk(chunks) == output

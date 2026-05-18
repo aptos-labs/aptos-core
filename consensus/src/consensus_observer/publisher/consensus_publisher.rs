@@ -522,6 +522,7 @@ mod test {
                 LedgerInfo::new(BlockInfo::empty(), HashValue::zero()),
                 AggregateSignature::empty(),
             ),
+            false,
         );
         consensus_publisher.publish_message(ordered_block_message.clone());
 

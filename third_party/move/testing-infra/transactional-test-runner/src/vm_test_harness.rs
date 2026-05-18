@@ -1,6 +1,7 @@
-// Copyright (c) The Diem Core Contributors
-// Copyright (c) The Move Contributors
-// SPDX-License-Identifier: Apache-2.0
+// Parts of the file are Copyright (c) The Diem Core Contributors
+// Parts of the file are Copyright (c) The Move Contributors
+// Parts of the file are Copyright (c) Aptos Foundation
+// All Aptos Foundation code and content is licensed pursuant to the Innovation-Enabling Source Code License, available at https://github.com/aptos-labs/aptos-core/blob/main/LICENSE
 
 use crate::{
     framework::{merge_output, run_test_impl, CompiledState, MoveTestAdapter},
@@ -26,6 +27,7 @@ use move_core_types::{
     identifier::{IdentStr, Identifier},
     language_storage::{ModuleId, StructTag, TypeTag},
     value::{MoveTypeLayout, MoveValue},
+    vm_status::StatusType,
 };
 use move_model::metadata::LanguageVersion;
 use move_resource_viewer::MoveValueAnnotator;
@@ -250,8 +252,9 @@ impl<'a> MoveTestAdapter<'a> for SimpleVMTestAdapter<'a> {
             Compatibility::new(
                 !extra_args.skip_check_struct_layout,
                 !extra_args.skip_check_friend_linking,
+                true,
                 false,
-                false,
+                true,
             )
         };
         let staging_module_storage = StagingModuleStorage::create_with_compat_config(
@@ -495,6 +498,18 @@ impl SimpleVMTestAdapter<'_> {
                 );
                 let trace = logger.finish();
                 let replay_result = TypeChecker::new(code_storage).replay(&trace);
+                if let Err(err) = &replay_result {
+                    // Replay validates that the execution trace is well-typed. If replay fails,
+                    // it should only be due to invariant violations (e.g., type mismatches in the trace).
+                    // Any other error type indicates an unexpected failure in the replay mechanism itself,
+                    // which we want to catch immediately during testing.
+                    if err.status_type() != StatusType::InvariantViolation {
+                        panic!(
+                            "Replay should never fail with non-invariant violation: {:?}",
+                            err
+                        );
+                    }
+                }
                 match replay_result.and(result) {
                     Ok(return_values) => (return_values, Some(trace)),
                     Err(err) => return (Err(err), Some(trace)),
@@ -602,9 +617,6 @@ pub struct TestRunConfig {
     pub experiments: Vec<(String, bool)>,
     /// Configuration for the VM that runs tests.
     pub vm_config: VMConfig,
-    /// Whether to use  Move Assembler (.masm) format when printing
-    /// bytecode.
-    pub use_masm: bool,
     /// Whether to print each command executed to test output.
     pub echo: bool,
     /// Set of targets into which to cross-compile.
@@ -648,17 +660,9 @@ impl TestRunConfig {
                 enable_debugging: true,
                 ..VMConfig::default_for_test()
             },
-            use_masm: true,
             echo: true,
             cross_compilation_targets: BTreeSet::new(),
             tracing: false,
-        }
-    }
-
-    pub fn with_masm(self) -> Self {
-        Self {
-            use_masm: true,
-            ..self
         }
     }
 
@@ -683,10 +687,6 @@ impl TestRunConfig {
 
     pub fn with_echo(self) -> Self {
         Self { echo: true, ..self }
-    }
-
-    pub(crate) fn using_masm(&self) -> bool {
-        self.use_masm
     }
 
     pub(crate) fn verifier_disabled(&self) -> bool {

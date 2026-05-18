@@ -1,0 +1,73 @@
+module 0x42::friend_defs {
+    friend 0x42::friend_consumer;
+    friend struct Config<T: copy + drop> has copy, drop {
+        value: T,
+        enabled: bool,
+    }
+    friend enum Status has copy, drop {
+        Active {
+            code: u64,
+        }
+        Inactive,
+        Pending {
+            code: u64,
+            reason: u64,
+        }
+    }
+}
+module 0x42::friend_consumer {
+    use 0x42::friend_defs;
+    fun borrow_code(s: &friend_defs::Status): u64 {
+        *&s.code
+    }
+    fun get_code(s: friend_defs::Status): u64 {
+        let _v0 = &s;
+        'l0: loop {
+            loop {
+                if (!(_v0 is Active)) {
+                    if (_v0 is Pending) break;
+                    if (_v0 is Inactive) break 'l0;
+                    abort 14566554180833181697
+                };
+                let friend_defs::Status::Active{code: _v1} = s;
+                return _v1
+            };
+            let friend_defs::Status::Pending{code: _v2, reason: _v3} = s;
+            return _v2
+        };
+        let friend_defs::Status::Inactive{} = s;
+        0
+    }
+    fun get_value(c: &friend_defs::Config<u64>): u64 {
+        *&c.value
+    }
+    fun is_active(s: &friend_defs::Status): bool {
+        s is Active
+    }
+    fun make_active(code: u64): friend_defs::Status {
+        friend_defs::Status::Active{code: code}
+    }
+    fun make_config(value: u64, enabled: bool): friend_defs::Config<u64> {
+        friend_defs::Config<u64>{value: value, enabled: enabled}
+    }
+    fun make_inactive(): friend_defs::Status {
+        friend_defs::Status::Inactive{}
+    }
+    fun round_trip(): u64 {
+        let _v0 = make_config(42, true);
+        set_value(&mut _v0, 99);
+        let (_v1,_v2) = unpack_config(_v0);
+        let _v3 = get_code(make_active(7));
+        _v1 + _v3
+    }
+    fun set_value(c: &mut friend_defs::Config<u64>, v: u64) {
+        let _v0 = &mut c.value;
+        *_v0 = v;
+    }
+    fun unpack_config(c: friend_defs::Config<u64>): (u64, bool) {
+        let friend_defs::Config<u64>{value: _v0, enabled: _v1} = c;
+        (_v0, _v1)
+    }
+}
+
+============ recompilation succeeded ========

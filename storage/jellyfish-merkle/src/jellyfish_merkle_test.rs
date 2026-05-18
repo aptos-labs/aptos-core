@@ -19,7 +19,7 @@ use rand::{rngs::StdRng, Rng, SeedableRng};
 fn update_nibble(original_key: &HashValue, n: usize, nibble: u8) -> HashValue {
     assert!(nibble < 16);
     let mut key = original_key.to_vec();
-    key[n / 2] = if n % 2 == 0 {
+    key[n / 2] = if n.is_multiple_of(2) {
         key[n / 2] & 0x0F | (nibble << 4)
     } else {
         key[n / 2] & 0xF0 | nibble

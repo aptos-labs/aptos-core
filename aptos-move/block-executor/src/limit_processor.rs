@@ -33,6 +33,9 @@ pub struct BlockGasLimitProcessor<T: Transaction> {
     start_time: Instant,
     print_conflicts_info: bool,
     hot_state_op_accumulator: Option<BlockHotStateOpAccumulator<T::Key>>,
+    /// When set, `should_end_block` returned true and this label identifies which limit fired.
+    /// `"gas"` for the per-block effective-gas limit; `"output_size"` for the output-size limit.
+    halted_by: Option<&'static str>,
 }
 
 impl<T: Transaction> BlockGasLimitProcessor<T> {
@@ -57,6 +60,7 @@ impl<T: Transaction> BlockGasLimitProcessor<T> {
             // TODO: have a configuration for it.
             print_conflicts_info: *PRINT_CONFLICTS_INFO,
             hot_state_op_accumulator,
+            halted_by: None,
         }
     }
 
@@ -136,6 +140,7 @@ impl<T: Transaction> BlockGasLimitProcessor<T> {
                     accumulated_block_gas {} >= PER_BLOCK_GAS_LIMIT {}",
                     mode, accumulated_block_gas, per_block_gas_limit,
                 );
+                self.halted_by = Some("gas");
                 return true;
             }
         }
@@ -149,6 +154,7 @@ impl<T: Transaction> BlockGasLimitProcessor<T> {
                     accumulated_output {} >= PER_BLOCK_OUTPUT_LIMIT {}",
                     mode, accumulated_output, per_block_output_limit,
                 );
+                self.halted_by = Some("output_size");
                 return true;
             }
         }
@@ -222,32 +228,31 @@ impl<T: Transaction> BlockGasLimitProcessor<T> {
         );
         counters::update_txn_gas_counters(&self.txn_fee_statements, is_parallel);
 
-        info!(
-            effective_block_gas = accumulated_effective_block_gas,
-            raw_block_gas = accumulated_raw_block_gas,
-            block_gas_limit = self.block_gas_limit_type.block_gas_limit().unwrap_or(0),
-            block_gas_limit_override = self.block_gas_limit_override.unwrap_or(0),
-            block_gas_limit_exceeded = self
-                .block_gas_limit()
-                .is_some_and(|limit| accumulated_effective_block_gas >= limit),
-            approx_output_size = accumulated_approx_output_size,
-            block_output_limit = self.block_gas_limit_type.block_output_limit().unwrap_or(0),
-            block_output_limit_exceeded = self
-                .block_gas_limit_type
-                .block_output_limit()
-                .is_some_and(|limit| accumulated_approx_output_size >= limit),
-            elapsed_ms = self.start_time.elapsed().as_millis(),
-            num_committed = num_committed,
-            num_total = num_total,
-            num_workers = num_workers,
-            "[BlockSTM]: {} execution completed. {} out of {} txns committed",
-            if is_parallel {
-                format!("Parallel[{}]", num_workers)
+        if let Some(reason) = self.halted_by {
+            let mode = if is_parallel {
+                counters::Mode::PARALLEL
             } else {
-                "Sequential".to_string()
-            },
-            num_committed,
-            num_total,
+                counters::Mode::SEQUENTIAL
+            };
+            let cut = num_total.saturating_sub(num_committed);
+            counters::BLOCK_TXNS_CUT_BY_LIMIT
+                .with_label_values(&[reason, mode])
+                .observe(cut as f64);
+        }
+
+        info!(
+            eff_gas = accumulated_effective_block_gas,
+            raw_gas = accumulated_raw_block_gas,
+            gas_lmt = self.block_gas_limit_type.block_gas_limit().unwrap_or(0),
+            gas_lmt_override = self.block_gas_limit_override.unwrap_or(0),
+            output_size = accumulated_approx_output_size,
+            output_lmt = self.block_gas_limit_type.block_output_limit().unwrap_or(0),
+            elapsed_ms = self.start_time.elapsed().as_millis(),
+            committed = num_committed,
+            total = num_total,
+            workers = num_workers,
+            parallel = is_parallel,
+            "block_executed",
         );
     }
 

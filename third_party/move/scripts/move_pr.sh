@@ -108,23 +108,22 @@ MOVE_CRATES="\
   -p move-vm-runtime\
   -p move-vm-types\
   -p move-ast-generator-tests\
+  -p move-model \
   -p move-asm\
+  -p move-docgen\
+  -p move-prover-bytecode-pipeline \
+  -p move-vm-transactional-tests \
+  -p bytecode-verifier-transactional-tests \
+  -p bytecode-verifier-tests \
+  -p move-package-manifest \
 "
 
 # This is a list of crates for integration testing.
 MOVE_CRATES_INTEGRATION_TEST="\
   -p aptos-transactional-test-harness \
-  -p bytecode-verifier-tests \
-  -p bytecode-verifier-transactional-tests \
-  -p move-asm \
-  -p move-decompiler \
-  -p move-model \
   -p move-package \
-  -p move-prover-bytecode-pipeline \
-  -p move-stackless-bytecode \
   -p move-transactional-test-runner \
   -p move-unit-test \
-  -p move-vm-transactional-tests \
   -p aptos-move-stdlib\
   -p move-abigen\
   -p move-docgen\
@@ -135,6 +134,7 @@ MOVE_CRATES_INTEGRATION_TEST="\
   -p e2e-move-tests\
   -p aptos-framework\
   -p aptos-api\
+  -p aptos-move-flow\
 "
 
 if [ ! -z "$CHECK" ]; then

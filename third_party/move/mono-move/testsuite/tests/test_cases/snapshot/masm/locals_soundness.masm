@@ -1,0 +1,27 @@
+module 0x66::locals_soundness
+
+// Regression: declared local written in one block, read in another.
+// DCE must not remove the st_loc because r1 (the local) is live across
+// the branch even though it has no use within the writing block.
+fun local_across_blocks(flag: bool, x: u64): u64
+    local y: u64
+    copy_loc x
+    st_loc y
+    move_loc flag
+    br_true l1
+    ld_u64 0
+    ret
+l1: move_loc y
+    ret
+
+// Regression: copy propagation must not substitute BorrowLoc sources.
+// After st_loc y, copy propagation would (unsoundly) map y -> x,
+// turning borrow_loc y into borrow_loc x and changing which frame
+// slot the reference points to.
+fun borrow_written_local(x: u64): u64
+    local y: u64
+    copy_loc x
+    st_loc y
+    borrow_loc y
+    read_ref
+    ret

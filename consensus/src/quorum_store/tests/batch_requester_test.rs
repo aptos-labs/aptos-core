@@ -126,7 +126,7 @@ async fn test_batch_request_exists() {
             .into(),
     );
 
-    let (_, subscriber_rx) = oneshot::channel();
+    let (_subscriber_tx, subscriber_rx) = oneshot::channel();
     let result = batch_requester
         .request_batch(
             *batch.digest(),
@@ -216,7 +216,7 @@ async fn test_batch_request_not_exists_not_expired() {
     );
 
     let request_start = Instant::now();
-    let (_, subscriber_rx) = oneshot::channel();
+    let (_subscriber_tx, subscriber_rx) = oneshot::channel();
     let result = batch_requester
         .request_batch(
             *batch.digest(),
@@ -261,7 +261,7 @@ async fn test_batch_request_not_exists_expired() {
     );
 
     let request_start = Instant::now();
-    let (_, subscriber_rx) = oneshot::channel();
+    let (_subscriber_tx, subscriber_rx) = oneshot::channel();
     let result = batch_requester
         .request_batch(
             *batch.digest(),

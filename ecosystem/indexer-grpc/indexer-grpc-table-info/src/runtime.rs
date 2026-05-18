@@ -29,7 +29,10 @@ pub fn bootstrap_internal_indexer_db(
     if !config.indexer_db_config.is_internal_indexer_db_enabled() || internal_indexer_db.is_none() {
         return None;
     }
-    let runtime = aptos_runtimes::spawn_named_runtime("index-db".to_string(), None);
+    let runtime = aptos_runtimes::spawn_named_runtime(
+        "index-db".to_string(),
+        config.indexer_db_config.runtime_threads,
+    );
     // Set up db config and open up the db initially to read metadata
     let mut indexer_service = InternalIndexerDBService::new(
         db_rw.reader,

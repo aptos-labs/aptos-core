@@ -12,7 +12,6 @@ use claims::{assert_none, assert_ok, assert_some};
 use move_core_types::{language_storage::TypeTag, parser::parse_struct_tag};
 use serde::{Deserialize, Serialize};
 use std::str::FromStr;
-use test_case::test_case;
 
 #[derive(Deserialize, Serialize)]
 struct Aggregator {
@@ -153,42 +152,37 @@ macro_rules! increment_counter_emit_event {
     };
 }
 
-#[test_case(1)]
-#[test_case(2)]
-fn test_events_with_snapshots(event_version: u64) {
-    let data = vec![
-        increment_counter!(),
-        increment_counter!(),
-        emit_event!(event_version, Some(2)),
-        increment_counter!(),
-        increment_counter!(),
-        increment_counter_emit_event!(SUCCESS, event_version, Some(5)),
-        increment_counter!(),
-        emit_event!(event_version, Some(6)),
-        increment_counter!(),
-        increment_counter!(),
-    ];
-    let h = run(data);
-    assert_counter_value_eq!(h, 8);
-}
+#[test]
+fn test_events_with_snapshots() {
+    for event_version in [1, 2] {
+        let h = run(vec![
+            increment_counter!(),
+            increment_counter!(),
+            emit_event!(event_version, Some(2)),
+            increment_counter!(),
+            increment_counter!(),
+            increment_counter_emit_event!(SUCCESS, event_version, Some(5)),
+            increment_counter!(),
+            emit_event!(event_version, Some(6)),
+            increment_counter!(),
+            increment_counter!(),
+        ]);
+        assert_counter_value_eq!(h, 8);
 
-#[test_case(1)]
-#[test_case(2)]
-fn test_events_with_snapshots_not_emitted_on_abort(event_version: u64) {
-    let data = vec![
-        increment_counter!(),
-        increment_counter!(),
-        increment_counter!(),
-        increment_counter!(),
-        increment_counter!(),
-        increment_counter!(),
-        increment_counter!(),
-        increment_counter!(),
-        increment_counter!(),
-        increment_counter!(),
-        increment_counter_emit_event!(EAGGREGATOR_OVERFLOW, event_version, None),
-    ];
-
-    let h = run(data);
-    assert_counter_value_eq!(h, 10);
+        // Events with snapshots are not emitted on abort.
+        let h = run(vec![
+            increment_counter!(),
+            increment_counter!(),
+            increment_counter!(),
+            increment_counter!(),
+            increment_counter!(),
+            increment_counter!(),
+            increment_counter!(),
+            increment_counter!(),
+            increment_counter!(),
+            increment_counter!(),
+            increment_counter_emit_event!(EAGGREGATOR_OVERFLOW, event_version, None),
+        ]);
+        assert_counter_value_eq!(h, 10);
+    }
 }

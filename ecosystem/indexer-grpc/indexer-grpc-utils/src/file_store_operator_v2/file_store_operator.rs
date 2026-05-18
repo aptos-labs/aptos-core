@@ -45,7 +45,7 @@ impl FileStoreOperatorV2 {
         transaction: Transaction,
         tx: Sender<(Vec<Transaction>, BatchMetadata, bool)>,
     ) -> Result<()> {
-        let end_batch = (transaction.version + 1) % self.num_txns_per_folder == 0;
+        let end_batch = (transaction.version + 1).is_multiple_of(self.num_txns_per_folder);
         let size_bytes = transaction.encoded_len();
         ensure!(
             self.version == transaction.version,

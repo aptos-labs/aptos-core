@@ -594,7 +594,7 @@ impl<V: Into<Vec<u8>> + Arbitrary + Clone + Debug + Eq + Sync + Send> Transactio
                 .unwrap();
 
             // Not all values become deltas - some remain as normal writes
-            if val_u128 % 10 != 0 {
+            if !val_u128.is_multiple_of(10) {
                 let delta = if val_u128 % 10 < 5 {
                     delta_sub(val_u128 % 100, u128::MAX)
                 } else {
@@ -609,7 +609,7 @@ impl<V: Into<Vec<u8>> + Arbitrary + Clone + Debug + Eq + Sync + Send> Transactio
             .as_u128()
             .unwrap()
             .unwrap();
-        let is_deletion = allow_deletes && val_u128 % 23 == 0;
+        let is_deletion = allow_deletes && val_u128.is_multiple_of(23);
         let mut write_value = ValueType::from_value(value.clone(), !is_deletion);
         write_value.metadata = raw_metadata((val_u128 >> 64) as u64);
 

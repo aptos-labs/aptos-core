@@ -13,14 +13,13 @@ use crate::{
 use anyhow::{bail, Result};
 use aptos_backup_cli::metadata::view::BackupStorageState;
 use aptos_forge::{reconfig, AptosPublicInfo, Node, NodeExt, Swarm, SwarmExt};
-use aptos_logger::info;
+use aptos_logger::{error, info};
 use aptos_temppath::TempPath;
 use aptos_types::{transaction::Version, waypoint::Waypoint};
 use itertools::Itertools;
 use std::{
     fs,
     path::Path,
-    process::Command,
     sync::{
         atomic::{AtomicBool, Ordering},
         Arc,
@@ -90,8 +89,8 @@ async fn test_db_restore() {
         5,
     )
     .await;
-    // explicit reconfigs: we are at least at epoch 5
-    for _ in 0..4 {
+    // explicit reconfigs: we are at least at epoch 6 (epoch ending 5 exists)
+    for _ in 0..5 {
         reconfig(
             &client_1,
             &transaction_factory,
@@ -113,7 +112,7 @@ async fn test_db_restore() {
     assert_balance(&client_1, &account_0, expected_balance_0).await;
     assert_balance(&client_1, &account_1, expected_balance_1).await;
 
-    info!("---------- 2. reached at least epoch 5, starting backup coordinator.");
+    info!("---------- 2. reached at least epoch 6, starting backup coordinator.");
     // make a backup from node 1
     let node1_config = swarm.validator(validator_peer_ids[1]).unwrap().config();
     let port = node1_config.storage.backup_service_address.port();
@@ -181,12 +180,11 @@ async fn test_db_restore() {
 fn db_backup_verify(backup_path: &Path, trusted_waypoints: &[Waypoint]) {
     info!("---------- running aptos-debugger aptos-db backup-verify");
     let now = Instant::now();
-    let bin_path = workspace_builder::get_bin("aptos-debugger");
     let metadata_cache_path = TempPath::new();
 
     metadata_cache_path.create_as_dir().unwrap();
 
-    let mut cmd = Command::new(bin_path.as_path());
+    let mut cmd = workspace_builder::get_aptos_debugger_command();
     cmd.args(["aptos-db", "backup", "verify"]);
     trusted_waypoints.iter().for_each(|w| {
         cmd.arg("--trust-waypoint");
@@ -212,13 +210,12 @@ fn db_backup_verify(backup_path: &Path, trusted_waypoints: &[Waypoint]) {
 fn replay_verify(backup_path: &Path, trusted_waypoints: &[Waypoint]) {
     info!("---------- running replay-verify");
     let now = Instant::now();
-    let bin_path = workspace_builder::get_bin("aptos-debugger");
     let metadata_cache_path = TempPath::new();
     let target_db_dir = TempPath::new();
 
     metadata_cache_path.create_as_dir().unwrap();
 
-    let mut cmd = Command::new(bin_path.as_path());
+    let mut cmd = workspace_builder::get_aptos_debugger_command();
     cmd.args(["aptos-db", "replay-verify"]);
     trusted_waypoints.iter().for_each(|w| {
         cmd.arg("--trust-waypoint");
@@ -256,7 +253,6 @@ fn wait_for_backups(
     target_epoch: u64,
     target_version: u64,
     now: Instant,
-    bin_path: &Path,
     metadata_cache_path: &Path,
     backup_path: &Path,
     trusted_waypoints: &[Waypoint],
@@ -266,22 +262,21 @@ fn wait_for_backups(
             "{}th wait for the backup to reach epoch {}, version {}.",
             i, target_epoch, target_version,
         );
-        let state = get_backup_storage_state(bin_path, metadata_cache_path, backup_path)?;
-        if state.latest_epoch_ending_epoch.is_some()
-            && state.latest_transaction_version.is_some()
+        let state = get_backup_storage_state(metadata_cache_path, backup_path)?;
+        if let Some(epoch_ending) = state.latest_epoch_ending_epoch
+            && let Some(txn_version) = state.latest_transaction_version
             && state.latest_state_snapshot_epoch.is_some()
-            && state.latest_state_snapshot_epoch.is_some()
-            && state.latest_epoch_ending_epoch.unwrap() >= target_epoch
-            && state.latest_transaction_version.unwrap() >= target_version
-            && state.latest_transaction_version.unwrap()
-                >= state.latest_state_snapshot_version.unwrap()
+            && let Some(snapshot_version) = state.latest_state_snapshot_version
+            && epoch_ending >= target_epoch
+            && txn_version >= target_version
+            && txn_version >= snapshot_version
         {
             info!(
                 "Backup created in {} seconds. backup storage state: {}",
                 now.elapsed().as_secs(),
                 state
             );
-            return Ok(state.latest_state_snapshot_version.unwrap());
+            return Ok(snapshot_version);
         }
         info!("Backup storage state: {}", state);
         if state.latest_transaction_version.is_some() {
@@ -291,15 +286,18 @@ fn wait_for_backups(
         std::thread::sleep(Duration::from_secs(1));
     }
 
+    error!(
+        "Timed out waiting for backup to reach epoch {}, version {}.",
+        target_epoch, target_version
+    );
     bail!("Failed to create backup.");
 }
 
 fn get_backup_storage_state(
-    bin_path: &Path,
     metadata_cache_path: &Path,
     backup_path: &Path,
 ) -> Result<BackupStorageState> {
-    let output = Command::new(bin_path)
+    let output = workspace_builder::get_aptos_debugger_command()
         .current_dir(workspace_root())
         .args([
             "aptos-db",
@@ -329,7 +327,6 @@ pub(crate) fn db_backup(
 ) -> (TempPath, Version) {
     info!("---------- running aptos db tool backup");
     let now = Instant::now();
-    let bin_path = workspace_builder::get_bin("aptos-debugger");
     let metadata_cache_path1 = TempPath::new();
     let metadata_cache_path2 = TempPath::new();
     let backup_path = TempPath::new();
@@ -340,10 +337,10 @@ pub(crate) fn db_backup(
 
     // Initialize backup storage, avoid race between the coordinator and wait_for_backups to create
     // the identity file.
-    get_backup_storage_state(&bin_path, metadata_cache_path2.path(), backup_path.path()).unwrap();
+    get_backup_storage_state(metadata_cache_path2.path(), backup_path.path()).unwrap();
 
     // spawn the backup coordinator
-    let mut backup_coordinator = Command::new(bin_path.as_path())
+    let mut backup_coordinator = workspace_builder::get_aptos_debugger_command()
         .current_dir(workspace_root())
         .args([
             "aptos-db",
@@ -370,14 +367,13 @@ pub(crate) fn db_backup(
         target_epoch,
         target_version,
         now,
-        bin_path.as_path(),
         metadata_cache_path2.path(),
         backup_path.path(),
         trusted_waypoints,
     );
 
     // start the backup compaction
-    let compaction = Command::new(bin_path.as_path())
+    let compaction = workspace_builder::get_aptos_debugger_command()
         .current_dir(workspace_root())
         .args([
             "aptos-db",
@@ -416,12 +412,11 @@ pub(crate) fn db_restore(
     target_verion: Option<Version>, /* target version should be same as epoch ending version to start a node */
 ) {
     let now = Instant::now();
-    let bin_path = workspace_builder::get_bin("aptos-debugger");
     let metadata_cache_path = TempPath::new();
 
     metadata_cache_path.create_as_dir().unwrap();
 
-    let mut cmd = Command::new(bin_path.as_path());
+    let mut cmd = workspace_builder::get_aptos_debugger_command();
     cmd.args(["aptos-db", "restore", "bootstrap-db"]);
     trusted_waypoints.iter().for_each(|w| {
         cmd.arg("--trust-waypoint");
@@ -454,7 +449,7 @@ pub(crate) fn db_restore(
 }
 
 async fn do_transfer_or_reconfig(info: &mut AptosPublicInfo) -> Result<()> {
-    const LOTS_MONEY: u64 = 100_000_000;
+    const LOTS_MONEY: u64 = 1_000_000_000;
     let r = rand::random::<u64>() % 10;
     if r < 3 {
         info!(
@@ -527,7 +522,7 @@ async fn test_db_restart() {
             let validator = swarm.validator_mut(*vid).unwrap();
             // sometimes trigger reconfig right before the restart, to expose edge cases around
             // epoch change
-            if rand::random::<usize>() % 3 == 0 {
+            if rand::random::<usize>().is_multiple_of(3) {
                 info!(
                     "{LINE} Triggering reconfig right before restarting. Root account seq_num: {}. Ledger info: {:?}",
                     pub_chain_info.root_account().sequence_number(),

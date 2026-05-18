@@ -1,0 +1,8 @@
+Move prover returns: exiting with bytecode transformation errors
+error: function `reads_check::reads_incomplete` accesses resource `reads_check::S` which is not covered by its `reads` or `modifies` declaration
+   ┌─ tests/sources/functional/reads_check.move:25:5
+   │
+25 │ ╭     spec reads_incomplete {
+26 │ │         reads R;  // error: S not covered
+27 │ │     }
+   │ ╰─────^

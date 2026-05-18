@@ -96,6 +96,26 @@ pub static OBSERVER_NUM_PROCESSED_BLOCKS: Lazy<IntGaugeVec> = Lazy::new(|| {
     .unwrap()
 });
 
+/// Gauge for tracking the root ledger info round for the consensus observer
+pub static OBSERVER_ROOT_LEDGER_INFO_ROUND: Lazy<IntGaugeVec> = Lazy::new(|| {
+    register_int_gauge_vec!(
+        "consensus_observer_root_ledger_info_round",
+        "Gauge for tracking the root ledger info round for the consensus observer",
+        &["processed_type"]
+    )
+    .unwrap()
+});
+
+/// Gauge for tracking the latest ordered block round forwarded to the execution pipeline
+pub static OBSERVER_FORWARDED_BLOCK_ROUND: Lazy<IntGaugeVec> = Lazy::new(|| {
+    register_int_gauge_vec!(
+        "consensus_observer_forwarded_block_round",
+        "Gauge for tracking the latest ordered block round forwarded to the execution pipeline",
+        &["processed_type"]
+    )
+    .unwrap()
+});
+
 /// Gauge for tracking the processed block rounds by the consensus observer
 pub static OBSERVER_PROCESSED_BLOCK_ROUNDS: Lazy<IntGaugeVec> = Lazy::new(|| {
     register_int_gauge_vec!(

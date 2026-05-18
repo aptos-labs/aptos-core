@@ -76,8 +76,8 @@ fn large_transactions() {
 fn alt_execution_limit_for_gov_proposals() {
     // This test validates that approved governance scripts automatically get the
     // alternate (usually increased) execution limit.
-    let max_gas_regular = 10;
-    let max_gas_gov = 100;
+    let max_gas_regular = 100;
+    let max_gas_gov = 1000;
 
     // Set up the testing environment
     let mut h = MoveHarness::new();

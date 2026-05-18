@@ -11,7 +11,7 @@ use prometheus::{
     proto::MetricFamily,
     Opts,
 };
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 
 const LINUX_SYSTEM_CPU_USAGE: &str = "linux_system_cpu_usage";
 const LINUX_CPU_METRICS_COUNT: usize = 11;
@@ -31,6 +31,10 @@ const LINUX_NUM_SECTORS_WRITTEN: &str = "num_sectors_written";
 const LINUX_TIME_WRITING_MS: &str = "time_writing_ms";
 const LINUX_PROGRESS_IO: &str = "io_in_progress";
 const LINUX_TOTAL_IO_TIME_MS: &str = "total_io_time_ms";
+
+const LINUX_DISK_INFO: &str = "info";
+const MODEL_LABEL: &str = "model";
+const RAID_LEVEL_LABEL: &str = "raid_level";
 
 const LINUX_RLIMIT_NOFILE_SOFT: &str = "rlimit_nofile_soft";
 
@@ -90,17 +94,14 @@ impl Collector for LinuxCpuMetricsCollector {
 
         let mut mfs = Vec::with_capacity(LINUX_CPU_METRICS_COUNT);
 
-        let kernel_stats = KernelStats::new();
-        if kernel_stats.is_err() {
-            warn!(
-                "unable to collect cpu metrics for linux: {}",
-                kernel_stats.unwrap_err()
-            );
-            return mfs;
-        }
-
-        let kernal_stats = kernel_stats.unwrap();
-        let cpu_time = kernal_stats.total;
+        let kernel_stats = match KernelStats::new() {
+            Ok(stats) => stats,
+            Err(err) => {
+                warn!("unable to collect cpu metrics for linux: {}", err);
+                return mfs;
+            },
+        };
+        let cpu_time = kernel_stats.total;
 
         cpu_time_counter!(mfs, cpu_time.user_ms(), "user_ms");
         cpu_time_counter!(mfs, cpu_time.nice_ms(), "nice_ms");
@@ -112,7 +113,7 @@ impl Collector for LinuxCpuMetricsCollector {
         cpu_time_counter_opt!(mfs, cpu_time.steal_ms(), "steal_ms");
         cpu_time_counter_opt!(mfs, cpu_time.guest_ms(), "guest_ms");
         cpu_time_counter_opt!(mfs, cpu_time.guest_nice_ms(), "guest_nice_ms");
-        cpu_time_counter!(mfs, kernal_stats.ctxt, "context_switches");
+        cpu_time_counter!(mfs, kernel_stats.ctxt, "context_switches");
 
         mfs
     }
@@ -130,8 +131,82 @@ pub(crate) struct LinuxDiskMetricsCollector {
     time_writing_ms: Desc,
     io_in_progress: Desc,
     total_io_time_ms: Desc,
+    disk_info: Desc,
+    /// Cached disk info: device name -> (model, raid_level)
+    disk_info_cache: HashMap<String, (String, String)>,
     rlimit_nofile_soft: ConstMetric,
     rlimit_nofile_hard: ConstMetric,
+}
+
+/// Resolve the drive model for a block device by walking sysfs.
+///
+/// For a partition (e.g. `sda1`, `nvme0n1p1`), `/sys/block/<part>/device/model`
+/// does not exist — only whole-disk entries have it. We use
+/// `/sys/class/block/<device>` (a symlink into the device tree) and walk up to
+/// the nearest ancestor that has a `device/model` file. This handles both
+/// SCSI (`sda1` → `sda`) and NVMe (`nvme0n1p1` → `nvme0n1`) naming correctly
+/// without string manipulation.
+///
+/// For md/RAID devices, the same resolution is applied to the first slave.
+fn read_disk_model(device: &str) -> String {
+    // Walk up from /sys/class/block/<device> to find the nearest device/model.
+    if let Some(model) = resolve_model_via_sysfs(device) {
+        return model;
+    }
+    // For md/RAID devices, try slaves sorted alphabetically for determinism
+    // (read_dir order is filesystem-dependent and can vary across restarts).
+    if let Ok(entries) = std::fs::read_dir(format!("/sys/block/{}/slaves", device)) {
+        let mut slaves: Vec<String> = entries
+            .flatten()
+            .map(|e| e.file_name().to_string_lossy().into_owned())
+            .collect();
+        slaves.sort();
+        for slave in &slaves {
+            if let Some(model) = resolve_model_via_sysfs(slave) {
+                return model;
+            }
+        }
+    }
+    "unknown".to_string()
+}
+
+/// Walk from `/sys/class/block/<device>` up the directory tree looking for
+/// `device/model`. Returns `None` if no ancestor has it.
+fn resolve_model_via_sysfs(device: &str) -> Option<String> {
+    let resolved = std::fs::canonicalize(format!("/sys/class/block/{}", device)).ok()?;
+    let mut path = resolved.as_path();
+    loop {
+        let model_path = path.join("device/model");
+        if let Ok(model) = std::fs::read_to_string(&model_path) {
+            return Some(model.trim().to_string());
+        }
+        path = path.parent()?;
+        // Stop before walking above /sys
+        if path.as_os_str() == "/sys" || path.as_os_str() == "/" {
+            return None;
+        }
+    }
+}
+
+fn read_raid_level(device: &str) -> String {
+    std::fs::read_to_string(format!("/sys/block/{}/md/level", device))
+        .map(|s| s.trim().to_string())
+        .unwrap_or_default()
+}
+
+/// Build a cache of (model, raid_level) for all non-loop block devices.
+fn build_disk_info_cache() -> HashMap<String, (String, String)> {
+    let mut cache = HashMap::new();
+    if let Ok(disk_stats) = procfs::diskstats() {
+        for stat in disk_stats {
+            if !stat.name.starts_with("loop") && !cache.contains_key(&stat.name) {
+                let model = read_disk_model(&stat.name);
+                let raid_level = read_raid_level(&stat.name);
+                cache.insert(stat.name, (model, raid_level));
+            }
+        }
+    }
+    cache
 }
 
 impl LinuxDiskMetricsCollector {
@@ -186,6 +261,17 @@ impl LinuxDiskMetricsCollector {
                 LINUX_TOTAL_IO_TIME_MS,
                 "Total number of milliseconds spent in IO"
             ),
+            disk_info: Opts::new(LINUX_DISK_INFO, "Disk device info")
+                .namespace(NAMESPACE)
+                .subsystem(LINUX_DISK_SUBSYSTEM)
+                .variable_labels(vec![
+                    NAME_LABEL.into(),
+                    MODEL_LABEL.into(),
+                    RAID_LEVEL_LABEL.into(),
+                ])
+                .describe()
+                .unwrap(),
+            disk_info_cache: build_disk_info_cache(),
             rlimit_nofile_soft: ConstMetric::new_gauge(
                 Opts::new(LINUX_RLIMIT_NOFILE_SOFT, "RLIMIT_NOFILE soft limit.")
                     .namespace(NAMESPACE)
@@ -229,6 +315,7 @@ impl Collector for LinuxDiskMetricsCollector {
             &self.time_writing_ms,
             &self.io_in_progress,
             &self.total_io_time_ms,
+            &self.disk_info,
         ]
     }
 
@@ -284,6 +371,7 @@ impl Collector for LinuxDiskMetricsCollector {
                 },
             };
 
+        let mut seen_devices = HashSet::new();
         for mount in mounts {
             if let Some(disk_stat) = disk_stats.get(&mount.majmin) {
                 let labels = std::slice::from_ref(&disk_stat.name);
@@ -297,6 +385,19 @@ impl Collector for LinuxDiskMetricsCollector {
                 disk_stats_counter!(mfs, time_writing_ms, disk_stat.time_writing, labels);
                 disk_stats_guage!(mfs, io_in_progress, disk_stat.in_progress, labels);
                 disk_stats_counter!(mfs, total_io_time_ms, disk_stat.time_in_progress, labels);
+
+                // Emit disk_info only once per device to avoid duplicates from bind mounts
+                if seen_devices.insert(disk_stat.name.clone()) {
+                    if let Some((model, raid_level)) = self.disk_info_cache.get(&disk_stat.name) {
+                        let info_labels: Vec<String> =
+                            vec![disk_stat.name.clone(), model.clone(), raid_level.clone()];
+                        mfs.extend(
+                            ConstMetric::new_gauge(self.disk_info.clone(), 1.0, Some(&info_labels))
+                                .unwrap()
+                                .collect(),
+                        );
+                    }
+                }
             }
         }
 

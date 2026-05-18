@@ -1,0 +1,65 @@
+//# publish
+module 0x66::helpers
+
+// f(a, b) = a * 100 + b
+#[persistent] public fun f(a: u64, b: u64): u64
+    copy_loc a
+    ld_u64 100
+    mul
+    move_loc b
+    add
+    ret
+
+//# run --verbose
+script
+use 0x66::helpers as h
+
+// Closures with different masks over same function are NOT equal.
+fun test_different_masks_not_equal()
+    local c1: |u64|u64 has drop
+    local c2: |u64|u64 has drop
+
+    // c1 captures 42 at position 0 (mask = 1): c1(x) = f(42, x)
+    ld_u64 42
+    pack_closure h::f, 1
+    st_loc c1
+
+    // c2 captures 42 at position 1 (mask = 2): c2(x) = f(x, 42)
+    ld_u64 42
+    pack_closure h::f, 2
+    st_loc c2
+
+    // They must NOT be equal.
+    move_loc c1
+    move_loc c2
+    eq
+    br_false ok
+    ld_u64 99
+    abort
+ ok: ret
+
+//# run --verbose
+script
+use 0x66::helpers as h
+
+// Closures with same mask and same captured value ARE equal.
+fun test_same_mask_equal()
+    local c1: |u64|u64 has drop
+    local c2: |u64|u64 has drop
+
+    // Both capture 42 at position 0 (mask = 1).
+    ld_u64 42
+    pack_closure h::f, 1
+    st_loc c1
+
+    ld_u64 42
+    pack_closure h::f, 1
+    st_loc c2
+
+    move_loc c1
+    move_loc c2
+    eq
+    br_true ok
+    ld_u64 100
+    abort
+ ok: ret

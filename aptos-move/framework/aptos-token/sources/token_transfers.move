@@ -127,25 +127,14 @@ module aptos_token::token_transfers {
             token::merge(dst_token, token);
         };
 
-        if (std::features::module_event_migration_enabled()) {
-            event::emit(
-                Offer {
-                    account: sender_addr,
-                    to_address: receiver,
-                    token_id,
-                    amount,
-                }
-            )
-        } else {
-            event::emit_event<TokenOfferEvent>(
-                &mut PendingClaims[sender_addr].offer_events,
-                TokenOfferEvent {
-                    to_address: receiver,
-                    token_id,
-                    amount,
-                },
-            );
-        }
+        event::emit(
+            Offer {
+                account: sender_addr,
+                to_address: receiver,
+                token_id,
+                amount,
+            }
+        );
     }
 
     public entry fun claim_script(
@@ -174,25 +163,14 @@ module aptos_token::token_transfers {
         let amount = token::get_token_amount(&tokens);
         token::deposit_token(receiver, tokens);
 
-        if (std::features::module_event_migration_enabled()) {
-            event::emit(
-                Claim {
-                    account: sender,
-                    to_address: signer::address_of(receiver),
-                    token_id,
-                    amount,
-                }
-            )
-        } else {
-            event::emit_event<TokenClaimEvent>(
-                &mut PendingClaims[sender].claim_events,
-                TokenClaimEvent {
-                    to_address: signer::address_of(receiver),
-                    token_id,
-                    amount,
-                },
-            );
-        };
+        event::emit(
+            Claim {
+                account: sender,
+                to_address: signer::address_of(receiver),
+                token_id,
+                amount,
+            }
+        );
     }
 
     public entry fun cancel_offer_script(
@@ -222,25 +200,14 @@ module aptos_token::token_transfers {
         let amount = token::get_token_amount(&token);
         token::deposit_token(sender, token);
 
-        if (std::features::module_event_migration_enabled()) {
-            event::emit(
-                CancelOffer {
-                    account: sender_addr,
-                    to_address: receiver,
-                    token_id,
-                    amount,
-                },
-            )
-        } else {
-            event::emit_event<TokenCancelOfferEvent>(
-                &mut PendingClaims[sender_addr].cancel_offer_events,
-                TokenCancelOfferEvent {
-                    to_address: receiver,
-                    token_id,
-                    amount,
-                },
-            );
-        }
+        event::emit(
+            CancelOffer {
+                account: sender_addr,
+                to_address: receiver,
+                token_id,
+                amount,
+            },
+        );
     }
 
     #[test(creator = @0x1, owner = @0x2)]

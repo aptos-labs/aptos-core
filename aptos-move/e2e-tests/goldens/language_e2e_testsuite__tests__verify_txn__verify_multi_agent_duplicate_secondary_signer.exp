@@ -10,6 +10,7 @@ Ok(
                     ),
                 ),
                 hotness: {},
+                native_positions: {},
             },
             events: [],
             gas_used: 0,

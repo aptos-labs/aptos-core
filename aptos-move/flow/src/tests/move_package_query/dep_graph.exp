@@ -1,0 +1,6 @@
+{
+  "0xcafe::alpha": [
+    "0xcafe::beta"
+  ],
+  "0xcafe::beta": []
+}

@@ -33,6 +33,11 @@ impl IndexApi {
             .check_api_output_enabled("Get ledger info", &accept_type)?;
         let ledger_info = self.context.get_latest_ledger_info()?;
         let node_role = self.context.node_role();
+        let encryption_key_hex = self
+            .context
+            .get_encryption_key(ledger_info.version())
+            .unwrap_or(None)
+            .map(hex::encode);
 
         api_spawn_blocking(move || match accept_type {
             AcceptType::Json => {
@@ -40,6 +45,7 @@ impl IndexApi {
                     ledger_info.clone(),
                     node_role,
                     Some(aptos_build_info::get_git_hash()),
+                    encryption_key_hex,
                 );
                 BasicResponse::try_from_json((
                     index_response,

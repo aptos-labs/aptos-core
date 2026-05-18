@@ -474,7 +474,10 @@ impl AptosDataBuilder {
                 remote_tx,
             };
 
-            thread::spawn(move || service.run());
+            thread::Builder::new()
+                .name("logger-svc".into())
+                .spawn(move || service.run())
+                .expect("failed to spawn logger-svc thread");
             logger
         } else {
             Arc::new(AptosData {

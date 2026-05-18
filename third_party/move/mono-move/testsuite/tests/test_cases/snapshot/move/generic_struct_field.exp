@@ -1,0 +1,49 @@
+=== masm ===
+// Bytecode version v10
+module 0x42::generic_struct_field
+struct Box<T0> has copy + drop
+  value: T0
+
+// Function definition at index 0
+fun get_u64(l0: &Box<u64>): u64
+    move_loc l0
+    borrow_field Box<u64>, value
+    read_ref
+    ret
+
+// Function definition at index 1
+fun make_u64(l0: u64): Box<u64>
+    move_loc l0
+    pack Box<u64>
+    ret
+
+
+=== specializer ===
+// module 0x42::generic_struct_field
+
+fun get_u64(r0): u64 {
+  slots: params(1), locals(0), temps(1)
+    r0: &0x42::generic_struct_field::Box<u64>
+    r1: u64
+  code:
+  L0:
+    0: r1 := read_field Box::value, r0
+    1: ret [r1]
+}
+
+fun make_u64(r0): Box<u64> {
+  slots: params(1), locals(0), temps(1)
+    r0: u64
+    r1: 0x42::generic_struct_field::Box<u64>
+  code:
+  L0:
+    0: r1 := pack 0x42::generic_struct_field::Box<u64>, [r0]
+    1: ret [r1]
+}
+
+=== micro-ops ===
+// module 0x42::generic_struct_field
+
+fun get_u64(): skipped (lowering: instruction ReadFieldGeneric not yet lowered)
+
+fun make_u64(): skipped (not all types are concrete)

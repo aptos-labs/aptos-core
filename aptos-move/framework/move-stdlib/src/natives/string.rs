@@ -15,6 +15,7 @@ use move_core_types::gas_algebra::NumBytes;
 use move_vm_runtime::native_functions::NativeFunction;
 use move_vm_types::{
     loaded_data::runtime_types::Type,
+    natives::function::{PartialVMError, PartialVMResult},
     values::{Value, VectorRef},
 };
 use smallvec::{smallvec, SmallVec};
@@ -24,9 +25,14 @@ use std::collections::VecDeque;
 // This is possible without copying of bytes because (a) we can
 // get a `std::cell::Ref<Vec<u8>>` from a `vector<u8>` and in turn a `&[u8]`
 // from that (b) assuming that `vector<u8>` embedded in a string
-// is already valid utf8, we can use `str::from_utf8_unchecked` to
+// is already valid utf8, we can use `str::from_utf8` to
 // create a `&str` view on the bytes without a copy. Once we have this
 // view, we can call ut8 functions like length, substring, etc.
+//
+// IMPORTANT: we cannot use unchecked code assuming utf8 because during
+// parallel speculative execution we cannot guarantee Move code did the
+// utf8 check, and we must handle invariant violation gracefully so that
+// re-execution is possible (speculation must never panic!).
 
 /***************************************************************************************************
  * native fun internal_check_utf8
@@ -41,7 +47,7 @@ fn native_check_utf8(
 ) -> SafeNativeResult<SmallVec<[Value; 1]>> {
     debug_assert!(args.len() == 1);
     let s_arg = safely_pop_arg!(args, VectorRef);
-    let s_ref = s_arg.as_bytes_ref();
+    let s_ref = s_arg.as_bytes_ref()?;
 
     context.charge(
         STRING_CHECK_UTF8_BASE
@@ -71,11 +77,8 @@ fn native_is_char_boundary(
 
     let i = safely_pop_arg!(args, u64);
     let s_arg = safely_pop_arg!(args, VectorRef);
-    let s_ref = s_arg.as_bytes_ref();
-    let ok = unsafe {
-        // This is safe because we guarantee the bytes to be utf8.
-        std::str::from_utf8_unchecked(s_ref.as_slice()).is_char_boundary(i as usize)
-    };
+    let s_ref = s_arg.as_bytes_ref()?;
+    let ok = from_utf8_checked(s_ref.as_slice())?.is_char_boundary(i as usize);
 
     Ok(smallvec![Value::bool(ok)])
 }
@@ -106,11 +109,8 @@ fn native_sub_string(
     context.charge(STRING_SUB_STRING_PER_BYTE * NumBytes::new((j - i) as u64))?;
 
     let s_arg = safely_pop_arg!(args, VectorRef);
-    let s_ref = s_arg.as_bytes_ref();
-    let s_str = unsafe {
-        // This is safe because we guarantee the bytes to be utf8.
-        std::str::from_utf8_unchecked(s_ref.as_slice())
-    };
+    let s_ref = s_arg.as_bytes_ref()?;
+    let s_str = from_utf8_checked(s_ref.as_slice())?;
     let v = Value::vector_u8(s_str[i..j].as_bytes().iter().cloned());
 
     Ok(smallvec![v])
@@ -132,14 +132,14 @@ fn native_index_of(
     context.charge(STRING_INDEX_OF_BASE)?;
 
     let r_arg = safely_pop_arg!(args, VectorRef);
-    let r_ref = r_arg.as_bytes_ref();
-    let r_str = unsafe { std::str::from_utf8_unchecked(r_ref.as_slice()) };
+    let r_ref = r_arg.as_bytes_ref()?;
+    let r_str = from_utf8_checked(r_ref.as_slice())?;
 
     context.charge(STRING_INDEX_OF_PER_BYTE_PATTERN * NumBytes::new(r_str.len() as u64))?;
 
     let s_arg = safely_pop_arg!(args, VectorRef);
-    let s_ref = s_arg.as_bytes_ref();
-    let s_str = unsafe { std::str::from_utf8_unchecked(s_ref.as_slice()) };
+    let s_ref = s_arg.as_bytes_ref()?;
+    let s_str = from_utf8_checked(s_ref.as_slice())?;
     let pos = match s_str.find(r_str) {
         Some(size) => size,
         None => s_str.len(),
@@ -166,4 +166,9 @@ pub fn make_all(
     ];
 
     builder.make_named_natives(natives)
+}
+
+fn from_utf8_checked(v: &[u8]) -> PartialVMResult<&str> {
+    std::str::from_utf8(v)
+        .map_err(|_| PartialVMError::new_invariant_violation("Every string must be UTF-8"))
 }

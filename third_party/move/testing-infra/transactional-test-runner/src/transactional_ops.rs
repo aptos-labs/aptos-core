@@ -1,6 +1,7 @@
-// Copyright (c) The Diem Core Contributors
-// Copyright (c) The Move Contributors
-// SPDX-License-Identifier: Apache-2.0
+// Parts of the file are Copyright (c) The Diem Core Contributors
+// Parts of the file are Copyright (c) The Move Contributors
+// Parts of the file are Copyright (c) Aptos Foundation
+// All Aptos Foundation code and content is licensed pursuant to the Innovation-Enabling Source Code License, available at https://github.com/aptos-labs/aptos-core/blob/main/LICENSE
 
 //! Transactional operations for building and executing transactional tests.
 //! This module provides helper functions and data types for converting
@@ -507,7 +508,7 @@ fn generate_script_wrapper_for_non_entry_function(
     if _target_func_def.visibility != Visibility::Public {
         return Err(anyhow::anyhow!(
             "Function {} is not public",
-            func_name_ident.to_string()
+            func_name_ident
         ));
     }
 

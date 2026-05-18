@@ -1,6 +1,7 @@
-// Copyright (c) The Diem Core Contributors
-// Copyright (c) The Move Contributors
-// SPDX-License-Identifier: Apache-2.0
+// Parts of the file are Copyright (c) The Diem Core Contributors
+// Parts of the file are Copyright (c) The Move Contributors
+// Parts of the file are Copyright (c) Aptos Foundation
+// All Aptos Foundation code and content is licensed pursuant to the Innovation-Enabling Source Code License, available at https://github.com/aptos-labs/aptos-core/blob/main/LICENSE
 
 pub const TEST_DIR: &str = "tests";
 
@@ -23,10 +24,11 @@ fn main() {
         })
         .map(|p| {
             let prompt = format!("move-asm-txn::{}", p.display());
-            let config = TestRunConfig::default()
-                .with_masm()
-                .with_echo()
-                .cross_compile_into(SyntaxChoice::ASM, true, None);
+            let config = TestRunConfig::default().with_echo().cross_compile_into(
+                SyntaxChoice::ASM,
+                true,
+                None,
+            );
             Trial::test(prompt, move || {
                 vm_test_harness::run_test_with_config(config, &p)
                     .map_err(|err| format!("{:?}", err).into())

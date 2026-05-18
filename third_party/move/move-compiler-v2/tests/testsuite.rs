@@ -1,6 +1,5 @@
-// Copyright © Aptos Foundation
-// Parts of the project are originally copyright © Meta Platforms, Inc.
-// SPDX-License-Identifier: Apache-2.0
+// Copyright (c) Aptos Foundation
+// Licensed pursuant to the Innovation-Enabling Source Code License, available at https://github.com/aptos-labs/aptos-core/blob/main/LICENSE
 
 use anyhow::bail;
 use codespan_reporting::{diagnostic::Severity, term::termcolor::Buffer};
@@ -173,6 +172,23 @@ const TEST_CONFIGS: Lazy<BTreeMap<&str, TestConfig>> = Lazy::new(|| {
     opts.testing = true;
     let config = || TestConfig::new(opts.clone());
     let configs = vec![
+        // --- Tests for match exhaustiveness and unreachable arm checking
+        TestConfig {
+            name: "match-checks",
+            runner: |p| run_test(p, get_config_by_name("match-checks")),
+            include: vec!["/match-checks/"],
+            stop_after: StopAfter::FirstAstPipeline,
+            ..config()
+        },
+        // --- Tests to showcase match transforms
+        TestConfig {
+            name: "match-transforms",
+            runner: |p| run_test(p, get_config_by_name("match-transforms")),
+            include: vec!["/match-transforms/"],
+            stop_after: StopAfter::FirstAstPipeline,
+            dump_ast: DumpLevel::EndStage,
+            ..config()
+        },
         // --- Tests for checking and ast processing
         // Tests for model building and various post-processing checking
         TestConfig {
@@ -199,16 +215,6 @@ const TEST_CONFIGS: Lazy<BTreeMap<&str, TestConfig>> = Lazy::new(|| {
             dump_ast: DumpLevel::EndStage,
             ..config()
         },
-        // Tests for checking v2 language features only supported if v2
-        // language is selected
-        TestConfig {
-            name: "checking-lang-v1",
-            runner: |p| run_test(p, get_config_by_name("checking-lang-v1")),
-            include: vec!["/checking-lang-v1/"],
-            stop_after: StopAfter::FirstAstPipeline,
-            dump_ast: DumpLevel::EndStage,
-            ..config().lang(LanguageVersion::V1)
-        },
         // Tests for checking v2 language features only supported if 2.2 or later
         // is selected
         TestConfig {
@@ -219,7 +225,7 @@ const TEST_CONFIGS: Lazy<BTreeMap<&str, TestConfig>> = Lazy::new(|| {
             dump_ast: DumpLevel::EndStage,
             ..config().lang(LanguageVersion::V2_2)
         },
-        // Tests for checking v2 language features only supported if 2.3 or later
+        // Tests for checking v2 language features only supported if 2.5 or later
         // is selected
         TestConfig {
             name: "checking-lang-v2.5",
@@ -637,8 +643,6 @@ fn run_test(path: &Path, config: TestConfig) -> anyhow::Result<()> {
     logging::setup_logging_for_testing(None);
     let path_str = path.display().to_string();
     let mut options = config.options.clone();
-    options.warn_unused = path_str.contains("/unused/");
-    options.warn_deprecated = path_str.contains("/deprecated/");
     options.compile_verify_code = path_str.contains("/verification/verify/");
     options.sources_deps = extract_test_directives(path, "// dep:")?;
     options.sources = vec![path_str.clone()];

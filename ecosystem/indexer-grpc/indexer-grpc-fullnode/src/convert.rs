@@ -3,10 +3,11 @@
 
 use aptos_api_types::{
     transaction::ValidatorTransaction as ApiValidatorTransactionEnum, AccountSignature,
-    DeleteModule, DeleteResource, Ed25519Signature, EntryFunctionId, EntryFunctionPayload, Event,
-    GenesisPayload, MoveAbility, MoveFunction, MoveFunctionGenericTypeParam,
-    MoveFunctionVisibility, MoveModule, MoveModuleBytecode, MoveModuleId, MoveScriptBytecode,
-    MoveStruct, MoveStructField, MoveStructTag, MoveType, MultiEd25519Signature, MultiKeySignature,
+    DeleteModule, DeleteResource, Ed25519Signature, EncryptedTransactionInnerPayload,
+    EncryptedTransactionPayload, EntryFunctionId, EntryFunctionPayload, Event, GenesisPayload,
+    MoveAbility, MoveFunction, MoveFunctionGenericTypeParam, MoveFunctionVisibility, MoveModule,
+    MoveModuleBytecode, MoveModuleId, MoveScriptBytecode, MoveStruct, MoveStructField,
+    MoveStructTag, MoveStructVariant, MoveType, MultiEd25519Signature, MultiKeySignature,
     MultisigPayload, MultisigTransactionPayload, PublicKey, ScriptPayload, Signature,
     SingleKeySignature, Transaction, TransactionInfo, TransactionPayload, TransactionSignature,
     WriteSet, WriteSetChange,
@@ -55,6 +56,17 @@ pub fn convert_move_struct_field(msf: &MoveStructField) -> transaction::MoveStru
     }
 }
 
+pub fn convert_move_struct_variant(variant: &MoveStructVariant) -> transaction::MoveStructVariant {
+    transaction::MoveStructVariant {
+        name: variant.name.0.to_string(),
+        fields: variant
+            .fields
+            .iter()
+            .map(convert_move_struct_field)
+            .collect(),
+    }
+}
+
 pub fn convert_move_struct(move_struct: &MoveStruct) -> transaction::MoveStruct {
     transaction::MoveStruct {
         name: move_struct.name.0.to_string(),
@@ -71,6 +83,11 @@ pub fn convert_move_struct(move_struct: &MoveStruct) -> transaction::MoveStruct 
             .fields
             .iter()
             .map(convert_move_struct_field)
+            .collect(),
+        variants: move_struct
+            .variants
+            .iter()
+            .map(convert_move_struct_variant)
             .collect(),
     }
 }
@@ -205,6 +222,59 @@ pub fn convert_transaction_payload(
                     },
                 ),
             ),
+        },
+
+        TransactionPayload::EncryptedTransactionPayload(ep) => {
+            let state = match ep {
+                EncryptedTransactionPayload::Encrypted(_) => {
+                    unreachable!("Encrypted state should not reach indexer gRPC")
+                },
+                EncryptedTransactionPayload::FailedDecryption(_) => {
+                    transaction::encrypted_transaction_payload::State::FailedDecryption(
+                        transaction::FailedDecryptionPayloadState {},
+                    )
+                },
+                EncryptedTransactionPayload::Decrypted(p) => {
+                    let decrypted_payload = match &p.decrypted_payload {
+                        EncryptedTransactionInnerPayload::EntryFunctionPayload(efp) => {
+                            transaction::decrypted_payload_state::DecryptedPayload::EntryFunctionPayload(
+                                convert_entry_function_payload(efp),
+                            )
+                        },
+                        EncryptedTransactionInnerPayload::ScriptPayload(sp) => {
+                            transaction::decrypted_payload_state::DecryptedPayload::ScriptPayload(
+                                convert_script_payload(sp),
+                            )
+                        },
+                        EncryptedTransactionInnerPayload::MultisigPayload(mp) => {
+                            transaction::decrypted_payload_state::DecryptedPayload::MultisigPayload(
+                                convert_multisig_payload(mp),
+                            )
+                        },
+                    };
+                    transaction::encrypted_transaction_payload::State::Decrypted(
+                        transaction::DecryptedPayloadState {
+                            decrypted_payload: Some(decrypted_payload),
+                        },
+                    )
+                },
+            };
+            transaction::TransactionPayload {
+                r#type: transaction::transaction_payload::Type::EncryptedTransactionPayload as i32,
+                payload: Some(
+                    transaction::transaction_payload::Payload::EncryptedTransactionPayload(
+                        transaction::EncryptedTransactionPayload { state: Some(state) },
+                    ),
+                ),
+                extra_config: Some(
+                    transaction::transaction_payload::ExtraConfig::ExtraConfigV1(
+                        transaction::ExtraConfigV1 {
+                            multisig_address: None,
+                            replay_protection_nonce: nonce,
+                        },
+                    ),
+                ),
+            }
         },
 
         // Deprecated.
@@ -526,6 +596,16 @@ pub fn convert_multisig_payload(
                     payload: Some(
                         transaction::multisig_transaction_payload::Payload::EntryFunctionPayload(
                             convert_entry_function_payload(entry_function_payload),
+                        ),
+                    ),
+                }
+            },
+            MultisigTransactionPayload::ScriptPayload(script_payload) => {
+                transaction::MultisigTransactionPayload {
+                    r#type: transaction::multisig_transaction_payload::Type::ScriptPayload as i32,
+                    payload: Some(
+                        transaction::multisig_transaction_payload::Payload::ScriptPayload(
+                            convert_script_payload(script_payload),
                         ),
                     ),
                 }

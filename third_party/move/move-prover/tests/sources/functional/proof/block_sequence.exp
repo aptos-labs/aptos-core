@@ -1,0 +1,13 @@
+Move prover returns: exiting with verification errors
+error: proof assertion not satisfied
+   ┌─ tests/sources/functional/proof/block_sequence.move:85:13
+   │
+85 │             assert a + b <= a;  // error: false when b > 0
+   │             ^^^^^^^^^^^^^^^^^^
+   │
+   =     at tests/sources/functional/proof/block_sequence.move:77: add_pair
+   =     at tests/sources/functional/proof/block_sequence.move:81: add_pair (spec)
+   =     at tests/sources/functional/proof/block_sequence.move:77: add_pair
+   =         a = <redacted>
+   =         b = <redacted>
+   =     at tests/sources/functional/proof/block_sequence.move:85: add_pair (spec)

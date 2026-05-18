@@ -55,21 +55,15 @@ impl<C: CurveGroup> std::fmt::Debug for PublicParameters<C> {
 
 #[allow(non_snake_case)]
 impl<C: CurveGroup> PublicParameters<C> {
-    pub fn new(approximate_num_shares: u32) -> Self {
+    pub fn new(approximate_num_shares: usize) -> Self {
         let (G, H) = Self::default_parameters();
         Self::from_bases(G, H, approximate_num_shares)
     }
 
     /// Builds public parameters from given bases and table size (e.g. for deserialization).
-    pub fn from_bases(G: C::Affine, H: C::Affine, approximate_num_shares: u32) -> Self {
-        let G_table = Arc::new(BatchMulPreprocessing::new(
-            G.into(),
-            approximate_num_shares.try_into().unwrap(),
-        ));
-        let H_table = Arc::new(BatchMulPreprocessing::new(
-            H.into(),
-            approximate_num_shares.try_into().unwrap(),
-        ));
+    pub fn from_bases(G: C::Affine, H: C::Affine, approximate_num_shares: usize) -> Self {
+        let G_table = Arc::new(BatchMulPreprocessing::new(G.into(), approximate_num_shares));
+        let H_table = Arc::new(BatchMulPreprocessing::new(H.into(), approximate_num_shares));
         Self {
             G,
             H,

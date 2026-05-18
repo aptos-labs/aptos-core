@@ -1,180 +1,180 @@
 Aborting with compilation errors:
 exiting with env checking errors
 warning: [lint] Unnecessary cast: the expression is already of the target type. Consider removing the cast for better readability.
-   ┌─ tests/model_ast_lints/find_unnecessary_casts_test.move:13:17
+   ┌─ tests/model_ast_lints/find_unnecessary_casts_test.move:16:17
    │
-13 │         let y = (x as u64);
+16 │         let y = (x as u64);
    │                 ^^^^^^^^^^
    │
    = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(unnecessary_cast)]`.
    = For more information, see https://aptos.dev/en/build/smart-contracts/linter#unnecessary_cast.
 
 warning: [lint] Unnecessary cast: the expression is already of the target type. Consider removing the cast for better readability.
-   ┌─ tests/model_ast_lints/find_unnecessary_casts_test.move:18:33
+   ┌─ tests/model_ast_lints/find_unnecessary_casts_test.move:21:33
    │
-18 │         let result = helper_u64(x as u64);
+21 │         let result = helper_u64(x as u64);
    │                                 ^^^^^^^^
    │
    = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(unnecessary_cast)]`.
    = For more information, see https://aptos.dev/en/build/smart-contracts/linter#unnecessary_cast.
 
 warning: [lint] Unnecessary cast: the expression is already of the target type. Consider removing the cast for better readability.
-   ┌─ tests/model_ast_lints/find_unnecessary_casts_test.move:23:9
+   ┌─ tests/model_ast_lints/find_unnecessary_casts_test.move:26:9
    │
-23 │         (x as u64)
+26 │         (x as u64)
    │         ^^^^^^^^^^
    │
    = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(unnecessary_cast)]`.
    = For more information, see https://aptos.dev/en/build/smart-contracts/linter#unnecessary_cast.
 
 warning: [lint] Unnecessary cast: the expression is already of the target type. Consider removing the cast for better readability.
-   ┌─ tests/model_ast_lints/find_unnecessary_casts_test.move:29:22
+   ┌─ tests/model_ast_lints/find_unnecessary_casts_test.move:32:22
    │
-29 │         let result = ((a + b) as u32);
+32 │         let result = ((a + b) as u32);
    │                      ^^^^^^^^^^^^^^^^
    │
    = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(unnecessary_cast)]`.
    = For more information, see https://aptos.dev/en/build/smart-contracts/linter#unnecessary_cast.
 
 warning: [lint] Unnecessary cast: the expression is already of the target type. Consider removing the cast for better readability.
-   ┌─ tests/model_ast_lints/find_unnecessary_casts_test.move:33:17
+   ┌─ tests/model_ast_lints/find_unnecessary_casts_test.move:36:17
    │
-33 │         let x = (U8_VALUE as u8);
+36 │         let x = (U8_VALUE as u8);
    │                 ^^^^^^^^^^^^^^^^
    │
    = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(unnecessary_cast)]`.
    = For more information, see https://aptos.dev/en/build/smart-contracts/linter#unnecessary_cast.
 
 warning: [lint] Unnecessary cast: the expression is already of the target type. Consider removing the cast for better readability.
-   ┌─ tests/model_ast_lints/find_unnecessary_casts_test.move:38:13
+   ┌─ tests/model_ast_lints/find_unnecessary_casts_test.move:41:13
    │
-38 │         if ((x as u64) > 0) { };
+41 │         if ((x as u64) > 0) { };
    │             ^^^^^^^^^^
    │
    = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(unnecessary_cast)]`.
    = For more information, see https://aptos.dev/en/build/smart-contracts/linter#unnecessary_cast.
 
 warning: [lint] Empty `if` branch. Consider simplifying by removing or rewriting.
-   ┌─ tests/model_ast_lints/find_unnecessary_casts_test.move:38:9
+   ┌─ tests/model_ast_lints/find_unnecessary_casts_test.move:41:9
    │
-38 │         if ((x as u64) > 0) { };
+41 │         if ((x as u64) > 0) { };
    │         ^^^^^^^^^^^^^^^^^^^^^^^
    │
    = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(empty_if)]`.
    = For more information, see https://aptos.dev/en/build/smart-contracts/linter#empty_if.
 
 warning: [lint] Unnecessary cast: the expression is already of the target type. Consider removing the cast for better readability.
-   ┌─ tests/model_ast_lints/find_unnecessary_casts_test.move:43:17
+   ┌─ tests/model_ast_lints/find_unnecessary_casts_test.move:46:17
    │
-43 │         assert!((x as u16) > 0, 0);
+46 │         assert!((x as u16) > 0, 0);
    │                 ^^^^^^^^^^
    │
    = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(unnecessary_cast)]`.
    = For more information, see https://aptos.dev/en/build/smart-contracts/linter#unnecessary_cast.
 
 warning: [lint] Unnecessary cast: the expression is already of the target type. Consider removing the cast for better readability.
-   ┌─ tests/model_ast_lints/find_unnecessary_casts_test.move:49:19
+   ┌─ tests/model_ast_lints/find_unnecessary_casts_test.move:52:19
    │
-49 │         let sum = (a as u64) + (b as u64);
+52 │         let sum = (a as u64) + (b as u64);
    │                   ^^^^^^^^^^
    │
    = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(unnecessary_cast)]`.
    = For more information, see https://aptos.dev/en/build/smart-contracts/linter#unnecessary_cast.
 
 warning: [lint] Unnecessary cast: the expression is already of the target type. Consider removing the cast for better readability.
-   ┌─ tests/model_ast_lints/find_unnecessary_casts_test.move:49:32
+   ┌─ tests/model_ast_lints/find_unnecessary_casts_test.move:52:32
    │
-49 │         let sum = (a as u64) + (b as u64);
+52 │         let sum = (a as u64) + (b as u64);
    │                                ^^^^^^^^^^
    │
    = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(unnecessary_cast)]`.
    = For more information, see https://aptos.dev/en/build/smart-contracts/linter#unnecessary_cast.
 
 warning: [lint] Unnecessary cast: the expression is already of the target type. Consider removing the cast for better readability.
-   ┌─ tests/model_ast_lints/find_unnecessary_casts_test.move:54:18
+   ┌─ tests/model_ast_lints/find_unnecessary_casts_test.move:57:18
    │
-54 │         let y = ((x as u64) as u64);
+57 │         let y = ((x as u64) as u64);
    │                  ^^^^^^^^^^
    │
    = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(unnecessary_cast)]`.
    = For more information, see https://aptos.dev/en/build/smart-contracts/linter#unnecessary_cast.
 
 warning: [lint] Unnecessary cast: the expression is already of the target type. Consider removing the cast for better readability.
-   ┌─ tests/model_ast_lints/find_unnecessary_casts_test.move:54:17
+   ┌─ tests/model_ast_lints/find_unnecessary_casts_test.move:57:17
    │
-54 │         let y = ((x as u64) as u64);
+57 │         let y = ((x as u64) as u64);
    │                 ^^^^^^^^^^^^^^^^^^^
    │
    = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(unnecessary_cast)]`.
    = For more information, see https://aptos.dev/en/build/smart-contracts/linter#unnecessary_cast.
 
 error: unknown lint check: `unnecessary_casts`
-   ┌─ tests/model_ast_lints/find_unnecessary_casts_test.move:90:18
+   ┌─ tests/model_ast_lints/find_unnecessary_casts_test.move:93:18
    │
-90 │     #[lint::skip(unnecessary_casts)]
+93 │     #[lint::skip(unnecessary_casts)]
    │                  ^^^^^^^^^^^^^^^^^
 
 warning: [lint] Unnecessary cast: the expression is already of the target type. Consider removing the cast for better readability.
-   ┌─ tests/model_ast_lints/find_unnecessary_casts_test.move:93:17
+   ┌─ tests/model_ast_lints/find_unnecessary_casts_test.move:96:17
    │
-93 │         let y = (x as u64);
+96 │         let y = (x as u64);
    │                 ^^^^^^^^^^
    │
    = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(unnecessary_cast)]`.
    = For more information, see https://aptos.dev/en/build/smart-contracts/linter#unnecessary_cast.
 
 error: unknown lint check: `unnecessary_casts`
-   ┌─ tests/model_ast_lints/find_unnecessary_casts_test.move:96:18
+   ┌─ tests/model_ast_lints/find_unnecessary_casts_test.move:99:18
    │
-96 │     #[lint::skip(unnecessary_casts)]
+99 │     #[lint::skip(unnecessary_casts)]
    │                  ^^^^^^^^^^^^^^^^^
 
 warning: [lint] Unnecessary cast: the expression is already of the target type. Consider removing the cast for better readability.
-    ┌─ tests/model_ast_lints/find_unnecessary_casts_test.move:100:19
+    ┌─ tests/model_ast_lints/find_unnecessary_casts_test.move:103:19
     │
-100 │         let sum = (a as u32) + (b as u32);
+103 │         let sum = (a as u32) + (b as u32);
     │                   ^^^^^^^^^^
     │
     = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(unnecessary_cast)]`.
     = For more information, see https://aptos.dev/en/build/smart-contracts/linter#unnecessary_cast.
 
 warning: [lint] Unnecessary cast: the expression is already of the target type. Consider removing the cast for better readability.
-    ┌─ tests/model_ast_lints/find_unnecessary_casts_test.move:100:32
+    ┌─ tests/model_ast_lints/find_unnecessary_casts_test.move:103:32
     │
-100 │         let sum = (a as u32) + (b as u32);
+103 │         let sum = (a as u32) + (b as u32);
     │                                ^^^^^^^^^^
     │
     = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(unnecessary_cast)]`.
     = For more information, see https://aptos.dev/en/build/smart-contracts/linter#unnecessary_cast.
 
 error: unknown lint check: `unnecessary_casts`
-    ┌─ tests/model_ast_lints/find_unnecessary_casts_test.move:105:14
+    ┌─ tests/model_ast_lints/find_unnecessary_casts_test.move:108:14
     │
-105 │ #[lint::skip(unnecessary_casts)]
+108 │ #[lint::skip(unnecessary_casts)]
     │              ^^^^^^^^^^^^^^^^^
 
 warning: [lint] Unnecessary cast: the expression is already of the target type. Consider removing the cast for better readability.
-    ┌─ tests/model_ast_lints/find_unnecessary_casts_test.move:110:17
+    ┌─ tests/model_ast_lints/find_unnecessary_casts_test.move:113:17
     │
-110 │         let y = (x as u64);
+113 │         let y = (x as u64);
     │                 ^^^^^^^^^^
     │
     = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(unnecessary_cast)]`.
     = For more information, see https://aptos.dev/en/build/smart-contracts/linter#unnecessary_cast.
 
 warning: [lint] Unnecessary cast: the expression is already of the target type. Consider removing the cast for better readability.
-    ┌─ tests/model_ast_lints/find_unnecessary_casts_test.move:116:22
+    ┌─ tests/model_ast_lints/find_unnecessary_casts_test.move:119:22
     │
-116 │         let result = (a as u8) + (b as u8);
+119 │         let result = (a as u8) + (b as u8);
     │                      ^^^^^^^^^
     │
     = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(unnecessary_cast)]`.
     = For more information, see https://aptos.dev/en/build/smart-contracts/linter#unnecessary_cast.
 
 warning: [lint] Unnecessary cast: the expression is already of the target type. Consider removing the cast for better readability.
-    ┌─ tests/model_ast_lints/find_unnecessary_casts_test.move:116:34
+    ┌─ tests/model_ast_lints/find_unnecessary_casts_test.move:119:34
     │
-116 │         let result = (a as u8) + (b as u8);
+119 │         let result = (a as u8) + (b as u8);
     │                                  ^^^^^^^^^
     │
     = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(unnecessary_cast)]`.

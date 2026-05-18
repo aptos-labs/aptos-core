@@ -61,6 +61,14 @@ pub struct NodeArgs {
     #[clap(long, default_value_t = DEFAULT_GRPC_STREAM_PORT)]
     txn_stream_port: u16,
 
+    /// Use the internal FullnodeData gRPC interface instead of the RawData (data
+    /// service) interface for the transaction stream. This is needed for example when
+    /// running the indexer-grpc-manager stack against the localnet, since the manager
+    /// expects the FullnodeData interface. If you aren't sure if you need to enable
+    /// this, you almost certainly don't.
+    #[clap(long)]
+    use_internal_fullnode_data_interface: bool,
+
     /// If set we won't run the node at all.
     //
     // Note: I decided that since running multiple partial localnets is a rare
@@ -88,6 +96,7 @@ pub struct NodeManager {
     config: NodeConfig,
     test_dir: PathBuf,
     no_node: bool,
+    use_internal_fullnode_data_interface: bool,
 }
 
 pub fn build_node_config(
@@ -135,6 +144,7 @@ impl NodeManager {
             !args.node_args.no_txn_stream,
             args.node_args.txn_stream_port,
             args.node_args.no_node,
+            args.node_args.use_internal_fullnode_data_interface,
         )
     }
 
@@ -145,12 +155,17 @@ impl NodeManager {
         run_txn_stream: bool,
         txn_stream_port: u16,
         no_node: bool,
+        use_internal_fullnode_data_interface: bool,
     ) -> Result<Self> {
         eprintln!();
 
         // Enable the grpc stream on the node if we will run a txn stream service.
         node_config.indexer_grpc.enabled = run_txn_stream;
-        node_config.indexer_grpc.use_data_service_interface = run_txn_stream;
+        // When use_internal_fullnode_data_interface is set, expose the internal
+        // FullnodeData gRPC interface instead of the RawData interface. The
+        // indexer-grpc-manager expects FullnodeData/GetTransactionsFromNode.
+        node_config.indexer_grpc.use_data_service_interface =
+            run_txn_stream && !use_internal_fullnode_data_interface;
         node_config.indexer_grpc.address.set_port(txn_stream_port);
 
         node_config.indexer_table_info.table_info_service_mode = match run_txn_stream {
@@ -172,6 +187,7 @@ impl NodeManager {
             config: node_config,
             test_dir,
             no_node,
+            use_internal_fullnode_data_interface,
         })
     }
 
@@ -207,7 +223,9 @@ impl ServiceManager for NodeManager {
         let node_api_url = self.get_node_api_url();
         let mut checkers = HashSet::new();
         checkers.insert(HealthChecker::NodeApi(node_api_url));
-        if self.config.indexer_grpc.enabled {
+        // The DataServiceGrpc health check uses the RawData interface, which
+        // is not available when the FullnodeData interface is exposed instead.
+        if self.config.indexer_grpc.enabled && !self.use_internal_fullnode_data_interface {
             let data_service_url = self.get_data_service_url();
             checkers.insert(HealthChecker::DataServiceGrpc(data_service_url));
         }

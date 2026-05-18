@@ -150,10 +150,7 @@ pub fn new_test_context_inner(
     let validator_owner = validator_identity.account_address.unwrap();
     let (sender, recver) = channel::<(Instant, Version)>((Instant::now(), 0 as Version));
     let (db, db_rw) = if use_db_with_indexer {
-        let mut aptos_db = AptosDB::new_for_test_with_indexer(
-            &tmp_dir,
-            node_config.storage.rocksdb_configs.enable_storage_sharding,
-        );
+        let mut aptos_db = AptosDB::new_for_test(&tmp_dir);
         if node_config
             .indexer_db_config
             .is_internal_indexer_db_enabled()
@@ -173,7 +170,6 @@ pub fn new_test_context_inner(
                     .enable_storage_sharding,
                 ..Default::default()
             },
-            false, /* indexer */
             BUFFERED_STATE_TARGET_ITEMS_FOR_TEST,
             DEFAULT_MAX_NUM_NODES_PER_LRU_CACHE_SHARD,
             None,
@@ -593,6 +589,34 @@ impl TestContext {
                 "transaction_payload": {
                     "type": "entry_function_payload",
                     "function": function,
+                    "type_arguments": type_args,
+                    "arguments": args
+                }
+            }),
+            expected_status_code,
+        )
+        .await;
+    }
+
+    pub async fn execute_multisig_transaction_with_script_payload(
+        &mut self,
+        owner: &mut LocalAccount,
+        multisig_account: AccountAddress,
+        bytecode_hex: &str,
+        type_args: &[&str],
+        args: &[&str],
+        expected_status_code: u16,
+    ) {
+        self.api_execute_txn_expecting(
+            owner,
+            json!({
+                "type": "multisig_payload",
+                "multisig_address": multisig_account.to_hex_literal(),
+                "transaction_payload": {
+                    "type": "script_payload",
+                    "code": {
+                        "bytecode": format!("0x{}", bytecode_hex),
+                    },
                     "type_arguments": type_args,
                     "arguments": args
                 }
@@ -1200,6 +1224,34 @@ impl TestContext {
                 "transaction_payload": {
                     "type": "entry_function_payload",
                     "function": function,
+                    "type_arguments": type_args,
+                    "arguments": args
+                }
+            }),
+            expected_status_code,
+        )
+        .await
+    }
+
+    pub async fn simulate_multisig_script_transaction(
+        &mut self,
+        owner: &LocalAccount,
+        multisig_account: AccountAddress,
+        bytecode_hex: &str,
+        type_args: &[&str],
+        args: &[&str],
+        expected_status_code: u16,
+    ) -> Value {
+        self.simulate_transaction(
+            owner,
+            json!({
+                "type": "multisig_payload",
+                "multisig_address": multisig_account.to_hex_literal(),
+                "transaction_payload": {
+                    "type": "script_payload",
+                    "code": {
+                        "bytecode": format!("0x{}", bytecode_hex),
+                    },
                     "type_arguments": type_args,
                     "arguments": args
                 }

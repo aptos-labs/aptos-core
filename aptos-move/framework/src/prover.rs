@@ -3,13 +3,10 @@
 
 use crate::build_model;
 use anyhow::bail;
-use codespan_reporting::{
-    diagnostic::Severity,
-    term::termcolor::{ColorChoice, StandardStream},
-};
+use codespan_reporting::diagnostic::Severity;
 use log::{info, LevelFilter};
 use move_compiler_v2::Experiment;
-use move_core_types::account_address::AccountAddress;
+use move_core_types::{account_address::AccountAddress, diag_writer::DiagWriter};
 use move_model::{
     metadata::{CompilerVersion, LanguageVersion},
     model::{GlobalEnv, VerificationScope},
@@ -121,12 +118,26 @@ pub struct ProverOptions {
     #[clap(long = "skip-instance-check")]
     pub skip_instance_check: bool,
 
-    #[clap(skip)]
+    /// Generate an independent verification condition for each assertion in a
+    /// function instead of a single combined condition. Can help when a
+    /// function contains both provable-but-hard asserts and asserts that
+    /// produce counterexamples; useful for diagnosing per-function timeouts.
+    #[clap(long)]
+    pub split_vcs_by_assert: bool,
+
+    /// Maximum number of counterexamples reported per verification
+    /// condition.
+    #[clap(long)]
+    pub error_limit: Option<usize>,
+
+    /// Internal flag: use a temp dir for boogie output so parallel invocations
+    /// don't interfere. Set automatically by test harnesses.
+    #[clap(long, hide = true)]
     pub for_test: bool,
 }
 
 impl ProverOptions {
-    /// Runs the move prover on the package.
+    /// Runs the move prover on the package, writing diagnostics to stderr.
     pub fn prove(
         self,
         dev_mode: bool,
@@ -139,9 +150,35 @@ impl ProverOptions {
         known_attributes: &BTreeSet<String>,
         experiments: &[String],
     ) -> anyhow::Result<()> {
-        if compiler_version.is_some_and(|v| v == CompilerVersion::V1) {
-            return Err(anyhow::Error::msg("Compiler v1 is not supported"));
-        }
+        let mut writer = DiagWriter::stderr();
+        self.prove_to(
+            &mut writer,
+            dev_mode,
+            package_path,
+            named_addresses,
+            bytecode_version,
+            compiler_version,
+            language_version,
+            skip_attribute_checks,
+            known_attributes,
+            experiments,
+        )
+    }
+
+    /// Runs the move prover on the package, writing diagnostics to the given writer.
+    pub fn prove_to(
+        self,
+        writer: &mut DiagWriter,
+        dev_mode: bool,
+        package_path: &Path,
+        named_addresses: BTreeMap<String, AccountAddress>,
+        bytecode_version: Option<u32>,
+        compiler_version: Option<CompilerVersion>,
+        language_version: Option<LanguageVersion>,
+        skip_attribute_checks: bool,
+        known_attributes: &BTreeSet<String>,
+        experiments: &[String],
+    ) -> anyhow::Result<()> {
         let now = Instant::now();
         let for_test = self.for_test;
         let benchmark = self.benchmark;
@@ -153,6 +190,8 @@ impl ProverOptions {
         };
         let mut model = build_model(
             dev_mode,
+            false, // test_mode
+            true,  // verify_mode: prover needs #[verify_only] code
             package_path,
             named_addresses,
             self.filter.clone(),
@@ -162,7 +201,10 @@ impl ProverOptions {
             skip_attribute_checks,
             known_attributes.clone(),
             experiments_vec,
+            true,  // with_bytecode: prover needs FileFormat bytecode
+            false, // all_files_as_targets
         )?;
+        model.check_errors("in compilation")?;
         let mut options = self.convert_options(package_path)?;
         options.language_version = language_version;
         // Need to ensure a distinct output.bpl file for concurrent execution. In non-test
@@ -183,17 +225,12 @@ impl ProverOptions {
                 .to_string();
             None
         };
-        options.backend.custom_natives =
-            Some(move_prover_boogie_backend::options::CustomNativeOptions {
-                template_bytes: include_bytes!("aptos-natives.bpl").to_vec(),
-                module_instance_names: move_prover_boogie_backend::options::custom_native_options(),
-            });
+        configure_aptos_custom_natives(&mut options);
         if benchmark {
             // Special mode of benchmarking
             run_prover_benchmark(package_path, &mut model, options)?;
         } else {
-            let mut writer = StandardStream::stderr(ColorChoice::Auto);
-            move_prover::run_move_prover_with_model_v2(&mut model, &mut writer, options, now)?;
+            move_prover::run_move_prover_with_model_v2(&mut model, writer, options, now)?;
         }
         Ok(())
     }
@@ -257,6 +294,9 @@ impl ProverOptions {
                 loop_unroll: self.loop_unroll.or(base_opts.backend.loop_unroll),
                 skip_instance_check: self.skip_instance_check
                     || base_opts.backend.skip_instance_check,
+                split_vcs_by_assert: self.split_vcs_by_assert
+                    || base_opts.backend.split_vcs_by_assert,
+                error_limit: self.error_limit.unwrap_or(base_opts.backend.error_limit),
                 ..base_opts.backend
             },
             ..base_opts
@@ -283,26 +323,32 @@ fn run_prover_benchmark(
     mut options: Options,
 ) -> anyhow::Result<()> {
     info!("starting prover benchmark");
-    // Determine sources and dependencies from the env
-    let mut sources = BTreeSet::new();
+    // Determine sources and dependencies from the env.
+    // We collect parent *directories* (not individual files) for both sources and deps so that
+    // the Move compiler finds all `.move` AND `.spec.move` files in each directory.
+    let mut sources: Vec<String> = vec![];
     let mut deps: Vec<String> = vec![];
     for module in env.get_modules() {
         let file_name = module.get_source_path().to_string_lossy().to_string();
-        if module.is_primary_target() {
-            sources.insert(module.get_source_path().to_string_lossy().to_string());
-        } else if let Some(p) = Path::new(&file_name)
+        let target = if module.is_primary_target() {
+            &mut sources
+        } else {
+            &mut deps
+        };
+        if let Some(p) = Path::new(&file_name)
             .parent()
             .and_then(|p| p.canonicalize().ok())
         {
-            // The prover doesn't like to have `p` and `p/s` as dep paths, filter those out
+            // The prover doesn't like to have `p` and `p/s` as paths, filter those out
             let p = p.to_string_lossy().to_string();
             let mut done = false;
-            for d in &mut deps {
-                if p.starts_with(&*d) {
-                    // p is subsumed
+            for d in target.iter_mut() {
+                // Use Path::starts_with for component-level prefix checks.
+                if Path::new(&p).starts_with(&*d) {
+                    // p is subsumed by d
                     done = true;
                     break;
-                } else if d.starts_with(&p) {
+                } else if Path::new(&*d).starts_with(&p) {
                     // p is more general or equal to d, swap it out
                     *d = p.to_string();
                     done = true;
@@ -310,12 +356,14 @@ fn run_prover_benchmark(
                 }
             }
             if !done {
-                deps.push(p)
+                target.push(p)
             }
         } else {
             bail!("invalid file path `{}`", file_name)
         }
     }
+    // Remove from `deps` any path that is already covered by a `sources` entry so the directory is not compiled twice.
+    deps.retain(|d| !sources.iter().any(|s| Path::new(d).starts_with(s)));
 
     // Enrich the prover options by the aliases in the env
     for (alias, address) in env.get_address_alias_map() {
@@ -378,4 +426,19 @@ fn run_prover_benchmark(
         }
     }
     move_prover_lab::plot::plot_svg(&args)
+}
+
+/// Sets `options.backend.custom_natives` to the Aptos-specific native Boogie implementations
+/// from `aptos-natives.bpl`.
+///
+/// This must be called before running the Move Prover on any Aptos package (or package that
+/// transitively depends on `move-stdlib`, which includes the `cmp` module with `pragma intrinsic`
+/// types). Without it, the Boogie backend lacks the `$1_cmp_Ordering` type declaration and the
+/// `cmp_vector_instances` axioms, causing Boogie compilation errors.
+pub fn configure_aptos_custom_natives(options: &mut Options) {
+    options.backend.custom_natives =
+        Some(move_prover_boogie_backend::options::CustomNativeOptions {
+            template_bytes: include_bytes!("aptos-natives.bpl").to_vec(),
+            module_instance_names: move_prover_boogie_backend::options::custom_native_options(),
+        });
 }

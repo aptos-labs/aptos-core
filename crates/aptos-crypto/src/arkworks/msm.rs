@@ -5,20 +5,22 @@
 //!
 //! An MSM takes a collection of bases and corresponding scalars and computes
 //! their linear combination. This module defines a simple container for such
-//! inputs, along with a small trait to abstract over concrete container types.
+//! inputs.
 
-use crate::utils;
-use anyhow::ensure;
-use ark_ec::CurveGroup;
+use crate::{arkworks::random::sample_field_element, utils};
+use anyhow::{bail, Result};
+use ark_ec::AffineRepr;
+use ark_ff::Zero;
 use ark_serialize::{CanonicalDeserialize, CanonicalSerialize};
-use std::fmt::Debug;
+use rand::Rng;
+use std::{collections::HashMap, fmt::Debug};
 
 /// Input to a (not necessarily fixed-base) multi-scalar multiplication (MSM).
 ///
 /// An MSM input consists of:
 /// * a list of base elements, and
 /// * a list of scalar elements,
-/// which are interpreted pairwise.
+/// which are coupled pairwise.
 ///
 /// Implementations that construct an `MsmInput` should ensure that
 /// `bases.len() == scalars.len()`
@@ -27,57 +29,35 @@ pub struct MsmInput<
     B: CanonicalSerialize + CanonicalDeserialize,
     S: CanonicalSerialize + CanonicalDeserialize,
 > {
-    /// the bases of the MSM
+    /// The bases of the MSM.
     pub bases: Vec<B>,
-    /// the scalars of the MSM
+    /// The scalars of the MSM.
     pub scalars: Vec<S>,
 }
 
-/// Trait abstraction for types representing MSM inputs.
-///
-/// This exists as a workaround because stable Rust does not yet support default
-/// associated types. (Now we have to do `type MsmInput: IsMsmInput` rather than `type MsmInput = IsMsmInput`)
-/// TODO: we probably don't need this trait, can just do MsmInput<E::Base, E::Scalar> in function signatures???
-pub trait IsMsmInput: Sized {
-    // maybe make B and S associated types instead
-    /// The scalar type used in the MSMs.
-    type Scalar: Clone + CanonicalSerialize + CanonicalDeserialize + Eq + Debug;
-
-    /// The group/base type used in the MSMs. Current instantiations always use E::G1Affine but as explained
-    /// in the TODO of doc comment of `fn verify_msm_hom`, we might want to be working with enums here in the future.
-    type Base: Clone + CanonicalSerialize + CanonicalDeserialize + Eq + Debug;
-
-    /// Returns a reference to the slice of base elements in this MSM input.
-    fn bases(&self) -> &[Self::Base];
-
-    /// Returns a reference to the slice of scalar elements in this MSM input.
-    fn scalars(&self) -> &[Self::Scalar];
-
-    /// Constructs a new MSM input from the provided bases and scalars.
-    ///
-    /// Should return an error if the lengths of `bases` and `scalars` do not match.
-    fn new(bases: Vec<Self::Base>, scalars: Vec<Self::Scalar>) -> anyhow::Result<Self>;
-}
-
-impl<B, S> IsMsmInput for MsmInput<B, S>
+impl<B, S> MsmInput<B, S>
 where
     B: CanonicalSerialize + CanonicalDeserialize + Clone + Eq + Debug,
     S: CanonicalSerialize + CanonicalDeserialize + Clone + Eq + Debug,
 {
-    type Base = B;
-    type Scalar = S;
-
-    fn bases(&self) -> &[Self::Base] {
+    /// Returns a reference to the slice of base elements in this MSM input.
+    #[inline]
+    pub fn bases(&self) -> &[B] {
         &self.bases
     }
 
-    fn scalars(&self) -> &[Self::Scalar] {
+    /// Returns a reference to the slice of scalar elements in this MSM input.
+    #[inline]
+    pub fn scalars(&self) -> &[S] {
         &self.scalars
     }
 
-    fn new(bases: Vec<Self::Base>, scalars: Vec<Self::Scalar>) -> anyhow::Result<Self> {
+    /// Constructs a new MSM input from the provided bases and scalars.
+    ///
+    /// Returns an error if the lengths of `bases` and `scalars` do not match.
+    pub fn new(bases: Vec<B>, scalars: Vec<S>) -> Result<Self> {
         if bases.len() != scalars.len() {
-            anyhow::bail!(
+            bail!(
                 "MsmInput length mismatch: {} bases, {} scalars",
                 bases.len(),
                 scalars.len(),
@@ -87,60 +67,71 @@ where
     }
 }
 
-/// Verifies that a collection of MSMs are all equal to zero, by combining
-/// them into one big MSM using random linear combination, following the
-/// Schwartz-Zippel philosophy.
+/// Merges multiple `MsmInput`s into one by scaling the i-th input by `scales[i]` and aggregating.
+/// Same base across inputs is combined (scalars summed). Terms with zero scalar are dropped.
 ///
-/// In this particular function we assume that this process has already been
-/// "started", which is *useful* since the sigma protocol's MSM scalars are
-/// already manipulated with betas, and changing that would make things a
-/// tiny bit slower
-///
-/// TODO: in theory the hash table approach as in the sigma protocol might be useful here again - move it
-#[allow(non_snake_case)]
-pub fn verify_msm_terms_with_start<C: CurveGroup>(
-    new_msm_terms: Vec<MsmInput<C::Affine, C::ScalarField>>,
-    existing_msm_terms: MsmInput<C::Affine, C::ScalarField>,
-    powers_of_beta: Vec<C::ScalarField>,
-) -> anyhow::Result<()> {
-    assert_eq!(new_msm_terms.len(), powers_of_beta.len());
-
-    let mut final_bases = existing_msm_terms.bases().to_vec();
-    let mut final_scalars = existing_msm_terms.scalars().to_vec();
-
-    for (term, beta_power) in new_msm_terms.into_iter().zip(powers_of_beta) {
-        let mut scalars = term.scalars().to_vec();
-
-        for scalar in scalars.iter_mut() {
-            *scalar *= beta_power;
-        }
-
-        final_bases.extend(term.bases());
-        final_scalars.extend(scalars);
+/// Returns an error if `inputs.len() != scales.len()` or if the merged MSM input is invalid.
+pub fn merge_msm_inputs_with_scales<A: AffineRepr>(
+    inputs: &[MsmInput<A, A::ScalarField>],
+    scales: &[A::ScalarField],
+) -> Result<MsmInput<A, A::ScalarField>> {
+    if inputs.len() != scales.len() {
+        bail!(
+            "inputs and scales length mismatch: {} inputs, {} scales",
+            inputs.len(),
+            scales.len(),
+        );
     }
-
-    let msm_result = C::msm(&final_bases, &final_scalars).expect("Could not compute batch MSM");
-    ensure!(msm_result == C::ZERO);
-
-    Ok(())
+    let mut agg: HashMap<A, A::ScalarField> = HashMap::new();
+    for (input, scale) in inputs.iter().zip(scales.iter()) {
+        for (base, scalar) in input.bases().iter().zip(input.scalars().iter()) {
+            let s = *scalar * scale;
+            agg.entry(*base).and_modify(|s0| *s0 += s).or_insert(s);
+        }
+    }
+    let (bases, scalars): (Vec<_>, Vec<_>) = agg.into_iter().filter(|(_, s)| !s.is_zero()).unzip();
+    MsmInput::new(bases, scalars)
 }
 
-/// Verifies that a collection of MSMs are all equal to zero, by combining
-/// them into one big MSM using random linear combination, following the
-/// Schwartz-Zippel philosophy; delegates the actual work to
-/// `verify_msm_terms_with_start()`
-///
-/// TODO: doesn't get used?
-#[allow(non_snake_case)]
-pub fn verify_msm_terms<C: CurveGroup>(
-    msm_terms: Vec<MsmInput<C::Affine, C::ScalarField>>,
-    beta: C::ScalarField,
-) -> anyhow::Result<()> {
-    let powers_of_beta = utils::powers(beta, msm_terms.len());
+/// Merges multiple `MsmInput`s into one by sampling a random `beta`, using
+/// `[1, beta, beta^2, ...]` as scales, and calling `merge_msm_inputs_with_scales`.
+pub fn merge_msm_inputs<A: AffineRepr, R: Rng>(
+    inputs: &[MsmInput<A, A::ScalarField>],
+    rng: &mut R,
+) -> Result<MsmInput<A, A::ScalarField>> {
+    let beta = sample_field_element(rng);
+    let scales = utils::powers(beta, inputs.len());
+    merge_msm_inputs_with_scales(inputs, &scales)
+}
 
-    verify_msm_terms_with_start::<C>(
-        msm_terms,
-        MsmInput::new(Vec::new(), Vec::new()).unwrap(),
-        powers_of_beta,
-    )
+/// Multi-scalar multiplication with boolean scalars.
+///
+/// Treats each `bool` as 0 or 1 and returns
+/// `sum_i scalars[i] * bases[i]`.
+///
+/// # Arguments
+/// * `bases` – curve points (affine).
+/// * `scalars` – one boolean per base; `true` means include that base, `false` means skip it.
+///
+/// # Panics
+/// In debug builds, panics if `bases.len() != scalars.len()`.
+///
+/// Probably won't be needed in future versions of `arkworks`.
+pub fn msm_bool<A: AffineRepr>(bases: &[A], scalars: &[bool]) -> A::Group {
+    // Bases and scalars must have the same length for multi-scalar multiplication.
+    debug_assert_eq!(
+        bases.len(),
+        scalars.len(),
+        "bases and scalars must have the same length for MSM (got {} bases, {} scalars)",
+        bases.len(),
+        scalars.len()
+    );
+
+    let mut acc = A::Group::zero();
+    for (base, &bit) in bases.iter().zip(scalars) {
+        if bit {
+            acc += base;
+        }
+    }
+    acc
 }

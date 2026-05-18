@@ -132,9 +132,9 @@ impl AptosEnvironment {
         self.0.inject_create_signer_for_gov_sim
     }
 
-    /// Returns bytes corresponding to the verifier config in this environment.
-    pub fn verifier_config_bytes(&self) -> &Vec<u8> {
-        &self.0.verifier_bytes
+    /// Returns the hash of the serialized verifier config in this environment.
+    pub fn verifier_config_hash(&self) -> &[u8; 32] {
+        self.0.runtime_environment.verifier_config_hash()
     }
 
     /// Returns true if runtime checks can be performed after execution.
@@ -197,10 +197,6 @@ struct Environment {
 
     /// Hash of configs used in this environment. Used to be able to compare environments.
     hash: [u8; 32],
-    /// Bytes of serialized verifier config. Used to detect any changes in verification configs.
-    /// We stored bytes instead of hash because config is expected to be smaller than the crypto
-    /// hash itself.
-    verifier_bytes: Vec<u8>,
 
     /// If true, runtime checks such as paranoid may not be performed during speculative execution
     /// of transactions, but instead once at post-commit time based on the collected execution
@@ -255,7 +251,7 @@ impl Environment {
                 )
             },
             Err(_) => {
-                let ty_builder = aptos_default_ty_builder();
+                let ty_builder = aptos_default_ty_builder(true);
                 (
                     NativeGasParameters::zeros(),
                     MiscGasParameters::zeros(),
@@ -280,8 +276,6 @@ impl Environment {
             &timed_features,
             ty_builder,
         );
-        let verifier_bytes =
-            bcs::to_bytes(&vm_config.verifier_config).expect("Verifier config is serializable");
         let runtime_environment = RuntimeEnvironment::new_with_config(natives, vm_config);
 
         // We use an `Option` to handle the VK not being set on-chain, or an incorrect VK being set
@@ -312,7 +306,6 @@ impl Environment {
             runtime_environment,
             inject_create_signer_for_gov_sim,
             hash,
-            verifier_bytes,
             async_runtime_checks_enabled: get_async_runtime_checks(),
         }
     }

@@ -11,9 +11,9 @@ proptest! {
     fn test_encode_decode(
         state_key in any::<HashValue>(),
         version in any::<Version>(),
-        v in any::<Option<HotStateValue>>(),
+        entry in any::<Option<HotStateEntry>>(),
     ) {
-        assert_encode_decode::<HotStateValueByKeyHashSchema>(&(state_key, version), &v);
+        assert_encode_decode::<HotStateValueByKeyHashSchema>(&(state_key, version), &entry);
     }
 }
 

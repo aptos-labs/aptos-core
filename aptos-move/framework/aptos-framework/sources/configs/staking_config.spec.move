@@ -163,6 +163,7 @@ spec aptos_framework::staking_config {
     }
 
     spec reward_rate(): (u64, u64) {
+        pragma verify_duration_estimate = 120;
         let config = global<StakingConfig>(@aptos_framework);
         aborts_if !exists<StakingConfig>(@aptos_framework);
         include StakingRewardsConfigRequirement;

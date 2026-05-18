@@ -1,0 +1,16 @@
+{
+  "called": [
+    "0xcafe::ops::apply"
+  ],
+  "called_transitive": [
+    "0xcafe::ops::apply"
+  ],
+  "used": [
+    "0xcafe::ops::add",
+    "0xcafe::ops::apply"
+  ],
+  "used_transitive": [
+    "0xcafe::ops::add",
+    "0xcafe::ops::apply"
+  ]
+}

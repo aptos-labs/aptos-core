@@ -10,12 +10,10 @@ use crate::{
     },
     smoke_test_environment::SwarmBuilder,
 };
-use aptos::{
-    common::types::{CliError, CliTypedResult, GasOptions, TransactionSummary},
-    move_tool::MemberId,
-};
+use aptos::common::types::{CliError, CliTypedResult, GasOptions, TransactionSummary};
 use aptos_forge::{Swarm, SwarmExt};
 use aptos_logger::info;
+use aptos_move_cli::MemberId;
 use aptos_types::on_chain_config::OnChainRandomnessConfig;
 use std::{str::FromStr, sync::Arc, time::Duration};
 

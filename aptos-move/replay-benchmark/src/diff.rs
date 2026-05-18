@@ -117,22 +117,20 @@ impl TransactionDiff {
                     let left = left.as_ref();
                     let right = right.as_ref();
 
-                    if left.is_none() {
-                        println!("{}", "========".yellow());
-                        println!("{}", format!("write {:?}", state_key).red());
-                    } else if right.is_none() {
-                        println!("{}", format!("write {:?}", state_key).green());
-                        println!("{}", "========".yellow());
-                    } else {
-                        println!(
-                            "{}",
-                            format!("write {:?} op {:?}", state_key, left.unwrap()).green()
-                        );
-                        println!("{}", "========".yellow());
-                        println!(
-                            "{}",
-                            format!("write {:?} op {:?}", state_key, right.unwrap()).red()
-                        );
+                    match (left, right) {
+                        (None, _) => {
+                            println!("{}", "========".yellow());
+                            println!("{}", format!("write {:?}", state_key).red());
+                        },
+                        (_, None) => {
+                            println!("{}", format!("write {:?}", state_key).green());
+                            println!("{}", "========".yellow());
+                        },
+                        (Some(l), Some(r)) => {
+                            println!("{}", format!("write {:?} op {:?}", state_key, l).green());
+                            println!("{}", "========".yellow());
+                            println!("{}", format!("write {:?} op {:?}", state_key, r).red());
+                        },
                     }
                 },
             }

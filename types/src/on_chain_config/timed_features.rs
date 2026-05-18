@@ -8,6 +8,9 @@ use serde::Serialize;
 use strum::{EnumCount, IntoEnumIterator};
 use strum_macros::{EnumCount as EnumCountMacro, EnumIter};
 
+/// NOTE: if you add a restriction e.g. for the bytecode verifier and want
+/// to test whether testnet/mainnet is effected, you MUST define an override
+/// to enable the flag during replay. By default, flags are not enabled in replay.
 #[derive(Debug, EnumCountMacro, EnumIter, Clone, Copy, Eq, PartialEq)]
 pub enum TimedFeatureFlag {
     // Was always enabled.
@@ -19,9 +22,8 @@ pub enum TimedFeatureFlag {
 
     // Fixes the bug of table natives not tracking the memory usage of the global values they create.
     FixMemoryUsageTracking,
-    // Disable checking for captured option types.
-    // Only when this feature is turned on, feature flag ENABLE_CAPTURE_OPTION can control whether the option type can be captured.
-    DisabledCaptureOption,
+    // Was used to disable checking for captured option types. Feature is now permanently enabled.
+    _DisabledCaptureOption,
 
     /// Fixes the bug that table natives double count the memory usage of the global values.
     FixTableNativesMemoryDoubleCounting,
@@ -36,6 +38,18 @@ pub enum TimedFeatureFlag {
     /// Use the full transaction size (including authenticator) for gas checks
     /// instead of just the raw transaction size.
     UseFullTransactionSizeForGasCheck,
+
+    /// Enables strict bounds in the production verifier config for struct definitions,
+    /// struct variants, fields in struct, function definitions, and basic blocks in script.
+    EnableStrictBoundsInProdConfig,
+
+    /// Revise some bounds in prod config which have been established by previous configs.
+    RevisedBoundsInProdConfig,
+
+    /// If enabled, `bcs::constant_serialized_size` uses local cache to deduplicate traversals
+    /// of same struct nodes, counting cache hits as 1 node instead of re-expanding its full
+    /// subtree.
+    ConstantSerializedSizeLocalCache,
 }
 
 /// Representation of features that are gated by the block timestamps.
@@ -56,23 +70,35 @@ pub enum TimedFeatureOverride {
 }
 
 impl TimedFeatureOverride {
-    #[allow(unused, clippy::match_single_binding)]
+    #[allow(unused)]
     const fn get_override(&self, flag: TimedFeatureFlag) -> Option<bool> {
         use TimedFeatureFlag::*;
         use TimedFeatureOverride::*;
 
-        Some(match self {
-            Replay => match flag {
-                _LimitTypeTagSize => true,
-                _ModuleComplexityCheck => true,
-                // Add overrides for replay here.
-                _ => return None,
-            },
-            Testing => match flag {
-                EntryCompatibility => true,
-                _ => return None, // Activate all flags
-            },
-        })
+        match (self, flag) {
+            // Add overrides for replay here.
+            (Replay, _LimitTypeTagSize) => Some(true),
+            (Replay, _ModuleComplexityCheck) => Some(true),
+            // Add overrides for testing here.
+            (Testing, EntryCompatibility) => Some(true),
+            // Exhaustive over flags so adding a new flag forces a decision.
+            (
+                _,
+                _LimitTypeTagSize
+                | _ModuleComplexityCheck
+                | EntryCompatibility
+                | ChargeBytesForPrints
+                | FixMemoryUsageTracking
+                | _DisabledCaptureOption
+                | FixTableNativesMemoryDoubleCounting
+                | ClosureDepthCheck
+                | FixCryptoAlgebraNativesResultHandling
+                | UseFullTransactionSizeForGasCheck
+                | EnableStrictBoundsInProdConfig
+                | RevisedBoundsInProdConfig
+                | ConstantSerializedSizeLocalCache,
+            ) => None,
+        }
     }
 }
 
@@ -127,14 +153,14 @@ impl TimedFeatureFlag {
                 .with_ymd_and_hms(2025, 3, 11, 17, 0, 0)
                 .unwrap()
                 .with_timezone(&Utc),
-            (DisabledCaptureOption, TESTNET) => Los_Angeles
+            (_DisabledCaptureOption, TESTNET) => Los_Angeles
                 .with_ymd_and_hms(2025, 9, 15, 12, 0, 0)
                 .unwrap()
                 .with_timezone(&Utc),
             // For testing, time set to 1 hour after the beginning of time to test the old and new behaviors in tests.
-            (DisabledCaptureOption, TESTING) => Utc.with_ymd_and_hms(1970, 1, 1, 1, 0, 0).unwrap(),
+            (_DisabledCaptureOption, TESTING) => Utc.with_ymd_and_hms(1970, 1, 1, 1, 0, 0).unwrap(),
             // For mainnet, always enable this feature.
-            (DisabledCaptureOption, MAINNET) => BEGINNING_OF_TIME,
+            (_DisabledCaptureOption, MAINNET) => BEGINNING_OF_TIME,
 
             (FixTableNativesMemoryDoubleCounting, TESTNET) => Los_Angeles
                 .with_ymd_and_hms(2025, 10, 16, 17, 0, 0)
@@ -179,6 +205,33 @@ impl TimedFeatureFlag {
                 .with_timezone(&Utc),
             (UseFullTransactionSizeForGasCheck, MAINNET) => Los_Angeles
                 .with_ymd_and_hms(2026, 2, 9, 12, 0, 0)
+                .unwrap()
+                .with_timezone(&Utc),
+
+            (EnableStrictBoundsInProdConfig, TESTNET) => Los_Angeles
+                .with_ymd_and_hms(2026, 2, 25, 10, 0, 0)
+                .unwrap()
+                .with_timezone(&Utc),
+            (EnableStrictBoundsInProdConfig, MAINNET) => Los_Angeles
+                .with_ymd_and_hms(2026, 2, 27, 10, 0, 0)
+                .unwrap()
+                .with_timezone(&Utc),
+
+            (RevisedBoundsInProdConfig, TESTNET) => Los_Angeles
+                .with_ymd_and_hms(2026, 3, 3, 21, 0, 0)
+                .unwrap()
+                .with_timezone(&Utc),
+            (RevisedBoundsInProdConfig, MAINNET) => Los_Angeles
+                .with_ymd_and_hms(2026, 3, 5, 10, 0, 0)
+                .unwrap()
+                .with_timezone(&Utc),
+
+            (ConstantSerializedSizeLocalCache, TESTNET) => Los_Angeles
+                .with_ymd_and_hms(2026, 3, 11, 21, 0, 0)
+                .unwrap()
+                .with_timezone(&Utc),
+            (ConstantSerializedSizeLocalCache, MAINNET) => Los_Angeles
+                .with_ymd_and_hms(2026, 3, 13, 10, 0, 0)
                 .unwrap()
                 .with_timezone(&Utc),
 

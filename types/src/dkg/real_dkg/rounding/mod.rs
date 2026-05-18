@@ -69,17 +69,8 @@ impl DKGRounding {
             secrecy_threshold_in_stake_ratio + U64F64::DELTA,
         );
 
-        let total_weight_min = total_weight_lower_bound(validator_stakes);
-        let total_weight_max = total_weight_upper_bound(
-            validator_stakes,
-            reconstruct_threshold_in_stake_ratio,
-            secrecy_threshold_in_stake_ratio,
-        );
-
         let (profile, rounding_error, rounding_method) = match DKGRoundingProfile::new(
             validator_stakes,
-            total_weight_min,
-            total_weight_max,
             secrecy_threshold_in_stake_ratio,
             reconstruct_threshold_in_stake_ratio,
             fast_secrecy_threshold_in_stake_ratio,
@@ -186,17 +177,20 @@ impl Debug for DKGRoundingProfile {
 impl DKGRoundingProfile {
     pub fn new(
         validator_stakes: &Vec<u64>,
-        total_weight_min: usize,
-        total_weight_max: usize,
         secrecy_threshold_in_stake_ratio: U64F64,
         reconstruct_threshold_in_stake_ratio: U64F64,
         fast_secrecy_threshold_in_stake_ratio: Option<U64F64>,
     ) -> anyhow::Result<Self> {
-        ensure!(total_weight_min >= validator_stakes.len());
-        ensure!(total_weight_max >= total_weight_min);
         ensure!(secrecy_threshold_in_stake_ratio * U64F64::from_num(3) > U64F64::from_num(1));
         ensure!(secrecy_threshold_in_stake_ratio < reconstruct_threshold_in_stake_ratio);
         ensure!(reconstruct_threshold_in_stake_ratio * U64F64::from_num(3) <= U64F64::from_num(2));
+
+        let total_weight_min = total_weight_lower_bound(validator_stakes);
+        let total_weight_max = total_weight_upper_bound(
+            validator_stakes,
+            reconstruct_threshold_in_stake_ratio,
+            secrecy_threshold_in_stake_ratio,
+        );
 
         let stake_total: u64 = validator_stakes.iter().sum();
         let mut weight_low = total_weight_min as u64;

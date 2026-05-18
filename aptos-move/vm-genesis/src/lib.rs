@@ -11,28 +11,26 @@ use aptos_crypto::{
     ed25519::{Ed25519PrivateKey, Ed25519PublicKey},
     HashValue, PrivateKey, Uniform,
 };
-use aptos_framework::{ReleaseBundle, ReleasePackage};
 use aptos_gas_schedule::{
     AptosGasParameters, InitialGasSchedule, ToOnChainGasSchedule, LATEST_GAS_FEATURE_VERSION,
 };
+use aptos_release_bundle::{ReleaseBundle, ReleasePackage};
 use aptos_types::{
-    account_config::{
-        self, aptos_test_root_address, events::NewEpochEvent, CORE_CODE_ADDRESS,
-        EXPERIMENTAL_CODE_ADDRESS,
-    },
+    account_config::{self, aptos_test_root_address, events::NewEpochEvent, CORE_CODE_ADDRESS},
     chain_id::ChainId,
     contract_event::{ContractEvent, ContractEventV1},
     executable::ModulePath,
     jwks::{
         jwk::{JWKMoveStruct, JWK},
         patch::{IssuerJWK, PatchJWKMoveStruct, PatchUpsertJWK},
-        secure_test_rsa_jwk,
+        secure_test_rsa_jwk, OIDCProvider as JwksOidcProvider,
     },
     keyless::{
         self, test_utils::get_sample_iss, Groth16VerificationKey, KEYLESS_ACCOUNT_MODULE_NAME,
     },
     move_utils::as_move_value::AsMoveValue,
     on_chain_config::{
+        chunky_dkg_config::{ChunkyDKGConfigMoveStruct, OnChainChunkyDKGConfig},
         randomness_api_v0_config::{AllowCustomMaxGasFlag, RequiredGasDeposit},
         FeatureFlag, Features, GasScheduleV2, OnChainConsensusConfig, OnChainExecutionConfig,
         OnChainJWKConsensusConfig, OnChainRandomnessConfig, RandomnessConfigMoveStruct,
@@ -80,7 +78,6 @@ const GENESIS_MODULE_NAME: &str = "genesis";
 const GOVERNANCE_MODULE_NAME: &str = "aptos_governance";
 const CODE_MODULE_NAME: &str = "code";
 const VERSION_MODULE_NAME: &str = "version";
-const JWK_CONSENSUS_CONFIG_MODULE_NAME: &str = "jwk_consensus_config";
 const JWKS_MODULE_NAME: &str = "jwks";
 const CONFIG_BUFFER_MODULE_NAME: &str = "config_buffer";
 const DKG_MODULE_NAME: &str = "dkg";
@@ -88,6 +85,10 @@ const RANDOMNESS_API_V0_CONFIG_MODULE_NAME: &str = "randomness_api_v0_config";
 const RANDOMNESS_CONFIG_SEQNUM_MODULE_NAME: &str = "randomness_config_seqnum";
 const RANDOMNESS_CONFIG_MODULE_NAME: &str = "randomness_config";
 const RANDOMNESS_MODULE_NAME: &str = "randomness";
+const CHUNKY_DKG_MODULE_NAME: &str = "chunky_dkg";
+const CHUNKY_DKG_CONFIG_MODULE_NAME: &str = "chunky_dkg_config";
+const CHUNKY_DKG_CONFIG_SEQNUM_MODULE_NAME: &str = "chunky_dkg_config_seqnum";
+const DECRYPTION_MODULE_NAME: &str = "decryption";
 const ACCOUNT_ABSTRACTION_MODULE_NAME: &str = "account_abstraction";
 const RECONFIGURATION_STATE_MODULE_NAME: &str = "reconfiguration_state";
 
@@ -112,6 +113,7 @@ pub struct GenesisConfiguration {
     pub employee_vesting_period_duration: u64,
     pub initial_features_override: Option<Features>,
     pub randomness_config_override: Option<OnChainRandomnessConfig>,
+    pub chunky_dkg_config_override: Option<OnChainChunkyDKGConfig>,
     pub jwk_consensus_config_override: Option<OnChainJWKConsensusConfig>,
     pub initial_jwks: Vec<IssuerJWK>,
     pub keyless_groth16_vk: Option<Groth16VerificationKey>,
@@ -335,6 +337,19 @@ pub fn encode_genesis_change_set(
         randomness_config,
     );
     initialize_randomness_resources(&mut session, &module_storage, &mut traversal_context);
+    let chunky_dkg_config = genesis_config
+        .chunky_dkg_config_override
+        .clone()
+        .unwrap_or_else(OnChainChunkyDKGConfig::default_for_genesis);
+    initialize_chunky_dkg_config_seqnum(&mut session, &module_storage, &mut traversal_context);
+    initialize_chunky_dkg_config(
+        &mut session,
+        &module_storage,
+        &mut traversal_context,
+        chunky_dkg_config,
+    );
+    initialize_chunky_dkg(&mut session, &module_storage, &mut traversal_context);
+    initialize_decryption(&mut session, &module_storage, &mut traversal_context);
     initialize_on_chain_governance(
         &mut session,
         &module_storage,
@@ -351,23 +366,17 @@ pub fn encode_genesis_change_set(
     if genesis_config.is_test {
         allow_core_resources_to_set_version(&mut session, &module_storage, &mut traversal_context);
     }
-    let jwk_consensus_config = genesis_config
-        .jwk_consensus_config_override
-        .clone()
-        .unwrap_or_else(OnChainJWKConsensusConfig::default_for_genesis);
-    initialize_jwk_consensus_config(
-        &mut session,
-        &module_storage,
-        &mut traversal_context,
-        &jwk_consensus_config,
-    );
-    initialize_jwks_resources(&mut session, &module_storage, &mut traversal_context);
-    initialize_keyless_accounts(
+    initialize_jwks_with_defaults(
         &mut session,
         &module_storage,
         &mut traversal_context,
         chain_id,
-        genesis_config.initial_jwks.clone(),
+        genesis_config,
+    );
+    initialize_keyless_accounts(
+        &mut session,
+        &module_storage,
+        &mut traversal_context,
         genesis_config.keyless_groth16_vk.clone(),
     );
     initialize_confidential_asset(
@@ -488,27 +497,6 @@ fn exec_function(
         ty_args,
         args,
         CORE_CODE_ADDRESS,
-    );
-}
-
-fn exec_experimental_function(
-    session: &mut SessionExt<impl AptosMoveResolver>,
-    module_storage: &impl ModuleStorage,
-    traversal_context: &mut TraversalContext,
-    module_name: &str,
-    function_name: &str,
-    ty_args: Vec<TypeTag>,
-    args: Vec<Vec<u8>>,
-) {
-    exec_function_internal(
-        session,
-        module_storage,
-        traversal_context,
-        module_name,
-        function_name,
-        ty_args,
-        args,
-        EXPERIMENTAL_CODE_ADDRESS,
     );
 }
 
@@ -715,6 +703,74 @@ fn initialize_randomness_resources(
     );
 }
 
+fn initialize_chunky_dkg_config_seqnum(
+    session: &mut SessionExt<impl AptosMoveResolver>,
+    module_storage: &impl AptosModuleStorage,
+    traversal_context: &mut TraversalContext,
+) {
+    exec_function(
+        session,
+        module_storage,
+        traversal_context,
+        CHUNKY_DKG_CONFIG_SEQNUM_MODULE_NAME,
+        "initialize",
+        vec![],
+        serialize_values(&vec![MoveValue::Signer(CORE_CODE_ADDRESS)]),
+    );
+}
+
+fn initialize_chunky_dkg_config(
+    session: &mut SessionExt<impl AptosMoveResolver>,
+    module_storage: &impl AptosModuleStorage,
+    traversal_context: &mut TraversalContext,
+    chunky_dkg_config: OnChainChunkyDKGConfig,
+) {
+    exec_function(
+        session,
+        module_storage,
+        traversal_context,
+        CHUNKY_DKG_CONFIG_MODULE_NAME,
+        "initialize",
+        vec![],
+        serialize_values(&vec![
+            MoveValue::Signer(CORE_CODE_ADDRESS),
+            ChunkyDKGConfigMoveStruct::from(chunky_dkg_config).as_move_value(),
+        ]),
+    );
+}
+
+fn initialize_chunky_dkg(
+    session: &mut SessionExt<impl AptosMoveResolver>,
+    module_storage: &impl AptosModuleStorage,
+    traversal_context: &mut TraversalContext,
+) {
+    exec_function(
+        session,
+        module_storage,
+        traversal_context,
+        CHUNKY_DKG_MODULE_NAME,
+        "initialize",
+        vec![],
+        serialize_values(&vec![MoveValue::Signer(CORE_CODE_ADDRESS)]),
+    );
+}
+
+fn initialize_decryption(
+    session: &mut SessionExt<impl AptosMoveResolver>,
+    module_storage: &impl AptosModuleStorage,
+    traversal_context: &mut TraversalContext,
+) {
+    exec_function(
+        session,
+        module_storage,
+        traversal_context,
+        DECRYPTION_MODULE_NAME,
+        "initialize",
+        vec![],
+        serialize_values(&vec![MoveValue::Signer(CORE_CODE_ADDRESS)]),
+    );
+}
+
 fn initialize_account_abstraction(
     session: &mut SessionExt<impl AptosMoveResolver>,
     module_storage: &impl AptosModuleStorage,
@@ -809,39 +865,63 @@ fn initialize_reconfiguration_state(
     );
 }
 
-fn initialize_jwk_consensus_config(
-    session: &mut SessionExt<impl AptosMoveResolver>,
-    module_storage: &impl AptosModuleStorage,
-    traversal_context: &mut TraversalContext,
-    jwk_consensus_config: &OnChainJWKConsensusConfig,
-) {
-    exec_function(
-        session,
-        module_storage,
-        traversal_context,
-        JWK_CONSENSUS_CONFIG_MODULE_NAME,
-        "initialize",
-        vec![],
-        serialize_values(&vec![
-            MoveValue::Signer(CORE_CODE_ADDRESS),
-            jwk_consensus_config.as_move_value(),
-        ]),
-    );
+fn genesis_jwk_initial_patches(
+    chain_id: ChainId,
+    mut initial_jwks: Vec<IssuerJWK>,
+) -> Vec<PatchJWKMoveStruct> {
+    if chain_id.is_mainnet() {
+        return vec![];
+    }
+    let additional_jwk_patch = IssuerJWK {
+        issuer: get_sample_iss(),
+        jwk: JWK::RSA(secure_test_rsa_jwk()),
+    };
+    initial_jwks.insert(0, additional_jwk_patch);
+    initial_jwks
+        .into_iter()
+        .map(|issuer_jwk| {
+            let IssuerJWK { issuer, jwk } = issuer_jwk;
+            let upsert_patch = PatchUpsertJWK {
+                issuer,
+                jwk: JWKMoveStruct::from(jwk),
+            };
+            PatchJWKMoveStruct::from(upsert_patch)
+        })
+        .collect()
 }
 
-fn initialize_jwks_resources(
+fn initialize_jwks_with_defaults(
     session: &mut SessionExt<impl AptosMoveResolver>,
     module_storage: &impl AptosModuleStorage,
     traversal_context: &mut TraversalContext,
+    chain_id: ChainId,
+    genesis_config: &GenesisConfiguration,
 ) {
+    let cfg = genesis_config
+        .jwk_consensus_config_override
+        .clone()
+        .unwrap_or_else(OnChainJWKConsensusConfig::default_for_genesis);
+    let providers = match cfg {
+        OnChainJWKConsensusConfig::Off => vec![],
+        OnChainJWKConsensusConfig::V1(v1) => v1
+            .oidc_providers
+            .into_iter()
+            .map(JwksOidcProvider::from)
+            .collect(),
+    };
+    let patches = genesis_jwk_initial_patches(chain_id, genesis_config.initial_jwks.clone());
     exec_function(
         session,
         module_storage,
         traversal_context,
         JWKS_MODULE_NAME,
-        "initialize",
+        "initialize_with_defaults",
         vec![],
-        serialize_values(&vec![MoveValue::Signer(CORE_CODE_ADDRESS)]),
+        serialize_values(&vec![
+            MoveValue::Signer(CORE_CODE_ADDRESS),
+            providers.as_move_value(),
+            patches.as_move_value(),
+        ]),
     );
 }
 
@@ -909,8 +989,6 @@ fn initialize_keyless_accounts(
     session: &mut SessionExt<impl AptosMoveResolver>,
     module_storage: &impl AptosModuleStorage,
     traversal_context: &mut TraversalContext,
-    chain_id: ChainId,
-    mut initial_jwks: Vec<IssuerJWK>,
     vk: Option<Groth16VerificationKey>,
 ) {
     let config = keyless::Configuration::new_for_devnet();
@@ -927,7 +1005,7 @@ fn initialize_keyless_accounts(
         ]),
     );
 
-    if vk.is_some() {
+    if let Some(vk_value) = vk {
         exec_function(
             session,
             module_storage,
@@ -937,39 +1015,7 @@ fn initialize_keyless_accounts(
             vec![],
             serialize_values(&vec![
                 MoveValue::Signer(CORE_CODE_ADDRESS),
-                vk.unwrap().as_move_value(),
-            ]),
-        );
-    }
-    if !chain_id.is_mainnet() {
-        let additional_jwk_patch = IssuerJWK {
-            issuer: get_sample_iss(),
-            jwk: JWK::RSA(secure_test_rsa_jwk()),
-        };
-        initial_jwks.insert(0, additional_jwk_patch);
-
-        let jwk_patches: Vec<PatchJWKMoveStruct> = initial_jwks
-            .into_iter()
-            .map(|issuer_jwk| {
-                let IssuerJWK { issuer, jwk } = issuer_jwk;
-                let upsert_patch = PatchUpsertJWK {
-                    issuer,
-                    jwk: JWKMoveStruct::from(jwk),
-                };
-                PatchJWKMoveStruct::from(upsert_patch)
-            })
-            .collect();
-
-        exec_function(
-            session,
-            module_storage,
-            traversal_context,
-            JWKS_MODULE_NAME,
-            "set_patches",
-            vec![],
-            serialize_values(&vec![
-                MoveValue::Signer(CORE_CODE_ADDRESS),
-                jwk_patches.as_move_value(),
+                vk_value.as_move_value(),
             ]),
         );
     }
@@ -982,14 +1028,14 @@ fn initialize_confidential_asset(
     traversal_context: &mut TraversalContext,
 ) {
     if !chain_id.is_mainnet() && !chain_id.is_testnet() {
-        exec_experimental_function(
+        exec_function(
             session,
             module_storage,
             traversal_context,
             "confidential_asset",
-            "init_module_for_genesis",
+            "init_module_for_devnet",
             vec![],
-            serialize_values(&vec![MoveValue::Signer(EXPERIMENTAL_CODE_ADDRESS)]),
+            serialize_values(&vec![MoveValue::Signer(CORE_CODE_ADDRESS)]),
         );
     }
 }
@@ -1285,49 +1331,17 @@ fn verify_genesis_events(events: &[ContractEvent]) {
     assert_eq!(new_epoch_events[0].sequence_number(), 0);
 }
 
-/// An enum specifying whether the compiled stdlib/scripts should be used or freshly built versions
-/// should be used.
-#[derive(Debug, Eq, PartialEq)]
-pub enum GenesisOptions {
-    /// Framework compiled from head
-    Head,
-    /// Framework as it was released or upgraded in testnet
-    Testnet,
-    /// Framework as it was released or upgraded in mainnet
-    Mainnet,
-}
-
 /// Generate an artificial genesis `ChangeSet` for testing
-pub fn generate_genesis_change_set_for_testing(genesis_options: GenesisOptions) -> ChangeSet {
-    generate_genesis_change_set_for_testing_with_count(genesis_options, 1)
+pub fn generate_genesis_change_set_for_testing() -> ChangeSet {
+    generate_genesis_change_set_for_testing_with_count(1)
 }
 
-pub fn generate_genesis_change_set_for_testing_with_count(
-    genesis_options: GenesisOptions,
-    count: u64,
-) -> ChangeSet {
-    let framework = match genesis_options {
-        GenesisOptions::Head => aptos_cached_packages::head_release_bundle(),
-        GenesisOptions::Testnet => aptos_framework::testnet_release_bundle(),
-        GenesisOptions::Mainnet => {
-            // We don't yet have mainnet, so returning testnet here
-            aptos_framework::testnet_release_bundle()
-        },
-    };
-
-    generate_test_genesis(framework, Some(count as usize)).0
-}
-
-/// Generate a genesis `ChangeSet` for mainnet
-pub fn generate_genesis_change_set_for_mainnet(genesis_options: GenesisOptions) -> ChangeSet {
-    let framework = match genesis_options {
-        GenesisOptions::Head => aptos_cached_packages::head_release_bundle(),
-        GenesisOptions::Testnet => aptos_framework::testnet_release_bundle(),
-        // We don't yet have mainnet, so returning testnet here
-        GenesisOptions::Mainnet => aptos_framework::testnet_release_bundle(),
-    };
-
-    generate_mainnet_genesis(framework, Some(1)).0
+pub fn generate_genesis_change_set_for_testing_with_count(count: u64) -> ChangeSet {
+    generate_test_genesis(
+        aptos_cached_packages::head_release_bundle(),
+        Some(count as usize),
+    )
+    .0
 }
 
 pub fn test_genesis_transaction() -> Transaction {
@@ -1438,6 +1452,7 @@ pub fn generate_test_genesis(
             employee_vesting_period_duration: 5 * 60, // 5 minutes
             initial_features_override: None,
             randomness_config_override: None,
+            chunky_dkg_config_override: None,
             jwk_consensus_config_override: None,
             initial_jwks: vec![],
             keyless_groth16_vk: None,
@@ -1490,6 +1505,7 @@ fn mainnet_genesis_config() -> GenesisConfiguration {
         employee_vesting_period_duration: 5 * 60, // 5 minutes
         initial_features_override: None,
         randomness_config_override: None,
+        chunky_dkg_config_override: None,
         jwk_consensus_config_override: None,
         initial_jwks: vec![],
         keyless_groth16_vk: None,

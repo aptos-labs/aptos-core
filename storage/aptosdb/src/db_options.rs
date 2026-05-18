@@ -11,34 +11,6 @@ use aptos_types::transaction::Version;
 
 const VERSION_SIZE: usize = std::mem::size_of::<Version>();
 
-pub(super) fn ledger_db_column_families() -> Vec<ColumnFamilyName> {
-    vec![
-        /* empty cf */ DEFAULT_COLUMN_FAMILY_NAME,
-        BLOCK_BY_VERSION_CF_NAME,
-        BLOCK_INFO_CF_NAME,
-        EPOCH_BY_VERSION_CF_NAME,
-        EVENT_ACCUMULATOR_CF_NAME,
-        EVENT_BY_KEY_CF_NAME,
-        EVENT_BY_VERSION_CF_NAME,
-        EVENT_CF_NAME,
-        LEDGER_INFO_CF_NAME,
-        PERSISTED_AUXILIARY_INFO_CF_NAME,
-        STALE_STATE_VALUE_INDEX_CF_NAME,
-        STATE_VALUE_CF_NAME,
-        TRANSACTION_CF_NAME,
-        TRANSACTION_ACCUMULATOR_CF_NAME,
-        TRANSACTION_ACCUMULATOR_HASH_CF_NAME,
-        TRANSACTION_AUXILIARY_DATA_CF_NAME,
-        ORDERED_TRANSACTION_BY_ACCOUNT_CF_NAME,
-        TRANSACTION_SUMMARIES_BY_ACCOUNT_CF_NAME,
-        TRANSACTION_BY_HASH_CF_NAME,
-        TRANSACTION_INFO_CF_NAME,
-        VERSION_DATA_CF_NAME,
-        WRITE_SET_CF_NAME,
-        DB_METADATA_CF_NAME,
-    ]
-}
-
 pub(super) fn event_db_column_families() -> Vec<ColumnFamilyName> {
     vec![
         /* empty cf */ DEFAULT_COLUMN_FAMILY_NAME,
@@ -128,16 +100,6 @@ pub(super) fn skip_reporting_cf(cf_name: &str) -> bool {
     cf_name == DEFAULT_COLUMN_FAMILY_NAME || cf_name == DB_METADATA_CF_NAME
 }
 
-pub(super) fn state_kv_db_column_families() -> Vec<ColumnFamilyName> {
-    vec![
-        /* empty cf */ DEFAULT_COLUMN_FAMILY_NAME,
-        DB_METADATA_CF_NAME,
-        STALE_STATE_VALUE_INDEX_CF_NAME,
-        STATE_VALUE_CF_NAME,
-        STATE_VALUE_INDEX_CF_NAME,
-    ]
-}
-
 pub(super) fn state_kv_db_new_key_column_families() -> Vec<ColumnFamilyName> {
     vec![
         /* empty cf */ DEFAULT_COLUMN_FAMILY_NAME,
@@ -151,7 +113,9 @@ pub(super) fn state_kv_db_new_key_column_families() -> Vec<ColumnFamilyName> {
 pub(super) fn hot_state_kv_db_column_families() -> Vec<ColumnFamilyName> {
     vec![
         /* empty cf */ DEFAULT_COLUMN_FAMILY_NAME,
+        DB_METADATA_CF_NAME,
         HOT_STATE_VALUE_BY_KEY_HASH_CF_NAME,
+        STALE_STATE_VALUE_INDEX_BY_KEY_HASH_CF_NAME,
     ]
 }
 
@@ -222,10 +186,24 @@ fn convert_index_type(index_type: IndexType) -> BlockBasedIndexType {
     }
 }
 
+/// Disable write stalling for append-only, sequential-key CFs (ledger sub-DBs keyed by version).
+/// Compaction on these CFs is entirely trivial moves (file renames, no I/O), but they share the
+/// background compaction thread pool with state DBs. When the pool is saturated by state DB
+/// compactions, these CFs can't get scheduled and would otherwise stall writes.
+///
+/// We disable both stall vectors:
+///   - Pending compaction bytes: set to 0 (unlimited) — the estimate is fictional for trivial moves.
+///   - L0 file count: set very high — non-overlapping L0 files from sequential keys don't hurt
+///     read performance, and auto-compaction will catch up when the pool has spare capacity.
+fn with_no_compaction_stalling(cf_opts: &mut Options) {
+    cf_opts.set_soft_pending_compaction_bytes_limit(0);
+    cf_opts.set_hard_pending_compaction_bytes_limit(0);
+    cf_opts.set_level_zero_slowdown_writes_trigger(1000);
+    cf_opts.set_level_zero_stop_writes_trigger(2000);
+}
+
 fn with_state_key_extractor_processor(cf_name: ColumnFamilyName, cf_opts: &mut Options) {
-    if cf_name == STATE_VALUE_CF_NAME
-        || cf_name == STATE_VALUE_BY_KEY_HASH_CF_NAME
-        || cf_name == HOT_STATE_VALUE_BY_KEY_HASH_CF_NAME
+    if cf_name == STATE_VALUE_BY_KEY_HASH_CF_NAME || cf_name == HOT_STATE_VALUE_BY_KEY_HASH_CF_NAME
     {
         let prefix_extractor =
             SliceTransform::create("state_key_extractor", state_key_extractor, None);
@@ -242,7 +220,11 @@ pub(super) fn gen_event_cfds(
     block_cache: Option<&Cache>,
 ) -> Vec<ColumnFamilyDescriptor> {
     let cfs = event_db_column_families();
-    gen_cfds(rocksdb_config, block_cache, cfs, |_, _| {})
+    gen_cfds(rocksdb_config, block_cache, cfs, |cf_name, cf_opts| {
+        if cf_name == EVENT_CF_NAME || cf_name == EVENT_ACCUMULATOR_CF_NAME {
+            with_no_compaction_stalling(cf_opts);
+        }
+    })
 }
 
 pub(super) fn gen_persisted_auxiliary_info_cfds(
@@ -250,7 +232,11 @@ pub(super) fn gen_persisted_auxiliary_info_cfds(
     block_cache: Option<&Cache>,
 ) -> Vec<ColumnFamilyDescriptor> {
     let cfs = persisted_auxiliary_info_db_column_families();
-    gen_cfds(rocksdb_config, block_cache, cfs, |_, _| {})
+    gen_cfds(rocksdb_config, block_cache, cfs, |cf_name, cf_opts| {
+        if cf_name == PERSISTED_AUXILIARY_INFO_CF_NAME {
+            with_no_compaction_stalling(cf_opts);
+        }
+    })
 }
 
 pub(super) fn gen_transaction_accumulator_cfds(
@@ -258,7 +244,13 @@ pub(super) fn gen_transaction_accumulator_cfds(
     block_cache: Option<&Cache>,
 ) -> Vec<ColumnFamilyDescriptor> {
     let cfs = transaction_accumulator_db_column_families();
-    gen_cfds(rocksdb_config, block_cache, cfs, |_, _| {})
+    gen_cfds(rocksdb_config, block_cache, cfs, |cf_name, cf_opts| {
+        if cf_name == TRANSACTION_ACCUMULATOR_CF_NAME
+            || cf_name == TRANSACTION_ACCUMULATOR_HASH_CF_NAME
+        {
+            with_no_compaction_stalling(cf_opts);
+        }
+    })
 }
 
 pub(super) fn gen_transaction_auxiliary_data_cfds(
@@ -266,14 +258,22 @@ pub(super) fn gen_transaction_auxiliary_data_cfds(
     block_cache: Option<&Cache>,
 ) -> Vec<ColumnFamilyDescriptor> {
     let cfs = transaction_auxiliary_data_db_column_families();
-    gen_cfds(rocksdb_config, block_cache, cfs, |_, _| {})
+    gen_cfds(rocksdb_config, block_cache, cfs, |cf_name, cf_opts| {
+        if cf_name == TRANSACTION_AUXILIARY_DATA_CF_NAME {
+            with_no_compaction_stalling(cf_opts);
+        }
+    })
 }
 pub(super) fn gen_transaction_cfds(
     rocksdb_config: &RocksdbConfig,
     block_cache: Option<&Cache>,
 ) -> Vec<ColumnFamilyDescriptor> {
     let cfs = transaction_db_column_families();
-    gen_cfds(rocksdb_config, block_cache, cfs, |_, _| {})
+    gen_cfds(rocksdb_config, block_cache, cfs, |cf_name, cf_opts| {
+        if cf_name == TRANSACTION_CF_NAME {
+            with_no_compaction_stalling(cf_opts);
+        }
+    })
 }
 
 pub(super) fn gen_transaction_info_cfds(
@@ -281,7 +281,11 @@ pub(super) fn gen_transaction_info_cfds(
     block_cache: Option<&Cache>,
 ) -> Vec<ColumnFamilyDescriptor> {
     let cfs = transaction_info_db_column_families();
-    gen_cfds(rocksdb_config, block_cache, cfs, |_, _| {})
+    gen_cfds(rocksdb_config, block_cache, cfs, |cf_name, cf_opts| {
+        if cf_name == TRANSACTION_INFO_CF_NAME {
+            with_no_compaction_stalling(cf_opts);
+        }
+    })
 }
 
 pub(super) fn gen_write_set_cfds(
@@ -289,7 +293,11 @@ pub(super) fn gen_write_set_cfds(
     block_cache: Option<&Cache>,
 ) -> Vec<ColumnFamilyDescriptor> {
     let cfs = write_set_db_column_families();
-    gen_cfds(rocksdb_config, block_cache, cfs, |_, _| {})
+    gen_cfds(rocksdb_config, block_cache, cfs, |cf_name, cf_opts| {
+        if cf_name == WRITE_SET_CF_NAME {
+            with_no_compaction_stalling(cf_opts);
+        }
+    })
 }
 
 pub(super) fn gen_ledger_metadata_cfds(
@@ -298,19 +306,6 @@ pub(super) fn gen_ledger_metadata_cfds(
 ) -> Vec<ColumnFamilyDescriptor> {
     let cfs = ledger_metadata_db_column_families();
     gen_cfds(rocksdb_config, block_cache, cfs, |_, _| {})
-}
-
-pub(super) fn gen_ledger_cfds(
-    rocksdb_config: &RocksdbConfig,
-    block_cache: Option<&Cache>,
-) -> Vec<ColumnFamilyDescriptor> {
-    let cfs = ledger_db_column_families();
-    gen_cfds(
-        rocksdb_config,
-        block_cache,
-        cfs,
-        with_state_key_extractor_processor,
-    )
 }
 
 pub(super) fn gen_state_merkle_cfds(

@@ -16,7 +16,7 @@ use crate::{
             AASigningData, AccountAuthenticator, AnyPublicKey, AnySignature,
             SingleKeyAuthenticator, TransactionAuthenticator,
         },
-        encrypted_payload::EncryptedPayload,
+        encrypted_payload::{DecryptionFailureReason, EncryptedPayload},
     },
     vm_status::{DiscardedVMStatus, KeptVMStatus, StatusCode, StatusType, VMStatus},
     write_set::{HotStateOp, WriteSet},
@@ -687,6 +687,32 @@ impl RawTransaction {
     pub fn signing_message(&self) -> Result<Vec<u8>, CryptoMaterialError> {
         signing_message(self)
     }
+
+    /// Converts a RawTransaction with an EncryptedPayload into a variant that uses
+    /// TransactionExecutable::Encrypted for signature verification.
+    /// This is needed because signatures are verified over the executable, not the encrypted ciphertext.
+    pub fn as_encrypted_variant(&self) -> Cow<'_, Self> {
+        match &self.payload {
+            TransactionPayload::EncryptedPayload(EncryptedPayload::Decrypted {
+                original, ..
+            })
+            | TransactionPayload::EncryptedPayload(EncryptedPayload::FailedDecryption {
+                original,
+                ..
+            }) => Cow::Owned(RawTransaction {
+                sender: self.sender,
+                sequence_number: self.sequence_number,
+                payload: TransactionPayload::EncryptedPayload(EncryptedPayload::Encrypted(
+                    original.clone(),
+                )),
+                max_gas_amount: self.max_gas_amount,
+                gas_unit_price: self.gas_unit_price,
+                expiration_timestamp_secs: self.expiration_timestamp_secs,
+                chain_id: self.chain_id,
+            }),
+            _ => Cow::Borrowed(self),
+        }
+    }
 }
 
 fn gen_auth(
@@ -808,6 +834,7 @@ pub enum TransactionExecutable {
     Script(Script),
     EntryFunction(EntryFunction),
     Empty,
+    Encrypted,
 }
 
 impl TransactionExecutable {
@@ -830,6 +857,7 @@ impl TransactionExecutable {
             },
             TransactionExecutable::Script(script) => TransactionExecutableRef::Script(script),
             TransactionExecutable::Empty => TransactionExecutableRef::Empty,
+            TransactionExecutable::Encrypted => TransactionExecutableRef::Encrypted,
         }
     }
 }
@@ -839,6 +867,7 @@ pub enum TransactionExecutableRef<'a> {
     Script(&'a Script),
     EntryFunction(&'a EntryFunction),
     Empty,
+    Encrypted,
 }
 
 impl TransactionExecutableRef<'_> {
@@ -855,6 +884,84 @@ impl TransactionExecutableRef<'_> {
     }
 }
 
+/// Multipliers for higher transaction limits, expressed as percent of the base
+/// limit (100 = 1x, 200 = 2x, 250 = 2.5x).
+///
+/// INVARIANT: must match Move representation for BCS serialization.
+#[derive(Clone, Debug, Hash, Eq, PartialEq, Serialize, Deserialize)]
+pub enum RequestedMultipliers {
+    V1 {
+        /// Execution-gas multiplier as percent of the base limit where 100 is 1x.
+        execution_multiplier_percent: u64,
+        /// IO-gas multiplier as percent of the base limit where 100 is 1x.
+        io_multiplier_percent: u64,
+    },
+}
+
+impl RequestedMultipliers {
+    /// Returns the execution-gas multiplier as percent (100 is 1x).
+    pub fn execution_multiplier_percent(&self) -> u64 {
+        match self {
+            Self::V1 {
+                execution_multiplier_percent,
+                ..
+            } => *execution_multiplier_percent,
+        }
+    }
+
+    /// Returns the IO-gas multiplier as percent (100 is 1x).
+    pub fn io_multiplier_percent(&self) -> u64 {
+        match self {
+            Self::V1 {
+                io_multiplier_percent,
+                ..
+            } => *io_multiplier_percent,
+        }
+    }
+}
+
+/// Request for higher transaction execution limits, carried in the transaction
+/// payload. Backed by staking proof (pool ownership, delegated voter, or
+/// delegation pool delegator). BCS-serialized and deserialized by the Move
+/// prologue.
+///
+/// INVARIANT: must match Move representation for BCS serialization.
+#[derive(Clone, Debug, Hash, Eq, PartialEq, Serialize, Deserialize)]
+pub enum UserTxnLimitsRequest {
+    /// Fee payer owns a stake pool.
+    StakePoolOwner { multipliers: RequestedMultipliers },
+    /// Fee payer is the delegated voter of the specified stake pool.
+    DelegatedVoter {
+        pool_address: AccountAddress,
+        multipliers: RequestedMultipliers,
+    },
+    /// Fee payer is a delegator in the specified delegation pool.
+    DelegationPoolDelegator {
+        pool_address: AccountAddress,
+        multipliers: RequestedMultipliers,
+    },
+}
+
+impl UserTxnLimitsRequest {
+    pub fn multipliers(&self) -> &RequestedMultipliers {
+        match self {
+            Self::StakePoolOwner { multipliers, .. }
+            | Self::DelegatedVoter { multipliers, .. }
+            | Self::DelegationPoolDelegator { multipliers, .. } => multipliers,
+        }
+    }
+}
+
+/// VM-internal higher-limit request.
+/// This is NOT serialized in the transaction payload.
+#[derive(Clone, Debug)]
+pub enum TxnLimitsRequest {
+    /// An approved governance proposal script.
+    ApprovedGovernanceScript,
+    /// A user-submitted staking-backed request.
+    Staking(UserTxnLimitsRequest),
+}
+
 #[derive(Clone, Debug, Hash, Eq, PartialEq, Serialize, Deserialize)]
 pub enum TransactionExtraConfig {
     V1 {
@@ -862,6 +969,13 @@ pub enum TransactionExtraConfig {
         // None for regular transactions
         // Some(nonce) for orderless transactions
         replay_protection_nonce: Option<u64>,
+    },
+    V2 {
+        multisig_address: Option<AccountAddress>,
+        replay_protection_nonce: Option<u64>,
+        /// If set, the transaction requests increased gas limits backed by
+        /// staking proof.
+        txn_limits_request: Option<UserTxnLimitsRequest>,
     },
 }
 
@@ -889,12 +1003,7 @@ impl TransactionPayload {
     }
 
     pub fn replay_protection_nonce(&self) -> Option<u64> {
-        match self {
-            Self::Payload(TransactionPayloadInner::V1 { extra_config, .. }) => {
-                extra_config.replay_protection_nonce()
-            },
-            _ => None,
-        }
+        self.extra_config().replay_protection_nonce()
     }
 
     pub fn executable(&self) -> Result<TransactionExecutable> {
@@ -956,6 +1065,13 @@ impl TransactionPayload {
         }
     }
 
+    pub fn decryption_failure_reason(&self) -> Option<&DecryptionFailureReason> {
+        match self {
+            TransactionPayload::EncryptedPayload(ep) => ep.decryption_failure_reason(),
+            _ => None,
+        }
+    }
+
     // Used in transaction emitter when printing errors.
     pub fn payload_type(&self) -> Cow<'static, str> {
         if self.is_multisig() {
@@ -970,6 +1086,7 @@ impl TransactionPayload {
             .into(),
             Ok(TransactionExecutableRef::Script(_)) => "script".into(),
             Ok(TransactionExecutableRef::Empty) => "empty".into(),
+            Ok(TransactionExecutableRef::Encrypted) => "encrypted".into(),
             Err(_) => "deprecated_payload".into(),
         }
     }
@@ -1010,6 +1127,16 @@ impl TransactionPayload {
                         replay_protection_nonce: replay_protection_nonce
                             .or_else(|| Some(replay_nonce_f())),
                     },
+                    TransactionExtraConfig::V2 {
+                        multisig_address,
+                        replay_protection_nonce,
+                        txn_limits_request,
+                    } => TransactionExtraConfig::V2 {
+                        multisig_address,
+                        replay_protection_nonce: replay_protection_nonce
+                            .or_else(|| Some(replay_nonce_f())),
+                        txn_limits_request,
+                    },
                 }
             }
             TransactionPayload::Payload(TransactionPayloadInner::V1 {
@@ -1037,6 +1164,21 @@ impl TransactionPayload {
                 TransactionExtraConfig::V1 {
                     multisig_address,
                     replay_protection_nonce: Some(replay_protection_nonce),
+                }
+            },
+            TransactionExtraConfig::V2 {
+                multisig_address,
+                replay_protection_nonce: old_replay_protection_nonce,
+                txn_limits_request,
+            } => {
+                assert!(
+                    old_replay_protection_nonce.is_none(),
+                    "trying to set replay protection nonce twice."
+                );
+                TransactionExtraConfig::V2 {
+                    multisig_address,
+                    replay_protection_nonce: Some(replay_protection_nonce),
+                    txn_limits_request,
                 }
             },
         };
@@ -1075,6 +1217,10 @@ impl TransactionExtraConfig {
             Self::V1 {
                 replay_protection_nonce,
                 ..
+            }
+            | Self::V2 {
+                replay_protection_nonce,
+                ..
             } => *replay_protection_nonce,
         }
     }
@@ -1086,9 +1232,20 @@ impl TransactionExtraConfig {
     pub fn multisig_address(&self) -> Option<AccountAddress> {
         match self {
             Self::V1 {
-                multisig_address,
-                replay_protection_nonce: _,
+                multisig_address, ..
+            }
+            | Self::V2 {
+                multisig_address, ..
             } => *multisig_address,
+        }
+    }
+
+    pub fn txn_limits_request(&self) -> Option<&UserTxnLimitsRequest> {
+        match self {
+            Self::V1 { .. } => None,
+            Self::V2 {
+                txn_limits_request, ..
+            } => txn_limits_request.as_ref(),
         }
     }
 }
@@ -1383,7 +1540,13 @@ impl SignedTransaction {
 
     pub fn raw_txn_bytes_len(&self) -> usize {
         *self.raw_txn_size.get_or_init(|| {
-            bcs::serialized_size(&self.raw_txn).expect("Unable to serialize RawTransaction")
+            if self.is_encrypted_txn() {
+                let enc_raw_txn = self.raw_txn.as_encrypted_variant();
+                bcs::serialized_size(enc_raw_txn.as_ref())
+                    .expect("Unable to serialize RawTransaction")
+            } else {
+                bcs::serialized_size(&self.raw_txn).expect("Unable to serialize RawTransaction")
+            }
         })
     }
 
@@ -1423,9 +1586,15 @@ impl SignedTransaction {
 
     /// Returns the hash when the transaction is committed onchain.
     pub fn committed_hash(&self) -> HashValue {
-        *self
-            .committed_hash
-            .get_or_init(|| compute_transaction_hash(&Transaction::UserTransaction(self.clone())))
+        *self.committed_hash.get_or_init(|| {
+            if self.is_encrypted_txn() {
+                compute_transaction_hash(&Transaction::UserTransaction(
+                    self.clone().into_encrypted_variant(),
+                ))
+            } else {
+                compute_transaction_hash(&Transaction::UserTransaction(self.clone()))
+            }
+        })
     }
 
     pub fn replay_protector(&self) -> ReplayProtector {
@@ -1438,6 +1607,19 @@ impl SignedTransaction {
 
     pub fn payload_mut(&mut self) -> &mut TransactionPayload {
         &mut self.raw_txn.payload
+    }
+
+    /// Converts a SignedTransaction with an EncryptedPayload into a variant that uses
+    /// TransactionExecutable::Encrypted for signature verification.
+    /// This is needed because signatures are verified over the executable, not the encrypted ciphertext.
+    pub fn into_encrypted_variant(self) -> Self {
+        SignedTransaction {
+            raw_txn: self.raw_txn.as_encrypted_variant().into_owned(),
+            authenticator: self.authenticator,
+            raw_txn_size: OnceCell::new(),
+            authenticator_size: OnceCell::new(),
+            committed_hash: OnceCell::new(),
+        }
     }
 }
 
@@ -3101,6 +3283,20 @@ impl Transaction {
         })
     }
 
+    pub fn block_epilogue_v2(
+        block_id: HashValue,
+        block_end_info: BlockEndInfo,
+        fee_distribution: FeeDistribution,
+        to_make_hot: BTreeSet<StateKey>,
+    ) -> Self {
+        Self::BlockEpilogue(BlockEpiloguePayload::V2 {
+            block_id,
+            block_end_info,
+            fee_distribution,
+            to_make_hot,
+        })
+    }
+
     pub fn try_as_signed_user_txn(&self) -> Option<&SignedTransaction> {
         match self {
             Transaction::UserTransaction(txn) => Some(txn),
@@ -3230,6 +3426,15 @@ pub trait BlockExecutableTransaction: Sync + Send + Clone + 'static {
         _block_id: HashValue,
         _block_end_info: TBlockEndInfoExt<Self::Key>,
         _fee_distribution: FeeDistribution,
+    ) -> Self {
+        unimplemented!()
+    }
+
+    fn block_epilogue_v2(
+        _block_id: HashValue,
+        _block_end_info: BlockEndInfo,
+        _fee_distribution: FeeDistribution,
+        _to_make_hot: BTreeSet<Self::Key>,
     ) -> Self {
         unimplemented!()
     }

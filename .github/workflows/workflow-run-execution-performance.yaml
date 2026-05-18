@@ -27,11 +27,6 @@ on:
         default: false
         type: boolean
         description: Whether to run or skip move-only e2e tests at the beginning.
-      USE_COIN_APT:
-        required: false
-        default: false
-        type: boolean
-        description: By default, FA APT is exclusively used. If set Coin APT is used instead.
       SOURCE:
         required: false
         default: CI
@@ -40,6 +35,11 @@ on:
         required: false
         default: "32"
         type: string
+      NOTIFY_SLACK:
+        required: false
+        default: false
+        type: boolean
+        description: Whether to post to Slack on failure
   # This allows the workflow to be triggered manually from the Github UI or CLI
   # NOTE: because the "number" type is not supported, we default to 720 minute timeout
   workflow_dispatch:
@@ -88,11 +88,6 @@ on:
         default: false
         type: boolean
         description: Whether to skip move-only e2e tests at the beginning.
-      USE_COIN_APT:
-        required: false
-        default: false
-        type: boolean
-        description: By default, FA APT is exclusively used. If set Coin APT is used instead.
       IGNORE_TARGET_DETERMINATION:
         required: false
         default: true
@@ -105,6 +100,11 @@ on:
         - ADHOC
         type: choice
         description: Test source (always adhoc from here)
+      NOTIFY_SLACK:
+        required: false
+        default: false
+        type: boolean
+        description: Whether to post to Slack on failure
 jobs:
   # This job determines which tests to run
   test-target-determinator:
@@ -135,8 +135,17 @@ jobs:
 
       - name: Run single node execution benchmark in performance build mode
         shell: bash
-        run: TABULATE_INSTALL=lib-only pip install tabulate && FLOW="${{ inputs.FLOW }}" SOURCE="${{ inputs.SOURCE }}" RUNNER_NAME="${{ inputs.RUNNER_NAME }}" SKIP_MOVE_E2E="${{ inputs.SKIP_MOVE_E2E && '1' || '' }}" DISABLE_FA_APT="${{ inputs.USE_COIN_APT && '1' || '' }}" NUMBER_OF_EXECUTION_THREADS="${{ inputs.NUMBER_OF_EXECUTION_THREADS }}" testsuite/single_node_performance.py
+        run: TABULATE_INSTALL=lib-only pip install tabulate && FLOW="${{ inputs.FLOW }}" SOURCE="${{ inputs.SOURCE }}" RUNNER_NAME="${{ inputs.RUNNER_NAME }}" SKIP_MOVE_E2E="${{ inputs.SKIP_MOVE_E2E && '1' || '' }}" NUMBER_OF_EXECUTION_THREADS="${{ inputs.NUMBER_OF_EXECUTION_THREADS }}" testsuite/single_node_performance.py
         if: ${{ (inputs.IGNORE_TARGET_DETERMINATION || needs.test-target-determinator.outputs.run_execution_performance_test == 'true') }}
 
       - run: echo "Skipping single node execution performance! Unrelated changes detected."
         if: ${{ !inputs.IGNORE_TARGET_DETERMINATION && needs.test-target-determinator.outputs.run_execution_performance_test != 'true' }}
+
+      - name: Post to Slack on failure
+        if: ${{ failure() && inputs.NOTIFY_SLACK }}
+        uses: slackapi/slack-github-action@af78098f536edbc4de71162a307590698245be95 # pin@v3.0.1
+        with:
+          webhook: ${{ secrets.EXECUTION_PERF_SLACK_WEBHOOK_URL }}
+          webhook-type: incoming-webhook
+          payload: |
+            text: ":x: execution-performance failed (flow: `${{ inputs.FLOW }}`, runner: `${{ inputs.RUNNER_NAME }}`): <${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}|link>"
