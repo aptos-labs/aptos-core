@@ -1,0 +1,29 @@
+
+Diagnostics:
+error: Cannot mix `=` with `!=` / `in` for the same parameter
+  ┌─ tests/unit_test/test/fuzz_mix_assign_constraint.move:3:23
+  │
+3 │     #[test(_a = @0x1, _a != @0x2)]
+  │                       ^^^^^^^^^^
+
+error: unable to generate test
+  ┌─ tests/unit_test/test/fuzz_mix_assign_constraint.move:4:16
+  │
+3 │     #[test(_a = @0x1, _a != @0x2)]
+  │       --------------------------- no fuzz value source is registered; install a `FuzzValueSource` to enable implicit-fuzz #[test] expansion
+4 │     public fun mix_eq_then_ne(_a: signer) { }
+  │                ^^^^^^^^^^^^^^ -- Corresponding to this parameter
+
+error: Cannot mix `=` with `!=` / `in` for the same parameter
+  ┌─ tests/unit_test/test/fuzz_mix_assign_constraint.move:6:12
+  │
+6 │     #[test(_a != @0x2, _a = @0x1)]
+  │            ^^^^^^^^^^
+
+error: unable to generate test
+  ┌─ tests/unit_test/test/fuzz_mix_assign_constraint.move:7:16
+  │
+6 │     #[test(_a != @0x2, _a = @0x1)]
+  │       --------------------------- no fuzz value source is registered; install a `FuzzValueSource` to enable implicit-fuzz #[test] expansion
+7 │     public fun mix_ne_then_eq(_a: signer) { }
+  │                ^^^^^^^^^^^^^^ -- Corresponding to this parameter

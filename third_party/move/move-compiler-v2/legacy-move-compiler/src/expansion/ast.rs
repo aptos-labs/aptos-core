@@ -45,14 +45,28 @@ pub enum AttributeValue_ {
     Value(Value),
     Module(ModuleIdent),
     ModuleAccess(ModuleAccess),
+    List(Vec<AttributeValue>),
+    Range {
+        lo: Box<AttributeValue>,
+        hi: Box<AttributeValue>,
+        inclusive_hi: bool,
+    },
+    Union(Vec<AttributeValue>),
 }
 pub type AttributeValue = Spanned<AttributeValue_>;
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum ConstraintOp {
+    Ne,
+    In,
+}
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum Attribute_ {
     Name(Name),
     Assigned(Name, Box<AttributeValue>),
     Parameterized(Name, Attributes),
+    Constrained(Name, ConstraintOp, Box<AttributeValue>),
 }
 pub type Attribute = Spanned<Attribute_>;
 
@@ -61,7 +75,8 @@ impl Attribute_ {
         match self {
             Attribute_::Name(nm)
             | Attribute_::Assigned(nm, _)
-            | Attribute_::Parameterized(nm, _) => nm,
+            | Attribute_::Parameterized(nm, _)
+            | Attribute_::Constrained(nm, _, _) => nm,
         }
     }
 }
@@ -70,6 +85,11 @@ impl Attribute_ {
 pub enum AttributeName_ {
     Unknown(Symbol),
     Known(KnownAttribute),
+    /// Unique-by-construction key used by `Attribute_::Constrained` entries.
+    /// `slot` makes duplicate constraints on the same parameter (e.g.
+    /// `a in X, a != Y`) distinct in the [`UniqueMap`] that stores attributes,
+    /// while [`Display`](std::fmt::Display) still shows the underlying name.
+    Disambiguated(Symbol, u32),
 }
 pub type AttributeName = Spanned<AttributeName_>;
 
@@ -880,6 +900,7 @@ impl fmt::Display for AttributeName_ {
         match self {
             AttributeName_::Unknown(sym) => write!(f, "{}", sym),
             AttributeName_::Known(known) => write!(f, "{}", known.name()),
+            AttributeName_::Disambiguated(sym, _) => write!(f, "{}", sym),
         }
     }
 }
@@ -990,6 +1011,29 @@ impl AstDebug for AttributeValue_ {
             AttributeValue_::Value(v) => v.ast_debug(w),
             AttributeValue_::Module(m) => w.write(&format!("{}", m)),
             AttributeValue_::ModuleAccess(n) => n.ast_debug(w),
+            AttributeValue_::List(items) => {
+                w.write("[");
+                w.list(items, ", ", |w, item| {
+                    item.value.ast_debug(w);
+                    false
+                });
+                w.write("]");
+            },
+            AttributeValue_::Range {
+                lo,
+                hi,
+                inclusive_hi,
+            } => {
+                lo.value.ast_debug(w);
+                w.write(if *inclusive_hi { "..=" } else { ".." });
+                hi.value.ast_debug(w);
+            },
+            AttributeValue_::Union(items) => {
+                w.list(items, " | ", |w, item| {
+                    item.value.ast_debug(w);
+                    false
+                });
+            },
         }
     }
 }
@@ -1011,6 +1055,14 @@ impl AstDebug for Attribute_ {
                     false
                 });
                 w.write(")");
+            },
+            Attribute_::Constrained(n, op, v) => {
+                w.write(&format!("{}", n));
+                w.write(match op {
+                    ConstraintOp::Ne => " != ",
+                    ConstraintOp::In => " in ",
+                });
+                v.ast_debug(w);
             },
         }
     }

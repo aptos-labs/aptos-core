@@ -1,0 +1,57 @@
+
+Diagnostics:
+error: unable to generate test
+  ┌─ tests/unit_test/test/fuzz_constraints.move:6:16
+  │
+5 │     #[test(_a != @0x42)]
+  │       ----------------- no fuzz value source is registered; install a `FuzzValueSource` to enable implicit-fuzz #[test] expansion
+6 │     public fun ne_single(_a: signer) { }
+  │                ^^^^^^^^^ -- Corresponding to this parameter
+
+error: unable to generate test
+  ┌─ tests/unit_test/test/fuzz_constraints.move:9:16
+  │
+8 │     #[test(_a != [@0x42, @0x41])]
+  │       -------------------------- no fuzz value source is registered; install a `FuzzValueSource` to enable implicit-fuzz #[test] expansion
+9 │     public fun ne_list(_a: signer) { }
+  │                ^^^^^^^ -- Corresponding to this parameter
+
+error: unable to generate test
+   ┌─ tests/unit_test/test/fuzz_constraints.move:12:16
+   │
+11 │     #[test(_a in [@0x1, @0x2, @0x3])]
+   │       ------------------------------ no fuzz value source is registered; install a `FuzzValueSource` to enable implicit-fuzz #[test] expansion
+12 │     public fun in_list(_a: signer) { }
+   │                ^^^^^^^ -- Corresponding to this parameter
+
+error: unable to generate test
+   ┌─ tests/unit_test/test/fuzz_constraints.move:15:16
+   │
+14 │     #[test(_a in 1..=10)]
+   │       ------------------ no fuzz value source is registered; install a `FuzzValueSource` to enable implicit-fuzz #[test] expansion
+15 │     public fun in_inclusive_range(_a: signer) { }
+   │                ^^^^^^^^^^^^^^^^^^ -- Corresponding to this parameter
+
+error: unable to generate test
+   ┌─ tests/unit_test/test/fuzz_constraints.move:18:16
+   │
+17 │     #[test(_a in 1..10)]
+   │       ----------------- no fuzz value source is registered; install a `FuzzValueSource` to enable implicit-fuzz #[test] expansion
+18 │     public fun in_half_open_range(_a: signer) { }
+   │                ^^^^^^^^^^^^^^^^^^ -- Corresponding to this parameter
+
+error: unable to generate test
+   ┌─ tests/unit_test/test/fuzz_constraints.move:21:16
+   │
+20 │     #[test(_a in @0x1 | @0x5..=@0x10 | @0x20)]
+   │       --------------------------------------- no fuzz value source is registered; install a `FuzzValueSource` to enable implicit-fuzz #[test] expansion
+21 │     public fun in_union(_a: signer) { }
+   │                ^^^^^^^^ -- Corresponding to this parameter
+
+error: unable to generate test
+   ┌─ tests/unit_test/test/fuzz_constraints.move:26:16
+   │
+25 │     #[test(_a in [@0x1, @0x2, @0x3], _a != @0x2)]
+   │       ------------------------------------------ no fuzz value source is registered; install a `FuzzValueSource` to enable implicit-fuzz #[test] expansion
+26 │     public fun in_with_excludes(_a: signer) { }
+   │                ^^^^^^^^^^^^^^^^ -- Corresponding to this parameter

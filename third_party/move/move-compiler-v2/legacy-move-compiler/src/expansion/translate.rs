@@ -698,7 +698,8 @@ fn deprecated_attribute_location(attributes: &[P::Attributes]) -> Option<Loc> {
             let sp!(nloc, sym) = match &attr.value {
                 P::Attribute_::Name(n)
                 | P::Attribute_::Assigned(n, _)
-                | P::Attribute_::Parameterized(n, _) => *n,
+                | P::Attribute_::Parameterized(n, _)
+                | P::Attribute_::Constrained(n, _, _) => *n,
             };
             match KnownAttribute::resolve(sym) {
                 Some(KnownAttribute::Deprecation(_dep)) => Some(nloc),
@@ -728,11 +729,14 @@ fn unique_attributes(
     attributes: impl IntoIterator<Item = E::Attribute>,
 ) -> E::Attributes {
     let mut attr_map = UniqueMap::new();
+    let mut constrained_slot: u32 = 0;
     for sp!(loc, attr_) in attributes {
+        let is_constrained = matches!(&attr_, E::Attribute_::Constrained(..));
         let sp!(nloc, sym) = match &attr_ {
             E::Attribute_::Name(n)
             | E::Attribute_::Assigned(n, _)
-            | E::Attribute_::Parameterized(n, _) => *n,
+            | E::Attribute_::Parameterized(n, _)
+            | E::Attribute_::Constrained(n, _, _) => *n,
         };
         let name_ = match KnownAttribute::resolve(sym) {
             None => {
@@ -797,7 +801,17 @@ fn unique_attributes(
                 E::AttributeName_::Known(known)
             },
         };
-        if let Err((_, old_loc)) = attr_map.add(sp(nloc, name_), sp(loc, attr_)) {
+        // `Constrained` entries are deliberately allowed to repeat on the same parameter
+        // (e.g. `a in [..], a != 5`) — give each a unique slot so the `UniqueMap` accepts
+        // them. The `Disambiguated` key still `Display`s as the underlying name.
+        let key = if is_constrained {
+            let slot = constrained_slot;
+            constrained_slot += 1;
+            sp(nloc, E::AttributeName_::Disambiguated(sym, slot))
+        } else {
+            sp(nloc, name_)
+        };
+        if let Err((_, old_loc)) = attr_map.add(key, sp(loc, attr_)) {
             let msg = format!("Duplicate attribute '{}' attached to the same item", name_);
             context.env.add_diag(diag!(
                 Declarations::DuplicateItem,
@@ -825,6 +839,13 @@ fn attribute(
                 .map(|a| attribute(context, attr_position, a))
                 .collect::<Option<Vec<_>>>()?;
             EA::Parameterized(n, unique_attributes(context, attr_position, true, attrs))
+        },
+        PA::Constrained(n, op, v) => {
+            let op = match op {
+                P::ConstraintOp::Ne => E::ConstraintOp::Ne,
+                P::ConstraintOp::In => E::ConstraintOp::In,
+            };
+            EA::Constrained(n, op, Box::new(attribute_value(context, *v)?))
         },
     }))
 }
@@ -918,6 +939,29 @@ fn attribute_value(
                     Some(DeprecatedItem::Module),
                 )?),
             }
+        },
+        PV::List(items) => {
+            let items = items
+                .into_iter()
+                .map(|v| attribute_value(context, v))
+                .collect::<Option<Vec<_>>>()?;
+            EV::List(items)
+        },
+        PV::Range {
+            lo,
+            hi,
+            inclusive_hi,
+        } => EV::Range {
+            lo: Box::new(attribute_value(context, *lo)?),
+            hi: Box::new(attribute_value(context, *hi)?),
+            inclusive_hi,
+        },
+        PV::Union(items) => {
+            let items = items
+                .into_iter()
+                .map(|v| attribute_value(context, v))
+                .collect::<Option<Vec<_>>>()?;
+            EV::Union(items)
         },
     }))
 }

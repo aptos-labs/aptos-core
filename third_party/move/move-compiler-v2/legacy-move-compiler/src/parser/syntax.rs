@@ -714,11 +714,75 @@ fn parse_visibility(context: &mut Context) -> Result<Visibility, Box<Diagnostic>
     })
 }
 
-// Parse an attribute value. Either a value literal or a module access
-//      AttributeValue =
-//          <Value>
-//          | <NameAccessChain>
+// Parse an attribute value.
+//      AttributeValue   = <UnionValue>
+//      UnionValue       = <RangeValue> ( "|" <RangeValue> )*
+//      RangeValue       = <PrimaryValue> [ ( ".." | "..=" ) <PrimaryValue> ]
+//      PrimaryValue     = <Value>
+//                       | "[" Comma<AttributeValue> "]"
+//                       | <NameAccessChain>
 fn parse_attribute_value(context: &mut Context) -> Result<AttributeValue, Box<Diagnostic>> {
+    let start_loc = context.tokens.start_loc();
+    let first = parse_attribute_range_value(context)?;
+    if context.tokens.peek() != Tok::Pipe {
+        return Ok(first);
+    }
+    let mut elements = vec![first];
+    while match_token(context.tokens, Tok::Pipe)? {
+        elements.push(parse_attribute_range_value(context)?);
+    }
+    let end_loc = context.tokens.previous_end_loc();
+    Ok(spanned(
+        context.tokens.file_hash(),
+        start_loc,
+        end_loc,
+        AttributeValue_::Union(elements),
+    ))
+}
+
+fn parse_attribute_range_value(context: &mut Context) -> Result<AttributeValue, Box<Diagnostic>> {
+    let start_loc = context.tokens.start_loc();
+    let lo = parse_attribute_primary_value(context)?;
+    let inclusive_hi = match context.tokens.peek() {
+        Tok::PeriodPeriod => false,
+        Tok::PeriodPeriodEqual => true,
+        _ => return Ok(lo),
+    };
+    context.tokens.advance()?;
+    let hi = parse_attribute_primary_value(context)?;
+    let end_loc = context.tokens.previous_end_loc();
+    Ok(spanned(
+        context.tokens.file_hash(),
+        start_loc,
+        end_loc,
+        AttributeValue_::Range {
+            lo: Box::new(lo),
+            hi: Box::new(hi),
+            inclusive_hi,
+        },
+    ))
+}
+
+fn parse_attribute_primary_value(
+    context: &mut Context,
+) -> Result<AttributeValue, Box<Diagnostic>> {
+    let start_loc = context.tokens.start_loc();
+    if context.tokens.peek() == Tok::LBracket {
+        let items = parse_comma_list(
+            context,
+            Tok::LBracket,
+            Tok::RBracket,
+            parse_attribute_value,
+            "attribute value",
+        )?;
+        let end_loc = context.tokens.previous_end_loc();
+        return Ok(spanned(
+            context.tokens.file_hash(),
+            start_loc,
+            end_loc,
+            AttributeValue_::List(items),
+        ));
+    }
     if let Some(v) = maybe_parse_value(context)? {
         return Ok(sp(v.loc, AttributeValue_::Value(v)));
     }
@@ -731,6 +795,8 @@ fn parse_attribute_value(context: &mut Context) -> Result<AttributeValue, Box<Di
 //      Attribute =
 //          <AttributeName>
 //          | <AttributeName> "=" <AttributeValue>
+//          | <AttributeName> "!=" <AttributeValue>
+//          | <AttributeName> "in" <AttributeValue>
 //          | <AttributeName> "(" Comma<Attribute> ")"
 //      AttributeName = <Identifier> ( "::" Identifier )* // merged into one identifier
 fn parse_attribute(context: &mut Context) -> Result<Attribute, Box<Diagnostic>> {
@@ -746,6 +812,22 @@ fn parse_attribute(context: &mut Context) -> Result<Attribute, Box<Diagnostic>> 
         Tok::Equal => {
             context.tokens.advance()?;
             Attribute_::Assigned(n, Box::new(parse_attribute_value(context)?))
+        },
+        Tok::ExclaimEqual => {
+            context.tokens.advance()?;
+            Attribute_::Constrained(
+                n,
+                ConstraintOp::Ne,
+                Box::new(parse_attribute_value(context)?),
+            )
+        },
+        Tok::Identifier if context.tokens.content() == "in" => {
+            context.tokens.advance()?;
+            Attribute_::Constrained(
+                n,
+                ConstraintOp::In,
+                Box::new(parse_attribute_value(context)?),
+            )
         },
         Tok::LParen => {
             let args_ = parse_comma_list(

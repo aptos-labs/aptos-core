@@ -70,18 +70,35 @@ pub struct SpecFunDecl {
 pub enum AttributeValue {
     Value(NodeId, Value),
     Name(NodeId, Option<ModuleName>, Symbol),
+    List(NodeId, Vec<AttributeValue>),
+    Range {
+        id: NodeId,
+        lo: Box<AttributeValue>,
+        hi: Box<AttributeValue>,
+        inclusive_hi: bool,
+    },
+    Union(NodeId, Vec<AttributeValue>),
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum ConstraintOp {
+    Ne,
+    In,
 }
 
 #[derive(Debug, Clone)]
 pub enum Attribute {
     Apply(NodeId, Symbol, Vec<Attribute>),
     Assign(NodeId, Symbol, AttributeValue),
+    Constrained(NodeId, Symbol, ConstraintOp, AttributeValue),
 }
 
 impl Attribute {
     pub fn name(&self) -> Symbol {
         match self {
-            Attribute::Assign(_, s, _) | Attribute::Apply(_, s, _) => *s,
+            Attribute::Assign(_, s, _)
+            | Attribute::Apply(_, s, _)
+            | Attribute::Constrained(_, s, _, _) => *s,
         }
     }
 
@@ -91,7 +108,9 @@ impl Attribute {
 
     pub fn node_id(&self) -> NodeId {
         match self {
-            Attribute::Assign(id, _, _) | Attribute::Apply(id, _, _) => *id,
+            Attribute::Assign(id, _, _)
+            | Attribute::Apply(id, _, _)
+            | Attribute::Constrained(id, _, _, _) => *id,
         }
     }
 }

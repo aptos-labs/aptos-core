@@ -115,14 +115,28 @@ pub struct UseDecl {
 pub enum AttributeValue_ {
     Value(Value),
     ModuleAccess(NameAccessChain),
+    List(Vec<AttributeValue>),
+    Range {
+        lo: Box<AttributeValue>,
+        hi: Box<AttributeValue>,
+        inclusive_hi: bool,
+    },
+    Union(Vec<AttributeValue>),
 }
 pub type AttributeValue = Spanned<AttributeValue_>;
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum ConstraintOp {
+    Ne,
+    In,
+}
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum Attribute_ {
     Name(Name),
     Assigned(Name, Box<AttributeValue>),
     Parameterized(Name, Attributes),
+    Constrained(Name, ConstraintOp, Box<AttributeValue>),
 }
 pub type Attribute = Spanned<Attribute_>;
 
@@ -133,7 +147,8 @@ impl Attribute_ {
         match self {
             Attribute_::Name(nm)
             | Attribute_::Assigned(nm, _)
-            | Attribute_::Parameterized(nm, _) => nm,
+            | Attribute_::Parameterized(nm, _)
+            | Attribute_::Constrained(nm, _, _) => nm,
         }
     }
 }
@@ -1195,6 +1210,29 @@ impl AstDebug for AttributeValue_ {
         match self {
             AttributeValue_::Value(v) => v.ast_debug(w),
             AttributeValue_::ModuleAccess(n) => n.ast_debug(w),
+            AttributeValue_::List(items) => {
+                w.write("[");
+                w.list(items, ", ", |w, item| {
+                    item.value.ast_debug(w);
+                    false
+                });
+                w.write("]");
+            },
+            AttributeValue_::Range {
+                lo,
+                hi,
+                inclusive_hi,
+            } => {
+                lo.value.ast_debug(w);
+                w.write(if *inclusive_hi { "..=" } else { ".." });
+                hi.value.ast_debug(w);
+            },
+            AttributeValue_::Union(items) => {
+                w.list(items, " | ", |w, item| {
+                    item.value.ast_debug(w);
+                    false
+                });
+            },
         }
     }
 }
@@ -1216,6 +1254,14 @@ impl AstDebug for Attribute_ {
                     false
                 });
                 w.write(")");
+            },
+            Attribute_::Constrained(n, op, v) => {
+                w.write(&format!("{}", n));
+                w.write(match op {
+                    ConstraintOp::Ne => " != ",
+                    ConstraintOp::In => " in ",
+                });
+                v.ast_debug(w);
             },
         }
     }

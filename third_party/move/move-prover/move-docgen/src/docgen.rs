@@ -565,6 +565,47 @@ impl<'env> Docgen<'env> {
         }
     }
 
+    /// Gets a readable version of an attribute value.
+    fn gen_attribute_value(&self, value: &AttributeValue) -> String {
+        match value {
+            AttributeValue::Value(_node_id, value) => self.env.display(value).to_string(),
+            AttributeValue::Name(_node_id, module_name_option, symbol2) => {
+                let symbol2_name = self.name_string(*symbol2).to_string();
+                let module_prefix = match module_name_option {
+                    None => "".to_string(),
+                    Some(ref module_name) => {
+                        format!("{}::", module_name.display_full(self.env))
+                    },
+                };
+                format!("{}{}", module_prefix, symbol2_name)
+            },
+            AttributeValue::List(_, items) => {
+                let inner = items
+                    .iter()
+                    .map(|i| self.gen_attribute_value(i))
+                    .join(", ");
+                format!("[{}]", inner)
+            },
+            AttributeValue::Range {
+                lo,
+                hi,
+                inclusive_hi,
+                ..
+            } => {
+                format!(
+                    "{}{}{}",
+                    self.gen_attribute_value(lo),
+                    if *inclusive_hi { "..=" } else { ".." },
+                    self.gen_attribute_value(hi)
+                )
+            },
+            AttributeValue::Union(_, items) => items
+                .iter()
+                .map(|i| self.gen_attribute_value(i))
+                .join(" | "),
+        }
+    }
+
     /// Gets a readable version of an attribute.
     fn gen_attribute(&self, attribute: &Attribute) -> String {
         let annotation_body: String = match attribute {
@@ -579,22 +620,24 @@ impl<'env> Docgen<'env> {
             },
             Attribute::Assign(_node_id, symbol, attribute_value) => {
                 let symbol_string = self.name_string(*symbol).to_string();
-                match attribute_value {
-                    AttributeValue::Value(_node_id, value) => {
-                        let value_string = self.env.display(value);
-                        format!("{} = {}", symbol_string, value_string)
-                    },
-                    AttributeValue::Name(_node_id, module_name_option, symbol2) => {
-                        let symbol2_name = self.name_string(*symbol2).to_string();
-                        let module_prefix = match module_name_option {
-                            None => "".to_string(),
-                            Some(ref module_name) => {
-                                format!("{}::", module_name.display_full(self.env))
-                            },
-                        };
-                        format!("{} = {}{}", symbol_string, module_prefix, symbol2_name)
-                    },
-                }
+                format!(
+                    "{} = {}",
+                    symbol_string,
+                    self.gen_attribute_value(attribute_value)
+                )
+            },
+            Attribute::Constrained(_node_id, symbol, op, attribute_value) => {
+                let symbol_string = self.name_string(*symbol).to_string();
+                let op_str = match op {
+                    move_model::ast::ConstraintOp::Ne => "!=",
+                    move_model::ast::ConstraintOp::In => "in",
+                };
+                format!(
+                    "{} {} {}",
+                    symbol_string,
+                    op_str,
+                    self.gen_attribute_value(attribute_value)
+                )
             },
         };
         annotation_body

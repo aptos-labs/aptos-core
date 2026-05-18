@@ -11,7 +11,10 @@
 //! includes info about each '#[test]' function: name, arguments to provide, and expected failure or
 //! success.
 
-use crate::options::Options;
+use crate::{
+    fuzz::{Domain, FuzzValueSource, NoFuzzSource, ParamSpec, RangeSpec},
+    options::Options,
+};
 use codespan_reporting::diagnostic::Severity;
 use legacy_move_compiler::{
     shared::known_attributes::{AttributeKind, TestingAttribute},
@@ -22,13 +25,20 @@ use move_core_types::{
     identifier::Identifier, language_storage::ModuleId, value::MoveValue, vm_status::StatusCode,
 };
 use move_model::{
-    ast::{Address, Attribute, AttributeValue, ModuleName, Value},
+    ast::{Address, Attribute, AttributeValue, ConstraintOp, ModuleName, Value},
     model::{FunctionEnv, GlobalEnv, Loc, ModuleEnv, Parameter},
     symbol::Symbol,
     ty::{PrimitiveType, Type},
 };
 use num::{BigInt, ToPrimitive};
 use std::collections::BTreeMap;
+
+/// Default number of values to draw per fuzzed parameter.
+const DEFAULT_FUZZ_ITERATIONS: usize = 16;
+/// Default deterministic seed if the caller does not override.
+const DEFAULT_FUZZ_SEED: u64 = 0;
+/// Cap on Cartesian-product expansion to guard against accidental explosion.
+const MAX_FUZZ_CASES: usize = 1024;
 
 //***************************************************************************
 // Test Plan Building
@@ -40,6 +50,16 @@ pub fn construct_test_plan(
     env: &GlobalEnv,
     package_filter: Option<Symbol>,
 ) -> Option<Vec<ModuleTestPlan>> {
+    construct_test_plan_with_fuzz_source(env, package_filter, &NoFuzzSource)
+}
+
+/// Like [`construct_test_plan`], but the caller can supply a [`FuzzValueSource`] to materialize
+/// values for implicit-fuzz or `in`/`!=` constrained parameters.
+pub fn construct_test_plan_with_fuzz_source(
+    env: &GlobalEnv,
+    package_filter: Option<Symbol>,
+    fuzz_source: &dyn FuzzValueSource,
+) -> Option<Vec<ModuleTestPlan>> {
     let options = env.get_extension::<Options>().expect("options");
     if !options.compile_test_code {
         return None;
@@ -49,7 +69,7 @@ pub fn construct_test_plan(
         env.get_modules()
             .filter_map(|module| {
                 if module.is_primary_target() {
-                    construct_module_test_plan(env, package_filter, module)
+                    construct_module_test_plan(env, package_filter, fuzz_source, module)
                 } else {
                     None
                 }
@@ -61,6 +81,7 @@ pub fn construct_test_plan(
 fn construct_module_test_plan(
     env: &GlobalEnv,
     _package_filter: Option<Symbol>,
+    fuzz_source: &dyn FuzzValueSource,
     module: ModuleEnv,
 ) -> Option<ModuleTestPlan> {
     // TODO (#12885): what is a package?  Do we need this code?
@@ -71,11 +92,8 @@ fn construct_module_test_plan(
     let current_module = module.get_name();
     let tests: BTreeMap<_, _> = module
         .get_functions()
-        .filter_map(|func| {
-            let func_name = func.get_name_str();
-            build_test_info(env, current_module, func)
-                .map(|test_case| (func_name.clone(), test_case))
-        })
+        .flat_map(|func| build_test_info(env, current_module, fuzz_source, func).into_iter())
+        .map(|test_case| (test_case.test_name.clone(), test_case))
         .collect();
 
     let module_id = module.get_identifier();
@@ -108,8 +126,9 @@ fn construct_module_test_plan(
 fn build_test_info(
     env: &GlobalEnv,
     current_module: &ModuleName,
+    fuzz_source: &dyn FuzzValueSource,
     function: FunctionEnv,
-) -> Option<TestCase> {
+) -> Vec<TestCase> {
     let fn_name_str = function.get_name_str();
     let fn_id_loc = function.get_id_loc();
 
@@ -132,7 +151,7 @@ fn build_test_info(
                 let abort_loc = env.get_node_loc(abort_id);
                 env.error_with_labels(&fn_id_loc, fn_msg, vec![(abort_loc, abort_msg.to_string())]);
             }
-            return None;
+            return Vec::new();
         },
         Some(test_attribute) => test_attribute,
     };
@@ -157,47 +176,52 @@ fn build_test_info(
         ]);
     }
 
-    let test_annotation_params = parse_test_attribute(env, test_attribute, 0);
+    let specs = match parse_test_attribute(env, test_attribute, 0) {
+        Some(specs) => specs,
+        None => return Vec::new(),
+    };
 
-    let mut arguments = Vec::new();
-    for param in function.get_parameters_ref() {
-        let Parameter(var, ty, var_loc) = &param;
+    let parameters: Vec<_> = function.get_parameters_ref().iter().cloned().collect();
 
-        match test_annotation_params.get(var) {
-            Some(MoveValue::Address(addr)) => match ty {
-                Type::Primitive(PrimitiveType::Signer) => arguments.push(MoveValue::Signer(*addr)),
-                Type::Reference(_, inner) if **inner == Type::Primitive(PrimitiveType::Signer) => {
-                    arguments.push(MoveValue::Signer(*addr));
-                },
-                Type::Primitive(PrimitiveType::Address) => {
-                    arguments.push(MoveValue::Address(*addr))
-                },
-                _ => {
-                    let err_msg = "Unexpected argument type: expect an address or a signer";
-                    let invalid_test = "unable to generate test";
-                    env.error_with_labels(&fn_id_loc, invalid_test, vec![
-                        (test_attribute_loc.clone(), err_msg.to_string()),
-                        (
-                            var_loc.clone(),
-                            "Corresponding to this parameter".to_string(),
-                        ),
-                    ]);
-                },
-            },
-            Some(value) => arguments.push(value.clone()),
+    // For each parameter, materialize one dimension of MoveValues.
+    let mut had_error = false;
+    let mut had_fuzz = false;
+    let mut dimensions: Vec<(Symbol, Vec<MoveValue>)> = Vec::with_capacity(parameters.len());
+    for param in &parameters {
+        let Parameter(var, ty, var_loc) = param;
+        // Synthesize an implicit-fuzz spec when no spec was given for this param.
+        let owned_default;
+        let spec_ref = match specs.get(var) {
+            Some(s) => s,
             None => {
-                let missing_param_msg = "Missing test parameter assignment in test. Expected a \
-                                         parameter to be assigned in this attribute";
-                let invalid_test = "unable to generate test";
-                env.error_with_labels(&fn_id_loc, invalid_test, vec![
-                    (test_attribute_loc.clone(), missing_param_msg.to_string()),
-                    (
-                        var_loc.clone(),
-                        "Corresponding to this parameter".to_string(),
-                    ),
-                ]);
+                owned_default = ParamSpec::Fuzz {
+                    domain: Domain::default(),
+                    exclude: Domain::default(),
+                };
+                &owned_default
             },
+        };
+        match materialize_param_values(
+            env,
+            fuzz_source,
+            &fn_id_loc,
+            &test_attribute_loc,
+            var_loc,
+            ty,
+            spec_ref,
+        ) {
+            Some(values) => {
+                if matches!(spec_ref, ParamSpec::Fuzz { .. }) {
+                    had_fuzz = true;
+                }
+                dimensions.push((*var, values));
+            },
+            None => had_error = true,
         }
+    }
+
+    if had_error {
+        return Vec::new();
     }
 
     let expected_failure = match abort_attribute_opt {
@@ -205,62 +229,366 @@ fn build_test_info(
         Some(abort_attribute) => parse_failure_attribute(env, current_module, abort_attribute),
     };
 
-    Some(TestCase {
-        test_name: fn_name_str.to_string(),
-        arguments,
-        expected_failure,
-    })
+    // Cartesian product across all parameter dimensions.
+    let total: usize = dimensions
+        .iter()
+        .map(|(_, vs)| vs.len())
+        .product::<usize>()
+        .max(1);
+    if total > MAX_FUZZ_CASES {
+        env.error(
+            &fn_id_loc,
+            &format!(
+                "#[test] expansion would produce {} cases (cap: {}). Narrow the matrix, fuzz \
+                 domain, or `--fuzz-iterations`.",
+                total, MAX_FUZZ_CASES
+            ),
+        );
+        return Vec::new();
+    }
+
+    if had_fuzz {
+        env.diag(
+            Severity::Note,
+            &fn_id_loc,
+            &format!(
+                "fuzz: expanded `{}` to {} case{}",
+                fn_name_str,
+                total,
+                if total == 1 { "" } else { "s" }
+            ),
+        );
+    }
+
+    if dimensions.is_empty() {
+        // Zero-arg function: a single case with no arguments and the bare function name.
+        return vec![TestCase {
+            test_name: fn_name_str.to_string(),
+            arguments: Vec::new(),
+            expected_failure,
+        }];
+    }
+
+    // If every dimension has exactly one value, emit a single TestCase with the bare function
+    // name (preserves existing test-name behavior for non-expanded #[test] functions).
+    let is_single = dimensions.iter().all(|(_, vs)| vs.len() == 1);
+
+    let mut cases = Vec::with_capacity(total);
+    let mut indices = vec![0usize; dimensions.len()];
+    loop {
+        let mut arguments = Vec::with_capacity(dimensions.len());
+        let mut suffix_parts = Vec::with_capacity(dimensions.len());
+        for (i, (var, vs)) in dimensions.iter().enumerate() {
+            let v = &vs[indices[i]];
+            arguments.push(v.clone());
+            suffix_parts.push(format!(
+                "{}={}",
+                var.display(env.symbol_pool()),
+                format_move_value(v)
+            ));
+        }
+        let test_name = if is_single {
+            fn_name_str.to_string()
+        } else {
+            format!("{}[{}]", fn_name_str, suffix_parts.join(","))
+        };
+        cases.push(TestCase {
+            test_name,
+            arguments,
+            expected_failure: expected_failure.clone(),
+        });
+        // Advance odometer.
+        let mut idx = dimensions.len();
+        loop {
+            if idx == 0 {
+                return cases;
+            }
+            idx -= 1;
+            indices[idx] += 1;
+            if indices[idx] < dimensions[idx].1.len() {
+                break;
+            }
+            indices[idx] = 0;
+        }
+    }
+}
+
+/// Compact human-readable rendering for a `MoveValue`, used in expanded
+/// test-case suffixes like `foo[a=@0x1,b=42]`.
+fn format_move_value(v: &MoveValue) -> String {
+    match v {
+        MoveValue::Address(a) | MoveValue::Signer(a) => format!("@{}", a.short_str_lossless()),
+        MoveValue::U8(x) => x.to_string(),
+        MoveValue::U16(x) => x.to_string(),
+        MoveValue::U32(x) => x.to_string(),
+        MoveValue::U64(x) => x.to_string(),
+        MoveValue::U128(x) => x.to_string(),
+        MoveValue::U256(x) => x.to_string(),
+        MoveValue::Bool(b) => b.to_string(),
+        other => format!("{:?}", other),
+    }
+}
+
+/// Turn a [`ParamSpec`] into the concrete list of `MoveValue`s for that parameter.
+/// Returns `None` and reports an error on type mismatch or fuzz-source failure.
+fn materialize_param_values(
+    env: &GlobalEnv,
+    fuzz_source: &dyn FuzzValueSource,
+    fn_id_loc: &Loc,
+    test_attribute_loc: &Loc,
+    var_loc: &Loc,
+    ty: &Type,
+    spec: &ParamSpec,
+) -> Option<Vec<MoveValue>> {
+    match spec {
+        ParamSpec::Concrete(v) => coerce_to_param_type(env, fn_id_loc, test_attribute_loc, var_loc, ty, v.clone())
+            .map(|v| vec![v]),
+        ParamSpec::Matrix(vs) => {
+            let mut out = Vec::with_capacity(vs.len());
+            for v in vs {
+                let coerced = coerce_to_param_type(
+                    env,
+                    fn_id_loc,
+                    test_attribute_loc,
+                    var_loc,
+                    ty,
+                    v.clone(),
+                )?;
+                out.push(coerced);
+            }
+            Some(out)
+        },
+        ParamSpec::Fuzz { domain, exclude } => {
+            match fuzz_source.sample(ty, domain, exclude, DEFAULT_FUZZ_ITERATIONS, DEFAULT_FUZZ_SEED)
+            {
+                Ok(vs) if vs.is_empty() => {
+                    env.error_with_labels(fn_id_loc, "unable to generate test", vec![
+                        (
+                            test_attribute_loc.clone(),
+                            "Fuzz source returned no values for this parameter".to_string(),
+                        ),
+                        (
+                            var_loc.clone(),
+                            "Corresponding to this parameter".to_string(),
+                        ),
+                    ]);
+                    None
+                },
+                Ok(vs) => Some(vs),
+                Err(msg) => {
+                    env.error_with_labels(fn_id_loc, "unable to generate test", vec![
+                        (test_attribute_loc.clone(), msg),
+                        (
+                            var_loc.clone(),
+                            "Corresponding to this parameter".to_string(),
+                        ),
+                    ]);
+                    None
+                },
+            }
+        },
+    }
+}
+
+/// Apply the same signer/address coercion logic the legacy `#[test(a = @0x..)]`
+/// code used. Returns `None` and reports an error on type mismatch.
+fn coerce_to_param_type(
+    env: &GlobalEnv,
+    fn_id_loc: &Loc,
+    test_attribute_loc: &Loc,
+    var_loc: &Loc,
+    ty: &Type,
+    value: MoveValue,
+) -> Option<MoveValue> {
+    match (&value, ty) {
+        (MoveValue::Address(addr), Type::Primitive(PrimitiveType::Signer)) => {
+            Some(MoveValue::Signer(*addr))
+        },
+        (MoveValue::Address(addr), Type::Reference(_, inner))
+            if **inner == Type::Primitive(PrimitiveType::Signer) =>
+        {
+            Some(MoveValue::Signer(*addr))
+        },
+        (MoveValue::Address(_), Type::Primitive(PrimitiveType::Address)) => Some(value),
+        _ => {
+            let err_msg = "Unexpected argument type: expect an address or a signer";
+            let invalid_test = "unable to generate test";
+            env.error_with_labels(fn_id_loc, invalid_test, vec![
+                (test_attribute_loc.clone(), err_msg.to_string()),
+                (
+                    var_loc.clone(),
+                    "Corresponding to this parameter".to_string(),
+                ),
+            ]);
+            None
+        },
+    }
 }
 
 //***************************************************************************
 // Attribute parsers
 //***************************************************************************
 
+/// Parse the contents of `#[test(...)]` into one [`ParamSpec`] per named
+/// parameter. Returns `None` if a fatal structural error was encountered (and
+/// the caller should abandon test-case generation for this function).
 fn parse_test_attribute(
     env: &GlobalEnv,
     test_attribute: &Attribute,
     depth: usize,
-) -> BTreeMap<Symbol, MoveValue> {
+) -> Option<BTreeMap<Symbol, ParamSpec>> {
     match test_attribute {
         Attribute::Apply(id, _, _) if depth > 0 => {
             let aloc = env.get_node_loc(*id);
             env.error(&aloc, "Unexpected nested attribute in test declaration");
-            BTreeMap::new()
+            None
         },
-        Attribute::Apply(_id, sym, vec) => {
+        Attribute::Apply(_id, sym, inner) => {
             assert!(
                 *TestingAttribute::TEST == env.symbol_pool().string(*sym).to_string(),
                 "ICE: We should only be parsing a raw test attribute"
             );
-            vec.iter()
-                .flat_map(|attr| parse_test_attribute(env, attr, depth + 1))
-                .collect()
-        },
-        Attribute::Assign(id, sym, val) => {
-            if depth != 1 {
-                let aloc = env.get_node_loc(*id);
-                env.error(&aloc, "Unexpected nested attribute in test declaration");
-                return BTreeMap::new();
+            let mut specs: BTreeMap<Symbol, ParamSpec> = BTreeMap::new();
+            for attr in inner {
+                if !merge_test_param_entry(env, &mut specs, attr) {
+                    // entry-level errors have already been reported; keep processing the rest
+                }
             }
-
-            let value = match convert_attribute_value_to_move_value(env, val) {
-                Some(move_value) => move_value,
-                None => {
-                    let aloc = env.get_node_loc(*id);
-                    let assign_loc = env.get_node_loc(*id);
-                    env.error_with_labels(&assign_loc, "Unsupported attribute value", vec![(
-                        aloc,
-                        "Assigned in this attribute".to_string(),
-                    )]);
-                    return BTreeMap::new();
-                },
-            };
-
-            let mut args = BTreeMap::new();
-            args.insert(*sym, value);
-            args
+            Some(specs)
+        },
+        Attribute::Assign(id, _, _) | Attribute::Constrained(id, _, _, _) => {
+            let aloc = env.get_node_loc(*id);
+            env.error(
+                &aloc,
+                "Unexpected top-level form for #[test]; expected `#[test(...)]`",
+            );
+            None
         },
     }
+}
+
+/// Process one entry within `#[test(...)]` (e.g. `a = @0x1`, `a in 1..=10`,
+/// `a != [..]`) and merge it into `specs`. Returns `true` on success.
+fn merge_test_param_entry(
+    env: &GlobalEnv,
+    specs: &mut BTreeMap<Symbol, ParamSpec>,
+    attr: &Attribute,
+) -> bool {
+    match attr {
+        Attribute::Assign(id, sym, val) => {
+            let entry_loc = env.get_node_loc(*id);
+            // List literal on the RHS expands to a Matrix; anything else is a single value.
+            let new_spec = match val {
+                AttributeValue::List(_, items) => {
+                    let mut values = Vec::with_capacity(items.len());
+                    for item in items {
+                        match convert_attribute_value_to_move_value(env, item) {
+                            Some(v) => values.push(v),
+                            None => {
+                                let iloc = attribute_value_loc(env, item);
+                                env.error(&iloc, "Unsupported value in test matrix");
+                                return false;
+                            },
+                        }
+                    }
+                    ParamSpec::Matrix(values)
+                },
+                _ => match convert_attribute_value_to_move_value(env, val) {
+                    Some(v) => ParamSpec::Concrete(v),
+                    None => {
+                        env.error_with_labels(&entry_loc, "Unsupported attribute value", vec![(
+                            entry_loc.clone(),
+                            "Assigned in this attribute".to_string(),
+                        )]);
+                        return false;
+                    },
+                },
+            };
+            insert_or_reject(env, specs, *sym, new_spec, &entry_loc)
+        },
+        Attribute::Constrained(id, sym, op, val) => {
+            let entry_loc = env.get_node_loc(*id);
+            // Build/extend a Fuzz spec for this parameter.
+            let existing = specs.remove(sym);
+            let (mut domain, mut exclude) = match existing {
+                None => (Domain::default(), Domain::default()),
+                Some(ParamSpec::Fuzz { domain, exclude }) => (domain, exclude),
+                Some(_) => {
+                    env.error(
+                        &entry_loc,
+                        "Cannot mix `=` with `!=` / `in` for the same parameter",
+                    );
+                    return false;
+                },
+            };
+            let target = match op {
+                ConstraintOp::In => &mut domain,
+                ConstraintOp::Ne => &mut exclude,
+            };
+            fold_into_domain(val, target);
+            specs.insert(*sym, ParamSpec::Fuzz { domain, exclude });
+            true
+        },
+        Attribute::Apply(id, _, _) => {
+            let aloc = env.get_node_loc(*id);
+            env.error(&aloc, "Unexpected nested attribute in test declaration");
+            false
+        },
+    }
+}
+
+/// Insert `new_spec` for `sym`, or report a duplicate / mixed-form error.
+fn insert_or_reject(
+    env: &GlobalEnv,
+    specs: &mut BTreeMap<Symbol, ParamSpec>,
+    sym: Symbol,
+    new_spec: ParamSpec,
+    entry_loc: &Loc,
+) -> bool {
+    if specs.contains_key(&sym) {
+        env.error(
+            entry_loc,
+            "Duplicate or conflicting spec for this parameter (use one of `=`, `in`, or `!=`)",
+        );
+        return false;
+    }
+    specs.insert(sym, new_spec);
+    true
+}
+
+/// Flatten a model-AST `AttributeValue` into literals and ranges inside the
+/// given [`Domain`]. Unions and nested lists are flattened recursively;
+/// anything else lands in `literals`.
+fn fold_into_domain(value: &AttributeValue, dom: &mut Domain) {
+    match value {
+        AttributeValue::Range {
+            lo,
+            hi,
+            inclusive_hi,
+            ..
+        } => dom.ranges.push(RangeSpec {
+            lo: (**lo).clone(),
+            hi: (**hi).clone(),
+            inclusive_hi: *inclusive_hi,
+        }),
+        AttributeValue::List(_, items) | AttributeValue::Union(_, items) => {
+            for item in items {
+                fold_into_domain(item, dom);
+            }
+        },
+        leaf => dom.literals.push(leaf.clone()),
+    }
+}
+
+fn attribute_value_loc(env: &GlobalEnv, value: &AttributeValue) -> Loc {
+    let id = match value {
+        AttributeValue::Value(id, _) => *id,
+        AttributeValue::Name(id, _, _) => *id,
+        AttributeValue::List(id, _) => *id,
+        AttributeValue::Range { id, .. } => *id,
+        AttributeValue::Union(id, _) => *id,
+    };
+    env.get_node_loc(id)
 }
 
 fn parse_failure_attribute(
@@ -278,6 +606,14 @@ fn parse_failure_attribute(
                 assign_loc.clone(),
                 expected_msg.to_string(),
             )]);
+            None
+        },
+        Attribute::Constrained(id, _, _, _) => {
+            let aloc = env.get_node_loc(*id);
+            env.error(
+                &aloc,
+                "Constraint operators (`!=`, `in`) are not supported in #[expected_failure(...)]",
+            );
             None
         },
         Attribute::Apply(id, sym, attrs) => {
@@ -493,6 +829,15 @@ fn check_attribute_unassigned(env: &GlobalEnv, kind: &str, attr: Attribute) -> O
             env.error(&attr_loc, &msg);
             None
         },
+        Attribute::Constrained(id, sym, _, _) => {
+            assert!(env.symbol_pool().string(sym).to_string() == kind);
+            let attr_loc = env.get_node_loc(id);
+            env.error(
+                &attr_loc,
+                "Constraint operators (`!=`, `in`) are not supported in expected failure attributes",
+            );
+            None
+        },
     }
 }
 
@@ -514,6 +859,14 @@ fn get_assigned_attribute(
                 kind
             );
             env.error(&loc, &msg);
+            None
+        },
+        Attribute::Constrained(id, _, _, _) => {
+            let loc = env.get_node_loc(id);
+            env.error(
+                &loc,
+                "Constraint operators (`!=`, `in`) are not supported in expected failure attributes",
+            );
             None
         },
     }
@@ -541,6 +894,16 @@ fn convert_location(env: &GlobalEnv, attr: Attribute) -> Option<ModuleId> {
             )]);
             None
         },
+        AttributeValue::List(id, _)
+        | AttributeValue::Range { id, .. }
+        | AttributeValue::Union(id, _) => {
+            let vloc = env.get_node_loc(id);
+            env.error_with_labels(&loc, "invalid attribute value", vec![(
+                vloc,
+                "Expected a module identifier, e.g. 'std::vector'".to_string(),
+            )]);
+            None
+        },
     }
 }
 
@@ -561,6 +924,16 @@ fn convert_constant_value_u64_constant_or_value(
         AttributeValue::Name(id, opt_module_name, sym) => {
             let vloc = env.get_node_loc(*id);
             (vloc, opt_module_name, sym)
+        },
+        AttributeValue::List(id, _)
+        | AttributeValue::Range { id, .. }
+        | AttributeValue::Union(id, _) => {
+            let loc = env.get_node_loc(*id);
+            env.error(
+                &loc,
+                "Expected a numeric constant or value; list, range, and union forms are not supported here",
+            );
+            return None;
         },
     };
     let module_env: ModuleEnv = if let Some(module_name) = opt_module_name {

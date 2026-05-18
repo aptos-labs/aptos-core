@@ -33,6 +33,7 @@ pub enum Tok {
     Minus,
     Period,
     PeriodPeriod,
+    PeriodPeriodEqual,
     Slash,
     Colon,
     ColonColon,
@@ -130,6 +131,7 @@ impl fmt::Display for Tok {
             Minus => "-",
             Period => ".",
             PeriodPeriod => "..",
+            PeriodPeriodEqual => "..=",
             Slash => "/",
             Colon => ":",
             ColonColon => "::",
@@ -649,7 +651,9 @@ fn find_token(
             }
         },
         '.' => {
-            if text.starts_with("..") {
+            if text.starts_with("..=") {
+                (Tok::PeriodPeriodEqual, 3)
+            } else if text.starts_with("..") {
                 (Tok::PeriodPeriod, 2)
             } else {
                 (Tok::Period, 1)

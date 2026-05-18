@@ -1188,6 +1188,18 @@ impl ModuleContext<'_> {
                         )
                     }
                 },
+                Attribute::Constrained(_, name, _, _) => {
+                    let name = fun_env.symbol_pool().string(*name);
+                    if matches!(
+                        name.as_str(),
+                        well_known::PERSISTENT_ATTRIBUTE | well_known::MODULE_LOCK_ATTRIBUTE
+                    ) {
+                        self.error(
+                            fun_env.get_id_loc(),
+                            format!("attribute `{}` cannot have a constraint", name),
+                        )
+                    }
+                },
             }
         }
         if !has_persistent && fun_env.visibility() == Visibility::Public {

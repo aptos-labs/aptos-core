@@ -42,6 +42,16 @@ fn parse_lint_skip_attribute(
             );
             BTreeSet::new()
         },
+        Attribute::Constrained(id, ..) => {
+            env.error(
+                &env.get_node_loc(*id),
+                &format!(
+                    "expected `#[{}(...)]`, not a constrained value",
+                    LintAttribute::SKIP
+                ),
+            );
+            BTreeSet::new()
+        },
         Attribute::Apply(id, _, attrs) => {
             if attrs.is_empty() {
                 env.error(
@@ -56,6 +66,13 @@ fn parse_lint_skip_attribute(
                     env.error(
                         &env.get_node_loc(*id),
                         "did not expect an assigned value, expected only the names of the lint checks to be skipped",
+                    );
+                    None
+                },
+                Attribute::Constrained(id, ..) => {
+                    env.error(
+                        &env.get_node_loc(*id),
+                        "did not expect a constrained value, expected only the names of the lint checks to be skipped",
                     );
                     None
                 },

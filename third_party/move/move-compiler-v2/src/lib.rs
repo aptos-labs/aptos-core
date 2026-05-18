@@ -8,6 +8,7 @@ pub mod env_pipeline;
 mod experiments;
 pub mod external_checks;
 mod file_format_generator;
+pub mod fuzz;
 pub mod lint_common;
 pub mod logging;
 pub mod options;
