@@ -287,8 +287,8 @@ mod dbtool_tests {
         rt: &Runtime,
         backup_dir: &Path,
         target_db_dir: &Path,
-        start: Version,
-        end: Version,
+        start_version: Version,
+        target_version: Version,
         trusted_waypoints: &[Waypoint],
     ) -> anyhow::Result<()> {
         let mut restore_args = vec![
@@ -296,9 +296,9 @@ mod dbtool_tests {
             "restore".to_string(),
             "bootstrap-db".to_string(),
             "--ledger-history-start-version".to_string(),
-            start.to_string(),
+            start_version.to_string(),
             "--target-version".to_string(),
-            end.to_string(),
+            target_version.to_string(),
             "--target-db-dir".to_string(),
             target_db_dir.to_str().unwrap().to_string(),
             "--local-fs-dir".to_string(),
@@ -656,6 +656,12 @@ mod dbtool_tests {
         (rt, server_addr)
     }
 
+    // Source DB built by `test_execution_with_storage_impl_inner`:
+    //   - genesis at version 0 (epoch 0 ending)
+    //   - block 1 ends at version 11 with a reconfig (epoch 1 ending)
+    //   - block 2 ends at version 13 with a reconfig (epoch 2 ending)
+    //   - block 3 ends at version 29, no reconfig (final LedgerInfo in epoch 3)
+    // So LedgerInfos exist at versions 0, 11, 13, and 29; 30 total versions.
     #[test]
     fn test_restore_db_with_trusted_waypoint_smoke() {
         let backup_dir = TempPath::new();
@@ -669,6 +675,7 @@ mod dbtool_tests {
         );
         let server_addr = format!(" http://localhost:{}", port);
 
+        // Back up epoch endings for epochs [0, 3): the LedgerInfos at versions 0, 11, 13.
         rt.block_on(
             DBTool::try_parse_from([
                 "aptos-db-tool",
@@ -689,6 +696,7 @@ mod dbtool_tests {
         )
         .unwrap();
 
+        // Back up state snapshots for epochs 0, 1, 2 (one per ended epoch).
         for epoch in ["0", "1", "2"] {
             rt.block_on(
                 DBTool::try_parse_from([
@@ -709,6 +717,7 @@ mod dbtool_tests {
             .unwrap();
         }
 
+        // Back up transactions in two 15-version chunks: 0..15 and 15..30 (covers all 30 versions).
         for (start_version, num_transactions) in [("0", "15"), ("15", "15")] {
             rt.block_on(
                 DBTool::try_parse_from([
@@ -731,6 +740,7 @@ mod dbtool_tests {
             .unwrap();
         }
 
+        // Trusted waypoint = LedgerInfo ending epoch 2, which sits at version 13.
         let epoch_change_proof = source_db.get_epoch_ending_ledger_infos(2, 3).unwrap();
         let trusted_waypoint =
             Waypoint::new_epoch_boundary(epoch_change_proof.ledger_info_with_sigs[0].ledger_info())
@@ -748,8 +758,13 @@ mod dbtool_tests {
             })
             .expect("missing epoch ending backup");
         let chunk_path = epoch_backup_handle.join("0-.chunk");
+        // Corrupt the LedgerInfo at version 11 (epoch 1 ending) so it can no longer be verified.
         corrupt_epoch_ending_chunk(&chunk_path, 11);
 
+        // Restore target version is 16: past the trusted_waypoint (13) but before the next
+        // LedgerInfo (29). start_version = target_version = 16 means a single-version slice.
+        // Without the trusted_waypoint, the corrupted LedgerInfo at 11 fails verification and
+        // restore errors out.
         let failing_db_dir = TempPath::new();
         failing_db_dir.create_as_dir().unwrap();
         assert!(
@@ -758,6 +773,8 @@ mod dbtool_tests {
             "restore should fail when an earlier epoch ending LI is unverifiable",
         );
 
+        // With the trusted_waypoint at 13 the corrupted LedgerInfo at 11 is bypassed; restore
+        // succeeds.
         let restored_db_dir = TempPath::new();
         restored_db_dir.create_as_dir().unwrap();
         run_bootstrap_db_restore(
@@ -770,8 +787,10 @@ mod dbtool_tests {
         )
         .unwrap();
 
+        // Highest verifiable LedgerInfo <= target_version=16 is the trusted_waypoint at 13:
+        // the LedgerInfo at 11 is corrupted, the LedgerInfo at 29 is past target.
         let restored_db = AptosDB::new_for_test(restored_db_dir.path());
-        assert_eq!(restored_db.get_latest_ledger_info_version().unwrap(), 16);
+        assert_eq!(restored_db.get_latest_ledger_info_version().unwrap(), 13);
 
         rt.shutdown_timeout(Duration::from_secs(1));
     }
