@@ -83,6 +83,13 @@ struct TestHarness {
 
 impl TestHarness {
     fn new(seeds: PeerSet) -> (Self, ConnectivityManager<FixedInterval>) {
+        Self::new_with_connection_limit(seeds, Some(MAX_TEST_CONNECTIONS))
+    }
+
+    fn new_with_connection_limit(
+        seeds: PeerSet,
+        outbound_connection_limit: Option<usize>,
+    ) -> (Self, ConnectivityManager<FixedInterval>) {
         let network_context = NetworkContext::mock();
         let time_service = TimeService::mock();
         let (connection_reqs_tx, connection_reqs_rx) =
@@ -102,7 +109,7 @@ impl TestHarness {
             CONNECTIVITY_CHECK_INTERVAL,
             FixedInterval::new(CONNECTION_DELAY),
             MAX_CONNECTION_DELAY,
-            Some(MAX_TEST_CONNECTIONS),
+            outbound_connection_limit,
             true, /* mutual_authentication */
             true, /* enable_latency_aware_dialing */
             None, /* access_control_policy */
@@ -712,6 +719,88 @@ fn multiple_addrs_shrinking() {
         mock.trigger_pending_dials().await;
         mock.expect_one_dial_success(other_peer_id, other_addr_4)
             .await;
+    };
+    block_on(future::join(conn_mgr.start(), test));
+}
+
+// Test that when a peer has multiple addresses and the first one fails, the
+// fallback address is tried on the very next connectivity check — without
+// waiting for TRY_DIAL_BACKOFF_TIME (5 minutes) to expire. This is the core
+// fix for PFNs that should fall back from validator addresses to VFN addresses
+// immediately on failure.
+#[test]
+fn fallback_addr_tried_immediately_after_failure() {
+    let (peer_id, mut peer, pubkey, _) = test_peer(AccountAddress::ZERO);
+    let (mut mock, conn_mgr) = TestHarness::new(HashMap::new());
+
+    let test = async move {
+        // Peer has two addresses: the first simulates a validator port (closed),
+        // the second simulates a VFN port (open).
+        let val_addr = network_address_with_pubkey("/ip4/127.0.0.1/tcp/6182", pubkey);
+        let vfn_addr = network_address_with_pubkey("/ip4/127.0.0.1/tcp/6182", pubkey);
+        peer.addresses = vec![val_addr.clone(), vfn_addr.clone()];
+
+        let update = hashmap! {peer_id => peer};
+        mock.send_update_discovered_peers(DiscoverySource::OnChainValidatorSet, update)
+            .await;
+
+        // First check: dial val_addr, which fails.
+        mock.trigger_connectivity_check().await;
+        mock.trigger_pending_dials().await;
+        mock.expect_one_dial_fail(peer_id, val_addr).await;
+
+        // Second check: only CONNECTIVITY_CHECK_INTERVAL (5s) has elapsed, which
+        // is far less than TRY_DIAL_BACKOFF_TIME (5 min). The peer must still be
+        // dialed immediately at the fallback vfn_addr rather than being skipped.
+        mock.trigger_connectivity_check().await;
+        mock.trigger_pending_dials().await;
+        mock.expect_one_dial_success(peer_id, vfn_addr).await;
+    };
+    block_on(future::join(conn_mgr.start(), test));
+}
+
+// Test that when the connection limit is 1 and two peers are eligible, the
+// peer in pending_fallbacks (failed one address, still has more to try) is
+// given priority over a freshly discovered peer that has never been dialed.
+#[test]
+fn fallback_peers_prioritized_over_regular_peers() {
+    // Peer A has two addresses; peer B has one. Neither is a seed.
+    let (peer_id_a, mut peer_a, pubkey_a, _) = test_peer(AccountAddress::ZERO);
+    let addr_a1 = network_address_with_pubkey("/ip4/127.0.0.1/tcp/9091", pubkey_a);
+    let addr_a2 = network_address_with_pubkey("/ip4/127.0.0.1/tcp/9092", pubkey_a);
+    peer_a.addresses = vec![addr_a1.clone(), addr_a2.clone()];
+
+    let (peer_id_b, peer_b, _, addr_b) = test_peer(AccountAddress::ONE);
+
+    // Connection limit = 1 so at most one peer is dialed per check.
+    let (mut mock, conn_mgr) = TestHarness::new_with_connection_limit(HashMap::new(), Some(1));
+
+    let test = async move {
+        // Discover only peer A first and fail at its first address.
+        let update_a = hashmap! {peer_id_a => peer_a};
+        mock.send_update_discovered_peers(DiscoverySource::OnChainValidatorSet, update_a)
+            .await;
+
+        mock.trigger_connectivity_check().await;
+        mock.trigger_pending_dials().await;
+        mock.expect_one_dial_fail(peer_id_a, addr_a1).await;
+        // A is now in pending_fallbacks with addr_a2 remaining.
+
+        // Discover peer B via a different source so peer A is not removed from
+        // the discovered peer set (each source manages its own entries).
+        let update_b = hashmap! {peer_id_b => peer_b};
+        mock.send_update_discovered_peers(DiscoverySource::File, update_b)
+            .await;
+
+        // With limit=1, only one peer is dialed. Peer A (pending_fallback) must
+        // get the slot ahead of freshly discovered peer B.
+        mock.trigger_connectivity_check().await;
+        mock.trigger_pending_dials().await;
+        mock.expect_one_dial_success(peer_id_a, addr_a2).await;
+        // At this point A is connected and the limit is reached, so B will not
+        // be dialed. The test is satisfied: the fallback peer was prioritized.
+        let _ = peer_id_b; // suppress unused warning
+        let _ = addr_b;
     };
     block_on(future::join(conn_mgr.start(), test));
 }

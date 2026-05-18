@@ -132,6 +132,11 @@ pub struct ConnectivityManager<TBackoff> {
     enable_latency_aware_dialing: bool,
     /// Access control policy for peer connections
     access_control_policy: Option<Arc<AccessControlPolicy>>,
+    /// Peers that failed a dial but have more addresses to try in the current
+    /// cycle (e.g., validator address failed, VFN address not yet tried).
+    /// These peers are prioritized on the very next connectivity check so we
+    /// don't wait TRY_DIAL_BACKOFF_TIME before falling back to the next addr.
+    pending_fallbacks: HashSet<PeerId>,
 }
 
 /// Different sources for peer addresses, ordered by priority (Onchain=highest,
@@ -399,6 +404,7 @@ where
             mutual_authentication,
             enable_latency_aware_dialing,
             access_control_policy,
+            pending_fallbacks: HashSet::new(),
         };
 
         // Set the initial seed config addresses and public keys
@@ -451,7 +457,7 @@ where
                         None => break,
                     }
                 },
-                peer_id = pending_dials.select_next_some() => {
+                (peer_id, dial_failed) = pending_dials.select_next_some() => {
                     trace!(
                         NetworkSchema::new(&self.network_context)
                             .remote_peer(&peer_id),
@@ -460,6 +466,24 @@ where
                         peer_id.short_str(),
                     );
                     self.dial_queue.remove(&peer_id);
+
+                    // If the dial failed and the peer has more addresses to try
+                    // in the current cycle (e.g., VFN fallback after a failed
+                    // validator address), mark it for priority on the next
+                    // connectivity check. This avoids the full TRY_DIAL_BACKOFF_TIME
+                    // wait before the next address is tried.
+                    if dial_failed && !self.connected.contains_key(&peer_id) {
+                        let has_more_addrs = {
+                            let discovered_peers = self.discovered_peers.read();
+                            self.dial_states.get(&peer_id).zip(
+                                discovered_peers.peer_set.get(&peer_id)
+                            ).map(|(state, peer)| state.addr_idx < peer.addrs.len())
+                            .unwrap_or(false)
+                        };
+                        if has_more_addrs {
+                            self.pending_fallbacks.insert(peer_id);
+                        }
+                    }
                 },
             }
         }
@@ -573,9 +597,13 @@ where
     /// Identifies a set of peers to dial and queues them for dialing
     async fn dial_eligible_peers<'a>(
         &'a mut self,
-        pending_dials: &'a mut FuturesUnordered<BoxFuture<'static, PeerId>>,
+        pending_dials: &'a mut FuturesUnordered<BoxFuture<'static, (PeerId, bool)>>,
     ) {
+        // First, choose peers normally (respecting connection limits, latency,
+        // etc.), but give pending_fallback peers the highest priority so they
+        // are always included before recently-dialed peers without fallbacks.
         for (peer_id, peer) in self.choose_peers_to_dial().await {
+            self.pending_fallbacks.remove(&peer_id);
             self.queue_dial_peer(peer_id, peer, pending_dials);
         }
     }
@@ -643,25 +671,44 @@ where
             return vec![];
         }
 
-        // Prioritize the eligible peers and select the peers to dial
-        if selection::should_select_peers_by_latency(
+        // Partition eligible peers into two groups:
+        // 1. Peers in pending_fallbacks: these failed a dial on a previous
+        //    address and still have untried addresses (e.g., VFN fallback after
+        //    a failed validator address). They must be selected first so the
+        //    next address is tried immediately, without waiting for
+        //    TRY_DIAL_BACKOFF_TIME to expire.
+        // 2. Regular peers: selected using the normal latency/random logic.
+        let (mut fallback_peers, regular_peers): (Vec<_>, Vec<_>) = eligible_peers
+            .into_iter()
+            .partition(|(peer_id, _)| self.pending_fallbacks.contains(peer_id));
+
+        // Always include pending_fallback peers first (up to the dial limit).
+        fallback_peers.truncate(num_peers_to_dial);
+        let num_remaining = num_peers_to_dial.saturating_sub(fallback_peers.len());
+
+        // Fill remaining slots from regular peers using the normal selection logic
+        let regular_selected = if num_remaining == 0 {
+            vec![]
+        } else if selection::should_select_peers_by_latency(
             &self.network_context,
             self.enable_latency_aware_dialing,
         ) {
             // Ping the eligible peers (so that we can fetch missing ping latency information)
-            self.ping_eligible_peers(&eligible_peers).await;
+            self.ping_eligible_peers(&regular_peers).await;
 
             // Choose the peers to dial (weighted by ping latency)
             selection::choose_random_peers_by_ping_latency(
                 self.network_context,
-                eligible_peers,
-                num_peers_to_dial,
+                regular_peers,
+                num_remaining,
                 self.discovered_peers.clone(),
             )
         } else {
             // Choose the peers randomly
-            selection::choose_peers_to_dial_randomly(eligible_peers, num_peers_to_dial)
-        }
+            selection::choose_peers_to_dial_randomly(regular_peers, num_remaining)
+        };
+
+        fallback_peers.into_iter().chain(regular_selected).collect()
     }
 
     /// Pings the eligible peers to calculate their ping latencies
@@ -738,7 +785,7 @@ where
         &'a mut self,
         peer_id: PeerId,
         peer: DiscoveredPeer,
-        pending_dials: &'a mut FuturesUnordered<BoxFuture<'static, PeerId>>,
+        pending_dials: &'a mut FuturesUnordered<BoxFuture<'static, (PeerId, bool)>>,
     ) {
         // If we're attempting to dial a Peer we must not be connected to it. This ensures that
         // newly eligible, but not connected to peers, have their counter initialized properly.
@@ -807,9 +854,12 @@ where
                 },
                 _ = cancel_rx.fuse() => DialResult::Cancelled,
             };
+            let dial_failed = matches!(dial_result, DialResult::Failed(_));
             log_dial_result(network_context, peer_id, addr, dial_result);
-            // Send peer_id as future result so it can be removed from dial queue.
-            peer_id
+            // Return the peer_id and whether the dial failed so the caller
+            // can remove the peer from the dial queue and immediately retry
+            // the next address on failure (e.g., fall back to VFN address).
+            (peer_id, dial_failed)
         };
         pending_dials.push(f.boxed());
 
@@ -825,7 +875,7 @@ where
     // incarnations.
     async fn check_connectivity<'a>(
         &'a mut self,
-        pending_dials: &'a mut FuturesUnordered<BoxFuture<'static, PeerId>>,
+        pending_dials: &'a mut FuturesUnordered<BoxFuture<'static, (PeerId, bool)>>,
     ) {
         trace!(
             NetworkSchema::new(&self.network_context),
@@ -997,6 +1047,9 @@ where
                 if let Some(dial_state) = self.dial_states.get_mut(&peer_id) {
                     *dial_state = DialState::new(self.backoff_strategy.clone());
                 }
+                // Addresses changed, so the dial state is reset to addr[0].
+                // Any pending fallback entry is now stale (it pointed to addr[1]+).
+                self.pending_fallbacks.remove(&peer_id);
             }
         }
 
@@ -1035,6 +1088,7 @@ where
                 // Cancel possible queued dial to this peer.
                 self.dial_states.remove(&peer_id);
                 self.dial_queue.remove(&peer_id);
+                self.pending_fallbacks.remove(&peer_id);
             },
             peer_manager::ConnectionNotification::LostPeer(metadata, _network_id) => {
                 let peer_id = metadata.remote_peer_id;
