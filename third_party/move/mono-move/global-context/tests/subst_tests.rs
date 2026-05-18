@@ -96,7 +96,7 @@ fn nominal_substitutes_ty_args() {
     );
 
     // The substituted nominal must structurally be a Nominal with the same
-    // executable_id / name.
+    // module ID and name.
     match view_type(out) {
         Type::Nominal {
             module_id: out_eid,

@@ -36,7 +36,7 @@ use crate::maintenance_config::MaintenanceConfig;
 use anyhow::{bail, Result};
 use dashmap::DashMap;
 use mono_move_alloc::{GlobalArenaPool, GlobalArenaPtr, GlobalArenaShard};
-use mono_move_core::{types::NominalLayout, ExecutableId, Interner};
+use mono_move_core::{types::NominalLayout, Interner, ModuleId};
 use move_binary_format::{file_format::SignatureToken, CompiledModule};
 use parking_lot::{RwLock, RwLockReadGuard, RwLockWriteGuard};
 use std::{
@@ -49,7 +49,7 @@ use std::{
 mod identifiers;
 use identifiers::IdentifierInternerKey;
 mod module_ids;
-use module_ids::ExecutableIdInternerKey;
+use module_ids::ModuleIdInternerKey;
 mod loaded_module;
 pub use loaded_module::{
     FunctionSlot, LoadedModule, LoadedModuleSlot, ModuleMandatoryDependencies, ModuleSlot,
@@ -98,7 +98,7 @@ pub struct GlobalContext {
 /// data is allocated is kept separately.
 struct Context {
     identifiers: DashMap<IdentifierInternerKey, InternedIdentifier, ahash::RandomState>,
-    module_ids: DashMap<ExecutableIdInternerKey, InternedModuleId, ahash::RandomState>,
+    module_ids: DashMap<ModuleIdInternerKey, InternedModuleId, ahash::RandomState>,
     types: DashMap<TypeInternerKey, InternedType, ahash::RandomState>,
     type_lists: DashMap<TypeListInternerKey, InternedTypeList, ahash::RandomState>,
     module_cache: ModuleCache,
@@ -312,7 +312,7 @@ impl<'ctx> ExecutionGuard<'ctx> {
     /// reference tied to the guard's lifetime, if found.
     pub fn get_module<'guard>(
         &'guard self,
-        key: ArenaRef<'guard, ExecutableId>,
+        key: ArenaRef<'guard, ModuleId>,
     ) -> Option<&'guard LoadedModule> {
         let ptr = self.ctx.module_cache.get(key.into_global_arena_ptr())?;
 
@@ -327,7 +327,7 @@ impl<'ctx> ExecutionGuard<'ctx> {
     /// shard write lock on the create path.
     pub fn get_or_create_module_slot<'guard>(
         &'guard self,
-        key: ArenaRef<'guard, ExecutableId>,
+        key: ArenaRef<'guard, ModuleId>,
     ) -> LoadedModuleSlot {
         self.ctx
             .module_cache
@@ -339,7 +339,7 @@ impl<'ctx> ExecutionGuard<'ctx> {
     pub fn arena_ref_for_module_id<'guard>(
         &'guard self,
         ptr: InternedModuleId,
-    ) -> ArenaRef<'guard, ExecutableId>
+    ) -> ArenaRef<'guard, ModuleId>
     where
         'ctx: 'guard,
     {
