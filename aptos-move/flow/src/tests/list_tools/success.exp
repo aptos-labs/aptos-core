@@ -258,5 +258,56 @@
       "readOnlyHint": false,
       "destructiveHint": true
     }
+  },
+  {
+    "name": "move_replay_transaction",
+    "description": "Replay a committed on-chain transaction locally to debug its outcome. Supports optional local Move package overrides.",
+    "inputSchema": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "title": "MoveReplayTransactionParams",
+      "type": "object",
+      "properties": {
+        "txn_id": {
+          "description": "The committed transaction version (ledger version) to replay.",
+          "type": "integer",
+          "format": "uint64",
+          "minimum": 0
+        },
+        "network": {
+          "description": "Network: \"mainnet\" | \"testnet\" | \"devnet\" | a REST endpoint URL.",
+          "type": "string"
+        },
+        "local_package_paths": {
+          "description": "Optional: paths to local Move packages whose modules override\nthe on-chain versions during replay. Each path must contain Move.toml.",
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "default": []
+        },
+        "named_addresses": {
+          "description": "Optional: named-address bindings for compiling local packages.\nMaps \"name\" → \"0xADDR\". Only used when local_package_paths is non-empty.",
+          "type": "object",
+          "additionalProperties": {
+            "type": "string"
+          },
+          "default": {}
+        },
+        "node_api_key": {
+          "description": "Optional: API key sent as `Authorization: Bearer <key>`.",
+          "type": "string",
+          "default": null,
+          "nullable": true
+        }
+      },
+      "required": [
+        "txn_id",
+        "network"
+      ]
+    },
+    "annotations": {
+      "readOnlyHint": true,
+      "destructiveHint": false
+    }
   }
 ]
