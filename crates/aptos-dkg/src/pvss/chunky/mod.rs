@@ -27,6 +27,7 @@ pub use subtranscript::Subtranscript as WeightedSubtranscript;
 pub use verify_common::SokContext;
 pub use weighted_transcript::Transcript as UnsignedWeightedTranscript;
 pub use weighted_transcript_v2::Transcript as UnsignedWeightedTranscriptv2;
+/// MaxBcsSize(E=Bls12_381): 818 + 32·n + 120·W + 24·max_w + 128·(W + max_w)·c + 80·ell.
 #[allow(type_alias_bounds)]
 pub type SignedWeightedTranscript<E: Pairing> = GenericSigning<UnsignedWeightedTranscript<E>>;
 #[allow(type_alias_bounds)]

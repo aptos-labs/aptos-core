@@ -42,16 +42,25 @@ use sigma_protocol::homomorphism::TrivialShape as HkzgCommitment;
 use std::time::{Duration, Instant};
 use std::{fmt::Debug, io::Write};
 
+/// ArkSize(E=Bls12_381): 385 + 80·ell.
 #[allow(non_snake_case)]
 #[derive(CanonicalSerialize, CanonicalDeserialize, Debug, Clone, PartialEq, Eq)]
 pub struct Proof<E: Pairing> {
+    /// ArkSize(E=Bls12_381): 48.
     hat_C: E::G1Affine,
+    /// ArkSize(E=Bls12_381): 113.
     pi_PoK: sigma_protocol::Proof<E::ScalarField, two_term_msm::Homomorphism<E::G1>>,
-    Cs: Vec<E::G1Affine>, // has length ell
+    /// ArkSize(E=Bls12_381): 8 + 48·ell.
+    Cs: Vec<E::G1Affine>,
+    /// ArkSize(E=Bls12_381): 48.
     D: E::G1Affine,
+    /// ArkSize(E=Bls12_381): 32.
     a: E::ScalarField,
+    /// ArkSize(E=Bls12_381): 32.
     a_h: E::ScalarField,
-    a_js: Vec<E::ScalarField>, // has length ell
+    /// ArkSize(E=Bls12_381): 8 + 32·ell.
+    a_js: Vec<E::ScalarField>,
+    /// ArkSize(E=Bls12_381): 96.
     pi_gamma: univariate_hiding_kzg::OpeningProof<E>,
 }
 
@@ -1263,11 +1272,14 @@ pub mod two_term_msm {
         pub base_2: C::Affine,
     }
 
+    /// ArkSize(F=Bls12_381::Fr): 64.
     #[derive(
         SigmaProtocolWitness, CanonicalSerialize, CanonicalDeserialize, Clone, Debug, PartialEq, Eq,
     )]
     pub struct Witness<F: PrimeField> {
+        /// ArkSize(F=Bls12_381::Fr): 32.
         pub poly_randomness: Scalar<F>,
+        /// ArkSize(F=Bls12_381::Fr): 32.
         pub hiding_kzg_randomness: Scalar<F>,
     }
 

@@ -67,27 +67,37 @@ use serde::{Deserialize, Serialize};
 pub const DST: &[u8; 39] = b"APTOS_WEIGHTED_CHUNKY_FIELD_PVSS_FS_DST";
 
 /// Weighted chunky PVSS transcript.
+///
+/// MaxBcsSize(P=Bls12_381): 706 + 32·n + 120·W + 24·max_w + 128·(W + max_w)·c + 80·ell.
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq)]
 pub struct Transcript<P: Pairing> {
+    /// MaxBcsSize: 8.
     dealer: Player,
-    /// This is the aggregatable subtranscript
+    /// The aggregatable subtranscript.
+    /// ArkSize(P=Bls12_381): 120 + 16·n + 104·W + 8·max_w + 48·(W + max_w)·c.
     #[serde(serialize_with = "ark_se", deserialize_with = "ark_de")]
     // Even though `Subtranscript` implements serde, we need this attribute macro because `Pairing` does not implement serde
     pub subtrs: Subtranscript<P>,
     /// Proof (of knowledge) showing that the s_{i,j}'s in C are base-B representations (of the s_i's in V, but this is not part of the proof), and that the r_j's in R are used in C
+    /// ArkSize(P=Bls12_381): 546 + 16·(n + W + max_w) + 80·(W + max_w)·c + 80·ell.
     #[serde(serialize_with = "ark_se", deserialize_with = "ark_de")]
     pub sharing_proof: SharingProof<P>,
 }
 
 /// Proof that chunked ciphertexts and commitments are consistent (SoK + batched range proof).
+///
+/// ArkSize(E=Bls12_381): 546 + 16·(n + W + max_w) + 80·(W + max_w)·c + 80·ell.
 #[allow(non_snake_case)]
 #[derive(CanonicalSerialize, CanonicalDeserialize, Clone, Debug, PartialEq, Eq)]
 pub struct SharingProof<E: Pairing> {
-    /// SoK: the SK is knowledge of `witnesses` s_{i,j} yielding the commitment and the C and the R, their image is the PK, and the signed message is a certain context `cntxt`
+    /// SoK: the SK is knowledge of `witnesses` s_{i,j} yielding the commitment and the C and the R, their image is the PK, and the signed message is a certain context `cntxt`.
+    /// ArkSize(E=Bls12_381): 113 + 16·(n + W + max_w) + 80·(W + max_w)·c.
     pub SoK: sigma_protocol::Proof<E::ScalarField, hkzg_chunked_elgamal::Homomorphism<'static, E>>, // static because we don't want the lifetime of the Proof to depend on the Homomorphism
-    /// A batched range proof showing that all committed values s_{i,j} lie in some range
+    /// A batched range proof showing that all committed values s_{i,j} lie in some range.
+    /// ArkSize(E=Bls12_381): 385 + 80·ell.
     pub range_proof: dekart_univariate_v2::Proof<E>,
-    /// A KZG-style commitment to the values s_{i,j} going into the range proof
+    /// A KZG-style commitment to the values s_{i,j} going into the range proof.
+    /// ArkSize(E=Bls12_381): 48.
     pub range_proof_commitment:
         <dekart_univariate_v2::Proof<E> as BatchedRangeProof<E>>::CommitmentNormalised,
 }
