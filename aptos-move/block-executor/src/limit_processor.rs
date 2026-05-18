@@ -125,9 +125,7 @@ impl<T: Transaction> BlockGasLimitProcessor<T> {
             self.block_gas_limit_override,
             self.block_gas_limit_type.block_gas_limit(),
         ) {
-            (Some(override_limit), Some(onchain_limit)) => {
-                Some(override_limit.min(onchain_limit))
-            },
+            (Some(override_limit), Some(onchain_limit)) => Some(override_limit.min(onchain_limit)),
             (Some(override_limit), None) => Some(override_limit),
             (None, onchain_limit) => onchain_limit,
         }
