@@ -1,0 +1,12 @@
+---
+remote_endpoint: ~
+name: "resume-confidential-assets"
+proposals:
+  - name: step_1_resume_confidential_assets
+    metadata:
+      title: "Resume confidential assets"
+      description: "Lifts the emergency pause on confidential assets"
+      discussion_url: "https://github.com/aptos-foundation/AIPs/discussions/<?>"
+    execution_mode: MultiStep
+    update_sequence:
+      - RawScript: aptos-move/aptos-release-builder/data/proposals/resume_confidential_assets.move
