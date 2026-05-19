@@ -54,7 +54,7 @@ use futures::{
 use futures_util::future::join_all;
 use itertools::Itertools;
 use ordered_float::OrderedFloat;
-use rand_latest::Rng;
+use rand_latest::prelude::SliceRandom;
 use serde::Serialize;
 use std::{
     cmp::{min, Ordering},
@@ -134,6 +134,8 @@ pub struct ConnectivityManager<TBackoff> {
     access_control_policy: Option<Arc<AccessControlPolicy>>,
     /// The minimum number of dial attempts before a peer is put into backoff mode
     num_dials_before_backoff: usize,
+    /// The maximum number of addresses to ping in parallel per peer (for latency aware dialing)
+    max_parallel_peer_latency_pings: usize,
 }
 
 /// Different sources for peer addresses, ordered by priority (Onchain=highest,
@@ -279,9 +281,15 @@ impl DiscoveredPeer {
         self.dial_count = self.dial_count.saturating_add(1);
     }
 
-    /// Updates the ping latency for this peer
+    /// Updates the ping latency for this peer, keeping the lowest observed value
+    /// so that when multiple addresses are probed in parallel the fastest is chosen.
     pub fn set_ping_latency_secs(&mut self, latency_secs: f64) {
-        self.ping_latency_secs = Some(latency_secs);
+        // Calculate the smallest latency
+        let ping_latency_secs = match self.ping_latency_secs {
+            Some(existing) => existing.min(latency_secs),
+            None => latency_secs,
+        };
+        self.ping_latency_secs = Some(ping_latency_secs);
     }
 
     /// Returns true iff this peer should be considered "recently dialed" for backoff purposes.
@@ -381,6 +389,7 @@ where
         enable_latency_aware_dialing: bool,
         access_control_policy: Option<Arc<AccessControlPolicy>>,
         num_dials_before_backoff: usize,
+        max_parallel_peer_latency_pings: usize,
     ) -> Self {
         // Verify that the trusted peers set exists and that it is empty
         let trusted_peers = peers_and_metadata
@@ -419,6 +428,7 @@ where
             enable_latency_aware_dialing,
             access_control_policy,
             num_dials_before_backoff,
+            max_parallel_peer_latency_pings,
         };
 
         // Set the initial seed config addresses and public keys
@@ -708,19 +718,21 @@ where
         let ping_start_time = Instant::now();
         let mut ping_tasks = vec![];
         for (peer_id, peer) in &peers_to_ping {
-            // Get the network address for the peer
+            // Get the network addresses for the peer
             let network_context = self.network_context;
-            let network_address = match self.dial_states.get(peer_id) {
-                Some(dial_state) => match dial_state.random_addr(&peer.addrs) {
-                    Some(network_address) => network_address.clone(),
-                    None => {
+            let network_addresses = match self.dial_states.get(peer_id) {
+                Some(dial_state) => {
+                    let addrs =
+                        dial_state.random_addrs(&peer.addrs, self.max_parallel_peer_latency_pings);
+                    if addrs.is_empty() {
                         warn!(
                             NetworkSchema::new(&network_context),
                             "Peer {} does not have a network address!",
                             peer_id.short_str()
                         );
                         continue; // Continue onto the next peer
-                    },
+                    }
+                    addrs
                 },
                 None => {
                     warn!(
@@ -732,16 +744,15 @@ where
                 },
             };
 
-            // Ping the peer
-            let ping_task = spawn_latency_ping_task(
-                network_context,
-                *peer_id,
-                network_address,
-                self.discovered_peers.clone(),
-            );
-
-            // Add the task to the list of ping tasks
-            ping_tasks.push(ping_task);
+            // Ping each address in parallel; the lowest latency result wins
+            for network_address in network_addresses {
+                ping_tasks.push(spawn_latency_ping_task(
+                    network_context,
+                    *peer_id,
+                    network_address,
+                    self.discovered_peers.clone(),
+                ));
+            }
         }
 
         // Wait for all the ping tasks to complete (or timeout)
@@ -1415,10 +1426,18 @@ where
         curr_addr
     }
 
-    /// Returns a random address to dial for this peer
-    fn random_addr<'a>(&self, addrs: &'a Addresses) -> Option<&'a NetworkAddress> {
-        let addr_index = ::rand_latest::thread_rng().gen_range(0..addrs.len());
-        self.get_addr_at_index(addr_index, addrs)
+    /// Returns up to `max_count` randomly selected addresses for this peer
+    fn random_addrs(&self, addrs: &Addresses, max_count: usize) -> Vec<NetworkAddress> {
+        let all_addrs: Vec<_> = addrs.0.iter().flatten().cloned().collect();
+        if all_addrs.is_empty() {
+            return vec![];
+        }
+
+        let num_addrs_to_select = min(max_count, all_addrs.len());
+        all_addrs
+            .choose_multiple(&mut rand_latest::thread_rng(), num_addrs_to_select)
+            .cloned()
+            .collect()
     }
 
     fn next_backoff_delay(&mut self, max_delay: Duration) -> Duration {
@@ -1432,6 +1451,7 @@ where
 mod tests {
     use super::*;
     use aptos_config::config::PeerRole;
+    use std::iter;
 
     #[test]
     fn test_has_dialed_recently_below_threshold() {
@@ -1517,5 +1537,79 @@ mod tests {
             peer.update_last_dial_time();
         }
         peer
+    }
+
+    /// Builds an `Addresses` object from a list of address strings
+    fn make_addresses(address_strings: &[&str]) -> Addresses {
+        let network_addresses: Vec<NetworkAddress> = address_strings
+            .iter()
+            .map(|raw_string| raw_string.parse().unwrap())
+            .collect();
+
+        let mut addresses = Addresses::default();
+        addresses.update(DiscoverySource::Config, network_addresses);
+        addresses
+    }
+
+    #[test]
+    fn test_random_addrs_empty() {
+        let addresses = Addresses::default();
+        let state = DialState::new(iter::repeat(Duration::ZERO));
+
+        // Requesting any addresses from an empty set should return an empty set
+        assert!(state.random_addrs(&addresses, 3).is_empty());
+    }
+
+    #[test]
+    fn test_random_addrs_capped_by_available() {
+        let addresses = make_addresses(&["/ip4/1.2.3.4/tcp/1000", "/ip4/1.2.3.5/tcp/1001"]);
+        let state = DialState::new(iter::repeat(Duration::ZERO));
+
+        // Requesting more than available returns at most len(addresses)
+        assert_eq!(state.random_addrs(&addresses, 10).len(), 2);
+    }
+
+    #[test]
+    fn test_random_addrs_capped_by_max_count() {
+        let addresses = make_addresses(&[
+            "/ip4/1.2.3.4/tcp/1000",
+            "/ip4/1.2.3.5/tcp/1001",
+            "/ip4/1.2.3.6/tcp/1002",
+        ]);
+        let state = DialState::new(std::iter::repeat(Duration::ZERO));
+
+        // Requesting a subset of available addresses should return exactly max_count addresses
+        assert_eq!(state.random_addrs(&addresses, 2).len(), 2);
+    }
+
+    #[test]
+    fn test_random_addrs_returns_subset() {
+        let address_strings = &[
+            "/ip4/1.2.3.4/tcp/1000",
+            "/ip4/1.2.3.5/tcp/1001",
+            "/ip4/1.2.3.6/tcp/1002",
+        ];
+        let network_addresses: Vec<NetworkAddress> = address_strings
+            .iter()
+            .map(|address_string| address_string.parse().unwrap())
+            .collect();
+        let addresses = make_addresses(address_strings);
+        let state = DialState::new(iter::repeat(Duration::ZERO));
+
+        // Random addrs should be a subset of the input addresses
+        let result = state.random_addrs(&addresses, 2);
+        assert_eq!(result.len(), 2);
+        for network_address in &result {
+            assert!(network_addresses.contains(network_address));
+        }
+    }
+
+    #[test]
+    fn test_set_ping_latency_keeps_minimum() {
+        let mut peer = DiscoveredPeer::new(PeerRole::ValidatorFullNode);
+        peer.set_ping_latency_secs(0.1);
+        peer.set_ping_latency_secs(0.05); // lower — should win
+        peer.set_ping_latency_secs(0.2); // higher — should be ignored
+        assert_eq!(peer.ping_latency_secs, Some(0.05));
     }
 }
