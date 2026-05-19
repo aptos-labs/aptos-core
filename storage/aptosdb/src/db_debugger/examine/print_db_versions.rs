@@ -47,7 +47,6 @@ impl Cmd {
                 /*max_num_nodes_per_lru_cache_shard=*/ 0,
                 HotStateConfig {
                     delete_on_restart: false,
-                    persist_hotness_in_write_set: false,
                     ..HotStateConfig::default()
                 },
             )?;
