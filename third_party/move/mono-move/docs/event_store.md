@@ -75,8 +75,8 @@ The Move entrypoint is `event::emit<T: store + drop>(msg: T)` (defined in `aptos
 The Event Store provides the following APIs to MonoMove's native functions:
 
 - **emit(ty, value)** — boxes the given event value, and then append it to `entries` along with its type.
-- **create_checkpoint() → Handle** — push the current entries length onto the checkpoints array; return the new marker's index.
-- **rollback(h)** — truncate the entries array back to the snapshot at `h`, then truncate the checkpoints array down to and including `h`. Orphaned boxed values and orphaned old-buffer copies become unreachable and are reclaimed at the next GC.
+- **create_checkpoint()** — push the current entries length onto the checkpoints array.
+- **rollback(n)** — pop the top `n` markers from the checkpoints array, truncating `entries` back to the snapshot at the n-th most recent marker. Counts the most recent checkpoints rather than referring to one by handle, so there's no stale-handle / ABA risk if markers are popped and later slots get reused. Orphaned boxed values and orphaned old-buffer copies become unreachable and are reclaimed at the next GC.
 - **iter** — read-only walk in emission order, used at transaction end for serialization.
 
 No explicit commit: a marker that's never rolled back to just sits in the checkpoints array (4 bytes) until transaction end.
