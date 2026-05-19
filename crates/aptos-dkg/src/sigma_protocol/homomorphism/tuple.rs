@@ -128,6 +128,8 @@ where
 ///
 /// This is necessary because Rust tuples do **not** inherit traits like `IntoIterator`,
 /// but `fixed_base_msms::CodomainShape<T>` requires them.
+///
+/// ArkSize(A=TrivialShape<Bls12_381::G1Affine>, B=chunked_elgamal::CodomainShape<Bls12_381::G1Affine>): 64 + 8·(n + W + max_w) + 48·(W + max_w)·c.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct TupleCodomainShape<A, B>(pub A, pub B);
 

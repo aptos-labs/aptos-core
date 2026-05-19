@@ -35,21 +35,26 @@ use std::iter::repeat_with;
 //
 // TODO: should probably record here how many times the subtranscript has been aggregated, since
 // it can speed up the BSGS algorithm, especially in tests
+/// ArkSize(E=Bls12_381): 120 + 16·n + 104·W + 8·max_w + 48·(W + max_w)·c.
 #[allow(non_snake_case)]
 #[derive(
     CanonicalSerialize, CanonicalDeserialize, Serialize, Deserialize, Clone, Debug, PartialEq, Eq,
 )]
 pub struct Subtranscript<E: Pairing> {
-    // The dealt public key
+    /// The dealt public key.
+    /// ArkSize(E=Bls12_381): 96.
     #[serde(serialize_with = "ark_se", deserialize_with = "ark_de")]
     pub V0: E::G2Affine,
-    // The dealt public key shares
+    /// The dealt public key shares.
+    /// ArkSize(E=Bls12_381): 8 + 8·n + 96·W.
     #[serde(serialize_with = "ark_se", deserialize_with = "ark_de")]
     pub Vs: Vec<Vec<E::G2Affine>>,
     /// First chunked ElGamal component: C[i][j] = s_{i,j} * G + r_j * ek_i. Here s_i = \sum_j s_{i,j} * B^j // TODO: change notation because B is not a group element? maybe β or radix?
+    /// ArkSize(E=Bls12_381): 8 + 8·n + 8·W + 48·W·c.
     #[serde(serialize_with = "ark_se", deserialize_with = "ark_de")]
     pub Cs: Vec<Vec<Vec<E::G1Affine>>>,
-    /// Second chunked ElGamal component: R[j] = r_j * H
+    /// Second chunked ElGamal component: R[j] = r_j * H.
+    /// ArkSize(E=Bls12_381): 8 + 8·max_w + 48·max_w·c.
     #[serde(serialize_with = "ark_se", deserialize_with = "ark_de")]
     pub Rs: Vec<Vec<E::G1Affine>>,
 }

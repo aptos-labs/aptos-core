@@ -143,6 +143,8 @@ pub trait EntrywiseMap<T>: Sized {
 // ===============================================================================
 
 /// A trivial wrapper type for a single value. Should be used to wrap when the codomain of a homomorphism is something like E::G1
+///
+/// ArkSize(T=Bls12_381::G1Affine): 48.
 #[derive(CanonicalSerialize, CanonicalDeserialize, Clone, Debug, PartialEq, Eq)]
 pub struct TrivialShape<T: CanonicalSerialize + CanonicalDeserialize + Clone + Debug + Eq>(pub T);
 

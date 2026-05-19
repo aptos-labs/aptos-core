@@ -14,8 +14,8 @@ use crate::parser::PrintSection;
 use anyhow::{anyhow, Result};
 use mono_move_core::{
     interner::{InternedIdentifier, InternedModuleId},
-    types::{FieldLayout, InternedType},
-    FieldTypes,
+    types::{FieldLayout, InternedType, InternedTypeList, EMPTY_TYPE_LIST},
+    FieldTypes, Interner,
 };
 use mono_move_global_context::ExecutionGuard;
 use move_binary_format::{access::ModuleAccess, CompiledModule};
@@ -99,16 +99,22 @@ pub fn format_micro_ops(guard: &ExecutionGuard<'_>, module_ir: &ModuleIR) -> Str
 
     for func_ir in module_ir.functions.iter().flatten() {
         let func_name = module.identifier_at(func_ir.name_idx).to_string();
-        if let Err(e) =
-            try_set_lowering_requirements_for_function(&mut loader_ctx, module_ir, func_ir)
-        {
+        if let Err(e) = try_set_lowering_requirements_for_function(
+            &mut loader_ctx,
+            module_ir,
+            func_ir,
+            // TODO: we render only at publish time, so there is no way to
+            //  render instantiated generics. Figure out what is the best
+            //  way to print their code.
+            EMPTY_TYPE_LIST,
+        ) {
             out.push_str(&format!(
                 "\nfun {}(): skipped (cannot set lowering requirements: {})\n",
                 func_name, e
             ));
             continue;
         }
-        match try_build_context(module_ir, func_ir) {
+        match try_build_context(module_ir, func_ir, EMPTY_TYPE_LIST, guard) {
             Err(e) => {
                 out.push_str(&format!(
                     "\nfun {}(): skipped (context: {})\n",
@@ -178,5 +184,9 @@ impl SpecializerContext for SnapshotLoaderContext<'_, '_, '_> {
         fields: Option<&[FieldLayout]>,
     ) -> Result<()> {
         self.guard.set_nominal_layout(ty, size, align, fields)
+    }
+
+    fn subst_type(&self, ty: InternedType, ty_args: InternedTypeList) -> Result<InternedType> {
+        self.guard.subst_type(ty, ty_args)
     }
 }

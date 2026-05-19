@@ -5,22 +5,10 @@
 
 use mono_move_alloc::GlobalArenaPtr;
 use mono_move_core::{
-    types::EMPTY_TYPE_LIST, Code, CodeOffset as CO, DescriptorId, ExecutableId, FrameLayoutInfo,
-    FrameOffset as FO, Function, MicroOp, SortedSafePointEntries,
+    Code, CodeOffset as CO, DescriptorId, FrameLayoutInfo, FrameOffset as FO, Function, MicroOp,
+    SortedSafePointEntries,
 };
 use mono_move_runtime::{verify_function, ObjectDescriptor, ObjectDescriptorTable};
-use move_core_types::account_address::AccountAddress;
-
-static VERIFIER_TEST_MODULE_ID_STORAGE: ExecutableId = unsafe {
-    // SAFETY: the backing `&'static str` outlives the program; the
-    // resulting `GlobalArenaPtr<str>` is valid for that lifetime.
-    ExecutableId::new(
-        AccountAddress::ONE,
-        GlobalArenaPtr::from_static("verifier_test"),
-    )
-};
-const VERIFIER_TEST_MODULE_ID: GlobalArenaPtr<ExecutableId> =
-    GlobalArenaPtr::from_static(&VERIFIER_TEST_MODULE_ID_STORAGE);
 
 fn trivial_descriptors() -> ObjectDescriptorTable {
     let mut t = ObjectDescriptorTable::new();
@@ -192,18 +180,11 @@ fn frame_bounds_fat_ptr_write() {
 }
 
 #[test]
-fn frame_bounds_callfunc_metadata() {
+fn frame_bounds_extended_frame_too_small() {
     use MicroOp::*;
     let func = Function {
         name: GlobalArenaPtr::from_static("test"),
-        code: Code::from_vec(vec![
-            CallIndirect {
-                module_id: VERIFIER_TEST_MODULE_ID,
-                func_name: GlobalArenaPtr::from_static("fn_1"),
-                ty_args: EMPTY_TYPE_LIST,
-            },
-            Return,
-        ]),
+        code: Code::from_vec(vec![Return]),
         param_sizes: vec![],
         param_and_local_sizes_sum: 8,
         extended_frame_size: 16, // param_and_local_sizes_sum 8 + 24 = 32 > 16
@@ -350,37 +331,6 @@ fn invalid_conditional_jump_target() {
     let errors = verify_function(&func, &trivial_descriptors());
     assert!(!errors.is_empty());
     assert!(errors.iter().any(|e| e.message.contains("jump target")));
-}
-
-// ---------------------------------------------------------------------------
-// Invalid cross-function references
-// ---------------------------------------------------------------------------
-
-#[test]
-#[ignore]
-fn invalid_callfunc_func_id() {
-    use MicroOp::*;
-    let func = Function {
-        name: GlobalArenaPtr::from_static("test"),
-        code: Code::from_vec(vec![
-            CallIndirect {
-                module_id: VERIFIER_TEST_MODULE_ID,
-                func_name: GlobalArenaPtr::from_static("fn_42"),
-                ty_args: EMPTY_TYPE_LIST,
-            },
-            Return,
-        ]),
-        param_sizes: vec![],
-        param_sizes_sum: 0,
-        param_and_local_sizes_sum: 0,
-        extended_frame_size: 32,
-        zero_frame: false,
-        frame_layout: FrameLayoutInfo::empty(),
-        safe_point_layouts: SortedSafePointEntries::empty(),
-    };
-    let errors = verify_function(&func, &trivial_descriptors());
-    assert!(!errors.is_empty());
-    assert!(errors.iter().any(|e| e.message.contains("func_id")));
 }
 
 // ---------------------------------------------------------------------------

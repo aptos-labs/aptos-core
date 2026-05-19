@@ -72,10 +72,15 @@ impl<'a, C: CurveGroup> CanonicalSerialize for Homomorphism<'a, C> {
 }
 
 /// This struct is used as `CodomainShape<T>`, but the same layout also applies to the `Witness` type.
+///
+/// ArkSize(T=Bls12_381::G1Affine): 16 + 8·(n + W + max_w) + 48·(W + max_w)·c.
 #[derive(CanonicalSerialize, CanonicalDeserialize, Clone, Debug, PartialEq, Eq)]
 pub struct CodomainShape<T: CanonicalSerialize + CanonicalDeserialize + Clone> {
-    pub chunks: Vec<Vec<Vec<T>>>, // Depending on T these can be chunked ciphertexts, or their MSM representations
-    pub randomness: Vec<Vec<T>>,  // Same story, depending on T
+    /// Chunked ciphertexts or their MSM representations, depending on T.
+    /// ArkSize(T=Bls12_381::G1Affine): 8 + 8·n + 8·W + 48·W·c.
+    pub chunks: Vec<Vec<Vec<T>>>,
+    /// ArkSize(T=Bls12_381::G1Affine): 8 + 8·max_w + 48·max_w·c.
+    pub randomness: Vec<Vec<T>>,
 }
 
 // Witness shape happens to be identical to CodomainShape, this is mostly coincidental

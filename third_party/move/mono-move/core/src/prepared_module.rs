@@ -5,15 +5,16 @@
 
 use crate::{
     interner::{InternedIdentifier, InternedModuleId, Interner},
-    types::{InternedType, EMPTY_TYPE_LIST},
+    types::{InternedType, InternedTypeList, EMPTY_TYPE_LIST},
 };
 use anyhow::{bail, Result};
 use move_binary_format::{
     access::ModuleAccess,
     file_format::{
-        ConstantPoolIndex, FieldHandleIndex, IdentifierIndex, ModuleHandleIndex, SignatureIndex,
-        SignatureToken, StructDefinitionIndex, StructFieldInformation, StructHandle,
-        StructHandleIndex, VariantFieldHandleIndex, VariantIndex,
+        ConstantPoolIndex, FieldHandleIndex, FunctionHandleIndex, FunctionInstantiationIndex,
+        IdentifierIndex, ModuleHandleIndex, SignatureIndex, SignatureToken, StructDefinitionIndex,
+        StructFieldInformation, StructHandle, StructHandleIndex, VariantFieldHandleIndex,
+        VariantIndex,
     },
     CompiledModule,
 };
@@ -60,6 +61,43 @@ pub struct PreparedModule {
     /// Indexed by [`ModuleHandleIndex`]. Self-handle resolves to the same id
     /// as [`Self::id`].
     module_ids: Vec<InternedModuleId>,
+    /// Parameter and return types for every function handle referenced in
+    /// the module. For a generic function, these may contain [`Type::TypeParam`]
+    /// nodes referencing the function's own type parameters — they are not
+    /// guaranteed to be fully concrete.
+    ///
+    /// Indexed by [`FunctionHandleIndex`].
+    function_signatures: Vec<FunctionSignature>,
+    /// Parameter and return types, as well as type arguments, for every
+    /// function instantiation in this module. The type arguments have been
+    /// applied to the underlying handle's params/returns. They may still
+    /// contain [`Type::TypeParam`] nodes referencing type parameters of the
+    /// *enclosing* (caller) function — substitution here only resolves the
+    /// call site's own type arguments, not the caller's free type parameters.
+    ///
+    /// Indexed by [`FunctionInstantiationIndex`].
+    function_instantiation_signatures: Vec<FunctionInstantiationSignature>,
+}
+
+/// Parameter and return types of a function handle, interned. Note that for a
+/// generic function these may contain free type parameters of the function
+/// itself, and are therefore not necessarily fully concrete.
+#[derive(Clone, Copy)]
+pub struct FunctionSignature {
+    pub params: InternedTypeList,
+    pub returns: InternedTypeList,
+}
+
+/// Parameter and return types of a function instantiation, together with the
+/// type arguments applied at the call site. The type arguments have already
+/// been substituted into `params` and `returns`. The result may still contain
+/// free type parameters of the enclosing function, so this is not guaranteed
+/// to be fully concrete either.
+#[derive(Clone, Copy)]
+pub struct FunctionInstantiationSignature {
+    pub params: InternedTypeList,
+    pub returns: InternedTypeList,
+    pub ty_args: InternedTypeList,
 }
 
 /// Field types of any struct or enum definition in this module.
@@ -186,6 +224,21 @@ impl PreparedModule {
         self.interned_identifiers[idx.0 as usize]
     }
 
+    /// Returns parameter and return types for the given function handle.
+    pub fn function_signature_at(&self, idx: FunctionHandleIndex) -> FunctionSignature {
+        self.function_signatures[idx.0 as usize]
+    }
+
+    /// Returns parameter and return types, as well as type arguments for the
+    /// given function instantiation. Parameters and returns have already
+    /// been substituted under type arguments.
+    pub fn function_instantiation_signature_at(
+        &self,
+        idx: FunctionInstantiationIndex,
+    ) -> FunctionInstantiationSignature {
+        self.function_instantiation_signatures[idx.0 as usize]
+    }
+
     /// Builds resolved module from compiled one, interning all signatures,
     /// field and constant types.
     pub fn build(module: CompiledModule, interner: &impl Interner) -> Result<Self> {
@@ -284,6 +337,31 @@ impl PreparedModule {
             .map(|c| intern_sig_token(&c.type_, &module, interner))
             .collect::<Result<Vec<_>>>()?;
 
+        let function_signatures = module
+            .function_handles()
+            .iter()
+            .map(|h| FunctionSignature {
+                params: interner.type_list_of(&signatures[h.parameters.0 as usize]),
+                returns: interner.type_list_of(&signatures[h.return_.0 as usize]),
+            })
+            .collect::<Vec<_>>();
+
+        let function_instantiation_signatures = module
+            .function_instantiations()
+            .iter()
+            .map(|inst| {
+                let handle_sig = function_signatures[inst.handle.0 as usize];
+                let ty_args = interner.type_list_of(&signatures[inst.type_parameters.0 as usize]);
+                let params = interner.subst_type_list(handle_sig.params, ty_args)?;
+                let returns = interner.subst_type_list(handle_sig.returns, ty_args)?;
+                Ok(FunctionInstantiationSignature {
+                    params,
+                    returns,
+                    ty_args,
+                })
+            })
+            .collect::<Result<Vec<_>>>()?;
+
         Ok(Self {
             module,
             id,
@@ -294,6 +372,8 @@ impl PreparedModule {
             constant_types,
             interned_identifiers,
             module_ids,
+            function_signatures,
+            function_instantiation_signatures,
         })
     }
 }

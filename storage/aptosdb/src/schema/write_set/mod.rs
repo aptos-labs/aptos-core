@@ -22,7 +22,7 @@ use aptos_schemadb::{
 use aptos_types::{
     state_store::state_key::StateKey,
     transaction::Version,
-    write_set::{HotStateOp, ValueWriteSet, WriteSet, WriteSetV0},
+    write_set::{HotStateOp, WriteSet, WriteSetV0},
 };
 use byteorder::{BigEndian, ReadBytesExt};
 use serde::{Deserialize, Serialize};
@@ -41,12 +41,12 @@ impl KeyCodec<WriteSetSchema> for Version {
     }
 }
 
-/// Storage-only serialization format for `WriteSet`. Separate from `ValueWriteSet` so that the
-/// `BCSCryptoHash` (which goes through `WriteSet::Serialize` → `ValueWriteSet`) is not affected
-/// for now.
+/// Storage-only serialization format for `WriteSet`. Separate from `WriteSet` itself so that the
+/// `BCSCryptoHash` (which goes through `WriteSet::Serialize` → `WriteSet::V0` layout) is not
+/// affected for now.
 #[derive(Serialize, Deserialize)]
 enum PersistedWriteSet {
-    /// Legacy format: identical BCS layout to `ValueWriteSet::V0`.
+    /// Legacy format: identical BCS layout to `WriteSet::V0`'s payload.
     V0(WriteSetV0),
     /// Extended format that also persists the set of hot state keys.
     V1 {
@@ -69,7 +69,7 @@ pub(crate) fn encode_write_set(
         };
         bcs::to_bytes(&persisted)
     } else {
-        // Delegates to WriteSet::Serialize → ValueWriteSet → V0 layout.
+        // Delegates to WriteSet::Serialize → WriteSet::V0 layout.
         bcs::to_bytes(write_set)
     }
 }
@@ -77,14 +77,17 @@ pub(crate) fn encode_write_set(
 /// Decode a `WriteSet` from storage, handling both V0 (legacy) and V1 (with hotness) formats.
 fn decode_write_set(data: &[u8]) -> bcs::Result<WriteSet> {
     match bcs::from_bytes(data)? {
-        PersistedWriteSet::V0(ws_v0) => Ok(WriteSet::new_from_value(ValueWriteSet::V0(ws_v0))),
-        PersistedWriteSet::V1 { value, hotness } => Ok(WriteSet::new_from_value_with_hotness(
-            ValueWriteSet::V0(value),
-            hotness
-                .into_iter()
-                .map(|key| (key, HotStateOp::make_hot()))
-                .collect(),
-        )),
+        PersistedWriteSet::V0(ws_v0) => Ok(WriteSet::V0(ws_v0)),
+        PersistedWriteSet::V1 { value, hotness } => {
+            let mut ws = WriteSet::V0(value);
+            ws.add_hotness(
+                hotness
+                    .into_iter()
+                    .map(|key| (key, HotStateOp::make_hot()))
+                    .collect(),
+            );
+            Ok(ws)
+        },
     }
 }
 
