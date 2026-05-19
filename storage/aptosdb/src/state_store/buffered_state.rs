@@ -1,111 +1,68 @@
 // Copyright (c) Aptos Foundation
 // Licensed pursuant to the Innovation-Enabling Source Code License, available at https://github.com/aptos-labs/aptos-core/blob/main/LICENSE
 
-//! This file defines state store buffered state that has been committed.
+//! Main-state buffered state. Thin façade over the generic
+//! [`crate::common::BufferedState`] — the only state-specific piece
+//! still here is [`HotStateAccumulator`], which provides the
+//! pre/post-checkpoint hot-state accumulation that gets folded into
+//! each [`SnapshotToCommit`].
 
 use crate::{
+    common::{spawn_commit_pipeline, BufferedStateCore, BufferedStateExtras},
     metrics::{LATEST_CHECKPOINT_VERSION, OTHER_TIMERS_SECONDS},
     state_store::{
         persisted_state::PersistedState,
-        state_snapshot_committer::{SnapshotToCommit, StateSnapshotCommitter},
+        state_merkle_batch_committer::StateMerkleBatchCommitter,
+        state_snapshot_committer::{
+            merklize_main_state, SnapshotToCommit, STATE_BATCH_CHANNEL_SIZE,
+        },
         StateDb,
     },
 };
 use aptos_infallible::Mutex;
 use aptos_metrics_core::TimerHelper;
-use aptos_storage_interface::{
-    state_store::{
-        empty_hot_state_updates,
-        state_with_summary::{LedgerStateWithSummary, StateWithSummary},
-        HotStateShardUpdates, HotStateUpdates,
-    },
-    Result,
+use aptos_storage_interface::state_store::{
+    empty_hot_state_updates,
+    state_with_summary::{LedgerStateWithSummary, StateWithSummary},
+    HotStateShardUpdates, HotStateUpdates,
 };
 use aptos_types::{state_store::NUM_STATE_SHARDS, transaction::Version};
 use itertools::Itertools;
-use std::{
-    sync::{
-        mpsc,
-        mpsc::{Sender, SyncSender},
-        Arc, MutexGuard,
-    },
-    thread::JoinHandle,
-};
+use std::sync::Arc;
 
 pub(crate) const ASYNC_COMMIT_CHANNEL_BUFFER_SIZE: u64 = 1;
 pub(crate) const TARGET_SNAPSHOT_INTERVAL_IN_VERSION: u64 = 100_000;
 
-/// BufferedState manages a range of recent state checkpoints and asynchronously commits
-/// the updates in batches.
-#[derive(Debug)]
-pub struct BufferedState {
-    /// the current state and the last checkpoint. shared with outside world.
-    current_state: Arc<Mutex<LedgerStateWithSummary>>,
-    /// The most recent checkpoint sent for persistence, not guaranteed to have committed already.
-    last_snapshot: StateWithSummary,
-    /// channel to send a checkpoint for persistence asynchronously
-    state_commit_sender: SyncSender<CommitMessage<SnapshotToCommit>>,
-    /// Estimated number of items in the buffer.
-    estimated_items: usize,
-    /// The target number of items in the buffer between commits.
-    target_items: usize,
-    /// Hot state updates covering `[last_snapshot, current_state.last_checkpoint()]`.
-    /// Drained into the committer on every snapshot flush.
-    pending_hot_state_updates: [HotStateShardUpdates; NUM_STATE_SHARDS],
-    /// Hot state updates covering `(current_state.last_checkpoint(), current_state.latest()]`.
-    /// Folded into `pending_hot_state_updates` once a later chunk advances the checkpoint past
-    /// them.
-    post_checkpoint_hot_state_updates: [HotStateShardUpdates; NUM_STATE_SHARDS],
-    join_handle: Option<JoinHandle<()>>,
+/// Buffered state for main state. Composes the shared generic with
+/// [`HotStateAccumulator`] for the per-pipeline hot-state extras.
+pub type BufferedState = crate::common::BufferedState<
+    LedgerStateWithSummary,
+    StateWithSummary,
+    SnapshotToCommit,
+    HotStateAccumulator,
+>;
+
+/// Hot-state pre/post-checkpoint accumulator. Implements
+/// [`BufferedStateExtras`] for main state so that the snapshot
+/// committer receives the right `hot_state_updates` bundled into each
+/// [`SnapshotToCommit`].
+///
+/// Two buckets:
+/// - `pending`: hot-state updates covering `(last_snapshot, current.last_checkpoint()]`.
+///   Drained into the payload on every snapshot flush.
+/// - `post_checkpoint`: hot-state updates covering
+///   `(current.last_checkpoint(), current.latest()]`. Folded into
+///   `pending` once a later chunk advances the checkpoint past them.
+pub struct HotStateAccumulator {
+    pending: [HotStateShardUpdates; NUM_STATE_SHARDS],
+    post_checkpoint: [HotStateShardUpdates; NUM_STATE_SHARDS],
 }
 
-pub(crate) enum CommitMessage<T> {
-    Data(T),
-    Sync(Sender<()>),
-    Exit,
-}
-
-impl BufferedState {
-    pub(crate) fn new_at_snapshot(
-        state_db: &Arc<StateDb>,
-        last_snapshot: StateWithSummary,
-        target_items: usize,
-        out_current_state: Arc<Mutex<LedgerStateWithSummary>>,
-        out_persisted_state: PersistedState,
-    ) -> Self {
-        let (state_commit_sender, state_commit_receiver) =
-            mpsc::sync_channel(ASYNC_COMMIT_CHANNEL_BUFFER_SIZE as usize);
-        let arc_state_db = Arc::clone(state_db);
-        *out_current_state.lock() =
-            LedgerStateWithSummary::new_at_checkpoint(last_snapshot.clone());
-        out_persisted_state.hack_reset(last_snapshot.clone());
-
-        let persisted_state_clone = out_persisted_state.clone();
-        let last_snapshot_clone = last_snapshot.clone();
-        // Create a new thread with receiver subscribing to state commit changes
-        let join_handle = std::thread::Builder::new()
-            .name("state-committer".to_string())
-            .spawn(move || {
-                let committer = StateSnapshotCommitter::new(
-                    arc_state_db,
-                    state_commit_receiver,
-                    last_snapshot_clone,
-                    persisted_state_clone,
-                );
-                committer.run();
-            })
-            .expect("Failed to spawn state committer thread.");
-        Self::report_last_checkpoint_version(last_snapshot.version());
+impl HotStateAccumulator {
+    pub fn new() -> Self {
         Self {
-            current_state: out_current_state.clone(),
-            last_snapshot,
-            state_commit_sender,
-            estimated_items: 0,
-            target_items,
-            pending_hot_state_updates: empty_hot_state_updates(),
-            post_checkpoint_hot_state_updates: empty_hot_state_updates(),
-            // The join handle of the async state commit thread for graceful drop.
-            join_handle: Some(join_handle),
+            pending: empty_hot_state_updates(),
+            post_checkpoint: empty_hot_state_updates(),
         }
     }
 
@@ -118,141 +75,134 @@ impl BufferedState {
             t.merge(i);
         }
     }
+}
 
-    /// This method checks whether a commit is needed based on the target_items value and the number of items in state_until_checkpoint.
-    /// If a commit is needed, it sends a CommitMessage::Data message to the StateSnapshotCommitter thread to commit the data.
-    /// If sync_commit is true, it also sends a CommitMessage::Sync message to ensure that the commit is completed before returning.
-    fn maybe_commit(&mut self, checkpoint: Option<StateWithSummary>, sync_commit: bool) {
-        if let Some(checkpoint) = checkpoint {
-            if !checkpoint.is_the_same(&self.last_snapshot)
-                && (sync_commit
-                    || self.estimated_items >= self.target_items
-                    || self.buffered_versions() >= TARGET_SNAPSHOT_INTERVAL_IN_VERSION)
-            {
-                self.enqueue_commit(checkpoint);
-            }
-        }
-
-        if sync_commit {
-            self.drain_commits();
-        }
-    }
-
-    fn current_state_locked(&self) -> MutexGuard<'_, LedgerStateWithSummary> {
-        self.current_state.lock()
-    }
-
-    fn buffered_versions(&self) -> u64 {
-        self.current_state_locked().next_version() - self.last_snapshot.next_version()
-    }
-
-    fn enqueue_commit(&mut self, checkpoint: StateWithSummary) {
-        let _timer = OTHER_TIMERS_SECONDS.timer_with(&["buffered_state___enqueue_commit"]);
-
-        let hot_state_updates = std::mem::replace(
-            &mut self.pending_hot_state_updates,
-            empty_hot_state_updates(),
-        );
-        self.state_commit_sender
-            .send(CommitMessage::Data(SnapshotToCommit {
-                snapshot: checkpoint.clone(),
-                hot_state_updates,
-            }))
-            .unwrap();
-        // n.b. if the latest state is not a (the latest) checkpoint, the items between them are
-        // not counted towards the next commit. If this becomes a concern we can count the items
-        // instead of putting it 0 here.
-        self.estimated_items = 0;
-        self.last_snapshot = checkpoint;
-    }
-
-    fn drain_commits(&mut self) {
-        let _timer = OTHER_TIMERS_SECONDS.timer_with(&["buffered_state___drain_commits"]);
-
-        let (commit_sync_sender, commit_sync_receiver) = mpsc::channel();
-        self.state_commit_sender
-            .send(CommitMessage::Sync(commit_sync_sender))
-            .unwrap();
-        commit_sync_receiver.recv().unwrap();
-    }
-
-    pub(crate) fn sync_commit(&mut self) {
-        let checkpoint = self.current_state_locked().last_checkpoint().clone();
-        self.maybe_commit(Some(checkpoint), true /* sync_commit */);
-    }
-
-    fn report_last_checkpoint_version(version: Option<Version>) {
-        LATEST_CHECKPOINT_VERSION.set(version.map_or(-1, |v| v as i64));
-    }
-
-    /// This method updates the buffered state with new data.
-    pub fn update(
-        &mut self,
-        new_state: LedgerStateWithSummary,
-        hot_state_updates: HotStateUpdates,
-        estimated_new_items: usize,
-        sync_commit: bool,
-    ) -> Result<()> {
-        let _timer = OTHER_TIMERS_SECONDS.timer_with(&["buffered_state___update"]);
-
-        let old_state = self.current_state_locked().clone();
-        assert!(new_state.is_descendant_of(&old_state));
-
-        self.estimated_items += estimated_new_items;
-        let version = new_state.last_checkpoint().version();
-
-        let last_checkpoint = new_state.last_checkpoint().clone();
-        // Commit state only if there is a new checkpoint, eases testing and make estimated
-        // buffer size a tad more realistic.
-        let checkpoint_to_commit_opt =
-            (old_state.next_version() < last_checkpoint.next_version()).then_some(last_checkpoint);
-        *self.current_state_locked() = new_state;
-
-        // When a new checkpoint advances past earlier chunks' post-checkpoint updates,
-        // those updates are now pre-(new-)checkpoint and become eligible for the next
-        // snapshot flush. Fold them into `pending_hot_state_updates` first.
-        if checkpoint_to_commit_opt.is_some() {
-            let prev_post_checkpoint = std::mem::replace(
-                &mut self.post_checkpoint_hot_state_updates,
-                empty_hot_state_updates(),
-            );
-            Self::merge_hot_state_updates(
-                &mut self.pending_hot_state_updates,
-                prev_post_checkpoint,
-            );
-        }
-        // Merge this chunk's pre-checkpoint portion before potentially flushing.
-        if let Some(shards) = hot_state_updates.for_last_checkpoint {
-            Self::merge_hot_state_updates(&mut self.pending_hot_state_updates, shards);
-        }
-        self.maybe_commit(checkpoint_to_commit_opt, sync_commit);
-        // The post-checkpoint portion of this chunk goes into `post_checkpoint` so it is
-        // NOT flushed at the current checkpoint — its versions are past the snapshot.
-        if let Some(shards) = hot_state_updates.for_latest {
-            Self::merge_hot_state_updates(&mut self.post_checkpoint_hot_state_updates, shards);
-        }
-        Self::report_last_checkpoint_version(version);
-        Ok(())
-    }
-
-    pub(crate) fn quit(&mut self) {
-        if let Some(handle) = self.join_handle.take() {
-            self.sync_commit();
-            self.state_commit_sender.send(CommitMessage::Exit).unwrap();
-            handle
-                .join()
-                .expect("snapshot commit thread should join peacefully.");
-        }
-    }
-
-    /// used by restore tooling
-    pub(crate) fn force_last_snapshot(&mut self, snapshot: StateWithSummary) {
-        self.last_snapshot = snapshot
+impl Default for HotStateAccumulator {
+    fn default() -> Self {
+        Self::new()
     }
 }
 
-impl Drop for BufferedState {
-    fn drop(&mut self) {
-        self.quit()
+impl BufferedStateExtras<SnapshotToCommit, StateWithSummary> for HotStateAccumulator {
+    type ChunkInput = HotStateUpdates;
+
+    /// Phase order:
+    /// 1. If `checkpoint_advanced`, fold the previous chunk's
+    ///    `post_checkpoint` accumulation into `pending` (those updates
+    ///    now precede the new checkpoint).
+    /// 2. Merge this chunk's `for_last_checkpoint` portion into
+    ///    `pending`. After this `build_payload` (if invoked) will see
+    ///    all pre-checkpoint updates inclusive of this chunk's
+    ///    contribution.
+    /// 3. Merge this chunk's `for_latest` portion into
+    ///    `post_checkpoint` so it is preserved across the upcoming
+    ///    `build_payload` and folded into the next pending bucket when
+    ///    a future chunk advances the checkpoint.
+    fn absorb_chunk(&mut self, input: HotStateUpdates, checkpoint_advanced: bool) {
+        if checkpoint_advanced {
+            let prev_post = std::mem::replace(&mut self.post_checkpoint, empty_hot_state_updates());
+            Self::merge_hot_state_updates(&mut self.pending, prev_post);
+        }
+        if let Some(shards) = input.for_last_checkpoint {
+            Self::merge_hot_state_updates(&mut self.pending, shards);
+        }
+        if let Some(shards) = input.for_latest {
+            Self::merge_hot_state_updates(&mut self.post_checkpoint, shards);
+        }
     }
+
+    fn build_payload(&mut self, snapshot: StateWithSummary) -> SnapshotToCommit {
+        let hot_state_updates = std::mem::replace(&mut self.pending, empty_hot_state_updates());
+        SnapshotToCommit {
+            snapshot,
+            hot_state_updates,
+        }
+    }
+}
+
+impl BufferedState {
+    /// Construct a `BufferedState` at the snapshot version. State-specific
+    /// dependencies (state_db, persisted state) thread through here; the
+    /// generic [`crate::common::BufferedState`] doesn't need to know about
+    /// them.
+    pub(crate) fn new_at_snapshot(
+        state_db: &Arc<StateDb>,
+        last_snapshot: StateWithSummary,
+        target_items: usize,
+        out_current_state: Arc<Mutex<LedgerStateWithSummary>>,
+        out_persisted_state: PersistedState,
+    ) -> Self {
+        new_at_snapshot_impl(
+            state_db,
+            last_snapshot,
+            target_items,
+            out_current_state,
+            out_persisted_state,
+        )
+    }
+}
+
+fn new_at_snapshot_impl(
+    state_db: &Arc<StateDb>,
+    last_snapshot: StateWithSummary,
+    target_items: usize,
+    out_current_state: Arc<Mutex<LedgerStateWithSummary>>,
+    out_persisted_state: PersistedState,
+) -> BufferedState {
+    let arc_state_db = Arc::clone(state_db);
+    *out_current_state.lock() = LedgerStateWithSummary::new_at_checkpoint(last_snapshot.clone());
+    out_persisted_state.hack_reset(last_snapshot.clone());
+
+    let merklize_state_db = Arc::clone(&arc_state_db);
+    let persisted_state_clone = out_persisted_state.clone();
+    let commit_thread = spawn_commit_pipeline(
+        "state-committer",
+        ASYNC_COMMIT_CHANNEL_BUFFER_SIZE as usize,
+        "state_batch_committer",
+        STATE_BATCH_CHANNEL_SIZE,
+        last_snapshot.clone(),
+        move |batch_receiver| {
+            StateMerkleBatchCommitter::new(arc_state_db, batch_receiver, persisted_state_clone)
+                .run();
+        },
+        move |last_snapshot, input| merklize_main_state(&merklize_state_db, last_snapshot, input),
+    );
+    report_last_checkpoint_version(last_snapshot.version());
+    BufferedState::new(
+        BufferedStateCore::new(
+            out_current_state,
+            last_snapshot,
+            commit_thread,
+            target_items,
+            TARGET_SNAPSHOT_INTERVAL_IN_VERSION,
+        ),
+        HotStateAccumulator::new(),
+    )
+}
+
+/// Wrapper around `BufferedState::update` that also reports the
+/// last-checkpoint metric and adapts the timer label. Callers
+/// (state-side commit path) should invoke this rather than
+/// `BufferedState::update` directly so the metric stays in lockstep.
+pub(crate) fn update(
+    state: &mut BufferedState,
+    new_state: LedgerStateWithSummary,
+    hot_state_updates: HotStateUpdates,
+    estimated_new_items: usize,
+    sync_commit: bool,
+) -> aptos_storage_interface::Result<()> {
+    let _timer = OTHER_TIMERS_SECONDS.timer_with(&["buffered_state___update"]);
+    let version = new_state.last_checkpoint().version();
+    state.update(
+        new_state,
+        hot_state_updates,
+        estimated_new_items,
+        sync_commit,
+    )?;
+    report_last_checkpoint_version(version);
+    Ok(())
+}
+
+fn report_last_checkpoint_version(version: Option<Version>) {
+    LATEST_CHECKPOINT_VERSION.set(version.map_or(-1, |v| v as i64));
 }

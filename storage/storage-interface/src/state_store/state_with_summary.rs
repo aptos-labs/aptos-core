@@ -136,30 +136,47 @@ impl StateWithSummary {
     }
 }
 
+/// Latest + last-checkpoint pair generic over the per-pipeline
+/// state-with-summary type. Main state uses it via the
+/// [`LedgerStateWithSummary`] type alias below; native-position uses
+/// it as `crate::position_buffered_state::PositionLedgerStateWithSummary`
+/// in the aptos-db crate. `latest` is the Deref target so existing
+/// callers can use deref coercion.
 #[derive(Clone, Debug, Deref, DerefMut)]
-pub struct LedgerStateWithSummary {
+pub struct LedgerWithSummary<W: Clone> {
     #[deref]
     #[deref_mut]
-    latest: StateWithSummary,
-    last_checkpoint: StateWithSummary,
+    latest: W,
+    last_checkpoint: W,
 }
 
-impl LedgerStateWithSummary {
-    pub fn from_latest_and_last_checkpoint(
-        latest: StateWithSummary,
-        last_checkpoint: StateWithSummary,
-    ) -> Self {
-        assert!(latest.is_descendant_of(&last_checkpoint));
+impl<W: Clone> LedgerWithSummary<W> {
+    pub fn from_latest_and_last_checkpoint(latest: W, last_checkpoint: W) -> Self {
         Self {
             latest,
             last_checkpoint,
         }
     }
 
-    pub fn new_at_checkpoint(checkpoint: StateWithSummary) -> Self {
+    pub fn new_at_checkpoint(checkpoint: W) -> Self {
         Self::from_latest_and_last_checkpoint(checkpoint.clone(), checkpoint)
     }
 
+    pub fn latest(&self) -> &W {
+        &self.latest
+    }
+
+    pub fn last_checkpoint(&self) -> &W {
+        &self.last_checkpoint
+    }
+}
+
+/// Main-state ledger-state pair. Type alias of the generic
+/// [`LedgerWithSummary`]; state-specific helpers live as inherent
+/// impl below.
+pub type LedgerStateWithSummary = LedgerWithSummary<StateWithSummary>;
+
+impl LedgerStateWithSummary {
     pub fn new_empty(hot_state_config: HotStateConfig) -> Self {
         let empty = StateWithSummary::new_empty(hot_state_config);
         Self::from_latest_and_last_checkpoint(empty.clone(), empty)
@@ -176,24 +193,20 @@ impl LedgerStateWithSummary {
     }
 
     pub fn is_at_checkpoint(&self) -> bool {
-        self.latest.next_version() == self.last_checkpoint.next_version()
-    }
-
-    pub fn last_checkpoint(&self) -> &StateWithSummary {
-        &self.last_checkpoint
+        self.latest().next_version() == self.last_checkpoint().next_version()
     }
 
     pub fn ledger_state(&self) -> LedgerState {
         LedgerState::new(
-            self.latest.state().clone(),
-            self.last_checkpoint.state().clone(),
+            self.latest().state().clone(),
+            self.last_checkpoint().state().clone(),
         )
     }
 
     pub fn ledger_state_summary(&self) -> LedgerStateSummary {
         LedgerStateSummary::new(
-            self.last_checkpoint.summary().clone(),
-            self.latest.summary().clone(),
+            self.last_checkpoint().summary().clone(),
+            self.latest().summary().clone(),
         )
     }
 
@@ -202,7 +215,9 @@ impl LedgerStateWithSummary {
     }
 
     pub fn is_descendant_of(&self, rhs: &Self) -> bool {
-        self.latest.is_descendant_of(&rhs.latest)
-            && self.last_checkpoint.is_descendant_of(&rhs.last_checkpoint)
+        self.latest().is_descendant_of(rhs.latest())
+            && self
+                .last_checkpoint()
+                .is_descendant_of(rhs.last_checkpoint())
     }
 }

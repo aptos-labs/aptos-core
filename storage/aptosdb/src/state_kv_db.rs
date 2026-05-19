@@ -62,9 +62,16 @@ fn metadata_db_name(is_hot: bool) -> &'static str {
 }
 
 pub struct StateKvDb {
-    state_kv_metadata_db: Arc<DB>,
-    state_kv_db_shards: [Arc<DB>; NUM_STATE_SHARDS],
+    inner: crate::sharded_kv_db::ShardedKvDb,
     is_hot: bool,
+}
+
+impl std::ops::Deref for StateKvDb {
+    type Target = crate::sharded_kv_db::ShardedKvDb;
+
+    fn deref(&self) -> &crate::sharded_kv_db::ShardedKvDb {
+        &self.inner
+    }
 }
 
 impl StateKvDb {
@@ -167,8 +174,7 @@ impl StateKvDb {
             .unwrap();
 
         let state_kv_db = Self {
-            state_kv_metadata_db,
-            state_kv_db_shards,
+            inner: crate::sharded_kv_db::ShardedKvDb::new(state_kv_metadata_db, state_kv_db_shards),
             is_hot,
         };
 
@@ -216,21 +222,21 @@ impl StateKvDb {
         if let Some(batch) = state_kv_metadata_batch {
             let _timer = OTHER_TIMERS_SECONDS
                 .timer_with(&[&format!("{}__state_kv_db__commit_metadata", self.db_tag())]);
-            self.state_kv_metadata_db.write_schemas(batch)?;
+            self.inner.metadata_db().write_schemas(batch)?;
         }
 
         self.write_progress(version)
     }
 
     pub(crate) fn write_progress(&self, version: Version) -> Result<()> {
-        self.state_kv_metadata_db.put::<DbMetadataSchema>(
+        self.inner.metadata_db().put::<DbMetadataSchema>(
             &DbMetadataKey::StateKvCommitProgress,
             &DbMetadataValue::Version(version),
         )
     }
 
     pub(crate) fn write_pruner_progress(&self, version: Version) -> Result<()> {
-        self.state_kv_metadata_db.put::<DbMetadataSchema>(
+        self.inner.metadata_db().put::<DbMetadataSchema>(
             &DbMetadataKey::StateKvPrunerProgress,
             &DbMetadataValue::Version(version),
         )
@@ -275,19 +281,19 @@ impl StateKvDb {
     }
 
     pub(crate) fn metadata_db(&self) -> &DB {
-        &self.state_kv_metadata_db
+        self.inner.metadata_db()
     }
 
     pub(crate) fn metadata_db_arc(&self) -> Arc<DB> {
-        Arc::clone(&self.state_kv_metadata_db)
+        Arc::clone(self.inner.metadata_db())
     }
 
     pub(crate) fn db_shard(&self, shard_id: usize) -> &DB {
-        &self.state_kv_db_shards[shard_id]
+        self.inner.shard(shard_id)
     }
 
     pub(crate) fn db_shard_arc(&self, shard_id: usize) -> Arc<DB> {
-        Arc::clone(&self.state_kv_db_shards[shard_id])
+        Arc::clone(self.inner.shard(shard_id))
     }
 
     pub(crate) fn num_shards(&self) -> usize {
@@ -304,7 +310,7 @@ impl StateKvDb {
             &DbMetadataKey::StateKvShardCommitProgress(shard_id),
             &DbMetadataValue::Version(version),
         )?;
-        self.state_kv_db_shards[shard_id].write_schemas(batch)
+        self.inner.shard(shard_id).write_schemas(batch)
     }
 
     fn open_shard<P: AsRef<Path>>(

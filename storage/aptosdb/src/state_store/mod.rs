@@ -938,7 +938,8 @@ impl StateStore {
         }
 
         // synchronously commit the snapshot at the last checkpoint here if not committed to disk yet.
-        buffered_state.update(
+        crate::state_store::buffered_state::update(
+            buffered_state,
             updated,
             hot_state_updates,
             0,    /* estimated_items, doesn't matter since we sync-commit */
@@ -1011,7 +1012,11 @@ impl StateStore {
     }
 
     pub fn reset(&self) {
-        self.buffered_state.lock().quit();
+        // The previous `BufferedState::quit()` call here was a manual
+        // shutdown sequence (sync_commit + Exit + join). That logic
+        // now lives in `Drop` for symmetry with `PositionBufferedState`,
+        // and the replacement assignment below drops the old buffered
+        // state in place.
         // TODO(HotState): restore does not reconstruct the hot state yet, so we pass empty
         // metadata here. This is safe because callers (restore / state-sync) open the DB with
         // `empty_buffered_state_for_restore`, so the DashMaps are always empty.

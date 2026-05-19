@@ -35,6 +35,7 @@ pub mod position_db;
 pub mod position_merkle_db;
 mod pruner;
 mod sharded_jmt_merkle_db;
+mod sharded_kv_db;
 mod state_kv_db;
 mod state_merkle_db;
 mod state_store;
