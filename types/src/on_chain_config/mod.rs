@@ -26,6 +26,7 @@ mod chain_id;
 pub mod chunky_dkg_config;
 mod commit_history;
 mod consensus_config;
+pub mod epoch_timeout_config;
 mod execution_config;
 mod gas_schedule;
 mod jwk_consensus_config;
@@ -49,6 +50,7 @@ pub use self::{
         LeaderReputationType, OnChainConsensusConfig, ProposerAndVoterConfig, ProposerElectionType,
         ValidatorTxnConfig, DEFAULT_ENABLED_WINDOW_SIZE, DEFAULT_WINDOW_SIZE,
     },
+    epoch_timeout_config::EpochTimeoutConfig,
     execution_config::{
         BlockGasLimitType, ExecutionConfigV1, ExecutionConfigV2, ExecutionConfigV4,
         ExecutionConfigV7, OnChainExecutionConfig, TransactionDeduperType, TransactionShufflerType,
