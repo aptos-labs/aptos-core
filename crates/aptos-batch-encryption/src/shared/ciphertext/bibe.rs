@@ -176,7 +176,6 @@ impl<P: Plaintext> BIBECTDecrypt<P> for BIBEDecryptionKey {
     }
 }
 
-
 #[cfg(test)]
 pub mod tests {
     use super::{BIBECTDecrypt, BIBECTEncrypt};
