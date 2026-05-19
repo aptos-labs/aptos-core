@@ -487,6 +487,7 @@ impl<T: TBatchInfo> BatchMsg<T> {
                 batch.author() == peer_id,
                 "Batch author doesn't match sender"
             );
+            batch.batch_info().verify_kind(verifier)?;
             batch.verify()?
         }
         Ok(())

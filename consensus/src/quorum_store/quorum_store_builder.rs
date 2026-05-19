@@ -312,6 +312,7 @@ impl InnerBuilder {
             self.batch_store.clone().unwrap(),
             self.quorum_store_to_mempool_sender,
             self.mempool_txn_pull_timeout_ms,
+            &self.verifier,
         );
         spawn_named!(
             "batch_generator",
@@ -339,6 +340,7 @@ impl InnerBuilder {
                 self.config.receiver_max_total_bytes as u64,
                 self.config.batch_expiry_gap_when_init_usecs,
                 self.transaction_filter_config.clone(),
+                self.config.enable_fast_batches_rx,
             );
             #[allow(unused_variables)]
             let name = format!("batch_coordinator-{}", i);
@@ -357,6 +359,7 @@ impl InnerBuilder {
             self.proof_cache,
             self.broadcast_proofs,
             self.config.batch_expiry_gap_when_init_usecs,
+            self.config.enable_fast_batches_rx,
         );
         spawn_named!(
             "proof_coordinator",

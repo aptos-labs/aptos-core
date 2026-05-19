@@ -40,7 +40,7 @@ impl PerBatchKindTxnLimits {
             .iter()
             .map(|(kind, limit)| {
                 let used = consumed.get(kind).copied().unwrap_or(0);
-                (*kind, limit.saturating_sub(used))
+                (kind.clone(), limit.saturating_sub(used))
             })
             .collect();
         Self { limits }

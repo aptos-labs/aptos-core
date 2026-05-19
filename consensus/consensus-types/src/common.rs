@@ -164,11 +164,11 @@ pub fn verify_batch_kind_transactions(
                         .context("Encrypted transaction ciphertext verification failed")
                 })?;
         },
-        Some(BatchKind::Normal) => {
+        Some(BatchKind::Normal) | Some(BatchKind::FastProof(_)) => {
             for txn in txns {
                 ensure!(
                     !txn.is_encrypted_txn(),
-                    "Normal batch contains encrypted transaction"
+                    "Non-encrypted batch contains encrypted transaction"
                 );
             }
         },
