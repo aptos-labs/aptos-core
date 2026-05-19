@@ -733,12 +733,21 @@ where
                 return Ok(());
             }
         }
-        let result = validator
-            .verify_multi_signatures(&self.info, &self.multi_signature)
-            .context(format!(
-                "Failed to verify ProofOfStore for batch: {:?}",
-                self.info
-            ));
+        let result = if batch_info_ext.is_v2() {
+            validator
+                .verify_multi_signatures(&batch_info_ext, &self.multi_signature)
+                .context(format!(
+                    "Failed to verify ProofOfStore for batch: {:?}",
+                    self.info
+                ))
+        } else {
+            validator
+                .verify_multi_signatures(self.info.as_batch_info(), &self.multi_signature)
+                .context(format!(
+                    "Failed to verify ProofOfStore for batch: {:?}",
+                    self.info
+                ))
+        };
         if result.is_ok() {
             cache.insert(batch_info_ext, self.multi_signature.clone());
         }
