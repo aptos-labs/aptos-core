@@ -1,19 +1,17 @@
 Ok(
     [
         TransactionOutput {
-            write_set: WriteSet {
-                value: V0(
-                    WriteSetV0(
-                        WriteSetMut {
-                            write_set: {
-                                StateKey::AccessPath { address: 0xf5b9d6f01a99e74c790e2f330c092fa05455a8193f1dfc1b113ecc54d067afe1, path: "Resource(0x1::account::Account)" }: Modification(20f5b9d6f01a99e74c790e2f330c092fa05455a8193f1dfc1b113ecc54d067afe10c00000000000000000000000000000000000000000000000000000000000000f5b9d6f01a99e74c790e2f330c092fa05455a8193f1dfc1b113ecc54d067afe100000000000000000100000000000000f5b9d6f01a99e74c790e2f330c092fa05455a8193f1dfc1b113ecc54d067afe10000, metadata:StateValueMetadata { inner: None }),
-                            },
+            write_set: V0(
+                WriteSetV0 {
+                    ws_mut: WriteSetMut {
+                        write_set: {
+                            StateKey::AccessPath { address: 0xf5b9d6f01a99e74c790e2f330c092fa05455a8193f1dfc1b113ecc54d067afe1, path: "Resource(0x1::account::Account)" }: Modification(20f5b9d6f01a99e74c790e2f330c092fa05455a8193f1dfc1b113ecc54d067afe10c00000000000000000000000000000000000000000000000000000000000000f5b9d6f01a99e74c790e2f330c092fa05455a8193f1dfc1b113ecc54d067afe100000000000000000100000000000000f5b9d6f01a99e74c790e2f330c092fa05455a8193f1dfc1b113ecc54d067afe10000, metadata:StateValueMetadata { inner: None }),
                         },
-                    ),
-                ),
-                hotness: {},
-                native_positions: {},
-            },
+                    },
+                    hotness: {},
+                    extensions: [],
+                },
+            ),
             events: [
                 ModuleEvent { type: Struct(StructTag { address: 0000000000000000000000000000000000000000000000000000000000000001, module: Identifier("transaction_fee"), name: Identifier("FeeStatement"), type_args: [] }), event_data: "20000000000000001d00000000000000040000000000000000000000000000000000000000000000" },
             ],
@@ -32,20 +30,18 @@ Ok(
 Ok(
     [
         TransactionOutput {
-            write_set: WriteSet {
-                value: V0(
-                    WriteSetV0(
-                        WriteSetMut {
-                            write_set: {
-                                StateKey::AccessPath { address: 0xf5b9d6f01a99e74c790e2f330c092fa05455a8193f1dfc1b113ecc54d067afe1, path: "Resource(0x1::account::Account)" }: Modification(20f5b9d6f01a99e74c790e2f330c092fa05455a8193f1dfc1b113ecc54d067afe10d00000000000000000000000000000000000000000000000000000000000000f5b9d6f01a99e74c790e2f330c092fa05455a8193f1dfc1b113ecc54d067afe100000000000000000100000000000000f5b9d6f01a99e74c790e2f330c092fa05455a8193f1dfc1b113ecc54d067afe10000, metadata:StateValueMetadata { inner: None }),
-                                StateKey::AccessPath { address: 0xf5b9d6f01a99e74c790e2f330c092fa05455a8193f1dfc1b113ecc54d067afe1, path: "Resource(0xf5b9d6f01a99e74c790e2f330c092fa05455a8193f1dfc1b113ecc54d067afe1::M::T1)" }: Creation(0300000000000000, metadata:StateValueMetadata { inner: Some(StateValueMetadataInner { slot_deposit: 0, bytes_deposit: 0, creation_time_usecs: 0 }) }),
-                            },
+            write_set: V0(
+                WriteSetV0 {
+                    ws_mut: WriteSetMut {
+                        write_set: {
+                            StateKey::AccessPath { address: 0xf5b9d6f01a99e74c790e2f330c092fa05455a8193f1dfc1b113ecc54d067afe1, path: "Resource(0x1::account::Account)" }: Modification(20f5b9d6f01a99e74c790e2f330c092fa05455a8193f1dfc1b113ecc54d067afe10d00000000000000000000000000000000000000000000000000000000000000f5b9d6f01a99e74c790e2f330c092fa05455a8193f1dfc1b113ecc54d067afe100000000000000000100000000000000f5b9d6f01a99e74c790e2f330c092fa05455a8193f1dfc1b113ecc54d067afe10000, metadata:StateValueMetadata { inner: None }),
+                            StateKey::AccessPath { address: 0xf5b9d6f01a99e74c790e2f330c092fa05455a8193f1dfc1b113ecc54d067afe1, path: "Resource(0xf5b9d6f01a99e74c790e2f330c092fa05455a8193f1dfc1b113ecc54d067afe1::M::T1)" }: Creation(0300000000000000, metadata:StateValueMetadata { inner: Some(StateValueMetadataInner { slot_deposit: 0, bytes_deposit: 0, creation_time_usecs: 0 }) }),
                         },
-                    ),
-                ),
-                hotness: {},
-                native_positions: {},
-            },
+                    },
+                    hotness: {},
+                    extensions: [],
+                },
+            ),
             events: [
                 ModuleEvent { type: Struct(StructTag { address: 0000000000000000000000000000000000000000000000000000000000000001, module: Identifier("transaction_fee"), name: Identifier("FeeStatement"), type_args: [] }), event_data: "21000000000000001d00000000000000050000000000000000000000000000000000000000000000" },
             ],
@@ -60,19 +56,17 @@ Ok(
 Ok(
     [
         TransactionOutput {
-            write_set: WriteSet {
-                value: V0(
-                    WriteSetV0(
-                        WriteSetMut {
-                            write_set: {
-                                StateKey::AccessPath { address: 0xf5b9d6f01a99e74c790e2f330c092fa05455a8193f1dfc1b113ecc54d067afe1, path: "Resource(0x1::account::Account)" }: Modification(20f5b9d6f01a99e74c790e2f330c092fa05455a8193f1dfc1b113ecc54d067afe10e00000000000000000000000000000000000000000000000000000000000000f5b9d6f01a99e74c790e2f330c092fa05455a8193f1dfc1b113ecc54d067afe100000000000000000100000000000000f5b9d6f01a99e74c790e2f330c092fa05455a8193f1dfc1b113ecc54d067afe10000, metadata:StateValueMetadata { inner: None }),
-                            },
+            write_set: V0(
+                WriteSetV0 {
+                    ws_mut: WriteSetMut {
+                        write_set: {
+                            StateKey::AccessPath { address: 0xf5b9d6f01a99e74c790e2f330c092fa05455a8193f1dfc1b113ecc54d067afe1, path: "Resource(0x1::account::Account)" }: Modification(20f5b9d6f01a99e74c790e2f330c092fa05455a8193f1dfc1b113ecc54d067afe10e00000000000000000000000000000000000000000000000000000000000000f5b9d6f01a99e74c790e2f330c092fa05455a8193f1dfc1b113ecc54d067afe100000000000000000100000000000000f5b9d6f01a99e74c790e2f330c092fa05455a8193f1dfc1b113ecc54d067afe10000, metadata:StateValueMetadata { inner: None }),
                         },
-                    ),
-                ),
-                hotness: {},
-                native_positions: {},
-            },
+                    },
+                    hotness: {},
+                    extensions: [],
+                },
+            ),
             events: [
                 ModuleEvent { type: Struct(StructTag { address: 0000000000000000000000000000000000000000000000000000000000000001, module: Identifier("transaction_fee"), name: Identifier("FeeStatement"), type_args: [] }), event_data: "27000000000000001d000000000000000a0000000000000000000000000000000000000000000000" },
             ],
@@ -87,20 +81,18 @@ Ok(
 Ok(
     [
         TransactionOutput {
-            write_set: WriteSet {
-                value: V0(
-                    WriteSetV0(
-                        WriteSetMut {
-                            write_set: {
-                                StateKey::AccessPath { address: 0xf5b9d6f01a99e74c790e2f330c092fa05455a8193f1dfc1b113ecc54d067afe1, path: "Resource(0x1::account::Account)" }: Modification(20f5b9d6f01a99e74c790e2f330c092fa05455a8193f1dfc1b113ecc54d067afe10f00000000000000000000000000000000000000000000000000000000000000f5b9d6f01a99e74c790e2f330c092fa05455a8193f1dfc1b113ecc54d067afe100000000000000000100000000000000f5b9d6f01a99e74c790e2f330c092fa05455a8193f1dfc1b113ecc54d067afe10000, metadata:StateValueMetadata { inner: None }),
-                                StateKey::AccessPath { address: 0xf5b9d6f01a99e74c790e2f330c092fa05455a8193f1dfc1b113ecc54d067afe1, path: "Resource(0xf5b9d6f01a99e74c790e2f330c092fa05455a8193f1dfc1b113ecc54d067afe1::M::T1)" }: Deletion(metadata:StateValueMetadata { inner: Some(StateValueMetadataInner { slot_deposit: 0, bytes_deposit: 0, creation_time_usecs: 0 }) }),
-                            },
+            write_set: V0(
+                WriteSetV0 {
+                    ws_mut: WriteSetMut {
+                        write_set: {
+                            StateKey::AccessPath { address: 0xf5b9d6f01a99e74c790e2f330c092fa05455a8193f1dfc1b113ecc54d067afe1, path: "Resource(0x1::account::Account)" }: Modification(20f5b9d6f01a99e74c790e2f330c092fa05455a8193f1dfc1b113ecc54d067afe10f00000000000000000000000000000000000000000000000000000000000000f5b9d6f01a99e74c790e2f330c092fa05455a8193f1dfc1b113ecc54d067afe100000000000000000100000000000000f5b9d6f01a99e74c790e2f330c092fa05455a8193f1dfc1b113ecc54d067afe10000, metadata:StateValueMetadata { inner: None }),
+                            StateKey::AccessPath { address: 0xf5b9d6f01a99e74c790e2f330c092fa05455a8193f1dfc1b113ecc54d067afe1, path: "Resource(0xf5b9d6f01a99e74c790e2f330c092fa05455a8193f1dfc1b113ecc54d067afe1::M::T1)" }: Deletion(metadata:StateValueMetadata { inner: Some(StateValueMetadataInner { slot_deposit: 0, bytes_deposit: 0, creation_time_usecs: 0 }) }),
                         },
-                    ),
-                ),
-                hotness: {},
-                native_positions: {},
-            },
+                    },
+                    hotness: {},
+                    extensions: [],
+                },
+            ),
             events: [
                 ModuleEvent { type: Struct(StructTag { address: 0000000000000000000000000000000000000000000000000000000000000001, module: Identifier("transaction_fee"), name: Identifier("FeeStatement"), type_args: [] }), event_data: "28000000000000001d000000000000000b0000000000000000000000000000000000000000000000" },
             ],
@@ -111,19 +103,17 @@ Ok(
             auxiliary_data: None,
         },
         TransactionOutput {
-            write_set: WriteSet {
-                value: V0(
-                    WriteSetV0(
-                        WriteSetMut {
-                            write_set: {
-                                StateKey::AccessPath { address: 0xf5b9d6f01a99e74c790e2f330c092fa05455a8193f1dfc1b113ecc54d067afe1, path: "Resource(0x1::account::Account)" }: Modification(20f5b9d6f01a99e74c790e2f330c092fa05455a8193f1dfc1b113ecc54d067afe11000000000000000000000000000000000000000000000000000000000000000f5b9d6f01a99e74c790e2f330c092fa05455a8193f1dfc1b113ecc54d067afe100000000000000000100000000000000f5b9d6f01a99e74c790e2f330c092fa05455a8193f1dfc1b113ecc54d067afe10000, metadata:StateValueMetadata { inner: None }),
-                            },
+            write_set: V0(
+                WriteSetV0 {
+                    ws_mut: WriteSetMut {
+                        write_set: {
+                            StateKey::AccessPath { address: 0xf5b9d6f01a99e74c790e2f330c092fa05455a8193f1dfc1b113ecc54d067afe1, path: "Resource(0x1::account::Account)" }: Modification(20f5b9d6f01a99e74c790e2f330c092fa05455a8193f1dfc1b113ecc54d067afe11000000000000000000000000000000000000000000000000000000000000000f5b9d6f01a99e74c790e2f330c092fa05455a8193f1dfc1b113ecc54d067afe100000000000000000100000000000000f5b9d6f01a99e74c790e2f330c092fa05455a8193f1dfc1b113ecc54d067afe10000, metadata:StateValueMetadata { inner: None }),
                         },
-                    ),
-                ),
-                hotness: {},
-                native_positions: {},
-            },
+                    },
+                    hotness: {},
+                    extensions: [],
+                },
+            ),
             events: [
                 ModuleEvent { type: Struct(StructTag { address: 0000000000000000000000000000000000000000000000000000000000000001, module: Identifier("transaction_fee"), name: Identifier("FeeStatement"), type_args: [] }), event_data: "20000000000000001d00000000000000040000000000000000000000000000000000000000000000" },
             ],
