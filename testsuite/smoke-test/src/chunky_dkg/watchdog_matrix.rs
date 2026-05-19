@@ -484,7 +484,14 @@ async fn run_matrix_case(case: MatrixCase) {
     info!("at epoch {} (x+1); running functional assertions", epoch_x_plus_1);
 
     let expect_roll_success = case.cur_rdkg == Finished;
-    let expect_key_some = case.prior_cdkg == Finished || case.cur_cdkg == Finished;
+    // PerEpochEncryptionKey.is_some() is "any chunky DKG that completed before
+    // x+1." Two ways that can happen:
+    //   - chunky was on at genesis (prior_cdkg ≠ NotTriggered), so epoch 1 → 2
+    //     ran a chunky DKG with no failpoints armed and it completed; the key
+    //     resource is Some from epoch 2 onwards regardless of later aborts;
+    //   - current chunky DKG completed (cur_cdkg = Finished), so a fresh key
+    //     was buffered at the end of epoch x.
+    let expect_key_some = case.prior_cdkg != NotTriggered || case.cur_cdkg == Finished;
 
     assert_encryption_key_presence(&client, expect_key_some).await;
     roll_dice_and_expect(&mut cli, root_idx, expect_roll_success).await;
