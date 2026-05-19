@@ -16,21 +16,30 @@
 //! All cases are #[ignore]'d to keep them out of CI. Run on-demand via:
 //!   cargo nextest run -p smoke-test -- --include-ignored watchdog_matrix
 //!
-//! This MVP file currently implements 3 representative cases:
-//!   - NT_NT_F_A: matches the existing single-case test (prior sync reconfig, cDKG aborts in x).
-//!   - F_F_F_F:   baseline; no aborts anywhere, watchdog never fires.
-//!   - A_A_A_A:   stress; both DKGs abort in both x-1 and x.
+//! Each test additionally asserts feature behavior in x+1:
+//!   - randomness: roll `0x_::dice::roll` and expect SUCCESS iff cur_rdkg = Finished;
+//!     expect FAILURE (txn abort) iff cur_rdkg = Aborted (no fresh DKG result ⇒
+//!     `randomness::next_32_bytes` aborts on `option::borrow` of an empty seed).
+//!   - encryption: check `PerEpochEncryptionKey`:
+//!     · Class A / B (chunky off at genesis): key Some iff *any* cDKG completed up
+//!       to and including x ⇒ effectively `cur_cdkg = Finished`.
+//!     · Class C (chunky on at genesis): a cDKG ran in epoch 1→2 already, so the
+//!       key is always Some — assert that.
 
 use super::shadow_mode::create_swarm_with_dkg_only;
 use crate::utils::get_on_chain_resource;
+use aptos::{common::types::GasOptions, test::CliTestFramework};
 use aptos_forge::{LocalSwarm, NodeExt, Swarm, SwarmExt};
 use aptos_logger::info;
+use aptos_move_cli::MemberId;
 use aptos_rest_client::Client;
 use aptos_types::{
+    decryption::PerEpochEncryptionKeyResource,
     dkg::chunky_dkg::ChunkyDKGState,
     on_chain_config::{FeatureFlag, Features, OnChainChunkyDKGConfig, OnChainRandomnessConfig},
 };
-use std::{sync::Arc, time::Duration};
+use move_core_types::{language_storage::CORE_CODE_ADDRESS, move_resource::MoveStructType};
+use std::{collections::BTreeMap, str::FromStr, sync::Arc, time::Duration};
 
 #[derive(Copy, Clone, Debug, PartialEq, Eq)]
 enum DkgOutcome {
@@ -264,7 +273,91 @@ async fn create_swarm_class_c(
     (swarm, cli, root_idx)
 }
 
-// ----------------------- Functional check stubs -----------------------
+// ----------------------- Functional checks -----------------------
+
+/// Publish the `on_chain_dice` move-example module. Mirrors
+/// `randomness::e2e_basic_consumption::publish_on_chain_dice_module`
+/// — duplicated here to keep test-module privacy intact.
+async fn publish_dice_module(cli: &mut CliTestFramework, publisher_idx: usize) {
+    cli.init_move_dir();
+    let mut package_addresses = BTreeMap::new();
+    package_addresses.insert("module_owner", "_");
+
+    cli.init_package(
+        "OnChainDice".to_string(),
+        package_addresses,
+        Some(CliTestFramework::aptos_framework_dir()),
+    )
+    .await
+    .unwrap();
+
+    let content =
+        include_str!("../../../../aptos-move/move-examples/on_chain_dice/sources/dice.move")
+            .to_string();
+    cli.add_file_in_package("sources/dice.move", content);
+
+    cli.wait_for_account(publisher_idx).await.unwrap();
+    let mut named = BTreeMap::new();
+    let account = cli.account_id(publisher_idx).to_string();
+    named.insert("module_owner", account.as_str());
+    cli.publish_package(publisher_idx, None, named, None)
+        .await
+        .unwrap();
+}
+
+/// Try to roll the dice. Asserts behavior matches the expected outcome:
+///   `expect_success = true`  → txn must commit (rDKG result available in x+1).
+///   `expect_success = false` → txn must NOT commit (rDKG aborted ⇒ randomness
+///                              unavailable ⇒ `randomness::next_32_bytes` aborts).
+async fn roll_dice_and_expect(cli: &mut CliTestFramework, publisher_idx: usize, expect_success: bool) {
+    let account = cli.account_id(publisher_idx).to_hex_literal();
+    let roll = MemberId::from_str(&format!("{}::dice::roll", account)).unwrap();
+    let gas_options = GasOptions {
+        gas_unit_price: Some(100),
+        max_gas: Some(10_000),
+        expiration_secs: 60,
+    };
+    let result = cli
+        .run_function(publisher_idx, Some(gas_options), roll, vec![], vec![])
+        .await;
+    match (result, expect_success) {
+        (Ok(summary), true) => {
+            info!("dice::roll committed as expected: {:?}", summary.transaction_hash);
+        },
+        (Err(e), false) => {
+            info!("dice::roll failed as expected (no randomness): {}", e);
+        },
+        (Ok(summary), false) => {
+            panic!(
+                "dice::roll unexpectedly committed when rDKG aborted: {:?}",
+                summary
+            );
+        },
+        (Err(e), true) => {
+            panic!("dice::roll unexpectedly failed when rDKG finished: {}", e);
+        },
+    }
+}
+
+/// Read `PerEpochEncryptionKey` and check it matches the expected presence.
+async fn assert_encryption_key_presence(client: &Client, expect_some: bool) {
+    let tag = PerEpochEncryptionKeyResource::struct_tag();
+    let key = client
+        .get_account_resource_bcs::<PerEpochEncryptionKeyResource>(
+            CORE_CODE_ADDRESS,
+            &tag.to_canonical_string(),
+        )
+        .await
+        .expect("PerEpochEncryptionKeyResource")
+        .into_inner()
+        .encryption_key
+        .is_some();
+    assert_eq!(
+        key, expect_some,
+        "encryption_key.is_some() mismatch (got {}, expected {})",
+        key, expect_some
+    );
+}
 
 /// Plain-txn progress: emit a small traffic burst and assert the chain commits
 /// something. This is the minimal "chain is alive" check; richer randomness
@@ -307,18 +400,23 @@ async fn run_matrix_case(case: MatrixCase) {
     }
 }
 
-/// Class A: prior is (NT, NT). Use governance with sync reconfig during epoch
-/// 2 to enable chunky+watchdog — that sync reconfig IS the x-1 → x transition
-/// with no DKG. Then end of epoch 3 is the x → x+1 transition.
+/// Class A: prior is (NT, NT). Use governance with `force_end_epoch` during
+/// epoch 2 to enable chunky+watchdog without any DKG — that's the x-1 → x
+/// transition with truly zero DKG activity. Then end of epoch 3 is the x →
+/// x+1 transition.
 async fn run_class_a(case: MatrixCase) {
     assert!(case.prior_is_nt_nt());
-    let (swarm, cli, root_idx) = create_swarm_with_dkg_only(4, EPOCH_DURATION_SECS).await;
+    let (swarm, mut cli, root_idx) = create_swarm_with_dkg_only(4, EPOCH_DURATION_SECS).await;
     let client = swarm.validators().nth(1).unwrap().rest_client();
 
     swarm
         .wait_for_all_nodes_to_catchup_to_epoch(2, Duration::from_secs(EPOCH_DURATION_SECS * 3))
         .await
         .expect("epoch 2");
+
+    // Publish dice early so it's available regardless of when randomness
+    // becomes usable; the module deploy itself doesn't need randomness.
+    publish_dice_module(&mut cli, root_idx).await;
 
     let epoch_before = client
         .get_ledger_information()
@@ -328,7 +426,6 @@ async fn run_class_a(case: MatrixCase) {
         .epoch;
     info!("Class A: stable at epoch {}", epoch_before);
 
-    // Failpoints for CURRENT epoch (x = epoch 3) outcomes.
     if case.cur_rdkg == Aborted {
         info!("Class A: enabling rDKG abort failpoint for current epoch");
         set_failpoint_on_all(&swarm, FP_RDKG, "return").await;
@@ -341,11 +438,15 @@ async fn run_class_a(case: MatrixCase) {
     info!("Class A: governance enables chunky+watchdog+ENC + force_end_epoch");
     gov_enable_all_with_force_end_epoch(&cli, root_idx, WATCHDOG_GRACE_SECS).await;
 
-    // Now we're in epoch 3 (= x). End of epoch 3 will produce the current state
-    // via the failpoints set above.
     let target = epoch_before + 2;
     wait_for_epoch_with_logging(&client, target, EPOCH_DURATION_SECS, WATCHDOG_GRACE_SECS).await;
 
+    // Leave failpoints in their cur state — disarming would let the natural
+    // end-of-x+1 reconfig succeed and overwrite encryption_key, masking
+    // cur_cdkg=Aborted vs Finished. Snapshot the resource first.
+    // Class A: chunky off until x; only the cur cDKG run could have produced a key.
+    assert_encryption_key_presence(&client, case.cur_cdkg == Finished).await;
+    roll_dice_and_expect(&mut cli, root_idx, case.cur_rdkg == Finished).await;
     assert_chain_progresses(&client).await;
     info!("Class A case {:?} OK", case);
 }
@@ -361,13 +462,15 @@ async fn run_class_b(case: MatrixCase) {
     assert!(case.prior_cdkg == NotTriggered);
     assert!(case.prior_rdkg != NotTriggered);
 
-    let (swarm, cli, root_idx) = create_swarm_with_dkg_only(4, EPOCH_DURATION_SECS).await;
+    let (swarm, mut cli, root_idx) = create_swarm_with_dkg_only(4, EPOCH_DURATION_SECS).await;
     let client = swarm.validators().nth(1).unwrap().rest_client();
 
     swarm
         .wait_for_all_nodes_to_catchup_to_epoch(2, Duration::from_secs(EPOCH_DURATION_SECS * 3))
         .await
         .expect("epoch 2");
+
+    publish_dice_module(&mut cli, root_idx).await;
 
     let epoch_at_watchdog_gov = client
         .get_ledger_information()
@@ -378,12 +481,10 @@ async fn run_class_b(case: MatrixCase) {
     info!("Class B: stable at epoch {} (enabling watchdog)", epoch_at_watchdog_gov);
 
     gov_enable_watchdog_with_sync_reconfig(&cli, root_idx, WATCHDOG_GRACE_SECS).await;
-    // Now in epoch_at_watchdog_gov + 1. Chunky still off.
 
     info!("Class B: buffering chunky+ENC for next epoch (no reconfig)");
     gov_buffer_chunky_and_enc_no_reconfig(&cli, root_idx).await;
 
-    // Set PRIOR rDKG failpoint (cDKG won't trigger this epoch — chunky off).
     if case.prior_rdkg == Aborted {
         info!("Class B: prior rDKG=A — setting rDKG abort failpoint");
         set_failpoint_on_all(&swarm, FP_RDKG, "return").await;
@@ -393,7 +494,6 @@ async fn run_class_b(case: MatrixCase) {
     wait_for_epoch_with_logging(&client, prior_target, EPOCH_DURATION_SECS, WATCHDOG_GRACE_SECS)
         .await;
 
-    // Now in epoch x = prior_target with chunky on. Adjust failpoints for current.
     if case.cur_rdkg == Finished {
         clear_failpoint_on_all(&swarm, FP_RDKG).await;
     } else {
@@ -409,6 +509,9 @@ async fn run_class_b(case: MatrixCase) {
     wait_for_epoch_with_logging(&client, current_target, EPOCH_DURATION_SECS, WATCHDOG_GRACE_SECS)
         .await;
 
+    // Class B: chunky off until x; only the cur cDKG run could have produced a key.
+    assert_encryption_key_presence(&client, case.cur_cdkg == Finished).await;
+    roll_dice_and_expect(&mut cli, root_idx, case.cur_rdkg == Finished).await;
     assert_chain_progresses(&client).await;
     info!("Class B case {:?} OK", case);
 }
@@ -423,13 +526,15 @@ async fn run_class_c(case: MatrixCase) {
         "class C requires both prior r and c triggered",
     );
 
-    let (swarm, cli, root_idx) = create_swarm_class_c(4, EPOCH_DURATION_SECS).await;
+    let (swarm, mut cli, root_idx) = create_swarm_class_c(4, EPOCH_DURATION_SECS).await;
     let client = swarm.validators().nth(1).unwrap().rest_client();
 
     swarm
         .wait_for_all_nodes_to_catchup_to_epoch(2, Duration::from_secs(EPOCH_DURATION_SECS * 4))
         .await
         .expect("epoch 2");
+
+    publish_dice_module(&mut cli, root_idx).await;
 
     let epoch_at_gov = client
         .get_ledger_information()
@@ -471,6 +576,10 @@ async fn run_class_c(case: MatrixCase) {
     let current_target = prior_target + 1;
     wait_for_epoch_with_logging(&client, current_target, EPOCH_DURATION_SECS, WATCHDOG_GRACE_SECS).await;
 
+    // Class C: chunky on from genesis, so epoch 1→2 already produced a key.
+    // The PerEpochEncryptionKey is therefore always Some, regardless of cur cDKG.
+    assert_encryption_key_presence(&client, true).await;
+    roll_dice_and_expect(&mut cli, root_idx, case.cur_rdkg == Finished).await;
     assert_chain_progresses(&client).await;
     info!("Class C case {:?} OK", case);
 }
