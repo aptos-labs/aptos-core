@@ -161,6 +161,17 @@ impl<'a, T: ExecutionContext> InterpreterContext<'a, T> {
         unsafe { read_u64(self.stack.as_ptr(), FRAME_METADATA_SIZE + offset as usize) }
     }
 
+    /// Read `size` raw bytes from the root frame at the given byte offset.
+    pub fn root_result_bytes(&self, offset: u32, size: u32) -> &[u8] {
+        unsafe {
+            let base = self
+                .stack
+                .as_ptr()
+                .add(FRAME_METADATA_SIZE + offset as usize);
+            std::slice::from_raw_parts(base, size as usize)
+        }
+    }
+
     /// Copy argument bytes into the root frame at the given byte offset.
     pub fn set_root_arg(&mut self, offset: u32, arg: &[u8]) {
         unsafe {
@@ -411,17 +422,17 @@ macro_rules! dispatch_int_operand {
 }
 
 // Generates an `#[inline(never)]` arith dispatcher (`exec_int_add` etc.)
-// from a function name, an error label, and the checked associated fn to
-// call on the operand pair. Marking the dispatcher `#[inline(never)]`
-// keeps the hot [`InterpreterContext::step`] loop compact: the per-op
-// type fanout (12 widths × 2 operand kinds) lives in the out-of-line
-// function and only inflates the i-cache for that op when it actually
-// runs.
+// from a function name, an error message string used when the checked op
+// returns `None`, and the checked associated fn to call on the operand
+// pair. Marking the dispatcher `#[inline(never)]` keeps the hot
+// [`InterpreterContext::step`] loop compact: the per-op type fanout
+// (12 widths × 2 operand kinds) lives in the out-of-line function and
+// only inflates the i-cache for that op when it actually runs.
 //
 // Example usage:
 //   impl_int_arith!(exec_int_add, "IntAdd: under/overflow", checked_add);
 macro_rules! impl_int_arith {
-    ($fn_name:ident, $op_label:literal, $method:ident) => {
+    ($fn_name:ident, $err_msg:literal, $method:ident) => {
         /// # Safety
         /// `fp` is the current frame pointer; `op`'s slot offsets are
         /// in-bounds (enforced by the verifier).
@@ -433,7 +444,7 @@ macro_rules! impl_int_arith {
                         let lhs_val: $ty = read_int::<$ty>(fp, op.lhs);
                         let rhs_val: $ty = $rhs;
                         let result: $ty = <$ty>::$method(lhs_val, rhs_val)
-                            .ok_or_else(|| anyhow::anyhow!($op_label))?;
+                            .ok_or_else(|| anyhow::anyhow!($err_msg))?;
                         write_int::<$ty>(fp, op.dst, result);
                     }};
                 }
@@ -444,9 +455,10 @@ macro_rules! impl_int_arith {
     };
 }
 
-// Each label notes the abort condition. Signed arith can underflow on
-// `Add` (e.g. `i8::MIN + (-1)`) as well as overflow on `Sub`, so both are
-// reported as "under/overflow" to keep the message accurate for either.
+// Each error message notes the abort condition. Signed arith can
+// underflow on `Add` (e.g. `i8::MIN + (-1)`) as well as overflow on `Sub`,
+// so both are reported as "under/overflow" to keep the message accurate
+// for either.
 impl_int_arith!(exec_int_add, "IntAdd: under/overflow", checked_add);
 impl_int_arith!(exec_int_sub, "IntSub: under/overflow", checked_sub);
 impl_int_arith!(exec_int_mul, "IntMul: under/overflow", checked_mul);
@@ -458,25 +470,29 @@ impl_int_arith!(exec_int_mod, "IntMod: by zero or overflow", checked_rem);
 // rejects signed operands at the interpreter level — bitwise on signed
 // integers is undefined in Move and would also fail to compile against
 // [`I256`], which doesn't implement the Rust bit operators.
+//
+// `#[rustfmt::skip]`: nested `macro_rules! exec` uses literal
+// `unsigned` / `signed` tokens that confuse rustfmt's indenter.
+#[rustfmt::skip]
 macro_rules! impl_int_bitwise {
-    ($fn_name:ident, $op_label:literal, $bop:tt) => {
+    ($fn_name:ident, $op_name:literal, $bop:tt) => {
         /// # Safety
         /// See [`exec_int_add`].
         #[inline(never)]
         unsafe fn $fn_name(fp: *mut u8, op: &IntBinaryOp) -> ExecutionResult<()> {
             unsafe {
                 macro_rules! exec {
-                                    ($ty:ty, unsigned, $rhs:expr) => {{
-                                        let lhs_val: $ty = read_int::<$ty>(fp, op.lhs);
-                                        let rhs_val: $ty = $rhs;
-                                        let result: $ty = lhs_val $bop rhs_val;
-                                        write_int::<$ty>(fp, op.dst, result);
-                                    }};
-                                    ($ty:ty, signed, $rhs:expr) => {{
-                                        let _ = $rhs;
-                                        bail!(concat!($op_label, " on a signed value is invalid"))
-                                    }};
-                                }
+                    ($ty:ty, unsigned, $rhs:expr) => {{
+                        let lhs_val: $ty = read_int::<$ty>(fp, op.lhs);
+                        let rhs_val: $ty = $rhs;
+                        let result: $ty = lhs_val $bop rhs_val;
+                        write_int::<$ty>(fp, op.dst, result);
+                    }};
+                    ($ty:ty, signed, $rhs:expr) => {{
+                        let _ = $rhs;
+                        bail!(concat!($op_name, " on a signed value is invalid"))
+                    }};
+                }
                 dispatch_int_operand!(fp, &op.rhs, exec);
                 Ok(())
             }
@@ -488,21 +504,45 @@ impl_int_bitwise!(exec_int_bit_and, "IntBitAnd", &);
 impl_int_bitwise!(exec_int_bit_or, "IntBitOr", |);
 impl_int_bitwise!(exec_int_bit_xor, "IntBitXor", ^);
 
-// Generates a shift dispatcher (`exec_int_shl` / `exec_int_shr`). The
-// shift amount is always `u8` in Move (range-checked here against
-// `op.ty.bit_width()`); native widths shift by `u32`, [`U256`] by `Self`.
+// Dispatch on a shift op's lhs type. Centralizes the 12-arm fanout so
+// `impl_int_shift!` can stay a one-invocation generator. Native widths
+// shift by `u32`; [`U256`]'s `Shl`/`Shr` impls require `Self` for the rhs,
+// so its arm passes `u256_from_u8($shift_amount)` instead. Signed arms
+// fall through to a `signed` action arm so the caller can bail.
+macro_rules! dispatch_shift_lhs_ty {
+    ($ty:expr, $shift_amount:expr, $action:ident) => {
+        match $ty {
+            IntTy::U8 => $action!(u8, unsigned, $shift_amount as u32),
+            IntTy::U16 => $action!(u16, unsigned, $shift_amount as u32),
+            IntTy::U32 => $action!(u32, unsigned, $shift_amount as u32),
+            IntTy::U64 => $action!(u64, unsigned, $shift_amount as u32),
+            IntTy::U128 => $action!(u128, unsigned, $shift_amount as u32),
+            IntTy::U256 => $action!(U256, unsigned, u256_from_u8($shift_amount)),
+            IntTy::I8 => $action!(i8, signed, 0u32),
+            IntTy::I16 => $action!(i16, signed, 0u32),
+            IntTy::I32 => $action!(i32, signed, 0u32),
+            IntTy::I64 => $action!(i64, signed, 0u32),
+            IntTy::I128 => $action!(i128, signed, 0u32),
+            IntTy::I256 => $action!(I256, signed, 0u32),
+        }
+    };
+}
+
+// Generates a shift dispatcher (`exec_int_shl` / `exec_int_shr`). Same
+// shape as [`impl_int_arith!`] / [`impl_int_bitwise!`]: a nested `exec!`
+// macro defines the per-type body once, and [`dispatch_shift_lhs_ty!`]
+// fans it out over the 12 [`IntTy`] arms.
 //
-// We inline the 6-arm `match op.ty` directly rather than calling out to
-// another `macro_rules!` like the binary ops do, because a nested macro
-// definition would have to thread `$bop` (a `<<` / `>>` token) through
-// another expansion layer — rustfmt's indent heuristic mis-handles that
-// pattern.
-//
-// TODO: `op.ty` may include signed widths under the unified [`IntTy`].
-// Move shifts are unsigned-only, so signed arms `bail!()` as a runtime
+// The shift amount is always `u8` in Move and is range-checked here
+// against `op.ty.bit_width()`. The `signed` arms `bail!()` as a runtime
 // guard; the verifier rejects them ahead of time.
+// `#[rustfmt::skip]` on the outer macro: the nested `macro_rules! exec`
+// uses literal `unsigned` / `signed` tokens in its arms, which confuses
+// rustfmt into over-indenting every arm past the first. Skipping the
+// whole macro keeps the body readable.
+#[rustfmt::skip]
 macro_rules! impl_int_shift {
-    ($fn_name:ident, $op_label:literal, $bop:tt) => {
+    ($fn_name:ident, $op_name:literal, $bop:tt) => {
         /// # Safety
         /// See [`exec_int_add`].
         #[inline(never)]
@@ -512,52 +552,26 @@ macro_rules! impl_int_shift {
                     ShiftOperand::SlotU8(off) => read_u8(fp, *off),
                     ShiftOperand::ImmU8(v) => *v,
                 };
-                let shift_u32 = shift_amount as u32;
                 let bit_width = op.ty.bit_width() as u32;
-                if shift_u32 >= bit_width {
+                if (shift_amount as u32) >= bit_width {
                     bail!(
-                        concat!($op_label, ".{}: shift amount {} >= bit width {}"),
+                        concat!($op_name, ".{}: shift amount {} >= bit width {}"),
                         op.ty,
                         shift_amount,
                         bit_width
                     );
                 }
-                match op.ty {
-                    IntTy::U8 => {
-                        let lhs_val: u8 = read_int::<u8>(fp, op.lhs);
-                        let result: u8 = lhs_val $bop shift_u32;
-                        write_int::<u8>(fp, op.dst, result);
-                    },
-                    IntTy::U16 => {
-                        let lhs_val: u16 = read_int::<u16>(fp, op.lhs);
-                        let result: u16 = lhs_val $bop shift_u32;
-                        write_int::<u16>(fp, op.dst, result);
-                    },
-                    IntTy::U32 => {
-                        let lhs_val: u32 = read_int::<u32>(fp, op.lhs);
-                        let result: u32 = lhs_val $bop shift_u32;
-                        write_int::<u32>(fp, op.dst, result);
-                    },
-                    IntTy::U64 => {
-                        let lhs_val: u64 = read_int::<u64>(fp, op.lhs);
-                        let result: u64 = lhs_val $bop shift_u32;
-                        write_int::<u64>(fp, op.dst, result);
-                    },
-                    IntTy::U128 => {
-                        let lhs_val: u128 = read_int::<u128>(fp, op.lhs);
-                        let result: u128 = lhs_val $bop shift_u32;
-                        write_int::<u128>(fp, op.dst, result);
-                    },
-                    IntTy::U256 => {
-                        let lhs_val: U256 = read_int::<U256>(fp, op.lhs);
-                        let rhs_val = u256_from_u8(shift_amount);
-                        let result: U256 = lhs_val $bop rhs_val;
-                        write_int::<U256>(fp, op.dst, result);
-                    },
-                    IntTy::I8 | IntTy::I16 | IntTy::I32 | IntTy::I64 | IntTy::I128 | IntTy::I256 => {
-                        bail!(concat!($op_label, " on a signed value is invalid"))
-                    },
+                macro_rules! exec {
+                    ($ty:ty, unsigned, $shift_val:expr) => {{
+                        let lhs_val: $ty = read_int::<$ty>(fp, op.lhs);
+                        let result: $ty = lhs_val $bop $shift_val;
+                        write_int::<$ty>(fp, op.dst, result);
+                    }};
+                    ($_ty:ty, signed, $_shift_val:expr) => {{
+                        bail!(concat!($op_name, " on a signed value is invalid"))
+                    }};
                 }
+                dispatch_shift_lhs_ty!(op.ty, shift_amount, exec);
                 Ok(())
             }
         }

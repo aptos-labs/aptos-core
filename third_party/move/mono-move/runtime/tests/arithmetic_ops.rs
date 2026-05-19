@@ -3,29 +3,25 @@
 
 //! Property tests for integer arithmetic / bitwise / shift micro-ops.
 //!
-//! For every supported (type, kind) combination — both the u64
-//! specialized variants ([`MicroOp::AddU64`] etc.) and the unspecialized
-//! [`MicroOp::IntBinary`] / [`MicroOp::IntBinary`] /
-//! [`MicroOp::IntShift`] families — the property is the same shape:
+//! For every supported (type, kind) combination, the property is the same
+//! shape:
 //!
 //! > For any (lhs, rhs) input, the runtime's output matches Rust's
 //! > reference impl (`T::checked_*` for arithmetic, native `& | ^` for
 //! > bitwise, `T::checked_shl` / `T::checked_shr` for shift). Both
 //! > succeed with the same value, or both abort.
 //!
-//! ## Shared dispatch
-//!
-//! The u64 specialized variants and the unspecialized encoding share the
-//! exact same property bodies. A small dispatch macro
-//! ([`arith_op`] / [`bit_op`] / [`shift_op`]) maps the test's Rust type
-//! token (`u64`, `u8`, `U256`, …) plus the op kind to the right
-//! [`MicroOp`] variant — specialized for u64, tag-dispatched otherwise.
-//! Invocations stay one line each:
+//! Each `prop_*` macro takes an optional `specialized` flag at the end.
+//! Without the flag (default), the test builds the MicroOp through the
+//! unspecialized per-kind path; with `specialized`, the test builds the
+//! u64 fast-path variant. Only u64 has a specialized form today, so the
+//! flag is u64-only. For u64 we run both forms; for every other width
+//! only the default applies.
 //!
 //! ```ignore
-//! prop_arith!(u64_add,  u64,  Add, u64::checked_add);
-//! prop_arith!(u8_add,   u8,   Add, u8::checked_add);
-//! prop_arith!(u256_add, U256, Add, U256::checked_add);
+//! prop_arith!(u64_add,             u64, Add, u64::checked_add);
+//! prop_arith!(u64_add_specialized, u64, Add, u64::checked_add, specialized);
+//! prop_arith!(u8_add,              u8,  Add, u8::checked_add);
 //! ```
 //!
 //! Each property fires the proptest default (256 cases). Edge values
@@ -113,6 +109,7 @@ macro_rules! impl_int_type_operand_boxed {
 impl_int_type_operand_inline!(u8, SlotU8, ImmU8);
 impl_int_type_operand_inline!(u16, SlotU16, ImmU16);
 impl_int_type_operand_inline!(u32, SlotU32, ImmU32);
+impl_int_type_operand_inline!(u64, SlotU64, ImmU64);
 impl_int_type_operand_inline!(i8, SlotI8, ImmI8);
 impl_int_type_operand_inline!(i16, SlotI16, ImmI16);
 impl_int_type_operand_inline!(i32, SlotI32, ImmI32);
@@ -134,6 +131,9 @@ impl UnsignedTypeTag for u16 {
 }
 impl UnsignedTypeTag for u32 {
     const UNSIGNED_TY: IntTy = IntTy::U32;
+}
+impl UnsignedTypeTag for u64 {
+    const UNSIGNED_TY: IntTy = IntTy::U64;
 }
 impl UnsignedTypeTag for u128 {
     const UNSIGNED_TY: IntTy = IntTy::U128;
@@ -447,68 +447,15 @@ fn unspec_negate_op<T: SignedTypeTag>() -> MicroOp {
 }
 
 // ---------------------------------------------------------------------------
-// Type → MicroOp dispatch macros
+// Type → MicroOp dispatch
 // ---------------------------------------------------------------------------
 //
-// `u64` routes to the specialized variant; every other supported width
-// routes through the unspec helper, which builds the right [`IntOperand`]
-// reg / imm arm via [`IntTypeOperand`]. Macro arms are tried top-to-bottom
-// — the `u64` literal arm wins for u64, the catch-all `$ty:tt` arm handles
-// the rest. The reg-reg dispatchers pass `T` via turbofish; the imm
-// dispatchers infer `T` from the imm value's type for arith/bitwise and
-// pass `T` via turbofish for shift (whose imm is always `u8`).
-
-macro_rules! arith_op {
-    (u64, $kind:ident) => {
-        u64_binary_op(BinKind::$kind)
-    };
-    ($ty:tt, $kind:ident) => {
-        unspec_binary_op::<$ty>(BinKind::$kind)
-    };
-}
-
-macro_rules! bit_op {
-    (u64, $kind:ident) => {
-        u64_binary_op(BinKind::$kind)
-    };
-    ($ty:tt, $kind:ident) => {
-        unspec_binary_op::<$ty>(BinKind::$kind)
-    };
-}
-
-macro_rules! shift_op {
-    (u64, $kind:ident) => {
-        u64_shift_op(ShiftKind::$kind)
-    };
-    ($ty:tt, $kind:ident) => {
-        unspec_shift_op::<$ty>(ShiftKind::$kind)
-    };
-}
-
-macro_rules! arith_imm_op {
-    (u64, $kind:ident, $imm:expr) => {
-        u64_binary_imm_op(BinKind::$kind, $imm)
-    };
-    ($ty:tt, $kind:ident, $imm:expr) => {
-        unspec_binary_imm_op(BinKind::$kind, $imm)
-    };
-}
-
-macro_rules! bit_imm_op {
-    // No u64 specialized variant — every width routes through unspec.
-    ($ty:tt, $kind:ident, $imm:expr) => {
-        unspec_binary_imm_op(BinKind::$kind, $imm)
-    };
-}
-
-macro_rules! shift_imm_op {
-    (u64, $kind:ident, $imm:expr) => {
-        u64_shift_imm_op(ShiftKind::$kind, $imm)
-    };
-    ($ty:tt, $kind:ident, $imm:expr) => {
-        unspec_shift_imm_op::<$ty>(ShiftKind::$kind, $imm)
-    };
-}
+// Each `prop_*` macro takes an optional `specialized` flag. Without the
+// flag (the default), the MicroOp is built via the unspecialized helper
+// — exercising the per-kind [`IntOperand`] dispatch in the runtime.
+// With the flag, the MicroOp is built via the u64 specialized helper;
+// this form only matches when `$ty == u64`, so passing the flag with
+// any other type is a compile error.
 
 macro_rules! negate_op {
     ($ty:tt) => {
@@ -574,13 +521,27 @@ fn u256_from_u8(s: u8) -> U256 {
 // bodies — only the MicroOp produced by the dispatch differs.
 
 /// Arithmetic property: runtime output matches `$ref_fn(a, b) -> Option<T>`.
+/// Default form exercises the unspecialized per-kind path; the
+/// `specialized` flag (u64-only) exercises the specialized fast path.
 macro_rules! prop_arith {
     ($name:ident, $ty:tt, $kind:ident, $ref_fn:expr) => {
         proptest! {
             #[test]
             fn $name(a in strat!($ty), b in strat!($ty)) {
                 let expected: Option<$ty> = $ref_fn(a, b);
-                let actual: Option<$ty> = run_binop::<$ty>(arith_op!($ty, $kind), a, b);
+                let op = unspec_binary_op::<$ty>(BinKind::$kind);
+                let actual: Option<$ty> = run_binop::<$ty>(op, a, b);
+                prop_assert_eq!(expected, actual);
+            }
+        }
+    };
+    ($name:ident,u64, $kind:ident, $ref_fn:expr,specialized) => {
+        proptest! {
+            #[test]
+            fn $name(a in strat!(u64), b in strat!(u64)) {
+                let expected: Option<u64> = $ref_fn(a, b);
+                let op = u64_binary_op(BinKind::$kind);
+                let actual: Option<u64> = run_binop::<u64>(op, a, b);
                 prop_assert_eq!(expected, actual);
             }
         }
@@ -588,14 +549,27 @@ macro_rules! prop_arith {
 }
 
 /// Bitwise property: infallible, so the reference returns `T` directly
-/// and the runtime is expected to never abort.
+/// and the runtime is expected to never abort. Default → unspec; flag →
+/// u64-specialized.
 macro_rules! prop_bit {
     ($name:ident, $ty:tt, $kind:ident, $ref_fn:expr) => {
         proptest! {
             #[test]
             fn $name(a in strat!($ty), b in strat!($ty)) {
                 let expected: $ty = $ref_fn(a, b);
-                let actual: Option<$ty> = run_binop::<$ty>(bit_op!($ty, $kind), a, b);
+                let op = unspec_binary_op::<$ty>(BinKind::$kind);
+                let actual: Option<$ty> = run_binop::<$ty>(op, a, b);
+                prop_assert_eq!(Some(expected), actual);
+            }
+        }
+    };
+    ($name:ident,u64, $kind:ident, $ref_fn:expr,specialized) => {
+        proptest! {
+            #[test]
+            fn $name(a in strat!(u64), b in strat!(u64)) {
+                let expected: u64 = $ref_fn(a, b);
+                let op = u64_binary_op(BinKind::$kind);
+                let actual: Option<u64> = run_binop::<u64>(op, a, b);
                 prop_assert_eq!(Some(expected), actual);
             }
         }
@@ -605,24 +579,34 @@ macro_rules! prop_bit {
 /// Shift property: shift amount is always `u8`; the reference returns
 /// `Option<T>` so native widths can express the out-of-range abort case
 /// and U256 (where shift < 256 by construction) returns `Some(_)` always.
+/// Default → unspec; flag → u64-specialized.
 macro_rules! prop_shift {
     ($name:ident, $ty:tt, $kind:ident, $ref_fn:expr) => {
         proptest! {
             #[test]
             fn $name(a in strat!($ty), s in any::<u8>()) {
                 let expected: Option<$ty> = $ref_fn(a, s);
-                let actual: Option<$ty> = run_shift::<$ty>(shift_op!($ty, $kind), a, s);
+                let op = unspec_shift_op::<$ty>(ShiftKind::$kind);
+                let actual: Option<$ty> = run_shift::<$ty>(op, a, s);
+                prop_assert_eq!(expected, actual);
+            }
+        }
+    };
+    ($name:ident,u64, $kind:ident, $ref_fn:expr,specialized) => {
+        proptest! {
+            #[test]
+            fn $name(a in strat!(u64), s in any::<u8>()) {
+                let expected: Option<u64> = $ref_fn(a, s);
+                let op = u64_shift_op(ShiftKind::$kind);
+                let actual: Option<u64> = run_shift::<u64>(op, a, s);
                 prop_assert_eq!(expected, actual);
             }
         }
     };
 }
 
-/// Property for u64 immediate-form ops. Imm forms have a different
-/// `MicroOp` shape (`{ dst, src, imm }`), so they don't go through the
-/// dispatch macros. `$imm_strategy` is bounded for variants the verifier
-/// rejects on bad immediates (div/mod imm must be > 0; shift imm must be
-/// < 64).
+/// Property for u64 immediate-form ops with no unspecialized counterpart
+/// (currently just `RSubU64Imm`).
 macro_rules! prop_imm {
     ($name:ident, $variant:ident, $imm_strategy:expr, $ref_fn:expr) => {
         proptest! {
@@ -639,15 +623,26 @@ macro_rules! prop_imm {
 
 /// Arithmetic imm property: runtime matches `$ref_fn(a, imm) -> Option<T>`.
 /// `$imm_strategy` is bounded for Div / Mod kinds (must be nonzero) and
-/// open for Add / Sub / Mul.
+/// open for Add / Sub / Mul. Default → unspec; flag → u64-specialized.
 macro_rules! prop_arith_imm {
     ($name:ident, $ty:tt, $kind:ident, $imm_strategy:expr, $ref_fn:expr) => {
         proptest! {
             #[test]
             fn $name(a in strat!($ty), imm in $imm_strategy) {
                 let expected: Option<$ty> = $ref_fn(a, imm);
-                let op = arith_imm_op!($ty, $kind, imm);
+                let op = unspec_binary_imm_op::<$ty>(BinKind::$kind, imm);
                 let actual: Option<$ty> = run_unop::<$ty>(op, a);
+                prop_assert_eq!(expected, actual);
+            }
+        }
+    };
+    ($name:ident,u64, $kind:ident, $imm_strategy:expr, $ref_fn:expr,specialized) => {
+        proptest! {
+            #[test]
+            fn $name(a in strat!(u64), imm in $imm_strategy) {
+                let expected: Option<u64> = $ref_fn(a, imm);
+                let op = u64_binary_imm_op(BinKind::$kind, imm);
+                let actual: Option<u64> = run_unop::<u64>(op, a);
                 prop_assert_eq!(expected, actual);
             }
         }
@@ -655,14 +650,16 @@ macro_rules! prop_arith_imm {
 }
 
 /// Bitwise imm property. Infallible — no Option wrapping on the
-/// reference side. No u64 invocations (no specialized variant exists).
+/// reference side. No specialized form: u64 bitwise imm has no
+/// specialized variant, so every width goes through the unspecialized
+/// path.
 macro_rules! prop_bit_imm {
     ($name:ident, $ty:tt, $kind:ident, $ref_fn:expr) => {
         proptest! {
             #[test]
             fn $name(a in strat!($ty), imm in strat!($ty)) {
                 let expected: $ty = $ref_fn(a, imm);
-                let op = bit_imm_op!($ty, $kind, imm);
+                let op = unspec_binary_imm_op::<$ty>(BinKind::$kind, imm);
                 let actual: Option<$ty> = run_unop::<$ty>(op, a);
                 prop_assert_eq!(Some(expected), actual);
             }
@@ -672,15 +669,27 @@ macro_rules! prop_bit_imm {
 
 /// Shift imm property. `$imm_strategy` is bounded to `0..bit_width($ty)`
 /// for native widths so the verifier accepts the op; u256 uses
-/// `any::<u8>()` because u8 caps at 255 < 256 = bit_width.
+/// `any::<u8>()` because u8 caps at 255 < 256 = bit_width. Default →
+/// unspec; flag → u64-specialized.
 macro_rules! prop_shift_imm {
     ($name:ident, $ty:tt, $kind:ident, $imm_strategy:expr, $ref_fn:expr) => {
         proptest! {
             #[test]
             fn $name(a in strat!($ty), imm in $imm_strategy) {
                 let expected: Option<$ty> = $ref_fn(a, imm);
-                let op = shift_imm_op!($ty, $kind, imm);
+                let op = unspec_shift_imm_op::<$ty>(ShiftKind::$kind, imm);
                 let actual: Option<$ty> = run_unop::<$ty>(op, a);
+                prop_assert_eq!(expected, actual);
+            }
+        }
+    };
+    ($name:ident,u64, $kind:ident, $imm_strategy:expr, $ref_fn:expr,specialized) => {
+        proptest! {
+            #[test]
+            fn $name(a in strat!(u64), imm in $imm_strategy) {
+                let expected: Option<u64> = $ref_fn(a, imm);
+                let op = u64_shift_imm_op(ShiftKind::$kind, imm);
+                let actual: Option<u64> = run_unop::<u64>(op, a);
                 prop_assert_eq!(expected, actual);
             }
         }
@@ -727,6 +736,12 @@ prop_arith!(u64_sub, u64, Sub, u64::checked_sub);
 prop_arith!(u64_mul, u64, Mul, u64::checked_mul);
 prop_arith!(u64_div, u64, Div, u64::checked_div);
 prop_arith!(u64_mod, u64, Mod, u64::checked_rem);
+
+prop_arith!(u64_add_specialized, u64, Add, u64::checked_add, specialized);
+prop_arith!(u64_sub_specialized, u64, Sub, u64::checked_sub, specialized);
+prop_arith!(u64_mul_specialized, u64, Mul, u64::checked_mul, specialized);
+prop_arith!(u64_div_specialized, u64, Div, u64::checked_div, specialized);
+prop_arith!(u64_mod_specialized, u64, Mod, u64::checked_rem, specialized);
 
 prop_arith!(u128_add, u128, Add, u128::checked_add);
 prop_arith!(u128_sub, u128, Sub, u128::checked_sub);
@@ -796,6 +811,28 @@ prop_bit!(u64_and, u64, BitAnd, |a: u64, b: u64| a & b);
 prop_bit!(u64_or, u64, BitOr, |a: u64, b: u64| a | b);
 prop_bit!(u64_xor, u64, BitXor, |a: u64, b: u64| a ^ b);
 
+prop_bit!(
+    u64_and_specialized,
+    u64,
+    BitAnd,
+    |a: u64, b: u64| a & b,
+    specialized
+);
+prop_bit!(
+    u64_or_specialized,
+    u64,
+    BitOr,
+    |a: u64, b: u64| a | b,
+    specialized
+);
+prop_bit!(
+    u64_xor_specialized,
+    u64,
+    BitXor,
+    |a: u64, b: u64| a ^ b,
+    specialized
+);
+
 prop_bit!(u128_and, u128, BitAnd, |a: u128, b: u128| a & b);
 prop_bit!(u128_or, u128, BitOr, |a: u128, b: u128| a | b);
 prop_bit!(u128_xor, u128, BitXor, |a: u128, b: u128| a ^ b);
@@ -836,6 +873,21 @@ prop_shift!(u64_shl, u64, Shl, |a: u64, s: u8| u64::checked_shl(
 prop_shift!(u64_shr, u64, Shr, |a: u64, s: u8| u64::checked_shr(
     a, s as u32
 ));
+
+prop_shift!(
+    u64_shl_specialized,
+    u64,
+    Shl,
+    |a: u64, s: u8| u64::checked_shl(a, s as u32),
+    specialized
+);
+prop_shift!(
+    u64_shr_specialized,
+    u64,
+    Shr,
+    |a: u64, s: u8| u64::checked_shr(a, s as u32),
+    specialized
+);
 
 prop_shift!(u128_shl, u128, Shl, |a: u128, s: u8| {
     u128::checked_shl(a, s as u32)
@@ -878,6 +930,47 @@ prop_arith_imm!(u64_sub_imm, u64, Sub, any::<u64>(), u64::checked_sub);
 prop_arith_imm!(u64_mul_imm, u64, Mul, any::<u64>(), u64::checked_mul);
 prop_arith_imm!(u64_div_imm, u64, Div, 1u64.., u64::checked_div);
 prop_arith_imm!(u64_mod_imm, u64, Mod, 1u64.., u64::checked_rem);
+
+prop_arith_imm!(
+    u64_add_imm_specialized,
+    u64,
+    Add,
+    any::<u64>(),
+    u64::checked_add,
+    specialized
+);
+prop_arith_imm!(
+    u64_sub_imm_specialized,
+    u64,
+    Sub,
+    any::<u64>(),
+    u64::checked_sub,
+    specialized
+);
+prop_arith_imm!(
+    u64_mul_imm_specialized,
+    u64,
+    Mul,
+    any::<u64>(),
+    u64::checked_mul,
+    specialized
+);
+prop_arith_imm!(
+    u64_div_imm_specialized,
+    u64,
+    Div,
+    1u64..,
+    u64::checked_div,
+    specialized
+);
+prop_arith_imm!(
+    u64_mod_imm_specialized,
+    u64,
+    Mod,
+    1u64..,
+    u64::checked_rem,
+    specialized
+);
 
 prop_arith_imm!(u128_add_imm, u128, Add, strat!(u128), u128::checked_add);
 prop_arith_imm!(u128_sub_imm, u128, Sub, strat!(u128), u128::checked_sub);
@@ -990,6 +1083,23 @@ prop_shift_imm!(u64_shl_imm, u64, Shl, 0u8..64, |a: u64, s: u8| {
 prop_shift_imm!(u64_shr_imm, u64, Shr, 0u8..64, |a: u64, s: u8| {
     u64::checked_shr(a, s as u32)
 });
+
+prop_shift_imm!(
+    u64_shl_imm_specialized,
+    u64,
+    Shl,
+    0u8..64,
+    |a: u64, s: u8| { u64::checked_shl(a, s as u32) },
+    specialized
+);
+prop_shift_imm!(
+    u64_shr_imm_specialized,
+    u64,
+    Shr,
+    0u8..64,
+    |a: u64, s: u8| { u64::checked_shr(a, s as u32) },
+    specialized
+);
 
 prop_shift_imm!(u128_shl_imm, u128, Shl, 0u8..128, |a: u128, s: u8| {
     u128::checked_shl(a, s as u32)
