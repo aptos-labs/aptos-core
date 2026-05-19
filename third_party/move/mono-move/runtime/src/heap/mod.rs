@@ -13,9 +13,9 @@ pub(crate) mod object_descriptor;
 pub(crate) mod pinned_roots;
 
 use crate::{
-    bail,
-    error::ExecutionResult,
+    error::{RuntimeError, RuntimeResult},
     heap::object_descriptor::{ObjectDescriptor, ObjectDescriptorInner},
+    invariant_violation,
     memory::{
         read_descriptor, read_forwarding, read_obj_size, read_ptr, read_u64, write_descriptor,
         write_forwarding, write_obj_size, write_ptr, write_u64, MemoryRegion,
@@ -222,20 +222,20 @@ fn heap_alloc(
     pc: usize,
     total_size: usize,
     descriptor_id: DescriptorId,
-) -> ExecutionResult<*mut u8> {
+) -> RuntimeResult<*mut u8> {
     // Round up to MAX_ALIGN with overflow protection; the
     // `MAX_SINGLE_ALLOCATION_SIZE` check below then applies to the
     // *aligned* size so the rounding can't smuggle an oversize allocation
     // past the bound.
-    let aligned_size = checked_align_max(total_size).ok_or_else(|| {
-        anyhow::anyhow!("heap_alloc: size {} overflows after alignment", total_size)
-    })?;
+    let aligned_size =
+        checked_align_max(total_size).ok_or_else(|| RuntimeError::AllocationTooLarge {
+            requested: total_size,
+        })?;
     debug_assert!(aligned_size >= OBJECT_HEADER_SIZE);
     if aligned_size > MAX_SINGLE_ALLOCATION_SIZE {
-        bail!(
-            "heap_alloc: size {} exceeds maximum single allocation size",
-            aligned_size
-        );
+        return Err(RuntimeError::AllocationTooLarge {
+            requested: aligned_size,
+        });
     }
 
     // Bound check uses integer arithmetic on addresses rather than
@@ -246,10 +246,9 @@ fn heap_alloc(
     if !fits_in_buffer(heap, aligned_size) {
         gc_collect(heap, descriptors, pinned_roots, fp, current_func, pc)?;
         if !fits_in_buffer(heap, aligned_size) {
-            bail!(
-                "out of heap memory after GC (requested {} bytes)",
-                aligned_size
-            );
+            return Err(RuntimeError::OutOfHeapMemory {
+                requested: aligned_size,
+            });
         }
     }
 
@@ -280,11 +279,11 @@ pub(crate) fn alloc_vec(
     descriptor_id: DescriptorId,
     elem_size: u32,
     capacity_in_elems: u64,
-) -> ExecutionResult<*mut u8> {
+) -> RuntimeResult<*mut u8> {
     let total_size = (capacity_in_elems as usize)
         .checked_mul(elem_size as usize)
         .and_then(|v| v.checked_add(OBJECT_HEADER_SIZE + VEC_DATA_OFFSET))
-        .ok_or_else(|| anyhow::anyhow!("alloc_vec: size overflow"))?;
+        .ok_or(RuntimeError::VecAllocSizeOverflow)?;
     heap_alloc(
         heap,
         descriptors,
@@ -308,7 +307,7 @@ pub(crate) fn alloc_obj(
     current_func: NonNull<Function>,
     pc: usize,
     descriptor_id: DescriptorId,
-) -> ExecutionResult<*mut u8> {
+) -> RuntimeResult<*mut u8> {
     let payload_size = match descriptors[descriptor_id.as_usize()].inner() {
         ObjectDescriptorInner::Struct { size, .. } => *size as usize,
         ObjectDescriptorInner::Enum { size, .. } => *size as usize,
@@ -317,10 +316,11 @@ pub(crate) fn alloc_obj(
             // Add the 8-byte tag+padding prefix to the values-region size.
             CAPTURED_DATA_VALUES_OFFSET + *size as usize
         },
-        ObjectDescriptorInner::Trivial | ObjectDescriptorInner::Vector { .. } => bail!(
-            "alloc_obj called with non-allocatable descriptor {}",
-            descriptor_id
-        ),
+        ObjectDescriptorInner::Trivial | ObjectDescriptorInner::Vector { .. } => {
+            invariant_violation!(NonAllocatableDescriptor {
+                descriptor_id: descriptor_id.as_u32(),
+            });
+        },
     };
     heap_alloc(
         heap,
@@ -357,7 +357,7 @@ pub(crate) fn grow_vec_ref(
     vec_ref_offset: usize,
     elem_size: u32,
     required_cap_in_elems: u64,
-) -> ExecutionResult<*mut u8> {
+) -> RuntimeResult<*mut u8> {
     unsafe {
         let base = read_ptr(fp, vec_ref_offset);
         let off = read_u64(fp, vec_ref_offset + 8) as usize;
@@ -443,7 +443,7 @@ pub(crate) fn gc_collect(
     frame_ptr: *mut u8,
     current_func: NonNull<Function>,
     pc_top: usize,
-) -> ExecutionResult<()> {
+) -> RuntimeResult<()> {
     heap.gc_count += 1;
 
     let to_space = MemoryRegion::new(heap.buffer.len());
@@ -532,14 +532,11 @@ pub(crate) fn gc_collect(
             let obj_size = read_obj_size(obj_ptr) as usize;
 
             if obj_size == 0 || obj_size != align_max(obj_size) {
-                bail!(
-                    "GC scan: invalid object size {} (expected non-zero, MAX_ALIGN-byte aligned)",
-                    obj_size
-                );
+                invariant_violation!(GcInvalidObjectSize { size: obj_size });
             }
 
             if descriptor_id == FORWARDED_MARKER {
-                bail!("GC found forwarding marker in to-space (invariant violation)");
+                invariant_violation!(GcForwardingMarkerInToSpace);
             }
             gc_scan_object(descriptors, heap, obj_ptr, descriptor_id, &mut free_ptr);
 

@@ -5,14 +5,14 @@
 //! and a bump-allocated heap with copying GC.
 
 use crate::{
-    bail,
-    error::ExecutionResult,
+    error::{ArithOp, RuntimeError, RuntimeResult, Signedness, VecOp},
     heap::{
         macros::{alloc_obj, alloc_vec, gc_collect, grow_vec_ref},
         object_descriptor::{ObjectDescriptor, CLOSURE_DESCRIPTOR_ID},
         pinned_roots::PinnedRoots,
         Heap,
     },
+    invariant_violation,
     memory::{
         read_obj_size, read_ptr, read_u64, read_u8, vec_elem_ptr, write_ptr, write_u64,
         MemoryRegion,
@@ -25,10 +25,10 @@ use crate::{
 use mono_move_core::{
     CallClosureOp, ClosureFuncRef, DescriptorId, ExecutionContext, FrameOffset, Function,
     IntBinaryOp, IntNegateOp, IntOperand, IntShiftOp, IntTy, MicroOp, PackClosureOp, ShiftOperand,
-    SizedSlot, CAPTURED_DATA_TAG_MATERIALIZED, CAPTURED_DATA_TAG_OFFSET,
-    CAPTURED_DATA_VALUES_OFFSET, CLOSURE_CAPTURED_DATA_PTR_OFFSET, CLOSURE_FUNC_REF_OFFSET,
-    CLOSURE_MASK_OFFSET, FRAME_METADATA_SIZE, FUNC_REF_PAYLOAD_OFFSET, FUNC_REF_TAG_OFFSET,
-    FUNC_REF_TAG_RESOLVED, MAX_ALIGN, OBJECT_HEADER_SIZE,
+    CAPTURED_DATA_TAG_MATERIALIZED, CAPTURED_DATA_TAG_OFFSET, CAPTURED_DATA_VALUES_OFFSET,
+    CLOSURE_CAPTURED_DATA_PTR_OFFSET, CLOSURE_FUNC_REF_OFFSET, CLOSURE_MASK_OFFSET,
+    FRAME_METADATA_SIZE, FUNC_REF_PAYLOAD_OFFSET, FUNC_REF_TAG_OFFSET, FUNC_REF_TAG_RESOLVED,
+    MAX_ALIGN, OBJECT_HEADER_SIZE,
 };
 use mono_move_gas::GasMeter;
 use move_core_types::int256::{I256, U256};
@@ -195,7 +195,7 @@ impl<'a, T: ExecutionContext> InterpreterContext<'a, T> {
         &mut self,
         descriptor_id: DescriptorId,
         values: &[u64],
-    ) -> ExecutionResult<u64> {
+    ) -> RuntimeResult<u64> {
         let n = values.len() as u64;
         let ptr = alloc_vec!(self, self.frame_ptr, descriptor_id, 8, n)?;
         unsafe {
@@ -248,7 +248,7 @@ unsafe fn binop_u64<F: FnOnce(u64, u64) -> u64>(
     }
 }
 
-/// `dst <- op(lhs_slot, rhs_slot)`. Bail with `err` on `None`.
+/// `dst <- op(lhs_slot, rhs_slot)` (fallible).
 #[inline(always)]
 unsafe fn checked_binop_u64<F: FnOnce(u64, u64) -> Option<u64>>(
     fp: *mut u8,
@@ -256,18 +256,15 @@ unsafe fn checked_binop_u64<F: FnOnce(u64, u64) -> Option<u64>>(
     lhs: FrameOffset,
     rhs: FrameOffset,
     op: F,
-    err: &'static str,
-) -> ExecutionResult<()> {
+) -> Option<()> {
     // SAFETY: `fp` is the current frame pointer and `lhs`/`rhs`/`dst` are
     // in-bounds 8-byte slots within that frame (enforced by the verifier).
     unsafe {
         let a = read_u64(fp, lhs);
         let b = read_u64(fp, rhs);
-        match op(a, b) {
-            Some(v) => write_u64(fp, dst, v),
-            None => bail!(err),
-        }
-        Ok(())
+        let v = op(a, b)?;
+        write_u64(fp, dst, v);
+        Some(())
     }
 }
 
@@ -288,7 +285,7 @@ unsafe fn imm_op_u64<F: FnOnce(u64, u64) -> u64>(
     }
 }
 
-/// `dst <- op(src_slot, imm)`. Bail with `err` on `None`.
+/// `dst <- op(src_slot, imm)` (fallible).
 #[inline(always)]
 unsafe fn checked_imm_op_u64<F: FnOnce(u64, u64) -> Option<u64>>(
     fp: *mut u8,
@@ -296,23 +293,20 @@ unsafe fn checked_imm_op_u64<F: FnOnce(u64, u64) -> Option<u64>>(
     src: FrameOffset,
     imm: u64,
     op: F,
-    err: &'static str,
-) -> ExecutionResult<()> {
+) -> Option<()> {
     // SAFETY: `fp` is the current frame pointer and `src`/`dst` are
     // in-bounds 8-byte slots within that frame (enforced by the verifier).
     unsafe {
         let a = read_u64(fp, src);
-        match op(a, imm) {
-            Some(v) => write_u64(fp, dst, v),
-            None => bail!(err),
-        }
-        Ok(())
+        let v = op(a, imm)?;
+        write_u64(fp, dst, v);
+        Some(())
     }
 }
 
-/// `dst <- op(lhs_slot, rhs_slot_as_shift)`. Bail if shift `>= 64`.
-/// `op_name` is used to format the error message. The shift amount lives in
+/// `dst <- op(lhs_slot, rhs_slot_as_shift)`. The shift amount lives in
 /// a 1-byte slot (Move bytecode invariant); only that byte is read.
+/// Return `Err(shift)` if the shift amount is `>= 64`.
 #[inline(always)]
 unsafe fn shift_u64<F: FnOnce(u64, u64) -> u64>(
     fp: *mut u8,
@@ -320,18 +314,17 @@ unsafe fn shift_u64<F: FnOnce(u64, u64) -> u64>(
     lhs: FrameOffset,
     rhs: FrameOffset,
     op: F,
-    op_name: &'static str,
-) -> ExecutionResult<()> {
+) -> Result<(), u8> {
     // SAFETY: `fp` is the current frame pointer; `lhs`/`dst` are in-bounds
     // 8-byte slots and `rhs` is an in-bounds 1-byte slot within that frame
     // (enforced by the verifier).
     unsafe {
-        let shift = read_u8(fp, rhs) as u64;
+        let shift = read_u8(fp, rhs);
         if shift >= 64 {
-            bail!("{}: shift amount {} exceeds 63", op_name, shift);
+            return Err(shift);
         }
         let v = read_u64(fp, lhs);
-        write_u64(fp, dst, op(v, shift));
+        write_u64(fp, dst, op(v, shift as u64));
         Ok(())
     }
 }
@@ -422,7 +415,7 @@ macro_rules! dispatch_int_operand {
 }
 
 // Generates an `#[inline(never)]` arith dispatcher (`exec_int_add` etc.)
-// from a function name, an error message string used when the checked op
+// from a function name, an error variant used when the checked op
 // returns `None`, and the checked associated fn to call on the operand
 // pair. Marking the dispatcher `#[inline(never)]` keeps the hot
 // [`InterpreterContext::step`] loop compact: the per-op type fanout
@@ -430,21 +423,22 @@ macro_rules! dispatch_int_operand {
 // only inflates the i-cache for that op when it actually runs.
 //
 // Example usage:
-//   impl_int_arith!(exec_int_add, "IntAdd: under/overflow", checked_add);
+//   impl_int_arith!(exec_int_add, ArithmeticUnderOverflow { op: ArithOp::Add }, checked_add);
+#[rustfmt::skip]
 macro_rules! impl_int_arith {
-    ($fn_name:ident, $err_msg:literal, $method:ident) => {
+    ($fn_name:ident, $variant:ident $body:tt, $method:ident) => {
         /// # Safety
         /// `fp` is the current frame pointer; `op`'s slot offsets are
         /// in-bounds (enforced by the verifier).
         #[inline(never)]
-        unsafe fn $fn_name(fp: *mut u8, op: &IntBinaryOp) -> ExecutionResult<()> {
+        unsafe fn $fn_name(fp: *mut u8, op: &IntBinaryOp) -> RuntimeResult<()> {
             unsafe {
                 macro_rules! exec {
                     ($ty: ty,$_sign: tt,$rhs: expr) => {{
                         let lhs_val: $ty = read_int::<$ty>(fp, op.lhs);
                         let rhs_val: $ty = $rhs;
                         let result: $ty = <$ty>::$method(lhs_val, rhs_val)
-                            .ok_or_else(|| anyhow::anyhow!($err_msg))?;
+                            .ok_or_else(|| RuntimeError::$variant $body)?;
                         write_int::<$ty>(fp, op.dst, result);
                     }};
                 }
@@ -459,11 +453,31 @@ macro_rules! impl_int_arith {
 // underflow on `Add` (e.g. `i8::MIN + (-1)`) as well as overflow on `Sub`,
 // so both are reported as "under/overflow" to keep the message accurate
 // for either.
-impl_int_arith!(exec_int_add, "IntAdd: under/overflow", checked_add);
-impl_int_arith!(exec_int_sub, "IntSub: under/overflow", checked_sub);
-impl_int_arith!(exec_int_mul, "IntMul: under/overflow", checked_mul);
-impl_int_arith!(exec_int_div, "IntDiv: by zero or overflow", checked_div);
-impl_int_arith!(exec_int_mod, "IntMod: by zero or overflow", checked_rem);
+impl_int_arith!(
+    exec_int_add,
+    ArithmeticUnderOverflow { op: ArithOp::Add },
+    checked_add
+);
+impl_int_arith!(
+    exec_int_sub,
+    ArithmeticUnderOverflow { op: ArithOp::Sub },
+    checked_sub
+);
+impl_int_arith!(
+    exec_int_mul,
+    ArithmeticUnderOverflow { op: ArithOp::Mul },
+    checked_mul
+);
+impl_int_arith!(
+    exec_int_div,
+    DivisionByZeroOrOverflow { op: ArithOp::Div },
+    checked_div
+);
+impl_int_arith!(
+    exec_int_mod,
+    DivisionByZeroOrOverflow { op: ArithOp::Mod },
+    checked_rem
+);
 
 // Generates an `#[inline(never)]` bitwise dispatcher. Same shape as
 // [`impl_int_arith!`] but uses an infix `$bop` (one of `&`, `|`, `^`) and
@@ -475,11 +489,11 @@ impl_int_arith!(exec_int_mod, "IntMod: by zero or overflow", checked_rem);
 // `unsigned` / `signed` tokens that confuse rustfmt's indenter.
 #[rustfmt::skip]
 macro_rules! impl_int_bitwise {
-    ($fn_name:ident, $op_name:literal, $bop:tt) => {
+    ($fn_name:ident, $base_op:expr, $bop:tt) => {
         /// # Safety
         /// See [`exec_int_add`].
         #[inline(never)]
-        unsafe fn $fn_name(fp: *mut u8, op: &IntBinaryOp) -> ExecutionResult<()> {
+        unsafe fn $fn_name(fp: *mut u8, op: &IntBinaryOp) -> RuntimeResult<()> {
             unsafe {
                 macro_rules! exec {
                     ($ty:ty, unsigned, $rhs:expr) => {{
@@ -490,7 +504,10 @@ macro_rules! impl_int_bitwise {
                     }};
                     ($ty:ty, signed, $rhs:expr) => {{
                         let _ = $rhs;
-                        bail!(concat!($op_name, " on a signed value is invalid"))
+                        invariant_violation!(OperationNotSupportedForType {
+                            op: $base_op,
+                            signedness: Signedness::Signed,
+                        });
                     }};
                 }
                 dispatch_int_operand!(fp, &op.rhs, exec);
@@ -500,9 +517,9 @@ macro_rules! impl_int_bitwise {
     };
 }
 
-impl_int_bitwise!(exec_int_bit_and, "IntBitAnd", &);
-impl_int_bitwise!(exec_int_bit_or, "IntBitOr", |);
-impl_int_bitwise!(exec_int_bit_xor, "IntBitXor", ^);
+impl_int_bitwise!(exec_int_bit_and, ArithOp::BitAnd, &);
+impl_int_bitwise!(exec_int_bit_or, ArithOp::BitOr, |);
+impl_int_bitwise!(exec_int_bit_xor, ArithOp::BitXor, ^);
 
 // Dispatch on a shift op's lhs type. Centralizes the 12-arm fanout so
 // `impl_int_shift!` can stay a one-invocation generator. Native widths
@@ -534,19 +551,19 @@ macro_rules! dispatch_shift_lhs_ty {
 // fans it out over the 12 [`IntTy`] arms.
 //
 // The shift amount is always `u8` in Move and is range-checked here
-// against `op.ty.bit_width()`. The `signed` arms `bail!()` as a runtime
-// guard; the verifier rejects them ahead of time.
+// against `op.ty.bit_width()`. The `signed` arms raise an invariant
+// violation; the verifier rejects them ahead of time.
 // `#[rustfmt::skip]` on the outer macro: the nested `macro_rules! exec`
 // uses literal `unsigned` / `signed` tokens in its arms, which confuses
 // rustfmt into over-indenting every arm past the first. Skipping the
 // whole macro keeps the body readable.
 #[rustfmt::skip]
 macro_rules! impl_int_shift {
-    ($fn_name:ident, $op_name:literal, $bop:tt) => {
+    ($fn_name:ident, $base_op:expr, $bop:tt) => {
         /// # Safety
         /// See [`exec_int_add`].
         #[inline(never)]
-        unsafe fn $fn_name(fp: *mut u8, op: &IntShiftOp) -> ExecutionResult<()> {
+        unsafe fn $fn_name(fp: *mut u8, op: &IntShiftOp) -> RuntimeResult<()> {
             unsafe {
                 let shift_amount: u8 = match &op.rhs {
                     ShiftOperand::SlotU8(off) => read_u8(fp, *off),
@@ -554,12 +571,12 @@ macro_rules! impl_int_shift {
                 };
                 let bit_width = op.ty.bit_width() as u32;
                 if (shift_amount as u32) >= bit_width {
-                    bail!(
-                        concat!($op_name, ".{}: shift amount {} >= bit width {}"),
-                        op.ty,
+                    return Err(RuntimeError::ShiftAmountOutOfRange {
+                        op: $base_op,
+                        ty: op.ty,
                         shift_amount,
-                        bit_width
-                    );
+                        bit_width,
+                    });
                 }
                 macro_rules! exec {
                     ($ty:ty, unsigned, $shift_val:expr) => {{
@@ -568,7 +585,10 @@ macro_rules! impl_int_shift {
                         write_int::<$ty>(fp, op.dst, result);
                     }};
                     ($_ty:ty, signed, $_shift_val:expr) => {{
-                        bail!(concat!($op_name, " on a signed value is invalid"))
+                        invariant_violation!(OperationNotSupportedForType {
+                            op: $base_op,
+                            signedness: Signedness::Signed,
+                        });
                     }};
                 }
                 dispatch_shift_lhs_ty!(op.ty, shift_amount, exec);
@@ -578,20 +598,19 @@ macro_rules! impl_int_shift {
     };
 }
 
-impl_int_shift!(exec_int_shl, "IntShl", <<);
-impl_int_shift!(exec_int_shr, "IntShr", >>);
+impl_int_shift!(exec_int_shl, ArithOp::Shl, <<);
+impl_int_shift!(exec_int_shr, ArithOp::Shr, >>);
 
 /// # Safety
 /// See [`exec_int_add`].
 #[inline(never)]
-unsafe fn exec_int_negate(fp: *mut u8, op: &IntNegateOp) -> ExecutionResult<()> {
+unsafe fn exec_int_negate(fp: *mut u8, op: &IntNegateOp) -> RuntimeResult<()> {
     unsafe {
         macro_rules! exec {
             ($ty:ty) => {{
                 let src_val: $ty = read_int::<$ty>(fp, op.src);
-                let result: $ty = <$ty>::checked_neg(src_val).ok_or_else(|| {
-                    anyhow::anyhow!("IntNegate.{}: Negate of MIN overflows", op.ty)
-                })?;
+                let result: $ty = <$ty>::checked_neg(src_val)
+                    .ok_or_else(|| RuntimeError::NegateMinOverflow { ty: op.ty })?;
                 write_int::<$ty>(fp, op.dst, result);
             }};
         }
@@ -603,7 +622,10 @@ unsafe fn exec_int_negate(fp: *mut u8, op: &IntNegateOp) -> ExecutionResult<()> 
             IntTy::I128 => exec!(i128),
             IntTy::I256 => exec!(I256),
             IntTy::U8 | IntTy::U16 | IntTy::U32 | IntTy::U64 | IntTy::U128 | IntTy::U256 => {
-                bail!("IntNegate on an unsigned value is invalid")
+                invariant_violation!(OperationNotSupportedForType {
+                    op: ArithOp::Negate,
+                    signedness: Signedness::Unsigned,
+                });
             },
         }
         Ok(())
@@ -616,7 +638,7 @@ unsafe fn exec_int_negate(fp: *mut u8, op: &IntNegateOp) -> ExecutionResult<()> 
 
 impl<T: ExecutionContext> InterpreterContext<'_, T> {
     #[inline(always)]
-    pub fn step(&mut self) -> ExecutionResult<StepResult> {
+    pub fn step(&mut self) -> RuntimeResult<StepResult> {
         // SAFETY: Current function is always a valid, non-null pointer because
         // it is derived from function reference (e.g., entrypoint) or when
         // executing a call instruction, which stores a valid pointer.
@@ -630,12 +652,11 @@ impl<T: ExecutionContext> InterpreterContext<'_, T> {
         let code = code_guard.as_slice();
 
         if self.pc >= code.len() {
-            bail!(
-                "pc out of bounds: pc={} but function {} has {} instructions",
-                self.pc,
-                unsafe { func.name.as_ref_unchecked() },
-                code.len()
-            );
+            invariant_violation!(PcOutOfBounds {
+                pc: self.pc,
+                func_name: unsafe { func.name.as_ref_unchecked() }.to_string(),
+                code_len: code.len(),
+            });
         }
 
         let fp = self.frame_ptr;
@@ -661,7 +682,10 @@ impl<T: ExecutionContext> InterpreterContext<'_, T> {
                     //   3. IC insert target
                     //   4. Patching:
                     //      If can patch caller, try it.
-                    let target = self.exec_ctx.load_function(module_id, func_name, ty_args)?;
+                    let target = self
+                        .exec_ctx
+                        .load_function(module_id, func_name, ty_args)
+                        .map_err(RuntimeError::Loader)?;
                     // SAFETY: `target` points to a `Function`, which is not reclaimed during
                     // execution as guaranteed by the execution guard.
                     return self.call(func, fp, target.as_ref_unchecked());
@@ -769,46 +793,75 @@ impl<T: ExecutionContext> InterpreterContext<'_, T> {
 
                 // Add
                 MicroOp::AddU64 { dst, lhs, rhs } => {
-                    checked_binop_u64(fp, dst, lhs, rhs, u64::checked_add, "AddU64: overflow")?
+                    checked_binop_u64(fp, dst, lhs, rhs, u64::checked_add).ok_or_else(|| {
+                        RuntimeError::ArithmeticOverflow {
+                            op: ArithOp::Add,
+                            ty: IntTy::U64,
+                        }
+                    })?
                 },
                 MicroOp::AddU64Imm { dst, src, imm } => {
-                    checked_imm_op_u64(fp, dst, src, imm, u64::checked_add, "AddU64Imm: overflow")?
+                    checked_imm_op_u64(fp, dst, src, imm, u64::checked_add).ok_or_else(|| {
+                        RuntimeError::ArithmeticOverflow {
+                            op: ArithOp::Add,
+                            ty: IntTy::U64,
+                        }
+                    })?
                 },
 
                 // Sub
                 MicroOp::SubU64 { dst, lhs, rhs } => {
-                    checked_binop_u64(fp, dst, lhs, rhs, u64::checked_sub, "SubU64: underflow")?
+                    checked_binop_u64(fp, dst, lhs, rhs, u64::checked_sub).ok_or_else(|| {
+                        RuntimeError::ArithmeticUnderflow {
+                            op: ArithOp::Sub,
+                            ty: IntTy::U64,
+                        }
+                    })?
                 },
                 MicroOp::SubU64Imm { dst, src, imm } => {
-                    checked_imm_op_u64(fp, dst, src, imm, u64::checked_sub, "SubU64Imm: underflow")?
+                    checked_imm_op_u64(fp, dst, src, imm, u64::checked_sub).ok_or_else(|| {
+                        RuntimeError::ArithmeticUnderflow {
+                            op: ArithOp::Sub,
+                            ty: IntTy::U64,
+                        }
+                    })?
                 },
                 // dst = imm - src, so flip the operand order.
-                MicroOp::RSubU64Imm { dst, src, imm } => checked_imm_op_u64(
-                    fp,
-                    dst,
-                    src,
-                    imm,
-                    |s, i| u64::checked_sub(i, s),
-                    "RSubU64Imm: underflow",
-                )?,
+                MicroOp::RSubU64Imm { dst, src, imm } => {
+                    checked_imm_op_u64(fp, dst, src, imm, |s, i| u64::checked_sub(i, s))
+                        .ok_or_else(|| RuntimeError::ArithmeticUnderflow {
+                            op: ArithOp::Sub,
+                            ty: IntTy::U64,
+                        })?
+                },
 
                 // Mul
                 MicroOp::MulU64 { dst, lhs, rhs } => {
-                    checked_binop_u64(fp, dst, lhs, rhs, u64::checked_mul, "MulU64: overflow")?
+                    checked_binop_u64(fp, dst, lhs, rhs, u64::checked_mul).ok_or_else(|| {
+                        RuntimeError::ArithmeticOverflow {
+                            op: ArithOp::Mul,
+                            ty: IntTy::U64,
+                        }
+                    })?
                 },
                 MicroOp::MulU64Imm { dst, src, imm } => {
-                    checked_imm_op_u64(fp, dst, src, imm, u64::checked_mul, "MulU64Imm: overflow")?
+                    checked_imm_op_u64(fp, dst, src, imm, u64::checked_mul).ok_or_else(|| {
+                        RuntimeError::ArithmeticOverflow {
+                            op: ArithOp::Mul,
+                            ty: IntTy::U64,
+                        }
+                    })?
                 },
 
                 // Div / Mod
-                MicroOp::DivU64 { dst, lhs, rhs } => checked_binop_u64(
-                    fp,
-                    dst,
-                    lhs,
-                    rhs,
-                    u64::checked_div,
-                    "DivU64: division by zero",
-                )?,
+                MicroOp::DivU64 { dst, lhs, rhs } => {
+                    checked_binop_u64(fp, dst, lhs, rhs, u64::checked_div).ok_or_else(|| {
+                        RuntimeError::DivisionByZero {
+                            op: ArithOp::Div,
+                            ty: IntTy::U64,
+                        }
+                    })?
+                },
                 // INVARIANT: the verifier rejects `imm == 0`, so plain `s / imm`
                 // cannot trigger Rust's div-by-zero panic. Asserted below in
                 // debug builds as a defensive check.
@@ -819,14 +872,14 @@ impl<T: ExecutionContext> InterpreterContext<'_, T> {
                     );
                     imm_op_u64(fp, dst, src, imm, |s, i| s / i)
                 },
-                MicroOp::ModU64 { dst, lhs, rhs } => checked_binop_u64(
-                    fp,
-                    dst,
-                    lhs,
-                    rhs,
-                    u64::checked_rem,
-                    "ModU64: division by zero",
-                )?,
+                MicroOp::ModU64 { dst, lhs, rhs } => {
+                    checked_binop_u64(fp, dst, lhs, rhs, u64::checked_rem).ok_or_else(|| {
+                        RuntimeError::DivisionByZero {
+                            op: ArithOp::Mod,
+                            ty: IntTy::U64,
+                        }
+                    })?
+                },
                 // INVARIANT: the verifier rejects `imm == 0`, so plain `s % imm`
                 // cannot trigger Rust's div-by-zero panic. Asserted below in
                 // debug builds as a defensive check.
@@ -844,9 +897,13 @@ impl<T: ExecutionContext> InterpreterContext<'_, T> {
                 MicroOp::BitXorU64 { dst, lhs, rhs } => binop_u64(fp, dst, lhs, rhs, |a, b| a ^ b),
 
                 // Shifts
-                MicroOp::ShlU64 { dst, lhs, rhs } => {
-                    shift_u64(fp, dst, lhs, rhs, |v, s| v << s, "ShlU64")?
-                },
+                MicroOp::ShlU64 { dst, lhs, rhs } => shift_u64(fp, dst, lhs, rhs, |v, s| v << s)
+                    .map_err(|shift_amount| RuntimeError::ShiftAmountOutOfRange {
+                        op: ArithOp::Shl,
+                        ty: IntTy::U64,
+                        shift_amount,
+                        bit_width: 64,
+                    })?,
                 // INVARIANT: the verifier rejects `imm >= 64`, so plain `s << imm`
                 // cannot wrap or trigger UB. Asserted below in debug builds as a
                 // defensive check.
@@ -854,9 +911,13 @@ impl<T: ExecutionContext> InterpreterContext<'_, T> {
                     debug_assert!(imm < 64, "ShlU64Imm: imm must be < 64 (verifier invariant)");
                     imm_op_u64(fp, dst, src, imm as u64, |s, i| s << i)
                 },
-                MicroOp::ShrU64 { dst, lhs, rhs } => {
-                    shift_u64(fp, dst, lhs, rhs, |v, s| v >> s, "ShrU64")?
-                },
+                MicroOp::ShrU64 { dst, lhs, rhs } => shift_u64(fp, dst, lhs, rhs, |v, s| v >> s)
+                    .map_err(|shift_amount| RuntimeError::ShiftAmountOutOfRange {
+                        op: ArithOp::Shr,
+                        ty: IntTy::U64,
+                        shift_amount,
+                        bit_width: 64,
+                    })?,
                 // INVARIANT: the verifier rejects `imm >= 64`, so plain `s >> imm`
                 // cannot wrap or trigger UB. Asserted below in debug builds as a
                 // defensive check.
@@ -944,11 +1005,11 @@ impl<T: ExecutionContext> InterpreterContext<'_, T> {
                     let ref_off = read_u64(fp, vec_ref + 8) as usize;
                     let vec_ptr = read_ptr(ref_base, ref_off);
                     if vec_ptr.is_null() {
-                        bail!("VecPopBack on empty vector");
+                        return Err(RuntimeError::PopFromEmptyVector);
                     }
                     let len = read_u64(vec_ptr, VEC_LENGTH_OFFSET);
                     if len == 0 {
-                        bail!("VecPopBack on empty vector");
+                        return Err(RuntimeError::PopFromEmptyVector);
                     }
                     let new_len = len - 1;
                     std::ptr::copy_nonoverlapping(
@@ -968,20 +1029,24 @@ impl<T: ExecutionContext> InterpreterContext<'_, T> {
                     let ref_base = read_ptr(fp, vec_ref);
                     let ref_off = read_u64(fp, vec_ref + 8) as usize;
                     let vec_ptr = read_ptr(ref_base, ref_off);
-                    let idx_val = read_u64(fp, idx);
+                    let idx = read_u64(fp, idx);
                     if vec_ptr.is_null() {
-                        bail!("VecLoadElem index out of bounds: idx={} len=0", idx_val,);
+                        return Err(RuntimeError::VectorIndexOutOfBounds {
+                            op: VecOp::LoadElem,
+                            idx,
+                            len: 0,
+                        });
                     }
                     let len = read_u64(vec_ptr, VEC_LENGTH_OFFSET);
-                    if idx_val >= len {
-                        bail!(
-                            "VecLoadElem index out of bounds: idx={} len={}",
-                            idx_val,
-                            len
-                        );
+                    if idx >= len {
+                        return Err(RuntimeError::VectorIndexOutOfBounds {
+                            op: VecOp::LoadElem,
+                            idx,
+                            len,
+                        });
                     }
                     std::ptr::copy_nonoverlapping(
-                        vec_elem_ptr(vec_ptr, idx_val, elem_size),
+                        vec_elem_ptr(vec_ptr, idx, elem_size),
                         fp.add(dst.into()),
                         elem_size as usize,
                     );
@@ -996,21 +1061,25 @@ impl<T: ExecutionContext> InterpreterContext<'_, T> {
                     let ref_base = read_ptr(fp, vec_ref);
                     let ref_off = read_u64(fp, vec_ref + 8) as usize;
                     let vec_ptr = read_ptr(ref_base, ref_off);
-                    let idx_val = read_u64(fp, idx);
+                    let idx = read_u64(fp, idx);
                     if vec_ptr.is_null() {
-                        bail!("VecStoreElem index out of bounds: idx={} len=0", idx_val,);
+                        return Err(RuntimeError::VectorIndexOutOfBounds {
+                            op: VecOp::StoreElem,
+                            idx,
+                            len: 0,
+                        });
                     }
                     let len = read_u64(vec_ptr, VEC_LENGTH_OFFSET);
-                    if idx_val >= len {
-                        bail!(
-                            "VecStoreElem index out of bounds: idx={} len={}",
-                            idx_val,
-                            len
-                        );
+                    if idx >= len {
+                        return Err(RuntimeError::VectorIndexOutOfBounds {
+                            op: VecOp::StoreElem,
+                            idx,
+                            len,
+                        });
                     }
                     std::ptr::copy_nonoverlapping(
                         fp.add(src.into()),
-                        vec_elem_ptr(vec_ptr, idx_val, elem_size) as *mut u8,
+                        vec_elem_ptr(vec_ptr, idx, elem_size) as *mut u8,
                         elem_size as usize,
                     );
                 },
@@ -1025,15 +1094,23 @@ impl<T: ExecutionContext> InterpreterContext<'_, T> {
                     let ref_base = read_ptr(fp, vec_ref);
                     let ref_off = read_u64(fp, vec_ref + 8) as usize;
                     let vec_ptr = read_ptr(ref_base, ref_off);
-                    let idx_val = read_u64(fp, idx);
+                    let idx = read_u64(fp, idx);
                     if vec_ptr.is_null() {
-                        bail!("VecBorrow index out of bounds: idx={} len=0", idx_val);
+                        return Err(RuntimeError::VectorIndexOutOfBounds {
+                            op: VecOp::Borrow,
+                            idx,
+                            len: 0,
+                        });
                     }
                     let len = read_u64(vec_ptr, VEC_LENGTH_OFFSET);
-                    if idx_val >= len {
-                        bail!("VecBorrow index out of bounds: idx={} len={}", idx_val, len);
+                    if idx >= len {
+                        return Err(RuntimeError::VectorIndexOutOfBounds {
+                            op: VecOp::Borrow,
+                            idx,
+                            len,
+                        });
                     }
-                    let offset = VEC_DATA_OFFSET as u64 + idx_val * elem_size as u64;
+                    let offset = VEC_DATA_OFFSET as u64 + idx * elem_size as u64;
                     write_ptr(fp, dst, vec_ptr);
                     write_u64(fp, dst + 8, offset);
                 },
@@ -1198,7 +1275,7 @@ impl<T: ExecutionContext> InterpreterContext<'_, T> {
     ///   (relative to the data segment, so `32 - 8 = 24`) in its
     ///   `pointer_offsets`, so GC traces the captured-data pointer after
     ///   the closure is reachable via the frame slot.
-    unsafe fn exec_pack_closure(&mut self, fp: *mut u8, op: &PackClosureOp) -> ExecutionResult<()> {
+    unsafe fn exec_pack_closure(&mut self, fp: *mut u8, op: &PackClosureOp) -> RuntimeResult<()> {
         unsafe {
             // Fast path: non-capturing closure. Skip the second allocation
             // and leave `captured_data_ptr` as the zeroed/null value written
@@ -1295,17 +1372,17 @@ impl<T: ExecutionContext> InterpreterContext<'_, T> {
         func: &Function,
         fp: *mut u8,
         op: &CallClosureOp,
-    ) -> ExecutionResult<StepResult> {
+    ) -> RuntimeResult<StepResult> {
         unsafe {
             let closure = read_ptr(fp, op.closure_src);
             if closure.is_null() {
-                bail!("CallClosure: null closure pointer");
+                invariant_violation!(NullClosure);
             }
 
             // Decode `ClosureFuncRef`. v0 supports only Resolved.
             let func_tag = *closure.add(CLOSURE_FUNC_REF_OFFSET + FUNC_REF_TAG_OFFSET);
             if func_tag != FUNC_REF_TAG_RESOLVED {
-                bail!(
+                todo!(
                     "CallClosure: unsupported func_ref tag {} (only Resolved supported in v0)",
                     func_tag
                 );
@@ -1313,7 +1390,7 @@ impl<T: ExecutionContext> InterpreterContext<'_, T> {
             let callee_raw = read_ptr(closure, CLOSURE_FUNC_REF_OFFSET + FUNC_REF_PAYLOAD_OFFSET)
                 as *const Function;
             if callee_raw.is_null() {
-                bail!("CallClosure: null function pointer in closure");
+                invariant_violation!(NullFuncRefInClosure);
             }
             let callee = &*callee_raw;
 
@@ -1335,10 +1412,9 @@ impl<T: ExecutionContext> InterpreterContext<'_, T> {
             // and unifies closure call codegen with direct call codegen.
             // See George's pseudocode in PR #19519 review thread.
             if callee.param_sizes.len() > 64 {
-                bail!(
-                    "CallClosure: callee has {} params, exceeds 64-bit mask capacity",
-                    callee.param_sizes.len()
-                );
+                invariant_violation!(TooManyClosureParams {
+                    num_params: callee.param_sizes.len(),
+                });
             }
 
             // Stack-overflow check up front: `call_unchecked` skips the
@@ -1352,14 +1428,11 @@ impl<T: ExecutionContext> InterpreterContext<'_, T> {
             let captured_data = read_ptr(closure, CLOSURE_CAPTURED_DATA_PTR_OFFSET);
             if mask != 0 {
                 if captured_data.is_null() {
-                    bail!("CallClosure: null captured_data for closure with captured params");
+                    invariant_violation!(NullCapturedData);
                 }
                 let cap_tag = *captured_data.add(CAPTURED_DATA_TAG_OFFSET);
                 if cap_tag != CAPTURED_DATA_TAG_MATERIALIZED {
-                    bail!(
-                        "CallClosure: unsupported captured-data tag {} (only Materialized supported in v0)",
-                        cap_tag
-                    );
+                    todo!("CallClosure: unsupported captured-data tag {} (only Materialized supported in v0)", cap_tag);
                 }
             }
 
@@ -1376,18 +1449,16 @@ impl<T: ExecutionContext> InterpreterContext<'_, T> {
                     );
                     captured_value_offset += param_size as usize;
                 } else {
-                    let slot: &SizedSlot = op
-                        .provided_args
-                        .get(provided_idx)
-                        .ok_or_else(|| anyhow::anyhow!("CallClosure: not enough provided args"))?;
+                    let Some(slot) = op.provided_args.get(provided_idx) else {
+                        invariant_violation!(NotEnoughProvidedArgs);
+                    };
                     if slot.size != param_size {
-                        bail!(
-                            "CallClosure: provided_args[{}].size {} != callee param_sizes[{}] {}",
+                        invariant_violation!(ClosureArgSizeMismatch {
                             provided_idx,
-                            slot.size,
-                            i,
-                            param_size
-                        );
+                            provided_size: slot.size,
+                            param_idx: i,
+                            param_size,
+                        });
                     }
                     // Use `copy` (not `copy_nonoverlapping`): a provided
                     // arg's source slot may lie in the caller's reserved
@@ -1404,12 +1475,12 @@ impl<T: ExecutionContext> InterpreterContext<'_, T> {
                 }
                 param_offset_in_callee += param_size as usize;
             }
-            if provided_idx != op.provided_args.len() {
-                bail!(
-                    "CallClosure: {} provided_args but only {} non-captured params consumed",
-                    op.provided_args.len(),
-                    provided_idx
-                );
+            let provided = op.provided_args.len();
+            if provided_idx != provided {
+                invariant_violation!(ClosureArgsCountMismatch {
+                    provided,
+                    consumed: provided_idx,
+                });
             }
 
             // Standard call protocol: save metadata and switch to the
@@ -1432,12 +1503,12 @@ impl<T: ExecutionContext> InterpreterContext<'_, T> {
         caller: &Function,
         fp: *mut u8,
         callee: &Function,
-    ) -> ExecutionResult<*mut u8> {
+    ) -> RuntimeResult<*mut u8> {
         unsafe {
             let new_fp = fp.add(caller.param_and_local_sizes_sum + FRAME_METADATA_SIZE);
             let stack_end = self.stack.as_ptr().add(self.stack.len());
             if new_fp.add(callee.extended_frame_size) > stack_end {
-                bail!("stack overflow");
+                return Err(RuntimeError::StackOverflow);
             }
             Ok(new_fp)
         }
@@ -1456,7 +1527,7 @@ impl<T: ExecutionContext> InterpreterContext<'_, T> {
         caller: &Function,
         fp: *mut u8,
         callee: &Function,
-    ) -> ExecutionResult<StepResult> {
+    ) -> RuntimeResult<StepResult> {
         let new_fp = unsafe { self.check_stack_for_call(caller, fp, callee)? };
         unsafe { self.call_unchecked(caller, fp, callee, new_fp) }
     }
@@ -1480,7 +1551,7 @@ impl<T: ExecutionContext> InterpreterContext<'_, T> {
         fp: *mut u8,
         callee: &Function,
         new_fp: *mut u8,
-    ) -> ExecutionResult<StepResult> {
+    ) -> RuntimeResult<StepResult> {
         unsafe {
             // Zero everything beyond parameters (locals, metadata, callee
             // arg/return region) so pointer slots start as null.
@@ -1510,7 +1581,7 @@ impl<T: ExecutionContext> InterpreterContext<'_, T> {
     // iteration. LLVM can't keep them in registers because heap operations
     // (VecPushBack, etc.) take &mut self, which may alias these fields.
     // Write back only on CallFunc/Return.
-    pub fn run(&mut self) -> ExecutionResult<()> {
+    pub fn run(&mut self) -> RuntimeResult<()> {
         loop {
             match self.step()? {
                 StepResult::Continue => {},
