@@ -23,6 +23,7 @@ module aptos_framework::account {
     friend aptos_framework::aptos_account;
     friend aptos_framework::coin;
     friend aptos_framework::genesis;
+    friend aptos_framework::keyless_account;
     friend aptos_framework::multisig_account;
     friend aptos_framework::resource_account;
     friend aptos_framework::transaction_validation;
@@ -102,6 +103,16 @@ module aptos_framework::account {
     /// This struct solves this problem by mapping the new authentication key `b` to the original address `a` and thus helping the wallet software during recovery find the correct address.
     struct OriginatingAddress has key {
         address_map: Table<address, address>,
+    }
+
+    /// Per-account encrypted backup of a confidential-asset decryption key (DK). The ciphertext is opaque to the
+    /// chain — clients (e.g. Petra) own encryption/decryption. Writers go through `upsert_encrypted_dk` (friend-only)
+    /// so the calling module owns the policy (e.g. atomicity with a key rotation); readers can use the
+    /// `get_encrypted_dk` view. Versioned via the `V1` variant so the schema can evolve.
+    enum EncryptedDK has key, store, copy, drop {
+        V1 {
+            ciphertext: vector<u8>,
+        }
     }
 
     /// This structs stores the challenge message that should be signed during key rotation. First, this struct is
@@ -220,9 +231,17 @@ module aptos_framework::account {
     const ENOT_THE_ORIGINAL_PUBLIC_KEY: u64 = 26;
     /// The set_originating_address is disabled due to potential poisoning from account abstraction
     const ESET_ORIGINATING_ADDRESS_DISABLED: u64 = 27;
+    /// The ciphertext being written into `EncryptedDK` exceeds `MAX_ENCRYPTED_DK_BYTES`.
+    const EENCRYPTED_DK_TOO_LONG: u64 = 28;
+    /// No `EncryptedDK` resource exists for the queried address.
+    const EENCRYPTED_DK_NOT_FOUND: u64 = 29;
 
     /// Explicitly separate the GUID space between Object and Account to prevent accidental overlap.
     const MAX_GUID_CREATION_NUM: u64 = 0x4000000000000;
+
+    /// Maximum size of the payload stored in `EncryptedDK`. 128 bytes is generous for the initial use case
+    /// (an encrypted 32-byte confidential-asset DK with nonce + auth tag), while keeping per-account state small.
+    const MAX_ENCRYPTED_DK_BYTES: u64 = 128;
 
     #[test_only]
     /// Create signer for testing, independently of an Aptos-style `Account`.
@@ -495,9 +514,9 @@ module aptos_framework::account {
         });
     }
 
-    /// Upserts an ED25519 backup key to an account that has a keyless public key as its original public key by converting the account's authentication key
+    /// Upserts an Ed25519 backup key to an account that has a keyless public key as its original public key by converting the account's authentication key
     /// to a multi-key of the original keyless public key and the new backup key that requires 1 signature from either key to authenticate.
-    /// This function takes a the account's original keyless public key and a ED25519 backup public key and rotates the account's authentication key to a multi-key of
+    /// This function takes the account's original keyless public key and a Ed25519 backup public key and rotates the account's authentication key to a multi-key of
     /// the original keyless public key and the new backup key that requires 1 signature from either key to authenticate.
     ///
     /// Note: This function emits a `KeyRotationToMultiPublicKey` event marking both keys as verified since the keyless public key
@@ -506,7 +525,7 @@ module aptos_framework::account {
     /// # Arguments
     /// * `account` - The signer representing the keyless account
     /// * `keyless_public_key` - The original keyless public key of the account (wrapped in an AnyPublicKey)
-    /// * `backup_public_key` - The ED25519 public key to add as a backup
+    /// * `backup_public_key` - The Ed25519 public key to add as a backup
     /// * `backup_key_proof` - A signature from the backup key proving ownership
     ///
     /// # Aborts
@@ -571,6 +590,58 @@ module aptos_framework::account {
             old_auth_key,
             new_auth_key,
         });
+    }
+
+    /// Atomically performs an `upsert_ed25519_backup_key_on_keyless_account` and stores `dk_ciphertext` in the
+    /// account's `EncryptedDK` resource. Currently used for backing up confidential-asset decryption keys on-chain
+    /// in Petra for keyless accounts. The ciphertext is opaque to the chain — see `EncryptedDK`.
+    ///
+    /// SECURITY: This function does not verify that `dk_ciphertext` is a well-formed encryption of the DK corresponding
+    /// to the registered EK on-chain. (It could, in theory, but we've judged the implementation complexity too high.)
+    /// Wallets using this function must be careful to only call this using a `dk_ciphertext` produced from its own
+    /// keyless Ed25519 backup key flow under the user-controlled `backup_public_key`.
+    entry fun upsert_ed25519_backup_key_and_encrypt_dk(
+        account: &signer,
+        keyless_public_key: vector<u8>,
+        backup_public_key: vector<u8>,
+        backup_key_proof: vector<u8>,
+        dk_ciphertext: vector<u8>
+    ) acquires Account, EncryptedDK {
+        upsert_ed25519_backup_key_on_keyless_account(account, keyless_public_key, backup_public_key, backup_key_proof);
+        upsert_encrypted_dk(account, dk_ciphertext);
+    }
+
+    /// Upserts the opaque per-account `EncryptedDK` for `account`. Friend-only so that the policy of who can
+    /// write a ciphertext (and the atomicity guarantees that come with it, e.g. coupling with a key rotation) lives
+    /// in the calling module rather than at this layer.
+    public(friend) fun upsert_encrypted_dk(account: &signer, ciphertext: vector<u8>) acquires EncryptedDK {
+        assert!(
+            ciphertext.length() <= MAX_ENCRYPTED_DK_BYTES,
+            error::invalid_argument(EENCRYPTED_DK_TOO_LONG)
+        );
+        let addr = signer::address_of(account);
+        if (!exists<EncryptedDK>(addr)) {
+            move_to(account, EncryptedDK::V1 { ciphertext: ciphertext });
+        } else {
+            EncryptedDK[addr].ciphertext = ciphertext;
+        };
+    }
+
+    #[view]
+    /// Returns the `EncryptedDK` stored for `addr`. Aborts with `EENCRYPTED_DK_NOT_FOUND` if none exists,
+    /// so callers must check `encrypted_dk_exists(addr)` first if absence is a valid case.
+    public fun get_encrypted_dk(addr: address): EncryptedDK acquires EncryptedDK {
+        assert!(
+            exists<EncryptedDK>(addr),
+            error::not_found(EENCRYPTED_DK_NOT_FOUND)
+        );
+        EncryptedDK[addr]
+    }
+
+    #[view]
+    /// Returns whether an `EncryptedDK` is stored for `addr`.
+    public fun encrypted_dk_exists(addr: address): bool {
+        exists<EncryptedDK>(addr)
     }
 
     /// Generic authentication key rotation function that allows the user to rotate their authentication key from any scheme to any scheme.
