@@ -251,8 +251,10 @@ pub struct HotStateConfig {
     /// Whether we compute root hashes for hot state in executor and commit the resulting JMT to
     /// db.
     pub compute_root_hash: bool,
-    /// Whether to persist hotness data alongside write sets in write set DB.
-    pub persist_hotness_in_write_set: bool,
+    /// Whether execution should construct write sets using the V1 format.
+    /// TODO(HotState): this is a local devnet-only knob for now; use onchain config before
+    /// enabling on persistent networks.
+    pub use_write_set_v1: bool,
     /// Whether to embed the per-block hot-state promotions into the epilogue transactions.
     pub persist_hotness_in_epilogue: bool,
 }
@@ -264,7 +266,7 @@ impl Default for HotStateConfig {
             refresh_interval_versions: 100_000,
             delete_on_restart: true,
             compute_root_hash: true,
-            persist_hotness_in_write_set: true,
+            use_write_set_v1: false,
             persist_hotness_in_epilogue: false,
         }
     }
@@ -684,13 +686,12 @@ impl ConfigOptimizer for StorageConfig {
                 config.assert_rlimit_nofile = true;
                 modified_config = true;
             }
-            // TODO(HotState): Hotness persistence in write sets is disabled on mainnet and testnet
-            // unless explicitly enabled.
+            // TODO(HotState): WriteSet V1 is disabled on mainnet and testnet unless explicitly
+            // enabled. Use onchain config before enabling this on persistent networks.
             if (chain_id.is_mainnet() || chain_id.is_testnet())
-                && config_yaml["hot_state_config"]["persist_hotness_in_write_set"].as_bool()
-                    != Some(true)
+                && config_yaml["hot_state_config"]["use_write_set_v1"].as_bool() != Some(true)
             {
-                config.hot_state_config.persist_hotness_in_write_set = false;
+                config.hot_state_config.use_write_set_v1 = false;
                 modified_config = true;
             }
         }
@@ -929,5 +930,49 @@ mod test {
 
         assert_eq!(node_config.storage.ensure_rlimit_nofile, 999_999);
         assert!(node_config.storage.assert_rlimit_nofile);
+    }
+
+    #[test]
+    fn test_optimize_use_write_set_v1() {
+        let mut node_config = NodeConfig::default();
+        node_config.storage.hot_state_config.use_write_set_v1 = true;
+
+        let yaml = serde_yaml::from_str(
+            r#"
+            storage:
+              ensure_rlimit_nofile: 0
+              hot_state_config: {}
+            "#,
+        )
+        .unwrap();
+        let modified_config = StorageConfig::optimize(
+            &mut node_config,
+            &yaml,
+            NodeType::Validator,
+            Some(ChainId::mainnet()),
+        )
+        .unwrap();
+        assert!(modified_config);
+        assert!(!node_config.storage.hot_state_config.use_write_set_v1);
+
+        node_config.storage.hot_state_config.use_write_set_v1 = true;
+        let yaml = serde_yaml::from_str(
+            r#"
+            storage:
+              ensure_rlimit_nofile: 0
+              hot_state_config:
+                use_write_set_v1: true
+            "#,
+        )
+        .unwrap();
+        let modified_config = StorageConfig::optimize(
+            &mut node_config,
+            &yaml,
+            NodeType::Validator,
+            Some(ChainId::mainnet()),
+        )
+        .unwrap();
+        assert!(!modified_config);
+        assert!(node_config.storage.hot_state_config.use_write_set_v1);
     }
 }
