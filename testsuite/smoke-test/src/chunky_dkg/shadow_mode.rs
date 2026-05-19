@@ -18,7 +18,7 @@ use std::{sync::Arc, time::Duration};
 
 /// Create a swarm with randomness/DKG enabled but chunky DKG OFF.
 /// Returns (swarm, cli, root_idx) for governance script execution.
-async fn create_swarm_with_dkg_only(
+pub(super) async fn create_swarm_with_dkg_only(
     num_validators: usize,
     epoch_duration_secs: u64,
 ) -> (
