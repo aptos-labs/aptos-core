@@ -29,7 +29,7 @@ use aptos_types::{
         StateViewId, StateViewResult, TStateView, NUM_STATE_SHARDS,
     },
     transaction::Version,
-    write_set::{BaseStateOp, HotStateOp, WriteOp},
+    write_set::{BaseStateOp, WriteOp},
 };
 use itertools::Itertools;
 use lru::LruCache;
@@ -874,7 +874,7 @@ fn naive_run_blocks(blocks: Vec<(Vec<UserTxn>, Option<UserTxn>)>) -> (Vec<Txn>, 
             // So we insert value ops after.
             let mut write_set: BTreeMap<StateKey, BaseStateOp> = to_make_hot
                 .iter()
-                .map(|k| (k.clone(), HotStateOp::make_hot().into_base_op()))
+                .map(|k| (k.clone(), BaseStateOp::MakeHot))
                 .collect();
             for (k, v_opt) in epi_txn.writes {
                 let op = match v_opt {
