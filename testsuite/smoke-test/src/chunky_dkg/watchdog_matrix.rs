@@ -143,6 +143,42 @@ script {{
         .expect("governance: enable all + sync reconfig");
 }
 
+/// Class B governance: buffer chunky V1 + ENC feature for the next epoch
+/// WITHOUT an immediate reconfigure. The buffered values apply at whatever
+/// natural reconfig fires next — i.e., the x-1 → x boundary. This lets us
+/// have chunky OFF in x-1 (so prior cDKG = NotTriggered) while still having
+/// it ON in x (so current cDKG can be Aborted/Finished).
+async fn gov_buffer_chunky_and_enc_no_reconfig(
+    cli: &aptos::test::CliTestFramework,
+    root_idx: usize,
+) {
+    let script = r#"
+script {
+    use aptos_std::fixed_point64;
+    use aptos_framework::aptos_governance;
+    use aptos_framework::chunky_dkg_config;
+    use aptos_framework::features;
+
+    fun main(core_resources: &signer) {
+        let framework_signer = aptos_governance::get_signer_testnet_only(core_resources, @0x1);
+
+        let chunky_cfg = chunky_dkg_config::new_v1(
+            fixed_point64::create_from_rational(1, 2),
+            fixed_point64::create_from_rational(2, 3),
+        );
+        chunky_dkg_config::set_for_next_epoch(&framework_signer, chunky_cfg);
+
+        features::change_feature_flags_for_next_epoch(&framework_signer, vector[108], vector[]);
+
+        // No reconfigure() — values stay buffered until the next natural reconfig.
+    }
+}
+"#;
+    cli.run_script(root_idx, script)
+        .await
+        .expect("governance: buffer chunky+ENC (no reconfig)");
+}
+
 /// Class C governance: enable the watchdog ONLY, with sync reconfig. Used when
 /// chunky is already on from genesis and we just need the watchdog up before
 /// any abort can happen.
@@ -257,7 +293,11 @@ async fn run_matrix_case(case: MatrixCase) {
 
     if case.prior_is_nt_nt() {
         run_class_a(case).await;
+    } else if case.prior_cdkg == NotTriggered {
+        // Prior rDKG is triggered (A or F), prior cDKG is NT.
+        run_class_b(case).await;
     } else {
+        // Prior rDKG and cDKG both triggered.
         run_class_c(case).await;
     }
 }
@@ -305,15 +345,77 @@ async fn run_class_a(case: MatrixCase) {
     info!("Class A case {:?} OK", case);
 }
 
+/// Class B: prior rDKG is triggered (A or F), prior cDKG = NotTriggered.
+/// Setup: same swarm as Class A (chunky off at genesis). Enable watchdog via
+/// gov+sync in epoch 2 → epoch 3. In epoch 3 buffer chunky+ENC without
+/// reconfig + set prior rDKG failpoint. End of epoch 3 = x-1 → x: only rDKG
+/// triggers (chunky still off), outcome per failpoint. Buffered chunky+ENC
+/// apply at that reconfig, so epoch 4 = x has chunky on. End of epoch 4 = x
+/// → x+1 produces current state.
+async fn run_class_b(case: MatrixCase) {
+    assert!(case.prior_cdkg == NotTriggered);
+    assert!(case.prior_rdkg != NotTriggered);
+
+    let (swarm, cli, root_idx) = create_swarm_with_dkg_only(4, EPOCH_DURATION_SECS).await;
+    let client = swarm.validators().nth(1).unwrap().rest_client();
+
+    swarm
+        .wait_for_all_nodes_to_catchup_to_epoch(2, Duration::from_secs(EPOCH_DURATION_SECS * 3))
+        .await
+        .expect("epoch 2");
+
+    let epoch_at_watchdog_gov = client
+        .get_ledger_information()
+        .await
+        .unwrap()
+        .into_inner()
+        .epoch;
+    info!("Class B: stable at epoch {} (enabling watchdog)", epoch_at_watchdog_gov);
+
+    gov_enable_watchdog_with_sync_reconfig(&cli, root_idx, WATCHDOG_GRACE_SECS).await;
+    // Now in epoch_at_watchdog_gov + 1. Chunky still off.
+
+    info!("Class B: buffering chunky+ENC for next epoch (no reconfig)");
+    gov_buffer_chunky_and_enc_no_reconfig(&cli, root_idx).await;
+
+    // Set PRIOR rDKG failpoint (cDKG won't trigger this epoch — chunky off).
+    if case.prior_rdkg == Aborted {
+        info!("Class B: prior rDKG=A — setting rDKG abort failpoint");
+        set_failpoint_on_all(&swarm, FP_RDKG, "return").await;
+    }
+
+    let prior_target = epoch_at_watchdog_gov + 2;
+    wait_for_epoch_with_logging(&client, prior_target, EPOCH_DURATION_SECS, WATCHDOG_GRACE_SECS)
+        .await;
+
+    // Now in epoch x = prior_target with chunky on. Adjust failpoints for current.
+    if case.cur_rdkg == Finished {
+        clear_failpoint_on_all(&swarm, FP_RDKG).await;
+    } else {
+        set_failpoint_on_all(&swarm, FP_RDKG, "return").await;
+    }
+    if case.cur_cdkg == Finished {
+        clear_failpoint_on_all(&swarm, FP_CDKG).await;
+    } else {
+        set_failpoint_on_all(&swarm, FP_CDKG, "return").await;
+    }
+
+    let current_target = prior_target + 1;
+    wait_for_epoch_with_logging(&client, current_target, EPOCH_DURATION_SECS, WATCHDOG_GRACE_SECS)
+        .await;
+
+    assert_chain_progresses(&client).await;
+    info!("Class B case {:?} OK", case);
+}
+
 /// Class C: prior involves chunky on in x-1. Genesis has chunky on; governance
 /// in epoch 2 turns the watchdog on (sync reconfig → epoch 3). End of epoch 3
 /// = x-1 → x transition produces prior state via failpoints set before the
 /// transition; failpoints adjusted between epochs for current state.
 async fn run_class_c(case: MatrixCase) {
-    assert!(!case.prior_is_nt_nt(), "class C requires prior with at least one triggered");
     assert!(
         case.prior_rdkg != NotTriggered && case.prior_cdkg != NotTriggered,
-        "MVP class C handles both prior r and c triggered; class B (prior cDKG=NT only) is post-MVP",
+        "class C requires both prior r and c triggered",
     );
 
     let (swarm, cli, root_idx) = create_swarm_class_c(4, EPOCH_DURATION_SECS).await;
@@ -404,28 +506,48 @@ async fn wait_for_epoch_with_logging(
     }
 }
 
-// ----------------------- MVP tests (#[ignore]) -----------------------
+// ----------------------- 28 #[ignore]'d matrix tests -----------------------
 
-/// Class A baseline — equivalent to the existing #19813 test (prior sync
-/// reconfig, current rDKG finishes, current cDKG aborts via failpoint).
-#[tokio::test]
-#[ignore]
-async fn watchdog_matrix_nt_nt_f_a() {
-    run_matrix_case(MatrixCase::new(NotTriggered, NotTriggered, Finished, Aborted)).await;
+macro_rules! matrix_test {
+    ($name:ident, $pr:expr, $pc:expr, $cr:expr, $cc:expr) => {
+        #[tokio::test]
+        #[ignore]
+        async fn $name() {
+            run_matrix_case(MatrixCase::new($pr, $pc, $cr, $cc)).await;
+        }
+    };
 }
 
-/// Class C all-finished — no aborts anywhere; watchdog must not corrupt the
-/// happy path.
-#[tokio::test]
-#[ignore]
-async fn watchdog_matrix_f_f_f_f() {
-    run_matrix_case(MatrixCase::new(Finished, Finished, Finished, Finished)).await;
-}
+// ----- Class A: prior (NT, NT) — 4 cases -----
+matrix_test!(watchdog_matrix_nt_nt_f_f, NotTriggered, NotTriggered, Finished, Finished);
+matrix_test!(watchdog_matrix_nt_nt_f_a, NotTriggered, NotTriggered, Finished, Aborted);
+matrix_test!(watchdog_matrix_nt_nt_a_f, NotTriggered, NotTriggered, Aborted, Finished);
+matrix_test!(watchdog_matrix_nt_nt_a_a, NotTriggered, NotTriggered, Aborted, Aborted);
 
-/// Class C stress — both DKGs abort in x-1 AND x; watchdog must fire twice
-/// in a row.
-#[tokio::test]
-#[ignore]
-async fn watchdog_matrix_a_a_a_a() {
-    run_matrix_case(MatrixCase::new(Aborted, Aborted, Aborted, Aborted)).await;
-}
+// ----- Class B: prior rDKG triggered, prior cDKG NT — 8 cases -----
+matrix_test!(watchdog_matrix_a_nt_f_f, Aborted, NotTriggered, Finished, Finished);
+matrix_test!(watchdog_matrix_a_nt_f_a, Aborted, NotTriggered, Finished, Aborted);
+matrix_test!(watchdog_matrix_a_nt_a_f, Aborted, NotTriggered, Aborted, Finished);
+matrix_test!(watchdog_matrix_a_nt_a_a, Aborted, NotTriggered, Aborted, Aborted);
+matrix_test!(watchdog_matrix_f_nt_f_f, Finished, NotTriggered, Finished, Finished);
+matrix_test!(watchdog_matrix_f_nt_f_a, Finished, NotTriggered, Finished, Aborted);
+matrix_test!(watchdog_matrix_f_nt_a_f, Finished, NotTriggered, Aborted, Finished);
+matrix_test!(watchdog_matrix_f_nt_a_a, Finished, NotTriggered, Aborted, Aborted);
+
+// ----- Class C: both prior triggered — 16 cases -----
+matrix_test!(watchdog_matrix_a_a_f_f, Aborted, Aborted, Finished, Finished);
+matrix_test!(watchdog_matrix_a_a_f_a, Aborted, Aborted, Finished, Aborted);
+matrix_test!(watchdog_matrix_a_a_a_f, Aborted, Aborted, Aborted, Finished);
+matrix_test!(watchdog_matrix_a_a_a_a, Aborted, Aborted, Aborted, Aborted);
+matrix_test!(watchdog_matrix_a_f_f_f, Aborted, Finished, Finished, Finished);
+matrix_test!(watchdog_matrix_a_f_f_a, Aborted, Finished, Finished, Aborted);
+matrix_test!(watchdog_matrix_a_f_a_f, Aborted, Finished, Aborted, Finished);
+matrix_test!(watchdog_matrix_a_f_a_a, Aborted, Finished, Aborted, Aborted);
+matrix_test!(watchdog_matrix_f_a_f_f, Finished, Aborted, Finished, Finished);
+matrix_test!(watchdog_matrix_f_a_f_a, Finished, Aborted, Finished, Aborted);
+matrix_test!(watchdog_matrix_f_a_a_f, Finished, Aborted, Aborted, Finished);
+matrix_test!(watchdog_matrix_f_a_a_a, Finished, Aborted, Aborted, Aborted);
+matrix_test!(watchdog_matrix_f_f_f_f, Finished, Finished, Finished, Finished);
+matrix_test!(watchdog_matrix_f_f_f_a, Finished, Finished, Finished, Aborted);
+matrix_test!(watchdog_matrix_f_f_a_f, Finished, Finished, Aborted, Finished);
+matrix_test!(watchdog_matrix_f_f_a_a, Finished, Finished, Aborted, Aborted);
