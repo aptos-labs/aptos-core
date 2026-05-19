@@ -56,7 +56,9 @@ fn bench_int_arith_loop(c: &mut Criterion) {
     {
         let (functions, descriptors) = micro_op_u64_loop();
         let mut exec_ctx = LocalExecutionContext::unmetered();
-        // TODO: hoist interpreter context setup out of the timed body.
+        // TODO: use `criterion::Bencher::iter_custom` to start/stop the timer
+        // around the run, so context construction is excluded from the
+        // measurement.
         group.bench_function("micro_op/u64", |b| {
             b.iter(|| {
                 let mut ctx = InterpreterContext::new(&mut exec_ctx, &descriptors, unsafe {
@@ -73,7 +75,9 @@ fn bench_int_arith_loop(c: &mut Criterion) {
     {
         let (functions, descriptors) = micro_op_i64_loop();
         let mut exec_ctx = LocalExecutionContext::unmetered();
-        // TODO: hoist interpreter context setup out of the timed body.
+        // TODO: use `criterion::Bencher::iter_custom` to start/stop the timer
+        // around the run, so context construction is excluded from the
+        // measurement.
         group.bench_function("micro_op/i64", |b| {
             b.iter(|| {
                 let mut ctx = InterpreterContext::new(&mut exec_ctx, &descriptors, unsafe {

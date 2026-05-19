@@ -125,10 +125,7 @@ use std::fmt;
 mod gas;
 mod unspecialized;
 pub use gas::MicroOpGasSchedule;
-pub use unspecialized::{
-    IntBinaryOp, IntNegateOp, IntOperand, IntShiftOp, ShiftOperand, UnspecializedSignedIntTy,
-    UnspecializedUnsignedIntTy,
-};
+pub use unspecialized::{IntBinaryOp, IntNegateOp, IntOperand, IntShiftOp, IntTy, ShiftOperand};
 
 /// A typed wrapper around a `u32` frame-pointer-relative byte offset.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -295,9 +292,8 @@ pub enum MicroOp {
     //======================================================================
     // Arithmetic & bitwise (specialized u64)
     //======================================================================
-    // Fast-path variants for u64 reg-reg and immediate-form ops. Every
-    // other integer width is handled by the unspecialized per-kind
-    // variants below. All arithmetic is checked.
+    // Fast-path variants for u64 slot-slot and immediate-form ops. All
+    // arithmetic is checked.
     //======================================================================
 
     // --- Add ---
@@ -441,8 +437,11 @@ pub enum MicroOp {
     //======================================================================
     // Arithmetic & bitwise (unspecialized, per-kind variants)
     //======================================================================
-    // Per-kind variants for every non-u64 integer width. See [`IntBinaryOp`]
-    // / [`IntShiftOp`] / [`IntNegateOp`] for operand layout and semantics.
+    // Per-kind variants that tag-dispatch on the operand type at runtime.
+    // See [`IntBinaryOp`] / [`IntShiftOp`] / [`IntNegateOp`] for operand
+    // layout and semantics; the set of which `(op, type)` combinations are
+    // unspecialized vs. promoted to dedicated variants follows the
+    // specialization principle described in [`unspecialized`].
     //
     // TODO: heap-boxing wide imm operands inside [`IntOperand`] costs an
     // allocation and a pointer-chase per micro-op. A side-table keyed by

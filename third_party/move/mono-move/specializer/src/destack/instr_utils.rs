@@ -97,6 +97,11 @@ pub(crate) fn remap_source_slots_with(instr: &mut Instr, f: impl FnMut(Slot) -> 
 // =============================================================================
 
 /// Extract the destination slot and immediate value from a load instruction.
+// TODO: the wide arms (`LdU128`/`LdU256`/`LdI128`/`LdI256`) each allocate
+// a `Box` here, even when `try_fuse_immediate_binop` decides not to fuse.
+// Consider splitting `extract_imm_value` into a cheap "would this fuse?"
+// check + a separate constructor, or otherwise pulling allocation behind
+// the fusion-eligibility check.
 pub(crate) fn extract_imm_value(instr: &Instr) -> Option<(Slot, ImmValue)> {
     match instr {
         Instr::LdTrue(dst) => Some((*dst, ImmValue::Bool(true))),
@@ -114,6 +119,9 @@ pub(crate) fn extract_imm_value(instr: &Instr) -> Option<(Slot, ImmValue)> {
         Instr::LdI128(dst, val) => Some((*dst, ImmValue::I128(Box::new(*val)))),
         Instr::LdI256(dst, val) => Some((*dst, ImmValue::I256(Box::new(*val)))),
 
+        // `LdConst` loads from the constant pool — its payload isn't a
+        // fixed-width integer literal, so it's never fusible into
+        // `BinaryOpImm`.
         Instr::LdConst(_, _) => None,
 
         // Non-load instructions.

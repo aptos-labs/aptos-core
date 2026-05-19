@@ -290,16 +290,18 @@ impl FunctionVerifier<'_> {
                 self.check_frame_access_8(pc, dst);
             },
 
-            // Unspecialized integer binary ops. Operand width comes from
-            // the rhs's [`IntOperand`] variant; lhs / dst must point at
-            // slots of the same width. Bitwise additionally rejects signed
-            // operands — [`IntOperand`] can't exclude that combination
-            // on its own since arith and bitwise share its encoding.
+            // Unspecialized integer binary ops. Checks:
+            //   - `dst`, `lhs`, and (if `rhs` is a slot) `rhs` are all
+            //     in-bounds slots of width `op.rhs.byte_width()`.
+            //   - Bitwise ops reject signed operands.
             //
-            // TODO: a previous revision also statically rejected
-            // `IntDiv`/`IntMod` with an imm-zero rhs. Revisit once we have
-            // a clearer policy on what the specializer is allowed to reject
-            // statically.
+            // TODO: also statically reject `IntDiv`/`IntMod` with an
+            // imm-zero rhs. Same for u64 variants (currently the u64
+            // variants statically error out) and shifts. Revisit once we
+            // have a clearer policy on what the specializer is allowed
+            // to reject statically — turning runtime aborts into
+            // verification errors makes the specializer's
+            // constant-folding observable in the error type.
             MicroOp::IntAdd(ref op)
             | MicroOp::IntSub(ref op)
             | MicroOp::IntMul(ref op)
@@ -314,18 +316,21 @@ impl FunctionVerifier<'_> {
                 }
             },
 
-            // Shifts: lhs is `op.ty.byte_width()`; rhs is either a 1-byte
-            // slot or an inline u8. For the imm form, reject
-            // `imm >= ty.bit_width()` statically (same policy as
-            // `ShlU64Imm` / `ShrU64Imm`).
+            // Shifts: `lhs` / `dst` are slots of width `op.ty.byte_width()`;
+            // `rhs` is either a 1-byte slot or an inline u8. The shift
+            // amount is statically range-checked for the imm form, and
+            // signedness of `ty` is checked at runtime via the dispatcher.
+            //
+            // TODO: as noted above for div/mod, the static imm range check
+            // turns a runtime abort into a verification error — revisit.
             MicroOp::IntShl(op) | MicroOp::IntShr(op) => {
-                let size = op.ty.byte_width();
+                let size = op.ty.byte_width() as u32;
                 self.check_frame_access(Some(pc), op.lhs, size);
                 self.check_frame_access(Some(pc), op.dst, size);
                 match op.rhs {
-                    ShiftOperand::RegU8(rhs) => self.check_frame_access_1(pc, rhs),
+                    ShiftOperand::SlotU8(rhs) => self.check_frame_access_1(pc, rhs),
                     ShiftOperand::ImmU8(imm) => {
-                        if (imm as u32) >= op.ty.bit_width() {
+                        if (imm as usize) >= op.ty.bit_width() {
                             self.err(
                                 Some(pc),
                                 format!(
@@ -339,13 +344,11 @@ impl FunctionVerifier<'_> {
                 }
             },
 
-            // [`MicroOp::IntNegate`] is signed-only at the type level
-            // ([`UnspecializedSignedIntTy`] excludes unsigned widths and
-            // u64), so the only legality check left here is frame access.
-            // The `src == MIN` overflow case is enforced at runtime —
-            // statically deciding it would require const-prop on `src`.
+            // `IntNegate` is signed-only — checked at runtime by the
+            // dispatcher. The `src == MIN` overflow case is also a
+            // runtime abort.
             MicroOp::IntNegate(op) => {
-                let size = op.ty.byte_width();
+                let size = op.ty.byte_width() as u32;
                 self.check_frame_access(Some(pc), op.src, size);
                 self.check_frame_access(Some(pc), op.dst, size);
             },
@@ -801,12 +804,12 @@ impl FunctionVerifier<'_> {
     }
 
     /// Verify an [`IntBinaryOp`]: dst and lhs are slots of width
-    /// `op.rhs.byte_width()`; if rhs is a Reg arm, its slot is checked too.
+    /// `op.rhs.byte_width()`; if rhs is a slot arm, its slot is checked too.
     fn check_int_binop_frame_access(&mut self, pc: usize, op: &IntBinaryOp) {
-        let size = op.rhs.byte_width();
+        let size = op.rhs.byte_width() as u32;
         self.check_frame_access(Some(pc), op.lhs, size);
         self.check_frame_access(Some(pc), op.dst, size);
-        if let Some(rhs_off) = op.rhs.reg_offset() {
+        if let Some(rhs_off) = op.rhs.slot_offset() {
             self.check_frame_access(Some(pc), rhs_off, size);
         }
     }

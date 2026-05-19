@@ -34,8 +34,8 @@
 use mono_move_alloc::GlobalArenaPtr;
 use mono_move_core::{
     Code, FrameLayoutInfo, FrameOffset as FO, Function, IntBinaryOp, IntNegateOp, IntOperand,
-    IntShiftOp, LocalExecutionContext, MicroOp, ShiftOperand, SortedSafePointEntries,
-    UnspecializedSignedIntTy, UnspecializedUnsignedIntTy, FRAME_METADATA_SIZE,
+    IntShiftOp, IntTy, LocalExecutionContext, MicroOp, ShiftOperand, SortedSafePointEntries,
+    FRAME_METADATA_SIZE,
 };
 use mono_move_runtime::{InterpreterContext, ObjectDescriptor};
 use move_core_types::int256::{I256, U256};
@@ -74,7 +74,7 @@ enum ShiftKind {
 //
 // `IntTypeOperand` ties a Rust integer type to its [`IntOperand`] reg /
 // imm constructors. `UnsignedTypeTag` ties an unsigned Rust integer to
-// its [`UnspecializedUnsignedIntTy`] tag for shift dispatch. Both are
+// its [`IntTy`] tag for shift dispatch. Both are
 // test-only — production code constructs operands directly.
 
 trait IntTypeOperand: Copy {
@@ -110,59 +110,59 @@ macro_rules! impl_int_type_operand_boxed {
     };
 }
 
-impl_int_type_operand_inline!(u8, RegU8, ImmU8);
-impl_int_type_operand_inline!(u16, RegU16, ImmU16);
-impl_int_type_operand_inline!(u32, RegU32, ImmU32);
-impl_int_type_operand_inline!(i8, RegI8, ImmI8);
-impl_int_type_operand_inline!(i16, RegI16, ImmI16);
-impl_int_type_operand_inline!(i32, RegI32, ImmI32);
-impl_int_type_operand_inline!(i64, RegI64, ImmI64);
-impl_int_type_operand_boxed!(u128, RegU128, ImmU128);
-impl_int_type_operand_boxed!(U256, RegU256, ImmU256);
-impl_int_type_operand_boxed!(i128, RegI128, ImmI128);
-impl_int_type_operand_boxed!(I256, RegI256, ImmI256);
+impl_int_type_operand_inline!(u8, SlotU8, ImmU8);
+impl_int_type_operand_inline!(u16, SlotU16, ImmU16);
+impl_int_type_operand_inline!(u32, SlotU32, ImmU32);
+impl_int_type_operand_inline!(i8, SlotI8, ImmI8);
+impl_int_type_operand_inline!(i16, SlotI16, ImmI16);
+impl_int_type_operand_inline!(i32, SlotI32, ImmI32);
+impl_int_type_operand_inline!(i64, SlotI64, ImmI64);
+impl_int_type_operand_boxed!(u128, SlotU128, ImmU128);
+impl_int_type_operand_boxed!(U256, SlotU256, ImmU256);
+impl_int_type_operand_boxed!(i128, SlotI128, ImmI128);
+impl_int_type_operand_boxed!(I256, SlotI256, ImmI256);
 
 trait UnsignedTypeTag {
-    const UNSIGNED_TY: UnspecializedUnsignedIntTy;
+    const UNSIGNED_TY: IntTy;
 }
 
 impl UnsignedTypeTag for u8 {
-    const UNSIGNED_TY: UnspecializedUnsignedIntTy = UnspecializedUnsignedIntTy::U8;
+    const UNSIGNED_TY: IntTy = IntTy::U8;
 }
 impl UnsignedTypeTag for u16 {
-    const UNSIGNED_TY: UnspecializedUnsignedIntTy = UnspecializedUnsignedIntTy::U16;
+    const UNSIGNED_TY: IntTy = IntTy::U16;
 }
 impl UnsignedTypeTag for u32 {
-    const UNSIGNED_TY: UnspecializedUnsignedIntTy = UnspecializedUnsignedIntTy::U32;
+    const UNSIGNED_TY: IntTy = IntTy::U32;
 }
 impl UnsignedTypeTag for u128 {
-    const UNSIGNED_TY: UnspecializedUnsignedIntTy = UnspecializedUnsignedIntTy::U128;
+    const UNSIGNED_TY: IntTy = IntTy::U128;
 }
 impl UnsignedTypeTag for U256 {
-    const UNSIGNED_TY: UnspecializedUnsignedIntTy = UnspecializedUnsignedIntTy::U256;
+    const UNSIGNED_TY: IntTy = IntTy::U256;
 }
 
 trait SignedTypeTag {
-    const SIGNED_TY: UnspecializedSignedIntTy;
+    const SIGNED_TY: IntTy;
 }
 
 impl SignedTypeTag for i8 {
-    const SIGNED_TY: UnspecializedSignedIntTy = UnspecializedSignedIntTy::I8;
+    const SIGNED_TY: IntTy = IntTy::I8;
 }
 impl SignedTypeTag for i16 {
-    const SIGNED_TY: UnspecializedSignedIntTy = UnspecializedSignedIntTy::I16;
+    const SIGNED_TY: IntTy = IntTy::I16;
 }
 impl SignedTypeTag for i32 {
-    const SIGNED_TY: UnspecializedSignedIntTy = UnspecializedSignedIntTy::I32;
+    const SIGNED_TY: IntTy = IntTy::I32;
 }
 impl SignedTypeTag for i64 {
-    const SIGNED_TY: UnspecializedSignedIntTy = UnspecializedSignedIntTy::I64;
+    const SIGNED_TY: IntTy = IntTy::I64;
 }
 impl SignedTypeTag for i128 {
-    const SIGNED_TY: UnspecializedSignedIntTy = UnspecializedSignedIntTy::I128;
+    const SIGNED_TY: IntTy = IntTy::I128;
 }
 impl SignedTypeTag for I256 {
-    const SIGNED_TY: UnspecializedSignedIntTy = UnspecializedSignedIntTy::I256;
+    const SIGNED_TY: IntTy = IntTy::I256;
 }
 
 // ---------------------------------------------------------------------------
@@ -415,7 +415,7 @@ fn unspec_shift_op<T: UnsignedTypeTag>(kind: ShiftKind) -> MicroOp {
         ty: T::UNSIGNED_TY,
         dst: FO(SLOT_DST),
         lhs: FO(SLOT_LHS),
-        rhs: ShiftOperand::RegU8(FO(SLOT_RHS)),
+        rhs: ShiftOperand::SlotU8(FO(SLOT_RHS)),
     })
 }
 

@@ -13,8 +13,8 @@ use crate::stackless_exec_ir::{
 use anyhow::{bail, Context, Result};
 use mono_move_core::{
     types::{strip_ref, view_type, InternedType, Type},
-    CodeOffset, FrameOffset, IntBinaryOp, IntNegateOp, IntOperand, IntShiftOp, MicroOp,
-    ShiftOperand, UnspecializedSignedIntTy, UnspecializedUnsignedIntTy,
+    CodeOffset, FrameOffset, IntBinaryOp, IntNegateOp, IntOperand, IntShiftOp, IntTy, MicroOp,
+    ShiftOperand,
 };
 
 pub fn lower_function(func_ir: &FunctionIR, ctx: &LoweringContext) -> Result<Vec<MicroOp>> {
@@ -249,6 +249,9 @@ impl<'a> LoweringState<'a> {
 
             // --- Binary ops ---
             Instr::BinaryOp(dst, op, lhs, rhs) => {
+                // TODO: BinaryOp / BinaryOpImm share most of their shape
+                // (operand resolution + per-kind emit); consider factoring
+                // out the common skeleton once cast / cmp ops settle.
                 let lhs_info = self.slot(*lhs)?;
                 let rhs_info = self.slot(*rhs)?;
                 let dst_info = self.def_slot(*dst)?;
@@ -258,10 +261,9 @@ impl<'a> LoweringState<'a> {
                 let rhs = rhs_info.offset;
 
                 // Fast path: emit a specialized u64 variant when one exists.
-                // Fall through to the unspecialized per-kind path otherwise
-                // (u64 `Cmp(_)` / `Or` / `And` have no specialized variant
-                // and follow the same path as non-u64 widths).
-                if matches!(lhs_ty, Type::U64) {
+                // u64 `Cmp(_)` / `Or` / `And` have no specialized variant
+                // and fall through to the unspecialized path.
+                if lhs_ty.is_u64() {
                     let emitted = match op {
                         BinaryOp::Add => Some(MicroOp::AddU64 { dst, lhs, rhs }),
                         BinaryOp::Sub => Some(MicroOp::SubU64 { dst, lhs, rhs }),
@@ -290,17 +292,13 @@ impl<'a> LoweringState<'a> {
                     | BinaryOp::BitAnd
                     | BinaryOp::BitOr
                     | BinaryOp::BitXor => {
-                        let rhs_op = int_operand_from_reg(lhs_ty, rhs)?;
+                        let rhs = int_operand_from_slot(lhs_ty, rhs)?;
                         if matches!(op, BinaryOp::BitAnd | BinaryOp::BitOr | BinaryOp::BitXor)
-                            && rhs_op.is_signed()
+                            && rhs.is_signed()
                         {
-                            bail!("BinaryOp {:?}: bitwise on signed type (Move semantics)", op);
+                            bail!("BinaryOp {:?}: bitwise on a signed value is invalid", op);
                         }
-                        let binop = IntBinaryOp {
-                            dst,
-                            lhs,
-                            rhs: rhs_op,
-                        };
+                        let binop = IntBinaryOp { dst, lhs, rhs };
                         self.emit(match op {
                             BinaryOp::Add => MicroOp::IntAdd(binop),
                             BinaryOp::Sub => MicroOp::IntSub(binop),
@@ -310,15 +308,21 @@ impl<'a> LoweringState<'a> {
                             BinaryOp::BitAnd => MicroOp::IntBitAnd(binop),
                             BinaryOp::BitOr => MicroOp::IntBitOr(binop),
                             BinaryOp::BitXor => MicroOp::IntBitXor(binop),
-                            _ => unreachable!(),
+                            BinaryOp::Shl
+                            | BinaryOp::Shr
+                            | BinaryOp::Cmp(_)
+                            | BinaryOp::Or
+                            | BinaryOp::And => {
+                                bail!("internal: unexpected op in arith/bitwise arm")
+                            },
                         });
                     },
                     BinaryOp::Shl | BinaryOp::Shr => {
-                        let ty =
-                            UnspecializedUnsignedIntTy::from_type(lhs_ty).ok_or_else(|| {
+                        let ty = IntTy::from_type(lhs_ty)
+                            .filter(|t| !t.is_signed())
+                            .ok_or_else(|| {
                                 anyhow::anyhow!(
-                                    "BinaryOp {:?}: requires an unsigned non-u64 integer type \
-                                 (Move semantics)",
+                                    "BinaryOp {:?}: requires an unsigned non-u64 integer type",
                                     op
                                 )
                             })?;
@@ -326,12 +330,22 @@ impl<'a> LoweringState<'a> {
                             ty,
                             dst,
                             lhs,
-                            rhs: ShiftOperand::RegU8(rhs),
+                            rhs: ShiftOperand::SlotU8(rhs),
                         };
                         self.emit(match op {
                             BinaryOp::Shl => MicroOp::IntShl(shift_op),
                             BinaryOp::Shr => MicroOp::IntShr(shift_op),
-                            _ => unreachable!(),
+                            BinaryOp::Add
+                            | BinaryOp::Sub
+                            | BinaryOp::Mul
+                            | BinaryOp::Div
+                            | BinaryOp::Mod
+                            | BinaryOp::BitAnd
+                            | BinaryOp::BitOr
+                            | BinaryOp::BitXor
+                            | BinaryOp::Cmp(_)
+                            | BinaryOp::Or
+                            | BinaryOp::And => bail!("internal: unexpected op in shift arm"),
                         });
                     },
                     // Comparison-to-register and logical and/or are not
@@ -344,6 +358,8 @@ impl<'a> LoweringState<'a> {
 
             // --- Binary ops with immediate ---
             Instr::BinaryOpImm(dst, op, src, imm) => {
+                // TODO: see [`Instr::BinaryOp`] above on factoring out the
+                // shared skeleton between the reg-reg and imm forms.
                 let src_info = self.slot(*src)?;
                 let dst_info = self.def_slot(*dst)?;
                 let src_ty = self.slot_type(*src)?;
@@ -353,32 +369,32 @@ impl<'a> LoweringState<'a> {
                 // Fast path: u64 specialized imm variants where they exist.
                 // u64 BitAnd/BitOr/BitXor/Cmp/Or/And imm have no specialized
                 // variant and fall through to the unspecialized path below.
-                if matches!(src_ty, Type::U64) {
+                if src_ty.is_u64() {
                     let emitted = match op {
                         BinaryOp::Add => Some(MicroOp::AddU64Imm {
                             dst,
                             src: lhs,
-                            imm: imm_to_u64(imm),
+                            imm: imm_to_u64(imm)?,
                         }),
                         BinaryOp::Sub => Some(MicroOp::SubU64Imm {
                             dst,
                             src: lhs,
-                            imm: imm_to_u64(imm),
+                            imm: imm_to_u64(imm)?,
                         }),
                         BinaryOp::Mul => Some(MicroOp::MulU64Imm {
                             dst,
                             src: lhs,
-                            imm: imm_to_u64(imm),
+                            imm: imm_to_u64(imm)?,
                         }),
                         BinaryOp::Div => Some(MicroOp::DivU64Imm {
                             dst,
                             src: lhs,
-                            imm: imm_to_u64(imm),
+                            imm: imm_to_u64(imm)?,
                         }),
                         BinaryOp::Mod => Some(MicroOp::ModU64Imm {
                             dst,
                             src: lhs,
-                            imm: imm_to_u64(imm),
+                            imm: imm_to_u64(imm)?,
                         }),
                         BinaryOp::Shl => Some(MicroOp::ShlU64Imm {
                             dst,
@@ -416,10 +432,7 @@ impl<'a> LoweringState<'a> {
                         if matches!(op, BinaryOp::BitAnd | BinaryOp::BitOr | BinaryOp::BitXor)
                             && rhs.is_signed()
                         {
-                            bail!(
-                                "BinaryOpImm {:?}: bitwise on signed type (Move semantics)",
-                                op,
-                            );
+                            bail!("BinaryOpImm {:?}: bitwise on a signed value is invalid", op,);
                         }
                         let binop = IntBinaryOp { dst, lhs, rhs };
                         self.emit(match op {
@@ -431,15 +444,21 @@ impl<'a> LoweringState<'a> {
                             BinaryOp::BitAnd => MicroOp::IntBitAnd(binop),
                             BinaryOp::BitOr => MicroOp::IntBitOr(binop),
                             BinaryOp::BitXor => MicroOp::IntBitXor(binop),
-                            _ => unreachable!(),
+                            BinaryOp::Shl
+                            | BinaryOp::Shr
+                            | BinaryOp::Cmp(_)
+                            | BinaryOp::Or
+                            | BinaryOp::And => {
+                                bail!("internal: unexpected op in arith/bitwise arm")
+                            },
                         });
                     },
                     BinaryOp::Shl | BinaryOp::Shr => {
-                        let ty =
-                            UnspecializedUnsignedIntTy::from_type(src_ty).ok_or_else(|| {
+                        let ty = IntTy::from_type(src_ty)
+                            .filter(|t| !t.is_signed())
+                            .ok_or_else(|| {
                                 anyhow::anyhow!(
-                                    "BinaryOpImm {:?}: requires an unsigned non-u64 integer type \
-                                 (Move semantics)",
+                                    "BinaryOpImm {:?}: requires an unsigned non-u64 integer type",
                                     op
                                 )
                             })?;
@@ -452,11 +471,19 @@ impl<'a> LoweringState<'a> {
                         self.emit(match op {
                             BinaryOp::Shl => MicroOp::IntShl(shift_op),
                             BinaryOp::Shr => MicroOp::IntShr(shift_op),
-                            _ => unreachable!(),
+                            BinaryOp::Add
+                            | BinaryOp::Sub
+                            | BinaryOp::Mul
+                            | BinaryOp::Div
+                            | BinaryOp::Mod
+                            | BinaryOp::BitAnd
+                            | BinaryOp::BitOr
+                            | BinaryOp::BitXor
+                            | BinaryOp::Cmp(_)
+                            | BinaryOp::Or
+                            | BinaryOp::And => bail!("internal: unexpected op in shift arm"),
                         });
                     },
-                    // Comparison-to-register and logical and/or are not yet
-                    // lowered for any integer width.
                     BinaryOp::Cmp(_) | BinaryOp::Or | BinaryOp::And => {
                         bail!("BinaryOpImm {:?} not yet lowered", op)
                     },
@@ -464,17 +491,13 @@ impl<'a> LoweringState<'a> {
             },
 
             // --- Unary ops ---
-            //
-            // Only [`UnaryOp::Negate`] is lowered here today. Boolean Not,
-            // FreezeRef, and the Cast* family will land in their own arms as
-            // they get implemented. There is no specialized i64 fast-path
-            // variant — every signed width routes through the unspecialized
-            // [`MicroOp::IntNegate`].
             Instr::UnaryOp(dst, UnaryOp::Negate, src) => {
                 let src_ty = self.slot_type(*src)?;
-                let signed_ty = UnspecializedSignedIntTy::from_type(src_ty).ok_or_else(|| {
-                    anyhow::anyhow!("UnaryOp::Negate requires a signed integer type")
-                })?;
+                let signed_ty = IntTy::from_type(src_ty)
+                    .filter(|t| t.is_signed())
+                    .ok_or_else(|| {
+                        anyhow::anyhow!("UnaryOp::Negate requires a signed integer type")
+                    })?;
                 let src_info = self.slot(*src)?;
                 let dst_info = self.def_slot(*dst)?;
                 self.emit(MicroOp::IntNegate(IntNegateOp {
@@ -602,7 +625,7 @@ impl<'a> LoweringState<'a> {
                 let src_ty = self.slot_type(*src)?;
                 if Self::is_u64_sized(src_ty) {
                     let src_info = self.slot(*src)?;
-                    let v = imm_to_u64(imm);
+                    let v = imm_to_u64(imm)?;
                     let idx = self.out_buf.len();
                     self.branch_fixups.push(idx);
                     match op {
@@ -824,8 +847,8 @@ fn decode_label(encoded: u32) -> u16 {
     (encoded & 0x7FFF_FFFF) as u16
 }
 
-fn imm_to_u64(imm: &ImmValue) -> u64 {
-    match imm {
+fn imm_to_u64(imm: &ImmValue) -> Result<u64> {
+    Ok(match imm {
         ImmValue::Bool(true) => 1,
         ImmValue::Bool(false) => 0,
         ImmValue::U8(v) => *v as u64,
@@ -836,11 +859,10 @@ fn imm_to_u64(imm: &ImmValue) -> u64 {
         ImmValue::I16(v) => *v as u64,
         ImmValue::I32(v) => *v as u64,
         ImmValue::I64(v) => *v as u64,
-        // Wide imms can't appear with a u64-typed slot in well-typed Move.
         ImmValue::U128(_) | ImmValue::U256(_) | ImmValue::I128(_) | ImmValue::I256(_) => {
-            unreachable!("u64 fast path receives wide imm — ill-typed IR")
+            bail!("u64 fast path received a wide imm — ill-typed IR")
         },
-    }
+    })
 }
 
 /// Extract a u8 shift amount. The rhs of a Move `Shl`/`Shr` is always u8
@@ -852,23 +874,11 @@ fn shift_imm_u8(imm: &ImmValue) -> Result<u8> {
     }
 }
 
-/// Build an [`IntOperand`] reg arm matching `ty`.
-fn int_operand_from_reg(ty: &Type, off: FrameOffset) -> Result<IntOperand> {
-    Ok(match ty {
-        Type::U8 => IntOperand::RegU8(off),
-        Type::U16 => IntOperand::RegU16(off),
-        Type::U32 => IntOperand::RegU32(off),
-        Type::U64 => IntOperand::RegU64(off),
-        Type::U128 => IntOperand::RegU128(off),
-        Type::U256 => IntOperand::RegU256(off),
-        Type::I8 => IntOperand::RegI8(off),
-        Type::I16 => IntOperand::RegI16(off),
-        Type::I32 => IntOperand::RegI32(off),
-        Type::I64 => IntOperand::RegI64(off),
-        Type::I128 => IntOperand::RegI128(off),
-        Type::I256 => IntOperand::RegI256(off),
-        _ => bail!("expected an integer type"),
-    })
+/// Build an [`IntOperand`] slot arm from a Move integer type and frame
+/// offset.
+fn int_operand_from_slot(ty: &Type, off: FrameOffset) -> Result<IntOperand> {
+    let int_ty = IntTy::from_type(ty).ok_or_else(|| anyhow::anyhow!("expected an integer type"))?;
+    Ok(IntOperand::slot(int_ty, off))
 }
 
 /// Build an [`IntOperand`] imm arm matching `imm`. The destacker emits an
