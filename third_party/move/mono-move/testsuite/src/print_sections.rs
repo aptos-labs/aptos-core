@@ -141,13 +141,14 @@ pub fn format_micro_ops(guard: &ExecutionGuard<'_>, module_ir: &ModuleIR) -> Str
                 out.push_str(&format!("\nfun {}(): skipped ({})\n", func_name, reason));
             },
             Ok(BuildContextOutcome::Built(ctx)) => match lower_function(func_ir, &ctx) {
-                Ok(ops) => {
+                Ok((ops, safe_points)) => {
                     out.push('\n');
                     out.push_str(
                         &MicroOpsFunctionDisplay {
                             func_name: &func_name,
                             ctx: &ctx,
                             ops: &ops,
+                            safe_points: &safe_points,
                         }
                         .to_string(),
                     );

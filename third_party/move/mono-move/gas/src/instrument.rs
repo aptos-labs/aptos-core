@@ -26,6 +26,15 @@
 //! rewritten to account for all inserted charge ops. The [`RemapTargets`]
 //! trait lets each instruction type perform this rewrite without the gas
 //! crate knowing instruction internals.
+//!
+//! ## Op-position remapping
+//!
+//! TODO: this goes away once we move gas instrumentation to the stackless exec
+//! IR level. Distinct from branch-target remapping: a branch target lands on
+//! the inserted `Charge` at the new block start, but consumers like safe-point
+//! tables need the original op's *own* new position (not the Charge before it).
+//! [`GasInstrumentor::run_with_pc_map`] returns the per-original-op new-PC map
+//! for that purpose. The map is monotone increasing.
 
 use crate::{compute_basic_blocks, GasSchedule, HasCfgInfo, InstrCost};
 
@@ -84,8 +93,24 @@ impl<S> GasInstrumentor<S> {
         I: HasCfgInfo + RemapTargets + GasMeteredInstruction,
         S: GasSchedule<I>,
     {
+        self.run_with_pc_map(ops).0
+    }
+
+    /// Like [`Self::run`], but also returns a per-original-op new-PC
+    /// map: `pc_map[i]` is where `ops[i]` lives in the instrumented
+    /// sequence. Use this to remap PC-keyed sidecars (e.g.,
+    /// safe-point tables). Distinct from the branch-target remap,
+    /// which lands on inserted `Charge` ops at block entries rather
+    /// than on the original ops themselves.
+    ///
+    /// Monotone strictly-increasing, so PC-sorted inputs stay sorted.
+    pub fn run_with_pc_map<I>(&self, ops: Vec<I>) -> (Vec<I>, Vec<u32>)
+    where
+        I: HasCfgInfo + RemapTargets + GasMeteredInstruction,
+        S: GasSchedule<I>,
+    {
         if ops.is_empty() {
-            return vec![];
+            return (vec![], vec![]);
         }
 
         let blocks = compute_basic_blocks(&ops);
@@ -114,19 +139,23 @@ impl<S> GasInstrumentor<S> {
         let remap = |t: usize| t + block_starts.partition_point(|&s| s < t) + d_before[t];
 
         let mut result = Vec::with_capacity(ops.len() + blocks.len() + n_dynamic);
+        let mut pc_map: Vec<u32> = Vec::with_capacity(ops.len());
         let mut bi = 0usize;
         for (i, (op, cost)) in ops.into_iter().zip(costs).enumerate() {
             if bi < block_starts.len() && block_starts[bi] == i {
                 result.push(I::charge(block_costs[bi]));
                 bi += 1;
             }
+            // `op`'s own new position, not the `Charge` that `remap(i)`
+            // targets.
+            pc_map.push(result.len() as u32);
             result.push(op.remap_targets(remap));
             if let Some(dynamic) = cost.dynamic {
                 result.push(dynamic);
             }
         }
 
-        result
+        (result, pc_map)
     }
 }
 

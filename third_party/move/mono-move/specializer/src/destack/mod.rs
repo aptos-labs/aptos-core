@@ -4,7 +4,6 @@
 //! Destack pipeline: converts Move bytecode into stackless execution IR.
 
 mod analysis;
-mod instr_utils;
 pub mod optimize;
 mod slot_alloc;
 mod ssa_conversion;
@@ -25,5 +24,10 @@ pub fn destack(module: CompiledModule, interner: &impl Interner) -> Result<Modul
     let module = PreparedModule::build(module, interner)?;
     let mut module_ir = translate::translate_module(module, interner)?;
     optimize::optimize_module(&mut module_ir);
+    // Debug-mode failsafe: verify xfer invariants hold after optimization.
+    #[cfg(debug_assertions)]
+    for func in module_ir.functions.iter().flatten() {
+        analysis::assert_xfer_invariants_on_final_ir(func)?;
+    }
     Ok(module_ir)
 }

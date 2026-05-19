@@ -4,13 +4,16 @@
 //! Display for lowered micro-ops in test baselines.
 
 use super::context::LoweringContext;
-use mono_move_core::MicroOp;
+use mono_move_core::{MicroOp, SafePointEntry};
 use std::fmt;
 
 pub struct MicroOpsFunctionDisplay<'a> {
     pub func_name: &'a str,
     pub ctx: &'a LoweringContext,
     pub ops: &'a [MicroOp],
+    /// Safe-point entries; each `code_offset` indexes into `ops`.
+    /// An empty slice omits the `safe_point_layouts:` section.
+    pub safe_points: &'a [SafePointEntry],
 }
 
 impl fmt::Display for MicroOpsFunctionDisplay<'_> {
@@ -21,6 +24,18 @@ impl fmt::Display for MicroOpsFunctionDisplay<'_> {
         for (i, op) in self.ops.iter().enumerate() {
             write!(f, "    {}: {}", i, op)?;
             writeln!(f)?;
+        }
+        if !self.safe_points.is_empty() {
+            writeln!(f, "  safe_point_layouts:")?;
+            for entry in self.safe_points {
+                let offsets: Vec<String> = entry
+                    .layout
+                    .heap_ptr_offsets
+                    .iter()
+                    .map(|o| o.0.to_string())
+                    .collect();
+                writeln!(f, "    {}: [{}]", entry.code_offset.0, offsets.join(", "))?;
+            }
         }
         writeln!(f, "}}")
     }
