@@ -691,6 +691,20 @@ impl<'a> LoweringState<'a> {
                 self.emit(MicroOp::Return);
             },
 
+            // --- Abort ---
+            Instr::Abort(code) => {
+                let code = self.slot(*code)?;
+                self.emit(MicroOp::Abort { code: code.offset });
+            },
+            Instr::AbortMsg(code, message) => {
+                let code = self.slot(*code)?;
+                let message = self.slot(*message)?;
+                self.emit(MicroOp::AbortMsg {
+                    code: code.offset,
+                    message: message.offset,
+                });
+            },
+
             _ => bail!("instruction {} not yet lowered", instr.opcode_name()),
         }
         Ok(())

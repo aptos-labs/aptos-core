@@ -69,6 +69,8 @@ impl HasCfgInfo for MicroOp {
             | MicroOp::IntShr(_)
             | MicroOp::IntNegate(_)
             | MicroOp::Return
+            | MicroOp::Abort { .. }
+            | MicroOp::AbortMsg { .. }
             | MicroOp::CallIndirect { .. }
             | MicroOp::CallDirect { .. }
             | MicroOp::VecNew { .. }
@@ -180,6 +182,8 @@ impl RemapTargets for MicroOp {
             | MicroOp::IntShr(_)
             | MicroOp::IntNegate(_)
             | MicroOp::Return
+            | MicroOp::Abort { .. }
+            | MicroOp::AbortMsg { .. }
             | MicroOp::CallIndirect { .. }
             | MicroOp::CallDirect { .. }
             | MicroOp::VecNew { .. }
@@ -262,6 +266,8 @@ impl GasSchedule<MicroOp> for MicroOpGasSchedule {
             // --- Control flow ---
             MicroOp::CallIndirect { .. } | MicroOp::CallDirect { .. } => 10,
             MicroOp::Return => 2,
+            MicroOp::Abort { .. } => 2,
+            MicroOp::AbortMsg { .. } => 5,
             MicroOp::Jump { .. } => 2,
             MicroOp::JumpNotZeroU64 { .. }
             | MicroOp::JumpGreaterEqualU64Imm { .. }

@@ -429,6 +429,15 @@ impl FunctionVerifier<'_> {
 
             MicroOp::Return | MicroOp::ForceGC => {},
 
+            MicroOp::Abort { code } => {
+                self.check_frame_access_8(pc, code);
+            },
+
+            MicroOp::AbortMsg { code, message } => {
+                self.check_frame_access_8(pc, code);
+                self.check_frame_access_8(pc, message);
+            },
+
             MicroOp::CallIndirect { .. } | MicroOp::CallDirect { .. } => {},
 
             // ----- VecNew -----
