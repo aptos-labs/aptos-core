@@ -260,6 +260,7 @@ pub fn fetch_mainnet_genesis_info(git_options: GitOptions) -> CliTypedResult<Mai
             initial_features_override: None,
             randomness_config_override: None,
             chunky_dkg_config_override: None,
+            epoch_timeout_grace_period_secs_override: None,
             jwk_consensus_config_override: None,
             initial_jwks: vec![],
             keyless_groth16_vk: None,
@@ -306,6 +307,8 @@ pub fn fetch_genesis_info(git_options: GitOptions) -> CliTypedResult<GenesisInfo
             initial_features_override: layout.initial_features_override.clone(),
             randomness_config_override: layout.randomness_config_override.clone(),
             chunky_dkg_config_override: layout.chunky_dkg_config_override.clone(),
+            epoch_timeout_grace_period_secs_override: layout
+                .epoch_timeout_grace_period_secs_override,
             jwk_consensus_config_override: layout.jwk_consensus_config_override.clone(),
             initial_jwks: layout.initial_jwks.clone(),
             keyless_groth16_vk: layout.keyless_groth16_vk_override.clone(),

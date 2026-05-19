@@ -23,6 +23,7 @@ mod epoch_timeout;
 mod governance_recovery;
 mod shadow_mode;
 mod stall_recovery;
+mod watchdog_matrix;
 mod with_validator_down;
 
 /// Poll on-chain `ChunkyDKGState` until we see a completed session.

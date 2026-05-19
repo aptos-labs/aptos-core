@@ -115,6 +115,7 @@ pub struct GenesisConfiguration {
     pub initial_features_override: Option<Features>,
     pub randomness_config_override: Option<OnChainRandomnessConfig>,
     pub chunky_dkg_config_override: Option<OnChainChunkyDKGConfig>,
+    pub epoch_timeout_grace_period_secs_override: Option<u64>,
     pub jwk_consensus_config_override: Option<OnChainJWKConsensusConfig>,
     pub initial_jwks: Vec<IssuerJWK>,
     pub keyless_groth16_vk: Option<Groth16VerificationKey>,
@@ -350,7 +351,12 @@ pub fn encode_genesis_change_set(
         chunky_dkg_config,
     );
     initialize_chunky_dkg(&mut session, &module_storage, &mut traversal_context);
-    initialize_epoch_timeout_config(&mut session, &module_storage, &mut traversal_context);
+    initialize_epoch_timeout_config(
+        &mut session,
+        &module_storage,
+        &mut traversal_context,
+        genesis_config.epoch_timeout_grace_period_secs_override,
+    );
     initialize_decryption(&mut session, &module_storage, &mut traversal_context);
     initialize_on_chain_governance(
         &mut session,
@@ -653,16 +659,35 @@ fn initialize_epoch_timeout_config(
     session: &mut SessionExt<impl AptosMoveResolver>,
     module_storage: &impl AptosModuleStorage,
     traversal_context: &mut TraversalContext,
+    grace_period_secs_override: Option<u64>,
 ) {
-    exec_function(
-        session,
-        module_storage,
-        traversal_context,
-        EPOCH_TIMEOUT_CONFIG_MODULE_NAME,
-        "initialize",
-        vec![],
-        serialize_values(&vec![MoveValue::Signer(CORE_CODE_ADDRESS)]),
-    );
+    match grace_period_secs_override {
+        Some(grace_period_secs) => {
+            exec_function(
+                session,
+                module_storage,
+                traversal_context,
+                EPOCH_TIMEOUT_CONFIG_MODULE_NAME,
+                "initialize_with_grace_period",
+                vec![],
+                serialize_values(&vec![
+                    MoveValue::Signer(CORE_CODE_ADDRESS),
+                    MoveValue::U64(grace_period_secs),
+                ]),
+            );
+        },
+        None => {
+            exec_function(
+                session,
+                module_storage,
+                traversal_context,
+                EPOCH_TIMEOUT_CONFIG_MODULE_NAME,
+                "initialize",
+                vec![],
+                serialize_values(&vec![MoveValue::Signer(CORE_CODE_ADDRESS)]),
+            );
+        },
+    }
 }
 
 fn initialize_randomness_api_v0_config(
@@ -1471,6 +1496,7 @@ pub fn generate_test_genesis(
             initial_features_override: None,
             randomness_config_override: None,
             chunky_dkg_config_override: None,
+            epoch_timeout_grace_period_secs_override: None,
             jwk_consensus_config_override: None,
             initial_jwks: vec![],
             keyless_groth16_vk: None,
@@ -1524,6 +1550,7 @@ fn mainnet_genesis_config() -> GenesisConfiguration {
         initial_features_override: None,
         randomness_config_override: None,
         chunky_dkg_config_override: None,
+        epoch_timeout_grace_period_secs_override: None,
         jwk_consensus_config_override: None,
         initial_jwks: vec![],
         keyless_groth16_vk: None,

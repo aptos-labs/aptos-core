@@ -24,6 +24,15 @@ module aptos_framework::epoch_timeout_config {
         }
     }
 
+    /// Initialize the configuration with the watchdog already armed.
+    /// Used by genesis builders that want the watchdog active from epoch 1.
+    public fun initialize_with_grace_period(framework: &signer, grace_period_secs: u64) {
+        system_addresses::assert_aptos_framework(framework);
+        if (!exists<EpochTimeoutConfig>(@aptos_framework)) {
+            move_to(framework, new_with_grace_period(grace_period_secs))
+        }
+    }
+
     /// Used by on-chain governance to update the watchdog config for the next epoch.
     public fun set_for_next_epoch(framework: &signer, new_config: EpochTimeoutConfig) {
         system_addresses::assert_aptos_framework(framework);

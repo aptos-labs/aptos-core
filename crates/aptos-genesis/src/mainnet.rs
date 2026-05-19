@@ -148,6 +148,9 @@ impl MainnetGenesisInfo {
                 initial_features_override: self.initial_features_override.clone(),
                 randomness_config_override: self.randomness_config_override.clone(),
                 chunky_dkg_config_override: self.chunky_dkg_config_override.clone(),
+                // Mainnet genesis does not arm the epoch-timeout watchdog;
+                // it is left disabled and may be enabled via governance later.
+                epoch_timeout_grace_period_secs_override: None,
                 jwk_consensus_config_override: self.jwk_consensus_config_override.clone(),
                 initial_jwks: vec![],
                 keyless_groth16_vk: None,

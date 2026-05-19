@@ -78,6 +78,7 @@ pub struct GenesisInfo {
     pub initial_features_override: Option<Features>,
     pub randomness_config_override: Option<OnChainRandomnessConfig>,
     pub chunky_dkg_config_override: Option<OnChainChunkyDKGConfig>,
+    pub epoch_timeout_grace_period_secs_override: Option<u64>,
     pub jwk_consensus_config_override: Option<OnChainJWKConsensusConfig>,
     pub initial_jwks: Vec<IssuerJWK>,
     pub keyless_groth16_vk: Option<Groth16VerificationKey>,
@@ -120,6 +121,8 @@ impl GenesisInfo {
             initial_features_override: genesis_config.initial_features_override.clone(),
             randomness_config_override: genesis_config.randomness_config_override.clone(),
             chunky_dkg_config_override: genesis_config.chunky_dkg_config_override.clone(),
+            epoch_timeout_grace_period_secs_override: genesis_config
+                .epoch_timeout_grace_period_secs_override,
             jwk_consensus_config_override: genesis_config.jwk_consensus_config_override.clone(),
             initial_jwks: genesis_config.initial_jwks.clone(),
             keyless_groth16_vk: genesis_config.keyless_groth16_vk.clone(),
@@ -158,6 +161,8 @@ impl GenesisInfo {
                 initial_features_override: self.initial_features_override.clone(),
                 randomness_config_override: self.randomness_config_override.clone(),
                 chunky_dkg_config_override: self.chunky_dkg_config_override.clone(),
+                epoch_timeout_grace_period_secs_override: self
+                    .epoch_timeout_grace_period_secs_override,
                 jwk_consensus_config_override: self.jwk_consensus_config_override.clone(),
                 initial_jwks: self.initial_jwks.clone(),
                 keyless_groth16_vk: self.keyless_groth16_vk.clone(),
