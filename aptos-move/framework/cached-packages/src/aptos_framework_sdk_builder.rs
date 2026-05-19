@@ -174,9 +174,24 @@ pub enum EntryFunctionCall {
     /// authority of the new authentication key.
     AccountSetOriginatingAddress {},
 
-    /// Upserts an ED25519 backup key to an account that has a keyless public key as its original public key by converting the account's authentication key
+    /// Atomically performs an `upsert_ed25519_backup_key_on_keyless_account` and stores `dk_ciphertext` in the
+    /// account's `EncryptedDK` resource. Currently used for backing up confidential-asset decryption keys on-chain
+    /// in Petra for keyless accounts. The ciphertext is opaque to the chain — see `EncryptedDK`.
+    ///
+    /// SECURITY: This function does not verify that `dk_ciphertext` is a well-formed encryption of the DK corresponding
+    /// to the registered EK on-chain. (It could, in theory, but we've judged the implementation complexity too high.)
+    /// Wallets using this function must be careful to only call this using a `dk_ciphertext` produced from its own
+    /// keyless Ed25519 backup key flow under the user-controlled `backup_public_key`.
+    AccountUpsertEd25519BackupKeyAndEncryptDk {
+        keyless_public_key: Vec<u8>,
+        backup_public_key: Vec<u8>,
+        backup_key_proof: Vec<u8>,
+        dk_ciphertext: Vec<u8>,
+    },
+
+    /// Upserts an Ed25519 backup key to an account that has a keyless public key as its original public key by converting the account's authentication key
     /// to a multi-key of the original keyless public key and the new backup key that requires 1 signature from either key to authenticate.
-    /// This function takes a the account's original keyless public key and a ED25519 backup public key and rotates the account's authentication key to a multi-key of
+    /// This function takes the account's original keyless public key and a Ed25519 backup public key and rotates the account's authentication key to a multi-key of
     /// the original keyless public key and the new backup key that requires 1 signature from either key to authenticate.
     ///
     /// Note: This function emits a `KeyRotationToMultiPublicKey` event marking both keys as verified since the keyless public key
@@ -185,7 +200,7 @@ pub enum EntryFunctionCall {
     /// # Arguments
     /// * `account` - The signer representing the keyless account
     /// * `keyless_public_key` - The original keyless public key of the account (wrapped in an AnyPublicKey)
-    /// * `backup_public_key` - The ED25519 public key to add as a backup
+    /// * `backup_public_key` - The Ed25519 public key to add as a backup
     /// * `backup_key_proof` - A signature from the backup key proving ownership
     ///
     /// # Aborts
@@ -1325,6 +1340,17 @@ impl EntryFunctionCall {
                 cap_update_table,
             ),
             AccountSetOriginatingAddress {} => account_set_originating_address(),
+            AccountUpsertEd25519BackupKeyAndEncryptDk {
+                keyless_public_key,
+                backup_public_key,
+                backup_key_proof,
+                dk_ciphertext,
+            } => account_upsert_ed25519_backup_key_and_encrypt_dk(
+                keyless_public_key,
+                backup_public_key,
+                backup_key_proof,
+                dk_ciphertext,
+            ),
             AccountUpsertEd25519BackupKeyOnKeylessAccount {
                 keyless_public_key,
                 backup_public_key,
@@ -2292,9 +2318,42 @@ pub fn account_set_originating_address() -> TransactionPayload {
     ))
 }
 
-/// Upserts an ED25519 backup key to an account that has a keyless public key as its original public key by converting the account's authentication key
+/// Atomically performs an `upsert_ed25519_backup_key_on_keyless_account` and stores `dk_ciphertext` in the
+/// account's `EncryptedDK` resource. Currently used for backing up confidential-asset decryption keys on-chain
+/// in Petra for keyless accounts. The ciphertext is opaque to the chain — see `EncryptedDK`.
+///
+/// SECURITY: This function does not verify that `dk_ciphertext` is a well-formed encryption of the DK corresponding
+/// to the registered EK on-chain. (It could, in theory, but we've judged the implementation complexity too high.)
+/// Wallets using this function must be careful to only call this using a `dk_ciphertext` produced from its own
+/// keyless Ed25519 backup key flow under the user-controlled `backup_public_key`.
+pub fn account_upsert_ed25519_backup_key_and_encrypt_dk(
+    keyless_public_key: Vec<u8>,
+    backup_public_key: Vec<u8>,
+    backup_key_proof: Vec<u8>,
+    dk_ciphertext: Vec<u8>,
+) -> TransactionPayload {
+    TransactionPayload::EntryFunction(EntryFunction::new(
+        ModuleId::new(
+            AccountAddress::new([
+                0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+                0, 0, 0, 1,
+            ]),
+            ident_str!("account").to_owned(),
+        ),
+        ident_str!("upsert_ed25519_backup_key_and_encrypt_dk").to_owned(),
+        vec![],
+        vec![
+            bcs::to_bytes(&keyless_public_key).unwrap(),
+            bcs::to_bytes(&backup_public_key).unwrap(),
+            bcs::to_bytes(&backup_key_proof).unwrap(),
+            bcs::to_bytes(&dk_ciphertext).unwrap(),
+        ],
+    ))
+}
+
+/// Upserts an Ed25519 backup key to an account that has a keyless public key as its original public key by converting the account's authentication key
 /// to a multi-key of the original keyless public key and the new backup key that requires 1 signature from either key to authenticate.
-/// This function takes a the account's original keyless public key and a ED25519 backup public key and rotates the account's authentication key to a multi-key of
+/// This function takes the account's original keyless public key and a Ed25519 backup public key and rotates the account's authentication key to a multi-key of
 /// the original keyless public key and the new backup key that requires 1 signature from either key to authenticate.
 ///
 /// Note: This function emits a `KeyRotationToMultiPublicKey` event marking both keys as verified since the keyless public key
@@ -2303,7 +2362,7 @@ pub fn account_set_originating_address() -> TransactionPayload {
 /// # Arguments
 /// * `account` - The signer representing the keyless account
 /// * `keyless_public_key` - The original keyless public key of the account (wrapped in an AnyPublicKey)
-/// * `backup_public_key` - The ED25519 public key to add as a backup
+/// * `backup_public_key` - The Ed25519 public key to add as a backup
 /// * `backup_key_proof` - A signature from the backup key proving ownership
 ///
 /// # Aborts
@@ -5654,6 +5713,23 @@ mod decoder {
         }
     }
 
+    pub fn account_upsert_ed25519_backup_key_and_encrypt_dk(
+        payload: &TransactionPayload,
+    ) -> Option<EntryFunctionCall> {
+        if let TransactionPayload::EntryFunction(script) = payload {
+            Some(
+                EntryFunctionCall::AccountUpsertEd25519BackupKeyAndEncryptDk {
+                    keyless_public_key: bcs::from_bytes(script.args().get(0)?).ok()?,
+                    backup_public_key: bcs::from_bytes(script.args().get(1)?).ok()?,
+                    backup_key_proof: bcs::from_bytes(script.args().get(2)?).ok()?,
+                    dk_ciphertext: bcs::from_bytes(script.args().get(3)?).ok()?,
+                },
+            )
+        } else {
+            None
+        }
+    }
+
     pub fn account_upsert_ed25519_backup_key_on_keyless_account(
         payload: &TransactionPayload,
     ) -> Option<EntryFunctionCall> {
@@ -7573,6 +7649,10 @@ static SCRIPT_FUNCTION_DECODER_MAP: once_cell::sync::Lazy<EntryFunctionDecoderMa
         map.insert(
             "account_set_originating_address".to_string(),
             Box::new(decoder::account_set_originating_address),
+        );
+        map.insert(
+            "account_upsert_ed25519_backup_key_and_encrypt_dk".to_string(),
+            Box::new(decoder::account_upsert_ed25519_backup_key_and_encrypt_dk),
         );
         map.insert(
             "account_upsert_ed25519_backup_key_on_keyless_account".to_string(),
