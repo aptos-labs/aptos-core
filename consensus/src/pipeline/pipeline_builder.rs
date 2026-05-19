@@ -1373,7 +1373,7 @@ impl PipelineBuilder {
             has_rand_txns_fut: _,
             rand_check_fut: _,
             execute_fut,
-            observer_publish_fut: _,
+            observer_publish_fut,
             ledger_update_fut,
             post_ledger_update_fut: _,
             commit_vote_fut: _,
@@ -1385,6 +1385,11 @@ impl PipelineBuilder {
         } = all_futs;
         wait_and_log_error(prepare_fut, format!("{epoch} {round} {block_id} prepare")).await;
         wait_and_log_error(execute_fut, format!("{epoch} {round} {block_id} execute")).await;
+        wait_and_log_error(
+            observer_publish_fut,
+            format!("{epoch} {round} {block_id} observer publish"),
+        )
+        .await;
         wait_and_log_error(
             ledger_update_fut,
             format!("{epoch} {round} {block_id} ledger update"),
