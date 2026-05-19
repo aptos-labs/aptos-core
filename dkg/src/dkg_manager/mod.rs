@@ -426,6 +426,11 @@ impl<DKG: DKGTrait> DKGManager<DKG> {
             "[DKG] Processing DKGStart event."
         );
         fail_point!("dkg::process_dkg_start_event");
+        // Test-only abort path: closure form so action="return" lets the
+        // function return Ok(()) without dealing, simulating an rDKG that
+        // never produces a transcript. Used by the epoch-watchdog matrix
+        // smoke tests.
+        fail_point!("dkg::process_dkg_start_event_test_skip", |_| Ok(()));
         let DKGStartEvent {
             session_metadata,
             start_time_us,
