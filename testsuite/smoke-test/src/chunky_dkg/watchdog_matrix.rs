@@ -100,11 +100,16 @@ async fn clear_failpoint_on_all(swarm: &LocalSwarm, name: &str) {
 
 // ----------------------- Governance scripts -----------------------
 
-/// Class A governance: enable chunky V1 + watchdog + ENC in one shot, with a
-/// trailing aptos_governance::reconfigure() that produces a synchronous
-/// (no-DKG) epoch advance. Mirrors what enable_chunky_v1_and_watchdog does
-/// in `epoch_timeout.rs`.
-async fn gov_enable_all_with_sync_reconfig(
+/// Class A governance: enable chunky V1 + watchdog + ENC in one shot, ending
+/// with `aptos_governance::force_end_epoch` (NOT `::reconfigure`). The
+/// distinction is critical: `reconfigure` triggers an *async* reconfig via
+/// rDKG when validator_txns + randomness are on (our case), which would (a)
+/// run rDKG during the gov transition — making prior rDKG=Finished, not
+/// NotTriggered — and (b) abort that rDKG if the test pre-armed the rDKG
+/// failpoint, with no watchdog yet active to recover. `force_end_epoch`
+/// goes straight to `finish()`, applying buffered configs without any DKG,
+/// so the prior is genuinely (NT, NT).
+async fn gov_enable_all_with_force_end_epoch(
     cli: &aptos::test::CliTestFramework,
     root_idx: usize,
     watchdog_grace_secs: u64,
@@ -132,7 +137,7 @@ script {{
 
         features::change_feature_flags_for_next_epoch(&framework_signer, vector[108], vector[]);
 
-        aptos_governance::reconfigure(&framework_signer);
+        aptos_governance::force_end_epoch(&framework_signer);
     }}
 }}
 "#,
@@ -140,7 +145,7 @@ script {{
     );
     cli.run_script(root_idx, &script)
         .await
-        .expect("governance: enable all + sync reconfig");
+        .expect("governance: enable all + force_end_epoch");
 }
 
 /// Class B governance: buffer chunky V1 + ENC feature for the next epoch
@@ -333,8 +338,8 @@ async fn run_class_a(case: MatrixCase) {
         set_failpoint_on_all(&swarm, FP_CDKG, "return").await;
     }
 
-    info!("Class A: governance enables chunky+watchdog+ENC (sync reconfig)");
-    gov_enable_all_with_sync_reconfig(&cli, root_idx, WATCHDOG_GRACE_SECS).await;
+    info!("Class A: governance enables chunky+watchdog+ENC + force_end_epoch");
+    gov_enable_all_with_force_end_epoch(&cli, root_idx, WATCHDOG_GRACE_SECS).await;
 
     // Now we're in epoch 3 (= x). End of epoch 3 will produce the current state
     // via the failpoints set above.
