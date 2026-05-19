@@ -41,6 +41,7 @@ impl ConnectivityManagerBuilder {
         enable_latency_aware_dialing: bool,
         access_control_policy: Option<Arc<AccessControlPolicy>>,
         num_dials_before_backoff: usize,
+        max_parallel_peer_latency_pings: usize,
     ) -> Self {
         let (conn_mgr_reqs_tx, conn_mgr_reqs_rx) = aptos_channels::new(
             channel_size,
@@ -65,6 +66,7 @@ impl ConnectivityManagerBuilder {
                 enable_latency_aware_dialing,
                 access_control_policy,
                 num_dials_before_backoff,
+                max_parallel_peer_latency_pings,
             )),
         }
     }
