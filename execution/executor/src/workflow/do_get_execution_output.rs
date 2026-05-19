@@ -47,7 +47,7 @@ use aptos_types::{
         AuxiliaryInfoTrait, BlockOutput, PersistedAuxiliaryInfo, Transaction, TransactionOutput,
         TransactionStatus, Version,
     },
-    write_set::{HotStateOp, TransactionWrite, WriteSet},
+    write_set::{TransactionWrite, WriteSet},
 };
 use aptos_vm::VMBlockExecutor;
 use itertools::Itertools;
@@ -163,10 +163,7 @@ impl DoGetExecutionOutput {
                     payload
                         .try_get_keys_to_make_hot()
                         .cloned()
-                        .unwrap_or_default()
-                        .into_iter()
-                        .map(|key| (key, HotStateOp::make_hot()))
-                        .collect(),
+                        .unwrap_or_default(),
                 );
             }
         }
