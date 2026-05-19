@@ -22,7 +22,7 @@ use aptos_schemadb::{
 use aptos_types::{
     state_store::state_key::StateKey,
     transaction::Version,
-    write_set::{HotStateOp, ValueWriteSet, WriteSet, WriteSetV0},
+    write_set::{ValueWriteSet, WriteSet, WriteSetV0},
 };
 use byteorder::{BigEndian, ReadBytesExt};
 use serde::{Deserialize, Serialize};
@@ -80,10 +80,7 @@ fn decode_write_set(data: &[u8]) -> bcs::Result<WriteSet> {
         PersistedWriteSet::V0(ws_v0) => Ok(WriteSet::new_from_value(ValueWriteSet::V0(ws_v0))),
         PersistedWriteSet::V1 { value, hotness } => Ok(WriteSet::new_from_value_with_hotness(
             ValueWriteSet::V0(value),
-            hotness
-                .into_iter()
-                .map(|key| (key, HotStateOp::make_hot()))
-                .collect(),
+            hotness,
         )),
     }
 }
