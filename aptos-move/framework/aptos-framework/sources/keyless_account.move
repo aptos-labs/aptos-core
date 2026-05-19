@@ -38,6 +38,9 @@ module aptos_framework::keyless_account {
     /// and Ed25519 backup public key. Indicates this is not a keyless+Ed25519-backup account.
     const E_NOT_KEYLESS_BACKUP_ACCOUNT: u64 = 5;
 
+    /// The supplied `keyless_public_key` is not a `Keyless` or `FederatedKeyless` single-key variant.
+    const E_NOT_KEYLESS_PUBLIC_KEY: u64 = 6;
+
     #[resource_group(scope = global)]
     struct Group {}
 
@@ -257,7 +260,7 @@ module aptos_framework::keyless_account {
         let keyless_single_key = single_key::new_public_key_from_bytes(keyless_public_key);
         assert!(
             single_key::is_keyless_or_federated_keyless_public_key(&keyless_single_key),
-            error::invalid_argument(E_NOT_KEYLESS_BACKUP_ACCOUNT)
+            error::invalid_argument(E_NOT_KEYLESS_PUBLIC_KEY)
         );
 
         let expected_auth_key = multi_key::new_multi_key_from_single_keys(
