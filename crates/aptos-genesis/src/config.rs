@@ -97,6 +97,10 @@ pub struct Layout {
     /// An optional chunky DKG config to use, instead of the default.
     #[serde(default)]
     pub chunky_dkg_config_override: Option<OnChainChunkyDKGConfig>,
+    /// An optional grace period (seconds) for the epoch force-end watchdog.
+    /// `Some(n)` arms the watchdog at genesis with grace `n`; `None` leaves it disabled.
+    #[serde(default)]
+    pub epoch_timeout_grace_period_secs_override: Option<u64>,
     /// An optional initial features override.
     #[serde(default)]
     pub initial_features_override: Option<Features>,
@@ -144,6 +148,7 @@ impl Default for Layout {
             keyless_groth16_vk_override: None,
             randomness_config_override: None,
             chunky_dkg_config_override: None,
+            epoch_timeout_grace_period_secs_override: None,
             initial_features_override: None,
         }
     }
