@@ -163,6 +163,7 @@ impl NetworkBuilder {
             true, /* enable_latency_aware_dialing */
             None, /* access_control_policy */
             2,    /* num_dials_before_backoff */
+            3,    /* max_parallel_peer_latency_pings */
         );
 
         builder
@@ -239,6 +240,7 @@ impl NetworkBuilder {
             config.enable_latency_aware_dialing,
             access_control_policy,
             config.num_dials_before_backoff,
+            config.max_parallel_peer_latency_pings,
         );
 
         network_builder.discovery_listeners = Some(Vec::new());
@@ -347,6 +349,7 @@ impl NetworkBuilder {
         enable_latency_aware_dialing: bool,
         access_control_policy: Option<Arc<AccessControlPolicy>>,
         num_dials_before_backoff: usize,
+        max_parallel_peer_latency_pings: usize,
     ) -> &mut Self {
         let pm_conn_mgr_notifs_rx = self.peer_manager_builder.add_connection_event_listener();
         let outbound_connection_limit = if !self.network_context.network_id().is_validator_network()
@@ -372,6 +375,7 @@ impl NetworkBuilder {
             enable_latency_aware_dialing,
             access_control_policy,
             num_dials_before_backoff,
+            max_parallel_peer_latency_pings,
         ));
         self
     }
