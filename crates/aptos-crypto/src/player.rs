@@ -17,6 +17,7 @@ use serde::{Deserialize, Serialize};
     Clone,
     Serialize,
     Deserialize,
+    Hash
 )]
 pub struct Player {
     /// A number from 0 to n-1.

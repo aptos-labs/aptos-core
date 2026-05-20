@@ -1,12 +1,14 @@
 // Copyright (c) Aptos Foundation
 // Licensed pursuant to the Innovation-Enabling Source Code License, available at https://github.com/aptos-labs/aptos-core/blob/main/LICENSE
 
+use std::collections::HashMap;
+
 use crate::{
     errors::MissingEvalProofError,
     traits::{BatchThresholdEncryption, DecryptionKeyShare},
 };
 use anyhow::Result;
-use aptos_crypto::TSecretSharingConfig;
+use aptos_crypto::{TSecretSharingConfig, player::Player};
 use rayon::iter::{IndexedParallelIterator as _, IntoParallelIterator, IntoParallelRefIterator as _, ParallelIterator};
 
 #[cfg(test)]
@@ -89,16 +91,17 @@ impl<Scheme: BatchThresholdEncryption> SmokeTest<Scheme> {
             .collect::<Result<Vec<()>>>()
             .unwrap();
 
+        let dk_shares_map : HashMap<Player, Scheme::DecryptionKeyShare> = HashMap::from_iter(
+            dk_shares.into_iter()
+                .map(|dk_share| (dk_share.player(), dk_share))
+        );
+
         let eligible_share_subset: Vec<<Scheme as BatchThresholdEncryption>::DecryptionKeyShare> =
             self.tc
                 .get_random_eligible_subset_of_players(&mut rng_aptos)
                 .into_par_iter()
                 .map(|player| {
-                    dk_shares
-                        .iter()
-                        .find(|share| share.player() == player)
-                        .unwrap()
-                        .clone()
+                    dk_shares_map[&player].clone()
                 })
                 .collect();
 
