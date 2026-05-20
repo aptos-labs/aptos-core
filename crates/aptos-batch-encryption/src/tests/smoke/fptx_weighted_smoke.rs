@@ -151,10 +151,10 @@ fn weighted_smoke_with_setup_for_testing() {
         FPTXWeighted::setup_for_testing(rng.r#gen(), 8, 1, &tc).unwrap();
 
     let smoke_test = SmokeTest::<FPTXWeighted>::new(tc, ek, dk, vks, msk_shares);
-    smoke_test.run_with_one_ct(0)
-    .test_decryption_verification();
-    smoke_test.run_with_max_cts(0)
-    .test_decryption_verification();
+    smoke_test.run_with_one_ct(0).test_decryption_verification();
+    smoke_test
+        .run_with_max_cts(0)
+        .test_decryption_verification();
 }
 
 type T = aptos_dkg::pvss::chunky::SignedWeightedTranscript<crate::group::Pairing>;
@@ -173,9 +173,8 @@ fn weighted_smoke_with_pvss() {
     let (_, tc, ek, vks, msk_shares) = run_pvss(&dk);
 
     let smoke_test = SmokeTest::<FPTXWeighted>::new(tc, ek, dk, vks, msk_shares);
-    smoke_test.run_with_one_ct(0)
-    .test_decryption_verification();
-    smoke_test.run_with_max_cts(0)
-    .test_decryption_verification();
-
+    smoke_test.run_with_one_ct(0).test_decryption_verification();
+    smoke_test
+        .run_with_max_cts(0)
+        .test_decryption_verification();
 }
