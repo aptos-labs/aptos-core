@@ -131,6 +131,7 @@ pub fn get_registry() -> Result<Registry> {
     tracer.trace_type::<transaction::webauthn::AssertionSignature>(&samples)?;
     tracer.trace_type::<aptos_types::keyless::EphemeralCertificate>(&samples)?;
     tracer.trace_type::<write_set::WriteOp>(&samples)?;
+    tracer.trace_type::<write_set::WriteSet>(&samples)?;
 
     // aliases within StructTag
     tracer.ignore_aliases("StructTag", &["type_params"])?;

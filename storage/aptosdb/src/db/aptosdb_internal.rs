@@ -247,7 +247,6 @@ impl AptosDB {
                 0,     // max_num_nodes_per_lru_cache_shard
                 HotStateConfig {
                     delete_on_restart: delete_hot_state_on_restart,
-                    persist_hotness_in_write_set: false,
                     ..HotStateConfig::default()
                 },
             )?;
