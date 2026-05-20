@@ -119,7 +119,6 @@ impl AptosDB {
             env,
             block_cache,
             readonly,
-            hot_state_config.persist_hotness_in_write_set,
         )?;
         let hot_state_kv_db = if !readonly {
             Some(StateKvDb::new(

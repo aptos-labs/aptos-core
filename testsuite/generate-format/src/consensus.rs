@@ -125,6 +125,7 @@ pub fn get_registry() -> Result<Registry> {
     tracer.trace_type::<transaction::webauthn::AssertionSignature>(&samples)?;
     tracer.trace_type::<aptos_types::keyless::EphemeralCertificate>(&samples)?;
     tracer.trace_type::<write_set::WriteOp>(&samples)?;
+    tracer.trace_type::<write_set::WriteSet>(&samples)?;
     tracer.trace_type::<PersistedStateValueMetadata>(&samples)?;
     tracer.trace_type::<transaction::MultisigTransactionPayload>(&samples)?;
 
