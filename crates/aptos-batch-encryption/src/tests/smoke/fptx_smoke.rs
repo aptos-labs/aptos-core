@@ -16,6 +16,6 @@ fn smoke_with_setup_for_testing() {
     let (ek, dk, vks, msk_shares) = FPTX::setup_for_testing(rng.r#gen(), 8, 1, &tc).unwrap();
     run_smoke_single_round::<FPTX>(tc, ek, dk, vks, msk_shares);
 
-    let (ek, dk, vks, msk_shares) = FPTX::setup_for_testing(rng.r#gen(), 8, 1, &tc).unwrap();
+    let (ek, dk, vks, msk_shares) = FPTX::setup_for_testing(rng.r#gen(), 8, 2, &tc).unwrap();
     run_smoke_all_rounds::<FPTX>(tc, ek, dk, vks, msk_shares);
 }
