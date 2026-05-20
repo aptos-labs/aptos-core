@@ -651,6 +651,24 @@ impl SpecTranslator<'_> {
         } else {
             "{:inline}"
         };
+        // Opt-in `:weight N` on the recursive-defining axiom, read from the spec
+        // fun's `weight` property (set by `spec fun NAME(...): T [weight = N]`).
+        let rec_weight: Option<u32> = if recursive && fun.body.is_some() && !fun.uninterpreted {
+            let spec = fun.spec.borrow();
+            let weight_sym = self.env.symbol_pool().make("weight");
+            spec.properties.get(&weight_sym).and_then(|v| match v {
+                move_model::ast::PropertyValue::Value(move_model::ast::Value::Number(n)) => {
+                    use num::ToPrimitive;
+                    n.to_u32()
+                },
+                _ => None,
+            })
+        } else {
+            None
+        };
+        // With a weight, switch from inlined `function NAME(p) { body }` (whose
+        // auto-axiomatisation has no place to carry attributes) to an explicit axiom.
+        let emit_explicit_axiom = rec_weight.is_some();
         emit!(
             self.writer,
             "function {} {}({}): {}",
@@ -659,6 +677,90 @@ impl SpecTranslator<'_> {
             param_list,
             result_type
         );
+        if emit_explicit_axiom {
+            emitln!(self.writer, ";");
+            // Emit: axiom (forall <params> :: {NAME(<args>)} {:weight N} NAME(<args>) == <body>);
+            // Recover arg names by splitting `param_list` (full Boogie signature: type-info,
+            // memory and value parameters — `fun.params` covers only the value params).
+            let body = fun.body.as_ref().unwrap();
+            let call_args: String = param_list
+                .split(", ")
+                .filter_map(|p| p.split_once(':').map(|(name, _)| name.trim()))
+                .collect::<Vec<_>>()
+                .join(", ");
+            let call = format!("{}({})", boogie_name, call_args);
+            if !param_list.is_empty() {
+                emit!(
+                    self.writer,
+                    "axiom (forall {} :: {{{}}} {{:weight {}}} {} == (",
+                    param_list,
+                    call,
+                    rec_weight.unwrap(),
+                    call,
+                );
+            } else {
+                emit!(
+                    self.writer,
+                    "axiom {{:weight {}}} {} == (",
+                    rec_weight.unwrap(),
+                    call,
+                );
+            }
+
+            // Mirror the body-inline path's intermediate-label / old-aware setup so
+            // spec funs using `old(...)` or intermediate `MemoryLabel`s translate correctly.
+            let all_labels = self.collect_intermediate_labels_from_exp(body);
+            let quant_bound = self.collect_quant_bound_state_labels(body);
+            let intermediate_labels: BTreeSet<_> = all_labels
+                .into_iter()
+                .filter(|(label, mem)| {
+                    self.resolve_label_for_memory(*label, mem) == Some(*label)
+                        && !quant_bound.contains(label)
+                })
+                .collect();
+            if !intermediate_labels.is_empty() {
+                emit!(self.writer, "(exists ");
+                for (i, (label, mem)) in intermediate_labels.iter().enumerate() {
+                    if i > 0 {
+                        emit!(self.writer, ", ");
+                    }
+                    let name = boogie_resource_memory_name(self.env, mem, &Some(*label));
+                    let ty = boogie_struct_name(
+                        &self.env.get_struct_qid(mem.to_qualified_id()),
+                        &mem.inst,
+                        false,
+                    );
+                    emit!(self.writer, "{}: $Memory {}", name, ty);
+                }
+                emit!(self.writer, " :: ");
+            }
+            if fun.uses_old {
+                let mut trans = self.clone();
+                trans.fun_old_memory = Some(old_memory);
+                trans.fun_mut_params = fun
+                    .params
+                    .iter()
+                    .filter(|Parameter(_, ty, _)| ty.is_mutable_reference())
+                    .map(|Parameter(name, _, _)| *name)
+                    .collect();
+                trans.translate_exp(body);
+            } else {
+                self.translate_exp(body);
+            }
+            if !intermediate_labels.is_empty() {
+                emit!(self.writer, ")");
+            }
+
+            if !param_list.is_empty() {
+                emitln!(self.writer, "));");
+            } else {
+                emitln!(self.writer, ");");
+            }
+            // Generate axioms from any user-written ensures/requires on the spec fun.
+            self.generate_spec_function_axioms(fun, module_env, boogie_name.clone(), param_list);
+            emitln!(self.writer);
+            return;
+        }
         if fun.uninterpreted {
             // Uninterpreted function has no body.
             emitln!(self.writer, ";");
@@ -2917,7 +3019,7 @@ impl SpecTranslator<'_> {
 
     fn translate_quant(
         &self,
-        _node_id: NodeId,
+        node_id: NodeId,
         kind: QuantKind,
         ranges: &[(Pattern, Exp)],
         triggers: &[Vec<Exp>],
@@ -3104,6 +3206,9 @@ impl SpecTranslator<'_> {
                     emit!(self.writer, "{{{}}}", resource_value);
                 }
             }
+        }
+        if let Some(weight) = self.env.get_quant_weight(node_id) {
+            emit!(self.writer, "{{:weight {}}}", weight);
         }
         // Translate range constraints.
         let connective = match kind {

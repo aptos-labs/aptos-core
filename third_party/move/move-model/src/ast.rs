@@ -417,13 +417,15 @@ pub enum Proof {
     Assume(Loc, Exp),
     /// `apply lemma(args);` — instantiate a lemma's requires/ensures.
     Apply(Loc, QualifiedId<LemmaId>, Vec<Exp>),
-    /// `forall bindings [triggers] apply lemma(args);` — quantified lemma instantiation.
+    /// `forall bindings [triggers] [weight = N] apply lemma(args);` — quantified lemma
+    /// instantiation. Optional `weight` forwards to SMT-LIB `:weight N` on the quantifier.
     ForallApply(
         Loc,
         Vec<(Symbol, Type)>,
         Vec<Vec<Exp>>,
         QualifiedId<LemmaId>,
         Vec<Exp>,
+        Option<u32>,
     ),
     /// `calc(e1 relop e2 relop ... en);` — calculational proof chain.
     /// Each triple is (lhs, relop, rhs).
@@ -458,7 +460,10 @@ impl Proof {
                     && a1.len() == a2.len()
                     && a1.iter().zip(a2).all(|(x, y)| x.structural_eq(y))
             },
-            (Proof::ForallApply(_, b1, t1, l1, a1), Proof::ForallApply(_, b2, t2, l2, a2)) => {
+            (
+                Proof::ForallApply(_, b1, t1, l1, a1, w1),
+                Proof::ForallApply(_, b2, t2, l2, a2, w2),
+            ) => {
                 b1 == b2
                     && t1.len() == t2.len()
                     && t1.iter().zip(t2).all(|(ts1, ts2)| {
@@ -468,6 +473,7 @@ impl Proof {
                     && l1 == l2
                     && a1.len() == a2.len()
                     && a1.iter().zip(a2).all(|(x, y)| x.structural_eq(y))
+                    && w1 == w2
             },
             (Proof::Calc(_, s1), Proof::Calc(_, s2)) => {
                 s1.len() == s2.len()
@@ -733,7 +739,7 @@ pub fn collect_proof_exps<'a>(proof: &'a Proof, result: &mut Vec<&'a Exp>) {
                 result.push(arg);
             }
         },
-        Proof::ForallApply(_, _, patterns, _, args) => {
+        Proof::ForallApply(_, _, patterns, _, args, _) => {
             for group in patterns {
                 for exp in group {
                     result.push(exp);
@@ -2162,7 +2168,7 @@ impl ExpData {
                     arg.visit_positions_impl(visitor)?;
                 }
             },
-            Proof::ForallApply(_, _, patterns, _, args) => {
+            Proof::ForallApply(_, _, patterns, _, args, _) => {
                 for group in patterns {
                     for exp in group {
                         exp.visit_positions_impl(visitor)?;
@@ -2283,6 +2289,9 @@ impl ExpData {
             if let Some(inst) = new_node_inst {
                 env.set_node_instantiation(new_id, inst);
             }
+            if let Some(weight) = env.get_quant_weight(id) {
+                env.set_quant_weight(new_id, weight);
+            }
             Some(new_id)
         } else {
             None
@@ -2307,6 +2316,9 @@ impl ExpData {
             let new_id = env.new_node(new_loc.clone(), new_node_ty);
             if let Some(inst) = new_node_inst {
                 env.set_node_instantiation(new_id, inst);
+            }
+            if let Some(weight) = env.get_quant_weight(id) {
+                env.set_quant_weight(new_id, weight);
             }
             Some(new_id)
         } else {
