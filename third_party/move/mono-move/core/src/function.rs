@@ -134,10 +134,10 @@ impl SortedSafePointEntries {
 /// Frame layout (fp-relative):
 ///
 /// ```text
-///   [0 .. param_sizes_sum)                    parameters (written by caller as arguments)
+///   [0 .. param_sizes_sum)                                  parameters (written by caller as arguments)
 ///   [param_sizes_sum .. param_and_local_sizes_sum)          locals
 ///   [param_and_local_sizes_sum .. param_and_local_sizes_sum+24)     metadata (saved_pc, saved_fp, saved_func_id)
-///   [param_and_local_sizes_sum+24 .. extended_frame_size)  callee arg/return slots
+///   [param_and_local_sizes_sum+24 .. extended_frame_size)   callee arg/return slots
 /// ```
 ///
 /// `extended_frame_size` == `param_and_local_sizes_sum + FRAME_METADATA_SIZE` for leaf
