@@ -451,6 +451,16 @@ EventKey:
     - creation_number: U64
     - account_address:
         TYPENAME: AccountAddress
+Extension:
+  ENUM:
+    0:
+      NativePosition:
+        NEWTYPE:
+          MAP:
+            KEY:
+              TYPENAME: StateKey
+            VALUE:
+              TYPENAME: WriteOp
 FederatedKeylessPublicKey:
   STRUCT:
     - jwk_addr:
@@ -1080,6 +1090,10 @@ WriteSet:
       V0:
         NEWTYPE:
           TYPENAME: WriteSetV0
+    1:
+      V1:
+        NEWTYPE:
+          TYPENAME: WriteSetV1
 WriteSetMut:
   STRUCT:
     - write_set:
@@ -1102,8 +1116,19 @@ WriteSetPayload:
           - script:
               TYPENAME: Script
 WriteSetV0:
-  NEWTYPESTRUCT:
-    TYPENAME: WriteSetMut
+  STRUCT:
+    - ws_mut:
+        TYPENAME: WriteSetMut
+WriteSetV1:
+  STRUCT:
+    - ws_mut:
+        TYPENAME: WriteSetMut
+    - hotness:
+        SEQ:
+          TYPENAME: StateKey
+    - extensions:
+        SEQ:
+          TYPENAME: Extension
 ZKP:
   ENUM:
     0:
