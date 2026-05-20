@@ -189,9 +189,10 @@ jobs:
     steps:
       # mislav/bump-homebrew-formula-action@v3 broke after GitHub changed
       # authenticated tarball redirects from HTTP 302 to 303 (upstream
-      # issue #340, no patch released). dawidd6/action-homebrew-bump-formula
-      # wraps `brew bump-formula-pr`, which handles redirects correctly.
-      - uses: dawidd6/action-homebrew-bump-formula@v7
+      # mislav/bump-homebrew-formula-action#340, no patch released).
+      # dawidd6/action-homebrew-bump-formula wraps `brew bump-formula-pr`,
+      # which handles redirects correctly.
+      - uses: dawidd6/action-homebrew-bump-formula@1446dca236b0440c6f02723a3f14f13be2c04ab0 # pin@v7
         with:
           token: ${{ secrets.APTOS_BOT_GH_PAT_APTOS_CORE_HOMEBREW_BUMPER }}
           formula: aptos
