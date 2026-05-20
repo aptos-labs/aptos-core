@@ -1361,7 +1361,18 @@ impl MicroOp {
             | MicroOp::HeapMoveTo { .. }
             | MicroOp::Charge { .. }
             | MicroOp::StoreRandomU64 { .. }
-            | MicroOp::CallClosure(_) => false,
+            | MicroOp::CallClosure(_)
+            | MicroOp::IntAdd(_)
+            | MicroOp::IntSub(_)
+            | MicroOp::IntMul(_)
+            | MicroOp::IntDiv(_)
+            | MicroOp::IntMod(_)
+            | MicroOp::IntBitAnd(_)
+            | MicroOp::IntBitOr(_)
+            | MicroOp::IntBitXor(_)
+            | MicroOp::IntShl(_)
+            | MicroOp::IntShr(_)
+            | MicroOp::IntNegate(_) => false,
         }
     }
 

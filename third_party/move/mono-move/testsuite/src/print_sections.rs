@@ -18,7 +18,7 @@ use crate::parser::PrintSection;
 use anyhow::{anyhow, Result};
 use mono_move_core::{
     interner::{InternedIdentifier, InternedModuleId},
-    types::{FieldLayout, InternedType, InternedTypeList, EMPTY_TYPE_LIST},
+    types::{view_type_list, FieldLayout, InternedType, InternedTypeList, EMPTY_TYPE_LIST},
     FieldTypes, Interner,
 };
 use mono_move_global_context::ExecutionGuard;
@@ -202,7 +202,16 @@ pub fn format_frame_layout(guard: &ExecutionGuard<'_>, module_ir: &ModuleIR) -> 
                 out.push_str(&format!("fun {}: skipped ({})\n", func_name, reason));
             },
             Ok(BuildContextOutcome::Built(ctx)) => {
-                match derive_frame_layout(&ctx, func_ir, &func_ir.home_slot_types) {
+                // Mirror `try_lower_function`'s substitution path.
+                let home_list = guard.type_list_of(&func_ir.home_slot_types);
+                let home_list = match guard.subst_type_list(home_list, EMPTY_TYPE_LIST) {
+                    Ok(l) => l,
+                    Err(e) => {
+                        out.push_str(&format!("fun {}: skipped (subst: {})\n", func_name, e));
+                        continue;
+                    },
+                };
+                match derive_frame_layout(&ctx, func_ir, view_type_list(home_list)) {
                     Ok(derived) => {
                         let offsets: Vec<String> = derived
                             .heap_ptr_offsets
