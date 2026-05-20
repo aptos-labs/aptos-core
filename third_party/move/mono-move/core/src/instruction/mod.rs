@@ -123,7 +123,9 @@ use std::fmt;
 
 // Submodules for instruction.
 mod gas;
+mod unspecialized;
 pub use gas::MicroOpGasSchedule;
+pub use unspecialized::{IntBinaryOp, IntNegateOp, IntOperand, IntShiftOp, IntTy, ShiftOperand};
 
 /// A typed wrapper around a `u32` frame-pointer-relative byte offset.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -269,10 +271,16 @@ pub enum MicroOp {
     // - bulk data movement.
     //======================================================================
     /// Store an immediate u64 (8 bytes) at `dst` in the current frame.
-    StoreImm8 { dst: FrameOffset, imm: u64 },
+    StoreImm8 {
+        dst: FrameOffset,
+        imm: u64,
+    },
 
     /// Copy 8 bytes from `src` to `dst`.
-    Move8 { dst: FrameOffset, src: FrameOffset },
+    Move8 {
+        dst: FrameOffset,
+        src: FrameOffset,
+    },
 
     /// Copy `size` bytes from `src` to `dst`.
     Move {
@@ -282,21 +290,10 @@ pub enum MicroOp {
     },
 
     //======================================================================
-    // Arithmetic & bitwise
+    // Arithmetic & bitwise (specialized u64)
     //======================================================================
-    // Currently u64-only. Each op has a reg-reg form and/or an immediate
-    // form; we add variants as the compiler needs them. All arithmetic is
-    // checked: overflow / underflow / division by zero / oversize shift
-    // all abort.
-    //
-    // Bitwise ops carry the `Bit` prefix to disambiguate from the boolean
-    // logical Or/And/Not (which will not have it).
-    //
-    // May want:
-    // - Logical Or/And/Not (Phase 3), Negate (signed), bitwise Not,
-    // - Reverse-imm forms: RDiv, RMod, RShl, RShr (mirroring RSubU64Imm),
-    // - u8, u16, u32 variants (mask on u64?), u128/u256 (multi-word),
-    // - signed integer support.
+    // Fast-path variants for u64 slot-slot and immediate-form ops. All
+    // arithmetic is checked.
     //======================================================================
 
     // --- Add ---
@@ -438,6 +435,32 @@ pub enum MicroOp {
     },
 
     //======================================================================
+    // Arithmetic & bitwise (unspecialized, per-kind variants)
+    //======================================================================
+    // Per-kind variants that tag-dispatch on the operand type at runtime.
+    // See [`IntBinaryOp`] / [`IntShiftOp`] / [`IntNegateOp`] for operand
+    // layout and semantics; the set of which `(op, type)` combinations are
+    // unspecialized vs. promoted to dedicated variants follows the
+    // specialization principle described in [`unspecialized`].
+    //
+    // TODO: heap-boxing wide imm operands inside [`IntOperand`] costs an
+    // allocation and a pointer-chase per micro-op. A side-table keyed by
+    // `pc` would improve cache locality and let the inline op stay
+    // pointer-free; revisit once we have profiling data to motivate it.
+    //======================================================================
+    IntAdd(IntBinaryOp),
+    IntSub(IntBinaryOp),
+    IntMul(IntBinaryOp),
+    IntDiv(IntBinaryOp),
+    IntMod(IntBinaryOp),
+    IntBitAnd(IntBinaryOp),
+    IntBitOr(IntBinaryOp),
+    IntBitXor(IntBinaryOp),
+    IntShl(IntShiftOp),
+    IntShr(IntShiftOp),
+    IntNegate(IntNegateOp),
+
+    //======================================================================
     // Control flow
     //======================================================================
     // Fused compare-and-branch (no separate cmp + flags).
@@ -468,7 +491,9 @@ pub enum MicroOp {
     // TODO: Currently dead code — the specializer never emits this. A follow-up
     // pass should patch same-module `CallIndirect` sites to `CallDirect` once
     // the target is known to live in the same module.
-    CallDirect { ptr: FunctionPtr },
+    CallDirect {
+        ptr: FunctionPtr,
+    },
 
     /// Return from the current function call. The compiler has already
     /// emitted micro-ops to write return values at the start of the
@@ -477,7 +502,9 @@ pub enum MicroOp {
     Return,
 
     /// Unconditional jump.
-    Jump { target: CodeOffset },
+    Jump {
+        target: CodeOffset,
+    },
 
     /// Jump to `target` if the u64 at `src` is **not** zero.
     JumpNotZeroU64 {
@@ -553,7 +580,9 @@ pub enum MicroOp {
     /// Initialize an empty vector by writing a null pointer to `dst`.
     /// No heap allocation occurs; the first `VecPushBack` allocates lazily
     /// using the `descriptor_id` and `elem_size` it carries.
-    VecNew { dst: FrameOffset },
+    VecNew {
+        dst: FrameOffset,
+    },
 
     /// Write the length (u64) of the vector to `dst`.
     /// `vec_ref` is a 16-byte fat pointer `(base, offset)` whose target
@@ -749,7 +778,9 @@ pub enum MicroOp {
     //======================================================================
     /// Charge a pre-computed static gas cost for the current basic block.
     /// The interpreter must call the gas meter and abort on exhaustion.
-    Charge { cost: u64 },
+    Charge {
+        cost: u64,
+    },
 
     //======================================================================
     // Debugging
@@ -758,7 +789,9 @@ pub enum MicroOp {
     /// Provides easy access to randomness during execution, enabling
     /// stress tests based on random sequences of operations (e.g. GC
     /// correctness, heap layout robustness).
-    StoreRandomU64 { dst: FrameOffset },
+    StoreRandomU64 {
+        dst: FrameOffset,
+    },
 
     /// Unconditionally trigger a garbage collection cycle.
     /// Useful for testing GC correctness.
@@ -865,6 +898,43 @@ impl fmt::Display for MicroOp {
             },
             MicroOp::ShrU64Imm { dst, src, imm } => {
                 write!(f, "ShrU64Imm [{}] <- [{}] >> #{}", dst.0, src.0, imm)
+            },
+            MicroOp::IntAdd(op) => {
+                write!(f, "IntAdd [{}] <- [{}] + {}", op.dst.0, op.lhs.0, op.rhs)
+            },
+            MicroOp::IntSub(op) => {
+                write!(f, "IntSub [{}] <- [{}] - {}", op.dst.0, op.lhs.0, op.rhs)
+            },
+            MicroOp::IntMul(op) => {
+                write!(f, "IntMul [{}] <- [{}] * {}", op.dst.0, op.lhs.0, op.rhs)
+            },
+            MicroOp::IntDiv(op) => {
+                write!(f, "IntDiv [{}] <- [{}] / {}", op.dst.0, op.lhs.0, op.rhs)
+            },
+            MicroOp::IntMod(op) => {
+                write!(f, "IntMod [{}] <- [{}] % {}", op.dst.0, op.lhs.0, op.rhs)
+            },
+            MicroOp::IntBitAnd(op) => {
+                write!(f, "IntBitAnd [{}] <- [{}] & {}", op.dst.0, op.lhs.0, op.rhs)
+            },
+            MicroOp::IntBitOr(op) => {
+                write!(f, "IntBitOr [{}] <- [{}] | {}", op.dst.0, op.lhs.0, op.rhs)
+            },
+            MicroOp::IntBitXor(op) => {
+                write!(f, "IntBitXor [{}] <- [{}] ^ {}", op.dst.0, op.lhs.0, op.rhs)
+            },
+            MicroOp::IntShl(op) => write!(
+                f,
+                "IntShl.{} [{}] <- [{}] << {}",
+                op.ty, op.dst.0, op.lhs.0, op.rhs
+            ),
+            MicroOp::IntShr(op) => write!(
+                f,
+                "IntShr.{} [{}] <- [{}] >> {}",
+                op.ty, op.dst.0, op.lhs.0, op.rhs
+            ),
+            MicroOp::IntNegate(op) => {
+                write!(f, "IntNegate.{} [{}] <- -[{}]", op.ty, op.dst.0, op.src.0)
             },
             MicroOp::CallIndirect {
                 module_id,

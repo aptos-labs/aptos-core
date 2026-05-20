@@ -295,7 +295,7 @@ dependencies = [
 
 [[package]]
 name = "aptos"
-version = "9.2.0"
+version = "9.3.0"
 dependencies = [
  "anyhow",
  "aptos-api-types",
@@ -12854,6 +12854,7 @@ dependencies = [
  "mono-move-core",
  "mono-move-gas",
  "move-core-types",
+ "proptest",
  "rand 0.7.3",
  "thiserror 1.0.69",
 ]

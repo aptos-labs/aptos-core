@@ -758,10 +758,14 @@ fn imm_value(imm: &ImmValue) -> String {
         ImmValue::U16(v) => format!("#{}u16", v),
         ImmValue::U32(v) => format!("#{}u32", v),
         ImmValue::U64(v) => format!("#{}", v),
+        ImmValue::U128(v) => format!("#{}u128", **v),
+        ImmValue::U256(v) => format!("#{}u256", **v),
         ImmValue::I8(v) => format!("#{}i8", v),
         ImmValue::I16(v) => format!("#{}i16", v),
         ImmValue::I32(v) => format!("#{}i32", v),
         ImmValue::I64(v) => format!("#{}i64", v),
+        ImmValue::I128(v) => format!("#{}i128", **v),
+        ImmValue::I256(v) => format!("#{}i256", **v),
     }
 }
 
