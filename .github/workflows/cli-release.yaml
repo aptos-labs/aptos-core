@@ -183,19 +183,18 @@ jobs:
     name: "Make PR to bump version in Homebrew"
     needs:
       - release-binaries
-    runs-on: 2cpu-gh-ubuntu24-x64
+    # GitHub-hosted ubuntu-24.04 ships Linuxbrew preinstalled, which the
+    # action below requires. The previous self-hosted runner did not.
+    runs-on: ubuntu-24.04
     steps:
-      - uses: mislav/bump-homebrew-formula-action@v3
+      # mislav/bump-homebrew-formula-action@v3 broke after GitHub changed
+      # authenticated tarball redirects from HTTP 302 to 303 (upstream
+      # issue #340, no patch released). dawidd6/action-homebrew-bump-formula
+      # wraps `brew bump-formula-pr`, which handles redirects correctly.
+      - uses: dawidd6/action-homebrew-bump-formula@v7
         with:
-          formula-name: aptos
-          tag-name: "${{ format('aptos-cli-v{0}', inputs.release_version) }}"
-          base-branch: main
-          create-pullrequest: true
-          commit-message: |
-            {{formulaName}} {{version}}
-
-            Created by https://github.com/mislav/bump-homebrew-formula-action
-
+          token: ${{ secrets.APTOS_BOT_GH_PAT_APTOS_CORE_HOMEBREW_BUMPER }}
+          formula: aptos
+          tag: "${{ format('aptos-cli-v{0}', inputs.release_version) }}"
+          message: |
             From CLI release run ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
-        env:
-          COMMITTER_TOKEN: ${{ secrets.APTOS_BOT_GH_PAT_APTOS_CORE_HOMEBREW_BUMPER }}
