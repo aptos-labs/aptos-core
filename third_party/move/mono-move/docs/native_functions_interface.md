@@ -55,7 +55,7 @@ Capabilities, grouped by section:
 ## 3. Data Manipulation (Args & Returns)
 
 - **Natives never see `fp` directly.** The context exposes typed accessors over the calling frame.
-- Reading a `&T` yields a pointer / fat-pointer view — no `read_ref()` deep-copy. Eliminates today's `bcs::to_bytes(&T)` deep-copy defect as a side effect.
+- **Restricted frame interaction.** Natives interact with the calling frame only through args (read) and returns (write). No locals on the VM stack — any Rust-side scratch / locals the native needs live on the Rust stack instead. To be revisited during implementation.
 
 Context APIs (tentative):
 
