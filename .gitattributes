@@ -28,3 +28,4 @@
 # Generated files, dont show diffs etc
 **/src/pb/*.rs linguist-generated=true
 *.fixture linguist-generated=true
+aptos-move/e2e-tests/goldens/**/*.exp linguist-generated=true
