@@ -119,7 +119,7 @@ impl<Scheme: BatchThresholdEncryption> SmokeTest<Scheme> {
             digest: d,
             eval_proofs: pfs,
             cts,
-            plaintexts: plaintexts
+            plaintexts
         }
 
     }
