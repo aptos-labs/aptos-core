@@ -49,6 +49,10 @@ type ResolvingPackage = ResolutionPackage<ResolvingNamedAddress>;
 #[derive(Debug, Clone)]
 pub struct ResolvingNamedAddress {
     value: Rc<RefCell<Option<AccountAddress>>>,
+    /// When `true` this entry was pinned by a command-line override (via
+    /// `additional_named_addresses`).  Any attempt to `unify` a conflicting value
+    /// is silently ignored so the CLI value always wins.
+    forced: bool,
 }
 
 /// A `ResolutionGraph` comes in two flavors:
@@ -99,17 +103,26 @@ impl ResolvingGraph {
         build_options: BuildConfig,
         writer: &mut W,
     ) -> Result<ResolvingGraph> {
-        let global_named_address_pool = build_options
-            .additional_named_addresses
-            .clone()
-            .into_iter()
-            .map(|(name, addr)| {
-                (
-                    NamedAddress::from(name),
-                    ResolvingNamedAddress::new(Some(addr)),
-                )
-            })
-            .collect();
+        // Seed the pool with additional_named_addresses (conflict = error, original behaviour)
+        // and forced_named_addresses (conflict = CLI value wins, used by --named-address).
+        let mut global_named_address_pool: BTreeMap<NamedAddress, ResolvingNamedAddress> =
+            build_options
+                .additional_named_addresses
+                .clone()
+                .into_iter()
+                .map(|(name, addr)| {
+                    (
+                        NamedAddress::from(name),
+                        ResolvingNamedAddress::new(Some(addr)),
+                    )
+                })
+                .collect();
+        for (name, addr) in &build_options.forced_named_addresses {
+            global_named_address_pool.insert(
+                NamedAddress::from(name.as_str()),
+                ResolvingNamedAddress::new_forced(*addr),
+            );
+        }
 
         let mut resolution_graph = Self {
             root_package_path: root_package_path.clone(),
@@ -696,6 +709,16 @@ impl ResolvingNamedAddress {
     pub fn new(address_opt: Option<AccountAddress>) -> Self {
         Self {
             value: Rc::new(RefCell::new(address_opt)),
+            forced: false,
+        }
+    }
+
+    /// Create a "forced" entry whose value cannot be overridden by package-level
+    /// address assignments.  Used for command-line `--named-addresses` overrides.
+    pub fn new_forced(address: AccountAddress) -> Self {
+        Self {
+            value: Rc::new(RefCell::new(Some(address))),
+            forced: true,
         }
     }
 
@@ -703,15 +726,21 @@ impl ResolvingNamedAddress {
         match address_opt {
             None => Ok(()),
             Some(addr_val) => match &mut *self.value.borrow_mut() {
-                Some(current_value) if current_value != &addr_val =>
-                    bail!("Attempted to assign a different value '0x{}' to an a already-assigned named address '0x{}'",
-                        addr_val.short_str_lossless(), current_value.short_str_lossless()
-                    ),
+                Some(current_value) if current_value != &addr_val => {
+                    if self.forced {
+                        // CLI override wins; silently keep the forced value.
+                        Ok(())
+                    } else {
+                        bail!("Attempted to assign a different value '0x{}' to an a already-assigned named address '0x{}'",
+                            addr_val.short_str_lossless(), current_value.short_str_lossless()
+                        )
+                    }
+                },
                 Some(_) => Ok(()),
                 x @ None => {
                     *x = Some(addr_val);
                     Ok(())
-                }
+                },
             },
         }
     }

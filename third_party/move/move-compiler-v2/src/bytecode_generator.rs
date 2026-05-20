@@ -1013,6 +1013,7 @@ impl Generator<'_> {
             | Operation::TypeValue
             | Operation::TypeDomain
             | Operation::ResourceDomain
+            | Operation::StateDomain
             | Operation::Global(_)
             | Operation::CanModify
             | Operation::Old
@@ -1044,7 +1045,10 @@ impl Generator<'_> {
             | Operation::ExtendEventStore
             | Operation::EventStoreIncludes
             | Operation::EventStoreIncludedIn
-            | Operation::Behavior(..) => self.internal_error(
+            | Operation::Behavior(..)
+            | Operation::SpecPublish(..)
+            | Operation::SpecRemove(..)
+            | Operation::SpecUpdate(..) => self.internal_error(
                 id,
                 format!("unsupported specification construct: `{:?}`", op),
             ),
@@ -1382,7 +1386,10 @@ impl Generator<'_> {
                     self.get_node_type(id)
                 };
                 let temp = self.new_temp(ty);
-                self.generate(vec![temp], exp);
+                // Materializing a general expression into a temporary must not let the
+                // current reference mode leak into arbitrary sub-expressions. Preserve
+                // reference mode only for the dedicated direct-selection case above.
+                self.without_reference_mode(|s| s.generate(vec![temp], exp));
                 temp
             },
         }
@@ -2184,6 +2191,10 @@ impl Generator<'_> {
             Pattern::LiteralValue(..) => {
                 // Value patterns should have been transformed to if-else before bytecode generation
                 self.internal_error(id, "unexpected value pattern in bytecode generation")
+            },
+            Pattern::Range(..) => {
+                // Range patterns should have been transformed to if-else before bytecode generation
+                self.internal_error(id, "unexpected range pattern in bytecode generation")
             },
             Pattern::Error(_) => self.internal_error(id, "unexpected error pattern"),
         }

@@ -72,10 +72,15 @@ impl<'a, C: CurveGroup> CanonicalSerialize for Homomorphism<'a, C> {
 }
 
 /// This struct is used as `CodomainShape<T>`, but the same layout also applies to the `Witness` type.
+///
+/// ArkSize(T=Bls12_381::G1Affine): 16 + 8·(n + W + max_w) + 48·(W + max_w)·c.
 #[derive(CanonicalSerialize, CanonicalDeserialize, Clone, Debug, PartialEq, Eq)]
 pub struct CodomainShape<T: CanonicalSerialize + CanonicalDeserialize + Clone> {
-    pub chunks: Vec<Vec<Vec<T>>>, // Depending on T these can be chunked ciphertexts, or their MSM representations
-    pub randomness: Vec<Vec<T>>,  // Same story, depending on T
+    /// Chunked ciphertexts or their MSM representations, depending on T.
+    /// ArkSize(T=Bls12_381::G1Affine): 8 + 8·n + 8·W + 48·W·c.
+    pub chunks: Vec<Vec<Vec<T>>>,
+    /// ArkSize(T=Bls12_381::G1Affine): 8 + 8·max_w + 48·max_w·c.
+    pub randomness: Vec<Vec<T>>,
 }
 
 // Witness shape happens to be identical to CodomainShape, this is mostly coincidental
@@ -378,8 +383,8 @@ where
     r_vals
 }
 
-pub fn num_chunks_per_scalar<F: PrimeField>(ell: u8) -> usize {
-    F::MODULUS_BIT_SIZE.div_ceil(ell as u32) as usize
+pub fn num_chunks_per_scalar<F: PrimeField>(ell: usize) -> usize {
+    (F::MODULUS_BIT_SIZE as usize).div_ceil(ell)
 }
 
 /// Decrypt a vector of chunked ciphertexts using the corresponding committed randomness and decryption keys
@@ -390,7 +395,7 @@ pub fn num_chunks_per_scalar<F: PrimeField>(ell: u8) -> usize {
 /// - `dk`: decryption key for the player.
 /// - `pp`: public parameters (provides group generator).
 /// - `table`: precomputed BSGS table for discrete log.
-/// - `radix_exponent`: exponent used to split/reconstruct chunks.
+/// - `ell`: exponent used to split/reconstruct chunks.
 ///
 /// # Returns
 /// - Vec of decrypted scalars.
@@ -402,7 +407,7 @@ pub fn decrypt_chunked_scalars<C: CurveGroup>(
     _pp: &PublicParameters<C>,
     table: &crate::dlog::table::BabyStepTable<C::Affine>,
     table_dlog_range_bound: u64,
-    radix_exponent: u8,
+    ell: usize,
 ) -> Vec<C::ScalarField> {
     let mut decrypted_scalars = Vec::with_capacity(Cs_rows.len());
 
@@ -422,7 +427,7 @@ pub fn decrypt_chunked_scalars<C: CurveGroup>(
             .collect();
 
         // Convert chunks back to scalar
-        let recovered = chunks::le_chunks_to_scalar(radix_exponent, &chunk_values);
+        let recovered = chunks::le_chunks_to_scalar(ell, &chunk_values);
 
         decrypted_scalars.push(recovered);
     }
@@ -465,8 +470,8 @@ mod tests {
 
     fn prepare_chunked_witness<F: PrimeField>(
         sc: WeightedConfig<ShamirThresholdConfig<F>>,
-        ell: u8,
-    ) -> (Vec<F>, Witness<F>, u8, usize) {
+        ell: usize,
+    ) -> (Vec<F>, Witness<F>, usize, usize) {
         let mut rng = thread_rng();
 
         // 1. Generate random values
@@ -520,7 +525,7 @@ mod tests {
         } = hom.apply(&witness).expect("apply");
 
         // 8. Build a baby-step giant-step table for computing discrete logs
-        let table = dlog::table::BabyStepTable::new(pp.G, (1u64 << (radix_exponent / 2)) as u32);
+        let table = dlog::table::BabyStepTable::new(pp.G, 1 << (radix_exponent / 2));
 
         // 9. Perform decryption of each ciphertext and reconstruct plaintexts
         // TODO: call some built-in function for this instead

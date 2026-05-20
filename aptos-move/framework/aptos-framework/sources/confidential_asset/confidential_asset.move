@@ -72,8 +72,8 @@ module aptos_framework::confidential_asset {
     /// There are no pending transfers to roll over.
     const E_NOTHING_TO_ROLLOVER: u64 = 13;
 
-    /// The auditor encryption key must not be the identity (zero) point.
-    const E_AUDITOR_EK_IS_IDENTITY: u64 = 14;
+    /// The encryption key must not be the identity (zero) point.
+    const E_EK_IS_IDENTITY: u64 = 14;
 
     /// Self-transfers are not allowed: sender and recipient must be different.
     const E_SELF_TRANSFER: u64 = 15;
@@ -83,6 +83,15 @@ module aptos_framework::confidential_asset {
 
     /// Allow listing is not enabled yet.
     const E_ALLOW_LISTING_IS_DISABLED: u64 = 17;
+
+    /// Pointlessly depositing zero into one's confidential balance would unncessarily increment the `transfers_received` counter.
+    const E_POINTLESSLY_DEPOSITING_ZERO: u64 = 18;
+
+    /// Memo in confidential transfer must not exceed `MAX_MEMO_BYTES`.
+    const E_MEMO_TOO_LONG: u64 = 19;
+
+    /// All user operations are paused by governance via emergency pause.
+    const E_EMERGENCY_PAUSED: u64 = 20;
 
     /// An internal error occurred: there is either a bug or a misconfiguration in the contract.
     const E_INTERNAL_ERROR: u64 = 999;
@@ -98,6 +107,9 @@ module aptos_framework::confidential_asset {
     /// The maximum number of transactions can be aggregated on the pending balance before rollover is required.
     /// i.e., `ConfidentialStore::transfers_received` will never exceed this value.
     const MAX_TRANSFERS_BEFORE_ROLLOVER: u64 = 65536;
+
+    /// Maximum number of bytes a confidential transfer's memo is allowed to be
+    const MAX_MEMO_BYTES: u64 = 256;
 
     /// The mainnet chain ID. If the chain ID is 1, the allow list is enabled.
     const MAINNET_CHAIN_ID: u8 = 1;
@@ -146,6 +158,13 @@ module aptos_framework::confidential_asset {
 
             /// Used to derive a signer that owns all the FAs' primary stores and `AssetConfig` objects.
             extend_ref: ExtendRef
+        },
+        V2 {
+            allow_list_enabled: bool,
+            global_auditor: AuditorConfig,
+            extend_ref: ExtendRef,
+            /// When true, all user operations are paused. Managed by governance via `set_emergency_paused`.
+            emergency_paused: bool,
         }
     }
 
@@ -283,6 +302,11 @@ module aptos_framework::confidential_asset {
         V1 { asset_type: Object<fungible_asset::Metadata>, new: AuditorConfig }
     }
 
+    #[event]
+    enum EmergencyPauseChanged has drop, store {
+        V1 { paused: bool }
+    }
+
     // === Module initialization (5 out of 13) ===
 
     /// Called once when this module is first published on-chain.
@@ -319,11 +343,12 @@ module aptos_framework::confidential_asset {
         let chain_id = chain_id::get();
         move_to(
             deployer,
-            GlobalConfig::V1 {
+            GlobalConfig::V2 {
                 allow_list_enabled: chain_id == MAINNET_CHAIN_ID || chain_id == TESTNET_CHAIN_ID,
                 global_auditor: AuditorConfig::V1 { ek: std::option::none(), epoch: 0 },
                 // DO NOT CHANGE: using long syntax until framework change is released to mainnet
-                extend_ref: object::create_object(deployer_address).generate_extend_ref()
+                extend_ref: object::create_object(deployer_address).generate_extend_ref(),
+                emergency_paused: false,
             }
         );
     }
@@ -395,6 +420,7 @@ module aptos_framework::confidential_asset {
         ek: CompressedRistretto,
         proof: RegistrationProof
     ) acquires GlobalConfig, AssetConfig {
+        assert!(!is_emergency_paused(), error::invalid_state(E_EMERGENCY_PAUSED));
         assert!(is_safe_for_confidentiality(&asset_type), error::invalid_argument(E_UNSAFE_DISPATCHABLE_FA));
         assert!(is_confidentiality_enabled_for_asset_type(asset_type), error::invalid_argument(E_ASSET_TYPE_DISALLOWED));
 
@@ -402,6 +428,7 @@ module aptos_framework::confidential_asset {
             !has_confidential_store(signer::address_of(sender), asset_type),
             error::already_exists(E_CONFIDENTIAL_STORE_ALREADY_REGISTERED)
         );
+        assert!(!ek.is_identity(), error::invalid_argument(E_EK_IS_IDENTITY));
 
         // Makes sure the user knows their decryption key.
         assert_valid_registration_proof(sender, asset_type, &ek, proof);
@@ -428,9 +455,11 @@ module aptos_framework::confidential_asset {
     ) acquires ConfidentialStore, GlobalConfig, AssetConfig {
         let addr = signer::address_of(depositor);
 
+        assert!(!is_emergency_paused(), error::invalid_state(E_EMERGENCY_PAUSED));
         assert!(is_safe_for_confidentiality(&asset_type), error::invalid_argument(E_UNSAFE_DISPATCHABLE_FA));
         assert!(is_confidentiality_enabled_for_asset_type(asset_type), error::invalid_argument(E_ASSET_TYPE_DISALLOWED));
         assert!(!incoming_transfers_paused(addr, asset_type), error::invalid_state(E_INCOMING_TRANSFERS_PAUSED));
+        assert!(amount != 0, error::invalid_argument(E_POINTLESSLY_DEPOSITING_ZERO));
 
         // Note: Gets the "confidential asset pool" for this asset type, or sets it up if this asset type is veiled for the first time
         let pool_fa_store = ensure_pool_fa_store(asset_type);
@@ -457,7 +486,7 @@ module aptos_framework::confidential_asset {
 
         event::emit(Deposited::V1 { addr, amount, asset_type, new_pending_balance: ca_store.pending_balance });
 
-        // Re-asserting dispatchable FA functionality that charges fees on withdraw/deposit was not invoked.
+        // Abundantly-paranoid: Re-asserting dispatchable FA functionality that charges fees on withdraw/deposit was not invoked.
         assert!(amount == fungible_asset::balance(pool_fa_store) - before, error::invalid_argument(E_UNSAFE_DISPATCHABLE_FA));
     }
 
@@ -490,7 +519,11 @@ module aptos_framework::confidential_asset {
         amount: u64,
         proof: WithdrawalProof
     ) acquires ConfidentialStore, GlobalConfig, AssetConfig {
+        assert!(!is_emergency_paused(), error::invalid_state(E_EMERGENCY_PAUSED));
         assert!(is_safe_for_confidentiality(&asset_type), error::invalid_argument(E_UNSAFE_DISPATCHABLE_FA));
+
+        // WARNING: We do not assert `is_confidentiality_enabled_for_asset_type` because we want to give users a way to
+        // withdraw from the confidential into their public balance after an asset type is disabled.
 
         let sender_addr = signer::address_of(sender);
 
@@ -505,6 +538,9 @@ module aptos_framework::confidential_asset {
         );
 
         let ca_store = borrow_confidential_store_mut(sender_addr, asset_type);
+        if(amount == 0 && ca_store.normalized) {
+            abort(error::invalid_state(E_ALREADY_NORMALIZED));
+        };
         ca_store.normalized = true;
         ca_store.available_balance = compressed_new_balance;
         ca_store.update_auditor_hint(&effective_auditor); // enables auditor to later tell whether their balance ciphertext is stale
@@ -584,9 +620,11 @@ module aptos_framework::confidential_asset {
         proof: TransferProof,
         memo: vector<u8>,
     ) acquires ConfidentialStore, AssetConfig, GlobalConfig {
+        assert!(!is_emergency_paused(), error::invalid_state(E_EMERGENCY_PAUSED));
         assert!(is_safe_for_confidentiality(&asset_type), error::invalid_argument(E_UNSAFE_DISPATCHABLE_FA));
         assert!(is_confidentiality_enabled_for_asset_type(asset_type), error::invalid_argument(E_ASSET_TYPE_DISALLOWED));
         assert!(!incoming_transfers_paused(to, asset_type), error::invalid_state(E_INCOMING_TRANSFERS_PAUSED));
+        assert!(memo.length() <= MAX_MEMO_BYTES, error::invalid_argument(E_MEMO_TOO_LONG));
 
         let from = signer::address_of(sender);
         assert!(from != to, error::invalid_argument(E_SELF_TRANSFER));
@@ -596,7 +634,7 @@ module aptos_framework::confidential_asset {
         let old_balance = get_available_balance(from, asset_type);
 
         // Note: Sender's amount in `TransferProof::compressed_amount::compressed_R_sender` is not used here; only included so it can be indexed for dapps that need it
-        let (compressed_new_balance, recipient_amount, amount, ek_volun_auds) =
+        let (compressed_new_balance, amount, compressed_amount, ek_volun_auds) =
             assert_valid_transfer_proof(
                 sender, to, asset_type,
                 &ek_sender, &ek_recip,
@@ -606,7 +644,7 @@ module aptos_framework::confidential_asset {
 
         // Update recipient's confidential store
         let recip_ca_store = borrow_confidential_store_mut(to, asset_type);
-        let new_pending_balance = add_assign_pending(&mut recip_ca_store.pending_balance, &recipient_amount);
+        let new_pending_balance = add_assign_pending(&mut recip_ca_store.pending_balance, &amount);
         recip_ca_store.transfers_received += 1;
 
         assert!(
@@ -621,7 +659,7 @@ module aptos_framework::confidential_asset {
         sender_ca_store.update_auditor_hint(&effective_auditor); // enables auditor to later tell whether their balance ciphertext is stale
 
         event::emit(Transferred::V1 {
-            from, to, asset_type, amount, ek_volun_auds,
+            from, to, asset_type, amount: compressed_amount, ek_volun_auds,
             sender_auditor_hint: sender_ca_store.auditor_hint,
             new_sender_available_balance: compressed_new_balance,
             new_recip_pending_balance: new_pending_balance,
@@ -638,7 +676,7 @@ module aptos_framework::confidential_asset {
         new_R: vector<vector<u8>>, // part of the proof
         sigma_proto_comm: vector<vector<u8>>, // part of the proof
         sigma_proto_resp: vector<vector<u8>>, // part of the proof
-    ) acquires ConfidentialStore {
+    ) acquires ConfidentialStore, GlobalConfig {
         // Just parse stuff and forward to the more type-safe function
         let compressed_new_ek = new_compressed_point_from_bytes(new_ek).extract();
         let compressed_new_R = deserialize_compressed_points(new_R);
@@ -658,7 +696,8 @@ module aptos_framework::confidential_asset {
         asset_type: Object<fungible_asset::Metadata>,
         proof: KeyRotationProof,
         resume_incoming_transfers: bool,
-    ) {
+    ) acquires ConfidentialStore, GlobalConfig {
+        assert!(!is_emergency_paused(), error::invalid_state(E_EMERGENCY_PAUSED));
         // Step 1: Assert (a) incoming transfers are paused & (b) pending balance is zero / has been rolled over
         let ca_store = borrow_confidential_store_mut(signer::address_of(owner), asset_type);
         // (a) Assert incoming transfers are paused & unpause them after, if flag is set.
@@ -680,6 +719,7 @@ module aptos_framework::confidential_asset {
         );
 
         // Step 3: Install the new EK and the new re-encrypted available balance
+        assert!(!compressed_new_ek.is_identity(), error::invalid_argument(E_EK_IS_IDENTITY));
         ca_store.ek = compressed_new_ek;
         // We're just updating the available balance's EK-dependant R component & leaving the pending balance the same.
         confidential_balance::set_available_R(&mut ca_store.available_balance, compressed_new_R);
@@ -704,7 +744,6 @@ module aptos_framework::confidential_asset {
         sigma_proto_resp: vector<vector<u8>>
     ) acquires ConfidentialStore, AssetConfig, GlobalConfig {
         let user = signer::address_of(sender);
-        assert!(!is_normalized(user, asset_type), error::invalid_state(E_ALREADY_NORMALIZED));
 
         withdraw_to_raw(
             sender, asset_type, user, 0,
@@ -720,7 +759,6 @@ module aptos_framework::confidential_asset {
         proof: WithdrawalProof
     ) acquires ConfidentialStore, AssetConfig, GlobalConfig {
         let user = signer::address_of(sender);
-        assert!(!is_normalized(user, asset_type), error::invalid_state(E_ALREADY_NORMALIZED));
 
         // Normalization is withdrawal with v = 0
         withdraw_to(sender, asset_type, user, 0, proof);
@@ -730,7 +768,9 @@ module aptos_framework::confidential_asset {
     public entry fun rollover_pending_balance(
         sender: &signer,
         asset_type: Object<fungible_asset::Metadata>
-    ) acquires ConfidentialStore {
+    ) acquires ConfidentialStore, GlobalConfig {
+        assert!(!is_emergency_paused(), error::invalid_state(E_EMERGENCY_PAUSED));
+
         let user = signer::address_of(sender);
         let ca_store = borrow_confidential_store_mut(user, asset_type);
 
@@ -752,7 +792,7 @@ module aptos_framework::confidential_asset {
     public entry fun rollover_pending_balance_and_pause(
         sender: &signer,
         asset_type: Object<fungible_asset::Metadata>
-    ) acquires ConfidentialStore {
+    ) acquires ConfidentialStore, GlobalConfig {
         rollover_pending_balance(sender, asset_type);
         set_incoming_transfers_paused(sender, asset_type, true);
     }
@@ -773,7 +813,9 @@ module aptos_framework::confidential_asset {
         owner: &signer,
         asset_type: Object<fungible_asset::Metadata>,
         paused: bool
-    ) acquires ConfidentialStore {
+    ) acquires ConfidentialStore, GlobalConfig {
+        assert!(!is_emergency_paused(), error::invalid_state(E_EMERGENCY_PAUSED));
+
         let ca_store = borrow_confidential_store_mut(signer::address_of(owner), asset_type);
         let old_paused = ca_store.pause_incoming;
         if (old_paused != paused) {
@@ -857,7 +899,7 @@ module aptos_framework::confidential_asset {
         let new_ek = new_ek_bytes.map(|ek| new_compressed_point_from_bytes(ek).extract());
 
         if (new_ek.is_some()) {
-            assert!(!new_ek.borrow().is_identity(), error::invalid_argument(E_AUDITOR_EK_IS_IDENTITY));
+            assert!(!new_ek.borrow().is_identity(), error::invalid_argument(E_EK_IS_IDENTITY));
         };
 
         // Increment epoch only when installing or changing the EK (not when removing):
@@ -882,11 +924,44 @@ module aptos_framework::confidential_asset {
         changed
     }
 
+    /// Pauses or unpauses all user operations. Upgrades GlobalConfig from V1 to V2 on first call (for testnet compatibility).
+    public fun set_emergency_paused(aptos_framework: &signer, paused: bool) acquires GlobalConfig {
+        system_addresses::assert_aptos_framework(aptos_framework);
+        let config = borrow_global_mut<GlobalConfig>(@aptos_framework);
+        if (config is GlobalConfig::V2) {
+            let GlobalConfig::V2 { emergency_paused, .. } = config;
+            if (*emergency_paused != paused) {
+                *emergency_paused = paused;
+                event::emit(EmergencyPauseChanged::V1 { paused });
+            }
+        } else {
+            // Upgrade V1 → V2: move_from, destructure, reconstruct with new field
+            let GlobalConfig::V1 { allow_list_enabled, global_auditor, extend_ref } =
+                move_from<GlobalConfig>(@aptos_framework);
+            move_to(aptos_framework, GlobalConfig::V2 {
+                allow_list_enabled, global_auditor, extend_ref, emergency_paused: paused,
+            });
+            // V1 is implicitly unpaused, so only emit if actually changing to paused
+            if (paused) {
+                event::emit(EmergencyPauseChanged::V1 { paused });
+            }
+        }
+    }
+
     // ============================================================== //
     //     End of SECURITY-SENSITIVE public governance functions      //
     // ============================================================== //
 
     // === Public view functions (9 out of 13) ===
+
+    #[view]
+    public fun is_emergency_paused(): bool acquires GlobalConfig {
+        let config = borrow_global<GlobalConfig>(@aptos_framework);
+        match (config) {
+            GlobalConfig::V2 { emergency_paused, .. } => *emergency_paused,
+            _ => false,
+        }
+    }
 
     #[view]
     public fun has_confidential_store(
@@ -979,22 +1054,26 @@ module aptos_framework::confidential_asset {
     }
 
     #[view]
-    /// Returns the effective auditor: asset-specific if set, else global.
+    /// Returns the effective auditor: asset-specific if its EK is set, else global.
     /// Used by dapp developers to fetch the right auditor EK to create withdraw, normalize or transfer transactions.
     public fun get_effective_auditor_config(
         asset_type: Object<fungible_asset::Metadata>
     ): EffectiveAuditorConfig acquires AssetConfig, GlobalConfig {
         let config_addr = get_asset_config_address(asset_type); // first, check asset-specific auditor
         if (exists<AssetConfig>(config_addr)) {
-            return EffectiveAuditorConfig::V1 {
-                is_global: false,
-                config: borrow_global<AssetConfig>(config_addr).auditor
+            let auditor = borrow_global<AssetConfig>(config_addr).auditor;
+            // Only use asset-specific auditor if its EK is actually set; otherwise fall through to global.
+            if (auditor.ek.is_some()) {
+                return EffectiveAuditorConfig::V1 {
+                    is_global: false,
+                    config: auditor
+                };
             };
         };
 
         EffectiveAuditorConfig::V1 {      // otherwise, fall back to global auditor
             is_global: true,
-            config: borrow_global<GlobalConfig>( @aptos_framework).global_auditor
+            config: borrow_global<GlobalConfig>(@aptos_framework).global_auditor
         }
     }
 
@@ -1014,6 +1093,11 @@ module aptos_framework::confidential_asset {
     #[view]
     public fun get_max_transfers_before_rollover(): u64 {
         MAX_TRANSFERS_BEFORE_ROLLOVER
+    }
+
+    #[view]
+    public fun get_max_memo_bytes(): u64 {
+        MAX_MEMO_BYTES
     }
 
     // === Private, internal functions (10 out of 13) ===
@@ -1238,10 +1322,10 @@ module aptos_framework::confidential_asset {
 
         let v = new_scalar_from_u64(amount);
 
-        let (stmt, new_balance_P) = sigma_protocol_withdraw::new_withdrawal_statement(
+        let stmt = sigma_protocol_withdraw::new_withdrawal_statement(
             *ek, old_balance, &compressed_new_balance, compressed_ek_aud, v,
         );
-        confidential_range_proofs::assert_valid_range_proof(&new_balance_P, &zkrp_new_balance);
+        confidential_range_proofs::assert_valid_range_proof(compressed_new_balance.get_compressed_P(), &zkrp_new_balance);
 
         let session = sigma_protocol_withdraw::new_session(sender, asset_type, compressed_ek_aud.is_some());
         session.assert_verifies(&stmt, &sigma);
@@ -1271,26 +1355,32 @@ module aptos_framework::confidential_asset {
             zkrp_new_balance, zkrp_amount, sigma
         } = proof;
 
+        // Note: `update_auditor` already guarantees that `compressed_ek_eff_aud` is not the identity, but the voluntary
+        // auditor EKs need to be manually checked.
+        compressed_ek_volun_auds.for_each_ref(|ek| {
+            assert!(!ek.is_identity(), error::invalid_argument(E_EK_IS_IDENTITY));
+        });
+
         let has_effective_auditor = compressed_ek_eff_aud.is_some();
         let num_volun_auditors = compressed_ek_volun_auds.length();
 
         // Auditor count checks are performed inside new_transfer_statement
-        let (stmt, new_balance_P, recip_pending) = sigma_protocol_transfer::new_transfer_statement(
+        let (stmt, amount) = sigma_protocol_transfer::new_transfer_statement(
             *compressed_ek_sender, *compressed_ek_recip,
             compressed_old_balance, &compressed_new_balance,
             &compressed_amount,
             compressed_ek_eff_aud, &compressed_ek_volun_auds,
         );
 
-        confidential_range_proofs::assert_valid_range_proof(recip_pending.get_P(), &zkrp_amount);
-        confidential_range_proofs::assert_valid_range_proof(&new_balance_P, &zkrp_new_balance);
+        confidential_range_proofs::assert_valid_range_proof(compressed_amount.get_compressed_P(), &zkrp_amount);
+        confidential_range_proofs::assert_valid_range_proof(compressed_new_balance.get_compressed_P(), &zkrp_new_balance);
 
         let session = sigma_protocol_transfer::new_session(
             sender, recipient_addr, asset_type, has_effective_auditor, num_volun_auditors,
         );
         session.assert_verifies(&stmt, &sigma);
 
-        (compressed_new_balance, recip_pending, compressed_amount, compressed_ek_volun_auds)
+        (compressed_new_balance, amount, compressed_amount, compressed_ek_volun_auds)
     }
 
     fun assert_valid_key_rotation_proof(

@@ -17,12 +17,16 @@
 //! The algorithm recursively decomposes the pattern matrix column-by-column, specializing
 //! by each constructor. This avoids a cross-product explosion that would occur with value
 //! enumeration on deeply nested tuple patterns.
+//!
+//! Range patterns are unified with literal number patterns: a literal `n` is treated as the
+//! half-open interval `[n, n+1)`, and all range comparisons use interval arithmetic.
 
 use itertools::Itertools;
 use move_model::{
     ast::{ExpData, MatchArm, Pattern, Value},
     model::{GlobalEnv, NodeId, QualifiedId, StructId},
     symbol::Symbol,
+    ty::{PrimitiveType, Type},
 };
 use num::BigInt;
 use std::collections::BTreeSet;
@@ -57,7 +61,9 @@ enum MConstructor {
     Variant(QualifiedId<StructId>, Symbol),
     Struct(QualifiedId<StructId>),
     Bool(bool),
-    Number(BigInt),
+    /// Half-open interval [lo, hi). `None` = type-based boundary.
+    /// `Number(n)` is represented as `Range(Some(n), Some(n+1))`.
+    Range(Option<BigInt>, Option<BigInt>),
     ByteArray(Vec<u8>),
     Tuple(usize),
 }
@@ -84,13 +90,62 @@ enum WitnessPat {
     },
 }
 
+/// Get the PrimitiveType from a pattern's type, stripping references.
+fn get_prim_type(env: &GlobalEnv, pat: &Pattern) -> Option<PrimitiveType> {
+    let ty = env.get_node_type(pat.node_id());
+    match ty.skip_reference() {
+        Type::Primitive(p) => Some(*p),
+        _ => None,
+    }
+}
+
+/// Normalize a half-open range [lo, hi) at type boundaries:
+/// If `lo == type_min`, replace with `None` (= -inf for coverage purposes).
+/// If `hi == type_max + 1`, replace with `None` (= +inf for coverage purposes).
+fn normalize_range(
+    lo: Option<BigInt>,
+    hi: Option<BigInt>,
+    prim: Option<&PrimitiveType>,
+) -> (Option<BigInt>, Option<BigInt>) {
+    let norm_lo = match (lo, prim) {
+        (Some(l), Some(p)) => {
+            if let Some(min) = p.get_min_value() {
+                if l == min {
+                    None
+                } else {
+                    Some(l)
+                }
+            } else {
+                Some(l)
+            }
+        },
+        (l, _) => l,
+    };
+    let norm_hi = match (hi, prim) {
+        (Some(h), Some(p)) => {
+            if let Some(max) = p.get_max_value() {
+                let type_end = max + 1; // one past the max
+                if h == type_end {
+                    None
+                } else {
+                    Some(h)
+                }
+            } else {
+                Some(h)
+            }
+        },
+        (h, _) => h,
+    };
+    (norm_lo, norm_hi)
+}
+
 /// Convert an AST `Pattern` to a `MatPat`.
-fn pattern_to_matpat(pat: &Pattern) -> MatPat {
+fn pattern_to_matpat(env: &GlobalEnv, pat: &Pattern) -> MatPat {
     match pat {
         Pattern::Var(_, _) | Pattern::Wildcard(_) | Pattern::Error(_) => MatPat::Wild,
         Pattern::Tuple(_, pats) => MatPat::Ctor(
             MConstructor::Tuple(pats.len()),
-            pats.iter().map(pattern_to_matpat).collect(),
+            pats.iter().map(|p| pattern_to_matpat(env, p)).collect(),
         ),
         Pattern::Struct(_, sid, variant, pats) => {
             let ctor = if let Some(v) = variant {
@@ -98,13 +153,41 @@ fn pattern_to_matpat(pat: &Pattern) -> MatPat {
             } else {
                 MConstructor::Struct(sid.to_qualified_id())
             };
-            MatPat::Ctor(ctor, pats.iter().map(pattern_to_matpat).collect())
+            MatPat::Ctor(
+                ctor,
+                pats.iter().map(|p| pattern_to_matpat(env, p)).collect(),
+            )
         },
         Pattern::LiteralValue(_, val) => match val {
             Value::Bool(b) => MatPat::Ctor(MConstructor::Bool(*b), vec![]),
-            Value::Number(n) => MatPat::Ctor(MConstructor::Number(n.clone()), vec![]),
+            Value::Number(n) => {
+                // Represent literal `n` as the half-open interval [n, n+1).
+                let lo = n.clone();
+                let hi = n + 1;
+                let prim = get_prim_type(env, pat);
+                let (norm_lo, norm_hi) = normalize_range(Some(lo), Some(hi), prim.as_ref());
+                MatPat::Ctor(MConstructor::Range(norm_lo, norm_hi), vec![])
+            },
             Value::ByteArray(bytes) => MatPat::Ctor(MConstructor::ByteArray(bytes.clone()), vec![]),
             _ => unreachable!("unsupported literal pattern value"),
+        },
+        Pattern::Range(_, lo, hi, inclusive) => {
+            // Normalize to half-open [lo, hi).
+            let norm_lo = lo.as_ref().and_then(|v| v.to_bigint());
+            let norm_hi = match (hi.as_ref(), inclusive) {
+                (Some(val), true) => {
+                    // inclusive upper: [lo, hi+1)
+                    val.to_bigint().map(|n| n + 1)
+                },
+                (Some(val), false) => {
+                    // exclusive upper: [lo, hi)
+                    val.to_bigint()
+                },
+                (None, _) => None, // open-ended: [lo, +inf)
+            };
+            let prim = get_prim_type(env, pat);
+            let (norm_lo, norm_hi) = normalize_range(norm_lo, norm_hi, prim.as_ref());
+            MatPat::Ctor(MConstructor::Range(norm_lo, norm_hi), vec![])
         },
     }
 }
@@ -114,8 +197,144 @@ fn constructor_arity(env: &GlobalEnv, ctor: &MConstructor) -> usize {
     match ctor {
         MConstructor::Variant(sid, v) => env.get_struct(*sid).get_fields_of_variant(*v).count(),
         MConstructor::Struct(sid) => env.get_struct(*sid).get_fields().count(),
-        MConstructor::Bool(_) | MConstructor::Number(_) | MConstructor::ByteArray(_) => 0,
+        MConstructor::Bool(_) | MConstructor::Range(_, _) | MConstructor::ByteArray(_) => 0,
         MConstructor::Tuple(n) => *n,
+    }
+}
+
+/// Check if a row range [rlo, rhi) contains the constructor range [clo, chi).
+/// `None` for lo means -infinity, `None` for hi means +infinity.
+fn range_contains(
+    rlo: &Option<BigInt>,
+    rhi: &Option<BigInt>,
+    clo: &Option<BigInt>,
+    chi: &Option<BigInt>,
+) -> bool {
+    // Check rlo <= clo
+    let lo_ok = match (rlo, clo) {
+        (None, _) => true,
+        (Some(_), None) => false,
+        (Some(r), Some(c)) => r <= c,
+    };
+    // Check chi <= rhi
+    let hi_ok = match (rhi, chi) {
+        (_, None) => rhi.is_none(),
+        (None, _) => true,
+        (Some(r), Some(c)) => c <= r,
+    };
+    lo_ok && hi_ok
+}
+
+/// Split `[qlo, qhi)` into disjoint sub-ranges at every boundary point from
+/// Range constructors in the matrix's first column that falls strictly inside
+/// the query range. Each resulting sub-range is either fully contained by any
+/// given matrix range or disjoint from it.
+fn split_range_at_matrix_boundaries(
+    matrix: &[Vec<MatPat>],
+    qlo: &Option<BigInt>,
+    qhi: &Option<BigInt>,
+) -> Vec<(Option<BigInt>, Option<BigInt>)> {
+    let mut points = BTreeSet::new();
+    for row in matrix {
+        if let MatPat::Ctor(MConstructor::Range(lo, hi), _) = &row[0] {
+            if let Some(l) = lo {
+                points.insert(l.clone());
+            }
+            if let Some(h) = hi {
+                points.insert(h.clone());
+            }
+        }
+    }
+    // Keep only points strictly inside (qlo, qhi).
+    let split_points: Vec<&BigInt> = points
+        .iter()
+        .filter(|p| {
+            let after_lo = match qlo {
+                None => true,
+                Some(l) => *p > l,
+            };
+            let before_hi = match qhi {
+                None => true,
+                Some(h) => *p < h,
+            };
+            after_lo && before_hi
+        })
+        .collect();
+    if split_points.is_empty() {
+        return vec![(qlo.clone(), qhi.clone())];
+    }
+    let mut result = Vec::new();
+    let mut current_lo = qlo.clone();
+    for p in split_points {
+        result.push((current_lo, Some(p.clone())));
+        current_lo = Some(p.clone());
+    }
+    result.push((current_lo, qhi.clone()));
+    result
+}
+
+/// Collect Range intervals from a set of constructors and sort by lower bound
+/// (None = -infinity comes first).
+fn collect_and_sort_intervals(
+    seen: &BTreeSet<MConstructor>,
+) -> Vec<(&Option<BigInt>, &Option<BigInt>)> {
+    let mut intervals: Vec<(&Option<BigInt>, &Option<BigInt>)> = seen
+        .iter()
+        .filter_map(|c| {
+            if let MConstructor::Range(lo, hi) = c {
+                Some((lo, hi))
+            } else {
+                None
+            }
+        })
+        .collect();
+    intervals.sort_by(|a, b| match (&a.0, &b.0) {
+        (None, None) => std::cmp::Ordering::Equal,
+        (None, Some(_)) => std::cmp::Ordering::Less,
+        (Some(_), None) => std::cmp::Ordering::Greater,
+        (Some(x), Some(y)) => x.cmp(y),
+    });
+    intervals
+}
+
+/// Sweep sorted intervals and find the first gap, if any.
+/// Returns `None` if the intervals fully cover [-inf, +inf).
+/// Returns `Some((gap_lo, gap_hi))` for the first uncovered sub-range.
+///
+/// Assumes intervals have been through `normalize_range`, where `None`
+/// means "extends to the type boundary" (not "unresolved").
+fn find_first_gap(
+    intervals: &[(&Option<BigInt>, &Option<BigInt>)],
+) -> Option<(Option<BigInt>, Option<BigInt>)> {
+    let mut coverage_end: Option<BigInt> = None;
+    let mut started = false;
+    for (lo, hi) in intervals {
+        if !started {
+            if lo.is_some() {
+                return Some((None, lo.as_ref().cloned()));
+            }
+            started = true;
+        } else if let (Some(l), Some(end)) = (lo, &coverage_end)
+            && l > end
+        {
+            return Some((Some(end.clone()), Some(l.clone())));
+        }
+        match (hi, &coverage_end) {
+            (None, _) => return None, // covered to +inf
+            (Some(h), None) => coverage_end = Some(h.clone()),
+            (Some(h), Some(end)) => {
+                if h > end {
+                    coverage_end = Some(h.clone());
+                }
+            },
+        }
+    }
+    if let Some(end) = coverage_end {
+        Some((Some(end), None))
+    } else if !started {
+        Some((None, None))
+    } else {
+        None
     }
 }
 
@@ -143,7 +362,15 @@ fn all_constructors_if_complete(
             // Exactly one constructor — always complete.
             Some(seen.iter().cloned().collect())
         },
-        MConstructor::Number(_) | MConstructor::ByteArray(_) => None, // integers and byte arrays are never complete
+        MConstructor::Range(_, _) => {
+            let intervals = collect_and_sort_intervals(seen);
+            if find_first_gap(&intervals).is_none() {
+                Some(seen.iter().cloned().collect())
+            } else {
+                None
+            }
+        },
+        MConstructor::ByteArray(_) => None, // byte arrays are never complete
     }
 }
 
@@ -155,21 +382,31 @@ fn find_missing_constructor(
     seen: &BTreeSet<MConstructor>,
 ) -> Option<(MConstructor, usize)> {
     let first = seen.iter().next()?;
-    let missing: Vec<MConstructor> = match first {
-        MConstructor::Bool(_) => [MConstructor::Bool(false), MConstructor::Bool(true)]
-            .into_iter()
-            .filter(|c| !seen.contains(c))
-            .collect(),
-        MConstructor::Variant(sid, _) => env
-            .get_struct(*sid)
-            .get_variants()
-            .map(|v| MConstructor::Variant(*sid, v))
-            .filter(|c| !seen.contains(c))
-            .collect(),
-        _ => return None,
-    };
-    let additional = missing.len().saturating_sub(1);
-    missing.into_iter().next().map(|c| (c, additional))
+    match first {
+        MConstructor::Bool(_) => {
+            let missing: Vec<MConstructor> = [MConstructor::Bool(false), MConstructor::Bool(true)]
+                .into_iter()
+                .filter(|c| !seen.contains(c))
+                .collect();
+            let additional = missing.len().saturating_sub(1);
+            missing.into_iter().next().map(|c| (c, additional))
+        },
+        MConstructor::Variant(sid, _) => {
+            let missing: Vec<MConstructor> = env
+                .get_struct(*sid)
+                .get_variants()
+                .map(|v| MConstructor::Variant(*sid, v))
+                .filter(|c| !seen.contains(c))
+                .collect();
+            let additional = missing.len().saturating_sub(1);
+            missing.into_iter().next().map(|c| (c, additional))
+        },
+        MConstructor::Range(_, _) => {
+            let intervals = collect_and_sort_intervals(seen);
+            find_first_gap(&intervals).map(|(lo, hi)| (MConstructor::Range(lo, hi), 0))
+        },
+        _ => None,
+    }
 }
 
 // ---- Matrix operations ------------------------------------------------------------------
@@ -184,12 +421,24 @@ fn specialize(matrix: &[Vec<MatPat>], ctor: &MConstructor, arity: usize) -> Vec<
 
 fn specialize_row(row: &[MatPat], ctor: &MConstructor, arity: usize) -> Option<Vec<MatPat>> {
     match &row[0] {
-        MatPat::Ctor(c, args) if c == ctor => {
-            let mut new_row = args.clone();
-            new_row.extend_from_slice(&row[1..]);
-            Some(new_row)
+        MatPat::Ctor(c, args) => {
+            // For Range constructors, check containment instead of equality.
+            if let (MConstructor::Range(clo, chi), MConstructor::Range(rlo, rhi)) = (ctor, c) {
+                if range_contains(rlo, rhi, clo, chi) {
+                    let mut new_row = args.clone();
+                    new_row.extend_from_slice(&row[1..]);
+                    return Some(new_row);
+                }
+                return None;
+            }
+            if c == ctor {
+                let mut new_row = args.clone();
+                new_row.extend_from_slice(&row[1..]);
+                Some(new_row)
+            } else {
+                None
+            }
         },
-        MatPat::Ctor(_, _) => None,
         MatPat::Wild => {
             let mut new_row = vec![MatPat::Wild; arity];
             new_row.extend_from_slice(&row[1..]);
@@ -232,6 +481,19 @@ fn is_useful(env: &GlobalEnv, matrix: &[Vec<MatPat>], q: &[MatPat]) -> bool {
 
     match &q[0] {
         MatPat::Ctor(c, sub) => {
+            // For Range constructors, split at matrix boundaries so each
+            // sub-range is fully contained by individual matrix rows.
+            // The query is useful iff any sub-range is useful.
+            if let MConstructor::Range(qlo, qhi) = c {
+                let sub_ranges = split_range_at_matrix_boundaries(matrix, qlo, qhi);
+                return sub_ranges.iter().any(|(lo, hi)| {
+                    let sub_ctor = MConstructor::Range(lo.clone(), hi.clone());
+                    let spec = specialize(matrix, &sub_ctor, 0);
+                    let mut new_q: Vec<MatPat> = sub.clone();
+                    new_q.extend_from_slice(&q[1..]);
+                    is_useful(env, &spec, &new_q)
+                });
+            }
             let arity = sub.len();
             let spec = specialize(matrix, c, arity);
             let mut new_q: Vec<MatPat> = sub.clone();
@@ -240,13 +502,23 @@ fn is_useful(env: &GlobalEnv, matrix: &[Vec<MatPat>], q: &[MatPat]) -> bool {
         },
         MatPat::Wild => {
             if let Some(all) = all_constructors_if_complete(env, &head_ctors) {
-                all.iter().any(|c| {
-                    let arity = constructor_arity(env, c);
-                    let spec = specialize(matrix, c, arity);
-                    let mut new_q = vec![MatPat::Wild; arity];
-                    new_q.extend_from_slice(&q[1..]);
-                    is_useful(env, &spec, &new_q)
-                })
+                // For ranges, use atomic intervals to handle partial overlaps.
+                if matches!(all.first(), Some(MConstructor::Range(_, _))) {
+                    let atomic = split_range_at_matrix_boundaries(matrix, &None, &None);
+                    atomic.iter().any(|(lo, hi)| {
+                        let sub_ctor = MConstructor::Range(lo.clone(), hi.clone());
+                        let spec = specialize(matrix, &sub_ctor, 0);
+                        is_useful(env, &spec, &q[1..])
+                    })
+                } else {
+                    all.iter().any(|c| {
+                        let arity = constructor_arity(env, c);
+                        let spec = specialize(matrix, c, arity);
+                        let mut new_q = vec![MatPat::Wild; arity];
+                        new_q.extend_from_slice(&q[1..]);
+                        is_useful(env, &spec, &new_q)
+                    })
+                }
             } else {
                 let def = default_matrix(matrix);
                 is_useful(env, &def, &q[1..])
@@ -284,6 +556,14 @@ fn collect_witnesses(
 
     match &q[0] {
         MatPat::Ctor(c, sub) => {
+            // Range splitting is only implemented in `is_useful`; this branch
+            // is currently unreachable for Range constructors because the entry
+            // point always passes `[Wild]`.
+            assert!(
+                !matches!(c, MConstructor::Range(_, _)),
+                "collect_witnesses should not be called with a Range Ctor query; \
+                 range splitting is only implemented in is_useful"
+            );
             let arity = sub.len();
             let spec = specialize(matrix, c, arity);
             let mut new_q: Vec<MatPat> = sub.clone();
@@ -295,8 +575,25 @@ fn collect_witnesses(
         },
         MatPat::Wild => {
             let mut all_witnesses = Vec::new();
-            // Check each seen constructor (may have internal gaps).
-            for c in &head_ctors {
+            // For Range constructors, split into atomic intervals to
+            // correctly handle partial overlaps between matrix rows.
+            let effective_ctors: Vec<MConstructor> = if head_ctors
+                .iter()
+                .any(|c| matches!(c, MConstructor::Range(_, _)))
+            {
+                let mut atomic = BTreeSet::new();
+                for c in &head_ctors {
+                    if let MConstructor::Range(lo, hi) = c {
+                        for (slo, shi) in split_range_at_matrix_boundaries(matrix, lo, hi) {
+                            atomic.insert(MConstructor::Range(slo, shi));
+                        }
+                    }
+                }
+                atomic.into_iter().collect()
+            } else {
+                head_ctors.iter().cloned().collect()
+            };
+            for c in &effective_ctors {
                 let arity = constructor_arity(env, c);
                 let spec = specialize(matrix, c, arity);
                 let mut new_q = vec![MatPat::Wild; arity];
@@ -361,7 +658,7 @@ fn analyze_match_coverage(env: &GlobalEnv, disc_node_id: NodeId, arms: &[MatchAr
     // Build the unconditional matrix incrementally for reachability checking.
     let mut uncond_matrix: Vec<Vec<MatPat>> = Vec::new();
     for arm in arms {
-        let mp = pattern_to_matpat(&arm.pattern);
+        let mp = pattern_to_matpat(env, &arm.pattern);
         let q = vec![mp.clone()];
         if !is_useful(env, &uncond_matrix, &q) {
             env.error(
@@ -389,8 +686,11 @@ fn analyze_match_coverage(env: &GlobalEnv, disc_node_id: NodeId, arms: &[MatchAr
                     } => *additional_missing,
                     _ => 0,
                 };
+                let is_range_witness = contains_range_witness(&w[0]);
                 if additional > 0 {
                     format!("missing `{}` (and {} more)", pat, additional)
+                } else if is_range_witness {
+                    format!("missing at least `{}`", pat)
                 } else {
                     format!("missing `{}`", pat)
                 }
@@ -406,12 +706,23 @@ fn analyze_match_coverage(env: &GlobalEnv, disc_node_id: NodeId, arms: &[MatchAr
 
 // ---- Witness display --------------------------------------------------------------------
 
+/// Check whether a witness pattern contains a range constructor anywhere
+/// (including nested inside structs/tuples).
+fn contains_range_witness(w: &WitnessPat) -> bool {
+    match w {
+        WitnessPat::Wild => false,
+        WitnessPat::Ctor { ctor, args, .. } => {
+            matches!(ctor, MConstructor::Range(_, _)) || args.iter().any(contains_range_witness)
+        },
+    }
+}
+
 fn display_witness_pat(env: &GlobalEnv, w: &WitnessPat) -> String {
     match w {
         WitnessPat::Wild => "_".to_string(),
         WitnessPat::Ctor { ctor, args, .. } => match ctor {
             MConstructor::Bool(b) => format!("{}", b),
-            MConstructor::Number(n) => format!("{}", n),
+            MConstructor::Range(lo, hi) => display_range_witness(lo, hi),
             MConstructor::ByteArray(bytes) => {
                 if let Ok(s) = std::str::from_utf8(bytes) {
                     format!("b\"{}\"", s)
@@ -430,6 +741,24 @@ fn display_witness_pat(env: &GlobalEnv, w: &WitnessPat) -> String {
     }
 }
 
+/// Display a range witness in a human-readable form.
+fn display_range_witness(lo: &Option<BigInt>, hi: &Option<BigInt>) -> String {
+    match (lo, hi) {
+        (Some(l), Some(h)) => {
+            // Check if it's a single value [n, n+1).
+            let one = BigInt::from(1);
+            if h == &(l + &one) {
+                format!("{}", l)
+            } else {
+                format!("{}..{}", l, h)
+            }
+        },
+        (Some(l), None) => format!("{}..", l),
+        (None, Some(h)) => format!("..{}", h),
+        (None, None) => "_".to_string(),
+    }
+}
+
 fn display_witness_struct(
     env: &GlobalEnv,
     sid: QualifiedId<StructId>,
@@ -441,18 +770,35 @@ fn display_witness_struct(
     if let Some(v) = var {
         s.push_str(&format!("::{}", v.display(env.symbol_pool())));
     }
-    // Display struct fields, or {..} if all wildcards.
+    // Display fields: positional uses `(..)` / `(a, b)`, named uses `{..}` / `{f: a}`.
     if var.is_none() || !args.is_empty() {
+        let positional = struct_env
+            .get_fields_optional_variant(var)
+            .any(|f| f.is_positional());
         if args.iter().all(|a| matches!(a, WitnessPat::Wild)) {
-            s.push_str("{..}");
+            if positional {
+                s.push_str("(..)");
+            } else {
+                s.push_str("{..}");
+            }
         } else {
             let fields: Vec<String> = struct_env
                 .get_fields_optional_variant(var)
-                .map(|f| f.get_name().display(env.symbol_pool()).to_string())
                 .zip(args.iter())
-                .map(|(f, a)| format!("{}: {}", f, display_witness_pat(env, a)))
+                .map(|(f, a)| {
+                    if positional {
+                        display_witness_pat(env, a)
+                    } else {
+                        let name = f.get_name().display(env.symbol_pool()).to_string();
+                        format!("{}: {}", name, display_witness_pat(env, a))
+                    }
+                })
                 .collect();
-            s.push_str(&format!("{{{}}}", fields.join(", ")));
+            if positional {
+                s.push_str(&format!("({})", fields.join(", ")));
+            } else {
+                s.push_str(&format!("{{{}}}", fields.join(", ")));
+            }
         }
     }
     s

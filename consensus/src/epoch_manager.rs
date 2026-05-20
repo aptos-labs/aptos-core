@@ -101,10 +101,11 @@ use aptos_types::{
     epoch_state::EpochState,
     jwks::SupportedOIDCProviders,
     on_chain_config::{
-        ChunkyDKGConfigMoveStruct, Features, LeaderReputationType, OnChainChunkyDKGConfig,
-        OnChainConfigPayload, OnChainConfigProvider, OnChainConsensusConfig,
-        OnChainExecutionConfig, OnChainJWKConsensusConfig, OnChainRandomnessConfig,
-        ProposerElectionType, RandomnessConfigMoveStruct, RandomnessConfigSeqNum, ValidatorSet,
+        ChunkyDKGConfigMoveStruct, ChunkyDKGConfigSeqNum, Features, LeaderReputationType,
+        OnChainChunkyDKGConfig, OnChainConfigPayload, OnChainConfigProvider,
+        OnChainConsensusConfig, OnChainExecutionConfig, OnChainJWKConsensusConfig,
+        OnChainRandomnessConfig, ProposerElectionType, RandomnessConfigMoveStruct,
+        RandomnessConfigSeqNum, ValidatorSet,
     },
     randomness::{RandKeys, WvufPP, WVUF},
     secret_sharing::SecretShareConfig,
@@ -148,11 +149,13 @@ pub struct EpochManager<P: OnChainConfigProvider> {
     author: Author,
     config: ConsensusConfig,
     randomness_override_seq_num: u64,
+    chunky_dkg_override_seq_num: u64,
     time_service: Arc<dyn TimeService>,
     self_sender: aptos_channels::UnboundedSender<Event<ConsensusMsg>>,
     network_sender: ConsensusNetworkClient<NetworkClient<ConsensusMsg>>,
     timeout_sender: aptos_channels::Sender<Round>,
     quorum_store_enabled: bool,
+    encrypted_enabled: bool,
     quorum_store_to_mempool_sender: Sender<QuorumStoreRequest>,
     execution_client: Arc<dyn TExecutionClient>,
     storage: Arc<dyn PersistentLivenessStorage>,
@@ -230,12 +233,15 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
             author,
             config,
             randomness_override_seq_num: node_config.randomness_override_seq_num,
+            chunky_dkg_override_seq_num: node_config.chunky_dkg_override_seq_num,
             time_service,
             self_sender,
             network_sender,
             timeout_sender,
             // This default value is updated at epoch start
             quorum_store_enabled: false,
+            // This default value is updated at epoch start
+            encrypted_enabled: false,
             quorum_store_to_mempool_sender,
             execution_client,
             storage,
@@ -907,11 +913,13 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
             self.config.max_pruned_blocks_in_mem,
             Arc::clone(&self.time_service),
             self.config.vote_back_pressure_limit,
+            self.config.max_commit_gap,
             payload_manager,
             onchain_consensus_config.order_vote_enabled(),
             onchain_consensus_config.window_size(),
             self.pending_blocks.clone(),
             Some(pipeline_builder),
+            self.config.skip_sync_small_gap_rounds,
         ));
 
         let failures_tracker = Arc::new(Mutex::new(ExponentialWindowFailureTracker::new(
@@ -920,7 +928,7 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
         )));
         let encrypted_txn_limit = secret_share_verifier
             .as_ref()
-            .map(|c| c.config().digest_key().max_batch_size() as u64);
+            .map(|_| self.config.quorum_store.sender_max_encrypted_batch_txns as u64);
         let opt_qs_payload_param_provider = Arc::new(OptQSPullParamsProvider::new(
             self.config.quorum_store.enable_opt_quorum_store,
             self.config.quorum_store.opt_qs_minimum_batch_age_usecs,
@@ -1167,6 +1175,9 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
         if !onchain_chunky_dkg_config.chunky_dkg_enabled() {
             return Err(NoSecretSharingReason::FeatureDisabled);
         }
+        if onchain_chunky_dkg_config.is_shadow_mode() {
+            return Err(NoSecretSharingReason::ShadowMode);
+        }
 
         let dkg_state =
             maybe_chunky_dkg_state.map_err(NoSecretSharingReason::ChunkyDKGStateResourceMissing)?;
@@ -1232,6 +1243,10 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
         self.epoch_state = Some(epoch_state.clone());
 
         let onchain_consensus_config: anyhow::Result<OnChainConsensusConfig> = payload.get();
+        self.encrypted_enabled = payload
+            .get::<Features>()
+            .map(|f| f.is_encrypted_transactions_enabled())
+            .unwrap_or(false);
         let onchain_execution_config: anyhow::Result<OnChainExecutionConfig> = payload.get();
         let onchain_randomness_config_seq_num: anyhow::Result<RandomnessConfigSeqNum> =
             payload.get();
@@ -1241,6 +1256,8 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
         let dkg_state = payload.get::<DKGState>();
         let chunky_dkg_state = payload.get::<ChunkyDKGState>();
         let chunky_dkg_config_move_struct: anyhow::Result<ChunkyDKGConfigMoveStruct> =
+            payload.get();
+        let onchain_chunky_dkg_config_seq_num: anyhow::Result<ChunkyDKGConfigSeqNum> =
             payload.get();
 
         if let Err(error) = &onchain_consensus_config {
@@ -1324,8 +1341,22 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
         };
 
         info!("Generating secret share config");
-        let onchain_chunky_dkg_config =
-            OnChainChunkyDKGConfig::from_configs(chunky_dkg_config_move_struct.ok());
+        let onchain_chunky_dkg_config_seq_num = onchain_chunky_dkg_config_seq_num
+            .unwrap_or_else(|_| ChunkyDKGConfigSeqNum::default_if_missing());
+        info!(
+            epoch = epoch_state.epoch,
+            local = self.chunky_dkg_override_seq_num,
+            onchain = onchain_chunky_dkg_config_seq_num.seq_num,
+            "Checking chunky DKG config override."
+        );
+        if self.chunky_dkg_override_seq_num > onchain_chunky_dkg_config_seq_num.seq_num {
+            warn!("ChunkyDKG will be force-disabled by local config!");
+        }
+        let onchain_chunky_dkg_config = OnChainChunkyDKGConfig::from_configs(
+            self.chunky_dkg_override_seq_num,
+            onchain_chunky_dkg_config_seq_num.seq_num,
+            chunky_dkg_config_move_struct.ok(),
+        );
         let secret_share_verifier = match self.try_get_secret_share_config_for_epoch(
             loaded_consensus_key.clone(),
             &epoch_state,
@@ -1664,6 +1695,7 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
                 .ok_or_else(|| anyhow::anyhow!("Epoch state is not available"))?;
             let proof_cache = self.proof_cache.clone();
             let quorum_store_enabled = self.quorum_store_enabled;
+            let encrypted_enabled = self.encrypted_enabled;
             let opt_qs_v2_rx_enabled = self.config.quorum_store.enable_opt_qs_v2_payload_rx;
             let quorum_store_msg_tx = self.quorum_store_msg_tx.clone();
             let buffered_proposal_tx = self.buffered_proposal_tx.clone();
@@ -1672,6 +1704,8 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
             let max_num_batches = self.config.quorum_store.receiver_max_num_batches;
             let max_batch_expiry_gap_usecs =
                 self.config.quorum_store.batch_expiry_gap_when_init_usecs;
+            let max_batch_txns = self.config.quorum_store.receiver_max_batch_txns as u64;
+            let max_batch_bytes = self.config.quorum_store.receiver_max_batch_bytes as u64;
             let payload_manager = self.payload_manager.clone();
             let pending_blocks = self.pending_blocks.clone();
             self.bounded_executor
@@ -1687,6 +1721,9 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
                             peer_id == my_peer_id,
                             max_num_batches,
                             max_batch_expiry_gap_usecs,
+                            max_batch_txns,
+                            max_batch_bytes,
+                            encrypted_enabled,
                         )
                     ) {
                         Ok(verified_event) => {
@@ -2101,6 +2138,7 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
 pub enum NoSecretSharingReason {
     VTxnDisabled,
     FeatureDisabled,
+    ShadowMode,
     ChunkyDKGStateResourceMissing(anyhow::Error),
     DKGCompletedSessionResourceMissing,
     CompletedSessionTooOld,

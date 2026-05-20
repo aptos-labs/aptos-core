@@ -3,20 +3,20 @@
 
 use crate::{
     chunky::{
-        types::{AggregatedSubtranscriptWithHashes, ChunkyDKGTranscriptRequest},
-        validation::validate_chunky_transcript,
+        common::deserialize_chunky_transcript_and_verify,
+        types::{
+            AggregatedSubtranscriptWithHashes, ChunkyDKGTranscriptRequest, ChunkyTranscriptWithHash,
+        },
     },
     counters,
     types::DKGMessage,
 };
-use anyhow::{ensure, Context};
+use anyhow::{anyhow, ensure, Context};
+use aptos_bitvec::BitVec;
 use aptos_channels::aptos_channel;
 use aptos_consensus_types::common::Author;
 use aptos_crypto::HashValue;
-use aptos_dkg::pvss::{
-    traits::transcript::{Aggregatable, Aggregated, HasAggregatableSubtranscript},
-    Player,
-};
+use aptos_dkg::pvss::traits::transcript::{Aggregatable, Aggregated};
 use aptos_infallible::RwLock;
 use aptos_logger::info;
 use aptos_reliable_broadcast::{BroadcastStatus, ReliableBroadcast};
@@ -24,7 +24,7 @@ use aptos_types::{
     dkg::{
         chunky_dkg::{
             AggregatedSubtranscript, ChunkyDKGSession, ChunkyDKGTranscript, ChunkySubtranscript,
-            ChunkyTranscript, DealerPublicKey,
+            DealerPublicKey,
         },
         DKGTranscriptMetadata,
     },
@@ -52,7 +52,7 @@ pub fn start_subtranscript_aggregation(
     spks: Vec<DealerPublicKey>,
     start_time: Duration,
     agg_subtrx_tx: Option<aptos_channel::Sender<(), AggregatedSubtranscriptWithHashes>>,
-    received_transcripts: Arc<RwLock<HashMap<AccountAddress, Arc<ChunkyTranscript>>>>,
+    received_transcripts: Arc<RwLock<HashMap<AccountAddress, ChunkyTranscriptWithHash>>>,
 ) -> AbortHandle {
     let epoch = dkg_config.session_metadata.dealer_epoch;
     let req = ChunkyDKGTranscriptRequest::new(epoch);
@@ -112,7 +112,7 @@ pub struct ChunkyTranscriptAggregationState {
     dkg_config: Arc<ChunkyDKGSession>,
     signing_pubkeys: Vec<DealerPublicKey>,
     start_time: Duration,
-    received_transcripts: Arc<RwLock<HashMap<AccountAddress, Arc<ChunkyTranscript>>>>,
+    received_transcripts: Arc<RwLock<HashMap<AccountAddress, ChunkyTranscriptWithHash>>>,
     inner_state: RwLock<InnerState>,
 }
 
@@ -124,7 +124,7 @@ impl ChunkyTranscriptAggregationState {
         signing_pubkeys: Vec<DealerPublicKey>,
         start_time: Duration,
         agg_subtrx_tx: Option<aptos_channel::Sender<(), AggregatedSubtranscriptWithHashes>>,
-        received_transcripts: Arc<RwLock<HashMap<AccountAddress, Arc<ChunkyTranscript>>>>,
+        received_transcripts: Arc<RwLock<HashMap<AccountAddress, ChunkyTranscriptWithHash>>>,
     ) -> Self {
         Self {
             epoch_state,
@@ -143,7 +143,7 @@ impl ChunkyTranscriptAggregationState {
         sender: Author,
         metadata: &DKGTranscriptMetadata,
         transcript_bytes: &[u8],
-    ) -> anyhow::Result<(ChunkyTranscript, u64)> {
+    ) -> anyhow::Result<(ChunkyTranscriptWithHash, u64)> {
         // Validate metadata (epoch, author, voting power) — specific to the aggregation context.
         ensure!(
             metadata.epoch == self.dkg_config.session_metadata.dealer_epoch,
@@ -154,22 +154,21 @@ impl ChunkyTranscriptAggregationState {
             "[ChunkyDKG] adding peer chunky transcript failed with node author mismatch"
         );
 
-        let peer_power = self.epoch_state.verifier.get_voting_power(&sender);
-        ensure!(
-            peer_power.is_some(),
-            "[ChunkyDKG] adding peer chunky transcript failed with illegal dealer"
-        );
-        let peer_power = peer_power.expect("Peer must be valid");
+        let peer_power = self
+            .epoch_state
+            .verifier
+            .get_voting_power(&sender)
+            .ok_or_else(|| {
+                anyhow!("[ChunkyDKG] adding peer chunky transcript failed with illegal dealer")
+            })?;
 
         // Shared validation: deserialize, verify, check dealer ID.
-        let mut rng = rand::thread_rng();
-        let transcript = validate_chunky_transcript(
+        let transcript = deserialize_chunky_transcript_and_verify(
             sender,
             transcript_bytes,
             &self.dkg_config,
             &self.signing_pubkeys,
             &self.epoch_state,
-            &mut rng,
         )?;
 
         Ok((transcript, peer_power))
@@ -200,7 +199,6 @@ impl BroadcastStatus<DKGMessage> for Arc<ChunkyTranscriptAggregationState> {
             }
         }
 
-        // RwLock allows concurrent validation of multiple transcripts
         let (transcript, peer_power) =
             self.validate_and_deserialize_transcript(sender, metadata, transcript_bytes)?;
 
@@ -221,25 +219,30 @@ impl BroadcastStatus<DKGMessage> for Arc<ChunkyTranscriptAggregationState> {
             );
         }
 
-        // Store the transcript (Arc-wrapped for cheap clone-out by RPC handlers)
-        let transcript = Arc::new(transcript);
+        // Store the transcript before aggregation so that `received_transcripts` and
+        // `contributors` stay consistent even if `aggregate_with` fails via `?`.
+        // The quorum path below reads `received_transcripts` and expects every contributor
+        // to have a stored transcript.
+        let subtranscript = transcript.get_subtranscript();
         {
             let mut received_transcripts = self.received_transcripts.write();
-            received_transcripts.insert(metadata.author, Arc::clone(&transcript));
+            received_transcripts.insert(metadata.author, transcript);
         }
 
-        // Aggregate the transcript (projective accumulator; normalize when quorum is met)
-        // TODO(ibalajiarun): Should the transcript be aggregated if quorum is already met?
         inner_state.contributors.insert(metadata.author);
+
+        // Quorum already reached — transcript is stored for the fetcher but no
+        // further aggregation is needed.
+        if inner_state.agg_subtrx_tx.is_none() {
+            let all_received = inner_state.contributors.len() >= self.epoch_state.verifier.len();
+            return Ok(all_received.then_some(()));
+        }
         if let Some(agg_subtrx) = inner_state.subtrx.as_mut() {
             agg_subtrx
-                .aggregate_with(
-                    &self.dkg_config.threshold_config,
-                    &transcript.get_subtranscript(),
-                )
+                .aggregate_with(&self.dkg_config.threshold_config, &subtranscript)
                 .context("chunky transcript aggregation failed")?;
         } else {
-            inner_state.subtrx = Some(transcript.get_subtranscript().to_aggregated());
+            inner_state.subtrx = Some(subtranscript.to_aggregated());
         }
 
         // Check quorum and send if needed
@@ -257,61 +260,51 @@ impl BroadcastStatus<DKGMessage> for Arc<ChunkyTranscriptAggregationState> {
 
         // Send to agg_subtrx_tx when quorum is met (only once)
         if quorum_met {
-            if let Some(tx) = inner_state.agg_subtrx_tx.take() {
-                let agg_trx = inner_state.subtrx.take().unwrap().normalize();
-                // Convert AccountAddress contributors to Player by getting their validator indices.
-                // Sort by AccountAddress so dealers order is deterministic (HashSet iteration is
-                // non-deterministic); AggregatedSubtranscript is BCSCryptoHash'd for certification.
-                let mut contributors: Vec<_> = inner_state.contributors.iter().copied().collect();
-                contributors.sort();
-                let dealers: Vec<Player> = contributors
-                    .iter()
-                    .map(|addr| {
-                        self.epoch_state
-                            .verifier
-                            .address_to_validator_index()
-                            .get(addr)
-                            .map(|&index| Player { id: index })
-                            .expect("Request must be sent to validators in current set only")
-                    })
-                    .collect();
-                // Compute per-dealer transcript hashes in the same order as dealers.
-                // These are included in the signature request so the responder can detect
-                // equivocated transcripts (where a dealer sent different transcripts to
-                // different validators), not just missing ones.
-                let dealer_transcript_hashes: Vec<HashValue> = {
-                    let received = self.received_transcripts.read();
-                    contributors
-                        .iter()
-                        .map(|addr| {
-                            let transcript = received
-                                .get(addr)
-                                .expect("contributor must have a stored transcript");
-                            let bytes = bcs::to_bytes(transcript.as_ref())
-                                .expect("transcript re-serialization should not fail");
-                            HashValue::sha3_256_of(&bytes)
-                        })
-                        .collect()
-                };
-                let agg_subtrx = AggregatedSubtranscript {
+            let tx = inner_state
+                .agg_subtrx_tx
+                .take()
+                .expect("agg_subtrx_tx must be Some due to early return above");
+            let agg_trx = inner_state.subtrx.take().unwrap().normalize();
+            let num_validators = self.epoch_state.verifier.len();
+            let addr_to_index = self.epoch_state.verifier.address_to_validator_index();
+            let received = self.received_transcripts.read();
+
+            let mut dealer_bitmask = BitVec::with_num_bits(num_validators as u16);
+            let mut indexed_hashes: Vec<(usize, HashValue)> = Vec::new();
+            for addr in inner_state.contributors.iter() {
+                let index = *addr_to_index
+                    .get(addr)
+                    .ok_or_else(|| anyhow!("contributor {} not in validator set", addr))?;
+                dealer_bitmask.set(index as u16);
+                let hash = received
+                    .get(addr)
+                    .ok_or_else(|| anyhow!("contributor {} missing stored transcript", addr))?
+                    .hash();
+                indexed_hashes.push((index, hash));
+            }
+            indexed_hashes.sort_by_key(|(idx, _)| *idx);
+            let dealer_transcript_hashes: Vec<HashValue> =
+                indexed_hashes.into_iter().map(|(_, h)| h).collect();
+            drop(received);
+
+            let with_hashes = AggregatedSubtranscriptWithHashes {
+                aggregated_subtranscript: AggregatedSubtranscript {
+                    dealer_epoch: self.dkg_config.session_metadata.dealer_epoch,
                     subtranscript: agg_trx,
-                    dealers,
-                };
-                let with_hashes = AggregatedSubtranscriptWithHashes {
-                    aggregated_subtranscript: agg_subtrx,
-                    dealer_transcript_hashes,
-                };
-                if let Err(e) = tx.push((), with_hashes) {
-                    info!(
-                        epoch = epoch,
-                        "[ChunkyDKG] Failed to send aggregated chunky transcript to ChunkyDKGManager when quorum met: {:?}", e
-                    );
-                } else {
-                    info!(
-                        epoch = epoch,
-                        "[ChunkyDKG] sent aggregated chunky transcript to ChunkyDKGManager (quorum met)"
-                    );
-                }
+                    dealer_bitmask,
+                },
+                dealer_transcript_hashes,
+            };
+            if let Err(e) = tx.push((), with_hashes) {
+                info!(
+                    epoch = epoch,
+                    "[ChunkyDKG] Failed to send aggregated chunky transcript to ChunkyDKGManager when quorum met: {:?}", e
+                );
+            } else {
+                info!(
+                    epoch = epoch,
+                    "[ChunkyDKG] sent aggregated chunky transcript to ChunkyDKGManager (quorum met)"
+                );
             }
         }
 
@@ -369,9 +362,10 @@ mod tests {
             setup.spks(),
             duration_since_epoch(),
             Some(tx),
-            Arc::new(RwLock::new(
-                HashMap::<AccountAddress, Arc<ChunkyTranscript>>::new(),
-            )),
+            Arc::new(RwLock::new(HashMap::<
+                AccountAddress,
+                ChunkyTranscriptWithHash,
+            >::new())),
         ));
         (state, rx)
     }
@@ -402,8 +396,13 @@ mod tests {
         let agg = rx.select_next_some().now_or_never();
         assert!(agg.is_some());
         let agg_with_hashes = agg.unwrap();
-        // Dealers should be sorted by AccountAddress, then mapped to validator indices.
-        assert_eq!(agg_with_hashes.aggregated_subtranscript.dealers.len(), 3);
+        assert_eq!(
+            agg_with_hashes
+                .aggregated_subtranscript
+                .dealer_bitmask
+                .count_ones(),
+            3
+        );
         assert_eq!(agg_with_hashes.dealer_transcript_hashes.len(), 3);
 
         // Fourth transcript — all received, returns Some(()).
@@ -464,6 +463,33 @@ mod tests {
     }
 
     #[tokio::test]
+    async fn test_aggregation_rejects_oversized_transcript_bytes() {
+        let setup = ChunkyTestSetup::new_uniform(4);
+        let (state, _rx) = make_agg_state(&setup, 0);
+
+        let session_bound = setup.dkg_config.expected_max_transcript_size();
+        // One byte over the per-session bound — the size gate should reject it.
+        let oversized = ChunkyDKGTranscript::new(
+            setup.dkg_config.session_metadata.dealer_epoch,
+            setup.addrs[0],
+            vec![0u8; session_bound + 1],
+        );
+        let start = std::time::Instant::now();
+        let result = BroadcastStatus::add(&state, setup.addrs[0], oversized);
+        let elapsed = start.elapsed();
+        assert!(result.is_err());
+        let err_msg = format!("{:#}", result.unwrap_err());
+        assert!(
+            err_msg.contains("exceeds max"),
+            "expected size-gate rejection, got: {err_msg}"
+        );
+        assert!(
+            elapsed < std::time::Duration::from_secs(1),
+            "rejection took {elapsed:?}; expected sub-second"
+        );
+    }
+
+    #[tokio::test]
     async fn test_aggregation_unequal_voting_power() {
         // Validator 3 has power 7, total = 10, quorum = 7.
         let setup = ChunkyTestSetup::new(4, vec![1, 1, 1, 7]);
@@ -479,7 +505,13 @@ mod tests {
         let agg = rx.select_next_some().now_or_never();
         assert!(agg.is_some());
         let agg_with_hashes = agg.unwrap();
-        assert_eq!(agg_with_hashes.aggregated_subtranscript.dealers.len(), 1);
+        assert_eq!(
+            agg_with_hashes
+                .aggregated_subtranscript
+                .dealer_bitmask
+                .count_ones(),
+            1
+        );
         assert_eq!(agg_with_hashes.dealer_transcript_hashes.len(), 1);
     }
 }

@@ -91,9 +91,13 @@ module 0x42::two_state_labels {
     }
     spec two_increments {
         pragma aborts_if_is_partial;
-        // First increment: entry → S
-        ensures ..S |~ counter_increased(addr);
-        // Second increment: S → exit
+        // The defining condition uses a mutation to fully pin Counter at S.
+        // A pure spec-function inequality (counter_increased) is not strong
+        // enough to determine the label state.
+        ensures ..S |~ update<Counter>(addr,
+            update_field(old(Counter[addr]), value, old(Counter[addr].value) + 1));
+        // Second increment: S → exit.  counter_increased is uses_old so it
+        // observes both S (pre) and exit (post).
         ensures S.. |~ counter_increased(addr);
     }
 

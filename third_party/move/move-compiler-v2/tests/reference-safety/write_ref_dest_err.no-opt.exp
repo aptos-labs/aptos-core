@@ -1,6 +1,16 @@
 
 Diagnostics:
 error: cannot drop local `_y` which is still borrowed
+   ┌─ tests/reference-safety/write_ref_dest_err.move:18:19
+   │
+17 │         let z = &_y;
+   │                 --- local `_y` previously borrowed here
+18 │         (_y, _) = foo(&_y);
+   │                   ^^^^^^^^ dropped here
+19 │         *z;
+   │         -- conflicting reference `z` used here
+
+error: cannot drop local `_y` which is still borrowed
    ┌─ tests/reference-safety/write_ref_dest_err.move:25:9
    │
 24 │         let z = &_y;

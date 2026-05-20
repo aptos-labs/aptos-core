@@ -93,9 +93,9 @@ module aptos_std::ed25519 {
     }
 
     /// Converts a ValidatedPublicKey to an UnvalidatedPublicKey, which can be used in the strict verification APIs.
-    public fun public_key_to_unvalidated(pk: &ValidatedPublicKey): UnvalidatedPublicKey {
+    public fun public_key_to_unvalidated(self: &ValidatedPublicKey): UnvalidatedPublicKey {
         UnvalidatedPublicKey {
-            bytes: pk.bytes
+            bytes: self.bytes
         }
     }
 

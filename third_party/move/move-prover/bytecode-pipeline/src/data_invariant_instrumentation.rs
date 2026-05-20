@@ -17,7 +17,6 @@ use move_model::{
     ast,
     ast::{ConditionKind, Exp, ExpData, QuantKind, RewriteResult, TempIndex},
     exp_generator::ExpGenerator,
-    metadata::LanguageVersion,
     model::{FunctionEnv, Loc, NodeId, StructEnv},
     pragmas::{INTRINSIC_FUN_MAP_SPEC_GET, INTRINSIC_TYPE_MAP},
     ty::Type,
@@ -259,11 +258,6 @@ impl<'a> Instrumenter<'a> {
         use ast::Operation::*;
         use ExpData::*;
 
-        let lang_ver_ge_2 = self
-            .builder
-            .global_env()
-            .language_version()
-            .is_at_least(LanguageVersion::V2_0);
         // First generate a conjunction for all invariants on this struct.
         let mut result = vec![];
         for cond in struct_env
@@ -276,11 +270,10 @@ impl<'a> Instrumenter<'a> {
             // target, as any other `Select` will have exactly one argument.
             let exp_rewriter = &mut |e: Exp| match e.as_ref() {
                 LocalVar(_, var) => {
-                    if lang_ver_ge_2
-                        && var
-                            .display(self.builder.global_env().symbol_pool())
-                            .to_string()
-                            == well_known::RECEIVER_PARAM_NAME
+                    if var
+                        .display(self.builder.global_env().symbol_pool())
+                        .to_string()
+                        == well_known::RECEIVER_PARAM_NAME
                     {
                         RewriteResult::Rewritten(value.clone())
                     } else {

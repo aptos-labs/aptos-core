@@ -192,6 +192,8 @@ enum SecretShareItem {
     Decided {
         self_share: SecretShare,
     },
+    /// Round had no encrypted txns; key derivation skipped, further shares rejected.
+    Skipped,
 }
 
 impl SecretShareItem {
@@ -238,6 +240,9 @@ impl SecretShareItem {
                 Ok(())
             },
             SecretShareItem::Decided { .. } => Ok(()),
+            SecretShareItem::Skipped => {
+                bail!("Received share for skipped round")
+            },
         }
     }
 
@@ -265,6 +270,10 @@ impl SecretShareItem {
             item @ (SecretShareItem::Decided { .. }
             | SecretShareItem::PendingMetadata(_)
             | SecretShareItem::Aggregating { .. }) => item,
+            SecretShareItem::Skipped => {
+                warn!("try_aggregate called on skipped round — logic bug");
+                SecretShareItem::Skipped
+            },
         };
         let _ = std::mem::replace(self, new_item);
     }
@@ -273,7 +282,13 @@ impl SecretShareItem {
         let item = std::mem::replace(self, Self::new(Author::ONE));
         let new_item = match item {
             SecretShareItem::Aggregating { self_share, .. } => Self::Decided { self_share },
-            other => other,
+            other @ (SecretShareItem::PendingMetadata(_)
+            | SecretShareItem::PendingDecision { .. }
+            | SecretShareItem::Decided { .. }) => other,
+            SecretShareItem::Skipped => {
+                warn!("aggregation_succeeded called on skipped round — logic bug");
+                SecretShareItem::Skipped
+            },
         };
         let _ = std::mem::replace(self, new_item);
     }
@@ -308,7 +323,13 @@ impl SecretShareItem {
                     share_aggregator: aggregator,
                 }
             },
-            other => other,
+            other @ (SecretShareItem::PendingMetadata(_)
+            | SecretShareItem::PendingDecision { .. }
+            | SecretShareItem::Decided { .. }) => other,
+            SecretShareItem::Skipped => {
+                warn!("aggregation_failed called on skipped round — logic bug");
+                SecretShareItem::Skipped
+            },
         };
         let _ = std::mem::replace(self, new_item);
     }
@@ -318,27 +339,33 @@ impl SecretShareItem {
         share: SecretShare,
         share_weights: &HashMap<Author, u64>,
     ) -> anyhow::Result<()> {
-        let item = std::mem::replace(self, Self::new(Author::ONE));
-        let share_weight = *share_weights
-            .get(share.author())
-            .ok_or_else(|| anyhow::anyhow!("Author {} not found in weights", share.author()))?;
-        let new_item = match item {
-            SecretShareItem::PendingMetadata(mut share_aggregator) => {
+        match self {
+            SecretShareItem::PendingMetadata(_) => {
+                let share_weight = *share_weights.get(share.author()).ok_or_else(|| {
+                    anyhow::anyhow!("Author {} not found in weights", share.author())
+                })?;
+                let SecretShareItem::PendingMetadata(mut share_aggregator) =
+                    std::mem::replace(self, Self::new(Author::ONE))
+                else {
+                    unreachable!("variant gated above")
+                };
                 let metadata = share.metadata.clone();
                 share_aggregator.retain(share.metadata(), share_weights);
                 share_aggregator.add_share(share, share_weight);
-                SecretShareItem::PendingDecision {
+                *self = SecretShareItem::PendingDecision {
                     metadata,
                     share_aggregator,
-                }
+                };
+                Ok(())
             },
             SecretShareItem::PendingDecision { .. } => {
-                bail!("Cannot add self share in PendingDecision state");
+                bail!("Cannot add self share in PendingDecision state")
             },
-            SecretShareItem::Aggregating { .. } | SecretShareItem::Decided { .. } => return Ok(()),
-        };
-        let _ = std::mem::replace(self, new_item);
-        Ok(())
+            SecretShareItem::Aggregating { .. } | SecretShareItem::Decided { .. } => Ok(()),
+            SecretShareItem::Skipped => {
+                bail!("Cannot add self share for skipped round")
+            },
+        }
     }
 
     fn get_all_shares_authors(&self) -> Option<HashSet<Author>> {
@@ -348,7 +375,8 @@ impl SecretShareItem {
             } => Some(share_aggregator.shares.keys().cloned().collect()),
             SecretShareItem::Aggregating { .. }
             | SecretShareItem::Decided { .. }
-            | SecretShareItem::PendingMetadata(_) => None,
+            | SecretShareItem::PendingMetadata(_)
+            | SecretShareItem::Skipped => None,
         }
     }
 
@@ -360,6 +388,7 @@ impl SecretShareItem {
             } => share_aggregator.get_self_share(),
             SecretShareItem::Aggregating { self_share, .. }
             | SecretShareItem::Decided { self_share, .. } => Some(self_share.clone()),
+            SecretShareItem::Skipped => None,
         }
     }
 }
@@ -447,6 +476,24 @@ impl SecretShareStore {
         item.add_share(share, weight)?;
         item.try_aggregate(&self.verifier, self.decision_tx.clone());
         Ok(item.has_decision())
+    }
+
+    pub fn mark_round_skipped(&mut self, round: Round) {
+        if let Some(existing) = self.secret_share_map.get(&round) {
+            match existing {
+                SecretShareItem::PendingMetadata(_) | SecretShareItem::Skipped => {},
+                SecretShareItem::PendingDecision { .. }
+                | SecretShareItem::Aggregating { .. }
+                | SecretShareItem::Decided { .. } => {
+                    warn!(
+                        round = round,
+                        "mark_round_skipped overwriting active state — logic bug"
+                    );
+                },
+            }
+        }
+        self.secret_share_map
+            .insert(round, SecretShareItem::Skipped);
     }
 
     pub fn handle_aggregation_success(&mut self, round: Round) {
@@ -783,9 +830,51 @@ mod tests {
                 SecretShareItem::PendingMetadata(_) => "PendingMetadata",
                 SecretShareItem::Aggregating { .. } => "Aggregating",
                 SecretShareItem::Decided { .. } => "Decided",
+                SecretShareItem::Skipped => "Skipped",
                 SecretShareItem::PendingDecision { .. } => unreachable!(),
             }),
         }
+    }
+
+    #[tokio::test]
+    async fn test_store_aggregation_with_malformed_vector_share() {
+        // Defense-in-depth: if a share with the wrong vector length somehow bypasses
+        // structural checks and reaches aggregation, reconstruction must return an
+        // error rather than panic (which would crash the node).
+        let ctx = TestContext::new(vec![1, 2, 2, 1]);
+        let (mut store, mut rx) = make_store(&ctx);
+        let round = 5;
+        store.update_highest_known_round(round);
+        let metadata = create_metadata(ctx.epoch, round);
+
+        // self share (weight 1)
+        let self_share = create_secret_share(&ctx, 0, &metadata);
+        store.add_self_share(self_share).unwrap();
+
+        // good peer shares (weight 2 and 2) -- total weight 5 == threshold
+        for i in 1..=2 {
+            let share = create_secret_share(&ctx, i, &metadata);
+            store.add_share(share).unwrap();
+        }
+
+        // Malformed share from author[3] (weight 1 but length 3). Pushed in past the
+        // verifier, which in production catches this at optimistic_verify.
+        let mut malformed = create_secret_share(&ctx, 3, &metadata);
+        let extra = malformed.share.1[0].clone();
+        malformed.share.1.push(extra.clone());
+        malformed.share.1.push(extra);
+        store.add_share(malformed).unwrap();
+
+        // Without the defense-in-depth fix to `get_virtual_player`, reconstruct would
+        // panic inside spawn_blocking and this timeout would fire.
+        use futures::StreamExt;
+        let result = tokio::time::timeout(std::time::Duration::from_secs(5), rx.next())
+            .await
+            .expect("Timed out waiting for aggregation result (panic inside spawn_blocking?)")
+            .expect("Channel closed unexpectedly");
+        // Threshold is 5 and weights [1,2,2] after evicting the bad share sum to 5,
+        // so aggregation succeeds on the retry.
+        assert_eq!(unwrap_success(result).metadata, metadata);
     }
 
     #[tokio::test]
@@ -836,5 +925,224 @@ mod tests {
             .expect("Timed out waiting for decision")
             .expect("Channel closed unexpectedly");
         assert_eq!(unwrap_success(result).metadata, metadata);
+    }
+
+    fn variant_name(item: &SecretShareItem) -> &'static str {
+        match item {
+            SecretShareItem::PendingMetadata(_) => "PendingMetadata",
+            SecretShareItem::PendingDecision { .. } => "PendingDecision",
+            SecretShareItem::Aggregating { .. } => "Aggregating",
+            SecretShareItem::Decided { .. } => "Decided",
+            SecretShareItem::Skipped => "Skipped",
+        }
+    }
+
+    #[test]
+    fn test_add_share_with_metadata_on_pending_decision_preserves_state() {
+        let ctx = TestContext::new(vec![1, 1, 1, 1]);
+        let metadata = create_metadata(ctx.epoch, 5);
+        let peer_weights = ctx.secret_share_config.get_peer_weights().clone();
+
+        let mut aggregator = SecretShareAggregator::new(ctx.authors[0]);
+        let peer_share = create_secret_share(&ctx, 1, &metadata);
+        let w1 = ctx
+            .secret_share_config
+            .get_peer_weight(&ctx.authors[1])
+            .unwrap();
+        aggregator.add_share(peer_share, w1);
+
+        let shares_before = aggregator.shares.clone();
+        let total_weight_before = aggregator.total_weight;
+
+        let mut item = SecretShareItem::PendingDecision {
+            metadata: metadata.clone(),
+            share_aggregator: aggregator,
+        };
+
+        let self_share = create_secret_share(&ctx, 0, &metadata);
+        let result = item.add_share_with_metadata(self_share, &peer_weights);
+        assert!(result.is_err());
+
+        match &item {
+            SecretShareItem::PendingDecision {
+                metadata: m,
+                share_aggregator,
+            } => {
+                assert_eq!(m, &metadata);
+                assert_eq!(share_aggregator.shares.len(), shares_before.len());
+                for (author, share) in &shares_before {
+                    let got = share_aggregator
+                        .shares
+                        .get(author)
+                        .expect("share should be preserved");
+                    assert_eq!(got.author, share.author);
+                    assert_eq!(got.metadata, share.metadata);
+                }
+                assert_eq!(share_aggregator.total_weight, total_weight_before);
+            },
+            other => panic!("Expected PendingDecision, got {}", variant_name(other)),
+        }
+    }
+
+    #[test]
+    fn test_add_share_with_metadata_unknown_author_preserves_state() {
+        let ctx = TestContext::new(vec![1, 1, 1, 1]);
+        let metadata = create_metadata(ctx.epoch, 5);
+        let peer_weights = ctx.secret_share_config.get_peer_weights().clone();
+
+        let mut aggregator = SecretShareAggregator::new(ctx.authors[0]);
+        let peer_share = create_secret_share(&ctx, 1, &metadata);
+        let w1 = ctx
+            .secret_share_config
+            .get_peer_weight(&ctx.authors[1])
+            .unwrap();
+        aggregator.add_share(peer_share, w1);
+
+        let shares_before = aggregator.shares.clone();
+        let total_weight_before = aggregator.total_weight;
+
+        let mut item = SecretShareItem::PendingMetadata(aggregator);
+
+        let unknown_author = Author::random();
+        let self_share_template = create_secret_share(&ctx, 0, &metadata);
+        let unknown_share = SecretShare::new(
+            unknown_author,
+            metadata.clone(),
+            self_share_template.share.clone(),
+        );
+        let result = item.add_share_with_metadata(unknown_share, &peer_weights);
+        assert!(result.is_err());
+
+        match &item {
+            SecretShareItem::PendingMetadata(aggr) => {
+                assert_eq!(aggr.shares.len(), shares_before.len());
+                for (author, share) in &shares_before {
+                    let got = aggr.shares.get(author).expect("share should be preserved");
+                    assert_eq!(got.author, share.author);
+                    assert_eq!(got.metadata, share.metadata);
+                }
+                assert_eq!(aggr.total_weight, total_weight_before);
+            },
+            other => panic!("Expected PendingMetadata, got {}", variant_name(other)),
+        }
+    }
+
+    #[test]
+    fn test_get_all_shares_authors_returns_none_for_terminal_and_preaggregation_states() {
+        // The share-requester task relies on `get_all_shares_authors` returning
+        // `None` for any state in which requesting more shares is useless:
+        //   - Aggregating / Decided: we already have (or are finalizing) enough
+        //     shares; retry is driven by `process_aggregation_result` instead.
+        //   - Skipped: round has no encrypted txns.
+        //   - PendingMetadata: self-share not yet derived, we have no metadata
+        //     to request against.
+        // Only `PendingDecision` returns `Some(known_authors)`.
+        let ctx = TestContext::new(vec![1, 1, 1, 1]);
+        let metadata = create_metadata(ctx.epoch, 5);
+
+        // Aggregating
+        let self_share = create_secret_share(&ctx, 0, &metadata);
+        let item = SecretShareItem::Aggregating {
+            metadata: metadata.clone(),
+            self_share: self_share.clone(),
+            pending_shares: HashMap::new(),
+        };
+        assert!(item.get_all_shares_authors().is_none());
+
+        // Decided
+        let item = SecretShareItem::Decided { self_share };
+        assert!(item.get_all_shares_authors().is_none());
+
+        // Skipped
+        let item = SecretShareItem::Skipped;
+        assert!(item.get_all_shares_authors().is_none());
+
+        // PendingMetadata
+        let item = SecretShareItem::PendingMetadata(SecretShareAggregator::new(ctx.authors[0]));
+        assert!(item.get_all_shares_authors().is_none());
+    }
+
+    #[test]
+    fn test_mark_round_skipped_rejects_future_shares() {
+        let ctx = TestContext::new(vec![1, 1, 1, 1]);
+        let (mut store, _rx) = make_store(&ctx);
+        let round = 5;
+        store.update_highest_known_round(round);
+        let metadata = create_metadata(ctx.epoch, round);
+
+        store.mark_round_skipped(round);
+        match store
+            .secret_share_map
+            .get(&round)
+            .expect("entry should exist after mark_round_skipped")
+        {
+            SecretShareItem::Skipped => {},
+            other => panic!("Expected Skipped, got {}", variant_name(other)),
+        }
+
+        let peer_share = create_secret_share(&ctx, 1, &metadata);
+        assert!(store.add_share(peer_share).is_err());
+
+        match store
+            .secret_share_map
+            .get(&round)
+            .expect("entry should still exist")
+        {
+            SecretShareItem::Skipped => {},
+            other => panic!(
+                "Expected Skipped after add_share, got {}",
+                variant_name(other)
+            ),
+        }
+    }
+
+    #[test]
+    fn test_mark_round_skipped_after_pending_metadata() {
+        let ctx = TestContext::new(vec![1, 1, 1, 1]);
+        let (mut store, _rx) = make_store(&ctx);
+        let round = 5;
+        store.update_highest_known_round(round);
+        let metadata = create_metadata(ctx.epoch, round);
+
+        let peer_share = create_secret_share(&ctx, 1, &metadata);
+        store
+            .add_share(peer_share)
+            .expect("add_share should succeed for fresh round");
+
+        match store
+            .secret_share_map
+            .get(&round)
+            .expect("entry should exist after add_share")
+        {
+            SecretShareItem::PendingMetadata(aggr) => {
+                assert_eq!(aggr.shares.len(), 1);
+            },
+            other => panic!("Expected PendingMetadata, got {}", variant_name(other)),
+        }
+
+        store.mark_round_skipped(round);
+        match store
+            .secret_share_map
+            .get(&round)
+            .expect("entry should exist after mark_round_skipped")
+        {
+            SecretShareItem::Skipped => {},
+            other => panic!("Expected Skipped, got {}", variant_name(other)),
+        }
+
+        let peer_share_2 = create_secret_share(&ctx, 2, &metadata);
+        assert!(store.add_share(peer_share_2).is_err());
+
+        match store
+            .secret_share_map
+            .get(&round)
+            .expect("entry should still exist")
+        {
+            SecretShareItem::Skipped => {},
+            other => panic!(
+                "Expected Skipped after subsequent add_share, got {}",
+                variant_name(other)
+            ),
+        }
     }
 }

@@ -24,10 +24,9 @@ use serde::{
     Deserialize, Serialize,
 };
 use std::{
-    collections::{btree_map::Entry, BTreeMap},
     convert::TryInto,
     fmt::{self, Debug},
-    sync::{Arc, Mutex},
+    sync::Arc,
 };
 
 /// The maximal number of enum variants which are supported in values. This must align with
@@ -53,32 +52,19 @@ pub const MOVE_VARIANT_NAME: &str = "variant";
 pub const MOVE_VARIANT_NAME_FIELD: &str = "name";
 
 /// In order to serialize enums with serde, we have to provide `&'static str` names for
-/// variants. This static cache is used to generate those names, and contains
-/// signatures of the form `["0", "1", "2", ..]`. The size of this cache
-/// is bound by `VARIANT_COUNT_MAX * VARIANT_COUNT_MAX / 2` (8064 with max 127)
-static VARIANT_NAME_PLACEHOLDER_CACHE: Lazy<Mutex<BTreeMap<usize, &'static [&'static str]>>> =
-    Lazy::new(|| Mutex::new(Default::default()));
+/// variants. This static is used to generate those names, and contains signatures of
+/// the form `["0", "1", "2", ..]`.
+static VARIANT_NAME_PLACEHOLDERS: Lazy<[&'static str; VARIANT_COUNT_MAX as usize]> =
+    Lazy::new(|| {
+        std::array::from_fn(|i| Box::leak(format!("{i}").into_boxed_str()) as &'static str)
+    });
 
 /// Returns variant name placeholders for providing dummy names in serde serialization.
 pub fn variant_name_placeholder(len: usize) -> Result<&'static [&'static str], anyhow::Error> {
     if len > VARIANT_COUNT_MAX as usize {
         bail!("variant count is restricted to {}", VARIANT_COUNT_MAX);
     }
-    let mutex = &VARIANT_NAME_PLACEHOLDER_CACHE;
-    let mut lock = mutex.lock().expect("acquire index name lock");
-    match lock.entry(len) {
-        Entry::Vacant(e) => {
-            let signature = Box::new(
-                (0..len)
-                    .map(|idx| Box::new(format!("{}", idx)).leak() as &str)
-                    .collect::<Vec<_>>(),
-            )
-            .leak();
-            e.insert(signature);
-            Ok(signature)
-        },
-        Entry::Occupied(e) => Ok(e.get()),
-    }
+    Ok(&VARIANT_NAME_PLACEHOLDERS[..len])
 }
 
 /// enum signer {

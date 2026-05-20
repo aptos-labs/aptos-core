@@ -70,6 +70,35 @@ fn friend_add_entry() {
 }
 
 #[test]
+fn friend_non_entry_to_private() {
+    // friend visibility demoted to private on a non-entry function. Allowed in
+    // production via the early-skip path (TREAT_FRIEND_AS_PRIVATE on =>
+    // check_friend_linking off => non-entry friend functions skip every check).
+    // Pinning it down here so future refactors of the skip logic can't silently
+    // regress it.
+    let result = check_upgrade("public(friend) fun f(){}", "fun f(){}");
+    assert_success!(result);
+}
+
+#[test]
+fn friend_entry_to_private_entry() {
+    // `public(friend) entry fun f()` -> `entry fun f()` must succeed.
+    // Entry is preserved; friend visibility is independently demoted to private.
+    let result = check_upgrade("public(friend) entry fun f(){}", "entry fun f(){}");
+    assert_success!(result);
+
+    let result = check_upgrade_latest_move("package entry fun f(){}", "entry fun f(){}");
+    assert_success!(result);
+}
+
+#[test]
+fn public_entry_to_private_entry_rejected() {
+    // Public must remain public.
+    let result = check_upgrade("public entry fun f(){}", "entry fun f(){}");
+    assert_vm_status!(result, StatusCode::BACKWARD_INCOMPATIBLE_MODULE_UPDATE);
+}
+
+#[test]
 fn friend_upgrade_failures() {
     let result = check_upgrade("public(friend) entry fun f(){}", "public(friend) fun f(){}");
     assert_vm_status!(result, StatusCode::BACKWARD_INCOMPATIBLE_MODULE_UPDATE);

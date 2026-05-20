@@ -151,6 +151,16 @@ impl TransactionStore {
             .and_then(|txns| txns.get(&replay_protector))
     }
 
+    /// Fetch committed hash without cloning the full transaction.
+    pub(crate) fn get_committed_hash(
+        &self,
+        address: &AccountAddress,
+        replay_protector: ReplayProtector,
+    ) -> Option<HashValue> {
+        self.get_mempool_txn(address, replay_protector)
+            .map(|txn| txn.txn.committed_hash())
+    }
+
     /// Fetch transaction by account address + replay_protector.
     pub(crate) fn get(
         &self,
@@ -509,12 +519,16 @@ impl TransactionStore {
         insertion_info.ready_time = SystemTime::now();
         if let Ok(time_delta) = SystemTime::now().duration_since(insertion_info.insertion_time) {
             let submitted_by = insertion_info.submitted_by_label();
+            let pull_count = insertion_info
+                .consensus_pulled_counter
+                .load(std::sync::atomic::Ordering::Relaxed);
             counters::core_mempool_txn_commit_latency(
                 CONSENSUS_READY_LABEL,
                 submitted_by,
                 bucket,
                 time_delta,
                 priority,
+                pull_count,
             );
 
             if ready_for_mempool_broadcast {
@@ -524,6 +538,7 @@ impl TransactionStore {
                     bucket,
                     time_delta,
                     priority,
+                    pull_count,
                 );
             }
         }
@@ -842,14 +857,10 @@ impl TransactionStore {
         sender_bucket: MempoolSenderBucket,
         start_end_pairs: HashMap<TimelineIndexIdentifier, (u64, u64)>,
     ) -> Vec<(SignedTransaction, u64)> {
-        self.timeline_index
-            .get(&sender_bucket)
-            .unwrap_or_else(|| {
-                panic!(
-                    "Unable to get the timeline index for the sender bucket {}",
-                    sender_bucket
-                )
-            })
+        let Some(index) = self.timeline_index.get(&sender_bucket) else {
+            return Vec::new();
+        };
+        index
             .timeline_range(start_end_pairs)
             .iter()
             .filter_map(|(account, replay_protector)| {

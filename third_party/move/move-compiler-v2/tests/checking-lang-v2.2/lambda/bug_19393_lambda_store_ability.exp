@@ -1,0 +1,10 @@
+
+Diagnostics:
+error: function resulting from lambda lifting is missing the `store` ability
+  ┌─ tests/checking-lang-v2.2/lambda/bug_19393_lambda_store_ability.move:8:23
+  │
+8 │         require_store(|| 1u64);
+  │                       ^^^^^^^
+  │
+  = lambda cannot be reduced to partial application of existing function
+  = expected function type: `||u64 has store`

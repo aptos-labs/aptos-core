@@ -42,6 +42,7 @@ const COMMON_EXCLUSIONS: &[&str] = &[
     "/no-recursive-type-check/",
     "/testing-constant/",
     "/structs_visibility/",
+    "/public_const/",
 ];
 
 /// Note that any config which has different output for a test directory
@@ -96,16 +97,6 @@ const TEST_CONFIGS: &[TestConfig] = &[
         exclude: COMMON_EXCLUSIONS,
         cross_compile: false,
     },
-    // Test `/operator_eval/` with language version 1 and 2
-    TestConfig {
-        name: "operator-eval-lang-1",
-        runner: |p| run(p, get_config_by_name("operator-eval-lang-1")),
-        experiments: &[(Experiment::OPTIMIZE, true)],
-        language_version: LanguageVersion::V1,
-        include: &["/operator_eval/"],
-        exclude: &["/structs_visibility/"],
-        cross_compile: false,
-    },
     TestConfig {
         name: "operator-eval-lang-2",
         runner: |p| run(p, get_config_by_name("operator-eval-lang-2")),
@@ -148,6 +139,15 @@ const TEST_CONFIGS: &[TestConfig] = &[
         experiments: &[],
         language_version: LanguageVersion::latest(),
         include: &["/structs_visibility/"],
+        exclude: &[],
+        cross_compile: false,
+    },
+    TestConfig {
+        name: "public-const",
+        runner: |p| run(p, get_config_by_name("public-const")),
+        experiments: &[],
+        language_version: LanguageVersion::latest(),
+        include: &["/public_const/"],
         exclude: &[],
         cross_compile: false,
     },
@@ -209,8 +209,6 @@ const SEPARATE_BASELINE: &[&str] = &[
     "no-v1-comparison/enum/enum_scoping.move",
     // Different error messages depending on optimizations or not
     "no-v1-comparison/fv_as_keys.move",
-    // needed until bug #17615 is fixed
-    "misc/bug_14817_extended.move",
     // run in verbose mode to unveil the exact error messages
     "/signed-int/",
     // different expected result

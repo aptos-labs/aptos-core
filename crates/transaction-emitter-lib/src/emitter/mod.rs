@@ -15,7 +15,7 @@ use crate::emitter::{
     },
     metrics::update_tps_gauges,
     stats::{DynamicStatsTracking, TxnStats},
-    submission_worker::{EncryptionKeyRotator, SubmissionWorker},
+    submission_worker::SubmissionWorker,
     transaction_executor::RestApiReliableTransactionSubmitter,
 };
 use again::RetryPolicy;
@@ -175,6 +175,7 @@ pub struct EmitJobRequest {
 
     gas_price: u64,
     init_gas_price_multiplier: u64,
+    encrypted_gas_price_multiplier: u64,
 
     mint_to_root: bool,
     skip_funding_accounts: bool,
@@ -220,6 +221,7 @@ impl Default for EmitJobRequest {
             gas_price: aptos_global_constants::GAS_UNIT_PRICE,
             init_max_gas_per_txn: None,
             init_gas_price_multiplier: 2,
+            encrypted_gas_price_multiplier: 2,
             mint_to_root: false,
             skip_funding_accounts: false,
             txn_expiration_time_secs: 60,
@@ -278,6 +280,11 @@ impl EmitJobRequest {
 
     pub fn init_gas_price_multiplier(mut self, init_gas_price_multiplier: u64) -> Self {
         self.init_gas_price_multiplier = init_gas_price_multiplier;
+        self
+    }
+
+    pub fn encrypted_gas_price_multiplier(mut self, encrypted_gas_price_multiplier: u64) -> Self {
+        self.encrypted_gas_price_multiplier = encrypted_gas_price_multiplier;
         self
     }
 
@@ -429,6 +436,23 @@ impl EmitJobRequest {
 
     pub fn get_init_gas_price(&self) -> u64 {
         self.gas_price * self.init_gas_price_multiplier
+    }
+
+    pub fn needs_encryption(&self) -> bool {
+        self.encrypt_transactions
+            || self.transaction_mix_per_phase.iter().any(|phase| {
+                phase
+                    .iter()
+                    .any(|(tt, _)| matches!(tt, TransactionType::Encrypted { .. }))
+            })
+    }
+
+    pub fn get_effective_gas_price(&self) -> u64 {
+        if self.needs_encryption() {
+            self.gas_price * self.encrypted_gas_price_multiplier
+        } else {
+            self.gas_price
+        }
     }
 
     pub fn calculate_mode_params(&self) -> EmitModeParams {
@@ -781,18 +805,26 @@ impl TxnEmitter {
             .with_gas_unit_price(req.get_init_gas_price())
             .with_transaction_expiration_time(init_expiration_time);
 
+        let needs_encryption = req.needs_encryption();
+        let traffic_gas_price = req.get_effective_gas_price();
+        if needs_encryption {
+            info!(
+                "Encrypted transactions enabled – boosting gas price from {} to {} ({}x multiplier)",
+                req.gas_price, traffic_gas_price, req.encrypted_gas_price_multiplier,
+            );
+        }
+
         // Build traffic factory (may encrypt)
         let txn_factory = self
             .txn_factory
             .clone()
             .with_transaction_expiration_time(mode_params.txn_expiration_time_secs)
-            .with_gas_unit_price(req.gas_price)
+            .with_gas_unit_price(traffic_gas_price)
             .with_max_gas_amount(req.max_gas_per_txn);
 
         // Set the encryption key on the traffic factory upfront.
         // init_txn_factory has its own independent Arc so it won't be affected.
-        let encrypt_transactions = req.encrypt_transactions;
-        if encrypt_transactions {
+        if needs_encryption {
             let state = self.rest_cli.get_ledger_information().await?.into_inner();
             txn_factory
                 .update_encryption_key_state(state.epoch, state.encryption_key.as_deref())?;
@@ -897,13 +929,48 @@ impl TxnEmitter {
         // Creating workers is slow with many workers (TODO check why)
         // so we create them all first, before starting them - so they start at the right time for
         // traffic pattern to be correct.
-        let rotator = if encrypt_transactions {
-            Some(Arc::new(EncryptionKeyRotator::new(
-                txn_factory.encryption_key_handle(),
-            )))
-        } else {
-            None
-        };
+        // Spawn a background task that polls for the encryption key periodically.
+        // This is faster than waiting for submit response headers, which can take
+        // a full worker loop cycle (~txn_expiration_time_secs) to propagate.
+        if needs_encryption {
+            let poll_client = self.rest_cli.clone();
+            let encryption_key_handle = txn_factory.encryption_key_handle();
+            let poll_stop = stop.clone();
+            tokio_handle.spawn(async move {
+                let mut poll_interval = time::interval(Duration::from_secs(5));
+                loop {
+                    poll_interval.tick().await;
+                    if poll_stop.load(Ordering::Relaxed) {
+                        break;
+                    }
+                    if let Ok(resp) = poll_client.get_ledger_information().await {
+                        let state = resp.into_inner();
+                        let mut guard = encryption_key_handle.write().unwrap();
+                        if state.epoch > guard.epoch {
+                            let new_key = state.encryption_key.as_deref().map(bcs::from_bytes);
+                            match new_key {
+                                Some(Ok(key)) => {
+                                    guard.epoch = state.epoch;
+                                    guard.key = Some(key);
+                                    info!(
+                                        "Encryption key poller: rotated key for epoch {}",
+                                        state.epoch
+                                    );
+                                },
+                                None => {
+                                    guard.epoch = state.epoch;
+                                    guard.key = None;
+                                },
+                                Some(Err(_)) => {
+                                    // Key bytes present but deserialization failed;
+                                    // don't advance epoch so we retry next tick.
+                                },
+                            }
+                        }
+                    }
+                }
+            });
+        }
 
         info!("Tx emitter creating workers");
         let mut submission_workers = Vec::with_capacity(num_accounts);
@@ -928,7 +995,6 @@ impl TxnEmitter {
                 all_start_sleep_durations[worker_index],
                 check_account_sequence_only_once_for.contains(&worker_index),
                 self.from_rng(),
-                rotator.clone(),
             );
             submission_workers.push(worker);
         }
@@ -1381,12 +1447,13 @@ pub fn get_needed_balance_per_account_from_req(req: &EmitJobRequest, num_account
         );
         val
     } else {
+        let effective_gas_price = req.get_effective_gas_price();
         get_needed_balance_per_account(
             req.expected_max_txns,
             req.get_expected_gas_per_txn(),
             SEND_AMOUNT,
             num_accounts,
-            req.gas_price,
+            effective_gas_price,
             req.max_gas_per_txn,
         )
     }

@@ -36,8 +36,30 @@ impl SecretShareVerifier {
         self.pessimistic_set.insert(author);
     }
 
-    fn verify_structural(&self, author: &Author) -> anyhow::Result<()> {
-        let _index = self.config.get_id(author)?;
+    fn verify_structural(&self, share: &SecretShare) -> anyhow::Result<()> {
+        let author = share.author();
+        let index = self.config.get_id(author)?;
+        // The Player id embedded in the share must match the author's validator index.
+        // Without this check a malicious validator could declare any player id, leading
+        // to incorrect reconstruction or out-of-bounds access during aggregation.
+        ensure!(
+            share.share.0.id == index,
+            "Player id {} does not match expected index {} for author {}",
+            share.share.0.id,
+            index,
+            author
+        );
+        // The number of sub-shares must equal the author's weight. Without this check a
+        // malicious validator could cause `get_virtual_player` to be called with an
+        // out-of-range index during reconstruction and crash the node.
+        let expected_weight = self.config.get_peer_weight(author)? as usize;
+        ensure!(
+            share.share.1.len() == expected_weight,
+            "Share vector length {} does not match expected weight {} for author {}",
+            share.share.1.len(),
+            expected_weight,
+            author
+        );
         Ok(())
     }
 
@@ -48,8 +70,13 @@ impl SecretShareVerifier {
             share.author(),
             sender
         );
+        // Structural validation runs on both branches: the pessimistic crypto
+        // verify does not bind share.share.0.id to the author's validator
+        // index, so an author could otherwise smuggle a mismatched player id
+        // past verification and poison Lagrange interpolation downstream.
+        self.verify_structural(share)?;
         if self.should_verify_optimistically(share.author()) {
-            self.verify_structural(share.author())
+            Ok(())
         } else {
             share.verify(&self.config)
         }
@@ -115,18 +142,82 @@ mod tests {
     }
 
     #[test]
-    fn test_verify_structural_valid_author() {
+    fn test_verify_structural_valid_share() {
         let ctx = TestContext::new(vec![1, 1, 1, 1]);
         let verifier = SecretShareVerifier::new(ctx.secret_share_config.clone(), true);
-        assert!(verifier.verify_structural(&ctx.authors[0]).is_ok());
+        let metadata = create_metadata(ctx.epoch, 5);
+        let share = create_secret_share(&ctx, 0, &metadata);
+        assert!(verifier.verify_structural(&share).is_ok());
     }
 
     #[test]
     fn test_verify_structural_invalid_author() {
         let ctx = TestContext::new(vec![1, 1, 1, 1]);
         let verifier = SecretShareVerifier::new(ctx.secret_share_config.clone(), true);
-        let unknown = Author::random();
-        assert!(verifier.verify_structural(&unknown).is_err());
+        let metadata = create_metadata(ctx.epoch, 5);
+        let mut share = create_secret_share(&ctx, 0, &metadata);
+        share.author = Author::random();
+        assert!(verifier.verify_structural(&share).is_err());
+    }
+
+    #[test]
+    fn test_verify_structural_rejects_wrong_vector_length() {
+        // authors[1] has weight 2 -- a share with 3 sub-shares must be rejected
+        let ctx = TestContext::new(vec![1, 2, 2, 1]);
+        let verifier = SecretShareVerifier::new(ctx.secret_share_config.clone(), true);
+        let metadata = create_metadata(ctx.epoch, 5);
+        let mut share = create_secret_share(&ctx, 1, &metadata);
+        let extra = share.share.1[0].clone();
+        share.share.1.push(extra);
+        assert_eq!(share.share.1.len(), 3);
+        let err = verifier.verify_structural(&share).unwrap_err();
+        assert!(
+            format!("{err}").contains("Share vector length"),
+            "unexpected error: {err}"
+        );
+    }
+
+    #[test]
+    fn test_verify_structural_rejects_shorter_vector_length() {
+        // authors[1] has weight 2 -- a share with 1 sub-share must be rejected
+        let ctx = TestContext::new(vec![1, 2, 2, 1]);
+        let verifier = SecretShareVerifier::new(ctx.secret_share_config.clone(), true);
+        let metadata = create_metadata(ctx.epoch, 5);
+        let mut share = create_secret_share(&ctx, 1, &metadata);
+        share.share.1.pop();
+        assert_eq!(share.share.1.len(), 1);
+        let err = verifier.verify_structural(&share).unwrap_err();
+        assert!(
+            format!("{err}").contains("Share vector length"),
+            "unexpected error: {err}"
+        );
+    }
+
+    #[test]
+    fn test_verify_structural_rejects_wrong_player_id() {
+        let ctx = TestContext::new(vec![1, 1, 1, 1]);
+        let verifier = SecretShareVerifier::new(ctx.secret_share_config.clone(), true);
+        let metadata = create_metadata(ctx.epoch, 5);
+        let mut share = create_secret_share(&ctx, 1, &metadata);
+        // Flip the player id to a different validator's index
+        share.share.0.id = (share.share.0.id + 1) % 4;
+        let err = verifier.verify_structural(&share).unwrap_err();
+        assert!(
+            format!("{err}").contains("Player id"),
+            "unexpected error: {err}"
+        );
+    }
+
+    #[test]
+    fn test_optimistic_verify_rejects_wrong_vector_length() {
+        let ctx = TestContext::new(vec![1, 2, 2, 1]);
+        let verifier = SecretShareVerifier::new(ctx.secret_share_config.clone(), true);
+        let metadata = create_metadata(ctx.epoch, 5);
+        let mut share = create_secret_share(&ctx, 1, &metadata);
+        let extra = share.share.1[0].clone();
+        share.share.1.push(extra);
+        // author[1] is in the optimistic set so only verify_structural runs
+        assert!(verifier.optimistic_verify(&share, &ctx.authors[1]).is_err());
     }
 
     #[test]

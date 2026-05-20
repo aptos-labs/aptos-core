@@ -151,8 +151,8 @@ pub struct PipelineInputTx {
     pub qc_tx: Option<oneshot::Sender<Arc<QuorumCert>>>,
     pub rand_tx: Option<oneshot::Sender<Option<Randomness>>>,
     pub order_vote_tx: Option<oneshot::Sender<()>>,
-    pub ordered_blocks_and_proof_fut:
-        Option<oneshot::Sender<(Vec<Arc<PipelinedBlock>>, WrappedLedgerInfo)>>,
+    pub order_proof_tx: Option<oneshot::Sender<WrappedLedgerInfo>>,
+    pub ordered_blocks_for_observer_tx: Option<oneshot::Sender<OrderedBlocksForObserver>>,
     pub commit_proof_tx: Option<oneshot::Sender<LedgerInfoWithSignatures>>,
     pub secret_shared_key_tx: Option<oneshot::Sender<Option<SecretSharedKey>>>,
 }
@@ -161,9 +161,82 @@ pub struct PipelineInputRx {
     pub qc_rx: oneshot::Receiver<Arc<QuorumCert>>,
     pub rand_rx: oneshot::Receiver<Option<Randomness>>,
     pub order_vote_rx: oneshot::Receiver<()>,
-    pub ordered_blocks_and_proof_fut: TaskFuture<(Vec<Arc<PipelinedBlock>>, WrappedLedgerInfo)>,
+    pub order_proof_fut: TaskFuture<WrappedLedgerInfo>,
+    pub ordered_blocks_for_observer_fut: TaskFuture<OrderedBlocksForObserver>,
     pub commit_proof_fut: TaskFuture<LedgerInfoWithSignatures>,
     pub secret_shared_key_rx: oneshot::Receiver<Option<SecretSharedKey>>,
+}
+
+#[derive(Clone)]
+pub struct OrderedBlocksForObserver {
+    /// `block_id` (HashValue) helps with logging if a block is dropped before observer publishing.
+    blocks: Vec<(HashValue, Weak<PipelinedBlock>)>,
+}
+
+impl OrderedBlocksForObserver {
+    pub fn new(blocks: &[Arc<PipelinedBlock>]) -> Self {
+        Self {
+            blocks: blocks
+                .iter()
+                .map(|block| (block.id(), Arc::downgrade(block)))
+                .collect(),
+        }
+    }
+
+    pub fn pipelined_blocks(&self) -> Result<Vec<Arc<PipelinedBlock>>, HashValue> {
+        self.blocks
+            .iter()
+            .map(|(block_id, block)| block.upgrade().ok_or(*block_id))
+            .collect()
+    }
+
+    pub fn pipelined_block(
+        &self,
+        target_block_id: HashValue,
+    ) -> Result<Option<Arc<PipelinedBlock>>, HashValue> {
+        for (block_id, block) in &self.blocks {
+            if *block_id == target_block_id {
+                return block.upgrade().map(Some).ok_or(*block_id);
+            }
+        }
+        Ok(None)
+    }
+
+    pub fn last_block_id(&self) -> Option<HashValue> {
+        self.blocks.last().map(|(block_id, _)| *block_id)
+    }
+
+    pub fn block_ids(&self) -> Vec<HashValue> {
+        self.blocks.iter().map(|(block_id, _)| *block_id).collect()
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn ordered_blocks_for_observer_does_not_keep_blocks_alive() {
+        let block = Arc::new(PipelinedBlock::new_ordered(
+            Block::make_genesis_block(),
+            OrderedBlockWindow::empty(),
+        ));
+        let block_id = block.id();
+
+        let ordered_blocks = OrderedBlocksForObserver::new(std::slice::from_ref(&block));
+        assert_eq!(Arc::strong_count(&block), 1);
+
+        {
+            let upgraded_blocks = ordered_blocks.pipelined_blocks().unwrap();
+            assert_eq!(upgraded_blocks.len(), 1);
+            assert_eq!(upgraded_blocks[0].id(), block_id);
+        }
+
+        assert_eq!(Arc::strong_count(&block), 1);
+
+        drop(block);
+        assert_eq!(ordered_blocks.pipelined_blocks().unwrap_err(), block_id);
+    }
 }
 
 /// A window of blocks that are needed for execution with the execution pool, EXCLUDING the current block
@@ -368,8 +441,19 @@ impl PipelinedBlock {
         }
     }
 
+    /// Stores the randomness on the block and eagerly sends it via the pipeline channel
+    /// to unblock the execution phase as early as possible. Without this, later blocks
+    /// in the same ordering batch deadlock: their has_rand_txns_fut waits for earlier
+    /// blocks' execute_fut, which waits for rand_rx. The execution_schedule_phase also
+    /// sends via this channel as a fallback (using take(), so only one send actually occurs).
     pub fn set_randomness(&self, randomness: Randomness) {
-        assert!(self.randomness.set(randomness.clone()).is_ok());
+        assert!(self.randomness.set(randomness).is_ok());
+        if let Some(tx) = self.pipeline_tx().lock().as_mut() {
+            let _ = tx
+                .rand_tx
+                .take()
+                .map(|tx| tx.send(self.randomness().cloned()));
+        }
     }
 
     /// Stores the decryption key on the block and eagerly sends it via the pipeline channel

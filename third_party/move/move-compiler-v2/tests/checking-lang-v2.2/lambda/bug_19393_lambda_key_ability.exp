@@ -1,0 +1,7 @@
+
+Diagnostics:
+error: constraint `||u64 has ..` does not have required ability `key`
+   ┌─ tests/checking-lang-v2.2/lambda/bug_19393_lambda_key_ability.move:11:21
+   │
+11 │         require_key(|| 1u64);
+   │                     ^^^^^^^

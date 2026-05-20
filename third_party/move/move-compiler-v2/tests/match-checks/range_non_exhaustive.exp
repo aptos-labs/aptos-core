@@ -1,0 +1,33 @@
+
+Diagnostics:
+error: match not exhaustive
+  ┌─ tests/match-checks/range_non_exhaustive.move:4:16
+  │
+4 │         match (x) {
+  │                ^
+  │
+  = missing at least `..1`
+
+error: match not exhaustive
+   ┌─ tests/match-checks/range_non_exhaustive.move:11:16
+   │
+11 │         match (x) {
+   │                ^
+   │
+   = missing at least `10..20`
+
+error: match not exhaustive
+   ┌─ tests/match-checks/range_non_exhaustive.move:19:16
+   │
+19 │         match (x) {
+   │                ^
+   │
+   = missing at least `..5`
+
+error: match not exhaustive
+   ┌─ tests/match-checks/range_non_exhaustive.move:26:16
+   │
+26 │         match (x) {
+   │                ^
+   │
+   = missing at least `100..`

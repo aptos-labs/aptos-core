@@ -5,6 +5,7 @@ use crate::{
     pruner::pruner_utils::get_or_initialize_subpruner_progress,
     schema::{
         db_metadata::{DbMetadataKey, DbMetadataSchema, DbMetadataValue},
+        hot_state_value_by_key_hash::HotStateValueByKeyHashSchema,
         stale_state_value_index_by_key_hash::StaleStateValueIndexByKeyHashSchema,
         state_value_by_key_hash::StateValueByKeyHashSchema,
     },
@@ -19,6 +20,7 @@ use std::sync::Arc;
 pub(in crate::pruner) struct StateKvShardPruner {
     shard_id: usize,
     db_shard: Arc<DB>,
+    is_hot: bool,
 }
 
 impl StateKvShardPruner {
@@ -26,17 +28,23 @@ impl StateKvShardPruner {
         shard_id: usize,
         db_shard: Arc<DB>,
         metadata_progress: Version,
+        is_hot: bool,
     ) -> Result<Self> {
         let progress = get_or_initialize_subpruner_progress(
             &db_shard,
             &DbMetadataKey::StateKvShardPrunerProgress(shard_id),
             metadata_progress,
         )?;
-        let myself = Self { shard_id, db_shard };
+        let myself = Self {
+            shard_id,
+            db_shard,
+            is_hot,
+        };
 
         info!(
             progress = progress,
             metadata_progress = metadata_progress,
+            is_hot = is_hot,
             "Catching up state kv shard {shard_id}."
         );
         myself.prune(progress, metadata_progress)?;
@@ -64,8 +72,12 @@ impl StateKvShardPruner {
             }
             batch.delete::<StaleStateValueIndexByKeyHashSchema>(&index)?;
             if !index.is_first_write() {
-                batch
-                    .delete::<StateValueByKeyHashSchema>(&(index.state_key_hash, index.version))?;
+                let db_key = (index.state_key_hash, index.version);
+                if self.is_hot {
+                    batch.delete::<HotStateValueByKeyHashSchema>(&db_key)?;
+                } else {
+                    batch.delete::<StateValueByKeyHashSchema>(&db_key)?;
+                }
             }
         }
         batch.put::<DbMetadataSchema>(

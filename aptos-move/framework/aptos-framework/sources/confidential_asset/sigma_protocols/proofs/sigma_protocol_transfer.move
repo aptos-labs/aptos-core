@@ -101,7 +101,9 @@ module aptos_framework::sigma_protocol_transfer {
     use std::option::Option;
     use std::signer;
     use std::vector;
-    use aptos_std::ristretto255::{Self, RistrettoPoint, CompressedRistretto};
+    use aptos_std::ristretto255::{Self, CompressedRistretto};
+    #[test_only]
+    use aptos_std::ristretto255::RistrettoPoint;
     use aptos_framework::chain_id;
     use aptos_framework::fungible_asset::Metadata;
     use aptos_framework::object::Object;
@@ -252,7 +254,7 @@ module aptos_framework::sigma_protocol_transfer {
         compressed_amount: &CompressedAmount,
         compressed_ek_eff_aud: &Option<CompressedRistretto>,
         compressed_ek_volun_auds: &vector<CompressedRistretto>,
-    ): (Statement<Transfer>, vector<RistrettoPoint>, Balance<Pending>) {
+    ): (Statement<Transfer>, Balance<Pending>) {
         let has_eff = compressed_ek_eff_aud.is_some();
         let num_volun = compressed_ek_volun_auds.length();
 
@@ -285,8 +287,7 @@ module aptos_framework::sigma_protocol_transfer {
         assert!(b.add_point(compressed_ek_recip) == IDX_EK_RECIP, e);                                                         // ek_recip
         assert!(b.add_points(compressed_old_balance.get_compressed_P()) == START_IDX_OLD_P, e);                            // old_P
         assert!(b.add_points(compressed_old_balance.get_compressed_R()) == START_IDX_OLD_P + ell, e);                      // old_R
-        let (idx, new_balance_P) = b.add_points_cloned(compressed_new_balance.get_compressed_P()); // new_P
-        assert!(idx == START_IDX_OLD_P + 2 * ell, e);
+        assert!(b.add_points(compressed_new_balance.get_compressed_P()) == START_IDX_OLD_P + 2 * ell, e); // new_P
         assert!(b.add_points(compressed_new_balance.get_compressed_R()) == START_IDX_OLD_P + 3 * ell, e);                  // new_R
         let (idx, amount_P) = b.add_points_cloned(compressed_amount.get_compressed_P());           // amount_P
         assert!(idx == START_IDX_OLD_P + 4 * ell, e);
@@ -315,8 +316,8 @@ module aptos_framework::sigma_protocol_transfer {
 
         let stmt = b.build();
         assert_transfer_statement_is_well_formed(&stmt, has_eff, num_volun);
-        let recip_pending = new_pending_from_p_and_r(amount_P, recip_R);
-        (stmt, new_balance_P, recip_pending)
+        let amount = new_pending_from_p_and_r(amount_P, recip_R);
+        (stmt, amount)
     }
 
     /// The combined homomorphism $\psi$ for the transfer relation (see module-level doc for full definition).

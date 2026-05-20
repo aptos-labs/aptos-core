@@ -100,8 +100,10 @@ impl InnerCiphertext for BIBECiphertext {
         digest: &Digest,
         eval_proof: &EvalProof,
     ) -> PreparedBIBECiphertext {
-        let pairing_output = PairingSetting::pairing(digest.as_g1(), self.ct_g2[0])
-            + PairingSetting::pairing(**eval_proof, self.ct_g2[1]);
+        let pairing_output = PairingSetting::multi_pairing([digest.as_g1(), **eval_proof], [
+            self.ct_g2[0],
+            self.ct_g2[1],
+        ]);
 
         PreparedBIBECiphertext {
             id: self.id,
@@ -171,24 +173,6 @@ impl<P: Plaintext> BIBECTDecrypt<P> for BIBEDecryptionKey {
         let symmetric_key = otp.unpad_key(&ct.padded_key);
 
         symmetric_key.decrypt(&ct.symmetric_ciphertext)
-    }
-}
-
-#[cfg(test)]
-impl BIBECiphertext {
-    pub(crate) fn blank_for_testing() -> Self {
-        use ark_std::Zero;
-
-        BIBECiphertext {
-            id: Id::new(Fr::zero()),
-            ct_g2: [
-                G2Affine::generator(),
-                (G2Affine::generator() * Fr::from(2)).into(),
-                (G2Affine::generator() * Fr::from(3)).into(),
-            ],
-            padded_key: OneTimePaddedKey::blank_for_testing(),
-            symmetric_ciphertext: SymmetricCiphertext::blank_for_testing(),
-        }
     }
 }
 

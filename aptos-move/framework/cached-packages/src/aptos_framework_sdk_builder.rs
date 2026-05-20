@@ -174,9 +174,24 @@ pub enum EntryFunctionCall {
     /// authority of the new authentication key.
     AccountSetOriginatingAddress {},
 
-    /// Upserts an ED25519 backup key to an account that has a keyless public key as its original public key by converting the account's authentication key
+    /// Atomically performs an `upsert_ed25519_backup_key_on_keyless_account` and stores `dk_ciphertext` in the
+    /// account's `EncryptedDK` resource. Currently used for backing up confidential-asset decryption keys on-chain
+    /// in Petra for keyless accounts. The ciphertext is opaque to the chain — see `EncryptedDK`.
+    ///
+    /// SECURITY: This function does not verify that `dk_ciphertext` is a well-formed encryption of the DK corresponding
+    /// to the registered EK on-chain. (It could, in theory, but we've judged the implementation complexity too high.)
+    /// Wallets using this function must be careful to only call this using a `dk_ciphertext` produced from its own
+    /// keyless Ed25519 backup key flow under the user-controlled `backup_public_key`.
+    AccountUpsertEd25519BackupKeyAndEncryptDk {
+        keyless_public_key: Vec<u8>,
+        backup_public_key: Vec<u8>,
+        backup_key_proof: Vec<u8>,
+        dk_ciphertext: Vec<u8>,
+    },
+
+    /// Upserts an Ed25519 backup key to an account that has a keyless public key as its original public key by converting the account's authentication key
     /// to a multi-key of the original keyless public key and the new backup key that requires 1 signature from either key to authenticate.
-    /// This function takes a the account's original keyless public key and a ED25519 backup public key and rotates the account's authentication key to a multi-key of
+    /// This function takes the account's original keyless public key and a Ed25519 backup public key and rotates the account's authentication key to a multi-key of
     /// the original keyless public key and the new backup key that requires 1 signature from either key to authenticate.
     ///
     /// Note: This function emits a `KeyRotationToMultiPublicKey` event marking both keys as verified since the keyless public key
@@ -185,7 +200,7 @@ pub enum EntryFunctionCall {
     /// # Arguments
     /// * `account` - The signer representing the keyless account
     /// * `keyless_public_key` - The original keyless public key of the account (wrapped in an AnyPublicKey)
-    /// * `backup_public_key` - The ED25519 public key to add as a backup
+    /// * `backup_public_key` - The Ed25519 public key to add as a backup
     /// * `backup_key_proof` - A signature from the backup key proving ownership
     ///
     /// # Aborts
@@ -776,6 +791,22 @@ pub enum EntryFunctionCall {
         metadata_values: Vec<Vec<u8>>,
     },
 
+    /// Like `create_with_owners`, but also configures a timelock at creation time so the initial
+    /// queue is protected by the timelock from the very first transaction.
+    ///
+    /// `timelock_period` and `override_threshold` are two separate `Option<u64>` because entry
+    /// function arguments cannot carry tuple-typed options. If `timelock_period` is `None` no
+    /// timelock is configured and `override_threshold` must also be `None`. If `timelock_period`
+    /// is `Some`, the bounds and invariants are identical to `upsert_timelock`.
+    MultisigAccountCreateWithOwnersAndTimelock {
+        additional_owners: Vec<AccountAddress>,
+        num_signatures_required: u64,
+        metadata_keys: Vec<Vec<u8>>,
+        metadata_values: Vec<Vec<u8>>,
+        timelock_period: Option<u64>,
+        override_threshold: Option<u64>,
+    },
+
     /// Like `create_with_owners`, but removes the calling account after creation.
     ///
     /// This is for creating a vanity multisig account from a bootstrapping account that should not
@@ -820,6 +851,10 @@ pub enum EntryFunctionCall {
         owners_to_remove: Vec<AccountAddress>,
     },
 
+    /// Remove the timelock configuration for the multisig account.
+    /// Aborts if no timelock is configured.
+    MultisigAccountRemoveTimelock {},
+
     /// Swap an owner in for an old one, without changing required signatures.
     MultisigAccountSwapOwner {
         to_swap_in: AccountAddress,
@@ -859,6 +894,24 @@ pub enum EntryFunctionCall {
     /// maliciously alter the number of signatures required.
     MultisigAccountUpdateSignaturesRequired {
         new_num_signatures_required: u64,
+    },
+
+    /// Upsert the timelock configuration for the multisig account.
+    /// timelock_period must be between MIN_TIMELOCK_PERIOD and MAX_TIMELOCK_PERIOD.
+    /// override_threshold, if provided, must be > num_signatures_required and <= the number of owners.
+    ///
+    /// Note on pending transactions: the timelock check measures elapsed time from a transaction's
+    /// `creation_time_secs`, not from when the timelock was activated. Because multisig transactions
+    /// execute strictly in sequence order, this is only observable for transactions queued *after*
+    /// this `upsert_timelock` call but *before* it executes — those transactions may become
+    /// executable sooner than `timelock_period` seconds after this call takes effect, because part
+    /// of their elapsed time is counted from before the new timelock was live. Transactions queued
+    /// after this call has executed receive the full `timelock_period` protection. This residual
+    /// window is bounded by the previous timelock period (or by approval time, if there was no
+    /// prior timelock) and is considered an acceptable, operator-visible risk.
+    MultisigAccountUpsertTimelock {
+        timelock_period: u64,
+        override_threshold: Option<u64>,
     },
 
     /// Generic function that can be used to either approve or reject a multisig transaction
@@ -1325,6 +1378,17 @@ impl EntryFunctionCall {
                 cap_update_table,
             ),
             AccountSetOriginatingAddress {} => account_set_originating_address(),
+            AccountUpsertEd25519BackupKeyAndEncryptDk {
+                keyless_public_key,
+                backup_public_key,
+                backup_key_proof,
+                dk_ciphertext,
+            } => account_upsert_ed25519_backup_key_and_encrypt_dk(
+                keyless_public_key,
+                backup_public_key,
+                backup_key_proof,
+                dk_ciphertext,
+            ),
             AccountUpsertEd25519BackupKeyOnKeylessAccount {
                 keyless_public_key,
                 backup_public_key,
@@ -1681,6 +1745,21 @@ impl EntryFunctionCall {
                 metadata_keys,
                 metadata_values,
             ),
+            MultisigAccountCreateWithOwnersAndTimelock {
+                additional_owners,
+                num_signatures_required,
+                metadata_keys,
+                metadata_values,
+                timelock_period,
+                override_threshold,
+            } => multisig_account_create_with_owners_and_timelock(
+                additional_owners,
+                num_signatures_required,
+                metadata_keys,
+                metadata_values,
+                timelock_period,
+                override_threshold,
+            ),
             MultisigAccountCreateWithOwnersThenRemoveBootstrapper {
                 owners,
                 num_signatures_required,
@@ -1712,6 +1791,7 @@ impl EntryFunctionCall {
             MultisigAccountRemoveOwners { owners_to_remove } => {
                 multisig_account_remove_owners(owners_to_remove)
             },
+            MultisigAccountRemoveTimelock {} => multisig_account_remove_timelock(),
             MultisigAccountSwapOwner {
                 to_swap_in,
                 to_swap_out,
@@ -1735,6 +1815,10 @@ impl EntryFunctionCall {
             MultisigAccountUpdateSignaturesRequired {
                 new_num_signatures_required,
             } => multisig_account_update_signatures_required(new_num_signatures_required),
+            MultisigAccountUpsertTimelock {
+                timelock_period,
+                override_threshold,
+            } => multisig_account_upsert_timelock(timelock_period, override_threshold),
             MultisigAccountVoteTransaction {
                 multisig_account,
                 sequence_number,
@@ -2292,9 +2376,42 @@ pub fn account_set_originating_address() -> TransactionPayload {
     ))
 }
 
-/// Upserts an ED25519 backup key to an account that has a keyless public key as its original public key by converting the account's authentication key
+/// Atomically performs an `upsert_ed25519_backup_key_on_keyless_account` and stores `dk_ciphertext` in the
+/// account's `EncryptedDK` resource. Currently used for backing up confidential-asset decryption keys on-chain
+/// in Petra for keyless accounts. The ciphertext is opaque to the chain — see `EncryptedDK`.
+///
+/// SECURITY: This function does not verify that `dk_ciphertext` is a well-formed encryption of the DK corresponding
+/// to the registered EK on-chain. (It could, in theory, but we've judged the implementation complexity too high.)
+/// Wallets using this function must be careful to only call this using a `dk_ciphertext` produced from its own
+/// keyless Ed25519 backup key flow under the user-controlled `backup_public_key`.
+pub fn account_upsert_ed25519_backup_key_and_encrypt_dk(
+    keyless_public_key: Vec<u8>,
+    backup_public_key: Vec<u8>,
+    backup_key_proof: Vec<u8>,
+    dk_ciphertext: Vec<u8>,
+) -> TransactionPayload {
+    TransactionPayload::EntryFunction(EntryFunction::new(
+        ModuleId::new(
+            AccountAddress::new([
+                0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+                0, 0, 0, 1,
+            ]),
+            ident_str!("account").to_owned(),
+        ),
+        ident_str!("upsert_ed25519_backup_key_and_encrypt_dk").to_owned(),
+        vec![],
+        vec![
+            bcs::to_bytes(&keyless_public_key).unwrap(),
+            bcs::to_bytes(&backup_public_key).unwrap(),
+            bcs::to_bytes(&backup_key_proof).unwrap(),
+            bcs::to_bytes(&dk_ciphertext).unwrap(),
+        ],
+    ))
+}
+
+/// Upserts an Ed25519 backup key to an account that has a keyless public key as its original public key by converting the account's authentication key
 /// to a multi-key of the original keyless public key and the new backup key that requires 1 signature from either key to authenticate.
-/// This function takes a the account's original keyless public key and a ED25519 backup public key and rotates the account's authentication key to a multi-key of
+/// This function takes the account's original keyless public key and a Ed25519 backup public key and rotates the account's authentication key to a multi-key of
 /// the original keyless public key and the new backup key that requires 1 signature from either key to authenticate.
 ///
 /// Note: This function emits a `KeyRotationToMultiPublicKey` event marking both keys as verified since the keyless public key
@@ -2303,7 +2420,7 @@ pub fn account_set_originating_address() -> TransactionPayload {
 /// # Arguments
 /// * `account` - The signer representing the keyless account
 /// * `keyless_public_key` - The original keyless public key of the account (wrapped in an AnyPublicKey)
-/// * `backup_public_key` - The ED25519 public key to add as a backup
+/// * `backup_public_key` - The Ed25519 public key to add as a backup
 /// * `backup_key_proof` - A signature from the backup key proving ownership
 ///
 /// # Aborts
@@ -3947,6 +4064,42 @@ pub fn multisig_account_create_with_owners(
     ))
 }
 
+/// Like `create_with_owners`, but also configures a timelock at creation time so the initial
+/// queue is protected by the timelock from the very first transaction.
+///
+/// `timelock_period` and `override_threshold` are two separate `Option<u64>` because entry
+/// function arguments cannot carry tuple-typed options. If `timelock_period` is `None` no
+/// timelock is configured and `override_threshold` must also be `None`. If `timelock_period`
+/// is `Some`, the bounds and invariants are identical to `upsert_timelock`.
+pub fn multisig_account_create_with_owners_and_timelock(
+    additional_owners: Vec<AccountAddress>,
+    num_signatures_required: u64,
+    metadata_keys: Vec<Vec<u8>>,
+    metadata_values: Vec<Vec<u8>>,
+    timelock_period: Option<u64>,
+    override_threshold: Option<u64>,
+) -> TransactionPayload {
+    TransactionPayload::EntryFunction(EntryFunction::new(
+        ModuleId::new(
+            AccountAddress::new([
+                0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+                0, 0, 0, 1,
+            ]),
+            ident_str!("multisig_account").to_owned(),
+        ),
+        ident_str!("create_with_owners_and_timelock").to_owned(),
+        vec![],
+        vec![
+            bcs::to_bytes(&additional_owners).unwrap(),
+            bcs::to_bytes(&num_signatures_required).unwrap(),
+            bcs::to_bytes(&metadata_keys).unwrap(),
+            bcs::to_bytes(&metadata_values).unwrap(),
+            bcs::to_bytes(&timelock_period).unwrap(),
+            bcs::to_bytes(&override_threshold).unwrap(),
+        ],
+    ))
+}
+
 /// Like `create_with_owners`, but removes the calling account after creation.
 ///
 /// This is for creating a vanity multisig account from a bootstrapping account that should not
@@ -4076,6 +4229,23 @@ pub fn multisig_account_remove_owners(owners_to_remove: Vec<AccountAddress>) -> 
     ))
 }
 
+/// Remove the timelock configuration for the multisig account.
+/// Aborts if no timelock is configured.
+pub fn multisig_account_remove_timelock() -> TransactionPayload {
+    TransactionPayload::EntryFunction(EntryFunction::new(
+        ModuleId::new(
+            AccountAddress::new([
+                0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+                0, 0, 0, 1,
+            ]),
+            ident_str!("multisig_account").to_owned(),
+        ),
+        ident_str!("remove_timelock").to_owned(),
+        vec![],
+        vec![],
+    ))
+}
+
 /// Swap an owner in for an old one, without changing required signatures.
 pub fn multisig_account_swap_owner(
     to_swap_in: AccountAddress,
@@ -4192,6 +4362,40 @@ pub fn multisig_account_update_signatures_required(
         ident_str!("update_signatures_required").to_owned(),
         vec![],
         vec![bcs::to_bytes(&new_num_signatures_required).unwrap()],
+    ))
+}
+
+/// Upsert the timelock configuration for the multisig account.
+/// timelock_period must be between MIN_TIMELOCK_PERIOD and MAX_TIMELOCK_PERIOD.
+/// override_threshold, if provided, must be > num_signatures_required and <= the number of owners.
+///
+/// Note on pending transactions: the timelock check measures elapsed time from a transaction's
+/// `creation_time_secs`, not from when the timelock was activated. Because multisig transactions
+/// execute strictly in sequence order, this is only observable for transactions queued *after*
+/// this `upsert_timelock` call but *before* it executes — those transactions may become
+/// executable sooner than `timelock_period` seconds after this call takes effect, because part
+/// of their elapsed time is counted from before the new timelock was live. Transactions queued
+/// after this call has executed receive the full `timelock_period` protection. This residual
+/// window is bounded by the previous timelock period (or by approval time, if there was no
+/// prior timelock) and is considered an acceptable, operator-visible risk.
+pub fn multisig_account_upsert_timelock(
+    timelock_period: u64,
+    override_threshold: Option<u64>,
+) -> TransactionPayload {
+    TransactionPayload::EntryFunction(EntryFunction::new(
+        ModuleId::new(
+            AccountAddress::new([
+                0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+                0, 0, 0, 1,
+            ]),
+            ident_str!("multisig_account").to_owned(),
+        ),
+        ident_str!("upsert_timelock").to_owned(),
+        vec![],
+        vec![
+            bcs::to_bytes(&timelock_period).unwrap(),
+            bcs::to_bytes(&override_threshold).unwrap(),
+        ],
     ))
 }
 
@@ -5654,6 +5858,23 @@ mod decoder {
         }
     }
 
+    pub fn account_upsert_ed25519_backup_key_and_encrypt_dk(
+        payload: &TransactionPayload,
+    ) -> Option<EntryFunctionCall> {
+        if let TransactionPayload::EntryFunction(script) = payload {
+            Some(
+                EntryFunctionCall::AccountUpsertEd25519BackupKeyAndEncryptDk {
+                    keyless_public_key: bcs::from_bytes(script.args().get(0)?).ok()?,
+                    backup_public_key: bcs::from_bytes(script.args().get(1)?).ok()?,
+                    backup_key_proof: bcs::from_bytes(script.args().get(2)?).ok()?,
+                    dk_ciphertext: bcs::from_bytes(script.args().get(3)?).ok()?,
+                },
+            )
+        } else {
+            None
+        }
+    }
+
     pub fn account_upsert_ed25519_backup_key_on_keyless_account(
         payload: &TransactionPayload,
     ) -> Option<EntryFunctionCall> {
@@ -6588,6 +6809,25 @@ mod decoder {
         }
     }
 
+    pub fn multisig_account_create_with_owners_and_timelock(
+        payload: &TransactionPayload,
+    ) -> Option<EntryFunctionCall> {
+        if let TransactionPayload::EntryFunction(script) = payload {
+            Some(
+                EntryFunctionCall::MultisigAccountCreateWithOwnersAndTimelock {
+                    additional_owners: bcs::from_bytes(script.args().get(0)?).ok()?,
+                    num_signatures_required: bcs::from_bytes(script.args().get(1)?).ok()?,
+                    metadata_keys: bcs::from_bytes(script.args().get(2)?).ok()?,
+                    metadata_values: bcs::from_bytes(script.args().get(3)?).ok()?,
+                    timelock_period: bcs::from_bytes(script.args().get(4)?).ok()?,
+                    override_threshold: bcs::from_bytes(script.args().get(5)?).ok()?,
+                },
+            )
+        } else {
+            None
+        }
+    }
+
     pub fn multisig_account_create_with_owners_then_remove_bootstrapper(
         payload: &TransactionPayload,
     ) -> Option<EntryFunctionCall> {
@@ -6671,6 +6911,16 @@ mod decoder {
         }
     }
 
+    pub fn multisig_account_remove_timelock(
+        payload: &TransactionPayload,
+    ) -> Option<EntryFunctionCall> {
+        if let TransactionPayload::EntryFunction(_script) = payload {
+            Some(EntryFunctionCall::MultisigAccountRemoveTimelock {})
+        } else {
+            None
+        }
+    }
+
     pub fn multisig_account_swap_owner(payload: &TransactionPayload) -> Option<EntryFunctionCall> {
         if let TransactionPayload::EntryFunction(script) = payload {
             Some(EntryFunctionCall::MultisigAccountSwapOwner {
@@ -6728,6 +6978,19 @@ mod decoder {
         if let TransactionPayload::EntryFunction(script) = payload {
             Some(EntryFunctionCall::MultisigAccountUpdateSignaturesRequired {
                 new_num_signatures_required: bcs::from_bytes(script.args().get(0)?).ok()?,
+            })
+        } else {
+            None
+        }
+    }
+
+    pub fn multisig_account_upsert_timelock(
+        payload: &TransactionPayload,
+    ) -> Option<EntryFunctionCall> {
+        if let TransactionPayload::EntryFunction(script) = payload {
+            Some(EntryFunctionCall::MultisigAccountUpsertTimelock {
+                timelock_period: bcs::from_bytes(script.args().get(0)?).ok()?,
+                override_threshold: bcs::from_bytes(script.args().get(1)?).ok()?,
             })
         } else {
             None
@@ -7575,6 +7838,10 @@ static SCRIPT_FUNCTION_DECODER_MAP: once_cell::sync::Lazy<EntryFunctionDecoderMa
             Box::new(decoder::account_set_originating_address),
         );
         map.insert(
+            "account_upsert_ed25519_backup_key_and_encrypt_dk".to_string(),
+            Box::new(decoder::account_upsert_ed25519_backup_key_and_encrypt_dk),
+        );
+        map.insert(
             "account_upsert_ed25519_backup_key_on_keyless_account".to_string(),
             Box::new(decoder::account_upsert_ed25519_backup_key_on_keyless_account),
         );
@@ -7869,6 +8136,10 @@ static SCRIPT_FUNCTION_DECODER_MAP: once_cell::sync::Lazy<EntryFunctionDecoderMa
             Box::new(decoder::multisig_account_create_with_owners),
         );
         map.insert(
+            "multisig_account_create_with_owners_and_timelock".to_string(),
+            Box::new(decoder::multisig_account_create_with_owners_and_timelock),
+        );
+        map.insert(
             "multisig_account_create_with_owners_then_remove_bootstrapper".to_string(),
             Box::new(decoder::multisig_account_create_with_owners_then_remove_bootstrapper),
         );
@@ -7893,6 +8164,10 @@ static SCRIPT_FUNCTION_DECODER_MAP: once_cell::sync::Lazy<EntryFunctionDecoderMa
             Box::new(decoder::multisig_account_remove_owners),
         );
         map.insert(
+            "multisig_account_remove_timelock".to_string(),
+            Box::new(decoder::multisig_account_remove_timelock),
+        );
+        map.insert(
             "multisig_account_swap_owner".to_string(),
             Box::new(decoder::multisig_account_swap_owner),
         );
@@ -7911,6 +8186,10 @@ static SCRIPT_FUNCTION_DECODER_MAP: once_cell::sync::Lazy<EntryFunctionDecoderMa
         map.insert(
             "multisig_account_update_signatures_required".to_string(),
             Box::new(decoder::multisig_account_update_signatures_required),
+        );
+        map.insert(
+            "multisig_account_upsert_timelock".to_string(),
+            Box::new(decoder::multisig_account_upsert_timelock),
         );
         map.insert(
             "multisig_account_vote_transaction".to_string(),

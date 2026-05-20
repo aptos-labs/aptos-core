@@ -6,7 +6,7 @@ error: match not exhaustive
 3 │         match (x) {
   │                ^
   │
-  = missing `_`
+  = missing at least `..1`
 
 error: unreachable pattern
    ┌─ tests/match-checks/literal_coverage_err.move:12:13

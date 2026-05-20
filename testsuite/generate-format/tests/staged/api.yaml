@@ -191,6 +191,18 @@ BlockEpiloguePayload:
               TYPENAME: BlockEndInfo
           - fee_distribution:
               TYPENAME: FeeDistribution
+    2:
+      V2:
+        STRUCT:
+          - block_id:
+              TYPENAME: HashValue
+          - block_end_info:
+              TYPENAME: BlockEndInfo
+          - fee_distribution:
+              TYPENAME: FeeDistribution
+          - to_make_hot:
+              SEQ:
+                TYPENAME: StateKey
 BlockMetadata:
   STRUCT:
     - id:
@@ -338,6 +350,14 @@ DecKeyMetadata:
   STRUCT:
     - epoch: U64
     - round: U64
+DecryptedPlaintext:
+  STRUCT:
+    - executable:
+        TYPENAME: TransactionExecutable
+    - decryption_nonce:
+        TUPLEARRAY:
+          CONTENT: U8
+          SIZE: 16
 DecryptionFailureReason:
   ENUM:
     0:
@@ -350,6 +370,16 @@ DecryptionFailureReason:
       DecryptionKeyUnavailable: UNIT
     4:
       ClaimedEntryFunctionMismatch: UNIT
+    5:
+      PayloadHashMismatch: UNIT
+    6:
+      EpochMismatch: UNIT
+    7:
+      EpochEndRetry: UNIT
+    8:
+      TrustedSetupExhausted: UNIT
+    9:
+      ExecuteBlockLimitReached: UNIT
 DepositEvent:
   STRUCT:
     - amount: U64
@@ -360,32 +390,29 @@ Ed25519PublicKey:
   NEWTYPESTRUCT: BYTES
 Ed25519Signature:
   NEWTYPESTRUCT: BYTES
+EncryptedInner:
+  STRUCT:
+    - ciphertext:
+        TYPENAME: Ciphertext
+    - extra_config:
+        TYPENAME: TransactionExtraConfig
+    - payload_hash:
+        TYPENAME: HashValue
+    - encryption_epoch: U64
+    - claimed_entry_fun:
+        OPTION:
+          TYPENAME: ClaimedEntryFunction
 EncryptedPayload:
   ENUM:
     0:
       Encrypted:
-        STRUCT:
-          - ciphertext:
-              TYPENAME: Ciphertext
-          - extra_config:
-              TYPENAME: TransactionExtraConfig
-          - payload_hash:
-              TYPENAME: HashValue
-          - claimed_entry_fun:
-              OPTION:
-                TYPENAME: ClaimedEntryFunction
+        NEWTYPE:
+          TYPENAME: EncryptedInner
     1:
       FailedDecryption:
         STRUCT:
-          - ciphertext:
-              TYPENAME: Ciphertext
-          - extra_config:
-              TYPENAME: TransactionExtraConfig
-          - payload_hash:
-              TYPENAME: HashValue
-          - claimed_entry_fun:
-              OPTION:
-                TYPENAME: ClaimedEntryFunction
+          - original:
+              TYPENAME: EncryptedInner
           - eval_proof:
               OPTION:
                 TYPENAME: EvalProof
@@ -394,20 +421,12 @@ EncryptedPayload:
     2:
       Decrypted:
         STRUCT:
-          - ciphertext:
-              TYPENAME: Ciphertext
-          - extra_config:
-              TYPENAME: TransactionExtraConfig
-          - payload_hash:
-              TYPENAME: HashValue
-          - claimed_entry_fun:
-              OPTION:
-                TYPENAME: ClaimedEntryFunction
+          - original:
+              TYPENAME: EncryptedInner
           - eval_proof:
               TYPENAME: EvalProof
-          - executable:
-              TYPENAME: TransactionExecutable
-          - decryption_nonce: U64
+          - decrypted:
+              TYPENAME: DecryptedPlaintext
 EntryFunction:
   STRUCT:
     - module:
@@ -619,6 +638,10 @@ MultisigTransactionPayload:
       EntryFunction:
         NEWTYPE:
           TYPENAME: EntryFunction
+    1:
+      Script:
+        NEWTYPE:
+          TYPENAME: Script
 OneTimePaddedKey:
   NEWTYPESTRUCT:
     TUPLEARRAY:
@@ -697,6 +720,13 @@ RawTransaction:
     - expiration_timestamp_secs: U64
     - chain_id:
         TYPENAME: ChainId
+RequestedMultipliers:
+  ENUM:
+    0:
+      V1:
+        STRUCT:
+          - execution_multiplier_percent: U64
+          - io_multiplier_percent: U64
 Script:
   STRUCT:
     - code: BYTES
@@ -753,6 +783,10 @@ StateKey:
     2:
       Raw:
         NEWTYPE: BYTES
+    3:
+      TradingNative:
+        NEWTYPE:
+          TYPENAME: TradingNativeKey
 StateValueMetadata:
   ENUM:
     0:
@@ -787,6 +821,17 @@ SymmetricCiphertext:
 TableHandle:
   NEWTYPESTRUCT:
     TYPENAME: AccountAddress
+TradingNativeKey:
+  ENUM:
+    0:
+      Position:
+        STRUCT:
+          - exchange:
+              TYPENAME: AccountAddress
+          - account:
+              TYPENAME: AccountAddress
+          - market:
+              TYPENAME: AccountAddress
 Transaction:
   ENUM:
     0:
@@ -955,6 +1000,17 @@ TransactionExtraConfig:
                 TYPENAME: AccountAddress
           - replay_protection_nonce:
               OPTION: U64
+    1:
+      V2:
+        STRUCT:
+          - multisig_address:
+              OPTION:
+                TYPENAME: AccountAddress
+          - replay_protection_nonce:
+              OPTION: U64
+          - txn_limits_request:
+              OPTION:
+                TYPENAME: UserTxnLimitsRequest
 TransactionInfo:
   ENUM:
     0:
@@ -1071,6 +1127,27 @@ TypeTag:
       i128: UNIT
     17:
       i256: UNIT
+UserTxnLimitsRequest:
+  ENUM:
+    0:
+      StakePoolOwner:
+        STRUCT:
+          - multipliers:
+              TYPENAME: RequestedMultipliers
+    1:
+      DelegatedVoter:
+        STRUCT:
+          - pool_address:
+              TYPENAME: AccountAddress
+          - multipliers:
+              TYPENAME: RequestedMultipliers
+    2:
+      DelegationPoolDelegator:
+        STRUCT:
+          - pool_address:
+              TYPENAME: AccountAddress
+          - multipliers:
+              TYPENAME: RequestedMultipliers
 ValidatorTransaction:
   ENUM:
     0:

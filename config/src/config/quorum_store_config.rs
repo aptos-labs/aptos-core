@@ -100,6 +100,8 @@ pub struct QuorumStoreConfig {
     pub db_quota: usize,
     pub batch_quota: usize,
     pub back_pressure: QuorumStoreBackPressureConfig,
+    /// Per-author capacity for each remote batch coordinator ingress queue.
+    pub remote_batch_coordinator_channel_size: usize,
     pub num_workers_for_remote_batches: usize,
     pub batch_buckets: Vec<u64>,
     pub allow_batches_without_pos_in_proposal: bool,
@@ -150,6 +152,7 @@ impl Default for QuorumStoreConfig {
             db_quota: 300_000_000,
             batch_quota: 300_000,
             back_pressure: QuorumStoreBackPressureConfig::default(),
+            remote_batch_coordinator_channel_size: 10,
             // number of batch coordinators to handle QS batch messages, should be >= 1
             num_workers_for_remote_batches: 10,
             batch_buckets: DEFAULT_BUCKETS.to_vec(),
@@ -157,9 +160,9 @@ impl Default for QuorumStoreConfig {
             enable_opt_quorum_store: true,
             opt_qs_minimum_batch_age_usecs: Duration::from_millis(50).as_micros() as u64,
             enable_payload_v2: false,
-            enable_batch_v2_tx: false,
+            enable_batch_v2_tx: true,
             enable_batch_v2_rx: true,
-            enable_opt_qs_v2_payload_tx: false,
+            enable_opt_qs_v2_payload_tx: true,
             enable_opt_qs_v2_payload_rx: true,
         }
     }

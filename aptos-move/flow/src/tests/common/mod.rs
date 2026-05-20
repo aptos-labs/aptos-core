@@ -64,6 +64,7 @@ pub async fn make_client() -> rmcp::service::RunningService<rmcp::RoleClient, ()
         bytecode_version: None,
         language_version: LanguageVersion::latest(),
         experiments: vec![],
+        tool_timeout: 120,
     };
     let global = GlobalOpts {
         platform: Platform::Claude,

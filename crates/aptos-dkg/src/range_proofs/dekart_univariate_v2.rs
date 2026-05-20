@@ -42,16 +42,25 @@ use sigma_protocol::homomorphism::TrivialShape as HkzgCommitment;
 use std::time::{Duration, Instant};
 use std::{fmt::Debug, io::Write};
 
+/// ArkSize(E=Bls12_381): 385 + 80·ell.
 #[allow(non_snake_case)]
 #[derive(CanonicalSerialize, CanonicalDeserialize, Debug, Clone, PartialEq, Eq)]
 pub struct Proof<E: Pairing> {
+    /// ArkSize(E=Bls12_381): 48.
     hat_C: E::G1Affine,
+    /// ArkSize(E=Bls12_381): 113.
     pi_PoK: sigma_protocol::Proof<E::ScalarField, two_term_msm::Homomorphism<E::G1>>,
-    Cs: Vec<E::G1Affine>, // has length ell
+    /// ArkSize(E=Bls12_381): 8 + 48·ell.
+    Cs: Vec<E::G1Affine>,
+    /// ArkSize(E=Bls12_381): 48.
     D: E::G1Affine,
+    /// ArkSize(E=Bls12_381): 32.
     a: E::ScalarField,
+    /// ArkSize(E=Bls12_381): 32.
     a_h: E::ScalarField,
-    a_js: Vec<E::ScalarField>, // has length ell
+    /// ArkSize(E=Bls12_381): 8 + 32·ell.
+    a_js: Vec<E::ScalarField>,
+    /// ArkSize(E=Bls12_381): 96.
     pi_gamma: univariate_hiding_kzg::OpeningProof<E>,
 }
 
@@ -87,15 +96,15 @@ impl<E: Pairing> From<ProofProjective<E>> for Proof<E> {
 impl<E: Pairing> Proof<E> {
     /// Generates a random looking proof (but not a valid one).
     /// Useful for testing and benchmarking. TODO: might be able to derive this through derive macros etc
-    pub fn generate<R: rand::Rng + rand::CryptoRng>(ell: u8, rng: &mut R) -> Self {
+    pub fn generate<R: rand::Rng + rand::CryptoRng>(ell: usize, rng: &mut R) -> Self {
         Self {
             hat_C: unsafe_random_point(rng),
             pi_PoK: two_term_msm::Proof::generate(rng),
-            Cs: unsafe_random_points(ell as usize, rng),
+            Cs: unsafe_random_points(ell, rng),
             D: unsafe_random_point(rng),
             a: sample_field_element(rng),
             a_h: sample_field_element(rng),
-            a_js: sample_field_elements(ell as usize, rng),
+            a_js: sample_field_elements(ell, rng),
             pi_gamma: univariate_hiding_kzg::OpeningProof::generate(rng),
         }
     }
@@ -298,9 +307,50 @@ impl<E: Pairing> traits::BatchedRangeProof<E> for Proof<E> {
     }
 
     #[allow(non_snake_case)]
-    fn setup<R: RngCore + CryptoRng>(
+    fn setup(
+        max_ell: usize,
+        vk_hkzg: univariate_hiding_kzg::VerificationKey<E>,
+        ck_S: univariate_hiding_kzg::CommitmentKey<E>,
+    ) -> (ProverKey<E>, VerificationKey<E>) {
+        let h_denom_eval = compute_h_denom_eval::<E>(&ck_S.roots_of_unity_in_eval_dom);
+
+        let powers_of_two = arkworks::powers_of_two::<E::ScalarField>(max_ell.into());
+
+        let prover_precomputed = ProverPrecomputed {
+            powers_of_two: powers_of_two.clone(),
+            h_denom_eval,
+        };
+
+        let verifier_precomputed = VerifierPrecomputed {
+            powers_of_two,
+            roots_of_unity: ck_S.roots_of_unity_in_eval_dom.clone(),
+        };
+
+        let lagr_0: E::G1Affine = match &ck_S.msm_basis {
+            SrsBasis::Lagrange { lagr: lagr_g1 } => lagr_g1[0],
+            SrsBasis::PowersOfTau { .. } => panic!("Wrong basis, this should not happen"),
+        };
+
+        let vk = VerificationKey {
+            xi_1: ck_S.xi_1,
+            lagr_0,
+            vk_hkzg,
+            verifier_precomputed,
+        };
+        let prk = ProverKey {
+            vk: vk.clone(),
+            max_n: ck_S.msm_basis.size() - 1,
+            ck_S,
+            prover_precomputed,
+        };
+
+        (prk, vk)
+    }
+
+    #[allow(non_snake_case)]
+    fn setup_for_testing<R: RngCore + CryptoRng>(
         max_n: usize,
-        max_ell: u8,
+        max_ell: usize,
         group_generators: GroupGenerators<E>,
         rng: &mut R,
     ) -> (ProverKey<E>, VerificationKey<E>) {
@@ -332,7 +382,7 @@ impl<E: Pairing> traits::BatchedRangeProof<E> for Proof<E> {
 
         #[cfg(feature = "range_proof_timing_univariate_v2")]
         let start = Instant::now();
-        let (vk_hkzg, ck_S) = univariate_hiding_kzg::setup(
+        let (vk_hkzg, ck_S) = univariate_hiding_kzg::setup_with_trapdoor(
             max_n + 1,
             SrsType::Lagrange,
             group_generators.clone(),
@@ -417,7 +467,7 @@ impl<E: Pairing> traits::BatchedRangeProof<E> for Proof<E> {
     fn prove<R: RngCore + CryptoRng>(
         pk: &ProverKey<E>,
         values: &[Self::Input],
-        ell: u8,
+        ell: usize,
         comm: &Self::CommitmentNormalised,
         rho: &Self::CommitmentRandomness,
         rng: &mut R,
@@ -453,7 +503,7 @@ impl<E: Pairing> traits::BatchedRangeProof<E> for Proof<E> {
         } = pk;
 
         let n = values.len();
-        let max_ell: u8 = prover_precomputed.powers_of_two.len().try_into().unwrap();
+        let max_ell: usize = prover_precomputed.powers_of_two.len();
 
         assert!(
             n <= *max_n,
@@ -546,7 +596,7 @@ impl<E: Pairing> traits::BatchedRangeProof<E> for Proof<E> {
         let bits = scalars_to_bits::scalars_to_bits_le(values, ell);
         let f_j_evals_without_r = scalars_to_bits::transpose_bit_matrix(&bits);
 
-        let rs: Vec<E::ScalarField> = sample_field_elements(ell as usize, rng);
+        let rs: Vec<E::ScalarField> = sample_field_elements(ell, rng);
 
         let f_js_evals: Vec<Vec<E::ScalarField>> = f_j_evals_without_r
             .iter()
@@ -559,7 +609,7 @@ impl<E: Pairing> traits::BatchedRangeProof<E> for Proof<E> {
             })
             .collect();
 
-        let rhos: Vec<E::ScalarField> = sample_field_elements(ell as usize, rng);
+        let rhos: Vec<E::ScalarField> = sample_field_elements(ell, rng);
 
         let hkzg_commitment_hom = univariate_hiding_kzg::CommitmentHomomorphism::<E> {
             msm_basis: lagr_g1,
@@ -589,7 +639,7 @@ impl<E: Pairing> traits::BatchedRangeProof<E> for Proof<E> {
         #[cfg(feature = "range_proof_timing_univariate_v2")]
         let start = Instant::now();
         // Step 6
-        let (beta, betas) = fiat_shamir::get_beta_challenges::<E>(&mut fs_t, ell as usize);
+        let (beta, betas) = fiat_shamir::get_beta_challenges::<E>(&mut fs_t, ell);
         #[cfg(feature = "range_proof_timing_univariate_v2")]
         print_cumulative("get_beta_challenges", start.elapsed());
 
@@ -624,7 +674,7 @@ impl<E: Pairing> traits::BatchedRangeProof<E> for Proof<E> {
 
         #[cfg(feature = "range_proof_timing_univariate_v2")]
         let start = Instant::now();
-        let f_j_coeffs: Vec<Vec<E::ScalarField>> = (0..ell as usize)
+        let f_j_coeffs: Vec<Vec<E::ScalarField>> = (0..ell)
             .map(|j| {
                 let mut f_j = f_js_evals[j].clone();
                 debug_assert_eq!(f_j.len(), pk.max_n + 1);
@@ -653,7 +703,7 @@ impl<E: Pairing> traits::BatchedRangeProof<E> for Proof<E> {
         #[cfg(feature = "range_proof_timing_univariate_v2")]
         let start = Instant::now();
         let h_evals: Vec<E::ScalarField> = {
-            let ell_usize = ell as usize;
+            let ell_usize = ell;
             let two = E::ScalarField::from(2u64);
             let pow2_j = &prover_precomputed.powers_of_two;
 
@@ -745,7 +795,7 @@ impl<E: Pairing> traits::BatchedRangeProof<E> for Proof<E> {
             *num_omegas_inv,
         );
 
-        let a_js: Vec<E::ScalarField> = (0..ell as usize)
+        let a_js: Vec<E::ScalarField> = (0..ell)
             .map(|i| {
                 let poly = ark_poly::univariate::DensePolynomial {
                     coeffs: f_j_coeffs[i].clone(),
@@ -758,7 +808,7 @@ impl<E: Pairing> traits::BatchedRangeProof<E> for Proof<E> {
         fiat_shamir::append_evaluations_at_gamma::<E>(&mut fs_t, a, a_h, &a_js);
 
         // Step 9c:
-        let (mu, mu_h, mus) = fiat_shamir::get_mu_challenges::<E>(&mut fs_t, ell as usize);
+        let (mu, mu_h, mus) = fiat_shamir::get_mu_challenges::<E>(&mut fs_t, ell);
         #[cfg(feature = "range_proof_timing_univariate_v2")]
         print_cumulative(
             "Step 9: a,a_h,a_js + append_evaluations_at_gamma + get_mu_challenges",
@@ -836,7 +886,7 @@ impl<E: Pairing> traits::BatchedRangeProof<E> for Proof<E> {
         &self,
         vk: &Self::VerificationKey,
         n: usize,
-        ell: u8,
+        ell: usize,
         comm: &Self::CommitmentNormalised,
         rng: &mut R,
     ) -> Result<(Vec<E::G1Affine>, Vec<E::G2Affine>)> {
@@ -869,7 +919,7 @@ impl<E: Pairing> traits::BatchedRangeProof<E> for Proof<E> {
 
         let max_ell = verifier_precomputed.powers_of_two.len();
         ensure!(
-            ell as usize <= max_ell,
+            ell <= max_ell,
             "ell (got {}) must be ≤ max_ell (which is {})",
             ell,
             max_ell
@@ -894,13 +944,13 @@ impl<E: Pairing> traits::BatchedRangeProof<E> for Proof<E> {
         } = self;
 
         ensure!(
-            Cs.len() == ell as usize,
+            Cs.len() == ell,
             "Cs length must equal ell (got {} vs ell {})",
             Cs.len(),
             ell
         );
         ensure!(
-            a_js.len() == ell as usize,
+            a_js.len() == ell,
             "a_js length must equal ell (got {} vs ell {})",
             a_js.len(),
             ell
@@ -947,7 +997,7 @@ impl<E: Pairing> traits::BatchedRangeProof<E> for Proof<E> {
         fiat_shamir::append_f_j_commitments::<E>(&mut fs_t, &Cs);
 
         // Step 5
-        let (beta, beta_js) = fiat_shamir::get_beta_challenges::<E>(&mut fs_t, ell as usize);
+        let (beta, beta_js) = fiat_shamir::get_beta_challenges::<E>(&mut fs_t, ell);
 
         // Step 6
         fiat_shamir::append_h_commitment::<E>(&mut fs_t, &D);
@@ -960,7 +1010,7 @@ impl<E: Pairing> traits::BatchedRangeProof<E> for Proof<E> {
         fiat_shamir::append_evaluations_at_gamma::<E>(&mut fs_t, *a, *a_h, &a_js);
 
         // Step 9:
-        let (mu, mu_h, mu_js) = fiat_shamir::get_mu_challenges::<E>(&mut fs_t, ell as usize);
+        let (mu, mu_h, mu_js) = fiat_shamir::get_mu_challenges::<E>(&mut fs_t, ell);
         #[cfg(feature = "range_proof_timing_univariate_v2")]
         print_cumulative("Step 4a–9: append_sigma + append_f_j + get_beta + append_h + gamma + append_evaluations_at_gamma + get_mu_challenges", start.elapsed());
 
@@ -1222,11 +1272,14 @@ pub mod two_term_msm {
         pub base_2: C::Affine,
     }
 
+    /// ArkSize(F=Bls12_381::Fr): 64.
     #[derive(
         SigmaProtocolWitness, CanonicalSerialize, CanonicalDeserialize, Clone, Debug, PartialEq, Eq,
     )]
     pub struct Witness<F: PrimeField> {
+        /// ArkSize(F=Bls12_381::Fr): 32.
         pub poly_randomness: Scalar<F>,
+        /// ArkSize(F=Bls12_381::Fr): 32.
         pub hiding_kzg_randomness: Scalar<F>,
     }
 

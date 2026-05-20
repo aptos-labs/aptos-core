@@ -45,27 +45,6 @@ module 0x42::loops {
         };
     }
 
-
-    // Ensures only: skip aborts inference
-    fun double_n_times_ensures(r: &mut u64, n: u64) {
-        let i = 0;
-        while (i < n) {
-            *r = *r * 2;
-            i = i + 1;
-        };
-    }
-
-
-    // Aborts only: skip ensures inference
-    fun double_n_times_aborts(r: &mut u64, n: u64) {
-        let i = 0;
-        while (i < n) {
-            *r = *r * 2;
-            i = i + 1;
-        };
-    }
-
-
     // ==================== Loop with Conditional ====================
 
     // Conditionally increment in loop

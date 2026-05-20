@@ -5,7 +5,7 @@ use super::{
     DEFAULT_FORGE_DEPLOYER_IMAGE_TAG, FORGE_DEPLOYER_SERVICE_ACCOUNT_NAME,
     FORGE_DEPLOYER_VALUES_ENV_VAR_NAME,
 };
-use crate::{maybe_create_k8s_resource, wait_log_job, K8sApi, ReadWrite, Result};
+use crate::{maybe_create_k8s_resource, wait_log_job, ApiError, K8sApi, ReadWrite, Result};
 use again::RetryPolicy;
 use k8s_openapi::api::{
     batch::v1::Job,
@@ -167,7 +167,14 @@ impl ForgeDeployerManager {
      * configmap and job.
      */
     pub async fn start(&self, config: serde_json::Value) -> Result<()> {
-        self.ensure_namespace_prepared().await?;
+        RetryPolicy::exponential(Duration::from_millis(1000))
+            .with_max_delay(Duration::from_secs(30))
+            .with_max_retries(20)
+            .retry_if(
+                || self.ensure_namespace_prepared(),
+                |e: &ApiError| matches!(e, ApiError::RetryableError(_)),
+            )
+            .await?;
         self.cleanup_deployer_resources().await;
         let config_map = self.build_forge_deployer_k8s_config_map(config)?;
         let job = self.build_forge_deployer_k8s_job(config_map.name())?;
@@ -188,8 +195,13 @@ impl ForgeDeployerManager {
         let name = self.get_name();
         info!("Cleaning up pre-existing deployer resources for: {}", &name);
 
+        let force_delete = DeleteParams {
+            grace_period_seconds: Some(0),
+            ..Default::default()
+        };
+
         // Delete the job first, then the configmap (reverse order of creation)
-        match self.jobs_api.delete(&name, &DeleteParams::default()).await {
+        match self.jobs_api.delete(&name, &force_delete).await {
             Ok(_) => info!("Deleted pre-existing deployer job: {}", &name),
             Err(kube::Error::Api(api_err)) if api_err.code == 404 => {
                 info!("No pre-existing deployer job found: {}", &name);
@@ -202,11 +214,7 @@ impl ForgeDeployerManager {
             },
         }
 
-        match self
-            .config_maps_api
-            .delete(&name, &DeleteParams::default())
-            .await
-        {
+        match self.config_maps_api.delete(&name, &force_delete).await {
             Ok(_) => info!("Deleted pre-existing deployer configmap: {}", &name),
             Err(kube::Error::Api(api_err)) if api_err.code == 404 => {
                 info!("No pre-existing deployer configmap found: {}", &name);
@@ -262,7 +270,7 @@ impl ForgeDeployerManager {
         }
     }
 
-    async fn ensure_namespace_prepared(&self) -> Result<()> {
+    async fn ensure_namespace_prepared(&self) -> Result<(), ApiError> {
         info!("Ensuring namespace is prepared");
         let namespace = self.build_namespace();
         info!("Creating namespace: {}", &namespace.name());

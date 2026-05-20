@@ -86,6 +86,10 @@ pub struct FrameSpec {
     pub modifies_targets: Vec<Exp>,
     /// Resource types that are read (resolved struct IDs).
     pub reads_targets: BTreeSet<QualifiedInstId<StructId>>,
+    /// Wildcard: `modifies_of<f> *` — function can modify any memory.
+    pub modifies_all: bool,
+    /// Wildcard: `reads_of<f> *` — function can read any memory.
+    pub reads_all: bool,
 }
 
 /// Combined reads/writes access for a function-typed parameter.
@@ -315,9 +319,23 @@ pub enum BehaviorKind {
     AbortsOf,
     /// `ensures_of<f>(args)` - the postcondition of function `f`
     EnsuresOf,
-    /// `result_of<f>(args)` - deterministic result selector based on `ensures_of`
-    /// Semantics: `result_of<f>(x) == choose y where ensures_of<f>(x, y)`
+    /// `result_of<f>(args)` — `choose r where ensures_of<f>(args, r, ...)`.
     ResultOf,
+    /// `write_of<f, j>(args)` — WP-internal selector for the post-state of
+    /// the j-th `&mut` parameter (counted among `&mut` parameters). Not
+    /// surface syntax; emitted by spec inference and translated by the
+    /// Boogie backend to a Skolem axiomatized against `ensures_of`.
+    WriteOf(usize),
+}
+
+impl BehaviorKind {
+    /// True for predicates whose semantics span pre- and post-memory.
+    pub fn is_two_state(&self) -> bool {
+        matches!(
+            self,
+            BehaviorKind::EnsuresOf | BehaviorKind::ResultOf | BehaviorKind::WriteOf(_)
+        )
+    }
 }
 
 impl fmt::Display for BehaviorKind {
@@ -328,6 +346,7 @@ impl fmt::Display for BehaviorKind {
             AbortsOf => write!(f, "aborts_of"),
             EnsuresOf => write!(f, "ensures_of"),
             ResultOf => write!(f, "result_of"),
+            WriteOf(j) => write!(f, "write_of_{}", j),
         }
     }
 }
@@ -556,6 +575,12 @@ impl Spec {
             && self.properties.is_empty()
             && self.update_map.is_empty()
             && self.proof.is_none()
+            && self.frame_spec.as_ref().is_none_or(|fs| {
+                fs.modifies_targets.is_empty()
+                    && fs.reads_targets.is_empty()
+                    && !fs.modifies_all
+                    && !fs.reads_all
+            })
     }
 
     pub fn filter<P>(&self, pred: P) -> impl Iterator<Item = &Condition>
@@ -608,6 +633,11 @@ impl Spec {
         for exp in self.proof_exps() {
             result.append(&mut exp.used_funs_with_uses())
         }
+        if let Some(fs) = &self.frame_spec {
+            for target in &fs.modifies_targets {
+                result.append(&mut target.used_funs_with_uses())
+            }
+        }
         result
     }
 
@@ -625,6 +655,11 @@ impl Spec {
         }
         for exp in self.proof_exps() {
             result.append(&mut exp.called_funs_with_callsites())
+        }
+        if let Some(fs) = &self.frame_spec {
+            for target in &fs.modifies_targets {
+                result.append(&mut target.called_funs_with_callsites())
+            }
         }
         result
     }
@@ -1134,7 +1169,10 @@ impl ExpData {
         use ExpData::*;
         matches!(
             self,
-            LocalVar(..) | Temporary(..) | Call(_, Operation::Select(..), _)
+            LocalVar(..)
+                | Temporary(..)
+                | Call(_, Operation::Select(..), _)
+                | Call(_, Operation::SelectVariants(..), _)
         )
     }
 
@@ -1262,6 +1300,36 @@ impl ExpData {
             (SpecBlock(_, spec1), SpecBlock(_, spec2)) => spec1.structural_eq(spec2),
             _ => false,
         }
+    }
+
+    /// Returns true if this expression is state-neutral: its value does not depend on
+    /// global state and is the same regardless of which program state it's evaluated in.
+    /// Such expressions can safely be extracted into spec-level `let` bindings.
+    pub fn is_state_neutral(&self) -> bool {
+        let mut neutral = true;
+        self.visit_pre_order(&mut |e: &ExpData| match e {
+            ExpData::Call(_, Operation::Global(_), _)
+            | ExpData::Call(_, Operation::Exists(_), _)
+            | ExpData::Call(_, Operation::Old, _)
+            | ExpData::Call(_, Operation::Result(..), _) => {
+                neutral = false;
+                false
+            },
+            ExpData::Call(
+                _,
+                Operation::Behavior(_, range)
+                | Operation::SpecFunction(_, _, range)
+                | Operation::SpecPublish(range)
+                | Operation::SpecRemove(range)
+                | Operation::SpecUpdate(range),
+                _,
+            ) if range.pre.is_some() || range.post.is_some() => {
+                neutral = false;
+                false
+            },
+            _ => neutral,
+        });
+        neutral
     }
 
     pub fn node_id(&self) -> NodeId {
@@ -1501,6 +1569,13 @@ impl ExpData {
                     for mem in fun.used_memory.iter() {
                         result.insert(mem.to_owned().instantiate(inst));
                     }
+                },
+                Call(id, SpecPublish(_), _)
+                | Call(id, SpecRemove(_), _)
+                | Call(id, SpecUpdate(_), _) => {
+                    let inst = &env.get_node_instantiation(*id);
+                    let (mid, sid, sinst) = inst[0].require_struct();
+                    result.insert(mid.qualified_inst(sid, sinst.to_owned()));
                 },
                 _ => {},
             }
@@ -2343,8 +2418,9 @@ impl ExpData {
                         | Shr | And | Or | Eq | Neq | Lt | Gt | Le | Ge | Copy | Move | Not
                         | Cast | Negate | Exists(..) | BorrowGlobal(..) | Borrow(..) | Deref
                         | MoveTo | MoveFrom | Freeze(..) | Abort(..) | Vector | Len | TypeValue
-                        | TypeDomain | ResourceDomain | Global(..) | CanModify | Old
-                        | Trace(..) | EmptyVec | SingleVec | UpdateVec | ConcatVec | IndexOfVec
+                        | TypeDomain | ResourceDomain | StateDomain | Global(..) | CanModify
+                        | Old | Trace(..) | SpecPublish(..) | SpecRemove(..) | SpecUpdate(..)
+                        | EmptyVec | SingleVec | UpdateVec | ConcatVec | IndexOfVec
                         | ContainsVec | InRangeRange | InRangeVec | RangeVec | MaxU8 | MaxU16
                         | MaxU32 | MaxU64 | MaxU128 | MaxU256 | Bv2Int | Int2Bv | AbortFlag
                         | AbortCode | WellFormed | BoxValue | UnboxValue | EmptyEventStore
@@ -2583,10 +2659,20 @@ pub enum Operation {
     TypeValue,
     TypeDomain,
     ResourceDomain,
+    StateDomain,
     Global(Option<MemoryLabel>),
     CanModify,
     Old,
     Trace(TraceKind),
+
+    // Spec-level mutation builtins. Two-state predicates carrying MemoryRange.
+    // Type argument: the resource type. Args: (addr, value) or (addr).
+    // `publish<R>(addr, value)` — resource R is published at addr
+    SpecPublish(MemoryRange),
+    // `remove<R>(addr)` — resource R is removed from addr
+    SpecRemove(MemoryRange),
+    // `update<R>(addr, value)` — resource R at addr is updated to value
+    SpecUpdate(MemoryRange),
 
     EmptyVec,
     SingleVec,
@@ -2622,7 +2708,21 @@ pub enum Operation {
 }
 
 /// A label used for referring to a specific memory in Global and Exists expressions.
-pub type MemoryLabel = GlobalId;
+/// This is a function-scoped identifier — labels are only meaningful within the
+/// context of a single function's spec. When inlining specs across functions,
+/// labels are freshened to avoid collisions.
+#[derive(Debug, PartialEq, Eq, PartialOrd, Ord, Hash, Clone, Copy)]
+pub struct MemoryLabel(usize);
+
+impl MemoryLabel {
+    pub fn new(idx: usize) -> Self {
+        Self(idx)
+    }
+
+    pub fn as_usize(self) -> usize {
+        self.0
+    }
+}
 
 /// Describes the memory state range for an operation that accesses global state.
 /// - `pre`: which memory snapshot `old()` references resolve to
@@ -2662,6 +2762,9 @@ pub enum Pattern {
     ),
     /// A literal value pattern (for matching literal constants)
     LiteralValue(NodeId, Value),
+    /// A range pattern: Range(id, lo, hi, inclusive_upper)
+    /// lo..hi, lo..=hi, lo.., ..hi, ..=hi, ..
+    Range(NodeId, Option<Value>, Option<Value>, bool),
     Error(NodeId),
 }
 
@@ -2674,6 +2777,7 @@ impl Pattern {
             | Pattern::Tuple(id, _)
             | Pattern::Struct(id, _, _, _)
             | Pattern::LiteralValue(id, _)
+            | Pattern::Range(id, _, _, _)
             | Pattern::Error(id) => *id,
         }
     }
@@ -2700,6 +2804,9 @@ impl Pattern {
                         .all(|(p1, p2)| p1.structural_eq(p2))
             },
             (Pattern::LiteralValue(_, v1), Pattern::LiteralValue(_, v2)) => v1 == v2,
+            (Pattern::Range(_, lo1, hi1, inc1), Pattern::Range(_, lo2, hi2, inc2)) => {
+                lo1 == lo2 && hi1 == hi2 && inc1 == inc2
+            },
             (Pattern::Error(_), Pattern::Error(_)) => true,
             _ => false,
         }
@@ -2735,7 +2842,7 @@ impl Pattern {
     pub fn has_no_struct(&self) -> bool {
         use Pattern::*;
         match self {
-            Var(..) | Wildcard(..) | LiteralValue(..) | Error(..) => true,
+            Var(..) | Wildcard(..) | LiteralValue(..) | Range(..) | Error(..) => true,
             Tuple(_, pats) => pats.iter().all(|p| p.has_no_struct()),
             Struct(..) => false,
         }
@@ -2962,7 +3069,10 @@ impl Pattern {
                     .map(|pat| pat.remove_vars(vars))
                     .collect(),
             ),
-            Pattern::Error(..) | Pattern::Wildcard(..) | Pattern::LiteralValue(..) => self,
+            Pattern::Error(..)
+            | Pattern::Wildcard(..)
+            | Pattern::LiteralValue(..)
+            | Pattern::Range(..) => self,
         }
     }
 
@@ -3009,7 +3119,10 @@ impl Pattern {
                     None
                 }
             },
-            Pattern::Error(..) | Pattern::Wildcard(..) | Pattern::LiteralValue(..) => None,
+            Pattern::Error(..)
+            | Pattern::Wildcard(..)
+            | Pattern::LiteralValue(..)
+            | Pattern::Range(..) => None,
         }
     }
 
@@ -3023,7 +3136,7 @@ impl Pattern {
         use Pattern::*;
         visitor(false, self);
         match self {
-            Var(..) | Wildcard(..) | LiteralValue(..) | Error(..) => {},
+            Var(..) | Wildcard(..) | LiteralValue(..) | Range(..) | Error(..) => {},
             Tuple(_, patvec) => {
                 for pat in patvec {
                     pat.visit_pre_post(visitor);
@@ -3176,6 +3289,19 @@ impl PatDisplay<'_> {
             LiteralValue(_, val) => {
                 write!(f, "{}", self.env.display(val))?;
             },
+            Range(_, lo, hi, inclusive) => {
+                if let Some(l) = lo {
+                    write!(f, "{}", self.env.display(l))?;
+                }
+                if *inclusive {
+                    write!(f, "..=")?;
+                } else {
+                    write!(f, "..")?;
+                }
+                if let Some(h) = hi {
+                    write!(f, "{}", self.env.display(h))?;
+                }
+            },
             Error(_) => write!(f, "Pattern::Error")?,
         }
         if self.show_type && !showed_type {
@@ -3230,6 +3356,15 @@ pub enum Value {
 }
 
 impl Value {
+    /// If this is a `Number`, return the contained `BigInt`; otherwise `None`.
+    pub fn to_bigint(&self) -> Option<BigInt> {
+        if let Value::Number(n) = self {
+            Some(n.clone())
+        } else {
+            None
+        }
+    }
+
     /// Implement an equality relation on values which identifies representations which
     /// implement the same runtime value, assuming that types match.
     ///
@@ -3375,6 +3510,17 @@ impl fmt::Display for EnvDisplay<'_, PropertyBag> {
 /// # Purity of Expressions
 
 impl Operation {
+    /// Returns all `MemoryLabel` values embedded in this operation.
+    pub fn memory_labels(&self) -> Vec<MemoryLabel> {
+        use Operation::*;
+        match self {
+            Global(Some(l)) | Exists(Some(l)) => vec![*l],
+            Behavior(_, range) | SpecFunction(_, _, range) => range.labels().collect(),
+            SpecPublish(range) | SpecRemove(range) | SpecUpdate(range) => range.labels().collect(),
+            _ => vec![],
+        }
+    }
+
     /// Determines whether this operation depends on global memory
     pub fn uses_no_memory<F>(&self, check_pure: &F) -> bool
     where
@@ -3489,14 +3635,17 @@ impl Operation {
             Vector => false,           // Move-related
 
             // Builtin functions (spec only)
-            Len => false,            // Spec
-            TypeValue => false,      // Spec
-            TypeDomain => false,     // Spec
-            ResourceDomain => false, // Spec
-            Global(..) => false,     // Spec
-            CanModify => false,      // Spec
-            Old => false,            // Spec
-            Trace(..) => false,      // Spec
+            Len => false,             // Spec
+            TypeValue => false,       // Spec
+            TypeDomain => false,      // Spec
+            ResourceDomain => false,  // Spec
+            Global(..) => false,      // Spec
+            CanModify => false,       // Spec
+            Old => false,             // Spec
+            Trace(..) => false,       // Spec
+            SpecPublish(..) => false, // Spec
+            SpecRemove(..) => false,  // Spec
+            SpecUpdate(..) => false,  // Spec
 
             EmptyVec => false,     // Spec
             SingleVec => false,    // Spec
@@ -3530,6 +3679,7 @@ impl Operation {
             // Operation with no effect
             TestVariants(..) => true, // Cannot abort
             NoOp => true,
+            StateDomain => true, // Spec domain, not runtime
         }
     }
 

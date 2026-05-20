@@ -1,0 +1,138 @@
+[
+  {
+    "kubernetes": {
+      "container_name": "decibel-ws",
+      "namespace": "decibel-ws-mainnet-prod",
+      "pod_name": "decibel-ws-0",
+      "pod_node_name": "gke-node-1",
+      "node_labels": {
+        "node.kubernetes.io/instance-type": "n2-standard-8",
+        "topology.gke.io/zone": "us-central1-a"
+      },
+      "labels": {},
+      "annotations": {}
+    },
+    "message": "{\"level\":\"info\",\"message\":\"Processor lag from start/end tx: 12345, 67890\",\"timestamp\":\"2026-03-03T10:00:00Z\"}",
+    "source_type": "kubernetes_logs",
+    "stream": "stderr"
+  },
+  {
+    "kubernetes": {
+      "container_name": "decibel-ws",
+      "namespace": "decibel-ws-mainnet-prod",
+      "pod_name": "decibel-ws-0",
+      "pod_node_name": "gke-node-1",
+      "node_labels": {
+        "node.kubernetes.io/instance-type": "n2-standard-8",
+        "topology.gke.io/zone": "us-central1-a"
+      },
+      "labels": {},
+      "annotations": {}
+    },
+    "message": "{\"level\":\"info\",\"message\":\"[Transaction Stream] Received transactions from GRPC.\",\"timestamp\":\"2026-03-03T10:00:01Z\"}",
+    "source_type": "kubernetes_logs",
+    "stream": "stderr"
+  },
+  {
+    "kubernetes": {
+      "container_name": "decibel-ws",
+      "namespace": "decibel-ws-mainnet-prod",
+      "pod_name": "decibel-ws-0",
+      "pod_node_name": "gke-node-1",
+      "node_labels": {
+        "node.kubernetes.io/instance-type": "n2-standard-8",
+        "topology.gke.io/zone": "us-central1-a"
+      },
+      "labels": {},
+      "annotations": {}
+    },
+    "message": "{\"level\":\"info\",\"message\":\"[RATE STATS] Broadcast channel message counts\",\"timestamp\":\"2026-03-03T10:00:02Z\"}",
+    "source_type": "kubernetes_logs",
+    "stream": "stderr"
+  },
+  {
+    "kubernetes": {
+      "container_name": "decibel-ws",
+      "namespace": "decibel-ws-mainnet-prod",
+      "pod_name": "decibel-ws-0",
+      "pod_node_name": "gke-node-1",
+      "node_labels": {
+        "node.kubernetes.io/instance-type": "n2-standard-8",
+        "topology.gke.io/zone": "us-central1-a"
+      },
+      "labels": {},
+      "annotations": {}
+    },
+    "message": "{\"level\":\"info\",\"message\":\"Transformer state at version 9876543\",\"timestamp\":\"2026-03-03T10:00:03Z\"}",
+    "source_type": "kubernetes_logs",
+    "stream": "stderr"
+  },
+  {
+    "kubernetes": {
+      "container_name": "decibel-ws",
+      "namespace": "decibel-ws-mainnet-prod",
+      "pod_name": "decibel-ws-0",
+      "pod_node_name": "gke-node-1",
+      "node_labels": {
+        "node.kubernetes.io/instance-type": "n2-standard-8",
+        "topology.gke.io/zone": "us-central1-a"
+      },
+      "labels": {},
+      "annotations": {}
+    },
+    "message": "{\"level\":\"info\",\"message\":\"Client removed from registry after forwarding task exit: 192.168.1.1:54321\",\"timestamp\":\"2026-03-03T10:00:04Z\"}",
+    "source_type": "kubernetes_logs",
+    "stream": "stderr"
+  },
+  {
+    "kubernetes": {
+      "container_name": "decibel-ws",
+      "namespace": "decibel-ws-mainnet-prod",
+      "pod_name": "decibel-ws-0",
+      "pod_node_name": "gke-node-1",
+      "node_labels": {
+        "node.kubernetes.io/instance-type": "n2-standard-8",
+        "topology.gke.io/zone": "us-central1-a"
+      },
+      "labels": {},
+      "annotations": {}
+    },
+    "message": "{\"level\":\"info\",\"message\":\"Client timed out, sending close frame\",\"timestamp\":\"2026-03-03T10:00:05Z\"}",
+    "source_type": "kubernetes_logs",
+    "stream": "stderr"
+  },
+  {
+    "kubernetes": {
+      "container_name": "decibel-ws",
+      "namespace": "decibel-ws-mainnet-prod",
+      "pod_name": "decibel-ws-0",
+      "pod_node_name": "gke-node-1",
+      "node_labels": {
+        "node.kubernetes.io/instance-type": "n2-standard-8",
+        "topology.gke.io/zone": "us-central1-a"
+      },
+      "labels": {},
+      "annotations": {}
+    },
+    "message": "{\"level\":\"info\",\"message\":\"Keepalive check completed\",\"timestamp\":\"2026-03-03T10:00:06Z\"}",
+    "source_type": "kubernetes_logs",
+    "stream": "stderr"
+  },
+  {
+    "kubernetes": {
+      "container_name": "decibel-ws",
+      "namespace": "decibel-ws-mainnet-prod",
+      "pod_name": "decibel-ws-0",
+      "pod_node_name": "gke-node-1",
+      "node_labels": {
+        "node.kubernetes.io/instance-type": "n2-standard-8",
+        "topology.gke.io/zone": "us-central1-a"
+      },
+      "labels": {},
+      "annotations": {}
+    },
+    "message": "{\"level\":\"warn\",\"message\":\"WebSocket error for client 10.0.0.1:12345: ResetWithoutClosingHandshake\",\"timestamp\":\"2026-03-03T10:00:07Z\"}",
+    "source_type": "kubernetes_logs",
+    "stream": "stderr"
+  }
+]

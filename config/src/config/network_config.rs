@@ -40,8 +40,8 @@ pub const PING_TIMEOUT_MS: u64 = 20_000;
 pub const PING_FAILURES_TOLERATED: u64 = 3;
 pub const CONNECTIVITY_CHECK_INTERVAL_MS: u64 = 5000;
 pub const MAX_CONNECTION_DELAY_MS: u64 = 60_000; /* 1 minute */
-pub const MAX_FULLNODE_OUTBOUND_CONNECTIONS: usize = 6;
-pub const MAX_INBOUND_CONNECTIONS: usize = 100;
+pub const MAX_FULLNODE_OUTBOUND_CONNECTIONS: usize = 5;
+pub const MAX_INBOUND_CONNECTIONS: usize = 50;
 pub const MAX_MESSAGE_METADATA_SIZE: usize = 128 * 1024; /* 128 KiB: a buffer for metadata that might be added to messages by networking */
 pub const MESSAGE_PADDING_SIZE: usize = 2 * 1024 * 1024; /* 2 MiB: a safety buffer to allow messages to get larger during serialization */
 pub const MAX_APPLICATION_MESSAGE_SIZE: usize =
@@ -72,6 +72,16 @@ impl AccessControlPolicy {
             AccessControlPolicy::BlockList(blocked_peers) => !blocked_peers.contains(peer_id),
         }
     }
+}
+
+/// Rate limiting configuration for inbound network traffic
+#[derive(Clone, Debug, Default, Deserialize, PartialEq, Serialize)]
+#[serde(default, deny_unknown_fields)]
+pub struct RateLimitConfig {
+    /// Max inbound bytes/sec per peer. None = unlimited.
+    pub inbound_bytes_per_second: Option<u64>,
+    /// Max inbound messages/sec per peer. None = unlimited.
+    pub inbound_messages_per_second: Option<u64>,
 }
 
 #[derive(Clone, Debug, Deserialize, PartialEq, Serialize)]
@@ -148,6 +158,13 @@ pub struct NetworkConfig {
     pub access_control_policy: Option<AccessControlPolicy>,
     /// Priority inbound peers that can bypass connection limits
     pub priority_inbound_peers: Vec<PeerId>,
+    /// Rate limiting configuration for inbound network traffic (per peer).
+    /// If None, inbound rate limiting is disabled.
+    pub inbound_rate_limit_config: Option<RateLimitConfig>,
+    /// The minimum number of dial attempts before a peer is put into backoff mode
+    pub num_dials_before_backoff: usize,
+    /// The maximum number of addresses to ping in parallel per peer (for latency aware dialing)
+    pub max_parallel_peer_latency_pings: usize,
 }
 
 impl Default for NetworkConfig {
@@ -194,6 +211,9 @@ impl NetworkConfig {
             enable_latency_aware_dialing: true,
             access_control_policy: None,
             priority_inbound_peers: Vec::new(),
+            inbound_rate_limit_config: None,
+            num_dials_before_backoff: 2, // Attempt at least 2 dials before backing off
+            max_parallel_peer_latency_pings: 3, // Ping up to 3 addresses in parallel
         };
 
         // Configure the number of parallel deserialization tasks

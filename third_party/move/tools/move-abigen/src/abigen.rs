@@ -335,6 +335,7 @@ impl<'env> Abigen<'env> {
             | Fun(..)
             | TypeDomain(_)
             | ResourceDomain(..)
+            | StateDomain
             | Error
             | Var(_)
             | Reference(_, _) => return Ok(None),

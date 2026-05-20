@@ -64,6 +64,10 @@ impl<'kv> PerVersionStateUpdateRefs<'kv> {
         Self {
             first_version,
             shards: shards.map(|mut shard| {
+                // Things are already sorted by version, but we need to sort by
+                // `(version, key_hash)` for having a canonical order within each
+                // version too. Simply sort the whole thing here.
+                shard.sort_by_key(|(k, u)| (u.version, *k.crypto_hash_ref()));
                 // Release over-allocated memory during construction.
                 shard.shrink_to_fit();
                 shard
@@ -412,5 +416,30 @@ mod tests {
         verify_batching(for_latest, "A", 11, "A1");
         verify_batching(for_latest, "B", 10, "B0");
         verify_batching(for_latest, "C", 12, "C2");
+    }
+
+    /// Each shard's per-version vec must be ordered by `(version, key_hash)`.
+    /// This is the order in which `State::update` inserts keys into
+    /// `HotStateLRU`, and must match `assemble_lru_chain` in
+    /// `storage/aptosdb/src/state_kv_db.rs`, which rebuilds the LRU on restart
+    /// by sorting loaded entries on the same tuple. Otherwise the chain
+    /// produced for same-version keys at runtime would not survive a restart.
+    #[test]
+    fn test_per_version_shards_ordered_by_version_then_hash() {
+        // Use many byte-pattern keys so every shard receives multiple entries
+        // per version. `WriteSet` iterates its `BTreeMap` in `StateKey` byte
+        // order, which is essentially independent of `HashValue` order within
+        // a shard, so this meaningfully exercises the sort.
+        let keys0: Vec<_> = (0..=255u8).map(|b| format!("k0_{b:02x}")).collect();
+        let keys1: Vec<_> = (0..=255u8).map(|b| format!("k1_{b:02x}")).collect();
+        let pairs0: Vec<_> = keys0.iter().map(|k| (k.as_str(), "v0")).collect();
+        let pairs1: Vec<_> = keys1.iter().map(|k| (k.as_str(), "v1")).collect();
+        let ws0 = write_set(&pairs0);
+        let ws1 = write_set(&pairs1);
+        let ret = StateUpdateRefs::index_write_sets(0, vec![&ws0, &ws1], 2, vec![]);
+
+        for shard in &ret.for_latest_per_version().unwrap().shards {
+            assert!(shard.is_sorted_by_key(|(k, u)| (u.version, *k.crypto_hash_ref())));
+        }
     }
 }

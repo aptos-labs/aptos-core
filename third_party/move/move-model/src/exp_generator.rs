@@ -428,16 +428,15 @@ pub trait ExpGenerator<'env> {
     fn mk_field_select(&self, field_env: &FieldEnv<'_>, targs: &[Type], exp: Exp) -> Exp {
         let ty = field_env.get_type().instantiate(targs);
         let node_id = self.new_node(ty, None);
-        ExpData::Call(
-            node_id,
-            Operation::Select(
-                field_env.struct_env.module_env.get_id(),
-                field_env.struct_env.get_id(),
-                field_env.get_id(),
-            ),
-            vec![exp],
-        )
-        .into_exp()
+        let mid = field_env.struct_env.module_env.get_id();
+        let sid = field_env.struct_env.get_id();
+        let fid = field_env.get_id();
+        let op = if field_env.get_variant().is_some() {
+            Operation::SelectVariants(mid, sid, vec![fid])
+        } else {
+            Operation::Select(mid, sid, fid)
+        };
+        ExpData::Call(node_id, op, vec![exp]).into_exp()
     }
 
     /// Makes an expression which updates a field in a struct.
@@ -611,6 +610,68 @@ pub trait ExpGenerator<'env> {
     }
 
     // =================================================================================================
+    // Spec Mutation Builtin Helpers
+
+    /// Create `publish<R>(addr, value)` with given memory range.
+    /// Semantics: resource R is published at addr with the given value,
+    /// transitioning from the pre-state to the post-state in the range.
+    fn mk_spec_publish(
+        &self,
+        struct_env: &StructEnv,
+        type_args: &[Type],
+        addr: Exp,
+        value: Exp,
+        range: MemoryRange,
+    ) -> Exp {
+        let struct_type = Type::Struct(
+            struct_env.module_env.get_id(),
+            struct_env.get_id(),
+            type_args.to_vec(),
+        );
+        let node_id = self.new_node(BOOL_TYPE.clone(), Some(vec![struct_type]));
+        ExpData::Call(node_id, Operation::SpecPublish(range), vec![addr, value]).into_exp()
+    }
+
+    /// Create `remove<R>(addr)` with given memory range.
+    /// Semantics: resource R is removed from addr,
+    /// transitioning from the pre-state to the post-state in the range.
+    fn mk_spec_remove(
+        &self,
+        struct_env: &StructEnv,
+        type_args: &[Type],
+        addr: Exp,
+        range: MemoryRange,
+    ) -> Exp {
+        let struct_type = Type::Struct(
+            struct_env.module_env.get_id(),
+            struct_env.get_id(),
+            type_args.to_vec(),
+        );
+        let node_id = self.new_node(BOOL_TYPE.clone(), Some(vec![struct_type]));
+        ExpData::Call(node_id, Operation::SpecRemove(range), vec![addr]).into_exp()
+    }
+
+    /// Create `update<R>(addr, value)` with given memory range.
+    /// Semantics: resource R at addr is updated to value,
+    /// transitioning from the pre-state to the post-state in the range.
+    fn mk_spec_update(
+        &self,
+        struct_env: &StructEnv,
+        type_args: &[Type],
+        addr: Exp,
+        value: Exp,
+        range: MemoryRange,
+    ) -> Exp {
+        let struct_type = Type::Struct(
+            struct_env.module_env.get_id(),
+            struct_env.get_id(),
+            type_args.to_vec(),
+        );
+        let node_id = self.new_node(BOOL_TYPE.clone(), Some(vec![struct_type]));
+        ExpData::Call(node_id, Operation::SpecUpdate(range), vec![addr, value]).into_exp()
+    }
+
+    // =================================================================================================
     // Numeric Expression Helpers
 
     /// Make a numeric constant expression with NUM_TYPE (spec arbitrary precision).
@@ -723,31 +784,120 @@ pub trait ExpGenerator<'env> {
     }
 
     // =================================================================================================
+    // Spec Vector Helpers
+
+    /// `len(v)` — element count, `Type::Num`.
+    fn mk_len(&self, v: Exp) -> Exp {
+        self.mk_call(&NUM_TYPE, Operation::Len, vec![v])
+    }
+
+    /// `v[i]` — element access, result type `elem_ty`.
+    fn mk_index(&self, v: Exp, i: Exp, elem_ty: &Type) -> Exp {
+        self.mk_call(elem_ty, Operation::Index, vec![v, i])
+    }
+
+    /// `v[from..to]` — range slice, result type `vec_ty`.
+    fn mk_slice(&self, v: Exp, from: Exp, to: Exp, vec_ty: &Type) -> Exp {
+        self.mk_call(vec_ty, Operation::Slice, vec![v, from, to])
+    }
+
+    /// `in_range(v, i)` — bounds-check predicate.
+    fn mk_in_range_vec(&self, v: Exp, i: Exp) -> Exp {
+        self.mk_bool_call(Operation::InRangeVec, vec![v, i])
+    }
+
+    /// `vec()` — empty vector with element type `elem_ty`.
+    fn mk_empty_vec(&self, elem_ty: &Type) -> Exp {
+        let vec_ty = Type::Vector(Box::new(elem_ty.clone()));
+        self.mk_call_with_inst(&vec_ty, vec![elem_ty.clone()], Operation::EmptyVec, vec![])
+    }
+
+    /// `vec(e)` — singleton vector with element type `elem_ty`.
+    fn mk_single_vec(&self, e: Exp, elem_ty: &Type) -> Exp {
+        let vec_ty = Type::Vector(Box::new(elem_ty.clone()));
+        self.mk_call_with_inst(&vec_ty, vec![elem_ty.clone()], Operation::SingleVec, vec![
+            e,
+        ])
+    }
+
+    /// `concat(a, b)` — vector concatenation.
+    fn mk_concat_vec(&self, a: Exp, b: Exp, vec_ty: &Type) -> Exp {
+        self.mk_call(vec_ty, Operation::ConcatVec, vec![a, b])
+    }
+
+    /// `update(v, i, e)` — functional update.
+    fn mk_update_vec(&self, v: Exp, i: Exp, e: Exp, vec_ty: &Type) -> Exp {
+        self.mk_call(vec_ty, Operation::UpdateVec, vec![v, i, e])
+    }
+
+    /// `contains(v, e)` — membership predicate.
+    ///
+    /// `Operation::ContainsVec` is translated by `spec_translator` via
+    /// `translate_primitive_inst_call`, which uses the node's type
+    /// instantiation to compute the per-element-type suffix
+    /// (e.g. `$ContainsVec'#0'`). Without an explicit instantiation the
+    /// emitted Boogie name has no suffix and fails name resolution.
+    fn mk_contains_vec(&self, v: Exp, e: Exp, elem_ty: &Type) -> Exp {
+        self.mk_call_with_inst(
+            &BOOL_TYPE,
+            vec![elem_ty.clone()],
+            Operation::ContainsVec,
+            vec![v, e],
+        )
+    }
+
+    /// `update(update(v, i, v[j]), j, v[i])` — the post-state vector after
+    /// `vector::swap(v, i, j)`.
+    fn mk_swap_post(&self, v: Exp, i: Exp, j: Exp, elem_ty: &Type, vec_ty: &Type) -> Exp {
+        let v_at_j = self.mk_index(v.clone(), j.clone(), elem_ty);
+        let v_at_i = self.mk_index(v.clone(), i.clone(), elem_ty);
+        let inner = self.mk_update_vec(v, i.clone(), v_at_j, vec_ty);
+        self.mk_update_vec(inner, j, v_at_i, vec_ty)
+    }
+
+    // =================================================================================================
     // Function Values
 
     /// Create a closure expression for a function reference.
     /// Returns the closure expression and the function's result type.
-    fn mk_closure(&self, module_id: ModuleId, fun_id: FunId, type_inst: &[Type]) -> (Exp, Type) {
+    /// When `mask` and `captured_args` are provided, the closure represents a
+    /// partial application where captured arguments are baked in and only the
+    /// remaining (non-captured) parameters form the closure's function type.
+    fn mk_closure(
+        &self,
+        module_id: ModuleId,
+        fun_id: FunId,
+        type_inst: &[Type],
+        mask: ClosureMask,
+        captured_args: Vec<Exp>,
+    ) -> (Exp, Type) {
         let fun_env = self
             .global_env()
             .get_module(module_id)
             .into_function(fun_id);
-        let param_types: Vec<Type> = fun_env
+        let all_param_types: Vec<Type> = fun_env
             .get_parameters()
             .iter()
             .map(|p| p.1.instantiate(type_inst))
             .collect();
+        // Only non-captured parameters appear in the closure's function type.
+        let provided_param_types: Vec<Type> = all_param_types
+            .iter()
+            .enumerate()
+            .filter(|(i, _)| !mask.is_captured(*i))
+            .map(|(_, ty)| ty.clone())
+            .collect();
         let result_type = fun_env.get_result_type().instantiate(type_inst);
         let fun_type = Type::Fun(
-            Box::new(Type::tuple(param_types)),
+            Box::new(Type::tuple(provided_param_types)),
             Box::new(result_type.clone()),
             AbilitySet::EMPTY,
         );
         let node_id = self.new_node(fun_type, Some(type_inst.to_vec()));
         let exp = ExpData::Call(
             node_id,
-            Operation::Closure(module_id, fun_id, ClosureMask::empty()),
-            vec![],
+            Operation::Closure(module_id, fun_id, mask),
+            captured_args,
         )
         .into_exp();
         (exp, result_type)
@@ -782,7 +932,17 @@ pub trait ExpGenerator<'env> {
         let mid = signer_module.get_id();
         let fid = address_of_fun.get_id();
         let addr_ty = Type::Primitive(PrimitiveType::Address);
-        self.mk_call(&addr_ty, Operation::MoveFunction(mid, fid), vec![exp])
+        // Use SpecFunction if the spec function exists (prover context),
+        // fall back to MoveFunction otherwise.
+        if let Some((spec_fun_id, _)) = address_of_fun.find_spec_fun() {
+            self.mk_call(
+                &addr_ty,
+                Operation::SpecFunction(mid, spec_fun_id, MemoryRange::default()),
+                vec![exp],
+            )
+        } else {
+            self.mk_call(&addr_ty, Operation::MoveFunction(mid, fid), vec![exp])
+        }
     }
 
     // =================================================================================================
@@ -970,6 +1130,28 @@ pub trait ExpGenerator<'env> {
         let range = MemoryRange { pre, post };
         self.mk_bool_call(
             Operation::Behavior(BehaviorKind::EnsuresOf, range),
+            all_args,
+        )
+    }
+
+    /// Build `write_of<f, j>(args)` with pre/post state labels.
+    /// `mut_ref_idx` indexes the targeted `&mut` parameter among the
+    /// callee's `&mut` parameters only.
+    fn mk_write_of_with_state(
+        &self,
+        fun_exp: Exp,
+        args: Vec<Exp>,
+        mut_ref_value_type: &Type,
+        mut_ref_idx: usize,
+        pre: Option<MemoryLabel>,
+        post: Option<MemoryLabel>,
+    ) -> Exp {
+        let mut all_args = vec![fun_exp];
+        all_args.extend(args);
+        let range = MemoryRange { pre, post };
+        self.mk_call(
+            mut_ref_value_type,
+            Operation::Behavior(BehaviorKind::WriteOf(mut_ref_idx), range),
             all_args,
         )
     }

@@ -16,17 +16,17 @@ use crate::{
 use anyhow::Result;
 use aptos_batch_encryption::{
     group::{Fr, G2Affine, Pairing},
-    shared::{digest::DigestKey, encryption_key::EncryptionKey},
+    shared::{digest::DigestKey, digest_key_file, encryption_key::EncryptionKey},
 };
-use aptos_crypto::{bls12381, weighted_config::WeightedConfigArkworks, TSecretSharingConfig};
+use aptos_bitvec::BitVec;
+use aptos_crypto::{bls12381, weighted_config::WeightedConfigArkworks};
 use aptos_crypto_derive::{BCSCryptoHash, CryptoHasher};
 use aptos_dkg::pvss::{
     chunky::{
         DecryptPrivKey, EncryptPubKey, InputSecret, PublicParameters, SignedWeightedTranscript,
         WeightedSubtranscript,
     },
-    traits::{transcript::Transcript, TranscriptCore},
-    Player,
+    traits::TranscriptCore,
 };
 use ark_ec::AffineRepr;
 use fixed::types::U64F64;
@@ -35,7 +35,7 @@ use move_core_types::{
     move_resource::MoveStructType,
 };
 use once_cell::sync::Lazy;
-use rand::{rngs::StdRng, CryptoRng, RngCore, SeedableRng};
+use rand::{rngs::StdRng, SeedableRng};
 use serde::{Deserialize, Serialize};
 use std::{
     cmp::max,
@@ -45,7 +45,9 @@ use std::{
     time::Instant,
 };
 
+/// MaxBcsSize: 818 + 32·n + 120·W + 24·max_w + 128·(W + max_w)·c + 80·ell.
 pub type ChunkyTranscript = SignedWeightedTranscript<Pairing>;
+/// ArkSize: 120 + 16·n + 104·W + 8·max_w + 48·(W + max_w)·c.
 pub type ChunkySubtranscript = WeightedSubtranscript<Pairing>;
 pub type DealerPrivateKey = bls12381::PrivateKey;
 pub type DealerPublicKey = bls12381::PublicKey;
@@ -60,36 +62,64 @@ pub static TEST_DIGEST_KEY: Lazy<Arc<DigestKey>> = Lazy::new(|| {
     let mut rng = ark_std::rand::rngs::StdRng::seed_from_u64(100u64);
     Arc::new(DigestKey::new(&mut rng, 32, 200).expect("DigestKey creation should not fail"))
 });
+/// Shared test PublicParameters for chunky DKG (unit tests only).
+pub static TEST_PUBLIC_PARAMETERS: Lazy<Arc<ChunkyDKGPublicParameters>> = Lazy::new(|| {
+    let mut rng = StdRng::seed_from_u64(200u64);
+    Arc::new(PublicParameters::new_for_testing(
+        24,
+        aptos_dkg::pvss::chunky::DEFAULT_ELL_FOR_DEPLOYMENT,
+        4,
+        G2Affine::generator(),
+        &mut rng,
+    ))
+});
 
-/// Path to the BCS-serialized DigestKey blob file.
-static DIGEST_KEY_PATH: OnceLock<PathBuf> = OnceLock::new();
-/// Direct DigestKey override (for test chains).
-static DIGEST_KEY_OVERRIDE: OnceLock<Arc<DigestKey>> = OnceLock::new();
+/// Path to the BCS-serialized PublicParameters blob file.
+static PUBLIC_PARAMETERS_PATH: OnceLock<PathBuf> = OnceLock::new();
 
-/// Production DigestKey: checks override first, then reads from file path.
+/// Deferred PublicParameters source — no expensive work at init time.
+#[derive(Debug)]
+enum PublicParametersOverride {
+    /// Resolve to TEST_PUBLIC_PARAMETERS on first access (deferred).
+    TestFallback,
+    /// An explicit Arc (e.g. set directly in tests).
+    Explicit(Arc<ChunkyDKGPublicParameters>),
+}
+
+/// Deferred PublicParameters override (for test chains).
+static PUBLIC_PARAMETERS_OVERRIDE: OnceLock<PublicParametersOverride> = OnceLock::new();
+
+/// Production PublicParameters: checks override first, then reads from file path.
 /// Returns `None` if neither was configured or if reading/deserializing fails.
-pub static DIGEST_KEY: Lazy<Option<Arc<DigestKey>>> = Lazy::new(|| {
-    if let Some(key) = DIGEST_KEY_OVERRIDE.get() {
-        return Some(Arc::clone(key));
+/// TEST_PUBLIC_PARAMETERS is only evaluated here (on first access), not at boot.
+pub static PUBLIC_PARAMETERS: Lazy<Option<Arc<ChunkyDKGPublicParameters>>> = Lazy::new(|| {
+    match PUBLIC_PARAMETERS_OVERRIDE.get() {
+        Some(PublicParametersOverride::TestFallback) => {
+            return Some(Arc::clone(&TEST_PUBLIC_PARAMETERS));
+        },
+        Some(PublicParametersOverride::Explicit(pp)) => {
+            return Some(Arc::clone(pp));
+        },
+        None => {},
     }
-    let path = DIGEST_KEY_PATH.get()?;
+    let path = PUBLIC_PARAMETERS_PATH.get()?;
     let start = Instant::now();
     let bytes = match std::fs::read(path) {
         Ok(b) => b,
         Err(e) => {
             tracing::error!(
-                "[DigestKey] failed to read blob file {}: {}",
+                "[PublicParameters] failed to read blob file {}: {}",
                 path.display(),
                 e
             );
             return None;
         },
     };
-    let key: DigestKey = match bcs::from_bytes(&bytes) {
+    let pp: ChunkyDKGPublicParameters = match bcs::from_bytes(&bytes) {
         Ok(k) => k,
         Err(e) => {
             tracing::error!(
-                "[DigestKey] failed to deserialize blob ({} bytes): {}",
+                "[PublicParameters] failed to deserialize blob ({} bytes): {}",
                 bytes.len(),
                 e
             );
@@ -98,9 +128,101 @@ pub static DIGEST_KEY: Lazy<Option<Arc<DigestKey>>> = Lazy::new(|| {
     };
     let elapsed = start.elapsed();
     tracing::info!(
-        "[DigestKey] loaded from {} ({} bytes) in {:?}",
+        "[PublicParameters] loaded from {} ({} bytes) in {:?}",
         path.display(),
         bytes.len(),
+        elapsed,
+    );
+    Some(Arc::new(pp))
+});
+
+/// Store the path to the PublicParameters blob file. No I/O is performed.
+pub fn set_public_parameters_path(path: PathBuf) {
+    PUBLIC_PARAMETERS_PATH
+        .set(path)
+        .expect("PublicParameters path already set");
+}
+
+/// Directly set the PublicParameters.
+pub fn set_public_parameters(pp: Arc<ChunkyDKGPublicParameters>) {
+    PUBLIC_PARAMETERS_OVERRIDE
+        .set(PublicParametersOverride::Explicit(pp))
+        .expect("PublicParameters already set");
+}
+
+/// Result of early PublicParameters initialization (metadata only, no file read).
+#[derive(Debug)]
+pub enum PublicParametersSource {
+    /// A blob file exists and will be lazily read on first access.
+    WillLoadFromFile { path: PathBuf, file_size: u64 },
+    /// Will fall back to the built-in test parameters on first access.
+    TestKeyFallback,
+    /// No PublicParameters available (no path configured, not a test chain).
+    NotAvailable,
+}
+
+/// Initialize the PublicParameters source. No expensive work is performed;
+/// TEST_PUBLIC_PARAMETERS construction is deferred to first access.
+/// Unlike DigestKey, PublicParameters are needed by all nodes (including fullnodes)
+/// to construct ChunkyDKGSession during state sync.
+pub fn initialize_public_parameters(chain_id: ChainId) -> PublicParametersSource {
+    if let Some(path) = PUBLIC_PARAMETERS_PATH.get() {
+        match std::fs::metadata(path) {
+            Ok(meta) => PublicParametersSource::WillLoadFromFile {
+                path: path.clone(),
+                file_size: meta.len(),
+            },
+            Err(_) => PublicParametersSource::NotAvailable,
+        }
+    } else if chain_id == ChainId::test() {
+        let _ = PUBLIC_PARAMETERS_OVERRIDE.set(PublicParametersOverride::TestFallback);
+        PublicParametersSource::TestKeyFallback
+    } else {
+        PublicParametersSource::NotAvailable
+    }
+}
+
+/// Path to the BCS-serialized DigestKey blob file.
+static DIGEST_KEY_PATH: OnceLock<PathBuf> = OnceLock::new();
+
+/// Deferred DigestKey source — no expensive work at init time.
+#[derive(Debug)]
+enum DigestKeyOverride {
+    /// Resolve to TEST_DIGEST_KEY on first access (deferred).
+    TestFallback,
+    /// An explicit Arc (e.g. set directly in tests).
+    Explicit(Arc<DigestKey>),
+}
+
+/// Deferred DigestKey override (for test chains).
+static DIGEST_KEY_OVERRIDE: OnceLock<DigestKeyOverride> = OnceLock::new();
+
+/// Production DigestKey: checks override first, then reads from file path.
+/// Returns `None` if neither was configured or if reading/deserializing fails.
+/// TEST_DIGEST_KEY is only evaluated here (on first access), not at boot.
+pub static DIGEST_KEY: Lazy<Option<Arc<DigestKey>>> = Lazy::new(|| {
+    match DIGEST_KEY_OVERRIDE.get() {
+        Some(DigestKeyOverride::TestFallback) => {
+            return Some(Arc::clone(&TEST_DIGEST_KEY));
+        },
+        Some(DigestKeyOverride::Explicit(key)) => {
+            return Some(Arc::clone(key));
+        },
+        None => {},
+    }
+    let path = DIGEST_KEY_PATH.get()?;
+    let start = Instant::now();
+    let key: DigestKey = match digest_key_file::read_digest_key(path) {
+        Ok(k) => k,
+        Err(e) => {
+            tracing::error!("[DigestKey] failed to read file: {}", e);
+            return None;
+        },
+    };
+    let elapsed = start.elapsed();
+    tracing::info!(
+        "[DigestKey] loaded from {} in {:?}",
+        path.display(),
         elapsed,
     );
     Some(Arc::new(key))
@@ -113,16 +235,18 @@ pub fn set_digest_key_path(path: PathBuf) {
         .expect("DigestKey path already set");
 }
 
-/// Directly set the DigestKey (for test chains).
+/// Directly set the DigestKey.
 pub fn set_digest_key(key: Arc<DigestKey>) {
-    DIGEST_KEY_OVERRIDE.set(key).expect("DigestKey already set");
+    DIGEST_KEY_OVERRIDE
+        .set(DigestKeyOverride::Explicit(key))
+        .expect("DigestKey already set");
 }
 
 /// Result of early DigestKey initialization (metadata only, no file read).
 #[derive(Debug)]
 pub enum DigestKeySource {
     /// A blob file exists and will be lazily read on first access.
-    WillLoadFromFile { file_size: u64 },
+    WillLoadFromFile { path: PathBuf, file_size: u64 },
     /// Fell back to the built-in test key.
     TestKeyFallback,
     /// No DigestKey is available (no path configured, not a test chain).
@@ -130,28 +254,35 @@ pub enum DigestKeySource {
 }
 
 /// Initialize the DigestKey source. Checks metadata only (no file read).
-/// On test chains without an explicit path, sets the test key override.
-pub fn initialize_digest_key(chain_id: ChainId) -> DigestKeySource {
+/// On test chains without an explicit path, sets the test key override
+/// for validator nodes only. Non-validator nodes (fullnodes) should not
+/// have a digest key since they don't participate in decryption.
+pub fn initialize_digest_key(chain_id: ChainId, is_validator: bool) -> DigestKeySource {
     if let Some(path) = DIGEST_KEY_PATH.get() {
         match std::fs::metadata(path) {
             Ok(meta) => DigestKeySource::WillLoadFromFile {
+                path: path.clone(),
                 file_size: meta.len(),
             },
             Err(_) => DigestKeySource::NotAvailable,
         }
-    } else if chain_id == ChainId::test() {
-        let _ = DIGEST_KEY_OVERRIDE.set(Arc::clone(&TEST_DIGEST_KEY));
+    } else if chain_id == ChainId::test() && is_validator {
+        let _ = DIGEST_KEY_OVERRIDE.set(DigestKeyOverride::TestFallback);
         DigestKeySource::TestKeyFallback
     } else {
         DigestKeySource::NotAvailable
     }
 }
 
-/// An aggregated transcript with the list of dealers who contributed to it.
+/// An aggregated transcript with the set of dealers who contributed to it.
+///
+/// Dealers are represented as a `BitVec` bitmask over validator indices,
+/// which inherently prevents duplicates and ensures canonical ordering.
 #[derive(Clone, Debug, Serialize, Deserialize, CryptoHasher, BCSCryptoHash)]
 pub struct AggregatedSubtranscript {
+    pub dealer_epoch: u64,
     pub subtranscript: ChunkySubtranscript,
-    pub dealers: Vec<Player>,
+    pub dealer_bitmask: BitVec,
 }
 
 impl AggregatedSubtranscript {
@@ -204,34 +335,12 @@ impl ChunkyDKGTranscript {
 #[derive(Clone, Debug)]
 pub struct ChunkyDKGSession {
     pub threshold_config: ChunkyDKGThresholdConfig,
-    pub public_parameters: ChunkyDKGPublicParameters,
+    pub public_parameters: Arc<ChunkyDKGPublicParameters>,
     pub session_metadata: ChunkyDKGSessionMetadata,
     pub eks: Vec<ChunkyEncryptPubKey>,
 }
 
 impl ChunkyDKGSession {
-    pub fn deal<A: Serialize + Clone, R: RngCore + CryptoRng>(
-        &self,
-        ssk: &DealerPrivateKey,
-        spk: &DealerPublicKey,
-        s: &ChunkyInputSecret,
-        sid: &A,
-        dealer: &Player,
-        rng: &mut R,
-    ) -> ChunkyTranscript {
-        ChunkyTranscript::deal(
-            &self.threshold_config,
-            &self.public_parameters,
-            ssk,
-            spk,
-            &self.eks,
-            s,
-            sid,
-            dealer,
-            rng,
-        )
-    }
-
     /// Create a new DKG session from on-chain session metadata.
     pub fn new(dkg_session_metadata: &ChunkyDKGSessionMetadata) -> Arc<ChunkyDKGSession> {
         let onchain_config = dkg_session_metadata
@@ -280,20 +389,10 @@ impl ChunkyDKGSession {
         )
         .expect("Failed to create WeightedConfigArkworks");
 
-        // Create PublicParameters<Pairing> with max_num_shares based on total weight
-        // TODO(ibalajiarun): Modify PublicParameters to take in u64 weights.
-        let total_weight: u32 = profile.validator_weights.iter().sum::<u64>() as u32;
-
-        // TODO(ibalajiarun): Replace seed for public parameters with a trusted setup
-        let seed = dkg_session_metadata.dealer_epoch;
-        let mut rng_aptos = StdRng::seed_from_u64(seed);
-        let public_parameters = PublicParameters::new_for_testing(
-            total_weight as usize,
-            aptos_dkg::pvss::chunky::DEFAULT_ELL_FOR_DEPLOYMENT,
-            threshold_config.get_total_num_players(),
-            G2Affine::generator(),
-            &mut rng_aptos,
-        );
+        let public_parameters = PUBLIC_PARAMETERS
+            .as_ref()
+            .expect("PublicParameters not initialized; call initialize_public_parameters first")
+            .clone();
 
         Arc::new(ChunkyDKGSession {
             threshold_config,
@@ -301,6 +400,23 @@ impl ChunkyDKGSession {
             session_metadata: dkg_session_metadata.clone(),
             eks,
         })
+    }
+
+    /// BCS wire-size upper bound for an inbound `ChunkyTranscript`. Used as a structural
+    /// validation gate before deserialization.
+    ///
+    /// Formula taken from `aptos_dkg::pvss::signed::generic_signing::GenericSigning`'s
+    /// `MaxBcsSize(T=UnsignedWeightedTranscript<Bls12_381>)` annotation.
+    pub fn expected_max_transcript_size(&self) -> usize {
+        const FR_BITS: usize = 255;
+        let n = self.eks.len();
+        let w = self.threshold_config.get_total_weight();
+        let max_w = self.threshold_config.get_max_weight();
+        let ell = self.public_parameters.ell.max(1);
+        let c = FR_BITS.div_ceil(ell);
+        let max_bcs_size = 818 + 32 * n + 120 * w + 24 * max_w + 128 * (w + max_w) * c + 80 * ell;
+        const FIXED_SLACK: usize = 4 * 1024;
+        max_bcs_size + FIXED_SLACK
     }
 }
 
@@ -413,4 +529,93 @@ impl ChunkyDKGState {
 impl OnChainConfig for ChunkyDKGState {
     const MODULE_IDENTIFIER: &'static str = "chunky_dkg";
     const TYPE_IDENTIFIER: &'static str = "ChunkyDKGState";
+}
+
+#[cfg(test)]
+mod transcript_size_bound_tests {
+    use super::*;
+    use aptos_crypto::{SigningKey, Uniform};
+    use aptos_dkg::pvss::{
+        chunky::DEFAULT_ELL_FOR_DEPLOYMENT,
+        traits::{transcript::Transcript, Convert, HasEncryptionPublicParams},
+        Player,
+    };
+    use rand::thread_rng;
+
+    fn deal_and_check(weights: Vec<usize>, max_num_shares: usize) {
+        let mut rng_pp = StdRng::seed_from_u64(0xC0FFEE);
+        let pp = Arc::new(ChunkyDKGPublicParameters::new_for_testing(
+            max_num_shares,
+            DEFAULT_ELL_FOR_DEPLOYMENT,
+            4,
+            G2Affine::generator(),
+            &mut rng_pp,
+        ));
+        let total_w: usize = weights.iter().sum();
+        let threshold_config =
+            ChunkyDKGThresholdConfig::new(total_w.div_ceil(2).max(1), weights.clone()).unwrap();
+        let n = weights.len();
+        let dks: Vec<ChunkyDecryptPrivKey> = (0..n)
+            .map(|_| Uniform::generate(&mut thread_rng()))
+            .collect();
+        let eks: Vec<ChunkyEncryptPubKey> = dks
+            .iter()
+            .map(|dk| dk.to(pp.get_encryption_public_params()))
+            .collect();
+        let ssk: DealerPrivateKey = Uniform::generate(&mut thread_rng());
+        let spk: DealerPublicKey = ssk.verifying_key();
+        let session = ChunkyDKGSession {
+            threshold_config,
+            public_parameters: pp,
+            session_metadata: ChunkyDKGSessionMetadata {
+                dealer_epoch: 0,
+                chunky_dkg_config: OnChainChunkyDKGConfig::default_enabled().into(),
+                dealer_validator_set: vec![],
+                target_validator_set: vec![],
+            },
+            eks,
+        };
+        let bound = session.expected_max_transcript_size();
+        let mut rng = thread_rng();
+        let secret = ChunkyInputSecret::generate(&mut rng);
+        let trx = ChunkyTranscript::deal(
+            &session.threshold_config,
+            &session.public_parameters,
+            &ssk,
+            &spk,
+            &session.eks,
+            &secret,
+            &session.session_metadata,
+            &Player { id: 0 },
+            &mut rng,
+        );
+        let actual = bcs::to_bytes(&trx).unwrap().len();
+        let w = session.threshold_config.get_total_weight();
+        let max_w = session.threshold_config.get_max_weight();
+        println!(
+            "[size-bound] W={w} max_w={max_w} n={n} actual={actual} bound={bound} headroom={}",
+            bound as isize - actual as isize
+        );
+        assert!(actual <= bound, "actual {actual} > bound {bound}");
+    }
+
+    #[test]
+    fn within_bound_w16() {
+        deal_and_check(vec![4, 4, 4, 4], 24);
+    }
+
+    #[test]
+    fn within_bound_w100() {
+        deal_and_check(vec![20; 5], 128);
+    }
+
+    #[test]
+    fn within_bound_w200() {
+        deal_and_check(vec![40; 5], 256);
+    }
+
+    #[test]
+    fn within_bound_w400() {
+        deal_and_check(vec![40; 10], 512);
+    }
 }

@@ -98,7 +98,7 @@ impl WithMaxNumShares for PublicParameters {
         Self::default()
     }
 
-    fn with_max_num_shares_and_bit_size(_n: usize, _ell: u8) -> Self {
+    fn with_max_num_shares_and_bit_size(_n: usize, _ell: usize) -> Self {
         panic!("This is the wrong PVSS for bit sizes")
     }
 

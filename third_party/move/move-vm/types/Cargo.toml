@@ -31,11 +31,16 @@ triomphe = { workspace = true }
 
 [dev-dependencies]
 claims = { workspace = true }
+criterion = { workspace = true }
 mockall = { workspace = true }
 move-binary-format = { workspace = true, features = ["fuzzing"] }
 once_cell = { workspace = true }
 proptest = { workspace = true }
 rand = { workspace = true }
+
+[[bench]]
+name = "drop_bench"
+harness = false
 
 [features]
 default = [

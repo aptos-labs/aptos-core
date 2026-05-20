@@ -1,7 +1,4 @@
-
-<a id="0x1_vector"></a>
-
-# Module `0x1::vector`
+# Module `0x1::vector` <a id="0x1_vector"></a>
 
 A variable-sized container that can hold any type. Indexing is 0-based, and
 vectors are growable. This module has many native functions.
@@ -46,10 +43,7 @@ the return on investment didn't seem worth it for these simple functions.
 <pre><code></code></pre>
 
 
-
-<a id="@Constants_0"></a>
-
-## Constants
+## Constants <a id="@Constants_0"></a>
 
 
 <a id="0x1_vector_EINDEX_OUT_OF_BOUNDS"></a>
@@ -61,10 +55,7 @@ The index into the vector is out of bounds
 </code></pre>
 
 
-
-<a id="0x1_vector_empty"></a>
-
-## Function `empty`
+## Function `empty` <a id="0x1_vector_empty"></a>
 
 Create an empty vector.
 
@@ -86,9 +77,7 @@ Create an empty vector.
 
 </details>
 
-<a id="0x1_vector_length"></a>
-
-## Function `length`
+## Function `length` <a id="0x1_vector_length"></a>
 
 Return the length of the vector.
 
@@ -110,9 +99,7 @@ Return the length of the vector.
 
 </details>
 
-<a id="0x1_vector_borrow"></a>
-
-## Function `borrow`
+## Function `borrow` <a id="0x1_vector_borrow"></a>
 
 Acquire an immutable reference to the <code>i</code>th element of the vector <code>v</code>.
 Aborts if <code>i</code> is out of bounds.
@@ -135,9 +122,7 @@ Aborts if <code>i</code> is out of bounds.
 
 </details>
 
-<a id="0x1_vector_push_back"></a>
-
-## Function `push_back`
+## Function `push_back` <a id="0x1_vector_push_back"></a>
 
 Add element <code>e</code> to the end of the vector <code>v</code>.
 
@@ -159,9 +144,7 @@ Add element <code>e</code> to the end of the vector <code>v</code>.
 
 </details>
 
-<a id="0x1_vector_borrow_mut"></a>
-
-## Function `borrow_mut`
+## Function `borrow_mut` <a id="0x1_vector_borrow_mut"></a>
 
 Return a mutable reference to the <code>i</code>th element in the vector <code>v</code>.
 Aborts if <code>i</code> is out of bounds.
@@ -184,9 +167,7 @@ Aborts if <code>i</code> is out of bounds.
 
 </details>
 
-<a id="0x1_vector_pop_back"></a>
-
-## Function `pop_back`
+## Function `pop_back` <a id="0x1_vector_pop_back"></a>
 
 Pop an element from the end of vector <code>v</code>.
 Aborts if <code>v</code> is empty.
@@ -209,9 +190,7 @@ Aborts if <code>v</code> is empty.
 
 </details>
 
-<a id="0x1_vector_destroy_empty"></a>
-
-## Function `destroy_empty`
+## Function `destroy_empty` <a id="0x1_vector_destroy_empty"></a>
 
 Destroy the vector <code>v</code>.
 Aborts if <code>v</code> is not empty.
@@ -234,9 +213,7 @@ Aborts if <code>v</code> is not empty.
 
 </details>
 
-<a id="0x1_vector_swap"></a>
-
-## Function `swap`
+## Function `swap` <a id="0x1_vector_swap"></a>
 
 Swaps the elements at the <code>i</code>th and <code>j</code>th indices in the vector <code>v</code>.
 Aborts if <code>i</code> or <code>j</code> is out of bounds.
@@ -259,9 +236,7 @@ Aborts if <code>i</code> or <code>j</code> is out of bounds.
 
 </details>
 
-<a id="0x1_vector_singleton"></a>
-
-## Function `singleton`
+## Function `singleton` <a id="0x1_vector_singleton"></a>
 
 Return an vector of size one containing element <code>e</code>.
 
@@ -286,6 +261,7 @@ Return an vector of size one containing element <code>e</code>.
 
 </details>
 
+
 <details>
 <summary>Specification</summary>
 
@@ -299,9 +275,7 @@ Return an vector of size one containing element <code>e</code>.
 
 </details>
 
-<a id="0x1_vector_reverse"></a>
-
-## Function `reverse`
+## Function `reverse` <a id="0x1_vector_reverse"></a>
 
 Reverses the order of the elements in the vector <code>v</code> in place.
 
@@ -333,6 +307,7 @@ Reverses the order of the elements in the vector <code>v</code> in place.
 
 </details>
 
+
 <details>
 <summary>Specification</summary>
 
@@ -345,9 +320,7 @@ Reverses the order of the elements in the vector <code>v</code> in place.
 
 </details>
 
-<a id="0x1_vector_find"></a>
-
-## Function `find`
+## Function `find` <a id="0x1_vector_find"></a>
 
 
 
@@ -392,9 +365,7 @@ Reverses the order of the elements in the vector <code>v</code> in place.
 
 </details>
 
-<a id="0x1_vector_append"></a>
-
-## Function `append`
+## Function `append` <a id="0x1_vector_append"></a>
 
 Pushes all of the elements of the <code>other</code> vector into the <code>lhs</code> vector.
 
@@ -419,6 +390,7 @@ Pushes all of the elements of the <code>other</code> vector into the <code>lhs</
 
 </details>
 
+
 <details>
 <summary>Specification</summary>
 
@@ -431,9 +403,7 @@ Pushes all of the elements of the <code>other</code> vector into the <code>lhs</
 
 </details>
 
-<a id="0x1_vector_is_empty"></a>
-
-## Function `is_empty`
+## Function `is_empty` <a id="0x1_vector_is_empty"></a>
 
 Return <code><b>true</b></code> if the vector <code>v</code> has no elements and <code><b>false</b></code> otherwise.
 
@@ -456,6 +426,7 @@ Return <code><b>true</b></code> if the vector <code>v</code> has no elements and
 
 </details>
 
+
 <details>
 <summary>Specification</summary>
 
@@ -468,9 +439,7 @@ Return <code><b>true</b></code> if the vector <code>v</code> has no elements and
 
 </details>
 
-<a id="0x1_vector_contains"></a>
-
-## Function `contains`
+## Function `contains` <a id="0x1_vector_contains"></a>
 
 Return true if <code>e</code> is in the vector <code>v</code>.
 Otherwise, returns false.
@@ -500,6 +469,7 @@ Otherwise, returns false.
 
 </details>
 
+
 <details>
 <summary>Specification</summary>
 
@@ -512,9 +482,7 @@ Otherwise, returns false.
 
 </details>
 
-<a id="0x1_vector_index_of"></a>
-
-## Function `index_of`
+## Function `index_of` <a id="0x1_vector_index_of"></a>
 
 Return <code>(<b>true</b>, i)</code> if <code>e</code> is in the vector <code>v</code> at index <code>i</code>.
 Otherwise, returns <code>(<b>false</b>, 0)</code>.
@@ -544,6 +512,7 @@ Otherwise, returns <code>(<b>false</b>, 0)</code>.
 
 </details>
 
+
 <details>
 <summary>Specification</summary>
 
@@ -556,9 +525,7 @@ Otherwise, returns <code>(<b>false</b>, 0)</code>.
 
 </details>
 
-<a id="0x1_vector_remove"></a>
-
-## Function `remove`
+## Function `remove` <a id="0x1_vector_remove"></a>
 
 Remove the <code>i</code>th element of the vector <code>v</code>, shifting all subsequent elements.
 This is O(n) and preserves ordering of elements in the vector.
@@ -589,6 +556,7 @@ Aborts if <code>i</code> is out of bounds.
 
 </details>
 
+
 <details>
 <summary>Specification</summary>
 
@@ -601,9 +569,7 @@ Aborts if <code>i</code> is out of bounds.
 
 </details>
 
-<a id="0x1_vector_swap_remove"></a>
-
-## Function `swap_remove`
+## Function `swap_remove` <a id="0x1_vector_swap_remove"></a>
 
 Swap the <code>i</code>th element of the vector <code>v</code> with the last element and then pop the element.
 This is O(1), but does not preserve ordering of elements in the vector.
@@ -631,6 +597,7 @@ Aborts if <code>i</code> is out of bounds.
 
 </details>
 
+
 <details>
 <summary>Specification</summary>
 
@@ -643,9 +610,7 @@ Aborts if <code>i</code> is out of bounds.
 
 </details>
 
-<a id="0x1_vector_for_each"></a>
-
-## Function `for_each`
+## Function `for_each` <a id="0x1_vector_for_each"></a>
 
 Apply the function to each element in the vector, consuming it.
 
@@ -672,9 +637,7 @@ Apply the function to each element in the vector, consuming it.
 
 </details>
 
-<a id="0x1_vector_for_each_ref"></a>
-
-## Function `for_each_ref`
+## Function `for_each_ref` <a id="0x1_vector_for_each_ref"></a>
 
 Apply the function to a reference of each element in the vector.
 
@@ -701,9 +664,7 @@ Apply the function to a reference of each element in the vector.
 
 </details>
 
-<a id="0x1_vector_for_each_mut"></a>
-
-## Function `for_each_mut`
+## Function `for_each_mut` <a id="0x1_vector_for_each_mut"></a>
 
 Apply the function to a mutable reference to each element in the vector.
 
@@ -730,9 +691,7 @@ Apply the function to a mutable reference to each element in the vector.
 
 </details>
 
-<a id="0x1_vector_fold"></a>
-
-## Function `fold`
+## Function `fold` <a id="0x1_vector_fold"></a>
 
 Fold the function over the elements. For example, <code><a href="vector.md#0x1_vector_fold">fold</a>(<a href="vector.md#0x1_vector">vector</a>[1,2,3], 0, f)</code> will execute
 <code>f(f(f(0, 1), 2), 3)</code>
@@ -762,9 +721,7 @@ Fold the function over the elements. For example, <code><a href="vector.md#0x1_v
 
 </details>
 
-<a id="0x1_vector_map"></a>
-
-## Function `map`
+## Function `map` <a id="0x1_vector_map"></a>
 
 Map the function over the elements of the vector, producing a new vector.
 
@@ -792,9 +749,7 @@ Map the function over the elements of the vector, producing a new vector.
 
 </details>
 
-<a id="0x1_vector_filter"></a>
-
-## Function `filter`
+## Function `filter` <a id="0x1_vector_filter"></a>
 
 Filter the vector using the boolean function, removing all elements for which <code>p(e)</code> is not true.
 
@@ -824,15 +779,10 @@ Filter the vector using the boolean function, removing all elements for which <c
 
 </details>
 
-<a id="@Module_Specification_1"></a>
-
-## Module Specification
+## Module Specification <a id="@Module_Specification_1"></a>
 
 
-
-<a id="@Helper_Functions_2"></a>
-
-### Helper Functions
+### Helper Functions <a id="@Helper_Functions_2"></a>
 
 
 Check if <code>v1</code> is equal to the result of adding <code>e</code> at the end of <code>v2</code>

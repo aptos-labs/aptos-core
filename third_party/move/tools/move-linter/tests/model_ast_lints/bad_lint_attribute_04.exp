@@ -1,7 +1,7 @@
 Aborting with compilation errors:
 exiting with env checking errors
 error: unknown lint check: `unknown_lint`
-  ┌─ tests/model_ast_lints/bad_lint_attribute_04.move:2:18
+  ┌─ tests/model_ast_lints/bad_lint_attribute_04.move:3:18
   │
-2 │     #[lint::skip(unknown_lint)]
+3 │     #[lint::skip(unknown_lint)]
   │                  ^^^^^^^^^^^^

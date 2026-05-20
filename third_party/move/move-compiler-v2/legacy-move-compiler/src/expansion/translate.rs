@@ -1303,6 +1303,7 @@ fn constant_(context: &mut Context, pconstant: P::Constant) -> (ConstantName, E:
         attributes: pattributes,
         loc,
         name,
+        visibility: pvisibility,
         signature: psignature,
         value: pvalue,
     } = pconstant;
@@ -1311,9 +1312,13 @@ fn constant_(context: &mut Context, pconstant: P::Constant) -> (ConstantName, E:
     let signature = type_(context, psignature);
     let value = exp_(context, pvalue);
     let _specs = context.extract_exp_specs();
+    let visibility = pvisibility
+        .map(visibility)
+        .unwrap_or(E::Visibility::Internal);
     let constant = E::Constant {
         attributes,
         loc,
+        visibility,
         signature,
         value,
     };
@@ -1760,6 +1765,7 @@ fn spec_member(context: &mut Context, sp!(loc, pm): P::SpecBlockMember) -> E::Sp
             fun_param,
             params,
             targets,
+            all,
         } => EM::ModifiesOf {
             fun_param,
             params: params
@@ -1767,10 +1773,16 @@ fn spec_member(context: &mut Context, sp!(loc, pm): P::SpecBlockMember) -> E::Sp
                 .map(|(v, t)| (v, type_(context, t)))
                 .collect(),
             targets: targets.into_iter().map(|e| exp_(context, e)).collect(),
+            all,
         },
-        PM::ReadsOf { fun_param, types } => EM::ReadsOf {
+        PM::ReadsOf {
+            fun_param,
+            types,
+            all,
+        } => EM::ReadsOf {
             fun_param,
             types: types.into_iter().map(|t| type_(context, t)).collect(),
+            all,
         },
         PM::Modifies { targets } => EM::Modifies {
             targets: targets.into_iter().map(|e| exp_(context, e)).collect(),
@@ -2085,8 +2097,7 @@ fn name_access_chain(
         },
         (_, PN::Two(sp!(_, LN::Name(n1)), n2)) => {
             if let Some((mident, mem)) = context.aliases.member_alias_get(&n1).filter(|_| {
-                context.env.flags().lang_v2()
-                    && is_valid_struct_constant_or_schema_name(n1.value.as_str())
+                is_valid_struct_constant_or_schema_name(n1.value.as_str())
                     && is_valid_struct_constant_or_schema_name(n2.value.as_str())
             }) {
                 // n1 is interpreted as a type and n2 as a variant in the type
@@ -2279,17 +2290,6 @@ fn exp_(context: &mut Context, sp!(loc, pe_): P::Exp) -> E::Exp {
         },
         PE::Move(v) => EE::Move(v),
         PE::Copy(v) => EE::Copy(v),
-        PE::Name(_pn, Some(_ty)) if !context.in_spec_context && !context.env.flags().lang_v2() => {
-            context.env.add_diag(diag!(
-                Syntax::SpecContextRestricted,
-                (
-                    loc,
-                    "Expected name to be followed by a brace-enclosed list of field expressions \
-                     or a parenthesized list of arguments for a function call",
-                )
-            ));
-            EE::UnresolvedError
-        },
         PE::Name(pn, ptys_opt) => {
             let en_opt = name_access_chain(context, Access::Term, pn);
             let tys_opt = optional_types(context, ptys_opt);
@@ -2569,25 +2569,7 @@ fn exp_(context: &mut Context, sp!(loc, pe_): P::Exp) -> E::Exp {
             exp(context, *e),
             tys.into_iter().map(|ty| type_(context, ty)).collect(),
         ),
-        PE::Index(e, i) => {
-            if context.env.flags().lang_v2() || context.in_spec_context {
-                EE::Index(exp(context, *e), exp(context, *i))
-            } else {
-                // If it is a name, call `name_access_chain` to avoid
-                // the unused alias warning
-                if let PE::Name(pn, _) = e.value {
-                    let _ = name_access_chain(context, Access::Term, pn);
-                }
-                context.env.add_diag(diag!(
-                    Syntax::UnsupportedLanguageItem,
-                    (
-                        loc,
-                        "`_[_]` index operator in non-specification code only allowed in Move 2 and beyond"
-                    )
-                ));
-                EE::UnresolvedError
-            }
-        },
+        PE::Index(e, i) => EE::Index(exp(context, *e), exp(context, *i)),
         PE::Annotate(e, ty) => EE::Annotate(exp(context, *e), type_(context, ty)),
         PE::Spec(_) if context.in_spec_context => {
             context.env.add_diag(diag!(
@@ -2604,7 +2586,7 @@ fn exp_(context: &mut Context, sp!(loc, pe_): P::Exp) -> E::Exp {
             } = unbound_names;
             EE::Spec(spec_id, unbound_vars, unbound_func_ptrs)
         },
-        PE::Behavior(kind, fn_name, type_args, sp!(args_loc, args)) => {
+        PE::Behavior(kind, target, sp!(args_loc, args)) => {
             if !context.in_spec_context {
                 context.env.add_diag(diag!(
                     Syntax::SpecContextRestricted,
@@ -2615,14 +2597,9 @@ fn exp_(context: &mut Context, sp!(loc, pe_): P::Exp) -> E::Exp {
                 ));
                 EE::UnresolvedError
             } else {
-                let e_fn_name = name_access_chain(context, Access::Term, fn_name);
-                let e_type_args = optional_types(context, type_args);
+                let e_target = exp_(context, *target);
                 let e_args = sp(args_loc, exps(context, args));
-                if let Some(fn_access) = e_fn_name {
-                    EE::Behavior(kind, fn_access, e_type_args, e_args)
-                } else {
-                    EE::UnresolvedError
-                }
+                EE::Behavior(kind, Box::new(e_target), e_args)
             }
         },
         PE::StateLabeled(pre_label, inner, post_label) => {
@@ -2865,12 +2842,60 @@ fn bind_with_range_list(
     let rs_: Option<Vec<E::LValueWithRange>> = prs_
         .into_iter()
         .map(|sp!(loc, (pb, pr))| -> Option<E::LValueWithRange> {
+            // State-domain ranges (`S in *`) produce a $spec_state_domain call.
+            // The binding variable must be treated as a plain variable, not a
+            // struct pattern, even if uppercase (since state labels conventionally
+            // use uppercase names like `S`).
+            let is_state_domain = is_state_domain_range(&pr);
             let r = exp_(context, pr);
-            let b = bind(context, pb)?;
+            let b = if is_state_domain {
+                bind_as_var(context, pb)
+            } else {
+                bind(context, pb)?
+            };
             Some(sp(loc, (b, r)))
         })
         .collect();
     Some(sp(loc, rs_?))
+}
+
+/// Returns true if the range expression is a `$spec_state_domain()` call.
+fn is_state_domain_range(exp: &P::Exp) -> bool {
+    use crate::parser::ast::{Exp_ as PE, NameAccessChain_ as NA};
+    if let PE::Call(sp!(_, NA::One(name)), _, _, _) = &exp.value {
+        name.value.as_str() == "$spec_state_domain"
+    } else {
+        false
+    }
+}
+
+/// Like `bind`, but always produces a variable binding (never struct destructure).
+/// Used for state-domain quantifier variables, which use uppercase names by convention
+/// (e.g., `S` in `forall S in *:`). Skips the local name validity check since these
+/// are state labels, not regular local variables.
+fn bind_as_var(context: &mut Context, sp!(loc, pb_): P::Bind) -> E::LValue {
+    use E::LValue_ as EL;
+    use P::Bind_ as PB;
+    let b_ = match pb_ {
+        PB::Var(v) => {
+            // Skip check_valid_local_name: state labels use uppercase by convention.
+            EL::Var(sp(loc, E::ModuleAccess_::Name(v.0)), None)
+        },
+        _ => {
+            context.env.add_diag(diag!(
+                Syntax::SpecContextRestricted,
+                (
+                    loc,
+                    "state domain quantifier variable must be a simple variable"
+                )
+            ));
+            EL::Var(
+                sp(loc, E::ModuleAccess_::Name(sp(loc, Symbol::from("_")))),
+                None,
+            )
+        },
+    };
+    sp(loc, b_)
 }
 
 fn bind(context: &mut Context, sp!(loc, pb_): P::Bind) -> Option<E::LValue> {
@@ -2878,9 +2903,7 @@ fn bind(context: &mut Context, sp!(loc, pb_): P::Bind) -> Option<E::LValue> {
     use P::Bind_ as PB;
     let b_ = match pb_ {
         PB::Var(v) => {
-            if context.env.flags().lang_v2()
-                && is_valid_struct_constant_or_schema_name(v.value().as_str())
-            {
+            if is_valid_struct_constant_or_schema_name(v.value().as_str()) {
                 // Interpret as an unqualified module access
                 EL::Unpack(
                     sp(v.loc(), ModuleAccess_::Name(v.0)),
@@ -2954,6 +2977,17 @@ fn bind(context: &mut Context, sp!(loc, pb_): P::Bind) -> Option<E::LValue> {
             let eval = value(context, pval)?;
             EL::Literal(eval)
         },
+        PB::Range(plo, phi, inclusive) => {
+            let elo = match plo {
+                Some(v) => Some(value(context, v)?),
+                None => None,
+            };
+            let ehi = match phi {
+                Some(v) => Some(value(context, v)?),
+                None => None,
+            };
+            EL::Range(elo, ehi, inclusive)
+        },
     };
     Some(sp(loc, b_))
 }
@@ -2974,7 +3008,7 @@ fn lvalues(context: &mut Context, sp!(loc, e_): P::Exp) -> Option<LValue> {
                 pes.into_iter().map(|pe| assign(context, pe)).collect();
             L::Assigns(sp(loc, al_opt?))
         },
-        PE::Index(_, _) if context.env.flags().lang_v2() => {
+        PE::Index(_, _) => {
             let er = exp(context, sp(loc, e_));
             L::Mutate(er)
         },
@@ -3301,13 +3335,8 @@ fn unbound_names_exp(unbound: &mut UnboundNames, sp!(_, e_): &E::Exp) {
             unbound.vars.extend(unbound_vars);
             unbound.func_ptrs.extend(unbound_func_ptrs);
         },
-        EE::Behavior(_, fn_name, _type_args, sp!(_, args)) => {
-            match &fn_name.value {
-                E::ModuleAccess_::Name(n) => {
-                    unbound.func_ptrs.insert(*n);
-                },
-                E::ModuleAccess_::ModuleAccess(..) => (),
-            }
+        EE::Behavior(_, target, sp!(_, args)) => {
+            unbound_names_exp(unbound, target);
             unbound_names_exps(unbound, args);
         },
         EE::StateLabeled(_, inner, _) => {
@@ -3389,8 +3418,8 @@ fn unbound_names_bind(unbound: &mut UnboundNames, sp!(_, l_): &E::LValue) {
                 .collect();
             unbound_names_binds(unbound, &sp(loc, ls))
         },
-        EL::Literal(_) => {
-            // Literals don't bind any variables
+        EL::Literal(_) | EL::Range(..) => {
+            // Literals and ranges don't bind any variables
         },
     }
 }
@@ -3428,8 +3457,8 @@ fn unbound_names_assign(unbound: &mut UnboundNames, sp!(_, l_): &E::LValue) {
                 .collect();
             unbound_names_assigns(unbound, &sp(loc, ls))
         },
-        EL::Literal(_) => {
-            // Literals don't have variables to assign
+        EL::Literal(_) | EL::Range(..) => {
+            // Literals and ranges don't have variables to assign
         },
     }
 }

@@ -1,3 +1,4 @@
+// @checks=experimental
 module 0xc0ffee::unnecessary_casts_test {
 
     const U8_VALUE: u8 = 255;

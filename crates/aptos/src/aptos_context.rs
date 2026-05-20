@@ -8,8 +8,8 @@
 //! gas profiling, benchmarking, and session-based execution.
 
 use aptos_cli_common::{
-    explorer_transaction_link, get_account_with_state, prompt_yes_with_override, AccountType,
-    CliError, CliTypedResult, Network, ReplayProtectionType, TransactionOptions,
+    explorer_transaction_link, format_txn_status, get_account_with_state, prompt_yes_with_override,
+    AccountType, CliError, CliTypedResult, Network, ReplayProtectionType, TransactionOptions,
     TransactionSummary, ACCEPTED_CLOCK_SKEW_US, US_IN_SECS,
 };
 use aptos_crypto::ed25519::Ed25519Signature;
@@ -71,6 +71,7 @@ impl aptos_move_cli::AptosContext for RealAptosContext {
             println!();
             println!("Simulating transaction locally using the gas profiler...");
             let fold_unique_stack = options.fold_unique_stack;
+            let skip_gas_profiler_consistency_check = options.skip_gas_profiler_consistency_check;
             simulate_using_debugger(
                 options,
                 payload,
@@ -82,6 +83,7 @@ impl aptos_move_cli::AptosContext for RealAptosContext {
                         hash,
                         aux_info,
                         fold_unique_stack,
+                        skip_gas_profiler_consistency_check,
                     )
                 },
             )
@@ -131,6 +133,7 @@ impl aptos_move_cli::AptosContext for RealAptosContext {
                     request.ty_args,
                     request.args,
                     options.profile_gas,
+                    options.skip_gas_profiler_consistency_check,
                 )?;
                 Ok(output)
             },
@@ -227,8 +230,10 @@ where
         success,
         timestamp_us: None,
         version: Some(version),
-        vm_status: Some(vm_status.to_string()),
+        vm_status: Some(format_txn_status(vm_output.status(), &vm_status)),
         deployed_object_address: None,
+        events: None,
+        changes: None,
     })
 }
 
@@ -275,7 +280,7 @@ async fn simulate_using_session(
         sender_account.sign_with_transaction_builder(transaction_factory.payload(payload));
     let hash = transaction.committed_hash();
 
-    let (vm_status, txn_output) = sess.execute_transaction(transaction, false)?;
+    let (vm_status, txn_output) = sess.execute_transaction(transaction, false, false)?;
 
     let success = match txn_output.status() {
         TransactionStatus::Keep(exec_status) => Some(exec_status.is_success()),
@@ -293,8 +298,10 @@ async fn simulate_using_session(
         success,
         timestamp_us: None,
         version: None,
-        vm_status: Some(vm_status.to_string()),
+        vm_status: Some(format_txn_status(txn_output.status(), &vm_status)),
         deployed_object_address: None,
+        events: None,
+        changes: None,
     })
 }
 

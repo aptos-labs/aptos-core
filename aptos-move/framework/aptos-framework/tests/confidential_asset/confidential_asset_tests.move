@@ -74,13 +74,14 @@ module aptos_framework::confidential_asset_tests {
         token: Object<Metadata>,
         to: address,
         amount: u64,
-        new_amount: u128
+        new_amount: u128,
+        memo: vector<u8>,
     ) {
         let proof = prove_transfer(
             signer::address_of(sender), to, token, sender_dk, amount, new_amount, &vector[],
         );
 
-        confidential_asset::confidential_transfer(sender, token, to, proof, vector[]);
+        confidential_asset::confidential_transfer(sender, token, to, proof, memo);
     }
 
     fun audit_transfer(
@@ -505,28 +506,28 @@ module aptos_framework::confidential_asset_tests {
         register(&alice, &alice_dk, alice_ek, token);
         register(&bob, &bob_dk, bob_ek, token);
 
-        confidential_asset::deposit(&alice, token, 200);
+        // Test transfers with various memo lengths (0, 128, 256 bytes)
+        let memo_lengths = vector[0u64, 128, 256];
+        let num_transfers = memo_lengths.length();
+        let amount_per_transfer = 10u64;
+        let deposit_amount = amount_per_transfer * (num_transfers as u64);
+
+        confidential_asset::deposit(&alice, token, deposit_amount);
         confidential_asset::rollover_pending_balance(&alice, token);
 
-        transfer(&alice, &alice_dk, token, bob_addr, 100, 100);
-
-        assert!(
-            check_available_balance_decrypts_to(alice_addr, token, &alice_dk, 100, false),
-            1
-        );
-        assert!(
-            check_pending_balance_decrypts_to(bob_addr, token, &bob_dk, 100),
-            1
-        );
-
-        transfer(&alice, &alice_dk, token, bob_addr, 100, 0);
+        let remaining = (deposit_amount as u128);
+        memo_lengths.for_each(|len| {
+            let memo = std::vector::range(0, len).map(|i| ((i % 256) as u8));
+            remaining -= (amount_per_transfer as u128);
+            transfer(&alice, &alice_dk, token, bob_addr, amount_per_transfer, remaining, memo);
+        });
 
         assert!(
             check_available_balance_decrypts_to(alice_addr, token, &alice_dk, 0, false),
             1
         );
         assert!(
-            check_pending_balance_decrypts_to(bob_addr, token, &bob_dk, 200),
+            check_pending_balance_decrypts_to(bob_addr, token, &bob_dk, deposit_amount),
             1
         );
     }
@@ -885,7 +886,7 @@ module aptos_framework::confidential_asset_tests {
         let v = new_scalar_from_u64(v);
         let compressed_old_balance = confidential_asset::get_available_balance(sender_addr, asset_type);
         let compressed_new_balance = new_balance.compress();
-        let (stmt, _) = sigma_protocol_withdraw::new_withdrawal_statement(
+        let stmt = sigma_protocol_withdraw::new_withdrawal_statement(
             ek, &compressed_old_balance, &compressed_new_balance, &compressed_ek_aud, v
         );
         let witn = sigma_protocol_proof_tests::new_withdrawal_witness(*dk_sender, new_a, *new_r);
@@ -988,5 +989,25 @@ module aptos_framework::confidential_asset_tests {
             compressed_new_R,
             session.prove(&stmt, &witn),
         )
+    }
+
+    #[test(confidential_asset = @aptos_framework, aptos_fx = @aptos_framework, fa = @0xfa, alice = @0xa1, bob = @0xb0)]
+    #[expected_failure(abort_code = 65555, location = aptos_framework::confidential_asset)]
+    fun fail_transfer_memo_too_long(
+        confidential_asset: signer, aptos_fx: signer, fa: signer, alice: signer, bob: signer,
+    ) {
+        let token = set_up_for_confidential_asset_test(
+            &confidential_asset, &aptos_fx, &fa, &alice, &bob, 500, 500,
+        );
+
+        let (alice_dk, alice_ek) = generate_twisted_elgamal_keypair();
+        let (bob_dk, bob_ek) = generate_twisted_elgamal_keypair();
+        register(&alice, &alice_dk, alice_ek, token);
+        register(&bob, &bob_dk, bob_ek, token);
+        confidential_asset::deposit(&alice, token, 200);
+        confidential_asset::rollover_pending_balance(&alice, token);
+
+        let memo = std::vector::range(0, 257).map(|i| ((i % 256) as u8));
+        transfer(&alice, &alice_dk, token, signer::address_of(&bob), 100, 100, memo);
     }
 }

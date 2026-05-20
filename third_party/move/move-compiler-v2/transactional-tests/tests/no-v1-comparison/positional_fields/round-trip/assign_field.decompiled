@@ -69,13 +69,13 @@ module 0x42::test {
                 if (p0 is V2) break;
                 abort 14566554180833181697
             };
-            let _v0 = &mut p0._0;
+            let _v0 = &mut p0.V1._0;
             let _v1 = &mut p0._1;
             *_v0 = 42u8;
             *_v1 = true;
             return ()
         };
-        let _v2 = &mut p0._0;
+        let _v2 = &mut p0.V2._0;
         let _v3 = &mut (&mut (&mut _v2._0)._0).x;
         *_v3 = 0u8;
         let _v4 = &mut (&mut _v2._1).x;

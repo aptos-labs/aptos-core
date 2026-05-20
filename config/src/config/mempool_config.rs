@@ -103,6 +103,9 @@ pub struct MempoolConfig {
     pub enable_max_load_balancing_at_any_load: bool,
     /// Maximum number of orderless transactions allowed in the Mempool per user
     pub orderless_txn_capacity_per_user: usize,
+    /// Maximum rate of inbound transactions (TPS) per peer (note: client
+    /// submission is not affected). If None, no rate limit is applied.
+    pub inbound_rate_limit_tps_per_peer: Option<u64>,
 }
 
 impl Default for MempoolConfig {
@@ -169,6 +172,7 @@ impl Default for MempoolConfig {
             ],
             enable_max_load_balancing_at_any_load: false,
             orderless_txn_capacity_per_user: 5000,
+            inbound_rate_limit_tps_per_peer: None,
         }
     }
 }

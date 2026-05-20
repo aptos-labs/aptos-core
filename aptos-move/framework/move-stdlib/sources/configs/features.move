@@ -846,6 +846,36 @@ module std::features {
         is_enabled(ENCRYPTED_TRANSACTIONS)
     }
 
+    /// Whether the transaction limits feature is enabled. Allows transactions
+    /// to request higher execution/IO gas limits backed by staking voting power.
+    const TRANSACTION_LIMITS: u64 = 111;
+
+    public fun get_transaction_limits_feature(): u64 {
+        TRANSACTION_LIMITS
+    }
+
+    public fun is_transaction_limits_enabled(): bool {
+        is_enabled(TRANSACTION_LIMITS)
+    }
+
+    /// Whether the storage slot natives are enabled.
+    const STORAGE_SLOT_NATIVES: u64 = 113;
+
+    public fun is_storage_slot_natives_enabled(): bool {
+        is_enabled(STORAGE_SLOT_NATIVES)
+    }
+
+    /// Whether the multisig timelock feature is enabled.
+    const MULTISIG_TIMELOCK: u64 = 115;
+
+    public fun get_multisig_timelock_feature(): u64 {
+        MULTISIG_TIMELOCK
+    }
+
+    public fun is_multisig_timelock_enabled(): bool {
+        is_enabled(MULTISIG_TIMELOCK)
+    }
+
     // ============================================================================================
     // Feature Flag Implementation
 

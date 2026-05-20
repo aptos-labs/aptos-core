@@ -1,7 +1,7 @@
 Aborting with compilation errors:
 exiting with env checking errors
 error: unexpected nested attributes
-  ┌─ tests/model_ast_lints/bad_lint_attribute_06.move:2:18
+  ┌─ tests/model_ast_lints/bad_lint_attribute_06.move:3:18
   │
-2 │     #[lint::skip(while_true(yes=1))]
+3 │     #[lint::skip(while_true(yes=1))]
   │                  ^^^^^^^^^^^^^^^^^

@@ -4,6 +4,7 @@
 use crate::{access_path::AccessPath, state_store::table::TableHandle};
 use aptos_crypto_derive::CryptoHasher;
 use bytes::{BufMut, Bytes, BytesMut};
+use move_core_types::account_address::AccountAddress;
 use num_derive::{FromPrimitive, ToPrimitive};
 use serde::{Deserialize, Serialize};
 use std::{
@@ -18,7 +19,24 @@ use thiserror::Error;
 pub enum StateKeyTag {
     AccessPath,
     TableItem,
+    /// Umbrella for the trading-native subsystem. Sub-entities
+    /// (Position, future Collateral / Order / ...) are distinguished
+    /// by [`TradingNativeKeyTag`] inside the payload, not by a
+    /// top-level tag. This keeps the top-level tag space focused on
+    /// subsystem-level categories.
+    TradingNative = 2,
     Raw = 255,
+}
+
+/// Sub-tag distinguishing entities inside the
+/// [`StateKeyInner::TradingNative`] umbrella. Encoded as the first
+/// byte of the payload after the top-level [`StateKeyTag::TradingNative`]
+/// byte. Variant ordinals are part of the on-disk byte format —
+/// **do not reorder or insert before existing entries**.
+#[repr(u8)]
+#[derive(Clone, Debug, FromPrimitive, ToPrimitive)]
+pub enum TradingNativeKeyTag {
+    Position = 0,
 }
 
 /// Error thrown when a [`StateKey`] fails to be deserialized out of a byte sequence stored in physical
@@ -35,6 +53,10 @@ pub enum StateKeyDecodeErr {
 
     #[error("Not enough bytes: tag: {}, num bytes: {}", tag, num_bytes)]
     NotEnoughBytes { tag: u8, num_bytes: usize },
+
+    /// The sub-tag inside a `TradingNative` payload is unrecognized.
+    #[error("unknown TradingNative sub-tag: {}", unknown_sub_tag)]
+    UnknownTradingNativeSubTag { unknown_sub_tag: u8 },
 
     #[error(transparent)]
     BcsError(#[from] bcs::Error),
@@ -56,6 +78,25 @@ pub enum StateKeyInner {
     // Only used for testing
     #[serde(with = "serde_bytes")]
     Raw(Vec<u8>),
+    /// Umbrella variant for the trading-native subsystem. Specific
+    /// entities are distinguished by the inner [`TradingNativeKey`].
+    TradingNative(TradingNativeKey),
+}
+
+/// Sub-shape of a `StateKeyInner::TradingNative` key. Each variant
+/// owns a fixed-width encoding; the [`TradingNativeKeyTag`] sub-tag
+/// is written/read once per encode/decode.
+#[derive(
+    Clone, Debug, CryptoHasher, Eq, PartialEq, Serialize, Deserialize, Ord, PartialOrd, Hash,
+)]
+#[cfg_attr(any(test, feature = "fuzzing"), derive(proptest_derive::Arbitrary))]
+pub enum TradingNativeKey {
+    /// Native-position persisted entry: per-(exchange, account, market) position.
+    Position {
+        exchange: AccountAddress,
+        account: AccountAddress,
+        market: AccountAddress,
+    },
 }
 
 impl StateKeyInner {
@@ -76,6 +117,21 @@ impl StateKeyInner {
             StateKeyInner::Raw(raw_bytes) => {
                 writer.write_all(&[StateKeyTag::Raw as u8])?;
                 writer.write_all(raw_bytes)?;
+            },
+            StateKeyInner::TradingNative(key) => {
+                writer.write_all(&[StateKeyTag::TradingNative as u8])?;
+                match key {
+                    TradingNativeKey::Position {
+                        exchange,
+                        account,
+                        market,
+                    } => {
+                        writer.write_all(&[TradingNativeKeyTag::Position as u8])?;
+                        writer.write_all(exchange.as_ref())?;
+                        writer.write_all(account.as_ref())?;
+                        writer.write_all(market.as_ref())?;
+                    },
+                }
             },
         };
 
@@ -99,6 +155,17 @@ impl Debug for StateKeyInner {
             },
             StateKeyInner::Raw(bytes) => {
                 write!(f, "StateKey::Raw({})", hex::encode(bytes),)
+            },
+            StateKeyInner::TradingNative(key) => match key {
+                TradingNativeKey::Position {
+                    exchange,
+                    account,
+                    market,
+                } => write!(
+                    f,
+                    "StateKey::TradingNative::Position {{ exchange: {}, account: {}, market: {} }}",
+                    exchange, account, market,
+                ),
             },
         }
     }

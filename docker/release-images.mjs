@@ -46,7 +46,7 @@ import {
 // When we release aptos-node, we also want to release related images for tooling, testing, etc. Similarly, other images have other related images
 // that we can release together, ie in a release group.
 const IMAGES_TO_RELEASE_BY_RELEASE_GROUP = {
-  "aptos-node": ["validator", "validator-testing", "faucet", "tools"],
+  "aptos-node": ["validator", "validator-testing", "faucet", "tools", "indexer-grpc"],
   "aptos-indexer-grpc": ["indexer-grpc"],
 };
 
@@ -61,12 +61,15 @@ const IMAGES_TO_RELEASE = {
     [CargoBuildProfiles.Release]: [CargoBuildFeatures.Default],
   },
   faucet: {
+    [CargoBuildProfiles.Performance]: [CargoBuildFeatures.Default],
     [CargoBuildProfiles.Release]: [CargoBuildFeatures.Default],
   },
   tools: {
+    [CargoBuildProfiles.Performance]: [CargoBuildFeatures.Default],
     [CargoBuildProfiles.Release]: [CargoBuildFeatures.Default],
   },
   "indexer-grpc": {
+    [CargoBuildProfiles.Performance]: [CargoBuildFeatures.Default],
     [CargoBuildProfiles.Release]: [CargoBuildFeatures.Default],
   },
 };
@@ -74,7 +77,7 @@ const IMAGES_TO_RELEASE = {
 async function main() {
   const REQUIRED_ARGS = ["GIT_SHA", "GCP_DOCKER_ARTIFACT_REPO", "IMAGE_TAG_PREFIX"];
   const OPTIONAL_ARGS = ["WAIT_FOR_IMAGE_SECONDS", "DRY_RUN"];
-  const BOOLEAN_ARGS = ["PROFILE_RELEASE"];
+  const BOOLEAN_ARGS = ["PROFILE_RELEASE", "GCP_ONLY"];
 
   const parsedArgs = parseArgsFromFlagOrEnv(REQUIRED_ARGS, OPTIONAL_ARGS, BOOLEAN_ARGS);
 
@@ -89,13 +92,16 @@ async function main() {
 
   const INTERNAL_TARGET_REGISTRIES = [GCP_ARTIFACT_REPO];
 
-  const ALL_TARGET_REGISTRIES = [...INTERNAL_TARGET_REGISTRIES, DOCKERHUB];
+  const ALL_TARGET_REGISTRIES = parsedArgs.GCP_ONLY
+    ? INTERNAL_TARGET_REGISTRIES
+    : [...INTERNAL_TARGET_REGISTRIES, DOCKERHUB];
 
   // default 10 seconds
   parsedArgs.WAIT_FOR_IMAGE_SECONDS = parseInt(parsedArgs.WAIT_FOR_IMAGE_SECONDS ?? 10, 10);
 
   // dry run
   console.log(`INFO: dry run: ${parsedArgs.DRY_RUN}`);
+  console.log(`INFO: gcp only: ${parsedArgs.GCP_ONLY}`);
 
   // get the appropriate release group based on the image tag prefix
   const imageReleaseGroup = getImageReleaseGroupByImageTagPrefix(parsedArgs.IMAGE_TAG_PREFIX);
@@ -131,15 +137,22 @@ async function main() {
             profilePrefix,
             featureSuffix,
           )}`;
+          // Second ref: same image, tag with git SHA appended (joinTagSegments adds "_" before the sha segment).
+          const imageTargetWithSha = joinTagSegments(imageTarget, parsedArgs.GIT_SHA);
           await waitForImageToBecomeAvailable(imageSource, parsedArgs.WAIT_FOR_IMAGE_SECONDS);
           if (parsedArgs.DRY_RUN) {
-            console.info(chalk.yellow(`INFO: skipping copy of ${imageSource} to ${imageTarget} due to dry run`));
+            console.info(
+              chalk.yellow(
+                `INFO: skipping copy of ${imageSource} to ${imageTarget} and ${imageTargetWithSha} due to dry run`,
+              ),
+            );
             continue;
           } else {
             console.info(chalk.green(`INFO: copying ${imageSource} to ${imageTarget}`));
+            console.info(chalk.green(`INFO: copying ${imageSource} to ${imageTargetWithSha}`));
           }
           await $`${crane} copy ${imageSource} ${imageTarget}`;
-          await $`${crane} copy ${imageSource} ${joinTagSegments(imageTarget, parsedArgs.GIT_SHA)}`;
+          await $`${crane} copy ${imageSource} ${imageTargetWithSha}`;
         }
       }
     }

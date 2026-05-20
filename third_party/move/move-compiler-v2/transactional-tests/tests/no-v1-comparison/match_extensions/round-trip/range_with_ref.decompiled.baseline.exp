@@ -1,0 +1,20 @@
+processed 10 tasks
+task 0 lines 3-57:  publish [module 0xc0ffee::m {]
+task 1 lines 60-60:  run 0xc0ffee::m::test_ref_range --args 0u64
+return values: 0
+task 2 lines 62-62:  run 0xc0ffee::m::test_ref_range --args 5u64
+return values: 1
+task 3 lines 64-64:  run 0xc0ffee::m::test_ref_range --args 10u64
+return values: 0
+task 4 lines 66-66:  run 0xc0ffee::m::test_ref_enum_in_range
+return values: 1
+task 5 lines 68-68:  run 0xc0ffee::m::test_ref_enum_out_range
+return values: 2
+task 6 lines 70-70:  run 0xc0ffee::m::test_ref_enum_v2
+return values: 3
+task 7 lines 72-72:  run 0xc0ffee::m::test_mut_ref_range --args 0u64
+return values: 0
+task 8 lines 74-74:  run 0xc0ffee::m::test_mut_ref_range --args 5u64
+return values: 1
+task 9 lines 76-76:  run 0xc0ffee::m::test_mut_ref_range --args 10u64
+return values: 0

@@ -9,7 +9,6 @@ error: post-condition does not hold
    =         x = <redacted>
    =     at tests/sources/functional/shift.move:34: shiftl_7_incorrect
    =         result = <redacted>
-   =     at tests/sources/functional/shift.move:35: shiftl_7_incorrect
    =     at tests/sources/functional/shift.move:38: shiftl_7_incorrect (spec)
 
 error: post-condition does not hold
@@ -22,7 +21,6 @@ error: post-condition does not hold
    =         x = <redacted>
    =     at tests/sources/functional/shift.move:50: shiftr_7_incorrect
    =         result = <redacted>
-   =     at tests/sources/functional/shift.move:51: shiftr_7_incorrect
    =     at tests/sources/functional/shift.move:54: shiftr_7_incorrect (spec)
 
 error: post-condition does not hold
@@ -35,5 +33,4 @@ error: post-condition does not hold
    =         x = <redacted>
    =     at tests/sources/functional/shift.move:66: shift_l_11_incorrect
    =         result = <redacted>
-   =     at tests/sources/functional/shift.move:67: shift_l_11_incorrect
    =     at tests/sources/functional/shift.move:95: shift_l_11_incorrect (spec)

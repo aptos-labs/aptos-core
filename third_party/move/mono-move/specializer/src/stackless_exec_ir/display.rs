@@ -1,21 +1,19 @@
 // Copyright (c) Aptos Foundation
 // Licensed pursuant to the Innovation-Enabling Source Code License, available at https://github.com/aptos-labs/aptos-core/blob/main/LICENSE
 
-//! Human-readable display for the stackless execution IR.
-//! Resolves pool indices using the CompiledModule for readable output.
+//! Display for the stackless IR. Types render from their interned form;
+//! entity handles (functions, fields, variants) resolve via `CompiledModule`.
 
-use super::{BinaryOp, FunctionIR, ImmValue, Instr, ModuleIR, Slot, UnaryOp};
+use super::{BinaryOp, CmpOp, FunctionIR, ImmValue, Instr, ModuleIR, Slot, UnaryOp};
+use mono_move_core::types::{display_type, display_type_list};
 use move_binary_format::{
     access::ModuleAccess,
     file_format::{
         FieldHandleIndex, FieldInstantiationIndex, FunctionHandleIndex, FunctionInstantiationIndex,
-        SignatureToken, StructDefInstantiationIndex, StructDefinitionIndex, StructHandleIndex,
-        StructVariantHandleIndex, StructVariantInstantiationIndex, VariantFieldHandleIndex,
-        VariantFieldInstantiationIndex,
+        SignatureToken, VariantFieldHandleIndex, VariantFieldInstantiationIndex,
     },
     CompiledModule,
 };
-use move_vm_types::loaded_data::runtime_types::Type;
 use std::fmt;
 
 impl fmt::Display for ModuleIR {
@@ -24,14 +22,9 @@ impl fmt::Display for ModuleIR {
         let self_handle = module.module_handle_at(module.self_module_handle_idx);
         let addr = module.address_identifier_at(self_handle.address);
         let name = module.identifier_at(self_handle.name);
-        writeln!(
-            f,
-            "=== Module 0x{}::{} ===",
-            addr.short_str_lossless(),
-            name
-        )?;
+        writeln!(f, "// module 0x{}::{}", addr.short_str_lossless(), name)?;
 
-        for func_ir in &self.functions {
+        for func_ir in self.functions.iter().flatten() {
             writeln!(f)?;
             display_function(f, module, func_ir)?;
         }
@@ -70,11 +63,11 @@ fn display_function(
     }
     writeln!(f, " {{")?;
     let num_temps = func.num_home_slots - func.num_params - func.num_locals;
-    if func.num_xfer_slots > 0 {
+    if func.num_xfer_positions > 0 {
         writeln!(
             f,
             "  slots: params({}), locals({}), temps({}), xfer({})",
-            func.num_params, func.num_locals, num_temps, func.num_xfer_slots
+            func.num_params, func.num_locals, num_temps, func.num_xfer_positions
         )?;
     } else {
         writeln!(
@@ -86,24 +79,23 @@ fn display_function(
 
     // Display slot declarations with types
     for i in 0..func.num_home_slots {
-        let ty = &func.home_slot_types[i as usize];
+        let ty = func.home_slot_types[i as usize];
         write!(f, "    r{}: ", i)?;
-        display_type(f, module, ty)?;
+        display_type(f, ty)?;
         writeln!(f)?;
     }
     writeln!(f, "  code:")?;
 
     // Instructions
     let mut instr_num = 0;
-    for instr in &func.instrs {
-        if let Instr::Label(label) = instr {
-            writeln!(f, "  L{}:", label.0)?;
-            continue;
+    for block in &func.blocks {
+        writeln!(f, "  L{}:", block.label.0)?;
+        for instr in &block.instrs {
+            write!(f, "    {}: ", instr_num)?;
+            display_instr(f, module, instr)?;
+            writeln!(f)?;
+            instr_num += 1;
         }
-        write!(f, "    {}: ", instr_num)?;
-        display_instr(f, module, instr)?;
-        writeln!(f)?;
-        instr_num += 1;
     }
 
     writeln!(f, "}}")?;
@@ -133,17 +125,6 @@ fn write_dsts(f: &mut fmt::Formatter<'_>, ds: &[Slot]) -> fmt::Result {
     write!(f, "{} := ", slot_names(ds))
 }
 
-fn struct_name(module: &CompiledModule, idx: StructDefinitionIndex) -> String {
-    let def = &module.struct_defs[idx.0 as usize];
-    let handle = module.struct_handle_at(def.struct_handle);
-    module.identifier_at(handle.name).to_string()
-}
-
-fn struct_inst_name(module: &CompiledModule, idx: StructDefInstantiationIndex) -> String {
-    let inst = &module.struct_def_instantiations[idx.0 as usize];
-    struct_name(module, inst.def)
-}
-
 fn func_name(module: &CompiledModule, idx: FunctionHandleIndex) -> String {
     let handle = module.function_handle_at(idx);
     module.identifier_at(handle.name).to_string()
@@ -171,27 +152,6 @@ fn field_name(module: &CompiledModule, idx: FieldHandleIndex) -> String {
 fn field_inst_name(module: &CompiledModule, idx: FieldInstantiationIndex) -> String {
     let inst = &module.field_instantiations[idx.0 as usize];
     field_name(module, inst.handle)
-}
-
-fn variant_handle_name(module: &CompiledModule, idx: StructVariantHandleIndex) -> String {
-    let handle = &module.struct_variant_handles[idx.0 as usize];
-    let def = &module.struct_defs[handle.struct_index.0 as usize];
-    let struct_handle = module.struct_handle_at(def.struct_handle);
-    let sname = module.identifier_at(struct_handle.name);
-    let vname = match &def.field_information {
-        move_binary_format::file_format::StructFieldInformation::DeclaredVariants(variants) => {
-            module
-                .identifier_at(variants[handle.variant as usize].name)
-                .to_string()
-        },
-        _ => format!("#{}", handle.variant),
-    };
-    format!("{}::{}", sname, vname)
-}
-
-fn variant_inst_name(module: &CompiledModule, idx: StructVariantInstantiationIndex) -> String {
-    let inst = &module.struct_variant_instantiations[idx.0 as usize];
-    variant_handle_name(module, inst.handle)
 }
 
 fn variant_field_name(module: &CompiledModule, idx: VariantFieldHandleIndex) -> String {
@@ -328,92 +288,67 @@ fn display_instr(
         },
 
         // --- Struct ---
-        Instr::Pack(d, idx, fields) => {
+        Instr::Pack(d, ty, fields) => {
             write_dst(f, *d)?;
-            write!(
-                f,
-                "pack {}, {}",
-                struct_name(module, *idx),
-                slot_names(fields)
-            )
+            write!(f, "pack ")?;
+            display_type(f, *ty)?;
+            write!(f, ", {}", slot_names(fields))
         },
-        Instr::PackGeneric(d, idx, fields) => {
+        Instr::PackGeneric(d, ty, fields) => {
             write_dst(f, *d)?;
-            write!(
-                f,
-                "pack {}, {}",
-                struct_inst_name(module, *idx),
-                slot_names(fields)
-            )
+            write!(f, "pack ")?;
+            display_type(f, *ty)?;
+            write!(f, ", {}", slot_names(fields))
         },
-        Instr::Unpack(ds, idx, s) => {
+        Instr::Unpack(ds, ty, s) => {
             write_dsts(f, ds)?;
-            write!(f, "unpack {}, {}", struct_name(module, *idx), slot_name(*s))
+            write!(f, "unpack ")?;
+            display_type(f, *ty)?;
+            write!(f, ", {}", slot_name(*s))
         },
-        Instr::UnpackGeneric(ds, idx, s) => {
+        Instr::UnpackGeneric(ds, ty, s) => {
             write_dsts(f, ds)?;
-            write!(
-                f,
-                "unpack {}, {}",
-                struct_inst_name(module, *idx),
-                slot_name(*s)
-            )
+            write!(f, "unpack ")?;
+            display_type(f, *ty)?;
+            write!(f, ", {}", slot_name(*s))
         },
 
         // --- Variant ---
-        Instr::PackVariant(d, idx, fields) => {
+        Instr::PackVariant(d, ty, variant, fields) => {
             write_dst(f, *d)?;
-            write!(
-                f,
-                "pack_variant {}, {}",
-                variant_handle_name(module, *idx),
-                slot_names(fields)
-            )
+            write!(f, "pack_variant ")?;
+            display_type(f, *ty)?;
+            write!(f, "@{}, {}", variant, slot_names(fields))
         },
-        Instr::PackVariantGeneric(d, idx, fields) => {
+        Instr::PackVariantGeneric(d, ty, variant, fields) => {
             write_dst(f, *d)?;
-            write!(
-                f,
-                "pack_variant {}, {}",
-                variant_inst_name(module, *idx),
-                slot_names(fields)
-            )
+            write!(f, "pack_variant ")?;
+            display_type(f, *ty)?;
+            write!(f, "@{}, {}", variant, slot_names(fields))
         },
-        Instr::UnpackVariant(ds, idx, s) => {
+        Instr::UnpackVariant(ds, ty, variant, s) => {
             write_dsts(f, ds)?;
-            write!(
-                f,
-                "unpack_variant {}, {}",
-                variant_handle_name(module, *idx),
-                slot_name(*s)
-            )
+            write!(f, "unpack_variant ")?;
+            display_type(f, *ty)?;
+            write!(f, "@{}, {}", variant, slot_name(*s))
         },
-        Instr::UnpackVariantGeneric(ds, idx, s) => {
+        Instr::UnpackVariantGeneric(ds, ty, variant, s) => {
             write_dsts(f, ds)?;
-            write!(
-                f,
-                "unpack_variant {}, {}",
-                variant_inst_name(module, *idx),
-                slot_name(*s)
-            )
+            write!(f, "unpack_variant ")?;
+            display_type(f, *ty)?;
+            write!(f, "@{}, {}", variant, slot_name(*s))
         },
-        Instr::TestVariant(d, idx, s) => {
+        Instr::TestVariant(d, ty, variant, s) => {
             write_dst(f, *d)?;
-            write!(
-                f,
-                "test_variant {}, {}",
-                variant_handle_name(module, *idx),
-                slot_name(*s)
-            )
+            write!(f, "test_variant ")?;
+            display_type(f, *ty)?;
+            write!(f, "@{}, {}", variant, slot_name(*s))
         },
-        Instr::TestVariantGeneric(d, idx, s) => {
+        Instr::TestVariantGeneric(d, ty, variant, s) => {
             write_dst(f, *d)?;
-            write!(
-                f,
-                "test_variant {}, {}",
-                variant_inst_name(module, *idx),
-                slot_name(*s)
-            )
+            write!(f, "test_variant ")?;
+            display_type(f, *ty)?;
+            write!(f, "@{}, {}", variant, slot_name(*s))
         },
 
         // --- References ---
@@ -579,91 +514,64 @@ fn display_instr(
         },
 
         // --- Globals ---
-        Instr::Exists(d, idx, a) => {
+        Instr::Exists(d, ty, a) => {
             write_dst(f, *d)?;
-            write!(f, "exists {}, {}", struct_name(module, *idx), slot_name(*a))
+            write!(f, "exists ")?;
+            display_type(f, *ty)?;
+            write!(f, ", {}", slot_name(*a))
         },
-        Instr::ExistsGeneric(d, idx, a) => {
+        Instr::ExistsGeneric(d, ty, a) => {
             write_dst(f, *d)?;
-            write!(
-                f,
-                "exists {}, {}",
-                struct_inst_name(module, *idx),
-                slot_name(*a)
-            )
+            write!(f, "exists ")?;
+            display_type(f, *ty)?;
+            write!(f, ", {}", slot_name(*a))
         },
-        Instr::MoveFrom(d, idx, a) => {
+        Instr::MoveFrom(d, ty, a) => {
             write_dst(f, *d)?;
-            write!(
-                f,
-                "move_from {}, {}",
-                struct_name(module, *idx),
-                slot_name(*a)
-            )
+            write!(f, "move_from ")?;
+            display_type(f, *ty)?;
+            write!(f, ", {}", slot_name(*a))
         },
-        Instr::MoveFromGeneric(d, idx, a) => {
+        Instr::MoveFromGeneric(d, ty, a) => {
             write_dst(f, *d)?;
-            write!(
-                f,
-                "move_from {}, {}",
-                struct_inst_name(module, *idx),
-                slot_name(*a)
-            )
+            write!(f, "move_from ")?;
+            display_type(f, *ty)?;
+            write!(f, ", {}", slot_name(*a))
         },
         // MoveTo has no destination (side-effect)
-        Instr::MoveTo(idx, s, v) => {
-            write!(
-                f,
-                "move_to {}, {}, {}",
-                struct_name(module, *idx),
-                slot_name(*s),
-                slot_name(*v)
-            )
+        Instr::MoveTo(ty, s, v) => {
+            write!(f, "move_to ")?;
+            display_type(f, *ty)?;
+            write!(f, ", {}, {}", slot_name(*s), slot_name(*v))
         },
-        Instr::MoveToGeneric(idx, s, v) => {
-            write!(
-                f,
-                "move_to {}, {}, {}",
-                struct_inst_name(module, *idx),
-                slot_name(*s),
-                slot_name(*v)
-            )
+        Instr::MoveToGeneric(ty, s, v) => {
+            write!(f, "move_to ")?;
+            display_type(f, *ty)?;
+            write!(f, ", {}, {}", slot_name(*s), slot_name(*v))
         },
-        Instr::ImmBorrowGlobal(d, idx, a) => {
+        Instr::ImmBorrowGlobal(d, ty, a) => {
             write_dst(f, *d)?;
-            write!(
-                f,
-                "imm_borrow_global {}, {}",
-                struct_name(module, *idx),
-                slot_name(*a)
-            )
+            write!(f, "imm_borrow_global ")?;
+            display_type(f, *ty)?;
+            write!(f, ", {}", slot_name(*a))
         },
-        Instr::ImmBorrowGlobalGeneric(d, idx, a) => {
+        Instr::ImmBorrowGlobalGeneric(d, ty, a) => {
             write_dst(f, *d)?;
-            write!(
-                f,
-                "imm_borrow_global {}, {}",
-                struct_inst_name(module, *idx),
-                slot_name(*a)
-            )
+            write!(f, "imm_borrow_global ")?;
+            display_type(f, *ty)?;
+            write!(f, ", {}", slot_name(*a))
         },
-        Instr::MutBorrowGlobal(d, idx, a) => {
+        Instr::MutBorrowGlobal(d, ty, a) => {
             write_dst(f, *d)?;
-            write!(
-                f,
-                "mut_borrow_global {}, {}",
-                struct_name(module, *idx),
-                slot_name(*a)
-            )
+            write!(f, "mut_borrow_global ")?;
+            display_type(f, *ty)?;
+            write!(f, ", {}", slot_name(*a))
         },
-        Instr::MutBorrowGlobalGeneric(d, idx, a) => {
+        Instr::MutBorrowGlobalGeneric(d, ty, a) => {
             write_dst(f, *d)?;
-            write!(
-                f,
-                "mut_borrow_global {}, {}",
-                struct_inst_name(module, *idx),
-                slot_name(*a)
-            )
+            write!(f, "mut_borrow_global ")?;
+            display_type(f, *ty)?;
+            write!(f, ", {}", slot_name(*a))
         },
 
         // --- Calls ---
@@ -702,64 +610,65 @@ fn display_instr(
                 slot_names(captured)
             )
         },
-        Instr::CallClosure(rets, sig_idx, args) => {
+        Instr::CallClosure(rets, sig_types, args) => {
             write_dsts(f, rets)?;
-            write!(f, "call_closure #{}, {}", sig_idx.0, slot_names(args))
+            write!(f, "call_closure ")?;
+            write!(f, "[")?;
+            display_type_list(f, *sig_types)?;
+            write!(f, "]")?;
+            write!(f, ", {}", slot_names(args))
         },
 
         // --- Vector ---
-        Instr::VecPack(d, sig, count, elems) => {
+        Instr::VecPack(d, elem_ty, count, elems) => {
             write_dst(f, *d)?;
-            write!(f, "vec_pack #{}, {}, {}", sig.0, count, slot_names(elems))
+            write!(f, "vec_pack ")?;
+            display_type(f, *elem_ty)?;
+            write!(f, ", {}, {}", count, slot_names(elems))
         },
-        Instr::VecLen(d, sig, s) => {
+        Instr::VecLen(d, elem_ty, s) => {
             write_dst(f, *d)?;
-            write!(f, "vec_len #{}, {}", sig.0, slot_name(*s))
+            write!(f, "vec_len ")?;
+            display_type(f, *elem_ty)?;
+            write!(f, ", {}", slot_name(*s))
         },
-        Instr::VecImmBorrow(d, sig, v, i) => {
+        Instr::VecImmBorrow(d, elem_ty, v, i) => {
             write_dst(f, *d)?;
-            write!(
-                f,
-                "vec_imm_borrow #{}, {}, {}",
-                sig.0,
-                slot_name(*v),
-                slot_name(*i)
-            )
+            write!(f, "vec_imm_borrow ")?;
+            display_type(f, *elem_ty)?;
+            write!(f, ", {}, {}", slot_name(*v), slot_name(*i))
         },
-        Instr::VecMutBorrow(d, sig, v, i) => {
+        Instr::VecMutBorrow(d, elem_ty, v, i) => {
             write_dst(f, *d)?;
-            write!(
-                f,
-                "vec_mut_borrow #{}, {}, {}",
-                sig.0,
-                slot_name(*v),
-                slot_name(*i)
-            )
+            write!(f, "vec_mut_borrow ")?;
+            display_type(f, *elem_ty)?;
+            write!(f, ", {}, {}", slot_name(*v), slot_name(*i))
         },
         // VecPushBack has no destination
-        Instr::VecPushBack(sig, v, val) => {
-            write!(
-                f,
-                "vec_push_back #{}, {}, {}",
-                sig.0,
-                slot_name(*v),
-                slot_name(*val)
-            )
+        Instr::VecPushBack(elem_ty, v, val) => {
+            write!(f, "vec_push_back ")?;
+            display_type(f, *elem_ty)?;
+            write!(f, ", {}, {}", slot_name(*v), slot_name(*val))
         },
-        Instr::VecPopBack(d, sig, s) => {
+        Instr::VecPopBack(d, elem_ty, s) => {
             write_dst(f, *d)?;
-            write!(f, "vec_pop_back #{}, {}", sig.0, slot_name(*s))
+            write!(f, "vec_pop_back ")?;
+            display_type(f, *elem_ty)?;
+            write!(f, ", {}", slot_name(*s))
         },
-        Instr::VecUnpack(ds, sig, count, s) => {
+        Instr::VecUnpack(ds, elem_ty, count, s) => {
             write_dsts(f, ds)?;
-            write!(f, "vec_unpack #{}, {}, {}", sig.0, count, slot_name(*s))
+            write!(f, "vec_unpack ")?;
+            display_type(f, *elem_ty)?;
+            write!(f, ", {}, {}", count, slot_name(*s))
         },
         // VecSwap has no destination
-        Instr::VecSwap(sig, v, i, j) => {
+        Instr::VecSwap(elem_ty, v, i, j) => {
+            write!(f, "vec_swap ")?;
+            display_type(f, *elem_ty)?;
             write!(
                 f,
-                "vec_swap #{}, {}, {}, {}",
-                sig.0,
+                ", {}, {}, {}",
                 slot_name(*v),
                 slot_name(*i),
                 slot_name(*j)
@@ -767,10 +676,25 @@ fn display_instr(
         },
 
         // --- Control flow (no destinations) ---
-        Instr::Label(l) => write!(f, "L{}:", l.0),
         Instr::Branch(l) => write!(f, "branch L{}", l.0),
         Instr::BrTrue(l, c) => write!(f, "br_true L{}, {}", l.0, slot_name(*c)),
         Instr::BrFalse(l, c) => write!(f, "br_false L{}, {}", l.0, slot_name(*c)),
+        Instr::BrCmp(l, op, lhs, rhs) => write!(
+            f,
+            "br_{} L{}, {}, {}",
+            cmp_op_name(op),
+            l.0,
+            slot_name(*lhs),
+            slot_name(*rhs)
+        ),
+        Instr::BrCmpImm(l, op, src, imm) => write!(
+            f,
+            "br_{} L{}, {}, {}",
+            cmp_op_name(op),
+            l.0,
+            slot_name(*src),
+            imm_value(imm)
+        ),
         Instr::Ret(rs) => write!(f, "ret {}", slot_names(rs)),
         Instr::Abort(c) => write!(f, "abort {}", slot_name(*c)),
         Instr::AbortMsg(c, m) => write!(f, "abort_msg {}, {}", slot_name(*c), slot_name(*m)),
@@ -806,17 +730,23 @@ fn binary_op_name(op: &BinaryOp) -> &'static str {
         BinaryOp::Mod => "mod",
         BinaryOp::BitOr => "bit_or",
         BinaryOp::BitAnd => "bit_and",
-        BinaryOp::Xor => "xor",
+        BinaryOp::BitXor => "bit_xor",
         BinaryOp::Shl => "shl",
         BinaryOp::Shr => "shr",
-        BinaryOp::Lt => "lt",
-        BinaryOp::Gt => "gt",
-        BinaryOp::Le => "le",
-        BinaryOp::Ge => "ge",
-        BinaryOp::Eq => "eq",
-        BinaryOp::Neq => "neq",
+        BinaryOp::Cmp(cmp) => cmp_op_name(cmp),
         BinaryOp::Or => "or",
         BinaryOp::And => "and",
+    }
+}
+
+fn cmp_op_name(op: &CmpOp) -> &'static str {
+    match op {
+        CmpOp::Lt => "lt",
+        CmpOp::Gt => "gt",
+        CmpOp::Le => "le",
+        CmpOp::Ge => "ge",
+        CmpOp::Eq => "eq",
+        CmpOp::Neq => "neq",
     }
 }
 
@@ -828,82 +758,14 @@ fn imm_value(imm: &ImmValue) -> String {
         ImmValue::U16(v) => format!("#{}u16", v),
         ImmValue::U32(v) => format!("#{}u32", v),
         ImmValue::U64(v) => format!("#{}", v),
+        ImmValue::U128(v) => format!("#{}u128", **v),
+        ImmValue::U256(v) => format!("#{}u256", **v),
         ImmValue::I8(v) => format!("#{}i8", v),
         ImmValue::I16(v) => format!("#{}i16", v),
         ImmValue::I32(v) => format!("#{}i32", v),
         ImmValue::I64(v) => format!("#{}i64", v),
-    }
-}
-
-/// Display a runtime `Type` with struct names resolved via the module.
-///
-/// `StructNameIndex` values are assumed to be ordinals matching `StructHandleIndex`,
-/// which is how this crate's `type_conversion` builds them.
-fn display_type(f: &mut fmt::Formatter<'_>, module: &CompiledModule, ty: &Type) -> fmt::Result {
-    match ty {
-        Type::Bool => write!(f, "bool"),
-        Type::U8 => write!(f, "u8"),
-        Type::U16 => write!(f, "u16"),
-        Type::U32 => write!(f, "u32"),
-        Type::U64 => write!(f, "u64"),
-        Type::U128 => write!(f, "u128"),
-        Type::U256 => write!(f, "u256"),
-        Type::I8 => write!(f, "i8"),
-        Type::I16 => write!(f, "i16"),
-        Type::I32 => write!(f, "i32"),
-        Type::I64 => write!(f, "i64"),
-        Type::I128 => write!(f, "i128"),
-        Type::I256 => write!(f, "i256"),
-        Type::Address => write!(f, "address"),
-        Type::Signer => write!(f, "signer"),
-        Type::TyParam(idx) => write!(f, "_{}", idx),
-        Type::Vector(inner) => {
-            write!(f, "vector<")?;
-            display_type(f, module, inner)?;
-            write!(f, ">")
-        },
-        Type::Reference(inner) => {
-            write!(f, "&")?;
-            display_type(f, module, inner)
-        },
-        Type::MutableReference(inner) => {
-            write!(f, "&mut ")?;
-            display_type(f, module, inner)
-        },
-        Type::Struct { idx, .. } => {
-            let sh_idx = StructHandleIndex(idx.to_string().parse::<u16>().unwrap());
-            let handle = module.struct_handle_at(sh_idx);
-            write!(f, "{}", module.identifier_at(handle.name))
-        },
-        Type::StructInstantiation { idx, ty_args, .. } => {
-            let sh_idx = StructHandleIndex(idx.to_string().parse::<u16>().unwrap());
-            let handle = module.struct_handle_at(sh_idx);
-            write!(f, "{}<", module.identifier_at(handle.name))?;
-            for (i, arg) in ty_args.iter().enumerate() {
-                if i > 0 {
-                    write!(f, ", ")?;
-                }
-                display_type(f, module, arg)?;
-            }
-            write!(f, ">")
-        },
-        Type::Function { args, results, .. } => {
-            write!(f, "|")?;
-            for (i, arg) in args.iter().enumerate() {
-                if i > 0 {
-                    write!(f, ", ")?;
-                }
-                display_type(f, module, arg)?;
-            }
-            write!(f, "|")?;
-            for (i, r) in results.iter().enumerate() {
-                if i > 0 {
-                    write!(f, ", ")?;
-                }
-                display_type(f, module, r)?;
-            }
-            Ok(())
-        },
+        ImmValue::I128(v) => format!("#{}i128", **v),
+        ImmValue::I256(v) => format!("#{}i256", **v),
     }
 }
 

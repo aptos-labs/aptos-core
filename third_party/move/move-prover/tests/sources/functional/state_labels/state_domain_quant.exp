@@ -1,0 +1,6 @@
+Move prover returns: exiting with compilation errors
+error: unused quantified state label `S`; state domain variables must be used as state labels (`|~`) in the body
+   ┌─ tests/sources/functional/state_labels/state_domain_quant.move:82:25
+   │
+82 │         requires forall S in *, x: u64: x > 0; // error: unused quantified state label
+   │                         ^

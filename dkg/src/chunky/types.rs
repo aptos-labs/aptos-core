@@ -1,19 +1,45 @@
 // Copyright (c) Aptos Foundation
 // Licensed pursuant to the Innovation-Enabling Source Code License, available at https://github.com/aptos-labs/aptos-core/blob/main/LICENSE
 
+use aptos_bitvec::BitVec;
 use aptos_crypto::HashValue;
 use aptos_crypto_derive::CryptoHasher;
-use aptos_dkg::pvss::Player;
+use aptos_dkg::pvss::traits::transcript::HasAggregatableSubtranscript;
 use aptos_types::{
     aggregate_signature::AggregateSignature,
     dkg::{
-        chunky_dkg::{AggregatedSubtranscript, ChunkyDKGTranscript},
+        chunky_dkg::{
+            AggregatedSubtranscript, ChunkyDKGTranscript, ChunkySubtranscript, ChunkyTranscript,
+        },
         DKGTranscriptMetadata,
     },
 };
 use move_core_types::account_address::AccountAddress;
 use serde::{Deserialize, Serialize};
 use std::sync::Arc;
+
+/// Wrapper around `ChunkyTranscript` with a precomputed transcript hash.
+pub struct ChunkyTranscriptWithHash {
+    pub transcript: Arc<ChunkyTranscript>,
+    hash: HashValue,
+}
+
+impl ChunkyTranscriptWithHash {
+    pub fn new(transcript: ChunkyTranscript, hash: HashValue) -> Self {
+        Self {
+            transcript: Arc::new(transcript),
+            hash,
+        }
+    }
+
+    pub fn hash(&self) -> HashValue {
+        self.hash
+    }
+
+    pub fn get_subtranscript(&self) -> ChunkySubtranscript {
+        self.transcript.get_subtranscript()
+    }
+}
 
 /// Once Chunky DKG starts, a validator should send this message to peers in order to collect Chunky DKG transcripts from peers.
 #[derive(Clone, Serialize, Deserialize, Debug, PartialEq)]
@@ -27,13 +53,14 @@ impl ChunkyDKGTranscriptRequest {
     }
 }
 
-/// Request to validate an aggregated subtranscript. Contains the hash of the subtranscript and the dealers.
+/// Request to validate an aggregated subtranscript. Contains the hash of the subtranscript
+/// and a bitmask identifying which dealers contributed.
 #[derive(Clone, Serialize, Deserialize, CryptoHasher, Debug, PartialEq)]
 pub struct ChunkyDKGSubtranscriptSignatureRequest {
     pub dealer_epoch: u64,
     pub subtranscript_hash: HashValue,
-    pub aggregated_subtrx_dealers: Vec<Player>,
-    /// Per-dealer transcript hash, same order as `aggregated_subtrx_dealers`.
+    pub dealer_bitmask: BitVec,
+    /// Per-dealer transcript hash, ordered by set-bit position (ascending validator index).
     /// Allows the responder to detect equivocated transcripts (not just missing ones).
     pub dealer_transcript_hashes: Vec<HashValue>,
 }
@@ -42,13 +69,13 @@ impl ChunkyDKGSubtranscriptSignatureRequest {
     pub fn new(
         dealer_epoch: u64,
         subtranscript_hash: HashValue,
-        aggregated_subtrx_dealers: Vec<Player>,
+        dealer_bitmask: BitVec,
         dealer_transcript_hashes: Vec<HashValue>,
     ) -> Self {
         Self {
             dealer_epoch,
             subtranscript_hash,
-            aggregated_subtrx_dealers,
+            dealer_bitmask,
             dealer_transcript_hashes,
         }
     }

@@ -1,0 +1,23 @@
+=== stackless ===
+// module 0x66::test
+
+fun add_values(r0, r1): u64 {
+  slots: params(2), locals(0), temps(1)
+    r0: u64
+    r1: u64
+    r2: u64
+  code:
+  L0:
+    0: r2 := add r0, r1
+    1: ret [r2]
+}
+=== micro-ops ===
+// module 0x66::test
+
+fun add_values() {
+  frame_data_size: 24
+  code:
+    0: AddU64 [16] <- [0] + [8]
+    1: Move8 [0] <- [16]
+    2: Return
+}

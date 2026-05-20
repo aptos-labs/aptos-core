@@ -2,8 +2,11 @@
 // Licensed pursuant to the Innovation-Enabling Source Code License, available at https://github.com/aptos-labs/aptos-core/blob/main/LICENSE
 
 mod context;
+
 pub use context::{
-    ArenaRef, Executable, ExecutableBuilder, ExecutionGuard, FieldLayout, Function, GlobalContext,
-    MaintenanceGuard, Type,
+    struct_info_at, try_as_primitive_type, view_name, view_type, view_type_list, ArenaRef,
+    ExecutionGuard, FieldLayout, FunctionSlot, GlobalContext, InternedType, InternedTypeList,
+    LoadedModule, LoadedModuleSlot, MaintenanceGuard, ModuleMandatoryDependencies, ModuleSlot,
+    Type,
 };
 pub mod maintenance_config;

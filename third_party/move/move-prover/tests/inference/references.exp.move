@@ -85,7 +85,7 @@ module 0x42::references {
     spec read_rgb_red(c: Color): u8 {
         pragma opaque = true;
         ensures [inferred] (c is RGB) ==> result == c.r;
-        ensures [inferred] !(c is RGB) ==> result == 0;
+        ensures [inferred] (c is Red) ==> result == 0;
         aborts_if [inferred] false;
     }
 
@@ -111,7 +111,7 @@ module 0x42::references {
     spec get_red_component(c: Color): u8 {
         pragma opaque = true;
         ensures [inferred] result == c.r;
-        aborts_if [inferred] !(c is RGB);
+        aborts_if [inferred] c is Red;
     }
 
 
@@ -123,7 +123,7 @@ module 0x42::references {
     spec get_green_via_ref(c: &Color): u8 {
         pragma opaque = true;
         ensures [inferred] result == c.g;
-        aborts_if [inferred] !(c is RGB);
+        aborts_if [inferred] c is Red;
     }
 
 
@@ -135,7 +135,7 @@ module 0x42::references {
         pragma opaque = true;
         ensures [inferred] result == (c.r as u16) + (c.g as u16) + (c.b as u16);
         aborts_if [inferred] (c.r as u16) + (c.g as u16) + (c.b as u16) > MAX_U16;
-        aborts_if [inferred] !(c is RGB);
+        aborts_if [inferred] c is Red;
         aborts_if [inferred] (c.r as u16) + (c.g as u16) > MAX_U16;
     }
 

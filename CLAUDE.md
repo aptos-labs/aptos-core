@@ -2,6 +2,8 @@
 
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
+**Aptos CLI releases:** See `.cursor/skills/aptos-cli-release/SKILL.md` for version bumps and `crates/aptos/CHANGELOG.md` updates.
+
 ## Project Overview
 
 Aptos Core is a layer 1 blockchain written primarily in Rust with Move smart contracts. It's a production-grade system with 200+ workspace crates organized into major subsystems: consensus, execution, storage, network, mempool, API, and Move VM.
@@ -33,10 +35,14 @@ cargo +nightly fmt                  # Just formatting
 ```
 
 ### Move Framework Changes
-After modifying Move code in `aptos-move/framework/`:
+
+**RULE: If ANY `.move` file under `aptos-move/framework/` is changed (added, modified, or deleted), you MUST rebuild the cached packages before committing or testing.**
+
 ```bash
-cargo build -p aptos-cached-packages   # REQUIRED: rebuild cached packages
+cargo build -p aptos-cached-packages   # REQUIRED after any Move framework change
 ```
+
+This regenerates `aptos-move/framework/cached-packages/src/head.mrb`, the binary bundle loaded at genesis/runtime. Skipping this step means node binaries and tests will silently run the OLD framework even though source changed. Always `git status aptos-move/framework/cached-packages/` after rebuilding and commit the regenerated `.mrb`.
 
 ### Development Setup
 ```bash

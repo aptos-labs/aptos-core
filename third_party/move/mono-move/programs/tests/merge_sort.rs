@@ -15,14 +15,17 @@ fn native() {
 
 #[cfg(feature = "micro-op")]
 mod micro_op {
+    use mono_move_core::LocalExecutionContext;
     use mono_move_programs::merge_sort::{micro_op_merge_sort, shuffled_range};
     use mono_move_runtime::{read_u64, InterpreterContext, VEC_DATA_OFFSET};
 
     fn run(n: u64) -> Vec<u64> {
         let values = shuffled_range(n, 42);
-        let (mut functions, descriptors) = micro_op_merge_sort();
-        mono_move_programs::resolve_calls(&mut functions);
-        let mut ctx = InterpreterContext::new(&functions, &descriptors, 0);
+        let (functions, descriptors) = micro_op_merge_sort();
+        let mut exec_ctx = LocalExecutionContext::with_max_budget();
+        let mut ctx = InterpreterContext::new(&mut exec_ctx, &descriptors, unsafe {
+            functions[0].as_ref_unchecked()
+        });
         let vec_ptr = ctx
             .alloc_u64_vec(mono_move_core::DescriptorId(0), &values)
             .unwrap();
@@ -30,9 +33,17 @@ mod micro_op {
         ctx.run().unwrap();
 
         let heap_ptr = ctx.root_heap_ptr(0);
-        (0..n)
+        let result: Vec<u64> = (0..n)
             .map(|i| unsafe { read_u64(heap_ptr, VEC_DATA_OFFSET + i as usize * 8) })
-            .collect()
+            .collect();
+
+        drop(ctx);
+        for ptr in functions {
+            // SAFETY: The interpreter context has been dropped, so the
+            // function pointers it referenced are no longer in use.
+            unsafe { ptr.free_unchecked() };
+        }
+        result
     }
 
     #[test]

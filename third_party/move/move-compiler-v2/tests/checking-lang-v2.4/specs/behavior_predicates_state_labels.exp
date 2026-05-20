@@ -44,8 +44,8 @@ module 0x42::M {
     }
 
     spec apply_result_chain(f: |u64|u64, x: u64): u64 {
-        ensures ..r1 |~ result_of<f>(x) == result;
-        ensures r1.. |~ result_of<f>(x) == result;
+        ensures (..r1 |~ result_of<f>(x)) == result;
+        ensures (r1.. |~ result_of<f>(x)) == result;
     }
 
     fun apply_simple_chain(f: |u64|u64, x: u64): u64 {

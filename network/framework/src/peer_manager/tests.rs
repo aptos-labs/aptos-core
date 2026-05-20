@@ -124,6 +124,7 @@ fn build_test_peer_manager(
         MAX_INBOUND_CONNECTIONS,
         None,       /* access_control_policy */
         Vec::new(), /* priority_peers */
+        None,       /* inbound_rate_limit_config */
     );
 
     (
@@ -803,6 +804,7 @@ fn create_peer_manager_with_policy(
         MAX_INBOUND_CONNECTIONS,
         policy.map(std::sync::Arc::new),
         Vec::new(), /* priority_peers */
+        None,       /* inbound_rate_limit_config */
     )
 }
 
@@ -1290,6 +1292,7 @@ fn create_peer_manager_with_priority_peers(
         inbound_connection_limit,
         None, /* access_control_policy */
         priority_inbound_peers,
+        None, /* inbound_rate_limit_config */
     );
 
     (

@@ -181,7 +181,7 @@ mod tests {
         let G = G1Affine::generator();
         let range_limit = 1 << 8;
 
-        let baby_table = dlog::table::BabyStepTable::new(G, (1 << 4) as u32);
+        let baby_table = dlog::table::BabyStepTable::new(G, 1 << 4);
 
         // Test **all** values of x from 0 to `range_limit - 1`
         for x in 0..range_limit {
@@ -200,7 +200,7 @@ mod tests {
     fn test_dlog_vec_batched_matches_dlog_vec() {
         let G = G1Projective::generator();
         let range_limit = 1 << 12;
-        let baby_table = dlog::table::BabyStepTable::new(G.into_affine(), (1 << 6) as u32);
+        let baby_table = dlog::table::BabyStepTable::new(G.into_affine(), 1 << 6);
 
         for num_targets in [1, 4, 16] {
             let xs: Vec<u64> = (0..num_targets)
@@ -230,7 +230,7 @@ mod tests {
     fn test_dlog_vec_batched_rolling_with_batch_size_matches() {
         let G = G1Projective::generator();
         let range_limit = 1 << 12;
-        let baby_table = dlog::table::BabyStepTable::new(G.into_affine(), (1 << 6) as u32);
+        let baby_table = dlog::table::BabyStepTable::new(G.into_affine(), 1 << 6);
 
         for num_targets in [1, 4, 8] {
             let xs: Vec<u64> = (0..num_targets)

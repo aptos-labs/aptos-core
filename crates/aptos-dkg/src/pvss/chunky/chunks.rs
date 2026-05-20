@@ -5,7 +5,7 @@ use ark_ff::{BigInteger, PrimeField};
 
 /// Converts a field element into little-endian chunks of `num_bits` bits.
 /// Supports any chunk size from 1 to 64 bits (e.g. 43 or 52 bits). Made `pub` for tests.
-pub fn scalar_to_le_chunks<F: PrimeField>(num_bits: u8, scalar: &F) -> Vec<F> {
+pub fn scalar_to_le_chunks<F: PrimeField>(num_bits: usize, scalar: &F) -> Vec<F> {
     assert!(num_bits > 0 && num_bits <= 64, "Invalid chunk size");
     if num_bits.is_multiple_of(8) {
         return scalar_to_le_chunks_byte_aligned(num_bits, scalar);
@@ -13,15 +13,15 @@ pub fn scalar_to_le_chunks<F: PrimeField>(num_bits: u8, scalar: &F) -> Vec<F> {
 
     let bytes = scalar.into_bigint().to_bytes_le();
     let total_bits = bytes.len() * 8;
-    let num_chunks = total_bits.div_ceil(num_bits as usize);
+    let num_chunks = total_bits.div_ceil(num_bits);
 
     let mut chunks = Vec::with_capacity(num_chunks);
 
     for chunk_idx in 0..num_chunks {
-        let start = chunk_idx * (num_bits as usize);
+        let start = chunk_idx * num_bits;
         let mut value: u64 = 0;
         for i in 0..num_bits {
-            let bit_idx = start + (i as usize);
+            let bit_idx = start + i;
             if bit_idx < total_bits {
                 let byte_idx = bit_idx / 8;
                 let bit_in_byte = bit_idx % 8;
@@ -39,7 +39,7 @@ pub fn scalar_to_le_chunks<F: PrimeField>(num_bits: u8, scalar: &F) -> Vec<F> {
 /// Faster for those sizes since it works on whole bytes. Made `pub` for tests and benchmarks.
 ///
 /// Benchmarks suggest it's 1.5x faster than `scalar_to_le_chunks` for 32 bits, and 2x faster than `scalar_to_le_chunks` for 64 bits.
-pub fn scalar_to_le_chunks_byte_aligned<F: PrimeField>(num_bits: u8, scalar: &F) -> Vec<F> {
+pub fn scalar_to_le_chunks_byte_aligned<F: PrimeField>(num_bits: usize, scalar: &F) -> Vec<F> {
     assert!(
         num_bits.is_multiple_of(8) && num_bits > 0 && num_bits <= 64,
         "Invalid chunk size (must be multiple of 8)"
@@ -47,11 +47,11 @@ pub fn scalar_to_le_chunks_byte_aligned<F: PrimeField>(num_bits: u8, scalar: &F)
 
     let bytes = scalar.into_bigint().to_bytes_le();
     let num_bytes = num_bits / 8;
-    let num_chunks = bytes.len().div_ceil(num_bytes as usize);
+    let num_chunks = bytes.len().div_ceil(num_bytes);
 
     let mut chunks = Vec::with_capacity(num_chunks);
 
-    for bytes_chunk in bytes.chunks(num_bytes as usize) {
+    for bytes_chunk in bytes.chunks(num_bytes) {
         let mut padded = [0u8; 8]; // The last chunk might be shorter, so this guarantees a fixed 8-byte buffer
         padded[..bytes_chunk.len()].copy_from_slice(bytes_chunk);
 
@@ -66,7 +66,7 @@ pub fn scalar_to_le_chunks_byte_aligned<F: PrimeField>(num_bits: u8, scalar: &F)
 /// Reconstructs a field element from `num_bits`-bit chunks (little-endian order). Made `pub` for tests
 /// This is the inverse of `scalar_to_le_chunks`.
 /// Chunks must be in the range [0, 2^num_bits).
-pub fn le_chunks_to_scalar<F: PrimeField>(num_bits: u8, chunks: &[F]) -> F {
+pub fn le_chunks_to_scalar<F: PrimeField>(num_bits: usize, chunks: &[F]) -> F {
     assert!(num_bits > 0 && num_bits <= 64, "Invalid chunk size");
 
     let base = F::from(1u128 << num_bits); // need u128 in the case where `num_bits` is 64, because of `chunk * multiplier`
@@ -112,7 +112,7 @@ mod tests {
     #[test]
     fn test_zero_roundtrips() {
         let zero = Fr::zero();
-        for &num_bits in &[1u8, 7, 8, 16, 32, 52, 64] {
+        for &num_bits in &[1, 7, 8, 16, 32, 52, 64] {
             let chunks = scalar_to_le_chunks(num_bits, &zero);
             let reconstructed = le_chunks_to_scalar(num_bits, &chunks);
             assert_eq!(
@@ -127,7 +127,7 @@ mod tests {
     #[test]
     fn test_byte_aligned_matches_arbitrary() {
         let mut rng = test_rng();
-        for &num_bits in &[8u8, 16, 32, 64] {
+        for &num_bits in &[8, 16, 32, 64] {
             for _ in 0..50 {
                 let scalar: Fr = Fr::rand(&mut rng);
                 let chunks_arb = scalar_to_le_chunks(num_bits, &scalar);

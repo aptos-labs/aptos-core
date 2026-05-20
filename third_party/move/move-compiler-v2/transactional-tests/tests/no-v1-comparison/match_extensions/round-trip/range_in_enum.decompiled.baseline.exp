@@ -1,0 +1,30 @@
+processed 15 tasks
+task 0 lines 3-178:  publish [module 0xc0ffee::m {]
+task 1 lines 181-181:  run 0xc0ffee::m::test_dark_color
+return values: 1
+task 2 lines 183-183:  run 0xc0ffee::m::test_bright_color
+return values: 2
+task 3 lines 185-185:  run 0xc0ffee::m::test_mixed_color
+return values: 2
+task 4 lines 187-187:  run 0xc0ffee::m::test_named_color
+return values: 3
+task 5 lines 189-189:  run 0xc0ffee::m::test_v1_in_range
+return values: 1
+task 6 lines 191-191:  run 0xc0ffee::m::test_v1_out_range
+return values: 2
+task 7 lines 193-193:  run 0xc0ffee::m::test_v2_both_match
+return values: 3
+task 8 lines 195-195:  run 0xc0ffee::m::test_v2_range_only
+return values: 4
+task 9 lines 197-197:  run 0xc0ffee::m::test_v3
+return values: 5
+task 10 lines 199-199:  run 0xc0ffee::m::test_multi_v1_in
+return values: 1
+task 11 lines 201-201:  run 0xc0ffee::m::test_multi_v1_out
+return values: 2
+task 12 lines 203-203:  run 0xc0ffee::m::test_multi_v2_in
+return values: 3
+task 13 lines 205-205:  run 0xc0ffee::m::test_multi_v2_out
+return values: 4
+task 14 lines 207-207:  run 0xc0ffee::m::test_multi_v3
+return values: 5

@@ -9,15 +9,15 @@ use serde::{de::DeserializeOwned, Serialize};
 use std::hash::Hash;
 
 pub trait BatchThresholdEncryption {
-    type ThresholdConfig: aptos_crypto::TSecretSharingConfig;
+    type ThresholdConfig: aptos_crypto::TSecretSharingConfig + Send + Sync;
     type SubTranscript: TranscriptCore;
 
     /// An encryption key for the scheme. Allows for generating ciphertexts.
-    type EncryptionKey;
+    type EncryptionKey: Send + Sync;
 
     /// A digest key for the scheme. Allows for generating digests given a list of ciphertexts.
     /// Internally, this is a modified KZG setup.
-    type DigestKey: Serialize + DeserializeOwned;
+    type DigestKey: Send + Sync;
 
     /// A ciphertext for the scheme.
     type Ciphertext: Serialize
@@ -41,10 +41,6 @@ pub trait BatchThresholdEncryption {
         + Send
         + Sync;
 
-    /// The round number used when generating a digest. For security to hold, validators must only
-    /// generate a single decryption key corresponding to a round number.
-    type Round;
-
     /// The succinct commitment to the set of ciphertexts.
     type Digest: Sized + Send + Sync;
 
@@ -59,14 +55,14 @@ pub trait BatchThresholdEncryption {
 
     /// A share of the master secret key, which allows for deriving
     /// decryption key shares.
-    type MasterSecretKeyShare;
+    type MasterSecretKeyShare: Send + Sync;
 
     /// Used to verify whether a specific player's decryption key share is valid w.r.t. a specific
     /// digest.
-    type VerificationKey: VerificationKey;
+    type VerificationKey: VerificationKey + Send + Sync;
 
     /// A share of the decryption key.
-    type DecryptionKeyShare: DecryptionKeyShare;
+    type DecryptionKeyShare: DecryptionKeyShare + Send + Sync;
 
     /// A decryption key that has been reconstructed by a threshold of decryption key shares.
     type DecryptionKey: Send + Sized + Sync;
@@ -109,6 +105,12 @@ pub trait BatchThresholdEncryption {
         Vec<Self::MasterSecretKeyShare>,
     )>;
 
+    /// Gets the max batch size that the given digest key supports.
+    fn max_batch_size(dk: &Self::DigestKey) -> usize;
+
+    /// Gets the number of rounds that the given digest key supports.
+    fn num_rounds(dk: &Self::DigestKey) -> usize;
+
     /// Encrypt a plaintext with respect to any arbitrary associated data. This associated data is
     /// "bound" to the resulting CT, such that it will only verify with respect to the same
     /// associated data.
@@ -123,7 +125,7 @@ pub trait BatchThresholdEncryption {
     fn digest(
         digest_key: &Self::DigestKey,
         cts: &[Self::Ciphertext],
-        round: Self::Round,
+        round: u64,
     ) -> Result<(Self::Digest, Self::EvalProofsPromise)>;
 
     /// Validators *must* verify each ciphertext before approving it to be decrypted, in order to
@@ -227,6 +229,6 @@ pub trait VerificationKey: Serialize + DeserializeOwned {
     fn player(&self) -> Player;
 }
 
-pub trait DecryptionKeyShare: Serialize + DeserializeOwned {
+pub trait DecryptionKeyShare: Serialize + DeserializeOwned + Clone {
     fn player(&self) -> Player;
 }

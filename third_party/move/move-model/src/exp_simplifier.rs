@@ -255,7 +255,7 @@ impl<'a, 'env, G: ExpGenerator<'env>> ExpSimplifier<'a, 'env, G> {
         if self
             .assumptions
             .iter()
-            .any(|a| self.is_complementary(a, exp) || self.implies_complementary(a, exp))
+            .any(|a| self.is_contradictory(a, exp) || self.implies_complementary(a, exp))
         {
             return true;
         }
@@ -324,6 +324,31 @@ impl<'a, 'env, G: ExpGenerator<'env>> ExpSimplifier<'a, 'env, G> {
                 );
                 self.mk_bool_call(Operation::Eq, vec![args[1].clone(), zero])
             },
+            // !(x is V1|...|Vk) => (x is complement) where complement = AllVariants \ {V1,...,Vk}
+            ExpData::Call(_, Operation::TestVariants(mid, sid, variants), args)
+                if args.len() == 1 =>
+            {
+                let struct_env = self.env().get_module(*mid).into_struct(*sid);
+                if struct_env.has_variants() {
+                    let complement: Vec<Symbol> = struct_env
+                        .get_variants()
+                        .filter(|v| !variants.contains(v))
+                        .collect();
+                    if complement.is_empty() {
+                        return self.mk_bool_const(false);
+                    }
+                    let node_id = self
+                        .generator
+                        .new_node(Type::Primitive(PrimitiveType::Bool), None);
+                    return ExpData::Call(
+                        node_id,
+                        Operation::TestVariants(*mid, *sid, complement),
+                        args.to_vec(),
+                    )
+                    .into_exp();
+                }
+                self.mk_bool_call(Operation::Not, vec![arg])
+            },
             // Negate comparisons: !(a < b) => a >= b, etc.
             ExpData::Call(_, op, args) if args.len() == 2 && negate_comparison(op).is_some() => {
                 self.mk_bool_call(negate_comparison(op).unwrap(), vec![
@@ -342,7 +367,7 @@ impl<'a, 'env, G: ExpGenerator<'env>> ExpSimplifier<'a, 'env, G> {
             (ExpData::Value(_, Value::Bool(false)), _)
             | (_, ExpData::Value(_, Value::Bool(false))) => self.mk_bool_const(false),
             _ if arg1.structural_eq(&arg2) => arg1,
-            _ if self.is_complementary(&arg1, &arg2) => self.mk_bool_const(false),
+            _ if self.is_contradictory(&arg1, &arg2) => self.mk_bool_const(false),
             // If one implies the other, keep the stronger (the one that implies)
             _ if self.implies_comparison(&arg2, &arg1) => arg2,
             _ if self.implies_comparison(&arg1, &arg2) => arg1,
@@ -352,6 +377,35 @@ impl<'a, 'env, G: ExpGenerator<'env>> ExpSimplifier<'a, 'env, G> {
             _ if self.conjunction_implies_comparison(&arg2, &arg1) => arg2,
             _ if self.conjunction_implies_comparison(&arg1, &arg2) => arg1,
             _ => {
+                // Variant set intersection: (x is V1|...) && (x is W1|...) → (x is V∩W)
+                if let (Some((mid_a, sid_a, vars_a, exp_a)), Some((mid_b, sid_b, vars_b, exp_b))) =
+                    (as_test_variants(&arg1), as_test_variants(&arg2))
+                {
+                    if mid_a == mid_b && sid_a == sid_b && exp_a.as_ref().structural_eq(exp_b) {
+                        let intersection: Vec<Symbol> = vars_a
+                            .iter()
+                            .filter(|v| vars_b.contains(v))
+                            .copied()
+                            .collect();
+                        if intersection.is_empty() {
+                            return self.mk_bool_const(false);
+                        } else if intersection.len() == vars_a.len() {
+                            return arg1; // arg1 ⊆ arg2
+                        } else if intersection.len() == vars_b.len() {
+                            return arg2; // arg2 ⊆ arg1
+                        } else {
+                            let node_id = self
+                                .generator
+                                .new_node(Type::Primitive(PrimitiveType::Bool), None);
+                            return ExpData::Call(
+                                node_id,
+                                Operation::TestVariants(mid_a, sid_a, intersection),
+                                vec![exp_a.clone()],
+                            )
+                            .into_exp();
+                        }
+                    }
+                }
                 // Antisymmetry: a <= b && a >= b → a == b (and symmetric variants)
                 if let Some(eq) = self.try_antisymmetry_to_eq(&arg1, &arg2) {
                     return eq;
@@ -363,6 +417,22 @@ impl<'a, 'env, G: ExpGenerator<'env>> ExpSimplifier<'a, 'env, G> {
                 // Empty integer range: c1 < x && x < c2 where c2 <= c1 + 1 → false
                 if let Some(result) = self.try_empty_range(&arg1, &arg2) {
                     return result;
+                }
+                // Bubble matching TestVariants out of conjunctions so they can
+                // intersect. TV1 && (... && TV2 && ...) → (TV1∩TV2) && ...
+                if let Some((mid1, sid1, _, exp1)) = as_test_variants(&arg1) {
+                    if let Some(result) =
+                        self.extract_and_intersect_tv(mid1, sid1, exp1, &arg1, &arg2)
+                    {
+                        return result;
+                    }
+                }
+                if let Some((mid2, sid2, _, exp2)) = as_test_variants(&arg2) {
+                    if let Some(result) =
+                        self.extract_and_intersect_tv(mid2, sid2, exp2, &arg2, &arg1)
+                    {
+                        return result;
+                    }
                 }
                 self.mk_bool_call(Operation::And, vec![arg1, arg2])
             },
@@ -380,13 +450,62 @@ impl<'a, 'env, G: ExpGenerator<'env>> ExpSimplifier<'a, 'env, G> {
             // If one implies the other, keep the weaker (the one that is implied)
             _ if self.implies_comparison(&arg1, &arg2) => arg2,
             _ if self.implies_comparison(&arg2, &arg1) => arg1,
-            // Factor complementary conjunctions: (P && Q) || (!P && Q) → Q
             _ => {
-                if let Some(result) = self.try_factor_complementary_or(&arg1, &arg2) {
-                    result
-                } else {
-                    self.mk_bool_call(Operation::Or, vec![arg1, arg2])
+                // Variant set union: (x is V1|...) || (x is W1|...) → (x is V∪W)
+                if let (Some((mid_a, sid_a, vars_a, exp_a)), Some((mid_b, sid_b, vars_b, exp_b))) =
+                    (as_test_variants(&arg1), as_test_variants(&arg2))
+                {
+                    if mid_a == mid_b && sid_a == sid_b && exp_a.as_ref().structural_eq(exp_b) {
+                        let mut union: Vec<Symbol> = vars_a.to_vec();
+                        for v in vars_b {
+                            if !union.contains(v) {
+                                union.push(*v);
+                            }
+                        }
+                        let struct_env = self.env().get_module(mid_a).into_struct(sid_a);
+                        if struct_env.has_variants() {
+                            let total = struct_env.get_variants().count();
+                            if union.len() >= total {
+                                return self.mk_bool_const(true);
+                            }
+                        }
+                        if union.len() == vars_a.len() {
+                            return arg1; // arg2 ⊆ arg1
+                        }
+                        if union.len() == vars_b.len() {
+                            return arg2; // arg1 ⊆ arg2
+                        }
+                        let node_id = self
+                            .generator
+                            .new_node(Type::Primitive(PrimitiveType::Bool), None);
+                        return ExpData::Call(
+                            node_id,
+                            Operation::TestVariants(mid_a, sid_a, union),
+                            vec![exp_a.clone()],
+                        )
+                        .into_exp();
+                    }
                 }
+                // Factor complementary conjunctions: (P && Q) || (!P && Q) → Q
+                if let Some(result) = self.try_factor_complementary_or(&arg1, &arg2) {
+                    return result;
+                }
+                // Bubble TestVariants to front of disjunctions for union.
+                if as_test_variants(&arg1).is_none() {
+                    if let ExpData::Call(_, Operation::Or, rhs) = arg2.as_ref() {
+                        if rhs.len() == 2 {
+                            if as_test_variants(&rhs[0]).is_some() {
+                                return self
+                                    .mk_or(rhs[0].clone(), self.mk_or(arg1, rhs[1].clone()));
+                            }
+                            if as_test_variants(&rhs[1]).is_some() {
+                                return self
+                                    .mk_or(rhs[1].clone(), self.mk_or(arg1, rhs[0].clone()));
+                            }
+                        }
+                    }
+                }
+                self.mk_bool_call(Operation::Or, vec![arg1, arg2])
             },
         }
     }
@@ -398,7 +517,7 @@ impl<'a, 'env, G: ExpGenerator<'env>> ExpSimplifier<'a, 'env, G> {
             (_, ExpData::Value(_, Value::Bool(true))) => self.mk_bool_const(true),
             (_, ExpData::Value(_, Value::Bool(false))) => self.mk_not(arg1),
             (_, ExpData::Call(_, Operation::Implies, args)) if args.len() == 2 => {
-                if self.is_complementary(&arg1, &args[0]) {
+                if self.is_contradictory(&arg1, &args[0]) {
                     self.mk_bool_const(true)
                 } else if arg1.structural_eq(&args[0]) {
                     self.mk_implies(arg1, args[1].clone())
@@ -627,7 +746,60 @@ impl<'a, 'env, G: ExpGenerator<'env>> ExpSimplifier<'a, 'env, G> {
             },
             _ => {},
         }
+        // Variant test implication: (x is V1) implies (x is V1|V2) when V1 ⊆ V1|V2
+        if let (Some((mid_s, sid_s, vars_s, exp_s)), Some((mid_w, sid_w, vars_w, exp_w))) =
+            (as_test_variants(stronger), as_test_variants(weaker))
+        {
+            if mid_s == mid_w
+                && sid_s == sid_w
+                && exp_s.as_ref().structural_eq(exp_w)
+                && vars_s.iter().all(|v| vars_w.contains(v))
+            {
+                return true;
+            }
+        }
         false
+    }
+
+    /// Walk into a conjunction to find a TestVariants on the same (mid, sid, exp),
+    /// intersect it with `tv`, and rebuild the conjunction with the result.
+    /// Returns `Some(intersected && rest)` or `None` if no matching TV found.
+    fn extract_and_intersect_tv(
+        &self,
+        mid: ModuleId,
+        sid: StructId,
+        exp: &Exp,
+        tv: &Exp,
+        conj: &Exp,
+    ) -> Option<Exp> {
+        if let ExpData::Call(_, Operation::And, args) = conj.as_ref() {
+            if args.len() == 2 {
+                // Check left child
+                if let Some((mid2, sid2, _, exp2)) = as_test_variants(&args[0]) {
+                    if mid == mid2 && sid == sid2 && exp.as_ref().structural_eq(exp2) {
+                        return Some(
+                            self.mk_and(self.mk_and(tv.clone(), args[0].clone()), args[1].clone()),
+                        );
+                    }
+                }
+                // Check right child
+                if let Some((mid2, sid2, _, exp2)) = as_test_variants(&args[1]) {
+                    if mid == mid2 && sid == sid2 && exp.as_ref().structural_eq(exp2) {
+                        return Some(
+                            self.mk_and(self.mk_and(tv.clone(), args[1].clone()), args[0].clone()),
+                        );
+                    }
+                }
+                // Recurse into children
+                if let Some(result) = self.extract_and_intersect_tv(mid, sid, exp, tv, &args[0]) {
+                    return Some(self.mk_and(result, args[1].clone()));
+                }
+                if let Some(result) = self.extract_and_intersect_tv(mid, sid, exp, tv, &args[1]) {
+                    return Some(self.mk_and(args[0].clone(), result));
+                }
+            }
+        }
+        None
     }
 
     /// Checks if `conj` is a conjunction containing a conjunct that implies `target`.
@@ -682,6 +854,10 @@ impl<'a, 'env, G: ExpGenerator<'env>> ExpSimplifier<'a, 'env, G> {
 
     fn is_complementary(&self, a: &Exp, b: &Exp) -> bool {
         is_complementary(a, b)
+    }
+
+    fn is_contradictory(&self, a: &Exp, b: &Exp) -> bool {
+        is_contradictory(a, b)
     }
 
     /// Checks whether knowing `assumption` is true makes `exp` false, using
@@ -828,7 +1004,7 @@ impl<'a, 'env, G: ExpGenerator<'env>> ExpSimplifier<'a, 'env, G> {
         let lt_ab = self.mk_bool_call(Operation::Lt, vec![a.clone(), b.clone()]);
         self.assumptions.iter().any(|asn| {
             // Not(Lt(a, b)) or implied by comparison
-            if self.is_complementary(asn, &lt_ab) || self.implies_complementary(asn, &lt_ab) {
+            if self.is_contradictory(asn, &lt_ab) || self.implies_complementary(asn, &lt_ab) {
                 return true;
             }
             // Ge(a, b) means a >= b means !(a < b)
@@ -1518,6 +1694,15 @@ impl<'a, 'env, G: ExpGenerator<'env>> ExpSimplifier<'a, 'env, G> {
             body
         };
 
+        // Vacuous / trivially-true forall: `forall x: T: true` is `true` regardless
+        // of T's domain (vacuous when T is empty, trivially true otherwise). This
+        // catches `forall x where false: P` after `mk_implies` collapsed
+        // `false ==> P` to `true` — e.g. an empty integer range `forall j: u64
+        // where j < 0: P` once `simplify_by_type_bounds` reduced `j < 0` to `false`.
+        if is_bool_const(&body, true) {
+            return self.mk_bool_const(true);
+        }
+
         // Step 1: Flatten nested foralls.
         let mut body = self.flatten_nested_quant(QuantKind::Forall, &mut ranges, &body);
 
@@ -1823,6 +2008,15 @@ impl<'a, 'env, G: ExpGenerator<'env>> ExpSimplifier<'a, 'env, G> {
         } else {
             body
         };
+
+        // Empty / trivially-false exists: `exists x: T: false` is `false` (no
+        // witness can satisfy `false`). This catches `exists x where false: P` after
+        // `mk_and` collapsed `false /\ P` to `false` — e.g. an empty integer range
+        // `exists j: u64 where j < 0: P` once `simplify_by_type_bounds` reduced
+        // `j < 0` to `false`.
+        if is_bool_const(&body, false) {
+            return self.mk_bool_const(false);
+        }
 
         // Step 1: Flatten nested exists.
         let mut body = self.flatten_nested_quant(QuantKind::Exists, &mut ranges, &body);
@@ -2793,7 +2987,7 @@ impl<'a, 'env, G: ExpGenerator<'env>> ExpSimplifier<'a, 'env, G> {
     /// or `None` if unfolding is not possible.
     fn try_unfold_spec_fun(
         &mut self,
-        _call_id: NodeId,
+        call_id: NodeId,
         mid: ModuleId,
         fid: SpecFunId,
         args: &[Exp],
@@ -2801,19 +2995,31 @@ impl<'a, 'env, G: ExpGenerator<'env>> ExpSimplifier<'a, 'env, G> {
         if self.spec_fun_unfold_depth >= MAX_SPEC_FUN_UNFOLD_DEPTH {
             return None;
         }
+        // Extract body and param_map in a nested scope so that borrows of env
+        // through module/decl are released before we use env again below.
+        let (body, param_map) = {
+            let env = self.env();
+            let module = env.get_module(mid);
+            let decl = module.get_spec_fun(fid);
+            if decl.is_native || decl.uninterpreted || decl.is_move_fun || decl.body.is_none() {
+                return None;
+            }
+            let body = decl.body.as_ref().unwrap().clone();
+            let param_map: BTreeMap<Symbol, Exp> = decl
+                .params
+                .iter()
+                .enumerate()
+                .filter_map(|(i, param)| args.get(i).map(|a| (param.0, a.clone())))
+                .collect();
+            (body, param_map)
+        };
         let env = self.env();
-        let module = env.get_module(mid);
-        let decl = module.get_spec_fun(fid);
-        if decl.is_native || decl.uninterpreted || decl.body.is_none() {
-            return None;
-        }
-        let body = decl.body.as_ref().unwrap().clone();
-        let param_map: BTreeMap<Symbol, Exp> = decl
-            .params
-            .iter()
-            .enumerate()
-            .filter_map(|(i, param)| args.get(i).map(|a| (param.0, a.clone())))
-            .collect();
+        // Get the call-site type instantiation. These are the actual type arguments
+        // substituted for the spec function's own TypeParameter(i) placeholders.
+        // Without applying them to the body, TypeParameter(i) in nested spec calls
+        // (e.g., spec_len<K,V> inside spec_table_len<K,V>) remain unresolved and
+        // render as `#i` in the output.
+        let type_inst = env.get_node_instantiation(call_id);
         let mut replacer = |_id: NodeId, target: RewriteTarget| -> Option<Exp> {
             if let RewriteTarget::LocalVar(sym) = target {
                 param_map.get(&sym).cloned()
@@ -2822,7 +3028,15 @@ impl<'a, 'env, G: ExpGenerator<'env>> ExpSimplifier<'a, 'env, G> {
             }
         };
         let substituted = ExpRewriter::new(env, &mut replacer).rewrite_exp(body);
-        Some(substituted)
+        // Apply call-site type instantiation to body nodes so TypeParameter(i)
+        // in the spec function body are replaced with the actual type arguments.
+        if !type_inst.is_empty() {
+            Some(ExpData::rewrite_node_id(substituted, &mut |id| {
+                ExpData::instantiate_node(env, id, &type_inst)
+            }))
+        } else {
+            Some(substituted)
+        }
     }
 }
 
@@ -2891,6 +3105,7 @@ fn flatten_conjunction_into(exp: &Exp, result: &mut Vec<Exp>) {
 
 /// Check if two boolean expressions are complementary (one is the negation of the other).
 /// Uses `ExpData::structural_eq` for comparison, ignoring `NodeId`s.
+/// Complementary means `a == !b`, implying both `a && b == false` AND `a || b == true`.
 pub fn is_complementary(a: &Exp, b: &Exp) -> bool {
     match a.as_ref() {
         ExpData::Call(_, Operation::Not, args) if args.len() == 1 => {
@@ -2903,6 +3118,36 @@ pub fn is_complementary(a: &Exp, b: &Exp) -> bool {
             _ => false,
         },
     }
+}
+
+/// Check if two boolean expressions are contradictory (cannot both be true simultaneously).
+/// This is weaker than complementary: `a && b == false` but NOT necessarily `a || b == true`.
+/// Includes complementary expressions and disjoint variant tests.
+pub fn is_contradictory(a: &Exp, b: &Exp) -> bool {
+    if is_complementary(a, b) {
+        return true;
+    }
+    // Two TestVariants on the same expr: contradictory if disjoint variant sets
+    if let (Some((mid_a, sid_a, vars_a, exp_a)), Some((mid_b, sid_b, vars_b, exp_b))) =
+        (as_test_variants(a), as_test_variants(b))
+    {
+        mid_a == mid_b
+            && sid_a == sid_b
+            && exp_a.as_ref().structural_eq(exp_b)
+            && !vars_a.iter().any(|v| vars_b.contains(v))
+    } else {
+        false
+    }
+}
+
+/// Extract `(mid, sid, variants, tested_exp)` from a `TestVariants` expression.
+fn as_test_variants(exp: &Exp) -> Option<(ModuleId, StructId, &[Symbol], &Exp)> {
+    if let ExpData::Call(_, Operation::TestVariants(mid, sid, variants), args) = exp.as_ref() {
+        if args.len() == 1 {
+            return Some((*mid, *sid, variants.as_slice(), &args[0]));
+        }
+    }
+    None
 }
 
 // -----------------------------------------------------------
@@ -4627,6 +4872,65 @@ mod tests {
         assert_is_bool(&result, true);
     }
 
+    /// Build a quantifier expression with an explicit `where` clause.
+    fn mk_quant_where(
+        env: &GlobalEnv,
+        kind: QuantKind,
+        vars: Vec<(&str, Type)>,
+        cond: Exp,
+        body: Exp,
+    ) -> Exp {
+        let pool = env.symbol_pool();
+        let ranges: Vec<(Pattern, Exp)> = vars
+            .into_iter()
+            .map(|(name, ty)| {
+                let sym = pool.make(name);
+                let pat_id = env.new_node(Loc::default(), ty.clone());
+                let range_id = env.new_node(Loc::default(), Type::TypeDomain(Box::new(ty)));
+                let range = ExpData::Call(range_id, Operation::TypeDomain, vec![]).into_exp();
+                (Pattern::Var(pat_id, sym), range)
+            })
+            .collect();
+        let id = env.new_node(Loc::default(), BOOL_TYPE.clone());
+        ExpData::Quant(id, kind, ranges, vec![], Some(cond), body).into_exp()
+    }
+
+    #[test]
+    fn test_forall_where_false() {
+        // forall x: u64 where false: P(x) → true (vacuous)
+        let env = test_env();
+        let num_ty = Type::Primitive(PrimitiveType::U64);
+        let p = mk_temp(&env, 0, BOOL_TYPE.clone());
+        let quant = mk_quant_where(
+            &env,
+            QuantKind::Forall,
+            vec![("x", num_ty)],
+            mk_bool(&env, false),
+            p,
+        );
+        let mut g = test_gen(&env);
+        let mut s = ExpSimplifier::new(&mut g);
+        let result = s.simplify(quant);
+        assert_is_bool(&result, true);
+    }
+
+    #[test]
+    fn test_forall_empty_int_range() {
+        // forall x: u64 where x < 0: P(x) → true
+        // The where clause `x < 0` with `x: u64` reduces to `false` via type bounds,
+        // and the forall over an empty range is vacuously true.
+        let env = test_env();
+        let num_ty = Type::Primitive(PrimitiveType::U64);
+        let x = mk_local(&env, "x", num_ty.clone());
+        let p = mk_temp(&env, 0, BOOL_TYPE.clone());
+        let cond = mk_bool_op(&env, Operation::Lt, vec![x, mk_num(&env, 0)]);
+        let quant = mk_quant_where(&env, QuantKind::Forall, vec![("x", num_ty)], cond, p);
+        let mut g = test_gen(&env);
+        let mut s = ExpSimplifier::new(&mut g);
+        let result = s.simplify(quant);
+        assert_is_bool(&result, true);
+    }
+
     #[test]
     fn test_forall_antecedent_only_elimination() {
         // forall x: (x <= n ==> P) where P doesn't mention x → P
@@ -4727,6 +5031,55 @@ mod tests {
         let mut s = ExpSimplifier::new(&mut g);
         let result = s.simplify(quant);
         assert_is_temp(&result, 0);
+    }
+
+    #[test]
+    fn test_exists_body_false() {
+        // exists x: u64: false → false
+        let env = test_env();
+        let num_ty = Type::Primitive(PrimitiveType::U64);
+        let body = mk_bool(&env, false);
+        let quant = mk_quant(&env, QuantKind::Exists, vec![("x", num_ty)], body);
+        let mut g = test_gen(&env);
+        let mut s = ExpSimplifier::new(&mut g);
+        let result = s.simplify(quant);
+        assert_is_bool(&result, false);
+    }
+
+    #[test]
+    fn test_exists_where_false() {
+        // exists x: u64 where false: P(x) → false (no witness)
+        let env = test_env();
+        let num_ty = Type::Primitive(PrimitiveType::U64);
+        let p = mk_temp(&env, 0, BOOL_TYPE.clone());
+        let quant = mk_quant_where(
+            &env,
+            QuantKind::Exists,
+            vec![("x", num_ty)],
+            mk_bool(&env, false),
+            p,
+        );
+        let mut g = test_gen(&env);
+        let mut s = ExpSimplifier::new(&mut g);
+        let result = s.simplify(quant);
+        assert_is_bool(&result, false);
+    }
+
+    #[test]
+    fn test_exists_empty_int_range() {
+        // exists x: u64 where x < 0: P(x) → false
+        // The where clause `x < 0` with `x: u64` reduces to `false` via type bounds,
+        // and an exists over an empty range has no witness.
+        let env = test_env();
+        let num_ty = Type::Primitive(PrimitiveType::U64);
+        let x = mk_local(&env, "x", num_ty.clone());
+        let p = mk_temp(&env, 0, BOOL_TYPE.clone());
+        let cond = mk_bool_op(&env, Operation::Lt, vec![x, mk_num(&env, 0)]);
+        let quant = mk_quant_where(&env, QuantKind::Exists, vec![("x", num_ty)], cond, p);
+        let mut g = test_gen(&env);
+        let mut s = ExpSimplifier::new(&mut g);
+        let result = s.simplify(quant);
+        assert_is_bool(&result, false);
     }
 
     #[test]

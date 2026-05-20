@@ -331,7 +331,7 @@ pub trait WithMaxNumShares {
     fn with_max_num_shares(n: usize) -> Self;
 
     // TODO: rethink this function and the next one
-    fn with_max_num_shares_and_bit_size(n: usize, ell: u8) -> Self;
+    fn with_max_num_shares_and_bit_size(n: usize, ell: usize) -> Self;
 
     /// This is a modified function which might create public parameters that are fairly nonsensical, but which are sufficient for `generate()`
     /// TODO: Not sure we need `n` here

@@ -85,6 +85,15 @@ impl<S: DKGTrait> BroadcastStatus<DKGMessage> for Arc<TranscriptAggregationState
             metadata.author == sender,
             "[DKG] adding peer transcript failed with node author mismatch"
         );
+
+        let session_max = S::expected_max_transcript_size(&self.dkg_pub_params);
+        ensure!(
+            transcript_bytes.len() <= session_max,
+            "[DKG] adding peer transcript failed: transcript size {} exceeds max {}",
+            transcript_bytes.len(),
+            session_max,
+        );
+
         let transcript = bcs::from_bytes(transcript_bytes.as_slice()).map_err(|e| {
             anyhow!("[DKG] adding peer transcript failed with trx deserialization error: {e}")
         })?;

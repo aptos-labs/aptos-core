@@ -252,8 +252,9 @@ impl<'a> MoveTestAdapter<'a> for SimpleVMTestAdapter<'a> {
             Compatibility::new(
                 !extra_args.skip_check_struct_layout,
                 !extra_args.skip_check_friend_linking,
+                true,
                 false,
-                false,
+                true,
             )
         };
         let staging_module_storage = StagingModuleStorage::create_with_compat_config(

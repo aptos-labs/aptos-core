@@ -71,7 +71,12 @@ impl WeightedBIBEMasterSecretKeyShare {
         &self,
         tc: &WeightedConfigArkworks<Fr>,
     ) -> Vec<BIBEMasterSecretKeyShare> {
+        // TODO: propagate Result so a deserialized weighted_player with an
+        // out-of-bounds id cannot panic. Safe today because instances are
+        // only constructed locally via FPTXWeighted::setup, not decoded from
+        // untrusted input.
         tc.get_all_virtual_players(&self.weighted_player)
+            .expect("weighted_player id is in bounds")
             .into_iter()
             .enumerate()
             .map(|(i, virt_player)| BIBEMasterSecretKeyShare {
@@ -135,7 +140,12 @@ impl WeightedBIBEVerificationKey {
     }
 
     pub fn virtualized_vks(&self, tc: &WeightedConfigArkworks<Fr>) -> Vec<BIBEVerificationKey> {
+        // TODO: propagate Result so a deserialized weighted_player with an
+        // out-of-bounds id cannot panic. Safe today because instances are
+        // only constructed locally via FPTXWeighted::setup, not decoded from
+        // untrusted input.
         tc.get_all_virtual_players(&self.weighted_player)
+            .expect("weighted_player id is in bounds")
             .into_iter()
             .enumerate()
             .map(|(i, virt_player)| BIBEVerificationKey {
@@ -164,6 +174,7 @@ impl WeightedBIBEVerificationKey {
             })
             .zip(&dk_share.1)
             .try_for_each(|(vk, dk_share)| {
+                // TODO could use a multipairing to do this more quickly
                 vk.verify_decryption_key_share(digest, &(self.weighted_player, dk_share.clone()))
             })
     }
@@ -221,7 +232,6 @@ impl BatchThresholdEncryption for FPTXWeighted {
     type Id = Id;
     type MasterSecretKeyShare = WeightedBIBEMasterSecretKeyShare;
     type PreparedCiphertext = PreparedCiphertext;
-    type Round = u64;
     type SubTranscript = aptos_dkg::pvss::chunky::WeightedSubtranscript<Pairing>;
     type ThresholdConfig = aptos_crypto::weighted_config::WeightedConfigArkworks<Fr>;
     type VerificationKey = WeightedBIBEVerificationKey;
@@ -315,6 +325,14 @@ impl BatchThresholdEncryption for FPTXWeighted {
         Ok((ek, digest_key, vks, msk_shares))
     }
 
+    fn max_batch_size(dk: &Self::DigestKey) -> usize {
+        dk.max_batch_size()
+    }
+
+    fn num_rounds(dk: &Self::DigestKey) -> usize {
+        dk.num_rounds()
+    }
+
     fn encrypt<R: CryptoRng + RngCore>(
         ek: &Self::EncryptionKey,
         rng: &mut R,
@@ -327,7 +345,7 @@ impl BatchThresholdEncryption for FPTXWeighted {
     fn digest(
         digest_key: &Self::DigestKey,
         cts: &[Self::Ciphertext],
-        round: Self::Round,
+        round: u64,
     ) -> anyhow::Result<(Self::Digest, Self::EvalProofsPromise)> {
         FPTX::digest(digest_key, cts, round)
     }

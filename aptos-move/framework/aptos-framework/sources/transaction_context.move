@@ -17,6 +17,7 @@ module aptos_framework::transaction_context {
     /// Transaction index is not avaulable in this execution context.
     const ETRANSACTION_INDEX_NOT_AVAILABLE: u64 = 5;
 
+
     /// A wrapper denoting aptos unique identifer (AUID)
     /// for storing an address
     struct AUID has drop, store {
@@ -188,6 +189,13 @@ module aptos_framework::transaction_context {
         assert!(features::transaction_context_extension_enabled(), error::invalid_state(ETRANSACTION_CONTEXT_EXTENSION_NOT_ENABLED));
         payload.entry_function_payload
     }
+
+    /// Returns whether the current transaction is an encrypted transaction.
+    /// This function aborts if called outside of the transaction prologue, execution, or epilogue phases.
+    public fun is_encrypted_txn(): bool {
+        is_encrypted_txn_internal()
+    }
+    native fun is_encrypted_txn_internal(): bool;
 
     /// Returns a monotonically increasing counter value that combines timestamp, transaction index,
     /// session counter, and local counter into a 128-bit value.

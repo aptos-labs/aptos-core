@@ -11,7 +11,6 @@
 //! Verified with a single pairing equation.
 //!
 //! Largely following: <https://alinush.github.io/chunky#chunky-a-weighted-non-malleable-pvss>
-
 use crate::{
     delegate_transcript_core_to_subtrs,
     pcs::univariate_hiding_kzg,
@@ -45,7 +44,7 @@ use aptos_crypto::{
     arkworks::{
         self,
         msm::{self, MsmInput},
-        random::{sample_field_element_with_powers, unsafe_random_point},
+        random::{sample_field_element, sample_field_element_with_powers, unsafe_random_point},
         scrape::LowDegreeTest,
         serialization::{ark_de, ark_se},
         srs::SrsBasis,
@@ -68,27 +67,37 @@ use serde::{Deserialize, Serialize};
 pub const DST: &[u8; 39] = b"APTOS_WEIGHTED_CHUNKY_FIELD_PVSS_FS_DST";
 
 /// Weighted chunky PVSS transcript.
+///
+/// MaxBcsSize(P=Bls12_381): 706 + 32·n + 120·W + 24·max_w + 128·(W + max_w)·c + 80·ell.
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq)]
 pub struct Transcript<P: Pairing> {
+    /// MaxBcsSize: 8.
     dealer: Player,
-    /// This is the aggregatable subtranscript
+    /// The aggregatable subtranscript.
+    /// ArkSize(P=Bls12_381): 120 + 16·n + 104·W + 8·max_w + 48·(W + max_w)·c.
     #[serde(serialize_with = "ark_se", deserialize_with = "ark_de")]
     // Even though `Subtranscript` implements serde, we need this attribute macro because `Pairing` does not implement serde
     pub subtrs: Subtranscript<P>,
     /// Proof (of knowledge) showing that the s_{i,j}'s in C are base-B representations (of the s_i's in V, but this is not part of the proof), and that the r_j's in R are used in C
+    /// ArkSize(P=Bls12_381): 546 + 16·(n + W + max_w) + 80·(W + max_w)·c + 80·ell.
     #[serde(serialize_with = "ark_se", deserialize_with = "ark_de")]
     pub sharing_proof: SharingProof<P>,
 }
 
 /// Proof that chunked ciphertexts and commitments are consistent (SoK + batched range proof).
+///
+/// ArkSize(E=Bls12_381): 546 + 16·(n + W + max_w) + 80·(W + max_w)·c + 80·ell.
 #[allow(non_snake_case)]
 #[derive(CanonicalSerialize, CanonicalDeserialize, Clone, Debug, PartialEq, Eq)]
 pub struct SharingProof<E: Pairing> {
-    /// SoK: the SK is knowledge of `witnesses` s_{i,j} yielding the commitment and the C and the R, their image is the PK, and the signed message is a certain context `cntxt`
+    /// SoK: the SK is knowledge of `witnesses` s_{i,j} yielding the commitment and the C and the R, their image is the PK, and the signed message is a certain context `cntxt`.
+    /// ArkSize(E=Bls12_381): 113 + 16·(n + W + max_w) + 80·(W + max_w)·c.
     pub SoK: sigma_protocol::Proof<E::ScalarField, hkzg_chunked_elgamal::Homomorphism<'static, E>>, // static because we don't want the lifetime of the Proof to depend on the Homomorphism
-    /// A batched range proof showing that all committed values s_{i,j} lie in some range
+    /// A batched range proof showing that all committed values s_{i,j} lie in some range.
+    /// ArkSize(E=Bls12_381): 385 + 80·ell.
     pub range_proof: dekart_univariate_v2::Proof<E>,
-    /// A KZG-style commitment to the values s_{i,j} going into the range proof
+    /// A KZG-style commitment to the values s_{i,j} going into the range proof.
+    /// ArkSize(E=Bls12_381): 48.
     pub range_proof_commitment:
         <dekart_univariate_v2::Proof<E> as BatchedRangeProof<E>>::CommitmentNormalised,
 }
@@ -306,6 +315,39 @@ impl<const N: usize, P: FpConfig<N>, E: Pairing<ScalarField = Fp<P, N>>>
             sid,
             <Self as traits::Transcript>::dst(),
         )?;
+
+        // Check SoK shape
+        if self.sharing_proof.SoK.z.chunked_plaintexts.len() != sc.get_total_num_players() {
+            bail!("Sharing proof has incorrect shape: z.len() != sc.get_total_num_players()");
+        }
+        for (i, chunked_plaintexts) in self
+            .sharing_proof
+            .SoK
+            .z
+            .chunked_plaintexts
+            .iter()
+            .enumerate()
+        {
+            if chunked_plaintexts.len() != sc.get_player_weight(&sc.get_player(i))
+                .expect("Should never fail to get player, b/c of z.len() == sc.get_total_num_players() check above")
+            {
+                bail!("Sharing proof has incorrect shape: chunked plaintext vec lengths do not correspond to player weights");
+            }
+            for chunked_plaintext in chunked_plaintexts {
+                if chunked_plaintext.len() != num_chunks_per_scalar::<E::ScalarField>(pp.ell) {
+                    bail!("Sharing proof has incorrect shape: chunked plaintext has incorrect number of chunks");
+                }
+            }
+        }
+        if self.sharing_proof.SoK.z.elgamal_randomness.len() != sc.get_max_weight() {
+            bail!("Sharing proof has incorrect shape: elgamal_randomness.len() should equal sc.get_max_weight()");
+        }
+        for randomness in &self.sharing_proof.SoK.z.elgamal_randomness {
+            if randomness.len() != num_chunks_per_scalar::<E::ScalarField>(pp.ell) {
+                bail!("Sharing proof has incorrect shape: elgamal_randomness element has incorrect number of chunks");
+            }
+        }
+
         let Vs_flat = self.subtrs.all_Vs_flat(); // Also has the public key V[0]
 
         // Step 1: Do the SCRAPE LDT (G_2)
@@ -319,13 +361,15 @@ impl<const N: usize, P: FpConfig<N>, E: Pairing<ScalarField = Fp<P, N>>>
         let ldt_msm_terms = ldt.ldt_msm_input(&Vs_flat)?;
 
         // Step 2: Verify the range proof
-        let (g1_terms, g2_terms) = self.sharing_proof.range_proof.pairing_for_verify(
-            &pp.pk_range_proof.vk,
-            sc.get_total_weight() * num_chunks_per_scalar::<E::ScalarField>(pp.ell),
-            pp.ell,
-            &self.sharing_proof.range_proof_commitment,
-            rng,
-        )?;
+        // Note(Rex): g1_terms and g2_terms are the hiding KZG verification pairing terms
+        let (dekart_verification_g1_terms, dekart_verification_g2_terms) =
+            self.sharing_proof.range_proof.pairing_for_verify(
+                &pp.pk_range_proof.vk,
+                sc.get_total_weight() * num_chunks_per_scalar::<E::ScalarField>(pp.ell),
+                pp.ell,
+                &self.sharing_proof.range_proof_commitment,
+                rng,
+            )?;
 
         // Step 3: Check that ciphertexts encrypt the committed shares
         let n = sc.get_total_weight();
@@ -408,14 +452,21 @@ impl<const N: usize, P: FpConfig<N>, E: Pairing<ScalarField = Fp<P, N>>>
                 )
             })?;
 
+        let random_scalar_for_dekart: E::ScalarField = sample_field_element(rng);
+        let random_scalar_for_ciphertext_check: E::ScalarField = sample_field_element(rng);
+
         let res = E::multi_pairing(
-            g1_terms.iter().copied().chain([
-                combined_G1.into_affine(),
-                *pp.get_encryption_public_params().message_base(),
-            ]),
-            g2_terms
-                .iter()
-                .copied()
+            dekart_verification_g1_terms
+                .into_iter()
+                .map(|g| (g * random_scalar_for_dekart).into_affine())
+                .chain([
+                    (combined_G1 * random_scalar_for_ciphertext_check).into_affine(),
+                    (*pp.get_encryption_public_params().message_base()
+                        * random_scalar_for_ciphertext_check)
+                        .into_affine(),
+                ]),
+            dekart_verification_g2_terms
+                .into_iter()
                 .chain([pp.get_commitment_base(), (-combined_G2).into_affine()]),
         );
         if PairingOutput::<E>::ZERO != res {

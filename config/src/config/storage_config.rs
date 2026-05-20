@@ -167,9 +167,9 @@ impl Default for RocksdbConfig {
         Self {
             // Allow db to close old sst files, saving memory.
             max_open_files: 5000,
-            // For now we set the max total WAL size to be 1G. This config can be useful when column
+            // Max size WAL can accumulate per DB before a flush is forced. Useful when column
             // families are updated at non-uniform frequencies.
-            max_total_wal_size: 1u64 << 30,
+            max_total_wal_size: 512 << 20,
             // This includes jobs for flush and compaction.
             max_background_jobs: 4,
             // Not used. Only kept for backward compatibility.
@@ -220,10 +220,14 @@ impl Default for RocksdbConfigs {
     fn default() -> Self {
         Self {
             ledger_db_config: RocksdbConfig::default(),
-            state_merkle_db_config: RocksdbConfig::default(),
+            state_merkle_db_config: RocksdbConfig {
+                max_total_wal_size: 256 << 20,
+                ..Default::default()
+            },
             state_kv_db_config: RocksdbConfig {
                 bloom_filter_bits: Some(10.0),
                 bloom_before_level: Some(2),
+                max_total_wal_size: 256 << 20,
                 ..Default::default()
             },
             index_db_config: RocksdbConfig {
@@ -253,6 +257,8 @@ pub struct HotStateConfig {
     pub compute_root_hash: bool,
     /// Whether to persist hotness data alongside write sets in write set DB.
     pub persist_hotness_in_write_set: bool,
+    /// Whether to embed the per-block hot-state promotions into the epilogue transactions.
+    pub persist_hotness_in_epilogue: bool,
 }
 
 impl Default for HotStateConfig {
@@ -263,6 +269,7 @@ impl Default for HotStateConfig {
             delete_on_restart: true,
             compute_root_hash: true,
             persist_hotness_in_write_set: true,
+            persist_hotness_in_epilogue: false,
         }
     }
 }
@@ -679,14 +686,6 @@ impl ConfigOptimizer for StorageConfig {
             }
             if chain_id.is_testnet() && config_yaml["assert_rlimit_nofile"].is_null() {
                 config.assert_rlimit_nofile = true;
-                modified_config = true;
-            }
-            // TODO(HotState): Hot state root hash computation is off by default in Mainnet unless
-            // explicitly enabled.
-            if chain_id.is_mainnet()
-                && config_yaml["hot_state_config"]["compute_root_hash"].as_bool() != Some(true)
-            {
-                config.hot_state_config.compute_root_hash = false;
                 modified_config = true;
             }
             // TODO(HotState): Hotness persistence in write sets is disabled on mainnet and testnet

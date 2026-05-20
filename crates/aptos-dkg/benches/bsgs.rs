@@ -10,7 +10,7 @@ use criterion::{criterion_group, criterion_main, BenchmarkId, Criterion};
 use rand::{rngs::StdRng, Rng, SeedableRng};
 
 /// (vec_len, range_limit, table_size)
-fn configs() -> &'static [(usize, u64, u32)] {
+fn configs() -> &'static [(usize, u64, usize)] {
     &[
         //        (8, 1 << 32, 1 << 25),
         //        (8, 1 << 32, 1 << 25),
@@ -115,7 +115,7 @@ fn bench_table_build<E: Pairing>(c: &mut Criterion, curve_name: &str) {
     group.sample_size(10); // It can't do less than 10
 
     // Time seems almost linear in the size of the table, so doesn't make sense to benchmark many values
-    let table_sizes: &[u32] = &[1u32 << 20];
+    let table_sizes: &[usize] = &[1 << 20];
     let G = E::G1::generator();
 
     for &table_size in table_sizes {
@@ -125,7 +125,7 @@ fn bench_table_build<E: Pairing>(c: &mut Criterion, curve_name: &str) {
             |b, &table_size| {
                 b.iter(|| {
                     let t = table::BabyStepTable::new(G.into_affine(), table_size);
-                    assert_eq!(t.table_size as usize, table_size as usize);
+                    assert_eq!(t.table_size, table_size);
                 });
             },
         );

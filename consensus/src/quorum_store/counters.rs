@@ -26,6 +26,13 @@ pub const CALLBACK_SUCCESS_LABEL: &str = "callback_success";
 
 pub const POS_EXPIRED_LABEL: &str = "expired";
 pub const POS_DUPLICATE_LABEL: &str = "duplicate";
+pub const POS_COLLISION_LABEL: &str = "collision";
+
+pub const BATCH_COLLISION_LABEL: &str = "collision";
+
+pub fn inc_rejected_batch_count(reason: &str) {
+    REJECTED_BATCH_COUNT.with_label_values(&[reason]).inc();
+}
 
 static TRANSACTION_COUNT_BUCKETS: Lazy<Vec<f64>> = Lazy::new(|| {
     exponential_buckets(
@@ -166,7 +173,7 @@ pub static BATCH_NUM_PER_BLOCK: Lazy<HistogramVec> = Lazy::new(|| {
         "quorum_store_batch_num_per_block",
         "Histogram for the number of batches per (committed) blocks.",
         &["type"],
-        TRANSACTION_COUNT_BUCKETS.clone(),
+        PROOF_COUNT_BUCKETS.clone(),
     )
     .unwrap()
 });
@@ -338,6 +345,16 @@ pub static CONSENSUS_PULL_NUM_UNIQUE_TXNS: Lazy<HistogramVec> = Lazy::new(|| {
     .unwrap()
 });
 
+pub static CONSENSUS_PULL_NUM_TXNS_PER_KIND: Lazy<HistogramVec> = Lazy::new(|| {
+    register_histogram_vec!(
+        "quorum_store_consensus_pull_num_txns_per_kind",
+        "Number of txns pulled for consensus, by pull kind and batch kind (normal, encrypted, or v1).",
+        &["pull_kind", "batch_kind"],
+        TRANSACTION_COUNT_BUCKETS.clone(),
+    )
+    .unwrap()
+});
+
 pub static CONSENSUS_PULL_SIZE_IN_BYTES: Lazy<HistogramVec> = Lazy::new(|| {
     register_histogram_vec!(
         "quorum_store_consensus_pull_size_in_bytes",
@@ -379,7 +396,7 @@ pub static NUM_BATCHES_WITHOUT_PROOF_OF_STORE: Lazy<Histogram> = Lazy::new(|| {
     register_histogram!(
         "num_batches_without_proof_of_store",
         "Histogram for the number of batches without proof of store in proof manager",
-        TRANSACTION_COUNT_BUCKETS.clone(),
+        PROOF_COUNT_BUCKETS.clone(),
     )
     .unwrap()
 });
@@ -408,7 +425,7 @@ pub static PROOF_SIZE_WHEN_PULL: Lazy<Histogram> = Lazy::new(|| {
     register_histogram!(
         "quorum_store_proof_size_when_pull",
         "Histogram for the number of proof-of-store per block when pulled for consensus.",
-        TRANSACTION_COUNT_BUCKETS.clone(),
+        PROOF_COUNT_BUCKETS.clone(),
     )
     .unwrap()
 });
@@ -756,6 +773,15 @@ pub fn inc_rejected_pos_count(reason: &str) {
     REJECTED_POS_COUNT.with_label_values(&[reason]).inc();
 }
 
+static REJECTED_BATCH_COUNT: Lazy<IntCounterVec> = Lazy::new(|| {
+    register_int_counter_vec!(
+        "quorum_store_rejected_batch_count",
+        "Count of batches rejected by the proof queue, grouped by reason.",
+        &["reason"]
+    )
+    .unwrap()
+});
+
 /// Count of the received batches since last restart.
 pub static RECEIVED_REMOTE_BATCH_COUNT: Lazy<IntCounter> = Lazy::new(|| {
     register_int_counter!(
@@ -1102,6 +1128,14 @@ pub static BATCH_COORDINATOR_NUM_BATCH_REQS: Lazy<IntCounterVec> = Lazy::new(|| 
         "quorum_store_batch_coord_requests",
         "Number of requests to batch coordinator.",
         &["bucket"]
+    )
+    .unwrap()
+});
+
+pub static REMOTE_BATCH_COORDINATOR_DROPPED_MSGS: Lazy<IntCounter> = Lazy::new(|| {
+    register_int_counter!(
+        "quorum_store_remote_batch_coordinator_dropped_msgs",
+        "Dropped messages at remote batch coordinator ingress."
     )
     .unwrap()
 });

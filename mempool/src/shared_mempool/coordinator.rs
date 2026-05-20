@@ -437,6 +437,7 @@ async fn handle_update_peers<NetworkClient, TransactionValidator>(
         }
         for peer in &disabled {
             debug!(LogSchema::new(LogEntry::LostPeer).peer(peer));
+            smp.inbound_peer_rate_limiters.remove(peer);
         }
     }
 }

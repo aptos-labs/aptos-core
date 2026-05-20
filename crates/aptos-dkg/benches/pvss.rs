@@ -87,7 +87,7 @@ pub fn all_groups(c: &mut Criterion) {
             .collect();
         for tc in &configs {
             let mut rng = StdRng::seed_from_u64(42);
-            let ell = Some(32u8);
+            let ell = Some(32);
             // Single PP setup (table + dekart); keys/secrets generated once per variant.
             let (d1, d2) = test_utils::setup_dealing_chunky_both(tc, ell, &mut rng);
             if chunky_v1_enabled {
@@ -132,7 +132,7 @@ pub fn aggregatable_pvss_group<T: AggregatableTranscript + MalleableTranscript>(
 pub fn subaggregatable_pvss_group<T>(
     sc: &T::SecretSharingConfig,
     c: &mut Criterion,
-    ell: Option<u8>,
+    ell: Option<usize>,
     curve_name: &str,
 ) -> DealingArgs<T>
 where
@@ -153,7 +153,7 @@ where
 pub fn subaggregatable_pvss_group_with_dealing<T>(
     sc: &T::SecretSharingConfig,
     c: &mut Criterion,
-    ell: Option<u8>,
+    ell: Option<usize>,
     curve_name: &str,
     d: &DealingArgs<T>,
 ) where

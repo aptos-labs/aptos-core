@@ -1,45 +1,49 @@
-# The Move Programming Language
+# The Move on Aptos Book
 
 [Introduction](introduction.md)
 
-## Getting Started
+# Encapsulation
 
-- [Modules and Scripts](modules-and-scripts.md)
-- [Move Tutorial](creating-coins.md)
+- [Modules, Packages, and Imports](modules-and-packages.md)
 
-## Primitive Types
+# Types and Values
 
-- [Integers](integers.md)
-- [Bool](bool.md)
-- [Address](address.md)
+- [Primitive Types](primitive-types.md)
 - [Vector](vector.md)
-- [Signer](signer.md)
 - [References](references.md)
 - [Tuples and Unit](tuples.md)
+- [Structs, Resources, and Enums](structs-and-enums.md)
+- [Generics and Type Abilities](generics-and-abilities.md)
+- [Global Storage](global-storage.md)
+- [Equality and Comparison](equality-and-comparison.md)
 
-## Basic Concepts
+# Constants and Functions
 
-- [Local Variables and Scopes](variables.md)
-- [Equality](equality.md)
-- [Abort and Assert](abort-and-assert.md)
-- [Conditionals](conditionals.md)
-- [While and Loop](loops.md)
-- [Functions](functions.md)
-- [Structs and Resources](structs-and-resources.md)
 - [Constants](constants.md)
-- [Generics](generics.md)
-- [Type Abilities](abilities.md)
-- [Uses and Aliases](uses.md)
-- [Friends](friends.md)
-- [Packages](packages.md)
+- [Functions](functions.md)
+- [Local Variables and Scopes](variables.md)
+- [Abort and Assert](abort-and-assert.md)
+- [Conditionals and Loops](conditionals-and-loops.md)
+
+# Testing
 - [Unit Tests](unit-testing.md)
 
-## Global Storage
+# Aptos CLI
 
-- [Global Storage Structure](global-storage-structure.md)
-- [Global Storage Operators](global-storage-operators.md)
+- [Overview](cli.md)
+- [Develop](cli-develop.md)
+- [Publish](cli-deploy.md)
+- [Run](cli-run.md)
 
-## Reference
+# Move Prover
+
+- [Specification Language](spec-lang.md)
+- [Compositional Specifications](spec-compositional.md)
+- [Proofs and Inference](spec-proofs.md)
+- [User Guide](prover-guide.md)
+
+# Reference
 
 - [Standard Library](standard-library.md)
 - [Coding Conventions](coding-conventions.md)
+- [Language Versions](move-versions.md)

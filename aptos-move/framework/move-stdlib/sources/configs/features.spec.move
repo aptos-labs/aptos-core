@@ -98,6 +98,16 @@ spec std::features {
         spec_is_enabled(ABORT_IF_MULTISIG_PAYLOAD_MISMATCH)
     }
 
+    spec fun spec_multisig_timelock_enabled(): bool {
+        spec_is_enabled(MULTISIG_TIMELOCK)
+    }
+
+    spec is_multisig_timelock_enabled {
+        pragma opaque;
+        aborts_if [abstract] false;
+        ensures [abstract] result == spec_multisig_timelock_enabled();
+    }
+
     spec fun spec_new_accounts_default_to_fa_store_enabled(): bool {
         spec_is_enabled(NEW_ACCOUNTS_DEFAULT_TO_FA_STORE)
     }
@@ -128,5 +138,11 @@ spec std::features {
 
     spec fun spec_sha_512_and_ripemd_160_enabled(): bool {
         spec_is_enabled(SHA_512_AND_RIPEMD_160_NATIVES)
+    }
+
+    spec is_storage_slot_natives_enabled {
+        pragma opaque;
+        aborts_if [abstract] false;
+        ensures [abstract] result == spec_is_enabled(STORAGE_SLOT_NATIVES);
     }
 }

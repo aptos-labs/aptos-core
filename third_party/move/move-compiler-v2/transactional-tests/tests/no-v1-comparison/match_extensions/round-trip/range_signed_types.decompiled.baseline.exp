@@ -1,0 +1,52 @@
+processed 26 tasks
+task 0 lines 3-112:  publish [module 0xc0ffee::m {]
+task 1 lines 115-115:  run 0xc0ffee::m::test_i8_cross_zero --args -5i8
+return values: 1
+task 2 lines 117-117:  run 0xc0ffee::m::test_i8_cross_zero --args 0i8
+return values: 1
+task 3 lines 119-119:  run 0xc0ffee::m::test_i8_cross_zero --args 4i8
+return values: 1
+task 4 lines 121-121:  run 0xc0ffee::m::test_i8_cross_zero --args 5i8
+return values: 0
+task 5 lines 123-123:  run 0xc0ffee::m::test_i8_negative --args -100i8
+return values: 1
+task 6 lines 125-125:  run 0xc0ffee::m::test_i8_negative --args -75i8
+return values: 1
+task 7 lines 127-127:  run 0xc0ffee::m::test_i8_negative --args -50i8
+return values: 0
+task 8 lines 129-129:  run 0xc0ffee::m::test_i8_negative --args -49i8
+return values: 0
+task 9 lines 131-131:  run 0xc0ffee::m::test_i16 --args -500i16
+return values: 1
+task 10 lines 133-133:  run 0xc0ffee::m::test_i16 --args 0i16
+return values: 2
+task 11 lines 135-135:  run 0xc0ffee::m::test_i16 --args 500i16
+return values: 2
+task 12 lines 137-137:  run 0xc0ffee::m::test_i16 --args 2000i16
+return values: 0
+task 13 lines 139-139:  run 0xc0ffee::m::test_i32 --args -50i32
+return values: 1
+task 14 lines 141-141:  run 0xc0ffee::m::test_i32 --args 0i32
+return values: 2
+task 15 lines 143-143:  run 0xc0ffee::m::test_i32 --args 50i32
+return values: 2
+task 16 lines 145-145:  run 0xc0ffee::m::test_i32 --args 200i32
+return values: 0
+task 17 lines 147-147:  run 0xc0ffee::m::test_i64 --args -50i64
+return values: 1
+task 18 lines 149-149:  run 0xc0ffee::m::test_i64 --args 0i64
+return values: 2
+task 19 lines 151-151:  run 0xc0ffee::m::test_i64 --args 50i64
+return values: 2
+task 20 lines 153-153:  run 0xc0ffee::m::test_i128 --args -50i128
+return values: 1
+task 21 lines 155-155:  run 0xc0ffee::m::test_i128 --args 0i128
+return values: 2
+task 22 lines 157-157:  run 0xc0ffee::m::test_i128 --args 50i128
+return values: 2
+task 23 lines 159-159:  run 0xc0ffee::m::test_i256 --args -50i256
+return values: 1
+task 24 lines 161-161:  run 0xc0ffee::m::test_i256 --args 0i256
+return values: 2
+task 25 lines 163-163:  run 0xc0ffee::m::test_i256 --args 50i256
+return values: 2

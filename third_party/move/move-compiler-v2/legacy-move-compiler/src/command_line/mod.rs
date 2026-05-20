@@ -57,8 +57,6 @@ pub const MVC_DUMP_ENV_VAR: &str = "MVC_DUMP";
 
 pub const WARN_UNUSED_FLAG: &str = "Wunused";
 
-pub const LANG_V2_FLAG: &str = "lang_v2";
-
 // Flag to dump a stacktrace on a compiler error, for users who like
 // to keep RUST_BACKTRACE always enabled.
 pub const MOVE_COMPILER_BACKTRACE_ENV_VAR: &str = "MOVE_COMPILER_BACKTRACE";

@@ -4,11 +4,11 @@
 //! This module defines the gas parameters for Aptos Framework & Stdlib.
 
 use crate::{
-    gas_feature_versions::{RELEASE_V1_14, RELEASE_V1_8, RELEASE_V1_9_SKIPPED},
     gas_schedule::NativeGasParameters,
     ver::gas_feature_versions::{
-        RELEASE_V1_12, RELEASE_V1_13, RELEASE_V1_23, RELEASE_V1_26, RELEASE_V1_28, RELEASE_V1_36,
-        RELEASE_V1_39,
+        RELEASE_V1_12, RELEASE_V1_13, RELEASE_V1_14, RELEASE_V1_23, RELEASE_V1_26, RELEASE_V1_28,
+        RELEASE_V1_36, RELEASE_V1_39, RELEASE_V1_45, RELEASE_V1_46, RELEASE_V1_8,
+        RELEASE_V1_9_SKIPPED,
     },
 };
 use aptos_gas_algebra::{
@@ -68,7 +68,7 @@ crate::gas_schedule::macros::define_gas_parameters!(
         [algebra_ark_bn254_fr_inv: InternalGas, { 12.. => "algebra.ark_bn254_fr_inv" }, 2222160],
         [algebra_ark_bn254_fr_mul: InternalGas, { 12.. => "algebra.ark_bn254_fr_mul" }, 18130],
         [algebra_ark_bn254_fr_neg: InternalGas, { 12.. => "algebra.ark_bn254_fr_neg" }, 7920],
-        [algebra_ark_bn254_fr_one: InternalGas, { 12.. => "algebra.ark_bn254_fr_one" }, 0],
+        [algebra_ark_bn254_fr_one: InternalGas, { 12.. => "algebra.ark_bn254_fr_one" }, 7750],
         [algebra_ark_bn254_fr_serialize: InternalGas, { 12.. => "algebra.ark_bn254_fr_serialize" }, 47320],
         [algebra_ark_bn254_fr_square: InternalGas, { 12.. => "algebra.ark_bn254_fr_square" }, 7920],
         [algebra_ark_bn254_fr_sub: InternalGas, { 12.. => "algebra.ark_bn254_fr_sub" }, 19060],
@@ -316,6 +316,7 @@ crate::gas_schedule::macros::define_gas_parameters!(
         [transaction_context_entry_function_payload_per_byte_in_str: InternalGasPerByte, {RELEASE_V1_12.. => "transaction_context.entry_function_payload.per_abstract_memory_unit"}, 180],
         [transaction_context_multisig_payload_base: InternalGas, {RELEASE_V1_12.. => "transaction_context.multisig_payload.base"}, 7350],
         [transaction_context_multisig_payload_per_byte_in_str: InternalGasPerByte, {RELEASE_V1_12.. => "transaction_context.multisig_payload.per_abstract_memory_unit"}, 180],
+        [transaction_context_is_encrypted_txn_base: InternalGas, {RELEASE_V1_45.. => "transaction_context.is_encrypted_txn.base"}, 7350],
 
         [code_request_publish_base: InternalGas, "code.request_publish.base", 18380],
         [code_request_publish_per_byte: InternalGasPerByte, "code.request_publish.per_byte", 70],
@@ -361,5 +362,11 @@ crate::gas_schedule::macros::define_gas_parameters!(
 
         // Reflection
         [reflect_resolve_base: InternalGas, { RELEASE_V1_39.. => "reflect.resolve_base" }, 40960],
+
+        // Storage slot
+        [storage_slot_borrow_base: InternalGas, { RELEASE_V1_46.. => "storage_slot.borrow.base" }, 9190],
+        [storage_slot_borrow_per_byte_loaded: InternalGasPerByte, { RELEASE_V1_46.. => "storage_slot.borrow.per_byte_loaded" }, 1830],
+        [storage_slot_borrow_mut_base: InternalGas, { RELEASE_V1_46.. => "storage_slot.borrow_mut.base" }, 9190],
+        [storage_slot_borrow_mut_per_byte_loaded: InternalGasPerByte, { RELEASE_V1_46.. => "storage_slot.borrow_mut.per_byte_loaded" }, 1830],
     ]
 );

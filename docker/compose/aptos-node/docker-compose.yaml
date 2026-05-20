@@ -55,6 +55,23 @@ services:
       - type: bind
         source: ./keys/validator-identity.yaml
         target: /opt/aptos/genesis/validator-identity.yaml
+      # ----------------------------------------------------------------------
+      # Trusted setup files for chunky DKG / batch encryption.
+      # Required for validators on non-test chains.
+      #
+      # To enable:
+      #   1. Place `digest_key.bin` and `pp.bin` in this directory (next to
+      #      `genesis.blob` and `waypoint.txt`).
+      #   2. Uncomment the two `- type: bind` blocks immediately below.
+      #   3. Uncomment the `digest_key_blob_path` and `public_parameters_blob_path`
+      #      entries under `consensus:` in validator.yaml.
+      # ----------------------------------------------------------------------
+      # - type: bind
+      #   source: ./digest_key.bin
+      #   target: /opt/aptos/genesis/digest_key.bin
+      # - type: bind
+      #   source: ./pp.bin
+      #   target: /opt/aptos/genesis/pp.bin
     command: ["/usr/local/bin/aptos-node", "-f", "/opt/aptos/etc/validator.yaml"]
     restart: unless-stopped
     expose:

@@ -6,19 +6,19 @@ by the Move Prover.
 
 ### Function spec clauses
 
-These appear in `spec fun_name { ... }` blocks. Spec blocks ALWAYS appear after the function
+These appear in `spec fun_name { ... }` blocks. Spec blocks always appear after the function
 definition. If `fun_name` clashes with a soft keyword (e.g. `lemma`), use `spec @fun_name { ... }`
 to escape it.
 
 - `ensures <expr>`: Postcondition that must hold when the function returns normally.
   Evaluated in the **post-state**. Use `old(expr)` to refer to pre-state values.
 - `aborts_if <expr>`: Condition under which the function may abort. **Evaluated in the
-  pre-state** — **NEVER use `old()`** (see `old()` usage rules below). If any
+  pre-state** — do not use `old()` (see `old()` usage rules below). If any
   `aborts_if` conditions are present, the function must abort if and only if one of the
   conditions holds. Omitting all `aborts_if` clauses means abort behavior is *unspecified*
   (any abort is allowed). To express that a function never aborts, write `aborts_if false;`.
 - `requires <expr>`: Precondition that callers must satisfy. **Evaluated in the pre-state** —
-  **NEVER use `old()`** (see `old()` usage rules below).
+  Do not use `old()` (see `old()` usage rules below).
 - `modifies <resource>`: Declares which global resources the function may modify.
 
 ### Loop invariants
@@ -148,124 +148,6 @@ spec {
 };
 ```
 
-
-# Proofs and Lemmas
-
-## Example
-
-```move
-spec fun sum(n: u64): u64 {
-    if (n == 0) { 0 } else { n + sum(n - 1) }
-}
-
-spec lemma monotonicity(x: num, y: num) {
-    requires x <= y;
-    ensures sum(x) <= sum(y);
-} proof {
-    if (x < y) {
-        assert sum(y - 1) <= sum(y);
-        apply monotonicity(x, y - 1);
-    }
-}
-
-
-fun sum_up_to(n: u64): u64 { /* iterative impl */ }
-spec sum_up_to {
-    requires n <= 5;
-    ensures result == sum(n);
-} proof {
-   forall x,y {sum(x), sum(y)} apply monotonicity(x, y);
-}
-```
-
-## Proofs
-
-A proof consists of a sequence of
-proof statements together with if-then-else and let bindings.
-
-```ebnf
-Proof :=
- | "let" name "=" Expr                      # Abbreviate an expression
- | "if" "(" Expr ")" Proof "else" Proof     # Conditional
- | ProofBlock
- | "assert" Expr                            # Assert a condition
- | "assume" Expr                            # Inject an unproven assumption ("axiom")
- | "apply" LemmaInstance                    # Instantiate a Lemma
- | "forall" QuantifierDecls [ Patterns ]
-   "apply" LemmaInstance                    # Universal Lemma Instantiation
- | "calc" "(" Expr { RelOp Expr } ")"      # Dijkstras calc
- ;
- 
-ProofBlock := 
-   "{" { Proof ";" } "}"
- ;
- 
-LemmaInstance ::=
-   QualfiedName "(" [ Expr { "," Expr } ] ")"
- 
-RelOp := "==" | "!=" | "<" | "<=" | ">" | ">="
- ;
- 
-```
-
-A proof block can be attached to any specification block as postfix to that block, for example:
-
-```
-spec sum_to_n {
-  ensures result == sum(n);
-} proof {
-  forall x: u64, y: u64 apply Monotonicity(x, y);
-}  
-```
-
-A proof is translated by mapping it to a sequence of assumes/asserts at the
-verification entry points of a function.
-
-- The split statement is translated by creating different verification variants for each value split 
-  with according assumptions of the value at the split point and otherwise identical content.
-- The apply statement is translated by injecting pre/post conditions of the (expected to be proven) lemma.
-  This is very similar like calling an opaque function in Move code.
-
-## Lemmas
-
-A Lemma is a member of a specification block, similar like a spec function. Its
-user syntax is:
-
-```
-spec fun sum(n: u64): u64 {
-    if (n == 0) { 0 } else { n + sum(n - 1) }
-}
-spec lemma sum_monotonicity(x: num, y: num) {
-    requires x <= y;
-    ensures sum(x) <= sum(y);
-} proof {
-    if (x < y) {
-        assert sum(y - 1) <= sum(y);
-        apply sum_monotonicity(x, y - 1);
-    }
-}
-```
-
-Or on module block level:
-
-```
-spec module {
-  fun sum ...
-  lemma sum_monotonicity ...
-}
-```
-
-The `spec lemma` shortcut is sugar for `spec module { lemma ... }`, analogous
-to the `spec fun` shortcut for helper functions.
-
-It has a parameter list like a spec function (but no return value) followed by a
-specification block (with requires, ensures, and pragmas the only allowed conditions).
-Attached to this is an (optional) proof.
-
-Lemma names are in a separate namespace. They are scoped to modules,
-similar like specification functions. They can only be referenced from
-proof 'apply' statements.
-
 ### Property markers
 
 The `[inferred]` property marks conditions that were not written by the user. Its value indicates
@@ -279,7 +161,7 @@ the origin or quality:
   SMT solvers. Likely to cause verification timeouts — should be simplified or reformulated.
 
 
-## Reference
+### Links
 
 - [Move Specification Language](https://aptos.dev/en/build/smart-contracts/prover/spec-lang)
 {% endif %}

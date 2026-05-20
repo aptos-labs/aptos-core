@@ -20,6 +20,7 @@ module aptos_framework::config_buffer {
     use aptos_framework::system_addresses;
 
     friend aptos_framework::chunky_dkg_config;
+    friend aptos_framework::chunky_dkg_config_seqnum;
     friend aptos_framework::consensus_config;
     friend aptos_framework::decryption;
     friend aptos_framework::execution_config;

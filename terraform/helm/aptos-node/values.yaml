@@ -34,19 +34,22 @@ haproxy:
     # -- Image repo to use for HAProxy images
     repo: haproxy
     # -- Image tag to use for HAProxy images
-    tag: 3.0.2@sha256:3fa2e323a2f422239a39eff345b41ab20a7a91aa4ad8c3c82b9ae85dd241214b
+    tag: 3.0.18@sha256:6e6dcc6aa3ea63091c675db38c35bea31b8bec9bb3aa19b708435e900248fabf
     # -- Image pull policy to use for HAProxy images
     pullPolicy: IfNotPresent
   resources:
     limits:
-      cpu: 7
-      memory: 16Gi
+      cpu: 5
+      memory: 1G
     requests:
-      cpu: 7
-      memory: 16Gi
+      cpu: 1
+      memory: 200M
   nodeSelector: {}
   tolerations: []
   affinity: {}
+  topologySpreadConstraints: []
+  # -- Hint to the scheduler to place HAproxy close to its VN
+  compactPlacement: false
 
   config:
     # -- Whether to send Proxy Protocol v2
@@ -55,6 +58,15 @@ haproxy:
     user: nobody
   # -- Name of the Kubernetes TLS secret to use for HAProxy
   tls_secret:
+
+tools:
+  image:
+    # -- Image repo to use for tools images
+    repo: aptoslabs/tools
+    # -- Image tag to use for tools images. If set, overrides `imageTag`
+    tag:
+    # -- Image pull policy to use for tools images
+    pullPolicy: IfNotPresent
 
 validator:
   # -- Internal: name of your validator for use in labels
@@ -80,11 +92,14 @@ validator:
     size: 2048Gi
   # -- Log level for the validator
   rust_log: info
+  # -- Configuration for jemalloc
+  malloc_conf: ""
   # -- Flag to force enable telemetry service (useful for forge tests)
   force_enable_telemetry: false
   nodeSelector: {}
   tolerations: []
   affinity: {}
+  topologySpreadConstraints: []
   # -- Validator configuration. See NodeConfig https://github.com/aptos-labs/aptos-core/blob/main/config/src/config/mod.rs
   config: {}
   # -- DEPRECATED: it's broken with Cillium a.k.a. GKE DataplaneV2.
@@ -94,7 +109,19 @@ validator:
   podAnnotations:
     # Determines which log levels are retained by the Vector pipeline
     # aptos.dev/min-log-level-to-retain: warn
-  useConsensusHealthCheckAsStartupProbe: false # once https://github.com/aptos-labs/aptos-core/pull/15512 is rolled out to all networks (at the time of writing (dec 21 2024) it's only in devnet) we can remove this flag and always add this probe
+  healthChecks:
+    enabled: false
+    enableLivenessProbe: false
+    # If set, only update certain replicas. An useful hack for staged rollout.
+    filterReplicas:
+  # -- Pod terminationGracePeriodSeconds: time the validator binary has to commit in-flight
+  # consensus / REST work after SIGTERM before SIGKILL. Set high enough to cover the slowest
+  # graceful shutdown path.
+  terminationGracePeriodSeconds: 60
+  # -- preStop sleep: pause before SIGTERM so kube-proxy + the GKE NEG controller have time to
+  # remove this pod from Service endpoints / NEGs after the pod's deletionTimestamp is set.
+  # Without this, in-flight LB/NEG traffic can be cut at termination time.
+  preStopSleepSeconds: 15
 
 fullnode:
   # -- Specify fullnode groups by `name` and number of `replicas`
@@ -116,11 +143,16 @@ fullnode:
     size: 2048Gi
   # -- Log level for the fullnode
   rust_log: info
+  # -- Configuration for jemalloc
+  malloc_conf: ""
   # -- Flag to force enable telemetry service (useful for forge tests)
   force_enable_telemetry: false
   nodeSelector: {}
   tolerations: []
   affinity: {}
+  topologySpreadConstraints: []
+  # -- Hint to the scheduler to place the VFN close to its VN
+  compactPlacement: false
   # -- Fullnode configuration. See NodeConfig https://github.com/aptos-labs/aptos-core/blob/main/config/src/config/mod.rs
   config:
     # This full_node_networks config block allows changing only the below parameters for public fullnode networks
@@ -151,8 +183,12 @@ service:
     externalTrafficPolicy: Local
     # -- If set and if the ServiceType is LoadBalancer, allow traffic to validators from these CIDRs
     loadBalancerSourceRanges:
+    # -- Enable the PFN port to allow the validator to answer PFN queries, removing the need for a VFN.
+    enablePfnPort: false
     # -- Enable the REST API on the validator
     enableRestApi: true
+    # -- Enable a standalone NEG for the validator REST API (GKE only)
+    enableRestStandaloneNeg: false
     # -- Enable the metrics port on the validator
     enableMetricsPort: false
     # -- Enable the admin port on the validator
@@ -194,6 +230,34 @@ loadTestGenesis: false
 enablePrivilegedMode: false
 
 genesis_blob_upload_url: https://us-west1-aptos-forge-gcp-0.cloudfunctions.net/signed-url?cluster_name=unknown&era=1
+# -- GCS bucket path for genesis artifacts (e.g., gs://bucket-name/genesis/namespace/current)
+genesis_bucket_path:
+# -- Trusted setup configuration. Bytes are downloaded once per PVC and reused
+# across pod restarts (idempotent based on URL marker). Bump refreshCounter to
+# force re-download without changing the URLs.
+trustedSetup:
+  # -- Directory on a persistent mount where the trusted setup files are written.
+  # Must live on a writable, persistent volume (aptos-data PVC by default).
+  path: /opt/aptos/data/trusted-setup
+  # -- Bump to force re-download of all trusted-setup files even if URLs unchanged.
+  refreshCounter: 0
+  # -- URL to download the digest key blob (e.g., https://github.com/aptos-labs/aptos-networks/raw/.../digest_key.bin)
+  digestKeyUrl: ""
+  # -- URL to download the public parameters blob (e.g., https://github.com/aptos-labs/aptos-networks/raw/.../pp.bin)
+  publicParametersUrl: ""
+# -- Azure Blob Storage configuration for genesis artifacts (alternative to GCS)
+azure_genesis_storage:
+  # -- Enable Azure Blob Storage for genesis
+  enabled: false
+  # -- Azure Storage Account name
+  storageAccount:
+  # -- Azure Blob Container name
+  container:
+  # -- Blob path prefix (e.g., genesis/devnet-azure/current)
+  blobPath:
+  # -- Client ID for Azure AD Workload Identity
+  # Required when enabled=true. Uses federated tokens for authentication.
+  workloadIdentityClientId:
 cluster_name: unknown
 
 # Additional labels

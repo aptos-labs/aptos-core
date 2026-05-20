@@ -93,7 +93,7 @@ pub async fn test_mempool_process_incoming_transactions_impl(
         NodeType::extract_from_config(&config),
     );
 
-    let _ = tasks::process_incoming_transactions(&smp, txns, timeline_state, false).await;
+    let _ = tasks::process_incoming_transactions(&smp, txns, timeline_state, None).await;
 }
 
 proptest! {

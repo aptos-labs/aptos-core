@@ -3,11 +3,21 @@
 
 //! Static verifier for `Function` bodies. Checks well-formedness properties
 //! that would otherwise cause undefined behavior at runtime: frame bounds,
-//! pointer slot validity, invalid jump targets, etc.
+//! pointer slot validity, invalid jump targets, op/descriptor variant
+//! mismatch, etc.
+//!
+//! The descriptor table itself is not verified here — its self-soundness
+//! (reserved entries, nonzero sizes, in-bounds pointer offsets) is enforced
+//! by [`crate::types::ObjectDescriptorTable`] at construction time. The
+//! per-function checks below trust that any descriptor they look up by id
+//! is internally well-formed.
 
-use crate::types::ObjectDescriptor;
+use crate::heap::object_descriptor::{
+    ObjectDescriptor, ObjectDescriptorInner, CLOSURE_DESCRIPTOR_ID,
+};
 use mono_move_core::{
-    CodeOffset, DescriptorId, FrameOffset, Function, MicroOp, FRAME_METADATA_SIZE,
+    CallClosureOp, ClosureFuncRef, CodeOffset, DescriptorId, FrameOffset, Function, IntBinaryOp,
+    MicroOp, PackClosureOp, ShiftOperand, FRAME_METADATA_SIZE,
 };
 use std::fmt;
 
@@ -17,7 +27,7 @@ use std::fmt;
 
 #[derive(Debug)]
 pub struct VerificationError {
-    pub func_id: usize,
+    pub func_name: String,
     pub pc: Option<usize>,
     pub message: String,
 }
@@ -25,8 +35,8 @@ pub struct VerificationError {
 impl fmt::Display for VerificationError {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self.pc {
-            Some(pc) => write!(f, "func {}, pc {}: {}", self.func_id, pc, self.message),
-            None => write!(f, "func {}: {}", self.func_id, self.message),
+            Some(pc) => write!(f, "'{}', pc {}: {}", self.func_name, pc, self.message),
+            None => write!(f, "'{}': {}", self.func_name, self.message),
         }
     }
 }
@@ -35,22 +45,31 @@ impl fmt::Display for VerificationError {
 // Public API
 // ---------------------------------------------------------------------------
 
-/// Validate all functions and their pointer slots against the descriptor table.
-/// Returns an empty `Vec` on success.
-pub fn verify_program(
-    functions: &[Function],
+/// Validate a single function and its pointer slots against the descriptor
+/// table. Returns an empty `Vec` on success.
+pub fn verify_function(
+    func: &Function,
     descriptors: &[ObjectDescriptor],
 ) -> Vec<VerificationError> {
     let mut errors = Vec::new();
-    for (fid, func) in functions.iter().enumerate() {
-        let mut fv = FunctionVerifier {
-            func_id: fid,
-            func,
-            all_functions: functions,
-            descriptors,
-            errors: &mut errors,
-        };
-        fv.verify();
+    let mut fv = FunctionVerifier {
+        func,
+        descriptors,
+        errors: &mut errors,
+    };
+    fv.verify();
+    errors
+}
+
+/// Validate every function in a program against a shared descriptor table.
+/// Errors from each function are concatenated.
+pub fn verify_program(
+    funcs: &[&Function],
+    descriptors: &[ObjectDescriptor],
+) -> Vec<VerificationError> {
+    let mut errors = Vec::new();
+    for func in funcs {
+        errors.extend(verify_function(func, descriptors));
     }
     errors
 }
@@ -60,46 +79,140 @@ pub fn verify_program(
 // ---------------------------------------------------------------------------
 
 struct FunctionVerifier<'a> {
-    func_id: usize,
     func: &'a Function,
-    all_functions: &'a [Function],
     descriptors: &'a [ObjectDescriptor],
     errors: &'a mut Vec<VerificationError>,
 }
 
 impl FunctionVerifier<'_> {
     fn verify(&mut self) {
-        if self.func.code.is_empty() {
+        let code_guard = self.func.code.load();
+        let code = code_guard.as_slice();
+
+        let base_offsets = &self.func.frame_layout.heap_ptr_offsets;
+        let safe_point_layouts = self.func.safe_point_layouts.entries();
+
+        // --- Function-level sanity ---
+        // Code must be non-empty (at minimum a Return).
+        if code.is_empty() {
             self.err(None, "code must be non-empty");
         }
+
+        // --- Frame geometry ---
+        // extended_frame_size must be large enough to hold locals + metadata.
         if self.func.frame_size() > self.func.extended_frame_size {
             self.err(
                 None,
                 format!(
-                    "extended_frame_size ({}) must be >= frame_size() (args_and_locals_size {} + FRAME_METADATA_SIZE {} = {})",
+                    "extended_frame_size ({}) must be >= frame_size() (param_and_local_sizes_sum {} + FRAME_METADATA_SIZE {} = {})",
                     self.func.extended_frame_size,
-                    self.func.args_and_locals_size,
+                    self.func.param_and_local_sizes_sum,
                     FRAME_METADATA_SIZE,
                     self.func.frame_size()
                 ),
             );
         }
-        if self.func.args_size > self.func.args_and_locals_size {
+        // param_sizes_sum must fit within the data region.
+        if self.func.param_sizes_sum > self.func.param_and_local_sizes_sum {
             self.err(
                 None,
                 format!(
-                    "args_size ({}) must be <= args_and_locals_size ({})",
-                    self.func.args_size, self.func.args_and_locals_size
+                    "param_sizes_sum ({}) must be <= param_and_local_sizes_sum ({})",
+                    self.func.param_sizes_sum, self.func.param_and_local_sizes_sum
+                ),
+            );
+        }
+        // param_and_local_sizes_sum must be 8-byte aligned. The runtime writes
+        // frame metadata (saved pc/fp/func_ptr) at `fp + param_and_local_sizes_sum`
+        // via `write_u64`, which requires 8-byte alignment, and the callee
+        // frame pointer (`fp + param_and_local_sizes_sum + FRAME_METADATA_SIZE`)
+        // inherits this alignment for the callee's slot accesses.
+        if !self.func.param_and_local_sizes_sum.is_multiple_of(8) {
+            self.err(
+                None,
+                format!(
+                    "param_and_local_sizes_sum ({}) must be 8-byte aligned",
+                    self.func.param_and_local_sizes_sum
                 ),
             );
         }
 
-        for &off in &self.func.pointer_offsets {
-            self.check_frame_access(None, off, 8);
+        // --- Base frame_layout: pointer offsets valid at every PC ---
+        // Each offset must be in-bounds, not overlap metadata, and sorted.
+        self.check_pointer_offsets(None, base_offsets);
+
+        // --- Safe-point layouts: per-PC pointer offsets ---
+
+        // Entries must be strictly sorted by code_offset.
+        for w in safe_point_layouts.windows(2) {
+            if w[0].code_offset.0 >= w[1].code_offset.0 {
+                self.err(
+                    None,
+                    format!(
+                        "safe_point_layouts: entries not strictly sorted (code_offset {} >= {})",
+                        w[0].code_offset.0, w[1].code_offset.0
+                    ),
+                );
+                break;
+            }
         }
 
-        for (pc, instr) in self.func.code.iter().enumerate() {
+        // Per-entry: valid code_offset, pointer offsets in-bounds and
+        // sorted, disjoint from frame_layout.
+        for entry in safe_point_layouts {
+            let co = entry.code_offset.0;
+
+            if (co as usize) >= code.len() {
+                self.err(
+                    None,
+                    format!(
+                        "safe_point_layouts: code_offset {} out of bounds (code length {})",
+                        co,
+                        code.len()
+                    ),
+                );
+            }
+
+            let sp_offsets = &entry.layout.heap_ptr_offsets;
+            self.check_pointer_offsets(Some(co as usize), sp_offsets);
+
+            for &off in sp_offsets {
+                if base_offsets.contains(&off) {
+                    self.err(
+                        Some(co as usize),
+                        format!(
+                            "safe_point_layouts: offset {} duplicates frame_layout",
+                            off.0
+                        ),
+                    );
+                }
+            }
+        }
+
+        // --- Per-instruction checks ---
+        // Frame access bounds, jump targets, descriptor validity, etc.
+        for (pc, instr) in code.iter().enumerate() {
             self.verify_instruction(pc, instr);
+        }
+    }
+
+    /// Validate a set of pointer offsets: each must be within the extended
+    /// frame, not overlap the metadata segment, and be strictly sorted.
+    fn check_pointer_offsets(&mut self, pc: Option<usize>, offsets: &[FrameOffset]) {
+        for &off in offsets {
+            self.check_frame_access(pc, off, 8);
+        }
+        for w in offsets.windows(2) {
+            if w[0].0 >= w[1].0 {
+                self.err(
+                    pc,
+                    format!(
+                        "pointer_offsets not strictly sorted ({} >= {})",
+                        w[0].0, w[1].0
+                    ),
+                );
+                break;
+            }
         }
     }
 
@@ -113,12 +226,43 @@ impl FunctionVerifier<'_> {
                 self.check_frame_access_8(pc, dst);
             },
 
-            MicroOp::SubU64Imm { dst, src, imm: _ }
+            MicroOp::AddU64Imm { dst, src, imm: _ }
+            | MicroOp::SubU64Imm { dst, src, imm: _ }
             | MicroOp::RSubU64Imm { dst, src, imm: _ }
-            | MicroOp::AddU64Imm { dst, src, imm: _ }
-            | MicroOp::ShrU64Imm { dst, src, imm: _ } => {
+            | MicroOp::MulU64Imm { dst, src, imm: _ } => {
                 self.check_frame_access_8(pc, src);
                 self.check_frame_access_8(pc, dst);
+            },
+
+            // Div / Mod imm: reject `imm == 0` statically — at runtime it
+            // would always abort, so this is dead-code-with-a-bomb.
+            //
+            // TODO: this changes the surface vs the old VM, which aborted
+            // at runtime with a `DIV_BY_ZERO` status code. The cleanest
+            // fix is probably for the specializer to detect `imm == 0` and
+            // emit an explicit `Abort(DIV_BY_ZERO)` instead of `*U64Imm`,
+            // so the verifier never sees the bad op. Open question: can
+            // the specializer report any error post-bytecode-verification,
+            // and if so should it fail the whole module or only the
+            // function (or only the basic block)? The branch containing
+            // `imm == 0` may not even be reachable at runtime. Revisit
+            // once the abort/error story is settled.
+            MicroOp::DivU64Imm { dst, src, imm } | MicroOp::ModU64Imm { dst, src, imm } => {
+                self.check_frame_access_8(pc, src);
+                self.check_frame_access_8(pc, dst);
+                if imm == 0 {
+                    self.err(Some(pc), "division by zero (imm)");
+                }
+            },
+
+            // Shift imm: reject `imm >= 64` statically — same reason as
+            // div by zero (the runtime would always abort).
+            MicroOp::ShlU64Imm { dst, src, imm } | MicroOp::ShrU64Imm { dst, src, imm } => {
+                self.check_frame_access_8(pc, src);
+                self.check_frame_access_8(pc, dst);
+                if imm >= 64 {
+                    self.err(Some(pc), format!("shift amount {} exceeds 63 (imm)", imm));
+                }
             },
 
             MicroOp::Move8 { dst, src } => {
@@ -127,11 +271,86 @@ impl FunctionVerifier<'_> {
             },
 
             MicroOp::AddU64 { dst, lhs, rhs }
-            | MicroOp::XorU64 { dst, lhs, rhs }
-            | MicroOp::ModU64 { dst, lhs, rhs } => {
+            | MicroOp::SubU64 { dst, lhs, rhs }
+            | MicroOp::MulU64 { dst, lhs, rhs }
+            | MicroOp::DivU64 { dst, lhs, rhs }
+            | MicroOp::ModU64 { dst, lhs, rhs }
+            | MicroOp::BitAndU64 { dst, lhs, rhs }
+            | MicroOp::BitOrU64 { dst, lhs, rhs }
+            | MicroOp::BitXorU64 { dst, lhs, rhs } => {
                 self.check_frame_access_8(pc, lhs);
                 self.check_frame_access_8(pc, rhs);
                 self.check_frame_access_8(pc, dst);
+            },
+
+            // Shifts: `rhs` is a 1-byte slot (the Move shift amount is u8).
+            MicroOp::ShlU64 { dst, lhs, rhs } | MicroOp::ShrU64 { dst, lhs, rhs } => {
+                self.check_frame_access_8(pc, lhs);
+                self.check_frame_access_1(pc, rhs);
+                self.check_frame_access_8(pc, dst);
+            },
+
+            // Unspecialized integer binary ops. Checks:
+            //   - `dst`, `lhs`, and (if `rhs` is a slot) `rhs` are all
+            //     in-bounds slots of width `op.rhs.byte_width()`.
+            //   - Bitwise ops reject signed operands.
+            //
+            // TODO: also statically reject `IntDiv`/`IntMod` with an
+            // imm-zero rhs. Same for u64 variants (currently the u64
+            // variants statically error out) and shifts. Revisit once we
+            // have a clearer policy on what the specializer is allowed
+            // to reject statically — turning runtime aborts into
+            // verification errors makes the specializer's
+            // constant-folding observable in the error type.
+            MicroOp::IntAdd(ref op)
+            | MicroOp::IntSub(ref op)
+            | MicroOp::IntMul(ref op)
+            | MicroOp::IntDiv(ref op)
+            | MicroOp::IntMod(ref op) => {
+                self.check_int_binop_frame_access(pc, op);
+            },
+            MicroOp::IntBitAnd(ref op) | MicroOp::IntBitOr(ref op) | MicroOp::IntBitXor(ref op) => {
+                self.check_int_binop_frame_access(pc, op);
+                if op.rhs.is_signed() {
+                    self.err(Some(pc), "bitwise on signed type");
+                }
+            },
+
+            // Shifts: `lhs` / `dst` are slots of width `op.ty.byte_width()`;
+            // `rhs` is either a 1-byte slot or an inline u8. The shift
+            // amount is statically range-checked for the imm form, and
+            // signedness of `ty` is checked at runtime via the dispatcher.
+            //
+            // TODO: as noted above for div/mod, the static imm range check
+            // turns a runtime abort into a verification error — revisit.
+            MicroOp::IntShl(op) | MicroOp::IntShr(op) => {
+                let size = op.ty.byte_width() as u32;
+                self.check_frame_access(Some(pc), op.lhs, size);
+                self.check_frame_access(Some(pc), op.dst, size);
+                match op.rhs {
+                    ShiftOperand::SlotU8(rhs) => self.check_frame_access_1(pc, rhs),
+                    ShiftOperand::ImmU8(imm) => {
+                        if (imm as usize) >= op.ty.bit_width() {
+                            self.err(
+                                Some(pc),
+                                format!(
+                                    "shift amount {} exceeds bit width {} (imm)",
+                                    imm,
+                                    op.ty.bit_width()
+                                ),
+                            );
+                        }
+                    },
+                }
+            },
+
+            // `IntNegate` is signed-only — checked at runtime by the
+            // dispatcher. The `src == MIN` overflow case is also a
+            // runtime abort.
+            MicroOp::IntNegate(op) => {
+                let size = op.ty.byte_width() as u32;
+                self.check_frame_access(Some(pc), op.src, size);
+                self.check_frame_access(Some(pc), op.dst, size);
             },
 
             MicroOp::Move { dst, src, size } => {
@@ -167,6 +386,24 @@ impl FunctionVerifier<'_> {
                 self.check_jump(pc, target);
             },
 
+            MicroOp::JumpGreaterU64Imm {
+                target,
+                src,
+                imm: _,
+            } => {
+                self.check_frame_access_8(pc, src);
+                self.check_jump(pc, target);
+            },
+
+            MicroOp::JumpLessEqualU64Imm {
+                target,
+                src,
+                imm: _,
+            } => {
+                self.check_frame_access_8(pc, src);
+                self.check_jump(pc, target);
+            },
+
             MicroOp::JumpLessU64 { target, lhs, rhs }
             | MicroOp::JumpGreaterEqualU64 { target, lhs, rhs }
             | MicroOp::JumpNotEqualU64 { target, lhs, rhs } => {
@@ -177,12 +414,7 @@ impl FunctionVerifier<'_> {
 
             MicroOp::Return | MicroOp::ForceGC => {},
 
-            MicroOp::CallFunc { func_id } => {
-                if func_id as usize >= self.all_functions.len() {
-                    self.err(Some(pc), format!("func_id {} out of bounds", func_id));
-                }
-            },
-            MicroOp::CallLocalFunc { .. } => {},
+            MicroOp::CallIndirect { .. } | MicroOp::CallDirect { .. } => {},
 
             // ----- VecNew -----
             MicroOp::VecNew { dst } => {
@@ -215,6 +447,20 @@ impl FunctionVerifier<'_> {
                 self.check_nonzero_size(pc, elem_size);
                 self.check_frame_access(Some(pc), elem, elem_size);
                 self.check_descriptor(pc, descriptor_id);
+                if descriptor_id.as_usize() < self.descriptors.len()
+                    && !matches!(
+                        self.descriptors[descriptor_id.as_usize()].inner(),
+                        ObjectDescriptorInner::Vector { .. }
+                    )
+                {
+                    self.err(
+                        Some(pc),
+                        format!(
+                            "VecPushBack: descriptor_id {} is not a Vector",
+                            descriptor_id
+                        ),
+                    );
+                }
             },
 
             MicroOp::VecPopBack {
@@ -293,8 +539,8 @@ impl FunctionVerifier<'_> {
                 self.check_descriptor(pc, descriptor_id);
                 if descriptor_id.as_usize() < self.descriptors.len()
                     && !matches!(
-                        self.descriptors[descriptor_id.as_usize()],
-                        ObjectDescriptor::Struct { .. } | ObjectDescriptor::Enum { .. }
+                        self.descriptors[descriptor_id.as_usize()].inner(),
+                        ObjectDescriptorInner::Struct { .. } | ObjectDescriptorInner::Enum { .. }
                     )
                 {
                     self.err(
@@ -332,6 +578,171 @@ impl FunctionVerifier<'_> {
 
             // Inserted by the instrumentation pass; no frame accesses to verify.
             MicroOp::Charge { .. } => {},
+
+            MicroOp::PackClosure(ref op) => self.verify_pack_closure(pc, op),
+            MicroOp::CallClosure(ref op) => self.verify_call_closure(pc, op),
+        }
+    }
+
+    fn verify_pack_closure(&mut self, pc: usize, op: &PackClosureOp) {
+        // Destination: 8-byte heap pointer slot for the closure heap object.
+        self.check_frame_access_8(pc, op.dst);
+        // The closure object itself uses the implicit reserved
+        // `CLOSURE_DESCRIPTOR_ID` — no per-op field for it. The descriptor
+        // table is constructed via `ObjectDescriptorTable::new`, which
+        // unconditionally places `Closure` at this index (and therefore
+        // also guarantees `len() > CLOSURE_DESCRIPTOR_ID`). The asserts
+        // below are sanity checks against future internal regressions.
+        debug_assert!(
+            CLOSURE_DESCRIPTOR_ID.as_usize() < self.descriptors.len(),
+            "ObjectDescriptorTable invariant: descriptor table must have entry at {}",
+            CLOSURE_DESCRIPTOR_ID
+        );
+        debug_assert!(
+            matches!(
+                self.descriptors[CLOSURE_DESCRIPTOR_ID.as_usize()].inner(),
+                ObjectDescriptorInner::Closure
+            ),
+            "ObjectDescriptorTable invariant: descriptor[{}] must be Closure",
+            CLOSURE_DESCRIPTOR_ID
+        );
+        // captured_data_descriptor_id and `captured` must agree on emptiness:
+        // a captured-data object is allocated iff at least one value is
+        // captured.
+        match (op.captured_data_descriptor_id, op.captured.is_empty()) {
+            (None, true) => {},
+            (Some(id), false) => {
+                self.check_descriptor(pc, id);
+                let idx = id.as_usize();
+                if idx < self.descriptors.len()
+                    && !matches!(
+                        self.descriptors[idx].inner(),
+                        ObjectDescriptorInner::CapturedData { .. }
+                    )
+                {
+                    self.err(
+                        Some(pc),
+                        format!(
+                            "PackClosure: captured_data_descriptor_id {} is not a CapturedData",
+                            id
+                        ),
+                    );
+                }
+            },
+            (Some(id), true) => {
+                self.err(
+                    Some(pc),
+                    format!(
+                        "PackClosure: captured_data_descriptor_id {} provided but no captures",
+                        id
+                    ),
+                );
+            },
+            (None, false) => {
+                self.err(
+                    Some(pc),
+                    "PackClosure: captured non-empty but captured_data_descriptor_id is None"
+                        .to_string(),
+                );
+            },
+        }
+        // Captured sources: verify each (offset, size) is in-bounds.
+        for slot in &op.captured {
+            self.check_nonzero_size(pc, slot.size);
+            self.check_frame_access(Some(pc), slot.offset, slot.size);
+        }
+        // Captured count must match the mask.
+        let captured_count = op.mask.count_ones() as usize;
+        if op.captured.len() != captured_count {
+            self.err(
+                Some(pc),
+                format!(
+                    "PackClosure: captured list length {} does not match mask captured count {}",
+                    op.captured.len(),
+                    captured_count
+                ),
+            );
+        }
+        // For Resolved targets the mask must not set bits beyond the
+        // callee's parameter count, and the callee's parameter count must
+        // fit in the u64 mask.
+        match &op.func_ref {
+            ClosureFuncRef::Resolved(func_ptr) => {
+                let callee = unsafe { func_ptr.as_ref_unchecked() };
+                let param_count = callee.param_sizes.len();
+                if param_count > 64 {
+                    self.err(
+                        Some(pc),
+                        format!(
+                            "PackClosure: callee has {} params, exceeds 64-bit mask capacity",
+                            param_count
+                        ),
+                    );
+                }
+                if param_count < 64 && op.mask >> param_count != 0 {
+                    self.err(
+                        Some(pc),
+                        format!(
+                            "PackClosure: mask 0x{:x} sets bits beyond callee param count {}",
+                            op.mask, param_count
+                        ),
+                    );
+                }
+                // Each captured slot's size must match the corresponding
+                // callee parameter's size. The captured list is in
+                // mask-bit-set order through the param list.
+                let mut k = 0usize;
+                for (i, &param_size) in callee.param_sizes.iter().enumerate() {
+                    if (op.mask >> i) & 1 != 0 {
+                        if let Some(slot) = op.captured.get(k) {
+                            if slot.size != param_size {
+                                self.err(
+                                    Some(pc),
+                                    format!(
+                                        "PackClosure: captured[{}].size {} != callee param_sizes[{}] {}",
+                                        k, slot.size, i, param_size,
+                                    ),
+                                );
+                            }
+                        }
+                        k += 1;
+                    }
+                }
+            },
+        }
+        // The captured-data descriptor's values region must be exactly
+        // the materialized captured values — no padding, no extras.
+        // Together with the descriptor self-soundness pass, this is
+        // sufficient to ensure the runtime's fixed-offset writes stay in
+        // bounds.
+        if let Some(id) = op.captured_data_descriptor_id {
+            let expected_values_size: u32 = op.captured.iter().map(|s| s.size).sum();
+            let idx = id.as_usize();
+            if idx < self.descriptors.len() {
+                if let ObjectDescriptorInner::CapturedData { size: actual, .. } =
+                    self.descriptors[idx].inner()
+                {
+                    if *actual != expected_values_size {
+                        self.err(
+                            Some(pc),
+                            format!(
+                                "PackClosure: captured_data values size {} != expected {}",
+                                actual, expected_values_size
+                            ),
+                        );
+                    }
+                }
+            }
+        }
+    }
+
+    fn verify_call_closure(&mut self, pc: usize, op: &CallClosureOp) {
+        // Closure source: 8-byte heap pointer slot.
+        self.check_frame_access_8(pc, op.closure_src);
+        // Provided arg sources: each (offset, size) in-bounds.
+        for slot in &op.provided_args {
+            self.check_nonzero_size(pc, slot.size);
+            self.check_frame_access(Some(pc), slot.offset, slot.size);
         }
     }
 
@@ -340,8 +751,10 @@ impl FunctionVerifier<'_> {
     // -----------------------------------------------------------------------
 
     fn err(&mut self, pc: Option<usize>, msg: impl Into<String>) {
+        // SAFETY: The function name is allocated in an arena alive during verification.
+        let func_name = unsafe { self.func.name.as_ref_unchecked() }.to_string();
         self.errors.push(VerificationError {
-            func_id: self.func_id,
+            func_name,
             pc,
             message: msg.into(),
         });
@@ -369,8 +782,8 @@ impl FunctionVerifier<'_> {
             return;
         }
 
-        let meta_start = self.func.args_and_locals_size;
-        let meta_end = self.func.args_and_locals_size + FRAME_METADATA_SIZE;
+        let meta_start = self.func.param_and_local_sizes_sum;
+        let meta_end = self.func.param_and_local_sizes_sum + FRAME_METADATA_SIZE;
         if offset < meta_end && meta_start < end {
             self.err(
                 pc,
@@ -386,6 +799,21 @@ impl FunctionVerifier<'_> {
         self.check_frame_access(Some(pc), offset, 8);
     }
 
+    fn check_frame_access_1(&mut self, pc: usize, offset: FrameOffset) {
+        self.check_frame_access(Some(pc), offset, 1);
+    }
+
+    /// Verify an [`IntBinaryOp`]: dst and lhs are slots of width
+    /// `op.rhs.byte_width()`; if rhs is a slot arm, its slot is checked too.
+    fn check_int_binop_frame_access(&mut self, pc: usize, op: &IntBinaryOp) {
+        let size = op.rhs.byte_width() as u32;
+        self.check_frame_access(Some(pc), op.lhs, size);
+        self.check_frame_access(Some(pc), op.dst, size);
+        if let Some(rhs_off) = op.rhs.slot_offset() {
+            self.check_frame_access(Some(pc), rhs_off, size);
+        }
+    }
+
     fn check_descriptor(&mut self, pc: usize, descriptor_id: DescriptorId) {
         if descriptor_id.as_usize() >= self.descriptors.len() {
             self.err(
@@ -396,13 +824,14 @@ impl FunctionVerifier<'_> {
     }
 
     fn check_jump(&mut self, pc: usize, target: CodeOffset) {
-        if (target.0 as usize) >= self.func.code.len() {
+        // TODO: avoid reloading code.
+        let code_len = self.func.code.load().len();
+        if (target.0 as usize) >= code_len {
             self.err(
                 Some(pc),
                 format!(
                     "jump target {} out of bounds (code length {})",
-                    target.0,
-                    self.func.code.len()
+                    target.0, code_len,
                 ),
             );
         }

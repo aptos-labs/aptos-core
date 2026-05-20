@@ -1,0 +1,21 @@
+//**** Cross-compiled for `move` syntax from `tests/misc/bug_17615_inline_ref_mode.move`
+
+//# publish
+module 0xc0ffee::m {
+    struct P has copy, drop {
+        q: Q,
+    }
+    struct Q has copy, drop {
+        r: u64,
+    }
+    public fun main() {
+        let _v0 = P{q: Q{r: 0}};
+        let _v1 = &mut (&mut (&mut _v0).q).r;
+        *_v1 = 20;
+        let _v2 = _v0;
+        assert!(*&(&(&_v2).q).r == 20, 0);
+    }
+}
+
+
+//# run 0xc0ffee::m::main

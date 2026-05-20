@@ -1,6 +1,6 @@
 
 Diagnostics:
-error: behavior predicate target `x` must have function type, found `u64`
+error: behavior predicate target must have function type, found `u64`
    ┌─ tests/checking-lang-v2.4/specs/behavior_predicates_err.move:20:17
    │
 20 │         ensures requires_of<x>(x);
@@ -42,8 +42,8 @@ error: expected 1 argument(s) for result_of but 2 were provided
 96 │         ensures result == result_of<helper>(x, x);
    │                           ^^^^^^^^^^^^^^^^^^^^^^^
 
-error: unknown function `M::nonexistent_function` in behavior predicate
-    ┌─ tests/checking-lang-v2.4/specs/behavior_predicates_err.move:107:17
+error: undeclared `nonexistent_function`
+    ┌─ tests/checking-lang-v2.4/specs/behavior_predicates_err.move:107:29
     │
 107 │         ensures requires_of<nonexistent_function>(x);
-    │                 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    │                             ^^^^^^^^^^^^^^^^^^^^

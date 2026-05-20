@@ -33,27 +33,38 @@
 //!   - Trade-off: minor memory waste for lower lock contention.
 
 use crate::maintenance_config::MaintenanceConfig;
+use anyhow::{bail, Result};
 use dashmap::DashMap;
 use mono_move_alloc::{GlobalArenaPool, GlobalArenaPtr, GlobalArenaShard};
-use mono_move_core::ExecutableId;
+use mono_move_core::{types::NominalLayout, Interner, ModuleId};
+use move_binary_format::{file_format::SignatureToken, CompiledModule};
 use parking_lot::{RwLock, RwLockReadGuard, RwLockWriteGuard};
 use std::{
     hash::{Hash, Hasher},
     marker::PhantomData,
+    sync::OnceLock,
 };
 
 // Submodules: to split implementation into smaller pieces.
 mod identifiers;
 use identifiers::IdentifierInternerKey;
-mod executable_ids;
-use executable_ids::ExecutableIdInternerKey;
-mod executable;
-pub use executable::{Executable, ExecutableBuilder, Function};
-mod executable_cache;
-use executable_cache::ExecutableCache;
+mod module_ids;
+use module_ids::ModuleIdInternerKey;
+mod loaded_module;
+pub use loaded_module::{
+    FunctionSlot, LoadedModule, LoadedModuleSlot, ModuleMandatoryDependencies, ModuleSlot,
+};
+mod module_cache;
+use module_cache::ModuleCache;
+use mono_move_core::interner::{InternedIdentifier, InternedModuleId};
+use move_core_types::{account_address::AccountAddress, identifier::IdentStr};
+
 mod types;
-use types::TypeInternerKey;
-pub use types::{FieldLayout, Type};
+pub use types::{
+    struct_info_at, try_as_primitive_type, view_name, view_type, view_type_list, FieldLayout,
+    InternedType, InternedTypeList, Type,
+};
+use types::{TypeInternerKey, TypeListInternerKey};
 
 /// Global execution context with a two-phase state machine.
 ///
@@ -70,7 +81,7 @@ pub use types::{FieldLayout, Type};
 ///    execution phases, e.g., between blocks of transactions) such as cache
 ///    cleanup or data deallocation.
 pub struct GlobalContext {
-    /// Shared caches storing interned data, executables.
+    /// Shared caches storing interned data, modules.
     ctx: Context,
     /// Pool of arenas (assigned per execution worker). Each worker gets
     /// exclusive access to their arena to avoid contention.
@@ -86,11 +97,11 @@ pub struct GlobalContext {
 /// Shared context containing interned data structures. Global arena where the
 /// data is allocated is kept separately.
 struct Context {
-    identifiers: DashMap<IdentifierInternerKey, GlobalArenaPtr<str>, ahash::RandomState>,
-    executable_ids:
-        DashMap<ExecutableIdInternerKey, GlobalArenaPtr<ExecutableId>, ahash::RandomState>,
-    types: DashMap<TypeInternerKey, GlobalArenaPtr<Type>, ahash::RandomState>,
-    executable_cache: ExecutableCache,
+    identifiers: DashMap<IdentifierInternerKey, InternedIdentifier, ahash::RandomState>,
+    module_ids: DashMap<ModuleIdInternerKey, InternedModuleId, ahash::RandomState>,
+    types: DashMap<TypeInternerKey, InternedType, ahash::RandomState>,
+    type_lists: DashMap<TypeListInternerKey, InternedTypeList, ahash::RandomState>,
+    module_cache: ModuleCache,
 }
 
 /// RAII guard for the maintenance phase providing exclusive write access.
@@ -179,9 +190,10 @@ impl GlobalContext {
         Self {
             ctx: Context {
                 identifiers: DashMap::default(),
-                executable_ids: DashMap::default(),
+                module_ids: DashMap::default(),
                 types: DashMap::default(),
-                executable_cache: ExecutableCache::new(),
+                type_lists: DashMap::default(),
+                module_cache: ModuleCache::new(),
             },
             global_arena: GlobalArenaPool::with_num_arenas(num_workers),
             maintenance_config,
@@ -246,14 +258,19 @@ impl<'ctx> MaintenanceGuard<'ctx> {
         self.ctx.identifiers.len()
     }
 
-    /// Returns the number of entries in interner's map for executable IDs.
-    pub fn interned_executable_ids_count(&self) -> usize {
-        self.ctx.executable_ids.len()
+    /// Returns the number of entries in interner's map for module IDs.
+    pub fn interned_module_ids_count(&self) -> usize {
+        self.ctx.module_ids.len()
     }
 
     /// Returns the number of entries in interner's map for types.
     pub fn interned_types_count(&self) -> usize {
         self.ctx.types.len()
+    }
+
+    /// Returns the number of entries in interner's map for type lists.
+    pub fn interned_type_lists_count(&self) -> usize {
+        self.ctx.type_lists.len()
     }
 
     /// Resets all caches that store pointers to the arenas, and then resets
@@ -275,40 +292,376 @@ impl<'ctx> MaintenanceGuard<'ctx> {
 }
 
 impl<'ctx> ExecutionGuard<'ctx> {
-    /// Inserts a loaded executable into the cache, keyed by its interned ID.
-    pub fn insert_executable<'guard>(
-        &'guard self,
-        key: ArenaRef<'guard, ExecutableId>,
-        executable: Box<Executable>,
-    ) -> &'guard Executable {
-        // TODO: use ID stored inside executable instead.
-        let ptr = self
-            .ctx
-            .executable_cache
-            .insert(key.into_global_arena_ptr(), executable);
+    /// Inserts a loaded module into the cache, keyed by its interned ID.
+    ///
+    /// Returns an error only if the cache detects an invariant violation
+    /// during install. Under normal operation this method always returns
+    /// `Ok`.
+    pub fn insert_module(&self, module: Box<LoadedModule>) -> Result<&LoadedModule> {
+        let ptr = self.ctx.module_cache.insert(module)?;
 
         // SAFETY: The pointer is valid since it was created by leaking a box,
         // and can only be freed during the maintenance phase, while we are in
-        // the execution phase (guard is alive). If the executable was already
-        // in the cache, it is also alive (maintenance has not reset caches).
-        unsafe { ptr.as_ref_unchecked() }
+        // the execution phase (guard is alive). If the loaded module was
+        // already in the cache, it is also alive (maintenance has not reset
+        // caches).
+        Ok(unsafe { ptr.as_ref_unchecked() })
     }
 
-    /// Looks up a cached executable by its interned ID and returns a reference
-    /// tied to the guard's lifetime, if found.
-    pub fn get_executable<'guard>(
+    /// Looks up a cached loaded module by its interned ID and returns a
+    /// reference tied to the guard's lifetime, if found.
+    pub fn get_module<'guard>(
         &'guard self,
-        key: ArenaRef<'guard, ExecutableId>,
-    ) -> Option<&'guard Executable>
-    where
-        'ctx: 'guard,
-    {
-        let ptr = self.ctx.executable_cache.get(key.into_global_arena_ptr())?;
+        key: ArenaRef<'guard, ModuleId>,
+    ) -> Option<&'guard LoadedModule> {
+        let ptr = self.ctx.module_cache.get(key.into_global_arena_ptr())?;
 
         // SAFETY: The pointer is valid since it was created by leaking a box,
         // and can only be freed during the maintenance phase, while we are in
         // the execution phase (guard is alive).
         Some(unsafe { ptr.as_ref_unchecked() })
+    }
+
+    /// Returns the stable slot for `key`, creating an empty one if absent.
+    /// The returned pointer is valid for the cache's lifetime. Takes a
+    /// shard write lock on the create path.
+    pub fn get_or_create_module_slot<'guard>(
+        &'guard self,
+        key: ArenaRef<'guard, ModuleId>,
+    ) -> LoadedModuleSlot {
+        self.ctx
+            .module_cache
+            .get_or_create_slot(key.into_global_arena_ptr())
+    }
+
+    /// Wraps module ID pointer in a guard-scoped [`ArenaRef`], matching the
+    /// key shape used by the module cache.
+    pub fn arena_ref_for_module_id<'guard>(
+        &'guard self,
+        ptr: InternedModuleId,
+    ) -> ArenaRef<'guard, ModuleId>
+    where
+        'ctx: 'guard,
+    {
+        // SAFETY: interned ids are alive for the entire execution phase.
+        unsafe { self.arena_ref(ptr) }
+    }
+
+    // ====================================================================
+    // Public type construction helpers
+    // ====================================================================
+
+    /// Safely dereferences a type pointer. Returns a reference to the
+    /// underlying [`Type`] data. The reference is valid for the guard's
+    /// lifetime.
+    ///
+    /// This localizes `unsafe` to this method.
+    pub fn type_data(&self, ptr: InternedType) -> &Type {
+        // SAFETY: All type pointers are valid during the execution phase
+        // because the arena is not reset while any ExecutionGuard is alive.
+        unsafe { ptr.as_ref_unchecked() }
+    }
+
+    /// Interns a nominal (struct or enum) identity without populating its
+    /// layout. The returned pointer can be used immediately in IR, but
+    /// [`Type::size_and_align`] and [`Type::layout`] will return [`None`]
+    /// until [`Self::set_nominal_layout`] is called for this type. Callers
+    /// using this in cross-module contexts must tolerate the missing layout
+    /// until a layout-population pass runs.
+    pub fn intern_nominal(
+        &self,
+        module_id: InternedModuleId,
+        name: GlobalArenaPtr<str>,
+        ty_args: InternedTypeList,
+    ) -> InternedType {
+        let ty = self.global_arena.alloc(Type::Nominal {
+            module_id,
+            name,
+            ty_args,
+            layout: OnceLock::new(),
+        });
+        self.insert_allocated_type_pointer_internal(ty)
+    }
+
+    /// Allocates the field-layout slice in the arena (when `fields` is
+    /// `Some`), builds a [`NominalLayout`] and installs it into the type's
+    /// layout slot. Pass `Some(&fields)` for structs and `None` for enums.
+    /// Returns an error if `ty` is not a nominal type.
+    ///
+    /// Setting layouts concurrently is safe: the layout stores canonical
+    /// field type pointers and so is structurally identical across threads.
+    pub fn set_nominal_layout(
+        &self,
+        ty: InternedType,
+        size: u32,
+        align: u32,
+        fields: Option<&[FieldLayout]>,
+    ) -> Result<()> {
+        let slot = match view_type(ty) {
+            Type::Nominal { layout: slot, .. } => slot,
+            Type::Bool
+            | Type::U8
+            | Type::U16
+            | Type::U32
+            | Type::U64
+            | Type::U128
+            | Type::U256
+            | Type::I8
+            | Type::I16
+            | Type::I32
+            | Type::I64
+            | Type::I128
+            | Type::I256
+            | Type::Address
+            | Type::Signer
+            | Type::ImmutRef { .. }
+            | Type::MutRef { .. }
+            | Type::Vector { .. }
+            | Type::Function { .. }
+            | Type::TypeParam { .. } => {
+                bail!("set_nominal_layout called on a non-nominal type")
+            },
+        };
+
+        // Fast path: if the layout is already installed, skip the field-slice
+        // allocation entirely. A race can still leak one allocation between
+        // this check and `slot.set` below, but that is bounded and consistent
+        // with the documented arena race trade-off.
+        if slot.get().is_some() {
+            return Ok(());
+        }
+
+        let layout = match fields {
+            Some(fields) => {
+                let fields_ptr = self.global_arena.alloc_slice_copy(fields);
+                NominalLayout::new_struct(size, align, fields_ptr)
+            },
+            None => NominalLayout::new_enum(size, align),
+        };
+        if let Err(other_layout) = slot.set(layout) {
+            let installed_layout = slot.get().expect("Layout was just installed");
+            debug_assert_eq!(installed_layout.size, other_layout.size);
+            debug_assert_eq!(installed_layout.align, other_layout.align);
+            debug_assert_eq!(
+                installed_layout.field_layouts().is_some(),
+                other_layout.field_layouts().is_some()
+            );
+            // Layout computation is deterministic given the type identity,
+            // so per-field offsets must match too.
+            if let (Some(installed), Some(other)) = (
+                installed_layout.field_layouts(),
+                other_layout.field_layouts(),
+            ) {
+                debug_assert_eq!(installed.len(), other.len());
+                for (installed, other) in installed.iter().zip(other.iter()) {
+                    debug_assert_eq!(installed.offset, other.offset);
+                }
+            }
+        }
+        Ok(())
+    }
+
+    /// Looks up a type previously interned from a signature token of `module`.
+    /// Returns `None` if the token has not yet been interned in this module's
+    /// context.
+    ///
+    /// For nominal types, the returned pointer carries identity but its
+    /// layout slot may still be empty — `set_nominal_layout` runs in a
+    /// separate pass after all field types are interned. Callers consuming
+    /// this in cross-module contexts must tolerate `None` from
+    /// [`Type::size_and_align`] and [`Type::layout`] until the layout-
+    /// population pass completes.
+    pub fn try_intern_for_module(
+        &self,
+        token: &SignatureToken,
+        module: &CompiledModule,
+    ) -> Option<InternedType> {
+        self.get_interned_type_pointer_internal(token, module)
+    }
+}
+
+impl<'ctx> Interner for ExecutionGuard<'ctx> {
+    fn type_param_of(&self, idx: u16) -> InternedType {
+        let ty = self.global_arena.alloc(Type::TypeParam { idx });
+        self.insert_allocated_type_pointer_internal(ty)
+    }
+
+    fn vector_of(&self, elem: InternedType) -> InternedType {
+        let ty = self.global_arena.alloc(Type::Vector { elem });
+        self.insert_allocated_type_pointer_internal(ty)
+    }
+
+    fn immut_ref_of(&self, inner: InternedType) -> InternedType {
+        let ty = self.global_arena.alloc(Type::ImmutRef { inner });
+        self.insert_allocated_type_pointer_internal(ty)
+    }
+
+    fn mut_ref_of(&self, inner: InternedType) -> InternedType {
+        let ty = self.global_arena.alloc(Type::MutRef { inner });
+        self.insert_allocated_type_pointer_internal(ty)
+    }
+
+    fn function_of(
+        &self,
+        args: InternedTypeList,
+        results: InternedTypeList,
+        abilities: move_core_types::ability::AbilitySet,
+    ) -> InternedType {
+        let ty = self.global_arena.alloc(Type::Function {
+            args,
+            results,
+            abilities,
+        });
+        self.insert_allocated_type_pointer_internal(ty)
+    }
+
+    fn type_list_of(&self, types: &[InternedType]) -> InternedTypeList {
+        if types.is_empty() {
+            return types::EMPTY_TYPE_LIST;
+        }
+        let ptr = self.global_arena.alloc_slice_copy(types);
+        self.insert_allocated_type_list_internal(InternedTypeList::new(ptr))
+    }
+
+    fn nominal_of(
+        &self,
+        module_id: InternedModuleId,
+        name: InternedIdentifier,
+        ty_args: InternedTypeList,
+    ) -> InternedType {
+        let ty = self.global_arena.alloc(Type::Nominal {
+            module_id,
+            name,
+            ty_args,
+            layout: OnceLock::new(),
+        });
+        self.insert_allocated_type_pointer_internal(ty)
+    }
+
+    fn module_id_of(&self, address: &AccountAddress, name: &IdentStr) -> InternedModuleId {
+        self.intern_address_name_internal(*address, name)
+    }
+
+    fn identifier_of(&self, identifier: &IdentStr) -> InternedIdentifier {
+        self.intern_identifier_internal(identifier)
+    }
+
+    // TODO:
+    //   1. Non-recursive implementation.
+    //   2. Current implementation is O(N^2) because hashes of inner types are
+    //      not cached, and have to be recomputed on insertion.
+    fn subst_type(
+        &self,
+        ty: InternedType,
+        ty_args: InternedTypeList,
+    ) -> anyhow::Result<InternedType> {
+        if ty_args.is_empty() {
+            return Ok(ty);
+        }
+
+        Ok(match view_type(ty) {
+            Type::Bool
+            | Type::U8
+            | Type::U16
+            | Type::U32
+            | Type::U64
+            | Type::U128
+            | Type::U256
+            | Type::I8
+            | Type::I16
+            | Type::I32
+            | Type::I64
+            | Type::I128
+            | Type::I256
+            | Type::Address
+            | Type::Signer => ty,
+
+            Type::Vector { elem } => {
+                let new_elem = self.subst_type(*elem, ty_args)?;
+                if new_elem == *elem {
+                    ty
+                } else {
+                    self.vector_of(new_elem)
+                }
+            },
+            Type::ImmutRef { inner } => {
+                let new_inner = self.subst_type(*inner, ty_args)?;
+                if new_inner == *inner {
+                    ty
+                } else {
+                    self.immut_ref_of(new_inner)
+                }
+            },
+            Type::MutRef { inner } => {
+                let new_inner = self.subst_type(*inner, ty_args)?;
+                if new_inner == *inner {
+                    ty
+                } else {
+                    self.mut_ref_of(new_inner)
+                }
+            },
+            Type::Nominal {
+                module_id,
+                name,
+                ty_args: inner_args,
+                layout,
+            } => {
+                let new_inner_args = self.subst_type_list(*inner_args, ty_args)?;
+                if new_inner_args == *inner_args {
+                    ty
+                } else {
+                    debug_assert!(layout.get().is_none(), "Layout cannot be set for generics");
+                    self.nominal_of(*module_id, *name, new_inner_args)
+                }
+            },
+            Type::Function {
+                args,
+                results,
+                abilities,
+            } => {
+                let new_args = self.subst_type_list(*args, ty_args)?;
+                let new_results = self.subst_type_list(*results, ty_args)?;
+                if new_args == *args && new_results == *results {
+                    ty
+                } else {
+                    self.function_of(new_args, new_results, *abilities)
+                }
+            },
+            Type::TypeParam { idx } => {
+                let table = view_type_list(ty_args);
+                *table.get(*idx as usize).ok_or_else(|| {
+                    anyhow::anyhow!(
+                        "type parameter index {idx} out of bounds: substitution table has {} entries",
+                        table.len(),
+                    )
+                })?
+            },
+        })
+    }
+
+    fn subst_type_list(
+        &self,
+        tys: InternedTypeList,
+        ty_args: InternedTypeList,
+    ) -> anyhow::Result<InternedTypeList> {
+        if ty_args.is_empty() || tys.is_empty() {
+            return Ok(tys);
+        }
+
+        let slice = view_type_list(tys);
+        let mut changed = false;
+        let mut new_tys = Vec::with_capacity(slice.len());
+        for &ty in slice {
+            let new_ty = self.subst_type(ty, ty_args)?;
+            if new_ty != ty {
+                changed = true;
+            }
+            new_tys.push(new_ty);
+        }
+        if !changed {
+            return Ok(tys);
+        }
+        Ok(self.type_list_of(&new_tys))
     }
 }
 
@@ -333,20 +686,22 @@ impl<'ctx> MaintenanceGuard<'ctx> {
         // is important to ensure these caches are cleared before that.
         let Context {
             identifiers,
-            executable_ids,
+            module_ids,
             types,
-            executable_cache,
+            type_lists,
+            module_cache,
         } = self.ctx;
 
         identifiers.clear();
-        executable_ids.clear();
+        module_ids.clear();
         types.clear();
+        type_lists.clear();
 
         // SAFETY: We are in maintenance phase, and therefore there are no
-        // execution guards alive. Hence, there are no pointers to executables
+        // execution guards alive. Hence, there are no pointers to modules
         // alive, and it is safe to free the allocation behind the box.
         unsafe {
-            executable_cache.clear();
+            module_cache.clear();
         }
     }
 }
@@ -374,7 +729,7 @@ impl<'ctx> ExecutionGuard<'ctx> {
 
 impl<'guard, T: ?Sized> ArenaRef<'guard, T> {
     /// Returns the underlying [`GlobalArenaPtr`] for this arena reference.
-    pub(crate) fn into_global_arena_ptr(self) -> GlobalArenaPtr<T> {
+    pub fn into_global_arena_ptr(self) -> GlobalArenaPtr<T> {
         self.ptr
     }
 

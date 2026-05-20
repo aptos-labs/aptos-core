@@ -27,6 +27,10 @@ The lowering pipeline should:
 - convert "named slots" in stackless execution IR into "sized slots" based on
   fully concretized type information
 
+Both pipelines should strive to minimize small allocations all over the place,
+and apply principles of data-oriented design to take advantage of modern CPU
+architectures and memory hierarchies.
+
 ## Destack pipeline
 
 - convert stack-based Move bytecode into a partial SSA form, eliminating the

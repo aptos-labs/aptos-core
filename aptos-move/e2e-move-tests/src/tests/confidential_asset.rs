@@ -557,6 +557,73 @@ fn print_gas_cost(
     println!("\\-----------------------------------");
 }
 
+/// Print the total BCS-serialized size of a transaction payload's entry function arguments.
+fn print_txn_payload_size(function: &str, payload: &TransactionPayload) {
+    let size = match payload {
+        TransactionPayload::EntryFunction(ef) => ef.args().iter().map(|a| a.len()).sum::<usize>(),
+        _ => panic!("expected EntryFunction payload"),
+    };
+    println!();
+    println!(
+        "TXN payload size for {}: {} bytes ({:.2} KiB)",
+        function,
+        size.separate_with_commas(),
+        size as f64 / 1024.0
+    );
+}
+
+/// Print TXN size breakdown: sigma protocol + bulletproofs + other data (ciphertexts, EKs, etc.).
+#[cfg(feature = "move-harness-with-test-only")]
+fn print_proof_size(function: &str, proof_size: &ProofSizeInfo) {
+    const ELEMENT_SIZE: usize = 32; // 32 bytes for both compressed Ristretto points and scalars
+    let sigma_bytes =
+        (proof_size.num_group_elements + proof_size.num_field_elements) * ELEMENT_SIZE;
+    let total_bulletproof_bytes: usize = proof_size.bulletproof_bytes.iter().sum();
+    let other_bytes = proof_size.num_other_points * ELEMENT_SIZE;
+    let total = sigma_bytes + total_bulletproof_bytes + other_bytes;
+
+    let pct = |n: usize| -> String {
+        if total == 0 {
+            "0%".to_string()
+        } else {
+            format!("{}%", n * 100 / total)
+        }
+    };
+
+    let kib = |n: usize| -> String { format!("{:.2} KiB", n as f64 / 1024.0) };
+
+    println!();
+    println!("TXN size report for {}:", function);
+    println!(
+        "| Sigma protocol:  {} ({})",
+        kib(sigma_bytes),
+        pct(sigma_bytes)
+    );
+    println!("|   Group elements (A):  {}", proof_size.num_group_elements);
+    println!("|   Field elements (σ):  {}", proof_size.num_field_elements);
+    if !proof_size.bulletproof_bytes.is_empty() {
+        println!(
+            "| Bulletproofs:    {} ({})",
+            kib(total_bulletproof_bytes),
+            pct(total_bulletproof_bytes)
+        );
+        for (i, &bp) in proof_size.bulletproof_bytes.iter().enumerate() {
+            println!("|   Range proof #{}: {}", i + 1, kib(bp));
+        }
+    } else {
+        println!("| Bulletproofs:    (none)");
+    }
+    println!(
+        "| Other data:      {} ({}) [{} points]",
+        kib(other_bytes),
+        pct(other_bytes),
+        proof_size.num_other_points
+    );
+    println!("* ----------------------------------");
+    println!("| TXN size:        {}", kib(total));
+    println!("\\-----------------------------------");
+}
+
 /// Generate HTML gas report if detailed profiling is requested.
 fn maybe_generate_html_report(detailed: bool, gas_log: &TransactionGasLog, report_name: &str) {
     if detailed {
@@ -600,10 +667,20 @@ fn profile_confidential_asset_register(detailed: bool) {
     let proof: MoveRegistrationProof =
         bcs::from_bytes(&result.return_values[0].0).expect("deserialize RegistrationProof");
     let MoveRegistrationProof::V1 { sigma } = proof;
+    let num_group_elements = sigma.compressed_comm_a.len();
+    let num_field_elements = sigma.resp_sigma.len();
     let sigma_comm = extract_compressed_bytes(sigma.compressed_comm_a);
     let sigma_resp = extract_scalar_bytes(sigma.resp_sigma);
 
+    print_proof_size("register", &ProofSizeInfo {
+        num_group_elements,
+        num_field_elements,
+        bulletproof_bytes: vec![],
+        num_other_points: 1, // ek
+    });
+
     let payload = create_register_payload(apt_metadata, &ek_bytes, sigma_comm, sigma_resp);
+    print_txn_payload_size("register", &payload);
 
     let (status, gas_log, gas_used, fee_statement) =
         h.evaluate_gas_with_profiler_and_status(&alice, payload);
@@ -660,14 +737,16 @@ fn profile_confidential_asset_deposit(detailed: bool, first_deposit: bool) {
     let deposit_amount = 1000u64;
     let payload = create_deposit_payload(apt_metadata, deposit_amount);
 
-    let (status, gas_log, gas_used, fee_statement) =
-        h.evaluate_gas_with_profiler_and_status(&alice, payload);
-
     let label = if first_deposit {
         "deposit (first time)"
     } else {
         "deposit"
     };
+    print_txn_payload_size(label, &payload);
+
+    let (status, gas_log, gas_used, fee_statement) =
+        h.evaluate_gas_with_profiler_and_status(&alice, payload);
+
     print_gas_cost(
         label,
         gas_used,
@@ -735,6 +814,7 @@ fn profile_confidential_asset_rollover_pending_balance(detailed: bool) {
 
     // Benchmark rollover_pending_balance
     let payload = create_rollover_pending_balance_payload(apt_metadata);
+    print_txn_payload_size("rollover_pending_balance", &payload);
 
     let (status, gas_log, gas_used, fee_statement) =
         h.evaluate_gas_with_profiler_and_status(&alice, payload);
@@ -782,6 +862,8 @@ fn profile_fungible_asset_transfer(detailed: bool) {
     let payload =
         create_fungible_asset_transfer_payload(apt_metadata, *bob.address(), transfer_amount);
 
+    print_txn_payload_size("primary_fungible_store::transfer", &payload);
+
     let (status, gas_log, gas_used, fee_statement) =
         h.evaluate_gas_with_profiler_and_status(&alice, payload);
 
@@ -809,6 +891,16 @@ fn bench_gas_fungible_asset_transfer_detailed() {
     profile_fungible_asset_transfer(true);
 }
 
+/// TXN size breakdown: sigma protocol + bulletproofs + other cryptographic data (ciphertexts, EKs).
+#[cfg(feature = "move-harness-with-test-only")]
+struct ProofSizeInfo {
+    num_group_elements: usize,
+    num_field_elements: usize,
+    bulletproof_bytes: Vec<usize>,
+    /// Number of compressed Ristretto points in ciphertexts/EKs (not part of sigma or bulletproofs).
+    num_other_points: usize,
+}
+
 /// Generate a withdrawal proof and build the transaction payload.
 #[cfg(feature = "move-harness-with-test-only")]
 fn prove_and_build_withdraw_to(
@@ -819,7 +911,7 @@ fn prove_and_build_withdraw_to(
     alice_dk: &[u8],
     withdraw_amount: u64,
     new_balance_amount: u128,
-) -> TransactionPayload {
+) -> (TransactionPayload, ProofSizeInfo) {
     let result = h
         .exec_function_bypass_visibility(
             FRAMEWORK_ADDRESS,
@@ -845,13 +937,20 @@ fn prove_and_build_withdraw_to(
         sigma,
     } = proof;
 
+    let num_group_elements = sigma.compressed_comm_a.len();
+    let num_field_elements = sigma.resp_sigma.len();
+    let zkrp_new_balance_len = zkrp_new_balance.bytes.len();
+
     let MoveCompressedAvailableBalance::V1 {
         P: new_bal_p,
         R: new_bal_r,
         R_aud: new_bal_r_aud,
     } = compressed_new_balance;
 
-    create_withdraw_to_payload(
+    // Ciphertext points: new_balance P (ℓ) + R (ℓ) + R_aud (0 or ℓ)
+    let num_other_points = new_bal_p.len() + new_bal_r.len() + new_bal_r_aud.len();
+
+    let payload = create_withdraw_to_payload(
         apt_metadata,
         *bob.address(),
         withdraw_amount,
@@ -861,7 +960,16 @@ fn prove_and_build_withdraw_to(
         zkrp_new_balance.bytes,
         extract_compressed_bytes(sigma.compressed_comm_a),
         extract_scalar_bytes(sigma.resp_sigma),
-    )
+    );
+
+    let size_info = ProofSizeInfo {
+        num_group_elements,
+        num_field_elements,
+        bulletproof_bytes: vec![zkrp_new_balance_len],
+        num_other_points,
+    };
+
+    (payload, size_info)
 }
 
 /// Profile gas usage for the confidential asset `withdraw_to` function.
@@ -897,7 +1005,7 @@ fn profile_confidential_asset_withdraw_to(detailed: bool, auditor_mode: AuditorM
 
     if auditor_mode == AuditorMode::AuditorSubsequent {
         remaining -= withdraw_amount;
-        let payload = prove_and_build_withdraw_to(
+        let (payload, _) = prove_and_build_withdraw_to(
             &mut h,
             &alice,
             &bob,
@@ -911,7 +1019,7 @@ fn profile_confidential_asset_withdraw_to(detailed: bool, auditor_mode: AuditorM
     }
 
     remaining -= withdraw_amount;
-    let payload = prove_and_build_withdraw_to(
+    let (payload, proof_size) = prove_and_build_withdraw_to(
         &mut h,
         &alice,
         &bob,
@@ -921,14 +1029,17 @@ fn profile_confidential_asset_withdraw_to(detailed: bool, auditor_mode: AuditorM
         remaining as u128,
     );
 
-    let (status, gas_log, gas_used, fee_statement) =
-        h.evaluate_gas_with_profiler_and_status(&alice, payload);
-
     let label = match auditor_mode {
         AuditorMode::NoAuditor => "withdraw_to",
         AuditorMode::AuditorFirst => "withdraw_to (with auditor, first time)",
         AuditorMode::AuditorSubsequent => "withdraw_to (with auditor, subsequent)",
     };
+    print_txn_payload_size(label, &payload);
+
+    let (status, gas_log, gas_used, fee_statement) =
+        h.evaluate_gas_with_profiler_and_status(&alice, payload);
+
+    print_proof_size(label, &proof_size);
     print_gas_cost(
         label,
         gas_used,
@@ -979,7 +1090,7 @@ fn prove_and_build_confidential_transfer(
     transfer_amount: u64,
     new_balance_amount: u128,
     volun_auditor_eks: &[Vec<u8>],
-) -> TransactionPayload {
+) -> (TransactionPayload, ProofSizeInfo) {
     let result = h
         .exec_function_bypass_visibility(
             FRAMEWORK_ADDRESS,
@@ -1010,11 +1121,22 @@ fn prove_and_build_confidential_transfer(
         sigma,
     } = proof;
 
+    let num_group_elements = sigma.compressed_comm_a.len();
+    let num_field_elements = sigma.resp_sigma.len();
+    let zkrp_new_balance_len = zkrp_new_balance.bytes.len();
+    let zkrp_amount_len = zkrp_amount.bytes.len();
+
+    let num_ek_volun = compressed_ek_volun_auds.len();
     let ek_volun_auds_bytes: Vec<Vec<u8>> = compressed_ek_volun_auds
         .into_iter()
         .map(|p| p.data)
         .collect();
 
+    let num_amount_R_volun: usize = compressed_amount
+        .compressed_R_volun_auds
+        .iter()
+        .map(|rs| rs.len())
+        .sum();
     let amount_R_volun_auds_bytes: Vec<Vec<Vec<u8>>> = compressed_amount
         .compressed_R_volun_auds
         .into_iter()
@@ -1027,7 +1149,18 @@ fn prove_and_build_confidential_transfer(
         R_aud: new_bal_R_aud,
     } = compressed_new_balance;
 
-    create_confidential_transfer_payload(
+    // Other data: new_balance (P + R + R_aud) + amount (P + R_sender + R_recip + R_eff_aud) + ek_volun_auds + amount_R_volun_auds
+    let num_other_points = new_bal_P.len()
+        + new_bal_R.len()
+        + new_bal_R_aud.len()
+        + compressed_amount.compressed_P.len()
+        + compressed_amount.compressed_R_sender.len()
+        + compressed_amount.compressed_R_recip.len()
+        + compressed_amount.compressed_R_eff_aud.len()
+        + num_ek_volun
+        + num_amount_R_volun;
+
+    let payload = create_confidential_transfer_payload(
         apt_metadata,
         *bob.address(),
         extract_compressed_bytes(new_bal_P),
@@ -1044,7 +1177,16 @@ fn prove_and_build_confidential_transfer(
         extract_compressed_bytes(sigma.compressed_comm_a),
         extract_scalar_bytes(sigma.resp_sigma),
         vec![], // memo
-    )
+    );
+
+    let size_info = ProofSizeInfo {
+        num_group_elements,
+        num_field_elements,
+        bulletproof_bytes: vec![zkrp_new_balance_len, zkrp_amount_len],
+        num_other_points,
+    };
+
+    (payload, size_info)
 }
 
 /// Profile gas usage for the confidential asset `confidential_transfer` function.
@@ -1091,7 +1233,7 @@ fn profile_confidential_asset_confidential_transfer(
 
     if auditor_mode == AuditorMode::AuditorSubsequent {
         remaining -= transfer_amount;
-        let payload = prove_and_build_confidential_transfer(
+        let (payload, _) = prove_and_build_confidential_transfer(
             &mut h,
             &alice,
             &bob,
@@ -1106,7 +1248,7 @@ fn profile_confidential_asset_confidential_transfer(
     }
 
     remaining -= transfer_amount;
-    let payload = prove_and_build_confidential_transfer(
+    let (payload, proof_size) = prove_and_build_confidential_transfer(
         &mut h,
         &alice,
         &bob,
@@ -1116,9 +1258,6 @@ fn profile_confidential_asset_confidential_transfer(
         remaining as u128,
         &volun_auditor_eks,
     );
-
-    let (status, gas_log, gas_used, fee_statement) =
-        h.evaluate_gas_with_profiler_and_status(&alice, payload);
 
     let volun_label = if num_volun_auditors > 0 {
         format!(", {} volun", num_volun_auditors)
@@ -1140,6 +1279,12 @@ fn profile_confidential_asset_confidential_transfer(
             )
         },
     };
+    print_txn_payload_size(&label, &payload);
+
+    let (status, gas_log, gas_used, fee_statement) =
+        h.evaluate_gas_with_profiler_and_status(&alice, payload);
+
+    print_proof_size(&label, &proof_size);
     print_gas_cost(
         &label,
         gas_used,
@@ -1289,6 +1434,10 @@ fn profile_confidential_asset_rotate_encryption_key(detailed: bool) {
         sigma,
     } = proof;
 
+    let num_group_elements = sigma.compressed_comm_a.len();
+    let num_field_elements = sigma.resp_sigma.len();
+    let compressed_new_R_len = compressed_new_R.len();
+
     let new_ek_bytes = compressed_new_ek.data;
     let new_R_bytes = extract_compressed_bytes(compressed_new_R);
     let sigma_proto_comm = extract_compressed_bytes(sigma.compressed_comm_a);
@@ -1303,10 +1452,19 @@ fn profile_confidential_asset_rotate_encryption_key(detailed: bool) {
         sigma_proto_comm,
         sigma_proto_resp,
     );
+    print_txn_payload_size("rotate_encryption_key", &payload);
 
     let (status, gas_log, gas_used, fee_statement) =
         h.evaluate_gas_with_profiler_and_status(&alice, payload);
 
+    // Other data: new_ek (1) + new_R (ℓ)
+    let num_other_points = 1 + compressed_new_R_len;
+    print_proof_size("rotate_encryption_key", &ProofSizeInfo {
+        num_group_elements,
+        num_field_elements,
+        bulletproof_bytes: vec![],
+        num_other_points,
+    });
     print_gas_cost(
         "rotate_encryption_key",
         gas_used,

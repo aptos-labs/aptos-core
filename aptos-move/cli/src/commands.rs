@@ -22,11 +22,11 @@ use crate::{
 };
 use aptos_api_types::AptosErrorCode;
 use aptos_cli_common::{
-    check_if_file_exists, create_dir_if_not_exist, dir_default_to_current, get_sequence_number,
-    load_account_arg, parse_json_file, prompt_yes_with_override, write_to_file, CliCommand,
-    CliConfig, CliError, CliResult, CliTypedResult, ConfigSearchMode, MoveManifestAccountWrapper,
-    ProfileOptions, PromptOptions, RestOptions, SaveFile, TransactionOptions, TransactionSummary,
-    GIT_IGNORE,
+    check_if_file_exists, create_dir_if_not_exist, dir_default_to_current, format_txn_status,
+    get_sequence_number, load_account_arg, parse_json_file, prompt_yes_with_override,
+    write_to_file, CliCommand, CliConfig, CliError, CliResult, CliTypedResult, ConfigSearchMode,
+    MoveManifestAccountWrapper, ProfileOptions, PromptOptions, RestOptions, SaveFile,
+    TransactionOptions, TransactionSummary, GIT_IGNORE,
 };
 use aptos_crypto::HashValue;
 use aptos_framework::{
@@ -178,7 +178,7 @@ impl MoveTool {
     }
 }
 
-#[derive(Default, Parser)]
+#[derive(Debug, Default, Parser)]
 pub struct FrameworkPackageArgs {
     /// Git revision or branch for the Aptos framework
     ///
@@ -2307,6 +2307,10 @@ pub struct Simulate {
     #[clap(long)]
     local: bool,
 
+    /// Include simulated events and state changes in the output.
+    #[clap(long)]
+    show_details: bool,
+
     #[clap(skip)]
     pub env: Arc<MoveEnv>,
 }
@@ -2326,11 +2330,63 @@ impl CliCommand<TransactionSummary> for Simulate {
         let payload = TransactionPayload::EntryFunction(entry_function);
 
         if self.local {
-            self.txn_options.simulate_locally(payload, &self.env).await
+            self.txn_options
+                .simulate_locally(payload, &self.env, self.show_details)
+                .await
         } else {
             let mut rng = rand::rngs::StdRng::from_entropy();
-            self.txn_options.simulate_remotely(&mut rng, payload).await
+            self.txn_options
+                .simulate_remotely(&mut rng, payload, self.show_details)
+                .await
         }
+    }
+}
+
+#[cfg(test)]
+mod simulate_flag_tests {
+    use super::{MoveTool, Simulate};
+    use clap::Parser;
+
+    #[derive(Parser)]
+    struct TestCli {
+        #[clap(subcommand)]
+        tool: MoveTool,
+    }
+
+    fn parse_simulate(args: &[&str]) -> Simulate {
+        let cli = TestCli::try_parse_from(std::iter::once("test").chain(args.iter().copied()))
+            .expect("simulate args should parse");
+        match cli.tool {
+            MoveTool::Simulate(simulate) => simulate,
+            _ => panic!("expected MoveTool::Simulate"),
+        }
+    }
+
+    #[test]
+    fn simulate_flags_default_to_false() {
+        let simulate = parse_simulate(&[
+            "simulate",
+            "--function-id",
+            "0x1::aptos_account::transfer",
+            "--args",
+            "address:0x1",
+            "u64:1",
+        ]);
+        assert!(!simulate.show_details);
+    }
+
+    #[test]
+    fn simulate_flags_parse_when_provided() {
+        let simulate = parse_simulate(&[
+            "simulate",
+            "--function-id",
+            "0x1::aptos_account::transfer",
+            "--args",
+            "address:0x1",
+            "u64:1",
+            "--show-details",
+        ]);
+        assert!(simulate.show_details);
     }
 }
 
@@ -2467,6 +2523,12 @@ pub struct Replay {
     #[clap(long, requires("profile_gas"))]
     pub(crate) fold_unique_stack: bool,
 
+    /// If set, bypass the gas profiler's internal consistency check. The check failing
+    /// indicates a bug in the gas profiler itself; use this flag to still produce a
+    /// (possibly incomplete) gas report instead of aborting.
+    #[clap(long, requires("profile_gas"))]
+    pub(crate) skip_gas_profiler_consistency_check: bool,
+
     /// If present, skip the comparison against the expected transaction output.
     #[clap(long)]
     pub(crate) skip_comparison: bool,
@@ -2475,6 +2537,35 @@ pub struct Replay {
     /// as `Authorization: Bearer <key>`
     #[clap(long)]
     pub(crate) node_api_key: Option<String>,
+
+    /// Override one or more on-chain packages with a locally compiled version.
+    ///
+    /// Format: `<path_to_move_package>` (may be repeated).
+    ///
+    /// The local package is compiled, and every module it defines replaces the
+    /// corresponding on-chain module during replay.  Use this to add debug
+    /// logging, insert assertions, or test patches without deploying.
+    ///
+    /// Example:
+    ///   --use-local-package ./my-package  --use-local-package ./other-package
+    #[clap(long, value_name = "PATH")]
+    pub(crate) use_local_package: Vec<PathBuf>,
+
+    /// Override named addresses when compiling local packages.
+    ///
+    /// Format: `<name>=<address>` (may be repeated).
+    ///
+    /// Use this when the local Move.toml has dev addresses that differ from the
+    /// on-chain addresses, or when dependencies disagree on an address value.
+    ///
+    /// Example:
+    ///   --named-address my_module=0x<address>  --named-address other=0x<address>
+    #[clap(
+        long = "named-address",
+        value_parser = aptos_cli_common::parse_map::<String, MoveManifestAccountWrapper>,
+        default_value = ""
+    )]
+    pub(crate) named_addresses: BTreeMap<String, MoveManifestAccountWrapper>,
 
     #[clap(skip)]
     pub env: Arc<MoveEnv>,
@@ -2525,15 +2616,142 @@ impl CliCommand<TransactionSummary> for Replay {
 
         let txn = match txn {
             Transaction::UserTransaction(txn) => txn,
-            _ => {
-                return Err(CliError::UnexpectedError(
-                    "Unsupported transaction type. Only user transactions are supported."
-                        .to_string(),
-                ))
+            other => {
+                // System transactions (BlockMetadata, BlockEpilogue,
+                // StateCheckpoint, ValidatorTransaction, etc.) take the
+                // block-executor path. None of the user-txn-specific options
+                // (gas profiling, benchmarking, local package overrides)
+                // apply, so reject those upfront with a clear message.
+                if self.profile_gas {
+                    return Err(CliError::UnexpectedError(
+                        "Gas profiling is only supported for user transactions.".to_string(),
+                    ));
+                }
+                if self.benchmark {
+                    return Err(CliError::UnexpectedError(
+                        "Benchmarking is only supported for user transactions.".to_string(),
+                    ));
+                }
+                if !self.use_local_package.is_empty() {
+                    return Err(CliError::UnexpectedError(
+                        "Local package overrides are only supported for user transactions."
+                            .to_string(),
+                    ));
+                }
+
+                println!("Replaying system transaction at version {}...", self.txn_id);
+                let txn_output = debugger
+                    .execute_transaction_at_version(self.txn_id, other, aux_info)
+                    .map_err(|e| {
+                        CliError::UnexpectedError(format!(
+                            "Failed to execute system transaction: {}",
+                            e
+                        ))
+                    })?;
+
+                if !self.skip_comparison {
+                    txn_output
+                        .ensure_match_transaction_info(self.txn_id, &txn_info, None, None)
+                        .map_err(|msg| CliError::UnexpectedError(msg.to_string()))?;
+                }
+
+                let success = match txn_output.status() {
+                    TransactionStatus::Keep(exec_status) => Some(exec_status.is_success()),
+                    TransactionStatus::Discard(_) | TransactionStatus::Retry => None,
+                };
+                return Ok(TransactionSummary {
+                    transaction_hash: txn_info.transaction_hash().into(),
+                    gas_used: Some(txn_output.gas_used()),
+                    gas_unit_price: None,
+                    pending: None,
+                    sender: None,
+                    sequence_number: None,
+                    replay_protector: None,
+                    success,
+                    timestamp_us: None,
+                    version: Some(self.txn_id),
+                    vm_status: Some(format!("{:?}", txn_output.status())),
+                    deployed_object_address: None,
+                    events: None,
+                    changes: None,
+                });
             },
         };
 
         let hash = txn.committed_hash();
+
+        // Build local overrides and source locator when --use-local-package is set.
+        let (local_overrides, source_locator) = if !self.use_local_package.is_empty() {
+            let mut overrides = aptos_validator_interface::LocalModuleOverrides::new();
+            let mut locator = crate::source_locator::AptosSourceLocator::new();
+
+            // Resolve --named-address flags into the map BuildOptions expects.
+            let named_addresses: BTreeMap<String, AccountAddress> = self
+                .named_addresses
+                .iter()
+                .filter_map(|(k, v)| v.account_address.map(|a| (k.clone(), a)))
+                .collect();
+
+            for pkg_path in &self.use_local_package {
+                let built = BuiltPackage::build(pkg_path.clone(), BuildOptions {
+                    with_srcs: true,
+                    with_source_maps: true,
+                    forced_named_addresses: named_addresses.clone(),
+                    ..BuildOptions::default()
+                })
+                .map_err(|e| {
+                    CliError::UnexpectedError(format!(
+                        "Failed to build local package at {}: {}",
+                        pkg_path.display(),
+                        e
+                    ))
+                })?;
+
+                for unit in built.package.root_modules() {
+                    if let legacy_move_compiler::compiled_unit::CompiledUnit::Module(ref named) =
+                        unit.unit
+                    {
+                        let module = &named.module;
+                        let mut bytes = vec![];
+                        module.serialize(&mut bytes).map_err(|e| {
+                            CliError::UnexpectedError(format!(
+                                "Failed to serialize module {}: {}",
+                                module.self_id(),
+                                e
+                            ))
+                        })?;
+                        let module_id = module.self_id();
+                        overrides.add_module(&module_id, bytes);
+
+                        let sm_bytes = unit.unit.serialize_source_map();
+                        let source_text = std::fs::read_to_string(&unit.source_path)
+                            .unwrap_or_else(|e| {
+                                eprintln!(
+                                    "Warning: could not read source file {}: {}",
+                                    unit.source_path.display(),
+                                    e
+                                );
+                                String::new()
+                            });
+                        let filename = unit.source_path.to_string_lossy().into_owned();
+                        if let Err(e) =
+                            locator.add_local_module(module, &sm_bytes, &source_text, &filename)
+                        {
+                            eprintln!(
+                                "Warning: could not load source map for {}: {}",
+                                module_id, e
+                            );
+                        }
+                    }
+                }
+            }
+
+            let locator_arc: Arc<dyn move_vm_runtime::source_locator::SourceLocator> =
+                Arc::new(locator);
+            (Some(Arc::new(overrides)), Some(locator_arc))
+        } else {
+            (None, None)
+        };
 
         // Execute the transaction.
         let (vm_status, vm_output) = if self.profile_gas {
@@ -2545,6 +2763,7 @@ impl CliCommand<TransactionSummary> for Replay {
                 hash,
                 aux_info,
                 self.fold_unique_stack,
+                self.skip_gas_profiler_consistency_check,
             )?
         } else if self.benchmark {
             println!("Benchmarking transaction...");
@@ -2554,6 +2773,16 @@ impl CliCommand<TransactionSummary> for Replay {
                 txn.clone(),
                 hash,
                 aux_info,
+            )?
+        } else if let Some(overrides) = local_overrides {
+            println!("Replaying transaction with local package override(s)...");
+            local_simulation::run_transaction_with_local_overrides(
+                &*debugger,
+                self.txn_id,
+                txn.clone(),
+                aux_info,
+                overrides,
+                source_locator,
             )?
         } else {
             println!("Replaying transaction...");
@@ -2579,7 +2808,11 @@ impl CliCommand<TransactionSummary> for Replay {
                 ))
             })?;
 
-        if !self.skip_comparison {
+        // When local package overrides are in use the replayed code diverges from
+        // what was originally executed on-chain (different instructions, gas, etc.),
+        // so output comparison is meaningless and is automatically skipped.
+        let skip_comparison = self.skip_comparison || !self.use_local_package.is_empty();
+        if !skip_comparison {
             txn_output
                 .ensure_match_transaction_info(self.txn_id, &txn_info, None, None)
                 .map_err(|msg| CliError::UnexpectedError(msg.to_string()))?;
@@ -2605,8 +2838,10 @@ impl CliCommand<TransactionSummary> for Replay {
             success,
             timestamp_us: None,
             version: Some(self.txn_id),
-            vm_status: Some(vm_status.to_string()),
+            vm_status: Some(format_txn_status(txn_output.status(), &vm_status)),
             deployed_object_address: None,
+            events: None,
+            changes: None,
         };
 
         Ok(summary)

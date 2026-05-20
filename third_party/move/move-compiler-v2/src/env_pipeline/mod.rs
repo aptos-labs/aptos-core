@@ -24,7 +24,6 @@ pub mod match_transforms;
 pub mod model_ast_lints;
 pub mod recursive_struct_checker;
 pub mod rewrite_target;
-pub mod seqs_in_binop_checker;
 pub mod spec_checker;
 pub mod spec_rewriter;
 pub mod struct_usage_collector;

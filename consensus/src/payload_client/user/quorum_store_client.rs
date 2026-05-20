@@ -2,7 +2,9 @@
 // Licensed pursuant to the Innovation-Enabling Source Code License, available at https://github.com/aptos-labs/aptos-core/blob/main/LICENSE
 
 use crate::{
-    counters::WAIT_FOR_FULL_BLOCKS_TRIGGERED, error::QuorumStoreError, monitor,
+    counters::{PULL_LOOP_DURATION, PULL_LOOP_EMPTY_RETRIES, WAIT_FOR_FULL_BLOCKS_TRIGGERED},
+    error::QuorumStoreError,
+    monitor,
     payload_client::user::UserPayloadClient,
 };
 use aptos_consensus_types::{
@@ -105,6 +107,7 @@ impl UserPayloadClient for QuorumStoreClient {
         });
         // keep polling QuorumStore until there's payloads available or there's still pending payloads
         let start_time = Instant::now();
+        let mut empty_retries: u64 = 0;
 
         let payload = loop {
             // Make sure we don't wait more than expected, due to thread scheduling delays/processing time consumed
@@ -122,15 +125,20 @@ impl UserPayloadClient for QuorumStoreClient {
                 )
                 .await?;
             if payload.is_empty() && !return_empty && !done {
+                empty_retries += 1;
                 sleep(Duration::from_millis(NO_TXN_DELAY)).await;
                 continue;
             }
             break payload;
         };
+        let pull_duration = start_time.elapsed();
+        PULL_LOOP_DURATION.observe(pull_duration.as_secs_f64());
+        PULL_LOOP_EMPTY_RETRIES.observe(empty_retries as f64);
         debug!(
             pull_params = ?params,
-            duration_ms = start_time.elapsed().as_millis() as u64,
+            duration_ms = pull_duration.as_millis() as u64,
             payload_len = payload.len(),
+            empty_retries = empty_retries,
             return_empty = return_empty,
             return_non_full = return_non_full,
             "Pull payloads from QuorumStore: proposal"

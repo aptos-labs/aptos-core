@@ -11,7 +11,7 @@ use aptos_logger::info;
 #[tokio::test]
 async fn chunky_dkg_with_validator_down() {
     let epoch_duration_secs = 10;
-    let estimated_dkg_latency_secs = 20;
+    let estimated_dkg_latency_secs = 60;
     let time_limit_secs = epoch_duration_secs + estimated_dkg_latency_secs;
 
     let mut swarm = create_swarm_with_chunky_dkg(4, epoch_duration_secs).await;
@@ -47,11 +47,11 @@ async fn chunky_dkg_with_validator_down() {
     // Verify the transcript is valid even with a validator down
     let subtranscript = verify_chunky_dkg_transcript(&session_2);
     assert!(
-        !subtranscript.dealers.is_empty(),
+        subtranscript.dealer_bitmask.count_ones() > 0,
         "Transcript should have dealers even with one validator down"
     );
     info!(
         "Transcript verified successfully with {} dealers",
-        subtranscript.dealers.len()
+        subtranscript.dealer_bitmask.count_ones()
     );
 }

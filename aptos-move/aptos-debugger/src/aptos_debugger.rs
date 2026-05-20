@@ -181,7 +181,16 @@ impl AptosDebugger {
             &auxiliary_info,
         )?;
 
-        Ok((status, output, gas_profiler.finish()))
+        // Note: we deliberately return the log without running the consistency
+        // check. Callers are responsible for invoking
+        // `log.exec_io.check_consistency()` and `log.storage.check_consistency()`
+        // themselves; this lets user-facing tools (e.g. the CLI) format their
+        // own error message and/or offer an opt-out flag.
+        Ok((
+            status,
+            output,
+            gas_profiler.finish_without_consistency_check(),
+        ))
     }
 
     pub async fn execute_past_transactions(
@@ -475,6 +484,18 @@ impl MoveDebugger for AptosDebugger {
         DynStateView::new(Box::new(self.state_view_at_version(version)))
     }
 
+    fn state_view_at_version_with_overrides(
+        &self,
+        version: u64,
+        overrides: std::sync::Arc<aptos_validator_interface::LocalModuleOverrides>,
+    ) -> DynStateView {
+        DynStateView::new(Box::new(DebuggerStateView::new_with_overrides(
+            self.debugger.clone(),
+            version,
+            overrides,
+        )))
+    }
+
     fn execute_transaction_at_version_with_gas_profiler(
         &self,
         version: u64,
@@ -482,6 +503,27 @@ impl MoveDebugger for AptosDebugger {
         auxiliary_info: AuxiliaryInfo,
     ) -> anyhow::Result<(VMStatus, VMOutput, TransactionGasLog)> {
         self.execute_transaction_at_version_with_gas_profiler(version, txn, auxiliary_info)
+    }
+
+    fn execute_transaction_at_version(
+        &self,
+        version: u64,
+        transaction: Transaction,
+        auxiliary_info: PersistedAuxiliaryInfo,
+    ) -> anyhow::Result<TransactionOutput> {
+        // Route through the block-executor path so all Transaction variants
+        // (user + system) are handled uniformly. Single-element batch.
+        let outputs = self.execute_transactions_at_version(
+            version,
+            vec![transaction],
+            vec![auxiliary_info],
+            1,
+            &[1],
+        )?;
+        outputs
+            .into_iter()
+            .next()
+            .ok_or_else(|| anyhow::anyhow!("execute_transactions_at_version returned no outputs"))
     }
 
     async fn get_committed_transaction_at_version(

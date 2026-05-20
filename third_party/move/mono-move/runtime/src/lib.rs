@@ -3,15 +3,23 @@
 
 //! New VM runtime PoC with unified stack, bump-allocated heap, and copying GC.
 
+mod error;
 pub(crate) mod heap;
 mod interpreter;
 pub(crate) mod memory;
 mod types;
 mod verifier;
 
+pub use error::{ExecutionError, ExecutionResult};
+pub use heap::{
+    object_descriptor::{
+        ObjectDescriptor, ObjectDescriptorTable, CLOSURE_DESCRIPTOR_ID, TRIVIAL_DESCRIPTOR_ID,
+    },
+    pinned_roots::{PinGuard, PinnedRoots},
+};
 pub use interpreter::InterpreterContext;
 pub use memory::{
     read_ptr, read_u32, read_u64, vec_elem_ptr, write_ptr, write_u32, write_u64, MemoryRegion,
 };
-pub use types::{ObjectDescriptor, StepResult, VEC_DATA_OFFSET, VEC_LENGTH_OFFSET};
-pub use verifier::{verify_program, VerificationError};
+pub use types::{StepResult, VEC_DATA_OFFSET, VEC_LENGTH_OFFSET};
+pub use verifier::{verify_function, verify_program, VerificationError};

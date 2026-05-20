@@ -1,0 +1,19 @@
+inference succeeded, wrote spec files for 1 file(s) (read the files to see the changes):
+- <TEMPDIR>/filegen.spec.move
+
+=== source (untouched) ===
+module 0xCAFE::filegen {
+    fun add_one(x: u64): u64 {
+        x + 1
+    }
+}
+=== spec file ===
+spec 0xcafe::filegen {
+
+    spec add_one(x: u64): u64 {
+        pragma opaque = true;
+        ensures [inferred] result == x + 1;
+        aborts_if [inferred] x == MAX_U64;
+    }
+
+}

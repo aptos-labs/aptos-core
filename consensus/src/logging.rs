@@ -43,6 +43,7 @@ pub enum LogEvent {
     ReceiveOrderVote,
     RetrieveBlock,
     StateSync,
+    StateSyncTrigger,
     Timeout,
     Vote,
     VoteNIL,

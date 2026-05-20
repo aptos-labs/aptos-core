@@ -4,8 +4,9 @@
 use crate::state_store::state_view::hot_state_view::HotStateView;
 use aptos_crypto::HashValue;
 use aptos_experimental_layered_map::LayeredMap;
-use aptos_types::state_store::{
-    hot_state::THotStateSlot, state_key::StateKey, state_slot::StateSlot,
+use aptos_types::{
+    state_store::{hot_state::THotStateSlot, state_key::StateKey, state_slot::StateSlot},
+    transaction::Version,
 };
 use std::{collections::HashMap, num::NonZeroUsize, sync::Arc};
 
@@ -25,6 +26,8 @@ pub(crate) struct HotStateLRU<'a> {
     tail: Option<HashValue>,
     /// Total number of items.
     num_items: usize,
+    /// Sum of `StateSlot::size()` across all hot entries in this shard.
+    total_value_bytes: usize,
 }
 
 impl<'a> HotStateLRU<'a> {
@@ -35,6 +38,7 @@ impl<'a> HotStateLRU<'a> {
         head: Option<HashValue>,
         tail: Option<HashValue>,
         num_items: usize,
+        total_value_bytes: usize,
     ) -> Self {
         Self {
             capacity,
@@ -44,10 +48,13 @@ impl<'a> HotStateLRU<'a> {
             head,
             tail,
             num_items,
+            total_value_bytes,
         }
     }
 
-    pub fn insert(&mut self, key: &StateKey, mut slot: StateSlot) {
+    /// Inserts a hot slot as the most recent entry. Returns the old `hot_since_version` if
+    /// replacing an existing hot entry.
+    pub fn insert(&mut self, key: &StateKey, mut slot: StateSlot) -> Option<Version> {
         assert!(
             slot.is_hot(),
             "Should not insert cold slots into hot state."
@@ -62,10 +69,14 @@ impl<'a> HotStateLRU<'a> {
             slot.set_state_key(key.clone());
         }
         let key_hash = *key.crypto_hash_ref();
-        if self.delete(&key_hash).is_none() {
-            self.num_items += 1;
+        let old_slot = self.delete(&key_hash);
+        match &old_slot {
+            Some(old) => self.total_value_bytes -= old.size(),
+            None => self.num_items += 1,
         }
+        self.total_value_bytes += slot.size();
         self.insert_as_head(key_hash, slot);
+        old_slot.map(|s| s.expect_hot_since_version())
     }
 
     fn insert_as_head(&mut self, key_hash: HashValue, mut slot: StateSlot) {
@@ -107,6 +118,7 @@ impl<'a> HotStateLRU<'a> {
             let prev_key_hash = *slot
                 .prev()
                 .expect("There must be at least one newer entry (num_items > capacity >= 1).");
+            self.total_value_bytes -= slot.size();
             evicted.push((current, slot.clone()));
             self.pending.insert(current, slot.to_cold());
             current = prev_key_hash;
@@ -179,8 +191,15 @@ impl<'a> HotStateLRU<'a> {
         Option<HashValue>,
         Option<HashValue>,
         usize,
+        usize,
     ) {
-        (self.pending, self.head, self.tail, self.num_items)
+        (
+            self.pending,
+            self.head,
+            self.tail,
+            self.num_items,
+            self.total_value_bytes,
+        )
     }
 
     #[cfg(test)]
@@ -205,12 +224,15 @@ impl<'a> HotStateLRU<'a> {
     ) {
         let mut current = start;
         let mut num_visited = 0;
+        let mut total_value_bytes = 0;
         while let Some(key_hash) = current {
             let slot = self.expect_hot_slot(&key_hash);
             num_visited += 1;
+            total_value_bytes += slot.size();
             current = func(&slot);
         }
         assert_eq!(num_visited, self.num_items);
+        assert_eq!(total_value_bytes, self.total_value_bytes);
     }
 }
 
@@ -380,6 +402,7 @@ mod tests {
             let mut head = None;
             let mut tail = None;
             let mut num_items = 0;
+            let mut total_value_bytes = 0;
             // Use an unbounded cache because it can temporarily exceed the capacity in the middle
             // of the block.
             let mut naive_lru = LruCache::unbounded();
@@ -392,6 +415,7 @@ mod tests {
                     head,
                     tail,
                     num_items,
+                    total_value_bytes,
                 );
                 lru.validate();
 
@@ -416,11 +440,22 @@ mod tests {
                 lru.validate();
                 assert_lru_equal(&lru, &naive_lru);
 
-                let (updates, new_head, new_tail, new_num_items) = lru.into_updates();
+                let (updates, new_head, new_tail, new_num_items, new_total_value_bytes) =
+                    lru.into_updates();
+
+                assert_eq!(new_head, naive_lru.peek_mru().map(|(k, _)| *k));
+                assert_eq!(new_tail, naive_lru.peek_lru().map(|(k, _)| *k));
+                assert_eq!(new_num_items, naive_lru.len());
+                assert_eq!(
+                    new_total_value_bytes,
+                    naive_lru.iter().map(|(_, s)| s.size()).sum::<usize>(),
+                );
+
                 test_obj.commit_updates(updates, new_head, new_tail, new_num_items);
                 head = new_head;
                 tail = new_tail;
                 num_items = new_num_items;
+                total_value_bytes = new_total_value_bytes;
             }
         }
     }

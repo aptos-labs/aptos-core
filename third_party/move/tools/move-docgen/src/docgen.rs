@@ -70,6 +70,32 @@ pub enum OutputFormat {
     MDX,
 }
 
+/// Returns true if `source_path` belongs to the named Move package.
+///
+/// Heuristic: a Move package directory is by convention the named-directory
+/// component sitting immediately above a `sources` (or `tests`/`scripts`)
+/// directory in the source path. Paths produced by move-package can contain
+/// `..` segments (`pkg_a/../pkg_b/sources/foo.move`) so we cannot simply
+/// check whether `package` appears anywhere in the components.
+fn source_path_in_package(source_path: &std::ffi::OsStr, package: &str) -> bool {
+    let path = Path::new(source_path);
+    let components: Vec<_> = path.components().collect();
+    for (i, c) in components.iter().enumerate().skip(1) {
+        let name = c.as_os_str();
+        if name == "sources" || name == "tests" || name == "scripts" {
+            // Find the previous named component (skipping `..`/`.`).
+            for prev in components[..i].iter().rev() {
+                let prev_name = prev.as_os_str();
+                if prev_name == ".." || prev_name == "." {
+                    continue;
+                }
+                return prev_name == std::ffi::OsStr::new(package);
+            }
+        }
+    }
+    false
+}
+
 /// Options passed into the documentation generator.
 #[derive(Debug, Clone, clap::Parser, Serialize, Deserialize)]
 #[serde(default, deny_unknown_fields)]
@@ -144,9 +170,29 @@ pub struct DocgenOptions {
     /// Output format for docs, either MD or MDX
     #[clap(long, value_enum)]
     pub output_format: Option<OutputFormat>,
+    /// Style of `{{move-index}}` and `{{move-index PKG}}` link entries.
+    #[clap(long, value_enum, default_value_t = IndexLinkStyle::Anchored)]
+    pub index_link_style: IndexLinkStyle,
     /// Ensure Unix paths
     #[clap(long)]
     pub ensure_unix_paths: bool,
+}
+
+/// Controls how `{{move-index}}` (and `{{move-index PKG}}`) renders entries.
+#[derive(ValueEnum, Clone, Copy, Debug, Default, Hash, Eq, PartialEq, Serialize, Deserialize)]
+pub enum IndexLinkStyle {
+    /// `[`addr::mod`](file.md#0x1_mod)` — fully-qualified module path as
+    /// link text and an in-document anchor as the fragment. Suited to
+    /// landing pages where the index lives in the same single-doc tree as
+    /// the modules and readers want deep-links into a module's sections.
+    #[default]
+    Anchored,
+    /// `[mod](pkg/file.md)` — bare module name as link text, file-level
+    /// link target with no fragment. When emitted from `{{move-index PKG}}`
+    /// the `pkg/` prefix matches the placeholder argument; without a filter
+    /// no prefix is added. Suited to multi-document layouts (book SUMMARY,
+    /// catalog pages) where each module is its own page.
+    Plain,
 }
 
 impl Default for DocgenOptions {
@@ -167,6 +213,7 @@ impl Default for DocgenOptions {
             include_dep_diagrams: false,
             include_call_diagrams: false,
             output_format: None,
+            index_link_style: IndexLinkStyle::Anchored,
             ensure_unix_paths: false,
         }
     }
@@ -230,7 +277,10 @@ enum TemplateElement {
     Text(String),
     IncludeModule(String),
     IncludeToc,
-    Index,
+    /// `{{move-index}}` (no argument) emits a flat index of all primary-target modules.
+    /// `{{move-index PKG}}` emits an mdbook-friendly index of modules whose source
+    /// path lives under a directory component named `PKG`.
+    Index(Option<String>),
 }
 
 /// A map from spec block targets to associated spec blocks.
@@ -361,7 +411,7 @@ impl<'env> Docgen<'env> {
                 r"(?xm)^\s*>\s*\{\{
                 ( (?P<include>move-include\s+(?P<include_name>\w+))
                 | (?P<toc>move-toc)
-                | (?P<index>move-index)
+                | (?P<index>move-index(\s+(?P<index_pkg>\S+))?)
                 )\s*}}.*$",
             )
             .unwrap()
@@ -383,7 +433,8 @@ impl<'env> Docgen<'env> {
             } else if cap.name("toc").is_some() {
                 res.push(TemplateElement::IncludeToc);
             } else if cap.name("index").is_some() {
-                res.push(TemplateElement::Index);
+                let pkg = cap.name("index_pkg").map(|m| m.as_str().to_string());
+                res.push(TemplateElement::Index(pkg));
             } else {
                 unreachable!("regex misbehavior");
             }
@@ -434,8 +485,8 @@ impl<'env> Docgen<'env> {
                         emitln!(self.writer, ">> duplicate move-toc (technical restriction)");
                     }
                 },
-                TemplateElement::Index => {
-                    self.gen_index();
+                TemplateElement::Index(pkg) => {
+                    self.gen_index(pkg.as_deref());
                 },
             }
         }
@@ -1159,10 +1210,18 @@ impl<'env> Docgen<'env> {
         self.writer = writer;
     }
 
-    /// Generate an index of all modules and scripts in the context. This includes generated
-    /// ones and those which are only dependencies.
-    fn gen_index(&self) {
-        // Sort all modules and script by simple name. (Perhaps we should include addresses?)
+    /// Generate an index of modules.
+    ///
+    /// `package_filter` controls *which* modules appear:
+    ///   * `None` — all primary-target modules (i.e. modules belonging to the
+    ///     package(s) currently being documented).
+    ///   * `Some(pkg)` — every module whose source path identifies it as
+    ///     belonging to the named package, regardless of primary-target
+    ///     status. (See `source_path_in_package` for the heuristic.)
+    ///
+    /// `self.options.index_link_style` controls *how* each entry is rendered.
+    /// See `IndexLinkStyle`.
+    fn gen_index(&self, package_filter: Option<&str>) {
         let sorted_infos = self.infos.iter().sorted_by(|(id1, _), (id2, _)| {
             let name = |id: ModuleId| {
                 self.env
@@ -1172,18 +1231,44 @@ impl<'env> Docgen<'env> {
             Ord::cmp(name(**id1).as_str(), name(**id2).as_str())
         });
         self.begin_items();
-        for (id, _) in sorted_infos {
+        for (id, _info) in sorted_infos {
             let module_env = self.env.get_module(*id);
-            if !module_env.is_primary_target() {
-                // Do not include modules which are not target (outside the package)
-                // into the index.
+            // Filter.
+            let included = match package_filter {
+                None => module_env.is_primary_target(),
+                Some(pkg) => source_path_in_package(module_env.get_source_path(), pkg),
+            };
+            if !included {
                 continue;
             }
-            self.item_text(&format!(
-                "[`{}`]({})",
-                module_env.get_name().display_full(module_env.env),
-                self.ref_for_module(&module_env)
-            ))
+            // Format.
+            let entry = match self.options.index_link_style {
+                IndexLinkStyle::Anchored => format!(
+                    "[`{}`]({})",
+                    module_env.get_name().display_full(module_env.env),
+                    self.ref_for_module(&module_env)
+                ),
+                IndexLinkStyle::Plain => {
+                    let simple = self
+                        .env
+                        .symbol_pool()
+                        .string(module_env.get_name().name())
+                        .to_string();
+                    let stem = Path::new(module_env.get_source_path())
+                        .file_stem()
+                        .map(|s| s.to_string_lossy().into_owned())
+                        .unwrap_or_else(|| simple.clone());
+                    // With a package filter, prefix the link with the package
+                    // subdirectory; without, keep the link bare. Falling back
+                    // to `info.target_file` would be wrong when modules are
+                    // primary targets (target_file is just the basename).
+                    match package_filter {
+                        Some(pkg) => format!("[{}]({}/{}.md)", simple, pkg, stem),
+                        None => format!("[{}]({}.md)", simple, stem),
+                    }
+                },
+            };
+            self.item_text(&entry);
         }
         self.end_items();
     }
@@ -1758,25 +1843,29 @@ impl<'env> Docgen<'env> {
     }
 
     /// Creates a new section header and inserts a table-of-contents entry into the generator.
+    ///
+    /// The anchor is emitted *inline* on the heading line —
+    /// `# Heading <a id="label"></a>` — rather than on a separate preceding
+    /// line. Both forms produce the same rendered HTML (an anchor element
+    /// inside the heading), so deep links to `file.md#label` keep working.
+    /// Inlining keeps the heading a single block, which strict markdown
+    /// consumers (notably mdbook's `SUMMARY.md` parser) require.
     fn section_header(&self, s: &str, label: &str) {
         let level = *self.section_nest.borrow();
         if usize::saturating_add(self.options.section_level_start, level) > MAX_SUBSECTIONS {
             panic!("Maximum number of subheadings exceeded with heading: {}", s)
         }
+        let hashes = self.repeat_str("#", self.options.section_level_start + level);
         if !label.is_empty() {
-            self.label(label);
             let entry = TocEntry {
                 title: s.to_owned(),
                 label: label.to_string(),
             };
             self.toc.borrow_mut().push((level, entry));
+            emitln!(self.writer, "{} {} <a id=\"{}\"></a>", hashes, s, label);
+        } else {
+            emitln!(self.writer, "{} {}", hashes, s);
         }
-        emitln!(
-            self.writer,
-            "{} {}",
-            self.repeat_str("#", self.options.section_level_start + level),
-            s,
-        );
         emitln!(self.writer);
     }
 
@@ -1816,6 +1905,11 @@ impl<'env> Docgen<'env> {
         if self.options.collapsed_sections {
             emitln!(self.writer);
             emitln!(self.writer, "</details>");
+            // CommonMark terminates an HTML block at a blank line. Without
+            // this trailing blank, whatever follows `</details>` (typically
+            // the next `## Function` heading) is treated as raw HTML and
+            // renders literally.
+            emitln!(self.writer);
         }
     }
 
@@ -2317,5 +2411,54 @@ impl<'env> Docgen<'env> {
     /// Repeats a string n times.
     fn repeat_str(&self, s: &str, n: usize) -> String {
         (0..n).map(|_| s).collect::<String>()
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::source_path_in_package;
+    use std::ffi::OsStr;
+
+    #[test]
+    fn source_path_in_package_matches_directory_above_sources() {
+        assert!(source_path_in_package(
+            OsStr::new("/repo/aptos-move/framework/move-stdlib/sources/option.move"),
+            "move-stdlib",
+        ));
+        assert!(source_path_in_package(
+            OsStr::new("relative/aptos-stdlib/sources/big_vector.move"),
+            "aptos-stdlib",
+        ));
+    }
+
+    #[test]
+    fn source_path_in_package_skips_dotdot_segments() {
+        // move-package emits paths like `aptos-experimental/../aptos-framework/.../move-stdlib/sources/cmp.move`
+        // — every named component appears in `Path::components()`, so a naïve
+        // "any component matches" check would falsely match every package.
+        // The package is the *last named directory before `sources/`*.
+        let p = OsStr::new(
+            "/root/aptos-move/framework/aptos-experimental/../aptos-framework/../aptos-stdlib/../move-stdlib/sources/cmp.move",
+        );
+        assert!(source_path_in_package(p, "move-stdlib"));
+        assert!(!source_path_in_package(p, "aptos-stdlib"));
+        assert!(!source_path_in_package(p, "aptos-framework"));
+        assert!(!source_path_in_package(p, "aptos-experimental"));
+    }
+
+    #[test]
+    fn source_path_in_package_rejects_unrelated_package() {
+        assert!(!source_path_in_package(
+            OsStr::new("/repo/aptos-move/framework/move-stdlib/sources/option.move"),
+            "aptos-stdlib",
+        ));
+    }
+
+    #[test]
+    fn source_path_in_package_handles_tests_dir() {
+        assert!(source_path_in_package(
+            OsStr::new("/repo/aptos-move/framework/aptos-stdlib/tests/foo.move"),
+            "aptos-stdlib",
+        ));
     }
 }

@@ -46,7 +46,6 @@ aptos-vm = { workspace = true }
 bcs = { workspace = true }
 blake2-rfc = { workspace = true }
 digest = { workspace = true }
-env_logger = { workspace = true }
 ethers = { workspace = true }
 hex = { workspace = true }
 hyper = { workspace = true }

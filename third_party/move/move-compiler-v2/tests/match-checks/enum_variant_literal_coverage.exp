@@ -6,7 +6,7 @@ error: match not exhaustive
 9 │         match (e) {
   │                ^
   │
-  = missing `E::V1{..}`
+  = missing at least `E::V1(..1)`
 
 error: unreachable pattern
    ┌─ tests/match-checks/enum_variant_literal_coverage.move:19:13

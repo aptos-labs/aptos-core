@@ -43,6 +43,7 @@ pub mod exp_generator;
 pub mod exp_rewriter;
 pub mod exp_simplifier;
 pub mod intrinsics;
+pub mod memory_labels;
 pub mod metadata;
 pub mod model;
 pub mod options;
@@ -381,6 +382,16 @@ fn run_move_checker(env: &mut GlobalEnv, program: E::Program) {
     // After all specs have been processed, warn about any unused schemas.
     builder.warn_unused_schemas();
 
+    // Sync cross-module constant users into GlobalEnv. Each module is finalized as it is
+    // translated, before later modules' function bodies run. Users added by
+    // track_constant_usage for cross-module references therefore arrive after the defining
+    // module is already stored. This pass propagates them into the env.
+    builder.sync_const_users();
+
+    // Must run after populate_env() (all modules and constants are registered).
+    // Must run before add_friend_decl_for_package_visibility() and check_and_update_friend_info()
+    // so that const$NAME functions are visible when friend/package deps are computed.
+    builder.inject_const_accessor_functions();
     builder.add_friend_decl_for_package_visibility();
 
     // Perform any remaining friend-declaration checks and update friend module id information.

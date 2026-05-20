@@ -15,7 +15,8 @@ The runtime is at proof-of-concept stage. See `TODO.md` for the backlog of missi
 | Module | Purpose |
 |---|---|
 | `interpreter.rs` | Core interpreter loop (`step`/`run`), `InterpreterContext` (owns stack + heap + pc state), call/return protocol |
-| `heap.rs` | Bump allocator, vector/struct/enum allocation, vector growth, Cheney's copying GC |
+| `heap/mod.rs` | Bump allocator, vector/struct/enum allocation, vector growth, Cheney's copying GC |
+| `heap/pinned_roots.rs` | Auxiliary GC root set for pointers that must survive across allocations (used by `PackClosure`, native functions) |
 | `memory.rs` | `MemoryRegion` (owned 8-byte-aligned allocation), raw pointer helpers (`read_u64`, `write_ptr`, etc.) |
 | `types.rs` | `ObjectDescriptor` (GC tracing layouts), `StepResult`, layout constants (header offsets, frame metadata offsets) |
 | `verifier.rs` | Static verification of `Function` bodies before execution (frame bounds, jump targets, descriptor validity) |
@@ -24,9 +25,9 @@ The runtime is at proof-of-concept stage. See `TODO.md` for the backlog of missi
 
 **Unified stack.** Call frames live in a single contiguous `MemoryRegion`. See `docs/stack_and_calling_convention.md` for the frame layout diagram and full calling convention.
 
-**Bump-allocated heap with copying GC.** Heap objects (vectors, structs, enums) are bump-allocated. When the bump pointer hits the end, Cheney's copying GC runs: it walks the call stack using per-function `pointer_offsets` to find roots, then does a breadth-first copy of all reachable objects into a fresh to-space. Forwarding pointers handle cycles and double-scans.
+**Bump-allocated heap with copying GC.** Heap objects (vectors, structs, enums) are bump-allocated. When the bump pointer hits the end, Cheney's copying GC runs: it walks the call stack using per-function `frame_layout` (and per-safe-point `safe_point_layouts`) to find roots, then does a breadth-first copy of all reachable objects into a fresh to-space. Forwarding pointers handle cycles and double-scans.
 
-**Object layout.** Every heap object starts with an 8-byte header: `[descriptor_id: u32, size_in_bytes: u32]`. The descriptor tells the GC how to trace internal pointers. Vectors additionally store a `length` field after the header (capacity is derived from `size_in_bytes`).
+**Object layout.** Every heap object has an 8-byte header `[descriptor_id: u32, size_in_bytes: u32]` at *negative* offsets relative to the object pointer (descriptor at `obj_ptr - 8`, size at `obj_ptr - 4`). The allocator reserves `OBJECT_HEADER_SIZE = MAX_ALIGN` bytes before each data region; when `MAX_ALIGN > 8` the leading bytes are unused header padding, keeping the data start `MAX_ALIGN`-aligned. Per-type layouts (struct fields, enum tag/variants, vector length/data, closure fields, captured-data values) are expressed relative to the data start, so the shared header is invisible to them. Vectors store a `length` field at offset 0 of the data region (capacity is derived from `size_in_bytes`). The descriptor tells the GC how to trace internal pointers.
 
 **Fat pointers.** References are 16-byte `(base_ptr, byte_offset)` pairs. This lets borrows point into the interior of heap objects (e.g., a struct field or vector element) without a separate indirection.
 
@@ -37,8 +38,8 @@ The runtime is at proof-of-concept stage. See `TODO.md` for the backlog of missi
 The interpreter uses raw pointer arithmetic extensively (`unsafe`). Correctness depends on invariants maintained jointly by the compiler, verifier, and runtime:
 
 1. **Frame metadata integrity** — saved `fp`/`pc`/`func_ptr` are written only by call/return, never by user micro-ops
-2. **Pointer-slot accuracy** — `Function::pointer_offsets` exactly matches slots that hold live heap pointers
-3. **Object header integrity** — `descriptor_id` and `size` are set by the allocator and never overwritten by user code
+2. **Pointer-slot accuracy** — `Function::frame_layout` (and matching `safe_point_layouts` entries) together exactly match slots that hold live heap pointers
+3. **Object header integrity** — `descriptor_id` and `size` live at fixed negative offsets (`obj_ptr - 8` / `obj_ptr - 4`) set by the allocator; user micro-ops only access offsets within the data region (≥ 0) so they cannot reach the header
 
 The verifier checks what it can statically; the rest is the compiler's responsibility.
 
@@ -48,7 +49,7 @@ Detailed design documents live in `../docs/`:
 
 | Doc | Covers |
 |---|---|
-| `stack_and_calling_convention.md` | Frame layout, call/return protocol, unified vs separate stack, GC root discovery via `pointer_offsets`, security considerations |
+| `stack_and_calling_convention.md` | Frame layout, call/return protocol, unified vs separate stack, GC root discovery via `frame_layout` and `safe_point_layouts`, security considerations |
 | `heap_and_gc.md` | Block/transaction memory management, bump allocator + Cheney's copying GC, GC design space analysis (four approaches), memory safety |
 | `value_representation.md` | Heap object header, primitive/struct/enum/vector layouts, fat pointer references, vector growth semantics |
 | `native_functions.md` | Native function calling convention, error handling, gas metering, generics (WIP — not yet implemented) |

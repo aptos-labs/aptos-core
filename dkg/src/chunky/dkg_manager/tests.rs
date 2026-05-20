@@ -5,13 +5,17 @@ use super::ChunkyDKGManager;
 use crate::{
     chunky::{
         test_utils::{ChunkyTestSetup, DummyNetworkSender},
-        types::{CertifiedAggregatedSubtranscript, MissingTranscriptRequest},
+        types::{
+            CertifiedAggregatedSubtranscript, ChunkyDKGSubtranscriptSignatureRequest,
+            MissingTranscriptRequest,
+        },
     },
     network::{DummyRpcResponseSender, IncomingRpcRequest},
     types::DKGMessage,
 };
+use aptos_bitvec::BitVec;
 use aptos_bounded_executor::BoundedExecutor;
-use aptos_crypto::SigningKey;
+use aptos_crypto::{HashValue, SigningKey};
 use aptos_infallible::RwLock;
 use aptos_network::{
     application::{interface::NetworkClient, storage::PeersAndMetadata},
@@ -289,4 +293,212 @@ async fn test_close_and_notifications() {
         .process_dkg_txn_pulled_notification(dummy_txn)
         .await;
     assert!(result.is_err());
+}
+
+fn new_signature_request_rpc(
+    epoch: u64,
+    sender: AccountAddress,
+    subtranscript_hash: HashValue,
+    dealer_bitmask: BitVec,
+    dealer_transcript_hashes: Vec<HashValue>,
+    response_collector: Arc<RwLock<Vec<anyhow::Result<DKGMessage>>>>,
+) -> IncomingRpcRequest {
+    IncomingRpcRequest {
+        msg: DKGMessage::SubtranscriptSignatureRequest(
+            ChunkyDKGSubtranscriptSignatureRequest::new(
+                epoch,
+                subtranscript_hash,
+                dealer_bitmask,
+                dealer_transcript_hashes,
+            ),
+        ),
+        sender,
+        response_sender: Box::new(DummyRpcResponseSender::new(response_collector)),
+    }
+}
+
+/// Helper: advance a manager through the full DKG lifecycle to Finished.
+async fn advance_to_finished(manager: &mut ChunkyDKGManager, setup: &ChunkyTestSetup) {
+    let event = ChunkyDKGStartEvent {
+        session_metadata: setup.session_metadata.clone(),
+        start_time_us: Duration::from_secs(1700000000).as_micros() as u64,
+    };
+    manager.process_dkg_start_event(event).await.unwrap();
+
+    let agg_with_hashes = setup.aggregate_subtranscripts_with_hashes(&[0, 1, 2]);
+    let agg_subtrx = agg_with_hashes.aggregated_subtranscript.clone();
+    manager
+        .process_aggregated_subtranscript(agg_with_hashes)
+        .await
+        .unwrap();
+
+    let mut sigs = std::collections::BTreeMap::new();
+    for i in 0..3 {
+        let sig = setup.private_keys[i].sign(&agg_subtrx).unwrap();
+        sigs.insert(setup.addrs[i], sig);
+    }
+    let aggregate_signature = setup
+        .epoch_state
+        .verifier
+        .aggregate_signatures(sigs.iter())
+        .unwrap();
+    let certified = CertifiedAggregatedSubtranscript {
+        aggregated_subtranscript: Arc::new(agg_subtrx),
+        aggregate_signature,
+    };
+    manager
+        .process_certified_aggregated_subtranscript(certified)
+        .await
+        .unwrap();
+    assert_eq!(manager.state_name(), "Finished");
+}
+
+#[tokio::test]
+async fn test_signature_request_accepted_in_finished_state() {
+    let setup = ChunkyTestSetup::new_uniform(4);
+    let mut manager = create_test_manager(&setup);
+    advance_to_finished(&mut manager, &setup).await;
+
+    // Build a signature request with a dummy hash — the handler will be spawned
+    // even though the hash won't match locally. The key test is that the request
+    // is accepted (not rejected with "not ready") in Finished state.
+    let rpc_response_collector = Arc::new(RwLock::new(vec![]));
+    let dummy_bitmask = BitVec::with_num_bits(4);
+    let rpc_req = new_signature_request_rpc(
+        999,
+        setup.addrs[1],
+        HashValue::zero(),
+        dummy_bitmask,
+        vec![],
+        rpc_response_collector.clone(),
+    );
+    let result = manager.process_peer_rpc_msg(rpc_req).await;
+    // Should succeed (handler spawned), not return "not ready" error.
+    assert!(result.is_ok());
+    let last_responses = std::mem::take(&mut *rpc_response_collector.write());
+    // Response is sent asynchronously by the spawned handler, so it may not
+    // be available immediately. The important check is that process_peer_rpc_msg
+    // didn't reject the request. The response collector may be empty at this
+    // point (handler still running) — that's fine.
+    // Verify no "not ready" error was sent synchronously.
+    for resp in &last_responses {
+        if let Err(e) = resp {
+            assert!(
+                !e.to_string().contains("not ready"),
+                "Signature request should be accepted in Finished state"
+            );
+        }
+    }
+}
+
+#[tokio::test]
+async fn test_signature_request_rejected_in_init_and_aggregation_states() {
+    let setup = ChunkyTestSetup::new_uniform(4);
+    let mut manager = create_test_manager(&setup);
+
+    let rpc_response_collector = Arc::new(RwLock::new(vec![]));
+    let dummy_bitmask = BitVec::with_num_bits(4);
+
+    // Init state — should be rejected with "not ready".
+    let rpc_req = new_signature_request_rpc(
+        999,
+        setup.addrs[1],
+        HashValue::zero(),
+        dummy_bitmask.clone(),
+        vec![],
+        rpc_response_collector.clone(),
+    );
+    let result = manager.process_peer_rpc_msg(rpc_req).await;
+    assert!(result.is_ok());
+    let last_responses = std::mem::take(&mut *rpc_response_collector.write());
+    assert_eq!(last_responses.len(), 1);
+    assert!(last_responses[0].is_err());
+    assert!(last_responses[0]
+        .as_ref()
+        .unwrap_err()
+        .to_string()
+        .contains("not ready"));
+
+    // AwaitSubtranscriptAggregation state — should also be rejected.
+    let event = ChunkyDKGStartEvent {
+        session_metadata: setup.session_metadata.clone(),
+        start_time_us: Duration::from_secs(1700000000).as_micros() as u64,
+    };
+    manager.process_dkg_start_event(event).await.unwrap();
+    assert_eq!(manager.state_name(), "AwaitSubtranscriptAggregation");
+
+    let rpc_req = new_signature_request_rpc(
+        999,
+        setup.addrs[1],
+        HashValue::zero(),
+        dummy_bitmask,
+        vec![],
+        rpc_response_collector.clone(),
+    );
+    let result = manager.process_peer_rpc_msg(rpc_req).await;
+    assert!(result.is_ok());
+    let last_responses = std::mem::take(&mut *rpc_response_collector.write());
+    assert_eq!(last_responses.len(), 1);
+    assert!(last_responses[0].is_err());
+    assert!(last_responses[0]
+        .as_ref()
+        .unwrap_err()
+        .to_string()
+        .contains("not ready"));
+}
+
+#[tokio::test]
+async fn test_signature_request_rate_limited_per_sender() {
+    let setup = ChunkyTestSetup::new_uniform(4);
+    let mut manager = create_test_manager(&setup);
+    advance_to_finished(&mut manager, &setup).await;
+
+    let rpc_response_collector = Arc::new(RwLock::new(vec![]));
+    let dummy_bitmask = BitVec::with_num_bits(4);
+
+    // First request from sender 1 — should be accepted and spawns a handler.
+    let rpc_req = new_signature_request_rpc(
+        999,
+        setup.addrs[1],
+        HashValue::zero(),
+        dummy_bitmask.clone(),
+        vec![],
+        rpc_response_collector.clone(),
+    );
+    manager.process_peer_rpc_msg(rpc_req).await.unwrap();
+
+    // Second request from the SAME sender with a DIFFERENT hash — should be
+    // rate-limited because the first handler is still running.
+    let rpc_req = new_signature_request_rpc(
+        999,
+        setup.addrs[1],
+        HashValue::from_u64(42),
+        dummy_bitmask.clone(),
+        vec![],
+        rpc_response_collector.clone(),
+    );
+    manager.process_peer_rpc_msg(rpc_req).await.unwrap();
+    let last_responses = std::mem::take(&mut *rpc_response_collector.write());
+    // The rate-limited response is sent synchronously.
+    let has_rate_limited = last_responses.iter().any(|r| {
+        r.as_ref()
+            .err()
+            .is_some_and(|e| e.to_string().contains("already in-flight"))
+    });
+    assert!(
+        has_rate_limited,
+        "Second concurrent request from same sender should be rate-limited"
+    );
+
+    // Request from a DIFFERENT sender should still be accepted.
+    let rpc_req = new_signature_request_rpc(
+        999,
+        setup.addrs[2],
+        HashValue::zero(),
+        dummy_bitmask,
+        vec![],
+        rpc_response_collector.clone(),
+    );
+    let result = manager.process_peer_rpc_msg(rpc_req).await;
+    assert!(result.is_ok());
 }

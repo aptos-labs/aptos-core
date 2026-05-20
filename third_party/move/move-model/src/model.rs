@@ -140,6 +140,11 @@ impl Loc {
         self.inlined_from_loc.is_some()
     }
 
+    /// Returns the immediate `inlined-from` link of this location, if any.
+    pub fn inlined_from_loc(&self) -> Option<&Loc> {
+        self.inlined_from_loc.as_deref()
+    }
+
     // If `self` is an inlined `Loc`, then add the same
     // inlining info to the parameter `loc`.
     fn inline_if_needed(&self, loc: Loc) -> Loc {
@@ -432,6 +437,12 @@ impl GlobalId {
     }
 }
 
+impl std::fmt::Display for GlobalId {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "@{}", self.0)
+    }
+}
+
 impl IntrinsicId {
     pub fn new(idx: usize) -> Self {
         Self(idx)
@@ -611,7 +622,10 @@ pub struct GlobalEnv {
     /// A set containing spec functions which are called/used in specs. Note that these
     /// are represented without type instantiation because we assume the backend can handle
     /// generics in the expression language.
-    pub(crate) used_spec_funs: BTreeSet<QualifiedId<SpecFunId>>,
+    /// Uses `RefCell` for interior mutability so spec inference (which holds `&GlobalEnv`)
+    /// can register new spec functions. Must not call `add_used_spec_fun` while a borrow
+    /// from `is_spec_fun_used` or iteration is held.
+    pub(crate) used_spec_funs: RefCell<BTreeSet<QualifiedId<SpecFunId>>>,
     /// An annotation of all intrinsic declarations
     pub(crate) intrinsics: IntrinsicsAnnotation,
     /// A type-indexed container for storing extension data in the environment.
@@ -633,6 +647,10 @@ pub struct GlobalEnv {
     pub function_size_estimate: RefCell<BTreeMap<QualifiedId<FunId>, FunctionSize>>,
     /// Names associated with memory labels (state labels for behavior predicates).
     pub(crate) memory_label_names: RefCell<BTreeMap<MemoryLabel, Symbol>>,
+    /// Lazy caches for derived call-graph queries (inverses, transitive
+    /// closures). Invalidated wholesale whenever any function's `used_funs`
+    /// / `called_funs` changes.
+    pub(crate) call_graph_cache: CallGraphCache,
 }
 
 /// A helper type for implementing fmt::Display depending on GlobalEnv
@@ -687,7 +705,7 @@ impl GlobalEnv {
             global_id_counter: RefCell::new(0),
             global_invariants: Default::default(),
             global_invariants_for_memory: Default::default(),
-            used_spec_funs: BTreeSet::new(),
+            used_spec_funs: RefCell::new(BTreeSet::new()),
             intrinsics: Default::default(),
             extensions: Default::default(),
             stdlib_address: None,
@@ -698,6 +716,7 @@ impl GlobalEnv {
             cmp_types: RefCell::new(Default::default()),
             function_size_estimate: RefCell::new(Default::default()),
             memory_label_names: RefCell::new(BTreeMap::new()),
+            call_graph_cache: CallGraphCache::default(),
         }
     }
 
@@ -840,6 +859,11 @@ impl GlobalEnv {
     /// Get the name for a memory label, if one exists.
     pub fn get_memory_label_name(&self, label: MemoryLabel) -> Option<Symbol> {
         self.memory_label_names.borrow().get(&label).copied()
+    }
+
+    /// Get a snapshot of all memory label names.
+    pub fn get_memory_label_names(&self) -> BTreeMap<MemoryLabel, Symbol> {
+        self.memory_label_names.borrow().clone()
     }
 
     /// Returns a reference to the symbol pool owned by this environment.
@@ -1490,12 +1514,12 @@ impl GlobalEnv {
 
     /// Returns true if a spec fun is used in specs.
     pub fn is_spec_fun_used(&self, id: QualifiedId<SpecFunId>) -> bool {
-        self.used_spec_funs.contains(&id)
+        self.used_spec_funs.borrow().contains(&id)
     }
 
     /// Marks a spec fun to be used
-    pub fn add_used_spec_fun(&mut self, id: QualifiedId<SpecFunId>) {
-        self.used_spec_funs.insert(id);
+    pub fn add_used_spec_fun(&self, id: QualifiedId<SpecFunId>) {
+        self.used_spec_funs.borrow_mut().insert(id);
     }
 
     /// Determines whether the given spec fun is recursive.
@@ -1703,6 +1727,9 @@ impl GlobalEnv {
             used_modules_including_specs: Default::default(),
             friend_modules: Default::default(),
         });
+        // The new module's `function_data` contributes call-graph edges that
+        // can make arbitrary cached inverse/transitive entries stale.
+        self.call_graph_cache.invalidate();
         id
     }
 
@@ -1935,6 +1962,11 @@ impl GlobalEnv {
         mod_data.friend_decls = friend_decls;
         mod_data.compiled_module = Some(module);
         mod_data.source_map = Some(source_map);
+        // Attaching bytecode may populate/overwrite `used_funs`/`called_funs`
+        // on existing `FunctionData`, and may insert new struct-API
+        // `FunctionData` entries. Either can make arbitrary entries in the
+        // cross-function call-graph caches stale.
+        self.call_graph_cache.invalidate();
     }
 
     /// Updates modules previously loaded into the environment
@@ -2084,6 +2116,7 @@ impl GlobalEnv {
             field_data,
             variants: None,
             spec: RefCell::new(Spec::default()),
+            field_access_of: vec![],
             is_native: false,
             visibility: Visibility::Private,
             has_package_visibility: false,
@@ -2210,17 +2243,12 @@ impl GlobalEnv {
             .function_data
             .get_mut(&fun.id)
             .unwrap();
-        // Recompute called and used functions.
         data.called_funs = Some(def.called_funs());
         data.used_funs = Some(def.used_funs());
-        // Reset various caches because the AST has changed.
-        *data.calling_funs.borrow_mut() = None;
-        *data.transitive_closure_of_called_funs.borrow_mut() = None;
-        *data.using_funs.borrow_mut() = None;
-        *data.transitive_closure_of_used_funs.borrow_mut() = None;
-        *data.used_functions_with_transitive_inline.borrow_mut() = None;
-        // Set the new function definition.
         data.def = Some(def);
+        // Any `used_funs`/`called_funs` change can stale arbitrary entries in the
+        // cross-function call-graph caches; drop them all.
+        self.call_graph_cache.invalidate();
     }
 
     /// Sets the inferred acquired structs of this function.
@@ -2287,13 +2315,7 @@ impl GlobalEnv {
             spec: RefCell::new(spec_opt.unwrap_or_default()),
             def: Some(def),
             called_funs: Some(called_funs),
-            calling_funs: RefCell::new(None),
-            transitive_closure_of_called_funs: RefCell::new(None),
             used_funs: Some(used_funs),
-            using_funs: RefCell::new(None),
-            transitive_closure_of_used_funs: RefCell::new(None),
-            used_functions_with_transitive_inline: RefCell::new(None),
-            used_structs: RefCell::new(None),
         };
         assert!(self
             .module_data
@@ -2301,7 +2323,10 @@ impl GlobalEnv {
             .expect("module defined")
             .function_data
             .insert(FunId::new(name), data)
-            .is_none())
+            .is_none());
+        // The new function's edges can stale reverse/inverse queries cached for
+        // any of its callees; drop the whole cross-function cache.
+        self.call_graph_cache.invalidate();
     }
 
     /// Adds a new function definition from data
@@ -2314,6 +2339,9 @@ impl GlobalEnv {
             .function_data
             .insert(FunId::new(data.name), data)
             .is_none());
+        // The new function's edges can stale reverse/inverse queries cached for
+        // any of its callees; drop the whole cross-function cache.
+        self.call_graph_cache.invalidate();
         new_id
     }
 
@@ -2359,13 +2387,7 @@ impl GlobalEnv {
             spec: RefCell::new(spec_opt.unwrap_or_default()),
             def: Some(def),
             called_funs: Some(called_funs),
-            calling_funs: RefCell::new(None),
-            transitive_closure_of_called_funs: RefCell::new(None),
             used_funs: Some(used_funs),
-            using_funs: RefCell::new(None),
-            transitive_closure_of_used_funs: RefCell::new(None),
-            used_functions_with_transitive_inline: RefCell::new(None),
-            used_structs: RefCell::new(None),
         }
     }
 
@@ -2544,6 +2566,23 @@ impl GlobalEnv {
             .expect("function data exists");
         data.fun_param_access_of[param_idx].used_memory = used_memory;
         data.fun_param_access_of[param_idx].old_memory = old_memory;
+    }
+
+    /// Sets derived memory on a struct field's access_of entry.
+    pub fn set_struct_field_access_of_memory(
+        &mut self,
+        qid: QualifiedId<StructId>,
+        field_idx: usize,
+        used_memory: BTreeSet<QualifiedInstId<StructId>>,
+        old_memory: BTreeSet<QualifiedInstId<StructId>>,
+    ) {
+        let data = self
+            .get_module_data_mut(qid.module_id)
+            .struct_data
+            .get_mut(&qid.id)
+            .expect("struct data exists");
+        data.field_access_of[field_idx].used_memory = used_memory;
+        data.field_access_of[field_idx].old_memory = old_memory;
     }
 
     /// Returns an iterator for all modules in the environment.
@@ -2841,10 +2880,12 @@ impl GlobalEnv {
             .unwrap_or(Address::Numerical(AccountAddress::TWO))
     }
 
-    // Removes all functions not matching the predicate from
-    //   module_data fields function_data and function_idx_to_id
-    //   remaining function_data fields used_funs and using_funs
-    pub fn filter_functions<F>(&mut self, mut predicate: F)
+    /// In-place destructive retain: keeps every function for which `predicate`
+    /// returns `true`, removes the rest from each module's `function_data` /
+    /// `function_idx_to_id`, and prunes removed ids from surviving functions'
+    /// `used_funs` / `called_funs`. Invalidates all cross-function call-graph
+    /// caches since arbitrary entries may now reference removed functions.
+    pub fn retain_functions<F>(&mut self, mut predicate: F)
     where
         F: FnMut(&QualifiedId<FunId>) -> bool,
     {
@@ -2860,11 +2901,12 @@ impl GlobalEnv {
                 if let Some(used_funs) = fun_data.used_funs.as_mut() {
                     used_funs.retain(|qfun_id| predicate(qfun_id))
                 }
-                if let Some(using_funs) = &mut *fun_data.using_funs.borrow_mut() {
-                    using_funs.retain(|qfun_id| predicate(qfun_id))
+                if let Some(called_funs) = fun_data.called_funs.as_mut() {
+                    called_funs.retain(|qfun_id| predicate(qfun_id))
                 }
             });
         }
+        self.call_graph_cache.invalidate();
     }
 
     /// Update the friend declarations in all target modules, when the
@@ -3343,6 +3385,11 @@ impl<'env> ModuleEnv<'env> {
         })
     }
 
+    /// Checks whether this item is only used in tests or verification.
+    pub fn is_test_or_verify_only(&self) -> bool {
+        self.is_test_only() || self.is_verify_only()
+    }
+
     /// Returns the use declarations of this module.
     pub fn get_use_decls(&self) -> &[UseDecl] {
         &self.data.use_decls
@@ -3510,7 +3557,7 @@ impl<'env> ModuleEnv<'env> {
     }
 
     /// Returns true if functions in the current module can call a public(package) function in the given module.
-    fn can_call_package_fun_in(&self, other: &Self) -> bool {
+    pub(crate) fn can_call_package_fun_in(&self, other: &Self) -> bool {
         !self.is_script_module()
             && !other.is_script_module()
             // TODO(#13745): fix this when we have a way to check if
@@ -3893,6 +3940,7 @@ impl<'env> ModuleEnv<'env> {
     pub fn spec_fun_is_used(&self, spec_fun_id: SpecFunId) -> bool {
         self.env
             .used_spec_funs
+            .borrow()
             .contains(&self.get_id().qualified(spec_fun_id))
     }
 
@@ -4019,6 +4067,10 @@ pub struct StructData {
     /// Associated specification.
     pub(crate) spec: RefCell<Spec>,
 
+    /// Access declarations for function-typed fields (`reads_of<f>`, `modifies_of<f>`).
+    /// Reuses `FunParamAccessOf` where `fun_param` is the field name symbol.
+    pub(crate) field_access_of: Vec<FunParamAccessOf>,
+
     /// Whether this struct is native
     pub is_native: bool,
 
@@ -4049,6 +4101,7 @@ impl StructData {
             field_data: Default::default(),
             variants: None,
             spec: RefCell::new(Default::default()),
+            field_access_of: vec![],
             is_native: false,
             visibility: Visibility::Private,
             has_package_visibility: false,
@@ -4382,6 +4435,11 @@ impl<'env> StructEnv<'env> {
         self.data.spec.borrow()
     }
 
+    /// Returns access declarations for function-typed fields in this struct.
+    pub fn get_field_access_of(&self) -> &[FunParamAccessOf] {
+        &self.data.field_access_of
+    }
+
     /// Returns the value of a boolean pragma for this struct. This first looks up a
     /// pragma in this struct, then the enclosing module, and finally uses the provided default.
     /// value
@@ -4567,6 +4625,10 @@ pub struct NamedConstantData {
     /// The value of this constant, if known.
     pub(crate) value: Value,
 
+    pub(crate) visibility: Visibility,
+    /// `package` visibility flag; when true, `visibility` is `Friend`.
+    pub(crate) has_package_visibility: bool,
+
     /// Attributes attached to this constant.
     pub(crate) attributes: Vec<Attribute>,
 
@@ -4606,6 +4668,14 @@ impl NamedConstantEnv<'_> {
     /// Returns the type of the constant
     pub fn get_type(&self) -> Type {
         self.data.type_.clone()
+    }
+
+    pub fn get_visibility(&self) -> Visibility {
+        self.data.visibility
+    }
+
+    pub fn has_package_visibility(&self) -> bool {
+        self.data.has_package_visibility
     }
 
     /// Returns the value of this constant
@@ -4864,29 +4934,86 @@ pub struct FunctionData {
     /// Optional definition associated with this function.
     pub(crate) def: Option<Exp>,
 
-    /// A cache for the called functions.
+    /// The set of functions directly called by this function's body.
+    /// Local to this function — recomputed from `def` on `set_function_def`.
     pub(crate) called_funs: Option<BTreeSet<QualifiedId<FunId>>>,
 
-    /// A cache for the calling functions.
-    pub(crate) calling_funs: RefCell<Option<BTreeSet<QualifiedId<FunId>>>>,
-
-    /// A cache for the transitive closure of the called functions.
-    pub(crate) transitive_closure_of_called_funs: RefCell<Option<BTreeSet<QualifiedId<FunId>>>>,
-
-    /// A cache for the used functions.  Used functions are those called or with values taken here.
+    /// The set of functions called or with values taken from this function's body.
+    /// Local to this function — recomputed from `def` on `set_function_def`.
     pub(crate) used_funs: Option<BTreeSet<QualifiedId<FunId>>>,
+}
 
-    /// A cache for the using functions.  Using functions are those which call or take value of this.
-    pub(crate) using_funs: RefCell<Option<BTreeSet<QualifiedId<FunId>>>>,
+/// Lazy caches for cross-function derivations over the call graph. The graph
+/// itself lives on each function's `used_funs` / `called_funs`; these are
+/// views over it (inverses, transitive closures, inline-expanded variants).
+///
+/// Every entry depends on multiple functions' `used_funs` / `called_funs`, so
+/// any AST change to those inputs can invalidate arbitrary entries. Rather
+/// than tracking fine-grained dependencies, everything is wiped via
+/// `invalidate()` whenever a function definition changes.
+#[derive(Debug, Default)]
+pub(crate) struct CallGraphCache {
+    /// Inverse of `called_funs`: for each function, the functions that directly call it.
+    calling_funs: RefCell<BTreeMap<QualifiedId<FunId>, BTreeSet<QualifiedId<FunId>>>>,
+    /// Transitive closure over `called_funs`.
+    transitive_closure_of_called_funs:
+        RefCell<BTreeMap<QualifiedId<FunId>, BTreeSet<QualifiedId<FunId>>>>,
+    /// Inverse of `used_funs`: for each function, the functions that call or take its value.
+    using_funs: RefCell<BTreeMap<QualifiedId<FunId>, BTreeSet<QualifiedId<FunId>>>>,
+    /// Transitive closure over `used_funs`.
+    transitive_closure_of_used_funs:
+        RefCell<BTreeMap<QualifiedId<FunId>, BTreeSet<QualifiedId<FunId>>>>,
+    /// Forward closure over `used_funs`, recursing only through inline callees.
+    used_functions_with_transitive_inline:
+        RefCell<BTreeMap<QualifiedId<FunId>, BTreeSet<QualifiedId<FunId>>>>,
+    /// Reverse closure over `using_funs`, with direct inline callers replaced by their
+    /// (transitive) callers. Reflects the post-inlining call graph.
+    using_functions_with_transitive_inline:
+        RefCell<BTreeMap<QualifiedId<FunId>, BTreeSet<QualifiedId<FunId>>>>,
+    /// Forward closure of used structs/enums, recursing through inline callees.
+    used_structs_with_transitive_inline:
+        RefCell<BTreeMap<QualifiedId<FunId>, BTreeSet<QualifiedId<StructId>>>>,
+}
 
-    /// A cache for the transitive closure of the used functions.
-    pub(crate) transitive_closure_of_used_funs: RefCell<Option<BTreeSet<QualifiedId<FunId>>>>,
+impl CallGraphCache {
+    /// Discards every entry. Call whenever any function's `used_funs` or
+    /// `called_funs` changes. Resetting the whole struct (rather than clearing
+    /// each map individually) means new fields added later are invalidated
+    /// automatically.
+    pub(crate) fn invalidate(&mut self) {
+        *self = Self::default();
+    }
 
-    /// A cache for used functions including ones obtained by transitively traversing used inline functions.
-    pub(crate) used_functions_with_transitive_inline: RefCell<Option<BTreeSet<QualifiedId<FunId>>>>,
+    /// Look up `qid` in `cache`, returning a clone on hit. On miss, run `compute`,
+    /// store the result, and return it. Centralizes the memo pattern so each
+    /// accessor stays focused on its specific derivation.
+    fn cached<V: Clone>(
+        cache: &RefCell<BTreeMap<QualifiedId<FunId>, V>>,
+        qid: QualifiedId<FunId>,
+        compute: impl FnOnce() -> V,
+    ) -> V {
+        if let Some(v) = cache.borrow().get(&qid) {
+            return v.clone();
+        }
+        let v = compute();
+        cache.borrow_mut().insert(qid, v.clone());
+        v
+    }
 
-    /// A cache for used structs.
-    pub(crate) used_structs: RefCell<Option<BTreeSet<QualifiedId<StructId>>>>,
+    /// Like [`Self::cached`], but the computation may fail. On hit the cached
+    /// value is returned as `Some`; on miss-with-failure nothing is stored.
+    fn cached_opt<V: Clone>(
+        cache: &RefCell<BTreeMap<QualifiedId<FunId>, V>>,
+        qid: QualifiedId<FunId>,
+        compute: impl FnOnce() -> Option<V>,
+    ) -> Option<V> {
+        if let Some(v) = cache.borrow().get(&qid) {
+            return Some(v.clone());
+        }
+        let v = compute()?;
+        cache.borrow_mut().insert(qid, v.clone());
+        Some(v)
+    }
 }
 
 impl FunctionData {
@@ -4914,13 +5041,7 @@ impl FunctionData {
             spec: RefCell::new(Default::default()),
             def: None,
             called_funs: None,
-            calling_funs: RefCell::new(None),
-            transitive_closure_of_called_funs: RefCell::new(None),
             used_funs: None,
-            using_funs: RefCell::new(None),
-            transitive_closure_of_used_funs: RefCell::new(None),
-            used_functions_with_transitive_inline: RefCell::new(None),
-            used_structs: RefCell::new(None),
         }
     }
 }
@@ -4983,6 +5104,40 @@ impl<'env> FunctionEnv<'env> {
             m.identifier_at(m.function_handle_at(self.data.handle_idx?).name)
                 .to_owned(),
         )
+    }
+
+    /// Returns true if this function is pure: it does not access or modify global
+    /// memory and has no mutable reference parameters. Purity is determined via the
+    /// associated spec function's `used_memory` (computed by the spec rewriter).
+    /// Returns false if no spec function exists (conservative).
+    pub fn is_pure(&'env self) -> bool {
+        if self
+            .get_parameters()
+            .iter()
+            .any(|p| p.1.is_mutable_reference())
+        {
+            return false;
+        }
+        if let Some((_, decl)) = self.find_spec_fun() {
+            decl.used_memory.is_empty()
+        } else {
+            false
+        }
+    }
+
+    /// Finds the associated spec function for this Move function, if one exists.
+    /// The spec function is derived from the Move function during the spec rewriter
+    /// pass and is named `$<function_name>` by convention.
+    pub fn find_spec_fun(&'env self) -> Option<(SpecFunId, &'env SpecFunDecl)> {
+        let spec_fun_name = self
+            .module_env
+            .env
+            .symbol_pool()
+            .make(&format!("${}", self.get_name().display(self.symbol_pool())));
+        self.module_env
+            .get_spec_funs()
+            .find(|(_, decl)| decl.name == spec_fun_name && decl.is_move_fun)
+            .map(|(id, decl)| (*id, decl))
     }
 
     /// Gets the id of this function.
@@ -5069,6 +5224,18 @@ impl<'env> FunctionEnv<'env> {
     /// `unpack_variant$S$V`). These are synthetic wrappers with no user-written body or spec.
     pub fn is_struct_api(&self) -> bool {
         self.data.is_struct_api
+    }
+
+    /// Returns `true` for synthetic `const$<NAME>` accessors injected by
+    /// `inject_const_accessor_functions`. Hide from decompiled source and skip
+    /// lints that target the underlying constant.
+    pub fn is_const_accessor(&self) -> bool {
+        let name = self.symbol_pool().string(self.get_name());
+        name.starts_with(&format!(
+            "{}{}",
+            language_storage::CONST,
+            language_storage::DOLLAR_SIGN_DELIMITER
+        ))
     }
 
     /// Returns `true` for functions that have no independently-processed bytecode target in the
@@ -5668,22 +5835,19 @@ impl<'env> FunctionEnv<'env> {
 
     /// Get the functions that use this one, if available.
     pub fn get_using_functions(&self) -> Option<BTreeSet<QualifiedId<FunId>>> {
-        if let Some(using) = &*self.data.using_funs.borrow() {
-            return Some(using.clone());
-        }
-        let mut set: BTreeSet<QualifiedId<FunId>> = BTreeSet::new();
-        for module_env in self.module_env.env.get_modules() {
-            for fun_env in module_env.get_functions() {
-                if fun_env
-                    .get_used_functions()?
-                    .contains(&self.get_qualified_id())
-                {
-                    set.insert(fun_env.get_qualified_id());
+        let qid = self.get_qualified_id();
+        let env = self.module_env.env;
+        CallGraphCache::cached_opt(&env.call_graph_cache.using_funs, qid, || {
+            let mut set = BTreeSet::new();
+            for module_env in env.get_modules() {
+                for fun_env in module_env.get_functions() {
+                    if fun_env.get_used_functions()?.contains(&qid) {
+                        set.insert(fun_env.get_qualified_id());
+                    }
                 }
             }
-        }
-        *self.data.using_funs.borrow_mut() = Some(set.clone());
-        Some(set)
+            Some(set)
+        })
     }
 
     /// Get the functions that this one uses, if available.
@@ -5695,95 +5859,128 @@ impl<'env> FunctionEnv<'env> {
     /// in the closure have `get_used_functions` available; if one of them not, this
     /// function panics.
     pub fn get_transitive_closure_of_used_functions(&self) -> BTreeSet<QualifiedId<FunId>> {
-        if let Some(trans_used) = &*self.data.transitive_closure_of_used_funs.borrow() {
-            return trans_used.clone();
-        }
-
-        let mut set = BTreeSet::new();
-        let mut reachable_funcs = VecDeque::new();
-        reachable_funcs.push_back(self.clone());
-
-        // BFS in reachable_funcs to collect all reachable functions
-        while !reachable_funcs.is_empty() {
-            let fnc = reachable_funcs.pop_front().unwrap();
-            for callee in fnc.get_used_functions().expect("call info available") {
-                let f = self.module_env.env.get_function(*callee);
-                let qualified_id = f.get_qualified_id();
-                if set.insert(qualified_id) {
-                    reachable_funcs.push_back(f.clone());
+        let qid = self.get_qualified_id();
+        let env = self.module_env.env;
+        CallGraphCache::cached(
+            &env.call_graph_cache.transitive_closure_of_used_funs,
+            qid,
+            || {
+                let mut set = BTreeSet::new();
+                let mut reachable_funcs = VecDeque::new();
+                reachable_funcs.push_back(self.clone());
+                while let Some(fnc) = reachable_funcs.pop_front() {
+                    for callee in fnc.get_used_functions().expect("call info available") {
+                        let f = env.get_function(*callee);
+                        if set.insert(f.get_qualified_id()) {
+                            reachable_funcs.push_back(f);
+                        }
+                    }
                 }
-            }
-        }
-        *self.data.transitive_closure_of_used_funs.borrow_mut() = Some(set.clone());
-        set
+                set
+            },
+        )
     }
 
     /// Get used functions including ones obtained by transitively traversing used inline functions
     pub fn get_used_functions_with_transitive_inline(&self) -> BTreeSet<QualifiedId<FunId>> {
-        if let Some(trans_used) = &*self.data.used_functions_with_transitive_inline.borrow() {
-            return trans_used.clone();
-        }
-
-        let mut set = BTreeSet::new();
-        let mut reachable_funcs = VecDeque::new();
-        reachable_funcs.push_back(self.clone());
-
-        while let Some(fnc) = reachable_funcs.pop_front() {
-            for callee in fnc.get_used_functions().expect("call info available") {
-                let f = self.module_env.env.get_function(*callee);
-                let qualified_id = f.get_qualified_id();
-                if set.insert(qualified_id) && f.is_inline() {
-                    reachable_funcs.push_back(f.clone());
+        let qid = self.get_qualified_id();
+        let env = self.module_env.env;
+        CallGraphCache::cached(
+            &env.call_graph_cache.used_functions_with_transitive_inline,
+            qid,
+            || {
+                let mut set = BTreeSet::new();
+                let mut reachable_funcs = VecDeque::new();
+                reachable_funcs.push_back(self.clone());
+                while let Some(fnc) = reachable_funcs.pop_front() {
+                    for callee in fnc.get_used_functions().expect("call info available") {
+                        let f = env.get_function(*callee);
+                        if set.insert(f.get_qualified_id()) && f.is_inline() {
+                            reachable_funcs.push_back(f);
+                        }
+                    }
                 }
-            }
-        }
-        *self.data.used_functions_with_transitive_inline.borrow_mut() = Some(set.clone());
-        set
+                set
+            },
+        )
+    }
+
+    /// Get the functions that effectively use (call) this one after inline expansion.
+    /// Direct callers that are themselves inline functions are replaced by their
+    /// (transitive) callers, because after inlining those inline callers no longer
+    /// contain a call site — their callers do.
+    pub fn get_using_functions_with_transitive_inline(&self) -> BTreeSet<QualifiedId<FunId>> {
+        let qid = self.get_qualified_id();
+        let env = self.module_env.env;
+        CallGraphCache::cached(
+            &env.call_graph_cache.using_functions_with_transitive_inline,
+            qid,
+            || {
+                let mut result = BTreeSet::new();
+                let mut visited = BTreeSet::new();
+                visited.insert(qid);
+                let mut reachable_funcs = VecDeque::new();
+                reachable_funcs.push_back(self.clone());
+                while let Some(fnc) = reachable_funcs.pop_front() {
+                    for user in fnc.get_using_functions().expect("call info available") {
+                        if !visited.insert(user) {
+                            continue;
+                        }
+                        let user_fun = env.get_function(user);
+                        if user_fun.is_inline() {
+                            reachable_funcs.push_back(user_fun);
+                        } else {
+                            result.insert(user);
+                        }
+                    }
+                }
+                result
+            },
+        )
     }
 
     /// Get used structs/enums including ones obtained by transitively traversing used inline functions
     pub fn get_used_structs_with_transitive_inline(&self) -> BTreeSet<QualifiedId<StructId>> {
-        if let Some(used_structs) = &*self.data.used_structs.borrow() {
-            return used_structs.clone();
-        }
-
-        let mut set = BTreeSet::new();
-        let mut reachable_funcs = VecDeque::new();
-        reachable_funcs.push_back(self.clone());
-
-        while let Some(fnc) = reachable_funcs.pop_front() {
-            if let Some(def) = fnc.get_def() {
-                set.extend(def.struct_usage(self.module_env.env, true));
-            }
-            for callee in fnc.get_used_functions().expect("call info available") {
-                let f = self.module_env.env.get_function(*callee);
-                if f.is_inline() {
-                    reachable_funcs.push_back(f.clone());
+        let qid = self.get_qualified_id();
+        let env = self.module_env.env;
+        CallGraphCache::cached(
+            &env.call_graph_cache.used_structs_with_transitive_inline,
+            qid,
+            || {
+                let mut set = BTreeSet::new();
+                let mut reachable_funcs = VecDeque::new();
+                reachable_funcs.push_back(self.clone());
+                while let Some(fnc) = reachable_funcs.pop_front() {
+                    if let Some(def) = fnc.get_def() {
+                        set.extend(def.struct_usage(env, true));
+                    }
+                    for callee in fnc.get_used_functions().expect("call info available") {
+                        let f = env.get_function(*callee);
+                        if f.is_inline() {
+                            reachable_funcs.push_back(f);
+                        }
+                    }
                 }
-            }
-        }
-        *self.data.used_structs.borrow_mut() = Some(set.clone());
-        set
+                set
+            },
+        )
     }
 
     /// Get the functions that call this one, if available.
     pub fn get_calling_functions(&self) -> Option<BTreeSet<QualifiedId<FunId>>> {
-        if let Some(calling) = &*self.data.calling_funs.borrow() {
-            return Some(calling.clone());
-        }
-        let mut set: BTreeSet<QualifiedId<FunId>> = BTreeSet::new();
-        for module_env in self.module_env.env.get_modules() {
-            for fun_env in module_env.get_functions() {
-                if fun_env
-                    .get_called_functions()?
-                    .contains(&self.get_qualified_id())
-                {
-                    set.insert(fun_env.get_qualified_id());
+        let qid = self.get_qualified_id();
+        let env = self.module_env.env;
+        CallGraphCache::cached_opt(&env.call_graph_cache.calling_funs, qid, || {
+            let mut set = BTreeSet::new();
+            for module_env in env.get_modules() {
+                for fun_env in module_env.get_functions() {
+                    if fun_env.get_called_functions()?.contains(&qid) {
+                        set.insert(fun_env.get_qualified_id());
+                    }
                 }
             }
-        }
-        *self.data.calling_funs.borrow_mut() = Some(set.clone());
-        Some(set)
+            Some(set)
+        })
     }
 
     /// Get the functions that this one calls, if available.
@@ -5795,27 +5992,26 @@ impl<'env> FunctionEnv<'env> {
     /// in the closure have `get_called_functions` available; if one of them not, this
     /// function panics.
     pub fn get_transitive_closure_of_called_functions(&self) -> BTreeSet<QualifiedId<FunId>> {
-        if let Some(trans_called) = &*self.data.transitive_closure_of_called_funs.borrow() {
-            return trans_called.clone();
-        }
-
-        let mut set = BTreeSet::new();
-        let mut reachable_funcs = VecDeque::new();
-        reachable_funcs.push_back(self.clone());
-
-        // BFS in reachable_funcs to collect all reachable functions
-        while !reachable_funcs.is_empty() {
-            let fnc = reachable_funcs.pop_front().unwrap();
-            for callee in fnc.get_called_functions().expect("call info available") {
-                let f = self.module_env.env.get_function(*callee);
-                let qualified_id = f.get_qualified_id();
-                if set.insert(qualified_id) {
-                    reachable_funcs.push_back(f.clone());
+        let qid = self.get_qualified_id();
+        let env = self.module_env.env;
+        CallGraphCache::cached(
+            &env.call_graph_cache.transitive_closure_of_called_funs,
+            qid,
+            || {
+                let mut set = BTreeSet::new();
+                let mut reachable_funcs = VecDeque::new();
+                reachable_funcs.push_back(self.clone());
+                while let Some(fnc) = reachable_funcs.pop_front() {
+                    for callee in fnc.get_called_functions().expect("call info available") {
+                        let f = env.get_function(*callee);
+                        if set.insert(f.get_qualified_id()) {
+                            reachable_funcs.push_back(f);
+                        }
+                    }
                 }
-            }
-        }
-        *self.data.transitive_closure_of_called_funs.borrow_mut() = Some(set.clone());
-        set
+                set
+            },
+        )
     }
 
     /// Returns the function name excluding the address and the module name

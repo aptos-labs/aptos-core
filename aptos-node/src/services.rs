@@ -11,13 +11,13 @@ use aptos_consensus::{
     quorum_store::quorum_store_db::QuorumStoreDB,
 };
 use aptos_consensus_notifications::ConsensusNotifier;
-use aptos_data_client::client::AptosDataClient;
 use aptos_db_indexer::{db_indexer::InternalIndexerDB, indexer_reader::IndexerReaders};
 use aptos_event_notifications::{DbBackedOnChainConfig, ReconfigNotificationListener};
 use aptos_indexer_grpc_fullnode::runtime::bootstrap as bootstrap_indexer_grpc;
 use aptos_indexer_grpc_table_info::runtime::{
     bootstrap as bootstrap_indexer_table_info, bootstrap_internal_indexer_db,
 };
+use aptos_inspection_service::server::InspectionServiceComponents;
 use aptos_logger::{debug, telemetry_log_writer::TelemetryLog, LoggerFilterUpdater};
 use aptos_mempool::{
     network::MempoolSyncMsg, MempoolClientRequest, MempoolClientSender, QuorumStoreRequest,
@@ -202,17 +202,16 @@ pub fn start_admin_service(node_config: &NodeConfig) -> AdminService {
     AdminService::new(node_config)
 }
 
-/// Starts the node inspection service and returns the runtime
+/// Starts the node inspection service and returns the runtime.
+///
+/// Pass an `Arc<InspectionServiceComponents>` whose fields are initially `None`.
+/// After the rest of the node has initialised, call `components.set(...)` to
+/// inject the live values, at which point all endpoints will become fully operational.
 pub fn start_node_inspection_service(
     node_config: &NodeConfig,
-    aptos_data_client: AptosDataClient,
-    peers_and_metadata: Arc<PeersAndMetadata>,
+    components: Arc<InspectionServiceComponents>,
 ) -> Runtime {
-    aptos_inspection_service::start_inspection_service(
-        node_config.clone(),
-        aptos_data_client,
-        peers_and_metadata,
-    )
+    aptos_inspection_service::start_inspection_service(node_config.clone(), components)
 }
 
 /// Starts the peer monitoring service and returns the runtime

@@ -66,7 +66,11 @@ fn used_type_parameters_in_ty(ty: &Type) -> BTreeSet<u16> {
             .flat_map(|t| used_type_parameters_in_ty(t))
             .collect(),
         Type::Reference(_, t) => used_type_parameters_in_ty(t),
-        Type::TypeDomain(..) | Type::ResourceDomain(..) | Type::Error | Type::Var(..) => {
+        Type::TypeDomain(..)
+        | Type::ResourceDomain(..)
+        | Type::StateDomain
+        | Type::Error
+        | Type::Var(..) => {
             unreachable!("unexpected type")
         },
     }

@@ -45,12 +45,17 @@ use std::{iter::repeat_with, marker::PhantomData};
 /// - the HKZG randomness,
 /// - the chunked plaintexts, and
 /// - the ElGamal randomness.
+///
+/// ArkSize(F=Bls12_381::Fr): 48 + 8·(n + W + max_w) + 32·(W + max_w)·c.
 #[derive(
     SigmaProtocolWitness, CanonicalSerialize, CanonicalDeserialize, Debug, Clone, PartialEq, Eq,
 )]
 pub struct HkzgElgamalWitness<F: PrimeField> {
+    /// ArkSize(F=Bls12_381::Fr): 32.
     pub hkzg_randomness: univariate_hiding_kzg::CommitmentRandomness<F>,
+    /// ArkSize(F=Bls12_381::Fr): 8 + 8·n + 8·W + 32·W·c.
     pub chunked_plaintexts: Vec<Vec<Vec<Scalar<F>>>>, // For each player, plaintexts z_i, which are chunked z_{i,j}
+    /// ArkSize(F=Bls12_381::Fr): 8 + 8·max_w + 32·max_w·c.
     pub elgamal_randomness: Vec<Vec<Scalar<F>>>, // For at most max_weight, for each chunk, a blinding factor
 }
 
@@ -73,11 +78,6 @@ pub fn prepare_chunked_witness<E: Pairing, R: RngCore + CryptoRng>(
     sc: &WeightedConfigArkworks<E::ScalarField>,
     rng: &mut R,
 ) -> WitnessData<E> {
-    debug_assert!(
-        (8..=63).contains(&pp.ell),
-        "pp.ell must be between 8 and 63 (inclusive), got {}", // 2^64 will lead to overflows
-        pp.ell
-    );
     // Step 3: convert the Shamir shares into chunked values
     let f_evals_chunked: Vec<Vec<E::ScalarField>> = f_evals
         .iter()
@@ -94,7 +94,7 @@ pub fn prepare_chunked_witness<E: Pairing, R: RngCore + CryptoRng>(
         repeat_with(|| {
             chunked_elgamal::correlated_randomness(
                 rng,
-                1 << pp.ell as u64, // debug_assert is to prevent overflow here
+                1 << pp.ell as u64,
                 chunked_elgamal::num_chunks_per_scalar::<E::ScalarField>(pp.ell),
                 &E::ScalarField::zero(),
             )
@@ -209,7 +209,9 @@ impl<'a, E: Pairing> Proof<'a, E> {
                 chunked_elgamal::CodomainShape {
                     chunks: (0..sc.get_total_num_players())
                         .map(|i| {
-                            let w = sc.get_player_weight(&sc.get_player(i)); // TODO: combine these functions...
+                            let w = sc
+                                .get_player_weight(&sc.get_player(i))
+                                .expect("player id from sc.get_player is in bounds"); // TODO: combine these functions...
                             (0..w)
                                 .map(|_| unsafe_random_points(number_of_chunks_per_share, rng))
                                 .collect()
@@ -226,7 +228,9 @@ impl<'a, E: Pairing> Proof<'a, E> {
                     univariate_hiding_kzg::CommitmentRandomness::<E::ScalarField>::rand(rng),
                 chunked_plaintexts: (0..sc.get_total_num_players())
                     .map(|i| {
-                        let w = sc.get_player_weight(&sc.get_player(i)); // TODO: combine these functions...
+                        let w = sc
+                            .get_player_weight(&sc.get_player(i))
+                            .expect("player id from sc.get_player is in bounds"); // TODO: combine these functions...
                         (0..w)
                             .map(|_| {
                                 Scalar::vec_from_inner(sample_field_elements(

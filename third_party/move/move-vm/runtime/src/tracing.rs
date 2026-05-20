@@ -22,6 +22,9 @@ use std::{
 
 const MOVE_VM_TRACING_ENV_VAR_NAME: &str = "MOVE_VM_TRACE";
 const MOVE_VM_STEPPING_ENV_VAR_NAME: &str = "MOVE_VM_STEP";
+/// Comma-separated list of debugger commands to consume automatically instead
+/// of prompting stdin.  Activates the debug loop even without `MOVE_VM_STEP`.
+pub(crate) const MOVE_VM_STEP_COMMANDS_ENV_VAR_NAME: &str = "MOVE_VM_STEP_COMMANDS";
 
 static FILE_PATH: OnceLock<ArcSwap<String>> = OnceLock::new();
 static TRACING_ENABLED: OnceLock<AtomicBool> = OnceLock::new();
@@ -57,8 +60,12 @@ pub(crate) fn is_tracing_enabled() -> &'static AtomicBool {
 
 #[inline]
 pub(crate) fn is_debugging_enabled() -> &'static AtomicBool {
-    DEBUGGING_ENABLED
-        .get_or_init(|| AtomicBool::new(env::var(MOVE_VM_STEPPING_ENV_VAR_NAME).is_ok()))
+    DEBUGGING_ENABLED.get_or_init(|| {
+        AtomicBool::new(
+            env::var(MOVE_VM_STEPPING_ENV_VAR_NAME).is_ok()
+                || env::var(MOVE_VM_STEP_COMMANDS_ENV_VAR_NAME).is_ok(),
+        )
+    })
 }
 
 pub fn flush_tracing_buffer() {

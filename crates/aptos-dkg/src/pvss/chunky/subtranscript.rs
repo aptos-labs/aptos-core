@@ -12,6 +12,7 @@ use crate::{
     traits::{transcript::Aggregated, Aggregatable, TranscriptCore},
     Scalar,
 };
+use anyhow::ensure;
 use aptos_crypto::{
     arkworks::{
         random::{unsafe_random_point, unsafe_random_points},
@@ -34,21 +35,26 @@ use std::iter::repeat_with;
 //
 // TODO: should probably record here how many times the subtranscript has been aggregated, since
 // it can speed up the BSGS algorithm, especially in tests
+/// ArkSize(E=Bls12_381): 120 + 16·n + 104·W + 8·max_w + 48·(W + max_w)·c.
 #[allow(non_snake_case)]
 #[derive(
     CanonicalSerialize, CanonicalDeserialize, Serialize, Deserialize, Clone, Debug, PartialEq, Eq,
 )]
 pub struct Subtranscript<E: Pairing> {
-    // The dealt public key
+    /// The dealt public key.
+    /// ArkSize(E=Bls12_381): 96.
     #[serde(serialize_with = "ark_se", deserialize_with = "ark_de")]
     pub V0: E::G2Affine,
-    // The dealt public key shares
+    /// The dealt public key shares.
+    /// ArkSize(E=Bls12_381): 8 + 8·n + 96·W.
     #[serde(serialize_with = "ark_se", deserialize_with = "ark_de")]
     pub Vs: Vec<Vec<E::G2Affine>>,
     /// First chunked ElGamal component: C[i][j] = s_{i,j} * G + r_j * ek_i. Here s_i = \sum_j s_{i,j} * B^j // TODO: change notation because B is not a group element? maybe β or radix?
+    /// ArkSize(E=Bls12_381): 8 + 8·n + 8·W + 48·W·c.
     #[serde(serialize_with = "ark_se", deserialize_with = "ark_de")]
     pub Cs: Vec<Vec<Vec<E::G1Affine>>>,
-    /// Second chunked ElGamal component: R[j] = r_j * H
+    /// Second chunked ElGamal component: R[j] = r_j * H.
+    /// ArkSize(E=Bls12_381): 8 + 8·max_w + 48·max_w·c.
     #[serde(serialize_with = "ark_se", deserialize_with = "ark_de")]
     pub Rs: Vec<Vec<E::G1Affine>>,
 }
@@ -108,7 +114,11 @@ impl<const N: usize, P: FpConfig<N>, E: Pairing<ScalarField = Fp<P, N>>> Transcr
         pp: &Self::PublicParameters,
     ) -> (Self::DealtSecretKeyShare, Self::DealtPubKeyShare) {
         let Cs = &self.Cs[player.id];
-        debug_assert_eq!(Cs.len(), sc.get_player_weight(player));
+        debug_assert_eq!(
+            Cs.len(),
+            sc.get_player_weight(player)
+                .expect("player id is in bounds")
+        );
 
         if !Cs.is_empty()
             && let Some(first_key) = self.Rs.first()
@@ -161,18 +171,48 @@ impl<E: Pairing> Aggregated<Subtranscript<E>> for SubtranscriptProjective<E> {
         sc: &WeightedConfigArkworks<E::ScalarField>,
         other: &Subtranscript<E>,
     ) -> anyhow::Result<()> {
-        debug_assert_eq!(self.Cs_proj.len(), sc.get_total_num_players());
-        debug_assert_eq!(self.Vs_proj.len(), sc.get_total_num_players());
-        debug_assert_eq!(self.Cs_proj.len(), other.Cs.len());
-        debug_assert_eq!(self.Rs_proj.len(), other.Rs.len());
-        debug_assert_eq!(self.Vs_proj.len(), other.Vs.len());
+        ensure!(
+            self.Cs_proj.len() == sc.get_total_num_players(),
+            "Cs_proj length {} != num_players {}",
+            self.Cs_proj.len(),
+            sc.get_total_num_players()
+        );
+        ensure!(
+            self.Vs_proj.len() == sc.get_total_num_players(),
+            "Vs_proj length {} != num_players {}",
+            self.Vs_proj.len(),
+            sc.get_total_num_players()
+        );
+        ensure!(
+            self.Cs_proj.len() == other.Cs.len(),
+            "Cs_proj length {} != other {}",
+            self.Cs_proj.len(),
+            other.Cs.len()
+        );
+        ensure!(
+            self.Rs_proj.len() == other.Rs.len(),
+            "Rs_proj length {} != other {}",
+            self.Rs_proj.len(),
+            other.Rs.len()
+        );
+        ensure!(
+            self.Vs_proj.len() == other.Vs.len(),
+            "Vs_proj length {} != other {}",
+            self.Vs_proj.len(),
+            other.Vs.len()
+        );
 
         // Aggregate the V0s
         self.V0_proj += other.V0;
 
         // Aggregate Vs (nested) element-wise
         for (vs_row, other_row) in self.Vs_proj.iter_mut().zip(&other.Vs) {
-            debug_assert_eq!(vs_row.len(), other_row.len());
+            ensure!(
+                vs_row.len() == other_row.len(),
+                "Vs row length {} != other {}",
+                vs_row.len(),
+                other_row.len()
+            );
             for (v_ij, other_v_ij) in vs_row.iter_mut().zip(other_row) {
                 *v_ij += *other_v_ij;
             }
@@ -301,7 +341,9 @@ impl<E: Pairing> Subtranscript<E> {
         let Cs: Vec<Vec<Vec<E::G1Affine>>> = (0..sc.get_total_num_players())
             .map(|i| {
                 let player = sc.get_player(i);
-                let w = sc.get_player_weight(&player);
+                let w = sc
+                    .get_player_weight(&player)
+                    .expect("player id from sc.get_player is in bounds");
                 repeat_with(|| unsafe_random_points(num_chunks_per_share, rng))
                     .take(w)
                     .collect()

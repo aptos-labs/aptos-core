@@ -30,6 +30,7 @@ aptos-peer-monitoring-service-types = { workspace = true }
 aptos-proptest-helpers = { workspace = true, optional = true }
 aptos-short-hex-str = { workspace = true }
 aptos-time-service = { workspace = true }
+aptos-token-bucket = { workspace = true }
 aptos-types = { workspace = true }
 arc-swap = { workspace = true }
 async-trait = { workspace = true }

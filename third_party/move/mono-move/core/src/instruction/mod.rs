@@ -16,8 +16,7 @@
 //!
 //! - **Fixed-size micro-ops**: each [`MicroOp`] variant should fit in a fixed
 //!   number of bytes so side-tables (e.g. source maps, gas tables) can be
-//!   indexed by program counter without indirection. Current size is 24 bytes;
-//!   we should aim to bring this down to 16.
+//!   indexed by program counter without indirection.
 //!
 //! - **Variable-size frame slots**: frame slots are variable-sized. Each
 //!   micro-op makes the width explicit — either baked into the opcode name
@@ -37,7 +36,7 @@
 //!                 caller frame                           callee frame
 //!     ┌──────────────────────────────────┐   ┌──────────────────────────────┐
 //!     │                        │ saved  ││   │                              │
-//!     │  caller slots          │  pc    ││   │  arg slots  │  other slots   │
+//!     │  caller slots          │  pc    ││   │  params     │  other slots   │
 //!     │                        │  fp    ││   │                              │
 //!     │                        │func_ptr││   │                              │
 //!     └──────────────────────────────────┘   └──────────────────────────────┘
@@ -46,13 +45,12 @@
 //!   ```
 //!
 //!   **Call**: the compiler emits explicit micro-ops to place arguments
-//!   into the callee's frame slots. The `CallFunc`/`CallLocalFunc`
-//!   instruction itself implicitly writes the metadata `(pc, fp,
-//!   func_ptr)` at the end of the caller frame and sets `fp` to the
-//!   callee frame.
+//!   into the callee's parameter region. Call instructions ([`CallIndirect`],
+//!   [`CallDirect`]) implicitly write the metadata `(pc, fp, func_ptr)` at
+//!   the end of the caller frame and sets `fp` to the callee frame.
 //!   **Return**: the compiler emits explicit micro-ops to write return
 //!   values at the start of the callee's frame (potentially overwriting
-//!   arg slots). The `Return` instruction itself implicitly restores
+//!   parameter slots). The `Return` instruction itself implicitly restores
 //!   `pc`/`fp` from the metadata at `fp - FRAME_METADATA_SIZE`.
 //!
 //! ## Design decisions to revisit
@@ -115,12 +113,19 @@
 //!   `elem_ptr_offsets` lists byte offsets *within each element* that hold
 //!   heap pointers.
 
-use crate::Function;
-use std::{fmt, ptr::NonNull};
+use crate::{
+    align::MAX_ALIGN,
+    interner::{InternedIdentifier, InternedModuleId},
+    types::{display_type_list, InternedTypeList},
+    FunctionPtr,
+};
+use std::fmt;
 
 // Submodules for instruction.
 mod gas;
+mod unspecialized;
 pub use gas::MicroOpGasSchedule;
+pub use unspecialized::{IntBinaryOp, IntNegateOp, IntOperand, IntShiftOp, IntTy, ShiftOperand};
 
 /// A typed wrapper around a `u32` frame-pointer-relative byte offset.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -175,7 +180,84 @@ impl std::fmt::Display for DescriptorId {
     }
 }
 
-#[derive(Debug)]
+/// A sized view into a frame slot: its byte offset and width.
+//
+// TODO: reconcile with `SlotInfo` (same shape, different provenance).
+// Also: add alignment information once the layout admits non-8-byte
+// fields, otherwise callers that pack `SizedSlot`s back-to-back (e.g.
+// captured data) will produce mis-aligned fields.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct SizedSlot {
+    pub offset: FrameOffset,
+    pub size: u32,
+}
+
+/// Reference to the target function of a closure.
+///
+/// Conceptually an enum. The concrete in-memory representation of this enum
+/// (tag size, padding, payload layout) inside closure heap objects is given
+/// by [`CLOSURE_FUNC_REF_SIZE`] and associated constants.
+#[derive(Clone)]
+pub enum ClosureFuncRef {
+    /// Local function, already monomorphized and materialized.
+    Resolved(FunctionPtr),
+    // `Unresolved { ... }` — cross-module form, TBD. Resolved lazily at call
+    // time. Its payload will mirror whatever representation cross-module
+    // calls end up using.
+}
+
+impl fmt::Display for ClosureFuncRef {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            ClosureFuncRef::Resolved(ptr) => {
+                // SAFETY: Micro-ops are currently displayed only during execution
+                // when the guard is held.
+                // TODO: Have a safe display impl that takes guard.
+                let func = unsafe { ptr.as_ref_unchecked() };
+                let func_name = unsafe { func.name.as_ref_unchecked() };
+                write!(f, "Resolved({})", func_name)
+            },
+        }
+    }
+}
+
+/// Operand data for [`MicroOp::PackClosure`].
+///
+/// Boxed so the micro-op enum stays small despite the variable-length
+/// `captured` list.
+#[derive(Clone)]
+pub struct PackClosureOp {
+    /// Frame slot that receives the heap pointer to the closure object.
+    pub dst: FrameOffset,
+    /// Target function.
+    pub func_ref: ClosureFuncRef,
+    /// Bitmask of which function parameters are captured vs provided.
+    pub mask: u64,
+    /// Descriptor for the allocated `ClosureCapturedData` (Materialized)
+    /// object. `Some` iff this closure captures at least one value;
+    /// otherwise `None` and no captured-data object is allocated.
+    ///
+    /// The closure object's own descriptor is implicit: it is always the
+    /// reserved `CLOSURE_DESCRIPTOR_ID` slot in the descriptor table.
+    pub captured_data_descriptor_id: Option<DescriptorId>,
+    /// Sources (in caller's frame) of the captured values, in the order that
+    /// `mask.is_captured(i)` is true — i.e. ascending `i` through the
+    /// function's parameter list.
+    pub captured: Vec<SizedSlot>,
+}
+
+/// Operand data for [`MicroOp::CallClosure`].
+#[derive(Clone, Debug)]
+pub struct CallClosureOp {
+    /// Frame slot holding the closure heap pointer.
+    pub closure_src: FrameOffset,
+    /// Sources (in caller's frame) of the provided (non-captured) arguments,
+    /// in the order that `mask.is_captured(i)` is false — i.e. ascending `i`
+    /// through the function's parameter list.
+    pub provided_args: Vec<SizedSlot>,
+}
+
+#[derive(Clone)]
 pub enum MicroOp {
     //======================================================================
     // Data movement
@@ -189,10 +271,16 @@ pub enum MicroOp {
     // - bulk data movement.
     //======================================================================
     /// Store an immediate u64 (8 bytes) at `dst` in the current frame.
-    StoreImm8 { dst: FrameOffset, imm: u64 },
+    StoreImm8 {
+        dst: FrameOffset,
+        imm: u64,
+    },
 
     /// Copy 8 bytes from `src` to `dst`.
-    Move8 { dst: FrameOffset, src: FrameOffset },
+    Move8 {
+        dst: FrameOffset,
+        src: FrameOffset,
+    },
 
     /// Copy `size` bytes from `src` to `dst`.
     Move {
@@ -202,16 +290,13 @@ pub enum MicroOp {
     },
 
     //======================================================================
-    // Arithmetic & bitwise
+    // Arithmetic & bitwise (specialized u64)
     //======================================================================
-    // Currently u64-only. Each op has a reg-reg form and/or an immediate
-    // form; we add variants as the compiler needs them.
-    //
-    // May want:
-    // - Mul, Div, Sub (reg-reg), Negate, bitwise And/Or/Xor/Not, Shl,
-    // - u8, u16, u32 variants (mask on u64?), u128/u256 (multi-word),
-    // - signed integer support.
+    // Fast-path variants for u64 slot-slot and immediate-form ops. All
+    // arithmetic is checked.
     //======================================================================
+
+    // --- Add ---
     /// `dst = lhs + rhs` (u64, checked).
     AddU64 {
         dst: FrameOffset,
@@ -224,6 +309,14 @@ pub enum MicroOp {
         dst: FrameOffset,
         src: FrameOffset,
         imm: u64,
+    },
+
+    // --- Sub ---
+    /// `dst = lhs - rhs` (u64, checked).
+    SubU64 {
+        dst: FrameOffset,
+        lhs: FrameOffset,
+        rhs: FrameOffset,
     },
 
     /// `dst = src - imm` (u64, checked).
@@ -240,26 +333,132 @@ pub enum MicroOp {
         imm: u64,
     },
 
-    /// `dst = lhs ^ rhs` (u64, bitwise XOR).
-    XorU64 {
+    // --- Mul ---
+    /// `dst = lhs * rhs` (u64, checked).
+    MulU64 {
         dst: FrameOffset,
         lhs: FrameOffset,
         rhs: FrameOffset,
     },
 
-    /// `dst = src >> imm` (u64, logical right shift).
-    ShrU64Imm {
+    /// `dst = src * imm` (u64, checked).
+    MulU64Imm {
         dst: FrameOffset,
         src: FrameOffset,
         imm: u64,
     },
 
-    /// `dst = lhs % rhs` (u64 modulo). Panics on division by zero.
+    // --- Div ---
+    /// `dst = lhs / rhs` (u64). Aborts on division by zero.
+    DivU64 {
+        dst: FrameOffset,
+        lhs: FrameOffset,
+        rhs: FrameOffset,
+    },
+
+    /// `dst = src / imm` (u64). Aborts if `imm == 0`.
+    DivU64Imm {
+        dst: FrameOffset,
+        src: FrameOffset,
+        imm: u64,
+    },
+
+    // --- Mod ---
+    /// `dst = lhs % rhs` (u64). Aborts on division by zero.
     ModU64 {
         dst: FrameOffset,
         lhs: FrameOffset,
         rhs: FrameOffset,
     },
+
+    /// `dst = src % imm` (u64). Aborts if `imm == 0`.
+    ModU64Imm {
+        dst: FrameOffset,
+        src: FrameOffset,
+        imm: u64,
+    },
+
+    // --- Bitwise ---
+    /// `dst = lhs & rhs` (u64, bitwise AND).
+    BitAndU64 {
+        dst: FrameOffset,
+        lhs: FrameOffset,
+        rhs: FrameOffset,
+    },
+
+    /// `dst = lhs | rhs` (u64, bitwise OR).
+    BitOrU64 {
+        dst: FrameOffset,
+        lhs: FrameOffset,
+        rhs: FrameOffset,
+    },
+
+    /// `dst = lhs ^ rhs` (u64, bitwise XOR).
+    BitXorU64 {
+        dst: FrameOffset,
+        lhs: FrameOffset,
+        rhs: FrameOffset,
+    },
+
+    // --- Shifts ---
+    //
+    // The shift amount is a u8 (matching Move bytecode, where the rhs of
+    // `Shl`/`Shr` is always u8). For the reg-reg forms, `rhs` is the offset
+    // of a 1-byte slot; the interpreter reads exactly one byte from it.
+    /// `dst = lhs << rhs` (u64). `rhs` is a 1-byte slot. Aborts if `rhs >= 64`.
+    ShlU64 {
+        dst: FrameOffset,
+        lhs: FrameOffset,
+        rhs: FrameOffset,
+    },
+
+    /// `dst = src << imm` (u64). Aborts if `imm >= 64`.
+    ShlU64Imm {
+        dst: FrameOffset,
+        src: FrameOffset,
+        imm: u8,
+    },
+
+    /// `dst = lhs >> rhs` (u64, logical right shift). `rhs` is a 1-byte slot.
+    /// Aborts if `rhs >= 64`.
+    ShrU64 {
+        dst: FrameOffset,
+        lhs: FrameOffset,
+        rhs: FrameOffset,
+    },
+
+    /// `dst = src >> imm` (u64, logical right shift). Aborts if `imm >= 64`.
+    ShrU64Imm {
+        dst: FrameOffset,
+        src: FrameOffset,
+        imm: u8,
+    },
+
+    //======================================================================
+    // Arithmetic & bitwise (unspecialized, per-kind variants)
+    //======================================================================
+    // Per-kind variants that tag-dispatch on the operand type at runtime.
+    // See [`IntBinaryOp`] / [`IntShiftOp`] / [`IntNegateOp`] for operand
+    // layout and semantics; the set of which `(op, type)` combinations are
+    // unspecialized vs. promoted to dedicated variants follows the
+    // specialization principle described in [`unspecialized`].
+    //
+    // TODO: heap-boxing wide imm operands inside [`IntOperand`] costs an
+    // allocation and a pointer-chase per micro-op. A side-table keyed by
+    // `pc` would improve cache locality and let the inline op stay
+    // pointer-free; revisit once we have profiling data to motivate it.
+    //======================================================================
+    IntAdd(IntBinaryOp),
+    IntSub(IntBinaryOp),
+    IntMul(IntBinaryOp),
+    IntDiv(IntBinaryOp),
+    IntMod(IntBinaryOp),
+    IntBitAnd(IntBinaryOp),
+    IntBitOr(IntBinaryOp),
+    IntBitXor(IntBinaryOp),
+    IntShl(IntShiftOp),
+    IntShr(IntShiftOp),
+    IntNegate(IntNegateOp),
 
     //======================================================================
     // Control flow
@@ -276,16 +475,25 @@ pub enum MicroOp {
     // - more conditions: ==, !=, >, <=, and const variants,
     // - something for enum dispatch (jump table)?
     //======================================================================
-    /// Call function `func_id`. The compiler has already emitted micro-ops
-    /// to place arguments into the callee's frame. This instruction
-    /// implicitly writes the metadata `(pc, fp, func_ptr)` at
-    /// `current_fp + args_and_locals_size` and sets `fp` to
-    /// `current_fp + args_and_locals_size + FRAME_METADATA_SIZE`.
-    CallFunc { func_id: u32 },
+    /// Call a function by module identity and name. The specializer has already
+    /// emitted micro-ops to place arguments into the callee's parameter region.
+    /// This instruction implicitly writes the metadata `(pc, fp, func_ptr)` at
+    /// `current_fp + param_and_local_sizes_sum` and sets `fp` to
+    /// `current_fp + param_and_local_sizes_sum + FRAME_METADATA_SIZE`.
+    CallIndirect {
+        module_id: InternedModuleId,
+        func_name: InternedIdentifier,
+        ty_args: InternedTypeList,
+    },
 
     /// Call a function via direct pointer. Same calling convention as
-    /// `CallFunc`.
-    CallLocalFunc { ptr: NonNull<Function> },
+    /// `CallIndirect`.
+    // TODO: Currently dead code — the specializer never emits this. A follow-up
+    // pass should patch same-module `CallIndirect` sites to `CallDirect` once
+    // the target is known to live in the same module.
+    CallDirect {
+        ptr: FunctionPtr,
+    },
 
     /// Return from the current function call. The compiler has already
     /// emitted micro-ops to write return values at the start of the
@@ -294,7 +502,9 @@ pub enum MicroOp {
     Return,
 
     /// Unconditional jump.
-    Jump { target: CodeOffset },
+    Jump {
+        target: CodeOffset,
+    },
 
     /// Jump to `target` if the u64 at `src` is **not** zero.
     JumpNotZeroU64 {
@@ -311,6 +521,20 @@ pub enum MicroOp {
 
     /// Jump to `target` if the u64 at `src` is **<** `imm`.
     JumpLessU64Imm {
+        target: CodeOffset,
+        src: FrameOffset,
+        imm: u64,
+    },
+
+    /// Jump to `target` if the u64 at `src` is **>** `imm`.
+    JumpGreaterU64Imm {
+        target: CodeOffset,
+        src: FrameOffset,
+        imm: u64,
+    },
+
+    /// Jump to `target` if the u64 at `src` is **<=** `imm`.
+    JumpLessEqualU64Imm {
         target: CodeOffset,
         src: FrameOffset,
         imm: u64,
@@ -356,7 +580,9 @@ pub enum MicroOp {
     /// Initialize an empty vector by writing a null pointer to `dst`.
     /// No heap allocation occurs; the first `VecPushBack` allocates lazily
     /// using the `descriptor_id` and `elem_size` it carries.
-    VecNew { dst: FrameOffset },
+    VecNew {
+        dst: FrameOffset,
+    },
 
     /// Write the length (u64) of the vector to `dst`.
     /// `vec_ref` is a 16-byte fat pointer `(base, offset)` whose target
@@ -552,7 +778,9 @@ pub enum MicroOp {
     //======================================================================
     /// Charge a pre-computed static gas cost for the current basic block.
     /// The interpreter must call the gas meter and abort on exhaustion.
-    Charge { cost: u64 },
+    Charge {
+        cost: u64,
+    },
 
     //======================================================================
     // Debugging
@@ -561,7 +789,9 @@ pub enum MicroOp {
     /// Provides easy access to randomness during execution, enabling
     /// stress tests based on random sequences of operations (e.g. GC
     /// correctness, heap layout robustness).
-    StoreRandomU64 { dst: FrameOffset },
+    StoreRandomU64 {
+        dst: FrameOffset,
+    },
 
     /// Unconditionally trigger a garbage collection cycle.
     /// Useful for testing GC correctness.
@@ -575,9 +805,32 @@ pub enum MicroOp {
     //   including signed casts.
     // - **Boolean**: logical Not, And, Or (distinct from bitwise).
     // - **Global storage**: MoveTo, MoveFrom, BorrowGlobal, Exists.
-    // - **Closures / function values**
     // - **Runtime instrumentation**: tracing, profiling, coverage hooks.
     //======================================================================
+
+    //======================================================================
+    // Closures / function values
+    //======================================================================
+    // Two fused super-instructions. Both carry variable-length data and are
+    // boxed so the base `MicroOp` enum stays small. The closure runtime
+    // representation is a two-level heap object: a closure object that
+    // points to a separate `ClosureCapturedData` object.
+    //======================================================================
+    /// Pack a closure. Allocates the closure object and a fresh
+    /// `ClosureCapturedData` (Materialized) object, copies captured values
+    /// into the latter, and writes the closure heap pointer to `dst`.
+    /// **MAY TRIGGER GC** (two allocations).
+    PackClosure(Box<PackClosureOp>),
+
+    /// Call a closure. Reads the closure at `closure_src`, interleaves its
+    /// captured values with the provided arguments into the callee's
+    /// parameter region (using the mask and the callee's `param_sizes`),
+    /// then performs the standard call protocol.
+    ///
+    /// For v0 this only supports `ClosureFuncRef::Resolved` closures whose
+    /// captured data is `Materialized`. A raw-captured-data path (for
+    /// closures loaded from storage) is future work.
+    CallClosure(Box<CallClosureOp>),
 }
 
 impl fmt::Display for MicroOp {
@@ -598,23 +851,118 @@ impl fmt::Display for MicroOp {
             MicroOp::AddU64Imm { dst, src, imm } => {
                 write!(f, "AddU64Imm [{}] <- [{}] + #{}", dst.0, src.0, imm)
             },
+            MicroOp::SubU64 { dst, lhs, rhs } => {
+                write!(f, "SubU64 [{}] <- [{}] - [{}]", dst.0, lhs.0, rhs.0)
+            },
             MicroOp::SubU64Imm { dst, src, imm } => {
                 write!(f, "SubU64Imm [{}] <- [{}] - #{}", dst.0, src.0, imm)
             },
             MicroOp::RSubU64Imm { dst, src, imm } => {
                 write!(f, "RSubU64Imm [{}] <- #{} - [{}]", dst.0, imm, src.0)
             },
-            MicroOp::ShrU64Imm { dst, src, imm } => {
-                write!(f, "ShrU64Imm [{}] <- [{}] >> #{}", dst.0, src.0, imm)
+            MicroOp::MulU64 { dst, lhs, rhs } => {
+                write!(f, "MulU64 [{}] <- [{}] * [{}]", dst.0, lhs.0, rhs.0)
+            },
+            MicroOp::MulU64Imm { dst, src, imm } => {
+                write!(f, "MulU64Imm [{}] <- [{}] * #{}", dst.0, src.0, imm)
+            },
+            MicroOp::DivU64 { dst, lhs, rhs } => {
+                write!(f, "DivU64 [{}] <- [{}] / [{}]", dst.0, lhs.0, rhs.0)
+            },
+            MicroOp::DivU64Imm { dst, src, imm } => {
+                write!(f, "DivU64Imm [{}] <- [{}] / #{}", dst.0, src.0, imm)
             },
             MicroOp::ModU64 { dst, lhs, rhs } => {
                 write!(f, "ModU64 [{}] <- [{}] % [{}]", dst.0, lhs.0, rhs.0)
             },
-            MicroOp::CallFunc { func_id } => {
-                write!(f, "CallFunc #{}", func_id)
+            MicroOp::ModU64Imm { dst, src, imm } => {
+                write!(f, "ModU64Imm [{}] <- [{}] % #{}", dst.0, src.0, imm)
             },
-            MicroOp::CallLocalFunc { ptr } => {
-                write!(f, "CallLocalFunc {:p}", ptr)
+            MicroOp::BitAndU64 { dst, lhs, rhs } => {
+                write!(f, "BitAndU64 [{}] <- [{}] & [{}]", dst.0, lhs.0, rhs.0)
+            },
+            MicroOp::BitOrU64 { dst, lhs, rhs } => {
+                write!(f, "BitOrU64 [{}] <- [{}] | [{}]", dst.0, lhs.0, rhs.0)
+            },
+            MicroOp::BitXorU64 { dst, lhs, rhs } => {
+                write!(f, "BitXorU64 [{}] <- [{}] ^ [{}]", dst.0, lhs.0, rhs.0)
+            },
+            MicroOp::ShlU64 { dst, lhs, rhs } => {
+                write!(f, "ShlU64 [{}] <- [{}] << [{}]", dst.0, lhs.0, rhs.0)
+            },
+            MicroOp::ShlU64Imm { dst, src, imm } => {
+                write!(f, "ShlU64Imm [{}] <- [{}] << #{}", dst.0, src.0, imm)
+            },
+            MicroOp::ShrU64 { dst, lhs, rhs } => {
+                write!(f, "ShrU64 [{}] <- [{}] >> [{}]", dst.0, lhs.0, rhs.0)
+            },
+            MicroOp::ShrU64Imm { dst, src, imm } => {
+                write!(f, "ShrU64Imm [{}] <- [{}] >> #{}", dst.0, src.0, imm)
+            },
+            MicroOp::IntAdd(op) => {
+                write!(f, "IntAdd [{}] <- [{}] + {}", op.dst.0, op.lhs.0, op.rhs)
+            },
+            MicroOp::IntSub(op) => {
+                write!(f, "IntSub [{}] <- [{}] - {}", op.dst.0, op.lhs.0, op.rhs)
+            },
+            MicroOp::IntMul(op) => {
+                write!(f, "IntMul [{}] <- [{}] * {}", op.dst.0, op.lhs.0, op.rhs)
+            },
+            MicroOp::IntDiv(op) => {
+                write!(f, "IntDiv [{}] <- [{}] / {}", op.dst.0, op.lhs.0, op.rhs)
+            },
+            MicroOp::IntMod(op) => {
+                write!(f, "IntMod [{}] <- [{}] % {}", op.dst.0, op.lhs.0, op.rhs)
+            },
+            MicroOp::IntBitAnd(op) => {
+                write!(f, "IntBitAnd [{}] <- [{}] & {}", op.dst.0, op.lhs.0, op.rhs)
+            },
+            MicroOp::IntBitOr(op) => {
+                write!(f, "IntBitOr [{}] <- [{}] | {}", op.dst.0, op.lhs.0, op.rhs)
+            },
+            MicroOp::IntBitXor(op) => {
+                write!(f, "IntBitXor [{}] <- [{}] ^ {}", op.dst.0, op.lhs.0, op.rhs)
+            },
+            MicroOp::IntShl(op) => write!(
+                f,
+                "IntShl.{} [{}] <- [{}] << {}",
+                op.ty, op.dst.0, op.lhs.0, op.rhs
+            ),
+            MicroOp::IntShr(op) => write!(
+                f,
+                "IntShr.{} [{}] <- [{}] >> {}",
+                op.ty, op.dst.0, op.lhs.0, op.rhs
+            ),
+            MicroOp::IntNegate(op) => {
+                write!(f, "IntNegate.{} [{}] <- -[{}]", op.ty, op.dst.0, op.src.0)
+            },
+            MicroOp::CallIndirect {
+                module_id,
+                func_name,
+                ty_args,
+            } => {
+                // SAFETY: Micro-ops are currently displayed only during execution
+                // when the guard is held.
+                // TODO: Have a safe display impl that takes guard.
+                let module_id = unsafe { module_id.as_ref_unchecked() };
+                let addr = module_id.address().short_str_lossless();
+                let module_name = unsafe { module_id.name().as_ref_unchecked() };
+                let func_name = unsafe { func_name.as_ref_unchecked() };
+                write!(f, "CallIndirect 0x{}::{}::{}", addr, module_name, func_name)?;
+                if !ty_args.is_empty() {
+                    write!(f, "<")?;
+                    display_type_list(f, *ty_args)?;
+                    write!(f, ">")?;
+                }
+                Ok(())
+            },
+            MicroOp::CallDirect { ptr } => {
+                // SAFETY: Micro-ops are currently displayed only during execution
+                // when the guard is held.
+                // TODO: Have a safe display impl that takes guard.
+                let func = unsafe { ptr.as_ref_unchecked() };
+                let func_name = unsafe { func.name.as_ref_unchecked() };
+                write!(f, "CallDirect {}", func_name)
             },
             MicroOp::Return => {
                 write!(f, "Return")
@@ -629,6 +977,16 @@ impl fmt::Display for MicroOp {
                 write!(
                     f,
                     "JumpGreaterEqualU64Imm @{} [{}] >= #{}",
+                    target.0, src.0, imm
+                )
+            },
+            MicroOp::JumpGreaterU64Imm { target, src, imm } => {
+                write!(f, "JumpGreaterU64Imm @{} [{}] > #{}", target.0, src.0, imm)
+            },
+            MicroOp::JumpLessEqualU64Imm { target, src, imm } => {
+                write!(
+                    f,
+                    "JumpLessEqualU64Imm @{} [{}] <= #{}",
                     target.0, src.0, imm
                 )
             },
@@ -775,9 +1133,6 @@ impl fmt::Display for MicroOp {
             MicroOp::StoreRandomU64 { dst } => {
                 write!(f, "StoreRandomU64 [{}]", dst.0)
             },
-            MicroOp::XorU64 { dst, lhs, rhs } => {
-                write!(f, "XorU64 [{}] <- [{}] ^ [{}]", dst.0, lhs.0, rhs.0)
-            },
             MicroOp::JumpLessU64Imm { target, src, imm } => {
                 write!(f, "JumpLessU64Imm @{} [{}] < #{}", target.0, src.0, imm)
             },
@@ -801,6 +1156,39 @@ impl fmt::Display for MicroOp {
             MicroOp::Charge { cost } => {
                 write!(f, "Charge #{}", cost)
             },
+            MicroOp::PackClosure(op) => {
+                write!(
+                    f,
+                    "PackClosure [{}] <- func_ref={}, mask={:b}, captured_desc=",
+                    op.dst.0, op.func_ref, op.mask
+                )?;
+                match op.captured_data_descriptor_id {
+                    Some(id) => write!(f, "{}", id)?,
+                    None => write!(f, "<none>")?,
+                }
+                write!(f, ", captured=[")?;
+                for (i, slot) in op.captured.iter().enumerate() {
+                    if i > 0 {
+                        write!(f, ", ")?;
+                    }
+                    write!(f, "[{}]({})", slot.offset.0, slot.size)?;
+                }
+                write!(f, "]")
+            },
+            MicroOp::CallClosure(op) => {
+                write!(
+                    f,
+                    "CallClosure closure=[{}], provided_args=[",
+                    op.closure_src.0
+                )?;
+                for (i, slot) in op.provided_args.iter().enumerate() {
+                    if i > 0 {
+                        write!(f, ", ")?;
+                    }
+                    write!(f, "[{}]({})", slot.offset.0, slot.size)?;
+                }
+                write!(f, "]")
+            },
         }
     }
 }
@@ -812,26 +1200,119 @@ impl fmt::Display for MicroOp {
 /// Size of the per-frame metadata section: `(saved_pc, saved_fp, func_id)`.
 pub const FRAME_METADATA_SIZE: usize = 24;
 
-/// Size of the object header: [descriptor_id: u32 | size_in_bytes: u32].
-pub const OBJECT_HEADER_SIZE: usize = 8;
+/// Allocation overhead per heap object — the number of bytes the bump
+/// allocator reserves *before* the data region for the
+/// `[descriptor_id: u32 | size_in_bytes: u32]` header. The header pair
+/// always sits in the last 8 bytes of this reservation (at `obj_ptr - 8`
+/// and `obj_ptr - 4`); any additional bytes are padding so the data start
+/// remains [`MAX_ALIGN`]-aligned.
+///
+/// Tying `OBJECT_HEADER_SIZE` to [`MAX_ALIGN`] is what keeps both
+/// invariants (header-aligned, data-aligned) automatic as [`MAX_ALIGN`]
+/// grows: a future bump to 16 expands the reservation without changing
+/// any per-type layout constant below.
+pub const OBJECT_HEADER_SIZE: usize = MAX_ALIGN;
 
-/// Offset where struct field data begins (same as OBJECT_HEADER_SIZE).
-pub const STRUCT_DATA_OFFSET: usize = OBJECT_HEADER_SIZE; // 8
+const _: () = {
+    // The header pair (`desc_id: u32 + size: u32`) needs the last 8 bytes
+    // of the reservation. Cannot be less.
+    assert!(OBJECT_HEADER_SIZE >= 8);
+    // Data start = header start + OBJECT_HEADER_SIZE; needs to land on a
+    // `MAX_ALIGN` boundary.
+    assert!(OBJECT_HEADER_SIZE.is_multiple_of(MAX_ALIGN));
+};
 
 /// Offset of the variant tag (u64) within an enum object.
-pub const ENUM_TAG_OFFSET: usize = OBJECT_HEADER_SIZE; // 8
+pub const ENUM_TAG_OFFSET: usize = 0;
 
-/// Offset where enum variant field data begins (after header + tag).
-pub const ENUM_DATA_OFFSET: usize = OBJECT_HEADER_SIZE + 8; // 16
+/// Offset where enum variant field data begins (after the tag).
+pub const ENUM_DATA_OFFSET: usize = 8;
+
+// ---------------------------------------------------------------------------
+// Closure object layout
+// ---------------------------------------------------------------------------
+//
+// Closure object (heap-allocated, fixed data-region size):
+//
+//   [func_ref(16)] [mask(8)] [captured_data_ptr(8)]  = 32 bytes
+//
+// Offsets below are relative to the data start (the object pointer). The
+// 8-byte header lives at `obj_ptr - 8`; allocator bookkeeping is hidden
+// from per-type layouts.
+//
+// `func_ref` is an inline `ClosureFuncRef` enum. Reserved as 16 bytes to
+// leave room for a future `Unresolved` variant; v0 uses only `Resolved`:
+//
+//   within func_ref:
+//     offset 0:  tag (u8)   — FUNC_REF_TAG_RESOLVED = 0
+//     offset 1:  padding (7 bytes)
+//     offset 8:  payload (8-byte pointer)
+
+/// Reserved size for an inline `ClosureFuncRef` inside a closure heap object.
+/// Sized to accommodate a future `Unresolved` variant without on-disk layout
+/// changes.
+pub const CLOSURE_FUNC_REF_SIZE: usize = 16;
+
+/// Offset of the `func_ref` field within a closure heap object's data region.
+pub const CLOSURE_FUNC_REF_OFFSET: usize = 0;
+
+/// Offset of the `mask` field within a closure heap object.
+pub const CLOSURE_MASK_OFFSET: usize = CLOSURE_FUNC_REF_OFFSET + CLOSURE_FUNC_REF_SIZE; // 16
+
+/// Offset of the `captured_data_ptr` field within a closure heap object.
+/// The GC traces this slot (heap pointer to the `ClosureCapturedData` object).
+pub const CLOSURE_CAPTURED_DATA_PTR_OFFSET: usize = CLOSURE_MASK_OFFSET + 8; // 24
+
+/// Size of a closure heap object's data region (the header is separate).
+pub const CLOSURE_DATA_SIZE: usize = CLOSURE_CAPTURED_DATA_PTR_OFFSET + 8; // 32
+
+// Offsets within the `func_ref` region.
+/// Byte offset of the tag within `func_ref`.
+pub const FUNC_REF_TAG_OFFSET: usize = 0;
+/// Byte offset of the payload within `func_ref`.
+pub const FUNC_REF_PAYLOAD_OFFSET: usize = 8;
+
+/// `ClosureFuncRef::Resolved` tag value.
+pub const FUNC_REF_TAG_RESOLVED: u8 = 0;
+// Future: `FUNC_REF_TAG_UNRESOLVED: u8 = 1`
+
+// ---------------------------------------------------------------------------
+// ClosureCapturedData object layout (Materialized)
+// ---------------------------------------------------------------------------
+//
+//   Data region: [tag(1)] [padding(7)] [captured values packed in param order]
+//
+// Offsets below are relative to the data start (the object pointer). The
+// 8-byte header lives at `obj_ptr - 8`.
+//
+// Captured values are packed tightly, in the order of their parameter
+// positions (i.e. ascending `i` where `mask.is_captured(i)` is true).
+// Total count is implied by `mask.captured_count()`. Individual sizes are
+// read from the target function's `param_sizes` at call time.
+
+/// Byte offset of the tag (u8) within a `ClosureCapturedData` heap object.
+pub const CAPTURED_DATA_TAG_OFFSET: usize = 0;
+
+/// Byte offset where captured values begin (after tag + padding).
+pub const CAPTURED_DATA_VALUES_OFFSET: usize = 8;
+
+/// `ClosureCapturedData::Materialized` tag value.
+pub const CAPTURED_DATA_TAG_MATERIALIZED: u8 = 0;
+// Future: `CAPTURED_DATA_TAG_RAW: u8 = 1`
 
 impl MicroOp {
-    // ----- Struct helpers (offsets relative to STRUCT_DATA_OFFSET) -----
+    // ----- Struct helpers -----
+    //
+    // Field offsets are byte offsets within the struct's data region, which
+    // is exactly what each Heap* op's `offset` field already names — the
+    // header lives at a negative offset and is invisible to per-type
+    // layouts.
 
     pub fn struct_load8(heap_ptr: FrameOffset, field_offset: u32, dst: FrameOffset) -> Self {
         MicroOp::HeapMoveFrom8 {
             dst,
             heap_ptr,
-            offset: STRUCT_DATA_OFFSET as u32 + field_offset,
+            offset: field_offset,
         }
     }
 
@@ -844,7 +1325,7 @@ impl MicroOp {
         MicroOp::HeapMoveFrom {
             dst,
             heap_ptr,
-            offset: STRUCT_DATA_OFFSET as u32 + field_offset,
+            offset: field_offset,
             size,
         }
     }
@@ -852,7 +1333,7 @@ impl MicroOp {
     pub fn struct_store8(heap_ptr: FrameOffset, field_offset: u32, src: FrameOffset) -> Self {
         MicroOp::HeapMoveTo8 {
             heap_ptr,
-            offset: STRUCT_DATA_OFFSET as u32 + field_offset,
+            offset: field_offset,
             src,
         }
     }
@@ -865,7 +1346,7 @@ impl MicroOp {
     ) -> Self {
         MicroOp::HeapMoveTo {
             heap_ptr,
-            offset: STRUCT_DATA_OFFSET as u32 + field_offset,
+            offset: field_offset,
             src,
             size,
         }
@@ -875,11 +1356,11 @@ impl MicroOp {
         MicroOp::HeapBorrow {
             dst,
             obj_ref,
-            offset: STRUCT_DATA_OFFSET as u32 + field_offset,
+            offset: field_offset,
         }
     }
 
-    // ----- Enum helpers (offsets relative to ENUM_DATA_OFFSET) -----
+    // ----- Enum helpers (variant fields live after the 8-byte tag) -----
 
     pub fn enum_get_tag(heap_ptr: FrameOffset, dst: FrameOffset) -> Self {
         MicroOp::HeapMoveFrom8 {
@@ -956,8 +1437,9 @@ mod tests {
 
     #[test]
     fn micro_op_size() {
-        // Current size is 24 bytes due to large variants (e.g.
-        // JumpGreaterEqualU64Imm). We should aim to bring this down to 16.
-        assert_eq!(std::mem::size_of::<MicroOp>(), 24);
+        // TODO:
+        //   Size is dominated by indirect call: refactor to keep variant size
+        //   small and keep call metadata in a side table.
+        assert_eq!(std::mem::size_of::<MicroOp>(), 48);
     }
 }

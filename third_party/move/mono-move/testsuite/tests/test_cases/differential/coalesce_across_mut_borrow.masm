@@ -1,0 +1,18 @@
+// RUN: publish
+module 0x66::test
+
+fun pre_borrow_copy(x: u64): u64
+    copy_loc x
+    ld_u64 99
+    mut_borrow_loc x
+    write_ref
+    ret
+
+// RUN: execute 0x66::test::pre_borrow_copy --args 7
+// CHECK: results: 7
+
+// RUN: execute 0x66::test::pre_borrow_copy --args 0
+// CHECK: results: 0
+
+// RUN: execute 0x66::test::pre_borrow_copy --args 12345
+// CHECK: results: 12345

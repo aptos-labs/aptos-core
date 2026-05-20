@@ -115,6 +115,7 @@ pub(super) fn hot_state_kv_db_column_families() -> Vec<ColumnFamilyName> {
         /* empty cf */ DEFAULT_COLUMN_FAMILY_NAME,
         DB_METADATA_CF_NAME,
         HOT_STATE_VALUE_BY_KEY_HASH_CF_NAME,
+        STALE_STATE_VALUE_INDEX_BY_KEY_HASH_CF_NAME,
     ]
 }
 

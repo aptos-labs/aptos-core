@@ -54,7 +54,6 @@ petgraph = "0.5.1"
 proptest = { workspace = true }
 proptest-derive = { workspace = true }
 rand = { workspace = true }
-rayon = { workspace = true }
 serde = { workspace = true }
 
 [features]

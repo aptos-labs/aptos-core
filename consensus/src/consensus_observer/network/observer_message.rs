@@ -382,9 +382,14 @@ impl PipelinedBlockV2Owned {
         }
         if let Some(key) = self.secret_shared_key {
             block.set_decryption_key(key);
-            // Note: Decryption key must be Some if decrypted transactions are available.
-            block.set_decrypted_txns(self.decrypted_txns);
         }
+        // decrypted_txns is independent of secret_shared_key: the validator
+        // pipeline emits FailedDecryption variants (TrustedSetupExhausted,
+        // EpochEndRetry, BatchLimitReached, DecryptionKeyUnavailable, etc.)
+        // without ever setting a decryption key. Dropping them here would
+        // cause the observer's prepare input to diverge from the validator's,
+        // changing executed-txn count and block_approx_output_size.
+        block.set_decrypted_txns(self.decrypted_txns);
         Arc::new(block)
     }
 }
@@ -1955,6 +1960,47 @@ mod test {
             .verify_payload_signatures(&epoch_state)
             .unwrap_err();
         assert_matches!(error, Error::InvalidMessageError(_));
+    }
+
+    #[test]
+    fn test_ordered_block_v2_preserves_decrypted_txns_when_secret_shared_key_is_none() {
+        // Regression test: the validator's decryption pipeline emits non-empty
+        // decrypted_txns (FailedDecryption variants like TrustedSetupExhausted,
+        // EpochEndRetry, BatchLimitReached, DecryptionKeyUnavailable) without
+        // ever setting a secret_shared_key on the block. The observer-side
+        // deserializer must not gate `set_decrypted_txns` on the key being
+        // present, otherwise the observer's prepare input drops those txns and
+        // diverges from the validator (different executed-txn count, different
+        // block_approx_output_size).
+        let block_info = create_block_info(0, HashValue::random());
+        let pipelined_block = create_pipelined_block(block_info.clone());
+
+        // Populate decrypted_txns; leave secret_shared_key unset.
+        let decrypted_txns = create_signed_transactions(3);
+        pipelined_block.set_decrypted_txns(decrypted_txns.clone());
+        assert!(pipelined_block.secret_shared_key().is_none());
+
+        let ordered_proof = LedgerInfoWithSignatures::new(
+            LedgerInfo::new(block_info, HashValue::random()),
+            AggregateSignature::empty(),
+        );
+        let ordered_block_v2 = OrderedBlockV2::new(vec![pipelined_block], ordered_proof);
+
+        // Round-trip through bcs (the wire format used by the consensus observer).
+        let bytes = bcs::to_bytes(&ordered_block_v2).unwrap();
+        let decoded: OrderedBlockV2 = bcs::from_bytes(&bytes).unwrap();
+
+        let blocks = decoded.into_ordered_block().blocks().clone();
+        assert_eq!(blocks.len(), 1);
+        assert!(
+            blocks[0].secret_shared_key().is_none(),
+            "secret_shared_key should remain unset after round-trip"
+        );
+        assert_eq!(
+            blocks[0].decrypted_txns(),
+            Some(decrypted_txns),
+            "decrypted_txns must survive deserialization even when secret_shared_key is None"
+        );
     }
 
     /// Creates and returns a new batch info with random data

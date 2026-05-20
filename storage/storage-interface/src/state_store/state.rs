@@ -14,7 +14,7 @@ use crate::{
             hot_state_view::HotStateView,
         },
         versioned_state_value::StateUpdateRef,
-        HotStateShardUpdates, HotStateUpdates,
+        HotEvictionOp, HotInsertionOp, HotStateShardUpdates, HotStateUpdates,
     },
     DbReader,
 };
@@ -42,14 +42,21 @@ pub struct HotStateMetadata {
     latest: Option<HashValue>,
     oldest: Option<HashValue>,
     num_items: usize,
+    total_value_bytes: usize,
 }
 
 impl HotStateMetadata {
-    fn new() -> Self {
+    pub fn new(
+        latest: Option<HashValue>,
+        oldest: Option<HashValue>,
+        num_items: usize,
+        total_value_bytes: usize,
+    ) -> Self {
         Self {
-            latest: None,
-            oldest: None,
-            num_items: 0,
+            latest,
+            oldest,
+            num_items,
+            total_value_bytes,
         }
     }
 }
@@ -93,10 +100,24 @@ impl State {
         usage: StateStorageUsage,
         hot_state_config: HotStateConfig,
     ) -> Self {
+        Self::new_at_version_with_hot_state_metadata(
+            version,
+            usage,
+            hot_state_config,
+            arr![HotStateMetadata::default(); 16],
+        )
+    }
+
+    pub fn new_at_version_with_hot_state_metadata(
+        version: Option<Version>,
+        usage: StateStorageUsage,
+        hot_state_config: HotStateConfig,
+        hot_state_metadata: [HotStateMetadata; NUM_STATE_SHARDS],
+    ) -> Self {
         Self::new_with_updates(
             version,
             Arc::new(arr![MapLayer::new_family("state"); 16]),
-            arr![HotStateMetadata::new(); 16],
+            hot_state_metadata,
             usage,
             hot_state_config,
         )
@@ -160,6 +181,10 @@ impl State {
         self.hot_state_metadata[shard_id].num_items
     }
 
+    pub fn hot_value_bytes(&self, shard_id: usize) -> usize {
+        self.hot_state_metadata[shard_id].total_value_bytes
+    }
+
     fn update(
         &self,
         persisted_hot_state: Arc<dyn HotStateView>,
@@ -211,17 +236,16 @@ impl State {
                         hot_metadata.latest,
                         hot_metadata.oldest,
                         hot_metadata.num_items,
+                        hot_metadata.total_value_bytes,
                     );
                     let mut all_updates = per_version.iter();
-                    let mut insertions = HashMap::new();
-                    let mut evictions = HashMap::new();
+                    let mut shard_updates = HotStateShardUpdates::default();
                     for ckpt_version in all_checkpoint_versions {
                         for (key, update) in
                             all_updates.take_while_ref(|(_k, u)| u.version <= *ckpt_version)
                         {
                             let key_hash = *key.crypto_hash_ref();
-                            evictions.remove(&key_hash);
-                            if let Some(insertion) = Self::apply_one_update(
+                            if let Some(op) = Self::apply_one_update(
                                 &mut lru,
                                 overlay,
                                 cache,
@@ -229,20 +253,23 @@ impl State {
                                 update,
                                 self.hot_state_config.refresh_interval_versions,
                             ) {
-                                insertions.insert(key_hash, insertion);
+                                shard_updates.insert(key_hash, op);
                             }
                         }
                         // Only evict at the checkpoints.
                         for (key_hash, slot) in lru.maybe_evict() {
-                            insertions.remove(&key_hash);
                             assert!(slot.is_hot());
-                            evictions.insert(key_hash, *ckpt_version);
+                            shard_updates
+                                .evict(key_hash, HotEvictionOp {
+                                    eviction_version: *ckpt_version,
+                                    superseded_version: Some(slot.expect_hot_since_version()),
+                                })
+                                .expect("LRU eviction must succeed.");
                         }
                     }
                     for (key, update) in all_updates {
                         let key_hash = *key.crypto_hash_ref();
-                        evictions.remove(&key_hash);
-                        if let Some(insertion) = Self::apply_one_update(
+                        if let Some(op) = Self::apply_one_update(
                             &mut lru,
                             overlay,
                             cache,
@@ -250,11 +277,12 @@ impl State {
                             update,
                             self.hot_state_config.refresh_interval_versions,
                         ) {
-                            insertions.insert(key_hash, insertion);
+                            shard_updates.insert(key_hash, op);
                         }
                     }
 
-                    let (new_items, new_head, new_tail, new_num_items) = lru.into_updates();
+                    let (new_items, new_head, new_tail, new_num_items, new_total_value_bytes) =
+                        lru.into_updates();
                     let new_items = new_items.into_iter().collect_vec();
 
                     // TODO(aldenhu): change interface to take iter of ref
@@ -263,12 +291,10 @@ impl State {
                         latest: new_head,
                         oldest: new_tail,
                         num_items: new_num_items,
+                        total_value_bytes: new_total_value_bytes,
                     };
                     let new_usage = Self::usage_delta_for_shard(cache, overlay, batched_updates);
-                    (
-                        ((new_layer, new_metadata), new_usage),
-                        HotStateShardUpdates::new(insertions, evictions),
-                    )
+                    (((new_layer, new_metadata), new_usage), shard_updates)
                 },
             )
             .unzip();
@@ -292,9 +318,8 @@ impl State {
         ))
     }
 
-    /// Applies the update and returns `(HotStateValue, Option<value_version>)` that will later
-    /// go into the hot state Merkle tree and DB. `None` if the op is `MakeHot` and it's
-    /// determined that refresh is not necessary.
+    /// Applies one update to the LRU. Returns `None` if the op is `MakeHot` and refresh is not
+    /// necessary.
     fn apply_one_update(
         lru: &mut HotStateLRU,
         overlay: &LayeredMap<HashValue, StateSlot>,
@@ -302,15 +327,17 @@ impl State {
         key: &StateKey,
         update: &StateUpdateRef,
         refresh_interval: Version,
-    ) -> Option<(HotStateValue, Option<Version>)> {
+    ) -> Option<HotInsertionOp> {
         let key_hash = *key.crypto_hash_ref();
         if let Some(state_value_opt) = update.state_op.as_state_value_opt() {
-            lru.insert(key, update.to_result_slot((*key).clone()).unwrap());
-            let value_version = state_value_opt.map(|_| update.version);
-            return Some((
-                HotStateValue::new(state_value_opt.cloned(), update.version),
-                value_version,
-            ));
+            let superseded_version =
+                lru.insert(key, update.to_result_slot((*key).clone()).unwrap());
+            return Some(HotInsertionOp {
+                state_key: (*key).clone(),
+                value: HotStateValue::new(state_value_opt.cloned(), update.version),
+                value_version: state_value_opt.map(|_| update.version),
+                superseded_version,
+            });
         }
 
         if let Some(mut slot) = lru.get_slot(&key_hash) {
@@ -327,9 +354,14 @@ impl State {
             };
             if refreshed {
                 let value_version = slot_to_insert.value_version_opt();
-                let ret = HotStateValue::clone_from_slot(&slot_to_insert);
-                lru.insert(key, slot_to_insert);
-                Some((ret, value_version))
+                let value = HotStateValue::clone_from_slot(&slot_to_insert);
+                let superseded_version = lru.insert(key, slot_to_insert);
+                Some(HotInsertionOp {
+                    state_key: (*key).clone(),
+                    value,
+                    value_version,
+                    superseded_version,
+                })
             } else {
                 None
             }
@@ -338,9 +370,14 @@ impl State {
             assert!(slot.is_cold());
             let value_version = slot.value_version_opt();
             let slot = slot.to_hot(update.version);
-            let ret = HotStateValue::clone_from_slot(&slot);
-            lru.insert(key, slot);
-            Some((ret, value_version))
+            let value = HotStateValue::clone_from_slot(&slot);
+            let superseded_version = lru.insert(key, slot);
+            Some(HotInsertionOp {
+                state_key: (*key).clone(),
+                value,
+                value_version,
+                superseded_version,
+            })
         }
     }
 

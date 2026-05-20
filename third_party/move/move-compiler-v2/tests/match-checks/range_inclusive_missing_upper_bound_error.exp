@@ -1,0 +1,13 @@
+
+Diagnostics:
+error: inclusive range pattern requires an upper bound
+  ┌─ tests/match-checks/range_inclusive_missing_upper_bound_error.move:5:13
+  │
+5 │             ..= => 1,
+  │             ^^^
+
+error: inclusive range pattern requires an upper bound
+   ┌─ tests/match-checks/range_inclusive_missing_upper_bound_error.move:13:13
+   │
+13 │             0..= => 1,
+   │             ^^^^

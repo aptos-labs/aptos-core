@@ -57,7 +57,7 @@ module 0x42::c {
         f(x, y)
     }
     fun test(x: a::MyList, y: b::MyOtherList) {
-        foo(|arg0,arg1| lambda__1__test(arg0, arg1), x, y)
+        foo(|x,y| lambda__1__test(x, y), x, y)
     }
     fun lambda__1__test(x: a::MyList, y: b::MyOtherList) {
         if (a::len(&x) + b::len(&y) == 1) () else abort 1

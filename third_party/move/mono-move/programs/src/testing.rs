@@ -12,11 +12,10 @@ use move_binary_format::file_format::CompiledModule;
 use move_core_types::{identifier::Identifier, value::MoveValue};
 use move_vm_runtime::{
     data_cache::{MoveVmDataCacheAdapter, TransactionDataCache},
-    dispatch_loader,
     module_traversal::{TraversalContext, TraversalStorage},
     move_vm::{MoveVM, SerializedReturnValues},
     native_extensions::NativeContextExtensions,
-    AsUnsyncModuleStorage, EagerLoader, InstantiatedFunctionLoader, LegacyLoaderConfig,
+    AsUnsyncModuleStorage, InstantiatedFunctionLoader, LazyLoader, LegacyLoaderConfig,
     LoadedFunction,
 };
 use move_vm_test_utils::InMemoryStorage;
@@ -58,28 +57,27 @@ pub fn run_move_function(
     let traversal_storage = TraversalStorage::new();
     let mut traversal_context = TraversalContext::new(&traversal_storage);
 
-    dispatch_loader!(&module_storage, loader, {
-        let func = loader
-            .load_instantiated_function(
-                &LegacyLoaderConfig::unmetered(),
-                &mut gas_meter,
-                &mut traversal_context,
-                &module_id,
-                &fun_name,
-                &[],
-            )
-            .unwrap();
-        MoveVM::execute_loaded_function(
-            func,
-            args,
-            &mut MoveVmDataCacheAdapter::new(&mut data_cache, &storage, &loader),
+    let loader = LazyLoader::new(&module_storage);
+    let func = loader
+        .load_instantiated_function(
+            &LegacyLoaderConfig::unmetered(),
             &mut gas_meter,
             &mut traversal_context,
-            &mut NativeContextExtensions::default(),
-            &loader,
+            &module_id,
+            &fun_name,
+            &[],
         )
-        .unwrap()
-    })
+        .unwrap();
+    MoveVM::execute_loaded_function(
+        func,
+        args,
+        &mut MoveVmDataCacheAdapter::new(&mut data_cache, &storage, &loader),
+        &mut gas_meter,
+        &mut traversal_context,
+        &mut NativeContextExtensions::default(),
+        &loader,
+    )
+    .unwrap()
 }
 
 /// Publish a module, load a function, and pass a [`LoadedMoveFunction`]
@@ -119,7 +117,7 @@ pub fn with_loaded_move_function_with_deps<R>(
     all_modules.push(module);
     let storage = publish_modules(&all_modules);
     let module_storage = storage.as_unsync_module_storage();
-    let loader = EagerLoader::new(&module_storage);
+    let loader = LazyLoader::new(&module_storage);
 
     let module_id = module.self_id();
     let fun_name = Identifier::new(fun_name).unwrap();
@@ -187,6 +185,10 @@ pub fn arg_u64(n: u64) -> Vec<u8> {
     MoveValue::U64(n).simple_serialize().unwrap()
 }
 
+pub fn arg_i64(n: i64) -> Vec<u8> {
+    MoveValue::I64(n).simple_serialize().unwrap()
+}
+
 pub fn arg_vec_u64(v: &[u64]) -> Vec<u8> {
     let elems: Vec<MoveValue> = v.iter().map(|&x| MoveValue::U64(x)).collect();
     MoveValue::Vector(elems).simple_serialize().unwrap()
@@ -199,6 +201,11 @@ pub fn arg_vec_u64(v: &[u64]) -> Vec<u8> {
 pub fn return_u64(result: &SerializedReturnValues) -> u64 {
     let bytes = &result.return_values[0].0;
     u64::from_le_bytes(bytes[..8].try_into().unwrap())
+}
+
+pub fn return_i64(result: &SerializedReturnValues) -> i64 {
+    let bytes = &result.return_values[0].0;
+    i64::from_le_bytes(bytes[..8].try_into().unwrap())
 }
 
 pub fn return_vec_u64(result: &SerializedReturnValues) -> Vec<u64> {

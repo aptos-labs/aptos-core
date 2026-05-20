@@ -6,6 +6,7 @@ use aptos_cli_common::{CliError, CliTypedResult};
 use aptos_crypto::HashValue;
 use aptos_gas_profiling::FrameName;
 use aptos_types::transaction::{AuxiliaryInfo, PersistedAuxiliaryInfo, SignedTransaction};
+use aptos_validator_interface::LocalModuleOverrides;
 use aptos_vm::{data_cache::AsMoveResolver, AptosVM};
 use aptos_vm_environment::{environment::AptosEnvironment, prod_configs};
 use aptos_vm_logging::log_schema::AdapterLogSchema;
@@ -13,7 +14,8 @@ use aptos_vm_types::{
     module_and_script_storage::AsAptosCodeStorage, output::VMOutput, resolver::StateStorageView,
 };
 use move_core_types::vm_status::VMStatus;
-use std::{path::Path, time::Instant};
+use move_vm_runtime::source_locator::{self, SourceLocator};
+use std::{path::Path, sync::Arc, time::Instant};
 
 pub fn run_transaction_using_debugger(
     debugger: &dyn MoveDebugger,
@@ -22,7 +24,8 @@ pub fn run_transaction_using_debugger(
     _hash: HashValue,
     persisted_auxiliary_info: PersistedAuxiliaryInfo,
 ) -> CliTypedResult<(VMStatus, VMOutput)> {
-    // Enable debugging so MOVE_VM_STEP and MOVE_VM_TRACE environment variables are recognized.
+    // Required for MOVE_TRACE_EXEC and MOVE_VM_STEP: gates exec-state attachment
+    // to errors and the step-debugger loop in the interpreter.
     prod_configs::set_debugging_enabled(true);
 
     let state_view = debugger.state_view_at_version(version);
@@ -42,6 +45,53 @@ pub fn run_transaction_using_debugger(
     );
 
     Ok((vm_status, vm_output))
+}
+
+/// Replay a transaction with local module overrides and an optional source
+/// locator (for line mapping and named locals).
+pub fn run_transaction_with_local_overrides(
+    debugger: &dyn MoveDebugger,
+    version: u64,
+    transaction: SignedTransaction,
+    persisted_auxiliary_info: PersistedAuxiliaryInfo,
+    overrides: Arc<LocalModuleOverrides>,
+    locator: Option<Arc<dyn SourceLocator>>,
+) -> CliTypedResult<(VMStatus, VMOutput)> {
+    // Same as above; also enables debug::print output from local Move code.
+    prod_configs::set_debugging_enabled(true);
+
+    // Install the source locator for this thread so the VM interpreter can
+    // resolve source lines, parameter names, and struct field names.
+    // The guard ensures the locator is cleared even if execution panics.
+    struct SourceLocatorGuard;
+    impl Drop for SourceLocatorGuard {
+        fn drop(&mut self) {
+            source_locator::clear_source_locator();
+        }
+    }
+    let _guard = if let Some(loc) = locator {
+        source_locator::set_source_locator(loc);
+        Some(SourceLocatorGuard)
+    } else {
+        None
+    };
+
+    let state_view = debugger.state_view_at_version_with_overrides(version, overrides);
+    let env = AptosEnvironment::new(&state_view);
+    let vm = AptosVM::new(&env);
+    let log_context = AdapterLogSchema::new(state_view.id(), 0);
+    let resolver = state_view.as_move_resolver();
+    let code_storage = state_view.as_aptos_code_storage(&env);
+
+    let result = vm.execute_user_transaction(
+        &resolver,
+        &code_storage,
+        &transaction,
+        &log_context,
+        &AuxiliaryInfo::new(persisted_auxiliary_info, None),
+    );
+
+    Ok(result)
 }
 
 pub fn benchmark_transaction_using_debugger(
@@ -124,6 +174,45 @@ pub fn benchmark_transaction_using_debugger(
     Ok((vm_status, vm_output))
 }
 
+/// Runs the gas profiler's consistency checks on `log` and reports any
+/// discrepancies using CLI-flavored messaging (including a pointer to
+/// `--skip-gas-profiler-consistency-check`).
+///
+/// When `skip` is true, inconsistencies are emitted as warnings on stderr so
+/// the user still gets a (potentially incomplete) gas report. Otherwise, the
+/// first inconsistency causes a panic so the failure is loud.
+fn handle_gas_profiler_consistency_check(log: &aptos_gas_profiling::TransactionGasLog, skip: bool) {
+    let errors: Vec<_> = [
+        log.exec_io.check_consistency(),
+        log.storage.check_consistency(),
+    ]
+    .into_iter()
+    .filter_map(Result::err)
+    .collect();
+    if errors.is_empty() {
+        return;
+    }
+    // Collect all errors before reporting so a panic on the first doesn't hide
+    // a second simultaneous failure.
+    let combined = errors
+        .iter()
+        .map(|e| e.to_string())
+        .collect::<Vec<_>>()
+        .join("\n\n");
+    if skip {
+        eprintln!(
+            "warning: {combined}\n\
+             (consistency check was bypassed via --skip-gas-profiler-consistency-check; \
+             the generated gas report may be incomplete or inaccurate.)"
+        );
+    } else {
+        panic!(
+            "{combined}\n\nRerun with --skip-gas-profiler-consistency-check to bypass this \
+             check and still produce a (possibly incomplete) gas report."
+        );
+    }
+}
+
 pub fn profile_transaction_using_debugger(
     debugger: &dyn MoveDebugger,
     version: u64,
@@ -131,6 +220,7 @@ pub fn profile_transaction_using_debugger(
     hash: HashValue,
     persisted_auxiliary_info: PersistedAuxiliaryInfo,
     fold_unique_stack: bool,
+    skip_gas_profiler_consistency_check: bool,
 ) -> CliTypedResult<(VMStatus, VMOutput)> {
     let (vm_status, vm_output, mut gas_log) = debugger
         .execute_transaction_at_version_with_gas_profiler(
@@ -141,6 +231,8 @@ pub fn profile_transaction_using_debugger(
         .map_err(|err| {
             CliError::UnexpectedError(format!("failed to simulate txn with gas profiler: {}", err))
         })?;
+
+    handle_gas_profiler_consistency_check(&gas_log, skip_gas_profiler_consistency_check);
 
     // Optionally fold the call graph by unique stack traces
     if fold_unique_stack {

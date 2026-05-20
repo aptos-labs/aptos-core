@@ -1,0 +1,15 @@
+
+Diagnostics:
+error: match not exhaustive
+   ┌─ tests/match-checks/range_enum_tuple_mix.move:20:16
+   │
+20 │         match ((c, x)) {
+   │                ^^^^^^
+   │
+   = missing at least `(Color::Green, 100..)`
+
+error: unreachable pattern
+   ┌─ tests/match-checks/range_enum_tuple_mix.move:31:13
+   │
+31 │             (Color::Red, 0..10) => 2,
+   │             ^^^^^^^^^^^^^^^^^^^

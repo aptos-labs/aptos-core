@@ -15,6 +15,11 @@ from subprocess import Popen, PIPE, CalledProcessError
 from dataclasses import dataclass, field
 from enum import Flag, auto
 
+from single_node_performance_calibration import (
+    NON_BLOCKING_EXECUTOR_TYPES,
+    tps_band,
+)
+
 
 class Flow(Flag):
     # Tests that are run on PRs
@@ -708,24 +713,18 @@ with tempfile.TemporaryDirectory() as tmpdirname:
         else:
             assert test.key in calibrated_expected_tps, test
             cur_calibration = calibrated_expected_tps[test.key]
+            min_tps, max_tps = tps_band(
+                cur_calibration.expected_tps,
+                cur_calibration.count,
+                cur_calibration.min_ratio,
+                cur_calibration.max_ratio,
+            )
             criteria = Criteria(
                 expected_tps=cur_calibration.expected_tps,
-                min_tps=cur_calibration.expected_tps
-                * (
-                    1
-                    - (1 - cur_calibration.min_ratio)
-                    * (1 + 10.0 / cur_calibration.count)
-                    - 1.0 / cur_calibration.count
-                ),
+                min_tps=min_tps,
                 min_warn_tps=cur_calibration.expected_tps
                 * pow(cur_calibration.min_ratio, 0.8),
-                max_tps=cur_calibration.expected_tps
-                * (
-                    1
-                    + (cur_calibration.max_ratio - 1)
-                    * (1 + 10.0 / cur_calibration.count)
-                    + 1.0 / cur_calibration.count
-                ),
+                max_tps=max_tps,
                 max_warn_tps=cur_calibration.expected_tps
                 * pow(cur_calibration.max_ratio, 0.8),
             )
@@ -1019,9 +1018,14 @@ with tempfile.TemporaryDirectory() as tmpdirname:
             )
             print_table(results, by_levels=False, only_fields=[])
 
+        is_blocking = (
+            not test.waived
+            and test.key.executor_type not in NON_BLOCKING_EXECUTOR_TYPES
+        )
+
         if single_node_result.tps < criteria.min_tps:
             text = f"regression detected {single_node_result.tps}, expected median {criteria.expected_tps}, threshold: {criteria.min_tps}), {test.key} didn't meet TPS requirements"
-            if not test.waived:
+            if is_blocking:
                 errors.append(text)
             else:
                 warnings.append(text)
@@ -1033,7 +1037,7 @@ with tempfile.TemporaryDirectory() as tmpdirname:
             and single_node_result.tps > criteria.max_tps
         ):
             text = f"perf improvement detected {single_node_result.tps}, expected median {criteria.expected_tps}, threshold: {criteria.max_tps}), {test.key} exceeded TPS requirements, increase TPS requirements to match new baseline"
-            if not test.waived:
+            if is_blocking:
                 errors.append(text)
             else:
                 warnings.append(text)

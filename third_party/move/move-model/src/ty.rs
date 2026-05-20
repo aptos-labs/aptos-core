@@ -52,6 +52,7 @@ pub enum Type {
     // Types only appearing in specifications.
     TypeDomain(Box<Type>),
     ResourceDomain(ModuleId, StructId, Option<Vec<Type>>),
+    StateDomain,
 
     // Temporary types used during type checking
     Error,
@@ -441,7 +442,16 @@ impl Constraint {
             }
         }
         match (abilities, result) {
-            (Some(abs), Some(Type::Fun(arg, res, _))) => Some(Type::Fun(arg, res, abs)),
+            (Some(abs), Some(Type::Fun(arg, res, _))) => {
+                // Function types can have at most copy, drop, and store. The `key` ability
+                // is never achievable for function values, so these constraints are
+                // incompatible.
+                if abs.setminus(AbilitySet::PUBLIC_FUNCTIONS).is_empty() {
+                    Some(Type::Fun(arg, res, abs))
+                } else {
+                    None
+                }
+            },
             (Some(abs), Some(Type::Primitive(PrimitiveType::U64)))
                 if !abs.has_ability(Ability::Key) =>
             {
@@ -641,10 +651,46 @@ impl Constraint {
                 }
                 Ok(false)
             },
+            // Check compatibility between ability and function value type.
+            // Function values can have at most copy, drop, and store (the last only for
+            // public functions). They can never have the `key` ability.
+            (Constraint::HasAbilities(a1, _), Constraint::SomeFunctionValue(..)) => {
+                let unsupported_abilities = a1.setminus(AbilitySet::PUBLIC_FUNCTIONS);
+                if !unsupported_abilities.is_empty() {
+                    return Err(TypeUnificationError::MissingAbilitiesForConstraints(
+                        loc.clone(),
+                        other.clone(),
+                        unsupported_abilities,
+                        ctx_opt,
+                    ));
+                }
+                Ok(false)
+            },
+            (Constraint::SomeFunctionValue(..), Constraint::HasAbilities(a1, _)) => {
+                let unsupported_abilities = a1.setminus(AbilitySet::PUBLIC_FUNCTIONS);
+                if !unsupported_abilities.is_empty() {
+                    return Err(TypeUnificationError::MissingAbilitiesForConstraints(
+                        loc.clone(),
+                        self.clone(),
+                        unsupported_abilities,
+                        ctx_opt,
+                    ));
+                }
+                Ok(false)
+            },
             // SomeStruct and SomeReceiverFunction constrain orthogonal aspects of a type
             // (field existence vs receiver function existence), so they can coexist.
             (Constraint::SomeStruct(..), Constraint::SomeReceiverFunction(..))
             | (Constraint::SomeReceiverFunction(..), Constraint::SomeStruct(..)) => Ok(false),
+            // SomeReference is orthogonal to constraints that propagate over references
+            // (SomeStruct, SomeReceiverFunction — see `propagate_over_reference`): the
+            // reference shape applies to the outer type while the field/method
+            // requirement is satisfied by the referent. E.g. `&mut S` is a reference and
+            // `S` has the field/method.
+            (Constraint::SomeReference(..), Constraint::SomeStruct(..))
+            | (Constraint::SomeStruct(..), Constraint::SomeReference(..))
+            | (Constraint::SomeReference(..), Constraint::SomeReceiverFunction(..))
+            | (Constraint::SomeReceiverFunction(..), Constraint::SomeReference(..)) => Ok(false),
             // After the above checks, if one of the constraints is
             // accumulating, indicate its compatible but cannot be joined.
             (c1, c2) if c1.accumulating() || c2.accumulating() => Ok(false),
@@ -1129,7 +1175,7 @@ impl Type {
         match self {
             Primitive(p) => p.is_spec(),
             Fun(args, result, _) => args.is_spec() || result.is_spec(),
-            TypeDomain(..) | ResourceDomain(..) | Error => true,
+            TypeDomain(..) | ResourceDomain(..) | StateDomain | Error => true,
             Var(..) | TypeParameter(..) => false,
             Tuple(ts) => ts.iter().any(|t| t.is_spec()),
             Struct(_, _, ts) => ts.iter().any(|t| t.is_spec()),
@@ -1219,7 +1265,7 @@ impl Type {
                 types.push(self.clone());
                 types
             },
-            Type::ResourceDomain(_, _, None) => {
+            Type::ResourceDomain(_, _, None) | Type::StateDomain => {
                 vec![self.clone()]
             },
             Type::Var(..) => {
@@ -1342,6 +1388,7 @@ impl Type {
             Type::Fun(..)
             | Type::TypeDomain(..)
             | Type::ResourceDomain(..)
+            | Type::StateDomain
             | Type::Var(..)
             | Type::Error => false,
         }
@@ -1542,7 +1589,7 @@ impl Type {
                 *sid,
                 args_opt.as_ref().map(|args| replace_vec(args, visiting)),
             ),
-            Type::Primitive(..) | Type::Error => self.clone(),
+            Type::Primitive(..) | Type::StateDomain | Type::Error => self.clone(),
         }
     }
 
@@ -1577,7 +1624,7 @@ impl Type {
             Vector(et) => et.is_incomplete(),
             Reference(_, bt) => bt.is_incomplete(),
             TypeDomain(bt) => bt.is_incomplete(),
-            Error | Primitive(..) | TypeParameter(_) | ResourceDomain(..) => false,
+            Error | Primitive(..) | TypeParameter(_) | ResourceDomain(..) | StateDomain => false,
         }
     }
 
@@ -1765,7 +1812,7 @@ impl Type {
             Vector(et) => et.internal_get_vars(vars),
             Reference(_, bt) => bt.internal_get_vars(vars),
             TypeDomain(bt) => bt.internal_get_vars(vars),
-            Error | Primitive(..) | TypeParameter(..) | ResourceDomain(..) => {},
+            Error | Primitive(..) | TypeParameter(..) | ResourceDomain(..) | StateDomain => {},
         }
     }
 
@@ -2508,7 +2555,7 @@ impl Substitution {
             },
             Fun(_, _, abilities) => check(*abilities),
             Reference(_, _) => check(AbilitySet::REFERENCES),
-            TypeDomain(_) | ResourceDomain(_, _, _) => check(AbilitySet::EMPTY),
+            TypeDomain(_) | ResourceDomain(_, _, _) | StateDomain => check(AbilitySet::EMPTY),
             Error => Ok(()),
             Var(idx) => {
                 // Discharge the constraint by adding it to the substitution for
@@ -2622,6 +2669,26 @@ impl Substitution {
             }
         }
         false
+    }
+
+    /// Extracts function arg/result types from a type, considering constraints.
+    /// Returns `Some((arg_ty, result_ty))` if the type is `Type::Fun` or a constrained
+    /// variable with `SomeFunctionValue`.
+    pub fn get_fun_type(&self, t: &Type) -> Option<(Type, Type)> {
+        let t = self.specialize(t);
+        if let Type::Fun(arg_ty, result_ty, _) = &t {
+            return Some((self.specialize(arg_ty), self.specialize(result_ty)));
+        }
+        if let Type::Var(idx) = &t {
+            if let Some(constrs) = self.constraints.get(idx) {
+                for (_, _, c) in constrs {
+                    if let Constraint::SomeFunctionValue(arg_ty, result_ty) = c {
+                        return Some((self.specialize(arg_ty), self.specialize(result_ty)));
+                    }
+                }
+            }
+        }
+        None
     }
 
     /// Return either a shallow or deep substitution of the type variable.
@@ -2838,6 +2905,9 @@ impl Substitution {
                     e1,
                     e2,
                 )?)));
+            },
+            (Type::StateDomain, Type::StateDomain) => {
+                return Ok(Type::StateDomain);
             },
             _ => {},
         }
@@ -3837,6 +3907,7 @@ impl fmt::Display for TypeDisplay<'_> {
                 }
                 f.write_str(">")
             },
+            StateDomain => write!(f, "state_domain"),
             Fun(a, t, abilities) => {
                 f.write_str("|")?;
                 if !a.is_unit() {
@@ -4076,9 +4147,10 @@ pub trait AbilityInference: AbilityContext {
                     .unwrap_or(AbilitySet::PRIMITIVES),
             ),
             Type::Fun(_, _, abilities) => (false, *abilities),
-            Type::TypeDomain(_) | Type::ResourceDomain(_, _, _) | Type::Error => {
-                (false, AbilitySet::EMPTY)
-            },
+            Type::TypeDomain(_)
+            | Type::ResourceDomain(_, _, _)
+            | Type::StateDomain
+            | Type::Error => (false, AbilitySet::EMPTY),
         }
     }
 

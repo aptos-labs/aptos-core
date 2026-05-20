@@ -90,12 +90,13 @@ struct CoverageResponse {
 
 #[tool_router(router = package_test_router, vis = "pub(crate)")]
 impl FlowSession {
-    /// Run tests, then either establish a baseline or report newly covered lines.
+    // Run tests, then either establish a baseline or report newly covered lines.
+    // Set establish_baseline=true to save current coverage as baseline (use before
+    // generating new tests). Without establish_baseline, returns lines newly covered
+    // since baseline. Returns newly_covered=null if no baseline exists — call with
+    // establish_baseline first.
     #[tool(
-        description = "Run Move unit tests for a package. Set establish_baseline=true to save \
-                          current coverage as baseline (use before generating new tests). Without \
-                          establish_baseline, returns lines newly covered since baseline. Returns \
-                          newly_covered=null if no baseline exists — call with establish_baseline first.",
+        description = "Run Move unit tests for a package",
         annotations(read_only_hint = false, destructive_hint = false)
     )]
     async fn move_package_test(
@@ -108,10 +109,10 @@ impl FlowSession {
             .unwrap_or_else(tool_error))
     }
 
+    // Uses existing coverage map if available, otherwise runs tests first.
+    // Use this to identify which code paths need test coverage.
     #[tool(
-        description = "Get uncovered source lines for a package, optionally scoped to a function. \
-                          Uses existing coverage map if available, otherwise runs tests first. \
-                          Use this to identify which code paths need test coverage.",
+        description = "Get uncovered source lines for a package",
         annotations(read_only_hint = false, destructive_hint = false)
     )]
     async fn move_package_coverage(
@@ -292,7 +293,18 @@ impl FlowSession {
     async fn run_tests_async(&self, pkg_path: &Path) -> Result<(bool, String), rmcp::ErrorData> {
         let args = self.args().clone();
         let path = pkg_path.to_path_buf();
-        let result = tokio::task::spawn_blocking(move || run_tests(&path, &args)).await;
+        let tool_timeout = self.tool_timeout();
+        let result = tokio::time::timeout(
+            tool_timeout,
+            tokio::task::spawn_blocking(move || run_tests(&path, &args)),
+        )
+        .await
+        .map_err(|_| {
+            mcp_err(format!(
+                "tool timeout ({}s exceeded)",
+                tool_timeout.as_secs()
+            ))
+        })?;
         result
             // spawn_blocking task panicked or was cancelled (bug)
             .map_err(|e| mcp_err(format!("test task error: {}", e)))?
@@ -481,14 +493,6 @@ fn load_coverage_map(path: &Path) -> anyhow::Result<CoverageMap> {
     }
 }
 
-/// Ensure bytecode is available and return the model environment.
-fn ensure_env(pkg_data: &mut PackageData) -> anyhow::Result<&GlobalEnv> {
-    if !pkg_data.built_with_bytecode() {
-        pkg_data.rebuild_with_bytecode()?;
-    }
-    Ok(pkg_data.env())
-}
-
 /// Convert uncovered locations from a SourceCoverageBuilder to line numbers.
 fn uncovered_lines(builder: &SourceCoverageBuilder, env: &GlobalEnv) -> BTreeSet<u32> {
     builder
@@ -510,7 +514,7 @@ fn compute_uncovered(
     pkg_data: &mut PackageData,
     line_filter: Option<&LineFilter>,
 ) -> anyhow::Result<BTreeMap<String, BTreeSet<u32>>> {
-    let env = ensure_env(pkg_data)?;
+    let env = pkg_data.env();
     let cov_map = load_coverage_map(&coverage_map_path(pkg_path))?;
 
     let mut result: BTreeMap<String, BTreeSet<u32>> = BTreeMap::new();
@@ -551,7 +555,7 @@ fn compute_newly_covered(
     if !has_coverage_map(pkg_path) {
         return Ok(None);
     }
-    let env = ensure_env(pkg_data)?;
+    let env = pkg_data.env();
     let current_cov = CoverageMap::from_binary_file(&coverage_map_path(pkg_path))?;
     let baseline_cov =
         CoverageMap::from_binary_file(&baseline_coverage_map_path(base_dir, pkg_path))?;
@@ -598,7 +602,7 @@ fn make_function_line_filter(
     let Some(function) = function else {
         return Ok(None);
     };
-    let env = ensure_env(pkg_data).map_err(|e| mcp_err_chain("failed to load env", &e))?;
+    let env = pkg_data.env();
     let func = resolve_function(env, function)?;
     let loc = func.get_loc();
     let start = env

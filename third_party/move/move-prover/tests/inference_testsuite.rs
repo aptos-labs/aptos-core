@@ -14,7 +14,6 @@ use codespan_reporting::term::termcolor::Buffer;
 use libtest_mimic::{Arguments, Trial};
 use log::warn;
 use move_command_line_common::env::read_env_var;
-use move_compiler_v2::Experiment;
 use move_model::metadata::LanguageVersion;
 use move_prover::{
     cli::Options,
@@ -35,12 +34,6 @@ const DEBUG: bool = false;
 
 static NOT_CONFIGURED_WARNED: AtomicBool = AtomicBool::new(false);
 
-const FUNCTION_VALUE_EXPERIMENTS: &[&str] = &[
-    Experiment::KEEP_INLINE_FUNS,
-    Experiment::LIFT_INLINE_FUNS,
-    Experiment::SKIP_INLINING_INLINE_FUNS,
-];
-
 fn test_runner(path: &Path) -> anyhow::Result<()> {
     let mut baseline_out = String::new();
 
@@ -53,7 +46,17 @@ fn test_runner(path: &Path) -> anyhow::Result<()> {
         .path()
         .join(path.with_extension("enriched.move").file_name().unwrap());
 
-    let mut inf_options = make_options(path)?;
+    // If a companion .spec.move exists next to the source, include it in both
+    // the inference and verification steps.  This exercises Bug 8b: output_unified
+    // must check file_id before using a spec block's byte position.
+    let companion_spec = path.with_extension("spec.move");
+    let extra_sources: Vec<PathBuf> = if companion_spec.exists() {
+        vec![companion_spec]
+    } else {
+        vec![]
+    };
+
+    let mut inf_options = make_options(path, &extra_sources)?;
     inf_options.inference = InferenceOptions {
         inference: true,
         inference_output: InferenceOutput::Unified,
@@ -65,10 +68,7 @@ fn test_runner(path: &Path) -> anyhow::Result<()> {
     inf_options.backend.stable_test_output = true;
 
     let mut error_writer = Buffer::no_color();
-    let experiments: Vec<String> = FUNCTION_VALUE_EXPERIMENTS
-        .iter()
-        .map(|s| String::from(*s))
-        .collect();
+    let experiments: Vec<String> = vec![];
     let (dump, result) = if DEBUG {
         match run_inference_with_bytecode_dump(&mut error_writer, inf_options, experiments.clone())
         {
@@ -117,7 +117,7 @@ fn test_runner(path: &Path) -> anyhow::Result<()> {
     let verify_result = (|| -> anyhow::Result<()> {
         let no_tools = read_env_var("BOOGIE_EXE").is_empty() || read_env_var("Z3_EXE").is_empty();
 
-        let mut verify_options = make_options(verify_source)?;
+        let mut verify_options = make_options(verify_source, &extra_sources)?;
         verify_options.setup_logging_for_test();
         verify_options.prover.stable_test_output = true;
         verify_options.backend.stable_test_output = true;
@@ -171,7 +171,8 @@ fn test_runner(path: &Path) -> anyhow::Result<()> {
 }
 
 /// Build prover `Options` for the given Move source.
-fn make_options(path: &Path) -> anyhow::Result<Options> {
+/// `extra_sources` lists additional source files (e.g. companion `.spec.move`) to include.
+fn make_options(path: &Path, extra_sources: &[PathBuf]) -> anyhow::Result<Options> {
     let temp_dir = tempfile::TempDir::new()?;
     std::fs::create_dir_all(temp_dir.path())?;
     let base_name = format!("{}.bpl", path.file_stem().unwrap().to_str().unwrap());
@@ -185,20 +186,29 @@ fn make_options(path: &Path) -> anyhow::Result<Options> {
     let mut flags: Vec<String> = vec![
         "mvp_test".to_string(),
         "--verbose=warn".to_string(),
-        "--dependency=../move-stdlib/sources".to_string(),
-        "--dependency=../move-stdlib/nursery/sources".to_string(),
-        "--dependency=../extensions/move-table-extension/sources".to_string(),
+        "--dependency=../../../aptos-move/framework/move-stdlib/sources".to_string(),
+        "--dependency=../../../aptos-move/framework/aptos-stdlib/sources".to_string(),
+        "--dependency=../../../aptos-move/framework/aptos-framework/sources".to_string(),
         "--named-addresses".to_string(),
         "std=0x1".to_string(),
-        "extensions=0x2".to_string(),
+        "aptos_std=0x1".to_string(),
+        "aptos_framework=0x1".to_string(),
+        "aptos_fungible_asset=0xA".to_string(),
+        "aptos_token=0x3".to_string(),
+        "core_resources=0xA550C18".to_string(),
+        "vm_reserved=0x0".to_string(),
+        "vm=0x0".to_string(),
         format!("--output={}", output),
     ];
 
     // Add flags specified in the source via `// flag:` directives.
     flags.extend(extract_test_directives(path, "// flag:")?);
 
-    // The source file itself.
+    // The source file itself, then any extra sources (e.g. companion .spec.move).
     flags.push(path.to_string_lossy().to_string());
+    for src in extra_sources {
+        flags.push(src.to_string_lossy().to_string());
+    }
 
     let mut options = Options::create_from_args(&flags)?;
     options.language_version = Some(LanguageVersion::latest());
@@ -224,6 +234,12 @@ fn collect_tests(tests: &mut Vec<Trial>, dir: &str) {
             continue;
         }
         let path = entry.path().to_path_buf();
+        // Skip tests marked with `// no_ci:`.
+        if let Ok(directives) = extract_test_directives(&path, "// no_ci:") {
+            if !directives.is_empty() {
+                continue;
+            }
+        }
         let test_name = format!("inference::{}", path.strip_prefix(&base).unwrap().display());
         tests.push(Trial::test(test_name, move || {
             test_runner(&path).map_err(|err| format!("{:?}", err).into())

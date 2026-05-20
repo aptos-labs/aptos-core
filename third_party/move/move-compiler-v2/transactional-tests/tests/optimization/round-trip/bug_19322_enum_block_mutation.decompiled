@@ -1,0 +1,32 @@
+//**** Cross-compiled for `move` syntax from `tests/optimization/bug_19322_enum_block_mutation.move`
+
+//# publish
+module 0x42::m {
+    enum MyEnum has copy, drop {
+        V {
+            x: u64,
+        }
+    }
+    struct MyStruct has copy, drop {
+        x: u64,
+    }
+    fun test_enum_block_mutation(): u64 {
+        let _v0 = MyEnum::V{x: 10};
+        let _v1 = _v0;
+        let _v2 = &mut (&mut _v1).x;
+        *_v2 = 42;
+        *&(&_v0).x
+    }
+    fun test_struct_block_mutation(): u64 {
+        let _v0 = MyStruct{x: 10};
+        let _v1 = _v0;
+        let _v2 = &mut (&mut _v1).x;
+        *_v2 = 42;
+        *&(&_v0).x
+    }
+}
+
+
+//# run 0x42::m::test_struct_block_mutation
+
+//# run 0x42::m::test_enum_block_mutation

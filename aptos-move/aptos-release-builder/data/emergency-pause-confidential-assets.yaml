@@ -1,0 +1,12 @@
+---
+remote_endpoint: ~
+name: "emergency-pause-confidential-assets"
+proposals:
+  - name: step_1_emergency_pause_confidential_assets
+    metadata:
+      title: "Emergency pause confidential assets"
+      description: "Emergency pause confidential assets"
+      discussion_url: "https://github.com/aptos-foundation/AIPs/discussions/<?>"
+    execution_mode: MultiStep
+    update_sequence:
+      - RawScript: aptos-move/aptos-release-builder/data/proposals/emergency_pause_confidential_assets.move

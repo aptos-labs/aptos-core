@@ -209,4 +209,29 @@ module 0x42::state_labels {
         // Second publish - should be evaluated at intermediate state after first
         publish_resource(account2, v2);
     }
+
+    // =========================================================================
+    // Chained calls: result feeds as argument to the next call.
+    // Creates nested result_of with multiple state labels (S1, S2, S3).
+    // The hoisting pass must extract nested label-defining result_of
+    // into spec-level let bindings to avoid duplicate label definitions
+    // across ensures/aborts conditions.
+    // =========================================================================
+
+    /// Swap: read the resource value at addr, then write input back.
+    /// Each call modifies state and returns the old value.
+    fun swap_value(addr: address, input: u64): u64 acquires Resource {
+        let r = &mut Resource[addr];
+        let old_val = r.value;
+        r.value = input;
+        old_val
+    }
+
+    /// Three chained calls where each result feeds as argument to the next.
+    /// Creates nested result_of with 3 state labels (S1, S2, S3).
+    fun chained_swaps(a1: address, a2: address, a3: address): u64 acquires Resource {
+        let x = swap_value(a1, 0);
+        let y = swap_value(a2, x);   // result of first is arg to second
+        swap_value(a3, y)             // result of second is arg to third
+    }
 }

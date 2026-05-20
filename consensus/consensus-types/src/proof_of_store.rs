@@ -373,7 +373,9 @@ where
         Self { signed_infos }
     }
 
-    pub fn verify(
+    /// Per-entry verification shared by V1 (`verify`) and V2 (`verify_v2`).
+    /// Variant-specific gating is layered on by the concrete impls.
+    fn verify_inner(
         &self,
         sender: PeerId,
         max_num_batches: usize,
@@ -393,6 +395,12 @@ where
         Ok(())
     }
 
+    pub fn has_encrypted_batches(&self) -> bool {
+        self.signed_infos
+            .iter()
+            .any(|si| si.info.batch_kind() == Some(BatchKind::Encrypted))
+    }
+
     pub fn epoch(&self) -> anyhow::Result<u64> {
         ensure!(!self.signed_infos.is_empty(), "Empty message");
         let epoch = self.signed_infos[0].epoch();
@@ -409,6 +417,46 @@ where
 
     pub fn take(self) -> Vec<SignedBatchInfo<T>> {
         self.signed_infos
+    }
+}
+
+impl SignedBatchInfoMsg<BatchInfo> {
+    pub fn verify(
+        &self,
+        sender: PeerId,
+        max_num_batches: usize,
+        max_batch_expiry_gap_usecs: u64,
+        validator: &ValidatorVerifier,
+    ) -> anyhow::Result<()> {
+        self.verify_inner(
+            sender,
+            max_num_batches,
+            max_batch_expiry_gap_usecs,
+            validator,
+        )
+    }
+}
+
+impl SignedBatchInfoMsg<BatchInfoExt> {
+    pub fn verify_v2(
+        &self,
+        sender: PeerId,
+        max_num_batches: usize,
+        max_batch_expiry_gap_usecs: u64,
+        validator: &ValidatorVerifier,
+    ) -> anyhow::Result<()> {
+        for signed_info in &self.signed_infos {
+            ensure!(
+                signed_info.batch_info().is_v2(),
+                "Non-V2 entry in SignedBatchInfoMsgV2"
+            );
+        }
+        self.verify_inner(
+            sender,
+            max_num_batches,
+            max_batch_expiry_gap_usecs,
+            validator,
+        )
     }
 }
 
@@ -576,7 +624,9 @@ where
         Self { proofs }
     }
 
-    pub fn verify(
+    /// Per-proof verification shared by V1 (`verify`) and V2 (`verify_v2`).
+    /// Variant-specific gating is layered on by the concrete impls.
+    fn verify_inner(
         &self,
         max_num_proofs: usize,
         validator: &ValidatorVerifier,
@@ -595,6 +645,12 @@ where
         Ok(())
     }
 
+    pub fn has_encrypted_batches(&self) -> bool {
+        self.proofs
+            .iter()
+            .any(|p| p.info().batch_kind() == Some(BatchKind::Encrypted))
+    }
+
     pub fn epoch(&self) -> anyhow::Result<u64> {
         ensure!(!self.proofs.is_empty(), "Empty message");
         let epoch = self.proofs[0].epoch();
@@ -611,6 +667,31 @@ where
 
     pub fn take(self) -> Vec<ProofOfStore<T>> {
         self.proofs
+    }
+}
+
+impl ProofOfStoreMsg<BatchInfo> {
+    pub fn verify(
+        &self,
+        max_num_proofs: usize,
+        validator: &ValidatorVerifier,
+        cache: &ProofCache,
+    ) -> anyhow::Result<()> {
+        self.verify_inner(max_num_proofs, validator, cache)
+    }
+}
+
+impl ProofOfStoreMsg<BatchInfoExt> {
+    pub fn verify_v2(
+        &self,
+        max_num_proofs: usize,
+        validator: &ValidatorVerifier,
+        cache: &ProofCache,
+    ) -> anyhow::Result<()> {
+        for proof in &self.proofs {
+            ensure!(proof.info().is_v2(), "Non-V2 entry in ProofOfStoreMsgV2");
+        }
+        self.verify_inner(max_num_proofs, validator, cache)
     }
 }
 
@@ -652,12 +733,21 @@ where
                 return Ok(());
             }
         }
-        let result = validator
-            .verify_multi_signatures(&self.info, &self.multi_signature)
-            .context(format!(
-                "Failed to verify ProofOfStore for batch: {:?}",
-                self.info
-            ));
+        let result = if batch_info_ext.is_v2() {
+            validator
+                .verify_multi_signatures(&batch_info_ext, &self.multi_signature)
+                .context(format!(
+                    "Failed to verify ProofOfStore for batch: {:?}",
+                    self.info
+                ))
+        } else {
+            validator
+                .verify_multi_signatures(self.info.as_batch_info(), &self.multi_signature)
+                .context(format!(
+                    "Failed to verify ProofOfStore for batch: {:?}",
+                    self.info
+                ))
+        };
         if result.is_ok() {
             cache.insert(batch_info_ext, self.multi_signature.clone());
         }
@@ -719,5 +809,182 @@ impl From<ProofOfStore<BatchInfo>> for ProofOfStore<BatchInfoExt> {
             info: info.into(),
             multi_signature: sig,
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use aptos_bitvec::BitVec;
+    use aptos_crypto::HashValue;
+    use aptos_types::{
+        aggregate_signature::PartialSignatures, quorum_store::BatchId,
+        validator_verifier::random_validator_verifier,
+    };
+
+    fn v1_info() -> BatchInfoExt {
+        BatchInfoExt::new_v1(
+            PeerId::random(),
+            BatchId::new_for_test(1),
+            1,
+            1,
+            HashValue::random(),
+            0,
+            0,
+            0,
+        )
+    }
+
+    fn v2_info() -> BatchInfoExt {
+        BatchInfoExt::new_v2(
+            PeerId::random(),
+            BatchId::new_for_test(2),
+            1,
+            u64::MAX,
+            HashValue::random(),
+            0,
+            0,
+            0,
+            BatchKind::Normal,
+        )
+    }
+
+    fn make_batch_info(author: PeerId) -> BatchInfo {
+        BatchInfo::new(
+            author,
+            BatchId::new_for_test(1),
+            /* epoch */ 1,
+            /* expiration */ u64::MAX,
+            HashValue::random(),
+            /* num_txns */ 1,
+            /* num_bytes */ 1,
+            /* gas_bucket_start */ 0,
+        )
+    }
+
+    fn aggregate<T: CryptoHash + Serialize>(
+        signers: &[ValidatorSigner],
+        verifier: &ValidatorVerifier,
+        msg: &T,
+    ) -> AggregateSignature {
+        let partial = PartialSignatures::new(
+            signers
+                .iter()
+                .map(|s| (s.author(), s.sign(msg).unwrap()))
+                .collect(),
+        );
+        verifier
+            .aggregate_signatures(partial.signatures_iter())
+            .unwrap()
+    }
+
+    #[test]
+    fn signed_batch_info_msg_verify_v2_rejects_v1_entry() {
+        let author = PeerId::random();
+        let msg = SignedBatchInfoMsg::new(vec![
+            SignedBatchInfo::dummy(v1_info(), author),
+            SignedBatchInfo::dummy(v2_info(), author),
+        ]);
+        let err = msg
+            .verify_v2(author, 10, u64::MAX, &ValidatorVerifier::new(vec![]))
+            .expect_err("must reject V1 entry in SignedBatchInfoMsgV2");
+        assert!(
+            err.to_string()
+                .contains("Non-V2 entry in SignedBatchInfoMsgV2"),
+            "unexpected error: {err}"
+        );
+    }
+
+    #[test]
+    fn proof_of_store_msg_verify_v2_rejects_v1_entry() {
+        let msg = ProofOfStoreMsg::new(vec![
+            ProofOfStore::new(v1_info(), AggregateSignature::empty()),
+            ProofOfStore::new(v2_info(), AggregateSignature::empty()),
+        ]);
+        let err = msg
+            .verify_v2(10, &ValidatorVerifier::new(vec![]), &ProofCache::new(1))
+            .expect_err("must reject V1 entry in ProofOfStoreMsgV2");
+        assert!(
+            err.to_string()
+                .contains("Non-V2 entry in ProofOfStoreMsgV2"),
+            "unexpected error: {err}"
+        );
+    }
+
+    #[test]
+    fn verify_v1_proof_wrapped_as_batch_info_ext() {
+        // V1 batches are signed over `BatchInfo` (see batch_store::persist_inner),
+        // but a V2 OptQuorumStorePayload carries V1 batch proofs wrapped as
+        // `BatchInfoExt::V1`. Verification must hash against the raw
+        // `BatchInfo`, not the V1 enum variant.
+        let (signers, verifier) = random_validator_verifier(4, None, false);
+        let info = make_batch_info(signers[0].author());
+
+        let multi_sig = aggregate(&signers, &verifier, &info);
+
+        let proof_v1 = ProofOfStore::new(info.clone(), multi_sig);
+        let proof_ext: ProofOfStore<BatchInfoExt> = proof_v1.into();
+
+        let cache = ProofCache::new(128);
+        proof_ext.verify(&verifier, &cache).unwrap();
+    }
+
+    #[test]
+    fn verify_v2_proof() {
+        // V2 batches are signed over `BatchInfoExt` directly.
+        let (signers, verifier) = random_validator_verifier(4, None, false);
+        let info = make_batch_info(signers[0].author());
+        let ext = BatchInfoExt::V2 {
+            info,
+            extra: ExtraBatchInfo {
+                batch_kind: BatchKind::Normal,
+            },
+        };
+
+        let multi_sig = aggregate(&signers, &verifier, &ext);
+
+        let proof = ProofOfStore::new(ext, multi_sig);
+        let cache = ProofCache::new(128);
+        proof.verify(&verifier, &cache).unwrap();
+    }
+
+    #[test]
+    fn verify_v1_proof_signed_over_wrong_type_fails() {
+        // Regression guard: if a future change ever signs a V1 batch as
+        // `BatchInfoExt::V1` instead of `BatchInfo`, verify must reject it.
+        let (signers, verifier) = random_validator_verifier(4, None, false);
+        let info = make_batch_info(signers[0].author());
+        let ext_v1 = BatchInfoExt::V1 { info: info.clone() };
+
+        let bad_sig = aggregate(&signers, &verifier, &ext_v1);
+
+        let proof = ProofOfStore::new(ext_v1, bad_sig);
+        let cache = ProofCache::new(128);
+        assert!(proof.verify(&verifier, &cache).is_err());
+    }
+
+    #[test]
+    fn verify_rejects_insufficient_voting_power() {
+        // Sanity: a single signature out of 4 validators is below quorum.
+        let (signers, verifier) = random_validator_verifier(4, None, false);
+        let info = make_batch_info(signers[0].author());
+
+        let one_signer = &signers[..1];
+        let partial = PartialSignatures::new(
+            one_signer
+                .iter()
+                .map(|s| (s.author(), s.sign(&info).unwrap()))
+                .collect(),
+        );
+        let agg = verifier
+            .aggregate_signatures(partial.signatures_iter())
+            .unwrap();
+        // Sanity-check the bitmask actually reflects a single signer.
+        let bits: BitVec = agg.get_signers_bitvec().clone();
+        assert_eq!(bits.iter_ones().count(), 1);
+
+        let proof: ProofOfStore<BatchInfoExt> = ProofOfStore::new(info, agg).into();
+        let cache = ProofCache::new(128);
+        assert!(proof.verify(&verifier, &cache).is_err());
     }
 }
