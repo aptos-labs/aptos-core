@@ -62,7 +62,7 @@ pub trait BatchThresholdEncryption {
     type VerificationKey: VerificationKey + Send + Sync;
 
     /// A share of the decryption key.
-    type DecryptionKeyShare: DecryptionKeyShare;
+    type DecryptionKeyShare: DecryptionKeyShare + Send + Sync;
 
     /// A decryption key that has been reconstructed by a threshold of decryption key shares.
     type DecryptionKey: Send + Sized + Sync;

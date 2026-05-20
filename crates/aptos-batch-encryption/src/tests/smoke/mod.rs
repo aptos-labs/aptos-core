@@ -7,7 +7,7 @@ use crate::{
 };
 use anyhow::Result;
 use aptos_crypto::TSecretSharingConfig;
-use rayon::iter::{IntoParallelIterator, IntoParallelRefIterator as _, ParallelIterator};
+use rayon::iter::{IndexedParallelIterator as _, IntoParallelIterator, IntoParallelRefIterator as _, ParallelIterator};
 
 #[cfg(test)]
 pub mod fptx_smoke;
@@ -75,7 +75,7 @@ impl<Scheme: BatchThresholdEncryption> SmokeTest<Scheme> {
 
         let dk_shares: Vec<<Scheme as BatchThresholdEncryption>::DecryptionKeyShare> = self
             .msk_shares
-            .iter()
+            .par_iter()
             .map(|msk_share| {
                 <Scheme as BatchThresholdEncryption>::derive_decryption_key_share(msk_share, &d)
                     .unwrap()
@@ -83,7 +83,7 @@ impl<Scheme: BatchThresholdEncryption> SmokeTest<Scheme> {
             .collect();
 
         dk_shares
-            .iter()
+            .par_iter()
             .zip(&self.vks)
             .map(|(dk_share, vk)| Scheme::verify_decryption_key_share(vk, &d, dk_share))
             .collect::<Result<Vec<()>>>()
@@ -92,7 +92,7 @@ impl<Scheme: BatchThresholdEncryption> SmokeTest<Scheme> {
         let eligible_share_subset: Vec<<Scheme as BatchThresholdEncryption>::DecryptionKeyShare> =
             self.tc
                 .get_random_eligible_subset_of_players(&mut rng_aptos)
-                .into_iter()
+                .into_par_iter()
                 .map(|player| {
                     dk_shares
                         .iter()
