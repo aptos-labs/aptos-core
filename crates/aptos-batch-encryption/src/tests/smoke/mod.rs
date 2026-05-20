@@ -6,8 +6,12 @@ use crate::{
     traits::{BatchThresholdEncryption, DecryptionKeyShare},
 };
 use anyhow::Result;
-use aptos_crypto::TSecretSharingConfig;
-use rayon::iter::{IntoParallelIterator, IntoParallelRefIterator as _, ParallelIterator};
+use aptos_crypto::{player::Player, TSecretSharingConfig};
+use rayon::iter::{
+    IndexedParallelIterator as _, IntoParallelIterator, IntoParallelRefIterator as _,
+    ParallelIterator,
+};
+use std::collections::HashMap;
 
 #[cfg(test)]
 pub mod fptx_smoke;
@@ -75,7 +79,7 @@ impl<Scheme: BatchThresholdEncryption> SmokeTest<Scheme> {
 
         let dk_shares: Vec<<Scheme as BatchThresholdEncryption>::DecryptionKeyShare> = self
             .msk_shares
-            .iter()
+            .par_iter()
             .map(|msk_share| {
                 <Scheme as BatchThresholdEncryption>::derive_decryption_key_share(msk_share, &d)
                     .unwrap()
@@ -83,23 +87,23 @@ impl<Scheme: BatchThresholdEncryption> SmokeTest<Scheme> {
             .collect();
 
         dk_shares
-            .iter()
+            .par_iter()
             .zip(&self.vks)
             .map(|(dk_share, vk)| Scheme::verify_decryption_key_share(vk, &d, dk_share))
             .collect::<Result<Vec<()>>>()
             .unwrap();
 
+        let dk_shares_map: HashMap<Player, Scheme::DecryptionKeyShare> = HashMap::from_iter(
+            dk_shares
+                .into_iter()
+                .map(|dk_share| (dk_share.player(), dk_share)),
+        );
+
         let eligible_share_subset: Vec<<Scheme as BatchThresholdEncryption>::DecryptionKeyShare> =
             self.tc
                 .get_random_eligible_subset_of_players(&mut rng_aptos)
-                .into_iter()
-                .map(|player| {
-                    dk_shares
-                        .iter()
-                        .find(|share| share.player() == player)
-                        .unwrap()
-                        .clone()
-                })
+                .into_par_iter()
+                .map(|player| dk_shares_map[&player].clone())
                 .collect();
 
         let dec_key = Scheme::reconstruct_decryption_key(&eligible_share_subset, &self.tc).unwrap();
@@ -148,10 +152,10 @@ impl<Scheme: BatchThresholdEncryption> SmokeTest<Scheme> {
     }
 
     pub fn run_with_max_cts(&self, round: u64) -> Decryption<Scheme> {
-        let mut rng_arkworks = ark_std::rand::thread_rng();
-
         let cts = (0..Scheme::max_batch_size(&self.dk))
+            .into_par_iter()
             .map(|_| {
+                let mut rng_arkworks = ark_std::rand::thread_rng();
                 Scheme::encrypt(
                     &self.ek,
                     &mut rng_arkworks,
@@ -164,10 +168,10 @@ impl<Scheme: BatchThresholdEncryption> SmokeTest<Scheme> {
 
         let result = self.do_decryption(round, cts);
 
-        for i in 0..result.cts.len() {
+        (0..result.cts.len()).into_par_iter().for_each(|i| {
             Scheme::verify_ct(&result.cts[i], &associated_data()).unwrap();
             assert_eq!(result.plaintexts[i], plaintext());
-        }
+        });
 
         result
     }
