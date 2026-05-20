@@ -1,7 +1,8 @@
 // Copyright (c) Aptos Foundation
 // Licensed pursuant to the Innovation-Enabling Source Code License, available at https://github.com/aptos-labs/aptos-core/blob/main/LICENSE
 use crate::{
-    schemes::fptx_succinct::FPTXSuccinct, tests::smoke::run_smoke_single_round, traits::BatchThresholdEncryption,
+    schemes::fptx_succinct::FPTXSuccinct, tests::smoke::run_smoke_single_round,
+    traits::BatchThresholdEncryption,
 };
 use aptos_crypto::arkworks::shamir::ShamirThresholdConfig;
 use ark_std::rand::{thread_rng, Rng as _};

@@ -106,15 +106,10 @@ pub trait BatchThresholdEncryption {
     )>;
 
     /// Gets the max batch size that the given digest key supports.
-    fn max_batch_size(
-        dk: &Self::DigestKey
-    ) -> usize;
-
+    fn max_batch_size(dk: &Self::DigestKey) -> usize;
 
     /// Gets the number of rounds that the given digest key supports.
-    fn num_rounds(
-        dk: &Self::DigestKey
-    ) -> usize;
+    fn num_rounds(dk: &Self::DigestKey) -> usize;
 
     /// Encrypt a plaintext with respect to any arbitrary associated data. This associated data is
     /// "bound" to the resulting CT, such that it will only verify with respect to the same

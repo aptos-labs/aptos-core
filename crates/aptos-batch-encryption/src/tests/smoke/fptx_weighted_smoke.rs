@@ -2,11 +2,14 @@
 // Licensed pursuant to the Innovation-Enabling Source Code License, available at https://github.com/aptos-labs/aptos-core/blob/main/LICENSE
 
 #[cfg(test)]
-use crate::tests::smoke::{run_smoke_single_round, run_smoke_all_rounds};
+use crate::tests::smoke::{run_smoke_all_rounds, run_smoke_single_round};
 use crate::{
-    group::{Fr, G1Affine, G2Affine, Pairing}, schemes::fptx_weighted::{
+    group::{Fr, G1Affine, G2Affine, Pairing},
+    schemes::fptx_weighted::{
         FPTXWeighted, WeightedBIBEMasterSecretKeyShare, WeightedBIBEVerificationKey,
-    }, shared::{digest::DigestKey, encryption_key::EncryptionKey}, traits::BatchThresholdEncryption
+    },
+    shared::{digest::DigestKey, encryption_key::EncryptionKey},
+    traits::BatchThresholdEncryption,
 };
 use aptos_crypto::{
     arkworks::{srs::SrsType, GroupGenerators},
