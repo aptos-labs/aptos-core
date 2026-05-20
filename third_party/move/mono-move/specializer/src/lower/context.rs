@@ -127,10 +127,8 @@ pub enum BuildContextOutcome {
     Skipped(&'static str),
 }
 
-/// Returns `true` if any of `types` is a concrete [`Type::Nominal`].
-/// Such types are out of scope for the current GC-layout pass and
-/// trigger a `Skipped("nominal type not yet supported")` outcome.
-fn has_concrete_nominal(types: &[InternedType]) -> bool {
+/// Returns `true` if any of `types` is a [`Type::Nominal`].
+fn contains_nominal(types: &[InternedType]) -> bool {
     types
         .iter()
         .any(|&ty| matches!(view_type(ty), Type::Nominal { .. }))
@@ -173,7 +171,7 @@ pub fn try_build_context(
     let home_types = view_type_list(home_list);
     // Concrete Nominals (post-substitution) are out of scope for the
     // current GC-layout pass.
-    if has_concrete_nominal(home_types) {
+    if contains_nominal(home_types) {
         return Ok(BuildContextOutcome::Skipped(
             "nominal type not yet supported",
         ));
@@ -197,7 +195,7 @@ pub fn try_build_context(
         interner.type_list_of(module_ir.module.interned_types_at(own_handle.return_));
     let own_ret_list = interner.subst_type_list(own_ret_list, ty_args)?;
     let own_ret_types = view_type_list(own_ret_list);
-    if has_concrete_nominal(own_ret_types) {
+    if contains_nominal(own_ret_types) {
         return Ok(BuildContextOutcome::Skipped(
             "nominal type not yet supported",
         ));
@@ -274,7 +272,7 @@ pub fn try_build_context(
 
         let param_types = view_type_list(param_list);
         let ret_types = view_type_list(ret_list);
-        if has_concrete_nominal(param_types) || has_concrete_nominal(ret_types) {
+        if contains_nominal(param_types) || contains_nominal(ret_types) {
             return Ok(BuildContextOutcome::Skipped(
                 "nominal type not yet supported",
             ));
@@ -424,7 +422,6 @@ pub fn try_lower_function(
         .iter()
         .map(|s| s.size)
         .collect::<Vec<_>>();
-    let param_sizes_sum = param_sizes.iter().map(|s| *s as usize).sum::<usize>();
     let param_and_local_sizes_sum = ctx.frame_data_size as usize;
     let extended_frame_size = ctx
         .call_sites
@@ -443,17 +440,17 @@ pub fn try_lower_function(
     // into `Function::safe_point_layouts`. Today they stay empty.
     let home_list = interner.type_list_of(&func_ir.home_slot_types);
     let home_list = interner.subst_type_list(home_list, ty_args)?;
-    let derived = derive_frame_layout(&ctx, view_type_list(home_list), func_ir.num_params)?;
+    let derived = derive_frame_layout(&ctx, func_ir, view_type_list(home_list))?;
 
     Ok(Function {
         name,
         code: Code::from_vec(code),
         param_sizes,
-        param_sizes_sum,
+        param_sizes_sum: derived.param_sizes_sum as usize,
         param_and_local_sizes_sum,
         extended_frame_size,
         zero_frame: derived.zero_frame,
-        frame_layout: FrameLayoutInfo::new(derived.frame_layout),
+        frame_layout: FrameLayoutInfo::new(derived.heap_ptr_offsets),
         safe_point_layouts: SortedSafePointEntries::empty(),
     })
 }

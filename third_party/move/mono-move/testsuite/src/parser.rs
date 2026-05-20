@@ -89,12 +89,14 @@ pub enum Check {
 /// A snapshot section requested via `// RUN: publish --print(...)`.
 #[derive(Debug, Copy, Clone, PartialEq, Eq)]
 pub enum PrintSection {
+    /// Move bytecode disassembly. Selected by `--print(bytecode)`.
     Bytecode,
+    /// Stackless execution IR. Selected by `--print(stackless)`.
     Stackless,
+    /// Lowered micro-ops. Selected by `--print(micro-ops)`.
     MicroOps,
-    /// Per-function `frame_layout` and `zero_frame` as derived by
-    /// `gc_layout::derive_frame_layout`. Selected by
-    /// `--print(frame-layout)`.
+    /// Per-function GC frame layout.
+    /// Selected by `--print(frame-layout)`.
     FrameLayout,
 }
 

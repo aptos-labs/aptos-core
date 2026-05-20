@@ -2,68 +2,74 @@
 // Licensed pursuant to the Innovation-Enabling Source Code License, available at https://github.com/aptos-labs/aptos-core/blob/main/LICENSE
 
 //! Type-driven derivation of GC frame layout from monomorphic slot types.
-//!
-//! Each frame slot's type determines whether — and at which byte
-//! offset(s) within the slot — it holds a heap pointer the GC must
-//! scan. This module exposes [`append_pointer_offsets`], which encodes
-//! that mapping per [`mono_move_core::types::Type`] variant.
 
 use super::context::LoweringContext;
+use crate::stackless_exec_ir::FunctionIR;
 use anyhow::{bail, Result};
 use mono_move_core::{
     types::{view_type, InternedType, Type},
     FrameOffset,
 };
 
-/// `frame_layout` plus the derived `zero_frame` flag for a function.
+/// GC-relevant frame metadata derived for a single function.
 pub struct DerivedFrameLayout {
-    /// Sorted, deduplicated frame byte-offsets of pointer slots.
-    pub frame_layout: Vec<FrameOffset>,
-    /// `true` iff at least one offset belongs to a non-parameter home
-    /// slot — the runtime must zero `param_sizes_sum..extended_frame_size`
-    /// at frame creation so pointer locals start null.
+    /// Sorted, deduplicated frame byte-offsets of heap-pointer slots.
+    pub heap_ptr_offsets: Vec<FrameOffset>,
+    /// `true` iff at least one offset belongs to a non-parameter home slot.
     pub zero_frame: bool,
+    /// Byte size of the parameter region.
+    pub param_sizes_sum: u32,
 }
 
-/// Derive `frame_layout` and `zero_frame` for a function from its home
-/// slot types.
+/// Derive the GC frame layout for `func_ir`. `home_slot_types` is
+/// taken separately so the caller can pass a substituted view.
 pub fn derive_frame_layout(
     ctx: &LoweringContext,
+    func_ir: &FunctionIR,
     home_slot_types: &[InternedType],
-    num_params: u16,
 ) -> Result<DerivedFrameLayout> {
-    let mut frame_layout: Vec<FrameOffset> = Vec::new();
+    let mut heap_ptr_offsets = vec![];
+    // TODO: consider whether `LoweringContext::home_slots` should carry
+    // each slot's type directly, so we wouldn't need to zip with a
+    // separate `home_slot_types` slice here.
     for (slot, &ty) in ctx.home_slots.iter().zip(home_slot_types.iter()) {
-        append_pointer_offsets(ty, slot.offset.0, &mut frame_layout)?;
+        for rel in type_pointer_offsets(ty)? {
+            heap_ptr_offsets.push(FrameOffset(slot.offset.0 + rel));
+        }
     }
-    frame_layout.sort_by_key(|o| o.0);
-    frame_layout.dedup();
+    // TODO: revisit whether sort and dedup is necessary here or if invariants
+    // established beforehand guarantee them already.
+    heap_ptr_offsets.sort_by_key(|o| o.0);
+    heap_ptr_offsets.dedup();
 
     let param_sizes_sum: u32 = ctx
         .home_slots
         .iter()
-        .take(num_params as usize)
+        .take(func_ir.num_params as usize)
         .map(|s| s.size)
         .sum();
-    let zero_frame = frame_layout.iter().any(|off| off.0 >= param_sizes_sum);
+    // Is any offset in the non-parameter region?
+    let zero_frame = heap_ptr_offsets
+        .last()
+        .is_some_and(|off| off.0 >= param_sizes_sum);
 
     Ok(DerivedFrameLayout {
-        frame_layout,
+        heap_ptr_offsets,
         zero_frame,
+        param_sizes_sum,
     })
 }
 
-/// For a value of type `ty` laid out at frame offset `base`, append
-/// the frame-relative byte offsets of the pointer slots within the
-/// value that the GC must scan.
+/// Byte offsets of the pointer slots inside a value of type `ty`,
+/// relative to the value's start.
 ///
-/// Returns `Err` if `ty` is a variant this module doesn't yet handle.
-pub fn append_pointer_offsets(
-    ty: InternedType,
-    base: u32,
-    out: &mut Vec<FrameOffset>,
-) -> Result<()> {
-    match view_type(ty) {
+/// Returns an error if the provided type is not yet supported or
+/// contains non-instantiated type parameters.
+//
+// TODO: when nominal support lands, return the offsets cached on
+// `NominalLayout` directly instead of recursing into fields here.
+pub fn type_pointer_offsets(ty: InternedType) -> Result<Vec<u32>> {
+    let offsets = match view_type(ty) {
         // Scalars: no pointer offsets.
         Type::Bool
         | Type::U8
@@ -79,22 +85,18 @@ pub fn append_pointer_offsets(
         | Type::I128
         | Type::I256
         | Type::Address
-        | Type::Signer => {},
+        | Type::Signer => vec![],
 
-        // 16-byte fat pointer: base half at `base`, scalar offset half
-        // at `base + 8`. Only the base is a pointer slot.
-        Type::ImmutRef { .. } | Type::MutRef { .. } => {
-            out.push(FrameOffset(base));
-        },
+        // 16-byte fat pointer: base half at offset 0, scalar offset
+        // half at +8. Only the base is a pointer slot.
+        Type::ImmutRef { .. } | Type::MutRef { .. } => vec![0],
 
-        // 8-byte heap pointer.
-        Type::Vector { .. } | Type::Function { .. } => {
-            out.push(FrameOffset(base));
-        },
+        // 8-byte heap pointers.
+        Type::Vector { .. } | Type::Function { .. } => vec![0],
 
-        // TODO: drill into `NominalLayout::field_layouts()` to
-        // surface internal pointer offsets, treating fieldless
-        // (enum) layouts as a single 8-byte heap-pointer slot.
+        // TODO: support nominals by reading pointer offsets cached
+        // on `NominalLayout` (populated once via a field walk, the
+        // same way size/alignment is).
         Type::Nominal { .. } => {
             bail!("nominal type in frame slot not yet supported by gc_layout");
         },
@@ -102,6 +104,6 @@ pub fn append_pointer_offsets(
         Type::TypeParam { .. } => {
             bail!("type parameter reached gc_layout — try_build_context should have skipped");
         },
-    }
-    Ok(())
+    };
+    Ok(offsets)
 }

@@ -75,15 +75,15 @@ impl FrameLayoutInfo {
     }
 }
 
-/// Additional frame layout that applies at a specific safe point.
+/// At specific safepoints, this entry supplements the base `frame_layout` with
+/// additional pointer offsets that are only valid at that PC.
 ///
-/// **Top-frame-only contract.** A `SafePointEntry { code_offset, layout }`
-/// is consulted by the GC only when (a) this function is the top stack
-/// frame and (b) its current PC equals `code_offset`. Caller-below frames
-/// use `frame_layout` (always-on) alone.
+/// Top-frame-only contract: this entry is consulted by the GC only when (a)
+/// this function is the top stack frame and (b) its current PC equals
+/// `code_offset`.
 ///
 /// `code_offset` must point at an op for which [`MicroOp::is_allocating`]
-/// returns `true`. The runtime verifier rejects entries at any other PC.
+/// returns `true`.
 pub struct SafePointEntry {
     pub code_offset: CodeOffset,
     pub layout: FrameLayoutInfo,
@@ -202,7 +202,7 @@ pub struct Function {
     ///   specializer must guarantee this.
     ///
     /// Callee-region offsets (≥ `frame_size()`) should go in
-    /// `safe_point_layouts` (top-frame-only), not here., unless the
+    /// `safe_point_layouts` (top-frame-only), not here, unless the
     /// value is pointer-shaped at every PC.
     pub frame_layout: FrameLayoutInfo,
     /// Per-safe-point frame layouts.

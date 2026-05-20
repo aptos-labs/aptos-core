@@ -1,15 +1,18 @@
 // Copyright (c) Aptos Foundation
 // Licensed pursuant to the Innovation-Enabling Source Code License, available at https://github.com/aptos-labs/aptos-core/blob/main/LICENSE
 
-//! Render print sections (bytecode, stackless IR, micro-ops,
-//! frame-layout) for the differential and snapshot test harnesses.
+//! Render print sections for the differential and snapshot test harnesses.
 //!
 //! Given a list of [`PrintSection`]s requested via `// RUN: publish
 //! --print(...)`, [`render`] produces a string containing a
 //! `=== <section> ===` block per requested section per compiled module.
-//! Sections are emitted in a fixed order
-//! (`bytecode` → `stackless` → `micro-ops` → `frame-layout`)
-//! regardless of the order in the directive.
+//!
+//! Sections are emitted in the following order, when requested:
+//!
+//! - `bytecode`
+//! - `stackless`
+//! - `micro-ops`
+//! - `frame-layout`
 
 use crate::parser::PrintSection;
 use anyhow::{anyhow, Result};
@@ -199,15 +202,15 @@ pub fn format_frame_layout(guard: &ExecutionGuard<'_>, module_ir: &ModuleIR) -> 
                 out.push_str(&format!("fun {}: skipped ({})\n", func_name, reason));
             },
             Ok(BuildContextOutcome::Built(ctx)) => {
-                match derive_frame_layout(&ctx, &func_ir.home_slot_types, func_ir.num_params) {
+                match derive_frame_layout(&ctx, func_ir, &func_ir.home_slot_types) {
                     Ok(derived) => {
                         let offsets: Vec<String> = derived
-                            .frame_layout
+                            .heap_ptr_offsets
                             .iter()
                             .map(|o| o.0.to_string())
                             .collect();
                         out.push_str(&format!(
-                            "fun {}: frame_layout=[{}] zero_frame={}\n",
+                            "fun {}: heap_ptr_offsets=[{}] zero_frame={}\n",
                             func_name,
                             offsets.join(", "),
                             derived.zero_frame
