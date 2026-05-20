@@ -866,7 +866,7 @@ module std::features {
     }
 
     /// Whether the multisig timelock feature is enabled.
-    const MULTISIG_TIMELOCK: u64 = 114;
+    const MULTISIG_TIMELOCK: u64 = 115;
 
     public fun get_multisig_timelock_feature(): u64 {
         MULTISIG_TIMELOCK
