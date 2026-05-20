@@ -22,10 +22,10 @@ use aptos_schemadb::{
 use aptos_types::{
     state_store::state_key::StateKey,
     transaction::Version,
-    write_set::{HotStateOp, ValueWriteSet, WriteSet, WriteSetV0},
+    write_set::{WriteSet, WriteSetV0},
 };
 use byteorder::{BigEndian, ReadBytesExt};
-use serde::{Deserialize, Serialize};
+use serde::Deserialize;
 use std::{collections::BTreeSet, mem::size_of};
 
 define_schema!(WriteSetSchema, Version, WriteSet, WRITE_SET_CF_NAME);
@@ -41,51 +41,14 @@ impl KeyCodec<WriteSetSchema> for Version {
     }
 }
 
-/// Storage-only serialization format for `WriteSet`. Separate from `ValueWriteSet` so that the
-/// `BCSCryptoHash` (which goes through `WriteSet::Serialize` → `ValueWriteSet`) is not affected
-/// for now.
-#[derive(Serialize, Deserialize)]
-enum PersistedWriteSet {
-    /// Legacy format: identical BCS layout to `ValueWriteSet::V0`.
-    V0(WriteSetV0),
-    /// Extended format that also persists the set of hot state keys.
-    V1 {
-        value: WriteSetV0,
-        hotness: BTreeSet<StateKey>,
-    },
-}
-
-/// Encode a `WriteSet` for storage. When `persist_hotness` is true, produces the V1 format
-/// (which includes the set of hot state keys); otherwise produces the legacy V0 format
-/// (byte-identical to `bcs::to_bytes(write_set)`).
-pub(crate) fn encode_write_set(
-    write_set: &WriteSet,
-    persist_hotness: bool,
-) -> bcs::Result<Vec<u8>> {
-    if persist_hotness {
-        let persisted = PersistedWriteSet::V1 {
-            value: write_set.as_v0().clone(),
-            hotness: write_set.hotness_keys().cloned().collect(),
-        };
-        bcs::to_bytes(&persisted)
-    } else {
-        // Delegates to WriteSet::Serialize → ValueWriteSet → V0 layout.
-        bcs::to_bytes(write_set)
-    }
-}
-
-/// Decode a `WriteSet` from storage, handling both V0 (legacy) and V1 (with hotness) formats.
-fn decode_write_set(data: &[u8]) -> bcs::Result<WriteSet> {
-    match bcs::from_bytes(data)? {
-        PersistedWriteSet::V0(ws_v0) => Ok(WriteSet::new_from_value(ValueWriteSet::V0(ws_v0))),
-        PersistedWriteSet::V1 { value, hotness } => Ok(WriteSet::new_from_value_with_hotness(
-            ValueWriteSet::V0(value),
-            hotness
-                .into_iter()
-                .map(|key| (key, HotStateOp::make_hot()))
-                .collect(),
-        )),
-    }
+/// Legacy V1 payload (without the enum tag byte) from binaries that pre-date the
+/// `pub enum WriteSet { V0, V1 }` representation.
+/// TODO(HotState): this is only needed temporarily to avoid forge-compat test failures because in
+/// these tests the baseline validators would write legacy format to DB.
+#[derive(Deserialize)]
+struct LegacyWriteSetV1Payload {
+    value: WriteSetV0,
+    hotness: BTreeSet<StateKey>,
 }
 
 impl ValueCodec<WriteSetSchema> for WriteSet {
@@ -94,7 +57,22 @@ impl ValueCodec<WriteSetSchema> for WriteSet {
     }
 
     fn decode_value(data: &[u8]) -> Result<Self> {
-        decode_write_set(data).map_err(Into::into)
+        // Tag 0 (V0) is byte-identical between the new and legacy formats. Tag 1 (V1)
+        // differs: the new format appends an `extensions: Vec<Extension>` absent from
+        // legacy bytes, so the new decoder errors at end-of-stream on legacy V1 — fall
+        // back to the legacy payload shape.
+        match data.first() {
+            Some(&1) => match bcs::from_bytes::<WriteSet>(data) {
+                Ok(ws) => Ok(ws),
+                Err(_) => {
+                    let legacy: LegacyWriteSetV1Payload = bcs::from_bytes(&data[1..])?;
+                    let mut ws = WriteSet::V0(legacy.value);
+                    ws.add_hotness(legacy.hotness);
+                    Ok(ws)
+                },
+            },
+            _ => bcs::from_bytes::<WriteSet>(data).map_err(Into::into),
+        }
     }
 }
 

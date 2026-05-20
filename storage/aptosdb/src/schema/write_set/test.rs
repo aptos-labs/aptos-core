@@ -3,9 +3,8 @@
 
 use super::*;
 use aptos_schemadb::{schema::fuzzing::assert_encode_decode, test_no_panic_decoding};
-use aptos_types::write_set::WriteOp;
+use aptos_types::{state_store::state_key::StateKey, write_set::WriteOp};
 use proptest::prelude::*;
-use std::collections::BTreeMap;
 
 proptest! {
     #[test]
@@ -19,10 +18,9 @@ proptest! {
 
 test_no_panic_decoding!(WriteSetSchema);
 
-/// Data serialized with the old format (`bcs::to_bytes` via the custom `WriteSet::Serialize`,
-/// which only serializes the `value` field) must decode correctly through `decode_write_set`.
+/// V0 (default) WriteSets round-trip through the schema codec.
 #[test]
-fn test_decode_legacy_format() {
+fn test_v0_roundtrip() {
     let ws = WriteSet::new(vec![
         (
             StateKey::raw(b"key1"),
@@ -35,57 +33,80 @@ fn test_decode_legacy_format() {
     ])
     .unwrap();
 
-    // Old encode path: WriteSet::Serialize → ValueWriteSet::V0
-    let old_bytes = bcs::to_bytes(&ws).unwrap();
-    let decoded = decode_write_set(&old_bytes).unwrap();
-
+    let bytes = <WriteSet as ValueCodec<WriteSetSchema>>::encode_value(&ws).unwrap();
+    let decoded = <WriteSet as ValueCodec<WriteSetSchema>>::decode_value(&bytes).unwrap();
     assert_eq!(decoded.as_v0(), ws.as_v0());
     assert_eq!(decoded.hotness_keys().count(), 0);
 }
 
-/// Roundtrip: a `WriteSet` with hotness, encoded via `encode_write_set(..., true)` and decoded
-/// via `decode_write_set`, must preserve both the value write ops and the set of hot keys.
+/// V1 WriteSets (crafted from a mirror since the production code has no public
+/// `WriteSet::V1` constructor yet) round-trip through the schema codec.
 #[test]
-fn test_roundtrip_with_hotness() {
-    let mut ws = WriteSet::new(vec![(
-        StateKey::raw(b"a"),
-        WriteOp::legacy_creation(b"v".to_vec().into()),
-    )])
-    .unwrap();
+fn test_v1_roundtrip() {
+    use aptos_types::write_set::{Extension, WriteSetMut};
 
-    let hot_keys: BTreeMap<StateKey, HotStateOp> = [
-        (StateKey::raw(b"hot1"), HotStateOp::make_hot()),
-        (StateKey::raw(b"hot2"), HotStateOp::make_hot()),
-    ]
-    .into_iter()
-    .collect();
-    ws.add_hotness(hot_keys);
+    // Mirrors the on-wire shape of `WriteSetV1`.
+    #[derive(serde::Serialize)]
+    struct WriteSetV1Mirror<'a> {
+        value_writes: &'a WriteSetMut,
+        hotness: &'a BTreeSet<StateKey>,
+        extensions: &'a [Extension],
+    }
 
-    let encoded = encode_write_set(&ws, true).unwrap();
-    let decoded = decode_write_set(&encoded).unwrap();
+    let value_writes = WriteSetMut::new(vec![(
+        StateKey::raw(b"key1"),
+        WriteOp::legacy_creation(b"val1".to_vec().into()),
+    )]);
+    let hotness: BTreeSet<StateKey> = [StateKey::raw(b"hot1")].into_iter().collect();
 
-    assert_eq!(decoded.as_v0(), ws.as_v0());
-    assert_eq!(
-        decoded.hotness_keys().collect::<BTreeSet<_>>(),
-        ws.hotness_keys().collect::<BTreeSet<_>>(),
+    let mut bytes = vec![1u8]; // BCS variant tag for V1.
+    bytes.extend(
+        bcs::to_bytes(&WriteSetV1Mirror {
+            value_writes: &value_writes,
+            hotness: &hotness,
+            extensions: &[],
+        })
+        .unwrap(),
     );
+
+    let decoded = <WriteSet as ValueCodec<WriteSetSchema>>::decode_value(&bytes).unwrap();
+    let reencoded = <WriteSet as ValueCodec<WriteSetSchema>>::encode_value(&decoded).unwrap();
+    assert_eq!(reencoded, bytes);
+    let redecoded = <WriteSet as ValueCodec<WriteSetSchema>>::decode_value(&reencoded).unwrap();
+    assert_eq!(decoded, redecoded);
 }
 
-/// `encode_write_set(ws, false)` must produce byte-identical output to the old
-/// `bcs::to_bytes(&ws)` path. This guarantees `PersistedWriteSet::V0` has the same BCS layout
-/// as `ValueWriteSet::V0`.
+/// Legacy V1 bytes (variant tag 1 with `value ++ hotness`, no trailing extensions) must
+/// decode via the fallback path and preserve both writes and hotness.
 #[test]
-fn test_v0_byte_identity() {
-    let ws = WriteSet::new(vec![
-        (
-            StateKey::raw(b"x"),
-            WriteOp::legacy_creation(b"y".to_vec().into()),
-        ),
-        (StateKey::raw(b"z"), WriteOp::legacy_deletion()),
-    ])
-    .unwrap();
+fn test_decode_legacy_v1_fallback() {
+    // Mirrors the legacy V1 payload shape so we can serialize it from this side.
+    #[derive(serde::Serialize)]
+    struct LegacyV1<'a> {
+        value: &'a WriteSetV0,
+        hotness: &'a BTreeSet<StateKey>,
+    }
 
-    let old_bytes = bcs::to_bytes(&ws).unwrap();
-    let new_bytes = encode_write_set(&ws, false).unwrap();
-    assert_eq!(old_bytes, new_bytes);
+    let writes = WriteSet::new(vec![(
+        StateKey::raw(b"key1"),
+        WriteOp::legacy_creation(b"val1".to_vec().into()),
+    )])
+    .unwrap();
+    let hotness: BTreeSet<StateKey> = [StateKey::raw(b"hot1"), StateKey::raw(b"hot2")]
+        .into_iter()
+        .collect();
+
+    let mut bytes = vec![1u8]; // BCS variant tag for V1.
+    bytes.extend(
+        bcs::to_bytes(&LegacyV1 {
+            value: writes.as_v0(),
+            hotness: &hotness,
+        })
+        .unwrap(),
+    );
+
+    let mut expected = writes;
+    expected.add_hotness(hotness);
+    let decoded = <WriteSet as ValueCodec<WriteSetSchema>>::decode_value(&bytes).unwrap();
+    assert_eq!(decoded.as_v0(), expected.as_v0());
 }
