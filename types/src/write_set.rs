@@ -17,8 +17,8 @@ use once_cell::sync::Lazy;
 use ref_cast::RefCast;
 use serde::{Deserialize, Deserializer, Serialize, Serializer};
 use std::{
-    collections::{btree_map, BTreeMap},
-    fmt::{Debug, Formatter},
+    collections::{btree_map, BTreeMap, BTreeSet},
+    fmt::Debug,
 };
 use strum_macros::AsRefStr;
 
@@ -513,38 +513,6 @@ impl Default for ValueWriteSet {
     }
 }
 
-// TODO(HotState): revisit when the hot state is deterministic.
-/// Represents a hotness only change, not persisted for now.
-#[derive(Clone, Eq, PartialEq)]
-pub struct HotStateOp(BaseStateOp);
-
-impl HotStateOp {
-    pub fn make_hot() -> Self {
-        Self(BaseStateOp::MakeHot)
-    }
-
-    pub fn as_base_op(&self) -> &BaseStateOp {
-        &self.0
-    }
-
-    pub fn into_base_op(self) -> BaseStateOp {
-        self.0
-    }
-}
-
-impl Debug for HotStateOp {
-    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
-        use BaseStateOp::*;
-
-        match &self.0 {
-            MakeHot => write!(f, "MakeHot"),
-            Creation(_) | Modification(_) | Deletion(_) => {
-                unreachable!("malformed hot state op")
-            },
-        }
-    }
-}
-
 /// Native-position write produced by a transaction. Type-distinct
 /// from [`WriteOp`] so the compiler refuses to mix native-position
 /// entries into the main-state bucket (`ValueWriteSet`). Wraps the
@@ -581,7 +549,7 @@ pub struct WriteSet {
     value: ValueWriteSet,
     /// Hot state promotions, non-empty only in block epilogues.
     /// TODO(HotState): not hashed into `TransactionInfo` for now.
-    hotness: BTreeMap<StateKey, HotStateOp>,
+    hotness: BTreeSet<StateKey>,
     /// Native-position writes staged by the transaction. Routed
     /// to the dedicated `position_db` + in-memory `NativeStateStore`
     /// by the storage commit applier; never enters main state.
@@ -607,7 +575,7 @@ impl<'de> Deserialize<'de> for WriteSet {
         let value = ValueWriteSet::deserialize(deserializer)?;
         Ok(Self {
             value,
-            hotness: BTreeMap::new(),
+            hotness: BTreeSet::new(),
             native_positions: BTreeMap::new(),
         })
     }
@@ -639,15 +607,12 @@ impl WriteSet {
     pub fn new_from_value(value: ValueWriteSet) -> Self {
         Self {
             value,
-            hotness: BTreeMap::new(),
+            hotness: BTreeSet::new(),
             native_positions: BTreeMap::new(),
         }
     }
 
-    pub fn new_from_value_with_hotness(
-        value: ValueWriteSet,
-        hotness: BTreeMap<StateKey, HotStateOp>,
-    ) -> Self {
+    pub fn new_from_value_with_hotness(value: ValueWriteSet, hotness: BTreeSet<StateKey>) -> Self {
         Self {
             value,
             hotness,
@@ -717,11 +682,13 @@ impl WriteSet {
     }
 
     pub fn base_op_iter(&self) -> impl Iterator<Item = (&StateKey, &BaseStateOp)> {
+        static MAKE_HOT_OP: BaseStateOp = BaseStateOp::MakeHot;
+
         self.as_v0()
             .iter()
             .map(|(key, op)| (key, op.as_base_op()))
             .merge_join_by(
-                self.hotness.iter().map(|(key, op)| (key, op.as_base_op())),
+                self.hotness.iter().map(|key| (key, &MAKE_HOT_OP)),
                 |a, b| a.0.cmp(b.0),
             )
             .map(|entry| {
@@ -736,10 +703,10 @@ impl WriteSet {
     }
 
     pub fn hotness_keys(&self) -> impl Iterator<Item = &StateKey> {
-        self.hotness.keys()
+        self.hotness.iter()
     }
 
-    pub fn add_hotness(&mut self, hotness: BTreeMap<StateKey, HotStateOp>) {
+    pub fn add_hotness(&mut self, hotness: BTreeSet<StateKey>) {
         assert!(
             self.hotness.is_empty(),
             "hotness should only be initialized once."
@@ -871,7 +838,7 @@ impl WriteSetMut {
         // TODO: add structural validation
         Ok(WriteSet {
             value: ValueWriteSet::V0(WriteSetV0(self)),
-            hotness: BTreeMap::new(),
+            hotness: BTreeSet::new(),
             native_positions: BTreeMap::new(),
         })
     }
