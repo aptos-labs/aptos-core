@@ -24,6 +24,7 @@ use crate::{
         version_data::VersionDataSchema,
         write_set::WriteSetSchema,
     },
+    sharded_jmt_merkle_db::ShardedJmtMerkleDb,
     state_kv_db::StateKvDb,
     state_merkle_db::StateMerkleDb,
     state_store::MAX_COMMIT_PROGRESS_DIFFERENCE,
@@ -608,7 +609,7 @@ fn delete_nodes_and_stale_indices_at_or_after_version(
         batch.delete::<JellyfishMerkleNodeSchema>(&key)?;
     }
 
-    StateMerkleDb::put_progress(version.checked_sub(1), shard_id, batch)
+    ShardedJmtMerkleDb::put_progress(version.checked_sub(1), shard_id, batch)
 }
 
 struct Progress {
