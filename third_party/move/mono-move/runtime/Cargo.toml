@@ -17,8 +17,9 @@ anyhow = { workspace = true }
 mono-move-alloc = { workspace = true }
 mono-move-core = { workspace = true }
 mono-move-gas = { workspace = true }
+move-core-types = { workspace = true }
 rand = { workspace = true }
 thiserror = { workspace = true }
 
 [dev-dependencies]
-move-core-types = { workspace = true }
+proptest = { workspace = true }

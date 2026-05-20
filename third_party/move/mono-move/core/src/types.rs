@@ -371,6 +371,13 @@ impl Type {
         })
     }
 
+    /// True iff this is `Type::U64`. Used by the specializer to gate the
+    /// u64-specialized micro-op fast paths.
+    #[inline(always)]
+    pub fn is_u64(&self) -> bool {
+        matches!(self, Type::U64)
+    }
+
     /// Returns layout for a nominal (struct or enum) type, or [`None`] for
     /// other types or for nominal types whose layout slot has not yet been
     /// populated.

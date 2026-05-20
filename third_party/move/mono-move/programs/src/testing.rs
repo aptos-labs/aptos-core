@@ -185,6 +185,10 @@ pub fn arg_u64(n: u64) -> Vec<u8> {
     MoveValue::U64(n).simple_serialize().unwrap()
 }
 
+pub fn arg_i64(n: i64) -> Vec<u8> {
+    MoveValue::I64(n).simple_serialize().unwrap()
+}
+
 pub fn arg_vec_u64(v: &[u64]) -> Vec<u8> {
     let elems: Vec<MoveValue> = v.iter().map(|&x| MoveValue::U64(x)).collect();
     MoveValue::Vector(elems).simple_serialize().unwrap()
@@ -197,6 +201,11 @@ pub fn arg_vec_u64(v: &[u64]) -> Vec<u8> {
 pub fn return_u64(result: &SerializedReturnValues) -> u64 {
     let bytes = &result.return_values[0].0;
     u64::from_le_bytes(bytes[..8].try_into().unwrap())
+}
+
+pub fn return_i64(result: &SerializedReturnValues) -> i64 {
+    let bytes = &result.return_values[0].0;
+    i64::from_le_bytes(bytes[..8].try_into().unwrap())
 }
 
 pub fn return_vec_u64(result: &SerializedReturnValues) -> Vec<u64> {
