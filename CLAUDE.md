@@ -35,10 +35,14 @@ cargo +nightly fmt                  # Just formatting
 ```
 
 ### Move Framework Changes
-After modifying Move code in `aptos-move/framework/`:
+
+**RULE: If ANY `.move` file under `aptos-move/framework/` is changed (added, modified, or deleted), you MUST rebuild the cached packages before committing or testing.**
+
 ```bash
-cargo build -p aptos-cached-packages   # REQUIRED: rebuild cached packages
+cargo build -p aptos-cached-packages   # REQUIRED after any Move framework change
 ```
+
+This regenerates `aptos-move/framework/cached-packages/src/head.mrb`, the binary bundle loaded at genesis/runtime. Skipping this step means node binaries and tests will silently run the OLD framework even though source changed. Always `git status aptos-move/framework/cached-packages/` after rebuilding and commit the regenerated `.mrb`.
 
 ### Development Setup
 ```bash

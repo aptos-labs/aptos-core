@@ -64,15 +64,18 @@ This file provides guidance for AI coding agents working autonomously in this re
 
 ### Workflow: Move Framework Changes
 
+**MANDATORY RULE: Any change to a `.move` file under `aptos-move/framework/` (add/modify/delete) REQUIRES rebuilding cached packages. No exceptions.** The cached `head.mrb` is the binary bundle loaded at genesis and runtime — if it is out of sync with Move source, nodes and tests silently execute stale framework code.
+
 ```
 1. Locate: Find module in aptos-move/framework/<package>/sources/
 2. Understand: Read module and its tests
 3. Modify: Make changes to Move code
 4. Test Move: cargo test -p <framework-package>
-5. Rebuild cached packages (REQUIRED):
+5. Rebuild cached packages (REQUIRED — do not skip):
    cargo build -p aptos-cached-packages
-6. Verify: Check for uncommitted generated files
+6. Verify and commit the regenerated bundle:
    git status aptos-move/framework/cached-packages/
+   # Expect: M aptos-move/framework/cached-packages/src/head.mrb
 ```
 
 ### Workflow: API Changes

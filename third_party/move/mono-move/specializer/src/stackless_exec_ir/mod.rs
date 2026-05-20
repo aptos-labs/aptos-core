@@ -124,19 +124,28 @@ pub enum BinaryOp {
     And,
 }
 
-/// Immediate values for `BinaryOpImm`. Restricted to small types.
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+/// Immediate values for `BinaryOpImm`. Wide widths (u128 / U256 / i128 /
+/// I256) are boxed.
+#[derive(Clone, Debug, PartialEq, Eq)]
 pub enum ImmValue {
     Bool(bool),
     U8(u8),
     U16(u16),
     U32(u32),
     U64(u64),
+    U128(Box<u128>),
+    U256(Box<U256>),
     I8(i8),
     I16(i16),
     I32(i32),
     I64(i64),
+    I128(Box<i128>),
+    I256(Box<I256>),
 }
+
+// Wide variants box their payload to keep the enum at 16 bytes regardless
+// of the largest integer type.
+const _: () = assert!(std::mem::size_of::<ImmValue>() == 16);
 
 /// A stackless IR instruction with explicit named-slot operands.
 ///
