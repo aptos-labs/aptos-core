@@ -148,10 +148,10 @@ impl<Scheme: BatchThresholdEncryption> SmokeTest<Scheme> {
     }
 
     pub fn run_with_max_cts(&self, round: u64) -> Decryption<Scheme> {
-        let mut rng_arkworks = ark_std::rand::thread_rng();
-
         let cts = (0..Scheme::max_batch_size(&self.dk))
+            .into_par_iter()
             .map(|_| {
+                let mut rng_arkworks = ark_std::rand::thread_rng();
                 Scheme::encrypt(
                     &self.ek,
                     &mut rng_arkworks,
@@ -164,10 +164,12 @@ impl<Scheme: BatchThresholdEncryption> SmokeTest<Scheme> {
 
         let result = self.do_decryption(round, cts);
 
-        for i in 0..result.cts.len() {
-            Scheme::verify_ct(&result.cts[i], &associated_data()).unwrap();
-            assert_eq!(result.plaintexts[i], plaintext());
-        }
+        (0..result.cts.len())
+            .into_par_iter()
+            .for_each(|i| {
+                Scheme::verify_ct(&result.cts[i], &associated_data()).unwrap();
+                assert_eq!(result.plaintexts[i], plaintext());
+            });
 
         result
     }
