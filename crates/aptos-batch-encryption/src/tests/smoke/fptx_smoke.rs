@@ -1,6 +1,6 @@
 // Copyright (c) Aptos Foundation
 // Licensed pursuant to the Innovation-Enabling Source Code License, available at https://github.com/aptos-labs/aptos-core/blob/main/LICENSE
-use crate::{schemes::fptx::FPTX, tests::smoke::run_smoke, traits::BatchThresholdEncryption};
+use crate::{schemes::fptx::FPTX, tests::smoke::{run_smoke_all_rounds, run_smoke_single_round}, traits::BatchThresholdEncryption};
 use aptos_crypto::arkworks::shamir::ShamirThresholdConfig;
 use ark_std::rand::{thread_rng, Rng as _};
 
@@ -10,6 +10,8 @@ fn smoke_with_setup_for_testing() {
     let tc = ShamirThresholdConfig::new(3, 8);
 
     let (ek, dk, vks, msk_shares) = FPTX::setup_for_testing(rng.r#gen(), 8, 1, &tc).unwrap();
+    run_smoke_single_round::<FPTX>(tc, ek, dk, vks, msk_shares);
 
-    run_smoke::<FPTX>(tc, ek, dk, vks, msk_shares);
+    let (ek, dk, vks, msk_shares) = FPTX::setup_for_testing(rng.r#gen(), 8, 1, &tc).unwrap();
+    run_smoke_all_rounds::<FPTX>(tc, ek, dk, vks, msk_shares);
 }
