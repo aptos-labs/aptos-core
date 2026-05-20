@@ -55,3 +55,7 @@ harness = false
 [[bench]]
 name = "match_sum"
 harness = false
+
+[[bench]]
+name = "int_arith_loop"
+harness = false

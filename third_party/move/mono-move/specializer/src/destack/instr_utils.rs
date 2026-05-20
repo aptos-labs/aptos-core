@@ -97,6 +97,11 @@ pub(crate) fn remap_source_slots_with(instr: &mut Instr, f: impl FnMut(Slot) -> 
 // =============================================================================
 
 /// Extract the destination slot and immediate value from a load instruction.
+// TODO: the wide arms (`LdU128`/`LdU256`/`LdI128`/`LdI256`) each allocate
+// a `Box` here, even when `try_fuse_immediate_binop` decides not to fuse.
+// Consider splitting `extract_imm_value` into a cheap "would this fuse?"
+// check + a separate constructor, or otherwise pulling allocation behind
+// the fusion-eligibility check.
 pub(crate) fn extract_imm_value(instr: &Instr) -> Option<(Slot, ImmValue)> {
     match instr {
         Instr::LdTrue(dst) => Some((*dst, ImmValue::Bool(true))),
@@ -105,17 +110,19 @@ pub(crate) fn extract_imm_value(instr: &Instr) -> Option<(Slot, ImmValue)> {
         Instr::LdU16(dst, val) => Some((*dst, ImmValue::U16(*val))),
         Instr::LdU32(dst, val) => Some((*dst, ImmValue::U32(*val))),
         Instr::LdU64(dst, val) => Some((*dst, ImmValue::U64(*val))),
+        Instr::LdU128(dst, val) => Some((*dst, ImmValue::U128(Box::new(*val)))),
+        Instr::LdU256(dst, val) => Some((*dst, ImmValue::U256(Box::new(*val)))),
         Instr::LdI8(dst, val) => Some((*dst, ImmValue::I8(*val))),
         Instr::LdI16(dst, val) => Some((*dst, ImmValue::I16(*val))),
         Instr::LdI32(dst, val) => Some((*dst, ImmValue::I32(*val))),
         Instr::LdI64(dst, val) => Some((*dst, ImmValue::I64(*val))),
+        Instr::LdI128(dst, val) => Some((*dst, ImmValue::I128(Box::new(*val)))),
+        Instr::LdI256(dst, val) => Some((*dst, ImmValue::I256(Box::new(*val)))),
 
-        // Too large or non-numeric — not fusible into BinaryOpImm.
-        Instr::LdU128(_, _)
-        | Instr::LdU256(_, _)
-        | Instr::LdI128(_, _)
-        | Instr::LdI256(_, _)
-        | Instr::LdConst(_, _) => None,
+        // `LdConst` loads from the constant pool — its payload isn't a
+        // fixed-width integer literal, so it's never fusible into
+        // `BinaryOpImm`.
+        Instr::LdConst(_, _) => None,
 
         // Non-load instructions.
         Instr::Copy(_, _)

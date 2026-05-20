@@ -10,6 +10,7 @@
 
 pub mod bst;
 pub mod fib;
+pub mod int_arith_loop;
 pub mod match_sum;
 pub mod merge_sort;
 pub mod nested_loop;
