@@ -1,9 +1,13 @@
 // Copyright (c) Aptos Foundation
 // Licensed pursuant to the Innovation-Enabling Source Code License, available at https://github.com/aptos-labs/aptos-core/blob/main/LICENSE
 
-use crate::traits::{BatchThresholdEncryption, DecryptionKeyShare};
+use crate::{
+    errors::MissingEvalProofError,
+    traits::{BatchThresholdEncryption, DecryptionKeyShare, Plaintext},
+};
 use anyhow::Result;
 use aptos_crypto::TSecretSharingConfig;
+use rayon::iter::{IntoParallelIterator, ParallelIterator};
 
 #[cfg(test)]
 pub mod fptx_smoke;
@@ -11,7 +15,7 @@ pub mod fptx_smoke;
 pub mod fptx_succinct_smoke;
 pub mod fptx_weighted_smoke;
 
-pub fn run_smoke<Scheme: BatchThresholdEncryption>(
+pub fn run_smoke_all_rounds<Scheme: BatchThresholdEncryption>(
     tc: <Scheme as BatchThresholdEncryption>::ThresholdConfig,
     ek: <Scheme as BatchThresholdEncryption>::EncryptionKey,
     dk: <Scheme as BatchThresholdEncryption>::DigestKey,
@@ -19,7 +23,50 @@ pub fn run_smoke<Scheme: BatchThresholdEncryption>(
     msk_shares: Vec<<Scheme as BatchThresholdEncryption>::MasterSecretKeyShare>,
 ) {
     let mut rng_arkworks = ark_std::rand::thread_rng();
-    let mut rng_aptos = rand::thread_rng();
+
+    let plaintext: String = String::from("hi");
+    let associated_data: String = String::from("hi");
+
+    for round in 0..Scheme::num_rounds(&dk) {
+        // Test a decryption round w/ 1 CT
+        let ct = Scheme::encrypt(&ek, &mut rng_arkworks, &plaintext, &associated_data).unwrap();
+        Scheme::verify_ct(&ct, &associated_data).unwrap();
+        let (_, _, _, decrypted_plaintexts) = do_decryption::<Scheme, String>(
+            &tc,
+            &ek,
+            &dk,
+            &vks,
+            &msk_shares,
+            std::slice::from_ref(&ct),
+            round as u64,
+        );
+        assert_eq!(decrypted_plaintexts[0], plaintext);
+
+        // Test a decryption round w/ B CTs
+        let cts = (0..Scheme::max_batch_size(&dk))
+            .map(|_| Scheme::encrypt(&ek, &mut rng_arkworks, &plaintext, &associated_data).unwrap())
+            .collect::<Vec<Scheme::Ciphertext>>();
+
+        let (_, _, _, decrypted_plaintexts) =
+            do_decryption::<Scheme, String>(&tc, &ek, &dk, &vks, &msk_shares, &cts, round as u64);
+
+        for i in 0..cts.len() {
+            Scheme::verify_ct(&cts[i], &associated_data).unwrap();
+            assert_eq!(decrypted_plaintexts[i], plaintext);
+        }
+    }
+
+    // note: skips individual decryption verification so that the test runs faster
+}
+
+pub fn run_smoke_single_round<Scheme: BatchThresholdEncryption>(
+    tc: <Scheme as BatchThresholdEncryption>::ThresholdConfig,
+    ek: <Scheme as BatchThresholdEncryption>::EncryptionKey,
+    dk: <Scheme as BatchThresholdEncryption>::DigestKey,
+    vks: Vec<<Scheme as BatchThresholdEncryption>::VerificationKey>,
+    msk_shares: Vec<<Scheme as BatchThresholdEncryption>::MasterSecretKeyShare>,
+) {
+    let mut rng_arkworks = ark_std::rand::thread_rng();
 
     let plaintext: String = String::from("hi");
     let associated_data: String = String::from("hi");
@@ -27,20 +74,55 @@ pub fn run_smoke<Scheme: BatchThresholdEncryption>(
     let ct = Scheme::encrypt(&ek, &mut rng_arkworks, &plaintext, &associated_data).unwrap();
     Scheme::verify_ct(&ct, &associated_data).unwrap();
 
-    let (d, pfs_promise) = Scheme::digest(&dk, std::slice::from_ref(&ct), 0).unwrap();
-    let pfs = Scheme::eval_proofs_compute_all(&pfs_promise, &dk);
+    let (dk, d, pfs, decrypted_plaintexts) = do_decryption::<Scheme, String>(
+        &tc,
+        &ek,
+        &dk,
+        &vks,
+        &msk_shares,
+        std::slice::from_ref(&ct),
+        0,
+    );
+
+    assert_eq!(decrypted_plaintexts[0], plaintext);
+
+    // Test decryption verification
+    let eval_proof = Scheme::eval_proof_for_ct(&pfs, &ct).unwrap();
+    let individual_decrypted_plaintext: String =
+        Scheme::decrypt_slow(&dk, &ct, &d, &eval_proof).unwrap();
+    assert_eq!(individual_decrypted_plaintext, plaintext);
+}
+
+fn do_decryption<Scheme: BatchThresholdEncryption, P: Plaintext>(
+    tc: &<Scheme as BatchThresholdEncryption>::ThresholdConfig,
+    ek: &<Scheme as BatchThresholdEncryption>::EncryptionKey,
+    dk: &<Scheme as BatchThresholdEncryption>::DigestKey,
+    vks: &[<Scheme as BatchThresholdEncryption>::VerificationKey],
+    msk_shares: &[<Scheme as BatchThresholdEncryption>::MasterSecretKeyShare],
+    cts: &[Scheme::Ciphertext],
+    round: u64,
+) -> (
+    Scheme::DecryptionKey,
+    Scheme::Digest,
+    Scheme::EvalProofs,
+    Vec<P>,
+) {
+    let mut rng_aptos = rand::thread_rng();
+
+    let (d, pfs_promise) = Scheme::digest(dk, cts, round).unwrap();
+    let pfs = Scheme::eval_proofs_compute_all(&pfs_promise, dk);
 
     let dk_shares: Vec<<Scheme as BatchThresholdEncryption>::DecryptionKeyShare> = msk_shares
-        .into_iter()
+        .iter()
         .map(|msk_share| {
-            <Scheme as BatchThresholdEncryption>::derive_decryption_key_share(&msk_share, &d)
+            <Scheme as BatchThresholdEncryption>::derive_decryption_key_share(msk_share, &d)
                 .unwrap()
         })
         .collect();
 
     dk_shares
         .iter()
-        .zip(&vks)
+        .zip(vks)
         .map(|(dk_share, vk)| Scheme::verify_decryption_key_share(vk, &d, dk_share))
         .collect::<Result<Vec<()>>>()
         .unwrap();
@@ -57,21 +139,21 @@ pub fn run_smoke<Scheme: BatchThresholdEncryption>(
         })
         .collect();
 
-    let dk = Scheme::reconstruct_decryption_key(&eligible_share_subset, &tc).unwrap();
+    let dk = Scheme::reconstruct_decryption_key(&eligible_share_subset, tc).unwrap();
 
-    <Scheme as BatchThresholdEncryption>::verify_decryption_key(&ek, &d, &dk).unwrap();
+    <Scheme as BatchThresholdEncryption>::verify_decryption_key(ek, &d, &dk).unwrap();
 
-    let decrypted_plaintext: String = Scheme::decrypt(
-        &dk,
-        &<Scheme as BatchThresholdEncryption>::prepare_ct(&ct, &d, &pfs).unwrap(),
-    )
-    .unwrap();
+    let prepared_cts = cts
+        .into_par_iter()
+        .map(|ct| <Scheme as BatchThresholdEncryption>::prepare_ct(ct, &d, &pfs))
+        .collect::<Result<Vec<Scheme::PreparedCiphertext>, MissingEvalProofError>>()
+        .unwrap();
 
-    assert_eq!(decrypted_plaintext, plaintext);
+    let plaintexts = prepared_cts
+        .into_par_iter()
+        .map(|prepared_ct| Scheme::decrypt(&dk, &prepared_ct))
+        .collect::<Result<Vec<P>>>()
+        .unwrap();
 
-    // Test decryption verification
-    let eval_proof = Scheme::eval_proof_for_ct(&pfs, &ct).unwrap();
-    let individual_decrypted_plaintext: String =
-        Scheme::decrypt_slow(&dk, &ct, &d, &eval_proof).unwrap();
-    assert_eq!(individual_decrypted_plaintext, plaintext);
+    (dk, d, pfs, plaintexts)
 }

@@ -2,7 +2,7 @@
 // Licensed pursuant to the Innovation-Enabling Source Code License, available at https://github.com/aptos-labs/aptos-core/blob/main/LICENSE
 
 #[cfg(test)]
-use crate::tests::smoke::run_smoke;
+use crate::tests::smoke::{run_smoke_all_rounds, run_smoke_single_round};
 use crate::{
     group::{Fr, G1Affine, G2Affine, Pairing},
     schemes::fptx_weighted::{
@@ -150,7 +150,7 @@ fn weighted_smoke_with_setup_for_testing() {
     let (ek, dk, vks, msk_shares) =
         FPTXWeighted::setup_for_testing(rng.r#gen(), 8, 1, &tc).unwrap();
 
-    run_smoke::<FPTXWeighted>(tc, ek, dk, vks, msk_shares);
+    run_smoke_single_round::<FPTXWeighted>(tc, ek, dk, vks, msk_shares);
 }
 
 type T = aptos_dkg::pvss::chunky::SignedWeightedTranscript<crate::group::Pairing>;
@@ -168,5 +168,10 @@ fn weighted_smoke_with_pvss() {
     let dk = DigestKey::new(&mut thread_rng(), 8, 1).unwrap();
     let (_, tc, ek, vks, msk_shares) = run_pvss(&dk);
 
-    run_smoke::<FPTXWeighted>(tc, ek, dk, vks, msk_shares);
+    run_smoke_single_round::<FPTXWeighted>(tc, ek, dk, vks, msk_shares);
+
+    let dk = DigestKey::new(&mut thread_rng(), 8, 2).unwrap();
+    let (_, tc, ek, vks, msk_shares) = run_pvss(&dk);
+
+    run_smoke_all_rounds::<FPTXWeighted>(tc, ek, dk, vks, msk_shares);
 }
