@@ -86,12 +86,12 @@ fn do_decryption<Scheme: BatchThresholdEncryption, P: Plaintext>(
     let mut rng_aptos = rand::thread_rng();
 
     let (d, pfs_promise) = Scheme::digest(dk, cts, round).unwrap();
-    let pfs = Scheme::eval_proofs_compute_all(&pfs_promise, &dk);
+    let pfs = Scheme::eval_proofs_compute_all(&pfs_promise, dk);
 
     let dk_shares: Vec<<Scheme as BatchThresholdEncryption>::DecryptionKeyShare> = msk_shares
-        .into_iter()
+        .iter()
         .map(|msk_share| {
-            <Scheme as BatchThresholdEncryption>::derive_decryption_key_share(&msk_share, &d)
+            <Scheme as BatchThresholdEncryption>::derive_decryption_key_share(msk_share, &d)
                 .unwrap()
         })
         .collect();
@@ -115,9 +115,9 @@ fn do_decryption<Scheme: BatchThresholdEncryption, P: Plaintext>(
         })
         .collect();
 
-    let dk = Scheme::reconstruct_decryption_key(&eligible_share_subset, &tc).unwrap();
+    let dk = Scheme::reconstruct_decryption_key(&eligible_share_subset, tc).unwrap();
 
-    <Scheme as BatchThresholdEncryption>::verify_decryption_key(&ek, &d, &dk).unwrap();
+    <Scheme as BatchThresholdEncryption>::verify_decryption_key(ek, &d, &dk).unwrap();
 
     let prepared_cts = cts.into_par_iter()
         .map(|ct| <Scheme as BatchThresholdEncryption>::prepare_ct(ct, &d, &pfs))
