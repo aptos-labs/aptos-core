@@ -5,11 +5,9 @@
 //! and a bump-allocated heap with copying GC.
 
 use crate::{
-    descriptor_provider::DescriptorProvider,
     error::{ArithOp, RuntimeError, RuntimeResult, RuntimeStatus, Signedness, VecOp},
     heap::{
         macros::{alloc_obj, alloc_vec, gc_collect, grow_vec_ref},
-        object_descriptor::CLOSURE_DESCRIPTOR_ID,
         pinned_roots::PinnedRoots,
         Heap,
     },
@@ -25,12 +23,12 @@ use crate::{
     },
 };
 use mono_move_core::{
-    CallClosureOp, ClosureFuncRef, DescriptorId, ExecutionContext, FrameOffset, Function,
-    IntBinaryOp, IntNegateOp, IntOperand, IntShiftOp, IntTy, MicroOp, PackClosureOp, ShiftOperand,
-    CAPTURED_DATA_TAG_MATERIALIZED, CAPTURED_DATA_TAG_OFFSET, CAPTURED_DATA_VALUES_OFFSET,
-    CLOSURE_CAPTURED_DATA_PTR_OFFSET, CLOSURE_FUNC_REF_OFFSET, CLOSURE_MASK_OFFSET,
-    FRAME_METADATA_SIZE, FUNC_REF_PAYLOAD_OFFSET, FUNC_REF_TAG_OFFSET, FUNC_REF_TAG_RESOLVED,
-    MAX_ALIGN, OBJECT_HEADER_SIZE,
+    CallClosureOp, ClosureFuncRef, DescriptorId, DescriptorProvider, ExecutionContext, FrameOffset,
+    Function, IntBinaryOp, IntNegateOp, IntOperand, IntShiftOp, IntTy, MicroOp, PackClosureOp,
+    ShiftOperand, CAPTURED_DATA_TAG_MATERIALIZED, CAPTURED_DATA_TAG_OFFSET,
+    CAPTURED_DATA_VALUES_OFFSET, CLOSURE_CAPTURED_DATA_PTR_OFFSET, CLOSURE_DESCRIPTOR_ID,
+    CLOSURE_FUNC_REF_OFFSET, CLOSURE_MASK_OFFSET, FRAME_METADATA_SIZE, FUNC_REF_PAYLOAD_OFFSET,
+    FUNC_REF_TAG_OFFSET, FUNC_REF_TAG_RESOLVED, MAX_ALIGN, OBJECT_HEADER_SIZE,
 };
 use mono_move_gas::GasMeter;
 use move_core_types::int256::{I256, U256};
@@ -71,7 +69,7 @@ impl<'a, T: ExecutionContext + DescriptorProvider> InterpreterContext<'a, T> {
 
     /// Create a new context with a custom heap size (for testing GC pressure).
     pub fn with_heap_size(exec_ctx: &'a mut T, entry: &Function, heap_size: usize) -> Self {
-        let verification_errors = crate::verifier::verify_function(entry, exec_ctx.descriptors());
+        let verification_errors = crate::verifier::verify_function(entry, exec_ctx);
         assert!(
             verification_errors.is_empty(),
             "verification failed:\n{}",

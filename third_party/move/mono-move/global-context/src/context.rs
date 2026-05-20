@@ -50,15 +50,19 @@
 
 use crate::maintenance_config::MaintenanceConfig;
 use anyhow::{bail, Result};
+use arc_swap::ArcSwap;
 use dashmap::DashMap;
 use mono_move_alloc::{GlobalArenaPool, GlobalArenaPtr, GlobalArenaShard};
-use mono_move_core::{types::NominalLayout, DescriptorId, FrameOffset, Interner, ModuleId};
+use mono_move_core::{
+    types::NominalLayout, DescriptorId, DescriptorProvider, FrameOffset, Interner, ModuleId,
+    ObjectDescriptor,
+};
 use move_binary_format::{file_format::SignatureToken, CompiledModule};
 use parking_lot::{Mutex, RwLock, RwLockReadGuard, RwLockWriteGuard};
 use std::{
     hash::{Hash, Hasher},
     marker::PhantomData,
-    sync::OnceLock,
+    sync::{Arc, OnceLock},
 };
 
 // Submodules: to split implementation into smaller pieces.
@@ -118,44 +122,59 @@ struct Context {
     types: DashMap<TypeInternerKey, InternedType, ahash::RandomState>,
     type_lists: DashMap<TypeListInternerKey, InternedTypeList, ahash::RandomState>,
     module_cache: ModuleCache,
-    /// Published vector-object descriptors keyed by element `InternedType`. The
-    /// runtime materializes its `ObjectDescriptorTable` from these records via
-    /// [`ExecutionGuard::published_vec_descriptors`].
-    //
-    // TODO: consider storing as `ObjectDescriptor` directly and adding
-    // a dependency on the runtime crate?
-    vec_descriptors: VecDescriptors,
+    /// Published object descriptors.
+    descriptors: Descriptors,
 }
 
-/// First user-assigned descriptor id. Slots 0 and 1 are reserved by
-/// `ObjectDescriptorTable::new` for `Trivial` and `Closure` respectively.
-const FIRST_USER_DESCRIPTOR_ID: u32 = 2;
-
-/// A published vector descriptor, in the form needed to construct an
-/// `ObjectDescriptor::new_vector` later.
-#[derive(Clone)]
-pub struct VecDescriptorRecord {
-    pub elem_ty: InternedType,
-    // TODO: the following two fields are derivable from `elem_ty`.
-    pub elem_size: u32,
-    pub elem_ptr_offsets: Vec<FrameOffset>,
+/// Storage for the published object-descriptor set.
+///
+/// # Invariants
+///
+/// - `table[id.as_usize()]` is the descriptor for [`DescriptorId`] `id`.
+/// - Slot 0 is [`ObjectDescriptor::trivial`] and slot 1 is
+///   [`ObjectDescriptor::closure`]; user descriptors start at slot 2.
+/// - For every `(elem_ty, id)` in `vector_by_elem`, `table[id]` is a
+///   `Vector` descriptor with that element type.
+/// - Entries are appended but never removed or reordered during the
+///   execution phase; only [`MaintenanceGuard::reset_arena_pool`] clears
+///   the table.
+/// - Descriptors are held behind `Arc` so the table's `store` on reset
+///   drops their heap-owning payloads (e.g. `Vec<u32>` offset lists).
+//
+// TODO(perf): if the per-lookup `Arc` deref or the per-append `Vec` clone
+// shows up in profiles, switch to arena-allocated descriptors with POD
+// payloads (`&'arena [u32]` instead of `Vec<u32>`). Eliminates the `Arc`
+// indirection and the clone-per-append at the cost of changing
+// `ObjectDescriptorInner`'s payload shape.
+struct Descriptors {
+    /// Vector-descriptor idempotency cache: `elem_ty -> id`. Lock-free reads
+    /// via DashMap; the first publisher for a given `elem_ty` takes a shard
+    /// write-lock once. Other descriptor kinds (struct/enum/captured-data)
+    /// will need their own idempotency caches when added.
+    vector_by_elem: DashMap<InternedType, DescriptorId, ahash::RandomState>,
+    /// All descriptors (reserved + user) in id order. Replaced atomically
+    /// on append. Readers `load()` without locking.
+    table: ArcSwap<Vec<Arc<ObjectDescriptor>>>,
+    /// Held while appending a new descriptor.
+    publish_lock: Mutex<()>,
 }
 
-/// Storage for the published vector-descriptor set, split for concurrency.
-/// Atomicity of "lookup-then-append" is provided by the [`DashMap::entry`] API:
-/// the shard lock is held across the `or_insert_with` closure, so two
-/// concurrent publishes of the *same* `elem_ty` serialize at the shard level
-/// and share one resulting [`DescriptorId`].
-#[derive(Default)]
-struct VecDescriptors {
-    /// Lock-free lookup, consistent with the other interners on [`Context`].
-    /// Concurrent `publish_vec_descriptor` calls for *different* element types
-    /// proceed in parallel without a global lock.
-    by_elem: DashMap<InternedType, DescriptorId, ahash::RandomState>,
-    /// Records vector held only during the actual append on a cache miss and
-    /// during snapshot clones; never blocks an idempotent
-    /// `publish_vec_descriptor` cache hit.
-    records: Mutex<Vec<VecDescriptorRecord>>,
+impl Default for Descriptors {
+    fn default() -> Self {
+        Self {
+            vector_by_elem: DashMap::default(),
+            table: ArcSwap::from_pointee(initial_descriptors()),
+            publish_lock: Mutex::new(()),
+        }
+    }
+}
+
+/// Initial descriptor table: the two reserved entries.
+fn initial_descriptors() -> Vec<Arc<ObjectDescriptor>> {
+    vec![
+        Arc::new(ObjectDescriptor::trivial()),
+        Arc::new(ObjectDescriptor::closure()),
+    ]
 }
 
 /// RAII guard for the maintenance phase providing exclusive write access.
@@ -248,7 +267,7 @@ impl GlobalContext {
                 types: DashMap::default(),
                 type_lists: DashMap::default(),
                 module_cache: ModuleCache::new(),
-                vec_descriptors: VecDescriptors::default(),
+                descriptors: Descriptors::default(),
             },
             global_arena: GlobalArenaPool::with_num_arenas(num_workers),
             maintenance_config,
@@ -516,37 +535,42 @@ impl<'ctx> ExecutionGuard<'ctx> {
         Ok(())
     }
 
-    /// Records a vector-object descriptor for `elem_ty` and returns
-    /// its assigned [`DescriptorId`]. Idempotent: subsequent calls
-    /// with the same `elem_ty` return the same id without appending.
+    /// Materializes a vector-object descriptor for `elem_ty` into the
+    /// shared arena and returns its assigned [`DescriptorId`]. Idempotent:
+    /// subsequent calls with the same `elem_ty` return the same id without
+    /// re-allocating.
     pub fn publish_vec_descriptor(
         &self,
         elem_ty: InternedType,
         elem_size: u32,
         elem_ptr_offsets: &[FrameOffset],
     ) -> DescriptorId {
+        // Fast path: existing entry returns without touching the shard
+        // write-lock or the publish_lock.
+        if let Some(id) = self.ctx.descriptors.vector_by_elem.get(&elem_ty) {
+            return *id;
+        }
         *self
             .ctx
-            .vec_descriptors
-            .by_elem
+            .descriptors
+            .vector_by_elem
             .entry(elem_ty)
             .or_insert_with(|| {
-                let mut records = self.ctx.vec_descriptors.records.lock();
-                let idx = u32::try_from(records.len())
-                    .expect("published vector-descriptor count exceeds u32::MAX");
-                records.push(VecDescriptorRecord {
-                    elem_ty,
-                    elem_size,
-                    elem_ptr_offsets: elem_ptr_offsets.to_vec(),
-                });
-                DescriptorId(FIRST_USER_DESCRIPTOR_ID + idx)
+                let offsets: Vec<u32> = elem_ptr_offsets.iter().map(|o| o.0).collect();
+                let desc = Arc::new(
+                    ObjectDescriptor::new_vector(elem_size, offsets)
+                        .unwrap_or_else(|e| panic!("publish_vec_descriptor: {e}")),
+                );
+                let _publish = self.ctx.descriptors.publish_lock.lock();
+                let cur = self.ctx.descriptors.table.load();
+                let mut next = cur.as_ref().clone();
+                let id = DescriptorId(
+                    u32::try_from(next.len()).expect("published descriptor count exceeds u32::MAX"),
+                );
+                next.push(desc);
+                self.ctx.descriptors.table.store(Arc::new(next));
+                id
             })
-    }
-
-    /// Snapshot of the published vector-descriptor records, in id
-    /// order starting at [`FIRST_USER_DESCRIPTOR_ID`].
-    pub fn published_vec_descriptors(&self) -> Vec<VecDescriptorRecord> {
-        self.ctx.vec_descriptors.records.lock().clone()
     }
 
     /// Looks up a type previously interned from a signature token of `module`.
@@ -565,6 +589,23 @@ impl<'ctx> ExecutionGuard<'ctx> {
         module: &CompiledModule,
     ) -> Option<InternedType> {
         self.get_interned_type_pointer_internal(token, module)
+    }
+}
+
+impl<'ctx> DescriptorProvider for ExecutionGuard<'ctx> {
+    fn descriptor(&self, id: DescriptorId) -> Option<&ObjectDescriptor> {
+        let guard = self.ctx.descriptors.table.load();
+        let arc = guard.get(id.as_usize())?;
+        let ptr: *const ObjectDescriptor = Arc::as_ptr(arc);
+        drop(guard);
+        // SAFETY: Descriptor `Arc`s are dropped only when the table is
+        // replaced on maintenance reset, which requires the phase write-lock
+        // and therefore the absence of any live `ExecutionGuard`. This
+        // `ExecutionGuard` holds the phase read-lock, so no maintenance can
+        // run while `&self` lives — the `Arc<ObjectDescriptor>` for any id
+        // that resolved here stays alive for the returned reference's
+        // lifetime, which is tied to `&self`.
+        Some(unsafe { &*ptr })
     }
 }
 
@@ -778,17 +819,18 @@ impl<'ctx> MaintenanceGuard<'ctx> {
             types,
             type_lists,
             module_cache,
-            vec_descriptors,
+            descriptors,
         } = self.ctx;
 
         identifiers.clear();
         module_ids.clear();
         types.clear();
         type_lists.clear();
-        // Records reference `InternedType` pointers that live in the
-        // arena being reset, so they must be dropped here too.
-        vec_descriptors.by_elem.clear();
-        vec_descriptors.records.lock().clear();
+        // User descriptors and `vector_by_elem` keys reference arena
+        // allocations about to be reset, so they must be dropped here.
+        // Reserved slots point at `'static` descriptors and are reinstalled.
+        descriptors.vector_by_elem.clear();
+        descriptors.table.store(Arc::new(initial_descriptors()));
 
         // SAFETY: We are in maintenance phase, and therefore there are no
         // execution guards alive. Hence, there are no pointers to modules

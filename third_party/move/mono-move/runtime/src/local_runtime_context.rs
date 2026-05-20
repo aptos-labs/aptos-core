@@ -4,11 +4,11 @@
 //! Minimal [`ExecutionContext`] + [`DescriptorProvider`] impl for tests
 //! and benchmarks that don't go through the full loader stack.
 
-use crate::{descriptor_provider::DescriptorProvider, ObjectDescriptor, ObjectDescriptorTable};
 use mono_move_core::{
     interner::{InternedIdentifier, InternedModuleId},
     types::InternedTypeList,
-    ExecutionContext, FunctionPtr, LocalExecutionContext,
+    DescriptorId, DescriptorProvider, ExecutionContext, FunctionPtr, LocalExecutionContext,
+    ObjectDescriptor, ObjectDescriptorTable,
 };
 use mono_move_gas::{GasMeter, NoOpGasMeter, SimpleGasMeter};
 
@@ -87,7 +87,7 @@ impl<G: GasMeter> ExecutionContext for LocalRuntimeContext<G> {
 }
 
 impl<G: GasMeter> DescriptorProvider for LocalRuntimeContext<G> {
-    fn descriptors(&self) -> &[ObjectDescriptor] {
-        self.descriptors.as_slice()
+    fn descriptor(&self, id: DescriptorId) -> Option<&ObjectDescriptor> {
+        self.descriptors.descriptor(id)
     }
 }
