@@ -356,6 +356,7 @@ where
                     parent_block.output.ensure_result_state_summary()?,
                     &ProvableStateSummary::new_persisted(self.db.reader.as_ref())?,
                     None,
+                    None,
                 )?);
                 output.set_ledger_update_output(DoLedgerUpdate::run(
                     &output.execution_output,
