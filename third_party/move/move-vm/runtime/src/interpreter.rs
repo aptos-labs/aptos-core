@@ -1152,6 +1152,28 @@ where
         let pre_native_call_value_stack_size = self.operand_stack.value.len();
         let pre_native_call_type_stack_size = self.operand_stack.types.len();
 
+        // === [native-tracing] instrumentation: record unique (module::function) names
+        // seen during a run. Logged once per name to stderr with a [NATIVE_TRACE] prefix.
+        {
+            use std::collections::HashSet;
+            use std::sync::{Mutex, OnceLock};
+            static SEEN: OnceLock<Mutex<HashSet<String>>> = OnceLock::new();
+            let key = match function.module_id() {
+                Some(mid) => format!(
+                    "0x{}::{}::{}",
+                    mid.address().short_str_lossless(),
+                    mid.name(),
+                    function.name(),
+                ),
+                None => format!("<no_module>::{}", function.name()),
+            };
+            let set = SEEN.get_or_init(|| Mutex::new(HashSet::new()));
+            if set.lock().unwrap().insert(key.clone()) {
+                eprintln!("[NATIVE_TRACE] {}", key);
+            }
+        }
+        // === [native-tracing] end
+
         let result = native_function(&mut native_context, ty_args, args)?;
 
         // Note(Gas): The order by which gas is charged / error gets returned MUST NOT be modified
