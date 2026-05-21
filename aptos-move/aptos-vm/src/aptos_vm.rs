@@ -2774,7 +2774,7 @@ impl AptosVM {
         block_epilogue: BlockEpiloguePayload,
         log_context: &AdapterLogSchema,
     ) -> Result<(VMStatus, VMOutput), VMStatus> {
-        let (block_id, fee_distribution) = match block_epilogue {
+        let (block_id, fee_distribution, to_make_hot) = match block_epilogue {
             BlockEpiloguePayload::V0 { .. } => {
                 let status = TransactionStatus::Keep(ExecutionStatus::Success);
                 let output = VMOutput::empty_with_status(status);
@@ -2782,14 +2782,18 @@ impl AptosVM {
             },
             BlockEpiloguePayload::V1 {
                 block_id,
+                block_end_info,
                 fee_distribution,
-                ..
-            }
-            | BlockEpiloguePayload::V2 {
+            } => {
+                let (_inner, to_make_hot) = block_end_info.into_parts();
+                (block_id, fee_distribution, to_make_hot)
+            },
+            BlockEpiloguePayload::V2 {
                 block_id,
                 fee_distribution,
+                to_make_hot,
                 ..
-            } => (block_id, fee_distribution),
+            } => (block_id, fee_distribution, to_make_hot),
         };
 
         let mut gas_meter = UnmeteredGasMeter;
@@ -2813,7 +2817,7 @@ impl AptosVM {
         let traversal_storage = TraversalStorage::new();
         let mut traversal_context = TraversalContext::new(&traversal_storage);
 
-        let output = match session
+        let mut output = match session
             .execute_function_bypass_visibility(
                 &BLOCK_MODULE,
                 BLOCK_EPILOGUE,
@@ -2842,9 +2846,13 @@ impl AptosVM {
 
         SYSTEM_TRANSACTIONS_EXECUTED.inc();
 
-        // TODO(HotState): generate an output according to the block end info in the
-        //   transaction. (maybe resort to the move resolver, but for simplicity I would
-        //   just include the full slot in both the transaction and the output).
+        // The payload carries the read-only keys collected from user transactions
+        // that should be promoted to hot. Fold them into the output's change set,
+        // dropping any key the epilogue itself writes (the write already promotes
+        // it). Note: during state sync, V1's to_make_hot is empty here because the
+        // field is `#[serde(skip)]` on BlockEndInfoExt; only V2 carries it through.
+        output.set_hotness_after_writes(to_make_hot);
+
         Ok((VMStatus::Executed, output))
     }
 

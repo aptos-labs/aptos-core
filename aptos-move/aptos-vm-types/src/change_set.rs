@@ -39,7 +39,7 @@ use rand::Rng;
 use std::{
     collections::{
         btree_map::Entry::{Occupied, Vacant},
-        BTreeMap,
+        BTreeMap, BTreeSet,
     },
     hash::Hash,
 };
@@ -89,6 +89,11 @@ pub struct VMChangeSet {
     // TODO[agg_v1](cleanup) deprecate aggregator_v1 fields.
     aggregator_v1_write_set: BTreeMap<StateKey, WriteOp>,
     aggregator_v1_delta_set: BTreeMap<StateKey, DeltaOp>,
+
+    /// Read-only keys this transaction wants to promote into the hot state.
+    /// Currently only populated by the block epilogue. Materializes into
+    /// `BaseStateOp::MakeHot` markers when the storage `WriteSet` is built.
+    hotness: BTreeSet<StateKey>,
 }
 
 macro_rules! squash_writes_pair {
@@ -113,6 +118,7 @@ impl VMChangeSet {
             delayed_field_change_set: BTreeMap::new(),
             aggregator_v1_write_set: BTreeMap::new(),
             aggregator_v1_delta_set: BTreeMap::new(),
+            hotness: BTreeSet::new(),
         }
     }
 
@@ -129,6 +135,7 @@ impl VMChangeSet {
             delayed_field_change_set,
             aggregator_v1_write_set,
             aggregator_v1_delta_set,
+            hotness: BTreeSet::new(),
         }
     }
 
@@ -231,6 +238,7 @@ impl VMChangeSet {
             aggregator_v1_delta_set,
             delayed_field_change_set,
             events,
+            hotness,
         } = self;
 
         if !aggregator_v1_delta_set.is_empty() {
@@ -264,9 +272,12 @@ impl VMChangeSet {
         write_set_mut.extend(aggregator_v1_write_set);
 
         let events = events.into_iter().map(|(e, _)| e).collect();
-        let write_set = write_set_mut
+        let mut write_set = write_set_mut
             .freeze()
             .expect("Freezing a WriteSet does not fail.");
+        if !hotness.is_empty() {
+            write_set.add_hotness(hotness);
+        }
         Ok(StorageChangeSet::new(write_set, events))
     }
 
@@ -360,6 +371,21 @@ impl VMChangeSet {
 
     pub fn events(&self) -> &[(ContractEvent, Option<MoveTypeLayout>)] {
         &self.events
+    }
+
+    pub fn hotness(&self) -> &BTreeSet<StateKey> {
+        &self.hotness
+    }
+
+    /// Sets the hotness set, used by the block epilogue VM path to promote
+    /// read-only keys to the hot state via `BaseStateOp::MakeHot` markers.
+    /// Must only be called when the hotness is currently empty.
+    pub fn set_hotness(&mut self, hotness: BTreeSet<StateKey>) {
+        debug_assert!(
+            self.hotness.is_empty(),
+            "hotness should only be initialized once."
+        );
+        self.hotness = hotness;
     }
 
     /// Materializes this change set: all aggregator v1 deltas are converted into writes and
@@ -746,6 +772,7 @@ impl VMChangeSet {
             aggregator_v1_delta_set: additional_aggregator_delta_set,
             delayed_field_change_set: additional_delayed_field_change_set,
             events: additional_events,
+            hotness: additional_hotness,
         } = additional_change_set;
 
         Self::squash_additional_aggregator_v1_changes(
@@ -763,6 +790,7 @@ impl VMChangeSet {
             additional_delayed_field_change_set,
         )?;
         self.events.extend(additional_events);
+        self.hotness.extend(additional_hotness);
         Ok(())
     }
 
