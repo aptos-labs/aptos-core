@@ -31,7 +31,7 @@ fn assert_eq_outputs(vm_output: &VMOutput, txn_output: TransactionOutput) {
         .collect::<BTreeMap<StateKey, WriteOp>>();
 
     // A way to obtain a reference to the map inside a WriteSet.
-    let mut write_set_mut = txn_output.write_set().clone().into_mut();
+    let mut write_set_mut = txn_output.write_set().clone().into_value_writes();
     let txn_output_writes = write_set_mut.as_inner_mut();
 
     assert_eq!(vm_output_writes, txn_output_writes);
