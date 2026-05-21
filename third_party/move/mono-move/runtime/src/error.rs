@@ -3,9 +3,10 @@
 
 //! Interpreter-internal error types.
 
-use mono_move_core::{ExecutionErrorKind, IntTy, IntoExecutionError};
+use mono_move_core::{ExecutionErrorKind, IntTy, IntoExecutionError, ResourceProviderError};
 use mono_move_gas::GasExhaustedError;
 use mono_move_loader::LoaderError;
+use move_core_types::account_address::AccountAddress;
 use std::fmt;
 use thiserror::Error;
 
@@ -51,6 +52,15 @@ pub enum RuntimeError {
     #[error("{op} index out of bounds: idx={idx} len={len}")]
     VectorIndexOutOfBounds { op: VecOp, idx: u64, len: u64 },
 
+    #[error("{op}: resource does not exist at {addr}")]
+    ResourceDoesNotExist {
+        op: GlobalStorageOp,
+        addr: AccountAddress,
+    },
+
+    #[error("MoveTo: resource already exists at {addr}")]
+    ResourceAlreadyExists { addr: AccountAddress },
+
     #[error("stack overflow")]
     StackOverflow,
 
@@ -74,6 +84,16 @@ pub enum RuntimeError {
     InvariantViolation(#[from] RuntimeInvariantViolation),
 }
 
+impl From<ResourceProviderError> for RuntimeError {
+    fn from(err: ResourceProviderError) -> Self {
+        match err {
+            ResourceProviderError::InvariantViolation(msg) => RuntimeError::InvariantViolation(
+                RuntimeInvariantViolation::ResourceProviderInvariant(msg),
+            ),
+        }
+    }
+}
+
 impl IntoExecutionError for RuntimeError {
     fn kind(&self) -> ExecutionErrorKind {
         use RuntimeError::*;
@@ -91,7 +111,9 @@ impl IntoExecutionError for RuntimeError {
             | NegateMinOverflow { .. }
             | PopFromEmptyVector
             | VectorIndexOutOfBounds { .. }
-            | InvalidAbortMessage => ExecutionErrorKind::InvalidOperation,
+            | InvalidAbortMessage
+            | ResourceDoesNotExist { .. }
+            | ResourceAlreadyExists { .. } => ExecutionErrorKind::InvalidOperation,
 
             StackOverflow
             | OutOfHeapMemory { .. }
@@ -169,6 +191,23 @@ impl fmt::Display for VecOp {
     }
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum GlobalStorageOp {
+    BorrowGlobal,
+    BorrowGlobalMut,
+    MoveFrom,
+}
+
+impl fmt::Display for GlobalStorageOp {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            GlobalStorageOp::BorrowGlobal => write!(f, "BorrowGlobal"),
+            GlobalStorageOp::BorrowGlobalMut => write!(f, "BorrowGlobalMut"),
+            GlobalStorageOp::MoveFrom => write!(f, "MoveFrom"),
+        }
+    }
+}
+
 /// Conditions that should never occur if the compiler, verifier, and
 /// runtime maintain their invariants. Surfaced rather than panicked so
 /// callers can produce a clean per-transaction outcome and alert
@@ -226,6 +265,15 @@ pub enum RuntimeInvariantViolation {
         "CallClosure: {provided} provided_args but only {consumed} non-captured params consumed"
     )]
     ClosureArgsCountMismatch { provided: usize, consumed: usize },
+
+    #[error("resource provider: {0}")]
+    ResourceProviderInvariant(String),
+
+    #[error("rollback({requested}): only {available} checkpoint(s) on the stack")]
+    RollbackUnderflow { requested: usize, available: usize },
+
+    #[error("enum tag {tag} out of range for {variant_count} variants")]
+    EnumTagOutOfRange { tag: u64, variant_count: usize },
 }
 
 /// Successful terminal outcomes from `Interpreter::run`. Runtime

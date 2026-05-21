@@ -8,6 +8,7 @@ mod instruction;
 pub mod interner;
 mod object_descriptor;
 mod prepared_module;
+pub mod storage;
 pub mod types;
 
 pub use align::{
@@ -33,5 +34,9 @@ pub use object_descriptor::{
 };
 pub use prepared_module::{
     FieldTypes, FunctionInstantiationSignature, FunctionSignature, PreparedModule,
+};
+pub use storage::{
+    ModuleProvider, NoResourceProvider, ResourceProvider, ResourceProviderError, StorageRead,
+    NO_RESOURCE_PROVIDER,
 };
 pub use types::{convert_mut_to_immut_ref, strip_ref};

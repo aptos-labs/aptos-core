@@ -10,7 +10,7 @@ use crate::ExecutionContext;
 use mono_move_core::{
     interner::{InternedIdentifier, InternedModuleId},
     types::InternedTypeList,
-    DescriptorId, DescriptorProvider, FunctionPtr, ObjectDescriptor,
+    DescriptorId, DescriptorProvider, FunctionPtr, ObjectDescriptor, ResourceProvider,
 };
 use mono_move_gas::GasMeter;
 use mono_move_loader::{Loader, LoaderResult, ModuleReadSet};
@@ -22,14 +22,24 @@ pub struct TransactionContext<'guard, 'ctx, G: GasMeter> {
     loader: Loader<'guard, 'ctx>,
     read_set: ModuleReadSet<'guard>,
     gas_meter: G,
+    // TODO(refactor):
+    //   We need to move resource read-set here, as well as heap and some
+    //   other fields from interpreter context which should live longer than
+    //   a single interpreter session.
+    resource_provider: &'guard dyn ResourceProvider,
 }
 
 impl<'guard, 'ctx, G: GasMeter> TransactionContext<'guard, 'ctx, G> {
-    pub fn new(loader: Loader<'guard, 'ctx>, gas_meter: G) -> Self {
+    pub fn new(
+        loader: Loader<'guard, 'ctx>,
+        gas_meter: G,
+        resource_provider: &'guard dyn ResourceProvider,
+    ) -> Self {
         Self {
             loader,
             read_set: ModuleReadSet::new(),
             gas_meter,
+            resource_provider,
         }
     }
 
@@ -59,6 +69,10 @@ impl<'guard, 'ctx, G: GasMeter> ExecutionContext for TransactionContext<'guard, 
             name,
             ty_args,
         )
+    }
+
+    fn resource_provider(&self) -> &dyn ResourceProvider {
+        self.resource_provider
     }
 }
 
