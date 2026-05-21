@@ -29,6 +29,7 @@ impl ApplyExecutionOutput {
             &base_view.state_summary,
             &ProvableStateSummary::new_persisted(reader)?,
             None,
+            None,
         )?;
         let ledger_update_output = DoLedgerUpdate::run(
             &execution_output,

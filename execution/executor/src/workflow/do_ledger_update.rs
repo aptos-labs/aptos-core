@@ -27,10 +27,18 @@ impl DoLedgerUpdate {
     ) -> Result<LedgerUpdateOutput> {
         let _timer = OTHER_TIMERS.timer_with(&["do_ledger_update"]);
 
+        let use_transaction_info_v1 = state_checkpoint_output
+            .state_summary
+            .last_checkpoint()
+            .hot_state_config()
+            .use_transaction_info_v1;
+
         // Assemble `TransactionInfo`s
         let (transaction_infos, transaction_info_hashes) = Self::assemble_transaction_infos(
             &execution_output.to_commit,
             state_checkpoint_output.state_checkpoint_hashes.clone(),
+            state_checkpoint_output.hot_state_checkpoint_hashes.clone(),
+            use_transaction_info_v1,
         );
 
         // Calculate root hash
@@ -47,6 +55,8 @@ impl DoLedgerUpdate {
     fn assemble_transaction_infos(
         to_commit: &TransactionsWithOutput,
         state_checkpoint_hashes: Vec<Option<HashValue>>,
+        hot_state_checkpoint_hashes: Vec<Option<HashValue>>,
+        use_transaction_info_v1: bool,
     ) -> (Vec<TransactionInfo>, Vec<HashValue>) {
         let _timer = OTHER_TIMERS.timer_with(&["assemble_transaction_infos"]);
 
@@ -74,18 +84,32 @@ impl DoLedgerUpdate {
                 let event_root_hash =
                     InMemoryEventAccumulator::from_leaves(&event_hashes).root_hash();
                 let write_set_hash = CryptoHash::hash(txn_output.write_set());
-                let txn_info = TransactionInfo::new(
-                    txn.committed_hash(),
-                    write_set_hash,
-                    event_root_hash,
-                    state_checkpoint_hash,
-                    txn_output.gas_used(),
-                    txn_output
-                        .status()
-                        .as_kept_status()
-                        .expect("Already sorted."),
-                    auxiliary_info_hash,
-                );
+                let status = txn_output
+                    .status()
+                    .as_kept_status()
+                    .expect("Already sorted.");
+                let txn_info = if use_transaction_info_v1 {
+                    TransactionInfo::new_v1(
+                        txn.committed_hash(),
+                        write_set_hash,
+                        event_root_hash,
+                        state_checkpoint_hash,
+                        hot_state_checkpoint_hashes[i],
+                        txn_output.gas_used(),
+                        status,
+                        auxiliary_info_hash,
+                    )
+                } else {
+                    TransactionInfo::new(
+                        txn.committed_hash(),
+                        write_set_hash,
+                        event_root_hash,
+                        state_checkpoint_hash,
+                        txn_output.gas_used(),
+                        status,
+                        auxiliary_info_hash,
+                    )
+                };
                 let txn_info_hash = txn_info.hash();
                 (txn_info, txn_info_hash)
             })
