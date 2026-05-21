@@ -167,6 +167,9 @@ impl DoGetExecutionOutput {
                 );
             }
         }
+        if parent_state.latest().hot_state_config().use_write_set_v1 {
+            Self::convert_write_sets_to_v1(&mut transaction_outputs);
+        }
 
         Parser::parse(
             state_view.next_version(),
@@ -191,11 +194,14 @@ impl DoGetExecutionOutput {
         append_state_checkpoint_to_block: Option<HashValue>,
     ) -> Result<ExecutionOutput> {
         let state_view_arc = Arc::new(state_view);
-        let transaction_outputs = Self::execute_block_sharded::<V>(
+        let mut transaction_outputs = Self::execute_block_sharded::<V>(
             transactions.clone(),
             state_view_arc.clone(),
             onchain_config,
         )?;
+        if parent_state.latest().hot_state_config().use_write_set_v1 {
+            Self::convert_write_sets_to_v1(&mut transaction_outputs);
+        }
 
         // TODO(Manu): Handle state checkpoint here.
 
@@ -217,6 +223,12 @@ impl DoGetExecutionOutput {
             false, // prime_state_cache
             append_state_checkpoint_to_block.is_some(),
         )
+    }
+
+    fn convert_write_sets_to_v1(transaction_outputs: &mut [TransactionOutput]) {
+        transaction_outputs
+            .iter_mut()
+            .for_each(TransactionOutput::convert_write_set_to_v1);
     }
 
     pub fn by_transaction_output(

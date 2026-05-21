@@ -39,41 +39,26 @@ fn test_v0_roundtrip() {
     assert_eq!(decoded.hotness_keys().count(), 0);
 }
 
-/// V1 WriteSets (crafted from a mirror since the production code has no public
-/// `WriteSet::V1` constructor yet) round-trip through the schema codec.
+/// V1 WriteSets constructed by production code round-trip through the schema codec.
 #[test]
 fn test_v1_roundtrip() {
-    use aptos_types::write_set::{Extension, WriteSetMut};
-
-    // Mirrors the on-wire shape of `WriteSetV1`.
-    #[derive(serde::Serialize)]
-    struct WriteSetV1Mirror<'a> {
-        value_writes: &'a WriteSetMut,
-        hotness: &'a BTreeSet<StateKey>,
-        extensions: &'a [Extension],
-    }
-
-    let value_writes = WriteSetMut::new(vec![(
+    let mut ws = WriteSet::new(vec![(
         StateKey::raw(b"key1"),
         WriteOp::legacy_creation(b"val1".to_vec().into()),
-    )]);
+    )])
+    .unwrap();
     let hotness: BTreeSet<_> = [StateKey::raw(b"hot1")].into_iter().collect();
+    ws.add_hotness(hotness.clone());
+    let ws = ws.into_v1();
 
-    let mut bytes = vec![1u8]; // BCS variant tag for V1.
-    bytes.extend(
-        bcs::to_bytes(&WriteSetV1Mirror {
-            value_writes: &value_writes,
-            hotness: &hotness,
-            extensions: &[],
-        })
-        .unwrap(),
-    );
-
+    let bytes = ws.encode_value().unwrap();
     let decoded = WriteSet::decode_value(&bytes).unwrap();
-    let reencoded = decoded.encode_value().unwrap();
-    assert_eq!(reencoded, bytes);
-    let redecoded = WriteSet::decode_value(&reencoded).unwrap();
-    assert_eq!(decoded, redecoded);
+    assert!(matches!(decoded, WriteSet::V1(_)));
+    assert_eq!(decoded, ws);
+    assert_eq!(
+        decoded.hotness_keys().cloned().collect::<BTreeSet<_>>(),
+        hotness
+    );
 }
 
 /// Legacy V1 bytes (variant tag 1 with `value ++ hotness`, no trailing extensions) must
