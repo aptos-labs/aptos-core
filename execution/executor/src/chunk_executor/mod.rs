@@ -343,17 +343,33 @@ impl<V: VMBlockExecutor> ChunkExecutorInner<V> {
             chunk_verifier,
         } = chunk;
 
+        let txn_infos = chunk_verifier.transaction_infos();
+        let all_v1 = matches!(txn_infos.first(), Some(TransactionInfo::V1(_)));
+        ensure!(
+            txn_infos
+                .iter()
+                .all(|t| matches!(t, TransactionInfo::V1(_)) == all_v1),
+            "Mixed TransactionInfo variants in the same chunk are not allowed.",
+        );
+        let known_state_checkpoints = Some(
+            txn_infos
+                .iter()
+                .map(|t| t.state_checkpoint_hash())
+                .collect_vec(),
+        );
+        let known_hot_state_checkpoints = all_v1.then(|| {
+            txn_infos
+                .iter()
+                .map(|t| t.hot_state_checkpoint_hash())
+                .collect_vec()
+        });
         let state_checkpoint_output = DoStateCheckpoint::run(
             &output.execution_output,
             &parent_state_summary,
             &ProvableStateSummary::new_persisted(self.db.reader.as_ref())?,
-            Some(
-                chunk_verifier
-                    .transaction_infos()
-                    .iter()
-                    .map(|t| t.state_checkpoint_hash())
-                    .collect_vec(),
-            ),
+            known_state_checkpoints,
+            known_hot_state_checkpoints,
+            all_v1,
         )?;
 
         let ledger_update_output = DoLedgerUpdate::run(
