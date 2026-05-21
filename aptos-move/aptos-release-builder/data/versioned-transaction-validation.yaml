@@ -1,0 +1,12 @@
+remote_endpoint: ~
+name: "v1.45-versioned-transaction-validation"
+proposals:
+  - name: versioned_transaction_validation
+    metadata:
+      title: "Proposal to enable versioned transaction validation APIs"
+      description: "Enables new prologue/epilogue functions for better maintainability and future extensions"
+    execution_mode: MultiStep
+    update_sequence:
+      - FeatureFlag:
+          enabled:
+            - versioned_transaction_validation
