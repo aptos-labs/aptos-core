@@ -8,7 +8,7 @@
 //! The block executor runs many transactions in parallel within a block and
 //! sequentially across blocks. Code-derived data (interned identifiers,
 //! interned types, loaded modules) is long-lived: it survives across
-//! transactions and is shared between worker threads.Ideally, the following
+//! transactions and is shared between worker threads. Ideally, the following
 //! requirements are satisfied:
 //!   - allocations are cheap and lock-free on the hot path,
 //!   - references to data can be handed to workers and stay valid for the
