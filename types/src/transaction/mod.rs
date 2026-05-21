@@ -3438,6 +3438,10 @@ pub trait BlockExecutableTransaction: Sync + Send + Clone + 'static {
         unimplemented!()
     }
 
+    fn try_get_block_epilogue_keys_to_make_hot(&self) -> Option<&BTreeSet<Self::Key>> {
+        None
+    }
+
     fn pre_write_values(&self) -> Vec<(Self::Key, Self::Value)> {
         vec![]
     }

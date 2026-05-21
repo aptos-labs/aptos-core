@@ -47,7 +47,7 @@ use move_vm_runtime::execution_tracing::Trace;
 use move_vm_types::delayed_values::delayed_field_id::DelayedFieldID;
 use once_cell::sync::OnceCell;
 use std::{
-    collections::{BTreeMap, HashMap, HashSet},
+    collections::{BTreeMap, BTreeSet, HashMap, HashSet},
     marker::PhantomData,
 };
 use triomphe::Arc as TriompheArc;
@@ -401,6 +401,14 @@ impl BlockExecutorTransactionOutput for AptosTransactionOutput {
                 .is_ok_and(|status| status.is_success());
         }
         false
+    }
+
+    fn add_hotness(&mut self, hotness: BTreeSet<StateKey>) -> Result<(), PanicError> {
+        self.vm_output
+            .as_mut()
+            .ok_or_else(|| code_invariant_error("Output must be set to add hotness"))?
+            .add_hotness(hotness);
+        Ok(())
     }
 
     fn check_materialization(&self) -> Result<bool, PanicError> {
