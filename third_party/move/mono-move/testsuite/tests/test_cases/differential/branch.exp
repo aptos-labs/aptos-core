@@ -35,9 +35,12 @@ fun clamp(r0): u64 {
 fun clamp() {
   frame_data_size: 16
   code:
-    0: JumpGreaterU64Imm @2 [0] > #10
-    1: Return
-    2: StoreImm8 [8] <- #10
-    3: Move8 [0] <- [8]
-    4: Return
+    0: Charge #3
+    1: JumpGreaterU64Imm @4 [0] > #10
+    2: Charge #2
+    3: Return
+    4: Charge #6
+    5: StoreImm8 [8] <- #10
+    6: Move8 [0] <- [8]
+    7: Return
 }

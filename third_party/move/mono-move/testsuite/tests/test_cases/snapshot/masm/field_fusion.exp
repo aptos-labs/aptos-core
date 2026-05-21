@@ -85,7 +85,8 @@ fun increment_field(r0) {
 fun identity() {
   frame_data_size: 8
   code:
-    0: Return
+    0: Charge #2
+    1: Return
 }
 
 fun add_two_fields(): skipped (nominal type not yet supported)

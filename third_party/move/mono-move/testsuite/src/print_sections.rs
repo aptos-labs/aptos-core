@@ -18,17 +18,16 @@ use crate::parser::PrintSection;
 use anyhow::{anyhow, Result};
 use mono_move_core::{
     interner::{InternedIdentifier, InternedModuleId},
-    types::{view_type_list, FieldLayout, InternedType, InternedTypeList, EMPTY_TYPE_LIST},
+    types::{FieldLayout, InternedType, InternedTypeList, EMPTY_TYPE_LIST},
     DescriptorId, FieldTypes, FrameOffset, Interner,
 };
 use mono_move_global_context::ExecutionGuard;
 use move_binary_format::{access::ModuleAccess, CompiledModule};
 use specializer::{
     destack,
-    lower::{
-        context::{try_discover_types_for_lowering_in_function, SpecializerContext},
-        gc_layout::derive_frame_layout,
-        lower_function, try_build_context, BuildContextOutcome, MicroOpsFunctionDisplay,
+    lower::context::{
+        try_discover_types_for_lowering_in_function, try_lower_function, LoweringOutcome,
+        SpecializerContext,
     },
     stackless_exec_ir::ModuleIR,
 };
@@ -59,14 +58,14 @@ pub fn render(
                 push_section(
                     &mut out,
                     "=== micro-ops ===\n",
-                    &format_micro_ops(guard, &module_ir),
+                    &render_micro_ops(guard, &module_ir),
                 );
             }
             if want_frame_layout {
                 push_section(
                     &mut out,
                     "=== frame-layout ===\n",
-                    &format_frame_layout(guard, &module_ir),
+                    &render_frame_layout(guard, &module_ir),
                 );
             }
         }
@@ -87,155 +86,91 @@ fn format_bytecode(module: &CompiledModule) -> Result<String> {
         .map_err(|e| anyhow!("bytecode disassembly failed: {:#}", e))
 }
 
-/// Format the micro-ops for every function in `module_ir`, with a
-/// `// module ...` banner and a stanza per function (or a
-/// `skipped (...)` line when lowering is not yet supported).
-///
-/// Sizes types per-function via `try_build_context_v2` before invoking
-/// `try_build_context`, so the second call's `type_size_and_align`
-/// lookups all hit when the function only references types from the
-/// module itself.
-pub fn format_micro_ops(guard: &ExecutionGuard<'_>, module_ir: &ModuleIR) -> String {
-    let module = &module_ir.module;
+fn push_module_banner(out: &mut String, module: &CompiledModule) {
     let self_handle = module.module_handle_at(module.self_module_handle_idx);
     let addr = module.address_identifier_at(self_handle.address);
     let mod_name = module.identifier_at(self_handle.name);
-
-    let mut out = String::new();
     out.push_str(&format!(
         "// module 0x{}::{}\n",
         addr.short_str_lossless(),
         mod_name
     ));
+}
 
+/// Lower each function in `module_ir`, returning `(name, result)` pairs.
+//
+// TODO: we render only at publish time, so there is no way to render
+// instantiated generics. Figure out what is the best way to print
+// their code.
+fn lower_functions(
+    guard: &ExecutionGuard<'_>,
+    module_ir: &ModuleIR,
+) -> Vec<(String, Result<LoweringOutcome>)> {
     let mut loader_ctx = SnapshotLoaderContext { guard, module_ir };
+    module_ir
+        .functions
+        .iter()
+        .flatten()
+        .map(|func_ir| {
+            let name = module_ir.module.identifier_at(func_ir.name_idx).to_string();
+            let result = try_discover_types_for_lowering_in_function(
+                &mut loader_ctx,
+                module_ir,
+                func_ir,
+                EMPTY_TYPE_LIST,
+            )
+            .and_then(|vd| try_lower_function(module_ir, func_ir, EMPTY_TYPE_LIST, guard, vd));
+            (name, result)
+        })
+        .collect()
+}
 
-    for func_ir in module_ir.functions.iter().flatten() {
-        let func_name = module.identifier_at(func_ir.name_idx).to_string();
-        // TODO: we render only at publish time, so there is no way to
-        //  render instantiated generics. Figure out what is the best
-        //  way to print their code.
-        let vec_descriptors = match try_discover_types_for_lowering_in_function(
-            &mut loader_ctx,
-            module_ir,
-            func_ir,
-            EMPTY_TYPE_LIST,
-        ) {
-            Ok(map) => map,
+/// Render the micro-ops section: module banner + per-function stanzas.
+pub fn render_micro_ops(guard: &ExecutionGuard<'_>, module_ir: &ModuleIR) -> String {
+    let mut out = String::new();
+    push_module_banner(&mut out, &module_ir.module);
+    for (name, result) in lower_functions(guard, module_ir) {
+        match result {
+            Ok(LoweringOutcome::Built(f)) => {
+                out.push('\n');
+                out.push_str(&f.to_string());
+            },
+            Ok(LoweringOutcome::Skipped(reason)) => {
+                out.push_str(&format!("\nfun {}(): skipped ({})\n", name, reason));
+            },
             Err(e) => {
-                out.push_str(&format!(
-                    "\nfun {}(): skipped (cannot discover types: {})\n",
-                    func_name, e
-                ));
-                continue;
-            },
-        };
-        match try_build_context(module_ir, func_ir, EMPTY_TYPE_LIST, guard, vec_descriptors) {
-            Err(e) => {
-                out.push_str(&format!(
-                    "\nfun {}(): skipped (context: {})\n",
-                    func_name, e
-                ));
-            },
-            Ok(BuildContextOutcome::Skipped(reason)) => {
-                out.push_str(&format!("\nfun {}(): skipped ({})\n", func_name, reason));
-            },
-            Ok(BuildContextOutcome::Built(ctx)) => match lower_function(func_ir, &ctx) {
-                Ok((ops, safe_points)) => {
-                    out.push('\n');
-                    out.push_str(
-                        &MicroOpsFunctionDisplay {
-                            func_name: &func_name,
-                            ctx: &ctx,
-                            ops: &ops,
-                            safe_points: &safe_points,
-                        }
-                        .to_string(),
-                    );
-                },
-                Err(e) => {
-                    out.push_str(&format!(
-                        "\nfun {}(): skipped (lowering: {})\n",
-                        func_name, e
-                    ));
-                },
+                out.push_str(&format!("\nfun {}(): skipped (lowering: {:#})\n", name, e));
             },
         }
     }
     out
 }
 
-/// Format derived `frame_layout` and `zero_frame` for every function
-/// in `module_ir`, one line per function. Skipped functions surface
-/// their `skipped (...)` reason (same shape as `format_micro_ops`)
-/// instead of layout values.
-pub fn format_frame_layout(guard: &ExecutionGuard<'_>, module_ir: &ModuleIR) -> String {
-    let module = &module_ir.module;
-    let self_handle = module.module_handle_at(module.self_module_handle_idx);
-    let addr = module.address_identifier_at(self_handle.address);
-    let mod_name = module.identifier_at(self_handle.name);
-
+/// Render the frame-layout section for each function in the module.
+pub fn render_frame_layout(guard: &ExecutionGuard<'_>, module_ir: &ModuleIR) -> String {
     let mut out = String::new();
-    out.push_str(&format!(
-        "// module 0x{}::{}\n",
-        addr.short_str_lossless(),
-        mod_name
-    ));
-
-    let mut loader_ctx = SnapshotLoaderContext { guard, module_ir };
-
-    for func_ir in module_ir.functions.iter().flatten() {
-        let func_name = module.identifier_at(func_ir.name_idx).to_string();
-        let vec_descriptors = match try_discover_types_for_lowering_in_function(
-            &mut loader_ctx,
-            module_ir,
-            func_ir,
-            EMPTY_TYPE_LIST,
-        ) {
-            Ok(map) => map,
-            Err(e) => {
+    push_module_banner(&mut out, &module_ir.module);
+    for (name, result) in lower_functions(guard, module_ir) {
+        match result {
+            Ok(LoweringOutcome::Built(f)) => {
+                let offsets: Vec<String> = f
+                    .frame_layout
+                    .heap_ptr_offsets
+                    .iter()
+                    .map(|o| o.0.to_string())
+                    .collect();
                 out.push_str(&format!(
-                    "fun {}: skipped (cannot discover types: {})\n",
-                    func_name, e
+                    "fun {}: heap_ptr_offsets=[{}] zero_frame={}\n",
+                    name,
+                    offsets.join(", "),
+                    f.zero_frame
                 ));
-                continue;
             },
-        };
-        match try_build_context(module_ir, func_ir, EMPTY_TYPE_LIST, guard, vec_descriptors) {
+            Ok(LoweringOutcome::Skipped(reason)) => {
+                out.push_str(&format!("fun {}: skipped ({})\n", name, reason));
+            },
             Err(e) => {
-                out.push_str(&format!("fun {}: skipped (context: {})\n", func_name, e));
-            },
-            Ok(BuildContextOutcome::Skipped(reason)) => {
-                out.push_str(&format!("fun {}: skipped ({})\n", func_name, reason));
-            },
-            Ok(BuildContextOutcome::Built(ctx)) => {
-                // Mirror `try_lower_function`'s substitution path.
-                let home_list = guard.type_list_of(&func_ir.home_slot_types);
-                let home_list = match guard.subst_type_list(home_list, EMPTY_TYPE_LIST) {
-                    Ok(l) => l,
-                    Err(e) => {
-                        out.push_str(&format!("fun {}: skipped (subst: {})\n", func_name, e));
-                        continue;
-                    },
-                };
-                match derive_frame_layout(&ctx, func_ir, view_type_list(home_list)) {
-                    Ok(derived) => {
-                        let offsets: Vec<String> = derived
-                            .heap_ptr_offsets
-                            .iter()
-                            .map(|o| o.0.to_string())
-                            .collect();
-                        out.push_str(&format!(
-                            "fun {}: heap_ptr_offsets=[{}] zero_frame={}\n",
-                            func_name,
-                            offsets.join(", "),
-                            derived.zero_frame
-                        ));
-                    },
-                    Err(e) => {
-                        out.push_str(&format!("fun {}: skipped (gc_layout: {})\n", func_name, e));
-                    },
-                }
+                out.push_str(&format!("fun {}: skipped (lowering: {:#})\n", name, e));
             },
         }
     }

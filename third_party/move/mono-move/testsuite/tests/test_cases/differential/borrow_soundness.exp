@@ -65,42 +65,46 @@ fun mut_borrow_kills_reverse(r0): u64 {
 fun borrow_loc_no_source_subst() {
   frame_data_size: 40
   code:
-    0: Move8 [8] <- [0]
-    1: SlotBorrow [16] <- &[8]
-    2: ReadRef [32] <- *[16] (size=8)
-    3: Move8 [0] <- [32]
-    4: Return
+    0: Charge #34
+    1: Move8 [8] <- [0]
+    2: SlotBorrow [16] <- &[8]
+    3: ReadRef [32] <- *[16] (size=8)
+    4: Move8 [0] <- [32]
+    5: Return
 }
 
 fun imm_borrow_value_prop() {
   frame_data_size: 40
   code:
-    0: Move8 [8] <- [0]
-    1: SlotBorrow [16] <- &[8]
-    2: ReadRef [32] <- *[16] (size=8)
-    3: AddU64 [32] <- [32] + [0]
-    4: Move8 [0] <- [32]
-    5: Return
+    0: Charge #37
+    1: Move8 [8] <- [0]
+    2: SlotBorrow [16] <- &[8]
+    3: ReadRef [32] <- *[16] (size=8)
+    4: AddU64 [32] <- [32] + [0]
+    5: Move8 [0] <- [32]
+    6: Return
 }
 
 fun mut_borrow_kills_subst() {
   frame_data_size: 40
   code:
-    0: Move8 [8] <- [0]
-    1: StoreImm8 [16] <- #42
-    2: SlotBorrow [24] <- &[8]
-    3: WriteRef *[24] <- [16] (size=8)
-    4: Move8 [0] <- [8]
-    5: Return
+    0: Charge #36
+    1: Move8 [8] <- [0]
+    2: StoreImm8 [16] <- #42
+    3: SlotBorrow [24] <- &[8]
+    4: WriteRef *[24] <- [16] (size=8)
+    5: Move8 [0] <- [8]
+    6: Return
 }
 
 fun mut_borrow_kills_reverse() {
   frame_data_size: 40
   code:
-    0: Move8 [8] <- [0]
-    1: StoreImm8 [16] <- #99
-    2: SlotBorrow [24] <- &[0]
-    3: WriteRef *[24] <- [16] (size=8)
-    4: Move8 [0] <- [8]
-    5: Return
+    0: Charge #36
+    1: Move8 [8] <- [0]
+    2: StoreImm8 [16] <- #99
+    3: SlotBorrow [24] <- &[0]
+    4: WriteRef *[24] <- [16] (size=8)
+    5: Move8 [0] <- [8]
+    6: Return
 }

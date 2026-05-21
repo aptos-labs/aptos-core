@@ -43,17 +43,19 @@ fun quad(r0): u64 {
 fun double() {
   frame_data_size: 16
   code:
-    0: AddU64 [8] <- [0] + [0]
-    1: Move8 [0] <- [8]
-    2: Return
+    0: Charge #7
+    1: AddU64 [8] <- [0] + [0]
+    2: Move8 [0] <- [8]
+    3: Return
 }
 
 fun quad() {
   frame_data_size: 8
   code:
-    0: Move8 [32] <- [0]
-    1: CallIndirect 0x1::test::double
+    0: Charge #26
+    1: Move8 [32] <- [0]
     2: CallIndirect 0x1::test::double
-    3: Move8 [0] <- [32]
-    4: Return
+    3: CallIndirect 0x1::test::double
+    4: Move8 [0] <- [32]
+    5: Return
 }

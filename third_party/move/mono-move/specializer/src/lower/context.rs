@@ -9,7 +9,7 @@
 use crate::{
     lower::{
         gc_layout::{derive_frame_layout, type_pointer_offsets},
-        lower_function,
+        translate::lower_function,
     },
     stackless_exec_ir::{FunctionIR, Instr, ModuleIR},
 };

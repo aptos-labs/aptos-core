@@ -66,26 +66,29 @@ fun take(r0) {
 fun caller() {
   frame_data_size: 32
   code:
-    0: CallIndirect 0x66::vec_pushback_safe_point::fresh
-    1: VecNew [0]
-    2: SlotBorrow [8] <- &[0]
-    3: StoreImm8 [24] <- #42
-    4: VecPushBack [8].push([24], size=8, desc=2)
-    5: CallIndirect 0x66::vec_pushback_safe_point::take
-    6: Return
+    0: Charge #64
+    1: CallIndirect 0x66::vec_pushback_safe_point::fresh
+    2: VecNew [0]
+    3: SlotBorrow [8] <- &[0]
+    4: StoreImm8 [24] <- #42
+    5: VecPushBack [8].push([24], size=8, desc=2)
+    6: CallIndirect 0x66::vec_pushback_safe_point::take
+    7: Return
   safe_point_layouts:
-    4: [56]
+    5: [56]
 }
 
 fun fresh() {
   frame_data_size: 8
   code:
-    0: VecNew [0]
-    1: Return
+    0: Charge #12
+    1: VecNew [0]
+    2: Return
 }
 
 fun take() {
   frame_data_size: 8
   code:
-    0: Return
+    0: Charge #2
+    1: Return
 }

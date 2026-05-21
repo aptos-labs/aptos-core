@@ -259,104 +259,113 @@ fun negate_i256(r0): i256 {
 === micro-ops ===
 // module 0x66::test
 
-fun add_u8(): skipped (context: home slot: slot align 1 < 8 not yet supported (u64-aligned types only))
+fun add_u8(): skipped (lowering: home slot: slot align 1 < 8 not yet supported (u64-aligned types only))
 
-fun sub_u16(): skipped (context: home slot: slot align 2 < 8 not yet supported (u64-aligned types only))
+fun sub_u16(): skipped (lowering: home slot: slot align 2 < 8 not yet supported (u64-aligned types only))
 
-fun mul_u32(): skipped (context: home slot: slot align 4 < 8 not yet supported (u64-aligned types only))
+fun mul_u32(): skipped (lowering: home slot: slot align 4 < 8 not yet supported (u64-aligned types only))
 
 fun div_u128() {
   frame_data_size: 48
   code:
-    0: IntDiv [32] <- [0] / u128 [16]
-    1: Move(16) [0] <- [32]
-    2: Return
+    0: Charge #57
+    1: IntDiv [32] <- [0] / u128 [16]
+    2: Move(16) [0] <- [32]
+    3: Return
 }
 
 fun mod_u256() {
   frame_data_size: 96
   code:
-    0: IntMod [64] <- [0] % u256 [32]
-    1: Move(32) [0] <- [64]
-    2: Return
+    0: Charge #105
+    1: IntMod [64] <- [0] % u256 [32]
+    2: Move(32) [0] <- [64]
+    3: Return
 }
 
-fun add_i8(): skipped (context: home slot: slot align 1 < 8 not yet supported (u64-aligned types only))
+fun add_i8(): skipped (lowering: home slot: slot align 1 < 8 not yet supported (u64-aligned types only))
 
-fun sub_i16(): skipped (context: home slot: slot align 2 < 8 not yet supported (u64-aligned types only))
+fun sub_i16(): skipped (lowering: home slot: slot align 2 < 8 not yet supported (u64-aligned types only))
 
-fun mul_i32(): skipped (context: home slot: slot align 4 < 8 not yet supported (u64-aligned types only))
+fun mul_i32(): skipped (lowering: home slot: slot align 4 < 8 not yet supported (u64-aligned types only))
 
 fun div_i64() {
   frame_data_size: 24
   code:
-    0: IntDiv [16] <- [0] / i64 [8]
-    1: Move8 [0] <- [16]
-    2: Return
+    0: Charge #9
+    1: IntDiv [16] <- [0] / i64 [8]
+    2: Move8 [0] <- [16]
+    3: Return
 }
 
 fun mod_i128() {
   frame_data_size: 48
   code:
-    0: IntMod [32] <- [0] % i128 [16]
-    1: Move(16) [0] <- [32]
-    2: Return
+    0: Charge #57
+    1: IntMod [32] <- [0] % i128 [16]
+    2: Move(16) [0] <- [32]
+    3: Return
 }
 
 fun add_i256() {
   frame_data_size: 96
   code:
-    0: IntAdd [64] <- [0] + i256 [32]
-    1: Move(32) [0] <- [64]
-    2: Return
+    0: Charge #105
+    1: IntAdd [64] <- [0] + i256 [32]
+    2: Move(32) [0] <- [64]
+    3: Return
 }
 
 fun bit_and_u128() {
   frame_data_size: 48
   code:
-    0: IntBitAnd [32] <- [0] & u128 [16]
-    1: Move(16) [0] <- [32]
-    2: Return
+    0: Charge #57
+    1: IntBitAnd [32] <- [0] & u128 [16]
+    2: Move(16) [0] <- [32]
+    3: Return
 }
 
-fun bit_or_u8(): skipped (context: home slot: slot align 1 < 8 not yet supported (u64-aligned types only))
+fun bit_or_u8(): skipped (lowering: home slot: slot align 1 < 8 not yet supported (u64-aligned types only))
 
-fun bit_xor_u32(): skipped (context: home slot: slot align 4 < 8 not yet supported (u64-aligned types only))
+fun bit_xor_u32(): skipped (lowering: home slot: slot align 4 < 8 not yet supported (u64-aligned types only))
 
-fun shl_u16(): skipped (context: home slot: slot align 2 < 8 not yet supported (u64-aligned types only))
+fun shl_u16(): skipped (lowering: home slot: slot align 2 < 8 not yet supported (u64-aligned types only))
 
-fun shr_u256(): skipped (context: home slot: slot align 1 < 8 not yet supported (u64-aligned types only))
+fun shr_u256(): skipped (lowering: home slot: slot align 1 < 8 not yet supported (u64-aligned types only))
 
-fun add_u8_imm(): skipped (context: home slot: slot align 1 < 8 not yet supported (u64-aligned types only))
+fun add_u8_imm(): skipped (lowering: home slot: slot align 1 < 8 not yet supported (u64-aligned types only))
 
 fun mul_u128_imm() {
   frame_data_size: 32
   code:
-    0: IntMul [16] <- [0] * u128 #1000
-    1: Move(16) [0] <- [16]
-    2: Return
+    0: Charge #57
+    1: IntMul [16] <- [0] * u128 #1000
+    2: Move(16) [0] <- [16]
+    3: Return
 }
 
-fun bit_and_u32_imm(): skipped (context: home slot: slot align 4 < 8 not yet supported (u64-aligned types only))
+fun bit_and_u32_imm(): skipped (lowering: home slot: slot align 4 < 8 not yet supported (u64-aligned types only))
 
-fun shl_u16_imm(): skipped (context: home slot: slot align 2 < 8 not yet supported (u64-aligned types only))
+fun shl_u16_imm(): skipped (lowering: home slot: slot align 2 < 8 not yet supported (u64-aligned types only))
 
-fun sub_i32_imm(): skipped (context: home slot: slot align 4 < 8 not yet supported (u64-aligned types only))
+fun sub_i32_imm(): skipped (lowering: home slot: slot align 4 < 8 not yet supported (u64-aligned types only))
 
-fun negate_i8(): skipped (context: home slot: slot align 1 < 8 not yet supported (u64-aligned types only))
+fun negate_i8(): skipped (lowering: home slot: slot align 1 < 8 not yet supported (u64-aligned types only))
 
 fun negate_i64() {
   frame_data_size: 16
   code:
-    0: IntNegate.i64 [8] <- -[0]
-    1: Move8 [0] <- [8]
-    2: Return
+    0: Charge #9
+    1: IntNegate.i64 [8] <- -[0]
+    2: Move8 [0] <- [8]
+    3: Return
 }
 
 fun negate_i256() {
   frame_data_size: 64
   code:
-    0: IntNegate.i256 [32] <- -[0]
-    1: Move(32) [0] <- [32]
-    2: Return
+    0: Charge #105
+    1: IntNegate.i256 [32] <- -[0]
+    2: Move(32) [0] <- [32]
+    3: Return
 }

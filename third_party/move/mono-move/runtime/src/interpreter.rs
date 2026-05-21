@@ -647,7 +647,7 @@ impl<T: ExecutionContext + DescriptorProvider> InterpreterContext<'_, T> {
         if self.pc >= code.len() {
             invariant_violation!(PcOutOfBounds {
                 pc: self.pc,
-                func_name: unsafe { func.name.as_ref_unchecked() }.to_string(),
+                func_name: func.name().to_string(),
                 code_len: code.len(),
             });
         }

@@ -177,116 +177,130 @@ fun shr_imm(r0): u64 {
 fun add_values() {
   frame_data_size: 24
   code:
-    0: AddU64 [16] <- [0] + [8]
-    1: Move8 [0] <- [16]
-    2: Return
+    0: Charge #7
+    1: AddU64 [16] <- [0] + [8]
+    2: Move8 [0] <- [16]
+    3: Return
 }
 
 fun complex_arith() {
   frame_data_size: 24
   code:
-    0: MulU64Imm [8] <- [0] * #2
-    1: AddU64Imm [16] <- [8] + #1
-    2: Move8 [0] <- [16]
-    3: Return
+    0: Charge #11
+    1: MulU64Imm [8] <- [0] * #2
+    2: AddU64Imm [16] <- [8] + #1
+    3: Move8 [0] <- [16]
+    4: Return
 }
 
 fun sub_values() {
   frame_data_size: 24
   code:
-    0: SubU64 [16] <- [0] - [8]
-    1: Move8 [0] <- [16]
-    2: Return
+    0: Charge #7
+    1: SubU64 [16] <- [0] - [8]
+    2: Move8 [0] <- [16]
+    3: Return
 }
 
 fun sub_imm() {
   frame_data_size: 16
   code:
-    0: SubU64Imm [8] <- [0] - #5
-    1: Move8 [0] <- [8]
-    2: Return
+    0: Charge #7
+    1: SubU64Imm [8] <- [0] - #5
+    2: Move8 [0] <- [8]
+    3: Return
 }
 
 fun div_values() {
   frame_data_size: 24
   code:
-    0: DivU64 [16] <- [0] / [8]
-    1: Move8 [0] <- [16]
-    2: Return
+    0: Charge #9
+    1: DivU64 [16] <- [0] / [8]
+    2: Move8 [0] <- [16]
+    3: Return
 }
 
 fun mod_values() {
   frame_data_size: 24
   code:
-    0: ModU64 [16] <- [0] % [8]
-    1: Move8 [0] <- [16]
-    2: Return
+    0: Charge #9
+    1: ModU64 [16] <- [0] % [8]
+    2: Move8 [0] <- [16]
+    3: Return
 }
 
 fun bit_and() {
   frame_data_size: 24
   code:
-    0: BitAndU64 [16] <- [0] & [8]
-    1: Move8 [0] <- [16]
-    2: Return
+    0: Charge #7
+    1: BitAndU64 [16] <- [0] & [8]
+    2: Move8 [0] <- [16]
+    3: Return
 }
 
 fun bit_or() {
   frame_data_size: 24
   code:
-    0: BitOrU64 [16] <- [0] | [8]
-    1: Move8 [0] <- [16]
-    2: Return
+    0: Charge #7
+    1: BitOrU64 [16] <- [0] | [8]
+    2: Move8 [0] <- [16]
+    3: Return
 }
 
 fun bit_xor() {
   frame_data_size: 24
   code:
-    0: BitXorU64 [16] <- [0] ^ [8]
-    1: Move8 [0] <- [16]
-    2: Return
+    0: Charge #7
+    1: BitXorU64 [16] <- [0] ^ [8]
+    2: Move8 [0] <- [16]
+    3: Return
 }
 
-fun shl_values(): skipped (context: home slot: slot align 1 < 8 not yet supported (u64-aligned types only))
+fun shl_values(): skipped (lowering: home slot: slot align 1 < 8 not yet supported (u64-aligned types only))
 
-fun shr_values(): skipped (context: home slot: slot align 1 < 8 not yet supported (u64-aligned types only))
+fun shr_values(): skipped (lowering: home slot: slot align 1 < 8 not yet supported (u64-aligned types only))
 
 fun mul_imm() {
   frame_data_size: 16
   code:
-    0: MulU64Imm [8] <- [0] * #7
-    1: Move8 [0] <- [8]
-    2: Return
+    0: Charge #8
+    1: MulU64Imm [8] <- [0] * #7
+    2: Move8 [0] <- [8]
+    3: Return
 }
 
 fun div_imm() {
   frame_data_size: 16
   code:
-    0: DivU64Imm [8] <- [0] / #3
-    1: Move8 [0] <- [8]
-    2: Return
+    0: Charge #9
+    1: DivU64Imm [8] <- [0] / #3
+    2: Move8 [0] <- [8]
+    3: Return
 }
 
 fun mod_imm() {
   frame_data_size: 16
   code:
-    0: ModU64Imm [8] <- [0] % #10
-    1: Move8 [0] <- [8]
-    2: Return
+    0: Charge #9
+    1: ModU64Imm [8] <- [0] % #10
+    2: Move8 [0] <- [8]
+    3: Return
 }
 
 fun shl_imm() {
   frame_data_size: 16
   code:
-    0: ShlU64Imm [8] <- [0] << #4
-    1: Move8 [0] <- [8]
-    2: Return
+    0: Charge #7
+    1: ShlU64Imm [8] <- [0] << #4
+    2: Move8 [0] <- [8]
+    3: Return
 }
 
 fun shr_imm() {
   frame_data_size: 16
   code:
-    0: ShrU64Imm [8] <- [0] >> #2
-    1: Move8 [0] <- [8]
-    2: Return
+    0: Charge #7
+    1: ShrU64Imm [8] <- [0] >> #2
+    2: Move8 [0] <- [8]
+    3: Return
 }
