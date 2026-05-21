@@ -501,8 +501,16 @@ fn now_usecs() -> u64 {
     aptos_infallible::duration_since_epoch().as_micros() as u64
 }
 
-/// Block-finalization stages that should stay grouped with the preceding
-/// Executed(Retry) rather than starting a new display-attempt.
+/// Stages that fire AFTER `Executed(Retry)` but logically belong to the same
+/// block as the retried execution. `mark_retry` increments `current_attempt`
+/// immediately after recording `Executed(Retry)`, so these stages' records
+/// carry the *next* attempt number even though they're block N's finalization.
+///
+/// Used by:
+/// - the `data.stages` text builder (delay `[attempt_N+1]` marker until a
+///   non-finalization stage fires), and
+/// - `build_first_attempt_scalars` (route these into attempt-1's scalar slots
+///   instead of dropping them as "not attempt 1").
 fn is_block_finalization(stage: TransactionStage) -> bool {
     matches!(
         stage,
@@ -761,13 +769,7 @@ fn log_trace(trace: &TransactionTrace) {
         }
     };
 
-    let v = build_per_stage_vectors(&sorted_stages, base, max_attempt);
-
-    // Drop all-None vectors so per-stage fields without any populated attempt
-    // never appear in the structured payload.
-    fn keep<T>(v: Vec<Option<T>>) -> Option<Vec<Option<T>>> {
-        v.iter().any(Option::is_some).then_some(v)
-    }
+    let scalars = build_first_attempt_scalars(&sorted_stages, base);
 
     let mut schema = LogSchema::new(LogEvent::TxnTrace)
         .hash(trace.hash)
@@ -780,184 +782,158 @@ fn log_trace(trace: &TransactionTrace) {
     if let Some(g) = trace.gas_unit_price {
         schema = schema.gas_unit_price(g);
     }
-    if let Some(x) = keep(v.mempool_insert_ms) {
+    if let Some(x) = scalars.mempool_insert_ms {
         schema = schema.mempool_insert_ms(x);
     }
-    if let Some(x) = keep(v.qs_batch_pull_ms) {
+    if let Some(x) = scalars.qs_batch_pull_ms {
         schema = schema.qs_batch_pull_ms(x);
     }
-    if let Some(x) = keep(v.qs_batch_created_ms) {
+    if let Some(x) = scalars.qs_batch_created_ms {
         schema = schema.qs_batch_created_ms(x);
     }
-    if let Some(x) = keep(v.qs_proof_of_store_ms) {
+    if let Some(x) = scalars.qs_proof_of_store_ms {
         schema = schema.qs_proof_of_store_ms(x);
     }
-    if let Some(x) = keep(v.block_proposed_ms) {
+    if let Some(x) = scalars.block_proposed_ms {
         schema = schema.block_proposed_ms(x);
     }
-    if let Some(x) = keep(v.block_proposed_kind) {
+    if let Some(x) = scalars.block_proposed_kind {
         schema = schema.block_proposed_kind(x);
     }
-    if let Some(x) = keep(v.block_received_ms) {
+    if let Some(x) = scalars.block_received_ms {
         schema = schema.block_received_ms(x);
     }
-    if let Some(x) = keep(v.execution_start_ms) {
+    if let Some(x) = scalars.execution_start_ms {
         schema = schema.execution_start_ms(x);
     }
-    if let Some(x) = keep(v.executed_ms) {
+    if let Some(x) = scalars.executed_ms {
         schema = schema.executed_ms(x);
     }
-    if let Some(x) = keep(v.executed_status) {
+    if let Some(x) = scalars.executed_status {
         schema = schema.executed_status(x);
     }
-    if let Some(x) = keep(v.block_ordered_ms) {
+    if let Some(x) = scalars.block_ordered_ms {
         schema = schema.block_ordered_ms(x);
     }
-    if let Some(x) = keep(v.certified_ms) {
+    if let Some(x) = scalars.certified_ms {
         schema = schema.certified_ms(x);
     }
-    if let Some(x) = keep(v.pre_commit_ms) {
+    if let Some(x) = scalars.pre_commit_ms {
         schema = schema.pre_commit_ms(x);
     }
-    if let Some(x) = keep(v.committed_ms) {
+    if let Some(x) = scalars.committed_ms {
         schema = schema.committed_ms(x);
     }
-    if let Some(x) = keep(v.mempool_commit_ms) {
+    if let Some(x) = scalars.mempool_commit_ms {
         schema = schema.mempool_commit_ms(x);
     }
-    if let Some(x) = keep(v.mempool_reject_ms) {
+    if let Some(x) = scalars.mempool_reject_ms {
         schema = schema.mempool_reject_ms(x);
     }
 
     info!(schema);
 }
 
-/// Per-attempt per-stage latency vectors (ms). Each vector has length
-/// `attempts`; index `i` corresponds to attempt `i+1`. `None` at index `i`
-/// means the stage did not fire in attempt `i+1`. The value at a populated
-/// slot is the **absolute latency in ms from `MempoolInsert`** (the trace's
-/// insertion time) — i.e., the cumulative time the txn has been in the
-/// pipeline when this stage fired. `max` across all populated entries equals
-/// `total_latency_ms`.
+/// Per-stage scalars for the **first pipeline pass** (attempt 1). Each value
+/// is the absolute latency in ms from `MempoolInsert`. Single scalar per
+/// stage (no per-attempt arrays) so Humio/Grafana queries are direct:
+/// `data.committed_ms` instead of `data.committed_ms[N]`. Multi-attempt
+/// detail lives in the `stages` text string.
 #[derive(Debug, Default)]
-struct StageVectors {
-    mempool_insert_ms: Vec<Option<i64>>,
-    qs_batch_pull_ms: Vec<Option<i64>>,
-    qs_batch_created_ms: Vec<Option<i64>>,
-    qs_proof_of_store_ms: Vec<Option<i64>>,
-    block_proposed_ms: Vec<Option<i64>>,
-    block_proposed_kind: Vec<Option<String>>,
-    block_received_ms: Vec<Option<i64>>,
-    execution_start_ms: Vec<Option<i64>>,
-    executed_ms: Vec<Option<i64>>,
-    executed_status: Vec<Option<String>>,
-    block_ordered_ms: Vec<Option<i64>>,
-    certified_ms: Vec<Option<i64>>,
-    pre_commit_ms: Vec<Option<i64>>,
-    committed_ms: Vec<Option<i64>>,
-    mempool_commit_ms: Vec<Option<i64>>,
-    mempool_reject_ms: Vec<Option<i64>>,
+struct StageScalars {
+    mempool_insert_ms: Option<i64>,
+    qs_batch_pull_ms: Option<i64>,
+    qs_batch_created_ms: Option<i64>,
+    qs_proof_of_store_ms: Option<i64>,
+    block_proposed_ms: Option<i64>,
+    block_proposed_kind: Option<String>,
+    block_received_ms: Option<i64>,
+    execution_start_ms: Option<i64>,
+    executed_ms: Option<i64>,
+    executed_status: Option<String>,
+    block_ordered_ms: Option<i64>,
+    certified_ms: Option<i64>,
+    pre_commit_ms: Option<i64>,
+    committed_ms: Option<i64>,
+    mempool_commit_ms: Option<i64>,
+    mempool_reject_ms: Option<i64>,
 }
 
-/// Build per-attempt per-stage absolute-latency vectors from chronologically-
-/// sorted stage records. `base` is the trace's MempoolInsert timestamp. Each
-/// populated entry is `(record.timestamp_usecs - base) / 1000` — the cumulative
-/// time in the pipeline at that stage. `max` across the returned vectors
-/// equals `(last_stage.timestamp_usecs - base) / 1000`.
-fn build_per_stage_vectors(
+/// Build per-stage scalars from the first pipeline pass (attempt 1), from
+/// chronologically-sorted stage records. `base` is the trace's MempoolInsert
+/// timestamp; each value is `(record.timestamp_usecs - base) / 1000`.
+///
+/// For non-block-finalization stages we filter by `record.attempt == 1`. For
+/// block-finalization stages (BlockOrdered/PreCommit/Certified/Committed) we
+/// need extra logic: `mark_retry` bumps `current_attempt` immediately after
+/// `Executed(Retry)`, so block 1's finalization stages get stamped with
+/// `attempt = 2` in the underlying record — even though they belong to the
+/// first pipeline pass. We track `display_attempt` (which only advances on
+/// non-finalization stages) to identify them, matching the same logic used
+/// in the human-readable `stages` text.
+fn build_first_attempt_scalars(
     sorted_stages: &[crate::types::StageRecord],
     base: u64,
-    max_attempt: u32,
-) -> StageVectors {
-    let n = max_attempt as usize;
-    let mut v = StageVectors {
-        mempool_insert_ms: vec![None; n],
-        qs_batch_pull_ms: vec![None; n],
-        qs_batch_created_ms: vec![None; n],
-        qs_proof_of_store_ms: vec![None; n],
-        block_proposed_ms: vec![None; n],
-        block_proposed_kind: vec![None; n],
-        block_received_ms: vec![None; n],
-        execution_start_ms: vec![None; n],
-        executed_ms: vec![None; n],
-        executed_status: vec![None; n],
-        block_ordered_ms: vec![None; n],
-        certified_ms: vec![None; n],
-        pre_commit_ms: vec![None; n],
-        committed_ms: vec![None; n],
-        mempool_commit_ms: vec![None; n],
-        mempool_reject_ms: vec![None; n],
-    };
-
-    // `display_attempt` tracks the most recently-seen non-block-finalization
-    // attempt and is used to route block-finalization stages to the slot of
-    // the block whose pipeline produced them. The split matters because
-    // `mark_retry` bumps `current_attempt` immediately after `Executed(Retry)`,
-    // so block N's PreCommit/Certified/Committed (which fire *after* that
-    // bump) get stamped with attempt N+1 in the underlying record — even
-    // though they belong to block N. The display loop in `log_trace` already
-    // handles this via `is_block_finalization`; we mirror the same logic here
-    // so block N+1's actual finalization stages aren't overwritten by block
-    // N's earlier observations.
+) -> StageScalars {
+    let mut scalars = StageScalars::default();
     let mut display_attempt: u32 = 1;
     for record in sorted_stages {
         let is_finalization = is_block_finalization(record.stage);
         if !is_finalization {
             display_attempt = display_attempt.max(record.attempt);
         }
-        let slot_attempt = if is_finalization {
+        // For non-finalization stages, route by `record.attempt`; for
+        // finalization stages, use `display_attempt` (since `mark_retry` may
+        // have bumped `record.attempt` past attempt 1 even though the stage
+        // belongs to block 1). Anything not in attempt 1 is skipped and only
+        // appears in the `stages` text.
+        let effective_attempt = if is_finalization {
             display_attempt
         } else {
             record.attempt
         };
-        let idx = (slot_attempt as usize).saturating_sub(1);
-        if idx >= n {
+        if effective_attempt != 1 {
             continue;
         }
-        // Absolute latency in ms from `base` (MempoolInsert time). Each stage
-        // entry answers "at what point in the pipeline did this stage fire?"
-        // — directly usable as an e2e latency in Humio/Grafana queries.
-        // Can be negative for `BlockProposed`, which uses the proposer's
-        // `block.timestamp_usecs` (a different validator's clock).
+        // Absolute latency in ms from `base` (MempoolInsert time). Can be
+        // negative for `BlockProposed` (proposer's clock).
         let abs_ms = (record.timestamp_usecs as i64 - base as i64) / 1000;
-        let slot = match record.stage {
-            TransactionStage::MempoolInsert => &mut v.mempool_insert_ms,
-            TransactionStage::QsBatchPull => &mut v.qs_batch_pull_ms,
-            TransactionStage::QsBatchCreated => &mut v.qs_batch_created_ms,
-            TransactionStage::QsProofOfStore => &mut v.qs_proof_of_store_ms,
-            TransactionStage::BlockProposed => &mut v.block_proposed_ms,
-            TransactionStage::BlockReceived => &mut v.block_received_ms,
-            TransactionStage::ExecutionStart => &mut v.execution_start_ms,
-            TransactionStage::Executed => &mut v.executed_ms,
-            TransactionStage::BlockOrdered => &mut v.block_ordered_ms,
-            TransactionStage::Certified => &mut v.certified_ms,
-            TransactionStage::PreCommit => &mut v.pre_commit_ms,
-            TransactionStage::Committed => &mut v.committed_ms,
-            TransactionStage::MempoolCommit => &mut v.mempool_commit_ms,
-            TransactionStage::MempoolReject => &mut v.mempool_reject_ms,
+        let slot: &mut Option<i64> = match record.stage {
+            TransactionStage::MempoolInsert => &mut scalars.mempool_insert_ms,
+            TransactionStage::QsBatchPull => &mut scalars.qs_batch_pull_ms,
+            TransactionStage::QsBatchCreated => &mut scalars.qs_batch_created_ms,
+            TransactionStage::QsProofOfStore => &mut scalars.qs_proof_of_store_ms,
+            TransactionStage::BlockProposed => &mut scalars.block_proposed_ms,
+            TransactionStage::BlockReceived => &mut scalars.block_received_ms,
+            TransactionStage::ExecutionStart => &mut scalars.execution_start_ms,
+            TransactionStage::Executed => &mut scalars.executed_ms,
+            TransactionStage::BlockOrdered => &mut scalars.block_ordered_ms,
+            TransactionStage::Certified => &mut scalars.certified_ms,
+            TransactionStage::PreCommit => &mut scalars.pre_commit_ms,
+            TransactionStage::Committed => &mut scalars.committed_ms,
+            TransactionStage::MempoolCommit => &mut scalars.mempool_commit_ms,
+            TransactionStage::MempoolReject => &mut scalars.mempool_reject_ms,
         };
-        // If the same (stage, attempt) is recorded twice (e.g., two QsBatchPull
-        // events in the same attempt), keep the first observation.
-        if slot[idx].is_none() {
-            slot[idx] = Some(abs_ms);
+        // If the same stage fires twice in attempt 1, keep the first observation.
+        if slot.is_none() {
+            *slot = Some(abs_ms);
         }
 
         match (&record.stage, &record.metadata) {
             (TransactionStage::BlockProposed, Some(StageMetadata::BatchInclusion(kind))) => {
-                if v.block_proposed_kind[idx].is_none() {
-                    v.block_proposed_kind[idx] = Some(kind.as_ref().to_string());
+                if scalars.block_proposed_kind.is_none() {
+                    scalars.block_proposed_kind = Some(kind.as_ref().to_string());
                 }
             },
             (TransactionStage::Executed, Some(StageMetadata::Execution(status))) => {
-                if v.executed_status[idx].is_none() {
-                    v.executed_status[idx] = Some(status.as_ref().to_string());
+                if scalars.executed_status.is_none() {
+                    scalars.executed_status = Some(status.as_ref().to_string());
                 }
             },
             _ => {},
         }
     }
-
-    v
+    scalars
 }
 
 #[cfg(test)]
@@ -1132,83 +1108,34 @@ mod tests {
         let max_attempt = sorted.iter().map(|s| s.attempt).max().unwrap();
         assert_eq!(max_attempt, 2);
 
-        let v = build_per_stage_vectors(&sorted, base, max_attempt);
+        let scalars = build_first_attempt_scalars(&sorted, base);
 
-        // Each vector must have length == max_attempt.
-        assert_eq!(v.mempool_insert_ms.len(), 2);
-        assert_eq!(v.qs_batch_pull_ms.len(), 2);
-        assert_eq!(v.executed_ms.len(), 2);
-        assert_eq!(v.committed_ms.len(), 2);
-
-        // Attempt 1: each entry is the stage's absolute latency in ms from
-        // `base` (MempoolInsert, t=0). Block 1's PreCommit/Certified/Committed
-        // are stamped with `attempt = 2` in their records (mark_retry already
-        // bumped current_attempt), but the vector builder must still route
-        // them to slot[0] — they belong to the retried block.
-        assert_eq!(v.mempool_insert_ms[0], Some(0));
-        assert_eq!(v.qs_batch_pull_ms[0], Some(50));
-        assert_eq!(v.qs_batch_created_ms[0], Some(53));
-        assert_eq!(v.qs_proof_of_store_ms[0], Some(80));
-        assert_eq!(v.block_proposed_ms[0], Some(100));
-        assert_eq!(v.block_received_ms[0], Some(105));
-        assert_eq!(v.execution_start_ms[0], Some(120));
-        assert_eq!(v.block_ordered_ms[0], Some(145));
-        assert_eq!(v.executed_ms[0], Some(150));
-        assert_eq!(v.pre_commit_ms[0], Some(160));
-        assert_eq!(v.certified_ms[0], Some(165));
-        assert_eq!(v.committed_ms[0], Some(170));
+        // Structured scalars capture the first pipeline pass only — including
+        // block 1's PreCommit/Certified/Committed even though those records
+        // are stamped with `attempt = 2` due to mark_retry timing. Attempt 2's
+        // pipeline lives only in the `stages` text string and is not asserted
+        // here.
+        assert_eq!(scalars.mempool_insert_ms, Some(0));
+        assert_eq!(scalars.qs_batch_pull_ms, Some(50));
+        assert_eq!(scalars.qs_batch_created_ms, Some(53));
+        assert_eq!(scalars.qs_proof_of_store_ms, Some(80));
+        assert_eq!(scalars.block_proposed_ms, Some(100));
+        assert_eq!(scalars.block_received_ms, Some(105));
+        assert_eq!(scalars.execution_start_ms, Some(120));
+        assert_eq!(scalars.block_ordered_ms, Some(145));
+        assert_eq!(scalars.executed_ms, Some(150));
+        assert_eq!(scalars.pre_commit_ms, Some(160));
+        assert_eq!(scalars.certified_ms, Some(165));
+        assert_eq!(scalars.committed_ms, Some(170));
         // No MempoolCommit on attempt 1 — it retries.
-        assert_eq!(v.mempool_commit_ms[0], None);
-        // Attempt-1 metadata.
-        assert_eq!(v.block_proposed_kind[0].as_deref(), Some("Proof"));
-        assert_eq!(v.executed_status[0].as_deref(), Some("Retry"));
-
-        // Attempt 2: same absolute-time semantics — values keep growing.
-        assert_eq!(v.mempool_insert_ms[1], None);
-        assert_eq!(v.qs_batch_pull_ms[1], Some(200));
-        assert_eq!(v.qs_batch_created_ms[1], Some(210));
-        assert_eq!(v.qs_proof_of_store_ms[1], Some(230));
-        assert_eq!(v.block_proposed_ms[1], Some(250));
-        assert_eq!(v.block_received_ms[1], Some(255));
-        assert_eq!(v.execution_start_ms[1], Some(270));
-        assert_eq!(v.executed_ms[1], Some(300));
-        assert_eq!(v.block_ordered_ms[1], Some(310));
-        assert_eq!(v.certified_ms[1], Some(320));
-        assert_eq!(v.pre_commit_ms[1], Some(330));
-        assert_eq!(v.committed_ms[1], Some(340));
-        assert_eq!(v.mempool_commit_ms[1], Some(350));
-        // Attempt-2 metadata.
-        assert_eq!(v.block_proposed_kind[1].as_deref(), Some("Opt"));
-        assert_eq!(v.executed_status[1].as_deref(), Some("Keep"));
-
-        // Invariant: max of all populated entries across every per-stage
-        // vector == total_latency_ms = (last_ts - base) / 1000.
-        let total_latency_ms = (350_000i64 - base as i64) / 1000;
-        let max_abs: i64 = [
-            &v.mempool_insert_ms,
-            &v.qs_batch_pull_ms,
-            &v.qs_batch_created_ms,
-            &v.qs_proof_of_store_ms,
-            &v.block_proposed_ms,
-            &v.block_received_ms,
-            &v.execution_start_ms,
-            &v.executed_ms,
-            &v.block_ordered_ms,
-            &v.certified_ms,
-            &v.pre_commit_ms,
-            &v.committed_ms,
-            &v.mempool_commit_ms,
-            &v.mempool_reject_ms,
-        ]
-        .iter()
-        .flat_map(|vec| vec.iter().filter_map(|x| *x))
-        .max()
-        .unwrap();
-        assert_eq!(max_abs, total_latency_ms);
+        assert_eq!(scalars.mempool_commit_ms, None);
+        // First-attempt metadata: Retry status on the retried execution.
+        assert_eq!(scalars.block_proposed_kind.as_deref(), Some("Proof"));
+        assert_eq!(scalars.executed_status.as_deref(), Some("Retry"));
     }
 
     #[test]
-    fn test_per_stage_vectors_single_attempt() {
+    fn test_first_attempt_scalars_single_attempt() {
         use crate::types::{ExecutionStatus, StageMetadata, TransactionTrace};
         let mut trace = TransactionTrace::new(HashValue::random(), AccountAddress::random(), 1000);
         trace.record(TransactionStage::MempoolInsert, 1000);
@@ -1223,16 +1150,16 @@ mod tests {
 
         let mut sorted = trace.stages.clone();
         sorted.sort_by_key(|s| s.timestamp_usecs);
-        let v = build_per_stage_vectors(&sorted, 1000, 1);
+        let scalars = build_first_attempt_scalars(&sorted, 1000);
 
         // Absolute latency from base (t=1000). All values divided by 1000usec/ms.
-        assert_eq!(v.mempool_insert_ms, vec![Some(0)]);
-        assert_eq!(v.qs_batch_pull_ms, vec![Some(0)]); // (1500-1000)/1000 = 0 ms
-        assert_eq!(v.executed_ms, vec![Some(2)]); // (3000-1000)/1000 = 2
-        assert_eq!(v.committed_ms, vec![Some(3)]); // (4000-1000)/1000 = 3
-        assert_eq!(v.mempool_commit_ms, vec![Some(3)]); // (4500-1000)/1000 = 3
-        assert_eq!(v.qs_batch_created_ms, vec![None]);
-        assert_eq!(v.executed_status[0].as_deref(), Some("Keep"));
+        assert_eq!(scalars.mempool_insert_ms, Some(0));
+        assert_eq!(scalars.qs_batch_pull_ms, Some(0)); // (1500-1000)/1000 = 0 ms
+        assert_eq!(scalars.executed_ms, Some(2)); // (3000-1000)/1000 = 2
+        assert_eq!(scalars.committed_ms, Some(3)); // (4000-1000)/1000 = 3
+        assert_eq!(scalars.mempool_commit_ms, Some(3)); // (4500-1000)/1000 = 3
+        assert_eq!(scalars.qs_batch_created_ms, None);
+        assert_eq!(scalars.executed_status.as_deref(), Some("Keep"));
     }
 
     #[test]

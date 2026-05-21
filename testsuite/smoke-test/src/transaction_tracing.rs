@@ -125,8 +125,9 @@ async fn test_transaction_tracing() {
     );
     println!("Found {} total TxnTrace log entries", parsed_traces.len());
 
-    // Per-stage delta vectors we expect to be present on a committed trace.
-    let required_delta_fields = [
+    // Per-stage scalar fields expected on a committed trace's first pipeline
+    // pass. Each is `data.<field>` as a JSON number — no array indexing.
+    let required_scalar_fields = [
         "mempool_insert_ms",
         "qs_batch_pull_ms",
         "block_proposed_ms",
@@ -161,7 +162,7 @@ async fn test_transaction_tracing() {
         let outcome = trace["outcome"].as_str().expect("outcome must be string");
         let attempts = trace["attempts"]
             .as_u64()
-            .expect("attempts must be unsigned int") as usize;
+            .expect("attempts must be unsigned int");
         assert!(attempts >= 1, "attempts must be >= 1, got {}", attempts);
 
         let total_latency_ms = trace["total_latency_ms"]
@@ -176,68 +177,60 @@ async fn test_transaction_tracing() {
             stages
         );
 
-        // Per-stage absolute-latency vectors: each must be a Vec<Option<i64>>
-        // of length == attempts. Track the max across all populated entries —
-        // it must equal `total_latency_ms` for a committed trace. Most stages
-        // are non-negative (local clock, fires after MempoolInsert), but
-        // `block_proposed_ms` records the proposer's `block.timestamp_usecs`
-        // and can legitimately be negative due to cross-validator clock skew.
-        let mut max_abs: i64 = 0;
+        // Every populated `*_ms` per-stage field must be a plain JSON number
+        // (not an array — the schema emits scalars for the first pipeline
+        // pass only). Most stages use the local clock and are non-negative;
+        // `block_proposed_ms` can be negative due to cross-validator clock
+        // skew. We also assert no value exceeds `total_latency_ms` (the
+        // structured scalars only cover attempt 1; for a retried trace,
+        // total_latency reflects later attempts and stays >= scalar max).
         for (key, val) in trace.as_object().expect("trace must be object").iter() {
             if !key.ends_with("_ms") || key == "total_latency_ms" || key == "age_ms" {
                 continue;
             }
-            let arr = match val.as_array() {
-                Some(a) => a,
-                None => continue,
+            let d = match val.as_i64() {
+                Some(n) => n,
+                None => panic!("{} must be i64, got {}", key, val),
             };
-            assert_eq!(
-                arr.len(),
-                attempts,
-                "field {} has length {} but attempts={}",
-                key,
-                arr.len(),
-                attempts
-            );
-            for entry in arr {
-                if entry.is_null() {
-                    continue;
-                }
-                let d = entry
-                    .as_i64()
-                    .unwrap_or_else(|| panic!("{} entry must be i64 or null, got {}", key, entry));
-                if key != "block_proposed_ms" {
-                    assert!(d >= 0, "abs latency {} for {} must be non-negative", d, key);
-                }
-                if d > max_abs {
-                    max_abs = d;
-                }
+            if key != "block_proposed_ms" {
+                assert!(d >= 0, "abs latency {} for {} must be non-negative", d, key);
             }
-        }
-
-        // Only commit-outcome traces should have the max-equals-total
-        // invariant (other outcomes like eviction may be truncated).
-        if outcome == "committed" {
-            // `total_latency_ms` is (last_stage - mempool_insert) in ms. With
-            // absolute-from-base per-stage values, the max populated entry is
-            // the last stage chronologically — same as total_latency_ms.
-            // Allow ±1ms tolerance for integer division rounding.
-            let diff = (max_abs - total_latency_ms).abs();
             assert!(
-                diff <= 1,
-                "max abs latency {} != total_latency_ms {} (diff={}) for {}",
-                max_abs,
+                d <= total_latency_ms,
+                "{} = {} exceeds total_latency_ms = {} (hash={})",
+                key,
+                d,
                 total_latency_ms,
-                diff,
                 hash
             );
-            // For committed traces we should see the terminal pipeline stages.
-            for f in &required_delta_fields {
+        }
+
+        if outcome == "committed" {
+            // First-attempt scalars for the terminal pipeline stages must be
+            // present. For a single-attempt commit, `mempool_commit_ms` equals
+            // `total_latency_ms`; for a retried-then-committed trace, the
+            // structured fields only cover attempt 1 (no MempoolCommit there),
+            // so this required check is gated to single-attempt traces.
+            if attempts == 1 {
+                for f in &required_scalar_fields {
+                    assert!(
+                        trace.get(f).is_some(),
+                        "committed single-attempt trace {} missing scalar field {}",
+                        hash,
+                        f
+                    );
+                }
+                let mempool_commit_ms = trace["mempool_commit_ms"]
+                    .as_i64()
+                    .expect("mempool_commit_ms must be int on single-attempt commit");
+                let diff = (mempool_commit_ms - total_latency_ms).abs();
                 assert!(
-                    trace.get(f).is_some(),
-                    "committed trace {} missing per-stage field {}",
-                    hash,
-                    f
+                    diff <= 1,
+                    "mempool_commit_ms {} != total_latency_ms {} (diff={}) for {}",
+                    mempool_commit_ms,
+                    total_latency_ms,
+                    diff,
+                    hash
                 );
             }
             assert!(

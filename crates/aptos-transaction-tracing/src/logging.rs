@@ -9,8 +9,11 @@
 //!
 //! The primary event is `TxnTrace`, emitted by `store::log_trace` when a
 //! traced transaction reaches a terminal state. Per-stage latencies are
-//! exposed as parallel vectors indexed by attempt number so multi-attempt
-//! (retried) transactions retain full per-attempt detail.
+//! recorded as scalars for the **first pipeline pass** (attempt 1) to keep
+//! Humio/Grafana queries simple — no `[N]` indexing needed. Retried
+//! transactions' later attempts are visible in the `stages` text string.
+//! `attempts > 1` is the signal for "this txn retried; check `stages` for
+//! per-attempt detail."
 
 use aptos_crypto::HashValue;
 use aptos_logger::Schema;
@@ -41,37 +44,39 @@ pub struct LogSchema {
     remaining_batch_mappings: Option<usize>,
     remaining_block_mappings: Option<usize>,
 
-    // Per-stage absolute latency from MempoolInsert (ms). Vector index =
-    // attempt index (0-based). `None` element = stage did not fire in that
-    // attempt. The vectors all share the same length = `attempts` so values at
-    // the same index are correlated. The max across all populated entries
-    // equals `total_latency_ms` — each entry is directly usable as an e2e
-    // latency in Humio/Grafana without summing predecessors.
+    // Per-stage absolute latency from MempoolInsert (ms) for the first
+    // pipeline pass (attempt 1). Each field is a scalar — directly queryable
+    // in Humio/Grafana as `data.<field>` with no array indexing required.
     //
-    // Values are signed and can be negative: `block_proposed_ms` records the
-    // proposer's `block.timestamp_usecs`, which is on a different validator's
-    // clock and can precede this node's MempoolInsert. Every other stage uses
-    // the local clock and is non-negative.
-    mempool_insert_ms: Option<Vec<Option<i64>>>,
-    qs_batch_pull_ms: Option<Vec<Option<i64>>>,
-    qs_batch_created_ms: Option<Vec<Option<i64>>>,
-    qs_proof_of_store_ms: Option<Vec<Option<i64>>>,
-    block_proposed_ms: Option<Vec<Option<i64>>>,
-    block_proposed_kind: Option<Vec<Option<String>>>,
-    block_received_ms: Option<Vec<Option<i64>>>,
-    execution_start_ms: Option<Vec<Option<i64>>>,
-    executed_ms: Option<Vec<Option<i64>>>,
-    executed_status: Option<Vec<Option<String>>>,
-    block_ordered_ms: Option<Vec<Option<i64>>>,
-    certified_ms: Option<Vec<Option<i64>>>,
-    pre_commit_ms: Option<Vec<Option<i64>>>,
-    committed_ms: Option<Vec<Option<i64>>>,
-    mempool_commit_ms: Option<Vec<Option<i64>>>,
-    mempool_reject_ms: Option<Vec<Option<i64>>>,
+    // For a single-attempt commit (the common case), these reflect the full
+    // pipeline end-to-end. For a retried trace (attempts > 1), they reflect
+    // only attempt 1's path (including the retried block's
+    // PreCommit/Certified/Committed); look at `stages` for per-attempt detail.
+    //
+    // `block_proposed_ms` can be negative: it records the proposer's
+    // `block.timestamp_usecs`, which is on a different validator's clock and
+    // can precede this node's MempoolInsert. Every other stage uses the
+    // local clock and is non-negative.
+    mempool_insert_ms: Option<i64>,
+    qs_batch_pull_ms: Option<i64>,
+    qs_batch_created_ms: Option<i64>,
+    qs_proof_of_store_ms: Option<i64>,
+    block_proposed_ms: Option<i64>,
+    block_proposed_kind: Option<String>,
+    block_received_ms: Option<i64>,
+    execution_start_ms: Option<i64>,
+    executed_ms: Option<i64>,
+    executed_status: Option<String>,
+    block_ordered_ms: Option<i64>,
+    certified_ms: Option<i64>,
+    pre_commit_ms: Option<i64>,
+    committed_ms: Option<i64>,
+    mempool_commit_ms: Option<i64>,
+    mempool_reject_ms: Option<i64>,
 
     // Full diagnostic string with all attempts and metadata. Preserves
     // `wait(...)`, batch-pull `n=/max=/excl=/bp=` info, and per-attempt
-    // markers that the structured per-stage vectors do not capture.
+    // markers — the place to look for retry-path detail.
     stages: Option<String>,
 }
 
