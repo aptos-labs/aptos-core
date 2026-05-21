@@ -269,7 +269,7 @@ impl Default for HotStateConfig {
             refresh_interval_versions: 100_000,
             delete_on_restart: true,
             compute_root_hash: true,
-            use_write_set_v1: true,
+            use_write_set_v1: false,
             persist_hotness_in_epilogue: false,
         }
     }
@@ -687,14 +687,6 @@ impl ConfigOptimizer for StorageConfig {
             }
             if chain_id.is_testnet() && config_yaml["assert_rlimit_nofile"].is_null() {
                 config.assert_rlimit_nofile = true;
-                modified_config = true;
-            }
-            // TODO(HotState): WriteSet V1 is disabled on mainnet and testnet unless explicitly
-            // enabled.
-            if (chain_id.is_mainnet() || chain_id.is_testnet())
-                && config_yaml["hot_state_config"]["use_write_set_v1"].as_bool() != Some(true)
-            {
-                config.hot_state_config.use_write_set_v1 = false;
                 modified_config = true;
             }
         }

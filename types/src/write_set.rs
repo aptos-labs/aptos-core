@@ -637,6 +637,17 @@ impl WriteSet {
         }
     }
 
+    pub fn into_v1(self) -> Self {
+        match self {
+            Self::V0(ws) => Self::V1(WriteSetV1 {
+                value_writes: ws.value_writes,
+                hotness: ws.hotness,
+                extensions: ws.extensions,
+            }),
+            Self::V1(ws) => Self::V1(ws),
+        }
+    }
+
     pub fn new(write_ops: impl IntoIterator<Item = (StateKey, WriteOp)>) -> Result<Self> {
         WriteSetMut::new(write_ops).freeze()
     }
