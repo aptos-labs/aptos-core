@@ -7,7 +7,9 @@
 use crate::{
     error::{ArithOp, RuntimeError, RuntimeResult, Signedness, VecOp},
     heap::{
-        macros::{alloc_obj, alloc_vec, gc_collect, grow_vec_ref},
+        gc_collect,
+        macros::{alloc_obj, alloc_vec, grow_vec_ref},
+        make_scan_roots,
         object_descriptor::{ObjectDescriptor, CLOSURE_DESCRIPTOR_ID},
         pinned_roots::PinnedRoots,
         Heap,
@@ -34,7 +36,6 @@ use mono_move_gas::GasMeter;
 use move_core_types::int256::{I256, U256};
 use rand::{rngs::StdRng, Rng, SeedableRng};
 use std::ptr::{null, NonNull};
-
 // ---------------------------------------------------------------------------
 // Runtime state
 // ---------------------------------------------------------------------------
@@ -932,7 +933,16 @@ impl<T: ExecutionContext> InterpreterContext<'_, T> {
                 },
 
                 MicroOp::ForceGC => {
-                    gc_collect!(self)?;
+                    gc_collect(
+                        &mut self.heap,
+                        self.descriptors,
+                        make_scan_roots(
+                            &self.pinned_roots,
+                            self.frame_ptr,
+                            self.current_func,
+                            self.pc,
+                        ),
+                    )?;
                 },
 
                 MicroOp::Move8 { dst, src } => {

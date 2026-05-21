@@ -14,7 +14,10 @@ pub(crate) mod pinned_roots;
 
 use crate::{
     error::{RuntimeError, RuntimeResult},
-    heap::object_descriptor::{ObjectDescriptor, ObjectDescriptorInner},
+    heap::{
+        object_descriptor::{ObjectDescriptor, ObjectDescriptorInner},
+        pinned_roots::PinnedRoots,
+    },
     invariant_violation,
     memory::{
         read_descriptor, read_forwarding, read_obj_size, read_ptr, read_u64, write_descriptor,
@@ -30,7 +33,6 @@ use mono_move_core::{
     CLOSURE_CAPTURED_DATA_PTR_OFFSET, CLOSURE_DATA_SIZE, ENUM_DATA_OFFSET, ENUM_TAG_OFFSET,
     FRAME_METADATA_SIZE, OBJECT_HEADER_SIZE,
 };
-use pinned_roots::PinnedRoots;
 use std::ptr::NonNull;
 
 // ---------------------------------------------------------------------------
@@ -62,25 +64,23 @@ use std::ptr::NonNull;
 /// collide with the free functions in the value namespace of this module
 /// when re-exported.
 pub(crate) mod macros {
-    /// Forwards to [`super::alloc_obj`]. Arguments: (`$ctx`, `$fp`,
-    /// `$descriptor_id`).
+    /// Forwards to [`super::alloc_obj`] via [`super::alloc_or_gc`].
+    /// Arguments: (`$ctx`, `$fp`, `$descriptor_id`).
     macro_rules! alloc_obj {
         ($ctx:ident, $fp:expr, $descriptor_id:expr $(,)?) => {
-            $crate::heap::alloc_obj(
+            $crate::heap::alloc_or_gc(
                 &mut $ctx.heap,
                 $ctx.descriptors,
-                &$ctx.pinned_roots,
-                $fp,
-                $ctx.current_func,
-                $ctx.pc,
-                $descriptor_id,
+                |heap| $crate::heap::alloc_obj(heap, $ctx.descriptors, $descriptor_id),
+                $crate::heap::make_scan_roots(&$ctx.pinned_roots, $fp, $ctx.current_func, $ctx.pc),
             )
         };
     }
     pub(crate) use alloc_obj;
 
-    /// Forwards to [`super::alloc_vec`]. Arguments: (`$ctx`, `$fp`,
-    /// `$descriptor_id`, `$elem_size`, `$capacity_in_elems`).
+    /// Forwards to [`super::alloc_vec`] via [`super::alloc_or_gc`].
+    /// Arguments: (`$ctx`, `$fp`, `$descriptor_id`, `$elem_size`,
+    /// `$capacity_in_elems`).
     macro_rules! alloc_vec {
         (
             $ctx:ident,
@@ -89,22 +89,20 @@ pub(crate) mod macros {
             $elem_size:expr,
             $capacity_in_elems:expr $(,)?
         ) => {
-            $crate::heap::alloc_vec(
+            $crate::heap::alloc_or_gc(
                 &mut $ctx.heap,
                 $ctx.descriptors,
-                &$ctx.pinned_roots,
-                $fp,
-                $ctx.current_func,
-                $ctx.pc,
-                $descriptor_id,
-                $elem_size,
-                $capacity_in_elems,
+                |heap| {
+                    $crate::heap::alloc_vec(heap, $descriptor_id, $elem_size, $capacity_in_elems)
+                },
+                $crate::heap::make_scan_roots(&$ctx.pinned_roots, $fp, $ctx.current_func, $ctx.pc),
             )
         };
     }
     pub(crate) use alloc_vec;
 
-    /// Forwards to [`super::grow_vec_ref`]. Arguments: (`$ctx`, `$fp`,
+    /// Forwards to [`super::grow_vec_ref`] via
+    /// [`super::alloc_or_gc`]. Arguments: (`$ctx`, `$fp`,
     /// `$vec_ref_offset`, `$elem_size`, `$required_cap_in_elems`).
     macro_rules! grow_vec_ref {
         (
@@ -114,35 +112,91 @@ pub(crate) mod macros {
             $elem_size:expr,
             $required_cap_in_elems:expr $(,)?
         ) => {
-            $crate::heap::grow_vec_ref(
+            $crate::heap::alloc_or_gc(
                 &mut $ctx.heap,
                 $ctx.descriptors,
-                &$ctx.pinned_roots,
-                $ctx.current_func,
-                $ctx.pc,
-                $fp,
-                $vec_ref_offset,
-                $elem_size,
-                $required_cap_in_elems,
+                |heap| {
+                    $crate::heap::grow_vec_ref(
+                        heap,
+                        $fp,
+                        $vec_ref_offset,
+                        $elem_size,
+                        $required_cap_in_elems,
+                    )
+                },
+                $crate::heap::make_scan_roots(&$ctx.pinned_roots, $fp, $ctx.current_func, $ctx.pc),
             )
         };
     }
     pub(crate) use grow_vec_ref;
+}
 
-    /// Forwards to [`super::gc_collect`]. Arguments: (`$ctx`,).
-    macro_rules! gc_collect {
-        ($ctx:ident $(,)?) => {
-            $crate::heap::gc_collect(
-                &mut $ctx.heap,
-                $ctx.descriptors,
-                &$ctx.pinned_roots,
-                $ctx.frame_ptr,
-                $ctx.current_func,
-                $ctx.pc,
-            )
-        };
+#[derive(Debug)]
+pub(crate) enum AllocationError {
+    /// Heap is full and the requested size did not fit. GC will be triggered
+    /// to continue. If after GC there is still not enough space, converted to
+    /// runtime error.
+    OutOfHeapMemory { requested: usize },
+    /// Runtime error, not recoverable.
+    RuntimeError(RuntimeError),
+}
+
+type AllocationResult<T> = Result<T, AllocationError>;
+
+impl From<RuntimeError> for AllocationError {
+    fn from(err: RuntimeError) -> Self {
+        Self::RuntimeError(err)
     }
-    pub(crate) use gc_collect;
+}
+
+impl AllocationError {
+    pub fn into_runtime_error(self) -> RuntimeError {
+        match self {
+            AllocationError::OutOfHeapMemory { requested } => {
+                RuntimeError::OutOfHeapMemory { requested }
+            },
+            AllocationError::RuntimeError(err) => err,
+        }
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Allocation orchestration
+// ---------------------------------------------------------------------------
+
+/// Run `try_alloc`; on [`AllocationError::OutOfHeapMemory`] run GC with
+/// `scan_roots` and retry once. GC is deterministic over the root set so
+/// the retry is single-shot.
+pub(crate) fn alloc_or_gc(
+    heap: &mut Heap,
+    descriptors: &[ObjectDescriptor],
+    try_alloc: impl Fn(&mut Heap) -> AllocationResult<*mut u8>,
+    scan_roots: impl FnOnce(&mut RootScanner<'_>),
+) -> RuntimeResult<*mut u8> {
+    match try_alloc(heap) {
+        Ok(p) => Ok(p),
+        Err(AllocationError::OutOfHeapMemory { .. }) => {
+            gc_collect(heap, descriptors, scan_roots)?;
+            try_alloc(heap).map_err(AllocationError::into_runtime_error)
+        },
+        Err(e) => Err(e.into_runtime_error()),
+    }
+}
+
+/// Build the standard root-scanning closure for an interpreter context.
+/// Captures the field borrows the GC needs (pinned roots + frame walker)
+/// without taking `&self`, so callers can still pass `&mut self.heap`
+/// alongside the returned closure.
+pub(crate) fn make_scan_roots<'a>(
+    pinned_roots: &'a PinnedRoots,
+    fp: *mut u8,
+    current_func: NonNull<Function>,
+    pc: usize,
+) -> impl Fn(&mut RootScanner<'_>) + 'a {
+    move |scanner| {
+        scan_call_stack(scanner, fp, current_func, pc);
+        pinned_roots.scan(scanner);
+    }
 }
 
 // ---------------------------------------------------------------------------
@@ -208,34 +262,27 @@ impl Heap {
 /// only need to populate the data region (e.g. vector length, captured
 /// values).
 ///
-/// Triggers GC if the bump allocator is full; fails on OOM after GC.
-///
-/// `fp`, `current_func`, `pc` describe the top of the call stack so that GC
-/// (if triggered) can walk frames to find roots. `pinned_roots` is the
-/// auxiliary root set.
+/// Returns [`AllocationError::OutOfHeapMemory`] when the heap is full so the
+/// caller can run GC and retry.
 fn heap_alloc(
     heap: &mut Heap,
-    descriptors: &[ObjectDescriptor],
-    pinned_roots: &PinnedRoots,
-    fp: *mut u8,
-    current_func: NonNull<Function>,
-    pc: usize,
     total_size: usize,
     descriptor_id: DescriptorId,
-) -> RuntimeResult<*mut u8> {
+) -> AllocationResult<*mut u8> {
     // Round up to MAX_ALIGN with overflow protection; the
     // `MAX_SINGLE_ALLOCATION_SIZE` check below then applies to the
     // *aligned* size so the rounding can't smuggle an oversize allocation
     // past the bound.
-    let aligned_size =
-        checked_align_max(total_size).ok_or_else(|| RuntimeError::AllocationTooLarge {
+    let aligned_size = checked_align_max(total_size).ok_or_else(|| {
+        AllocationError::from(RuntimeError::AllocationTooLarge {
             requested: total_size,
-        })?;
+        })
+    })?;
     debug_assert!(aligned_size >= OBJECT_HEADER_SIZE);
     if aligned_size > MAX_SINGLE_ALLOCATION_SIZE {
-        return Err(RuntimeError::AllocationTooLarge {
+        return Err(AllocationError::from(RuntimeError::AllocationTooLarge {
             requested: aligned_size,
-        });
+        }));
     }
 
     // Bound check uses integer arithmetic on addresses rather than
@@ -244,12 +291,9 @@ fn heap_alloc(
     // the end of the buffer is UB, so we cannot legally form the
     // out-of-bounds pointer just to compare it.
     if !fits_in_buffer(heap, aligned_size) {
-        gc_collect(heap, descriptors, pinned_roots, fp, current_func, pc)?;
-        if !fits_in_buffer(heap, aligned_size) {
-            return Err(RuntimeError::OutOfHeapMemory {
-                requested: aligned_size,
-            });
-        }
+        return Err(AllocationError::OutOfHeapMemory {
+            requested: aligned_size,
+        });
     }
 
     unsafe {
@@ -271,29 +315,19 @@ fn heap_alloc(
 /// VEC_DATA_OFFSET`, rounded up to `MAX_ALIGN`.
 pub(crate) fn alloc_vec(
     heap: &mut Heap,
-    descriptors: &[ObjectDescriptor],
-    pinned_roots: &PinnedRoots,
-    fp: *mut u8,
-    current_func: NonNull<Function>,
-    pc: usize,
     descriptor_id: DescriptorId,
     elem_size: u32,
     capacity_in_elems: u64,
-) -> RuntimeResult<*mut u8> {
+) -> AllocationResult<*mut u8> {
     let total_size = (capacity_in_elems as usize)
         .checked_mul(elem_size as usize)
         .and_then(|v| v.checked_add(OBJECT_HEADER_SIZE + VEC_DATA_OFFSET))
-        .ok_or(RuntimeError::VecAllocSizeOverflow)?;
-    heap_alloc(
-        heap,
-        descriptors,
-        pinned_roots,
-        fp,
-        current_func,
-        pc,
-        total_size,
-        descriptor_id,
-    )
+        .ok_or_else(|| {
+            AllocationError::from(RuntimeError::AllocationTooLarge {
+                requested: usize::MAX,
+            })
+        })?;
+    heap_alloc(heap, total_size, descriptor_id)
     // `length` defaults to 0 via heap_alloc's zero-init.
 }
 
@@ -302,12 +336,8 @@ pub(crate) fn alloc_vec(
 pub(crate) fn alloc_obj(
     heap: &mut Heap,
     descriptors: &[ObjectDescriptor],
-    pinned_roots: &PinnedRoots,
-    fp: *mut u8,
-    current_func: NonNull<Function>,
-    pc: usize,
     descriptor_id: DescriptorId,
-) -> RuntimeResult<*mut u8> {
+) -> AllocationResult<*mut u8> {
     let payload_size = match descriptors[descriptor_id.as_usize()].inner() {
         ObjectDescriptorInner::Struct { size, .. } => *size as usize,
         ObjectDescriptorInner::Enum { size, .. } => *size as usize,
@@ -317,21 +347,14 @@ pub(crate) fn alloc_obj(
             CAPTURED_DATA_VALUES_OFFSET + *size as usize
         },
         ObjectDescriptorInner::Trivial | ObjectDescriptorInner::Vector { .. } => {
-            invariant_violation!(NonAllocatableDescriptor {
-                descriptor_id: descriptor_id.as_u32(),
-            });
+            return Err(AllocationError::from(RuntimeError::InvariantViolation(
+                crate::error::RuntimeInvariantViolation::NonAllocatableDescriptor {
+                    descriptor_id: descriptor_id.as_u32(),
+                },
+            )));
         },
     };
-    heap_alloc(
-        heap,
-        descriptors,
-        pinned_roots,
-        fp,
-        current_func,
-        pc,
-        OBJECT_HEADER_SIZE + payload_size,
-        descriptor_id,
-    )
+    heap_alloc(heap, OBJECT_HEADER_SIZE + payload_size, descriptor_id)
 }
 
 /// Grow a vector to at least `required_cap_in_elems` elements, accessed
@@ -339,25 +362,21 @@ pub(crate) fn alloc_obj(
 /// pointer is written back through the reference; returns the new object
 /// pointer.
 ///
+/// Returns [`AllocationError::OutOfHeapMemory`] when the heap is full so the
+/// caller can run GC and retry.
+///
 /// # Safety
 ///
 /// `fp` must point to a valid frame. `vec_ref_offset` must be the byte
 /// offset of a 16-byte fat pointer `(base, offset)` whose target holds
-/// the current vector heap pointer. `alloc_vec` may trigger GC which
-/// relocates objects; the fat pointer's base in `heap_ptr_offsets` and the
-/// vector pointer in the struct's `pointer_offsets` are updated by the GC.
-/// We re-read through the fat pointer after allocation.
+/// the current vector heap pointer.
 pub(crate) fn grow_vec_ref(
     heap: &mut Heap,
-    descriptors: &[ObjectDescriptor],
-    pinned_roots: &PinnedRoots,
-    current_func: NonNull<Function>,
-    pc: usize,
     fp: *mut u8,
     vec_ref_offset: usize,
     elem_size: u32,
     required_cap_in_elems: u64,
-) -> RuntimeResult<*mut u8> {
+) -> AllocationResult<*mut u8> {
     unsafe {
         let base = read_ptr(fp, vec_ref_offset);
         let off = read_u64(fp, vec_ref_offset + 8) as usize;
@@ -378,21 +397,7 @@ pub(crate) fn grow_vec_ref(
             new_cap_in_elems = required_cap_in_elems;
         }
 
-        // alloc_vec may trigger GC. Re-read through the fat pointer afterward.
-        let new_ptr = alloc_vec(
-            heap,
-            descriptors,
-            pinned_roots,
-            fp,
-            current_func,
-            pc,
-            descriptor_id,
-            elem_size,
-            new_cap_in_elems,
-        )?;
-        let base = read_ptr(fp, vec_ref_offset);
-        let off = read_u64(fp, vec_ref_offset + 8) as usize;
-        let old_ptr = read_ptr(base, off);
+        let new_ptr = alloc_vec(heap, descriptor_id, elem_size, new_cap_in_elems)?;
 
         let byte_count = old_len as usize * elem_size as usize;
         if byte_count > 0 {
@@ -411,11 +416,105 @@ pub(crate) fn grow_vec_ref(
 }
 
 // ---------------------------------------------------------------------------
+// Root scanner
+// ---------------------------------------------------------------------------
+
+/// Phase-1 root-walking interface for the GC. Built by [`gc_collect`]
+/// and passed to the caller's `scan_roots` closure. Each root source
+/// iterates its slots and calls [`Self::relocate`] per pointer,
+/// writing the returned value back into the slot.
+pub struct RootScanner<'a> {
+    /// Used by [`is_heap_ptr`] to decide whether a pointer is a
+    /// from-space heap pointer (and thus needs relocation) or an
+    /// external pointer (passed through unchanged).
+    heap: &'a Heap,
+    /// Bump cursor in to-space. Advances by `obj_size` per relocation.
+    free_ptr: &'a mut *mut u8,
+}
+
+impl<'a> RootScanner<'a> {
+    /// Relocate a possibly-from-space pointer to its to-space
+    /// address. If `ptr` is null or not a heap pointer (e.g. an
+    /// external resource pointer), it is returned unchanged.
+    ///
+    /// Callers must uphold the object-header-integrity invariant
+    /// documented on [`gc_collect`]: if `ptr` is in-heap, its
+    /// header at `ptr - OBJECT_HEADER_SIZE` must be valid.
+    pub fn relocate(&mut self, ptr: *mut u8) -> *mut u8 {
+        if ptr.is_null() || !is_heap_ptr(self.heap, ptr) {
+            return ptr;
+        }
+        gc_copy_object(ptr, self.free_ptr)
+    }
+
+    /// Test-only constructor. Production code only sees a
+    /// `RootScanner` handed in by [`gc_collect`].
+    #[cfg(test)]
+    pub(crate) fn for_test(heap: &'a Heap, free_ptr: &'a mut *mut u8) -> RootScanner<'a> {
+        RootScanner { heap, free_ptr }
+    }
+}
+
+/// Scan call-stack roots: the top frame's `frame_layout` plus the
+/// matching `safe_point_layouts` entry (if any), then every caller
+/// frame's `frame_layout`. Each pointer offset is read, relocated
+/// via the scanner, and written back.
+pub fn scan_call_stack(
+    scanner: &mut RootScanner<'_>,
+    fp: *mut u8,
+    current_func: NonNull<Function>,
+    pc_top: usize,
+) {
+    // Two sets of pointer offsets are scanned for the top frame:
+    //   1. `frame_layout.heap_ptr_offsets` — always applies, to
+    //      every frame on the stack.
+    //   2. The matching `safe_point_layouts` entry for the *top*
+    //      frame's `pc_top`, if any — provides additional pointer
+    //      offsets that are only valid at that specific top-frame
+    //      safe point (an allocating op currently executing in the
+    //      top frame).
+    //
+    // Per `SafePointEntry`'s top-frame-only contract,
+    // `safe_point_layouts` is consulted only for the top frame;
+    // caller-below frames use `frame_layout` alone.
+    // SAFETY: current_func is valid (caller's invariant).
+    let top_func = unsafe { current_func.as_ref() };
+    unsafe {
+        gc_scan_frame_roots(scanner, fp, &top_func.frame_layout.heap_ptr_offsets);
+        if let Some(sp_layout) = top_func.safe_point_layout_at(pc_top) {
+            gc_scan_frame_roots(scanner, fp, &sp_layout.heap_ptr_offsets);
+        }
+    }
+
+    // Walk caller frames with frame_layout only.
+    let mut fp = fp;
+    loop {
+        // SAFETY: `fp.sub(FRAME_METADATA_SIZE)` reads metadata written
+        // by the call protocol when this frame's callee was created.
+        // Arena pointers are valid for the executable's lifetime.
+        let meta = unsafe { fp.sub(FRAME_METADATA_SIZE) };
+        let saved_func_ptr =
+            unsafe { read_ptr(meta, META_SAVED_FUNC_PTR_OFFSET) } as *const Function;
+        if saved_func_ptr.is_null() {
+            break;
+        }
+        fp = unsafe { read_ptr(meta, META_SAVED_FP_OFFSET) };
+        // SAFETY: non-null checked above.
+        let caller_func_ptr = unsafe { NonNull::new_unchecked(saved_func_ptr as *mut Function) };
+        let caller_func = unsafe { caller_func_ptr.as_ref() };
+        unsafe {
+            gc_scan_frame_roots(scanner, fp, &caller_func.frame_layout.heap_ptr_offsets);
+        }
+    }
+}
+
+// ---------------------------------------------------------------------------
 // Garbage collection
 // ---------------------------------------------------------------------------
 
-/// Run Cheney's copying GC. Walks the call stack to find roots via
-/// per-function pointer slot lists, scans [`PinnedRoots`], then does a
+/// Run Cheney's copying GC. The caller's `scan_roots` closure walks
+/// every root source (call stack, pinned roots, etc.) and routes each
+/// pointer through [`RootScanner::relocate`]. The GC then does a
 /// breadth-first copy of all reachable objects.
 ///
 /// # Safety assumptions
@@ -439,10 +538,7 @@ pub(crate) fn grow_vec_ref(
 pub(crate) fn gc_collect(
     heap: &mut Heap,
     descriptors: &[ObjectDescriptor],
-    pinned_roots: &PinnedRoots,
-    frame_ptr: *mut u8,
-    current_func: NonNull<Function>,
-    pc_top: usize,
+    scan_roots: impl FnOnce(&mut RootScanner<'_>),
 ) -> RuntimeResult<()> {
     heap.gc_count += 1;
 
@@ -456,78 +552,16 @@ pub(crate) fn gc_collect(
     // of from-space survives, producing UB on `.add` / `.sub`.
     let mut free_ptr = to_space.as_ptr();
 
-    // Phase 1: scan roots from the call stack.
-    //
-    // Two sets of pointer offsets are scanned per frame:
-    //   1. `frame_layout.heap_ptr_offsets` — always applies, to every
-    //      frame on the stack.
-    //   2. The matching `safe_point_layouts` entry for the *top*
-    //      frame's `pc_top`, if any — provides additional pointer
-    //      offsets that are only valid at that specific top-frame
-    //      safe point (an allocating op currently executing in the
-    //      top frame).
-    //
-    // Per `SafePointEntry`'s top-frame-only contract,
-    // `safe_point_layouts` is consulted only for the top frame;
-    // caller-below frames use `frame_layout` alone.
+    // Phase 1: hand the scanner to the caller's closure. The
+    // closure walks every root source (call stack, pinned roots,
+    // and future ones like global-storage writes) and routes each
+    // pointer through `RootScanner::relocate`.
     {
-        // Top frame: frame_layout + safe_point_layouts[pc_top].
-        // SAFETY: current_func is valid (caller's invariant).
-        let top_func = unsafe { current_func.as_ref() };
-        unsafe {
-            gc_scan_frame_roots(
-                heap,
-                frame_ptr,
-                &top_func.frame_layout.heap_ptr_offsets,
-                &mut free_ptr,
-            );
-
-            if let Some(sp_layout) = top_func.safe_point_layout_at(pc_top) {
-                gc_scan_frame_roots(heap, frame_ptr, &sp_layout.heap_ptr_offsets, &mut free_ptr);
-            }
-        }
-    }
-
-    // Walk caller frames with frame_layout only.
-    let mut fp = frame_ptr;
-    loop {
-        // SAFETY: `fp.sub(FRAME_METADATA_SIZE)` reads metadata written
-        // by the call protocol when this frame's callee was created.
-        // Arena pointers are valid for the executable's lifetime.
-        let meta = unsafe { fp.sub(FRAME_METADATA_SIZE) };
-        let saved_func_ptr =
-            unsafe { read_ptr(meta, META_SAVED_FUNC_PTR_OFFSET) } as *const Function;
-        if saved_func_ptr.is_null() {
-            break;
-        }
-        fp = unsafe { read_ptr(meta, META_SAVED_FP_OFFSET) };
-        // SAFETY: non-null checked above.
-        let caller_func_ptr = unsafe { NonNull::new_unchecked(saved_func_ptr as *mut Function) };
-        let caller_func = unsafe { caller_func_ptr.as_ref() };
-        unsafe {
-            gc_scan_frame_roots(
-                heap,
-                fp,
-                &caller_func.frame_layout.heap_ptr_offsets,
-                &mut free_ptr,
-            );
-        }
-    }
-
-    // Phase 1b: scan the auxiliary pinned-roots set.
-    //
-    // SAFETY: `update_in_place` requires that its callback neither pin
-    // new objects nor drop `PinGuard`s tied to this `PinnedRoots`. Our
-    // callback only calls `gc_copy_object` and `is_heap_ptr`, which don't
-    // touch the pinned-roots set.
-    unsafe {
-        pinned_roots.update_in_place(|old_ptr| {
-            if is_heap_ptr(heap, old_ptr) {
-                gc_copy_object(old_ptr, &mut free_ptr)
-            } else {
-                old_ptr
-            }
-        });
+        let mut scanner = RootScanner {
+            heap,
+            free_ptr: &mut free_ptr,
+        };
+        scan_roots(&mut scanner);
     }
 
     // Phase 2: Cheney-style breadth-first scan of copied objects.
@@ -594,18 +628,12 @@ fn is_heap_ptr(heap: &Heap, ptr: *const u8) -> bool {
 /// - `fp` must point to a valid frame.
 /// - Each entry in `offsets` must be a valid 8-byte-aligned offset within
 ///   the frame's extended size.
-/// - `free_ptr` must point into to-space with sufficient room.
-unsafe fn gc_scan_frame_roots(
-    heap: &Heap,
-    fp: *mut u8,
-    offsets: &[FrameOffset],
-    free_ptr: &mut *mut u8,
-) {
+unsafe fn gc_scan_frame_roots(scanner: &mut RootScanner<'_>, fp: *mut u8, offsets: &[FrameOffset]) {
     unsafe {
         for &offset in offsets {
             let old_ptr = read_ptr(fp, offset);
-            if !old_ptr.is_null() && is_heap_ptr(heap, old_ptr) {
-                let new_ptr = gc_copy_object(old_ptr, free_ptr);
+            if !old_ptr.is_null() {
+                let new_ptr = scanner.relocate(old_ptr);
                 write_ptr(fp, offset, new_ptr);
             }
         }
