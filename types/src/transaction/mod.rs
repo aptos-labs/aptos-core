@@ -2088,6 +2088,10 @@ impl TransactionOutput {
         &self.write_set
     }
 
+    pub fn convert_write_set_to_v1(&mut self) {
+        self.write_set = std::mem::take(&mut self.write_set).into_v1();
+    }
+
     // This is a special function to update the total supply in the write set. 'TransactionOutput'
     // already has materialized write set, but in case of sharding support for total_supply, we
     // want to update the total supply in the write set by aggregating the total supply deltas from
