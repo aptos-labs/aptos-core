@@ -120,7 +120,7 @@ impl DoGetExecutionOutput {
             onchain_config,
             transaction_slice_metadata,
         )?;
-        let (mut transaction_outputs, block_epilogue_txn) = block_output.into_inner();
+        let (transaction_outputs, block_epilogue_txn) = block_output.into_inner();
         let (transactions, mut auxiliary_infos) = txn_provider.into_inner();
         let mut transactions = transactions
             .into_iter()
@@ -143,29 +143,6 @@ impl DoGetExecutionOutput {
             };
 
             auxiliary_infos.push(block_epilogue_aux_info);
-        }
-
-        // Manually create hotness write sets for block epilogue transaction(s), based on the block
-        // end info saved. Note that even if we are re-executing transactions during a state sync,
-        // the block end info is not re-computed and has to come from the previous execution.
-        //
-        // If the input transactions are from a normal block, the last one should be the epilogue.
-        // If they are from a chunk (i.e. we are re-executing transactions during state sync), then
-        // there could be zero or more block epilogue transactions, and we need to handle all of
-        // them.
-        //
-        // TODO(HotState): it might be better to do this in AptosVM::execute_single_transaction,
-        // but we need to figure out how to properly construct `VMOutput` from block end info.
-        for (transaction, output) in transactions.iter().zip_eq(transaction_outputs.iter_mut()) {
-            if let Transaction::BlockEpilogue(payload) = transaction {
-                assert!(output.status().is_kept(), "Block epilogue must be kept");
-                output.add_hotness(
-                    payload
-                        .try_get_keys_to_make_hot()
-                        .cloned()
-                        .unwrap_or_default(),
-                );
-            }
         }
 
         Parser::parse(

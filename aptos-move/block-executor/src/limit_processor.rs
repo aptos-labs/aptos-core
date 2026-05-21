@@ -91,9 +91,7 @@ impl<T: Transaction> BlockGasLimitProcessor<T> {
             } else {
                 txn_read_write_summary.collapse_resource_group_conflicts()
             };
-            if let Some(x) = &mut self.hot_state_op_accumulator {
-                x.add_transaction(rw_summary.keys_written(), rw_summary.keys_read());
-            }
+            self.accumulate_hot_state_op(&rw_summary);
             self.txn_read_write_summaries.push(rw_summary);
             self.compute_conflict_multiplier(conflict_overlap_length as usize)
         } else {
@@ -280,6 +278,47 @@ impl<T: Transaction> BlockGasLimitProcessor<T> {
         self.finish_update_counters_and_log_info(false, num_committed, num_total, 1)
     }
 
+    pub(crate) fn keys_to_make_hot_match(&self, keys: &BTreeSet<T::Key>) -> bool {
+        self.hot_state_op_accumulator
+            .as_ref()
+            .is_some_and(|accumulator| accumulator.keys_to_make_hot() == keys)
+    }
+
+    pub(crate) fn accumulate_hot_state_op(&mut self, rw_summary: &ReadWriteSummary<T>) {
+        if let Some(accumulator) = &mut self.hot_state_op_accumulator {
+            accumulator.add_transaction(rw_summary.keys_written(), rw_summary.keys_read());
+        }
+    }
+
+    pub(crate) fn apply_block_epilogue_read_write_summary(
+        keys_to_make_hot_from_block_body: &BTreeSet<T::Key>,
+        epilogue_read_write_summary: &ReadWriteSummary<T>,
+    ) -> BTreeSet<T::Key> {
+        BlockHotStateOpAccumulator::apply_transaction_to_keys_to_make_hot(
+            keys_to_make_hot_from_block_body.clone(),
+            epilogue_read_write_summary.keys_written(),
+            epilogue_read_write_summary.keys_read(),
+        )
+    }
+
+    pub(crate) fn block_epilogue_hotness_plan(
+        &self,
+        keys_to_make_hot_from_block_body: &BTreeSet<T::Key>,
+        epilogue_read_write_summary: Option<&ReadWriteSummary<T>>,
+    ) -> (bool, BTreeSet<T::Key>) {
+        if let Some(read_write_summary) = epilogue_read_write_summary {
+            (
+                self.keys_to_make_hot_match(keys_to_make_hot_from_block_body),
+                Self::apply_block_epilogue_read_write_summary(
+                    keys_to_make_hot_from_block_body,
+                    read_write_summary,
+                ),
+            )
+        } else {
+            (false, keys_to_make_hot_from_block_body.clone())
+        }
+    }
+
     pub(crate) fn get_block_end_info(&self) -> TBlockEndInfoExt<T::Key> {
         let inner = BlockEndInfo::V0 {
             block_gas_limit_reached: self
@@ -303,7 +342,7 @@ impl<T: Transaction> BlockGasLimitProcessor<T> {
         TBlockEndInfoExt::new(inner, to_make_hot)
     }
 
-    fn get_keys_to_make_hot(&self) -> BTreeSet<T::Key> {
+    pub(crate) fn get_keys_to_make_hot(&self) -> BTreeSet<T::Key> {
         if self.hot_state_op_accumulator.is_none() {
             warn!("BlockHotStateOpAccumulator is not set.");
         }

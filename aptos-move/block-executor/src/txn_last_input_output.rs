@@ -206,6 +206,22 @@ impl<T: Transaction, O: TransactionOutput<Txn = T>> OutputWrapper<T, O> {
             .as_ref()
             .expect("Output must be set when status is success or skip rest"))
     }
+
+    fn check_success_or_skip_status_mut(&mut self) -> Result<&mut O, PanicError> {
+        if self.output_status_kind != OutputStatusKind::Success
+            && self.output_status_kind != OutputStatusKind::SkipRest
+        {
+            return Err(code_invariant_error(format!(
+                "Output status {:?}!= success or skip rest",
+                self.output_status_kind
+            )));
+        }
+
+        Ok(self
+            .output
+            .as_mut()
+            .expect("Output must be set when status is success or skip rest"))
+    }
 }
 
 pub struct TxnLastInputOutput<T: Transaction, O: TransactionOutput<Txn = T>> {
@@ -290,6 +306,36 @@ impl<T: Transaction, O: TransactionOutput<Txn = T>> TxnLastInputOutput<T, O> {
         Some(Arc::clone(self.inputs[txn_idx as usize].lock().as_ref()?))
     }
 
+    pub(crate) fn add_block_epilogue_hotness(
+        &self,
+        txn_idx: TxnIndex,
+        txn: &T,
+        block_limit_processor: &mut BlockGasLimitProcessor<T>,
+    ) -> Result<(), PanicError> {
+        let Some(keys_to_make_hot) = txn.try_get_block_epilogue_keys_to_make_hot() else {
+            return Ok(());
+        };
+
+        let mut output_wrapper = self.output_wrappers[txn_idx as usize].lock();
+        let hotness =
+            if let Some(read_write_summary) = output_wrapper.maybe_read_write_summary.as_ref() {
+                let (use_accumulated_hotness, fallback_hotness) = block_limit_processor
+                    .block_epilogue_hotness_plan(keys_to_make_hot, Some(read_write_summary));
+                block_limit_processor.accumulate_hot_state_op(read_write_summary);
+                if use_accumulated_hotness {
+                    block_limit_processor.get_keys_to_make_hot()
+                } else {
+                    fallback_hotness
+                }
+            } else {
+                keys_to_make_hot.clone()
+            };
+
+        output_wrapper
+            .check_success_or_skip_status_mut()?
+            .add_hotness(hotness)
+    }
+
     // Should be called when txn_idx is committed, while holding commit lock.
     //
     // Records fee statement separately for block epilogue txn. This is done because the
@@ -305,6 +351,7 @@ impl<T: Transaction, O: TransactionOutput<Txn = T>> TxnLastInputOutput<T, O> {
     pub(crate) fn commit(
         &self,
         txn_idx: TxnIndex,
+        txn: &T,
         num_txns: TxnIndex,
         num_workers: usize,
         block_limit_processor: &mut BlockGasLimitProcessor<T>,
@@ -329,21 +376,41 @@ impl<T: Transaction, O: TransactionOutput<Txn = T>> TxnLastInputOutput<T, O> {
             );
             return Err(PanicOr::Or(ParallelBlockExecutionError::FatalVMError));
         }
-        let output_before_guard = output_wrapper
-            .check_success_or_skip_status()?
-            .before_materialization()?;
+        let (
+            mut skips_rest,
+            mut must_create_epilogue_txn,
+            has_new_epoch_event,
+            fee_statement,
+            maybe_epilogue_hotness,
+        ) = {
+            let output_before_guard = output_wrapper
+                .check_success_or_skip_status()?
+                .before_materialization()?;
+            let has_new_epoch_event = output_before_guard.has_new_epoch_event();
+            let maybe_epilogue_hotness =
+                txn.try_get_block_epilogue_keys_to_make_hot()
+                    .map(|keys_to_make_hot| {
+                        block_limit_processor.block_epilogue_hotness_plan(
+                            keys_to_make_hot,
+                            maybe_read_write_summary.as_ref(),
+                        )
+                    });
 
-        let (mut skips_rest, mut must_create_epilogue_txn) =
-            if output_wrapper.output_status_kind == OutputStatusKind::SkipRest {
-                (true, !output_before_guard.has_new_epoch_event())
-            } else {
-                assert!(output_wrapper.output_status_kind == OutputStatusKind::Success);
-                (
-                    false,
-                    txn_idx == num_txns - 1 && !output_before_guard.has_new_epoch_event(),
-                )
-            };
-        let fee_statement = output_before_guard.fee_statement();
+            let (skips_rest, must_create_epilogue_txn) =
+                if output_wrapper.output_status_kind == OutputStatusKind::SkipRest {
+                    (true, !has_new_epoch_event)
+                } else {
+                    assert!(output_wrapper.output_status_kind == OutputStatusKind::Success);
+                    (false, txn_idx == num_txns - 1 && !has_new_epoch_event)
+                };
+            (
+                skips_rest,
+                must_create_epilogue_txn,
+                has_new_epoch_event,
+                output_before_guard.fee_statement(),
+                maybe_epilogue_hotness,
+            )
+        };
 
         // For committed txns, calculate the accumulated gas costs.
         block_limit_processor.accumulate_fee_statement(
@@ -352,13 +419,23 @@ impl<T: Transaction, O: TransactionOutput<Txn = T>> TxnLastInputOutput<T, O> {
             output_wrapper.maybe_approx_output_size,
         );
 
+        if let Some((use_accumulated_hotness, fallback_hotness)) = maybe_epilogue_hotness {
+            let hotness = if use_accumulated_hotness {
+                block_limit_processor.get_keys_to_make_hot()
+            } else {
+                fallback_hotness
+            };
+            output_wrapper
+                .check_success_or_skip_status_mut()?
+                .add_hotness(hotness)?;
+        }
+
         if txn_idx < num_txns - 1
             && block_limit_processor.should_end_block_parallel()
             && !skips_rest
         {
             if output_wrapper.output_status_kind == OutputStatusKind::Success {
-                must_create_epilogue_txn |= !output_before_guard.has_new_epoch_event();
-                drop(output_before_guard);
+                must_create_epilogue_txn |= !has_new_epoch_event;
                 output_wrapper.output_status_kind = OutputStatusKind::SkipRest;
             }
             skips_rest = true;

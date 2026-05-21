@@ -2842,9 +2842,8 @@ impl AptosVM {
 
         SYSTEM_TRANSACTIONS_EXECUTED.inc();
 
-        // TODO(HotState): generate an output according to the block end info in the
-        //   transaction. (maybe resort to the move resolver, but for simplicity I would
-        //   just include the full slot in both the transaction and the output).
+        // Hot-state promotions from the block epilogue payload are attached after
+        // Block-STM captures this transaction's reads and writes.
         Ok((VMStatus::Executed, output))
     }
 

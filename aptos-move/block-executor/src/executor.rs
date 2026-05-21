@@ -1111,6 +1111,7 @@ where
 
         last_input_output.commit(
             txn_idx,
+            block.get_txn(txn_idx),
             num_txns,
             num_workers,
             block_limit_processor,
@@ -1753,6 +1754,14 @@ where
                     runtime_environment,
                     &self.config,
                 )?;
+                {
+                    let mut block_limit_processor = block_limit_processor.acquire();
+                    last_input_output.add_block_epilogue_hotness(
+                        epilogue_txn_idx,
+                        &epilogue_txn,
+                        &mut block_limit_processor,
+                    )?;
+                }
                 self.materialize_txn_commit(
                     epilogue_txn_idx,
                     scheduler,
@@ -2411,6 +2420,14 @@ where
                                 output_before_guard.get_write_summary(),
                             )
                         });
+                    let maybe_epilogue_hotness =
+                        txn.try_get_block_epilogue_keys_to_make_hot()
+                            .map(|keys_to_make_hot| {
+                                block_limit_processor.block_epilogue_hotness_plan(
+                                    keys_to_make_hot,
+                                    read_write_summary.as_ref(),
+                                )
+                            });
 
                     block_limit_processor.accumulate_fee_statement(
                         output_before_guard.fee_statement(),
@@ -2426,6 +2443,16 @@ where
 
                     // Drop to acquire a write lock, then re-assign the output_before_guard.
                     drop(output_before_guard);
+                    if let Some((use_accumulated_hotness, fallback_hotness)) =
+                        maybe_epilogue_hotness
+                    {
+                        let hotness = if use_accumulated_hotness {
+                            block_limit_processor.get_keys_to_make_hot()
+                        } else {
+                            fallback_hotness
+                        };
+                        output.add_hotness(hotness)?;
+                    }
                     output.legacy_sequential_materialize_agg_v1(&latest_view);
                     let output_before_guard = output.before_materialization()?;
 

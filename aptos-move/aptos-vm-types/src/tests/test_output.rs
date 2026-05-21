@@ -17,7 +17,7 @@ use aptos_types::{
 };
 use claims::{assert_err, assert_matches, assert_ok};
 use move_core_types::vm_status::{AbortLocation, VMStatus};
-use std::collections::BTreeMap;
+use std::collections::{BTreeMap, BTreeSet};
 
 fn assert_eq_outputs(vm_output: &VMOutput, txn_output: TransactionOutput) {
     let vm_output_writes = &vm_output
@@ -69,6 +69,21 @@ fn test_ok_output_equality_no_deltas() {
     assert_eq!(&vm_output, &materialized_vm_output);
     assert_eq_outputs(&vm_output, txn_output_1);
     assert_eq_outputs(&vm_output, txn_output_2);
+}
+
+#[test]
+fn test_output_carries_hotness() {
+    let mut vm_output = build_vm_output(vec![], vec![], vec![], vec![], vec![]);
+    let hotness = BTreeSet::from([as_state_key!("hot")]);
+    vm_output.add_hotness(hotness.clone());
+
+    let txn_output = assert_ok!(vm_output.into_transaction_output());
+    let output_hotness = txn_output
+        .write_set()
+        .hotness_keys()
+        .cloned()
+        .collect::<BTreeSet<_>>();
+    assert_eq!(output_hotness, hotness);
 }
 
 #[test]

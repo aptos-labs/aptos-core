@@ -136,6 +136,16 @@ impl BlockExecutableTransaction for SignatureVerifiedTransaction {
             .into()
     }
 
+    fn try_get_block_epilogue_keys_to_make_hot(&self) -> Option<&BTreeSet<Self::Key>> {
+        match self {
+            SignatureVerifiedTransaction::Valid(Transaction::BlockEpilogue(payload))
+            | SignatureVerifiedTransaction::Invalid(Transaction::BlockEpilogue(payload)) => {
+                payload.try_get_keys_to_make_hot()
+            },
+            _ => None,
+        }
+    }
+
     fn pre_write_values(&self) -> Vec<(Self::Key, Self::Value)> {
         let timestamp = match self {
             SignatureVerifiedTransaction::Valid(Transaction::BlockMetadataExt(metadata_txn)) => {

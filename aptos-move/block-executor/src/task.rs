@@ -29,7 +29,7 @@ use move_vm_runtime::execution_tracing::Trace;
 use move_vm_types::delayed_values::delayed_field_id::DelayedFieldID;
 use once_cell::sync::OnceCell;
 use std::{
-    collections::{BTreeMap, HashMap, HashSet},
+    collections::{BTreeMap, BTreeSet, HashMap, HashSet},
     fmt::Debug,
 };
 use triomphe::Arc as TriompheArc;
@@ -229,6 +229,15 @@ pub trait TransactionOutput: Send + Debug {
 
     /// Returns true iff the transaction status is Keep(Success).
     fn is_materialized_and_success(&self) -> bool;
+
+    /// Adds hot-state promotions that should be committed with this output.
+    fn add_hotness(
+        &mut self,
+        _hotness: BTreeSet<<Self::Txn as Transaction>::Key>,
+    ) -> Result<(), PanicError> {
+        Ok(())
+    }
+
     /// The purpose of this method is to return true if the output has been materialized
     /// (i.e. incorporate_materialized_txn_output has been called), or false otherwise.
     /// The method can also assert any invariants provided by the trait implementation

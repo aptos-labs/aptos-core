@@ -24,7 +24,10 @@ use move_core_types::{
 };
 use move_vm_runtime::execution_tracing::Trace;
 use move_vm_types::delayed_values::delayed_field_id::DelayedFieldID;
-use std::{collections::BTreeMap, mem};
+use std::{
+    collections::{BTreeMap, BTreeSet},
+    mem,
+};
 
 /// Output produced by the VM after executing a transaction.
 ///
@@ -35,6 +38,7 @@ use std::{collections::BTreeMap, mem};
 pub struct VMOutput {
     change_set: VMChangeSet,
     module_write_set: ModuleWriteSet,
+    hotness: BTreeSet<StateKey>,
     fee_statement: FeeStatement,
     status: TransactionStatus,
     /// Trace of the user transaction payload execution in Move VM. Trace is always created as
@@ -53,6 +57,7 @@ impl VMOutput {
         Self {
             change_set,
             module_write_set,
+            hotness: BTreeSet::new(),
             fee_statement,
             status,
             trace: Trace::empty(),
@@ -63,6 +68,7 @@ impl VMOutput {
         Self {
             change_set: VMChangeSet::empty(),
             module_write_set: ModuleWriteSet::empty(),
+            hotness: BTreeSet::new(),
             fee_statement: FeeStatement::zero(),
             status,
             trace: Trace::empty(),
@@ -105,6 +111,14 @@ impl VMOutput {
 
     pub fn status(&self) -> &TransactionStatus {
         &self.status
+    }
+
+    pub fn add_hotness(&mut self, hotness: BTreeSet<StateKey>) {
+        assert!(
+            self.hotness.is_empty(),
+            "hotness should only be initialized once."
+        );
+        self.hotness = hotness;
     }
 
     /// Sets the trace for this output. Should only be called once to replace the default empty
@@ -192,6 +206,7 @@ impl VMOutput {
         let Self {
             change_set,
             module_write_set,
+            hotness,
             fee_statement,
             status,
             trace,
@@ -206,9 +221,12 @@ impl VMOutput {
             ));
         }
 
-        let (write_set, events) = change_set
+        let (mut write_set, events) = change_set
             .try_combine_into_storage_change_set(module_write_set)?
             .into_inner();
+        if !hotness.is_empty() {
+            write_set.add_hotness(hotness);
+        }
         Ok(TransactionOutput::new(
             write_set,
             events,

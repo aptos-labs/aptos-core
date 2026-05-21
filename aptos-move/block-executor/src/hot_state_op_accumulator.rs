@@ -68,4 +68,34 @@ where
     pub fn get_keys_to_make_hot(&self) -> BTreeSet<Key> {
         self.to_make_hot.clone()
     }
+
+    pub fn keys_to_make_hot(&self) -> &BTreeSet<Key> {
+        &self.to_make_hot
+    }
+
+    pub fn apply_transaction_to_keys_to_make_hot<'a>(
+        mut to_make_hot: BTreeSet<Key>,
+        writes: impl Iterator<Item = &'a Key>,
+        reads: impl Iterator<Item = &'a Key>,
+    ) -> BTreeSet<Key>
+    where
+        Key: 'a,
+    {
+        let writes = writes.cloned().collect::<hashbrown::HashSet<_>>();
+        for key in &writes {
+            to_make_hot.remove(key);
+        }
+
+        for key in reads {
+            if to_make_hot.len() >= Self::MAX_PROMOTIONS_PER_BLOCK {
+                continue;
+            }
+            if writes.contains(key) {
+                continue;
+            }
+            to_make_hot.insert(key.clone());
+        }
+
+        to_make_hot
+    }
 }
