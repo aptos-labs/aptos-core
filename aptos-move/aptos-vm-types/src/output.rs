@@ -24,7 +24,10 @@ use move_core_types::{
 };
 use move_vm_runtime::execution_tracing::Trace;
 use move_vm_types::delayed_values::delayed_field_id::DelayedFieldID;
-use std::{collections::BTreeMap, mem};
+use std::{
+    collections::{BTreeMap, BTreeSet},
+    mem,
+};
 
 /// Output produced by the VM after executing a transaction.
 ///
@@ -105,6 +108,25 @@ impl VMOutput {
 
     pub fn status(&self) -> &TransactionStatus {
         &self.status
+    }
+
+    /// Folds `hotness` (read-only keys requested for promotion to hot state) into
+    /// the underlying change set, after removing any key this output already
+    /// writes (a write already promotes the slot, so the MakeHot marker would be
+    /// redundant). Only the block epilogue path is expected to call this.
+    pub fn set_hotness_after_writes(&mut self, mut hotness: BTreeSet<StateKey>) {
+        if hotness.is_empty() {
+            return;
+        }
+        for key in self.change_set.resource_write_set().keys() {
+            hotness.remove(key);
+        }
+        for key in self.change_set.aggregator_v1_write_set().keys() {
+            hotness.remove(key);
+        }
+        if !hotness.is_empty() {
+            self.change_set.set_hotness(hotness);
+        }
     }
 
     /// Sets the trace for this output. Should only be called once to replace the default empty
