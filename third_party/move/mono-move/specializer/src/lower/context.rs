@@ -127,6 +127,17 @@ pub enum BuildContextOutcome {
     Skipped(&'static str),
 }
 
+/// Outcome of attempting to lower a function: either a fully lowered
+/// [`Function`] was produced, or lowering was skipped for an
+/// out-of-scope feature (currently nominal types or partial
+/// concretization). Mirrors [`BuildContextOutcome`] — `Skipped` is a
+/// non-fatal "not yet supported," while internal-invariant violations
+/// still travel on the `Err` path.
+pub enum LoweringOutcome {
+    Built(Function),
+    Skipped(&'static str),
+}
+
 /// Returns `true` if any of `types` is a [`Type::Nominal`].
 fn contains_nominal(types: &[InternedType]) -> bool {
     types
@@ -381,20 +392,27 @@ pub trait SpecializerContext {
     fn subst_type(&self, ty: InternedType, ty_args: InternedTypeList) -> Result<InternedType>;
 }
 
-/// Attempts to lower a function, and returns an error if lowering failed. The
-/// caller must ensure this is not the case by ensuring that all lowering
-/// requirements are satisfied (e.g., type sizes known).
+/// Attempts to lower a function.
+///
+/// Returns:
+///
+/// - `Ok(LoweringOutcome::Built(f))` on success.
+/// - `Ok(LoweringOutcome::Skipped(reason))` when `try_build_context`
+///   reports an out-of-scope shape (currently nominal types or
+///   partial concretization). The caller decides how to handle this —
+///   today, the loader surfaces it as a load-time error while keeping
+///   any side-effects (side-loaded dependencies, gas charges) that
+///   earlier phases already committed to the read-set.
+/// - `Err(_)` for internal-invariant violations and other real bugs.
 pub fn try_lower_function(
     module_ir: &ModuleIR,
     func_ir: &FunctionIR,
     ty_args: InternedTypeList,
     interner: &impl Interner,
-) -> Result<Function> {
+) -> Result<LoweringOutcome> {
     let ctx = match try_build_context(module_ir, func_ir, ty_args, interner)? {
         BuildContextOutcome::Built(c) => c,
-        BuildContextOutcome::Skipped(reason) => {
-            bail!("Failed to create lowering context: {}", reason)
-        },
+        BuildContextOutcome::Skipped(reason) => return Ok(LoweringOutcome::Skipped(reason)),
     };
 
     let name = module_ir.module.interned_identifier_at(func_ir.name_idx);
@@ -442,7 +460,7 @@ pub fn try_lower_function(
     let home_list = interner.subst_type_list(home_list, ty_args)?;
     let derived = derive_frame_layout(&ctx, func_ir, view_type_list(home_list))?;
 
-    Ok(Function {
+    Ok(LoweringOutcome::Built(Function {
         name,
         code: Code::from_vec(code),
         param_sizes,
@@ -452,7 +470,7 @@ pub fn try_lower_function(
         zero_frame: derived.zero_frame,
         frame_layout: FrameLayoutInfo::new(derived.heap_ptr_offsets),
         safe_point_layouts: SortedSafePointEntries::empty(),
-    })
+    }))
 }
 
 /// Tries to enforce lowering requirements for all functions in the given

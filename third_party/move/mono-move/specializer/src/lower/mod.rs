@@ -9,6 +9,8 @@ pub mod gc_layout;
 mod parallel_copy;
 mod translate;
 
-pub use context::{try_build_context, BuildContextOutcome, LoweringContext, SlotInfo};
+pub use context::{
+    try_build_context, BuildContextOutcome, LoweringContext, LoweringOutcome, SlotInfo,
+};
 pub use display::MicroOpsFunctionDisplay;
 pub use translate::lower_function;
