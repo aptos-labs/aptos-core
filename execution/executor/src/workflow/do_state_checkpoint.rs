@@ -9,7 +9,7 @@ use aptos_executor_types::{
 };
 use aptos_metrics_core::TimerHelper;
 use aptos_storage_interface::state_store::state_summary::{
-    LedgerStateSummary, ProvableStateSummary,
+    LedgerStateSummary, ProvableStateSummary, StateSummary,
 };
 
 pub struct DoStateCheckpoint;
@@ -20,6 +20,7 @@ impl DoStateCheckpoint {
         parent_state_summary: &LedgerStateSummary,
         persisted_state_summary: &ProvableStateSummary,
         known_state_checkpoints: Option<Vec<Option<HashValue>>>,
+        known_hot_state_checkpoints: Option<Vec<Option<HashValue>>>,
     ) -> Result<StateCheckpointOutput> {
         let _timer = OTHER_TIMERS.timer_with(&["do_state_checkpoint"]);
 
@@ -29,24 +30,48 @@ impl DoStateCheckpoint {
             execution_output.to_commit.state_update_refs(),
         )?;
 
-        let state_checkpoint_hashes = Self::get_state_checkpoint_hashes(
+        // When we compute the cold-state checkpoint hash from scratch (rather than verifying
+        // against known hashes from chunk sync), the output vec has room for exactly one Some
+        // entry — multiple checkpoints in the input would silently lose all but the last. Block
+        // execution is already structurally guaranteed to have at most one (asserted in
+        // ExecutionOutput::new); the only path that hits the compute branch without that
+        // guarantee is tests. Note: gating on the cold known is intentional — chunk sync may
+        // span multiple checkpoints (V0 chunks pass cold=Some, hot=None).
+        if !execution_output.is_block && known_state_checkpoints.is_none() {
+            execution_output.to_commit.ensure_at_most_one_checkpoint()?;
+        }
+
+        let state_checkpoint_hashes = Self::get_checkpoint_hashes(
             execution_output,
             known_state_checkpoints,
             &state_summary,
+            StateSummary::root_hash,
+            "state",
+        )?;
+
+        let hot_state_checkpoint_hashes = Self::get_checkpoint_hashes(
+            execution_output,
+            known_hot_state_checkpoints,
+            &state_summary,
+            StateSummary::hot_root_hash,
+            "hot state",
         )?;
 
         Ok(StateCheckpointOutput::new(
             state_summary,
             state_checkpoint_hashes,
+            hot_state_checkpoint_hashes,
         ))
     }
 
-    fn get_state_checkpoint_hashes(
+    fn get_checkpoint_hashes(
         execution_output: &ExecutionOutput,
-        known_state_checkpoints: Option<Vec<Option<HashValue>>>,
+        known: Option<Vec<Option<HashValue>>>,
         state_summary: &LedgerStateSummary,
+        extract: impl Fn(&StateSummary) -> HashValue,
+        label: &str,
     ) -> Result<Vec<Option<HashValue>>> {
-        let _timer = OTHER_TIMERS.timer_with(&["get_state_checkpoint_hashes"]);
+        let _timer = OTHER_TIMERS.timer_with(&["get_checkpoint_hashes"]);
 
         let num_txns = execution_output.to_commit.len();
         let last_checkpoint_index = execution_output
@@ -54,35 +79,28 @@ impl DoStateCheckpoint {
             .state_update_refs()
             .last_inner_checkpoint_index();
 
-        if let Some(known) = known_state_checkpoints {
+        if let Some(known) = known {
             ensure!(
                 known.len() == num_txns,
-                "Bad number of known hashes. {} vs {}",
+                "Bad number of known {label} hashes. {} vs {}",
                 known.len(),
-                num_txns
+                num_txns,
             );
             if let Some(idx) = last_checkpoint_index {
+                let expected = extract(state_summary.last_checkpoint());
                 ensure!(
-                    known[idx] == Some(state_summary.last_checkpoint().root_hash()),
-                    "Root hash mismatch with known hashes passed in. {:?} vs {:?}",
+                    known[idx] == Some(expected),
+                    "{label} root hash mismatch with known hashes passed in. {:?} vs {:?}",
                     known[idx],
-                    Some(&state_summary.last_checkpoint().root_hash()),
+                    Some(expected),
                 );
             }
-
             Ok(known)
         } else {
-            if !execution_output.is_block {
-                // We should enter this branch only in test.
-                execution_output.to_commit.ensure_at_most_one_checkpoint()?;
-            }
-
             let mut out = vec![None; num_txns];
-
             if let Some(index) = last_checkpoint_index {
-                out[index] = Some(state_summary.last_checkpoint().root_hash());
+                out[index] = Some(extract(state_summary.last_checkpoint()));
             }
-
             Ok(out)
         }
     }
