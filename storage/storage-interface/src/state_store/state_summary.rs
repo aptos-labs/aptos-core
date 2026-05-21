@@ -69,6 +69,10 @@ impl StateSummary {
         self.global_state_summary.root_hash()
     }
 
+    pub fn hot_state_config(&self) -> &HotStateConfig {
+        &self.hot_state_config
+    }
+
     pub fn next_version(&self) -> Version {
         self.next_version
     }

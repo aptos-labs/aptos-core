@@ -2226,6 +2226,7 @@ impl TransactionOutput {
 #[cfg_attr(any(test, feature = "fuzzing"), derive(Arbitrary))]
 pub enum TransactionInfo {
     V0(TransactionInfoV0),
+    V1(TransactionInfoV1),
 }
 
 impl TransactionInfo {
@@ -2243,6 +2244,28 @@ impl TransactionInfo {
             state_change_hash,
             event_root_hash,
             state_checkpoint_hash,
+            gas_used,
+            status,
+            auxiliary_info_hash,
+        ))
+    }
+
+    pub fn new_v1(
+        transaction_hash: HashValue,
+        state_change_hash: HashValue,
+        event_root_hash: HashValue,
+        state_checkpoint_hash: Option<HashValue>,
+        hot_state_checkpoint_hash: Option<HashValue>,
+        gas_used: u64,
+        status: ExecutionStatus,
+        auxiliary_info_hash: Option<HashValue>,
+    ) -> Self {
+        Self::V1(TransactionInfoV1::new(
+            transaction_hash,
+            state_change_hash,
+            event_root_hash,
+            state_checkpoint_hash,
+            hot_state_checkpoint_hash,
             gas_used,
             status,
             auxiliary_info_hash,
@@ -2278,14 +2301,69 @@ impl TransactionInfo {
             Some(HashValue::default()),
         )
     }
-}
 
-impl Deref for TransactionInfo {
-    type Target = TransactionInfoV0;
-
-    fn deref(&self) -> &Self::Target {
+    pub fn transaction_hash(&self) -> HashValue {
         match self {
-            Self::V0(txn_info) => txn_info,
+            Self::V0(v) => v.transaction_hash,
+            Self::V1(v) => v.transaction_hash,
+        }
+    }
+
+    pub fn state_change_hash(&self) -> HashValue {
+        match self {
+            Self::V0(v) => v.state_change_hash,
+            Self::V1(v) => v.state_change_hash,
+        }
+    }
+
+    pub fn event_root_hash(&self) -> HashValue {
+        match self {
+            Self::V0(v) => v.event_root_hash,
+            Self::V1(v) => v.event_root_hash,
+        }
+    }
+
+    pub fn state_checkpoint_hash(&self) -> Option<HashValue> {
+        match self {
+            Self::V0(v) => v.state_checkpoint_hash,
+            Self::V1(v) => v.state_checkpoint_hash,
+        }
+    }
+
+    pub fn has_state_checkpoint_hash(&self) -> bool {
+        self.state_checkpoint_hash().is_some()
+    }
+
+    pub fn ensure_state_checkpoint_hash(&self) -> Result<HashValue> {
+        self.state_checkpoint_hash()
+            .ok_or_else(|| format_err!("State checkpoint hash not present in TransactionInfo"))
+    }
+
+    pub fn hot_state_checkpoint_hash(&self) -> Option<HashValue> {
+        match self {
+            Self::V0(_) => None,
+            Self::V1(v) => v.hot_state_checkpoint_hash,
+        }
+    }
+
+    pub fn auxiliary_info_hash(&self) -> Option<HashValue> {
+        match self {
+            Self::V0(v) => v.auxiliary_info_hash,
+            Self::V1(v) => v.auxiliary_info_hash,
+        }
+    }
+
+    pub fn gas_used(&self) -> u64 {
+        match self {
+            Self::V0(v) => v.gas_used,
+            Self::V1(v) => v.gas_used,
+        }
+    }
+
+    pub fn status(&self) -> &ExecutionStatus {
+        match self {
+            Self::V0(v) => &v.status,
+            Self::V1(v) => &v.status,
         }
     }
 }
@@ -2376,6 +2454,61 @@ impl TransactionInfoV0 {
 
     pub fn status(&self) -> &ExecutionStatus {
         &self.status
+    }
+}
+
+#[derive(Clone, CryptoHasher, BCSCryptoHash, Debug, Eq, PartialEq, Serialize, Deserialize)]
+#[cfg_attr(any(test, feature = "fuzzing"), derive(Arbitrary))]
+pub struct TransactionInfoV1 {
+    gas_used: u64,
+    status: ExecutionStatus,
+    transaction_hash: HashValue,
+    event_root_hash: HashValue,
+    state_change_hash: HashValue,
+    state_checkpoint_hash: Option<HashValue>,
+    hot_state_checkpoint_hash: Option<HashValue>,
+    auxiliary_info_hash: Option<HashValue>,
+
+    // Reserved for future changes.
+    placeholder0: Option<HashValue>,
+    placeholder1: Option<HashValue>,
+    placeholder2: Option<HashValue>,
+    placeholder3: Option<HashValue>,
+    placeholder4: Option<HashValue>,
+    placeholder5: Option<HashValue>,
+    placeholder6: Option<HashValue>,
+    placeholder7: Option<HashValue>,
+}
+
+impl TransactionInfoV1 {
+    pub fn new(
+        transaction_hash: HashValue,
+        state_change_hash: HashValue,
+        event_root_hash: HashValue,
+        state_checkpoint_hash: Option<HashValue>,
+        hot_state_checkpoint_hash: Option<HashValue>,
+        gas_used: u64,
+        status: ExecutionStatus,
+        auxiliary_info_hash: Option<HashValue>,
+    ) -> Self {
+        Self {
+            gas_used,
+            status,
+            transaction_hash,
+            event_root_hash,
+            state_change_hash,
+            state_checkpoint_hash,
+            hot_state_checkpoint_hash,
+            auxiliary_info_hash,
+            placeholder0: None,
+            placeholder1: None,
+            placeholder2: None,
+            placeholder3: None,
+            placeholder4: None,
+            placeholder5: None,
+            placeholder6: None,
+            placeholder7: None,
+        }
     }
 }
 
