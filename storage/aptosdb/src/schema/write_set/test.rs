@@ -5,7 +5,6 @@ use super::*;
 use aptos_schemadb::{schema::fuzzing::assert_encode_decode, test_no_panic_decoding};
 use aptos_types::write_set::WriteOp;
 use proptest::prelude::*;
-use std::collections::BTreeMap;
 
 proptest! {
     #[test]
@@ -53,12 +52,9 @@ fn test_roundtrip_with_hotness() {
     )])
     .unwrap();
 
-    let hot_keys: BTreeMap<StateKey, HotStateOp> = [
-        (StateKey::raw(b"hot1"), HotStateOp::make_hot()),
-        (StateKey::raw(b"hot2"), HotStateOp::make_hot()),
-    ]
-    .into_iter()
-    .collect();
+    let hot_keys: BTreeSet<_> = [StateKey::raw(b"hot1"), StateKey::raw(b"hot2")]
+        .into_iter()
+        .collect();
     ws.add_hotness(hot_keys);
 
     let encoded = encode_write_set(&ws, true).unwrap();
