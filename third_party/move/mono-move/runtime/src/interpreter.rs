@@ -5,7 +5,7 @@
 //! and a bump-allocated heap with copying GC.
 
 use crate::{
-    error::{ArithOp, RuntimeError, RuntimeResult, Signedness, VecOp},
+    error::{ArithOp, RuntimeError, RuntimeResult, RuntimeStatus, Signedness, VecOp},
     heap::{
         macros::{alloc_obj, alloc_vec, gc_collect, grow_vec_ref},
         object_descriptor::{ObjectDescriptor, CLOSURE_DESCRIPTOR_ID},
@@ -18,8 +18,9 @@ use crate::{
         MemoryRegion,
     },
     types::{
-        StepResult, DEFAULT_HEAP_SIZE, DEFAULT_STACK_SIZE, META_SAVED_FP_OFFSET,
-        META_SAVED_FUNC_PTR_OFFSET, META_SAVED_PC_OFFSET, VEC_DATA_OFFSET, VEC_LENGTH_OFFSET,
+        StepResult, ABORT_MESSAGE_SIZE_LIMIT, DEFAULT_HEAP_SIZE, DEFAULT_STACK_SIZE,
+        META_SAVED_FP_OFFSET, META_SAVED_FUNC_PTR_OFFSET, META_SAVED_PC_OFFSET, VEC_DATA_OFFSET,
+        VEC_LENGTH_OFFSET,
     },
 };
 use mono_move_core::{
@@ -786,6 +787,41 @@ impl<T: ExecutionContext> InterpreterContext<'_, T> {
                     self.pc = read_u64(meta, META_SAVED_PC_OFFSET) as usize;
                     self.frame_ptr = read_ptr(meta, META_SAVED_FP_OFFSET);
                     return Ok(StepResult::Continue);
+                },
+
+                MicroOp::Abort { code } => {
+                    let code = read_u64(fp, code);
+                    return Ok(StepResult::Aborted {
+                        code,
+                        message: None,
+                    });
+                },
+
+                MicroOp::AbortMsg { code, message } => {
+                    let code = read_u64(fp, code);
+                    let vec_ptr = read_ptr(fp, message);
+                    let message = if vec_ptr.is_null() {
+                        String::new()
+                    } else {
+                        // TODO: charge gas for abort message bytes.
+                        let len = read_u64(vec_ptr, VEC_LENGTH_OFFSET) as usize;
+                        if len > ABORT_MESSAGE_SIZE_LIMIT {
+                            return Err(RuntimeError::AbortMessageTooLong {
+                                len,
+                                max: ABORT_MESSAGE_SIZE_LIMIT,
+                            });
+                        }
+                        // SAFETY: `vec_ptr` is non-null (checked above) and
+                        // points at a heap vector with `len` initialized
+                        // bytes at `VEC_DATA_OFFSET`.
+                        let data = vec_ptr.add(VEC_DATA_OFFSET);
+                        String::from_utf8(std::slice::from_raw_parts(data, len).to_vec())
+                            .map_err(|_| RuntimeError::InvalidAbortMessage)?
+                    };
+                    return Ok(StepResult::Aborted {
+                        code,
+                        message: Some(message),
+                    });
                 },
 
                 // ----- Arithmetic -----
@@ -1581,11 +1617,14 @@ impl<T: ExecutionContext> InterpreterContext<'_, T> {
     // iteration. LLVM can't keep them in registers because heap operations
     // (VecPushBack, etc.) take &mut self, which may alias these fields.
     // Write back only on CallFunc/Return.
-    pub fn run(&mut self) -> RuntimeResult<()> {
+    pub fn run(&mut self) -> RuntimeResult<RuntimeStatus> {
         loop {
             match self.step()? {
                 StepResult::Continue => {},
-                StepResult::Done => return Ok(()),
+                StepResult::Done => return Ok(RuntimeStatus::Success),
+                StepResult::Aborted { code, message } => {
+                    return Ok(RuntimeStatus::Aborted { code, message })
+                },
             }
         }
     }
