@@ -889,14 +889,36 @@ fn build_per_stage_vectors(
         mempool_reject_ms: vec![None; n],
     };
 
+    // `display_attempt` tracks the most recently-seen non-block-finalization
+    // attempt and is used to route block-finalization stages to the slot of
+    // the block whose pipeline produced them. The split matters because
+    // `mark_retry` bumps `current_attempt` immediately after `Executed(Retry)`,
+    // so block N's PreCommit/Certified/Committed (which fire *after* that
+    // bump) get stamped with attempt N+1 in the underlying record — even
+    // though they belong to block N. The display loop in `log_trace` already
+    // handles this via `is_block_finalization`; we mirror the same logic here
+    // so block N+1's actual finalization stages aren't overwritten by block
+    // N's earlier observations.
+    let mut display_attempt: u32 = 1;
     for record in sorted_stages {
-        let idx = (record.attempt as usize).saturating_sub(1);
+        let is_finalization = is_block_finalization(record.stage);
+        if !is_finalization {
+            display_attempt = display_attempt.max(record.attempt);
+        }
+        let slot_attempt = if is_finalization {
+            display_attempt
+        } else {
+            record.attempt
+        };
+        let idx = (slot_attempt as usize).saturating_sub(1);
         if idx >= n {
             continue;
         }
         // Absolute latency in ms from `base` (MempoolInsert time). Each stage
         // entry answers "at what point in the pipeline did this stage fire?"
         // — directly usable as an e2e latency in Humio/Grafana queries.
+        // Can be negative for `BlockProposed`, which uses the proposer's
+        // `block.timestamp_usecs` (a different validator's clock).
         let abs_ms = (record.timestamp_usecs as i64 - base as i64) / 1000;
         let slot = match record.stage {
             TransactionStage::MempoolInsert => &mut v.mempool_insert_ms,
@@ -1068,20 +1090,22 @@ mod tests {
         );
         trace.record(TransactionStage::BlockReceived, 105_000);
         trace.record(TransactionStage::ExecutionStart, 120_000);
+        trace.record(TransactionStage::BlockOrdered, 145_000);
         trace.record_with_metadata(
             TransactionStage::Executed,
             150_000,
             StageMetadata::Execution(ExecutionStatus::Retry),
         );
-        // Block still finalizes for attempt 1's block (these stages keep
-        // attempt=1 because we haven't bumped current_attempt yet — the same
-        // as how the real code records block-finalization stages).
-        trace.record(TransactionStage::BlockOrdered, 155_000);
-        trace.record(TransactionStage::Certified, 160_000);
-        trace.record(TransactionStage::PreCommit, 165_000);
-        trace.record(TransactionStage::Committed, 170_000);
-        // mark_retry: now attempt 2.
+        // `record_execution_result` calls `mark_retry` immediately after
+        // recording `Executed(Retry)`. Subsequent block-finalization stages
+        // for *this* (block 1) therefore have `attempt = 2` in the record,
+        // even though they belong to the retried block. The vector builder
+        // must route them to slot[0] anyway, mirroring the display loop's
+        // `is_block_finalization` logic.
         trace.current_attempt = 2;
+        trace.record(TransactionStage::PreCommit, 160_000);
+        trace.record(TransactionStage::Certified, 165_000);
+        trace.record(TransactionStage::Committed, 170_000);
         trace.record(TransactionStage::QsBatchPull, 200_000);
         trace.record(TransactionStage::QsBatchCreated, 210_000);
         trace.record(TransactionStage::QsProofOfStore, 230_000);
@@ -1117,7 +1141,10 @@ mod tests {
         assert_eq!(v.committed_ms.len(), 2);
 
         // Attempt 1: each entry is the stage's absolute latency in ms from
-        // `base` (MempoolInsert, t=0).
+        // `base` (MempoolInsert, t=0). Block 1's PreCommit/Certified/Committed
+        // are stamped with `attempt = 2` in their records (mark_retry already
+        // bumped current_attempt), but the vector builder must still route
+        // them to slot[0] — they belong to the retried block.
         assert_eq!(v.mempool_insert_ms[0], Some(0));
         assert_eq!(v.qs_batch_pull_ms[0], Some(50));
         assert_eq!(v.qs_batch_created_ms[0], Some(53));
@@ -1125,10 +1152,10 @@ mod tests {
         assert_eq!(v.block_proposed_ms[0], Some(100));
         assert_eq!(v.block_received_ms[0], Some(105));
         assert_eq!(v.execution_start_ms[0], Some(120));
+        assert_eq!(v.block_ordered_ms[0], Some(145));
         assert_eq!(v.executed_ms[0], Some(150));
-        assert_eq!(v.block_ordered_ms[0], Some(155));
-        assert_eq!(v.certified_ms[0], Some(160));
-        assert_eq!(v.pre_commit_ms[0], Some(165));
+        assert_eq!(v.pre_commit_ms[0], Some(160));
+        assert_eq!(v.certified_ms[0], Some(165));
         assert_eq!(v.committed_ms[0], Some(170));
         // No MempoolCommit on attempt 1 — it retries.
         assert_eq!(v.mempool_commit_ms[0], None);

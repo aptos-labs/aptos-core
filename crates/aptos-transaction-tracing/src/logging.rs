@@ -47,6 +47,11 @@ pub struct LogSchema {
     // the same index are correlated. The max across all populated entries
     // equals `total_latency_ms` — each entry is directly usable as an e2e
     // latency in Humio/Grafana without summing predecessors.
+    //
+    // Values are signed and can be negative: `block_proposed_ms` records the
+    // proposer's `block.timestamp_usecs`, which is on a different validator's
+    // clock and can precede this node's MempoolInsert. Every other stage uses
+    // the local clock and is non-negative.
     mempool_insert_ms: Option<Vec<Option<i64>>>,
     qs_batch_pull_ms: Option<Vec<Option<i64>>>,
     qs_batch_created_ms: Option<Vec<Option<i64>>>,

@@ -177,9 +177,11 @@ async fn test_transaction_tracing() {
         );
 
         // Per-stage absolute-latency vectors: each must be a Vec<Option<i64>>
-        // of length == attempts, and every populated value must be non-
-        // negative. Track the max across all populated entries — it must
-        // equal `total_latency_ms` for a committed trace.
+        // of length == attempts. Track the max across all populated entries —
+        // it must equal `total_latency_ms` for a committed trace. Most stages
+        // are non-negative (local clock, fires after MempoolInsert), but
+        // `block_proposed_ms` records the proposer's `block.timestamp_usecs`
+        // and can legitimately be negative due to cross-validator clock skew.
         let mut max_abs: i64 = 0;
         for (key, val) in trace.as_object().expect("trace must be object").iter() {
             if !key.ends_with("_ms") || key == "total_latency_ms" || key == "age_ms" {
@@ -204,7 +206,9 @@ async fn test_transaction_tracing() {
                 let d = entry
                     .as_i64()
                     .unwrap_or_else(|| panic!("{} entry must be i64 or null, got {}", key, entry));
-                assert!(d >= 0, "abs latency {} for {} must be non-negative", d, key);
+                if key != "block_proposed_ms" {
+                    assert!(d >= 0, "abs latency {} for {} must be non-negative", d, key);
+                }
                 if d > max_abs {
                     max_abs = d;
                 }
