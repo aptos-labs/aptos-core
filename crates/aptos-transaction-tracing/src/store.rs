@@ -832,10 +832,13 @@ fn log_trace(trace: &TransactionTrace) {
     info!(schema);
 }
 
-/// Per-attempt per-stage delta vectors (ms). Each vector has length `attempts`;
-/// index `i` corresponds to attempt `i+1`. `None` at index `i` means the stage
-/// did not fire in attempt `i+1`. The value at a populated slot is the delta
-/// in ms from the previous chronological stage of the same trace.
+/// Per-attempt per-stage latency vectors (ms). Each vector has length
+/// `attempts`; index `i` corresponds to attempt `i+1`. `None` at index `i`
+/// means the stage did not fire in attempt `i+1`. The value at a populated
+/// slot is the **absolute latency in ms from `MempoolInsert`** (the trace's
+/// insertion time) — i.e., the cumulative time the txn has been in the
+/// pipeline when this stage fired. `max` across all populated entries equals
+/// `total_latency_ms`.
 #[derive(Debug, Default)]
 struct StageVectors {
     mempool_insert_ms: Vec<Option<i64>>,
@@ -856,10 +859,11 @@ struct StageVectors {
     mempool_reject_ms: Vec<Option<i64>>,
 }
 
-/// Build per-attempt per-stage delta vectors from chronologically-sorted stage
-/// records. `base` is the trace's MempoolInsert timestamp (used as the starting
-/// reference for the first stage's delta). Summing all populated deltas across
-/// the returned vectors equals `(last_stage.timestamp_usecs - base) / 1000`.
+/// Build per-attempt per-stage absolute-latency vectors from chronologically-
+/// sorted stage records. `base` is the trace's MempoolInsert timestamp. Each
+/// populated entry is `(record.timestamp_usecs - base) / 1000` — the cumulative
+/// time in the pipeline at that stage. `max` across the returned vectors
+/// equals `(last_stage.timestamp_usecs - base) / 1000`.
 fn build_per_stage_vectors(
     sorted_stages: &[crate::types::StageRecord],
     base: u64,
@@ -885,14 +889,15 @@ fn build_per_stage_vectors(
         mempool_reject_ms: vec![None; n],
     };
 
-    let mut prev_ts = base;
     for record in sorted_stages {
         let idx = (record.attempt as usize).saturating_sub(1);
         if idx >= n {
             continue;
         }
-        let delta_ms = (record.timestamp_usecs as i64 - prev_ts as i64) / 1000;
-        prev_ts = record.timestamp_usecs;
+        // Absolute latency in ms from `base` (MempoolInsert time). Each stage
+        // entry answers "at what point in the pipeline did this stage fire?"
+        // — directly usable as an e2e latency in Humio/Grafana queries.
+        let abs_ms = (record.timestamp_usecs as i64 - base as i64) / 1000;
         let slot = match record.stage {
             TransactionStage::MempoolInsert => &mut v.mempool_insert_ms,
             TransactionStage::QsBatchPull => &mut v.qs_batch_pull_ms,
@@ -912,7 +917,7 @@ fn build_per_stage_vectors(
         // If the same (stage, attempt) is recorded twice (e.g., two QsBatchPull
         // events in the same attempt), keep the first observation.
         if slot[idx].is_none() {
-            slot[idx] = Some(delta_ms);
+            slot[idx] = Some(abs_ms);
         }
 
         match (&record.stage, &record.metadata) {
@@ -1111,50 +1116,48 @@ mod tests {
         assert_eq!(v.executed_ms.len(), 2);
         assert_eq!(v.committed_ms.len(), 2);
 
-        // Attempt 1: deltas are from the previous chronological stage.
-        // MempoolInsert is the first record at the base — delta = 0.
+        // Attempt 1: each entry is the stage's absolute latency in ms from
+        // `base` (MempoolInsert, t=0).
         assert_eq!(v.mempool_insert_ms[0], Some(0));
         assert_eq!(v.qs_batch_pull_ms[0], Some(50));
-        assert_eq!(v.qs_batch_created_ms[0], Some(3));
-        assert_eq!(v.qs_proof_of_store_ms[0], Some(27));
-        assert_eq!(v.block_proposed_ms[0], Some(20));
-        assert_eq!(v.block_received_ms[0], Some(5));
-        assert_eq!(v.execution_start_ms[0], Some(15));
-        assert_eq!(v.executed_ms[0], Some(30));
-        assert_eq!(v.block_ordered_ms[0], Some(5));
-        assert_eq!(v.certified_ms[0], Some(5));
-        assert_eq!(v.pre_commit_ms[0], Some(5));
-        assert_eq!(v.committed_ms[0], Some(5));
+        assert_eq!(v.qs_batch_created_ms[0], Some(53));
+        assert_eq!(v.qs_proof_of_store_ms[0], Some(80));
+        assert_eq!(v.block_proposed_ms[0], Some(100));
+        assert_eq!(v.block_received_ms[0], Some(105));
+        assert_eq!(v.execution_start_ms[0], Some(120));
+        assert_eq!(v.executed_ms[0], Some(150));
+        assert_eq!(v.block_ordered_ms[0], Some(155));
+        assert_eq!(v.certified_ms[0], Some(160));
+        assert_eq!(v.pre_commit_ms[0], Some(165));
+        assert_eq!(v.committed_ms[0], Some(170));
         // No MempoolCommit on attempt 1 — it retries.
         assert_eq!(v.mempool_commit_ms[0], None);
         // Attempt-1 metadata.
         assert_eq!(v.block_proposed_kind[0].as_deref(), Some("Proof"));
         assert_eq!(v.executed_status[0].as_deref(), Some("Retry"));
 
-        // Attempt 2: first record is QsBatchPull at t=200_000 — the previous
-        // chronological stage was attempt 1's Committed at t=170_000, so the
-        // gap is 30ms (re-pull wait).
+        // Attempt 2: same absolute-time semantics — values keep growing.
         assert_eq!(v.mempool_insert_ms[1], None);
-        assert_eq!(v.qs_batch_pull_ms[1], Some(30));
-        assert_eq!(v.qs_batch_created_ms[1], Some(10));
-        assert_eq!(v.qs_proof_of_store_ms[1], Some(20));
-        assert_eq!(v.block_proposed_ms[1], Some(20));
-        assert_eq!(v.block_received_ms[1], Some(5));
-        assert_eq!(v.execution_start_ms[1], Some(15));
-        assert_eq!(v.executed_ms[1], Some(30));
-        assert_eq!(v.block_ordered_ms[1], Some(10));
-        assert_eq!(v.certified_ms[1], Some(10));
-        assert_eq!(v.pre_commit_ms[1], Some(10));
-        assert_eq!(v.committed_ms[1], Some(10));
-        assert_eq!(v.mempool_commit_ms[1], Some(10));
+        assert_eq!(v.qs_batch_pull_ms[1], Some(200));
+        assert_eq!(v.qs_batch_created_ms[1], Some(210));
+        assert_eq!(v.qs_proof_of_store_ms[1], Some(230));
+        assert_eq!(v.block_proposed_ms[1], Some(250));
+        assert_eq!(v.block_received_ms[1], Some(255));
+        assert_eq!(v.execution_start_ms[1], Some(270));
+        assert_eq!(v.executed_ms[1], Some(300));
+        assert_eq!(v.block_ordered_ms[1], Some(310));
+        assert_eq!(v.certified_ms[1], Some(320));
+        assert_eq!(v.pre_commit_ms[1], Some(330));
+        assert_eq!(v.committed_ms[1], Some(340));
+        assert_eq!(v.mempool_commit_ms[1], Some(350));
         // Attempt-2 metadata.
         assert_eq!(v.block_proposed_kind[1].as_deref(), Some("Opt"));
         assert_eq!(v.executed_status[1].as_deref(), Some("Keep"));
 
-        // Invariant: sum of all populated deltas across every per-stage
+        // Invariant: max of all populated entries across every per-stage
         // vector == total_latency_ms = (last_ts - base) / 1000.
         let total_latency_ms = (350_000i64 - base as i64) / 1000;
-        let sum: i64 = [
+        let max_abs: i64 = [
             &v.mempool_insert_ms,
             &v.qs_batch_pull_ms,
             &v.qs_batch_created_ms,
@@ -1172,8 +1175,9 @@ mod tests {
         ]
         .iter()
         .flat_map(|vec| vec.iter().filter_map(|x| *x))
-        .sum();
-        assert_eq!(sum, total_latency_ms);
+        .max()
+        .unwrap();
+        assert_eq!(max_abs, total_latency_ms);
     }
 
     #[test]
@@ -1194,11 +1198,12 @@ mod tests {
         sorted.sort_by_key(|s| s.timestamp_usecs);
         let v = build_per_stage_vectors(&sorted, 1000, 1);
 
+        // Absolute latency from base (t=1000). All values divided by 1000usec/ms.
         assert_eq!(v.mempool_insert_ms, vec![Some(0)]);
-        assert_eq!(v.qs_batch_pull_ms, vec![Some(0)]); // (1500-1000)/1000 = 0 ms (sub-ms rounding)
-        assert_eq!(v.executed_ms, vec![Some(1)]); // (3000-1500)/1000 = 1
-        assert_eq!(v.committed_ms, vec![Some(1)]); // (4000-3000)/1000 = 1
-        assert_eq!(v.mempool_commit_ms, vec![Some(0)]); // (4500-4000)/1000 = 0
+        assert_eq!(v.qs_batch_pull_ms, vec![Some(0)]); // (1500-1000)/1000 = 0 ms
+        assert_eq!(v.executed_ms, vec![Some(2)]); // (3000-1000)/1000 = 2
+        assert_eq!(v.committed_ms, vec![Some(3)]); // (4000-1000)/1000 = 3
+        assert_eq!(v.mempool_commit_ms, vec![Some(3)]); // (4500-1000)/1000 = 3
         assert_eq!(v.qs_batch_created_ms, vec![None]);
         assert_eq!(v.executed_status[0].as_deref(), Some("Keep"));
     }

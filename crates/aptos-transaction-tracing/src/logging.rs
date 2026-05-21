@@ -41,11 +41,12 @@ pub struct LogSchema {
     remaining_batch_mappings: Option<usize>,
     remaining_block_mappings: Option<usize>,
 
-    // Per-stage delta from the previous chronological stage (ms).
-    // Vector index = attempt index (0-based). `None` element = stage did not
-    // fire in that attempt. The vectors all share the same length = `attempts`
-    // so values at the same index are correlated. Summing all populated deltas
-    // across all stages and attempts reproduces `total_latency_ms`.
+    // Per-stage absolute latency from MempoolInsert (ms). Vector index =
+    // attempt index (0-based). `None` element = stage did not fire in that
+    // attempt. The vectors all share the same length = `attempts` so values at
+    // the same index are correlated. The max across all populated entries
+    // equals `total_latency_ms` — each entry is directly usable as an e2e
+    // latency in Humio/Grafana without summing predecessors.
     mempool_insert_ms: Option<Vec<Option<i64>>>,
     qs_batch_pull_ms: Option<Vec<Option<i64>>>,
     qs_batch_created_ms: Option<Vec<Option<i64>>>,

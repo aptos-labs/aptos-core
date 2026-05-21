@@ -176,9 +176,11 @@ async fn test_transaction_tracing() {
             stages
         );
 
-        // Per-stage delta vectors: each must be a Vec<Option<i64>> of length
-        // == attempts, and every populated delta must be non-negative.
-        let mut sum_of_deltas: i64 = 0;
+        // Per-stage absolute-latency vectors: each must be a Vec<Option<i64>>
+        // of length == attempts, and every populated value must be non-
+        // negative. Track the max across all populated entries — it must
+        // equal `total_latency_ms` for a committed trace.
+        let mut max_abs: i64 = 0;
         for (key, val) in trace.as_object().expect("trace must be object").iter() {
             if !key.ends_with("_ms") || key == "total_latency_ms" || key == "age_ms" {
                 continue;
@@ -202,23 +204,25 @@ async fn test_transaction_tracing() {
                 let d = entry
                     .as_i64()
                     .unwrap_or_else(|| panic!("{} entry must be i64 or null, got {}", key, entry));
-                assert!(d >= 0, "delta {} for {} must be non-negative", d, key);
-                sum_of_deltas += d;
+                assert!(d >= 0, "abs latency {} for {} must be non-negative", d, key);
+                if d > max_abs {
+                    max_abs = d;
+                }
             }
         }
 
-        // Only commit-outcome traces should have the full sum-of-deltas
+        // Only commit-outcome traces should have the max-equals-total
         // invariant (other outcomes like eviction may be truncated).
         if outcome == "committed" {
-            // `total_latency_ms` is (last_stage - mempool_insert) in ms. The
-            // sum of inter-stage deltas equals the same value (since the
-            // first delta is from MempoolInsert to itself = 0). Allow ±1ms
-            // tolerance for integer division rounding.
-            let diff = (sum_of_deltas - total_latency_ms).abs();
+            // `total_latency_ms` is (last_stage - mempool_insert) in ms. With
+            // absolute-from-base per-stage values, the max populated entry is
+            // the last stage chronologically — same as total_latency_ms.
+            // Allow ±1ms tolerance for integer division rounding.
+            let diff = (max_abs - total_latency_ms).abs();
             assert!(
                 diff <= 1,
-                "sum of deltas {} != total_latency_ms {} (diff={}) for {}",
-                sum_of_deltas,
+                "max abs latency {} != total_latency_ms {} (diff={}) for {}",
+                max_abs,
                 total_latency_ms,
                 diff,
                 hash
