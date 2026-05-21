@@ -36,7 +36,7 @@ use shared_dsa::UnorderedSet;
 use specializer::{
     lower::context::{
         try_lower_function, try_set_lowering_requirements,
-        try_set_lowering_requirements_for_function, SpecializerContext,
+        try_set_lowering_requirements_for_function, LoweringOutcome, SpecializerContext,
     },
     ModuleIR,
 };
@@ -246,7 +246,16 @@ impl<'guard, 'ctx> Loader<'guard, 'ctx> {
             bail!("All modules are in the read-set");
         })?;
 
-        let function = try_lower_function(module.ir(), func_ir, ty_args, self.guard)?;
+        let function = match try_lower_function(module.ir(), func_ir, ty_args, self.guard)? {
+            LoweringOutcome::Built(f) => f,
+            // TODO: drop this arm — together with the `LoweringOutcome`
+            // enum and the corresponding `BuildContextOutcome::Skipped`
+            // paths in the specializer — once `try_build_context`
+            // handles nominal types and partial concretization. At that
+            // point `try_lower_function` is total and can go back to
+            // returning `Result<Function>` directly.
+            LoweringOutcome::Skipped(reason) => bail!("Failed to lower function: {}", reason),
+        };
         Ok((function, function_ms))
     }
 }

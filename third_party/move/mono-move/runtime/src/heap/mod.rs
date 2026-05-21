@@ -22,7 +22,7 @@ use crate::{
     },
     types::{
         DEFAULT_HEAP_SIZE, FORWARDED_MARKER, META_SAVED_FP_OFFSET, META_SAVED_FUNC_PTR_OFFSET,
-        META_SAVED_PC_OFFSET, VEC_DATA_OFFSET, VEC_LENGTH_OFFSET,
+        VEC_DATA_OFFSET, VEC_LENGTH_OFFSET,
     },
 };
 use mono_move_core::{
@@ -458,46 +458,59 @@ pub(crate) fn gc_collect(
 
     // Phase 1: scan roots from the call stack.
     //
-    // For each frame we scan two sets of pointer offsets:
-    //   1. `frame_layout.heap_ptr_offsets` — always applies.
-    //   2. The matching `safe_point_layouts` entry for the frame's
-    //      current PC, if any — provides additional pointer offsets
-    //      that are only valid at that specific safe point.
+    // Two sets of pointer offsets are scanned per frame:
+    //   1. `frame_layout.heap_ptr_offsets` — always applies, to every
+    //      frame on the stack.
+    //   2. The matching `safe_point_layouts` entry for the *top*
+    //      frame's `pc_top`, if any — provides additional pointer
+    //      offsets that are only valid at that specific top-frame
+    //      safe point (an allocating op currently executing in the
+    //      top frame).
     //
-    // PC tracking: the topmost frame uses `pc_top`. For caller frames,
-    // the saved PC is read from the callee's frame metadata (the return
-    // address stored when returning from a call).
-    let mut fp = frame_ptr;
-    let mut func_ptr = current_func;
-    let mut pc = pc_top;
-
-    loop {
-        // SAFETY: func_ptr is a valid, non-null pointer — set by the call
-        // instruction and saved/restored via frame metadata. These pointers
-        // are valid for the lifetime of the module and not freed during
-        // execution. `fp.sub` retrieves saved metadata written by the call
-        // protocol.
-        let func = unsafe { func_ptr.as_ref() };
+    // Per `SafePointEntry`'s top-frame-only contract,
+    // `safe_point_layouts` is consulted only for the top frame;
+    // caller-below frames use `frame_layout` alone.
+    {
+        // Top frame: frame_layout + safe_point_layouts[pc_top].
+        // SAFETY: current_func is valid (caller's invariant).
+        let top_func = unsafe { current_func.as_ref() };
         unsafe {
-            // Scan base pointer offsets (always active).
-            let base_offsets = &func.frame_layout.heap_ptr_offsets;
-            gc_scan_frame_roots(heap, fp, base_offsets, &mut free_ptr);
+            gc_scan_frame_roots(
+                heap,
+                frame_ptr,
+                &top_func.frame_layout.heap_ptr_offsets,
+                &mut free_ptr,
+            );
 
-            // Scan safe-point-specific pointer offsets, if any.
-            if let Some(sp_layout) = func.safe_point_layout_at(pc) {
-                gc_scan_frame_roots(heap, fp, &sp_layout.heap_ptr_offsets, &mut free_ptr);
+            if let Some(sp_layout) = top_func.safe_point_layout_at(pc_top) {
+                gc_scan_frame_roots(heap, frame_ptr, &sp_layout.heap_ptr_offsets, &mut free_ptr);
             }
+        }
+    }
 
-            let meta = fp.sub(FRAME_METADATA_SIZE);
-            let saved_func_ptr = read_ptr(meta, META_SAVED_FUNC_PTR_OFFSET) as *const Function;
-            if saved_func_ptr.is_null() {
-                break;
-            }
-            pc = read_u64(meta, META_SAVED_PC_OFFSET) as usize;
-            fp = read_ptr(meta, META_SAVED_FP_OFFSET);
-            // SAFETY: saved_func_ptr is non-null — we checked for the
-            // null sentinel above and would have broken out of the loop.
-            func_ptr = NonNull::new_unchecked(saved_func_ptr as *mut Function);
+    // Walk caller frames with frame_layout only.
+    let mut fp = frame_ptr;
+    loop {
+        // SAFETY: `fp.sub(FRAME_METADATA_SIZE)` reads metadata written
+        // by the call protocol when this frame's callee was created.
+        // Arena pointers are valid for the executable's lifetime.
+        let meta = unsafe { fp.sub(FRAME_METADATA_SIZE) };
+        let saved_func_ptr =
+            unsafe { read_ptr(meta, META_SAVED_FUNC_PTR_OFFSET) } as *const Function;
+        if saved_func_ptr.is_null() {
+            break;
+        }
+        fp = unsafe { read_ptr(meta, META_SAVED_FP_OFFSET) };
+        // SAFETY: non-null checked above.
+        let caller_func_ptr = unsafe { NonNull::new_unchecked(saved_func_ptr as *mut Function) };
+        let caller_func = unsafe { caller_func_ptr.as_ref() };
+        unsafe {
+            gc_scan_frame_roots(
+                heap,
+                fp,
+                &caller_func.frame_layout.heap_ptr_offsets,
+                &mut free_ptr,
+            );
         }
     }
 

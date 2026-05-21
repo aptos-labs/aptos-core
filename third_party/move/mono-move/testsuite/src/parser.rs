@@ -89,9 +89,15 @@ pub enum Check {
 /// A snapshot section requested via `// RUN: publish --print(...)`.
 #[derive(Debug, Copy, Clone, PartialEq, Eq)]
 pub enum PrintSection {
+    /// Move bytecode disassembly. Selected by `--print(bytecode)`.
     Bytecode,
+    /// Stackless execution IR. Selected by `--print(stackless)`.
     Stackless,
+    /// Lowered micro-ops. Selected by `--print(micro-ops)`.
     MicroOps,
+    /// Per-function GC frame layout.
+    /// Selected by `--print(frame-layout)`.
+    FrameLayout,
 }
 
 /// A single step in a differential test.
@@ -203,6 +209,7 @@ fn parse_publish_modifiers(rest: &str) -> anyhow::Result<Vec<PrintSection>> {
             "bytecode" => PrintSection::Bytecode,
             "stackless" => PrintSection::Stackless,
             "micro-ops" => PrintSection::MicroOps,
+            "frame-layout" => PrintSection::FrameLayout,
             _ => bail!("Unknown print section: {:?}", token),
         };
         if sections.contains(&section) {
