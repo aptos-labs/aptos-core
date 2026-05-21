@@ -266,7 +266,11 @@ def main():
     for new_row in parsed:
         try:
             key = tuple(new_row[c] for c in columns[:key_columns_count])
-            executor_type = new_row["executor_type"]
+            # Move-e2e rows do not carry an executor_type column; the gate
+            # below only applies to the non-move-e2e path.
+            executor_type = (
+                None if args.move_e2e else new_row["executor_type"]
+            )
         except KeyError as e:
             print(f"Row missing required column {e}; "
                   f"treating as unparseable.")
