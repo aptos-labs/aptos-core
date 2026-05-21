@@ -2479,8 +2479,22 @@ impl Display for TransactionInfo {
     fn fmt(&self, f: &mut Formatter) -> std::fmt::Result {
         write!(
             f,
-            "TransactionInfo: [txn_hash: {}, state_change_hash: {}, event_root_hash: {}, state_checkpoint_hash: {:?}, gas_used: {}, recorded_status: {:?}]",
-            self.transaction_hash(), self.state_change_hash(), self.event_root_hash(), self.state_checkpoint_hash(), self.gas_used(), self.status(),
+            "TransactionInfo: [\
+                txn_hash: {}, \
+                state_change_hash: {}, \
+                event_root_hash: {}, \
+                state_checkpoint_hash: {:?}, \
+                hot_state_checkpoint_hash: {:?}, \
+                gas_used: {}, \
+                recorded_status: {:?}\
+            ]",
+            self.transaction_hash(),
+            self.state_change_hash(),
+            self.event_root_hash(),
+            self.state_checkpoint_hash(),
+            self.hot_state_checkpoint_hash(),
+            self.gas_used(),
+            self.status(),
         )
     }
 }
