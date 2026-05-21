@@ -286,11 +286,14 @@ impl TransactionTraceStore {
 
     /// Process a proposed block: record BlockProposed per batch and register
     /// block → traced txn hashes for efficient post-proposal stage recording.
+    /// `parent_block_timestamp_usecs` is the proposal timestamp of the
+    /// block's parent (used as a front-run-exposure bound).
     /// Called from round_manager::process_proposal.
     pub fn process_proposed_block(
         &self,
         block_id: HashValue,
         block_timestamp_usecs: u64,
+        parent_block_timestamp_usecs: u64,
         batch_digests: &[(HashValue, crate::types::BatchInclusionType)],
         proposal_info: Option<crate::types::BlockProposalInfo>,
     ) {
@@ -309,20 +312,23 @@ impl TransactionTraceStore {
         }
         self.register_block(block_id, block_traced_txns.clone());
 
-        // Record BlockReceived at local clock for all traced txns in the block.
-        // Also attach proposal info (proposer + round) for diagnosis.
-        if let Some(info) = proposal_info {
-            for hash in &block_traced_txns {
-                self.record_stage_with_metadata_at(
+        // Record ParentBlockProposed (from QC) and BlockReceived (local clock)
+        // for every traced txn in the block. `proposal_info` is also attached
+        // to BlockReceived for diagnosis (proposer + round).
+        for hash in &block_traced_txns {
+            self.record_stage_at(
+                hash,
+                TransactionStage::ParentBlockProposed,
+                parent_block_timestamp_usecs,
+            );
+            match &proposal_info {
+                Some(info) => self.record_stage_with_metadata_at(
                     hash,
                     TransactionStage::BlockReceived,
                     StageMetadata::BlockProposal(info.clone()),
                     now,
-                );
-            }
-        } else {
-            for hash in &block_traced_txns {
-                self.record_stage_at(hash, TransactionStage::BlockReceived, now);
+                ),
+                None => self.record_stage_at(hash, TransactionStage::BlockReceived, now),
             }
         }
     }
@@ -794,6 +800,9 @@ fn log_trace(trace: &TransactionTrace) {
     if let Some(x) = scalars.qs_proof_of_store_ms {
         schema = schema.qs_proof_of_store_ms(x);
     }
+    if let Some(x) = scalars.parent_block_proposed_ms {
+        schema = schema.parent_block_proposed_ms(x);
+    }
     if let Some(x) = scalars.block_proposed_ms {
         schema = schema.block_proposed_ms(x);
     }
@@ -845,6 +854,7 @@ struct StageScalars {
     qs_batch_pull_ms: Option<i64>,
     qs_batch_created_ms: Option<i64>,
     qs_proof_of_store_ms: Option<i64>,
+    parent_block_proposed_ms: Option<i64>,
     block_proposed_ms: Option<i64>,
     block_proposed_kind: Option<String>,
     block_received_ms: Option<i64>,
@@ -903,6 +913,7 @@ fn build_first_attempt_scalars(
             TransactionStage::QsBatchPull => &mut scalars.qs_batch_pull_ms,
             TransactionStage::QsBatchCreated => &mut scalars.qs_batch_created_ms,
             TransactionStage::QsProofOfStore => &mut scalars.qs_proof_of_store_ms,
+            TransactionStage::ParentBlockProposed => &mut scalars.parent_block_proposed_ms,
             TransactionStage::BlockProposed => &mut scalars.block_proposed_ms,
             TransactionStage::BlockReceived => &mut scalars.block_received_ms,
             TransactionStage::ExecutionStart => &mut scalars.execution_start_ms,
@@ -1059,6 +1070,9 @@ mod tests {
         trace.record(TransactionStage::QsBatchPull, 50_000);
         trace.record(TransactionStage::QsBatchCreated, 53_000);
         trace.record(TransactionStage::QsProofOfStore, 80_000);
+        // Parent block was proposed 10ms before the txn was inserted in this
+        // node's mempool — negative absolute latency from base.
+        trace.record(TransactionStage::ParentBlockProposed, 90_000);
         trace.record_with_metadata(
             TransactionStage::BlockProposed,
             100_000,
@@ -1119,6 +1133,7 @@ mod tests {
         assert_eq!(scalars.qs_batch_pull_ms, Some(50));
         assert_eq!(scalars.qs_batch_created_ms, Some(53));
         assert_eq!(scalars.qs_proof_of_store_ms, Some(80));
+        assert_eq!(scalars.parent_block_proposed_ms, Some(90));
         assert_eq!(scalars.block_proposed_ms, Some(100));
         assert_eq!(scalars.block_received_ms, Some(105));
         assert_eq!(scalars.execution_start_ms, Some(120));
@@ -1140,6 +1155,10 @@ mod tests {
         let mut trace = TransactionTrace::new(HashValue::random(), AccountAddress::random(), 1000);
         trace.record(TransactionStage::MempoolInsert, 1000);
         trace.record(TransactionStage::QsBatchPull, 1500);
+        // Parent block timestamp can precede MempoolInsert (e.g., the previous
+        // block was committed before this txn arrived) — assert that's handled
+        // as a signed value.
+        trace.record(TransactionStage::ParentBlockProposed, 0);
         trace.record_with_metadata(
             TransactionStage::Executed,
             3000,
@@ -1155,6 +1174,7 @@ mod tests {
         // Absolute latency from base (t=1000). All values divided by 1000usec/ms.
         assert_eq!(scalars.mempool_insert_ms, Some(0));
         assert_eq!(scalars.qs_batch_pull_ms, Some(0)); // (1500-1000)/1000 = 0 ms
+        assert_eq!(scalars.parent_block_proposed_ms, Some(-1)); // (0-1000)/1000 = -1 ms
         assert_eq!(scalars.executed_ms, Some(2)); // (3000-1000)/1000 = 2
         assert_eq!(scalars.committed_ms, Some(3)); // (4000-1000)/1000 = 3
         assert_eq!(scalars.mempool_commit_ms, Some(3)); // (4500-1000)/1000 = 3

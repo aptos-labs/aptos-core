@@ -192,7 +192,12 @@ async fn test_transaction_tracing() {
                 Some(n) => n,
                 None => panic!("{} must be i64, got {}", key, val),
             };
-            if key != "block_proposed_ms" {
+            // Most stages use local clocks and are non-negative;
+            // `block_proposed_ms` and `parent_block_proposed_ms` record
+            // foreign-block timestamps (proposer's clock for the child and
+            // parent blocks) and can be negative due to cross-validator
+            // clock skew.
+            if key != "block_proposed_ms" && key != "parent_block_proposed_ms" {
                 assert!(d >= 0, "abs latency {} for {} must be non-negative", d, key);
             }
             assert!(
