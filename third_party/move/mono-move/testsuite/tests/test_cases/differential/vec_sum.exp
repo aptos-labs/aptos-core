@@ -113,4 +113,4 @@ fun sum_first_n() {
 }
 === frame-layout ===
 // module 0xc0ffee::vec_sum
-fun sum_first_n: frame_layout=[8, 24, 40] zero_frame=true
+fun sum_first_n: heap_ptr_offsets=[8, 24, 40] zero_frame=true
