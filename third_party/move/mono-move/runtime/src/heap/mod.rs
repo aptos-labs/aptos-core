@@ -13,16 +13,16 @@ pub(crate) mod object_descriptor;
 pub(crate) mod pinned_roots;
 
 use crate::{
-    bail,
-    error::ExecutionResult,
+    error::{RuntimeError, RuntimeResult},
     heap::object_descriptor::{ObjectDescriptor, ObjectDescriptorInner},
+    invariant_violation,
     memory::{
         read_descriptor, read_forwarding, read_obj_size, read_ptr, read_u64, write_descriptor,
         write_forwarding, write_obj_size, write_ptr, write_u64, MemoryRegion,
     },
     types::{
         DEFAULT_HEAP_SIZE, FORWARDED_MARKER, META_SAVED_FP_OFFSET, META_SAVED_FUNC_PTR_OFFSET,
-        META_SAVED_PC_OFFSET, VEC_DATA_OFFSET, VEC_LENGTH_OFFSET,
+        VEC_DATA_OFFSET, VEC_LENGTH_OFFSET,
     },
 };
 use mono_move_core::{
@@ -222,20 +222,20 @@ fn heap_alloc(
     pc: usize,
     total_size: usize,
     descriptor_id: DescriptorId,
-) -> ExecutionResult<*mut u8> {
+) -> RuntimeResult<*mut u8> {
     // Round up to MAX_ALIGN with overflow protection; the
     // `MAX_SINGLE_ALLOCATION_SIZE` check below then applies to the
     // *aligned* size so the rounding can't smuggle an oversize allocation
     // past the bound.
-    let aligned_size = checked_align_max(total_size).ok_or_else(|| {
-        anyhow::anyhow!("heap_alloc: size {} overflows after alignment", total_size)
-    })?;
+    let aligned_size =
+        checked_align_max(total_size).ok_or_else(|| RuntimeError::AllocationTooLarge {
+            requested: total_size,
+        })?;
     debug_assert!(aligned_size >= OBJECT_HEADER_SIZE);
     if aligned_size > MAX_SINGLE_ALLOCATION_SIZE {
-        bail!(
-            "heap_alloc: size {} exceeds maximum single allocation size",
-            aligned_size
-        );
+        return Err(RuntimeError::AllocationTooLarge {
+            requested: aligned_size,
+        });
     }
 
     // Bound check uses integer arithmetic on addresses rather than
@@ -246,10 +246,9 @@ fn heap_alloc(
     if !fits_in_buffer(heap, aligned_size) {
         gc_collect(heap, descriptors, pinned_roots, fp, current_func, pc)?;
         if !fits_in_buffer(heap, aligned_size) {
-            bail!(
-                "out of heap memory after GC (requested {} bytes)",
-                aligned_size
-            );
+            return Err(RuntimeError::OutOfHeapMemory {
+                requested: aligned_size,
+            });
         }
     }
 
@@ -280,11 +279,11 @@ pub(crate) fn alloc_vec(
     descriptor_id: DescriptorId,
     elem_size: u32,
     capacity_in_elems: u64,
-) -> ExecutionResult<*mut u8> {
+) -> RuntimeResult<*mut u8> {
     let total_size = (capacity_in_elems as usize)
         .checked_mul(elem_size as usize)
         .and_then(|v| v.checked_add(OBJECT_HEADER_SIZE + VEC_DATA_OFFSET))
-        .ok_or_else(|| anyhow::anyhow!("alloc_vec: size overflow"))?;
+        .ok_or(RuntimeError::VecAllocSizeOverflow)?;
     heap_alloc(
         heap,
         descriptors,
@@ -308,7 +307,7 @@ pub(crate) fn alloc_obj(
     current_func: NonNull<Function>,
     pc: usize,
     descriptor_id: DescriptorId,
-) -> ExecutionResult<*mut u8> {
+) -> RuntimeResult<*mut u8> {
     let payload_size = match descriptors[descriptor_id.as_usize()].inner() {
         ObjectDescriptorInner::Struct { size, .. } => *size as usize,
         ObjectDescriptorInner::Enum { size, .. } => *size as usize,
@@ -317,10 +316,11 @@ pub(crate) fn alloc_obj(
             // Add the 8-byte tag+padding prefix to the values-region size.
             CAPTURED_DATA_VALUES_OFFSET + *size as usize
         },
-        ObjectDescriptorInner::Trivial | ObjectDescriptorInner::Vector { .. } => bail!(
-            "alloc_obj called with non-allocatable descriptor {}",
-            descriptor_id
-        ),
+        ObjectDescriptorInner::Trivial | ObjectDescriptorInner::Vector { .. } => {
+            invariant_violation!(NonAllocatableDescriptor {
+                descriptor_id: descriptor_id.as_u32(),
+            });
+        },
     };
     heap_alloc(
         heap,
@@ -357,7 +357,7 @@ pub(crate) fn grow_vec_ref(
     vec_ref_offset: usize,
     elem_size: u32,
     required_cap_in_elems: u64,
-) -> ExecutionResult<*mut u8> {
+) -> RuntimeResult<*mut u8> {
     unsafe {
         let base = read_ptr(fp, vec_ref_offset);
         let off = read_u64(fp, vec_ref_offset + 8) as usize;
@@ -443,7 +443,7 @@ pub(crate) fn gc_collect(
     frame_ptr: *mut u8,
     current_func: NonNull<Function>,
     pc_top: usize,
-) -> ExecutionResult<()> {
+) -> RuntimeResult<()> {
     heap.gc_count += 1;
 
     let to_space = MemoryRegion::new(heap.buffer.len());
@@ -458,46 +458,59 @@ pub(crate) fn gc_collect(
 
     // Phase 1: scan roots from the call stack.
     //
-    // For each frame we scan two sets of pointer offsets:
-    //   1. `frame_layout.heap_ptr_offsets` — always applies.
-    //   2. The matching `safe_point_layouts` entry for the frame's
-    //      current PC, if any — provides additional pointer offsets
-    //      that are only valid at that specific safe point.
+    // Two sets of pointer offsets are scanned per frame:
+    //   1. `frame_layout.heap_ptr_offsets` — always applies, to every
+    //      frame on the stack.
+    //   2. The matching `safe_point_layouts` entry for the *top*
+    //      frame's `pc_top`, if any — provides additional pointer
+    //      offsets that are only valid at that specific top-frame
+    //      safe point (an allocating op currently executing in the
+    //      top frame).
     //
-    // PC tracking: the topmost frame uses `pc_top`. For caller frames,
-    // the saved PC is read from the callee's frame metadata (the return
-    // address stored when returning from a call).
-    let mut fp = frame_ptr;
-    let mut func_ptr = current_func;
-    let mut pc = pc_top;
-
-    loop {
-        // SAFETY: func_ptr is a valid, non-null pointer — set by the call
-        // instruction and saved/restored via frame metadata. These pointers
-        // are valid for the lifetime of the module and not freed during
-        // execution. `fp.sub` retrieves saved metadata written by the call
-        // protocol.
-        let func = unsafe { func_ptr.as_ref() };
+    // Per `SafePointEntry`'s top-frame-only contract,
+    // `safe_point_layouts` is consulted only for the top frame;
+    // caller-below frames use `frame_layout` alone.
+    {
+        // Top frame: frame_layout + safe_point_layouts[pc_top].
+        // SAFETY: current_func is valid (caller's invariant).
+        let top_func = unsafe { current_func.as_ref() };
         unsafe {
-            // Scan base pointer offsets (always active).
-            let base_offsets = &func.frame_layout.heap_ptr_offsets;
-            gc_scan_frame_roots(heap, fp, base_offsets, &mut free_ptr);
+            gc_scan_frame_roots(
+                heap,
+                frame_ptr,
+                &top_func.frame_layout.heap_ptr_offsets,
+                &mut free_ptr,
+            );
 
-            // Scan safe-point-specific pointer offsets, if any.
-            if let Some(sp_layout) = func.safe_point_layout_at(pc) {
-                gc_scan_frame_roots(heap, fp, &sp_layout.heap_ptr_offsets, &mut free_ptr);
+            if let Some(sp_layout) = top_func.safe_point_layout_at(pc_top) {
+                gc_scan_frame_roots(heap, frame_ptr, &sp_layout.heap_ptr_offsets, &mut free_ptr);
             }
+        }
+    }
 
-            let meta = fp.sub(FRAME_METADATA_SIZE);
-            let saved_func_ptr = read_ptr(meta, META_SAVED_FUNC_PTR_OFFSET) as *const Function;
-            if saved_func_ptr.is_null() {
-                break;
-            }
-            pc = read_u64(meta, META_SAVED_PC_OFFSET) as usize;
-            fp = read_ptr(meta, META_SAVED_FP_OFFSET);
-            // SAFETY: saved_func_ptr is non-null — we checked for the
-            // null sentinel above and would have broken out of the loop.
-            func_ptr = NonNull::new_unchecked(saved_func_ptr as *mut Function);
+    // Walk caller frames with frame_layout only.
+    let mut fp = frame_ptr;
+    loop {
+        // SAFETY: `fp.sub(FRAME_METADATA_SIZE)` reads metadata written
+        // by the call protocol when this frame's callee was created.
+        // Arena pointers are valid for the executable's lifetime.
+        let meta = unsafe { fp.sub(FRAME_METADATA_SIZE) };
+        let saved_func_ptr =
+            unsafe { read_ptr(meta, META_SAVED_FUNC_PTR_OFFSET) } as *const Function;
+        if saved_func_ptr.is_null() {
+            break;
+        }
+        fp = unsafe { read_ptr(meta, META_SAVED_FP_OFFSET) };
+        // SAFETY: non-null checked above.
+        let caller_func_ptr = unsafe { NonNull::new_unchecked(saved_func_ptr as *mut Function) };
+        let caller_func = unsafe { caller_func_ptr.as_ref() };
+        unsafe {
+            gc_scan_frame_roots(
+                heap,
+                fp,
+                &caller_func.frame_layout.heap_ptr_offsets,
+                &mut free_ptr,
+            );
         }
     }
 
@@ -532,14 +545,11 @@ pub(crate) fn gc_collect(
             let obj_size = read_obj_size(obj_ptr) as usize;
 
             if obj_size == 0 || obj_size != align_max(obj_size) {
-                bail!(
-                    "GC scan: invalid object size {} (expected non-zero, MAX_ALIGN-byte aligned)",
-                    obj_size
-                );
+                invariant_violation!(GcInvalidObjectSize { size: obj_size });
             }
 
             if descriptor_id == FORWARDED_MARKER {
-                bail!("GC found forwarding marker in to-space (invariant violation)");
+                invariant_violation!(GcForwardingMarkerInToSpace);
             }
             gc_scan_object(descriptors, heap, obj_ptr, descriptor_id, &mut free_ptr);
 

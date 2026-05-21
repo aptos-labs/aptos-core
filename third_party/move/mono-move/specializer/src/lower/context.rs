@@ -7,10 +7,10 @@
 //! All lookups are O(1) via indexed Vecs — no maps.
 
 use crate::{
-    lower::lower_function,
+    lower::{gc_layout::derive_frame_layout, lower_function},
     stackless_exec_ir::{FunctionIR, Instr, ModuleIR},
 };
-use anyhow::{anyhow, bail, Result};
+use anyhow::{bail, Result};
 use mono_move_core::{
     align_up_u32,
     interner::{InternedIdentifier, InternedModuleId},
@@ -18,8 +18,8 @@ use mono_move_core::{
         view_name, view_type, view_type_list, Alignment, FieldLayout, InternedType,
         InternedTypeList, Size, Type, EMPTY_TYPE_LIST,
     },
-    Code, FieldTypes, FrameLayoutInfo, FrameOffset, Function, Interner, MicroOp,
-    MicroOpGasSchedule, SortedSafePointEntries, FRAME_METADATA_SIZE,
+    Code, FieldTypes, FrameLayoutInfo, FrameOffset, Function, Interner, MicroOpGasSchedule,
+    SortedSafePointEntries, FRAME_METADATA_SIZE,
 };
 use mono_move_gas::GasInstrumentor;
 use move_binary_format::access::ModuleAccess;
@@ -114,16 +114,53 @@ pub struct LoweringContext {
     pub scratch_size: u32,
 }
 
-/// Try to build a `LoweringContext` for a monomorphic function.
-/// Returns `Ok(None)` if any type is not concrete (e.g. type parameters
-/// or unresolved structs); `Err` for unsupported alignments and other
-/// unexpected failures.
+/// Outcome of attempting to build a [`LoweringContext`]: either the
+/// context was built, or the function is intentionally skipped with a
+/// human-readable reason for display in the snapshot baseline.
+///
+/// Distinct from the `Err` return: alignment failures and other
+/// internal-invariant violations stay on the `Err` path because they
+/// indicate a real bug. `Skipped` is reserved for "this function is
+/// out of scope for the current lowering, on purpose."
+pub enum BuildContextOutcome {
+    Built(LoweringContext),
+    Skipped(&'static str),
+}
+
+/// Outcome of attempting to lower a function: either a fully lowered
+/// [`Function`] was produced, or lowering was skipped for an
+/// out-of-scope feature (currently nominal types or partial
+/// concretization). Mirrors [`BuildContextOutcome`] — `Skipped` is a
+/// non-fatal "not yet supported," while internal-invariant violations
+/// still travel on the `Err` path.
+pub enum LoweringOutcome {
+    Built(Function),
+    Skipped(&'static str),
+}
+
+/// Returns `true` if any of `types` is a [`Type::Nominal`].
+fn contains_nominal(types: &[InternedType]) -> bool {
+    types
+        .iter()
+        .any(|&ty| matches!(view_type(ty), Type::Nominal { .. }))
+}
+
+/// Try to build a [`LoweringContext`] for a monomorphic function.
+///
+/// Returns:
+///
+/// - `Ok(Built(ctx))` on success.
+/// - `Ok(Skipped(reason))` if any type can't be handled — the reason
+///   is a short label shown in the snapshot baseline (e.g.
+///   "not all types are concrete", "nominal type not yet supported").
+/// - `Err(_)` for unsupported alignments and other internal-invariant
+///   failures.
 pub fn try_build_context(
     module_ir: &ModuleIR,
     func_ir: &FunctionIR,
     ty_args: InternedTypeList,
     interner: &impl Interner,
-) -> Result<Option<LoweringContext>> {
+) -> Result<BuildContextOutcome> {
     // 1. Compute home slot layout with natural alignment padding.
     //
     // Slots are laid out linearly in declaration order, padding each to
@@ -142,8 +179,16 @@ pub fn try_build_context(
     // canonicalization step is pure overhead for this caller.
     let home_list = interner.type_list_of(&func_ir.home_slot_types);
     let home_list = interner.subst_type_list(home_list, ty_args)?;
-    let Some(home_slots) = layout_slots(0, view_type_list(home_list)) else {
-        return Ok(None);
+    let home_types = view_type_list(home_list);
+    // Concrete Nominals (post-substitution) are out of scope for the
+    // current GC-layout pass.
+    if contains_nominal(home_types) {
+        return Ok(BuildContextOutcome::Skipped(
+            "nominal type not yet supported",
+        ));
+    }
+    let Some(home_slots) = layout_slots(0, home_types) else {
+        return Ok(BuildContextOutcome::Skipped("not all types are concrete"));
     };
     check_supported_alignment(&home_slots, |s| s.align, "home slot")?;
     // `frame_data_size` must be `MIN_SLOT_ALIGN`-aligned so that
@@ -160,8 +205,14 @@ pub fn try_build_context(
     let own_ret_list =
         interner.type_list_of(module_ir.module.interned_types_at(own_handle.return_));
     let own_ret_list = interner.subst_type_list(own_ret_list, ty_args)?;
-    let Some(return_slots) = layout_slots(0, view_type_list(own_ret_list)) else {
-        return Ok(None);
+    let own_ret_types = view_type_list(own_ret_list);
+    if contains_nominal(own_ret_types) {
+        return Ok(BuildContextOutcome::Skipped(
+            "nominal type not yet supported",
+        ));
+    }
+    let Some(return_slots) = layout_slots(0, own_ret_types) else {
+        return Ok(BuildContextOutcome::Skipped("not all types are concrete"));
     };
     check_supported_alignment(&return_slots, |s| s.align, "return slot")?;
 
@@ -232,11 +283,16 @@ pub fn try_build_context(
 
         let param_types = view_type_list(param_list);
         let ret_types = view_type_list(ret_list);
+        if contains_nominal(param_types) || contains_nominal(ret_types) {
+            return Ok(BuildContextOutcome::Skipped(
+                "nominal type not yet supported",
+            ));
+        }
         let Some(arg_slots) = layout_typed_slots_contiguously(callee_base, param_types) else {
-            return Ok(None);
+            return Ok(BuildContextOutcome::Skipped("not all types are concrete"));
         };
         let Some(ret_slots) = layout_typed_slots_contiguously(callee_base, ret_types) else {
-            return Ok(None);
+            return Ok(BuildContextOutcome::Skipped("not all types are concrete"));
         };
         check_supported_alignment(&arg_slots, |s| s.slot.align, "callee arg")?;
         check_supported_alignment(&ret_slots, |s| s.slot.align, "callee ret")?;
@@ -253,7 +309,7 @@ pub fn try_build_context(
         });
     }
 
-    Ok(Some(LoweringContext {
+    Ok(BuildContextOutcome::Built(LoweringContext {
         home_slots,
         frame_data_size,
         call_sites,
@@ -336,71 +392,47 @@ pub trait SpecializerContext {
     fn subst_type(&self, ty: InternedType, ty_args: InternedTypeList) -> Result<InternedType>;
 }
 
-/// Attempts to lower a function, and returns an error if lowering failed. The
-/// caller must ensure this is not the case by ensuring that all lowering
-/// requirements are satisfied (e.g., type sizes known).
+/// Attempts to lower a function.
+///
+/// Returns:
+///
+/// - `Ok(LoweringOutcome::Built(f))` on success.
+/// - `Ok(LoweringOutcome::Skipped(reason))` when `try_build_context`
+///   reports an out-of-scope shape (currently nominal types or
+///   partial concretization). The caller decides how to handle this —
+///   today, the loader surfaces it as a load-time error while keeping
+///   any side-effects (side-loaded dependencies, gas charges) that
+///   earlier phases already committed to the read-set.
+/// - `Err(_)` for internal-invariant violations and other real bugs.
 pub fn try_lower_function(
     module_ir: &ModuleIR,
     func_ir: &FunctionIR,
     ty_args: InternedTypeList,
     interner: &impl Interner,
-) -> Result<Function> {
-    let ctx = try_build_context(module_ir, func_ir, ty_args, interner)?
-        .ok_or_else(|| anyhow!("Failed to create lowering context: not all types are concrete"))?;
+) -> Result<LoweringOutcome> {
+    let ctx = match try_build_context(module_ir, func_ir, ty_args, interner)? {
+        BuildContextOutcome::Built(c) => c,
+        BuildContextOutcome::Skipped(reason) => return Ok(LoweringOutcome::Skipped(reason)),
+    };
 
     let name = module_ir.module.interned_identifier_at(func_ir.name_idx);
     let code = lower_function(func_ir, &ctx)?;
     let code = GasInstrumentor::new(MicroOpGasSchedule).run(code);
 
-    // TODO: `frame_layout` is hardcoded empty (no slots scanned by GC).
-    // That is sound only while every fat-pointer slot in this function
-    // holds a stack base (filtered by `is_heap_ptr` at GC time). If the
-    // lowering ever emits an op that puts a heap pointer in a frame
-    // slot, the resulting slot is invisible to GC and a collection
-    // during a callee would leave it dangling. Refuse to build such a
-    // function until `frame_layout` is derived from the lowering
-    // context.
+    // Defense-in-depth guard for allocating ops — they trigger GC at
+    // their own PC and need top-frame `safe_point_layouts` (not yet
+    // emitted by gc_layout) to keep callee-region pointers alive.
     //
-    // Today's lowering doesn't emit any of these ops (the destacker
-    // bails first on unsupported Move instructions), so this is a
-    // future-trip guard. Categories listed by what semantically puts
-    // a heap pointer in a frame slot:
-    //   - heap object create / borrow / field read:
-    //     `HeapNew`, `HeapBorrow`, `HeapMoveFrom8`, `HeapMoveFrom`
-    //   - vector create / borrow / element read / pop:
-    //     `VecNew`, `VecBorrow`, `VecLoadElem`, `VecPopBack`
-    //   - heap-pointer republish (in-place vec base mutation):
-    //     `VecPushBack`
-    //   - closures (heap-pointer captures):
-    //     `PackClosure`, `CallClosure`
-    //
-    // Calls (`CallFunc` / `CallDirect` / `CallIndirect`) are not
-    // listed here even though a callee returning a heap-typed value
-    // would put a heap pointer in the caller's ret region: the
-    // hazard depends on the callee's return signature, not on the
-    // op itself, and today's lowering bails before emitting a call
-    // that returns anything heap-backed.
+    // TODO: drop this guard once allocating-op safe points are
+    // derived.
     for op in &code {
-        match op {
-            MicroOp::HeapNew { .. }
-            | MicroOp::HeapBorrow { .. }
-            | MicroOp::HeapMoveFrom8 { .. }
-            | MicroOp::HeapMoveFrom { .. }
-            | MicroOp::VecNew { .. }
-            | MicroOp::VecBorrow { .. }
-            | MicroOp::VecLoadElem { .. }
-            | MicroOp::VecPopBack { .. }
-            | MicroOp::VecPushBack { .. }
-            | MicroOp::PackClosure(..)
-            | MicroOp::CallClosure(..) => {
-                bail!(
-                    "function `{}` lowers a heap-pointer-producing op but \
-                             frame_layout is not yet derived from the lowering context — \
-                             GC would not see the resulting slot",
-                    view_name(name),
-                );
-            },
-            _ => {},
+        if op.is_allocating() {
+            bail!(
+                "function `{}` lowers allocating op `{}` but `safe_point_layouts` is not yet \
+                 derived from the lowering context — GC would not see callee-region pointers",
+                view_name(name),
+                op,
+            );
         }
     }
 
@@ -408,7 +440,6 @@ pub fn try_lower_function(
         .iter()
         .map(|s| s.size)
         .collect::<Vec<_>>();
-    let param_sizes_sum = param_sizes.iter().map(|s| *s as usize).sum::<usize>();
     let param_and_local_sizes_sum = ctx.frame_data_size as usize;
     let extended_frame_size = ctx
         .call_sites
@@ -419,18 +450,27 @@ pub fn try_lower_function(
         // Leaf function: no callee slots needed beyond metadata.
         .unwrap_or(param_and_local_sizes_sum + FRAME_METADATA_SIZE);
 
-    Ok(Function {
+    // Derive `frame_layout` and `zero_frame` from home-slot types.
+    // Substitute `ty_args` so generic instantiations see concrete
+    // types — `gc_layout` rejects raw `TypeParam`s.
+    //
+    // TODO: derive callee-region safe-point entries and feed them
+    // into `Function::safe_point_layouts`. Today they stay empty.
+    let home_list = interner.type_list_of(&func_ir.home_slot_types);
+    let home_list = interner.subst_type_list(home_list, ty_args)?;
+    let derived = derive_frame_layout(&ctx, func_ir, view_type_list(home_list))?;
+
+    Ok(LoweringOutcome::Built(Function {
         name,
         code: Code::from_vec(code),
         param_sizes,
-        param_sizes_sum,
+        param_sizes_sum: derived.param_sizes_sum as usize,
         param_and_local_sizes_sum,
         extended_frame_size,
-        // TODO: hardcoded for now.
-        zero_frame: false,
-        frame_layout: FrameLayoutInfo::empty(),
+        zero_frame: derived.zero_frame,
+        frame_layout: FrameLayoutInfo::new(derived.heap_ptr_offsets),
         safe_point_layouts: SortedSafePointEntries::empty(),
-    })
+    }))
 }
 
 /// Tries to enforce lowering requirements for all functions in the given

@@ -28,5 +28,5 @@ mod transaction_context;
 
 pub use loader::{Loader, LoadingPolicy, LoweringPolicy};
 pub use module_provider::ModuleProvider;
-pub use read_set::{ModuleRead, ModuleReadSet};
+pub use read_set::{ModuleRead, ModuleReadSet, ModuleState};
 pub use transaction_context::TransactionContext;
