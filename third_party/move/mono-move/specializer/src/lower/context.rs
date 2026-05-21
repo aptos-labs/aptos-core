@@ -460,13 +460,13 @@ pub fn try_lower_function(
     // TODO: this remapping of safe-point PCs to the allocating op's own new position
     // will go away once we move gas instrumentation to the stackless exec IR level.
     let (code, pc_map) = GasInstrumentor::new(MicroOpGasSchedule).run_with_pc_map(code);
-    let mut safe_points: Vec<SafePointEntry> = raw_safe_points
+    let mut safe_points = raw_safe_points
         .into_iter()
         .map(|entry| SafePointEntry {
             code_offset: CodeOffset(pc_map[entry.code_offset.0 as usize]),
             layout: entry.layout,
         })
-        .collect();
+        .collect::<Vec<_>>();
     // TODO: drop this sort if we can guarantee the input is already
     // sorted. `pc_map` is monotone and `emit` pushes in code-offset
     // order, so it's structurally a no-op today — kept as a safety

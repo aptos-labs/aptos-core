@@ -7,6 +7,10 @@ use super::context::LoweringContext;
 use mono_move_core::{MicroOp, SafePointEntry};
 use std::fmt;
 
+// TODO: replace this test-only display struct with a `Display` impl on
+// `mono_move_core::Function`, and have the snapshot pipeline build a
+// `Function` (via `try_lower_function`) instead of calling the
+// lower-level `lower_function` and piecing fields together here.
 pub struct MicroOpsFunctionDisplay<'a> {
     pub func_name: &'a str,
     pub ctx: &'a LoweringContext,

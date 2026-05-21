@@ -139,7 +139,7 @@ impl<S> GasInstrumentor<S> {
         let remap = |t: usize| t + block_starts.partition_point(|&s| s < t) + d_before[t];
 
         let mut result = Vec::with_capacity(ops.len() + blocks.len() + n_dynamic);
-        let mut pc_map: Vec<u32> = Vec::with_capacity(ops.len());
+        let mut pc_map = Vec::with_capacity(ops.len());
         let mut bi = 0usize;
         for (i, (op, cost)) in ops.into_iter().zip(costs).enumerate() {
             if bi < block_starts.len() && block_starts[bi] == i {
