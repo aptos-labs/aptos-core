@@ -90,11 +90,15 @@ async fn test_transaction_tracing() {
     // Wait for tracing logs to be flushed
     tokio::time::sleep(std::time::Duration::from_secs(3)).await;
 
-    // Check validator logs for TxnTrace entries
-    let mut total_trace_count = 0;
+    // Collect every TxnTrace log line from every validator and parse the
+    // structured-JSON payload appended by aptos_logger.
+    let mut parsed_traces: Vec<serde_json::Value> = Vec::new();
     for validator in swarm.validators() {
         let logs = validator.get_log_contents().unwrap_or_default();
-        let trace_lines: Vec<&str> = logs.lines().filter(|l| l.contains("TxnTrace")).collect();
+        let trace_lines: Vec<&str> = logs
+            .lines()
+            .filter(|l| l.contains("\"event\":\"TxnTrace\""))
+            .collect();
         println!(
             "Validator {} has {} TxnTrace log entries",
             validator.peer_id(),
@@ -102,36 +106,149 @@ async fn test_transaction_tracing() {
         );
         for line in &trace_lines {
             println!("  {}", line);
+            // aptos_logger appends ` {...json...}` at the end of the line in
+            // text mode; locate the trailing JSON object and parse it.
+            let json_start = line
+                .find("{\"event\"")
+                .or_else(|| line.find('{'))
+                .expect("TxnTrace log line should contain a JSON payload");
+            let json_str = &line[json_start..];
+            let value: serde_json::Value = serde_json::from_str(json_str)
+                .unwrap_or_else(|e| panic!("failed to parse TxnTrace JSON: {} in {}", e, json_str));
+            parsed_traces.push(value);
         }
-        total_trace_count += trace_lines.len();
     }
 
     assert!(
-        total_trace_count > 0,
+        !parsed_traces.is_empty(),
         "Expected TxnTrace log entries in validator logs, found none."
     );
-    println!(
-        "Found {} total TxnTrace log entries across all validators",
-        total_trace_count
-    );
+    println!("Found {} total TxnTrace log entries", parsed_traces.len());
 
-    // Verify at least one tracked address appears in the trace logs
-    let all_logs: String = swarm
-        .validators()
-        .filter_map(|v| v.get_log_contents().ok())
-        .collect::<Vec<_>>()
-        .join("\n");
+    // Per-stage delta vectors we expect to be present on a committed trace.
+    let required_delta_fields = [
+        "mempool_insert_ms",
+        "qs_batch_pull_ms",
+        "block_proposed_ms",
+        "executed_ms",
+        "committed_ms",
+        "mempool_commit_ms",
+    ];
 
+    // Match the bare-hex form produced by serde for AccountAddress.
     let tracked_hex: Vec<String> = addresses.iter().map(|a| a.to_hex()).collect();
-    let mut found_addresses = 0;
-    for addr in &tracked_hex {
-        if all_logs.contains(addr) {
-            found_addresses += 1;
-            println!("Found traced address {} in validator logs", addr);
+    let mut committed_with_tracked_sender = 0;
+
+    for trace in &parsed_traces {
+        // Basic identity fields. HashValue and AccountAddress both serialize
+        // via serde as bare hex (no `0x` prefix) — their Display impls print
+        // `0x...` but the on-wire JSON does not. Humio queries against
+        // `data.hash` / `data.sender` therefore use bare hex.
+        assert_eq!(trace["event"], "TxnTrace");
+        let hash = trace["hash"].as_str().expect("hash must be string");
+        assert!(
+            !hash.starts_with("0x") && hash.len() == 64,
+            "hash should be bare 64-char hex: {}",
+            hash
+        );
+        let sender = trace["sender"].as_str().expect("sender must be string");
+        assert!(
+            !sender.starts_with("0x") && sender.len() == 64,
+            "sender should be bare 64-char hex: {}",
+            sender
+        );
+
+        let outcome = trace["outcome"].as_str().expect("outcome must be string");
+        let attempts = trace["attempts"]
+            .as_u64()
+            .expect("attempts must be unsigned int") as usize;
+        assert!(attempts >= 1, "attempts must be >= 1, got {}", attempts);
+
+        let total_latency_ms = trace["total_latency_ms"]
+            .as_i64()
+            .expect("total_latency_ms must be int");
+
+        // `stages` is the human-readable timeline string.
+        let stages = trace["stages"].as_str().expect("stages must be string");
+        assert!(
+            stages.contains("MempoolInsert="),
+            "stages should contain MempoolInsert= marker: {}",
+            stages
+        );
+
+        // Per-stage delta vectors: each must be a Vec<Option<i64>> of length
+        // == attempts, and every populated delta must be non-negative.
+        let mut sum_of_deltas: i64 = 0;
+        for (key, val) in trace.as_object().expect("trace must be object").iter() {
+            if !key.ends_with("_ms") || key == "total_latency_ms" || key == "age_ms" {
+                continue;
+            }
+            let arr = match val.as_array() {
+                Some(a) => a,
+                None => continue,
+            };
+            assert_eq!(
+                arr.len(),
+                attempts,
+                "field {} has length {} but attempts={}",
+                key,
+                arr.len(),
+                attempts
+            );
+            for entry in arr {
+                if entry.is_null() {
+                    continue;
+                }
+                let d = entry
+                    .as_i64()
+                    .unwrap_or_else(|| panic!("{} entry must be i64 or null, got {}", key, entry));
+                assert!(d >= 0, "delta {} for {} must be non-negative", d, key);
+                sum_of_deltas += d;
+            }
+        }
+
+        // Only commit-outcome traces should have the full sum-of-deltas
+        // invariant (other outcomes like eviction may be truncated).
+        if outcome == "committed" {
+            // `total_latency_ms` is (last_stage - mempool_insert) in ms. The
+            // sum of inter-stage deltas equals the same value (since the
+            // first delta is from MempoolInsert to itself = 0). Allow ±1ms
+            // tolerance for integer division rounding.
+            let diff = (sum_of_deltas - total_latency_ms).abs();
+            assert!(
+                diff <= 1,
+                "sum of deltas {} != total_latency_ms {} (diff={}) for {}",
+                sum_of_deltas,
+                total_latency_ms,
+                diff,
+                hash
+            );
+            // For committed traces we should see the terminal pipeline stages.
+            for f in &required_delta_fields {
+                assert!(
+                    trace.get(f).is_some(),
+                    "committed trace {} missing per-stage field {}",
+                    hash,
+                    f
+                );
+            }
+            assert!(
+                stages.contains("Committed="),
+                "committed trace stages should mention Committed=: {}",
+                stages
+            );
+            if tracked_hex.iter().any(|h| h == sender) {
+                committed_with_tracked_sender += 1;
+            }
         }
     }
+
     assert!(
-        found_addresses > 0,
-        "Expected at least one tracked sender address in TxnTrace logs, found none"
+        committed_with_tracked_sender > 0,
+        "Expected at least one committed TxnTrace from a tracked sender, found none."
+    );
+    println!(
+        "Verified {} committed TxnTrace entries from tracked senders",
+        committed_with_tracked_sender
     );
 }

@@ -4,6 +4,7 @@
 use crate::{
     counters::observe_stage_latency,
     filter::TransactionFilter,
+    logging::{LogEvent, LogSchema},
     types::{ExecutionStatus, StageMetadata, TransactionStage, TransactionTrace},
 };
 use aptos_crypto::HashValue;
@@ -449,13 +450,11 @@ impl TransactionTraceStore {
                 return true;
             }
             // Log the orphaned trace before evicting so partial pipeline data is visible.
-            warn!(
-                "TxnTrace GC evicting orphaned trace: hash=0x{} sender={} age_ms={} stages={}",
-                trace.hash.to_hex(),
-                trace.sender,
-                now_usecs().saturating_sub(trace.insertion_time_usecs) / 1000,
-                trace.stages.len(),
-            );
+            warn!(LogSchema::new(LogEvent::TxnTraceEvicted)
+                .hash(trace.hash)
+                .sender(trace.sender)
+                .age_ms(now_usecs().saturating_sub(trace.insertion_time_usecs) / 1000)
+                .num_stages(trace.stages.len()));
             evicted += 1;
             false
         });
@@ -487,16 +486,13 @@ impl TransactionTraceStore {
             self.block_txns.remove(id);
         }
         if evicted > 0 || batch_evicted > 0 || block_evicted > 0 {
-            info!(
-                "TxnTrace GC: evicted {} orphaned traces, {} stale batch mappings, {} stale block mappings. \
-                 Remaining: {} traces, {} batch mappings, {} block mappings.",
-                evicted,
-                batch_evicted,
-                block_evicted,
-                self.traces.len(),
-                self.batch_txns.len(),
-                self.block_txns.len(),
-            );
+            info!(LogSchema::new(LogEvent::TxnTraceGcSummary)
+                .evicted_traces(evicted)
+                .evicted_batch_mappings(batch_evicted)
+                .evicted_block_mappings(block_evicted)
+                .remaining_traces(self.traces.len())
+                .remaining_batch_mappings(self.batch_txns.len())
+                .remaining_block_mappings(self.block_txns.len()));
         }
     }
 }
@@ -765,21 +761,176 @@ fn log_trace(trace: &TransactionTrace) {
         }
     };
 
-    let gas_str = match trace.gas_unit_price {
-        Some(g) => format!(" gas_unit_price={}", g),
-        None => String::new(),
+    let v = build_per_stage_vectors(&sorted_stages, base, max_attempt);
+
+    // Drop all-None vectors so per-stage fields without any populated attempt
+    // never appear in the structured payload.
+    fn keep<T>(v: Vec<Option<T>>) -> Option<Vec<Option<T>>> {
+        v.iter().any(Option::is_some).then_some(v)
+    }
+
+    let mut schema = LogSchema::new(LogEvent::TxnTrace)
+        .hash(trace.hash)
+        .sender(trace.sender)
+        .attempts(max_attempt)
+        .total_latency_ms(total_latency_ms)
+        .outcome(outcome)
+        .stages(stage_parts.join(" "));
+
+    if let Some(g) = trace.gas_unit_price {
+        schema = schema.gas_unit_price(g);
+    }
+    if let Some(x) = keep(v.mempool_insert_ms) {
+        schema = schema.mempool_insert_ms(x);
+    }
+    if let Some(x) = keep(v.qs_batch_pull_ms) {
+        schema = schema.qs_batch_pull_ms(x);
+    }
+    if let Some(x) = keep(v.qs_batch_created_ms) {
+        schema = schema.qs_batch_created_ms(x);
+    }
+    if let Some(x) = keep(v.qs_proof_of_store_ms) {
+        schema = schema.qs_proof_of_store_ms(x);
+    }
+    if let Some(x) = keep(v.block_proposed_ms) {
+        schema = schema.block_proposed_ms(x);
+    }
+    if let Some(x) = keep(v.block_proposed_kind) {
+        schema = schema.block_proposed_kind(x);
+    }
+    if let Some(x) = keep(v.block_received_ms) {
+        schema = schema.block_received_ms(x);
+    }
+    if let Some(x) = keep(v.execution_start_ms) {
+        schema = schema.execution_start_ms(x);
+    }
+    if let Some(x) = keep(v.executed_ms) {
+        schema = schema.executed_ms(x);
+    }
+    if let Some(x) = keep(v.executed_status) {
+        schema = schema.executed_status(x);
+    }
+    if let Some(x) = keep(v.block_ordered_ms) {
+        schema = schema.block_ordered_ms(x);
+    }
+    if let Some(x) = keep(v.certified_ms) {
+        schema = schema.certified_ms(x);
+    }
+    if let Some(x) = keep(v.pre_commit_ms) {
+        schema = schema.pre_commit_ms(x);
+    }
+    if let Some(x) = keep(v.committed_ms) {
+        schema = schema.committed_ms(x);
+    }
+    if let Some(x) = keep(v.mempool_commit_ms) {
+        schema = schema.mempool_commit_ms(x);
+    }
+    if let Some(x) = keep(v.mempool_reject_ms) {
+        schema = schema.mempool_reject_ms(x);
+    }
+
+    info!(schema);
+}
+
+/// Per-attempt per-stage delta vectors (ms). Each vector has length `attempts`;
+/// index `i` corresponds to attempt `i+1`. `None` at index `i` means the stage
+/// did not fire in attempt `i+1`. The value at a populated slot is the delta
+/// in ms from the previous chronological stage of the same trace.
+#[derive(Debug, Default)]
+struct StageVectors {
+    mempool_insert_ms: Vec<Option<i64>>,
+    qs_batch_pull_ms: Vec<Option<i64>>,
+    qs_batch_created_ms: Vec<Option<i64>>,
+    qs_proof_of_store_ms: Vec<Option<i64>>,
+    block_proposed_ms: Vec<Option<i64>>,
+    block_proposed_kind: Vec<Option<String>>,
+    block_received_ms: Vec<Option<i64>>,
+    execution_start_ms: Vec<Option<i64>>,
+    executed_ms: Vec<Option<i64>>,
+    executed_status: Vec<Option<String>>,
+    block_ordered_ms: Vec<Option<i64>>,
+    certified_ms: Vec<Option<i64>>,
+    pre_commit_ms: Vec<Option<i64>>,
+    committed_ms: Vec<Option<i64>>,
+    mempool_commit_ms: Vec<Option<i64>>,
+    mempool_reject_ms: Vec<Option<i64>>,
+}
+
+/// Build per-attempt per-stage delta vectors from chronologically-sorted stage
+/// records. `base` is the trace's MempoolInsert timestamp (used as the starting
+/// reference for the first stage's delta). Summing all populated deltas across
+/// the returned vectors equals `(last_stage.timestamp_usecs - base) / 1000`.
+fn build_per_stage_vectors(
+    sorted_stages: &[crate::types::StageRecord],
+    base: u64,
+    max_attempt: u32,
+) -> StageVectors {
+    let n = max_attempt as usize;
+    let mut v = StageVectors {
+        mempool_insert_ms: vec![None; n],
+        qs_batch_pull_ms: vec![None; n],
+        qs_batch_created_ms: vec![None; n],
+        qs_proof_of_store_ms: vec![None; n],
+        block_proposed_ms: vec![None; n],
+        block_proposed_kind: vec![None; n],
+        block_received_ms: vec![None; n],
+        execution_start_ms: vec![None; n],
+        executed_ms: vec![None; n],
+        executed_status: vec![None; n],
+        block_ordered_ms: vec![None; n],
+        certified_ms: vec![None; n],
+        pre_commit_ms: vec![None; n],
+        committed_ms: vec![None; n],
+        mempool_commit_ms: vec![None; n],
+        mempool_reject_ms: vec![None; n],
     };
 
-    info!(
-        "TxnTrace hash=0x{} sender={}{} attempts={} total_latency_ms={} outcome={} stages=[{}]",
-        trace.hash.to_hex(),
-        trace.sender,
-        gas_str,
-        max_attempt,
-        total_latency_ms,
-        outcome,
-        stage_parts.join(" ")
-    );
+    let mut prev_ts = base;
+    for record in sorted_stages {
+        let idx = (record.attempt as usize).saturating_sub(1);
+        if idx >= n {
+            continue;
+        }
+        let delta_ms = (record.timestamp_usecs as i64 - prev_ts as i64) / 1000;
+        prev_ts = record.timestamp_usecs;
+        let slot = match record.stage {
+            TransactionStage::MempoolInsert => &mut v.mempool_insert_ms,
+            TransactionStage::QsBatchPull => &mut v.qs_batch_pull_ms,
+            TransactionStage::QsBatchCreated => &mut v.qs_batch_created_ms,
+            TransactionStage::QsProofOfStore => &mut v.qs_proof_of_store_ms,
+            TransactionStage::BlockProposed => &mut v.block_proposed_ms,
+            TransactionStage::BlockReceived => &mut v.block_received_ms,
+            TransactionStage::ExecutionStart => &mut v.execution_start_ms,
+            TransactionStage::Executed => &mut v.executed_ms,
+            TransactionStage::BlockOrdered => &mut v.block_ordered_ms,
+            TransactionStage::Certified => &mut v.certified_ms,
+            TransactionStage::PreCommit => &mut v.pre_commit_ms,
+            TransactionStage::Committed => &mut v.committed_ms,
+            TransactionStage::MempoolCommit => &mut v.mempool_commit_ms,
+            TransactionStage::MempoolReject => &mut v.mempool_reject_ms,
+        };
+        // If the same (stage, attempt) is recorded twice (e.g., two QsBatchPull
+        // events in the same attempt), keep the first observation.
+        if slot[idx].is_none() {
+            slot[idx] = Some(delta_ms);
+        }
+
+        match (&record.stage, &record.metadata) {
+            (TransactionStage::BlockProposed, Some(StageMetadata::BatchInclusion(kind))) => {
+                if v.block_proposed_kind[idx].is_none() {
+                    v.block_proposed_kind[idx] = Some(kind.as_ref().to_string());
+                }
+            },
+            (TransactionStage::Executed, Some(StageMetadata::Execution(status))) => {
+                if v.executed_status[idx].is_none() {
+                    v.executed_status[idx] = Some(status.as_ref().to_string());
+                }
+            },
+            _ => {},
+        }
+    }
+
+    v
 }
 
 #[cfg(test)]
@@ -890,6 +1041,166 @@ mod tests {
         assert!(store.get_trace(&hash).is_some());
         store.finalize_trace(&hash);
         assert!(store.get_trace(&hash).is_none());
+    }
+
+    #[test]
+    fn test_per_stage_vectors_multi_attempt_retry() {
+        use crate::types::{BatchInclusionType, ExecutionStatus, StageMetadata, TransactionTrace};
+        // Build a trace by hand that simulates a retry: attempt 1 ends in
+        // Executed(Retry) and the block commits; attempt 2 re-pulls, executes
+        // as Keep, and finalizes. Times are in usecs; deltas come out in ms.
+        let base = 0u64;
+        let mut trace = TransactionTrace::new(HashValue::random(), AccountAddress::random(), base);
+        // Attempt 1
+        trace.record(TransactionStage::MempoolInsert, 0);
+        trace.record(TransactionStage::QsBatchPull, 50_000);
+        trace.record(TransactionStage::QsBatchCreated, 53_000);
+        trace.record(TransactionStage::QsProofOfStore, 80_000);
+        trace.record_with_metadata(
+            TransactionStage::BlockProposed,
+            100_000,
+            StageMetadata::BatchInclusion(BatchInclusionType::Proof),
+        );
+        trace.record(TransactionStage::BlockReceived, 105_000);
+        trace.record(TransactionStage::ExecutionStart, 120_000);
+        trace.record_with_metadata(
+            TransactionStage::Executed,
+            150_000,
+            StageMetadata::Execution(ExecutionStatus::Retry),
+        );
+        // Block still finalizes for attempt 1's block (these stages keep
+        // attempt=1 because we haven't bumped current_attempt yet — the same
+        // as how the real code records block-finalization stages).
+        trace.record(TransactionStage::BlockOrdered, 155_000);
+        trace.record(TransactionStage::Certified, 160_000);
+        trace.record(TransactionStage::PreCommit, 165_000);
+        trace.record(TransactionStage::Committed, 170_000);
+        // mark_retry: now attempt 2.
+        trace.current_attempt = 2;
+        trace.record(TransactionStage::QsBatchPull, 200_000);
+        trace.record(TransactionStage::QsBatchCreated, 210_000);
+        trace.record(TransactionStage::QsProofOfStore, 230_000);
+        trace.record_with_metadata(
+            TransactionStage::BlockProposed,
+            250_000,
+            StageMetadata::BatchInclusion(BatchInclusionType::Opt),
+        );
+        trace.record(TransactionStage::BlockReceived, 255_000);
+        trace.record(TransactionStage::ExecutionStart, 270_000);
+        trace.record_with_metadata(
+            TransactionStage::Executed,
+            300_000,
+            StageMetadata::Execution(ExecutionStatus::Keep),
+        );
+        trace.record(TransactionStage::BlockOrdered, 310_000);
+        trace.record(TransactionStage::Certified, 320_000);
+        trace.record(TransactionStage::PreCommit, 330_000);
+        trace.record(TransactionStage::Committed, 340_000);
+        trace.record(TransactionStage::MempoolCommit, 350_000);
+
+        let mut sorted = trace.stages.clone();
+        sorted.sort_by_key(|s| s.timestamp_usecs);
+        let max_attempt = sorted.iter().map(|s| s.attempt).max().unwrap();
+        assert_eq!(max_attempt, 2);
+
+        let v = build_per_stage_vectors(&sorted, base, max_attempt);
+
+        // Each vector must have length == max_attempt.
+        assert_eq!(v.mempool_insert_ms.len(), 2);
+        assert_eq!(v.qs_batch_pull_ms.len(), 2);
+        assert_eq!(v.executed_ms.len(), 2);
+        assert_eq!(v.committed_ms.len(), 2);
+
+        // Attempt 1: deltas are from the previous chronological stage.
+        // MempoolInsert is the first record at the base — delta = 0.
+        assert_eq!(v.mempool_insert_ms[0], Some(0));
+        assert_eq!(v.qs_batch_pull_ms[0], Some(50));
+        assert_eq!(v.qs_batch_created_ms[0], Some(3));
+        assert_eq!(v.qs_proof_of_store_ms[0], Some(27));
+        assert_eq!(v.block_proposed_ms[0], Some(20));
+        assert_eq!(v.block_received_ms[0], Some(5));
+        assert_eq!(v.execution_start_ms[0], Some(15));
+        assert_eq!(v.executed_ms[0], Some(30));
+        assert_eq!(v.block_ordered_ms[0], Some(5));
+        assert_eq!(v.certified_ms[0], Some(5));
+        assert_eq!(v.pre_commit_ms[0], Some(5));
+        assert_eq!(v.committed_ms[0], Some(5));
+        // No MempoolCommit on attempt 1 — it retries.
+        assert_eq!(v.mempool_commit_ms[0], None);
+        // Attempt-1 metadata.
+        assert_eq!(v.block_proposed_kind[0].as_deref(), Some("Proof"));
+        assert_eq!(v.executed_status[0].as_deref(), Some("Retry"));
+
+        // Attempt 2: first record is QsBatchPull at t=200_000 — the previous
+        // chronological stage was attempt 1's Committed at t=170_000, so the
+        // gap is 30ms (re-pull wait).
+        assert_eq!(v.mempool_insert_ms[1], None);
+        assert_eq!(v.qs_batch_pull_ms[1], Some(30));
+        assert_eq!(v.qs_batch_created_ms[1], Some(10));
+        assert_eq!(v.qs_proof_of_store_ms[1], Some(20));
+        assert_eq!(v.block_proposed_ms[1], Some(20));
+        assert_eq!(v.block_received_ms[1], Some(5));
+        assert_eq!(v.execution_start_ms[1], Some(15));
+        assert_eq!(v.executed_ms[1], Some(30));
+        assert_eq!(v.block_ordered_ms[1], Some(10));
+        assert_eq!(v.certified_ms[1], Some(10));
+        assert_eq!(v.pre_commit_ms[1], Some(10));
+        assert_eq!(v.committed_ms[1], Some(10));
+        assert_eq!(v.mempool_commit_ms[1], Some(10));
+        // Attempt-2 metadata.
+        assert_eq!(v.block_proposed_kind[1].as_deref(), Some("Opt"));
+        assert_eq!(v.executed_status[1].as_deref(), Some("Keep"));
+
+        // Invariant: sum of all populated deltas across every per-stage
+        // vector == total_latency_ms = (last_ts - base) / 1000.
+        let total_latency_ms = (350_000i64 - base as i64) / 1000;
+        let sum: i64 = [
+            &v.mempool_insert_ms,
+            &v.qs_batch_pull_ms,
+            &v.qs_batch_created_ms,
+            &v.qs_proof_of_store_ms,
+            &v.block_proposed_ms,
+            &v.block_received_ms,
+            &v.execution_start_ms,
+            &v.executed_ms,
+            &v.block_ordered_ms,
+            &v.certified_ms,
+            &v.pre_commit_ms,
+            &v.committed_ms,
+            &v.mempool_commit_ms,
+            &v.mempool_reject_ms,
+        ]
+        .iter()
+        .flat_map(|vec| vec.iter().filter_map(|x| *x))
+        .sum();
+        assert_eq!(sum, total_latency_ms);
+    }
+
+    #[test]
+    fn test_per_stage_vectors_single_attempt() {
+        use crate::types::{ExecutionStatus, StageMetadata, TransactionTrace};
+        let mut trace = TransactionTrace::new(HashValue::random(), AccountAddress::random(), 1000);
+        trace.record(TransactionStage::MempoolInsert, 1000);
+        trace.record(TransactionStage::QsBatchPull, 1500);
+        trace.record_with_metadata(
+            TransactionStage::Executed,
+            3000,
+            StageMetadata::Execution(ExecutionStatus::Keep),
+        );
+        trace.record(TransactionStage::Committed, 4000);
+        trace.record(TransactionStage::MempoolCommit, 4500);
+
+        let mut sorted = trace.stages.clone();
+        sorted.sort_by_key(|s| s.timestamp_usecs);
+        let v = build_per_stage_vectors(&sorted, 1000, 1);
+
+        assert_eq!(v.mempool_insert_ms, vec![Some(0)]);
+        assert_eq!(v.qs_batch_pull_ms, vec![Some(0)]); // (1500-1000)/1000 = 0 ms (sub-ms rounding)
+        assert_eq!(v.executed_ms, vec![Some(1)]); // (3000-1500)/1000 = 1
+        assert_eq!(v.committed_ms, vec![Some(1)]); // (4000-3000)/1000 = 1
+        assert_eq!(v.mempool_commit_ms, vec![Some(0)]); // (4500-4000)/1000 = 0
+        assert_eq!(v.qs_batch_created_ms, vec![None]);
+        assert_eq!(v.executed_status[0].as_deref(), Some("Keep"));
     }
 
     #[test]
