@@ -130,6 +130,7 @@ pub fn get_registry() -> Result<Registry> {
     tracer.trace_type::<transaction::ExecutionStatus>(&samples)?;
     tracer.trace_type::<TransactionAuthenticator>(&samples)?;
     tracer.trace_type::<write_set::WriteOp>(&samples)?;
+    tracer.trace_type::<write_set::WriteSet>(&samples)?;
     tracer.trace_type::<PersistedStateValueMetadata>(&samples)?;
     tracer.trace_type::<AccountAuthenticator>(&samples)?;
     tracer.trace_type::<AbortLocation>(&samples)?;
