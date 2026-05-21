@@ -3,6 +3,7 @@
 
 //! MoveVM and Session wrapped, to make sure Aptos natives and extensions are always installed and
 //! taken care of after session finish.
+pub(crate) mod read_tracking_resolver;
 mod resolver;
 pub mod session;
 mod vm;

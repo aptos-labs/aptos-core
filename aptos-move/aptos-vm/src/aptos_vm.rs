@@ -9,6 +9,7 @@ use crate::{
     gas::{check_gas, make_prod_gas_meter, make_prod_gas_meter_impl},
     keyless_validation,
     move_vm_ext::{
+        read_tracking_resolver::ReadTrackingResolver,
         session::{
             user_transaction_sessions::{
                 abort_hook::AbortHookSession,
@@ -2796,8 +2797,7 @@ impl AptosVM {
             } => (block_id, fee_distribution, to_make_hot),
         };
 
-        let mut gas_meter = UnmeteredGasMeter;
-        let mut session = self.new_session(resolver, SessionId::block_epilogue(block_id), None);
+        let tracking_resolver = ReadTrackingResolver::new(resolver);
 
         let (validator_indices, amounts) = match fee_distribution {
             FeeDistribution::V0 { amount } => amount
@@ -2814,44 +2814,65 @@ impl AptosVM {
             MoveValue::Vector(amounts),
         ];
 
-        let traversal_storage = TraversalStorage::new();
-        let mut traversal_context = TraversalContext::new(&traversal_storage);
+        // Scoped so the borrow of `tracking_resolver` via `session` ends before
+        // we consume the tracker via `into_reads()` below.
+        let mut output = {
+            let mut gas_meter = UnmeteredGasMeter;
+            let mut session = self.new_session(
+                &tracking_resolver,
+                SessionId::block_epilogue(block_id),
+                None,
+            );
 
-        let mut output = match session
-            .execute_function_bypass_visibility(
-                &BLOCK_MODULE,
-                BLOCK_EPILOGUE,
-                vec![],
-                serialize_values(&args),
-                &mut gas_meter,
-                &mut traversal_context,
-                module_storage,
-            )
-            .map(|_return_vals| ())
-            .or_else(|e| expect_only_successful_execution(e, BLOCK_EPILOGUE.as_str(), log_context))
-        {
-            Ok(_) => get_system_transaction_output(
-                session,
-                module_storage,
-                &self.storage_gas_params(log_context)?.change_set_configs,
-            )?,
-            Err(e) => {
-                error!(
-                    "Unexpected error from BlockEpilogue txn: {e:?}, fallback to return success."
-                );
-                let status = TransactionStatus::Keep(ExecutionStatus::Success);
-                VMOutput::empty_with_status(status)
-            },
+            let traversal_storage = TraversalStorage::new();
+            let mut traversal_context = TraversalContext::new(&traversal_storage);
+
+            match session
+                .execute_function_bypass_visibility(
+                    &BLOCK_MODULE,
+                    BLOCK_EPILOGUE,
+                    vec![],
+                    serialize_values(&args),
+                    &mut gas_meter,
+                    &mut traversal_context,
+                    module_storage,
+                )
+                .map(|_return_vals| ())
+                .or_else(|e| {
+                    expect_only_successful_execution(e, BLOCK_EPILOGUE.as_str(), log_context)
+                }) {
+                Ok(_) => get_system_transaction_output(
+                    session,
+                    module_storage,
+                    &self.storage_gas_params(log_context)?.change_set_configs,
+                )?,
+                Err(e) => {
+                    error!(
+                        "Unexpected error from BlockEpilogue txn: {e:?}, fallback to return success."
+                    );
+                    let status = TransactionStatus::Keep(ExecutionStatus::Success);
+                    VMOutput::empty_with_status(status)
+                },
+            }
         };
 
         SYSTEM_TRANSACTIONS_EXECUTED.inc();
 
-        // The payload carries the read-only keys collected from user transactions
-        // that should be promoted to hot. Fold them into the output's change set,
-        // dropping any key the epilogue itself writes (the write already promotes
-        // it). Note: during state sync, V1's to_make_hot is empty here because the
-        // field is `#[serde(skip)]` on BlockEndInfoExt; only V2 carries it through.
-        output.set_hotness_after_writes(to_make_hot);
+        // Fold into the hot-state promotion set:
+        //   - `to_make_hot` from the payload: keys read by user txns and not
+        //     written by them, accumulated by BlockSTM's hot-state op accumulator.
+        //   - the epilogue's own reads: captured here by the tracking resolver,
+        //     so reads inside the Move epilogue (fee distribution, validator
+        //     state, etc.) also get promoted.
+        // `set_hotness_after_writes` subtracts the epilogue's own writes — a
+        // write already promotes its slot, so a `MakeHot` marker would be
+        // redundant.
+        //
+        // Note: during state sync, V1's `to_make_hot` is empty here because the
+        // field is `#[serde(skip)]` on `BlockEndInfoExt`; only V2 round-trips it.
+        let mut hot_keys = to_make_hot;
+        hot_keys.extend(tracking_resolver.into_reads());
+        output.set_hotness_after_writes(hot_keys);
 
         Ok((VMStatus::Executed, output))
     }
