@@ -81,7 +81,7 @@ impl PersistedWriteOp {
     }
 }
 
-/// Shared in memory representation between the (value) WriteOp and the (hotness) HotStateOp
+/// Shared in memory representation between different operations.
 #[derive(Clone, Debug, Eq, PartialEq, AsRefStr)]
 pub enum BaseStateOp {
     Creation(StateValue),
