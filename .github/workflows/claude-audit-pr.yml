@@ -1,0 +1,250 @@
+name: Claude Audit PR
+
+# Triggers:
+#   1. The `m1-security` team is requested as a reviewer. Anyone in the org
+#      can request the team — keep the team empty (or use code-review
+#      assignment routing) to avoid notifying humans on every audit.
+#   2. The 'claude-audit' label is added to a PR (so the PR author can
+#      trigger it themselves — GitHub blocks self-reviewer-request, and
+#      a PR author cannot request a team they aren't in either).
+#   3. A PR comment contains '@claude' for follow-up questions.
+#
+# Fork PRs intentionally do NOT trigger this workflow (no pull_request_target),
+# because that would expose repository secrets to untrusted code.
+#
+# Audit *content* (subagent definition, analyzers, prompt, settings) lives in
+# movementlabsxyz/claude-pr-reviewer and is checked out + staged at runtime.
+# Bump REVIEWER_REF below to upgrade. See that repo's README for the consumer
+# contract.
+
+on:
+  pull_request:
+    types: [review_requested, labeled]
+  issue_comment:
+    types: [created]
+  # issue_comment fires on top-level PR comments. Thread replies under inline
+  # review comments fire pull_request_review_comment — separate event, same
+  # intent ("@claude, follow up on this finding"). Subscribe to both.
+  pull_request_review_comment:
+    types: [created]
+
+concurrency:
+  group: claude-audit-pr-${{ github.event.pull_request.number || github.event.issue.number }}
+  # MUST be false. When Claude posts any comment as part of its work (audit
+  # summary, inline reviews, progress pings), GitHub fires
+  # issue_comment.created / pull_request_review_comment.created back at this
+  # workflow. Those events share the same concurrency group (same PR number),
+  # and cancel-in-progress: true would cause the running audit to cancel
+  # itself mid-execution. The if-gate correctly skips bot-authored comments,
+  # but concurrency evaluates BEFORE the if-gate. See
+  # fix/disable-self-cancel for the root-cause investigation.
+  cancel-in-progress: false
+
+env:
+  # Pin to a tag (e.g. v1, v0.1.0) or an immutable SHA. Rolling tags pick up
+  # patches automatically; SHAs require a bump PR but are tamper-evident.
+  REVIEWER_REPO: movementlabsxyz/claude-pr-reviewer
+  REVIEWER_REF: v1
+
+jobs:
+  audit:
+    name: Claude audit
+    runs-on: ubuntu-latest
+
+    # Gate on the trigger type. Only fire when:
+    #   - pull_request events originate from the base repo (not a fork) — forks
+    #     cannot read secrets, so the job would silently fail without this guard,
+    #   - AND one of:
+    #       review_requested for the `m1-security` team, OR
+    #       the 'claude-audit' label was just added, OR
+    #       a PR comment / inline review comment contains '@claude' AND
+    #       the commenter is an org owner, member, or outside collaborator
+    #       (NOT a bot, NOT a random GitHub user). The author_association
+    #       check prevents drive-by @claude pings from random commenters
+    #       on this public repo from burning the audit budget.
+    if: >-
+      (
+        github.event_name == 'pull_request' &&
+        github.event.pull_request.head.repo.full_name == github.repository &&
+        (
+          (github.event.action == 'review_requested' && github.event.requested_team.slug == 'm1-security') ||
+          (github.event.action == 'labeled' && github.event.label.name == 'claude-audit')
+        )
+      ) ||
+      (
+        github.event_name == 'issue_comment' &&
+        github.event.issue.pull_request != null &&
+        contains(github.event.comment.body, '@claude') &&
+        github.event.comment.user.type != 'Bot' &&
+        contains(fromJSON('["OWNER","MEMBER","COLLABORATOR"]'), github.event.comment.author_association)
+      ) ||
+      (
+        github.event_name == 'pull_request_review_comment' &&
+        github.event.pull_request.head.repo.full_name == github.repository &&
+        contains(github.event.comment.body, '@claude') &&
+        github.event.comment.user.type != 'Bot' &&
+        contains(fromJSON('["OWNER","MEMBER","COLLABORATOR"]'), github.event.comment.author_association)
+      )
+
+    permissions:
+      contents: read
+      pull-requests: write
+      issues: write
+      id-token: write
+
+    steps:
+      - name: Resolve PR number
+        id: pr
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          EVENT_NAME: ${{ github.event_name }}
+          PR_EVENT_NUMBER: ${{ github.event.pull_request.number }}
+          ISSUE_NUMBER: ${{ github.event.issue.number }}
+          REPO: ${{ github.repository }}
+        run: |
+          set -euo pipefail
+          # pull_request and pull_request_review_comment events populate
+          # github.event.pull_request.number; issue_comment populates
+          # github.event.issue.number instead.
+          if [[ -n "$PR_EVENT_NUMBER" ]]; then
+            PR_NUMBER="$PR_EVENT_NUMBER"
+          elif [[ -n "$ISSUE_NUMBER" ]]; then
+            PR_NUMBER="$ISSUE_NUMBER"
+          else
+            echo "ERROR: could not resolve PR number from event payload" >&2
+            exit 1
+          fi
+
+          # Fetch head/base SHAs and base ref in one gh call, then batch outputs.
+          read -r HEAD_SHA BASE_SHA BASE_REF < <(
+            gh pr view "$PR_NUMBER" --repo "$REPO" \
+              --json headRefOid,baseRefOid,baseRefName \
+              -q '[.headRefOid, .baseRefOid, .baseRefName] | @tsv'
+          )
+
+          {
+            echo "number=$PR_NUMBER"
+            echo "head_sha=$HEAD_SHA"
+            echo "base_sha=$BASE_SHA"
+            echo "base_ref=$BASE_REF"
+          } >> "$GITHUB_OUTPUT"
+
+      - name: Checkout PR head
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ steps.pr.outputs.head_sha }}
+          fetch-depth: 0
+
+      - name: Fetch base branch
+        env:
+          BASE_REF: ${{ steps.pr.outputs.base_ref }}
+        run: |
+          set -euo pipefail
+          git fetch --no-tags --depth=1 origin "$BASE_REF"
+
+      - name: Checkout claude-pr-reviewer
+        uses: actions/checkout@v4
+        with:
+          repository: ${{ env.REVIEWER_REPO }}
+          ref: ${{ env.REVIEWER_REF }}
+          path: .claude-reviewer
+
+      - name: Stage Claude assets to user-level
+        # claude-code-action restores the workspace's .claude/ from origin/main
+        # before invoking Claude (security: PR head is untrusted). That wipes
+        # anything we cp into $GITHUB_WORKSPACE/.claude/. So we stage the
+        # subagent definition + references into the runner's user-level
+        # ~/.claude/agents/ instead — the action's restore is workspace-only,
+        # and Claude Code discovers user-level agents alongside project ones.
+        # Settings travels separately via the `settings:` input below.
+        run: |
+          set -euo pipefail
+          mkdir -p "$HOME/.claude/agents"
+          cp -r .claude-reviewer/agents/audit-pr   "$HOME/.claude/agents/"
+          cp    .claude-reviewer/agents/audit-pr.md "$HOME/.claude/agents/"
+          chmod +x "$HOME/.claude/agents/audit-pr/scripts/"*.sh
+
+      - name: Detect audit mode
+        id: mode
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          EVENT_NAME: ${{ github.event_name }}
+          PR_NUMBER: ${{ steps.pr.outputs.number }}
+          REPO: ${{ github.repository }}
+        run: |
+          set -euo pipefail
+          # Count prior Claude audit summary comments on the PR. Match the
+          # permissive prefix "## Claude Audit: PR" — tolerates both
+          # "PR #N" and "PR N" title variants the subagent has emitted.
+          PRIOR=$(gh pr view "$PR_NUMBER" --repo "$REPO" --json comments \
+                  -q '[.comments[] | select(.body | startswith("## Claude Audit: PR"))] | length' \
+                  || echo "0")
+
+          # Follow-up mode: comment-triggered AND a prior summary exists.
+          # Otherwise: fresh audit (label, review request, or first @claude).
+          if { [[ "$EVENT_NAME" == "issue_comment" ]] || [[ "$EVENT_NAME" == "pull_request_review_comment" ]]; } \
+             && [[ "${PRIOR:-0}" -gt 0 ]]; then
+            MODE="follow-up"
+          else
+            MODE="fresh"
+          fi
+
+          echo "Detected AUDIT_MODE=$MODE (event=$EVENT_NAME, prior_summaries=$PRIOR)"
+          echo "mode=$MODE" >> "$GITHUB_OUTPUT"
+
+      - name: Load prompt
+        # Mode-specific prompts live at .claude-reviewer/prompts/audit-pr-{fresh,follow-up}.md.
+        # The two modes are kept in SEPARATE files (not a single conditional prompt) because
+        # LLMs do not reliably gate on `if AUDIT_MODE=fresh ...` conditionals in natural-
+        # language prompts: a single file with both modes caused Claude to do a full re-audit
+        # on follow-up triggers in practice (rubujubi/aptos-core PR #22, v9 smoke test).
+        # See claude-pr-reviewer/prompts/ for the two files and the consumer contract.
+        id: load
+        env:
+          MODE: ${{ steps.mode.outputs.mode }}
+        run: |
+          set -euo pipefail
+          PROMPT_FILE=".claude-reviewer/prompts/audit-pr-${MODE}.md"
+          if [[ ! -f "$PROMPT_FILE" ]]; then
+            echo "ERROR: prompt file not found: $PROMPT_FILE" >&2
+            ls -la .claude-reviewer/prompts/ >&2 || true
+            exit 1
+          fi
+          {
+            echo 'prompt<<PROMPT_EOF'
+            cat "$PROMPT_FILE"
+            echo 'PROMPT_EOF'
+          } >> "$GITHUB_OUTPUT"
+
+      - name: Run Claude audit
+        uses: anthropics/claude-code-action@v1
+        env:
+          PR_NUMBER: ${{ steps.pr.outputs.number }}
+          BASE_SHA: ${{ steps.pr.outputs.base_sha }}
+          HEAD_SHA: ${{ steps.pr.outputs.head_sha }}
+          REPO_PATH: ${{ github.workspace }}
+          # Points at the user-level staged copy (see "Stage Claude assets to
+          # user-level"), NOT $GITHUB_WORKSPACE/.claude/... — the workspace one
+          # is wiped by the action's restore-from-main step.
+          AGENT_DIR: /home/runner/.claude/agents/audit-pr
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GITHUB_REPOSITORY: ${{ github.repository }}
+          GITHUB_EVENT_NAME: ${{ github.event_name }}
+          AUDIT_MODE: ${{ steps.mode.outputs.mode }}
+          COMMENT_ID: ${{ github.event.comment.id }}
+        with:
+          claude_code_oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
+          prompt: ${{ steps.load.outputs.prompt }}
+          # Path to the Claude Code permission allow-list. claude-code-action
+          # does NOT auto-load $GITHUB_WORKSPACE/.claude/settings.json — without
+          # this input, Claude Code falls back to default-deny mode, blocking
+          # $VAR expansion, printenv, gh, etc., and the agent burns turns on
+          # work-arounds. Source of truth lives in claude-pr-reviewer.
+          settings: .claude-reviewer/settings.json
+          claude_args: --model claude-opus-4-7 --max-turns 50 --verbose
+          # Stream Claude's tool calls and responses into the Actions log so
+          # we can see what it's doing. Required for diagnosing cancellations
+          # and turn-budget blow-ups. Safe for internal PRs; if the audit is
+          # ever run on external contributor PRs touching secrets, consider
+          # toggling this back to false.
+          show_full_output: "true"
