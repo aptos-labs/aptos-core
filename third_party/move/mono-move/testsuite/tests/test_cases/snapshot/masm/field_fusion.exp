@@ -88,12 +88,12 @@ fun identity() {
     0: Return
 }
 
-fun add_two_fields(): skipped (lowering: instruction ReadField not yet lowered)
+fun add_two_fields(): skipped (nominal type not yet supported)
 
-fun field_to_call(): skipped (lowering: instruction ReadField not yet lowered)
+fun field_to_call(): skipped (nominal type not yet supported)
 
-fun two_fields_to_call(): skipped (lowering: instruction ReadField not yet lowered)
+fun two_fields_to_call(): skipped (nominal type not yet supported)
 
-fun field_plus_constant(): skipped (lowering: instruction ReadField not yet lowered)
+fun field_plus_constant(): skipped (nominal type not yet supported)
 
 fun increment_field(): skipped (lowering: instruction ReadField not yet lowered)

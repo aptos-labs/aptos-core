@@ -19,3 +19,4 @@ mono-move-gas = { workspace = true }
 move-binary-format = { workspace = true }
 move-core-types = { workspace = true }
 shared-dsa = { workspace = true }
+thiserror = { workspace = true }

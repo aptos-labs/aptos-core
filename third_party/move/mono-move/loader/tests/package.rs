@@ -6,7 +6,7 @@
 use mono_move_core::types::EMPTY_TYPE_LIST;
 use mono_move_gas::{GasMeter, SimpleGasMeter};
 use mono_move_global_context::GlobalContext;
-use mono_move_loader::{Loader, LoadingPolicy, ModuleReadSet};
+use mono_move_loader::{Loader, LoadingPolicy, ModuleRead, ModuleReadSet, ModuleState};
 use mono_move_testsuite::InMemoryModuleProvider;
 use move_core_types::{account_address::AccountAddress, ident_str, language_storage::ModuleId};
 
@@ -77,18 +77,12 @@ fn package_policy_promotes_side_loaded_metered_module_on_function_call() {
     let guard = ctx.try_execution_context(0).unwrap();
     let loader = Loader::new_with_policy(&guard, &module_provider, LoadingPolicy::Package);
 
-    let id_a = guard
-        .intern_module_id(&ModuleId::new(
-            AccountAddress::ONE,
-            ident_str!("a").to_owned(),
-        ))
-        .into_global_arena_ptr();
-    let id_b = guard
-        .intern_module_id(&ModuleId::new(
-            AccountAddress::ONE,
-            ident_str!("b").to_owned(),
-        ))
-        .into_global_arena_ptr();
+    let id_a_module = ModuleId::new(AccountAddress::ONE, ident_str!("a").to_owned());
+    let id_b_module = ModuleId::new(AccountAddress::ONE, ident_str!("b").to_owned());
+    let id_a_key = guard.intern_module_id(&id_a_module);
+    let id_b_key = guard.intern_module_id(&id_b_module);
+    let id_a = id_a_key.into_global_arena_ptr();
+    let id_b = id_b_key.into_global_arena_ptr();
     let name_f = guard
         .intern_identifier(ident_str!("f"))
         .into_global_arena_ptr();
@@ -99,15 +93,52 @@ fn package_policy_promotes_side_loaded_metered_module_on_function_call() {
     let mut read_set = ModuleReadSet::new();
     let mut gas = SimpleGasMeter::new(u64::MAX);
 
-    // 1. Lowering `a::f` side-loads `b` for layout of `b::S`.
-    loader
-        .load_function(&mut read_set, &mut gas, id_a, name_f, EMPTY_TYPE_LIST)
-        .expect("load_function(a::f) must succeed");
+    // 1. `a::f` takes `b::S` by value, so lowering it walks `S` and side-loads
+    //    `b` as a metered read. The specializer doesn't yet derive GC layouts
+    //    for nominal home slots, so `try_lower_function` returns the skip
+    //    reason — but the read-set effects (side-loaded + metered `b`) have
+    //    already been committed by the requirements walker that runs first.
+    let err = match loader.load_function(&mut read_set, &mut gas, id_a, name_f, EMPTY_TYPE_LIST) {
+        Ok(_) => panic!("load_function(a::f) must surface the nominal-type skip"),
+        Err(e) => e,
+    };
+    assert!(
+        err.to_string().contains("nominal type not yet supported"),
+        "unexpected error: {err}"
+    );
+    assert!(
+        matches!(
+            read_set.get(id_b_key),
+            Some(ModuleRead::Loaded {
+                state: ModuleState::Metered,
+                ..
+            })
+        ),
+        "expected `b` to be recorded as a metered side-load after the failed `a::f` lowering"
+    );
 
-    // 2. Dispatch to `b::g`. Must promote `b` to ready and return the function successfully.
+    // 2. `b::g` is nominal-free, so dispatching to it succeeds. The package
+    //    policy must promote the already-metered `b` to ReadyForLowering
+    //    rather than re-loading or bailing.
     loader
         .load_function(&mut read_set, &mut gas, id_b, name_g, EMPTY_TYPE_LIST)
         .expect("load_function(b::g) must promote b, not bail");
+    assert!(matches!(
+        read_set.get(id_b_key),
+        Some(ModuleRead::Loaded {
+            state: ModuleState::ReadyForLowering,
+            ..
+        })
+    ));
+    // `a` is loaded via the package policy at the very start of step 1, so it
+    // should also be ready by now — confirms step 2 didn't regress its state.
+    assert!(matches!(
+        read_set.get(id_a_key),
+        Some(ModuleRead::Loaded {
+            state: ModuleState::ReadyForLowering,
+            ..
+        })
+    ));
 }
 
 #[test]

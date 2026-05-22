@@ -100,7 +100,7 @@ fun add() {
 
 fun get_x(): skipped (lowering: instruction ReadField not yet lowered)
 
-fun make_point(): skipped (lowering: instruction Pack not yet lowered)
+fun make_point(): skipped (nominal type not yet supported)
 
 fun max() {
   frame_data_size: 16

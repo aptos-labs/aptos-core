@@ -2,6 +2,7 @@
 // Licensed pursuant to the Innovation-Enabling Source Code License, available at https://github.com/aptos-labs/aptos-core/blob/main/LICENSE
 
 pub mod align;
+mod error;
 mod execution_context;
 mod function;
 mod instruction;
@@ -12,6 +13,7 @@ pub mod types;
 pub use align::{
     align_max, align_up, align_up_u32, checked_align_max, checked_align_up, MAX_ALIGN,
 };
+pub use error::{ExecutionError, ExecutionErrorKind, ExecutionResult, IntoExecutionError};
 pub use execution_context::{ExecutionContext, LocalExecutionContext};
 pub use function::{
     Code, FrameLayoutInfo, Function, FunctionPtr, SafePointEntry, SortedSafePointEntries,

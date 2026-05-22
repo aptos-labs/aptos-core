@@ -471,7 +471,6 @@ pub enum MicroOp {
     // handle "dirty" bools (values other than 0 or 1).
     //
     // May want:
-    // - Abort,
     // - more conditions: ==, !=, >, <=, and const variants,
     // - something for enum dispatch (jump table)?
     //======================================================================
@@ -559,6 +558,21 @@ pub enum MicroOp {
         target: CodeOffset,
         lhs: FrameOffset,
         rhs: FrameOffset,
+    },
+
+    /// Abort the current execution with a u64 abort code, read from
+    /// `code`.
+    Abort {
+        code: FrameOffset,
+    },
+
+    /// Abort the current execution with a u64 abort code and a
+    /// `vector<u8>` message read from `message`. The interpreter
+    /// copies the bytes out, validates them as UTF-8, and enforces
+    /// the abort-message size limit.
+    AbortMsg {
+        code: FrameOffset,
+        message: FrameOffset,
     },
 
     //======================================================================
@@ -967,6 +981,12 @@ impl fmt::Display for MicroOp {
             MicroOp::Return => {
                 write!(f, "Return")
             },
+            MicroOp::Abort { code } => {
+                write!(f, "Abort [{}]", code.0)
+            },
+            MicroOp::AbortMsg { code, message } => {
+                write!(f, "AbortMsg code=[{}] msg=[{}]", code.0, message.0)
+            },
             MicroOp::Jump { target } => {
                 write!(f, "Jump @{}", target.0)
             },
@@ -1301,6 +1321,83 @@ pub const CAPTURED_DATA_TAG_MATERIALIZED: u8 = 0;
 // Future: `CAPTURED_DATA_TAG_RAW: u8 = 1`
 
 impl MicroOp {
+    /// Returns `true` if this op can trigger GC in the current frame.
+    pub fn is_allocating(&self) -> bool {
+        match self {
+            // Allocating: may trigger GC.
+            MicroOp::HeapNew { .. }
+            | MicroOp::VecPushBack { .. }
+            | MicroOp::PackClosure(_)
+            | MicroOp::ForceGC => true,
+
+            // Non-allocating.
+            MicroOp::StoreImm8 { .. }
+            | MicroOp::Move8 { .. }
+            | MicroOp::Move { .. }
+            | MicroOp::AddU64 { .. }
+            | MicroOp::AddU64Imm { .. }
+            | MicroOp::SubU64 { .. }
+            | MicroOp::SubU64Imm { .. }
+            | MicroOp::RSubU64Imm { .. }
+            | MicroOp::MulU64 { .. }
+            | MicroOp::MulU64Imm { .. }
+            | MicroOp::DivU64 { .. }
+            | MicroOp::DivU64Imm { .. }
+            | MicroOp::ModU64 { .. }
+            | MicroOp::ModU64Imm { .. }
+            | MicroOp::BitAndU64 { .. }
+            | MicroOp::BitOrU64 { .. }
+            | MicroOp::BitXorU64 { .. }
+            | MicroOp::ShlU64 { .. }
+            | MicroOp::ShlU64Imm { .. }
+            | MicroOp::ShrU64 { .. }
+            | MicroOp::ShrU64Imm { .. }
+            | MicroOp::CallIndirect { .. }
+            | MicroOp::CallDirect { .. }
+            | MicroOp::Return
+            | MicroOp::Jump { .. }
+            | MicroOp::JumpNotZeroU64 { .. }
+            | MicroOp::JumpGreaterEqualU64Imm { .. }
+            | MicroOp::JumpLessU64Imm { .. }
+            | MicroOp::JumpGreaterU64Imm { .. }
+            | MicroOp::JumpLessEqualU64Imm { .. }
+            | MicroOp::JumpLessU64 { .. }
+            | MicroOp::JumpGreaterEqualU64 { .. }
+            | MicroOp::JumpNotEqualU64 { .. }
+            | MicroOp::Abort { .. }
+            | MicroOp::AbortMsg { .. }
+            | MicroOp::VecNew { .. }
+            | MicroOp::VecLen { .. }
+            | MicroOp::VecPopBack { .. }
+            | MicroOp::VecLoadElem { .. }
+            | MicroOp::VecStoreElem { .. }
+            | MicroOp::SlotBorrow { .. }
+            | MicroOp::VecBorrow { .. }
+            | MicroOp::HeapBorrow { .. }
+            | MicroOp::ReadRef { .. }
+            | MicroOp::WriteRef { .. }
+            | MicroOp::HeapMoveFrom8 { .. }
+            | MicroOp::HeapMoveFrom { .. }
+            | MicroOp::HeapMoveTo8 { .. }
+            | MicroOp::HeapMoveToImm8 { .. }
+            | MicroOp::HeapMoveTo { .. }
+            | MicroOp::Charge { .. }
+            | MicroOp::StoreRandomU64 { .. }
+            | MicroOp::CallClosure(_)
+            | MicroOp::IntAdd(_)
+            | MicroOp::IntSub(_)
+            | MicroOp::IntMul(_)
+            | MicroOp::IntDiv(_)
+            | MicroOp::IntMod(_)
+            | MicroOp::IntBitAnd(_)
+            | MicroOp::IntBitOr(_)
+            | MicroOp::IntBitXor(_)
+            | MicroOp::IntShl(_)
+            | MicroOp::IntShr(_)
+            | MicroOp::IntNegate(_) => false,
+        }
+    }
+
     // ----- Struct helpers -----
     //
     // Field offsets are byte offsets within the struct's data region, which

@@ -7,7 +7,7 @@ use mono_move_core::{types::EMPTY_TYPE_LIST, ExecutionContext, LocalExecutionCon
 use mono_move_gas::SimpleGasMeter;
 use mono_move_global_context::GlobalContext;
 use mono_move_loader::{Loader, LoadingPolicy, LoweringPolicy, ModuleReadSet, TransactionContext};
-use mono_move_runtime::{ExecutionError, InterpreterContext};
+use mono_move_runtime::{InterpreterContext, RuntimeError};
 use mono_move_testsuite::InMemoryModuleProvider;
 use move_core_types::{account_address::AccountAddress, ident_str};
 
@@ -54,7 +54,7 @@ module 0x1::test {
     let mut interpreter = InterpreterContext::new(&mut exec_ctx, &[], fib);
     interpreter.set_root_arg(0, &10u64.to_le_bytes());
     let err = interpreter.run().unwrap_err();
-    assert!(matches!(err, ExecutionError::GasExhausted(_)));
+    assert!(matches!(err, RuntimeError::GasExhausted(_)));
 }
 
 /// `load_function` errors when the gas budget is too small to cover the

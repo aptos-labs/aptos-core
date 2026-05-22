@@ -116,6 +116,8 @@ impl ModuleMandatoryDependencies {
     }
 }
 
+/// Lowered code for a single function instance, paired with the dependency
+/// slots the lowering required.
 pub struct FunctionSlot {
     pub function: FunctionPtr,
     pub mandatory_dependencies: Arc<[LoadedModuleSlot]>,
