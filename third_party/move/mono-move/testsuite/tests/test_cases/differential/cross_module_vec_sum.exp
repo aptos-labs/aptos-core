@@ -1,8 +1,8 @@
 === bytecode ===
 // Bytecode version v10
-module 0xc0ffee::vec_sum
+module 0xc0ffee::foo
 // Function definition at index 0
-#[persistent] public fun sum_first_n(l0: u64): u64
+#[persistent] public fun push_and_sum(l0: u64): u64
     local l1: vector<u64>
     local l2: u64
     vec_pack <u64>, 0
@@ -51,9 +51,9 @@ l2: move_loc l0
     ret
 
 === stackless ===
-// module 0xc0ffee::vec_sum
+// module 0xc0ffee::foo
 
-fun sum_first_n(r0): u64 {
+fun push_and_sum(r0): u64 {
   slots: params(1), locals(2), temps(3)
     r0: u64
     r1: vector<u64>
@@ -88,9 +88,9 @@ fun sum_first_n(r0): u64 {
     16: ret [r0]
 }
 === micro-ops ===
-// module 0xc0ffee::vec_sum
+// module 0xc0ffee::foo
 
-fun sum_first_n() {
+fun push_and_sum() {
   frame_data_size: 64
   code:
     0: VecNew [8]
@@ -112,5 +112,40 @@ fun sum_first_n() {
     16: Return
 }
 === frame-layout ===
-// module 0xc0ffee::vec_sum
-fun sum_first_n: heap_ptr_offsets=[8, 24, 40] zero_frame=true
+// module 0xc0ffee::foo
+fun push_and_sum: heap_ptr_offsets=[8, 24, 40] zero_frame=true
+=== bytecode ===
+// Bytecode version v10
+module 0xc0ffee::bar
+use 0xc0ffee::foo
+// Function definition at index 0
+#[persistent] public fun sum_first_n(l0: u64): u64
+    move_loc l0
+    call foo::push_and_sum
+    ret
+
+=== stackless ===
+// module 0xc0ffee::bar
+
+fun sum_first_n(r0): u64 {
+  slots: params(1), locals(0), temps(0), xfer(1)
+    r0: u64
+  code:
+  L0:
+    0: [x0] := call push_and_sum, [r0]
+    1: ret [x0]
+}
+=== micro-ops ===
+// module 0xc0ffee::bar
+
+fun sum_first_n() {
+  frame_data_size: 8
+  code:
+    0: Move8 [32] <- [0]
+    1: CallIndirect 0xc0ffee::foo::push_and_sum
+    2: Move8 [0] <- [32]
+    3: Return
+}
+=== frame-layout ===
+// module 0xc0ffee::bar
+fun sum_first_n: heap_ptr_offsets=[] zero_frame=false

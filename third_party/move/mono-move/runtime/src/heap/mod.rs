@@ -306,9 +306,12 @@ pub(crate) fn alloc_obj<P: DescriptorProvider + ?Sized>(
     pc: usize,
     descriptor_id: DescriptorId,
 ) -> RuntimeResult<*mut u8> {
-    let desc = provider
-        .descriptor(descriptor_id)
-        .expect("verifier ensures descriptor exists");
+    let desc = match provider.descriptor(descriptor_id) {
+        Some(desc) => desc,
+        None => invariant_violation!(DescriptorNotFound {
+            descriptor_id: descriptor_id.as_u32(),
+        }),
+    };
     let payload_size = match desc.inner() {
         ObjectDescriptorInner::Struct { size, .. } => *size as usize,
         ObjectDescriptorInner::Enum { size, .. } => *size as usize,
@@ -558,7 +561,7 @@ pub(crate) fn gc_collect<P: DescriptorProvider + ?Sized>(
                 obj_ptr,
                 DescriptorId(descriptor_id),
                 &mut free_ptr,
-            );
+            )?;
 
             scan_ptr = scan_ptr.add(obj_size);
         }
@@ -689,17 +692,12 @@ fn gc_scan_object<P: DescriptorProvider + ?Sized>(
     obj_ptr: *mut u8,
     descriptor_id: DescriptorId,
     free_ptr: &mut *mut u8,
-) {
+) -> RuntimeResult<()> {
     let desc = match provider.descriptor(descriptor_id) {
         Some(d) => d,
-        None => {
-            debug_assert!(
-                false,
-                "gc_scan_object: descriptor_id {} not found in provider",
-                descriptor_id
-            );
-            return;
-        },
+        None => invariant_violation!(DescriptorNotFound {
+            descriptor_id: descriptor_id.as_u32(),
+        }),
     };
 
     // All offsets below are relative to `obj_ptr` (the data-region
@@ -715,7 +713,7 @@ fn gc_scan_object<P: DescriptorProvider + ?Sized>(
         } => {
             debug_assert!(*elem_size > 0, "elem_size must not be zero");
             if elem_pointer_offsets.is_empty() {
-                return;
+                return Ok(());
             }
             unsafe {
                 let length = read_u64(obj_ptr, VEC_LENGTH_OFFSET) as usize;
@@ -737,7 +735,7 @@ fn gc_scan_object<P: DescriptorProvider + ?Sized>(
             pointer_offsets, ..
         } => {
             if pointer_offsets.is_empty() {
-                return;
+                return Ok(());
             }
             unsafe {
                 for &off in pointer_offsets {
@@ -755,11 +753,11 @@ fn gc_scan_object<P: DescriptorProvider + ?Sized>(
         } => unsafe {
             let tag = read_u64(obj_ptr, ENUM_TAG_OFFSET) as usize;
             if tag >= variant_pointer_offsets.len() {
-                return;
+                return Ok(());
             }
             let pointer_offsets = &variant_pointer_offsets[tag];
             if pointer_offsets.is_empty() {
-                return;
+                return Ok(());
             }
             for &off in pointer_offsets {
                 let old_ptr = read_ptr(obj_ptr, ENUM_DATA_OFFSET + off as usize);
@@ -783,7 +781,7 @@ fn gc_scan_object<P: DescriptorProvider + ?Sized>(
             pointer_offsets, ..
         } => {
             if pointer_offsets.is_empty() {
-                return;
+                return Ok(());
             }
             unsafe {
                 for &off in pointer_offsets {
@@ -797,4 +795,5 @@ fn gc_scan_object<P: DescriptorProvider + ?Sized>(
             }
         },
     }
+    Ok(())
 }

@@ -713,21 +713,40 @@ impl<P: DescriptorProvider + ?Sized> FunctionVerifier<'_, P> {
         // Together with the descriptor self-soundness pass, this is
         // sufficient to ensure the runtime's fixed-offset writes stay in
         // bounds.
-        if let Some(id) = op.captured_data_descriptor_id {
-            let expected_values_size: u32 = op.captured.iter().map(|s| s.size).sum();
-            if let Some(desc) = self.provider.descriptor(id) {
-                if let ObjectDescriptorInner::CapturedData { size: actual, .. } = desc.inner() {
-                    if *actual != expected_values_size {
-                        self.err(
-                            Some(pc),
-                            format!(
-                                "PackClosure: captured_data values size {} != expected {}",
-                                actual, expected_values_size
-                            ),
-                        );
-                    }
-                }
-            }
+        let Some(id) = op.captured_data_descriptor_id else {
+            // The `None` case is already validated by the (None, _) arms of the
+            // match above.
+            return;
+        };
+        let expected_values_size: u32 = op.captured.iter().map(|s| s.size).sum();
+        let Some(desc) = self.provider.descriptor(id) else {
+            self.err(
+                Some(pc),
+                format!(
+                    "PackClosure: captured_data descriptor {} not found",
+                    id.as_u32()
+                ),
+            );
+            return;
+        };
+        let ObjectDescriptorInner::CapturedData { size: actual, .. } = desc.inner() else {
+            self.err(
+                Some(pc),
+                format!(
+                    "PackClosure: captured_data descriptor {} is not a CapturedData descriptor",
+                    id.as_u32()
+                ),
+            );
+            return;
+        };
+        if *actual != expected_values_size {
+            self.err(
+                Some(pc),
+                format!(
+                    "PackClosure: captured_data values size {} != expected {}",
+                    actual, expected_values_size
+                ),
+            );
         }
     }
 

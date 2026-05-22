@@ -747,7 +747,10 @@ impl<'a> LoweringState<'a> {
                 let elem_size = concrete_type_size(*elem_ty, "vector elem type")?;
                 let vec_ty = strip_ref(self.slot_interned_type(*vec_ref)?)?;
                 let descriptor_id = self.ctx.vec_descriptor_id(vec_ty).ok_or_else(|| {
-                    anyhow::anyhow!("VecPushBack: descriptor for vector type not published")
+                    anyhow::anyhow!(
+                        "VecPushBack: no descriptor published for this vector type \
+                         (its element type may be generic or have unresolved layout)"
+                    )
                 })?;
                 let vec_ref_info = self.slot(*vec_ref)?;
                 let val_info = self.slot(*val)?;

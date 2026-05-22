@@ -422,6 +422,10 @@ pub trait SpecializerContext {
         elem_size: u32,
         elem_ptr_offsets: &[FrameOffset],
     ) -> Result<DescriptorId>;
+
+    /// Returns the already-published vector-descriptor id for `elem_ty`,
+    /// or `None` if no descriptor has been published yet.
+    fn vec_descriptor_for(&self, elem_ty: InternedType) -> Option<DescriptorId>;
 }
 
 /// Attempts to lower a function.
@@ -646,13 +650,14 @@ fn discover_type_metadata(
         },
         Type::Vector { elem } => {
             discover_type_metadata(ctx, *elem, EMPTY_TYPE_LIST, visited, vec_descriptors)?;
-            if let Some((elem_size, _)) = type_size_and_align(*elem) {
-                if let Ok(ptr_offsets) = type_pointer_offsets(*elem) {
-                    let ptr_offsets: Vec<FrameOffset> =
-                        ptr_offsets.into_iter().map(FrameOffset).collect();
-                    let id = ctx.publish_vec_descriptor(*elem, elem_size, &ptr_offsets)?;
-                    vec_descriptors.insert(ty, id);
-                }
+            if let Some(id) = ctx.vec_descriptor_for(*elem) {
+                vec_descriptors.insert(ty, id);
+            } else if let Some((elem_size, _)) = type_size_and_align(*elem)
+                && let Ok(ptr_offsets) = type_pointer_offsets(*elem)
+            {
+                let ptr_offsets = ptr_offsets.into_iter().map(FrameOffset).collect::<Vec<_>>();
+                let id = ctx.publish_vec_descriptor(*elem, elem_size, &ptr_offsets)?;
+                vec_descriptors.insert(ty, id);
             }
         },
         Type::Nominal {

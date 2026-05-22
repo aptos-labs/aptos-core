@@ -290,4 +290,8 @@ impl SpecializerContext for SnapshotLoaderContext<'_, '_, '_> {
             .guard
             .publish_vec_descriptor(elem_ty, elem_size, elem_ptr_offsets))
     }
+
+    fn vec_descriptor_for(&self, elem_ty: InternedType) -> Option<DescriptorId> {
+        self.guard.vec_descriptor_for(elem_ty)
+    }
 }

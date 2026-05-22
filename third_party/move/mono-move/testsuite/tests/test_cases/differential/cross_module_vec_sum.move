@@ -1,6 +1,4 @@
-// Cross-module lazy load + vector descriptor publish test.
-
-// RUN: publish
+// RUN: publish --print(bytecode,stackless,micro-ops,frame-layout)
 module 0xc0ffee::foo {
     public fun push_and_sum(n: u64): u64 {
         let v = std::vector::empty<u64>();
