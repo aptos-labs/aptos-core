@@ -260,6 +260,8 @@ pub struct HotStateConfig {
     pub use_write_set_v1: bool,
     /// Whether to embed the per-block hot-state promotions into the epilogue transactions.
     pub persist_hotness_in_epilogue: bool,
+    /// Whether execution should assemble `TransactionInfoV1` which carries hot state root hash.
+    pub use_transaction_info_v1: bool,
 }
 
 impl Default for HotStateConfig {
@@ -271,6 +273,7 @@ impl Default for HotStateConfig {
             compute_root_hash: true,
             use_write_set_v1: false,
             persist_hotness_in_epilogue: false,
+            use_transaction_info_v1: false,
         }
     }
 }
