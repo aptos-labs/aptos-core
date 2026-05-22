@@ -507,20 +507,30 @@ fn now_usecs() -> u64 {
     aptos_infallible::duration_since_epoch().as_micros() as u64
 }
 
-/// Stages that fire AFTER `Executed(Retry)` but logically belong to the same
-/// block as the retried execution. `mark_retry` increments `current_attempt`
-/// immediately after recording `Executed(Retry)`, so these stages' records
-/// carry the *next* attempt number even though they're block N's finalization.
+/// Stages that must NOT advance `display_attempt` when iterating the sorted
+/// stage list. Two reasons a stage's `record.attempt` may not reflect the
+/// "true" pipeline pass it belongs to:
+///
+/// - `mark_retry` increments `current_attempt` immediately after recording
+///   `Executed(Retry)`, so block N's later `BlockOrdered`/`PreCommit`/
+///   `Certified`/`Committed` records carry attempt N+1 even though they
+///   belong to block N.
+/// - `ParentBlockProposed` uses a foreign timestamp (the parent block's
+///   `block.timestamp_usecs`), so a record for attempt N+1's parent block can
+///   sort chronologically *between* attempt N's `Executed(Retry)` and
+///   `QsBatchPull(N+1)` — advancing `display_attempt` on it would misroute
+///   block N's finalization records into slot[N].
 ///
 /// Used by:
 /// - the `data.stages` text builder (delay `[attempt_N+1]` marker until a
-///   non-finalization stage fires), and
+///   non-passive stage fires), and
 /// - `build_first_attempt_scalars` (route these into attempt-1's scalar slots
-///   instead of dropping them as "not attempt 1").
+///   via `display_attempt` instead of their stale `record.attempt`).
 fn is_block_finalization(stage: TransactionStage) -> bool {
     matches!(
         stage,
-        TransactionStage::BlockOrdered
+        TransactionStage::ParentBlockProposed
+            | TransactionStage::BlockOrdered
             | TransactionStage::Certified
             | TransactionStage::PreCommit
             | TransactionStage::Committed
@@ -1071,6 +1081,15 @@ mod tests {
         // must route them to slot[0] anyway, mirroring the display loop's
         // `is_block_finalization` logic.
         trace.current_attempt = 2;
+        // Real-world bug reproduction: a new block's proposal arrives during
+        // block 1's commit-pipeline phase. `process_proposed_block` records
+        // `ParentBlockProposed` for block 2 with the foreign parent timestamp
+        // (155_000 here) AND with `attempt=2`. This record can sort
+        // chronologically *between* block 1's `Executed(Retry)` and block 1's
+        // `PreCommit`. The router must NOT treat it as the start of attempt
+        // 2's pipeline — otherwise block 1's finalization stages get misrouted
+        // to slot[1] instead of slot[0].
+        trace.record(TransactionStage::ParentBlockProposed, 155_000);
         trace.record(TransactionStage::PreCommit, 160_000);
         trace.record(TransactionStage::Certified, 165_000);
         trace.record(TransactionStage::Committed, 170_000);
