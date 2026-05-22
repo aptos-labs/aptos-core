@@ -752,7 +752,7 @@ impl<'a> LoweringState<'a> {
             // --- Abort ---
             Instr::Abort(code) => {
                 let code = self.slot(*code)?;
-                self.emit(MicroOp::Abort { code: code.offset });
+                self.emit(MicroOp::Abort { code: code.offset })?;
             },
             Instr::AbortMsg(code, message) => {
                 let code = self.slot(*code)?;
@@ -760,7 +760,7 @@ impl<'a> LoweringState<'a> {
                 self.emit(MicroOp::AbortMsg {
                     code: code.offset,
                     message: message.offset,
-                });
+                })?;
             },
 
             // --- Vector ---
