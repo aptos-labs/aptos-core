@@ -785,60 +785,38 @@ fn log_trace(trace: &TransactionTrace) {
         .outcome(outcome)
         .stages(stage_parts.join(" "));
 
-    if let Some(g) = trace.gas_unit_price {
-        schema = schema.gas_unit_price(g);
+    // For each `Option<_>` field, attach it to the schema only when populated.
+    // Mirrors the schema field order so the JSON ordering is predictable.
+    macro_rules! set_if_some {
+        ($src:ident, $($field:ident),+ $(,)?) => {
+            $(
+                if let Some(x) = $src.$field {
+                    schema = schema.$field(x);
+                }
+            )+
+        };
     }
-    if let Some(x) = scalars.mempool_insert_ms {
-        schema = schema.mempool_insert_ms(x);
-    }
-    if let Some(x) = scalars.qs_batch_pull_ms {
-        schema = schema.qs_batch_pull_ms(x);
-    }
-    if let Some(x) = scalars.qs_batch_created_ms {
-        schema = schema.qs_batch_created_ms(x);
-    }
-    if let Some(x) = scalars.qs_proof_of_store_ms {
-        schema = schema.qs_proof_of_store_ms(x);
-    }
-    if let Some(x) = scalars.parent_block_proposed_ms {
-        schema = schema.parent_block_proposed_ms(x);
-    }
-    if let Some(x) = scalars.block_proposed_ms {
-        schema = schema.block_proposed_ms(x);
-    }
-    if let Some(x) = scalars.block_proposed_kind {
-        schema = schema.block_proposed_kind(x);
-    }
-    if let Some(x) = scalars.block_received_ms {
-        schema = schema.block_received_ms(x);
-    }
-    if let Some(x) = scalars.execution_start_ms {
-        schema = schema.execution_start_ms(x);
-    }
-    if let Some(x) = scalars.executed_ms {
-        schema = schema.executed_ms(x);
-    }
-    if let Some(x) = scalars.executed_status {
-        schema = schema.executed_status(x);
-    }
-    if let Some(x) = scalars.block_ordered_ms {
-        schema = schema.block_ordered_ms(x);
-    }
-    if let Some(x) = scalars.certified_ms {
-        schema = schema.certified_ms(x);
-    }
-    if let Some(x) = scalars.pre_commit_ms {
-        schema = schema.pre_commit_ms(x);
-    }
-    if let Some(x) = scalars.committed_ms {
-        schema = schema.committed_ms(x);
-    }
-    if let Some(x) = scalars.mempool_commit_ms {
-        schema = schema.mempool_commit_ms(x);
-    }
-    if let Some(x) = scalars.mempool_reject_ms {
-        schema = schema.mempool_reject_ms(x);
-    }
+    set_if_some!(trace, gas_unit_price);
+    set_if_some!(
+        scalars,
+        mempool_insert_ms,
+        qs_batch_pull_ms,
+        qs_batch_created_ms,
+        qs_proof_of_store_ms,
+        parent_block_proposed_ms,
+        block_proposed_ms,
+        block_proposed_kind,
+        block_received_ms,
+        execution_start_ms,
+        executed_ms,
+        executed_status,
+        block_ordered_ms,
+        certified_ms,
+        pre_commit_ms,
+        committed_ms,
+        mempool_commit_ms,
+        mempool_reject_ms,
+    );
 
     info!(schema);
 }
