@@ -3,13 +3,22 @@
 
 #![forbid(unsafe_code)]
 
-use crate::{db_options::gen_position_cfds, sharded_kv_db::ShardedKvDb};
+use crate::{
+    db_options::gen_position_cfds,
+    schema::{
+        db_metadata::{DbMetadataKey, DbMetadataSchema, DbMetadataValue},
+        position_value::PositionValueSchema,
+    },
+    sharded_kv_db::ShardedKvDb,
+};
 use aptos_config::config::{RocksdbConfig, StorageDirPaths};
+use aptos_crypto::HashValue;
+use aptos_experimental_runtimes::thread_manager::THREAD_MANAGER;
 use aptos_logger::info;
 use aptos_rocksdb_options::gen_rocksdb_options;
-use aptos_schemadb::{Cache, Env, DB};
+use aptos_schemadb::{batch::SchemaBatch, Cache, Env, DB};
 use aptos_storage_interface::{AptosDbError, Result};
-use aptos_types::state_store::NUM_STATE_SHARDS;
+use aptos_types::{state_store::NUM_STATE_SHARDS, transaction::Version};
 use rayon::prelude::*;
 use std::{
     ops::Deref,
@@ -181,5 +190,69 @@ impl PositionDb {
         &self,
     ) -> [aptos_schemadb::batch::NativeBatch<'_>; NUM_NATIVE_VALUE_SHARDS] {
         std::array::from_fn(|shard_id| self.shard(shard_id).new_native_batch())
+    }
+
+    pub fn commit(
+        &self,
+        version: Version,
+        metadata_batch: Option<SchemaBatch>,
+        per_shard_batches: [Option<SchemaBatch>; NUM_NATIVE_VALUE_SHARDS],
+    ) -> Result<()> {
+        THREAD_MANAGER.get_io_pool().scope(|s| {
+            for (shard_id, batch_opt) in per_shard_batches.into_iter().enumerate() {
+                s.spawn(move |_| {
+                    self.commit_single_shard(version, shard_id, batch_opt)
+                        .unwrap_or_else(|err| {
+                            panic!("Failed to commit position shard {shard_id}: {err}.")
+                        });
+                });
+            }
+        });
+        if let Some(batch) = metadata_batch {
+            self.metadata_db().write_schemas(batch)?;
+        }
+        self.write_progress(version)
+    }
+
+    pub fn commit_single_shard(
+        &self,
+        version: Version,
+        shard_id: usize,
+        batch_opt: Option<SchemaBatch>,
+    ) -> Result<()> {
+        let mut batch = batch_opt.unwrap_or_default();
+        batch.put::<DbMetadataSchema>(
+            &DbMetadataKey::PositionShardCommitProgress(shard_id),
+            &DbMetadataValue::Version(version),
+        )?;
+        self.shard(shard_id).write_schemas(batch)
+    }
+
+    pub fn write_progress(&self, version: Version) -> Result<()> {
+        self.metadata_db().put::<DbMetadataSchema>(
+            &DbMetadataKey::PositionCommitProgress,
+            &DbMetadataValue::Version(version),
+        )
+    }
+
+    pub fn find_prior_version(
+        &self,
+        state_key_hash: HashValue,
+        at_version: Version,
+    ) -> Result<Option<Version>> {
+        if at_version == 0 {
+            return Ok(None);
+        }
+        let shard = ShardedKvDb::shard_of_hash(state_key_hash);
+        let mut iter = self.shard(shard).iter::<PositionValueSchema>()?;
+        // PositionValueSchema bit-inverts the version (newest-first); a
+        // forward seek lands on the largest version <= at_version-1.
+        iter.seek(&(state_key_hash, at_version - 1))?;
+        if let Some(Ok(((row_hash, row_version), _value))) = iter.next()
+            && row_hash == state_key_hash
+        {
+            return Ok(Some(row_version));
+        }
+        Ok(None)
     }
 }

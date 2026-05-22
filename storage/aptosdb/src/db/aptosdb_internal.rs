@@ -11,6 +11,7 @@ use crate::{
     state_kv_db::StateKvDb,
     state_merkle_db::StateMerkleDb,
     state_store::{StatePruner, StateStore},
+    trading_native::ENABLE_TRADING_NATIVE,
     transaction_store::TransactionStore,
 };
 #[cfg(any(test, feature = "db-debugger"))]
@@ -84,6 +85,9 @@ impl AptosDB {
             hot_state_config,
         ));
 
+        // The native-position DB isn't open here; it attaches later
+        // via `AptosDB::init_native_position`, which re-binds the
+        // pruner via `LedgerPrunerManager::attach_native_pruners`.
         let ledger_pruner = LedgerPrunerManager::new(
             Arc::clone(&ledger_db),
             pruner_config.ledger_pruner_config,
@@ -106,6 +110,7 @@ impl AptosDB {
             pre_commit_lock: std::sync::Mutex::new(()),
             commit_lock: std::sync::Mutex::new(()),
             update_subscriber: None,
+            position: None,
         }
     }
 
@@ -155,7 +160,7 @@ impl AptosDB {
             db.write_pruner_progress(synced_version)?;
         }
 
-        let myself = Self::new_with_dbs(
+        let mut myself = Self::new_with_dbs(
             ledger_db,
             hot_state_merkle_db,
             state_merkle_db,
@@ -168,6 +173,17 @@ impl AptosDB {
             internal_indexer_db,
             hot_state_config,
         );
+
+        if ENABLE_TRADING_NATIVE {
+            myself.init_native_position(
+                db_paths,
+                rocksdb_configs.state_kv_db_config,
+                rocksdb_configs.state_merkle_db_config,
+                &env,
+                &block_cache,
+                readonly,
+            )?;
+        }
 
         if !readonly {
             if let Some(version) = myself.get_synced_version()? {

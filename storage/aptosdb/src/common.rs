@@ -449,3 +449,27 @@ where
         }
     }
 }
+
+/// `current_state` is shared with outside readers; `buffered_state` is
+/// the commit-path mutex.
+pub struct PipelineStateStore<L, BS> {
+    current_state: Arc<Mutex<L>>,
+    buffered_state: Mutex<BS>,
+}
+
+impl<L, BS> PipelineStateStore<L, BS> {
+    pub fn from_parts(current_state: Arc<Mutex<L>>, buffered_state: BS) -> Self {
+        Self {
+            current_state,
+            buffered_state: Mutex::new(buffered_state),
+        }
+    }
+
+    pub fn current_state(&self) -> Arc<Mutex<L>> {
+        Arc::clone(&self.current_state)
+    }
+
+    pub(crate) fn buffered_state_locked(&self) -> aptos_infallible::MutexGuard<'_, BS> {
+        self.buffered_state.lock()
+    }
+}

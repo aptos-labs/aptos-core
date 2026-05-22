@@ -72,6 +72,8 @@ pub enum DbMetadataKey {
     StaleNodeCleanupDone,
     StaleNodeCleanupRegularProgress,
     StaleNodeCleanupEpochProgress,
+    PositionCommitProgress,
+    PositionShardCommitProgress(ShardId),
 }
 
 define_schema!(
