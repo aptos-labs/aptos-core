@@ -75,17 +75,15 @@ impl FrameLayoutInfo {
     }
 }
 
-/// Additional frame layout that applies at a specific safe point.
+/// At specific safepoints, this entry supplements the base `frame_layout` with
+/// additional pointer offsets that are only valid at that PC.
 ///
-/// Safe points are instructions where GC may run:
+/// Top-frame-only contract: this entry is consulted by the GC only when (a)
+/// this function is the top stack frame and (b) its current PC equals
+/// `code_offset`.
 ///
-/// - **Allocating instructions** (`HeapNew`, `VecPushBack`, `ForceGC`):
-///   GC runs during the instruction, so the safe point is at that
-///   instruction's own PC.
-/// - **Call return sites**: when a callee triggers GC, the caller's
-///   saved PC is `call_pc + 1`. The safe point for a caller frame is
-///   the instruction *after* the call — at that point, the shared
-///   arg/return region holds return values, not arguments.
+/// `code_offset` must point at an op for which [`MicroOp::is_allocating`]
+/// returns `true`.
 pub struct SafePointEntry {
     pub code_offset: CodeOffset,
     pub layout: FrameLayoutInfo,
@@ -134,10 +132,10 @@ impl SortedSafePointEntries {
 /// Frame layout (fp-relative):
 ///
 /// ```text
-///   [0 .. param_sizes_sum)                    parameters (written by caller as arguments)
+///   [0 .. param_sizes_sum)                                  parameters (written by caller as arguments)
 ///   [param_sizes_sum .. param_and_local_sizes_sum)          locals
 ///   [param_and_local_sizes_sum .. param_and_local_sizes_sum+24)     metadata (saved_pc, saved_fp, saved_func_id)
-///   [param_and_local_sizes_sum+24 .. extended_frame_size)  callee arg/return slots
+///   [param_and_local_sizes_sum+24 .. extended_frame_size)   callee arg/return slots
 /// ```
 ///
 /// `extended_frame_size` == `param_and_local_sizes_sum + FRAME_METADATA_SIZE` for leaf
@@ -196,36 +194,41 @@ pub struct Function {
     /// Invariants:
     ///
     /// - **Zeroed at frame creation**: when `zero_frame` is true, the
-    ///   runtime zeroes `param_sizes_sum..extended_frame_size` when a frame
-    ///   is created, so all non-parameter pointer slots (including the
-    ///   callee arg/return region) start as null.
+    ///   runtime zeroes `param_sizes_sum..extended_frame_size` when a
+    ///   frame is created, so all non-parameter pointer slots
+    ///   (including the callee arg/return region) start as null.
     /// - **Pointer-only writes**: a pointer slot may only be
     ///   overwritten with another valid heap pointer (or null). The
     ///   specializer must guarantee this.
     ///
-    /// The callee arg region (`frame_size()..extended_frame_size`)
-    /// overlaps with the callee's frame during GC traversal — both
-    /// frames may scan the same memory. The forwarding markers in
-    /// `gc_copy_object` handle double-scans correctly.
+    /// Callee-region offsets (≥ `frame_size()`) should go in
+    /// `safe_point_layouts` (top-frame-only), not here, unless the
+    /// value is pointer-shaped at every PC.
     pub frame_layout: FrameLayoutInfo,
     /// Per-safe-point frame layouts.
     ///
-    /// During GC, for each frame on the call stack, the GC scans the
-    /// union of `frame_layout.heap_ptr_offsets` (always) and the
-    /// matching safe-point entry's `heap_ptr_offsets` (if the frame's
-    /// current PC has a corresponding entry).
+    /// **Top-frame-only.** During GC, an entry at `code_offset = pc` is
+    /// consulted only when this function is the *top* stack frame and
+    /// its current PC equals `pc`. Caller frames below the top use
+    /// `frame_layout` (always-on) alone — `gc_collect` does not query
+    /// `safe_point_layouts` for any below-frame.
+    ///
+    /// Each entry's `code_offset` must point at an op for which
+    /// [`MicroOp::is_allocating`] returns `true` — the only PCs at
+    /// which a top-frame consultation can occur.
     ///
     /// The offsets in each safe-point entry must be disjoint from
-    /// `frame_layout.heap_ptr_offsets` — a slot that is always a pointer
-    /// belongs in `frame_layout`, not in individual safe-point entries.
+    /// `frame_layout.heap_ptr_offsets` — a slot that is always a
+    /// pointer belongs in `frame_layout`, not in individual safe-point
+    /// entries.
     ///
     /// This supplements `frame_layout` for slots whose pointer status
-    /// changes across the function — e.g., shared arg/return regions
-    /// that hold a pointer argument before a call but a scalar return
-    /// value after, or callee arg slots used by different callees.
+    /// changes across the function — typically shared callee arg/ret
+    /// region offsets that hold pointers only at specific allocating
+    /// ops in this function's body.
     ///
-    /// Empty when the function needs no per-PC distinction (all pointer
-    /// slots are stable across the entire function body).
+    /// Empty when the function needs no per-PC distinction (all
+    /// pointer slots are stable across the entire function body).
     pub safe_point_layouts: SortedSafePointEntries,
 }
 

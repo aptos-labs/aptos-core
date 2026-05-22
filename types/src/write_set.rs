@@ -17,8 +17,8 @@ use once_cell::sync::Lazy;
 use ref_cast::RefCast;
 use serde::{Deserialize, Deserializer, Serialize, Serializer};
 use std::{
-    collections::{btree_map, BTreeMap},
-    fmt::{Debug, Formatter},
+    collections::{btree_map, BTreeMap, BTreeSet},
+    fmt::Debug,
 };
 use strum_macros::AsRefStr;
 
@@ -81,7 +81,7 @@ impl PersistedWriteOp {
     }
 }
 
-/// Shared in memory representation between the (value) WriteOp and the (hotness) HotStateOp
+/// Shared in memory representation between different operations.
 #[derive(Clone, Debug, Eq, PartialEq, AsRefStr)]
 pub enum BaseStateOp {
     Creation(StateValue),
@@ -501,60 +501,11 @@ impl Debug for WriteOp {
     }
 }
 
-#[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
-#[serde(rename = "WriteSet")]
-pub enum ValueWriteSet {
-    V0(WriteSetV0),
-}
-
-impl Default for ValueWriteSet {
-    fn default() -> Self {
-        Self::V0(WriteSetV0::default())
-    }
-}
-
-// TODO(HotState): revisit when the hot state is deterministic.
-/// Represents a hotness only change, not persisted for now.
-#[derive(Clone, Eq, PartialEq)]
-pub struct HotStateOp(BaseStateOp);
-
-impl HotStateOp {
-    pub fn make_hot() -> Self {
-        Self(BaseStateOp::MakeHot)
-    }
-
-    pub fn as_base_op(&self) -> &BaseStateOp {
-        &self.0
-    }
-
-    pub fn into_base_op(self) -> BaseStateOp {
-        self.0
-    }
-}
-
-impl Debug for HotStateOp {
-    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
-        use BaseStateOp::*;
-
-        match &self.0 {
-            MakeHot => write!(f, "MakeHot"),
-            Creation(_) | Modification(_) | Deletion(_) => {
-                unreachable!("malformed hot state op")
-            },
-        }
-    }
-}
-
-/// Native-position write produced by a transaction. Type-distinct
-/// from [`WriteOp`] so the compiler refuses to mix native-position
-/// entries into the main-state bucket (`ValueWriteSet`). Wraps the
-/// same `BaseStateOp` payload variants as `WriteOp` (Creation /
-/// Modification / Deletion) — `MakeHot` is rejected at construction.
+/// Native-position write produced by a transaction. Type-distinct from [`WriteOp`] so the compiler
+/// refuses to mix native-position entries into the main-state bucket.
 ///
-/// Carried by [`WriteSet::native_positions`]; skipped from the
-/// WriteSet's serde representation, so `TransactionInfo` hashes and
-/// on-disk WriteSet bytes are unaffected. The storage commit applier
-/// (in `aptos-db`) consumes it via [`WriteSet::native_position_iter`].
+/// Carried inside [`Extension::NativePosition`] on a `WriteSet`. The storage commit applier (in
+/// `aptos-db`) consumes it via [`WriteSet::native_position_iter`].
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct NativePositionOp(BaseStateOp);
 
@@ -576,82 +527,124 @@ impl NativePositionOp {
     }
 }
 
-#[derive(BCSCryptoHash, Clone, CryptoHasher, Debug, Default, Eq, PartialEq)]
-pub struct WriteSet {
-    value: ValueWriteSet,
-    /// Hot state promotions, non-empty only in block epilogues.
-    /// TODO(HotState): not hashed into `TransactionInfo` for now.
-    hotness: BTreeMap<StateKey, HotStateOp>,
-    /// Native-position writes staged by the transaction. Routed
-    /// to the dedicated `position_db` + in-memory `NativeStateStore`
-    /// by the storage commit applier; never enters main state.
-    /// Skipped from serde so `TransactionInfo` hashes and the
-    /// on-disk WriteSet format are unaffected.
-    native_positions: BTreeMap<StateKey, NativePositionOp>,
-}
-
-impl Serialize for WriteSet {
+impl Serialize for NativePositionOp {
     fn serialize<S>(&self, serializer: S) -> std::result::Result<S::Ok, S::Error>
     where
         S: Serializer,
     {
-        self.value.serialize(serializer)
+        self.as_write_op().serialize(serializer)
     }
 }
 
-impl<'de> Deserialize<'de> for WriteSet {
+impl<'de> Deserialize<'de> for NativePositionOp {
     fn deserialize<D>(deserializer: D) -> std::result::Result<Self, D::Error>
     where
         D: Deserializer<'de>,
     {
-        let value = ValueWriteSet::deserialize(deserializer)?;
-        Ok(Self {
-            value,
-            hotness: BTreeMap::new(),
-            native_positions: BTreeMap::new(),
-        })
+        WriteOp::deserialize(deserializer).map(NativePositionOp::from_write_op)
+    }
+}
+
+/// Optional, opt-in side-channels carried by a `WriteSet` alongside the main value write set.
+/// Simply used to reduce the need to introduce `WriteSetV2` in the future.
+#[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
+pub enum Extension {
+    NativePosition(BTreeMap<StateKey, NativePositionOp>),
+}
+
+#[derive(BCSCryptoHash, Clone, CryptoHasher, Debug, Eq, PartialEq, Serialize, Deserialize)]
+pub enum WriteSet {
+    V0(WriteSetV0),
+    V1(WriteSetV1),
+}
+
+impl Default for WriteSet {
+    fn default() -> Self {
+        Self::V0(WriteSetV0::default())
     }
 }
 
 impl WriteSet {
-    fn into_v0(self) -> WriteSetV0 {
-        match self.value {
-            ValueWriteSet::V0(ws) => ws,
-        }
-    }
-
     pub fn as_v0(&self) -> &WriteSetV0 {
-        match &self.value {
-            ValueWriteSet::V0(ws) => ws,
+        match self {
+            Self::V0(ws) => ws,
+            Self::V1(_) => panic!("WriteSet is V1, expected V0"),
         }
     }
 
-    fn as_v0_mut(&mut self) -> &mut WriteSetV0 {
-        match &mut self.value {
-            ValueWriteSet::V0(ws) => ws,
+    fn value_writes(&self) -> &WriteSetMut {
+        match self {
+            Self::V0(ws) => &ws.value_writes,
+            Self::V1(ws) => &ws.value_writes,
         }
     }
 
-    pub fn into_mut(self) -> WriteSetMut {
-        self.into_v0().0
-    }
-
-    pub fn new_from_value(value: ValueWriteSet) -> Self {
-        Self {
-            value,
-            hotness: BTreeMap::new(),
-            native_positions: BTreeMap::new(),
+    fn value_writes_mut(&mut self) -> &mut WriteSetMut {
+        match self {
+            Self::V0(ws) => &mut ws.value_writes,
+            Self::V1(ws) => &mut ws.value_writes,
         }
     }
 
-    pub fn new_from_value_with_hotness(
-        value: ValueWriteSet,
-        hotness: BTreeMap<StateKey, HotStateOp>,
-    ) -> Self {
-        Self {
-            value,
-            hotness,
-            native_positions: BTreeMap::new(),
+    fn hotness_ref(&self) -> &BTreeSet<StateKey> {
+        match self {
+            Self::V0(ws) => &ws.hotness,
+            Self::V1(ws) => &ws.hotness,
+        }
+    }
+
+    fn hotness_mut(&mut self) -> &mut BTreeSet<StateKey> {
+        match self {
+            Self::V0(ws) => &mut ws.hotness,
+            Self::V1(ws) => &mut ws.hotness,
+        }
+    }
+
+    fn extensions_ref(&self) -> &Vec<Extension> {
+        match self {
+            Self::V0(ws) => &ws.extensions,
+            Self::V1(ws) => &ws.extensions,
+        }
+    }
+
+    fn extensions_mut(&mut self) -> &mut Vec<Extension> {
+        match self {
+            Self::V0(ws) => &mut ws.extensions,
+            Self::V1(ws) => &mut ws.extensions,
+        }
+    }
+
+    fn native_positions(&self) -> Option<&BTreeMap<StateKey, NativePositionOp>> {
+        let mut result = None;
+        for ext in self.extensions_ref() {
+            match ext {
+                Extension::NativePosition(m) => {
+                    assert!(
+                        result.is_none(),
+                        "at most one Extension::NativePosition expected"
+                    );
+                    result = Some(m);
+                },
+            }
+        }
+        result
+    }
+
+    pub fn into_value_writes(self) -> WriteSetMut {
+        match self {
+            Self::V0(ws) => ws.value_writes,
+            Self::V1(ws) => ws.value_writes,
+        }
+    }
+
+    pub fn into_v1(self) -> Self {
+        match self {
+            Self::V0(ws) => Self::V1(WriteSetV1 {
+                value_writes: ws.value_writes,
+                hotness: ws.hotness,
+                extensions: ws.extensions,
+            }),
+            Self::V1(ws) => Self::V1(ws),
         }
     }
 
@@ -672,7 +665,8 @@ impl WriteSet {
     }
 
     pub fn state_update_refs(&self) -> impl Iterator<Item = (&StateKey, Option<&StateValue>)> + '_ {
-        self.as_v0()
+        self.value_writes()
+            .write_set
             .iter()
             .map(|(key, op)| (key, op.as_state_value_opt()))
     }
@@ -685,43 +679,60 @@ impl WriteSet {
     }
 
     pub fn update_total_supply(&mut self, value: u128) {
-        self.as_v0_mut().update_total_supply(value);
+        assert!(self
+            .value_writes_mut()
+            .write_set
+            .insert(
+                TOTAL_SUPPLY_STATE_KEY.clone(),
+                WriteOp::legacy_modification(bcs::to_bytes(&value).unwrap().into())
+            )
+            .is_some());
     }
 
     pub fn get_write_op(&self, state_key: &StateKey) -> Option<&WriteOp> {
-        self.as_v0().get(state_key)
+        self.value_writes().get(state_key)
     }
 
     pub fn get_total_supply(&self) -> Option<u128> {
-        self.as_v0().get_total_supply()
+        let value = self
+            .value_writes()
+            .get(&TOTAL_SUPPLY_STATE_KEY)
+            .and_then(|op| op.bytes())
+            .map(|bytes| bcs::from_bytes::<u128>(bytes));
+        value.transpose().map_err(anyhow::Error::msg).unwrap()
     }
 
     pub fn is_empty(&self) -> bool {
-        self.as_v0().is_empty() && self.hotness.is_empty() && self.native_positions.is_empty()
+        self.value_writes().is_empty()
+            && self.hotness_ref().is_empty()
+            && self.extensions_ref().is_empty()
     }
 
     pub fn expect_into_write_op_iter(self) -> impl IntoIterator<Item = (StateKey, WriteOp)> {
-        self.into_v0().0.write_set
+        self.into_value_writes().write_set
     }
 
     pub fn expect_write_op_iter(&self) -> impl Iterator<Item = (&StateKey, &WriteOp)> {
-        self.as_v0().0.write_set.iter()
+        self.value_writes().write_set.iter()
     }
 
     pub fn write_op_iter(&self) -> impl Iterator<Item = (&StateKey, &WriteOp)> {
-        self.as_v0().iter()
+        self.value_writes().write_set.iter()
     }
 
     pub fn into_write_op_iter(self) -> impl Iterator<Item = (StateKey, WriteOp)> {
-        self.into_v0().into_write_op_iter()
+        self.into_value_writes().write_set.into_iter()
     }
 
     pub fn base_op_iter(&self) -> impl Iterator<Item = (&StateKey, &BaseStateOp)> {
-        self.as_v0()
+        static MAKE_HOT_OP: BaseStateOp = BaseStateOp::MakeHot;
+
+        self.value_writes()
+            .write_set
             .iter()
             .map(|(key, op)| (key, op.as_base_op()))
             .merge_join_by(
-                self.hotness.iter().map(|(key, op)| (key, op.as_base_op())),
+                self.hotness_ref().iter().map(|key| (key, &MAKE_HOT_OP)),
                 |a, b| a.0.cmp(b.0),
             )
             .map(|entry| {
@@ -736,94 +747,83 @@ impl WriteSet {
     }
 
     pub fn hotness_keys(&self) -> impl Iterator<Item = &StateKey> {
-        self.hotness.keys()
+        self.hotness_ref().iter()
     }
 
-    pub fn add_hotness(&mut self, hotness: BTreeMap<StateKey, HotStateOp>) {
-        assert!(
-            self.hotness.is_empty(),
-            "hotness should only be initialized once."
-        );
-        self.hotness = hotness;
+    pub fn add_hotness(&mut self, hotness: BTreeSet<StateKey>) {
+        let field = self.hotness_mut();
+        assert!(field.is_empty(), "hotness should only be initialized once.");
+        *field = hotness;
     }
 
     /// Iterate the native-position bucket. Used by the storage
     /// commit applier; main-state consumers never see these entries.
     pub fn native_position_iter(&self) -> impl Iterator<Item = (&StateKey, &NativePositionOp)> {
-        self.native_positions.iter()
+        self.native_positions().into_iter().flat_map(|m| m.iter())
     }
 
     pub fn native_position_keys(&self) -> impl Iterator<Item = &StateKey> {
-        self.native_positions.keys()
+        self.native_positions().into_iter().flat_map(|m| m.keys())
     }
 
     pub fn has_native_positions(&self) -> bool {
-        !self.native_positions.is_empty()
+        self.native_positions().is_some_and(|m| !m.is_empty())
     }
 
     /// Install the native-position bucket. Mirrors [`add_hotness`]:
     /// expected to be called once per WriteSet, at VM-output
     /// materialization time.
     pub fn add_native_positions(&mut self, native_positions: BTreeMap<StateKey, NativePositionOp>) {
+        let extensions = self.extensions_mut();
         assert!(
-            self.native_positions.is_empty(),
+            !extensions
+                .iter()
+                .any(|e| matches!(e, Extension::NativePosition(_))),
             "native_positions should only be initialized once."
         );
-        self.native_positions = native_positions;
+        // TODO: the order here is important when there are more extensions.
+        extensions.push(Extension::NativePosition(native_positions));
     }
 }
 
 /// `WriteSet` contains all access paths that one transaction modifies. Each of them is a `WriteOp`
 /// where `Value(val)` means that serialized representation should be updated to `val`, and
 /// `Deletion` means that we are going to delete this access path.
-#[derive(
-    BCSCryptoHash, Clone, CryptoHasher, Debug, Default, Eq, PartialEq, Serialize, Deserialize,
-)]
-pub struct WriteSetV0(WriteSetMut);
+#[derive(Clone, Debug, Default, Eq, PartialEq, Serialize, Deserialize)]
+pub struct WriteSetV0 {
+    value_writes: WriteSetMut,
+    /// Hot state promotions, non-empty only in block epilogues.
+    #[serde(skip)]
+    hotness: BTreeSet<StateKey>,
+    /// Opt-in side-channels (see [`Extension`]). Skipped from serde so `TransactionInfo` hashes and
+    /// the on-disk WriteSet format are unaffected.
+    #[serde(skip)]
+    extensions: Vec<Extension>,
+}
 
 impl WriteSetV0 {
     #[inline]
-    fn is_empty(&self) -> bool {
-        self.0.is_empty()
-    }
-
-    #[inline]
     pub fn iter(&self) -> btree_map::Iter<'_, StateKey, WriteOp> {
-        self.0.write_set.iter()
+        self.value_writes.write_set.iter()
     }
 
     #[inline]
     pub fn into_write_op_iter(self) -> btree_map::IntoIter<StateKey, WriteOp> {
-        self.0.write_set.into_iter()
+        self.value_writes.write_set.into_iter()
     }
 
     pub fn get(&self, key: &StateKey) -> Option<&WriteOp> {
-        self.0.get(key)
+        self.value_writes.get(key)
     }
+}
 
-    fn get_total_supply(&self) -> Option<u128> {
-        let value = self
-            .0
-            .get(&TOTAL_SUPPLY_STATE_KEY)
-            .and_then(|op| op.bytes())
-            .map(|bytes| bcs::from_bytes::<u128>(bytes));
-        value.transpose().map_err(anyhow::Error::msg).unwrap()
-    }
-
-    // This is a temporary method to update the total supply in the write set.
-    // TODO: get rid of this func() and use WriteSetMut instead; for that we need to change
-    //       VM execution such that to 'TransactionOutput' is materialized after updating
-    //       total_supply.
-    fn update_total_supply(&mut self, value: u128) {
-        assert!(self
-            .0
-            .write_set
-            .insert(
-                TOTAL_SUPPLY_STATE_KEY.clone(),
-                WriteOp::legacy_modification(bcs::to_bytes(&value).unwrap().into())
-            )
-            .is_some());
-    }
+/// Like [`WriteSetV0`], but serializes the hotness and extension
+/// buckets alongside the value write set.
+#[derive(Clone, Debug, Default, Eq, PartialEq, Serialize, Deserialize)]
+pub struct WriteSetV1 {
+    value_writes: WriteSetMut,
+    hotness: BTreeSet<StateKey>,
+    extensions: Vec<Extension>,
 }
 
 /// A mutable version of `WriteSet`.
@@ -869,11 +869,11 @@ impl WriteSetMut {
 
     pub fn freeze(self) -> Result<WriteSet> {
         // TODO: add structural validation
-        Ok(WriteSet {
-            value: ValueWriteSet::V0(WriteSetV0(self)),
-            hotness: BTreeMap::new(),
-            native_positions: BTreeMap::new(),
-        })
+        Ok(WriteSet::V0(WriteSetV0 {
+            value_writes: self,
+            hotness: BTreeSet::new(),
+            extensions: Vec::new(),
+        }))
     }
 
     pub fn get(&self, key: &StateKey) -> Option<&WriteOp> {

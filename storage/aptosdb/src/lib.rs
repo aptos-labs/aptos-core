@@ -32,6 +32,7 @@ mod event_store;
 mod ledger_db;
 mod lru_node_cache;
 mod pruner;
+mod sharded_jmt_merkle_db;
 mod state_kv_db;
 mod state_merkle_db;
 mod state_store;

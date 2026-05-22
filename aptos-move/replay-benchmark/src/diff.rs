@@ -253,8 +253,8 @@ impl TransactionDiffBuilder {
         right: WriteSet,
         fee_payer: Option<AccountAddress>,
     ) -> Vec<Diff> {
-        let mut left = left.into_mut().into_inner();
-        let mut right = right.into_mut().into_inner();
+        let mut left = left.into_value_writes().into_inner();
+        let mut right = right.into_value_writes().into_inner();
 
         let filter_gas_related_ops = |ops: &mut BTreeMap<StateKey, WriteOp>| {
             // Skip total coin APT supply comparisons.

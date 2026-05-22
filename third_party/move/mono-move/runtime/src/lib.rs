@@ -10,7 +10,7 @@ pub(crate) mod memory;
 mod types;
 mod verifier;
 
-pub use error::{ExecutionError, ExecutionResult};
+pub use error::{RuntimeError, RuntimeStatus};
 pub use heap::{
     object_descriptor::{
         ObjectDescriptor, ObjectDescriptorTable, CLOSURE_DESCRIPTOR_ID, TRIVIAL_DESCRIPTOR_ID,

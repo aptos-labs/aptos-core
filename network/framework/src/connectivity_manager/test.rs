@@ -107,6 +107,7 @@ impl TestHarness {
             true, /* enable_latency_aware_dialing */
             None, /* access_control_policy */
             2,    /* num_dials_before_backoff */
+            2,    /* max_parallel_peer_latency_pings */
         );
         let mock = Self {
             network_context,
@@ -1029,6 +1030,7 @@ fn create_connectivity_manager_with_policy(
         true, /* enable_latency_aware_dialing */
         access_control_policy,
         2, /* num_dials_before_backoff */
+        2, /* max_parallel_peer_latency_pings */
     )
 }
 

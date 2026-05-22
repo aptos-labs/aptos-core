@@ -68,3 +68,7 @@ fun add_refs() {
     3: Move8 [0] <- [40]
     4: Return
 }
+=== frame-layout ===
+// module 0xc0ffee::refs
+fun add: heap_ptr_offsets=[] zero_frame=false
+fun add_refs: heap_ptr_offsets=[0, 16] zero_frame=false

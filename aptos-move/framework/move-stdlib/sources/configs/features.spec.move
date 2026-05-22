@@ -98,6 +98,16 @@ spec std::features {
         spec_is_enabled(ABORT_IF_MULTISIG_PAYLOAD_MISMATCH)
     }
 
+    spec fun spec_multisig_timelock_enabled(): bool {
+        spec_is_enabled(MULTISIG_TIMELOCK)
+    }
+
+    spec is_multisig_timelock_enabled {
+        pragma opaque;
+        aborts_if [abstract] false;
+        ensures [abstract] result == spec_multisig_timelock_enabled();
+    }
+
     spec fun spec_new_accounts_default_to_fa_store_enabled(): bool {
         spec_is_enabled(NEW_ACCOUNTS_DEFAULT_TO_FA_STORE)
     }

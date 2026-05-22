@@ -3,7 +3,23 @@
 
 //! Core types and implementation for the global execution context.
 //!
-//! # Safety Contract & Design Principles
+//! # Rationale
+//!
+//! The block executor runs many transactions in parallel within a block and
+//! sequentially across blocks. Code-derived data (interned identifiers,
+//! interned types, loaded modules) is long-lived: it survives across
+//! transactions and is shared between worker threads. Ideally, the following
+//! requirements are satisfied:
+//!   - allocations are cheap and lock-free on the hot path,
+//!   - references to data can be handed to workers and stay valid for the
+//!     duration of their work without per-reference counting.
+//!
+//! Concurrent deallocation against many readers is the hard problem. To avoid
+//! it, memory is only reclaimed at certain epochs (e.g., between blocks). The
+//! two-phase state machine below turns this observation safety contract
+//! enforced at compile-time.
+//!
+//! # Safety Contract
 //!
 //! ## Two-Phase State Machine
 //!

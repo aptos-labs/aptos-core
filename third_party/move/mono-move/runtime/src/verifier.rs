@@ -157,8 +157,9 @@ impl FunctionVerifier<'_> {
             }
         }
 
-        // Per-entry: valid code_offset, pointer offsets in-bounds and
-        // sorted, disjoint from frame_layout.
+        // Per-entry: valid code_offset, op-kind matches top-frame-only
+        // contract, pointer offsets in-bounds and sorted, disjoint
+        // from frame_layout.
         for entry in safe_point_layouts {
             let co = entry.code_offset.0;
 
@@ -171,6 +172,20 @@ impl FunctionVerifier<'_> {
                         code.len()
                     ),
                 );
+            } else {
+                // Top-frame-only contract: an entry must sit at the
+                // PC of an allocating op (see `MicroOp::is_allocating`).
+                let op = &code[co as usize];
+                if !op.is_allocating() {
+                    self.err(
+                        Some(co as usize),
+                        format!(
+                            "safe_point_layouts: code_offset {} is not at an allocating op; \
+                             top-frame-only contract — see `SafePointEntry`",
+                            co
+                        ),
+                    );
+                }
             }
 
             let sp_offsets = &entry.layout.heap_ptr_offsets;
@@ -413,6 +428,15 @@ impl FunctionVerifier<'_> {
             },
 
             MicroOp::Return | MicroOp::ForceGC => {},
+
+            MicroOp::Abort { code } => {
+                self.check_frame_access_8(pc, code);
+            },
+
+            MicroOp::AbortMsg { code, message } => {
+                self.check_frame_access_8(pc, code);
+                self.check_frame_access_8(pc, message);
+            },
 
             MicroOp::CallIndirect { .. } | MicroOp::CallDirect { .. } => {},
 
