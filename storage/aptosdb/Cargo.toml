@@ -20,6 +20,7 @@ aptos-crypto = { workspace = true }
 aptos-db-indexer = { workspace = true }
 aptos-db-indexer-schemas = { workspace = true, features = ["fuzzing"] }
 aptos-executor-types = { workspace = true }
+aptos-experimental-layered-map = { workspace = true }
 aptos-experimental-runtimes = { workspace = true }
 aptos-infallible = { workspace = true }
 aptos-jellyfish-merkle = { workspace = true }
@@ -54,6 +55,7 @@ rayon = { workspace = true }
 serde = { workspace = true }
 static_assertions = { workspace = true }
 status-line = { workspace = true }
+thiserror = { workspace = true }
 tokio = { workspace = true }
 
 [dev-dependencies]

@@ -13,6 +13,8 @@ use crate::{
     metrics::{
         COMMITTED_TXNS, LATEST_TXN_VERSION, LEDGER_VERSION, NEXT_BLOCK_EPOCH, OTHER_TIMERS_SECONDS,
     },
+    native_state_committer::NativeStateCommitter,
+    position_buffered_state::PositionProofReader,
     pruner::PrunerManager,
     schema::{
         db_metadata::{DbMetadataKey, DbMetadataSchema, DbMetadataValue},
@@ -310,9 +312,88 @@ impl AptosDB {
                     .commit_transaction_accumulator(chunk.first_version, chunk.transaction_infos)
                     .unwrap()
             });
+            if self.position.is_some() {
+                s.spawn(|_| self.commit_native_position(chunk).unwrap());
+            }
         });
 
         Ok(new_root_hash)
+    }
+
+    fn commit_native_position(&self, chunk: &ChunkToCommit) -> Result<()> {
+        let _timer = OTHER_TIMERS_SECONDS.timer_with(&["commit_native_position"]);
+        let Some(bundle) = self.position.as_ref() else {
+            return Ok(());
+        };
+        let committer = NativeStateCommitter::new(bundle.kv_db.clone());
+
+        let chunk_first = chunk.first_version;
+        let chunk_last = chunk_first + chunk.len() as Version;
+        let chunk_checkpoint_version = chunk.state.last_checkpoint().version();
+        let checkpoint_within_chunk =
+            chunk_checkpoint_version.filter(|v| (chunk_first..chunk_last).contains(v));
+
+        let store_opt = bundle.state_store.as_ref();
+        let mut chain_state = store_opt.map(|s| s.current_state().lock().latest().clone());
+        let mut chain_checkpoint =
+            store_opt.map(|s| s.current_state().lock().last_checkpoint().clone());
+
+        let mut version = chunk_first;
+        for output in chunk.transaction_outputs {
+            let position_writes: Vec<_> = output
+                .write_set()
+                .native_position_iter()
+                .map(|(k, op)| (k.clone(), op.as_write_op().clone()))
+                .collect();
+            let merkle_updates_position = if !position_writes.is_empty() {
+                committer
+                    .apply(version, position_writes)
+                    .map_err(|e| AptosDbError::Other(format!("native commit: {e}")))?
+                    .position
+            } else {
+                Vec::new()
+            };
+
+            if let (Some(store), Some(prior_latest)) = (store_opt, chain_state.as_ref()) {
+                let proof_reader = PositionProofReader {
+                    merkle_db: bundle.merkle_db.clone(),
+                    version: store
+                        .current_state()
+                        .lock()
+                        .latest()
+                        .version()
+                        .unwrap_or(version),
+                };
+                let position_updates: Vec<_> = merkle_updates_position
+                    .into_iter()
+                    .map(|u| {
+                        (u.state_key_hash, crate::position_buffered_state::PositionSlot {
+                            state_key: u.state_key,
+                            value_hash: u.value_hash,
+                            value: None,
+                        })
+                    })
+                    .collect();
+                let new_latest = prior_latest.extend(version, position_updates, &proof_reader)?;
+                if Some(version) == checkpoint_within_chunk {
+                    chain_checkpoint = Some(new_latest.clone());
+                }
+                chain_state = Some(new_latest);
+            }
+            version += 1;
+        }
+
+        if let Some(store) = store_opt {
+            let new_state =
+                crate::position_buffered_state::PositionLedgerStateWithSummary::from_latest_and_last_checkpoint(
+                    chain_state.expect("chain_state set when store is set"),
+                    chain_checkpoint.expect("chain_checkpoint set when store is set"),
+                );
+            let estimated_items = chunk.transaction_outputs.len();
+            let mut bufstate = store.buffered_state_locked();
+            bufstate.update(new_state, (), estimated_items, /* sync_commit */ false)?;
+        }
+        Ok(())
     }
 
     fn commit_state_kv_and_ledger_metadata(&self, chunk: &ChunkToCommit) -> Result<()> {
