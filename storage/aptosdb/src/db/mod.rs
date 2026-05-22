@@ -2,9 +2,17 @@
 // Licensed pursuant to the Innovation-Enabling Source Code License, available at https://github.com/aptos-labs/aptos-core/blob/main/LICENSE
 
 use crate::{
-    backup::backup_handler::BackupHandler, event_store::EventStore, ledger_db::LedgerDb,
-    pruner::LedgerPrunerManager, rocksdb_property_reporter::RocksdbPropertyReporter,
-    state_kv_db::StateKvDb, state_merkle_db::StateMerkleDb, state_store::StateStore,
+    backup::backup_handler::BackupHandler,
+    db::aptosdb_native_position::PositionBundle,
+    event_store::EventStore,
+    ledger_db::LedgerDb,
+    position_db::PositionDb,
+    position_merkle_db::PositionMerkleDb,
+    pruner::LedgerPrunerManager,
+    rocksdb_property_reporter::RocksdbPropertyReporter,
+    state_kv_db::StateKvDb,
+    state_merkle_db::StateMerkleDb,
+    state_store::StateStore,
     transaction_store::TransactionStore,
 };
 use aptos_config::config::{HotStateConfig, PrunerConfig, RocksdbConfigs, StorageDirPaths};
@@ -37,6 +45,7 @@ pub struct AptosDB {
     /// This is just to detect concurrent calls to `commit_ledger()`
     commit_lock: std::sync::Mutex<()>,
     update_subscriber: Option<Sender<(Instant, Version)>>,
+    pub(crate) position: Option<Arc<PositionBundle>>,
 }
 
 // DbReader implementations and private functions used by them.
@@ -45,6 +54,9 @@ mod aptosdb_reader;
 mod aptosdb_writer;
 // Other private methods.
 mod aptosdb_internal;
+// Native-position subsystem: `PositionBundle` + `impl AptosDB` for
+// `position()` / `native_state_committer()` / `init_native_position()`.
+mod aptosdb_native_position;
 // Testonly methods.
 #[cfg(any(test, feature = "fuzzing", feature = "consensus-only-perf-test"))]
 mod aptosdb_testonly;
@@ -212,6 +224,13 @@ impl AptosDB {
             cp_path.as_ref(),
             /* is_hot = */ false,
         )?;
+        // Native-position DBs. The static `create_checkpoint` opens
+        // the source DB from `db_path` (creating it if absent), then
+        // checkpoints into `cp_path`. Deployments that never activated
+        // native-position still produce empty position checkpoints —
+        // matches state's always-create behavior.
+        PositionDb::create_checkpoint(db_path.as_ref(), cp_path.as_ref())?;
+        PositionMerkleDb::create_checkpoint(db_path.as_ref(), cp_path.as_ref())?;
 
         info!(
             db_path = db_path.as_ref(),
