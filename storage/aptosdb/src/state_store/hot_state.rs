@@ -721,6 +721,7 @@ mod tests {
         compute_root_hash: true,
         use_write_set_v1: true,
         persist_hotness_in_epilogue: false,
+        use_transaction_info_v1: false,
     };
 
     fn make_hot_slot(key: &StateKey, version: Version, value: &[u8]) -> StateSlot {
