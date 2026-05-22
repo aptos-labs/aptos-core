@@ -2,6 +2,7 @@
 // Licensed pursuant to the Innovation-Enabling Source Code License, available at https://github.com/aptos-labs/aptos-core/blob/main/LICENSE
 
 use crate::state_store::{
+    jmt_pipeline::ShardedJmtState,
     state::{HotStateMetadata, LedgerState, State},
     state_summary::{LedgerStateSummary, StateSummary},
 };
@@ -14,19 +15,73 @@ use aptos_types::{
 };
 use derive_more::{Deref, DerefMut};
 
+/// In-memory speculative states that pair with a [`StateSummary`] —
+/// main state's `State` and the position-shaped pipelines'
+/// `ShardedJmtState<Slot>` both implement this. Used by
+/// [`StateAndSummary::new`] to assert that the state half and summary
+/// half are at the same version.
+pub trait HasNextVersion {
+    fn next_version(&self) -> Version;
+}
+
+impl HasNextVersion for State {
+    fn next_version(&self) -> Version {
+        State::next_version(self)
+    }
+}
+
+impl<Slot: Clone + Send + Sync + 'static> HasNextVersion for ShardedJmtState<Slot> {
+    fn next_version(&self) -> Version {
+        ShardedJmtState::next_version(self)
+    }
+}
+
+/// `{ state, summary }` pair at one version, generic over the
+/// per-pipeline in-memory state type `S`. Main state uses
+/// `S = State` via the [`StateWithSummary`] type alias below;
+/// position-shaped pipelines use
+/// `S = ShardedJmtState<Slot>` via aliases in `aptos-db`.
+///
+/// `state` is the `Deref` target so existing main-state callers
+/// using deref coercion (e.g. `state_with_summary.usage()`) keep
+/// working — position-shaped pipelines deref into their
+/// `ShardedJmtState<Slot>` symmetrically.
 #[derive(Clone, Debug, Deref)]
-pub struct StateWithSummary {
+pub struct StateAndSummary<S> {
     #[deref]
-    state: State,
+    state: S,
     summary: StateSummary,
 }
 
-impl StateWithSummary {
-    pub fn new(state: State, summary: StateSummary) -> Self {
+impl<S> StateAndSummary<S> {
+    pub fn new(state: S, summary: StateSummary) -> Self
+    where
+        S: HasNextVersion,
+    {
         assert_eq!(state.next_version(), summary.next_version());
         Self { state, summary }
     }
 
+    pub fn state(&self) -> &S {
+        &self.state
+    }
+
+    pub fn summary(&self) -> &StateSummary {
+        &self.summary
+    }
+
+    pub fn into_inner(self) -> (S, StateSummary) {
+        let Self { state, summary } = self;
+        (state, summary)
+    }
+}
+
+/// Main-state `{ state, summary }` pair — type alias of the
+/// generic [`StateAndSummary`] with `S = State`. Main-state-specific
+/// constructors and helpers live as inherent impl below.
+pub type StateWithSummary = StateAndSummary<State>;
+
+impl StateWithSummary {
     pub fn new_empty(hot_state_config: HotStateConfig) -> Self {
         Self::new(
             State::new_empty(hot_state_config),
@@ -75,22 +130,9 @@ impl StateWithSummary {
         )
     }
 
-    pub fn state(&self) -> &State {
-        &self.state
-    }
-
-    pub fn summary(&self) -> &StateSummary {
-        &self.summary
-    }
-
     pub fn is_descendant_of(&self, other: &Self) -> bool {
-        self.state.is_descendant_of(&other.state) && self.summary.is_descendant_of(&other.summary)
-    }
-
-    pub fn into_inner(self) -> (State, StateSummary) {
-        let Self { state, summary } = self;
-
-        (state, summary)
+        self.state().is_descendant_of(other.state())
+            && self.summary().is_descendant_of(other.summary())
     }
 }
 
