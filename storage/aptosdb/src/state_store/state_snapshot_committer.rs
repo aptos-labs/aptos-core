@@ -142,27 +142,31 @@ impl StateSnapshotCommitter {
                     // TODO(HotState): for now we use `is_descendant_of` to determine if hot state
                     // summary is computed at all. When it's not enabled everything is
                     // `SparseMerkleTree::new_empty()`.
-                    let hot_state_merkle_batch_opt = if snapshot
+                    let hot_pair = snapshot
                         .summary()
                         .hot_state_summary
-                        .is_descendant_of(&self.last_snapshot.summary().hot_state_summary)
-                    {
-                        self.state_db.hot_state_merkle_db.as_ref().map(|db| {
-                            Self::merklize(
-                                db,
-                                base_version,
-                                version,
-                                &self.last_snapshot.summary().hot_state_summary,
-                                &snapshot.summary().hot_state_summary,
-                                hot_updates.try_into().expect("Must be 16 shards."),
-                                previous_epoch_ending_version,
-                            )
-                            .expect("Failed to compute JMT commit batch for hot state.")
-                            .0
-                        })
-                    } else {
+                        .as_ref()
+                        .zip(self.last_snapshot.summary().hot_state_summary.as_ref());
+                    let hot_state_merkle_batch_opt = match hot_pair {
+                        Some((snap_hot, last_hot)) if snap_hot.is_descendant_of(last_hot) => self
+                            .state_db
+                            .hot_state_merkle_db
+                            .as_ref()
+                            .map(|db| {
+                                Self::merklize(
+                                    db,
+                                    base_version,
+                                    version,
+                                    last_hot,
+                                    snap_hot,
+                                    hot_updates.try_into().expect("Must be 16 shards."),
+                                    previous_epoch_ending_version,
+                                )
+                                .expect("Failed to compute JMT commit batch for hot state.")
+                                .0
+                            }),
                         // TODO(HotState): this means that the relevant code path isn't enabled yet.
-                        None
+                        _ => None,
                     };
                     let (state_merkle_batch, leaf_count) = Self::merklize(
                         &self.state_db.state_merkle_db,

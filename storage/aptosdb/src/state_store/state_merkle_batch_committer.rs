@@ -84,7 +84,10 @@ impl StateMerkleBatchCommitter {
                         version = current_version,
                         base_version = base_version,
                         root_hash = snapshot.summary().root_hash(),
-                        hot_root_hash = snapshot.summary().hot_root_hash(),
+                        hot_root_hash = snapshot
+                            .summary()
+                            .hot_root_hash()
+                            .expect("main state always has a hot half"),
                         "State snapshot committed."
                     );
                     LATEST_SNAPSHOT_VERSION.set(current_version as i64);
