@@ -4,6 +4,7 @@
 use crate::{
     counters::observe_stage_latency,
     filter::TransactionFilter,
+    logging::{LogEvent, LogSchema},
     types::{ExecutionStatus, StageMetadata, TransactionStage, TransactionTrace},
 };
 use aptos_crypto::HashValue;
@@ -285,11 +286,14 @@ impl TransactionTraceStore {
 
     /// Process a proposed block: record BlockProposed per batch and register
     /// block → traced txn hashes for efficient post-proposal stage recording.
+    /// `parent_block_timestamp_usecs` is the proposal timestamp of the
+    /// block's parent (used as a front-run-exposure bound).
     /// Called from round_manager::process_proposal.
     pub fn process_proposed_block(
         &self,
         block_id: HashValue,
         block_timestamp_usecs: u64,
+        parent_block_timestamp_usecs: u64,
         batch_digests: &[(HashValue, crate::types::BatchInclusionType)],
         proposal_info: Option<crate::types::BlockProposalInfo>,
     ) {
@@ -308,20 +312,23 @@ impl TransactionTraceStore {
         }
         self.register_block(block_id, block_traced_txns.clone());
 
-        // Record BlockReceived at local clock for all traced txns in the block.
-        // Also attach proposal info (proposer + round) for diagnosis.
-        if let Some(info) = proposal_info {
-            for hash in &block_traced_txns {
-                self.record_stage_with_metadata_at(
+        // Record ParentBlockProposed (from QC) and BlockReceived (local clock)
+        // for every traced txn in the block. `proposal_info` is also attached
+        // to BlockReceived for diagnosis (proposer + round).
+        for hash in &block_traced_txns {
+            self.record_stage_at(
+                hash,
+                TransactionStage::ParentBlockProposed,
+                parent_block_timestamp_usecs,
+            );
+            match &proposal_info {
+                Some(info) => self.record_stage_with_metadata_at(
                     hash,
                     TransactionStage::BlockReceived,
                     StageMetadata::BlockProposal(info.clone()),
                     now,
-                );
-            }
-        } else {
-            for hash in &block_traced_txns {
-                self.record_stage_at(hash, TransactionStage::BlockReceived, now);
+                ),
+                None => self.record_stage_at(hash, TransactionStage::BlockReceived, now),
             }
         }
     }
@@ -449,13 +456,11 @@ impl TransactionTraceStore {
                 return true;
             }
             // Log the orphaned trace before evicting so partial pipeline data is visible.
-            warn!(
-                "TxnTrace GC evicting orphaned trace: hash=0x{} sender={} age_ms={} stages={}",
-                trace.hash.to_hex(),
-                trace.sender,
-                now_usecs().saturating_sub(trace.insertion_time_usecs) / 1000,
-                trace.stages.len(),
-            );
+            warn!(LogSchema::new(LogEvent::TxnTraceEvicted)
+                .hash(trace.hash)
+                .sender(trace.sender)
+                .age_ms(now_usecs().saturating_sub(trace.insertion_time_usecs) / 1000)
+                .num_stages(trace.stages.len()));
             evicted += 1;
             false
         });
@@ -487,16 +492,13 @@ impl TransactionTraceStore {
             self.block_txns.remove(id);
         }
         if evicted > 0 || batch_evicted > 0 || block_evicted > 0 {
-            info!(
-                "TxnTrace GC: evicted {} orphaned traces, {} stale batch mappings, {} stale block mappings. \
-                 Remaining: {} traces, {} batch mappings, {} block mappings.",
-                evicted,
-                batch_evicted,
-                block_evicted,
-                self.traces.len(),
-                self.batch_txns.len(),
-                self.block_txns.len(),
-            );
+            info!(LogSchema::new(LogEvent::TxnTraceGcSummary)
+                .evicted_traces(evicted)
+                .evicted_batch_mappings(batch_evicted)
+                .evicted_block_mappings(block_evicted)
+                .remaining_traces(self.traces.len())
+                .remaining_batch_mappings(self.batch_txns.len())
+                .remaining_block_mappings(self.block_txns.len()));
         }
     }
 }
@@ -505,12 +507,30 @@ fn now_usecs() -> u64 {
     aptos_infallible::duration_since_epoch().as_micros() as u64
 }
 
-/// Block-finalization stages that should stay grouped with the preceding
-/// Executed(Retry) rather than starting a new display-attempt.
+/// Stages that must NOT advance `display_attempt` when iterating the sorted
+/// stage list. Two reasons a stage's `record.attempt` may not reflect the
+/// "true" pipeline pass it belongs to:
+///
+/// - `mark_retry` increments `current_attempt` immediately after recording
+///   `Executed(Retry)`, so block N's later `BlockOrdered`/`PreCommit`/
+///   `Certified`/`Committed` records carry attempt N+1 even though they
+///   belong to block N.
+/// - `ParentBlockProposed` uses a foreign timestamp (the parent block's
+///   `block.timestamp_usecs`), so a record for attempt N+1's parent block can
+///   sort chronologically *between* attempt N's `Executed(Retry)` and
+///   `QsBatchPull(N+1)` — advancing `display_attempt` on it would misroute
+///   block N's finalization records into slot[N].
+///
+/// Used by:
+/// - the `data.stages` text builder (delay `[attempt_N+1]` marker until a
+///   non-passive stage fires), and
+/// - `build_first_attempt_scalars` (route these into attempt-1's scalar slots
+///   via `display_attempt` instead of their stale `record.attempt`).
 fn is_block_finalization(stage: TransactionStage) -> bool {
     matches!(
         stage,
-        TransactionStage::BlockOrdered
+        TransactionStage::ParentBlockProposed
+            | TransactionStage::BlockOrdered
             | TransactionStage::Certified
             | TransactionStage::PreCommit
             | TransactionStage::Committed
@@ -765,21 +785,154 @@ fn log_trace(trace: &TransactionTrace) {
         }
     };
 
-    let gas_str = match trace.gas_unit_price {
-        Some(g) => format!(" gas_unit_price={}", g),
-        None => String::new(),
-    };
+    let scalars = build_first_attempt_scalars(&sorted_stages, base);
 
-    info!(
-        "TxnTrace hash=0x{} sender={}{} attempts={} total_latency_ms={} outcome={} stages=[{}]",
-        trace.hash.to_hex(),
-        trace.sender,
-        gas_str,
-        max_attempt,
-        total_latency_ms,
-        outcome,
-        stage_parts.join(" ")
+    let mut schema = LogSchema::new(LogEvent::TxnTrace)
+        .hash(trace.hash)
+        .sender(trace.sender)
+        .attempts(max_attempt)
+        .total_latency_ms(total_latency_ms)
+        .outcome(outcome)
+        .stages(stage_parts.join(" "));
+
+    // For each `Option<_>` field, attach it to the schema only when populated.
+    // Mirrors the schema field order so the JSON ordering is predictable.
+    macro_rules! set_if_some {
+        ($src:ident, $($field:ident),+ $(,)?) => {
+            $(
+                if let Some(x) = $src.$field {
+                    schema = schema.$field(x);
+                }
+            )+
+        };
+    }
+    set_if_some!(trace, gas_unit_price);
+    set_if_some!(
+        scalars,
+        mempool_insert_ms,
+        qs_batch_pull_ms,
+        qs_batch_created_ms,
+        qs_proof_of_store_ms,
+        parent_block_proposed_ms,
+        block_proposed_ms,
+        block_proposed_kind,
+        block_received_ms,
+        execution_start_ms,
+        executed_ms,
+        executed_status,
+        block_ordered_ms,
+        certified_ms,
+        pre_commit_ms,
+        committed_ms,
+        mempool_commit_ms,
+        mempool_reject_ms,
     );
+
+    info!(schema);
+}
+
+/// Per-stage scalars for the **first pipeline pass** (attempt 1). Each value
+/// is the absolute latency in ms from `MempoolInsert`. Single scalar per
+/// stage (no per-attempt arrays) so Humio/Grafana queries are direct:
+/// `data.committed_ms` instead of `data.committed_ms[N]`. Multi-attempt
+/// detail lives in the `stages` text string.
+#[derive(Debug, Default)]
+struct StageScalars {
+    mempool_insert_ms: Option<i64>,
+    qs_batch_pull_ms: Option<i64>,
+    qs_batch_created_ms: Option<i64>,
+    qs_proof_of_store_ms: Option<i64>,
+    parent_block_proposed_ms: Option<i64>,
+    block_proposed_ms: Option<i64>,
+    block_proposed_kind: Option<String>,
+    block_received_ms: Option<i64>,
+    execution_start_ms: Option<i64>,
+    executed_ms: Option<i64>,
+    executed_status: Option<String>,
+    block_ordered_ms: Option<i64>,
+    certified_ms: Option<i64>,
+    pre_commit_ms: Option<i64>,
+    committed_ms: Option<i64>,
+    mempool_commit_ms: Option<i64>,
+    mempool_reject_ms: Option<i64>,
+}
+
+/// Build per-stage scalars from the first pipeline pass (attempt 1), from
+/// chronologically-sorted stage records. `base` is the trace's MempoolInsert
+/// timestamp; each value is `(record.timestamp_usecs - base) / 1000`.
+///
+/// For non-block-finalization stages we filter by `record.attempt == 1`. For
+/// block-finalization stages (BlockOrdered/PreCommit/Certified/Committed) we
+/// need extra logic: `mark_retry` bumps `current_attempt` immediately after
+/// `Executed(Retry)`, so block 1's finalization stages get stamped with
+/// `attempt = 2` in the underlying record — even though they belong to the
+/// first pipeline pass. We track `display_attempt` (which only advances on
+/// non-finalization stages) to identify them, matching the same logic used
+/// in the human-readable `stages` text.
+fn build_first_attempt_scalars(
+    sorted_stages: &[crate::types::StageRecord],
+    base: u64,
+) -> StageScalars {
+    let mut scalars = StageScalars::default();
+    let mut display_attempt: u32 = 1;
+    for record in sorted_stages {
+        let is_finalization = is_block_finalization(record.stage);
+        if !is_finalization {
+            display_attempt = display_attempt.max(record.attempt);
+        }
+        // For non-finalization stages, route by `record.attempt`; for
+        // finalization stages, use `display_attempt` (since `mark_retry` may
+        // have bumped `record.attempt` past attempt 1 even though the stage
+        // belongs to block 1). Anything not in attempt 1 is skipped and only
+        // appears in the `stages` text.
+        let effective_attempt = if is_finalization {
+            display_attempt
+        } else {
+            record.attempt
+        };
+        if effective_attempt != 1 {
+            continue;
+        }
+        // Absolute latency in ms from `base` (MempoolInsert time). Can be
+        // negative for `BlockProposed` (proposer's clock).
+        let abs_ms = (record.timestamp_usecs as i64 - base as i64) / 1000;
+        let slot: &mut Option<i64> = match record.stage {
+            TransactionStage::MempoolInsert => &mut scalars.mempool_insert_ms,
+            TransactionStage::QsBatchPull => &mut scalars.qs_batch_pull_ms,
+            TransactionStage::QsBatchCreated => &mut scalars.qs_batch_created_ms,
+            TransactionStage::QsProofOfStore => &mut scalars.qs_proof_of_store_ms,
+            TransactionStage::ParentBlockProposed => &mut scalars.parent_block_proposed_ms,
+            TransactionStage::BlockProposed => &mut scalars.block_proposed_ms,
+            TransactionStage::BlockReceived => &mut scalars.block_received_ms,
+            TransactionStage::ExecutionStart => &mut scalars.execution_start_ms,
+            TransactionStage::Executed => &mut scalars.executed_ms,
+            TransactionStage::BlockOrdered => &mut scalars.block_ordered_ms,
+            TransactionStage::Certified => &mut scalars.certified_ms,
+            TransactionStage::PreCommit => &mut scalars.pre_commit_ms,
+            TransactionStage::Committed => &mut scalars.committed_ms,
+            TransactionStage::MempoolCommit => &mut scalars.mempool_commit_ms,
+            TransactionStage::MempoolReject => &mut scalars.mempool_reject_ms,
+        };
+        // If the same stage fires twice in attempt 1, keep the first observation.
+        if slot.is_none() {
+            *slot = Some(abs_ms);
+        }
+
+        match (&record.stage, &record.metadata) {
+            (TransactionStage::BlockProposed, Some(StageMetadata::BatchInclusion(kind))) => {
+                if scalars.block_proposed_kind.is_none() {
+                    scalars.block_proposed_kind = Some(kind.as_ref().to_string());
+                }
+            },
+            (TransactionStage::Executed, Some(StageMetadata::Execution(status))) => {
+                if scalars.executed_status.is_none() {
+                    scalars.executed_status = Some(status.as_ref().to_string());
+                }
+            },
+            _ => {},
+        }
+    }
+    scalars
 }
 
 #[cfg(test)]
@@ -890,6 +1043,140 @@ mod tests {
         assert!(store.get_trace(&hash).is_some());
         store.finalize_trace(&hash);
         assert!(store.get_trace(&hash).is_none());
+    }
+
+    #[test]
+    fn test_per_stage_vectors_multi_attempt_retry() {
+        use crate::types::{BatchInclusionType, ExecutionStatus, StageMetadata, TransactionTrace};
+        // Build a trace by hand that simulates a retry: attempt 1 ends in
+        // Executed(Retry) and the block commits; attempt 2 re-pulls, executes
+        // as Keep, and finalizes. Times are in usecs; deltas come out in ms.
+        let base = 0u64;
+        let mut trace = TransactionTrace::new(HashValue::random(), AccountAddress::random(), base);
+        // Attempt 1
+        trace.record(TransactionStage::MempoolInsert, 0);
+        trace.record(TransactionStage::QsBatchPull, 50_000);
+        trace.record(TransactionStage::QsBatchCreated, 53_000);
+        trace.record(TransactionStage::QsProofOfStore, 80_000);
+        // Parent block was proposed 10ms before the txn was inserted in this
+        // node's mempool — negative absolute latency from base.
+        trace.record(TransactionStage::ParentBlockProposed, 90_000);
+        trace.record_with_metadata(
+            TransactionStage::BlockProposed,
+            100_000,
+            StageMetadata::BatchInclusion(BatchInclusionType::Proof),
+        );
+        trace.record(TransactionStage::BlockReceived, 105_000);
+        trace.record(TransactionStage::ExecutionStart, 120_000);
+        trace.record(TransactionStage::BlockOrdered, 145_000);
+        trace.record_with_metadata(
+            TransactionStage::Executed,
+            150_000,
+            StageMetadata::Execution(ExecutionStatus::Retry),
+        );
+        // `record_execution_result` calls `mark_retry` immediately after
+        // recording `Executed(Retry)`. Subsequent block-finalization stages
+        // for *this* (block 1) therefore have `attempt = 2` in the record,
+        // even though they belong to the retried block. The vector builder
+        // must route them to slot[0] anyway, mirroring the display loop's
+        // `is_block_finalization` logic.
+        trace.current_attempt = 2;
+        // Real-world bug reproduction: a new block's proposal arrives during
+        // block 1's commit-pipeline phase. `process_proposed_block` records
+        // `ParentBlockProposed` for block 2 with the foreign parent timestamp
+        // (155_000 here) AND with `attempt=2`. This record can sort
+        // chronologically *between* block 1's `Executed(Retry)` and block 1's
+        // `PreCommit`. The router must NOT treat it as the start of attempt
+        // 2's pipeline — otherwise block 1's finalization stages get misrouted
+        // to slot[1] instead of slot[0].
+        trace.record(TransactionStage::ParentBlockProposed, 155_000);
+        trace.record(TransactionStage::PreCommit, 160_000);
+        trace.record(TransactionStage::Certified, 165_000);
+        trace.record(TransactionStage::Committed, 170_000);
+        trace.record(TransactionStage::QsBatchPull, 200_000);
+        trace.record(TransactionStage::QsBatchCreated, 210_000);
+        trace.record(TransactionStage::QsProofOfStore, 230_000);
+        trace.record_with_metadata(
+            TransactionStage::BlockProposed,
+            250_000,
+            StageMetadata::BatchInclusion(BatchInclusionType::Opt),
+        );
+        trace.record(TransactionStage::BlockReceived, 255_000);
+        trace.record(TransactionStage::ExecutionStart, 270_000);
+        trace.record_with_metadata(
+            TransactionStage::Executed,
+            300_000,
+            StageMetadata::Execution(ExecutionStatus::Keep),
+        );
+        trace.record(TransactionStage::BlockOrdered, 310_000);
+        trace.record(TransactionStage::Certified, 320_000);
+        trace.record(TransactionStage::PreCommit, 330_000);
+        trace.record(TransactionStage::Committed, 340_000);
+        trace.record(TransactionStage::MempoolCommit, 350_000);
+
+        let mut sorted = trace.stages.clone();
+        sorted.sort_by_key(|s| s.timestamp_usecs);
+        let max_attempt = sorted.iter().map(|s| s.attempt).max().unwrap();
+        assert_eq!(max_attempt, 2);
+
+        let scalars = build_first_attempt_scalars(&sorted, base);
+
+        // Structured scalars capture the first pipeline pass only — including
+        // block 1's PreCommit/Certified/Committed even though those records
+        // are stamped with `attempt = 2` due to mark_retry timing. Attempt 2's
+        // pipeline lives only in the `stages` text string and is not asserted
+        // here.
+        assert_eq!(scalars.mempool_insert_ms, Some(0));
+        assert_eq!(scalars.qs_batch_pull_ms, Some(50));
+        assert_eq!(scalars.qs_batch_created_ms, Some(53));
+        assert_eq!(scalars.qs_proof_of_store_ms, Some(80));
+        assert_eq!(scalars.parent_block_proposed_ms, Some(90));
+        assert_eq!(scalars.block_proposed_ms, Some(100));
+        assert_eq!(scalars.block_received_ms, Some(105));
+        assert_eq!(scalars.execution_start_ms, Some(120));
+        assert_eq!(scalars.block_ordered_ms, Some(145));
+        assert_eq!(scalars.executed_ms, Some(150));
+        assert_eq!(scalars.pre_commit_ms, Some(160));
+        assert_eq!(scalars.certified_ms, Some(165));
+        assert_eq!(scalars.committed_ms, Some(170));
+        // No MempoolCommit on attempt 1 — it retries.
+        assert_eq!(scalars.mempool_commit_ms, None);
+        // First-attempt metadata: Retry status on the retried execution.
+        assert_eq!(scalars.block_proposed_kind.as_deref(), Some("Proof"));
+        assert_eq!(scalars.executed_status.as_deref(), Some("Retry"));
+    }
+
+    #[test]
+    fn test_first_attempt_scalars_single_attempt() {
+        use crate::types::{ExecutionStatus, StageMetadata, TransactionTrace};
+        let mut trace = TransactionTrace::new(HashValue::random(), AccountAddress::random(), 1000);
+        trace.record(TransactionStage::MempoolInsert, 1000);
+        trace.record(TransactionStage::QsBatchPull, 1500);
+        // Parent block timestamp can precede MempoolInsert (e.g., the previous
+        // block was committed before this txn arrived) — assert that's handled
+        // as a signed value.
+        trace.record(TransactionStage::ParentBlockProposed, 0);
+        trace.record_with_metadata(
+            TransactionStage::Executed,
+            3000,
+            StageMetadata::Execution(ExecutionStatus::Keep),
+        );
+        trace.record(TransactionStage::Committed, 4000);
+        trace.record(TransactionStage::MempoolCommit, 4500);
+
+        let mut sorted = trace.stages.clone();
+        sorted.sort_by_key(|s| s.timestamp_usecs);
+        let scalars = build_first_attempt_scalars(&sorted, 1000);
+
+        // Absolute latency from base (t=1000). All values divided by 1000usec/ms.
+        assert_eq!(scalars.mempool_insert_ms, Some(0));
+        assert_eq!(scalars.qs_batch_pull_ms, Some(0)); // (1500-1000)/1000 = 0 ms
+        assert_eq!(scalars.parent_block_proposed_ms, Some(-1)); // (0-1000)/1000 = -1 ms
+        assert_eq!(scalars.executed_ms, Some(2)); // (3000-1000)/1000 = 2
+        assert_eq!(scalars.committed_ms, Some(3)); // (4000-1000)/1000 = 3
+        assert_eq!(scalars.mempool_commit_ms, Some(3)); // (4500-1000)/1000 = 3
+        assert_eq!(scalars.qs_batch_created_ms, None);
+        assert_eq!(scalars.executed_status.as_deref(), Some("Keep"));
     }
 
     #[test]

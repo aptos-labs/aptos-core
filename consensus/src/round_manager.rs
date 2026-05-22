@@ -1311,10 +1311,13 @@ impl RoundManager {
                         round: proposal.round(),
                     }
                 });
+                let parent_block_timestamp_usecs =
+                    proposal.quorum_cert().certified_block().timestamp_usecs();
                 aptos_transaction_tracing::store::TransactionTraceStore::global()
                     .process_proposed_block(
                         proposal.id(),
                         proposal.timestamp_usecs(),
+                        parent_block_timestamp_usecs,
                         &batch_digests,
                         proposal_info,
                     );
