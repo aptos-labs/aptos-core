@@ -38,6 +38,8 @@ module aptos_framework::solana_derivable_account {
     const EINVALID_PUBLIC_KEY: u64 = 5;
     /// Invalid public key length.
     const EINVALID_PUBLIC_KEY_LENGTH: u64 = 6;
+    /// Malformed data with trailing bytes.
+    const EMALFORMED_DATA: u64 = 7;
 
     // a 58-character alphabet consisting of numbers (1-9) and almost all (A-Z, a-z) letters,
     // excluding 0, O, I, and l to avoid confusion between similar-looking characters.
@@ -62,6 +64,7 @@ module aptos_framework::solana_derivable_account {
         let stream = bcs_stream::new(*abstract_public_key);
         let base58_public_key = bcs_stream::deserialize_vector<u8>(&mut stream, |x| deserialize_u8(x));
         let domain = bcs_stream::deserialize_vector<u8>(&mut stream, |x| deserialize_u8(x));
+        assert!(!bcs_stream::has_remaining(&mut stream), EMALFORMED_DATA);
         (base58_public_key, domain)
     }
 
@@ -71,6 +74,7 @@ module aptos_framework::solana_derivable_account {
         let signature_type = bcs_stream::deserialize_u8(&mut stream);
         if (signature_type == 0x00) {
             let signature = bcs_stream::deserialize_vector<u8>(&mut stream, |x| deserialize_u8(x));
+            assert!(!bcs_stream::has_remaining(&mut stream), EMALFORMED_DATA);
             SIWSAbstractSignature::MessageV1 { signature }
         } else {
             abort(EINVALID_SIGNATURE_TYPE)
@@ -259,5 +263,34 @@ module aptos_framework::solana_derivable_account {
         let auth_data = create_derivable_auth_data(digest, abstract_signature, abstract_public_key);
         let entry_function_name = b"0x1::aptos_account::transfer";
         authenticate_auth_data(auth_data, &entry_function_name);
+    }
+
+    #[test]
+    #[expected_failure(abort_code = EMALFORMED_DATA)]
+    fun test_deserialize_abstract_signature_with_trailing_bytes() {
+        let signature_bytes = vector[129, 0, 6, 135, 53, 153, 88, 201, 243, 227, 13, 232, 192, 42, 167, 94, 3, 120, 49, 80, 102, 193, 61, 211, 189, 83, 37, 121, 5, 216, 30, 25, 243, 207, 172, 248, 94, 201, 123, 66, 237, 66, 122, 201, 171, 215, 162, 187, 218, 188, 24, 165, 52, 147, 210, 39, 128, 78, 62, 81, 73, 167, 235, 1];
+        let abstract_signature = create_message_v1_signature(signature_bytes);
+        // Append trailing bytes to simulate griefing attack
+        abstract_signature.push_back(0xDE);
+        abstract_signature.push_back(0xAD);
+        abstract_signature.push_back(0xBE);
+        abstract_signature.push_back(0xEF);
+        // This should fail with EMALFORMED_DATA due to trailing bytes
+        deserialize_abstract_signature(&abstract_signature);
+    }
+
+    #[test]
+    #[expected_failure(abort_code = EMALFORMED_DATA)]
+    fun test_deserialize_abstract_public_key_with_trailing_bytes() {
+        let base58_public_key = b"G56zT1K6AQab7FzwHdQ8hiHXusR14Rmddw6Vz5MFbbmV";
+        let domain = b"aptos-labs.github.io";
+        let abstract_public_key = create_abstract_public_key(utf8(base58_public_key), utf8(domain));
+        // Append trailing bytes to simulate griefing attack
+        abstract_public_key.push_back(0xDE);
+        abstract_public_key.push_back(0xAD);
+        abstract_public_key.push_back(0xBE);
+        abstract_public_key.push_back(0xEF);
+        // This should fail with EMALFORMED_DATA due to trailing bytes
+        deserialize_abstract_public_key(&abstract_public_key);
     }
 }
