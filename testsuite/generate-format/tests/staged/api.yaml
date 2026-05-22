@@ -1027,6 +1027,10 @@ TransactionInfo:
       V0:
         NEWTYPE:
           TYPENAME: TransactionInfoV0
+    1:
+      V1:
+        NEWTYPE:
+          TYPENAME: TransactionInfoV1
 TransactionInfoV0:
   STRUCT:
     - gas_used: U64
@@ -1042,6 +1046,50 @@ TransactionInfoV0:
         OPTION:
           TYPENAME: HashValue
     - auxiliary_info_hash:
+        OPTION:
+          TYPENAME: HashValue
+TransactionInfoV1:
+  STRUCT:
+    - gas_used: U64
+    - status:
+        TYPENAME: ExecutionStatus
+    - transaction_hash:
+        TYPENAME: HashValue
+    - event_root_hash:
+        TYPENAME: HashValue
+    - state_change_hash:
+        TYPENAME: HashValue
+    - state_checkpoint_hash:
+        OPTION:
+          TYPENAME: HashValue
+    - hot_state_checkpoint_hash:
+        OPTION:
+          TYPENAME: HashValue
+    - auxiliary_info_hash:
+        OPTION:
+          TYPENAME: HashValue
+    - placeholder0:
+        OPTION:
+          TYPENAME: HashValue
+    - placeholder1:
+        OPTION:
+          TYPENAME: HashValue
+    - placeholder2:
+        OPTION:
+          TYPENAME: HashValue
+    - placeholder3:
+        OPTION:
+          TYPENAME: HashValue
+    - placeholder4:
+        OPTION:
+          TYPENAME: HashValue
+    - placeholder5:
+        OPTION:
+          TYPENAME: HashValue
+    - placeholder6:
+        OPTION:
+          TYPENAME: HashValue
+    - placeholder7:
         OPTION:
           TYPENAME: HashValue
 TransactionOnChainData:
