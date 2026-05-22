@@ -21,8 +21,8 @@ use mono_move_core::{
         view_type, view_type_list, Alignment, FieldLayout, InternedType, InternedTypeList, Size,
         Type, EMPTY_TYPE_LIST,
     },
-    Code, DescriptorId, FieldTypes, FrameLayoutInfo, FrameOffset, Function, Interner,
-    MicroOpGasSchedule, SortedSafePointEntries, FRAME_METADATA_SIZE,
+    Code, CodeOffset, DescriptorId, FieldTypes, FrameLayoutInfo, FrameOffset, Function, Interner,
+    MicroOpGasSchedule, SafePointEntry, SortedSafePointEntries, FRAME_METADATA_SIZE,
 };
 use mono_move_gas::GasInstrumentor;
 use move_binary_format::access::ModuleAccess;
@@ -456,15 +456,22 @@ pub fn try_lower_function(
     };
 
     let name = module_ir.module.interned_identifier_at(func_ir.name_idx);
-    let code = lower_function(func_ir, &ctx)?;
-    let code = GasInstrumentor::new(MicroOpGasSchedule).run(code);
-
-    // TODO: derive per-PC `safe_point_layouts` so that allocating
-    // ops (`MicroOp::is_allocating`) can keep callee-region pointers
-    // alive across the GC they may trigger. Until this lands,
-    // executing such an op while callee-region pointer slots are live
-    // will silently miss those pointers — GC may collect or move
-    // objects that the frame still references.
+    let (code, raw_safe_points) = lower_function(func_ir, &ctx)?;
+    // TODO: this remapping of safe-point PCs to the allocating op's own new position
+    // will go away once we move gas instrumentation to the stackless exec IR level.
+    let (code, pc_map) = GasInstrumentor::new(MicroOpGasSchedule).run_with_pc_map(code);
+    let mut safe_points = raw_safe_points
+        .into_iter()
+        .map(|entry| SafePointEntry {
+            code_offset: CodeOffset(pc_map[entry.code_offset.0 as usize]),
+            layout: entry.layout,
+        })
+        .collect::<Vec<_>>();
+    // TODO: drop this sort if we can guarantee the input is already
+    // sorted. `pc_map` is monotone and `emit` pushes in code-offset
+    // order, so it's structurally a no-op today — kept as a safety
+    // net for now.
+    safe_points.sort_by_key(|e| e.code_offset.0);
 
     let param_sizes = ctx.home_slots[..func_ir.num_params as usize]
         .iter()
@@ -483,9 +490,6 @@ pub fn try_lower_function(
     // Derive `frame_layout` and `zero_frame` from home-slot types.
     // Substitute `ty_args` so generic instantiations see concrete
     // types — `gc_layout` rejects raw `TypeParam`s.
-    //
-    // TODO: derive callee-region safe-point entries and feed them
-    // into `Function::safe_point_layouts`. Today they stay empty.
     let home_list = interner.type_list_of(&func_ir.home_slot_types);
     let home_list = interner.subst_type_list(home_list, ty_args)?;
     let derived = derive_frame_layout(&ctx, func_ir, view_type_list(home_list))?;
@@ -499,7 +503,7 @@ pub fn try_lower_function(
         extended_frame_size,
         zero_frame: derived.zero_frame,
         frame_layout: FrameLayoutInfo::new(derived.heap_ptr_offsets),
-        safe_point_layouts: SortedSafePointEntries::empty(),
+        safe_point_layouts: SortedSafePointEntries::new(safe_points),
     }))
 }
 

@@ -110,6 +110,8 @@ fun push_and_sum() {
     14: SubU64Imm [16] <- [16] - #1
     15: Jump @10
     16: Return
+  safe_point_layouts:
+    4: []
 }
 === frame-layout ===
 // module 0xc0ffee::foo

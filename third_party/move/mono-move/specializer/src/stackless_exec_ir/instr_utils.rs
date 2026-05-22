@@ -30,7 +30,7 @@
 //!   caller-provided closures (`impl FnMut`) are monomorphized and inlined
 //!   at each call site.
 
-use crate::stackless_exec_ir::{BinaryOp, ImmValue, Instr, Slot};
+use super::{BinaryOp, ImmValue, Instr, Slot};
 use smallvec::SmallVec;
 
 /// Most instructions have at most 4 defs or uses.
@@ -95,6 +95,16 @@ pub(crate) fn remap_source_slots_with(instr: &mut Instr, f: impl FnMut(Slot) -> 
 // =============================================================================
 // Other instruction utilities
 // =============================================================================
+
+/// Call-like instructions (`Call`, `CallGeneric`, `CallClosure`) that clobber
+/// Xfer slots.
+#[inline]
+pub(crate) fn clobbers_xfer(instr: &Instr) -> bool {
+    matches!(
+        instr,
+        Instr::Call(..) | Instr::CallGeneric(..) | Instr::CallClosure(..)
+    )
+}
 
 /// Extract the destination slot and immediate value from a load instruction.
 // TODO: the wide arms (`LdU128`/`LdU256`/`LdI128`/`LdI256`) each allocate

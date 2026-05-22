@@ -8,10 +8,12 @@
 //! Pass: Dead instruction elimination
 //! Pass: Slot renumbering
 
-use super::instr_utils::{
-    for_each_def, for_each_slot, for_each_use, remap_all_slots_with, remap_source_slots_with,
+use crate::stackless_exec_ir::{
+    instr_utils::{
+        for_each_def, for_each_slot, for_each_use, remap_all_slots_with, remap_source_slots_with,
+    },
+    FunctionIR, Instr, ModuleIR, Slot,
 };
-use crate::stackless_exec_ir::{FunctionIR, Instr, ModuleIR, Slot};
 use shared_dsa::{UnorderedMap, UnorderedSet};
 
 /// Optimize all functions in a module IR.
@@ -86,7 +88,11 @@ fn copy_propagation(func: &mut FunctionIR) {
 
             match instr {
                 Instr::Copy(dst, src) | Instr::Move(dst, src) => {
-                    subst.insert(*dst, *src);
+                    // Xfer slot values don't survive a call boundary,
+                    // so don't copy propagate from them.
+                    if !matches!(src, Slot::Xfer(_)) {
+                        subst.insert(*dst, *src);
+                    }
                 },
                 _ => {},
             }

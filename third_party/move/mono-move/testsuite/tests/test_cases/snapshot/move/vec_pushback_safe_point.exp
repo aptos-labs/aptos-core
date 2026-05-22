@@ -1,0 +1,91 @@
+=== masm ===
+// Bytecode version v10
+module 0x66::vec_pushback_safe_point
+// Function definition at index 0
+#[persistent] public fun caller()
+    local l0: vector<u64>
+    call fresh
+    vec_pack <u64>, 0
+    st_loc l0
+    mut_borrow_loc l0
+    ld_u64 42
+    // @5
+    vec_push_back <u64>
+    call take
+    ret
+
+// Function definition at index 1
+fun fresh(): vector<u8>
+    vec_pack <u8>, 0
+    ret
+
+// Function definition at index 2
+fun take(l0: vector<u8>)
+    ret
+
+
+=== specializer ===
+// module 0x66::vec_pushback_safe_point
+
+fun caller() {
+  slots: params(0), locals(1), temps(2), xfer(1)
+    r0: vector<u64>
+    r1: &mut vector<u64>
+    r2: u64
+  code:
+  L0:
+    0: [x0] := call fresh, []
+    1: r0 := vec_pack u64, 0, []
+    2: r1 := mut_borrow_loc r0
+    3: r2 := ld_u64 42
+    4: vec_push_back u64, r1, r2
+    5: [] := call take, [x0]
+    6: ret []
+}
+
+fun fresh(): vector<u8> {
+  slots: params(0), locals(0), temps(1)
+    r0: vector<u8>
+  code:
+  L0:
+    0: r0 := vec_pack u8, 0, []
+    1: ret [r0]
+}
+
+fun take(r0) {
+  slots: params(1), locals(0), temps(0)
+    r0: vector<u8>
+  code:
+  L0:
+    0: ret []
+}
+
+=== micro-ops ===
+// module 0x66::vec_pushback_safe_point
+
+fun caller() {
+  frame_data_size: 32
+  code:
+    0: CallIndirect 0x66::vec_pushback_safe_point::fresh
+    1: VecNew [0]
+    2: SlotBorrow [8] <- &[0]
+    3: StoreImm8 [24] <- #42
+    4: VecPushBack [8].push([24], size=8, desc=2)
+    5: CallIndirect 0x66::vec_pushback_safe_point::take
+    6: Return
+  safe_point_layouts:
+    4: [56]
+}
+
+fun fresh() {
+  frame_data_size: 8
+  code:
+    0: VecNew [0]
+    1: Return
+}
+
+fun take() {
+  frame_data_size: 8
+  code:
+    0: Return
+}

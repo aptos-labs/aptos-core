@@ -7,6 +7,7 @@
 //! eliminating the operand stack and allowing direct named-slot operands on each instruction.
 
 mod display;
+pub(crate) mod instr_utils;
 
 use mono_move_core::{
     types::{InternedType, InternedTypeList},

@@ -6,12 +6,11 @@
 //! Consumes `BlockAnalysis` from `analysis` and maps SSA temp `Vid`s to
 //! real `Home`/`Xfer` slots using liveness-driven type-keyed reuse.
 
-use super::{
-    analysis::BlockAnalysis,
+use super::{analysis::BlockAnalysis, ssa_function::SSAFunction};
+use crate::stackless_exec_ir::{
     instr_utils::{collect_defs_and_uses, remap_all_slots_with},
-    ssa_function::SSAFunction,
+    BasicBlock, Instr, Slot,
 };
-use crate::stackless_exec_ir::{BasicBlock, Instr, Slot};
 use anyhow::{bail, Context, Result};
 use mono_move_core::types::InternedType;
 use shared_dsa::UnorderedMap;
