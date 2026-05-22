@@ -46,6 +46,7 @@ pub fn lower_function(
         state.label_map[block.label.0 as usize] = Some(state.out_buf.len() as u32);
         for instr in &block.instrs {
             state.lower_instr(func_ir, instr)?;
+            state.commit_xfer_bindings_after(instr);
         }
     }
     state.fixup_branches()?;
@@ -144,8 +145,7 @@ impl<'a> LoweringState<'a> {
     fn emit(&mut self, op: MicroOp) -> Result<()> {
         if op.is_allocating() {
             let code_offset = CodeOffset(self.out_buf.len() as u32);
-            let mut heap_ptr_offsets: Vec<FrameOffset> =
-                Vec::with_capacity(self.xfer_bindings.len());
+            let mut heap_ptr_offsets = Vec::with_capacity(self.xfer_bindings.len());
             for ts in self.xfer_bindings.iter().flatten() {
                 let rels = type_pointer_offsets(ts.ty).with_context(|| {
                     format!(
@@ -827,6 +827,11 @@ impl<'a> LoweringState<'a> {
             _ => bail!("instruction {} not yet lowered", instr.opcode_name()),
         }
 
+        Ok(())
+    }
+
+    /// Advance the Xfer state machine after `instr` has been lowered.
+    fn commit_xfer_bindings_after(&mut self, instr: &Instr) {
         // Calls manage their own Xfer state in `lower_call`.
         if !clobbers_xfer(instr) {
             // Release Xfer bindings consumed by this instr's uses.
@@ -846,8 +851,6 @@ impl<'a> LoweringState<'a> {
                 "calls must not leave a pending Xfer def bind",
             );
         }
-
-        Ok(())
     }
 
     /// Lower one call. Args are written by reverse iteration over the
