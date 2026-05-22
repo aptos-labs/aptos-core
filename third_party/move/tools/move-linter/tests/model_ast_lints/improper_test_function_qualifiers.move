@@ -52,12 +52,12 @@ module 0x42::tests {
 
     // OK: `#[test]` fire suppressed via `lint::skip`
     #[test]
-    #[lint::skip(improper_test_function_modifiers)]
+    #[lint::skip(improper_test_function_qualifiers)]
     public entry fun suppressed_test() {}
 
     // OK: `#[test_only]` fire suppressed via `lint::skip`
     #[test_only]
-    #[lint::skip(improper_test_function_modifiers)]
+    #[lint::skip(improper_test_function_qualifiers)]
     entry fun suppressed_test_only() {}
 }
 
@@ -72,7 +72,7 @@ module 0x42::tests_friend {
 }
 
 // `#[test_only]` module: each function inherits `#[test_only]` from the
-// module, so `entry` is flagged but visibility modifiers are allowed.
+// module, so `entry` is flagged but visibility qualifiers are allowed.
 #[test_only]
 module 0x42::test_only_module {
     // OK: `public` inside a `#[test_only]` module

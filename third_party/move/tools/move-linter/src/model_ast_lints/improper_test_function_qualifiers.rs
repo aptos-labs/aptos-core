@@ -1,10 +1,10 @@
 // Copyright (c) Aptos Foundation
 // Licensed pursuant to the Innovation-Enabling Source Code License, available at https://github.com/aptos-labs/aptos-core/blob/main/LICENSE
 
-//! Lint check for improper modifiers on test functions.
+//! Lint check for improper qualifiers on test functions.
 //!
 //! Rules:
-//! 1. A `#[test]` function must not have any visibility modifier and must
+//! 1. A `#[test]` function must not have any visibility qualifier and must
 //!    not be `entry`.
 //! 2. A `#[test_only]` function (or any function inside a `#[test_only]`
 //!    module) must not be `entry`.
@@ -13,12 +13,12 @@ use move_binary_format::file_format::Visibility;
 use move_compiler_v2::external_checks::FunctionChecker;
 use move_model::model::FunctionEnv;
 
-const CHECKER_NAME: &str = "improper_test_function_modifiers";
+const CHECKER_NAME: &str = "improper_test_function_qualifiers";
 
 #[derive(Default)]
-pub struct ImproperTestFunctionModifiers;
+pub struct ImproperTestFunctionQualifiers;
 
-impl FunctionChecker for ImproperTestFunctionModifiers {
+impl FunctionChecker for ImproperTestFunctionQualifiers {
     fn get_name(&self) -> String {
         CHECKER_NAME.to_string()
     }
@@ -44,16 +44,16 @@ impl FunctionChecker for ImproperTestFunctionModifiers {
         let msg: &str = if is_test {
             match (has_visibility, has_entry) {
                 (true, true) => {
-                    "`#[test]` functions should not have visibility modifiers and should not be `entry`"
+                    "`#[test]` functions should not have visibility qualifiers and should not be `entry`"
                 },
-                (true, false) => "`#[test]` functions should not have visibility modifiers",
+                (true, false) => "`#[test]` functions should not have visibility qualifiers",
                 (false, true) => "`#[test]` functions should not be `entry`",
-                (false, false) => unreachable!("early-returned above when neither modifier is set"),
+                (false, false) => unreachable!("early-returned above when neither qualifier is set"),
             }
         } else if has_entry {
             "`#[test_only]` functions should not be `entry`"
         } else {
-            // `#[test_only]` allows visibility modifiers.
+            // `#[test_only]` allows visibility qualifiers.
             return;
         };
 
