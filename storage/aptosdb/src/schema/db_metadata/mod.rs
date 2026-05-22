@@ -72,6 +72,15 @@ pub enum DbMetadataKey {
     StaleNodeCleanupDone,
     StaleNodeCleanupRegularProgress,
     StaleNodeCleanupEpochProgress,
+    /// Progress tracker for the native-position value pruner.
+    PositionPrunerProgress,
+    /// Last fully-committed version for the native-position value DB.
+    /// Mirrors `StateKvCommitProgress`.
+    PositionCommitProgress,
+    /// Per-shard last-committed version for the native-position value DB.
+    /// Mirrors `StateKvShardCommitProgress`. Truncation-on-startup uses
+    /// this to roll back partial commits.
+    PositionShardCommitProgress(ShardId),
 }
 
 define_schema!(

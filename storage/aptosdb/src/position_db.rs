@@ -23,14 +23,20 @@
 
 use crate::{
     db_options::{gen_position_cfds, gen_position_metadata_cfds},
+    schema::{
+        db_metadata::{DbMetadataKey, DbMetadataSchema, DbMetadataValue},
+        position_value::PositionValueSchema,
+    },
     sharded_kv_db::ShardedKvDb,
 };
 use aptos_config::config::RocksdbConfig;
+use aptos_crypto::HashValue;
+use aptos_experimental_runtimes::thread_manager::THREAD_MANAGER;
 use aptos_logger::info;
 use aptos_rocksdb_options::gen_rocksdb_options;
-use aptos_schemadb::{Cache, Env, DB};
+use aptos_schemadb::{batch::SchemaBatch, Cache, Env, DB};
 use aptos_storage_interface::{AptosDbError, Result};
-use aptos_types::state_store::NUM_STATE_SHARDS;
+use aptos_types::{state_store::NUM_STATE_SHARDS, transaction::Version};
 use rayon::prelude::*;
 use std::{
     ops::Deref,
@@ -38,13 +44,8 @@ use std::{
     sync::Arc,
 };
 
-/// Number of value-DB shards. Mirrors `aptos_types::state_store::NUM_STATE_SHARDS`.
 pub const NUM_NATIVE_VALUE_SHARDS: usize = NUM_STATE_SHARDS;
 
-/// Sharded handle for the position value tier. Thin wrapper around
-/// [`ShardedKvDb`] (the 16-shards + metadata-DB substrate shared with
-/// main state's `state_kv_db`). Adds position-specific schema reads /
-/// writes; layout / routing accessors come through `Deref`.
 #[derive(Debug)]
 pub struct PositionDb {
     inner: ShardedKvDb,
@@ -59,10 +60,6 @@ impl Deref for PositionDb {
 }
 
 impl PositionDb {
-    /// Open a sharded `position_db` rooted at `path`. Mirrors
-    /// `StateKvDb::new` — opens the metadata DB at `<path>/metadata/`
-    /// and 16 shard DBs at `<path>/shard_<i>/` with production CF
-    /// tuning. `position_db` has no hot/cold split.
     pub fn new(
         path: &Path,
         rocksdb_config: RocksdbConfig,
@@ -78,7 +75,7 @@ impl PositionDb {
             env,
             block_cache,
             readonly,
-            /* is_metadata = */ true,
+            true,
         )?);
         info!(
             metadata_db_path = %metadata_db_path.display(),
@@ -104,9 +101,6 @@ impl PositionDb {
         })
     }
 
-    /// Test-only: build a `PositionDb` whose 16 shards + metadata slot
-    /// all point at one `Arc<DB>` — defeats per-shard parallelism but
-    /// avoids opening 17 RocksDB instances per test.
     #[cfg(any(test, feature = "fuzzing"))]
     pub fn new_uniform_for_test(db: Arc<DB>) -> Self {
         let shards: [Arc<DB>; NUM_NATIVE_VALUE_SHARDS] = std::array::from_fn(|_| Arc::clone(&db));
@@ -132,7 +126,7 @@ impl PositionDb {
             env,
             block_cache,
             readonly,
-            /* is_metadata = */ false,
+            false,
         )
     }
 
@@ -157,5 +151,78 @@ impl PositionDb {
             DB::open_cf(rocksdb_opts, path.as_path(), name, cfds)
         };
         res.map_err(|e| AptosDbError::Other(format!("failed to open {name}: {e}")))
+    }
+
+    /// Commit per-shard batches in parallel with progress stamps.
+    /// Mirrors `StateKvDb::commit`.
+    pub fn commit(
+        &self,
+        version: Version,
+        metadata_batch: Option<SchemaBatch>,
+        per_shard_batches: [Option<SchemaBatch>; NUM_NATIVE_VALUE_SHARDS],
+    ) -> Result<()> {
+        THREAD_MANAGER.get_io_pool().scope(|s| {
+            for (shard_id, batch_opt) in per_shard_batches.into_iter().enumerate() {
+                s.spawn(move |_| {
+                    self.commit_single_shard(version, shard_id, batch_opt)
+                        .unwrap_or_else(|err| {
+                            panic!("Failed to commit position shard {shard_id}: {err}.")
+                        });
+                });
+            }
+        });
+        if let Some(batch) = metadata_batch {
+            self.metadata_db().write_schemas(batch)?;
+        }
+        self.write_progress(version)
+    }
+
+    pub fn commit_single_shard(
+        &self,
+        version: Version,
+        shard_id: usize,
+        batch_opt: Option<SchemaBatch>,
+    ) -> Result<()> {
+        let mut batch = batch_opt.unwrap_or_else(SchemaBatch::new);
+        batch.put::<DbMetadataSchema>(
+            &DbMetadataKey::PositionShardCommitProgress(shard_id),
+            &DbMetadataValue::Version(version),
+        )?;
+        self.shard(shard_id).write_schemas(batch)
+    }
+
+    pub fn write_progress(&self, version: Version) -> Result<()> {
+        self.metadata_db().put::<DbMetadataSchema>(
+            &DbMetadataKey::PositionCommitProgress,
+            &DbMetadataValue::Version(version),
+        )
+    }
+
+    pub fn write_pruner_progress(&self, version: Version) -> Result<()> {
+        self.metadata_db().put::<DbMetadataSchema>(
+            &DbMetadataKey::PositionPrunerProgress,
+            &DbMetadataValue::Version(version),
+        )
+    }
+
+    /// Most recent prior version `< at_version` at which
+    /// `state_key_hash` was written.
+    pub fn find_prior_version(
+        &self,
+        state_key_hash: HashValue,
+        at_version: Version,
+    ) -> Result<Option<Version>> {
+        if at_version == 0 {
+            return Ok(None);
+        }
+        let shard = ShardedKvDb::shard_of_hash(state_key_hash);
+        let mut iter = self.shard(shard).iter::<PositionValueSchema>()?;
+        iter.seek(&(state_key_hash, at_version - 1))?;
+        if let Some(Ok(((row_hash, row_version), _value))) = iter.next() {
+            if row_hash == state_key_hash {
+                return Ok(Some(row_version));
+            }
+        }
+        Ok(None)
     }
 }
