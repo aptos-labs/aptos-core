@@ -150,10 +150,11 @@ fun sum_first_n(r0): u64 {
 fun sum_first_n() {
   frame_data_size: 8
   code:
-    0: Move8 [32] <- [0]
-    1: CallIndirect 0xc0ffee::foo::push_and_sum
-    2: Move8 [0] <- [32]
-    3: Return
+    0: Charge #16
+    1: Move8 [32] <- [0]
+    2: CallIndirect 0xc0ffee::foo::push_and_sum
+    3: Move8 [0] <- [32]
+    4: Return
 }
 === frame-layout ===
 // module 0xc0ffee::bar
