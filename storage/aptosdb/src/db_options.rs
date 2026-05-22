@@ -86,6 +86,31 @@ pub(super) fn ledger_metadata_db_column_families() -> Vec<ColumnFamilyName> {
     ]
 }
 
+pub(crate) fn position_db_column_families() -> Vec<ColumnFamilyName> {
+    vec![
+        /* empty cf */ DEFAULT_COLUMN_FAMILY_NAME,
+        POSITION_VALUE_CF_NAME,
+        STALE_POSITION_VALUE_INDEX_CF_NAME,
+    ]
+}
+
+pub(crate) fn position_db_metadata_column_families() -> Vec<ColumnFamilyName> {
+    vec![
+        /* empty cf */ DEFAULT_COLUMN_FAMILY_NAME,
+        DB_METADATA_CF_NAME,
+    ]
+}
+
+pub(crate) fn position_merkle_db_column_families() -> Vec<ColumnFamilyName> {
+    vec![
+        /* empty cf */ DEFAULT_COLUMN_FAMILY_NAME,
+        DB_METADATA_CF_NAME,
+        JELLYFISH_MERKLE_NODE_CF_NAME,
+        STALE_NODE_INDEX_CF_NAME,
+        STALE_NODE_INDEX_CROSS_EPOCH_CF_NAME,
+    ]
+}
+
 pub(super) fn state_merkle_db_column_families() -> Vec<ColumnFamilyName> {
     vec![
         /* empty cf */ DEFAULT_COLUMN_FAMILY_NAME,
@@ -169,7 +194,9 @@ fn gen_table_options(
         }
     }
 
-    if cf_name == STATE_VALUE_BY_KEY_HASH_CF_NAME || cf_name == HOT_STATE_VALUE_BY_KEY_HASH_CF_NAME
+    if cf_name == STATE_VALUE_BY_KEY_HASH_CF_NAME
+        || cf_name == HOT_STATE_VALUE_BY_KEY_HASH_CF_NAME
+        || cf_name == POSITION_VALUE_CF_NAME
     {
         // We do not generally perform point queries on these tables.
         table_options.set_whole_key_filtering(false);
@@ -203,7 +230,9 @@ fn with_no_compaction_stalling(cf_opts: &mut Options) {
 }
 
 fn with_state_key_extractor_processor(cf_name: ColumnFamilyName, cf_opts: &mut Options) {
-    if cf_name == STATE_VALUE_BY_KEY_HASH_CF_NAME || cf_name == HOT_STATE_VALUE_BY_KEY_HASH_CF_NAME
+    if cf_name == STATE_VALUE_BY_KEY_HASH_CF_NAME
+        || cf_name == HOT_STATE_VALUE_BY_KEY_HASH_CF_NAME
+        || cf_name == POSITION_VALUE_CF_NAME
     {
         let prefix_extractor =
             SliceTransform::create("state_key_extractor", state_key_extractor, None);
@@ -213,6 +242,50 @@ fn with_state_key_extractor_processor(cf_name: ColumnFamilyName, cf_opts: &mut O
 
 fn state_key_extractor(state_value_raw_key: &[u8]) -> &[u8] {
     &state_value_raw_key[..(state_value_raw_key.len() - VERSION_SIZE)]
+}
+
+/// CF descriptors for one shard of `position_db`. Mirrors
+/// `gen_state_kv_shard_cfds`: installs `state_key_extractor` on the
+/// hash-keyed value CF (and disables `whole_key_filtering` for it
+/// via `gen_table_options`) so seek-by-hash uses a prefix bloom
+/// filter. Hash-scattered CFs do not get `with_no_compaction_stalling`
+/// — that helper is for sequential-key append-only CFs (see its
+/// docstring), and these CFs need real compaction work.
+#[allow(dead_code)]
+pub(crate) fn gen_position_cfds(
+    rocksdb_config: &RocksdbConfig,
+    block_cache: Option<&Cache>,
+) -> Vec<ColumnFamilyDescriptor> {
+    let cfs = position_db_column_families();
+    gen_cfds(
+        rocksdb_config,
+        block_cache,
+        cfs,
+        with_state_key_extractor_processor,
+    )
+}
+
+/// CF descriptors for the `position_db` metadata DB (pruner-progress
+/// bookkeeping). Only the `db_metadata` CF; no per-CF post-processing.
+#[allow(dead_code)]
+pub(crate) fn gen_position_metadata_cfds(
+    rocksdb_config: &RocksdbConfig,
+    block_cache: Option<&Cache>,
+) -> Vec<ColumnFamilyDescriptor> {
+    let cfs = position_db_metadata_column_families();
+    gen_cfds(rocksdb_config, block_cache, cfs, |_, _| {})
+}
+
+/// CF descriptors for `position_merkle_db`. Mirrors
+/// `gen_state_merkle_cfds`: no per-CF post-processing. The JMT CFs
+/// are hash-scattered and need real compaction.
+#[allow(dead_code)]
+pub(crate) fn gen_position_merkle_cfds(
+    rocksdb_config: &RocksdbConfig,
+    block_cache: Option<&Cache>,
+) -> Vec<ColumnFamilyDescriptor> {
+    let cfs = position_merkle_db_column_families();
+    gen_cfds(rocksdb_config, block_cache, cfs, |_, _| {})
 }
 
 pub(super) fn gen_event_cfds(

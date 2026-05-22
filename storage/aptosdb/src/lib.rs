@@ -31,6 +31,8 @@ mod db_options;
 mod event_store;
 mod ledger_db;
 mod lru_node_cache;
+pub mod position_db;
+pub mod position_merkle_db;
 mod pruner;
 mod sharded_jmt_merkle_db;
 mod state_kv_db;
