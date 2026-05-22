@@ -8,7 +8,7 @@ use crate::{read_set::ModuleReadSet, Loader};
 use mono_move_core::{
     interner::{InternedIdentifier, InternedModuleId},
     types::InternedTypeList,
-    ExecutionContext, FunctionPtr,
+    DescriptorId, DescriptorProvider, ExecutionContext, FunctionPtr, ObjectDescriptor,
 };
 use mono_move_gas::GasMeter;
 
@@ -41,7 +41,8 @@ impl<'guard, 'ctx, G: GasMeter> ExecutionContext for TransactionContext<'guard, 
         &mut self.gas_meter
     }
 
-    /// Looks up cross-module targets in the read-set, falling back to the [`Loader`] on cache miss.
+    /// Looks up cross-module targets in the read-set, falling back to
+    /// the [`Loader`] on cache miss.
     fn load_function(
         &mut self,
         module_id: InternedModuleId,
@@ -55,5 +56,11 @@ impl<'guard, 'ctx, G: GasMeter> ExecutionContext for TransactionContext<'guard, 
             name,
             ty_args,
         )
+    }
+}
+
+impl<'guard, 'ctx, G: GasMeter> DescriptorProvider for TransactionContext<'guard, 'ctx, G> {
+    fn descriptor(&self, id: DescriptorId) -> Option<&ObjectDescriptor> {
+        self.loader.guard().descriptor(id)
     }
 }
