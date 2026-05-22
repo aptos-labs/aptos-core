@@ -24,11 +24,18 @@ impl ApplyExecutionOutput {
         base_view: LedgerSummary,
         reader: &(dyn DbReader + Sync),
     ) -> Result<PartialStateComputeResult> {
+        let use_transaction_info_v1 = base_view
+            .state_summary
+            .last_checkpoint()
+            .hot_state_config()
+            .use_transaction_info_v1;
         let state_checkpoint_output = DoStateCheckpoint::run(
             &execution_output,
             &base_view.state_summary,
             &ProvableStateSummary::new_persisted(reader)?,
             None,
+            None,
+            use_transaction_info_v1,
         )?;
         let ledger_update_output = DoLedgerUpdate::run(
             &execution_output,
