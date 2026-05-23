@@ -7,7 +7,10 @@
 //! All lookups are O(1) via indexed Vecs — no maps.
 
 use crate::{
-    lower::{gc_layout::derive_frame_layout, lower_function},
+    lower::{
+        gc_layout::{derive_frame_layout, type_pointer_offsets},
+        lower_function,
+    },
     stackless_exec_ir::{FunctionIR, Instr, ModuleIR},
 };
 use anyhow::{bail, Result};
@@ -15,15 +18,15 @@ use mono_move_core::{
     align_up_u32,
     interner::{InternedIdentifier, InternedModuleId},
     types::{
-        view_name, view_type, view_type_list, Alignment, FieldLayout, InternedType,
-        InternedTypeList, Size, Type, EMPTY_TYPE_LIST,
+        view_type, view_type_list, Alignment, FieldLayout, InternedType, InternedTypeList, Size,
+        Type, EMPTY_TYPE_LIST,
     },
-    Code, FieldTypes, FrameLayoutInfo, FrameOffset, Function, Interner, MicroOpGasSchedule,
-    SortedSafePointEntries, FRAME_METADATA_SIZE,
+    Code, CodeOffset, DescriptorId, FieldTypes, FrameLayoutInfo, FrameOffset, Function, Interner,
+    MicroOpGasSchedule, SafePointEntry, SortedSafePointEntries, FRAME_METADATA_SIZE,
 };
 use mono_move_gas::GasInstrumentor;
 use move_binary_format::access::ModuleAccess;
-use shared_dsa::UnorderedSet;
+use shared_dsa::{UnorderedMap, UnorderedSet};
 
 /// Minimum slot alignment supported by the current micro-op set.
 ///
@@ -57,6 +60,14 @@ fn check_supported_alignment<T>(
 /// type is not concrete (e.g., contains type parameters or unresolved structs).
 pub fn type_size_and_align(ty: InternedType) -> Option<(Size, Alignment)> {
     view_type(ty).size_and_align()
+}
+
+/// Size in bytes of `ty`. Errors when the type isn't concrete; `label`
+/// identifies the value in the error message.
+pub fn concrete_type_size(ty: InternedType, label: &str) -> Result<u32> {
+    let (size, _) =
+        type_size_and_align(ty).ok_or_else(|| anyhow::anyhow!("{} has no concrete size", label))?;
+    Ok(size)
 }
 
 /// Byte-level location of a typed value in the current function's frame.
@@ -100,18 +111,26 @@ pub struct LoweringContext {
     pub return_slots: Vec<SlotInfo>,
     pub num_xfer_positions: u16,
     /// Frame offset of the cycle-breaking scratch slot used by
-    /// `parallel_copy::emit_parallel_copy` for `Instr::Ret`. Sized to
-    /// hold the widest value in this function's `return_slots` (Ret
-    /// copies have matching src/dst types, so that's a safe upper
-    /// bound). `0` (with `scratch_size == 0`) when the function has no
-    /// returns. The scratch lives at the end of the home region, so
-    /// callees see a slightly bumped `callee_base`. Only inspected for
-    /// at most one micro-op of any pair, so it doesn't need GC
-    /// tracking.
-    pub scratch_offset: FrameOffset,
-    /// Width of the scratch slot in bytes, or `0` if no scratch is
-    /// reserved.
-    pub scratch_size: u32,
+    /// `parallel_copy::emit_parallel_copy` for `Instr::Ret`.
+    /// Reserved at the end of the home region (sized to fit the widest
+    /// return value). `None` when no scratch is needed.
+    ///
+    /// Invariant: scratch's live range never spans an allocating
+    /// micro-op, so does not need GC tracking.
+    pub scratch: Option<FrameOffset>,
+    /// `vector<T>` -> published `DescriptorId`.
+    ///
+    /// Invariant: contains an entry for every vector type mentioned in
+    /// this function.
+    pub vec_descriptors: UnorderedMap<InternedType, DescriptorId>,
+}
+
+impl LoweringContext {
+    /// `DescriptorId` published for `vec_ty` (the vector type itself,
+    /// not its element type), or `None` if no entry exists.
+    pub fn vec_descriptor_id(&self, vec_ty: InternedType) -> Option<DescriptorId> {
+        self.vec_descriptors.get(&vec_ty).copied()
+    }
 }
 
 /// Outcome of attempting to build a [`LoweringContext`]: either the
@@ -160,6 +179,7 @@ pub fn try_build_context(
     func_ir: &FunctionIR,
     ty_args: InternedTypeList,
     interner: &impl Interner,
+    vec_descriptors: UnorderedMap<InternedType, DescriptorId>,
 ) -> Result<BuildContextOutcome> {
     // 1. Compute home slot layout with natural alignment padding.
     //
@@ -251,13 +271,13 @@ pub fn try_build_context(
     //    We may also want to consider stricter bounding on number of
     //    return values in the bytecode verifier.
     let max_value_width: u32 = return_slots.iter().map(|s| s.size).max().unwrap_or(0);
-    let (scratch_offset, scratch_size) = if return_slots.len() >= 2 && max_value_width > 0 {
+    let scratch = if return_slots.len() >= 2 && max_value_width > 0 {
         let offset = align_up_u32(frame_data_size, MIN_SLOT_ALIGN);
         let size = align_up_u32(max_value_width, MIN_SLOT_ALIGN);
         frame_data_size = offset + size;
-        (FrameOffset(offset), size)
+        Some(FrameOffset(offset))
     } else {
-        (FrameOffset(0), 0)
+        None
     };
 
     // 4. Walk `Call`/`CallGeneric` instructions and lay out each callee's
@@ -315,8 +335,8 @@ pub fn try_build_context(
         call_sites,
         return_slots,
         num_xfer_positions: func_ir.num_xfer_positions,
-        scratch_offset,
-        scratch_size,
+        scratch,
+        vec_descriptors,
     }))
 }
 
@@ -390,9 +410,28 @@ pub trait SpecializerContext {
     ///    parameter `i` in the generic type. It should never be smaller. If
     ///    so, then substitution fails.
     fn subst_type(&self, ty: InternedType, ty_args: InternedTypeList) -> Result<InternedType>;
+
+    /// Publishes a vector descriptor for `elem_ty` (with byte width
+    /// `elem_size` and intra-element heap-pointer offsets
+    /// `elem_ptr_offsets`), returning the assigned [`DescriptorId`].
+    /// Idempotent on `elem_ty`: subsequent calls with the same element
+    /// type return the same id without appending.
+    fn publish_vec_descriptor(
+        &self,
+        elem_ty: InternedType,
+        elem_size: u32,
+        elem_ptr_offsets: &[FrameOffset],
+    ) -> Result<DescriptorId>;
+
+    /// Returns the already-published vector-descriptor id for `elem_ty`,
+    /// or `None` if no descriptor has been published yet.
+    fn vec_descriptor_for(&self, elem_ty: InternedType) -> Option<DescriptorId>;
 }
 
 /// Attempts to lower a function.
+///
+/// `vec_descriptors` must contain an entry for every vector type
+/// mentioned in `func_ir` (see [`LoweringContext::vec_descriptors`]).
 ///
 /// Returns:
 ///
@@ -409,32 +448,30 @@ pub fn try_lower_function(
     func_ir: &FunctionIR,
     ty_args: InternedTypeList,
     interner: &impl Interner,
+    vec_descriptors: UnorderedMap<InternedType, DescriptorId>,
 ) -> Result<LoweringOutcome> {
-    let ctx = match try_build_context(module_ir, func_ir, ty_args, interner)? {
+    let ctx = match try_build_context(module_ir, func_ir, ty_args, interner, vec_descriptors)? {
         BuildContextOutcome::Built(c) => c,
         BuildContextOutcome::Skipped(reason) => return Ok(LoweringOutcome::Skipped(reason)),
     };
 
     let name = module_ir.module.interned_identifier_at(func_ir.name_idx);
-    let code = lower_function(func_ir, &ctx)?;
-    let code = GasInstrumentor::new(MicroOpGasSchedule).run(code);
-
-    // Defense-in-depth guard for allocating ops — they trigger GC at
-    // their own PC and need top-frame `safe_point_layouts` (not yet
-    // emitted by gc_layout) to keep callee-region pointers alive.
-    //
-    // TODO: drop this guard once allocating-op safe points are
-    // derived.
-    for op in &code {
-        if op.is_allocating() {
-            bail!(
-                "function `{}` lowers allocating op `{}` but `safe_point_layouts` is not yet \
-                 derived from the lowering context — GC would not see callee-region pointers",
-                view_name(name),
-                op,
-            );
-        }
-    }
+    let (code, raw_safe_points) = lower_function(func_ir, &ctx)?;
+    // TODO: this remapping of safe-point PCs to the allocating op's own new position
+    // will go away once we move gas instrumentation to the stackless exec IR level.
+    let (code, pc_map) = GasInstrumentor::new(MicroOpGasSchedule).run_with_pc_map(code);
+    let mut safe_points = raw_safe_points
+        .into_iter()
+        .map(|entry| SafePointEntry {
+            code_offset: CodeOffset(pc_map[entry.code_offset.0 as usize]),
+            layout: entry.layout,
+        })
+        .collect::<Vec<_>>();
+    // TODO: drop this sort if we can guarantee the input is already
+    // sorted. `pc_map` is monotone and `emit` pushes in code-offset
+    // order, so it's structurally a no-op today — kept as a safety
+    // net for now.
+    safe_points.sort_by_key(|e| e.code_offset.0);
 
     let param_sizes = ctx.home_slots[..func_ir.num_params as usize]
         .iter()
@@ -453,9 +490,6 @@ pub fn try_lower_function(
     // Derive `frame_layout` and `zero_frame` from home-slot types.
     // Substitute `ty_args` so generic instantiations see concrete
     // types — `gc_layout` rejects raw `TypeParam`s.
-    //
-    // TODO: derive callee-region safe-point entries and feed them
-    // into `Function::safe_point_layouts`. Today they stay empty.
     let home_list = interner.type_list_of(&func_ir.home_slot_types);
     let home_list = interner.subst_type_list(home_list, ty_args)?;
     let derived = derive_frame_layout(&ctx, func_ir, view_type_list(home_list))?;
@@ -469,64 +503,75 @@ pub fn try_lower_function(
         extended_frame_size,
         zero_frame: derived.zero_frame,
         frame_layout: FrameLayoutInfo::new(derived.heap_ptr_offsets),
-        safe_point_layouts: SortedSafePointEntries::empty(),
+        safe_point_layouts: SortedSafePointEntries::new(safe_points),
     }))
 }
 
-/// Tries to enforce lowering requirements for all functions in the given
-/// module:
-///   - calculating type sizes, alignments,
-///   - calculating field offsets for structs.
-/// Note that the requirements might not be set if there are any generic types
-/// or external modules are not available in the context to obtain the field
-/// information.
-pub fn try_set_lowering_requirements(
+/// Walks every type reachable from each function in `module_ir` and publishes
+/// the layout metadata lowering needs:
+///   - type sizes, alignments,
+///   - field offsets for structs,
+///   - vector descriptors (one per unique `vector<T>` element type).
+///
+/// Returns the `InternedType -> DescriptorId` map for any vector types
+/// encountered.
+///
+/// Note that generic types or types from out-of-scope modules may remain
+/// unresolved, in which case the corresponding layouts simply aren't published.
+pub fn try_discover_types_for_lowering_in_module(
     ctx: &mut impl SpecializerContext,
     module_ir: &ModuleIR,
-) -> Result<()> {
+) -> Result<UnorderedMap<InternedType, DescriptorId>> {
     let mut visited = UnorderedSet::new();
+    let mut vec_descriptors = UnorderedMap::new();
     for func_ir in module_ir.functions.iter().filter_map(|f| f.as_ref()) {
-        try_set_lowering_requirements_for_function_impl(
+        try_discover_types_for_lowering_in_function_impl(
             ctx,
             module_ir,
             func_ir,
             EMPTY_TYPE_LIST,
             &mut visited,
+            &mut vec_descriptors,
         )?;
     }
-    Ok(())
+    Ok(vec_descriptors)
 }
 
-/// Tries to enforce lowering requirements for the function in the given
-/// module:
-///   - calculating type sizes, alignments,
-///   - calculating field offsets for structs.
-/// Note that the requirements might not be set if there are any generic types
-/// or external modules are not available in the context to obtain the field
-/// information.
-pub fn try_set_lowering_requirements_for_function(
+/// Per-function variant of [`try_discover_types_for_lowering_in_module`]. Returns
+/// the vector-descriptor map discovered for this function's type set.
+pub fn try_discover_types_for_lowering_in_function(
     ctx: &mut impl SpecializerContext,
     module_ir: &ModuleIR,
     func_ir: &FunctionIR,
     ty_args: InternedTypeList,
-) -> Result<()> {
+) -> Result<UnorderedMap<InternedType, DescriptorId>> {
     let mut visited = UnorderedSet::new();
-    try_set_lowering_requirements_for_function_impl(ctx, module_ir, func_ir, ty_args, &mut visited)
+    let mut vec_descriptors = UnorderedMap::new();
+    try_discover_types_for_lowering_in_function_impl(
+        ctx,
+        module_ir,
+        func_ir,
+        ty_args,
+        &mut visited,
+        &mut vec_descriptors,
+    )?;
+    Ok(vec_descriptors)
 }
 
-fn try_set_lowering_requirements_for_function_impl(
+fn try_discover_types_for_lowering_in_function_impl(
     ctx: &mut impl SpecializerContext,
     module_ir: &ModuleIR,
     func_ir: &FunctionIR,
     ty_args: InternedTypeList,
     visited: &mut UnorderedSet<InternedType>,
+    vec_descriptors: &mut UnorderedMap<InternedType, DescriptorId>,
 ) -> Result<()> {
     for &ty in func_ir.home_slot_types.iter() {
-        walk_and_size(ctx, ty, ty_args, visited)?;
+        discover_type_metadata(ctx, ty, ty_args, visited, vec_descriptors)?;
     }
     let own_handle = module_ir.module.function_handle_at(func_ir.handle_idx);
     for &ty in module_ir.module.interned_types_at(own_handle.return_) {
-        walk_and_size(ctx, ty, ty_args, visited)?;
+        discover_type_metadata(ctx, ty, ty_args, visited, vec_descriptors)?;
     }
     for instr in func_ir.instrs() {
         let (params, returns) = match instr {
@@ -545,10 +590,10 @@ fn try_set_lowering_requirements_for_function_impl(
         };
 
         for &ty in view_type_list(params) {
-            walk_and_size(ctx, ty, ty_args, visited)?;
+            discover_type_metadata(ctx, ty, ty_args, visited, vec_descriptors)?;
         }
         for &ty in view_type_list(returns) {
-            walk_and_size(ctx, ty, ty_args, visited)?;
+            discover_type_metadata(ctx, ty, ty_args, visited, vec_descriptors)?;
         }
     }
 
@@ -561,14 +606,19 @@ fn try_set_lowering_requirements_for_function_impl(
 /// which field information is not available (same treatment as generic type
 /// parameters).
 ///
+/// Additionally, for each `Type::Vector` reached, recurses into the element
+/// type, then publishes a vector descriptor and records the assigned
+/// `DescriptorId` in `vec_descriptors`.
+///
 /// TODO: For fields, we need to check borrow instructions to make sure the
 ///       offsets are calculated for them.
 /// TODO: Make this not recursive.
-fn walk_and_size(
+fn discover_type_metadata(
     ctx: &mut impl SpecializerContext,
     ty: InternedType,
     ty_args: InternedTypeList,
     visited: &mut UnorderedSet<InternedType>,
+    vec_descriptors: &mut UnorderedMap<InternedType, DescriptorId>,
 ) -> Result<()> {
     let ty = ctx.subst_type(ty, ty_args)?;
     if !visited.insert(ty) {
@@ -592,13 +642,27 @@ fn walk_and_size(
         | Type::Address
         | Type::Signer
         | Type::TypeParam { .. }
-        | Type::Vector { .. }
-        | Type::ImmutRef { .. }
-        | Type::MutRef { .. }
         | Type::Function { .. } => {
-            // Sizes for primitives, vectors, function types, and references
-            // are known, there is nothing to do. Type parameters have unknown
-            // size - just continue.
+            // Sizes for primitives and function types are known; type
+            // parameters have unknown size — nothing to discover.
+        },
+        Type::ImmutRef { inner } | Type::MutRef { inner } => {
+            // Refs are fixed-size, but the referent's types still need
+            // discovery. `ty` was already substituted above, so any
+            // type params in `inner` are concrete — pass `EMPTY_TYPE_LIST`.
+            discover_type_metadata(ctx, *inner, EMPTY_TYPE_LIST, visited, vec_descriptors)?;
+        },
+        Type::Vector { elem } => {
+            discover_type_metadata(ctx, *elem, EMPTY_TYPE_LIST, visited, vec_descriptors)?;
+            if let Some(id) = ctx.vec_descriptor_for(*elem) {
+                vec_descriptors.insert(ty, id);
+            } else if let Some((elem_size, _)) = type_size_and_align(*elem)
+                && let Ok(ptr_offsets) = type_pointer_offsets(*elem)
+            {
+                let ptr_offsets = ptr_offsets.into_iter().map(FrameOffset).collect::<Vec<_>>();
+                let id = ctx.publish_vec_descriptor(*elem, elem_size, &ptr_offsets)?;
+                vec_descriptors.insert(ty, id);
+            }
         },
         Type::Nominal {
             module_id,
@@ -629,7 +693,7 @@ fn walk_and_size(
                         // all types inside must be instantiated. Even if we
                         // encounter some nominal, its type arguments would be
                         // substituted as well.
-                        walk_and_size(ctx, ft, EMPTY_TYPE_LIST, visited)?;
+                        discover_type_metadata(ctx, ft, EMPTY_TYPE_LIST, visited, vec_descriptors)?;
                     }
 
                     // Best-effort layout computation. If any field is still

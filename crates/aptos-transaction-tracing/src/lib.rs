@@ -10,6 +10,7 @@
 
 pub mod counters;
 pub mod filter;
+pub mod logging;
 pub mod store;
 pub mod types;
 

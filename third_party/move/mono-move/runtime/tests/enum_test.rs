@@ -5,12 +5,12 @@
 
 use mono_move_alloc::GlobalArenaPtr;
 use mono_move_core::{
-    Code, CodeOffset as CO, FrameLayoutInfo, FrameOffset as FO, Function, LocalExecutionContext,
-    MicroOp, SortedSafePointEntries, ENUM_DATA_OFFSET, ENUM_TAG_OFFSET,
+    Code, CodeOffset as CO, FrameLayoutInfo, FrameOffset as FO, Function, MicroOp,
+    SortedSafePointEntries, ENUM_DATA_OFFSET, ENUM_TAG_OFFSET,
 };
 use mono_move_runtime::{
-    read_ptr, read_u64, InterpreterContext, ObjectDescriptor, ObjectDescriptorTable,
-    VEC_DATA_OFFSET, VEC_LENGTH_OFFSET,
+    read_ptr, read_u64, InterpreterContext, LocalRuntimeContext, ObjectDescriptor,
+    ObjectDescriptorTable, VEC_DATA_OFFSET, VEC_LENGTH_OFFSET,
 };
 
 // ---------------------------------------------------------------------------
@@ -55,8 +55,8 @@ fn enum_basic() {
         frame_layout: FrameLayoutInfo::new(vec![FO(shape)]),
         safe_point_layouts: SortedSafePointEntries::empty(),
     }];
-    let mut exec_ctx = LocalExecutionContext::with_max_budget();
-    let mut ctx = InterpreterContext::new(&mut exec_ctx, &descriptors, &functions[0]);
+    let mut exec_ctx = LocalRuntimeContext::with_max_budget(descriptors);
+    let mut ctx = InterpreterContext::new(&mut exec_ctx, &functions[0]);
     ctx.run().unwrap();
 
     assert_eq!(ctx.root_result(), 7, "result should be 3 + 4 = 7");
@@ -109,8 +109,8 @@ fn enum_survives_gc() {
         frame_layout: FrameLayoutInfo::new(vec![FO(shape)]),
         safe_point_layouts: SortedSafePointEntries::empty(),
     }];
-    let mut exec_ctx = LocalExecutionContext::with_max_budget();
-    let mut ctx = InterpreterContext::new(&mut exec_ctx, &descriptors, &functions[0]);
+    let mut exec_ctx = LocalRuntimeContext::with_max_budget(descriptors);
+    let mut ctx = InterpreterContext::new(&mut exec_ctx, &functions[0]);
     ctx.run().unwrap();
 
     assert_eq!(
@@ -171,8 +171,8 @@ fn enum_gc_traces_refs() {
         frame_layout: FrameLayoutInfo::new(vec![FO(val), FO(vec), FO(vec_ref)]),
         safe_point_layouts: SortedSafePointEntries::empty(),
     }];
-    let mut exec_ctx = LocalExecutionContext::with_max_budget();
-    let mut ctx = InterpreterContext::new(&mut exec_ctx, &descriptors, &functions[0]);
+    let mut exec_ctx = LocalRuntimeContext::with_max_budget(descriptors);
+    let mut ctx = InterpreterContext::new(&mut exec_ctx, &functions[0]);
     ctx.run().unwrap();
 
     assert_eq!(ctx.root_result(), 10, "vec[0] should be 10 after GC");
@@ -236,8 +236,8 @@ fn enum_pattern_match() {
         frame_layout: FrameLayoutInfo::new(vec![FO(op)]),
         safe_point_layouts: SortedSafePointEntries::empty(),
     }];
-    let mut exec_ctx = LocalExecutionContext::with_max_budget();
-    let mut ctx = InterpreterContext::new(&mut exec_ctx, &descriptors, &functions[0]);
+    let mut exec_ctx = LocalRuntimeContext::with_max_budget(descriptors);
+    let mut ctx = InterpreterContext::new(&mut exec_ctx, &functions[0]);
     ctx.run().unwrap();
 
     assert_eq!(ctx.root_result(), 35, "result should be 10 + 25 = 35");
@@ -285,8 +285,8 @@ fn enum_variant_switch() {
         frame_layout: FrameLayoutInfo::new(vec![FO(e)]),
         safe_point_layouts: SortedSafePointEntries::empty(),
     }];
-    let mut exec_ctx = LocalExecutionContext::with_max_budget();
-    let mut ctx = InterpreterContext::new(&mut exec_ctx, &descriptors, &functions[0]);
+    let mut exec_ctx = LocalRuntimeContext::with_max_budget(descriptors);
+    let mut ctx = InterpreterContext::new(&mut exec_ctx, &functions[0]);
     ctx.run().unwrap();
 
     assert_eq!(ctx.root_result(), 223, "result should be 1 + 222 = 223");
@@ -336,8 +336,8 @@ fn enum_borrow_field() {
         frame_layout: FrameLayoutInfo::new(vec![FO(e), FO(r#ref), FO(e_ref)]),
         safe_point_layouts: SortedSafePointEntries::empty(),
     }];
-    let mut exec_ctx = LocalExecutionContext::with_max_budget();
-    let mut ctx = InterpreterContext::new(&mut exec_ctx, &descriptors, &functions[0]);
+    let mut exec_ctx = LocalRuntimeContext::with_max_budget(descriptors);
+    let mut ctx = InterpreterContext::new(&mut exec_ctx, &functions[0]);
     ctx.run().unwrap();
 
     assert_eq!(ctx.root_result(), 99, "field_b should be 99 after WriteRef");
@@ -393,8 +393,8 @@ fn enum_gc_variant_switching() {
         frame_layout: FrameLayoutInfo::new(vec![FO(ctr), FO(vec), FO(vec_ref)]),
         safe_point_layouts: SortedSafePointEntries::empty(),
     }];
-    let mut exec_ctx = LocalExecutionContext::with_max_budget();
-    let mut ctx = InterpreterContext::new(&mut exec_ctx, &descriptors, &functions[0]);
+    let mut exec_ctx = LocalRuntimeContext::with_max_budget(descriptors);
+    let mut ctx = InterpreterContext::new(&mut exec_ctx, &functions[0]);
     ctx.run().unwrap();
 
     assert_eq!(
@@ -452,8 +452,8 @@ fn enum_in_struct() {
         frame_layout: FrameLayoutInfo::new(vec![FO(wrapper), FO(payload)]),
         safe_point_layouts: SortedSafePointEntries::empty(),
     }];
-    let mut exec_ctx = LocalExecutionContext::with_max_budget();
-    let mut ctx = InterpreterContext::new(&mut exec_ctx, &descriptors, &functions[0]);
+    let mut exec_ctx = LocalRuntimeContext::with_max_budget(descriptors);
+    let mut ctx = InterpreterContext::new(&mut exec_ctx, &functions[0]);
     ctx.run().unwrap();
 
     assert_eq!(
@@ -522,8 +522,8 @@ fn enum_in_vector() {
         frame_layout: FrameLayoutInfo::new(vec![FO(vec), FO(e), FO(vec_ref)]),
         safe_point_layouts: SortedSafePointEntries::empty(),
     }];
-    let mut exec_ctx = LocalExecutionContext::with_max_budget();
-    let mut ctx = InterpreterContext::new(&mut exec_ctx, &descriptors, &functions[0]);
+    let mut exec_ctx = LocalRuntimeContext::with_max_budget(descriptors);
+    let mut ctx = InterpreterContext::new(&mut exec_ctx, &functions[0]);
     ctx.run().unwrap();
 
     assert_eq!(

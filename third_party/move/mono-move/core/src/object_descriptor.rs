@@ -1,15 +1,16 @@
 // Copyright (c) Aptos Foundation
 // Licensed pursuant to the Innovation-Enabling Source Code License, available at https://github.com/aptos-labs/aptos-core/blob/main/LICENSE
 
-//! Object descriptors and the program-wide [`ObjectDescriptorTable`].
+//! Object descriptors and the [`DescriptorProvider`] trait.
 //!
 //! An [`ObjectDescriptor`] tells the GC how to trace internal pointers
-//! within a single heap object. The descriptor table is a program-wide
-//! `Vec<ObjectDescriptor>` indexed by [`DescriptorId`], with two reserved
-//! entries (`Trivial` at 0, `Closure` at 1) that are populated implicitly
-//! by [`ObjectDescriptorTable::new`].
+//! within a single heap object. Two entries are reserved at fixed
+//! [`DescriptorId`] slots: `Trivial` (id `0`) and `Closure` (id `1`).
+//! Producers (the global context, tests) append user descriptors starting
+//! at [`RESERVED_DESCRIPTOR_COUNT`]; consumers (the runtime) look them up
+//! through a [`DescriptorProvider`].
 
-use mono_move_core::DescriptorId;
+use crate::DescriptorId;
 
 // ---------------------------------------------------------------------------
 // Object descriptors (for GC tracing)
@@ -19,34 +20,29 @@ use mono_move_core::DescriptorId;
 /// trace internal pointers. Only one level of indirection is described;
 /// pointed-to objects are self-describing via their own headers.
 ///
-/// `ObjectDescriptor` is opaque to external callers — the wrapped
-/// [`ObjectDescriptorInner`] enum is crate-private. External code creates
-/// descriptors only through the validating constructors
+/// External code creates descriptors through the validating constructors
 /// ([`Self::new_vector`], [`Self::new_struct`], [`Self::new_enum`],
-/// [`Self::new_captured_data`]) which return `anyhow::Result`; `Trivial`
-/// and `Closure` are placed by [`ObjectDescriptorTable::new`] at their
-/// reserved indices and cannot be constructed externally. Any
-/// `&ObjectDescriptor` flowing through the runtime is therefore
+/// [`Self::new_captured_data`]) which return `anyhow::Result`. `Trivial`
+/// and `Closure` aren't externally constructable; they live only at their
+/// reserved slots via [`TRIVIAL_DESCRIPTOR`] / [`CLOSURE_DESCRIPTOR`].
+/// Any `&ObjectDescriptor` flowing through the runtime is therefore
 /// self-sound by construction (nonzero size, in-bounds 8-byte-aligned
 /// strictly-sorted pointer offsets).
+///
+/// [`Self::inner`] exposes the internal variant for the runtime's GC and
+/// verifier to dispatch on. The opacity guarantee is "external code can
+/// only *construct* validated descriptors"; reading the variant is fine.
 #[derive(Debug)]
 pub struct ObjectDescriptor(ObjectDescriptorInner);
 
-/// Crate-private representation of an [`ObjectDescriptor`]. The runtime's
-/// GC and verifier match on this directly via [`ObjectDescriptor::inner`].
+/// Variants of [`ObjectDescriptor`]. The runtime's GC and verifier match
+/// on this via [`ObjectDescriptor::inner`].
 #[derive(Debug)]
-pub(crate) enum ObjectDescriptorInner {
+pub enum ObjectDescriptorInner {
     /// No internal heap references. GC copies the blob and moves on.
     Trivial,
 
     /// Closure object — fixed runtime layout shared by every closure.
-    ///
-    /// Data-region layout (`size = CLOSURE_DATA_SIZE = 32`):
-    /// `[func_ref(16)] [mask(8)] [captured_data_ptr(8)]`. The single heap
-    /// pointer is `captured_data_ptr` at offset
-    /// `CLOSURE_CAPTURED_DATA_PTR_OFFSET = 24`. Both the size and the
-    /// pointer offset are constants of the runtime layout — there is
-    /// nothing per-instance to store here.
     Closure,
 
     /// Vector whose elements may contain heap pointers at known offsets.
@@ -95,6 +91,18 @@ pub(crate) enum ObjectDescriptorInner {
 }
 
 impl ObjectDescriptor {
+    /// Construct the reserved [`Trivial`](ObjectDescriptorInner::Trivial)
+    /// descriptor. Producers install one of these at [`TRIVIAL_DESCRIPTOR_ID`].
+    pub const fn trivial() -> Self {
+        Self(ObjectDescriptorInner::Trivial)
+    }
+
+    /// Construct the reserved [`Closure`](ObjectDescriptorInner::Closure)
+    /// descriptor. Producers install one of these at [`CLOSURE_DESCRIPTOR_ID`].
+    pub const fn closure() -> Self {
+        Self(ObjectDescriptorInner::Closure)
+    }
+
     /// Construct a [`Vector`](ObjectDescriptorInner::Vector) descriptor.
     ///
     /// Returns `Err` if `elem_size == 0` or any offset in
@@ -142,8 +150,12 @@ impl ObjectDescriptor {
             anyhow::anyhow!("Enum: size {} too small to hold the 8-byte tag", size)
         })?;
         for (variant, offsets) in variant_pointer_offsets.iter().enumerate() {
-            let label = format!("Enum::variant_pointer_offsets[{}]", variant);
-            check_pointer_offsets(&label, offsets, variant_region)?;
+            check_pointer_offsets_indexed(
+                "Enum::variant_pointer_offsets",
+                variant,
+                offsets,
+                variant_region,
+            )?;
         }
         Ok(Self(ObjectDescriptorInner::Enum {
             size,
@@ -166,46 +178,57 @@ impl ObjectDescriptor {
         }))
     }
 
-    /// Crate-internal access to the inner enum for pattern matching by
-    /// the GC and verifier.
-    pub(crate) fn inner(&self) -> &ObjectDescriptorInner {
+    /// Access the inner variant for pattern matching by the GC and
+    /// verifier.
+    pub fn inner(&self) -> &ObjectDescriptorInner {
         &self.0
     }
 }
 
-/// Reserved descriptor table index for [`ObjectDescriptorInner::Trivial`].
-/// Every program's descriptor table has `Trivial` at this index.
+/// Reserved descriptor slot for [`ObjectDescriptorInner::Trivial`].
 pub const TRIVIAL_DESCRIPTOR_ID: DescriptorId = DescriptorId(0);
 
-/// Reserved descriptor table index for [`ObjectDescriptorInner::Closure`].
-/// Every program's descriptor table has `Closure` at this index. The
+/// Reserved descriptor slot for [`ObjectDescriptorInner::Closure`]. The
 /// `PackClosure` micro-op uses this implicitly — it does not carry a
 /// closure descriptor id of its own.
 pub const CLOSURE_DESCRIPTOR_ID: DescriptorId = DescriptorId(1);
 
+/// Number of reserved descriptors that every provider exposes (currently
+/// `Trivial` and `Closure`). User descriptors are assigned ids starting
+/// at this value.
+pub const RESERVED_DESCRIPTOR_COUNT: u32 = 2;
+
 // ---------------------------------------------------------------------------
-// Object descriptor table
+// DescriptorProvider
 // ---------------------------------------------------------------------------
 
-/// Program-wide table of [`ObjectDescriptor`] entries, indexed by
-/// [`DescriptorId`].
+/// Per-id lookup of object descriptors.
 ///
-/// The table starts with two reserved entries:
-///   - index `0` is [`ObjectDescriptorInner::Trivial`]
-///   - index `1` is [`ObjectDescriptorInner::Closure`]
+/// # Invariant
 ///
-/// User descriptors are appended starting at index `2` via [`Self::push`].
-/// `Trivial` and `Closure` aren't externally constructable; they only
-/// live at their reserved indices.
+/// For every [`DescriptorId`] referenced by a function the interpreter
+/// could execute next, [`Self::descriptor`] must return `Some`.
+/// The verifier checks this invariant up-front for the entry function.
+pub trait DescriptorProvider {
+    /// Returns the descriptor for `id`, or `None` if `id` is not a
+    /// descriptor known to this provider.
+    fn descriptor(&self, id: DescriptorId) -> Option<&ObjectDescriptor>;
+}
+
+// ---------------------------------------------------------------------------
+// ObjectDescriptorTable — a simple in-memory provider for tests/benches
+// ---------------------------------------------------------------------------
+
+/// In-memory table of [`ObjectDescriptor`] entries, indexed by
+/// [`DescriptorId`]. Suitable for tests, benches, and small standalone
+/// programs that need a `DescriptorProvider` without going through the
+/// global context.
 ///
+/// The table starts with the two reserved entries (`Trivial` at id `0`,
+/// `Closure` at id `1`); user descriptors are appended via [`Self::push`].
 /// Each user descriptor is validated by its constructor before reaching
-/// the table (nonzero size, in-bounds 8-byte-aligned strictly-sorted
-/// pointer offsets, `Enum` size large enough for the 8-byte tag). Any
-/// `&ObjectDescriptorTable` is therefore structurally well-formed by
-/// construction; no separate verification pass is needed.
-///
-/// Implements `Deref<Target = [ObjectDescriptor]>`, so it can be passed
-/// anywhere a `&[ObjectDescriptor]` is expected.
+/// the table, so any `&ObjectDescriptorTable` is structurally well-formed
+/// by construction.
 #[derive(Debug)]
 pub struct ObjectDescriptorTable {
     descriptors: Vec<ObjectDescriptor>,
@@ -218,21 +241,11 @@ impl ObjectDescriptorTable {
     /// Fresh table containing only the two reserved entries.
     pub fn new() -> Self {
         Self {
-            descriptors: vec![
-                ObjectDescriptor(ObjectDescriptorInner::Trivial),
-                ObjectDescriptor(ObjectDescriptorInner::Closure),
-            ],
+            descriptors: vec![ObjectDescriptor::trivial(), ObjectDescriptor::closure()],
         }
     }
 
     /// Append a user descriptor and return its assigned [`DescriptorId`].
-    /// Callers must capture the returned id and use it in micro-ops; the
-    /// descriptor's index in the underlying storage is not part of the
-    /// public API.
-    ///
-    /// `desc` is sound by construction (the public constructors on
-    /// [`ObjectDescriptor`] validate inline), so this method does no
-    /// further validation; it just appends.
     pub fn push(&mut self, desc: ObjectDescriptor) -> DescriptorId {
         let id = DescriptorId(
             u32::try_from(self.descriptors.len())
@@ -242,12 +255,7 @@ impl ObjectDescriptorTable {
         id
     }
 
-    /// View the table as a slice indexed by [`DescriptorId`].
-    pub fn as_slice(&self) -> &[ObjectDescriptor] {
-        &self.descriptors
-    }
-
-    /// Number of entries (always at least 2).
+    /// Number of entries (always at least [`RESERVED_DESCRIPTOR_COUNT`]).
     pub fn len(&self) -> usize {
         self.descriptors.len()
     }
@@ -259,32 +267,58 @@ impl Default for ObjectDescriptorTable {
     }
 }
 
-impl std::ops::Deref for ObjectDescriptorTable {
-    type Target = [ObjectDescriptor];
-
-    fn deref(&self) -> &[ObjectDescriptor] {
-        self.as_slice()
+impl DescriptorProvider for ObjectDescriptorTable {
+    fn descriptor(&self, id: DescriptorId) -> Option<&ObjectDescriptor> {
+        self.descriptors.get(id.as_usize())
     }
+}
+
+// ---------------------------------------------------------------------------
+// Helpers
+// ---------------------------------------------------------------------------
+
+/// Variant of [`check_pointer_offsets`] that defers the label allocation
+/// to the error path. Hot construction loops (e.g. enums with many
+/// variants) avoid the per-iteration `format!` on the success path.
+fn check_pointer_offsets_indexed(
+    label_prefix: &str,
+    index: usize,
+    offsets: &[u32],
+    region_size: u32,
+) -> anyhow::Result<()> {
+    check_pointer_offsets_with_label(
+        || format!("{}[{}]", label_prefix, index),
+        offsets,
+        region_size,
+    )
 }
 
 /// Check that each offset in `offsets` names an 8-byte pointer in-bounds of
 /// a region of `region_size` bytes (`off + 8 <= region_size`), is 8-byte
 /// aligned, and that the list is strictly sorted (non-overlap follows).
 fn check_pointer_offsets(label: &str, offsets: &[u32], region_size: u32) -> anyhow::Result<()> {
+    check_pointer_offsets_with_label(|| label.to_string(), offsets, region_size)
+}
+
+fn check_pointer_offsets_with_label(
+    label: impl Fn() -> String,
+    offsets: &[u32],
+    region_size: u32,
+) -> anyhow::Result<()> {
     for &off in offsets {
         anyhow::ensure!(
             off % 8 == 0,
             "{}: offset {} is not 8-byte aligned",
-            label,
+            label(),
             off
         );
         let end = off
             .checked_add(8)
-            .ok_or_else(|| anyhow::anyhow!("{}: offset {} + 8 overflows", label, off))?;
+            .ok_or_else(|| anyhow::anyhow!("{}: offset {} + 8 overflows", label(), off))?;
         anyhow::ensure!(
             end <= region_size,
             "{}: pointer at offset {} (end {}) exceeds region size {}",
-            label,
+            label(),
             off,
             end,
             region_size
@@ -294,7 +328,7 @@ fn check_pointer_offsets(label: &str, offsets: &[u32], region_size: u32) -> anyh
         anyhow::ensure!(
             w[0] < w[1],
             "{}: offsets not strictly sorted ({} >= {})",
-            label,
+            label(),
             w[0],
             w[1]
         );
@@ -310,8 +344,14 @@ mod tests {
     fn new_has_reserved_entries() {
         let t = ObjectDescriptorTable::new();
         assert_eq!(t.len(), 2);
-        assert!(matches!(t[0].inner(), ObjectDescriptorInner::Trivial));
-        assert!(matches!(t[1].inner(), ObjectDescriptorInner::Closure));
+        assert!(matches!(
+            t.descriptor(TRIVIAL_DESCRIPTOR_ID).map(|d| d.inner()),
+            Some(ObjectDescriptorInner::Trivial)
+        ));
+        assert!(matches!(
+            t.descriptor(CLOSURE_DESCRIPTOR_ID).map(|d| d.inner()),
+            Some(ObjectDescriptorInner::Closure)
+        ));
     }
 
     #[test]
@@ -407,14 +447,5 @@ mod tests {
         // 8 + 8 = 16 > 8
         assert!(err_msg(ObjectDescriptor::new_captured_data(8, vec![8]))
             .contains("exceeds region size"));
-    }
-
-    // ----- Deref to slice -----
-
-    #[test]
-    fn deref_to_slice_works() {
-        let t = ObjectDescriptorTable::new();
-        let s: &[ObjectDescriptor] = &t;
-        assert_eq!(s.len(), 2);
     }
 }

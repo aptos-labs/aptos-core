@@ -30,10 +30,9 @@
 use mono_move_alloc::GlobalArenaPtr;
 use mono_move_core::{
     Code, FrameLayoutInfo, FrameOffset as FO, Function, IntBinaryOp, IntNegateOp, IntOperand,
-    IntShiftOp, IntTy, LocalExecutionContext, MicroOp, ShiftOperand, SortedSafePointEntries,
-    FRAME_METADATA_SIZE,
+    IntShiftOp, IntTy, MicroOp, ShiftOperand, SortedSafePointEntries, FRAME_METADATA_SIZE,
 };
-use mono_move_runtime::{InterpreterContext, ObjectDescriptor};
+use mono_move_runtime::{InterpreterContext, LocalRuntimeContext};
 use move_core_types::int256::{I256, U256};
 use proptest::prelude::*;
 
@@ -203,9 +202,8 @@ fn run_wide(
     dst_size: usize,
 ) -> Result<Vec<u8>, anyhow::Error> {
     let func = make_func(op);
-    let descriptors: Vec<ObjectDescriptor> = vec![];
-    let mut exec_ctx = LocalExecutionContext::with_max_budget();
-    let mut ctx = InterpreterContext::new(&mut exec_ctx, &descriptors, &func);
+    let mut exec_ctx = LocalRuntimeContext::with_max_budget_no_descriptors();
+    let mut ctx = InterpreterContext::new(&mut exec_ctx, &func);
     if !lhs_bytes.is_empty() {
         ctx.set_root_arg(SLOT_LHS, lhs_bytes);
     }

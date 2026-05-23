@@ -9,12 +9,11 @@ mod helpers;
 const N: u64 = 1000;
 
 fn bench_nested_loop(c: &mut Criterion) {
-    use mono_move_core::LocalExecutionContext;
     use mono_move_programs::{
         nested_loop::{micro_op_nested_loop, move_bytecode_nested_loop, native_nested_loop},
         testing,
     };
-    use mono_move_runtime::InterpreterContext;
+    use mono_move_runtime::{InterpreterContext, LocalRuntimeContext};
 
     // -- native & micro_op -------------------------------------------------
     {
@@ -29,11 +28,11 @@ fn bench_nested_loop(c: &mut Criterion) {
 
         // plain (no gas instrumentation)
         let (functions, descriptors) = micro_op_nested_loop();
-        let mut exec_ctx = LocalExecutionContext::unmetered();
+        let mut exec_ctx = LocalRuntimeContext::unmetered_with_descriptors(descriptors);
         // TODO: hoist interpreter context setup out of the timed body.
         group.bench_function("micro_op", |b| {
             b.iter(|| {
-                let mut ctx = InterpreterContext::new(&mut exec_ctx, &descriptors, unsafe {
+                let mut ctx = InterpreterContext::new(&mut exec_ctx, unsafe {
                     functions[0].as_ref_unchecked()
                 });
                 ctx.set_root_arg(0, &N.to_le_bytes());
@@ -43,13 +42,13 @@ fn bench_nested_loop(c: &mut Criterion) {
         });
 
         // with gas instrumentation
-        let (functions_gas, _) = micro_op_nested_loop();
+        let (functions_gas, descriptors_gas) = micro_op_nested_loop();
         helpers::gas_instrument(&functions_gas);
-        let mut exec_ctx = LocalExecutionContext::with_max_budget();
+        let mut exec_ctx = LocalRuntimeContext::with_max_budget(descriptors_gas);
         // TODO: hoist interpreter context setup out of the timed body.
         group.bench_function("micro_op/gas", |b| {
             b.iter(|| {
-                let mut ctx = InterpreterContext::new(&mut exec_ctx, &descriptors, unsafe {
+                let mut ctx = InterpreterContext::new(&mut exec_ctx, unsafe {
                     functions_gas[0].as_ref_unchecked()
                 });
                 ctx.set_root_arg(0, &N.to_le_bytes());

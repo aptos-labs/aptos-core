@@ -6,12 +6,12 @@
 
 use mono_move_alloc::GlobalArenaPtr;
 use mono_move_core::{
-    Code, FrameLayoutInfo, FrameOffset as FO, Function, FunctionPtr, LocalExecutionContext,
-    MicroOp, SortedSafePointEntries, FRAME_METADATA_SIZE,
+    Code, FrameLayoutInfo, FrameOffset as FO, Function, FunctionPtr, MicroOp,
+    SortedSafePointEntries, FRAME_METADATA_SIZE,
 };
 use mono_move_runtime::{
-    read_ptr, read_u64, InterpreterContext, ObjectDescriptor, ObjectDescriptorTable,
-    VEC_DATA_OFFSET,
+    read_ptr, read_u64, InterpreterContext, LocalRuntimeContext, ObjectDescriptor,
+    ObjectDescriptorTable, VEC_DATA_OFFSET,
 };
 
 #[test]
@@ -58,8 +58,8 @@ fn ref_basic() {
         frame_layout: FrameLayoutInfo::new(vec![FO(vec), FO(r#ref), FO(vec_ref)]),
         safe_point_layouts: SortedSafePointEntries::empty(),
     }];
-    let mut exec_ctx = LocalExecutionContext::with_max_budget();
-    let mut ctx = InterpreterContext::new(&mut exec_ctx, &descriptors, &functions[0]);
+    let mut exec_ctx = LocalRuntimeContext::with_max_budget(descriptors);
+    let mut ctx = InterpreterContext::new(&mut exec_ctx, &functions[0]);
     ctx.run().unwrap();
 
     assert_eq!(
@@ -117,8 +117,8 @@ fn ref_survives_gc() {
         frame_layout: FrameLayoutInfo::new(vec![FO(vec), FO(ref_base), FO(vec_ref)]),
         safe_point_layouts: SortedSafePointEntries::empty(),
     }];
-    let mut exec_ctx = LocalExecutionContext::with_max_budget();
-    let mut ctx = InterpreterContext::new(&mut exec_ctx, &descriptors, &functions[0]);
+    let mut exec_ctx = LocalRuntimeContext::with_max_budget(descriptors);
+    let mut ctx = InterpreterContext::new(&mut exec_ctx, &functions[0]);
     ctx.run().unwrap();
 
     assert_eq!(
@@ -204,8 +204,8 @@ fn ref_cross_frame() {
         safe_point_layouts: SortedSafePointEntries::empty(),
     };
 
-    let mut exec_ctx = LocalExecutionContext::with_max_budget();
-    let mut ctx = InterpreterContext::new(&mut exec_ctx, &descriptors, &main_func);
+    let mut exec_ctx = LocalRuntimeContext::with_max_budget(descriptors);
+    let mut ctx = InterpreterContext::new(&mut exec_ctx, &main_func);
     ctx.run().unwrap();
 
     assert_eq!(
@@ -288,8 +288,8 @@ fn ref_multiple_borrows() {
         ]),
         safe_point_layouts: SortedSafePointEntries::empty(),
     }];
-    let mut exec_ctx = LocalExecutionContext::with_max_budget();
-    let mut ctx = InterpreterContext::new(&mut exec_ctx, &descriptors, &functions[0]);
+    let mut exec_ctx = LocalRuntimeContext::with_max_budget(descriptors);
+    let mut ctx = InterpreterContext::new(&mut exec_ctx, &functions[0]);
     ctx.run().unwrap();
 
     assert_eq!(
@@ -350,8 +350,8 @@ fn ref_borrow_local() {
         frame_layout: FrameLayoutInfo::new(vec![FO(ref_base), FO(vec), FO(vec_ref)]),
         safe_point_layouts: SortedSafePointEntries::empty(),
     }];
-    let mut exec_ctx = LocalExecutionContext::with_max_budget();
-    let mut ctx = InterpreterContext::new(&mut exec_ctx, &descriptors, &functions[0]);
+    let mut exec_ctx = LocalRuntimeContext::with_max_budget(descriptors);
+    let mut ctx = InterpreterContext::new(&mut exec_ctx, &functions[0]);
     ctx.run().unwrap();
 
     assert_eq!(
@@ -433,8 +433,8 @@ fn ref_nested_vectors() {
         ]),
         safe_point_layouts: SortedSafePointEntries::empty(),
     }];
-    let mut exec_ctx = LocalExecutionContext::with_max_budget();
-    let mut ctx = InterpreterContext::new(&mut exec_ctx, &descriptors, &functions[0]);
+    let mut exec_ctx = LocalRuntimeContext::with_max_budget(descriptors);
+    let mut ctx = InterpreterContext::new(&mut exec_ctx, &functions[0]);
     ctx.run().unwrap();
 
     assert_eq!(
@@ -513,8 +513,8 @@ fn ref_survives_double_gc() {
         frame_layout: FrameLayoutInfo::new(vec![FO(vec), FO(ref_base), FO(vec_ref)]),
         safe_point_layouts: SortedSafePointEntries::empty(),
     }];
-    let mut exec_ctx = LocalExecutionContext::with_max_budget();
-    let mut ctx = InterpreterContext::new(&mut exec_ctx, &descriptors, &functions[0]);
+    let mut exec_ctx = LocalRuntimeContext::with_max_budget(descriptors);
+    let mut ctx = InterpreterContext::new(&mut exec_ctx, &functions[0]);
     ctx.run().unwrap();
 
     assert_eq!(
@@ -569,8 +569,8 @@ fn ref_struct_field_borrow() {
         frame_layout: FrameLayoutInfo::new(vec![FO(entry), FO(r#ref), FO(entry_ref)]),
         safe_point_layouts: SortedSafePointEntries::empty(),
     }];
-    let mut exec_ctx = LocalExecutionContext::with_max_budget();
-    let mut ctx = InterpreterContext::new(&mut exec_ctx, &descriptors, &functions[0]);
+    let mut exec_ctx = LocalRuntimeContext::with_max_budget(descriptors);
+    let mut ctx = InterpreterContext::new(&mut exec_ctx, &functions[0]);
     ctx.run().unwrap();
 
     assert_eq!(
@@ -620,8 +620,8 @@ fn ref_struct_field_survives_gc() {
         frame_layout: FrameLayoutInfo::new(vec![FO(entry), FO(ref_base), FO(entry_ref)]),
         safe_point_layouts: SortedSafePointEntries::empty(),
     }];
-    let mut exec_ctx = LocalExecutionContext::with_max_budget();
-    let mut ctx = InterpreterContext::new(&mut exec_ctx, &descriptors, &functions[0]);
+    let mut exec_ctx = LocalRuntimeContext::with_max_budget(descriptors);
+    let mut ctx = InterpreterContext::new(&mut exec_ctx, &functions[0]);
     ctx.run().unwrap();
 
     assert_eq!(ctx.root_result(), 13, "entry.value should be 13 after GC");
@@ -666,8 +666,8 @@ fn ref_self_copy() {
     };
     let descriptors = ObjectDescriptorTable::new();
 
-    let mut exec_ctx = LocalExecutionContext::with_max_budget();
-    let mut ctx = InterpreterContext::new(&mut exec_ctx, &descriptors, &function);
+    let mut exec_ctx = LocalRuntimeContext::with_max_budget(descriptors);
+    let mut ctx = InterpreterContext::new(&mut exec_ctx, &function);
     ctx.run().unwrap();
 
     assert_eq!(

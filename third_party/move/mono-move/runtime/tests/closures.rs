@@ -14,10 +14,12 @@
 use mono_move_alloc::GlobalArenaPtr;
 use mono_move_core::{
     CallClosureOp, ClosureFuncRef, Code, CodeOffset as CO, DescriptorId, FrameLayoutInfo,
-    FrameOffset as FO, Function, FunctionPtr, LocalExecutionContext, MicroOp, PackClosureOp,
-    SizedSlot, SortedSafePointEntries, FRAME_METADATA_SIZE,
+    FrameOffset as FO, Function, FunctionPtr, MicroOp, PackClosureOp, SizedSlot,
+    SortedSafePointEntries, FRAME_METADATA_SIZE,
 };
-use mono_move_runtime::{InterpreterContext, ObjectDescriptor, ObjectDescriptorTable};
+use mono_move_runtime::{
+    InterpreterContext, LocalRuntimeContext, ObjectDescriptor, ObjectDescriptorTable,
+};
 
 // ---------------------------------------------------------------------------
 // Descriptors (shared — these describe object *shapes*, not test state)
@@ -207,9 +209,9 @@ fn make_vector_map() -> Function {
     }
 }
 
-fn run_main_and_get_u64_result(main: &Function, descriptors: &[ObjectDescriptor]) -> u64 {
-    let mut exec_ctx = LocalExecutionContext::with_max_budget();
-    let mut ctx = InterpreterContext::new(&mut exec_ctx, descriptors, main);
+fn run_main_and_get_u64_result(main: &Function, descriptors: ObjectDescriptorTable) -> u64 {
+    let mut exec_ctx = LocalRuntimeContext::with_max_budget(descriptors);
+    let mut ctx = InterpreterContext::new(&mut exec_ctx, main);
     ctx.run().unwrap();
     ctx.root_result()
 }
@@ -277,7 +279,7 @@ fn identity_no_captures() {
         safe_point_layouts: SortedSafePointEntries::empty(),
     };
 
-    let result = run_main_and_get_u64_result(&main, &descs.table);
+    let result = run_main_and_get_u64_result(&main, descs.table);
     assert_eq!(result, 42);
 
     for ptr in function_ptrs {
@@ -349,7 +351,7 @@ fn add_captured_a_provided_b() {
         safe_point_layouts: SortedSafePointEntries::empty(),
     };
 
-    let result = run_main_and_get_u64_result(&main, &descs.table);
+    let result = run_main_and_get_u64_result(&main, descs.table);
     assert_eq!(result, 42);
 
     for ptr in function_ptrs {
@@ -414,7 +416,7 @@ fn add_provided_a_captured_b() {
         safe_point_layouts: SortedSafePointEntries::empty(),
     };
 
-    let result = run_main_and_get_u64_result(&main, &descs.table);
+    let result = run_main_and_get_u64_result(&main, descs.table);
     assert_eq!(result, 42);
 
     for ptr in function_ptrs {
@@ -482,7 +484,7 @@ fn add_all_captured() {
         safe_point_layouts: SortedSafePointEntries::empty(),
     };
 
-    let result = run_main_and_get_u64_result(&main, &descs.table);
+    let result = run_main_and_get_u64_result(&main, descs.table);
     assert_eq!(result, 42);
 
     for ptr in function_ptrs {
@@ -654,7 +656,7 @@ fn vector_map_add_captured() {
         safe_point_layouts: SortedSafePointEntries::empty(),
     };
 
-    let result = run_main_and_get_u64_result(&main, &descs.table);
+    let result = run_main_and_get_u64_result(&main, descs.table);
     assert_eq!(result, (2 + y_val) + (3 + y_val) + (4 + y_val));
 
     for ptr in function_ptrs {
