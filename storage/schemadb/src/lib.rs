@@ -36,7 +36,8 @@ use iterator::{ScanDirection, SchemaIterator};
 /// Type alias to `rocksdb::ReadOptions`. See [`rocksdb doc`](https://github.com/pingcap/rust-rocksdb/blob/master/src/rocksdb_options.rs)
 pub use rocksdb::{
     statistics::Ticker, BlockBasedIndexType, BlockBasedOptions, Cache, ColumnFamilyDescriptor,
-    DBCompressionType, Env, Options, ReadOptions, SliceTransform, DEFAULT_COLUMN_FAMILY_NAME,
+    DBCompressionType, Env, Options, ReadOptions, SliceTransform, WriteBufferManager,
+    DEFAULT_COLUMN_FAMILY_NAME,
 };
 use rocksdb::{ErrorKind, WriteOptions};
 use std::{collections::HashSet, fmt, iter::Iterator, path::Path};

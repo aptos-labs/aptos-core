@@ -22,7 +22,9 @@ use aptos_config::config::RocksdbConfig;
 use aptos_experimental_runtimes::thread_manager::THREAD_MANAGER;
 use aptos_logger::prelude::info;
 use aptos_rocksdb_options::gen_rocksdb_options;
-use aptos_schemadb::{batch::SchemaBatch, Cache, ColumnFamilyDescriptor, Env, DB};
+use aptos_schemadb::{
+    batch::SchemaBatch, Cache, ColumnFamilyDescriptor, Env, WriteBufferManager, DB,
+};
 use aptos_storage_interface::Result;
 use aptos_types::transaction::Version;
 use std::{
@@ -114,6 +116,7 @@ impl LedgerDb {
         ledger_db_config: RocksdbConfig,
         env: Option<&Env>,
         block_cache: Option<&Cache>,
+        write_buffer_manager: Option<&WriteBufferManager>,
         readonly: bool,
     ) -> Result<Self> {
         let ledger_metadata_db_path = Self::metadata_db_path(db_root_path.as_ref());
@@ -123,6 +126,7 @@ impl LedgerDb {
             &ledger_db_config,
             env,
             block_cache,
+            write_buffer_manager,
             readonly,
         )?);
 
@@ -149,6 +153,7 @@ impl LedgerDb {
                         &ledger_db_config,
                         env,
                         block_cache,
+                        write_buffer_manager,
                         readonly,
                     )
                     .unwrap(),
@@ -166,6 +171,7 @@ impl LedgerDb {
                         &ledger_db_config,
                         env,
                         block_cache,
+                        write_buffer_manager,
                         readonly,
                     )
                     .unwrap(),
@@ -179,6 +185,7 @@ impl LedgerDb {
                         &ledger_db_config,
                         env,
                         block_cache,
+                        write_buffer_manager,
                         readonly,
                     )
                     .unwrap(),
@@ -192,6 +199,7 @@ impl LedgerDb {
                         &ledger_db_config,
                         env,
                         block_cache,
+                        write_buffer_manager,
                         readonly,
                     )
                     .unwrap(),
@@ -205,6 +213,7 @@ impl LedgerDb {
                         &ledger_db_config,
                         env,
                         block_cache,
+                        write_buffer_manager,
                         readonly,
                     )
                     .unwrap(),
@@ -218,6 +227,7 @@ impl LedgerDb {
                         &ledger_db_config,
                         env,
                         block_cache,
+                        write_buffer_manager,
                         readonly,
                     )
                     .unwrap(),
@@ -231,6 +241,7 @@ impl LedgerDb {
                         &ledger_db_config,
                         env,
                         block_cache,
+                        write_buffer_manager,
                         readonly,
                     )
                     .unwrap(),
@@ -259,6 +270,7 @@ impl LedgerDb {
         let ledger_db = Self::new(
             db_root_path,
             RocksdbConfig::default(),
+            None,
             None,
             None,
             /*readonly=*/ false,
@@ -394,18 +406,19 @@ impl LedgerDb {
         db_config: &RocksdbConfig,
         env: Option<&Env>,
         block_cache: Option<&Cache>,
+        write_buffer_manager: Option<&WriteBufferManager>,
         readonly: bool,
     ) -> Result<DB> {
         let db = if readonly {
             DB::open_cf_readonly(
-                gen_rocksdb_options(db_config, env, true),
+                gen_rocksdb_options(db_config, env, write_buffer_manager, true),
                 path.clone(),
                 name,
                 Self::gen_cfds_by_name(db_config, block_cache, name),
             )?
         } else {
             DB::open_cf(
-                gen_rocksdb_options(db_config, env, false),
+                gen_rocksdb_options(db_config, env, write_buffer_manager, false),
                 path.clone(),
                 name,
                 Self::gen_cfds_by_name(db_config, block_cache, name),

@@ -10,7 +10,7 @@ use crate::{
 use aptos_config::config::{HotStateConfig, PrunerConfig, RocksdbConfigs, StorageDirPaths};
 use aptos_db_indexer::db_indexer::InternalIndexerDB;
 use aptos_logger::prelude::*;
-use aptos_schemadb::{batch::SchemaBatch, Cache, Env};
+use aptos_schemadb::{batch::SchemaBatch, Cache, Env, WriteBufferManager};
 use aptos_storage_interface::{db_ensure as ensure, AptosDbError, Result};
 use aptos_types::{ledger_info::LedgerInfoWithSignatures, transaction::Version};
 use std::{path::Path, sync::Arc, time::Instant};
@@ -103,6 +103,7 @@ impl AptosDB {
         rocksdb_configs: RocksdbConfigs,
         env: Option<&Env>,
         block_cache: Option<&Cache>,
+        write_buffer_manager: Option<&WriteBufferManager>,
         readonly: bool,
         max_num_nodes_per_lru_cache_shard: usize,
         hot_state_config: HotStateConfig,
@@ -118,6 +119,7 @@ impl AptosDB {
             rocksdb_configs.ledger_db_config,
             env,
             block_cache,
+            write_buffer_manager,
             readonly,
         )?;
         let hot_state_kv_db = if !readonly {
@@ -126,6 +128,7 @@ impl AptosDB {
                 rocksdb_configs.state_kv_db_config,
                 env,
                 block_cache,
+                write_buffer_manager,
                 readonly,
                 /* is_hot = */ true,
                 hot_state_config.delete_on_restart,
@@ -138,6 +141,7 @@ impl AptosDB {
             rocksdb_configs.state_kv_db_config,
             env,
             block_cache,
+            write_buffer_manager,
             readonly,
             /* is_hot = */ false,
             /* delete_on_restart = */ false,
@@ -148,6 +152,7 @@ impl AptosDB {
                 rocksdb_configs.state_merkle_db_config,
                 env,
                 block_cache,
+                write_buffer_manager,
                 readonly,
                 max_num_nodes_per_lru_cache_shard,
                 /* is_hot = */ true,
@@ -161,6 +166,7 @@ impl AptosDB {
             rocksdb_configs.state_merkle_db_config,
             env,
             block_cache,
+            write_buffer_manager,
             readonly,
             max_num_nodes_per_lru_cache_shard,
             /* is_hot = */ false,

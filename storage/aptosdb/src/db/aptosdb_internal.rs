@@ -26,7 +26,7 @@ use aptos_logger::prelude::*;
 use aptos_metrics_core::{IntGaugeVecHelper, TimerHelper};
 #[cfg(any(test, feature = "db-debugger"))]
 use aptos_schemadb::batch::SchemaBatch;
-use aptos_schemadb::{Cache, Env};
+use aptos_schemadb::{Cache, Env, WriteBufferManager};
 #[cfg(test)]
 use aptos_storage_interface::Order;
 use aptos_storage_interface::{
@@ -133,6 +133,13 @@ impl AptosDB {
             rocksdb_configs.shared_block_cache_size,
             /* estimated_entry_charge = */ 0,
         );
+        let write_buffer_manager =
+            (rocksdb_configs.shared_write_buffer_manager_size > 0).then(|| {
+                WriteBufferManager::new_write_buffer_manager(
+                    rocksdb_configs.shared_write_buffer_manager_size,
+                    /* allow_stall = */ false,
+                )
+            });
 
         let (ledger_db, hot_state_merkle_db, state_merkle_db, hot_state_kv_db, state_kv_db) =
             Self::open_dbs(
@@ -140,6 +147,7 @@ impl AptosDB {
                 rocksdb_configs,
                 Some(&env),
                 Some(&block_cache),
+                write_buffer_manager.as_ref(),
                 readonly,
                 max_num_nodes_per_lru_cache_shard,
                 hot_state_config,
@@ -243,6 +251,7 @@ impl AptosDB {
                 RocksdbConfigs::default(),
                 None,  // env
                 None,  // block_cache
+                None,  // write_buffer_manager
                 false, // readonly
                 0,     // max_num_nodes_per_lru_cache_shard
                 HotStateConfig {
