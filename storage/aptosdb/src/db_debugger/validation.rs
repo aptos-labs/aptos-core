@@ -123,6 +123,7 @@ pub fn verify_state_kvs(
         RocksdbConfig::default(),
         None,
         None,
+        None,
         /* readonly = */ false,
         /* is_hot = */ false,
         /* delete_on_restart = */ false,

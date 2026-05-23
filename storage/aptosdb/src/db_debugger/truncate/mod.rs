@@ -64,6 +64,7 @@ impl Cmd {
                     RocksdbConfigs::default(),
                     None,
                     None,
+                    None,
                     /*readonly=*/ false,
                     /*max_num_nodes_per_lru_cache_shard=*/ 0,
                     HotStateConfig {
