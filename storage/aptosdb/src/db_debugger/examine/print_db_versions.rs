@@ -36,6 +36,7 @@ impl Cmd {
         let rocksdb_config = RocksdbConfigs::default();
         let env = None;
         let block_cache = None;
+        let write_buffer_manager = None;
         // TODO(HotState): handle hot state merkle db and hot state kv db.
         let (ledger_db, _hot_state_merkle_db, state_merkle_db, _hot_state_kv_db, state_kv_db) =
             AptosDB::open_dbs(
@@ -43,6 +44,7 @@ impl Cmd {
                 rocksdb_config,
                 env,
                 block_cache,
+                write_buffer_manager,
                 /*readonly=*/ true,
                 /*max_num_nodes_per_lru_cache_shard=*/ 0,
                 HotStateConfig {

@@ -22,12 +22,14 @@ impl Cmd {
         let rocksdb_config = RocksdbConfigs::default();
         let env = None;
         let block_cache = None;
+        let write_buffer_manager = None;
 
         let (ledger_db, _, _, _, _) = AptosDB::open_dbs(
             &StorageDirPaths::from_path(&self.db_dir),
             rocksdb_config,
             env,
             block_cache,
+            write_buffer_manager,
             /*readonly=*/ true,
             /*max_num_nodes_per_lru_cache_shard=*/ 0,
             HotStateConfig {
