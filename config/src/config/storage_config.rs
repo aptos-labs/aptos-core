@@ -205,11 +205,15 @@ pub struct RocksdbConfigs {
     pub low_priority_background_threads: i32,
     /// The size of the single block cache shared by all the DB instances in `AptosDB`.
     pub shared_block_cache_size: usize,
+    /// Total memtable memory budget (bytes) shared by all the DB instances in `AptosDB`.
+    pub shared_write_buffer_manager_size: usize,
 }
 
 impl RocksdbConfigs {
     /// Default block cache size is 24GB.
     pub const DEFAULT_BLOCK_CACHE_SIZE: usize = 24 * (1 << 30);
+    /// Default shared write buffer manager budget is 2GB across all CFs/DBs.
+    pub const DEFAULT_WRITE_BUFFER_MANAGER_SIZE: usize = 2 * (1 << 30);
 }
 
 fn default_to_true() -> bool {
@@ -238,6 +242,7 @@ impl Default for RocksdbConfigs {
             high_priority_background_threads: 4,
             low_priority_background_threads: 4,
             shared_block_cache_size: Self::DEFAULT_BLOCK_CACHE_SIZE,
+            shared_write_buffer_manager_size: Self::DEFAULT_WRITE_BUFFER_MANAGER_SIZE,
         }
     }
 }

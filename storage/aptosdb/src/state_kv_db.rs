@@ -24,7 +24,7 @@ use aptos_metrics_core::TimerHelper;
 use aptos_rocksdb_options::gen_rocksdb_options;
 use aptos_schemadb::{
     batch::{SchemaBatch, WriteBatch},
-    Cache, Env, ReadOptions, DB,
+    Cache, Env, ReadOptions, WriteBufferManager, DB,
 };
 use aptos_storage_interface::Result;
 use aptos_types::{
@@ -85,6 +85,7 @@ impl StateKvDb {
         state_kv_db_config: RocksdbConfig,
         env: Option<&Env>,
         block_cache: Option<&Cache>,
+        write_buffer_manager: Option<&WriteBufferManager>,
         readonly: bool,
         is_hot: bool,
         delete_on_restart: bool,
@@ -94,6 +95,7 @@ impl StateKvDb {
             state_kv_db_config,
             env,
             block_cache,
+            write_buffer_manager,
             readonly,
             is_hot,
             delete_on_restart,
@@ -105,6 +107,7 @@ impl StateKvDb {
         state_kv_db_config: RocksdbConfig,
         env: Option<&Env>,
         block_cache: Option<&Cache>,
+        write_buffer_manager: Option<&WriteBufferManager>,
         readonly: bool,
         is_hot: bool,
         delete_on_restart: bool,
@@ -127,6 +130,7 @@ impl StateKvDb {
             &state_kv_db_config,
             env,
             block_cache,
+            write_buffer_manager,
             readonly,
             is_hot,
             delete_on_restart,
@@ -152,6 +156,7 @@ impl StateKvDb {
                     &state_kv_db_config,
                     env,
                     block_cache,
+                    write_buffer_manager,
                     readonly,
                     is_hot,
                     delete_on_restart,
@@ -247,6 +252,7 @@ impl StateKvDb {
             RocksdbConfig::default(),
             None,
             None,
+            None,
             /* readonly = */ false,
             is_hot,
             /* delete_on_restart = */ false,
@@ -313,6 +319,7 @@ impl StateKvDb {
         state_kv_db_config: &RocksdbConfig,
         env: Option<&Env>,
         block_cache: Option<&Cache>,
+        write_buffer_manager: Option<&WriteBufferManager>,
         readonly: bool,
         is_hot: bool,
         delete_on_restart: bool,
@@ -328,6 +335,7 @@ impl StateKvDb {
             state_kv_db_config,
             env,
             block_cache,
+            write_buffer_manager,
             readonly,
             is_hot,
             delete_on_restart,
@@ -340,6 +348,7 @@ impl StateKvDb {
         state_kv_db_config: &RocksdbConfig,
         env: Option<&Env>,
         block_cache: Option<&Cache>,
+        write_buffer_manager: Option<&WriteBufferManager>,
         readonly: bool,
         is_hot: bool,
         delete_on_restart: bool,
@@ -350,7 +359,8 @@ impl StateKvDb {
             std::fs::remove_dir_all(&path).unwrap_or(());
         }
 
-        let rocksdb_opts = gen_rocksdb_options(state_kv_db_config, env, readonly);
+        let rocksdb_opts =
+            gen_rocksdb_options(state_kv_db_config, env, write_buffer_manager, readonly);
         let cfds = if is_hot {
             gen_hot_state_kv_shard_cfds(state_kv_db_config, block_cache)
         } else {

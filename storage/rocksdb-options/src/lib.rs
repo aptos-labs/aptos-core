@@ -2,7 +2,7 @@
 // Licensed pursuant to the Innovation-Enabling Source Code License, available at https://github.com/aptos-labs/aptos-core/blob/main/LICENSE
 
 use aptos_config::config::{RocksDBStatsLevel, RocksdbConfig};
-use rocksdb::{statistics::StatsLevel, Env, Options};
+use rocksdb::{statistics::StatsLevel, Env, Options, WriteBufferManager};
 
 // TODO: Clean this up. It is currently separated into its own crate
 // to avoid circular dependencies, because it depends on aptos-config (which
@@ -19,10 +19,18 @@ fn convert_stats_level(level: RocksDBStatsLevel) -> StatsLevel {
     }
 }
 
-pub fn gen_rocksdb_options(config: &RocksdbConfig, env: Option<&Env>, readonly: bool) -> Options {
+pub fn gen_rocksdb_options(
+    config: &RocksdbConfig,
+    env: Option<&Env>,
+    write_buffer_manager: Option<&WriteBufferManager>,
+    readonly: bool,
+) -> Options {
     let mut db_opts = Options::default();
     if let Some(env) = env {
         db_opts.set_env(env);
+    }
+    if let Some(wbm) = write_buffer_manager {
+        db_opts.set_write_buffer_manager(wbm);
     }
     db_opts.set_max_open_files(config.max_open_files);
     db_opts.set_max_total_wal_size(config.max_total_wal_size);

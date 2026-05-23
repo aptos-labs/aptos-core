@@ -17,19 +17,20 @@ pub fn open_db<P: AsRef<Path>>(
     readonly: bool,
 ) -> Result<DB> {
     let env = None;
+    let write_buffer_manager = None;
     if readonly {
         Ok(DB::open_readonly(
             db_path,
             TABLE_INFO_DB_NAME,
             column_families(),
-            gen_rocksdb_options(rocksdb_config, env, readonly),
+            gen_rocksdb_options(rocksdb_config, env, write_buffer_manager, readonly),
         )?)
     } else {
         Ok(DB::open(
             db_path,
             TABLE_INFO_DB_NAME,
             column_families(),
-            gen_rocksdb_options(rocksdb_config, env, readonly),
+            gen_rocksdb_options(rocksdb_config, env, write_buffer_manager, readonly),
         )?)
     }
 }
@@ -39,11 +40,12 @@ pub fn open_internal_indexer_db<P: AsRef<Path>>(
     rocksdb_config: &RocksdbConfig,
 ) -> Result<DB> {
     let env = None;
+    let write_buffer_manager = None;
     Ok(DB::open(
         db_path,
         INTERNAL_INDEXER_DB_NAME,
         internal_indexer_column_families(),
-        gen_rocksdb_options(rocksdb_config, env, false),
+        gen_rocksdb_options(rocksdb_config, env, write_buffer_manager, false),
     )?)
 }
 

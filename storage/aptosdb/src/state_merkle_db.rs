@@ -26,7 +26,7 @@ use aptos_config::config::{RocksdbConfig, StorageDirPaths};
 use aptos_jellyfish_merkle::{node_type::NodeKey, TreeReader, TreeWriter};
 use aptos_logger::prelude::*;
 use aptos_rocksdb_options::gen_rocksdb_options;
-use aptos_schemadb::{Cache, Env, DB};
+use aptos_schemadb::{Cache, Env, WriteBufferManager, DB};
 use aptos_storage_interface::{db_ensure as ensure, AptosDbError, Result};
 use aptos_types::{
     state_store::{state_key::StateKey, NUM_STATE_SHARDS},
@@ -79,6 +79,7 @@ impl StateMerkleDb {
         state_merkle_db_config: RocksdbConfig,
         env: Option<&Env>,
         block_cache: Option<&Cache>,
+        write_buffer_manager: Option<&WriteBufferManager>,
         readonly: bool,
         // TODO(grao): Currently when this value is set to 0 we disable both caches. This is
         // hacky, need to revisit.
@@ -96,6 +97,7 @@ impl StateMerkleDb {
             state_merkle_db_config,
             env,
             block_cache,
+            write_buffer_manager,
             readonly,
             max_nodes_per_lru_cache_shard,
             is_hot,
@@ -114,6 +116,7 @@ impl StateMerkleDb {
             RocksdbConfig::default(),
             /*env=*/ None,
             /*block_cache=*/ None,
+            /*write_buffer_manager=*/ None,
             /*readonly=*/ false,
             /*max_nodes_per_lru_cache_shard=*/ 0,
             is_hot,
@@ -144,6 +147,7 @@ impl StateMerkleDb {
         state_merkle_db_config: RocksdbConfig,
         env: Option<&Env>,
         block_cache: Option<&Cache>,
+        write_buffer_manager: Option<&WriteBufferManager>,
         readonly: bool,
         max_nodes_per_lru_cache_shard: usize,
         is_hot: bool,
@@ -164,6 +168,7 @@ impl StateMerkleDb {
             &state_merkle_db_config,
             env,
             block_cache,
+            write_buffer_manager,
             readonly,
             delete_on_restart,
         )?);
@@ -187,6 +192,7 @@ impl StateMerkleDb {
                     &state_merkle_db_config,
                     env,
                     block_cache,
+                    write_buffer_manager,
                     readonly,
                     is_hot,
                     delete_on_restart,
@@ -230,6 +236,7 @@ impl StateMerkleDb {
         state_merkle_db_config: &RocksdbConfig,
         env: Option<&Env>,
         block_cache: Option<&Cache>,
+        write_buffer_manager: Option<&WriteBufferManager>,
         readonly: bool,
         is_hot: bool,
         delete_on_restart: bool,
@@ -245,6 +252,7 @@ impl StateMerkleDb {
             state_merkle_db_config,
             env,
             block_cache,
+            write_buffer_manager,
             readonly,
             delete_on_restart,
         )
@@ -256,6 +264,7 @@ impl StateMerkleDb {
         state_merkle_db_config: &RocksdbConfig,
         env: Option<&Env>,
         block_cache: Option<&Cache>,
+        write_buffer_manager: Option<&WriteBufferManager>,
         readonly: bool,
         delete_on_restart: bool,
     ) -> Result<DB> {
@@ -267,14 +276,14 @@ impl StateMerkleDb {
 
         Ok(if readonly {
             DB::open_cf_readonly(
-                gen_rocksdb_options(state_merkle_db_config, env, true),
+                gen_rocksdb_options(state_merkle_db_config, env, write_buffer_manager, true),
                 path,
                 name,
                 gen_state_merkle_cfds(state_merkle_db_config, block_cache),
             )?
         } else {
             DB::open_cf(
-                gen_rocksdb_options(state_merkle_db_config, env, false),
+                gen_rocksdb_options(state_merkle_db_config, env, write_buffer_manager, false),
                 path,
                 name,
                 gen_state_merkle_cfds(state_merkle_db_config, block_cache),

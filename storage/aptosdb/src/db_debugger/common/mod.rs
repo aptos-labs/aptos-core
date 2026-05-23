@@ -21,11 +21,13 @@ impl DbDir {
     pub fn open_state_merkle_db(&self) -> Result<StateMerkleDb> {
         let env = None;
         let block_cache = None;
+        let write_buffer_manager = None;
         StateMerkleDb::new(
             &StorageDirPaths::from_path(&self.db_dir),
             RocksdbConfig::default(),
             env,
             block_cache,
+            write_buffer_manager,
             /* read_only = */ false,
             /* max_nodes_per_lru_cache_shard = */ 0,
             /* is_hot = */ false,
@@ -36,11 +38,13 @@ impl DbDir {
     pub fn open_state_kv_db(&self) -> Result<StateKvDb> {
         let env = None;
         let block_cache = None;
+        let write_buffer_manager = None;
         StateKvDb::new(
             &StorageDirPaths::from_path(&self.db_dir),
             RocksdbConfig::default(),
             env,
             block_cache,
+            write_buffer_manager,
             /* read_only = */ true,
             /* is_hot = */ false,
             /* delete_on_restart = */ false,
@@ -50,11 +54,13 @@ impl DbDir {
     pub fn open_ledger_db(&self) -> Result<LedgerDb> {
         let env = None;
         let block_cache = None;
+        let write_buffer_manager = None;
         LedgerDb::new(
             self.db_dir.as_path(),
             RocksdbConfig::default(),
             env,
             block_cache,
+            write_buffer_manager,
             /*readonly=*/ true,
         )
     }

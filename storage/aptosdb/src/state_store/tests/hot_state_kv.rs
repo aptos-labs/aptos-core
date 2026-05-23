@@ -35,6 +35,7 @@ fn create_hot_state_kv_db(path: &TempPath) -> StateKvDb {
         RocksdbConfig::default(),
         /* env = */ None,
         /* block_cache = */ None,
+        /* write_buffer_manager = */ None,
         /* readonly = */ false,
         /* is_hot = */ true,
         /* delete_on_restart = */ false,
