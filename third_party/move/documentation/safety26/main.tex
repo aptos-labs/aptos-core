@@ -1,0 +1,55 @@
+\documentclass[runningheads]{llncs}
+
+\input{prelude.tex}
+
+\begin{document}
+
+\title{Runtime Safety in Move}
+\titlerunning{Runtime Safety in Move}
+
+\author{Victor Gao \and
+        Wolfgang Grieskamp \and
+        Vineeth Kashyap \and
+        George Mitenkov \and \\
+        Teng Zhang \and
+        Runtian Zhou \and
+        Andrea Cappa \and
+        Marco Illadi}
+\authorrunning{V. Gao et al.}
+\institute{Aptos Labs, Palo Alto, USA}
+
+\maketitle
+
+\begin{abstract}
+Move is a smart-contract language originally developed for the Diem blockchain and now deployed at scale on Aptos.
+Move programs execute as fully typed bytecode, which lets the platform statically verify a small set of foundational safety properties --- in particular type safety and reference safety --- ahead of execution, during code loading time.
+While this design gives Move strong on-paper guarantees, the static verification logic is intricate, and historically it has been a source of bugs in the platform itself: subtle errors in the verifier can let bytecode through that violates the very rules the verifier is meant to enforce.
+In a smart-contract setting, such bugs are not academic: a missed type or reference rule violation can translate directly into loss of assets, forged authority, or unrecoverable corruption of on-chain state.
+For this reason, Aptos relies on a second layer of defense in the form of \emph{runtime safety checks} that re-check the critical invariants during execution, providing protection against both compromised bytecode and latent verifier bugs.
+This paper describes the runtime safety checks in place for Move on Aptos.
+\keywords{Move \and Smart contracts \and Runtime verification \and Type safety \and Reference safety.}
+\end{abstract}
+
+\input{intro}
+\input{move}
+\input{checks}
+\input{trusted}
+\input{async}
+\input{perf}
+\input{concl}
+
+\begin{credits}
+\subsubsection{\discintname}
+All authors are employees of Aptos Labs and may hold equity in the
+company. The work described is implemented in the Aptos blockchain.
+\end{credits}
+
+\bibliographystyle{splncs04}
+\bibliography{biblio}
+
+\end{document}
+
+%%% Local Variables:
+%%% mode: latex
+%%% TeX-master: t
+%%% End:

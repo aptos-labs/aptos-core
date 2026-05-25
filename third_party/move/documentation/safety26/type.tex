@@ -1,0 +1,56 @@
+\subsection{Type Safety}
+\label{sec:type}
+
+Move's nominal typing means two structs with identical layout but different names are distinct types.
+A \emph{type-confusion} exploit breaks that distinction, and is most damaging when one of the two types is privileged.
+Consider the following example:
+
+\begin{MoveBox}
+module 0x1::admin {
+  struct Capability(address);
+  public fun admin_action(c: &Capability) {
+    /* gated by Capability */
+  }
+}
+
+module 0x2::attacker {
+  struct FakedCapability(address);
+}
+\end{MoveBox}
+
+The attacker freely constructs a |FakedCapability| (it owns the type) and only needs a route that delivers it to |admin_action| as if it were a |Capability|.
+
+\subsubsection{Example} Back when Move was developed at Meta/Facebook, vector operations were added to the VM.
+The developer forgot to add a type check in the bytecode verifier for the vector element type on push.
+The compiler did perform this check, so no test case via the source language could reach the problem.
+However, it was possible to manually construct bytecode, skipping the compiler, which did the following (conceptually):
+
+\begin{MoveBox}
+let v: vector<Capability> = vector::empty();
+v.push_back(FakedCapability(victim)); // should be rejected
+admin_action(&v[0]);  // runs on a forged token
+\end{MoveBox}
+
+The two types share a layout, so every downstream read succeeds, and the gated action runs on a token its owner never minted. This bug was found as part of the Aptos bug bounty program before the network went to mainnet.
+
+
+\subsubsection{Performing the Checks}
+In order to prevent type confusion, we perform type checks at runtime.
+To this end a type stack is maintained in parallel to the operand stack of the Move VM.
+Whenever a value is pushed on the operand stack, its type is also pushed on the type stack.
+This type is known since the Move VM has typed registers.
+Whenever a value is popped from the stack and stored in a register or consumed by an operation, the corresponding type is popped as well and compared with the expected type, creating a runtime error if type confusion is detected.
+
+
+%$\theta ::= \epsilon \mid \theta \cdot \tau$ is added to the execution environment in Fig.~\ref{fig:semantics}.
+%Let $r$ be a reference such that $r = (\textrm{index}(F), l)$ on $\COPYLOC l$ and $\MOVELOC l$, and the reference %on the stack for $\READREF$, then $\tau(r)$ is pushed on the type stack.
+% When $\WRITEREF$ is executed, we pop the type $\tau'$ from the type stack and check $\tau' = \tau(r)$; if the check fails, type confusion has been detected.
+
+
+
+
+
+%%% Local Variables:
+%%% mode: latex
+%%% TeX-master: "main"
+%%% End:
