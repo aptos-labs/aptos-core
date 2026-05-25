@@ -4,7 +4,6 @@
 use crate::{
     loaded_data::runtime_types::Type,
     values::{
-        debug,
         values_impl::{Container, IndexedRef, Value},
         Locals,
     },
