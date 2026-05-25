@@ -16,7 +16,7 @@ pub fn sha3_256(bytes: &[u8]) -> [u8; 32] {
 macro_rules! debug_write {
     ($($toks: tt)*) => {
         write!($($toks)*).map_err(|_|
-            PartialVMError::new(StatusCode::UNKNOWN_INVARIANT_VIOLATION_ERROR)
+            move_binary_format::errors::PartialVMError::new(move_core_types::vm_status::StatusCode::UNKNOWN_INVARIANT_VIOLATION_ERROR)
                 .with_message("failed to write to buffer".to_string())
         )
     };
@@ -26,7 +26,7 @@ macro_rules! debug_write {
 macro_rules! debug_writeln {
     ($($toks: tt)*) => {
         writeln!($($toks)*).map_err(|_|
-            PartialVMError::new(StatusCode::UNKNOWN_INVARIANT_VIOLATION_ERROR)
+            move_binary_format::errors::PartialVMError::new(move_core_types::vm_status::StatusCode::UNKNOWN_INVARIANT_VIOLATION_ERROR)
                 .with_message("failed to write to buffer".to_string())
         )
     };

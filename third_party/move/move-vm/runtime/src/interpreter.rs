@@ -52,9 +52,10 @@ use move_vm_types::{
     loaded_data::{runtime_access_specifier::AccessInstance, runtime_types::Type},
     natives::function::NativeResult,
     ty_interner::InternedTypePool,
+    values,
     values::{
-        self, AbstractFunction, Closure, GlobalValue, Locals, Reference, SignerRef, Struct,
-        StructRef, VMValueCast, Value, Vector, VectorRef,
+        AbstractFunction, Closure, GlobalValue, Locals, Reference, SignerRef, Struct, StructRef,
+        VMValueCast, Value, Vector, VectorRef,
     },
     views::TypeView,
 };
@@ -127,6 +128,7 @@ pub(crate) struct Interpreter;
 
 pub(crate) trait InterpreterDebugInterface {
     fn get_stack_frames(&self, count: usize) -> ExecutionState;
+    fn get_stack_depth(&self) -> usize;
     fn debug_print_stack_trace(
         &self,
         buf: &mut String,
@@ -1679,7 +1681,6 @@ where
         err
     }
 
-    #[allow(dead_code)]
     fn debug_print_frame<B: Write>(
         &self,
         buf: &mut B,
@@ -1780,7 +1781,7 @@ where
         internal_state.push_str(
             format!(
                 "*frame #{}: {} [pc = {}]:\n",
-                self.call_stack.0.len(),
+                self.get_stack_depth(),
                 current_frame.function.name_as_pretty_string(),
                 current_frame.pc,
             )
@@ -1841,7 +1842,6 @@ impl<LoaderImpl> InterpreterDebugInterface for InterpreterImpl<'_, LoaderImpl>
 where
     LoaderImpl: Loader,
 {
-    #[allow(dead_code)]
     #[cold]
     fn debug_print_stack_trace(
         &self,
@@ -1883,6 +1883,10 @@ where
             })
             .collect();
         ExecutionState::new(stack_trace)
+    }
+
+    fn get_stack_depth(&self) -> usize {
+        self.call_stack.0.len()
     }
 }
 
@@ -2101,7 +2105,7 @@ impl Frame {
             };
             if is_tracing_for!(TraceCategory::VMError) {
                 let mut str = String::new();
-                let abort_idx = interpreter.call_stack.0.len();
+                let abort_idx = interpreter.get_stack_depth();
                 if let Err(print_err) = interpreter
                     .debug_print_stack_trace(&mut str, interpreter.loader.runtime_environment())
                 {

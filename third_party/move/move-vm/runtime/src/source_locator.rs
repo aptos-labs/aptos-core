@@ -10,8 +10,11 @@
 //! introducing a crate dependency on Aptos.
 
 use move_binary_format::{errors::PartialVMResult, file_format::FunctionDefinitionIndex};
-use move_core_types::language_storage::ModuleId;
-use move_vm_types::values::Locals;
+use move_core_types::{identifier::Identifier, language_storage::ModuleId};
+use move_vm_types::{
+    loaded_data::runtime_types::Type,
+    values::{debug, debug::DebugValue, Locals},
+};
 use std::{cell::RefCell, fmt, sync::Arc};
 
 // ── Public trait ─────────────────────────────────────────────────────────────
@@ -103,25 +106,101 @@ pub fn get_function_param_and_local_names(
     })
 }
 
-/// Query the current thread's source locator for struct field names.
-pub fn get_struct_field_names(module_id: &ModuleId, struct_name: &str) -> Option<Vec<String>> {
-    LOCATOR.with(|l| {
-        l.borrow()
-            .as_ref()
-            .and_then(|loc| loc.get_struct_field_names(module_id, struct_name))
-    })
+#[derive(Debug)]
+struct LocalInfo {
+    index: usize,
+    name: String,
+    ty: Type,
 }
 
-/// Query the current thread's source locator for enum variant info.
-pub fn get_enum_variant_info(
-    module_id: &ModuleId,
-    enum_name: &str,
-) -> Option<Vec<(String, Vec<String>)>> {
-    LOCATOR.with(|l| {
-        l.borrow()
-            .as_ref()
-            .and_then(|loc| loc.get_enum_variant_info(module_id, enum_name))
-    })
+/// Resolve local variable info for a function using the global source
+/// locator. Returns one `LocalInfo` per local slot (parameters + locals).
+/// When no source map is available, names fall back to `local[idx]`.
+fn build_local_infos(function: &crate::LoadedFunction) -> Vec<LocalInfo> {
+    let total = function.local_tys().len();
+
+    let names = function
+        .module_id()
+        .and_then(|mid| get_function_param_and_local_names(mid, function.index()))
+        .map(|(_, n)| n);
+
+    (0..total)
+        .map(|local_idx| {
+            let name = names
+                .as_ref()
+                .and_then(|n| n.get(local_idx).cloned())
+                .filter(|s| !s.is_empty())
+                .unwrap_or_else(|| format!("local[{}]", local_idx));
+            let ty = function
+                .local_tys()
+                .get(local_idx)
+                .expect("local_idx derived from function.local_tys()");
+            LocalInfo {
+                index: local_idx,
+                name,
+                ty: ty.clone(),
+            }
+        })
+        .collect()
+}
+
+pub struct LocatorTypeResolver<'a> {
+    runtime_environment: &'a crate::RuntimeEnvironment,
+}
+
+impl<'a> LocatorTypeResolver<'a> {
+    pub(crate) fn new(runtime_environment: &'a crate::RuntimeEnvironment) -> Self {
+        Self {
+            runtime_environment,
+        }
+    }
+}
+
+impl debug::TypeResolver for LocatorTypeResolver<'_> {
+    fn get_adt_name(&self, ty: &Type) -> Option<(ModuleId, Identifier)> {
+        self.runtime_environment.get_struct_name(ty).ok().flatten()
+    }
+
+    fn get_adt_info(&self, ty: &Type) -> Option<debug::AdtInfo> {
+        let (module_id, struct_name) = self.get_adt_name(ty)?;
+
+        let enum_variants = LOCATOR.with(|l| {
+            l.borrow()
+                .as_ref()
+                .and_then(|loc| loc.get_enum_variant_info(&module_id, struct_name.as_str()))
+        });
+
+        match enum_variants {
+            Some(variants) => {
+                let adt_variants = variants
+                    .into_iter()
+                    .map(|(variant_name, source_names)| {
+                        let fields = source_names
+                            .iter()
+                            .map(|name| (name.clone(), None))
+                            .collect();
+                        (variant_name, fields)
+                    })
+                    .collect();
+                Some(debug::AdtInfo::Enum {
+                    variants: adt_variants,
+                })
+            },
+            None => {
+                let source_names = LOCATOR.with(|l| {
+                    l.borrow().as_ref().and_then(|loc| {
+                        loc.get_struct_field_names(&module_id, struct_name.as_str())
+                    })
+                })?;
+
+                let fields = source_names
+                    .iter()
+                    .map(|name| (name.clone(), None))
+                    .collect();
+                Some(debug::AdtInfo::Struct { fields })
+            },
+        }
+    }
 }
 
 /// Write enriched local-variable display (with source names and struct field
@@ -138,42 +217,42 @@ pub(crate) fn print_locals_enriched<B: fmt::Write>(
     runtime_environment: &crate::RuntimeEnvironment,
     compact: bool,
 ) -> PartialVMResult<()> {
-    let names_info = function
-        .module_id()
-        .and_then(|mid| get_function_param_and_local_names(mid, function.index()));
-    let param_count = function.param_tys().len();
+    use move_vm_types::{debug_write, debug_writeln, values::debug::serialize_value_for_debug};
 
-    if let Some((_, ref names)) = names_info {
-        let type_info: Vec<Option<move_vm_types::values::LocalTypeInfo>> = function
-            .local_tys()
-            .iter()
-            .map(|ty| {
-                let (mid, sname) = runtime_environment.get_struct_name(ty).ok().flatten()?;
-                let sname_str = sname.as_str();
-                if let Some(fields) = get_struct_field_names(&mid, sname_str) {
-                    Some(move_vm_types::values::LocalTypeInfo::Struct(fields))
-                } else {
-                    get_enum_variant_info(&mid, sname_str)
-                        .map(move_vm_types::values::LocalTypeInfo::Enum)
-                }
-            })
-            .collect();
-        move_vm_types::values::debug::print_locals_with_info(
-            buf,
-            locals,
-            compact,
-            param_count,
-            Some(names.as_slice()),
-            Some(type_info.as_slice()),
-        )
-    } else {
-        move_vm_types::values::debug::print_locals_with_info(
-            buf,
-            locals,
-            compact,
-            param_count,
-            None,
-            None,
-        )
+    let infos = build_local_infos(function);
+    let adt_resolver = LocatorTypeResolver::new(runtime_environment);
+    let param_count = function.param_tys().len();
+    let total = infos.len();
+
+    let mut printed_header = false;
+    for info in &infos[..param_count.min(total)] {
+        let dv = serialize_value_for_debug(locals, info.index, &info.ty, &adt_resolver);
+        if compact && matches!(&dv, DebugValue::Invalid) {
+            continue;
+        }
+        if !printed_header {
+            debug_writeln!(buf, "        Parameters:")?;
+            printed_header = true;
+        }
+        debug_write!(buf, "            [{}] {}: ", info.index, info.name)?;
+        debug_write!(buf, "{}", dv)?;
+        debug_writeln!(buf)?;
     }
+
+    printed_header = false;
+    for info in &infos[param_count..param_count.max(total)] {
+        let dv = serialize_value_for_debug(locals, info.index, &info.ty, &adt_resolver);
+        if compact && matches!(&dv, DebugValue::Invalid) {
+            continue;
+        }
+        if !printed_header {
+            debug_writeln!(buf, "        Locals:")?;
+            printed_header = true;
+        }
+        debug_write!(buf, "            [{}] {}: ", info.index, info.name)?;
+        debug_write!(buf, "{}", dv)?;
+        debug_writeln!(buf)?;
+    }
+
+    Ok(())
 }
