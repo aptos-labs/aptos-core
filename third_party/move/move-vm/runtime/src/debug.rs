@@ -368,12 +368,12 @@ impl DebugContext for MoveStepDebugContext {
     }
 
     fn capture_thread_state(&self) -> Box<dyn ThreadStateHandle> {
+        struct NoopThreadState;
+
+        impl ThreadStateHandle for NoopThreadState {
+            fn install_on_thread(&self) {}
+        }
+
         Box::new(NoopThreadState)
     }
-}
-
-struct NoopThreadState;
-
-impl ThreadStateHandle for NoopThreadState {
-    fn install_on_thread(&self) {}
 }
