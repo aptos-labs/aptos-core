@@ -2556,10 +2556,6 @@ impl SignerRef {
  *
  **************************************************************************************/
 impl Locals {
-    pub fn borrow_values(&self) -> std::cell::Ref<'_, Vec<Value>> {
-        self.0.borrow()
-    }
-
     #[cfg_attr(feature = "force-inline", inline(always))]
     pub fn new(n: usize) -> Self {
         Self(Rc::new(RefCell::new(
@@ -2649,6 +2645,11 @@ impl Locals {
             Some(_) => Ok(false),
             None => Err(Self::local_index_out_of_bounds(idx, locals.len())),
         }
+    }
+
+    #[cfg(feature = "debugger")]
+    pub fn borrow_values(&self) -> std::cell::Ref<'_, Vec<Value>> {
+        self.0.borrow()
     }
 
     #[cold]

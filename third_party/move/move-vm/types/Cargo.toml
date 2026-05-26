@@ -48,6 +48,7 @@ default = [
     "inline-locals"
 ]
 testing = []
+debugger = []
 fuzzing = ["proptest", "move-binary-format/fuzzing"]
 force-inline = []
 inline-vm-casts = []
