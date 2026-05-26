@@ -692,7 +692,7 @@
       "targets": [
         {
           "datasource": { "type": "prometheus", "uid": "${Datasource}" },
-          "expr": "sum by (container) (rate(container_cpu_usage_seconds_total{environment=~\"$environment\", container=~\"$container\"}[$AggInterval]))",
+          "expr": "sum by (container) (rate(container_cpu_usage_seconds_total{container=~\"$container\"}[$AggInterval]))",
           "format": "time_series",
           "intervalFactor": 1,
           "legendFormat": "{{container}}",
@@ -700,7 +700,7 @@
         },
         {
           "datasource": { "type": "prometheus", "uid": "${Datasource}" },
-          "expr": "sum by (container_name) (rate(container_cpu_usage_seconds_total{environment=~\"$environment\", container_name=~\"$container\"}[$AggInterval]))",
+          "expr": "sum by (container_name) (rate(container_cpu_usage_seconds_total{container_name=~\"$container\"}[$AggInterval]))",
           "format": "time_series",
           "intervalFactor": 1,
           "legendFormat": "{{container_name}}",
@@ -873,7 +873,7 @@
       "targets": [
         {
           "datasource": { "type": "prometheus", "uid": "${Datasource}" },
-          "expr": "container_memory_working_set_bytes{environment=~\"$environment\", container=~\"$container\"} / container_spec_memory_limit_bytes{container=~\"$container\"}",
+          "expr": "container_memory_working_set_bytes{container=~\"$container\"} / container_spec_memory_limit_bytes{container=~\"$container\"}",
           "format": "time_series",
           "intervalFactor": 1,
           "legendFormat": "{{container}}",
@@ -881,7 +881,7 @@
         },
         {
           "datasource": { "type": "prometheus", "uid": "${Datasource}" },
-          "expr": "container_memory_working_set_bytes{environment=~\"$environment\", container_name=~\"$container\"} / container_spec_memory_limit_bytes{container_name=~\"$container\"}",
+          "expr": "container_memory_working_set_bytes{container_name=~\"$container\"} / container_spec_memory_limit_bytes{container_name=~\"$container\"}",
           "format": "time_series",
           "intervalFactor": 1,
           "legendFormat": "{{container_name}}",
@@ -962,7 +962,7 @@
       "targets": [
         {
           "datasource": { "type": "prometheus", "uid": "${Datasource}" },
-          "expr": "kubelet_volume_stats_used_bytes{environment=~\"$environment\", cluster=~\"$cluster\", namespace=~\"$namespace\", persistentvolumeclaim=~\".*-($container)-e.*\"} / kubelet_volume_stats_capacity_bytes{cluster=~\"$cluster\", namespace=~\"$namespace\", persistentvolumeclaim=~\".*-($container)-e.*\"}",
+          "expr": "kubelet_volume_stats_used_bytes{cluster=~\"$cluster\", namespace=~\"$namespace\", persistentvolumeclaim=~\".*-($container)-e.*\"} / kubelet_volume_stats_capacity_bytes{cluster=~\"$cluster\", namespace=~\"$namespace\", persistentvolumeclaim=~\".*-($container)-e.*\"}",
           "format": "time_series",
           "intervalFactor": 1,
           "legendFormat": "{{persistentvolumeclaim}}",

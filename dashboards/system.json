@@ -95,7 +95,7 @@
       "pluginVersion": "10.0.1-cloud.2.a7a20fbf",
       "targets": [
         {
-          "expr": "rate(container_cpu_usage_seconds_total{environment=~\"$environment\", cluster=~\"$cluster\", namespace=~\"$namespace\", container=~\"$container\"}[$interval])",
+          "expr": "rate(container_cpu_usage_seconds_total{cluster=~\"$cluster\", namespace=~\"$namespace\", container=~\"$container\"}[$interval])",
           "format": "time_series",
           "intervalFactor": 1,
           "legendFormat": "{{pod}}-{{container}}",
@@ -148,7 +148,7 @@
       "steppedLine": false,
       "targets": [
         {
-          "expr": "container_memory_working_set_bytes{environment=~\"$environment\", cluster=~\"$cluster\", namespace=~\"$namespace\", container=~\"$container\"}",
+          "expr": "container_memory_working_set_bytes{cluster=~\"$cluster\", namespace=~\"$namespace\", container=~\"$container\"}",
           "format": "time_series",
           "intervalFactor": 1,
           "legendFormat": "{{pod}}-{{container}}",
@@ -277,7 +277,7 @@
         {
           "datasource": { "type": "prometheus", "uid": "${Datasource}" },
           "editorMode": "code",
-          "expr": "kubelet_volume_stats_used_bytes{environment=~\"$environment\", cluster=~\"$cluster\", namespace=~\"$namespace\", persistentvolumeclaim=~\".*-($container)-e.*\"} / kubelet_volume_stats_capacity_bytes{cluster=~\"$cluster\", namespace=~\"$namespace\", persistentvolumeclaim=~\".*-($container)-e.*\"}",
+          "expr": "kubelet_volume_stats_used_bytes{cluster=~\"$cluster\", namespace=~\"$namespace\", persistentvolumeclaim=~\".*-($container)-e.*\"} / kubelet_volume_stats_capacity_bytes{cluster=~\"$cluster\", namespace=~\"$namespace\", persistentvolumeclaim=~\".*-($container)-e.*\"}",
           "format": "time_series",
           "intervalFactor": 1,
           "legendFormat": "{{pod}}-{{persistentvolumeclaim}}",
@@ -342,7 +342,7 @@
         {
           "datasource": { "type": "prometheus", "uid": "${Datasource}" },
           "editorMode": "code",
-          "expr": "kubelet_volume_stats_used_bytes{environment=~\"$environment\", cluster=~\"$cluster\", namespace=~\"$namespace\", persistentvolumeclaim=~\".*-($container)-e.*\"}",
+          "expr": "kubelet_volume_stats_used_bytes{cluster=~\"$cluster\", namespace=~\"$namespace\", persistentvolumeclaim=~\".*-($container)-e.*\"}",
           "hide": false,
           "legendFormat": "{{cluster}} {{pod}}",
           "range": true,
@@ -404,7 +404,7 @@
       "steppedLine": false,
       "targets": [
         {
-          "expr": "container_memory_working_set_bytes{environment=~\"$environment\", cluster=~\"$cluster\", namespace=~\"$namespace\", container=~\"$container\"} / container_spec_memory_limit_bytes{cluster=~\"$cluster\", namespace=~\"$namespace\", container=~\"$container\"}",
+          "expr": "container_memory_working_set_bytes{cluster=~\"$cluster\", namespace=~\"$namespace\", container=~\"$container\"} / container_spec_memory_limit_bytes{cluster=~\"$cluster\", namespace=~\"$namespace\", container=~\"$container\"}",
           "format": "time_series",
           "intervalFactor": 1,
           "legendFormat": "{{pod}}-{{container}}",
@@ -530,7 +530,7 @@
         {
           "datasource": { "type": "prometheus", "uid": "P968F4F8972F6D74D" },
           "editorMode": "code",
-          "expr": "rate(container_network_receive_bytes_total{environment=~\"$environment\", cluster=~\"$cluster\", namespace=~\"$namespace\", pod=~\"$pod\"}[$interval]) + rate(container_network_transmit_bytes_total{cluster=~\"$cluster\", namespace=~\"$namespace\", pod=~\"$pod\"}[$interval])",
+          "expr": "rate(container_network_receive_bytes_total{cluster=~\"$cluster\", namespace=~\"$namespace\", pod=~\"$pod\"}[$interval]) + rate(container_network_transmit_bytes_total{cluster=~\"$cluster\", namespace=~\"$namespace\", pod=~\"$pod\"}[$interval])",
           "format": "time_series",
           "intervalFactor": 1,
           "legendFormat": "{{pod}}-{{pod}}",

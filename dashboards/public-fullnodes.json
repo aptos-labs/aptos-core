@@ -332,12 +332,12 @@
       "steppedLine": false,
       "targets": [
         {
-          "expr": "aptos_core_mempool_index_size{environment=~\"$environment\", cluster=~\"$cluster\", namespace=~\"$namespace\", index=\"system_ttl\", pod=~\".*fullnode.*\", pod=~\"$pod\"}",
+          "expr": "aptos_core_mempool_index_size{environment=~\"$environment\", cluster=~\"$cluster\", namespace=~\"$namespace\", index=\"system_ttl\", pod=~\"$pod\"}",
           "legendFormat": "{{pod}}-{{pod}}",
           "refId": "A"
         },
         {
-          "expr": "aptos_core_mempool_index_size{environment=~\"$environment\", cluster=~\"$cluster\", namespace=~\"$namespace\", index=\"system_ttl\", job=~\".*fullnode.*\", pod=~\"$pod\"}",
+          "expr": "aptos_core_mempool_index_size{environment=~\"$environment\", cluster=~\"$cluster\", namespace=~\"$namespace\", index=\"system_ttl\", pod=~\"$pod\"}",
           "legendFormat": "{{pod}}-{{job}}",
           "refId": "B"
         }
@@ -397,12 +397,12 @@
       "steppedLine": false,
       "targets": [
         {
-          "expr": "aptos_core_mempool_txn_commit_latency_sum{environment=~\"$environment\", cluster=~\"$cluster\", namespace=~\"$namespace\", pod=~\".*fullnode.*\", pod=~\"$pod\"} / aptos_core_mempool_txn_commit_latency_count{cluster=~\"$cluster\", namespace=~\"$namespace\", pod=~\".*fullnode.*\", pod=~\"$pod\"}",
+          "expr": "aptos_core_mempool_txn_commit_latency_sum{environment=~\"$environment\", cluster=~\"$cluster\", namespace=~\"$namespace\", pod=~\"$pod\"} / aptos_core_mempool_txn_commit_latency_count{cluster=~\"$cluster\", namespace=~\"$namespace\", pod=~\"$pod\"}",
           "legendFormat": "{{pod}}-{{pod}}",
           "refId": "A"
         },
         {
-          "expr": "aptos_core_mempool_txn_commit_latency_sum{environment=~\"$environment\", cluster=~\"$cluster\", namespace=~\"$namespace\", job=~\".*fullnode.*\", pod=~\"$pod\"} / aptos_core_mempool_txn_commit_latency_count{cluster=~\"$cluster\", namespace=~\"$namespace\", job=~\".*fullnode.*\", pod=~\"$pod\"}",
+          "expr": "aptos_core_mempool_txn_commit_latency_sum{environment=~\"$environment\", cluster=~\"$cluster\", namespace=~\"$namespace\", pod=~\"$pod\"} / aptos_core_mempool_txn_commit_latency_count{cluster=~\"$cluster\", namespace=~\"$namespace\", pod=~\"$pod\"}",
           "legendFormat": "{{pod}}-{{job}}",
           "refId": "B"
         }
@@ -593,12 +593,12 @@
       "steppedLine": false,
       "targets": [
         {
-          "expr": "sum(irate(container_network_transmit_bytes_total{environment=~\"$environment\", cluster=~\"$cluster\", namespace=~\"$namespace\", pod=~\"$pod.*fullnode.*\"}[$interval])) by (pod)",
+          "expr": "sum(irate(container_network_transmit_bytes_total{environment=~\"$environment\", cluster=~\"$cluster\", namespace=~\"$namespace\", pod=~\"$pod\"}[$interval])) by (pod)",
           "legendFormat": "{{pod}}",
           "refId": "A"
         },
         {
-          "expr": "sum(irate(container_network_transmit_bytes_total{environment=~\"$environment\", cluster=~\"$cluster\", namespace=~\"$namespace\", pod=~\"$pod.*fullnode.*\"}[$interval]))",
+          "expr": "sum(irate(container_network_transmit_bytes_total{environment=~\"$environment\", cluster=~\"$cluster\", namespace=~\"$namespace\", pod=~\"$pod\"}[$interval]))",
           "legendFormat": "total",
           "refId": "B"
         }
@@ -657,12 +657,12 @@
       "steppedLine": false,
       "targets": [
         {
-          "expr": "sum(irate(container_network_receive_bytes_total{environment=~\"$environment\", cluster=~\"$cluster\", namespace=~\"$namespace\", pod=~\"$pod.*fullnode.*\"}[$interval])) by (pod)",
+          "expr": "sum(irate(container_network_receive_bytes_total{environment=~\"$environment\", cluster=~\"$cluster\", namespace=~\"$namespace\", pod=~\"$pod\"}[$interval])) by (pod)",
           "legendFormat": "{{pod}}",
           "refId": "A"
         },
         {
-          "expr": "sum(irate(container_network_receive_bytes_total{environment=~\"$environment\", cluster=~\"$cluster\", namespace=~\"$namespace\", pod=~\"$pod.*fullnode.*\"}[$interval]))",
+          "expr": "sum(irate(container_network_receive_bytes_total{environment=~\"$environment\", cluster=~\"$cluster\", namespace=~\"$namespace\", pod=~\"$pod\"}[$interval]))",
           "legendFormat": "total",
           "refId": "B"
         }
@@ -733,12 +733,12 @@
       "steppedLine": false,
       "targets": [
         {
-          "expr": "1 - kubelet_volume_stats_available_bytes{environment=~\"$environment\", cluster=~\"$cluster\", namespace=~\"$namespace\", persistentvolumeclaim=~\"fn.$pod.*\", pod=~\"$pod\"} / kubelet_volume_stats_capacity_bytes{cluster=~\"$cluster\", namespace=~\"$namespace\", persistentvolumeclaim=~\"fn.$pod.*\", pod=~\"$pod\"}",
+          "expr": "1 - kubelet_volume_stats_available_bytes{cluster=~\"$cluster\", namespace=~\"$namespace\", persistentvolumeclaim=~\".*-fn-.*-node-storage\"} / kubelet_volume_stats_capacity_bytes{cluster=~\"$cluster\", namespace=~\"$namespace\", persistentvolumeclaim=~\".*-fn-.*-node-storage\"}",
           "legendFormat": "{{persistentvolumeclaim}}",
           "refId": "A"
         },
         {
-          "expr": "1 - kubelet_volume_stats_available_bytes{environment=~\"$environment\", cluster=~\"$cluster\", namespace=~\"$namespace\", persistentvolumeclaim=~\"$pod.*fullnode.*\", pod!~\"val.*\"} / kubelet_volume_stats_capacity_bytes{cluster=~\"$cluster\", namespace=~\"$namespace\", persistentvolumeclaim=~\"$pod.*fullnode.*\", pod!~\"val.*\"}",
+          "expr": "1 - kubelet_volume_stats_available_bytes{cluster=~\"$cluster\", namespace=~\"$namespace\", persistentvolumeclaim=~\".*-fn-.*-node-storage\"} / kubelet_volume_stats_capacity_bytes{cluster=~\"$cluster\", namespace=~\"$namespace\", persistentvolumeclaim=~\".*-fn-.*-node-storage\"}",
           "legendFormat": "{{persistentvolumeclaim}}",
           "refId": "B"
         }
@@ -797,9 +797,8 @@
       "steppedLine": false,
       "targets": [
         {
-          "datasource": { "type": "prometheus", "uid": "fHo-R604z" },
           "editorMode": "code",
-          "expr": "container_memory_working_set_bytes{environment=~\"$environment\", container=\"fullnode\", pod=~\"$pod.*\", job=\"kubernetes-cadvisor\", cluster=~\"$cluster\", namespace=~\"$namespace\"}",
+          "expr": "container_memory_working_set_bytes{container=\"fn\", pod=~\"$pod.*\", job=\"kubelet\", cluster=~\"$cluster\", namespace=~\"$namespace\"}",
           "legendFormat": "{{pod}}",
           "range": true,
           "refId": "A"
