@@ -216,6 +216,15 @@ async fn epoch_timeout_watchdog_force_ends_epoch() {
              epoch advanced through some path other than the watchdog",
         );
     info!("Found ForceEndEpochEvent: {}", event_data);
+    let variant = event_data
+        .get("__variant__")
+        .and_then(|v| v.as_str())
+        .unwrap_or_else(|| panic!("missing __variant__: {}", event_data));
+    assert_eq!(
+        variant, "V1",
+        "unexpected ForceEndEpochEvent variant: {}",
+        event_data,
+    );
     let chunky_incomplete = event_data
         .get("chunky_incomplete")
         .and_then(|v| v.as_bool())

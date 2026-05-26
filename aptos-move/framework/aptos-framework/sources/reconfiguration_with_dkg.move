@@ -27,12 +27,14 @@ module aptos_framework::reconfiguration_with_dkg {
     friend aptos_framework::aptos_governance;
 
     #[event]
-    struct ForceEndEpochEvent has drop, store {
-        epoch: u64,
-        dkg_incomplete: bool,
-        chunky_incomplete: bool,
-        deadline_us: u64,
-        now_us: u64,
+    enum ForceEndEpochEvent has drop, store {
+        V1 {
+            epoch: u64,
+            dkg_incomplete: bool,
+            chunky_incomplete: bool,
+            deadline_us: u64,
+            now_us: u64,
+        }
     }
 
     /// Trigger a reconfiguration with DKG.
@@ -138,7 +140,7 @@ module aptos_framework::reconfiguration_with_dkg {
             if (now_us >= deadline_us) {
                 let dkg_incomplete = dkg::incomplete_session().is_some();
                 let chunky_incomplete = chunky_dkg::incomplete_session().is_some();
-                event::emit(ForceEndEpochEvent {
+                event::emit(ForceEndEpochEvent::V1 {
                     epoch: reconfiguration::current_epoch(),
                     dkg_incomplete,
                     chunky_incomplete,
