@@ -28,7 +28,13 @@ options provided to the prover.
 // Integer Types
 
 // Constants, Instructions, and Procedures needed by both unsigned and signed integers, but defined separately.
-{% macro integer_type(name, typename, min, max) %}
+//
+// Division and modulus use Move runtime semantics (truncate toward zero,
+// remainder takes sign of the dividend), not Boogie's built-in Euclidean
+// `div`/`mod`. For unsigned types the two coincide and the emitted body is
+// a single `div`/`mod` op; for signed types we branch on the sign of the
+// dividend so the SMT formula stays linear (no `*` in conditions).
+{% macro integer_type(name, typename, min, max, signed) %}
 const $MIN_{{name}}: int;
 const $MAX_{{name}}: int;
 axiom $MIN_{{name}} == {{min}};
@@ -82,42 +88,81 @@ procedure {:inline 1} $Mul{{name}}(src1: int, src2: int) returns (dst: int)
     }
     dst := src1 * src2;
 }
+
+procedure {:inline 1} $Div{{name}}(src1: int, src2: int) returns (dst: int)
+{
+{%- if signed %}
+    if (src2 == 0 || (src1 == $MIN_{{name}} && src2 == -1)) {
+        call $ExecFailureAbort();
+        return;
+    }
+    // Truncate toward zero. Boogie's `div` is Euclidean and agrees with
+    // truncation when the dividend is non-negative; for negative dividend
+    // we negate, divide, negate.
+    if (src1 >= 0) {
+        dst := src1 div src2;
+    } else {
+        dst := -((-src1) div src2);
+    }
+{%- else %}
+    if (src2 == 0) {
+        call $ExecFailureAbort();
+        return;
+    }
+    dst := src1 div src2;
+{%- endif %}
+}
+
+procedure {:inline 1} $Mod{{name}}(src1: int, src2: int) returns (dst: int)
+{
+{%- if signed %}
+    if (src2 == 0) {
+        call $ExecFailureAbort();
+        return;
+    }
+    // Truncate-toward-zero remainder: same sign as the dividend.
+    if (src1 >= 0) {
+        dst := src1 mod src2;
+    } else {
+        dst := -((-src1) mod src2);
+    }
+{%- else %}
+    if (src2 == 0) {
+        call $ExecFailureAbort();
+        return;
+    }
+    dst := src1 mod src2;
+{%- endif %}
+}
 {% endmacro %}
 
-{{ self::integer_type(name="U8", typename="u8", min=0, max=255) }}
-{{ self::integer_type(name="U16", typename="u16", min=0, max=65535) }}
-{{ self::integer_type(name="U32", typename="u32", min=0, max=4294967295) }}
-{{ self::integer_type(name="U64", typename="u64", min=0, max="18446744073709551615") }}
-{{ self::integer_type(name="U128", typename="u128", min=0, max="340282366920938463463374607431768211455") }}
-{{ self::integer_type(name="U256", typename="u256", min=0, max="115792089237316195423570985008687907853269984665640564039457584007913129639935") }}
-{{ self::integer_type(name="I8", typename="i8", min=-128, max=127) }}
-{{ self::integer_type(name="I16", typename="i16", min=-32768, max=32767) }}
-{{ self::integer_type(name="I32", typename="i32", min=-2147483648, max=2147483647) }}
-{{ self::integer_type(name="I64", typename="i64", min="-9223372036854775808", max="9223372036854775807") }}
-{{ self::integer_type(name="I128", typename="i128", min="-170141183460469231731687303715884105728", max="170141183460469231731687303715884105727") }}
-{{ self::integer_type(name="I256", typename="i256", min="-57896044618658097711785492504343953926634992332820282019728792003956564819968", max="57896044618658097711785492504343953926634992332820282019728792003956564819967") }}
+{{ self::integer_type(name="U8", typename="u8", min=0, max=255, signed=false) }}
+{{ self::integer_type(name="U16", typename="u16", min=0, max=65535, signed=false) }}
+{{ self::integer_type(name="U32", typename="u32", min=0, max=4294967295, signed=false) }}
+{{ self::integer_type(name="U64", typename="u64", min=0, max="18446744073709551615", signed=false) }}
+{{ self::integer_type(name="U128", typename="u128", min=0, max="340282366920938463463374607431768211455", signed=false) }}
+{{ self::integer_type(name="U256", typename="u256", min=0, max="115792089237316195423570985008687907853269984665640564039457584007913129639935", signed=false) }}
+{{ self::integer_type(name="I8", typename="i8", min=-128, max=127, signed=true) }}
+{{ self::integer_type(name="I16", typename="i16", min=-32768, max=32767, signed=true) }}
+{{ self::integer_type(name="I32", typename="i32", min=-2147483648, max=2147483647, signed=true) }}
+{{ self::integer_type(name="I64", typename="i64", min="-9223372036854775808", max="9223372036854775807", signed=true) }}
+{{ self::integer_type(name="I128", typename="i128", min="-170141183460469231731687303715884105728", max="170141183460469231731687303715884105727", signed=true) }}
+{{ self::integer_type(name="I256", typename="i256", min="-57896044618658097711785492504343953926634992332820282019728792003956564819968", max="57896044618658097711785492504343953926634992332820282019728792003956564819967", signed=true) }}
 
 // Instructions and Procedures shared by unsigned and signed integers
 
 // uninterpreted function to return an undefined value.
 function $undefined_int(): int;
 
-procedure {:inline 1} $Div(src1: int, src2: int) returns (dst: int)
-{
-    if (src2 == 0) {
-        call $ExecFailureAbort();
-        return;
-    }
-    dst := src1 div src2;
+// Spec-level signed division / modulus, truncated toward zero (Move runtime
+// semantics). The spec translator emits these for `/` and `%` on signed
+// operand types; for unsigned operands Boogie's built-in `div`/`mod` is
+// emitted directly (the two coincide when both operands are non-negative).
+function {:inline} $signed_div(a: int, b: int): int {
+    if a >= 0 then a div b else -((-a) div b)
 }
-
-procedure {:inline 1} $Mod(src1: int, src2: int) returns (dst: int)
-{
-    if (src2 == 0) {
-        call $ExecFailureAbort();
-        return;
-    }
-    dst := src1 mod src2;
+function {:inline} $signed_mod(a: int, b: int): int {
+    if a >= 0 then a mod b else -((-a) mod b)
 }
 
 // Unimplemented binary arithmetic operations; return the dst

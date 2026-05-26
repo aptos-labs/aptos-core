@@ -1398,8 +1398,8 @@ impl SpecTranslator<'_> {
             Operation::Add => self.translate_op("+", "Add", args),
             Operation::Sub => self.translate_op("-", "Sub", args),
             Operation::Mul => self.translate_op("*", "Mul", args),
-            Operation::Mod => self.translate_op("mod", "Mod", args),
-            Operation::Div => self.translate_op("div", "Div", args),
+            Operation::Mod => self.translate_div_or_mod("mod", "Mod", "$signed_mod", args),
+            Operation::Div => self.translate_div_or_mod("div", "Div", "$signed_div", args),
             Operation::BitOr => self.translate_bit_op("$Or", args),
             Operation::BitAnd => self.translate_bit_op("$And", args),
             Operation::Xor => self.translate_bit_op("$Xor", args),
@@ -3332,6 +3332,51 @@ impl SpecTranslator<'_> {
                 emit!(self.writer, "$t{} == $t{}", idx1, idx2);
             },
             _ => self.translate_rel_op("==", args),
+        }
+    }
+
+    /// Translates `div` / `mod`. Mirrors `translate_op` for the unsigned and
+    /// bitwise cases, but for signed operand types emits a call to the
+    /// truncate-toward-zero helper (`$signed_div` / `$signed_mod`) so the spec
+    /// matches Move runtime semantics rather than Boogie's Euclidean
+    /// `div` / `mod`.
+    fn translate_div_or_mod(
+        &self,
+        boogie_op: &str,
+        bv_op: &str,
+        signed_helper: &str,
+        args: &[Exp],
+    ) {
+        let global_state = &self
+            .env
+            .get_extension::<GlobalNumberOperationState>()
+            .expect("global number operation state");
+        let num_oper = global_state.get_node_num_oper(args[0].node_id());
+        if num_oper == Bitwise {
+            let oper_base = boogie_num_type_base(
+                self.env,
+                Some(self.env.get_node_loc(args[0].node_id())),
+                &self.env.get_node_type(args[0].node_id()),
+                true,
+            );
+            emit!(self.writer, "${}'{}'(", bv_op, oper_base);
+            self.translate_seq(args.iter(), ", ", |e| self.translate_exp(e));
+            emit!(self.writer, ")");
+        } else if self
+            .env
+            .get_node_type(args[0].node_id())
+            .skip_reference()
+            .is_signed_int()
+        {
+            emit!(self.writer, "{}(", signed_helper);
+            self.translate_seq(args.iter(), ", ", |e| self.translate_exp(e));
+            emit!(self.writer, ")");
+        } else {
+            emit!(self.writer, "(");
+            self.translate_exp(&args[0]);
+            emit!(self.writer, " {} ", boogie_op);
+            self.translate_exp(&args[1]);
+            emit!(self.writer, ")");
         }
     }
 
