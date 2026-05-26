@@ -3,10 +3,60 @@
 
 use super::shadow_mode::create_swarm_with_dkg_only;
 use crate::utils::get_on_chain_resource;
+use aptos_api_types::Transaction;
 use aptos_forge::{Node, NodeExt, SwarmExt};
 use aptos_logger::info;
+use aptos_rest_client::Client;
 use aptos_types::dkg::chunky_dkg::ChunkyDKGState;
 use std::time::Duration;
+
+const FORCE_END_EVENT_TYPE: &str = "0x1::reconfiguration_with_dkg::ForceEndEpochEvent";
+
+/// Scan transactions from `start_version` forward, returning the first
+/// `ForceEndEpochEvent` payload as JSON (or `None` if not found within
+/// `max_txns` transactions).
+async fn find_force_end_event(
+    client: &Client,
+    start_version: u64,
+    max_txns: u64,
+) -> Option<serde_json::Value> {
+    const PAGE: u16 = 100;
+    let mut cursor = start_version;
+    let mut scanned: u64 = 0;
+    while scanned < max_txns {
+        let txns = client
+            .get_transactions(Some(cursor), Some(PAGE))
+            .await
+            .expect("get_transactions")
+            .into_inner();
+        if txns.is_empty() {
+            return None;
+        }
+        for txn in &txns {
+            let events = match txn {
+                Transaction::UserTransaction(t) => &t.events,
+                Transaction::BlockMetadataTransaction(t) => &t.events,
+                Transaction::GenesisTransaction(t) => &t.events,
+                Transaction::StateCheckpointTransaction(_) => continue,
+                Transaction::BlockEpilogueTransaction(_) => continue,
+                Transaction::ValidatorTransaction(t) => t.events(),
+                Transaction::PendingTransaction(_) => continue,
+            };
+            for ev in events {
+                if ev.typ.to_string() == FORCE_END_EVENT_TYPE {
+                    return Some(ev.data.clone());
+                }
+            }
+        }
+        let last_version = txns
+            .last()
+            .and_then(|t| t.version())
+            .expect("transaction has version");
+        cursor = last_version + 1;
+        scanned += txns.len() as u64;
+    }
+    None
+}
 
 /// Enable chunky DKG in real V1 mode (no shadow grace period) AND set the
 /// general epoch-timeout watchdog with a short grace period — all in one
@@ -77,13 +127,17 @@ async fn epoch_timeout_watchdog_force_ends_epoch() {
         .await
         .expect("Waited too long for epoch 2.");
 
-    let epoch_before = client
+    let ledger_before = client
         .get_ledger_information()
         .await
         .expect("ledger info")
-        .into_inner()
-        .epoch;
-    info!("Network stable at epoch {}", epoch_before);
+        .into_inner();
+    let epoch_before = ledger_before.epoch;
+    let version_before = ledger_before.version;
+    info!(
+        "Network stable at epoch {} (version {})",
+        epoch_before, version_before
+    );
 
     // Stall chunky DKG on all validators before enabling it.
     info!("Activating chunky_dkg::process_dkg_start_event failpoint on all validators...");
@@ -148,5 +202,29 @@ async fn epoch_timeout_watchdog_force_ends_epoch() {
         dkg_state.last_completed.is_none(),
         "Chunky DKG should not have completed (failpoint blocks it)"
     );
+
+    // Critical: assert the watchdog actually fired. Without this, the test would
+    // pass even if some other finalization path advanced the epoch.
+    info!(
+        "Scanning for ForceEndEpochEvent from version {}...",
+        version_before
+    );
+    let event_data = find_force_end_event(&client, version_before, 50_000)
+        .await
+        .expect(
+            "ForceEndEpochEvent not found in transactions after watchdog deadline — \
+             epoch advanced through some path other than the watchdog",
+        );
+    info!("Found ForceEndEpochEvent: {}", event_data);
+    let chunky_incomplete = event_data
+        .get("chunky_incomplete")
+        .and_then(|v| v.as_bool())
+        .unwrap_or_else(|| panic!("missing/non-bool chunky_incomplete: {}", event_data));
+    assert!(
+        chunky_incomplete,
+        "ForceEndEpochEvent.chunky_incomplete should be true (chunky DKG was stalled): {}",
+        event_data,
+    );
+
     info!("Watchdog force-ended the epoch despite stalled chunky DKG");
 }
