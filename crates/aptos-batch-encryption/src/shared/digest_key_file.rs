@@ -256,13 +256,15 @@ pub fn read_digest_key_v1_range(
 }
 
 pub fn read_round(file: &File, header: &HeaderV1) -> Result<Round> {
-    let tau_powers_g1: Vec<G1Affine> = (0..header.num_powers_per_round())
+    let mut tau_powers_g1: Vec<G1Affine> = (0..header.num_powers_per_round())
         .map(|_| G1Affine::deserialize_with_mode(file, Compress::No, Validate::No))
         .collect::<std::result::Result<Vec<G1Affine>, SerializationError>>()?;
+    tau_powers_g1.shrink_to_fit();
 
-    let prepared_input_y: Vec<G1Projective> = (0..header.prepared_input_size())
+    let mut prepared_input_y: Vec<G1Projective> = (0..header.prepared_input_size())
         .map(|_| G1Projective::deserialize_with_mode(file, Compress::No, Validate::No))
         .collect::<std::result::Result<Vec<G1Projective>, SerializationError>>()?;
+    prepared_input_y.shrink_to_fit();
 
     Ok(Round {
         tau_powers_g1,
