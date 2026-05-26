@@ -573,9 +573,9 @@ pub(crate) fn realistic_env_max_load_encrypted_test(duration: Duration) -> Forge
             config.consensus.quorum_store.enable_opt_qs_v2_payload_rx = true;
             config.consensus_observer.enable_v2_message_sending = true;
             config.consensus.digest_key_blob_path =
-                Some("/opt/aptos/genesis/digest_key.bin".into());
+                Some("/opt/aptos/data/trusted-setup/digest_key.bin".into());
             config.consensus.public_parameters_blob_path =
-                Some("/opt/aptos/genesis/pp.bin".into());
+                Some("/opt/aptos/data/trusted-setup/pp.bin".into());
         }))
         .with_fullnode_override_node_config_fn(Arc::new(|config, _| {
             config.api.allow_encrypted_txns_submission = true;
@@ -648,9 +648,9 @@ pub(crate) fn realistic_env_max_load_encrypted_mix_test(duration: Duration) -> F
             config.consensus.quorum_store.enable_opt_qs_v2_payload_rx = true;
             config.consensus_observer.enable_v2_message_sending = true;
             config.consensus.digest_key_blob_path =
-                Some("/opt/aptos/genesis/digest_key.bin".into());
+                Some("/opt/aptos/data/trusted-setup/digest_key.bin".into());
             config.consensus.public_parameters_blob_path =
-                Some("/opt/aptos/genesis/pp.bin".into());
+                Some("/opt/aptos/data/trusted-setup/pp.bin".into());
         }))
         .with_fullnode_override_node_config_fn(Arc::new(|config, _| {
             config.api.allow_encrypted_txns_submission = true;
@@ -721,9 +721,9 @@ pub(crate) fn realistic_env_chunky_dkg_epoch_change_test(duration: Duration) -> 
             config.consensus.quorum_store.enable_opt_qs_v2_payload_rx = true;
             config.consensus_observer.enable_v2_message_sending = true;
             config.consensus.digest_key_blob_path =
-                Some("/opt/aptos/genesis/digest_key.bin".into());
+                Some("/opt/aptos/data/trusted-setup/digest_key.bin".into());
             config.consensus.public_parameters_blob_path =
-                Some("/opt/aptos/genesis/pp.bin".into());
+                Some("/opt/aptos/data/trusted-setup/pp.bin".into());
         }))
         .with_pfn_override_node_config_fn(Arc::new(|config, _| {
             config.base.enable_validator_pfn_connections = true;

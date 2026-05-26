@@ -343,10 +343,10 @@ impl ForgeConfig {
                 ["gas_limit"] = serde_yaml::to_value(&gas_limit_backpressure).unwrap();
 
             if let Some(url) = &digest_key_blob_url {
-                helm_values["digest_key_blob_url"] = url.clone().into();
+                helm_values["trustedSetup"]["digestKeyUrl"] = url.clone().into();
             }
             if let Some(url) = &public_parameters_blob_url {
-                helm_values["public_parameters_blob_url"] = url.clone().into();
+                helm_values["trustedSetup"]["publicParametersUrl"] = url.clone().into();
             }
         }))
     }
