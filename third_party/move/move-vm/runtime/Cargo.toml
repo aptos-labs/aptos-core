@@ -50,6 +50,7 @@ default = [
 ]
 profiling = ["move-vm-profiler/probe-profiler"]
 testing = []
+debugger = []
 fuzzing = ["move-vm-types/fuzzing"]
 failpoints = ["fail/failpoints"]
 # Enable this features for tests that check bytecode verification.

@@ -3,9 +3,8 @@
 // Parts of the file are Copyright (c) Aptos Foundation
 // All Aptos Foundation code and content is licensed pursuant to the Innovation-Enabling Source Code License, available at https://github.com/aptos-labs/aptos-core/blob/main/LICENSE
 
-use crate::{
-    interpreter::InterpreterDebugInterface, source_locator, LoadedFunction, RuntimeEnvironment,
-};
+pub use crate::interpreter::InterpreterDebugInterface;
+use crate::{source_locator, LoadedFunction, RuntimeEnvironment};
 use move_vm_types::{instr::Instruction, values::Locals};
 use std::{
     collections::{BTreeSet, VecDeque},
@@ -130,7 +129,7 @@ impl FromStr for DebugCommand {
     }
 }
 
-pub(crate) trait DebugContext: Send {
+pub trait DebugContext: Send {
     fn debug_loop(
         &mut self,
         function: &LoadedFunction,

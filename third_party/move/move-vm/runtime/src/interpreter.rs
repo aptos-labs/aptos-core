@@ -125,7 +125,7 @@ macro_rules! set_err_info {
 /// It mimics execution on a single thread, with an call stack and an operand stack.
 pub(crate) struct Interpreter;
 
-pub(crate) trait InterpreterDebugInterface {
+pub trait InterpreterDebugInterface {
     fn get_stack_frames(&self, count: usize) -> ExecutionState;
     fn get_stack_depth(&self) -> usize;
     fn debug_print_stack_trace(
@@ -133,6 +133,13 @@ pub(crate) trait InterpreterDebugInterface {
         buf: &mut String,
         runtime_environment: &RuntimeEnvironment,
     ) -> PartialVMResult<()>;
+    #[cfg(feature = "debugger")]
+    fn get_frame_locals(&self, depth: usize) -> Option<(&LoadedFunction, &Locals)>;
+    #[cfg(feature = "debugger")]
+    fn load_struct_type(
+        &self,
+        idx: &move_vm_types::loaded_data::struct_name_indexing::StructNameIndex,
+    ) -> Option<std::sync::Arc<move_vm_types::loaded_data::runtime_types::StructType>>;
 }
 
 /// `InterpreterImpl` instances can execute Move functions.
@@ -1886,6 +1893,29 @@ where
 
     fn get_stack_depth(&self) -> usize {
         self.call_stack.0.len()
+    }
+
+    #[cfg(feature = "debugger")]
+    fn get_frame_locals(&self, depth: usize) -> Option<(&LoadedFunction, &Locals)> {
+        let len = self.call_stack.0.len();
+        if depth >= len {
+            return None;
+        }
+        let frame = &self.call_stack.0[len - 1 - depth];
+        Some((&frame.function, &frame.locals))
+    }
+
+    #[cfg(feature = "debugger")]
+    fn load_struct_type(
+        &self,
+        idx: &move_vm_types::loaded_data::struct_name_indexing::StructNameIndex,
+    ) -> Option<std::sync::Arc<move_vm_types::loaded_data::runtime_types::StructType>> {
+        use crate::module_traversal::{TraversalContext, TraversalStorage};
+        let storage = TraversalStorage::new();
+        let mut ctx = TraversalContext::new(&storage);
+        self.loader
+            .load_struct_definition(&mut move_vm_types::gas::UnmeteredGasMeter, &mut ctx, idx)
+            .ok()
     }
 }
 
