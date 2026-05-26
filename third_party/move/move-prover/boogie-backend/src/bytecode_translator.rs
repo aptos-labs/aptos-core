@@ -6190,7 +6190,12 @@ impl FunctionTranslator<'_> {
                     GetVariantField(mid, sid, variants, inst, field_offset) => {
                         let inst = &self.inst_slice(inst);
                         let src = srcs[0];
-                        let mut src_str = str_local(src);
+                        let src_str = str_local(src);
+                        let value_str = if self.get_local_type(src).is_reference() {
+                            format!("$Dereference({})", src_str)
+                        } else {
+                            src_str
+                        };
                         let dest_str = str_local(dests[0]);
                         let struct_env = env.get_module(*mid).into_struct(*sid);
                         self.check_intrinsic_select(attr_id, &struct_env);
@@ -6198,9 +6203,6 @@ impl FunctionTranslator<'_> {
                         // Need to go through all variants to find the correct field
                         for variant in variants {
                             emitln!(writer, "{} if (", else_symbol);
-                            if self.get_local_type(src).is_reference() {
-                                src_str = format!("$Dereference({})", src_str);
-                            };
                             let struct_variant_name =
                                 boogie_struct_variant_name(&struct_env, inst, *variant);
                             let field_env = struct_env.get_field_by_offset_optional_variant(
@@ -6208,8 +6210,8 @@ impl FunctionTranslator<'_> {
                                 *field_offset,
                             );
                             let field_sel = boogie_field_sel(&field_env);
-                            emit!(writer, "{} is {}) {{", src_str, struct_variant_name);
-                            emitln!(writer, "{} := {}->{};", dest_str, src_str, field_sel);
+                            emit!(writer, "{} is {}) {{", value_str, struct_variant_name);
+                            emitln!(writer, "{} := {}->{};", dest_str, value_str, field_sel);
                             emitln!(writer, "}");
                             if else_symbol.is_empty() {
                                 else_symbol = " else ";
