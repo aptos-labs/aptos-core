@@ -143,6 +143,18 @@ pub static BATCH_GENERATOR_MAIN_LOOP: Lazy<DurationHistogram> = Lazy::new(|| {
     )
 });
 
+/// Number of transactions the batch generator dropped because the
+/// transaction's serialized size alone exceeded `sender_max_batch_bytes`.
+/// A non-zero value indicates configuration drift between the per-transaction
+/// size cap enforced upstream of the batch generator and `sender_max_batch_bytes`.
+pub static BATCH_GENERATOR_DROPPED_OVERSIZED_TXNS: Lazy<IntCounter> = Lazy::new(|| {
+    register_int_counter!(
+        "quorum_store_batch_generator_dropped_oversized_txns",
+        "Number of transactions the batch generator dropped because their size alone exceeded sender_max_batch_bytes."
+    )
+    .unwrap()
+});
+
 //////////////////////
 // NEW QUORUM STORE
 //////////////////////

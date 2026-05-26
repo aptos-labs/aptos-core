@@ -234,6 +234,12 @@ impl BatchGenerator {
                 batches.push(batch);
                 *total_batches_remaining = total_batches_remaining.saturating_sub(1);
                 txns_remaining -= num_batch_txns;
+            } else {
+                // The leading transaction alone exceeds `sender_max_batch_bytes`;
+                // drop it so the loop makes progress.
+                counters::BATCH_GENERATOR_DROPPED_OVERSIZED_TXNS.inc();
+                txns.remove(0);
+                txns_remaining -= 1;
             }
         }
     }

@@ -785,3 +785,85 @@ async fn test_remote_batches_in_progress() {
         .unwrap()
         .unwrap();
 }
+
+// Ensures the batch-generator pull cycle terminates and produces no
+// batches when every queued transaction's serialized size exceeds
+// `sender_max_batch_bytes`. The pull is bounded by a wall-clock timeout
+// so any future regression that fails to make progress under this
+// configuration fails the test deterministically instead of hanging.
+#[tokio::test(flavor = "multi_thread")]
+async fn test_oversized_txn_does_not_hang_batch_generator() {
+    let (quorum_store_to_mempool_tx, mut quorum_store_to_mempool_rx) = channel(1_024);
+
+    // Set the per-sender batch byte cap strictly below the size of a single
+    // generated transaction so every queued transaction is, by itself, too
+    // large to fit into any batch.
+    let txn_bytes_len = create_vec_signed_transactions(1)[0].txn_bytes_len();
+    let config = QuorumStoreConfig {
+        sender_max_batch_bytes: txn_bytes_len - 1,
+        ..Default::default()
+    };
+
+    let author = AccountAddress::random();
+    let mut batch_generator = BatchGenerator::new(
+        0,
+        author,
+        config,
+        Arc::new(MockQuorumStoreDB::new()),
+        Arc::new(MockBatchWriter::new()),
+        quorum_store_to_mempool_tx,
+        1000,
+    );
+
+    // Mempool-side fixture: respond to the pull with a small set of
+    // transactions. The mempool helper applies its own cumulative-size cap
+    // before returning transactions to the batch generator. Pass a generous
+    // cap (well above the total payload) so the helper does not filter any
+    // transaction out — the per-sender batch byte cap inside the batch
+    // generator is what this test exercises.
+    let fixture = tokio::spawn(async move {
+        queue_mempool_batch_response(
+            create_vec_signed_transactions(3),
+            txn_bytes_len * 10,
+            &mut quorum_store_to_mempool_rx,
+        )
+        .await;
+    });
+
+    // Run the pull on a detached OS thread, not `tokio::spawn`. The regression
+    // is a synchronous infinite loop in `bucket_into_batches`; tokio cannot
+    // preempt a task that doesn't `.await`, so `tokio::spawn` + `timeout`
+    // would record the failure but the runtime drop would then block forever
+    // waiting on the wedged worker. A detached OS thread is reaped by the OS
+    // at process exit instead. The numeric arg is `max_count` forwarded to
+    // mempool — sized so this cap does not gate the test.
+    let (done_tx, done_rx) = std::sync::mpsc::sync_channel(1);
+    std::thread::spawn(move || {
+        let rt = tokio::runtime::Builder::new_current_thread()
+            .enable_all()
+            .build()
+            .unwrap();
+        let _ = done_tx.send(rt.block_on(batch_generator.handle_scheduled_pull(300)));
+    });
+
+    // 5s is far above the expected runtime over a handful of transactions.
+    // `recv_timeout` runs on the blocking pool so the mempool fixture can
+    // still progress on a tokio worker.
+    let result = tokio::task::spawn_blocking(move || done_rx.recv_timeout(Duration::from_secs(5)))
+        .await
+        .unwrap()
+        .expect(
+            "handle_scheduled_pull must terminate when every queued txn exceeds the per-sender batch byte cap",
+        );
+
+    assert_eq!(
+        result.len(),
+        0,
+        "transactions exceeding sender_max_batch_bytes must not be batched"
+    );
+
+    timeout(Duration::from_millis(10_000), fixture)
+        .await
+        .unwrap()
+        .unwrap();
+}
