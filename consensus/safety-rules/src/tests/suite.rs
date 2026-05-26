@@ -709,8 +709,8 @@ fn test_2chain_rules(constructor: &Callback) {
             result.unwrap_err();
         }
     };
-    // block == qc + 1, commit
-    expect(&a1, None, true, true);
+    // block == qc + 1, but qc points to genesis (round 0), so no commit
+    expect(&a1, None, true, false);
     // block != qc + 1 && block != tc + 1
     expect(
         &b1,
