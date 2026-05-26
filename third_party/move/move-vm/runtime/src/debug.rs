@@ -130,9 +130,21 @@ impl FromStr for DebugCommand {
     }
 }
 
+pub(crate) trait DebugContext: Send {
+    fn debug_loop(
+        &mut self,
+        function: &LoadedFunction,
+        locals: &Locals,
+        pc: u16,
+        instr: &Instruction,
+        runtime_environment: &RuntimeEnvironment,
+        interpreter: &dyn InterpreterDebugInterface,
+    );
+}
+
 #[derive(Debug)]
 #[allow(unused)]
-pub(crate) struct DebugContext {
+pub(crate) struct MoveStepDebugContext {
     breakpoints: BTreeSet<String>,
     input_checker: InputChecker,
 }
@@ -151,7 +163,7 @@ enum InputChecker {
     Continue,
 }
 
-impl DebugContext {
+impl MoveStepDebugContext {
     #[allow(unused)]
     pub(crate) fn new() -> Self {
         Self {
@@ -159,9 +171,11 @@ impl DebugContext {
             input_checker: InputChecker::StepRemaining(1),
         }
     }
+}
 
+impl DebugContext for MoveStepDebugContext {
     #[allow(unused)]
-    pub(crate) fn debug_loop(
+    fn debug_loop(
         &mut self,
         function: &LoadedFunction,
         locals: &Locals,

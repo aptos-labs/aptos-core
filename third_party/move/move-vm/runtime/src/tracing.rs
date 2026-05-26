@@ -4,7 +4,9 @@
 // All Aptos Foundation code and content is licensed pursuant to the Innovation-Enabling Source Code License, available at https://github.com/aptos-labs/aptos-core/blob/main/LICENSE
 
 use crate::{
-    debug::DebugContext, interpreter::InterpreterDebugInterface, loader::LoadedFunction,
+    debug::{DebugContext, MoveStepDebugContext},
+    interpreter::InterpreterDebugInterface,
+    loader::LoadedFunction,
     RuntimeEnvironment,
 };
 use arc_swap::ArcSwap;
@@ -30,7 +32,7 @@ static FILE_PATH: OnceLock<ArcSwap<String>> = OnceLock::new();
 static TRACING_ENABLED: OnceLock<AtomicBool> = OnceLock::new();
 static DEBUGGING_ENABLED: OnceLock<AtomicBool> = OnceLock::new();
 static LOGGING_FILE_WRITER: OnceLock<Mutex<BufWriter<File>>> = OnceLock::new();
-static DEBUG_CONTEXT: OnceLock<Mutex<DebugContext>> = OnceLock::new();
+static DEBUG_CONTEXT: OnceLock<Mutex<Box<dyn DebugContext>>> = OnceLock::new();
 
 /// Turn tracing on or off, saving info to the path.
 pub fn enable_tracing(path_opt: Option<&str>) {
@@ -100,8 +102,8 @@ fn create_buffered_output(path: &Path) -> BufWriter<File> {
     BufWriter::with_capacity(4096 * 1024 /* 4096KB */, file)
 }
 
-pub(crate) fn get_debug_context() -> &'static Mutex<DebugContext> {
-    DEBUG_CONTEXT.get_or_init(|| Mutex::new(DebugContext::new()))
+pub(crate) fn get_debug_context() -> &'static Mutex<Box<dyn DebugContext>> {
+    DEBUG_CONTEXT.get_or_init(|| Mutex::new(Box::new(MoveStepDebugContext::new())))
 }
 
 pub(crate) fn debug_trace(
