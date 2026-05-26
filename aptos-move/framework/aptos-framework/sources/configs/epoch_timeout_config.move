@@ -6,11 +6,18 @@
 ///
 /// When `force_end_grace_period_secs = none`, the watchdog is disabled.
 module aptos_framework::epoch_timeout_config {
+    use std::error;
     use std::option::Option;
     use aptos_framework::config_buffer;
     use aptos_framework::system_addresses;
 
     friend aptos_framework::reconfiguration_with_dkg;
+
+    /// `new_with_grace_period(0)` is disallowed: a zero grace period would cause
+    /// the watchdog to fire in the same block prologue that triggers reconfig,
+    /// skipping DKG entirely. Use `new_disabled()` if you mean to disable the
+    /// watchdog.
+    const E_GRACE_PERIOD_MUST_BE_POSITIVE: u64 = 1;
 
     struct EpochTimeoutConfig has copy, drop, key, store {
         force_end_grace_period_secs: Option<u64>,
@@ -47,7 +54,15 @@ module aptos_framework::epoch_timeout_config {
         EpochTimeoutConfig { force_end_grace_period_secs: std::option::none() }
     }
 
+    /// Build a watchdog config with a positive grace period (seconds). The
+    /// grace period is the slack allowed *beyond* the epoch interval before
+    /// the watchdog force-finalizes the reconfig. Aborts on `grace_period_secs
+    /// == 0` — pass through `new_disabled()` to turn the watchdog off.
     public fun new_with_grace_period(grace_period_secs: u64): EpochTimeoutConfig {
+        assert!(
+            grace_period_secs > 0,
+            error::invalid_argument(E_GRACE_PERIOD_MUST_BE_POSITIVE),
+        );
         EpochTimeoutConfig {
             force_end_grace_period_secs: std::option::some(grace_period_secs)
         }
@@ -135,5 +150,11 @@ module aptos_framework::epoch_timeout_config {
     fun non_framework_signer_cannot_set(framework: signer, attacker: signer) {
         initialize_for_testing(&framework);
         set_for_next_epoch(&attacker, new_with_grace_period(10));
+    }
+
+    #[test]
+    #[expected_failure(abort_code = 0x10001, location = Self)]
+    fun zero_grace_period_aborts() {
+        let _ = new_with_grace_period(0);
     }
 }
