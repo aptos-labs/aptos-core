@@ -5,18 +5,20 @@
 
 use crate::{
     interner::{InternedIdentifier, InternedModuleId, Interner},
-    types::{InternedType, EMPTY_TYPE_LIST},
+    types::{InternedType, InternedTypeList, EMPTY_TYPE_LIST},
 };
 use anyhow::{bail, Result};
 use move_binary_format::{
     access::ModuleAccess,
     file_format::{
-        ConstantPoolIndex, FieldHandleIndex, SignatureIndex, SignatureToken, StructDefinitionIndex,
+        ConstantPoolIndex, FieldHandleIndex, FunctionHandleIndex, FunctionInstantiationIndex,
+        IdentifierIndex, ModuleHandleIndex, SignatureIndex, SignatureToken, StructDefinitionIndex,
         StructFieldInformation, StructHandle, StructHandleIndex, VariantFieldHandleIndex,
         VariantIndex,
     },
     CompiledModule,
 };
+use shared_dsa::UnorderedMap;
 use std::ops::Deref;
 
 /// Wraps deserialized and verified [`CompiledModule`] with pre-interned type
@@ -25,6 +27,8 @@ use std::ops::Deref;
 pub struct PreparedModule {
     /// Original compiled module. Kept so that its tables can be accessed.
     module: CompiledModule,
+    /// Interned ID of this module.
+    id: InternedModuleId,
     /// Interned signatures from compiled module. Note that below tables are
     /// still needed because file format does not deduplicate all signatures.
     /// For example, fields carry their own signature and not an index into
@@ -37,6 +41,8 @@ pub struct PreparedModule {
     ///
     /// Indexed by [`StructHandleIndex`].
     nominal_types: Vec<InternedType>,
+    /// Maps struct or enum name to its local [`StructDefinitionIndex`].
+    nominal_definitions: UnorderedMap<InternedIdentifier, StructDefinitionIndex>,
     /// Interned struct or enum field types from compiled module. Only for
     /// declared structs or enums.
     ///
@@ -46,10 +52,57 @@ pub struct PreparedModule {
     ///
     /// Indexed by [`ConstantPoolIndex`].
     constant_types: Vec<InternedType>,
+    /// Interned identifiers from compiled module.
+    ///
+    /// Indexed by [`IdentifierIndex`].
+    interned_identifiers: Vec<InternedIdentifier>,
+    /// Interned module IDs for every module handle in the compiled module.
+    ///
+    /// Indexed by [`ModuleHandleIndex`]. Self-handle resolves to the same id
+    /// as [`Self::id`].
+    module_ids: Vec<InternedModuleId>,
+    /// Parameter and return types for every function handle referenced in
+    /// the module. For a generic function, these may contain [`Type::TypeParam`]
+    /// nodes referencing the function's own type parameters — they are not
+    /// guaranteed to be fully concrete.
+    ///
+    /// Indexed by [`FunctionHandleIndex`].
+    function_signatures: Vec<FunctionSignature>,
+    /// Parameter and return types, as well as type arguments, for every
+    /// function instantiation in this module. The type arguments have been
+    /// applied to the underlying handle's params/returns. They may still
+    /// contain [`Type::TypeParam`] nodes referencing type parameters of the
+    /// *enclosing* (caller) function — substitution here only resolves the
+    /// call site's own type arguments, not the caller's free type parameters.
+    ///
+    /// Indexed by [`FunctionInstantiationIndex`].
+    function_instantiation_signatures: Vec<FunctionInstantiationSignature>,
+}
+
+/// Parameter and return types of a function handle, interned. Note that for a
+/// generic function these may contain free type parameters of the function
+/// itself, and are therefore not necessarily fully concrete.
+#[derive(Clone, Copy)]
+pub struct FunctionSignature {
+    pub params: InternedTypeList,
+    pub returns: InternedTypeList,
+}
+
+/// Parameter and return types of a function instantiation, together with the
+/// type arguments applied at the call site. The type arguments have already
+/// been substituted into `params` and `returns`. The result may still contain
+/// free type parameters of the enclosing function, so this is not guaranteed
+/// to be fully concrete either.
+#[derive(Clone, Copy)]
+pub struct FunctionInstantiationSignature {
+    pub params: InternedTypeList,
+    pub returns: InternedTypeList,
+    pub ty_args: InternedTypeList,
 }
 
 /// Field types of any struct or enum definition in this module.
-enum FieldTypes {
+#[derive(Clone)]
+pub enum FieldTypes {
     Struct(Vec<InternedType>),
     Enum(Vec<Vec<InternedType>>),
 }
@@ -64,10 +117,27 @@ impl Deref for PreparedModule {
 }
 
 impl PreparedModule {
+    /// Returns interned module ID of this module.
+    pub fn id(&self) -> InternedModuleId {
+        self.id
+    }
+
+    /// Returns the interned module ID for the given module handle.
+    pub fn module_id_at(&self, idx: ModuleHandleIndex) -> InternedModuleId {
+        self.module_ids[idx.0 as usize]
+    }
+
     /// Returns interned types corresponding to the compiled module's
     /// signature.
     pub fn interned_types_at(&self, idx: SignatureIndex) -> &[InternedType] {
         &self.signatures[idx.0 as usize]
+    }
+
+    /// Returns all interned types corresponding to the compiled module's
+    /// nominal types (structs or enums). Note that these types can be imported
+    /// from other modules.
+    pub fn interned_nominal_types_at(&self) -> &[InternedType] {
+        &self.nominal_types
     }
 
     /// Returns interned type corresponding to the compiled module's nominal
@@ -82,6 +152,16 @@ impl PreparedModule {
     pub fn interned_nominal_def_type_at(&self, def_idx: StructDefinitionIndex) -> InternedType {
         let idx = self.module.struct_def_at(def_idx).struct_handle;
         self.interned_nominal_type_at(idx)
+    }
+
+    /// Looks up a struct or enum definition by its interned name, and returns
+    /// its index.
+    pub fn interned_nominal_type_def_idx(
+        &self,
+        name: InternedIdentifier,
+    ) -> Option<StructDefinitionIndex> {
+        let idx = self.nominal_definitions.get(&name).copied()?;
+        Some(idx)
     }
 
     /// Returns interned types corresponding to the compiled module's struct
@@ -109,6 +189,13 @@ impl PreparedModule {
         }
     }
 
+    /// Looks up a struct or enum definition by its interned name, and returns
+    /// its fields (or variants with fields).
+    pub fn interned_field_types(&self, name: InternedIdentifier) -> Option<&FieldTypes> {
+        let idx = self.interned_nominal_type_def_idx(name)?;
+        Some(&self.field_types[idx.0 as usize])
+    }
+
     /// Returns interned type corresponding to the compiled module's struct
     /// field.
     pub fn interned_field_type_at(&self, idx: FieldHandleIndex) -> InternedType {
@@ -132,9 +219,47 @@ impl PreparedModule {
         self.constant_types[idx.0 as usize]
     }
 
+    /// Returns interned type corresponding to the compiled module's constant.
+    pub fn interned_identifier_at(&self, idx: IdentifierIndex) -> InternedIdentifier {
+        self.interned_identifiers[idx.0 as usize]
+    }
+
+    /// Returns parameter and return types for the given function handle.
+    pub fn function_signature_at(&self, idx: FunctionHandleIndex) -> FunctionSignature {
+        self.function_signatures[idx.0 as usize]
+    }
+
+    /// Returns parameter and return types, as well as type arguments for the
+    /// given function instantiation. Parameters and returns have already
+    /// been substituted under type arguments.
+    pub fn function_instantiation_signature_at(
+        &self,
+        idx: FunctionInstantiationIndex,
+    ) -> FunctionInstantiationSignature {
+        self.function_instantiation_signatures[idx.0 as usize]
+    }
+
     /// Builds resolved module from compiled one, interning all signatures,
     /// field and constant types.
     pub fn build(module: CompiledModule, interner: &impl Interner) -> Result<Self> {
+        let id = interner.module_id_of(module.self_addr(), module.self_name());
+
+        let interned_identifiers = module
+            .identifiers
+            .iter()
+            .map(|identifier| interner.identifier_of(identifier.as_ident_str()))
+            .collect::<Vec<_>>();
+
+        let module_ids = module
+            .module_handles()
+            .iter()
+            .map(|mh| {
+                let addr = module.address_identifier_at(mh.address);
+                let name = module.identifier_at(mh.name);
+                interner.module_id_of(addr, name)
+            })
+            .collect::<Vec<_>>();
+
         let signatures = module
             .signatures()
             .iter()
@@ -167,11 +292,13 @@ impl PreparedModule {
             })
             .collect();
 
+        let mut nominal_definitions = UnorderedMap::with_capacity(module.struct_defs().len());
         let field_types = module
             .struct_defs()
             .iter()
-            .map(|def| {
-                Ok(match &def.field_information {
+            .enumerate()
+            .map(|(idx, def)| {
+                let field_types = match &def.field_information {
                     StructFieldInformation::Native => {
                         bail!("Native fields are deprecated");
                     },
@@ -194,7 +321,13 @@ impl PreparedModule {
                             .collect::<Result<Vec<_>>>()?;
                         FieldTypes::Enum(variants)
                     },
-                })
+                };
+
+                let handle = module.struct_handle_at(def.struct_handle);
+                let name = interned_identifiers[handle.name.0 as usize];
+                nominal_definitions.insert(name, StructDefinitionIndex(idx as u16));
+
+                Ok(field_types)
             })
             .collect::<Result<Vec<_>>>()?;
 
@@ -204,12 +337,43 @@ impl PreparedModule {
             .map(|c| intern_sig_token(&c.type_, &module, interner))
             .collect::<Result<Vec<_>>>()?;
 
+        let function_signatures = module
+            .function_handles()
+            .iter()
+            .map(|h| FunctionSignature {
+                params: interner.type_list_of(&signatures[h.parameters.0 as usize]),
+                returns: interner.type_list_of(&signatures[h.return_.0 as usize]),
+            })
+            .collect::<Vec<_>>();
+
+        let function_instantiation_signatures = module
+            .function_instantiations()
+            .iter()
+            .map(|inst| {
+                let handle_sig = function_signatures[inst.handle.0 as usize];
+                let ty_args = interner.type_list_of(&signatures[inst.type_parameters.0 as usize]);
+                let params = interner.subst_type_list(handle_sig.params, ty_args)?;
+                let returns = interner.subst_type_list(handle_sig.returns, ty_args)?;
+                Ok(FunctionInstantiationSignature {
+                    params,
+                    returns,
+                    ty_args,
+                })
+            })
+            .collect::<Result<Vec<_>>>()?;
+
         Ok(Self {
             module,
+            id,
             signatures,
             nominal_types,
+            nominal_definitions,
             field_types,
             constant_types,
+            interned_identifiers,
+            module_ids,
+            function_signatures,
+            function_instantiation_signatures,
         })
     }
 }

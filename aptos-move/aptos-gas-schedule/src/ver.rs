@@ -8,6 +8,9 @@
 ///   - Changing how gas is calculated in any way
 ///
 /// Change log:
+/// - V46:
+///    - Correct value for gas param `algebra.ark_bn254_fr_one`.
+///    - Fix BN254 `Fr::one()` native to charge `algebra.ark_bn254_fr_one`.
 /// - V45:
 ///    - New minimum price per gas unit parameter for higher-limit transactions
 ///    - Gas charging for encrypted transaction decryption

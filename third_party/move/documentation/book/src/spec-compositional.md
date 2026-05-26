@@ -151,6 +151,8 @@ spec test_known {
 
 The existence of `result_of<f>(args)` implies that `f` is deterministic — it denotes the unique value `y` satisfying `ensures_of<f>(args, y)`. This is why `result_of` also establishes functional behavior: if `ensures_of<f>(x, y1)` and `ensures_of<f>(x, y2)` both hold, then `y1 == y2 == result_of<f>(x)`.
 
+`result_of<f>(args)` has the return type of `f`. For void callees, `result_of` is invalid; use `ensures_of` instead. For closures with `&mut` parameters, see [Mutable Reference Parameters](#mutable-reference-parameters).
+
 ### Inline Closure Specifications
 
 When a closure is passed to an opaque higher-order function, the prover needs to know the closure's specification to reason about it. Closures can carry inline specifications using the `spec { ... }` syntax:
@@ -200,37 +202,36 @@ This approach enables modular verification: the implementation of `apply_opaque`
 
 ### Mutable Reference Parameters
 
-Behavioral predicates extend to closures with mutable reference parameters. When a function takes `&mut T`, it effectively has two outputs: the explicit return value and the modified reference. The predicates account for both:
+Behavioral predicates extend to closures with mutable reference parameters. A `&mut T` argument appears **once** in a behavioral-predicate call — the prover supplies both the pre-state and post-state of the argument to the underlying predicate automatically:
+
+```move
+fun apply_mut(f: |&mut u64| u64, x: &mut u64): u64 { f(x) }
+spec apply_mut {
+    ensures result == result_of<f>(x);
+}
+```
+
+`result_of<f>(x_mut)` has the same type as the procedure's `result`, so `result == result_of<f>(x_mut)` type-checks directly. The `&mut` post-state of `x` is constrained deterministically: when `f` is functional in its inputs, `x`'s post-state is uniquely determined by its pre-state.
+
+`ensures_of<f>(x_mut, r)` is the relational form. It is equivalent to `r == result_of<f>(x_mut)` for non-void deterministic callees, and is the only choice for void callees:
 
 ```move
 fun apply_void_mut(f: |&mut u64|, x: &mut u64) { f(x) }
 spec apply_void_mut {
-    // For void return with &mut param, result_of returns the modified value
-    ensures x == result_of<f>(old(x));
-}
-
-fun apply_mut(f: |&mut u64| u64, x: &mut u64): u64 { f(x) }
-spec apply_mut {
-    // For non-void return with &mut, ensures_of takes (input, result, modified_param)
-    ensures ensures_of<f>(old(x), result, x);
+    // Void `f` has no return — `result_of` is rejected. `ensures_of`
+    // relates pre- and post-state of `x`.
+    ensures ensures_of<f>(x);
 }
 ```
 
-When a closure both returns a value and modifies a `&mut` parameter, `result_of` returns a tuple `(explicit_result, modified_value)`:
+For multi-return closures with `&mut` parameters, `result_of<f>` returns the declared return tuple. The `&mut` post-state is still pinned automatically:
 
 ```move
-fun apply_mut_result(f: |&mut u64| u64, x: &mut u64): u64 { f(x) }
-spec apply_mut_result {
-    ensures (result, x) == result_of<f>(old(x));
+fun apply_two_results(f: |&mut u64| (u64, u64), x: &mut u64): (u64, u64) {
+    f(x)
 }
-```
-
-Tuple components can be extracted with let expressions:
-
-```move
-spec apply_mut_extract {
-    ensures result == {let (r, _p) = result_of<f>(old(x)); r};
-    ensures x == {let (_r, p) = result_of<f>(old(x)); p};
+spec apply_two_results {
+    ensures (result_1, result_2) == result_of<f>(x);
 }
 ```
 

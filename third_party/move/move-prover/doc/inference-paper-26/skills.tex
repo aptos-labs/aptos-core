@@ -2,25 +2,29 @@
 \label{sec:skills}
 
 The agentic side of the workflow is delivered as a Claude Code plugin, packaging skills (markdown instructions), edit-time hooks, and an MCP server.
-The plugin is generated from Tera templates so that shared content (such as the verification sub-workflow) is included by reference rather than duplicated.
+A text templating system lets shared content (e.g.\ the verification sub-workflow) be included by reference rather than duplicated. The setup is at~\cite{MoveFlow}; we summarize the major design aspects.
 
 \Paragraph{Skills}
-The inference skill registers the workflow of Sec.~\ref{sec:example} as a fixed task sequence --- synthesize loop invariants, run \WP, simplify, full-scope verification, fix logical errors, resolve timeouts --- and tags every emitted condition with an \texttt{[inferred]} marker so that re-runs are idempotent and never disturb user-written specs.
-Beyond the task script, the skills concentrate the domain guidance the agent would otherwise have to rediscover.
-\emph{Loop invariants:} when to introduce recursive helper functions for iterative quantities, and when to prefer state-level invariants on resources --- assumed by the prover at every call site, including each loop iteration --- over per-loop inductive arguments.
-\emph{Simplification:} discard vacuous conditions; replace unbounded quantifiers, a frequent source of SMT timeouts, with bounded or closed-form equivalents; and require trigger annotations on the surviving ones.
-\emph{Timeout resolution:} a hierarchy of escalations --- strengthen state-level invariants, then introduce spec helpers, then lemmas, then explicit proof scripts --- with a strict prohibition on weakening abort or post conditions to silence a timeout, since this trades a real property for the appearance of progress.
-The simplification and timeout-resolution material is shared, via template inclusion, with a standalone verification skill, so the same guidance applies whether the spec was inferred or written by hand.
+The inference skill registers the workflow of Sec.~\ref{sec:example} as a fixed task sequence --- synthesize loop invariants, run \WP, simplify, run full-scope verification, fix logical errors, resolve timeouts --- and tags every emitted condition with an \texttt{[inferred]} marker so that re-runs are idempotent and never disturb user-written specs.
+Beyond the task script, the skills consolidate the domain guidance the agent would otherwise have to rediscover.
+\begin{Itemize}
+\item \emph{Loop invariants:} when to introduce recursive helper functions for iterative quantities, and when to prefer state-level invariants on resources --- assumed by the prover at every call site, including each loop iteration --- over per-loop inductive arguments.
+\item \emph{Simplification:} discard vacuous conditions; replace unbounded quantifiers, a frequent source of SMT timeouts, with bounded or closed-form equivalents; and require trigger annotations on the surviving ones.
+\item \emph{Timeout resolution:} a hierarchy of escalations --- strengthen state-level invariants, then introduce spec helpers, then lemmas, then explicit proof scripts --- with a strict prohibition on weakening abort or postconditions to silence a timeout, since this trades a real property for the appearance of progress.
+\end{Itemize}
+\noindent
+Via template inclusion, the simplification and timeout-resolution material is shared with a standalone verification skill, so the same guidance applies whether the spec was inferred or written by hand.
 
 \Paragraph{Hooks}
-Event hooks in \texttt{hooks.json} couple the plugin to the agent's life cycle.
-The most important hook is \texttt{PostToolUse}, triggered after every \texttt{Edit} or \texttt{Write} on a \texttt{.move} file: it parses the modified file, runs a set of offline AST checks (e.g.\ \texttt{old()} used outside \texttt{ensures}, references or dereferences inside spec expressions, deprecated Move~1 syntax such as \texttt{borrow\_global<\ldots>}), and auto-formats.
-When any check fails, the hook exits non-zero and the diagnostic is surfaced back into the agent's transcript, where it functions as immediate feedback that the next turn must address --- the agent is, in effect, given a fast linter loop without the round-trip cost of a full prover invocation.
+Event hooks couple the plugin to the agent's life cycle.
+The most important hook is \texttt{PostToolUse}, triggered after every \texttt{Edit} or \texttt{Write} on a \texttt{.move} file: it parses the file, runs offline AST checks, and auto-formats the generated source.
+When any check fails, the hook exits non-zero and the diagnostic is surfaced into the agent's transcript as immediate feedback for the next turn --- in effect, a fast linter loop without the cost of a full prover invocation.
 
 \Paragraph{MCP integration}
-The plugin also ships a stdio MCP server that exposes the Move toolchain to \CC as a small set of tools: compile-status checking, package manifest inspection, structural queries (dependency graph, module summary, call graph, function usage), invoking the prover with a per-function filter, a per-VC timeout, and an exclude list, and running the \WP-based spec inference of Sec.~\ref{sec:wp} with a function- or module-level filter.
-The server holds a long-lived cache for the active package, invalidated by an OS-native file watcher on source changes.
-This makes the cost of a single tool call negligible relative to a fresh \texttt{cargo build}, which is what makes the iterative \emph{infer / verify / refine} loop tractable at the granularity inference needs.
+The plugin ships a stdio MCP server that exposes the Move toolchain to \CC as a curated set of tools, including \MVP for \WP analysis and verification.
+The MCP commands let the agent narrow calls to single functions or modules, with parameters such as timeout duration.
+The advantage of MCP over a CLI is a long-lived cache for the active package.
+Each tool call is then cheap relative to a fresh run from source, making the iterative \emph{infer / verify / refine} loop tractable at the fine granularity inference requires.
 
 %%% Local Variables:
 %%% mode: latex

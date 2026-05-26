@@ -177,6 +177,10 @@ pub enum FeatureFlag {
     VERSIONED_TRANSACTION_VALIDATION = 112,
     /// Whether storage_slot move natives are enabled.
     STORAGE_SLOT_NATIVES = 113,
+    /// If enabled, a module upgrade may downgrade the visibility of an `entry` function
+    /// from `friend/package` to private, while keeping the `entry` modifier. The `entry`
+    /// modifier itself still cannot be removed. See issue #19650.
+    ALLOW_FRIEND_ENTRY_VISIBILITY_DOWNGRADE = 114,
 }
 
 impl FeatureFlag {
@@ -290,6 +294,7 @@ impl FeatureFlag {
             Self::TRANSACTION_LIMITS,
             Self::VERSIONED_TRANSACTION_VALIDATION,
             Self::STORAGE_SLOT_NATIVES,
+            Self::ALLOW_FRIEND_ENTRY_VISIBILITY_DOWNGRADE,
         ]
     }
 }
@@ -355,7 +360,14 @@ impl Features {
             .flat_map(|byte| (0..8).map(move |bit_idx| byte & (1 << bit_idx) != 0))
             .enumerate()
             .filter(|(_feature_idx, enabled)| *enabled)
-            .map(|(feature_idx, _)| FeatureFlag::from_repr(feature_idx).unwrap())
+            .map(|(feature_idx, _)| {
+                FeatureFlag::from_repr(feature_idx).unwrap_or_else(|| {
+                    panic!(
+                        "unknown FeatureFlag index {feature_idx} in features bitmap; \
+                         a newer-binary override likely set a flag this binary does not know"
+                    )
+                })
+            })
             .collect()
     }
 

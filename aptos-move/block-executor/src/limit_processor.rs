@@ -33,6 +33,9 @@ pub struct BlockGasLimitProcessor<T: Transaction> {
     start_time: Instant,
     print_conflicts_info: bool,
     hot_state_op_accumulator: Option<BlockHotStateOpAccumulator<T::Key>>,
+    /// When set, `should_end_block` returned true and this label identifies which limit fired.
+    /// `"gas"` for the per-block effective-gas limit; `"output_size"` for the output-size limit.
+    halted_by: Option<&'static str>,
 }
 
 impl<T: Transaction> BlockGasLimitProcessor<T> {
@@ -57,6 +60,7 @@ impl<T: Transaction> BlockGasLimitProcessor<T> {
             // TODO: have a configuration for it.
             print_conflicts_info: *PRINT_CONFLICTS_INFO,
             hot_state_op_accumulator,
+            halted_by: None,
         }
     }
 
@@ -117,10 +121,17 @@ impl<T: Transaction> BlockGasLimitProcessor<T> {
     }
 
     fn block_gas_limit(&self) -> Option<u64> {
-        if self.block_gas_limit_override.is_some() {
-            self.block_gas_limit_override
-        } else {
-            self.block_gas_limit_type.block_gas_limit()
+        // The override is proposer-supplied (via the payload's TxnAndGasLimits) and
+        // is not validated against the on-chain cap during consensus payload
+        // verification. Clamp it to the on-chain limit so a Byzantine proposer
+        // cannot raise the per-block gas cap; the override may only lower it.
+        match (
+            self.block_gas_limit_override,
+            self.block_gas_limit_type.block_gas_limit(),
+        ) {
+            (Some(override_limit), Some(onchain_limit)) => Some(override_limit.min(onchain_limit)),
+            (Some(override_limit), None) => Some(override_limit),
+            (None, onchain_limit) => onchain_limit,
         }
     }
 
@@ -136,6 +147,7 @@ impl<T: Transaction> BlockGasLimitProcessor<T> {
                     accumulated_block_gas {} >= PER_BLOCK_GAS_LIMIT {}",
                     mode, accumulated_block_gas, per_block_gas_limit,
                 );
+                self.halted_by = Some("gas");
                 return true;
             }
         }
@@ -149,6 +161,7 @@ impl<T: Transaction> BlockGasLimitProcessor<T> {
                     accumulated_output {} >= PER_BLOCK_OUTPUT_LIMIT {}",
                     mode, accumulated_output, per_block_output_limit,
                 );
+                self.halted_by = Some("output_size");
                 return true;
             }
         }
@@ -221,6 +234,18 @@ impl<T: Transaction> BlockGasLimitProcessor<T> {
             is_parallel,
         );
         counters::update_txn_gas_counters(&self.txn_fee_statements, is_parallel);
+
+        if let Some(reason) = self.halted_by {
+            let mode = if is_parallel {
+                counters::Mode::PARALLEL
+            } else {
+                counters::Mode::SEQUENTIAL
+            };
+            let cut = num_total.saturating_sub(num_committed);
+            counters::BLOCK_TXNS_CUT_BY_LIMIT
+                .with_label_values(&[reason, mode])
+                .observe(cut as f64);
+        }
 
         info!(
             eff_gas = accumulated_effective_block_gas,
@@ -350,6 +375,66 @@ mod test {
         processor.accumulate_fee_statement(execution_fee(10), None, None);
         assert!(!processor.should_end_block_parallel());
         processor.accumulate_fee_statement(execution_fee(50), None, None);
+        assert!(!processor.should_end_block_parallel());
+        processor.accumulate_fee_statement(execution_fee(40), None, None);
+        assert!(processor.should_end_block_parallel());
+    }
+
+    #[test]
+    fn test_override_cannot_exceed_onchain_limit() {
+        // Onchain effective cap is 100. A (potentially Byzantine) proposer-supplied
+        // override of u64::MAX must be clamped to 100, not honored as-is.
+        let block_gas_limit = BlockGasLimitType::ComplexLimitV1 {
+            effective_block_gas_limit: 100,
+            execution_gas_effective_multiplier: 1,
+            io_gas_effective_multiplier: 1,
+            conflict_penalty_window: 1,
+            use_module_publishing_block_conflict: false,
+            block_output_limit: None,
+            include_user_txn_size_in_block_output: true,
+            add_block_limit_outcome_onchain: false,
+            use_granular_resource_group_conflicts: false,
+        };
+
+        let mut processor = TestProcessor::new(block_gas_limit, Some(u64::MAX), 10);
+
+        processor.accumulate_fee_statement(execution_fee(60), None, None);
+        assert!(!processor.should_end_block_parallel());
+        // After 110 raw gas, the clamped (=100) onchain cap must trigger early halt.
+        processor.accumulate_fee_statement(execution_fee(50), None, None);
+        assert!(processor.should_end_block_parallel());
+    }
+
+    #[test]
+    fn test_override_can_lower_onchain_limit() {
+        // Override may still lower the effective cap below the onchain value.
+        let block_gas_limit = BlockGasLimitType::ComplexLimitV1 {
+            effective_block_gas_limit: 1_000_000,
+            execution_gas_effective_multiplier: 1,
+            io_gas_effective_multiplier: 1,
+            conflict_penalty_window: 1,
+            use_module_publishing_block_conflict: false,
+            block_output_limit: None,
+            include_user_txn_size_in_block_output: true,
+            add_block_limit_outcome_onchain: false,
+            use_granular_resource_group_conflicts: false,
+        };
+
+        let mut processor = TestProcessor::new(block_gas_limit, Some(50), 10);
+
+        processor.accumulate_fee_statement(execution_fee(20), None, None);
+        assert!(!processor.should_end_block_parallel());
+        processor.accumulate_fee_statement(execution_fee(40), None, None);
+        assert!(processor.should_end_block_parallel());
+    }
+
+    #[test]
+    fn test_override_when_onchain_is_no_limit() {
+        // When the onchain config has no cap, the override applies as given:
+        // there is no protocol cap to enforce, and Byzantine-amplification is moot.
+        let mut processor = TestProcessor::new(BlockGasLimitType::NoLimit, Some(50), 10);
+
+        processor.accumulate_fee_statement(execution_fee(20), None, None);
         assert!(!processor.should_end_block_parallel());
         processor.accumulate_fee_statement(execution_fee(40), None, None);
         assert!(processor.should_end_block_parallel());

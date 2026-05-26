@@ -19,7 +19,7 @@ use crate::{
         encrypted_payload::{DecryptionFailureReason, EncryptedPayload},
     },
     vm_status::{DiscardedVMStatus, KeptVMStatus, StatusCode, StatusType, VMStatus},
-    write_set::{HotStateOp, WriteSet},
+    write_set::WriteSet,
 };
 use anyhow::{ensure, format_err, Context, Error, Result};
 use aptos_crypto::{
@@ -38,7 +38,6 @@ use rayon::prelude::*;
 use serde::{Deserialize, Serialize};
 use std::{
     borrow::Cow,
-    collections::BTreeMap,
     convert::TryFrom,
     fmt::{self, Debug, Display, Formatter},
 };
@@ -884,25 +883,38 @@ impl TransactionExecutableRef<'_> {
     }
 }
 
-/// Multipliers for higher transaction limits, expressed in basis points
-/// (100 = 1x, 200 = 2x, 250 = 2.5x).
+/// Multipliers for higher transaction limits, expressed as percent of the base
+/// limit (100 = 1x, 200 = 2x, 250 = 2.5x).
 ///
 /// INVARIANT: must match Move representation for BCS serialization.
 #[derive(Clone, Debug, Hash, Eq, PartialEq, Serialize, Deserialize)]
 pub enum RequestedMultipliers {
-    V1 { execution_bps: u64, io_bps: u64 },
+    V1 {
+        /// Execution-gas multiplier as percent of the base limit where 100 is 1x.
+        execution_multiplier_percent: u64,
+        /// IO-gas multiplier as percent of the base limit where 100 is 1x.
+        io_multiplier_percent: u64,
+    },
 }
 
 impl RequestedMultipliers {
-    pub fn execution_bps(&self) -> u64 {
+    /// Returns the execution-gas multiplier as percent (100 is 1x).
+    pub fn execution_multiplier_percent(&self) -> u64 {
         match self {
-            Self::V1 { execution_bps, .. } => *execution_bps,
+            Self::V1 {
+                execution_multiplier_percent,
+                ..
+            } => *execution_multiplier_percent,
         }
     }
 
-    pub fn io_bps(&self) -> u64 {
+    /// Returns the IO-gas multiplier as percent (100 is 1x).
+    pub fn io_multiplier_percent(&self) -> u64 {
         match self {
-            Self::V1 { io_bps, .. } => *io_bps,
+            Self::V1 {
+                io_multiplier_percent,
+                ..
+            } => *io_multiplier_percent,
         }
     }
 }
@@ -2076,6 +2088,10 @@ impl TransactionOutput {
         &self.write_set
     }
 
+    pub fn convert_write_set_to_v1(&mut self) {
+        self.write_set = std::mem::take(&mut self.write_set).into_v1();
+    }
+
     // This is a special function to update the total supply in the write set. 'TransactionOutput'
     // already has materialized write set, but in case of sharding support for total_supply, we
     // want to update the total supply in the write set by aggregating the total supply deltas from
@@ -2199,7 +2215,7 @@ impl TransactionOutput {
         self.write_set.state_update_refs()
     }
 
-    pub fn add_hotness(&mut self, hotness: BTreeMap<StateKey, HotStateOp>) {
+    pub fn add_hotness(&mut self, hotness: BTreeSet<StateKey>) {
         self.write_set.add_hotness(hotness);
     }
 }
@@ -2210,6 +2226,7 @@ impl TransactionOutput {
 #[cfg_attr(any(test, feature = "fuzzing"), derive(Arbitrary))]
 pub enum TransactionInfo {
     V0(TransactionInfoV0),
+    V1(TransactionInfoV1),
 }
 
 impl TransactionInfo {
@@ -2227,6 +2244,28 @@ impl TransactionInfo {
             state_change_hash,
             event_root_hash,
             state_checkpoint_hash,
+            gas_used,
+            status,
+            auxiliary_info_hash,
+        ))
+    }
+
+    pub fn new_v1(
+        transaction_hash: HashValue,
+        state_change_hash: HashValue,
+        event_root_hash: HashValue,
+        state_checkpoint_hash: Option<HashValue>,
+        hot_state_checkpoint_hash: Option<HashValue>,
+        gas_used: u64,
+        status: ExecutionStatus,
+        auxiliary_info_hash: Option<HashValue>,
+    ) -> Self {
+        Self::V1(TransactionInfoV1::new(
+            transaction_hash,
+            state_change_hash,
+            event_root_hash,
+            state_checkpoint_hash,
+            hot_state_checkpoint_hash,
             gas_used,
             status,
             auxiliary_info_hash,
@@ -2262,19 +2301,74 @@ impl TransactionInfo {
             Some(HashValue::default()),
         )
     }
-}
 
-impl Deref for TransactionInfo {
-    type Target = TransactionInfoV0;
-
-    fn deref(&self) -> &Self::Target {
+    pub fn transaction_hash(&self) -> HashValue {
         match self {
-            Self::V0(txn_info) => txn_info,
+            Self::V0(v) => v.transaction_hash,
+            Self::V1(v) => v.transaction_hash,
+        }
+    }
+
+    pub fn state_change_hash(&self) -> HashValue {
+        match self {
+            Self::V0(v) => v.state_change_hash,
+            Self::V1(v) => v.state_change_hash,
+        }
+    }
+
+    pub fn event_root_hash(&self) -> HashValue {
+        match self {
+            Self::V0(v) => v.event_root_hash,
+            Self::V1(v) => v.event_root_hash,
+        }
+    }
+
+    pub fn state_checkpoint_hash(&self) -> Option<HashValue> {
+        match self {
+            Self::V0(v) => v.state_checkpoint_hash,
+            Self::V1(v) => v.state_checkpoint_hash,
+        }
+    }
+
+    pub fn has_state_checkpoint_hash(&self) -> bool {
+        self.state_checkpoint_hash().is_some()
+    }
+
+    pub fn ensure_state_checkpoint_hash(&self) -> Result<HashValue> {
+        self.state_checkpoint_hash()
+            .ok_or_else(|| format_err!("State checkpoint hash not present in TransactionInfo"))
+    }
+
+    pub fn hot_state_checkpoint_hash(&self) -> Option<HashValue> {
+        match self {
+            Self::V0(_) => None,
+            Self::V1(v) => v.hot_state_checkpoint_hash,
+        }
+    }
+
+    pub fn auxiliary_info_hash(&self) -> Option<HashValue> {
+        match self {
+            Self::V0(v) => v.auxiliary_info_hash,
+            Self::V1(v) => v.auxiliary_info_hash,
+        }
+    }
+
+    pub fn gas_used(&self) -> u64 {
+        match self {
+            Self::V0(v) => v.gas_used,
+            Self::V1(v) => v.gas_used,
+        }
+    }
+
+    pub fn status(&self) -> &ExecutionStatus {
+        match self {
+            Self::V0(v) => &v.status,
+            Self::V1(v) => &v.status,
         }
     }
 }
 
-#[derive(Clone, CryptoHasher, BCSCryptoHash, Debug, Eq, PartialEq, Serialize, Deserialize)]
+#[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
 #[cfg_attr(any(test, feature = "fuzzing"), derive(Arbitrary))]
 pub struct TransactionInfoV0 {
     /// The amount of gas used.
@@ -2324,42 +2418,60 @@ impl TransactionInfoV0 {
             auxiliary_info_hash,
         }
     }
+}
 
-    pub fn transaction_hash(&self) -> HashValue {
-        self.transaction_hash
-    }
+#[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
+#[cfg_attr(any(test, feature = "fuzzing"), derive(Arbitrary))]
+pub struct TransactionInfoV1 {
+    gas_used: u64,
+    status: ExecutionStatus,
+    transaction_hash: HashValue,
+    event_root_hash: HashValue,
+    state_change_hash: HashValue,
+    state_checkpoint_hash: Option<HashValue>,
+    hot_state_checkpoint_hash: Option<HashValue>,
+    auxiliary_info_hash: Option<HashValue>,
 
-    pub fn state_change_hash(&self) -> HashValue {
-        self.state_change_hash
-    }
+    // Reserved for future changes.
+    placeholder0: Option<HashValue>,
+    placeholder1: Option<HashValue>,
+    placeholder2: Option<HashValue>,
+    placeholder3: Option<HashValue>,
+    placeholder4: Option<HashValue>,
+    placeholder5: Option<HashValue>,
+    placeholder6: Option<HashValue>,
+    placeholder7: Option<HashValue>,
+}
 
-    pub fn has_state_checkpoint_hash(&self) -> bool {
-        self.state_checkpoint_hash().is_some()
-    }
-
-    pub fn state_checkpoint_hash(&self) -> Option<HashValue> {
-        self.state_checkpoint_hash
-    }
-
-    pub fn auxiliary_info_hash(&self) -> Option<HashValue> {
-        self.auxiliary_info_hash
-    }
-
-    pub fn ensure_state_checkpoint_hash(&self) -> Result<HashValue> {
-        self.state_checkpoint_hash
-            .ok_or_else(|| format_err!("State checkpoint hash not present in TransactionInfo"))
-    }
-
-    pub fn event_root_hash(&self) -> HashValue {
-        self.event_root_hash
-    }
-
-    pub fn gas_used(&self) -> u64 {
-        self.gas_used
-    }
-
-    pub fn status(&self) -> &ExecutionStatus {
-        &self.status
+impl TransactionInfoV1 {
+    pub fn new(
+        transaction_hash: HashValue,
+        state_change_hash: HashValue,
+        event_root_hash: HashValue,
+        state_checkpoint_hash: Option<HashValue>,
+        hot_state_checkpoint_hash: Option<HashValue>,
+        gas_used: u64,
+        status: ExecutionStatus,
+        auxiliary_info_hash: Option<HashValue>,
+    ) -> Self {
+        Self {
+            gas_used,
+            status,
+            transaction_hash,
+            event_root_hash,
+            state_change_hash,
+            state_checkpoint_hash,
+            hot_state_checkpoint_hash,
+            auxiliary_info_hash,
+            placeholder0: None,
+            placeholder1: None,
+            placeholder2: None,
+            placeholder3: None,
+            placeholder4: None,
+            placeholder5: None,
+            placeholder6: None,
+            placeholder7: None,
+        }
     }
 }
 
@@ -2367,8 +2479,22 @@ impl Display for TransactionInfo {
     fn fmt(&self, f: &mut Formatter) -> std::fmt::Result {
         write!(
             f,
-            "TransactionInfo: [txn_hash: {}, state_change_hash: {}, event_root_hash: {}, state_checkpoint_hash: {:?}, gas_used: {}, recorded_status: {:?}]",
-            self.transaction_hash(), self.state_change_hash(), self.event_root_hash(), self.state_checkpoint_hash(), self.gas_used(), self.status(),
+            "TransactionInfo: [\
+                txn_hash: {}, \
+                state_change_hash: {}, \
+                event_root_hash: {}, \
+                state_checkpoint_hash: {:?}, \
+                hot_state_checkpoint_hash: {:?}, \
+                gas_used: {}, \
+                recorded_status: {:?}\
+            ]",
+            self.transaction_hash(),
+            self.state_change_hash(),
+            self.event_root_hash(),
+            self.state_checkpoint_hash(),
+            self.hot_state_checkpoint_hash(),
+            self.gas_used(),
+            self.status(),
         )
     }
 }

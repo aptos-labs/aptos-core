@@ -1,16 +1,15 @@
 Ok(
     [
         TransactionOutput {
-            write_set: WriteSet {
-                value: V0(
-                    WriteSetV0(
-                        WriteSetMut {
-                            write_set: {},
-                        },
-                    ),
-                ),
-                hotness: {},
-            },
+            write_set: V0(
+                WriteSetV0 {
+                    value_writes: WriteSetMut {
+                        write_set: {},
+                    },
+                    hotness: {},
+                    extensions: [],
+                },
+            ),
             events: [],
             gas_used: 0,
             status: Discard(

@@ -16,16 +16,24 @@ For the alignment story (per-primitive alignments, references, and how it flows 
 
 ## Heap Object Header
 
-All heap objects (structs, enums, vectors, and any future heap types) share a universal 8-byte header:
+All heap objects (structs, enums, vectors, and any future heap types) share a universal 8-byte header `[desc_id: u32 | size: u32]`. The header lives at a *negative* offset relative to the object pointer that callers hold — `obj_ptr` points at the start of the data region, and the header sits in the bytes immediately before it:
 
 ```
-┌──────────────────────────┐
-│ desc_id(4) | size(4)     │  8 bytes
-└──────────────────────────┘
+                     obj_ptr
+                        │
+                        ▼
+┌──────────────────────┬──────────────────────────┐
+│ desc_id(4) | size(4) │  data region             │
+└──────────────────────┴──────────────────────────┘
+   header (-8..-4..0)
 ```
 
-- `desc_id` (`u32`): indexes into the descriptor table, telling the GC how to trace internal pointers.
-- `size` (`u32`): total object size in bytes (header + data, 8-byte aligned), so the GC can skip over objects during linear heap scanning (Cheney's algorithm).
+- `desc_id` (`u32`, at `obj_ptr - 8`): indexes into the descriptor table, telling the GC how to trace internal pointers.
+- `size` (`u32`, at `obj_ptr - 4`): total object size in bytes (header + data, `MAX_ALIGN`-aligned), so the GC can skip over objects during linear heap scanning (Cheney's algorithm).
+
+The allocator reserves `OBJECT_HEADER_SIZE = MAX_ALIGN` bytes before each data region so that `obj_ptr` is itself `MAX_ALIGN`-aligned. When `MAX_ALIGN > 8`, the unused bytes precede `desc_id` (which stays adjacent to the data at offset `-8`); the negative-offset constants don't shift.
+
+Treating the header as allocator-only bookkeeping means per-type layouts (struct fields, enum tag/variants, vector length/data, closures, captured data) describe their data region exclusively — field 0 of a heap struct is at offset 0, the vector length is at offset 0, etc.
 
 ## Structs
 
@@ -45,17 +53,16 @@ Inline structs may not be explicitly reflected in runtime code, as they are alre
 
 ### Heap structs
 
-An 8-byte pointer in the enclosing memory region points to a heap object with the standard header followed by fields.
+An 8-byte pointer in the enclosing memory region points to the data region of a heap object. The header sits in the bytes immediately preceding the pointer's target.
 
 ```
 Owner region                       Heap
 ┌────────┐                  ┌──────────────────────────┐
-│   ●────┼─────────────────►│ desc_id(4) | size(4)     │  header
-│        │                  ├──────────────────────────┤
-└────────┘                  │ field_0                  │
-  8 bytes                   │ field_1                  │
-                            │ ...                      │
-                            └──────────────────────────┘
+│        │                  │ desc_id(4) | size(4)     │  header (-8..0)
+│   ●────┼─────────────────►│ field_0                  │  obj_ptr
+│        │                  │ field_1                  │
+└────────┘                  │ ...                      │
+  8 bytes                   └──────────────────────────┘
 ```
 
 The `desc_id` indexes into the descriptor table so the GC knows which field offsets hold heap pointers (`ObjectDescriptor::Struct`).
@@ -77,12 +84,11 @@ The current runtime implements only heap enums:
 ```
 Owner region                       Heap
 ┌────────┐                  ┌──────────────────────────┐
-│   ●────┼─────────────────►│ desc_id(4) | size(4)     │  header
+│        │                  │ desc_id(4) | size(4)     │  header (-8..0)
+│   ●────┼─────────────────►│ tag                      │  obj_ptr
 │        │                  ├──────────────────────────┤
-└────────┘                  │ tag                      │
-  8 bytes                   ├──────────────────────────┤
-                            │ variant fields           │
-                            └──────────────────────────┘
+└────────┘                  │ variant fields           │
+  8 bytes                   └──────────────────────────┘
 ```
 
 The GC traces enums via `ObjectDescriptor::Enum`, which provides per-variant pointer offset lists indexed by the tag.
@@ -100,17 +106,16 @@ An 8-byte pointer in the enclosing memory region points to a heap object (or nul
 ```
 Owner region                  Heap
 ┌────────┐             ┌──────────────────────────┐
-│   ●────┼────────────►│ desc_id(4) | size(4)     │  header
+│        │             │ desc_id(4) | size(4)     │  header (-8..0)
+│   ●────┼────────────►│ length (u64)             │  obj_ptr (offset 0)
 │        │             ├──────────────────────────┤
-└────────┘             │ length (u64)             │
-  8 bytes              ├──────────────────────────┤
-  (or null             │ elem_0                   │
-   if empty)           │ elem_1                   │
-                       │ ...                      │
-                       └──────────────────────────┘
+└────────┘             │ elem_0                   │
+  8 bytes              │ elem_1                   │
+  (or null             │ ...                      │
+   if empty)           └──────────────────────────┘
 ```
 
-The vector's metadata (length) lives on the heap alongside the element data. The GC needs the length to know how many elements to trace for inner pointers. Capacity is not stored explicitly — it is derived from the header: `cap = (size - VEC_DATA_OFFSET) / elem_size`.
+The vector's metadata (length) lives on the heap alongside the element data. The GC needs the length to know how many elements to trace for inner pointers. Capacity is not stored explicitly — it is derived from the header: `cap = (size - OBJECT_HEADER_SIZE - VEC_DATA_OFFSET) / elem_size`.
 
 A null pointer represents an empty vector with no heap allocation. `VecNew` writes null; the first `VecPushBack` allocates lazily.
 
@@ -123,27 +128,25 @@ For element alignment within vectors, see [`memory_alignment.md`](memory_alignme
 ### Heap struct containing a vector field
 
 ```
-Owner region         Heap (struct)                  Heap (vector)
-┌────────┐    ┌──────────────────────┐       ┌──────────────────────┐
-│   ●────┼───►│ desc_id(4) | size(4) │       │ desc_id(4) | size(4) │
-└────────┘    ├──────────────────────┤       ├──────────────────────┤
-              │ some_field           │       │ length (u64)         │
-              │ vec_ptr  ●───────────┼──────►│ elem_0               │
-              └──────────────────────┘       │ elem_1               │
-                                             │ ...                  │
-                                             └──────────────────────┘
+Owner region         Heap (struct)                Heap (vector)
+┌────────┐    ┌──────────────────────┐     ┌──────────────────────┐
+│        │    │ desc_id(4) | size(4) │     │ desc_id(4) | size(4) │
+│   ●────┼───►│ some_field           │     │ length (u64)         │
+└────────┘    │ vec_ptr  ●───────────┼────►│ elem_0               │
+              └──────────────────────┘     │ elem_1               │
+                                           │ ...                  │
+                                           └──────────────────────┘
 ```
 
 ### Heap struct containing another heap struct
 
 ```
-Owner region         Heap (outer)                    Heap (inner)
-┌────────┐    ┌──────────────────────┐        ┌──────────────────────┐
-│   ●────┼───►│ desc_id(4) | size(4) │        │ desc_id(4) | size(4) │
-└────────┘    ├──────────────────────┤        ├──────────────────────┤
-              │ inner_ptr ●──────────┼───────►│ field_0              │
-              │ other_field          │        │ field_1              │
-              └──────────────────────┘        └──────────────────────┘
+Owner region         Heap (outer)               Heap (inner)
+┌────────┐    ┌──────────────────────┐    ┌──────────────────────┐
+│        │    │ desc_id(4) | size(4) │    │ desc_id(4) | size(4) │
+│   ●────┼───►│ inner_ptr ●──────────┼───►│ field_0              │
+└────────┘    │ other_field          │    │ field_1              │
+              └──────────────────────┘    └──────────────────────┘
 ```
 
 ## References (Fat Pointers)
@@ -172,10 +175,10 @@ The base pointer points directly to the local's slot. The offset is always 0. Si
 ### Reference to a heap struct field
 
 ```
-  ref = (heap_ptr, STRUCT_DATA_OFFSET + field_offset)
+  ref = (heap_ptr, field_offset)
 ```
 
-Base points to the heap object. The GC can relocate the struct and update the base pointer; the field offset stays the same.
+Base points to the heap object's data region. The field offset is the byte offset of the field within the data region (the header is at a negative offset and is invisible to references). The GC can relocate the struct and update the base pointer; the field offset stays the same.
 
 ### Reference to a vector element
 
@@ -183,7 +186,7 @@ Base points to the heap object. The GC can relocate the struct and update the ba
   ref = (vec_heap_ptr, VEC_DATA_OFFSET + idx * elem_size)
 ```
 
-Base points to the vector's heap object. Safe as long as no growth occurs while the borrow is live (enforced by Move's borrow checker).
+Base points to the vector's heap object. `VEC_DATA_OFFSET` (= 8) skips the length field at the start of the data region. Safe as long as no growth occurs while the borrow is live (enforced by Move's borrow checker).
 
 ### Alternative: raw pointer references
 

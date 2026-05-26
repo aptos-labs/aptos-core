@@ -1,0 +1,12 @@
+// RUN: publish --print(stackless,micro-ops)
+module 0xc0ffee::self_ref
+
+fun overlap(x: u64): u64
+    borrow_loc x
+    read_ref
+    st_loc x
+    move_loc x
+    ret
+
+// RUN: execute 0xc0ffee::self_ref::overlap --args 42
+// CHECK: results: 42

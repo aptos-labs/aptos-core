@@ -54,7 +54,7 @@ use futures::{
 use futures_util::future::join_all;
 use itertools::Itertools;
 use ordered_float::OrderedFloat;
-use rand_latest::Rng;
+use rand_latest::prelude::SliceRandom;
 use serde::Serialize;
 use std::{
     cmp::{min, Ordering},
@@ -89,8 +89,8 @@ const MAX_SOCKET_ADDRESSES_TO_PING: usize = 2;
 
 /// The amount of time to try other peers until dialing this peer again.
 ///
-/// It's currently set to 5 minutes to ensure rotation through all (or most) peers
-const TRY_DIAL_BACKOFF_TIME: Duration = Duration::from_secs(300);
+/// It's currently set to 3 minutes to ensure rotation through all (or most) peers
+const TRY_DIAL_BACKOFF_TIME: Duration = Duration::from_secs(180);
 
 /// The ConnectivityManager actor.
 pub struct ConnectivityManager<TBackoff> {
@@ -132,6 +132,10 @@ pub struct ConnectivityManager<TBackoff> {
     enable_latency_aware_dialing: bool,
     /// Access control policy for peer connections
     access_control_policy: Option<Arc<AccessControlPolicy>>,
+    /// The minimum number of dial attempts before a peer is put into backoff mode
+    num_dials_before_backoff: usize,
+    /// The maximum number of addresses to ping in parallel per peer (for latency aware dialing)
+    max_parallel_peer_latency_pings: usize,
 }
 
 /// Different sources for peer addresses, ordered by priority (Onchain=highest,
@@ -238,6 +242,8 @@ struct DiscoveredPeer {
     keys: PublicKeys,
     /// The last time the node was dialed
     last_dial_time: SystemTime,
+    /// The number of times we have dialed this peer
+    dial_count: usize,
     /// The calculated peer ping latency (secs)
     ping_latency_secs: Option<f64>,
 }
@@ -249,6 +255,7 @@ impl DiscoveredPeer {
             addrs: Addresses::default(),
             keys: PublicKeys::default(),
             last_dial_time: SystemTime::UNIX_EPOCH,
+            dial_count: 0,
             ping_latency_secs: None,
         }
     }
@@ -268,18 +275,30 @@ impl DiscoveredPeer {
         self.addrs.is_empty() && self.keys.is_empty()
     }
 
-    /// Updates the last time we tried to connect to this node
+    /// Updates the last time we tried to connect to this node and increments the dial count
     pub fn update_last_dial_time(&mut self) {
         self.last_dial_time = SystemTime::now();
+        self.dial_count = self.dial_count.saturating_add(1);
     }
 
-    /// Updates the ping latency for this peer
+    /// Updates the ping latency for this peer, keeping the lowest observed value
+    /// so that when multiple addresses are probed in parallel the fastest is chosen.
     pub fn set_ping_latency_secs(&mut self, latency_secs: f64) {
-        self.ping_latency_secs = Some(latency_secs);
+        // Calculate the smallest latency
+        let ping_latency_secs = match self.ping_latency_secs {
+            Some(existing) => existing.min(latency_secs),
+            None => latency_secs,
+        };
+        self.ping_latency_secs = Some(ping_latency_secs);
     }
 
-    /// Based on input, backoff on amount of time to dial a peer again
-    pub fn has_dialed_recently(&self) -> bool {
+    /// Returns true iff this peer should be considered "recently dialed" for backoff purposes.
+    /// A peer is only put into backoff mode after it has been dialed at least
+    /// `num_dials_before_backoff` times, ensuring we try a few addresses before backing off.
+    pub fn has_dialed_recently(&self, num_dials_before_backoff: usize) -> bool {
+        if self.dial_count < num_dials_before_backoff {
+            return false;
+        }
         if let Ok(duration_since_last_dial) = self.last_dial_time.elapsed() {
             duration_since_last_dial < TRY_DIAL_BACKOFF_TIME
         } else {
@@ -288,10 +307,16 @@ impl DiscoveredPeer {
     }
 }
 
-impl PartialOrd for DiscoveredPeer {
-    fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
-        let self_dialed_recently = self.has_dialed_recently();
-        let other_dialed_recently = other.has_dialed_recently();
+impl DiscoveredPeer {
+    /// Compares this peer to another for dial prioritization. Peers that
+    /// haven't been dialed recently are prioritized (i.e., ordered as Less).
+    pub fn compare_dial_priority(
+        &self,
+        other: &Self,
+        num_dials_before_backoff: usize,
+    ) -> Option<Ordering> {
+        let self_dialed_recently = self.has_dialed_recently(num_dials_before_backoff);
+        let other_dialed_recently = other.has_dialed_recently(num_dials_before_backoff);
 
         // Less recently dialed is prioritized over recently dialed
         if !self_dialed_recently && other_dialed_recently {
@@ -347,6 +372,7 @@ where
     TBackoff: Iterator<Item = Duration> + Clone,
 {
     /// Creates a new instance of the [`ConnectivityManager`] actor.
+    #[allow(clippy::too_many_arguments)]
     pub fn new(
         network_context: NetworkContext,
         time_service: TimeService,
@@ -362,6 +388,8 @@ where
         mutual_authentication: bool,
         enable_latency_aware_dialing: bool,
         access_control_policy: Option<Arc<AccessControlPolicy>>,
+        num_dials_before_backoff: usize,
+        max_parallel_peer_latency_pings: usize,
     ) -> Self {
         // Verify that the trusted peers set exists and that it is empty
         let trusted_peers = peers_and_metadata
@@ -399,6 +427,8 @@ where
             mutual_authentication,
             enable_latency_aware_dialing,
             access_control_policy,
+            num_dials_before_backoff,
+            max_parallel_peer_latency_pings,
         };
 
         // Set the initial seed config addresses and public keys
@@ -657,10 +687,15 @@ where
                 eligible_peers,
                 num_peers_to_dial,
                 self.discovered_peers.clone(),
+                self.num_dials_before_backoff,
             )
         } else {
             // Choose the peers randomly
-            selection::choose_peers_to_dial_randomly(eligible_peers, num_peers_to_dial)
+            selection::choose_peers_to_dial_randomly(
+                eligible_peers,
+                num_peers_to_dial,
+                self.num_dials_before_backoff,
+            )
         }
     }
 
@@ -683,19 +718,21 @@ where
         let ping_start_time = Instant::now();
         let mut ping_tasks = vec![];
         for (peer_id, peer) in &peers_to_ping {
-            // Get the network address for the peer
+            // Get the network addresses for the peer
             let network_context = self.network_context;
-            let network_address = match self.dial_states.get(peer_id) {
-                Some(dial_state) => match dial_state.random_addr(&peer.addrs) {
-                    Some(network_address) => network_address.clone(),
-                    None => {
+            let network_addresses = match self.dial_states.get(peer_id) {
+                Some(dial_state) => {
+                    let addrs =
+                        dial_state.random_addrs(&peer.addrs, self.max_parallel_peer_latency_pings);
+                    if addrs.is_empty() {
                         warn!(
                             NetworkSchema::new(&network_context),
                             "Peer {} does not have a network address!",
                             peer_id.short_str()
                         );
                         continue; // Continue onto the next peer
-                    },
+                    }
+                    addrs
                 },
                 None => {
                     warn!(
@@ -707,16 +744,15 @@ where
                 },
             };
 
-            // Ping the peer
-            let ping_task = spawn_latency_ping_task(
-                network_context,
-                *peer_id,
-                network_address,
-                self.discovered_peers.clone(),
-            );
-
-            // Add the task to the list of ping tasks
-            ping_tasks.push(ping_task);
+            // Ping each address in parallel; the lowest latency result wins
+            for network_address in network_addresses {
+                ping_tasks.push(spawn_latency_ping_task(
+                    network_context,
+                    *peer_id,
+                    network_address,
+                    self.discovered_peers.clone(),
+                ));
+            }
         }
 
         // Wait for all the ping tasks to complete (or timeout)
@@ -1390,15 +1426,190 @@ where
         curr_addr
     }
 
-    /// Returns a random address to dial for this peer
-    fn random_addr<'a>(&self, addrs: &'a Addresses) -> Option<&'a NetworkAddress> {
-        let addr_index = ::rand_latest::thread_rng().gen_range(0..addrs.len());
-        self.get_addr_at_index(addr_index, addrs)
+    /// Returns up to `max_count` randomly selected addresses for this peer
+    fn random_addrs(&self, addrs: &Addresses, max_count: usize) -> Vec<NetworkAddress> {
+        let all_addrs: Vec<_> = addrs.0.iter().flatten().cloned().collect();
+        if all_addrs.is_empty() {
+            return vec![];
+        }
+
+        let num_addrs_to_select = min(max_count, all_addrs.len());
+        all_addrs
+            .choose_multiple(&mut rand_latest::thread_rng(), num_addrs_to_select)
+            .cloned()
+            .collect()
     }
 
     fn next_backoff_delay(&mut self, max_delay: Duration) -> Duration {
         let jitter = jitter(MAX_CONNECTION_DELAY_JITTER);
 
         min(max_delay, self.backoff.next().unwrap_or(max_delay)) + jitter
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use aptos_config::config::PeerRole;
+    use std::iter;
+
+    #[test]
+    fn test_has_dialed_recently_below_threshold() {
+        // A peer dialed once with num_dials_before_backoff=2 should not be in backoff
+        let peer = create_peer_dialed_n_times(1);
+        assert!(!peer.has_dialed_recently(2));
+    }
+
+    #[test]
+    fn test_has_dialed_recently_at_threshold() {
+        // A peer dialed exactly num_dials_before_backoff times should be in backoff
+        let peer = create_peer_dialed_n_times(2);
+        assert!(peer.has_dialed_recently(2));
+    }
+
+    #[test]
+    fn test_has_dialed_recently_above_threshold() {
+        // A peer dialed more than num_dials_before_backoff times should still be in backoff
+        let peer = create_peer_dialed_n_times(5);
+        assert!(peer.has_dialed_recently(2));
+    }
+
+    #[test]
+    fn test_has_dialed_recently_zero_dials() {
+        // A peer that has never been dialed should never be in backoff
+        let peer = DiscoveredPeer::new(PeerRole::ValidatorFullNode);
+        assert!(!peer.has_dialed_recently(1));
+        assert!(!peer.has_dialed_recently(2));
+    }
+
+    #[test]
+    fn test_has_dialed_recently_threshold_one() {
+        // With num_dials_before_backoff=1, a single dial should trigger backoff
+        let peer = create_peer_dialed_n_times(1);
+        assert!(peer.has_dialed_recently(1));
+    }
+
+    #[test]
+    fn test_compare_dial_priority_below_threshold_not_deprioritized() {
+        // A peer dialed once (below threshold=2) should not be deprioritized vs a fresh peer
+        let dialed_once_peer = create_peer_dialed_n_times(1);
+        let fresh_peer = DiscoveredPeer::new(PeerRole::ValidatorFullNode);
+
+        // Neither is in backoff, so ordering falls back to role comparison (equal here)
+        assert_eq!(
+            dialed_once_peer.compare_dial_priority(&fresh_peer, 2),
+            Some(Ordering::Equal)
+        );
+    }
+
+    #[test]
+    fn test_compare_dial_priority_at_threshold_is_deprioritized() {
+        // A peer that has hit the threshold should be ordered Greater (lower priority) than a fresh peer
+        let dialed_twice_peer = create_peer_dialed_n_times(2);
+        let fresh_peer = DiscoveredPeer::new(PeerRole::ValidatorFullNode);
+
+        assert_eq!(
+            dialed_twice_peer.compare_dial_priority(&fresh_peer, 2),
+            Some(Ordering::Greater)
+        );
+        assert_eq!(
+            fresh_peer.compare_dial_priority(&dialed_twice_peer, 2),
+            Some(Ordering::Less)
+        );
+    }
+
+    #[test]
+    fn test_dial_count_increments_on_update() {
+        let mut peer = DiscoveredPeer::new(PeerRole::ValidatorFullNode);
+        assert_eq!(peer.dial_count, 0);
+
+        peer.update_last_dial_time();
+        assert_eq!(peer.dial_count, 1);
+
+        peer.update_last_dial_time();
+        assert_eq!(peer.dial_count, 2);
+    }
+
+    /// Creates a `DiscoveredPeer` that has been dialed `n` times (with a recent dial time)
+    fn create_peer_dialed_n_times(n: usize) -> DiscoveredPeer {
+        let mut peer = DiscoveredPeer::new(PeerRole::ValidatorFullNode);
+        for _ in 0..n {
+            peer.update_last_dial_time();
+        }
+        peer
+    }
+
+    /// Builds an `Addresses` object from a list of address strings
+    fn make_addresses(address_strings: &[&str]) -> Addresses {
+        let network_addresses: Vec<NetworkAddress> = address_strings
+            .iter()
+            .map(|raw_string| raw_string.parse().unwrap())
+            .collect();
+
+        let mut addresses = Addresses::default();
+        addresses.update(DiscoverySource::Config, network_addresses);
+        addresses
+    }
+
+    #[test]
+    fn test_random_addrs_empty() {
+        let addresses = Addresses::default();
+        let state = DialState::new(iter::repeat(Duration::ZERO));
+
+        // Requesting any addresses from an empty set should return an empty set
+        assert!(state.random_addrs(&addresses, 3).is_empty());
+    }
+
+    #[test]
+    fn test_random_addrs_capped_by_available() {
+        let addresses = make_addresses(&["/ip4/1.2.3.4/tcp/1000", "/ip4/1.2.3.5/tcp/1001"]);
+        let state = DialState::new(iter::repeat(Duration::ZERO));
+
+        // Requesting more than available returns at most len(addresses)
+        assert_eq!(state.random_addrs(&addresses, 10).len(), 2);
+    }
+
+    #[test]
+    fn test_random_addrs_capped_by_max_count() {
+        let addresses = make_addresses(&[
+            "/ip4/1.2.3.4/tcp/1000",
+            "/ip4/1.2.3.5/tcp/1001",
+            "/ip4/1.2.3.6/tcp/1002",
+        ]);
+        let state = DialState::new(std::iter::repeat(Duration::ZERO));
+
+        // Requesting a subset of available addresses should return exactly max_count addresses
+        assert_eq!(state.random_addrs(&addresses, 2).len(), 2);
+    }
+
+    #[test]
+    fn test_random_addrs_returns_subset() {
+        let address_strings = &[
+            "/ip4/1.2.3.4/tcp/1000",
+            "/ip4/1.2.3.5/tcp/1001",
+            "/ip4/1.2.3.6/tcp/1002",
+        ];
+        let network_addresses: Vec<NetworkAddress> = address_strings
+            .iter()
+            .map(|address_string| address_string.parse().unwrap())
+            .collect();
+        let addresses = make_addresses(address_strings);
+        let state = DialState::new(iter::repeat(Duration::ZERO));
+
+        // Random addrs should be a subset of the input addresses
+        let result = state.random_addrs(&addresses, 2);
+        assert_eq!(result.len(), 2);
+        for network_address in &result {
+            assert!(network_addresses.contains(network_address));
+        }
+    }
+
+    #[test]
+    fn test_set_ping_latency_keeps_minimum() {
+        let mut peer = DiscoveredPeer::new(PeerRole::ValidatorFullNode);
+        peer.set_ping_latency_secs(0.1);
+        peer.set_ping_latency_secs(0.05); // lower — should win
+        peer.set_ping_latency_secs(0.2); // higher — should be ignored
+        assert_eq!(peer.ping_latency_secs, Some(0.05));
     }
 }

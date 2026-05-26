@@ -161,6 +161,10 @@ pub struct NetworkConfig {
     /// Rate limiting configuration for inbound network traffic (per peer).
     /// If None, inbound rate limiting is disabled.
     pub inbound_rate_limit_config: Option<RateLimitConfig>,
+    /// The minimum number of dial attempts before a peer is put into backoff mode
+    pub num_dials_before_backoff: usize,
+    /// The maximum number of addresses to ping in parallel per peer (for latency aware dialing)
+    pub max_parallel_peer_latency_pings: usize,
 }
 
 impl Default for NetworkConfig {
@@ -208,6 +212,8 @@ impl NetworkConfig {
             access_control_policy: None,
             priority_inbound_peers: Vec::new(),
             inbound_rate_limit_config: None,
+            num_dials_before_backoff: 2, // Attempt at least 2 dials before backing off
+            max_parallel_peer_latency_pings: 3, // Ping up to 3 addresses in parallel
         };
 
         // Configure the number of parallel deserialization tasks

@@ -1,7 +1,4 @@
-
-<a id="0x1_bit_vector"></a>
-
-# Module `0x1::bit_vector`
+# Module `0x1::bit_vector` <a id="0x1_bit_vector"></a>
 
 
 
@@ -19,10 +16,7 @@
 <pre><code></code></pre>
 
 
-
-<a id="0x1_bit_vector_BitVector"></a>
-
-## Struct `BitVector`
+## Struct `BitVector` <a id="0x1_bit_vector_BitVector"></a>
 
 
 
@@ -53,9 +47,7 @@
 
 </details>
 
-<a id="@Constants_0"></a>
-
-## Constants
+## Constants <a id="@Constants_0"></a>
 
 
 <a id="0x1_bit_vector_EINDEX"></a>
@@ -96,10 +88,7 @@ The maximum allowed bitvector size
 </code></pre>
 
 
-
-<a id="0x1_bit_vector_new"></a>
-
-## Function `new`
+## Function `new` <a id="0x1_bit_vector_new"></a>
 
 
 
@@ -141,6 +130,7 @@ The maximum allowed bitvector size
 
 </details>
 
+
 <details>
 <summary>Specification</summary>
 
@@ -168,9 +158,7 @@ The maximum allowed bitvector size
 
 </details>
 
-<a id="0x1_bit_vector_set"></a>
-
-## Function `set`
+## Function `set` <a id="0x1_bit_vector_set"></a>
 
 Set the bit at <code>bit_index</code> in the <code>bitvector</code> regardless of its previous state.
 
@@ -194,6 +182,7 @@ Set the bit at <code>bit_index</code> in the <code>bitvector</code> regardless o
 
 
 </details>
+
 
 <details>
 <summary>Specification</summary>
@@ -221,9 +210,7 @@ Set the bit at <code>bit_index</code> in the <code>bitvector</code> regardless o
 
 </details>
 
-<a id="0x1_bit_vector_unset"></a>
-
-## Function `unset`
+## Function `unset` <a id="0x1_bit_vector_unset"></a>
 
 Unset the bit at <code>bit_index</code> in the <code>bitvector</code> regardless of its previous state.
 
@@ -247,6 +234,7 @@ Unset the bit at <code>bit_index</code> in the <code>bitvector</code> regardless
 
 
 </details>
+
 
 <details>
 <summary>Specification</summary>
@@ -274,9 +262,7 @@ Unset the bit at <code>bit_index</code> in the <code>bitvector</code> regardless
 
 </details>
 
-<a id="0x1_bit_vector_shift_left"></a>
-
-## Function `shift_left`
+## Function `shift_left` <a id="0x1_bit_vector_shift_left"></a>
 
 Shift the <code>bitvector</code> left by <code>amount</code>. If <code>amount</code> is greater than the
 bitvector's length the bitvector will be zeroed out.
@@ -323,9 +309,7 @@ bitvector's length the bitvector will be zeroed out.
 
 </details>
 
-<a id="0x1_bit_vector_is_index_set"></a>
-
-## Function `is_index_set`
+## Function `is_index_set` <a id="0x1_bit_vector_is_index_set"></a>
 
 Return the value of the bit at <code>bit_index</code> in the <code>bitvector</code>. <code><b>true</b></code>
 represents "1" and <code><b>false</b></code> represents a 0
@@ -349,6 +333,7 @@ represents "1" and <code><b>false</b></code> represents a 0
 
 
 </details>
+
 
 <details>
 <summary>Specification</summary>
@@ -391,9 +376,7 @@ represents "1" and <code><b>false</b></code> represents a 0
 
 </details>
 
-<a id="0x1_bit_vector_length"></a>
-
-## Function `length`
+## Function `length` <a id="0x1_bit_vector_length"></a>
 
 Return the length (number of usable bits) of this bitvector
 
@@ -416,9 +399,7 @@ Return the length (number of usable bits) of this bitvector
 
 </details>
 
-<a id="0x1_bit_vector_longest_set_sequence_starting_at"></a>
-
-## Function `longest_set_sequence_starting_at`
+## Function `longest_set_sequence_starting_at` <a id="0x1_bit_vector_longest_set_sequence_starting_at"></a>
 
 Returns the length of the longest sequence of set bits starting at (and
 including) <code>start_index</code> in the <code>bitvector</code>. If there is no such

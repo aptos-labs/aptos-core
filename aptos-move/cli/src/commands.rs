@@ -2307,6 +2307,10 @@ pub struct Simulate {
     #[clap(long)]
     local: bool,
 
+    /// Include simulated events and state changes in the output.
+    #[clap(long)]
+    show_details: bool,
+
     #[clap(skip)]
     pub env: Arc<MoveEnv>,
 }
@@ -2326,11 +2330,63 @@ impl CliCommand<TransactionSummary> for Simulate {
         let payload = TransactionPayload::EntryFunction(entry_function);
 
         if self.local {
-            self.txn_options.simulate_locally(payload, &self.env).await
+            self.txn_options
+                .simulate_locally(payload, &self.env, self.show_details)
+                .await
         } else {
             let mut rng = rand::rngs::StdRng::from_entropy();
-            self.txn_options.simulate_remotely(&mut rng, payload).await
+            self.txn_options
+                .simulate_remotely(&mut rng, payload, self.show_details)
+                .await
         }
+    }
+}
+
+#[cfg(test)]
+mod simulate_flag_tests {
+    use super::{MoveTool, Simulate};
+    use clap::Parser;
+
+    #[derive(Parser)]
+    struct TestCli {
+        #[clap(subcommand)]
+        tool: MoveTool,
+    }
+
+    fn parse_simulate(args: &[&str]) -> Simulate {
+        let cli = TestCli::try_parse_from(std::iter::once("test").chain(args.iter().copied()))
+            .expect("simulate args should parse");
+        match cli.tool {
+            MoveTool::Simulate(simulate) => simulate,
+            _ => panic!("expected MoveTool::Simulate"),
+        }
+    }
+
+    #[test]
+    fn simulate_flags_default_to_false() {
+        let simulate = parse_simulate(&[
+            "simulate",
+            "--function-id",
+            "0x1::aptos_account::transfer",
+            "--args",
+            "address:0x1",
+            "u64:1",
+        ]);
+        assert!(!simulate.show_details);
+    }
+
+    #[test]
+    fn simulate_flags_parse_when_provided() {
+        let simulate = parse_simulate(&[
+            "simulate",
+            "--function-id",
+            "0x1::aptos_account::transfer",
+            "--args",
+            "address:0x1",
+            "u64:1",
+            "--show-details",
+        ]);
+        assert!(simulate.show_details);
     }
 }
 
@@ -2560,11 +2616,65 @@ impl CliCommand<TransactionSummary> for Replay {
 
         let txn = match txn {
             Transaction::UserTransaction(txn) => txn,
-            _ => {
-                return Err(CliError::UnexpectedError(
-                    "Unsupported transaction type. Only user transactions are supported."
-                        .to_string(),
-                ))
+            other => {
+                // System transactions (BlockMetadata, BlockEpilogue,
+                // StateCheckpoint, ValidatorTransaction, etc.) take the
+                // block-executor path. None of the user-txn-specific options
+                // (gas profiling, benchmarking, local package overrides)
+                // apply, so reject those upfront with a clear message.
+                if self.profile_gas {
+                    return Err(CliError::UnexpectedError(
+                        "Gas profiling is only supported for user transactions.".to_string(),
+                    ));
+                }
+                if self.benchmark {
+                    return Err(CliError::UnexpectedError(
+                        "Benchmarking is only supported for user transactions.".to_string(),
+                    ));
+                }
+                if !self.use_local_package.is_empty() {
+                    return Err(CliError::UnexpectedError(
+                        "Local package overrides are only supported for user transactions."
+                            .to_string(),
+                    ));
+                }
+
+                println!("Replaying system transaction at version {}...", self.txn_id);
+                let txn_output = debugger
+                    .execute_transaction_at_version(self.txn_id, other, aux_info)
+                    .map_err(|e| {
+                        CliError::UnexpectedError(format!(
+                            "Failed to execute system transaction: {}",
+                            e
+                        ))
+                    })?;
+
+                if !self.skip_comparison {
+                    txn_output
+                        .ensure_match_transaction_info(self.txn_id, &txn_info, None, None)
+                        .map_err(|msg| CliError::UnexpectedError(msg.to_string()))?;
+                }
+
+                let success = match txn_output.status() {
+                    TransactionStatus::Keep(exec_status) => Some(exec_status.is_success()),
+                    TransactionStatus::Discard(_) | TransactionStatus::Retry => None,
+                };
+                return Ok(TransactionSummary {
+                    transaction_hash: txn_info.transaction_hash().into(),
+                    gas_used: Some(txn_output.gas_used()),
+                    gas_unit_price: None,
+                    pending: None,
+                    sender: None,
+                    sequence_number: None,
+                    replay_protector: None,
+                    success,
+                    timestamp_us: None,
+                    version: Some(self.txn_id),
+                    vm_status: Some(format!("{:?}", txn_output.status())),
+                    deployed_object_address: None,
+                    events: None,
+                    changes: None,
+                });
             },
         };
 
@@ -2730,6 +2840,8 @@ impl CliCommand<TransactionSummary> for Replay {
             version: Some(self.txn_id),
             vm_status: Some(format_txn_status(txn_output.status(), &vm_status)),
             deployed_object_address: None,
+            events: None,
+            changes: None,
         };
 
         Ok(summary)

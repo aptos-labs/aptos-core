@@ -29,7 +29,7 @@ use aptos_types::{
         StateViewId, StateViewResult, TStateView, NUM_STATE_SHARDS,
     },
     transaction::Version,
-    write_set::{BaseStateOp, HotStateOp, WriteOp},
+    write_set::{BaseStateOp, WriteOp},
 };
 use itertools::Itertools;
 use lru::LruCache;
@@ -62,8 +62,9 @@ const TEST_CONFIG: HotStateConfig = HotStateConfig {
     refresh_interval_versions: REFRESH_INTERVAL_VERSIONS,
     delete_on_restart: false,
     compute_root_hash: true,
-    persist_hotness_in_write_set: true,
+    use_write_set_v1: true,
     persist_hotness_in_epilogue: false,
+    use_transaction_info_v1: false,
 };
 
 #[derive(Clone, Debug)]
@@ -874,7 +875,7 @@ fn naive_run_blocks(blocks: Vec<(Vec<UserTxn>, Option<UserTxn>)>) -> (Vec<Txn>, 
             // So we insert value ops after.
             let mut write_set: BTreeMap<StateKey, BaseStateOp> = to_make_hot
                 .iter()
-                .map(|k| (k.clone(), HotStateOp::make_hot().into_base_op()))
+                .map(|k| (k.clone(), BaseStateOp::MakeHot))
                 .collect();
             for (k, v_opt) in epi_txn.writes {
                 let op = match v_opt {

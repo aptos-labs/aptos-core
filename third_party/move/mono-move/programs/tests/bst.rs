@@ -120,20 +120,23 @@ fn native_insert_remove_sequence() {
 
 #[cfg(feature = "micro-op")]
 mod micro_op {
-    use mono_move_core::{ExecutionContext, Function, LocalExecutionContext};
+    use mono_move_core::{ExecutionContext, Function};
     use mono_move_programs::bst::{
         generate_ops, micro_op_bst, native_run_ops_with_results, FN_GET, FN_INSERT, FN_NEW,
         FN_REMOVE,
     };
-    use mono_move_runtime::InterpreterContext;
+    use mono_move_runtime::{DescriptorProvider, InterpreterContext, LocalRuntimeContext};
 
-    fn bst_new<T: ExecutionContext>(ctx: &mut InterpreterContext<'_, T>, func: &Function) -> u64 {
+    fn bst_new<T: ExecutionContext + DescriptorProvider>(
+        ctx: &mut InterpreterContext<'_, T>,
+        func: &Function,
+    ) -> u64 {
         ctx.invoke(func);
         ctx.run().unwrap();
         ctx.root_heap_ptr(0) as u64
     }
 
-    fn bst_insert<T: ExecutionContext>(
+    fn bst_insert<T: ExecutionContext + DescriptorProvider>(
         ctx: &mut InterpreterContext<'_, T>,
         func: &Function,
         bst: u64,
@@ -147,7 +150,7 @@ mod micro_op {
         ctx.run().unwrap();
     }
 
-    fn bst_get<T: ExecutionContext>(
+    fn bst_get<T: ExecutionContext + DescriptorProvider>(
         ctx: &mut InterpreterContext<'_, T>,
         func: &Function,
         bst: u64,
@@ -162,7 +165,7 @@ mod micro_op {
         (found, value)
     }
 
-    fn bst_remove<T: ExecutionContext>(
+    fn bst_remove<T: ExecutionContext + DescriptorProvider>(
         ctx: &mut InterpreterContext<'_, T>,
         func: &Function,
         bst: u64,
@@ -177,16 +180,13 @@ mod micro_op {
     /// Run the same ops on micro-op BST and return results in the same format
     /// as `native_run_ops_with_results`.
     fn micro_op_run_ops_with_results(ops: &[u64]) -> Vec<(u64, u64)> {
-        let (functions, descriptors, _arena) = micro_op_bst();
-        // SAFETY: Exclusive access during test setup; arena is alive.
-        unsafe { mono_move_core::Function::resolve_calls(&functions) };
-        // SAFETY: Arena is alive for the duration of this function.
-        let fn_new = unsafe { functions[FN_NEW].unwrap().as_ref_unchecked() };
-        let fn_insert = unsafe { functions[FN_INSERT].unwrap().as_ref_unchecked() };
-        let fn_get = unsafe { functions[FN_GET].unwrap().as_ref_unchecked() };
-        let fn_remove = unsafe { functions[FN_REMOVE].unwrap().as_ref_unchecked() };
-        let mut exec_ctx = LocalExecutionContext::with_max_budget();
-        let mut ctx = InterpreterContext::new(&mut exec_ctx, &descriptors, fn_new);
+        let (functions, descriptors) = micro_op_bst();
+        let fn_new = unsafe { functions[FN_NEW].as_ref_unchecked() };
+        let fn_insert = unsafe { functions[FN_INSERT].as_ref_unchecked() };
+        let fn_get = unsafe { functions[FN_GET].as_ref_unchecked() };
+        let fn_remove = unsafe { functions[FN_REMOVE].as_ref_unchecked() };
+        let mut exec_ctx = LocalRuntimeContext::with_max_budget(descriptors);
+        let mut ctx = InterpreterContext::new(&mut exec_ctx, fn_new);
         let bst = bst_new(&mut ctx, fn_new);
         let mut results = Vec::new();
         let mut i = 0;
@@ -201,6 +201,13 @@ mod micro_op {
                 2 => bst_remove(&mut ctx, fn_remove, bst, key),
                 _ => {},
             }
+        }
+
+        drop(ctx);
+        for ptr in functions {
+            // SAFETY: The interpreter context has been dropped, so the
+            // function pointers it referenced are no longer in use.
+            unsafe { ptr.free_unchecked() };
         }
         results
     }

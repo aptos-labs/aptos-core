@@ -1,0 +1,206 @@
+// RUN: publish --print(stackless,micro-ops)
+module 0x66::arg_regs
+
+fun identity(x: u64): u64
+    move_loc x
+    ret
+
+fun add_two(a: u64, b: u64): u64
+    copy_loc a
+    copy_loc b
+    add
+    ret
+
+fun swap(a: u64, b: u64): (u64, u64)
+    move_loc b
+    move_loc a
+    ret
+
+fun three_args(a: u64, b: u64, c: u64): u64
+    copy_loc a
+    copy_loc b
+    add
+    copy_loc c
+    add
+    ret
+
+fun simple_promotion(): u64
+    ld_u64 42
+    call identity
+    ret
+
+fun multi_arg(): u64
+    ld_u64 1
+    ld_u64 2
+    call add_two
+    ret
+
+// f(g(x)): inner ret feeds outer arg.
+fun nested_fg(): u64
+    ld_u64 7
+    call identity
+    call identity
+    ret
+
+// f(g(x), h(y)): g's ret must save across h.
+fun two_inner_calls(): u64
+    ld_u64 10
+    call identity
+    ld_u64 20
+    call identity
+    call add_two
+    ret
+
+fun computed_arg(x: u64): u64
+    copy_loc x
+    ld_u64 1
+    add
+    call identity
+    ret
+
+// Param + temp at one callsite.
+fun partial_promotion(x: u64): u64
+    copy_loc x
+    copy_loc x
+    ld_u64 1
+    add
+    call add_two
+    ret
+
+// Source is param (pinned), not promotable.
+fun call_with_param(x: u64): u64
+    copy_loc x
+    call identity
+    ret
+
+// Arg live after call: not promotable.
+fun arg_live_after_call(x: u64): u64
+    local tmp: u64
+    copy_loc x
+    call identity
+    st_loc tmp
+    copy_loc x
+    move_loc tmp
+    add
+    ret
+
+// Ret used past next call: not promotable.
+fun ret_used_past_next_call(): u64
+    local first: u64
+    ld_u64 10
+    call identity
+    st_loc first
+    ld_u64 20
+    call identity
+    move_loc first
+    add
+    ret
+
+fun multi_ret(): u64
+    ld_u64 3
+    ld_u64 4
+    call swap
+    call add_two
+    ret
+
+// arg_regs width = max across callsites.
+fun width_from_max(): u64
+    ld_u64 1
+    call identity
+    ld_u64 10
+    ld_u64 20
+    ld_u64 30
+    call three_args
+    add
+    ret
+
+fun call_in_loop(n: u64): u64
+    local acc: u64
+    ld_u64 0
+    st_loc acc
+l1: copy_loc n
+    ld_u64 0
+    gt
+    br_false l2
+    copy_loc n
+    call identity
+    move_loc acc
+    add
+    st_loc acc
+    copy_loc n
+    ld_u64 1
+    sub
+    st_loc n
+    branch l1
+l2: move_loc acc
+    ret
+
+// three_args(10, x, 30): mid arg is param (Home), others promotable.
+fun mixed_at_callsite(x: u64): u64
+    ld_u64 10
+    copy_loc x
+    ld_u64 30
+    call three_args
+    ret
+
+// First call's ret must stay Home (intervening call); other args promotable.
+fun mixed_intervening_call(): u64
+    ld_u64 10
+    call identity
+    ld_u64 20
+    call identity
+    ld_u64 30
+    call three_args
+    ret
+
+fun no_calls(): u64
+    ld_u64 99
+    ret
+
+// RUN: execute 0x66::arg_regs::simple_promotion
+// CHECK: results: 42
+
+// RUN: execute 0x66::arg_regs::multi_arg
+// CHECK: results: 3
+
+// RUN: execute 0x66::arg_regs::nested_fg
+// CHECK: results: 7
+
+// RUN: execute 0x66::arg_regs::two_inner_calls
+// CHECK: results: 30
+
+// RUN: execute 0x66::arg_regs::computed_arg --args 7
+// CHECK: results: 8
+
+// RUN: execute 0x66::arg_regs::partial_promotion --args 5
+// CHECK: results: 11
+
+// RUN: execute 0x66::arg_regs::call_with_param --args 42
+// CHECK: results: 42
+
+// RUN: execute 0x66::arg_regs::arg_live_after_call --args 7
+// CHECK: results: 14
+
+// RUN: execute 0x66::arg_regs::ret_used_past_next_call
+// CHECK: results: 30
+
+// RUN: execute 0x66::arg_regs::multi_ret
+// CHECK: results: 7
+
+// RUN: execute 0x66::arg_regs::width_from_max
+// CHECK: results: 61
+
+// RUN: execute 0x66::arg_regs::call_in_loop --args 3
+// CHECK: results: 6
+
+// RUN: execute 0x66::arg_regs::call_in_loop --args 0
+// CHECK: results: 0
+
+// RUN: execute 0x66::arg_regs::mixed_at_callsite --args 5
+// CHECK: results: 45
+
+// RUN: execute 0x66::arg_regs::mixed_intervening_call
+// CHECK: results: 60
+
+// RUN: execute 0x66::arg_regs::no_calls
+// CHECK: results: 99

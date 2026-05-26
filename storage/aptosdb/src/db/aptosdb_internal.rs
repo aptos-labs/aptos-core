@@ -145,6 +145,16 @@ impl AptosDB {
                 hot_state_config,
             )?;
 
+        // Seed pruner progress after `delete_on_restart` wipes the hot_state_kv_db, before
+        // initializing the pruner, so the pruner doesn't catch up from 0 over an empty DB.
+        if !readonly
+            && hot_state_config.delete_on_restart
+            && let Some(db) = hot_state_kv_db.as_ref()
+            && let Some(synced_version) = ledger_db.metadata_db().get_synced_version()?
+        {
+            db.write_pruner_progress(synced_version)?;
+        }
+
         let myself = Self::new_with_dbs(
             ledger_db,
             hot_state_merkle_db,
@@ -237,7 +247,6 @@ impl AptosDB {
                 0,     // max_num_nodes_per_lru_cache_shard
                 HotStateConfig {
                     delete_on_restart: delete_hot_state_on_restart,
-                    persist_hotness_in_write_set: false,
                     ..HotStateConfig::default()
                 },
             )?;

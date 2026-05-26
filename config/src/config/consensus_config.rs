@@ -172,9 +172,9 @@ impl Default for ExecutionBackpressureTxnLimitConfig {
     fn default() -> Self {
         Self {
             lookback_config: ExecutionBackpressureLookbackConfig {
-                num_blocks_to_look_at: 18,
+                num_blocks_to_look_at: 30,
                 min_block_time_ms_to_activate: 50,
-                min_blocks_to_activate: 4,
+                min_blocks_to_activate: 10,
                 metric: ExecutionBackpressureMetric::Percentile(0.5),
                 target_block_time_ms: 150,
             },
@@ -197,13 +197,13 @@ impl Default for ExecutionBackpressureGasLimitConfig {
         Self {
             lookback_config: ExecutionBackpressureLookbackConfig {
                 num_blocks_to_look_at: 30,
-                min_block_time_ms_to_activate: 10,
-                min_blocks_to_activate: 4,
+                min_block_time_ms_to_activate: 30,
+                min_blocks_to_activate: 10,
                 metric: ExecutionBackpressureMetric::Mean,
-                target_block_time_ms: 90,
+                target_block_time_ms: 150,
             },
             block_execution_overhead_ms: 10,
-            min_calibrated_block_gas_limit: 20000,
+            min_calibrated_block_gas_limit: 50000,
         }
     }
 }

@@ -1,7 +1,4 @@
-
-<a id="0x1_option"></a>
-
-# Module `0x1::option`
+# Module `0x1::option` <a id="0x1_option"></a>
 
 This module defines the Option type and its methods to represent and handle an optional value.
 
@@ -39,10 +36,7 @@ This module defines the Option type and its methods to represent and handle an o
 </code></pre>
 
 
-
-<a id="0x1_option_Option"></a>
-
-## Struct `Option`
+## Struct `Option` <a id="0x1_option_Option"></a>
 
 Abstraction of a value that may or may not be present. Implemented with a vector of size
 zero or one because Move bytecode does not have ADTs.
@@ -69,6 +63,7 @@ zero or one because Move bytecode does not have ADTs.
 
 </details>
 
+
 <details>
 <summary>Specification</summary>
 
@@ -84,9 +79,7 @@ because it's 0 for "none" or 1 for "some".
 
 </details>
 
-<a id="@Constants_0"></a>
-
-## Constants
+## Constants <a id="@Constants_0"></a>
 
 
 <a id="0x1_option_EOPTION_IS_SET"></a>
@@ -110,10 +103,7 @@ The <code><a href="option.md#0x1_option_Option">Option</a></code> is <code>None<
 </code></pre>
 
 
-
-<a id="0x1_option_none"></a>
-
-## Function `none`
+## Function `none` <a id="0x1_option_none"></a>
 
 Return an empty <code><a href="option.md#0x1_option_Option">Option</a></code>
 
@@ -135,6 +125,7 @@ Return an empty <code><a href="option.md#0x1_option_Option">Option</a></code>
 
 
 </details>
+
 
 <details>
 <summary>Specification</summary>
@@ -161,9 +152,7 @@ Return an empty <code><a href="option.md#0x1_option_Option">Option</a></code>
 
 </details>
 
-<a id="0x1_option_some"></a>
-
-## Function `some`
+## Function `some` <a id="0x1_option_some"></a>
 
 Return an <code><a href="option.md#0x1_option_Option">Option</a></code> containing <code>e</code>
 
@@ -185,6 +174,7 @@ Return an <code><a href="option.md#0x1_option_Option">Option</a></code> containi
 
 
 </details>
+
 
 <details>
 <summary>Specification</summary>
@@ -211,9 +201,7 @@ Return an <code><a href="option.md#0x1_option_Option">Option</a></code> containi
 
 </details>
 
-<a id="0x1_option_is_none"></a>
-
-## Function `is_none`
+## Function `is_none` <a id="0x1_option_is_none"></a>
 
 Return true if <code>t</code> does not hold a value
 
@@ -236,6 +224,7 @@ Return true if <code>t</code> does not hold a value
 
 </details>
 
+
 <details>
 <summary>Specification</summary>
 
@@ -250,9 +239,7 @@ Return true if <code>t</code> does not hold a value
 
 </details>
 
-<a id="0x1_option_is_some"></a>
-
-## Function `is_some`
+## Function `is_some` <a id="0x1_option_is_some"></a>
 
 Return true if <code>t</code> holds a value
 
@@ -275,6 +262,7 @@ Return true if <code>t</code> holds a value
 
 </details>
 
+
 <details>
 <summary>Specification</summary>
 
@@ -289,9 +277,7 @@ Return true if <code>t</code> holds a value
 
 </details>
 
-<a id="0x1_option_contains"></a>
-
-## Function `contains`
+## Function `contains` <a id="0x1_option_contains"></a>
 
 Return true if the value in <code>t</code> is equal to <code>e_ref</code>
 Always returns <code><b>false</b></code> if <code>t</code> does not hold a value
@@ -314,6 +300,7 @@ Always returns <code><b>false</b></code> if <code>t</code> does not hold a value
 
 
 </details>
+
 
 <details>
 <summary>Specification</summary>
@@ -340,9 +327,7 @@ Always returns <code><b>false</b></code> if <code>t</code> does not hold a value
 
 </details>
 
-<a id="0x1_option_borrow"></a>
-
-## Function `borrow`
+## Function `borrow` <a id="0x1_option_borrow"></a>
 
 Return an immutable reference to the value inside <code>t</code>
 Aborts if <code>t</code> does not hold a value
@@ -367,6 +352,7 @@ Aborts if <code>t</code> does not hold a value
 
 </details>
 
+
 <details>
 <summary>Specification</summary>
 
@@ -381,9 +367,7 @@ Aborts if <code>t</code> does not hold a value
 
 </details>
 
-<a id="0x1_option_borrow_with_default"></a>
-
-## Function `borrow_with_default`
+## Function `borrow_with_default` <a id="0x1_option_borrow_with_default"></a>
 
 Return a reference to the value inside <code>t</code> if it holds one
 Return <code>default_ref</code> if <code>t</code> does not hold a value
@@ -409,6 +393,7 @@ Return <code>default_ref</code> if <code>t</code> does not hold a value
 
 </details>
 
+
 <details>
 <summary>Specification</summary>
 
@@ -423,9 +408,7 @@ Return <code>default_ref</code> if <code>t</code> does not hold a value
 
 </details>
 
-<a id="0x1_option_get_with_default"></a>
-
-## Function `get_with_default`
+## Function `get_with_default` <a id="0x1_option_get_with_default"></a>
 
 Return the value inside <code>t</code> if it holds one
 Return <code>default</code> if <code>t</code> does not hold a value
@@ -454,6 +437,7 @@ Return <code>default</code> if <code>t</code> does not hold a value
 
 </details>
 
+
 <details>
 <summary>Specification</summary>
 
@@ -468,9 +452,7 @@ Return <code>default</code> if <code>t</code> does not hold a value
 
 </details>
 
-<a id="0x1_option_fill"></a>
-
-## Function `fill`
+## Function `fill` <a id="0x1_option_fill"></a>
 
 Convert the none option <code>t</code> to a some option by adding <code>e</code>.
 Aborts if <code>t</code> already holds a value
@@ -496,6 +478,7 @@ Aborts if <code>t</code> already holds a value
 
 </details>
 
+
 <details>
 <summary>Specification</summary>
 
@@ -511,9 +494,7 @@ Aborts if <code>t</code> already holds a value
 
 </details>
 
-<a id="0x1_option_extract"></a>
-
-## Function `extract`
+## Function `extract` <a id="0x1_option_extract"></a>
 
 Convert a <code>some</code> option to a <code>none</code> by removing and returning the value stored inside <code>t</code>
 Aborts if <code>t</code> does not hold a value
@@ -538,6 +519,7 @@ Aborts if <code>t</code> does not hold a value
 
 </details>
 
+
 <details>
 <summary>Specification</summary>
 
@@ -553,9 +535,7 @@ Aborts if <code>t</code> does not hold a value
 
 </details>
 
-<a id="0x1_option_borrow_mut"></a>
-
-## Function `borrow_mut`
+## Function `borrow_mut` <a id="0x1_option_borrow_mut"></a>
 
 Return a mutable reference to the value inside <code>t</code>
 Aborts if <code>t</code> does not hold a value
@@ -580,6 +560,7 @@ Aborts if <code>t</code> does not hold a value
 
 </details>
 
+
 <details>
 <summary>Specification</summary>
 
@@ -595,9 +576,7 @@ Aborts if <code>t</code> does not hold a value
 
 </details>
 
-<a id="0x1_option_swap"></a>
-
-## Function `swap`
+## Function `swap` <a id="0x1_option_swap"></a>
 
 Swap the old value inside <code>t</code> with <code>e</code> and return the old value
 Aborts if <code>t</code> does not hold a value
@@ -625,6 +604,7 @@ Aborts if <code>t</code> does not hold a value
 
 </details>
 
+
 <details>
 <summary>Specification</summary>
 
@@ -641,9 +621,7 @@ Aborts if <code>t</code> does not hold a value
 
 </details>
 
-<a id="0x1_option_swap_or_fill"></a>
-
-## Function `swap_or_fill`
+## Function `swap_or_fill` <a id="0x1_option_swap_or_fill"></a>
 
 Swap the old value inside <code>t</code> with <code>e</code> and return the old value;
 or if there is no old value, fill it with <code>e</code>.
@@ -672,6 +650,7 @@ Different from swap(), swap_or_fill() allows for <code>t</code> not holding a va
 
 </details>
 
+
 <details>
 <summary>Specification</summary>
 
@@ -686,9 +665,7 @@ Different from swap(), swap_or_fill() allows for <code>t</code> not holding a va
 
 </details>
 
-<a id="0x1_option_destroy_with_default"></a>
-
-## Function `destroy_with_default`
+## Function `destroy_with_default` <a id="0x1_option_destroy_with_default"></a>
 
 Destroys <code>t.</code> If <code>t</code> holds a value, return it. Returns <code>default</code> otherwise
 
@@ -713,6 +690,7 @@ Destroys <code>t.</code> If <code>t</code> holds a value, return it. Returns <co
 
 </details>
 
+
 <details>
 <summary>Specification</summary>
 
@@ -727,9 +705,7 @@ Destroys <code>t.</code> If <code>t</code> holds a value, return it. Returns <co
 
 </details>
 
-<a id="0x1_option_destroy_some"></a>
-
-## Function `destroy_some`
+## Function `destroy_some` <a id="0x1_option_destroy_some"></a>
 
 Unpack <code>t</code> and return its contents
 Aborts if <code>t</code> does not hold a value
@@ -757,6 +733,7 @@ Aborts if <code>t</code> does not hold a value
 
 </details>
 
+
 <details>
 <summary>Specification</summary>
 
@@ -771,9 +748,7 @@ Aborts if <code>t</code> does not hold a value
 
 </details>
 
-<a id="0x1_option_destroy_none"></a>
-
-## Function `destroy_none`
+## Function `destroy_none` <a id="0x1_option_destroy_none"></a>
 
 Unpack <code>t</code>
 Aborts if <code>t</code> holds a value
@@ -799,6 +774,7 @@ Aborts if <code>t</code> holds a value
 
 </details>
 
+
 <details>
 <summary>Specification</summary>
 
@@ -812,9 +788,7 @@ Aborts if <code>t</code> holds a value
 
 </details>
 
-<a id="0x1_option_to_vec"></a>
-
-## Function `to_vec`
+## Function `to_vec` <a id="0x1_option_to_vec"></a>
 
 Convert <code>t</code> into a vector of length 1 if it is <code>Some</code>,
 and an empty vector otherwise
@@ -839,6 +813,7 @@ and an empty vector otherwise
 
 </details>
 
+
 <details>
 <summary>Specification</summary>
 
@@ -853,9 +828,7 @@ and an empty vector otherwise
 
 </details>
 
-<a id="0x1_option_for_each"></a>
-
-## Function `for_each`
+## Function `for_each` <a id="0x1_option_for_each"></a>
 
 Apply the function to the optional element, consuming it.
 
@@ -882,9 +855,7 @@ Apply the function to the optional element, consuming it.
 
 </details>
 
-<a id="0x1_option_for_each_ref"></a>
-
-## Function `for_each_ref`
+## Function `for_each_ref` <a id="0x1_option_for_each_ref"></a>
 
 Apply the function to the optional element reference.
 
@@ -909,9 +880,7 @@ Apply the function to the optional element reference.
 
 </details>
 
-<a id="0x1_option_for_each_mut"></a>
-
-## Function `for_each_mut`
+## Function `for_each_mut` <a id="0x1_option_for_each_mut"></a>
 
 Apply the function to the optional element reference.
 
@@ -936,9 +905,7 @@ Apply the function to the optional element reference.
 
 </details>
 
-<a id="0x1_option_fold"></a>
-
-## Function `fold`
+## Function `fold` <a id="0x1_option_fold"></a>
 
 Folds the function over the optional element.
 
@@ -970,9 +937,7 @@ Folds the function over the optional element.
 
 </details>
 
-<a id="0x1_option_map"></a>
-
-## Function `map`
+## Function `map` <a id="0x1_option_map"></a>
 
 Maps the content of an option
 
@@ -1000,9 +965,7 @@ Maps the content of an option
 
 </details>
 
-<a id="0x1_option_filter"></a>
-
-## Function `filter`
+## Function `filter` <a id="0x1_option_filter"></a>
 
 Filters the content of an option
 
@@ -1029,9 +992,7 @@ Filters the content of an option
 
 </details>
 
-<a id="@Module_Specification_1"></a>
-
-## Module Specification
+## Module Specification <a id="@Module_Specification_1"></a>
 
 
 
@@ -1040,10 +1001,7 @@ Filters the content of an option
 </code></pre>
 
 
-
-<a id="@Helper_Schema_2"></a>
-
-### Helper Schema
+### Helper Schema <a id="@Helper_Schema_2"></a>
 
 
 

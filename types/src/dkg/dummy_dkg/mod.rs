@@ -124,6 +124,12 @@ impl DKGTrait for DummyDKG {
     fn get_dealers(transcript: &DummyDKGTranscript) -> BTreeSet<u64> {
         transcript.contributions_by_dealer.keys().copied().collect()
     }
+
+    fn expected_max_transcript_size(_params: &Self::PublicParams) -> usize {
+        // DummyDKGTranscript = DummySecret(u64) + BTreeMap<u64, DummySecret>; trivially small.
+        // Generous fixed bound covering any reasonable validator-set size in tests.
+        64 * 1024
+    }
 }
 
 #[derive(Copy, Clone, Debug, Default, PartialEq, Serialize, Deserialize)]

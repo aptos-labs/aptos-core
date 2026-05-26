@@ -17,9 +17,14 @@ path = "src/main.rs"
 
 [dependencies]
 anyhow = { workspace = true }
+aptos-cli-common = { workspace = true }
 aptos-framework = { workspace = true }
 aptos-gas-schedule = { workspace = true }
+aptos-move-cli = { workspace = true }
+aptos-move-debugger = { workspace = true }
+aptos-rest-client = { workspace = true }
 aptos-types = { workspace = true }
+aptos-validator-interface = { workspace = true }
 aptos-vm = { workspace = true, features = ["testing"] }
 clap = { workspace = true, features = ["derive"] }
 codespan-reporting = { workspace = true }
@@ -27,6 +32,7 @@ legacy-move-compiler = { workspace = true }
 log = { workspace = true }
 move-command-line-common = { workspace = true }
 move-compiler-v2 = { workspace = true }
+move-core-types = { workspace = true }
 move-coverage = { workspace = true }
 move-ir-types = { workspace = true }
 move-model = { workspace = true }
@@ -45,10 +51,12 @@ tempfile = { workspace = true }
 tera = { workspace = true }
 tokio = { workspace = true }
 tracing-log = { workspace = true }
+url = { workspace = true }
 walkdir = { workspace = true }
 
 [dev-dependencies]
 aptos-package-builder = { workspace = true }
+move-core-types = { workspace = true }
 move-prover-test-utils = { workspace = true }
 regex = { workspace = true }
 rmcp = { workspace = true, features = ["client"] }

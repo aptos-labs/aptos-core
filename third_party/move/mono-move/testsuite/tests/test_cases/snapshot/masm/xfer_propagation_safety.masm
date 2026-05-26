@@ -1,0 +1,18 @@
+module 0x66::test
+
+fun helper(): u64
+    ld_u64 7
+    ret
+
+fun void_no_arg()
+    ret
+
+fun trigger(): u64
+    local k: u64
+    call helper
+    ld_u64 0
+    st_loc k
+    st_loc k
+    call void_no_arg
+    move_loc k
+    ret

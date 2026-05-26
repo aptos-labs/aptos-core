@@ -3,6 +3,13 @@ image:
   pullPolicy: IfNotPresent
   tag: "0.34.X-distroless-libc"
 
+resources:
+  requests:
+    cpu: "100m"
+    memory: "64Mi"
+  limits:
+    cpu: "500m"
+    memory: "800Mi"
 
 # -- Choose any (you can choose multiple) logging sinks supported by vector as found here https://vector.dev/docs/reference/configuration/sinks/
 loggingSinks: {}

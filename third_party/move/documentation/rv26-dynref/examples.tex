@@ -1,0 +1,47 @@
+\section{Motivating Examples}\label{sec:examples}
+
+The enum example in Sect.~\ref{sec:intro} is the headline case:
+mutation to a parent value invalidates a reference still in scope
+below it. Two further examples make the design constraints concrete.
+
+\paragraph{Order matters.}
+Here are two fragments that differ only in the order of their last
+two statements:
+\begin{lstlisting}
+let x = 0; let r2 = &mut x; let r1 = &mut x;       // (a)
+*r2 = 5; *r1
+let x = 0; let r2 = &mut x; let r1 = &mut x;       // (b)
+*r1 = 5; *r2
+\end{lstlisting}
+Both fragments take two mutable references to \texttt{x}. Fragment
+(a) writes through one of them and reads through the other; fragment
+(b) does the same with the roles swapped. A static borrow check sees
+the same set of borrows in scope at the same program points and has
+to reject both. The runtime sees the actual sequence of operations
+and can be more precise: the read after the write is safe in either
+fragment, because the read does not modify state and the earlier
+write through the other handle has not been challenged by a later
+write. A small variant---\texttt{let r1 = r2;}---makes both handles
+copies of one reference, and the question becomes uninteresting.
+
+\paragraph{Two mutable arguments must not overlap.}
+A function takes two mutable references. The caller must make sure
+they refer to disjoint pieces of state, since otherwise the callee
+cannot reason about either argument locally. Passing
+\texttt{\&mut x.f} and \texttt{\&mut x.g} is fine---they touch
+different fields. Passing \texttt{\&mut x} and \texttt{\&mut x.g} is
+not---the second is reachable through the first. The runtime check is
+substructural: it has to ask, for any two reference arguments, whether
+one is reachable from the other through field projections,
+indexing, and so on, along the actual paths the program took.
+
+\medskip
+
+The three examples look different on the surface: variant mutation,
+mutable aliasing, and an overlap at a call boundary. But in every
+case, one operation invalidates the path through which another
+reference would read or write state. That observation is what
+motivates the model. The next section describes the data structure
+that records those paths; Sect.~\ref{sec:semantics} describes the
+single rule that decides which references the next destructive event
+invalidates.

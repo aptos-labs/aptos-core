@@ -4,15 +4,15 @@
 use crate::{
     ast::{
         AbortKind, AccessSpecifierKind, AddressSpecifier, Condition, ConditionKind, Exp, ExpData,
-        FrameSpec, LambdaCaptureKind, Operation, Pattern, PropertyBag, PropertyValue, QuantKind,
-        ResourceSpecifier, Spec, SpecVarDecl, TempIndex, Value,
+        FrameSpec, LambdaCaptureKind, MemoryRange, Operation, Pattern, PropertyBag, PropertyValue,
+        QuantKind, ResourceSpecifier, Spec, SpecVarDecl, TempIndex, Value,
     },
     code_writer::CodeWriter,
     emit, emitln,
     exp_builder::ExpBuilder,
     model::{
-        FieldEnv, FunId, FunctionEnv, GlobalEnv, ModuleId, NodeId, Parameter, QualifiedId,
-        QualifiedInstId, SpecVarId, StructEnv, StructId, TypeParameter, Visibility,
+        FieldEnv, FunId, FunctionEnv, GlobalEnv, ModuleId, NamedConstantEnv, NodeId, Parameter,
+        QualifiedId, QualifiedInstId, SpecVarId, StructEnv, StructId, TypeParameter, Visibility,
     },
     symbol::Symbol,
     ty::{PrimitiveType, ReferenceKind, Type, TypeDisplayContext},
@@ -132,6 +132,138 @@ fn prints_without_label_prefix(exp: &Exp) -> bool {
     })
 }
 
+/// True if `e` itself carries a state label (labeled Behavior/SpecFunction/
+/// SpecPublish/SpecRemove/SpecUpdate call or labeled Global/Exists).
+fn has_label_at_top(e: &ExpData) -> bool {
+    match e {
+        ExpData::Call(_, Operation::Global(Some(_)), _)
+        | ExpData::Call(_, Operation::Exists(Some(_)), _) => true,
+        ExpData::Call(
+            _,
+            Operation::Behavior(_, range)
+            | Operation::SpecFunction(_, _, range)
+            | Operation::SpecPublish(range)
+            | Operation::SpecRemove(range)
+            | Operation::SpecUpdate(range),
+            _,
+        ) => range.pre.is_some() || range.post.is_some(),
+        _ => false,
+    }
+}
+
+/// True if any direct child of `e` is labeled at top; guards the clause-
+/// level CSE — a directly labeled child is already handled by the
+/// label-prefix hoist or `hoist_nested_labels`.
+fn has_labeled_direct_child(e: &ExpData) -> bool {
+    let mut found = false;
+    let mut check = |child: &ExpData| {
+        if has_label_at_top(child) {
+            found = true;
+        }
+    };
+    match e {
+        ExpData::Call(_, _, args) => {
+            for a in args {
+                check(a.as_ref());
+            }
+        },
+        ExpData::Block(_, _, binding, body) => {
+            if let Some(b) = binding {
+                check(b.as_ref());
+            }
+            check(body.as_ref());
+        },
+        ExpData::IfElse(_, cond, on_true, on_false) => {
+            check(cond.as_ref());
+            check(on_true.as_ref());
+            check(on_false.as_ref());
+        },
+        ExpData::Sequence(_, exps) => {
+            for x in exps {
+                check(x.as_ref());
+            }
+        },
+        ExpData::Quant(_, _, _, _, _, body) => check(body.as_ref()),
+        _ => {},
+    }
+    found
+}
+
+/// Collect unique labeled subexpressions (dedup by structural equality).
+/// Stops at each labeled top — nested labels within get hoisted when the
+/// let-binding RHS is later printed. Skips quantifier bodies so bindings
+/// referencing the bound variable don't escape scope.
+fn collect_labeled_subexprs(e: &ExpData, out: &mut Vec<Exp>) {
+    if has_label_at_top(e) {
+        let e_exp = ExpData::into_exp(e.clone());
+        if !out.iter().any(|x| x.as_ref().structural_eq(&e_exp)) {
+            out.push(e_exp);
+        }
+        return;
+    }
+    match e {
+        ExpData::Call(_, _, args) => {
+            for a in args {
+                collect_labeled_subexprs(a.as_ref(), out);
+            }
+        },
+        ExpData::Block(_, _, binding, body) => {
+            if let Some(b) = binding {
+                collect_labeled_subexprs(b.as_ref(), out);
+            }
+            collect_labeled_subexprs(body.as_ref(), out);
+        },
+        ExpData::IfElse(_, cond, on_true, on_false) => {
+            collect_labeled_subexprs(cond.as_ref(), out);
+            collect_labeled_subexprs(on_true.as_ref(), out);
+            collect_labeled_subexprs(on_false.as_ref(), out);
+        },
+        ExpData::Sequence(_, exps) => {
+            for x in exps {
+                collect_labeled_subexprs(x.as_ref(), out);
+            }
+        },
+        // Quantifier bodies may reference the bound variable; hoisting
+        // out would leak scope.
+        ExpData::Quant(..) => {},
+        _ => {},
+    }
+}
+
+/// AST node count. Used to sort labeled subexprs smallest-first so outer
+/// ones reference inner let-binding names.
+fn node_count(exp: &ExpData) -> usize {
+    let mut count = 0;
+    exp.visit_pre_order(&mut |_| {
+        count += 1;
+        true
+    });
+    count
+}
+
+/// Replace every subexpression of `exp` structurally equal to `target`
+/// with `replacement`.
+fn substitute_structural(exp: &Exp, target: &Exp, replacement: &Exp) -> Exp {
+    use crate::exp_rewriter::ExpRewriterFunctions;
+    struct Sub<'a> {
+        target: &'a Exp,
+        replacement: &'a Exp,
+    }
+    impl ExpRewriterFunctions for Sub<'_> {
+        fn rewrite_exp(&mut self, exp: Exp) -> Exp {
+            if exp.as_ref().structural_eq(self.target) {
+                return self.replacement.clone();
+            }
+            self.rewrite_exp_descent(exp)
+        }
+    }
+    Sub {
+        target,
+        replacement,
+    }
+    .rewrite_exp(exp.clone())
+}
+
 /// Returns the priority and operator string for binary ops that support label hoisting.
 fn hoistable_bin_op_info(op: &Operation) -> Option<(Priority, &'static str)> {
     match op {
@@ -148,8 +280,6 @@ fn hoistable_bin_op_info(op: &Operation) -> Option<(Priority, &'static str)> {
         _ => None,
     }
 }
-
-// has_any_state_label removed — replaced by is_state_neutral (see above)
 
 impl<'a> Sourcifier<'a> {
     /// Creates a new sourcifier.
@@ -226,6 +356,11 @@ impl<'a> Sourcifier<'a> {
                 }
             }
         }
+        if module_env.get_named_constant_count() > 0 {
+            for const_env in module_env.get_named_constants() {
+                self.print_named_constant(&const_env);
+            }
+        }
         if module_env.get_function_count() > 0 {
             for fun_env in module_env.get_functions() {
                 // Skip auto-generated struct API wrappers (pack$S, unpack$S, borrow$S$N, …).
@@ -238,6 +373,10 @@ impl<'a> Sourcifier<'a> {
                          lift_to_stackless_bytecode must have excluded it",
                         fun_env.get_name_string()
                     );
+                    continue;
+                }
+                // Skip `const$NAME` accessors — covered by `print_named_constant` above.
+                if fun_env.is_const_accessor() {
                     continue;
                 }
                 self.print_fun(fun_env.get_qualified_id(), fun_env.get_def())
@@ -491,7 +630,21 @@ impl<'a> Sourcifier<'a> {
                 } else {
                     None
                 };
-                self.print_list("vector[", ", ", "]", values.iter(), |value| {
+                // For empty vector literals in spec context, emit `vector<T>[]` when the
+                // element type is known so the spec compiler can infer the element type.
+                // In non-spec (regular Move) context, bare `vector[]` is fine because
+                // the Move compiler handles type inference from surrounding context.
+                let open = if values.is_empty() && for_spec {
+                    if let Some(et) = elem_ty {
+                        let tctx = TypeDisplayContext::new(self.env());
+                        format!("vector<{}>[", et.display(&tctx))
+                    } else {
+                        "vector[".to_string()
+                    }
+                } else {
+                    "vector[".to_string()
+                };
+                self.print_list(&open, ", ", "]", values.iter(), |value| {
                     self.print_value(value, elem_ty, for_spec)
                 });
             },
@@ -680,6 +833,26 @@ impl<'a> Sourcifier<'a> {
 
         // Print struct spec if present
         self.print_struct_spec(&struct_env);
+    }
+
+    /// Print a `const` declaration: `<vis> const NAME: TYPE = VALUE;`.
+    pub fn print_named_constant(&self, const_env: &NamedConstantEnv) {
+        let vis_prefix = match const_env.get_visibility() {
+            Visibility::Private => "",
+            Visibility::Public => "public ",
+            Visibility::Friend if const_env.has_package_visibility() => "package ",
+            Visibility::Friend => "friend ",
+        };
+        let tctx = const_env.get_type_display_ctx();
+        emit!(
+            self.writer,
+            "{}const {}: {} = ",
+            vis_prefix,
+            self.sym(const_env.get_name()),
+            const_env.get_type().display(&tctx)
+        );
+        self.print_value(&const_env.get_value(), Some(&const_env.get_type()), false);
+        emitln!(self.writer, ";");
     }
 
     /// Check for dummy field the compiler introduces for empty structs
@@ -2570,6 +2743,18 @@ impl<'a> ExpSourcifier<'a> {
                 self.print_exp(Prio::Prefix, false, &args[0])
             }),
             Operation::Vector => self.parenthesize(context_prio, Prio::Postfix, || {
+                if args.is_empty() && self.for_spec {
+                    // In spec context, emit `vector<T>[]` so the spec compiler can
+                    // infer the element type without guessing.  In non-spec (regular
+                    // Move) context, bare `vector[]` is fine — the compiler infers
+                    // the type from surrounding context.
+                    let node_ty = self.env().get_node_type(id);
+                    if let Type::Vector(elem_ty) = &node_ty {
+                        let tctx = TypeDisplayContext::new(self.env());
+                        emit!(self.wr(), "vector<{}>[]", elem_ty.display(&tctx));
+                        return;
+                    }
+                }
                 emit!(self.wr(), "vector");
                 self.print_exp_list("[", "]", args)
             }),
@@ -2832,42 +3017,21 @@ impl<'a> ExpSourcifier<'a> {
                 emit!(self.wr(), ")")
             }),
             Operation::Behavior(kind, range) => {
-                let kind_str = match kind {
-                    crate::ast::BehaviorKind::AbortsOf => "aborts_of",
-                    crate::ast::BehaviorKind::EnsuresOf => "ensures_of",
-                    crate::ast::BehaviorKind::RequiresOf => "requires_of",
-                    crate::ast::BehaviorKind::ResultOf => "result_of",
-                };
+                // `WriteOf(j)` is WP-internal and is expected to be eliminated
+                // before sourcification; if it leaks here we still render via
+                // its `Display` (`write_of_{j}`) rather than panicking, so the
+                // baseline shows the offending shape for diagnosis.
+                let kind_str = kind.to_string();
                 let has_labels = range.pre.is_some() || range.post.is_some();
 
-                // When the operation has a state label range, hoist any
-                // argument that contains a labeled subexpression into a let
-                // binding so the outer label can't visually appear to scope
-                // over it. `args[0]` is the function target (closure/
-                // MoveFunction), not a value — never hoist it. Mirrors the
-                // SpecPublish/Remove/Update path above, but uses a targeted
-                // neutrality check that doesn't over-hoist `old(...)` or
-                // unlabeled `self.field` reads (which never print with a
-                // `|~` prefix and so can't create nested labels).
+                // If args carry their own labels, hoist them out into
+                // `let` bindings to avoid visually nested labels.
+                // `args[0]` is the function target and never hoisted.
                 let needs_let =
                     has_labels && args.iter().skip(1).any(|a| !prints_without_label_prefix(a));
                 if needs_let {
-                    let mut let_bindings = vec![];
-                    let new_args: Vec<Exp> = args
-                        .iter()
-                        .enumerate()
-                        .map(|(i, arg)| {
-                            if i == 0 || prints_without_label_prefix(arg) {
-                                arg.clone()
-                            } else {
-                                let (pat, var_exp) = self.let_bind_exp(arg, args);
-                                let_bindings.push((pat, arg.clone()));
-                                var_exp
-                            }
-                        })
-                        .collect();
-                    let new_call = ExpData::Call(id, oper.clone(), new_args).into_exp();
-                    let wrapped = self.wrap_in_lets(let_bindings, new_call);
+                    let wrapped =
+                        self.hoist_nested_labels(id, oper, args, /*keep_outer_label=*/ true);
                     self.print_exp(context_prio, true, &wrapped);
                     return;
                 }
@@ -2883,7 +3047,7 @@ impl<'a> ExpSourcifier<'a> {
                 };
                 if has_labels {
                     // aborts_of/requires_of only take a pre-state (single state form),
-                    // ensures_of/result_of can have pre..post ranges.
+                    // ensures_of/result_of/write_of can have pre..post ranges.
                     let is_single_state = matches!(
                         kind,
                         crate::ast::BehaviorKind::AbortsOf | crate::ast::BehaviorKind::RequiresOf
@@ -3014,12 +3178,52 @@ impl<'a> ExpSourcifier<'a> {
     /// Hoisting produces `S |~ global<R>(a) == x`, where the label provides context
     /// for the entire relation — a more natural reading for humans.
     fn print_exp_hoisting_label(&self, exp: &Exp) {
+        let preprocessed = self.hoist_clause_level_labels(exp);
+        let exp = &preprocessed;
         if has_hoistable_label(exp) {
             self.print_hoisted_label_prefix(exp);
             self.print_exp_without_label(Prio::General, exp);
         } else {
             self.print_exp(Prio::General, false, exp);
         }
+    }
+
+    /// Lift labeled subexpressions buried in non-hoistable positions (e.g.
+    /// inside arithmetic) into a clause-level `let` chain. Returns `exp`
+    /// unchanged when the label-prefix hoist or `hoist_nested_labels`
+    /// already handles all labels.
+    fn hoist_clause_level_labels(&self, exp: &Exp) -> Exp {
+        if has_label_at_top(exp.as_ref()) || has_labeled_direct_child(exp.as_ref()) {
+            return exp.clone();
+        }
+
+        let mut labeled: Vec<Exp> = Vec::new();
+        collect_labeled_subexprs(exp.as_ref(), &mut labeled);
+        if labeled.is_empty() {
+            return exp.clone();
+        }
+
+        labeled.sort_by_key(|e| node_count(e.as_ref()));
+
+        // Pass the clause as scope so generated names don't shadow free
+        // vars or temp display names in scope.
+        let scope = std::slice::from_ref(exp);
+        let mut let_bindings: Vec<(Pattern, Exp)> = Vec::new();
+        let mut substitutions: Vec<(Exp, Exp)> = Vec::new();
+        for sub in &labeled {
+            let mut sub_substituted = sub.clone();
+            for (target, repl) in &substitutions {
+                sub_substituted = substitute_structural(&sub_substituted, target, repl);
+            }
+            let (pat, var_exp) = self.let_bind_exp(&sub_substituted, scope);
+            let_bindings.push((pat, sub_substituted));
+            substitutions.push((sub.clone(), var_exp));
+        }
+        let mut new_exp = exp.clone();
+        for (target, repl) in &substitutions {
+            new_exp = substitute_structural(&new_exp, target, repl);
+        }
+        self.wrap_in_lets(let_bindings, new_exp)
     }
 
     /// Print a binary operator, hoisting a state label out if possible.
@@ -3147,13 +3351,19 @@ impl<'a> ExpSourcifier<'a> {
                     self.parent.enclosing_state_label.set(prev);
                 })
             },
-            ExpData::Call(_id, Operation::Behavior(kind, _range), args) => {
-                let kind_str = match kind {
-                    crate::ast::BehaviorKind::AbortsOf => "aborts_of",
-                    crate::ast::BehaviorKind::EnsuresOf => "ensures_of",
-                    crate::ast::BehaviorKind::RequiresOf => "requires_of",
-                    crate::ast::BehaviorKind::ResultOf => "result_of",
-                };
+            ExpData::Call(id, oper @ Operation::Behavior(kind, _range), args) => {
+                // See note above on `WriteOf` rendering.
+                let kind_str = kind.to_string();
+                // Caller already emitted the outer label, but args may
+                // still carry labels: hoist them so labels don't visually
+                // nest.
+                let nested_label = args.iter().skip(1).any(|a| !prints_without_label_prefix(a));
+                if nested_label {
+                    let wrapped =
+                        self.hoist_nested_labels(*id, oper, args, /*keep_outer_label=*/ false);
+                    self.print_exp(prio, false, &wrapped);
+                    return;
+                }
                 self.parenthesize(prio, Prio::Postfix, || {
                     emit!(self.wr(), "{}", kind_str);
                     emit!(self.wr(), "<");
@@ -3443,6 +3653,73 @@ impl<'a> ExpSourcifier<'a> {
                 );
                 ExpData::Block(block_id, pat, Some(binding), acc).into_exp()
             })
+    }
+
+    /// Lift labeled subexpressions in `args[1..]` into a `let` chain wrapping
+    /// the call. Smaller subexprs are bound first so outer ones can reference
+    /// inner names. `keep_outer_label = false` strips the call's range when
+    /// the caller already emitted the prefix (i.e. via
+    /// `print_exp_without_label`).
+    fn hoist_nested_labels(
+        &self,
+        id: NodeId,
+        oper: &Operation,
+        args: &[Exp],
+        keep_outer_label: bool,
+    ) -> Exp {
+        let mut labeled: Vec<Exp> = Vec::new();
+        for arg in args.iter().skip(1) {
+            arg.as_ref().visit_pre_order(&mut |e: &ExpData| {
+                if has_label_at_top(e) {
+                    let e_exp = ExpData::into_exp(e.clone());
+                    if !labeled.iter().any(|x| x.as_ref().structural_eq(&e_exp)) {
+                        labeled.push(e_exp);
+                    }
+                    false
+                } else {
+                    true
+                }
+            });
+        }
+        labeled.sort_by_key(|e| node_count(e.as_ref()));
+
+        let mut let_bindings: Vec<(Pattern, Exp)> = Vec::new();
+        let mut substitutions: Vec<(Exp, Exp)> = Vec::new();
+        for sub in &labeled {
+            let mut sub_substituted = sub.clone();
+            for (target, repl) in &substitutions {
+                sub_substituted = substitute_structural(&sub_substituted, target, repl);
+            }
+            let (pat, var_exp) = self.let_bind_exp(&sub_substituted, args);
+            let_bindings.push((pat, sub_substituted));
+            substitutions.push((sub.clone(), var_exp));
+        }
+
+        let new_args: Vec<Exp> = args
+            .iter()
+            .enumerate()
+            .map(|(i, arg)| {
+                if i == 0 {
+                    arg.clone()
+                } else {
+                    let mut current = arg.clone();
+                    for (target, repl) in &substitutions {
+                        current = substitute_structural(&current, target, repl);
+                    }
+                    current
+                }
+            })
+            .collect();
+
+        let inner_oper = if keep_outer_label {
+            oper.clone()
+        } else if let Operation::Behavior(kind, _) = oper {
+            Operation::Behavior(*kind, MemoryRange::default())
+        } else {
+            oper.clone()
+        };
+        let new_call = ExpData::Call(id, inner_oper, new_args).into_exp();
+        self.wrap_in_lets(let_bindings, new_call)
     }
 
     fn is_unspecified_abort_code(exp: &Exp) -> bool {

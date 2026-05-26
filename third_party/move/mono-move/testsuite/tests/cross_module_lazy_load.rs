@@ -9,7 +9,7 @@
 //! `CallIndirect` at runtime lazily loads it through the transaction
 //! context.
 
-use mono_move_core::ExecutionContext;
+use mono_move_core::{types::EMPTY_TYPE_LIST, ExecutionContext};
 use mono_move_gas::SimpleGasMeter;
 use mono_move_global_context::GlobalContext;
 use mono_move_loader::{Loader, LoadingPolicy, LoweringPolicy, TransactionContext};
@@ -43,7 +43,7 @@ fn call_indirect_triggers_lazy_module_load() {
     );
 
     // -- Wrap into a TransactionContext ---------------------------
-    let mut txn_ctx = TransactionContext::new(&guard, loader, SimpleGasMeter::new(u64::MAX));
+    let mut txn_ctx = TransactionContext::new(loader, SimpleGasMeter::new(u64::MAX));
 
     // -- Resolve bar::main through the txn_ctx ---------------------------
     // This lazily loads `bar` (via the loader) and returns a pointer to
@@ -56,7 +56,7 @@ fn call_indirect_triggers_lazy_module_load() {
         .intern_identifier(ident_str!("main"))
         .into_global_arena_ptr();
     let main_ptr = txn_ctx
-        .load_function(bar_id, main_name)
+        .load_function(bar_id, main_name, EMPTY_TYPE_LIST)
         .expect("bar::main should resolve");
     assert_eq!(txn_ctx.read_set().len(), 1, "only bar loaded so far");
 
@@ -64,7 +64,7 @@ fn call_indirect_triggers_lazy_module_load() {
     // SAFETY: `main_ptr` came from the executable cache, which is kept
     // alive by `guard` for the duration of this test.
     let main_fn = unsafe { main_ptr.as_ref_unchecked() };
-    let mut interp = InterpreterContext::new(&mut txn_ctx, &[], main_fn);
+    let mut interp = InterpreterContext::new(&mut txn_ctx, main_fn);
     interp.set_root_arg(0, &41u64.to_le_bytes());
     interp.run().expect("execution should succeed");
 

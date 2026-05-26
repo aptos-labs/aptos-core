@@ -11,12 +11,11 @@ const KEY_RANGE: u64 = 2500;
 const SEED: u64 = 42;
 
 fn bench_bst(c: &mut Criterion) {
-    use mono_move_core::LocalExecutionContext;
     use mono_move_programs::{
         bst::{generate_ops, micro_op_bst, move_bytecode_bst, move_stdlib_vector, native_run_ops},
         testing,
     };
-    use mono_move_runtime::InterpreterContext;
+    use mono_move_runtime::{InterpreterContext, LocalRuntimeContext};
 
     let ops = generate_ops(N_OPS, KEY_RANGE, SEED);
 
@@ -32,15 +31,13 @@ fn bench_bst(c: &mut Criterion) {
         });
 
         // plain (no gas instrumentation)
-        let (functions, descriptors, _arena) = micro_op_bst();
-        // SAFETY: Exclusive access during bench setup; arena is alive.
-        unsafe { mono_move_core::Function::resolve_calls(&functions) };
-        let mut exec_ctx = LocalExecutionContext::unmetered();
+        let (functions, descriptors) = micro_op_bst();
+        let mut exec_ctx = LocalRuntimeContext::unmetered_with_descriptors(descriptors);
         // TODO: hoist interpreter context setup out of the timed body.
         group.bench_function("micro_op", |b| {
             b.iter(|| {
-                let mut ctx = InterpreterContext::new(&mut exec_ctx, &descriptors, unsafe {
-                    functions[6].unwrap().as_ref_unchecked()
+                let mut ctx = InterpreterContext::new(&mut exec_ctx, unsafe {
+                    functions[6].as_ref_unchecked()
                 });
                 let vec_ptr = ctx
                     .alloc_u64_vec(mono_move_core::DescriptorId(0), &ops)
@@ -51,17 +48,14 @@ fn bench_bst(c: &mut Criterion) {
         });
 
         // with gas instrumentation
-        let (functions, _, _arena) = micro_op_bst();
-        // SAFETY: Exclusive access during bench setup; arena is alive.
-        let (functions_gas, _arena) = unsafe { helpers::gas_instrument(&functions) };
-        // SAFETY: Exclusive access during bench setup; arena is alive.
-        unsafe { mono_move_core::Function::resolve_calls(&functions_gas) };
-        let mut exec_ctx = LocalExecutionContext::with_max_budget();
+        let (functions_gas, descriptors_gas) = micro_op_bst();
+        helpers::gas_instrument(&functions_gas);
+        let mut exec_ctx = LocalRuntimeContext::with_max_budget(descriptors_gas);
         // TODO: hoist interpreter context setup out of the timed body.
         group.bench_function("micro_op/gas", |b| {
             b.iter(|| {
-                let mut ctx = InterpreterContext::new(&mut exec_ctx, &descriptors, unsafe {
-                    functions_gas[6].unwrap().as_ref_unchecked()
+                let mut ctx = InterpreterContext::new(&mut exec_ctx, unsafe {
+                    functions_gas[6].as_ref_unchecked()
                 });
                 let vec_ptr = ctx
                     .alloc_u64_vec(mono_move_core::DescriptorId(0), &ops)
@@ -72,6 +66,12 @@ fn bench_bst(c: &mut Criterion) {
         });
 
         group.finish();
+
+        for ptr in functions.into_iter().chain(functions_gas) {
+            // SAFETY: All bench measurements have completed; no interpreter
+            // context references these function pointers anymore.
+            unsafe { ptr.free_unchecked() };
+        }
     }
 
     // -- move_vm -----------------------------------------------------------

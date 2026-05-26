@@ -139,6 +139,10 @@ impl State {
         self.usage
     }
 
+    pub fn hot_state_config(&self) -> HotStateConfig {
+        self.hot_state_config
+    }
+
     pub fn shards(&self) -> &[MapLayer<HashValue, StateSlot>; NUM_STATE_SHARDS] {
         &self.shards
     }

@@ -88,6 +88,141 @@ script {
 
 > _else-clause_ → **else** _expression_
 
+## Match Expressions
+
+A `match` expression is a multi-way conditional. It evaluates the _discriminator_ in parentheses, then tries each arm in textual order; the first arm whose _pattern_ matches and whose optional `if` _guard_ holds is taken. Each arm has the form `pattern => body` (with an optional `if guard` between the pattern and `=>`).
+
+```move
+/// Map an HTTP status code to a human-readable message.
+fun status_message(code: u16): vector<u8> {
+    match (code) {
+        200 => b"OK",
+        404 => b"Not Found",
+        500 => b"Server Error",
+        _   => b"Unknown",
+    }
+}
+```
+
+Match expressions were first introduced in Move 2.0 for enum values: see [Matching Enum Values](./structs-and-enums.md#matching-enum-values) for the enum-specific patterns. Move 2.4 extends `match` to primitive values, range patterns, and references to primitive values, as described below. Additional struct- and enum-specific extensions (literal and range patterns nested inside variant patterns, struct/enum references, and mixed-tuple discriminators) are documented under [Match Expression Extensions](./structs-and-enums.md#match-expression-extensions).
+
+### Matching Primitive Values
+
+_Since language version 2.4_
+
+The discriminator of a `match` expression may be of types: a `bool`, any signed or unsigned integer, or `vector<u8>` (byte-strings). The corresponding arm patterns are written using the usual literal syntax:
+
+```move
+fun describe_command(s: vector<u8>): u64 {
+    match (s) {
+        b"start" => 1,
+        b"stop"  => 2,
+        x"00"    => 3,
+        _        => 0,
+    }
+}
+```
+
+Tuples of primitives are also supported, and may freely mix literals with variable bindings or `_` wildcards in the individual positions:
+
+```move
+fun combine(p: u8, q: u8): u8 {
+    match ((p, q)) {
+        (0, 0) => 0,
+        (0, 1) => 1,
+        (1, 0) => 2,
+        (1, 1) => 3,
+        _      => 255,
+    }
+}
+```
+
+Note that `address` is not supported as a primitive discriminator.
+
+### Range Patterns
+
+_Since language version 2.4_
+
+A range pattern matches a contiguous interval of integer values in a single arm. Both bounds are integer literals (signed integer literals may carry a unary minus, as in `-5..5`). The following forms are accepted:
+
+| Pattern   | Matches when           |
+| --------- | ---------------------- |
+| `lo..hi`  | `lo <= x && x < hi`    |
+| `lo..=hi` | `lo <= x && x <= hi`   |
+| `..hi`    | `x < hi`               |
+| `..=hi`   | `x <= hi`              |
+| `lo..`    | `lo <= x`              |
+
+A bare `..` is **not** a range pattern; inside struct or variant patterns it keeps its existing meaning as the [partial-field wildcard](./structs-and-enums.md#partial-patterns).
+
+For the purposes of exhaustiveness analysis, a literal pattern is treated as a singleton range, so adjacent literals and ranges can together cover the full domain of an integer type without any `_` arm:
+
+```move
+fun classify(x: u8): u64 {
+    match (x) {
+        0         => 0,
+        1..=127   => 1,
+        128..=255 => 2,
+    }
+}
+```
+
+Range patterns work on every integer type, including signed types that cross zero:
+
+```move
+fun sign(x: i32): u8 {
+    match (x) {
+        ..0  => 0, // negative
+        0    => 1, // zero
+        1..  => 2, // positive
+    }
+}
+```
+
+Empty or inverted ranges are rejected at compile time:
+
+```move
+// All errors: empty range pattern.
+match (x) { 5..5    => 1, _ => 0 }
+match (x) { 10..5   => 1, _ => 0 }
+match (x) { 10..=5  => 1, _ => 0 }
+```
+
+Range patterns may also appear nested inside struct or enum variant patterns — see [Match Expression Extensions](./structs-and-enums.md#match-expression-extensions).
+
+### Matching Through References
+
+_Since language version 2.4_
+
+A `match` expression may take an immutable or mutable reference to a primitive value as its discriminator. The arm patterns are written using the same literal and range syntax as for the value form:
+
+```move
+fun bool_ref(b: &bool): u64 {
+    match (b) { true => 1, false => 0 }
+}
+
+fun bytes_ref(bs: &vector<u8>): u64 {
+    match (bs) { b"hi" => 1, _ => 0 }
+}
+
+fun int_ref(x: &u64): u64 {
+    match (x) { 0..10 => 1, _ => 0 }
+}
+```
+
+`&mut` discriminators are supported in the same way. References to struct and enum values may also serve as discriminators — see [Match Expression Extensions](./structs-and-enums.md#match-expression-extensions).
+
+### Literal and Range Patterns Outside `match`
+
+Literal and range patterns are only legal inside `match` arms; they are rejected in `let` bindings, assignments, and lambda parameters, because those positions are irrefutable and must match every value of their type.
+
+```move
+// All errors: literal and range patterns are not allowed here.
+let S { x: 1 } = S { x: 1 };
+let 1u64 = 1;
+let f = |1u64| 0;
+```
+
 ## While, For, and Loop
 
 Move offers three constructs for looping: `while`, `for`, and `loop`.

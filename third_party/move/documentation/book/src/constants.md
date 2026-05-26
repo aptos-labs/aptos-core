@@ -56,8 +56,92 @@ features. It may or may not be removed later.
 
 ## Visibility
 
-`public` constants are not currently supported. `const` values can be used only in the declaring
-module.
+_Since language version 2.4_
+
+By default, a constant is module-private: it can be read only inside the module that declares it.
+Move 2.4 introduces explicit visibility modifiers that allow constants to be read from other
+modules.
+
+### Visibility Levels
+
+Three modifiers are available, mirroring the function visibility keywords:
+
+| Modifier  | Accessible from                                     |
+| --------- | --------------------------------------------------- |
+| `public`  | Any module                                          |
+| `package` | All modules in the same package (same address)      |
+| `friend`  | Modules declared as `friend` in the defining module |
+
+`public(package)` and `public(friend)` are accepted as aliases for `package` and `friend`
+respectively, but are discouraged and will be deprecated. Prefer the shorthand forms.
+
+```move
+module 0x42::m {
+    friend 0x42::n;
+
+    public const PUB: u64 = 10;
+    package const PKG: u64 = 20;
+    friend const FRD: u64 = 30;
+    const PRIV: u64 = 40; // module-private (default)
+}
+
+module 0x42::n {
+    use 0x42::m;
+
+    public fun read(): u64 {
+        m::PUB + m::PKG + m::FRD // all valid: same package, and `n` is a friend of `m`
+    }
+}
+
+module 0x43::other {
+    use 0x42::m;
+
+    public fun read(): u64 {
+        m::PUB         // valid: `public` is accessible from any module
+        // m::PKG      // ERROR: different package
+        // m::FRD      // ERROR: `other` is not a friend of `m`
+        // m::PRIV     // ERROR: module-private
+    }
+}
+```
+
+### Performance Consideration
+
+Cross-module constant reads are currently compiled into a synthetic accessor function call rather
+than a direct `LdConst` bytecode instruction. Thus, they are not a zero-cost abstraction yet: they
+are more expensive than the equivalent read inside the defining module. This is expected to change
+in the future with VM improvements. In the meantime, use visibility modifiers only when the
+cross-module access is genuinely needed.
+
+### Upgrade Behavior
+
+Non-private constants can have their value changed in a module upgrade. Because cross-module reads
+go through the synthetic accessor function, consuming modules automatically observe the new value
+after the defining module is upgraded — they do not need to be recompiled or republished.
+
+### Restrictions
+
+- Visibility modifiers are not allowed on constants declared inside a `script { ... }` block.
+- A cross-module constant read cannot appear in another constant's initializer. Same-module
+  references are fine:
+
+  ```move
+  module 0x42::m {
+      public const A: u64 = 10;
+      const B: u64 = A + 1; // OK: same module
+  }
+
+  module 0x42::n {
+      use 0x42::m;
+      public const C: u64 = m::A + 1; // ERROR: cross-module const read in a const initializer
+  }
+  ```
+
+- A `friend` or `package` constant cannot be read inside a `public` or `friend` `inline` function.
+  Such an inline function can be expanded into a module that lacks the required visibility, which
+  would leave an inaccessible accessor call in the caller's bytecode. Private `inline` functions
+  and `package inline` functions are unaffected, because their expansions cannot escape the
+  visibility scope.
 
 ## Valid Expressions
 

@@ -21,14 +21,14 @@
 //! At the end, walks the VM's outer vector via heap pointers and compares
 //! element-by-element against a pure-Rust simulation using the same seed.
 
-use mono_move_alloc::{ExecutableArena, ExecutableArenaPtr, GlobalArenaPtr};
+use mono_move_alloc::GlobalArenaPtr;
 use mono_move_core::{
-    CodeOffset as CO, FrameLayoutInfo, FrameOffset as FO, Function, LocalExecutionContext, MicroOp,
-    SortedSafePointEntries, STRUCT_DATA_OFFSET,
+    Code, CodeOffset as CO, FrameLayoutInfo, FrameOffset as FO, Function, FunctionPtr, MicroOp,
+    SortedSafePointEntries,
 };
 use mono_move_runtime::{
-    read_ptr, read_u64, InterpreterContext, ObjectDescriptor, ObjectDescriptorTable,
-    VEC_DATA_OFFSET, VEC_LENGTH_OFFSET,
+    read_ptr, read_u64, InterpreterContext, LocalRuntimeContext, ObjectDescriptor,
+    ObjectDescriptorTable, VEC_DATA_OFFSET, VEC_LENGTH_OFFSET,
 };
 use rand::{rngs::StdRng, Rng, SeedableRng};
 
@@ -94,13 +94,9 @@ fn simulate(n: u64, max_len: u64, seed: u64) -> Vec<(u64, Vec<u64>)> {
 ///   [fp + 16] : entry    (result: heap pointer to Entry struct)
 ///   [fp + 24] : vec_ref  (16-byte fat pointer to vec slot)
 fn make_gc_stress_program(
-    arena: &ExecutableArena,
     num_iterations: u64,
     max_len: u64,
-) -> (
-    Vec<Option<ExecutableArenaPtr<Function>>>,
-    ObjectDescriptorTable,
-) {
+) -> (Vec<FunctionPtr>, ObjectDescriptorTable) {
     use MicroOp::*;
 
     let mut descriptors = ObjectDescriptorTable::new();
@@ -115,7 +111,8 @@ fn make_gc_stress_program(
     let callee_vec_ref: u32 = 24;
 
     #[rustfmt::skip]
-    let make_entry_code = arena.alloc_slice_fill_iter([
+    let make_entry_code = vec![
+        // PC 0: vec = VecNew(descriptor=0, elem_size=8)
         VecNew { dst: FO(callee_vec) },
         SlotBorrow { dst: FO(callee_vec_ref), local: FO(callee_vec) },
         VecPushBack { vec_ref: FO(callee_vec_ref), elem: FO(callee_val), elem_size: 8, descriptor_id: desc_inner_vec },
@@ -126,22 +123,22 @@ fn make_gc_stress_program(
         MicroOp::struct_store8(FO(callee_entry), 8, FO(callee_vec)),
         // PC 6: return
         Return,
-    ]);
-    let callee_func = arena.alloc(Function {
+    ];
+    let callee_ptr = FunctionPtr::new(Box::new(Function {
         name: GlobalArenaPtr::from_static("test"),
-        code: make_entry_code,
-        param_sizes: ExecutableArenaPtr::empty_slice(),
+        code: Code::from_vec(make_entry_code),
+        param_sizes: vec![],
         param_sizes_sum: 8,
         param_and_local_sizes_sum: 40,
         extended_frame_size: 64,
         zero_frame: true,
-        frame_layout: FrameLayoutInfo::new(arena, [
+        frame_layout: FrameLayoutInfo::new(vec![
             FO(callee_vec),
             FO(callee_entry),
             FO(callee_vec_ref),
         ]),
         safe_point_layouts: SortedSafePointEntries::empty(),
-    });
+    }));
 
     // -- Function 0: main --
     let outer_vec: u32 = 0;
@@ -155,7 +152,7 @@ fn make_gc_stress_program(
     let entry_ptr: u32 = 104; // callee result slot (callee fp + 16)
 
     #[rustfmt::skip]
-    let code = arena.alloc_slice_fill_iter([
+    let code = vec![
         // ---- Setup ----
         // PC 0: outer_vec = VecNew(descriptor=2, elem_size=8)
         VecNew { dst: FO(outer_vec) },
@@ -184,7 +181,7 @@ fn make_gc_stress_program(
         // PC 10: write val to callee's argument slot
         Move8 { dst: FO(callee_arg), src: FO(r1) },
         // PC 11: call make_entry (func 1)
-        CallFunc { func_id: 1 },
+        CallDirect { ptr: callee_ptr },
         // After return: entry pointer is at fp+104 (callee's fp+16)
         // PC 12: len = VecLen(outer_vec_ref)
         VecLen { dst: FO(len), vec_ref: FO(outer_vec_ref) },
@@ -223,7 +220,7 @@ fn make_gc_stress_program(
         // PC 26: write val to callee's argument slot
         Move8 { dst: FO(callee_arg), src: FO(r1) },
         // PC 27: call make_entry (func 1) — result becomes garbage
-        CallFunc { func_id: 1 },
+        CallDirect { ptr: callee_ptr },
         // falls through to NEXT
 
         // ---- NEXT (PC 28) ----
@@ -233,24 +230,20 @@ fn make_gc_stress_program(
 
         // ---- DONE (PC 30) ----
         Return,
-    ]);
-    let main_func = arena.alloc(Function {
+    ];
+    let main_ptr = FunctionPtr::new(Box::new(Function {
         name: GlobalArenaPtr::from_static("test"),
-        code,
-        param_sizes: ExecutableArenaPtr::empty_slice(),
+        code: Code::from_vec(code),
+        param_sizes: vec![],
         param_sizes_sum: 0,
         param_and_local_sizes_sum: 64,
         extended_frame_size: 128,
         zero_frame: true,
-        frame_layout: FrameLayoutInfo::new(arena, [
-            FO(outer_vec),
-            FO(outer_vec_ref),
-            FO(entry_ptr),
-        ]),
+        frame_layout: FrameLayoutInfo::new(vec![FO(outer_vec), FO(outer_vec_ref), FO(entry_ptr)]),
         safe_point_layouts: SortedSafePointEntries::empty(),
-    });
+    }));
 
-    (vec![Some(main_func), Some(callee_func)], descriptors)
+    (vec![main_ptr, callee_ptr], descriptors)
 }
 
 // ---------------------------------------------------------------------------
@@ -264,8 +257,8 @@ unsafe fn read_vm_outer_vec(outer_ptr: *const u8) -> Vec<(u64, Vec<u64>)> {
 
         for i in 0..outer_len {
             let entry_ptr = read_ptr(outer_ptr, VEC_DATA_OFFSET + i * 8);
-            let key = read_u64(entry_ptr, STRUCT_DATA_OFFSET);
-            let values_ptr = read_ptr(entry_ptr, STRUCT_DATA_OFFSET + 8);
+            let key = read_u64(entry_ptr, 0usize);
+            let values_ptr = read_ptr(entry_ptr, 8usize);
             let values_len = read_u64(values_ptr, VEC_LENGTH_OFFSET) as usize;
             let mut values = Vec::with_capacity(values_len);
             for j in 0..values_len {
@@ -290,16 +283,11 @@ fn gc_stress() {
 
     let expected = simulate(n, max_len, seed);
 
-    let arena = ExecutableArena::new();
-    let (functions, descriptors) = make_gc_stress_program(&arena, n, max_len);
-    // SAFETY: Exclusive access during test setup; arena is alive.
-    unsafe { Function::resolve_calls(&functions) };
-
-    let mut exec_ctx = LocalExecutionContext::with_max_budget();
+    let (functions, descriptors) = make_gc_stress_program(n, max_len);
+    let mut exec_ctx = LocalRuntimeContext::with_max_budget(descriptors);
     let mut ctx = InterpreterContext::with_heap_size(
         &mut exec_ctx,
-        &descriptors,
-        unsafe { functions[0].unwrap().as_ref_unchecked() },
+        unsafe { functions[0].as_ref_unchecked() },
         8 * 1024,
     );
     ctx.set_rng_seed(seed);
@@ -331,4 +319,11 @@ fn gc_stress() {
     let flat: Vec<u64> = vm_values.iter().map(|e| e.0).collect();
     println!("final outer_vec keys: {:?}", flat);
     assert!(gc_runs > 0, "expected at least one GC collection");
+
+    drop(ctx);
+    for ptr in functions {
+        // SAFETY: The interpreter context has been dropped, so the function
+        // pointers it referenced through micro-ops are no longer in use.
+        unsafe { ptr.free_unchecked() };
+    }
 }

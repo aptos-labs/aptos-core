@@ -1,7 +1,7 @@
 \Section{Encoding}
 \label{sec:enc}
 
-We describe the implementation of function values as a translation into an imperative intermediate verification language (IVL) inspired by Boogie \cite{thisisboogie2}.
+We describe the implementation of function values as a translation into a conceptual (pseudo-code style) imperative intermediate verification language (IVL) inspired by Boogie~\cite{boogieIVL,thisisboogie2}.
 The encoding is given at the IVL level because this is where the interesting design decisions become visible --- the subsequent step to pure SMT is straightforward and uses standard techniques.
 The fragment of the IVL used in this section is familiar: procedures with $\HAVOC$, $\ASSUME$, $\ASSERT$, pure functions, \emph{algebraic datatypes} (tagged unions with selectors, like Rust enums), universal \emph{axioms} with \emph{triggers}, and polymorphic map types.
 State is represented by Boogie-style maps; in particular, each resource type $\tau$ yields a map $M_\tau \in \Addr \rightarrow \tau$, with $\Addr$ being the domain of addresses in Move (256-bit integers).
@@ -26,8 +26,8 @@ The union of these three sets is materialized as an algebraic datatype in the IV
 Parameter variants are nullary because, in a well-typed verification condition (VC), the value of an entrypoint function-typed parameter is a skolem constant pinned to its variant at entry; no runtime payload is required.
 Field variants carry an integer discriminator $n$ so that two locations in memory holding distinct field values are not forced to be equal --- a datatype with a single nullary constructor would otherwise collapse all field values to one.
 
-Notice that this representation captures \emph{all} possible functions of type $\tau$ relevant for a given VC.
-So we do not actually need to deal with an arbitrary number of function values when it comes to higher-order function verification, but only those which can be derived from the program.
+Notice that this representation captures \emph{all} possible functions of type $\tau$ relevant for a given VC (verification condition).
+So we do not actually need to deal with an arbitrary number of function values when it comes to higher-order function verification, but only those which can be derived from the program in a given context.
 The representation is further narrowed if the function value of a given type is not stored in a structure which ends in global memory.
 Storing a function value in a struct field introduces dynamic dispatch: two different field locations may hold different closures, and the discriminator $n$ in $F_{\sigma.x}(n)$ ensures the solver treats them as distinct.
 Nevertheless, we are able to pinpoint a specification to a particular $F_{\sigma.x}(n)$, as illustrated by the AMM example (Sec.~\ref{sec:amm}).
@@ -48,8 +48,8 @@ A few definitions for memory maps are needed.
 Note that these are definitions on the meta level of the description here and not part of the IVL; they are used to describe pseudo code in terms of the IVL.
 
 First, with $\Mem_R = \{ M \in \Addr \fun \rho \mid \rho \in R\}$ we denote a set of memory maps for the resource types in $R$.
-The $R$ can be omitted if it is clear from the context. For convenience, with $\Type(\Mem)$ the set of all types $\rho$ used in the memory maps of $\Mem$ is described.
-With $\Mem_R \downarrow S$, where $S \subseteq R$, the projection $\{ M \in \Mem_R \mid \rho(M) \in S \}$ is denoted.
+The $R$ can be omitted if it is clear from the context. For convenience, we write $\Type(\Mem)$ for the set of all types $\rho$ used in the memory maps of $\Mem$.
+With $\Mem_R \downarrow S$, where $S \subseteq R$, we denote the projection $\{ M \in \Mem_R \mid \rho(M) \in S \}$.
 
 In addition to memory, we also need to reason about modifications.
 A modification is a set of pairs of a type and an expression of the IVL of type $\Addr$, $\Mod \in \power (\Type \cross \Expr)$.
@@ -71,9 +71,9 @@ For parameters and fields, the information is declared in the spec block:
 \end{MoveBox}
 % @formatter:on
 
-\noindent For the wildcard operator !*!, all memory which is read or written as part of the currently generated VC is included, and in addition an abstract memory map for any 'unknown' memory the function may depend on.
+\noindent For the wildcard operator !*!, all memory which is read or written as part of the currently generated VC is included, plus an abstract memory map for any `unknown' memory the function may depend on.
 The unknown memory is needed for a sound encoding.
-For instance, if we verify function !foo! above in a context where there is no memory involved anywhere, we must not assume that !g(x)! delivers the same value in different states, as it may depend on this unknown additional memory.
+For instance, if we verify function !foo! above in a context where no memory is involved anywhere, we must not assume that !g(x)! delivers the same value in different states, as it may depend on this unknown additional memory.
 However, we can still know that the specification of !g! holds in every possible state.
 
 \Paragraph{Write Accesses}
@@ -95,7 +95,7 @@ For parameters and fields, the information is declared in the spec block, where 
 
 \noindent If no !modifies_of! is declared, it is assumed that the function does not modify global memory.
 
-Notice that a wildcard (!modifies_of<f> *!) is not supported, since the invocation of !f! would render the memory as arbitrary (no effective frame condition).
+Notice that a wildcard (!modifies_of<f> *!) is not supported, since the invocation of !f! would render the memory arbitrary (no effective frame condition).
 This is a notable restriction on what we can specify with higher-order functions in Move and is left for future work.
 
 \SubSection{Invoking Function Values}
@@ -178,7 +178,7 @@ For parameters and fields, we introduce uninterpreted functions.
 \noindent The meaning of the uninterpreted functions is determined by how they are injected into a VC via the regular mechanism by which pre/post conditions and invariants are handled.
 Consider a precondition like !requires aborts_if<param>(x)!, where !param! is a function-value parameter of a function !foo!.
 This will be injected in the VC as $\ASSUME \lnot aborts_{P_{foo, param}}(x)$.
-Similarly, for a data invariant of a field an assumption will be generated when the field is selected.
+Similarly, for a data invariant of a field, an assumption will be generated when the field is selected.
 
 
 \SubSection{Intermediate State Labels}
@@ -253,7 +253,7 @@ We overcame this by adopting a pattern that decouples the \emph{definition} of b
 This pattern is not specific to higher-order functions; it is a general Boogie encoding discipline for modular specifications that keeps SMT instantiation under control.
 The remaining implementation choices are natural refinements of applying this pattern consistently:
 
-\begin{itemize}
+\begin{Itemize}
     \item \emph{Behavioral predicates are uninterpreted functions connected by axioms, not Boogie functions with explicit bodies.}
     The implementation declares $ensures_\tau$ as an uninterpreted Boogie function and connects it to the per-function spec via an axiom of the form $(\forall\, \ldots\; ::\;  \mathit{eval\_call} \iff \mathit{rhs})$ with an explicit trigger pattern.
     Axioms with explicit triggers fire only when the trigger pattern matches a ground term in the proof context, keeping instantiation under control.
@@ -273,4 +273,4 @@ The remaining implementation choices are natural refinements of applying this pa
     \item \emph{State-label existential is flat, not recursive.}
     The recursive scheme above is logically equivalent to a single flat $(\exists\, \Mem^S, \Mem^T, \ldots\; ::\;  \ldots)$ wrapping the conjunction of defining fragments and the kind-specific clauses.
     The implementation uses the flat form, reducing the size of emitted Boogie and avoiding the additional SMT quantifier nesting that the recursive scheme would introduce.
-\end{itemize}
+\end{Itemize}

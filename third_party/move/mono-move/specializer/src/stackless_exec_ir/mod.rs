@@ -7,6 +7,7 @@
 //! eliminating the operand stack and allowing direct named-slot operands on each instruction.
 
 mod display;
+pub(crate) mod instr_utils;
 
 use mono_move_core::{
     types::{InternedType, InternedTypeList},
@@ -116,7 +117,7 @@ pub enum BinaryOp {
     Mod,
     BitOr,
     BitAnd,
-    Xor,
+    BitXor,
     Shl,
     Shr,
     Cmp(CmpOp),
@@ -124,19 +125,28 @@ pub enum BinaryOp {
     And,
 }
 
-/// Immediate values for `BinaryOpImm`. Restricted to small types.
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+/// Immediate values for `BinaryOpImm`. Wide widths (u128 / U256 / i128 /
+/// I256) are boxed.
+#[derive(Clone, Debug, PartialEq, Eq)]
 pub enum ImmValue {
     Bool(bool),
     U8(u8),
     U16(u16),
     U32(u32),
     U64(u64),
+    U128(Box<u128>),
+    U256(Box<U256>),
     I8(i8),
     I16(i16),
     I32(i32),
     I64(i64),
+    I128(Box<i128>),
+    I256(Box<I256>),
 }
+
+// Wide variants box their payload to keep the enum at 16 bytes regardless
+// of the largest integer type.
+const _: () = assert!(std::mem::size_of::<ImmValue>() == 16);
 
 /// A stackless IR instruction with explicit named-slot operands.
 ///
@@ -181,18 +191,17 @@ pub enum Instr {
     // TODO: depending on how we pre-intern types, we may be able to unify
     // some of instructions here.
     Pack(Slot, InternedType, Vec<Slot>),
-    PackGeneric(Slot, InternedType, InternedTypeList, Vec<Slot>),
+    PackGeneric(Slot, InternedType, Vec<Slot>),
     Unpack(Vec<Slot>, InternedType, Slot),
-    UnpackGeneric(Vec<Slot>, InternedType, InternedTypeList, Slot),
+    UnpackGeneric(Vec<Slot>, InternedType, Slot),
 
-    // --- Variant (enum type + variant ordinal; generic variants also
-    // carry an interned type-argument list) ---
+    // --- Variant (enum type + variant ordinal) ---
     PackVariant(Slot, InternedType, u16, Vec<Slot>),
-    PackVariantGeneric(Slot, InternedType, u16, InternedTypeList, Vec<Slot>),
+    PackVariantGeneric(Slot, InternedType, u16, Vec<Slot>),
     UnpackVariant(Vec<Slot>, InternedType, u16, Slot),
-    UnpackVariantGeneric(Vec<Slot>, InternedType, u16, InternedTypeList, Slot),
+    UnpackVariantGeneric(Vec<Slot>, InternedType, u16, Slot),
     TestVariant(Slot, InternedType, u16, Slot),
-    TestVariantGeneric(Slot, InternedType, u16, InternedTypeList, Slot),
+    TestVariantGeneric(Slot, InternedType, u16, Slot),
 
     // --- References ---
     ImmBorrowLoc(Slot, Slot),
@@ -221,19 +230,19 @@ pub enum Instr {
     WriteVariantField(VariantFieldHandleIndex, Slot, Slot),
     WriteVariantFieldGeneric(VariantFieldInstantiationIndex, Slot, Slot),
 
-    // --- Globals (struct type is the interned `Type` for the named resource;
-    // generic variants additionally carry an interned type-argument list) ---
+    // --- Globals (struct type is the interned `Type` for the named
+    // resource; generic variants carry the instantiated nominal) ---
     Exists(Slot, InternedType, Slot),
-    ExistsGeneric(Slot, InternedType, InternedTypeList, Slot),
+    ExistsGeneric(Slot, InternedType, Slot),
     MoveFrom(Slot, InternedType, Slot),
-    MoveFromGeneric(Slot, InternedType, InternedTypeList, Slot),
+    MoveFromGeneric(Slot, InternedType, Slot),
     /// `(struct_ty, signer, val)`
     MoveTo(InternedType, Slot, Slot),
-    MoveToGeneric(InternedType, InternedTypeList, Slot, Slot),
+    MoveToGeneric(InternedType, Slot, Slot),
     ImmBorrowGlobal(Slot, InternedType, Slot),
-    ImmBorrowGlobalGeneric(Slot, InternedType, InternedTypeList, Slot),
+    ImmBorrowGlobalGeneric(Slot, InternedType, Slot),
     MutBorrowGlobal(Slot, InternedType, Slot),
-    MutBorrowGlobalGeneric(Slot, InternedType, InternedTypeList, Slot),
+    MutBorrowGlobalGeneric(Slot, InternedType, Slot),
 
     // --- Calls ---
     Call(Vec<Slot>, FunctionHandleIndex, Vec<Slot>),
@@ -383,8 +392,9 @@ pub struct FunctionIR {
     pub num_locals: u16,
     /// Total Home slots used (params + locals + temps).
     pub num_home_slots: u16,
-    /// Maximum number of Xfer slots needed across all call sites in this function.
-    pub num_xfer_slots: u16,
+    /// Number of distinct `Xfer(j)` positions used across all calls in this
+    /// function.
+    pub num_xfer_positions: u16,
     /// Basic blocks of the function.
     pub blocks: Vec<BasicBlock>,
     /// Type of each Home slot (indexed by Home slot index, 0..num_home_slots-1).

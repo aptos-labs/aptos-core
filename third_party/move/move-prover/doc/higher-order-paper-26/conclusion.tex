@@ -2,6 +2,8 @@
 \label{sec:conclusion}
 
 \SubSection{Related work}
+\label{sec:related}
+
 Higher-order programs with side effects have been a long-standing concern in program verification.
 Our approach to behavioral predicates descends from the relational tradition of VDM~\cite{jones1990vdm}, Z~\cite{spivey1992z, grieskamp2000executablez}, and the B method~\cite{abrial1996bbook}, in which operations are specified by pre/post relations over an explicit state; state labels generalize this to intermediate snapshots and make the relational flavor composable.
 
@@ -16,15 +18,12 @@ While \fstar~is more expressive via separation logic, it misses the syntactic, c
 Dafny~\cite{DAFNY} is a close cousin of \MVP: it has a similar specification model of pre/post conditions, higher-order functions, and behavioral predicates.
 However, Dafny does not allow function values to modify state.
 This would be a severe restriction for Move, since it is a common usage pattern.
-Moreover, Move's resource-separated global memory and alias-free mutable reference model is not available in Dafny, similar as in \fstar.
+Moreover, Move's resource-separated global memory and alias-free mutable reference model is not available in Dafny, as is also the case in \fstar.
 While both languages support state labels, Move state labels as described here can be used in abstract specifications via universal and existential quantification.
 
-Lean~4~\cite{lean4} is a dependently-typed interactive theorem prover in the tradition of older similar systems~\cite{Isabelle, COQ}, supporting higher-order functions.
-Verification is tactic-driven and kernel-checked.
-Lean does not directly work on a programming language as \MVP does, but requires the user to create an encoding of the language inside its meta logic.
-For modeling of stateful systems, one would typically use monads, though any other model can be simulated as well.
-In contrast, \MVP is directly integrated with the Move language and leverages Move's specific memory and reference model.
-Furthermore, \MVP aims at automated SMT-based verification, with optional proof scripts.
+Lean~4~\cite{lean4} is a dependently-typed interactive theorem prover~\cite{Isabelle, COQ} supporting higher-order functions, with tactic-driven, kernel-checked verification.
+Unlike \MVP, Lean does not work directly on a programming language but requires the user to encode it in its meta logic, typically modeling stateful systems via monads.
+\MVP, in contrast, integrates directly with Move and aims at automated SMT-based verification, with optional proof scripts.
 
 In the smart-contract setting, dynamic dispatch is a central challenge for \solidity verifiers.
 \certora~\cite{certora} handles dispatch on Solidity by enumerating the possible callees of a virtual call (derived from the contracts in scope) and generating a case-split proof obligation per callee; summaries can be supplied by the user to abstract external calls.
@@ -39,10 +38,10 @@ The spec inference pipeline produces behavioral-predicate-based specifications f
 
 \SubSection{Conclusion}
 
-We described the extension of the Move Prover to Move 2's higher-order functions and dynamic dispatch.
+We extended \MVP to Move 2's higher-order functions and dynamic dispatch.
 The extension rests on two language additions --- behavioral predicates and state labels --- and on a Boogie encoding that discriminates closure invocations on the function-value variant reaching the call site.
-The design preserves \MVP's production-oriented cost model --- routine, predictable, counterexample-driven verification --- in the presence of dynamic dispatch.
-We further extended \MVP's specification inference tool to closures and dynamic dispatch: given arbitrary higher-order Move code, the tool now computes weakest-precondition-based specifications automatically, turning the question of whether a function value complies with a behavioral invariant into an automated verification problem.
+The design preserves \MVP's production-oriented cost model: routine, predictable, counterexample-driven verification, also in the presence of dynamic dispatch.
+We further extended \MVP's specification inference to closures and dynamic dispatch, turning compliance of a function value with a behavioral invariant into an automated verification problem.
 
 %%% Local Variables:
 %%% mode: latex

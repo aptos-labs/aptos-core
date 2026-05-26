@@ -41,16 +41,30 @@ pub const OPTION_STRUCT_NAME_STR: &str = "Option";
 // Module path separator used in fully-qualified type names (e.g. "0x1::string::String")
 pub const MODULE_SEPARATOR: &str = "::";
 
-// Struct API constants for public struct/enum APIs
-pub const PUBLIC_STRUCT_DELIMITER: &str = "$";
+// Name components used to construct synthetic wrapper function names for public struct/enum APIs
+// and public const accessors. The generated name format is: "<prefix>$<StructOrConstName>".
+// These constants must only be used for that purpose to avoid collisions with user-defined names.
+
+/// Delimiter between the wrapper prefix and the struct/const name (e.g., `pack$MyStruct`).
+pub const DOLLAR_SIGN_DELIMITER: &str = "$";
+/// Prefix for struct pack wrapper functions (e.g., `pack$MyStruct`).
 pub const PACK: &str = "pack";
+/// Prefix for struct unpack wrapper functions (e.g., `unpack$MyStruct`).
 pub const UNPACK: &str = "unpack";
+/// Prefix for enum variant pack wrapper functions (e.g., `pack_variant$MyVariant`).
 pub const PACK_VARIANT: &str = "pack_variant";
+/// Prefix for enum variant unpack wrapper functions (e.g., `unpack_variant$MyVariant`).
 pub const UNPACK_VARIANT: &str = "unpack_variant";
+/// Prefix for enum variant test (is-variant) wrapper functions (e.g., `test_variant$MyVariant`).
 pub const TEST_VARIANT: &str = "test_variant";
+/// Parameter name used in all struct API wrapper functions.
 pub const PARAM_NAME_FOR_STRUCT_API: &str = "_s";
+/// Prefix for struct field immutable borrow wrapper functions (e.g., `borrow$field`).
 pub const BORROW: &str = "borrow";
+/// Prefix for struct field mutable borrow wrapper functions (e.g., `borrow_mut$field`).
 pub const BORROW_MUT: &str = "borrow_mut";
+/// Prefix for public const accessor functions (e.g., `const$MY_CONST`).
+pub const CONST: &str = "const";
 
 pub static OPTION_MODULE_ID: Lazy<ModuleId> = Lazy::new(|| {
     ModuleId::new(

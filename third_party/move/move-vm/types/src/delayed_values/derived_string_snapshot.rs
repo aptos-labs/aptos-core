@@ -40,7 +40,12 @@ pub fn is_derived_string_struct_layout(layout: &MoveTypeLayout) -> bool {
     false
 }
 
-pub fn to_utf8_bytes(value: impl ToString) -> Vec<u8> {
+/// Test-only helper: encodes a value via its `Display` and returns the UTF-8
+/// bytes. Used in `block-executor`'s tests to construct fixture
+/// `DerivedStringSnapshot` values. Not called from production code; the
+/// production path constructs these values by other means (e.g. via the
+/// aggregator natives in `aptos-move/framework`).
+pub fn to_utf8_bytes_for_test(value: impl ToString) -> Vec<u8> {
     value.to_string().into_bytes()
 }
 

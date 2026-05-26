@@ -26,6 +26,7 @@ aptos-crypto = { workspace = true }
 aptos-framework = { workspace = true }
 aptos-gas-profiling = { workspace = true }
 aptos-gas-schedule = { workspace = true }
+aptos-resource-viewer = { workspace = true }
 aptos-rest-client = { workspace = true }
 aptos-sdk = { workspace = true }
 aptos-transaction-simulation = { workspace = true }

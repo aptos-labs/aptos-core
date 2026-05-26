@@ -1077,6 +1077,10 @@ struct SpecConverter<'a> {
     contains_imperative_expression: bool,
     /// Set to true when rewriting spec during inlining phase
     for_inline: bool,
+    /// > 0 while descending into args of a behavioral-predicate call;
+    /// preserves `Borrow(Mut, ...)` selectors so the model rewriter can
+    /// detect them and route pre-state through `save_param`.
+    bp_arg_depth: usize,
 }
 
 impl<'a> SpecConverter<'a> {
@@ -1093,6 +1097,7 @@ impl<'a> SpecConverter<'a> {
             reference_strip_exempted: Default::default(),
             contains_imperative_expression: false,
             for_inline: false,
+            bp_arg_depth: 0,
         }
     }
 
@@ -1109,6 +1114,7 @@ impl<'a> SpecConverter<'a> {
             reference_strip_exempted: Default::default(),
             contains_imperative_expression: false,
             for_inline: true,
+            bp_arg_depth: 0,
         }
     }
 
@@ -1180,7 +1186,16 @@ impl ExpRewriterFunctions for SpecConverter<'_> {
                 _ => exp,
             };
 
+            // Track BP-arg depth so `Borrow(Mut, ...)` selectors survive
+            // for the model rewriter.
+            let is_behavior = matches!(exp.as_ref(), Call(_, Behavior(_, _), _));
+            if is_behavior {
+                self.bp_arg_depth += 1;
+            }
             let exp = self.rewrite_exp_descent(exp);
+            if is_behavior {
+                self.bp_arg_depth -= 1;
+            }
 
             // Simplification after descent
             match exp.as_ref() {
@@ -1196,6 +1211,11 @@ impl ExpRewriterFunctions for SpecConverter<'_> {
                 Call(id, BorrowGlobal(ReferenceKind::Immutable), args) => {
                     // Map borrow_global to specification global
                     Call(*id, Global(None), args.clone()).into_exp()
+                },
+                Call(_, Borrow(ReferenceKind::Mutable), _) if self.bp_arg_depth > 0 => {
+                    // Preserve in BP args so the model rewriter sees the
+                    // stateful mut-ref shape.
+                    exp.clone()
                 },
                 Call(_, Borrow(_), args) | Call(_, Deref, args) => {
                     // Skip local borrow

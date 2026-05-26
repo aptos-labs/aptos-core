@@ -28,6 +28,7 @@ Three subcommands via `move-flow <subcommand>`:
 | `src/mcp/package_data.rs` | `PackageData` — wraps Move compiler's `GlobalEnv` |
 | `src/mcp/file_watcher.rs` | OS-native file watching for cache invalidation |
 | `src/mcp/tools/` | MCP tool implementations (status, manifest, test, verify, query, spec_infer) |
+| `src/mcp/tools/replay_transaction.rs` | Replay tool: fetches a committed tx, runs it locally, optionally with package overrides |
 | `src/plugin/render.rs` | Tera template rendering |
 | `src/plugin/output.rs` | File output writer |
 | `src/hooks/source_check/` | Edit hook: parse checking, AST checks, deprecated syntax detection |
@@ -36,7 +37,7 @@ Three subcommands via `move-flow <subcommand>`:
 
 ### MCP Tools
 
-`move_package_status`, `move_package_manifest`, `move_package_test`, `move_package_coverage`, `move_package_verify`, `move_package_query`, `move_package_spec_infer`
+`move_package_status`, `move_package_manifest`, `move_package_test`, `move_package_coverage`, `move_package_verify`, `move_package_query`, `move_package_spec_infer`, `move_replay_transaction`
 
 ## Testing
 

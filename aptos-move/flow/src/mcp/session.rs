@@ -44,6 +44,7 @@ impl FlowSession {
             + Self::package_status_router()
             + Self::package_test_router()
             + Self::package_verify_router()
+            + Self::replay_transaction_router()
     }
 
     /// Returns the names of all registered MCP tools.

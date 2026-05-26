@@ -1,8 +1,3 @@
----
-name: prover
-description: Information how to develop and extend the Move Prover
----
-
 The Move Prover is a formal verification tool for Move smart contracts. It translates Move code and specifications to
 Boogie, which then uses SMT solvers (Z3 or CVC5) to verify correctness.
 
@@ -237,49 +232,118 @@ invocation with a separate `GlobalEnv` instance — no state carries over.
 
 # Debugging
 
-- You can run the Move prover as
+## Running the Prover on Standalone Files
+
+Pass `--language-version 2.4` (or use a config file with `language_version = "2.4"`), otherwise newer syntax features
+(e.g., `@` state labels) won't parse. Use `--aptos` when verifying Aptos framework files.
 
 ```
 cargo run -p move-prover -- \
     --language-version 2.4 \
+    --aptos \
     -d <root>/third_party/move/move-stdlib/sources \
     -a std=0x1 \
     <source-files>
 ```
 
-- To verify files from the Aptos framework that depend on multiple packages, provide each package's
-  sources directory as a separate `-d` flag. For example, to verify a file in `aptos-stdlib`:
+To verify files that depend on multiple packages, provide each package's sources directory as a separate `-d` flag.
+For example, to verify a file in `aptos-stdlib`:
 
 ```
 cargo run -p move-prover -- \
     --language-version 2.4 \
+    --aptos \
     -d aptos-move/framework/move-stdlib/sources \
     -d aptos-move/framework/aptos-stdlib/sources \
     -a std=0x1 aptos_std=0x1 \
     -- <source-files-or-directory>
 ```
 
-- In order to inspect generated Boogie, use `--keep`. The following output will be generated:
+## Running the Prover on a Move Package
+
+To run the prover on a Move package (e.g. `aptos-stdlib`), use the Move CLI:
+
+```
+cargo run -p aptos-move-cli --features="binary" -- prove --package-dir aptos-move/framework/aptos-stdlib
+```
+
+The `prove` accepts multiple options, among those:
+
+```
+      --language-version <LANGUAGE_VERSION>
+          ...or --language LANGUAGE_VERSION
+          Specify the language version to be supported.
+          Defaults to the latest stable language version.
+          
+          [default: 2.3]
+
+  -v, --verbosity <VERBOSITY>
+          Verbosity level
+
+  -f, --filter <FILTER>
+          Filters targets out from the package. Any module with a matching file name will be a target, similar as with `cargo test`
+
+  -o, --only <ONLY>
+          Scopes verification to the specified function. This can either be a name of the form "mod::func" or simply "func", in the later case every matching function is taken
+
+  -t, --trace
+          Whether to display additional information in error reports. This may help debugging but also can make verification slower
+
+      --random-seed <RANDOM_SEED>
+          A seed for the prover
+
+      --proc-cores <PROC_CORES>
+          The number of cores to use for parallel processing of verification conditions
+
+      --shards <SHARDS>
+          The number of shards to split the verification problem into. Shards are processed sequentially. This can be used to ease memory pressure for verification of large packages
+
+      --only-shard <ONLY_SHARD>
+          If there are multiple shards, the shard to which verification shall be narrowed
+
+      --vc-timeout <VC_TIMEOUT>
+          A (soft) timeout for the solver, per verification condition, in seconds
+
+      --check-inconsistency
+          Whether to check consistency of specs by injecting impossible assertions
+
+      --keep-loops
+          Whether to keep loops as they are and pass them on to the underlying solver
+
+      --loop-unroll <LOOP_UNROLL>
+          Number of iterations to unroll loops
+
+      --stable-test-output
+          Whether output for e.g. diagnosis shall be stable/redacted so it can be used in test output
+
+      --dump
+          Whether to dump intermediate step results to files
+
+      --benchmark
+          Whether to benchmark verification. If selected, each verification target in the current package will be verified independently with timing recorded. This attempts to detect timeouts. A benchmark report will be written to `prover_benchmark.fun_data` in the package directory. The command also writes a `prover_benchmark.svg` graphic, which is build from the data in the file above, comparing with any other `*.fun_data` files in the package directory. Thus, you can rename the data file to something like
+          `prover_benchmark_v1.fun_data` and in the next run, compare benchmarks in the `.svg` file from multiple runs
+
+      --skip-instance-check
+          Whether to skip verification of type instantiations of functions. This may miss some verification conditions if different type instantiations can create different behavior via type reflection or storage access, but can speed up verification
+```
+
+
+## Inspecting Boogie and SMT Output
+
+- Use `--keep` to inspect generated Boogie:
     - `output.bpl` with the Boogie narrowed to verify given function
     - `output.bpl.log` the model as returned by Boogie to the Move Prover. The prover prints error messages derived from
       this to console
-- In order to inspect generated smtlib file and the z3 log for a *given function*, use
-  `--generate-smt --z3-trace=<function>`. The following output will be produced, assuming that source contains a
-  function `<addr>::<module>::<function>`:
-    - a file `_<addr>_<module>_<function>.smt` containing the smtlib input for Z3 as generated from the Boogie
-    - a file `<function>.z3log` containing Z3 log during verifying the function.
+- Use `--generate-smt --z3-trace=<function>` to inspect the smtlib file and z3 log for a *given function*. Assuming the
+  source contains `<addr>::<module>::<function>`:
+    - `_<addr>_<module>_<function>.smt` containing the smtlib input for Z3
+    - `<function>.z3log` containing Z3 log during verification
 
-# Efficiency: Avoid Repeated Prover Runs
+## Avoid Repeated Prover Runs
 
 Do NOT run the prover many times just to grep a single detail from its output — prover runs can take
 a long time. Instead, save the output to a file on the first run, then analyze that saved output for
 whatever you need.
-
-# Important: Language Version
-
-When testing the prover on standalone Move files, pass `--language-version 2.4`
-(or use a config file with `language_version = "2.4"`), otherwise newer syntax
-features (e.g., `@` state labels) won't parse.
 
 # Testing
 
@@ -314,7 +378,18 @@ MVP_TEST_FLAGS="-T=20" cargo test           # Custom flags
   correctness. Some `.exp` changes are expected (e.g. fewer errors after a fix),
   others represent regressions or bugs.
 
-# Inference Tests
+## Framework Testing
+
+To use the Aptos framework specifications as an integration test, run
+
+```
+cargo test -p aptos-framework \
+        move_stdlib_prover_tests \
+        move_aptos_stdlib_prover_tests \
+        move_framework_prover_tests \
+```
+
+## Inference Tests
 
 The inference test suite (`tests/inference/`) runs spec inference on Move source, produces enriched `.exp.move` files,
 then runs the prover on those files. The verification result is appended as a comment at the end of each `.exp.move`
