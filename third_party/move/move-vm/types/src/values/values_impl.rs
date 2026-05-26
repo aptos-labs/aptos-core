@@ -135,7 +135,7 @@ pub enum Value {
 /// sites unchanged. To move the inner Rc out (e.g., for `take_unique_ownership`), call
 /// [`NestedValues::into_rc`]. To clone (share), use `.clone()`.
 #[derive(Debug)]
-pub(crate) struct NestedValues(Rc<RefCell<Vec<Value>>>);
+pub struct NestedValues(Rc<RefCell<Vec<Value>>>);
 
 impl NestedValues {
     #[inline]
@@ -292,7 +292,7 @@ impl Drop for NestedValues {
 /// Except when not owned by the VM stack, a container always lives inside an Rc<RefCell<>>,
 /// making it possible to be shared by references.
 #[derive(Debug)]
-pub(crate) enum Container {
+pub enum Container {
     Locals(NestedValues),
     Vec(NestedValues),
     Struct(NestedValues),
@@ -316,7 +316,7 @@ pub(crate) enum Container {
 /// or in global storage. In the latter case, it also keeps a status flag indicating whether
 /// the container has been possibly modified.
 #[derive(Debug)]
-pub(crate) enum ContainerRef {
+pub enum ContainerRef {
     Local(Container),
     Global {
         status: Rc<RefCell<GlobalDataStatus>>,
@@ -328,7 +328,7 @@ pub(crate) enum ContainerRef {
 /// Clean - the data was only read.
 /// Dirty - the data was possibly modified.
 #[derive(Debug, Clone, Copy)]
-pub(crate) enum GlobalDataStatus {
+pub enum GlobalDataStatus {
     Clean,
     Dirty,
 }
@@ -339,9 +339,9 @@ pub(crate) enum GlobalDataStatus {
 /// addresses, delayed values, or closures). Container values (structs/vectors/locals) use
 /// [`ContainerRef`] instead.
 #[derive(Debug)]
-pub(crate) struct IndexedRef {
-    idx: u32,
-    container_ref: ContainerRef,
+pub struct IndexedRef {
+    pub idx: u32,
+    pub container_ref: ContainerRef,
     /// Only set for enums.
     tag: Option<u16>,
 }
@@ -625,7 +625,7 @@ fn take_unique_ownership<T: Debug>(r: Rc<RefCell<T>>) -> PartialVMResult<T> {
 }
 
 impl ContainerRef {
-    fn container(&self) -> &Container {
+    pub fn container(&self) -> &Container {
         match self {
             Self::Local(container) | Self::Global { container, .. } => container,
         }
@@ -2556,6 +2556,10 @@ impl SignerRef {
  *
  **************************************************************************************/
 impl Locals {
+    pub fn borrow_values(&self) -> std::cell::Ref<'_, Vec<Value>> {
+        self.0.borrow()
+    }
+
     #[cfg_attr(feature = "force-inline", inline(always))]
     pub fn new(n: usize) -> Self {
         Self(Rc::new(RefCell::new(
