@@ -365,7 +365,7 @@ mod tests {
 
     impl AbstractFunction for MockAbstractFunction {
         fn closure_mask(&self) -> ClosureMask {
-            unimplemented!()
+            self.data.mask
         }
 
         fn cmp_dyn(&self, other: &dyn AbstractFunction) -> PartialVMResult<Ordering> {

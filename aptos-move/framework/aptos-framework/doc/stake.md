@@ -120,7 +120,8 @@ or if their stake drops below the min required, they would get removed at the en
 -  [Function `append`](#0x1_stake_append)
 -  [Function `find_validator`](#0x1_stake_find_validator)
 -  [Function `generate_validator_info`](#0x1_stake_generate_validator_info)
--  [Function `get_next_epoch_voting_power`](#0x1_stake_get_next_epoch_voting_power)
+-  [Function `get_voting_power`](#0x1_stake_get_voting_power)
+-  [Function `settle_expired_pending_inactive`](#0x1_stake_settle_expired_pending_inactive)
 -  [Function `update_voting_power_increase`](#0x1_stake_update_voting_power_increase)
 -  [Function `assert_stake_pool_exists`](#0x1_stake_assert_stake_pool_exists)
 -  [Function `configure_allowed_validators`](#0x1_stake_configure_allowed_validators)
@@ -2897,7 +2898,7 @@ Add <code>coins</code> into <code>pool_address</code>. this requires the corresp
     };
 
     <b>let</b> (_, maximum_stake) = <a href="staking_config.md#0x1_staking_config_get_required_stake">staking_config::get_required_stake</a>(&<a href="staking_config.md#0x1_staking_config_get">staking_config::get</a>());
-    <b>let</b> voting_power = <a href="stake.md#0x1_stake_get_next_epoch_voting_power">get_next_epoch_voting_power</a>(stake_pool);
+    <b>let</b> voting_power = <a href="stake.md#0x1_stake_get_voting_power">get_voting_power</a>(stake_pool);
     <b>assert</b>!(voting_power &lt;= maximum_stake, <a href="../../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error_invalid_argument">error::invalid_argument</a>(<a href="stake.md#0x1_stake_ESTAKE_EXCEEDS_MAX">ESTAKE_EXCEEDS_MAX</a>));
 
     <b>if</b> (std::features::module_event_migration_enabled()) {
@@ -3287,7 +3288,12 @@ This internal version can only be called by the Genesis module during Genesis.
 
     <b>let</b> config = <a href="staking_config.md#0x1_staking_config_get">staking_config::get</a>();
     <b>let</b> (minimum_stake, maximum_stake) = <a href="staking_config.md#0x1_staking_config_get_required_stake">staking_config::get_required_stake</a>(&config);
-    <b>let</b> voting_power = <a href="stake.md#0x1_stake_get_next_epoch_voting_power">get_next_epoch_voting_power</a>(stake_pool);
+    // The pool was inactive <b>while</b> held outside the validator set; its `pending_inactive`
+    // is never touched by the per-epoch <b>update</b> routine. Settle <a href="../../aptos-stdlib/doc/any.md#0x1_any">any</a> expired <a href="stake.md#0x1_stake">stake</a> here so
+    // the <b>min</b>/max-<a href="stake.md#0x1_stake">stake</a> check (and the published <a href="voting.md#0x1_voting">voting</a> power on join) reflect the
+    // <b>post</b>-sweep view.
+    <a href="stake.md#0x1_stake_settle_expired_pending_inactive">settle_expired_pending_inactive</a>(stake_pool, <a href="timestamp.md#0x1_timestamp_now_seconds">timestamp::now_seconds</a>());
+    <b>let</b> voting_power = <a href="stake.md#0x1_stake_get_voting_power">get_voting_power</a>(stake_pool);
     <b>assert</b>!(voting_power &gt;= minimum_stake, <a href="../../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error_invalid_argument">error::invalid_argument</a>(<a href="stake.md#0x1_stake_ESTAKE_TOO_LOW">ESTAKE_TOO_LOW</a>));
     <b>assert</b>!(voting_power &lt;= maximum_stake, <a href="../../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error_invalid_argument">error::invalid_argument</a>(<a href="stake.md#0x1_stake_ESTAKE_TOO_HIGH">ESTAKE_TOO_HIGH</a>));
 
@@ -3553,7 +3559,7 @@ Can only be called by the operator of the validator/staking pool.
         // Decrease the <a href="voting.md#0x1_voting">voting</a> power increase <b>as</b> the pending validator's <a href="voting.md#0x1_voting">voting</a> power was added when they requested
         // <b>to</b> join. Now that they changed their mind, their <a href="voting.md#0x1_voting">voting</a> power should not affect the joining limit of this
         // epoch.
-        <b>let</b> validator_stake = (<a href="stake.md#0x1_stake_get_next_epoch_voting_power">get_next_epoch_voting_power</a>(stake_pool) <b>as</b> u128);
+        <b>let</b> validator_stake = (<a href="stake.md#0x1_stake_get_voting_power">get_voting_power</a>(stake_pool) <b>as</b> u128);
         // total_joining_power should be larger than validator_stake but just in case there <b>has</b> been a small
         // rounding <a href="../../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error">error</a> somewhere that can lead <b>to</b> an underflow, we still want <b>to</b> allow this transaction <b>to</b>
         // succeed.
@@ -3733,6 +3739,19 @@ power.
     <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector_for_each_ref">vector::for_each_ref</a>(&validator_set.pending_inactive, |validator| {
         <b>let</b> validator: &<a href="stake.md#0x1_stake_ValidatorInfo">ValidatorInfo</a> = validator;
         <a href="stake.md#0x1_stake_update_stake_pool">update_stake_pool</a>(validator_perf, validator.addr, &config);
+    });
+
+    // Settle expired `pending_inactive` on each pending_active pool before it is activated.
+    // The per-validator <b>update</b> routine above runs only over active and leaving-pending_inactive
+    // validators, so a pool joining this epoch <b>with</b> an expired lockup would otherwise carry
+    // its unswept `pending_inactive` into the published next-epoch <a href="voting.md#0x1_voting">voting</a> power and diverge
+    // from DKG's recomputation. Use the reconfig start time so all sweeps in this
+    // <a href="reconfiguration.md#0x1_reconfiguration">reconfiguration</a> agree on a single comparison clock.
+    <b>let</b> reconfig_start_secs = <a href="stake.md#0x1_stake_get_reconfig_start_time_secs">get_reconfig_start_time_secs</a>();
+    <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector_for_each_ref">vector::for_each_ref</a>(&validator_set.pending_active, |validator| {
+        <b>let</b> validator: &<a href="stake.md#0x1_stake_ValidatorInfo">ValidatorInfo</a> = validator;
+        <b>let</b> pending_active_pool = <b>borrow_global_mut</b>&lt;<a href="stake.md#0x1_stake_StakePool">StakePool</a>&gt;(validator.addr);
+        <a href="stake.md#0x1_stake_settle_expired_pending_inactive">settle_expired_pending_inactive</a>(pending_active_pool, reconfig_start_secs);
     });
 
     // Activate currently pending_active validators.
@@ -4185,7 +4204,11 @@ This function shouldn't abort.
 
 ## Function `get_reconfig_start_time_secs`
 
-Assuming we are in a middle of a reconfiguration (no matter it is immediate or async), get its start time.
+Get the reconfiguration start time when one is in progress; otherwise fall back to the
+current wall-clock time. Note: <code><a href="reconfiguration_state.md#0x1_reconfiguration_state_is_initialized">reconfiguration_state::is_initialized</a>()</code> is permanently
+true after framework genesis, so we must gate on <code>is_in_progress()</code> to avoid returning the
+previous reconfig's start time outside any active reconfig (which would also abort here
+since <code>start_time_secs()</code> requires the state to be active).
 
 
 <pre><code><b>fun</b> <a href="stake.md#0x1_stake_get_reconfig_start_time_secs">get_reconfig_start_time_secs</a>(): u64
@@ -4198,7 +4221,7 @@ Assuming we are in a middle of a reconfiguration (no matter it is immediate or a
 
 
 <pre><code><b>fun</b> <a href="stake.md#0x1_stake_get_reconfig_start_time_secs">get_reconfig_start_time_secs</a>(): u64 {
-    <b>if</b> (<a href="reconfiguration_state.md#0x1_reconfiguration_state_is_initialized">reconfiguration_state::is_initialized</a>()) {
+    <b>if</b> (<a href="reconfiguration_state.md#0x1_reconfiguration_state_is_in_progress">reconfiguration_state::is_in_progress</a>()) {
         <a href="reconfiguration_state.md#0x1_reconfiguration_state_start_time_secs">reconfiguration_state::start_time_secs</a>()
     } <b>else</b> {
         <a href="timestamp.md#0x1_timestamp_now_seconds">timestamp::now_seconds</a>()
@@ -4401,7 +4424,7 @@ This function includes failsafe logic to allow epoch changes even when the gover
 
 
 <pre><code><b>fun</b> <a href="stake.md#0x1_stake_generate_validator_info">generate_validator_info</a>(addr: <b>address</b>, stake_pool: &<a href="stake.md#0x1_stake_StakePool">StakePool</a>, config: <a href="stake.md#0x1_stake_ValidatorConfig">ValidatorConfig</a>): <a href="stake.md#0x1_stake_ValidatorInfo">ValidatorInfo</a> {
-    <b>let</b> voting_power = <a href="stake.md#0x1_stake_get_next_epoch_voting_power">get_next_epoch_voting_power</a>(stake_pool);
+    <b>let</b> voting_power = <a href="stake.md#0x1_stake_get_voting_power">get_voting_power</a>(stake_pool);
     <a href="stake.md#0x1_stake_ValidatorInfo">ValidatorInfo</a> {
         addr,
         voting_power,
@@ -4414,14 +4437,19 @@ This function includes failsafe logic to allow epoch changes even when the gover
 
 </details>
 
-<a id="0x1_stake_get_next_epoch_voting_power"></a>
+<a id="0x1_stake_get_voting_power"></a>
 
-## Function `get_next_epoch_voting_power`
+## Function `get_voting_power`
 
-Returns validator's next epoch voting power, including pending_active, active, and pending_inactive stake.
+Returns the sum of a stake pool's non-inactive coin buckets
+(<code>pending_active</code> + <code>active</code> + <code>pending_inactive</code>). This equals the validator's
+next-epoch voting power **only** when callers have already settled any expired
+<code>pending_inactive</code> into <code>inactive</code> via <code>settle_expired_pending_inactive</code>. Calling
+this on a pool with unswept expired stake will overstate voting power and diverge
+from the post-sweep view DKG independently recomputes from the same buckets.
 
 
-<pre><code><b>fun</b> <a href="stake.md#0x1_stake_get_next_epoch_voting_power">get_next_epoch_voting_power</a>(stake_pool: &<a href="stake.md#0x1_stake_StakePool">stake::StakePool</a>): u64
+<pre><code><b>fun</b> <a href="stake.md#0x1_stake_get_voting_power">get_voting_power</a>(stake_pool: &<a href="stake.md#0x1_stake_StakePool">stake::StakePool</a>): u64
 </code></pre>
 
 
@@ -4430,7 +4458,7 @@ Returns validator's next epoch voting power, including pending_active, active, a
 <summary>Implementation</summary>
 
 
-<pre><code><b>fun</b> <a href="stake.md#0x1_stake_get_next_epoch_voting_power">get_next_epoch_voting_power</a>(stake_pool: &<a href="stake.md#0x1_stake_StakePool">StakePool</a>): u64 {
+<pre><code><b>fun</b> <a href="stake.md#0x1_stake_get_voting_power">get_voting_power</a>(stake_pool: &<a href="stake.md#0x1_stake_StakePool">StakePool</a>): u64 {
     <b>let</b> value_pending_active = <a href="coin.md#0x1_coin_value">coin::value</a>(&stake_pool.pending_active);
     <b>let</b> value_active = <a href="coin.md#0x1_coin_value">coin::value</a>(&stake_pool.active);
     <b>let</b> value_pending_inactive = <a href="coin.md#0x1_coin_value">coin::value</a>(&stake_pool.pending_inactive);
@@ -4438,6 +4466,44 @@ Returns validator's next epoch voting power, including pending_active, active, a
         <b>assume</b> value_pending_active + value_active + value_pending_inactive &lt;= <a href="stake.md#0x1_stake_MAX_U64">MAX_U64</a>;
     };
     value_pending_active + value_active + value_pending_inactive
+}
+</code></pre>
+
+
+
+</details>
+
+<a id="0x1_stake_settle_expired_pending_inactive"></a>
+
+## Function `settle_expired_pending_inactive`
+
+Move a stake pool's <code>pending_inactive</code> stake into <code>inactive</code> if its lockup has elapsed
+by the supplied <code>cmp_time_secs</code>. The <code>locked_until_secs &gt; 0</code> guard skips pools whose
+lockup has not yet been initialized (e.g. a freshly created pool), which would
+otherwise be considered "expired" against any positive timestamp.
+
+Used at sites that read voting power on pools the per-epoch update routine does not
+touch — joiners (<code>pending_active</code> validators) and inactive pools — to keep the
+framework-published voting power in agreement with DKG's post-sweep view.
+
+
+<pre><code><b>fun</b> <a href="stake.md#0x1_stake_settle_expired_pending_inactive">settle_expired_pending_inactive</a>(stake_pool: &<b>mut</b> <a href="stake.md#0x1_stake_StakePool">stake::StakePool</a>, cmp_time_secs: u64)
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code><b>fun</b> <a href="stake.md#0x1_stake_settle_expired_pending_inactive">settle_expired_pending_inactive</a>(stake_pool: &<b>mut</b> <a href="stake.md#0x1_stake_StakePool">StakePool</a>, cmp_time_secs: u64) {
+    <b>if</b> (stake_pool.locked_until_secs &gt; 0
+        && cmp_time_secs &gt;= stake_pool.locked_until_secs) {
+        <a href="coin.md#0x1_coin_merge">coin::merge</a>(
+            &<b>mut</b> stake_pool.inactive,
+            <a href="coin.md#0x1_coin_extract_all">coin::extract_all</a>(&<b>mut</b> stake_pool.pending_inactive),
+        );
+    };
 }
 </code></pre>
 
@@ -4690,39 +4756,6 @@ Returns validator's next epoch voting power, including pending_active, active, a
 <b>global</b> <a href="stake.md#0x1_stake_ghost_active_num">ghost_active_num</a>: u64;
 <a id="0x1_stake_ghost_pending_inactive_num"></a>
 <b>global</b> <a href="stake.md#0x1_stake_ghost_pending_inactive_num">ghost_pending_inactive_num</a>: u64;
-</code></pre>
-
-
-
-
-<a id="0x1_stake_spec_validator_index_upper_bound"></a>
-
-
-<pre><code><b>fun</b> <a href="stake.md#0x1_stake_spec_validator_index_upper_bound">spec_validator_index_upper_bound</a>(): u64 {
-   len(<b>global</b>&lt;<a href="stake.md#0x1_stake_ValidatorPerformance">ValidatorPerformance</a>&gt;(@aptos_framework).validators)
-}
-</code></pre>
-
-
-
-
-<a id="0x1_stake_spec_has_stake_pool"></a>
-
-
-<pre><code><b>fun</b> <a href="stake.md#0x1_stake_spec_has_stake_pool">spec_has_stake_pool</a>(a: <b>address</b>): bool {
-   <b>exists</b>&lt;<a href="stake.md#0x1_stake_StakePool">StakePool</a>&gt;(a)
-}
-</code></pre>
-
-
-
-
-<a id="0x1_stake_spec_has_validator_config"></a>
-
-
-<pre><code><b>fun</b> <a href="stake.md#0x1_stake_spec_has_validator_config">spec_has_validator_config</a>(a: <b>address</b>): bool {
-   <b>exists</b>&lt;<a href="stake.md#0x1_stake_ValidatorConfig">ValidatorConfig</a>&gt;(a)
-}
 </code></pre>
 
 
@@ -5403,7 +5436,7 @@ Returns validator's next epoch voting power, including pending_active, active, a
             <a href="../../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_spec_is_some">option::spec_is_some</a>(<a href="stake.md#0x1_stake_spec_find_validator">spec_find_validator</a>(validator_set.pending_inactive, pool_address)) ||
                 <a href="../../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_spec_is_some">option::spec_is_some</a>(<a href="stake.md#0x1_stake_spec_find_validator">spec_find_validator</a>(validator_set.pending_active, pool_address));
 <b>let</b> config = <a href="staking_config.md#0x1_staking_config_get">staking_config::get</a>();
-<b>let</b> voting_power = <a href="stake.md#0x1_stake_get_next_epoch_voting_power">get_next_epoch_voting_power</a>(stake_pool);
+<b>let</b> voting_power = <a href="stake.md#0x1_stake_get_voting_power">get_voting_power</a>(stake_pool);
 <b>let</b> minimum_stake = config.minimum_stake;
 <b>let</b> maximum_stake = config.maximum_stake;
 <b>aborts_if</b> voting_power &lt; minimum_stake;
@@ -5541,7 +5574,7 @@ Returns validator's next epoch voting power, including pending_active, active, a
 <b>aborts_if</b> !validator_find_bool && <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector_length">vector::length</a>(validator_set.active_validators) &lt; 2;
 <b>aborts_if</b> validator_find_bool && <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector_length">vector::length</a>(validator_set.pending_active) &lt;= <a href="../../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_spec_borrow">option::spec_borrow</a>(<a href="stake.md#0x1_stake_spec_find_validator">spec_find_validator</a>(pending_active, pool_address));
 <b>let</b> <b>post</b> p_validator_set = <b>global</b>&lt;<a href="stake.md#0x1_stake_ValidatorSet">ValidatorSet</a>&gt;(@aptos_framework);
-<b>let</b> validator_stake = (<a href="stake.md#0x1_stake_get_next_epoch_voting_power">get_next_epoch_voting_power</a>(stake_pool) <b>as</b> u128);
+<b>let</b> validator_stake = (<a href="stake.md#0x1_stake_get_voting_power">get_voting_power</a>(stake_pool) <b>as</b> u128);
 <b>ensures</b> validator_find_bool && validator_set.total_joining_power &gt; validator_stake ==&gt;
             p_validator_set.total_joining_power == validator_set.total_joining_power - validator_stake;
 <b>ensures</b> !validator_find_bool ==&gt; !<a href="../../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_spec_is_some">option::spec_is_some</a>(<a href="stake.md#0x1_stake_spec_find_validator">spec_find_validator</a>(p_validator_set.pending_active, pool_address));
@@ -5801,6 +5834,39 @@ Returns validator's next epoch voting power, including pending_active, active, a
 
 <pre><code><b>fun</b> <a href="stake.md#0x1_stake_spec_validator_indices_active_pending_inactive">spec_validator_indices_active_pending_inactive</a>(validator_set: <a href="stake.md#0x1_stake_ValidatorSet">ValidatorSet</a>): bool {
    len(validator_set.pending_inactive) + len(validator_set.active_validators) == <a href="stake.md#0x1_stake_spec_validator_index_upper_bound">spec_validator_index_upper_bound</a>()
+}
+</code></pre>
+
+
+
+
+<a id="0x1_stake_spec_validator_index_upper_bound"></a>
+
+
+<pre><code><b>fun</b> <a href="stake.md#0x1_stake_spec_validator_index_upper_bound">spec_validator_index_upper_bound</a>(): u64 {
+   len(<b>global</b>&lt;<a href="stake.md#0x1_stake_ValidatorPerformance">ValidatorPerformance</a>&gt;(@aptos_framework).validators)
+}
+</code></pre>
+
+
+
+
+<a id="0x1_stake_spec_has_stake_pool"></a>
+
+
+<pre><code><b>fun</b> <a href="stake.md#0x1_stake_spec_has_stake_pool">spec_has_stake_pool</a>(a: <b>address</b>): bool {
+   <b>exists</b>&lt;<a href="stake.md#0x1_stake_StakePool">StakePool</a>&gt;(a)
+}
+</code></pre>
+
+
+
+
+<a id="0x1_stake_spec_has_validator_config"></a>
+
+
+<pre><code><b>fun</b> <a href="stake.md#0x1_stake_spec_has_validator_config">spec_has_validator_config</a>(a: <b>address</b>): bool {
+   <b>exists</b>&lt;<a href="stake.md#0x1_stake_ValidatorConfig">ValidatorConfig</a>&gt;(a)
 }
 </code></pre>
 

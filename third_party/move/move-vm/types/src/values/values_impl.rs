@@ -575,6 +575,7 @@ impl ValueImpl {
 
             (ClosureValue(Closure(fun1, captured1)), ClosureValue(Closure(fun2, captured2))) => {
                 if fun1.cmp_dyn(fun2.as_ref())? == Ordering::Equal
+                    && fun1.closure_mask() == fun2.closure_mask()
                     && captured1.len() == captured2.len()
                 {
                     for (v1, v2) in captured1.iter().zip(captured2.iter()) {
@@ -647,7 +648,9 @@ impl ValueImpl {
             },
 
             (ClosureValue(Closure(fun1, captured1)), ClosureValue(Closure(fun2, captured2))) => {
-                let o = fun1.cmp_dyn(fun2.as_ref())?;
+                let o = fun1
+                    .cmp_dyn(fun2.as_ref())?
+                    .then_with(|| fun1.closure_mask().cmp(&fun2.closure_mask()));
                 if o == Ordering::Equal {
                     for (v1, v2) in captured1.iter().zip(captured2.iter()) {
                         let o = v1.compare(v2, depth + 1, max_depth)?;
