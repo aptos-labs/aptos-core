@@ -4892,9 +4892,20 @@ impl<'env> SpecInferenceAnalyzer<'env> {
                 }
             },
             Operation::Mod => {
-                // Modulo aborts on: b == 0
+                // Modulo aborts on: b == 0, or for signed: a == MIN && b == -1
                 let zero = self.mk_num_const(BigInt::zero());
-                Some(self.mk_eq(b, zero))
+                let mod_zero = self.mk_eq(b.clone(), zero);
+
+                if ty.is_signed_int() {
+                    let min = self.mk_num_min(prim_ty)?;
+                    let neg_one = self.mk_num_const(BigInt::from(-1));
+                    let a_eq_min = self.mk_eq(a, min);
+                    let b_eq_neg1 = self.mk_eq(b, neg_one);
+                    let min_mod_neg1 = self.mk_and(a_eq_min, b_eq_neg1);
+                    Some(self.mk_or(mod_zero, min_mod_neg1))
+                } else {
+                    Some(mod_zero)
+                }
             },
             _ => None,
         }

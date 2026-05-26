@@ -1,0 +1,168 @@
+//**** Cross-compiled for `move` syntax from `tests/signed-int/rem_min_edge_cases.move`
+
+//# publish
+module 0xff::rem_min {
+    public fun min_i128(): i128 {
+        MIN_I128
+    }
+    public fun min_i128_rem_0(): i128 {
+        min_i128() % 0i128
+    }
+    public fun min_i128_rem_neg1(): i128 {
+        min_i128() % -1i128
+    }
+    public fun min_i16(): i16 {
+        MIN_I16
+    }
+    public fun min_i16_rem_0(): i16 {
+        min_i16() % 0i16
+    }
+    public fun min_i16_rem_neg1(): i16 {
+        min_i16() % -1i16
+    }
+    public fun min_i256(): i256 {
+        MIN_I256
+    }
+    public fun min_i256_rem_0(): i256 {
+        min_i256() % 0i256
+    }
+    public fun min_i256_rem_neg1(): i256 {
+        min_i256() % -1i256
+    }
+    public fun min_i32(): i32 {
+        MIN_I32
+    }
+    public fun min_i32_rem_0(): i32 {
+        min_i32() % 0i32
+    }
+    public fun min_i32_rem_neg1(): i32 {
+        min_i32() % -1i32
+    }
+    public fun min_i64(): i64 {
+        MIN_I64
+    }
+    public fun min_i64_rem_0(): i64 {
+        min_i64() % 0i64
+    }
+    public fun min_i64_rem_neg1(): i64 {
+        min_i64() % -1i64
+    }
+    public fun min_i8(): i8 {
+        MIN_I8
+    }
+    public fun min_i8_rem_0(): i8 {
+        min_i8() % 0i8
+    }
+    public fun min_i8_rem_neg1(): i8 {
+        min_i8() % -1i8
+    }
+}
+
+
+//# run --verbose
+script {
+    fun main() {
+        assert!(MIN_I8 % -1i8 == 0i8, 100);
+    }
+}
+
+
+//# run --verbose
+script {
+    fun main() {
+        assert!(MIN_I16 % -1i16 == 0i16, 200);
+    }
+}
+
+
+//# run --verbose
+script {
+    fun main() {
+        assert!(MIN_I32 % -1i32 == 0i32, 300);
+    }
+}
+
+
+//# run --verbose
+script {
+    fun main() {
+        assert!(MIN_I64 % -1i64 == 0i64, 400);
+    }
+}
+
+
+//# run --verbose
+script {
+    fun main() {
+        assert!(MIN_I128 % -1i128 == 0i128, 500);
+    }
+}
+
+
+//# run --verbose
+script {
+    fun main() {
+        assert!(MIN_I256 % -1i256 == 0i256, 600);
+    }
+}
+
+
+//# run --verbose
+script {
+    fun main() {
+        let _v0 = MIN_I8 % 0i8;
+    }
+}
+
+
+//# run --verbose
+script {
+    fun main() {
+        let _v0 = MIN_I16 % 0i16;
+    }
+}
+
+
+//# run --verbose
+script {
+    fun main() {
+        let _v0 = MIN_I32 % 0i32;
+    }
+}
+
+
+//# run --verbose
+script {
+    fun main() {
+        let _v0 = MIN_I64 % 0i64;
+    }
+}
+
+
+//# run --verbose
+script {
+    fun main() {
+        let _v0 = MIN_I128 % 0i128;
+    }
+}
+
+
+//# run --verbose
+script {
+    fun main() {
+        let _v0 = MIN_I256 % 0i256;
+    }
+}
+
+
+//# run 0xff::rem_min::min_i8_rem_0 --verbose
+
+//# run 0xff::rem_min::min_i16_rem_0 --verbose
+
+//# run 0xff::rem_min::min_i32_rem_0 --verbose
+
+//# run 0xff::rem_min::min_i64_rem_0 --verbose
+
+//# run 0xff::rem_min::min_i128_rem_0 --verbose
+
+//# run 0xff::rem_min::min_i256_rem_0 --verbose
