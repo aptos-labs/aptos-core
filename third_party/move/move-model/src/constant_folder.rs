@@ -299,7 +299,25 @@ impl<'env> ConstantFolder<'env> {
                     O::Div => {
                         self.binop_num(name(), BigInt::checked_div, id, result_pty, val0, val1)
                     },
-                    O::Mod => self.binop_num(name(), Self::checked_rem, id, result_pty, val0, val1),
+                    O::Mod => {
+                        // Move semantics for signed MIN % -1 is abort. Reject
+                        // in const evaluation and refuse to fold elsewhere so
+                        // the runtime executes the abort.
+                        if result_pty.is_signed()
+                            && val1 == &BigInt::from(-1)
+                            && result_pty.get_min_value().as_ref() == Some(val0)
+                        {
+                            self.constant_folding_error(id, |aself: &mut Self| {
+                                format!(
+                                    "Operator `{}` result value out of range for `{}`",
+                                    name(),
+                                    aself.display_type(&Type::Primitive(*result_pty)),
+                                )
+                            })
+                        } else {
+                            self.binop_num(name(), Self::checked_rem, id, result_pty, val0, val1)
+                        }
+                    },
                     O::Shl => {
                         // result_pty should be same size as arg0
                         let arg0_size = Self::ptype_num_bits_bigint(result_pty);
