@@ -51,6 +51,9 @@ module 0x42::signed_div_mod {
 
     spec mod_i64 {
         aborts_if y == 0;
+        // MIN % -1 overflows in Rust (`checked_rem` returns None); the prover
+        // must abort here too.
+        aborts_if x == MIN_I64 && y == -1;
         ensures x == 7 && y == 3 ==> result == 1;
         ensures x == -7 && y == 3 ==> result == -1;
         ensures x == 7 && y == -3 ==> result == 1;
@@ -67,6 +70,20 @@ module 0x42::signed_div_mod {
 
     spec div_min_by_neg_one_aborts {
         aborts_if true;
+    }
+
+    // Variable-operand check that `%` aborts on `MIN / -1` at runtime. (A
+    // constant-operand version like `MIN_I64 % -1` would be folded to `0` by
+    // the Move compiler before reaching the prover, so it can't exercise
+    // `$ModI64`'s guard — `spec mod_i64` above carries the actual check via
+    // its `aborts_if x == MIN_I64 && y == -1` clause.)
+    public fun mod_aborts_on_min_neg_one(x: i64, y: i64): i64 {
+        x % y
+    }
+
+    spec mod_aborts_on_min_neg_one {
+        aborts_if y == 0;
+        aborts_if x == MIN_I64 && y == -1;
     }
 
     // --- Unsigned (regression: must not change behavior) -------------------

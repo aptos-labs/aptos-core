@@ -27,13 +27,21 @@ options provided to the prover.
 // ============================================================================================
 // Integer Types
 
+// Signed division / modulus with Move runtime semantics: truncate toward
+// zero (the remainder takes the sign of the dividend), not Boogie's
+// built-in Euclidean `div`/`mod`. Defined once here and reused by both the
+// signed procedure bodies below and by the spec translator. The branch on
+// dividend sign keeps the SMT formula linear (no `*` in conditions); for
+// unsigned operands Boogie's `div`/`mod` is emitted directly because the
+// two semantics coincide when both operands are non-negative.
+function {:inline} $signed_div(a: int, b: int): int {
+    if a >= 0 then a div b else -((-a) div b)
+}
+function {:inline} $signed_mod(a: int, b: int): int {
+    if a >= 0 then a mod b else -((-a) mod b)
+}
+
 // Constants, Instructions, and Procedures needed by both unsigned and signed integers, but defined separately.
-//
-// Division and modulus use Move runtime semantics (truncate toward zero,
-// remainder takes sign of the dividend), not Boogie's built-in Euclidean
-// `div`/`mod`. For unsigned types the two coincide and the emitted body is
-// a single `div`/`mod` op; for signed types we branch on the sign of the
-// dividend so the SMT formula stays linear (no `*` in conditions).
 {% macro integer_type(name, typename, min, max, signed) %}
 const $MIN_{{name}}: int;
 const $MAX_{{name}}: int;
@@ -92,18 +100,13 @@ procedure {:inline 1} $Mul{{name}}(src1: int, src2: int) returns (dst: int)
 procedure {:inline 1} $Div{{name}}(src1: int, src2: int) returns (dst: int)
 {
 {%- if signed %}
+    // Signed: abort on div-by-zero *and* MIN/-1 (the latter overflows the
+    // signed range; Rust runtime returns None from `ix::checked_div`).
     if (src2 == 0 || (src1 == $MIN_{{name}} && src2 == -1)) {
         call $ExecFailureAbort();
         return;
     }
-    // Truncate toward zero. Boogie's `div` is Euclidean and agrees with
-    // truncation when the dividend is non-negative; for negative dividend
-    // we negate, divide, negate.
-    if (src1 >= 0) {
-        dst := src1 div src2;
-    } else {
-        dst := -((-src1) div src2);
-    }
+    dst := $signed_div(src1, src2);
 {%- else %}
     if (src2 == 0) {
         call $ExecFailureAbort();
@@ -116,16 +119,14 @@ procedure {:inline 1} $Div{{name}}(src1: int, src2: int) returns (dst: int)
 procedure {:inline 1} $Mod{{name}}(src1: int, src2: int) returns (dst: int)
 {
 {%- if signed %}
-    if (src2 == 0) {
+    // Signed: abort on mod-by-zero *and* MIN/-1. Rust's `ix::checked_rem`
+    // returns None for `MIN % -1`; the truncated formula would otherwise
+    // silently yield 0 since Boogie ints are unbounded.
+    if (src2 == 0 || (src1 == $MIN_{{name}} && src2 == -1)) {
         call $ExecFailureAbort();
         return;
     }
-    // Truncate-toward-zero remainder: same sign as the dividend.
-    if (src1 >= 0) {
-        dst := src1 mod src2;
-    } else {
-        dst := -((-src1) mod src2);
-    }
+    dst := $signed_mod(src1, src2);
 {%- else %}
     if (src2 == 0) {
         call $ExecFailureAbort();
@@ -153,17 +154,6 @@ procedure {:inline 1} $Mod{{name}}(src1: int, src2: int) returns (dst: int)
 
 // uninterpreted function to return an undefined value.
 function $undefined_int(): int;
-
-// Spec-level signed division / modulus, truncated toward zero (Move runtime
-// semantics). The spec translator emits these for `/` and `%` on signed
-// operand types; for unsigned operands Boogie's built-in `div`/`mod` is
-// emitted directly (the two coincide when both operands are non-negative).
-function {:inline} $signed_div(a: int, b: int): int {
-    if a >= 0 then a div b else -((-a) div b)
-}
-function {:inline} $signed_mod(a: int, b: int): int {
-    if a >= 0 then a mod b else -((-a) mod b)
-}
 
 // Unimplemented binary arithmetic operations; return the dst
 procedure {:inline 1} $ArithBinaryUnimplemented(src1: int, src2: int) returns (dst: int);
