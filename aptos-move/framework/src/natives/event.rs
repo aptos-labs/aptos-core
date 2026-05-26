@@ -87,14 +87,15 @@ fn native_write_to_event_store(
     // TODO(Gas): Get rid of abstract memory size
     context.charge(
         EVENT_WRITE_TO_EVENT_STORE_BASE
-            + EVENT_WRITE_TO_EVENT_STORE_PER_ABSTRACT_VALUE_UNIT * context.abs_val_size(&msg),
+            + EVENT_WRITE_TO_EVENT_STORE_PER_ABSTRACT_VALUE_UNIT * context.abs_val_size(&msg)?,
     )?;
     let ty_tag = context.type_to_type_tag(&ty)?;
     let (layout, has_aggregator_lifting) =
         context.type_to_type_layout_with_identifier_mappings(&ty)?;
 
     let function_value_extension = context.function_value_extension();
-    let blob = ValueSerDeContext::new()
+    let max_value_nest_depth = context.max_value_nest_depth();
+    let blob = ValueSerDeContext::new(max_value_nest_depth)
         .with_delayed_fields_serde()
         .with_func_args_deserialization(&function_value_extension)
         .serialize(&msg, &layout)?
@@ -161,7 +162,8 @@ fn native_emitted_events_by_handle(
         .into_iter()
         .map(|blob| {
             let function_value_extension = context.function_value_extension();
-            ValueSerDeContext::new()
+            let max_value_nest_depth = context.max_value_nest_depth();
+            ValueSerDeContext::new(max_value_nest_depth)
                 .with_func_args_deserialization(&function_value_extension)
                 .deserialize(blob, &ty_layout)
                 .ok_or_else(|| {
@@ -194,7 +196,8 @@ fn native_emitted_events(
         .into_iter()
         .map(|blob| {
             let function_value_extension = context.function_value_extension();
-            ValueSerDeContext::new()
+            let max_value_nest_depth = context.max_value_nest_depth();
+            ValueSerDeContext::new(max_value_nest_depth)
                 .with_func_args_deserialization(&function_value_extension)
                 .with_delayed_fields_serde()
                 .deserialize(blob, &ty_layout)
@@ -222,7 +225,7 @@ fn native_write_module_event_to_store(
 
     context.charge(
         EVENT_WRITE_TO_EVENT_STORE_BASE
-            + EVENT_WRITE_TO_EVENT_STORE_PER_ABSTRACT_VALUE_UNIT * context.abs_val_size(&msg),
+            + EVENT_WRITE_TO_EVENT_STORE_PER_ABSTRACT_VALUE_UNIT * context.abs_val_size(&msg)?,
     )?;
 
     let type_tag = context.type_to_type_tag(&ty)?;
@@ -262,7 +265,8 @@ fn native_write_module_event_to_store(
         context.type_to_type_layout_with_identifier_mappings(&ty)?;
 
     let function_value_extension = context.function_value_extension();
-    let blob = ValueSerDeContext::new()
+    let max_value_nest_depth = context.max_value_nest_depth();
+    let blob = ValueSerDeContext::new(max_value_nest_depth)
         .with_delayed_fields_serde()
         .with_func_args_deserialization(&function_value_extension)
         .serialize(&msg, &layout)?

@@ -385,13 +385,14 @@ fn native_add_box(
     let (gv, loaded) =
         table.get_or_create_global_value(&function_value_extension, table_context, key_bytes)?;
     let mem_usage = if !fix_memory_double_counting || loaded.is_some() {
-        gv.view().map(|val| {
-            u64::from(
+        gv.view()
+            .map(|val| {
                 context
                     .abs_val_gas_params()
-                    .abstract_heap_size(&val, context.gas_feature_version()),
-            )
-        })
+                    .abstract_heap_size(&val, context.gas_feature_version())
+                    .map(u64::from)
+            })
+            .transpose()?
     } else {
         None
     };
@@ -441,13 +442,14 @@ fn native_borrow_box(
     let (gv, loaded) =
         table.get_or_create_global_value(&function_value_extension, table_context, key_bytes)?;
     let mem_usage = if !fix_memory_double_counting || loaded.is_some() {
-        gv.view().map(|val| {
-            u64::from(
+        gv.view()
+            .map(|val| {
                 context
                     .abs_val_gas_params()
-                    .abstract_heap_size(&val, context.gas_feature_version()),
-            )
-        })
+                    .abstract_heap_size(&val, context.gas_feature_version())
+                    .map(u64::from)
+            })
+            .transpose()?
     } else {
         None
     };
@@ -498,13 +500,14 @@ fn native_contains_box(
     let (gv, loaded) =
         table.get_or_create_global_value(&function_value_extension, table_context, key_bytes)?;
     let mem_usage = if !fix_memory_double_counting || loaded.is_some() {
-        gv.view().map(|val| {
-            u64::from(
+        gv.view()
+            .map(|val| {
                 context
                     .abs_val_gas_params()
-                    .abstract_heap_size(&val, context.gas_feature_version()),
-            )
-        })
+                    .abstract_heap_size(&val, context.gas_feature_version())
+                    .map(u64::from)
+            })
+            .transpose()?
     } else {
         None
     };
@@ -549,13 +552,14 @@ fn native_remove_box(
     let (gv, loaded) =
         table.get_or_create_global_value(&function_value_extension, table_context, key_bytes)?;
     let mem_usage = if !fix_memory_double_counting || loaded.is_some() {
-        gv.view().map(|val| {
-            u64::from(
+        gv.view()
+            .map(|val| {
                 context
                     .abs_val_gas_params()
-                    .abstract_heap_size(&val, context.gas_feature_version()),
-            )
-        })
+                    .abstract_heap_size(&val, context.gas_feature_version())
+                    .map(u64::from)
+            })
+            .transpose()?
     } else {
         None
     };
@@ -631,7 +635,7 @@ fn serialize_key(
     layout: &MoveTypeLayout,
     key: &Value,
 ) -> PartialVMResult<Vec<u8>> {
-    ValueSerDeContext::new()
+    ValueSerDeContext::new(function_value_extension.max_value_nest_depth())
         .with_func_args_deserialization(function_value_extension)
         .serialize(key, layout)?
         .ok_or_else(|| partial_extension_error("cannot serialize table key"))
@@ -642,9 +646,10 @@ fn serialize_value(
     layout_info: &LayoutInfo,
     val: &Value,
 ) -> PartialVMResult<(Bytes, Option<Arc<MoveTypeLayout>>)> {
+    let max_value_nest_depth = function_value_extension.max_value_nest_depth();
     let serialization_result = if layout_info.has_identifier_mappings {
         // Value contains delayed fields, so we should be able to serialize it.
-        ValueSerDeContext::new()
+        ValueSerDeContext::new(max_value_nest_depth)
             .with_delayed_fields_serde()
             .with_func_args_deserialization(function_value_extension)
             .serialize(val, layout_info.layout.as_ref())?
@@ -652,7 +657,7 @@ fn serialize_value(
     } else {
         // No delayed fields, make sure serialization fails if there are any
         // native values.
-        ValueSerDeContext::new()
+        ValueSerDeContext::new(max_value_nest_depth)
             .with_func_args_deserialization(function_value_extension)
             .serialize(val, layout_info.layout.as_ref())?
             .map(|bytes| (bytes.into(), None))
@@ -667,12 +672,12 @@ fn deserialize_value(
 ) -> PartialVMResult<Value> {
     let layout = layout_info.layout.as_ref();
     let deserialization_result = if layout_info.has_identifier_mappings {
-        ValueSerDeContext::new()
+        ValueSerDeContext::new(function_value_extension.max_value_nest_depth())
             .with_func_args_deserialization(function_value_extension)
             .with_delayed_fields_serde()
             .deserialize(bytes, layout)
     } else {
-        ValueSerDeContext::new()
+        ValueSerDeContext::new(function_value_extension.max_value_nest_depth())
             .with_func_args_deserialization(function_value_extension)
             .deserialize(bytes, layout)
     };
