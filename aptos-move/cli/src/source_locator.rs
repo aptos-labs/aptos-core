@@ -110,6 +110,13 @@ impl AptosSourceLocator {
         Ok(())
     }
 
+    pub fn known_source_files(&self) -> Vec<&str> {
+        self.source_data
+            .values()
+            .flat_map(|d| d.files.values().map(|f| f.filename.as_str()))
+            .collect()
+    }
+
     /// Extract struct and enum type information from a compiled module and store
     /// it for annotated local-variable display in the debugger.
     pub fn add_struct_field_names_from_module(&mut self, compiled_module: &CompiledModule) {
