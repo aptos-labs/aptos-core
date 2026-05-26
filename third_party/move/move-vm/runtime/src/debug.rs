@@ -129,6 +129,10 @@ impl FromStr for DebugCommand {
     }
 }
 
+pub trait ThreadStateHandle: Send + Sync {
+    fn install_on_thread(&self);
+}
+
 pub trait DebugContext: Send {
     fn debug_loop(
         &mut self,
@@ -139,6 +143,8 @@ pub trait DebugContext: Send {
         runtime_environment: &RuntimeEnvironment,
         interpreter: &dyn InterpreterDebugInterface,
     );
+
+    fn capture_thread_state(&self) -> Box<dyn ThreadStateHandle>;
 }
 
 #[derive(Debug)]
@@ -360,4 +366,14 @@ impl DebugContext for MoveStepDebugContext {
             }
         }
     }
+
+    fn capture_thread_state(&self) -> Box<dyn ThreadStateHandle> {
+        Box::new(NoopThreadState)
+    }
+}
+
+struct NoopThreadState;
+
+impl ThreadStateHandle for NoopThreadState {
+    fn install_on_thread(&self) {}
 }

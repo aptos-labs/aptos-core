@@ -37,8 +37,8 @@ use move_vm_runtime::{
     move_vm::MoveVM,
     native_extensions::NativeContextExtensions,
     native_functions::NativeFunctionTable,
-    AsFunctionValueExtension, AsUnsyncModuleStorage, InstantiatedFunctionLoader,
-    LegacyLoaderConfig, RuntimeEnvironment,
+    tracing as vm_tracing, AsFunctionValueExtension, AsUnsyncModuleStorage,
+    InstantiatedFunctionLoader, LegacyLoaderConfig, RuntimeEnvironment,
 };
 use move_vm_test_utils::InMemoryStorage;
 use rayon::prelude::*;
@@ -205,8 +205,10 @@ impl TestRunner {
         writer: &Mutex<W>,
         options: &Mutex<F>,
     ) -> Result<TestResults> {
+        let thread_state = vm_tracing::capture_debug_thread_state();
         rayon::ThreadPoolBuilder::new()
             .num_threads(self.num_threads)
+            .start_handler(move |_| thread_state.install_on_thread())
             .build()
             .unwrap()
             .install(|| {

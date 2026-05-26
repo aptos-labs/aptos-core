@@ -71,6 +71,11 @@ pub fn set_source_locator(loc: Arc<dyn SourceLocator>) {
     LOCATOR.with(|l| *l.borrow_mut() = Some(loc));
 }
 
+/// Return a clone of the current thread's source locator, if any.
+pub fn get_source_locator() -> Option<Arc<dyn SourceLocator>> {
+    LOCATOR.with(|l| l.borrow().clone())
+}
+
 /// Remove the source locator for the current thread.
 pub fn clear_source_locator() {
     LOCATOR.with(|l| *l.borrow_mut() = None);
