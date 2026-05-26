@@ -29,7 +29,7 @@ use move_stackless_bytecode::{
     stackless_bytecode::{Bytecode, Operation, PropKind},
 };
 
-const INVARIANT_FAILS_MESSAGE: &str = "data invariant does not hold";
+pub const INVARIANT_FAILS_MESSAGE: &str = "data invariant does not hold";
 
 pub struct DataInvariantInstrumentationProcessor {}
 

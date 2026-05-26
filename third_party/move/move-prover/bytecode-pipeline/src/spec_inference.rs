@@ -93,7 +93,10 @@
 //!
 //! See `move-prover/src/inference.rs` for command-line usage.
 
-use crate::options::ProverOptions;
+use crate::{
+    data_invariant_instrumentation::INVARIANT_FAILS_MESSAGE as DATA_INVARIANT_FAILS_MESSAGE,
+    global_invariant_instrumentation::GLOBAL_INVARIANT_FAILS_MESSAGE, options::ProverOptions,
+};
 use codespan_reporting::diagnostic::Severity;
 use move_binary_format::file_format::CodeOffset;
 use move_core_types::function::ClosureMask;
@@ -118,6 +121,7 @@ use move_model::{
     sourcifier::Sourcifier,
     symbol::Symbol,
     ty::{PrimitiveType, Type, BOOL_TYPE, NUM_TYPE},
+    well_known,
 };
 use move_stackless_bytecode::{
     dataflow_analysis::{BlockState, DataflowAnalysis, StateMap, TransferFunctions},
@@ -2005,15 +2009,27 @@ fn rename_quant_vars_in_exp(env: &GlobalEnv, reserved: &BTreeSet<String>, exp: &
                 .filter(|s| !bound_syms.contains(s))
                 .map(|s| s.display(pool).to_string())
                 .collect();
-            // Also collect names of variables bound by nested quantifiers in the
-            // body. The recursive call has already renamed those, so they appear
-            // only as bound symbols (not in free_vars). Picking the same name for
-            // this quantifier would capture them.
-            body.as_ref().visit_post_order(&mut |e| {
+            // Also avoid names that appear free in range expressions: a range like
+            // `a..x` must not have its upper bound `x` shadowed by the bound variable.
+            for (_, range_exp) in ranges {
+                for sym in range_exp.as_ref().free_vars() {
+                    if !bound_syms.contains(&sym) {
+                        used_names.insert(sym.display(pool).to_string());
+                    }
+                }
+            }
+            // Also avoid names bound by inner quantifiers. Without this, the outer
+            // rename can pick a name already used as an inner binder (e.g. `x`), and
+            // then substituting the outer variable into the inner body causes
+            // `x: u64` references to be shadowed by the inner `x: BitVector` binder,
+            // producing type errors like `forall x: BitVector: x >= amount`.
+            body.as_ref().visit_pre_order(&mut |e| {
                 if let ExpData::Quant(_, _, inner_ranges, _, _, _) = e {
                     for (pat, _) in inner_ranges {
                         if let Pattern::Var(_, sym) = pat {
-                            used_names.insert(sym.display(pool).to_string());
+                            if !bound_syms.contains(sym) {
+                                used_names.insert(sym.display(pool).to_string());
+                            }
                         }
                     }
                 }
@@ -2220,18 +2236,28 @@ impl StateBoundaryAnalysis<'_, '_> {
     /// Determine whether an instruction creates a state boundary (new memory label).
     fn is_state_changing(&self, instr: &Bytecode) -> bool {
         match instr {
-            Bytecode::Call(_, dests, op, _, _) => match op {
+            Bytecode::Call(_, dests, op, srcs, _) => match op {
                 Operation::WriteBack(BorrowNode::GlobalRoot(_), _) => true,
                 Operation::MoveTo(_, _, _) | Operation::MoveFrom(_, _, _) => true,
                 Operation::Function(module_id, fun_id, type_inst) => {
-                    // Mirror the backward WP's logic: a function call is only
-                    // non-state-changing if it qualifies as a pure spec call
-                    // AND has exactly one dest (so it can be substituted).
+                    // Mirror the backward WP's cascade: a function call is only
+                    // non-state-changing if it qualifies for one of the direct-
+                    // substitution branches — pure spec call or native spec exp.
+                    // Either path applies the call's semantics by substitution
+                    // and emits no behavioral predicate, so the memory label
+                    // must not be advanced. Otherwise a vector::length (or
+                    // similar native) before a behavioral call would create a
+                    // spurious label boundary even though the underlying
+                    // memory state is unchanged.
                     !(dests.len() == 1
-                        && self
+                        && (self
                             .analyzer
                             .try_as_pure_spec_call(*module_id, *fun_id, type_inst)
-                            .is_some())
+                            .is_some()
+                            || self
+                                .analyzer
+                                .try_as_native_spec_exp(*module_id, *fun_id, type_inst, srcs)
+                                .is_some()))
                 },
                 Operation::Invoke => true,
                 _ => false,
@@ -2364,8 +2390,14 @@ impl<'env> TransferFunctions for SpecInferenceAnalyzer<'env> {
                             // WP[dest := f(args)](Q) = Q[dest ↦ spec_f(args)]
                             let args: Vec<Exp> =
                                 srcs.iter().map(|s| self.mk_temporary(*s)).collect();
-                            let spec_call = self.mk_call(
+                            // Use mk_call_with_inst to record the type instantiation so
+                            // the sourcifier emits explicit type arguments (e.g.,
+                            // `spec_new<K, V>()` instead of `spec_new()`). This is
+                            // required for zero-argument spec functions where type args
+                            // cannot be inferred from the argument list.
+                            let spec_call = self.mk_call_with_inst(
                                 &result_type,
+                                type_inst.to_vec(),
                                 AstOp::SpecFunction(
                                     *module_id,
                                     spec_fun_id,
@@ -2385,6 +2417,17 @@ impl<'env> TransferFunctions for SpecInferenceAnalyzer<'env> {
                             );
                             let aborts = self.mk_aborts_of(fun_exp, args);
                             state.add_aborts(aborts);
+                        } else if dests.len() == 1
+                            && let Some(spec_exp) =
+                                self.try_as_native_spec_exp(*module_id, *fun_id, type_inst, srcs)
+                        {
+                            // WP[dest := native_f(args)](Q) = Q[dest ↦ builtin_spec_op(args)]
+                            // Used for native std::vector functions with direct spec-language
+                            // equivalents (empty→[], length→len, borrow→index).  Avoids
+                            // creating an anonymous lambda that gets compiled to an
+                            // uninterpreted behavioral spec function.
+                            *state = self.substitute_exp_state(state, dests[0], &spec_exp);
+                            // Native vector functions cannot abort; no aborts_of needed.
                         } else {
                             // WP[dest := f(args)](Q) = Q[dest ↦ result_of<f>(args)]
                             let (fun_exp, result_type) = self.mk_closure(
@@ -3065,16 +3108,75 @@ impl<'env> TransferFunctions for SpecInferenceAnalyzer<'env> {
                         };
                         let sym = self.mk_symbol(&format!("$q{}", dest));
                         let local_exp = self.mk_local_by_sym(sym, ty.clone());
+                        // Flatten an expression into its top-level conjuncts.
+                        // `a && b && c` → `[a, b, c]`.
+                        fn flat_conjuncts(e: &Exp) -> Vec<Exp> {
+                            match e.as_ref() {
+                                ExpData::Call(_, AstOp::And, args) if args.len() == 2 => {
+                                    let mut v = flat_conjuncts(&args[0]);
+                                    v.extend(flat_conjuncts(&args[1]));
+                                    v
+                                },
+                                _ => vec![e.clone()],
+                            }
+                        }
                         let wrap = |this: &Self, e: &Exp, quant_kind: QuantKind| -> Exp {
                             if !e.as_ref().any(
                                 &mut |ed| matches!(ed, ExpData::Temporary(_, idx) if *idx == dest),
                             ) {
                                 return e.clone();
                             }
-                            // Replace Temporary(dest) with LocalVar(sym) in body.
-                            // For references, skip replacement inside old() — pre-state
-                            // values of reference parameters are fixed and should not
-                            // be quantified over.
+                            // For `forall` (ensures), distribute the quantifier over top-level
+                            // conjuncts: `forall x: (A(x) && B)` = `(forall x: A(x)) && B`.
+                            // This prevents unrelated conjuncts like `i >= amount` from being
+                            // pulled inside `forall x: T: ...` just because some other conjunct
+                            // mentions `self`/`dest`.
+                            //
+                            // For `exists` (aborts) we must NOT split: `exists x: A(x) && B(x)`
+                            // is NOT equivalent to `(exists x: A(x)) && (exists x: B(x))` —
+                            // splitting loses the correlation and over-approximates aborts.
+                            if quant_kind == QuantKind::Forall {
+                                let conjuncts = flat_conjuncts(e);
+                                if conjuncts.len() > 1 {
+                                    let wrapped: Vec<Exp> = conjuncts
+                                        .iter()
+                                        .map(|conjunct| {
+                                            if !conjunct.as_ref().any(&mut |ed| {
+                                                matches!(ed, ExpData::Temporary(_, idx) if *idx == dest)
+                                            }) {
+                                                return conjunct.clone();
+                                            }
+                                            let body = if is_ref {
+                                                this.substitute_temp_outside_old(
+                                                    conjunct, dest, &local_exp,
+                                                )
+                                            } else {
+                                                this.substitute_temp_with_exp(
+                                                    conjunct, dest, &local_exp,
+                                                )
+                                            };
+                                            let range = this.mk_type_domain(ty.clone());
+                                            let pat = this.mk_decl(sym, ty.clone());
+                                            let node_id = this.new_node(BOOL_TYPE.clone(), None);
+                                            ExpData::Quant(
+                                                node_id,
+                                                quant_kind,
+                                                vec![(pat, range)],
+                                                vec![],
+                                                None,
+                                                body,
+                                            )
+                                            .into_exp()
+                                        })
+                                        .collect();
+                                    return wrapped
+                                        .into_iter()
+                                        .reduce(|a, b| this.mk_and(a, b))
+                                        .unwrap_or_else(|| e.clone());
+                                }
+                            }
+                            // Default path: wrap the whole expression (used for Exists, or
+                            // when there's only a single conjunct).
                             let body = if is_ref {
                                 this.substitute_temp_outside_old(e, dest, &local_exp)
                             } else {
@@ -3181,7 +3283,7 @@ impl<'env> TransferFunctions for SpecInferenceAnalyzer<'env> {
             Bytecode::SaveMem(_, _, _) | Bytecode::SaveSpecVar(_, _, _) => {
                 // Extended bytecodes: not applicable for spec inference
             },
-            Bytecode::Prop(_, kind, exp) => {
+            Bytecode::Prop(id, kind, exp) => {
                 match kind {
                     PropKind::Assume | PropKind::Assert => {
                         // Treat WellFormed assumptions as no-ops for inference:
@@ -3192,6 +3294,21 @@ impl<'env> TransferFunctions for SpecInferenceAnalyzer<'env> {
                         // `forall x in ResourceDomain<T>: WellFormed(x)`
                         if matches!(kind, PropKind::Assume) && is_well_formed_prop(exp) {
                             return;
+                        }
+                        // Skip data/global invariant asserts: they are verification
+                        // conditions proven separately by the Boogie backend. Including
+                        // them as WP antecedents wraps every inferred ensures in an
+                        // invariant precondition, producing unhelpful conditional specs
+                        // for any function that constructs or packs a struct.
+                        if matches!(kind, PropKind::Assert) {
+                            let vc_msg = self.target.get_vc_info(*id).map(|s| s.as_str());
+                            if matches!(
+                                vc_msg,
+                                Some(s) if s == DATA_INVARIANT_FAILS_MESSAGE
+                                    || s == GLOBAL_INVARIANT_FAILS_MESSAGE
+                            ) {
+                                return;
+                            }
                         }
 
                         // Handle Identical (from spec let bindings) as substitution.
@@ -3854,6 +3971,65 @@ impl<'env> SpecInferenceAnalyzer<'env> {
             .collect()
     }
 
+    /// For native `std::vector` functions that have a direct spec-language equivalent
+    /// (built-in operations like `[]`, `len`, index), return the equivalent spec
+    /// expression substituting for the call result.  This avoids wrapping the function
+    /// reference in an anonymous lambda that gets compiled to an uninterpreted
+    /// behavioral spec function.
+    ///
+    /// Returns `Some(exp)` where `exp` is the spec expression for the result, or `None`
+    /// if the function has no direct spec equivalent.
+    fn try_as_native_spec_exp(
+        &self,
+        module_id: ModuleId,
+        fun_id: FunId,
+        type_inst: &[Type],
+        srcs: &[TempIndex],
+    ) -> Option<Exp> {
+        let env = self.global_env();
+        let module = env.get_module(module_id);
+        // Only handle std::vector native functions.
+        if module.get_name().addr() != &env.get_stdlib_address() {
+            return None;
+        }
+        if module.get_name().name() != env.symbol_pool().make(well_known::VECTOR_MODULE) {
+            return None;
+        }
+        let fun_env = env.get_function(module_id.qualified(fun_id));
+        let fun_name = fun_env.get_name().display(env.symbol_pool()).to_string();
+
+        match fun_name.as_str() {
+            // vector::empty<T>() → [] (empty vector literal)
+            "empty" => {
+                // Monomorphized code always provides T; bail to the behavioral
+                // predicate path rather than fabricating a wrong-typed literal.
+                let elem_type = type_inst.first().cloned()?;
+                let result_type = Type::Vector(Box::new(elem_type.clone()));
+                Some(self.mk_call_with_inst(&result_type, vec![elem_type], AstOp::Vector, vec![]))
+            },
+            // vector::length<T>(v) → len(v)
+            "length" if !srcs.is_empty() => {
+                let v = self.mk_temporary(srcs[0]);
+                Some(self.mk_call(&NUM_TYPE, AstOp::Len, vec![v]))
+            },
+            // vector::borrow<T>(v, i) → v[i]
+            "borrow" if srcs.len() >= 2 => {
+                // Monomorphized code always provides T; bail to the behavioral
+                // predicate path rather than fabricating a wrong-typed index.
+                let elem_type = type_inst.first().cloned()?;
+                let v = self.mk_temporary(srcs[0]);
+                let i = self.mk_temporary(srcs[1]);
+                Some(self.mk_call_with_inst(
+                    &elem_type,
+                    vec![elem_type.clone()],
+                    AstOp::Index,
+                    vec![v, i],
+                ))
+            },
+            _ => None,
+        }
+    }
+
     /// Check if a callee has an associated pure spec function (created by the
     /// spec rewriter) that can be called directly in spec expressions, returning
     /// the spec function id and instantiated result type if so.
@@ -3880,6 +4056,23 @@ impl<'env> SpecInferenceAnalyzer<'env> {
         {
             return None;
         }
+        // Special case: intrinsic Move functions (e.g. SimpleMap::contains_key) are
+        // axiomatized in Boogie via their paired spec function (e.g. spec_contains_key).
+        // They have no `$name` spec function body, so find_spec_fun() returns None.
+        // Instead, look up the spec function through the IntrinsicsAnnotation pairing table.
+        let callee_qid = callee.get_qualified_id();
+        if let Some(spec_qid) = self
+            .global_env()
+            .get_intrinsics()
+            .get_spec_fun_for_move_fun(&callee_qid)
+        {
+            // Use the spec function's return type, not the Move function's (which may be &V).
+            let mod_env = self.global_env().get_module(spec_qid.module_id);
+            let spec_decl = mod_env.get_spec_fun(spec_qid.id);
+            let result_type = spec_decl.result_type.instantiate(type_inst);
+            return Some((spec_qid.id, result_type));
+        }
+
         // Must have an associated spec function with a body and no memory use.
         // `spec_rewriter` removes the body (`body = None`) for any spec function that
         // contains imperative expressions (Loop, Assign, Mutate, Return, LoopCont), so

@@ -188,6 +188,22 @@ pub fn boogie_function_name(fun_env: &FunctionEnv<'_>, inst: &[Type], bv_flag: &
     )
 }
 
+/// Return the boogie "$-spec" function name for a native function.
+/// Native function prelude templates follow the naming convention
+/// `$module_$fname'inst'` for their pure, side-effect-free spec versions
+/// (e.g. `$1_vector_$empty'address'`).  When a native function has no
+/// Move-level spec, the Boogie backend can use this name to produce a
+/// concrete, deterministic body for the behavioral result function instead
+/// of leaving it as an unconstrained uninterpreted function.
+pub fn boogie_native_spec_fun_name(fun_env: &FunctionEnv<'_>, inst: &[Type]) -> String {
+    format!(
+        "${}_${}{}",
+        boogie_module_name(&fun_env.module_env),
+        fun_env.get_name().display(fun_env.symbol_pool()),
+        boogie_inst_suffix(fun_env.module_env.env, inst, &[])
+    )
+}
+
 /// Reverse map mangled function name to source level function name.
 pub fn boogie_reverse_function_name(_env: &GlobalEnv, s: &str) -> Option<String> {
     // TODO: in order to make this actually reversible, we can't use ${}_{}{} above

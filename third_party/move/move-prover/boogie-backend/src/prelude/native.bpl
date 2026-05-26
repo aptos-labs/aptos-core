@@ -571,6 +571,30 @@ function {:inline} {{impl.fun_spec_new}}{{S}}(): {{Self}} {
 }
 {%- endif %}
 
+{%- if impl.fun_spec_aborts_destroy_empty != "" %}
+function {:inline} {{impl.fun_spec_aborts_destroy_empty}}{{S}}(t: {{Self}}): bool {
+    LenTable(t) != 0
+}
+{%- endif %}
+
+{%- if impl.fun_spec_aborts_add != "" %}
+function {:inline} {{impl.fun_spec_aborts_add}}{{S}}(t: {{Self}}, k: {{K}}, v: {{V}}): bool {
+    ContainsTable(t, {{ENC}}(k))
+}
+{%- endif %}
+
+{%- if impl.fun_spec_aborts_del != "" %}
+function {:inline} {{impl.fun_spec_aborts_del}}{{S}}(t: {{Self}}, k: {{K}}): bool {
+    !ContainsTable(t, {{ENC}}(k))
+}
+{%- endif %}
+
+{%- if impl.fun_spec_aborts_borrow != "" %}
+function {:inline} {{impl.fun_spec_aborts_borrow}}{{S}}(t: {{Self}}, k: {{K}}): bool {
+    !ContainsTable(t, {{ENC}}(k))
+}
+{%- endif %}
+
 {% endmacro table_module %}
 
 
