@@ -17,6 +17,7 @@ use aptos_types::{
         config::BlockExecutorConfigFromOnchain,
         transaction_slice_metadata::TransactionSliceMetadata,
     },
+    on_chain_config::{Features, OnChainConfig},
     transaction::{AuxiliaryInfo, PersistedAuxiliaryInfo, Transaction, TransactionOutput, Version},
 };
 use aptos_vm::VMBlockExecutor;
@@ -82,6 +83,13 @@ impl TransactionChunk for ChunkToExecute {
             "transactions and persisted_aux_info must have the same length"
         );
 
+        // Chunks don't cross epoch boundaries, so `Features` at the parent state are the
+        // ones that governed original execution — needed to pick write-set /
+        // `TransactionInfo` formats that match the proofs.
+        let features = Features::fetch_config(&state_view).unwrap_or_default();
+        let onchain_config =
+            BlockExecutorConfigFromOnchain::new_no_block_limit().with_features(&features);
+
         // TODO(skedia) In the chunk executor path, we ideally don't need to verify the signature
         // as only transactions with verified signatures are committed to the storage.
         let sig_verified_txns = {
@@ -107,7 +115,7 @@ impl TransactionChunk for ChunkToExecute {
                 .collect(),
             parent_state,
             state_view,
-            BlockExecutorConfigFromOnchain::new_no_block_limit(),
+            onchain_config,
             TransactionSliceMetadata::unknown(),
         )
     }

@@ -36,6 +36,7 @@ use aptos_types::{
     },
     contract_event::ContractEvent,
     ledger_info::LedgerInfoWithSignatures,
+    on_chain_config::{Features, OnChainConfig},
     state_store::StateViewId,
     transaction::{
         signature_verified_transaction::SignatureVerifiedTransaction, AuxiliaryInfo,
@@ -631,6 +632,12 @@ impl<V: VMBlockExecutor> ChunkExecutorInner<V> {
             .take((end_version - begin_version) as usize)
             .map(|persisted_aux_info| AuxiliaryInfo::new(*persisted_aux_info, None))
             .collect::<Vec<_>>();
+        // `enqueue_chunks` splits by epoch boundary, so `Features` at the parent state
+        // are the ones that governed original execution — needed for re-execution to
+        // produce write sets and `TransactionInfo`s in the format the match check expects.
+        let features = Features::fetch_config(&state_view).unwrap_or_default();
+        let onchain_config =
+            BlockExecutorConfigFromOnchain::new_no_block_limit().with_features(&features);
         // State sync executor shouldn't have block gas limit.
         let execution_output = DoGetExecutionOutput::by_transaction_execution::<V>(
             &V::new(),
@@ -638,7 +645,7 @@ impl<V: VMBlockExecutor> ChunkExecutorInner<V> {
             auxiliary_info,
             &parent_state,
             state_view,
-            BlockExecutorConfigFromOnchain::new_no_block_limit(),
+            onchain_config,
             TransactionSliceMetadata::chunk(begin_version, end_version),
         )?;
         // not `zip_eq`, deliberately
