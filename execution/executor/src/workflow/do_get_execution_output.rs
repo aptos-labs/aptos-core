@@ -167,7 +167,7 @@ impl DoGetExecutionOutput {
                 );
             }
         }
-        if parent_state.latest().hot_state_config().use_write_set_v1 {
+        if onchain_config.hotness_in_epilogue() {
             Self::convert_write_sets_to_v1(&mut transaction_outputs);
         }
 
@@ -182,6 +182,7 @@ impl DoGetExecutionOutput {
             transaction_slice_metadata
                 .append_state_checkpoint_to_block()
                 .is_some(),
+            onchain_config.transaction_info_v1(),
         )
     }
 
@@ -199,7 +200,7 @@ impl DoGetExecutionOutput {
             state_view_arc.clone(),
             onchain_config,
         )?;
-        if parent_state.latest().hot_state_config().use_write_set_v1 {
+        if onchain_config.hotness_in_epilogue() {
             Self::convert_write_sets_to_v1(&mut transaction_outputs);
         }
 
@@ -222,6 +223,7 @@ impl DoGetExecutionOutput {
             state_view,
             false, // prime_state_cache
             append_state_checkpoint_to_block.is_some(),
+            onchain_config.transaction_info_v1(),
         )
     }
 
@@ -247,6 +249,9 @@ impl DoGetExecutionOutput {
             state_view,
             true,  // prime state cache
             false, // is_block
+            // Chunk apply path: the format is determined later by inspecting the chunk's actual
+            // `TransactionInfo` variants, not by this flag (see `chunk_executor::update_ledger`).
+            false,
         )?;
 
         let ret = out.clone();
@@ -360,6 +365,7 @@ impl Parser {
         base_state_view: CachedStateView,
         prime_state_cache: bool,
         is_block: bool,
+        transaction_info_v1: bool,
     ) -> Result<ExecutionOutput> {
         let _timer = OTHER_TIMERS.timer_with(&["parse_raw_output"]);
 
@@ -447,6 +453,7 @@ impl Parser {
             block_end_info,
             next_epoch_state,
             Planned::place_holder(),
+            transaction_info_v1,
         );
         let ret = out.clone();
         ret.subscribable_events
@@ -638,6 +645,7 @@ mod tests {
             auxiliary_infos,
             &state,
             CachedStateView::new_dummy(&state),
+            false,
             false,
             false,
         )

@@ -164,7 +164,6 @@ static NUM_PROOF_READING_THREADS: OnceCell<usize> = OnceCell::new();
 static DISCARD_FAILED_BLOCKS: OnceCell<bool> = OnceCell::new();
 static PROCESSED_TRANSACTIONS_DETAILED_COUNTERS: OnceCell<bool> = OnceCell::new();
 static ENABLE_PRE_WRITE: OnceCell<bool> = OnceCell::new();
-static PERSIST_HOTNESS_IN_EPILOGUE: OnceCell<bool> = OnceCell::new();
 
 macro_rules! deprecated_module_bundle {
     () => {
@@ -511,19 +510,6 @@ impl AptosVM {
         match ENABLE_PRE_WRITE.get() {
             Some(enable_pre_write) => *enable_pre_write,
             None => true,
-        }
-    }
-
-    /// Sets persist_hotness_in_epilogue flag when invoked the first time.
-    pub fn set_persist_hotness_in_epilogue_once(persist: bool) {
-        let _ = PERSIST_HOTNESS_IN_EPILOGUE.set(persist);
-    }
-
-    /// Get the persist_hotness_in_epilogue flag if already set, otherwise return default (false)
-    pub fn get_persist_hotness_in_epilogue() -> bool {
-        match PERSIST_HOTNESS_IN_EPILOGUE.get() {
-            Some(persist) => *persist,
-            None => false,
         }
     }
 
@@ -3425,7 +3411,6 @@ impl VMBlockExecutor for AptosVMBlockExecutor {
                 discard_failed_blocks: AptosVM::get_discard_failed_blocks(),
                 module_cache_config: BlockExecutorModuleCacheLocalConfig::default(),
                 enable_pre_write: AptosVM::get_enable_pre_write(),
-                persist_hotness_in_epilogue: AptosVM::get_persist_hotness_in_epilogue(),
             },
             onchain: onchain_config,
         };

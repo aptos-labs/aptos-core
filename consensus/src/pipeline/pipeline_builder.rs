@@ -569,7 +569,7 @@ impl PipelineBuilder {
                 self.executor.clone(),
                 block.clone(),
                 self.validators.clone(),
-                self.block_executor_onchain_config.clone(),
+                self.block_executor_onchain_config,
                 self.persisted_auxiliary_info_version,
             ),
             None,

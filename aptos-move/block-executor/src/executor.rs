@@ -2178,7 +2178,7 @@ where
             }
         }
         let fee_distribution = FeeDistribution::new(amount);
-        if self.config.local.persist_hotness_in_epilogue {
+        if self.config.onchain.hotness_in_epilogue() {
             let (inner, to_make_hot) = block_end_info.into_parts();
             Ok(T::block_epilogue_v2(
                 block_id,
