@@ -48,7 +48,7 @@ use aptos_types::{
     epoch_state::EpochState,
     ledger_info::LedgerInfoWithSignatures,
     on_chain_config::{
-        OnChainChunkyDKGConfig, OnChainConsensusConfig, OnChainExecutionConfig,
+        Features, OnChainChunkyDKGConfig, OnChainConsensusConfig, OnChainExecutionConfig,
         OnChainRandomnessConfig,
     },
     validator_signer::ValidatorSigner,
@@ -81,6 +81,7 @@ pub trait TExecutionClient: Send + Sync {
         onchain_execution_config: &OnChainExecutionConfig,
         onchain_randomness_config: &OnChainRandomnessConfig,
         onchain_chunky_dkg_config: &OnChainChunkyDKGConfig,
+        features: &Features,
         rand_config: Option<RandConfig>,
         secret_share_verifier: Option<Arc<SecretShareVerifier>>,
         rand_msg_rx: aptos_channel::Receiver<AccountAddress, IncomingRandGenRequest>,
@@ -536,6 +537,7 @@ impl TExecutionClient for ExecutionProxyClient {
         onchain_execution_config: &OnChainExecutionConfig,
         onchain_randomness_config: &OnChainRandomnessConfig,
         onchain_chunky_dkg_config: &OnChainChunkyDKGConfig,
+        features: &Features,
         rand_config: Option<RandConfig>,
         secret_share_verifier: Option<Arc<SecretShareVerifier>>,
         rand_msg_rx: aptos_channel::Receiver<AccountAddress, IncomingRandGenRequest>,
@@ -567,7 +569,7 @@ impl TExecutionClient for ExecutionProxyClient {
         let transaction_shuffler =
             create_transaction_shuffler(onchain_execution_config.transaction_shuffler_type());
         let block_executor_onchain_config: aptos_types::block_executor::config::BlockExecutorConfigFromOnchain =
-            onchain_execution_config.block_executor_onchain_config();
+            onchain_execution_config.block_executor_onchain_config(features);
         let transaction_deduper =
             create_transaction_deduper(onchain_execution_config.transaction_deduper_type());
         let randomness_enabled = onchain_consensus_config.is_vtxn_enabled()
@@ -812,6 +814,7 @@ impl TExecutionClient for DummyExecutionClient {
         _onchain_execution_config: &OnChainExecutionConfig,
         _onchain_randomness_config: &OnChainRandomnessConfig,
         _onchain_chunky_dkg_config: &OnChainChunkyDKGConfig,
+        _features: &Features,
         _rand_config: Option<RandConfig>,
         _secret_share_verifier: Option<Arc<SecretShareVerifier>>,
         _rand_msg_rx: aptos_channel::Receiver<AccountAddress, IncomingRandGenRequest>,

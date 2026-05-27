@@ -29,8 +29,9 @@ impl DoLedgerUpdate {
 
         // Assemble `TransactionInfo`s. The variant (V0 vs V1) is driven by whether
         // `hot_state_checkpoint_hashes` is present: `DoStateCheckpoint` produces `Some`
-        // iff V1 should be emitted (block path: local `use_transaction_info_v1`; chunk
-        // path: matches the incoming chunk's actual format).
+        // iff V1 should be emitted (block path: from the `TRANSACTION_INFO_V1` on-chain
+        // feature, threaded via `ExecutionOutput::transaction_info_v1`; chunk path:
+        // matches the incoming chunk's actual format).
         let (transaction_infos, transaction_info_hashes) = Self::assemble_transaction_infos(
             &execution_output.to_commit,
             &state_checkpoint_output.state_checkpoint_hashes,

@@ -1009,9 +1009,8 @@ impl<O: OutputLogger> FakeExecutorImpl<O> {
                 discard_failed_blocks: false,
                 module_cache_config: BlockExecutorModuleCacheLocalConfig::default(),
                 enable_pre_write: true,
-                persist_hotness_in_epilogue: false,
             },
-            onchain: onchain_config.clone(),
+            onchain: onchain_config,
         };
 
         #[cfg(fuzzing)]

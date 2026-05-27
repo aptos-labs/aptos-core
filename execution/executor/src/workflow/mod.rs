@@ -24,10 +24,7 @@ impl ApplyExecutionOutput {
         base_view: LedgerSummary,
         reader: &(dyn DbReader + Sync),
     ) -> Result<PartialStateComputeResult> {
-        let use_transaction_info_v1 = base_view
-            .state_summary
-            .hot_state_config()
-            .use_transaction_info_v1;
+        let use_transaction_info_v1 = execution_output.transaction_info_v1;
         let state_checkpoint_output = DoStateCheckpoint::run(
             &execution_output,
             &base_view.state_summary,
