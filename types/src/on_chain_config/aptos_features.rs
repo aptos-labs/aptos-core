@@ -181,6 +181,9 @@ pub enum FeatureFlag {
     /// from `friend/package` to private, while keeping the `entry` modifier. The `entry`
     /// modifier itself still cannot be removed. See issue #19650.
     ALLOW_FRIEND_ENTRY_VISIBILITY_DOWNGRADE = 114,
+    /// If enabled, the per-block hot-state promotion set is embedded into the block
+    /// epilogue transaction payload (`BlockEpiloguePayload::V2`).
+    HOTNESS_IN_EPILOGUE_PAYLOAD = 116,
 }
 
 impl FeatureFlag {
@@ -520,6 +523,10 @@ impl Features {
 
     pub fn is_versioned_transaction_validation_enabled(&self) -> bool {
         self.is_enabled(FeatureFlag::VERSIONED_TRANSACTION_VALIDATION)
+    }
+
+    pub fn is_hotness_in_epilogue_payload_enabled(&self) -> bool {
+        self.is_enabled(FeatureFlag::HOTNESS_IN_EPILOGUE_PAYLOAD)
     }
 
     pub fn get_max_identifier_size(&self) -> u64 {
