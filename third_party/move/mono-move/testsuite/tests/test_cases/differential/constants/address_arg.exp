@@ -14,5 +14,6 @@ fun identity(r0): address {
 fun identity() {
   frame_data_size: 32
   code:
-    0: Return
+    0: Charge #2
+    1: Return
 }

@@ -289,9 +289,11 @@ pub enum MicroOp {
         imm: Box<[u8; 16]>,
     },
 
-    /// Store 32 immediate bytes into the destination slot. Same LE
-    /// convention as `StoreImm8`: `U256.to_le_bytes()` / `I256.to_le_bytes()`,
-    /// or `AccountAddress` bytes verbatim (already a 32-byte buffer).
+    /// Store 32 immediate bytes into the destination slot. For numeric
+    /// values, same LE convention as `StoreImm8`: `U256.to_le_bytes()` /
+    /// `I256.to_le_bytes()`. `AccountAddress` is not numeric — it's a
+    /// 32-byte identifier — so its bytes are copied as-is, with no LE
+    /// reinterpretation.
     ///
     /// TODO(perf): use a side table instead of boxing.
     StoreImm32 {

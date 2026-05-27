@@ -123,7 +123,7 @@ mod micro_op {
         // acc = 1
         code.push(StoreImm8 {
             dst: FO(ACC),
-            imm: 1,
+            imm: 1u64.to_le_bytes(),
         });
 
         let loop_top = code.len() as u32;

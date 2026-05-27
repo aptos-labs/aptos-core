@@ -69,10 +69,10 @@ mod micro_op {
         #[rustfmt::skip]
         let code = vec![
             JumpNotZeroU64 { target: CO(3), src: FO(n) },
-            StoreImm8 { dst: FO(result), imm: 0 },
+            StoreImm8 { dst: FO(result), imm: 0u64.to_le_bytes() },
             Return,
             JumpGreaterEqualU64Imm { target: CO(6), src: FO(n), imm: 2 },
-            StoreImm8 { dst: FO(result), imm: 1 },
+            StoreImm8 { dst: FO(result), imm: 1u64.to_le_bytes() },
             Return,
             SubU64Imm { dst: FO(callee_n), src: FO(n), imm: 1 },
             CallDirect { ptr: fib_ptr },
