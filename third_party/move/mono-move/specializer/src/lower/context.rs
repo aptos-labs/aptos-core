@@ -22,7 +22,8 @@ use mono_move_core::{
         Type, EMPTY_TYPE_LIST,
     },
     Code, CodeOffset, DescriptorId, FieldTypes, FrameLayoutInfo, FrameOffset, Function, Interner,
-    MicroOpGasSchedule, SafePointEntry, SortedSafePointEntries, FRAME_METADATA_SIZE,
+    MicroOpGasSchedule, PreparedModule, SafePointEntry, SortedSafePointEntries,
+    FRAME_METADATA_SIZE,
 };
 use mono_move_gas::GasInstrumentor;
 use move_binary_format::access::ModuleAccess;
@@ -100,7 +101,10 @@ pub struct CallSiteInfo {
 /// Frame layout for one function.
 /// [TODO]: a few raw-`u32` fields remain (sizes/alignments); migrate
 /// them to dedicated newtypes for consistency with `FrameOffset`.
-pub struct LoweringContext {
+pub struct LoweringContext<'a> {
+    /// Module the function lives in; gives lowering access to the
+    /// constant pool and other module-level metadata.
+    pub module: &'a PreparedModule,
     pub home_slots: Vec<SlotInfo>,
     /// End offset of the home-slot region; feeds `callee_base`.
     pub frame_data_size: u32,
@@ -125,7 +129,7 @@ pub struct LoweringContext {
     pub vec_descriptors: UnorderedMap<InternedType, DescriptorId>,
 }
 
-impl LoweringContext {
+impl LoweringContext<'_> {
     /// `DescriptorId` published for `vec_ty` (the vector type itself,
     /// not its element type), or `None` if no entry exists.
     pub fn vec_descriptor_id(&self, vec_ty: InternedType) -> Option<DescriptorId> {
@@ -141,8 +145,8 @@ impl LoweringContext {
 /// internal-invariant violations stay on the `Err` path because they
 /// indicate a real bug. `Skipped` is reserved for "this function is
 /// out of scope for the current lowering, on purpose."
-pub enum BuildContextOutcome {
-    Built(LoweringContext),
+pub enum BuildContextOutcome<'a> {
+    Built(LoweringContext<'a>),
     Skipped(&'static str),
 }
 
@@ -174,13 +178,13 @@ fn contains_nominal(types: &[InternedType]) -> bool {
 ///   "not all types are concrete", "nominal type not yet supported").
 /// - `Err(_)` for unsupported alignments and other internal-invariant
 ///   failures.
-pub fn try_build_context(
-    module_ir: &ModuleIR,
+pub fn try_build_context<'a>(
+    module_ir: &'a ModuleIR,
     func_ir: &FunctionIR,
     ty_args: InternedTypeList,
     interner: &impl Interner,
     vec_descriptors: UnorderedMap<InternedType, DescriptorId>,
-) -> Result<BuildContextOutcome> {
+) -> Result<BuildContextOutcome<'a>> {
     // 1. Compute home slot layout with natural alignment padding.
     //
     // Slots are laid out linearly in declaration order, padding each to
@@ -330,6 +334,7 @@ pub fn try_build_context(
     }
 
     Ok(BuildContextOutcome::Built(LoweringContext {
+        module: &module_ir.module,
         home_slots,
         frame_data_size,
         call_sites,
@@ -456,7 +461,7 @@ pub fn try_lower_function(
     };
 
     let name = module_ir.module.interned_identifier_at(func_ir.name_idx);
-    let (code, raw_safe_points) = lower_function(func_ir, &ctx, &module_ir.module)?;
+    let (code, raw_safe_points) = lower_function(func_ir, &ctx)?;
     // TODO: this remapping of safe-point PCs to the allocating op's own new position
     // will go away once we move gas instrumentation to the stackless exec IR level.
     let (code, pc_map) = GasInstrumentor::new(MicroOpGasSchedule).run_with_pc_map(code);

@@ -16,7 +16,7 @@ use anyhow::{bail, Context, Result};
 use mono_move_core::{
     types::{strip_ref, view_type, InternedType, Type},
     CodeOffset, FrameLayoutInfo, FrameOffset, IntBinaryOp, IntNegateOp, IntOperand, IntShiftOp,
-    IntTy, MicroOp, PreparedModule, SafePointEntry, ShiftOperand,
+    IntTy, MicroOp, SafePointEntry, ShiftOperand,
 };
 use move_core_types::account_address::AccountAddress;
 
@@ -31,9 +31,8 @@ use move_core_types::account_address::AccountAddress;
 pub(super) fn lower_function(
     func_ir: &FunctionIR,
     ctx: &LoweringContext,
-    module: &PreparedModule,
 ) -> Result<(Vec<MicroOp>, Vec<SafePointEntry>)> {
-    let mut state = LoweringState::new(func_ir, ctx, module);
+    let mut state = LoweringState::new(func_ir, ctx);
     for block in &func_ir.blocks {
         // Xfer slots are block-local.
         debug_assert!(
@@ -57,9 +56,7 @@ pub(super) fn lower_function(
 
 struct LoweringState<'a> {
     /// Read-only frame layout for the function being lowered.
-    ctx: &'a LoweringContext,
-    /// Read-only module the function lives in.
-    module: &'a PreparedModule,
+    ctx: &'a LoweringContext<'a>,
     /// Output buffer. Micro-ops are appended in emit order.
     out_buf: Vec<MicroOp>,
     /// `Label(i)` → index in `out_buf` where block `i` begins. Dense
@@ -93,11 +90,10 @@ struct LoweringState<'a> {
 }
 
 impl<'a> LoweringState<'a> {
-    fn new(func_ir: &'a FunctionIR, ctx: &'a LoweringContext, module: &'a PreparedModule) -> Self {
+    fn new(func_ir: &'a FunctionIR, ctx: &'a LoweringContext<'a>) -> Self {
         let num_xfer_positions = ctx.num_xfer_positions as usize;
         LoweringState {
             ctx,
-            module,
             out_buf: Vec::new(),
             label_map: vec![None; func_ir.blocks.len()],
             branch_fixups: Vec::new(),
@@ -254,6 +250,7 @@ impl<'a> LoweringState<'a> {
                 })?;
             },
             // Narrow unsigned loads zero-extend into an 8-byte slot.
+            // TODO: drop the widening once sub-8-byte stores land.
             Instr::LdU8(dst, v) => {
                 let dst_info = self.def_slot(*dst)?;
                 self.emit(MicroOp::StoreImm8 {
@@ -277,6 +274,7 @@ impl<'a> LoweringState<'a> {
             },
             // Narrow signed loads sign-extend first, then bit-cast for the
             // LE byte representation.
+            // TODO: drop the widening once sub-8-byte stores land.
             Instr::LdI8(dst, v) => {
                 let dst_info = self.def_slot(*dst)?;
                 self.emit(MicroOp::StoreImm8 {
@@ -334,8 +332,8 @@ impl<'a> LoweringState<'a> {
                 })?;
             },
             Instr::LdConst(dst, idx) => {
-                let ty = view_type(self.module.interned_constant_type_at(*idx));
-                let bytes = self.module.constant_data_at(*idx);
+                let ty = view_type(self.ctx.module.interned_constant_type_at(*idx));
+                let bytes = self.ctx.module.constant_data_at(*idx);
                 match ty {
                     Type::Address => {
                         let addr = bcs::from_bytes::<AccountAddress>(bytes)
@@ -629,6 +627,8 @@ impl<'a> LoweringState<'a> {
             Instr::UnaryOp(dst, UnaryOp::FreezeRef, src) => {
                 // Runtime no-op: &mut T and &T share the same 16-byte
                 // fat-pointer representation. Propagate the slot value.
+                // TODO: fold this away at the stackless exec IR level so
+                // lowering emits nothing at all.
                 let src_info = self.slot(*src)?;
                 let dst_info = self.def_slot(*dst)?;
                 self.emit_single_move(dst_info.offset, src_info)?;

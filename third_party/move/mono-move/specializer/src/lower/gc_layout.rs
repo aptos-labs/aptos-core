@@ -24,7 +24,7 @@ pub struct DerivedFrameLayout {
 /// Derive the GC frame layout for `func_ir`. `home_slot_types` is
 /// taken separately so the caller can pass a substituted view.
 pub fn derive_frame_layout(
-    ctx: &LoweringContext,
+    ctx: &LoweringContext<'_>,
     func_ir: &FunctionIR,
     home_slot_types: &[InternedType],
 ) -> Result<DerivedFrameLayout> {
