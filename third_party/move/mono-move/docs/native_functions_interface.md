@@ -187,15 +187,10 @@ At session start the VM invokes each factory and stows the resulting `Box<dyn Na
 - **CodeContext** — small Rust-side wrapper holding an optional pointer to a heap-allocated publish request (which can be large — module bundles + metadata).
 - **StateStorageContext** — Rust-side only (borrowed host resolver).
 - **ObjectContext** — memo cache for `create_user_derived_object_address_impl`. Pure compute optimization; could be dropped, or if kept should live on the heap (same accounting argument as the crypto arenas, §4).
-- **AlgebraContext / RistrettoContext** — after the crypto-native rewrite (§4), the natives operate on heap-allocated curve points directly; these extensions may shrink to gas/feature-flag plumbing or go away entirely.
+- **AlgebraContext / RistrettoContext** — these exist today to host shadow-memory arenas for crypto objects. After the crypto-native rewrite (§4) moves those onto the regular heap, the arenas are no longer needed and the extensions can go away.
 - **TableContext, AggregatorContext** — core functionality (table storage, aggregator / delayed-field bookkeeping) moves into the runtime's global value system (§7). What remains, if anything, is a thin shim translating native calls into runtime storage operations; the extension may go away entirely.
 
-**Open question: rollback support.** Context: MonoMove is migrating away from the current VM's multi-session model (separate prologue / user / epilogue sessions stitched via `RespawnedSession`) toward a **single session** spanning the whole transaction, with rollback for partial failures. So extensions are created once and need to survive all three phases; rollback happens in-place. Two ways:
-
-- *Single set + per-extension rollback:* each extension implements checkpoint/rollback only if it needs to. EventStore already does; counters / memo caches / monotonically-increasing things don't. Aligned with the single-session direction.
-- *Spawn fresh per sub-session:* a fresh set per sub-phase, merged across boundaries. Matches today's Aptos VM, but cuts against the single-session goal.
-
-Settle once the sub-session model is pinned down.
+**Rollback.** MonoMove is migrating away from the current VM's multi-session model (separate prologue / user / epilogue sessions stitched via `RespawnedSession`) toward a **single session** spanning the whole transaction, with rollback for partial failures. We go with the **single-set + per-extension rollback** model: extensions are created once per transaction, live across all phases, and each implements checkpoint/rollback only if it has state worth rolling back. EventStore already does; counters / memo caches / monotonically-increasing things don't. (The alternative — spawning a fresh extension set per sub-phase, like today's Aptos VM — cuts against the single-session direction and is rejected.)
 
 ---
 
@@ -204,17 +199,13 @@ Settle once the sub-session model is pinned down.
 - **Delegate entirely.** The native interface exposes thin operations that pass through to the global value system (direction at #19536; not finalized).
 - Checkpoint / rollback is the global value system's concern, not the native interface's.
 
-Context APIs (tentative):
+In practice today, only existence checks are invoked via a native — `borrow_global`, `move_to`, `move_from` etc. are bytecode ops, not native calls. The native-facing context API is correspondingly small:
 
 ```rust
 ctx.exists_at(addr: AccountAddress, ty: InternedType) -> bool
-ctx.borrow_global(addr: AccountAddress, ty: InternedType) -> Result<Ref, _>
-ctx.borrow_global_mut(addr: AccountAddress, ty: InternedType) -> Result<MutRef, _>
-ctx.move_to(addr: AccountAddress, ty: InternedType, value: ValuePtr) -> Result<(), _>
-ctx.move_from(addr: AccountAddress, ty: InternedType) -> Result<ValuePtr, _>
 ```
 
-`Ref` / `MutRef` / `ValuePtr` resolve to whatever the global value system surfaces; the native interface just calls through.
+Table-specific operations (keyed by a `StorageKey`-style scheme rather than `address + type`) will be added separately once the global value system's table story firms up.
 
 ---
 
@@ -254,7 +245,6 @@ Lands once the broader VM error story in [`error_design.md`](error_design.md) se
 - Function resolution & loading
 - Function values / closures
 - Dynamic dispatch (e.g. dispatchable fungible assets, account abstraction)
-- Module traversal
 - Caller-frame introspection (e.g. `event::write_module_event_to_store` reading the caller's module ID for the cross-module-emit check)
 
 ---
@@ -273,7 +263,6 @@ Contract: **charge before work**. See [`vm_security_and_correctness.md`](vm_secu
 
 ## 12. Miscellaneous Open Items
 
-- **Rayon isolation for crypto natives.** Today's pairing and multi-scalar-multiplication natives wrap their work in `with_native_rayon(...)` to avoid deadlocking against the block executor's own rayon pool (the underlying crypto crates use `rayon::par_iter` internally). MonoMove will need an equivalent mechanism.
 - **Runtime reference checks.** The current VM has an opt-in runtime reference checker for borrow-rule safety. Whether MonoMove keeps an equivalent is open.
 
 ---
@@ -281,6 +270,8 @@ Contract: **charge before work**. See [`vm_security_and_correctness.md`](vm_secu
 ## 13. Security Considerations
 
 Native functions are trusted Rust code that bypasses the bytecode verifier — every native extends the VM's TCB. A bug in a native can violate any VM invariant (memory safety, type safety, gas metering, determinism) without any static check catching it. Treat them as a disproportionate risk relative to code volume.
+
+Native function safety is **best-effort by design.** The interface does what's cheaply done (typed accessors, descriptor-driven GC tracing, audit-driven invariants), but natives ultimately have direct access to VM internals when they need it and are responsible for their own correctness.
 
 Concerns specific to natives:
 
