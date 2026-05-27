@@ -849,11 +849,14 @@ impl StateStore {
         let current_state = out_current_state.lock().clone();
         info!(
             latest_in_memory_version = current_state.version(),
-            latest_in_memory_hot_root_hash = current_state.summary().hot_root_hash(),
+            latest_in_memory_hot_root_hash = current_state.summary().hot_root_hash().ok(),
             latest_in_memory_root_hash = current_state.summary().root_hash(),
             latest_snapshot_version = current_state.last_checkpoint().version(),
-            latest_snapshot_hot_root_hash =
-                current_state.last_checkpoint().summary().hot_root_hash(),
+            latest_snapshot_hot_root_hash = current_state
+                .last_checkpoint()
+                .summary()
+                .hot_root_hash()
+                .ok(),
             latest_snapshot_root_hash = current_state.last_checkpoint().summary().root_hash(),
             "StateStore initialization finished.",
         );
