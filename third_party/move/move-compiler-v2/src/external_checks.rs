@@ -133,6 +133,13 @@ pub trait FunctionChecker {
     /// Examine `func_env` and potentially emit reports via `self.report()`.
     fn check_function(&self, func_env: &FunctionEnv);
 
+    /// Whether this checker should also run on test/verify-only code.
+    /// Default `false` skips test code; override to `true` for lints
+    /// that are relevant for test/verify-only code.
+    fn runs_on_test_code(&self) -> bool {
+        false
+    }
+
     /// Report the `msg` highlighting the `loc`.
     fn report(&self, env: &GlobalEnv, loc: &Loc, msg: &str) {
         report(env, loc, msg, self.get_name().as_str());
