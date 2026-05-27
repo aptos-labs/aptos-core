@@ -39,7 +39,7 @@ use aptos_config::config::ConsensusConfig;
 use aptos_consensus_types::{
     block::Block,
     block_data::BlockType,
-    common::{Author, Round},
+    common::{Author, BatchSizeLimits, Round},
     order_vote::OrderVote,
     order_vote_msg::OrderVoteMsg,
     pipelined_block::PipelinedBlock,
@@ -106,13 +106,14 @@ impl UnverifiedEvent {
         self_message: bool,
         max_num_batches: usize,
         max_batch_expiry_gap_usecs: u64,
+        size_limits: BatchSizeLimits,
     ) -> Result<VerifiedEvent, VerifyError> {
         let start_time = Instant::now();
         Ok(match self {
             //TODO: no need to sign and verify the proposal
             UnverifiedEvent::ProposalMsg(p) => {
                 if !self_message {
-                    p.verify(peer_id, validator, proof_cache, quorum_store_enabled)?;
+                    p.verify(peer_id, validator, proof_cache, quorum_store_enabled, size_limits)?;
                     counters::VERIFY_MSG
                         .with_label_values(&["proposal"])
                         .observe(start_time.elapsed().as_secs_f64());

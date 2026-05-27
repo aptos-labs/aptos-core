@@ -2,7 +2,7 @@
 // Parts of the project are originally copyright © Meta Platforms, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::{block::Block, common::Author, proof_of_store::ProofCache, sync_info::SyncInfo};
+use crate::{block::Block, common::{Author, BatchSizeLimits}, proof_of_store::ProofCache, sync_info::SyncInfo};
 use anyhow::{anyhow, ensure, format_err, Context, Result};
 use aptos_short_hex_str::AsShortHexStr;
 use aptos_types::validator_verifier::ValidatorVerifier;
@@ -86,6 +86,7 @@ impl ProposalMsg {
         validator: &ValidatorVerifier,
         proof_cache: &ProofCache,
         quorum_store_enabled: bool,
+        size_limits: BatchSizeLimits,
     ) -> Result<()> {
         if let Some(proposal_author) = self.proposal.author() {
             ensure!(
@@ -96,7 +97,12 @@ impl ProposalMsg {
             );
         }
         self.proposal().payload().map_or(Ok(()), |p| {
-            p.verify(validator, proof_cache, quorum_store_enabled)
+            p.verify(
+                validator,
+                proof_cache,
+                quorum_store_enabled,
+                size_limits,
+            )
         })?;
 
         self.proposal()

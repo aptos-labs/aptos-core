@@ -1530,6 +1530,10 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
             let max_num_batches = self.config.quorum_store.receiver_max_num_batches;
             let max_batch_expiry_gap_usecs =
                 self.config.quorum_store.batch_expiry_gap_when_init_usecs;
+            let size_limits = aptos_consensus_types::common::BatchSizeLimits::new(
+                self.config.quorum_store.receiver_max_batch_txns as u64,
+                self.config.quorum_store.receiver_max_batch_bytes as u64,
+            );
             let payload_manager = self.payload_manager.clone();
             let pending_blocks = self.pending_blocks.clone();
             self.bounded_executor
@@ -1544,6 +1548,7 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
                             peer_id == my_peer_id,
                             max_num_batches,
                             max_batch_expiry_gap_usecs,
+                            size_limits,
                         )
                     ) {
                         Ok(verified_event) => {
