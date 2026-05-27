@@ -188,6 +188,22 @@ pub fn boogie_function_name(fun_env: &FunctionEnv<'_>, inst: &[Type], bv_flag: &
     )
 }
 
+/// Return the boogie "$-spec" function name for a native function.
+/// Native function prelude templates follow the naming convention
+/// `$module_$fname'inst'` for their pure, side-effect-free spec versions
+/// (e.g. `$1_vector_$empty'address'`).  When a native function has no
+/// Move-level spec, the Boogie backend can use this name to produce a
+/// concrete, deterministic body for the behavioral result function instead
+/// of leaving it as an unconstrained uninterpreted function.
+pub fn boogie_native_spec_fun_name(fun_env: &FunctionEnv<'_>, inst: &[Type]) -> String {
+    format!(
+        "${}_${}{}",
+        boogie_module_name(&fun_env.module_env),
+        fun_env.get_name().display(fun_env.symbol_pool()),
+        boogie_inst_suffix(fun_env.module_env.env, inst, &[])
+    )
+}
+
 /// Reverse map mangled function name to source level function name.
 pub fn boogie_reverse_function_name(_env: &GlobalEnv, s: &str) -> Option<String> {
     // TODO: in order to make this actually reversible, we can't use ${}_{}{} above
@@ -443,6 +459,29 @@ pub fn boogie_num_type_string(kind: &str, num: &str, bv_flag: bool) -> String {
 pub fn boogie_num_type_string_capital(kind: &str, num: &str, bv_flag: bool) -> String {
     let pre = if bv_flag { "Bv" } else { kind };
     [pre, num].join("")
+}
+
+/// Boogie procedure-name suffix for an integer-typed dest of an arithmetic op,
+/// e.g. `U64`, `I128`, `Bv32`. Used by the `Add`/`Sub`/`Mul`/`Div`/`Mod` arms of
+/// the bytecode translator to dispatch to the right per-type Boogie procedure.
+/// Panics if `ty` is not a primitive integer.
+pub fn boogie_int_suffix(ty: &Type, bv_flag: bool) -> String {
+    use PrimitiveType::*;
+    match ty {
+        Type::Primitive(U8) => boogie_num_type_string_capital("U", "8", bv_flag),
+        Type::Primitive(U16) => boogie_num_type_string_capital("U", "16", bv_flag),
+        Type::Primitive(U32) => boogie_num_type_string_capital("U", "32", bv_flag),
+        Type::Primitive(U64) => boogie_num_type_string_capital("U", "64", bv_flag),
+        Type::Primitive(U128) => boogie_num_type_string_capital("U", "128", bv_flag),
+        Type::Primitive(U256) => boogie_num_type_string_capital("U", "256", bv_flag),
+        Type::Primitive(I8) => boogie_num_type_string_capital("I", "8", bv_flag),
+        Type::Primitive(I16) => boogie_num_type_string_capital("I", "16", bv_flag),
+        Type::Primitive(I32) => boogie_num_type_string_capital("I", "32", bv_flag),
+        Type::Primitive(I64) => boogie_num_type_string_capital("I", "64", bv_flag),
+        Type::Primitive(I128) => boogie_num_type_string_capital("I", "128", bv_flag),
+        Type::Primitive(I256) => boogie_num_type_string_capital("I", "256", bv_flag),
+        _ => unreachable!("non-integer dest for arithmetic op"),
+    }
 }
 
 /// Return the boogie base type for a number type.

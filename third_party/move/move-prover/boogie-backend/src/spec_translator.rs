@@ -1395,11 +1395,11 @@ impl SpecTranslator<'_> {
             Operation::Copy | Operation::Move => self.translate_exp(&args[0]),
 
             // Binary operators
-            Operation::Add => self.translate_op("+", "Add", args),
-            Operation::Sub => self.translate_op("-", "Sub", args),
-            Operation::Mul => self.translate_op("*", "Mul", args),
-            Operation::Mod => self.translate_op("mod", "Mod", args),
-            Operation::Div => self.translate_op("div", "Div", args),
+            Operation::Add => self.translate_op("+", "Add", None, args),
+            Operation::Sub => self.translate_op("-", "Sub", None, args),
+            Operation::Mul => self.translate_op("*", "Mul", None, args),
+            Operation::Mod => self.translate_op("mod", "Mod", Some("$signed_mod"), args),
+            Operation::Div => self.translate_op("div", "Div", Some("$signed_div"), args),
             Operation::BitOr => self.translate_bit_op("$Or", args),
             Operation::BitAnd => self.translate_bit_op("$And", args),
             Operation::Xor => self.translate_bit_op("$Xor", args),
@@ -1409,10 +1409,10 @@ impl SpecTranslator<'_> {
             Operation::Iff => self.translate_logical_op("<==>", args),
             Operation::And => self.translate_logical_op("&&", args),
             Operation::Or => self.translate_logical_op("||", args),
-            Operation::Lt => self.translate_op("<", "Lt", args),
-            Operation::Le => self.translate_op("<=", "Le", args),
-            Operation::Gt => self.translate_op(">", "Gt", args),
-            Operation::Ge => self.translate_op(">=", "Ge", args),
+            Operation::Lt => self.translate_op("<", "Lt", None, args),
+            Operation::Le => self.translate_op("<=", "Le", None, args),
+            Operation::Gt => self.translate_op(">", "Gt", None, args),
+            Operation::Ge => self.translate_op(">=", "Ge", None, args),
             Operation::Identical => self.translate_identical(args),
             Operation::Eq => self.translate_eq_neq("$IsEqual", args),
             Operation::Neq => self.translate_eq_neq("!$IsEqual", args),
@@ -3335,7 +3335,19 @@ impl SpecTranslator<'_> {
         }
     }
 
-    fn translate_op(&self, boogie_op: &str, bv_op: &str, args: &[Exp]) {
+    /// Translates a binary arithmetic / relational op. `boogie_op` is the
+    /// infix operator for the unsigned (Euclidean / boolean) case; `bv_op` is
+    /// the bitwise function-name prefix (e.g. `Div`, `Lt`). `signed_helper`
+    /// is `Some("$signed_div" | "$signed_mod")` for `/` and `%`, which need
+    /// truncate-toward-zero semantics on signed operands; all other ops pass
+    /// `None` because they coincide under Move's and Boogie's encodings.
+    fn translate_op(
+        &self,
+        boogie_op: &str,
+        bv_op: &str,
+        signed_helper: Option<&str>,
+        args: &[Exp],
+    ) {
         let global_state = &self
             .env
             .get_extension::<GlobalNumberOperationState>()
@@ -3349,6 +3361,15 @@ impl SpecTranslator<'_> {
                 true,
             );
             emit!(self.writer, "${}'{}'(", bv_op, oper_base);
+            self.translate_seq(args.iter(), ", ", |e| self.translate_exp(e));
+            emit!(self.writer, ")");
+        } else if let Some(helper) = signed_helper.filter(|_| {
+            self.env
+                .get_node_type(args[0].node_id())
+                .skip_reference()
+                .is_signed_int()
+        }) {
+            emit!(self.writer, "{}(", helper);
             self.translate_seq(args.iter(), ", ", |e| self.translate_exp(e));
             emit!(self.writer, ")");
         } else {

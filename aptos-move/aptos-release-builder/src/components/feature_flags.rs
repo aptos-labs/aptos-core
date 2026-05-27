@@ -166,6 +166,7 @@ pub enum FeatureFlag {
     VersionedTransactionValidation,
     StorageSlotNatives,
     AllowFriendEntryVisibilityDowngrade,
+    HotnessInEpiloguePayload,
 }
 
 fn generate_features_blob(writer: &CodeWriter, data: &[u64]) {
@@ -435,6 +436,7 @@ impl From<FeatureFlag> for AptosFeatureFlag {
             FeatureFlag::AllowFriendEntryVisibilityDowngrade => {
                 AptosFeatureFlag::ALLOW_FRIEND_ENTRY_VISIBILITY_DOWNGRADE
             },
+            FeatureFlag::HotnessInEpiloguePayload => AptosFeatureFlag::HOTNESS_IN_EPILOGUE_PAYLOAD,
         }
     }
 }
@@ -631,6 +633,7 @@ impl From<AptosFeatureFlag> for FeatureFlag {
             AptosFeatureFlag::ALLOW_FRIEND_ENTRY_VISIBILITY_DOWNGRADE => {
                 FeatureFlag::AllowFriendEntryVisibilityDowngrade
             },
+            AptosFeatureFlag::HOTNESS_IN_EPILOGUE_PAYLOAD => FeatureFlag::HotnessInEpiloguePayload,
         }
     }
 }

@@ -61,6 +61,9 @@ pub(crate) fn get_realistic_env_test(
         "realistic_env_max_load_randomness_mixed" => {
             realistic_env_max_load_randomness_mixed_test(duration)
         },
+        "realistic_env_chunky_dkg_epoch_change" => {
+            realistic_env_chunky_dkg_epoch_change_test(duration)
+        },
         _ => return None, // The test name does not match a realistic-env test
     };
     Some(test)
@@ -570,9 +573,9 @@ pub(crate) fn realistic_env_max_load_encrypted_test(duration: Duration) -> Forge
             config.consensus.quorum_store.enable_opt_qs_v2_payload_rx = true;
             config.consensus_observer.enable_v2_message_sending = true;
             config.consensus.digest_key_blob_path =
-                Some("/opt/aptos/genesis/digest_key.bin".into());
+                Some("/opt/aptos/data/trusted-setup/digest_key.bin".into());
             config.consensus.public_parameters_blob_path =
-                Some("/opt/aptos/genesis/pp.bin".into());
+                Some("/opt/aptos/data/trusted-setup/pp.bin".into());
         }))
         .with_fullnode_override_node_config_fn(Arc::new(|config, _| {
             config.api.allow_encrypted_txns_submission = true;
@@ -645,9 +648,9 @@ pub(crate) fn realistic_env_max_load_encrypted_mix_test(duration: Duration) -> F
             config.consensus.quorum_store.enable_opt_qs_v2_payload_rx = true;
             config.consensus_observer.enable_v2_message_sending = true;
             config.consensus.digest_key_blob_path =
-                Some("/opt/aptos/genesis/digest_key.bin".into());
+                Some("/opt/aptos/data/trusted-setup/digest_key.bin".into());
             config.consensus.public_parameters_blob_path =
-                Some("/opt/aptos/genesis/pp.bin".into());
+                Some("/opt/aptos/data/trusted-setup/pp.bin".into());
         }))
         .with_fullnode_override_node_config_fn(Arc::new(|config, _| {
             config.api.allow_encrypted_txns_submission = true;
@@ -659,6 +662,88 @@ pub(crate) fn realistic_env_max_load_encrypted_mix_test(duration: Duration) -> F
                 .latency_polling_interval(Duration::from_millis(100)),
         )
         .with_success_criteria(success_criteria)
+}
+
+/// Asserts that epoch transitions are stable when Chunky DKG and encrypted transactions
+/// are both enabled. 20 validators, 1 PFN, 200 TPS of encrypted transfers, with an
+/// epoch change every 2 minutes.
+pub(crate) fn realistic_env_chunky_dkg_epoch_change_test(duration: Duration) -> ForgeConfig {
+    let num_validators = 20;
+    let num_vfns = 0;
+    let num_pfns = 1;
+
+    let success_criteria = SuccessCriteria::new(150)
+        .add_no_restarts()
+        .add_wait_for_catchup_s((duration.as_secs() / 10).max(60))
+        .add_latency_threshold(5.0, LatencyType::P50)
+        .add_latency_threshold(7.0, LatencyType::P70)
+        .add_chain_progress(StateProgressThreshold {
+            max_non_epoch_no_progress_secs: 20.0,
+            max_epoch_no_progress_secs: 20.0,
+            max_non_epoch_round_gap: 6,
+            max_epoch_round_gap: 6,
+        });
+
+    ForgeConfig::default()
+        .with_initial_validator_count(NonZeroUsize::new(num_validators).unwrap())
+        .with_initial_fullnode_count(num_vfns)
+        .add_network_test(wrap_with_realistic_env(
+            num_validators,
+            PerformanceBenchmark,
+        ))
+        .with_genesis_helm_config_fn(Arc::new(|helm_values| {
+            helm_values["chain"]["epoch_duration_secs"] = 120.into();
+            helm_values["chain"]["on_chain_consensus_config"] =
+                serde_yaml::to_value(OnChainConsensusConfig::default_for_genesis())
+                    .expect("must serialize");
+            helm_values["chain"]["on_chain_execution_config"] =
+                serde_yaml::to_value(OnChainExecutionConfig::default_for_genesis())
+                    .expect("must serialize");
+            helm_values["chain"]["randomness_config_override"] =
+                serde_yaml::to_value(OnChainRandomnessConfig::default_enabled())
+                    .expect("must serialize");
+            helm_values["chain"]["chunky_dkg_config_override"] =
+                serde_yaml::to_value(OnChainChunkyDKGConfig::default_enabled())
+                    .expect("must serialize");
+            let mut features = Features::default();
+            features.enable(FeatureFlag::ENCRYPTED_TRANSACTIONS);
+            helm_values["chain"]["initial_features_override"] =
+                serde_yaml::to_value(features).expect("must serialize");
+        }))
+        .with_digest_key_blob_url("https://github.com/aptos-labs/aptos-networks/raw/8cfc400bc1e42a232b5b36cde779a5b71d4d275b/devnet/digest_key.bin")
+        .with_public_parameters_blob_url("https://github.com/aptos-labs/aptos-networks/raw/8cfc400bc1e42a232b5b36cde779a5b71d4d275b/devnet/pp.bin")
+        .with_validator_override_node_config_fn(Arc::new(|config, _| {
+            config.base.enable_validator_pfn_connections = true;
+            config.api.allow_encrypted_txns_submission = true;
+            config.consensus.quorum_store.enable_batch_v2_tx = true;
+            config.consensus.quorum_store.enable_batch_v2_rx = true;
+            config.consensus.quorum_store.enable_opt_qs_v2_payload_tx = true;
+            config.consensus.quorum_store.enable_opt_qs_v2_payload_rx = true;
+            config.consensus_observer.enable_v2_message_sending = true;
+            config.consensus.digest_key_blob_path =
+                Some("/opt/aptos/data/trusted-setup/digest_key.bin".into());
+            config.consensus.public_parameters_blob_path =
+                Some("/opt/aptos/data/trusted-setup/pp.bin".into());
+        }))
+        .with_pfn_override_node_config_fn(Arc::new(|config, _| {
+            config.base.enable_validator_pfn_connections = true;
+            config.api.allow_encrypted_txns_submission = true;
+            config.consensus_observer.observer_enabled = true;
+            config
+                .consensus_observer
+                .observer_fallback_progress_threshold_ms = 30_000;
+            config
+                .consensus_observer
+                .observer_fallback_sync_lag_threshold_ms = 45_000;
+        }))
+        .with_emit_job(
+            EmitJobRequest::default()
+                .mode(EmitJobMode::ConstTps { tps: 200 })
+                .encrypt_transactions(true)
+                .latency_polling_interval(Duration::from_millis(100)),
+        )
+        .with_success_criteria(success_criteria)
+        .with_num_pfns(num_pfns)
 }
 
 /// Load test with 100% randomness-consuming transactions.

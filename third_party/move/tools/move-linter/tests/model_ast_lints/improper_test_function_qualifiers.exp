@@ -1,0 +1,64 @@
+
+Diagnostics:
+warning: [lint] `#[test]` functions should not have visibility qualifiers
+   ┌─ tests/model_ast_lints/improper_test_function_qualifiers.move:11:16
+   │
+11 │     public fun test_public() {}
+   │                ^^^^^^^^^^^
+   │
+   = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(improper_test_function_qualifiers)]`.
+   = For more information, see https://aptos.dev/en/build/smart-contracts/linter#improper_test_function_qualifiers.
+
+warning: [lint] `#[test]` functions should not be `entry`
+   ┌─ tests/model_ast_lints/improper_test_function_qualifiers.move:15:15
+   │
+15 │     entry fun test_entry() {}
+   │               ^^^^^^^^^^
+   │
+   = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(improper_test_function_qualifiers)]`.
+   = For more information, see https://aptos.dev/en/build/smart-contracts/linter#improper_test_function_qualifiers.
+
+warning: [lint] `#[test]` functions should not have visibility qualifiers and should not be `entry`
+   ┌─ tests/model_ast_lints/improper_test_function_qualifiers.move:19:22
+   │
+19 │     public entry fun test_public_entry() {}
+   │                      ^^^^^^^^^^^^^^^^^
+   │
+   = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(improper_test_function_qualifiers)]`.
+   = For more information, see https://aptos.dev/en/build/smart-contracts/linter#improper_test_function_qualifiers.
+
+warning: [lint] `#[test]` functions should not have visibility qualifiers
+   ┌─ tests/model_ast_lints/improper_test_function_qualifiers.move:23:17
+   │
+23 │     package fun test_public_package() {}
+   │                 ^^^^^^^^^^^^^^^^^^^
+   │
+   = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(improper_test_function_qualifiers)]`.
+   = For more information, see https://aptos.dev/en/build/smart-contracts/linter#improper_test_function_qualifiers.
+
+warning: [lint] `#[test_only]` functions should not be `entry`
+   ┌─ tests/model_ast_lints/improper_test_function_qualifiers.move:29:15
+   │
+29 │     entry fun test_only_entry() {}
+   │               ^^^^^^^^^^^^^^^
+   │
+   = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(improper_test_function_qualifiers)]`.
+   = For more information, see https://aptos.dev/en/build/smart-contracts/linter#improper_test_function_qualifiers.
+
+warning: [lint] `#[test_only]` functions should not be `entry`
+   ┌─ tests/model_ast_lints/improper_test_function_qualifiers.move:33:22
+   │
+33 │     public entry fun test_only_public_entry() {}
+   │                      ^^^^^^^^^^^^^^^^^^^^^^
+   │
+   = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(improper_test_function_qualifiers)]`.
+   = For more information, see https://aptos.dev/en/build/smart-contracts/linter#improper_test_function_qualifiers.
+
+warning: [lint] `#[test_only]` functions should not be `entry`
+   ┌─ tests/model_ast_lints/improper_test_function_qualifiers.move:88:15
+   │
+88 │     entry fun module_level_entry() {}
+   │               ^^^^^^^^^^^^^^^^^^
+   │
+   = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(improper_test_function_qualifiers)]`.
+   = For more information, see https://aptos.dev/en/build/smart-contracts/linter#improper_test_function_qualifiers.

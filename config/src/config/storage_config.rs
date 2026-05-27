@@ -263,8 +263,6 @@ pub struct HotStateConfig {
     /// Whether execution should construct write sets using the V1 format and include hotness
     /// changes in serialized format.
     pub use_write_set_v1: bool,
-    /// Whether to embed the per-block hot-state promotions into the epilogue transactions.
-    pub persist_hotness_in_epilogue: bool,
     /// Whether execution should assemble `TransactionInfoV1` which carries hot state root hash.
     pub use_transaction_info_v1: bool,
 }
@@ -277,7 +275,6 @@ impl Default for HotStateConfig {
             delete_on_restart: true,
             compute_root_hash: true,
             use_write_set_v1: false,
-            persist_hotness_in_epilogue: false,
             use_transaction_info_v1: false,
         }
     }

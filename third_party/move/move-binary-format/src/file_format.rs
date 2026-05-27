@@ -2213,12 +2213,14 @@ pub enum Bytecode {
     #[description = r#"
         Perform a modulo operation on the two integer values at the top of the stack and push the result on the stack.
 
-        This operation aborts the transaction in case the right hand side is zero.
+        This operation aborts the transaction in case the right hand side is zero or overflow happens.
+        Overflow can only happen for signed integer types, when the left hand side is the minimum
+        value of the type and the right hand side is -1.
     "#]
     #[semantics = r#"
         stack >> rhs
         stack >> lhs
-        if rhs == 0
+        if rhs == 0 || (lhs == i<N>::MIN && rhs == -1)
             arithmetic error
         else
             stack << (lhs % rhs)
