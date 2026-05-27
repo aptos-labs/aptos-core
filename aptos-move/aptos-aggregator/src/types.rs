@@ -161,13 +161,9 @@ impl DelayedFieldValue {
             (Derived(bytes), layout) if is_derived_string_struct_layout(layout) => {
                 bytes_and_width_to_derived_string_struct(bytes, width as usize)?
             },
-            (value, layout) => {
-                return Err(
-                    PartialVMError::new(StatusCode::VM_EXTENSION_ERROR).with_message(format!(
-                        "Failed to convert {:?} into Move value with {} layout",
-                        value, layout
-                    )),
-                )
+            (value, _layout) => {
+                return Err(PartialVMError::new(StatusCode::VM_EXTENSION_ERROR)
+                    .with_message(format!("Failed to convert {:?} into Move value", value)))
             },
         })
     }
@@ -213,8 +209,8 @@ impl TryFromMoveValue for DelayedFieldValue {
             _ => {
                 return Err(
                     PartialVMError::new(StatusCode::VM_EXTENSION_ERROR).with_message(format!(
-                        "Failed to convert Move value {:?} with {} layout into AggregatorValue",
-                        value, layout
+                        "Failed to convert Move value {} into AggregatorValue",
+                        value
                     )),
                 )
             },

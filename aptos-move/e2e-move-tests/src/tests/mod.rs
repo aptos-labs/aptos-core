@@ -28,6 +28,7 @@ mod fee_payer;
 mod friends;
 mod function_caches;
 mod function_value_depth;
+mod function_value_layout_dag;
 mod function_values;
 mod fungible_asset;
 mod fv_as_table_keys;
