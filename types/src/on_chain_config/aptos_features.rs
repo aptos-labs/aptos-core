@@ -181,6 +181,15 @@ pub enum FeatureFlag {
     /// from `friend/package` to private, while keeping the `entry` modifier. The `entry`
     /// modifier itself still cannot be removed. See issue #19650.
     ALLOW_FRIEND_ENTRY_VISIBILITY_DOWNGRADE = 114,
+    /// When enabled, per-block hot-state promotions are persisted through the block
+    /// epilogue: the promotion set is embedded into the block epilogue transaction
+    /// payload (`BlockEpiloguePayload::V2`), and every transaction output in the block
+    /// uses the V1 write-set format, which encodes hot-state changes in its serialized
+    /// writes.
+    HOTNESS_IN_EPILOGUE = 116,
+    /// When enabled, execution assembles `TransactionInfoV1`, which carries the hot
+    /// state root hash, so it is committed to the ledger accumulator.
+    TRANSACTION_INFO_V1 = 117,
 }
 
 impl FeatureFlag {
@@ -520,6 +529,14 @@ impl Features {
 
     pub fn is_versioned_transaction_validation_enabled(&self) -> bool {
         self.is_enabled(FeatureFlag::VERSIONED_TRANSACTION_VALIDATION)
+    }
+
+    pub fn is_hotness_in_epilogue_enabled(&self) -> bool {
+        self.is_enabled(FeatureFlag::HOTNESS_IN_EPILOGUE)
+    }
+
+    pub fn is_transaction_info_v1_enabled(&self) -> bool {
+        self.is_enabled(FeatureFlag::TRANSACTION_INFO_V1)
     }
 
     pub fn get_max_identifier_size(&self) -> u64 {

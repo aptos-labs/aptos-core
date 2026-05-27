@@ -876,6 +876,19 @@ module std::features {
         is_enabled(MULTISIG_TIMELOCK)
     }
 
+    /// When enabled, per-block hot-state promotions are persisted through the block
+    /// epilogue: the promotion set is embedded into the block epilogue transaction
+    /// payload (`BlockEpiloguePayload::V2`), and every transaction output in the block
+    /// uses the V1 write-set format, which encodes hot-state changes in its serialized
+    /// writes.
+    /// Lifetime: permanent
+    const HOTNESS_IN_EPILOGUE: u64 = 116;
+
+    /// When enabled, execution assembles `TransactionInfoV1`, which carries the hot
+    /// state root hash, so it is committed to the ledger accumulator.
+    /// Lifetime: permanent
+    const TRANSACTION_INFO_V1: u64 = 117;
+
     // ============================================================================================
     // Feature Flag Implementation
 

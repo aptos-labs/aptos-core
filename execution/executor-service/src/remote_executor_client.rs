@@ -195,7 +195,7 @@ impl<S: StateView + Sync + Send + 'static> ExecutorClient<S> for RemoteExecutorC
             let execution_request = RemoteExecutionRequest::ExecuteBlock(ExecuteBlockCommand {
                 sub_blocks,
                 concurrency_level: concurrency_level_per_shard,
-                onchain_config: onchain_config.clone(),
+                onchain_config,
             });
 
             senders[shard_id]
