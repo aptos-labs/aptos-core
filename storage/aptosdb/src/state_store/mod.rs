@@ -849,14 +849,17 @@ impl StateStore {
         let current_state = out_current_state.lock().clone();
         info!(
             latest_in_memory_version = current_state.version(),
-            latest_in_memory_hot_root_hash = current_state.summary().hot_root_hash().ok(),
+            latest_in_memory_hot_root_hash = current_state
+                .summary()
+                .hot_root_hash()
+                .expect("main state always has a hot half"),
             latest_in_memory_root_hash = current_state.summary().root_hash(),
             latest_snapshot_version = current_state.last_checkpoint().version(),
             latest_snapshot_hot_root_hash = current_state
                 .last_checkpoint()
                 .summary()
                 .hot_root_hash()
-                .ok(),
+                .expect("main state always has a hot half"),
             latest_snapshot_root_hash = current_state.last_checkpoint().summary().root_hash(),
             "StateStore initialization finished.",
         );
@@ -935,7 +938,7 @@ impl StateStore {
         }
 
         // synchronously commit the snapshot at the last checkpoint here if not committed to disk yet.
-        buffered_state.update(
+        buffered_state.update_and_report(
             updated,
             hot_state_updates,
             0,    /* estimated_items, doesn't matter since we sync-commit */
@@ -1008,6 +1011,12 @@ impl StateStore {
     }
 
     pub fn reset(&self) {
+        // Drain + shut down the old pipeline against the *current*
+        // chain family before `create_buffered_state_from_latest_snapshot`
+        // repoints `current_state` at a new MapLayer family. Doing
+        // the shutdown lazily via `Drop` would let the old thread's
+        // drop-time `sync_commit` read the new family and panic on
+        // `is_descendant_of`.
         self.buffered_state.lock().quit();
         // TODO(HotState): restore does not reconstruct the hot state yet, so we pass empty
         // metadata here. This is safe because callers (restore / state-sync) open the DB with
