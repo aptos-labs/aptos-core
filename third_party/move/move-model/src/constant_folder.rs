@@ -320,6 +320,9 @@ impl<'env> ConstantFolder<'env> {
                             // the prover's translation differs from runtime wrap.
                             return None;
                         };
+                        // Typing only admits unsigned `Shl` operands; the
+                        // modular wrap below assumes that.
+                        debug_assert!(!result_pty.is_signed());
                         // Wrap modulo 2^N to match the runtime's wrapping `<<`.
                         let num_bits = BigInt::from(bits);
                         self.shift_rhs_check(val1, &num_bits, id, name())
