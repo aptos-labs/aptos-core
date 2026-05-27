@@ -8,6 +8,8 @@ module aptos_framework::reconfiguration_with_dkg {
     use aptos_framework::create_signer;
     use aptos_framework::decryption;
     use aptos_framework::dkg;
+    use aptos_framework::epoch_timeout_config;
+    use aptos_framework::event;
     use aptos_framework::execution_config;
     use aptos_framework::gas_schedule;
     use aptos_framework::jwk_consensus_config;
@@ -23,6 +25,17 @@ module aptos_framework::reconfiguration_with_dkg {
     use aptos_framework::timestamp;
     friend aptos_framework::block;
     friend aptos_framework::aptos_governance;
+
+    #[event]
+    enum ForceEndEpochEvent has drop, store {
+        V1 {
+            epoch: u64,
+            dkg_incomplete: bool,
+            chunky_incomplete: bool,
+            deadline_us: u64,
+            now_us: u64,
+        }
+    }
 
     /// Trigger a reconfiguration with DKG.
     /// Do nothing if one is already in progress.
@@ -97,6 +110,7 @@ module aptos_framework::reconfiguration_with_dkg {
         randomness_api_v0_config::on_new_epoch(framework);
         chunky_dkg_config_seqnum::on_new_epoch(framework);
         chunky_dkg_config::on_new_epoch(framework);
+        epoch_timeout_config::on_new_epoch(framework);
         decryption::on_new_epoch(framework);
         reconfiguration::reconfigure();
     }
@@ -112,6 +126,31 @@ module aptos_framework::reconfiguration_with_dkg {
     /// signal "something may have changed" and let this function decide.
     fun try_finalize_reconfig(account: &signer) {
         if (!reconfiguration_state::is_in_progress()) { return };
+
+        // Emergency watchdog: force-finalize regardless of DKG state once the
+        // grace period has elapsed since reconfiguration started. Equivalent
+        // to `now >= last_reconfiguration_time + epoch_interval + grace_period`,
+        // since `reconfiguration_state::start_time_secs()` is set when the
+        // block prologue triggers reconfig after `epoch_interval` has elapsed.
+        let force_end_grace = epoch_timeout_config::force_end_grace_period_secs();
+        if (force_end_grace.is_some()) {
+            let now_us = timestamp::now_microseconds();
+            let deadline_us = reconfiguration_state::start_time_secs() * 1_000_000
+                + (*force_end_grace.borrow()) * 1_000_000;
+            if (now_us >= deadline_us) {
+                let dkg_incomplete = dkg::incomplete_session().is_some();
+                let chunky_incomplete = chunky_dkg::incomplete_session().is_some();
+                event::emit(ForceEndEpochEvent::V1 {
+                    epoch: reconfiguration::current_epoch(),
+                    dkg_incomplete,
+                    chunky_incomplete,
+                    deadline_us,
+                    now_us,
+                });
+                finish(account);
+                return
+            };
+        };
 
         // DKG must be done.
         if (dkg::incomplete_session().is_some()) { return };
