@@ -1,0 +1,7 @@
+//# publish
+module 0x22::test
+
+public fun ret_instr()
+    ret
+
+//# run --verbose 0x22::test::ret_instr --display-trace

@@ -1,0 +1,41 @@
+//**** Cross-compiled for `move` syntax from `tests/control_flow/break_continue_for_loop_nested.move`
+
+//# run
+script {
+    fun main() {
+        let _v0;
+        let _v1 = 0;
+        let _v2 = 0;
+        let _v3 = 0;
+        let _v4 = false;
+        'l0: loop {
+            loop {
+                if (_v4) _v3 = _v3 + 1 else _v4 = true;
+                if (!(_v3 < 10)) break 'l0;
+                _v2 = _v2 + 1;
+                if (_v2 >= 15) break 'l0;
+                _v2 = _v2 + 2;
+                _v0 = 0;
+                let _v5 = 0;
+                let _v6 = false;
+                loop {
+                    if (_v6) _v5 = _v5 + 1 else _v6 = true;
+                    if (!(_v5 < 10)) break;
+                    _v0 = _v0 + 1;
+                    if (_v0 >= 15) break;
+                    _v0 = _v0 + 2;
+                    if (_v5 % 2 == 0) continue;
+                    _v0 = _v0 * 2
+                };
+                if (!(_v0 == 16)) break;
+                _v1 = _v1 + _v0;
+                if (_v3 % 2 == 0) continue;
+                _v2 = _v2 * 2;
+                continue
+            };
+            abort _v0
+        };
+        _v0 = 3 * _v1 + _v2;
+        assert!(_v0 == 160, _v0);
+    }
+}

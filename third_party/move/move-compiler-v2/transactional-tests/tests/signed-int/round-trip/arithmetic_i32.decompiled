@@ -1,0 +1,165 @@
+//**** Cross-compiled for `move` syntax from `tests/signed-int/arithmetic_i32.move`
+
+//# run --verbose
+script {
+    fun main() {
+        ()
+    }
+}
+
+
+//# run --verbose
+script {
+    fun main() {
+        let _v0 = 1i32 + 2147483647i32;
+    }
+}
+
+
+//# run --verbose
+script {
+    fun main() {
+        let _v0 = -1i32 + -2147483648i32;
+    }
+}
+
+
+//# run --verbose
+script {
+    fun main() {
+        ()
+    }
+}
+
+
+//# run --verbose
+script {
+    fun main() {
+        let _v0 = -2i32 - 2147483647i32;
+    }
+}
+
+
+//# run --verbose
+script {
+    fun main() {
+        let _v0 = 1i32 - -2147483647i32;
+    }
+}
+
+
+//# run --verbose
+script {
+    fun main() {
+        ()
+    }
+}
+
+
+//# run --verbose
+script {
+    fun main() {
+        let _v0 = 46341i32 * 46341i32;
+    }
+}
+
+
+//# run --verbose
+script {
+    fun main() {
+        let _v0 = -46341i32 * -46341i32;
+    }
+}
+
+
+//# run --verbose
+script {
+    fun main() {
+        let _v0 = 2147483647i32 * 2i32;
+    }
+}
+
+
+//# run --verbose
+script {
+    fun main() {
+        let _v0 = -2147483648i32 * -1i32;
+    }
+}
+
+
+//# run --verbose
+script {
+    fun main() {
+        ()
+    }
+}
+
+
+//# run --verbose
+script {
+    fun main() {
+        let _v0 = 1i32 / 0i32;
+    }
+}
+
+
+//# run --verbose
+script {
+    fun main() {
+        let _v0 = -1i32 / 0i32;
+    }
+}
+
+
+//# run --verbose
+script {
+    fun main() {
+        let _v0 = -2147483648i32 / -1i32;
+    }
+}
+
+
+//# run --verbose
+script {
+    fun main() {
+        ()
+    }
+}
+
+
+//# run --verbose
+script {
+    fun main() {
+        let _v0 = 1i32 % 0i32;
+    }
+}
+
+
+//# run --verbose
+script {
+    fun main() {
+        let _v0 = -1i32 % 0i32;
+    }
+}
+
+
+//# publish
+module 0xff::negate_i32 {
+    fun negate(p0: i32): i32 {
+        -p0
+    }
+    public fun test1() {
+        let _v0 = -20i32;
+        let _v1 = negate(20i32);
+        assert!(_v0 == _v1, 14566554180833181696);
+    }
+    public fun test2() {
+        let _v0 = negate(-2147483648i32);
+    }
+}
+
+
+//# run 0xff::negate_i32::test1 --verbose
+
+//# run 0xff::negate_i32::test2 --verbose

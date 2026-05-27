@@ -1,0 +1,8 @@
+//# publish
+module 0x22::test
+
+public fun ld_u128_instr(): u128
+    ld_u128 128
+    ret
+
+//# run --verbose 0x22::test::ld_u128_instr --display-trace

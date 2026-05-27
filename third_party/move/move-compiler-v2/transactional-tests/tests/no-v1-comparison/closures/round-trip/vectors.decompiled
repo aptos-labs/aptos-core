@@ -1,0 +1,42 @@
+//**** Cross-compiled for `move` syntax from `tests/no-v1-comparison/closures/vectors.move`
+
+//# publish
+module 0x42::test {
+    use 0x1::vector;
+    public fun eval(p0: u64): u64 {
+        let _v0 = make();
+        let _v1 = 0;
+        let _v2 = _v0;
+        vector::reverse<|u64|(u64) has drop>(&mut _v2);
+        while (!vector::is_empty<|u64|(u64) has drop>(&_v2)) {
+            let _v3 = vector::pop_back<|u64|(u64) has drop>(&mut _v2);
+            let _v4 = _v3(p0);
+            _v1 = _v1 + _v4;
+            continue
+        };
+        _v1
+    }
+    fun make(): vector<|u64|(u64) has drop> {
+        let _v0: |u64|u64 has copy + drop = |arg0| lambda__1__make(arg0);
+        let _v1: |u64|u64 has copy + drop = |arg0| lambda__2__make(arg0);
+        let _v2: |u64|u64 has copy + drop = |arg0| lambda__3__make(arg0);
+        let _v3 = vector::empty<|u64|(u64) has drop>();
+        let _v4 = &mut _v3;
+        vector::push_back<|u64|(u64) has drop>(_v4, _v0);
+        vector::push_back<|u64|(u64) has drop>(_v4, _v1);
+        vector::push_back<|u64|(u64) has drop>(_v4, _v2);
+        _v3
+    }
+    fun lambda__1__make(p0: u64): u64 {
+        p0 + 1
+    }
+    fun lambda__2__make(p0: u64): u64 {
+        p0 + 2
+    }
+    fun lambda__3__make(p0: u64): u64 {
+        p0 + 3
+    }
+}
+
+
+//# run 0x42::test::eval --args 2

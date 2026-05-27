@@ -1,4 +1,4 @@
 processed 2 tasks
-
-task 1 'run'. lines 30-30:
+task 0 lines 1-28:  publish [// TODO(#12036): should pass once optimizations on by default]
+task 1 lines 30-30:  run 0x42::Test::test
 return values: 625

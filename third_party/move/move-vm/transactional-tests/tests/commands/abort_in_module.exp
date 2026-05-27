@@ -1,6 +1,6 @@
 processed 2 tasks
-
-task 1 'run'. lines 10-18:
+task 0 lines 1-8:  publish [module 0x1.M {]
+task 1 lines 10-18:  run [import 0x1.M;]
 Error: Script execution failed with VMError: {
     major_status: ABORTED,
     sub_status: Some(22),

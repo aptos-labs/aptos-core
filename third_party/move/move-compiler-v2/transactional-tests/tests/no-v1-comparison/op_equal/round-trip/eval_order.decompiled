@@ -1,0 +1,55 @@
+//**** Cross-compiled for `move` syntax from `tests/no-v1-comparison/op_equal/eval_order.move`
+
+//# publish
+module 0xc0ffee::m {
+    fun mod1(p0: &mut u64) {
+        *p0 = *p0 + 2;
+    }
+    fun mod2(p0: &mut u64): u64 {
+        let _v0 = p0;
+        *_v0 = *_v0 + 2;
+        *p0
+    }
+    public fun test0() {
+        let _v0 = 1 + 2;
+        _v0 = _v0 + _v0;
+        assert!(_v0 + _v0 == 12, 14566554180833181696);
+    }
+    public fun test1() {
+        let _v0 = 1 + 2;
+        assert!(_v0 + _v0 == 6, 14566554180833181696);
+    }
+    public fun test2() {
+        let _v0 = 1;
+        mod1(&mut _v0);
+        assert!(_v0 + _v0 == 6, 14566554180833181696);
+    }
+    public fun test3() {
+        let _v0 = 1;
+        let _v1 = mod2(&mut _v0);
+        assert!(_v0 + _v1 == 6, 14566554180833181696);
+    }
+    public fun test4() {
+        let _v0 = vector[1, 2, 3];
+        let _v1 = &_v0;
+        let _v2 = 0 + 1;
+        let _v3 = _v2;
+        _v3 = *0x1::vector::borrow<u64>(_v1, _v3);
+        let _v4 = &mut _v0;
+        let _v5 = _v2 + 1;
+        let _v6 = 0x1::vector::borrow_mut<u64>(_v4, _v5);
+        *_v6 = *_v6 + _v3;
+        assert!(_v0 == vector[1, 2, 5], 14566554180833181696);
+    }
+}
+
+
+//# run --verbose -- 0xc0ffee::m::test0
+
+//# run --verbose -- 0xc0ffee::m::test1
+
+//# run --verbose -- 0xc0ffee::m::test2
+
+//# run --verbose -- 0xc0ffee::m::test3
+
+//# run --verbose -- 0xc0ffee::m::test4

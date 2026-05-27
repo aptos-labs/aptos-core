@@ -42,6 +42,8 @@ pub const VECTOR_FUNCS_WITH_BYTECODE_INSTRS: &[&str] = &[
     "swap",
 ];
 
+pub const CMP_MODULE: &str = "cmp";
+
 pub const TYPE_NAME_MOVE: &str = "type_info::type_name";
 pub const TYPE_NAME_SPEC: &str = "type_info::$type_name";
 pub const TYPE_INFO_MOVE: &str = "type_info::type_of";

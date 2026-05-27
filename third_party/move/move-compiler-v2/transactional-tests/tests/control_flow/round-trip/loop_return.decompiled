@@ -1,0 +1,8 @@
+//**** Cross-compiled for `move` syntax from `tests/control_flow/loop_return.move`
+
+//# run
+script {
+    fun main() {
+        ()
+    }
+}

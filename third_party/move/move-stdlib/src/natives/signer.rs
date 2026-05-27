@@ -30,7 +30,7 @@ pub struct BorrowAddressGasParameters {
 fn native_borrow_address(
     gas_params: &BorrowAddressGasParameters,
     _context: &mut NativeContext,
-    _ty_args: Vec<Type>,
+    _ty_args: &[Type],
     mut arguments: VecDeque<Value>,
 ) -> PartialVMResult<NativeResult> {
     debug_assert!(_ty_args.is_empty());

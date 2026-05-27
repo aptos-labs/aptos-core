@@ -88,7 +88,8 @@ impl<'a> CyclicInstantiationChecker<'a> {
         insts: &[Type],
         callers_chain: &mut Vec<(Loc, QualifiedInstId<FunId>)>,
     ) -> bool {
-        if let Operation::MoveFunction(mod_id, fun_id) = op {
+        if let Operation::MoveFunction(mod_id, fun_id) | Operation::Closure(mod_id, fun_id, _) = op
+        {
             let callee_uninst = mod_id.qualified_inst(*fun_id, self.get_inst(*nid));
             let callee = callee_uninst.instantiate(insts);
             if *mod_id != self.mod_env.get_id() || self.def_not_recursive(callee.to_qualified_id())
@@ -97,8 +98,8 @@ impl<'a> CyclicInstantiationChecker<'a> {
                 // or if the callee is not recursive
                 true
             } else {
-                for (_, ancester_caller) in callers_chain.iter() {
-                    if ancester_caller.to_qualified_id() == callee.to_qualified_id() {
+                for (_, ancestor_caller) in callers_chain.iter() {
+                    if ancestor_caller.to_qualified_id() == callee.to_qualified_id() {
                         // we are checking for the root caller
                         let (_, checking_for) = &callers_chain[0];
                         if checking_for.to_qualified_id() != callee.to_qualified_id() {
@@ -164,7 +165,7 @@ impl<'a> CyclicInstantiationChecker<'a> {
             .mod_env
             .env
             .get_function(id)
-            .get_transitive_closure_of_called_functions()
+            .get_transitive_closure_of_used_functions()
             .contains(&id)
     }
 
@@ -184,7 +185,7 @@ impl<'a> CyclicInstantiationChecker<'a> {
                 // callee of `caller`
                 let (callee_loc, callee) = &callers_chain[i + 1];
                 format!(
-                    "`{}` calls `{}` {}",
+                    "`{}` uses `{}` {}",
                     self.display_call(caller, root),
                     self.display_call(callee, root),
                     callee_loc.display_file_name_and_line(self.mod_env.env)
@@ -194,7 +195,7 @@ impl<'a> CyclicInstantiationChecker<'a> {
         let (_caller_loc, caller) = &callers_chain.last().expect("parent");
         let callee_loc = self.mod_env.env.get_node_loc(nid);
         labels.push(format!(
-            "`{}` calls `{}` {}",
+            "`{}` uses `{}` {}",
             self.display_call(caller, root),
             self.display_call(&callee, root),
             callee_loc.display_file_name_and_line(self.mod_env.env)
@@ -207,7 +208,7 @@ impl<'a> CyclicInstantiationChecker<'a> {
             .env
             .error_with_notes(
                 &root_loc,
-                "cyclic type instantiation: a cycle of recursive calls causes a type to grow without bound",
+                "cyclic type instantiation: a cycle of recursive uses causes a type to grow without bound",
                 labels
             )
     }
@@ -236,7 +237,14 @@ fn ty_contains_ty_parameter(ty: &Type) -> Option<u16> {
         Type::Vector(ty) => ty_contains_ty_parameter(ty),
         Type::Struct(_, _, insts) => insts.iter().filter_map(ty_contains_ty_parameter).next(),
         Type::Primitive(_) => None,
-        _ => panic!("ICE: {:?} used as a type parameter", ty),
+        Type::Fun(args, result, _) => {
+            ty_contains_ty_parameter(args).or_else(|| ty_contains_ty_parameter(result))
+        },
+        Type::Reference(_, ty) => ty_contains_ty_parameter(ty),
+        Type::Tuple(ty) => ty.iter().filter_map(ty_contains_ty_parameter).next(),
+        Type::TypeDomain(_) | Type::ResourceDomain(..) | Type::Error | Type::Var(_) => {
+            panic!("ICE: {:?} used as a type parameter", ty)
+        },
     }
 }
 
@@ -246,6 +254,13 @@ fn ty_properly_contains_ty_parameter(ty: &Type) -> Option<u16> {
         Type::Vector(ty) => ty_contains_ty_parameter(ty),
         Type::Struct(_, _, insts) => insts.iter().filter_map(ty_contains_ty_parameter).next(),
         Type::Primitive(_) | Type::TypeParameter(_) => None,
-        _ => panic!("ICE: {:?} used as a type parameter", ty),
+        Type::Fun(args, result, _) => {
+            ty_contains_ty_parameter(args).or_else(|| ty_contains_ty_parameter(result))
+        },
+        Type::Reference(_, ty) => ty_contains_ty_parameter(ty),
+        Type::Tuple(ty) => ty.iter().filter_map(ty_contains_ty_parameter).next(),
+        Type::TypeDomain(_) | Type::ResourceDomain(..) | Type::Error | Type::Var(_) => {
+            panic!("ICE: {:?} used as a type parameter", ty)
+        },
     }
 }

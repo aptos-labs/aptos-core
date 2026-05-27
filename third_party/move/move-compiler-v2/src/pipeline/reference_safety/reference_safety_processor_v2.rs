@@ -527,7 +527,7 @@ impl LifetimeState {
     }
 
     /// Returns an iteration of child edges of given node.
-    fn children(&self, label: &LifetimeLabel) -> impl Iterator<Item = &BorrowEdge> {
+    fn children(&self, label: &LifetimeLabel) -> impl Iterator<Item = &BorrowEdge> + use<'_> {
         self.node(label).children.iter()
     }
 
@@ -1410,7 +1410,7 @@ impl LifetimeAnalysisStep<'_, '_> {
     }
 
     #[inline]
-    fn target(&self) -> &FunctionTarget {
+    fn target(&self) -> &FunctionTarget<'_> {
         self.parent.target
     }
 

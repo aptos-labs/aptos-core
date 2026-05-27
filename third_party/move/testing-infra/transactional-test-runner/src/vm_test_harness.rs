@@ -3,7 +3,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{
-    framework::{run_test_impl, CompiledState, MoveTestAdapter},
+    framework::{merge_output, run_test_impl, CompiledState, MoveTestAdapter},
     tasks::{EmptyCommand, InitCommand, SyntaxChoice, TaskInput},
 };
 use anyhow::{anyhow, bail, Result};
@@ -13,11 +13,8 @@ use legacy_move_compiler::{
     shared::known_attributes::KnownAttribute,
 };
 use move_binary_format::{
-    access::ModuleAccess,
-    compatibility::Compatibility,
-    errors::{Location, VMResult},
-    file_format::CompiledScript,
-    CompiledModule,
+    access::ModuleAccess, compatibility::Compatibility, errors, errors::VMResult,
+    file_format::CompiledScript, CompiledModule,
 };
 use move_bytecode_verifier::VerifierConfig;
 use move_command_line_common::{
@@ -36,12 +33,15 @@ use move_stdlib::move_stdlib_named_addresses;
 use move_symbol_pool::Symbol;
 use move_vm_runtime::{
     config::VMConfig,
-    data_cache::TransactionDataCache,
+    data_cache::{MoveVmDataCacheAdapter, TransactionDataCache},
+    dispatch_loader,
+    execution_tracing::{FullTraceRecorder, Trace, TraceRecorder},
     module_traversal::*,
     move_vm::{MoveVM, SerializedReturnValues},
     native_extensions::NativeContextExtensions,
     AsFunctionValueExtension, AsUnsyncCodeStorage, AsUnsyncModuleStorage, CodeStorage,
-    LoadedFunction, ModuleStorage, RuntimeEnvironment, StagingModuleStorage,
+    InstantiatedFunctionLoader, LegacyLoaderConfig, RuntimeEnvironment, ScriptLoader,
+    StagingModuleStorage, TypeChecker,
 };
 use move_vm_test_utils::{
     gas_schedule::{CostTable, Gas, GasStatus},
@@ -83,11 +83,25 @@ pub struct AdapterPublishArgs {
     pub verbose: bool,
 }
 
+/// Specifies entrypoint to dispatch execution of a script or a Move function.
+enum EntryPoint<'a> {
+    Script {
+        script_bytes: &'a [u8],
+    },
+    Function {
+        module: &'a ModuleId,
+        function: &'a IdentStr,
+    },
+}
+
 #[derive(Debug, Parser)]
 pub struct AdapterExecuteArgs {
-    /// print more complete information for VMErrors on run
+    /// Print more complete information for VM errors during the run.
     #[clap(long)]
     pub verbose: bool,
+    #[clap(long)]
+    /// Displays the trace collected during execution.
+    pub display_trace: bool,
 }
 
 fn move_test_debug() -> bool {
@@ -124,6 +138,9 @@ impl<'a> MoveTestAdapter<'a> for SimpleVMTestAdapter<'a> {
         pre_compiled_deps_v2: &'a PrecompiledFilesModules,
         task_opt: Option<TaskInput<(InitCommand, EmptyCommand)>>,
     ) -> (Self, Option<String>) {
+        // Set stable test display of VM Errors so we can use the --verbose flag in baseline tests
+        errors::set_stable_test_display();
+
         let additional_mapping = match task_opt.map(|t| t.command) {
             Some((InitCommand { named_addresses }, _)) => {
                 verify_and_create_named_address_mapping(named_addresses).unwrap()
@@ -142,10 +159,8 @@ impl<'a> MoveTestAdapter<'a> for SimpleVMTestAdapter<'a> {
             named_address_mapping.insert(name, addr);
         }
 
-        let vm_config = match &run_config {
-            TestRunConfig::CompilerV2 { vm_config, .. } => vm_config.clone(),
-        };
-        let runtime_environment = create_runtime_environment(vm_config);
+        let vm_config = &run_config.vm_config;
+        let runtime_environment = create_runtime_environment(vm_config.clone());
         let storage = InMemoryStorage::new_with_runtime_environment(runtime_environment);
         let max_binary_format_version = storage.max_binary_format_version();
 
@@ -227,12 +242,15 @@ impl<'a> MoveTestAdapter<'a> for SimpleVMTestAdapter<'a> {
         let sender = *id.address();
         let verbose = extra_args.verbose;
 
-        let compat = if extra_args.skip_check_struct_and_pub_function_linking {
+        let compat = if extra_args.skip_check_struct_and_pub_function_linking
+            || self.run_config.verifier_disabled()
+        {
             Compatibility::no_check()
         } else {
             Compatibility::new(
                 !extra_args.skip_check_struct_layout,
                 !extra_args.skip_check_friend_linking,
+                false,
                 false,
             )
         };
@@ -267,7 +285,7 @@ impl<'a> MoveTestAdapter<'a> for SimpleVMTestAdapter<'a> {
         txn_args: Vec<MoveValue>,
         gas_budget: Option<u64>,
         extra_args: Self::ExtraRunArgs,
-    ) -> Result<Option<String>> {
+    ) -> Option<String> {
         let code_storage = self.storage.clone().into_unsync_code_storage();
 
         let signers: Vec<_> = signers
@@ -276,10 +294,12 @@ impl<'a> MoveTestAdapter<'a> for SimpleVMTestAdapter<'a> {
             .collect();
 
         let mut script_bytes = vec![];
-        script.serialize_for_version(
+        if let Err(err) = script.serialize_for_version(
             Some(self.storage.max_binary_format_version()),
             &mut script_bytes,
-        )?;
+        ) {
+            return Some(format!("Error: {}", err));
+        }
 
         let args = txn_args
             .iter()
@@ -293,16 +313,29 @@ impl<'a> MoveTestAdapter<'a> for SimpleVMTestAdapter<'a> {
             .collect();
         let verbose = extra_args.verbose;
 
-        code_storage
-            .load_script(&script_bytes, &type_args)
-            .and_then(|func| self.execute_loaded_function(func, args, gas_budget, &code_storage))
-            .map_err(|err| {
-                anyhow!(
+        let (result, trace) = self.execute_entrypoint(
+            EntryPoint::Script {
+                script_bytes: &script_bytes,
+            },
+            &type_args,
+            args,
+            gas_budget,
+            &code_storage,
+        );
+
+        let trace_str =
+            trace.and_then(|t| extra_args.display_trace.then_some(t.to_string_for_tests()));
+        match result {
+            Ok(_) => trace_str,
+            Err(err) => {
+                let err = anyhow!(
                     "Script execution failed with VMError: {}",
                     err.format_test_output(move_test_debug() || verbose)
-                )
-            })?;
-        Ok(None)
+                );
+                let err_str = Some(format!("Error: {}", err));
+                merge_output(trace_str, err_str)
+            },
+        }
     }
 
     fn call_function(
@@ -314,8 +347,8 @@ impl<'a> MoveTestAdapter<'a> for SimpleVMTestAdapter<'a> {
         txn_args: Vec<MoveValue>,
         gas_budget: Option<u64>,
         extra_args: Self::ExtraRunArgs,
-    ) -> Result<(Option<String>, SerializedReturnValues)> {
-        let module_storage = self.storage.clone().into_unsync_module_storage();
+    ) -> Option<String> {
+        let code_storage = self.storage.clone().into_unsync_code_storage();
 
         let signers: Vec<_> = signers
             .into_iter()
@@ -334,16 +367,30 @@ impl<'a> MoveTestAdapter<'a> for SimpleVMTestAdapter<'a> {
             .collect();
         let verbose = extra_args.verbose;
 
-        let serialized_return_values = module_storage
-            .load_function(module, function, &type_args)
-            .and_then(|func| self.execute_loaded_function(func, args, gas_budget, &module_storage))
-            .map_err(|err| {
-                anyhow!(
+        let (result, trace) = self.execute_entrypoint(
+            EntryPoint::Function { module, function },
+            &type_args,
+            args,
+            gas_budget,
+            &code_storage,
+        );
+
+        let trace_str =
+            trace.and_then(|t| extra_args.display_trace.then_some(t.to_string_for_tests()));
+        match result {
+            Ok(return_values) => {
+                let rendered_return_value = self.display_return_values(return_values);
+                merge_output(trace_str, rendered_return_value)
+            },
+            Err(err) => {
+                let err = anyhow!(
                     "Function execution failed with VMError: {}",
                     err.format_test_output(move_test_debug() || verbose)
-                )
-            })?;
-        Ok((None, serialized_return_values))
+                );
+                let err_str = Some(format!("Error: {}", err));
+                merge_output(trace_str, err_str)
+            },
+        }
     }
 
     fn view_data(
@@ -389,39 +436,91 @@ impl<'a> MoveTestAdapter<'a> for SimpleVMTestAdapter<'a> {
 }
 
 impl SimpleVMTestAdapter<'_> {
-    fn execute_loaded_function(
+    fn execute_entrypoint(
         &mut self,
-        function: LoadedFunction,
+        entry_point: EntryPoint,
+        ty_args: &[TypeTag],
         args: Vec<Vec<u8>>,
         gas_budget: Option<u64>,
-        module_storage: &impl ModuleStorage,
-    ) -> VMResult<SerializedReturnValues> {
-        let mut gas_status = get_gas_status(
+        code_storage: &impl CodeStorage,
+    ) -> (VMResult<SerializedReturnValues>, Option<Trace>) {
+        let mut gas_meter = get_gas_status(
             &move_vm_test_utils::gas_schedule::INITIAL_COST_SCHEDULE,
             gas_budget,
         )
         .unwrap();
 
         let traversal_storage = TraversalStorage::new();
+        let mut traversal_context = TraversalContext::new(&traversal_storage);
         let mut extensions = NativeContextExtensions::default();
-
         let mut data_cache = TransactionDataCache::empty();
-        let return_values = MoveVM::execute_loaded_function(
-            function,
-            args,
-            &mut data_cache,
-            &mut gas_status,
-            &mut TraversalContext::new(&traversal_storage),
-            &mut extensions,
-            module_storage,
-            &self.storage,
-        )?;
+
+        let (return_values, trace) = dispatch_loader!(code_storage, loader, {
+            let legacy_loader_config = LegacyLoaderConfig::unmetered();
+            let result = match entry_point {
+                EntryPoint::Script { script_bytes } => loader.load_script(
+                    &legacy_loader_config,
+                    &mut gas_meter,
+                    &mut traversal_context,
+                    script_bytes,
+                    ty_args,
+                ),
+                EntryPoint::Function { module, function } => loader.load_instantiated_function(
+                    &legacy_loader_config,
+                    &mut gas_meter,
+                    &mut traversal_context,
+                    module,
+                    function,
+                    ty_args,
+                ),
+            };
+            let function = match result {
+                Ok(function) => function,
+                Err(err) => return (Err(err), None),
+            };
+
+            let mut data_cache =
+                MoveVmDataCacheAdapter::new(&mut data_cache, &self.storage, &loader);
+            if self.run_config.tracing {
+                let mut logger = FullTraceRecorder::new();
+                let result = MoveVM::execute_loaded_function_with_tracing(
+                    function,
+                    args,
+                    &mut data_cache,
+                    &mut gas_meter,
+                    &mut traversal_context,
+                    &mut extensions,
+                    &loader,
+                    &mut logger,
+                );
+                let trace = logger.finish();
+                let replay_result = TypeChecker::new(code_storage).replay(&trace);
+                match replay_result.and(result) {
+                    Ok(return_values) => (return_values, Some(trace)),
+                    Err(err) => return (Err(err), Some(trace)),
+                }
+            } else {
+                let result = MoveVM::execute_loaded_function(
+                    function,
+                    args,
+                    &mut data_cache,
+                    &mut gas_meter,
+                    &mut traversal_context,
+                    &mut extensions,
+                    &loader,
+                );
+                match result {
+                    Ok(return_values) => (return_values, None),
+                    Err(err) => return (Err(err), None),
+                }
+            }
+        });
 
         let change_set = data_cache
-            .into_effects(module_storage)
-            .map_err(|err| err.finish(Location::Undefined))?;
+            .into_effects(code_storage)
+            .expect("Producing a change set always succeeds");
         self.storage.apply(change_set).unwrap();
-        Ok(return_values)
+        (Ok(return_values), trace)
     }
 }
 
@@ -497,42 +596,120 @@ static PRECOMPILED_MOVE_STDLIB_V2: Lazy<PrecompiledFilesModules> = Lazy::new(|| 
 });
 
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub enum TestRunConfig {
-    CompilerV2 {
-        language_version: LanguageVersion,
-        /// List of experiments and whether to enable them or not.
-        experiments: Vec<(String, bool)>,
-        /// Configuration for the VM that runs tests.
-        vm_config: VMConfig,
-    },
+pub struct TestRunConfig {
+    pub language_version: LanguageVersion,
+    /// List of experiments and whether to enable them or not.
+    pub experiments: Vec<(String, bool)>,
+    /// Configuration for the VM that runs tests.
+    pub vm_config: VMConfig,
+    /// Whether to use  Move Assembler (.masm) format when printing
+    /// bytecode.
+    pub use_masm: bool,
+    /// Whether to print each command executed to test output.
+    pub echo: bool,
+    /// Set of targets into which to cross-compile.
+    pub cross_compilation_targets: BTreeSet<CrossCompileTarget>,
+    /// If enabled, records execution trace (disabling runtime type checks).
+    pub tracing: bool,
+}
+
+/// A cross-compile target. A new transactional test source file
+/// is generated for the target, with all embedded source code
+/// replaced by the result of decompiling or disassembling it.
+/// The file is placed in `<path>.decompiled` and `<path>.disassembled`,
+/// respectively.
+#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord)]
+pub struct CrossCompileTarget {
+    /// The syntax into which to cross-compile.
+    pub syntax: SyntaxChoice,
+    /// Whether the cross-compiled result should be run as a test
+    /// after cross-compilation.
+    pub run_after: bool,
+    /// Optional suffix to append to the file name of the code for cross compilation.
+    pub suffix: Option<String>,
+}
+
+impl Default for TestRunConfig {
+    fn default() -> Self {
+        TestRunConfig::new(LanguageVersion::latest(), vec![])
+    }
 }
 
 impl TestRunConfig {
     /// Returns compiler V2 config with default VM config.
-    pub fn compiler_v2(
-        language_version: LanguageVersion,
-        experiments: Vec<(String, bool)>,
-    ) -> Self {
-        Self::CompilerV2 {
+    pub fn new(language_version: LanguageVersion, experiments: Vec<(String, bool)>) -> Self {
+        Self {
             language_version,
             experiments,
             vm_config: VMConfig {
                 verifier_config: VerifierConfig::production(),
                 paranoid_type_checks: true,
+                enable_enum_option: false,
                 ..VMConfig::default()
             },
+            use_masm: true,
+            echo: true,
+            cross_compilation_targets: BTreeSet::new(),
+            tracing: false,
+        }
+    }
+
+    pub fn with_masm(self) -> Self {
+        Self {
+            use_masm: true,
+            ..self
+        }
+    }
+
+    pub fn cross_compile_into(
+        self,
+        syntax: SyntaxChoice,
+        run_after: bool,
+        suffix: Option<String>,
+    ) -> Self {
+        assert!(matches!(syntax, SyntaxChoice::ASM | SyntaxChoice::Source));
+        let mut cross_compilation_targets = self.cross_compilation_targets.clone();
+        cross_compilation_targets.insert(CrossCompileTarget {
+            syntax,
+            run_after,
+            suffix,
+        });
+        Self {
+            cross_compilation_targets,
+            ..self
+        }
+    }
+
+    pub fn with_echo(self) -> Self {
+        Self { echo: true, ..self }
+    }
+
+    pub(crate) fn using_masm(&self) -> bool {
+        self.use_masm
+    }
+
+    pub(crate) fn verifier_disabled(&self) -> bool {
+        self.vm_config.verifier_config.verify_nothing()
+    }
+
+    pub fn with_runtime_ref_checks(self) -> Self {
+        Self {
+            vm_config: self.vm_config.set_paranoid_ref_checks(true),
+            ..self
         }
     }
 }
 
 pub fn run_test(path: &Path) -> Result<(), Box<dyn std::error::Error>> {
-    run_test_with_config(
-        TestRunConfig::compiler_v2(LanguageVersion::default(), vec![]),
-        path,
-    )
+    run_test_with_config(TestRunConfig::new(LanguageVersion::default(), vec![]), path)
 }
 
 fn precompiled_v2_stdlib() -> &'static PrecompiledFilesModules {
+    &PRECOMPILED_MOVE_STDLIB_V2
+}
+
+#[cfg(feature = "fuzzing")]
+pub fn precompiled_v2_stdlib_fuzzer() -> &'static PrecompiledFilesModules {
     &PRECOMPILED_MOVE_STDLIB_V2
 }
 

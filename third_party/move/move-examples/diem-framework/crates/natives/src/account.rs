@@ -13,7 +13,7 @@ use std::collections::VecDeque;
 
 pub fn native_create_signer(
     _context: &mut NativeContext,
-    ty_args: Vec<Type>,
+    ty_args: &[Type],
     mut arguments: VecDeque<Value>,
 ) -> PartialVMResult<NativeResult> {
     debug_assert!(ty_args.is_empty());
@@ -29,7 +29,7 @@ pub fn native_create_signer(
 /// remain for replaying old transactions
 pub fn native_destroy_signer(
     _context: &mut NativeContext,
-    ty_args: Vec<Type>,
+    ty_args: &[Type],
     arguments: VecDeque<Value>,
 ) -> PartialVMResult<NativeResult> {
     debug_assert!(ty_args.is_empty());

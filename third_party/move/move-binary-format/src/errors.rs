@@ -10,11 +10,27 @@ use move_core_types::{
     language_storage::ModuleId,
     vm_status::{self, StatusCode, StatusType, VMStatus},
 };
+use once_cell::sync::{Lazy, OnceCell};
 use std::fmt;
 
 pub type VMResult<T> = ::std::result::Result<T, VMError>;
 pub type BinaryLoaderResult<T> = ::std::result::Result<T, PartialVMError>;
 pub type PartialVMResult<T> = ::std::result::Result<T, PartialVMError>;
+
+static STABLE_TEST_DISPLAY: OnceCell<bool> = OnceCell::new();
+
+/// Call this function if display of errors should be stable for baseline tests.
+/// Specifically, no stack traces should be generated, as they contain transitive
+/// file locations.
+pub fn set_stable_test_display() {
+    STABLE_TEST_DISPLAY.set(true).unwrap_or(())
+}
+
+/// Check whether stable test display is enabled. This can be used by other components
+/// to adjust their output.
+pub fn is_stable_test_display() -> bool {
+    STABLE_TEST_DISPLAY.get().copied().unwrap_or(false)
+}
 
 /// This macro is used to panic while debugging fuzzing crashes obtaining the right stack trace.
 /// e.g. DEBUG_VM_STATUS=ABORTED,UNKNOWN_INVARIANT_VIOLATION_ERROR ./fuzz.sh run move_aptosvm_publish_and_run <testcase>
@@ -73,6 +89,7 @@ struct VMError_ {
 }
 
 impl VMError {
+    #[cold]
     pub fn into_vm_status(self) -> VMStatus {
         let VMError_ {
             major_status,
@@ -225,6 +242,7 @@ impl VMError {
         )
     }
 
+    #[cold]
     pub fn to_partial(self) -> PartialVMError {
         let VMError_ {
             major_status,
@@ -345,6 +363,7 @@ struct PartialVMError_ {
 }
 
 impl PartialVMError {
+    #[cold]
     pub fn all_data(
         self,
     ) -> (
@@ -373,6 +392,7 @@ impl PartialVMError {
         )
     }
 
+    #[cold]
     pub fn finish(self, location: Location) -> VMError {
         let PartialVMError_ {
             major_status,
@@ -382,12 +402,21 @@ impl PartialVMError {
             indices,
             offsets,
         } = *self.0;
-        let bt = std::backtrace::Backtrace::capture();
-        let message = if std::backtrace::BacktraceStatus::Captured == bt.status() {
-            if let Some(message) = message {
-                Some(format!("{}\nBacktrace: {:#?}", message, bt).to_string())
+        static MOVE_TEST_DEBUG: Lazy<bool> = Lazy::new(|| {
+            std::env::var("MOVE_TEST_DEBUG").is_ok_and(|v| matches!(v.as_str(), "true" | "1"))
+        });
+        let message = if *MOVE_TEST_DEBUG {
+            // Do this only if env var is set. Otherwise, we cannot use the output in baseline files
+            // since it is not deterministic.
+            let bt = std::backtrace::Backtrace::capture();
+            if std::backtrace::BacktraceStatus::Captured == bt.status() {
+                if let Some(message) = message {
+                    Some(format!("{}\nBacktrace: {:#?}", message, bt).to_string())
+                } else {
+                    Some(format!("Backtrace: {:#?}", bt).to_string())
+                }
             } else {
-                Some(format!("Backtrace: {:#?}", bt).to_string())
+                message
             }
         } else {
             message
@@ -404,9 +433,12 @@ impl PartialVMError {
         }))
     }
 
+    #[cold]
     pub fn new(major_status: StatusCode) -> Self {
         debug_assert!(major_status != StatusCode::EXECUTED);
-        let message = if major_status == StatusCode::UNKNOWN_INVARIANT_VIOLATION_ERROR {
+        let message = if major_status == StatusCode::UNKNOWN_INVARIANT_VIOLATION_ERROR
+            && !is_stable_test_display()
+        {
             let mut len = 5;
             let mut trace: String = "Unknown invariant violation generated:\n".to_string();
             backtrace::trace(|frame| {
@@ -448,6 +480,7 @@ impl PartialVMError {
         }))
     }
 
+    #[cold]
     pub fn new_invariant_violation(msg: impl ToString) -> PartialVMError {
         Self::new(StatusCode::UNKNOWN_INVARIANT_VIOLATION_ERROR).with_message(msg.to_string())
     }
@@ -460,14 +493,19 @@ impl PartialVMError {
         self.0.sub_status
     }
 
+    #[cold]
     pub fn with_sub_status(mut self, sub_status: u64) -> Self {
         debug_assert!(self.0.sub_status.is_none());
         self.0.sub_status = Some(sub_status);
         self
     }
 
-    pub fn with_message(mut self, mut message: String) -> Self {
+    #[cold]
+    pub fn with_message(mut self, message: impl ToString) -> Self {
+        let mut message = message.to_string();
         if self.0.major_status == StatusCode::UNKNOWN_INVARIANT_VIOLATION_ERROR {
+            // If there is already something in the message, interpret as stack  trace
+            // and append at the end
             if let Some(stacktrace) = self.0.message.take() {
                 message = format!("{} @{}", message, stacktrace);
             }
@@ -477,6 +515,7 @@ impl PartialVMError {
         self
     }
 
+    #[cold]
     pub fn with_exec_state(mut self, exec_state: ExecutionState) -> Self {
         debug_assert!(self.0.exec_state.is_none());
         self.0.exec_state = Some(exec_state);
@@ -487,21 +526,25 @@ impl PartialVMError {
         self.0.message.as_deref()
     }
 
+    #[cold]
     pub fn at_index(mut self, kind: IndexKind, index: TableIndex) -> Self {
         self.0.indices.push((kind, index));
         self
     }
 
+    #[cold]
     pub fn at_indices(mut self, additional_indices: Vec<(IndexKind, TableIndex)>) -> Self {
         self.0.indices.extend(additional_indices);
         self
     }
 
+    #[cold]
     pub fn at_code_offset(mut self, function: FunctionDefinitionIndex, offset: CodeOffset) -> Self {
         self.0.offsets.push((function, offset));
         self
     }
 
+    #[cold]
     pub fn at_code_offsets(
         mut self,
         additional_offsets: Vec<(FunctionDefinitionIndex, CodeOffset)>,
@@ -512,6 +555,7 @@ impl PartialVMError {
 
     /// Append the message `message` to the message field of the VM status, and insert a separator
     /// if the original message is non-empty.
+    #[cold]
     pub fn append_message_with_separator(
         mut self,
         separator: char,
@@ -610,6 +654,7 @@ pub fn vm_status_of_result<T>(result: VMResult<T>) -> VMStatus {
     }
 }
 
+#[cold]
 pub fn offset_out_of_bounds(
     status: StatusCode,
     kind: IndexKind,
@@ -627,6 +672,7 @@ pub fn offset_out_of_bounds(
         .at_code_offset(cur_function, cur_bytecode_offset)
 }
 
+#[cold]
 pub fn bounds_error(
     status: StatusCode,
     kind: IndexKind,
@@ -642,6 +688,7 @@ pub fn bounds_error(
         .with_message(msg)
 }
 
+#[cold]
 pub fn verification_error(status: StatusCode, kind: IndexKind, idx: TableIndex) -> PartialVMError {
     PartialVMError::new(status).at_index(kind, idx)
 }

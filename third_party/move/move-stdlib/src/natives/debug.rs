@@ -30,7 +30,7 @@ pub struct PrintGasParameters {
 fn native_print(
     gas_params: &PrintGasParameters,
     _context: &mut NativeContext,
-    mut ty_args: Vec<Type>,
+    ty_args: &[Type],
     mut args: VecDeque<Value>,
     _move_std_addr: AccountAddress,
 ) -> PartialVMResult<NativeResult> {
@@ -38,7 +38,7 @@ fn native_print(
     debug_assert!(args.len() == 1);
 
     let _val = args.pop_back().unwrap();
-    let _ty = ty_args.pop().unwrap();
+    let _ty = &ty_args[0];
 
     // No-op if the feature flag is not present.
     #[cfg(feature = "testing")]
@@ -93,7 +93,7 @@ pub struct PrintStackTraceGasParameters {
 fn native_print_stack_trace(
     gas_params: &PrintStackTraceGasParameters,
     context: &mut NativeContext,
-    ty_args: Vec<Type>,
+    ty_args: &[Type],
     args: VecDeque<Value>,
 ) -> PartialVMResult<NativeResult> {
     debug_assert!(ty_args.is_empty());
@@ -175,18 +175,22 @@ mod testing {
     }
 
     fn get_annotated_struct_layout(
-        context: &NativeContext,
+        context: &mut NativeContext,
         ty: &Type,
     ) -> PartialVMResult<MoveStructLayout> {
         let annotated_type_layout = context.type_to_fully_annotated_layout(ty)?;
-        match annotated_type_layout {
-            MoveTypeLayout::Struct(annotated_struct_layout) => Ok(annotated_struct_layout),
-            _ => Err(
+        if let Some(MoveTypeLayout::Struct(annotated_struct_layout)) =
+            annotated_type_layout.as_ref().map(|l| l.as_ref())
+        {
+            // Note: this stdlib is not used in production, so cloning here is acceptable.
+            Ok(annotated_struct_layout.clone())
+        } else {
+            Err(
                 PartialVMError::new(StatusCode::INTERNAL_TYPE_ERROR).with_message(
                     "Could not convert Type to fully-annotated MoveTypeLayout via NativeContext"
                         .to_string(),
                 ),
-            ),
+            )
         }
     }
 
@@ -248,26 +252,30 @@ mod testing {
 
     /// Prints any `Value` in a user-friendly manner.
     pub(crate) fn print_value(
-        context: &NativeContext,
+        context: &mut NativeContext,
         out: &mut String,
         val: Value,
-        ty: Type,
+        ty: &Type,
         move_std_addr: &AccountAddress,
         depth: usize,
         canonicalize: bool,
         single_line: bool,
         include_int_types: bool,
     ) -> PartialVMResult<()> {
-        // get type layout in VM format
-        let ty_layout = context.type_to_type_layout(&ty)?;
+        // Get type layout in VM format. We do not expect to see any delayed fields here because
+        // this debug implementation is
+        //  1. Not used in production, instead debug implementation from 0x1::string_utils is used.
+        //  2. Not called in block-execution context where delayed fields are relevant.
+        let ty_layout = context.type_to_type_layout_check_no_delayed_fields(ty)?;
 
-        match &ty_layout {
+        match ty_layout.as_ref() {
             MoveTypeLayout::Vector(_) => {
-                // get the inner type T of a vector<T>
-                let inner_ty = get_vector_inner_type(&ty)?;
-                let inner_tyl = context.type_to_type_layout(inner_ty)?;
+                // Get the inner type T of a vector<T>. Again, we should not see any delayed fields
+                // in the debug context.
+                let inner_ty = get_vector_inner_type(ty)?;
+                let inner_tyl = context.type_to_type_layout_check_no_delayed_fields(inner_ty)?;
 
-                match inner_tyl {
+                match inner_tyl.as_ref() {
                     // We cannot simply convert a `Value` (of type vector) to a `MoveValue` because
                     // there might be a struct in the vector that needs to be "decorated" using the
                     // logic in this function. Instead, we recursively "unpack" the vector until we
@@ -290,7 +298,7 @@ mod testing {
                                     context,
                                     out,
                                     val,
-                                    inner_ty.clone(),
+                                    inner_ty,
                                     move_std_addr,
                                     depth,
                                     canonicalize,
@@ -337,7 +345,7 @@ mod testing {
                     },
                 };
 
-                let annotated_struct_layout = get_annotated_struct_layout(context, &ty)?;
+                let annotated_struct_layout = get_annotated_struct_layout(context, ty)?;
                 let decorated_struct = move_struct.decorate(&annotated_struct_layout);
 
                 print_move_value(
@@ -413,6 +421,42 @@ mod testing {
                 write!(out, "{}", u256).map_err(fmt_error_to_partial_vm_error)?;
                 if include_int_types {
                     write!(out, "u256").map_err(fmt_error_to_partial_vm_error)?;
+                }
+            },
+            MoveValue::I8(i8) => {
+                write!(out, "{}", i8).map_err(fmt_error_to_partial_vm_error)?;
+                if include_int_types {
+                    write!(out, "i8").map_err(fmt_error_to_partial_vm_error)?;
+                }
+            },
+            MoveValue::I16(i16) => {
+                write!(out, "{}", i16).map_err(fmt_error_to_partial_vm_error)?;
+                if include_int_types {
+                    write!(out, "i16").map_err(fmt_error_to_partial_vm_error)?;
+                }
+            },
+            MoveValue::I32(i32) => {
+                write!(out, "{}", i32).map_err(fmt_error_to_partial_vm_error)?;
+                if include_int_types {
+                    write!(out, "i32").map_err(fmt_error_to_partial_vm_error)?;
+                }
+            },
+            MoveValue::I64(i64) => {
+                write!(out, "{}", i64).map_err(fmt_error_to_partial_vm_error)?;
+                if include_int_types {
+                    write!(out, "i64").map_err(fmt_error_to_partial_vm_error)?;
+                }
+            },
+            MoveValue::I128(i128) => {
+                write!(out, "{}", i128).map_err(fmt_error_to_partial_vm_error)?;
+                if include_int_types {
+                    write!(out, "i128").map_err(fmt_error_to_partial_vm_error)?;
+                }
+            },
+            MoveValue::I256(i256) => {
+                write!(out, "{}", i256).map_err(fmt_error_to_partial_vm_error)?;
+                if include_int_types {
+                    write!(out, "i256").map_err(fmt_error_to_partial_vm_error)?;
                 }
             },
             MoveValue::Bool(b) => {
@@ -590,7 +634,7 @@ mod testing {
         single_line: bool,
         include_int_types: bool,
         vec: Vec<ValType>,
-        print_inner_value: impl Fn(
+        mut print_inner_value: impl FnMut(
             &mut String,
             ValType,
             &AccountAddress,

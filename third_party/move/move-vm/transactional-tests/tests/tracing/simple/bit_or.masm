@@ -1,0 +1,10 @@
+//# publish
+module 0x22::test
+
+public fun bit_or_instr(): u8
+    ld_u8 0
+    ld_u8 1
+    bit_or
+    ret
+
+//# run --verbose 0x22::test::bit_or_instr --display-trace

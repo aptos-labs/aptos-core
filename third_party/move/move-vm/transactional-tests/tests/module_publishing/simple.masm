@@ -1,0 +1,34 @@
+//# publish --verbose
+module 0x66::math
+
+public fun add(x: u32, y: u32): u32
+    move_loc x
+    move_loc y
+    add
+    ret
+
+public fun assert_eq(x: u32, y:u32)
+    move_loc x
+    move_loc y
+    eq
+    br_true r
+    ld_u64 255
+    abort
+r:
+    ret
+
+
+//# run --verbose
+script
+
+fun main()
+    ld_u32 10
+    ld_u32 20
+    call 0x66::math::add
+    ld_u32 30
+    call 0x66::math::assert_eq
+    ret
+
+//# run 0x66::math::add --args 0u32 1u32 --verbose
+
+//# run 0x66::math::assert_eq --args 23u32 23u32 --verbose

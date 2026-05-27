@@ -1,6 +1,5 @@
 processed 4 tasks
-
-task 0 'publish'. lines 1-4:
+task 0 lines 1-4:  publish [module 0x42.M1 {]
 Error: Unable to publish module '0000000000000000000000000000000000000000000000000000000000000042::M1'. Got VMError: {
     major_status: INVALID_SIGNATURE_TOKEN,
     sub_status: None,
@@ -8,8 +7,7 @@ Error: Unable to publish module '00000000000000000000000000000000000000000000000
     indices: [(StructDefinition, 0)],
     offsets: [],
 }
-
-task 1 'publish'. lines 6-9:
+task 1 lines 6-9:  publish [module 0x42.M2 {]
 Error: Unable to publish module '0000000000000000000000000000000000000000000000000000000000000042::M2'. Got VMError: {
     major_status: INVALID_SIGNATURE_TOKEN,
     sub_status: None,
@@ -17,8 +15,7 @@ Error: Unable to publish module '00000000000000000000000000000000000000000000000
     indices: [(StructDefinition, 0)],
     offsets: [],
 }
-
-task 2 'publish'. lines 11-14:
+task 2 lines 11-14:  publish [module 0x42.M3 {]
 Error: Unable to publish module '0000000000000000000000000000000000000000000000000000000000000042::M3'. Got VMError: {
     major_status: INVALID_SIGNATURE_TOKEN,
     sub_status: None,
@@ -26,8 +23,7 @@ Error: Unable to publish module '00000000000000000000000000000000000000000000000
     indices: [(StructDefinition, 0)],
     offsets: [],
 }
-
-task 3 'publish'. lines 16-19:
+task 3 lines 16-19:  publish [module 0x42.M4 {]
 Error: Unable to publish module '0000000000000000000000000000000000000000000000000000000000000042::M4'. Got VMError: {
     major_status: INVALID_SIGNATURE_TOKEN,
     sub_status: None,

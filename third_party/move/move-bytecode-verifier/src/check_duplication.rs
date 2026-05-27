@@ -271,6 +271,7 @@ impl<'a> DuplicationChecker<'a> {
                 },
                 StructFieldInformation::DeclaredVariants(variants) => {
                     Self::check_duplicate_variants(variants.iter())?;
+                    // Note: unlike structs, number of fields within a variant can be zero.
                     for variant in variants {
                         Self::check_duplicate_fields(variant.fields.iter())?
                     }

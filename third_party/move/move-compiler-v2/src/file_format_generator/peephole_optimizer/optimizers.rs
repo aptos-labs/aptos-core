@@ -7,6 +7,7 @@ use move_binary_format::file_format::{Bytecode, CodeOffset};
 
 /// A contiguous chunk of bytecode that may have been transformed from some
 /// other "original" contiguous chunk of bytecode.
+#[derive(PartialEq, Eq)]
 pub struct TransformedCodeChunk {
     /// The transformed bytecode.
     pub code: Vec<Bytecode>,
@@ -30,6 +31,13 @@ impl TransformedCodeChunk {
     /// Create an empty chunk.
     pub fn empty() -> Self {
         Self::new(vec![], vec![])
+    }
+
+    /// Extract a contiguous sub-chunk from this chunk,
+    pub fn extract(&self, start: CodeOffset, end: CodeOffset) -> TransformedCodeChunk {
+        let new_code = self.code[start as usize..=end as usize].to_vec();
+        let new_offsets = self.original_offsets[start as usize..=end as usize].to_vec();
+        TransformedCodeChunk::new(new_code, new_offsets)
     }
 
     /// Extend this chunk with another `other` chunk.

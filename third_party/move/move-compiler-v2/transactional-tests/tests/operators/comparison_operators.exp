@@ -1,1 +1,7 @@
 processed 6 tasks
+task 0 lines 1-26:  run [script {]
+task 1 lines 28-55:  run [script {]
+task 2 lines 57-84:  run [script {]
+task 3 lines 86-113:  run [script {]
+task 4 lines 115-142:  run [script {]
+task 5 lines 144-171:  run [script {]

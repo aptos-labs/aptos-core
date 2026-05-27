@@ -1,6 +1,6 @@
 processed 9 tasks
-
-task 1 'run'. lines 17-22:
+task 0 lines 1-15:  publish [module 0x1.M {]
+task 1 lines 17-22:  run [import 0x1.M;]
 Error: Script execution failed with VMError: {
     major_status: CONSTRAINT_NOT_SATISFIED,
     sub_status: None,
@@ -8,8 +8,7 @@ Error: Script execution failed with VMError: {
     indices: [],
     offsets: [],
 }
-
-task 2 'run'. lines 24-29:
+task 2 lines 24-29:  run [import 0x1.M;]
 Error: Script execution failed with VMError: {
     major_status: CONSTRAINT_NOT_SATISFIED,
     sub_status: None,
@@ -17,8 +16,7 @@ Error: Script execution failed with VMError: {
     indices: [],
     offsets: [],
 }
-
-task 3 'run'. lines 31-36:
+task 3 lines 31-36:  run [import 0x1.M;]
 Error: Script execution failed with VMError: {
     major_status: CONSTRAINT_NOT_SATISFIED,
     sub_status: None,
@@ -26,8 +24,7 @@ Error: Script execution failed with VMError: {
     indices: [],
     offsets: [],
 }
-
-task 4 'run'. lines 38-43:
+task 4 lines 38-43:  run [import 0x1.M;]
 Error: Script execution failed with VMError: {
     major_status: CONSTRAINT_NOT_SATISFIED,
     sub_status: None,
@@ -35,8 +32,7 @@ Error: Script execution failed with VMError: {
     indices: [],
     offsets: [],
 }
-
-task 5 'run'. lines 45-50:
+task 5 lines 45-50:  run [import 0x1.M;]
 Error: Script execution failed with VMError: {
     major_status: CONSTRAINT_NOT_SATISFIED,
     sub_status: None,
@@ -44,8 +40,7 @@ Error: Script execution failed with VMError: {
     indices: [],
     offsets: [],
 }
-
-task 6 'run'. lines 52-57:
+task 6 lines 52-57:  run [import 0x1.M;]
 Error: Script execution failed with VMError: {
     major_status: CONSTRAINT_NOT_SATISFIED,
     sub_status: None,
@@ -53,8 +48,7 @@ Error: Script execution failed with VMError: {
     indices: [],
     offsets: [],
 }
-
-task 7 'run'. lines 59-64:
+task 7 lines 59-64:  run [import 0x1.M;]
 Error: Script execution failed with VMError: {
     major_status: CONSTRAINT_NOT_SATISFIED,
     sub_status: None,
@@ -62,8 +56,7 @@ Error: Script execution failed with VMError: {
     indices: [],
     offsets: [],
 }
-
-task 8 'run'. lines 66-71:
+task 8 lines 66-71:  run [import 0x1.M;]
 Error: Script execution failed with VMError: {
     major_status: CONSTRAINT_NOT_SATISFIED,
     sub_status: None,

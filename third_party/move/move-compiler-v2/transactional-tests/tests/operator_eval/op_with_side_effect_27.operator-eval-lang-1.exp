@@ -1,6 +1,5 @@
 processed 3 tasks
-
-task 0 'publish'. lines 1-6:
+task 0 lines 1-6:  publish [module 0xc0ffee::m {]
 Error: compilation errors:
  error: A sequence within an operand of binary operation `&&` can obscure program logic and is not allowed by this compiler.
   ┌─ TEMPFILE:4:9
@@ -33,8 +32,7 @@ error: A sequence within an operand of binary operation `||` can obscure program
   = In either of these cases, please ensure to check the code does what you expect it to, because of changed semantics.
 
 
-
-task 1 'run'. lines 8-8:
+task 1 lines 8-8:  run 0xc0ffee::m::test --args true
 Error: Function execution failed with VMError: {
     major_status: LINKER_ERROR,
     sub_status: None,
@@ -42,8 +40,7 @@ Error: Function execution failed with VMError: {
     indices: [],
     offsets: [],
 }
-
-task 2 'run'. lines 10-10:
+task 2 lines 10-10:  run 0xc0ffee::m::test --args false
 Error: Function execution failed with VMError: {
     major_status: LINKER_ERROR,
     sub_status: None,

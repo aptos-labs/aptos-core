@@ -1,0 +1,103 @@
+// -- Model dump before first bytecode pipeline
+module 0x8675309::M1 {
+    struct R<T> {
+        x: u64,
+    }
+    public fun extract<T>(r: &mut R<T>,y: u64): R<T> {
+        {
+          let x: u64 = Sub<u64>(select M1::R.x<&mut R<T>>(r), y);
+          pack M1::R<T>(x)
+        }
+    }
+} // end 0x8675309::M1
+module 0x8675309::M {
+    use 0x8675309::M1::{R}; // resolved as: 0x8675309::M1
+    use 0x8675309::M1::{extract}; // resolved as: 0x8675309::M1
+    struct R1<T> {
+        x: M1::R<T>,
+    }
+    private fun f<T>(a: address): M1::R<T> {
+        {
+          let r: &mut R1<T> = BorrowGlobal(Mutable)<R1<T>>(a);
+          M1::extract<T>(Borrow(Mutable)(select M::R1.x<&mut R1<T>>(r)), 3)
+        }
+    }
+    public fun t0<T>(a: address): M1::R<T> {
+        if false {
+          Tuple()
+        } else {
+          Abort(0)
+        };
+        M::f<T>(a)
+    }
+} // end 0x8675309::M
+
+// -- Sourcified model before first bytecode pipeline
+module 0x8675309::M1 {
+    struct R<phantom T> has copy, drop, store, key {
+        x: u64,
+    }
+    public fun extract<T>(r: &mut R<T>, y: u64): R<T> {
+        let x = r.x - y;
+        R<T>{x: x}
+    }
+}
+module 0x8675309::M {
+    use 0x8675309::M1;
+    use 0x8675309::M1;
+    struct R1<phantom T> has key {
+        x: M1::R<T>,
+    }
+    fun f<T>(a: address): M1::R<T> {
+        let r = borrow_global_mut<R1<T>>(a);
+        M1::extract<T>(&mut r.x, 3)
+    }
+    public fun t0<T>(a: address): M1::R<T> {
+        if (false) () else abort 0;
+        f<T>(a)
+    }
+}
+
+
+Diagnostics:
+warning: If condition is always false, so then branch code eliminated as dead code
+   ┌─ tests/simplifier-elimination/assert_false_with_resource.move:30:17
+   │
+30 │         assert!(false, 0);
+   │         ------  ^^^^^
+   │         │       │
+   │         │       condition is always false
+   │         then branch eliminated
+
+// -- Model dump before second bytecode pipeline
+module 0x8675309::M1 {
+    struct R<T> {
+        x: u64,
+    }
+    public fun extract<T>(r: &mut R<T>,y: u64): R<T> {
+        {
+          let x: u64 = Sub<u64>(select M1::R.x<&mut R<T>>(r), y);
+          pack M1::R<T>(x)
+        }
+    }
+} // end 0x8675309::M1
+module 0x8675309::M {
+    use 0x8675309::M1::{R}; // resolved as: 0x8675309::M1
+    use 0x8675309::M1::{extract}; // resolved as: 0x8675309::M1
+    struct R1<T> {
+        x: M1::R<T>,
+    }
+    private fun f<T>(a: address): M1::R<T> {
+        {
+          let r: &mut R1<T> = BorrowGlobal(Mutable)<R1<T>>(a);
+          M1::extract<T>(Borrow(Mutable)(select M::R1.x<&mut R1<T>>(r)), 3)
+        }
+    }
+    public fun t0<T>(a: address): M1::R<T> {
+        Abort(0);
+        M::f<T>(a)
+    }
+} // end 0x8675309::M
+
+
+============ bytecode verification succeeded ========

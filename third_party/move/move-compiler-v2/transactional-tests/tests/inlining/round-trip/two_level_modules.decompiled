@@ -1,0 +1,16 @@
+//**** Cross-compiled for `move` syntax from `tests/inlining/two_level_modules.move`
+
+//# publish
+module 0x42::TwoLevelTestModule {
+}
+
+
+//# publish
+module 0x42::TwoLevelTestMain {
+    public fun test(): u64 {
+        18
+    }
+}
+
+
+//# run 0x42::TwoLevelTestMain::test

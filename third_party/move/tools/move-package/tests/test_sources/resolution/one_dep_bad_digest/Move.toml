@@ -6,4 +6,4 @@ version = "0.0.0"
 A = "0x1"
 
 [dependencies]
-OtherDep = { local = "./deps_only/other_dep", addr_subst = { "A" = "B" }, digest = "BAD_DIGEST"}
+OtherDep = { local = "./deps_only/other_dep", digest = "BAD_DIGEST"}

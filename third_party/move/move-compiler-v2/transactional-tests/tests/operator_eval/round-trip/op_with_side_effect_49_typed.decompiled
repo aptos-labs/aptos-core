@@ -1,0 +1,16 @@
+//**** Cross-compiled for `move` syntax from `tests/operator_eval/op_with_side_effect_49_typed.move`
+
+//# publish
+module 0xc0ffee::m {
+    public fun test(): u64 {
+        let _v0 = 1;
+        let _v1 = _v0;
+        _v0 = _v0 + 1;
+        let _v2 = _v1 + _v0;
+        let _v3 = _v0 + 7;
+        _v2 + _v3
+    }
+}
+
+
+//# run 0xc0ffee::m::test

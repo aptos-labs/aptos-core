@@ -33,15 +33,6 @@ impl ModelBuilder {
     // TODO: In the future we will need a better way to do this to support renaming in packages
     // where we want to support building a Move model.
     pub fn build_model(&self) -> Result<GlobalEnv> {
-        // Make sure no renamings have been performed
-        if let Some(pkg_name) = self.resolution_graph.contains_renaming() {
-            anyhow::bail!(
-                "Found address renaming in package '{}' when \
-                    building Move model -- this is currently not supported",
-                pkg_name
-            )
-        }
-
         // Targets are all files in the root package
         let root_name = &self.resolution_graph.root_package.package.name;
         let root_package = self.resolution_graph.get_package(root_name).clone();
@@ -140,6 +131,13 @@ impl ModelBuilder {
                 options.known_attributes.clone_from(known_attributes);
                 options.skip_attribute_checks = skip_attribute_checks;
                 options.compile_verify_code = true;
+                options.experiments.clone_from(
+                    &self
+                        .resolution_graph
+                        .build_options
+                        .compiler_config
+                        .experiments,
+                );
                 let mut error_writer = StandardStream::stderr(ColorChoice::Auto);
                 move_compiler_v2::run_move_compiler_for_analysis(&mut error_writer, options)
             },

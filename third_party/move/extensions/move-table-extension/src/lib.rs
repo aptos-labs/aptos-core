@@ -19,8 +19,9 @@ use move_core_types::{
     vm_status::StatusCode,
 };
 use move_vm_runtime::{
+    native_extensions::UnreachableSessionListener,
     native_functions,
-    native_functions::{NativeContext, NativeFunction, NativeFunctionTable},
+    native_functions::{LoaderContext, NativeContext, NativeFunction, NativeFunctionTable},
 };
 use move_vm_types::{
     loaded_data::runtime_types::Type,
@@ -37,6 +38,7 @@ use std::{
     fmt::{Debug, Display},
     sync::Arc,
 };
+use triomphe::Arc as TriompheArc;
 
 // ===========================================================================================
 // Public Data Structures and Constants
@@ -137,8 +139,8 @@ struct TableData {
 /// A structure representing a single table.
 struct Table {
     handle: TableHandle,
-    key_layout: MoveTypeLayout,
-    value_layout: MoveTypeLayout,
+    key_layout: TriompheArc<MoveTypeLayout>,
+    value_layout: TriompheArc<MoveTypeLayout>,
     content: BTreeMap<Vec<u8>, GlobalValue>,
 }
 
@@ -147,6 +149,8 @@ const HANDLE_FIELD_INDEX: usize = 0;
 
 // =========================================================================================
 // Implementation of Native Table Context
+
+impl<'a> UnreachableSessionListener for NativeTableContext<'a> {}
 
 impl<'a> NativeTableContext<'a> {
     /// Create a new instance of a native table context. This must be passed in via an
@@ -215,15 +219,21 @@ impl TableData {
     /// the table, like the type layout for keys and values.
     fn get_or_create_table(
         &mut self,
-        context: &NativeContext,
+        loader_context: &mut LoaderContext,
         handle: TableHandle,
         key_ty: &Type,
         value_ty: &Type,
     ) -> PartialVMResult<&mut Table> {
         Ok(match self.tables.entry(handle) {
             Entry::Vacant(e) => {
-                let key_layout = context.type_to_type_layout(key_ty)?;
-                let value_layout = context.type_to_type_layout(value_ty)?;
+                let key_layout = loader_context
+                    .type_to_type_layout_with_delayed_fields(key_ty)?
+                    .into_layout_when_has_no_delayed_fields()
+                    .expect("Move extension has no delayed fields");
+                let value_layout = loader_context
+                    .type_to_type_layout_with_delayed_fields(value_ty)?
+                    .into_layout_when_has_no_delayed_fields()
+                    .expect("Move extension has no delayed fields");
                 let table = Table {
                     handle,
                     key_layout,
@@ -345,7 +355,7 @@ pub struct NewTableHandleGasParameters {
 fn native_new_table_handle(
     gas_params: &NewTableHandleGasParameters,
     context: &mut NativeContext,
-    ty_args: Vec<Type>,
+    ty_args: &[Type],
     args: VecDeque<Value>,
 ) -> PartialVMResult<NativeResult> {
     assert_eq!(ty_args.len(), 2);
@@ -394,14 +404,14 @@ fn native_add_box(
     common_gas_params: &CommonGasParameters,
     gas_params: &AddBoxGasParameters,
     context: &mut NativeContext,
-    ty_args: Vec<Type>,
+    ty_args: &[Type],
     mut args: VecDeque<Value>,
 ) -> PartialVMResult<NativeResult> {
     assert_eq!(ty_args.len(), 3);
     assert_eq!(args.len(), 3);
 
-    let function_value_extension = context.function_value_extension();
-    let table_context = context.extensions().get::<NativeTableContext>();
+    let (extensions, mut loader_context) = context.extensions_with_loader_context();
+    let table_context = extensions.get::<NativeTableContext>();
     let mut table_data = table_context.table_data.borrow_mut();
 
     let val = args.pop_back().unwrap();
@@ -410,8 +420,10 @@ fn native_add_box(
 
     let mut cost = gas_params.base;
 
-    let table = table_data.get_or_create_table(context, handle, &ty_args[0], &ty_args[2])?;
+    let table =
+        table_data.get_or_create_table(&mut loader_context, handle, &ty_args[0], &ty_args[2])?;
 
+    let function_value_extension = loader_context.function_value_extension();
     let key_bytes = serialize(&function_value_extension, &table.key_layout, &key)?;
     cost += gas_params.per_byte_serialized * NumBytes::new(key_bytes.len() as u64);
 
@@ -446,23 +458,25 @@ fn native_borrow_box(
     common_gas_params: &CommonGasParameters,
     gas_params: &BorrowBoxGasParameters,
     context: &mut NativeContext,
-    ty_args: Vec<Type>,
+    ty_args: &[Type],
     mut args: VecDeque<Value>,
 ) -> PartialVMResult<NativeResult> {
     assert_eq!(ty_args.len(), 3);
     assert_eq!(args.len(), 2);
 
-    let function_value_extension = context.function_value_extension();
-    let table_context = context.extensions().get::<NativeTableContext>();
+    let (extensions, mut loader_context) = context.extensions_with_loader_context();
+    let table_context = extensions.get::<NativeTableContext>();
     let mut table_data = table_context.table_data.borrow_mut();
 
     let key = args.pop_back().unwrap();
     let handle = get_table_handle(&pop_arg!(args, StructRef))?;
 
-    let table = table_data.get_or_create_table(context, handle, &ty_args[0], &ty_args[2])?;
+    let table =
+        table_data.get_or_create_table(&mut loader_context, handle, &ty_args[0], &ty_args[2])?;
 
     let mut cost = gas_params.base;
 
+    let function_value_extension = loader_context.function_value_extension();
     let key_bytes = serialize(&function_value_extension, &table.key_layout, &key)?;
     cost += gas_params.per_byte_serialized * NumBytes::new(key_bytes.len() as u64);
 
@@ -497,23 +511,25 @@ fn native_contains_box(
     common_gas_params: &CommonGasParameters,
     gas_params: &ContainsBoxGasParameters,
     context: &mut NativeContext,
-    ty_args: Vec<Type>,
+    ty_args: &[Type],
     mut args: VecDeque<Value>,
 ) -> PartialVMResult<NativeResult> {
     assert_eq!(ty_args.len(), 3);
     assert_eq!(args.len(), 2);
 
-    let function_value_extension = context.function_value_extension();
-    let table_context = context.extensions().get::<NativeTableContext>();
+    let (extensions, mut loader_context) = context.extensions_with_loader_context();
+    let table_context = extensions.get::<NativeTableContext>();
     let mut table_data = table_context.table_data.borrow_mut();
 
     let key = args.pop_back().unwrap();
     let handle = get_table_handle(&pop_arg!(args, StructRef))?;
 
-    let table = table_data.get_or_create_table(context, handle, &ty_args[0], &ty_args[2])?;
+    let table =
+        table_data.get_or_create_table(&mut loader_context, handle, &ty_args[0], &ty_args[2])?;
 
     let mut cost = gas_params.base;
 
+    let function_value_extension = loader_context.function_value_extension();
     let key_bytes = serialize(&function_value_extension, &table.key_layout, &key)?;
     cost += gas_params.per_byte_serialized * NumBytes::new(key_bytes.len() as u64);
 
@@ -521,7 +537,7 @@ fn native_contains_box(
         table.get_or_create_global_value(&function_value_extension, table_context, key_bytes)?;
     cost += common_gas_params.calculate_load_cost(loaded);
 
-    let exists = Value::bool(gv.exists()?);
+    let exists = Value::bool(gv.exists());
 
     Ok(NativeResult::ok(cost, smallvec![exists]))
 }
@@ -547,23 +563,25 @@ fn native_remove_box(
     common_gas_params: &CommonGasParameters,
     gas_params: &RemoveGasParameters,
     context: &mut NativeContext,
-    ty_args: Vec<Type>,
+    ty_args: &[Type],
     mut args: VecDeque<Value>,
 ) -> PartialVMResult<NativeResult> {
     assert_eq!(ty_args.len(), 3);
     assert_eq!(args.len(), 2);
 
-    let function_value_extension = context.function_value_extension();
-    let table_context = context.extensions().get::<NativeTableContext>();
+    let (extensions, mut loader_context) = context.extensions_with_loader_context();
+    let table_context = extensions.get::<NativeTableContext>();
     let mut table_data = table_context.table_data.borrow_mut();
 
     let key = args.pop_back().unwrap();
     let handle = get_table_handle(&pop_arg!(args, StructRef))?;
 
-    let table = table_data.get_or_create_table(context, handle, &ty_args[0], &ty_args[2])?;
+    let table =
+        table_data.get_or_create_table(&mut loader_context, handle, &ty_args[0], &ty_args[2])?;
 
     let mut cost = gas_params.base;
 
+    let function_value_extension = loader_context.function_value_extension();
     let key_bytes = serialize(&function_value_extension, &table.key_layout, &key)?;
     cost += gas_params.per_byte_serialized * NumBytes::new(key_bytes.len() as u64);
 
@@ -596,18 +614,19 @@ pub struct DestroyEmptyBoxGasParameters {
 fn native_destroy_empty_box(
     gas_params: &DestroyEmptyBoxGasParameters,
     context: &mut NativeContext,
-    ty_args: Vec<Type>,
+    ty_args: &[Type],
     mut args: VecDeque<Value>,
 ) -> PartialVMResult<NativeResult> {
     assert_eq!(ty_args.len(), 3);
     assert_eq!(args.len(), 1);
 
-    let table_context = context.extensions().get::<NativeTableContext>();
+    let (extensions, mut loader_context) = context.extensions_with_loader_context();
+    let table_context = extensions.get::<NativeTableContext>();
     let mut table_data = table_context.table_data.borrow_mut();
 
     let handle = get_table_handle(&pop_arg!(args, StructRef))?;
     // TODO: Can the following line be removed?
-    table_data.get_or_create_table(context, handle, &ty_args[0], &ty_args[2])?;
+    table_data.get_or_create_table(&mut loader_context, handle, &ty_args[0], &ty_args[2])?;
 
     assert!(table_data.removed_tables.insert(handle));
 
@@ -630,7 +649,7 @@ pub struct DropUncheckedBoxGasParameters {
 fn native_drop_unchecked_box(
     gas_params: &DropUncheckedBoxGasParameters,
     _context: &mut NativeContext,
-    ty_args: Vec<Type>,
+    ty_args: &[Type],
     args: VecDeque<Value>,
 ) -> PartialVMResult<NativeResult> {
     assert_eq!(ty_args.len(), 3);

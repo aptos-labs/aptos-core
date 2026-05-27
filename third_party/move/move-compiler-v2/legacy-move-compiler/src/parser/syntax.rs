@@ -2219,6 +2219,37 @@ fn parse_unary_exp(context: &mut Context) -> Result<Exp, Box<Diagnostic>> {
             let e = parse_unary_exp(context)?;
             Exp_::UnaryExp(op, Box::new(e))
         },
+        // Parse `Minus` as the `Negate` unary operator
+        Tok::Minus => {
+            context.tokens.advance()?;
+            let op_end_loc = context.tokens.previous_end_loc();
+            let e = parse_unary_exp(context)?;
+            // if the operand is a numeric literal, we fold the negation into the literal
+            if let Exp_::Value(Spanned {
+                loc,
+                value: Value_::Num(s),
+            }) = e.value
+            {
+                let neg_num = format!("-{}", s.as_str());
+                // the new literal now spans from the `-` to the end of the original literal
+                let op_end_loc = loc.end();
+                Exp_::Value(spanned(
+                    context.tokens.file_hash(),
+                    start_loc,
+                    op_end_loc as usize,
+                    Value_::Num(Symbol::from(neg_num)),
+                ))
+            } else {
+                // otherwise, we create a new unary negation operator
+                let op = spanned(
+                    context.tokens.file_hash(),
+                    start_loc,
+                    op_end_loc,
+                    UnaryOp_::Negate,
+                );
+                Exp_::UnaryExp(op, Box::new(e))
+            }
+        },
         Tok::AmpMut => {
             context.tokens.advance()?;
             let e = parse_unary_exp(context)?;
@@ -3046,9 +3077,9 @@ fn parse_address_specifier(context: &mut Context) -> Result<AddressSpecifier, Bo
 // Parse a struct definition:
 //      StructDecl =
 //          native struct <StructDefName> <Abilities>? ";"
-//        | "struct" <StructDefName> <Abilities>? "{" Comma<FieldAnnot> "}" (<Abilities> ";")?
-//        | "struct" <StructDefName> ( "(" Comma<Type> ")" )? <Abilities>?";"
-//        | "enum" <StructDefName> <Abilities>? "{" Comma<EnumVariant> "}" (<Abilities> ";")?
+//        | <Visibility> "struct" <StructDefName> <Abilities>? "{" Comma<FieldAnnot> "}" (<Abilities> ";")?
+//        | <Visibility> "struct" <StructDefName> ( "(" Comma<Type> ")" )? <Abilities>?";"
+//        | <Visibility> "enum" <StructDefName> <Abilities>? "{" Comma<EnumVariant> "}" (<Abilities> ";")?
 //      StructDefName =
 //          <Identifier> <StructTypeParameter>
 //      EnumVariant =
@@ -3065,11 +3096,12 @@ fn parse_struct_decl(
     context: &mut Context,
 ) -> Result<StructDefinition, Box<Diagnostic>> {
     let Modifiers {
-        visibility,
+        visibility: visibility_opt,
         entry,
         native,
     } = modifiers;
-    match visibility {
+    let mut visibility = Visibility::Internal;
+    match visibility_opt {
         Some(vis) if !context.env.flags().lang_v2() => {
             let msg = format!(
                 "Invalid struct declaration. Structs cannot have visibility modifiers as they are \
@@ -3079,6 +3111,9 @@ fn parse_struct_decl(
             context
                 .env
                 .add_diag(diag!(Syntax::InvalidModifier, (vis.loc().unwrap(), msg)));
+        },
+        Some(vis) => {
+            visibility = vis;
         },
         _ => {},
     }
@@ -3168,6 +3203,7 @@ fn parse_struct_decl(
         name,
         type_parameters,
         layout,
+        visibility,
     })
 }
 
@@ -3510,7 +3546,10 @@ fn parse_use_alias(context: &mut Context) -> Result<Option<Name>, Box<Diagnostic
 fn is_friend_declaration(context: &mut Context) -> bool {
     if context.tokens.peek() == Tok::Friend {
         if let Ok((tok, content)) = context.tokens.lookahead_content() {
-            if ![Tok::Fun, Tok::Inline, Tok::Native].contains(&tok) && content != ENTRY_MODIFIER {
+            if ![Tok::Fun, Tok::Inline, Tok::Native, Tok::Struct].contains(&tok)
+                && content != ENTRY_MODIFIER
+                && content != ENUM_MODIFIER
+            {
                 return true;
             }
         }
@@ -3619,7 +3658,7 @@ fn parse_module(
                             Tok::Struct => ModuleMember::Struct(parse_struct_decl(
                                 false, attributes, start_loc, modifiers, context,
                             )?),
-                            Tok::Identifier if context.tokens.content() == "enum" => {
+                            Tok::Identifier if context.tokens.content() == ENUM_MODIFIER => {
                                 ModuleMember::Struct(parse_struct_decl(
                                     true, attributes, start_loc, modifiers, context,
                                 )?)

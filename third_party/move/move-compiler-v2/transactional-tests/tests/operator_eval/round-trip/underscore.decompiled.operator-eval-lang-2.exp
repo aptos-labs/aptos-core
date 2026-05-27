@@ -1,0 +1,97 @@
+processed 12 tasks
+task 0 lines 3-3:  run 0xc0ffee::m::test --args 4
+Error: Function execution failed with VMError: {
+    major_status: LINKER_ERROR,
+    sub_status: None,
+    location: undefined,
+    indices: [],
+    offsets: [],
+}
+task 1 lines 5-5:  run 0xc0ffee::m::test3 --args 5
+Error: Function execution failed with VMError: {
+    major_status: LINKER_ERROR,
+    sub_status: None,
+    location: undefined,
+    indices: [],
+    offsets: [],
+}
+task 2 lines 7-7:  run 0xc0ffee::m::test4 --args 5
+Error: Function execution failed with VMError: {
+    major_status: LINKER_ERROR,
+    sub_status: None,
+    location: undefined,
+    indices: [],
+    offsets: [],
+}
+task 3 lines 9-9:  run 0xc0ffee::m::test5 --args 5
+Error: Function execution failed with VMError: {
+    major_status: LINKER_ERROR,
+    sub_status: None,
+    location: undefined,
+    indices: [],
+    offsets: [],
+}
+task 4 lines 11-11:  run 0xc0ffee::m::test6 --args 5
+Error: Function execution failed with VMError: {
+    major_status: LINKER_ERROR,
+    sub_status: None,
+    location: undefined,
+    indices: [],
+    offsets: [],
+}
+task 5 lines 13-13:  run 0xc0ffee::m::test7 --args 5
+Error: Function execution failed with VMError: {
+    major_status: LINKER_ERROR,
+    sub_status: None,
+    location: undefined,
+    indices: [],
+    offsets: [],
+}
+task 6 lines 15-15:  run 0xc0ffee::m::test8 --args 5
+Error: Function execution failed with VMError: {
+    major_status: LINKER_ERROR,
+    sub_status: None,
+    location: undefined,
+    indices: [],
+    offsets: [],
+}
+task 7 lines 17-17:  run 0xc0ffee::m::test9
+Error: Function execution failed with VMError: {
+    major_status: LINKER_ERROR,
+    sub_status: None,
+    location: undefined,
+    indices: [],
+    offsets: [],
+}
+task 8 lines 19-19:  run 0xc0ffee::m::test10a
+Error: Function execution failed with VMError: {
+    major_status: LINKER_ERROR,
+    sub_status: None,
+    location: undefined,
+    indices: [],
+    offsets: [],
+}
+task 9 lines 21-21:  run 0xc0ffee::m::test10b
+Error: Function execution failed with VMError: {
+    major_status: LINKER_ERROR,
+    sub_status: None,
+    location: undefined,
+    indices: [],
+    offsets: [],
+}
+task 10 lines 23-23:  run 0xc0ffee::m::test10c
+Error: Function execution failed with VMError: {
+    major_status: LINKER_ERROR,
+    sub_status: None,
+    location: undefined,
+    indices: [],
+    offsets: [],
+}
+task 11 lines 25-25:  run 0xc0ffee::m::test11
+Error: Function execution failed with VMError: {
+    major_status: LINKER_ERROR,
+    sub_status: None,
+    location: undefined,
+    indices: [],
+    offsets: [],
+}

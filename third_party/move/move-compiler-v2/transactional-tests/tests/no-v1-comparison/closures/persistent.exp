@@ -1,1 +1,4 @@
 processed 3 tasks
+task 0 lines 1-20:  publish [module 0x66::test {]
+task 1 lines 22-22:  run 0x66::test::store --signers 0x66
+task 2 lines 24-24:  run 0x66::test::exec --signers 0x66

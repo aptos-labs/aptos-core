@@ -1,7 +1,6 @@
 processed 3 tasks
-
-task 1 'run'. lines 28-28:
+task 0 lines 1-26:  publish [module 0xc0ffee::m {]
+task 1 lines 28-28:  run 0xc0ffee::m::test1
 return values: 39
-
-task 2 'run'. lines 30-30:
+task 2 lines 30-30:  run 0xc0ffee::m::test2
 return values: 99

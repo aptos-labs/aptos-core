@@ -49,7 +49,7 @@ impl BasicBlockOptimizerPipeline {
         let mut code_chunk = TransformedCodeChunk::make_from(code);
         let mut cfg = VMControlFlowGraph::new(&code_chunk.code);
         loop {
-            let optimized_blocks = self.get_optimized_blocks(&code_chunk.code, &cfg);
+            let optimized_blocks = self.get_optimized_blocks(&code_chunk, &cfg);
             let optimized_code_chunk = Self::flatten_blocks(optimized_blocks);
             let optimized_cfg = VMControlFlowGraph::new(&optimized_code_chunk.code);
             if optimized_cfg.num_blocks() == cfg.num_blocks() {
@@ -62,7 +62,7 @@ impl BasicBlockOptimizerPipeline {
                 // Number of basic blocks changed, re-run the basic-block
                 // optimization pipeline again on the new basic blocks.
                 cfg = optimized_cfg;
-                code_chunk = optimized_code_chunk.remap(code_chunk.original_offsets);
+                code_chunk = optimized_code_chunk;
             }
         }
     }
@@ -71,14 +71,14 @@ impl BasicBlockOptimizerPipeline {
     /// basic blocks.
     fn get_optimized_blocks(
         &self,
-        code: &[Bytecode],
+        original_block: &TransformedCodeChunk,
         cfg: &VMControlFlowGraph,
     ) -> BTreeMap<CodeOffset, TransformedCodeChunk> {
         let mut optimized_blocks = BTreeMap::new();
         for block_id in cfg.blocks() {
             let start = cfg.block_start(block_id);
             let end = cfg.block_end(block_id); // `end` is inclusive
-            let mut block = TransformedCodeChunk::make_from(&code[start as usize..=end as usize]);
+            let mut block = original_block.extract(start, end);
             for bb_optimizer in self.optimizers.iter() {
                 block = bb_optimizer
                     .optimize(&block.code)
@@ -97,7 +97,7 @@ impl BasicBlockOptimizerPipeline {
         let mut block_mapping = BTreeMap::new();
         for (offset, block) in optimized_blocks {
             block_mapping.insert(offset, optimized_code.code.len() as CodeOffset);
-            optimized_code.extend(block, offset);
+            optimized_code.extend(block, 0);
         }
         Self::remap_branch_targets(&mut optimized_code.code, &block_mapping);
         optimized_code
@@ -113,5 +113,60 @@ impl BasicBlockOptimizerPipeline {
                 _ => {},
             }
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_basic_block_optimizer_pipeline() {
+        let pipeline = BasicBlockOptimizerPipeline::default();
+        use Bytecode::*;
+        // Below, we handcraft a scenario where multiple peephole optimizations can be applied,
+        // in multiple passes, including merging basic blocks multiple times.
+        // We test both the optimization as well as the offset transformation.
+        let code = vec![
+            CopyLoc(0),  // 0
+            CopyLoc(0),  // 1
+            Add,         // 2
+            StLoc(0),    // 3
+            CopyLoc(0),  // 4
+            StLoc(1),    // 5
+            MoveLoc(1),  // 6
+            StLoc(0),    // 7
+            LdTrue,      // 8
+            StLoc(2),    // 9
+            LdTrue,      // 10
+            StLoc(3),    // 11
+            MoveLoc(3),  // 12
+            BrFalse(22), // 13
+            MoveLoc(2),  // 14
+            BrFalse(22), // 15
+            CopyLoc(0),  // 16
+            CopyLoc(0),  // 17
+            Add,         // 18
+            StLoc(0),    // 19
+            CopyLoc(0),  // 20
+            Pop,         // 21
+            Ret,         // 22
+        ];
+        let optimized_code_chunk = pipeline.optimize(&code);
+        let expected_code_chunk = TransformedCodeChunk::new(
+            vec![
+                CopyLoc(0), // 0
+                CopyLoc(0), // 1
+                Add,        // 2
+                StLoc(0),   // 3
+                CopyLoc(0), // 16
+                CopyLoc(0), // 17
+                Add,        // 18
+                StLoc(0),   // 19
+                Ret,        // 22
+            ],
+            vec![0, 1, 2, 3, 16, 17, 18, 19, 22],
+        );
+        assert!(optimized_code_chunk == expected_code_chunk);
     }
 }

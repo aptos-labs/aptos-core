@@ -207,8 +207,8 @@ impl ResourceSpecifier {
         use ResourceSpecifier::*;
         match self {
             Any => true,
-            DeclaredAtAddress(addr) => struct_id.module.address() == addr,
-            DeclaredInModule(module_id) => &struct_id.module == module_id,
+            DeclaredAtAddress(addr) => struct_id.module().address() == addr,
+            DeclaredInModule(module_id) => struct_id.module() == module_id,
             Resource(enabled_struct_id) => enabled_struct_id == struct_id,
             ResourceInstantiation(enabled_struct_id, enabled_type_inst) => {
                 enabled_struct_id == struct_id && enabled_type_inst == type_inst

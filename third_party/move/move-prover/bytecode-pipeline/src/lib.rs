@@ -14,7 +14,6 @@ pub mod mut_ref_instrumentation;
 pub mod number_operation;
 pub mod number_operation_analysis;
 pub mod options;
-pub mod packed_types_analysis;
 pub mod pipeline_factory;
 pub mod spec_instrumentation;
 pub mod verification_analysis;

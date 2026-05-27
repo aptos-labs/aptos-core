@@ -18,7 +18,7 @@ module 0x42::b {
 module 0x42::c {
     use 0x42::a; // resolved as: 0x42::a
     use 0x42::b; // resolved as: 0x42::b
-    private fun foo(f: |(a::MyList, b::MyOtherList)|,x: a::MyList,y: b::MyOtherList) {
+    private fun foo(f: |a::MyList, b::MyOtherList|,x: a::MyList,y: b::MyOtherList) {
         (f)(x, y)
     }
     private fun test(x: a::MyList,y: b::MyOtherList) {
@@ -53,13 +53,13 @@ module 0x42::b {
 module 0x42::c {
     use 0x42::a;
     use 0x42::b;
-    fun foo(f: |(a::MyList, b::MyOtherList)|, x: a::MyList, y: b::MyOtherList) {
+    fun foo(f: |a::MyList, b::MyOtherList|, x: a::MyList, y: b::MyOtherList) {
         f(x, y)
     }
     fun test(x: a::MyList, y: b::MyOtherList) {
-        foo(|(arg0,arg1)| __lambda__1__test(arg0, arg1), x, y)
+        foo(|arg0,arg1| lambda__1__test(arg0, arg1), x, y)
     }
-    fun __lambda__1__test(x: a::MyList, y: b::MyOtherList) {
+    fun lambda__1__test(x: a::MyList, y: b::MyOtherList) {
         if (a::len(&x) + b::len(&y) == 1) () else abort 1
     }
 }

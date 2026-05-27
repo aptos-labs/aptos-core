@@ -1,0 +1,12 @@
+processed 11 tasks
+task 0 lines 5-8:  publish [module 0x66::incompatible_field_ability_has_drop]
+task 1 lines 15-18:  publish --verbose [module 0x66::incompatible_field_ability_has_drop]
+task 2 lines 25-28:  publish --verbose [module 0x66::incompatible_field_ability_has_drop]
+task 3 lines 35-38:  publish --verbose [module 0x66::incompatible_field_ability_has_drop]
+task 4 lines 46-49:  publish [module 0x66::incompatible_field_ability_has_copy_A_drop]
+task 5 lines 56-59:  publish --verbose [module 0x66::incompatible_field_ability_has_copy_A_drop]
+task 6 lines 66-69:  publish --verbose [module 0x66::incompatible_field_ability_has_copy_A_drop]
+task 7 lines 76-79:  publish --verbose [module 0x66::incompatible_field_ability_has_copy_A_drop]
+task 8 lines 87-90:  publish [module 0x66::incompatible_field_ability_]
+task 9 lines 97-100:  publish --verbose [module 0x66::incompatible_field_ability_]
+task 10 lines 107-110:  publish --verbose [module 0x66::incompatible_field_ability_]

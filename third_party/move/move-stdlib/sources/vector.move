@@ -78,6 +78,32 @@ module std::vector {
         pragma intrinsic = true;
     }
 
+    public inline fun find<Element>(v: &vector<Element>, f: |&Element|bool): (bool, u64) {
+        let find = false;
+        let found_index = 0;
+        let i = 0;
+        let len = length(v);
+        while ({
+            spec {
+                invariant i <= len;
+                invariant forall j: num where j >= 0 && j < i: !f(borrow(v, j));
+                invariant find ==> i < len && f(borrow(v, i));
+            };
+            i < len
+            }) {
+            // Cannot call return in an inline function so we need to resort to break here.
+            if (f(borrow(v, i))) {
+                find = true;
+                found_index = i;
+                break
+            };
+            i = i + 1;
+        };
+        spec {
+            assert !find <==> (forall j: num where j >= 0 && j < len: !f(v[j]));
+        };
+        (find, found_index)
+    }
 
     /// Pushes all of the elements of the `other` vector into the `lhs` vector.
     public fun append<Element>(lhs: &mut vector<Element>, other: vector<Element>) {

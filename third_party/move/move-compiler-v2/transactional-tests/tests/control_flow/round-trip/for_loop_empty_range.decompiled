@@ -1,0 +1,10 @@
+//**** Cross-compiled for `move` syntax from `tests/control_flow/for_loop_empty_range.move`
+
+//# run
+script {
+    fun main() {
+        let _v0 = 10;
+        if (false) _v0 = _v0 + 1;
+        if (_v0 < 9) abort 42;
+    }
+}

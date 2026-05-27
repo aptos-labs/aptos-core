@@ -119,7 +119,7 @@ pub struct Dependency {
     version: Option<Version>,
 
     /// Location of the dependency: local, git, or aptos (on-chain).
-    location: PackageLocation,
+    pub location: PackageLocation,
 }
 
 /// Location of a package dependency.
@@ -151,7 +151,7 @@ pub enum PackageLocation {
         node_url: String,
 
         /// Address of the published package.
-        package_addr: String,
+        package_addr: AccountAddress,
     },
 }
 
@@ -252,7 +252,7 @@ struct RawDependency {
     subdir: Option<String>,
 
     aptos: Option<String>,
-    address: Option<String>,
+    address: Option<AccountAddress>,
 }
 
 impl<'de> Deserialize<'de> for Dependency {

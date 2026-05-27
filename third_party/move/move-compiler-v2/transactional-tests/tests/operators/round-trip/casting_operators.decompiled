@@ -1,0 +1,280 @@
+//**** Cross-compiled for `move` syntax from `tests/operators/casting_operators.move`
+
+//# run
+script {
+    fun main() {
+        ()
+    }
+}
+
+
+//# run
+script {
+    fun main() {
+        ()
+    }
+}
+
+
+//# run
+script {
+    fun main() {
+        ()
+    }
+}
+
+
+//# run
+script {
+    fun main() {
+        ()
+    }
+}
+
+
+//# run
+script {
+    fun main() {
+        ()
+    }
+}
+
+
+//# run
+script {
+    fun main() {
+        ()
+    }
+}
+
+
+//# run
+script {
+    fun main() {
+        let _v0 = 256 as u8;
+    }
+}
+
+
+//# run
+script {
+    fun main() {
+        let _v0 = 303 as u8;
+    }
+}
+
+
+//# run
+script {
+    fun main() {
+        let _v0 = 256u128 as u8;
+    }
+}
+
+
+//# run
+script {
+    fun main() {
+        let _v0 = 56432u128 as u8;
+    }
+}
+
+
+//# run
+script {
+    fun main() {
+        let _v0 = 18446744073709551615 as u8;
+    }
+}
+
+
+//# run
+script {
+    fun main() {
+        let _v0 = 340282366920938463463374607431768211455u128 as u8;
+    }
+}
+
+
+//# run
+script {
+    fun main() {
+        let _v0 = 2561u16 as u8;
+    }
+}
+
+
+//# run
+script {
+    fun main() {
+        let _v0 = 65532u16 as u8;
+    }
+}
+
+
+//# run
+script {
+    fun main() {
+        let _v0 = 256123u32 as u8;
+    }
+}
+
+
+//# run
+script {
+    fun main() {
+        let _v0 = 11579208923731619542357098500868790785326998466564056403945758400791312963993u256 as u8;
+    }
+}
+
+
+//# run
+script {
+    fun main() {
+        let _v0 = 256343532 as u16;
+    }
+}
+
+
+//# run
+script {
+    fun main() {
+        let _v0 = 3564603 as u16;
+    }
+}
+
+
+//# run
+script {
+    fun main() {
+        let _v0 = 256666765790535666u128 as u16;
+    }
+}
+
+
+//# run
+script {
+    fun main() {
+        let _v0 = 256765735666u128 as u16;
+    }
+}
+
+
+//# run
+script {
+    fun main() {
+        let _v0 = 18446744073709551615 as u16;
+    }
+}
+
+
+//# run
+script {
+    fun main() {
+        let _v0 = 340282366920938463463374607431768211455u128 as u16;
+    }
+}
+
+
+//# run
+script {
+    fun main() {
+        let _v0 = 429496729u32 as u16;
+    }
+}
+
+
+//# run
+script {
+    fun main() {
+        let _v0 = 42949629u32 as u16;
+    }
+}
+
+
+//# run
+script {
+    fun main() {
+        let _v0 = 115792089237316195423570985008687907853269984665640564039457584007913129639u256 as u16;
+    }
+}
+
+
+//# run
+script {
+    fun main() {
+        let _v0 = 4294967295644 as u32;
+    }
+}
+
+
+//# run
+script {
+    fun main() {
+        ()
+    }
+}
+
+
+//# run
+script {
+    fun main() {
+        let _v0 = 256666765790535666u128 as u32;
+    }
+}
+
+
+//# run
+script {
+    fun main() {
+        let _v0 = 25676573566896u128 as u32;
+    }
+}
+
+
+//# run
+script {
+    fun main() {
+        let _v0 = 18446744073709551615 as u32;
+    }
+}
+
+
+//# run
+script {
+    fun main() {
+        let _v0 = 340282366920938463463374607431768211455u128 as u32;
+    }
+}
+
+
+//# run
+script {
+    fun main() {
+        let _v0 = 115792089237316195423570985008687907853269984665640564039457584007913129639u256 as u32;
+    }
+}
+
+
+//# run
+script {
+    fun main() {
+        let _v0 = 18446744073709551616u128 as u64;
+    }
+}
+
+
+//# run
+script {
+    fun main() {
+        let _v0 = 18446744073709551647u128 as u64;
+    }
+}
+
+
+//# run
+script {
+    fun main() {
+        let _v0 = 340282366920938463463374607431768211455u128 as u64;
+    }
+}

@@ -842,6 +842,7 @@ impl TransferFunctions for NumberOperationAnalysis<'_> {
                             baseline_flag,
                         );
                     },
+
                     BitOr | BitAnd | Xor => self.check_and_update_oper_dest(
                         state,
                         dests,
@@ -1174,7 +1175,8 @@ impl TransferFunctions for NumberOperationAnalysis<'_> {
                             } // empty, do nothing
                         }
                     },
-                    // TODO(#14349): add support for enum type related operation
+                    // TODO(#14349): add support for enum type related operation and
+                    //   function values.
                     _ => {},
                 }
             },

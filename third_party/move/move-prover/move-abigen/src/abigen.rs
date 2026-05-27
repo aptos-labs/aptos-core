@@ -79,7 +79,7 @@ impl<'env> Abigen<'env> {
     }
 
     /// Generates ABIs for all script modules in the environment (excluding the dependency set).
-    pub fn gen(&mut self) {
+    pub fn r#gen(&mut self) {
         for module in self.env.get_modules() {
             if module.is_primary_target() {
                 let mut path = PathBuf::from(&self.options.output_directory);
@@ -275,6 +275,12 @@ impl<'env> Abigen<'env> {
                     U64 => TypeTag::U64,
                     U128 => TypeTag::U128,
                     U256 => TypeTag::U256,
+                    I8 => TypeTag::I8,
+                    I16 => TypeTag::I16,
+                    I32 => TypeTag::I32,
+                    I64 => TypeTag::I64,
+                    I128 => TypeTag::I128,
+                    I256 => TypeTag::I256,
                     Address => TypeTag::Address,
                     Signer => TypeTag::Signer,
                     Num | Range | EventStore => {

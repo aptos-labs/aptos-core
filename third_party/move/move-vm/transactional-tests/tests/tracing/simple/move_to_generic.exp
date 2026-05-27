@@ -1,0 +1,9 @@
+processed 2 tasks
+task 0 lines 1-12:  publish [module 0x22::test]
+task 1 lines 14-14:  run --verbose 0x22::test::move_to_generic_instr --signers 0x22 --display-trace
+instructions: 5
+fingerprint: 3781773213287337273
+branch_outcomes: 
+calls:
+  entrypoint 0x0000000000000000000000000000000000000000000000000000000000000022::test::move_to_generic_instr
+

@@ -18,7 +18,10 @@ use either::Either;
 use internment::LocalIntern;
 use itertools::{EitherOrBoth, Itertools};
 use move_binary_format::file_format::{CodeOffset, Visibility};
-use move_core_types::{account_address::AccountAddress, function::ClosureMask};
+use move_core_types::{
+    account_address::AccountAddress, function::ClosureMask,
+    language_storage::pseudo_script_module_id,
+};
 use num::BigInt;
 use std::{
     borrow::Borrow,
@@ -168,12 +171,7 @@ impl ConditionKind {
     }
 
     pub fn allowed_on_lambda_spec(&self) -> bool {
-        // TODO(#16256): support all conditions allowed in `allowed_on_fun_decl`
-        use ConditionKind::*;
-        matches!(
-            self,
-            Requires | AbortsIf | Ensures | FunctionInvariant | LetPre(..)
-        )
+        self.allowed_on_fun_decl(Visibility::Public)
     }
 
     /// Returns true if this condition is allowed on a struct.
@@ -1221,12 +1219,54 @@ impl ExpData {
         called
     }
 
+    /// Returns the Move functions called by this expression, along with call sites and their
+    /// loop depth.
+    pub fn called_funs_with_callsites_and_loop_depth(
+        &self,
+    ) -> BTreeMap<QualifiedId<FunId>, BTreeSet<(NodeId, usize)>> {
+        let mut called: BTreeMap<_, BTreeSet<_>> = BTreeMap::new();
+        let mut loop_depth = 0;
+        let mut visitor = |post: bool, e: &ExpData| {
+            match e {
+                ExpData::Loop(..) => {
+                    if post {
+                        loop_depth -= 1
+                    } else {
+                        loop_depth += 1
+                    }
+                },
+                ExpData::Call(node_id, Operation::MoveFunction(mid, fid), _) if !post => {
+                    called
+                        .entry(mid.qualified(*fid))
+                        .or_default()
+                        .insert((*node_id, loop_depth));
+                },
+                _ => {},
+            }
+            true // keep going
+        };
+        self.visit_pre_post(&mut visitor);
+        called
+    }
+
     /// Returns true if the given expression contains a `continue` or
     /// `break` which refers to a loop in the given `nest_range`.
     /// For example, `branches_to(loop { break }, 1..10)` will return false,
     /// but `branches_to(loop { break }, 0..10)` will return true.
     /// count as exit.
     pub fn branches_to(&self, nest_range: Range<usize>) -> bool {
+        let branch_cond = |loop_nest: usize, nest: usize, _: bool| {
+            nest >= loop_nest && nest_range.contains(&(nest - loop_nest))
+        };
+        self.customizable_branches_to(branch_cond)
+    }
+
+    /// A customizable version of `branches_to`, allowing to
+    /// specify how a `continue` or `break` refers to which loop(s).
+    pub fn customizable_branches_to<F>(&self, condition: F) -> bool
+    where
+        F: Fn(usize, usize, bool) -> bool,
+    {
         let mut loop_nest = 0;
         let mut branches = false;
         let mut visitor = |post: bool, e: &ExpData| {
@@ -1238,9 +1278,7 @@ impl ExpData {
                         loop_nest += 1
                     }
                 },
-                ExpData::LoopCont(_, nest, _)
-                    if *nest >= loop_nest && nest_range.contains(&(*nest - loop_nest)) =>
-                {
+                ExpData::LoopCont(_, nest, cond) if condition(loop_nest, *nest, *cond) => {
                     branches = true;
                     return false; // found a reference, exit visit early
                 },
@@ -1306,9 +1344,34 @@ impl ExpData {
     ///
     /// If this is needed elsewhere we can move it out, currently it's a local helper.
     pub fn rewrite_loop_nest(&self, delta: isize) -> Exp {
+        self.customizable_rewrite_loop_nest(delta, Self::default_nest_rewrite)
+    }
+
+    /// A commonly used rewriter for adjusting nesting level of `LoopCont`
+    /// - `exp`: the target `LoopCont` expression to rewrite
+    /// - `nest`: the current nesting level of the loop
+    /// - `cont`: whether this is a `continue` or `break`
+    /// - `delta`: the delta to add to the nesting level; cound be negative
+    fn default_nest_rewrite(exp: Exp, _: usize, nest: usize, cont: bool, delta: isize) -> Exp {
+        let new_nest = (nest as isize) + delta;
+        assert!(
+            new_nest >= 0,
+            "loop removed which has break/continue references?"
+        );
+        ExpData::LoopCont(exp.node_id(), new_nest as usize, cont).into_exp()
+    }
+
+    /// A customizable version of `rewrite_loop_nest`, allowing to specify how
+    /// the rewriting is done.
+    pub fn customizable_rewrite_loop_nest(
+        &self,
+        delta: isize,
+        rewrite: fn(Exp, usize, usize, bool, isize) -> Exp,
+    ) -> Exp {
         LoopNestRewriter {
             loop_depth: 0,
             delta,
+            rewrite,
         }
         .rewrite_exp(self.clone().into_exp())
     }
@@ -1755,14 +1818,57 @@ impl ExpData {
         None
     }
 
-    /// Collect struct-related operations
-    pub fn struct_usage(&self, usage: &mut BTreeSet<QualifiedId<StructId>>) {
+    fn collect_struct_pattern(pat: &Pattern, usage: &mut BTreeSet<QualifiedId<StructId>>) {
+        if let Pattern::Struct(_, qid, _, pats) = pat {
+            usage.insert(qid.to_qualified_id());
+            for p in pats {
+                Self::collect_struct_pattern(p, usage);
+            }
+        }
+    }
+
+    /// Collect struct-related operations including unpacking
+    pub fn struct_usage(&self, env: &GlobalEnv, usage: &mut BTreeSet<QualifiedId<StructId>>) {
         self.visit_post_order(&mut |e| {
             if let ExpData::Call(_, oper, _) = e {
                 use Operation::*;
                 match oper {
-                    Select(mid, sid, ..) | UpdateField(mid, sid, ..) | Pack(mid, sid, _) => {
+                    SelectVariants(mid, sid, ..)
+                    | TestVariants(mid, sid, ..)
+                    | Select(mid, sid, ..)
+                    | UpdateField(mid, sid, ..)
+                    | Pack(mid, sid, _) => {
                         usage.insert(mid.qualified(*sid));
+                    },
+                    _ => {},
+                }
+            } else {
+                match e {
+                    ExpData::Assign(_, pat, _) | ExpData::Block(_, pat, _, _) => {
+                        Self::collect_struct_pattern(pat, usage);
+                    },
+                    ExpData::Lambda(id, pat, _, _, _) => {
+                        let fun_ty = env.get_node_type(*id);
+                        if let Some((wrapper_struct, _)) = fun_ty.get_struct(env) {
+                            usage.insert(wrapper_struct.get_qualified_id());
+                        }
+                        Self::collect_struct_pattern(pat, usage);
+                    },
+                    ExpData::Quant(_, _, pattern_tuple, _, _, _) => {
+                        for (pat, _) in pattern_tuple {
+                            Self::collect_struct_pattern(pat, usage);
+                        }
+                    },
+                    ExpData::Match(_, _, arms) => {
+                        for arm in arms.iter() {
+                            Self::collect_struct_pattern(&arm.pattern, usage);
+                        }
+                    },
+                    ExpData::Invoke(_, exp, _) => {
+                        let fun_ty = env.get_node_type(exp.node_id());
+                        if let Some((wrapper_struct, _)) = fun_ty.get_struct(env) {
+                            usage.insert(wrapper_struct.get_qualified_id());
+                        }
                     },
                     _ => {},
                 }
@@ -1843,18 +1949,15 @@ impl ExpRewriterFunctions for ExpRewriter<'_> {
 struct LoopNestRewriter {
     loop_depth: usize,
     delta: isize,
+    /// Args: target `LoopCont` expression, current depth of loop, nest level of `LoopCont`, continue or not, delta to add to nest level
+    rewrite: fn(Exp, usize, usize, bool, isize) -> Exp,
 }
 
 impl ExpRewriterFunctions for LoopNestRewriter {
     fn rewrite_exp(&mut self, exp: Exp) -> Exp {
         match exp.as_ref() {
-            ExpData::LoopCont(id, nest, cont) if *nest >= self.loop_depth => {
-                let new_nest = (*nest as isize) + self.delta;
-                assert!(
-                    new_nest >= 0,
-                    "loop removed which has break/continue references?"
-                );
-                ExpData::LoopCont(*id, new_nest as usize, *cont).into_exp()
+            ExpData::LoopCont(_, nest, cont) if *nest >= self.loop_depth => {
+                (self.rewrite)(exp.clone(), self.loop_depth, *nest, *cont, self.delta)
             },
             ExpData::Loop(_, _) => {
                 self.loop_depth += 1;
@@ -1919,6 +2022,7 @@ pub enum Operation {
     // Unary operators
     Not,
     Cast,
+    Negate,
 
     // Builtin functions (impl and spec)
     Exists(Option<MemoryLabel>),
@@ -2392,7 +2496,7 @@ impl PatDisplay<'_> {
         Self { show_type, ..self }
     }
 
-    fn type_ctx(&self) -> TypeDisplayContext {
+    fn type_ctx(&self) -> TypeDisplayContext<'_> {
         if let Some(fe) = &self.fun_env {
             fe.get_type_display_ctx()
         } else {
@@ -2739,7 +2843,8 @@ impl Operation {
 
             // Unary operators
             Not => true,
-            Cast => false, // can overflow
+            Cast => false,   // can overflow
+            Negate => false, // can overflow
 
             // Builtin functions (impl and spec)
             Exists(..) => false, // Spec
@@ -3003,6 +3108,14 @@ impl ModuleName {
         ModuleName(addr, name)
     }
 
+    /// Returns builtin module name.
+    pub fn builtin_module(env: &GlobalEnv) -> Self {
+        Self::new(
+            Address::Numerical(AccountAddress::ZERO),
+            env.symbol_pool().make("$$"),
+        )
+    }
+
     pub fn from_address_bytes_and_name(
         addr: legacy_move_compiler::shared::NumericalAddress,
         name: Symbol,
@@ -3032,15 +3145,18 @@ impl ModuleName {
     }
 
     /// Return the pseudo module name used for scripts, incorporating the `index`.
-    /// Our compiler infrastructure uses `MAX_ADDRESS` for pseudo modules created from scripts.
+    /// Our compiler infrastructure uses `SCRIPT_MODULE_ID` for pseudo modules created from scripts.
     pub fn pseudo_script_name(pool: &SymbolPool, index: usize) -> ModuleName {
         let name = pool.make(Self::pseudo_script_name_builder(SCRIPT_MODULE_NAME, index).as_str());
-        ModuleName(Address::Numerical(AccountAddress::MAX_ADDRESS), name)
+        ModuleName(
+            Address::Numerical(*pseudo_script_module_id().address()),
+            name,
+        )
     }
 
     /// Determine whether this is a script.
     pub fn is_script(&self) -> bool {
-        self.0 == Address::Numerical(AccountAddress::MAX_ADDRESS)
+        self.0 == Address::Numerical(*pseudo_script_module_id().address())
     }
 }
 
@@ -3465,7 +3581,7 @@ fn indent(fmt: impl fmt::Display) -> String {
 }
 
 impl ExpDisplay<'_> {
-    fn type_ctx(&self) -> TypeDisplayContext {
+    fn type_ctx(&self) -> TypeDisplayContext<'_> {
         if let Some(fe) = &self.fun_env {
             fe.get_type_display_ctx()
         } else {

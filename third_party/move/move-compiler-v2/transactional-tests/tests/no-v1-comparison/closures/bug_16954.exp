@@ -1,0 +1,24 @@
+processed 12 tasks
+task 0 lines 1-113:  publish [module 0xc0ffee::m {]
+task 1 lines 115-115:  run 0xc0ffee::m::test1
+return values: 44
+task 2 lines 117-117:  run 0xc0ffee::m::test2
+return values: 1
+task 3 lines 119-119:  run 0xc0ffee::m::test3
+return values: 1
+task 4 lines 121-121:  run 0xc0ffee::m::test4 --args 42
+return values: 43
+task 5 lines 123-123:  run 0xc0ffee::m::test5
+return values: 10
+task 6 lines 125-125:  run 0xc0ffee::m::test6
+return values: 17
+task 7 lines 127-127:  run 0xc0ffee::m::test7
+return values: 9
+task 8 lines 129-129:  run 0xc0ffee::m::test8
+return values: 6
+task 9 lines 131-131:  run 0xc0ffee::m::test9
+return values: 4
+task 10 lines 133-133:  run 0xc0ffee::m::test10
+return values: 5
+task 11 lines 135-135:  run 0xc0ffee::m::test11
+return values: 4

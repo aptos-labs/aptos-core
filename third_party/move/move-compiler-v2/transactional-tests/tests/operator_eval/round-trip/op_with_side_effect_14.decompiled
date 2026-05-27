@@ -1,0 +1,51 @@
+//**** Cross-compiled for `move` syntax from `tests/operator_eval/op_with_side_effect_14.move`
+
+//# publish
+module 0xc0ffee::m {
+    struct S has drop {
+        x: u64,
+        y: u64,
+        z: u64,
+    }
+    fun inc_x(p0: &mut S, p1: u64) {
+        let _v0 = *&p0.x + p1;
+        let _v1 = &mut p0.x;
+        *_v1 = _v0;
+    }
+    public fun test1(): u64 {
+        let _v0 = S{x: 1, y: 2, z: 3};
+        inc_x(&mut _v0, 6);
+        let _v1 = *&(&_v0).x;
+        inc_x(&mut _v0, 47);
+        let _v2 = *&(&_v0).x;
+        let _v3 = _v1 + _v2;
+        inc_x(&mut _v0, 117);
+        let _v4 = *&(&_v0).x;
+        _v3 + _v4
+    }
+    public fun test2(): u64 {
+        let _v0 = S{x: 1, y: 2, z: 3};
+        let _v1 = &mut _v0;
+        let _v2 = *&_v1.x + 6;
+        let _v3 = &mut _v1.x;
+        *_v3 = _v2;
+        let _v4 = *&(&_v0).x;
+        _v1 = &mut _v0;
+        let _v5 = *&_v1.x + 47;
+        let _v6 = &mut _v1.x;
+        *_v6 = _v5;
+        let _v7 = *&(&_v0).x;
+        let _v8 = _v4 + _v7;
+        _v1 = &mut _v0;
+        let _v9 = *&_v1.x + 117;
+        let _v10 = &mut _v1.x;
+        *_v10 = _v9;
+        let _v11 = *&(&_v0).x;
+        _v8 + _v11
+    }
+}
+
+
+//# run 0xc0ffee::m::test1
+
+//# run 0xc0ffee::m::test2

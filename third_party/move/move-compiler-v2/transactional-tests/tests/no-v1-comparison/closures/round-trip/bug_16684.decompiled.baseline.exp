@@ -1,0 +1,31 @@
+processed 16 tasks
+task 0 lines 3-129:  publish [module 0xc0ffee::m {]
+task 1 lines 132-132:  run 0xc0ffee::m::test1a
+return values: []
+task 2 lines 134-134:  run 0xc0ffee::m::test1b
+return values: []
+task 3 lines 136-136:  run 0xc0ffee::m::test2a
+return values: []
+task 4 lines 138-138:  run 0xc0ffee::m::test2b
+return values: []
+task 5 lines 140-140:  run 0xc0ffee::m::test3a --type-args u64
+return values: []
+task 6 lines 142-142:  run 0xc0ffee::m::test3b --type-args u16
+return values: []
+task 7 lines 144-144:  run 0xc0ffee::m::test4a --type-args u32
+return values: []
+task 8 lines 146-146:  run 0xc0ffee::m::test4b --type-args u128
+return values: []
+task 9 lines 148-148:  run 0xc0ffee::m::test5
+return values: []
+task 10 lines 150-150:  run 0xc0ffee::m::test6
+return values: [42]
+task 11 lines 152-152:  run 0xc0ffee::m::test7
+task 12 lines 154-154:  run 0xc0ffee::m::test8
+return values: 3
+task 13 lines 156-156:  run 0xc0ffee::m::test9a
+return values: [3, 2, 1]
+task 14 lines 158-158:  run 0xc0ffee::m::test9b
+return values: [3, 2, 1]
+task 15 lines 160-160:  run 0xc0ffee::m::test10
+return values: [1, 2, 3, 4]

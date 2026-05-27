@@ -22,7 +22,7 @@ pub const EXP_EXT: &str = "exp";
 datatest_stable::harness!(test_runner, "tests", r".*\.move$");
 
 fn test_runner(path: &Path) -> datatest_stable::Result<()> {
-    logging::setup_logging_for_testing();
+    logging::setup_logging_for_testing(None);
     let path_str = path.display().to_string();
     let mut options = Options {
         sources_deps: extract_test_directives(path, "// dep:")?,
@@ -59,7 +59,7 @@ fn test_runner(path: &Path) -> datatest_stable::Result<()> {
                     env.set_function_def(fun_id, def);
                 }
             }
-            let sourcifier = Sourcifier::new(&env);
+            let sourcifier = Sourcifier::new(&env, true);
             for mid in modules {
                 sourcifier.print_module(mid)
             }

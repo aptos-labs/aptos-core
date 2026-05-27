@@ -1,0 +1,181 @@
+
+Diagnostics:
+error: cannot use `i8` with an operator which expects a value of type `u8|u16|u32|u64|u128|u256`
+  ┌─ tests/integers/signed/non_supported_ops.move:4:9
+  │
+4 │         x | y
+  │         ^
+
+error: cannot use `i16` with an operator which expects a value of type `u8|u16|u32|u64|u128|u256`
+  ┌─ tests/integers/signed/non_supported_ops.move:8:9
+  │
+8 │         x | y
+  │         ^
+
+error: cannot use `i32` with an operator which expects a value of type `u8|u16|u32|u64|u128|u256`
+   ┌─ tests/integers/signed/non_supported_ops.move:12:9
+   │
+12 │         x | y
+   │         ^
+
+error: cannot use `i64` with an operator which expects a value of type `u8|u16|u32|u64|u128|u256`
+   ┌─ tests/integers/signed/non_supported_ops.move:16:9
+   │
+16 │         x | y
+   │         ^
+
+error: cannot use `i128` with an operator which expects a value of type `u8|u16|u32|u64|u128|u256`
+   ┌─ tests/integers/signed/non_supported_ops.move:20:9
+   │
+20 │         x | y
+   │         ^
+
+error: cannot use `i256` with an operator which expects a value of type `u8|u16|u32|u64|u128|u256`
+   ┌─ tests/integers/signed/non_supported_ops.move:24:9
+   │
+24 │         x | y
+   │         ^
+
+error: cannot use `i8` with an operator which expects a value of type `u8|u16|u32|u64|u128|u256`
+   ┌─ tests/integers/signed/non_supported_ops.move:28:9
+   │
+28 │         x & y
+   │         ^
+
+error: cannot use `i16` with an operator which expects a value of type `u8|u16|u32|u64|u128|u256`
+   ┌─ tests/integers/signed/non_supported_ops.move:32:9
+   │
+32 │         x & y
+   │         ^
+
+error: cannot use `i32` with an operator which expects a value of type `u8|u16|u32|u64|u128|u256`
+   ┌─ tests/integers/signed/non_supported_ops.move:36:9
+   │
+36 │         x & y
+   │         ^
+
+error: cannot use `i64` with an operator which expects a value of type `u8|u16|u32|u64|u128|u256`
+   ┌─ tests/integers/signed/non_supported_ops.move:40:9
+   │
+40 │         x & y
+   │         ^
+
+error: cannot use `i128` with an operator which expects a value of type `u8|u16|u32|u64|u128|u256`
+   ┌─ tests/integers/signed/non_supported_ops.move:44:9
+   │
+44 │         x & y
+   │         ^
+
+error: cannot use `i256` with an operator which expects a value of type `u8|u16|u32|u64|u128|u256`
+   ┌─ tests/integers/signed/non_supported_ops.move:48:9
+   │
+48 │         x & y
+   │         ^
+
+error: cannot use `i8` with an operator which expects a value of type `u8|u16|u32|u64|u128|u256`
+   ┌─ tests/integers/signed/non_supported_ops.move:52:9
+   │
+52 │         x ^ y
+   │         ^
+
+error: cannot use `i16` with an operator which expects a value of type `u8|u16|u32|u64|u128|u256`
+   ┌─ tests/integers/signed/non_supported_ops.move:56:9
+   │
+56 │         x ^ y
+   │         ^
+
+error: cannot use `i32` with an operator which expects a value of type `u8|u16|u32|u64|u128|u256`
+   ┌─ tests/integers/signed/non_supported_ops.move:60:9
+   │
+60 │         x ^ y
+   │         ^
+
+error: cannot use `i64` with an operator which expects a value of type `u8|u16|u32|u64|u128|u256`
+   ┌─ tests/integers/signed/non_supported_ops.move:64:9
+   │
+64 │         x ^ y
+   │         ^
+
+error: cannot use `i128` with an operator which expects a value of type `u8|u16|u32|u64|u128|u256`
+   ┌─ tests/integers/signed/non_supported_ops.move:68:9
+   │
+68 │         x ^ y
+   │         ^
+
+error: cannot use `i256` with an operator which expects a value of type `u8|u16|u32|u64|u128|u256`
+   ┌─ tests/integers/signed/non_supported_ops.move:72:9
+   │
+72 │         x ^ y
+   │         ^
+
+error: cannot use `i8` with an operator which expects a value of type `u8|u16|u32|u64|u128|u256`
+   ┌─ tests/integers/signed/non_supported_ops.move:76:9
+   │
+76 │         x << y
+   │         ^
+
+error: cannot use `i16` with an operator which expects a value of type `u8|u16|u32|u64|u128|u256`
+   ┌─ tests/integers/signed/non_supported_ops.move:80:9
+   │
+80 │         x << y
+   │         ^
+
+error: cannot use `i32` with an operator which expects a value of type `u8|u16|u32|u64|u128|u256`
+   ┌─ tests/integers/signed/non_supported_ops.move:84:9
+   │
+84 │         x << y
+   │         ^
+
+error: cannot use `i64` with an operator which expects a value of type `u8|u16|u32|u64|u128|u256`
+   ┌─ tests/integers/signed/non_supported_ops.move:88:9
+   │
+88 │         x << y
+   │         ^
+
+error: cannot use `i128` with an operator which expects a value of type `u8|u16|u32|u64|u128|u256`
+   ┌─ tests/integers/signed/non_supported_ops.move:92:9
+   │
+92 │         x << y
+   │         ^
+
+error: cannot use `i256` with an operator which expects a value of type `u8|u16|u32|u64|u128|u256`
+   ┌─ tests/integers/signed/non_supported_ops.move:96:9
+   │
+96 │         x << y
+   │         ^
+
+error: cannot use `i8` with an operator which expects a value of type `u8|u16|u32|u64|u128|u256`
+    ┌─ tests/integers/signed/non_supported_ops.move:100:9
+    │
+100 │         x >> y
+    │         ^
+
+error: cannot use `i16` with an operator which expects a value of type `u8|u16|u32|u64|u128|u256`
+    ┌─ tests/integers/signed/non_supported_ops.move:104:9
+    │
+104 │         x >> y
+    │         ^
+
+error: cannot use `i32` with an operator which expects a value of type `u8|u16|u32|u64|u128|u256`
+    ┌─ tests/integers/signed/non_supported_ops.move:108:9
+    │
+108 │         x >> y
+    │         ^
+
+error: cannot use `i64` with an operator which expects a value of type `u8|u16|u32|u64|u128|u256`
+    ┌─ tests/integers/signed/non_supported_ops.move:112:9
+    │
+112 │         x >> y
+    │         ^
+
+error: cannot use `i128` with an operator which expects a value of type `u8|u16|u32|u64|u128|u256`
+    ┌─ tests/integers/signed/non_supported_ops.move:116:9
+    │
+116 │         x >> y
+    │         ^
+
+error: cannot use `i256` with an operator which expects a value of type `u8|u16|u32|u64|u128|u256`
+    ┌─ tests/integers/signed/non_supported_ops.move:120:9
+    │
+120 │         x >> y
+    │         ^

@@ -1,1 +1,4 @@
 processed 3 tasks
+task 0 lines 1-11:  publish [// NOTE: given that we don't have multi-module publishing yet, we have to go through the]
+task 1 lines 13-20:  publish [module 0x42.M {]
+task 2 lines 22-31:  publish [module 0x42.N {]

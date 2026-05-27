@@ -1,19 +1,14 @@
 processed 7 tasks
-
-task 1 'run'. lines 71-71:
+task 0 lines 1-69:  publish [module 0x42::test {]
+task 1 lines 71-71:  run --verbose -- 0x42::test::test_proj_0
 return values: 42
-
-task 2 'run'. lines 73-73:
+task 2 lines 73-73:  run --verbose -- 0x42::test::test_proj_0_ref
 return values: 42
-
-task 3 'run'. lines 75-75:
+task 3 lines 75-75:  run --verbose -- 0x42::test::test_proj_2
 return values: true
-
-task 4 'run'. lines 77-77:
+task 4 lines 77-77:  run --verbose -- 0x42::test::test_proj_2_ref
 return values: true
-
-task 5 'run'. lines 79-79:
+task 5 lines 79-79:  run --verbose -- 0x42::test::test_get_x
 return values: 42
-
-task 6 'run'. lines 81-81:
+task 6 lines 81-81:  run --verbose -- 0x42::test::test_get_x_ref
 return values: 42

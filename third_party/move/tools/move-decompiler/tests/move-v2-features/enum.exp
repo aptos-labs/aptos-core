@@ -1,0 +1,143 @@
+module 0x99::enum_complex {
+    enum Admin has drop {
+        Superuser,
+        User {
+            _0: u64,
+        }
+    }
+    enum Entity has drop {
+        Person {
+            id: u64,
+        }
+        Institution {
+            id: u64,
+            admin: Admin,
+        }
+    }
+    fun admin_id(self: &Entity): u64 {
+        let _v0;
+        let _v1;
+        'l5: loop {
+            let _v2;
+            'l4: loop {
+                'l3: loop {
+                    let _v3;
+                    'l0: loop {
+                        'l1: loop {
+                            let _v4;
+                            'l2: loop {
+                                if (!((self is Institution) && (&self.admin is Superuser))) {
+                                    loop {
+                                        let _v5;
+                                        if (self is Institution) {
+                                            _v5 = &self.admin;
+                                            if (_v5 is User) {
+                                                _v3 = &_v5._0;
+                                                if (*_v3 > 10) break
+                                            }
+                                        };
+                                        loop {
+                                            if (self is Institution) {
+                                                _v5 = &self.admin;
+                                                if (_v5 is User) {
+                                                    if (*&_v5._0 <= 10) break}
+                                            };
+                                            _v4 = self;
+                                            if (_v4 is Person) {
+                                                _v3 = &_v4.id;
+                                                if (*_v3 > 10) break 'l0
+                                            };
+                                            if (!(_v4 is Institution)) break 'l1;
+                                            break 'l2
+                                        };
+                                        _v4 = self;
+                                        if (_v4 is Person) {
+                                            _v3 = &_v4.id;
+                                            if (*_v3 > 10) {
+                                                _v2 = *_v3;
+                                                break 'l3
+                                            }
+                                        };
+                                        if (_v4 is Institution) {
+                                            _v2 = *&_v4.id;
+                                            break 'l3
+                                        };
+                                        _v2 = 0;
+                                        break 'l3
+                                    };
+                                    _v1 = *_v3;
+                                    _v4 = self;
+                                    if (_v4 is Person) {
+                                        _v3 = &_v4.id;
+                                        if (*_v3 > 10) {
+                                            _v2 = *_v3;
+                                            break 'l4
+                                        }
+                                    };
+                                    if (_v4 is Institution) {
+                                        _v2 = *&_v4.id;
+                                        break 'l4
+                                    };
+                                    _v2 = 0;
+                                    break 'l4
+                                };
+                                _v0 = 1;
+                                if (self is Person) {
+                                    _v3 = &self.id;
+                                    if (*_v3 > 10) {
+                                        _v1 = *_v3;
+                                        break 'l5
+                                    }
+                                };
+                                if (self is Institution) {
+                                    _v1 = *&self.id;
+                                    break 'l5
+                                };
+                                _v1 = 0;
+                                break 'l5
+                            };
+                            return *&_v4.id
+                        };
+                        return 0
+                    };
+                    return *_v3
+                };
+                return _v2 + 5
+            };
+            return _v1 + _v2
+        };
+        _v0 + _v1
+    }
+}
+module 0x99::enum_simple {
+    enum Shape {
+        Circle {
+            radius: u64,
+        }
+        Rectangle {
+            width: u64,
+            height: u64,
+        }
+    }
+    fun destroy_empty(self: Shape): bool {
+        let _v0 = &self;
+        loop {
+            if (!(_v0 is Circle)) {
+                if (_v0 is Rectangle) break;
+                abort 14566554180833181697
+            };
+            let Shape::Circle{radius: _v1} = self;
+            return true
+        };
+        let Shape::Rectangle{width: _v2, height: _v3} = self;
+        false
+    }
+    fun example_destroy_shapes() {
+        let _v0 = Shape::Circle{radius: 0};
+        let _v1 = Shape::Rectangle{width: 0, height: 0};
+        let _v2 = destroy_empty(_v0);
+        let _v3 = destroy_empty(_v1);
+    }
+}
+
+============ recompilation succeeded ========

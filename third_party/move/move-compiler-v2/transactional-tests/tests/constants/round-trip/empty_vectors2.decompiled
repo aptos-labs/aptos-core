@@ -1,0 +1,38 @@
+//**** Cross-compiled for `move` syntax from `tests/constants/empty_vectors2.move`
+
+//# publish
+module 0x42::m {
+    use 0x1::vector;
+    public entry fun init() {
+        let _v0;
+        let _v1;
+        let _v2 = vector[vector[]];
+        let _v3 = *vector::borrow<vector<vector<u8>>>(&_v2, 0);
+        let _v4 = vector::empty<u64>();
+        let _v5 = _v3;
+        vector::reverse<vector<u8>>(&mut _v5);
+        while (!vector::is_empty<vector<u8>>(&_v5)) {
+            let _v6 = vector::pop_back<vector<u8>>(&mut _v5);
+            _v1 = &mut _v4;
+            let _v7 = _v6;
+            _v0 = vector::length<u8>(&_v7) + 2;
+            vector::push_back<u64>(_v1, _v0);
+            continue
+        };
+        let _v8 = vector[vector[]];
+        let _v9 = *vector::borrow<vector<u64>>(&_v8, 0);
+        let _v10 = vector::empty<u64>();
+        let _v11 = _v9;
+        vector::reverse<u64>(&mut _v11);
+        while (!vector::is_empty<u64>(&_v11)) {
+            let _v12 = vector::pop_back<u64>(&mut _v11);
+            _v1 = &mut _v10;
+            _v0 = _v12 + 3;
+            vector::push_back<u64>(_v1, _v0);
+            continue
+        };
+    }
+}
+
+
+//# run 0x42::m::init

@@ -1,1 +1,4 @@
 processed 3 tasks
+task 0 lines 1-29:  publish [module 0x1.A {]
+task 1 lines 31-58:  publish [module 0x1.Tester {]
+task 2 lines 60-67:  run --signers 0x1 [import 0x1.Tester;]

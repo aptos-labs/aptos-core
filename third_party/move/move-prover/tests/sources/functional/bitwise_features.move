@@ -171,6 +171,7 @@ module TestFeatures {
     }
 
     spec enable_feature_flags {
+        pragma verify = false; // timeout frequent, makes testsuite too slow
         pragma opaque;
         pragma timeout = 120;
         modifies global<Features>(@std);

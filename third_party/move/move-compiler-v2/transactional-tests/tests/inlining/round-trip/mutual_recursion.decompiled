@@ -1,0 +1,23 @@
+//**** Cross-compiled for `move` syntax from `tests/inlining/mutual_recursion.move`
+
+//# publish
+module 0x42::Mutual {
+    fun even(p0: u64): bool {
+        let _v0 = p0 == 0;
+        loop {
+            if (_v0) return true else {
+                p0 = p0 - 1;
+                if (!(p0 == 0)) break
+            };
+            return false
+        };
+        even(p0 - 1)
+    }
+    public fun recursion_check() {
+        assert!(even(4), 0);
+        assert!(even(4), 0);
+    }
+}
+
+
+//# run 0x42::Mutual::recursion_check

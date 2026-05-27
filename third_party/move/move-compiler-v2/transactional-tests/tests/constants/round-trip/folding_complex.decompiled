@@ -1,0 +1,8 @@
+//**** Cross-compiled for `move` syntax from `tests/constants/folding_complex.move`
+
+//# run
+script {
+    fun main() {
+        ()
+    }
+}

@@ -1,12 +1,11 @@
 processed 5 tasks
-
-task 2 'run'. lines 25-25:
+task 0 lines 1-21:  publish [module 0x42::test {]
+task 1 lines 23-23:  run --verbose --signers 0x1 -- 0x42::test::init
+task 2 lines 25-25:  run --verbose -- 0x42::test::ok1
 return values: true
-
-task 3 'run'. lines 27-27:
+task 3 lines 27-27:  run --verbose -- 0x42::test::ok2
 return values: true
-
-task 4 'run'. lines 29-29:
+task 4 lines 29-29:  run --verbose -- 0x42::test::fail1
 Error: Function execution failed with VMError: {
     message: not allowed to perform `reads 0x42::test::R<bool>(@0x1)`,
     major_status: ACCESS_DENIED,

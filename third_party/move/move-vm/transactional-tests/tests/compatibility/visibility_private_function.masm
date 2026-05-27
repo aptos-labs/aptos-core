@@ -1,0 +1,14 @@
+//# publish
+module 0x66::a
+fun foo()
+    ret
+fun bar()
+    ret
+
+
+//# publish
+module 0x66::a
+friend fun foo()
+    ret
+public fun bar()
+    ret

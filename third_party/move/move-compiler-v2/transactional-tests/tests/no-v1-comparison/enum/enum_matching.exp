@@ -1,43 +1,30 @@
 processed 15 tasks
-
-task 1 'run'. lines 175-175:
+task 0 lines 1-173:  publish [module 0x42::m {]
+task 1 lines 175-175:  run 0x42::m::t1_is_inner1
 return values: true
-
-task 2 'run'. lines 177-177:
+task 2 lines 177-177:  run 0x42::m::t2_is_inner1
 return values: false
-
-task 3 'run'. lines 179-179:
+task 3 lines 179-179:  run 0x42::m::t1_inner_value
 return values: 7
-
-task 4 'run'. lines 181-181:
+task 4 lines 181-181:  run 0x42::m::t1_outer_value
 return values: 0
-
-task 5 'run'. lines 183-183:
+task 5 lines 183-183:  run 0x42::m::t2_outer_value
 return values: 3
-
-task 6 'run'. lines 185-185:
+task 6 lines 185-185:  run 0x42::m::t3_outer_value
 return values: 8
-
-task 7 'run'. lines 187-187:
+task 7 lines 187-187:  run 0x42::m::t1_outer_value_nested
 return values: 27
-
-task 8 'run'. lines 189-189:
+task 8 lines 189-189:  run 0x42::m::t2_outer_value_nested
 return values: 12
-
-task 9 'run'. lines 191-191:
+task 9 lines 191-191:  run 0x42::m::t1_outer_value_with_cond
 return values: 1
-
-task 10 'run'. lines 193-193:
+task 10 lines 193-193:  run 0x42::m::t1_outer_value_with_cond_ref
 return values: true
-
-task 11 'run'. lines 195-195:
+task 11 lines 195-195:  run 0x42::m::t1_is_some
 return values: false
-
-task 12 'run'. lines 197-197:
+task 12 lines 197-197:  run 0x42::m::t2_is_some
 return values: true
-
-task 13 'run'. lines 199-199:
+task 13 lines 199-199:  run 0x42::m::t1_is_some_specialized
 return values: false
-
-task 14 'run'. lines 201-201:
+task 14 lines 201-201:  run 0x42::m::t2_is_some_specialized
 return values: true

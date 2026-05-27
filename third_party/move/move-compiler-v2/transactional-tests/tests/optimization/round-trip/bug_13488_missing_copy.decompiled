@@ -1,0 +1,26 @@
+//**** Cross-compiled for `move` syntax from `tests/optimization/bug_13488_missing_copy.move`
+
+//# publish
+module 0xc0ffee::m {
+    fun test() {
+        let _v0 = 0;
+        let _v1 = &_v0;
+        let _v2 = 0;
+        let _v3 = &_v2;
+        let _v4 = 0 + 0;
+        assert!(*_v1 == 0, 1);
+        assert!(*_v3 == 0, 1);
+    }
+    fun test2() {
+        let _v0 = 2;
+        let _v1 = &_v0;
+        let _v2 = 2;
+        let _v3 = &_v2;
+        assert!(2 + 2 == 4, 1);
+    }
+}
+
+
+//# run 0xc0ffee::m::test
+
+//# run 0xc0ffee::m::test2

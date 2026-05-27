@@ -1,0 +1,73 @@
+module 0x1::fixed_point32 {
+    struct FixedPoint32 has copy, drop, store {
+        value: u64,
+    }
+    public fun ceil(self: FixedPoint32): u64 {
+        let _v0 = floor(self) << 32u8;
+        if (*&(&self).value == _v0) return _v0 >> 32u8;
+        ((_v0 as u128) + 4294967296u128 >> 32u8) as u64
+    }
+    public fun floor(self: FixedPoint32): u64 {
+        *&(&self).value >> 32u8
+    }
+    public fun create_from_rational(numerator: u64, denominator: u64): FixedPoint32 {
+        let _v0;
+        let _v1 = (numerator as u128) << 64u8;
+        let _v2 = (denominator as u128) << 32u8;
+        assert!(_v2 != 0u128, 65537);
+        let _v3 = _v1 / _v2;
+        if (_v3 != 0u128) _v0 = true else _v0 = numerator == 0;
+        assert!(_v0, 131077);
+        assert!(_v3 <= 18446744073709551615u128, 131077);
+        FixedPoint32{value: _v3 as u64}
+    }
+    public fun create_from_raw_value(value: u64): FixedPoint32 {
+        FixedPoint32{value: value}
+    }
+    public fun create_from_u64(val: u64): FixedPoint32 {
+        let _v0 = (val as u128) << 32u8;
+        assert!(_v0 <= 18446744073709551615u128, 131077);
+        FixedPoint32{value: _v0 as u64}
+    }
+    public fun divide_u64(val: u64, divisor: FixedPoint32): u64 {
+        assert!(*&(&divisor).value != 0, 65540);
+        let _v0 = (val as u128) << 32u8;
+        let _v1 = (*&(&divisor).value) as u128;
+        let _v2 = _v0 / _v1;
+        assert!(_v2 <= 18446744073709551615u128, 131074);
+        _v2 as u64
+    }
+    public fun get_raw_value(self: FixedPoint32): u64 {
+        *&(&self).value
+    }
+    public fun is_zero(self: FixedPoint32): bool {
+        *&(&self).value == 0
+    }
+    public fun max(num1: FixedPoint32, num2: FixedPoint32): FixedPoint32 {
+        let _v0 = *&(&num1).value;
+        let _v1 = *&(&num2).value;
+        if (_v0 > _v1) return num1;
+        num2
+    }
+    public fun min(num1: FixedPoint32, num2: FixedPoint32): FixedPoint32 {
+        let _v0 = *&(&num1).value;
+        let _v1 = *&(&num2).value;
+        if (_v0 < _v1) return num1;
+        num2
+    }
+    public fun multiply_u64(val: u64, multiplier: FixedPoint32): u64 {
+        let _v0 = val as u128;
+        let _v1 = (*&(&multiplier).value) as u128;
+        let _v2 = _v0 * _v1 >> 32u8;
+        assert!(_v2 <= 18446744073709551615u128, 131075);
+        _v2 as u64
+    }
+    public fun round(self: FixedPoint32): u64 {
+        let _v0 = floor(self) << 32u8;
+        let _v1 = _v0 + 2147483648;
+        if (*&(&self).value < _v1) return _v0 >> 32u8;
+        ceil(self)
+    }
+}
+
+============ recompilation succeeded ========

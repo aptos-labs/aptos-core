@@ -1,6 +1,6 @@
 // -- Model dump before first bytecode pipeline
 module 0x42::Test {
-    public inline fun foo(f: |(u64, u64)|,z: u64) {
+    public inline fun foo(f: |u64, u64|,z: u64) {
         {
           let (_z: u64): (u64) = Tuple(z);
           {
@@ -17,7 +17,7 @@ module 0x42::Test {
         };
         Tuple()
     }
-    public inline fun quux(f: |(u64, u64)|,_z: u64) {
+    public inline fun quux(f: |u64, u64|,_z: u64) {
         {
           let x: u64 = 3;
           {
@@ -92,7 +92,7 @@ module 0x42::Test {
 
 // -- Sourcified model before first bytecode pipeline
 module 0x42::Test {
-    public inline fun foo(f: |(u64, u64)|, z: u64) {
+    public inline fun foo(f: |u64, u64|, z: u64) {
         {
             let (_z) = (z);
             let x = 3;
@@ -103,7 +103,7 @@ module 0x42::Test {
             };
         };
     }
-    public inline fun quux(f: |(u64, u64)|, _z: u64) {
+    public inline fun quux(f: |u64, u64|, _z: u64) {
         let x = 3;
         let q = 5;
         f(x, q);
@@ -144,7 +144,7 @@ module 0x42::Test {
 
 // -- Model dump before second bytecode pipeline
 module 0x42::Test {
-    public inline fun foo(f: |(u64, u64)|,z: u64) {
+    public inline fun foo(f: |u64, u64|,z: u64) {
         {
           let (_z: u64): (u64) = Tuple(z);
           (f)(3, 5);
@@ -152,7 +152,7 @@ module 0x42::Test {
         };
         Tuple()
     }
-    public inline fun quux(f: |(u64, u64)|,_z: u64) {
+    public inline fun quux(f: |u64, u64|,_z: u64) {
         (f)(3, 5);
         Tuple()
     }

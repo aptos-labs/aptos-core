@@ -1,0 +1,22 @@
+module 0x99::return_test {
+    public fun contains(e: u64, v: vector<u64>): bool {
+        let _v0 = 0;
+        let _v1 = 0x1::vector::length<u64>(&v);
+        let _v2 = false;
+        'l0: loop {
+            loop {
+                if (!(_v0 < _v1)) break 'l0;
+                let _v3 = 0x1::vector::borrow<u64>(&v, _v0);
+                let _v4 = &e;
+                if (_v3 == _v4) break;
+                _v0 = _v0 + 1;
+                continue
+            };
+            _v2 = true;
+            break
+        };
+        _v2
+    }
+}
+
+============ recompilation succeeded ========

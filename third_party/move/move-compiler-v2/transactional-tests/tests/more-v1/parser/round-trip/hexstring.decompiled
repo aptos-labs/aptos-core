@@ -1,0 +1,16 @@
+//**** Cross-compiled for `move` syntax from `tests/more-v1/parser/hexstring.move`
+
+//# run
+script {
+    use 0x1::vector;
+    fun main() {
+        let _v0 = vector[1u8, 2u8, 3u8, 4u8];
+        let _v1 = 0;
+        while (!vector::is_empty<u8>(&_v0)) {
+            let _v2 = vector::pop_back<u8>(&mut _v0) as u64;
+            _v1 = _v1 + _v2;
+            continue
+        };
+        assert!(_v1 == 10, _v1);
+    }
+}

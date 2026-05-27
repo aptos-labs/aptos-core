@@ -1,4 +1,5 @@
 processed 3 tasks
-
-task 2 'run'. lines 21-21:
+task 0 lines 1-10:  publish [module 0x42::TwoLevelTestModule {]
+task 1 lines 12-19:  publish [module 0x42::TwoLevelTestMain {]
+task 2 lines 21-21:  run 0x42::TwoLevelTestMain::test
 return values: 18

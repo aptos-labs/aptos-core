@@ -1,0 +1,14 @@
+processed 4 tasks
+task 0 lines 3-8:  run --verbose [script {]
+task 1 lines 11-16:  run --verbose [script {]
+task 2 lines 19-24:  run --verbose [script {]
+task 3 lines 27-32:  run --verbose [script {]
+Error: Script execution failed with VMError: {
+    message: Cannot cast int256::U256(57896044618658097711785492504343953926634992332820282019728792003956564819968) to int256::I256,
+    major_status: ARITHMETIC_ERROR,
+    sub_status: None,
+    location: script,
+    indices: [],
+    offsets: [(FunctionDefinitionIndex(0), 1)],
+    exec_state: Some(ExecutionState { stack_trace: [] }),
+}

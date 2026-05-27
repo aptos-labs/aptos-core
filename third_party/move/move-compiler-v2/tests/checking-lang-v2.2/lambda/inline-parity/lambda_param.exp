@@ -79,27 +79,27 @@ module 0x42::LambdaParam {
         b
     }
     fun test_lambda_symbol_param1() {
-        let a = inline_apply2(|arg0| __lambda__1__test_lambda_symbol_param1(arg0), 3);
+        let a = inline_apply2(|arg0| lambda__1__test_lambda_symbol_param1(arg0), 3);
         if (a == 3) () else abort 0;
     }
     fun test_lambda_symbol_param2() {
-        let a = inline_apply2(|arg0| __lambda__1__test_lambda_symbol_param2(arg0), 3);
+        let a = inline_apply2(|arg0| lambda__1__test_lambda_symbol_param2(arg0), 3);
         if (a == 3) () else abort 0;
-        let b = inline_apply(|arg0| __lambda__2__test_lambda_symbol_param2(arg0), 3);
+        let b = inline_apply(|arg0| lambda__2__test_lambda_symbol_param2(arg0), 3);
         if (b == 3) () else abort 0;
-        let b = inline_apply3(|arg0| __lambda__3__test_lambda_symbol_param2(arg0), 3);
+        let b = inline_apply3(|arg0| lambda__3__test_lambda_symbol_param2(arg0), 3);
         if (b == 3) () else abort 0;
     }
-    fun __lambda__1__test_lambda_symbol_param1(x: u64): u64 {
+    fun lambda__1__test_lambda_symbol_param1(x: u64): u64 {
         x
     }
-    fun __lambda__1__test_lambda_symbol_param2(x: u64): u64 {
+    fun lambda__1__test_lambda_symbol_param2(x: u64): u64 {
         x
     }
-    fun __lambda__2__test_lambda_symbol_param2(x: u64): u64 {
+    fun lambda__2__test_lambda_symbol_param2(x: u64): u64 {
         x
     }
-    fun __lambda__3__test_lambda_symbol_param2(x: u64): u64 {
+    fun lambda__3__test_lambda_symbol_param2(x: u64): u64 {
         x
     }
 }

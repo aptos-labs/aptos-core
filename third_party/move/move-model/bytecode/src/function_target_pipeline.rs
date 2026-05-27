@@ -10,8 +10,8 @@ use crate::{
 };
 use core::fmt;
 use itertools::{Either, Itertools};
-use log::{debug, info};
-use move_model::model::{FunId, FunctionEnv, GlobalEnv, QualifiedId};
+use log::debug;
+use move_model::model::{FunId, FunctionEnv, FunctionSize, GlobalEnv, QualifiedId};
 use petgraph::graph::DiGraph;
 use std::{
     collections::{BTreeMap, BTreeSet},
@@ -295,6 +295,23 @@ impl FunctionTargetsHolder {
             }
         }
     }
+
+    /// Computes the estimated sizes of functions using their stackless bytecode.
+    pub fn compute_function_size_estimates(&self) -> BTreeMap<QualifiedId<FunId>, FunctionSize> {
+        self.targets
+            .iter()
+            .filter_map(|(fid, variants)| {
+                let baseline_function = variants.get(&FunctionVariant::Baseline)?;
+                Some((
+                    *fid,
+                    FunctionSize::new(
+                        baseline_function.code.len(),
+                        baseline_function.local_types.len(),
+                    ),
+                ))
+            })
+            .collect()
+    }
 }
 
 impl FunctionTargetPipeline {
@@ -424,7 +441,7 @@ impl FunctionTargetPipeline {
         AfterEach: Fn(usize, &dyn FunctionTargetProcessor, &FunctionTargetsHolder) -> bool,
     {
         let rev_topo_order = Self::sort_in_reverse_topological_order(env, targets);
-        info!("transforming bytecode");
+        debug!("transforming bytecode");
         hook_before_pipeline(targets);
         for (step_count, processor) in self.processors.iter().enumerate() {
             if processor.is_single_run() {
@@ -573,7 +590,7 @@ impl FunctionTargetPipeline {
     }
 
     fn debug_dump(base_name: &str, step_count: usize, suffix: &str, content: &str) {
-        let name = format!("bytecode of {}_{}_{}", base_name, step_count, suffix);
+        let name = format!("bytecode of {}#step{}_{}", base_name, step_count, suffix);
         debug!("{}:\n{}\n", name, content.trim())
     }
 

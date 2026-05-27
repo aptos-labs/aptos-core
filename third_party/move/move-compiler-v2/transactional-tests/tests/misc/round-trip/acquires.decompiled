@@ -1,0 +1,18 @@
+//**** Cross-compiled for `move` syntax from `tests/misc/acquires.move`
+
+//# publish
+module 0x42::m {
+    struct R has key {
+        v: u64,
+    }
+    fun read(): u64
+        acquires R
+    {
+        *&borrow_global<R>(@0x42).v
+    }
+    public fun test(): u64
+        acquires R
+    {
+        read()
+    }
+}

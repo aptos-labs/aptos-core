@@ -1,0 +1,19 @@
+processed 2 tasks
+task 0 lines 1-19:  publish [module 0xc0ffee::corner_cases]
+Error: Unable to publish module '0000000000000000000000000000000000000000000000000000000000c0ffee::corner_cases'. Got VMError: {
+    major_status: BORROWLOC_EXISTS_BORROW_ERROR,
+    sub_status: None,
+    location: 0xc0ffee::corner_cases,
+    indices: [(FunctionDefinition, 0)],
+    offsets: [(FunctionDefinitionIndex(0), 3)],
+}
+task 1 lines 21-21:  run 0xc0ffee::corner_cases::fun1 --verbose
+Error: Function execution failed with VMError: {
+    message: Linker Error: Module 0000000000000000000000000000000000000000000000000000000000c0ffee::corner_cases doesn't exist,
+    major_status: LINKER_ERROR,
+    sub_status: None,
+    location: undefined,
+    indices: [],
+    offsets: [],
+    exec_state: None,
+}

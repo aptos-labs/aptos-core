@@ -73,6 +73,7 @@ module 0x12391283::M {
 
 // -- Sourcified model before first bytecode pipeline
 module 0x12391283::M {
+    use std::vector;
     fun test_1(): u64 {
         let gas_schedule_blob = vector[115u8, 115u8, 95u8, 112u8, 97u8, 99u8, 107u8, 101u8, 100u8, 32u8, 0u8, 0u8, 0u8, 0u8, 0u8, 0u8, 0u8];
         let (v,init) = (gas_schedule_blob, 0 as u64);

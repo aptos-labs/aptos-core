@@ -1,0 +1,10 @@
+processed 7 tasks
+task 0 lines 3-7:  publish [module 0x42::dummy {]
+task 1 lines 10-23:  publish [module 0x42::foo {]
+task 2 lines 26-41:  publish [module 0x42::bar {]
+task 3 lines 44-55:  publish [module 0x42::poc {]
+task 4 lines 58-58:  run 0x42::poc::run --signers 0x42
+task 5 lines 60-60:  run 0x42::bar::dummy_bar_exists --signers 0x42
+return values: true
+task 6 lines 62-62:  run 0x42::foo::foo_exists --signers 0x42 --type-args 0x42::dummy::Dummy
+return values: false

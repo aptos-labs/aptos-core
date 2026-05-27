@@ -1,0 +1,43 @@
+
+Diagnostics:
+error: function types cannot have `key` ability
+  ┌─ tests/checking-lang-v2.2/lambda/with_key.move:2:19
+  │
+2 │     fun caller(f: ||u64 has key): u64 {
+  │                   ^^^^^^^^^^^^^
+
+error: function types cannot have `key` ability
+  ┌─ tests/checking-lang-v2.2/lambda/with_key.move:7:16
+  │
+7 │         let f: ||u64 has key = || 1;
+  │                ^^^^^^^^^^^^^
+
+error: function types cannot have `key` ability
+   ┌─ tests/checking-lang-v2.2/lambda/with_key.move:12:16
+   │
+12 │         let f: ||u64 has key = || 1;
+   │                ^^^^^^^^^^^^^
+
+error: function types cannot have `key` ability
+   ┌─ tests/checking-lang-v2.2/lambda/with_key.move:20:18
+   │
+20 │     fun apply(f: ||S has key): S {
+   │                  ^^^^^^^^^^^
+
+error: function types cannot have `key` ability
+   ┌─ tests/checking-lang-v2.2/lambda/with_key.move:26:16
+   │
+26 │         let f: ||S has key = || s;
+   │                ^^^^^^^^^^^
+
+error: function types cannot have `key` ability
+   ┌─ tests/checking-lang-v2.2/lambda/with_key.move:38:17
+   │
+38 │         let f2: || u64 has copy + key = || 2;
+   │                 ^^^^^^^^^^^^^^^^^^^^^
+
+error: function types cannot have `key` ability
+   ┌─ tests/checking-lang-v2.2/lambda/with_key.move:39:17
+   │
+39 │         let f3: || u64 has copy + key = || 3;
+   │                 ^^^^^^^^^^^^^^^^^^^^^

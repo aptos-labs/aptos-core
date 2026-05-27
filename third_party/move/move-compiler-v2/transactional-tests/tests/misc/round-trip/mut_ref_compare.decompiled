@@ -1,0 +1,17 @@
+//**** Cross-compiled for `move` syntax from `tests/misc/mut_ref_compare.move`
+
+//# publish
+module 0x42::m {
+    fun test(): bool {
+        let _v0 = 1;
+        let _v1 = 1;
+        let _v2 = &mut _v0;
+        let _v3 = &mut _v1;
+        let _v4 = freeze(_v2);
+        let _v5 = freeze(_v3);
+        _v4 == _v5
+    }
+}
+
+
+//# run 0x42::m::test

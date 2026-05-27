@@ -1,0 +1,30 @@
+//# publish
+module 0x9::trusted
+
+public fun g(x: u64): u64
+    ld_u32 22
+    ret
+
+//# publish
+module 0x99::not_trusted
+use 0x9::trusted
+
+fun checks_parameter_types(): u64
+    ld_u32 1
+    call trusted::g
+    ret
+
+fun checks_return_types(): u32
+    local l: u64
+    ld_u64 1
+    call trusted::g
+    // If we call in a trusted function, type stack should be populated after return
+    // by the type in the function declaration, not actual (wrong) value on stack.
+    st_loc l
+    ld_u32 33
+    ret
+
+
+//# run --verbose 0x99::not_trusted::checks_parameter_types
+
+//# run --verbose 0x99::not_trusted::checks_return_types

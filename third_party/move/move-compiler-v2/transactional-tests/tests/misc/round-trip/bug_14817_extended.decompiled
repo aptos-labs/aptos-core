@@ -1,0 +1,186 @@
+//**** Cross-compiled for `move` syntax from `tests/misc/bug_14817_extended.move`
+
+//# publish
+module 0xc0ffee::m {
+    struct P has copy, drop {
+        q: Q,
+    }
+    struct Q has copy, drop {
+        r: u64,
+    }
+    public fun main() {
+        let _v0 = test_01(new_p());
+        assert!(*&(&(&_v0).q).r == 1, 0);
+        assert!(test_02(new_p()) == 10, 0);
+        let _v1 = new_p();
+        test_03(&mut _v1);
+        assert!(*&(&(&_v1).q).r == 12, 0);
+        let _v2 = test_04(new_p());
+        assert!(*&(&(&_v2).q).r == 14, 0);
+        let _v3 = test_05(new_p());
+        assert!(*&(&(&_v3).q).r == 15, 0);
+        let _v4 = test_06(new_p());
+        assert!(*&(&(&_v4).q).r == 16, 0);
+        let _v5 = test_07(new_p());
+        assert!(*&(&(&_v5).q).r == 0, 0);
+        assert!(test_08(1) == 1, 0);
+        assert!(test_09(3), 0);
+        let _v6 = test_10(new_p());
+        assert!(*&(&(&_v6).q).r == 20, 0);
+        let _v7 = test_11(new_p());
+        assert!(*&(&(&_v7).q).r == 0, 0);
+        let _v8 = test_12(new_p());
+        assert!(*&(&(&_v8).q).r == 5, 0);
+        let _v9 = test_13(new_p());
+        assert!(*&(&(&_v9).q).r == 0, 0);
+        let _v10 = test_14(new_p());
+        assert!(*&(&(&_v10).q).r == 24, 0);
+    }
+    fun new_p(): P {
+        P{q: Q{r: 0}}
+    }
+    fun test_01(p0: P): P {
+        let _v0 = &mut (&mut (&mut p0).q).r;
+        *_v0 = 1;
+        p0
+    }
+    fun test_02(p0: P): u64 {
+        *&(&(&p0).q).r + 10
+    }
+    fun test_03(p0: &mut P) {
+        let _v0 = &mut (&mut p0.q).r;
+        *_v0 = 12;
+    }
+    fun test_04(p0: P): P {
+        let _v0 = &mut (&mut (&mut p0).q).r;
+        *_v0 = 14;
+        p0
+    }
+    fun test_05(p0: P): P {
+        let _v0 = &mut (&mut (&mut p0).q).r;
+        *_v0 = 15;
+        p0
+    }
+    fun test_06(p0: P): P {
+        let _v0 = &mut (&mut (&mut p0).q).r;
+        *_v0 = 16;
+        p0
+    }
+    fun test_07(p0: P): P {
+        let _v0 = *&(&(&p0).q).r;
+        let _v1 = &mut _v0;
+        *_v1 = 17;
+        p0
+    }
+    fun test_08(p0: u64): u64 {
+        let _v0 = p0;
+        let _v1 = &mut _v0;
+        *_v1 = 18;
+        p0
+    }
+    fun test_09(p0: u64): bool {
+        let _v0 = freeze(&mut p0);
+        let _v1 = 3;
+        let _v2 = freeze(&mut _v1);
+        _v0 == _v2
+    }
+    fun test_10(p0: P): P {
+        let _v0 = &mut (&mut (&mut p0).q).r;
+        *_v0 = 20;
+        p0
+    }
+    fun test_11(p0: P): P {
+        let _v0 = p0;
+        let _v1 = &mut (&mut (&mut _v0).q).r;
+        *_v1 = 21;
+        p0
+    }
+    fun test_12(p0: P): P {
+        let _v0 = &mut (&mut (&mut p0).q).r;
+        *_v0 = 5;
+        let _v1 = *&(&(&p0).q).r;
+        let _v2 = &mut _v1;
+        *_v2 = 22;
+        p0
+    }
+    fun test_13(p0: P): P {
+        let _v0 = *&(&(&p0).q).r;
+        let _v1 = &mut _v0;
+        *_v1 = 23;
+        p0
+    }
+    fun test_14(p0: P): P {
+        let _v0 = Q{r: 24};
+        let _v1 = &mut (&mut p0).q;
+        *_v1 = _v0;
+        let _v2 = *&(&(&p0).q).r;
+        let _v3 = &mut _v2;
+        *_v3 = 12;
+        p0
+    }
+}
+
+
+//# run 0xc0ffee::m::main
+
+//# publish
+module 0xcafe::m1 {
+    struct Struct0 has copy, drop {
+        x: bool,
+    }
+    fun f(p0: Struct0) {
+        let _v0 = *&(&p0).x;
+        let _v1 = &mut _v0;
+        *_v1 = true;
+    }
+    public fun main() {
+        f(Struct0{x: true});
+    }
+}
+
+
+//# run 0xCAFE::m1::main
+
+//# publish
+module 0xcafe::m2 {
+    struct S has copy, drop {
+        x: bool,
+    }
+    fun f(p0: S) {
+        let _v0 = *&(&p0).x;
+        let _v1 = true;
+        let _v2 = &mut _v1;
+        *_v2 = _v0;
+        let _v3 = 0u8;
+        let _v4 = &mut _v3;
+        *_v4 = 123u8;
+    }
+    public fun main() {
+        f(S{x: true});
+    }
+}
+
+
+//# run 0xCAFE::m2::main
+
+//# publish
+module 0xc0ffee::m3 {
+    struct S has copy, drop {
+        f: ||(u8) has copy + drop,
+    }
+    public fun main() {
+        test(S{f: || lambda__1__main()});
+    }
+    fun lambda__1__main(): u8 {
+        42u8
+    }
+    fun test(p0: S) {
+        let _v0 = *&(&p0).f;
+        let _v1 = _v0();
+        let _v2 = &mut _v1;
+        *_v2 = 1u8;
+    }
+}
+
+
+//# run 0xc0ffee::m3::main

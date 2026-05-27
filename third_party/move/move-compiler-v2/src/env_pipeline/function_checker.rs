@@ -3,13 +3,16 @@
 
 //! Do a few checks of functions and function calls.
 
-use crate::Options;
+use crate::{experiments::Experiment, Options};
 use codespan_reporting::diagnostic::Severity;
 use move_binary_format::file_format::Visibility;
 use move_model::{
     ast::{ExpData, Operation, Pattern},
     metadata::LanguageVersion,
-    model::{FunId, FunctionEnv, GlobalEnv, Loc, ModuleEnv, NodeId, Parameter, QualifiedId},
+    model::{
+        FunId, FunctionEnv, GlobalEnv, Loc, ModuleEnv, ModuleId, NodeId, Parameter, QualifiedId,
+        StructEnv,
+    },
     ty::Type,
 };
 use std::{collections::BTreeSet, iter::Iterator, vec::Vec};
@@ -189,6 +192,7 @@ fn access_error(
     id: &NodeId,
     oper: &str,
     msg: String,
+    extra_msg: Option<String>,
     module_env: &ModuleEnv,
 ) {
     let call_details: Vec<_> = [*id]
@@ -196,9 +200,10 @@ fn access_error(
         .map(|node_id| (env.get_node_loc(*node_id), format!("{} here", oper)))
         .collect();
     let msg = format!(
-        "Invalid operation: {} can only be done within the defining module `{}`",
+        "Invalid operation: {} can only be done within the defining module `{}` {}",
         msg,
-        module_env.get_full_name_str()
+        module_env.get_full_name_str(),
+        extra_msg.unwrap_or_default()
     );
     env.diag_with_labels(Severity::Error, &fun_env.get_id_loc(), &msg, call_details);
 }
@@ -224,9 +229,14 @@ fn access_warning(
     env.diag_with_labels(Severity::Warning, &fun_env.get_id_loc(), &msg, call_details);
 }
 
+/// Check for access error or warning for a struct operation.
+/// storage operations include `exists`, `move_to`, `move_from`, `borrow_global`, `borrow_global_mut`
 fn check_for_access_error_or_warning<F>(
     env: &GlobalEnv,
     fun_env: &FunctionEnv,
+    struct_env: &StructEnv,
+    caller_module_id: &ModuleId,
+    storage_operation: bool,
     id: &NodeId,
     oper: &str,
     msg_maker: F,
@@ -237,8 +247,35 @@ fn check_for_access_error_or_warning<F>(
     F: Fn() -> String,
 {
     if cross_module {
-        access_error(env, fun_env, id, oper, msg_maker(), module_env);
+        let mut err_msg = None;
+        // storage operations cannot be cross-module, even for public structs
+        if !storage_operation && env.language_version().language_version_for_public_struct() {
+            match struct_env.get_visibility() {
+                Visibility::Public => {
+                    return;
+                },
+                Visibility::Friend => {
+                    if struct_env.module_env.has_friend(caller_module_id) {
+                        return;
+                    }
+                    let friend_str = if struct_env.has_package_visibility() {
+                        "modules in the same package".to_string()
+                    } else {
+                        "friend modules".to_string()
+                    };
+                    err_msg = Some(format!("or {}", friend_str));
+                },
+                Visibility::Private => {},
+            }
+        }
+        access_error(env, fun_env, id, oper, msg_maker(), err_msg, module_env);
     } else if caller_is_inline_non_private {
+        if !storage_operation
+            && env.language_version().language_version_for_public_struct()
+            && struct_env.get_visibility() == Visibility::Public
+        {
+            return;
+        }
         access_warning(env, fun_env, id, oper, msg_maker(), module_env);
     }
 }
@@ -250,31 +287,192 @@ fn check_privileged_operations_on_structs(env: &GlobalEnv, fun_env: &FunctionEnv
         let caller_module_id = fun_env.module_env.get_id();
         let caller_is_inline_non_private =
             fun_env.is_inline() && fun_env.visibility() != Visibility::Private;
-        fun_body.visit_pre_order(&mut |exp: &ExpData| {
-            match exp {
-                ExpData::Call(id, oper, _) => match oper {
-                    Operation::Exists(_)
-                    | Operation::BorrowGlobal(_)
-                    | Operation::MoveFrom
-                    | Operation::MoveTo => {
-                        let inst = env.get_node_instantiation(*id);
-                        debug_assert!(!inst.is_empty());
-                        if let Some((struct_env, _)) = inst[0].get_struct(env) {
-                            let mid = struct_env.module_env.get_id();
-                            let sid = struct_env.get_id();
-                            let qualified_struct_id = mid.qualified(sid);
+        // Ancestor spec blocks seen during AST traversal.
+        let mut spec_blocks_seen = 0;
+        fun_body.visit_pre_post(&mut |post, exp: &ExpData| {
+            if !post {
+                if matches!(exp, ExpData::SpecBlock(..)) {
+                    spec_blocks_seen += 1;
+                }
+                if spec_blocks_seen > 0 {
+                    // we are inside a spec block, no privileged operation check needed
+                    return true;
+                }
+                match exp {
+                    ExpData::Call(id, oper, _) => match oper {
+                        Operation::Exists(_)
+                        | Operation::BorrowGlobal(_)
+                        | Operation::MoveFrom
+                        | Operation::MoveTo => {
+                            let inst = env.get_node_instantiation(*id);
+                            debug_assert!(!inst.is_empty());
+                            if let Some((struct_env, _)) = inst[0].get_struct(env) {
+                                let mid = struct_env.module_env.get_id();
+                                let sid = struct_env.get_id();
+                                let qualified_struct_id = mid.qualified(sid);
+                                let struct_env = env.get_struct(qualified_struct_id);
+                                let msg_maker = || {
+                                    format!(
+                                        "storage operation on type `{}`",
+                                        struct_env.get_full_name_str(),
+                                    )
+                                };
+                                check_for_access_error_or_warning(
+                                    env,
+                                    fun_env,
+                                    &struct_env,
+                                    &caller_module_id,
+                                    true,
+                                    id,
+                                    "called",
+                                    msg_maker,
+                                    &struct_env.module_env,
+                                    mid != caller_module_id,
+                                    caller_is_inline_non_private,
+                                );
+                            }
+                        },
+                        Operation::Select(mid, sid, fid) => {
+                            let qualified_struct_id = mid.qualified(*sid);
                             let struct_env = env.get_struct(qualified_struct_id);
                             let msg_maker = || {
                                 format!(
-                                    "storage operation on type `{}`",
+                                    "access of the field `{}` on type `{}`",
+                                    fid.symbol().display(struct_env.symbol_pool()),
                                     struct_env.get_full_name_str(),
                                 )
                             };
                             check_for_access_error_or_warning(
                                 env,
                                 fun_env,
+                                &struct_env,
+                                &caller_module_id,
+                                false,
                                 id,
-                                "called",
+                                "accessed",
+                                msg_maker,
+                                &struct_env.module_env,
+                                *mid != caller_module_id,
+                                caller_is_inline_non_private,
+                            );
+                        },
+                        Operation::SelectVariants(mid, sid, fids) => {
+                            let qualified_struct_id = mid.qualified(*sid);
+                            let struct_env = env.get_struct(qualified_struct_id);
+                            // All field names are the same, so take one representative field id to report.
+                            let field_env = struct_env.get_field(fids[0]);
+                            let msg_maker = || {
+                                format!(
+                                    "access of the field `{}` on enum type `{}`",
+                                    field_env.get_name().display(struct_env.symbol_pool()),
+                                    struct_env.get_full_name_str(),
+                                )
+                            };
+                            check_for_access_error_or_warning(
+                                env,
+                                fun_env,
+                                &struct_env,
+                                &caller_module_id,
+                                false,
+                                id,
+                                "accessed",
+                                msg_maker,
+                                &struct_env.module_env,
+                                *mid != caller_module_id,
+                                caller_is_inline_non_private,
+                            );
+                        },
+                        Operation::TestVariants(mid, sid, _) => {
+                            let qualified_struct_id = mid.qualified(*sid);
+                            let struct_env = env.get_struct(qualified_struct_id);
+                            let msg_maker = || {
+                                format!(
+                                    "variant test on enum type `{}`",
+                                    struct_env.get_full_name_str(),
+                                )
+                            };
+                            check_for_access_error_or_warning(
+                                env,
+                                fun_env,
+                                &struct_env,
+                                &caller_module_id,
+                                false,
+                                id,
+                                "tested",
+                                msg_maker,
+                                &struct_env.module_env,
+                                *mid != caller_module_id,
+                                caller_is_inline_non_private,
+                            );
+                        },
+                        Operation::Pack(mid, sid, _) => {
+                            let qualified_struct_id = mid.qualified(*sid);
+                            let struct_env = env.get_struct(qualified_struct_id);
+                            let msg_maker =
+                                || format!("pack of `{}`", struct_env.get_full_name_str());
+                            check_for_access_error_or_warning(
+                                env,
+                                fun_env,
+                                &struct_env,
+                                &caller_module_id,
+                                false,
+                                id,
+                                "packed",
+                                msg_maker,
+                                &struct_env.module_env,
+                                *mid != caller_module_id,
+                                caller_is_inline_non_private,
+                            );
+                        },
+                        _ => {
+                            // all the other operations are either:
+                            // - not related to structs
+                            // - spec-only
+                        },
+                    },
+                    ExpData::Assign(_, pat, _)
+                    | ExpData::Block(_, pat, _, _)
+                    | ExpData::Lambda(_, pat, _, _, _) => {
+                        pat.visit_pre_post(&mut |_, pat| {
+                            if let Pattern::Struct(id, str, _, _) = pat {
+                                let module_id = str.module_id;
+                                let struct_env = env.get_struct(str.to_qualified_id());
+                                let msg_maker =
+                                    || format!("unpack of `{}`", struct_env.get_full_name_str(),);
+                                check_for_access_error_or_warning(
+                                    env,
+                                    fun_env,
+                                    &struct_env,
+                                    &caller_module_id,
+                                    false,
+                                    id,
+                                    "unpacked",
+                                    msg_maker,
+                                    &struct_env.module_env,
+                                    module_id != caller_module_id,
+                                    caller_is_inline_non_private,
+                                );
+                            }
+                        });
+                    },
+                    ExpData::Match(_, discriminator, _) => {
+                        let discriminator_node_id = discriminator.node_id();
+                        if let Type::Struct(mid, sid, _) =
+                            env.get_node_type(discriminator_node_id).drop_reference()
+                        {
+                            let qualified_struct_id = mid.qualified(sid);
+                            let struct_env = env.get_struct(qualified_struct_id);
+                            let msg_maker = || {
+                                format!("match on enum type `{}`", struct_env.get_full_name_str(),)
+                            };
+                            check_for_access_error_or_warning(
+                                env,
+                                fun_env,
+                                &struct_env,
+                                &caller_module_id,
+                                false,
+                                &discriminator_node_id,
+                                "matched",
                                 msg_maker,
                                 &struct_env.module_env,
                                 mid != caller_module_id,
@@ -282,150 +480,28 @@ fn check_privileged_operations_on_structs(env: &GlobalEnv, fun_env: &FunctionEnv
                             );
                         }
                     },
-                    Operation::Select(mid, sid, fid) => {
-                        let qualified_struct_id = mid.qualified(*sid);
-                        let struct_env = env.get_struct(qualified_struct_id);
-                        let msg_maker = || {
-                            format!(
-                                "access of the field `{}` on type `{}`",
-                                fid.symbol().display(struct_env.symbol_pool()),
-                                struct_env.get_full_name_str(),
-                            )
-                        };
-                        check_for_access_error_or_warning(
-                            env,
-                            fun_env,
-                            id,
-                            "accessed",
-                            msg_maker,
-                            &struct_env.module_env,
-                            *mid != caller_module_id,
-                            caller_is_inline_non_private,
-                        );
+                    ExpData::Invalid(_)
+                    | ExpData::Value(..)
+                    | ExpData::LocalVar(..)
+                    | ExpData::Temporary(..)
+                    | ExpData::Invoke(..)
+                    | ExpData::Quant(..)
+                    | ExpData::IfElse(..)
+                    | ExpData::Return(..)
+                    | ExpData::Sequence(..)
+                    | ExpData::Loop(..)
+                    | ExpData::LoopCont(..)
+                    | ExpData::Mutate(..) => {},
+                    ExpData::SpecBlock(_, _) => {
+                        unreachable!("we have already checked for spec blocks");
                     },
-                    Operation::SelectVariants(mid, sid, fids) => {
-                        let qualified_struct_id = mid.qualified(*sid);
-                        let struct_env = env.get_struct(qualified_struct_id);
-                        // All field names are the same, so take one representative field id to report.
-                        let field_env = struct_env.get_field(fids[0]);
-                        let msg_maker = || {
-                            format!(
-                                "access of the field `{}` on enum type `{}`",
-                                field_env.get_name().display(struct_env.symbol_pool()),
-                                struct_env.get_full_name_str(),
-                            )
-                        };
-                        check_for_access_error_or_warning(
-                            env,
-                            fun_env,
-                            id,
-                            "accessed",
-                            msg_maker,
-                            &struct_env.module_env,
-                            *mid != caller_module_id,
-                            caller_is_inline_non_private,
-                        );
-                    },
-                    Operation::TestVariants(mid, sid, _) => {
-                        let qualified_struct_id = mid.qualified(*sid);
-                        let struct_env = env.get_struct(qualified_struct_id);
-                        let msg_maker = || {
-                            format!(
-                                "variant test on enum type `{}`",
-                                struct_env.get_full_name_str(),
-                            )
-                        };
-                        check_for_access_error_or_warning(
-                            env,
-                            fun_env,
-                            id,
-                            "tested",
-                            msg_maker,
-                            &struct_env.module_env,
-                            *mid != caller_module_id,
-                            caller_is_inline_non_private,
-                        );
-                    },
-                    Operation::Pack(mid, sid, _) => {
-                        let qualified_struct_id = mid.qualified(*sid);
-                        let struct_env = env.get_struct(qualified_struct_id);
-                        let msg_maker = || format!("pack of `{}`", struct_env.get_full_name_str());
-                        check_for_access_error_or_warning(
-                            env,
-                            fun_env,
-                            id,
-                            "packed",
-                            msg_maker,
-                            &struct_env.module_env,
-                            *mid != caller_module_id,
-                            caller_is_inline_non_private,
-                        );
-                    },
-                    _ => {
-                        // all the other operations are either:
-                        // - not related to structs
-                        // - spec-only
-                    },
-                },
-                ExpData::Assign(_, pat, _)
-                | ExpData::Block(_, pat, _, _)
-                | ExpData::Lambda(_, pat, _, _, _) => {
-                    pat.visit_pre_post(&mut |_, pat| {
-                        if let Pattern::Struct(id, str, _, _) = pat {
-                            let module_id = str.module_id;
-                            let struct_env = env.get_struct(str.to_qualified_id());
-                            let msg_maker =
-                                || format!("unpack of `{}`", struct_env.get_full_name_str(),);
-                            check_for_access_error_or_warning(
-                                env,
-                                fun_env,
-                                id,
-                                "unpacked",
-                                msg_maker,
-                                &struct_env.module_env,
-                                module_id != caller_module_id,
-                                caller_is_inline_non_private,
-                            );
-                        }
-                    });
-                },
-                ExpData::Match(_, discriminator, _) => {
-                    let discriminator_node_id = discriminator.node_id();
-                    if let Type::Struct(mid, sid, _) =
-                        env.get_node_type(discriminator_node_id).drop_reference()
-                    {
-                        let qualified_struct_id = mid.qualified(sid);
-                        let struct_env = env.get_struct(qualified_struct_id);
-                        let msg_maker =
-                            || format!("match on enum type `{}`", struct_env.get_full_name_str(),);
-                        check_for_access_error_or_warning(
-                            env,
-                            fun_env,
-                            &discriminator_node_id,
-                            "matched",
-                            msg_maker,
-                            &struct_env.module_env,
-                            mid != caller_module_id,
-                            caller_is_inline_non_private,
-                        );
-                    }
-                },
-                ExpData::Invalid(_)
-                | ExpData::Value(..)
-                | ExpData::LocalVar(..)
-                | ExpData::Temporary(..)
-                | ExpData::Invoke(..)
-                | ExpData::Quant(..)
-                | ExpData::IfElse(..)
-                | ExpData::Return(..)
-                | ExpData::Sequence(..)
-                | ExpData::Loop(..)
-                | ExpData::LoopCont(..)
-                | ExpData::Mutate(..) => {},
-                // access in specs is not restricted
-                ExpData::SpecBlock(_, _) => {
-                    return false;
-                },
+                }
+            } else {
+                // post visit
+                if matches!(exp, ExpData::SpecBlock(..)) {
+                    debug_assert!(spec_blocks_seen > 0, "should match in pre and post");
+                    spec_blocks_seen -= 1;
+                }
             }
             true
         });
@@ -482,6 +558,12 @@ pub fn check_access_and_use(env: &mut GlobalEnv, before_inlining: bool) {
                     let callees_with_sites = def.used_funs_with_uses();
                     for (callee, sites) in &callees_with_sites {
                         let callee_func = env.get_function(*callee);
+
+                        // Script functions cannot be called.
+                        if callee_func.module_env.is_script_module() {
+                            calling_script_function_error(env, sites, &callee_func);
+                        }
+
                         // Check visibility.
 
                         // Same module is always visible
@@ -527,13 +609,25 @@ pub fn check_access_and_use(env: &mut GlobalEnv, before_inlining: bool) {
                                                     caller_func.module_env.get_full_name_str()
                                                 );
                                             } else {
-                                                call_package_fun_from_diff_package_error(
-                                                    env,
-                                                    sites,
-                                                    &caller_func,
-                                                    &callee_func,
-                                                );
-                                                false
+                                                // With "unsafe package visibility" experiment on, all package functions are made
+                                                // visible in all modules with the same address. The prover uses this in filter mode
+                                                // to get around the lack of package-based target filtering functionality.
+                                                let options = env
+                                                    .get_extension::<Options>()
+                                                    .expect("Options is available");
+                                                if options.experiment_on(
+                                                    Experiment::UNSAFE_PACKAGE_VISIBILITY,
+                                                ) {
+                                                    true
+                                                } else {
+                                                    call_package_fun_from_diff_package_error(
+                                                        env,
+                                                        sites,
+                                                        &caller_func,
+                                                        &callee_func,
+                                                    );
+                                                    false
+                                                }
                                             }
                                         } else {
                                             call_package_fun_from_diff_addr_error(
@@ -836,4 +930,17 @@ fn call_package_fun_from_diff_addr_error(
 ) {
     let why = "they are from different addresses";
     cannot_call_error(env, why, sites, caller, callee);
+}
+
+fn calling_script_function_error(env: &GlobalEnv, sites: &BTreeSet<NodeId>, callee: &FunctionEnv) {
+    let call_details: Vec<_> = sites
+        .iter()
+        .map(|node_id| (env.get_node_loc(*node_id), "used here".to_owned()))
+        .collect();
+    let callee_name = callee.get_name_str();
+    let msg = format!(
+        "script function `{}` cannot be used in Move code",
+        callee_name
+    );
+    env.diag_with_labels(Severity::Error, &callee.get_id_loc(), &msg, call_details);
 }

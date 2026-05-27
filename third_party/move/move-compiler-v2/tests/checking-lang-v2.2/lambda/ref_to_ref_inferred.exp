@@ -10,7 +10,7 @@ error: lambda expression has invalid type `|&&u64|(&&u64, &&u64)` (reference to 
 6 │ │         };
   │ ╰─────────^
 
-error: lambda expression has invalid type `|(&&u64, u64)|&&u64` (reference to a reference is disallowed)
+error: lambda expression has invalid type `|&&u64, u64|&&u64` (reference to a reference is disallowed)
    ┌─ tests/checking-lang-v2.2/lambda/ref_to_ref_inferred.move:10:17
    │
 10 │           let f = |x, y| {
@@ -21,7 +21,7 @@ error: lambda expression has invalid type `|(&&u64, u64)|&&u64` (reference to a 
 14 │ │         };
    │ ╰─────────^
 
-error: lambda expression has invalid type `|(&&&&&&u64, &&&u64)|u64` (reference to a reference is disallowed)
+error: lambda expression has invalid type `|&&&&&&u64, &&&u64|u64` (reference to a reference is disallowed)
    ┌─ tests/checking-lang-v2.2/lambda/ref_to_ref_inferred.move:18:17
    │
 18 │           let f = |x, y| {

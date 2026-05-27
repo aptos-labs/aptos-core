@@ -1,0 +1,19 @@
+//# publish --print-bytecode --verbose
+module 0x66::test
+
+struct S has key+drop
+  x: u64
+
+fun move_to(s: &signer)
+    move_loc s
+    ld_u64 3
+    pack S
+    move_to S
+    ret
+
+fun borrow(a: address): u64 acquires S
+    move_loc a
+    borrow_global S
+    borrow_field S, x
+    read_ref
+    ret

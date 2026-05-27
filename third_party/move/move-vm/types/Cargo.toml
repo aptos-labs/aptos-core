@@ -7,7 +7,7 @@ repository = "https://github.com/diem/diem"
 homepage = "https://diem.com"
 license = "Apache-2.0"
 publish = false
-edition = "2021"
+edition = { workspace = true }
 
 [dependencies]
 ambassador = { workspace = true }
@@ -33,10 +33,17 @@ triomphe = { workspace = true }
 claims = { workspace = true }
 mockall = { workspace = true }
 move-binary-format = { workspace = true, features = ["fuzzing"] }
+once_cell = { workspace = true }
 proptest = { workspace = true }
 rand = { workspace = true }
 
 [features]
-default = []
+default = [
+    "inline-vm-casts",
+    "inline-locals"
+]
 testing = []
 fuzzing = ["proptest", "move-binary-format/fuzzing"]
+force-inline = []
+inline-vm-casts = []
+inline-locals = []

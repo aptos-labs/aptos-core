@@ -1,0 +1,8 @@
+//# publish
+module 0x22::test
+
+public fun ld_u16_instr(): u16
+    ld_u16 16
+    ret
+
+//# run --verbose 0x22::test::ld_u16_instr --display-trace

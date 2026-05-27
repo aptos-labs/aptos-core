@@ -300,16 +300,37 @@ impl<'a> Instrumenter<'a> {
             result.push((cond.loc.clone(), exp));
         }
 
-        // If this is deep, recurse over all fields.
+        // If this is deep, recurse over all fields. For enum variants, need to guard the
+        // field invariants with an appropriate test.
         if deep {
-            for field_env in struct_env.get_fields() {
-                let field_exp = self
-                    .builder
-                    .mk_field_select(&field_env, targs, value.clone());
-                result.extend(self.translate_invariant(deep, field_exp));
+            if struct_env.has_variants() {
+                for variant in struct_env.get_variants() {
+                    let is_variant =
+                        self.builder
+                            .mk_variant_test(&struct_env, variant, value.clone());
+                    for field_env in struct_env.get_fields_of_variant(variant) {
+                        let field_exp =
+                            self.builder
+                                .mk_field_select(&field_env, targs, value.clone());
+                        result.extend(self.translate_invariant(deep, field_exp).iter().map(
+                            |inv| {
+                                (
+                                    inv.0.clone(),
+                                    self.builder.mk_implies(is_variant.clone(), inv.1.clone()),
+                                )
+                            },
+                        ));
+                    }
+                }
+            } else {
+                for field_env in struct_env.get_fields() {
+                    let field_exp = self
+                        .builder
+                        .mk_field_select(&field_env, targs, value.clone());
+                    result.extend(self.translate_invariant(deep, field_exp));
+                }
             }
         }
-
         result
     }
 }

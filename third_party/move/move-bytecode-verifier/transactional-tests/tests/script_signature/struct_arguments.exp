@@ -1,6 +1,6 @@
 processed 3 tasks
-
-task 1 'run'. lines 15-20:
+task 0 lines 1-13:  publish [// struct and struct ref arguments are now allowed]
+task 1 lines 15-20:  run --args 0 0 0 [import 0x42.M;]
 Error: Script execution failed with VMError: {
     major_status: ABORTED,
     sub_status: Some(0),
@@ -8,8 +8,7 @@ Error: Script execution failed with VMError: {
     indices: [],
     offsets: [(FunctionDefinitionIndex(0), 1)],
 }
-
-task 2 'run'. lines 22-22:
+task 2 lines 22-22:  run 0x42::M::foo --args 0 0 0
 Error: Function execution failed with VMError: {
     major_status: ABORTED,
     sub_status: Some(0),

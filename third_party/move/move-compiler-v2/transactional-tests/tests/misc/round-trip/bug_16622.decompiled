@@ -1,0 +1,151 @@
+//**** Cross-compiled for `move` syntax from `tests/misc/bug_16622.move`
+
+//# publish
+module 0xcafe::m0 {
+    enum Enum0 has copy, drop {
+        Variant0,
+        Variant1 {
+            field1: bool,
+        }
+    }
+    struct S has copy, drop {
+        field2: Enum0,
+    }
+    public fun f0() {
+        let _v0;
+        let _v1 = S{field2: Enum0::Variant1{field1: false}};
+        let _v2 = *&(&_v1).field2;
+        if (&_v2 is Variant0) {
+            let Enum0::Variant0{} = _v2;
+            let _v3 = true;
+            _v0 = &mut _v3
+        } else _v0 = &mut (&mut (&mut _v1).field2).field1;
+        *_v0 = true;
+    }
+}
+
+
+//# run 0xCAFE::m0::f0
+
+//# publish
+module 0xcafe::m1 {
+    enum Enum0 has copy, drop {
+        Variant0,
+        Variant1,
+    }
+    struct S has copy, drop {
+        field: Enum0,
+    }
+    public fun f0() {
+        let _v0;
+        let _v1 = S{field: Enum0::Variant1{}};
+        let _v2 = *&(&_v1).field;
+        if (&_v2 is Variant1) {
+            let Enum0::Variant1{} = _v2;
+            let _v3 = true;
+            _v0 = &mut _v3
+        } else {
+            let _v4 = _v1;
+            let _v5 = *&(&_v4).field;
+            let _v6 = true;
+            _v0 = &mut _v6
+        };
+        *_v0 = true;
+    }
+    public fun f1() {
+        let _v0;
+        let _v1 = S{field: Enum0::Variant1{}};
+        let _v2 = *&(&_v1).field;
+        let _v3 = *&(&_v1).field;
+        let _v4 = &_v2;
+        let _v5 = &_v3;
+        if ((_v4 is Variant1) && (_v5 is Variant1)) {
+            let Enum0::Variant1{} = _v2;
+            let Enum0::Variant1{} = _v3;
+            let _v6 = true;
+            _v0 = &mut _v6
+        } else {
+            let _v7 = _v1;
+            let _v8 = *&(&_v7).field;
+            let _v9 = true;
+            _v0 = &mut _v9
+        };
+        *_v0 = true;
+    }
+}
+
+
+//# run 0xCAFE::m1::f0
+
+//# run 0xCAFE::m1::f1
+
+//# publish
+module 0xcafe::m2 {
+    enum Enum0 has copy, drop {
+        Variant0,
+        Variant1 {
+            field1: bool,
+        }
+    }
+    enum Enum1 has copy, drop {
+        Variant2 {
+            field2: Enum0,
+        }
+    }
+    struct Struct1 has copy, drop {
+        _0: bool,
+    }
+    public fun f0() {
+        let _v0;
+        let _v1 = Enum1::Variant2{field2: Enum0::Variant1{field1: false}};
+        let _v2 = *&(&_v1).field2;
+        if (&_v2 is Variant1) {
+            let Enum0::Variant1{field1: _v3} = _v2;
+            _v0 = Struct1{_0: true}
+        } else {
+            let _v4 = _v1;
+            let _v5 = *&(&_v4).field2;
+            _v0 = Struct1{_0: true}
+        };
+        let _v6 = Struct1{_0: *&(&(&_v1).field2).field1};
+        let _v7 = &mut _v6;
+        *_v7 = _v0;
+        let _v8 = true;
+        let _v9 = &mut _v8;
+        *_v9 = true;
+    }
+}
+
+
+//# run 0xCAFE::m2::f0
+
+//# publish
+module 0xcafe::m3 {
+    enum Enum0 has copy, drop {
+        Variant0,
+        Variant1,
+    }
+    struct S has copy, drop {
+        field: Enum0,
+    }
+    fun f0(p0: S) {
+        let _v0;
+        let _v1 = *&(&p0).field;
+        if (&_v1 is Variant0) {
+            let Enum0::Variant0{} = _v1;
+            let _v2 = 1u8;
+            _v0 = &mut _v2
+        } else {
+            let _v3 = *&(&p0).field;
+            let _v4 = 1u8;
+            _v0 = &mut _v4
+        };
+        *_v0 = 1u8;
+    }
+    public fun test() {
+        f0(S{field: Enum0::Variant1{}});
+    }
+}
+
+
+//# run 0xCAFE::m3::test

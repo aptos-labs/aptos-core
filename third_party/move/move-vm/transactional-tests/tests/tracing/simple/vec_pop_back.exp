@@ -1,0 +1,9 @@
+processed 2 tasks
+task 0 lines 1-10:  publish [module 0x22::test]
+task 1 lines 12-12:  run --verbose 0x22::test::vec_pop_back_instr --display-trace
+instructions: 5
+fingerprint: 942593759067343093
+branch_outcomes: 
+calls:
+  entrypoint 0x0000000000000000000000000000000000000000000000000000000000000022::test::vec_pop_back_instr
+return values: 2

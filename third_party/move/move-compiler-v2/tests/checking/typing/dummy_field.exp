@@ -59,6 +59,6 @@ module 0x42::test {
     }
     public entry fun test4(s: &signer) {
         let r = T{};
-        move_to<T>(s, r);
+        move_to<T>(r, s);
     }
 }

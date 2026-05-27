@@ -4,10 +4,13 @@
 use crate::{
     config::VMConfig,
     frame_type_cache::FrameTypeCache,
+    interpreter::Stack,
     loader::{FunctionHandle, LoadedFunctionOwner, StructVariantInfo, VariantFieldInfo},
+    module_traversal::TraversalContext,
     reentrancy_checker::CallType,
     runtime_type_checks::RuntimeTypeCheck,
-    LoadedFunction, ModuleStorage,
+    storage::loader::traits::FunctionDefinitionLoader,
+    LoadedFunction,
 };
 use move_binary_format::{
     access::{ModuleAccess, ScriptAccess},
@@ -24,31 +27,53 @@ use move_core_types::{
     ability::Ability, account_address::AccountAddress, gas_algebra::NumTypeNodes,
     identifier::IdentStr, language_storage::ModuleId, vm_status::StatusCode,
 };
+use move_vm_profiler::FnGuard;
 use move_vm_types::{
     gas::GasMeter,
     loaded_data::{
         runtime_access_specifier::{AccessSpecifierEnv, AddressSpecifierFunction},
         runtime_types::{AbilityInfo, StructType, Type, TypeBuilder},
     },
+    ty_interner::{InternedTypePool, TypeVecId},
     values::Locals,
 };
 use std::{cell::RefCell, rc::Rc, sync::Arc};
+
+/// Represents types of locals of a Move function. Actual types are only need for runtime checks,
+/// and for non-generic functions can be borrowed directly from the function definition. For
+/// generic functions, type instantiations are cached by interpreter.
+pub(crate) enum LocalTys {
+    /// Used when runtime type checks are not enabled.
+    None,
+    /// Used for non-generic functions to avoid type clones around locals.
+    BorrowFromFunction,
+    /// Used for generic functions, where types are cached per-instantiation.
+    BorrowFromFunctionGeneric(Rc<[Type]>),
+}
 
 /// Represents the execution context for a function. When calls are made, frames are
 /// pushed and then popped to/from the call stack.
 pub(crate) struct Frame {
     pub(crate) pc: u16,
-    ty_builder: TypeBuilder,
+    pub(crate) ty_builder: TypeBuilder,
     // Currently being executed function.
     pub(crate) function: Rc<LoadedFunction>,
+    // Guard used to profile the execution of this function.
+    // Note that this is only stored to keep it alive for the lifetime of the frame.
+    // It is an option so we can pass `None` during the runtime type checks.
+    pub(crate) _guard: Option<FnGuard>,
     // How this frame was established.
-    call_type: CallType,
+    pub(crate) call_type: CallType,
     // Locals for this execution context and their instantiated types.
     pub(crate) locals: Locals,
-    local_tys: Vec<Type>,
+    pub(crate) local_tys: LocalTys,
     // Cache of types accessed in this frame, to improve performance when accessing
     // and constructing types.
     pub(crate) frame_cache: Rc<RefCell<FrameTypeCache>>,
+    // Saved value stack size of the caller that created this frame.
+    pub(crate) caller_value_stack_size: u32,
+    // Saved type stack size of the caller that created this frame.
+    pub(crate) caller_type_stack_size: u32,
 }
 
 impl AccessSpecifierEnv for Frame {
@@ -65,9 +90,12 @@ macro_rules! build_loaded_function {
     ($function_name:ident, $idx_ty:ty, $get_function_handle:ident) => {
         pub(crate) fn $function_name(
             &self,
-            module_storage: &impl ModuleStorage,
+            loader: &impl FunctionDefinitionLoader,
+            gas_meter: &mut impl GasMeter,
+            traversal_context: &mut TraversalContext,
             idx: $idx_ty,
             verified_ty_args: Vec<Type>,
+            ty_args_id: TypeVecId,
         ) -> PartialVMResult<LoadedFunction> {
             match self.function.owner() {
                 LoadedFunctionOwner::Module(module) => {
@@ -77,15 +105,19 @@ macro_rules! build_loaded_function {
                             (Ok(LoadedFunction {
                                 owner: LoadedFunctionOwner::Module(module.clone()),
                                 ty_args: verified_ty_args,
+                                ty_args_id,
                                 function: function.clone(),
                             }))
                         },
                         FunctionHandle::Remote { module, name } => self
                             .build_loaded_function_from_name_and_ty_args(
-                                module_storage,
+                                loader,
+                                gas_meter,
+                                traversal_context,
                                 module,
                                 name,
                                 verified_ty_args,
+                                ty_args_id,
                             ),
                     }
                 },
@@ -98,10 +130,13 @@ macro_rules! build_loaded_function {
                         .with_message("Scripts never have local functions".to_string())),
                         FunctionHandle::Remote { module, name } => self
                             .build_loaded_function_from_name_and_ty_args(
-                                module_storage,
+                                loader,
+                                gas_meter,
+                                traversal_context,
                                 module,
                                 name,
                                 verified_ty_args,
+                                ty_args_id,
                             ),
                     }
                 },
@@ -123,33 +158,66 @@ impl Frame {
         function_instantiation_handle_at
     );
 
+    #[cfg_attr(feature = "force-inline", inline(always))]
     pub(crate) fn make_new_frame<RTTCheck: RuntimeTypeCheck>(
         gas_meter: &mut impl GasMeter,
         call_type: CallType,
         vm_config: &VMConfig,
         function: Rc<LoadedFunction>,
+        guard: Option<FnGuard>,
         locals: Locals,
         frame_cache: Rc<RefCell<FrameTypeCache>>,
+        stack: &Stack,
     ) -> PartialVMResult<Frame> {
         let ty_args = function.ty_args();
-        for ty in function.local_tys() {
-            gas_meter
-                .charge_create_ty(NumTypeNodes::new(ty.num_nodes_in_subst(ty_args)? as u64))?;
-        }
 
         let ty_builder = vm_config.ty_builder.clone();
-        let local_tys = if RTTCheck::should_perform_checks() {
-            if ty_args.is_empty() {
-                function.local_tys().to_vec()
+        let local_tys = if ty_args.is_empty() {
+            // Function is not generic - avoid cloning types.
+            for ty in function.local_tys() {
+                gas_meter.charge_create_ty(NumTypeNodes::new(ty.num_nodes() as u64))?;
+            }
+
+            if RTTCheck::should_perform_checks(&function.function) {
+                LocalTys::BorrowFromFunction
             } else {
-                function
-                    .local_tys()
-                    .iter()
-                    .map(|ty| ty_builder.create_ty_with_subst(ty, ty_args))
-                    .collect::<PartialVMResult<Vec<_>>>()?
+                LocalTys::None
             }
         } else {
-            vec![]
+            // Try cached instantiated locals in frame cache. This way we instantiate only once per
+            // usage of the function.
+            let mut cache_borrow = frame_cache.borrow_mut();
+            if let Some(local_ty_counts) = cache_borrow.instantiated_local_ty_counts.as_ref() {
+                for cnt in local_ty_counts.iter() {
+                    gas_meter.charge_create_ty(*cnt)?;
+                }
+            } else {
+                let local_tys = function.local_tys();
+                let mut local_ty_counts = Vec::with_capacity(local_tys.len());
+                for ty in local_tys {
+                    let cnt = NumTypeNodes::new(ty.num_nodes_in_subst(ty_args)? as u64);
+                    gas_meter.charge_create_ty(cnt)?;
+                    local_ty_counts.push(cnt);
+                }
+                cache_borrow.instantiated_local_ty_counts = Some(Rc::from(local_ty_counts));
+            }
+
+            if RTTCheck::should_perform_checks(&function.function) {
+                if let Some(local_tys) = cache_borrow.instantiated_local_tys.as_ref().cloned() {
+                    LocalTys::BorrowFromFunctionGeneric(local_tys)
+                } else {
+                    let local_tys: Rc<[Type]> = function
+                        .local_tys()
+                        .iter()
+                        .map(|ty| ty_builder.create_ty_with_subst(ty, ty_args))
+                        .collect::<PartialVMResult<Vec<_>>>()
+                        .map(Rc::from)?;
+                    cache_borrow.instantiated_local_tys = Some(local_tys.clone());
+                    LocalTys::BorrowFromFunctionGeneric(local_tys)
+                }
+            } else {
+                LocalTys::None
+            }
         };
 
         Ok(Frame {
@@ -157,9 +225,12 @@ impl Frame {
             ty_builder,
             locals,
             function,
+            _guard: guard,
             call_type,
             local_tys,
             frame_cache,
+            caller_value_stack_size: stack.value.len() as u32,
+            caller_type_stack_size: stack.types.len() as u32,
         })
     }
 
@@ -171,12 +242,27 @@ impl Frame {
         self.call_type
     }
 
+    /// Returns a local type at specified index. Used for runtime type checks only, and if called
+    /// in non-type checking context will panic!
+    #[cfg_attr(feature = "force-inline", inline(always))]
     pub(crate) fn local_ty_at(&self, idx: usize) -> &Type {
-        &self.local_tys[idx]
+        match &self.local_tys {
+            LocalTys::None => {
+                unreachable!("Local types are not used when there are no runtime type checks")
+            },
+            LocalTys::BorrowFromFunction => &self.function.local_tys()[idx],
+            LocalTys::BorrowFromFunctionGeneric(tys) => &tys[idx],
+        }
     }
 
+    #[cfg_attr(feature = "force-inline", inline(always))]
     pub(crate) fn check_local_tys_have_drop_ability(&self) -> PartialVMResult<()> {
-        for (idx, ty) in self.local_tys.iter().enumerate() {
+        let local_tys = match &self.local_tys {
+            LocalTys::None => return Ok(()),
+            LocalTys::BorrowFromFunction => self.function.local_tys(),
+            LocalTys::BorrowFromFunctionGeneric(tys) => tys,
+        };
+        for (idx, ty) in local_tys.iter().enumerate() {
             if !self.locals.is_invalid(idx)? {
                 ty.paranoid_check_has_ability(Ability::Drop)?;
             }
@@ -184,6 +270,12 @@ impl Frame {
         Ok(())
     }
 
+    #[cfg_attr(feature = "force-inline", inline(always))]
+    pub(crate) fn untrusted_code(&self) -> bool {
+        !self.function.function.is_trusted
+    }
+
+    #[cfg_attr(feature = "force-inline", inline(always))]
     pub(crate) fn constant_at(&self, idx: ConstantPoolIndex) -> &Constant {
         use LoadedFunctionOwner::*;
         match self.function.owner() {
@@ -192,6 +284,7 @@ impl Frame {
         }
     }
 
+    #[cfg_attr(feature = "force-inline", inline(always))]
     pub(crate) fn get_struct_ty(&self, idx: StructDefinitionIndex) -> Type {
         use LoadedFunctionOwner::*;
         let struct_ty = match self.function.owner() {
@@ -241,6 +334,7 @@ impl Frame {
         )
     }
 
+    #[cfg_attr(feature = "force-inline", inline(always))]
     pub(crate) fn get_field_ty(&self, idx: FieldHandleIndex) -> PartialVMResult<&Type> {
         use LoadedFunctionOwner::*;
         match self.function.owner() {
@@ -252,6 +346,7 @@ impl Frame {
         }
     }
 
+    #[cfg_attr(feature = "force-inline", inline(always))]
     pub(crate) fn get_generic_field_ty(
         &self,
         idx: FieldInstantiationIndex,
@@ -299,6 +394,7 @@ impl Frame {
         }
     }
 
+    #[cfg_attr(feature = "force-inline", inline(always))]
     pub(crate) fn get_struct(&self, idx: StructDefinitionIndex) -> &Arc<StructType> {
         use LoadedFunctionOwner::*;
         match self.function.owner() {
@@ -396,6 +492,7 @@ impl Frame {
         )
     }
 
+    #[cfg_attr(feature = "force-inline", inline(always))]
     pub(crate) fn field_offset(&self, idx: FieldHandleIndex) -> usize {
         use LoadedFunctionOwner::*;
         match self.function.owner() {
@@ -404,6 +501,7 @@ impl Frame {
         }
     }
 
+    #[cfg_attr(feature = "force-inline", inline(always))]
     pub(crate) fn field_instantiation_offset(&self, idx: FieldInstantiationIndex) -> usize {
         use LoadedFunctionOwner::*;
         match self.function.owner() {
@@ -412,6 +510,7 @@ impl Frame {
         }
     }
 
+    #[cfg_attr(feature = "force-inline", inline(always))]
     pub(crate) fn field_count(&self, idx: StructDefinitionIndex) -> u16 {
         use LoadedFunctionOwner::*;
         match self.function.owner() {
@@ -420,6 +519,7 @@ impl Frame {
         }
     }
 
+    #[cfg_attr(feature = "force-inline", inline(always))]
     pub(crate) fn field_instantiation_count(&self, idx: StructDefInstantiationIndex) -> u16 {
         use LoadedFunctionOwner::*;
         match self.function.owner() {
@@ -428,6 +528,7 @@ impl Frame {
         }
     }
 
+    #[cfg_attr(feature = "force-inline", inline(always))]
     pub(crate) fn field_handle_to_struct(&self, idx: FieldHandleIndex) -> Type {
         use LoadedFunctionOwner::*;
         match self.function.owner() {
@@ -439,6 +540,7 @@ impl Frame {
         }
     }
 
+    #[cfg_attr(feature = "force-inline", inline(always))]
     pub(crate) fn field_instantiation_to_struct(
         &self,
         idx: FieldInstantiationIndex,
@@ -458,11 +560,12 @@ impl Frame {
 
     pub(crate) fn instantiate_generic_function(
         &self,
+        ty_pool: &InternedTypePool,
         gas_meter: Option<&mut impl GasMeter>,
         idx: FunctionInstantiationIndex,
-    ) -> PartialVMResult<Vec<Type>> {
+    ) -> PartialVMResult<(Vec<Type>, TypeVecId)> {
         use LoadedFunctionOwner::*;
-        let instantiation = match self.function.owner() {
+        let (instantiation, ty_args_id) = match self.function.owner() {
             Module(module) => module.function_instantiation_at(idx.0),
             Script(script) => script.function_instantiation_at(idx.0),
         };
@@ -479,30 +582,32 @@ impl Frame {
             .iter()
             .map(|ty| self.ty_builder.create_ty_with_subst(ty, ty_args))
             .collect::<PartialVMResult<Vec<_>>>()?;
-        Ok(instantiation)
+        let ty_args_id = match ty_args_id {
+            Some(ty_args_id) => ty_args_id,
+            // We can hit this case where original type args were only a partial instantiation.
+            None => ty_pool.intern_ty_args(&instantiation),
+        };
+
+        Ok((instantiation, ty_args_id))
     }
 
     pub(crate) fn build_loaded_function_from_name_and_ty_args(
         &self,
-        module_storage: &impl ModuleStorage,
+        loader: &impl FunctionDefinitionLoader,
+        gas_meter: &mut impl GasMeter,
+        traversal_context: &mut TraversalContext,
         module_id: &ModuleId,
         function_name: &IdentStr,
         verified_ty_args: Vec<Type>,
+        ty_args_id: TypeVecId,
     ) -> PartialVMResult<LoadedFunction> {
-        let (module, function) = module_storage
-            .fetch_function_definition(module_id.address(), module_id.name(), function_name)
-            .map_err(|_| {
-                // Note: legacy loader implementation used this error, so we need to remap.
-                PartialVMError::new(StatusCode::FUNCTION_RESOLUTION_FAILURE).with_message(format!(
-                    "Module or function do not exist for {}::{}::{}",
-                    module_id.address(),
-                    module_id.name(),
-                    function_name
-                ))
-            })?;
+        let (module, function) = loader
+            .load_function_definition(gas_meter, traversal_context, module_id, function_name)
+            .map_err(|err| err.to_partial())?;
         Ok(LoadedFunction {
             owner: LoadedFunctionOwner::Module(module),
             ty_args: verified_ty_args,
+            ty_args_id,
             function,
         })
     }

@@ -129,6 +129,10 @@ pub struct Options {
     /// External checks to be performed.
     #[clap(skip)]
     pub external_checks: Vec<Arc<dyn ExternalChecks>>,
+
+    /// Whether to print errors to stderr as they are reported.
+    #[clap(long, default_value = "true")]
+    pub print_errors: bool,
 }
 
 impl Default for Options {

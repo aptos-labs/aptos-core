@@ -1,0 +1,10 @@
+processed 2 tasks
+task 0 lines 3-14:  publish [module 0xc0ffee::m {]
+task 1 lines 17-17:  run 0xc0ffee::m::test --args true 1
+Error: Function execution failed with VMError: {
+    major_status: ABORTED,
+    sub_status: Some(1),
+    location: 0xc0ffee::m,
+    indices: [],
+    offsets: [(FunctionDefinitionIndex(0), 1)],
+}

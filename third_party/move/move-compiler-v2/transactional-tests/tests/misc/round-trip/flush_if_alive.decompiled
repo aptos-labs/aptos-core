@@ -1,0 +1,31 @@
+//**** Cross-compiled for `move` syntax from `tests/misc/flush_if_alive.move`
+
+//# publish
+module 0x42::m {
+    struct Cap1 has copy, store {
+        x: address,
+    }
+    struct Cap2 has copy, store {
+        x: address,
+    }
+    struct Cap3 has copy, store {
+        x: address,
+    }
+    struct Store has key {
+        c: Cap3,
+    }
+    fun init(p0: &signer): (Cap1, Cap3) {
+        let (_v0,_v1,_v2) = stuff();
+        let _v3 = _v2;
+        let _v4 = Store{c: _v3};
+        move_to<Store>(p0, _v4);
+        destroy(_v1);
+        (_v0, _v3)
+    }
+    fun stuff(): (Cap1, Cap2, Cap3) {
+        abort 0
+    }
+    fun destroy(p0: Cap2) {
+        let Cap2{x: _v0} = p0;
+    }
+}

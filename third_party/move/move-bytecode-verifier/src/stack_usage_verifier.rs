@@ -59,6 +59,9 @@ impl<'a> StackUsageVerifier<'a> {
             let (num_pops, num_pushes) = self.instruction_effect(&code[i as usize])?;
             if let Some(new_pushes) = u64::checked_add(overall_push, num_pushes) {
                 overall_push = new_pushes
+            } else {
+                return Err(PartialVMError::new(StatusCode::VALUE_STACK_PUSH_OVERFLOW)
+                    .at_code_offset(self.current_function(), block_start));
             };
 
             // Check that the accumulated pushes does not exceed a pre-defined max size
@@ -129,6 +132,12 @@ impl<'a> StackUsageVerifier<'a> {
             | Bytecode::LdU64(_)
             | Bytecode::LdU128(_)
             | Bytecode::LdU256(_)
+            | Bytecode::LdI8(_)
+            | Bytecode::LdI16(_)
+            | Bytecode::LdI32(_)
+            | Bytecode::LdI64(_)
+            | Bytecode::LdI128(_)
+            | Bytecode::LdI256(_)
             | Bytecode::LdTrue
             | Bytecode::LdFalse
             | Bytecode::LdConst(_)
@@ -139,6 +148,7 @@ impl<'a> StackUsageVerifier<'a> {
 
             // Instructions that pop and push once
             Bytecode::Not
+            | Bytecode::Negate
             | Bytecode::FreezeRef
             | Bytecode::ReadRef
             | Bytecode::Exists(_)
@@ -165,6 +175,12 @@ impl<'a> StackUsageVerifier<'a> {
             | Bytecode::CastU64
             | Bytecode::CastU128
             | Bytecode::CastU256
+            | Bytecode::CastI8
+            | Bytecode::CastI16
+            | Bytecode::CastI32
+            | Bytecode::CastI64
+            | Bytecode::CastI128
+            | Bytecode::CastI256
             | Bytecode::VecLen(_)
             | Bytecode::VecPopBack(_) => (1, 1),
 
@@ -228,42 +244,27 @@ impl<'a> StackUsageVerifier<'a> {
                 (arg_count, return_count)
             },
 
-            // ClosEval pops the number of arguments and pushes the results of the given function
-            // type
+            // `CallClosure` pops the closure and then the number of arguments and
+            // pushes the results of the given function type
             Bytecode::CallClosure(idx) => {
                 if let Some(SignatureToken::Function(args, result, _)) =
                     self.resolver.signature_at(*idx).0.first()
                 {
                     ((1 + args.len()) as u64, result.len() as u64)
                 } else {
-                    // We don't know what it will pop/push, but the signature checker
+                    // We don't know what it will pop/push, but the signature checker v2
                     // ensures we never reach this
                     (0, 0)
                 }
             },
 
-            // ClosPack pops the captured arguments and returns 1 value
-            Bytecode::PackClosure(idx, mask) => {
-                let function_handle = self.resolver.function_handle_at(*idx);
-                // TODO(#15664): use `captured_count` for efficiency
-                let arg_count = mask
-                    .extract(
-                        &self.resolver.signature_at(function_handle.parameters).0,
-                        true,
-                    )
-                    .len() as u64;
+            // `PackClosure` pops the captured arguments and returns 1 value
+            Bytecode::PackClosure(_, mask) => {
+                let arg_count = mask.captured_count() as u64;
                 (arg_count, 1)
             },
-            Bytecode::PackClosureGeneric(idx, mask) => {
-                let func_inst = self.resolver.function_instantiation_at(*idx);
-                let function_handle = self.resolver.function_handle_at(func_inst.handle);
-                // TODO(#15664): use `captured_count` for efficiency
-                let arg_count = mask
-                    .extract(
-                        &self.resolver.signature_at(function_handle.parameters).0,
-                        true,
-                    )
-                    .len() as u64;
+            Bytecode::PackClosureGeneric(_, mask) => {
+                let arg_count = mask.captured_count() as u64;
                 (arg_count, 1)
             },
 

@@ -1,0 +1,22 @@
+//**** Cross-compiled for `move` syntax from `tests/optimization/mut_refs_2.move`
+
+//# publish
+module 0xc0ffee::m {
+    struct S has copy, drop {
+        a: u64,
+        b: u64,
+    }
+    public fun main() {
+        assert!(test(S{a: 1, b: 2}) == 1, 5);
+    }
+    fun test(p0: S): u64 {
+        let _v0 = p0;
+        let _v1 = _v0;
+        let _v2 = &mut (&mut _v0).a;
+        *_v2 = 0;
+        *&(&_v1).a
+    }
+}
+
+
+//# run 0xc0ffee::m::main

@@ -1,7 +1,17 @@
-processed 4 tasks
-
-task 2 'run'. lines 72-72:
+processed 13 tasks
+task 0 lines 1-23:  publish [module 0x42::mod2 {]
+task 1 lines 25-70:  publish [module 0x42::mod3 {]
+task 2 lines 72-91:  publish [module 0x42::mod4 {]
+task 3 lines 93-112:  publish [module 0x42::mod5 {]
+task 4 lines 114-160:  publish [module 0x42::mod6 {]
+task 5 lines 162-162:  run 0x42::mod3::test_items --signers 0x42 --args true
 return values: true
-
-task 3 'run'. lines 74-74:
+task 6 lines 164-164:  run 0x42::mod3::test_items --signers 0x42 --args false
 return values: true
+task 7 lines 166-166:  run 0x42::mod4::initialize --signers 0x42
+task 8 lines 168-168:  run 0x42::mod4::check_exists --signers 0x42
+task 9 lines 170-170:  run 0x42::mod5::initialize --signers 0x42
+task 10 lines 172-172:  run 0x42::mod5::check_exists --signers 0x42
+task 11 lines 174-174:  run 0x42::mod6::initialize --signers 0x42
+task 12 lines 176-176:  run 0x42::mod6::compute --signers 0x42
+return values: 6

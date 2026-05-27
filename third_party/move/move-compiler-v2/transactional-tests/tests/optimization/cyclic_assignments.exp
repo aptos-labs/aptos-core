@@ -1,4 +1,4 @@
 processed 2 tasks
-
-task 1 'run'. lines 11-11:
+task 0 lines 1-9:  publish [module 0xc0ffee::m {]
+task 1 lines 11-11:  run 0xc0ffee::m::cyclic --args 42
 return values: 42

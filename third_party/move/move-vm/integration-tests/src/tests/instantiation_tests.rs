@@ -16,9 +16,14 @@ use move_core_types::{
     vm_status::StatusCode,
 };
 use move_vm_runtime::{
-    config::VMConfig, AsUnsyncCodeStorage, ModuleStorage, RuntimeEnvironment, StagingModuleStorage,
+    config::VMConfig,
+    dispatch_loader,
+    module_traversal::{TraversalContext, TraversalStorage},
+    AsUnsyncCodeStorage, InstantiatedFunctionLoader, LegacyLoaderConfig, ModuleStorage,
+    RuntimeEnvironment, StagingModuleStorage,
 };
 use move_vm_test_utils::InMemoryStorage;
+use move_vm_types::gas::UnmeteredGasMeter;
 
 #[test]
 fn instantiation_err() {
@@ -141,7 +146,17 @@ fn instantiation_err() {
 }
 
 fn load_function(module_storage: &impl ModuleStorage, module_id: &ModuleId, ty_args: &[TypeTag]) {
-    let res = module_storage.load_function(module_id, ident_str!("f"), ty_args);
+    let traversal_storage = TraversalStorage::new();
+    let res = dispatch_loader!(module_storage, loader, {
+        loader.load_instantiated_function(
+            &LegacyLoaderConfig::unmetered(),
+            &mut UnmeteredGasMeter,
+            &mut TraversalContext::new(&traversal_storage),
+            module_id,
+            ident_str!("f"),
+            ty_args,
+        )
+    });
     assert!(
         res.is_err(),
         "Instantiation must fail at load time when converting from type tag to type "

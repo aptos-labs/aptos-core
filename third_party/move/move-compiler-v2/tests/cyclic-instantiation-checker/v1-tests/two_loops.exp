@@ -1,17 +1,17 @@
 
 Diagnostics:
-error: cyclic type instantiation: a cycle of recursive calls causes a type to grow without bound
+error: cyclic type instantiation: a cycle of recursive uses causes a type to grow without bound
   ┌─ tests/cyclic-instantiation-checker/v1-tests/two_loops.move:7:9
   │
 7 │     fun f<T>() {
   │         ^
   │
-  = `f<T>` calls `f<S<T>>` at tests/cyclic-instantiation-checker/v1-tests/two_loops.move:8
+  = `f<T>` uses `f<S<T>>` at tests/cyclic-instantiation-checker/v1-tests/two_loops.move:8
 
-error: cyclic type instantiation: a cycle of recursive calls causes a type to grow without bound
+error: cyclic type instantiation: a cycle of recursive uses causes a type to grow without bound
    ┌─ tests/cyclic-instantiation-checker/v1-tests/two_loops.move:11:9
    │
 11 │     fun g<T>() {
    │         ^
    │
-   = `g<T>` calls `g<S<T>>` at tests/cyclic-instantiation-checker/v1-tests/two_loops.move:12
+   = `g<T>` uses `g<S<T>>` at tests/cyclic-instantiation-checker/v1-tests/two_loops.move:12

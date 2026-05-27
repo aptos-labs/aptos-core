@@ -1,1 +1,3 @@
 processed 2 tasks
+task 0 lines 1-41:  publish [module 0xc0ffee::greatest_product {]
+task 1 lines 43-43:  run 0xc0ffee::greatest_product::test_find_greatest_product

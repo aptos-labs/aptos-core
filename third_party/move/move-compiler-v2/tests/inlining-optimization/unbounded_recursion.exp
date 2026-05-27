@@ -1,0 +1,38 @@
+// -- Model dump before first bytecode pipeline
+module 0xc0ffee::m {
+    public fun infinite() {
+        m::infinite();
+        m::infinite();
+        Tuple()
+    }
+} // end 0xc0ffee::m
+
+// -- Sourcified model before first bytecode pipeline
+module 0xc0ffee::m {
+    public fun infinite() {
+        infinite();
+        infinite();
+    }
+}
+
+// -- Model dump before second bytecode pipeline
+module 0xc0ffee::m {
+    public fun infinite() {
+        m::infinite();
+        m::infinite();
+        Tuple()
+    }
+} // end 0xc0ffee::m
+
+
+============ disassembled file-format ==================
+// Bytecode version v9
+module 0xc0ffee::m
+// Function definition at index 0
+#[persistent] public fun infinite()
+    call infinite
+    call infinite
+    ret
+
+
+============ bytecode verification succeeded ========

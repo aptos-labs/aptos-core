@@ -46,12 +46,12 @@ module 0x42::test {
 // -- Sourcified model before first bytecode pipeline
 module 0x42::mathtest {
     public inline fun fun1(a: u64, b: u64, c: u64): u64 {
-        2u128 * (a as u128) + 3u128 * (b as u128) + 5u128 * (c as u128) as u64
+        (2u128 * (a as u128) + 3u128 * (b as u128) + 5u128 * (c as u128)) as u64
     }
 }
 module 0x42::mathtest2 {
     public inline fun fun2(a: u64, b: u64, c: u64): u64 {
-        7u128 * (a as u128) + 11u128 * (b as u128) + 13u128 * (c as u128) as u64
+        (7u128 * (a as u128) + 11u128 * (b as u128) + 13u128 * (c as u128)) as u64
     }
 }
 module 0x42::test {
@@ -62,20 +62,20 @@ module 0x42::test {
             let (a,b,c) = (2, {
                 let (a,b,c) = (3, {
                     let (a,b,c) = (4, 5, 6);
-                    7u128 * (a as u128) + 11u128 * (b as u128) + 13u128 * (c as u128) as u64
+                    (7u128 * (a as u128) + 11u128 * (b as u128) + 13u128 * (c as u128)) as u64
                 }, 7);
-                2u128 * (a as u128) + 3u128 * (b as u128) + 5u128 * (c as u128) as u64
+                (2u128 * (a as u128) + 3u128 * (b as u128) + 5u128 * (c as u128)) as u64
             }, {
                 let (a,b,c) = (8, 9, {
                     let (a,b,c) = (10, {
                         let (a,b,c) = (11, 12, 13);
-                        7u128 * (a as u128) + 11u128 * (b as u128) + 13u128 * (c as u128) as u64
+                        (7u128 * (a as u128) + 11u128 * (b as u128) + 13u128 * (c as u128)) as u64
                     }, 14);
-                    2u128 * (a as u128) + 3u128 * (b as u128) + 5u128 * (c as u128) as u64
+                    (2u128 * (a as u128) + 3u128 * (b as u128) + 5u128 * (c as u128)) as u64
                 });
-                7u128 * (a as u128) + 11u128 * (b as u128) + 13u128 * (c as u128) as u64
+                (7u128 * (a as u128) + 11u128 * (b as u128) + 13u128 * (c as u128)) as u64
             });
-            2u128 * (a as u128) + 3u128 * (b as u128) + 5u128 * (c as u128) as u64
+            (2u128 * (a as u128) + 3u128 * (b as u128) + 5u128 * (c as u128)) as u64
         };
         if (a == 81911) () else abort 0;
     }

@@ -1,0 +1,22 @@
+{% for abi_old in [ "has drop", "has copy+drop", ""] %}
+
+{% set suffix = mangle(repr=abi_old) %}
+
+//# publish
+module 0x66::incompatible_field_ability_{{suffix}}
+struct A
+    x: |u64|u32 {{abi_old}}
+
+
+{% for abi_new in [ "has copy", "has copy+store", ""] %}
+
+{% if abi_new != abi_old %}
+
+//# publish --verbose
+module 0x66::incompatible_field_ability_{{suffix}}
+struct A
+    x: |u64|u32 {{abi_new}}
+
+{% endif %}
+{% endfor %}
+{% endfor %}

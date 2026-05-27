@@ -1,0 +1,21 @@
+
+============ disassembled file-format ==================
+// Bytecode version v9
+module 0xcafe::Module0
+struct S has copy + drop + store + key
+  dummy_field: bool
+
+// Function definition at index 0
+#[persistent] public fun function1()
+    ret
+
+// Function definition at index 1
+#[persistent] public fun function2() acquires S
+    local l0: &S
+    ld_const<address> 48879
+    borrow_global S
+    pop
+    ret
+
+
+============ bytecode verification succeeded ========

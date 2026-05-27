@@ -8,22 +8,23 @@ mod tests {
     use crate::{
         delayed_values::delayed_field_id::DelayedFieldID,
         value_serde::{MockFunctionValueExtension, ValueSerDeContext},
-        values::{values_impl, AbstractFunction, SerializedFunctionData, Struct, Value},
+        values::{function_values_impl::mock::MockAbstractFunction, values_impl, Struct, Value},
     };
-    use better_any::{Tid, TidAble, TidExt};
+    use better_any::TidExt;
     use claims::{assert_err, assert_ok, assert_some};
     use move_binary_format::errors::PartialVMResult;
     use move_core_types::{
         ability::AbilitySet,
         account_address::AccountAddress,
-        function::{ClosureMask, MoveClosure, FUNCTION_DATA_SERIALIZATION_FORMAT_V1},
+        function::{ClosureMask, MoveClosure},
         identifier::Identifier,
-        language_storage::{FunctionTag, ModuleId, StructTag, TypeTag},
-        u256,
+        int256,
+        language_storage::{FunctionParamOrReturnTag, FunctionTag, ModuleId, StructTag, TypeTag},
         value::{IdentifierMappingKind, MoveStruct, MoveStructLayout, MoveTypeLayout, MoveValue},
     };
     use serde::{Deserialize, Serialize};
-    use std::{cmp::Ordering, iter};
+    use std::iter;
+
     // ==========================================================================
     // Enums
 
@@ -214,13 +215,15 @@ mod tests {
         vec![
             TypeTag::Address,
             TypeTag::Function(Box::new(FunctionTag {
-                args: vec![TypeTag::Struct(Box::new(StructTag {
-                    address: AccountAddress::TEN,
-                    module: Identifier::new("mod").unwrap(),
-                    name: Identifier::new("st").unwrap(),
-                    type_args: vec![TypeTag::Signer],
-                }))],
-                results: vec![TypeTag::Address],
+                args: vec![FunctionParamOrReturnTag::Value(TypeTag::Struct(Box::new(
+                    StructTag {
+                        address: AccountAddress::TEN,
+                        module: Identifier::new("mod").unwrap(),
+                        name: Identifier::new("st").unwrap(),
+                        type_args: vec![TypeTag::Signer],
+                    },
+                )))],
+                results: vec![FunctionParamOrReturnTag::Value(TypeTag::Address)],
                 abilities: AbilitySet::PUBLIC_FUNCTIONS,
             })),
         ]
@@ -332,61 +335,6 @@ mod tests {
 
     // --------------------------------------------------------------------------------------
     // VM Values
-
-    // Since Abstract functions are `Tid`, we cannot auto-mock them, so need to mock manually.
-    #[derive(Clone, Tid)]
-    struct MockAbstractFunction {
-        data: SerializedFunctionData,
-    }
-
-    impl MockAbstractFunction {
-        fn new(
-            fun_name: &str,
-            ty_args: Vec<TypeTag>,
-            mask: ClosureMask,
-            captured_layouts: Vec<MoveTypeLayout>,
-        ) -> MockAbstractFunction {
-            Self {
-                data: SerializedFunctionData {
-                    format_version: FUNCTION_DATA_SERIALIZATION_FORMAT_V1,
-                    module_id: ModuleId::new(AccountAddress::TWO, Identifier::new("m").unwrap()),
-                    fun_id: Identifier::new(fun_name).unwrap(),
-                    ty_args,
-                    mask,
-                    captured_layouts,
-                },
-            }
-        }
-
-        fn new_from_data(data: SerializedFunctionData) -> Self {
-            Self { data }
-        }
-    }
-
-    impl AbstractFunction for MockAbstractFunction {
-        fn closure_mask(&self) -> ClosureMask {
-            self.data.mask
-        }
-
-        fn cmp_dyn(&self, other: &dyn AbstractFunction) -> PartialVMResult<Ordering> {
-            // We only need equality for tests
-            let other_mock = other.downcast_ref::<MockAbstractFunction>().unwrap();
-            Ok(if self.data == other_mock.data {
-                Ordering::Equal
-            } else {
-                Ordering::Less
-            })
-        }
-
-        fn clone_dyn(&self) -> PartialVMResult<Box<dyn AbstractFunction>> {
-            unimplemented!()
-        }
-
-        fn to_canonical_string(&self) -> String {
-            // Needed for assertion failure printing
-            "<some function>".to_string()
-        }
-    }
 
     fn round_trip_vm_closure_value(
         fun: MockAbstractFunction,
@@ -527,7 +475,7 @@ mod tests {
             (Value::u32(10), U32),
             (Value::u64(10), U64),
             (Value::u128(10), U128),
-            (Value::u256(u256::U256::one()), U256),
+            (Value::u256(int256::U256::ONE), U256),
             (Value::bool(true), Bool),
             (Value::address(AccountAddress::ONE), Address),
             (Value::master_signer(AccountAddress::ONE), Signer),

@@ -1,0 +1,25 @@
+//**** Cross-compiled for `move` syntax from `tests/misc/sum_multiples_euler.move`
+
+//# publish
+module 0xc0ffee::sum_multiples {
+    public fun sum_multiples_3_or_5(p0: u64): u64 {
+        let _v0 = 0;
+        let _v1 = 0;
+        loop {
+            let _v2;
+            if (!(_v1 < p0)) break;
+            if (_v1 % 3 == 0) _v2 = true else _v2 = _v1 % 5 == 0;
+            if (_v2) _v0 = _v0 + _v1;
+            _v1 = _v1 + 1;
+            continue
+        };
+        _v0
+    }
+    public fun test_sum_multiples() {
+        assert!(sum_multiples_3_or_5(10) == 23, 0);
+        assert!(sum_multiples_3_or_5(1000) == 233168, 1);
+    }
+}
+
+
+//# run 0xc0ffee::sum_multiples::test_sum_multiples

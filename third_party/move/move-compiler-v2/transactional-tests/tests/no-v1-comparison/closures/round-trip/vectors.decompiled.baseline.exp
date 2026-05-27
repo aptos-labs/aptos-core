@@ -1,0 +1,4 @@
+processed 2 tasks
+task 0 lines 3-39:  publish [module 0x42::test {]
+task 1 lines 42-42:  run 0x42::test::eval --args 2
+return values: 12

@@ -1,0 +1,109 @@
+Running Move unit tests
+[ FAIL    ] 0xc0ffee::m::bad_cast1
+[ FAIL    ] 0xc0ffee::m::bad_cast2
+[ FAIL    ] 0xc0ffee::m::empty_vec
+[ FAIL    ] 0xc0ffee::m::int_overflow1
+[ FAIL    ] 0xc0ffee::m::int_overflow2
+[ FAIL    ] 0xc0ffee::m::non_existent_native
+0xc0ffee::m::bad_cast1
+Output: Ok(Changes { accounts: {} })
+0xc0ffee::m::bad_cast2
+Output: Ok(Changes { accounts: {} })
+0xc0ffee::m::empty_vec
+Output: Ok(Changes { accounts: {} })
+0xc0ffee::m::int_overflow1
+Output: Ok(Changes { accounts: {} })
+0xc0ffee::m::int_overflow2
+Output: Ok(Changes { accounts: {} })
+0xc0ffee::m::non_existent_native
+Output: Ok(Changes { accounts: {} })
+
+Test failures:
+
+Failures in 0xc0ffee::m:
+
+┌── bad_cast1 ──────
+│ error[E11001]: test failure
+│   ┌─ issue_17188.move:9:32
+│   │
+│ 5 │     public fun bad_cast1() {
+│   │                --------- In this function in 0xc0ffee::m
+│   ·
+│ 9 │         let small_number: u8 = (big_number as u8);
+│   │                                ^^^^^^^^^^^^^^^^^^ Test was not expected to error, but it gave an arithmetic error with error message: "Cannot cast u64(1000) to u8". Error originating in the module 0000000000000000000000000000000000000000000000000000000000c0ffee::m rooted here
+│ 
+│ 
+└──────────────────
+
+
+┌── bad_cast2 ──────
+│ error[E11001]: test failure
+│    ┌─ issue_17188.move:21:28
+│    │
+│ 14 │     public fun bad_cast2() {
+│    │                --------- In this function in 0xc0ffee::m
+│    ·
+│ 21 │             small_number = (big_number as u8);
+│    │                            ^^^^^^^^^^^^^^^^^^ Test was not expected to error, but it gave an arithmetic error with error message: "Cannot cast u64(256) to u8". Error originating in the module 0000000000000000000000000000000000000000000000000000000000c0ffee::m rooted here
+│ 
+│ 
+└──────────────────
+
+
+┌── empty_vec ──────
+│ error[E11001]: test failure
+│    ┌─ issue_17188.move:63:9
+│    │
+│ 60 │     public fun empty_vec() {
+│    │                --------- In this function in 0xc0ffee::m
+│    ·
+│ 63 │         vector::borrow(&vector::empty<u64>(), 1);
+│    │         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ Test was not expected to error, but it gave a vector operation error with sub-status 1 originating in the module 0000000000000000000000000000000000000000000000000000000000c0ffee::m rooted here
+│ 
+│ 
+└──────────────────
+
+
+┌── int_overflow1 ──────
+│ error[E11001]: test failure
+│    ┌─ issue_17188.move:36:28
+│    │
+│ 29 │     public fun int_overflow1() {
+│    │                ------------- In this function in 0xc0ffee::m
+│    ·
+│ 36 │         let overflow: u8 = 1 + z;
+│    │                            ^^^^^ Test was not expected to error, but it gave an arithmetic error with error message: "Addition overflow". Error originating in the module 0000000000000000000000000000000000000000000000000000000000c0ffee::m rooted here
+│ 
+│ 
+└──────────────────
+
+
+┌── int_overflow2 ──────
+│ error[E11001]: test failure
+│    ┌─ issue_17188.move:51:24
+│    │
+│ 41 │     public fun int_overflow2() {
+│    │                ------------- In this function in 0xc0ffee::m
+│    ·
+│ 51 │             overflow = overflow - 15;
+│    │                        ^^^^^^^^^^^^^ Test was not expected to error, but it gave an arithmetic error with error message: "Subtraction overflow". Error originating in the module 0000000000000000000000000000000000000000000000000000000000c0ffee::m rooted here
+│ 
+│ 
+└──────────────────
+
+
+┌── non_existent_native ──────
+│ error[E11001]: test failure
+│    ┌─ issue_17188.move:67:16
+│    │
+│ 67 │     native fun foo();
+│    │                ^^^
+│    │                │
+│    │                INTERNAL TEST ERROR: Unexpected Verification Error
+│ Test was not expected to error, but it gave a MISSING_DEPENDENCY (code 1021) error with error message: "Missing Native Function `foo`". Error originating in the module 0000000000000000000000000000000000000000000000000000000000c0ffee::m rooted here
+│    │                In this function in 0xc0ffee::m
+│ 
+│ 
+└──────────────────
+
+Test result: FAILED. Total tests: 6; passed: 0; failed: 6

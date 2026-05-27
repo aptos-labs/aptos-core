@@ -1,0 +1,61 @@
+processed 11 tasks
+task 0 lines 3-80:  publish [module 0x42::test {]
+task 1 lines 83-83:  run --verbose --signers 0x1 -- 0x42::test::init
+task 2 lines 85-85:  run --verbose -- 0x42::test::ok1
+return values: true
+task 3 lines 87-87:  run --verbose -- 0x42::test::ok2
+return values: true
+task 4 lines 89-89:  run --verbose --signers 0x2 -- 0x42::test::ok3
+return values: true
+task 5 lines 91-91:  run --verbose -- 0x42::test::ok4
+return values: true
+task 6 lines 93-93:  run --verbose -- 0x42::test::fail1
+Error: Function execution failed with VMError: {
+    message: not allowed to perform `reads 0x42::test::R(@0x1)`,
+    major_status: ACCESS_DENIED,
+    sub_status: None,
+    location: 0x42::test,
+    indices: [],
+    offsets: [(FunctionDefinitionIndex(1), 1)],
+    exec_state: Some(ExecutionState { stack_trace: [] }),
+}
+task 7 lines 95-95:  run --verbose -- 0x42::test::fail2
+Error: Function execution failed with VMError: {
+    message: not allowed to perform `reads 0x42::test::R(@0x1)`,
+    major_status: ACCESS_DENIED,
+    sub_status: None,
+    location: 0x42::test,
+    indices: [],
+    offsets: [(FunctionDefinitionIndex(2), 1)],
+    exec_state: Some(ExecutionState { stack_trace: [] }),
+}
+task 8 lines 97-97:  run --verbose -- 0x42::test::fail3
+Error: Function execution failed with VMError: {
+    message: not allowed to perform `writes 0x42::test::R(@0x1)`,
+    major_status: ACCESS_DENIED,
+    sub_status: None,
+    location: 0x42::test,
+    indices: [],
+    offsets: [(FunctionDefinitionIndex(3), 1)],
+    exec_state: Some(ExecutionState { stack_trace: [] }),
+}
+task 9 lines 99-99:  run --verbose -- 0x42::test::fail4
+Error: Function execution failed with VMError: {
+    message: not allowed to perform `writes 0x42::test::R(@0x1)`,
+    major_status: ACCESS_DENIED,
+    sub_status: None,
+    location: 0x42::test,
+    indices: [],
+    offsets: [(FunctionDefinitionIndex(4), 1)],
+    exec_state: Some(ExecutionState { stack_trace: [] }),
+}
+task 10 lines 101-101:  run --verbose -- 0x42::test::fail5
+Error: Function execution failed with VMError: {
+    message: not allowed to perform `reads 0x42::test::R(@0x1)`,
+    major_status: ACCESS_DENIED,
+    sub_status: None,
+    location: 0x42::test,
+    indices: [],
+    offsets: [(FunctionDefinitionIndex(6), 1)],
+    exec_state: Some(ExecutionState { stack_trace: [(Some(ModuleId { address: 0000000000000000000000000000000000000000000000000000000000000042, name: Identifier("test") }), FunctionDefinitionIndex(5), 0)] }),
+}

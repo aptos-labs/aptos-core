@@ -28,7 +28,7 @@ module 0x8675309::M {
         M::imm_imm<u64>(Freeze(false)(Borrow(Mutable)(0)), Freeze(false)(Borrow(Mutable)(0)));
         Tuple()
     }
-    private inline fun t2(f: |(&u64, &mut u64)|) {
+    private inline fun t2(f: |&u64, &mut u64|) {
         (f)(Borrow(Mutable)(0), Borrow(Mutable)(0));
         (f)(Borrow(Immutable)(0), Borrow(Mutable)(0));
         Tuple()
@@ -58,7 +58,7 @@ module 0x8675309::M {
         mut_imm<u64>(&mut 0, /*freeze*/&mut 0);
         imm_imm<u64>(/*freeze*/&mut 0, /*freeze*/&mut 0);
     }
-    inline fun t2(f: |(&u64, &mut u64)|) {
+    inline fun t2(f: |&u64, &mut u64|) {
         f(&mut 0, &mut 0);
         f(&0, &mut 0);
     }

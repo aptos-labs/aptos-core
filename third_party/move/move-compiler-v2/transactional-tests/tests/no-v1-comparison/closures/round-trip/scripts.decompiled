@@ -1,0 +1,38 @@
+//**** Cross-compiled for `move` syntax from `tests/no-v1-comparison/closures/scripts.move`
+
+//# publish
+module 0xc0ffee::m {
+    public fun foo() {
+        ()
+    }
+}
+
+
+//# run
+script {
+    use 0xc0ffee::m;
+    fun main() {
+        let _v0: || has copy + drop = || m::foo();
+        _v0();
+    }
+}
+
+
+//# run
+script {
+    use 0xc0ffee::m;
+    fun main() {
+        let _v0: || has copy + drop = || m::foo();
+        _v0();
+    }
+}
+
+
+//# run
+script {
+    use 0xc0ffee::m;
+    fun main() {
+        let _v0: || has copy + drop = || m::foo();
+        _v0();
+    }
+}

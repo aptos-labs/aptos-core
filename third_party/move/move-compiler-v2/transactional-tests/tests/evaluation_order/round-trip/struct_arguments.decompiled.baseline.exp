@@ -1,0 +1,50 @@
+processed 7 tasks
+task 0 lines 3-51:  publish [module 0x42::M {]
+task 1 lines 54-60:  run [script {]
+Error: Script execution failed with VMError: {
+    major_status: ARITHMETIC_ERROR,
+    sub_status: None,
+    location: 0x42::M,
+    indices: [],
+    offsets: [(FunctionDefinitionIndex(2), 2)],
+}
+task 2 lines 63-69:  run [script {]
+Error: Script execution failed with VMError: {
+    major_status: ARITHMETIC_ERROR,
+    sub_status: None,
+    location: 0x42::M,
+    indices: [],
+    offsets: [(FunctionDefinitionIndex(3), 2)],
+}
+task 3 lines 72-78:  run [script {]
+Error: Script execution failed with VMError: {
+    major_status: ARITHMETIC_ERROR,
+    sub_status: None,
+    location: 0x42::M,
+    indices: [],
+    offsets: [(FunctionDefinitionIndex(4), 2)],
+}
+task 4 lines 81-87:  run [script {]
+Error: Script execution failed with VMError: {
+    major_status: ARITHMETIC_ERROR,
+    sub_status: None,
+    location: 0x42::M,
+    indices: [],
+    offsets: [(FunctionDefinitionIndex(5), 2)],
+}
+task 5 lines 90-96:  run [script {]
+Error: Script execution failed with VMError: {
+    major_status: ARITHMETIC_ERROR,
+    sub_status: None,
+    location: 0x42::M,
+    indices: [],
+    offsets: [(FunctionDefinitionIndex(6), 2)],
+}
+task 6 lines 99-105:  run --signers 0x1 [script {]
+Error: Script execution failed with VMError: {
+    major_status: RESOURCE_ALREADY_EXISTS,
+    sub_status: None,
+    location: 0x42::M,
+    indices: [],
+    offsets: [(FunctionDefinitionIndex(1), 9)],
+}

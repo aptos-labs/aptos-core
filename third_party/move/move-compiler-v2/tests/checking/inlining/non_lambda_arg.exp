@@ -4,10 +4,10 @@ error: Only inline functions may have function-typed parameters, but non-inline 
   ┌─ tests/checking/inlining/non_lambda_arg.move:4:16
   │
 4 │     public fun incorrect_sort<T: copy>(arr: &mut vector<T>, a_less_b: |T, T| bool) {
-  │                ^^^^^^^^^^^^^^                               -------- Parameter `a_less_b` has function-valued type `|(T, T)|bool`.
+  │                ^^^^^^^^^^^^^^                               -------- Parameter `a_less_b` has function-valued type `|T, T|bool`.
 
 error: Only inline functions may have function-typed parameters, but non-inline function `sort::incorrect_sort_recursive` has a function parameter:
   ┌─ tests/checking/inlining/non_lambda_arg.move:9:16
   │
 9 │     public fun incorrect_sort_recursive<T: copy>(arr: &mut vector<T>, low: u64, high: u64, a_less_b: |T, T| bool) {
-  │                ^^^^^^^^^^^^^^^^^^^^^^^^                                                    -------- Parameter `a_less_b` has function-valued type `|(T, T)|bool`.
+  │                ^^^^^^^^^^^^^^^^^^^^^^^^                                                    -------- Parameter `a_less_b` has function-valued type `|T, T|bool`.

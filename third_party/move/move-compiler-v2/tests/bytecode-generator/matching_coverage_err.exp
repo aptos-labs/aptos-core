@@ -191,15 +191,15 @@ module 0xc0ffee::m {
     public fun exhaustive_tuple(i: &Inner) {
         match ((i, i)) {
             (Inner::Inner1{x: _},_) => (),
-            (Inner::Inner2{x: _,y: _},_) => (),
+            (Inner::Inner2{x: _, y: _},_) => (),
         }
     }
     public fun exhaustive_via_merge(o: &Outer) {
         match (o) {
             Outer::None{} => (),
             Outer::One{i: Inner::Inner1{x: _}} => (),
-            Outer::One{i: Inner::Inner2{x: _,y: _}} => (),
-            Outer::Two{i: _,b: _} => (),
+            Outer::One{i: Inner::Inner2{x: _, y: _}} => (),
+            Outer::Two{i: _, b: _} => (),
         }
     }
     public fun non_exhaustive(o: &Outer) {
@@ -212,14 +212,14 @@ module 0xc0ffee::m {
         match (o) {
             Outer::None{} => (),
             Outer::One{i: _} => (),
-            Outer::Two{i: _,b: b} if b.x > 0 => (),
+            Outer::Two{i: _, b: b} if b.x > 0 => (),
         }
     }
     public fun non_exhaustive_because_of_nested(o: &Outer) {
         match (o) {
             Outer::None{} => (),
             Outer::One{i: Inner::Inner1{x: _}} => (),
-            Outer::Two{i: _,b: _} => (),
+            Outer::Two{i: _, b: _} => (),
         }
     }
     public fun non_exhaustive_tuple(i: &Inner) {
@@ -230,14 +230,14 @@ module 0xc0ffee::m {
     public fun non_exhaustive_tuple2(i: &Inner) {
         match ((i, i)) {
             (Inner::Inner1{x: _},_) => (),
-            (_,Inner::Inner2{x: _,y: _}) => (),
+            (_,Inner::Inner2{x: _, y: _}) => (),
         }
     }
     public fun unreachable(o: &Outer) {
         match (o) {
             Outer::None{} => (),
             Outer::One{i: _} => (),
-            Outer::Two{i: _,b: _} => (),
+            Outer::Two{i: _, b: _} => (),
             _ => (),
         }
     }

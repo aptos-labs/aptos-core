@@ -7,7 +7,7 @@ module 0x42::test {
         modify(); // expect error message here
     }
 
-    public inline fun modify() acquires Test {
+    public inline fun modify() {
         borrow_global_mut<Test>(@0xcafe).value = 2;
     }
 }

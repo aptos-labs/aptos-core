@@ -1,7 +1,9 @@
 
 Diagnostics:
-bug: file format generator: Inferred and Store AssignKind should be not appear here.
+bug: compiler internal error: file format generator: Inferred and Store AssignKind should be not appear here.
   ┌─ tests/bytecode-verify-failure/equality.move:2:7
   │
 2 │   fun equality<T>(x: T, y: T): bool {
   │       ^^^^^^^^
+  │
+  = please consider reporting this issue (see https://aptos.dev/en/build/smart-contracts/compiler_v2#reporting-an-issue)

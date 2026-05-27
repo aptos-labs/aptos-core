@@ -7,6 +7,17 @@ use std::{cmp::Ordering, path::Path};
 use tempfile::tempdir;
 use walkdir::{DirEntry, WalkDir};
 
+pub const UB: &str = "UB";
+
+fn read_env_var(v: &str) -> String {
+    std::env::var(v).unwrap_or_else(|_| String::new())
+}
+
+fn read_bool_env_var(v: &str) -> bool {
+    let val = read_env_var(v).to_lowercase();
+    val.parse::<bool>() == Ok(true) || val.parse::<usize>() == Ok(1)
+}
+
 #[test]
 fn check_that_docs_are_updated() {
     let temp_dir = tempdir().unwrap();
@@ -14,11 +25,14 @@ fn check_that_docs_are_updated() {
     crate::build_stdlib_doc(&temp_dir.path().to_string_lossy());
 
     let res = check_dirs_not_diff(&temp_dir, crate::move_stdlib_docs_full_path());
-    assert!(
-        res.is_ok(),
-        "Generated docs differ from the ones checked in. {}",
-        res.unwrap_err()
-    )
+
+    if res.is_err() {
+        assert!(
+                !read_bool_env_var(UB),
+                "Generated docs differ from the ones checked in {}. Call this test with env variable UB=1 to regenerate or remove old baseline files.",
+                res.unwrap_err()
+            );
+    }
 }
 
 #[test]
@@ -69,7 +83,11 @@ fn check_dirs_not_diff<A: AsRef<Path>, B: AsRef<Path>>(
             )
         }
         if a.file_type().is_file() && std::fs::read(a.path())? != std::fs::read(b.path())? {
-            bail!("{} needs to be updated", display_dir_entry(a))
+            if read_bool_env_var(UB) {
+                std::fs::write(b.path(), std::fs::read(a.path())?).unwrap();
+            } else {
+                bail!("{}", display_dir_entry(b))
+            }
         }
     }
 

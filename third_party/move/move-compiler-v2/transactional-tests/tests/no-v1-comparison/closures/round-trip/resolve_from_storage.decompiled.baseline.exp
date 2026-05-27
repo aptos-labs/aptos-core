@@ -1,0 +1,4 @@
+processed 3 tasks
+task 0 lines 3-21:  publish [module 0x66::test {]
+task 1 lines 24-24:  run 0x66::test::init --signers 0x66
+task 2 lines 26-26:  run 0x66::test::call --args @0x66

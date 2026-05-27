@@ -1,0 +1,40 @@
+processed 6 tasks
+task 0 lines 3-38:  publish [module 0x42::test {]
+warning: Unused value of parameter `p0`. Consider removing the parameter, or prefixing with an underscore (e.g., `_p0`), or binding to `_`
+   ┌─ TEMPFILE:13:15
+   │
+13 │     fun fail1(p0: address): bool
+   │               ^^
+
+warning: Unused value of parameter `p0`. Consider removing the parameter, or prefixing with an underscore (e.g., `_p0`), or binding to `_`
+   ┌─ TEMPFILE:19:15
+   │
+19 │     fun fail2(p0: &signer): bool
+   │               ^^
+
+
+task 1 lines 41-41:  run --verbose --signers 0x1 -- 0x42::test::init
+task 2 lines 43-43:  run --verbose --args @0x1 -- 0x42::test::ok1
+return values: true
+task 3 lines 45-45:  run --verbose --signers 0x1 -- 0x42::test::ok2
+return values: true
+task 4 lines 47-47:  run --verbose --args @0x1 -- 0x42::test::fail1
+Error: Function execution failed with VMError: {
+    message: not allowed to perform `reads 0x42::test::R(@0x2)`,
+    major_status: ACCESS_DENIED,
+    sub_status: None,
+    location: 0x42::test,
+    indices: [],
+    offsets: [(FunctionDefinitionIndex(1), 1)],
+    exec_state: Some(ExecutionState { stack_trace: [] }),
+}
+task 5 lines 49-49:  run --verbose --signers 0x1 -- 0x42::test::fail2
+Error: Function execution failed with VMError: {
+    message: not allowed to perform `reads 0x42::test::R(@0x2)`,
+    major_status: ACCESS_DENIED,
+    sub_status: None,
+    location: 0x42::test,
+    indices: [],
+    offsets: [(FunctionDefinitionIndex(2), 3)],
+    exec_state: Some(ExecutionState { stack_trace: [] }),
+}

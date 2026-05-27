@@ -1,0 +1,26 @@
+processed 7 tasks
+task 0 lines 3-51:  publish [module 0x42::m {]
+task 1 lines 54-54:  run 0x42::m::test_get_x_v1
+return values: 43
+task 2 lines 56-56:  run 0x42::m::test_get_x_v2
+return values: 43
+task 3 lines 58-58:  run 0x42::m::test_get_x_v3
+return values: 43
+task 4 lines 60-60:  run 0x42::m::test_get_y_v1
+Error: Function execution failed with VMError: {
+    major_status: STRUCT_VARIANT_MISMATCH,
+    sub_status: None,
+    location: 0x42::m,
+    indices: [],
+    offsets: [(FunctionDefinitionIndex(3), 4)],
+}
+task 5 lines 62-62:  run 0x42::m::test_get_y_v2
+return values: true
+task 6 lines 64-64:  run 0x42::m::test_get_y_v3
+Error: Function execution failed with VMError: {
+    major_status: STRUCT_VARIANT_MISMATCH,
+    sub_status: None,
+    location: 0x42::m,
+    indices: [],
+    offsets: [(FunctionDefinitionIndex(5), 5)],
+}

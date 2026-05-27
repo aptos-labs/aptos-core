@@ -1,0 +1,7 @@
+//# publish --print-bytecode
+module 0x66::test
+
+fun f<A, B>(x: A, y: B): (A, B)
+    move_loc x
+    move_loc y
+    ret

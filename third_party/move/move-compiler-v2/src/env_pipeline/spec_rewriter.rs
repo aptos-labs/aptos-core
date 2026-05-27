@@ -24,7 +24,7 @@ use crate::env_pipeline::rewrite_target::{
     RewriteState, RewriteTarget, RewriteTargets, RewritingScope,
 };
 use itertools::Itertools;
-use log::info;
+use log::debug;
 use move_model::{
     ast::{ConditionKind, Exp, ExpData, GlobalInvariant, Operation, SpecBlockTarget, SpecFunDecl},
     exp_rewriter::ExpRewriterFunctions,
@@ -43,7 +43,7 @@ use std::{
 };
 
 pub fn run_spec_rewriter(env: &mut GlobalEnv) {
-    info!("rewriting specifications");
+    debug!("rewriting specifications");
 
     // Collect all spec blocks and spec functions in the whole program, plus
     // functions in compilation scope. For the later we need to process
@@ -233,7 +233,7 @@ pub fn run_spec_rewriter_inline(
     module_id: ModuleId,
     lambda_fun_map: BTreeMap<usize, FunctionData>,
 ) -> BTreeMap<usize, (QualifiedId<SpecFunId>, QualifiedId<FunId>)> {
-    info!("rewriting specifications in inline functions");
+    debug!("rewriting specifications in inline functions");
 
     let mut targets = RewriteTargets::create_fun_targets(env, vec![]);
 

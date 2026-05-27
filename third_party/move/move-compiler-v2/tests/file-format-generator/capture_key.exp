@@ -1,0 +1,22 @@
+
+============ disassembled file-format ==================
+// Bytecode version v9
+module 0xc0ffee::m
+struct S has key
+  i: u64
+
+// Function definition at index 0
+#[persistent] public fun test(): S
+    ld_u64 1
+    pack S
+    pack_closure __lambda__1__test, 1
+    call_closure <||S>
+    ret
+
+// Function definition at index 1
+fun __lambda__1__test(l0: S): S
+    move_loc l0
+    ret
+
+
+============ bytecode verification succeeded ========

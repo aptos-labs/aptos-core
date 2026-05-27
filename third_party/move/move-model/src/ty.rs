@@ -5,7 +5,7 @@
 //! Contains types and related functions.
 
 use crate::{
-    ast::{ModuleName, QualifiedSymbol},
+    ast::{Address, ModuleName, QualifiedSymbol},
     builder::{ith_str, pluralize},
     model::{
         FunId, GlobalEnv, Loc, ModuleId, QualifiedId, QualifiedInstId, StructEnv, StructId,
@@ -14,24 +14,21 @@ use crate::{
     symbol::Symbol,
 };
 use itertools::Itertools;
-#[allow(deprecated)]
-use move_binary_format::normalized::Type as MType;
 use move_binary_format::{
     access::ModuleAccess, file_format::SignatureToken, views::StructHandleView, CompiledModule,
 };
 use move_core_types::{
     ability::{Ability, AbilitySet},
-    language_storage::{FunctionTag, StructTag, TypeTag},
-    u256::U256,
+    int256::{I256, U256},
+    language_storage::{FunctionParamOrReturnTag, FunctionTag, TypeTag},
 };
 use num::BigInt;
 use num_traits::identities::Zero;
 use std::{
     cmp::Ordering,
     collections::{btree_map::Entry, BTreeMap, BTreeSet},
-    fmt,
-    fmt::{Debug, Formatter},
-    iter,
+    fmt::{self, Debug, Formatter},
+    iter, str,
 };
 
 /// Represents a type.
@@ -99,6 +96,12 @@ pub enum PrimitiveType {
     U64,
     U128,
     U256,
+    I8,
+    I16,
+    I32,
+    I64,
+    I128,
+    I256,
     Address,
     Signer,
     // Types only appearing in specifications
@@ -823,27 +826,10 @@ impl PrimitiveType {
     pub fn is_spec(&self) -> bool {
         use PrimitiveType::*;
         match self {
-            Bool | U8 | U16 | U32 | U64 | U128 | U256 | Address | Signer => false,
+            Bool | U8 | U16 | U32 | U64 | U128 | U256 | I8 | I16 | I32 | I64 | I128 | I256
+            | Address | Signer => false,
             Num | Range | EventStore => true,
         }
-    }
-
-    /// Attempt to convert this type into a normalized::Type
-    #[allow(deprecated)]
-    pub fn into_normalized_type(self) -> Option<MType> {
-        use PrimitiveType::*;
-        Some(match self {
-            Bool => MType::Bool,
-            U8 => MType::U8,
-            U16 => MType::U16,
-            U32 => MType::U32,
-            U64 => MType::U64,
-            U128 => MType::U128,
-            U256 => MType::U256,
-            Address => MType::Address,
-            Signer => MType::Signer,
-            Num | Range | EventStore => return None,
-        })
     }
 
     /// Infer a type from a value. Returns the set of int types which can fit the
@@ -851,11 +837,20 @@ impl PrimitiveType {
     pub fn possible_int_types(value: BigInt) -> Vec<PrimitiveType> {
         Self::all_int_types()
             .into_iter()
-            .filter(|t| value <= Self::get_max_value(t).expect("type has max"))
+            .filter(|t| {
+                value <= Self::get_max_value(t).expect("type has max")
+                    && value >= Self::get_min_value(t).expect("type has min")
+            })
             .collect()
     }
 
     pub fn all_int_types() -> Vec<PrimitiveType> {
+        let mut types = Self::all_signed_int_types();
+        types.extend(Self::all_unsigned_int_types());
+        types
+    }
+
+    pub fn all_unsigned_int_types() -> Vec<PrimitiveType> {
         vec![
             PrimitiveType::U8,
             PrimitiveType::U16,
@@ -863,6 +858,17 @@ impl PrimitiveType {
             PrimitiveType::U64,
             PrimitiveType::U128,
             PrimitiveType::U256,
+        ]
+    }
+
+    pub fn all_signed_int_types() -> Vec<PrimitiveType> {
+        vec![
+            PrimitiveType::I8,
+            PrimitiveType::I16,
+            PrimitiveType::I32,
+            PrimitiveType::I64,
+            PrimitiveType::I128,
+            PrimitiveType::I256,
         ]
     }
 
@@ -874,7 +880,13 @@ impl PrimitiveType {
             PrimitiveType::U32 => Some(BigInt::from(u32::MAX)),
             PrimitiveType::U64 => Some(BigInt::from(u64::MAX)),
             PrimitiveType::U128 => Some(BigInt::from(u128::MAX)),
-            PrimitiveType::U256 => Some(BigInt::from(&U256::max_value())),
+            PrimitiveType::U256 => Some(BigInt::from(U256::MAX)),
+            PrimitiveType::I8 => Some(BigInt::from(i8::MAX)),
+            PrimitiveType::I16 => Some(BigInt::from(i16::MAX)),
+            PrimitiveType::I32 => Some(BigInt::from(i32::MAX)),
+            PrimitiveType::I64 => Some(BigInt::from(i64::MAX)),
+            PrimitiveType::I128 => Some(BigInt::from(i128::MAX)),
+            PrimitiveType::I256 => Some(BigInt::from(I256::MAX)),
             PrimitiveType::Num => None,
             _ => unreachable!("no num type"),
         }
@@ -889,6 +901,12 @@ impl PrimitiveType {
             PrimitiveType::U64 => Some(BigInt::zero()),
             PrimitiveType::U128 => Some(BigInt::zero()),
             PrimitiveType::U256 => Some(BigInt::zero()),
+            PrimitiveType::I8 => Some(BigInt::from(i8::MIN)),
+            PrimitiveType::I16 => Some(BigInt::from(i16::MIN)),
+            PrimitiveType::I32 => Some(BigInt::from(i32::MIN)),
+            PrimitiveType::I64 => Some(BigInt::from(i64::MIN)),
+            PrimitiveType::I128 => Some(BigInt::from(i128::MIN)),
+            PrimitiveType::I256 => Some(BigInt::from(I256::MIN)),
             PrimitiveType::Num => None,
             _ => unreachable!("no num type"),
         }
@@ -903,8 +921,18 @@ impl PrimitiveType {
             PrimitiveType::U64 => Some(64),
             PrimitiveType::U128 => Some(128),
             PrimitiveType::U256 => Some(256),
+            PrimitiveType::I8 => Some(8),
+            PrimitiveType::I16 => Some(16),
+            PrimitiveType::I32 => Some(32),
+            PrimitiveType::I64 => Some(64),
+            PrimitiveType::I128 => Some(128),
+            PrimitiveType::I256 => Some(256),
             PrimitiveType::Num => None,
-            _ => unreachable!("no num type"),
+            PrimitiveType::Bool
+            | PrimitiveType::Address
+            | PrimitiveType::Signer
+            | PrimitiveType::Range
+            | PrimitiveType::EventStore => unreachable!("no num type"),
         }
     }
 }
@@ -1046,14 +1074,29 @@ impl Type {
         use PrimitiveType::*;
         use Type::*;
         match self {
-            Primitive(p) => matches!(p, U8 | U16 | U32 | U64 | U128 | U256 | Bool | Address),
+            Primitive(p) => matches!(
+                p,
+                U8 | U16
+                    | U32
+                    | U64
+                    | U128
+                    | U256
+                    | I8
+                    | I16
+                    | I32
+                    | I64
+                    | I128
+                    | I256
+                    | Bool
+                    | Address
+            ),
             Vector(ety) => ety.is_valid_for_constant(),
             _ => false,
         }
     }
 
     pub fn describe_valid_for_constant() -> &'static str {
-        "Expected one of `u8`, `u16, `u32`, `u64`, `u128`, `u256`, `bool`, `address`, \
+        "Expected one of `u8`, `u16, `u32`, `u64`, `u128`, `u256`, `i8`, `i16`, `i32`, `i64`, `i128`, `i256`, `bool`, `address`, \
          or `vector<_>` with valid element type."
     }
 
@@ -1086,6 +1129,89 @@ impl Type {
         matches!(self, Type::Var(_))
     }
 
+    /// Returns all internal types contained in this type (including itself), skipping reference types.
+    pub fn get_all_contained_types_with_skip_reference(&self, env: &GlobalEnv) -> Vec<Type> {
+        match self {
+            Type::Primitive(_) => vec![self.clone()],
+            Type::Tuple(ts) => ts
+                .iter()
+                .flat_map(|t| t.get_all_contained_types_with_skip_reference(env))
+                .collect(),
+            Type::Vector(et) => {
+                let mut types = et.get_all_contained_types_with_skip_reference(env);
+                types.push(self.clone());
+                types
+            },
+            Type::Struct(_, _, ts) => {
+                let struct_env = self.get_struct(env).unwrap().0;
+                let mut new_types = ts
+                    .iter()
+                    .zip(struct_env.data.type_params.iter())
+                    .filter(|(_, param)| !param.1.is_phantom)
+                    .flat_map(|(t, _)| t.get_all_contained_types_with_skip_reference(env))
+                    .collect_vec();
+                new_types.push(self.clone());
+                if struct_env.has_variants() {
+                    for variant in struct_env.get_variants() {
+                        for field in struct_env.get_fields_of_variant(variant) {
+                            new_types.extend(
+                                field
+                                    .get_type()
+                                    .instantiate(ts)
+                                    .get_all_contained_types_with_skip_reference(env),
+                            );
+                        }
+                    }
+                } else {
+                    for field in struct_env.get_fields() {
+                        new_types.extend(
+                            field
+                                .get_type()
+                                .instantiate(ts)
+                                .get_all_contained_types_with_skip_reference(env),
+                        );
+                    }
+                }
+                new_types
+            },
+            Type::Fun(arg, result, _) => {
+                let mut types = arg.get_all_contained_types_with_skip_reference(env);
+                types.extend(result.get_all_contained_types_with_skip_reference(env));
+                types
+            },
+            Type::Reference(_, bt) => {
+                let mut types = bt.get_all_contained_types_with_skip_reference(env);
+                types.push(self.clone());
+                types
+            },
+            Type::TypeDomain(bt) => {
+                let mut types = bt.get_all_contained_types_with_skip_reference(env);
+                types.push(self.clone());
+                types
+            },
+            Type::ResourceDomain(_, _, Some(bt)) => {
+                let mut types = bt
+                    .iter()
+                    .flat_map(|t| t.get_all_contained_types_with_skip_reference(env))
+                    .collect_vec();
+                types.push(self.clone());
+                types
+            },
+            Type::ResourceDomain(_, _, None) => {
+                vec![self.clone()]
+            },
+            Type::Var(..) => {
+                vec![self.clone()]
+            },
+            Type::Error => {
+                vec![self.clone()]
+            },
+            Type::TypeParameter(..) => {
+                vec![self.clone()]
+            },
+        }
+    }
+
     /// Returns true if this is any number type.
     pub fn is_number(&self) -> bool {
         if let Type::Primitive(p) = self {
@@ -1095,12 +1221,48 @@ impl Type {
             | PrimitiveType::U64
             | PrimitiveType::U128
             | PrimitiveType::U256
+            | PrimitiveType::I8
+            | PrimitiveType::I16
+            | PrimitiveType::I32
+            | PrimitiveType::I64
+            | PrimitiveType::I128
+            | PrimitiveType::I256
             | PrimitiveType::Num = p
             {
                 return true;
             }
         }
         false
+    }
+
+    /// Returns true if this is signed int type.
+    pub fn is_signed_int(&self) -> bool {
+        matches!(
+            self,
+            Type::Primitive(
+                PrimitiveType::I8
+                    | PrimitiveType::I16
+                    | PrimitiveType::I32
+                    | PrimitiveType::I64
+                    | PrimitiveType::I128
+                    | PrimitiveType::I256
+            )
+        )
+    }
+
+    /// Returns true if this is unsigned int type.
+    pub fn is_unsigned_int(&self) -> bool {
+        matches!(
+            self,
+            Type::Primitive(
+                PrimitiveType::U8
+                    | PrimitiveType::U16
+                    | PrimitiveType::U32
+                    | PrimitiveType::U64
+                    | PrimitiveType::U128
+                    | PrimitiveType::U256
+            )
+        )
     }
 
     /// Returns compatible number type if `self` and `ty` are compatible number types.
@@ -1418,64 +1580,23 @@ impl Type {
         }
     }
 
-    /// Attempt to convert this type into a normalized::Type
-    #[allow(deprecated)]
-    pub fn into_struct_type(self, env: &GlobalEnv) -> Option<MType> {
-        use Type::*;
-        match self {
-            Struct(mid, sid, ts) => env.get_struct_type(mid, sid, &ts),
-            _ => None,
-        }
-    }
-
-    /// Attempt to convert this type into a normalized::Type
-    #[allow(deprecated)]
-    pub fn into_normalized_type(self, env: &GlobalEnv) -> Option<MType> {
-        use Type::*;
-        match self {
-            Primitive(p) => Some(p.into_normalized_type().expect("Invariant violation: unexpected spec primitive")),
-            Struct(mid, sid, ts) =>
-                env.get_struct_type(mid, sid, &ts),
-            Vector(et) => Some(MType::Vector(
-                Box::new(et.into_normalized_type(env)
-                    .expect("Invariant violation: vector type argument contains incomplete, tuple, or spec type"))
-            )),
-            Reference(r, t) =>
-                match r {
-                    ReferenceKind::Mutable => {
-                        Some(MType::MutableReference(Box::new(t.into_normalized_type(env).expect("Invariant violation: reference type contains incomplete, tuple, or spec type"))))
-                    }
-                    ReferenceKind::Immutable => {
-                        Some(MType::Reference(Box::new(t.into_normalized_type(env).expect("Invariant violation: reference type contains incomplete, tuple, or spec type"))))
-                    }
-                },
-            TypeParameter(idx) => Some(MType::TypeParameter(idx)),
-            Tuple(..) | Error | Fun(..) | TypeDomain(..) | ResourceDomain(..) | Var(..) =>
-                None
-        }
-    }
-
-    /// Attempt to convert this type into a language_storage::StructTag
-    pub fn into_struct_tag(self, env: &GlobalEnv) -> Option<StructTag> {
-        self.into_struct_type(env)?.into_struct_tag()
-    }
-
-    /// Attempt to convert this type into a language_storage::TypeTag
-    pub fn into_type_tag(self, env: &GlobalEnv) -> Option<TypeTag> {
-        self.into_normalized_type(env)?.into_type_tag()
-    }
-
     /// Create a `Type` from `t`
     pub fn from_type_tag(t: &TypeTag, env: &GlobalEnv) -> Self {
         use Type::*;
         match t {
             TypeTag::Bool => Primitive(PrimitiveType::Bool),
             TypeTag::U8 => Primitive(PrimitiveType::U8),
-            TypeTag::U16 => Primitive(PrimitiveType::U8),
-            TypeTag::U32 => Primitive(PrimitiveType::U8),
+            TypeTag::U16 => Primitive(PrimitiveType::U16),
+            TypeTag::U32 => Primitive(PrimitiveType::U32),
             TypeTag::U64 => Primitive(PrimitiveType::U64),
             TypeTag::U128 => Primitive(PrimitiveType::U128),
-            TypeTag::U256 => Primitive(PrimitiveType::U8),
+            TypeTag::U256 => Primitive(PrimitiveType::U256),
+            TypeTag::I8 => Primitive(PrimitiveType::I8),
+            TypeTag::I16 => Primitive(PrimitiveType::I16),
+            TypeTag::I32 => Primitive(PrimitiveType::I32),
+            TypeTag::I64 => Primitive(PrimitiveType::I64),
+            TypeTag::I128 => Primitive(PrimitiveType::I128),
+            TypeTag::I256 => Primitive(PrimitiveType::I256),
             TypeTag::Address => Primitive(PrimitiveType::Address),
             TypeTag::Signer => Primitive(PrimitiveType::Signer),
             TypeTag::Struct(s) => {
@@ -1496,8 +1617,22 @@ impl Type {
                     results,
                     abilities,
                 } = fun.as_ref();
-                let from_vec = |ts: &[TypeTag]| {
-                    Type::tuple(ts.iter().map(|t| Type::from_type_tag(t, env)).collect_vec())
+                let from_vec = |ts: &[FunctionParamOrReturnTag]| {
+                    Type::tuple(
+                        ts.iter()
+                            .map(|t| match t {
+                                FunctionParamOrReturnTag::Reference(t) => Reference(
+                                    ReferenceKind::Immutable,
+                                    Box::new(Type::from_type_tag(t, env)),
+                                ),
+                                FunctionParamOrReturnTag::MutableReference(t) => Reference(
+                                    ReferenceKind::Mutable,
+                                    Box::new(Type::from_type_tag(t, env)),
+                                ),
+                                FunctionParamOrReturnTag::Value(t) => Type::from_type_tag(t, env),
+                            })
+                            .collect_vec(),
+                    )
                 };
                 Fun(
                     Box::new(from_vec(args)),
@@ -1531,6 +1666,12 @@ impl Type {
             SignatureToken::U64 => Type::Primitive(PrimitiveType::U64),
             SignatureToken::U128 => Type::Primitive(PrimitiveType::U128),
             SignatureToken::U256 => Type::Primitive(PrimitiveType::U256),
+            SignatureToken::I8 => Type::Primitive(PrimitiveType::I8),
+            SignatureToken::I16 => Type::Primitive(PrimitiveType::I16),
+            SignatureToken::I32 => Type::Primitive(PrimitiveType::I32),
+            SignatureToken::I64 => Type::Primitive(PrimitiveType::I64),
+            SignatureToken::I128 => Type::Primitive(PrimitiveType::I128),
+            SignatureToken::I256 => Type::Primitive(PrimitiveType::I256),
             SignatureToken::Address => Type::Primitive(PrimitiveType::Address),
             SignatureToken::Signer => Type::Primitive(PrimitiveType::Signer),
             SignatureToken::Reference(t) => Type::Reference(
@@ -1810,7 +1951,7 @@ pub trait UnificationContext: AbilityContext {
     ) -> Option<ReceiverFunctionInstance>;
 
     /// Returns a type display context.
-    fn type_display_context(&self) -> TypeDisplayContext;
+    fn type_display_context(&self) -> TypeDisplayContext<'_>;
 }
 
 /// Information returned about an instantiated function
@@ -1867,7 +2008,7 @@ impl UnificationContext for NoUnificationContext {
         None
     }
 
-    fn type_display_context(&self) -> TypeDisplayContext {
+    fn type_display_context(&self) -> TypeDisplayContext<'_> {
         unimplemented!("NoUnificationContext does not support type display")
     }
 }
@@ -3455,6 +3596,8 @@ pub struct TypeDisplayContext<'a> {
     pub used_modules: BTreeSet<ModuleId>,
     /// Whether to use `m::T` for representing types, for stable output in docgen
     pub use_module_qualification: bool,
+    /// Whether to display module addresses in types, to accommodate special cases
+    pub display_module_addr: bool,
     /// Var types that are recursive and should appear as `..` in display
     pub recursive_vars: Option<BTreeSet<u32>>,
 }
@@ -3470,6 +3613,7 @@ impl<'a> TypeDisplayContext<'a> {
             display_type_vars: false,
             used_modules: BTreeSet::new(),
             use_module_qualification: false,
+            display_module_addr: false,
             recursive_vars: None,
         }
     }
@@ -3494,6 +3638,7 @@ impl<'a> TypeDisplayContext<'a> {
             display_type_vars: false,
             used_modules: BTreeSet::new(),
             use_module_qualification: false,
+            display_module_addr: false,
             recursive_vars: None,
         }
     }
@@ -3516,6 +3661,66 @@ impl<'a> TypeDisplayContext<'a> {
             },
             ..self.clone()
         }
+    }
+
+    /// Check if the given module has the same address as the current module
+    pub fn is_current_addr(&self, module_address: &Address) -> bool {
+        self.module_name
+            .as_ref()
+            .is_some_and(|ctx_module| ctx_module.addr() == module_address)
+    }
+
+    /// Check if the given module has the same string identifier as the current module
+    pub fn is_current_name(&self, module_name: &str) -> bool {
+        self.module_name.as_ref().is_some_and(|ctx_module| {
+            ctx_module
+                .name()
+                .display(self.env.symbol_pool())
+                .to_string()
+                == *module_name
+        })
+    }
+
+    /// Check if the given module is the current module
+    pub fn is_current_module(&self, module_name: &ModuleName) -> bool {
+        self.module_name.as_ref() == Some(module_name)
+    }
+
+    /// Check if the given module is used by the current module
+    pub fn is_imported_module(&self, module_id: &ModuleId) -> bool {
+        self.used_modules.contains(module_id) || {
+            // `used_modules` may not have been propagated yet, so let's check `use_decls` as a backup.
+            let imported_module_env = self.env.get_module(*module_id);
+            self.module_name.as_ref().is_some_and(|ctx_module| {
+                self.env.find_module(ctx_module).is_some_and(|m| {
+                    m.get_use_decls()
+                        .iter()
+                        .any(|use_| use_.module_name == *imported_module_env.get_name())
+                })
+            })
+        }
+    }
+
+    /// Check if the given name clashes with a type parameter
+    pub fn clash_with_ty_params(&self, name: Symbol) -> bool {
+        self.type_param_names
+            .as_ref()
+            .map(|tparams| tparams.contains(&name))
+            .unwrap_or(false)
+    }
+
+    /// Get an optional alias for the given module
+    pub fn get_alias(&self, module_name: &ModuleName) -> Option<Symbol> {
+        self.module_name
+            .as_ref()
+            .and_then(|ctx_module| self.env.find_module(ctx_module))
+            .and_then(|module| {
+                module
+                    .get_use_decls()
+                    .iter()
+                    .find(|use_| use_.module_name == *module_name)
+                    .and_then(|use_| use_.alias)
+            })
     }
 }
 
@@ -3570,7 +3775,14 @@ impl fmt::Display for TypeDisplay<'_> {
             Fun(a, t, abilities) => {
                 f.write_str("|")?;
                 if !a.is_unit() {
-                    write!(f, "{}", a.display(self.context))?;
+                    let mut arg_str = a.display(self.context).to_string();
+                    // Function value args cannot be displayed as a tuple
+                    arg_str = arg_str
+                        .strip_prefix('(')
+                        .and_then(|s| s.strip_suffix(')'))
+                        .unwrap_or(&arg_str)
+                        .to_string();
+                    write!(f, "{}", arg_str)?;
                 }
                 f.write_str("|")?;
                 if !t.is_unit() {
@@ -3659,42 +3871,69 @@ impl TypeDisplay<'_> {
     #[allow(clippy::assigning_clones)]
     fn struct_str(&self, mid: ModuleId, sid: StructId) -> String {
         let env = self.context.env;
-        let mut str = if let Some(builder_table) = self.context.builder_struct_table {
-            let qsym = builder_table.get(&(mid, sid)).expect("type known");
-            qsym.display(self.context.env).to_string()
-        } else {
-            let struct_env = env.get_module(mid).into_struct(sid);
-            let module_name = struct_env.module_env.get_name();
-            let module_str = if self.context.use_module_qualification
-                || self.context.used_modules.contains(&mid)
-                || Some(module_name) == self.context.module_name.as_ref()
-            {
-                module_name.display(env).to_string()
+        // Get the struct ModuleName and struct name
+        let (ty_available, struct_module_name, struct_symbol) =
+            if let Some(builder_table) = self.context.builder_struct_table {
+                let qsym = builder_table.get(&(mid, sid)).expect("type known");
+                (false, qsym.module_name.clone(), qsym.symbol)
             } else {
-                module_name.display_full(env).to_string()
+                let module_env = env.get_module(mid);
+                (
+                    true,
+                    module_env.get_name().clone(),
+                    module_env.into_struct(sid).get_name(),
+                )
             };
-            format!(
-                "{}::{}",
-                module_str,
-                struct_env.get_name().display(env.symbol_pool())
-            )
-        };
-        if !self.context.use_module_qualification {
-            if let Some(mname) = &self.context.module_name {
-                let s = format!("{}::", mname.name().display(self.context.env.symbol_pool()));
-                if let Some(shortcut) = str.strip_prefix(&s) {
-                    if let Some(tparams) = &self.context.type_param_names {
-                        // Avoid name clash with type parameter
-                        if !tparams.contains(&self.context.env.symbol_pool().make(shortcut)) {
-                            str = shortcut.to_owned()
-                        }
-                    } else {
-                        str = shortcut.to_owned();
-                    }
-                }
+
+        let struct_module_addr = struct_module_name.addr().expect_numerical();
+        let struct_module_idstr = struct_module_name
+            .name()
+            .display(env.symbol_pool())
+            .to_string();
+        let struct_name = struct_symbol.display(env.symbol_pool()).to_string();
+
+        // If we are not able to get the type info, OR
+        // the type is not inside or the host module is not imported into the current module,
+        // let's do pattern matching!
+        if !ty_available
+            || (!self.context.is_current_module(&struct_module_name)
+                && !self.context.is_imported_module(&mid))
+        {
+            let mut result = String::new();
+            let show_addr = !self.context.is_current_addr(struct_module_name.addr());
+            let show_mod = show_addr
+                || !self.context.is_current_name(&struct_module_idstr)
+                || self.context.clash_with_ty_params(struct_symbol)
+                || self.context.use_module_qualification;
+
+            if show_addr {
+                result.push_str(&format!("0x{}::", struct_module_addr.short_str_lossless()));
             }
+            if show_mod {
+                result.push_str(&format!("{}::", struct_module_idstr));
+            }
+            result.push_str(&struct_name);
+            return result;
         }
-        str
+
+        // If there's a module alias, use it
+        if let Some(alias) = self.context.get_alias(&struct_module_name) {
+            return format!("{}::{}", alias.display(env.symbol_pool()), struct_name);
+        }
+
+        // No alias, but the struct is inside or imported into the current module
+        let mut result = String::new();
+        if self.context.display_module_addr {
+            result.push_str(&format!("0x{}::", struct_module_addr.short_str_lossless()));
+        }
+        if self.context.use_module_qualification
+            || !self.context.is_current_module(&struct_module_name)
+            || self.context.clash_with_ty_params(struct_symbol)
+        {
+            result.push_str(&format!("{}::", struct_module_idstr));
+        }
+        result.push_str(&struct_name);
+        result
     }
 }
 
@@ -3709,6 +3948,12 @@ impl fmt::Display for PrimitiveType {
             U64 => f.write_str("u64"),
             U128 => f.write_str("u128"),
             U256 => f.write_str("u256"),
+            I8 => f.write_str("i8"),
+            I16 => f.write_str("i16"),
+            I32 => f.write_str("i32"),
+            I64 => f.write_str("i64"),
+            I128 => f.write_str("i128"),
+            I256 => f.write_str("i256"),
             Address => f.write_str("address"),
             Signer => f.write_str("signer"),
             Range => f.write_str("range"),
@@ -3723,7 +3968,7 @@ pub trait AbilityInference: AbilityContext {
     /// Infers the abilities of the type. The returned boolean indicates whether
     /// the type is a phantom type parameter,
     fn infer_abilities(&self, ty: &Type) -> (bool, AbilitySet) {
-        let res = match ty {
+        match ty {
             Type::Primitive(p) => match p {
                 PrimitiveType::Bool
                 | PrimitiveType::U8
@@ -3732,6 +3977,12 @@ pub trait AbilityInference: AbilityContext {
                 | PrimitiveType::U64
                 | PrimitiveType::U128
                 | PrimitiveType::U256
+                | PrimitiveType::I8
+                | PrimitiveType::I16
+                | PrimitiveType::I32
+                | PrimitiveType::I64
+                | PrimitiveType::I128
+                | PrimitiveType::I256
                 | PrimitiveType::Num
                 | PrimitiveType::Range
                 | PrimitiveType::EventStore
@@ -3763,8 +4014,7 @@ pub trait AbilityInference: AbilityContext {
             Type::TypeDomain(_) | Type::ResourceDomain(_, _, _) | Type::Error => {
                 (false, AbilitySet::EMPTY)
             },
-        };
-        res
+        }
     }
 
     fn infer_struct_abilities(&self, qid: QualifiedId<StructId>, ty_args: &[Type]) -> AbilitySet {

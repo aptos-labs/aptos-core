@@ -1,0 +1,61 @@
+//**** Cross-compiled for `move` syntax from `tests/operator_eval/op_with_side_effect_32.move`
+
+//# publish
+module 0xc0ffee::m {
+    fun add3(p0: u64, p1: u64, p2: u64): u64 {
+        p0 + p1 + p2
+    }
+    fun inc(p0: &mut u64): u64 {
+        *p0 = *p0 + 1;
+        *p0
+    }
+    fun inc_by(p0: &mut u64, p1: u64): u64 {
+        *p0 = *p0 + p1;
+        *p0
+    }
+    public fun test1(): u64 {
+        let _v0 = 1;
+        let _v1 = _v0;
+        let _v2 = _v0;
+        _v0 = inc(&mut _v0);
+        let _v3 = _v0;
+        _v0 = _v0 + 1;
+        let _v4 = _v0;
+        _v0 = _v0 + 1;
+        let _v5 = add3(_v3, _v4, _v0);
+        _v0 = inc(&mut _v0) + 1;
+        let _v6 = _v0;
+        let _v7 = _v0;
+        _v0 = _v0 + 1;
+        let _v8 = add3(_v6, _v7, _v0);
+        let _v9 = add3(_v2, _v5, _v8);
+        let _v10 = _v1 + _v9;
+        let _v11 = inc(&mut _v0) + 1;
+        _v10 + _v11
+    }
+    public fun test2(): u64 {
+        let _v0 = 1;
+        let _v1 = _v0;
+        let _v2 = _v0;
+        _v0 = inc_by(&mut _v0, 3);
+        let _v3 = _v0;
+        _v0 = _v0 + 1;
+        let _v4 = _v0;
+        _v0 = _v0 + 1;
+        let _v5 = add3(_v3, _v4, _v0);
+        _v0 = inc(&mut _v0) + 1;
+        let _v6 = _v0;
+        let _v7 = _v0;
+        _v0 = _v0 + 1;
+        let _v8 = add3(_v6, _v7, _v0);
+        let _v9 = add3(_v2, _v5, _v8);
+        let _v10 = _v1 + _v9;
+        let _v11 = inc_by(&mut _v0, 47) + 1;
+        _v10 + _v11
+    }
+}
+
+
+//# run 0xc0ffee::m::test1
+
+//# run 0xc0ffee::m::test2

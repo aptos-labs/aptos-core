@@ -12,8 +12,8 @@ use crate::{
     function::{ClosureVisitor, MoveClosure},
     ident_str,
     identifier::Identifier,
+    int256,
     language_storage::{ModuleId, StructTag, TypeTag},
-    u256,
 };
 use anyhow::{anyhow, bail, Result as AResult};
 use once_cell::sync::Lazy;
@@ -133,9 +133,16 @@ pub enum MoveValue {
     // NOTE: Added in bytecode version v6, do not reorder!
     U16(u16),
     U32(u32),
-    U256(u256::U256),
+    U256(int256::U256),
     // Added in bytecode version v8
     Closure(Box<MoveClosure>),
+    // Added in bytecode version v9
+    I8(i8),
+    I16(i16),
+    I32(i32),
+    I64(i64),
+    I128(i128),
+    I256(int256::I256),
 }
 
 /// A layout associated with a named field
@@ -268,28 +275,19 @@ pub enum MoveTypeLayout {
     // Added in bytecode version v8
     #[serde(rename(serialize = "fun", deserialize = "fun"))]
     Function,
-}
-
-impl MoveTypeLayout {
-    /// Determines whether the layout is serialization compatible with the other layout
-    /// (that is, any value serialized with this layout can be deserialized by the other).
-    pub fn is_compatible_with(&self, other: &Self) -> bool {
-        use MoveTypeLayout::*;
-        match (self, other) {
-            (Vector(t1), Vector(t2)) => t1.is_compatible_with(t2),
-            (Struct(s1), Struct(s2)) => s1.is_compatible_with(s2),
-            // For all other cases, equality is used
-            (t1, t2) => t1 == t2,
-        }
-    }
-
-    pub fn is_compatible_with_slice(this: &[Self], other: &[Self]) -> bool {
-        this.len() == other.len()
-            && this
-                .iter()
-                .zip(other)
-                .all(|(t1, t2)| t1.is_compatible_with(t2))
-    }
+    // Added in bytecode version v9
+    #[serde(rename(serialize = "i8", deserialize = "i8"))]
+    I8,
+    #[serde(rename(serialize = "i16", deserialize = "i16"))]
+    I16,
+    #[serde(rename(serialize = "i32", deserialize = "i32"))]
+    I32,
+    #[serde(rename(serialize = "i64", deserialize = "i64"))]
+    I64,
+    #[serde(rename(serialize = "i128", deserialize = "i128"))]
+    I128,
+    #[serde(rename(serialize = "i256", deserialize = "i256"))]
+    I256,
 }
 
 impl MoveValue {
@@ -510,31 +508,6 @@ impl MoveStructLayout {
         Self::WithVariants(variants)
     }
 
-    /// Determines whether the layout is serialization compatible with the other layout
-    /// (that is, any value serialized with this layout can be deserialized by the other).
-    /// This only will consider runtime variants, decorated variants are only compatible
-    /// if equal.
-    pub fn is_compatible_with(&self, other: &Self) -> bool {
-        use MoveStructLayout::*;
-        match (self, other) {
-            (RuntimeVariants(variants1), RuntimeVariants(variants2)) => {
-                variants1.len() <= variants2.len()
-                    && variants1.iter().zip(variants2).all(|(fields1, fields2)| {
-                        MoveTypeLayout::is_compatible_with_slice(fields1, fields2)
-                    })
-            },
-            (Runtime(fields1), Runtime(fields2)) => {
-                fields1.len() == fields2.len()
-                    && fields1
-                        .iter()
-                        .zip(fields2)
-                        .all(|(t1, t2)| t1.is_compatible_with(t2))
-            },
-            // All other cases require equality
-            (s1, s2) => s1 == s2,
-        }
-    }
-
     pub fn fields(&self, variant: Option<usize>) -> &[MoveTypeLayout] {
         match self {
             Self::Runtime(vals) => vals,
@@ -606,7 +579,13 @@ impl<'d> serde::de::DeserializeSeed<'d> for &MoveTypeLayout {
             MoveTypeLayout::U32 => u32::deserialize(deserializer).map(MoveValue::U32),
             MoveTypeLayout::U64 => u64::deserialize(deserializer).map(MoveValue::U64),
             MoveTypeLayout::U128 => u128::deserialize(deserializer).map(MoveValue::U128),
-            MoveTypeLayout::U256 => u256::U256::deserialize(deserializer).map(MoveValue::U256),
+            MoveTypeLayout::U256 => int256::U256::deserialize(deserializer).map(MoveValue::U256),
+            MoveTypeLayout::I8 => i8::deserialize(deserializer).map(MoveValue::I8),
+            MoveTypeLayout::I16 => i16::deserialize(deserializer).map(MoveValue::I16),
+            MoveTypeLayout::I32 => i32::deserialize(deserializer).map(MoveValue::I32),
+            MoveTypeLayout::I64 => i64::deserialize(deserializer).map(MoveValue::I64),
+            MoveTypeLayout::I128 => i128::deserialize(deserializer).map(MoveValue::I128),
+            MoveTypeLayout::I256 => int256::I256::deserialize(deserializer).map(MoveValue::I256),
             MoveTypeLayout::Address => {
                 AccountAddress::deserialize(deserializer).map(MoveValue::Address)
             },
@@ -819,6 +798,12 @@ impl serde::Serialize for MoveValue {
             MoveValue::U64(i) => serializer.serialize_u64(*i),
             MoveValue::U128(i) => serializer.serialize_u128(*i),
             MoveValue::U256(i) => i.serialize(serializer),
+            MoveValue::I8(i) => serializer.serialize_i8(*i),
+            MoveValue::I16(i) => serializer.serialize_i16(*i),
+            MoveValue::I32(i) => serializer.serialize_i32(*i),
+            MoveValue::I64(i) => serializer.serialize_i64(*i),
+            MoveValue::I128(i) => serializer.serialize_i128(*i),
+            MoveValue::I256(i) => i.serialize(serializer),
             MoveValue::Address(a) => a.serialize(serializer),
             MoveValue::Signer(a) => {
                 // Runtime representation of signer looks following:
@@ -938,6 +923,12 @@ impl fmt::Display for MoveTypeLayout {
             U64 => write!(f, "u64"),
             U128 => write!(f, "u128"),
             U256 => write!(f, "u256"),
+            I8 => write!(f, "i8"),
+            I16 => write!(f, "i16"),
+            I32 => write!(f, "i32"),
+            I64 => write!(f, "i64"),
+            I128 => write!(f, "i128"),
+            I256 => write!(f, "i256"),
             Address => write!(f, "address"),
             Vector(typ) => write!(f, "vector<{}>", typ),
             Struct(s) => fmt::Display::fmt(s, f),
@@ -1006,6 +997,12 @@ impl TryInto<TypeTag> for &MoveTypeLayout {
             MoveTypeLayout::U64 => TypeTag::U64,
             MoveTypeLayout::U128 => TypeTag::U128,
             MoveTypeLayout::U256 => TypeTag::U256,
+            MoveTypeLayout::I8 => TypeTag::I8,
+            MoveTypeLayout::I16 => TypeTag::I16,
+            MoveTypeLayout::I32 => TypeTag::I32,
+            MoveTypeLayout::I64 => TypeTag::I64,
+            MoveTypeLayout::I128 => TypeTag::I128,
+            MoveTypeLayout::I256 => TypeTag::I256,
             MoveTypeLayout::Signer => TypeTag::Signer,
             MoveTypeLayout::Vector(v) => TypeTag::Vector(Box::new(v.as_ref().try_into()?)),
             MoveTypeLayout::Struct(v) => TypeTag::Struct(Box::new(v.try_into()?)),

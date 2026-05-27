@@ -55,6 +55,8 @@ fn run_test_with_modifiers(
                     None,
                     buffer,
                     UnitTestFactoryWithCostTable::new(None, None),
+                    false,
+                    unit_test_config.fail_fast,
                 )?,
                 modified_exp_path,
             ))
@@ -75,6 +77,8 @@ fn run_test_with_modifiers(
             None,
             buffer,
             UnitTestFactoryWithCostTable::new(None, None),
+            false,
+            unit_test_config.fail_fast,
         )?,
         path.with_extension(exp_ext),
     ));
@@ -83,8 +87,9 @@ fn run_test_with_modifiers(
 }
 
 // Runs all tests under the test/test_sources directory.
-fn run_test_impl(path: &Path) -> anyhow::Result<()> {
-    std::env::set_var("NO_COLOR", "1");
+fn run_test_impl(path: &Path, fail_fast: bool) -> anyhow::Result<()> {
+    // TODO: Audit that the environment access only happens in single-threaded code.
+    unsafe { std::env::set_var("NO_COLOR", "1") };
     let update_baseline = read_env_update_baseline();
     let source_files = vec![path.to_str().unwrap().to_owned()];
     let unit_test_config = UnitTestingConfig {
@@ -95,7 +100,7 @@ fn run_test_impl(path: &Path) -> anyhow::Result<()> {
             .into_iter()
             .collect(),
         verbose: true,
-        report_stacktrace_on_abort: true,
+        fail_fast,
 
         ..UnitTestingConfig::default()
     };
@@ -134,8 +139,36 @@ fn run_test_impl(path: &Path) -> anyhow::Result<()> {
 }
 
 fn run_test(path: &Path) -> datatest_stable::Result<()> {
-    run_test_impl(path)?;
+    run_test_impl(path, false)?;
     Ok(())
 }
 
-datatest_stable::harness!(run_test, "tests/test_sources", r".*\.move$");
+fn fail_fast(path: &Path) -> datatest_stable::Result<()> {
+    run_test_impl(path, true)?;
+    Ok(())
+}
+
+fn fail_fast_unexpected(path: &Path) -> datatest_stable::Result<()> {
+    run_test_impl(path, true)?;
+    Ok(())
+}
+
+fn no_fail_fast(path: &Path) -> datatest_stable::Result<()> {
+    run_test_impl(path, false)?;
+    Ok(())
+}
+
+datatest_stable::harness!(
+    run_test,
+    "tests/test_sources",
+    r".*\.move$",
+    fail_fast,
+    "tests/fail_fast",
+    r"unittest-fast\.move$",
+    no_fail_fast,
+    "tests/fail_fast",
+    r"unittest\.move$",
+    fail_fast_unexpected,
+    "tests/fail_fast",
+    r"unittest-fast-unexpected-success\.move$",
+);

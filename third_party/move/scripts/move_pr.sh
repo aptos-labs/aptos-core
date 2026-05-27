@@ -98,6 +98,7 @@ MOVE_CRATES="\
   -p move-vm-runtime\
   -p move-vm-types\
   -p move-ast-generator-tests\
+  -p move-asm\
 "
 
 # This is a list of crates for integration testing.
@@ -105,7 +106,9 @@ MOVE_CRATES_INTEGRATION_TEST="\
   -p aptos-transactional-test-harness \
   -p bytecode-verifier-tests \
   -p bytecode-verifier-transactional-tests \
+  -p move-asm \
   -p move-cli \
+  -p move-decompiler \
   -p move-model \
   -p move-package \
   -p move-prover-bytecode-pipeline \

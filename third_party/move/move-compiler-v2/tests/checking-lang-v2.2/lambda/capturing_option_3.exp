@@ -1,0 +1,44 @@
+
+Diagnostics:
+warning: capturing option values is currently not supported
+   ┌─ tests/checking-lang-v2.2/lambda/capturing_option_3.move:12:67
+   │
+12 │         let _f: ||option::Option<u64> has copy+drop+store = || id(v);
+   │                                                                   ^
+
+// -- Model dump before first bytecode pipeline
+module 0x99::m {
+    use std::option;
+    use std::vector;
+    struct FunctionStore {
+        f: ||0x1::option::Option<u64> has copy + drop + store,
+    }
+    private entry fun entry_func() {
+        {
+          let v: vector<0x1::option::Option<u64>> = vector::empty<0x1::option::Option<u64>>();
+          {
+            let _f: ||0x1::option::Option<u64> has copy + drop + store = closure#1m::id(v);
+            Tuple()
+          }
+        }
+    }
+    public fun id(_x: vector<0x1::option::Option<u64>>): 0x1::option::Option<u64> {
+        option::none<u64>()
+    }
+} // end 0x99::m
+
+// -- Sourcified model before first bytecode pipeline
+module 0x99::m {
+    use std::option;
+    use std::vector;
+    struct FunctionStore has key {
+        f: ||0x1::option::Option<u64> has copy + drop + store,
+    }
+    entry fun entry_func() {
+        let v = 0x1::vector::empty<0x1::option::Option<u64>>();
+        let _f: ||0x1::option::Option<u64> has copy + drop + store = || id(v);
+    }
+    public fun id(_x: vector<0x1::option::Option<u64>>): 0x1::option::Option<u64> {
+        0x1::option::none<u64>()
+    }
+}

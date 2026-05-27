@@ -1,0 +1,26 @@
+//# publish --print-bytecode
+module 0x66::test
+
+struct S has drop
+  _1: u64
+  _2: u8
+
+fun pack_and_select(): u8
+    ld_u64 3
+    ld_u8 2
+    pack S
+    call select
+    ret
+
+fun select(x: S): u8
+    borrow_loc x
+    borrow_field S, _2
+    read_ref
+    ret
+
+fun pack_and_unpack(): (u64, u8)
+    ld_u64 3
+    ld_u8 2
+    pack S
+    unpack S
+    ret

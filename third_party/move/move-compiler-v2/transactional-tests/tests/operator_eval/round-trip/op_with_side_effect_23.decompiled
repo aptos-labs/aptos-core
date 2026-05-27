@@ -1,0 +1,11 @@
+//**** Cross-compiled for `move` syntax from `tests/operator_eval/op_with_side_effect_23.move`
+
+//# publish
+module 0xc0ffee::m {
+    public fun test(): u64 {
+        abort 0
+    }
+}
+
+
+//# run 0xc0ffee::m::test

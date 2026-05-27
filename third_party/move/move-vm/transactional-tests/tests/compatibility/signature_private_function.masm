@@ -1,0 +1,18 @@
+//# publish
+module 0x66::a
+fun foo()
+    ret
+
+fun bar(x: u64): u64
+    ld_u64 10
+    ret
+
+//# publish
+module 0x66::a
+fun foo(y: u32): bool
+    ld_true
+    ret
+
+fun bar(): u32
+    ld_u32 20
+    ret

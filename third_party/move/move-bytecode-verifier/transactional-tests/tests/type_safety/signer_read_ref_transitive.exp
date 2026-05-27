@@ -1,6 +1,5 @@
 processed 2 tasks
-
-task 0 'publish'. lines 1-11:
+task 0 lines 1-11:  publish [module 0x42.M {]
 Error: Unable to publish module '0000000000000000000000000000000000000000000000000000000000000042::M'. Got VMError: {
     major_status: READREF_WITHOUT_COPY_ABILITY,
     sub_status: None,
@@ -8,8 +7,7 @@ Error: Unable to publish module '00000000000000000000000000000000000000000000000
     indices: [(FunctionDefinition, 0)],
     offsets: [(FunctionDefinitionIndex(0), 4)],
 }
-
-task 1 'publish'. lines 13-23:
+task 1 lines 13-23:  publish [module 0x42.M {]
 Error: Unable to publish module '0000000000000000000000000000000000000000000000000000000000000042::M'. Got VMError: {
     major_status: READREF_WITHOUT_COPY_ABILITY,
     sub_status: None,

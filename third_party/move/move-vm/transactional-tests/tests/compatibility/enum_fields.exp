@@ -1,0 +1,44 @@
+processed 6 tasks
+task 0 lines 1-6:  publish [module 0x66::a]
+task 1 lines 9-14:  publish [module 0x66::a]
+Error: Unable to publish module '0000000000000000000000000000000000000000000000000000000000000066::a'. Got VMError: {
+    major_status: BACKWARD_INCOMPATIBLE_MODULE_UPDATE,
+    sub_status: None,
+    location: undefined,
+    indices: [],
+    offsets: [],
+}
+task 2 lines 17-22:  publish [module 0x66::a]
+Error: Unable to publish module '0000000000000000000000000000000000000000000000000000000000000066::a'. Got VMError: {
+    major_status: BACKWARD_INCOMPATIBLE_MODULE_UPDATE,
+    sub_status: None,
+    location: undefined,
+    indices: [],
+    offsets: [],
+}
+task 3 lines 25-32:  publish [module 0x66::a]
+Error: Unable to publish module '0000000000000000000000000000000000000000000000000000000000000066::a'. Got VMError: {
+    major_status: BACKWARD_INCOMPATIBLE_MODULE_UPDATE,
+    sub_status: None,
+    location: undefined,
+    indices: [],
+    offsets: [],
+}
+task 4 lines 35-41:  publish [module 0x66::a]
+Error: error: expected `:`, found `<newline>`
+   ┌─ test:38:7
+   │  
+38 │       V0
+   │ ╭──────^
+39 │ │         // Cannot change field name, publish fails
+   │ ╰^
+
+
+task 5 lines 43-49:  publish [module 0x66::a]
+Error: Unable to publish module '0000000000000000000000000000000000000000000000000000000000000066::a'. Got VMError: {
+    major_status: BACKWARD_INCOMPATIBLE_MODULE_UPDATE,
+    sub_status: None,
+    location: undefined,
+    indices: [],
+    offsets: [],
+}

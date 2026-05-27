@@ -41,9 +41,7 @@ fn test_runner(path: &Path, options: ModelBuilderOptions) -> datatest_stable::Re
 }
 
 fn runner(path: &Path) -> datatest_stable::Result<()> {
-    test_runner(path, ModelBuilderOptions {
-        ..Default::default()
-    })
+    test_runner(path, ModelBuilderOptions::default())
 }
 
 datatest_stable::harness!(runner, "tests/sources", r".*\.move$");

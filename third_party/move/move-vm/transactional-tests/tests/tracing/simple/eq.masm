@@ -1,0 +1,10 @@
+//# publish
+module 0x22::test
+
+public fun eq_instr(): bool
+    ld_u64 23
+    ld_u64 23
+    eq
+    ret
+
+//# run --verbose 0x22::test::eq_instr --display-trace

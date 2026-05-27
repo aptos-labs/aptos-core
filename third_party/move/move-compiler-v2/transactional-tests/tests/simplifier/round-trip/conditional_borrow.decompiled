@@ -1,0 +1,76 @@
+//**** Cross-compiled for `move` syntax from `tests/simplifier/conditional_borrow.move`
+
+//# publish
+module 0x8675::M {
+    struct S has copy, drop {
+        f: u64,
+    }
+    public fun test(): u64 {
+        let _v0 = test1(7);
+        let _v1 = test1(2);
+        _v0 + _v1
+    }
+    fun test1(p0: u64): u64 {
+        let _v0;
+        if (p0 < 4) _v0 = p0 else _v0 = 3;
+        let _v1 = &mut _v0;
+        *_v1 = 10;
+        let _v2 = p0;
+        _v1 = &mut _v2;
+        *_v1 = *_v1 + 1;
+        let _v3 = _v2;
+        let _v4 = _v3 + 0;
+        _v1 = &mut _v4;
+        *_v1 = *_v1 + 2;
+        let _v5 = _v3;
+        _v1 = &mut _v5;
+        *_v1 = *_v1 + 4;
+        let _v6 = _v3;
+        _v1 = &mut _v6;
+        *_v1 = *_v1 + 8;
+        let _v7 = _v3;
+        _v1 = &mut _v7;
+        *_v1 = *_v1 + 16;
+        _v3
+    }
+    fun test1b(p0: S): u64 {
+        let _v0;
+        let _v1 = S{f: 3};
+        if (*&(&p0).f < 4) _v0 = p0 else _v0 = _v1;
+        let _v2 = &mut _v0;
+        let _v3 = *_v2;
+        let _v4 = &mut (&mut _v3).f;
+        *_v4 = 10;
+        let _v5 = p0;
+        _v2 = &mut _v5;
+        let _v6 = *_v2;
+        let _v7 = *&(&_v6).f + 1;
+        let _v8 = *_v2;
+        let _v9 = &mut (&mut _v8).f;
+        *_v9 = _v7;
+        let _v10 = _v5;
+        let _v11 = &mut (&mut _v10).f;
+        *_v11 = *_v11 + 1;
+        let _v12 = _v10;
+        let _v13 = *&(&_v12).f;
+        _v11 = &mut _v13;
+        *_v11 = *_v11 + 1;
+        let _v14 = *&(&_v12).f;
+        _v11 = &mut _v14;
+        *_v11 = *_v11 + 8;
+        let _v15 = *&(&_v12).f;
+        _v11 = &mut _v15;
+        *_v11 = *_v11 + 16;
+        *&(&_v12).f
+    }
+    public fun testb(): u64 {
+        let _v0 = test1b(S{f: 7});
+        let _v1 = test1b(S{f: 2});
+        _v0 + _v1
+    }
+}
+
+
+//# run 0x8675::M::test
+
+//# run 0x8675::M::testb

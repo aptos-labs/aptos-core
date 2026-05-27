@@ -6,7 +6,7 @@ use crate::{
     native_functions::{NativeFunction, NativeFunctions},
     storage::{
         ty_tag_converter::{TypeTagCache, TypeTagConverter},
-        verified_module_cache::VERIFIED_MODULES_V2,
+        verified_module_cache::VERIFIED_MODULES_CACHE,
     },
     Module, Script,
 };
@@ -22,17 +22,24 @@ use move_bytecode_verifier::dependencies;
 use move_core_types::{
     account_address::AccountAddress,
     identifier::{IdentStr, Identifier},
-    language_storage::{ModuleId, TypeTag},
+    language_storage::{ModuleId, TypeTag, MEM_MODULE_ID, OPTION_MODULE_ID},
     vm_status::{sub_status::unknown_invariant_violation::EPARANOID_FAILURE, StatusCode},
 };
-use move_vm_metrics::{Timer, VM_TIMER};
+use move_vm_metrics::{Timer, VERIFIED_MODULE_CACHE_SIZE, VM_TIMER};
 #[cfg(any(test, feature = "testing"))]
 use move_vm_types::loaded_data::{
     runtime_types::StructIdentifier, struct_name_indexing::StructNameIndex,
 };
-use move_vm_types::loaded_data::{runtime_types::Type, struct_name_indexing::StructNameIndexMap};
+use move_vm_types::{
+    loaded_data::{runtime_types::Type, struct_name_indexing::StructNameIndexMap},
+    module_id_interner::InternedModuleIdPool,
+    ty_interner::InternedTypePool,
+};
 use sha3::{Digest, Sha3_256};
 use std::sync::Arc;
+
+const OPTION_MODULE_BYTES: &[u8] = include_bytes!("option.mv");
+const MEM_MODULE_BYTES: &[u8] = include_bytes!("mem.mv");
 
 /// [MoveVM] runtime environment encapsulating different configurations. Shared between the VM and
 /// the code cache, possibly across multiple threads.
@@ -62,17 +69,23 @@ pub struct RuntimeEnvironment {
 
     /// SHA3-256 digest of the BCS-serialized [VerifierConfig] from `vm_config`. Precomputed at
     /// construction time so it can be combined with the module hash to form the
-    /// [VERIFIED_MODULES_V2] cache key without re-hashing the config on every lookup.
+    /// [VERIFIED_MODULES_CACHE] cache key without re-hashing the config on every lookup.
     ///
     /// Why this exists: the verified-module cache is a process-global LRU shared across all
     /// runtime environments. Without a per-config component in the key, two threads using
     /// different verifier configurations (e.g. straddling an epoch boundary where the config
-    /// changed) would treat each other's cached entries as their own — a module accepted under
+    /// changed) would treat each other's cached entries as their own. A module accepted under
     /// a more permissive config could be skipped under a stricter one.
-    /// 
-    /// Invariant: must stay in line with `vm_config.verifier_config`. Any mutation of `vm_config.verifier_config` must
-    /// recompute this digest.
+    ///
+    /// Invariant: must stay in line with `vm_config.verifier_config`. Any mutation of
+    /// `vm_config.verifier_config` must recompute this digest.
     verifier_config_digest: [u8; 32],
+
+    /// Pool of interned type representations. Same lifetime as struct index map.
+    interned_ty_pool: Arc<InternedTypePool>,
+
+    /// Pool of interned module ids.
+    interned_module_id_pool: Arc<InternedModuleIdPool>,
 }
 
 impl RuntimeEnvironment {
@@ -81,9 +94,20 @@ impl RuntimeEnvironment {
     pub fn new(
         natives: impl IntoIterator<Item = (AccountAddress, Identifier, Identifier, NativeFunction)>,
     ) -> Self {
+        Self::new_for_move_third_party_tests(natives, true, true)
+    }
+
+    /// API to control the enum option feature flag depending on whether the caller is from aptos or not
+    pub fn new_for_move_third_party_tests(
+        natives: impl IntoIterator<Item = (AccountAddress, Identifier, Identifier, NativeFunction)>,
+        enable_enum_option: bool,
+        enable_framework_for_option: bool,
+    ) -> Self {
         let vm_config = VMConfig {
             // Keep the paranoid mode on as we most likely want this for tests.
             paranoid_type_checks: true,
+            enable_enum_option,
+            enable_framework_for_option,
             ..VMConfig::default()
         };
         Self::new_with_config(natives, vm_config)
@@ -104,12 +128,23 @@ impl RuntimeEnvironment {
             struct_name_index_map: Arc::new(StructNameIndexMap::empty()),
             ty_tag_cache: Arc::new(TypeTagCache::empty()),
             verifier_config_digest,
+            interned_ty_pool: Arc::new(InternedTypePool::new()),
+            interned_module_id_pool: Arc::new(InternedModuleIdPool::new()),
         }
     }
 
     /// Returns the config currently used by this runtime environment.
     pub fn vm_config(&self) -> &VMConfig {
         &self.vm_config
+    }
+
+    /// Returns the type pool for interning that is currently used by this runtime environment.
+    pub fn ty_pool(&self) -> &InternedTypePool {
+        &self.interned_ty_pool
+    }
+
+    pub fn module_id_pool(&self) -> &InternedModuleIdPool {
+        &self.interned_module_id_pool
     }
 
     /// Enables delayed field optimization for this environment.
@@ -142,13 +177,19 @@ impl RuntimeEnvironment {
         immediate_dependencies: &[Arc<Module>],
     ) -> VMResult<Script> {
         dependencies::verify_script(
+            &self.vm_config.verifier_config,
             locally_verified_script.0.as_ref(),
             immediate_dependencies
                 .iter()
                 .map(|module| module.as_ref().as_ref()),
         )?;
-        Script::new(locally_verified_script.0, self.struct_name_index_map())
-            .map_err(|err| err.finish(Location::Script))
+        Script::new(
+            locally_verified_script.0,
+            self.struct_name_index_map(),
+            self.ty_pool(),
+            self.module_id_pool(),
+        )
+        .map_err(|err| err.finish(Location::Script))
     }
 
     /// Creates a locally verified compiled module by running:
@@ -160,10 +201,9 @@ impl RuntimeEnvironment {
         module_size: usize,
         module_hash: &[u8; 32],
     ) -> VMResult<LocallyVerifiedModule> {
-        if !VERIFIED_MODULES_V2.contains(module_hash, &self.verifier_config_digest) {
-            let _timer = VM_TIMER.timer_with_label(
-                "LoaderV2::build_locally_verified_module [verification cache miss]",
-            );
+        if !VERIFIED_MODULES_CACHE.contains(module_hash, &self.verifier_config_digest) {
+            let _timer =
+                VM_TIMER.timer_with_label("move_bytecode_verifier::verify_module_with_config");
 
             // For regular execution, we cache already verified modules. Note that this even caches
             // verification for the published modules. This should be ok because as long as both
@@ -175,7 +215,7 @@ impl RuntimeEnvironment {
                 compiled_module.as_ref(),
             )?;
             check_natives(compiled_module.as_ref())?;
-            VERIFIED_MODULES_V2.put(*module_hash, self.verifier_config_digest);
+            VERIFIED_MODULES_CACHE.put(*module_hash, self.verifier_config_digest);
         }
 
         Ok(LocallyVerifiedModule(compiled_module, module_size))
@@ -183,12 +223,13 @@ impl RuntimeEnvironment {
 
     /// Creates a verified module by running dependency verification pass for a locally verified
     /// module. The caller must provide verified module dependencies.
-    pub fn build_verified_module(
+    pub(crate) fn build_verified_module_with_linking_checks(
         &self,
         locally_verified_module: LocallyVerifiedModule,
         immediate_dependencies: &[Arc<Module>],
     ) -> VMResult<Module> {
         dependencies::verify_module(
+            &self.vm_config.verifier_config,
             locally_verified_module.0.as_ref(),
             immediate_dependencies
                 .iter()
@@ -199,10 +240,29 @@ impl RuntimeEnvironment {
             locally_verified_module.1,
             locally_verified_module.0,
             self.struct_name_index_map(),
+            self.ty_pool(),
+            self.module_id_pool(),
         );
 
         // Note: loader V1 implementation does not set locations for this error.
         result.map_err(|e| e.finish(Location::Undefined))
+    }
+
+    /// Creates a verified module for a locally verified module. Does not perform linking checks
+    /// for module's verified dependencies.
+    pub(crate) fn build_verified_module_skip_linking_checks(
+        &self,
+        locally_verified_module: LocallyVerifiedModule,
+    ) -> VMResult<Module> {
+        Module::new(
+            &self.natives,
+            locally_verified_module.1,
+            locally_verified_module.0,
+            self.struct_name_index_map(),
+            self.ty_pool(),
+            self.module_id_pool(),
+        )
+        .map_err(|err| err.finish(Location::Undefined))
     }
 
     /// Deserializes bytes into a compiled module.
@@ -231,7 +291,7 @@ impl RuntimeEnvironment {
     }
 
     /// Returns an error is module's address and name do not match the expected values.
-    #[inline]
+    #[cfg_attr(feature = "force-inline", inline(always))]
     pub fn paranoid_check_module_address_and_name(
         &self,
         module: &CompiledModule,
@@ -265,7 +325,7 @@ impl RuntimeEnvironment {
 
     /// Returns the re-indexing map currently used by this runtime environment to remap struct
     /// identifiers into indices.
-    pub(crate) fn struct_name_index_map(&self) -> &StructNameIndexMap {
+    pub fn struct_name_index_map(&self) -> &StructNameIndexMap {
         &self.struct_name_index_map
     }
 
@@ -290,7 +350,8 @@ impl RuntimeEnvironment {
         Ok(match ty {
             Struct { idx, .. } | StructInstantiation { idx, .. } => {
                 let struct_identifier = self.struct_name_index_map().idx_to_struct_name(*idx)?;
-                Some((struct_identifier.module, struct_identifier.name))
+                let (module, name) = struct_identifier.into_module_and_name();
+                Some((module, name))
             },
             Bool
             | U8
@@ -299,6 +360,12 @@ impl RuntimeEnvironment {
             | U64
             | U128
             | U256
+            | I8
+            | I16
+            | I32
+            | I64
+            | I128
+            | I256
             | Address
             | Signer
             | TyParam(_)
@@ -317,9 +384,23 @@ impl RuntimeEnvironment {
 
     /// Flushes the global caches with struct name indices and struct tags. Note that when calling
     /// this function, modules that still store indices into struct name cache must also be flushed.
-    pub fn flush_struct_name_and_tag_caches(&self) {
+    pub fn flush_all_caches(&self) {
         self.ty_tag_cache.flush();
         self.struct_name_index_map.flush();
+        self.interned_ty_pool.flush();
+        self.interned_module_id_pool.flush();
+    }
+
+    /// Flushes the global verified module cache. Should be used when verifier configuration has
+    /// changed.
+    pub fn flush_verified_module_cache() {
+        VERIFIED_MODULES_CACHE.flush();
+    }
+
+    /// Logs the size of the verified module cache.
+    pub fn log_verified_cache_size() {
+        let size = VERIFIED_MODULES_CACHE.size();
+        VERIFIED_MODULE_CACHE_SIZE.set(size as i64);
     }
 
     /// Test-only function to be able to populate [StructNameIndexMap] outside of this crate.
@@ -339,6 +420,32 @@ impl RuntimeEnvironment {
     ) -> PartialVMResult<StructIdentifier> {
         self.struct_name_index_map.idx_to_struct_name(idx)
     }
+
+    pub fn get_option_module_bytes(&self) -> Bytes {
+        Bytes::from(OPTION_MODULE_BYTES.to_vec())
+    }
+
+    pub fn get_mem_module_bytes(&self) -> Bytes {
+        Bytes::from(MEM_MODULE_BYTES.to_vec())
+    }
+
+    pub fn get_module_bytes_override(
+        &self,
+        addr: &AccountAddress,
+        name: &IdentStr,
+    ) -> Option<Bytes> {
+        let enable_enum_option = self.vm_config().enable_enum_option;
+        let enable_framework_for_option = self.vm_config().enable_framework_for_option;
+        if !enable_framework_for_option && enable_enum_option {
+            if addr == OPTION_MODULE_ID.address() && *name == *OPTION_MODULE_ID.name() {
+                return Some(self.get_option_module_bytes());
+            }
+            if addr == MEM_MODULE_ID.address() && *name == *MEM_MODULE_ID.name() {
+                return Some(self.get_mem_module_bytes());
+            }
+        }
+        None
+    }
 }
 
 impl Clone for RuntimeEnvironment {
@@ -349,6 +456,8 @@ impl Clone for RuntimeEnvironment {
             struct_name_index_map: Arc::clone(&self.struct_name_index_map),
             ty_tag_cache: Arc::clone(&self.ty_tag_cache),
             verifier_config_digest: self.verifier_config_digest,
+            interned_ty_pool: Arc::clone(&self.interned_ty_pool),
+            interned_module_id_pool: Arc::clone(&self.interned_module_id_pool),
         }
     }
 }

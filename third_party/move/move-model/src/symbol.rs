@@ -66,6 +66,12 @@ impl SymbolPool {
         }
     }
 
+    /// Check if a name has been taken by a symbol in this pool.
+    pub fn name_already_taken(&self, s: &str) -> bool {
+        let pool = self.inner.borrow();
+        pool.lookup.contains_key(&Rc::new(s.to_string()))
+    }
+
     /// Looks up a symbol by its string representation. If a symbol with this representation
     /// already exists, it will be returned, otherwise a new one will be created in the
     /// pool. The implementation uses internally a RefCell for storing symbols, so the pool

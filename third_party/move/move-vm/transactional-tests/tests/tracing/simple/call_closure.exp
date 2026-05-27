@@ -1,0 +1,11 @@
+processed 2 tasks
+task 0 lines 1-18:  publish [module 0x22::test]
+task 1 lines 20-20:  run --verbose 0x22::test::call_closure_instr --display-trace
+instructions: 10
+fingerprint: 455328042765678876
+branch_outcomes: 
+calls:
+  entrypoint 0x0000000000000000000000000000000000000000000000000000000000000022::test::call_closure_instr
+  closure 0x0000000000000000000000000000000000000000000000000000000000000022::test::identity_generic<..> 1
+  closure 0x0000000000000000000000000000000000000000000000000000000000000022::test::identity 0
+return values: 2

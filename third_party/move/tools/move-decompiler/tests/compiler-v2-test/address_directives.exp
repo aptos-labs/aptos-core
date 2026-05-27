@@ -1,0 +1,36 @@
+module 0x1::M {
+}
+module 0x2::M {
+    struct X {
+    }
+    public fun x(): X {
+        X{}
+    }
+}
+module 0x4::M {
+    use 0x2::M;
+    struct X {
+    }
+    public fun x(): X {
+        X{}
+    }
+    public fun both(): (X, M::X) {
+        let _v0 = X{};
+        let _v1 = M::x();
+        (_v0, _v1)
+    }
+}
+module 0x2::M2 {
+    use 0x2::M;
+    use 0x4::M as M_1;
+    struct X {
+    }
+    public fun x(): (M::X, X, M_1::X) {
+        let _v0 = M::x();
+        let _v1 = X{};
+        let _v2 = M_1::x();
+        (_v0, _v1, _v2)
+    }
+}
+
+============ recompilation succeeded ========

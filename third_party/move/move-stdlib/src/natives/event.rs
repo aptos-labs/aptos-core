@@ -28,7 +28,7 @@ pub struct WriteToEventStoreGasParameters {
 fn native_write_to_event_store(
     gas_params: &WriteToEventStoreGasParameters,
     _context: &mut NativeContext,
-    ty_args: Vec<Type>,
+    ty_args: &[Type],
     mut arguments: VecDeque<Value>,
 ) -> PartialVMResult<NativeResult> {
     debug_assert!(ty_args.len() == 1);

@@ -7,7 +7,7 @@ repository = "https://github.com/aptos-labs/aptos-core"
 homepage = "https://aptosfoundation.org/"
 license = "Apache-2.0"
 publish = false
-edition = "2021"
+edition = { workspace = true }
 
 [dependencies]
 anyhow = { workspace = true }
@@ -24,8 +24,12 @@ move-stackless-bytecode = { workspace = true }
 
 [dev-dependencies]
 datatest-stable = { workspace = true }
+libtest-mimic = { workspace = true }
 move-compiler-v2 = { workspace = true }
 move-prover-test-utils = { workspace = true }
+once_cell = { workspace = true }
+tempfile = { workspace = true }
+walkdir = { workspace = true }
 
 [features]
 default = []

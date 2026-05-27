@@ -1,0 +1,12 @@
+//**** Cross-compiled for `move` syntax from `tests/vm_test_harness/simple_init.move`
+
+//# init --addresses A=0x42 K=0x19
+
+//# publish
+module 0x42::M {
+}
+
+
+//# publish
+module 0x19::S {
+}

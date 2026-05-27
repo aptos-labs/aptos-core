@@ -387,7 +387,9 @@ where
     }
 
     /// Takes the modules stored in the module cache, and returns an iterator of keys and modules.
-    pub fn take_modules_iter(&mut self) -> impl Iterator<Item = (K, Arc<ModuleCode<DC, VC, E>>)> {
+    pub fn take_modules_iter(
+        &mut self,
+    ) -> impl Iterator<Item = (K, Arc<ModuleCode<DC, VC, E>>)> + use<K, DC, VC, E, V> {
         mem::take(&mut self.module_cache)
             .into_iter()
             .map(|(key, module)| (key, module.into_inner().into_module_code()))

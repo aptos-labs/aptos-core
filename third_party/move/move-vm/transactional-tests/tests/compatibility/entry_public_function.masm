@@ -1,0 +1,22 @@
+//# publish
+module 0x66::a
+public fun foo()
+    ret
+
+
+//# publish
+module 0x66::a
+entry public fun foo()
+    ret
+
+
+//# publish
+module 0x66::a
+// Private entry cannot become non-entry, publish fails
+public fun foo()
+    ret
+
+
+//# publish
+module 0x66::a
+// Public entry cannot be removed, publish fails

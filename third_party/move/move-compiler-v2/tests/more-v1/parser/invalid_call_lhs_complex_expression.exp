@@ -6,7 +6,7 @@ error: constraint `integer` incompatible with `||_ has ..`
 3 │         (if (true) 5 else 0)();
   │         ^^^^^^^^^^^^^^^^^^^^^^
 
-error: expected function of type `|(integer, integer)|_` but found `()`
+error: expected function of type `|integer, integer|_` but found `()`
   ┌─ tests/more-v1/parser/invalid_call_lhs_complex_expression.move:4:9
   │
 4 │         (while (false) {})(0, 1);

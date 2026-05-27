@@ -1,1 +1,4 @@
 processed 3 tasks
+task 0 lines 1-41:  publish [module 0x42.VTest {]
+task 1 lines 43-94:  publish [module 0x42.RTest {]
+task 2 lines 96-127:  run [import 0x42.RTest;]

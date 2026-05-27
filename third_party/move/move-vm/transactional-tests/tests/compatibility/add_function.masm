@@ -1,0 +1,18 @@
+//# publish
+module 0x66::a
+
+
+//# publish
+module 0x66::a
+fun a()
+    ret
+friend fun b()
+    ret
+public fun c()
+    ret
+entry fun d()
+    ret
+entry friend fun e()
+    ret
+entry public fun f()
+    ret

@@ -1,0 +1,28 @@
+{% import "macros" as macros %}
+
+{% for ty in [8, 16, 32, 64, 128, 256] %}
+
+//# publish --print-bytecode
+module 0x66::test_ok_i{{ty}}
+
+public fun f(x: i{{ty}}): i{{ty}}
+    move_loc x
+    ld_i{{ty}} 22
+    add
+    ld_i{{ty}} -45
+    add
+    ret
+
+
+//# publish --print-bytecode
+module 0x66::test_some_err_i{{ty}}
+
+public fun f(x: i{{ty}}): i{{ty}}
+    move_loc x
+    ld_i{{ty}} 288888888888992922
+    add
+    ld_i{{ty}} -2781274937452
+    add
+    ret
+
+{% endfor %}

@@ -1,0 +1,9 @@
+
+Diagnostics:
+error: cannot select field `x` since it has different types in variants of enum `Wrapper2`
+   ┌─ tests/checking-lang-v2.4/borrow_field.move:18:24
+   │
+18 │         let x_0 = &mut x.x;
+   │                        ^
+   │
+   = field `x` has type `u8` in variant `V2` and type `u64` in variant `V1`

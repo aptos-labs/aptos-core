@@ -13,7 +13,7 @@ use std::{collections::VecDeque, convert::TryFrom};
 
 pub fn native_ed25519_publickey_validation(
     _context: &mut NativeContext,
-    _ty_args: Vec<Type>,
+    _ty_args: &[Type],
     mut arguments: VecDeque<Value>,
 ) -> PartialVMResult<NativeResult> {
     debug_assert!(_ty_args.is_empty());
@@ -30,7 +30,7 @@ pub fn native_ed25519_publickey_validation(
 
 pub fn native_ed25519_signature_verification(
     _context: &mut NativeContext,
-    _ty_args: Vec<Type>,
+    _ty_args: &[Type],
     mut arguments: VecDeque<Value>,
 ) -> PartialVMResult<NativeResult> {
     debug_assert!(_ty_args.is_empty());

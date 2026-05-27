@@ -164,7 +164,7 @@ impl LoopSummary {
 
     /// Returns an iterator over `NodeId`s in this `LoopSummary` in pre-order according to its
     /// depth-first spanning tree.
-    pub fn preorder(&self) -> impl DoubleEndedIterator<Item = NodeId> {
+    pub fn preorder(&self) -> impl DoubleEndedIterator<Item = NodeId> + use<> {
         // `LoopSummary::new` assigns `NodeId`s to blocks in preorder, so just return the natural
         // order.
         (0..self.blocks.len()).map(|id| NodeId(id as u16))

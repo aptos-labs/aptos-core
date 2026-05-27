@@ -1,0 +1,11 @@
+//**** Cross-compiled for `move` syntax from `tests/constants/folding_vector.move`
+
+//# publish
+module 0x42::M {
+    fun foo() {
+        ()
+    }
+}
+
+
+//# run 0x42::M::foo

@@ -1,0 +1,35 @@
+//# publish
+module 0x66::helpers
+
+struct R has key+drop
+    f: |u64|u32 has store+drop
+
+public fun pack(f: |u64|u32): R
+    move_loc f
+    pack R
+    ret
+
+public fun f_store_drop(): |u64|u32 has store+drop
+    pack_closure action, 0
+    ret
+
+#[persistent] fun action(x: u64): u32
+    move_loc x
+    cast_u32
+    ld_u32 20
+    add
+    ret
+
+// The next only executes in paranoid mode when bv is turned off
+
+//# run --verbose
+script
+
+use 0x66::helpers as h
+
+fun paranoid_fails()
+    local f: |u64|u32
+    call h::f_store_drop
+    call h::pack
+    st_loc f
+    ret

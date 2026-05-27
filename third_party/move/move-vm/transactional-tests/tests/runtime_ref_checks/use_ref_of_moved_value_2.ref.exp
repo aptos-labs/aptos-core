@@ -1,0 +1,12 @@
+processed 2 tasks
+task 0 lines 1-12:  publish [module 0xc0ffee::m]
+task 1 lines 14-14:  run 0xc0ffee::m::foo --verbose
+Error: Function execution failed with VMError: {
+    message: Poisoned reference accessed,
+    major_status: UNKNOWN_INVARIANT_VIOLATION_ERROR,
+    sub_status: Some(3),
+    location: 0xc0ffee::m,
+    indices: [],
+    offsets: [(FunctionDefinitionIndex(0), 5)],
+    exec_state: Some(ExecutionState { stack_trace: [] }),
+}

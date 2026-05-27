@@ -1,0 +1,9 @@
+processed 2 tasks
+task 0 lines 1-8:  publish [module 0x22::test]
+task 1 lines 10-10:  run --verbose 0x22::test::st_loc_instr --display-trace
+instructions: 3
+fingerprint: 7179757166397572123
+branch_outcomes: 
+calls:
+  entrypoint 0x0000000000000000000000000000000000000000000000000000000000000022::test::st_loc_instr
+

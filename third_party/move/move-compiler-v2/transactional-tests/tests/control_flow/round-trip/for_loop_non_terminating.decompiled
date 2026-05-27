@@ -1,0 +1,15 @@
+//**** Cross-compiled for `move` syntax from `tests/control_flow/for_loop_non_terminating.move`
+
+//# run --gas-budget 700
+script {
+    fun main() {
+        let _v0 = 0;
+        let _v1 = false;
+        loop {
+            if (_v1) _v0 = _v0 + 1 else _v1 = true;
+            if (!(_v0 < 10)) break;
+            _v0 = 0
+        };
+        abort 42
+    }
+}

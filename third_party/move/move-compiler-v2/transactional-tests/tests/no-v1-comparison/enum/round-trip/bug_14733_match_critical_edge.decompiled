@@ -1,0 +1,191 @@
+//**** Cross-compiled for `move` syntax from `tests/no-v1-comparison/enum/bug_14733_match_critical_edge.move`
+
+//# publish
+module 0x815::m {
+    enum Admin has drop {
+        Superuser,
+        User {
+            _0: u64,
+        }
+    }
+    enum Entity has drop {
+        Person {
+            id: u64,
+        }
+        Institution {
+            id: u64,
+            admin: Admin,
+        }
+    }
+    fun admin_id(p0: &Entity): u64 {
+        let _v0;
+        let _v1;
+        'l5: loop {
+            let _v2;
+            'l4: loop {
+                'l3: loop {
+                    let _v3;
+                    'l0: loop {
+                        'l1: loop {
+                            let _v4;
+                            'l2: loop {
+                                if (!((p0 is Institution) && (&p0.admin is Superuser))) {
+                                    loop {
+                                        let _v5;
+                                        if (p0 is Institution) {
+                                            _v5 = &p0.admin;
+                                            if (_v5 is User) {
+                                                _v3 = &_v5._0;
+                                                if (*_v3 > 10) break
+                                            }
+                                        };
+                                        loop {
+                                            if (p0 is Institution) {
+                                                _v5 = &p0.admin;
+                                                if (_v5 is User) {
+                                                    if (*&_v5._0 <= 10) break}
+                                            };
+                                            _v4 = p0;
+                                            if (_v4 is Person) {
+                                                _v3 = &_v4.id;
+                                                if (*_v3 > 10) break 'l0
+                                            };
+                                            if (!(_v4 is Institution)) break 'l1;
+                                            break 'l2
+                                        };
+                                        _v4 = p0;
+                                        if (_v4 is Person) {
+                                            _v3 = &_v4.id;
+                                            if (*_v3 > 10) {
+                                                _v2 = *_v3;
+                                                break 'l3
+                                            }
+                                        };
+                                        if (_v4 is Institution) {
+                                            _v2 = *&_v4.id;
+                                            break 'l3
+                                        };
+                                        _v2 = 0;
+                                        break 'l3
+                                    };
+                                    _v1 = *_v3;
+                                    _v4 = p0;
+                                    if (_v4 is Person) {
+                                        _v3 = &_v4.id;
+                                        if (*_v3 > 10) {
+                                            _v2 = *_v3;
+                                            break 'l4
+                                        }
+                                    };
+                                    if (_v4 is Institution) {
+                                        _v2 = *&_v4.id;
+                                        break 'l4
+                                    };
+                                    _v2 = 0;
+                                    break 'l4
+                                };
+                                _v0 = 1;
+                                if (p0 is Person) {
+                                    _v3 = &p0.id;
+                                    if (*_v3 > 10) {
+                                        _v1 = *_v3;
+                                        break 'l5
+                                    }
+                                };
+                                if (p0 is Institution) {
+                                    _v1 = *&p0.id;
+                                    break 'l5
+                                };
+                                _v1 = 0;
+                                break 'l5
+                            };
+                            return *&_v4.id
+                        };
+                        return 0
+                    };
+                    return *_v3
+                };
+                return _v2 + 5
+            };
+            return _v1 + _v2
+        };
+        _v0 + _v1
+    }
+    fun test1(): u64 {
+        let _v0;
+        let _v1 = Entity::Person{id: 22};
+        let _v2 = &_v1;
+        loop {
+            if (_v2 is Person) {
+                _v0 = &_v2.id;
+                if (*_v0 > 10) break
+            };
+            if (_v2 is Institution) return *&_v2.id;
+            return 0
+        };
+        *_v0
+    }
+    fun test2(): u64 {
+        let _v0;
+        let _v1 = Entity::Person{id: 10};
+        let _v2 = &_v1;
+        loop {
+            if (_v2 is Person) {
+                _v0 = &_v2.id;
+                if (*_v0 > 10) break
+            };
+            if (_v2 is Institution) return *&_v2.id;
+            return 0
+        };
+        *_v0
+    }
+    fun test3(): u64 {
+        let _v0;
+        let _v1 = Admin::Superuser{};
+        let _v2 = Entity::Institution{id: 10, admin: _v1};
+        let _v3 = &_v2;
+        loop {
+            if (_v3 is Person) {
+                _v0 = &_v3.id;
+                if (*_v0 > 10) break
+            };
+            if (_v3 is Institution) return *&_v3.id;
+            return 0
+        };
+        *_v0
+    }
+    fun test4(): u64 {
+        let _v0 = Admin::Superuser{};
+        let _v1 = Entity::Institution{id: 20, admin: _v0};
+        admin_id(&_v1)
+    }
+    fun test5(): u64 {
+        let _v0 = Admin::User{_0: 23};
+        let _v1 = Entity::Institution{id: 20, admin: _v0};
+        admin_id(&_v1)
+    }
+    fun test6(): u64 {
+        let _v0 = Admin::User{_0: 8};
+        let _v1 = Entity::Institution{id: 20, admin: _v0};
+        admin_id(&_v1)
+    }
+    fun test7(): u64 {
+        let _v0 = Entity::Person{id: 15};
+        admin_id(&_v0)
+    }
+}
+
+
+//# run 0x815::m::test1
+
+//# run 0x815::m::test2
+
+//# run 0x815::m::test3
+
+//# run 0x815::m::test4
+
+//# run 0x815::m::test5
+
+//# run 0x815::m::test6
+
+//# run 0x815::m::test7

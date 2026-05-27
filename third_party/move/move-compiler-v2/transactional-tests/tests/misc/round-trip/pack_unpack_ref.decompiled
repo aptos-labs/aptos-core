@@ -1,0 +1,39 @@
+//**** Cross-compiled for `move` syntax from `tests/misc/pack_unpack_ref.move`
+
+//# publish
+module 0x42::pack_unpack_ref {
+    struct G has drop {
+        x1: u64,
+        x2: u64,
+        s: S,
+    }
+    struct S has drop {
+        f: u64,
+        g: u64,
+    }
+    fun unpack_ref_G() {
+        let _v0 = S{f: 0, g: 1};
+        let _v1 = G{x1: 2, x2: 3, s: _v0};
+        let _v2 = &mut _v1;
+        let _v3 = &mut _v2.x1;
+        let _v4 = &mut _v2.x2;
+        let _v5 = &mut _v2.s;
+        let _v6 = &mut _v5.f;
+        let _v7 = &mut _v5.g;
+        assert!(*_v6 == 0, 0);
+        assert!(*_v7 == 1, 1);
+        assert!(*_v3 == 2, 2);
+        assert!(*_v4 == 3, 3);
+        *_v3 = *_v3 + 1;
+        *_v4 = *_v4 + 1;
+        *_v6 = *_v6 + 1;
+        *_v7 = *_v7 + 1;
+        assert!(*_v6 == 1, 0);
+        assert!(*_v7 == 2, 1);
+        assert!(*_v3 == 3, 2);
+        assert!(*_v4 == 4, 3);
+    }
+}
+
+
+//# run  0x42::pack_unpack_ref::unpack_ref_G

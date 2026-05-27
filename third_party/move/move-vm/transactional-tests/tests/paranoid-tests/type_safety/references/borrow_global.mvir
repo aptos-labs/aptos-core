@@ -1,5 +1,5 @@
 //# publish
-module 0x2.A {
+module 0x22.A {
     struct G has key, drop { x: u64 }
 
     public make_g(): Self.G {
@@ -45,8 +45,8 @@ module 0x2.A {
     }
 }
 
-//# run --signers 0x1 
-import 0x2.A;
+//# run --signers 0x1
+import 0x22.A;
 import 0x1.signer;
 main(account: signer) {
     let a: address;
@@ -56,8 +56,8 @@ label b0:
     return;
 }
 
-//# run --signers 0x1 
-import 0x2.A;
+//# run --signers 0x1
+import 0x22.A;
 import 0x1.signer;
 main(account: signer) {
     let a: address;
@@ -70,8 +70,8 @@ label b0:
     return;
 }
 
-//# run --signers 0x1 
-import 0x2.A;
+//# run --signers 0x1
+import 0x22.A;
 import 0x1.signer;
 main(account: signer) {
     let a: address;
@@ -85,8 +85,8 @@ label b0:
     return;
 }
 
-//# run --signers 0x1 
-import 0x2.A;
+//# run --signers 0x1
+import 0x22.A;
 import 0x1.signer;
 main(account: signer) {
     let a: address;
@@ -99,8 +99,8 @@ label b0:
     return;
 }
 
-//# run --signers 0x1 
-import 0x2.A;
+//# run --signers 0x1
+import 0x22.A;
 import 0x1.signer;
 main(account: signer) {
     let a: address;
@@ -113,8 +113,8 @@ label b0:
     return;
 }
 
-//# run --signers 0x1 
-import 0x2.A;
+//# run --signers 0x1
+import 0x22.A;
 import 0x1.signer;
 main(account: signer) {
     let a: address;
@@ -126,8 +126,8 @@ label b0:
     return;
 }
 
-//# run --signers 0x1 
-import 0x2.A;
+//# run --signers 0x1
+import 0x22.A;
 import 0x1.signer;
 main(account: signer) {
     let a: address;

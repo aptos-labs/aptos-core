@@ -1,6 +1,5 @@
 processed 2 tasks
-
-task 0 'publish'. lines 1-43:
+task 0 lines 1-43:  publish [module 0x42::m {]
 warning: This assignment/binding to the left-hand-side variable `x` is unused. Consider removing this assignment/binding, or prefixing the left-hand-side variable with an underscore (e.g., `_x`), or renaming to `_`
    ┌─ TEMPFILE:20:21
    │
@@ -20,6 +19,5 @@ warning: This assignment/binding to the left-hand-side variable `i` is unused. C
    │             ^^^^^^^^^
 
 
-
-task 1 'run'. lines 45-45:
+task 1 lines 45-45:  run 0x42::m::t1_check_scoping
 return values: 3

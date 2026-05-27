@@ -14,7 +14,10 @@ use crate::{
         },
         module_builder::{ModuleBuilder, SpecBlockContext},
     },
-    metadata::LanguageVersion,
+    metadata::{
+        lang_feature_versions::{LANGUAGE_VERSION_FOR_RAC, SINT_LANGUAGE_VERSION_VALUE},
+        LanguageVersion,
+    },
     model::{
         FieldData, FieldId, FunctionKind, GlobalEnv, Loc, ModuleId, NodeId, Parameter, QualifiedId,
         QualifiedInstId, SpecFunId, StructId, TypeParameter, TypeParameterKind,
@@ -580,7 +583,6 @@ impl<'env, 'translator, 'module_translator> ExpTranslator<'env, 'translator, 'mo
                         "previously declared here".to_string(),
                     )],
                 );
-                return;
             }
             self.type_params.push((name, ty, kind, loc.clone()));
         } else if report_errors {
@@ -882,7 +884,7 @@ impl UnificationContext for ExpTranslator<'_, '_, '_> {
         }
     }
 
-    fn type_display_context(&self) -> TypeDisplayContext {
+    fn type_display_context(&self) -> TypeDisplayContext<'_> {
         self.type_display_context()
     }
 }
@@ -926,7 +928,7 @@ impl ExpTranslator<'_, '_, '_> {
         match &ty.value {
             Apply(access, args) => {
                 if let EA::ModuleAccess_::Name(n) = &access.value {
-                    let check_zero_args = |et: &mut Self, ty: Type| {
+                    let check_zero_args = |et: &Self, ty: Type| {
                         if args.is_empty() {
                             ty
                         } else {
@@ -939,6 +941,21 @@ impl ExpTranslator<'_, '_, '_> {
                                 ),
                             );
                             Type::Error
+                        }
+                    };
+                    let sint_gated_check_zero_args = |et: &Self, ty: Type| {
+                        if !self
+                            .env()
+                            .language_version
+                            .is_at_least(SINT_LANGUAGE_VERSION_VALUE)
+                        {
+                            et.error(
+                                loc,
+                                &format!("signed integer types not supported prior to language version {}", SINT_LANGUAGE_VERSION_VALUE.to_str()),
+                            );
+                            Type::Error
+                        } else {
+                            check_zero_args(et, ty)
                         }
                     };
                     // Attempt to resolve as builtin type.
@@ -955,6 +972,42 @@ impl ExpTranslator<'_, '_, '_> {
                         },
                         "u256" => {
                             return check_zero_args(self, Type::new_prim(PrimitiveType::U256));
+                        },
+                        "i8" => {
+                            return sint_gated_check_zero_args(
+                                self,
+                                Type::new_prim(PrimitiveType::I8),
+                            )
+                        },
+                        "i16" => {
+                            return sint_gated_check_zero_args(
+                                self,
+                                Type::new_prim(PrimitiveType::I16),
+                            )
+                        },
+                        "i32" => {
+                            return sint_gated_check_zero_args(
+                                self,
+                                Type::new_prim(PrimitiveType::I32),
+                            )
+                        },
+                        "i64" => {
+                            return sint_gated_check_zero_args(
+                                self,
+                                Type::new_prim(PrimitiveType::I64),
+                            )
+                        },
+                        "i128" => {
+                            return sint_gated_check_zero_args(
+                                self,
+                                Type::new_prim(PrimitiveType::I128),
+                            )
+                        },
+                        "i256" => {
+                            return sint_gated_check_zero_args(
+                                self,
+                                Type::new_prim(PrimitiveType::I256),
+                            )
                         },
                         "num" => return check_zero_args(self, Type::new_prim(PrimitiveType::Num)),
                         "range" => {
@@ -1069,11 +1122,11 @@ impl ExpTranslator<'_, '_, '_> {
                         vec![self.translate_function_param_or_return_type(result)]
                     },
                 };
-                Type::function(
-                    Type::tuple(arg_tys),
-                    Type::tuple(result_tys),
-                    self.parent.translate_abilities(abilities),
-                )
+                let ability_set = self.parent.translate_abilities(abilities);
+                if ability_set.has_key() {
+                    self.error(loc, "function types cannot have `key` ability");
+                }
+                Type::function(Type::tuple(arg_tys), Type::tuple(result_tys), ability_set)
             },
             Unit => Type::Tuple(vec![]),
             Multiple(vst) => {
@@ -1191,7 +1244,7 @@ impl ExpTranslator<'_, '_, '_> {
                 self.check_language_version(
                     &loc,
                     "read/write access specifiers.",
-                    LanguageVersion::V2_3,
+                    LANGUAGE_VERSION_FOR_RAC,
                 )?;
             },
         }
@@ -1754,9 +1807,9 @@ impl ExpTranslator<'_, '_, '_> {
                         );
                     }
                     // Insert freeze for each expression in the exp list
-                    let target_exp = if self.insert_freeze && expected_tys_opt.is_some() {
-                        let expected_tys =
-                            expected_tys_opt.expect("expected types should not be None");
+                    let target_exp = if self.insert_freeze
+                        && let Some(expected_tys) = expected_tys_opt
+                    {
                         let expected_ty_opt = expected_tys.get(i);
                         if let Some(expected_ty) = expected_ty_opt {
                             self.try_freeze(expected_ty, &ty, exp.into())
@@ -3057,50 +3110,95 @@ impl ExpTranslator<'_, '_, '_> {
                 );
                 Some((value, ty))
             },
-            EA::Value_::U8(x) => Some(self.translate_number(
+            EA::Value_::U8(x) => self.translate_number(
                 &loc,
                 BigInt::from_u8(*x).unwrap(),
                 Some(PrimitiveType::U8),
                 expected_type,
                 context,
-            )),
-            EA::Value_::U16(x) => Some(self.translate_number(
+            ),
+            EA::Value_::U16(x) => self.translate_number(
                 &loc,
                 BigInt::from_u16(*x).unwrap(),
                 Some(PrimitiveType::U16),
                 expected_type,
                 context,
-            )),
-            EA::Value_::U32(x) => Some(self.translate_number(
+            ),
+            EA::Value_::U32(x) => self.translate_number(
                 &loc,
                 BigInt::from_u32(*x).unwrap(),
                 Some(PrimitiveType::U32),
                 expected_type,
                 context,
-            )),
-            EA::Value_::U64(x) => Some(self.translate_number(
+            ),
+            EA::Value_::U64(x) => self.translate_number(
                 &loc,
                 BigInt::from_u64(*x).unwrap(),
                 Some(PrimitiveType::U64),
                 expected_type,
                 context,
-            )),
-            EA::Value_::U128(x) => Some(self.translate_number(
+            ),
+            EA::Value_::U128(x) => self.translate_number(
                 &loc,
                 BigInt::from_u128(*x).unwrap(),
                 Some(PrimitiveType::U128),
                 expected_type,
                 context,
-            )),
-            EA::Value_::U256(x) => Some(self.translate_number(
+            ),
+            EA::Value_::U256(x) => self.translate_number(
                 &loc,
-                BigInt::from(x),
+                BigInt::from(*x),
                 Some(PrimitiveType::U256),
                 expected_type,
                 context,
-            )),
+            ),
+            EA::Value_::I8(x) => self.translate_number(
+                &loc,
+                BigInt::from_i8(*x).unwrap(),
+                Some(PrimitiveType::I8),
+                expected_type,
+                context,
+            ),
+            EA::Value_::I16(x) => self.translate_number(
+                &loc,
+                BigInt::from_i16(*x).unwrap(),
+                Some(PrimitiveType::I16),
+                expected_type,
+                context,
+            ),
+            EA::Value_::I32(x) => self.translate_number(
+                &loc,
+                BigInt::from_i32(*x).unwrap(),
+                Some(PrimitiveType::I32),
+                expected_type,
+                context,
+            ),
+            EA::Value_::I64(x) => self.translate_number(
+                &loc,
+                BigInt::from_i64(*x).unwrap(),
+                Some(PrimitiveType::I64),
+                expected_type,
+                context,
+            ),
+            EA::Value_::I128(x) => self.translate_number(
+                &loc,
+                BigInt::from_i128(*x).unwrap(),
+                Some(PrimitiveType::I128),
+                expected_type,
+                context,
+            ),
+            EA::Value_::I256(x) => self.translate_number(
+                &loc,
+                BigInt::from(*x),
+                Some(PrimitiveType::I256),
+                expected_type,
+                context,
+            ),
+            EA::Value_::InferredNegNum(x) => {
+                self.translate_number(&loc, BigInt::from(*x), None, expected_type, context)
+            },
             EA::Value_::InferredNum(x) => {
-                Some(self.translate_number(&loc, BigInt::from(x), None, expected_type, context))
+                self.translate_number(&loc, BigInt::from(*x), None, expected_type, context)
             },
             EA::Value_::Bool(x) => Some((Value::Bool(*x), Type::new_prim(PrimitiveType::Bool))),
             EA::Value_::Bytearray(x) => {
@@ -3118,7 +3216,7 @@ impl ExpTranslator<'_, '_, '_> {
         requested_type: Option<PrimitiveType>,
         expected_type: &Type,
         context: &ErrorMessageContext,
-    ) -> (Value, Type) {
+    ) -> Option<(Value, Type)> {
         // First determine the type of the number.
         let mut possible_types = if let Some(requested) = requested_type {
             // The type of the constant is explicit (e.g. `0u64`)
@@ -3131,8 +3229,12 @@ impl ExpTranslator<'_, '_, '_> {
                 _ => unreachable!("not primitive"),
             }
         } else if self.is_spec_mode() {
-            // In specification mode, use U256.
-            vec![PrimitiveType::U256]
+            // In specification mode, use I256 or U256.
+            if value < BigInt::zero() {
+                vec![PrimitiveType::I256]
+            } else {
+                vec![PrimitiveType::U256]
+            }
         } else {
             // Infer the possible types from the value
             PrimitiveType::possible_int_types(value.clone())
@@ -3152,13 +3254,28 @@ impl ExpTranslator<'_, '_, '_> {
             )
         };
         let ty = self.check_type(loc, &ty, expected_type, context);
-        (Value::Number(value), ty)
+
+        if ty.is_signed_int()
+            && !self
+                .env()
+                .language_version()
+                .is_at_least(LanguageVersion::V2_3)
+        {
+            self.error(
+                loc,
+                "signed integer types are not supported in language versions prior to 2.3",
+            );
+            None
+        } else {
+            Some((Value::Number(value), ty))
+        }
     }
 
     /// Check whether value fits into primitive type, report error if not.
     fn check_range(&mut self, loc: &Loc, ty: PrimitiveType, value: BigInt) {
         let max = ty.get_max_value().unwrap_or(value.clone());
-        if value < BigInt::zero() || value > max {
+        let min = ty.get_min_value().unwrap_or(value.clone());
+        if value < min || value > max {
             let tcx = self.type_display_context();
             self.error(
                 loc,
@@ -3749,7 +3866,7 @@ impl ExpTranslator<'_, '_, '_> {
 
             return ExpData::Call(
                 id,
-                Operation::Closure(module_id, fun_id, ClosureMask::new_for_leading(0)),
+                Operation::Closure(module_id, fun_id, ClosureMask::empty()),
                 vec![],
             );
         }
@@ -3818,8 +3935,11 @@ impl ExpTranslator<'_, '_, '_> {
         context: &ErrorMessageContext,
         sym: &QualifiedSymbol,
     ) -> ExpData {
-        // Constants are always visible in specs.
-        if self.mode != ExpTranslationMode::Spec && sym.module_name != self.parent.module_name {
+        // Constants are always visible in specs. Builtin constants are visible everywhere.
+        if self.mode != ExpTranslationMode::Spec
+            && sym.module_name != self.parent.module_name
+            && sym.module_name != ModuleName::builtin_module(self.env())
+        {
             self.error(
                 loc,
                 &format!(
@@ -4738,7 +4858,7 @@ impl ExpTranslator<'_, '_, '_> {
         args: Vec<Exp>,
     ) -> Vec<Exp> {
         let params = entry.get_signature().1;
-        let new_args = params
+        params
             .iter()
             .map(|Parameter(_, ty, _)| ty.instantiate(instantiation))
             .zip(args)
@@ -4746,8 +4866,7 @@ impl ExpTranslator<'_, '_, '_> {
                 let exp_ty = self.env().get_node_type(exp.node_id());
                 self.try_freeze(&param_ty, &exp_ty, exp)
             })
-            .collect_vec();
-        new_args
+            .collect_vec()
     }
 
     /// Inserts the freeze operation when `expected_ty` is immutable ref and ty is mutable ref

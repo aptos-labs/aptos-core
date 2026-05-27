@@ -1,0 +1,20 @@
+//**** Cross-compiled for `move` syntax from `tests/optimization/loop_2.move`
+
+//# publish
+module 0xc0ffee::m {
+    public fun main() {
+        assert!(test(42) == 42, 5);
+    }
+    fun test(p0: u64): u64 {
+        let _v0 = p0;
+        let _v1 = 0;
+        while (_v1 < 10) {
+            _v0 = p0;
+            _v1 = _v1 + 1
+        };
+        _v0
+    }
+}
+
+
+//# run 0xc0ffee::m::main

@@ -1,0 +1,17 @@
+//# publish
+module 0x22::test
+
+struct A has drop
+  x: u64
+
+public fun borrow_field_instr(): u64
+    local a: A
+    ld_u64 3
+    pack A
+    st_loc a
+    borrow_loc a
+    borrow_field A, x
+    read_ref
+    ret
+
+//# run --verbose 0x22::test::borrow_field_instr --display-trace

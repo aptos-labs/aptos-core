@@ -1,0 +1,18 @@
+//# publish
+module 0x66::a
+public fun foo()
+    ret
+
+
+//# publish
+module 0x66::a
+// Public function cannot be changed to friend, publish fails
+friend fun foo()
+    ret
+
+
+//# publish
+module 0x66::a
+// Public function cannot be changed to private, publish fails
+fun foo()
+    ret

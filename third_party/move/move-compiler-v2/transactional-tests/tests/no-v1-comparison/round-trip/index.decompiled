@@ -1,0 +1,404 @@
+//**** Cross-compiled for `move` syntax from `tests/no-v1-comparison/index.move`
+
+//# publish
+module 0x42::test {
+    struct T has copy, drop, store, key {
+        w: W,
+    }
+    struct W has copy, drop, store, key {
+        x: u64,
+    }
+    struct M has copy, drop {
+        vec: vector<u8>,
+    }
+    struct R has drop, key {
+        value: bool,
+    }
+    struct S has copy, drop, key {
+        t: T,
+    }
+    struct Wrapper<T0: copy> has copy, drop, store, key {
+        inner: T0,
+    }
+    struct X<T0> has copy, drop, store {
+        value: T0,
+    }
+    struct Y<T0> has copy, drop, key {
+        field: T0,
+    }
+    fun init(p0: &signer) {
+        let _v0 = R{value: true};
+        move_to<R>(p0, _v0);
+    }
+    fun boo_1(p0: vector<S>, p1: W): u64 {
+        merge(&mut (&mut 0x1::vector::borrow_mut<S>(&mut p0, 0).t).w, p1);
+        *&(&(&0x1::vector::borrow<S>(&p0, 0).t).w).x
+    }
+    fun merge(p0: &mut W, p1: W) {
+        let _v0 = *&(&p1).x;
+        let _v1 = &mut p0.x;
+        *_v1 = *_v1 + _v0;
+    }
+    fun boo_2(p0: vector<W>, p1: W) {
+        merge(0x1::vector::borrow_mut<W>(&mut p0, 0), p1);
+        assert!(*&0x1::vector::borrow<W>(&p0, 0).x == 8, 0);
+    }
+    fun bubble_sort(p0: vector<u64>) {
+        let _v0 = 0x1::vector::length<u64>(&p0);
+        let _v1 = 0;
+        while (_v1 < _v0) {
+            let _v2 = 0;
+            loop {
+                let _v3 = _v0 - _v1 - 1;
+                if (!(_v2 < _v3)) break;
+                let _v4 = *0x1::vector::borrow<u64>(&p0, _v2);
+                let _v5 = &p0;
+                let _v6 = _v2 + 1;
+                let _v7 = *0x1::vector::borrow<u64>(_v5, _v6);
+                if (_v4 > _v7) {
+                    let _v8 = *0x1::vector::borrow<u64>(&p0, _v2);
+                    let _v9 = &p0;
+                    let _v10 = _v2 + 1;
+                    let _v11 = *0x1::vector::borrow<u64>(_v9, _v10);
+                    let _v12 = 0x1::vector::borrow_mut<u64>(&mut p0, _v2);
+                    *_v12 = _v11;
+                    let _v13 = &mut p0;
+                    let _v14 = _v2 + 1;
+                    let _v15 = 0x1::vector::borrow_mut<u64>(_v13, _v14);
+                    *_v15 = _v8
+                };
+                _v2 = _v2 + 1;
+                continue
+            };
+            _v1 = _v1 + 1;
+            continue
+        };
+        assert!(*0x1::vector::borrow<u64>(&p0, 0) == 1, 0);
+    }
+    fun call_sort() {
+        bubble_sort(vector[3, 1, 2]);
+    }
+    fun dispatch<T0: copy + store>(p0: address): T0
+        acquires Wrapper
+    {
+        unwrap<T0>(borrow_global<Wrapper<T0>>(p0))
+    }
+    fun unwrap<T0: copy>(p0: &Wrapper<T0>): T0 {
+        *&p0.inner
+    }
+    fun foo(p0: &Y<X<bool>>) {
+        assert!(*&(&p0.field).value == true, 0);
+    }
+    fun foo_1(p0: address, p1: W)
+        acquires S
+    {
+        merge(&mut (&mut borrow_global_mut<S>(p0).t).w, p1);
+    }
+    fun foo_2(p0: address, p1: W)
+        acquires W
+    {
+        merge(borrow_global_mut<W>(p0), p1);
+    }
+    fun greater(p0: &W, p1: W): bool {
+        let _v0 = *&p0.x;
+        let _v1 = *&(&p1).x;
+        _v0 > _v1
+    }
+    fun inc_vec_new(p0: &mut vector<u256>, p1: u64) {
+        let _v0 = *0x1::vector::borrow<u256>(freeze(p0), p1) + 1u256;
+        let _v1 = 0x1::vector::borrow_mut<u256>(p0, p1);
+        *_v1 = _v0;
+    }
+    fun inc_vec_new_test() {
+        let _v0 = vector[0u256];
+        let _v1 = *0x1::vector::borrow<u256>(&_v0, 0) + 1u256;
+        let _v2 = 0x1::vector::borrow_mut<u256>(&mut _v0, 0);
+        *_v2 = _v1;
+        assert!(*0x1::vector::borrow<u256>(&_v0, 0) == 1u256, 0);
+        let _v3 = &mut _v0;
+        inc_vec_new(_v3, 0);
+        assert!(*0x1::vector::borrow<u256>(freeze(_v3), 0) == 2u256, 0);
+    }
+    fun init_2(p0: &signer) {
+        let _v0 = Y<X<bool>>{field: X<bool>{value: true}};
+        move_to<Y<X<bool>>>(p0, _v0);
+    }
+    fun init_3(p0: &signer) {
+        let _v0 = Y<vector<u8>>{field: vector[1u8, 2u8, 3u8]};
+        move_to<Y<vector<u8>>>(p0, _v0);
+    }
+    fun init_receiver(p0: &signer) {
+        let _v0 = W{x: 2};
+        let _v1 = S{t: T{w: _v0}};
+        move_to<W>(p0, _v0);
+        move_to<S>(p0, _v1);
+    }
+    fun init_receiver_2(p0: &signer) {
+        let _v0 = Wrapper<u64>{inner: 2};
+        move_to<Wrapper<u64>>(p0, _v0);
+    }
+    fun test_index_then_field_select_1() {
+        let _v0 = X<bool>{value: true};
+        let _v1 = 0x1::vector::empty<X<bool>>();
+        0x1::vector::push_back<X<bool>>(&mut _v1, _v0);
+        let _v2 = _v1;
+        let _v3 = &mut 0x1::vector::borrow_mut<X<bool>>(&mut _v2, 0).value;
+        *_v3 = false;
+        assert!(*&0x1::vector::borrow<X<bool>>(&_v2, 0).value == false, 0);
+    }
+    fun test_index_then_field_select_2() {
+        let _v0 = X<bool>{value: true};
+        let _v1 = 0x1::vector::empty<X<bool>>();
+        0x1::vector::push_back<X<bool>>(&mut _v1, _v0);
+        let _v2 = _v1;
+        let _v3 = &mut _v2;
+        let _v4 = &mut 0x1::vector::borrow_mut<X<bool>>(_v3, 0).value;
+        *_v4 = false;
+        assert!(*&0x1::vector::borrow<X<bool>>(freeze(_v3), 0).value == false, 0);
+    }
+    fun test_index_then_field_select_3() {
+        let _v0 = X<bool>{value: true};
+        let _v1 = 0x1::vector::empty<X<bool>>();
+        0x1::vector::push_back<X<bool>>(&mut _v1, _v0);
+        let _v2 = _v1;
+        assert!(*&0x1::vector::borrow<X<bool>>(&_v2, 0).value == true, 0);
+    }
+    fun test_receiver()
+        acquires S, W
+    {
+        let _v0 = W{x: 3};
+        if (greater(borrow_global<W>(@0x1), _v0)) abort 0;
+        foo_1(@0x1, _v0);
+        assert!(*&(&(&borrow_global<S>(@0x1).t).w).x == 5, 0);
+        let _v1 = *borrow_global<S>(@0x1);
+        let _v2 = 0x1::vector::empty<S>();
+        0x1::vector::push_back<S>(&mut _v2, _v1);
+        assert!(boo_1(_v2, _v0) == 8, 1);
+        foo_2(@0x1, _v0);
+        assert!(*&borrow_global<W>(@0x1).x == 5, 0);
+        let _v3 = *borrow_global<W>(@0x1);
+        let _v4 = 0x1::vector::empty<W>();
+        0x1::vector::push_back<W>(&mut _v4, _v3);
+        boo_2(_v4, _v0);
+    }
+    fun test_receiver_2()
+        acquires Wrapper
+    {
+        assert!(dispatch<u64>(@0x1) == 2, 0);
+        let _v0 = Wrapper<u64>{inner: 2};
+        let _v1 = 0x1::vector::empty<Wrapper<u64>>();
+        0x1::vector::push_back<Wrapper<u64>>(&mut _v1, _v0);
+        let _v2 = _v1;
+        assert!(unwrap<u64>(0x1::vector::borrow<Wrapper<u64>>(&_v2, 0)) == 2, 0);
+    }
+    fun test_resource_1()
+        acquires R
+    {
+        assert!(*&borrow_global<R>(@0x1).value == true, 0);
+        let _v0 = R{value: false};
+        let _v1 = borrow_global_mut<R>(@0x1);
+        *_v1 = _v0;
+        assert!(*&borrow_global<R>(@0x1).value == false, 0);
+    }
+    fun test_resource_2()
+        acquires R
+    {
+        let _v0 = &mut borrow_global_mut<R>(@0x1).value;
+        *_v0 = false;
+        assert!(*&borrow_global<R>(@0x1).value == false, 1);
+    }
+    fun test_resource_3()
+        acquires Y
+    {
+        assert!(*&(&borrow_global<Y<X<bool>>>(@0x1).field).value == true, 0);
+    }
+    fun test_resource_4()
+        acquires Y
+    {
+        let _v0 = &mut (&mut borrow_global_mut<Y<X<bool>>>(@0x1).field).value;
+        *_v0 = false;
+        assert!(*&(&borrow_global<Y<X<bool>>>(@0x1).field).value == false, 1);
+    }
+    fun test_resource_5()
+        acquires Y
+    {
+        let _v0 = &mut (&mut borrow_global_mut<Y<X<bool>>>(@0x1).field).value;
+        *_v0 = false;
+        let _v1 = *borrow_global<Y<X<bool>>>(@0x1);
+        assert!(*&(&(&_v1).field).value == false, 1);
+    }
+    fun test_resource_freeze()
+        acquires Y
+    {
+        assert!(*&(&freeze(borrow_global_mut<Y<X<bool>>>(@0x1)).field).value == true, 0);
+    }
+    fun test_resource_with_vector()
+        acquires Y
+    {
+        assert!(*0x1::vector::borrow<u8>(&borrow_global<Y<vector<u8>>>(@0x2).field, 0) == 1u8, 0);
+    }
+    fun test_two_dimension() {
+        let _v0 = vector[vector[1, 2], vector[3, 4]];
+        assert!(*0x1::vector::borrow<u64>(0x1::vector::borrow<vector<u64>>(&_v0, 0), 0) == 1, 0);
+        let _v1 = 0x1::vector::borrow_mut<vector<u64>>(&mut _v0, 0);
+        *_v1 = vector[2, 3, 4];
+        assert!(*0x1::vector::borrow<u64>(0x1::vector::borrow<vector<u64>>(&_v0, 0), 0) == 2, 0);
+        let _v2 = 0x1::vector::borrow_mut<u64>(0x1::vector::borrow_mut<vector<u64>>(&mut _v0, 0), 1);
+        *_v2 = 4;
+        assert!(*0x1::vector::borrow<u64>(0x1::vector::borrow<vector<u64>>(&_v0, 0), 1) == 4, 0);
+        let _v3 = vector[vector[1, 2], vector[3, 4]];
+        let _v4 = &_v3;
+        let _v5 = 0 + 1;
+        let _v6 = 0x1::vector::borrow<vector<u64>>(_v4, _v5);
+        let _v7 = _v5 - 1;
+        assert!(*0x1::vector::borrow<u64>(_v6, _v7) == 3, 0);
+    }
+    fun test_vector() {
+        let _v0 = X<u64>{value: 2};
+        let _v1 = 0x1::vector::empty<X<u64>>();
+        let _v2 = &mut _v1;
+        0x1::vector::push_back<X<u64>>(_v2, _v0);
+        0x1::vector::push_back<X<u64>>(_v2, _v0);
+        let _v3 = _v1;
+        assert!(*&0x1::vector::borrow<X<u64>>(&_v3, 0).value == 2, 0);
+        let _v4 = &mut 0x1::vector::borrow_mut<X<u64>>(&mut _v3, 0).value;
+        *_v4 = 3;
+        assert!(*&0x1::vector::borrow<X<u64>>(&_v3, 0).value == 3, 0);
+    }
+    fun test_vector_borrow() {
+        let _v0 = X<bool>{value: true};
+        let _v1 = X<bool>{value: false};
+        let _v2 = Y<X<bool>>{field: _v0};
+        let _v3 = Y<X<bool>>{field: _v1};
+        let _v4 = 0x1::vector::empty<Y<X<bool>>>();
+        let _v5 = &mut _v4;
+        0x1::vector::push_back<Y<X<bool>>>(_v5, _v2);
+        0x1::vector::push_back<Y<X<bool>>>(_v5, _v3);
+        let _v6 = _v4;
+        assert!(*&(&0x1::vector::borrow<Y<X<bool>>>(&_v6, 0).field).value == true, 0);
+        assert!(*&(&0x1::vector::borrow<Y<X<bool>>>(&_v6, 1).field).value == false, 0);
+    }
+    fun test_vector_borrow_freeze() {
+        let _v0 = X<bool>{value: true};
+        let _v1 = X<bool>{value: false};
+        let _v2 = Y<X<bool>>{field: _v0};
+        let _v3 = Y<X<bool>>{field: _v1};
+        let _v4 = 0x1::vector::empty<Y<X<bool>>>();
+        let _v5 = &mut _v4;
+        0x1::vector::push_back<Y<X<bool>>>(_v5, _v2);
+        0x1::vector::push_back<Y<X<bool>>>(_v5, _v3);
+        let _v6 = _v4;
+        assert!(*&(&freeze(0x1::vector::borrow_mut<Y<X<bool>>>(&mut _v6, 0)).field).value == true, 0);
+        assert!(*&(&0x1::vector::borrow<Y<X<bool>>>(&_v6, 0).field).value == true, 0);
+        assert!(*&(&0x1::vector::borrow<Y<X<bool>>>(&_v6, 1).field).value == false, 0);
+        foo(freeze(0x1::vector::borrow_mut<Y<X<bool>>>(&mut _v6, 0)));
+    }
+    fun test_vector_borrow_mut() {
+        let _v0 = X<bool>{value: true};
+        let _v1 = X<bool>{value: false};
+        let _v2 = Y<X<bool>>{field: _v0};
+        let _v3 = Y<X<bool>>{field: _v1};
+        let _v4 = 0x1::vector::empty<Y<X<bool>>>();
+        let _v5 = &mut _v4;
+        0x1::vector::push_back<Y<X<bool>>>(_v5, _v2);
+        0x1::vector::push_back<Y<X<bool>>>(_v5, _v3);
+        let _v6 = _v4;
+        assert!(*&(&0x1::vector::borrow<Y<X<bool>>>(&_v6, 0).field).value == true, 0);
+        assert!(*&(&0x1::vector::borrow<Y<X<bool>>>(&_v6, 1).field).value == false, 0);
+        let _v7 = &mut (&mut 0x1::vector::borrow_mut<Y<X<bool>>>(&mut _v6, 0).field).value;
+        *_v7 = false;
+        let _v8 = &mut (&mut 0x1::vector::borrow_mut<Y<X<bool>>>(&mut _v6, 1).field).value;
+        *_v8 = true;
+        assert!(*&(&0x1::vector::borrow<Y<X<bool>>>(&_v6, 0).field).value == false, 0);
+        assert!(*&(&0x1::vector::borrow<Y<X<bool>>>(&_v6, 1).field).value == true, 0);
+    }
+    fun test_vector_const() {
+        let _v0 = vector[1u8, 2u8, 3u8];
+        assert!(*0x1::vector::borrow<u8>(&_v0, 0) == 1u8, 0);
+    }
+    fun test_vector_in_struct() {
+        let _v0 = M{vec: vector[1u8, 2u8, 3u8]};
+        let _v1 = 0x1::vector::empty<M>();
+        let _v2 = &mut _v1;
+        0x1::vector::push_back<M>(_v2, _v0);
+        0x1::vector::push_back<M>(_v2, _v0);
+        let _v3 = _v1;
+        assert!(*&0x1::vector::borrow<M>(&_v3, 0).vec == vector[1u8, 2u8, 3u8], 0);
+    }
+    fun test_vector_in_struct_2() {
+        let _v0 = M{vec: vector[1u8, 2u8, 3u8]};
+        let _v1 = 0x1::vector::empty<M>();
+        let _v2 = &mut _v1;
+        0x1::vector::push_back<M>(_v2, _v0);
+        0x1::vector::push_back<M>(_v2, _v0);
+        let _v3 = _v1;
+        assert!(*0x1::vector::borrow<u8>(&0x1::vector::borrow<M>(&_v3, 0).vec, 0) == 1u8, 0);
+    }
+    fun test_vector_in_struct_3() {
+        let _v0 = M{vec: vector[1u8, 2u8, 3u8]};
+        let _v1 = 0x1::vector::empty<M>();
+        let _v2 = &mut _v1;
+        0x1::vector::push_back<M>(_v2, _v0);
+        0x1::vector::push_back<M>(_v2, _v0);
+        let _v3 = _v1;
+        assert!(*0x1::vector::borrow<u8>(&0x1::vector::borrow<M>(&_v3, 0).vec, 2) == 3u8, 0);
+        assert!(*0x1::vector::borrow<u8>(&0x1::vector::borrow<M>(&_v3, 1).vec, 0) == 1u8, 0);
+    }
+}
+
+
+//# run --verbose --signers 0x1 -- 0x42::test::init
+
+//# run --verbose -- 0x42::test::test_resource_1
+
+//# run --verbose -- 0x42::test::test_resource_2
+
+//# run --verbose -- 0x42::test::test_vector
+
+//# run --verbose -- 0x42::test::test_two_dimension
+
+//# run --verbose -- 0x42::test::test_vector_borrow
+
+//# run --verbose -- 0x42::test::test_vector_borrow_freeze
+
+//# run --verbose -- 0x42::test::test_vector_borrow_mut
+
+//# run --verbose --signers 0x1 -- 0x42::test::init_2
+
+//# run --verbose -- 0x42::test::test_resource_3
+
+//# run --verbose -- 0x42::test::test_resource_freeze
+
+//# run --verbose -- 0x42::test::test_resource_4
+
+//# run --verbose -- 0x42::test::test_resource_5
+
+//# run --verbose -- 0x42::test::test_vector_const
+
+//# run --verbose -- 0x42::test::test_vector_in_struct
+
+//# run --verbose -- 0x42::test::test_vector_in_struct_2
+
+//# run --verbose -- 0x42::test::test_vector_in_struct_3
+
+//# run --verbose --signers 0x2 -- 0x42::test::init_3
+
+//# run --verbose -- 0x42::test::test_resource_with_vector
+
+//# run --verbose -- 0x42::test::call_sort
+
+//# run --verbose -- 0x42::test::test_index_then_field_select_1
+
+//# run --verbose -- 0x42::test::test_index_then_field_select_2
+
+//# run --verbose -- 0x42::test::test_index_then_field_select_3
+
+//# run --verbose -- 0x42::test::inc_vec_new_test
+
+//# run --verbose --signers 0x1 -- 0x42::test::init_receiver
+
+//# run --verbose -- 0x42::test::test_receiver
+
+//# run --verbose --signers 0x1 -- 0x42::test::init_receiver_2
+
+//# run --verbose -- 0x42::test::test_receiver_2

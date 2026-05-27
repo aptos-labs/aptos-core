@@ -347,7 +347,7 @@ impl DeprecatedItem {
         }
     }
 
-    pub fn get_code(&self) -> impl DiagnosticCode {
+    pub fn get_code(&self) -> impl DiagnosticCode + use<> {
         match self {
             DeprecatedItem::Module => NameResolution::DeprecatedModule,
             DeprecatedItem::Member => NameResolution::DeprecatedMember,

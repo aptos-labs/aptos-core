@@ -1,0 +1,117 @@
+//**** Cross-compiled for `move` syntax from `tests/no-v1-comparison/closures/calculator.move`
+
+//# publish
+module 0x66::calculator {
+    use 0x1::signer;
+    enum Input {
+        Number {
+            _0: u64,
+        }
+        Add,
+        Sub,
+    }
+    enum State has copy, drop, key {
+        Empty,
+        Value {
+            _0: u64,
+        }
+        Continuation {
+            _0: |u64|(u64) has copy + drop + store,
+        }
+    }
+    entry fun add(p0: &signer)
+        acquires State
+    {
+        let _v0 = Input::Add{};
+        process(p0, _v0);
+    }
+    fun process(p0: &signer, p1: Input)
+        acquires State
+    {
+        let _v0;
+        let _v1 = signer::address_of(p0);
+        let _v2 = move_from<State>(_v1);
+        let _v3 = &_v2;
+        let _v4 = &p1;
+        if (!((_v3 is Empty) && (_v4 is Number))) {
+            if (!((_v3 is Value) && (_v4 is Number))) {
+                if (!((_v3 is Value) && (_v4 is Add))) {
+                    if (!((_v3 is Value) && (_v4 is Sub))) {
+                        assert!((_v3 is Continuation) && (_v4 is Number), 1);
+                        let State::Continuation{_0: _v5} = _v2;
+                        let Input::Number{_0: _v6} = p1;
+                        _v0 = State::Value{_0: _v5(_v6)};
+                        move_to<State>(p0, _v0);
+                        return ()
+                    };
+                    let State::Value{_0: _v7} = _v2;
+                    let Input::Sub{} = p1;
+                    let _v8 = State::Continuation{_0: |arg0| storable_sub(_v7, arg0)};
+                    move_to<State>(p0, _v8);
+                    return ()
+                };
+                let State::Value{_0: _v9} = _v2;
+                let Input::Add{} = p1;
+                let _v10 = State::Continuation{_0: |arg0| storable_add(_v9, arg0)};
+                move_to<State>(p0, _v10);
+                return ()
+            };
+            let State::Value{_0: _v11} = _v2;
+            let Input::Number{_0: _v12} = p1;
+            let _v13 = State::Value{_0: _v12};
+            move_to<State>(p0, _v13);
+            return ()
+        };
+        let State::Empty{} = _v2;
+        let Input::Number{_0: _v14} = p1;
+        _v0 = State::Value{_0: _v14};
+        move_to<State>(p0, _v0);
+    }
+    fun init_module(p0: &signer) {
+        let _v0 = State::Empty{};
+        move_to<State>(p0, _v0);
+    }
+    entry fun number(p0: &signer, p1: u64)
+        acquires State
+    {
+        let _v0 = Input::Number{_0: p1};
+        process(p0, _v0);
+    }
+    #[persistent]
+    fun storable_sub(p0: u64, p1: u64): u64 {
+        p0 - p1
+    }
+    #[persistent]
+    fun storable_add(p0: u64, p1: u64): u64 {
+        p0 + p1
+    }
+    entry fun sub(p0: &signer)
+        acquires State
+    {
+        let _v0 = Input::Sub{};
+        process(p0, _v0);
+    }
+    fun view(p0: &signer): u64
+        acquires State
+    {
+        let _v0 = signer::address_of(p0);
+        let _v1 = borrow_global<State>(_v0);
+        assert!(_v1 is Value, 1);
+        *&_v1._0
+    }
+}
+
+
+//# run 0x66::calculator::init_module --signers 0x66
+
+//# run 0x66::calculator::number --signers 0x66 --args 10
+
+//# run 0x66::calculator::add --signers 0x66
+
+//# run 0x66::calculator::number --signers 0x66 --args 20
+
+//# run 0x66::calculator::sub --signers 0x66
+
+//# run 0x66::calculator::number --signers 0x66 --args 5
+
+//# run 0x66::calculator::view --signers 0x66

@@ -1,0 +1,129 @@
+
+Diagnostics:
+error: type `i64` is missing required ability `key`
+  ┌─ tests/integers/signed/invalid_resource.move:4:20
+  │
+4 │         if (exists<i64>(addr)) {
+  │                    ^^^
+  │
+  = required by instantiating type parameter `T:key` of function `exists`
+
+error: type `i64` is missing required ability `key`
+   ┌─ tests/integers/signed/invalid_resource.move:12:20
+   │
+12 │         if (exists<i64>(addr)) {
+   │                    ^^^
+   │
+   = required by instantiating type parameter `T:key` of function `exists`
+
+error: type `i128` is missing required ability `key`
+   ┌─ tests/integers/signed/invalid_resource.move:20:20
+   │
+20 │         if (exists<i128>(addr)) {
+   │                    ^^^^
+   │
+   = required by instantiating type parameter `T:key` of function `exists`
+
+error: type `i128` is missing required ability `key`
+   ┌─ tests/integers/signed/invalid_resource.move:28:20
+   │
+28 │         if (exists<i128>(addr)) {
+   │                    ^^^^
+   │
+   = required by instantiating type parameter `T:key` of function `exists`
+
+error: type `i64` is missing required ability `key`
+   ┌─ tests/integers/signed/invalid_resource.move:36:31
+   │
+36 │         let s = borrow_global<i64>(addr);
+   │                               ^^^
+   │
+   = required by instantiating type parameter `T:key` of function `borrow_global`
+
+error: type `i64` is missing required ability `key`
+   ┌─ tests/integers/signed/invalid_resource.move:41:31
+   │
+41 │         let s = borrow_global<i64>(addr);
+   │                               ^^^
+   │
+   = required by instantiating type parameter `T:key` of function `borrow_global`
+
+error: type `i128` is missing required ability `key`
+   ┌─ tests/integers/signed/invalid_resource.move:46:31
+   │
+46 │         let s = borrow_global<i128>(addr);
+   │                               ^^^^
+   │
+   = required by instantiating type parameter `T:key` of function `borrow_global`
+
+error: type `i128` is missing required ability `key`
+   ┌─ tests/integers/signed/invalid_resource.move:51:31
+   │
+51 │         let s = borrow_global<i128>(addr);
+   │                               ^^^^
+   │
+   = required by instantiating type parameter `T:key` of function `borrow_global`
+
+error: type `i64` is missing required ability `key`
+   ┌─ tests/integers/signed/invalid_resource.move:56:16
+   │
+56 │        move_to<i64>(account, x)
+   │                ^^^
+   │
+   = required by instantiating type parameter `T:key` of function `move_to`
+
+error: type `i64` is missing required ability `key`
+   ┌─ tests/integers/signed/invalid_resource.move:60:16
+   │
+60 │        move_to<i64>(account, x)
+   │                ^^^
+   │
+   = required by instantiating type parameter `T:key` of function `move_to`
+
+error: type `i128` is missing required ability `key`
+   ┌─ tests/integers/signed/invalid_resource.move:64:16
+   │
+64 │        move_to<i128>(account, x)
+   │                ^^^^
+   │
+   = required by instantiating type parameter `T:key` of function `move_to`
+
+error: type `i128` is missing required ability `key`
+   ┌─ tests/integers/signed/invalid_resource.move:68:16
+   │
+68 │        move_to<i128>(account, x)
+   │                ^^^^
+   │
+   = required by instantiating type parameter `T:key` of function `move_to`
+
+error: type `i64` is missing required ability `key`
+   ┌─ tests/integers/signed/invalid_resource.move:72:19
+   │
+72 │         move_from<i64>(signer::address_of(account))
+   │                   ^^^
+   │
+   = required by instantiating type parameter `T:key` of function `move_from`
+
+error: type `i64` is missing required ability `key`
+   ┌─ tests/integers/signed/invalid_resource.move:76:19
+   │
+76 │         move_from<i64>(signer::address_of(account))
+   │                   ^^^
+   │
+   = required by instantiating type parameter `T:key` of function `move_from`
+
+error: type `i128` is missing required ability `key`
+   ┌─ tests/integers/signed/invalid_resource.move:80:19
+   │
+80 │         move_from<i128>(signer::address_of(account))
+   │                   ^^^^
+   │
+   = required by instantiating type parameter `T:key` of function `move_from`
+
+error: type `i128` is missing required ability `key`
+   ┌─ tests/integers/signed/invalid_resource.move:84:19
+   │
+84 │         move_from<i128>(signer::address_of(account))
+   │                   ^^^^
+   │
+   = required by instantiating type parameter `T:key` of function `move_from`

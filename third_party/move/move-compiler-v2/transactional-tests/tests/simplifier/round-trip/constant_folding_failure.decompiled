@@ -1,0 +1,246 @@
+//**** Cross-compiled for `move` syntax from `tests/simplifier/constant_folding_failure.move`
+
+//# publish
+module 0xcafe::ConstantFailure {
+    fun main() {
+        let _v0 = 1u8 << 8u8;
+        let _v1 = 0u8 >> 8u8;
+        let _v2 = 1u8 / 0u8;
+        let _v3 = 1u8 % 0u8;
+        let _v4 = 255u8 + 255u8;
+        let _v5 = 0u8 - 1u8;
+        let _v6 = 256 as u8;
+        let _v7 = 0x1::vector::empty<u8>();
+        let _v8 = &mut _v7;
+        0x1::vector::push_back<u8>(_v8, _v0);
+        0x1::vector::push_back<u8>(_v8, _v1);
+        0x1::vector::push_back<u8>(_v8, _v2);
+        0x1::vector::push_back<u8>(_v8, _v3);
+        0x1::vector::push_back<u8>(_v8, _v4);
+        0x1::vector::push_back<u8>(_v8, _v5);
+        0x1::vector::push_back<u8>(_v8, _v6);
+        let _v9 = _v7;
+        let _v10 = 1u16 << 16u8;
+        let _v11 = 0u16 >> 16u8;
+        let _v12 = 1u16 / 0u16;
+        let _v13 = 1u16 % 0u16;
+        let _v14 = 65535u16 + 65535u16;
+        let _v15 = 0u16 - 1u16;
+        let _v16 = 65536 as u16;
+        let _v17 = 0x1::vector::empty<u16>();
+        let _v18 = &mut _v17;
+        0x1::vector::push_back<u16>(_v18, _v10);
+        0x1::vector::push_back<u16>(_v18, _v11);
+        0x1::vector::push_back<u16>(_v18, _v12);
+        0x1::vector::push_back<u16>(_v18, _v13);
+        0x1::vector::push_back<u16>(_v18, _v14);
+        0x1::vector::push_back<u16>(_v18, _v15);
+        0x1::vector::push_back<u16>(_v18, _v16);
+        let _v19 = _v17;
+        let _v20 = 1u32 << 32u8;
+        let _v21 = (1u8 << 8u8) as u32;
+        let _v22 = (1u16 << 16u8) as u32;
+        let _v23 = 0u32 >> 32u8;
+        let _v24 = (0u8 >> 8u8) as u32;
+        let _v25 = (0u16 >> 16u8) as u32;
+        let _v26 = 1u32 / 0u32;
+        let _v27 = 1u32 % 0u32;
+        let _v28 = 4294967295u32 + 4294967295u32;
+        let _v29 = (65535u16 + 65535u16) as u32;
+        let _v30 = (65535u16 + 65535u16) as u32;
+        let _v31 = (65535u16 + 65535u16) as u32;
+        let _v32 = 0u32 - 1u32;
+        let _v33 = 4294967296u128 as u32;
+        let _v34 = 0x1::vector::empty<u32>();
+        let _v35 = &mut _v34;
+        0x1::vector::push_back<u32>(_v35, _v20);
+        0x1::vector::push_back<u32>(_v35, _v21);
+        0x1::vector::push_back<u32>(_v35, _v22);
+        0x1::vector::push_back<u32>(_v35, _v23);
+        0x1::vector::push_back<u32>(_v35, _v24);
+        0x1::vector::push_back<u32>(_v35, _v25);
+        0x1::vector::push_back<u32>(_v35, _v26);
+        0x1::vector::push_back<u32>(_v35, _v27);
+        0x1::vector::push_back<u32>(_v35, _v28);
+        0x1::vector::push_back<u32>(_v35, _v29);
+        0x1::vector::push_back<u32>(_v35, _v30);
+        0x1::vector::push_back<u32>(_v35, _v31);
+        0x1::vector::push_back<u32>(_v35, _v32);
+        0x1::vector::push_back<u32>(_v35, _v33);
+        let _v36 = _v34;
+        let _v37 = 1 << 64u8;
+        let _v38 = (1u32 << 32u8) as u64;
+        let _v39 = 0 >> 64u8;
+        let _v40 = (0u32 >> 32u8) as u64;
+        let _v41 = 1 / 0;
+        let _v42 = 1 % 0;
+        let _v43 = 18446744073709551615 + 18446744073709551615;
+        let _v44 = (255u8 + 255u8) as u64;
+        let _v45 = (255u8 + 255u8) as u64;
+        let _v46 = (255u8 + 255u8) as u64;
+        let _v47 = (4294967295u32 + 4294967295u32) as u64;
+        let _v48 = (4294967295u32 + 4294967295u32) as u64;
+        let _v49 = (4294967295u32 + 4294967295u32) as u64;
+        let _v50 = 0 - 1;
+        let _v51 = 340282366920938463463374607431768211450u128 as u64;
+        let _v52 = 0x1::vector::empty<u64>();
+        let _v53 = &mut _v52;
+        0x1::vector::push_back<u64>(_v53, _v37);
+        0x1::vector::push_back<u64>(_v53, _v38);
+        0x1::vector::push_back<u64>(_v53, _v39);
+        0x1::vector::push_back<u64>(_v53, _v40);
+        0x1::vector::push_back<u64>(_v53, _v41);
+        0x1::vector::push_back<u64>(_v53, _v42);
+        0x1::vector::push_back<u64>(_v53, _v43);
+        0x1::vector::push_back<u64>(_v53, _v44);
+        0x1::vector::push_back<u64>(_v53, _v45);
+        0x1::vector::push_back<u64>(_v53, _v46);
+        0x1::vector::push_back<u64>(_v53, _v47);
+        0x1::vector::push_back<u64>(_v53, _v48);
+        0x1::vector::push_back<u64>(_v53, _v49);
+        0x1::vector::push_back<u64>(_v53, _v50);
+        0x1::vector::push_back<u64>(_v53, _v51);
+        let _v54 = _v52;
+        let _v55 = 1u128 << 128u8;
+        let _v56 = (1 << 64u8) as u128;
+        let _v57 = 0u128 >> 128u8;
+        let _v58 = (0 >> 64u8) as u128;
+        let _v59 = 1u128 / 0u128;
+        let _v60 = 1u128 % 0u128;
+        let _v61 = 340282366920938463463374607431768211450u128 + 340282366920938463463374607431768211450u128;
+        let _v62 = (18446744073709551615 + 18446744073709551615) as u128;
+        let _v63 = (18446744073709551615 + 18446744073709551615) as u128;
+        let _v64 = (18446744073709551615 + 18446744073709551615) as u128;
+        let _v65 = 0u128 - 1u128;
+        let _v66 = 340282366920938463463374607431768211456u256 as u128;
+        let _v67 = 0x1::vector::empty<u128>();
+        let _v68 = &mut _v67;
+        0x1::vector::push_back<u128>(_v68, _v55);
+        0x1::vector::push_back<u128>(_v68, _v56);
+        0x1::vector::push_back<u128>(_v68, _v57);
+        0x1::vector::push_back<u128>(_v68, _v58);
+        0x1::vector::push_back<u128>(_v68, _v59);
+        0x1::vector::push_back<u128>(_v68, _v60);
+        0x1::vector::push_back<u128>(_v68, _v61);
+        0x1::vector::push_back<u128>(_v68, _v62);
+        0x1::vector::push_back<u128>(_v68, _v63);
+        0x1::vector::push_back<u128>(_v68, _v64);
+        0x1::vector::push_back<u128>(_v68, _v65);
+        0x1::vector::push_back<u128>(_v68, _v66);
+        let _v69 = _v67;
+        let _v70 = (1u128 << 128u8) as u256;
+        let _v71 = (0u128 >> 128u8) as u256;
+        let _v72 = 1u256 / 0u256;
+        let _v73 = 1u256 % 0u256;
+        let _v74 = 115792089237316195423570985008687907853269984665640564039457584007913129639935u256 + 115792089237316195423570985008687907853269984665640564039457584007913129639935u256;
+        let _v75 = (340282366920938463463374607431768211450u128 + 340282366920938463463374607431768211450u128) as u256;
+        let _v76 = (340282366920938463463374607431768211450u128 + 340282366920938463463374607431768211450u128) as u256;
+        let _v77 = (340282366920938463463374607431768211450u128 + 340282366920938463463374607431768211450u128) as u256;
+        let _v78 = 0u256 - 1u256;
+        let _v79 = 0x1::vector::empty<u256>();
+        let _v80 = &mut _v79;
+        0x1::vector::push_back<u256>(_v80, _v70);
+        0x1::vector::push_back<u256>(_v80, _v71);
+        0x1::vector::push_back<u256>(_v80, _v72);
+        0x1::vector::push_back<u256>(_v80, _v73);
+        0x1::vector::push_back<u256>(_v80, _v74);
+        0x1::vector::push_back<u256>(_v80, _v75);
+        0x1::vector::push_back<u256>(_v80, _v76);
+        0x1::vector::push_back<u256>(_v80, _v77);
+        0x1::vector::push_back<u256>(_v80, _v78);
+        let _v81 = _v79;
+        let _v82 = sum_u8(&_v9);
+        let _v83 = sum_u16(&_v19);
+        let _v84 = sum_u32(&_v36);
+        let _v85 = sum_u64(&_v54);
+        let _v86 = sum_u128(&_v69);
+        let _v87 = sum_u256(&_v81);
+        assert!(_v82 != 0u8, 1);
+        assert!(_v83 != 0u16, 1);
+        assert!(_v84 != 0u32, 1);
+        assert!(_v85 != 0, 1);
+        assert!(_v86 != 0u128, 1);
+        assert!(_v87 != 0u256, 1);
+    }
+    fun sum_u8(p0: &vector<u8>): u8 {
+        let _v0 = 0u8;
+        let _v1 = 0;
+        loop {
+            let _v2 = 0x1::vector::length<u8>(p0);
+            if (!(_v1 < _v2)) break;
+            let _v3 = *0x1::vector::borrow<u8>(p0, _v1);
+            _v0 = _v0 + _v3;
+            _v1 = _v1 + 1;
+            continue
+        };
+        _v0
+    }
+    fun sum_u16(p0: &vector<u16>): u16 {
+        let _v0 = 0u16;
+        let _v1 = 0;
+        loop {
+            let _v2 = 0x1::vector::length<u16>(p0);
+            if (!(_v1 < _v2)) break;
+            let _v3 = *0x1::vector::borrow<u16>(p0, _v1);
+            _v0 = _v0 + _v3;
+            _v1 = _v1 + 1;
+            continue
+        };
+        _v0
+    }
+    fun sum_u32(p0: &vector<u32>): u32 {
+        let _v0 = 0u32;
+        let _v1 = 0;
+        loop {
+            let _v2 = 0x1::vector::length<u32>(p0);
+            if (!(_v1 < _v2)) break;
+            let _v3 = *0x1::vector::borrow<u32>(p0, _v1);
+            _v0 = _v0 + _v3;
+            _v1 = _v1 + 1;
+            continue
+        };
+        _v0
+    }
+    fun sum_u64(p0: &vector<u64>): u64 {
+        let _v0 = 0;
+        let _v1 = 0;
+        loop {
+            let _v2 = 0x1::vector::length<u64>(p0);
+            if (!(_v1 < _v2)) break;
+            let _v3 = *0x1::vector::borrow<u64>(p0, _v1);
+            _v0 = _v0 + _v3;
+            _v1 = _v1 + 1;
+            continue
+        };
+        _v0
+    }
+    fun sum_u128(p0: &vector<u128>): u128 {
+        let _v0 = 0u128;
+        let _v1 = 0;
+        loop {
+            let _v2 = 0x1::vector::length<u128>(p0);
+            if (!(_v1 < _v2)) break;
+            let _v3 = *0x1::vector::borrow<u128>(p0, _v1);
+            _v0 = _v0 + _v3;
+            _v1 = _v1 + 1;
+            continue
+        };
+        _v0
+    }
+    fun sum_u256(p0: &vector<u256>): u256 {
+        let _v0 = 0u256;
+        let _v1 = 0;
+        loop {
+            let _v2 = 0x1::vector::length<u256>(p0);
+            if (!(_v1 < _v2)) break;
+            let _v3 = *0x1::vector::borrow<u256>(p0, _v1);
+            _v0 = _v0 + _v3;
+            _v1 = _v1 + 1;
+            continue
+        };
+        _v0
+    }
+}
+
+
+//# run 0xcafe::ConstantFailure::main

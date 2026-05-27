@@ -51,12 +51,12 @@ impl ClosureMask {
         Self(mask)
     }
 
-    pub fn new_for_leading(n: usize) -> Self {
+    pub fn new_for_leading(n: usize) -> Result<Self, String> {
         let mut mask = Self::new(0);
         for i in 0..n {
-            mask.set_captured(i)
+            mask.set_captured(i)?;
         }
-        mask
+        Ok(mask)
     }
 
     pub fn bits(&self) -> u64 {
@@ -65,14 +65,22 @@ impl ClosureMask {
 
     /// Returns true if the i'th argument is captured. If `i` is out of range, false will
     /// be returned.
+    #[inline(always)]
     pub fn is_captured(&self, i: usize) -> bool {
         i < Self::MAX_ARGS && self.0 & (1 << i) != 0
     }
 
     /// Sets the ith argument to be captured
-    pub fn set_captured(&mut self, i: usize) {
-        assert!(i < Self::MAX_ARGS);
-        self.0 |= 1 << i
+    pub fn set_captured(&mut self, i: usize) -> Result<(), String> {
+        if i >= Self::MAX_ARGS {
+            return Err(format!(
+                "Captured argument index {} exceeds maximum allowed captured arguments {}",
+                i,
+                Self::MAX_ARGS
+            ));
+        }
+        self.0 |= 1 << i;
+        Ok(())
     }
 
     /// Apply a closure mask to a list of elements, returning only those

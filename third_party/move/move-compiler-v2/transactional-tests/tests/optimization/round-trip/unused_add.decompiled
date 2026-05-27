@@ -1,0 +1,11 @@
+//**** Cross-compiled for `move` syntax from `tests/optimization/unused_add.move`
+
+//# publish
+module 0xc0ffee::m {
+    public fun test() {
+        ()
+    }
+}
+
+
+//# run 0xc0ffee::m::test

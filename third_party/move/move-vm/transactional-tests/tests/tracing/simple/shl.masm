@@ -1,0 +1,10 @@
+//# publish
+module 0x22::test
+
+public fun shl_instr(a: u64): u64
+    move_loc a
+    ld_u8 1
+    shl
+    ret
+
+//# run --verbose 0x22::test::shl_instr --args 1u64 --display-trace

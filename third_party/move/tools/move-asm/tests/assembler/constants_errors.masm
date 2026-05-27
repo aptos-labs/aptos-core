@@ -1,0 +1,26 @@
+//# publish --print-bytecode
+module 0x66::test
+
+fun f_u8(): u8
+    ld_u8 512
+    ret
+
+fun f_u16(): u16
+    ld_u16 ident
+    ret
+
+fun c_u16(): u16
+    ld_const<u16> 65536
+    ret
+
+fun c_u8(): u128
+    ld_const<u8> 512
+    ret
+
+fun c_vec_u8(): vector<u8>
+    ld_const<vector<u8>> [256, 0]
+    ret
+
+fun c_vec_u8_2(): vector<u8>
+    ld_const<vector<u8>> 256
+    ret

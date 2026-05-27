@@ -1,0 +1,7 @@
+
+Diagnostics:
+error: type `|&||u64|u64 has copy + drop` is missing required ability `store`
+   ┌─ tests/ability-check/fv_as_keys/missing_store.move:19:35
+   │
+19 │     add_resource_with_struct(acc, f);
+   │                                   ^

@@ -1,0 +1,24 @@
+//**** Cross-compiled for `move` syntax from `tests/control_flow/for_loop_upper_bound.move`
+
+//# publish
+module 0x42::m {
+    fun foo(p0: &mut u64): u64 {
+        *p0 = *p0 + 1;
+        10
+    }
+    fun main(): u64 {
+        let _v0 = 0;
+        let _v1 = 0;
+        let _v2 = false;
+        let _v3 = foo(&mut _v0);
+        loop {
+            if (_v2) _v1 = _v1 + 1 else _v2 = true;
+            if (_v1 < _v3) continue;
+            break
+        };
+        _v0
+    }
+}
+
+
+//# run 0x42::m::main

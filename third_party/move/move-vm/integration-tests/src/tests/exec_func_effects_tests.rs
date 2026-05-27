@@ -10,8 +10,8 @@ use move_binary_format::errors::VMResult;
 use move_core_types::{
     account_address::AccountAddress,
     identifier::Identifier,
+    int256::U256,
     language_storage::ModuleId,
-    u256::U256,
     value::{serialize_values, MoveValue},
     vm_status::StatusCode,
 };

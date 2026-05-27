@@ -8,7 +8,7 @@ error: missing acquires annotation for `R`
 15 │         let r = borrow_global<R>(a);
    │                 ------------------- acquired here
    │
-   = since Move 2.2-unstable, `acquires` is inferred by the compiler and can be omitted from the function declaration.
+   = since Move 2.2, `acquires` is inferred by the compiler and can be omitted from the function declaration.
 
 error: unnecessary acquires annotation
    ┌─ tests/checking-lang-v2.2/acquires/acquires_error.move:14:40

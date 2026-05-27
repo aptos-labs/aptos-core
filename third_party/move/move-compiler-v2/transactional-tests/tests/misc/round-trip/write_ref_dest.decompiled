@@ -1,0 +1,22 @@
+//**** Cross-compiled for `move` syntax from `tests/misc/write_ref_dest.move`
+
+//# publish
+module 0x42::m {
+    fun foo(p0: &vector<u64>): (vector<u64>, u64) {
+        (*p0, 0)
+    }
+    fun test_assign() {
+        assert!(vector[1] == vector[1], 0);
+    }
+    fun test_call() {
+        let _v0 = 0x1::vector::empty<u64>();
+        let (_v1,_v2) = foo(&_v0);
+        let _v3 = 0x1::vector::empty<u64>();
+        assert!(_v1 == _v3, 0);
+    }
+}
+
+
+//# run 0x42::m::test_call
+
+//# run 0x42::m::test_assign

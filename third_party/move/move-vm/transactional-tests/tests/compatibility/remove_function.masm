@@ -1,0 +1,35 @@
+//# publish
+module 0x66::a
+fun foo()
+    ret
+
+
+//# publish
+module 0x66::a
+
+
+//# publish
+module 0x66::b
+friend fun friend_func()
+    ret
+
+
+//# publish
+module 0x66::b
+// Cannot friend public function, publish fails
+
+
+//# publish --skip-check-friend-linking
+module 0x66::b
+// If we treat friend as private, publish succeeds
+
+
+//# publish
+module 0x66::c
+public fun foo()
+    ret
+
+
+//# publish
+module 0x66::c
+// Cannot remove public function, publish fails

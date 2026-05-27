@@ -422,9 +422,9 @@ pub fn parse_struct_tag(s: &str) -> Result<StructTag> {
 mod tests {
     use crate::{
         account_address::AccountAddress,
+        int256,
         parser::{parse_struct_tag, parse_transaction_argument, parse_type_tag},
         transaction_argument::TransactionArgument,
-        u256,
     };
     use std::str::FromStr;
 
@@ -462,22 +462,22 @@ mod tests {
             ("01239498u32", T::U32(1239498)),
             ("35366u32", T::U32(35366)),
             ("4294967295u32", T::U32(4294967295)),
-            ("0u256", T::U256(u256::U256::from(0u8))),
+            ("0u256", T::U256(int256::U256::ZERO)),
             ("1_0u16", T::U16(1_0)),
             ("10_u16", T::U16(10)),
             ("10___u16", T::U16(10)),
             ("1_000u32", T::U32(1_000)),
             ("1_0_00u32", T::U32(1_000)),
             ("1_0_0_0u32", T::U32(1_000)),
-            ("1_000_000u256", T::U256(u256::U256::from(1_000_000u64))),
+            ("1_000_000u256", T::U256(int256::U256::from(1_000_000u64))),
             (
                 "1_000_000_000u256",
-                T::U256(u256::U256::from(1_000_000_000u128)),
+                T::U256(int256::U256::from(1_000_000_000u128)),
             ),
             (
                 "3402823669209384634633746074317682114551234u256",
                 T::U256(
-                    u256::U256::from_str("3402823669209384634633746074317682114551234").unwrap(),
+                    int256::U256::from_str("3402823669209384634633746074317682114551234").unwrap(),
                 ),
             ),
             ("true", T::Bool(true)),

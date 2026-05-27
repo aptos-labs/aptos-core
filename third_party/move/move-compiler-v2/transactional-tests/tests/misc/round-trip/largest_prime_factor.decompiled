@@ -1,0 +1,45 @@
+//**** Cross-compiled for `move` syntax from `tests/misc/largest_prime_factor.move`
+
+//# publish
+module 0xc0ffee::largest_prime_factor {
+    public fun largest_prime_factor(p0: u64): u64 {
+        let _v0 = 1;
+        let _v1 = 2;
+        loop {
+            let _v2;
+            let _v3 = p0 / 2;
+            if (!(_v1 <= _v3)) break;
+            if (p0 % _v1 == 0) _v2 = is_prime(_v1) else _v2 = false;
+            if (_v2) _v0 = _v1;
+            _v1 = _v1 + 1;
+            continue
+        };
+        if (is_prime(p0)) _v0 = p0;
+        _v0
+    }
+    public fun is_prime(p0: u64): bool {
+        'l0: loop {
+            'l1: loop {
+                if (!(p0 < 2)) {
+                    let _v0 = 2;
+                    loop {
+                        let _v1 = p0 / 2;
+                        if (!(_v0 <= _v1)) break 'l0;
+                        if (p0 % _v0 == 0) break 'l1;
+                        _v0 = _v0 + 1;
+                        continue
+                    }
+                };
+                return false
+            };
+            return false
+        };
+        true
+    }
+    public fun test_largest_prime_factor() {
+        assert!(largest_prime_factor(13195) == 29, 0);
+    }
+}
+
+
+//# run 0xc0ffee::largest_prime_factor::test_largest_prime_factor

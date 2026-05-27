@@ -1,0 +1,5 @@
+module 0x1::bcs {
+    public native fun to_bytes<MoveValue>(v: &MoveValue): vector<u8>;
+}
+
+============ recompilation succeeded ========

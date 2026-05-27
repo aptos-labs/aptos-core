@@ -80,6 +80,20 @@
 //!
 //!     goto L
 //!
+//! 5. Hoists jumps to blocks which simply exit the function into the source block. This
+//!    simplification may result in dead code which is removed in later stages:
+//!
+//!    L1: ...; goto L2;
+//!    L2: return|abort
+//!
+//!    ==>
+//!
+//!    L1: ...; return/abort;
+//!    L2: return|abort  // might be dead code now
+//!
+//!    While this transformation may lead to more complex stackless bytecode, it the
+//!    final stack machine of the VM, this avoids unnecessary temporaries and branches.
+//!
 //! We also remove unused labels.
 //!
 //! Side effects: removes all annotations.
@@ -493,17 +507,17 @@ impl ControlFlowGraphCodeGenerator {
         // check invariant 2
         assert!(self.successors.keys().eq(pred_map_reversed.keys()));
         for block in self.successors.keys() {
-            assert!(
+            assert_eq!(
                 self.successors
                     .get(block)
                     .expect("successors")
                     .iter()
+                    .collect::<BTreeSet<_>>(),
+                pred_map_reversed
+                    .get(block)
+                    .expect("pred_map_reversed")
+                    .iter()
                     .collect::<BTreeSet<_>>()
-                    == pred_map_reversed
-                        .get(block)
-                        .expect("pred_map_reversed")
-                        .iter()
-                        .collect::<BTreeSet<_>>()
             );
         }
         // check invariant 3
@@ -556,25 +570,23 @@ impl ControlFlowGraphCodeGenerator {
                         .iter()
                         .map(|block| self.get_block_label(*block).expect("label"))
                         .collect();
-                    assert!(
-                        succs_labels.len() == {
-                            if l0 == l1 {
-                                1
-                            } else {
-                                2
-                            }
+                    assert_eq!(succs_labels.len(), {
+                        if l0 == l1 {
+                            1
+                        } else {
+                            2
                         }
-                    );
+                    });
                     assert!(succs_labels.contains(l0));
                     assert!(succs_labels.contains(l1));
                 },
                 Bytecode::Jump(_, l) => {
                     let suc_block = self.get_the_non_trivial_successor(*block);
                     let suc_label = self.get_block_label(suc_block).expect("label");
-                    assert!(l == &suc_label);
+                    assert_eq!(l, &suc_label);
                 },
                 _ => {
-                    assert!(self.successors.get(block).expect("successors").len() == 1);
+                    assert_eq!(self.successors.get(block).expect("successors").len(), 1);
                 },
             }
         }
@@ -710,20 +722,26 @@ impl RedundantJumpRemover {
     /// Requires: `block` still in the cfg, `block` is not entry/exit
     fn remove_redundant_edges_from(&mut self, block: BlockId) {
         for suc in self.0.successors.get(&block).expect("successors").clone() {
-            if !self.0.is_trivial_block(suc) && self.remove_jump_if_possible(block, suc) {
-                // we may have removed block
-                if !self.0.successors.contains_key(&block) {
+            if !self.0.is_trivial_block(suc) {
+                if self.hoist_exit_jump_if_possible(block, suc) {
+                    // No further processing needed
                     break;
                 }
-                // successors of `block` changes
-                // consider
-                //    L0: goto L1; L1: goto L2; L2: goto L3;
-                // the successor of L0 is L1
-                // after merging block L1 into block L0 we get
-                //     L0: goto L2; L2: goto L3;
-                // now the successor of L0 becomes L2
-                // we continue to merge block L3 into block L0 ...
-                self.remove_redundant_edges_from(block);
+                if self.remove_jump_if_possible(block, suc) {
+                    // we may have removed block
+                    if !self.0.successors.contains_key(&block) {
+                        break;
+                    }
+                    // successors of `block` changes
+                    // consider
+                    //    L0: goto L1; L1: goto L2; L2: goto L3;
+                    // the successor of L0 is L1
+                    // after merging block L1 into block L0 we get
+                    //     L0: goto L2; L2: goto L3;
+                    // now the successor of L0 becomes L2
+                    // we continue to merge block L3 into block L0 ...
+                    self.remove_redundant_edges_from(block);
+                }
             }
         }
     }
@@ -787,6 +805,40 @@ impl RedundantJumpRemover {
             }
             true
         }
+    }
+
+    /// If the edge `(from , to)` is unconditional jump to an exit (return or abort)
+    /// instruction, pull that instruction into the `from` block, eliminating the jump.
+    /// The `to` block may eventually become dead code and removed by the deadcode
+    /// eliminator.
+    fn hoist_exit_jump_if_possible(&mut self, from: BlockId, to: BlockId) -> bool {
+        if from != to
+            && let Some(exit_bc) = self.get_exit_target(from, to).cloned()
+        {
+            let from_code = self.0.code_block_mut(from);
+            remove_tail_jump(from_code);
+            from_code.push(exit_bc);
+            true
+        } else {
+            false
+        }
+    }
+
+    /// Determine whether we jump `from` -> `to` and simply exit.
+    fn get_exit_target(&self, from: BlockId, to: BlockId) -> Option<&Bytecode> {
+        // Last instruction of from must be `Jump`
+        let from_instrs = self.0.block_instrs(from);
+        from_instrs
+            .last()
+            .filter(|bc| matches!(bc, Bytecode::Jump(..)))?;
+        let mut to_instrs = self.0.block_instrs(to);
+        // If the block may start with a label marker, skip it.
+        while matches!(to_instrs.first(), Some(Bytecode::Label(..))) {
+            to_instrs = &to_instrs[1..];
+        }
+        to_instrs
+            .first()
+            .filter(|bc| matches!(bc, Bytecode::Ret(..) | Bytecode::Abort(..)))
     }
 }
 

@@ -1,13 +1,10 @@
 processed 5 tasks
-
-task 1 'run'. lines 53-53:
+task 0 lines 1-51:  publish [module 0x42::test {]
+task 1 lines 53-53:  run --verbose -- 0x42::test::test1
 return values: 42
-
-task 2 'run'. lines 55-55:
+task 2 lines 55-55:  run --verbose -- 0x42::test::test2
 return values: 42
-
-task 3 'run'. lines 57-57:
+task 3 lines 57-57:  run --verbose -- 0x42::test::test3
 return values: 43
-
-task 4 'run'. lines 59-59:
+task 4 lines 59-59:  run --verbose -- 0x42::test::test4
 return values: 43

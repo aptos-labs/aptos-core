@@ -48,11 +48,8 @@ use legacy_move_compiler::command_line as cli;
 #[allow(unused_imports)]
 use log::{debug, info, warn};
 pub use move_binary_format::file_format::Visibility;
-#[allow(deprecated)]
-use move_binary_format::normalized::Type as MType;
 use move_binary_format::{
     access::ModuleAccess,
-    binary_views::BinaryIndexedView,
     file_format::{
         Bytecode, CodeOffset, Constant as VMConstant, ConstantPoolIndex, FunctionDefinitionIndex,
         FunctionHandleIndex, MemberCount, SignatureIndex, SignatureToken, StructDefinitionIndex,
@@ -61,7 +58,7 @@ use move_binary_format::{
     views::{FunctionDefinitionView, FunctionHandleView, StructHandleView},
     CompiledModule,
 };
-use move_bytecode_source_map::{mapping::SourceMapping, source_map::SourceMap};
+use move_bytecode_source_map::source_map::SourceMap;
 use move_command_line_common::{
     address::NumericalAddress, env::read_bool_env_var, files::FileHash,
 };
@@ -72,7 +69,6 @@ use move_core_types::{
     language_storage,
     value::MoveValue,
 };
-use move_disassembler::disassembler::{Disassembler, DisassemblerOptions};
 use num::ToPrimitive;
 use once_cell::sync::Lazy;
 use serde::{Deserialize, Serialize};
@@ -607,6 +603,10 @@ pub struct GlobalEnv {
     /// Whether the v2 compiler has generated this model.
     /// TODO: replace with a proper version number once we have this in file format
     pub(crate) generated_by_v2: bool,
+    /// A set of types that are instantiated in cmp module.
+    pub cmp_types: RefCell<BTreeSet<Type>>,
+    /// An estimate of each target Move function's size.
+    pub function_size_estimate: RefCell<BTreeMap<QualifiedId<FunId>, FunctionSize>>,
 }
 
 /// A helper type for implementing fmt::Display depending on GlobalEnv
@@ -668,6 +668,8 @@ impl GlobalEnv {
             address_alias_map: Default::default(),
             everything_is_target: Default::default(),
             generated_by_v2: false,
+            cmp_types: RefCell::new(Default::default()),
+            function_size_estimate: RefCell::new(Default::default()),
         }
     }
 
@@ -882,7 +884,7 @@ impl GlobalEnv {
     }
 
     /// Find all target modules and return in a vector
-    pub fn get_target_modules(&self) -> Vec<ModuleEnv> {
+    pub fn get_target_modules(&self) -> Vec<ModuleEnv<'_>> {
         let mut target_modules: Vec<ModuleEnv> = vec![];
         for module_env in self.get_modules() {
             if module_env.is_target() {
@@ -893,7 +895,7 @@ impl GlobalEnv {
     }
 
     /// Find all target modules and their transitive closures and return in a vector
-    pub fn get_target_modules_transitive_closure(&self) -> Vec<ModuleEnv> {
+    pub fn get_target_modules_transitive_closure(&self) -> Vec<ModuleEnv<'_>> {
         let mut target_and_transitive_modules: BTreeSet<ModuleId> = BTreeSet::new();
         let mut todo_modules: BTreeSet<ModuleId> = BTreeSet::new();
         for module_env in self.get_modules() {
@@ -924,7 +926,7 @@ impl GlobalEnv {
     }
 
     /// Find all primary target modules and return in a vector
-    pub fn get_primary_target_modules(&self) -> Vec<ModuleEnv> {
+    pub fn get_primary_target_modules(&self) -> Vec<ModuleEnv<'_>> {
         let mut target_modules: Vec<ModuleEnv> = vec![];
         for module_env in self.get_modules() {
             if module_env.is_primary_target() {
@@ -1249,6 +1251,15 @@ impl GlobalEnv {
             .any(|(d, _)| d.severity >= Severity::Warning)
     }
 
+    pub fn has_diag_in_primary_targets(&self, min_severity: Severity) -> bool {
+        self.diags.borrow().iter().any(|(d, _)| {
+            d.severity >= min_severity
+                && d.labels
+                    .iter()
+                    .any(|label| self.file_id_is_primary_target.contains(&label.file_id))
+        })
+    }
+
     /// Writes accumulated diagnostics of given or higher severity.
     pub fn report_diag<W: WriteColor>(&self, writer: &mut W, severity: Severity) {
         self.report_diag_with_filter(
@@ -1281,25 +1292,18 @@ impl GlobalEnv {
     // Comparison of Diagnostic values that tries to match program ordering so we
     // can display them to the user in a more natural order.
     fn cmp_diagnostic(diag1: &Diagnostic<FileId>, diag2: &Diagnostic<FileId>) -> Ordering {
-        let labels_ordering = GlobalEnv::cmp_labels(&diag1.labels, &diag2.labels);
-        if Ordering::Equal == labels_ordering {
-            let sev_ordering = diag1
+        GlobalEnv::cmp_labels(&diag1.labels, &diag2.labels).then_with(|| {
+            diag1
                 .severity
                 .partial_cmp(&diag2.severity)
-                .expect("Severity provides a total ordering for valid severity enum values");
-            if Ordering::Equal == sev_ordering {
-                let message_ordering = diag1.message.cmp(&diag2.message);
-                if Ordering::Equal == message_ordering {
-                    diag1.code.cmp(&diag2.code)
-                } else {
-                    message_ordering
-                }
-            } else {
-                sev_ordering
-            }
-        } else {
-            labels_ordering
-        }
+                .expect("Severity provides a total ordering for valid severity enum values")
+                .then_with(|| {
+                    diag1
+                        .message
+                        .cmp(&diag2.message)
+                        .then_with(|| diag1.code.cmp(&diag2.code))
+                })
+        })
     }
 
     // Label comparison that tries to match program ordering.  `FileId` is already set in visitation
@@ -1307,25 +1311,13 @@ impl GlobalEnv {
     // marking nested regions, we want the innermost region, so we order first by end of labelled
     // code region, then in reverse by start of region.
     fn cmp_label(label1: &Label<FileId>, label2: &Label<FileId>) -> Ordering {
-        let file_ordering = label1.file_id.cmp(&label2.file_id);
-        if Ordering::Equal == file_ordering {
-            // First order by end of region.
-            let end1 = label1.range.end;
-            let end2 = label2.range.end;
-            let end_ordering = end1.cmp(&end2);
-            if Ordering::Equal == end_ordering {
-                let start1 = label1.range.start;
-                let start2 = label2.range.start;
-
-                // For nested regions with same end, show inner-most region first.
-                // Swap 1 and 2 in comparing starts.
-                start2.cmp(&start1)
-            } else {
-                end_ordering
-            }
-        } else {
-            file_ordering
-        }
+        label1.file_id.cmp(&label2.file_id).then_with(|| {
+            label1
+                .range
+                .end
+                .cmp(&label2.range.end)
+                .then_with(|| label2.range.start.cmp(&label1.range.start))
+        })
     }
 
     // Label comparison within a list of labels for a given diagnostic, which orders by priority
@@ -1346,12 +1338,14 @@ impl GlobalEnv {
     fn cmp_labels(labels1: &[Label<FileId>], labels2: &[Label<FileId>]) -> Ordering {
         let mut sorted_labels1 = labels1.iter().collect_vec();
         sorted_labels1.sort_by(|l1, l2| GlobalEnv::cmp_label_priority(l1, l2));
+        let sorted_labels1_len = sorted_labels1.len();
         let mut sorted_labels2 = labels2.iter().collect_vec();
         sorted_labels2.sort_by(|l1, l2| GlobalEnv::cmp_label_priority(l1, l2));
+        let sorted_labels2_len = sorted_labels2.len();
         std::iter::zip(sorted_labels1, sorted_labels2)
             .map(|(l1, l2)| GlobalEnv::cmp_label(l1, l2))
-            .find(|r| Ordering::Equal != *r)
-            .unwrap_or(Ordering::Equal)
+            .fold(Ordering::Equal, Ordering::then)
+            .then_with(|| sorted_labels1_len.cmp(&sorted_labels2_len))
     }
 
     /// Writes accumulated diagnostics that pass through `filter`
@@ -1362,12 +1356,8 @@ impl GlobalEnv {
     {
         let mut shown = BTreeSet::new();
         self.diags.borrow_mut().sort_by(|a, b| {
-            let reported_ordering = a.1.cmp(&b.1);
-            if Ordering::Equal == reported_ordering {
-                GlobalEnv::cmp_diagnostic(&a.0, &b.0)
-            } else {
-                reported_ordering
-            }
+            a.1.cmp(&b.1)
+                .then_with(|| GlobalEnv::cmp_diagnostic(&a.0, &b.0))
         });
         for (diag, reported) in self.diags.borrow_mut().iter_mut().filter(|(d, reported)| {
             !reported
@@ -1728,11 +1718,104 @@ impl GlobalEnv {
         }
         let used_modules = self.get_used_modules_from_bytecode(&module);
         let friend_modules = self.get_friend_modules_from_bytecode(&module);
+
+        // If use decls decls are empty, let's propagage them from the CompiledModule with aliases assigned
+        let use_decls = if self.module_data[module_id.0 as usize].use_decls.is_empty() {
+            // Map to keep track of aliases for used modules
+            // key: module name (without address)
+            // value: [module address -> module alias]
+            let mut aliases = BTreeMap::new();
+            let mut make_alias = |address: Address, module_name: Symbol| {
+                // module name does not exist: alias not needed but keep track of it
+                let addr_alias_map = aliases.entry(module_name).or_insert_with(|| {
+                    let mut inner_map = BTreeMap::new();
+                    inner_map.insert(address.clone(), module_name);
+                    inner_map
+                });
+                // The module name exists and the address has not been recorded, we need to make an alias for this module name at this address
+                if addr_alias_map.get(&address).is_none() {
+                    let module_alias = format!(
+                        "{}_{}",
+                        module_name.display(&self.symbol_pool),
+                        addr_alias_map.len()
+                    );
+                    let alias = self.symbol_pool.make(&module_alias);
+                    addr_alias_map.insert(address, alias);
+                    return Some(alias);
+                }
+                None
+            };
+            used_modules
+                .iter()
+                .map(|mid| {
+                    let module_env = self.get_module(*mid);
+                    let name = module_env.get_name();
+                    UseDecl {
+                        loc: Loc::default(),
+                        module_name: name.clone(),
+                        module_id: Some(*mid),
+                        alias: make_alias(name.addr().clone(), name.name()),
+                        members: vec![],
+                    }
+                })
+                .collect()
+        } else {
+            vec![]
+        };
+        // If friend decls are empty, let's propagage them from the CompiledModule
+        // Different from use decls, we allow friend modules that have not been added to the GlobalEnv
+        // - why: use decls are ensured to be added when `with_dep_closure` is set, which is not the case for friend decls
+        let friend_decls = if self.module_data[module_id.0 as usize]
+            .friend_decls
+            .is_empty()
+        {
+            module
+                .immediate_friends_iter()
+                .map(|(ff_addr, ff_name)| {
+                    let addr = Address::Numerical(*ff_addr);
+                    let name = self.symbol_pool.make(ff_name.as_str());
+                    let module_name = ModuleName::new(addr, name);
+                    let module_id = self
+                        .find_module(&module_name)
+                        .map(|module_env| module_env.get_id());
+                    FriendDecl {
+                        loc: Loc::default(),
+                        module_name,
+                        module_id,
+                    }
+                })
+                .collect()
+        } else {
+            vec![]
+        };
+
         let mod_data = &mut self.module_data[module_id.0 as usize];
         mod_data.used_modules = used_modules;
+        mod_data.use_decls = use_decls;
         mod_data.friend_modules = friend_modules;
+        mod_data.friend_decls = friend_decls;
         mod_data.compiled_module = Some(module);
         mod_data.source_map = Some(source_map);
+    }
+
+    /// Updates modules previously loaded into the environment
+    pub fn update_loaded_modules(&mut self) {
+        // update friend modules that are not ready when loading a module
+        let friend_modules_vec: Vec<Option<BTreeSet<ModuleId>>> =
+            self.module_data
+                .iter()
+                .map(|mod_data| {
+                    mod_data.compiled_module.as_ref().map(|compiled_module| {
+                        self.get_friend_modules_from_bytecode(compiled_module)
+                    })
+                })
+                .collect();
+
+        for (mod_data, friend_modules_opt) in self.module_data.iter_mut().zip(friend_modules_vec) {
+            if let Some(friend_modules) = friend_modules_opt {
+                mod_data.friend_modules = friend_modules;
+            }
+        }
     }
 
     fn get_used_funs_from_bytecode(
@@ -1863,6 +1946,8 @@ impl GlobalEnv {
             variants: None,
             spec: RefCell::new(Spec::default()),
             is_native: false,
+            visibility: Visibility::Private,
+            has_package_visibility: false,
         }
     }
 
@@ -1984,8 +2069,16 @@ impl GlobalEnv {
             .function_data
             .get_mut(&fun.id)
             .unwrap();
-        data.used_funs = Some(def.used_funs());
+        // Recompute called and used functions.
         data.called_funs = Some(def.called_funs());
+        data.used_funs = Some(def.used_funs());
+        // Reset various caches because the AST has changed.
+        *data.calling_funs.borrow_mut() = None;
+        *data.transitive_closure_of_called_funs.borrow_mut() = None;
+        *data.using_funs.borrow_mut() = None;
+        *data.transitive_closure_of_used_funs.borrow_mut() = None;
+        *data.used_functions_with_transitive_inline.borrow_mut() = None;
+        // Set the new function definition.
         data.def = Some(def);
     }
 
@@ -2045,6 +2138,7 @@ impl GlobalEnv {
             using_funs: RefCell::new(None),
             transitive_closure_of_used_funs: RefCell::new(None),
             used_functions_with_transitive_inline: RefCell::new(None),
+            used_structs: RefCell::new(None),
         };
         assert!(self
             .module_data
@@ -2111,6 +2205,7 @@ impl GlobalEnv {
             using_funs: RefCell::new(None),
             transitive_closure_of_used_funs: RefCell::new(None),
             used_functions_with_transitive_inline: RefCell::new(None),
+            used_structs: RefCell::new(None),
         }
     }
 
@@ -2152,7 +2247,7 @@ impl GlobalEnv {
 
     /// Gets the spec block associated with the spec block target. Only
     /// module, struct, and function specs are supported.
-    pub fn get_spec_block(&self, target: &SpecBlockTarget) -> Ref<Spec> {
+    pub fn get_spec_block(&self, target: &SpecBlockTarget) -> Ref<'_, Spec> {
         use SpecBlockTarget::*;
         match target {
             Module(mid) => self.module_data[mid.to_usize()].module_spec.borrow(),
@@ -2179,7 +2274,7 @@ impl GlobalEnv {
 
     /// Gets the spec block associated with the spec block target. Only
     /// module, struct, and function specs are supported.
-    pub fn get_spec_block_mut(&self, target: &SpecBlockTarget) -> RefMut<Spec> {
+    pub fn get_spec_block_mut(&self, target: &SpecBlockTarget) -> RefMut<'_, Spec> {
         use SpecBlockTarget::*;
         match target {
             Module(mid) => self.module_data[mid.to_usize()].module_spec.borrow_mut(),
@@ -2205,8 +2300,18 @@ impl GlobalEnv {
     }
 
     /// Return the `StructEnv` for `str`
-    pub fn get_struct(&self, str: QualifiedId<StructId>) -> StructEnv {
+    pub fn get_struct(&self, str: QualifiedId<StructId>) -> StructEnv<'_> {
         self.get_module(str.module_id).into_struct(str.id)
+    }
+
+    /// Return the `Option<StructEnv>` for `str`
+    pub fn get_struct_opt(&self, str: QualifiedId<StructId>) -> Option<StructEnv<'_>> {
+        self.get_module_opt(str.module_id).and_then(|module| {
+            module.data.struct_data.get(&str.id).map(|data| StructEnv {
+                module_env: module,
+                data,
+            })
+        })
     }
 
     // Gets the number of modules in this environment.
@@ -2309,36 +2414,6 @@ impl GlobalEnv {
             return n.to_usize();
         }
         None
-    }
-
-    /// Attempt to compute a struct tag for (`mid`, `sid`, `ts`). Returns `Some` if all types in
-    /// `ts` are closed, `None` otherwise
-    pub fn get_struct_tag(
-        &self,
-        mid: ModuleId,
-        sid: StructId,
-        ts: &[Type],
-    ) -> Option<language_storage::StructTag> {
-        self.get_struct_type(mid, sid, ts)?.into_struct_tag()
-    }
-
-    /// Attempt to compute a struct type for (`mid`, `sid`, `ts`).
-    #[allow(deprecated)]
-    pub fn get_struct_type(&self, mid: ModuleId, sid: StructId, ts: &[Type]) -> Option<MType> {
-        let menv = self.get_module(mid);
-        Some(MType::Struct {
-            address: (if let Address::Numerical(addr) = *menv.self_address() {
-                Some(addr)
-            } else {
-                None
-            })?,
-            module: menv.get_identifier()?,
-            name: menv.get_struct(sid).get_identifier()?,
-            type_arguments: ts
-                .iter()
-                .map(|t| t.clone().into_normalized_type(self).unwrap())
-                .collect(),
-        })
     }
 
     /// Gets the location of the given node.
@@ -2534,7 +2609,7 @@ impl GlobalEnv {
     }
 
     /// Produce a TypeDisplayContext to print types within the scope of this env
-    pub fn get_type_display_ctx(&self) -> TypeDisplayContext {
+    pub fn get_type_display_ctx(&self) -> TypeDisplayContext<'_> {
         TypeDisplayContext::new(self)
     }
 
@@ -2575,6 +2650,42 @@ impl GlobalEnv {
                     using_funs.retain(|qfun_id| predicate(qfun_id))
                 }
             });
+        }
+    }
+
+    /// Update the friend declarations in all target modules, when the
+    /// callees could have changed due to AST-level optimizations.
+    pub fn update_friend_decls_in_targets(&mut self) {
+        let mut friend_decls_to_add = BTreeMap::new();
+        for module in self.get_target_modules() {
+            let module_name = module.get_name();
+            let needed = module.need_to_be_friended_by();
+            for need_to_be_friended_by in needed {
+                let need_to_be_friend_with = self.get_module(need_to_be_friended_by);
+                let already_friended = need_to_be_friend_with
+                    .get_friend_decls()
+                    .iter()
+                    .any(|friend_decl| &friend_decl.module_name == module_name);
+                if !already_friended {
+                    let loc = need_to_be_friend_with.get_loc();
+                    let friend_decl = FriendDecl {
+                        loc,
+                        module_name: module_name.clone(),
+                        module_id: Some(module.get_id()),
+                    };
+                    friend_decls_to_add
+                        .entry(need_to_be_friended_by)
+                        .or_insert_with(Vec::new)
+                        .push(friend_decl);
+                }
+            }
+        }
+        for (module_id, friend_decls) in friend_decls_to_add {
+            let module_data = self.get_module_data_mut(module_id);
+            module_data
+                .friend_modules
+                .extend(friend_decls.iter().flat_map(|d| d.module_id));
+            module_data.friend_decls.extend(friend_decls);
         }
     }
 }
@@ -2850,6 +2961,10 @@ impl GlobalEnv {
             format!(": {}", result_type.display(tctx))
         };
         format!("{}({}){}", type_params_str, params_str, result_str)
+    }
+
+    pub fn set_function_size_estimates(&self, sizes: BTreeMap<QualifiedId<FunId>, FunctionSize>) {
+        *self.function_size_estimate.borrow_mut() = sizes;
     }
 }
 
@@ -3148,6 +3263,26 @@ impl<'env> ModuleEnv<'env> {
                     deps.insert(used_mod_id);
                 }
             }
+            // Obtain used structs and enums for package visibility of structs/enums
+            if self
+                .env
+                .language_version()
+                .language_version_for_public_struct()
+            {
+                for used_struct in fun_env.get_used_structs_with_transitive_inline() {
+                    let used_mod_id = used_struct.module_id;
+                    if self.get_id() == used_struct.module_id {
+                        continue;
+                    }
+                    let used_mod_env = self.env.get_module(used_mod_id);
+                    let used_struct_env = used_mod_env.get_struct(used_struct.id);
+                    if used_struct_env.has_package_visibility()
+                        && self.can_call_package_fun_in(&used_mod_env)
+                    {
+                        deps.insert(used_mod_id);
+                    }
+                }
+            }
         }
         deps
     }
@@ -3194,7 +3329,7 @@ impl<'env> ModuleEnv<'env> {
     }
 
     /// Returns a context to display types for this module.
-    pub fn get_type_display_ctx(&self) -> TypeDisplayContext {
+    pub fn get_type_display_ctx(&self) -> TypeDisplayContext<'_> {
         TypeDisplayContext {
             module_name: Some(self.get_name().clone()),
             used_modules: self.get_used_modules(false),
@@ -3510,7 +3645,7 @@ impl<'env> ModuleEnv<'env> {
     }
 
     /// Gets module specification.
-    pub fn get_spec(&self) -> Ref<Spec> {
+    pub fn get_spec(&self) -> Ref<'_, Spec> {
         self.data.module_spec.borrow()
     }
 
@@ -3525,7 +3660,7 @@ impl<'env> ModuleEnv<'env> {
     pub fn get_spec_funs_of_name(
         &self,
         name: Symbol,
-    ) -> impl Iterator<Item = (&'env SpecFunId, &'env SpecFunDecl)> {
+    ) -> impl Iterator<Item = (&'env SpecFunId, &'env SpecFunDecl)> + use<'env> {
         self.data
             .spec_funs
             .iter()
@@ -3534,20 +3669,10 @@ impl<'env> ModuleEnv<'env> {
 
     /// Disassemble the module bytecode, if it is available.
     pub fn disassemble(&self) -> Option<String> {
-        let view = BinaryIndexedView::Module(self.get_verified_module()?);
-        let smap = self.data.source_map.as_ref().expect("source map").clone();
-        let disas = Disassembler::new(SourceMapping::new(smap, view), DisassemblerOptions {
-            only_externally_visible: false,
-            print_code: true,
-            print_basic_blocks: true,
-            print_locals: true,
-            print_bytecode_stats: false,
-        });
+        let module = self.get_verified_module()?;
         Some(
-            disas
-                .disassemble()
-                // Failure here is fatal and should not happen
-                .expect("Failed to disassemble a verified module"),
+            move_asm::disassembler::disassemble_module(String::new(), module, false)
+                .expect("disassemble succeeds"),
         )
     }
 
@@ -3606,6 +3731,14 @@ impl<'env> ModuleEnv<'env> {
             || self.is_module_in_ext("table")
             || self.is_module_in_ext("table_with_length")
     }
+
+    pub fn is_cmp(&self) -> bool {
+        self.is_module_in_std("cmp")
+    }
+
+    pub fn is_option(&self) -> bool {
+        self.is_module_in_std("option")
+    }
 }
 
 // =================================================================================================
@@ -3648,6 +3781,13 @@ pub struct StructData {
 
     /// Whether this struct is native
     pub is_native: bool,
+
+    /// Visibility of this struct
+    pub visibility: Visibility,
+
+    /// Whether this struct has package visibility before the transformation.
+    /// Invariant: when true, visibility is always friend.
+    pub(crate) has_package_visibility: bool,
 }
 
 impl StructData {
@@ -3664,6 +3804,8 @@ impl StructData {
             variants: None,
             spec: RefCell::new(Default::default()),
             is_native: false,
+            visibility: Visibility::Private,
+            has_package_visibility: false,
         }
     }
 }
@@ -3834,7 +3976,7 @@ impl<'env> StructEnv<'env> {
 
     /// Returns an iteration of the variant names in the struct, in the order they
     /// are declared.
-    pub fn get_variants(&self) -> impl Iterator<Item = Symbol> + 'env {
+    pub fn get_variants(&self) -> impl Iterator<Item = Symbol> + 'env + use<'env> {
         self.data
             .variants
             .as_ref()
@@ -3973,7 +4115,7 @@ impl<'env> StructEnv<'env> {
     }
 
     /// Returns the data invariants associated with this struct.
-    pub fn get_spec(&self) -> Ref<Spec> {
+    pub fn get_spec(&self) -> Ref<'_, Spec> {
         self.data.spec.borrow()
     }
 
@@ -3992,7 +4134,7 @@ impl<'env> StructEnv<'env> {
     }
 
     /// Produce a TypeDisplayContext to print types within the scope of this env
-    pub fn get_type_display_ctx(&self) -> TypeDisplayContext {
+    pub fn get_type_display_ctx(&self) -> TypeDisplayContext<'_> {
         let type_param_names = self
             .get_type_parameters()
             .iter()
@@ -4015,6 +4157,19 @@ impl<'env> StructEnv<'env> {
             }
         }
         None
+    }
+
+    /// Whether the current struct/enum is Option
+    pub fn is_option_type(&self) -> bool {
+        self.module_env.is_option() && self.get_full_name_str() == "option::Option"
+    }
+
+    pub fn get_visibility(&self) -> Visibility {
+        self.data.visibility
+    }
+
+    pub fn has_package_visibility(&self) -> bool {
+        self.data.has_package_visibility
     }
 }
 
@@ -4185,7 +4340,7 @@ impl NamedConstantEnv<'_> {
     }
 
     /// Returns a context to display types for this module.
-    pub fn get_type_display_ctx(&self) -> TypeDisplayContext {
+    pub fn get_type_display_ctx(&self) -> TypeDisplayContext<'_> {
         TypeDisplayContext {
             module_name: Some(self.module_env.get_name().clone()),
             used_modules: self.module_env.get_used_modules(false),
@@ -4400,6 +4555,9 @@ pub struct FunctionData {
 
     /// A cache for used functions including ones obtained by transitively traversing used inline functions.
     pub(crate) used_functions_with_transitive_inline: RefCell<Option<BTreeSet<QualifiedId<FunId>>>>,
+
+    /// A cache for used structs.
+    pub(crate) used_structs: RefCell<Option<BTreeSet<QualifiedId<StructId>>>>,
 }
 
 impl FunctionData {
@@ -4428,6 +4586,7 @@ impl FunctionData {
             using_funs: RefCell::new(None),
             transitive_closure_of_used_funs: RefCell::new(None),
             used_functions_with_transitive_inline: RefCell::new(None),
+            used_structs: RefCell::new(None),
         }
     }
 }
@@ -5133,6 +5292,31 @@ impl<'env> FunctionEnv<'env> {
         set
     }
 
+    /// Get used structs/enums including ones obtained by transitively traversing used inline functions
+    pub fn get_used_structs_with_transitive_inline(&self) -> BTreeSet<QualifiedId<StructId>> {
+        if let Some(used_structs) = &*self.data.used_structs.borrow() {
+            return used_structs.clone();
+        }
+
+        let mut set = BTreeSet::new();
+        let mut reachable_funcs = VecDeque::new();
+        reachable_funcs.push_back(self.clone());
+
+        while let Some(fnc) = reachable_funcs.pop_front() {
+            if let Some(def) = fnc.get_def() {
+                def.struct_usage(self.module_env.env, &mut set);
+            }
+            for callee in fnc.get_used_functions().expect("call info available") {
+                let f = self.module_env.env.get_function(*callee);
+                if f.is_inline() {
+                    reachable_funcs.push_back(f.clone());
+                }
+            }
+        }
+        *self.data.used_structs.borrow_mut() = Some(set.clone());
+        set
+    }
+
     /// Get the functions that call this one, if available.
     pub fn get_calling_functions(&self) -> Option<BTreeSet<QualifiedId<FunId>>> {
         if let Some(calling) = &*self.data.calling_funs.borrow() {
@@ -5247,7 +5431,7 @@ impl<'env> FunctionEnv<'env> {
     }
 
     /// Produce a TypeDisplayContext to print types within the scope of this env
-    pub fn get_type_display_ctx(&self) -> TypeDisplayContext {
+    pub fn get_type_display_ctx(&self) -> TypeDisplayContext<'_> {
         let type_param_names = self
             .get_type_parameters()
             .iter()
@@ -5436,5 +5620,22 @@ impl fmt::Display for EnvDisplay<'_, Parameter> {
             p.get_name().display(self.env.symbol_pool()),
             p.get_type().display(&self.env.get_type_display_ctx())
         )
+    }
+}
+
+#[derive(Clone, Copy, Debug, Default)]
+pub struct FunctionSize {
+    /// Number of instructions in the function body
+    pub code_size: usize,
+    /// Number of local variables in the function
+    pub num_locals: usize,
+}
+
+impl FunctionSize {
+    pub fn new(code_size: usize, num_locals: usize) -> Self {
+        Self {
+            code_size,
+            num_locals,
+        }
     }
 }

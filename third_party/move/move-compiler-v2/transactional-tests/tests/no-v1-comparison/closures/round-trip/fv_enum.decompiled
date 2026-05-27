@@ -1,0 +1,122 @@
+//**** Cross-compiled for `move` syntax from `tests/no-v1-comparison/closures/fv_enum.move`
+
+//# publish
+module 0x66::fv_enum_basic {
+    use 0x1::signer;
+    enum Action has drop {
+        Noop,
+        Call {
+            _0: |u64|(u64) has drop,
+        }
+    }
+    enum FunVec<T0> has key {
+        V1 {
+            v1: vector<|&mut T0|(T0) has copy + store>,
+        }
+        V2 {
+            v0: u64,
+            v1: vector<|&mut T0|(T0) has copy + store>,
+        }
+    }
+    enum Mapper<T0, T1> has key {
+        Id {
+            _0: |T0|(T1) has copy + store,
+        }
+        Twice {
+            _0: Version<T0, T1>,
+        }
+    }
+    enum Version<T0, T1> has copy, store {
+        V1 {
+            v1: |T0|(T1) has copy + store,
+        }
+    }
+    #[persistent]
+    fun add_k_persistent(p0: u64, p1: u64): u64 {
+        p0 + p1
+    }
+    #[persistent]
+    fun add_k_persistent_ref(p0: &mut u64, p1: u64): u64 {
+        *p0 = *p0 + 1;
+        *p0 + p1
+    }
+    fun call_square(p0: u64) {
+        let _v0;
+        let _v1 = Action::Call{_0: |arg0| square(arg0)};
+        if (&_v1 is Call) {
+            let Action::Call{_0: _v2} = _v1;
+            _v0 = _v2(p0)
+        } else _v0 = 0;
+        assert!(_v0 == 49, 14566554180833181696);
+    }
+    fun square(p0: u64): u64 {
+        p0 * p0
+    }
+    fun test_enum_in_another_enum(p0: &signer)
+        acquires Mapper
+    {
+        let _v0;
+        let _v1 = Mapper::Twice<u64,u64>{_0: Version::V1<u64,u64>{v1: |arg0| add_k_persistent(arg0, 3)}};
+        move_to<Mapper<u64, u64>>(p0, _v1);
+        let _v2 = signer::address_of(p0);
+        let _v3 = borrow_global<Mapper<u64, u64>>(_v2);
+        if (_v3 is Twice) {
+            let _v4 = &_v3._0;
+            let _v5 = *&_v4.v1;
+            let _v6 = _v5(10);
+            let _v7 = *&_v4.v1;
+            _v0 = _v7(_v6)
+        } else if (_v3 is Id) {
+            let _v8 = *&_v3._0;
+            _v0 = _v8(10)
+        } else abort 14566554180833181697;
+        assert!(_v0 == 16, 99);
+    }
+    fun test_fun_vec(p0: &signer)
+        acquires FunVec
+    {
+        let _v0: |&mut u64|(u64) has copy + drop + store = |arg0| add_k_persistent_ref(arg0, 3);
+        let _v1 = 0x1::vector::empty<|&mut u64|(u64) has copy + store>();
+        let _v2 = &mut _v1;
+        0x1::vector::push_back<|&mut u64|(u64) has copy + store>(_v2, _v0);
+        0x1::vector::push_back<|&mut u64|(u64) has copy + store>(_v2, _v0);
+        let _v3 = FunVec::V1<u64>{v1: _v1};
+        move_to<FunVec<u64>>(p0, _v3);
+        let _v4 = signer::address_of(p0);
+        let _v5 = move_from<FunVec<u64>>(_v4);
+        let _v6 = &_v5;
+        'l0: loop {
+            let _v7;
+            let _v8;
+            loop {
+                if (_v6 is V1) {
+                    let FunVec::V1<u64>{v1: _v9} = _v5;
+                    _v8 = _v9;
+                    _v7 = 0x1::vector::pop_back<|&mut u64|(u64) has copy + store>(&mut _v8);
+                    let _v10 = 3;
+                    let _v11 = &mut _v10;
+                    let _v12 = _v7(_v11);
+                    assert!(_v10 == 4, 0);
+                    if (_v12 == 7) break;
+                    abort 1
+                };
+                assert!(_v6 is V2, 14566554180833181697);
+                let FunVec::V2<u64>{v0: _v13, v1: _v14} = _v5;
+                0x1::vector::destroy_empty<|&mut u64|(u64) has copy + store>(_v14);
+                if (false) break 'l0;
+                abort 2
+            };
+            0x1::vector::push_back<|&mut u64|(u64) has copy + store>(&mut _v8, _v7);
+            _v3 = FunVec::V2<u64>{v0: 10, v1: _v8};
+            move_to<FunVec<u64>>(p0, _v3);
+            return ()
+        };
+    }
+}
+
+
+//# run 0x66::fv_enum_basic::call_square --args 7
+
+//# run 0x66::fv_enum_basic::test_enum_in_another_enum --signers 0x66
+
+//# run 0x66::fv_enum_basic::test_fun_vec --signers 0x66

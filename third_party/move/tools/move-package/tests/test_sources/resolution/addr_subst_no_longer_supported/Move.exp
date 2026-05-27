@@ -1,0 +1,1 @@
+Unable to resolve packages for package 'Root': While resolving dependency 'OtherDep' in package 'Root': Address substitution/renaming is no longer supported.

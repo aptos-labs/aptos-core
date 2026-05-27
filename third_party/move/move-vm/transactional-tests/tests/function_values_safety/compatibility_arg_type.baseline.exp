@@ -1,0 +1,36 @@
+processed 8 tasks
+task 0 lines 2-4:  publish [module 0x66::compatible_function_since_private]
+task 1 lines 6-8:  publish [module 0x66::compatible_function_since_private]
+task 2 lines 10-12:  publish [module 0x66::incompatible_function_since_persistent]
+task 3 lines 14-16:  publish --verbose [module 0x66::incompatible_function_since_persistent]
+Error: Unable to publish module '0000000000000000000000000000000000000000000000000000000000000066::incompatible_function_since_persistent'. Got VMError: {
+    message: Module update failure: new module not compatible with existing module in `0000000000000000000000000000000000000000000000000000000000000066::incompatible_function_since_persistent`: changed parameter types of function `foo`,
+    major_status: BACKWARD_INCOMPATIBLE_MODULE_UPDATE,
+    sub_status: None,
+    location: undefined,
+    indices: [],
+    offsets: [],
+    exec_state: None,
+}
+task 4 lines 18-20:  publish [module 0x66::incompatible_function_since_public]
+task 5 lines 22-24:  publish --verbose [module 0x66::incompatible_function_since_public]
+Error: Unable to publish module '0000000000000000000000000000000000000000000000000000000000000066::incompatible_function_since_public'. Got VMError: {
+    message: Module update failure: new module not compatible with existing module in `0000000000000000000000000000000000000000000000000000000000000066::incompatible_function_since_public`: changed parameter types of function `foo`,
+    major_status: BACKWARD_INCOMPATIBLE_MODULE_UPDATE,
+    sub_status: None,
+    location: undefined,
+    indices: [],
+    offsets: [],
+    exec_state: None,
+}
+task 6 lines 26-28:  publish [module 0x66::incompatible_function_result_since_public]
+task 7 lines 30-32:  publish --verbose [module 0x66::incompatible_function_result_since_public]
+Error: Unable to publish module '0000000000000000000000000000000000000000000000000000000000000066::incompatible_function_result_since_public'. Got VMError: {
+    message: Module update failure: new module not compatible with existing module in `0000000000000000000000000000000000000000000000000000000000000066::incompatible_function_result_since_public`: changed return type of function `foo`,
+    major_status: BACKWARD_INCOMPATIBLE_MODULE_UPDATE,
+    sub_status: None,
+    location: undefined,
+    indices: [],
+    offsets: [],
+    exec_state: None,
+}

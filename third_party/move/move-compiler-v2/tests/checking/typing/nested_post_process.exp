@@ -53,6 +53,9 @@ module 0x42::simple_map {
 
 // -- Sourcified model before first bytecode pipeline
 module 0x42::simple_map {
+    use std::error;
+    use std::option;
+    use std::vector;
     struct Element<Key, Value> has copy, drop, store {
         key: Key,
         value: Value,

@@ -1,1 +1,2 @@
 processed 1 task
+task 0 lines 1-11:  publish [// This is good as there is only one instance foo<T> for any T.]

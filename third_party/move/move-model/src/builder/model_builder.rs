@@ -8,7 +8,7 @@
 //! system, as well as type checking it and translating it to the spec language ast.
 
 use crate::{
-    ast::{Address, Attribute, FriendDecl, ModuleName, Operation, QualifiedSymbol, Spec, Value},
+    ast::{Attribute, FriendDecl, ModuleName, Operation, QualifiedSymbol, Spec, Value},
     builder::builtins,
     intrinsics::IntrinsicDecl,
     model::{
@@ -23,7 +23,7 @@ use codespan_reporting::diagnostic::Severity;
 use itertools::Itertools;
 use legacy_move_compiler::{expansion::ast as EA, parser::ast as PA, shared::NumericalAddress};
 use move_binary_format::file_format::Visibility;
-use move_core_types::{ability::AbilitySet, account_address::AccountAddress};
+use move_core_types::ability::{Ability, AbilitySet};
 use std::collections::{BTreeMap, BTreeSet};
 
 /// A builder is used to enter a sequence of modules in acyclic dependency order into the model. The
@@ -129,6 +129,7 @@ pub(crate) struct StructEntry {
     /// always false when it is enum
     pub is_empty_struct: bool,
     pub is_native: bool,
+    pub visibility: Visibility,
 }
 
 #[derive(Debug, Clone)]
@@ -271,6 +272,7 @@ impl<'env> ModelBuilder<'env> {
             display_type_vars: false,
             used_modules: BTreeSet::new(),
             use_module_qualification: false,
+            display_module_addr: false,
             recursive_vars: None,
         }
     }
@@ -363,7 +365,20 @@ impl<'env> ModelBuilder<'env> {
         type_params: Vec<TypeParameter>,
         layout: StructLayout,
         is_native: bool,
+        visibility: Visibility,
     ) {
+        if self
+            .env
+            .language_version()
+            .language_version_for_public_struct()
+            && visibility.is_public_or_friend()
+            && abilities.has_ability(Ability::Key)
+        {
+            self.env.error(
+                &loc,
+                "structs/enums with key ability cannot have public, package or friend visibility",
+            );
+        }
         let entry = StructEntry {
             loc,
             attributes,
@@ -375,6 +390,7 @@ impl<'env> ModelBuilder<'env> {
             receiver_functions: BTreeMap::new(),
             is_empty_struct: false,
             is_native,
+            visibility,
         };
         self.struct_table.insert(name.clone(), entry);
         self.reverse_struct_table
@@ -692,10 +708,7 @@ impl<'env> ModelBuilder<'env> {
 
     /// Returns the name for the pseudo builtin module.
     pub fn builtin_module(&self) -> ModuleName {
-        ModuleName::new(
-            Address::Numerical(AccountAddress::ZERO),
-            self.env.symbol_pool().make("$$"),
-        )
+        ModuleName::builtin_module(self.env)
     }
 
     /// Adds a spec function to used_spec_funs set.

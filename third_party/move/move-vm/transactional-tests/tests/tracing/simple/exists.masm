@@ -1,0 +1,23 @@
+//# publish
+module 0x22::test
+
+struct A has key
+    value: u64
+
+public fun store(s: &signer)
+    move_loc s
+    ld_u64 42
+    pack A
+    move_to A
+    ret
+
+public fun exists_instr(addr: address): bool
+    move_loc addr
+    exists A
+    ret
+
+//# run --verbose 0x22::test::store --signers 0x22
+
+//# run --verbose 0x22::test::exists_instr --args @0x22 --display-trace
+
+//# run --verbose 0x22::test::exists_instr --args @0x33 --display-trace

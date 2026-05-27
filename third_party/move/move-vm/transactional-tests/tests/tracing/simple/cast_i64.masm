@@ -1,0 +1,9 @@
+//# publish
+module 0x22::test
+
+public fun cast_i64_instr(): i64
+    ld_i64 64
+    cast_i64
+    ret
+
+//# run --verbose 0x22::test::cast_i64_instr --display-trace

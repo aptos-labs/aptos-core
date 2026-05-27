@@ -1,0 +1,35 @@
+//**** Cross-compiled for `move` syntax from `tests/inlining/multi_param.move`
+
+//# publish
+module 0x42::Test {
+    struct Elem<T0, T1> has drop {
+        k: T0,
+        v: T1,
+    }
+    public fun test() {
+        let _v0 = Elem<u64,u64>{k: 1, v: 2};
+        let _v1 = 0x1::vector::empty<Elem<u64, u64>>();
+        0x1::vector::push_back<Elem<u64, u64>>(&mut _v1, _v0);
+        let _v2 = _v1;
+        let _v3 = &mut _v2;
+        let _v4 = 0;
+        let _v5 = 0;
+        loop {
+            let _v6 = 0x1::vector::length<Elem<u64, u64>>(freeze(_v3));
+            if (!(_v5 < _v6)) break;
+            let _v7 = 0x1::vector::borrow_mut<Elem<u64, u64>>(_v3, _v5);
+            let _v8 = &_v7.k;
+            let _v9 = &mut _v7.v;
+            let _v10 = *_v8;
+            let _v11 = *_v9;
+            let _v12 = _v10 + _v11;
+            _v4 = _v4 + _v12;
+            _v5 = _v5 + 1;
+            continue
+        };
+        assert!(_v4 == 3, 0);
+    }
+}
+
+
+//# run 0x42::Test::test

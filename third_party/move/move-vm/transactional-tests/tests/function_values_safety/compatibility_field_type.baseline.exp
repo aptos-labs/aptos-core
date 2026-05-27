@@ -1,0 +1,123 @@
+processed 14 tasks
+task 0 lines 5-8:  publish [module 0x66::incompatible_field_type_u64]
+task 1 lines 15-18:  publish --verbose [module 0x66::incompatible_field_type_u64]
+Error: Unable to publish module '0000000000000000000000000000000000000000000000000000000000000066::incompatible_field_type_u64'. Got VMError: {
+    message: Module update failure: new module not compatible with existing module in `0000000000000000000000000000000000000000000000000000000000000066::incompatible_field_type_u64`: changed layout of struct `A`,
+    major_status: BACKWARD_INCOMPATIBLE_MODULE_UPDATE,
+    sub_status: None,
+    location: undefined,
+    indices: [],
+    offsets: [],
+    exec_state: None,
+}
+task 2 lines 21-24:  publish --verbose [module 0x66::incompatible_field_type_u64]
+Error: Unable to publish module '0000000000000000000000000000000000000000000000000000000000000066::incompatible_field_type_u64'. Got VMError: {
+    message: Module update failure: new module not compatible with existing module in `0000000000000000000000000000000000000000000000000000000000000066::incompatible_field_type_u64`: changed layout of struct `A`,
+    major_status: BACKWARD_INCOMPATIBLE_MODULE_UPDATE,
+    sub_status: None,
+    location: undefined,
+    indices: [],
+    offsets: [],
+    exec_state: None,
+}
+task 3 lines 31-34:  publish --verbose [module 0x66::incompatible_field_type_u64]
+Error: Unable to publish module '0000000000000000000000000000000000000000000000000000000000000066::incompatible_field_type_u64'. Got VMError: {
+    message: Module update failure: new module not compatible with existing module in `0000000000000000000000000000000000000000000000000000000000000066::incompatible_field_type_u64`: changed layout of struct `A`,
+    major_status: BACKWARD_INCOMPATIBLE_MODULE_UPDATE,
+    sub_status: None,
+    location: undefined,
+    indices: [],
+    offsets: [],
+    exec_state: None,
+}
+task 4 lines 37-40:  publish --verbose [module 0x66::incompatible_field_type_u64]
+Error: Unable to publish module '0000000000000000000000000000000000000000000000000000000000000066::incompatible_field_type_u64'. Got VMError: {
+    message: Module update failure: new module not compatible with existing module in `0000000000000000000000000000000000000000000000000000000000000066::incompatible_field_type_u64`: changed layout of struct `A`,
+    major_status: BACKWARD_INCOMPATIBLE_MODULE_UPDATE,
+    sub_status: None,
+    location: undefined,
+    indices: [],
+    offsets: [],
+    exec_state: None,
+}
+task 5 lines 47-50:  publish --verbose [module 0x66::incompatible_field_type_u64]
+Error: Unable to publish module '0000000000000000000000000000000000000000000000000000000000000066::incompatible_field_type_u64'. Got VMError: {
+    message: Module update failure: new module not compatible with existing module in `0000000000000000000000000000000000000000000000000000000000000066::incompatible_field_type_u64`: changed layout of struct `A`,
+    major_status: BACKWARD_INCOMPATIBLE_MODULE_UPDATE,
+    sub_status: None,
+    location: undefined,
+    indices: [],
+    offsets: [],
+    exec_state: None,
+}
+task 6 lines 53-56:  publish --verbose [module 0x66::incompatible_field_type_u64]
+Error: Unable to publish module '0000000000000000000000000000000000000000000000000000000000000066::incompatible_field_type_u64'. Got VMError: {
+    message: Module update failure: new module not compatible with existing module in `0000000000000000000000000000000000000000000000000000000000000066::incompatible_field_type_u64`: changed layout of struct `A`,
+    major_status: BACKWARD_INCOMPATIBLE_MODULE_UPDATE,
+    sub_status: None,
+    location: undefined,
+    indices: [],
+    offsets: [],
+    exec_state: None,
+}
+task 7 lines 64-67:  publish [module 0x66::incompatible_field_type_R_u8]
+task 8 lines 74-77:  publish --verbose [module 0x66::incompatible_field_type_R_u8]
+Error: Unable to publish module '0000000000000000000000000000000000000000000000000000000000000066::incompatible_field_type_R_u8'. Got VMError: {
+    message: Module update failure: new module not compatible with existing module in `0000000000000000000000000000000000000000000000000000000000000066::incompatible_field_type_R_u8`: changed layout of struct `A`,
+    major_status: BACKWARD_INCOMPATIBLE_MODULE_UPDATE,
+    sub_status: None,
+    location: undefined,
+    indices: [],
+    offsets: [],
+    exec_state: None,
+}
+task 9 lines 80-83:  publish --verbose [module 0x66::incompatible_field_type_R_u8]
+Error: Unable to publish module '0000000000000000000000000000000000000000000000000000000000000066::incompatible_field_type_R_u8'. Got VMError: {
+    message: Module update failure: new module not compatible with existing module in `0000000000000000000000000000000000000000000000000000000000000066::incompatible_field_type_R_u8`: changed layout of struct `A`,
+    major_status: BACKWARD_INCOMPATIBLE_MODULE_UPDATE,
+    sub_status: None,
+    location: undefined,
+    indices: [],
+    offsets: [],
+    exec_state: None,
+}
+task 10 lines 90-93:  publish --verbose [module 0x66::incompatible_field_type_R_u8]
+Error: Unable to publish module '0000000000000000000000000000000000000000000000000000000000000066::incompatible_field_type_R_u8'. Got VMError: {
+    message: Module update failure: new module not compatible with existing module in `0000000000000000000000000000000000000000000000000000000000000066::incompatible_field_type_R_u8`: changed layout of struct `A`,
+    major_status: BACKWARD_INCOMPATIBLE_MODULE_UPDATE,
+    sub_status: None,
+    location: undefined,
+    indices: [],
+    offsets: [],
+    exec_state: None,
+}
+task 11 lines 96-99:  publish --verbose [module 0x66::incompatible_field_type_R_u8]
+Error: Unable to publish module '0000000000000000000000000000000000000000000000000000000000000066::incompatible_field_type_R_u8'. Got VMError: {
+    message: Module update failure: new module not compatible with existing module in `0000000000000000000000000000000000000000000000000000000000000066::incompatible_field_type_R_u8`: changed layout of struct `A`,
+    major_status: BACKWARD_INCOMPATIBLE_MODULE_UPDATE,
+    sub_status: None,
+    location: undefined,
+    indices: [],
+    offsets: [],
+    exec_state: None,
+}
+task 12 lines 106-109:  publish --verbose [module 0x66::incompatible_field_type_R_u8]
+Error: Unable to publish module '0000000000000000000000000000000000000000000000000000000000000066::incompatible_field_type_R_u8'. Got VMError: {
+    message: Module update failure: new module not compatible with existing module in `0000000000000000000000000000000000000000000000000000000000000066::incompatible_field_type_R_u8`: changed layout of struct `A`,
+    major_status: BACKWARD_INCOMPATIBLE_MODULE_UPDATE,
+    sub_status: None,
+    location: undefined,
+    indices: [],
+    offsets: [],
+    exec_state: None,
+}
+task 13 lines 112-115:  publish --verbose [module 0x66::incompatible_field_type_R_u8]
+Error: Unable to publish module '0000000000000000000000000000000000000000000000000000000000000066::incompatible_field_type_R_u8'. Got VMError: {
+    message: Module update failure: new module not compatible with existing module in `0000000000000000000000000000000000000000000000000000000000000066::incompatible_field_type_R_u8`: changed layout of struct `A`,
+    major_status: BACKWARD_INCOMPATIBLE_MODULE_UPDATE,
+    sub_status: None,
+    location: undefined,
+    indices: [],
+    offsets: [],
+    exec_state: None,
+}

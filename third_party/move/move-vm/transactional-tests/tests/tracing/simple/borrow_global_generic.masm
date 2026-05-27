@@ -1,0 +1,23 @@
+//# publish
+module 0x22::test
+
+struct A<T> has key
+    value: T
+
+public fun store(s: &signer)
+    move_loc s
+    ld_u64 42
+    pack A<u64>
+    move_to A<u64>
+    ret
+
+public fun borrow_global_generic_instr(addr: address): u64 acquires A
+    move_loc addr
+    borrow_global A<u64>
+    borrow_field A<u64>, value
+    read_ref
+    ret
+
+//# run --verbose 0x22::test::store --signers 0x22
+
+//# run --verbose 0x22::test::borrow_global_generic_instr --args @0x22 --display-trace

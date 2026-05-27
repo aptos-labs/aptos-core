@@ -21,7 +21,7 @@ pub struct GetGasParameters {
 fn native_get(
     gas_params: &GetGasParameters,
     context: &mut NativeContext,
-    ty_args: Vec<Type>,
+    ty_args: &[Type],
     arguments: VecDeque<Value>,
 ) -> PartialVMResult<NativeResult> {
     debug_assert_eq!(ty_args.len(), 1);

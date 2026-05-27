@@ -1,0 +1,6 @@
+processed 3 tasks
+task 0 lines 3-14:  publish [module 0x42::M {]
+task 1 lines 17-17:  run 0x42::M::t1 --args 0
+return values: 0
+task 2 lines 19-19:  run 0x42::M::t2 --args 0
+return values: 0

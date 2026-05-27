@@ -1,1 +1,7 @@
 processed 6 tasks
+task 0 lines 1-12:  publish [module 0x66::registry {]
+task 1 lines 14-41:  publish [module 0x66::delayed_work {]
+task 2 lines 43-43:  run 0x66::delayed_work::initialize --signers 0x66
+task 3 lines 45-45:  run 0x66::delayed_work::add --signers 0x66 --args 5
+task 4 lines 47-47:  run 0x66::delayed_work::add --signers 0x66 --args 7
+task 5 lines 49-49:  run 0x66::delayed_work::eval --signers 0x66 --args 3 15

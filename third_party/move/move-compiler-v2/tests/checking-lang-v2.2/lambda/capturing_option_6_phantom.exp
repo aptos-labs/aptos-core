@@ -1,0 +1,40 @@
+// -- Model dump before first bytecode pipeline
+module 0x99::m {
+    use std::option;
+    struct FunctionStore {
+        f: ||u64 has copy + drop + store,
+    }
+    struct OptionStore<T> {
+        o: u64,
+    }
+    private entry fun entry_func() {
+        {
+          let v: OptionStore<0x1::option::Option<u64>> = pack m::OptionStore<0x1::option::Option<u64>>(3);
+          {
+            let _f: ||u64 has copy + drop + store = closure#1m::id(v);
+            Tuple()
+          }
+        }
+    }
+    public fun id(x: OptionStore<0x1::option::Option<u64>>): u64 {
+        select m::OptionStore.o<OptionStore<0x1::option::Option<u64>>>(x)
+    }
+} // end 0x99::m
+
+// -- Sourcified model before first bytecode pipeline
+module 0x99::m {
+    use std::option;
+    struct FunctionStore has key {
+        f: ||u64 has copy + drop + store,
+    }
+    struct OptionStore<phantom T> has copy, drop, store {
+        o: u64,
+    }
+    entry fun entry_func() {
+        let v = OptionStore<0x1::option::Option<u64>>{o: 3};
+        let _f: ||u64 has copy + drop + store = || id(v);
+    }
+    public fun id(x: OptionStore<0x1::option::Option<u64>>): u64 {
+        x.o
+    }
+}

@@ -1,0 +1,43 @@
+//**** Cross-compiled for `move` syntax from `tests/misc/prime_check.move`
+
+//# publish
+module 0xc0ffee::prime {
+    public fun is_prime(p0: u64): bool {
+        'l0: loop {
+            'l1: loop {
+                if (!(p0 < 2)) {
+                    let _v0 = 2;
+                    loop {
+                        let _v1 = p0 / 2;
+                        if (!(_v0 <= _v1)) break 'l0;
+                        if (p0 % _v0 == 0) break 'l1;
+                        _v0 = _v0 + 1;
+                        continue
+                    }
+                };
+                return false
+            };
+            return false
+        };
+        true
+    }
+    public fun test_is_prime() {
+        if (is_prime(0)) abort 0;
+        if (is_prime(1)) abort 1;
+        assert!(is_prime(2), 2);
+        assert!(is_prime(3), 3);
+        if (is_prime(4)) abort 4;
+        assert!(is_prime(5), 5);
+        if (is_prime(6)) abort 6;
+        assert!(is_prime(7), 7);
+        if (is_prime(8)) abort 8;
+        if (is_prime(9)) abort 9;
+        if (is_prime(10)) abort 10;
+        assert!(is_prime(11), 11);
+        if (is_prime(12)) abort 12;
+        assert!(is_prime(13), 13);
+    }
+}
+
+
+//# run 0xc0ffee::prime::test_is_prime

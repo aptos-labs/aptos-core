@@ -1,0 +1,106 @@
+module 0x99::noexit_loops {
+    struct R {
+    }
+    fun bar(_x: u64) {
+        ()
+    }
+    fun baz(_: &u64) {
+        ()
+    }
+    fun f1() {
+        let _v0 = 0;
+        loop _v0 = _v0 + 1
+    }
+    fun f10() {
+        loop continue
+    }
+    fun f11() {
+        loop continue
+    }
+    fun f12() {
+        ()
+    }
+    fun f13(cond: bool) {
+        let _v0;
+        if (cond) _v0 = 0 else _v0 = 1;
+        let _v1 = _v0 + 2;
+        let _v2 = 1 + _v1;
+        loop continue
+    }
+    fun f14(p: bool, q: bool) {
+        if (p) {
+            if (q) loop continue;
+            return ()
+        };
+    }
+    fun f15() {
+        let _v0 = 0;
+        _v0 = _v0 + 1;
+    }
+    fun f16() {
+        loop continue
+    }
+    fun f2(): u64 {
+        let _v0 = 1 + 1;
+        loop _v0 = _v0 + 1
+    }
+    fun f3(): u64 {
+        let _v0 = 1;
+        loop {
+            let _v1 = foo(_v0);
+            _v0 = _v0 + _v1;
+            continue
+        }
+    }
+    fun foo(x: u64): u64 {
+        x + 1
+    }
+    fun f4(): R {
+        loop continue
+    }
+    fun f5(): u64 {
+        loop continue
+    }
+    fun f6() {
+        loop continue
+    }
+    fun f7(): R {
+        loop continue
+    }
+    fun f8() {
+        loop continue
+    }
+    fun f9() {
+        loop continue
+    }
+}
+
+--- unable to recompile the decompiled code:
+exiting with context checking errors
+error: cannot return nothing from a function with result type `u64`
+   ┌─ noexit_loops.move:49:9
+   │
+49 │ ╭         loop {
+50 │ │             let _v1 = foo(_v0);
+51 │ │             _v0 = _v0 + _v1;
+52 │ │             continue
+53 │ │         }
+   │ ╰─────────^
+
+error: cannot return nothing from a function with result type `R`
+   ┌─ noexit_loops.move:59:9
+   │
+59 │         loop continue
+   │         ^^^^^^^^^^^^^
+
+error: cannot return nothing from a function with result type `u64`
+   ┌─ noexit_loops.move:62:9
+   │
+62 │         loop continue
+   │         ^^^^^^^^^^^^^
+
+error: cannot return nothing from a function with result type `R`
+   ┌─ noexit_loops.move:68:9
+   │
+68 │         loop continue
+   │         ^^^^^^^^^^^^^

@@ -31,7 +31,7 @@ pub struct Sha2_256GasParameters {
 fn native_sha2_256(
     gas_params: &Sha2_256GasParameters,
     _context: &mut NativeContext,
-    _ty_args: Vec<Type>,
+    _ty_args: &[Type],
     mut arguments: VecDeque<Value>,
 ) -> PartialVMResult<NativeResult> {
     debug_assert!(_ty_args.is_empty());
@@ -77,7 +77,7 @@ pub struct Sha3_256GasParameters {
 fn native_sha3_256(
     gas_params: &Sha3_256GasParameters,
     _context: &mut NativeContext,
-    _ty_args: Vec<Type>,
+    _ty_args: &[Type],
     mut arguments: VecDeque<Value>,
 ) -> PartialVMResult<NativeResult> {
     debug_assert!(_ty_args.is_empty());

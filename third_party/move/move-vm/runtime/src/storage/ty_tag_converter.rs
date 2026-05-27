@@ -5,7 +5,7 @@ use crate::{config::VMConfig, RuntimeEnvironment};
 use hashbrown::{hash_map::Entry, HashMap};
 use move_binary_format::errors::{PartialVMError, PartialVMResult};
 use move_core_types::{
-    language_storage::{FunctionTag, StructTag, TypeTag},
+    language_storage::{FunctionParamOrReturnTag, FunctionTag, StructTag, TypeTag},
     vm_status::StatusCode,
 };
 use move_vm_types::loaded_data::{runtime_types::Type, struct_name_indexing::StructNameIndex};
@@ -73,7 +73,7 @@ struct StructKeyRef<'a> {
 
 impl StructKey {
     #[cfg(test)]
-    fn as_ref(&self) -> StructKeyRef {
+    fn as_ref(&self) -> StructKeyRef<'_> {
         StructKeyRef {
             idx: &self.idx,
             ty_args: self.ty_args.as_slice(),
@@ -258,6 +258,12 @@ impl<'a> TypeTagConverter<'a> {
             Type::U64 => TypeTag::U64,
             Type::U128 => TypeTag::U128,
             Type::U256 => TypeTag::U256,
+            Type::I8 => TypeTag::I8,
+            Type::I16 => TypeTag::I16,
+            Type::I32 => TypeTag::I32,
+            Type::I64 => TypeTag::I64,
+            Type::I128 => TypeTag::I128,
+            Type::I256 => TypeTag::I256,
             Type::Address => TypeTag::Address,
             Type::Signer => TypeTag::Signer,
 
@@ -278,7 +284,8 @@ impl<'a> TypeTagConverter<'a> {
                 TypeTag::Struct(Box::new(struct_tag))
             },
 
-            // Functions: recurse
+            // Functions: recursively construct tags for argument and return types. Note that these
+            // can be references, unlike regular tags.
             Type::Function {
                 args,
                 results,
@@ -286,9 +293,23 @@ impl<'a> TypeTagConverter<'a> {
             } => {
                 let to_vec = |ts: &[Type],
                               gas_ctx: &mut PseudoGasContext|
-                 -> PartialVMResult<Vec<TypeTag>> {
+                 -> PartialVMResult<Vec<FunctionParamOrReturnTag>> {
                     ts.iter()
-                        .map(|t| self.ty_to_ty_tag_impl(t, gas_ctx))
+                        .map(|t| {
+                            Ok(match t {
+                                Type::Reference(t) => FunctionParamOrReturnTag::Reference(
+                                    self.ty_to_ty_tag_impl(t, gas_ctx)?,
+                                ),
+                                Type::MutableReference(t) => {
+                                    FunctionParamOrReturnTag::MutableReference(
+                                        self.ty_to_ty_tag_impl(t, gas_ctx)?,
+                                    )
+                                },
+                                t => FunctionParamOrReturnTag::Value(
+                                    self.ty_to_ty_tag_impl(t, gas_ctx)?,
+                                ),
+                            })
+                        })
                         .collect()
                 };
                 TypeTag::Function(Box::new(FunctionTag {
@@ -493,19 +514,23 @@ mod tests {
         );
 
         // Structs.
+        let module_id = ModuleId::new(AccountAddress::ONE, Identifier::new("foo").unwrap());
         let bar_idx = runtime_environment
             .struct_name_index_map()
-            .struct_name_to_idx(&StructIdentifier {
-                module: ModuleId::new(AccountAddress::ONE, Identifier::new("foo").unwrap()),
-                name: Identifier::new("Bar").unwrap(),
-            })
+            .struct_name_to_idx(&StructIdentifier::new(
+                runtime_environment.module_id_pool(),
+                module_id,
+                Identifier::new("Bar").unwrap(),
+            ))
             .unwrap();
+        let module_id = ModuleId::new(AccountAddress::TWO, Identifier::new("foo").unwrap());
         let foo_idx = runtime_environment
             .struct_name_index_map()
-            .struct_name_to_idx(&StructIdentifier {
-                module: ModuleId::new(AccountAddress::TWO, Identifier::new("foo").unwrap()),
-                name: Identifier::new("Foo").unwrap(),
-            })
+            .struct_name_to_idx(&StructIdentifier::new(
+                runtime_environment.module_id_pool(),
+                module_id,
+                Identifier::new("Foo").unwrap(),
+            ))
             .unwrap();
 
         let struct_ty =
@@ -577,10 +602,12 @@ mod tests {
         let runtime_environment = RuntimeEnvironment::new_with_config(vec![], vm_config);
         let ty_tag_converter = TypeTagConverter::new(&runtime_environment);
 
-        let id = StructIdentifier {
-            module: ModuleId::new(AccountAddress::ONE, Identifier::new("foo").unwrap()),
-            name: Identifier::new("Foo").unwrap(),
-        };
+        let module_id = ModuleId::new(AccountAddress::ONE, Identifier::new("foo").unwrap());
+        let id = StructIdentifier::new(
+            runtime_environment.module_id_pool(),
+            module_id,
+            Identifier::new("Foo").unwrap(),
+        );
         let idx = runtime_environment
             .struct_name_index_map()
             .struct_name_to_idx(&id)

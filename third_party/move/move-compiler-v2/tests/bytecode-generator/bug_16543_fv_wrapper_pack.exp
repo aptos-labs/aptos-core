@@ -1,0 +1,161 @@
+// -- Model dump before first bytecode pipeline
+module 0xc0ffee::m {
+    struct Lazy {
+        0: || has drop,
+    }
+} // end 0xc0ffee::m
+module 0xc0ffee::m_friend {
+    struct Lazy {
+        0: || has drop,
+    }
+} // end 0xc0ffee::m_friend
+module 0xc0ffee::n {
+    public fun test(): m::Lazy {
+        closure#0n::__lambda__1__test()
+    }
+    public fun test_friend(): m_friend::Lazy {
+        closure#0n::__lambda__1__test_friend()
+    }
+    private fun __lambda__1__test() {
+        Tuple()
+    }
+    private fun __lambda__1__test_friend() {
+        Tuple()
+    }
+} // end 0xc0ffee::n
+
+// -- Sourcified model before first bytecode pipeline
+module 0xc0ffee::m {
+    friend 0xc0ffee::n;
+    struct Lazy has drop {
+        0: || has drop,
+    }
+}
+module 0xc0ffee::m_friend {
+    friend 0xc0ffee::n;
+    struct Lazy has drop {
+        0: || has drop,
+    }
+}
+module 0xc0ffee::n {
+    public fun test(): m::Lazy {
+        <<wrongly typed closure expression>>
+    }
+    public fun test_friend(): m_friend::Lazy {
+        <<wrongly typed closure expression>>
+    }
+    fun lambda__1__test() {
+    }
+    fun lambda__1__test_friend() {
+    }
+}
+
+============ bytecode before first stackless bytecode pipeline ================
+
+[variant baseline]
+public fun n::test(): 0xc0ffee::m::Lazy {
+     var $t0: 0xc0ffee::m::Lazy
+     var $t1: || has drop
+  0: $t1 := closure#0 n::__lambda__1__test()
+  1: $t0 := pack 0xc0ffee::m::Lazy($t1)
+  2: return $t0
+}
+
+
+[variant baseline]
+public fun n::test_friend(): 0xc0ffee::m_friend::Lazy {
+     var $t0: 0xc0ffee::m_friend::Lazy
+     var $t1: || has drop
+  0: $t1 := closure#0 n::__lambda__1__test_friend()
+  1: $t0 := pack 0xc0ffee::m_friend::Lazy($t1)
+  2: return $t0
+}
+
+
+[variant baseline]
+fun n::__lambda__1__test() {
+  0: return ()
+}
+
+
+[variant baseline]
+fun n::__lambda__1__test_friend() {
+  0: return ()
+}
+
+// -- Model dump before second bytecode pipeline
+module 0xc0ffee::m {
+    struct Lazy {
+        0: || has drop,
+    }
+} // end 0xc0ffee::m
+module 0xc0ffee::m_friend {
+    struct Lazy {
+        0: || has drop,
+    }
+} // end 0xc0ffee::m_friend
+module 0xc0ffee::n {
+    public fun test(): m::Lazy {
+        closure#0n::__lambda__1__test()
+    }
+    public fun test_friend(): m_friend::Lazy {
+        closure#0n::__lambda__1__test_friend()
+    }
+    private fun __lambda__1__test() {
+        Tuple()
+    }
+    private fun __lambda__1__test_friend() {
+        Tuple()
+    }
+} // end 0xc0ffee::n
+
+============ bytecode before second stackless bytecode pipeline ================
+
+[variant baseline]
+public fun n::test(): 0xc0ffee::m::Lazy {
+     var $t0: 0xc0ffee::m::Lazy
+     var $t1: || has drop
+  0: $t1 := closure#0 n::__lambda__1__test()
+  1: $t0 := pack 0xc0ffee::m::Lazy($t1)
+  2: return $t0
+}
+
+
+[variant baseline]
+public fun n::test_friend(): 0xc0ffee::m_friend::Lazy {
+     var $t0: 0xc0ffee::m_friend::Lazy
+     var $t1: || has drop
+  0: $t1 := closure#0 n::__lambda__1__test_friend()
+  1: $t0 := pack 0xc0ffee::m_friend::Lazy($t1)
+  2: return $t0
+}
+
+
+[variant baseline]
+fun n::__lambda__1__test() {
+  0: return ()
+}
+
+
+[variant baseline]
+fun n::__lambda__1__test_friend() {
+  0: return ()
+}
+
+
+Diagnostics:
+bug: compiler internal error: struct not defined
+   ┌─ tests/bytecode-generator/bug_16543_fv_wrapper_pack.move:13:16
+   │
+13 │     public fun test(): 0xc0ffee::m::Lazy {
+   │                ^^^^
+   │
+   = please consider reporting this issue (see https://aptos.dev/en/build/smart-contracts/compiler_v2#reporting-an-issue)
+
+bug: compiler internal error: struct not defined
+   ┌─ tests/bytecode-generator/bug_16543_fv_wrapper_pack.move:17:16
+   │
+17 │     public fun test_friend(): 0xc0ffee::m_friend::Lazy {
+   │                ^^^^^^^^^^^
+   │
+   = please consider reporting this issue (see https://aptos.dev/en/build/smart-contracts/compiler_v2#reporting-an-issue)

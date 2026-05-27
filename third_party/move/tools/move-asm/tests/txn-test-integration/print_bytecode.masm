@@ -1,0 +1,21 @@
+//# print-bytecode
+// expecting error because default is script
+module 0x66::m
+
+public fun f(x: u64): u64
+    move_loc x
+    ret
+
+//# print-bytecode --input module
+module 0x66::m
+
+public fun f(x: u64): u64
+    move_loc x
+    ret
+
+
+//# print-bytecode
+script
+
+public fun f(x: u64)
+    ret

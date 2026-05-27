@@ -82,11 +82,11 @@ impl<T: TName> UniqueSet<T> {
         self.iter().all(|(_, x_)| other.contains_(x_))
     }
 
-    pub fn iter(&self) -> Iter<T> {
+    pub fn iter(&self) -> Iter<'_, T> {
         self.into_iter()
     }
 
-    pub fn cloned_iter(&self) -> impl Iterator<Item = T> {
+    pub fn cloned_iter(&self) -> impl Iterator<Item = T> + use<T> {
         self.into_iter()
             .map(|(loc, k_)| T::add_loc(loc, k_.clone()))
             .collect::<Vec<_>>()

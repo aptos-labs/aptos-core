@@ -1,0 +1,12 @@
+//# publish --print-bytecode
+module 0x66::test
+
+fun identity<T>(x: T): T
+    move_loc x
+    ret
+
+fun test(): u64
+    ld_u64 2
+    pack_closure identity<u64>, 1
+    call_closure < | |u64 has drop>
+    ret

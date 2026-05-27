@@ -48,17 +48,33 @@ error: abort not covered by any of the `aborts_if` clauses
    =         ABORTED
 
 error: abort not covered by any of the `aborts_if` clauses
+   ┌─ tests/sources/functional/cast.move:95:5
+   │
+93 │           (x as u64)
+   │           ---------- abort happened here with execution failure
+94 │       }
+95 │ ╭     spec aborting_u64_cast_incorrect {
+96 │ │         aborts_if false;
+97 │ │     }
+   │ ╰─────^
+   │
+   =     at tests/sources/functional/cast.move:92: aborting_u64_cast_incorrect
+   =         x = <redacted>
+   =     at tests/sources/functional/cast.move:93: aborting_u64_cast_incorrect
+   =         ABORTED
+
+error: abort not covered by any of the `aborts_if` clauses
     ┌─ tests/sources/functional/cast.move:109:5
     │
- 93 │           (x as u64)
-    │           ---------- abort happened here with execution failure
-    ·
-109 │ ╭     spec aborting_u64_cast_incorrect {
+107 │           (x as u128)
+    │           ----------- abort happened here with execution failure
+108 │       }
+109 │ ╭     spec aborting_u128_cast_incorrect {
 110 │ │         aborts_if false;
 111 │ │     }
     │ ╰─────^
     │
-    =     at tests/sources/functional/cast.move:92: aborting_u64_cast_incorrect
+    =     at tests/sources/functional/cast.move:106: aborting_u128_cast_incorrect
     =         x = <redacted>
-    =     at tests/sources/functional/cast.move:93: aborting_u64_cast_incorrect
+    =     at tests/sources/functional/cast.move:107: aborting_u128_cast_incorrect
     =         ABORTED

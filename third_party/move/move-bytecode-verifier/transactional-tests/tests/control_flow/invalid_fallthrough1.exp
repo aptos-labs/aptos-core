@@ -1,6 +1,5 @@
 processed 1 task
-
-task 0 'run'. lines 1-4:
+task 0 lines 1-4:  run [main() {]
 Error: Script execution failed with VMError: {
     major_status: EMPTY_CODE_UNIT,
     sub_status: None,

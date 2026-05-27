@@ -1,0 +1,8 @@
+//# publish
+module 0x22::test
+
+public fun move_loc_instr(a: u64): u64
+    move_loc a
+    ret
+
+//# run --verbose 0x22::test::move_loc_instr --args 10u64 --display-trace

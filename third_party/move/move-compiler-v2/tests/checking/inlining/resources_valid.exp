@@ -15,11 +15,11 @@ module 0x42::token {
     struct Token {
         val: u64,
     }
-    public fun get_value(ref: &objects::ReaderRef<Token>): u64
+    public fun get_value(ref: &obj::ReaderRef<Token>): u64
         acquires Token(*)
      {
         select token::Token.val<&Token>({
-          let (ref: &objects::ReaderRef<Token>): (&objects::ReaderRef<Token>) = Tuple(ref);
+          let (ref: &obj::ReaderRef<Token>): (&obj::ReaderRef<Token>) = Tuple(ref);
           BorrowGlobal(Immutable)<Token>(objects::get_addr<Token>(ref))
         })
     }
@@ -38,16 +38,16 @@ module 0x42::objects {
     }
 }
 module 0x42::token {
-    use 0x42::objects;
+    use 0x42::objects as obj;
     struct Token has key {
         val: u64,
     }
-    public fun get_value(ref: &objects::ReaderRef<Token>): u64
+    public fun get_value(ref: &obj::ReaderRef<Token>): u64
         acquires Token
     {
         {
             let (ref) = (ref);
-            borrow_global<Token>(objects::get_addr<Token>(ref))
+            borrow_global<Token>(obj::get_addr<Token>(ref))
         }.val
     }
 }
@@ -69,11 +69,11 @@ module 0x42::token {
     struct Token {
         val: u64,
     }
-    public fun get_value(ref: &objects::ReaderRef<Token>): u64
+    public fun get_value(ref: &obj::ReaderRef<Token>): u64
         acquires Token(*)
      {
         select token::Token.val<&Token>({
-          let (ref: &objects::ReaderRef<Token>): (&objects::ReaderRef<Token>) = Tuple(ref);
+          let (ref: &obj::ReaderRef<Token>): (&obj::ReaderRef<Token>) = Tuple(ref);
           BorrowGlobal(Immutable)<Token>(objects::get_addr<Token>(ref))
         })
     }

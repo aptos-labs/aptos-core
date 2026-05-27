@@ -1,0 +1,11 @@
+processed 3 tasks
+task 0 lines 3-10:  publish [module 0x42::X {]
+task 1 lines 13-19:  publish [module 0x42::Y {]
+task 2 lines 22-29:  run [script {]
+warning: unused alias
+   ┌─ TEMPFILE2:25:15
+   │
+25 │     use 0x42::X;
+   │               ^ Unused 'use' of alias 'X'. Consider removing it
+
+

@@ -1,5 +1,6 @@
 module A::OneDep {
-    use A::B;
+    use B::B;
+
     public fun do_b() {
         B::foo()
     }

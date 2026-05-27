@@ -1,6 +1,8 @@
 processed 5 tasks
-
-task 4 'view'. lines 41-41:
+task 1 lines 5-12:  run --signers A [script {]
+task 2 lines 16-25:  publish [module A::M {]
+task 3 lines 29-40:  run --signers A [script {]
+task 4 lines 41-41:  view --address A --resource 0x2a::M::Foo
 key 0x2a::M::Foo {
     x: 500
 }

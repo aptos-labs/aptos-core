@@ -1,0 +1,30 @@
+
+============ disassembled file-format ==================
+// Bytecode version v9
+module 0x42::test
+struct T<T0, T1> has drop
+  x: T0
+  y: T1
+
+struct S<T0, T1, T2> has drop
+  _0: T0
+  _1: T1
+  _2: T2
+
+// Function definition at index 0
+fun test_proj_0(): u8
+    local l0: u8
+    ld_u8 42
+    ld_const<address> 1
+    ld_true
+    pack S<u8, address, bool>
+    unpack S<u8, address, bool>
+    // @5
+    pop
+    pop
+    st_loc l0
+    move_loc l0
+    ret
+
+
+============ bytecode verification succeeded ========

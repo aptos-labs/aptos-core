@@ -1,0 +1,37 @@
+//# publish
+module 0x66::a
+struct A
+    a: u64
+    b: u8
+
+
+//# publish
+module 0x66::a
+struct A
+    a: u64
+    // Cannot removed fields, publish fails
+
+
+//# publish
+module 0x66::a
+struct A
+    a: u64
+    b: u8
+    // Cannot add fields, publish fails
+    c: bool
+
+
+//# publish
+module 0x66::a
+struct A
+    // Cannot change field name, publish fails
+    y: u64
+    b: u8
+
+
+//# publish
+module 0x66::a
+struct A
+    // Cannot change field type, publish fails
+    a: bool
+    b: u8

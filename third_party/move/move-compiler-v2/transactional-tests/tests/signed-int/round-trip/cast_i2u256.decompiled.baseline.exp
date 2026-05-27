@@ -1,0 +1,62 @@
+processed 7 tasks
+task 0 lines 3-8:  run --verbose [script {]
+task 1 lines 11-16:  run --verbose [script {]
+Error: Script execution failed with VMError: {
+    message: Cannot cast i8(-1) to int256::U256,
+    major_status: ARITHMETIC_ERROR,
+    sub_status: None,
+    location: script,
+    indices: [],
+    offsets: [(FunctionDefinitionIndex(0), 1)],
+    exec_state: Some(ExecutionState { stack_trace: [] }),
+}
+task 2 lines 19-24:  run --verbose [script {]
+Error: Script execution failed with VMError: {
+    message: Cannot cast i16(-1) to int256::U256,
+    major_status: ARITHMETIC_ERROR,
+    sub_status: None,
+    location: script,
+    indices: [],
+    offsets: [(FunctionDefinitionIndex(0), 1)],
+    exec_state: Some(ExecutionState { stack_trace: [] }),
+}
+task 3 lines 27-32:  run --verbose [script {]
+Error: Script execution failed with VMError: {
+    message: Cannot cast i32(-1) to int256::U256,
+    major_status: ARITHMETIC_ERROR,
+    sub_status: None,
+    location: script,
+    indices: [],
+    offsets: [(FunctionDefinitionIndex(0), 1)],
+    exec_state: Some(ExecutionState { stack_trace: [] }),
+}
+task 4 lines 35-40:  run --verbose [script {]
+Error: Script execution failed with VMError: {
+    message: Cannot cast i64(-1) to int256::U256,
+    major_status: ARITHMETIC_ERROR,
+    sub_status: None,
+    location: script,
+    indices: [],
+    offsets: [(FunctionDefinitionIndex(0), 1)],
+    exec_state: Some(ExecutionState { stack_trace: [] }),
+}
+task 5 lines 43-48:  run --verbose [script {]
+Error: Script execution failed with VMError: {
+    message: Cannot cast i128(-1) to int256::U256,
+    major_status: ARITHMETIC_ERROR,
+    sub_status: None,
+    location: script,
+    indices: [],
+    offsets: [(FunctionDefinitionIndex(0), 1)],
+    exec_state: Some(ExecutionState { stack_trace: [] }),
+}
+task 6 lines 51-56:  run --verbose [script {]
+Error: Script execution failed with VMError: {
+    message: Cannot cast I256(-1) to int256::U256,
+    major_status: ARITHMETIC_ERROR,
+    sub_status: None,
+    location: script,
+    indices: [],
+    offsets: [(FunctionDefinitionIndex(0), 1)],
+    exec_state: Some(ExecutionState { stack_trace: [] }),
+}

@@ -1,0 +1,22 @@
+//# publish
+module 0x66::a
+friend fun foo()
+    ret
+
+
+//# publish
+module 0x66::a
+entry friend fun foo()
+    ret
+
+
+//# publish
+module 0x66::a
+// Friend entry cannot become non-entry, publish fails
+friend fun foo()
+    ret
+
+
+//# publish
+module 0x66::a
+// Friend entry cannot be removed, publish fails

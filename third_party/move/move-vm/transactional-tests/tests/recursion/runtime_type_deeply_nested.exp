@@ -1,6 +1,6 @@
 processed 3 tasks
-
-task 1 'run'. lines 72-79:
+task 0 lines 1-70:  publish [module 0x42.M {]
+task 1 lines 72-79:  run [import 0x42.M;]
 Error: Script execution failed with VMError: {
     major_status: VM_MAX_TYPE_DEPTH_REACHED,
     sub_status: None,
@@ -8,8 +8,7 @@ Error: Script execution failed with VMError: {
     indices: [],
     offsets: [(FunctionDefinitionIndex(60), 0)],
 }
-
-task 2 'run'. lines 81-89:
+task 2 lines 81-89:  run [import 0x42.M;]
 Error: Script execution failed with VMError: {
     major_status: VM_MAX_TYPE_DEPTH_REACHED,
     sub_status: None,

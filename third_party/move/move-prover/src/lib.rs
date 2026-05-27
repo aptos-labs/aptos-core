@@ -10,6 +10,7 @@ use codespan_reporting::term::termcolor::{ColorChoice, StandardStream, WriteColo
 use itertools::Itertools;
 #[allow(unused_imports)]
 use log::{debug, info, warn};
+use log::{log_enabled, Level};
 use move_abigen::Abigen;
 use move_docgen::Docgen;
 use move_errmapgen::ErrmapGen;
@@ -74,6 +75,7 @@ pub fn create_move_prover_v2_model<W: WriteColor>(
         compile_test_code: false,
         compile_verify_code: true,
         external_checks: vec![],
+        print_errors: true,
     };
 
     move_compiler_v2::run_move_compiler_for_analysis(error_writer, compiler_options)
@@ -273,8 +275,7 @@ pub fn create_and_process_bytecode(options: &Options, env: &GlobalEnv) -> Functi
         }
         if options.prover.dump_bytecode {
             if let Some(out) = module_env.disassemble() {
-                let dump_file = output_dir.join(format!("{}.mv.disas", output_prefix));
-                fs::write(dump_file, out).expect("dumping disassembled module");
+                debug!("disassembled bytecode:\n{}", out);
             }
         }
         for func_env in module_env.get_functions() {
@@ -289,7 +290,7 @@ pub fn create_and_process_bytecode(options: &Options, env: &GlobalEnv) -> Functi
         pipeline_factory::default_pipeline_with_options(&options.prover)
     };
 
-    if options.prover.dump_bytecode {
+    if log_enabled!(Level::Debug) && options.prover.dump_bytecode {
         let dump_file_base = output_dir
             .join(output_prefix)
             .into_os_string()
@@ -300,7 +301,7 @@ pub fn create_and_process_bytecode(options: &Options, env: &GlobalEnv) -> Functi
             &mut targets,
             &dump_file_base,
             options.prover.dump_cfg,
-            &|_| {},
+            &|target| target.register_annotation_formatters_for_test(),
             || true,
         )
     } else {
@@ -325,7 +326,7 @@ fn run_docgen<W: WriteColor>(
     let generator = Docgen::new(env, &options.docgen);
     let checking_elapsed = now.elapsed();
     info!("generating documentation");
-    for (file, content) in generator.gen() {
+    for (file, content) in generator.r#gen() {
         let path = PathBuf::from(&file);
         fs::create_dir_all(path.parent().unwrap())?;
         fs::write(path.as_path(), content)?;
@@ -348,7 +349,7 @@ fn run_abigen(env: &GlobalEnv, options: &Options, now: Instant) -> anyhow::Resul
     let mut generator = Abigen::new(env, &options.abigen);
     let checking_elapsed = now.elapsed();
     info!("generating ABI files");
-    generator.gen();
+    generator.r#gen();
     for (file, content) in generator.into_result() {
         let path = PathBuf::from(&file);
         fs::create_dir_all(path.parent().unwrap())?;
@@ -367,7 +368,7 @@ fn run_errmapgen(env: &GlobalEnv, options: &Options, now: Instant) {
     let mut generator = ErrmapGen::new(env, &options.errmapgen);
     let checking_elapsed = now.elapsed();
     info!("generating error map");
-    generator.gen();
+    generator.r#gen();
     generator.save_result();
     let generating_elapsed = now.elapsed();
     info!(

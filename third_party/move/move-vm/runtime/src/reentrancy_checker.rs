@@ -21,17 +21,20 @@
 use crate::LoadedFunction;
 use move_binary_format::errors::{PartialVMError, PartialVMResult};
 use move_core_types::{language_storage::ModuleId, vm_status::StatusCode};
-use move_vm_types::loaded_data::runtime_types::StructIdentifier;
-use std::collections::{btree_map::Entry, BTreeMap};
+use move_vm_types::{
+    loaded_data::runtime_types::StructIdentifier, module_id_interner::InternedModuleId,
+};
+use std::collections::hash_map::Entry;
 
 /// The reentrancy checker's state
 #[derive(Default)]
 pub(crate) struct ReentrancyChecker {
     /// A multiset (bag) of active modules. This is not a set because the same
     /// module can be entered multiple times on closure dispatch.
-    active_modules: BTreeMap<ModuleId, usize>,
-    /// Whether we are in module lock mode. This happens if we enter a function via
-    /// `NativeDynamicDispatch`.
+    active_modules: fxhash::FxHashMap<InternedModuleId, usize>,
+    /// Whether we are in module lock mode. This happens if we enter a function which is locking:
+    ///   - call via [CallType::NativeDynamicDispatch],
+    ///   - function has `#[module_lock]` attribute.
     module_lock_count: usize,
 }
 
@@ -46,26 +49,40 @@ pub(crate) enum CallType {
     ClosureDynamicDispatch,
 }
 
+impl CallType {
+    /// Returns true of the call to callee needs to lock the module. This is the case if:
+    ///   1. we are dispatching via native,
+    ///   2. the callee has `#[module_lock]` attribute.
+    fn is_locking(&self, callee: &LoadedFunction) -> bool {
+        match self {
+            Self::NativeDynamicDispatch => true,
+            Self::Regular | Self::ClosureDynamicDispatch => callee.function.has_module_lock(),
+        }
+    }
+}
+
 impl ReentrancyChecker {
+    // note(inline): as `call_type` is sometimes a fixed value, this inline is very valuable
+    #[inline(always)]
     pub fn enter_function(
         &mut self,
         caller_module: Option<&ModuleId>,
         callee: &LoadedFunction,
         call_type: CallType,
     ) -> PartialVMResult<()> {
-        if call_type == CallType::NativeDynamicDispatch
-            || callee.function.has_module_reentrancy_lock
-        {
-            // If we enter a native dispatch function, or a function which has marked for locking,
-            // also enter module locking mode
-            self.enter_module_lock()
+        if call_type.is_locking(callee) {
+            self.enter_module_lock();
         }
+
         let callee_module = callee.module_or_script_id();
         if Some(callee_module) != caller_module {
             // Cross module call.
             // When module lock is active, and we have already called into this module, this
             // reentry is disallowed
-            match self.active_modules.entry(callee_module.clone()) {
+            match self
+                .active_modules
+                .entry(callee.owner.interned_module_or_script_id())
+            {
                 Entry::Occupied(mut e) => {
                     if self.module_lock_count > 0 {
                         return Err(PartialVMError::new(StatusCode::RUNTIME_DISPATCH_ERROR)
@@ -91,12 +108,13 @@ impl ReentrancyChecker {
             // which already has a check in place preventing a dispatch into the same module.
             *self
                 .active_modules
-                .entry(callee_module.clone())
+                .entry(callee.owner.interned_module_or_script_id())
                 .or_default() += 1;
         }
         Ok(())
     }
 
+    // note(inline): bloats code, not a hot path
     pub fn exit_function(
         &mut self,
         caller_module: &ModuleId,
@@ -107,7 +125,10 @@ impl ReentrancyChecker {
         if caller_module != callee_module || call_type == CallType::ClosureDynamicDispatch {
             // If this is an exit from cross-module call, or exit from closure dispatch,
             // decrement counter.
-            match self.active_modules.entry(callee_module.clone()) {
+            match self
+                .active_modules
+                .entry(callee.owner.interned_module_or_script_id())
+            {
                 Entry::Occupied(mut e) => {
                     let val = e.get_mut();
                     if *val == 1 {
@@ -123,9 +144,9 @@ impl ReentrancyChecker {
                 },
             }
         }
-        if call_type == CallType::NativeDynamicDispatch || callee.function.has_module_lock() {
-            // If this is native dispatch, exit module lock.
-            self.exit_module_lock()?
+
+        if call_type.is_locking(callee) {
+            self.exit_module_lock()?;
         }
         Ok(())
     }
@@ -148,7 +169,7 @@ impl ReentrancyChecker {
     pub fn check_resource_access(&self, struct_id: &StructIdentifier) -> PartialVMResult<()> {
         if self
             .active_modules
-            .get(&struct_id.module)
+            .get(&struct_id.interned_module_id())
             .copied()
             .unwrap_or_default()
             > 1

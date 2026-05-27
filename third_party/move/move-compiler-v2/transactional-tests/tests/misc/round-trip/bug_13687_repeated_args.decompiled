@@ -1,0 +1,18 @@
+//**** Cross-compiled for `move` syntax from `tests/misc/bug_13687_repeated_args.move`
+
+//# publish
+module 0xcafe::Module1 {
+    struct Struct3 has copy, drop {
+        var32: u16,
+        var33: u32,
+        var34: u8,
+        var35: u32,
+        var36: u32,
+    }
+    public fun function6(): Struct3 {
+        Struct3{var32: 21859u16, var33: 1399722001u32, var34: 154u8, var35: 1399722001u32, var36: 1399722001u32}
+    }
+}
+
+
+//# run 0xCAFE::Module1::function6

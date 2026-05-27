@@ -1,0 +1,15 @@
+//# publish
+module 0x22::test
+
+enum E has drop
+  V1
+    a: u64
+
+public fun unpack_variant_instr()
+    ld_u64 3
+    pack_variant E, V1
+    unpack_variant E, V1
+    pop
+    ret
+
+//# run --verbose 0x22::test::unpack_variant_instr --display-trace

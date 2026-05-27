@@ -1,0 +1,11 @@
+//# publish --print-bytecode
+module 0x66::test
+
+struct S has drop
+  x: u64
+
+fun select(x: S): u64
+    borrow_loc x
+    borrow_field S, bad
+    read_ref
+    ret

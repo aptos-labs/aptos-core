@@ -1,0 +1,32 @@
+//# publish --verbose
+module 0x66::a
+
+struct A has key + drop
+    x: u32
+
+fun init_a(s: &signer)
+    move_loc s
+    ld_u32 3
+    pack A
+    move_to A
+    ret
+
+public fun func_a()
+    pack_closure func_a, 0
+    call_closure<||>
+    ret
+
+public fun func_a_borrow_a(a: address) acquires A
+    copy_loc a
+    borrow_global A
+    pop
+    copy_loc a
+    pack_closure func_a_borrow_a, 0
+    call_closure<|address|>
+    ret
+
+//# run 0x66::a::init_a --signers 0x66 --verbose
+
+//# run 0x66::a::func_a --verbose
+
+//# run 0x66::a::func_a_borrow_a --args @0x66 --verbose

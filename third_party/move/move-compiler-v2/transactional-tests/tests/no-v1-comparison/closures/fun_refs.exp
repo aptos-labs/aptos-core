@@ -1,7 +1,6 @@
 processed 3 tasks
-
-task 1 'run'. lines 29-29:
+task 0 lines 1-27:  publish [module 0x42::test {]
+task 1 lines 29-29:  run 0x42::test::ref
 return values: 10
-
-task 2 'run'. lines 31-31:
+task 2 lines 31-31:  run 0x42::test::ref_mut
 return values: 49

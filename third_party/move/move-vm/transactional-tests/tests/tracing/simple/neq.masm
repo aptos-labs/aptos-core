@@ -1,0 +1,10 @@
+//# publish
+module 0x22::test
+
+public fun neq_instr(): bool
+    ld_u64 23
+    ld_u64 22
+    neq
+    ret
+
+//# run --verbose 0x22::test::neq_instr --display-trace

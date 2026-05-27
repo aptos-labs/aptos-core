@@ -14,7 +14,7 @@ prover's integration into the Move CLI and configured outside this tree.
 > `.exp`. To update those files, use `UPBL=1 cargo test`. To update or test a single file, you can
 > also provide a fragment of the Move source path.
 
-## Running the Prover on Sources in this Tree
+## Running the Prover for Debugging on Sources in this Tree
 
 > NOTE: in contrast to older versions, the prover does not longer automatically pick a configuration file via the MOVE_PROVER_CONFIG variable.
 
@@ -28,13 +28,23 @@ alias mvp=cargo run -p move-prover -- --config=<my_config.toml>
 The file at the path to `<my_config.toml>` should contain (at least) the following content:
 
 ```toml
+language_version = "2.2"  # Or any other options
 move_deps = [
-    "<your-path-to>/diem/language/move-stdlib/sources"
+  "/Users/<you>/aptos-core/third_party/move/move-stdlib/sources"
 ]
 move_named_address_values = [
-    "Std=0x1",
+  "std=0x1",
+  "extensions=0x2",
 ]
 ```
+
+The prover dumps debug information to the `debug!` channel of the `log` crate. It shares the logging configuration with the Move compiler as described [here](../../move-compiler-v2/src/logging.rs). One uses the MVC_LOG environment variable to configure the logging. E.g., `MVC_LOG=debug` sends active debug prints to stderr, and `MVC_LOG=debug@my.log` to the given file. While the env var controls the level of logging, `mvp` (above alias) still need to be told to create `debug!` via the verbose flag. The below command line shows how to let `mvp` dump stackless bytecode of all prover phases except compiler; this is useful for targeted debugging of the prover:
+
+```shell
+MVC_LOG="move_compiler_v2=info,debug@prover.log" \
+  mvp --verbose debug --dump-bytecode enum_invariants.move 
+```
+
 
 ## Running Tests: Quick Guide
 

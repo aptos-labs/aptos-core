@@ -1,0 +1,10 @@
+processed 5 tasks
+task 0 lines 3-37:  publish [module 0xdeadbeef::test {]
+task 1 lines 40-40:  run 0xdeadbeef::test::test1
+return values: 6
+task 2 lines 42-42:  run 0xdeadbeef::test::test2
+return values: 8
+task 3 lines 44-44:  run 0xdeadbeef::test::test3
+return values: 7
+task 4 lines 46-46:  run 0xdeadbeef::test::test4
+return values: 9

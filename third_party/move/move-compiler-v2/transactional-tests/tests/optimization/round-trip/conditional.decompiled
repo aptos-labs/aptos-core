@@ -1,0 +1,16 @@
+//**** Cross-compiled for `move` syntax from `tests/optimization/conditional.move`
+
+//# publish
+module 0xc0ffee::m {
+    public fun main() {
+        assert!(test(true) == 3, 0);
+        assert!(test(false) == 3, 1);
+    }
+    fun test(p0: bool): u64 {
+        if (p0) return 3;
+        3
+    }
+}
+
+
+//# run 0xc0ffee::m::main

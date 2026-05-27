@@ -1,11 +1,15 @@
 // Copyright (c) The Move Contributors
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::loaded_data::{
-    runtime_access_specifier::{
-        AccessInstance, AccessSpecifier, AccessSpecifierClause, AddressSpecifier, ResourceSpecifier,
+use crate::{
+    loaded_data::{
+        runtime_access_specifier::{
+            AccessInstance, AccessSpecifier, AccessSpecifierClause, AddressSpecifier,
+            ResourceSpecifier,
+        },
+        runtime_types::{StructIdentifier, Type, TypeBuilder},
     },
-    runtime_types::{StructIdentifier, Type, TypeBuilder},
+    module_id_interner::test_util::TEST_MODULE_ID_POOL,
 };
 use move_binary_format::file_format::AccessKind;
 use move_core_types::{
@@ -113,7 +117,7 @@ fn type_args_strategy() -> impl Strategy<Value = Vec<Type>> {
 
 fn struct_id_strategy() -> impl Strategy<Value = StructIdentifier> {
     (module_id_strategy(), identifier_strategy())
-        .prop_map(|(module, name)| StructIdentifier { module, name })
+        .prop_map(|(module, name)| StructIdentifier::new(&TEST_MODULE_ID_POOL, module, name))
 }
 
 fn module_id_strategy() -> impl Strategy<Value = ModuleId> {
@@ -159,8 +163,8 @@ fn resource_to_matching_specifier(
     resources.prop_flat_map(|(s, ts)| {
         prop_oneof![
             Just(ResourceSpecifier::Any),
-            Just(ResourceSpecifier::DeclaredAtAddress(s.module.address)),
-            Just(ResourceSpecifier::DeclaredInModule(s.module.clone())),
+            Just(ResourceSpecifier::DeclaredAtAddress(s.module().address)),
+            Just(ResourceSpecifier::DeclaredInModule(s.module().clone())),
             Just(ResourceSpecifier::Resource(s.clone())),
             Just(ResourceSpecifier::ResourceInstantiation(s, ts))
         ]

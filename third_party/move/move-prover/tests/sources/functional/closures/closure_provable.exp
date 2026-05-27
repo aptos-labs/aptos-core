@@ -1,0 +1,23 @@
+Move prover returns: exiting with verification errors
+error: post-condition does not hold
+   ┌─ tests/sources/functional/closures/closure_provable.move:30:9
+   │
+30 │         ensures result == x + 1;
+   │         ^^^^^^^^^^^^^^^^^^^^^^^^
+   │
+   =     at tests/sources/functional/closures/closure_provable.move:25: call_exec3_fail
+   =         x = <redacted>
+   =     at tests/sources/functional/closures/closure_provable.move:26: call_exec3_fail
+   =     at tests/sources/functional/closures/closure_provable.move:4: exec
+   =         f = <redacted>
+   =         x = <redacted>
+   =     at tests/sources/functional/closures/closure_provable.move:5: exec
+   =     at tests/sources/functional/closures/closure_provable.move:26: call_exec3_fail
+   =         y = <redacted>
+   =         result = <redacted>
+   =     at tests/sources/functional/closures/closure_provable.move:26: call_exec3_fail
+   =         result = <redacted>
+   =     at tests/sources/functional/closures/closure_provable.move:6: exec
+   =         result = <redacted>
+   =     at tests/sources/functional/closures/closure_provable.move:27: call_exec3_fail
+   =     at tests/sources/functional/closures/closure_provable.move:30: call_exec3_fail (spec)

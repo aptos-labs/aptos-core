@@ -1,0 +1,88 @@
+
+============ disassembled file-format ==================
+// Bytecode version v9
+module 0xcafe::Module0
+enum E has copy + drop
+  V1
+    f1: u8
+    f2: S
+  V2
+
+struct S has copy + drop
+  dummy_field: bool
+
+// Function definition at index 0
+#[persistent] public fun f()
+    local l0: E
+    local l1: &E
+    local l2: &S
+    local l3: bool
+    local l4: bool
+    local l5: &bool
+    local l6: bool
+    local l7: bool
+    pack_variant E, V2
+    st_loc l0
+    borrow_loc l0
+    st_loc l1
+    copy_loc l1
+    // @5
+    test_variant E, V1
+    br_false l0
+    move_loc l1
+    borrow_variant_field E, V1::f2
+    st_loc l2
+    // @10
+    move_loc l2
+    pop
+    move_loc l0
+    unpack_variant E, V1
+    unpack S
+    // @15
+    ld_true
+    st_loc l3
+    pop
+    pop
+    move_loc l3
+    // @20
+    br_false l1
+    ld_true
+    st_loc l4
+    branch l2
+l1: ld_false
+    // @25
+    st_loc l4
+l2: borrow_loc l4
+    st_loc l5
+    move_loc l5
+    pop
+    // @30
+    branch l3
+l0: move_loc l1
+    pop
+    move_loc l0
+    ld_true
+    // @35
+    st_loc l6
+    pop
+    move_loc l6
+    br_false l4
+    ld_true
+    // @40
+    st_loc l7
+    branch l5
+l4: ld_false
+    st_loc l7
+l5: borrow_loc l7
+    // @45
+    st_loc l5
+    move_loc l5
+    pop
+    branch l3
+    ld_u64 14566554180833181697
+    // @50
+    abort
+l3: ret
+
+
+============ bytecode verification succeeded ========

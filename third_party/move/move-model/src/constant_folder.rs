@@ -351,13 +351,11 @@ impl<'env> ConstantFolder<'env> {
                     O::Or => Some(V(id, Bool(*val0 || *val1)).into_exp()),
                     O::Eq => Some(V(id, Bool(*val0 == *val1)).into_exp()),
                     O::Neq => Some(V(id, Bool(*val0 != *val1)).into_exp()),
-                    _ => {
-                        return self.constant_folding_error(id, |_| {
-                            "Binary expression with boolean parameters and result \
+                    _ => self.constant_folding_error(id, |_| {
+                        "Binary expression with boolean parameters and result \
                              not foldable to constant"
-                                .to_owned()
-                        })
-                    },
+                            .to_owned()
+                    }),
                 }
             } else {
                 match oper {

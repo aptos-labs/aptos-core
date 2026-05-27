@@ -3,7 +3,7 @@ module 0x42::Test {
     private fun adder(x: u64,y: u64): u64 {
         Add<u64>(x, y)
     }
-    private fun apply(f: |(u64, u64)|u64,x: u64,y: u64): u64 {
+    private fun apply(f: |u64, u64|u64,x: u64,y: u64): u64 {
         (f)(x, y)
     }
     public fun main(): u64 {
@@ -19,13 +19,13 @@ module 0x42::Test {
     fun adder(x: u64, y: u64): u64 {
         x + y
     }
-    fun apply(f: |(u64, u64)|u64, x: u64, y: u64): u64 {
+    fun apply(f: |u64, u64|u64, x: u64, y: u64): u64 {
         f(x, y)
     }
     public fun main(): u64 {
-        apply(|(arg0,arg1)| __lambda__1__main(arg0, arg1), 10, 100)
+        apply(|arg0,arg1| lambda__1__main(arg0, arg1), 10, 100)
     }
-    fun __lambda__1__main(x: u64, y: u64): u64 {
+    fun lambda__1__main(x: u64, y: u64): u64 {
         adder(x, y)
     }
 }

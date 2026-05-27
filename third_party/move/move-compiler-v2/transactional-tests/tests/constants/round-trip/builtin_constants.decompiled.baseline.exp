@@ -1,0 +1,6 @@
+processed 5 tasks
+task 0 lines 3-11:  publish [module 0x66::m {]
+task 1 lines 14-14:  run 0x66::m::compile_for_testing
+task 2 lines 16-16:  run 0x66::m::min_max
+task 3 lines 18-23:  publish [module 0x66::shadow {]
+task 4 lines 26-26:  run 0x66::shadow::shadowed

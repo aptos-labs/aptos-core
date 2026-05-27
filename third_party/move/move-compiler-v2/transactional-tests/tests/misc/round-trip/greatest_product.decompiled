@@ -1,0 +1,42 @@
+//**** Cross-compiled for `move` syntax from `tests/misc/greatest_product.move`
+
+//# publish
+module 0xc0ffee::greatest_product {
+    public fun find_greatest_product(): u64 {
+        let _v0 = 0;
+        let _v1 = 0;
+        let _v2 = vector[7u8, 3u8, 1u8, 6u8, 7u8, 1u8, 7u8, 6u8, 5u8, 3u8, 1u8, 3u8, 3u8, 8u8, 7u8, 1u8, 5u8, 9u8, 9u8, 5u8, 9u8, 6u8, 9u8, 3u8, 2u8, 9u8, 8u8, 5u8, 3u8, 5u8, 7u8, 9u8, 3u8, 7u8, 2u8, 0u8, 0u8, 6u8, 3u8, 1u8, 7u8, 0u8, 1u8, 8u8, 8u8, 6u8, 7u8, 9u8, 8u8, 0u8, 8u8, 2u8, 8u8, 0u8, 8u8, 5u8, 1u8, 3u8, 2u8, 8u8, 7u8, 0u8, 3u8, 5u8, 0u8, 6u8, 6u8, 4u8, 8u8, 0u8, 7u8, 6u8, 7u8, 8u8, 8u8, 0u8, 1u8, 1u8, 6u8, 9u8, 5u8, 2u8, 3u8, 6u8, 1u8, 5u8, 6u8, 3u8, 0u8, 3u8, 8u8, 8u8, 6u8, 2u8, 3u8, 8u8, 8u8, 1u8, 7u8, 7u8, 4u8, 6u8, 2u8, 8u8, 2u8, 7u8, 9u8, 9u8, 4u8, 7u8, 5u8, 6u8, 4u8, 4u8, 7u8, 9u8, 9u8, 5u8, 8u8, 4u8, 7u8, 3u8, 4u8, 6u8, 7u8, 9u8, 9u8, 5u8, 3u8, 7u8, 1u8, 7u8, 6u8, 5u8, 2u8, 3u8, 7u8, 9u8, 1u8, 9u8, 9u8, 3u8, 5u8, 1u8, 9u8, 9u8, 7u8, 7u8, 8u8, 0u8, 0u8, 9u8, 8u8, 7u8, 6u8, 9u8, 7u8, 7u8, 7u8, 9u8, 9u8, 6u8, 7u8, 6u8, 9u8, 5u8, 5u8, 4u8, 8u8, 3u8, 7u8, 5u8, 5u8, 1u8, 5u8, 5u8, 8u8, 4u8, 4u8, 4u8];
+        let _v3 = 0x1::vector::length<u8>(&_v2);
+        loop {
+            let _v4 = _v3 - 4;
+            if (!(_v1 <= _v4)) break;
+            let _v5 = vector[7u8, 3u8, 1u8, 6u8, 7u8, 1u8, 7u8, 6u8, 5u8, 3u8, 1u8, 3u8, 3u8, 8u8, 7u8, 1u8, 5u8, 9u8, 9u8, 5u8, 9u8, 6u8, 9u8, 3u8, 2u8, 9u8, 8u8, 5u8, 3u8, 5u8, 7u8, 9u8, 3u8, 7u8, 2u8, 0u8, 0u8, 6u8, 3u8, 1u8, 7u8, 0u8, 1u8, 8u8, 8u8, 6u8, 7u8, 9u8, 8u8, 0u8, 8u8, 2u8, 8u8, 0u8, 8u8, 5u8, 1u8, 3u8, 2u8, 8u8, 7u8, 0u8, 3u8, 5u8, 0u8, 6u8, 6u8, 4u8, 8u8, 0u8, 7u8, 6u8, 7u8, 8u8, 8u8, 0u8, 1u8, 1u8, 6u8, 9u8, 5u8, 2u8, 3u8, 6u8, 1u8, 5u8, 6u8, 3u8, 0u8, 3u8, 8u8, 8u8, 6u8, 2u8, 3u8, 8u8, 8u8, 1u8, 7u8, 7u8, 4u8, 6u8, 2u8, 8u8, 2u8, 7u8, 9u8, 9u8, 4u8, 7u8, 5u8, 6u8, 4u8, 4u8, 7u8, 9u8, 9u8, 5u8, 8u8, 4u8, 7u8, 3u8, 4u8, 6u8, 7u8, 9u8, 9u8, 5u8, 3u8, 7u8, 1u8, 7u8, 6u8, 5u8, 2u8, 3u8, 7u8, 9u8, 1u8, 9u8, 9u8, 3u8, 5u8, 1u8, 9u8, 9u8, 7u8, 7u8, 8u8, 0u8, 0u8, 9u8, 8u8, 7u8, 6u8, 9u8, 7u8, 7u8, 7u8, 9u8, 9u8, 6u8, 7u8, 6u8, 9u8, 5u8, 5u8, 4u8, 8u8, 3u8, 7u8, 5u8, 5u8, 1u8, 5u8, 5u8, 8u8, 4u8, 4u8, 4u8];
+            let _v6 = (*0x1::vector::borrow<u8>(&_v5, _v1)) as u64;
+            let _v7 = vector[7u8, 3u8, 1u8, 6u8, 7u8, 1u8, 7u8, 6u8, 5u8, 3u8, 1u8, 3u8, 3u8, 8u8, 7u8, 1u8, 5u8, 9u8, 9u8, 5u8, 9u8, 6u8, 9u8, 3u8, 2u8, 9u8, 8u8, 5u8, 3u8, 5u8, 7u8, 9u8, 3u8, 7u8, 2u8, 0u8, 0u8, 6u8, 3u8, 1u8, 7u8, 0u8, 1u8, 8u8, 8u8, 6u8, 7u8, 9u8, 8u8, 0u8, 8u8, 2u8, 8u8, 0u8, 8u8, 5u8, 1u8, 3u8, 2u8, 8u8, 7u8, 0u8, 3u8, 5u8, 0u8, 6u8, 6u8, 4u8, 8u8, 0u8, 7u8, 6u8, 7u8, 8u8, 8u8, 0u8, 1u8, 1u8, 6u8, 9u8, 5u8, 2u8, 3u8, 6u8, 1u8, 5u8, 6u8, 3u8, 0u8, 3u8, 8u8, 8u8, 6u8, 2u8, 3u8, 8u8, 8u8, 1u8, 7u8, 7u8, 4u8, 6u8, 2u8, 8u8, 2u8, 7u8, 9u8, 9u8, 4u8, 7u8, 5u8, 6u8, 4u8, 4u8, 7u8, 9u8, 9u8, 5u8, 8u8, 4u8, 7u8, 3u8, 4u8, 6u8, 7u8, 9u8, 9u8, 5u8, 3u8, 7u8, 1u8, 7u8, 6u8, 5u8, 2u8, 3u8, 7u8, 9u8, 1u8, 9u8, 9u8, 3u8, 5u8, 1u8, 9u8, 9u8, 7u8, 7u8, 8u8, 0u8, 0u8, 9u8, 8u8, 7u8, 6u8, 9u8, 7u8, 7u8, 7u8, 9u8, 9u8, 6u8, 7u8, 6u8, 9u8, 5u8, 5u8, 4u8, 8u8, 3u8, 7u8, 5u8, 5u8, 1u8, 5u8, 5u8, 8u8, 4u8, 4u8, 4u8];
+            let _v8 = &_v7;
+            let _v9 = _v1 + 1;
+            let _v10 = (*0x1::vector::borrow<u8>(_v8, _v9)) as u64;
+            let _v11 = _v6 * _v10;
+            let _v12 = vector[7u8, 3u8, 1u8, 6u8, 7u8, 1u8, 7u8, 6u8, 5u8, 3u8, 1u8, 3u8, 3u8, 8u8, 7u8, 1u8, 5u8, 9u8, 9u8, 5u8, 9u8, 6u8, 9u8, 3u8, 2u8, 9u8, 8u8, 5u8, 3u8, 5u8, 7u8, 9u8, 3u8, 7u8, 2u8, 0u8, 0u8, 6u8, 3u8, 1u8, 7u8, 0u8, 1u8, 8u8, 8u8, 6u8, 7u8, 9u8, 8u8, 0u8, 8u8, 2u8, 8u8, 0u8, 8u8, 5u8, 1u8, 3u8, 2u8, 8u8, 7u8, 0u8, 3u8, 5u8, 0u8, 6u8, 6u8, 4u8, 8u8, 0u8, 7u8, 6u8, 7u8, 8u8, 8u8, 0u8, 1u8, 1u8, 6u8, 9u8, 5u8, 2u8, 3u8, 6u8, 1u8, 5u8, 6u8, 3u8, 0u8, 3u8, 8u8, 8u8, 6u8, 2u8, 3u8, 8u8, 8u8, 1u8, 7u8, 7u8, 4u8, 6u8, 2u8, 8u8, 2u8, 7u8, 9u8, 9u8, 4u8, 7u8, 5u8, 6u8, 4u8, 4u8, 7u8, 9u8, 9u8, 5u8, 8u8, 4u8, 7u8, 3u8, 4u8, 6u8, 7u8, 9u8, 9u8, 5u8, 3u8, 7u8, 1u8, 7u8, 6u8, 5u8, 2u8, 3u8, 7u8, 9u8, 1u8, 9u8, 9u8, 3u8, 5u8, 1u8, 9u8, 9u8, 7u8, 7u8, 8u8, 0u8, 0u8, 9u8, 8u8, 7u8, 6u8, 9u8, 7u8, 7u8, 7u8, 9u8, 9u8, 6u8, 7u8, 6u8, 9u8, 5u8, 5u8, 4u8, 8u8, 3u8, 7u8, 5u8, 5u8, 1u8, 5u8, 5u8, 8u8, 4u8, 4u8, 4u8];
+            let _v13 = &_v12;
+            let _v14 = _v1 + 2;
+            let _v15 = (*0x1::vector::borrow<u8>(_v13, _v14)) as u64;
+            let _v16 = _v11 * _v15;
+            let _v17 = vector[7u8, 3u8, 1u8, 6u8, 7u8, 1u8, 7u8, 6u8, 5u8, 3u8, 1u8, 3u8, 3u8, 8u8, 7u8, 1u8, 5u8, 9u8, 9u8, 5u8, 9u8, 6u8, 9u8, 3u8, 2u8, 9u8, 8u8, 5u8, 3u8, 5u8, 7u8, 9u8, 3u8, 7u8, 2u8, 0u8, 0u8, 6u8, 3u8, 1u8, 7u8, 0u8, 1u8, 8u8, 8u8, 6u8, 7u8, 9u8, 8u8, 0u8, 8u8, 2u8, 8u8, 0u8, 8u8, 5u8, 1u8, 3u8, 2u8, 8u8, 7u8, 0u8, 3u8, 5u8, 0u8, 6u8, 6u8, 4u8, 8u8, 0u8, 7u8, 6u8, 7u8, 8u8, 8u8, 0u8, 1u8, 1u8, 6u8, 9u8, 5u8, 2u8, 3u8, 6u8, 1u8, 5u8, 6u8, 3u8, 0u8, 3u8, 8u8, 8u8, 6u8, 2u8, 3u8, 8u8, 8u8, 1u8, 7u8, 7u8, 4u8, 6u8, 2u8, 8u8, 2u8, 7u8, 9u8, 9u8, 4u8, 7u8, 5u8, 6u8, 4u8, 4u8, 7u8, 9u8, 9u8, 5u8, 8u8, 4u8, 7u8, 3u8, 4u8, 6u8, 7u8, 9u8, 9u8, 5u8, 3u8, 7u8, 1u8, 7u8, 6u8, 5u8, 2u8, 3u8, 7u8, 9u8, 1u8, 9u8, 9u8, 3u8, 5u8, 1u8, 9u8, 9u8, 7u8, 7u8, 8u8, 0u8, 0u8, 9u8, 8u8, 7u8, 6u8, 9u8, 7u8, 7u8, 7u8, 9u8, 9u8, 6u8, 7u8, 6u8, 9u8, 5u8, 5u8, 4u8, 8u8, 3u8, 7u8, 5u8, 5u8, 1u8, 5u8, 5u8, 8u8, 4u8, 4u8, 4u8];
+            let _v18 = &_v17;
+            let _v19 = _v1 + 3;
+            let _v20 = (*0x1::vector::borrow<u8>(_v18, _v19)) as u64;
+            let _v21 = _v16 * _v20;
+            if (_v21 > _v0) _v0 = _v21;
+            _v1 = _v1 + 1;
+            continue
+        };
+        _v0
+    }
+    public fun test_find_greatest_product() {
+        assert!(find_greatest_product() == 3969, 0);
+    }
+}
+
+
+//# run 0xc0ffee::greatest_product::test_find_greatest_product

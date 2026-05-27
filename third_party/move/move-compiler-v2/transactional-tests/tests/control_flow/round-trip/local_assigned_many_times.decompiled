@@ -1,0 +1,18 @@
+//**** Cross-compiled for `move` syntax from `tests/control_flow/local_assigned_many_times.move`
+
+//# run
+script {
+    fun main() {
+        let _v0 = 5;
+        let _v1 = &_v0;
+        let _v2 = 2;
+        let _v3 = &_v2;
+        let _v4 = 5;
+        let _v5 = &_v4;
+        let _v6 = 2;
+        let _v7 = &_v6;
+        let _v8 = 5;
+        let _v9 = &_v8;
+        assert!(*_v7 == 2, 42);
+    }
+}

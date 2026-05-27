@@ -1,0 +1,154 @@
+processed 9 tasks
+task 0 lines 3-14:  publish --print-bytecode [// Bytecode version v8]
+
+== BEGIN Bytecode ==
+// Bytecode version v8
+module 0x66::test_ok_i8
+// Function definition at index 0
+public fun f(l0: i8): i8
+    move_loc l0
+    ld_i8 22
+    add
+    ld_i8 -45
+    add
+    // @5
+    ret
+
+
+== END Bytecode ==
+task 1 lines 18-29:  publish --print-bytecode [// Bytecode version v8]
+
+== BEGIN Bytecode ==
+// Bytecode version v8
+module 0x66::test_ok_i16
+// Function definition at index 0
+public fun f(l0: i16): i16
+    move_loc l0
+    ld_i16 22
+    add
+    ld_i16 -45
+    add
+    // @5
+    ret
+
+
+== END Bytecode ==
+task 2 lines 33-44:  publish --print-bytecode [// Bytecode version v8]
+
+== BEGIN Bytecode ==
+// Bytecode version v8
+module 0x66::test_ok_i32
+// Function definition at index 0
+public fun f(l0: i32): i32
+    move_loc l0
+    ld_i32 22
+    add
+    ld_i32 -45
+    add
+    // @5
+    ret
+
+
+== END Bytecode ==
+task 3 lines 48-59:  publish --print-bytecode [// Bytecode version v8]
+
+== BEGIN Bytecode ==
+// Bytecode version v8
+module 0x66::test_ok_i64
+// Function definition at index 0
+public fun f(l0: i64): i64
+    move_loc l0
+    ld_i64 22
+    add
+    ld_i64 -45
+    add
+    // @5
+    ret
+
+
+== END Bytecode ==
+task 4 lines 63-74:  publish --print-bytecode [// Bytecode version v8]
+
+== BEGIN Bytecode ==
+// Bytecode version v8
+module 0x66::test_some_err_i64
+// Function definition at index 0
+public fun f(l0: i64): i64
+    move_loc l0
+    ld_i64 288888888888992922
+    add
+    ld_i64 -2781274937452
+    add
+    // @5
+    ret
+
+
+== END Bytecode ==
+task 5 lines 78-89:  publish --print-bytecode [// Bytecode version v8]
+
+== BEGIN Bytecode ==
+// Bytecode version v8
+module 0x66::test_ok_i128
+// Function definition at index 0
+public fun f(l0: i128): i128
+    move_loc l0
+    ld_i128 22
+    add
+    ld_i128 -45
+    add
+    // @5
+    ret
+
+
+== END Bytecode ==
+task 6 lines 93-104:  publish --print-bytecode [// Bytecode version v8]
+
+== BEGIN Bytecode ==
+// Bytecode version v8
+module 0x66::test_some_err_i128
+// Function definition at index 0
+public fun f(l0: i128): i128
+    move_loc l0
+    ld_i128 288888888888992922
+    add
+    ld_i128 -2781274937452
+    add
+    // @5
+    ret
+
+
+== END Bytecode ==
+task 7 lines 108-119:  publish --print-bytecode [// Bytecode version v8]
+
+== BEGIN Bytecode ==
+// Bytecode version v8
+module 0x66::test_ok_i256
+// Function definition at index 0
+public fun f(l0: i256): i256
+    move_loc l0
+    ld_i256 22
+    add
+    ld_i256 -45
+    add
+    // @5
+    ret
+
+
+== END Bytecode ==
+task 8 lines 123-134:  publish --print-bytecode [// Bytecode version v8]
+
+== BEGIN Bytecode ==
+// Bytecode version v8
+module 0x66::test_some_err_i256
+// Function definition at index 0
+public fun f(l0: i256): i256
+    move_loc l0
+    ld_i256 288888888888992922
+    add
+    ld_i256 -2781274937452
+    add
+    // @5
+    ret
+
+
+== END Bytecode ==

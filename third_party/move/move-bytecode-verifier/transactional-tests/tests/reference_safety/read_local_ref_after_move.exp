@@ -1,6 +1,5 @@
 processed 1 task
-
-task 0 'run'. lines 1-11:
+task 0 lines 1-11:  run [main() {]
 Error: Script execution failed with VMError: {
     major_status: MOVELOC_EXISTS_BORROW_ERROR,
     sub_status: None,

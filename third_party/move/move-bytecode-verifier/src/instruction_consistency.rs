@@ -147,10 +147,13 @@ impl<'a> InstructionConsistency<'a> {
                 CallClosure(_) | FreezeRef | Pop | Ret | Branch(_) | BrTrue(_) | BrFalse(_)
                 | LdU8(_) | LdU16(_) | LdU32(_) | LdU64(_) | LdU128(_) | LdU256(_) | LdConst(_)
                 | CastU8 | CastU16 | CastU32 | CastU64 | CastU128 | CastU256 | LdTrue | LdFalse
-                | ReadRef | WriteRef | Add | Sub | Mul | Mod | Div | BitOr | BitAnd | Xor | Shl
-                | Shr | Or | And | Not | Eq | Neq | Lt | Gt | Le | Ge | CopyLoc(_) | MoveLoc(_)
-                | StLoc(_) | MutBorrowLoc(_) | ImmBorrowLoc(_) | VecLen(_) | VecImmBorrow(_)
-                | VecMutBorrow(_) | VecPushBack(_) | VecPopBack(_) | VecSwap(_) | Abort | Nop => (),
+                | ReadRef | WriteRef | Add | Sub | Mul | Mod | Div | Negate | BitOr | BitAnd
+                | Xor | Shl | Shr | Or | And | Not | Eq | Neq | Lt | Gt | Le | Ge | CopyLoc(_)
+                | MoveLoc(_) | StLoc(_) | MutBorrowLoc(_) | ImmBorrowLoc(_) | VecLen(_)
+                | VecImmBorrow(_) | VecMutBorrow(_) | VecPushBack(_) | VecPopBack(_)
+                | VecSwap(_) | Abort | Nop | LdI8(_) | LdI16(_) | LdI32(_) | LdI64(_)
+                | LdI128(_) | LdI256(_) | CastI8 | CastI16 | CastI32 | CastI64 | CastI128
+                | CastI256 => (),
             }
         }
         Ok(())

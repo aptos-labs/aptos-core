@@ -1,0 +1,8 @@
+//**** Cross-compiled for `move` syntax from `tests/control_flow/loop_infinite.move`
+
+//# run --gas-budget 700
+script {
+    fun main() {
+        loop continue
+    }
+}

@@ -1,0 +1,27 @@
+//# publish
+module 0x22::test
+
+struct A<T> has drop
+  x: T
+
+public fun pack_struct<T>(a: T): A<T>
+    move_loc a
+    pack A<T>
+    ret
+
+public fun read_struct_field<T>(a: &A<T>): &T
+    move_loc a
+    borrow_field A<T>, x
+    ret
+
+public fun call_generic_instr(a: u64): u64
+    local x: A<u64>
+    move_loc a
+    call 0x22::test::pack_struct<u64>
+    st_loc x
+    borrow_loc x
+    call 0x22::test::read_struct_field<u64>
+    read_ref
+    ret
+
+//# run --verbose 0x22::test::call_generic_instr --args 10u64 --display-trace

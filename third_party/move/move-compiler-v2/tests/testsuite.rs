@@ -214,12 +214,22 @@ const TEST_CONFIGS: Lazy<BTreeMap<&str, TestConfig>> = Lazy::new(|| {
         // Tests for checking v2 language features only supported if 2.3 or later
         // is selected
         TestConfig {
-            name: "checking-lang-v2.3",
-            runner: |p| run_test(p, get_config_by_name("checking-lang-v2.3")),
-            include: vec!["/checking-lang-v2.3/"],
+            name: "checking-lang-v2.5",
+            runner: |p| run_test(p, get_config_by_name("checking-lang-v2.5")),
+            include: vec!["/checking-lang-v2.5/"],
             stop_after: StopAfter::FirstAstPipeline,
             dump_ast: DumpLevel::EndStage,
-            ..config().lang(LanguageVersion::V2_3)
+            ..config().lang(LanguageVersion::V2_5)
+        },
+        TestConfig {
+            name: "checking-lang-v2.4",
+            runner: |p| run_test(p, get_config_by_name("checking-lang-v2.4")),
+            include: vec!["/checking-lang-v2.4/"],
+            stop_after: StopAfter::FileFormat,
+            dump_ast: DumpLevel::EndStage,
+            dump_bytecode: DumpLevel::EndStage,
+            dump_bytecode_filter: Some(vec![INITIAL_BYTECODE_STAGE, FILE_FORMAT_STAGE]),
+            ..config().lang(LanguageVersion::V2_4)
         },
         TestConfig {
             name: "unused-assignment",
@@ -250,6 +260,18 @@ const TEST_CONFIGS: Lazy<BTreeMap<&str, TestConfig>> = Lazy::new(|| {
             include: vec!["/simplifier-elimination/"],
             dump_ast: DumpLevel::EndStage,
             ..config().exp(Experiment::AST_SIMPLIFY_FULL)
+        },
+        // Tests for inlining optimization + full AST simplifier
+        TestConfig {
+            name: "inlining-optimization",
+            runner: |p| run_test(p, get_config_by_name("inlining-optimization")),
+            include: vec!["/inlining-optimization/"],
+            dump_ast: DumpLevel::EndStage,
+            dump_bytecode: DumpLevel::EndStage,
+            dump_bytecode_filter: Some(vec![FILE_FORMAT_STAGE]),
+            ..config()
+                .exp(Experiment::INLINING_OPTIMIZATION)
+                .exp(Experiment::AST_SIMPLIFY_FULL)
         },
         // Tests for more-v1 tests
         TestConfig {
@@ -580,6 +602,15 @@ const TEST_CONFIGS: Lazy<BTreeMap<&str, TestConfig>> = Lazy::new(|| {
             stop_after: StopAfter::SecondAstPipeline,
             ..config().exp(Experiment::MESSAGE_FORMAT_JSON)
         },
+        // Tests for integers
+        TestConfig {
+            name: "integers",
+            runner: |p| run_test(p, get_config_by_name("integers")),
+            include: vec!["integers"],
+            dump_ast: DumpLevel::EndStage,
+            dump_bytecode: DumpLevel::EndStage,
+            ..config().lang(LanguageVersion::V2_3)
+        },
     ];
     configs.into_iter().map(|c| (c.name, c)).collect()
 });
@@ -595,7 +626,7 @@ fn get_config_by_name(name: &str) -> TestConfig {
 
 /// Runs test at `path` with the given `config`.
 fn run_test(path: &Path, config: TestConfig) -> anyhow::Result<()> {
-    logging::setup_logging_for_testing();
+    logging::setup_logging_for_testing(None);
     let path_str = path.display().to_string();
     let mut options = config.options.clone();
     options.warn_unused = path_str.contains("/unused/");
@@ -766,7 +797,7 @@ fn run_env_pipeline(
             );
             if is_first_pipeline {
                 // Print the sourcified model during the first env pipeline.
-                let sourcifier = Sourcifier::new(&*env);
+                let sourcifier = Sourcifier::new(&*env, true);
                 for module in env.get_modules() {
                     if module.is_primary_target() {
                         sourcifier.print_module(module.get_id())

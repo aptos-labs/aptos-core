@@ -1,1 +1,3 @@
 processed 2 tasks
+task 0 lines 1-12:  publish [// TODO: we might need to modify this test if we enable unreachable code]
+task 1 lines 14-22:  run [import 0x1.Test;]

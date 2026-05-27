@@ -1,0 +1,63 @@
+
+Diagnostics:
+warning: capturing option values is currently not supported
+   ┌─ tests/checking-lang-v2.2/lambda/capturing_option_1.move:11:66
+   │
+11 │         let f: ||option::Option<u64> has copy+drop+store = || id(v);
+   │                                                                  ^
+
+warning: capturing option values is currently not supported
+   ┌─ tests/checking-lang-v2.2/lambda/capturing_option_1.move:16:67
+   │
+16 │         let _f: ||option::Option<u64> has copy+drop+store = || id(v);
+   │                                                                   ^
+
+// -- Model dump before first bytecode pipeline
+module 0x99::m {
+    use std::option;
+    struct FunctionStore {
+        f: ||0x1::option::Option<u64> has copy + drop + store,
+    }
+    private entry fun entry_func() {
+        {
+          let v: 0x1::option::Option<u64> = option::none<u64>();
+          {
+            let _f: ||0x1::option::Option<u64> has copy + drop + store = closure#1m::id(v);
+            Tuple()
+          }
+        }
+    }
+    public fun id(x: 0x1::option::Option<u64>): 0x1::option::Option<u64> {
+        x
+    }
+    private fun init_module(account: &signer) {
+        {
+          let v: 0x1::option::Option<u64> = option::none<u64>();
+          {
+            let f: ||0x1::option::Option<u64> has copy + drop + store = closure#1m::id(v);
+            MoveTo<FunctionStore>(account, pack m::FunctionStore(f));
+            Tuple()
+          }
+        }
+    }
+} // end 0x99::m
+
+// -- Sourcified model before first bytecode pipeline
+module 0x99::m {
+    use std::option;
+    struct FunctionStore has key {
+        f: ||0x1::option::Option<u64> has copy + drop + store,
+    }
+    entry fun entry_func() {
+        let v = 0x1::option::none<u64>();
+        let _f: ||0x1::option::Option<u64> has copy + drop + store = || id(v);
+    }
+    public fun id(x: 0x1::option::Option<u64>): 0x1::option::Option<u64> {
+        x
+    }
+    fun init_module(account: &signer) {
+        let v = 0x1::option::none<u64>();
+        let f: ||0x1::option::Option<u64> has copy + drop + store = || id(v);
+        move_to<FunctionStore>(FunctionStore{f: f}, account);
+    }
+}

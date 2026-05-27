@@ -1,0 +1,8 @@
+//# publish
+module 0x22::test
+
+public fun ld_const_instr(): vector<u8>
+    ld_const<vector<u8>> [1, 2, 3, 4]
+    ret
+
+//# run --verbose 0x22::test::ld_const_instr --display-trace

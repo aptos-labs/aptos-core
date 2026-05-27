@@ -104,13 +104,13 @@ module 0x42::m {
     inline fun get<R: key>(a: address): &R {
         borrow_global<R>(a)
     }
-    fun __lambda__1__function_code_spec_block(y: num): bool {
+    fun lambda__1__function_code_spec_block(y: num): bool {
         y > 0u256
     }
-    fun __lambda__1__function_spec_block(x: num): num {
+    fun lambda__1__function_spec_block(x: num): num {
         x + 1u256
     }
-    fun __lambda__2__function_spec_block(x: num): num {
+    fun lambda__2__function_spec_block(x: num): num {
         x + 1u256
     }
 }

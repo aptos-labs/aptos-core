@@ -1,0 +1,96 @@
+//**** Cross-compiled for `move` syntax from `tests/control_flow/sorter.move`
+
+//# publish
+module 0x42::heap {
+    fun array_equals(p0: &vector<u64>, p1: &vector<u64>): bool {
+        let _v0 = 0x1::vector::length<u64>(p0);
+        let _v1 = 0x1::vector::length<u64>(p1);
+        let _v2 = _v0 != _v1;
+        'l0: loop {
+            'l1: loop {
+                if (!_v2) {
+                    _v1 = 0;
+                    loop {
+                        if (!(_v1 < _v0)) break 'l0;
+                        let _v3 = *0x1::vector::borrow<u64>(p0, _v1);
+                        let _v4 = *0x1::vector::borrow<u64>(p1, _v1);
+                        if (_v3 != _v4) break 'l1;
+                        _v1 = _v1 + 1;
+                        continue
+                    }
+                };
+                return false
+            };
+            return false
+        };
+        true
+    }
+    fun create1(): vector<u64> {
+        vector[3, 2, 1, 5, 8, 4]
+    }
+    fun create2(): vector<u64> {
+        vector[1, 2, 3, 4, 5, 8]
+    }
+    public fun main() {
+        let _v0 = create1();
+        let _v1 = create2();
+        let _v2 = vcopy(&_v0);
+        let _v3 = &_v0;
+        let _v4 = &_v2;
+        assert!(array_equals(_v3, _v4), 23);
+        let _v5 = &_v1;
+        let _v6 = &_v1;
+        assert!(array_equals(_v5, _v6), 29);
+        sort(&mut _v0);
+        let _v7 = &_v1;
+        let _v8 = &_v0;
+        assert!(array_equals(_v7, _v8), 31);
+        let _v9 = &_v0;
+        let _v10 = &_v1;
+        assert!(array_equals(_v9, _v10), 29);
+        let _v11 = &_v0;
+        let _v12 = &_v2;
+        if (array_equals(_v11, _v12)) abort 31;
+    }
+    fun vcopy(p0: &vector<u64>): vector<u64> {
+        let _v0 = 0x1::vector::empty<u64>();
+        let _v1 = 0;
+        let _v2 = 0x1::vector::length<u64>(p0);
+        while (_v1 < _v2) {
+            let _v3 = &mut _v0;
+            let _v4 = *0x1::vector::borrow<u64>(p0, _v1);
+            0x1::vector::push_back<u64>(_v3, _v4);
+            _v1 = _v1 + 1;
+            continue
+        };
+        _v0
+    }
+    fun sort(p0: &mut vector<u64>) {
+        let _v0 = 0;
+        loop {
+            let _v1 = 0x1::vector::length<u64>(freeze(p0));
+            if (!(_v0 < _v1)) break;
+            let _v2 = _v0 + 1;
+            loop {
+                let _v3 = 0x1::vector::length<u64>(freeze(p0));
+                if (!(_v2 < _v3)) break;
+                let _v4 = *0x1::vector::borrow<u64>(freeze(p0), _v0);
+                let _v5 = *0x1::vector::borrow<u64>(freeze(p0), _v2);
+                if (_v4 > _v5) 0x1::vector::swap<u64>(p0, _v0, _v2);
+                _v2 = _v2 + 1;
+                continue
+            };
+            _v0 = _v0 + 1;
+            continue
+        };
+    }
+}
+
+
+//# run
+script {
+    use 0x42::heap;
+    fun main() {
+        heap::main();
+    }
+}

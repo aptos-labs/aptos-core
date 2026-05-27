@@ -1,0 +1,27 @@
+//# publish
+module 0x9::trusted
+
+fun f(): u64
+    ld_u32 1 // type error accepted
+    call g
+    ret
+
+fun g(x: u64): u64
+    ld_u64 22
+    ret
+
+//# run --verbose 0x9::trusted::f
+
+//# publish
+module 0x99::not_trusted
+
+fun f(): u64
+    ld_u32 1 // type error not accepted
+    call g
+    ret
+
+fun g(x: u64): u64
+    ld_u64 22
+    ret
+
+//# run --verbose 0x99::not_trusted::f

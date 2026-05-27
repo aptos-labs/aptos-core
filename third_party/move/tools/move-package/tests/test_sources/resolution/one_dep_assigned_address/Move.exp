@@ -35,6 +35,7 @@ ResolutionGraph {
             ),
             language_version: None,
             experiments: [],
+            print_errors: false,
         },
     },
     root_package: SourceManifest {
@@ -55,13 +56,7 @@ ResolutionGraph {
         dependencies: {
             "OtherDep": Dependency {
                 local: "./deps_only/other_dep",
-                subst: Some(
-                    {
-                        "A": RenameFrom(
-                            "B",
-                        ),
-                    },
-                ),
+                subst: None,
                 version: None,
                 digest: None,
                 git_info: None,
@@ -112,7 +107,6 @@ ResolutionGraph {
                 dev_dependencies: {},
             },
             package_path: "ELIDED_FOR_TEST",
-            renaming: {},
             resolution_table: {
                 "B": 0000000000000000000000000000000000000000000000000000000000000001,
             },
@@ -138,13 +132,7 @@ ResolutionGraph {
                 dependencies: {
                     "OtherDep": Dependency {
                         local: "./deps_only/other_dep",
-                        subst: Some(
-                            {
-                                "A": RenameFrom(
-                                    "B",
-                                ),
-                            },
-                        ),
+                        subst: None,
                         version: None,
                         digest: None,
                         git_info: None,
@@ -154,16 +142,19 @@ ResolutionGraph {
                 dev_dependencies: {},
             },
             package_path: "ELIDED_FOR_TEST",
-            renaming: {
-                "A": (
-                    "OtherDep",
-                    "B",
-                ),
-            },
             resolution_table: {
-                "A": 0000000000000000000000000000000000000000000000000000000000000001,
+                "B": 0000000000000000000000000000000000000000000000000000000000000001,
             },
             source_digest: "ELIDED_FOR_TEST",
+        },
+    },
+    global_named_address_pool: {
+        "B": ResolvingNamedAddress {
+            value: RefCell {
+                value: Some(
+                    0000000000000000000000000000000000000000000000000000000000000001,
+                ),
+            },
         },
     },
 }

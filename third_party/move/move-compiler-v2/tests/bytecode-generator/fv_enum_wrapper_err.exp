@@ -1,0 +1,9 @@
+
+Diagnostics:
+error: cannot select field `0` since it has different types in variants of enum `Wrapper`
+   ┌─ tests/bytecode-generator/fv_enum_wrapper_err.move:10:10
+   │
+10 │         (f.0)()
+   │          ^
+   │
+   = field `0` has type `||u64 has copy + drop` in variant `B` and type `||u64 has copy` in variant `A`

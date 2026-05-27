@@ -1,0 +1,43 @@
+module 0x1::error {
+    public fun aborted(r: u64): u64 {
+        canonical(7, r)
+    }
+    public fun canonical(category: u64, reason: u64): u64 {
+        (category << 16u8) + reason
+    }
+    public fun already_exists(r: u64): u64 {
+        canonical(8, r)
+    }
+    public fun internal(r: u64): u64 {
+        canonical(11, r)
+    }
+    public fun invalid_argument(r: u64): u64 {
+        canonical(1, r)
+    }
+    public fun invalid_state(r: u64): u64 {
+        canonical(3, r)
+    }
+    public fun not_found(r: u64): u64 {
+        canonical(6, r)
+    }
+    public fun not_implemented(r: u64): u64 {
+        canonical(12, r)
+    }
+    public fun out_of_range(r: u64): u64 {
+        canonical(2, r)
+    }
+    public fun permission_denied(r: u64): u64 {
+        canonical(5, r)
+    }
+    public fun resource_exhausted(r: u64): u64 {
+        canonical(9, r)
+    }
+    public fun unauthenticated(r: u64): u64 {
+        canonical(4, r)
+    }
+    public fun unavailable(r: u64): u64 {
+        canonical(13, r)
+    }
+}
+
+============ recompilation succeeded ========

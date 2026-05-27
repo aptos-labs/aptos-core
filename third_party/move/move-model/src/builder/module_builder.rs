@@ -19,6 +19,7 @@ use crate::{
     constant_folder::ConstantFolder,
     exp_rewriter::{ExpRewriter, ExpRewriterFunctions, RewriteTarget},
     intrinsics::process_intrinsic_declaration,
+    metadata::lang_feature_versions::LANGUAGE_VERSION_FOR_PUBLIC_STRUCT,
     model::{
         self, EqIgnoringLoc, FieldData, FieldId, FunId, FunctionData, FunctionKind, FunctionLoc,
         Loc, ModuleId, MoveIrLoc, NamedConstantData, NamedConstantId, NodeId, Parameter, SchemaId,
@@ -35,7 +36,8 @@ use crate::{
         Constraint, ConstraintContext, ErrorMessageContext, PrimitiveType, Type, Variance,
         BOOL_TYPE,
     },
-    well_known, LanguageVersion,
+    well_known::{self},
+    LanguageVersion,
 };
 use codespan_reporting::diagnostic::Severity;
 use itertools::Itertools;
@@ -66,12 +68,14 @@ pub(crate) struct ModuleBuilder<'env, 'translator> {
     pub use_decls: Vec<UseDecl>,
     /// Translated friend declarations.
     pub friend_decls: Vec<FriendDecl>,
-    /// Location of a friend visibility modifier in the current module
-    pub friend_fun_loc: Option<move_ir_types::location::Loc>,
+    /// Location of a friend/package visibility modifier in the current module
+    pub friend_visibility_loc: Option<move_ir_types::location::Loc>,
     /// Location of a package visibility modifier in the current module
     pub package_fun_loc: Option<move_ir_types::location::Loc>,
     /// Set of functions with package visibility in the current module
     pub package_funs: BTreeSet<FunId>,
+    /// Set of structs with package visibility in the current module
+    pub package_structs: BTreeSet<StructId>,
     /// Translated specification functions.
     pub spec_funs: Vec<SpecFunDecl>,
     /// During the definition analysis, the index into `spec_funs` we are currently
@@ -116,10 +120,7 @@ pub enum SpecBlockContext {
 impl SpecBlockContext {
     pub fn allow_old(&self) -> bool {
         use SpecBlockContext::*;
-        match self {
-            FunctionCodeV2(_, _, _) => false, // TODO(#16256): add support of old(..) to spec of lambda expression
-            _ => true,
-        }
+        !matches!(self, FunctionCodeV2(_, _, None))
     }
 
     pub fn name(&self) -> Option<&QualifiedSymbol> {
@@ -158,9 +159,10 @@ impl<'env, 'translator> ModuleBuilder<'env, 'translator> {
             module_id,
             module_name,
             use_decls: vec![],
-            friend_fun_loc: None,
+            friend_visibility_loc: None,
             package_fun_loc: None,
             package_funs: BTreeSet::new(),
+            package_structs: BTreeSet::new(),
             friend_decls: vec![],
             spec_funs: vec![],
             inline_spec_builder: Spec::default(),
@@ -522,6 +524,23 @@ impl ModuleBuilder<'_, '_> {
         let struct_id = StructId::new(qsym.symbol);
         let attrs = self.translate_attributes(&def.attributes);
         let abilities = self.translate_abilities(&def.abilities);
+        let visibility = match def.visibility {
+            EA::Visibility::Public(_) => Visibility::Public,
+            EA::Visibility::Friend(loc) => {
+                if self.friend_visibility_loc.is_none() {
+                    self.friend_visibility_loc = Some(loc);
+                }
+                Visibility::Friend
+            },
+            EA::Visibility::Internal => Visibility::Private,
+            EA::Visibility::Package(loc) => {
+                if self.package_fun_loc.is_none() {
+                    self.package_fun_loc = Some(loc);
+                }
+                self.package_structs.insert(struct_id);
+                Visibility::Friend
+            },
+        };
         let mut et = ExpTranslator::new(self);
         et.set_translate_move_fun();
         let type_params = et.analyze_and_add_type_params(
@@ -539,6 +558,7 @@ impl ModuleBuilder<'_, '_> {
             type_params,
             StructLayout::None, // will be filled in during definition analysis,
             matches!(def.layout, EA::StructLayout::Native(_)),
+            visibility,
         );
     }
 
@@ -554,8 +574,8 @@ impl ModuleBuilder<'_, '_> {
         let visibility = match def.visibility {
             EA::Visibility::Public(_) => Visibility::Public,
             EA::Visibility::Friend(loc) => {
-                if self.friend_fun_loc.is_none() {
-                    self.friend_fun_loc = Some(loc);
+                if self.friend_visibility_loc.is_none() {
+                    self.friend_visibility_loc = Some(loc);
                 }
                 Visibility::Friend
             },
@@ -1184,6 +1204,11 @@ impl ModuleBuilder<'_, '_> {
                 },
                 EA::SpecBlockMember_::Update { lhs, rhs } => {
                     self.def_ana_global_var_update(loc, &context, lhs, rhs)
+                },
+                EA::SpecBlockMember_::Pragma { properties }
+                    if matches!(context, SpecBlockContext::FunctionCodeV2(.., Some(..))) =>
+                {
+                    self.def_ana_pragma(loc, &context, properties);
                 },
                 _ => {
                     self.parent.error(loc, "item not allowed");
@@ -1940,7 +1965,7 @@ impl<'env, 'translator> ModuleBuilder<'env, 'translator> {
     fn check_visibility_compatibility(&self) {
         if let Some(package_vis_loc) = &self.package_fun_loc {
             let package_vis_loc = self.parent.to_loc(package_vis_loc);
-            let friend_vis_loc = if let Some(friend_vis_loc) = &self.friend_fun_loc {
+            let friend_vis_loc = if let Some(friend_vis_loc) = &self.friend_visibility_loc {
                 Some(self.parent.to_loc(friend_vis_loc))
             } else {
                 self.friend_decls
@@ -2742,7 +2767,8 @@ impl<'env, 'translator> ModuleBuilder<'env, 'translator> {
     fn iter_schema_includes<'a>(
         &self,
         members: &'a [EA::SpecBlockMember],
-    ) -> impl Iterator<Item = (&'a MoveIrLoc, &'a Vec<EA::PragmaProperty>, &'a EA::Exp)> {
+    ) -> impl Iterator<Item = (&'a MoveIrLoc, &'a Vec<EA::PragmaProperty>, &'a EA::Exp)> + use<'a>
+    {
         members.iter().filter_map(|m| {
             if let EA::SpecBlockMember_::Include { properties, exp } = &m.value {
                 Some((&m.loc, properties, exp))
@@ -3589,8 +3615,23 @@ impl ModuleBuilder<'_, '_> {
                 variants: if is_enum { Some(variants) } else { None },
                 spec: RefCell::new(spec),
                 is_native: entry.is_native,
+                visibility: entry.visibility,
+                has_package_visibility: self.package_structs.contains(&entry.struct_id),
             };
             struct_data.insert(StructId::new(name.symbol), data);
+            if entry.visibility != Visibility::Private
+                && !self
+                    .parent
+                    .env
+                    .language_version()
+                    .language_version_for_public_struct()
+            {
+                self.parent.env.warning(
+                        &loc,
+                        &format!("structs/enums with visibility modifier are only supported at version {} or later",
+                        LANGUAGE_VERSION_FOR_PUBLIC_STRUCT)
+                    );
+            }
         }
         let mut function_data: BTreeMap<FunId, FunctionData> = Default::default();
         for (name, entry) in &self.parent.fun_table {
@@ -3639,6 +3680,7 @@ impl ModuleBuilder<'_, '_> {
                 using_funs: RefCell::default(),
                 transitive_closure_of_used_funs: RefCell::default(),
                 used_functions_with_transitive_inline: RefCell::default(),
+                used_structs: RefCell::default(),
             };
             function_data.insert(fun_id, data);
         }

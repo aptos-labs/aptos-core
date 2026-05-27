@@ -1,0 +1,33 @@
+//**** Cross-compiled for `move` syntax from `tests/control_flow/nested_for_while_loops.move`
+
+//# run
+script {
+    fun main() {
+        let _v0 = 0;
+        let _v1 = 0;
+        let _v2 = false;
+        'l0: loop {
+            if (_v2) _v1 = _v1 + 1 else _v2 = true;
+            if (!(_v1 < 5)) break;
+            _v0 = _v0 + 1;
+            loop {
+                if (!(_v0 < 5)) continue 'l0;
+                _v0 = _v0 + 10
+            };
+            break
+        };
+        assert!(_v0 == 15, 42);
+        let _v3 = 0;
+        'l1: while (_v3 < 6) {
+            let _v4 = 0;
+            let _v5 = false;
+            loop {
+                if (_v5) _v4 = _v4 + 1 else _v5 = true;
+                if (!(_v4 < 5)) continue 'l1;
+                _v3 = _v3 + 1
+            };
+            break
+        };
+        assert!(_v3 == 10, 43);
+    }
+}

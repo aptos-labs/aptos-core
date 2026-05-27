@@ -1,0 +1,33 @@
+//**** Cross-compiled for `move` syntax from `tests/misc/sum_square_difference.move`
+
+//# publish
+module 0xc0ffee::sum_square_difference {
+    public fun difference(p0: u64): u64 {
+        let _v0 = square_of_sum(p0);
+        let _v1 = sum_of_squares(p0);
+        _v0 - _v1
+    }
+    public fun square_of_sum(p0: u64): u64 {
+        let _v0 = p0 + 1;
+        p0 = p0 * _v0 / 2;
+        p0 * p0
+    }
+    public fun sum_of_squares(p0: u64): u64 {
+        let _v0 = 0;
+        let _v1 = 1;
+        while (_v1 <= p0) {
+            let _v2 = _v1 * _v1;
+            _v0 = _v0 + _v2;
+            _v1 = _v1 + 1;
+            continue
+        };
+        _v0
+    }
+    public fun test_difference() {
+        assert!(difference(10) == 2640, 0);
+        assert!(difference(100) == 25164150, 1);
+    }
+}
+
+
+//# run 0xc0ffee::sum_square_difference::test_difference

@@ -1,0 +1,24 @@
+processed 3 tasks
+task 0 lines 1-8:  publish [module 0x22::test]
+task 1 lines 10-10:  run --verbose 0x22::test::sub_instr --args 20u64 10u64 --display-trace
+instructions: 4
+fingerprint: 7373663486772674913
+branch_outcomes: 
+calls:
+  entrypoint 0x0000000000000000000000000000000000000000000000000000000000000022::test::sub_instr
+return values: 10
+task 2 lines 12-12:  run --verbose 0x22::test::sub_instr --args 10u64 20u64 --display-trace
+instructions: 2
+fingerprint: 15885000166333901857
+branch_outcomes: 
+calls:
+  entrypoint 0x0000000000000000000000000000000000000000000000000000000000000022::test::sub_instr
+Error: Function execution failed with VMError: {
+    message: Subtraction overflow,
+    major_status: ARITHMETIC_ERROR,
+    sub_status: None,
+    location: 0x22::test,
+    indices: [],
+    offsets: [(FunctionDefinitionIndex(0), 2)],
+    exec_state: Some(ExecutionState { stack_trace: [] }),
+}

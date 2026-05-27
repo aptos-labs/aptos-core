@@ -1,5 +1,5 @@
 //# publish
-module 0x2.A {
+module 0x22.A {
   struct C { x: u64 }
   struct D { x: u64 }
 
@@ -21,8 +21,8 @@ module 0x2.A {
 }
 
 //# publish
-module 0x2.B {
-    import 0x2.A;
+module 0x22.B {
+    import 0x22.A;
 
     struct C { x: A.C }
 
@@ -43,7 +43,7 @@ module 0x2.B {
 }
 
 //# run --signers 0x1
-import 0x2.B;
+import 0x22.B;
 main(account: signer) {
 label b0:
     B.store(&account);

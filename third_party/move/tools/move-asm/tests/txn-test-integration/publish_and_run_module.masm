@@ -1,0 +1,8 @@
+//# publish --print-bytecode
+module 0x66::m
+
+public fun f(x: u64): u64
+    move_loc x
+    ret
+
+//# run 0x66::m::f --args 1 --verbose

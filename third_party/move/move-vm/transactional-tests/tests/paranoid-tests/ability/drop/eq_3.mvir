@@ -1,5 +1,5 @@
 //# publish
-module 0x2.B {
+module 0x22.B {
   struct C has drop { x: u64 }
   struct D has drop { x: u64 }
 
@@ -15,7 +15,7 @@ module 0x2.B {
 }
 
 //# run --signers 0x1
-import 0x2.B;
+import 0x22.B;
 main(account: signer) {
     let c: B.C;
     let d: B.D;

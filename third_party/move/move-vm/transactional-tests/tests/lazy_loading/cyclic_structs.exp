@@ -1,0 +1,25 @@
+processed 6 tasks
+task 0 lines 1-11:  publish --verbose [module 0x66::list]
+task 1 lines 14-18:  publish --verbose [module 0x66::cons]
+task 2 lines 21-33:  publish --verbose [module 0x66::list]
+task 3 lines 36-52:  publish --verbose [module 0x66::app]
+task 4 lines 55-55:  run 0x66::app::create_list --signers 0x42 --verbose
+Error: Function execution failed with VMError: {
+    message: Depth of a layout exceeded the maximum of 128 during construction,
+    major_status: VM_MAX_VALUE_DEPTH_REACHED,
+    sub_status: None,
+    location: 0x66::app,
+    indices: [],
+    offsets: [(FunctionDefinitionIndex(1), 3)],
+    exec_state: Some(ExecutionState { stack_trace: [] }),
+}
+task 5 lines 57-57:  run 0x66::app::list_exists --args @0x42 --verbose
+Error: Function execution failed with VMError: {
+    message: Depth of a layout exceeded the maximum of 128 during construction,
+    major_status: VM_MAX_VALUE_DEPTH_REACHED,
+    sub_status: None,
+    location: 0x66::app,
+    indices: [],
+    offsets: [(FunctionDefinitionIndex(0), 1)],
+    exec_state: Some(ExecutionState { stack_trace: [] }),
+}

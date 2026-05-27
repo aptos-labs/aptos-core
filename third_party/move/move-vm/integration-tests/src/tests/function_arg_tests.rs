@@ -10,8 +10,8 @@ use move_binary_format::errors::VMResult;
 use move_core_types::{
     account_address::AccountAddress,
     identifier::Identifier,
+    int256::U256,
     language_storage::TypeTag,
-    u256::U256,
     value::{MoveStruct, MoveValue},
     vm_status::StatusCode,
 };
@@ -220,8 +220,8 @@ fn expected_A_B__A_u32_vector_B_got_u16_u256__u16_u32_vector_u256() {
             MoveValue::U16(0),
             MoveValue::U32(0),
             MoveValue::Vector(vec![
-                MoveValue::U256(U256::from(0u8)),
-                MoveValue::U256(U256::from(0u8)),
+                MoveValue::U256(U256::ZERO),
+                MoveValue::U256(U256::ZERO),
             ]),
         ],
     )

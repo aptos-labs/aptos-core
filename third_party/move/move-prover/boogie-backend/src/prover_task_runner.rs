@@ -180,7 +180,7 @@ impl ProverTask for RunBoogieWithSeeds {
         let mut rng = rand::thread_rng();
         // Otherwise generate a list of random numbers to use as seeds.
         (0..num_instances)
-            .map(|_| rng.gen::<u8>() as usize)
+            .map(|_| rng.r#gen::<u8>() as usize)
             .collect()
     }
 
@@ -188,7 +188,7 @@ impl ProverTask for RunBoogieWithSeeds {
         let _guard = sem.acquire().await;
         let args = self
             .get_boogie_command(task_id)
-            .map_err(|err| std::io::Error::new(std::io::ErrorKind::Other, err))?;
+            .map_err(std::io::Error::other)?;
         debug!("running Boogie command with seed {}", task_id);
         Command::new(&args[0])
             .args(&args[1..])

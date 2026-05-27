@@ -1,4 +1,4 @@
 processed 2 tasks
-
-task 1 'run'. lines 22-33:
+task 0 lines 1-20:  publish [module 0x42.A {]
+task 1 lines 22-33:  run [import 0x42.A;]
 Error: Unbound module alias Diem

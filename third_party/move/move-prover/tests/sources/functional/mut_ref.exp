@@ -34,8 +34,6 @@ error: data invariant does not hold
   =         b = <redacted>
   =         x = <redacted>
   =     at tests/sources/functional/mut_ref.move:91: return_ref_different_path_vec2
-  =         return = <redacted>
-  =     at tests/sources/functional/mut_ref.move:91: return_ref_different_path_vec2
   =         result = <redacted>
   =         x = <redacted>
   =     at tests/sources/functional/mut_ref.move:92: return_ref_different_path_vec2

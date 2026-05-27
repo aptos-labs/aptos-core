@@ -1,6 +1,6 @@
 processed 2 tasks
-
-task 1 'run'. lines 143-143:
+task 0 lines 1-141:  publish [module 0xcafe::ConstantFailure {]
+task 1 lines 143-143:  run 0xcafe::ConstantFailure::main
 Error: Function execution failed with VMError: {
     major_status: ARITHMETIC_ERROR,
     sub_status: None,

@@ -144,8 +144,8 @@ impl<'a> BoundsChecker<'a> {
     }
 
     fn check_module_handles(&self) -> PartialVMResult<()> {
-        for script_handle in self.view.module_handles() {
-            self.check_module_handle(script_handle)?
+        for module_handle in self.view.module_handles() {
+            self.check_module_handle(module_handle)?
         }
         Ok(())
     }
@@ -240,7 +240,7 @@ impl<'a> BoundsChecker<'a> {
         check_bounds_impl(self.view.identifiers(), function_handle.name)?;
         check_bounds_impl(self.view.signatures(), function_handle.parameters)?;
         check_bounds_impl(self.view.signatures(), function_handle.return_)?;
-        // function signature type paramters must be in bounds to the function type parameters
+        // function signature type parameters must be in bounds to the function type parameters
         let type_param_count = function_handle.type_parameters.len();
         self.check_type_parameters_in_signature(function_handle.parameters, type_param_count)?;
         self.check_type_parameters_in_signature(function_handle.return_, type_param_count)?;
@@ -670,21 +670,27 @@ impl<'a> BoundsChecker<'a> {
                 // bytecode gets added.
                 FreezeRef | Pop | Ret | LdU8(_) | LdU16(_) | LdU32(_) | LdU64(_) | LdU256(_)
                 | LdU128(_) | CastU8 | CastU16 | CastU32 | CastU64 | CastU128 | CastU256
-                | LdTrue | LdFalse | ReadRef | WriteRef | Add | Sub | Mul | Mod | Div | BitOr
-                | BitAnd | Xor | Shl | Shr | Or | And | Not | Eq | Neq | Lt | Gt | Le | Ge
-                | Abort | Nop => (),
+                | LdI8(_) | LdI16(_) | LdI32(_) | LdI64(_) | LdI256(_) | LdI128(_) | CastI8
+                | CastI16 | CastI32 | CastI64 | CastI128 | CastI256 | LdTrue | LdFalse
+                | ReadRef | WriteRef | Add | Sub | Mul | Mod | Div | Negate | BitOr | BitAnd
+                | Xor | Shl | Shr | Or | And | Not | Eq | Neq | Lt | Gt | Le | Ge | Abort | Nop => {
+                },
             }
         }
         Ok(())
     }
 
+    /// Check `ty` for:
+    /// - struct handle bounds
+    /// - struct instantiations have the correct number of type parameters
     fn check_type(&self, ty: &SignatureToken) -> PartialVMResult<()> {
         use self::SignatureToken::*;
 
         for ty in ty.preorder_traversal() {
             match ty {
                 Bool | U8 | U16 | U32 | U64 | U128 | U256 | Address | Signer | TypeParameter(_)
-                | Reference(_) | MutableReference(_) | Vector(_) | Function(..) => (),
+                | Reference(_) | MutableReference(_) | Vector(_) | Function(..) | I8 | I16
+                | I32 | I64 | I128 | I256 => (),
                 Struct(idx) => {
                     check_bounds_impl(self.view.struct_handles(), *idx)?;
                     if let Some(sh) = self.view.struct_handles().get(idx.into_index()) {

@@ -7,7 +7,7 @@ repository = "https://github.com/diem/diem"
 homepage = "https://diem.com"
 license = "Apache-2.0"
 publish = false
-edition = "2021"
+edition = { workspace = true }
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
@@ -23,11 +23,12 @@ move-compiler-v2 = { workspace = true }
 move-core-types = { workspace = true }
 move-model = { workspace = true }
 move-stdlib = { path = "../../move-stdlib" }
-move-vm-runtime = { workspace = true, features = ["testing"] }
+move-vm-runtime = { workspace = true, features = ["disable_verifier_cache", "testing"] }
 move-vm-test-utils = { workspace = true }
 move-vm-types = { workspace = true, features = ["testing"] }
 smallvec = { workspace = true }
 tempfile = { workspace = true }
+test-case = { workspace = true }
 
 [features]
 default = []

@@ -8,7 +8,7 @@ use crate::{
         MAX_MODULE_COUNT, MAX_SIGNATURE_COUNT, MAX_STRUCT_COUNT, MAX_STRUCT_DEF_COUNT,
         MAX_STRUCT_DEF_INST_COUNT, MAX_STRUCT_VARIANT_COUNT, MAX_STRUCT_VARIANT_INST_COUNT,
     },
-    Options,
+    Options, COMPILER_BUG_REPORT_MSG,
 };
 use codespan_reporting::diagnostic::Severity;
 use itertools::Itertools;
@@ -20,7 +20,10 @@ use move_core_types::{
 use move_ir_types::ast as IR_AST;
 use move_model::{
     ast::{AccessSpecifier, AccessSpecifierKind, AddressSpecifier, Attribute, ResourceSpecifier},
-    metadata::{CompilationMetadata, CompilerVersion, LanguageVersion, COMPILATION_METADATA_KEY},
+    metadata::{
+        lang_feature_versions::LANGUAGE_VERSION_FOR_RAC, CompilationMetadata, CompilerVersion,
+        LanguageVersion, COMPILATION_METADATA_KEY,
+    },
     model::{
         FieldEnv, FunId, FunctionEnv, GlobalEnv, Loc, ModuleEnv, ModuleId, Parameter, QualifiedId,
         StructEnv, StructId, TypeParameter, TypeParameterKind,
@@ -124,7 +127,7 @@ impl ModuleGenerator {
         let compiler_version = options
             .compiler_version
             .unwrap_or(CompilerVersion::latest_stable());
-        let gen_access_specifiers = language_version.is_at_least(LanguageVersion::V2_3);
+        let gen_access_specifiers = language_version.is_at_least(LANGUAGE_VERSION_FOR_RAC);
         let gen_function_attributes = language_version.is_at_least(LanguageVersion::V2_2);
         let compilation_metadata = CompilationMetadata::new(compiler_version, language_version);
         let metadata = Metadata {
@@ -152,7 +155,7 @@ impl ModuleGenerator {
             };
             SourceMap::new(ctx.env.to_ir_loc(&module_env.get_loc()), module_name_opt)
         };
-        let mut gen = Self {
+        let mut r#gen = Self {
             gen_access_specifiers,
             gen_function_attributes,
             module_idx: FF::ModuleHandleIndex(0),
@@ -176,8 +179,8 @@ impl ModuleGenerator {
             module,
             source_map,
         };
-        gen.gen_module(ctx, module_env);
-        (gen.module, gen.source_map, gen.main_handle)
+        r#gen.gen_module(ctx, module_env);
+        (r#gen.module, r#gen.source_map, r#gen.main_handle)
     }
 
     /// Generates a module, visiting all of its members.
@@ -334,6 +337,12 @@ impl ModuleGenerator {
                 U64 => FF::SignatureToken::U64,
                 U128 => FF::SignatureToken::U128,
                 U256 => FF::SignatureToken::U256,
+                I8 => FF::SignatureToken::I8,
+                I16 => FF::SignatureToken::I16,
+                I32 => FF::SignatureToken::I32,
+                I64 => FF::SignatureToken::I64,
+                I128 => FF::SignatureToken::I128,
+                I256 => FF::SignatureToken::I256,
                 Address => FF::SignatureToken::Address,
                 Signer => FF::SignatureToken::Signer,
                 Num | Range | EventStore => {
@@ -368,9 +377,9 @@ impl ModuleGenerator {
                 }
             },
             Fun(param_ty, result_ty, abilities) => {
-                let list = |gen: &mut ModuleGenerator, ts: Vec<Type>| {
+                let list = |r#gen: &mut ModuleGenerator, ts: Vec<Type>| {
                     ts.into_iter()
-                        .map(|t| gen.signature_token(ctx, loc, &t))
+                        .map(|t| r#gen.signature_token(ctx, loc, &t))
                         .collect_vec()
                 };
                 FF::SignatureToken::Function(
@@ -995,8 +1004,13 @@ impl ModuleContext<'_> {
     }
 
     /// Emits an internal error at the location.
-    pub fn internal_error(&self, loc: impl AsRef<Loc>, msg: impl AsRef<str>) {
-        self.env.diag(Severity::Bug, loc.as_ref(), msg.as_ref())
+    pub fn internal_error(&self, loc: impl AsRef<Loc>, msg: impl AsRef<str> + ToString) {
+        self.env.diag_with_notes(
+            Severity::Bug,
+            loc.as_ref(),
+            format!("compiler internal error: {}", msg.to_string()).as_str(),
+            vec![COMPILER_BUG_REPORT_MSG.to_string()],
+        )
     }
 
     /// Check for a bound table index and report an error if its out of bound. All bounds
@@ -1069,6 +1083,33 @@ impl ModuleContext<'_> {
 }
 
 impl ModuleContext<'_> {
+    /// Get the called functions from the same module by traversing the stackless bytecode.
+    fn get_same_module_called_functions(
+        &self,
+        module: &ModuleEnv,
+    ) -> BTreeMap<FunId, BTreeSet<FunId>> {
+        let mut called_functions_map = BTreeMap::new();
+        for fun in module.get_functions() {
+            if fun.is_inline() {
+                continue;
+            }
+            let mut called_functions = BTreeSet::new();
+            let target = self.targets.get_target(&fun, &FunctionVariant::Baseline);
+            for bc in target.get_bytecode() {
+                use Bytecode::*;
+                use Operation::*;
+                if let Call(_, _, Function(mid, fid, _), ..) = bc {
+                    // only add functions from the same module and not the function itself
+                    if *mid == module.get_id() && *fid != fun.get_id() {
+                        called_functions.insert(*fid);
+                    }
+                }
+            }
+            called_functions_map.insert(fun.get_id(), called_functions);
+        }
+        called_functions_map
+    }
+
     /// Acquires analysis. This is temporary until we have the full reference analysis.
     fn generate_acquires_map(&self, module: &ModuleEnv) -> BTreeMap<FunId, BTreeSet<StructId>> {
         // Compute map with direct usage of resources
@@ -1077,6 +1118,7 @@ impl ModuleContext<'_> {
             .filter(|f| !f.is_inline())
             .map(|f| (f.get_id(), self.get_direct_function_acquires(&f)))
             .collect::<BTreeMap<_, _>>();
+        let called_functions_map = self.get_same_module_called_functions(module);
         // Now run a fixed-point loop: add resources used by called functions until there are no
         // changes.
         loop {
@@ -1085,20 +1127,16 @@ impl ModuleContext<'_> {
                 if fun.is_inline() {
                     continue;
                 }
-                if let Some(callees) = fun.get_called_functions() {
-                    let mut usage = usage_map[&fun.get_id()].clone();
-                    let count = usage.len();
+                let mut usage = usage_map[&fun.get_id()].clone();
+                let count = usage.len();
+                for called_fun in called_functions_map[&fun.get_id()].iter() {
                     // Extend usage by that of callees from the same module. Acquires is only
                     // local to a module.
-                    for callee in callees {
-                        if callee.module_id == module.get_id() {
-                            usage.extend(usage_map[&callee.id].iter().cloned());
-                        }
-                    }
-                    if usage.len() > count {
-                        *usage_map.get_mut(&fun.get_id()).unwrap() = usage;
-                        changes = true;
-                    }
+                    usage.extend(usage_map[called_fun].iter().cloned());
+                }
+                if usage.len() > count {
+                    *usage_map.get_mut(&fun.get_id()).unwrap() = usage;
+                    changes = true;
                 }
             }
             if !changes {

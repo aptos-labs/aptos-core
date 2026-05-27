@@ -1,0 +1,3 @@
+processed 2 tasks
+task 0 lines 1-8:  publish [module 0x66::a]
+task 1 lines 10-18:  publish [module 0x66::a]

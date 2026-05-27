@@ -10,6 +10,15 @@ warning: [lint] This looks like a swap, but one assignment overwrites the other.
    = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(almost_swapped)]`.
    = For more information, see https://aptos.dev/en/build/smart-contracts/linter#almost_swapped.
 
+warning: [lint] Empty `if` branch. Consider simplifying by removing or rewriting.
+   ┌─ tests/model_ast_lints/almost_swapped.move:13:5
+   │
+13 │     if (y == x) ();
+   │     ^^^^^^^^^^^^^^
+   │
+   = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(empty_if)]`.
+   = For more information, see https://aptos.dev/en/build/smart-contracts/linter#empty_if.
+
 warning: [lint] This looks like a swap, but one assignment overwrites the other.
    ┌─ tests/model_ast_lints/almost_swapped.move:19:5
    │
@@ -19,6 +28,15 @@ warning: [lint] This looks like a swap, but one assignment overwrites the other.
    │
    = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(almost_swapped)]`.
    = For more information, see https://aptos.dev/en/build/smart-contracts/linter#almost_swapped.
+
+warning: [lint] Empty `if` branch. Consider simplifying by removing or rewriting.
+   ┌─ tests/model_ast_lints/almost_swapped.move:21:5
+   │
+21 │     if (x2 == x1) ();
+   │     ^^^^^^^^^^^^^^^^
+   │
+   = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(empty_if)]`.
+   = For more information, see https://aptos.dev/en/build/smart-contracts/linter#empty_if.
 
 warning: [lint] This looks like a swap, but one assignment overwrites the other.
    ┌─ tests/model_ast_lints/almost_swapped.move:27:5
@@ -70,6 +88,15 @@ warning: [lint] This looks like a swap, but one assignment overwrites the other.
    = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(almost_swapped)]`.
    = For more information, see https://aptos.dev/en/build/smart-contracts/linter#almost_swapped.
 
+warning: [lint] Empty `if` branch. Consider simplifying by removing or rewriting.
+   ┌─ tests/model_ast_lints/almost_swapped.move:54:5
+   │
+54 │     if (y2 == y1) ();
+   │     ^^^^^^^^^^^^^^^^
+   │
+   = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(empty_if)]`.
+   = For more information, see https://aptos.dev/en/build/smart-contracts/linter#empty_if.
+
 warning: [lint] This looks like a swap, but one assignment overwrites the other.
    ┌─ tests/model_ast_lints/almost_swapped.move:61:5
    │
@@ -99,6 +126,15 @@ warning: [lint] This looks like a swap, but one assignment overwrites the other.
    │
    = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(almost_swapped)]`.
    = For more information, see https://aptos.dev/en/build/smart-contracts/linter#almost_swapped.
+
+warning: [lint] Empty `if` branch. Consider simplifying by removing or rewriting.
+   ┌─ tests/model_ast_lints/almost_swapped.move:74:5
+   │
+74 │     if (y4 == y3) ()
+   │     ^^^^^^^^^^^^^^^^
+   │
+   = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(empty_if)]`.
+   = For more information, see https://aptos.dev/en/build/smart-contracts/linter#empty_if.
 
 warning: [lint] This looks like a swap, but one assignment overwrites the other.
    ┌─ tests/model_ast_lints/almost_swapped.move:80:5
@@ -130,6 +166,15 @@ warning: [lint] This looks like a swap, but one assignment overwrites the other.
    = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(almost_swapped)]`.
    = For more information, see https://aptos.dev/en/build/smart-contracts/linter#almost_swapped.
 
+warning: [lint] Empty `if` branch. Consider simplifying by removing or rewriting.
+   ┌─ tests/model_ast_lints/almost_swapped.move:90:5
+   │
+90 │     if (y == x) ();
+   │     ^^^^^^^^^^^^^^
+   │
+   = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(empty_if)]`.
+   = For more information, see https://aptos.dev/en/build/smart-contracts/linter#empty_if.
+
 warning: [lint] This looks like a swap, but one assignment overwrites the other.
    ┌─ tests/model_ast_lints/almost_swapped.move:98:5
    │
@@ -140,6 +185,15 @@ warning: [lint] This looks like a swap, but one assignment overwrites the other.
    = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(almost_swapped)]`.
    = For more information, see https://aptos.dev/en/build/smart-contracts/linter#almost_swapped.
 
+warning: [lint] Empty `if` branch. Consider simplifying by removing or rewriting.
+    ┌─ tests/model_ast_lints/almost_swapped.move:100:5
+    │
+100 │     if (v1 == v2) ();
+    │     ^^^^^^^^^^^^^^^^
+    │
+    = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(empty_if)]`.
+    = For more information, see https://aptos.dev/en/build/smart-contracts/linter#empty_if.
+
 warning: [lint] This looks like a swap, but one assignment overwrites the other.
     ┌─ tests/model_ast_lints/almost_swapped.move:111:5
     │
@@ -149,3 +203,30 @@ warning: [lint] This looks like a swap, but one assignment overwrites the other.
     │
     = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(almost_swapped)]`.
     = For more information, see https://aptos.dev/en/build/smart-contracts/linter#almost_swapped.
+
+warning: [lint] Empty `if` branch. Consider simplifying by removing or rewriting.
+    ┌─ tests/model_ast_lints/almost_swapped.move:120:5
+    │
+120 │     if (y == x) ();
+    │     ^^^^^^^^^^^^^^
+    │
+    = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(empty_if)]`.
+    = For more information, see https://aptos.dev/en/build/smart-contracts/linter#empty_if.
+
+warning: [lint] Empty `if` branch. Consider simplifying by removing or rewriting.
+    ┌─ tests/model_ast_lints/almost_swapped.move:153:5
+    │
+153 │     if (x2 == x1) ();
+    │     ^^^^^^^^^^^^^^^^
+    │
+    = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(empty_if)]`.
+    = For more information, see https://aptos.dev/en/build/smart-contracts/linter#empty_if.
+
+warning: [lint] Empty `if` branch. Consider simplifying by removing or rewriting.
+    ┌─ tests/model_ast_lints/almost_swapped.move:162:5
+    │
+162 │     if (y == x) ();
+    │     ^^^^^^^^^^^^^^
+    │
+    = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(empty_if)]`.
+    = For more information, see https://aptos.dev/en/build/smart-contracts/linter#empty_if.

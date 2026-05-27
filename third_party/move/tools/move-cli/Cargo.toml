@@ -7,7 +7,7 @@ repository = "https://github.com/diem/diem"
 homepage = "https://diem.com"
 license = "Apache-2.0"
 publish = false
-edition = "2021"
+edition = { workspace = true }
 
 [dependencies]
 anyhow = { workspace = true }
@@ -41,10 +41,6 @@ httpmock = { workspace = true }
 [[bin]]
 name = "move"
 path = "src/main.rs"
-
-[[test]]
-name = "move_unit_tests_move_vm_and_stackless_vm"
-harness = false
 
 [[test]]
 name = "build_testsuite"

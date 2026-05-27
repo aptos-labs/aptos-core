@@ -1,0 +1,6 @@
+[package]
+name = "Baz"
+version = "0.1.2"
+
+[dependencies]
+Bar = { local = "././../bar" }

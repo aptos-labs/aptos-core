@@ -1,0 +1,19 @@
+//# publish --print-bytecode
+module 0x66::test1
+
+struct S has drop+copy
+  _1: u64
+  _2: u8
+
+//# publish --print-bytecode
+module 0x66::test2
+use 0x66::test1
+
+struct T has drop
+  _1: 0x66::test1::S
+
+fun get(x: T): test1::S
+    borrow_loc x
+    borrow_field T, _1
+    read_ref
+    ret

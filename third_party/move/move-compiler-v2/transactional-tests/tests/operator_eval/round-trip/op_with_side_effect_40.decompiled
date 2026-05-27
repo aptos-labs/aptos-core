@@ -1,0 +1,21 @@
+//**** Cross-compiled for `move` syntax from `tests/operator_eval/op_with_side_effect_40.move`
+
+//# publish
+module 0xc0ffee::m {
+    struct S {
+        x: u64,
+        y: u64,
+        z: u64,
+    }
+    public fun test(): u64 {
+        let _v0 = 1;
+        let _v1 = _v0;
+        _v0 = _v0 + 1;
+        let _v2 = _v0 + 1;
+        let S{x: _v3, y: _v4, z: _v5} = S{x: _v1, y: _v0, z: _v2};
+        _v3 + _v4 + _v5
+    }
+}
+
+
+//# run 0xc0ffee::m::test

@@ -1,0 +1,194 @@
+module 0x99::nested_loops {
+    fun nested_for_loops() {
+        let _v0 = 0;
+        let _v1 = 0;
+        let _v2 = false;
+        'l0: loop {
+            if (_v2) _v1 = _v1 + 1 else _v2 = true;
+            if (!(_v1 < 10)) break;
+            _v0 = _v0 + 1;
+            let _v3 = _v1;
+            let _v4 = false;
+            loop {
+                if (_v4) _v3 = _v3 + 1 else _v4 = true;
+                if (!(_v3 < 10)) continue 'l0;
+                _v0 = _v0 + 1
+            };
+            break
+        };
+    }
+    fun nested_for_while_loop_loops() {
+        let _v0 = 0;
+        let _v1 = 0;
+        let _v2 = false;
+        'l0: loop {
+            if (_v2) _v1 = _v1 + 1 else _v2 = true;
+            if (!(_v1 < 5)) break;
+            _v0 = _v0 + 1;
+            let _v3 = _v1;
+            'l1: loop {
+                if (!(_v3 < 10)) continue 'l0;
+                _v0 = _v0 + 1;
+                let _v4 = _v3;
+                _v3 = _v3 + 1;
+                loop {
+                    _v0 = _v0 + 1;
+                    if (_v4 > 10) continue 'l1;
+                    _v4 = _v4 + 1
+                };
+                break
+            };
+            break
+        };
+    }
+    fun nested_for_while_loops() {
+        let _v0 = 0;
+        let _v1 = 0;
+        let _v2 = false;
+        'l0: loop {
+            if (_v2) _v1 = _v1 + 1 else _v2 = true;
+            if (!(_v1 < 5)) break;
+            _v0 = _v0 + 1;
+            loop {
+                if (!(_v0 < 5)) continue 'l0;
+                _v0 = _v0 + 10
+            };
+            break
+        };
+    }
+    fun nested_loop_for_loops() {
+        let _v0 = 0;
+        let _v1 = 0;
+        'l0: loop {
+            _v0 = _v0 + 1;
+            let _v2 = 0;
+            if (_v0 > 3) break;
+            let _v3 = 0;
+            let _v4 = false;
+            loop {
+                if (_v4) _v3 = _v3 + 1 else _v4 = true;
+                if (!(_v3 < 5)) continue 'l0;
+                _v2 = _v2 + 1;
+                _v1 = _v1 + 1
+            };
+            break
+        };
+    }
+    fun nested_loop_loops() {
+        let _v0 = 0;
+        let _v1 = 0;
+        'l0: loop {
+            _v0 = _v0 + 1;
+            let _v2 = 0;
+            if (_v0 > 3) break;
+            loop {
+                _v2 = _v2 + 1;
+                _v1 = _v1 + 1;
+                if (_v2 > 7) continue 'l0
+            };
+            break
+        };
+    }
+    fun nested_loop_while_loops() {
+        let _v0 = 0;
+        let _v1 = 0;
+        'l0: loop {
+            _v0 = _v0 + 1;
+            let _v2 = 0;
+            if (_v0 > 3) break;
+            loop {
+                if (!(_v2 < 7)) continue 'l0;
+                _v2 = _v2 + 1;
+                _v1 = _v1 + 1
+            };
+            break
+        };
+    }
+    fun nested_while_loops() {
+        let _v0 = 0;
+        let _v1 = 0;
+        'l0: while (_v0 < 3) {
+            _v0 = _v0 + 1;
+            let _v2 = 0;
+            loop {
+                if (!(_v2 < 7)) continue 'l0;
+                _v2 = _v2 + 1;
+                _v1 = _v1 + 1
+            };
+            break
+        };
+    }
+    fun three_layer_for_loops() {
+        let _v0 = 0;
+        let _v1 = 0;
+        let _v2 = false;
+        'l0: loop {
+            if (_v2) _v1 = _v1 + 1 else _v2 = true;
+            if (!(_v1 < 10)) break;
+            _v0 = _v0 + 1;
+            let _v3 = _v1;
+            let _v4 = false;
+            'l1: loop {
+                if (_v4) _v3 = _v3 + 1 else _v4 = true;
+                if (!(_v3 < 10)) continue 'l0;
+                _v0 = _v0 + 1;
+                let _v5 = _v3;
+                let _v6 = false;
+                loop {
+                    if (_v6) _v5 = _v5 + 1 else _v6 = true;
+                    if (!(_v5 < 10)) continue 'l1;
+                    _v0 = _v0 + 1
+                };
+                break
+            };
+            break
+        };
+    }
+    fun three_layer_loop_loops() {
+        let _v0 = 0;
+        let _v1 = 0;
+        'l0: loop {
+            _v0 = _v0 + 1;
+            let _v2 = _v1;
+            if (_v1 > 10) break;
+            _v1 = _v1 + 1;
+            'l1: loop {
+                _v0 = _v0 + 1;
+                let _v3 = _v2;
+                if (_v2 > 10) continue 'l0;
+                _v2 = _v2 + 1;
+                loop {
+                    _v0 = _v0 + 1;
+                    if (_v3 > 10) continue 'l1;
+                    _v3 = _v3 + 1
+                };
+                break
+            };
+            break
+        };
+    }
+    fun three_layer_while_loops() {
+        let _v0 = 0;
+        let _v1 = 0;
+        'l0: while (_v1 < 10) {
+            _v0 = _v0 + 1;
+            let _v2 = _v1;
+            _v1 = _v1 + 1;
+            'l1: loop {
+                if (!(_v2 < 10)) continue 'l0;
+                _v0 = _v0 + 1;
+                let _v3 = _v2;
+                _v2 = _v2 + 1;
+                loop {
+                    if (!(_v3 < 10)) continue 'l1;
+                    _v0 = _v0 + 1;
+                    _v3 = _v3 + 1
+                };
+                break
+            };
+            break
+        };
+    }
+}
+
+============ recompilation succeeded ========

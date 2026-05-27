@@ -1,0 +1,22 @@
+//**** Cross-compiled for `move` syntax from `tests/no-v1-comparison/positional_fields/common_access.move`
+
+//# publish
+module 0x42::test {
+    enum Foo has drop {
+        A {
+            _0: u8,
+        }
+        B {
+            _0: u8,
+        }
+    }
+    fun common_access(p0: Foo): u8 {
+        *&(&p0)._0
+    }
+    fun test_common_access(): u8 {
+        common_access(Foo::A{_0: 42u8})
+    }
+}
+
+
+//# run --verbose -- 0x42::test::test_common_access

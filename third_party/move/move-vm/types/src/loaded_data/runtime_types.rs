@@ -4,11 +4,14 @@
 
 #![allow(clippy::non_canonical_partial_ord_impl)]
 
-use crate::loaded_data::struct_name_indexing::StructNameIndex;
+use crate::{
+    loaded_data::struct_name_indexing::StructNameIndex,
+    module_id_interner::{InternedModuleId, InternedModuleIdPool},
+};
 use derivative::Derivative;
 use itertools::Itertools;
 use move_binary_format::{
-    errors::{Location, PartialVMError, PartialVMResult, VMResult},
+    errors::{PartialVMError, PartialVMResult},
     file_format::{
         SignatureToken, StructHandle, StructTypeParameter, TypeParameterIndex, VariantIndex,
     },
@@ -16,7 +19,7 @@ use move_binary_format::{
 use move_core_types::{
     ability::{Ability, AbilitySet},
     identifier::Identifier,
-    language_storage::{FunctionTag, ModuleId, StructTag, TypeTag},
+    language_storage::{FunctionParamOrReturnTag, FunctionTag, ModuleId, StructTag, TypeTag},
     vm_status::{sub_status::unknown_invariant_violation::EPARANOID_FAILURE, StatusCode},
 };
 use serde::Serialize;
@@ -32,7 +35,6 @@ use std::{
 };
 use triomphe::Arc as TriompheArc;
 
-#[derive(PartialEq, Eq, PartialOrd, Ord, Hash, Clone, Debug)]
 /// A formula describing the value depth of a type, using (the depths of) the type parameters as inputs.
 ///
 /// It has the form of `max(CBase, T1 + C1, T2 + C2, ..)` where `Ti` is the depth of the ith type parameter
@@ -40,6 +42,7 @@ use triomphe::Arc as TriompheArc;
 ///
 /// This form has a special property: when you compute the max of multiple formulae, you can normalize
 /// them into a single formula.
+#[derive(PartialEq, Eq, PartialOrd, Ord, Hash, Clone, Debug)]
 pub struct DepthFormula {
     pub terms: Vec<(TypeParameterIndex, u64)>, // Ti + Ci
     pub constant: Option<u64>,                 // Cbase
@@ -93,14 +96,13 @@ impl DepthFormula {
             formulas.push(DepthFormula::constant(*constant))
         }
         for (t_i, c_i) in terms {
-            let Some(mut u_form) = map.remove(t_i) else {
+            let Some(u_form) = map.remove(t_i) else {
                 return Err(
                     PartialVMError::new(StatusCode::UNKNOWN_INVARIANT_VIOLATION_ERROR)
                         .with_message(format!("{t_i:?} missing mapping")),
                 );
             };
-            u_form.scale(*c_i);
-            formulas.push(u_form)
+            formulas.push(u_form.scale(*c_i))
         }
         Ok(DepthFormula::normalize(formulas))
     }
@@ -114,14 +116,15 @@ impl DepthFormula {
         depth
     }
 
-    pub fn scale(&mut self, c: u64) {
-        let Self { terms, constant } = self;
+    pub fn scale(mut self, c: u64) -> Self {
+        let Self { terms, constant } = &mut self;
         for (_t_i, c_i) in terms {
             *c_i = (*c_i).saturating_add(c);
         }
         if let Some(cbase) = constant.as_mut() {
             *cbase = (*cbase).saturating_add(c);
         }
+        self
     }
 }
 
@@ -145,6 +148,7 @@ impl StructType {
     /// must be None. Otherwise if its a variant struct, the variant for which the fields
     /// are requested must be given. For non-matching parameters, the function returns
     /// an empty list.
+    #[cfg_attr(feature = "force-inline", inline(always))]
     pub fn fields(&self, variant: Option<VariantIndex>) -> PartialVMResult<&[(Identifier, Type)]> {
         match (&self.layout, variant) {
             (StructLayout::Single(fields), None) => Ok(fields.as_slice()),
@@ -243,7 +247,7 @@ impl StructType {
         Ok(())
     }
 
-    #[cfg(test)]
+    #[cfg(any(test, feature = "testing"))]
     pub fn for_test() -> StructType {
         Self {
             idx: StructNameIndex::new(0),
@@ -257,8 +261,36 @@ impl StructType {
 
 #[derive(Debug, Clone, Eq, Hash, Ord, PartialEq, PartialOrd)]
 pub struct StructIdentifier {
-    pub module: ModuleId,
-    pub name: Identifier,
+    module: ModuleId,
+    interned_module_id: InternedModuleId,
+    name: Identifier,
+}
+
+impl StructIdentifier {
+    pub fn new(module_id_pool: &InternedModuleIdPool, module: ModuleId, name: Identifier) -> Self {
+        let interned_module_id = module_id_pool.intern_by_ref(&module);
+        Self {
+            module,
+            interned_module_id,
+            name,
+        }
+    }
+
+    pub fn module(&self) -> &ModuleId {
+        &self.module
+    }
+
+    pub fn interned_module_id(&self) -> InternedModuleId {
+        self.interned_module_id
+    }
+
+    pub fn name(&self) -> &Identifier {
+        &self.name
+    }
+
+    pub fn into_module_and_name(self) -> (ModuleId, Identifier) {
+        (self.module, self.name)
+    }
 }
 
 #[derive(Debug, Clone, Eq, Hash, Ord, PartialEq, PartialOrd)]
@@ -290,6 +322,12 @@ pub enum Type {
     U16,
     U32,
     U256,
+    I8,
+    I16,
+    I32,
+    I64,
+    I128,
+    I256,
 }
 
 pub struct TypePreorderTraversalIter<'a> {
@@ -299,6 +337,7 @@ pub struct TypePreorderTraversalIter<'a> {
 impl<'a> Iterator for TypePreorderTraversalIter<'a> {
     type Item = &'a Type;
 
+    #[cfg_attr(feature = "force-inline", inline(always))]
     fn next(&mut self) -> Option<Self::Item> {
         use Type::*;
 
@@ -314,6 +353,12 @@ impl<'a> Iterator for TypePreorderTraversalIter<'a> {
                     | U64
                     | U128
                     | U256
+                    | I8
+                    | I16
+                    | I32
+                    | I64
+                    | I128
+                    | I256
                     | Struct { .. }
                     | TyParam(..) => (),
 
@@ -423,6 +468,12 @@ impl Type {
             | U64
             | U128
             | U256
+            | I8
+            | I16
+            | I32
+            | I64
+            | I128
+            | I256
             | Address
             | Vector(_)
             | Struct { .. }
@@ -433,6 +484,14 @@ impl Type {
         }
     }
 
+    pub fn paranoid_check_is_no_ref(&self, msg: &str) -> PartialVMResult<()> {
+        if matches!(self, Type::Reference(_) | Type::MutableReference(_)) {
+            let msg = format!("{} `{}` cannot be a reference", msg, self);
+            return paranoid_failure!(msg);
+        }
+        Ok(())
+    }
+
     pub fn paranoid_check_is_bool_ty(&self) -> PartialVMResult<()> {
         if !matches!(self, Self::Bool) {
             let msg = format!("Expected boolean type, got {}", self);
@@ -441,6 +500,19 @@ impl Type {
         Ok(())
     }
 
+    #[cfg_attr(feature = "force-inline", inline(always))]
+    pub fn paranoid_check_is_sint_ty(&self) -> PartialVMResult<()> {
+        if !matches!(
+            self,
+            Self::I8 | Self::I16 | Self::I32 | Self::I64 | Self::I128 | Self::I256
+        ) {
+            let msg = format!("Expected signed integer type, got {}", self);
+            return paranoid_failure!(msg);
+        }
+        Ok(())
+    }
+
+    #[cfg_attr(feature = "force-inline", inline(always))]
     pub fn paranoid_check_is_u64_ty(&self) -> PartialVMResult<()> {
         if !matches!(self, Self::U64) {
             let msg = format!("Expected U64 type, got {}", self);
@@ -463,10 +535,11 @@ impl Type {
                 return Ok(());
             }
         }
-        let msg = format!("Expected address type, got {}", self);
+        let msg = format!("Expected &signer type, got {}", self);
         paranoid_failure!(msg)
     }
 
+    #[cfg_attr(feature = "force-inline", inline(always))]
     pub fn paranoid_check_has_ability(&self, ability: Ability) -> PartialVMResult<()> {
         if !self.abilities()?.has_ability(ability) {
             let msg = format!("Type {} does not have expected ability {}", self, ability);
@@ -475,6 +548,7 @@ impl Type {
         Ok(())
     }
 
+    #[cfg_attr(feature = "force-inline", inline(always))]
     pub fn paranoid_check_abilities(&self, expected_abilities: AbilitySet) -> PartialVMResult<()> {
         let abilities = self.abilities()?;
         if !expected_abilities.is_subset(abilities) {
@@ -487,6 +561,7 @@ impl Type {
         Ok(())
     }
 
+    #[cfg_attr(feature = "force-inline", inline(always))]
     pub fn paranoid_check_eq(&self, expected_ty: &Self) -> PartialVMResult<()> {
         if self != expected_ty {
             let msg = format!("Expected type {}, got {}", expected_ty, self);
@@ -495,6 +570,7 @@ impl Type {
         Ok(())
     }
 
+    #[cfg_attr(feature = "force-inline", inline(always))]
     pub fn paranoid_check_assignable(&self, expected_ty: &Self) -> PartialVMResult<()> {
         let ok = match (expected_ty, self) {
             (
@@ -529,6 +605,7 @@ impl Type {
         Ok(())
     }
 
+    #[cfg_attr(feature = "force-inline", inline(always))]
     pub fn paranoid_check_is_vec_ty(&self, expected_elem_ty: &Self) -> PartialVMResult<()> {
         if let Self::Vector(elem_ty) = self {
             return elem_ty.paranoid_check_eq(expected_elem_ty);
@@ -538,6 +615,7 @@ impl Type {
         paranoid_failure!(msg)
     }
 
+    #[cfg_attr(feature = "force-inline", inline(always))]
     pub fn paranoid_check_is_vec_ref_ty<const IS_MUT: bool>(
         &self,
         expected_elem_ty: &Self,
@@ -567,6 +645,7 @@ impl Type {
 
     /// Returns an error if the type is not a (mutable) vector reference. Otherwise, returns
     /// a (mutable) reference to its element type.
+    #[cfg_attr(feature = "force-inline", inline(always))]
     pub fn paranoid_check_and_get_vec_elem_ref_ty<const IS_MUT: bool>(
         &self,
         expected_elem_ty: &Self,
@@ -585,6 +664,7 @@ impl Type {
 
     /// Returns an error if the type is not a (mutable) vector reference. Otherwise, returns
     /// its element type.
+    #[cfg_attr(feature = "force-inline", inline(always))]
     pub fn paranoid_check_and_get_vec_elem_ty<const IS_MUT: bool>(
         &self,
         expected_elem_ty: &Self,
@@ -593,6 +673,7 @@ impl Type {
         Ok(self.get_vec_ref_elem_ty())
     }
 
+    #[cfg_attr(feature = "force-inline", inline(always))]
     fn get_vec_ref_elem_ty(&self) -> Self {
         match self {
             Self::Reference(inner_ty) | Self::MutableReference(inner_ty) => match inner_ty.as_ref()
@@ -604,7 +685,7 @@ impl Type {
         }
     }
 
-    #[inline]
+    #[cfg_attr(feature = "force-inline", inline(always))]
     pub fn paranoid_freeze_ref_ty(self) -> PartialVMResult<Type> {
         match self {
             Type::MutableReference(ty) => Ok(Type::Reference(ty)),
@@ -615,7 +696,7 @@ impl Type {
         }
     }
 
-    #[inline]
+    #[cfg_attr(feature = "force-inline", inline(always))]
     pub fn paranoid_read_ref(self) -> PartialVMResult<Type> {
         match self {
             Type::Reference(inner_ty) | Type::MutableReference(inner_ty) => {
@@ -629,7 +710,7 @@ impl Type {
         }
     }
 
-    #[inline]
+    #[cfg_attr(feature = "force-inline", inline(always))]
     pub fn paranoid_write_ref(&self, val_ty: &Type) -> PartialVMResult<()> {
         if let Type::MutableReference(inner_ty) = self {
             val_ty.paranoid_check_assignable(inner_ty)?;
@@ -640,6 +721,7 @@ impl Type {
         }
     }
 
+    #[cfg_attr(feature = "force-inline", inline(always))]
     pub fn paranoid_check_ref_eq(
         &self,
         expected_inner_ty: &Self,
@@ -670,6 +752,12 @@ impl Type {
             | Type::U32
             | Type::U256
             | Type::U128
+            | Type::I8
+            | Type::I64
+            | Type::I16
+            | Type::I32
+            | Type::I128
+            | Type::I256
             | Type::Address
             | Type::Signer
             | Type::Vector(_)
@@ -680,6 +768,9 @@ impl Type {
         }
     }
 
+    // Note(inline): Recursive function, but `#[cfg_attr(feature = "force-inline", inline(always))]` seems to improve perf slightly
+    //               and doesn't add much compile time.
+    #[cfg_attr(feature = "force-inline", inline(always))]
     pub fn abilities(&self) -> PartialVMResult<AbilitySet> {
         match self {
             Type::Bool
@@ -689,6 +780,12 @@ impl Type {
             | Type::U64
             | Type::U128
             | Type::U256
+            | Type::I8
+            | Type::I16
+            | Type::I32
+            | Type::I64
+            | Type::I128
+            | Type::I256
             | Type::Address => Ok(AbilitySet::PRIMITIVES),
 
             // Technically unreachable but, no point in erroring if we don't have to
@@ -748,6 +845,7 @@ impl Type {
     ///   - `u64` has one node
     ///   - `vector<u64>` has two nodes -- one for the vector and one for the element type u64.
     ///   - `Foo<u64, Bar<u8, bool>>` has 5 nodes.
+    #[cfg_attr(feature = "force-inline", inline(always))]
     pub fn num_nodes(&self) -> usize {
         self.preorder_traversal().count()
     }
@@ -795,6 +893,12 @@ impl Type {
                     | U64
                     | U128
                     | U256
+                    | I8
+                    | I16
+                    | I32
+                    | I64
+                    | I128
+                    | I256
                     | Vector(..)
                     | Struct { .. }
                     | Reference(..)
@@ -831,6 +935,12 @@ impl fmt::Display for Type {
             U64 => f.write_str("u64"),
             U128 => f.write_str("u128"),
             U256 => f.write_str("u256"),
+            I8 => f.write_str("i8"),
+            I16 => f.write_str("i16"),
+            I32 => f.write_str("i32"),
+            I64 => f.write_str("i64"),
+            I128 => f.write_str("i128"),
+            I256 => f.write_str("i256"),
             Address => f.write_str("address"),
             Signer => f.write_str("signer"),
             Vector(et) => write!(f, "vector<{}>", et),
@@ -881,52 +991,84 @@ impl TypeBuilder {
         }
     }
 
-    #[inline]
+    #[inline(always)]
     pub fn create_bool_ty(&self) -> Type {
         Type::Bool
     }
 
-    #[inline]
+    #[inline(always)]
     pub fn create_u8_ty(&self) -> Type {
         Type::U8
     }
 
-    #[inline]
+    #[inline(always)]
     pub fn create_u16_ty(&self) -> Type {
         Type::U16
     }
 
-    #[inline]
+    #[inline(always)]
     pub fn create_u32_ty(&self) -> Type {
         Type::U32
     }
 
-    #[inline]
+    #[inline(always)]
     pub fn create_u64_ty(&self) -> Type {
         Type::U64
     }
 
-    #[inline]
+    #[inline(always)]
     pub fn create_u128_ty(&self) -> Type {
         Type::U128
     }
 
-    #[inline]
+    #[inline(always)]
     pub fn create_u256_ty(&self) -> Type {
         Type::U256
     }
 
+    #[inline(always)]
+    pub fn create_i8_ty(&self) -> Type {
+        Type::I8
+    }
+
+    #[inline(always)]
+    pub fn create_i16_ty(&self) -> Type {
+        Type::I16
+    }
+
+    #[inline(always)]
+    pub fn create_i32_ty(&self) -> Type {
+        Type::I32
+    }
+
+    #[inline(always)]
+    pub fn create_i64_ty(&self) -> Type {
+        Type::I64
+    }
+
+    #[inline(always)]
+    pub fn create_i128_ty(&self) -> Type {
+        Type::I128
+    }
+
+    #[inline(always)]
+    pub fn create_i256_ty(&self) -> Type {
+        Type::I256
+    }
+
+    #[inline(always)]
     pub fn create_address_ty(&self) -> Type {
         Type::Address
     }
 
+    #[inline(always)]
     pub fn create_signer_ty(&self) -> Type {
         Type::Signer
     }
 
     /// Creates a (possibly mutable) reference type from the given inner type.
     /// Returns an error if the type size or depth are too large.
-    #[inline]
+    #[cfg_attr(feature = "force-inline", inline(always))]
     pub fn create_ref_ty(&self, inner_ty: &Type, is_mut: bool) -> PartialVMResult<Type> {
         let mut count = 1;
         let check = |c: &mut u64, d: u64| self.check(c, d);
@@ -951,7 +1093,7 @@ impl TypeBuilder {
 
     /// Creates a vector type with the given element type, returning an error
     /// if the type size or depth are too large.
-    #[inline]
+    #[cfg_attr(feature = "force-inline", inline(always))]
     pub fn create_vec_ty(&self, elem_ty: &Type) -> PartialVMResult<Type> {
         let mut count = 1;
         let check = |c: &mut u64, d: u64| self.check(c, d);
@@ -969,14 +1111,14 @@ impl TypeBuilder {
         Ok(Type::Vector(TriompheArc::new(elem_ty)))
     }
 
-    #[inline]
+    #[cfg_attr(feature = "force-inline", inline(always))]
     pub fn create_struct_ty(&self, idx: StructNameIndex, ability: AbilityInfo) -> Type {
         Type::Struct { idx, ability }
     }
 
     /// Creates a fully-instantiated struct type, performing the type substitution.
     /// Returns an error if the type size or depth are too large.
-    #[inline]
+    #[cfg_attr(feature = "force-inline", inline(always))]
     pub fn create_struct_instantiation_ty(
         &self,
         struct_ty: &StructType,
@@ -1018,6 +1160,7 @@ impl TypeBuilder {
 
     /// Creates a type for a Move constant. Note that constant types can be
     /// more restrictive and therefore have their own creation API.
+    #[cfg_attr(feature = "force-inline", inline(always))]
     pub fn create_constant_ty(&self, const_tok: &SignatureToken) -> PartialVMResult<Type> {
         let mut count = 0;
         self.create_constant_ty_impl(const_tok, &mut count, 1)
@@ -1033,9 +1176,9 @@ impl TypeBuilder {
     }
 
     /// Creates a fully-instantiated type from its storage representation.
-    pub fn create_ty<F>(&self, ty_tag: &TypeTag, mut resolver: F) -> VMResult<Type>
+    pub fn create_ty<F>(&self, ty_tag: &TypeTag, mut resolver: F) -> PartialVMResult<Type>
     where
-        F: FnMut(&StructTag) -> VMResult<Arc<StructType>>,
+        F: FnMut(&StructTag) -> PartialVMResult<Arc<StructType>>,
     {
         let mut count = 0;
         self.create_ty_impl(ty_tag, &mut resolver, &mut count, 1)
@@ -1048,24 +1191,35 @@ impl TypeBuilder {
         self.subst_impl(ty, ty_args, &mut count, 1, check)
     }
 
+    #[inline]
     fn check(&self, count: &mut u64, depth: u64) -> PartialVMResult<()> {
         if *count >= self.max_ty_size {
-            return Err(
-                PartialVMError::new(StatusCode::TOO_MANY_TYPE_NODES).with_message(format!(
-                    "Type size is larger than maximum {}",
-                    self.max_ty_size
-                )),
-            );
+            return self.too_many_nodes_error();
         }
         if depth > self.max_ty_depth {
-            return Err(
-                PartialVMError::new(StatusCode::VM_MAX_TYPE_DEPTH_REACHED).with_message(format!(
-                    "Type depth is larger than maximum {}",
-                    self.max_ty_depth
-                )),
-            );
+            return self.too_large_depth_error();
         }
         Ok(())
+    }
+
+    #[cold]
+    fn too_many_nodes_error(&self) -> PartialVMResult<()> {
+        Err(
+            PartialVMError::new(StatusCode::TOO_MANY_TYPE_NODES).with_message(format!(
+                "Type size is larger than maximum {}",
+                self.max_ty_size
+            )),
+        )
+    }
+
+    #[cold]
+    fn too_large_depth_error(&self) -> PartialVMResult<()> {
+        Err(
+            PartialVMError::new(StatusCode::VM_MAX_TYPE_DEPTH_REACHED).with_message(format!(
+                "Type depth is larger than maximum {}",
+                self.max_ty_depth
+            )),
+        )
     }
 
     fn create_constant_ty_impl(
@@ -1087,6 +1241,12 @@ impl TypeBuilder {
             S::U64 => U64,
             S::U128 => U128,
             S::U256 => U256,
+            S::I8 => I8,
+            S::I16 => I16,
+            S::I32 => I32,
+            S::I64 => I64,
+            S::I128 => I128,
+            S::I256 => I256,
             S::Address => Address,
             S::Vector(elem_tok) => {
                 let elem_ty = self.create_constant_ty_impl(elem_tok, count, depth + 1)?;
@@ -1100,12 +1260,16 @@ impl TypeBuilder {
                 );
             },
 
-            tok => {
+            S::Signer
+            | S::Function(..)
+            | S::Reference(_)
+            | S::MutableReference(_)
+            | S::TypeParameter(_) => {
                 return Err(
                     PartialVMError::new(StatusCode::UNKNOWN_INVARIANT_VIOLATION_ERROR)
                         .with_message(format!(
                             "{:?} is not allowed or is not a meaningful token for a constant",
-                            tok
+                            const_tok
                         )),
                 );
             },
@@ -1201,6 +1365,12 @@ impl TypeBuilder {
             U64 => U64,
             U128 => U128,
             U256 => U256,
+            I8 => I8,
+            I16 => I16,
+            I32 => I32,
+            I64 => I64,
+            I128 => I128,
+            I256 => I256,
             Address => Address,
             Signer => Signer,
             Vector(elem_ty) => {
@@ -1266,15 +1436,14 @@ impl TypeBuilder {
         resolver: &mut F,
         count: &mut u64,
         depth: u64,
-    ) -> VMResult<Type>
+    ) -> PartialVMResult<Type>
     where
-        F: FnMut(&StructTag) -> VMResult<Arc<StructType>>,
+        F: FnMut(&StructTag) -> PartialVMResult<Arc<StructType>>,
     {
         use Type::*;
         use TypeTag as T;
 
-        self.check(count, depth)
-            .map_err(|e| e.finish(Location::Undefined))?;
+        self.check(count, depth)?;
         *count += 1;
         Ok(match ty_tag {
             T::Bool => Bool,
@@ -1284,6 +1453,12 @@ impl TypeBuilder {
             T::U64 => U64,
             T::U128 => U128,
             T::U256 => U256,
+            T::I8 => I8,
+            T::I16 => I16,
+            T::I32 => I32,
+            T::I64 => I64,
+            T::I128 => I128,
+            T::I256 => I256,
             T::Address => Address,
             T::Signer => Signer,
             T::Vector(elem_ty_tag) => {
@@ -1304,8 +1479,7 @@ impl TypeBuilder {
                         let ty_arg = self.create_ty_impl(ty_arg, resolver, count, depth + 1)?;
                         ty_args.push(ty_arg);
                     }
-                    Type::verify_ty_arg_abilities(struct_ty.ty_param_constraints(), &ty_args)
-                        .map_err(|e| e.finish(Location::Undefined))?;
+                    Type::verify_ty_arg_abilities(struct_ty.ty_param_constraints(), &ty_args)?;
                     StructInstantiation {
                         idx: struct_ty.idx,
                         ty_args: triomphe::Arc::new(ty_args),
@@ -1322,10 +1496,24 @@ impl TypeBuilder {
                     results,
                     abilities,
                 } = fun.as_ref();
-                let mut to_list = |ts: &[TypeTag]| {
+                let mut to_list = |ts: &[FunctionParamOrReturnTag]| {
                     ts.iter()
-                        .map(|t| self.create_ty_impl(t, resolver, count, depth + 1))
-                        .collect::<VMResult<Vec<_>>>()
+                        .map(|t| {
+                            // Note: for reference or mutable reference tags, we add 1 more level
+                            // of depth, hence adding 2 to the counter.
+                            Ok(match t {
+                                FunctionParamOrReturnTag::Reference(t) => Reference(Box::new(
+                                    self.create_ty_impl(t, resolver, count, depth + 2)?,
+                                )),
+                                FunctionParamOrReturnTag::MutableReference(t) => MutableReference(
+                                    Box::new(self.create_ty_impl(t, resolver, count, depth + 2)?),
+                                ),
+                                FunctionParamOrReturnTag::Value(t) => {
+                                    self.create_ty_impl(t, resolver, count, depth + 1)?
+                                },
+                            })
+                        })
+                        .collect::<PartialVMResult<Vec<_>>>()
                 };
                 Function {
                     args: to_list(args)?,
@@ -1442,6 +1630,12 @@ impl<'a> TypeParamMap<'a> {
             | (Type::U64, Type::U64)
             | (Type::U128, Type::U128)
             | (Type::U256, Type::U256)
+            | (Type::I8, Type::I8)
+            | (Type::I16, Type::I16)
+            | (Type::I32, Type::I32)
+            | (Type::I64, Type::I64)
+            | (Type::I128, Type::I128)
+            | (Type::I256, Type::I256)
             | (Type::Bool, Type::Bool)
             | (Type::Address, Type::Address)
             | (Type::Signer, Type::Signer) => true,
@@ -1454,6 +1648,12 @@ impl<'a> TypeParamMap<'a> {
             | (Type::U64, _)
             | (Type::U128, _)
             | (Type::U256, _)
+            | (Type::I8, _)
+            | (Type::I16, _)
+            | (Type::I32, _)
+            | (Type::I64, _)
+            | (Type::I128, _)
+            | (Type::I256, _)
             | (Type::Bool, _)
             | (Type::Address, _)
             | (Type::Signer, _)
@@ -1573,7 +1773,7 @@ mod unit_tests {
 
         let ty = Vector(TriompheArc::new(Vector(TriompheArc::new(TyParam(0)))));
         let ty_arg = Vector(TriompheArc::new(Vector(TriompheArc::new(Bool))));
-        assert_ok!(ty_builder.create_ty_with_subst(&ty, &[ty_arg.clone()]));
+        assert_ok!(ty_builder.create_ty_with_subst(&ty, std::slice::from_ref(&ty_arg)));
 
         let ty_arg = Vector(TriompheArc::new(ty_arg));
         let err = assert_err!(ty_builder.create_ty_with_subst(&ty, &[ty_arg]));
@@ -1757,6 +1957,12 @@ mod unit_tests {
         assert_eq!(assert_ok!(ty_builder.create_constant_ty(&S::U64)), U64);
         assert_eq!(assert_ok!(ty_builder.create_constant_ty(&S::U128)), U128);
         assert_eq!(assert_ok!(ty_builder.create_constant_ty(&S::U256)), U256);
+        assert_eq!(assert_ok!(ty_builder.create_constant_ty(&S::I8)), I8);
+        assert_eq!(assert_ok!(ty_builder.create_constant_ty(&S::I16)), I16);
+        assert_eq!(assert_ok!(ty_builder.create_constant_ty(&S::I32)), I32);
+        assert_eq!(assert_ok!(ty_builder.create_constant_ty(&S::I64)), I64);
+        assert_eq!(assert_ok!(ty_builder.create_constant_ty(&S::I128)), I128);
+        assert_eq!(assert_ok!(ty_builder.create_constant_ty(&S::I256)), I256);
         assert_eq!(assert_ok!(ty_builder.create_constant_ty(&S::Bool)), Bool);
         assert_eq!(
             assert_ok!(ty_builder.create_constant_ty(&S::Address)),

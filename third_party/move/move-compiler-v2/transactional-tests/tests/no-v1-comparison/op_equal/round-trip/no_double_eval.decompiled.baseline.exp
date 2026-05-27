@@ -1,0 +1,5 @@
+processed 4 tasks
+task 0 lines 3-16:  publish [module 0xc0ffee::m1 {]
+task 1 lines 19-32:  publish [module 0xc0ffee::m2 {]
+task 2 lines 35-35:  run --verbose -- 0xc0ffee::m1::test
+task 3 lines 37-37:  run --verbose -- 0xc0ffee::m2::test

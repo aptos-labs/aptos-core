@@ -131,6 +131,14 @@ impl TransferFunctions for Optimizer<'_> {
                         }
                     }
                 },
+                Invoke => {
+                    // Need to assume effect
+                    for src in srcs {
+                        if self.target.get_local_type(*src).is_mutable_reference() {
+                            state.unwritten.insert(Reference(*src));
+                        }
+                    }
+                },
                 _ => {},
             }
         }
@@ -235,6 +243,13 @@ impl Optimizer<'_> {
                 Call(_, _, WriteBack(..), srcs, _)
                     if !is_unwritten(code_offset as CodeOffset, &Reference(srcs[0])) =>
                 {
+                    // When current write-back is redundant, we can also remove the previous PackRefDeep
+                    // because no need to check data invariant
+                    if let Some(Call(_, _, PackRefDeep, srcs_pack, _)) = new_instrs.last() {
+                        if srcs[0] == srcs_pack[0] {
+                            new_instrs.pop();
+                        }
+                    }
                     continue;
                 },
                 _ => {},

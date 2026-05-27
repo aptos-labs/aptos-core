@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use move_binary_format::file_format::*;
-use move_bytecode_verifier::dependencies;
+use move_bytecode_verifier::{dependencies, VerifierConfig};
 use move_core_types::{
     ability::AbilitySet, account_address::AccountAddress, identifier::Identifier,
     vm_status::StatusCode,
@@ -276,20 +276,23 @@ fn deprecated_script_visibility_checks_valid() {
     // module uses script functions from script context
     let is_valid = true;
     let non_generic_call_mod = mk_invoking_module(false, is_valid);
-    let result = dependencies::verify_module(&non_generic_call_mod, deps);
+    let result =
+        dependencies::verify_module(&VerifierConfig::default(), &non_generic_call_mod, deps);
     assert!(result.is_ok());
 
     let generic_call_mod = mk_invoking_module(true, is_valid);
-    let result = dependencies::verify_module(&generic_call_mod, deps);
+    let result = dependencies::verify_module(&VerifierConfig::default(), &generic_call_mod, deps);
     assert!(result.is_ok());
 
     // script uses script functions
     let non_generic_call_script = mk_invoking_script(false);
-    let result = dependencies::verify_script(&non_generic_call_script, deps);
+    let result =
+        dependencies::verify_script(&VerifierConfig::default(), &non_generic_call_script, deps);
     assert!(result.is_ok());
 
     let generic_call_script = mk_invoking_script(true);
-    let result = dependencies::verify_script(&generic_call_script, deps);
+    let result =
+        dependencies::verify_script(&VerifierConfig::default(), &generic_call_script, deps);
     assert!(result.is_ok());
 }
 
@@ -303,14 +306,15 @@ fn deprecated_script_visibility_checks_invalid() {
     // module uses script functions from script context
     let not_valid = false;
     let non_generic_call_mod = mk_invoking_module(false, not_valid);
-    let result = dependencies::verify_module(&non_generic_call_mod, deps);
+    let result =
+        dependencies::verify_module(&VerifierConfig::default(), &non_generic_call_mod, deps);
     assert_eq!(
         result.unwrap_err().major_status(),
         StatusCode::CALLED_SCRIPT_VISIBLE_FROM_NON_SCRIPT_VISIBLE,
     );
 
     let generic_call_mod = mk_invoking_module(true, not_valid);
-    let result = dependencies::verify_module(&generic_call_mod, deps);
+    let result = dependencies::verify_module(&VerifierConfig::default(), &generic_call_mod, deps);
     assert_eq!(
         result.unwrap_err().major_status(),
         StatusCode::CALLED_SCRIPT_VISIBLE_FROM_NON_SCRIPT_VISIBLE,

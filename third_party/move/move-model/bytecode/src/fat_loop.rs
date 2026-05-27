@@ -475,13 +475,12 @@ impl FatLoopBuilder {
             // because the fatloop algorithm doesn't support fallthrough
             if cfg.successors(*block_id).len() == 1 && !block[block.len() - 1].is_branching() {
                 let successor_id = cfg.successors(*block_id).first().unwrap();
-                let successor_label_opt = id_label_map.get(successor_id);
-                if successor_label_opt.is_some()
+                let successor_label_opt = id_label_map.get(successor_id).copied();
+                if let Some(successor_label) = successor_label_opt
                     && i != blocks.len() - 1
                     && !blocks.get(i + 1).unwrap().1.is_empty()
                 {
                     if let Some(lbl) = blocks.get(i + 1).unwrap().1[0].get_label_inner_opt() {
-                        let successor_label = *successor_label_opt.unwrap();
                         if lbl != successor_label {
                             let mut new_block = block.clone();
                             // Inserted bc is used for jumping to its successor so

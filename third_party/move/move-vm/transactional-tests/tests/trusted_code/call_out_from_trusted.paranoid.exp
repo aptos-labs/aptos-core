@@ -1,0 +1,13 @@
+processed 3 tasks
+task 0 lines 1-8:  publish [module 0x9::trusted]
+task 1 lines 10-24:  publish [module 0x99::not_trusted]
+task 2 lines 26-26:  run --verbose 0x99::not_trusted::call_apply
+Error: Function execution failed with VMError: {
+    message: Cannot add U32(33) and U64(1),
+    major_status: INTERNAL_TYPE_ERROR,
+    sub_status: None,
+    location: 0x99::not_trusted,
+    indices: [],
+    offsets: [(FunctionDefinitionIndex(1), 2)],
+    exec_state: Some(ExecutionState { stack_trace: [(Some(ModuleId { address: 0000000000000000000000000000000000000000000000000000000000000009, name: Identifier("trusted") }), FunctionDefinitionIndex(0), 2), (Some(ModuleId { address: 0000000000000000000000000000000000000000000000000000000000000099, name: Identifier("not_trusted") }), FunctionDefinitionIndex(0), 2)] }),
+}
