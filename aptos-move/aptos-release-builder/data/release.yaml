@@ -1,13 +1,13 @@
 ---
-remote_endpoint: https://fullnode.testnet.aptoslabs.com
+remote_endpoint: https://fullnode.mainnet.aptoslabs.com
 # replace with below for actual release, compat test needs concrete URL above:
 # remote_endpoint: ~
-name: "v1.45.0-rc"
+name: "v1.45.0"
 proposals:
   - name: proposal_1_upgrade_framework
     metadata:
-      title: "Multi-step proposal to upgrade testnet framework, version v1.45.0-rc"
-      description: "This includes changes in https://github.com/aptos-labs/aptos-core/releases/tag/aptos-framework-v1.45.0-rc"
+      title: "Multi-step proposal to upgrade mainnet framework, version v1.45.0"
+      description: "This includes changes in https://github.com/aptos-labs/aptos-core/releases/tag/aptos-framework-v1.45.0"
     execution_mode: MultiStep
     update_sequence:
       - Gas:
