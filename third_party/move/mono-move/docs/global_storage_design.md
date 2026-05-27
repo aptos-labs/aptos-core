@@ -16,9 +16,10 @@ Specifically, it covers:
     2) local caching so repeated reads do not re-enter the shared concurrent data structure,
     3) charging gas for IO on first load only (TBD if it has to be BCS-based).
 
-- Reads should be zero-copy (sharing a pointer).
-  Hence, VM must allow pointers into another transaction's memory region.
+- Obtaining a global reference does not involve copying the entire value representation behind the reference.
+  Hence, VM may allow pointers into another transaction's memory region.
   Because VM can read something other transaction writes, it is important that representation of the read value is consistent with the representation of the written value.
+  For example, if writes are represented as an overlay over immutable flat-memory value, reads should understand this representation.
 
 - Execution of every transaction records its pending writes as a write-set.
   The write-set can be made visible to Block-STM so that other transactions can observe it.
@@ -51,7 +52,7 @@ Alongside the working map, the transaction stores:
 The journal is append-only.
 On checkpoint, the runtime saves the current journal length and the epoch counter.
 On rollback, the journal is walked from the end back to the saved length and each entry's undo is applied to the working map.
-Entries are appended only on the *first* transition of a key in the current checkpoint epoch.
+Entries are appended only on the *first* state transition of the value in the current checkpoint epoch.
 Subsequent in-place mutations within the same epoch do not append, so the journal's size is bounded by the number of unique keys touched.
 Checkpoint cost is O(1); rollback cost is O(unique keys touched since the checkpoint).
 Pre-checkpoint allocations are never reached on the mutation path, so they remain physically untouched after rollback; allocations made post-checkpoint that become unreachable after rollback are reclaimed by GC.
@@ -64,6 +65,7 @@ Alternatives to the linear-journal are described in later sections.
 The working map is `HashMap<Key, Entry>` and, for the initial implementation, does not live on the same heap as values.
 The `Key` is `(AccountAddress, InternedType)`.
 The type is interned, so equality and hashing are cheap (note that global storage access requires canonicalization of generic instantiations).
+Note that eventually we may want to move the map to the heap (for more accurate accounting & security when it comes to memory limits).
 
 > IMPORTANT: because this is a hashmap, its traversal order is non-deterministic.
   We make sure that write-set generation enforces determinism in later sections.
@@ -74,7 +76,7 @@ Interpreter copies entry bytes or pointers into destination frame slots directly
 ```rust
 enum Read {
   // Value did not exist.
-  None,
+  DoesNotExist,
   // Points into another arena (other transaction write or block cache).
   // Version can be a Block-STM version, i.e., transaction index + incarnation (8 bytes total).
   ExternalHeap { ptr: *const u8, version: Version },
@@ -84,7 +86,7 @@ enum Read {
 
 enum MaybeWrite {
   // There was no write.
-  None,
+  NotModified,
   // Points into local transaction arena. The read was CoWed, but not necessarily modified.
   LocalHeap { ptr: *mut u8 },
   // Optimization for inline structs/enums: small values copied directly. Also, not necessarily modified.
@@ -138,8 +140,8 @@ enum MicroOp {
 
 `Exists` performs an existence check.
 Existence of the resource is determined from the entry's `(read, write)` pair:
-- `(None, None)`: does not exist.
-- `(_, None)`: exists.
+- `(DoesNotExist, NotModified)`: does not exist.
+- `(_, NotModified)`: exists.
 - `(_, Deleted)`: does not exist.
 - `(_, _)`: exists otherwise.
 Writes the boolean outcome to the `dst` slot.
@@ -235,15 +237,15 @@ enum MicroOp {
 `MoveTo` publishes a resource at the given address.
 The instruction aborts the transaction if the resource already exists.
 The pointer or inline data is moved to the working map from the `src` slot, and the previous write is appended to the journal.
-The previous write is `None` for a fresh resource, or `Deleted` if a `move_from` removed K earlier in the transaction (possibly in a prior epoch).
-Both must be recorded faithfully: a rollback of `MoveTo` after a prior `move_from` has to restore the entry's `write` to `Deleted`, not `None`, otherwise the existence check would report the resource as present when it was actually deleted.
+The previous write is `NotModified` for a fresh resource, or `Deleted` if a `move_from` removed K earlier in the transaction (possibly in a prior epoch).
+Both must be recorded faithfully: a rollback of `MoveTo` after a prior `move_from` has to restore the entry's `write` to `Deleted`, not `NotModified`, otherwise the existence check would report the resource as present when it was actually deleted.
 There is no need to CoW because the local heap owns the moved resource.
 
 ## Checkpoints and Rollback
 
 The working set and the journal support `checkpoint()` and `rollback(n)` (undoes the last `n` checkpoints) during a single transaction.
 These operations are invoked exclusively by the driver (Aptos VM), when there is no live data other than global values / events.
-This makes the journal a safe initial implementation: the checkpoint stack's depth is bounded by the Aptos VM session model (~3 levels: prologue, user, epilogue).
+Also, the checkpoint stack's depth is bounded by the Aptos VM session model (~3 levels: prologue, user, epilogue).
 
 A checkpoint stack runs alongside the working map.
 `checkpoint()` pushes `(journal.len(), current_epoch)` onto the stack and then increments `current_epoch`.
