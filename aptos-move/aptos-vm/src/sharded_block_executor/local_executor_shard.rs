@@ -195,7 +195,7 @@ impl<S: StateView + Sync + Send + 'static> ExecutorClient<S> for LocalExecutorCl
                     state_view.clone(),
                     sub_blocks_for_shard,
                     concurrency_level_per_shard,
-                    onchain_config.clone(),
+                    onchain_config,
                 ))
                 .unwrap();
         }
