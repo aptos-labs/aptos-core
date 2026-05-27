@@ -167,7 +167,7 @@ impl DoGetExecutionOutput {
                 );
             }
         }
-        if parent_state.latest().hot_state_config().use_write_set_v1 {
+        if onchain_config.hotness_in_epilogue() {
             Self::convert_write_sets_to_v1(&mut transaction_outputs);
         }
 
@@ -199,7 +199,7 @@ impl DoGetExecutionOutput {
             state_view_arc.clone(),
             onchain_config,
         )?;
-        if parent_state.latest().hot_state_config().use_write_set_v1 {
+        if onchain_config.hotness_in_epilogue() {
             Self::convert_write_sets_to_v1(&mut transaction_outputs);
         }
 

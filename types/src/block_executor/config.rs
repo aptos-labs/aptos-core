@@ -1,7 +1,7 @@
 // Copyright (c) Aptos Foundation
 // Licensed pursuant to the Innovation-Enabling Source Code License, available at https://github.com/aptos-labs/aptos-core/blob/main/LICENSE
 
-use crate::on_chain_config::BlockGasLimitType;
+use crate::on_chain_config::{BlockGasLimitType, Features};
 use serde::{Deserialize, Serialize};
 
 const DEFAULT_GAS_PRICE_TO_BURN: u64 = 90;
@@ -62,9 +62,6 @@ pub struct BlockExecutorLocalConfig {
     pub discard_failed_blocks: bool,
     pub module_cache_config: BlockExecutorModuleCacheLocalConfig,
     pub enable_pre_write: bool,
-    /// If true, the per-block hot-state promotion set is embedded into the block epilogue
-    /// transaction (BlockEpiloguePayload::V2).
-    pub persist_hotness_in_epilogue: bool,
 }
 
 impl BlockExecutorLocalConfig {
@@ -80,19 +77,19 @@ impl BlockExecutorLocalConfig {
             discard_failed_blocks: false,
             module_cache_config: BlockExecutorModuleCacheLocalConfig::default(),
             enable_pre_write: true,
-            persist_hotness_in_epilogue: false,
         }
     }
 }
 
 /// Configuration from on-chain configuration, that is
 /// required to be the same across all nodes.
-#[derive(Clone, Debug, Deserialize, Serialize)]
+#[derive(Clone, Copy, Debug, Deserialize, Serialize)]
 pub struct BlockExecutorConfigFromOnchain {
     pub block_gas_limit_type: BlockGasLimitType,
     enable_per_block_gas_limit: bool,
     per_block_gas_limit: Option<u64>,
     gas_price_to_burn: Option<u64>,
+    hotness_in_epilogue: bool,
 }
 
 impl BlockExecutorConfigFromOnchain {
@@ -106,6 +103,7 @@ impl BlockExecutorConfigFromOnchain {
             enable_per_block_gas_limit,
             per_block_gas_limit: None,
             gas_price_to_burn,
+            hotness_in_epilogue: false,
         }
     }
 
@@ -115,6 +113,7 @@ impl BlockExecutorConfigFromOnchain {
             enable_per_block_gas_limit: false,
             per_block_gas_limit: None,
             gas_price_to_burn: None,
+            hotness_in_epilogue: false,
         }
     }
 
@@ -125,6 +124,7 @@ impl BlockExecutorConfigFromOnchain {
             enable_per_block_gas_limit: false,
             per_block_gas_limit: None,
             gas_price_to_burn: None,
+            hotness_in_epilogue: false,
         }
     }
 
@@ -146,16 +146,24 @@ impl BlockExecutorConfigFromOnchain {
             enable_per_block_gas_limit: false,
             per_block_gas_limit: None,
             gas_price_to_burn: None,
+            hotness_in_epilogue: false,
         }
     }
 
-    pub fn with_block_gas_limit_override(self, block_gas_limit_override: Option<u64>) -> Self {
-        Self {
-            block_gas_limit_type: self.block_gas_limit_type,
-            enable_per_block_gas_limit: self.enable_per_block_gas_limit,
-            per_block_gas_limit: block_gas_limit_override,
-            gas_price_to_burn: self.gas_price_to_burn,
-        }
+    pub fn with_block_gas_limit_override(mut self, block_gas_limit_override: Option<u64>) -> Self {
+        self.per_block_gas_limit = block_gas_limit_override;
+        self
+    }
+
+    /// Apply on-chain feature-flag-derived settings to this config. Call this once per epoch
+    /// at the point the config is first constructed for execution.
+    pub fn with_features(mut self, features: &Features) -> Self {
+        self.hotness_in_epilogue = features.is_hotness_in_epilogue_enabled();
+        self
+    }
+
+    pub fn hotness_in_epilogue(&self) -> bool {
+        self.hotness_in_epilogue
     }
 
     pub fn block_gas_limit_override(&self) -> Option<u64> {
