@@ -828,6 +828,7 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
         onchain_randomness_config: OnChainRandomnessConfig,
         onchain_jwk_consensus_config: OnChainJWKConsensusConfig,
         onchain_chunky_dkg_config: OnChainChunkyDKGConfig,
+        features: Features,
         network_sender: Arc<NetworkSender>,
         payload_client: Arc<dyn PayloadClient>,
         payload_manager: Arc<dyn TPayloadManager>,
@@ -892,6 +893,7 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
                 &onchain_execution_config,
                 &onchain_randomness_config,
                 &onchain_chunky_dkg_config,
+                &features,
                 rand_config,
                 secret_share_verifier.clone(),
                 rand_msg_rx,
@@ -1243,10 +1245,8 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
         self.epoch_state = Some(epoch_state.clone());
 
         let onchain_consensus_config: anyhow::Result<OnChainConsensusConfig> = payload.get();
-        self.encrypted_enabled = payload
-            .get::<Features>()
-            .map(|f| f.is_encrypted_transactions_enabled())
-            .unwrap_or(false);
+        let features = payload.get::<Features>().unwrap_or_default();
+        self.encrypted_enabled = features.is_encrypted_transactions_enabled();
         let onchain_execution_config: anyhow::Result<OnChainExecutionConfig> = payload.get();
         let onchain_randomness_config_seq_num: anyhow::Result<RandomnessConfigSeqNum> =
             payload.get();
@@ -1417,6 +1417,7 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
                 onchain_randomness_config,
                 jwk_consensus_config,
                 onchain_chunky_dkg_config,
+                features,
                 network_sender,
                 payload_client,
                 payload_manager,
@@ -1434,6 +1435,7 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
                 onchain_randomness_config,
                 jwk_consensus_config,
                 onchain_chunky_dkg_config,
+                features,
                 network_sender,
                 payload_client,
                 payload_manager,
@@ -1492,6 +1494,7 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
         onchain_randomness_config: OnChainRandomnessConfig,
         jwk_consensus_config: OnChainJWKConsensusConfig,
         onchain_chunky_dkg_config: OnChainChunkyDKGConfig,
+        features: Features,
         network_sender: NetworkSender,
         payload_client: Arc<dyn PayloadClient>,
         payload_manager: Arc<dyn TPayloadManager>,
@@ -1515,6 +1518,7 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
                     onchain_randomness_config,
                     jwk_consensus_config,
                     onchain_chunky_dkg_config,
+                    features,
                     Arc::new(network_sender),
                     payload_client,
                     payload_manager,
@@ -1548,6 +1552,7 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
         onchain_randomness_config: OnChainRandomnessConfig,
         onchain_jwk_consensus_config: OnChainJWKConsensusConfig,
         onchain_chunky_dkg_config: OnChainChunkyDKGConfig,
+        features: Features,
         network_sender: NetworkSender,
         payload_client: Arc<dyn PayloadClient>,
         payload_manager: Arc<dyn TPayloadManager>,
@@ -1584,6 +1589,7 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
                 &on_chain_execution_config,
                 &onchain_randomness_config,
                 &onchain_chunky_dkg_config,
+                &features,
                 rand_config,
                 None,
                 rand_msg_rx,
