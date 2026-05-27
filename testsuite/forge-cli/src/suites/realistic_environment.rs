@@ -520,7 +520,7 @@ pub(crate) fn realistic_env_max_load_test(
 pub(crate) fn realistic_env_max_load_encrypted_test(duration: Duration) -> ForgeConfig {
     let num_validators = 5;
     let num_fullnodes = 1;
-    let mempool_backlog = 4000;
+    let mempool_backlog = 8000;
 
     let success_criteria = SuccessCriteria::new(15)
         .add_no_restarts()
