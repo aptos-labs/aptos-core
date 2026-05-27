@@ -4,12 +4,13 @@
 //! Defines the [`ExecutionContext`] trait the interpreter calls into,
 //! and a minimal [`LocalExecutionContext`] impl for tests and benchmarks.
 
-use crate::{
+use mono_move_core::{
     interner::{InternedIdentifier, InternedModuleId},
     types::InternedTypeList,
     FunctionPtr,
 };
 use mono_move_gas::{GasMeter, NoOpGasMeter, SimpleGasMeter};
+use mono_move_loader::LoaderResult;
 
 /// Runtime context consulted by the interpreter during execution: gas
 /// charging and cross-module function resolution.
@@ -25,7 +26,7 @@ pub trait ExecutionContext {
         module_id: InternedModuleId,
         name: InternedIdentifier,
         ty_args: InternedTypeList,
-    ) -> anyhow::Result<FunctionPtr>;
+    ) -> LoaderResult<FunctionPtr>;
 }
 
 /// A [`ExecutionContext`] that supports only local execution within a
@@ -72,7 +73,7 @@ impl<G: GasMeter> ExecutionContext for LocalExecutionContext<G> {
         _module_id: InternedModuleId,
         _name: InternedIdentifier,
         _ty_args: InternedTypeList,
-    ) -> anyhow::Result<FunctionPtr> {
-        anyhow::bail!("LocalExecutionContext: load_function not supported")
+    ) -> LoaderResult<FunctionPtr> {
+        panic!("LocalExecutionContext: load_function not supported")
     }
 }

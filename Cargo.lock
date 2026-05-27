@@ -12814,6 +12814,7 @@ dependencies = [
  "move-core-types",
  "shared-dsa",
  "specializer",
+ "thiserror 1.0.69",
 ]
 
 [[package]]
@@ -12855,6 +12856,7 @@ dependencies = [
  "mono-move-alloc",
  "mono-move-core",
  "mono-move-gas",
+ "mono-move-loader",
  "move-core-types",
  "proptest",
  "rand 0.7.3",

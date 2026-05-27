@@ -35,6 +35,9 @@ pub enum ExecutionErrorKind {
     /// Program attempted an operation that failed at runtime (vector
     /// OOB, arithmetic overflow, missing resource, etc.).
     InvalidOperation,
+    /// A referenced module, function, or struct could not be resolved
+    /// or had an incompatible signature.
+    LinkingError,
     /// A condition that should never occur — a VM bug. Production
     /// deployments should alert on these; users should not see them
     /// surface as transaction failures with diagnostic detail. Can
@@ -52,6 +55,7 @@ impl fmt::Display for ExecutionErrorKind {
             ExecutionErrorKind::OutOfGas => write!(f, "OutOfGas"),
             ExecutionErrorKind::RuntimeLimitExceeded => write!(f, "RuntimeLimitExceeded"),
             ExecutionErrorKind::InvalidOperation => write!(f, "InvalidOperation"),
+            ExecutionErrorKind::LinkingError => write!(f, "LinkingError"),
             ExecutionErrorKind::InvariantViolation => write!(f, "InvariantViolation"),
             ExecutionErrorKind::Placeholder => write!(f, "Placeholder"),
         }

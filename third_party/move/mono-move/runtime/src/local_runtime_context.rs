@@ -4,13 +4,14 @@
 //! Minimal [`ExecutionContext`] + [`DescriptorProvider`] impl for tests
 //! and benchmarks that don't go through the full loader stack.
 
+use crate::{ExecutionContext, LocalExecutionContext};
 use mono_move_core::{
     interner::{InternedIdentifier, InternedModuleId},
     types::InternedTypeList,
-    DescriptorId, DescriptorProvider, ExecutionContext, FunctionPtr, LocalExecutionContext,
-    ObjectDescriptor, ObjectDescriptorTable,
+    DescriptorId, DescriptorProvider, FunctionPtr, ObjectDescriptor, ObjectDescriptorTable,
 };
 use mono_move_gas::{GasMeter, NoOpGasMeter, SimpleGasMeter};
+use mono_move_loader::LoaderResult;
 
 /// Combines a [`LocalExecutionContext`] with an owned
 /// [`ObjectDescriptorTable`]. Used by tests and benches that need vector/object
@@ -81,7 +82,7 @@ impl<G: GasMeter> ExecutionContext for LocalRuntimeContext<G> {
         module_id: InternedModuleId,
         name: InternedIdentifier,
         ty_args: InternedTypeList,
-    ) -> anyhow::Result<FunctionPtr> {
+    ) -> LoaderResult<FunctionPtr> {
         self.inner.load_function(module_id, name, ty_args)
     }
 }

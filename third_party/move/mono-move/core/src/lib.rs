@@ -3,7 +3,6 @@
 
 pub mod align;
 mod error;
-mod execution_context;
 mod function;
 mod instruction;
 pub mod interner;
@@ -15,7 +14,6 @@ pub use align::{
     align_max, align_up, align_up_u32, checked_align_max, checked_align_up, MAX_ALIGN,
 };
 pub use error::{ExecutionError, ExecutionErrorKind, ExecutionResult, IntoExecutionError};
-pub use execution_context::{ExecutionContext, LocalExecutionContext};
 pub use function::{
     Code, FrameLayoutInfo, Function, FunctionPtr, SafePointEntry, SortedSafePointEntries,
 };
