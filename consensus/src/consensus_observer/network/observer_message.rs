@@ -1065,7 +1065,7 @@ impl BlockPayload {
     }
 
     /// Verifies the block payload digests and returns an error if the data is invalid
-    pub fn verify_payload_digests(&self) -> Result<(), Error> {
+    pub fn verify_payload_digests(&self, max_num_payload_proofs: u64) -> Result<(), Error> {
         // Get the block info and transactions
         let block_info = self.block.clone();
         let transactions = self.transaction_payload.transactions();
@@ -1100,6 +1100,24 @@ impl BlockPayload {
         let num_transactions = transactions.len();
         let num_payload_proofs = proof_batch_infos.len();
         let num_opt_and_inline_batches = inline_batch_infos.len();
+
+        // Verify the number of payload proofs does not exceed the maximum
+        if num_payload_proofs as u64 > max_num_payload_proofs {
+            return Err(Error::InvalidMessageError(format!(
+                "Number of payload proofs ({}) exceeds the maximum allowed ({})",
+                num_payload_proofs, max_num_payload_proofs
+            )));
+        }
+
+        // Verify that all proof batches and inline batches contain at least one transaction
+        for batch_info in proof_batch_infos.iter().chain(inline_batch_infos.iter()) {
+            if batch_info.num_txns() == 0 {
+                return Err(Error::InvalidMessageError(format!(
+                    "Payload batch contains zero transactions: {:?}",
+                    batch_info
+                )));
+            }
+        }
 
         // Gather the transactions for each payload batch
         let mut batches_and_transactions: Vec<(BatchInfo, Vec<SignedTransaction>)> = vec![];
@@ -1671,6 +1689,7 @@ mod test {
             .collect();
 
         // Create multiple batch proofs with random digests
+        let max_num_payload_proofs = 10_000;
         let num_batches = num_signed_transactions - 1;
         let mut proofs = vec![];
         for _ in 0..num_batches {
@@ -1692,7 +1711,9 @@ mod test {
             create_block_payload(None, &signed_transactions, &proofs, &inline_batches);
 
         // Verify the block hybrid payload digests and ensure it fails (the batch digests don't match)
-        let error = block_payload.verify_payload_digests().unwrap_err();
+        let error = block_payload
+            .verify_payload_digests(max_num_payload_proofs)
+            .unwrap_err();
         assert_matches!(error, Error::InvalidMessageError(_));
 
         // Create a block optqs payload (with the transactions, proofs and inline batches)
@@ -1704,7 +1725,9 @@ mod test {
         );
 
         // Verify the block optqs payload digests and ensure it fails (the batch digests don't match)
-        let error = block_payload.verify_payload_digests().unwrap_err();
+        let error = block_payload
+            .verify_payload_digests(max_num_payload_proofs)
+            .unwrap_err();
         assert_matches!(error, Error::InvalidMessageError(_));
 
         // Create multiple batch proofs with the correct digests
@@ -1721,7 +1744,9 @@ mod test {
             create_block_payload(None, &signed_transactions, &proofs, &inline_batches);
 
         // Verify the block payload digests and ensure it fails (the inline batch digests don't match)
-        let error = block_payload.verify_payload_digests().unwrap_err();
+        let error = block_payload
+            .verify_payload_digests(max_num_payload_proofs)
+            .unwrap_err();
         assert_matches!(error, Error::InvalidMessageError(_));
 
         // Create a block optqs payload (with the transactions, correct proofs and optqs and inline batches)
@@ -1733,7 +1758,9 @@ mod test {
         );
 
         // Verify the block optqs payload digests and ensure it fails (the inline batch digests don't match)
-        let error = block_payload.verify_payload_digests().unwrap_err();
+        let error = block_payload
+            .verify_payload_digests(max_num_payload_proofs)
+            .unwrap_err();
         assert_matches!(error, Error::InvalidMessageError(_));
 
         // Create a single inline batch with the correct digest
@@ -1757,7 +1784,9 @@ mod test {
             create_block_payload(None, &signed_transactions, &proofs, &inline_batches);
 
         // Verify the block payload digests and ensure it passes
-        block_payload.verify_payload_digests().unwrap();
+        block_payload
+            .verify_payload_digests(max_num_payload_proofs)
+            .unwrap();
 
         // Create a block payload (with the transactions, correct proofs and correct inline batches)
         let block_payload = create_block_optqs_payload(
@@ -1768,7 +1797,9 @@ mod test {
         );
 
         // Verify the block payload digests and ensure it passes
-        block_payload.verify_payload_digests().unwrap();
+        block_payload
+            .verify_payload_digests(max_num_payload_proofs)
+            .unwrap();
 
         // Create a block payload (with too many transactions)
         signed_transactions.append(&mut create_signed_transactions(1));
@@ -1776,7 +1807,9 @@ mod test {
             create_block_payload(None, &signed_transactions, &proofs, &inline_batches);
 
         // Verify the block payload digests and ensure it fails (there are too many transactions)
-        let error = block_payload.verify_payload_digests().unwrap_err();
+        let error = block_payload
+            .verify_payload_digests(max_num_payload_proofs)
+            .unwrap_err();
         assert_matches!(error, Error::InvalidMessageError(_));
 
         // Create a block optqs payload (with too many transactions)
@@ -1793,7 +1826,9 @@ mod test {
         );
 
         // Verify the block payload digests and ensure it fails (there are too many transactions)
-        let error = block_payload.verify_payload_digests().unwrap_err();
+        let error = block_payload
+            .verify_payload_digests(max_num_payload_proofs)
+            .unwrap_err();
         assert_matches!(error, Error::InvalidMessageError(_));
 
         // Create a block payload (with too few transactions)
@@ -1804,7 +1839,9 @@ mod test {
             create_block_payload(None, &signed_transactions, &proofs, &inline_batches);
 
         // Verify the block payload digests and ensure it fails (there are too few transactions)
-        let error = block_payload.verify_payload_digests().unwrap_err();
+        let error = block_payload
+            .verify_payload_digests(max_num_payload_proofs)
+            .unwrap_err();
         assert_matches!(error, Error::InvalidMessageError(_));
 
         // Create a block optqs payload (with too few transactions)
@@ -1821,7 +1858,9 @@ mod test {
         );
 
         // Verify the block payload digests and ensure it fails (there are too few transactions)
-        let error = block_payload.verify_payload_digests().unwrap_err();
+        let error = block_payload
+            .verify_payload_digests(max_num_payload_proofs)
+            .unwrap_err();
         assert_matches!(error, Error::InvalidMessageError(_));
     }
 
@@ -1844,6 +1883,7 @@ mod test {
         let signed_transactions = create_signed_transactions(num_signed_transactions);
 
         // Create multiple batch proofs (where some batches are expired)
+        let max_num_payload_proofs = 10_000;
         let (proofs, non_expired_transactions) =
             create_mixed_expiration_proofs(block_timestamp, &signed_transactions);
 
@@ -1856,7 +1896,7 @@ mod test {
         );
 
         // Verify the block payload digests and ensure it passes
-        assert_ok!(block_payload.verify_payload_digests());
+        assert_ok!(block_payload.verify_payload_digests(max_num_payload_proofs));
 
         // Create multiple inline transactions
         let num_inline_transactions = 25;
@@ -1879,7 +1919,9 @@ mod test {
         );
 
         // Verify the block payload digests and ensure it fails (expired inline batches are still checked)
-        let error = block_payload.verify_payload_digests().unwrap_err();
+        let error = block_payload
+            .verify_payload_digests(max_num_payload_proofs)
+            .unwrap_err();
         assert_matches!(error, Error::InvalidMessageError(_));
 
         // Create a block payload (with all inline transactions, no proofs and inline batches)
@@ -1891,7 +1933,7 @@ mod test {
         );
 
         // Verify the block payload digests and ensure it now passes
-        assert_ok!(block_payload.verify_payload_digests());
+        assert_ok!(block_payload.verify_payload_digests(max_num_payload_proofs));
 
         // Gather all transactions (from both QS and inline batches)
         let all_transactions: Vec<_> = non_expired_transactions
@@ -1909,7 +1951,52 @@ mod test {
         );
 
         // Verify the block payload digests and ensure it passes
-        assert_ok!(block_payload.verify_payload_digests());
+        assert_ok!(block_payload.verify_payload_digests(max_num_payload_proofs));
+    }
+
+    #[test]
+    fn test_verify_payload_digests_proof_count_limit() {
+        // Create transactions and proofs
+        let num_signed_transactions = 5;
+        let signed_transactions = create_signed_transactions(num_signed_transactions);
+
+        let mut proofs = vec![];
+        for transaction in &signed_transactions {
+            let batch_payload = BatchPayload::new(PeerId::ZERO, vec![transaction.clone()]);
+            let batch_info = create_batch_info_with_digest(batch_payload.hash(), 1, 1000);
+            let proof = ProofOfStore::new(batch_info, AggregateSignature::empty());
+            proofs.push(proof);
+        }
+
+        let block_payload = create_block_payload(None, &signed_transactions, &proofs, &[]);
+
+        // Ensure verification passes when the limit is at least the number of proofs
+        assert_ok!(block_payload.verify_payload_digests(num_signed_transactions as u64));
+
+        // Ensure verification fails when the limit is below the number of proofs
+        let error = block_payload
+            .verify_payload_digests(num_signed_transactions as u64 - 1)
+            .unwrap_err();
+        assert_matches!(error, Error::InvalidMessageError(_));
+    }
+
+    #[test]
+    fn test_verify_payload_digests_empty_batch_rejected() {
+        // Create a single transaction and a proof whose BatchInfo claims 0 txns
+        let signed_transactions = create_signed_transactions(1);
+        let batch_payload = BatchPayload::new(PeerId::ZERO, signed_transactions.clone());
+        let zero_txn_batch_info = create_batch_info_with_digest(batch_payload.hash(), 0, 1000);
+        let proof = ProofOfStore::new(zero_txn_batch_info, AggregateSignature::empty());
+
+        // Create a block payload with the transaction and the proof
+        let max_num_payload_proofs = 10;
+        let block_payload = create_block_payload(None, &signed_transactions, &[proof], &[]);
+
+        // Ensure verification fails because the proof batch declares zero transactions
+        let error = block_payload
+            .verify_payload_digests(max_num_payload_proofs)
+            .unwrap_err();
+        assert_matches!(error, Error::InvalidMessageError(_));
     }
 
     #[test]
