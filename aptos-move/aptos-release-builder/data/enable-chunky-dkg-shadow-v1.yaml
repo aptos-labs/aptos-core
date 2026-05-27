@@ -1,0 +1,12 @@
+---
+remote_endpoint: ~
+name: "enable-chunky-dkg-shadow-v1"
+proposals:
+  - name: enable_chunky_dkg_shadow_v1
+    metadata:
+      title: "Initialize Encrypted Mempool Framework and Enable ChunkyDKG Shadow V1"
+      description: "Initialize encrypted-mempool framework resources, then enable ChunkyDKG in shadow mode (1/2 secrecy, 2/3 reconstruction, 60s grace period)."
+    execution_mode: MultiStep
+    update_sequence:
+      - RawScript: aptos-move/aptos-release-builder/data/proposals/encrypted_mempool_initialization.move
+      - RawScript: aptos-move/aptos-release-builder/data/proposals/enable_chunky_dkg_shadow_v1.move
