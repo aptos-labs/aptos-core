@@ -8,8 +8,10 @@
 //! block boundaries, no phi nodes are needed — each value ID is defined exactly
 //! once within its block and never crosses a block boundary.
 
-use super::instr_utils::{extract_imm_value, is_commutative};
-use crate::stackless_exec_ir::{BasicBlock, BinaryOp, Instr};
+use crate::stackless_exec_ir::{
+    instr_utils::{extract_imm_value, is_commutative},
+    BasicBlock, BinaryOp, Instr,
+};
 use mono_move_core::types::InternedType;
 
 /// Intermediate SSA representation of a single function, before slot allocation.

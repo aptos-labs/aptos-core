@@ -509,6 +509,39 @@ fn output_to_files(env: &GlobalEnv, inferred_sym: Symbol, options: &Options) -> 
     Ok(())
 }
 
+/// Extract the address token as written in the source file's
+/// `module <addr>::<module_name>` declaration for a specific module.
+///
+/// Move permits multiple modules per file, so we must match by name rather
+/// than returning the first `module ` line found.  Returns `None` if the file
+/// cannot be read or no declaration for `module_name` is present.  The
+/// returned string is the raw address token (e.g. `"std"`, `"0xCAFE"`) with
+/// no surrounding whitespace.
+fn extract_module_address_from_source(
+    source_path: &std::ffi::OsStr,
+    module_name: &str,
+) -> Option<String> {
+    let content = fs::read_to_string(Path::new(source_path)).ok()?;
+    for line in content.lines() {
+        let t = line.trim();
+        let Some(rest) = t.strip_prefix("module ") else {
+            continue;
+        };
+        let rest = rest.trim();
+        let Some(idx) = rest.find("::") else { continue };
+        let addr = rest[..idx].trim();
+        // The part after `::` may be followed by `{`, whitespace, or a comment.
+        let after = rest[idx + 2..].trim_start();
+        let name_end = after
+            .find(|c: char| !(c.is_alphanumeric() || c == '_'))
+            .unwrap_or(after.len());
+        if &after[..name_end] == module_name {
+            return Some(addr.to_string());
+        }
+    }
+    None
+}
+
 /// Generate a fresh `.spec.move` file from scratch (no existing file to merge into).
 fn generate_fresh_spec_file(
     env: &GlobalEnv,
@@ -517,11 +550,30 @@ fn generate_fresh_spec_file(
     scope: &VerificationScope,
 ) -> String {
     let sourcifier = Sourcifier::new(env, true);
-    emitln!(
-        sourcifier.writer(),
-        "spec {} {{",
-        module.get_full_name_str()
-    );
+    // Emit `spec <addr>::<name> {` using the exact address token from the source file so
+    // that `merge_spec_modules` can match the spec back to its target module.  The Move
+    // model always stores addresses in numerical form, so `get_full_name_str()` always
+    // returns hex (e.g. `0x1::bit_vector`), which would fail to match a source module
+    // declared as `module std::bit_vector`.  Reading the source file directly preserves
+    // whichever form the author used (named alias or hex literal).
+    let full_name = module.get_full_name_str(); // `0x<hex>::<name>` — used as fallback
+    let simple_name = full_name
+        .rsplit_once("::")
+        .map(|(_, n)| n)
+        .unwrap_or(full_name.as_str());
+    let module_header = if let Some(addr) =
+        extract_module_address_from_source(module.get_source_path(), simple_name)
+    {
+        // Replace the hex address with the token from source (may be named or hex).
+        if let Some(colon_colon) = full_name.find("::") {
+            format!("{}{}", addr, &full_name[colon_colon..])
+        } else {
+            full_name
+        }
+    } else {
+        full_name
+    };
+    emitln!(sourcifier.writer(), "spec {} {{", module_header);
     sourcifier.writer().indent();
 
     for fun in module.get_functions() {

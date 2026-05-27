@@ -35,7 +35,7 @@ module 0x42::vault {
     spec harvest {
         let store_addr = object::object_address(Vault[vault_obj.object_address()].store);
         ensures FungibleStore[store_addr].balance >= old(FungibleStore[store_addr].balance);
-        let object_address_ = object::object_address(vault_obj);
+        let object_address_ = object::object_address<Vault>(vault_obj);
         ensures [inferred] S3.. |~ {
             let a = {
                 let b = {

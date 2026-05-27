@@ -15,17 +15,15 @@ fn native() {
 
 #[cfg(feature = "micro-op")]
 mod micro_op {
-    use mono_move_core::LocalExecutionContext;
     use mono_move_programs::merge_sort::{micro_op_merge_sort, shuffled_range};
-    use mono_move_runtime::{read_u64, InterpreterContext, VEC_DATA_OFFSET};
+    use mono_move_runtime::{read_u64, InterpreterContext, LocalRuntimeContext, VEC_DATA_OFFSET};
 
     fn run(n: u64) -> Vec<u64> {
         let values = shuffled_range(n, 42);
         let (functions, descriptors) = micro_op_merge_sort();
-        let mut exec_ctx = LocalExecutionContext::with_max_budget();
-        let mut ctx = InterpreterContext::new(&mut exec_ctx, &descriptors, unsafe {
-            functions[0].as_ref_unchecked()
-        });
+        let mut exec_ctx = LocalRuntimeContext::with_max_budget(descriptors);
+        let mut ctx =
+            InterpreterContext::new(&mut exec_ctx, unsafe { functions[0].as_ref_unchecked() });
         let vec_ptr = ctx
             .alloc_u64_vec(mono_move_core::DescriptorId(0), &values)
             .unwrap();

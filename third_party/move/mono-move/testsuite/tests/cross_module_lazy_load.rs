@@ -64,7 +64,7 @@ fn call_indirect_triggers_lazy_module_load() {
     // SAFETY: `main_ptr` came from the executable cache, which is kept
     // alive by `guard` for the duration of this test.
     let main_fn = unsafe { main_ptr.as_ref_unchecked() };
-    let mut interp = InterpreterContext::new(&mut txn_ctx, &[], main_fn);
+    let mut interp = InterpreterContext::new(&mut txn_ctx, main_fn);
     interp.set_root_arg(0, &41u64.to_le_bytes());
     interp.run().expect("execution should succeed");
 

@@ -20,10 +20,12 @@ impl StateCheckpointOutput {
     pub fn new(
         state_summary: LedgerStateSummary,
         state_checkpoint_hashes: Vec<Option<HashValue>>,
+        hot_state_checkpoint_hashes: Option<Vec<Option<HashValue>>>,
     ) -> Self {
         Self::new_impl(Inner {
             state_summary,
             state_checkpoint_hashes,
+            hot_state_checkpoint_hashes,
         })
     }
 
@@ -31,6 +33,7 @@ impl StateCheckpointOutput {
         Self::new_impl(Inner {
             state_summary: parent_state_summary,
             state_checkpoint_hashes: vec![],
+            hot_state_checkpoint_hashes: None,
         })
     }
 
@@ -53,4 +56,7 @@ impl StateCheckpointOutput {
 pub struct Inner {
     pub state_summary: LedgerStateSummary,
     pub state_checkpoint_hashes: Vec<Option<HashValue>>,
+    // TODO(HotState): this is currently None in testnet and mainnet, since we don't run hot state
+    // root hashes in consensus or state-sync yet.
+    pub hot_state_checkpoint_hashes: Option<Vec<Option<HashValue>>>,
 }

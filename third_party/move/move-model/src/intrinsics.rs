@@ -7,7 +7,9 @@ use crate::{
     ast::{Address, Operation, PropertyBag, PropertyValue, QualifiedSymbol},
     builder::module_builder::SpecBlockContext,
     model::{IntrinsicId, QualifiedId, SpecFunId},
-    pragmas::{INTRINSIC_PRAGMA, INTRINSIC_TYPE_MAP, INTRINSIC_TYPE_MAP_ASSOC_FUNCTIONS},
+    pragmas::{
+        IntrinsicFunDef, INTRINSIC_PRAGMA, INTRINSIC_TYPE_MAP, INTRINSIC_TYPE_MAP_ASSOC_FUNCTIONS,
+    },
     symbol::{Symbol, SymbolPool},
     FunId, GlobalEnv, Loc, ModuleBuilder, StructId,
 };
@@ -22,6 +24,11 @@ pub struct IntrinsicDecl {
     move_fun_to_intrinsic: BTreeMap<QualifiedId<FunId>, Symbol>,
     intrinsic_to_spec_fun: BTreeMap<Symbol, QualifiedId<SpecFunId>>,
     spec_fun_to_intrinsic: BTreeMap<QualifiedId<SpecFunId>, Symbol>,
+    /// Maps intrinsic Move function name symbol → intrinsic spec function name symbol,
+    /// for pure-spec substitution (read-only functions only).
+    move_to_spec_intrinsic: BTreeMap<Symbol, Symbol>,
+    /// Maps intrinsic Move function name symbol → intrinsic abort-condition spec function name symbol.
+    move_to_abort_spec_intrinsic: BTreeMap<Symbol, Symbol>,
 }
 
 impl IntrinsicDecl {
@@ -121,6 +128,8 @@ pub(crate) fn process_intrinsic_declaration(
         move_fun_to_intrinsic: BTreeMap::new(),
         intrinsic_to_spec_fun: BTreeMap::new(),
         spec_fun_to_intrinsic: BTreeMap::new(),
+        move_to_spec_intrinsic: BTreeMap::new(),
+        move_to_abort_spec_intrinsic: BTreeMap::new(),
     };
 
     // construct the pack
@@ -133,12 +142,12 @@ pub(crate) fn process_intrinsic_declaration(
 fn populate_intrinsic_decl(
     builder: &mut ModuleBuilder,
     loc: &Loc,
-    associated_funs: &BTreeMap<&str, bool>,
+    associated_funs: &BTreeMap<&str, IntrinsicFunDef>,
     props: &mut PropertyBag,
     decl: &mut IntrinsicDecl,
 ) {
     let symbol_pool = builder.symbol_pool();
-    for (&name, &is_move_fun) in associated_funs {
+    for (&name, fun_def) in associated_funs {
         let key_sym = symbol_pool.make(name);
 
         // look-up the target of the declaration, if present
@@ -175,7 +184,7 @@ fn populate_intrinsic_decl(
         };
 
         // check presence
-        if is_move_fun {
+        if fun_def.is_move_fun {
             match builder.parent.fun_table.get(&qualified_sym) {
                 None => {
                     builder.parent.error(
@@ -202,6 +211,16 @@ fn populate_intrinsic_decl(
                             ),
                         );
                         continue;
+                    }
+                    // Populate the direct Move→spec and Move→abort-spec maps from the
+                    // IntrinsicFunDef so callers don't need separate static lookup tables.
+                    if let Some(spec_name) = fun_def.spec_fun {
+                        let spec_sym = symbol_pool.make(spec_name);
+                        decl.move_to_spec_intrinsic.insert(key_sym, spec_sym);
+                    }
+                    if let Some(abort_name) = fun_def.abort_spec_fun {
+                        let abort_sym = symbol_pool.make(abort_name);
+                        decl.move_to_abort_spec_intrinsic.insert(key_sym, abort_sym);
                     }
                 },
             }
@@ -292,6 +311,30 @@ impl IntrinsicsAnnotation {
         self.intrinsic_move_funs
             .get(qid)
             .map(|id| self.decls.get(id).unwrap())
+    }
+
+    /// Given a Move function qualified ID, return the spec function qualified ID that
+    /// corresponds to it via the intrinsic map pairing encoded in `IntrinsicDecl`.
+    pub fn get_spec_fun_for_move_fun(
+        &self,
+        move_qid: &QualifiedId<FunId>,
+    ) -> Option<QualifiedId<SpecFunId>> {
+        let decl = self.get_decl_for_move_fun(move_qid)?;
+        let move_intrinsic_sym = decl.move_fun_to_intrinsic.get(move_qid)?;
+        let spec_intrinsic_sym = decl.move_to_spec_intrinsic.get(move_intrinsic_sym)?;
+        decl.intrinsic_to_spec_fun.get(spec_intrinsic_sym).cloned()
+    }
+
+    /// Given a Move function qualified ID, return the abort-condition spec function qualified ID
+    /// that corresponds to it via the intrinsic abort-spec pairing encoded in `IntrinsicDecl`.
+    pub fn get_abort_spec_fun_for_move_fun(
+        &self,
+        move_qid: &QualifiedId<FunId>,
+    ) -> Option<QualifiedId<SpecFunId>> {
+        let decl = self.get_decl_for_move_fun(move_qid)?;
+        let move_intrinsic_sym = decl.move_fun_to_intrinsic.get(move_qid)?;
+        let abort_intrinsic_sym = decl.move_to_abort_spec_intrinsic.get(move_intrinsic_sym)?;
+        decl.intrinsic_to_spec_fun.get(abort_intrinsic_sym).cloned()
     }
 
     /// Get the intrinsic decl for a spec function

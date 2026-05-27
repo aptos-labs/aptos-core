@@ -23,6 +23,7 @@
 //! `< frame_data_size`), disjoint from the arg region. No cycles, so no
 //! scratch slot needed for arg setup.
 
+use anyhow::{bail, Result};
 use mono_move_core::{FrameOffset, MicroOp};
 use smallbitvec::SmallBitVec;
 use smallvec::SmallVec;
@@ -55,11 +56,14 @@ pub(crate) struct Copy {
 ///
 /// Trivial copies (`width == 0` or `src == dst`) are filtered up front.
 ///
-/// `scratch` must be a frame offset of a slot wide enough to hold the largest
-/// copy width that could appear in a cycle; the caller is responsible for
-/// reserving it (`LoweringContext::scratch_offset`). When `copies` is acyclic,
-/// `scratch` is unused.
-pub(crate) fn emit_parallel_copy(out: &mut Vec<MicroOp>, copies: &[Copy], scratch: FrameOffset) {
+/// `scratch` must be the offset of a slot wide enough to hold the largest copy
+/// width that could appear in a cycle. `None` is only valid when `copies` is
+/// trivially acyclic (zero or one effective copy); returns `Err` otherwise.
+pub(crate) fn emit_parallel_copy(
+    out: &mut Vec<MicroOp>,
+    copies: &[Copy],
+    scratch: Option<FrameOffset>,
+) -> Result<()> {
     // Filter trivial copies. Inline-stack-allocated for the common
     // small-N path; spills to heap only for adversarial wide signatures.
     let mut copies: SmallVec<[Copy; STACK_COPY_CAPACITY]> = copies
@@ -69,12 +73,15 @@ pub(crate) fn emit_parallel_copy(out: &mut Vec<MicroOp>, copies: &[Copy], scratc
         .collect();
     let n = copies.len();
     if n == 0 {
-        return;
+        return Ok(());
     }
     if n == 1 {
         emit_one(out, copies[0]);
-        return;
+        return Ok(());
     }
+    let Some(scratch) = scratch else {
+        bail!("scratch slot required when emitting 2+ parallel copies");
+    };
 
     // Invariants:
     // 1. `[scratch, scratch + max_width)` is disjoint from every
@@ -200,6 +207,7 @@ pub(crate) fn emit_parallel_copy(out: &mut Vec<MicroOp>, copies: &[Copy], scratc
             clear_blocker(chosen, n, &alive, &mut blockers);
         }
     }
+    Ok(())
 }
 
 /// Mark copy `i` as emitted: clear it from `alive` and from every
@@ -280,7 +288,7 @@ mod tests {
 
     fn run(copies: &[Copy], scratch: u32) -> Vec<MicroOp> {
         let mut out = Vec::new();
-        emit_parallel_copy(&mut out, copies, FrameOffset(scratch));
+        emit_parallel_copy(&mut out, copies, Some(FrameOffset(scratch))).unwrap();
         out
     }
 

@@ -126,6 +126,7 @@ pub fn get_registry() -> Result<Registry> {
     tracer.trace_type::<transaction::UserTxnLimitsRequest>(&samples)?;
     tracer.trace_type::<transaction::WriteSetPayload>(&samples)?;
     tracer.trace_type::<transaction::BlockEpiloguePayload>(&samples)?;
+    tracer.trace_type::<transaction::TransactionInfo>(&samples)?;
     tracer.trace_type::<StateKey>(&samples)?;
     tracer.trace_type::<transaction::ExecutionStatus>(&samples)?;
     tracer.trace_type::<TransactionAuthenticator>(&samples)?;

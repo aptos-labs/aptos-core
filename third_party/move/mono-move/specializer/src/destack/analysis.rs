@@ -76,8 +76,10 @@
 //! upstream `MutBorrowLoc`. (Field-level coalescing, if ever added,
 //! would need to revisit this.)
 
-use super::instr_utils::{for_each_def, for_each_use};
-use crate::stackless_exec_ir::{Instr, Slot};
+use crate::stackless_exec_ir::{
+    instr_utils::{clobbers_xfer, for_each_def, for_each_use},
+    Instr, Slot,
+};
 use shared_dsa::{UnorderedMap, UnorderedSet};
 use smallbitvec::SmallBitVec;
 #[cfg(debug_assertions)]
@@ -487,6 +489,70 @@ fn next_arg_lifetime_overlaps(
     !(a_lu <= b_def || b_lu <= a_def)
 }
 
+/// Check the per-call structural Xfer invariants:
+///
+/// - **Arg positionality** (invariant 2): if `args[j]` resolves to
+///   `Xfer(i)`, then `i == j`.
+/// - **Return Xfer prefix** (invariant 5): the rets list is a
+///   (possibly empty) Xfer-resolved prefix followed by a non-Xfer
+///   suffix.
+/// - **Return monotonicity** (invariant 3): within the Xfer prefix,
+///   resolved Xfer indices strictly increase.
+#[cfg(debug_assertions)]
+fn check_call_structural_invariants<F>(
+    args: &[Slot],
+    rets: &[Slot],
+    xfer_pos: F,
+) -> anyhow::Result<()>
+where
+    F: Fn(&Slot) -> Option<u16>,
+{
+    use anyhow::bail;
+
+    for (j, slot) in args.iter().enumerate() {
+        if let Some(i) = xfer_pos(slot)
+            && i as usize != j
+        {
+            bail!(
+                "arg positionality: args[{}] resolves to Xfer({}), expected Xfer({})",
+                j,
+                i,
+                j,
+            );
+        }
+    }
+
+    let mut seen_non_xfer = false;
+    let mut last_xfer: Option<u16> = None;
+    for (k, slot) in rets.iter().enumerate() {
+        match xfer_pos(slot) {
+            Some(i) => {
+                if seen_non_xfer {
+                    bail!(
+                        "return Xfer prefix: rets[{}] resolves to Xfer({}) after a non-Xfer ret",
+                        k,
+                        i,
+                    );
+                }
+                if let Some(prev) = last_xfer
+                    && i <= prev
+                {
+                    bail!(
+                        "return monotonicity: rets[{}] = Xfer({}) ≤ prev Xfer({})",
+                        k,
+                        i,
+                        prev,
+                    );
+                }
+                last_xfer = Some(i);
+            },
+            None => seen_non_xfer = true,
+        }
+    }
+
+    Ok(())
+}
+
 /// Verifies the seven Xfer invariants from the file header on the
 /// just-built `xfer_precolor` map. Per-call invariants (arg
 /// positionality, return monotonicity, pass-through contiguity, return
@@ -526,44 +592,18 @@ fn assert_xfer_invariants(
             .copied()
             .unwrap_or(instrs.len());
 
-        // Arg positionality: args[j] precolored to Xfer must be Xfer(j).
-        for (j, vid) in args.iter().enumerate() {
-            if let Some(&Slot::Xfer(i)) = xfer_precolor.get(vid) {
-                assert_eq!(
-                    i, j as u16,
-                    "[arg positionality] args[{}] precolored to Xfer({})",
-                    j, i
-                );
+        // Structural invariants (arg positionality, return Xfer prefix, return
+        // monotonicity).
+        check_call_structural_invariants(args, rets, |slot| {
+            if !slot.is_vid() {
+                return None;
             }
-        }
-
-        // Return Xfer prefix: rets are an Xfer prefix followed by a Home
-        // suffix. Return monotonicity: within the prefix, Xfer indices
-        // strictly increase with k.
-        let mut seen_home = false;
-        let mut last_xfer: Option<u16> = None;
-        for (k, vid) in rets.iter().enumerate() {
-            match xfer_precolor.get(vid) {
-                Some(&Slot::Xfer(i)) if vid.is_vid() => {
-                    assert!(
-                        !seen_home,
-                        "[return Xfer prefix] rets[{}] precolored to Xfer follows a Home ret",
-                        k
-                    );
-                    if let Some(prev) = last_xfer {
-                        assert!(
-                            i > prev,
-                            "[return monotonicity] rets[{}] = Xfer({}) ≤ prev Xfer({})",
-                            k,
-                            i,
-                            prev
-                        );
-                    }
-                    last_xfer = Some(i);
-                },
-                _ => seen_home = true,
+            match xfer_precolor.get(slot) {
+                Some(&Slot::Xfer(i)) => Some(i),
+                _ => None,
             }
-        }
+        })
+        .unwrap_or_else(|e| panic!("[xfer structural invariant] {e}"));
 
         // Pass-through contiguity: among args of `call_pos` defined at the
         // immediately-preceding call and bound to Xfer, the positions form
@@ -704,16 +744,6 @@ fn assert_xfer_invariants(
     }
 }
 
-/// Call-like instructions (`Call`, `CallGeneric`, `CallClosure`) that
-/// clobber Xfer slots and act as call boundaries for liveness analysis.
-#[inline]
-fn clobbers_xfer(instr: &Instr) -> bool {
-    matches!(
-        instr,
-        Instr::Call(..) | Instr::CallGeneric(..) | Instr::CallClosure(..)
-    )
-}
-
 /// Returns `(rets, args)` for `Call` / `CallGeneric`. `CallClosure` is
 /// intentionally excluded: Xfer precoloring leaves closure calls alone
 /// (they still count as call boundaries via `clobbers_xfer`, just not
@@ -735,6 +765,145 @@ fn has_any_in_range(sorted: &[usize], lo: usize, hi: usize) -> bool {
     // Find the first element >= lo.
     let idx = sorted.partition_point(|&x| x < lo);
     idx < sorted.len() && sorted[idx] < hi
+}
+
+/// Verify that the post-optimize, slot-allocated IR satisfies the
+/// Xfer-slot invariants the lowering depends on.
+///
+/// The seven invariants at the top of this file are established by
+/// `BlockAnalysis::analyze` on pre-allocation Vid IR but are not
+/// re-checked through `optimize_module`. This walk re-checks the
+/// subset that survives slot allocation:
+///
+/// 1. Every use of `Xfer(j)` is preceded by a def in the same block.
+/// 2. At a call boundary, every bound Xfer slot is consumed by the
+///    call's args (orphans signal an upstream regression).
+/// 3. Calls clobber every Xfer slot; ret defs re-bind on the same
+///    instruction.
+/// 4. No Xfer binding leaks across a block boundary.
+/// 5. Per-call structural invariants — arg positionality, return
+///    Xfer prefix, return monotonicity — via
+///    `check_call_structural_invariants`, the same helper
+///    `assert_xfer_invariants` uses on the Vid-level maps.
+///
+/// Pass-through contiguity (invariant 4 in the header) is not
+/// checked here: it requires distinguishing bound positions that
+/// came from the previous call's rets from positions defined by
+/// intermediate non-call instrs, which this walk doesn't track.
+#[cfg(debug_assertions)]
+pub(crate) fn assert_xfer_invariants_on_final_ir(
+    func: &crate::stackless_exec_ir::FunctionIR,
+) -> anyhow::Result<()> {
+    use anyhow::bail;
+
+    let num_xfer = func.num_xfer_positions as usize;
+    let mut bound: Vec<bool> = vec![false; num_xfer];
+    for (b_idx, block) in func.blocks.iter().enumerate() {
+        // Block-local lifetime: a fresh state at every block.
+        bound.iter_mut().for_each(|b| *b = false);
+        for (i, instr) in block.instrs.iter().enumerate() {
+            // (1) every Xfer use must be live.
+            let mut unbound: Option<u16> = None;
+            for_each_use(instr, |s| {
+                if let Slot::Xfer(j) = s
+                    && !bound[j as usize]
+                    && unbound.is_none()
+                {
+                    unbound = Some(j);
+                }
+            });
+            if let Some(j) = unbound {
+                bail!(
+                    "post-optimize Xfer verifier: block {}, instr {}: use of Xfer({}) \
+                     with no live def earlier in this block — copy_propagation may have \
+                     rewritten a Home use to an Xfer use across a clobbering call",
+                    b_idx,
+                    i,
+                    j,
+                );
+            }
+
+            // (2) at a call boundary, every bound Xfer slot must
+            // be consumed by this call's args as args[j] = Xfer(j)
+            // (arg positionality).
+            if clobbers_xfer(instr) {
+                let (rets, args): (&[Slot], &[Slot]) = match instr {
+                    Instr::Call(rets, _, args)
+                    | Instr::CallGeneric(rets, _, args)
+                    | Instr::CallClosure(rets, _, args) => (rets, args),
+                    _ => unreachable!("clobbers_xfer matches only Call variants"),
+                };
+                // Structural invariants (arg positionality, return Xfer prefix,
+                // return monotonicity).
+                check_call_structural_invariants(args, rets, |s| match s {
+                    Slot::Xfer(i) => Some(*i),
+                    _ => None,
+                })
+                .map_err(|e| {
+                    anyhow::anyhow!(
+                        "post-optimize Xfer verifier: block {}, instr {}: {}",
+                        b_idx,
+                        i,
+                        e,
+                    )
+                })?;
+                // Orphan check: every bound slot must be consumed
+                // by this call's args. A bound position not in args
+                // signals a dead Xfer def from earlier in the block.
+                for (j, &b) in bound.iter().enumerate() {
+                    if b {
+                        let consumed_here = j < args.len() && args[j] == Slot::Xfer(j as u16);
+                        if !consumed_here {
+                            bail!(
+                                "post-optimize Xfer verifier: block {}, instr {}: \
+                                 Xfer({}) bound at call boundary but not consumed \
+                                 as args[{}] of this call — a dead Xfer def \
+                                 leaked from earlier in the block (likely an \
+                                 upstream destack precoloring regression)",
+                                b_idx,
+                                i,
+                                j,
+                                j,
+                            );
+                        }
+                    }
+                }
+                // Clobber: a call reuses the entire callee region;
+                // the ret defs below re-bind whatever positions
+                // this call returns to.
+                bound.iter_mut().for_each(|b| *b = false);
+            } else {
+                // Non-call: consumed uses release their bindings
+                // (single-use). Matches the lowering's end-of-instr
+                // clear.
+                for_each_use(instr, |s| {
+                    if let Slot::Xfer(j) = s {
+                        bound[j as usize] = false;
+                    }
+                });
+            }
+            // Defs bind: ret-Xfers for calls, Move/Copy dst (etc.)
+            // for non-calls.
+            for_each_def(instr, |s| {
+                if let Slot::Xfer(j) = s {
+                    bound[j as usize] = true;
+                }
+            });
+        }
+
+        // (3) no Xfer binding may survive past the end of a block.
+        for (j, &b) in bound.iter().enumerate() {
+            if b {
+                bail!(
+                    "post-optimize Xfer verifier: block {}: Xfer({}) bound at block end \
+                     (Xfer lifetimes must be block-local)",
+                    b_idx,
+                    j,
+                );
+            }
+        }
+    }
+    Ok(())
 }
 
 #[cfg(test)]
