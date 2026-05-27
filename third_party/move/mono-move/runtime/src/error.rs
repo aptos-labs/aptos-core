@@ -191,6 +191,9 @@ pub enum RuntimeInvariantViolation {
     #[error("alloc_obj called with non-allocatable descriptor {descriptor_id}")]
     NonAllocatableDescriptor { descriptor_id: u32 },
 
+    #[error("descriptor {descriptor_id} not found in descriptor table")]
+    DescriptorNotFound { descriptor_id: u32 },
+
     #[error("GC scan: invalid object size {size} (expected non-zero, MAX_ALIGN-byte aligned)")]
     GcInvalidObjectSize { size: usize },
 

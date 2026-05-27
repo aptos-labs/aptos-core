@@ -12,6 +12,11 @@ pub enum TransactionStage {
     QsBatchPull,
     QsBatchCreated,
     QsProofOfStore,
+    /// Proposal timestamp of the *parent* of the block that included this
+    /// txn. Useful as a front-run-exposure bound: once the parent is
+    /// proposed, the next leader is free to observe the mempool and decide
+    /// whether to include or front-run.
+    ParentBlockProposed,
     BlockProposed,
     /// Local-clock timestamp when this node received the block proposal.
     /// Compared with BlockProposed (leader's block_timestamp) to measure

@@ -109,7 +109,7 @@ pub const MODULE_LOCK_ATTRIBUTE: &str = "module_lock";
 ///
 /// This covers the bytecode-instruction natives in
 /// [`VECTOR_FUNCS_WITH_BYTECODE_INSTRS`] plus `singleton` and `contains`.
-pub fn is_special_vector_bp_fun_name(fun_name: &str) -> bool {
+fn is_special_vector_bp_fun_name(fun_name: &str) -> bool {
     VECTOR_FUNCS_WITH_BYTECODE_INSTRS.contains(&fun_name)
         || fun_name == "singleton"
         || fun_name == "contains"

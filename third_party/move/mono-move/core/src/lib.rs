@@ -7,6 +7,7 @@ mod execution_context;
 mod function;
 mod instruction;
 pub mod interner;
+mod object_descriptor;
 mod prepared_module;
 pub mod types;
 
@@ -28,6 +29,10 @@ pub use instruction::{
     FUNC_REF_TAG_RESOLVED, OBJECT_HEADER_SIZE,
 };
 pub use interner::{Interner, ModuleId};
+pub use object_descriptor::{
+    DescriptorProvider, ObjectDescriptor, ObjectDescriptorInner, ObjectDescriptorTable,
+    CLOSURE_DESCRIPTOR_ID, RESERVED_DESCRIPTOR_COUNT, TRIVIAL_DESCRIPTOR_ID,
+};
 pub use prepared_module::{
     FieldTypes, FunctionInstantiationSignature, FunctionSignature, PreparedModule,
 };

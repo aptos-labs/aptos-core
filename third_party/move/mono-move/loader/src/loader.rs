@@ -25,7 +25,7 @@ use anyhow::{anyhow, bail};
 use mono_move_core::{
     interner::{InternedIdentifier, InternedModuleId},
     types::{InternedType, InternedTypeList, EMPTY_TYPE_LIST},
-    FieldTypes, Function, FunctionPtr, Interner, ModuleId,
+    DescriptorId, FieldTypes, FrameOffset, Function, FunctionPtr, Interner, ModuleId,
 };
 use mono_move_gas::GasMeter;
 use mono_move_global_context::{
@@ -35,8 +35,8 @@ use mono_move_global_context::{
 use shared_dsa::UnorderedSet;
 use specializer::{
     lower::context::{
-        try_lower_function, try_set_lowering_requirements,
-        try_set_lowering_requirements_for_function, LoweringOutcome, SpecializerContext,
+        try_discover_types_for_lowering_in_function, try_discover_types_for_lowering_in_module,
+        try_lower_function, LoweringOutcome, SpecializerContext,
     },
     ModuleIR,
 };
@@ -110,6 +110,11 @@ impl<'guard, 'ctx> Loader<'guard, 'ctx> {
             module_provider,
             policy,
         }
+    }
+
+    /// Returns the execution guard this loader is bound to.
+    pub fn guard(&self) -> &'guard ExecutionGuard<'ctx> {
+        self.guard
     }
 
     /// Loads and returns the executable corresponding to the given ID,
@@ -224,7 +229,7 @@ impl<'guard, 'ctx> Loader<'guard, 'ctx> {
     ) -> anyhow::Result<(Function, Arc<[LoadedModuleSlot]>)> {
         let func_ir = module.get_function_ir(func_name)?;
         let mut loading_ctx = LoweringContext::new(self, read_set);
-        try_set_lowering_requirements_for_function(
+        let vec_descriptors = try_discover_types_for_lowering_in_function(
             &mut loading_ctx,
             module.ir(),
             func_ir,
@@ -246,16 +251,17 @@ impl<'guard, 'ctx> Loader<'guard, 'ctx> {
             bail!("All modules are in the read-set");
         })?;
 
-        let function = match try_lower_function(module.ir(), func_ir, ty_args, self.guard)? {
-            LoweringOutcome::Built(f) => f,
-            // TODO: drop this arm — together with the `LoweringOutcome`
-            // enum and the corresponding `BuildContextOutcome::Skipped`
-            // paths in the specializer — once `try_build_context`
-            // handles nominal types and partial concretization. At that
-            // point `try_lower_function` is total and can go back to
-            // returning `Result<Function>` directly.
-            LoweringOutcome::Skipped(reason) => bail!("Failed to lower function: {}", reason),
-        };
+        let function =
+            match try_lower_function(module.ir(), func_ir, ty_args, self.guard, vec_descriptors)? {
+                LoweringOutcome::Built(f) => f,
+                // TODO: drop this arm — together with the `LoweringOutcome`
+                // enum and the corresponding `BuildContextOutcome::Skipped`
+                // paths in the specializer — once `try_build_context`
+                // handles nominal types and partial concretization. At that
+                // point `try_lower_function` is total and can go back to
+                // returning `Result<Function>` directly.
+                LoweringOutcome::Skipped(reason) => bail!("Failed to lower function: {}", reason),
+            };
         Ok((function, function_ms))
     }
 }
@@ -482,7 +488,10 @@ impl<'guard, 'ctx> Loader<'guard, 'ctx> {
         walker.discovered_seen.insert(module.id());
         walker.discovered.push(self_slot);
 
-        try_set_lowering_requirements(&mut walker, module.ir())?;
+        // Per-function lowering re-walks types and rebuilds its own
+        // descriptor map; only the side-effecting publish-to-guard
+        // matters here.
+        let _ = try_discover_types_for_lowering_in_module(&mut walker, module.ir())?;
 
         // Set the mandatory set for the module. Because of concurrency, it is
         // possible that other thread sets it at before, so we need to reload
@@ -690,5 +699,21 @@ impl SpecializerContext for LoweringContext<'_, '_, '_> {
         ty_args: InternedTypeList,
     ) -> anyhow::Result<InternedType> {
         self.loader.guard.subst_type(ty, ty_args)
+    }
+
+    fn publish_vec_descriptor(
+        &self,
+        elem_ty: InternedType,
+        elem_size: u32,
+        elem_ptr_offsets: &[FrameOffset],
+    ) -> anyhow::Result<DescriptorId> {
+        Ok(self
+            .loader
+            .guard
+            .publish_vec_descriptor(elem_ty, elem_size, elem_ptr_offsets))
+    }
+
+    fn vec_descriptor_for(&self, elem_ty: InternedType) -> Option<DescriptorId> {
+        self.loader.guard.vec_descriptor_for(elem_ty)
     }
 }

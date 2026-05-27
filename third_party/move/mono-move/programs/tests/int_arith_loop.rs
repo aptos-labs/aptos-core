@@ -16,18 +16,16 @@ fn native_matches_across_flavors() {
 
 #[cfg(feature = "micro-op")]
 mod micro_op {
-    use mono_move_core::LocalExecutionContext;
     use mono_move_programs::int_arith_loop::{
         micro_op_i64_loop, micro_op_u64_loop, native_i64_loop, native_u64_loop, TEST_ITERS,
     };
-    use mono_move_runtime::InterpreterContext;
+    use mono_move_runtime::{InterpreterContext, LocalRuntimeContext};
 
     fn run_u64() -> u64 {
         let (functions, descriptors) = micro_op_u64_loop();
-        let mut exec_ctx = LocalExecutionContext::with_max_budget();
-        let mut ctx = InterpreterContext::new(&mut exec_ctx, &descriptors, unsafe {
-            functions[0].as_ref_unchecked()
-        });
+        let mut exec_ctx = LocalRuntimeContext::with_max_budget(descriptors);
+        let mut ctx =
+            InterpreterContext::new(&mut exec_ctx, unsafe { functions[0].as_ref_unchecked() });
         ctx.set_root_arg(0, &TEST_ITERS.to_le_bytes());
         ctx.run().unwrap();
         ctx.root_result()
@@ -35,10 +33,9 @@ mod micro_op {
 
     fn run_i64() -> i64 {
         let (functions, descriptors) = micro_op_i64_loop();
-        let mut exec_ctx = LocalExecutionContext::with_max_budget();
-        let mut ctx = InterpreterContext::new(&mut exec_ctx, &descriptors, unsafe {
-            functions[0].as_ref_unchecked()
-        });
+        let mut exec_ctx = LocalRuntimeContext::with_max_budget(descriptors);
+        let mut ctx =
+            InterpreterContext::new(&mut exec_ctx, unsafe { functions[0].as_ref_unchecked() });
         ctx.set_root_arg(0, &TEST_ITERS.to_le_bytes());
         ctx.run().unwrap();
         // root_result reads the slot as u64; reinterpret as i64.

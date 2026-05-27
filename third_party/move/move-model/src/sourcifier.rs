@@ -630,7 +630,21 @@ impl<'a> Sourcifier<'a> {
                 } else {
                     None
                 };
-                self.print_list("vector[", ", ", "]", values.iter(), |value| {
+                // For empty vector literals in spec context, emit `vector<T>[]` when the
+                // element type is known so the spec compiler can infer the element type.
+                // In non-spec (regular Move) context, bare `vector[]` is fine because
+                // the Move compiler handles type inference from surrounding context.
+                let open = if values.is_empty() && for_spec {
+                    if let Some(et) = elem_ty {
+                        let tctx = TypeDisplayContext::new(self.env());
+                        format!("vector<{}>[", et.display(&tctx))
+                    } else {
+                        "vector[".to_string()
+                    }
+                } else {
+                    "vector[".to_string()
+                };
+                self.print_list(&open, ", ", "]", values.iter(), |value| {
                     self.print_value(value, elem_ty, for_spec)
                 });
             },
@@ -2729,6 +2743,18 @@ impl<'a> ExpSourcifier<'a> {
                 self.print_exp(Prio::Prefix, false, &args[0])
             }),
             Operation::Vector => self.parenthesize(context_prio, Prio::Postfix, || {
+                if args.is_empty() && self.for_spec {
+                    // In spec context, emit `vector<T>[]` so the spec compiler can
+                    // infer the element type without guessing.  In non-spec (regular
+                    // Move) context, bare `vector[]` is fine — the compiler infers
+                    // the type from surrounding context.
+                    let node_ty = self.env().get_node_type(id);
+                    if let Type::Vector(elem_ty) = &node_ty {
+                        let tctx = TypeDisplayContext::new(self.env());
+                        emit!(self.wr(), "vector<{}>[]", elem_ty.display(&tctx));
+                        return;
+                    }
+                }
                 emit!(self.wr(), "vector");
                 self.print_exp_list("[", "]", args)
             }),

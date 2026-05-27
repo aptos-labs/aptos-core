@@ -3,10 +3,12 @@
 
 use mono_move_alloc::GlobalArenaPtr;
 use mono_move_core::{
-    Code, CodeOffset as CO, FrameLayoutInfo, FrameOffset as FO, Function, LocalExecutionContext,
-    MicroOp, SortedSafePointEntries,
+    Code, CodeOffset as CO, FrameLayoutInfo, FrameOffset as FO, Function, MicroOp,
+    SortedSafePointEntries,
 };
-use mono_move_runtime::{InterpreterContext, ObjectDescriptor, ObjectDescriptorTable};
+use mono_move_runtime::{
+    InterpreterContext, LocalRuntimeContext, ObjectDescriptor, ObjectDescriptorTable,
+};
 
 /// Data segment (48 bytes):
 ///   [fp + 0 ] : result (output) / scratch
@@ -66,8 +68,8 @@ fn make_vec_sum_program(n: u64) -> (Vec<Function>, ObjectDescriptorTable) {
 fn vec_sum_100() {
     let n: u64 = 100;
     let (functions, descriptors) = make_vec_sum_program(n);
-    let mut exec_ctx = LocalExecutionContext::with_max_budget();
-    let mut ctx = InterpreterContext::new(&mut exec_ctx, &descriptors, &functions[0]);
+    let mut exec_ctx = LocalRuntimeContext::with_max_budget(descriptors);
+    let mut ctx = InterpreterContext::new(&mut exec_ctx, &functions[0]);
     ctx.run().unwrap();
     assert_eq!(ctx.root_result(), n * (n - 1) / 2);
 }
@@ -76,9 +78,8 @@ fn vec_sum_100() {
 fn vec_sum_with_gc_pressure() {
     let n: u64 = 200;
     let (functions, descriptors) = make_vec_sum_program(n);
-    let mut exec_ctx = LocalExecutionContext::with_max_budget();
-    let mut ctx =
-        InterpreterContext::with_heap_size(&mut exec_ctx, &descriptors, &functions[0], 4 * 1024);
+    let mut exec_ctx = LocalRuntimeContext::with_max_budget(descriptors);
+    let mut ctx = InterpreterContext::with_heap_size(&mut exec_ctx, &functions[0], 4 * 1024);
     ctx.run().unwrap();
     assert_eq!(ctx.root_result(), n * (n - 1) / 2);
     assert!(ctx.gc_count() > 0, "GC should have run at least once");
