@@ -112,6 +112,7 @@ impl DoGetExecutionOutput {
         onchain_config: BlockExecutorConfigFromOnchain,
         transaction_slice_metadata: TransactionSliceMetadata,
     ) -> Result<ExecutionOutput> {
+        let hotness_in_epilogue = onchain_config.hotness_in_epilogue();
         let txn_provider = DefaultTxnProvider::new(transactions, auxiliary_infos.clone());
         let block_output = Self::execute_block::<V>(
             executor,
@@ -167,7 +168,7 @@ impl DoGetExecutionOutput {
                 );
             }
         }
-        if parent_state.latest().hot_state_config().use_write_set_v1 {
+        if hotness_in_epilogue {
             Self::convert_write_sets_to_v1(&mut transaction_outputs);
         }
 
@@ -193,13 +194,14 @@ impl DoGetExecutionOutput {
         onchain_config: BlockExecutorConfigFromOnchain,
         append_state_checkpoint_to_block: Option<HashValue>,
     ) -> Result<ExecutionOutput> {
+        let hotness_in_epilogue = onchain_config.hotness_in_epilogue();
         let state_view_arc = Arc::new(state_view);
         let mut transaction_outputs = Self::execute_block_sharded::<V>(
             transactions.clone(),
             state_view_arc.clone(),
             onchain_config,
         )?;
-        if parent_state.latest().hot_state_config().use_write_set_v1 {
+        if hotness_in_epilogue {
             Self::convert_write_sets_to_v1(&mut transaction_outputs);
         }
 
