@@ -270,19 +270,30 @@ pub enum MicroOp {
     // - `StoreImm` to handle arbitrary sizes,
     // - bulk data movement.
     //======================================================================
-    /// Store an immediate 8 bytes at `dst` in the current frame.
+    /// Store 8 immediate bytes into the destination slot. `imm` is the
+    /// little-endian (LE) byte representation of the value:
+    /// `u64.to_le_bytes()` for unsigned and `i64.to_le_bytes()` (i.e.
+    /// two's-complement) for signed. Narrower primitives (`u8`/`u16`/`u32`/
+    /// `i8`/`i16`/`i32`/`bool`) are widened to 8 bytes by the lowerer.
     StoreImm8 {
         dst: FrameOffset,
         imm: [u8; 8],
     },
 
-    /// Store an immediate 16 bytes at `dst` in the current frame.
+    /// Store 16 immediate bytes into the destination slot. Same LE
+    /// convention as `StoreImm8`: `u128.to_le_bytes()` / `i128.to_le_bytes()`.
+    ///
+    /// TODO(perf): use a side table instead of boxing.
     StoreImm16 {
         dst: FrameOffset,
         imm: Box<[u8; 16]>,
     },
 
-    /// Store an immediate 32 bytes at `dst` in the current frame.
+    /// Store 32 immediate bytes into the destination slot. Same LE
+    /// convention as `StoreImm8`: `U256.to_le_bytes()` / `I256.to_le_bytes()`,
+    /// or `AccountAddress` bytes verbatim (already a 32-byte buffer).
+    ///
+    /// TODO(perf): use a side table instead of boxing.
     StoreImm32 {
         dst: FrameOffset,
         imm: Box<[u8; 32]>,
