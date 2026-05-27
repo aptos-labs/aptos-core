@@ -150,8 +150,8 @@ impl TryIntoMoveValue for DelayedFieldID {
             },
             _ => {
                 return Err(code_invariant_error(format!(
-                    "Failed to convert {:?} into a Move value with {} layout",
-                    self, layout
+                    "Failed to convert {:?} into a Move value",
+                    self
                 )))
             },
         })
@@ -191,7 +191,7 @@ impl TryFromMoveValue for DelayedFieldID {
             // We use value to ID conversion in serialization.
             _ => {
                 return Err(code_invariant_error(format!(
-                    "Failed to convert a Move value with {layout} layout into an identifier, tagged with {hint:?}, with value {value:?}",
+                    "Failed to convert a Move value into an identifier, tagged with {hint:?}, with value {value:?}",
                 )))
             },
         };
