@@ -1,0 +1,70 @@
+=== stackless ===
+// module 0x1::test
+
+fun add_const(r0): u128 {
+  slots: params(1), locals(0), temps(1)
+    r0: u128
+    r1: u128
+  code:
+  L0:
+    0: r1 := add r0, #1267650600228229401496703205376u128
+    1: ret [r1]
+}
+
+fun max(): u128 {
+  slots: params(0), locals(0), temps(1)
+    r0: u128
+  code:
+  L0:
+    0: r0 := ld_u128 340282366920938463463374607431768211455
+    1: ret [r0]
+}
+
+fun mid(): u128 {
+  slots: params(0), locals(0), temps(1)
+    r0: u128
+  code:
+  L0:
+    0: r0 := ld_u128 1267650600228229401496703205376
+    1: ret [r0]
+}
+
+fun small(): u128 {
+  slots: params(0), locals(0), temps(1)
+    r0: u128
+  code:
+  L0:
+    0: r0 := ld_u128 42
+    1: ret [r0]
+}
+=== micro-ops ===
+// module 0x1::test
+
+fun add_const() {
+  frame_data_size: 32
+  code:
+    0: IntAdd [16] <- [0] + u128 #1267650600228229401496703205376
+    1: Move(16) [0] <- [16]
+    2: Return
+}
+
+fun max() {
+  frame_data_size: 16
+  code:
+    0: StoreImm16 [0] <- #340282366920938463463374607431768211455
+    1: Return
+}
+
+fun mid() {
+  frame_data_size: 16
+  code:
+    0: StoreImm16 [0] <- #1267650600228229401496703205376
+    1: Return
+}
+
+fun small() {
+  frame_data_size: 16
+  code:
+    0: StoreImm16 [0] <- #42
+    1: Return
+}

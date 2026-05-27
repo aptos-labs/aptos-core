@@ -119,6 +119,7 @@ use crate::{
     types::{display_type_list, InternedTypeList},
     FunctionPtr,
 };
+use move_core_types::int256::U256;
 use std::fmt;
 
 // Submodules for instruction.
@@ -269,10 +270,22 @@ pub enum MicroOp {
     // - `StoreImm` to handle arbitrary sizes,
     // - bulk data movement.
     //======================================================================
-    /// Store an immediate u64 (8 bytes) at `dst` in the current frame.
+    /// Store an immediate 8 bytes at `dst` in the current frame.
     StoreImm8 {
         dst: FrameOffset,
-        imm: u64,
+        imm: [u8; 8],
+    },
+
+    /// Store an immediate 16 bytes at `dst` in the current frame.
+    StoreImm16 {
+        dst: FrameOffset,
+        imm: Box<[u8; 16]>,
+    },
+
+    /// Store an immediate 32 bytes at `dst` in the current frame.
+    StoreImm32 {
+        dst: FrameOffset,
+        imm: Box<[u8; 32]>,
     },
 
     /// Copy 8 bytes from `src` to `dst`.
@@ -850,7 +863,23 @@ impl fmt::Display for MicroOp {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
             MicroOp::StoreImm8 { dst, imm } => {
-                write!(f, "StoreImm8 [{}] <- #{}", dst.0, imm)
+                write!(f, "StoreImm8 [{}] <- #{}", dst.0, u64::from_le_bytes(*imm))
+            },
+            MicroOp::StoreImm16 { dst, imm } => {
+                write!(
+                    f,
+                    "StoreImm16 [{}] <- #{}",
+                    dst.0,
+                    u128::from_le_bytes(**imm)
+                )
+            },
+            MicroOp::StoreImm32 { dst, imm } => {
+                write!(
+                    f,
+                    "StoreImm32 [{}] <- #{}",
+                    dst.0,
+                    U256::from_le_bytes(**imm)
+                )
             },
             MicroOp::Move8 { dst, src } => {
                 write!(f, "Move8 [{}] <- [{}]", dst.0, src.0)
@@ -1330,6 +1359,8 @@ impl MicroOp {
 
             // Non-allocating.
             MicroOp::StoreImm8 { .. }
+            | MicroOp::StoreImm16 { .. }
+            | MicroOp::StoreImm32 { .. }
             | MicroOp::Move8 { .. }
             | MicroOp::Move { .. }
             | MicroOp::AddU64 { .. }

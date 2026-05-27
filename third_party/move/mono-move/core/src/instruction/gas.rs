@@ -37,6 +37,8 @@ impl HasCfgInfo for MicroOp {
             | MicroOp::JumpGreaterEqualU64 { target, .. }
             | MicroOp::JumpNotEqualU64 { target, .. } => Some(target.0 as usize),
             MicroOp::StoreImm8 { .. }
+            | MicroOp::StoreImm16 { .. }
+            | MicroOp::StoreImm32 { .. }
             | MicroOp::Move8 { .. }
             | MicroOp::Move { .. }
             | MicroOp::AddU64 { .. }
@@ -150,6 +152,8 @@ impl RemapTargets for MicroOp {
                 rhs,
             },
             op @ (MicroOp::StoreImm8 { .. }
+            | MicroOp::StoreImm16 { .. }
+            | MicroOp::StoreImm32 { .. }
             | MicroOp::Move8 { .. }
             | MicroOp::Move { .. }
             | MicroOp::AddU64 { .. }
@@ -226,6 +230,8 @@ impl GasSchedule<MicroOp> for MicroOpGasSchedule {
         InstrCost::constant(match instr {
             // --- Data movement ---
             MicroOp::StoreImm8 { .. } => 2,
+            MicroOp::StoreImm16 { .. } => 3,
+            MicroOp::StoreImm32 { .. } => 4,
             MicroOp::Move8 { .. } => 2,
             MicroOp::Move { size, .. } => 2 + 3 * *size as u64,
 

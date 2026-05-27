@@ -219,6 +219,11 @@ impl PreparedModule {
         self.constant_types[idx.0 as usize]
     }
 
+    /// Raw (BCS-encoded) bytes of the constant at `idx`.
+    pub fn constant_data_at(&self, idx: ConstantPoolIndex) -> &[u8] {
+        &self.module.constant_pool()[idx.0 as usize].data
+    }
+
     /// Returns interned type corresponding to the compiled module's constant.
     pub fn interned_identifier_at(&self, idx: IdentifierIndex) -> InternedIdentifier {
         self.interned_identifiers[idx.0 as usize]

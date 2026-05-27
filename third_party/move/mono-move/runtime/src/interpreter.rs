@@ -818,7 +818,9 @@ impl<T: ExecutionContext + DescriptorProvider> InterpreterContext<'_, T> {
                 },
 
                 // ----- Arithmetic -----
-                MicroOp::StoreImm8 { dst, imm } => write_u64(fp, dst, imm),
+                MicroOp::StoreImm8 { dst, ref imm } => write_int::<[u8; 8]>(fp, dst, *imm),
+                MicroOp::StoreImm16 { dst, ref imm } => write_int::<[u8; 16]>(fp, dst, **imm),
+                MicroOp::StoreImm32 { dst, ref imm } => write_int::<[u8; 32]>(fp, dst, **imm),
 
                 // Add
                 MicroOp::AddU64 { dst, lhs, rhs } => {

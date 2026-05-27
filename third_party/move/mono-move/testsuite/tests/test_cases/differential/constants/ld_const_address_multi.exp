@@ -1,0 +1,36 @@
+=== stackless ===
+// module 0x1::test
+
+fun ret_a(): address {
+  slots: params(0), locals(0), temps(1)
+    r0: address
+  code:
+  L0:
+    0: r0 := ld_const #0
+    1: ret [r0]
+}
+
+fun ret_b(): address {
+  slots: params(0), locals(0), temps(1)
+    r0: address
+  code:
+  L0:
+    0: r0 := ld_const #1
+    1: ret [r0]
+}
+=== micro-ops ===
+// module 0x1::test
+
+fun ret_a() {
+  frame_data_size: 32
+  code:
+    0: StoreImm32 [0] <- #77193548260167611359494267807458109956502771454495792280332974934474558013440
+    1: Return
+}
+
+fun ret_b() {
+  frame_data_size: 32
+  code:
+    0: StoreImm32 [0] <- #84912903086184372495443694588203920952153048599945371508366272427922013814784
+    1: Return
+}

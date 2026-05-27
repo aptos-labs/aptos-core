@@ -456,7 +456,7 @@ pub fn try_lower_function(
     };
 
     let name = module_ir.module.interned_identifier_at(func_ir.name_idx);
-    let (code, raw_safe_points) = lower_function(func_ir, &ctx)?;
+    let (code, raw_safe_points) = lower_function(func_ir, &ctx, &module_ir.module)?;
     // TODO: this remapping of safe-point PCs to the allocating op's own new position
     // will go away once we move gas instrumentation to the stackless exec IR level.
     let (code, pc_map) = GasInstrumentor::new(MicroOpGasSchedule).run_with_pc_map(code);

@@ -18426,6 +18426,7 @@ name = "specializer"
 version = "0.1.0"
 dependencies = [
  "anyhow",
+ "bcs 0.1.4",
  "mono-move-core",
  "mono-move-gas",
  "move-binary-format",

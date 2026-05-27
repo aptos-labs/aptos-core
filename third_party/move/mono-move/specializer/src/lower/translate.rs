@@ -16,8 +16,9 @@ use anyhow::{bail, Context, Result};
 use mono_move_core::{
     types::{strip_ref, view_type, InternedType, Type},
     CodeOffset, FrameLayoutInfo, FrameOffset, IntBinaryOp, IntNegateOp, IntOperand, IntShiftOp,
-    IntTy, MicroOp, SafePointEntry, ShiftOperand,
+    IntTy, MicroOp, PreparedModule, SafePointEntry, ShiftOperand,
 };
+use move_core_types::account_address::AccountAddress;
 
 /// Lower a slot-allocated function to its micro-op form.
 ///
@@ -30,8 +31,9 @@ use mono_move_core::{
 pub(super) fn lower_function(
     func_ir: &FunctionIR,
     ctx: &LoweringContext,
+    module: &PreparedModule,
 ) -> Result<(Vec<MicroOp>, Vec<SafePointEntry>)> {
-    let mut state = LoweringState::new(func_ir, ctx);
+    let mut state = LoweringState::new(func_ir, ctx, module);
     for block in &func_ir.blocks {
         // Xfer slots are block-local.
         debug_assert!(
@@ -56,6 +58,8 @@ pub(super) fn lower_function(
 struct LoweringState<'a> {
     /// Read-only frame layout for the function being lowered.
     ctx: &'a LoweringContext,
+    /// Read-only module the function lives in.
+    module: &'a PreparedModule,
     /// Output buffer. Micro-ops are appended in emit order.
     out_buf: Vec<MicroOp>,
     /// `Label(i)` → index in `out_buf` where block `i` begins. Dense
@@ -89,10 +93,11 @@ struct LoweringState<'a> {
 }
 
 impl<'a> LoweringState<'a> {
-    fn new(func_ir: &'a FunctionIR, ctx: &'a LoweringContext) -> Self {
+    fn new(func_ir: &'a FunctionIR, ctx: &'a LoweringContext, module: &'a PreparedModule) -> Self {
         let num_xfer_positions = ctx.num_xfer_positions as usize;
         LoweringState {
             ctx,
+            module,
             out_buf: Vec::new(),
             label_map: vec![None; func_ir.blocks.len()],
             branch_fixups: Vec::new(),
@@ -229,71 +234,124 @@ impl<'a> LoweringState<'a> {
                 let dst_info = self.def_slot(*dst)?;
                 self.emit(MicroOp::StoreImm8 {
                     dst: dst_info.offset,
-                    imm: *v,
+                    imm: v.to_le_bytes(),
                 })?;
             },
             Instr::LdTrue(dst) => {
                 let dst_info = self.def_slot(*dst)?;
                 self.emit(MicroOp::StoreImm8 {
                     dst: dst_info.offset,
-                    imm: 1,
+                    // TODO: revisit sizing of boolean slots.
+                    imm: 1u64.to_le_bytes(),
                 })?;
             },
             Instr::LdFalse(dst) => {
                 let dst_info = self.def_slot(*dst)?;
                 self.emit(MicroOp::StoreImm8 {
                     dst: dst_info.offset,
-                    imm: 0,
+                    // TODO: revisit sizing of boolean slots.
+                    imm: 0u64.to_le_bytes(),
                 })?;
             },
+            // Narrow unsigned loads zero-extend into an 8-byte slot.
             Instr::LdU8(dst, v) => {
                 let dst_info = self.def_slot(*dst)?;
                 self.emit(MicroOp::StoreImm8 {
                     dst: dst_info.offset,
-                    imm: *v as u64,
+                    imm: (*v as u64).to_le_bytes(),
                 })?;
             },
             Instr::LdU16(dst, v) => {
                 let dst_info = self.def_slot(*dst)?;
                 self.emit(MicroOp::StoreImm8 {
                     dst: dst_info.offset,
-                    imm: *v as u64,
+                    imm: (*v as u64).to_le_bytes(),
                 })?;
             },
             Instr::LdU32(dst, v) => {
                 let dst_info = self.def_slot(*dst)?;
                 self.emit(MicroOp::StoreImm8 {
                     dst: dst_info.offset,
-                    imm: *v as u64,
+                    imm: (*v as u64).to_le_bytes(),
                 })?;
             },
+            // Narrow signed loads sign-extend first, then bit-cast for the
+            // LE byte representation.
             Instr::LdI8(dst, v) => {
                 let dst_info = self.def_slot(*dst)?;
                 self.emit(MicroOp::StoreImm8 {
                     dst: dst_info.offset,
-                    imm: *v as u64,
+                    imm: (*v as i64 as u64).to_le_bytes(),
                 })?;
             },
             Instr::LdI16(dst, v) => {
                 let dst_info = self.def_slot(*dst)?;
                 self.emit(MicroOp::StoreImm8 {
                     dst: dst_info.offset,
-                    imm: *v as u64,
+                    imm: (*v as i64 as u64).to_le_bytes(),
                 })?;
             },
             Instr::LdI32(dst, v) => {
                 let dst_info = self.def_slot(*dst)?;
                 self.emit(MicroOp::StoreImm8 {
                     dst: dst_info.offset,
-                    imm: *v as u64,
+                    imm: (*v as i64 as u64).to_le_bytes(),
                 })?;
             },
             Instr::LdI64(dst, v) => {
                 let dst_info = self.def_slot(*dst)?;
                 self.emit(MicroOp::StoreImm8 {
                     dst: dst_info.offset,
-                    imm: *v as u64,
+                    imm: v.to_le_bytes(),
                 })?;
+            },
+            Instr::LdU128(dst, v) => {
+                let dst_info = self.def_slot(*dst)?;
+                self.emit(MicroOp::StoreImm16 {
+                    dst: dst_info.offset,
+                    imm: Box::new(v.to_le_bytes()),
+                })?;
+            },
+            Instr::LdI128(dst, v) => {
+                let dst_info = self.def_slot(*dst)?;
+                self.emit(MicroOp::StoreImm16 {
+                    dst: dst_info.offset,
+                    imm: Box::new(v.to_le_bytes()),
+                })?;
+            },
+            Instr::LdU256(dst, v) => {
+                let dst_info = self.def_slot(*dst)?;
+                self.emit(MicroOp::StoreImm32 {
+                    dst: dst_info.offset,
+                    imm: Box::new(v.to_le_bytes()),
+                })?;
+            },
+            Instr::LdI256(dst, v) => {
+                let dst_info = self.def_slot(*dst)?;
+                self.emit(MicroOp::StoreImm32 {
+                    dst: dst_info.offset,
+                    imm: Box::new(v.to_le_bytes()),
+                })?;
+            },
+            Instr::LdConst(dst, idx) => {
+                let ty = view_type(self.module.interned_constant_type_at(*idx));
+                let bytes = self.module.constant_data_at(*idx);
+                match ty {
+                    Type::Address => {
+                        let addr = bcs::from_bytes::<AccountAddress>(bytes)
+                            .context("LdConst<address>: malformed constant data")?;
+                        let dst_info = self.def_slot(*dst)?;
+                        self.emit(MicroOp::StoreImm32 {
+                            dst: dst_info.offset,
+                            imm: Box::new(addr.into_bytes()),
+                        })?;
+                    },
+                    _ => bail!(
+                        "LdConst at constant pool index {} not yet lowered \
+                         (only address constants are supported)",
+                        idx.0,
+                    ),
+                }
             },
 
             // --- Copy/Move ---
@@ -567,6 +625,13 @@ impl<'a> LoweringState<'a> {
                     dst: dst_info.offset,
                     src: src_info.offset,
                 }))?;
+            },
+            Instr::UnaryOp(dst, UnaryOp::FreezeRef, src) => {
+                // Runtime no-op: &mut T and &T share the same 16-byte
+                // fat-pointer representation. Propagate the slot value.
+                let src_info = self.slot(*src)?;
+                let dst_info = self.def_slot(*dst)?;
+                self.emit_single_move(dst_info.offset, src_info)?;
             },
 
             // --- References ---

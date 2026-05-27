@@ -1,0 +1,70 @@
+=== stackless ===
+// module 0x1::test
+
+fun add_const(r0): u256 {
+  slots: params(1), locals(0), temps(1)
+    r0: u256
+    r1: u256
+  code:
+  L0:
+    0: r1 := add r0, #1606938044258990275541962092341162602522202993782792835301376u256
+    1: ret [r1]
+}
+
+fun high_half(): u256 {
+  slots: params(0), locals(0), temps(1)
+    r0: u256
+  code:
+  L0:
+    0: r0 := ld_u256 1606938044258990275541962092341162602522202993782792835301376
+    1: ret [r0]
+}
+
+fun max(): u256 {
+  slots: params(0), locals(0), temps(1)
+    r0: u256
+  code:
+  L0:
+    0: r0 := ld_u256 115792089237316195423570985008687907853269984665640564039457584007913129639935
+    1: ret [r0]
+}
+
+fun small(): u256 {
+  slots: params(0), locals(0), temps(1)
+    r0: u256
+  code:
+  L0:
+    0: r0 := ld_u256 42
+    1: ret [r0]
+}
+=== micro-ops ===
+// module 0x1::test
+
+fun add_const() {
+  frame_data_size: 64
+  code:
+    0: IntAdd [32] <- [0] + u256 #1606938044258990275541962092341162602522202993782792835301376
+    1: Move(32) [0] <- [32]
+    2: Return
+}
+
+fun high_half() {
+  frame_data_size: 32
+  code:
+    0: StoreImm32 [0] <- #1606938044258990275541962092341162602522202993782792835301376
+    1: Return
+}
+
+fun max() {
+  frame_data_size: 32
+  code:
+    0: StoreImm32 [0] <- #115792089237316195423570985008687907853269984665640564039457584007913129639935
+    1: Return
+}
+
+fun small() {
+  frame_data_size: 32
+  code:
+    0: StoreImm32 [0] <- #42
+    1: Return
+}
