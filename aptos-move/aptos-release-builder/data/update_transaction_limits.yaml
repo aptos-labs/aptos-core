@@ -1,0 +1,11 @@
+---
+remote_endpoint: ~
+name: "update_transaction_limits"
+proposals:
+  - name: update_transaction_limits
+    metadata:
+      title: "Update transaction_limits tiers"
+      description: "Set execution and IO tiers (2x/4x/8x) per governance proposal."
+    execution_mode: MultiStep
+    update_sequence:
+      - RawScript: aptos-move/aptos-release-builder/data/proposals/update_transaction_limits.move

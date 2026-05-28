@@ -1,0 +1,6 @@
+{
+  "title": "Update transaction_limits tiers",
+  "description": "Set execution and IO tiers (2x/4x/8x) per governance proposal.",
+  "source_code_url": "",
+  "discussion_url": ""
+}
