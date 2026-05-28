@@ -129,6 +129,7 @@ impl FromStr for DebugCommand {
     }
 }
 
+#[cfg(feature = "debugger")]
 pub trait ThreadStateHandle: Send + Sync {
     fn install_on_thread(&self);
 }
@@ -144,6 +145,7 @@ pub trait DebugContext: Send {
         interpreter: &dyn InterpreterDebugInterface,
     );
 
+    #[cfg(feature = "debugger")]
     fn capture_thread_state(&self) -> Box<dyn ThreadStateHandle>;
 }
 
@@ -367,6 +369,7 @@ impl DebugContext for MoveStepDebugContext {
         }
     }
 
+    #[cfg(feature = "debugger")]
     fn capture_thread_state(&self) -> Box<dyn ThreadStateHandle> {
         struct NoopThreadState;
 

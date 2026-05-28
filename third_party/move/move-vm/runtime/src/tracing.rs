@@ -4,7 +4,7 @@
 // All Aptos Foundation code and content is licensed pursuant to the Innovation-Enabling Source Code License, available at https://github.com/aptos-labs/aptos-core/blob/main/LICENSE
 
 use crate::{
-    debug::{DebugContext, MoveStepDebugContext, ThreadStateHandle},
+    debug::{DebugContext, MoveStepDebugContext},
     interpreter::InterpreterDebugInterface,
     loader::LoadedFunction,
     RuntimeEnvironment,
@@ -115,7 +115,8 @@ pub fn set_debug_context(ctx: Box<dyn DebugContext>) {
     DEBUG_CONTEXT.with(|cell| *cell.borrow_mut() = ctx);
 }
 
-pub fn capture_debug_thread_state() -> Box<dyn ThreadStateHandle> {
+#[cfg(feature = "debugger")]
+pub fn capture_debug_thread_state() -> Box<dyn crate::debug::ThreadStateHandle> {
     DEBUG_CONTEXT.with(|cell| cell.borrow().capture_thread_state())
 }
 

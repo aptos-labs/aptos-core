@@ -110,6 +110,7 @@ impl AptosSourceLocator {
         Ok(())
     }
 
+    /// Facilitates IDE debugger, not used in aptos-core otherwise.
     pub fn known_source_files(&self) -> Vec<&str> {
         self.source_data
             .values()
