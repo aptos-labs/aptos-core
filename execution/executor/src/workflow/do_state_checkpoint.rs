@@ -21,7 +21,6 @@ impl DoStateCheckpoint {
         persisted_state_summary: &ProvableStateSummary,
         known_state_checkpoints: Option<Vec<Option<HashValue>>>,
         known_hot_state_checkpoints: Option<Vec<Option<HashValue>>>,
-        use_transaction_info_v1: bool,
     ) -> Result<StateCheckpointOutput> {
         let _timer = OTHER_TIMERS.timer_with(&["do_state_checkpoint"]);
 
@@ -39,7 +38,8 @@ impl DoStateCheckpoint {
             last_checkpoint.root_hash(),
             "state",
         )?;
-        let hot_state_checkpoint_hashes = use_transaction_info_v1
+        let hot_state_checkpoint_hashes = execution_output
+            .transaction_info_v1
             .then(|| {
                 Self::get_state_checkpoint_hashes(
                     execution_output,

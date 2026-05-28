@@ -553,7 +553,7 @@ fn execute_block_no_limit(
             state_view,
             BlockExecutorConfig {
                 local: BlockExecutorLocalConfig::default_with_concurrency_level(concurrency_level),
-                onchain: BlockExecutorConfigFromOnchain::new_no_block_limit(),
+                onchain: BlockExecutorConfigFromOnchain::new_no_block_limit(), // TODO(HotState): will need to incorporate some features.
             },
             TransactionSliceMetadata::unknown(),
         )
