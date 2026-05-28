@@ -93,9 +93,10 @@ fun max(r0, r1): u64 {
 fun add() {
   frame_data_size: 24
   code:
-    0: AddU64 [16] <- [0] + [8]
-    1: Move8 [0] <- [16]
-    2: Return
+    0: Charge #7
+    1: AddU64 [16] <- [0] + [8]
+    2: Move8 [0] <- [16]
+    3: Return
 }
 
 fun get_x(): skipped (lowering: instruction ReadField not yet lowered)
@@ -105,8 +106,11 @@ fun make_point(): skipped (nominal type not yet supported)
 fun max() {
   frame_data_size: 16
   code:
-    0: JumpGreaterEqualU64 @2 [8] >= [0]
-    1: Return
-    2: Move8 [0] <- [8]
+    0: Charge #3
+    1: JumpGreaterEqualU64 @4 [8] >= [0]
+    2: Charge #2
     3: Return
+    4: Charge #4
+    5: Move8 [0] <- [8]
+    6: Return
 }

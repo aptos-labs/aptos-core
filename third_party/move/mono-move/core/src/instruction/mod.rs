@@ -214,8 +214,7 @@ impl fmt::Display for ClosureFuncRef {
                 // when the guard is held.
                 // TODO: Have a safe display impl that takes guard.
                 let func = unsafe { ptr.as_ref_unchecked() };
-                let func_name = unsafe { func.name.as_ref_unchecked() };
-                write!(f, "Resolved({})", func_name)
+                write!(f, "Resolved({})", func.name())
             },
         }
     }
@@ -975,8 +974,7 @@ impl fmt::Display for MicroOp {
                 // when the guard is held.
                 // TODO: Have a safe display impl that takes guard.
                 let func = unsafe { ptr.as_ref_unchecked() };
-                let func_name = unsafe { func.name.as_ref_unchecked() };
-                write!(f, "CallDirect {}", func_name)
+                write!(f, "CallDirect {}", func.name())
             },
             MicroOp::Return => {
                 write!(f, "Return")

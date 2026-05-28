@@ -27,7 +27,7 @@ use mono_move_core::{
 ///   in code-offset order. Non-allocating PCs are not represented;
 ///   the vector is sparse. Each entry's `code_offset` indexes
 ///   directly into `ops`.
-pub fn lower_function(
+pub(super) fn lower_function(
     func_ir: &FunctionIR,
     ctx: &LoweringContext,
 ) -> Result<(Vec<MicroOp>, Vec<SafePointEntry>)> {

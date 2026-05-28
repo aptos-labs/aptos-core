@@ -59,11 +59,12 @@ fun caller(): skipped (not all types are concrete)
 fun entry() {
   frame_data_size: 8
   code:
-    0: StoreImm8 [32] <- #42
-    1: Move8 [40] <- [0]
-    2: CallIndirect 0x1::test::caller<u64>
-    3: Move8 [0] <- [32]
-    4: Return
+    0: Charge #18
+    1: StoreImm8 [32] <- #42
+    2: Move8 [40] <- [0]
+    3: CallIndirect 0x1::test::caller<u64>
+    4: Move8 [0] <- [32]
+    5: Return
 }
 
 fun identity(): skipped (not all types are concrete)

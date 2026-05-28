@@ -51,15 +51,16 @@ fun identity(r0): _0 {
 === micro-ops ===
 // module 0x42::generic_call
 
-fun call_bool(): skipped (context: return slot: slot align 1 < 8 not yet supported (u64-aligned types only))
+fun call_bool(): skipped (lowering: return slot: slot align 1 < 8 not yet supported (u64-aligned types only))
 
 fun call_u64() {
   frame_data_size: 8
   code:
-    0: StoreImm8 [32] <- #7
-    1: CallIndirect 0x42::generic_call::identity<u64>
-    2: Move8 [0] <- [32]
-    3: Return
+    0: Charge #16
+    1: StoreImm8 [32] <- #7
+    2: CallIndirect 0x42::generic_call::identity<u64>
+    3: Move8 [0] <- [32]
+    4: Return
 }
 
 fun identity(): skipped (not all types are concrete)

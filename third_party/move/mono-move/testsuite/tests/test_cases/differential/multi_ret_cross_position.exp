@@ -40,26 +40,29 @@ fun caller(r0) {
 fun three_rets() {
   frame_data_size: 32
   code:
-    0: StoreImm8 [0] <- #1
-    1: StoreImm8 [8] <- #2
-    2: StoreImm8 [16] <- #3
-    3: Return
+    0: Charge #8
+    1: StoreImm8 [0] <- #1
+    2: StoreImm8 [8] <- #2
+    3: StoreImm8 [16] <- #3
+    4: Return
 }
 
 fun sink() {
   frame_data_size: 24
   code:
-    0: Return
+    0: Charge #2
+    1: Return
 }
 
 fun caller() {
   frame_data_size: 16
   code:
-    0: CallIndirect 0x66::test::three_rets
-    1: Move8 [8] <- [56]
-    2: Move8 [56] <- [48]
-    3: Move8 [48] <- [40]
-    4: Move8 [40] <- [0]
-    5: CallIndirect 0x66::test::sink
-    6: Return
+    0: Charge #30
+    1: CallIndirect 0x66::test::three_rets
+    2: Move8 [8] <- [56]
+    3: Move8 [56] <- [48]
+    4: Move8 [48] <- [40]
+    5: Move8 [40] <- [0]
+    6: CallIndirect 0x66::test::sink
+    7: Return
 }

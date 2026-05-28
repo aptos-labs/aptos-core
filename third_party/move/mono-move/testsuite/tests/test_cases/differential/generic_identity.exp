@@ -37,10 +37,11 @@ fun identity(r0): _0 {
 fun call_identity_u64() {
   frame_data_size: 8
   code:
-    0: Move8 [32] <- [0]
-    1: CallIndirect 0x1::test::identity<u64>
-    2: Move8 [0] <- [32]
-    3: Return
+    0: Charge #16
+    1: Move8 [32] <- [0]
+    2: CallIndirect 0x1::test::identity<u64>
+    3: Move8 [0] <- [32]
+    4: Return
 }
 
 fun identity(): skipped (not all types are concrete)

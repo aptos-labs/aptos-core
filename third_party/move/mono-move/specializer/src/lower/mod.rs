@@ -4,7 +4,6 @@
 //! Lowers stackless execution IR to monomorphized micro-ops.
 
 pub mod context;
-pub mod display;
 pub mod gc_layout;
 mod parallel_copy;
 mod translate;
@@ -12,5 +11,3 @@ mod translate;
 pub use context::{
     try_build_context, BuildContextOutcome, LoweringContext, LoweringOutcome, SlotInfo,
 };
-pub use display::MicroOpsFunctionDisplay;
-pub use translate::lower_function;

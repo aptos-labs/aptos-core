@@ -765,10 +765,8 @@ impl<P: DescriptorProvider + ?Sized> FunctionVerifier<'_, P> {
     // -----------------------------------------------------------------------
 
     fn err(&mut self, pc: Option<usize>, msg: impl Into<String>) {
-        // SAFETY: The function name is allocated in an arena alive during verification.
-        let func_name = unsafe { self.func.name.as_ref_unchecked() }.to_string();
         self.errors.push(VerificationError {
-            func_name,
+            func_name: self.func.name().to_string(),
             pc,
             message: msg.into(),
         });
