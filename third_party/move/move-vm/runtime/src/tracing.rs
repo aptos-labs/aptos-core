@@ -73,6 +73,7 @@ pub(crate) fn is_debugging_enabled() -> bool {
     DEBUGGING_ENABLED.with(|c| c.get())
 }
 
+#[cfg(feature = "debugger")]
 pub fn set_debugging_enabled(enable: bool) {
     DEBUGGING_ENABLED.with(|c| c.set(enable));
 }
@@ -109,6 +110,7 @@ fn create_buffered_output(path: &Path) -> BufWriter<File> {
     BufWriter::with_capacity(4096 * 1024 /* 4096KB */, file)
 }
 
+#[cfg(feature = "debugger")]
 pub fn set_debug_context(ctx: Box<dyn DebugContext>) {
     DEBUG_CONTEXT.with(|cell| *cell.borrow_mut() = ctx);
 }

@@ -72,6 +72,7 @@ pub fn set_source_locator(loc: Arc<dyn SourceLocator>) {
 }
 
 /// Return a clone of the current thread's source locator, if any.
+#[cfg(feature = "debugger")]
 pub fn get_source_locator() -> Option<Arc<dyn SourceLocator>> {
     LOCATOR.with(|l| l.borrow().clone())
 }
