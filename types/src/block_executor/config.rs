@@ -87,7 +87,7 @@ impl BlockExecutorLocalConfig {
 
 /// Configuration from on-chain configuration, that is
 /// required to be the same across all nodes.
-#[derive(Clone, Debug, Deserialize, Serialize)]
+#[derive(Clone, Copy, Debug, Deserialize, Serialize)]
 pub struct BlockExecutorConfigFromOnchain {
     pub block_gas_limit_type: BlockGasLimitType,
     enable_per_block_gas_limit: bool,
