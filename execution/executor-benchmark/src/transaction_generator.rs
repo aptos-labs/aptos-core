@@ -19,8 +19,10 @@ use aptos_types::{
     account_address::AccountAddress,
     account_config::{aptos_test_root_address, AccountResource, BlockResource, CORE_CODE_ADDRESS},
     block_metadata::BlockMetadata,
+    block_metadata_ext::BlockMetadataExt,
     chain_id::ChainId,
     on_chain_config::ConfigurationResource,
+    randomness::{RandMetadata, Randomness},
     state_store::MoveResourceExt,
     timestamp::TimestampResource,
     transaction::{
@@ -31,7 +33,7 @@ use chrono::Local;
 use indicatif::{ProgressBar, ProgressStyle};
 use itertools::Itertools;
 use move_core_types::{ident_str, language_storage::ModuleId};
-use rand::{rngs::StdRng, seq::SliceRandom, thread_rng, Rng, SeedableRng};
+use rand::{rngs::StdRng, seq::SliceRandom, thread_rng, Rng, RngCore, SeedableRng};
 use rayon::{
     iter::{IntoParallelRefIterator, IntoParallelRefMutIterator, ParallelIterator},
     ThreadPool, ThreadPoolBuilder,
@@ -168,7 +170,7 @@ impl BenchmarkTimestamp {
         self.base_usecs / 1_000_000 + 60
     }
 
-    /// Creates a `BlockMetadata` transaction for the next block, using a
+    /// Creates a `BlockMetadataExt` transaction for the next block, using a
     /// strictly increasing timestamp derived from this `BenchmarkTimestamp`.
     pub fn next_block_metadata_txn(&self, db: &DbReaderWriter) -> Transaction {
         let (round, timestamp_usecs) = self.next_round_and_timestamp();
@@ -180,7 +182,17 @@ impl BenchmarkTimestamp {
             timestamp_usecs
         );
 
-        Transaction::BlockMetadata(BlockMetadata::new(
+        let mut seed = vec![0u8; 32];
+        thread_rng().fill_bytes(&mut seed);
+        let randomness = Randomness::new(
+            RandMetadata {
+                epoch: self.epoch(),
+                round,
+            },
+            seed,
+        );
+
+        Transaction::BlockMetadataExt(BlockMetadataExt::new_v1(
             HashValue::random(),
             self.epoch(),
             round,
@@ -188,6 +200,7 @@ impl BenchmarkTimestamp {
             vec![],
             vec![],
             timestamp_usecs,
+            Some(randomness),
         ))
     }
 
@@ -197,6 +210,13 @@ impl BenchmarkTimestamp {
     /// computes a timestamp that triggers reconfiguration
     /// (`last_reconfig_time + epoch_interval + 1`), and returns the
     /// block (a `Vec<Transaction>` with one `BlockMetadata` entry).
+    ///
+    /// Uses `BlockMetadata` (not `BlockMetadataExt`) so that `block_prologue`
+    /// calls `reconfiguration::reconfigure()` directly and the epoch advances
+    /// immediately.  `BlockMetadataExt` would initiate a DKG session via
+    /// `reconfiguration_with_dkg::try_start()`, which can never complete in the
+    /// benchmark environment (no real DKG infrastructure), causing the epoch
+    /// change to stall.
     ///
     /// After committing this block, callers should use
     /// `BenchmarkTimestamp::from_db()` to get a fresh timestamp state
