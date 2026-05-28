@@ -62,9 +62,6 @@ pub struct BlockExecutorLocalConfig {
     pub discard_failed_blocks: bool,
     pub module_cache_config: BlockExecutorModuleCacheLocalConfig,
     pub enable_pre_write: bool,
-    /// If true, the per-block hot-state promotion set is embedded into the block epilogue
-    /// transaction (BlockEpiloguePayload::V2).
-    pub persist_hotness_in_epilogue: bool,
 }
 
 impl BlockExecutorLocalConfig {
@@ -80,7 +77,6 @@ impl BlockExecutorLocalConfig {
             discard_failed_blocks: false,
             module_cache_config: BlockExecutorModuleCacheLocalConfig::default(),
             enable_pre_write: true,
-            persist_hotness_in_epilogue: false,
         }
     }
 }
