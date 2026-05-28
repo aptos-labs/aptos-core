@@ -1,7 +1,7 @@
 // Copyright (c) Aptos Foundation
 // Licensed pursuant to the Innovation-Enabling Source Code License, available at https://github.com/aptos-labs/aptos-core/blob/main/LICENSE
 
-use crate::on_chain_config::BlockGasLimitType;
+use crate::on_chain_config::{BlockGasLimitType, Features};
 use serde::{Deserialize, Serialize};
 
 const DEFAULT_GAS_PRICE_TO_BURN: u64 = 90;
@@ -93,6 +93,8 @@ pub struct BlockExecutorConfigFromOnchain {
     enable_per_block_gas_limit: bool,
     per_block_gas_limit: Option<u64>,
     gas_price_to_burn: Option<u64>,
+    hotness_in_epilogue: bool,
+    transaction_info_v1: bool,
 }
 
 impl BlockExecutorConfigFromOnchain {
@@ -106,6 +108,8 @@ impl BlockExecutorConfigFromOnchain {
             enable_per_block_gas_limit,
             per_block_gas_limit: None,
             gas_price_to_burn,
+            hotness_in_epilogue: false,
+            transaction_info_v1: false,
         }
     }
 
@@ -115,6 +119,8 @@ impl BlockExecutorConfigFromOnchain {
             enable_per_block_gas_limit: false,
             per_block_gas_limit: None,
             gas_price_to_burn: None,
+            hotness_in_epilogue: false,
+            transaction_info_v1: false,
         }
     }
 
@@ -125,6 +131,8 @@ impl BlockExecutorConfigFromOnchain {
             enable_per_block_gas_limit: false,
             per_block_gas_limit: None,
             gas_price_to_burn: None,
+            hotness_in_epilogue: false,
+            transaction_info_v1: false,
         }
     }
 
@@ -146,16 +154,28 @@ impl BlockExecutorConfigFromOnchain {
             enable_per_block_gas_limit: false,
             per_block_gas_limit: None,
             gas_price_to_burn: None,
+            hotness_in_epilogue: false,
+            transaction_info_v1: false,
         }
     }
 
-    pub fn with_block_gas_limit_override(self, block_gas_limit_override: Option<u64>) -> Self {
-        Self {
-            block_gas_limit_type: self.block_gas_limit_type,
-            enable_per_block_gas_limit: self.enable_per_block_gas_limit,
-            per_block_gas_limit: block_gas_limit_override,
-            gas_price_to_burn: self.gas_price_to_burn,
-        }
+    pub fn with_block_gas_limit_override(mut self, block_gas_limit_override: Option<u64>) -> Self {
+        self.per_block_gas_limit = block_gas_limit_override;
+        self
+    }
+
+    pub fn with_features(mut self, features: &Features) -> Self {
+        self.hotness_in_epilogue = features.is_hotness_in_epilogue_enabled();
+        self.transaction_info_v1 = features.is_transaction_info_v1_enabled();
+        self
+    }
+
+    pub fn hotness_in_epilogue(&self) -> bool {
+        self.hotness_in_epilogue
+    }
+
+    pub fn transaction_info_v1(&self) -> bool {
+        self.transaction_info_v1
     }
 
     pub fn block_gas_limit_override(&self) -> Option<u64> {

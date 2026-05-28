@@ -828,6 +828,7 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
         onchain_randomness_config: OnChainRandomnessConfig,
         onchain_jwk_consensus_config: OnChainJWKConsensusConfig,
         onchain_chunky_dkg_config: OnChainChunkyDKGConfig,
+        features: Features,
         network_sender: Arc<NetworkSender>,
         payload_client: Arc<dyn PayloadClient>,
         payload_manager: Arc<dyn TPayloadManager>,
@@ -892,6 +893,7 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
                 &onchain_execution_config,
                 &onchain_randomness_config,
                 &onchain_chunky_dkg_config,
+                &features,
                 rand_config,
                 secret_share_verifier.clone(),
                 rand_msg_rx,
@@ -964,8 +966,7 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
             self.config
                 .min_max_txns_in_block_after_filtering_from_backpressure,
             onchain_execution_config
-                .block_executor_onchain_config()
-                .block_gas_limit_type
+                .block_gas_limit_type()
                 .block_gas_limit(),
             pipeline_backpressure_config,
             chain_health_backoff_config,
@@ -1243,10 +1244,12 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
         self.epoch_state = Some(epoch_state.clone());
 
         let onchain_consensus_config: anyhow::Result<OnChainConsensusConfig> = payload.get();
-        self.encrypted_enabled = payload
-            .get::<Features>()
-            .map(|f| f.is_encrypted_transactions_enabled())
-            .unwrap_or(false);
+        let onchain_features: anyhow::Result<Features> = payload.get();
+        if let Err(error) = &onchain_features {
+            warn!("Failed to read on-chain features {}", error);
+        }
+        let features = onchain_features.unwrap_or_default();
+        self.encrypted_enabled = features.is_encrypted_transactions_enabled();
         let onchain_execution_config: anyhow::Result<OnChainExecutionConfig> = payload.get();
         let onchain_randomness_config_seq_num: anyhow::Result<RandomnessConfigSeqNum> =
             payload.get();
@@ -1417,6 +1420,7 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
                 onchain_randomness_config,
                 jwk_consensus_config,
                 onchain_chunky_dkg_config,
+                features,
                 network_sender,
                 payload_client,
                 payload_manager,
@@ -1434,6 +1438,7 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
                 onchain_randomness_config,
                 jwk_consensus_config,
                 onchain_chunky_dkg_config,
+                features,
                 network_sender,
                 payload_client,
                 payload_manager,
@@ -1492,6 +1497,7 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
         onchain_randomness_config: OnChainRandomnessConfig,
         jwk_consensus_config: OnChainJWKConsensusConfig,
         onchain_chunky_dkg_config: OnChainChunkyDKGConfig,
+        features: Features,
         network_sender: NetworkSender,
         payload_client: Arc<dyn PayloadClient>,
         payload_manager: Arc<dyn TPayloadManager>,
@@ -1515,6 +1521,7 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
                     onchain_randomness_config,
                     jwk_consensus_config,
                     onchain_chunky_dkg_config,
+                    features,
                     Arc::new(network_sender),
                     payload_client,
                     payload_manager,
@@ -1548,6 +1555,7 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
         onchain_randomness_config: OnChainRandomnessConfig,
         onchain_jwk_consensus_config: OnChainJWKConsensusConfig,
         onchain_chunky_dkg_config: OnChainChunkyDKGConfig,
+        features: Features,
         network_sender: NetworkSender,
         payload_client: Arc<dyn PayloadClient>,
         payload_manager: Arc<dyn TPayloadManager>,
@@ -1584,6 +1592,7 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
                 &on_chain_execution_config,
                 &onchain_randomness_config,
                 &onchain_chunky_dkg_config,
+                &features,
                 rand_config,
                 None,
                 rand_msg_rx,

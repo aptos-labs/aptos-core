@@ -1096,6 +1096,7 @@ impl ConsensusObserver {
             execution_config,
             randomness_config,
             chunky_dkg_config,
+            features,
         ) = self
             .observer_epoch_state
             .wait_for_epoch_start(block_payloads)
@@ -1124,6 +1125,7 @@ impl ConsensusObserver {
                 &execution_config,
                 &randomness_config,
                 &chunky_dkg_config,
+                &features,
                 None,
                 None,
                 rand_msg_rx,
