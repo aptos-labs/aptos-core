@@ -264,7 +264,7 @@ where
                     auxiliary_info,
                     parent_output.result_state(),
                     state_view,
-                    onchain_config.clone(),
+                    onchain_config,
                     TransactionSliceMetadata::block(parent_block_id, block_id),
                 )?
             };
