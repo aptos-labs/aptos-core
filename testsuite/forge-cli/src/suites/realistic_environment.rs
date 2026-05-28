@@ -520,6 +520,7 @@ pub(crate) fn realistic_env_max_load_test(
 pub(crate) fn realistic_env_max_load_encrypted_test(duration: Duration) -> ForgeConfig {
     let num_validators = 5;
     let num_fullnodes = 1;
+    let num_pfns = 3;
     let mempool_backlog = 8000;
 
     let success_criteria = SuccessCriteria::new(15)
@@ -537,6 +538,7 @@ pub(crate) fn realistic_env_max_load_encrypted_test(duration: Duration) -> Forge
     ForgeConfig::default()
         .with_initial_validator_count(NonZeroUsize::new(num_validators).unwrap())
         .with_initial_fullnode_count(num_fullnodes)
+        .with_num_pfns(num_pfns)
         .add_network_test(wrap_with_realistic_env(num_validators, TwoTrafficsTest {
             inner_traffic: EmitJobRequest::default()
                 .mode(EmitJobMode::MaxLoad { mempool_backlog })
@@ -578,6 +580,9 @@ pub(crate) fn realistic_env_max_load_encrypted_test(duration: Duration) -> Forge
                 Some("/opt/aptos/data/trusted-setup/pp.bin".into());
         }))
         .with_fullnode_override_node_config_fn(Arc::new(|config, _| {
+            config.api.allow_encrypted_txns_submission = true;
+        }))
+        .with_pfn_override_node_config_fn(Arc::new(|config, _| {
             config.api.allow_encrypted_txns_submission = true;
         }))
         .with_emit_job(
