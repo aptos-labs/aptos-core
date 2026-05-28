@@ -1,3 +1,4 @@
+=== stackless ===
 // module 0x66::locals_soundness
 
 fun local_across_blocks(r0, r1): u64 {
@@ -30,7 +31,6 @@ fun borrow_written_local(r0): u64 {
     2: r3 := read_ref r2
     3: ret [r3]
 }
-
 === micro-ops ===
 // module 0x66::locals_soundness
 

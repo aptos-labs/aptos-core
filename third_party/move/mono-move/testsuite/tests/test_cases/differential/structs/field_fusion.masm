@@ -1,0 +1,134 @@
+// RUN: publish --print(stackless,micro-ops)
+module 0x66::field_fusion
+
+fun identity(x: u64): u64
+    move_loc x
+    ret
+
+struct Pair has drop+copy
+  _1: u64
+  _2: u64
+
+fun add_two_fields(p: Pair): u64
+    borrow_loc p
+    borrow_field Pair, _1
+    read_ref
+    borrow_loc p
+    borrow_field Pair, _2
+    read_ref
+    add
+    ret
+
+fun field_to_call(p: Pair): u64
+    borrow_loc p
+    borrow_field Pair, _1
+    read_ref
+    call identity
+    ret
+
+fun two_fields_to_call(a: Pair, b: Pair): u64
+    borrow_loc a
+    borrow_field Pair, _1
+    read_ref
+    borrow_loc b
+    borrow_field Pair, _2
+    read_ref
+    add
+    call identity
+    ret
+
+fun field_plus_constant(p: Pair): u64
+    borrow_loc p
+    borrow_field Pair, _1
+    read_ref
+    ld_u64 42
+    add
+    ret
+
+fun increment_field(p: &mut Pair)
+    copy_loc p
+    borrow_field Pair, _1
+    read_ref
+    ld_u64 1
+    add
+    move_loc p
+    mut_borrow_field Pair, _1
+    write_ref
+    ret
+
+fun test_add_two_fields(a: u64, b: u64): u64
+    local p: Pair
+    move_loc a
+    move_loc b
+    pack Pair
+    st_loc p
+    move_loc p
+    call add_two_fields
+    ret
+
+fun test_field_to_call(a: u64, b: u64): u64
+    local p: Pair
+    move_loc a
+    move_loc b
+    pack Pair
+    st_loc p
+    move_loc p
+    call field_to_call
+    ret
+
+fun test_two_fields_to_call(a1: u64, b1: u64, a2: u64, b2: u64): u64
+    local p1: Pair
+    local p2: Pair
+    move_loc a1
+    move_loc b1
+    pack Pair
+    st_loc p1
+    move_loc a2
+    move_loc b2
+    pack Pair
+    st_loc p2
+    move_loc p1
+    move_loc p2
+    call two_fields_to_call
+    ret
+
+fun test_field_plus_constant(a: u64, b: u64): u64
+    local p: Pair
+    move_loc a
+    move_loc b
+    pack Pair
+    st_loc p
+    move_loc p
+    call field_plus_constant
+    ret
+
+fun test_increment_field(a: u64, b: u64): u64
+    local p: Pair
+    move_loc a
+    move_loc b
+    pack Pair
+    st_loc p
+    mut_borrow_loc p
+    call increment_field
+    move_loc p
+    unpack Pair
+    pop
+    ret
+
+// RUN: execute 0x66::field_fusion::test_add_two_fields --args 10, 20
+// CHECK: results: 30
+
+// RUN: execute 0x66::field_fusion::test_field_to_call --args 7, 99
+// CHECK: results: 7
+
+// RUN: execute 0x66::field_fusion::test_two_fields_to_call --args 1, 99, 99, 2
+// CHECK: results: 3
+
+// RUN: execute 0x66::field_fusion::test_field_plus_constant --args 8, 0
+// CHECK: results: 50
+
+// RUN: execute 0x66::field_fusion::test_increment_field --args 5, 99
+// CHECK: results: 6
+
+// RUN: execute 0x66::field_fusion::test_increment_field --args 0, 0
+// CHECK: results: 1

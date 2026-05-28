@@ -54,9 +54,11 @@ pub fn optimize_module(module_ir: &mut ModuleIR) {
 /// reference (via `WriteRef`, function calls, etc.) without appearing as a
 /// def in `get_defs_uses`. So we kill subst entries for the borrowed slot
 /// at `MutBorrowLoc` — conservatively assuming hidden writes may follow.
+/// `MutBorrowLocField` and `WriteLocalField` have the same hazard.
 ///
 /// `ImmBorrowLoc` does NOT need this kill — the verifier guarantees the
-/// borrowed slot cannot be modified while immutably borrowed.
+/// borrowed slot cannot be modified while immutably borrowed. The same
+/// holds for `ImmBorrowLocField` and `ReadLocalField`.
 ///
 /// ## Why cross-block mutable borrows are safe
 ///
@@ -73,10 +75,13 @@ fn copy_propagation(func: &mut FunctionIR) {
         for instr in &mut block.instrs {
             remap_source_slots_with(instr, |s| *subst.get(&s).unwrap_or(&s));
 
-            // MutBorrowLoc kill: the borrowed slot may be silently written
-            // through the resulting reference (WriteRef), which is not tracked
-            // as a def. Kill any substitution involving the borrowed slot.
-            if let Instr::MutBorrowLoc(_, src) = instr {
+            // Kill subst for locals whose storage may be mutated without
+            // a full def: mut borrows (writes go through the ref) and
+            // `WriteLocalField` (partial write).
+            if let Instr::MutBorrowLoc(_, src)
+            | Instr::MutBorrowLocField(_, _, src)
+            | Instr::WriteLocalField(_, src, _) = instr
+            {
                 subst.remove(src);
                 subst.retain(|_, v| v != src);
             }

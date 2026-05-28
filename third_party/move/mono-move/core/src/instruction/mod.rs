@@ -745,6 +745,36 @@ pub enum MicroOp {
         size: u32,
     },
 
+    /// Copies the 16-byte fat pointer from `src_ref` to `dst_ref`, while
+    /// adding `offset` to the offset part of the fat pointer.
+    ///
+    /// Used to derive a field reference from a struct reference.
+    RefBumpImmOffset {
+        dst_ref: FrameOffset,
+        src_ref: FrameOffset,
+        offset: u32,
+    },
+
+    /// Read through a fat pointer (`ref_ptr`) with an extra immediate `offset`.
+    /// Copies `size` bytes from the referenced location (after folding in the
+    /// offset) to `dst`.
+    ReadRefOffset {
+        dst: FrameOffset,
+        ref_ptr: FrameOffset,
+        offset: u32,
+        size: u32,
+    },
+
+    /// Write through a fat pointer (`ref_ptr`) with an extra immediate
+    /// `offset`. Copies `size` bytes from `src` to the referenced location
+    /// (after folding in the offset). Symmetric counterpart to `ReadRefOffset`.
+    WriteRefOffset {
+        ref_ptr: FrameOffset,
+        offset: u32,
+        src: FrameOffset,
+        size: u32,
+    },
+
     //======================================================================
     // Heap object operations (structs and enums)
     //======================================================================
@@ -1138,6 +1168,41 @@ impl fmt::Display for MicroOp {
                     ref_ptr.0, src.0, size
                 )
             },
+            MicroOp::RefBumpImmOffset {
+                dst_ref,
+                src_ref,
+                offset,
+            } => {
+                write!(
+                    f,
+                    "RefBumpImmOffset [{}] <- [{}]+{}",
+                    dst_ref.0, src_ref.0, offset
+                )
+            },
+            MicroOp::ReadRefOffset {
+                dst,
+                ref_ptr,
+                offset,
+                size,
+            } => {
+                write!(
+                    f,
+                    "ReadRefOffset [{}] <- *[{}]+{} (size={})",
+                    dst.0, ref_ptr.0, offset, size
+                )
+            },
+            MicroOp::WriteRefOffset {
+                ref_ptr,
+                offset,
+                src,
+                size,
+            } => {
+                write!(
+                    f,
+                    "WriteRefOffset *[{}]+{} <- [{}] (size={})",
+                    ref_ptr.0, offset, src.0, size
+                )
+            },
             MicroOp::HeapNew { dst, descriptor_id } => {
                 write!(f, "HeapNew [{}] desc={}", dst.0, descriptor_id)
             },
@@ -1418,6 +1483,9 @@ impl MicroOp {
             | MicroOp::HeapBorrow { .. }
             | MicroOp::ReadRef { .. }
             | MicroOp::WriteRef { .. }
+            | MicroOp::RefBumpImmOffset { .. }
+            | MicroOp::ReadRefOffset { .. }
+            | MicroOp::WriteRefOffset { .. }
             | MicroOp::HeapMoveFrom8 { .. }
             | MicroOp::HeapMoveFrom { .. }
             | MicroOp::HeapMoveTo8 { .. }

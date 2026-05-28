@@ -1,3 +1,4 @@
+=== stackless ===
 // module 0x66::test
 
 fun helper(): u64 {
@@ -27,7 +28,6 @@ fun trigger(): u64 {
     3: [] := call void_no_arg, []
     4: ret [r0]
 }
-
 === micro-ops ===
 // module 0x66::test
 

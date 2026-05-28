@@ -19,7 +19,7 @@
 //!
 //! The design relies on three compile-time optimizations:
 //!
-//! - **Const generics** (`DEFS`, `USES`, `SKIP_BORROW_LOC_SRC`): branches
+//! - **Const generics** (`DEFS`, `USES`, `SKIP_STORAGE_LOC_USE`): branches
 //!   guarded by const booleans are eliminated during monomorphization. Each
 //!   wrapper compiles to a specialized match with only the relevant arms.
 //! - **Const folding of `SlotRole`**: the `def`/`used`/`defs`/`uses` emit
@@ -31,6 +31,7 @@
 //!   at each call site.
 
 use super::{BinaryOp, ImmValue, Instr, Slot};
+use mono_move_core::{types::InternedType, PreparedModule};
 use smallvec::SmallVec;
 
 /// Most instructions have at most 4 defs or uses.
@@ -40,7 +41,14 @@ pub(crate) type SlotList = SmallVec<[Slot; 4]>;
 #[derive(Clone, Copy, PartialEq, Eq)]
 enum SlotRole {
     Def,
-    Use,
+    /// A value use — the slot's bytes are read into the operation.
+    /// Single-use SSA semantics apply: after this instruction the
+    /// originally-bound value is consumed.
+    ValueUse,
+    /// A storage-location use — the slot's identity is referenced
+    /// but its bytes are not consumed; the slot stays live with the
+    /// same type after the instruction.
+    StorageLocationUse,
 }
 
 // =============================================================================
@@ -52,9 +60,21 @@ pub(crate) fn for_each_def(instr: &Instr, mut f: impl FnMut(Slot)) {
     visit_slots::<true, false>(instr, |slot, _| f(slot));
 }
 
-/// Apply `f` to each slot used (read) by an instruction.
+/// Apply `f` to each slot used (read) by an instruction. Includes
+/// both value uses and storage-location uses — the full union of
+/// read-side operands.
 pub(crate) fn for_each_use(instr: &Instr, mut f: impl FnMut(Slot)) {
     visit_slots::<false, true>(instr, |slot, _| f(slot));
+}
+
+/// Apply `f` to each slot whose value an instruction consumes,
+/// skipping storage-location uses.
+pub(crate) fn for_each_value_use(instr: &Instr, mut f: impl FnMut(Slot)) {
+    visit_slots::<false, true>(instr, |slot, role| {
+        if role == SlotRole::ValueUse {
+            f(slot);
+        }
+    });
 }
 
 /// Apply `f` to every slot (defs and uses) in an instruction.
@@ -63,12 +83,13 @@ pub(crate) fn for_each_slot(instr: &Instr, mut f: impl FnMut(Slot)) {
 }
 
 /// Collect defs and uses into separate lists in a single pass.
+/// Storage-location uses are grouped with value uses.
 pub(crate) fn collect_defs_and_uses(instr: &Instr) -> (SlotList, SlotList) {
     let mut defs = SlotList::new();
     let mut uses = SlotList::new();
     visit_slots::<true, true>(instr, |slot, role| match role {
         SlotRole::Def => defs.push(slot),
-        SlotRole::Use => uses.push(slot),
+        SlotRole::ValueUse | SlotRole::StorageLocationUse => uses.push(slot),
     });
     (defs, uses)
 }
@@ -104,6 +125,114 @@ pub(crate) fn clobbers_xfer(instr: &Instr) -> bool {
         instr,
         Instr::Call(..) | Instr::CallGeneric(..) | Instr::CallClosure(..)
     )
+}
+
+/// Concrete nominal (struct or enum) type whose layout `instr`'s
+/// lowering needs, if any.
+/// TODO: complete the function over all instructions.
+pub(crate) fn nominal_type_in_instr(
+    module: &PreparedModule,
+    instr: &Instr,
+) -> Option<InternedType> {
+    use move_binary_format::access::ModuleAccess;
+    match instr {
+        // Carry the concrete struct type directly.
+        Instr::Pack(_, ty, _) | Instr::Unpack(_, ty, _) => Some(*ty),
+
+        // Carry a field handle resolving to the owning concrete struct.
+        Instr::ImmBorrowField(_, fh, _)
+        | Instr::MutBorrowField(_, fh, _)
+        | Instr::ReadField(_, fh, _)
+        | Instr::WriteField(fh, _, _)
+        | Instr::ImmBorrowLocField(_, fh, _)
+        | Instr::MutBorrowLocField(_, fh, _)
+        | Instr::ReadLocalField(_, fh, _)
+        | Instr::WriteLocalField(fh, _, _) => {
+            let owner = module.field_handle_at(*fh).owner;
+            Some(module.interned_nominal_def_type_at(owner))
+        },
+
+        // Generic struct/field, variant (enum), global-resource, vector,
+        // and closure ops also carry types, but their lowering isn't
+        // supported yet — none reference a concrete inline struct here.
+        Instr::PackGeneric(..)
+        | Instr::UnpackGeneric(..)
+        | Instr::PackVariant(..)
+        | Instr::PackVariantGeneric(..)
+        | Instr::UnpackVariant(..)
+        | Instr::UnpackVariantGeneric(..)
+        | Instr::TestVariant(..)
+        | Instr::TestVariantGeneric(..)
+        | Instr::ImmBorrowFieldGeneric(..)
+        | Instr::MutBorrowFieldGeneric(..)
+        | Instr::ImmBorrowVariantField(..)
+        | Instr::MutBorrowVariantField(..)
+        | Instr::ImmBorrowVariantFieldGeneric(..)
+        | Instr::MutBorrowVariantFieldGeneric(..)
+        | Instr::ReadFieldGeneric(..)
+        | Instr::WriteFieldGeneric(..)
+        | Instr::ReadVariantField(..)
+        | Instr::ReadVariantFieldGeneric(..)
+        | Instr::WriteVariantField(..)
+        | Instr::WriteVariantFieldGeneric(..)
+        | Instr::Exists(..)
+        | Instr::ExistsGeneric(..)
+        | Instr::MoveFrom(..)
+        | Instr::MoveFromGeneric(..)
+        | Instr::MoveTo(..)
+        | Instr::MoveToGeneric(..)
+        | Instr::ImmBorrowGlobal(..)
+        | Instr::ImmBorrowGlobalGeneric(..)
+        | Instr::MutBorrowGlobal(..)
+        | Instr::MutBorrowGlobalGeneric(..)
+        | Instr::PackClosure(..)
+        | Instr::PackClosureGeneric(..)
+        | Instr::CallClosure(..)
+        | Instr::VecPack(..)
+        | Instr::VecLen(..)
+        | Instr::VecImmBorrow(..)
+        | Instr::VecMutBorrow(..)
+        | Instr::VecPushBack(..)
+        | Instr::VecPopBack(..)
+        | Instr::VecUnpack(..)
+        | Instr::VecSwap(..) => None,
+
+        // No struct type involved.
+        Instr::LdConst(..)
+        | Instr::LdTrue(..)
+        | Instr::LdFalse(..)
+        | Instr::LdU8(..)
+        | Instr::LdU16(..)
+        | Instr::LdU32(..)
+        | Instr::LdU64(..)
+        | Instr::LdU128(..)
+        | Instr::LdU256(..)
+        | Instr::LdI8(..)
+        | Instr::LdI16(..)
+        | Instr::LdI32(..)
+        | Instr::LdI64(..)
+        | Instr::LdI128(..)
+        | Instr::LdI256(..)
+        | Instr::Copy(..)
+        | Instr::Move(..)
+        | Instr::UnaryOp(..)
+        | Instr::BinaryOp(..)
+        | Instr::BinaryOpImm(..)
+        | Instr::ImmBorrowLoc(..)
+        | Instr::MutBorrowLoc(..)
+        | Instr::ReadRef(..)
+        | Instr::WriteRef(..)
+        | Instr::Call(..)
+        | Instr::CallGeneric(..)
+        | Instr::Branch(..)
+        | Instr::BrTrue(..)
+        | Instr::BrFalse(..)
+        | Instr::BrCmp(..)
+        | Instr::BrCmpImm(..)
+        | Instr::Ret(..)
+        | Instr::Abort(..)
+        | Instr::AbortMsg(..) => None,
+    }
 }
 
 /// Extract the destination slot and immediate value from a load instruction.
@@ -170,6 +299,10 @@ pub(crate) fn extract_imm_value(instr: &Instr) -> Option<(Slot, ImmValue)> {
         | Instr::ReadVariantFieldGeneric(_, _, _)
         | Instr::WriteVariantField(_, _, _)
         | Instr::WriteVariantFieldGeneric(_, _, _)
+        | Instr::ImmBorrowLocField(_, _, _)
+        | Instr::MutBorrowLocField(_, _, _)
+        | Instr::ReadLocalField(_, _, _)
+        | Instr::WriteLocalField(_, _, _)
         | Instr::Exists(_, _, _)
         | Instr::ExistsGeneric(_, _, _)
         | Instr::MoveFrom(_, _, _)
@@ -239,7 +372,16 @@ fn def<const ACTIVE: bool>(slot: Slot, f: &mut impl FnMut(Slot, SlotRole)) {
 #[inline]
 fn used<const ACTIVE: bool>(slot: Slot, f: &mut impl FnMut(Slot, SlotRole)) {
     if ACTIVE {
-        f(slot, SlotRole::Use);
+        f(slot, SlotRole::ValueUse);
+    }
+}
+
+/// Emit a storage-location use slot if `ACTIVE` is true. The slot's
+/// identity matters but its bytes are NOT consumed by the instruction.
+#[inline]
+fn storage_use<const ACTIVE: bool>(slot: Slot, f: &mut impl FnMut(Slot, SlotRole)) {
+    if ACTIVE {
+        f(slot, SlotRole::StorageLocationUse);
     }
 }
 
@@ -255,7 +397,7 @@ fn defs<const ACTIVE: bool>(slots: &[Slot], f: &mut impl FnMut(Slot, SlotRole)) 
 #[inline]
 fn uses<const ACTIVE: bool>(slots: &[Slot], f: &mut impl FnMut(Slot, SlotRole)) {
     if ACTIVE {
-        slots.iter().for_each(|slot| f(*slot, SlotRole::Use));
+        slots.iter().for_each(|slot| f(*slot, SlotRole::ValueUse));
     }
 }
 
@@ -331,9 +473,13 @@ fn visit_slots<const DEFS: bool, const USES: bool>(
             used::<USES>(*src, &mut f);
         },
 
-        Instr::ImmBorrowLoc(dst, src)
-        | Instr::MutBorrowLoc(dst, src)
-        | Instr::ImmBorrowField(dst, _, src)
+        // `src` is a storage-location use: the local's identity is
+        // taken, its bytes are not consumed.
+        Instr::ImmBorrowLoc(dst, src) | Instr::MutBorrowLoc(dst, src) => {
+            def::<DEFS>(*dst, &mut f);
+            storage_use::<USES>(*src, &mut f);
+        },
+        Instr::ImmBorrowField(dst, _, src)
         | Instr::MutBorrowField(dst, _, src)
         | Instr::ImmBorrowFieldGeneric(dst, _, src)
         | Instr::MutBorrowFieldGeneric(dst, _, src)
@@ -362,6 +508,23 @@ fn visit_slots<const DEFS: bool, const USES: bool>(
         | Instr::WriteVariantField(_, ref_slot, val)
         | Instr::WriteVariantFieldGeneric(_, ref_slot, val) => {
             used::<USES>(*ref_slot, &mut f);
+            used::<USES>(*val, &mut f);
+        },
+
+        // `local` names the inline-struct frame slot, not a reference:
+        // a storage-location use.
+        Instr::ImmBorrowLocField(dst, _, local)
+        | Instr::MutBorrowLocField(dst, _, local)
+        | Instr::ReadLocalField(dst, _, local) => {
+            def::<DEFS>(*dst, &mut f);
+            storage_use::<USES>(*local, &mut f);
+        },
+        // `local` is both a def (a field is written in-place) and a
+        // storage-location use (the other fields persist, so the slot
+        // stays live with the same type after the write).
+        Instr::WriteLocalField(_, local, val) => {
+            def::<DEFS>(*local, &mut f);
+            storage_use::<USES>(*local, &mut f);
             used::<USES>(*val, &mut f);
         },
 
@@ -467,10 +630,9 @@ fn rewrite_slots(slots: &mut [Slot], f: &mut impl FnMut(Slot) -> Slot) {
 /// Rewrite slot operands of an instruction in-place.
 ///
 /// - `DEFS` / `USES`: select which slots to rewrite (compile-time).
-/// - `SKIP_BORROW_LOC_SRC`: when true, BorrowLoc source operands are not
-///   rewritten — needed for copy propagation where substituting BorrowLoc
-///   sources would change which frame slot the reference points to (unsound).
-fn rewrite_instr_slots<const DEFS: bool, const USES: bool, const SKIP_BORROW_LOC_SRC: bool>(
+/// - `SKIP_STORAGE_LOC_USE`: when true, storage-location uses are not
+///   rewritten.
+fn rewrite_instr_slots<const DEFS: bool, const USES: bool, const SKIP_STORAGE_LOC_USE: bool>(
     instr: &mut Instr,
     mut f: impl FnMut(Slot) -> Slot,
 ) {
@@ -586,13 +748,12 @@ fn rewrite_instr_slots<const DEFS: bool, const USES: bool, const SKIP_BORROW_LOC
             }
         },
 
-        // BorrowLoc: when SKIP_BORROW_LOC_SRC is true, the source operand is a
-        // storage-location use (identity of the slot matters) and must not be rewritten.
+        // `src` is a storage-location use; skip it under SKIP_STORAGE_LOC_USE.
         Instr::ImmBorrowLoc(dst, src) | Instr::MutBorrowLoc(dst, src) => {
             if DEFS {
                 rewrite_slot(dst, &mut f);
             }
-            if USES && !SKIP_BORROW_LOC_SRC {
+            if USES && !SKIP_STORAGE_LOC_USE {
                 rewrite_slot(src, &mut f);
             }
         },
@@ -636,6 +797,30 @@ fn rewrite_instr_slots<const DEFS: bool, const USES: bool, const SKIP_BORROW_LOC
         | Instr::WriteVariantFieldGeneric(_, ref_slot, val) => {
             if USES {
                 rewrite_slot(ref_slot, &mut f);
+                rewrite_slot(val, &mut f);
+            }
+        },
+
+        // `local` is a storage-location use, so skip it under
+        // SKIP_STORAGE_LOC_USE.
+        Instr::ImmBorrowLocField(dst, _, local)
+        | Instr::MutBorrowLocField(dst, _, local)
+        | Instr::ReadLocalField(dst, _, local) => {
+            if DEFS {
+                rewrite_slot(dst, &mut f);
+            }
+            if USES && !SKIP_STORAGE_LOC_USE {
+                rewrite_slot(local, &mut f);
+            }
+        },
+        Instr::WriteLocalField(_, local, val) => {
+            // `local` is both a def and a storage-location use of one
+            // operand: rewrite once when either role is active. Under
+            // SKIP_STORAGE_LOC_USE only the use side is suppressed.
+            if DEFS || (USES && !SKIP_STORAGE_LOC_USE) {
+                rewrite_slot(local, &mut f);
+            }
+            if USES {
                 rewrite_slot(val, &mut f);
             }
         },

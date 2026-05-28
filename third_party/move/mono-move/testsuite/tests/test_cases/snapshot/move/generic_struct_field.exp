@@ -44,6 +44,6 @@ fun make_u64(r0): Box<u64> {
 === micro-ops ===
 // module 0x42::generic_struct_field
 
-fun get_u64(): skipped (lowering: instruction ReadFieldGeneric not yet lowered)
+fun get_u64(): skipped (lowering: generic field instruction not yet lowered)
 
-fun make_u64(): skipped (nominal type not yet supported)
+fun make_u64(): skipped (lowering: instruction PackGeneric not yet lowered)

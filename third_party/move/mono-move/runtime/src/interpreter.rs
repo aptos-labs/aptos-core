@@ -1167,6 +1167,43 @@ impl<T: ExecutionContext + DescriptorProvider> InterpreterContext<'_, T> {
                     std::ptr::copy(fp.add(src.into()), target, size as usize);
                 },
 
+                MicroOp::RefBumpImmOffset {
+                    dst_ref,
+                    src_ref,
+                    offset,
+                } => {
+                    let base = read_ptr(fp, src_ref);
+                    let src_off = read_u64(fp, src_ref + 8);
+                    write_ptr(fp, dst_ref, base);
+                    write_u64(fp, dst_ref + 8, src_off + offset as u64);
+                },
+
+                MicroOp::ReadRefOffset {
+                    dst,
+                    ref_ptr,
+                    offset,
+                    size,
+                } => {
+                    let base = read_ptr(fp, ref_ptr);
+                    let ref_off = read_u64(fp, ref_ptr + 8);
+                    let target = base.add(ref_off as usize + offset as usize);
+                    // Overlap-safe `copy`: `dst` and `*ref` may alias.
+                    std::ptr::copy(target, fp.add(dst.into()), size as usize);
+                },
+
+                MicroOp::WriteRefOffset {
+                    ref_ptr,
+                    offset,
+                    src,
+                    size,
+                } => {
+                    let base = read_ptr(fp, ref_ptr);
+                    let ref_off = read_u64(fp, ref_ptr + 8);
+                    let target = base.add(ref_off as usize + offset as usize);
+                    // Overlap-safe `copy`: `src` and `*ref` may alias.
+                    std::ptr::copy(fp.add(src.into()), target, size as usize);
+                },
+
                 // ----- Heap object instructions (structs and enums) -----
                 MicroOp::HeapNew { dst, descriptor_id } => {
                     let ptr = alloc_obj!(self, fp, descriptor_id)?;
