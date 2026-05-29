@@ -18,6 +18,12 @@ use std::collections::BTreeMap;
 /// Transfer APT between accounts
 ///
 #[derive(Debug, Parser)]
+#[clap(after_help = "Examples:
+  # Transfer 1000 Octas to an account, paying with the default profile
+  $ aptos account transfer --account 0xc0ffee --amount 1000
+
+  # Transfer without interactive confirmation prompts (for scripts/agents)
+  $ aptos account transfer --account 0xc0ffee --amount 1000 --assume-yes")]
 pub struct TransferCoins {
     /// Address of account to send APT to
     #[clap(long, value_parser = crate::common::types::load_account_arg)]
