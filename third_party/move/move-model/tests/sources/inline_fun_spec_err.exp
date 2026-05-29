@@ -1,5 +1,5 @@
-error: functional spec blocks for inline functions are not supported yet
-  ┌─ tests/sources/inline_fun_spec_err.move:5:10
+error: function-level spec blocks are not supported on inline functions with function-typed parameters
+  ┌─ tests/sources/inline_fun_spec_err.move:5:29
   │
-5 │     spec f {
-  │          ^
+5 │     public inline fun apply(f: |u64| u64, x: u64): u64 {
+  │                             ^

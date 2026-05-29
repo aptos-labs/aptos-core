@@ -1861,20 +1861,26 @@ impl GlobalEnv {
             }
         }
 
-        // Assign synthetic def_idx to lemma functions for Boogie debug tracking.
-        // Lemma functions are not compiled, so they lack a FunctionDefinitionIndex.
-        // We give them synthetic indices starting after the last compiled function,
-        // so `boogie_debug_track` can emit $track_local calls and the model extractor
-        // can resolve them back via `try_get_function_id`.
+        // Assign synthetic def_idx to lemma functions and to inline functions that
+        // carry a function-level spec, both of which need Boogie debug tracking but
+        // are absent from the compiled module's function defs. We give them synthetic
+        // indices starting after the last compiled function so `boogie_debug_track`
+        // can emit `$track_local`/`$track_abort` calls and the model extractor can
+        // resolve them back via `try_get_function_id`.
         let next_idx = module.function_defs.len() as u16;
         let mod_data = &mut self.module_data[module_id.0 as usize];
-        let lemma_funs: Vec<_> = mod_data
+        let synthetic_funs: Vec<_> = mod_data
             .function_data
             .iter()
-            .filter(|(_, data)| data.kind == FunctionKind::Lemma)
+            .filter(|(_, data)| {
+                data.kind == FunctionKind::Lemma
+                    || (data.kind == FunctionKind::Inline
+                        && (!data.spec.borrow().conditions.is_empty()
+                            || data.spec.borrow().frame_spec.is_some()))
+            })
             .map(|(fun_id, _)| *fun_id)
             .collect();
-        for (i, fun_id) in lemma_funs.iter().enumerate() {
+        for (i, fun_id) in synthetic_funs.iter().enumerate() {
             let def_idx = FunctionDefinitionIndex(next_idx + i as u16);
             if let Some(fun_data) = mod_data.function_data.get_mut(fun_id) {
                 fun_data.def_idx = Some(def_idx);
@@ -5240,11 +5246,13 @@ impl<'env> FunctionEnv<'env> {
 
     /// Returns `true` for functions that have no independently-processed bytecode target in the
     /// prover pipeline and should be skipped when iterating over functions for analysis:
-    /// - inline functions: their bodies are inlined at every call site
+    /// - inline functions: their bodies are inlined at every call site, EXCEPT when the
+    ///   inline function carries a function-level spec, in which case the prover verifies
+    ///   the body against the spec like any other function
     /// - struct API wrappers: their call sites are replaced by native operations
     ///   (Pack, BorrowField, etc.) in stackless_bytecode_generator before any processor runs
     pub fn is_not_prover_target(&self) -> bool {
-        self.is_inline() || self.is_struct_api()
+        (self.is_inline() && !self.has_fun_spec()) || self.is_struct_api()
     }
 
     /// If this is a struct API wrapper, returns `(ModuleId, StructId)` of the struct it
@@ -5441,6 +5449,16 @@ impl<'env> FunctionEnv<'env> {
     /// Return true if the function is an inline function
     pub fn is_inline(&self) -> bool {
         self.data.kind == FunctionKind::Inline
+    }
+
+    /// Return true if the function has a user-written function-level spec, i.e. a
+    /// `spec foo { ... }` block contributing at least one condition or frame condition.
+    /// Used to decide whether an inline function should participate in prover
+    /// verification (its body checked against the spec) and, when combined with
+    /// `is_opaque()`, whether to preserve calls to it at call sites rather than inlining.
+    pub fn has_fun_spec(&self) -> bool {
+        let spec = self.get_spec();
+        !spec.conditions.is_empty() || spec.frame_spec.is_some()
     }
 
     /// Return true if this is a lemma function (synthesized from a lemma declaration).

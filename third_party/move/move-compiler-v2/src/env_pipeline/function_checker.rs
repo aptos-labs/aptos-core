@@ -110,15 +110,23 @@ pub fn check_access_after_inlining(env: &GlobalEnv) {
                 let callee = env.get_function(callee_id);
 
                 if callee.is_inline() {
-                    for site in &sites {
-                        env.diag(
-                            Severity::Bug,
-                            &env.get_node_loc(*site),
-                            &format!(
-                                "call to inline function `{}` should have been expanded",
-                                callee.get_name_str(),
-                            ),
-                        );
+                    // Opaque inline functions that carry a function-level spec are
+                    // intentionally left as calls so the prover can substitute the
+                    // spec at the call site. A finalizing inliner pass run before
+                    // file format generation expands these, so the runtime binary
+                    // is unaffected.
+                    let kept_for_spec = callee.is_opaque() && callee.has_fun_spec();
+                    if !kept_for_spec {
+                        for site in &sites {
+                            env.diag(
+                                Severity::Bug,
+                                &env.get_node_loc(*site),
+                                &format!(
+                                    "call to inline function `{}` should have been expanded",
+                                    callee.get_name_str(),
+                                ),
+                            );
+                        }
                     }
                 }
 

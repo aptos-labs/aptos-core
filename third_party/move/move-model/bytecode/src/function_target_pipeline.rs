@@ -184,7 +184,9 @@ impl FunctionTargetsHolder {
 
     /// Adds a new function target. The target will be initialized from the Move byte code.
     pub fn add_target(&mut self, func_env: &FunctionEnv<'_>) {
-        // Skip inlined functions, they do not have associated bytecode.
+        // Skip inlined functions, they do not have associated bytecode. Inline functions
+        // with a function-level spec are added by the prover's higher-level setup using
+        // the AST-based bytecode generator (see `create_and_process_bytecode`).
         if func_env.is_inline() {
             return;
         }
@@ -241,8 +243,8 @@ impl FunctionTargetsHolder {
         func_env: &'env FunctionEnv<'env>,
     ) -> Vec<(FunctionVariant, FunctionTarget<'env>)> {
         assert!(
-            !func_env.is_inline(),
-            "attempt to get bytecode function target for inline function"
+            !func_env.is_inline() || func_env.has_fun_spec(),
+            "attempt to get bytecode function target for inline function without a function-level spec"
         );
         self.targets
             .get(&func_env.get_qualified_id())
@@ -482,7 +484,7 @@ impl FunctionTargetPipeline {
                             // check for fixedpoint in summaries
                             for fid in scc {
                                 let func_env = env.get_function(*fid);
-                                if func_env.is_inline() {
+                                if func_env.is_inline() && !func_env.has_fun_spec() {
                                     continue;
                                 }
                                 for (_, target) in targets.get_targets(&func_env) {

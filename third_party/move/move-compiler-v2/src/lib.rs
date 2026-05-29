@@ -3,7 +3,7 @@
 // Parts of the file are Copyright (c) Aptos Foundation
 // All Aptos Foundation code and content is licensed pursuant to the Innovation-Enabling Source Code License, available at https://github.com/aptos-labs/aptos-core/blob/main/LICENSE
 
-mod bytecode_generator;
+pub mod bytecode_generator;
 pub mod diagnostics;
 pub mod env_pipeline;
 mod experiments;
@@ -60,8 +60,9 @@ use move_binary_format::errors::VMError;
 use move_bytecode_source_map::source_map::SourceMap;
 use move_core_types::vm_status::StatusType;
 use move_model::{
+    ast::{Exp, ExpData, Operation},
     metadata::LanguageVersion,
-    model::{GlobalEnv, Loc, MoveIrLoc},
+    model::{FunId, GlobalEnv, Loc, MoveIrLoc, QualifiedId},
     PackageInfo,
 };
 use move_stackless_bytecode::function_target_pipeline::{
@@ -69,7 +70,10 @@ use move_stackless_bytecode::function_target_pipeline::{
 };
 use move_symbol_pool::Symbol;
 pub use options::Options;
-use std::{collections::BTreeSet, path::Path};
+use std::{
+    collections::{BTreeMap, BTreeSet},
+    path::Path,
+};
 
 const DEBUG: bool = false;
 const COMPILER_BUG_REPORT_MSG: &str =
@@ -230,6 +234,31 @@ pub fn run_move_compiler_to_model(mut options: Options) -> anyhow::Result<Global
         return Ok(env);
     }
 
+    // Opaque inline functions with a function-level spec have their call ops kept
+    // in caller bodies by the inliner so the prover can substitute the spec at
+    // the call site. File format generation cannot represent these calls (the
+    // referenced function is never emitted to the binary), so we snapshot the
+    // affected caller defs, run a finalizing inliner pass that expands them, do
+    // file format generation, and restore the snapshots so the prover sees the
+    // call-preserving version of each affected caller.
+    let preserved_defs = snapshot_opaque_inline_spec_callers(&env);
+    if !preserved_defs.is_empty() {
+        let lift_inline_funs = options.experiment_on(Experiment::LIFT_INLINE_FUNS);
+        let keep_inline_funs = options.experiment_on(Experiment::KEEP_INLINE_FUNS);
+        let rewriting_scope = RewritingScope::Everything;
+        inliner::run_inlining_with_options(
+            &mut env,
+            rewriting_scope,
+            keep_inline_funs,
+            lift_inline_funs,
+            true,
+        );
+        if env.has_errors() {
+            env.treat_everything_as_target(false);
+            return Ok(env);
+        }
+    }
+
     // Regenerate stackless bytecode after AST optimizations.
     let mut targets = run_stackless_bytecode_gen(&env);
     if env.has_errors() {
@@ -259,9 +288,58 @@ pub fn run_move_compiler_to_model(mut options: Options) -> anyhow::Result<Global
     let annotated_units = annotate_units(modules_and_scripts);
     run_bytecode_verifier(&annotated_units, &mut env);
 
+    // Restore the call-preserving caller defs that we set aside before file format
+    // generation, so downstream consumers (notably the prover) see the calls to
+    // opaque inline spec callees and can substitute the spec at each call site.
+    for (qfid, def) in preserved_defs {
+        env.set_function_def(qfid, def);
+    }
+
     env.set_compiler_v2(true);
     env.treat_everything_as_target(false);
     Ok(env)
+}
+
+/// Returns true if `def` contains a call to an opaque inline function that
+/// carries a function-level spec. The inliner preserves these calls in
+/// spec-rewrite (prover) mode so the prover can substitute the spec at the
+/// call site, just like for a normal opaque function.
+pub fn def_has_opaque_inline_spec_call(env: &GlobalEnv, def: &Exp) -> bool {
+    def.as_ref().any(&mut |e| {
+        if let ExpData::Call(_, Operation::MoveFunction(mid, fid), _) = e {
+            let callee = env.get_function(mid.qualified(*fid));
+            callee.is_inline() && callee.is_opaque() && callee.has_fun_spec()
+        } else {
+            false
+        }
+    })
+}
+
+/// Find caller functions whose AST contains a call to an opaque inline function
+/// that carries a function-level spec. The inliner preserves these calls in
+/// spec-rewrite (prover) mode, so we snapshot the affected caller defs here in
+/// order to restore them after file format generation has expanded the calls.
+///
+/// Inline functions without a function-level spec are skipped: the finalizing
+/// inliner pass drops them from the env, so there is nothing to restore. Inline
+/// functions WITH a function-level spec are included — they survive pruning and
+/// the prover verifies their bodies against the spec, so their preserved calls
+/// to other opaque-inline-with-spec funs must be restored too.
+fn snapshot_opaque_inline_spec_callers(env: &GlobalEnv) -> BTreeMap<QualifiedId<FunId>, Exp> {
+    let mut snapshot = BTreeMap::new();
+    for module in env.get_modules() {
+        for fun in module.get_functions() {
+            if fun.is_inline() && !fun.has_fun_spec() {
+                continue;
+            }
+            if let Some(def) = fun.get_def() {
+                if def_has_opaque_inline_spec_call(env, def) {
+                    snapshot.insert(fun.get_qualified_id(), def.clone());
+                }
+            }
+        }
+    }
+    snapshot
 }
 
 /// Run the type checker and return the global env (with errors if encountered). The result

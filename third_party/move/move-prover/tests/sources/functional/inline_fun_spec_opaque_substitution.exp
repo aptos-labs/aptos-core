@@ -1,0 +1,29 @@
+Move prover returns: exiting with verification errors
+error: function does not abort under this condition
+   ┌─ tests/sources/functional/inline_fun_spec_opaque_substitution.move:23:9
+   │
+23 │         aborts_if x == 0xFFFFFFFFFFFFFFFF || x == 0xFFFFFFFFFFFFFFFE;
+   │         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+   │
+   =     at tests/sources/functional/inline_fun_spec_opaque_substitution.move:18: add_one_opaque
+   =         x = <redacted>
+   =     at tests/sources/functional/inline_fun_spec_opaque_substitution.move:19: add_one_opaque
+   =         <redacted> = <redacted>
+   =         return = <redacted>
+   =         result = <redacted>
+   =     at tests/sources/functional/inline_fun_spec_opaque_substitution.move:23: add_one_opaque (spec)
+
+error: post-condition does not hold
+   ┌─ tests/sources/functional/inline_fun_spec_opaque_substitution.move:24:9
+   │
+24 │         ensures result == x + 2;
+   │         ^^^^^^^^^^^^^^^^^^^^^^^^
+   │
+   =     at tests/sources/functional/inline_fun_spec_opaque_substitution.move:18: add_one_opaque
+   =         x = <redacted>
+   =     at tests/sources/functional/inline_fun_spec_opaque_substitution.move:19: add_one_opaque
+   =         <redacted> = <redacted>
+   =         return = <redacted>
+   =         result = <redacted>
+   =     at tests/sources/functional/inline_fun_spec_opaque_substitution.move:23: add_one_opaque (spec)
+   =     at tests/sources/functional/inline_fun_spec_opaque_substitution.move:24: add_one_opaque (spec)

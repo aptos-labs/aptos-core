@@ -1258,12 +1258,22 @@ impl ModuleBuilder<'_, '_> {
                                 self.validate_target_signature(&fun_decl, &loc, signature);
                             }
 
-                            // TODO: to be revisited once we have high-order function
+                            // Inline functions may carry function-level specs, but in this
+                            // first iteration we disallow function-typed parameters: a lambda
+                            // argument gets inlined at the call site rather than passed as a
+                            // first-class function value, so referring to it from a spec is
+                            // not yet supported.
                             if fun_decl.kind == FunctionKind::Inline {
-                                self.parent.error(
-                                    &loc,
-                                    "functional spec blocks for inline functions are not supported yet",
-                                );
+                                if let Some(bad) = fun_decl
+                                    .params
+                                    .iter()
+                                    .find(|Parameter(_, ty, _)| matches!(ty, Type::Fun(..)))
+                                {
+                                    self.parent.error(
+                                        &bad.2,
+                                        "function-level spec blocks are not supported on inline functions with function-typed parameters",
+                                    );
+                                }
                             }
                         },
                         SpecBlockContext::Struct(..) | SpecBlockContext::Module => (),

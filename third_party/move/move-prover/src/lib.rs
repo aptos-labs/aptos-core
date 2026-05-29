@@ -22,7 +22,7 @@ use move_prover_boogie_backend::{
 use move_prover_bytecode_pipeline::{
     number_operation::GlobalNumberOperationState, pipeline_factory,
 };
-use move_stackless_bytecode::function_target_pipeline::FunctionTargetsHolder;
+use move_stackless_bytecode::function_target_pipeline::{FunctionTargetsHolder, FunctionVariant};
 use std::{
     fs,
     path::Path,
@@ -285,6 +285,43 @@ pub fn create_and_process_bytecode(options: &Options, env: &GlobalEnv) -> Functi
                 // Struct API wrappers have no user-written specs; skip them to avoid
                 // spurious invariant failures from DataInvariantInstrumentationProcessor.
                 continue;
+            }
+            if func_env.is_inline() && func_env.has_fun_spec() {
+                // Inline functions with a function-level spec are verified against
+                // their spec like any other function. They have no compiled module
+                // entry (inline funs are never emitted to the file format), so the
+                // legacy `add_target` path can't produce bytecode for them. Use the
+                // AST-based bytecode generator from compiler-v2 instead and insert
+                // the resulting baseline data directly.
+                let data = move_compiler_v2::bytecode_generator::generate_bytecode(
+                    env,
+                    func_env.get_qualified_id(),
+                );
+                targets.insert_target_data(
+                    &func_env.get_qualified_id(),
+                    FunctionVariant::Baseline,
+                    data,
+                );
+                continue;
+            }
+            // Callers that contain a preserved call to an opaque inline function
+            // with a function-level spec must be generated from their AST: the
+            // file format bytecode attached to the env was produced from the
+            // fully-inlined version and has lost the call op, but the AST has
+            // been restored to the call-preserving form for our benefit.
+            if let Some(def) = func_env.get_def() {
+                if move_compiler_v2::def_has_opaque_inline_spec_call(env, def) {
+                    let data = move_compiler_v2::bytecode_generator::generate_bytecode(
+                        env,
+                        func_env.get_qualified_id(),
+                    );
+                    targets.insert_target_data(
+                        &func_env.get_qualified_id(),
+                        FunctionVariant::Baseline,
+                        data,
+                    );
+                    continue;
+                }
             }
             targets.add_target(&func_env)
         }

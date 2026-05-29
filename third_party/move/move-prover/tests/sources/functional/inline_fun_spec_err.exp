@@ -1,0 +1,15 @@
+Move prover returns: exiting with verification errors
+error: post-condition does not hold
+   ┌─ tests/sources/functional/inline_fun_spec_err.move:15:9
+   │
+15 │         ensures result == x + 2;
+   │         ^^^^^^^^^^^^^^^^^^^^^^^^
+   │
+   =     at tests/sources/functional/inline_fun_spec_err.move:10: add_one_wrong_spec
+   =         x = <redacted>
+   =     at tests/sources/functional/inline_fun_spec_err.move:11: add_one_wrong_spec
+   =         <redacted> = <redacted>
+   =         return = <redacted>
+   =         result = <redacted>
+   =     at tests/sources/functional/inline_fun_spec_err.move:14: add_one_wrong_spec (spec)
+   =     at tests/sources/functional/inline_fun_spec_err.move:15: add_one_wrong_spec (spec)

@@ -390,7 +390,7 @@ impl VerificationAnalysisProcessor {
         if fun_env.is_test_only()
             || fun_env.is_intrinsic()
             || fun_env.is_native()
-            || fun_env.is_inline()
+            || (fun_env.is_inline() && !fun_env.has_fun_spec())
             || fun_env.is_struct_api()
         {
             // do not verify any of these function types

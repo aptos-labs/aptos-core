@@ -85,6 +85,22 @@ pub fn run_inlining(
     keep_inline_functions: bool,
     lift_inline_funs: bool,
 ) {
+    run_inlining_with_options(env, scope, keep_inline_functions, lift_inline_funs, false)
+}
+
+/// Like `run_inlining`, but allows forcing expansion of opaque inline functions that
+/// carry a function-level spec. In spec-rewrite (prover) mode, such calls are
+/// normally preserved so the prover can substitute the spec at the call site. The
+/// compile path calls this with `force_expand_opaque_spec_inlines = true` as a
+/// finalizing pass just before file format generation, so the file format does not
+/// contain calls to inline functions.
+pub fn run_inlining_with_options(
+    env: &mut GlobalEnv,
+    scope: RewritingScope,
+    keep_inline_functions: bool,
+    lift_inline_funs: bool,
+    force_expand_opaque_spec_inlines: bool,
+) {
     // Get function roots for running inlining.
     // Also generate errors for any invalid target inline functions.
     let mut targets = RewriteTargets::create(env, scope);
@@ -126,7 +142,12 @@ pub fn run_inlining(
         {
             // We inline functions bottom-up, so that any inline function which itself has calls to
             // inline functions has already had its stuff inlined.
-            let mut inliner = Inliner::new(env, targets, lift_inline_funs);
+            let mut inliner = Inliner::new(
+                env,
+                targets,
+                lift_inline_funs,
+                force_expand_opaque_spec_inlines,
+            );
             for target in targets_needing_inlining.into_iter() {
                 inliner.do_inlining_in(target);
             }
@@ -144,12 +165,22 @@ pub fn run_inlining(
     // scenarios since env dumping crashes if the functions are removed but still referenced
     // from somewhere.
     if !keep_inline_functions {
+        let spec_rewrite = env
+            .get_extension::<Options>()
+            .map(|o| o.experiment_on(Experiment::SPEC_REWRITE))
+            .unwrap_or(false);
         // First construct a list of functions to remove.
         let mut inline_funs = BTreeSet::new();
         for module in env.get_modules() {
             for func in module.get_functions() {
                 let id = func.get_qualified_id();
                 if func.is_inline() && func.get_def().is_some() {
+                    // In spec-rewrite (prover) mode, keep inline functions that carry
+                    // a function-level spec: the prover verifies the body against the
+                    // spec like a normal function.
+                    if spec_rewrite && func.has_fun_spec() {
+                        continue;
+                    }
                     // Only delete functions with a body.
                     inline_funs.insert(id);
                 }
@@ -414,6 +445,11 @@ struct Inliner<'env> {
     inline_targets: RewriteTargets,
     /// Flag to lift lambda expression arguments to inline functions
     lift_inline_funs: bool,
+    /// Whether to preserve call ops to opaque inline functions that carry a
+    /// function-level spec instead of expanding them. Set when running in
+    /// spec-rewrite (prover) mode AND the caller has not asked to force
+    /// expansion (the compile path does, just before file format gen).
+    preserve_opaque_spec_inline_calls: bool,
 }
 
 impl<'env> Inliner<'env> {
@@ -421,11 +457,18 @@ impl<'env> Inliner<'env> {
         env: &'env mut GlobalEnv,
         inline_targets: RewriteTargets,
         lift_inline_funs: bool,
+        force_expand_opaque_spec_inlines: bool,
     ) -> Self {
+        let spec_rewrite = env
+            .get_extension::<Options>()
+            .map(|o| o.experiment_on(Experiment::SPEC_REWRITE))
+            .unwrap_or(false);
+        let preserve_opaque_spec_inline_calls = spec_rewrite && !force_expand_opaque_spec_inlines;
         Self {
             env,
             inline_targets,
             lift_inline_funs,
+            preserve_opaque_spec_inline_calls,
         }
     }
 
@@ -527,6 +570,17 @@ impl ExpRewriterFunctions for OuterInlinerRewriter<'_, '_> {
             let qfid = module_id.qualified(*fun_id);
             let func_env = self.inliner.env.get_function(qfid);
             if func_env.is_inline() {
+                // Opaque inline functions that carry a function-level spec keep
+                // their call op intact so the prover substitutes the spec at the
+                // call site, just like a normal opaque function. The compile path
+                // runs a finalizing inliner pass (force_expand=true) before file
+                // format generation, which clears this flag and expands them.
+                if self.inliner.preserve_opaque_spec_inline_calls
+                    && func_env.is_opaque()
+                    && func_env.has_fun_spec()
+                {
+                    return None;
+                }
                 // inline the function call
                 let type_args = self.inliner.env.get_node_instantiation(call_id);
                 let parameters = func_env.get_parameters();
