@@ -749,7 +749,7 @@ pub enum MicroOp {
     /// adding `offset` to the offset part of the fat pointer.
     ///
     /// Used to derive a field reference from a struct reference.
-    RefBumpImmOffset {
+    DeriveRefOffsetImm {
         dst_ref: FrameOffset,
         src_ref: FrameOffset,
         offset: u32,
@@ -1168,14 +1168,14 @@ impl fmt::Display for MicroOp {
                     ref_ptr.0, src.0, size
                 )
             },
-            MicroOp::RefBumpImmOffset {
+            MicroOp::DeriveRefOffsetImm {
                 dst_ref,
                 src_ref,
                 offset,
             } => {
                 write!(
                     f,
-                    "RefBumpImmOffset [{}] <- [{}]+{}",
+                    "DeriveRefOffsetImm [{}] <- [{}]+{}",
                     dst_ref.0, src_ref.0, offset
                 )
             },
@@ -1187,7 +1187,7 @@ impl fmt::Display for MicroOp {
             } => {
                 write!(
                     f,
-                    "ReadRefOffset [{}] <- *[{}]+{} (size={})",
+                    "ReadRefOffset [{}] <- *([{}]+{}) (size={})",
                     dst.0, ref_ptr.0, offset, size
                 )
             },
@@ -1199,7 +1199,7 @@ impl fmt::Display for MicroOp {
             } => {
                 write!(
                     f,
-                    "WriteRefOffset *[{}]+{} <- [{}] (size={})",
+                    "WriteRefOffset *([{}]+{}) <- [{}] (size={})",
                     ref_ptr.0, offset, src.0, size
                 )
             },
@@ -1483,7 +1483,7 @@ impl MicroOp {
             | MicroOp::HeapBorrow { .. }
             | MicroOp::ReadRef { .. }
             | MicroOp::WriteRef { .. }
-            | MicroOp::RefBumpImmOffset { .. }
+            | MicroOp::DeriveRefOffsetImm { .. }
             | MicroOp::ReadRefOffset { .. }
             | MicroOp::WriteRefOffset { .. }
             | MicroOp::HeapMoveFrom8 { .. }

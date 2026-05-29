@@ -86,7 +86,7 @@ impl HasCfgInfo for MicroOp {
             | MicroOp::HeapBorrow { .. }
             | MicroOp::ReadRef { .. }
             | MicroOp::WriteRef { .. }
-            | MicroOp::RefBumpImmOffset { .. }
+            | MicroOp::DeriveRefOffsetImm { .. }
             | MicroOp::ReadRefOffset { .. }
             | MicroOp::WriteRefOffset { .. }
             | MicroOp::HeapNew { .. }
@@ -204,7 +204,7 @@ impl RemapTargets for MicroOp {
             | MicroOp::HeapBorrow { .. }
             | MicroOp::ReadRef { .. }
             | MicroOp::WriteRef { .. }
-            | MicroOp::RefBumpImmOffset { .. }
+            | MicroOp::DeriveRefOffsetImm { .. }
             | MicroOp::ReadRefOffset { .. }
             | MicroOp::WriteRefOffset { .. }
             | MicroOp::HeapNew { .. }
@@ -303,7 +303,7 @@ impl GasSchedule<MicroOp> for MicroOpGasSchedule {
             MicroOp::VecBorrow { .. } => 3,
             MicroOp::HeapBorrow { .. } => 2,
             MicroOp::ReadRef { size, .. } | MicroOp::WriteRef { size, .. } => 2 + 3 * *size as u64,
-            MicroOp::RefBumpImmOffset { .. } => 2,
+            MicroOp::DeriveRefOffsetImm { .. } => 2,
             MicroOp::ReadRefOffset { size, .. } | MicroOp::WriteRefOffset { size, .. } => {
                 2 + 3 * *size as u64
             },

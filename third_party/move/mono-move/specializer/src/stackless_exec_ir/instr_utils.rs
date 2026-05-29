@@ -19,7 +19,7 @@
 //!
 //! The design relies on three compile-time optimizations:
 //!
-//! - **Const generics** (`DEFS`, `USES`, `SKIP_STORAGE_LOC_USE`): branches
+//! - **Const generics** (`DEFS`, `USES`, `SKIP_PLACE_USE`): branches
 //!   guarded by const booleans are eliminated during monomorphization. Each
 //!   wrapper compiles to a specialized match with only the relevant arms.
 //! - **Const folding of `SlotRole`**: the `def`/`used`/`defs`/`uses` emit
@@ -45,10 +45,10 @@ enum SlotRole {
     /// Single-use SSA semantics apply: after this instruction the
     /// originally-bound value is consumed.
     ValueUse,
-    /// A storage-location use — the slot's identity is referenced
-    /// but its bytes are not consumed; the slot stays live with the
-    /// same type after the instruction.
-    StorageLocationUse,
+    /// A place use — the frame slot's identity (its location) is
+    /// referenced but its bytes are not consumed; the slot stays live
+    /// with the same type after the instruction.
+    PlaceUse,
 }
 
 // =============================================================================
@@ -61,14 +61,14 @@ pub(crate) fn for_each_def(instr: &Instr, mut f: impl FnMut(Slot)) {
 }
 
 /// Apply `f` to each slot used (read) by an instruction. Includes
-/// both value uses and storage-location uses — the full union of
+/// both value uses and place uses — the full union of
 /// read-side operands.
 pub(crate) fn for_each_use(instr: &Instr, mut f: impl FnMut(Slot)) {
     visit_slots::<false, true>(instr, |slot, _| f(slot));
 }
 
 /// Apply `f` to each slot whose value an instruction consumes,
-/// skipping storage-location uses.
+/// skipping place uses.
 pub(crate) fn for_each_value_use(instr: &Instr, mut f: impl FnMut(Slot)) {
     visit_slots::<false, true>(instr, |slot, role| {
         if role == SlotRole::ValueUse {
@@ -83,13 +83,13 @@ pub(crate) fn for_each_slot(instr: &Instr, mut f: impl FnMut(Slot)) {
 }
 
 /// Collect defs and uses into separate lists in a single pass.
-/// Storage-location uses are grouped with value uses.
+/// Place uses are grouped with value uses.
 pub(crate) fn collect_defs_and_uses(instr: &Instr) -> (SlotList, SlotList) {
     let mut defs = SlotList::new();
     let mut uses = SlotList::new();
     visit_slots::<true, true>(instr, |slot, role| match role {
         SlotRole::Def => defs.push(slot),
-        SlotRole::ValueUse | SlotRole::StorageLocationUse => uses.push(slot),
+        SlotRole::ValueUse | SlotRole::PlaceUse => uses.push(slot),
     });
     (defs, uses)
 }
@@ -376,12 +376,12 @@ fn used<const ACTIVE: bool>(slot: Slot, f: &mut impl FnMut(Slot, SlotRole)) {
     }
 }
 
-/// Emit a storage-location use slot if `ACTIVE` is true. The slot's
+/// Emit a place use slot if `ACTIVE` is true. The slot's
 /// identity matters but its bytes are NOT consumed by the instruction.
 #[inline]
 fn storage_use<const ACTIVE: bool>(slot: Slot, f: &mut impl FnMut(Slot, SlotRole)) {
     if ACTIVE {
-        f(slot, SlotRole::StorageLocationUse);
+        f(slot, SlotRole::PlaceUse);
     }
 }
 
@@ -473,7 +473,7 @@ fn visit_slots<const DEFS: bool, const USES: bool>(
             used::<USES>(*src, &mut f);
         },
 
-        // `src` is a storage-location use: the local's identity is
+        // `src` is a place use: the local's identity is
         // taken, its bytes are not consumed.
         Instr::ImmBorrowLoc(dst, src) | Instr::MutBorrowLoc(dst, src) => {
             def::<DEFS>(*dst, &mut f);
@@ -512,7 +512,7 @@ fn visit_slots<const DEFS: bool, const USES: bool>(
         },
 
         // `local` names the inline-struct frame slot, not a reference:
-        // a storage-location use.
+        // a place use.
         Instr::ImmBorrowLocField(dst, _, local)
         | Instr::MutBorrowLocField(dst, _, local)
         | Instr::ReadLocalField(dst, _, local) => {
@@ -520,7 +520,7 @@ fn visit_slots<const DEFS: bool, const USES: bool>(
             storage_use::<USES>(*local, &mut f);
         },
         // `local` is both a def (a field is written in-place) and a
-        // storage-location use (the other fields persist, so the slot
+        // place use (the other fields persist, so the slot
         // stays live with the same type after the write).
         Instr::WriteLocalField(_, local, val) => {
             def::<DEFS>(*local, &mut f);
@@ -630,9 +630,9 @@ fn rewrite_slots(slots: &mut [Slot], f: &mut impl FnMut(Slot) -> Slot) {
 /// Rewrite slot operands of an instruction in-place.
 ///
 /// - `DEFS` / `USES`: select which slots to rewrite (compile-time).
-/// - `SKIP_STORAGE_LOC_USE`: when true, storage-location uses are not
+/// - `SKIP_PLACE_USE`: when true, place uses are not
 ///   rewritten.
-fn rewrite_instr_slots<const DEFS: bool, const USES: bool, const SKIP_STORAGE_LOC_USE: bool>(
+fn rewrite_instr_slots<const DEFS: bool, const USES: bool, const SKIP_PLACE_USE: bool>(
     instr: &mut Instr,
     mut f: impl FnMut(Slot) -> Slot,
 ) {
@@ -748,12 +748,12 @@ fn rewrite_instr_slots<const DEFS: bool, const USES: bool, const SKIP_STORAGE_LO
             }
         },
 
-        // `src` is a storage-location use; skip it under SKIP_STORAGE_LOC_USE.
+        // `src` is a place use; skip it under SKIP_PLACE_USE.
         Instr::ImmBorrowLoc(dst, src) | Instr::MutBorrowLoc(dst, src) => {
             if DEFS {
                 rewrite_slot(dst, &mut f);
             }
-            if USES && !SKIP_STORAGE_LOC_USE {
+            if USES && !SKIP_PLACE_USE {
                 rewrite_slot(src, &mut f);
             }
         },
@@ -801,23 +801,23 @@ fn rewrite_instr_slots<const DEFS: bool, const USES: bool, const SKIP_STORAGE_LO
             }
         },
 
-        // `local` is a storage-location use, so skip it under
-        // SKIP_STORAGE_LOC_USE.
+        // `local` is a place use, so skip it under
+        // SKIP_PLACE_USE.
         Instr::ImmBorrowLocField(dst, _, local)
         | Instr::MutBorrowLocField(dst, _, local)
         | Instr::ReadLocalField(dst, _, local) => {
             if DEFS {
                 rewrite_slot(dst, &mut f);
             }
-            if USES && !SKIP_STORAGE_LOC_USE {
+            if USES && !SKIP_PLACE_USE {
                 rewrite_slot(local, &mut f);
             }
         },
         Instr::WriteLocalField(_, local, val) => {
-            // `local` is both a def and a storage-location use of one
+            // `local` is both a def and a place use of one
             // operand: rewrite once when either role is active. Under
-            // SKIP_STORAGE_LOC_USE only the use side is suppressed.
-            if DEFS || (USES && !SKIP_STORAGE_LOC_USE) {
+            // SKIP_PLACE_USE only the use side is suppressed.
+            if DEFS || (USES && !SKIP_PLACE_USE) {
                 rewrite_slot(local, &mut f);
             }
             if USES {

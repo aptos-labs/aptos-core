@@ -42,11 +42,11 @@ pub fn optimize_module(module_ir: &mut ModuleIR) {
 ///
 /// ## Two kinds of slot use
 /// 1. **Value use** — reads the slot's current value (e.g., `Add(dst, r, #5)`)
-/// 2. **Storage-location use** — takes a reference to the slot's storage location
+/// 2. **Place use** — takes a reference to the slot's place
 ///    (only `ImmBorrowLoc` and `MutBorrowLoc`)
 ///
 /// Copy propagation is sound for value uses (value equality suffices) but
-/// unsound for storage-location uses (identity of the slot matters).
+/// unsound for place uses (identity of the slot matters).
 /// `remap_source_slots_with` skips BorrowLoc sources to enforce this.
 ///
 /// ## The MutBorrowLoc hidden-write problem

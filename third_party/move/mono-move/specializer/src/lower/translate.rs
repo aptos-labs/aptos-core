@@ -956,7 +956,7 @@ impl<'a> LoweringState<'a> {
                 let (field_offset, _) = self.resolve_field(struct_ty, *fh)?;
                 let src_info = self.slot(*src)?;
                 let dst_info = self.def_slot(*dst)?;
-                self.emit(MicroOp::RefBumpImmOffset {
+                self.emit(MicroOp::DeriveRefOffsetImm {
                     dst_ref: dst_info.offset,
                     src_ref: src_info.offset,
                     offset: field_offset,
@@ -1129,7 +1129,7 @@ impl<'a> LoweringState<'a> {
         // Calls manage their own Xfer state in `lower_call`.
         if !clobbers_xfer(instr) {
             // Release Xfer bindings consumed by this instr's value uses.
-            // Storage-location uses leave the slot live, so their binding
+            // Place uses leave the slot live, so their binding
             // must persist for the GC to scan at the next safe point.
             for_each_value_use(instr, |s| {
                 if let Slot::Xfer(j) = s {

@@ -13,8 +13,8 @@ use crate::{
     },
     invariant_violation,
     memory::{
-        read_obj_size, read_ptr, read_u64, read_u8, vec_elem_ptr, write_ptr, write_u64,
-        MemoryRegion,
+        read_fat_ptr, read_obj_size, read_ptr, read_u64, read_u8, vec_elem_ptr, write_fat_ptr,
+        write_ptr, write_u64, MemoryRegion,
     },
     types::{
         StepResult, ABORT_MESSAGE_SIZE_LIMIT, DEFAULT_HEAP_SIZE, DEFAULT_STACK_SIZE,
@@ -981,9 +981,8 @@ impl<T: ExecutionContext + DescriptorProvider> InterpreterContext<'_, T> {
                 },
 
                 MicroOp::VecLen { dst, vec_ref } => {
-                    let ref_base = read_ptr(fp, vec_ref);
-                    let ref_off = read_u64(fp, vec_ref + 8) as usize;
-                    let vec_ptr = read_ptr(ref_base, ref_off);
+                    let (ref_base, ref_off) = read_fat_ptr(fp, vec_ref);
+                    let vec_ptr = read_ptr(ref_base, ref_off as usize);
                     let len = if vec_ptr.is_null() {
                         0
                     } else {
@@ -998,16 +997,14 @@ impl<T: ExecutionContext + DescriptorProvider> InterpreterContext<'_, T> {
                     elem_size,
                     descriptor_id,
                 } => {
-                    let ref_base = read_ptr(fp, vec_ref);
-                    let ref_off = read_u64(fp, vec_ref + 8) as usize;
-                    let mut vec_ptr = read_ptr(ref_base, ref_off);
+                    let (ref_base, ref_off) = read_fat_ptr(fp, vec_ref);
+                    let mut vec_ptr = read_ptr(ref_base, ref_off as usize);
 
                     if vec_ptr.is_null() {
                         vec_ptr = alloc_vec!(self, fp, descriptor_id, elem_size, 4)?;
                         // Re-read base after potential GC.
-                        let ref_base = read_ptr(fp, vec_ref);
-                        let ref_off = read_u64(fp, vec_ref + 8) as usize;
-                        write_ptr(ref_base, ref_off, vec_ptr);
+                        let (ref_base, ref_off) = read_fat_ptr(fp, vec_ref);
+                        write_ptr(ref_base, ref_off as usize, vec_ptr);
                     }
 
                     let len = read_u64(vec_ptr, VEC_LENGTH_OFFSET);
@@ -1032,9 +1029,8 @@ impl<T: ExecutionContext + DescriptorProvider> InterpreterContext<'_, T> {
                     vec_ref,
                     elem_size,
                 } => {
-                    let ref_base = read_ptr(fp, vec_ref);
-                    let ref_off = read_u64(fp, vec_ref + 8) as usize;
-                    let vec_ptr = read_ptr(ref_base, ref_off);
+                    let (ref_base, ref_off) = read_fat_ptr(fp, vec_ref);
+                    let vec_ptr = read_ptr(ref_base, ref_off as usize);
                     if vec_ptr.is_null() {
                         return Err(RuntimeError::PopFromEmptyVector);
                     }
@@ -1057,9 +1053,8 @@ impl<T: ExecutionContext + DescriptorProvider> InterpreterContext<'_, T> {
                     idx,
                     elem_size,
                 } => {
-                    let ref_base = read_ptr(fp, vec_ref);
-                    let ref_off = read_u64(fp, vec_ref + 8) as usize;
-                    let vec_ptr = read_ptr(ref_base, ref_off);
+                    let (ref_base, ref_off) = read_fat_ptr(fp, vec_ref);
+                    let vec_ptr = read_ptr(ref_base, ref_off as usize);
                     let idx = read_u64(fp, idx);
                     if vec_ptr.is_null() {
                         return Err(RuntimeError::VectorIndexOutOfBounds {
@@ -1089,9 +1084,8 @@ impl<T: ExecutionContext + DescriptorProvider> InterpreterContext<'_, T> {
                     src,
                     elem_size,
                 } => {
-                    let ref_base = read_ptr(fp, vec_ref);
-                    let ref_off = read_u64(fp, vec_ref + 8) as usize;
-                    let vec_ptr = read_ptr(ref_base, ref_off);
+                    let (ref_base, ref_off) = read_fat_ptr(fp, vec_ref);
+                    let vec_ptr = read_ptr(ref_base, ref_off as usize);
                     let idx = read_u64(fp, idx);
                     if vec_ptr.is_null() {
                         return Err(RuntimeError::VectorIndexOutOfBounds {
@@ -1122,9 +1116,8 @@ impl<T: ExecutionContext + DescriptorProvider> InterpreterContext<'_, T> {
                     idx,
                     elem_size,
                 } => {
-                    let ref_base = read_ptr(fp, vec_ref);
-                    let ref_off = read_u64(fp, vec_ref + 8) as usize;
-                    let vec_ptr = read_ptr(ref_base, ref_off);
+                    let (ref_base, ref_off) = read_fat_ptr(fp, vec_ref);
+                    let vec_ptr = read_ptr(ref_base, ref_off as usize);
                     let idx = read_u64(fp, idx);
                     if vec_ptr.is_null() {
                         return Err(RuntimeError::VectorIndexOutOfBounds {
@@ -1142,40 +1135,34 @@ impl<T: ExecutionContext + DescriptorProvider> InterpreterContext<'_, T> {
                         });
                     }
                     let offset = VEC_DATA_OFFSET as u64 + idx * elem_size as u64;
-                    write_ptr(fp, dst, vec_ptr);
-                    write_u64(fp, dst + 8, offset);
+                    write_fat_ptr(fp, dst, vec_ptr, offset);
                 },
 
                 MicroOp::SlotBorrow { dst, local } => {
-                    write_ptr(fp, dst, fp.add(local.into()));
-                    write_u64(fp, dst + 8, 0);
+                    write_fat_ptr(fp, dst, fp.add(local.into()), 0);
                 },
 
                 MicroOp::ReadRef { dst, ref_ptr, size } => {
-                    let base = read_ptr(fp, ref_ptr);
-                    let offset = read_u64(fp, ref_ptr + 8);
+                    let (base, offset) = read_fat_ptr(fp, ref_ptr);
                     let target = base.add(offset as usize);
                     // Overlap-safe `copy`: `dst` and `*ref` may alias.
                     std::ptr::copy(target, fp.add(dst.into()), size as usize);
                 },
 
                 MicroOp::WriteRef { ref_ptr, src, size } => {
-                    let base = read_ptr(fp, ref_ptr);
-                    let offset = read_u64(fp, ref_ptr + 8);
+                    let (base, offset) = read_fat_ptr(fp, ref_ptr);
                     let target = base.add(offset as usize);
                     // Overlap-safe `copy`: `src` and `*ref` may alias.
                     std::ptr::copy(fp.add(src.into()), target, size as usize);
                 },
 
-                MicroOp::RefBumpImmOffset {
+                MicroOp::DeriveRefOffsetImm {
                     dst_ref,
                     src_ref,
                     offset,
                 } => {
-                    let base = read_ptr(fp, src_ref);
-                    let src_off = read_u64(fp, src_ref + 8);
-                    write_ptr(fp, dst_ref, base);
-                    write_u64(fp, dst_ref + 8, src_off + offset as u64);
+                    let (base, src_off) = read_fat_ptr(fp, src_ref);
+                    write_fat_ptr(fp, dst_ref, base, src_off + offset as u64);
                 },
 
                 MicroOp::ReadRefOffset {
@@ -1184,8 +1171,7 @@ impl<T: ExecutionContext + DescriptorProvider> InterpreterContext<'_, T> {
                     offset,
                     size,
                 } => {
-                    let base = read_ptr(fp, ref_ptr);
-                    let ref_off = read_u64(fp, ref_ptr + 8);
+                    let (base, ref_off) = read_fat_ptr(fp, ref_ptr);
                     let target = base.add(ref_off as usize + offset as usize);
                     // Overlap-safe `copy`: `dst` and `*ref` may alias.
                     std::ptr::copy(target, fp.add(dst.into()), size as usize);
@@ -1197,8 +1183,7 @@ impl<T: ExecutionContext + DescriptorProvider> InterpreterContext<'_, T> {
                     src,
                     size,
                 } => {
-                    let base = read_ptr(fp, ref_ptr);
-                    let ref_off = read_u64(fp, ref_ptr + 8);
+                    let (base, ref_off) = read_fat_ptr(fp, ref_ptr);
                     let target = base.add(ref_off as usize + offset as usize);
                     // Overlap-safe `copy`: `src` and `*ref` may alias.
                     std::ptr::copy(fp.add(src.into()), target, size as usize);
@@ -1272,14 +1257,12 @@ impl<T: ExecutionContext + DescriptorProvider> InterpreterContext<'_, T> {
                     obj_ref,
                     offset,
                 } => {
-                    let ref_base = read_ptr(fp, obj_ref);
-                    let ref_off = read_u64(fp, obj_ref + 8) as usize;
-                    let obj_ptr = read_ptr(ref_base, ref_off);
+                    let (ref_base, ref_off) = read_fat_ptr(fp, obj_ref);
+                    let obj_ptr = read_ptr(ref_base, ref_off as usize);
                     // Unlike vectors, heap objects are never null — they
                     // are always allocated by HeapNew before being borrowed.
                     debug_assert!(!obj_ptr.is_null(), "HeapBorrow: null object pointer");
-                    write_ptr(fp, dst, obj_ptr);
-                    write_u64(fp, dst + 8, offset as u64);
+                    write_fat_ptr(fp, dst, obj_ptr, offset as u64);
                 },
 
                 MicroOp::Charge { cost } => {

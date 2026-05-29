@@ -553,7 +553,7 @@ impl<P: DescriptorProvider + ?Sized> FunctionVerifier<'_, P> {
                 self.check_frame_access(Some(pc), src, size);
             },
 
-            MicroOp::RefBumpImmOffset {
+            MicroOp::DeriveRefOffsetImm {
                 dst_ref, src_ref, ..
             } => {
                 self.check_frame_access(Some(pc), src_ref, 16);
