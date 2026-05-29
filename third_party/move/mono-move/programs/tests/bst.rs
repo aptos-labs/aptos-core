@@ -120,12 +120,14 @@ fn native_insert_remove_sequence() {
 
 #[cfg(feature = "micro-op")]
 mod micro_op {
-    use mono_move_core::{ExecutionContext, Function};
+    use mono_move_core::Function;
     use mono_move_programs::bst::{
         generate_ops, micro_op_bst, native_run_ops_with_results, FN_GET, FN_INSERT, FN_NEW,
         FN_REMOVE,
     };
-    use mono_move_runtime::{DescriptorProvider, InterpreterContext, LocalRuntimeContext};
+    use mono_move_runtime::{
+        DescriptorProvider, ExecutionContext, InterpreterContext, LocalRuntimeContext,
+    };
 
     fn bst_new<T: ExecutionContext + DescriptorProvider>(
         ctx: &mut InterpreterContext<'_, T>,

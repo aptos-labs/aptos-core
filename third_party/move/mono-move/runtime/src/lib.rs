@@ -4,14 +4,17 @@
 //! MonoVM runtime implementation.
 
 mod error;
+mod execution_context;
 pub(crate) mod heap;
 mod interpreter;
 mod local_runtime_context;
 pub(crate) mod memory;
+mod transaction_context;
 mod types;
 mod verifier;
 
 pub use error::{RuntimeError, RuntimeStatus};
+pub use execution_context::{ExecutionContext, LocalExecutionContext};
 pub use heap::pinned_roots::{PinGuard, PinnedRoots};
 pub use interpreter::InterpreterContext;
 pub use local_runtime_context::LocalRuntimeContext;
@@ -22,5 +25,6 @@ pub use mono_move_core::{
     DescriptorProvider, ObjectDescriptor, ObjectDescriptorTable, CLOSURE_DESCRIPTOR_ID,
     TRIVIAL_DESCRIPTOR_ID,
 };
+pub use transaction_context::TransactionContext;
 pub use types::{StepResult, VEC_DATA_OFFSET, VEC_LENGTH_OFFSET};
 pub use verifier::{verify_function, verify_program, VerificationError};

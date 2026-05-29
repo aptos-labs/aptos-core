@@ -5,6 +5,7 @@
 
 use mono_move_core::{ExecutionErrorKind, IntTy, IntoExecutionError};
 use mono_move_gas::GasExhaustedError;
+use mono_move_loader::LoaderError;
 use std::fmt;
 use thiserror::Error;
 
@@ -15,9 +16,8 @@ pub enum RuntimeError {
     #[error(transparent)]
     GasExhausted(#[from] GasExhaustedError),
 
-    // TODO: replace with a typed loader error once the loader has one.
     #[error(transparent)]
-    Loader(anyhow::Error),
+    Loader(#[from] LoaderError),
 
     #[error("{op}.{ty}: overflow")]
     ArithmeticOverflow { op: ArithOp, ty: IntTy },
@@ -80,8 +80,7 @@ impl IntoExecutionError for RuntimeError {
         match self {
             GasExhausted(_) => ExecutionErrorKind::OutOfGas,
 
-            // TODO: delegate to the loader's typed error once it has one.
-            Loader(_) => ExecutionErrorKind::Placeholder,
+            Loader(e) => e.kind(),
 
             ArithmeticOverflow { .. }
             | ArithmeticUnderflow { .. }

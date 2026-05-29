@@ -21,12 +21,12 @@
 //!   package atomically. Lowering is lazy: any function that needs information
 //!   outside the package is lowered during the first call.
 
+mod error;
 mod loader;
 mod module_provider;
 mod read_set;
-mod transaction_context;
 
+pub use error::{LoaderError, LoaderResult};
 pub use loader::{Loader, LoadingPolicy, LoweringPolicy};
 pub use module_provider::ModuleProvider;
 pub use read_set::{ModuleRead, ModuleReadSet, ModuleState};
-pub use transaction_context::TransactionContext;

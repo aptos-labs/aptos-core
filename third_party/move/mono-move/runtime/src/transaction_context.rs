@@ -3,14 +3,17 @@
 
 //! Transaction context that wires the [`Loader`] into the interpreter's
 //! cross-module dispatch path.
+//
+// TODO: move out of the runtime once a layer above it exists.
 
-use crate::{read_set::ModuleReadSet, Loader};
+use crate::ExecutionContext;
 use mono_move_core::{
     interner::{InternedIdentifier, InternedModuleId},
     types::InternedTypeList,
-    DescriptorId, DescriptorProvider, ExecutionContext, FunctionPtr, ObjectDescriptor,
+    DescriptorId, DescriptorProvider, FunctionPtr, ObjectDescriptor,
 };
 use mono_move_gas::GasMeter;
+use mono_move_loader::{Loader, LoaderResult, ModuleReadSet};
 
 /// Per-transaction execution context. Maintains per-transaction state
 /// (gas meter, read-set of loaded modules) and serves the interpreter's
@@ -48,7 +51,7 @@ impl<'guard, 'ctx, G: GasMeter> ExecutionContext for TransactionContext<'guard, 
         module_id: InternedModuleId,
         name: InternedIdentifier,
         ty_args: InternedTypeList,
-    ) -> anyhow::Result<FunctionPtr> {
+    ) -> LoaderResult<FunctionPtr> {
         self.loader.load_function(
             &mut self.read_set,
             &mut self.gas_meter,
