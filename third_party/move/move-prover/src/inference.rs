@@ -41,8 +41,7 @@ use move_model::{
 };
 use move_prover_bytecode_pipeline::pipeline_factory;
 use move_stackless_bytecode::{
-    function_target_pipeline::{FunctionTargetsHolder, FunctionVariant},
-    print_targets_with_annotations_for_test,
+    function_target_pipeline::FunctionTargetsHolder, print_targets_with_annotations_for_test,
 };
 use std::{
     fs,
@@ -142,33 +141,7 @@ fn run_spec_inference_inner<W: WriteColor>(
             if func_env.is_test_only() {
                 continue;
             }
-            if func_env.is_inline() && func_env.has_fun_spec() {
-                let data = move_compiler_v2::bytecode_generator::generate_bytecode(
-                    env,
-                    func_env.get_qualified_id(),
-                );
-                targets.insert_target_data(
-                    &func_env.get_qualified_id(),
-                    FunctionVariant::Baseline,
-                    data,
-                );
-                continue;
-            }
-            if let Some(def) = func_env.get_def() {
-                if move_compiler_v2::def_has_opaque_inline_spec_call(env, def) {
-                    let data = move_compiler_v2::bytecode_generator::generate_bytecode(
-                        env,
-                        func_env.get_qualified_id(),
-                    );
-                    targets.insert_target_data(
-                        &func_env.get_qualified_id(),
-                        FunctionVariant::Baseline,
-                        data,
-                    );
-                    continue;
-                }
-            }
-            targets.add_target(&func_env)
+            crate::add_prover_target(&mut targets, env, &func_env);
         }
     }
 

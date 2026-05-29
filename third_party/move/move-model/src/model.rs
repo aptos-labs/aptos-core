@@ -2240,6 +2240,18 @@ impl GlobalEnv {
             .map(|module| module.into_function(fun.id))
     }
 
+    /// Looks up the `FunctionEnv` for `fun`, returning `None` if either the module or
+    /// the function within it has been removed from the env. Unlike `get_function_opt`,
+    /// this does NOT panic when the module exists but the function entry has been
+    /// removed (e.g., inline functions pruned by `inliner::run_inlining`).
+    pub fn find_function(&self, fun: QualifiedId<FunId>) -> Option<FunctionEnv<'_>> {
+        let module = self.get_module_opt(fun.module_id)?;
+        if !module.data.function_data.contains_key(&fun.id) {
+            return None;
+        }
+        Some(module.into_function(fun.id))
+    }
+
     /// Sets the AST based definition of the function.
     pub fn set_function_def(&mut self, fun: QualifiedId<FunId>, def: Exp) {
         let data = self
@@ -5468,10 +5480,17 @@ impl<'env> FunctionEnv<'env> {
 
     /// Returns true if this function has no verified bytecode, meaning it should
     /// be skipped by prover pipeline processors that analyze or instrument code.
-    /// This includes non-compiled functions (native, inline, lemma) and intrinsic
-    /// functions (which have opaque semantics defined by the prover).
+    /// This includes natives, lemmas, intrinsics (opaque semantics defined by the
+    /// prover), and inline functions WITHOUT a function-level spec. Inline
+    /// functions WITH a function-level spec do have verified bytecode — the
+    /// prover generates it from the AST via `add_prover_target` — so they must
+    /// be visible to compositional analyses (e.g. borrow summaries) like a
+    /// normal compiled function.
     pub fn no_verified_bytecode(&self) -> bool {
-        !self.is_compiled() || self.is_intrinsic()
+        self.is_native()
+            || self.is_lemma()
+            || self.is_intrinsic()
+            || (self.is_inline() && !self.has_fun_spec())
     }
 
     /// Returns kind of this function.
@@ -5888,7 +5907,14 @@ impl<'env> FunctionEnv<'env> {
                 reachable_funcs.push_back(self.clone());
                 while let Some(fnc) = reachable_funcs.pop_front() {
                     for callee in fnc.get_used_functions().expect("call info available") {
-                        let f = env.get_function(*callee);
+                        // Same robustness as in
+                        // `get_transitive_closure_of_called_functions`: stale
+                        // `used_funs` entries may point at functions that have been
+                        // removed from the env.
+                        let Some(f) = env.find_function(*callee) else {
+                            set.insert(*callee);
+                            continue;
+                        };
                         if set.insert(f.get_qualified_id()) {
                             reachable_funcs.push_back(f);
                         }
@@ -6021,7 +6047,14 @@ impl<'env> FunctionEnv<'env> {
                 reachable_funcs.push_back(self.clone());
                 while let Some(fnc) = reachable_funcs.pop_front() {
                     for callee in fnc.get_called_functions().expect("call info available") {
-                        let f = env.get_function(*callee);
+                        // The cached `called_funs` set on a function may reference
+                        // functions that have since been removed from the env (e.g.,
+                        // inline functions pruned by the inliner). Treat such callees
+                        // as having no further callees rather than panicking.
+                        let Some(f) = env.find_function(*callee) else {
+                            set.insert(*callee);
+                            continue;
+                        };
                         if set.insert(f.get_qualified_id()) {
                             reachable_funcs.push_back(f);
                         }

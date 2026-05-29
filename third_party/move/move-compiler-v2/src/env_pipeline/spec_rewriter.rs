@@ -92,10 +92,15 @@ pub fn run_spec_rewriter(env: &mut GlobalEnv) {
         };
         for callee in callees {
             called_funs.insert(callee);
-            let mut transitive = env
-                .get_function(callee)
-                .get_transitive_closure_of_called_functions();
-            called_funs.append(&mut transitive);
+            // Callees referenced from specs can outlive their definitions in the env
+            // — for example, an inline function called from a spec is removed from
+            // the env by the inliner when `KEEP_INLINE_FUNS` is off. Skip such
+            // callees instead of panicking; without a body in the env there is no
+            // transitive closure to add.
+            if let Some(callee_env) = env.find_function(callee) {
+                let mut transitive = callee_env.get_transitive_closure_of_called_functions();
+                called_funs.append(&mut transitive);
+            }
         }
     }
 

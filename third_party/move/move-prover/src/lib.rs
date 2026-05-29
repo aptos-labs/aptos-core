@@ -14,7 +14,9 @@ use log::{debug, info, warn};
 use log::{log_enabled, Level};
 use move_compiler_v2::Experiment;
 use move_model::{
-    code_writer::CodeWriter, metadata::LATEST_STABLE_COMPILER_VERSION_VALUE, model::GlobalEnv,
+    code_writer::CodeWriter,
+    metadata::LATEST_STABLE_COMPILER_VERSION_VALUE,
+    model::{FunctionEnv, GlobalEnv},
 };
 use move_prover_boogie_backend::{
     add_prelude, boogie_wrapper::BoogieWrapper, bytecode_translator::BoogieTranslator,
@@ -260,6 +262,44 @@ pub fn verify_boogie(
     Ok(())
 }
 
+/// Adds a single function to the prover's targets, choosing between the AST-based
+/// bytecode generator and the legacy compiled-module-based one. The AST-based path
+/// is used in two cases that the legacy generator cannot handle correctly:
+///
+/// 1. Inline functions with a function-level spec. These have no entry in the
+///    compiled module (inline funs are never emitted to the file format), so the
+///    legacy generator (which reads from the compiled module) has no bytecode to
+///    work with.
+/// 2. Non-inline callers that retain a preserved call to an opaque inline function
+///    with a function-level spec. The compiled module attached to the env was
+///    produced from the fully-inlined version of the AST, so the legacy generator
+///    would lose the call op. The AST has since been restored to the
+///    call-preserving form, so we go through the AST-based generator to make the
+///    call visible to spec instrumentation.
+pub(crate) fn add_prover_target(
+    targets: &mut FunctionTargetsHolder,
+    env: &GlobalEnv,
+    func_env: &FunctionEnv<'_>,
+) {
+    let use_ast_generator = (func_env.is_inline() && func_env.has_fun_spec())
+        || func_env
+            .get_def()
+            .is_some_and(|def| move_compiler_v2::def_has_opaque_inline_spec_call(env, def));
+    if use_ast_generator {
+        let data = move_compiler_v2::bytecode_generator::generate_bytecode(
+            env,
+            func_env.get_qualified_id(),
+        );
+        targets.insert_target_data(
+            &func_env.get_qualified_id(),
+            FunctionVariant::Baseline,
+            data,
+        );
+    } else {
+        targets.add_target(func_env);
+    }
+}
+
 /// Create bytecode and process it.
 pub fn create_and_process_bytecode(options: &Options, env: &GlobalEnv) -> FunctionTargetsHolder {
     let mut targets = FunctionTargetsHolder::default();
@@ -286,44 +326,7 @@ pub fn create_and_process_bytecode(options: &Options, env: &GlobalEnv) -> Functi
                 // spurious invariant failures from DataInvariantInstrumentationProcessor.
                 continue;
             }
-            if func_env.is_inline() && func_env.has_fun_spec() {
-                // Inline functions with a function-level spec are verified against
-                // their spec like any other function. They have no compiled module
-                // entry (inline funs are never emitted to the file format), so the
-                // legacy `add_target` path can't produce bytecode for them. Use the
-                // AST-based bytecode generator from compiler-v2 instead and insert
-                // the resulting baseline data directly.
-                let data = move_compiler_v2::bytecode_generator::generate_bytecode(
-                    env,
-                    func_env.get_qualified_id(),
-                );
-                targets.insert_target_data(
-                    &func_env.get_qualified_id(),
-                    FunctionVariant::Baseline,
-                    data,
-                );
-                continue;
-            }
-            // Callers that contain a preserved call to an opaque inline function
-            // with a function-level spec must be generated from their AST: the
-            // file format bytecode attached to the env was produced from the
-            // fully-inlined version and has lost the call op, but the AST has
-            // been restored to the call-preserving form for our benefit.
-            if let Some(def) = func_env.get_def() {
-                if move_compiler_v2::def_has_opaque_inline_spec_call(env, def) {
-                    let data = move_compiler_v2::bytecode_generator::generate_bytecode(
-                        env,
-                        func_env.get_qualified_id(),
-                    );
-                    targets.insert_target_data(
-                        &func_env.get_qualified_id(),
-                        FunctionVariant::Baseline,
-                        data,
-                    );
-                    continue;
-                }
-            }
-            targets.add_target(&func_env)
+            add_prover_target(&mut targets, env, &func_env);
         }
     }
 
