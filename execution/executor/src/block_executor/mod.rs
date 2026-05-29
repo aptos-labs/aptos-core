@@ -269,10 +269,21 @@ where
                 )?
             };
 
-        // Record Executed(Keep/Retry/Discard) for traced txns in this block.
+        // Record Executed(Keep/Retry/Discard/Filtered) for traced txns in this
+        // block. Pass all three output sets so the tracer can distinguish
+        // pre-execution-filtered txns (deduped by hash before BlockSTM, e.g.
+        // because the same hash already committed in an earlier block) from
+        // VM-discarded ones. Without `keep_hashes`, the tracer would fall
+        // through to `Keep` for filtered txns and mislabel them.
         {
             let store = aptos_transaction_tracing::store::TransactionTraceStore::global();
             if store.is_enabled() {
+                let keep_hashes: Vec<HashValue> = execution_output
+                    .to_commit
+                    .transactions
+                    .iter()
+                    .map(|t| t.committed_hash())
+                    .collect();
                 let retry_hashes: Vec<HashValue> = execution_output
                     .to_retry
                     .transactions
@@ -285,7 +296,12 @@ where
                     .iter()
                     .map(|t| t.committed_hash())
                     .collect();
-                store.record_execution_result(&block_id, &retry_hashes, &discard_hashes);
+                store.record_execution_result(
+                    &block_id,
+                    &keep_hashes,
+                    &retry_hashes,
+                    &discard_hashes,
+                );
             }
         }
 

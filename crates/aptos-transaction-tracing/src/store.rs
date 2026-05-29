@@ -333,11 +333,21 @@ impl TransactionTraceStore {
         }
     }
 
-    /// Record execution results (Keep/Retry/Discard) for traced txns in a block.
-    /// Called from block_executor::execute_and_update_state after execution.
+    /// Record execution results (Keep/Retry/Discard/Filtered) for traced txns
+    /// in a block. Called from block_executor::execute_and_update_state after
+    /// execution.
+    ///
+    /// `keep_hashes`, `retry_hashes`, `discard_hashes` come from
+    /// `execution_output.to_commit/to_retry/to_discard`. A traced txn proposed
+    /// in this block but absent from all three sets was pre-filtered before
+    /// BlockSTM (most commonly: the prepare-block deduper saw the hash was
+    /// already committed in an earlier block) and is recorded as `Filtered`.
+    /// Without this fall-through case, deduped txns would be silently
+    /// mislabeled as `Keep`.
     pub fn record_execution_result(
         &self,
         block_id: &HashValue,
+        keep_hashes: &[HashValue],
         retry_hashes: &[HashValue],
         discard_hashes: &[HashValue],
     ) {
@@ -345,35 +355,30 @@ impl TransactionTraceStore {
             use crate::types::{ExecutionStatus, StageMetadata};
             let now = now_usecs();
 
+            let keep_set: std::collections::HashSet<HashValue> =
+                keep_hashes.iter().copied().collect();
             let retry_set: std::collections::HashSet<HashValue> =
                 retry_hashes.iter().copied().collect();
             let discard_set: std::collections::HashSet<HashValue> =
                 discard_hashes.iter().copied().collect();
 
             for hash in &traced_hashes {
-                if retry_set.contains(hash) {
-                    self.record_stage_with_metadata_at(
-                        hash,
-                        TransactionStage::Executed,
-                        StageMetadata::Execution(ExecutionStatus::Retry),
-                        now,
-                    );
+                let status = if keep_set.contains(hash) {
+                    ExecutionStatus::Keep
+                } else if retry_set.contains(hash) {
                     self.mark_retry(hash);
+                    ExecutionStatus::Retry
                 } else if discard_set.contains(hash) {
-                    self.record_stage_with_metadata_at(
-                        hash,
-                        TransactionStage::Executed,
-                        StageMetadata::Execution(ExecutionStatus::Discard),
-                        now,
-                    );
+                    ExecutionStatus::Discard
                 } else {
-                    self.record_stage_with_metadata_at(
-                        hash,
-                        TransactionStage::Executed,
-                        StageMetadata::Execution(ExecutionStatus::Keep),
-                        now,
-                    );
-                }
+                    ExecutionStatus::Filtered
+                };
+                self.record_stage_with_metadata_at(
+                    hash,
+                    TransactionStage::Executed,
+                    StageMetadata::Execution(status),
+                    now,
+                );
             }
         }
     }
@@ -781,6 +786,7 @@ fn log_trace(trace: &TransactionTrace) {
         match last_exec {
             Some(ExecutionStatus::Discard) => "discarded",
             Some(ExecutionStatus::Retry) => "retry_incomplete",
+            Some(ExecutionStatus::Filtered) => "filtered",
             _ => "unknown",
         }
     };
@@ -1177,6 +1183,57 @@ mod tests {
         assert_eq!(scalars.mempool_commit_ms, Some(3)); // (4500-1000)/1000 = 3
         assert_eq!(scalars.qs_batch_created_ms, None);
         assert_eq!(scalars.executed_status.as_deref(), Some("Keep"));
+    }
+
+    #[test]
+    fn test_record_execution_result_dispatches_all_four_statuses() {
+        use crate::types::{ExecutionStatus, StageMetadata};
+        let store = TransactionTraceStore::new();
+        let sender = AccountAddress::random();
+        let mut allowlist = std::collections::HashSet::new();
+        allowlist.insert(sender);
+        store.update_filter(TransactionFilter::new(true, allowlist, 1.0, 1.0));
+
+        let keep_hash = HashValue::random();
+        let retry_hash = HashValue::random();
+        let discard_hash = HashValue::random();
+        // Filtered = present in the block's traced set but in none of the
+        // three execution-output sets. Mirrors the duplicate-inclusion case
+        // where the prepare-block deduper drops the txn before BlockSTM
+        // because the same hash already committed in an earlier block.
+        let filtered_hash = HashValue::random();
+        for h in [keep_hash, retry_hash, discard_hash, filtered_hash] {
+            store.maybe_start_trace(h, sender, 0);
+        }
+        let block_id = HashValue::random();
+        store.register_block(block_id, vec![
+            keep_hash,
+            retry_hash,
+            discard_hash,
+            filtered_hash,
+        ]);
+
+        store.record_execution_result(&block_id, &[keep_hash], &[retry_hash], &[discard_hash]);
+
+        let last_exec_status = |h: &HashValue| -> Option<ExecutionStatus> {
+            let trace = store.get_trace(h).unwrap();
+            trace.stages.iter().rev().find_map(|s| match &s.metadata {
+                Some(StageMetadata::Execution(st)) => Some(*st),
+                _ => None,
+            })
+        };
+        assert_eq!(last_exec_status(&keep_hash), Some(ExecutionStatus::Keep));
+        assert_eq!(last_exec_status(&retry_hash), Some(ExecutionStatus::Retry));
+        assert_eq!(
+            last_exec_status(&discard_hash),
+            Some(ExecutionStatus::Discard)
+        );
+        assert_eq!(
+            last_exec_status(&filtered_hash),
+            Some(ExecutionStatus::Filtered),
+            "txn present in block but absent from keep/retry/discard sets must \
+             be tagged Filtered, not silently Keep"
+        );
     }
 
     #[test]
