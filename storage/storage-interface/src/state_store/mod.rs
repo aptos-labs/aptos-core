@@ -2,6 +2,7 @@
 // Licensed pursuant to the Innovation-Enabling Source Code License, available at https://github.com/aptos-labs/aptos-core/blob/main/LICENSE
 
 mod hot_state;
+pub mod leaf_entry;
 pub mod state;
 pub mod state_delta;
 pub mod state_summary;

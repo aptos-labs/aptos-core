@@ -23,7 +23,10 @@ use aptos_metrics_core::TimerHelper;
 use aptos_scratchpad::SparseMerkleTree;
 use aptos_storage_interface::{
     jmt_update_refs,
-    state_store::{state_with_summary::StateWithSummary, HotStateShardUpdates},
+    state_store::{
+        leaf_entry::leaf_entry_to_jmt_update, state_with_summary::StateWithSummary,
+        HotStateShardUpdates,
+    },
     Result,
 };
 use aptos_types::{
@@ -119,7 +122,8 @@ impl StateSnapshotCommitter {
                             let _timer = OTHER_TIMERS_SECONDS.timer_with(&["hash_jmt_updates"]);
                             updates
                                 .iter()
-                                .filter_map(|(_key_hash, slot)| slot.maybe_update_jmt(min_version))
+                                .filter(|(_key_hash, slot)| slot.passes_jmt_filter(min_version))
+                                .map(|(key_hash, slot)| leaf_entry_to_jmt_update(key_hash, &slot))
                                 .collect::<Vec<_>>()
                         })
                         .collect();
@@ -142,18 +146,18 @@ impl StateSnapshotCommitter {
                     // TODO(HotState): for now we use `is_descendant_of` to determine if hot state
                     // summary is computed at all. When it's not enabled everything is
                     // `SparseMerkleTree::new_empty()`.
-                    let hot_state_merkle_batch_opt = if snapshot
-                        .summary()
-                        .hot_state_summary
-                        .is_descendant_of(&self.last_snapshot.summary().hot_state_summary)
+                    let hot_state_merkle_batch_opt = if let (Some(new_hot), Some(old_hot)) = (
+                        snapshot.summary().hot_state_summary.as_ref(),
+                        self.last_snapshot.summary().hot_state_summary.as_ref(),
+                    ) && new_hot.is_descendant_of(old_hot)
                     {
                         self.state_db.hot_state_merkle_db.as_ref().map(|db| {
                             Self::merklize(
                                 db,
                                 base_version,
                                 version,
-                                &self.last_snapshot.summary().hot_state_summary,
-                                &snapshot.summary().hot_state_summary,
+                                old_hot,
+                                new_hot,
                                 hot_updates.try_into().expect("Must be 16 shards."),
                                 previous_epoch_ending_version,
                             )
