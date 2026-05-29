@@ -372,6 +372,13 @@ impl<P: DescriptorProvider + ?Sized> FunctionVerifier<'_, P> {
                 self.check_frame_access(Some(pc), op.dst, size);
             },
 
+            MicroOp::IntCast(op) => {
+                // Note: the Move bytecode permits casting from one integer type to self, effectively a no-op.
+                // Therefore we must NOT ban it here.
+                self.check_frame_access(Some(pc), op.src, op.from.byte_width() as u32);
+                self.check_frame_access(Some(pc), op.dst, op.to.byte_width() as u32);
+            },
+
             MicroOp::Move { dst, src, size } => {
                 self.check_nonzero_size(pc, size);
                 self.check_frame_access(Some(pc), src, size);

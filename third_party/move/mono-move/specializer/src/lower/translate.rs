@@ -15,8 +15,8 @@ use crate::stackless_exec_ir::{
 use anyhow::{bail, Context, Result};
 use mono_move_core::{
     types::{strip_ref, view_type, InternedType, Type},
-    CodeOffset, FrameLayoutInfo, FrameOffset, IntBinaryOp, IntNegateOp, IntOperand, IntShiftOp,
-    IntTy, MicroOp, SafePointEntry, ShiftOperand,
+    CodeOffset, FrameLayoutInfo, FrameOffset, IntBinaryOp, IntCastOp, IntNegateOp, IntOperand,
+    IntShiftOp, IntTy, MicroOp, SafePointEntry, ShiftOperand,
 };
 use move_binary_format::file_format::FieldHandleIndex;
 use move_core_types::account_address::AccountAddress;
@@ -198,6 +198,21 @@ impl<'a> LoweringState<'a> {
     /// when an interned pointer is needed instead.
     fn slot_type(&self, slot: Slot) -> Result<&'static Type> {
         Ok(view_type(self.slot_interned_type(slot)?))
+    }
+
+    /// Emit an `IntCast` to `to` from `src` into `dst`. The source type comes
+    /// from `src`'s slot type and the `to` type is supplied by the caller.
+    fn lower_cast(&mut self, dst: Slot, src: Slot, to: IntTy) -> Result<()> {
+        let from = IntTy::from_type(self.slot_type(src)?)
+            .ok_or_else(|| anyhow::anyhow!("cast source must be an integer type"))?;
+        let src_info = self.slot(src)?;
+        let dst_info = self.def_slot(dst)?;
+        self.emit(MicroOp::IntCast(IntCastOp {
+            from,
+            to,
+            dst: dst_info.offset,
+            src: src_info.offset,
+        }))
     }
 
     /// Size in bytes of `ref_slot`'s pointee.
@@ -625,6 +640,12 @@ impl<'a> LoweringState<'a> {
             },
 
             // --- Unary ops ---
+            Instr::UnaryOp(dst, op, src) if op.cast_target_ty().is_some() => {
+                let to = op
+                    .cast_target_ty()
+                    .expect("guard above ensures this is a cast");
+                self.lower_cast(*dst, *src, to)?;
+            },
             Instr::UnaryOp(dst, UnaryOp::Negate, src) => {
                 let src_ty = self.slot_type(*src)?;
                 let signed_ty = IntTy::from_type(src_ty)

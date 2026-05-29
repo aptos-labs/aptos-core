@@ -126,7 +126,9 @@ use std::fmt;
 mod gas;
 mod unspecialized;
 pub use gas::MicroOpGasSchedule;
-pub use unspecialized::{IntBinaryOp, IntNegateOp, IntOperand, IntShiftOp, IntTy, ShiftOperand};
+pub use unspecialized::{
+    IntBinaryOp, IntCastOp, IntNegateOp, IntOperand, IntShiftOp, IntTy, ShiftOperand,
+};
 
 /// A typed wrapper around a `u32` frame-pointer-relative byte offset.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -484,6 +486,7 @@ pub enum MicroOp {
     IntShl(IntShiftOp),
     IntShr(IntShiftOp),
     IntNegate(IntNegateOp),
+    IntCast(IntCastOp),
 
     //======================================================================
     // Control flow
@@ -1085,6 +1088,11 @@ impl fmt::Display for MicroOp {
             MicroOp::IntNegate(op) => {
                 write!(f, "IntNegate.{} [{}] <- -[{}]", op.ty, op.dst.0, op.src.0)
             },
+            MicroOp::IntCast(op) => write!(
+                f,
+                "IntCast.{}->{} [{}] <- [{}]",
+                op.from, op.to, op.dst.0, op.src.0
+            ),
             MicroOp::CallIndirect {
                 module_id,
                 func_name,
@@ -1596,6 +1604,7 @@ impl MicroOp {
             | MicroOp::IntShl(_)
             | MicroOp::IntShr(_)
             | MicroOp::IntNegate(_)
+            | MicroOp::IntCast(_)
             | MicroOp::Exists { .. }
             | MicroOp::BorrowGlobal { .. }
             | MicroOp::MoveTo { .. } => false,

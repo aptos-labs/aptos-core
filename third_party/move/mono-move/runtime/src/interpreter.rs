@@ -26,8 +26,8 @@ use crate::{
 };
 use mono_move_core::{
     storage::resource_provider::StorageKey, CallClosureOp, ClosureFuncRef, DescriptorId,
-    DescriptorProvider, FrameOffset, Function, IntBinaryOp, IntNegateOp, IntOperand, IntShiftOp,
-    IntTy, MicroOp, PackClosureOp, ShiftOperand, CAPTURED_DATA_TAG_MATERIALIZED,
+    DescriptorProvider, FrameOffset, Function, IntBinaryOp, IntCastOp, IntNegateOp, IntOperand,
+    IntShiftOp, IntTy, MicroOp, PackClosureOp, ShiftOperand, CAPTURED_DATA_TAG_MATERIALIZED,
     CAPTURED_DATA_TAG_OFFSET, CAPTURED_DATA_VALUES_OFFSET, CLOSURE_CAPTURED_DATA_PTR_OFFSET,
     CLOSURE_DESCRIPTOR_ID, CLOSURE_FUNC_REF_OFFSET, CLOSURE_MASK_OFFSET, FRAME_METADATA_SIZE,
     FUNC_REF_PAYLOAD_OFFSET, FUNC_REF_TAG_OFFSET, FUNC_REF_TAG_RESOLVED, MAX_ALIGN,
@@ -669,6 +669,56 @@ unsafe fn exec_int_negate(fp: *mut u8, op: &IntNegateOp) -> RuntimeResult<()> {
                 });
             },
         }
+        Ok(())
+    }
+}
+
+// Helper macro to dispatch based on an [`IntTy`] tag.
+macro_rules! dispatch_int_ty {
+    ($ty:expr, $action:ident) => {
+        match $ty {
+            IntTy::U8 => $action!(u8),
+            IntTy::U16 => $action!(u16),
+            IntTy::U32 => $action!(u32),
+            IntTy::U64 => $action!(u64),
+            IntTy::U128 => $action!(u128),
+            IntTy::U256 => $action!(U256),
+            IntTy::I8 => $action!(i8),
+            IntTy::I16 => $action!(i16),
+            IntTy::I32 => $action!(i32),
+            IntTy::I64 => $action!(i64),
+            IntTy::I128 => $action!(i128),
+            IntTy::I256 => $action!(I256),
+        }
+    };
+}
+
+/// Executes an `IntCast` operation. Handles all possible pairs of integer types.
+///
+/// # Safety
+///
+/// Same as [`exec_int_add`].
+#[inline(never)]
+unsafe fn exec_int_cast(fp: *mut u8, op: &IntCastOp) -> RuntimeResult<()> {
+    unsafe {
+        macro_rules! cast_from {
+            ($src_ty:ty) => {{
+                let src_val: $src_ty = read_int::<$src_ty>(fp, op.src);
+                macro_rules! cast_to {
+                    ($dst_ty: ty) => {{
+                        let result: $dst_ty = <$dst_ty>::try_from(src_val).map_err(|_| {
+                            RuntimeError::CastOutOfRange {
+                                from: op.from,
+                                to: op.to,
+                            }
+                        })?;
+                        write_int::<$dst_ty>(fp, op.dst, result);
+                    }};
+                }
+                dispatch_int_ty!(op.to, cast_to);
+            }};
+        }
+        dispatch_int_ty!(op.from, cast_from);
         Ok(())
     }
 }
@@ -1334,6 +1384,7 @@ impl<T: ExecutionContext + DescriptorProvider> InterpreterContext<'_, T> {
                 MicroOp::IntShl(ref op) => exec_int_shl(fp, op)?,
                 MicroOp::IntShr(ref op) => exec_int_shr(fp, op)?,
                 MicroOp::IntNegate(ref op) => exec_int_negate(fp, op)?,
+                MicroOp::IntCast(ref op) => exec_int_cast(fp, op)?,
 
                 MicroOp::Exists { addr, ty, dst } => {
                     let address = read_address(fp, addr);
