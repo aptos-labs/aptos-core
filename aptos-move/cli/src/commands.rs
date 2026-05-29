@@ -395,6 +395,12 @@ impl CliCommand<()> for InitPackage {
 
 /// Compiles a package and returns the associated ModuleIds
 #[derive(Parser)]
+#[clap(after_help = "Examples:
+  # Compile the package in the current directory
+  $ aptos move compile
+
+  # Compile a package in another directory with named addresses
+  $ aptos move compile --package-dir ./my_dapp --named-addresses alice=0xc0ffee")]
 pub struct CompilePackage {
     /// Save the package metadata in the package's build directory
     ///
