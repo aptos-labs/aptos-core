@@ -188,6 +188,11 @@ pub enum Instr {
     // --- Struct (second field is the interned struct `Type`; generic
     // variants additionally carry an interned type-argument list) ---
     //
+    // Contract: for the non-generic `Pack` / `Unpack`, the carried
+    // `InternedType` MUST be a fully-substituted concrete `Type::Nominal`
+    // — no `Type::TypeParam` in any constituent, and its `NominalLayout`
+    // must be populated.
+    //
     // TODO: depending on how we pre-intern types, we may be able to unify
     // some of instructions here.
     Pack(Slot, InternedType, Vec<Slot>),
@@ -229,6 +234,16 @@ pub enum Instr {
     ReadVariantFieldGeneric(Slot, VariantFieldInstantiationIndex, Slot),
     WriteVariantField(VariantFieldHandleIndex, Slot, Slot),
     WriteVariantFieldGeneric(VariantFieldInstantiationIndex, Slot, Slot),
+
+    // --- Fused inline-struct field access (borrow_loc + field op combined) ---
+    /// `dst = &local.field` (imm_borrow_loc + imm_borrow_field on an inline struct local)
+    ImmBorrowLocField(Slot, FieldHandleIndex, Slot),
+    /// `dst = &mut local.field`
+    MutBorrowLocField(Slot, FieldHandleIndex, Slot),
+    /// `dst = local.field` (imm_borrow_loc + read_field on an inline struct local)
+    ReadLocalField(Slot, FieldHandleIndex, Slot),
+    /// `local.field = src` (mut_borrow_loc + write_field on an inline struct local)
+    WriteLocalField(FieldHandleIndex, Slot, Slot),
 
     // --- Globals (struct type is the interned `Type` for the named
     // resource; generic variants carry the instantiated nominal) ---
@@ -334,6 +349,10 @@ impl Instr {
             Instr::ReadVariantFieldGeneric(..) => "ReadVariantFieldGeneric",
             Instr::WriteVariantField(..) => "WriteVariantField",
             Instr::WriteVariantFieldGeneric(..) => "WriteVariantFieldGeneric",
+            Instr::ImmBorrowLocField(..) => "ImmBorrowLocField",
+            Instr::MutBorrowLocField(..) => "MutBorrowLocField",
+            Instr::ReadLocalField(..) => "ReadLocalField",
+            Instr::WriteLocalField(..) => "WriteLocalField",
             Instr::Exists(..) => "Exists",
             Instr::ExistsGeneric(..) => "ExistsGeneric",
             Instr::MoveFrom(..) => "MoveFrom",

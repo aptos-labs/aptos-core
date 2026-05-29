@@ -94,18 +94,13 @@ fn package_policy_promotes_side_loaded_metered_module_on_function_call() {
     let mut gas = SimpleGasMeter::new(u64::MAX);
 
     // 1. `a::f` takes `b::S` by value, so lowering it walks `S` and side-loads
-    //    `b` as a metered read. The specializer doesn't yet derive GC layouts
-    //    for nominal home slots, so `try_lower_function` returns the skip
-    //    reason — but the read-set effects (side-loaded + metered `b`) have
-    //    already been committed by the requirements walker that runs first.
-    let err = match loader.load_function(&mut read_set, &mut gas, id_a, name_f, EMPTY_TYPE_LIST) {
-        Ok(_) => panic!("load_function(a::f) must surface the nominal-type skip"),
-        Err(e) => e,
-    };
-    assert!(
-        err.to_string().contains("nominal type not yet supported"),
-        "unexpected error: {err}"
-    );
+    //    `b` as a metered read. `S` is a concrete inline struct, so the
+    //    specializer derives its GC layout and `a::f` lowers successfully. That
+    //    layout-only side-load leaves `b` recorded as a metered read: only its
+    //    layout was needed, so its mandatory-dependency set isn't computed yet.
+    loader
+        .load_function(&mut read_set, &mut gas, id_a, name_f, EMPTY_TYPE_LIST)
+        .expect("load_function(a::f) must lower now that inline structs are supported");
     assert!(
         matches!(
             read_set.get(id_b_key),
@@ -114,7 +109,7 @@ fn package_policy_promotes_side_loaded_metered_module_on_function_call() {
                 ..
             })
         ),
-        "expected `b` to be recorded as a metered side-load after the failed `a::f` lowering"
+        "expected `b` to be recorded as a metered side-load after lowering `a::f`"
     );
 
     // 2. `b::g` is nominal-free, so dispatching to it succeeds. The package

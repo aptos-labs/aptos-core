@@ -9,7 +9,7 @@ use super::{
     parallel_copy,
 };
 use crate::stackless_exec_ir::{
-    instr_utils::{clobbers_xfer, for_each_use},
+    instr_utils::{clobbers_xfer, for_each_value_use},
     BinaryOp, CmpOp, FunctionIR, ImmValue, Instr, Label, Slot, UnaryOp,
 };
 use anyhow::{bail, Context, Result};
@@ -18,6 +18,7 @@ use mono_move_core::{
     CodeOffset, FrameLayoutInfo, FrameOffset, IntBinaryOp, IntNegateOp, IntOperand, IntShiftOp,
     IntTy, MicroOp, SafePointEntry, ShiftOperand,
 };
+use move_binary_format::file_format::FieldHandleIndex;
 use move_core_types::account_address::AccountAddress;
 
 /// Lower a slot-allocated function to its micro-op form.
@@ -40,8 +41,8 @@ pub(super) fn lower_function(
             "xfer_bindings not fully cleared at block boundary",
         );
         debug_assert!(
-            state.pending_def_bind.is_none(),
-            "pending_def_bind not committed at block boundary",
+            state.pending_def_binds.is_empty(),
+            "pending_def_binds not committed at block boundary",
         );
         state.xfer_bindings.fill(None);
         state.label_map[block.label.0 as usize] = Some(state.out_buf.len() as u32);
@@ -80,10 +81,10 @@ struct LoweringState<'a> {
     /// live value visible to the GC; `None` otherwise. Length
     /// `ctx.num_xfer_positions`.
     xfer_bindings: Vec<Option<TypedSlot>>,
-    /// Holds at most one pending Xfer binding. `Some((j, ts))`
-    /// means `Xfer(j)` is to be bound to typed slot `ts`; `None`
-    /// means no binding is pending.
-    pending_def_bind: Option<(u16, TypedSlot)>,
+    /// Xfer bindings staged by the current IR instruction's defs and
+    /// committed by `commit_xfer_bindings_after`. Each tuple is
+    /// `(j, typed_slot)`: the Xfer position `j` and the value bound there.
+    pending_def_binds: Vec<(u16, TypedSlot)>,
     /// Safe-point entries in code-offset order. Populated by `emit`
     /// when `op.is_allocating()`.
     pending_safe_points: Vec<SafePointEntry>,
@@ -100,9 +101,28 @@ impl<'a> LoweringState<'a> {
             call_site_cursor: 0,
             home_slot_types: &func_ir.home_slot_types,
             xfer_bindings: vec![None; num_xfer_positions],
-            pending_def_bind: None,
+            pending_def_binds: Vec::new(),
             pending_safe_points: Vec::new(),
         }
+    }
+
+    /// Resolve a `FieldHandleIndex` against the struct type `struct_ty`
+    /// and return `(field_byte_offset, field_byte_size)`.
+    fn resolve_field(&self, struct_ty: InternedType, fh: FieldHandleIndex) -> Result<(u32, u32)> {
+        let layout = view_type(struct_ty)
+            .layout()
+            .ok_or_else(|| anyhow::anyhow!("struct type has no layout populated"))?;
+        let fields = layout
+            .field_layouts()
+            .ok_or_else(|| anyhow::anyhow!("nominal type is not a struct (no field layouts)"))?;
+        let pos = self.ctx.module.field_position_at(fh) as usize;
+        let field = fields
+            .get(pos)
+            .ok_or_else(|| anyhow::anyhow!("field index {} out of range for struct", pos))?;
+        let (size, _) = view_type(field.ty())
+            .size_and_align()
+            .ok_or_else(|| anyhow::anyhow!("field type has no concrete size"))?;
+        Ok((field.offset, size))
     }
 
     fn xfer_binding(&self, j: u16) -> Result<TypedSlot> {
@@ -121,18 +141,14 @@ impl<'a> LoweringState<'a> {
     /// Returns layout info for a destination slot. For
     /// `Slot::Xfer(j)`, stages a pending binding from `Xfer(j)` to
     /// the typed slot at arg position `j` of the upcoming call.
-    /// Errors if a binding is already staged or for `Slot::Vid`.
+    /// Errors for `Slot::Vid`.
     fn def_slot(&mut self, slot: Slot) -> Result<SlotInfo> {
         Ok(match slot {
             Slot::Home(i) => self.ctx.home_slots[i as usize],
             Slot::Xfer(j) => {
                 let call_site = &self.ctx.call_sites[self.call_site_cursor];
                 let typed_slot = call_site.arg_slots[j as usize];
-                debug_assert!(
-                    self.pending_def_bind.is_none(),
-                    "second Xfer def_slot in one IR instr",
-                );
-                self.pending_def_bind = Some((j, typed_slot));
+                self.pending_def_binds.push((j, typed_slot));
                 typed_slot.slot
             },
             Slot::Vid(i) => bail!("Vid({}) in post-allocation IR", i),
@@ -889,6 +905,219 @@ impl<'a> LoweringState<'a> {
                 })?;
             },
 
+            // --- Inline-struct: by-value ---
+            //
+            // The struct lives in a frame slot at compile-time-known offset;
+            // the field's absolute frame offset is therefore also compile-time.
+            // No fat pointer is materialized.
+            Instr::ImmBorrowLocField(dst, fh, local) | Instr::MutBorrowLocField(dst, fh, local) => {
+                let struct_ty = self.slot_interned_type(*local)?;
+                let (field_offset, _) = self.resolve_field(struct_ty, *fh)?;
+                let local_info = self.slot(*local)?;
+                let dst_info = self.def_slot(*dst)?;
+                self.emit(MicroOp::SlotBorrow {
+                    dst: dst_info.offset,
+                    local: FrameOffset(local_info.offset.0 + field_offset),
+                })?;
+            },
+            Instr::ReadLocalField(dst, fh, local) => {
+                let struct_ty = self.slot_interned_type(*local)?;
+                let (field_offset, field_size) = self.resolve_field(struct_ty, *fh)?;
+                let local_info = self.slot(*local)?;
+                let dst_info = self.def_slot(*dst)?;
+                let src = SlotInfo {
+                    offset: FrameOffset(local_info.offset.0 + field_offset),
+                    size: field_size,
+                    align: local_info.align,
+                };
+                self.emit_single_move(dst_info.offset, src)?;
+            },
+            Instr::WriteLocalField(fh, local, val) => {
+                let struct_ty = self.slot_interned_type(*local)?;
+                let (field_offset, field_size) = self.resolve_field(struct_ty, *fh)?;
+                let local_info = self.slot(*local)?;
+                let val_info = self.slot(*val)?;
+                let src = SlotInfo {
+                    offset: val_info.offset,
+                    size: field_size,
+                    align: val_info.align,
+                };
+                self.emit_single_move(FrameOffset(local_info.offset.0 + field_offset), src)?;
+            },
+
+            // --- Inline-struct: by-ref ---
+            //
+            // The struct's location is only known at runtime via the fat
+            // pointer in `src` (or `dst_ref`). Use the offset-bearing ref
+            // micro-ops to fold the field offset into the address compute in a
+            // single dispatch.
+            Instr::ImmBorrowField(dst, fh, src) | Instr::MutBorrowField(dst, fh, src) => {
+                let struct_ty = strip_ref(self.slot_interned_type(*src)?)?;
+                let (field_offset, _) = self.resolve_field(struct_ty, *fh)?;
+                let src_info = self.slot(*src)?;
+                let dst_info = self.def_slot(*dst)?;
+                self.emit(MicroOp::DeriveRefOffsetImm {
+                    dst_ref: dst_info.offset,
+                    src_ref: src_info.offset,
+                    offset: field_offset,
+                })?;
+            },
+            Instr::ReadField(dst, fh, src) => {
+                let struct_ty = strip_ref(self.slot_interned_type(*src)?)?;
+                let (field_offset, field_size) = self.resolve_field(struct_ty, *fh)?;
+                let src_info = self.slot(*src)?;
+                let dst_info = self.def_slot(*dst)?;
+                self.emit(MicroOp::ReadRefOffset {
+                    dst: dst_info.offset,
+                    ref_ptr: src_info.offset,
+                    offset: field_offset,
+                    size: field_size,
+                })?;
+            },
+            Instr::WriteField(fh, dst_ref, val) => {
+                let struct_ty = strip_ref(self.slot_interned_type(*dst_ref)?)?;
+                let (field_offset, field_size) = self.resolve_field(struct_ty, *fh)?;
+                let ref_info = self.slot(*dst_ref)?;
+                let val_info = self.slot(*val)?;
+                self.emit(MicroOp::WriteRefOffset {
+                    ref_ptr: ref_info.offset,
+                    offset: field_offset,
+                    src: val_info.offset,
+                    size: field_size,
+                })?;
+            },
+
+            // --- Pack / Unpack: per-field byte copies between frame slots ---
+            //
+            // Per instance, emit fields in whichever order is overlap-safe
+            // for the resolved offsets: reverse if `reverse_emit_is_safe`,
+            // else forward if `forward_emit_is_safe`, else bail. A true
+            // copy cycle (which neither order resolves) needs a swap-style
+            // bytecode op which does not currently exist.
+            Instr::Pack(dst, struct_ty, args) => {
+                // `struct_ty` must be a concrete nominal with a populated layout.
+                let layout = view_type(*struct_ty)
+                    .layout()
+                    .ok_or_else(|| anyhow::anyhow!("Pack: struct_ty has no populated layout"))?;
+                let fields = layout.field_layouts().ok_or_else(|| {
+                    anyhow::anyhow!("Pack: nominal type is not a struct (no field layouts)")
+                })?;
+                if fields.len() != args.len() {
+                    bail!(
+                        "Pack: arg count {} does not match struct field count {}",
+                        args.len(),
+                        fields.len()
+                    );
+                }
+                let dst_info = self.def_slot(*dst)?;
+                let arg_infos = args
+                    .iter()
+                    .map(|s| self.slot(*s))
+                    .collect::<Result<Vec<_>>>()?;
+                // Pre-compute (size, align) per field once.
+                let field_widths: Vec<(u32, u32)> = fields
+                    .iter()
+                    .map(|field| {
+                        view_type(field.ty())
+                            .size_and_align()
+                            .ok_or_else(|| anyhow::anyhow!("Pack: field type has no concrete size"))
+                    })
+                    .collect::<Result<_>>()?;
+                let copies: Vec<_> = fields
+                    .iter()
+                    .zip(arg_infos.iter())
+                    .zip(field_widths.iter())
+                    .map(|((field, arg_info), &(size, _))| parallel_copy::Copy {
+                        src: arg_info.offset,
+                        dst: FrameOffset(dst_info.offset.0 + field.offset),
+                        width: size,
+                    })
+                    .collect();
+                let mut indices: Vec<usize> = (0..fields.len()).collect();
+                // TODO: check if we can have cheaper checks for reverse/forward emit safety
+                // in the presence of alignments.
+                if parallel_copy::reverse_emit_is_safe(&copies) {
+                    indices.reverse();
+                } else if !parallel_copy::forward_emit_is_safe(&copies) {
+                    bail!("Pack: neither reverse nor forward emit is overlap-safe");
+                }
+                for i in indices {
+                    let (size, align) = field_widths[i];
+                    self.emit_single_move(
+                        FrameOffset(dst_info.offset.0 + fields[i].offset),
+                        SlotInfo {
+                            offset: arg_infos[i].offset,
+                            size,
+                            align,
+                        },
+                    )?;
+                }
+            },
+            Instr::Unpack(dsts, struct_ty, src) => {
+                // See the `Instr::Pack` arm above for the `struct_ty` contract.
+                let layout = view_type(*struct_ty)
+                    .layout()
+                    .ok_or_else(|| anyhow::anyhow!("Unpack: struct_ty has no populated layout"))?;
+                let fields = layout.field_layouts().ok_or_else(|| {
+                    anyhow::anyhow!("Unpack: nominal type is not a struct (no field layouts)")
+                })?;
+                if fields.len() != dsts.len() {
+                    bail!(
+                        "Unpack: dst count {} does not match struct field count {}",
+                        dsts.len(),
+                        fields.len()
+                    );
+                }
+                let src_info = self.slot(*src)?;
+                // Pre-compute (size, align) per field and resolve each dst's
+                // SlotInfo. We do this in a separate pass so we can build the
+                // per-copy view the debug assert needs without interleaving
+                // it with the actual emit.
+                let mut field_widths = Vec::with_capacity(fields.len());
+                let mut dst_offsets = Vec::with_capacity(dsts.len());
+                for (field, dst) in fields.iter().zip(dsts.iter()) {
+                    let (size, align) =
+                        view_type(field.ty()).size_and_align().ok_or_else(|| {
+                            anyhow::anyhow!("Unpack: field type has no concrete size")
+                        })?;
+                    field_widths.push((size, align));
+                    let dst_info = self.def_slot(*dst)?;
+                    dst_offsets.push(dst_info.offset);
+                }
+                let copies: Vec<_> = fields
+                    .iter()
+                    .zip(dst_offsets.iter())
+                    .zip(field_widths.iter())
+                    .map(|((field, dst_off), &(size, _))| parallel_copy::Copy {
+                        src: FrameOffset(src_info.offset.0 + field.offset),
+                        dst: *dst_off,
+                        width: size,
+                    })
+                    .collect();
+                let mut indices: Vec<usize> = (0..fields.len()).collect();
+                if parallel_copy::reverse_emit_is_safe(&copies) {
+                    indices.reverse();
+                } else if !parallel_copy::forward_emit_is_safe(&copies) {
+                    bail!("Unpack: neither reverse nor forward emit is overlap-safe");
+                }
+                for i in indices {
+                    let (size, align) = field_widths[i];
+                    self.emit_single_move(dst_offsets[i], SlotInfo {
+                        offset: FrameOffset(src_info.offset.0 + fields[i].offset),
+                        size,
+                        align,
+                    })?;
+                }
+            },
+
+            // --- Generic and variant field forms: not yet lowered ---
+            Instr::ImmBorrowFieldGeneric(..)
+            | Instr::MutBorrowFieldGeneric(..)
+            | Instr::ReadFieldGeneric(..)
+            | Instr::WriteFieldGeneric(..) => {
+                bail!("generic field instruction not yet lowered")
+            },
+
             _ => bail!("instruction {} not yet lowered", instr.opcode_name()),
         }
 
@@ -899,20 +1128,36 @@ impl<'a> LoweringState<'a> {
     fn commit_xfer_bindings_after(&mut self, instr: &Instr) {
         // Calls manage their own Xfer state in `lower_call`.
         if !clobbers_xfer(instr) {
-            // Release Xfer bindings consumed by this instr's uses.
-            for_each_use(instr, |s| {
+            // Release Xfer bindings consumed by this instr's value uses.
+            // Place uses leave the slot live, so their binding
+            // must persist for the GC to scan at the next safe point.
+            for_each_value_use(instr, |s| {
                 if let Slot::Xfer(j) = s {
                     self.xfer_bindings[j as usize] = None;
                 }
             });
-            // Clear-then-commit so an instr that uses and re-defs
-            // the same `Xfer(j)` ends with the new value visible.
-            if let Some((j, ts)) = self.pending_def_bind.take() {
+            // Clear-then-commit so an instr that uses and re-defs the
+            // same `Xfer(j)` ends with the new value visible.
+            // Precolor guarantees distinct `j` per instr; assert it,
+            // since a duplicate would drop a `TypedSlot` and corrupt
+            // the safe-point heap-pointer map.
+            #[cfg(debug_assertions)]
+            {
+                let mut seen = shared_dsa::UnorderedSet::new();
+                for (j, _) in &self.pending_def_binds {
+                    debug_assert!(
+                        seen.insert(*j),
+                        "duplicate Xfer({}) staged for one IR instr",
+                        j,
+                    );
+                }
+            }
+            for (j, ts) in self.pending_def_binds.drain(..) {
                 self.xfer_bindings[j as usize] = Some(ts);
             }
         } else {
             debug_assert!(
-                self.pending_def_bind.is_none(),
+                self.pending_def_binds.is_empty(),
                 "calls must not leave a pending Xfer def bind",
             );
         }

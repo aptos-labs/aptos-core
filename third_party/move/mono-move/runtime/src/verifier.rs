@@ -553,6 +553,37 @@ impl<P: DescriptorProvider + ?Sized> FunctionVerifier<'_, P> {
                 self.check_frame_access(Some(pc), src, size);
             },
 
+            MicroOp::DeriveRefOffsetImm {
+                dst_ref, src_ref, ..
+            } => {
+                self.check_frame_access(Some(pc), src_ref, 16);
+                self.check_frame_access(Some(pc), dst_ref, 16);
+            },
+
+            MicroOp::ReadRefOffset {
+                dst,
+                ref_ptr,
+                offset,
+                size,
+            } => {
+                self.check_frame_access(Some(pc), ref_ptr, 16);
+                self.check_nonzero_size(pc, size);
+                self.check_ref_offset_size_no_overflow(pc, offset, size);
+                self.check_frame_access(Some(pc), dst, size);
+            },
+
+            MicroOp::WriteRefOffset {
+                ref_ptr,
+                offset,
+                src,
+                size,
+            } => {
+                self.check_frame_access(Some(pc), ref_ptr, 16);
+                self.check_nonzero_size(pc, size);
+                self.check_ref_offset_size_no_overflow(pc, offset, size);
+                self.check_frame_access(Some(pc), src, size);
+            },
+
             // ----- Heap object instructions -----
             MicroOp::HeapNew { dst, descriptor_id } => {
                 self.check_frame_access_8(pc, dst);
@@ -878,6 +909,17 @@ impl<P: DescriptorProvider + ?Sized> FunctionVerifier<'_, P> {
     fn check_nonzero_size(&mut self, pc: usize, size: u32) {
         if size == 0 {
             self.err(Some(pc), "size must be > 0");
+        }
+    }
+
+    /// Requires `offset + size` to fit in `u32`, so the access window
+    /// `[offset, offset + size)` cannot wrap.
+    fn check_ref_offset_size_no_overflow(&mut self, pc: usize, offset: u32, size: u32) {
+        if offset.checked_add(size).is_none() {
+            self.err(
+                Some(pc),
+                format!("offset {} + size {} overflows u32", offset, size),
+            );
         }
     }
 }

@@ -204,6 +204,11 @@ impl PreparedModule {
             .expect("Must be a struct")[h.field as usize]
     }
 
+    /// Returns the field's position within its owning struct.
+    pub fn field_position_at(&self, idx: FieldHandleIndex) -> u16 {
+        self.module.field_handle_at(idx).field
+    }
+
     /// Returns interned type corresponding to the compiled module's enum
     /// variant field.
     pub fn interned_variant_field_type_at(&self, idx: VariantFieldHandleIndex) -> InternedType {
