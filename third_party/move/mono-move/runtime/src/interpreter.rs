@@ -14,24 +14,24 @@ use crate::{
     },
     invariant_violation,
     memory::{
-        read_fat_ptr, read_obj_size, read_ptr, read_u64, read_u8, vec_elem_ptr, write_fat_ptr,
-        write_ptr, write_u64, MemoryRegion,
+        read_fat_ptr, read_ptr, read_u64, read_u8, vec_elem_ptr, write_fat_ptr, write_ptr,
+        write_u64, MemoryRegion,
     },
     types::{
         StepResult, ABORT_MESSAGE_SIZE_LIMIT, DEFAULT_HEAP_SIZE, DEFAULT_STACK_SIZE,
-        META_SAVED_FP_OFFSET, META_SAVED_FUNC_PTR_OFFSET, META_SAVED_PC_OFFSET, VEC_DATA_OFFSET,
-        VEC_LENGTH_OFFSET,
+        META_SAVED_FP_OFFSET, META_SAVED_FUNC_PTR_OFFSET, META_SAVED_PC_OFFSET,
+        VEC_CAPACITY_OFFSET, VEC_DATA_OFFSET, VEC_LENGTH_OFFSET,
     },
     ExecutionContext,
 };
 use mono_move_core::{
-    storage::resource_provider::StorageKey, CallClosureOp, ClosureFuncRef, DescriptorId,
-    DescriptorProvider, FrameOffset, Function, IntBinaryOp, IntNegateOp, IntOperand, IntShiftOp,
-    IntTy, MicroOp, PackClosureOp, ShiftOperand, CAPTURED_DATA_TAG_MATERIALIZED,
-    CAPTURED_DATA_TAG_OFFSET, CAPTURED_DATA_VALUES_OFFSET, CLOSURE_CAPTURED_DATA_PTR_OFFSET,
-    CLOSURE_DESCRIPTOR_ID, CLOSURE_FUNC_REF_OFFSET, CLOSURE_MASK_OFFSET, FRAME_METADATA_SIZE,
-    FUNC_REF_PAYLOAD_OFFSET, FUNC_REF_TAG_OFFSET, FUNC_REF_TAG_RESOLVED, MAX_ALIGN,
-    OBJECT_HEADER_SIZE,
+    storage::resource_provider::StorageKey, types::InternedType, CallClosureOp, ClosureFuncRef,
+    DescriptorProvider, FrameOffset, Function, IntBinaryOp, IntNegateOp,
+    IntOperand, IntShiftOp, IntTy, MicroOp, PackClosureOp, ShiftOperand,
+    CAPTURED_DATA_TAG_MATERIALIZED, CAPTURED_DATA_TAG_OFFSET, CAPTURED_DATA_VALUES_OFFSET,
+    CLOSURE_CAPTURED_DATA_PTR_OFFSET, CLOSURE_FUNC_REF_OFFSET, CLOSURE_MASK_OFFSET,
+    FRAME_METADATA_SIZE, FUNC_REF_PAYLOAD_OFFSET, FUNC_REF_TAG_OFFSET, FUNC_REF_TAG_RESOLVED,
+    MAX_ALIGN,
 };
 use mono_move_gas::GasMeter;
 use move_core_types::{
@@ -220,13 +220,9 @@ impl<'a, T: ExecutionContext + DescriptorProvider> InterpreterContext<'a, T> {
     /// Allocate a vector of `u64` values on the heap and return its address
     /// as a `u64` suitable for embedding in args. Useful for passing pre-built
     /// data into a program without generating initialization micro-ops.
-    pub fn alloc_u64_vec(
-        &mut self,
-        descriptor_id: DescriptorId,
-        values: &[u64],
-    ) -> RuntimeResult<u64> {
+    pub fn alloc_u64_vec(&mut self, vec_ty: InternedType, values: &[u64]) -> RuntimeResult<u64> {
         let n = values.len() as u64;
-        let ptr = alloc_vec!(self, self.frame_ptr, descriptor_id, 8, n)?;
+        let ptr = alloc_vec!(self, self.frame_ptr, vec_ty, 8, n)?;
         unsafe {
             write_u64(ptr, VEC_LENGTH_OFFSET, n);
             let data = ptr.add(VEC_DATA_OFFSET);
@@ -1042,22 +1038,20 @@ impl<T: ExecutionContext + DescriptorProvider> InterpreterContext<'_, T> {
                     vec_ref,
                     elem,
                     elem_size,
-                    descriptor_id,
+                    vec_ty,
                 } => {
                     let (ref_base, ref_off) = read_fat_ptr(fp, vec_ref);
                     let mut vec_ptr = read_ptr(ref_base, ref_off as usize);
 
                     if vec_ptr.is_null() {
-                        vec_ptr = alloc_vec!(self, fp, descriptor_id, elem_size, 4)?;
+                        vec_ptr = alloc_vec!(self, fp, vec_ty, elem_size, 4)?;
                         // Re-read base after potential GC.
                         let (ref_base, ref_off) = read_fat_ptr(fp, vec_ref);
                         write_ptr(ref_base, ref_off as usize, vec_ptr);
                     }
 
                     let len = read_u64(vec_ptr, VEC_LENGTH_OFFSET);
-                    let total = read_obj_size(vec_ptr) as usize;
-                    let cap_in_elems = ((total - OBJECT_HEADER_SIZE - VEC_DATA_OFFSET)
-                        / elem_size as usize) as u64;
+                    let cap_in_elems = read_u64(vec_ptr, VEC_CAPACITY_OFFSET);
 
                     if len >= cap_in_elems {
                         vec_ptr = grow_vec_ref!(self, fp, vec_ref.into(), elem_size, len + 1)?;
@@ -1237,8 +1231,8 @@ impl<T: ExecutionContext + DescriptorProvider> InterpreterContext<'_, T> {
                 },
 
                 // ----- Heap object instructions (structs and enums) -----
-                MicroOp::HeapNew { dst, descriptor_id } => {
-                    let ptr = alloc_obj!(self, fp, descriptor_id)?;
+                MicroOp::HeapNew { dst, ty } => {
+                    let ptr = alloc_obj!(self, fp, ty)?;
                     write_ptr(fp, dst, ptr);
                 },
 
@@ -1479,7 +1473,7 @@ impl<T: ExecutionContext + DescriptorProvider> InterpreterContext<'_, T> {
             // and leave `captured_data_ptr` as the zeroed/null value written
             // by `alloc_obj`. No pinning needed — only one allocation.
             if op.captured.is_empty() {
-                let closure = alloc_obj!(self, fp, CLOSURE_DESCRIPTOR_ID)?;
+                let closure = alloc_obj!(self, fp, op.func_ty)?;
                 self.write_closure_func_ref_and_mask(closure, op);
                 write_ptr(fp, op.dst, closure);
                 return Ok(());
@@ -1493,17 +1487,17 @@ impl<T: ExecutionContext + DescriptorProvider> InterpreterContext<'_, T> {
             // skipped). Pinning keeps the closure live across the second
             // allocation and lets GC update the pinned slot in-place if
             // the object is relocated.
-            let closure_ptr = alloc_obj!(self, fp, CLOSURE_DESCRIPTOR_ID)?;
+            let closure_ptr = alloc_obj!(self, fp, op.func_ty)?;
             let pin = self.pinned_roots.pin(NonNull::new_unchecked(closure_ptr));
 
             self.write_closure_func_ref_and_mask(pin.get().as_ptr(), op);
 
-            // SAFETY: the verifier guarantees `captured_data_descriptor_id`
-            // is `Some(CapturedData)` whenever `captured` is non-empty.
-            let captured_desc_id = op
-                .captured_data_descriptor_id
+            // SAFETY: the verifier guarantees `captured_data_ty` is `Some`
+            // whenever `captured` is non-empty.
+            let captured_ty = op
+                .captured_data_ty
                 .expect("verifier ensures Some when captured is non-empty");
-            let captured_data = alloc_obj!(self, fp, captured_desc_id)?;
+            let captured_data = alloc_obj!(self, fp, captured_ty)?;
             *captured_data.add(CAPTURED_DATA_TAG_OFFSET) = CAPTURED_DATA_TAG_MATERIALIZED;
 
             let mut captured_offset = CAPTURED_DATA_VALUES_OFFSET;

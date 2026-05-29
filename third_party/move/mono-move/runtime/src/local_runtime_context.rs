@@ -7,9 +7,9 @@
 use crate::{ExecutionContext, LocalExecutionContext};
 use mono_move_core::{
     interner::{InternedIdentifier, InternedModuleId},
-    types::InternedTypeList,
-    DescriptorId, DescriptorProvider, FunctionPtr, ObjectDescriptor, ObjectDescriptorTable,
-    ResourceProvider,
+    types::{InternedType, InternedTypeList},
+    DescriptorId, DescriptorProvider, FunctionPtr,
+    ObjectDescriptor, ObjectDescriptorTable, ResourceProvider,
 };
 use mono_move_gas::{GasMeter, NoOpGasMeter, SimpleGasMeter};
 use mono_move_loader::LoaderResult;
@@ -111,5 +111,9 @@ impl<'r, G: GasMeter> ExecutionContext for LocalRuntimeContext<'r, G> {
 impl<'r, G: GasMeter> DescriptorProvider for LocalRuntimeContext<'r, G> {
     fn descriptor(&self, id: DescriptorId) -> Option<&ObjectDescriptor> {
         self.descriptors.descriptor(id)
+    }
+
+    fn descriptor_id_for_type(&self, ty: InternedType) -> Option<DescriptorId> {
+        self.descriptors.descriptor_id_for_type(ty)
     }
 }

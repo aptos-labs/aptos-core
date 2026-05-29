@@ -13,9 +13,9 @@ use mono_move_core::{
     align::{checked_align_max, MAX_ALIGN},
     storage::resource_provider::StorageKey,
     types::InternedType,
-    DescriptorId, ResourceProvider, ResourceProviderError, StorageRead, OBJECT_HEADER_SIZE,
+    ResourceProvider, ResourceProviderError, StorageRead, OBJECT_HEADER_SIZE,
 };
-use mono_move_runtime::write_object_header;
+use mono_move_runtime::write_header_type;
 use move_core_types::account_address::AccountAddress;
 use std::{cell::RefCell, collections::HashMap, ptr::NonNull};
 
@@ -49,7 +49,7 @@ impl InMemoryResources {
     /// the data region, and keeps the box alive for the lifetime
     /// of `self`. Returns the data-region pointer the caller can
     /// embed into a parent payload (e.g., a struct field).
-    pub fn install_anchor(&self, descriptor_id: DescriptorId, payload: &[u8]) -> *mut u8 {
+    pub fn install_anchor(&self, ty: InternedType, payload: &[u8]) -> *mut u8 {
         let total = checked_align_max(OBJECT_HEADER_SIZE + payload.len())
             .expect("install_anchor: payload size overflows after alignment");
         debug_assert_eq!(MAX_ALIGN, 8, "Box<[u64]> alignment matches MAX_ALIGN");
@@ -59,7 +59,7 @@ impl InMemoryResources {
         // and the header at `obj_ptr - OBJECT_HEADER_SIZE` sits
         // inside the storage buffer.
         let obj_ptr = unsafe { (storage.as_mut_ptr() as *mut u8).add(OBJECT_HEADER_SIZE) };
-        unsafe { write_object_header(obj_ptr, descriptor_id, total as u32) };
+        unsafe { write_header_type(obj_ptr, ty) };
         if !payload.is_empty() {
             // SAFETY: source and destination spans don't overlap.
             unsafe { std::ptr::copy_nonoverlapping(payload.as_ptr(), obj_ptr, payload.len()) };
@@ -74,10 +74,9 @@ impl InMemoryResources {
         &self,
         addr: AccountAddress,
         ty: InternedType,
-        descriptor_id: DescriptorId,
         payload: &[u8],
     ) -> *const u8 {
-        let obj_ptr = self.install_anchor(descriptor_id, payload);
+        let obj_ptr = self.install_anchor(ty, payload);
         self.entries_install(addr, ty, obj_ptr);
         obj_ptr as *const u8
     }

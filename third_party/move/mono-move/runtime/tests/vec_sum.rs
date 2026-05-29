@@ -3,7 +3,7 @@
 
 use mono_move_alloc::GlobalArenaPtr;
 use mono_move_core::{
-    Code, CodeOffset as CO, FrameLayoutInfo, FrameOffset as FO, Function, MicroOp,
+    types::U64_TY, Code, CodeOffset as CO, FrameLayoutInfo, FrameOffset as FO, Function, MicroOp,
     SortedSafePointEntries,
 };
 use mono_move_runtime::{
@@ -26,7 +26,8 @@ fn make_vec_sum_program(n: u64) -> (Vec<Function>, ObjectDescriptorTable) {
     let slot_vec_ref: u32 = 32;
 
     let mut descriptors = ObjectDescriptorTable::new();
-    let desc_vec_u64 = descriptors.push(ObjectDescriptor::new_vector(8, vec![]).unwrap());
+    let vec_ty = U64_TY;
+    descriptors.push_for_type(vec_ty, ObjectDescriptor::new_vector(8, vec![]).unwrap());
 
     #[rustfmt::skip]
     let code = vec![
@@ -34,7 +35,7 @@ fn make_vec_sum_program(n: u64) -> (Vec<Function>, ObjectDescriptorTable) {
         SlotBorrow { dst: FO(slot_vec_ref), local: FO(slot_vec) },
         StoreImm8 { dst: FO(slot_i), imm: 0u64.to_le_bytes() },
         JumpGreaterEqualU64Imm { target: CO(9), src: FO(slot_i), imm: n },
-        VecPushBack { vec_ref: FO(slot_vec_ref), elem: FO(slot_i), elem_size: 8, descriptor_id: desc_vec_u64 },
+        VecPushBack { vec_ref: FO(slot_vec_ref), elem: FO(slot_i), elem_size: 8, vec_ty },
         StoreImm8 { dst: FO(slot_tmp), imm: 1u64.to_le_bytes() },
         AddU64 { dst: FO(slot_i), lhs: FO(slot_i), rhs: FO(slot_tmp) },
         JumpGreaterEqualU64Imm { target: CO(9), src: FO(slot_i), imm: n },

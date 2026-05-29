@@ -412,7 +412,10 @@ impl ResourceReadWriteSet {
     /// Relocate every working-map / journal `LocalHeap` pointer via
     /// the GC's [`RootScanner`]. Called from `gc_collect` alongside
     /// the call-stack and pinned-root scans.
-    pub(crate) fn scan(&mut self, scanner: &mut RootScanner<'_>) {
+    pub(crate) fn scan(
+        &mut self,
+        scanner: &mut RootScanner<'_, impl mono_move_core::DescriptorProvider + ?Sized>,
+    ) {
         for write in self
             .entries
             .values_mut()

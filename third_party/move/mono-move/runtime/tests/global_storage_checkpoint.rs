@@ -13,7 +13,7 @@ use common::InMemoryResources;
 use mono_move_alloc::GlobalArenaPtr;
 use mono_move_core::{
     types::{InternedType, Type},
-    Code, DescriptorId, FrameLayoutInfo, FrameOffset as FO, Function, MicroOp, ObjectDescriptor,
+    Code, FrameLayoutInfo, FrameOffset as FO, Function, MicroOp, ObjectDescriptor,
     ObjectDescriptorTable, SortedSafePointEntries,
 };
 use mono_move_gas::SimpleGasMeter;
@@ -33,10 +33,11 @@ fn resource_ty() -> InternedType {
     GlobalArenaPtr::from_static(&RESOURCE_TY_NODE)
 }
 
-fn fresh_descriptors() -> (ObjectDescriptorTable, DescriptorId) {
+fn fresh_descriptors() -> ObjectDescriptorTable {
     let mut table = ObjectDescriptorTable::new();
     let desc = table.push(ObjectDescriptor::new_struct(8, vec![]).unwrap());
-    (table, desc)
+    table.register_type(resource_ty(), desc);
+    table
 }
 
 fn addr(byte: u8) -> AccountAddress {
@@ -135,9 +136,9 @@ fn rollback_more_than_stack_depth_aborts() {
 
 #[test]
 fn rollback_restores_pre_mutation_state() {
-    let (descriptors, desc_id) = fresh_descriptors();
+    let descriptors = fresh_descriptors();
     let resources = InMemoryResources::new();
-    resources.install_global(addr(1), resource_ty(), desc_id, &make_resource(0xAAAA));
+    resources.install_global(addr(1), resource_ty(), &make_resource(0xAAAA));
     let mut exec_ctx = local_ctx_with(&resources, descriptors);
 
     let func = make_program(
@@ -194,9 +195,9 @@ fn rollback_of_move_from_then_move_to_restores_to_deleted() {
     //   4. MoveTo with fresh value (write becomes LocalHeap).
     //   5. rollback(1) → must restore write=Deleted (not None).
     //   6. Exists must return false.
-    let (descriptors, desc_id) = fresh_descriptors();
+    let descriptors = fresh_descriptors();
     let resources = InMemoryResources::new();
-    resources.install_global(addr(2), resource_ty(), desc_id, &make_resource(0xBBBB));
+    resources.install_global(addr(2), resource_ty(), &make_resource(0xBBBB));
     let mut exec_ctx = local_ctx_with(&resources, descriptors);
 
     let move_from_func = make_program(
@@ -214,7 +215,7 @@ fn rollback_of_move_from_then_move_to_restores_to_deleted() {
         vec![
             MicroOp::HeapNew {
                 dst: TMP,
-                descriptor_id: desc_id,
+                ty: resource_ty(),
             },
             MicroOp::MoveTo {
                 addr: ADDR,
@@ -272,9 +273,9 @@ fn rollback_of_move_from_then_move_to_restores_to_deleted() {
 
 #[test]
 fn same_epoch_second_mutation_no_journal_growth() {
-    let (descriptors, desc_id) = fresh_descriptors();
+    let descriptors = fresh_descriptors();
     let resources = InMemoryResources::new();
-    resources.install_global(addr(3), resource_ty(), desc_id, &make_resource(0xCCCC));
+    resources.install_global(addr(3), resource_ty(), &make_resource(0xCCCC));
     let mut exec_ctx = local_ctx_with(&resources, descriptors);
 
     let func = make_program(
@@ -306,9 +307,9 @@ fn same_epoch_second_mutation_no_journal_growth() {
 
 #[test]
 fn journal_grows_for_first_mutation_each_epoch() {
-    let (descriptors, desc_id) = fresh_descriptors();
+    let descriptors = fresh_descriptors();
     let resources = InMemoryResources::new();
-    resources.install_global(addr(4), resource_ty(), desc_id, &make_resource(0xDDDD));
+    resources.install_global(addr(4), resource_ty(), &make_resource(0xDDDD));
     let mut exec_ctx = local_ctx_with(&resources, descriptors);
 
     let func = make_program(
@@ -342,9 +343,9 @@ fn journal_grows_for_first_mutation_each_epoch() {
 
 #[test]
 fn rollback_n_collapses_multiple_checkpoints() {
-    let (descriptors, desc_id) = fresh_descriptors();
+    let descriptors = fresh_descriptors();
     let resources = InMemoryResources::new();
-    resources.install_global(addr(5), resource_ty(), desc_id, &make_resource(0xEEEE));
+    resources.install_global(addr(5), resource_ty(), &make_resource(0xEEEE));
     let mut exec_ctx = local_ctx_with(&resources, descriptors);
 
     let func = make_program(
@@ -385,9 +386,9 @@ fn rollback_n_collapses_multiple_checkpoints() {
 
 #[test]
 fn rollback_then_remutate_journals_again() {
-    let (descriptors, desc_id) = fresh_descriptors();
+    let descriptors = fresh_descriptors();
     let resources = InMemoryResources::new();
-    resources.install_global(addr(6), resource_ty(), desc_id, &make_resource(0xFFFF));
+    resources.install_global(addr(6), resource_ty(), &make_resource(0xFFFF));
     let mut exec_ctx = local_ctx_with(&resources, descriptors);
 
     let func = make_program(

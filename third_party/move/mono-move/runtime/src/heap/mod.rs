@@ -17,18 +17,20 @@ use crate::{
     global_storage::ResourceReadWriteSet,
     invariant_violation,
     memory::{
-        read_descriptor, read_forwarding, read_obj_size, read_ptr, read_u64, write_descriptor,
-        write_forwarding, write_object_header, write_ptr, write_u64, MemoryRegion,
+        is_forwarded, read_forwarding, read_header_type, read_ptr, read_u64,
+        write_forwarded_marker, write_forwarding, write_header_type, write_ptr, write_u64,
+        MemoryRegion,
     },
     types::{
-        DEFAULT_HEAP_SIZE, FORWARDED_MARKER, META_SAVED_FP_OFFSET, META_SAVED_FUNC_PTR_OFFSET,
+        DEFAULT_HEAP_SIZE, META_SAVED_FP_OFFSET, META_SAVED_FUNC_PTR_OFFSET, VEC_CAPACITY_OFFSET,
         VEC_DATA_OFFSET, VEC_LENGTH_OFFSET,
     },
 };
 use mono_move_core::{
-    align_max, checked_align_max, DescriptorId, DescriptorProvider, FrameOffset, Function,
-    ObjectDescriptorInner, CAPTURED_DATA_VALUES_OFFSET, CLOSURE_CAPTURED_DATA_PTR_OFFSET,
-    CLOSURE_DATA_SIZE, ENUM_DATA_OFFSET, ENUM_TAG_OFFSET, FRAME_METADATA_SIZE, OBJECT_HEADER_SIZE,
+    align_max, checked_align_max, types::InternedType, DescriptorId, DescriptorProvider,
+    FrameOffset, Function, ObjectDescriptorInner, CAPTURED_DATA_VALUES_OFFSET,
+    CLOSURE_CAPTURED_DATA_PTR_OFFSET, CLOSURE_DATA_SIZE, ENUM_DATA_OFFSET, ENUM_TAG_OFFSET,
+    FRAME_METADATA_SIZE, OBJECT_HEADER_SIZE,
 };
 use pinned_roots::PinnedRoots;
 use std::ptr::NonNull;
@@ -62,10 +64,9 @@ use std::ptr::NonNull;
 /// collide with the free functions in the value namespace of this module
 /// when re-exported.
 pub(crate) mod macros {
-    /// Forwards to [`super::alloc_obj`]. Arguments: (`$ctx`, `$fp`,
-    /// `$descriptor_id`).
+    /// Forwards to [`super::alloc_obj`]. Arguments: (`$ctx`, `$fp`, `$ty`).
     macro_rules! alloc_obj {
-        ($ctx:ident, $fp:expr, $descriptor_id:expr $(,)?) => {
+        ($ctx:ident, $fp:expr, $ty:expr $(,)?) => {
             $crate::heap::alloc_obj(
                 &mut $ctx.heap,
                 $ctx.exec_ctx,
@@ -74,22 +75,16 @@ pub(crate) mod macros {
                 $fp,
                 $ctx.current_func,
                 $ctx.pc,
-                $descriptor_id,
+                $ty,
             )
         };
     }
     pub(crate) use alloc_obj;
 
     /// Forwards to [`super::alloc_vec`]. Arguments: (`$ctx`, `$fp`,
-    /// `$descriptor_id`, `$elem_size`, `$capacity_in_elems`).
+    /// `$ty`, `$elem_size`, `$capacity_in_elems`).
     macro_rules! alloc_vec {
-        (
-            $ctx:ident,
-            $fp:expr,
-            $descriptor_id:expr,
-            $elem_size:expr,
-            $capacity_in_elems:expr $(,)?
-        ) => {
+        ($ctx:ident, $fp:expr, $ty:expr, $elem_size:expr, $capacity_in_elems:expr $(,)?) => {
             $crate::heap::alloc_vec(
                 &mut $ctx.heap,
                 $ctx.exec_ctx,
@@ -98,7 +93,7 @@ pub(crate) mod macros {
                 $fp,
                 $ctx.current_func,
                 $ctx.pc,
-                $descriptor_id,
+                $ty,
                 $elem_size,
                 $capacity_in_elems,
             )
@@ -257,14 +252,17 @@ pub(crate) fn alloc_or_gc<P: DescriptorProvider + ?Sized>(
 /// Root-walking interface for the GC. Passed to each root source that iterates
 /// its allocations and calls [`Self::relocate`] per pointer, writing the
 /// returned value back into the slot.
-pub(crate) struct RootScanner<'a> {
+pub(crate) struct RootScanner<'a, P: DescriptorProvider + ?Sized> {
     /// From-space heap.
     heap: &'a Heap,
+    /// Descriptor provider, used to compute the size of an object being copied
+    /// from its header type (the header no longer stores the size).
+    provider: &'a P,
     /// Bump cursor in to-space. Advances during relocation.
     free_ptr: *mut u8,
 }
 
-impl<'a> RootScanner<'a> {
+impl<'a, P: DescriptorProvider + ?Sized> RootScanner<'a, P> {
     /// Current to-space bump cursor.
     pub(crate) fn cursor(&self) -> usize {
         self.free_ptr as usize
@@ -275,21 +273,81 @@ impl<'a> RootScanner<'a> {
     /// the heap. Otherwise, returns the copy.
     ///
     /// Callers must uphold the object-header-integrity invariant
-    /// documented on [`gc_collect`]: if `ptr` is in-heap, its
-    /// header at `ptr - OBJECT_HEADER_SIZE` must be valid.
+    /// documented on [`gc_collect`]: if `ptr` is in-heap, its header type at
+    /// `ptr - OBJECT_HEADER_SIZE` must be valid and registered.
     pub(crate) fn relocate(&mut self, ptr: *mut u8) -> Option<*mut u8> {
         if ptr.is_null() || !is_heap_ptr(self.heap, ptr) {
             return None;
         }
-        Some(gc_copy_object(ptr, &mut self.free_ptr))
+        Some(gc_copy_object(self.provider, ptr, &mut self.free_ptr))
     }
 
     /// Test-only constructor. Production code only sees a
     /// `RootScanner` handed in by [`gc_collect`].
     #[cfg(test)]
-    pub(crate) fn for_test(heap: &'a Heap, free_ptr: *mut u8) -> RootScanner<'a> {
-        RootScanner { heap, free_ptr }
+    pub(crate) fn for_test(heap: &'a Heap, provider: &'a P, free_ptr: *mut u8) -> Self {
+        RootScanner {
+            heap,
+            provider,
+            free_ptr,
+        }
     }
+}
+
+/// Total allocated size (header + aligned payload) of an object given its
+/// descriptor. The header no longer stores the size; for vectors the size is
+/// derived from the capacity stored in the body.
+///
+/// # Safety
+///
+/// `obj_ptr` must point to the data region of a live heap object whose
+/// descriptor is `inner`.
+unsafe fn object_total_size_from_descriptor(
+    inner: &ObjectDescriptorInner,
+    obj_ptr: *const u8,
+) -> usize {
+    let payload = match inner {
+        ObjectDescriptorInner::Struct { size, .. } | ObjectDescriptorInner::Enum { size, .. } => {
+            *size as usize
+        },
+        ObjectDescriptorInner::Closure => CLOSURE_DATA_SIZE,
+        ObjectDescriptorInner::CapturedData { size, .. } => {
+            CAPTURED_DATA_VALUES_OFFSET + *size as usize
+        },
+        ObjectDescriptorInner::Vector { elem_size, .. } => {
+            // SAFETY: capacity lives at `VEC_CAPACITY_OFFSET` of every vector.
+            let capacity = unsafe { read_u64(obj_ptr, VEC_CAPACITY_OFFSET) } as usize;
+            VEC_DATA_OFFSET + capacity * (*elem_size as usize)
+        },
+        ObjectDescriptorInner::Trivial => {
+            unreachable!("Trivial objects are never heap-allocated")
+        },
+    };
+    align_max(OBJECT_HEADER_SIZE + payload)
+}
+
+/// Total allocated size of a live heap object, resolving its header type to a
+/// descriptor through `provider`. Used on the copy path, where the type is
+/// guaranteed registered (the same object-header-integrity invariant the old
+/// header-stored size relied on).
+///
+/// # Safety
+///
+/// `obj_ptr` must point to the data region of a live (non-forwarded) heap
+/// object whose header type is registered with `provider`.
+unsafe fn object_total_size<P: DescriptorProvider + ?Sized>(
+    provider: &P,
+    obj_ptr: *const u8,
+) -> usize {
+    let ty = unsafe { read_header_type(obj_ptr) }
+        .expect("object_total_size called on a forwarded or header-less object");
+    let descriptor_id = provider
+        .descriptor_id_for_type(ty)
+        .expect("live heap object's header type has no registered descriptor");
+    let desc = provider
+        .descriptor(descriptor_id)
+        .expect("registered descriptor id missing from provider");
+    unsafe { object_total_size_from_descriptor(desc.inner(), obj_ptr) }
 }
 
 // ---------------------------------------------------------------------------
@@ -306,10 +364,10 @@ impl<'a> RootScanner<'a> {
 ///
 /// Returns [`AllocationError::OutOfHeapMemory`] when the heap is full
 /// so the caller can trigger GC and retry.
-fn heap_alloc(
+pub(crate) fn heap_alloc(
     heap: &mut Heap,
     total_size: usize,
-    descriptor_id: DescriptorId,
+    ty: InternedType,
 ) -> AllocationResult<*mut u8> {
     // Round up to MAX_ALIGN with overflow protection; the
     // `MAX_SINGLE_ALLOCATION_SIZE` check below then applies to the
@@ -343,7 +401,7 @@ fn heap_alloc(
         heap.bump_ptr = header_start.add(aligned_size);
         std::ptr::write_bytes(header_start, 0, aligned_size);
         let obj_ptr = header_start.add(OBJECT_HEADER_SIZE);
-        write_object_header(obj_ptr, descriptor_id, aligned_size as u32);
+        write_header_type(obj_ptr, ty);
         Ok(obj_ptr)
     }
 }
@@ -362,7 +420,7 @@ pub(crate) fn alloc_vec<P: DescriptorProvider + ?Sized>(
     fp: *mut u8,
     current_func: NonNull<Function>,
     pc: usize,
-    descriptor_id: DescriptorId,
+    ty: InternedType,
     elem_size: u32,
     capacity_in_elems: u64,
 ) -> RuntimeResult<*mut u8> {
@@ -370,7 +428,7 @@ pub(crate) fn alloc_vec<P: DescriptorProvider + ?Sized>(
         .checked_mul(elem_size as usize)
         .and_then(|v| v.checked_add(OBJECT_HEADER_SIZE + VEC_DATA_OFFSET))
         .ok_or(RuntimeError::VecAllocSizeOverflow)?;
-    alloc_or_gc(
+    let obj_ptr = alloc_or_gc(
         heap,
         provider,
         rws,
@@ -378,13 +436,20 @@ pub(crate) fn alloc_vec<P: DescriptorProvider + ?Sized>(
         fp,
         current_func,
         pc,
-        |h| heap_alloc(h, total_size, descriptor_id),
-    )
-    // `length` defaults to 0 via heap_alloc's zero-init.
+        |h| heap_alloc(h, total_size, ty),
+    )?;
+    // Store the capacity in the body so the GC and growth can recover the
+    // object size without a header size field. `length` defaults to 0 via
+    // heap_alloc's zero-init.
+    // SAFETY: `obj_ptr` is a fresh vector object with room for the capacity
+    // field at `VEC_CAPACITY_OFFSET`.
+    unsafe { write_u64(obj_ptr, VEC_CAPACITY_OFFSET, capacity_in_elems) };
+    Ok(obj_ptr)
 }
 
-/// Allocate a new zeroed heap object (struct or enum). Size comes from the
-/// descriptor at `descriptor_id`.
+/// Allocate a new zeroed heap object (struct, enum, closure, or captured
+/// data). The object's `ty` is written into the header and resolved to its
+/// descriptor, which supplies the payload size.
 pub(crate) fn alloc_obj<P: DescriptorProvider + ?Sized>(
     heap: &mut Heap,
     provider: &P,
@@ -393,8 +458,12 @@ pub(crate) fn alloc_obj<P: DescriptorProvider + ?Sized>(
     fp: *mut u8,
     current_func: NonNull<Function>,
     pc: usize,
-    descriptor_id: DescriptorId,
+    ty: InternedType,
 ) -> RuntimeResult<*mut u8> {
+    let descriptor_id = match provider.descriptor_id_for_type(ty) {
+        Some(id) => id,
+        None => invariant_violation!(DescriptorNotFound { descriptor_id: 0 }),
+    };
     let desc = match provider.descriptor(descriptor_id) {
         Some(desc) => desc,
         None => invariant_violation!(DescriptorNotFound {
@@ -424,7 +493,7 @@ pub(crate) fn alloc_obj<P: DescriptorProvider + ?Sized>(
         fp,
         current_func,
         pc,
-        |h| heap_alloc(h, total_size, descriptor_id),
+        |h| heap_alloc(h, total_size, ty),
     )
 }
 
@@ -459,10 +528,8 @@ pub(crate) fn grow_vec_ref<P: DescriptorProvider + ?Sized>(
         let old_ptr = read_ptr(base, off);
 
         let old_len = read_u64(old_ptr, VEC_LENGTH_OFFSET);
-        let old_total = read_obj_size(old_ptr) as usize;
-        let old_cap_in_elems =
-            ((old_total - OBJECT_HEADER_SIZE - VEC_DATA_OFFSET) / elem_size as usize) as u64;
-        let descriptor_id = DescriptorId(read_descriptor(old_ptr));
+        let old_cap_in_elems = read_u64(old_ptr, VEC_CAPACITY_OFFSET);
+        let ty = read_header_type(old_ptr).expect("growing a forwarded vector");
 
         let mut new_cap_in_elems = if old_cap_in_elems == 0 {
             4
@@ -482,7 +549,7 @@ pub(crate) fn grow_vec_ref<P: DescriptorProvider + ?Sized>(
             fp,
             current_func,
             pc,
-            descriptor_id,
+            ty,
             elem_size,
             new_cap_in_elems,
         )?;
@@ -528,10 +595,10 @@ pub(crate) fn grow_vec_ref<P: DescriptorProvider + ?Sized>(
 ///   frame offset that may hold a live heap pointer, and *only* those
 ///   offsets. Missing entries → dangling pointers after GC; extra
 ///   entries → non-pointer data reinterpreted as a pointer (UB).
-/// - **Object header integrity**: the `descriptor_id` and `size` fields
-///   in every heap object header are set by the allocator and never
-///   overwritten by user code. Corrupted headers → wrong copy size or
-///   wrong reference tracing (UB).
+/// - **Object header integrity**: the interned-type word in every heap
+///   object header is set by the allocator, registered with the descriptor
+///   provider, and never overwritten by user code. Corrupted or unregistered
+///   headers → wrong copy size or wrong reference tracing (UB).
 pub(crate) fn gc_collect<P: DescriptorProvider + ?Sized>(
     heap: &mut Heap,
     provider: &P,
@@ -553,6 +620,7 @@ pub(crate) fn gc_collect<P: DescriptorProvider + ?Sized>(
     // of from-space survives, producing UB on `.add` / `.sub`.
     let mut scanner = RootScanner {
         heap,
+        provider,
         free_ptr: to_space.as_ptr(),
     };
 
@@ -622,21 +690,30 @@ pub(crate) fn gc_collect<P: DescriptorProvider + ?Sized>(
     while (scan_ptr as usize) < scanner.cursor() {
         // SAFETY: scan_ptr advances through to-space by each object's
         // aligned size. Object headers were copied verbatim by
-        // gc_copy_object, so descriptor_id and size are valid as long
-        // as the object-header-integrity invariant holds (see above).
+        // gc_copy_object, so the header type is valid as long as the
+        // object-header-integrity invariant holds (see above).
         unsafe {
             let obj_ptr = scan_ptr.add(OBJECT_HEADER_SIZE);
-            let descriptor_id = read_descriptor(obj_ptr);
-            let obj_size = read_obj_size(obj_ptr) as usize;
+
+            if is_forwarded(obj_ptr) {
+                return Err(RuntimeInvariantViolation::GcForwardingMarkerInToSpace);
+            }
+            let ty = read_header_type(obj_ptr).expect("non-forwarded object has a header type");
+            let descriptor_id = provider
+                .descriptor_id_for_type(ty)
+                .expect("live heap object's header type has no registered descriptor");
+            let desc = provider.descriptor(descriptor_id).ok_or(
+                RuntimeInvariantViolation::DescriptorNotFound {
+                    descriptor_id: descriptor_id.as_u32(),
+                },
+            )?;
+            let obj_size = object_total_size_from_descriptor(desc.inner(), obj_ptr);
 
             if obj_size == 0 || obj_size != align_max(obj_size) {
                 return Err(RuntimeInvariantViolation::GcInvalidObjectSize { size: obj_size });
             }
 
-            if descriptor_id == FORWARDED_MARKER {
-                return Err(RuntimeInvariantViolation::GcForwardingMarkerInToSpace);
-            }
-            gc_scan_object(provider, &mut scanner, obj_ptr, DescriptorId(descriptor_id))?;
+            gc_scan_object(provider, &mut scanner, obj_ptr, descriptor_id)?;
 
             scan_ptr = scan_ptr.add(obj_size);
         }
@@ -681,7 +758,11 @@ fn is_heap_ptr(heap: &Heap, ptr: *const u8) -> bool {
 /// - `fp` must point to a valid frame.
 /// - Each entry in `offsets` must be a valid 8-byte-aligned offset within
 ///   the frame's extended size.
-unsafe fn gc_scan_frame_roots(scanner: &mut RootScanner<'_>, fp: *mut u8, offsets: &[FrameOffset]) {
+unsafe fn gc_scan_frame_roots(
+    scanner: &mut RootScanner<'_, impl DescriptorProvider + ?Sized>,
+    fp: *mut u8,
+    offsets: &[FrameOffset],
+) {
     unsafe {
         for &offset in offsets {
             let old_ptr = read_ptr(fp, offset);
@@ -699,8 +780,8 @@ unsafe fn gc_scan_frame_roots(scanner: &mut RootScanner<'_>, fp: *mut u8, offset
 /// `old_ptr` and the returned pointer are *object pointers* (data-region
 /// starts); the header lives at `obj_ptr - OBJECT_HEADER_SIZE`. The
 /// forwarding pointer is parked at offset 0 of the data region (over the
-/// old object's first 8 payload bytes), and the descriptor field at
-/// `obj_ptr - 8` is overwritten with `FORWARDED_MARKER`.
+/// old object's first 8 payload bytes), and the header type word at
+/// `obj_ptr - 8` is overwritten with null to mark the object forwarded.
 ///
 /// `*free_ptr` is a raw bump cursor in to-space (header start of the
 /// next slot); after this call it advances by `obj_size`.
@@ -715,15 +796,17 @@ unsafe fn gc_scan_frame_roots(scanner: &mut RootScanner<'_>, fp: *mut u8, offset
 /// - The from-space object must not have been partially overwritten
 ///   except by a prior call to this function (which installs a
 ///   forwarding marker).
-fn gc_copy_object(old_ptr: *mut u8, free_ptr: &mut *mut u8) -> *mut u8 {
+fn gc_copy_object<P: DescriptorProvider + ?Sized>(
+    provider: &P,
+    old_ptr: *mut u8,
+    free_ptr: &mut *mut u8,
+) -> *mut u8 {
     unsafe {
-        let descriptor_id = read_descriptor(old_ptr);
-
-        if descriptor_id == FORWARDED_MARKER {
+        if is_forwarded(old_ptr) {
             return read_forwarding(old_ptr);
         }
 
-        let obj_size = read_obj_size(old_ptr) as usize;
+        let obj_size = object_total_size(provider, old_ptr);
         debug_assert!(
             obj_size >= OBJECT_HEADER_SIZE && obj_size == align_max(obj_size),
             "gc_copy_object: invalid object size {}",
@@ -738,7 +821,7 @@ fn gc_copy_object(old_ptr: *mut u8, free_ptr: &mut *mut u8) -> *mut u8 {
         *free_ptr = new_header_start.add(obj_size);
         let new_ptr = new_header_start.add(OBJECT_HEADER_SIZE);
 
-        write_descriptor(old_ptr, FORWARDED_MARKER);
+        write_forwarded_marker(old_ptr);
         write_forwarding(old_ptr, new_ptr);
 
         new_ptr
@@ -758,7 +841,7 @@ fn gc_copy_object(old_ptr: *mut u8, free_ptr: &mut *mut u8) -> *mut u8 {
 ///   room for any objects that will be copied.
 fn gc_scan_object<P: DescriptorProvider + ?Sized>(
     provider: &P,
-    scanner: &mut RootScanner<'_>,
+    scanner: &mut RootScanner<'_, P>,
     obj_ptr: *mut u8,
     descriptor_id: DescriptorId,
 ) -> Result<(), RuntimeInvariantViolation> {

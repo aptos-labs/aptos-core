@@ -125,7 +125,10 @@ impl PinnedRoots {
     }
 
     /// Relocate every currently-pinned slot via the scanner.
-    pub(super) fn scan(&self, scanner: &mut RootScanner<'_>) {
+    pub(super) fn scan(
+        &self,
+        scanner: &mut RootScanner<'_, impl mono_move_core::DescriptorProvider + ?Sized>,
+    ) {
         // SAFETY: We project through the `UnsafeCell`'s raw pointer
         // directly. Going via `&*self.inner.get()` first would derive a
         // read-only Stacked Borrows tag, and writing through a pointer
@@ -218,10 +221,22 @@ mod tests {
         heap::{heap_alloc, Heap, RootScanner},
         memory::MemoryRegion,
     };
-    use mono_move_core::{DescriptorId, OBJECT_HEADER_SIZE};
+    use mono_move_core::{
+        types::{InternedType, BOOL_TY},
+        ObjectDescriptor, ObjectDescriptorTable, OBJECT_HEADER_SIZE,
+    };
 
     fn fake_ptr(addr: usize) -> NonNull<u8> {
         NonNull::new(addr as *mut u8).unwrap()
+    }
+
+    /// Provider with a single 8-byte, pointer-free struct descriptor and a
+    /// header type registered for it.
+    fn provider_with_struct8() -> (ObjectDescriptorTable, InternedType) {
+        let mut table = ObjectDescriptorTable::new();
+        let ty = BOOL_TY;
+        table.push_for_type(ty, ObjectDescriptor::new_struct(8, vec![]).unwrap());
+        (table, ty)
     }
 
     #[test]
@@ -267,20 +282,16 @@ mod tests {
         drop(b);
     }
 
-    fn fresh_heap_with_obj() -> (Heap, *mut u8) {
-        let mut heap = Heap::new(4096);
-        let obj = heap_alloc(&mut heap, OBJECT_HEADER_SIZE + 8, DescriptorId(0)).unwrap();
-        (heap, obj)
-    }
-
     #[test]
     fn scan_relocates_pinned_slot() {
-        let (heap, obj) = fresh_heap_with_obj();
+        let (provider, ty) = provider_with_struct8();
+        let mut heap = Heap::new(4096);
+        let obj = heap_alloc(&mut heap, OBJECT_HEADER_SIZE + 8, ty).unwrap();
         let roots = PinnedRoots::new();
         let g = roots.pin(NonNull::new(obj).unwrap());
 
         let to_space = MemoryRegion::new(heap.buffer.len());
-        let mut scanner = RootScanner::for_test(&heap, to_space.as_ptr());
+        let mut scanner = RootScanner::for_test(&heap, &provider, to_space.as_ptr());
         roots.scan(&mut scanner);
 
         let after = g.get().as_ptr();
@@ -295,8 +306,10 @@ mod tests {
 
     #[test]
     fn scan_skips_freed_slots() {
-        let (mut heap, obj_a) = fresh_heap_with_obj();
-        let obj_b = heap_alloc(&mut heap, OBJECT_HEADER_SIZE + 8, DescriptorId(0)).unwrap();
+        let (provider, ty) = provider_with_struct8();
+        let mut heap = Heap::new(4096);
+        let obj_a = heap_alloc(&mut heap, OBJECT_HEADER_SIZE + 8, ty).unwrap();
+        let obj_b = heap_alloc(&mut heap, OBJECT_HEADER_SIZE + 8, ty).unwrap();
 
         let roots = PinnedRoots::new();
         let a = roots.pin(NonNull::new(obj_a).unwrap());
@@ -306,7 +319,7 @@ mod tests {
         let to_space = MemoryRegion::new(heap.buffer.len());
         let free_ptr = to_space.as_ptr();
         let initial_free = free_ptr as usize;
-        let mut scanner = RootScanner::for_test(&heap, free_ptr);
+        let mut scanner = RootScanner::for_test(&heap, &provider, free_ptr);
         roots.scan(&mut scanner);
 
         // Only one object should have been relocated into to-space —

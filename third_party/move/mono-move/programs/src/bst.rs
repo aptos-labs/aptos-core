@@ -267,8 +267,11 @@ pub fn native_run_ops_with_results(ops: &[u64]) -> Vec<(u64, u64)> {
 mod micro_op {
     use mono_move_alloc::GlobalArenaPtr;
     use mono_move_core::{
-        Code, CodeOffset as CO, DescriptorId, FrameLayoutInfo, FrameOffset as FO, Function,
-        FunctionPtr, MicroOp as Op, MicroOp::*, SortedSafePointEntries, FRAME_METADATA_SIZE,
+        types::{InternedType, BOOL_TY, U128_TY, U64_TY},
+        Code, CodeOffset as CO, FrameLayoutInfo, FrameOffset as FO, Function, FunctionPtr,
+        MicroOp as Op,
+        MicroOp::*,
+        SortedSafePointEntries, FRAME_METADATA_SIZE,
     };
     use mono_move_runtime::{ObjectDescriptor, ObjectDescriptorTable};
 
@@ -287,19 +290,33 @@ mod micro_op {
     pub const FN_REMOVE: usize = 4;
 
     pub fn program() -> (Vec<FunctionPtr>, ObjectDescriptorTable) {
+        // Distinct opaque header-type keys (the runtime resolves them to the
+        // descriptors registered below). The 8-byte free-list vector shares
+        // `U64_TY` with the `alloc_u64_vec` input vector callers pass in.
         let mut descriptors = ObjectDescriptorTable::new();
         // BstMap { nodes, free_list, root }: nodes and free_list are heap pointers.
-        let desc_bst_map = descriptors.push(ObjectDescriptor::new_struct(24, vec![0, 8]).unwrap());
+        let bst_map_ty: InternedType = BOOL_TY;
+        descriptors.push_for_type(
+            bst_map_ty,
+            ObjectDescriptor::new_struct(24, vec![0, 8]).unwrap(),
+        );
         // Nodes vector: 32-byte trivial node elements.
-        let desc_nodes_vec =
-            descriptors.push(ObjectDescriptor::new_vector(NODE_SIZE, vec![]).unwrap());
+        let nodes_vec_ty = U128_TY;
+        descriptors.push_for_type(
+            nodes_vec_ty,
+            ObjectDescriptor::new_vector(NODE_SIZE, vec![]).unwrap(),
+        );
         // Free-list vector: 8-byte trivial elements.
-        let desc_free_list_vec = descriptors.push(ObjectDescriptor::new_vector(8, vec![]).unwrap());
+        let free_list_vec_ty = U64_TY;
+        descriptors.push_for_type(
+            free_list_vec_ty,
+            ObjectDescriptor::new_vector(8, vec![]).unwrap(),
+        );
 
-        let new_ptr = FunctionPtr::new(Box::new(make_new(desc_bst_map)));
+        let new_ptr = FunctionPtr::new(Box::new(make_new(bst_map_ty)));
         let get_ptr = FunctionPtr::new(Box::new(make_get()));
-        let alloc_node_ptr = FunctionPtr::new(Box::new(make_alloc_node(desc_nodes_vec)));
-        let remove_node_ptr = FunctionPtr::new(Box::new(make_remove_node(desc_free_list_vec)));
+        let alloc_node_ptr = FunctionPtr::new(Box::new(make_alloc_node(nodes_vec_ty)));
+        let remove_node_ptr = FunctionPtr::new(Box::new(make_remove_node(free_list_vec_ty)));
         let insert_ptr = FunctionPtr::new(Box::new(make_insert(alloc_node_ptr)));
         let remove_ptr = FunctionPtr::new(Box::new(make_remove(remove_node_ptr)));
         let run_ops_ptr = FunctionPtr::new(Box::new(make_run_ops(
@@ -329,7 +346,7 @@ mod micro_op {
     // Frame layout:
     //   [0] result: bst_ref   [8] nodes (temp)   [16] free_list (temp)
     // =================================================================
-    fn make_new(desc_bst_map: DescriptorId) -> Function {
+    fn make_new(bst_map_ty: InternedType) -> Function {
         let bst = 0u32;
         let nodes = 8u32;
         let free_list = 16u32;
@@ -338,7 +355,7 @@ mod micro_op {
         let code = vec![
             VecNew { dst: FO(nodes) },                                             // 0
             VecNew { dst: FO(free_list) },                                         // 1
-            HeapNew { dst: FO(bst), descriptor_id: desc_bst_map },                       // 2
+            HeapNew { dst: FO(bst), ty: bst_map_ty },                                    // 2
             Op::struct_store8(FO(bst), BST_NODES, FO(nodes)),                 // 3
             Op::struct_store8(FO(bst), BST_FREE_LIST, FO(free_list)),         // 4
             HeapMoveToImm8 { heap_ptr: FO(bst),
@@ -549,7 +566,7 @@ mod micro_op {
     //   [72] idx   [80] fl_len
     //   [88] new_node (32B: key[88] val[96] left[104] right[112])
     // =================================================================
-    fn make_alloc_node(desc_nodes_vec: DescriptorId) -> Function {
+    fn make_alloc_node(nodes_vec_ty: InternedType) -> Function {
         let bst = 0u32;
         let key = 8u32;
         let value = 16u32;
@@ -582,7 +599,7 @@ mod micro_op {
             // PUSH path: idx = nodes.len(); nodes.push(new_node)
             VecLen { dst: FO(idx), vec_ref: FO(nodes_ref) },                       // 9
             VecPushBack { vec_ref: FO(nodes_ref), elem: FO(new_node),
-                          elem_size: NODE_SIZE, descriptor_id: desc_nodes_vec },         // 10
+                          elem_size: NODE_SIZE, vec_ty: nodes_vec_ty },                  // 10
             Jump { target: CO(14) },                                               // 11: → DONE
             // POP path (12): idx = free_list.pop(); nodes[idx] = new_node
             VecPopBack { dst: FO(idx), vec_ref: FO(free_list_ref),
@@ -725,7 +742,7 @@ mod micro_op {
     //   [80] parent   [88] cur   [96] cur_right
     //   [104] scratch (32B: key[104] val[112] left[120] right[128])
     // =================================================================
-    fn make_remove_node(desc_free_list_vec: DescriptorId) -> Function {
+    fn make_remove_node(free_list_vec_ty: InternedType) -> Function {
         let bst = 0u32;
         let idx = 8u32;
         let bst_ref = 16u32;
@@ -799,7 +816,7 @@ mod micro_op {
             Move8 { dst: FO(result), src: FO(cur) },                              // 32
             // -- FREE_RETURN (33): free_list.push(idx); return --
             VecPushBack { vec_ref: FO(free_list_ref), elem: FO(idx),
-                          elem_size: 8, descriptor_id: desc_free_list_vec },             // 33
+                          elem_size: 8, vec_ty: free_list_vec_ty },                      // 33
             Return,                                                                // 34
         ];
 

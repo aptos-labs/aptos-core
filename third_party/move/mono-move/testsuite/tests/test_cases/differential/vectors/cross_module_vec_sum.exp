@@ -93,6 +93,7 @@ fun push_and_sum(r0): u64 {
 fun push_and_sum() {
   frame_data_size: 64
   code:
+<<<<<<< HEAD:third_party/move/mono-move/testsuite/tests/test_cases/differential/vectors/cross_module_vec_sum.exp
     0: Charge #12
     1: VecNew [8]
     2: StoreImm8 [16] <- #0
@@ -117,6 +118,25 @@ fun push_and_sum() {
     21: Jump @14
     22: Charge #2
     23: Return
+=======
+    0: VecNew [8]
+    1: StoreImm8 [16] <- #0
+    2: JumpGreaterEqualU64 @7 [16] >= [0]
+    3: SlotBorrow [24] <- &[8]
+    4: VecPushBack [24].push([16], size=8)
+    5: AddU64Imm [16] <- [16] + #1
+    6: Jump @2
+    7: StoreImm8 [0] <- #0
+    8: SlotBorrow [40] <- &[8]
+    9: VecLen [16] <- vec_len([40])
+    10: JumpLessEqualU64Imm @16 [16] <= #0
+    11: SlotBorrow [24] <- &[8]
+    12: VecPopBack [56] <- [24].pop(size=8)
+    13: AddU64 [0] <- [0] + [56]
+    14: SubU64Imm [16] <- [16] - #1
+    15: Jump @10
+    16: Return
+>>>>>>> 1c1a141093 ([mono-move] Type pointers as descriptors):third_party/move/mono-move/testsuite/tests/test_cases/differential/cross_module_vec_sum.exp
   safe_point_layouts:
     7: []
 }

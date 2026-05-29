@@ -5,6 +5,7 @@
 
 use mono_move_alloc::GlobalArenaPtr;
 use mono_move_core::{
+    types::{BOOL_TY, U8_TY},
     Code, FrameLayoutInfo, FrameOffset as FO, Function, MicroOp, SortedSafePointEntries,
 };
 use mono_move_runtime::{
@@ -106,11 +107,12 @@ fn struct_heap_basic() {
     let tmp: u32 = 16;
 
     let mut descriptors = ObjectDescriptorTable::new();
-    let desc_entry_struct = descriptors.push(ObjectDescriptor::new_struct(16, vec![]).unwrap());
+    let entry_ty = BOOL_TY;
+    descriptors.push_for_type(entry_ty, ObjectDescriptor::new_struct(16, vec![]).unwrap());
 
     #[rustfmt::skip]
     let code = vec![
-        HeapNew { dst: FO(entry), descriptor_id: desc_entry_struct },
+        HeapNew { dst: FO(entry), ty: entry_ty },
         StoreImm8 { dst: FO(tmp), imm: 42u64.to_le_bytes() },
         MicroOp::struct_store8(FO(entry), 0, FO(tmp)),
         StoreImm8 { dst: FO(tmp), imm: 100u64.to_le_bytes() },
@@ -151,11 +153,12 @@ fn struct_heap_survives_gc() {
     let tmp: u32 = 16;
 
     let mut descriptors = ObjectDescriptorTable::new();
-    let desc_entry_struct = descriptors.push(ObjectDescriptor::new_struct(16, vec![]).unwrap());
+    let entry_ty = BOOL_TY;
+    descriptors.push_for_type(entry_ty, ObjectDescriptor::new_struct(16, vec![]).unwrap());
 
     #[rustfmt::skip]
     let code = vec![
-        HeapNew { dst: FO(entry), descriptor_id: desc_entry_struct },
+        HeapNew { dst: FO(entry), ty: entry_ty },
         StoreImm8 { dst: FO(tmp), imm: 7u64.to_le_bytes() },
         MicroOp::struct_store8(FO(entry), 0, FO(tmp)),
         StoreImm8 { dst: FO(tmp), imm: 13u64.to_le_bytes() },
@@ -205,22 +208,24 @@ fn struct_with_vector_field() {
     let ctr_ref: u32 = 48; // 16-byte fat pointer ref to ctr (for struct_borrow)
 
     let mut descriptors = ObjectDescriptorTable::new();
-    let desc_ctr_struct = descriptors.push(ObjectDescriptor::new_struct(16, vec![8]).unwrap());
-    let desc_vec_u64 = descriptors.push(ObjectDescriptor::new_vector(8, vec![]).unwrap());
+    let ctr_ty = BOOL_TY;
+    descriptors.push_for_type(ctr_ty, ObjectDescriptor::new_struct(16, vec![8]).unwrap());
+    let vec_ty = U8_TY;
+    descriptors.push_for_type(vec_ty, ObjectDescriptor::new_vector(8, vec![]).unwrap());
 
     #[rustfmt::skip]
     let code = vec![
-        HeapNew { dst: FO(ctr), descriptor_id: desc_ctr_struct },
+        HeapNew { dst: FO(ctr), ty: ctr_ty },
         StoreImm8 { dst: FO(tmp), imm: 999u64.to_le_bytes() },
         MicroOp::struct_store8(FO(ctr), 0, FO(tmp)),
         VecNew { dst: FO(items) },
         SlotBorrow { dst: FO(vec_ref), local: FO(items) },
         StoreImm8 { dst: FO(tmp), imm: 10u64.to_le_bytes() },
-        VecPushBack { vec_ref: FO(vec_ref), elem: FO(tmp), elem_size: 8, descriptor_id: desc_vec_u64 },
+        VecPushBack { vec_ref: FO(vec_ref), elem: FO(tmp), elem_size: 8, vec_ty },
         StoreImm8 { dst: FO(tmp), imm: 20u64.to_le_bytes() },
-        VecPushBack { vec_ref: FO(vec_ref), elem: FO(tmp), elem_size: 8, descriptor_id: desc_vec_u64 },
+        VecPushBack { vec_ref: FO(vec_ref), elem: FO(tmp), elem_size: 8, vec_ty },
         StoreImm8 { dst: FO(tmp), imm: 30u64.to_le_bytes() },
-        VecPushBack { vec_ref: FO(vec_ref), elem: FO(tmp), elem_size: 8, descriptor_id: desc_vec_u64 },
+        VecPushBack { vec_ref: FO(vec_ref), elem: FO(tmp), elem_size: 8, vec_ty },
         MicroOp::struct_store8(FO(ctr), 8, FO(items)),
         ForceGC,
         SlotBorrow { dst: FO(ctr_ref), local: FO(ctr) },
@@ -273,11 +278,12 @@ fn struct_borrow_field() {
     let entry_ref: u32 = 32; // 16-byte fat pointer ref to entry (for struct_borrow)
 
     let mut descriptors = ObjectDescriptorTable::new();
-    let desc_entry_struct = descriptors.push(ObjectDescriptor::new_struct(16, vec![]).unwrap());
+    let entry_ty = BOOL_TY;
+    descriptors.push_for_type(entry_ty, ObjectDescriptor::new_struct(16, vec![]).unwrap());
 
     #[rustfmt::skip]
     let code = vec![
-        HeapNew { dst: FO(entry), descriptor_id: desc_entry_struct },
+        HeapNew { dst: FO(entry), ty: entry_ty },
         StoreImm8 { dst: FO(result), imm: 5u64.to_le_bytes() },
         MicroOp::struct_store8(FO(entry), 0, FO(result)),
         StoreImm8 { dst: FO(result), imm: 10u64.to_le_bytes() },
@@ -327,11 +333,12 @@ fn struct_borrow_survives_gc() {
     let entry_ref: u32 = 32; // 16-byte fat pointer ref to entry (for struct_borrow)
 
     let mut descriptors = ObjectDescriptorTable::new();
-    let desc_entry_struct = descriptors.push(ObjectDescriptor::new_struct(16, vec![]).unwrap());
+    let entry_ty = BOOL_TY;
+    descriptors.push_for_type(entry_ty, ObjectDescriptor::new_struct(16, vec![]).unwrap());
 
     #[rustfmt::skip]
     let code = vec![
-        HeapNew { dst: FO(entry), descriptor_id: desc_entry_struct },
+        HeapNew { dst: FO(entry), ty: entry_ty },
         StoreImm8 { dst: FO(result), imm: 100u64.to_le_bytes() },
         MicroOp::struct_store8(FO(entry), 0, FO(result)),
         StoreImm8 { dst: FO(result), imm: 200u64.to_le_bytes() },

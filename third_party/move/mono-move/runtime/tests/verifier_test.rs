@@ -5,14 +5,37 @@
 
 use mono_move_alloc::GlobalArenaPtr;
 use mono_move_core::{
-    Code, CodeOffset as CO, DescriptorId, FrameLayoutInfo, FrameOffset as FO, Function, MicroOp,
-    SortedSafePointEntries,
+    types::{InternedType, Type},
+    Code, CodeOffset as CO, FrameLayoutInfo, FrameOffset as FO, Function, MicroOp,
+    SortedSafePointEntries, TRIVIAL_DESCRIPTOR_ID,
 };
 use mono_move_runtime::{verify_function, ObjectDescriptor, ObjectDescriptorTable};
 
+static VEC_TY_NODE: Type = Type::U64;
+static TRIVIAL_TY_NODE: Type = Type::Bool;
+static UNREGISTERED_TY_NODE: Type = Type::U8;
+
+/// Header type registered to a Vector descriptor by [`trivial_descriptors`].
+fn vec_ty() -> InternedType {
+    GlobalArenaPtr::from_static(&VEC_TY_NODE)
+}
+
+/// Header type registered to the reserved Trivial descriptor — the wrong
+/// variant for object-allocating ops.
+fn trivial_ty() -> InternedType {
+    GlobalArenaPtr::from_static(&TRIVIAL_TY_NODE)
+}
+
+/// Header type with no registered descriptor.
+fn unregistered_ty() -> InternedType {
+    GlobalArenaPtr::from_static(&UNREGISTERED_TY_NODE)
+}
+
 fn trivial_descriptors() -> ObjectDescriptorTable {
     let mut t = ObjectDescriptorTable::new();
-    t.push(ObjectDescriptor::new_vector(8, vec![]).unwrap());
+    let vec_id = t.push(ObjectDescriptor::new_vector(8, vec![]).unwrap());
+    t.register_type(vec_ty(), vec_id);
+    t.register_type(trivial_ty(), TRIVIAL_DESCRIPTOR_ID);
     t
 }
 
@@ -78,7 +101,7 @@ fn valid_with_vec_and_pointer_slots() {
         VecNew { dst: FO(0) },
         SlotBorrow { dst: FO(16), local: FO(0) },
         StoreImm8 { dst: FO(8), imm: 42u64.to_le_bytes() },
-        VecPushBack { vec_ref: FO(16), elem: FO(8), elem_size: 8, descriptor_id: DescriptorId(2) },
+        VecPushBack { vec_ref: FO(16), elem: FO(8), elem_size: 8, vec_ty: vec_ty() },
         Return,
     ];
     let func = Function {
@@ -369,7 +392,7 @@ fn invalid_descriptor_id() {
                 vec_ref: FO(8),
                 elem: FO(24),
                 elem_size: 8,
-                descriptor_id: DescriptorId(99),
+                vec_ty: unregistered_ty(),
             },
             Return,
         ]),
@@ -383,7 +406,9 @@ fn invalid_descriptor_id() {
     };
     let errors = verify_function(&func, &trivial_descriptors());
     assert!(!errors.is_empty());
-    assert!(errors.iter().any(|e| e.message.contains("descriptor_id")));
+    assert!(errors
+        .iter()
+        .any(|e| e.message.contains("no registered descriptor")));
 }
 
 // ---------------------------------------------------------------------------
@@ -436,7 +461,7 @@ fn zero_elem_size_vec_push() {
                 vec_ref: FO(8),
                 elem: FO(24),
                 elem_size: 0,
-                descriptor_id: DescriptorId(0),
+                vec_ty: vec_ty(),
             },
             Return,
         ]),
@@ -661,7 +686,7 @@ fn vec_pushback_must_target_vector_descriptor() {
                 vec_ref: FO(16),
                 elem: FO(8),
                 elem_size: 8,
-                descriptor_id: DescriptorId(0), // Trivial — wrong variant
+                vec_ty: trivial_ty(), // Trivial — wrong variant
             },
             Return,
         ]),
@@ -688,7 +713,7 @@ fn heap_new_rejects_vector_descriptor() {
         code: Code::from_vec(vec![
             HeapNew {
                 dst: FO(0),
-                descriptor_id: DescriptorId(2),
+                ty: vec_ty(),
             },
             Return,
         ]),

@@ -8,12 +8,14 @@
 
 use crate::{
     error::{RuntimeError, RuntimeInvariantViolation},
-    heap::{heap_alloc, AllocationError, AllocationResult, Heap},
-    memory::{read_descriptor, read_obj_size, read_ptr, read_u64, write_ptr},
+    heap::{
+        heap_alloc, object_total_size_from_descriptor, AllocationError, AllocationResult, Heap,
+    },
+    memory::{read_header_type, read_ptr, read_u64, write_ptr},
     types::{VEC_DATA_OFFSET, VEC_LENGTH_OFFSET},
 };
 use mono_move_core::{
-    DescriptorId, DescriptorProvider, ObjectDescriptorInner, CAPTURED_DATA_VALUES_OFFSET,
+    DescriptorProvider, ObjectDescriptorInner, CAPTURED_DATA_VALUES_OFFSET,
     CLOSURE_CAPTURED_DATA_PTR_OFFSET, ENUM_DATA_OFFSET, ENUM_TAG_OFFSET, OBJECT_HEADER_SIZE,
 };
 use std::ptr::NonNull;
@@ -35,12 +37,25 @@ impl Heap {
         descriptors: &P,
         src: NonNull<u8>,
     ) -> AllocationResult<NonNull<u8>> {
-        // SAFETY: caller's contract on `src`.
-        let src_size = unsafe { read_obj_size(src.as_ptr()) } as usize;
-        let src_desc_id = DescriptorId(unsafe { read_descriptor(src.as_ptr()) });
+        // SAFETY: caller's contract on `src`. The header stores the object's
+        // interned type, which resolves to its descriptor and size.
+        let ty =
+            unsafe { read_header_type(src.as_ptr()) }.expect("deep-copying a forwarded object");
+        let src_desc_id = descriptors.descriptor_id_for_type(ty).ok_or_else(|| {
+            RuntimeError::InvariantViolation(RuntimeInvariantViolation::DescriptorNotFound {
+                descriptor_id: 0,
+            })
+        })?;
+        let desc = descriptors.descriptor(src_desc_id).ok_or_else(|| {
+            RuntimeError::InvariantViolation(RuntimeInvariantViolation::DescriptorNotFound {
+                descriptor_id: src_desc_id.as_u32(),
+            })
+        })?;
+        // SAFETY: `src` is a live object whose descriptor is `desc`.
+        let src_size = unsafe { object_total_size_from_descriptor(desc.inner(), src.as_ptr()) };
         debug_assert!(src_size >= OBJECT_HEADER_SIZE);
 
-        let new_raw = heap_alloc(self, src_size, src_desc_id)?;
+        let new_raw = heap_alloc(self, src_size, ty)?;
         // SAFETY: `heap_alloc` returns non-null on success.
         let new = unsafe { NonNull::new_unchecked(new_raw) };
 
@@ -52,11 +67,6 @@ impl Heap {
                 src_size - OBJECT_HEADER_SIZE,
             );
         }
-        let desc = descriptors.descriptor(src_desc_id).ok_or_else(|| {
-            RuntimeError::InvariantViolation(RuntimeInvariantViolation::DescriptorNotFound {
-                descriptor_id: src_desc_id.as_u32(),
-            })
-        })?;
 
         // Walk pointer fields. The freshly-copied object still holds the old
         // child pointers, so each child is deep-copied and the corresponding

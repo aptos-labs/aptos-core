@@ -55,7 +55,7 @@ use dashmap::DashMap;
 use mono_move_alloc::{GlobalArenaPool, GlobalArenaPtr, GlobalArenaShard};
 use mono_move_core::{
     types::NominalLayout, DescriptorId, DescriptorProvider, FrameOffset, Interner, ModuleId,
-    ObjectDescriptor,
+    ObjectDescriptor, CLOSURE_DESCRIPTOR_ID,
 };
 use move_binary_format::{file_format::SignatureToken, CompiledModule};
 use parking_lot::{RwLock, RwLockReadGuard, RwLockWriteGuard};
@@ -632,6 +632,41 @@ impl<'ctx> ExecutionGuard<'ctx> {
 }
 
 impl<'ctx> DescriptorProvider for ExecutionGuard<'ctx> {
+    fn descriptor_id_for_type(&self, ty: InternedType) -> Option<DescriptorId> {
+        // The header stores the object's interned type; resolve it to a
+        // descriptor id. Vectors index `vector_by_elem` by element type;
+        // closures map any function type to the reserved closure descriptor.
+        //
+        // SAFETY: `view_type` dereferences the arena, sound while this guard
+        // holds the phase read-lock.
+        match view_type(ty) {
+            Type::Vector { elem } => self.ctx.descriptors.vector_by_elem.get(elem).map(|id| *id),
+            Type::Function { .. } => Some(CLOSURE_DESCRIPTOR_ID),
+            // Struct/enum and synthetic captured-data descriptors are not yet
+            // published through the global context (their lowering is
+            // pending). TODO: register and resolve them here once landed.
+            Type::Nominal { .. }
+            | Type::Bool
+            | Type::U8
+            | Type::U16
+            | Type::U32
+            | Type::U64
+            | Type::U128
+            | Type::U256
+            | Type::I8
+            | Type::I16
+            | Type::I32
+            | Type::I64
+            | Type::I128
+            | Type::I256
+            | Type::Address
+            | Type::Signer
+            | Type::ImmutRef { .. }
+            | Type::MutRef { .. }
+            | Type::TypeParam { .. } => None,
+        }
+    }
+
     fn descriptor(&self, id: DescriptorId) -> Option<&ObjectDescriptor> {
         let guard = self.ctx.descriptors.table.load();
         let arc = guard.get(id.as_usize())?;

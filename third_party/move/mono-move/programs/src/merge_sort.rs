@@ -63,17 +63,20 @@ pub fn native_merge_sort(v: &mut [u64]) {
 mod micro_op {
     use mono_move_alloc::GlobalArenaPtr;
     use mono_move_core::{
-        Code, CodeOffset as CO, FrameLayoutInfo, FrameOffset as FO, Function, FunctionPtr,
-        MicroOp::*, SortedSafePointEntries, FRAME_METADATA_SIZE,
+        types::U64_TY, Code, CodeOffset as CO, FrameLayoutInfo, FrameOffset as FO, Function,
+        FunctionPtr, MicroOp::*, SortedSafePointEntries, FRAME_METADATA_SIZE,
     };
     use mono_move_runtime::{ObjectDescriptor, ObjectDescriptorTable};
 
+    /// The input `vector<u64>` is created via `alloc_u64_vec` with the
+    /// well-known [`U64_TY`] header, registered here to the vector descriptor.
     #[rustfmt::skip]
     pub fn program() -> (Vec<FunctionPtr>, ObjectDescriptorTable) {
         let meta = FRAME_METADATA_SIZE as u32;
 
         let mut descriptors = ObjectDescriptorTable::new();
-        let desc_vec_u64 = descriptors.push(ObjectDescriptor::new_vector(8, vec![]).unwrap());
+        let vec_ty = U64_TY;
+        descriptors.push_for_type(vec_ty, ObjectDescriptor::new_vector(8, vec![]).unwrap());
 
         // =================================================================
         // Function 0 — merge_sort(vec)
@@ -263,11 +266,11 @@ mod micro_op {
                 VecLoadElem { dst: FO(elem_b), vec_ref: FO(vec_ref),
                               idx: FO(j), elem_size: 8 },                       // 11
                 JumpLessU64 { target: CO(16), lhs: FO(elem_a), rhs: FO(elem_b) }, // 12
-                VecPushBack { vec_ref: FO(tmp_ref), elem: FO(elem_b), elem_size: 8, descriptor_id: desc_vec_u64 }, // 13
+                VecPushBack { vec_ref: FO(tmp_ref), elem: FO(elem_b), elem_size: 8, vec_ty }, // 13
                 AddU64Imm { dst: FO(j), src: FO(j), imm: 1 },                   // 14
                 Jump { target: CO(5) },                                         // 15
 
-                VecPushBack { vec_ref: FO(tmp_ref), elem: FO(elem_a), elem_size: 8, descriptor_id: desc_vec_u64 }, // 16
+                VecPushBack { vec_ref: FO(tmp_ref), elem: FO(elem_a), elem_size: 8, vec_ty }, // 16
                 AddU64Imm { dst: FO(i), src: FO(i), imm: 1 },                   // 17
                 Jump { target: CO(5) },                                         // 18
 
@@ -275,7 +278,7 @@ mod micro_op {
                 Jump { target: CO(31) },                                        // 20
                 VecLoadElem { dst: FO(elem_a), vec_ref: FO(vec_ref),
                               idx: FO(i), elem_size: 8 },                       // 21
-                VecPushBack { vec_ref: FO(tmp_ref), elem: FO(elem_a), elem_size: 8, descriptor_id: desc_vec_u64 }, // 22
+                VecPushBack { vec_ref: FO(tmp_ref), elem: FO(elem_a), elem_size: 8, vec_ty }, // 22
                 AddU64Imm { dst: FO(i), src: FO(i), imm: 1 },                   // 23
                 Jump { target: CO(19) },                                        // 24
 
@@ -283,7 +286,7 @@ mod micro_op {
                 Jump { target: CO(31) },                                        // 26
                 VecLoadElem { dst: FO(elem_b), vec_ref: FO(vec_ref),
                               idx: FO(j), elem_size: 8 },                       // 27
-                VecPushBack { vec_ref: FO(tmp_ref), elem: FO(elem_b), elem_size: 8, descriptor_id: desc_vec_u64 }, // 28
+                VecPushBack { vec_ref: FO(tmp_ref), elem: FO(elem_b), elem_size: 8, vec_ty }, // 28
                 AddU64Imm { dst: FO(j), src: FO(j), imm: 1 },                   // 29
                 Jump { target: CO(25) },                                        // 30
 

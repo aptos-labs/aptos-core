@@ -233,13 +233,15 @@ pub struct PackClosureOp {
     pub func_ref: ClosureFuncRef,
     /// Bitmask of which function parameters are captured vs provided.
     pub mask: u64,
-    /// Descriptor for the allocated `ClosureCapturedData` (Materialized)
-    /// object. `Some` iff this closure captures at least one value;
+    /// The closure's function type, written into the closure object header.
+    /// Resolves to the reserved closure descriptor through the provider's
+    /// type-to-descriptor map.
+    pub func_ty: InternedType,
+    /// Interned type of the allocated `ClosureCapturedData` (Materialized)
+    /// object, written into its header and resolved to its descriptor via the
+    /// provider. `Some` iff this closure captures at least one value;
     /// otherwise `None` and no captured-data object is allocated.
-    ///
-    /// The closure object's own descriptor is implicit: it is always the
-    /// reserved `CLOSURE_DESCRIPTOR_ID` slot in the descriptor table.
-    pub captured_data_descriptor_id: Option<DescriptorId>,
+    pub captured_data_ty: Option<InternedType>,
     /// Sources (in caller's frame) of the captured values, in the order that
     /// `mask.is_captured(i)` is true — i.e. ascending `i` through the
     /// function's parameter list.
@@ -641,7 +643,9 @@ pub enum MicroOp {
         vec_ref: FrameOffset,
         elem: FrameOffset,
         elem_size: u32,
-        descriptor_id: DescriptorId,
+        /// The vector's interned type. Written into the heap object header and
+        /// resolved to a descriptor (for GC tracing) via the provider.
+        vec_ty: InternedType,
     },
 
     /// Pop last element. Copies `elem_size` bytes to `dst`.
@@ -800,7 +804,9 @@ pub enum MicroOp {
     /// preferable.
     HeapNew {
         dst: FrameOffset,
-        descriptor_id: DescriptorId,
+        /// The object's interned type. Written into the heap object header and
+        /// resolved to a descriptor (for size and GC tracing) via the provider.
+        ty: InternedType,
     },
 
     /// Copy 8 bytes from a heap object at `heap_ptr + offset` into `dst`.
@@ -1157,12 +1163,12 @@ impl fmt::Display for MicroOp {
                 vec_ref,
                 elem,
                 elem_size,
-                descriptor_id,
+                vec_ty: _,
             } => {
                 write!(
                     f,
-                    "VecPushBack [{}].push([{}], size={}, desc={})",
-                    vec_ref.0, elem.0, elem_size, descriptor_id
+                    "VecPushBack [{}].push([{}], size={})",
+                    vec_ref.0, elem.0, elem_size
                 )
             },
             MicroOp::VecPopBack {
@@ -1267,8 +1273,8 @@ impl fmt::Display for MicroOp {
                     ref_ptr.0, offset, src.0, size
                 )
             },
-            MicroOp::HeapNew { dst, descriptor_id } => {
-                write!(f, "HeapNew [{}] desc={}", dst.0, descriptor_id)
+            MicroOp::HeapNew { dst, ty: _ } => {
+                write!(f, "HeapNew [{}]", dst.0)
             },
             MicroOp::HeapMoveFrom8 {
                 dst,
@@ -1348,13 +1354,12 @@ impl fmt::Display for MicroOp {
             MicroOp::PackClosure(op) => {
                 write!(
                     f,
-                    "PackClosure [{}] <- func_ref={}, mask={:b}, captured_desc=",
-                    op.dst.0, op.func_ref, op.mask
+                    "PackClosure [{}] <- func_ref={}, mask={:b}, has_captured_data={}",
+                    op.dst.0,
+                    op.func_ref,
+                    op.mask,
+                    op.captured_data_ty.is_some()
                 )?;
-                match op.captured_data_descriptor_id {
-                    Some(id) => write!(f, "{}", id)?,
-                    None => write!(f, "<none>")?,
-                }
                 write!(f, ", captured=[")?;
                 for (i, slot) in op.captured.iter().enumerate() {
                     if i > 0 {

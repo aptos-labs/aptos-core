@@ -13,7 +13,7 @@ use common::InMemoryResources;
 use mono_move_alloc::GlobalArenaPtr;
 use mono_move_core::{
     types::{InternedType, Type},
-    Code, DescriptorId, FrameLayoutInfo, FrameOffset as FO, Function, MicroOp, ObjectDescriptor,
+    Code, FrameLayoutInfo, FrameOffset as FO, Function, MicroOp, ObjectDescriptor,
     ObjectDescriptorTable, SortedSafePointEntries,
 };
 use mono_move_gas::SimpleGasMeter;
@@ -33,10 +33,11 @@ fn resource_ty() -> InternedType {
     GlobalArenaPtr::from_static(&RESOURCE_TY_NODE)
 }
 
-fn fresh_descriptors() -> (ObjectDescriptorTable, DescriptorId) {
+fn fresh_descriptors() -> ObjectDescriptorTable {
     let mut table = ObjectDescriptorTable::new();
     let desc = table.push(ObjectDescriptor::new_struct(8, vec![]).unwrap());
-    (table, desc)
+    table.register_type(resource_ty(), desc);
+    table
 }
 
 fn addr(byte: u8) -> AccountAddress {
@@ -82,7 +83,7 @@ const ADDR: FO = FO(8);
 
 #[test]
 fn exists_returns_false_for_absent() {
-    let (descriptors, _) = fresh_descriptors();
+    let descriptors = fresh_descriptors();
     let func = make_program(vec![
         MicroOp::Exists {
             addr: ADDR,
@@ -102,9 +103,9 @@ fn exists_returns_false_for_absent() {
 
 #[test]
 fn exists_returns_true_for_present() {
-    let (descriptors, desc_id) = fresh_descriptors();
+    let descriptors = fresh_descriptors();
     let resources = InMemoryResources::new();
-    resources.install_global(addr(1), resource_ty(), desc_id, &make_resource(42));
+    resources.install_global(addr(1), resource_ty(), &make_resource(42));
     let mut exec_ctx = local_ctx_with(&resources, descriptors);
 
     let func = make_program(vec![
@@ -125,9 +126,9 @@ fn exists_returns_true_for_present() {
 
 #[test]
 fn exists_returns_false_after_move_from() {
-    let (descriptors, desc_id) = fresh_descriptors();
+    let descriptors = fresh_descriptors();
     let resources = InMemoryResources::new();
-    resources.install_global(addr(1), resource_ty(), desc_id, &make_resource(42));
+    resources.install_global(addr(1), resource_ty(), &make_resource(42));
     let mut exec_ctx = local_ctx_with(&resources, descriptors);
 
     let tmp: FO = FO(40);
@@ -172,10 +173,10 @@ fn exists_returns_false_after_move_from() {
 
 #[test]
 fn borrow_global_returns_storage_pointer_zero_copy() {
-    let (descriptors, desc_id) = fresh_descriptors();
+    let descriptors = fresh_descriptors();
     let resources = InMemoryResources::new();
     let expected_ptr =
-        resources.install_global(addr(2), resource_ty(), desc_id, &make_resource(0xDEAD_BEEF));
+        resources.install_global(addr(2), resource_ty(), &make_resource(0xDEAD_BEEF));
     let mut exec_ctx = local_ctx_with(&resources, descriptors);
 
     let func = make_program(vec![
@@ -200,7 +201,7 @@ fn borrow_global_returns_storage_pointer_zero_copy() {
 
 #[test]
 fn borrow_global_aborts_on_missing() {
-    let (descriptors, _) = fresh_descriptors();
+    let descriptors = fresh_descriptors();
     let func = make_program(vec![
         MicroOp::BorrowGlobal {
             addr: ADDR,
@@ -228,7 +229,7 @@ fn borrow_global_aborts_on_missing() {
 
 #[test]
 fn borrow_global_mut_aborts_on_missing() {
-    let (descriptors, _) = fresh_descriptors();
+    let descriptors = fresh_descriptors();
     let func = make_program(vec![
         MicroOp::BorrowGlobalMut {
             addr: ADDR,
@@ -256,7 +257,7 @@ fn borrow_global_mut_aborts_on_missing() {
 
 #[test]
 fn move_from_aborts_on_missing() {
-    let (descriptors, _) = fresh_descriptors();
+    let descriptors = fresh_descriptors();
     let func = make_program(vec![
         MicroOp::MoveFrom {
             addr: ADDR,
@@ -280,9 +281,9 @@ fn move_from_aborts_on_missing() {
 
 #[test]
 fn move_from_marks_deleted_and_second_borrow_aborts() {
-    let (descriptors, desc_id) = fresh_descriptors();
+    let descriptors = fresh_descriptors();
     let resources = InMemoryResources::new();
-    resources.install_global(addr(3), resource_ty(), desc_id, &make_resource(42));
+    resources.install_global(addr(3), resource_ty(), &make_resource(42));
     let mut exec_ctx = local_ctx_with(&resources, descriptors);
 
     let tmp: FO = FO(40);
@@ -328,10 +329,9 @@ fn move_from_marks_deleted_and_second_borrow_aborts() {
 
 #[test]
 fn force_gc_does_not_disturb_external_read() {
-    let (descriptors, desc_id) = fresh_descriptors();
+    let descriptors = fresh_descriptors();
     let resources = InMemoryResources::new();
-    let expected_ptr =
-        resources.install_global(addr(4), resource_ty(), desc_id, &make_resource(0x1234));
+    let expected_ptr = resources.install_global(addr(4), resource_ty(), &make_resource(0x1234));
     let mut exec_ctx = local_ctx_with(&resources, descriptors);
 
     let func = make_program(vec![

@@ -13,9 +13,10 @@
 
 use mono_move_alloc::GlobalArenaPtr;
 use mono_move_core::{
-    CallClosureOp, ClosureFuncRef, Code, CodeOffset as CO, DescriptorId, FrameLayoutInfo,
-    FrameOffset as FO, Function, FunctionPtr, MicroOp, PackClosureOp, SizedSlot,
-    SortedSafePointEntries, FRAME_METADATA_SIZE,
+    types::{InternedType, BOOL_TY, U16_TY, U32_TY, U8_TY},
+    CallClosureOp, ClosureFuncRef, Code, CodeOffset as CO, FrameLayoutInfo, FrameOffset as FO,
+    Function, FunctionPtr, MicroOp, PackClosureOp, SizedSlot, SortedSafePointEntries,
+    CLOSURE_DESCRIPTOR_ID, FRAME_METADATA_SIZE,
 };
 use mono_move_runtime::{
     InterpreterContext, LocalRuntimeContext, ObjectDescriptor, ObjectDescriptorTable,
@@ -43,21 +44,37 @@ use mono_move_runtime::{
 /// into its `PackClosure` / `VecPushBack` micro-ops.
 struct TestDescriptors {
     table: ObjectDescriptorTable,
-    desc_captured_1_u64: DescriptorId,
-    desc_captured_2_u64: DescriptorId,
-    desc_vec_u64: DescriptorId,
+    /// Closure function type — resolves to the reserved closure descriptor.
+    func_ty: InternedType,
+    captured_1_ty: InternedType,
+    captured_2_ty: InternedType,
+    vec_ty: InternedType,
 }
 
 fn test_descriptors() -> TestDescriptors {
     let mut table = ObjectDescriptorTable::new();
-    let desc_captured_1_u64 = table.push(ObjectDescriptor::new_captured_data(8, vec![]).unwrap());
-    let desc_captured_2_u64 = table.push(ObjectDescriptor::new_captured_data(16, vec![]).unwrap());
-    let desc_vec_u64 = table.push(ObjectDescriptor::new_vector(8, vec![]).unwrap());
+    // Closure objects carry their function type, which maps to the reserved
+    // closure descriptor.
+    let func_ty = BOOL_TY;
+    table.register_type(func_ty, CLOSURE_DESCRIPTOR_ID);
+    let captured_1_ty = U8_TY;
+    table.push_for_type(
+        captured_1_ty,
+        ObjectDescriptor::new_captured_data(8, vec![]).unwrap(),
+    );
+    let captured_2_ty = U16_TY;
+    table.push_for_type(
+        captured_2_ty,
+        ObjectDescriptor::new_captured_data(16, vec![]).unwrap(),
+    );
+    let vec_ty = U32_TY;
+    table.push_for_type(vec_ty, ObjectDescriptor::new_vector(8, vec![]).unwrap());
     TestDescriptors {
         table,
-        desc_captured_1_u64,
-        desc_captured_2_u64,
-        desc_vec_u64,
+        func_ty,
+        captured_1_ty,
+        captured_2_ty,
+        vec_ty,
     }
 }
 
@@ -257,7 +274,8 @@ fn identity_no_captures() {
                 dst: closure,
                 func_ref: ClosureFuncRef::Resolved(identity_ptr),
                 mask: 0,
-                captured_data_descriptor_id: None,
+                func_ty: descs.func_ty,
+                captured_data_ty: None,
                 captured: vec![],
             })),
             MicroOp::CallClosure(Box::new(CallClosureOp {
@@ -338,7 +356,8 @@ fn add_captured_a_provided_b() {
                 dst: closure,
                 func_ref: ClosureFuncRef::Resolved(add_ptr),
                 mask: 0b01, // capture position 0
-                captured_data_descriptor_id: Some(descs.desc_captured_1_u64),
+                func_ty: descs.func_ty,
+                captured_data_ty: Some(descs.captured_1_ty),
                 captured: vec![SizedSlot { offset: a, size: 8 }],
             })),
             MicroOp::CallClosure(Box::new(CallClosureOp {
@@ -409,7 +428,8 @@ fn add_provided_a_captured_b() {
                 dst: closure,
                 func_ref: ClosureFuncRef::Resolved(add_ptr),
                 mask: 0b10, // capture position 1
-                captured_data_descriptor_id: Some(descs.desc_captured_1_u64),
+                func_ty: descs.func_ty,
+                captured_data_ty: Some(descs.captured_1_ty),
                 captured: vec![SizedSlot { offset: b, size: 8 }],
             })),
             MicroOp::CallClosure(Box::new(CallClosureOp {
@@ -480,7 +500,8 @@ fn add_all_captured() {
                 dst: closure,
                 func_ref: ClosureFuncRef::Resolved(add_ptr),
                 mask: 0b11,
-                captured_data_descriptor_id: Some(descs.desc_captured_2_u64),
+                func_ty: descs.func_ty,
+                captured_data_ty: Some(descs.captured_2_ty),
                 captured: vec![SizedSlot { offset: a, size: 8 }, SizedSlot {
                     offset: b,
                     size: 8,
@@ -586,7 +607,7 @@ fn vector_map_add_captured() {
                 vec_ref,
                 elem: tmp,
                 elem_size: 8,
-                descriptor_id: descs.desc_vec_u64,
+                vec_ty: descs.vec_ty,
             },
             StoreImm8 {
                 dst: tmp,
@@ -596,7 +617,7 @@ fn vector_map_add_captured() {
                 vec_ref,
                 elem: tmp,
                 elem_size: 8,
-                descriptor_id: descs.desc_vec_u64,
+                vec_ty: descs.vec_ty,
             },
             StoreImm8 {
                 dst: tmp,
@@ -606,7 +627,7 @@ fn vector_map_add_captured() {
                 vec_ref,
                 elem: tmp,
                 elem_size: 8,
-                descriptor_id: descs.desc_vec_u64,
+                vec_ty: descs.vec_ty,
             },
             // === Pack closure: `|x| x + y`, wrapping add_u64 with `b` captured ===
             // pc 8: y = 10
@@ -619,7 +640,8 @@ fn vector_map_add_captured() {
                 dst: closure,
                 func_ref: ClosureFuncRef::Resolved(add_ptr),
                 mask: 0b10,
-                captured_data_descriptor_id: Some(descs.desc_captured_1_u64),
+                func_ty: descs.func_ty,
+                captured_data_ty: Some(descs.captured_1_ty),
                 captured: vec![SizedSlot { offset: y, size: 8 }],
             })),
             // === Call vector_map(vec, closure, n) ===

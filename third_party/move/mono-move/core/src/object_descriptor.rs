@@ -10,7 +10,11 @@
 //! at [`RESERVED_DESCRIPTOR_COUNT`]; consumers (the runtime) look them up
 //! through a [`DescriptorProvider`].
 
-use crate::DescriptorId;
+use crate::{
+    types::{display_type, InternedType},
+    DescriptorId,
+};
+use std::{collections::HashMap, fmt};
 
 // ---------------------------------------------------------------------------
 // Object descriptors (for GC tracing)
@@ -213,6 +217,12 @@ pub trait DescriptorProvider {
     /// Returns the descriptor for `id`, or `None` if `id` is not a
     /// descriptor known to this provider.
     fn descriptor(&self, id: DescriptorId) -> Option<&ObjectDescriptor>;
+
+    /// Returns the descriptor id associated with a heap object's header type,
+    /// or `None` if the type has no registered descriptor. Heap object headers
+    /// store the object's [`InternedType`]; the runtime resolves it to a
+    /// [`DescriptorId`] through this map to trace and size the object.
+    fn descriptor_id_for_type(&self, ty: InternedType) -> Option<DescriptorId>;
 }
 
 // ---------------------------------------------------------------------------
@@ -229,9 +239,33 @@ pub trait DescriptorProvider {
 /// Each user descriptor is validated by its constructor before reaching
 /// the table, so any `&ObjectDescriptorTable` is structurally well-formed
 /// by construction.
-#[derive(Debug)]
 pub struct ObjectDescriptorTable {
     descriptors: Vec<ObjectDescriptor>,
+    /// Maps a heap object's header [`InternedType`] to its descriptor id.
+    /// Populated by [`Self::register_type`] (and [`Self::push_for_type`]).
+    type_ids: HashMap<InternedType, DescriptorId>,
+}
+
+impl fmt::Debug for ObjectDescriptorTable {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        // Render the registered type keys by name via `display_type` rather
+        // than printing raw pointer addresses. This dereferences the interned
+        // types; like the other display impls in this crate, it is only used
+        // while a guard keeps the arena alive.
+        write!(
+            f,
+            "ObjectDescriptorTable {{ descriptors: {:?}, types: [",
+            self.descriptors
+        )?;
+        for (i, (ty, id)) in self.type_ids.iter().enumerate() {
+            if i > 0 {
+                write!(f, ", ")?;
+            }
+            display_type(f, *ty)?;
+            write!(f, " -> {}", id)?;
+        }
+        write!(f, "] }}")
+    }
 }
 
 // `len_without_is_empty`: the table always has the two reserved entries,
@@ -242,6 +276,7 @@ impl ObjectDescriptorTable {
     pub fn new() -> Self {
         Self {
             descriptors: vec![ObjectDescriptor::trivial(), ObjectDescriptor::closure()],
+            type_ids: HashMap::new(),
         }
     }
 
@@ -252,6 +287,19 @@ impl ObjectDescriptorTable {
                 .expect("descriptor table length exceeds u32::MAX"),
         );
         self.descriptors.push(desc);
+        id
+    }
+
+    /// Associate a header [`InternedType`] with an existing descriptor id so
+    /// the runtime can resolve the type stored in an object header.
+    pub fn register_type(&mut self, ty: InternedType, id: DescriptorId) {
+        self.type_ids.insert(ty, id);
+    }
+
+    /// Append a user descriptor, associate it with `ty`, and return its id.
+    pub fn push_for_type(&mut self, ty: InternedType, desc: ObjectDescriptor) -> DescriptorId {
+        let id = self.push(desc);
+        self.register_type(ty, id);
         id
     }
 
@@ -270,6 +318,10 @@ impl Default for ObjectDescriptorTable {
 impl DescriptorProvider for ObjectDescriptorTable {
     fn descriptor(&self, id: DescriptorId) -> Option<&ObjectDescriptor> {
         self.descriptors.get(id.as_usize())
+    }
+
+    fn descriptor_id_for_type(&self, ty: InternedType) -> Option<DescriptorId> {
+        self.type_ids.get(&ty).copied()
     }
 }
 

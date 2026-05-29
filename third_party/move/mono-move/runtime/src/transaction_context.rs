@@ -9,8 +9,9 @@
 use crate::ExecutionContext;
 use mono_move_core::{
     interner::{InternedIdentifier, InternedModuleId},
-    types::InternedTypeList,
-    DescriptorId, DescriptorProvider, FunctionPtr, ObjectDescriptor, ResourceProvider,
+    types::{InternedType, InternedTypeList},
+    DescriptorId, DescriptorProvider, FunctionPtr, ObjectDescriptor,
+    ResourceProvider,
 };
 use mono_move_gas::GasMeter;
 use mono_move_loader::{Loader, LoaderResult, ModuleReadSet};
@@ -79,5 +80,9 @@ impl<'guard, 'ctx, G: GasMeter> ExecutionContext for TransactionContext<'guard, 
 impl<'guard, 'ctx, G: GasMeter> DescriptorProvider for TransactionContext<'guard, 'ctx, G> {
     fn descriptor(&self, id: DescriptorId) -> Option<&ObjectDescriptor> {
         self.loader.guard().descriptor(id)
+    }
+
+    fn descriptor_id_for_type(&self, ty: InternedType) -> Option<DescriptorId> {
+        self.loader.guard().descriptor_id_for_type(ty)
     }
 }

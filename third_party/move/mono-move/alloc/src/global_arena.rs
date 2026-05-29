@@ -55,6 +55,18 @@ impl<T: ?Sized> GlobalArenaPtr<T> {
         self.0
     }
 
+    /// Wraps a raw non-null pointer to arena (or static) data.
+    ///
+    /// # Safety
+    ///
+    /// The pointer must point to valid `T` data that stays alive for as long
+    /// as the resulting [`GlobalArenaPtr`] is dereferenced. Intended for
+    /// reconstructing a pointer previously obtained from [`Self::as_raw_ptr`]
+    /// (e.g., a value stored in a heap object header).
+    pub unsafe fn from_non_null(ptr: NonNull<T>) -> Self {
+        Self(ptr)
+    }
+
     /// Returns the raw const pointer to the allocated data.
     pub fn as_raw_ptr(&self) -> *const T {
         self.0.as_ptr()

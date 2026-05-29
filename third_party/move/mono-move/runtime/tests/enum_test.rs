@@ -5,6 +5,7 @@
 
 use mono_move_alloc::GlobalArenaPtr;
 use mono_move_core::{
+    types::{BOOL_TY, U8_TY},
     Code, CodeOffset as CO, FrameLayoutInfo, FrameOffset as FO, Function, MicroOp,
     SortedSafePointEntries, ENUM_DATA_OFFSET, ENUM_TAG_OFFSET,
 };
@@ -26,12 +27,15 @@ fn enum_basic() {
     let tmp: u32 = 16;
 
     let mut descriptors = ObjectDescriptorTable::new();
-    let desc_shape_enum =
-        descriptors.push(ObjectDescriptor::new_enum(24, vec![vec![], vec![]]).unwrap());
+    let desc_shape_enum_ty = BOOL_TY;
+    descriptors.push_for_type(
+        desc_shape_enum_ty,
+        ObjectDescriptor::new_enum(24, vec![vec![], vec![]]).unwrap(),
+    );
 
     #[rustfmt::skip]
     let code = vec![
-        HeapNew { dst: FO(shape), descriptor_id: desc_shape_enum },
+        HeapNew { dst: FO(shape), ty: desc_shape_enum_ty },
         MicroOp::enum_set_tag(FO(shape), 1),
         StoreImm8 { dst: FO(tmp), imm: 3u64.to_le_bytes() },
         MicroOp::enum_store8(FO(shape), 0, FO(tmp)),
@@ -83,12 +87,15 @@ fn enum_survives_gc() {
     let tmp: u32 = 16;
 
     let mut descriptors = ObjectDescriptorTable::new();
-    let desc_shape_enum =
-        descriptors.push(ObjectDescriptor::new_enum(24, vec![vec![], vec![]]).unwrap());
+    let desc_shape_enum_ty = BOOL_TY;
+    descriptors.push_for_type(
+        desc_shape_enum_ty,
+        ObjectDescriptor::new_enum(24, vec![vec![], vec![]]).unwrap(),
+    );
 
     #[rustfmt::skip]
     let code = vec![
-        HeapNew { dst: FO(shape), descriptor_id: desc_shape_enum },
+        HeapNew { dst: FO(shape), ty: desc_shape_enum_ty },
         MicroOp::enum_set_tag(FO(shape), 0),
         StoreImm8 { dst: FO(tmp), imm: 42u64.to_le_bytes() },
         MicroOp::enum_store8(FO(shape), 0, FO(tmp)),
@@ -136,21 +143,28 @@ fn enum_gc_traces_refs() {
     let vec_ref: u32 = 32;
 
     let mut descriptors = ObjectDescriptorTable::new();
-    let desc_val_enum =
-        descriptors.push(ObjectDescriptor::new_enum(16, vec![vec![], vec![0]]).unwrap());
-    let desc_vec_u64 = descriptors.push(ObjectDescriptor::new_vector(8, vec![]).unwrap());
+    let desc_val_enum_ty = BOOL_TY;
+    descriptors.push_for_type(
+        desc_val_enum_ty,
+        ObjectDescriptor::new_enum(16, vec![vec![], vec![0]]).unwrap(),
+    );
+    let desc_vec_u64_ty = U8_TY;
+    descriptors.push_for_type(
+        desc_vec_u64_ty,
+        ObjectDescriptor::new_vector(8, vec![]).unwrap(),
+    );
 
     #[rustfmt::skip]
     let code = vec![
         VecNew { dst: FO(vec) },
         SlotBorrow { dst: FO(vec_ref), local: FO(vec) },
         StoreImm8 { dst: FO(tmp), imm: 10u64.to_le_bytes() },
-        VecPushBack { vec_ref: FO(vec_ref), elem: FO(tmp), elem_size: 8, descriptor_id: desc_vec_u64 },
+        VecPushBack { vec_ref: FO(vec_ref), elem: FO(tmp), elem_size: 8, vec_ty: desc_vec_u64_ty },
         StoreImm8 { dst: FO(tmp), imm: 20u64.to_le_bytes() },
-        VecPushBack { vec_ref: FO(vec_ref), elem: FO(tmp), elem_size: 8, descriptor_id: desc_vec_u64 },
+        VecPushBack { vec_ref: FO(vec_ref), elem: FO(tmp), elem_size: 8, vec_ty: desc_vec_u64_ty },
         StoreImm8 { dst: FO(tmp), imm: 30u64.to_le_bytes() },
-        VecPushBack { vec_ref: FO(vec_ref), elem: FO(tmp), elem_size: 8, descriptor_id: desc_vec_u64 },
-        HeapNew { dst: FO(val), descriptor_id: desc_val_enum },
+        VecPushBack { vec_ref: FO(vec_ref), elem: FO(tmp), elem_size: 8, vec_ty: desc_vec_u64_ty },
+        HeapNew { dst: FO(val), ty: desc_val_enum_ty },
         MicroOp::enum_set_tag(FO(val), 1),
         MicroOp::enum_store8(FO(val), 0, FO(vec)),
         ForceGC,
@@ -205,12 +219,15 @@ fn enum_pattern_match() {
     let tmp: u32 = 16;
 
     let mut descriptors = ObjectDescriptorTable::new();
-    let desc_op_enum =
-        descriptors.push(ObjectDescriptor::new_enum(24, vec![vec![], vec![]]).unwrap());
+    let desc_op_enum_ty = BOOL_TY;
+    descriptors.push_for_type(
+        desc_op_enum_ty,
+        ObjectDescriptor::new_enum(24, vec![vec![], vec![]]).unwrap(),
+    );
 
     #[rustfmt::skip]
     let code = vec![
-        HeapNew { dst: FO(op), descriptor_id: desc_op_enum },
+        HeapNew { dst: FO(op), ty: desc_op_enum_ty },
         MicroOp::enum_set_tag(FO(op), 0),
         StoreImm8 { dst: FO(tmp), imm: 10u64.to_le_bytes() },
         MicroOp::enum_store8(FO(op), 0, FO(tmp)),
@@ -256,12 +273,15 @@ fn enum_variant_switch() {
     let tmp: u32 = 16;
 
     let mut descriptors = ObjectDescriptorTable::new();
-    let desc_e_enum =
-        descriptors.push(ObjectDescriptor::new_enum(16, vec![vec![], vec![]]).unwrap());
+    let desc_e_enum_ty = BOOL_TY;
+    descriptors.push_for_type(
+        desc_e_enum_ty,
+        ObjectDescriptor::new_enum(16, vec![vec![], vec![]]).unwrap(),
+    );
 
     #[rustfmt::skip]
     let code = vec![
-        HeapNew { dst: FO(e), descriptor_id: desc_e_enum },
+        HeapNew { dst: FO(e), ty: desc_e_enum_ty },
         MicroOp::enum_set_tag(FO(e), 0),
         StoreImm8 { dst: FO(tmp), imm: 111u64.to_le_bytes() },
         MicroOp::enum_store8(FO(e), 0, FO(tmp)),
@@ -306,12 +326,15 @@ fn enum_borrow_field() {
     let e_ref: u32 = 32; // 16-byte fat pointer ref to e (for enum_borrow)
 
     let mut descriptors = ObjectDescriptorTable::new();
-    let desc_e_enum =
-        descriptors.push(ObjectDescriptor::new_enum(24, vec![vec![], vec![]]).unwrap());
+    let desc_e_enum_ty = BOOL_TY;
+    descriptors.push_for_type(
+        desc_e_enum_ty,
+        ObjectDescriptor::new_enum(24, vec![vec![], vec![]]).unwrap(),
+    );
 
     #[rustfmt::skip]
     let code = vec![
-        HeapNew { dst: FO(e), descriptor_id: desc_e_enum },
+        HeapNew { dst: FO(e), ty: desc_e_enum_ty },
         MicroOp::enum_set_tag(FO(e), 0),
         StoreImm8 { dst: FO(result), imm: 10u64.to_le_bytes() },
         MicroOp::enum_store8(FO(e), 0, FO(result)),
@@ -358,17 +381,24 @@ fn enum_gc_variant_switching() {
     let vec_ref: u32 = 32;
 
     let mut descriptors = ObjectDescriptorTable::new();
-    let desc_ctr_enum =
-        descriptors.push(ObjectDescriptor::new_enum(16, vec![vec![], vec![0]]).unwrap());
-    let desc_vec_u64 = descriptors.push(ObjectDescriptor::new_vector(8, vec![]).unwrap());
+    let desc_ctr_enum_ty = BOOL_TY;
+    descriptors.push_for_type(
+        desc_ctr_enum_ty,
+        ObjectDescriptor::new_enum(16, vec![vec![], vec![0]]).unwrap(),
+    );
+    let desc_vec_u64_ty = U8_TY;
+    descriptors.push_for_type(
+        desc_vec_u64_ty,
+        ObjectDescriptor::new_vector(8, vec![]).unwrap(),
+    );
 
     #[rustfmt::skip]
     let code = vec![
         VecNew { dst: FO(vec) },
         SlotBorrow { dst: FO(vec_ref), local: FO(vec) },
         StoreImm8 { dst: FO(tmp), imm: 100u64.to_le_bytes() },
-        VecPushBack { vec_ref: FO(vec_ref), elem: FO(tmp), elem_size: 8, descriptor_id: desc_vec_u64 },
-        HeapNew { dst: FO(ctr), descriptor_id: desc_ctr_enum },
+        VecPushBack { vec_ref: FO(vec_ref), elem: FO(tmp), elem_size: 8, vec_ty: desc_vec_u64_ty },
+        HeapNew { dst: FO(ctr), ty: desc_ctr_enum_ty },
         MicroOp::enum_set_tag(FO(ctr), 1),
         MicroOp::enum_store8(FO(ctr), 0, FO(vec)),
         ForceGC,
@@ -419,17 +449,24 @@ fn enum_in_struct() {
     let tmp: u32 = 24;
 
     let mut descriptors = ObjectDescriptorTable::new();
-    let desc_wrapper_struct = descriptors.push(ObjectDescriptor::new_struct(16, vec![8]).unwrap());
-    let desc_payload_enum =
-        descriptors.push(ObjectDescriptor::new_enum(16, vec![vec![], vec![]]).unwrap());
+    let desc_wrapper_struct_ty = BOOL_TY;
+    descriptors.push_for_type(
+        desc_wrapper_struct_ty,
+        ObjectDescriptor::new_struct(16, vec![8]).unwrap(),
+    );
+    let desc_payload_enum_ty = U8_TY;
+    descriptors.push_for_type(
+        desc_payload_enum_ty,
+        ObjectDescriptor::new_enum(16, vec![vec![], vec![]]).unwrap(),
+    );
 
     #[rustfmt::skip]
     let code = vec![
-        HeapNew { dst: FO(payload), descriptor_id: desc_payload_enum },
+        HeapNew { dst: FO(payload), ty: desc_payload_enum_ty },
         MicroOp::enum_set_tag(FO(payload), 1),
         StoreImm8 { dst: FO(tmp), imm: 42u64.to_le_bytes() },
         MicroOp::enum_store8(FO(payload), 0, FO(tmp)),
-        HeapNew { dst: FO(wrapper), descriptor_id: desc_wrapper_struct },
+        HeapNew { dst: FO(wrapper), ty: desc_wrapper_struct_ty },
         StoreImm8 { dst: FO(tmp), imm: 7u64.to_le_bytes() },
         MicroOp::struct_store8(FO(wrapper), 0, FO(tmp)),
         MicroOp::struct_store8(FO(wrapper), 8, FO(payload)),
@@ -479,26 +516,33 @@ fn enum_in_vector() {
     let vec_ref: u32 = 32;
 
     let mut descriptors = ObjectDescriptorTable::new();
-    let desc_e_enum =
-        descriptors.push(ObjectDescriptor::new_enum(24, vec![vec![], vec![]]).unwrap());
-    let desc_vec_enum_ptrs = descriptors.push(ObjectDescriptor::new_vector(8, vec![0]).unwrap());
+    let desc_e_enum_ty = BOOL_TY;
+    descriptors.push_for_type(
+        desc_e_enum_ty,
+        ObjectDescriptor::new_enum(24, vec![vec![], vec![]]).unwrap(),
+    );
+    let desc_vec_enum_ptrs_ty = U8_TY;
+    descriptors.push_for_type(
+        desc_vec_enum_ptrs_ty,
+        ObjectDescriptor::new_vector(8, vec![0]).unwrap(),
+    );
 
     #[rustfmt::skip]
     let code = vec![
         VecNew { dst: FO(vec) },
         SlotBorrow { dst: FO(vec_ref), local: FO(vec) },
-        HeapNew { dst: FO(e), descriptor_id: desc_e_enum },
+        HeapNew { dst: FO(e), ty: desc_e_enum_ty },
         MicroOp::enum_set_tag(FO(e), 0),
         StoreImm8 { dst: FO(tmp), imm: 10u64.to_le_bytes() },
         MicroOp::enum_store8(FO(e), 0, FO(tmp)),
-        VecPushBack { vec_ref: FO(vec_ref), elem: FO(e), elem_size: 8, descriptor_id: desc_vec_enum_ptrs },
-        HeapNew { dst: FO(e), descriptor_id: desc_e_enum },
+        VecPushBack { vec_ref: FO(vec_ref), elem: FO(e), elem_size: 8, vec_ty: desc_vec_enum_ptrs_ty },
+        HeapNew { dst: FO(e), ty: desc_e_enum_ty },
         MicroOp::enum_set_tag(FO(e), 1),
         StoreImm8 { dst: FO(tmp), imm: 30u64.to_le_bytes() },
         MicroOp::enum_store8(FO(e), 0, FO(tmp)),
         StoreImm8 { dst: FO(tmp), imm: 40u64.to_le_bytes() },
         MicroOp::enum_store8(FO(e), 8, FO(tmp)),
-        VecPushBack { vec_ref: FO(vec_ref), elem: FO(e), elem_size: 8, descriptor_id: desc_vec_enum_ptrs },
+        VecPushBack { vec_ref: FO(vec_ref), elem: FO(e), elem_size: 8, vec_ty: desc_vec_enum_ptrs_ty },
         ForceGC,
         StoreImm8 { dst: FO(tmp), imm: 0u64.to_le_bytes() },
         VecLoadElem { dst: FO(e), vec_ref: FO(vec_ref), idx: FO(tmp), elem_size: 8 },

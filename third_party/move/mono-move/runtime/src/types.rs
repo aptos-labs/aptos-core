@@ -41,14 +41,16 @@ pub(crate) const META_SAVED_FP_OFFSET: usize = 8;
 /// Byte offset of `saved_func_ptr` within frame metadata.
 pub(crate) const META_SAVED_FUNC_PTR_OFFSET: usize = 16;
 
-/// Offset of the `length` field within a vector object's data region.
-/// Vectors put the length at the very start of the data region; element 0
-/// begins at [`VEC_DATA_OFFSET`].
+/// Offset of the `length` field (u64) within a vector object's data region.
+/// Vectors put the length at the very start of the data region.
 pub const VEC_LENGTH_OFFSET: usize = 0;
-/// Offset where vector element data begins (after the `length` field).
-/// Capacity is not stored; it is derived from the header's `size_in_bytes`
-/// field: `capacity = (size_in_bytes - OBJECT_HEADER_SIZE - VEC_DATA_OFFSET) / elem_size`.
-pub const VEC_DATA_OFFSET: usize = 8;
+/// Offset of the `capacity` field (u64, in elements) within a vector object's
+/// data region. The header no longer stores object size, so the vector's
+/// capacity lives in the body: `total_size = OBJECT_HEADER_SIZE +
+/// VEC_DATA_OFFSET + capacity * elem_size`.
+pub const VEC_CAPACITY_OFFSET: usize = 8;
+/// Offset where vector element data begins (after `length` and `capacity`).
+pub const VEC_DATA_OFFSET: usize = 16;
 
 // Element 0 must land on a `MAX_ALIGN`-aligned offset so that any element
 // type (whose alignment is ≤ `MAX_ALIGN`) is naturally aligned. Object
@@ -57,6 +59,4 @@ pub const VEC_DATA_OFFSET: usize = 8;
 // `VEC_DATA_OFFSET` itself is also a `MAX_ALIGN` multiple. See
 // `docs/memory_alignment.md` (§8.3).
 const _: () = assert!(VEC_DATA_OFFSET.is_multiple_of(MAX_ALIGN));
-
-/// Marker written into the `descriptor_id` field of a forwarded object during GC.
-pub(crate) const FORWARDED_MARKER: u32 = u32::MAX;
+const _: () = assert!(VEC_CAPACITY_OFFSET.is_multiple_of(MAX_ALIGN));

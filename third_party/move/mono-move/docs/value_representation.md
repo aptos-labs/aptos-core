@@ -16,22 +16,23 @@ For the alignment story (per-primitive alignments, references, and how it flows 
 
 ## Heap Object Header
 
-All heap objects (structs, enums, vectors, and any future heap types) share a universal 8-byte header `[desc_id: u32 | size: u32]`. The header lives at a *negative* offset relative to the object pointer that callers hold — `obj_ptr` points at the start of the data region, and the header sits in the bytes immediately before it:
+All heap objects (structs, enums, vectors, and any future heap types) share a universal 8-byte header: the object's `InternedType` pointer. The header lives at a *negative* offset relative to the object pointer that callers hold — `obj_ptr` points at the start of the data region, and the header sits in the 8 bytes immediately before it:
 
 ```
-                     obj_ptr
-                        │
-                        ▼
-┌──────────────────────┬──────────────────────────┐
-│ desc_id(4) | size(4) │  data region             │
-└──────────────────────┴──────────────────────────┘
-   header (-8..-4..0)
+                obj_ptr
+                   │
+                   ▼
+┌────────────────┬──────────────────────────┐
+│  InternedType  │  data region             │
+└────────────────┴──────────────────────────┘
+   header (-8..0)
 ```
 
-- `desc_id` (`u32`, at `obj_ptr - 8`): indexes into the descriptor table, telling the GC how to trace internal pointers.
-- `size` (`u32`, at `obj_ptr - 4`): total object size in bytes (header + data, `MAX_ALIGN`-aligned), so the GC can skip over objects during linear heap scanning (Cheney's algorithm).
+The header is the object's interned type (a non-null arena pointer, 8 bytes). The runtime treats it as an opaque key: it never dereferences the type, only resolves it to a descriptor through `DescriptorProvider::descriptor_id_for_type`. The descriptor tells the GC how to trace internal pointers and (together with the stored vector capacity) how big the object is, so the GC can skip over objects during linear heap scanning (Cheney's algorithm). The header no longer stores `desc_id` or `size` — both are looked up from the type.
 
-The allocator reserves `OBJECT_HEADER_SIZE = MAX_ALIGN` bytes before each data region so that `obj_ptr` is itself `MAX_ALIGN`-aligned. When `MAX_ALIGN > 8`, the unused bytes precede `desc_id` (which stays adjacent to the data at offset `-8`); the negative-offset constants don't shift.
+A **null** header word marks a *forwarded* object during GC (an `InternedType` is never null). The forwarding pointer is parked at offset 0 of the data region, as before.
+
+The allocator reserves `OBJECT_HEADER_SIZE = MAX_ALIGN` bytes before each data region so that `obj_ptr` is itself `MAX_ALIGN`-aligned. When `MAX_ALIGN > 8`, the unused bytes precede the type word (which stays adjacent to the data at offset `-8`); the negative-offset constant doesn't shift.
 
 Treating the header as allocator-only bookkeeping means per-type layouts (struct fields, enum tag/variants, vector length/data, closures, captured data) describe their data region exclusively — field 0 of a heap struct is at offset 0, the vector length is at offset 0, etc.
 
@@ -58,14 +59,14 @@ An 8-byte pointer in the enclosing memory region points to the data region of a 
 ```
 Owner region                       Heap
 ┌────────┐                  ┌──────────────────────────┐
-│        │                  │ desc_id(4) | size(4)     │  header (-8..0)
+│        │                  │ InternedType             │  header (-8..0)
 │   ●────┼─────────────────►│ field_0                  │  obj_ptr
 │        │                  │ field_1                  │
 └────────┘                  │ ...                      │
   8 bytes                   └──────────────────────────┘
 ```
 
-The `desc_id` indexes into the descriptor table so the GC knows which field offsets hold heap pointers (`ObjectDescriptor::Struct`).
+The header type resolves to an `ObjectDescriptor::Struct`, which tells the GC which field offsets hold heap pointers.
 
 For field alignment within heap structs, see [`memory_alignment.md`](memory_alignment.md).
 
@@ -84,7 +85,7 @@ The current runtime implements only heap enums:
 ```
 Owner region                       Heap
 ┌────────┐                  ┌──────────────────────────┐
-│        │                  │ desc_id(4) | size(4)     │  header (-8..0)
+│        │                  │ InternedType             │  header (-8..0)
 │   ●────┼─────────────────►│ tag                      │  obj_ptr
 │        │                  ├──────────────────────────┤
 └────────┘                  │ variant fields           │
@@ -106,20 +107,21 @@ An 8-byte pointer in the enclosing memory region points to a heap object (or nul
 ```
 Owner region                  Heap
 ┌────────┐             ┌──────────────────────────┐
-│        │             │ desc_id(4) | size(4)     │  header (-8..0)
+│        │             │ InternedType             │  header (-8..0)
 │   ●────┼────────────►│ length (u64)             │  obj_ptr (offset 0)
+│        │             │ capacity (u64)           │  VEC_CAPACITY_OFFSET (8)
 │        │             ├──────────────────────────┤
-└────────┘             │ elem_0                   │
+└────────┘             │ elem_0                   │  VEC_DATA_OFFSET (16)
   8 bytes              │ elem_1                   │
   (or null             │ ...                      │
    if empty)           └──────────────────────────┘
 ```
 
-The vector's metadata (length) lives on the heap alongside the element data. The GC needs the length to know how many elements to trace for inner pointers. Capacity is not stored explicitly — it is derived from the header: `cap = (size - OBJECT_HEADER_SIZE - VEC_DATA_OFFSET) / elem_size`.
+The vector's metadata (length and capacity) lives on the heap alongside the element data. The GC needs the length to know how many elements to trace for inner pointers, and the capacity to compute the object's total size (`OBJECT_HEADER_SIZE + VEC_DATA_OFFSET + capacity * elem_size`) — since the header no longer stores the size, the capacity is stored explicitly in the body at `VEC_CAPACITY_OFFSET = 8`, and element data begins at `VEC_DATA_OFFSET = 16`.
 
 A null pointer represents an empty vector with no heap allocation. `VecNew` writes null; the first `VecPushBack` allocates lazily.
 
-The `desc_id` tells the GC how to trace element pointers via `ObjectDescriptor::Vector`, which stores the element size and the byte offsets within each element that hold heap pointers.
+The header type resolves to an `ObjectDescriptor::Vector`, which stores the element size and the byte offsets within each element that hold heap pointers, so the GC can trace element pointers.
 
 For element alignment within vectors, see [`memory_alignment.md`](memory_alignment.md).
 
@@ -130,7 +132,7 @@ For element alignment within vectors, see [`memory_alignment.md`](memory_alignme
 ```
 Owner region         Heap (struct)                Heap (vector)
 ┌────────┐    ┌──────────────────────┐     ┌──────────────────────┐
-│        │    │ desc_id(4) | size(4) │     │ desc_id(4) | size(4) │
+│        │    │ InternedType         │     │ InternedType         │
 │   ●────┼───►│ some_field           │     │ length (u64)         │
 └────────┘    │ vec_ptr  ●───────────┼────►│ elem_0               │
               └──────────────────────┘     │ elem_1               │
@@ -143,7 +145,7 @@ Owner region         Heap (struct)                Heap (vector)
 ```
 Owner region         Heap (outer)               Heap (inner)
 ┌────────┐    ┌──────────────────────┐    ┌──────────────────────┐
-│        │    │ desc_id(4) | size(4) │    │ desc_id(4) | size(4) │
+│        │    │ InternedType         │    │ InternedType         │
 │   ●────┼───►│ inner_ptr ●──────────┼───►│ field_0              │
 └────────┘    │ other_field          │    │ field_1              │
               └──────────────────────┘    └──────────────────────┘
@@ -186,7 +188,7 @@ Base points to the heap object's data region. The field offset is the byte offse
   ref = (vec_heap_ptr, VEC_DATA_OFFSET + idx * elem_size)
 ```
 
-Base points to the vector's heap object. `VEC_DATA_OFFSET` (= 8) skips the length field at the start of the data region. Safe as long as no growth occurs while the borrow is live (enforced by Move's borrow checker).
+Base points to the vector's heap object. `VEC_DATA_OFFSET` (= 16) skips the length and capacity fields at the start of the data region. Safe as long as no growth occurs while the borrow is live (enforced by Move's borrow checker).
 
 ### Alternative: raw pointer references
 

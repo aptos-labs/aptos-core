@@ -11,9 +11,9 @@
 //! publish time.
 
 use mono_move_core::{
-    CallClosureOp, ClosureFuncRef, CodeOffset, DescriptorId, DescriptorProvider, FrameOffset,
-    Function, IntBinaryOp, MicroOp, ObjectDescriptorInner, PackClosureOp, ShiftOperand,
-    CLOSURE_DESCRIPTOR_ID, FRAME_METADATA_SIZE,
+    types::InternedType, CallClosureOp, ClosureFuncRef, CodeOffset, DescriptorProvider,
+    FrameOffset, Function, IntBinaryOp, MicroOp, ObjectDescriptor, ObjectDescriptorInner,
+    PackClosureOp, ShiftOperand, CLOSURE_DESCRIPTOR_ID, FRAME_METADATA_SIZE,
 };
 use std::fmt;
 
@@ -469,15 +469,15 @@ impl<P: DescriptorProvider + ?Sized> FunctionVerifier<'_, P> {
                 vec_ref,
                 elem,
                 elem_size,
-                descriptor_id,
+                vec_ty,
             } => {
                 self.check_frame_access(Some(pc), vec_ref, 16);
                 self.check_nonzero_size(pc, elem_size);
                 self.check_frame_access(Some(pc), elem, elem_size);
-                self.check_descriptor_variant(
+                self.check_type_descriptor_variant(
                     pc,
                     "VecPushBack",
-                    descriptor_id,
+                    vec_ty,
                     |inner| matches!(inner, ObjectDescriptorInner::Vector { .. }),
                     "a Vector",
                 );
@@ -585,12 +585,12 @@ impl<P: DescriptorProvider + ?Sized> FunctionVerifier<'_, P> {
             },
 
             // ----- Heap object instructions -----
-            MicroOp::HeapNew { dst, descriptor_id } => {
+            MicroOp::HeapNew { dst, ty } => {
                 self.check_frame_access_8(pc, dst);
-                self.check_descriptor_variant(
+                self.check_type_descriptor_variant(
                     pc,
                     "HeapNew",
-                    descriptor_id,
+                    ty,
                     |inner| {
                         matches!(
                             inner,
@@ -671,34 +671,30 @@ impl<P: DescriptorProvider + ?Sized> FunctionVerifier<'_, P> {
             "reserved descriptor[{}] must be Closure",
             CLOSURE_DESCRIPTOR_ID
         );
-        // captured_data_descriptor_id and `captured` must agree on emptiness:
-        // a captured-data object is allocated iff at least one value is
+        // captured_data_ty and `captured` must agree on emptiness: a
+        // captured-data object is allocated iff at least one value is
         // captured.
-        match (op.captured_data_descriptor_id, op.captured.is_empty()) {
+        match (op.captured_data_ty, op.captured.is_empty()) {
             (None, true) => {},
-            (Some(id), false) => {
-                self.check_descriptor_variant(
+            (Some(ty), false) => {
+                self.check_type_descriptor_variant(
                     pc,
                     "PackClosure",
-                    id,
+                    ty,
                     |inner| matches!(inner, ObjectDescriptorInner::CapturedData { .. }),
                     "a CapturedData",
                 );
             },
-            (Some(id), true) => {
+            (Some(_), true) => {
                 self.err(
                     Some(pc),
-                    format!(
-                        "PackClosure: captured_data_descriptor_id {} provided but no captures",
-                        id
-                    ),
+                    "PackClosure: captured_data_ty provided but no captures".to_string(),
                 );
             },
             (None, false) => {
                 self.err(
                     Some(pc),
-                    "PackClosure: captured non-empty but captured_data_descriptor_id is None"
-                        .to_string(),
+                    "PackClosure: captured non-empty but captured_data_ty is None".to_string(),
                 );
             },
         }
@@ -771,29 +767,23 @@ impl<P: DescriptorProvider + ?Sized> FunctionVerifier<'_, P> {
         // Together with the descriptor self-soundness pass, this is
         // sufficient to ensure the runtime's fixed-offset writes stay in
         // bounds.
-        let Some(id) = op.captured_data_descriptor_id else {
+        let Some(ty) = op.captured_data_ty else {
             // The `None` case is already validated by the (None, _) arms of the
             // match above.
             return;
         };
         let expected_values_size: u32 = op.captured.iter().map(|s| s.size).sum();
-        let Some(desc) = self.provider.descriptor(id) else {
+        let Some(desc) = self.descriptor_for_type(ty) else {
             self.err(
                 Some(pc),
-                format!(
-                    "PackClosure: captured_data descriptor {} not found",
-                    id.as_u32()
-                ),
+                "PackClosure: captured_data type has no registered descriptor".to_string(),
             );
             return;
         };
         let ObjectDescriptorInner::CapturedData { size: actual, .. } = desc.inner() else {
             self.err(
                 Some(pc),
-                format!(
-                    "PackClosure: captured_data descriptor {} is not a CapturedData descriptor",
-                    id.as_u32()
-                ),
+                "PackClosure: captured_data type is not a CapturedData descriptor".to_string(),
             );
             return;
         };
@@ -884,29 +874,33 @@ impl<P: DescriptorProvider + ?Sized> FunctionVerifier<'_, P> {
         }
     }
 
-    /// Check that `descriptor_id` resolves and its variant satisfies `pred`.
-    /// `op` names the calling micro-op and `expected` names the expected
-    /// variant, both for the error message.
-    fn check_descriptor_variant(
+    /// Resolves a heap object's interned type to its descriptor through the
+    /// provider's type-to-descriptor map.
+    fn descriptor_for_type(&self, ty: InternedType) -> Option<&ObjectDescriptor> {
+        self.provider
+            .descriptor_id_for_type(ty)
+            .and_then(|id| self.provider.descriptor(id))
+    }
+
+    /// Check that the header type `ty` resolves to a descriptor whose variant
+    /// satisfies `pred`. `op` names the calling micro-op and `expected` names
+    /// the expected variant, both for the error message.
+    fn check_type_descriptor_variant(
         &mut self,
         pc: usize,
         op: &str,
-        descriptor_id: DescriptorId,
+        ty: InternedType,
         pred: impl FnOnce(&ObjectDescriptorInner) -> bool,
         expected: &str,
     ) {
-        match self.provider.descriptor(descriptor_id) {
+        match self.descriptor_for_type(ty) {
             None => self.err(
                 Some(pc),
-                format!("{}: unknown descriptor_id {}", op, descriptor_id),
+                format!("{}: type has no registered descriptor", op),
             ),
-            Some(desc) if !pred(desc.inner()) => self.err(
-                Some(pc),
-                format!(
-                    "{}: descriptor_id {} is not {}",
-                    op, descriptor_id, expected
-                ),
-            ),
+            Some(desc) if !pred(desc.inner()) => {
+                self.err(Some(pc), format!("{}: descriptor is not {}", op, expected))
+            },
             Some(_) => {},
         }
     }

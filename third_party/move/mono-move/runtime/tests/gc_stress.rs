@@ -23,6 +23,7 @@
 
 use mono_move_alloc::GlobalArenaPtr;
 use mono_move_core::{
+    types::{BOOL_TY, U16_TY, U8_TY},
     Code, CodeOffset as CO, FrameLayoutInfo, FrameOffset as FO, Function, FunctionPtr, MicroOp,
     SortedSafePointEntries,
 };
@@ -100,9 +101,21 @@ fn make_gc_stress_program(
     use MicroOp::*;
 
     let mut descriptors = ObjectDescriptorTable::new();
-    let desc_entry_struct = descriptors.push(ObjectDescriptor::new_struct(16, vec![8]).unwrap());
-    let desc_outer_vec = descriptors.push(ObjectDescriptor::new_vector(8, vec![0]).unwrap());
-    let desc_inner_vec = descriptors.push(ObjectDescriptor::new_vector(8, vec![]).unwrap());
+    let entry_struct_ty = BOOL_TY;
+    descriptors.push_for_type(
+        entry_struct_ty,
+        ObjectDescriptor::new_struct(16, vec![8]).unwrap(),
+    );
+    let outer_vec_ty = U8_TY;
+    descriptors.push_for_type(
+        outer_vec_ty,
+        ObjectDescriptor::new_vector(8, vec![0]).unwrap(),
+    );
+    let inner_vec_ty = U16_TY;
+    descriptors.push_for_type(
+        inner_vec_ty,
+        ObjectDescriptor::new_vector(8, vec![]).unwrap(),
+    );
 
     // -- Function 1: make_entry(val) -> entry_ptr --
     let callee_val: u32 = 0;
@@ -115,8 +128,8 @@ fn make_gc_stress_program(
         // PC 0: vec = VecNew(descriptor=0, elem_size=8)
         VecNew { dst: FO(callee_vec) },
         SlotBorrow { dst: FO(callee_vec_ref), local: FO(callee_vec) },
-        VecPushBack { vec_ref: FO(callee_vec_ref), elem: FO(callee_val), elem_size: 8, descriptor_id: desc_inner_vec },
-        HeapNew { dst: FO(callee_entry), descriptor_id: desc_entry_struct },
+        VecPushBack { vec_ref: FO(callee_vec_ref), elem: FO(callee_val), elem_size: 8, vec_ty: inner_vec_ty },
+        HeapNew { dst: FO(callee_entry), ty: entry_struct_ty },
         // PC 4: entry.key = val
         MicroOp::struct_store8(FO(callee_entry), 0, FO(callee_val)),
         // PC 5: entry.values = vec
@@ -188,7 +201,7 @@ fn make_gc_stress_program(
         // PC 13: if len >= max_len: goto REPLACE (PC 16)
         JumpGreaterEqualU64Imm { target: CO(16), src: FO(len), imm: max_len },
         // ---- PUSH (PC 14) ----
-        VecPushBack { vec_ref: FO(outer_vec_ref), elem: FO(entry_ptr), elem_size: 8, descriptor_id: desc_outer_vec },
+        VecPushBack { vec_ref: FO(outer_vec_ref), elem: FO(entry_ptr), elem_size: 8, vec_ty: outer_vec_ty },
         // PC 15: goto NEXT (PC 28)
         Jump { target: CO(28) },
 

@@ -47,7 +47,7 @@ fn bench_merge_sort(c: &mut Criterion) {
                     functions[0].as_ref_unchecked()
                 });
                 let vec_ptr = ctx
-                    .alloc_u64_vec(mono_move_core::DescriptorId(0), &input)
+                    .alloc_u64_vec(mono_move_core::types::U64_TY, &input)
                     .unwrap();
                 ctx.set_root_arg(0, &vec_ptr.to_le_bytes());
                 ctx.run().unwrap();
@@ -65,7 +65,7 @@ fn bench_merge_sort(c: &mut Criterion) {
                     functions_gas[0].as_ref_unchecked()
                 });
                 let vec_ptr = ctx
-                    .alloc_u64_vec(mono_move_core::DescriptorId(0), &input)
+                    .alloc_u64_vec(mono_move_core::types::U64_TY, &input)
                     .unwrap();
                 ctx.set_root_arg(0, &vec_ptr.to_le_bytes());
                 ctx.run().unwrap();

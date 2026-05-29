@@ -4,8 +4,15 @@
 //! Low-level memory utilities: aligned buffer and raw pointer helpers.
 
 use crate::VEC_DATA_OFFSET;
-use mono_move_core::{DescriptorId, MAX_ALIGN};
-use std::alloc::{self, Layout};
+use mono_move_alloc::GlobalArenaPtr;
+use mono_move_core::{
+    types::{InternedType, Type},
+    MAX_ALIGN,
+};
+use std::{
+    alloc::{self, Layout},
+    ptr::NonNull,
+};
 
 // ---------------------------------------------------------------------------
 // Aligned buffer — owns a zeroed, [`MAX_ALIGN`]-aligned allocation
@@ -172,66 +179,69 @@ pub unsafe fn vec_elem_ptr(vec_ptr: *const u8, idx: u64, elem_size: u32) -> *con
 // ---------------------------------------------------------------------------
 //
 // A heap object pointer (`obj_ptr`) points at the first byte of the object's
-// data region. The 8-byte `[desc_id: u32 | size: u32]` header sits in the
-// 8 bytes immediately preceding `obj_ptr` (i.e., at offsets -8 and -4). When
-// `MAX_ALIGN > 8`, the allocator reserves `OBJECT_HEADER_SIZE = MAX_ALIGN`
-// bytes before each data region so that the data start stays MAX_ALIGN-aligned;
-// the descriptor+size pair always lives at the last 8 bytes of that reservation
-// (i.e., adjacent to the data — good for cache locality, and the negative
-// offsets stay invariant across MAX_ALIGN values).
+// data region. The 8-byte header is a single `InternedType` pointer sitting in
+// the 8 bytes immediately preceding `obj_ptr` (offset -8). The runtime treats
+// it as an opaque key: it never dereferences the type, only resolves it to a
+// `DescriptorId` through `DescriptorProvider::descriptor_id_for_type`. A null
+// header word marks a forwarded object during GC (an `InternedType` is never
+// null). When `MAX_ALIGN > 8`, the allocator reserves
+// `OBJECT_HEADER_SIZE = MAX_ALIGN` bytes before each data region so that the
+// data start stays MAX_ALIGN-aligned; the type word always lives at the last 8
+// bytes of that reservation (adjacent to the data, and the negative offset
+// stays invariant across MAX_ALIGN values).
 
-/// Byte offset of `descriptor_id` (u32) from `obj_ptr`. Always `-8`.
-const HEADER_DESCRIPTOR_NEG_OFFSET: isize = -8;
-/// Byte offset of `size_in_bytes` (u32) from `obj_ptr`. Always `-4`.
-const HEADER_SIZE_NEG_OFFSET: isize = -4;
+/// Byte offset of the interned-type header word from `obj_ptr`. Always `-8`.
+const HEADER_TYPE_NEG_OFFSET: isize = -8;
 
-/// Read the descriptor id from an object's header.
+/// Read the interned-type header word. Returns [`None`] when the word is null,
+/// which marks a forwarded object during GC.
 ///
 /// # Safety
 /// `obj_ptr` must point to the data region of a valid heap object whose
 /// header lies at `obj_ptr - 8`.
 #[inline(always)]
-pub(crate) unsafe fn read_descriptor(obj_ptr: *const u8) -> u32 {
+pub(crate) unsafe fn read_header_type(obj_ptr: *const u8) -> Option<InternedType> {
     // SAFETY: caller must uphold the documented pointer requirements.
-    unsafe { (obj_ptr.offset(HEADER_DESCRIPTOR_NEG_OFFSET) as *const u32).read() }
+    let raw = unsafe { (obj_ptr.offset(HEADER_TYPE_NEG_OFFSET) as *const *mut Type).read() };
+    // SAFETY: a non-null word was written by `write_header_type` from a live
+    // interned type pointer; reconstructing it is sound under the same
+    // arena-liveness contract the caller already relies on.
+    NonNull::new(raw).map(|p| unsafe { GlobalArenaPtr::from_non_null(p) })
 }
 
-/// Write the descriptor id into an object's header.
+/// True if the object's header word is null — the forwarded marker.
+///
+/// # Safety
+/// `obj_ptr` must point to the data region of a valid heap object whose
+/// header lies at `obj_ptr - 8`.
+#[inline(always)]
+pub(crate) unsafe fn is_forwarded(obj_ptr: *const u8) -> bool {
+    // SAFETY: caller must uphold the documented pointer requirements.
+    unsafe { (obj_ptr.offset(HEADER_TYPE_NEG_OFFSET) as *const usize).read() == 0 }
+}
+
+/// Write the interned-type header word for the object whose data region starts
+/// at the given pointer.
+///
+/// # Safety
+/// Pointer points to the data region of a valid heap object with header start
+/// at [`HEADER_TYPE_NEG_OFFSET`].
+#[inline(always)]
+pub unsafe fn write_header_type(obj_ptr: *mut u8, ty: InternedType) {
+    // SAFETY: caller must uphold the documented pointer requirements.
+    unsafe { (obj_ptr.offset(HEADER_TYPE_NEG_OFFSET) as *mut *const Type).write(ty.as_raw_ptr()) }
+}
+
+/// Mark an object as forwarded by writing a null header word. The forwarding
+/// pointer is written separately into the data region via [`write_forwarding`].
 ///
 /// # Safety
 /// `obj_ptr` must point to the data region of a writable heap object whose
 /// header lies at `obj_ptr - 8`.
 #[inline(always)]
-pub(crate) unsafe fn write_descriptor(obj_ptr: *mut u8, descriptor_id: u32) {
+pub(crate) unsafe fn write_forwarded_marker(obj_ptr: *mut u8) {
     // SAFETY: caller must uphold the documented pointer requirements.
-    unsafe { (obj_ptr.offset(HEADER_DESCRIPTOR_NEG_OFFSET) as *mut u32).write(descriptor_id) }
-}
-
-/// Read the total object size (header + aligned payload) from the header.
-///
-/// # Safety
-/// `obj_ptr` must point to the data region of a valid heap object whose
-/// header lies at `obj_ptr - 8`.
-#[inline(always)]
-pub(crate) unsafe fn read_obj_size(obj_ptr: *const u8) -> u32 {
-    // SAFETY: caller must uphold the documented pointer requirements.
-    unsafe { (obj_ptr.offset(HEADER_SIZE_NEG_OFFSET) as *const u32).read() }
-}
-
-/// Write header fields (descriptor ID and size) for the object whose data
-/// region starts at the given pointer.
-///
-/// # Safety
-///
-/// Pointer points to the data region of a valid heap object with header start
-/// at [`HEADER_DESCRIPTOR_NEG_OFFSET`].
-#[inline(always)]
-pub unsafe fn write_object_header(obj_ptr: *mut u8, descriptor_id: DescriptorId, size: u32) {
-    // SAFETY: caller must uphold the documented pointer requirements.
-    unsafe {
-        write_descriptor(obj_ptr, descriptor_id.as_u32());
-        (obj_ptr.offset(HEADER_SIZE_NEG_OFFSET) as *mut u32).write(size)
-    }
+    unsafe { (obj_ptr.offset(HEADER_TYPE_NEG_OFFSET) as *mut usize).write(0) }
 }
 
 /// Read the forwarding pointer that the GC writes into a forwarded-from-space
@@ -239,8 +249,7 @@ pub unsafe fn write_object_header(obj_ptr: *mut u8, descriptor_id: DescriptorId,
 ///
 /// # Safety
 /// `obj_ptr` must point to the data region of a forwarded heap object (i.e.,
-/// `read_descriptor(obj_ptr) == FORWARDED_MARKER`), with at least 8 bytes of
-/// data region.
+/// `is_forwarded(obj_ptr)`), with at least 8 bytes of data region.
 #[inline(always)]
 pub(crate) unsafe fn read_forwarding(obj_ptr: *const u8) -> *mut u8 {
     // SAFETY: caller must uphold the documented pointer requirements.
@@ -248,8 +257,8 @@ pub(crate) unsafe fn read_forwarding(obj_ptr: *const u8) -> *mut u8 {
 }
 
 /// Write a forwarding pointer into a from-space object's first 8 data bytes.
-/// Used together with `write_descriptor(obj_ptr, FORWARDED_MARKER)` to mark
-/// an object as forwarded during GC.
+/// Used together with [`write_forwarded_marker`] to mark an object as
+/// forwarded during GC.
 ///
 /// # Safety
 /// `obj_ptr` must point to the data region of a writable heap object with

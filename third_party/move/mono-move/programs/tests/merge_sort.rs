@@ -25,7 +25,7 @@ mod micro_op {
         let mut ctx =
             InterpreterContext::new(&mut exec_ctx, unsafe { functions[0].as_ref_unchecked() });
         let vec_ptr = ctx
-            .alloc_u64_vec(mono_move_core::DescriptorId(0), &values)
+            .alloc_u64_vec(mono_move_core::types::U64_TY, &values)
             .unwrap();
         ctx.set_root_arg(0, &vec_ptr.to_le_bytes());
         ctx.run().unwrap();

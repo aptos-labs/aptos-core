@@ -11,7 +11,7 @@ use common::InMemoryResources;
 use mono_move_alloc::GlobalArenaPtr;
 use mono_move_core::{
     types::{InternedType, Type},
-    Code, DescriptorId, FrameLayoutInfo, FrameOffset as FO, Function, MicroOp, ObjectDescriptor,
+    Code, FrameLayoutInfo, FrameOffset as FO, Function, MicroOp, ObjectDescriptor,
     ObjectDescriptorTable, SortedSafePointEntries,
 };
 use mono_move_gas::SimpleGasMeter;
@@ -33,10 +33,12 @@ fn other_resource_ty() -> InternedType {
     GlobalArenaPtr::from_static(&OTHER_RESOURCE_TY_NODE)
 }
 
-fn fresh_descriptors() -> (ObjectDescriptorTable, DescriptorId) {
+fn fresh_descriptors() -> ObjectDescriptorTable {
     let mut table = ObjectDescriptorTable::new();
     let desc = table.push(ObjectDescriptor::new_struct(8, vec![]).unwrap());
-    (table, desc)
+    table.register_type(resource_ty(), desc);
+    table.register_type(other_resource_ty(), desc);
+    table
 }
 
 fn addr(byte: u8) -> AccountAddress {
@@ -87,10 +89,9 @@ const TMP: FO = FO(40);
 
 #[test]
 fn borrow_global_mut_deep_copies_external_resource() {
-    let (descriptors, desc_id) = fresh_descriptors();
+    let descriptors = fresh_descriptors();
     let resources = InMemoryResources::new();
-    let storage_ptr =
-        resources.install_global(addr(1), resource_ty(), desc_id, &make_resource(0xAAAA));
+    let storage_ptr = resources.install_global(addr(1), resource_ty(), &make_resource(0xAAAA));
     let mut exec_ctx = local_ctx_with(&resources, descriptors);
 
     let func = make_program_with_tmp(
@@ -120,9 +121,9 @@ fn borrow_global_mut_deep_copies_external_resource() {
 
 #[test]
 fn borrow_global_mut_same_epoch_no_extra_copy() {
-    let (descriptors, desc_id) = fresh_descriptors();
+    let descriptors = fresh_descriptors();
     let resources = InMemoryResources::new();
-    resources.install_global(addr(2), resource_ty(), desc_id, &make_resource(0xBBBB));
+    resources.install_global(addr(2), resource_ty(), &make_resource(0xBBBB));
     let mut exec_ctx = local_ctx_with(&resources, descriptors);
 
     let result_a: FO = FO(40);
@@ -169,7 +170,7 @@ fn borrow_global_mut_same_epoch_no_extra_copy() {
 
 #[test]
 fn move_to_publishes_resource_and_exists_is_true() {
-    let (descriptors, desc_id) = fresh_descriptors();
+    let descriptors = fresh_descriptors();
     let mut exec_ctx = LocalRuntimeContext::with_max_budget(descriptors);
 
     let func = Function {
@@ -177,7 +178,7 @@ fn move_to_publishes_resource_and_exists_is_true() {
         code: Code::from_vec(vec![
             MicroOp::HeapNew {
                 dst: TMP,
-                descriptor_id: desc_id,
+                ty: resource_ty(),
             },
             MicroOp::MoveTo {
                 addr: ADDR,
@@ -209,9 +210,9 @@ fn move_to_publishes_resource_and_exists_is_true() {
 
 #[test]
 fn move_to_aborts_when_already_present() {
-    let (descriptors, desc_id) = fresh_descriptors();
+    let descriptors = fresh_descriptors();
     let resources = InMemoryResources::new();
-    resources.install_global(addr(4), resource_ty(), desc_id, &make_resource(0));
+    resources.install_global(addr(4), resource_ty(), &make_resource(0));
     let mut exec_ctx = local_ctx_with(&resources, descriptors);
 
     let func = Function {
@@ -219,7 +220,7 @@ fn move_to_aborts_when_already_present() {
         code: Code::from_vec(vec![
             MicroOp::HeapNew {
                 dst: TMP,
-                descriptor_id: desc_id,
+                ty: resource_ty(),
             },
             MicroOp::MoveTo {
                 addr: ADDR,
@@ -251,10 +252,9 @@ fn move_to_aborts_when_already_present() {
 
 #[test]
 fn move_from_deep_copies_external_resource() {
-    let (descriptors, desc_id) = fresh_descriptors();
+    let descriptors = fresh_descriptors();
     let resources = InMemoryResources::new();
-    let storage_ptr =
-        resources.install_global(addr(5), resource_ty(), desc_id, &make_resource(0xCCCC));
+    let storage_ptr = resources.install_global(addr(5), resource_ty(), &make_resource(0xCCCC));
     let mut exec_ctx = local_ctx_with(&resources, descriptors);
 
     let func = make_program_with_tmp(
@@ -285,9 +285,9 @@ fn move_from_deep_copies_external_resource() {
 
 #[test]
 fn gc_traces_and_relocates_local_heap_writes() {
-    let (descriptors, desc_id) = fresh_descriptors();
+    let descriptors = fresh_descriptors();
     let resources = InMemoryResources::new();
-    resources.install_global(addr(6), resource_ty(), desc_id, &make_resource(0xDDDD));
+    resources.install_global(addr(6), resource_ty(), &make_resource(0xDDDD));
     let mut exec_ctx = local_ctx_with(&resources, descriptors);
 
     let func = Function {
@@ -337,15 +337,10 @@ fn gc_traces_and_relocates_local_heap_writes() {
 
 #[test]
 fn distinct_keys_track_independently() {
-    let (descriptors, desc_id) = fresh_descriptors();
+    let descriptors = fresh_descriptors();
     let resources = InMemoryResources::new();
-    resources.install_global(addr(7), resource_ty(), desc_id, &make_resource(0xEEE1));
-    resources.install_global(
-        addr(7),
-        other_resource_ty(),
-        desc_id,
-        &make_resource(0xEEE2),
-    );
+    resources.install_global(addr(7), resource_ty(), &make_resource(0xEEE1));
+    resources.install_global(addr(7), other_resource_ty(), &make_resource(0xEEE2));
     let mut exec_ctx = local_ctx_with(&resources, descriptors);
 
     let dst_a: FO = FO(40);

@@ -22,8 +22,8 @@ mod common;
 use common::InMemoryResources;
 use mono_move_alloc::GlobalArenaPtr;
 use mono_move_core::{
-    types::{InternedType, Type},
-    Code, DescriptorId, FrameLayoutInfo, FrameOffset as FO, Function, MicroOp, ObjectDescriptor,
+    types::{InternedType, Type, BOOL_TY},
+    Code, FrameLayoutInfo, FrameOffset as FO, Function, MicroOp, ObjectDescriptor,
     ObjectDescriptorTable, SortedSafePointEntries, ENUM_DATA_OFFSET, ENUM_TAG_OFFSET,
 };
 use mono_move_gas::SimpleGasMeter;
@@ -61,8 +61,7 @@ fn local_ctx_with<'r>(
 const ADDR: FO = FO(8);
 const TMP: FO = FO(40);
 
-fn make_borrow_mut_program(desc_id: DescriptorId) -> Function {
-    let _ = desc_id; // descriptor_id is no longer carried on the MicroOp.
+fn make_borrow_mut_program() -> Function {
     Function {
         name: GlobalArenaPtr::from_static("test"),
         code: Code::from_vec(vec![
@@ -84,10 +83,12 @@ fn make_borrow_mut_program(desc_id: DescriptorId) -> Function {
 }
 
 /// Layout for an 8-byte u64 vector storage payload: `[length(8) |
-/// data(8 * n)]`. Returns the raw bytes to feed `install_anchor`.
+/// capacity(8) | data(8 * n)]`. Capacity equals the element count (a
+/// full vector). Returns the raw bytes to feed `install_anchor`.
 fn build_u64_vec_payload(values: &[u64]) -> Vec<u8> {
     let mut buf = Vec::with_capacity(VEC_DATA_OFFSET + values.len() * 8);
-    buf.extend_from_slice(&(values.len() as u64).to_le_bytes());
+    buf.extend_from_slice(&(values.len() as u64).to_le_bytes()); // length
+    buf.extend_from_slice(&(values.len() as u64).to_le_bytes()); // capacity
     debug_assert_eq!(buf.len(), VEC_DATA_OFFSET);
     for v in values {
         buf.extend_from_slice(&v.to_le_bytes());
@@ -104,18 +105,22 @@ fn build_u64_vec_payload(values: &[u64]) -> Vec<u8> {
 #[test]
 fn borrow_global_mut_deep_copies_nested_struct() {
     let mut descriptors = ObjectDescriptorTable::new();
-    let inner_desc = descriptors.push(ObjectDescriptor::new_struct(8, vec![]).unwrap());
-    let parent_desc = descriptors.push(ObjectDescriptor::new_struct(8, vec![0]).unwrap());
+    let inner_ty = BOOL_TY;
+    descriptors.push_for_type(inner_ty, ObjectDescriptor::new_struct(8, vec![]).unwrap());
+    descriptors.push_for_type(
+        resource_ty(),
+        ObjectDescriptor::new_struct(8, vec![0]).unwrap(),
+    );
 
     let resources = InMemoryResources::new();
-    let inner_storage_ptr = resources.install_anchor(inner_desc, &0xCAFE_u64.to_le_bytes());
+    let inner_storage_ptr = resources.install_anchor(inner_ty, &0xCAFE_u64.to_le_bytes());
     let parent_payload = (inner_storage_ptr as u64).to_le_bytes();
-    let parent_storage_ptr = resources.install_anchor(parent_desc, &parent_payload);
+    let parent_storage_ptr = resources.install_anchor(resource_ty(), &parent_payload);
     // Wire the parent into the working-map key.
     resources.entries_install(addr(1), resource_ty(), parent_storage_ptr);
 
     let mut exec_ctx = local_ctx_with(&resources, descriptors);
-    let func = make_borrow_mut_program(parent_desc);
+    let func = make_borrow_mut_program();
     let mut ctx = InterpreterContext::new(&mut exec_ctx, &func);
     ctx.set_root_arg(8, &addr(1).into_bytes());
     ctx.run().unwrap();
@@ -143,18 +148,22 @@ fn borrow_global_mut_deep_copies_nested_struct() {
 #[test]
 fn borrow_global_mut_deep_copies_struct_with_vector() {
     let mut descriptors = ObjectDescriptorTable::new();
-    let vec_desc = descriptors.push(ObjectDescriptor::new_vector(8, vec![]).unwrap());
-    let parent_desc = descriptors.push(ObjectDescriptor::new_struct(8, vec![0]).unwrap());
+    let vec_ty = BOOL_TY;
+    descriptors.push_for_type(vec_ty, ObjectDescriptor::new_vector(8, vec![]).unwrap());
+    descriptors.push_for_type(
+        resource_ty(),
+        ObjectDescriptor::new_struct(8, vec![0]).unwrap(),
+    );
 
     let resources = InMemoryResources::new();
     let vec_payload = build_u64_vec_payload(&[0xAAAA, 0xBBBB, 0xCCCC]);
-    let vec_storage_ptr = resources.install_anchor(vec_desc, &vec_payload);
+    let vec_storage_ptr = resources.install_anchor(vec_ty, &vec_payload);
     let parent_payload = (vec_storage_ptr as u64).to_le_bytes();
-    let parent_storage_ptr = resources.install_anchor(parent_desc, &parent_payload);
+    let parent_storage_ptr = resources.install_anchor(resource_ty(), &parent_payload);
     resources.entries_install(addr(2), resource_ty(), parent_storage_ptr);
 
     let mut exec_ctx = local_ctx_with(&resources, descriptors);
-    let func = make_borrow_mut_program(parent_desc);
+    let func = make_borrow_mut_program();
     let mut ctx = InterpreterContext::new(&mut exec_ctx, &func);
     ctx.set_root_arg(8, &addr(2).into_bytes());
     ctx.run().unwrap();
@@ -189,22 +198,25 @@ fn borrow_global_mut_deep_copies_struct_with_vector() {
 #[test]
 fn borrow_global_mut_deep_copies_enum_variant() {
     let mut descriptors = ObjectDescriptorTable::new();
-    let inner_desc = descriptors.push(ObjectDescriptor::new_struct(8, vec![]).unwrap());
-    let enum_desc =
-        descriptors.push(ObjectDescriptor::new_enum(16, vec![vec![], vec![0]]).unwrap());
+    let inner_ty = BOOL_TY;
+    descriptors.push_for_type(inner_ty, ObjectDescriptor::new_struct(8, vec![]).unwrap());
+    descriptors.push_for_type(
+        resource_ty(),
+        ObjectDescriptor::new_enum(16, vec![vec![], vec![0]]).unwrap(),
+    );
 
     let resources = InMemoryResources::new();
-    let inner_storage_ptr = resources.install_anchor(inner_desc, &0xBEEF_u64.to_le_bytes());
+    let inner_storage_ptr = resources.install_anchor(inner_ty, &0xBEEF_u64.to_le_bytes());
 
     // Payload: [tag = 1 (u64)] [inner_ptr (8B)]
     let mut payload = Vec::with_capacity(16);
     payload.extend_from_slice(&1u64.to_le_bytes());
     payload.extend_from_slice(&(inner_storage_ptr as u64).to_le_bytes());
-    let enum_storage_ptr = resources.install_anchor(enum_desc, &payload);
+    let enum_storage_ptr = resources.install_anchor(resource_ty(), &payload);
     resources.entries_install(addr(3), resource_ty(), enum_storage_ptr);
 
     let mut exec_ctx = local_ctx_with(&resources, descriptors);
-    let func = make_borrow_mut_program(enum_desc);
+    let func = make_borrow_mut_program();
     let mut ctx = InterpreterContext::new(&mut exec_ctx, &func);
     ctx.set_root_arg(8, &addr(3).into_bytes());
     ctx.run().unwrap();
@@ -238,13 +250,17 @@ fn borrow_global_mut_deep_copies_enum_variant() {
 #[test]
 fn deep_copy_survives_gc_mid_walk() {
     let mut descriptors = ObjectDescriptorTable::new();
-    let inner_desc = descriptors.push(ObjectDescriptor::new_struct(8, vec![]).unwrap());
-    let parent_desc = descriptors.push(ObjectDescriptor::new_struct(8, vec![0]).unwrap());
+    let inner_ty = BOOL_TY;
+    descriptors.push_for_type(inner_ty, ObjectDescriptor::new_struct(8, vec![]).unwrap());
+    descriptors.push_for_type(
+        resource_ty(),
+        ObjectDescriptor::new_struct(8, vec![0]).unwrap(),
+    );
 
     let resources = InMemoryResources::new();
-    let inner_storage_ptr = resources.install_anchor(inner_desc, &0x9999_u64.to_le_bytes());
+    let inner_storage_ptr = resources.install_anchor(inner_ty, &0x9999_u64.to_le_bytes());
     let parent_storage_ptr =
-        resources.install_anchor(parent_desc, &(inner_storage_ptr as u64).to_le_bytes());
+        resources.install_anchor(resource_ty(), &(inner_storage_ptr as u64).to_le_bytes());
     resources.entries_install(addr(7), resource_ty(), parent_storage_ptr);
 
     // Frame: ADDR(32B)@8, TMP(8B)@40 (rooted), GARBAGE(8B)@48 (unrooted).
@@ -259,15 +275,15 @@ fn deep_copy_survives_gc_mid_walk() {
             // the third HeapNew already triggers one GC pass.
             MicroOp::HeapNew {
                 dst: GARBAGE,
-                descriptor_id: inner_desc,
+                ty: inner_ty,
             },
             MicroOp::HeapNew {
                 dst: GARBAGE,
-                descriptor_id: inner_desc,
+                ty: inner_ty,
             },
             MicroOp::HeapNew {
                 dst: GARBAGE,
-                descriptor_id: inner_desc,
+                ty: inner_ty,
             },
             // Now deep-copy a 2-level resource. The inner alloc
             // inside `deep_copy_value` won't fit alongside the new
@@ -323,13 +339,17 @@ fn deep_copy_survives_gc_mid_walk() {
 #[test]
 fn move_from_deep_copies_external_resource_survives_gc_mid_walk() {
     let mut descriptors = ObjectDescriptorTable::new();
-    let inner_desc = descriptors.push(ObjectDescriptor::new_struct(8, vec![]).unwrap());
-    let parent_desc = descriptors.push(ObjectDescriptor::new_struct(8, vec![0]).unwrap());
+    let inner_ty = BOOL_TY;
+    descriptors.push_for_type(inner_ty, ObjectDescriptor::new_struct(8, vec![]).unwrap());
+    descriptors.push_for_type(
+        resource_ty(),
+        ObjectDescriptor::new_struct(8, vec![0]).unwrap(),
+    );
 
     let resources = InMemoryResources::new();
-    let inner_storage_ptr = resources.install_anchor(inner_desc, &0xAAAA_u64.to_le_bytes());
+    let inner_storage_ptr = resources.install_anchor(inner_ty, &0xAAAA_u64.to_le_bytes());
     let parent_storage_ptr =
-        resources.install_anchor(parent_desc, &(inner_storage_ptr as u64).to_le_bytes());
+        resources.install_anchor(resource_ty(), &(inner_storage_ptr as u64).to_le_bytes());
     resources.entries_install(addr(8), resource_ty(), parent_storage_ptr);
 
     // Frame: ADDR(32B)@8, TMP(8B)@40 (rooted), GARBAGE(8B)@48 (unrooted).
@@ -343,15 +363,15 @@ fn move_from_deep_copies_external_resource_survives_gc_mid_walk() {
             // same pressure pattern as the BorrowGlobalMut variant.
             MicroOp::HeapNew {
                 dst: GARBAGE,
-                descriptor_id: inner_desc,
+                ty: inner_ty,
             },
             MicroOp::HeapNew {
                 dst: GARBAGE,
-                descriptor_id: inner_desc,
+                ty: inner_ty,
             },
             MicroOp::HeapNew {
                 dst: GARBAGE,
-                descriptor_id: inner_desc,
+                ty: inner_ty,
             },
             // MoveFrom flips the entry to Deleted, then takes the
             // deep-copy slow path. The inner alloc inside
