@@ -97,9 +97,9 @@ mod micro_op {
 
         #[rustfmt::skip]
         let code = vec![
-            StoreImm8 { dst: FO(sum), imm: 0 },               // 0: sum = 0
-            StoreImm8 { dst: FO(i),   imm: 0 },               // 1: i = 0
-            StoreImm8 { dst: FO(c4),  imm: 4 },               // 2: const4 = 4
+            StoreImm8 { dst: FO(sum), imm: 0u64.to_le_bytes() },               // 0: sum = 0
+            StoreImm8 { dst: FO(i), imm: 0u64.to_le_bytes() },               // 1: i = 0
+            StoreImm8 { dst: FO(c4), imm: 4u64.to_le_bytes() },               // 2: const4 = 4
 
             // LOOP (3): if i < n goto BODY else goto END
             JumpLessU64 { target: CO(6), lhs: FO(i), rhs: FO(n) }, // 3

@@ -119,6 +119,7 @@ use crate::{
     types::{display_type_list, InternedTypeList},
     FunctionPtr,
 };
+use move_core_types::int256::U256;
 use std::fmt;
 
 // Submodules for instruction.
@@ -269,10 +270,35 @@ pub enum MicroOp {
     // - `StoreImm` to handle arbitrary sizes,
     // - bulk data movement.
     //======================================================================
-    /// Store an immediate u64 (8 bytes) at `dst` in the current frame.
+    /// Store 8 immediate bytes into the destination slot. `imm` is the
+    /// little-endian (LE) byte representation of the value:
+    /// `u64.to_le_bytes()` for unsigned and `i64.to_le_bytes()` (i.e.
+    /// two's-complement) for signed. Narrower primitives (`u8`/`u16`/`u32`/
+    /// `i8`/`i16`/`i32`/`bool`) are widened to 8 bytes by the lowerer.
     StoreImm8 {
         dst: FrameOffset,
-        imm: u64,
+        imm: [u8; 8],
+    },
+
+    /// Store 16 immediate bytes into the destination slot. Same LE
+    /// convention as `StoreImm8`: `u128.to_le_bytes()` / `i128.to_le_bytes()`.
+    ///
+    /// TODO(perf): use a side table instead of boxing.
+    StoreImm16 {
+        dst: FrameOffset,
+        imm: Box<[u8; 16]>,
+    },
+
+    /// Store 32 immediate bytes into the destination slot. For numeric
+    /// values, same LE convention as `StoreImm8`: `U256.to_le_bytes()` /
+    /// `I256.to_le_bytes()`. `AccountAddress` is not numeric — it's a
+    /// 32-byte identifier — so its bytes are copied as-is, with no LE
+    /// reinterpretation.
+    ///
+    /// TODO(perf): use a side table instead of boxing.
+    StoreImm32 {
+        dst: FrameOffset,
+        imm: Box<[u8; 32]>,
     },
 
     /// Copy 8 bytes from `src` to `dst`.
@@ -850,7 +876,23 @@ impl fmt::Display for MicroOp {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
             MicroOp::StoreImm8 { dst, imm } => {
-                write!(f, "StoreImm8 [{}] <- #{}", dst.0, imm)
+                write!(f, "StoreImm8 [{}] <- #{}", dst.0, u64::from_le_bytes(*imm))
+            },
+            MicroOp::StoreImm16 { dst, imm } => {
+                write!(
+                    f,
+                    "StoreImm16 [{}] <- #{}",
+                    dst.0,
+                    u128::from_le_bytes(**imm)
+                )
+            },
+            MicroOp::StoreImm32 { dst, imm } => {
+                write!(
+                    f,
+                    "StoreImm32 [{}] <- #{}",
+                    dst.0,
+                    U256::from_le_bytes(**imm)
+                )
             },
             MicroOp::Move8 { dst, src } => {
                 write!(f, "Move8 [{}] <- [{}]", dst.0, src.0)
@@ -1330,6 +1372,8 @@ impl MicroOp {
 
             // Non-allocating.
             MicroOp::StoreImm8 { .. }
+            | MicroOp::StoreImm16 { .. }
+            | MicroOp::StoreImm32 { .. }
             | MicroOp::Move8 { .. }
             | MicroOp::Move { .. }
             | MicroOp::AddU64 { .. }

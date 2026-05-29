@@ -233,6 +233,14 @@ impl<P: DescriptorProvider + ?Sized> FunctionVerifier<'_, P> {
                 self.check_frame_access_8(pc, dst);
             },
 
+            MicroOp::StoreImm16 { dst, imm: _ } => {
+                self.check_frame_access(Some(pc), dst, 16);
+            },
+
+            MicroOp::StoreImm32 { dst, imm: _ } => {
+                self.check_frame_access(Some(pc), dst, 32);
+            },
+
             MicroOp::StoreRandomU64 { dst } => {
                 self.check_frame_access_8(pc, dst);
             },
