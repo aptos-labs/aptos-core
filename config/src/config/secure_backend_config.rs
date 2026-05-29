@@ -1,7 +1,7 @@
 // Copyright (c) Aptos Foundation
 // Licensed pursuant to the Innovation-Enabling Source Code License, available at https://github.com/aptos-labs/aptos-core/blob/main/LICENSE
 
-use crate::config::Error;
+use crate::config::{EncryptedCredential, Error};
 use aptos_secure_storage::{InMemoryStorage, Namespaced, OnDiskStorage, Storage, VaultStorage};
 use serde::{Deserialize, Serialize};
 use std::{
@@ -96,13 +96,19 @@ pub struct OnDiskStorageConfig {
     data_dir: PathBuf,
 }
 
-/// Tokens can either be directly within this config or stored somewhere on disk.
+/// Tokens can either be directly within this config, stored somewhere on disk,
+/// or stored encrypted-at-rest and decrypted at runtime with a password sourced
+/// from an environment variable.
 #[derive(Clone, Debug, Deserialize, PartialEq, Eq, Serialize)]
 #[serde(rename_all = "snake_case")]
 pub enum Token {
     FromConfig(String),
     /// This is an absolute path and not relative to data_dir
     FromDisk(PathBuf),
+    /// The token is stored encrypted-at-rest inside the config and decrypted at
+    /// runtime using a password read from an environment variable. This avoids
+    /// leaving the raw token readable on disk.
+    FromEncrypted(EncryptedCredential),
 }
 
 impl Token {
@@ -110,6 +116,7 @@ impl Token {
         match self {
             Token::FromDisk(path) => read_file(path),
             Token::FromConfig(token) => Ok(token.clone()),
+            Token::FromEncrypted(credential) => credential.decrypt_to_string(),
         }
     }
 }
@@ -301,5 +308,47 @@ vault:
 
         let config = Token::FromConfig("config_token".to_string());
         assert_eq!("config_token", config.read_token().unwrap());
+    }
+
+    #[test]
+    fn test_token_backwards_compatible_parsing() {
+        // Existing configs that predate encrypted tokens must keep parsing.
+        let from_config: Token = serde_yaml::from_str("from_config: \"plaintext_token\"").unwrap();
+        assert_eq!(
+            from_config,
+            Token::FromConfig("plaintext_token".to_string())
+        );
+
+        let from_disk: Token = serde_yaml::from_str("from_disk: \"/token\"").unwrap();
+        assert_eq!(from_disk, Token::FromDisk(PathBuf::from("/token")));
+    }
+
+    #[test]
+    fn test_encrypted_token_parsing_and_reading() {
+        let password = "super-secret-password";
+        let env_name = "APTOS_TEST_VAULT_TOKEN_PASSWORD_NEVER_SET";
+        let credential =
+            EncryptedCredential::encrypt_with(b"my_vault_token", password, env_name, 1000).unwrap();
+
+        // The encrypted token serializes/deserializes as a config value.
+        let token = Token::FromEncrypted(credential.clone());
+        let yaml = serde_yaml::to_string(&token).unwrap();
+        assert!(yaml.contains("from_encrypted"));
+        // The raw token must never appear in the serialized config.
+        assert!(!yaml.contains("my_vault_token"));
+        let parsed: Token = serde_yaml::from_str(&yaml).unwrap();
+        assert_eq!(parsed, token);
+
+        // The underlying credential decrypts back to the raw token when given
+        // the password directly (the env-driven path is exercised at runtime;
+        // this crate forbids unsafe code, so tests cannot mutate the env).
+        assert_eq!(
+            b"my_vault_token".to_vec(),
+            credential.decrypt_with_password(password).unwrap()
+        );
+
+        // Without the password env var set, reading the token fails cleanly.
+        assert!(std::env::var(env_name).is_err());
+        assert!(matches!(token.read_token(), Err(Error::MissingEnvVar(_))));
     }
 }

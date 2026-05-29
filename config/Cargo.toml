@@ -27,10 +27,12 @@ bcs = { workspace = true }
 byteorder = { workspace = true }
 cfg-if = { workspace = true }
 get_if_addrs = { workspace = true }
+hex = { workspace = true }
 maplit = { workspace = true }
 num_cpus = { workspace = true }
 poem-openapi = { workspace = true }
 rand = { workspace = true }
+ring = { workspace = true }
 serde = { workspace = true }
 serde_json = { workspace = true }
 serde_merge = { workspace = true }
