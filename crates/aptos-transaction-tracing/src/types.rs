@@ -41,11 +41,17 @@ pub enum BatchInclusionType {
 }
 
 /// Execution outcome for a transaction.
+///
+/// `Filtered` covers txns that were dropped before reaching BlockSTM (e.g.
+/// the prepare-block deduper removed a hash already committed in an earlier
+/// block, signature verification failed, etc.). Such a txn appears in the
+/// proposed block but in none of `to_commit` / `to_retry` / `to_discard`.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, strum_macros::AsRefStr)]
 pub enum ExecutionStatus {
     Keep,
     Retry,
     Discard,
+    Filtered,
 }
 
 /// A single batch creation event (one per pull round that produced batches)
