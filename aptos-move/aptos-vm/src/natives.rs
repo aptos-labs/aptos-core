@@ -165,7 +165,7 @@ pub fn assert_no_test_natives(err_msg: &str) {
             NativeGasParameters::zeros(),
             MiscGasParameters::zeros(),
             TimedFeaturesBuilder::enable_all().build(),
-            Features::default()
+            Features::default_features()
         )
         .into_iter()
         .all(|(_, module_name, func_name, _)| {
@@ -245,7 +245,7 @@ mod tests {
             NativeGasParameters::zeros(),
             MiscGasParameters::zeros(),
             TimedFeaturesBuilder::enable_all().build(),
-            Features::default(),
+            Features::default_features(),
         )
         .into_iter()
         .any(|(_, module_name, func_name, _)| {

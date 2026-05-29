@@ -808,7 +808,7 @@ async fn setup_local_net_inner(
 ) {
     let (mut swarm, mut cli, _faucet) = SwarmBuilder::new_local(1)
         .with_init_genesis_config(Arc::new(move |conf| {
-            let mut features = Features::default();
+            let mut features = Features::default_features();
             if enable_fed_keyless_in_genesis {
                 features.enable(FeatureFlag::FEDERATED_KEYLESS);
             } else {

@@ -576,7 +576,7 @@ where
                 opt.verify_sequence_numbers,
                 opt.pipeline_opt
                     .pipeline_config(opt.storage_opt.enable_indexer_grpc),
-                Features::default(),
+                Features::default_features(),
                 opt.use_keyless_accounts,
             );
         },

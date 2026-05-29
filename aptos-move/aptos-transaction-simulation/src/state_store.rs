@@ -238,7 +238,9 @@ pub trait SimulationStateStore: TStateView<Key = StateKey> {
     where
         Self: Sized,
     {
-        let features: Features = self.get_on_chain_config().unwrap_or_default();
+        let features: Features = self
+            .get_on_chain_config()
+            .unwrap_or_else(|_| Features::default_features());
         let use_fa_balance = features.is_enabled(FeatureFlag::NEW_ACCOUNTS_DEFAULT_TO_FA_APT_STORE);
         let use_concurrent_balance =
             features.is_enabled(FeatureFlag::DEFAULT_TO_CONCURRENT_FUNGIBLE_BALANCE);

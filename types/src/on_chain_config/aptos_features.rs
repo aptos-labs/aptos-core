@@ -315,8 +315,26 @@ pub struct Features {
     pub features: Vec<u8>,
 }
 
-impl Default for Features {
-    fn default() -> Self {
+// impl Default for Features {
+//     fn default() -> Self {
+//         let mut features = Features {
+//             features: vec![0; 5],
+//         };
+//
+//         for feature in FeatureFlag::default_features() {
+//             features.enable(feature);
+//         }
+//         features
+//     }
+// }
+
+impl OnChainConfig for Features {
+    const MODULE_IDENTIFIER: &'static str = "features";
+    const TYPE_IDENTIFIER: &'static str = "Features";
+}
+
+impl Features {
+    pub fn default_features() -> Self {
         let mut features = Features {
             features: vec![0; 5],
         };
@@ -326,18 +344,11 @@ impl Default for Features {
         }
         features
     }
-}
 
-impl OnChainConfig for Features {
-    const MODULE_IDENTIFIER: &'static str = "features";
-    const TYPE_IDENTIFIER: &'static str = "Features";
-}
-
-impl Features {
     /// Returns default features for testing. This is the same as `default()` except features are
     /// added or removed to ensure available runtime checks are enabled during tests.
     pub fn default_for_tests() -> Self {
-        let mut features = Self::default();
+        let mut features = Self::default_features();
         // Do not trust any code during testing, but verify it at runtime.
         features.disable(FeatureFlag::ENABLE_TRUSTED_CODE);
         features

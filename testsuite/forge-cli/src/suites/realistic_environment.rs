@@ -558,7 +558,7 @@ pub(crate) fn realistic_env_max_load_encrypted_test(duration: Duration) -> Forge
             helm_values["chain"]["chunky_dkg_config_override"] =
                 serde_yaml::to_value(OnChainChunkyDKGConfig::default_enabled())
                     .expect("must serialize");
-            let mut features = Features::default();
+            let mut features = Features::default_features();
             features.enable(FeatureFlag::ENCRYPTED_TRANSACTIONS);
             helm_values["chain"]["initial_features_override"] =
                 serde_yaml::to_value(features).expect("must serialize");
@@ -633,7 +633,7 @@ pub(crate) fn realistic_env_max_load_encrypted_mix_test(duration: Duration) -> F
             helm_values["chain"]["chunky_dkg_config_override"] =
                 serde_yaml::to_value(OnChainChunkyDKGConfig::default_enabled())
                     .expect("must serialize");
-            let mut features = Features::default();
+            let mut features = Features::default_features();
             features.enable(FeatureFlag::ENCRYPTED_TRANSACTIONS);
             helm_values["chain"]["initial_features_override"] =
                 serde_yaml::to_value(features).expect("must serialize");
@@ -705,7 +705,7 @@ pub(crate) fn realistic_env_chunky_dkg_epoch_change_test(duration: Duration) -> 
             helm_values["chain"]["chunky_dkg_config_override"] =
                 serde_yaml::to_value(OnChainChunkyDKGConfig::default_enabled())
                     .expect("must serialize");
-            let mut features = Features::default();
+            let mut features = Features::default_features();
             features.enable(FeatureFlag::ENCRYPTED_TRANSACTIONS);
             helm_values["chain"]["initial_features_override"] =
                 serde_yaml::to_value(features).expect("must serialize");

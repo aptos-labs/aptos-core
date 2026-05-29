@@ -37,7 +37,7 @@ async fn jwk_consensus_per_key() {
         }))
         .with_init_genesis_config(Arc::new(move |conf| {
             conf.epoch_duration_secs = epoch_duration_secs;
-            let mut features = Features::default();
+            let mut features = Features::default_features();
             features.enable(FeatureFlag::JWK_CONSENSUS_PER_KEY_MODE);
             conf.initial_features_override = Some(features);
         }))

@@ -263,7 +263,7 @@ async fn extract_on_chain_configs(
             ))
         );
     }
-    let features = onchain_features.unwrap_or_default();
+    let features = onchain_features.unwrap_or_else(|_| Features::default_features());
 
     // Return the extracted epoch state and on-chain configs
     (

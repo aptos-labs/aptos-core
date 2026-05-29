@@ -100,7 +100,7 @@ pub struct SingleRunResults {
 }
 
 pub fn default_benchmark_features() -> Features {
-    let mut features = Features::default();
+    let mut features = Features::default_features();
     features.disable(FeatureFlag::CALCULATE_TRANSACTION_FEE_FOR_DISTRIBUTION);
     features
 }

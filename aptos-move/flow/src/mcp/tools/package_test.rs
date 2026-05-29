@@ -393,7 +393,7 @@ fn aptos_test_natives() -> NativeFunctionTable {
         NativeGasParameters::zeros(),
         MiscGasParameters::zeros(),
         TimedFeaturesBuilder::enable_all().build(),
-        Features::default(),
+        Features::default_features(),
     )
 }
 

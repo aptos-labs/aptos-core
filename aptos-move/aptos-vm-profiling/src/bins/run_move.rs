@@ -189,7 +189,7 @@ fn main() -> Result<()> {
         NativeGasParameters::zeros(),
         MiscGasParameters::zeros(),
         TimedFeaturesBuilder::enable_all().build(),
-        Features::default(),
+        Features::default_features(),
         None,
     );
 

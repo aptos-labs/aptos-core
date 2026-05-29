@@ -169,7 +169,9 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
             "EpochManager starting new epoch."
         );
 
-        let features = payload.get::<Features>().unwrap_or_default();
+        let features = payload
+            .get::<Features>()
+            .unwrap_or_else(|_| Features::default_features());
         let jwk_consensus_config = payload.get::<OnChainJWKConsensusConfig>();
         let onchain_observed_jwks = payload.get::<ObservedJWKs>().ok();
         let onchain_consensus_config = payload.get::<OnChainConsensusConfig>().unwrap_or_default();

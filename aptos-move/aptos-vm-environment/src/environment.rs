@@ -212,8 +212,8 @@ impl Environment {
     ) -> Self {
         // We compute and store a hash of configs in order to distinguish different environments.
         let mut sha3_256 = Sha3_256::new();
-        let features =
-            fetch_config_and_update_hash::<Features>(&mut sha3_256, state_view).unwrap_or_default();
+        let features = fetch_config_and_update_hash::<Features>(&mut sha3_256, state_view)
+            .unwrap_or_else(Features::default_features);
 
         // If no chain ID is in storage, we assume we are in a testing environment.
         let chain_id = fetch_config_and_update_hash::<ChainId>(&mut sha3_256, state_view)
@@ -345,7 +345,7 @@ pub mod tests {
         let env = Environment::new(&state_view, false, None);
 
         // Check default values.
-        assert_eq!(&env.features, &Features::default());
+        assert_eq!(&env.features, &Features::default_features());
         assert_eq!(env.chain_id.id(), ChainId::test().id());
         assert!(
             !env.runtime_environment
@@ -387,7 +387,7 @@ pub mod tests {
         );
         non_default_configuration.set_last_reconfiguration_time_for_test(1);
 
-        let mut non_default_features = Features::default();
+        let mut non_default_features = Features::default_features();
         assert!(non_default_features.is_enabled(FeatureFlag::EMIT_FEE_STATEMENT));
         non_default_features.disable(FeatureFlag::EMIT_FEE_STATEMENT);
 

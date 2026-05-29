@@ -26,7 +26,7 @@ fuzz_target!(|fuzz_data: RunnableState| -> Corpus {
     let timed_features = TimedFeaturesBuilder::enable_all().build();
     let verifier_config = prod_configs::aptos_prod_verifier_config(
         LATEST_GAS_FEATURE_VERSION,
-        &Features::default(),
+        &Features::default_features(),
         &timed_features,
     );
 

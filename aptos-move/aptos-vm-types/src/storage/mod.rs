@@ -42,7 +42,7 @@ impl StorageGasParameters {
     pub fn unlimited() -> Self {
         Self::new_impl(
             LATEST_GAS_FEATURE_VERSION,
-            &Features::default(),
+            &Features::default_features(),
             &AptosGasParameters::zeros(), // free of charge
             &DummyConfigStorage,
             ChangeSetConfigs::unlimited_at_gas_feature_version(LATEST_GAS_FEATURE_VERSION), // no limits
@@ -52,7 +52,7 @@ impl StorageGasParameters {
     pub fn latest() -> Self {
         Self::new(
             LATEST_GAS_FEATURE_VERSION,
-            &Features::default(),
+            &Features::default_features(),
             &AptosGasParameters::initial(),
             &DummyConfigStorage,
         )
