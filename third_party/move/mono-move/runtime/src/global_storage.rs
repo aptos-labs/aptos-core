@@ -244,19 +244,14 @@ impl ResourceReadWriteSet {
         Ok(())
     }
 
-    /// Records a deletion of a resource at the given key (returning the data
-    /// pointer to the caller). Returns an error if the resource does not
-    /// exist.
+    /// First step when moving the resource out of storage. Returns an error if
+    /// the resource does not exist or was already deleted.
     ///
-    /// ## Invariants
-    ///
-    /// - The read is also recorded for the entry (with is previous state).
-    ///
-    /// ## Caller invariants
-    ///
-    /// Caller must ensure that the data is **copied** if its is not ready
-    /// for mutation (it was immutably borrowed or modified in older epoch).
-    pub(crate) fn move_from(
+    /// Returns the pointer to the data that currently exists, which may or may
+    /// not be directly writable. If writable, caller can use it as is. If not
+    /// writable, caller has to perform a **copy** of the value and update the
+    /// map via [`Self::commit_move_from`].
+    pub(crate) fn try_move_from(
         &mut self,
         provider: &dyn ResourceProvider,
         key: StorageKey,
@@ -269,17 +264,35 @@ impl ResourceReadWriteSet {
             }
         })?;
 
-        // Entry now stores a deletion.
+        // If writable, it is same epoch. So no need to record anything in the
+        // journal.
+        if matches!(ptr, EntryPtr::Writable(..)) {
+            entry.write = StorageWrite::Deleted {
+                epoch: self.current_epoch,
+            };
+        }
+        Ok(ptr)
+    }
+
+    /// Second step when moving the resource out of global storage. Only used
+    /// for pointers that are not writable (i.e, not owned by the current
+    /// transaction's heap or originating from older epoch). The caller must
+    /// have performed a deep copy of data, allocating it in the local heap.
+    /// Records the older write in the journal for reverts.
+    ///
+    /// ## Panics
+    ///
+    /// [`Self::try_move_from`] ensures that entry exists in the map.
+    /// If this condition is violated, panics.
+    pub(crate) fn commit_move_from(&mut self, key: StorageKey) {
+        let entry = self
+            .entries
+            .get_mut(&key)
+            .expect("Entry must exist after move_from attempt");
         let old_write = std::mem::replace(&mut entry.write, StorageWrite::Deleted {
             epoch: self.current_epoch,
         });
-
-        // We need to record the previous write to the journal so that it can be
-        // reverted.
-        //
-        // Note: the caller has to handle the copy.
         self.record_write_to_journal(key, old_write);
-        Ok(ptr)
     }
 
     /// Returns the current epoch.
@@ -332,11 +345,7 @@ impl ResourceReadWriteSet {
 
         // Walk the journal top-down to the saved length, applying each entry
         // from the undo log.
-        while self.journal.len() > target.journal_len {
-            let restored_entry = self
-                .journal
-                .pop()
-                .expect("Journal length has just been checked");
+        for restored_entry in self.journal.drain(target.journal_len..).rev() {
             let curr_entry = self
                 .entries
                 .get_mut(&restored_entry.key)

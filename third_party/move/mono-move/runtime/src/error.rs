@@ -82,16 +82,9 @@ pub enum RuntimeError {
 
     #[error("invariant violation: {0}")]
     InvariantViolation(#[from] RuntimeInvariantViolation),
-}
 
-impl From<ResourceProviderError> for RuntimeError {
-    fn from(err: ResourceProviderError) -> Self {
-        match err {
-            ResourceProviderError::InvariantViolation(msg) => RuntimeError::InvariantViolation(
-                RuntimeInvariantViolation::ResourceProviderInvariant(msg),
-            ),
-        }
-    }
+    #[error("resource provider: {0}")]
+    ResourceProvider(#[from] ResourceProviderError),
 }
 
 impl IntoExecutionError for RuntimeError {
@@ -122,6 +115,7 @@ impl IntoExecutionError for RuntimeError {
             | AbortMessageTooLong { .. } => ExecutionErrorKind::RuntimeLimitExceeded,
 
             InvariantViolation(_) => ExecutionErrorKind::InvariantViolation,
+            ResourceProvider(e) => e.kind(),
         }
     }
 }

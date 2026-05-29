@@ -3,7 +3,7 @@
 
 //! Resource storage access for the runtime.
 
-use crate::types::InternedType;
+use crate::{types::InternedType, ExecutionErrorKind, IntoExecutionError};
 use move_core_types::account_address::AccountAddress;
 use std::ptr::NonNull;
 use thiserror::Error;
@@ -37,6 +37,14 @@ impl StorageKey {
 pub enum ResourceProviderError {
     #[error("resource provider invariant violation: {0}")]
     InvariantViolation(String),
+}
+
+impl IntoExecutionError for ResourceProviderError {
+    fn kind(&self) -> ExecutionErrorKind {
+        match self {
+            ResourceProviderError::InvariantViolation(_) => ExecutionErrorKind::InvariantViolation,
+        }
+    }
 }
 
 /// Storage read returned to the VM. Every VM execution records reads of any

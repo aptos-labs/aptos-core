@@ -1373,12 +1373,17 @@ impl<T: ExecutionContext + DescriptorProvider> InterpreterContext<'_, T> {
 
                 MicroOp::MoveFrom { addr, ty, dst } => {
                     let address = read_address(fp, addr);
-                    let ptr = match self.read_write_set.move_from(
-                        self.exec_ctx.resource_provider(),
-                        StorageKey::Resource(address, ty),
-                    )? {
+                    let key = StorageKey::Resource(address, ty);
+                    let entry_ptr = self
+                        .read_write_set
+                        .try_move_from(self.exec_ctx.resource_provider(), key)?;
+                    let ptr = match entry_ptr {
                         EntryPtr::Writable(ptr) => ptr,
-                        EntryPtr::NonWritable(ptr) => self.deep_copy(ptr)?,
+                        EntryPtr::NonWritable(ptr) => {
+                            let ptr = self.deep_copy(ptr)?;
+                            self.read_write_set.commit_move_from(key);
+                            ptr
+                        },
                     };
                     write_ptr(fp, dst, ptr.as_ptr());
                 },
