@@ -24,7 +24,12 @@ use std::{
     time::{Duration, Instant, SystemTime},
 };
 
-/// Prompts for confirmation until a yes or no is given explicitly
+/// Prompts for confirmation until a yes or no is given explicitly.
+///
+/// Returns `false` (the safe "no" answer) if stdin reaches EOF or errors. This
+/// prevents the prompt from looping forever when stdin is closed or redirected
+/// from `/dev/null`, which is the common case for non-interactive/automated
+/// callers such as coding agents and CI.
 pub fn prompt_yes(prompt: &str) -> bool {
     let mut result: Result<bool, ()> = Err(());
 
@@ -32,8 +37,13 @@ pub fn prompt_yes(prompt: &str) -> bool {
     while result.is_err() {
         println!("{} [yes/no] >", prompt);
         let mut input = String::new();
-        if std::io::stdin().read_line(&mut input).is_err() {
-            continue;
+        match std::io::stdin().read_line(&mut input) {
+            // `Ok(0)` means EOF: stdin is closed and no further input can be
+            // read. Returning here avoids an infinite loop.
+            Ok(0) => return false,
+            // A read error is also unrecoverable for prompting purposes.
+            Err(_) => return false,
+            Ok(_) => {},
         }
         result = match input.trim().to_lowercase().as_str() {
             "yes" | "y" => Ok(true),
