@@ -69,7 +69,9 @@ impl CliCommand<Vec<AccountBalance>> for Balance {
             account
         } else {
             return Err(CliError::CommandArgumentError(
-                "Please provide an account using --account or run aptos init".to_string(),
+                "No account found. Provide one with `--account <address>`, or run `aptos init` \
+                 and select it with `--profile <name>`."
+                    .to_string(),
             ));
         };
         if let Some(ref coin) = self.coin_type {
