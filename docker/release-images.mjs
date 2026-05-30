@@ -33,9 +33,11 @@
 
 import {
   assertExecutingInRepoRoot,
+  assertTagMatchesSourceVersion,
   CargoBuildFeatures,
   CargoBuildProfiles,
   installCrane,
+  isReleaseImage,
   lazyImports,
   parseArgsFromFlagOrEnv,
   pnpmInstall,
@@ -82,6 +84,14 @@ async function main() {
   const parsedArgs = parseArgsFromFlagOrEnv(REQUIRED_ARGS, OPTIONAL_ARGS, BOOLEAN_ARGS);
 
   await assertExecutingInRepoRoot();
+
+  // For release tags (aptos-node-vX.Y.Z), fail fast if the tag version doesn't match
+  // aptos-node/Cargo.toml. Non-release prefixes (devnet, nightly, adhoc, ...) are not
+  // version tags, so isReleaseImage() skips them.
+  if (isReleaseImage(parsedArgs.IMAGE_TAG_PREFIX)) {
+    assertTagMatchesSourceVersion(parsedArgs.IMAGE_TAG_PREFIX);
+  }
+
   const crane = await installCrane();
   const craneVersion = await $`${crane} version`;
   console.log(`INFO: crane version: ${craneVersion}`);
