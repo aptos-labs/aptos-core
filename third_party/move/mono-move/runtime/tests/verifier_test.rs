@@ -48,8 +48,8 @@ fn valid_with_arithmetic_and_jumps() {
 
     #[rustfmt::skip]
     let code = vec![
-        StoreImm8 { dst: FO(0), imm: 10 },
-        StoreImm8 { dst: FO(8), imm: 1 },
+        StoreImm8 { dst: FO(0), imm: 10u64.to_le_bytes() },
+        StoreImm8 { dst: FO(8), imm: 1u64.to_le_bytes() },
         SubU64Imm { dst: FO(0), src: FO(0), imm: 1 },
         JumpNotZeroU64 { target: CO(2), src: FO(0) },
         Return,
@@ -77,7 +77,7 @@ fn valid_with_vec_and_pointer_slots() {
     let code = vec![
         VecNew { dst: FO(0) },
         SlotBorrow { dst: FO(16), local: FO(0) },
-        StoreImm8 { dst: FO(8), imm: 42 },
+        StoreImm8 { dst: FO(8), imm: 42u64.to_le_bytes() },
         VecPushBack { vec_ref: FO(16), elem: FO(8), elem_size: 8, descriptor_id: DescriptorId(2) },
         Return,
     ];
@@ -105,7 +105,13 @@ fn frame_bounds_store_u64() {
     use MicroOp::*;
     let func = Function {
         name: GlobalArenaPtr::from_static("test"),
-        code: Code::from_vec(vec![StoreImm8 { dst: FO(8), imm: 0 }, Return]),
+        code: Code::from_vec(vec![
+            StoreImm8 {
+                dst: FO(8),
+                imm: 0u64.to_le_bytes(),
+            },
+            Return,
+        ]),
         param_sizes: vec![],
         param_and_local_sizes_sum: 8,
         extended_frame_size: 32, // offset 8 lands in metadata [8, 32)
@@ -157,7 +163,10 @@ fn frame_bounds_fat_ptr_write() {
     let func = Function {
         name: GlobalArenaPtr::from_static("test"),
         code: Code::from_vec(vec![
-            StoreImm8 { dst: FO(0), imm: 0 },
+            StoreImm8 {
+                dst: FO(0),
+                imm: 0u64.to_le_bytes(),
+            },
             SlotBorrow {
                 dst: FO(8),
                 local: FO(0),
@@ -313,7 +322,10 @@ fn invalid_conditional_jump_target() {
     let func = Function {
         name: GlobalArenaPtr::from_static("test"),
         code: Code::from_vec(vec![
-            StoreImm8 { dst: FO(0), imm: 0 },
+            StoreImm8 {
+                dst: FO(0),
+                imm: 0u64.to_le_bytes(),
+            },
             JumpNotZeroU64 {
                 target: CO(99),
                 src: FO(0),
@@ -351,7 +363,7 @@ fn invalid_descriptor_id() {
             },
             StoreImm8 {
                 dst: FO(24),
-                imm: 42,
+                imm: 42u64.to_le_bytes(),
             },
             VecPushBack {
                 vec_ref: FO(8),
@@ -418,7 +430,7 @@ fn zero_elem_size_vec_push() {
             },
             StoreImm8 {
                 dst: FO(24),
-                imm: 42,
+                imm: 42u64.to_le_bytes(),
             },
             VecPushBack {
                 vec_ref: FO(8),
@@ -601,7 +613,7 @@ fn multiple_errors_collected() {
         code: Code::from_vec(vec![
             StoreImm8 {
                 dst: FO(100),
-                imm: 0,
+                imm: 0u64.to_le_bytes(),
             }, // out of bounds
             Jump { target: CO(99) }, // invalid target
             Return,
@@ -641,7 +653,10 @@ fn vec_pushback_must_target_vector_descriptor() {
                 dst: FO(16),
                 local: FO(0),
             },
-            StoreImm8 { dst: FO(8), imm: 1 },
+            StoreImm8 {
+                dst: FO(8),
+                imm: 1u64.to_le_bytes(),
+            },
             VecPushBack {
                 vec_ref: FO(16),
                 elem: FO(8),

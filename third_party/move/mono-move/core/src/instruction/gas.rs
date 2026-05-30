@@ -37,6 +37,8 @@ impl HasCfgInfo for MicroOp {
             | MicroOp::JumpGreaterEqualU64 { target, .. }
             | MicroOp::JumpNotEqualU64 { target, .. } => Some(target.0 as usize),
             MicroOp::StoreImm8 { .. }
+            | MicroOp::StoreImm16 { .. }
+            | MicroOp::StoreImm32 { .. }
             | MicroOp::Move8 { .. }
             | MicroOp::Move { .. }
             | MicroOp::AddU64 { .. }
@@ -84,6 +86,9 @@ impl HasCfgInfo for MicroOp {
             | MicroOp::HeapBorrow { .. }
             | MicroOp::ReadRef { .. }
             | MicroOp::WriteRef { .. }
+            | MicroOp::DeriveRefOffsetImm { .. }
+            | MicroOp::ReadRefOffset { .. }
+            | MicroOp::WriteRefOffset { .. }
             | MicroOp::HeapNew { .. }
             | MicroOp::HeapMoveFrom8 { .. }
             | MicroOp::HeapMoveFrom { .. }
@@ -150,6 +155,8 @@ impl RemapTargets for MicroOp {
                 rhs,
             },
             op @ (MicroOp::StoreImm8 { .. }
+            | MicroOp::StoreImm16 { .. }
+            | MicroOp::StoreImm32 { .. }
             | MicroOp::Move8 { .. }
             | MicroOp::Move { .. }
             | MicroOp::AddU64 { .. }
@@ -197,6 +204,9 @@ impl RemapTargets for MicroOp {
             | MicroOp::HeapBorrow { .. }
             | MicroOp::ReadRef { .. }
             | MicroOp::WriteRef { .. }
+            | MicroOp::DeriveRefOffsetImm { .. }
+            | MicroOp::ReadRefOffset { .. }
+            | MicroOp::WriteRefOffset { .. }
             | MicroOp::HeapNew { .. }
             | MicroOp::HeapMoveFrom8 { .. }
             | MicroOp::HeapMoveFrom { .. }
@@ -226,6 +236,8 @@ impl GasSchedule<MicroOp> for MicroOpGasSchedule {
         InstrCost::constant(match instr {
             // --- Data movement ---
             MicroOp::StoreImm8 { .. } => 2,
+            MicroOp::StoreImm16 { .. } => 3,
+            MicroOp::StoreImm32 { .. } => 4,
             MicroOp::Move8 { .. } => 2,
             MicroOp::Move { size, .. } => 2 + 3 * *size as u64,
 
@@ -291,6 +303,10 @@ impl GasSchedule<MicroOp> for MicroOpGasSchedule {
             MicroOp::VecBorrow { .. } => 3,
             MicroOp::HeapBorrow { .. } => 2,
             MicroOp::ReadRef { size, .. } | MicroOp::WriteRef { size, .. } => 2 + 3 * *size as u64,
+            MicroOp::DeriveRefOffsetImm { .. } => 2,
+            MicroOp::ReadRefOffset { size, .. } | MicroOp::WriteRefOffset { size, .. } => {
+                2 + 3 * *size as u64
+            },
 
             // --- Heap object operations ---
             MicroOp::HeapNew { .. } => 8,

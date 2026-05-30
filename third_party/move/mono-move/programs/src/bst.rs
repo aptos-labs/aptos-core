@@ -396,7 +396,7 @@ mod micro_op {
             JumpLessU64 { target: CO(11), lhs: FO(key), rhs: FO(node_key) },      // 6: key < node.key → LEFT
             JumpLessU64 { target: CO(13), lhs: FO(node_key), rhs: FO(key) },      // 7: node.key < key → RIGHT
             // EQUAL (8)
-            StoreImm8 { dst: FO(tag), imm: 1 },                                   // 8
+            StoreImm8 { dst: FO(tag), imm: 1u64.to_le_bytes() },                                   // 8
             Move8 { dst: FO(value), src: FO(node_val) },                           // 9
             Return,                                                                // 10
             // GO_LEFT (11)
@@ -406,8 +406,8 @@ mod micro_op {
             Move8 { dst: FO(idx), src: FO(node_right) },                          // 13
             Jump { target: CO(4) },                                                // 14
             // NONE (15)
-            StoreImm8 { dst: FO(tag), imm: 0 },                                   // 15
-            StoreImm8 { dst: FO(value), imm: 0 },                                 // 16
+            StoreImm8 { dst: FO(tag), imm: 0u64.to_le_bytes() },                                   // 15
+            StoreImm8 { dst: FO(value), imm: 0u64.to_le_bytes() },                                 // 16
             Return,                                                                // 17
         ];
 
@@ -574,8 +574,8 @@ mod micro_op {
             // Build new_node = { key, value, NULL, NULL }
             Move8 { dst: FO(new_node_key), src: FO(key) },                        // 3
             Move8 { dst: FO(new_node_val), src: FO(value) },                      // 4
-            StoreImm8 { dst: FO(new_node_left), imm: NULL },                      // 5
-            StoreImm8 { dst: FO(new_node_right), imm: NULL },                     // 6
+            StoreImm8 { dst: FO(new_node_left), imm: NULL.to_le_bytes() },                      // 5
+            StoreImm8 { dst: FO(new_node_right), imm: NULL.to_le_bytes() },                     // 6
             // Check free_list
             VecLen { dst: FO(fl_len), vec_ref: FO(free_list_ref) },                // 7
             JumpNotZeroU64 { target: CO(12), src: FO(fl_len) },                    // 8: → POP
@@ -649,7 +649,7 @@ mod micro_op {
             SlotBorrow { dst: FO(bst_ref), local: FO(bst) },                      // 0
             Op::struct_borrow(FO(bst_ref), BST_NODES, FO(nodes_ref)),              // 1
             Op::struct_load8(FO(bst), BST_ROOT, FO(root)),                         // 2
-            StoreImm8 { dst: FO(parent), imm: NULL },                              // 3
+            StoreImm8 { dst: FO(parent), imm: NULL.to_le_bytes() },                              // 3
             Move8 { dst: FO(idx), src: FO(root) },                                // 4
             // -- LOOP (5): while idx != NULL --
             JumpGreaterEqualU64Imm { target: CO(27),
@@ -864,7 +864,7 @@ mod micro_op {
             // -- Init loop --
             SlotBorrow { dst: FO(ops_ref), local: FO(ops) },                      // 2
             VecLen { dst: FO(len), vec_ref: FO(ops_ref) },                        // 3
-            StoreImm8 { dst: FO(i), imm: 0 },                                    // 4
+            StoreImm8 { dst: FO(i), imm: 0u64.to_le_bytes() },                                    // 4
             // -- LOOP (5) --
             JumpGreaterEqualU64 { target: CO(28),
                                   lhs: FO(i), rhs: FO(len) },                    // 5: → DONE

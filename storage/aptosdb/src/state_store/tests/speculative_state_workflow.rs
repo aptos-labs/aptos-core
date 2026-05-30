@@ -421,7 +421,7 @@ impl StateByVersion {
 
     fn assert_state_summary(&self, state_summary: &StateSummary) {
         assert_eq!(
-            state_summary.hot_root_hash(),
+            state_summary.hot_root_hash().unwrap(),
             self.get_state(state_summary.version())
                 .hot_summary
                 .get_root_hash()

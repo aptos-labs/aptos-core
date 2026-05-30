@@ -204,6 +204,11 @@ impl PreparedModule {
             .expect("Must be a struct")[h.field as usize]
     }
 
+    /// Returns the field's position within its owning struct.
+    pub fn field_position_at(&self, idx: FieldHandleIndex) -> u16 {
+        self.module.field_handle_at(idx).field
+    }
+
     /// Returns interned type corresponding to the compiled module's enum
     /// variant field.
     pub fn interned_variant_field_type_at(&self, idx: VariantFieldHandleIndex) -> InternedType {
@@ -217,6 +222,11 @@ impl PreparedModule {
     /// Returns interned type corresponding to the compiled module's constant.
     pub fn interned_constant_type_at(&self, idx: ConstantPoolIndex) -> InternedType {
         self.constant_types[idx.0 as usize]
+    }
+
+    /// Raw (BCS-encoded) bytes of the constant at `idx`.
+    pub fn constant_data_at(&self, idx: ConstantPoolIndex) -> &[u8] {
+        &self.module.constant_pool()[idx.0 as usize].data
     }
 
     /// Returns interned type corresponding to the compiled module's constant.

@@ -1,3 +1,4 @@
+// RUN: publish --print(stackless,micro-ops)
 module 0x66::test
 
 fun add_values(a: u64, b: u64): u64
@@ -100,3 +101,48 @@ fun shr_imm(x: u64): u64
     ld_u8 2
     shr
     ret
+
+// RUN: execute 0x66::test::add_values --args 2, 3
+// CHECK: results: 5
+
+// RUN: execute 0x66::test::add_values --args 0, 0
+// CHECK: results: 0
+
+// RUN: execute 0x66::test::complex_arith --args 10
+// CHECK: results: 21
+
+// RUN: execute 0x66::test::sub_values --args 10, 3
+// CHECK: results: 7
+
+// RUN: execute 0x66::test::sub_imm --args 20
+// CHECK: results: 15
+
+// RUN: execute 0x66::test::div_values --args 20, 5
+// CHECK: results: 4
+
+// RUN: execute 0x66::test::mod_values --args 20, 7
+// CHECK: results: 6
+
+// RUN: execute 0x66::test::bit_and --args 12, 10
+// CHECK: results: 8
+
+// RUN: execute 0x66::test::bit_or --args 12, 10
+// CHECK: results: 14
+
+// RUN: execute 0x66::test::bit_xor --args 12, 10
+// CHECK: results: 6
+
+// RUN: execute 0x66::test::mul_imm --args 6
+// CHECK: results: 42
+
+// RUN: execute 0x66::test::div_imm --args 10
+// CHECK: results: 3
+
+// RUN: execute 0x66::test::mod_imm --args 23
+// CHECK: results: 3
+
+// RUN: execute 0x66::test::shl_imm --args 1
+// CHECK: results: 16
+
+// RUN: execute 0x66::test::shr_imm --args 64
+// CHECK: results: 16

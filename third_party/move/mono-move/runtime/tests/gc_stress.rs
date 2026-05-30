@@ -159,9 +159,9 @@ fn make_gc_stress_program(
         // PC 1: outer_vec_ref = SlotBorrow(outer_vec)
         SlotBorrow { dst: FO(outer_vec_ref), local: FO(outer_vec) },
         // PC 2: i = 0
-        StoreImm8 { dst: FO(i), imm: 0 },
+        StoreImm8 { dst: FO(i), imm: 0u64.to_le_bytes() },
         // PC 3: const_hundred = 100
-        StoreImm8 { dst: FO(const_hundred), imm: 100 },
+        StoreImm8 { dst: FO(const_hundred), imm: 100u64.to_le_bytes() },
 
         // ---- LOOP (PC 4) ----
         JumpGreaterEqualU64Imm { target: CO(30), src: FO(i), imm: num_iterations },

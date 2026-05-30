@@ -24,7 +24,7 @@ pub struct DerivedFrameLayout {
 /// Derive the GC frame layout for `func_ir`. `home_slot_types` is
 /// taken separately so the caller can pass a substituted view.
 pub fn derive_frame_layout(
-    ctx: &LoweringContext,
+    ctx: &LoweringContext<'_>,
     func_ir: &FunctionIR,
     home_slot_types: &[InternedType],
 ) -> Result<DerivedFrameLayout> {
@@ -60,14 +60,52 @@ pub fn derive_frame_layout(
     })
 }
 
+/// Returns `true` iff `type_pointer_offsets` would accept `ty` without
+/// erroring. Keep in sync with `type_pointer_offsets`: every case that
+/// `bail!`s there must return `false` here.
+pub fn gc_layout_supports(ty: InternedType) -> bool {
+    match view_type(ty) {
+        Type::Bool
+        | Type::U8
+        | Type::U16
+        | Type::U32
+        | Type::U64
+        | Type::U128
+        | Type::U256
+        | Type::I8
+        | Type::I16
+        | Type::I32
+        | Type::I64
+        | Type::I128
+        | Type::I256
+        | Type::Address
+        | Type::Signer
+        | Type::ImmutRef { .. }
+        | Type::MutRef { .. }
+        | Type::Vector { .. }
+        | Type::Function { .. } => true,
+        Type::Nominal { .. } => {
+            // Mirrors the bails in `type_pointer_offsets`'s Nominal arm:
+            // unpopulated layout, enum (no field_layouts), or unsupported field.
+            let Some(layout) = view_type(ty).layout() else {
+                return false;
+            };
+            let Some(fields) = layout.field_layouts() else {
+                return false;
+            };
+            fields.iter().all(|f| gc_layout_supports(f.ty()))
+        },
+        Type::TypeParam { .. } => false,
+    }
+}
+
 /// Byte offsets of the pointer slots inside a value of type `ty`,
 /// relative to the value's start.
 ///
 /// Returns an error if the provided type is not yet supported or
-/// contains non-instantiated type parameters.
-//
-// TODO: when nominal support lands, return the offsets cached on
-// `NominalLayout` directly instead of recursing into fields here.
+/// contains non-instantiated type parameters. Callers that want to
+/// decide *whether* to lower a function should use `gc_layout_supports`
+/// for a graceful `Skipped` outcome rather than reaching this `Err`.
 pub fn type_pointer_offsets(ty: InternedType) -> Result<Vec<u32>> {
     let offsets = match view_type(ty) {
         // Scalars: no pointer offsets.
@@ -94,11 +132,34 @@ pub fn type_pointer_offsets(ty: InternedType) -> Result<Vec<u32>> {
         // 8-byte heap pointers.
         Type::Vector { .. } | Type::Function { .. } => vec![0],
 
-        // TODO: support nominals by reading pointer offsets cached
-        // on `NominalLayout` (populated once via a field walk, the
-        // same way size/alignment is).
+        // Inline structs: walk each field's pointer offsets and shift
+        // by the field's byte offset within the struct.
+        // TODO: Enums.
+        //
+        // TODO: rewrite without recursion or add a depth/visited bound;
+        // a malformed or racing `NominalLayout` publisher could otherwise
+        // produce a cyclic layout that blows the stack here.
         Type::Nominal { .. } => {
-            bail!("nominal type in frame slot not yet supported by gc_layout");
+            let layout = view_type(ty)
+                .layout()
+                .ok_or_else(|| anyhow::anyhow!("nominal type has no layout populated"))?;
+            let Some(fields) = layout.field_layouts() else {
+                bail!("enum type in frame slot not yet supported by gc_layout");
+            };
+            let mut out = vec![];
+            for field in fields {
+                for rel in type_pointer_offsets(field.ty())? {
+                    let abs = field.offset.checked_add(rel).ok_or_else(|| {
+                        anyhow::anyhow!(
+                            "gc_layout: field.offset {} + inner offset {} overflows u32",
+                            field.offset,
+                            rel,
+                        )
+                    })?;
+                    out.push(abs);
+                }
+            }
+            out
         },
 
         Type::TypeParam { .. } => {

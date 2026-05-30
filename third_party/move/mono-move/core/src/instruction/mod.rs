@@ -119,6 +119,7 @@ use crate::{
     types::{display_type_list, InternedTypeList},
     FunctionPtr,
 };
+use move_core_types::int256::U256;
 use std::fmt;
 
 // Submodules for instruction.
@@ -269,10 +270,35 @@ pub enum MicroOp {
     // - `StoreImm` to handle arbitrary sizes,
     // - bulk data movement.
     //======================================================================
-    /// Store an immediate u64 (8 bytes) at `dst` in the current frame.
+    /// Store 8 immediate bytes into the destination slot. `imm` is the
+    /// little-endian (LE) byte representation of the value:
+    /// `u64.to_le_bytes()` for unsigned and `i64.to_le_bytes()` (i.e.
+    /// two's-complement) for signed. Narrower primitives (`u8`/`u16`/`u32`/
+    /// `i8`/`i16`/`i32`/`bool`) are widened to 8 bytes by the lowerer.
     StoreImm8 {
         dst: FrameOffset,
-        imm: u64,
+        imm: [u8; 8],
+    },
+
+    /// Store 16 immediate bytes into the destination slot. Same LE
+    /// convention as `StoreImm8`: `u128.to_le_bytes()` / `i128.to_le_bytes()`.
+    ///
+    /// TODO(perf): use a side table instead of boxing.
+    StoreImm16 {
+        dst: FrameOffset,
+        imm: Box<[u8; 16]>,
+    },
+
+    /// Store 32 immediate bytes into the destination slot. For numeric
+    /// values, same LE convention as `StoreImm8`: `U256.to_le_bytes()` /
+    /// `I256.to_le_bytes()`. `AccountAddress` is not numeric — it's a
+    /// 32-byte identifier — so its bytes are copied as-is, with no LE
+    /// reinterpretation.
+    ///
+    /// TODO(perf): use a side table instead of boxing.
+    StoreImm32 {
+        dst: FrameOffset,
+        imm: Box<[u8; 32]>,
     },
 
     /// Copy 8 bytes from `src` to `dst`.
@@ -719,6 +745,36 @@ pub enum MicroOp {
         size: u32,
     },
 
+    /// Copies the 16-byte fat pointer from `src_ref` to `dst_ref`, while
+    /// adding `offset` to the offset part of the fat pointer.
+    ///
+    /// Used to derive a field reference from a struct reference.
+    DeriveRefOffsetImm {
+        dst_ref: FrameOffset,
+        src_ref: FrameOffset,
+        offset: u32,
+    },
+
+    /// Read through a fat pointer (`ref_ptr`) with an extra immediate `offset`.
+    /// Copies `size` bytes from the referenced location (after folding in the
+    /// offset) to `dst`.
+    ReadRefOffset {
+        dst: FrameOffset,
+        ref_ptr: FrameOffset,
+        offset: u32,
+        size: u32,
+    },
+
+    /// Write through a fat pointer (`ref_ptr`) with an extra immediate
+    /// `offset`. Copies `size` bytes from `src` to the referenced location
+    /// (after folding in the offset). Symmetric counterpart to `ReadRefOffset`.
+    WriteRefOffset {
+        ref_ptr: FrameOffset,
+        offset: u32,
+        src: FrameOffset,
+        size: u32,
+    },
+
     //======================================================================
     // Heap object operations (structs and enums)
     //======================================================================
@@ -850,7 +906,23 @@ impl fmt::Display for MicroOp {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
             MicroOp::StoreImm8 { dst, imm } => {
-                write!(f, "StoreImm8 [{}] <- #{}", dst.0, imm)
+                write!(f, "StoreImm8 [{}] <- #{}", dst.0, u64::from_le_bytes(*imm))
+            },
+            MicroOp::StoreImm16 { dst, imm } => {
+                write!(
+                    f,
+                    "StoreImm16 [{}] <- #{}",
+                    dst.0,
+                    u128::from_le_bytes(**imm)
+                )
+            },
+            MicroOp::StoreImm32 { dst, imm } => {
+                write!(
+                    f,
+                    "StoreImm32 [{}] <- #{}",
+                    dst.0,
+                    U256::from_le_bytes(**imm)
+                )
             },
             MicroOp::Move8 { dst, src } => {
                 write!(f, "Move8 [{}] <- [{}]", dst.0, src.0)
@@ -1096,6 +1168,41 @@ impl fmt::Display for MicroOp {
                     ref_ptr.0, src.0, size
                 )
             },
+            MicroOp::DeriveRefOffsetImm {
+                dst_ref,
+                src_ref,
+                offset,
+            } => {
+                write!(
+                    f,
+                    "DeriveRefOffsetImm [{}] <- [{}]+{}",
+                    dst_ref.0, src_ref.0, offset
+                )
+            },
+            MicroOp::ReadRefOffset {
+                dst,
+                ref_ptr,
+                offset,
+                size,
+            } => {
+                write!(
+                    f,
+                    "ReadRefOffset [{}] <- *([{}]+{}) (size={})",
+                    dst.0, ref_ptr.0, offset, size
+                )
+            },
+            MicroOp::WriteRefOffset {
+                ref_ptr,
+                offset,
+                src,
+                size,
+            } => {
+                write!(
+                    f,
+                    "WriteRefOffset *([{}]+{}) <- [{}] (size={})",
+                    ref_ptr.0, offset, src.0, size
+                )
+            },
             MicroOp::HeapNew { dst, descriptor_id } => {
                 write!(f, "HeapNew [{}] desc={}", dst.0, descriptor_id)
             },
@@ -1330,6 +1437,8 @@ impl MicroOp {
 
             // Non-allocating.
             MicroOp::StoreImm8 { .. }
+            | MicroOp::StoreImm16 { .. }
+            | MicroOp::StoreImm32 { .. }
             | MicroOp::Move8 { .. }
             | MicroOp::Move { .. }
             | MicroOp::AddU64 { .. }
@@ -1374,6 +1483,9 @@ impl MicroOp {
             | MicroOp::HeapBorrow { .. }
             | MicroOp::ReadRef { .. }
             | MicroOp::WriteRef { .. }
+            | MicroOp::DeriveRefOffsetImm { .. }
+            | MicroOp::ReadRefOffset { .. }
+            | MicroOp::WriteRefOffset { .. }
             | MicroOp::HeapMoveFrom8 { .. }
             | MicroOp::HeapMoveFrom { .. }
             | MicroOp::HeapMoveTo8 { .. }

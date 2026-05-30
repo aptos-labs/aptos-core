@@ -189,7 +189,7 @@ mod micro_op {
                 SlotBorrow { dst: FO(vec_ref), local: FO(vec) },
                 VecLen { dst: FO(len), vec_ref: FO(vec_ref) },
                 Move8 { dst: FO(callee_vec), src: FO(vec) },
-                StoreImm8 { dst: FO(callee_lo), imm: 0 },
+                StoreImm8 { dst: FO(callee_lo), imm: 0u64.to_le_bytes() },
                 Move8 { dst: FO(callee_hi), src: FO(len) },
                 CallDirect { ptr: merge_sort_range_ptr },
                 Return,
@@ -288,7 +288,7 @@ mod micro_op {
                 Jump { target: CO(25) },                                        // 30
 
                 Move8 { dst: FO(k), src: FO(lo) },                              // 31
-                StoreImm8 { dst: FO(tmp_idx), imm: 0 },                         // 32
+                StoreImm8 { dst: FO(tmp_idx), imm: 0u64.to_le_bytes() },                         // 32
                 JumpLessU64 { target: CO(35), lhs: FO(k), rhs: FO(hi) },        // 33
                 Return,                                                          // 34
                 VecLoadElem { dst: FO(elem_a), vec_ref: FO(tmp_ref),

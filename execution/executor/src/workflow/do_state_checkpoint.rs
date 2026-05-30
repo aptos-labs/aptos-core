@@ -44,7 +44,7 @@ impl DoStateCheckpoint {
                 Self::get_state_checkpoint_hashes(
                     execution_output,
                     known_hot_state_checkpoints,
-                    last_checkpoint.hot_root_hash(),
+                    last_checkpoint.hot_root_hash()?,
                     "hot_state",
                 )
             })

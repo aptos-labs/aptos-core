@@ -1,3 +1,4 @@
+// RUN: publish --print(stackless,micro-ops)
 module 0x66::test
 
 fun helper(): u64
@@ -16,3 +17,6 @@ fun trigger(): u64
     call void_no_arg
     move_loc k
     ret
+
+// RUN: execute 0x66::test::trigger
+// CHECK: results: 7

@@ -1,3 +1,4 @@
+// RUN: publish --print(stackless,micro-ops)
 module 0x66::test
 
 fun loop_down(x: u64)
@@ -19,3 +20,12 @@ fun conditional(flag: bool): u64
     ret
 l1: ld_u64 1
     ret
+
+// RUN: execute 0x66::test::loop_down --args 0
+// CHECK: results:
+
+// RUN: execute 0x66::test::loop_down --args 1
+// CHECK: results:
+
+// RUN: execute 0x66::test::loop_down --args 1000
+// CHECK: results:

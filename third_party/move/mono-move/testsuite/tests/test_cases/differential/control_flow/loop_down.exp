@@ -1,3 +1,4 @@
+=== stackless ===
 // module 0x66::test
 
 fun loop_down(r0) {
@@ -27,7 +28,6 @@ fun conditional(r0): u64 {
     3: r1 := ld_u64 1
     4: ret [r1]
 }
-
 === micro-ops ===
 // module 0x66::test
 
