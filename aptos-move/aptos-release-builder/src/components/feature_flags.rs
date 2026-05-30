@@ -164,6 +164,10 @@ pub enum FeatureFlag {
     MultisigScript,
     TransactionLimits,
     VersionedTransactionValidation,
+    StorageSlotNatives,
+    AllowFriendEntryVisibilityDowngrade,
+    HotnessInEpilogue,
+    TransactionInfoV1,
 }
 
 fn generate_features_blob(writer: &CodeWriter, data: &[u64]) {
@@ -429,6 +433,12 @@ impl From<FeatureFlag> for AptosFeatureFlag {
             FeatureFlag::VersionedTransactionValidation => {
                 AptosFeatureFlag::VERSIONED_TRANSACTION_VALIDATION
             },
+            FeatureFlag::StorageSlotNatives => AptosFeatureFlag::STORAGE_SLOT_NATIVES,
+            FeatureFlag::AllowFriendEntryVisibilityDowngrade => {
+                AptosFeatureFlag::ALLOW_FRIEND_ENTRY_VISIBILITY_DOWNGRADE
+            },
+            FeatureFlag::HotnessInEpilogue => AptosFeatureFlag::HOTNESS_IN_EPILOGUE,
+            FeatureFlag::TransactionInfoV1 => AptosFeatureFlag::TRANSACTION_INFO_V1,
         }
     }
 }
@@ -621,6 +631,12 @@ impl From<AptosFeatureFlag> for FeatureFlag {
             AptosFeatureFlag::VERSIONED_TRANSACTION_VALIDATION => {
                 FeatureFlag::VersionedTransactionValidation
             },
+            AptosFeatureFlag::STORAGE_SLOT_NATIVES => FeatureFlag::StorageSlotNatives,
+            AptosFeatureFlag::ALLOW_FRIEND_ENTRY_VISIBILITY_DOWNGRADE => {
+                FeatureFlag::AllowFriendEntryVisibilityDowngrade
+            },
+            AptosFeatureFlag::HOTNESS_IN_EPILOGUE => FeatureFlag::HotnessInEpilogue,
+            AptosFeatureFlag::TRANSACTION_INFO_V1 => FeatureFlag::TransactionInfoV1,
         }
     }
 }

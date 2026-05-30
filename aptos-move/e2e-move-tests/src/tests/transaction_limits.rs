@@ -3,23 +3,29 @@
 
 //! End-to-end tests for staking-backed transaction limits.
 
-use crate::{assert_success, stake::setup_staking, MoveHarness};
+use crate::{
+    assert_success,
+    stake::{initialize_staking, join_validator_set, rotate_consensus_key, setup_staking},
+    MoveHarness,
+};
 use aptos_cached_packages::aptos_stdlib::{
     aptos_coin_transfer, delegation_pool_add_stake, delegation_pool_initialize_delegation_pool,
     stake_set_delegated_voter,
 };
+use aptos_crypto::HashValue;
 use aptos_language_e2e_tests::account::{Account, TransactionBuilder};
 use aptos_types::{
     account_address::AccountAddress,
     move_utils::MemberId,
-    on_chain_config::FeatureFlag,
+    on_chain_config::{ApprovedExecutionHashes, FeatureFlag, OnChainConfig},
     transaction::{
-        RequestedMultipliers, SignedTransaction, TransactionExecutable, TransactionExtraConfig,
-        TransactionPayload, TransactionPayloadInner, TransactionStatus, UserTxnLimitsRequest,
+        RequestedMultipliers, Script, SignedTransaction, TransactionExecutable,
+        TransactionExtraConfig, TransactionPayload, TransactionPayloadInner, TransactionStatus,
+        UserTxnLimitsRequest,
     },
 };
 use move_core_types::{ident_str, language_storage::StructTag, vm_status::StatusCode};
-use serde::Serialize;
+use serde::{Deserialize, Serialize};
 use std::str::FromStr;
 
 const DEFAULT_GAS_UNIT_PRICE: u64 = 100;
@@ -40,35 +46,42 @@ const DEFAULT_EXECUTION_TIERS: [(u64, u64); 3] =
 const DEFAULT_IO_TIERS: [(u64, u64); 3] =
     [(20_000_000, 200), (200_000_000, 400), (1_000_000_000, 800)];
 
-fn stake_pool_owner(execution_bps: u64, io_bps: u64) -> UserTxnLimitsRequest {
+fn stake_pool_owner(
+    execution_multiplier_percent: u64,
+    io_multiplier_percent: u64,
+) -> UserTxnLimitsRequest {
     UserTxnLimitsRequest::StakePoolOwner {
         multipliers: RequestedMultipliers::V1 {
-            execution_bps,
-            io_bps,
+            execution_multiplier_percent,
+            io_multiplier_percent,
         },
     }
 }
 
-fn delegated_voter(pool: AccountAddress, execution_bps: u64, io_bps: u64) -> UserTxnLimitsRequest {
+fn delegated_voter(
+    pool: AccountAddress,
+    execution_multiplier_percent: u64,
+    io_multiplier_percent: u64,
+) -> UserTxnLimitsRequest {
     UserTxnLimitsRequest::DelegatedVoter {
         pool_address: pool,
         multipliers: RequestedMultipliers::V1 {
-            execution_bps,
-            io_bps,
+            execution_multiplier_percent,
+            io_multiplier_percent,
         },
     }
 }
 
 fn delegation_pool_delegator(
     pool: AccountAddress,
-    execution_bps: u64,
-    io_bps: u64,
+    execution_multiplier_percent: u64,
+    io_multiplier_percent: u64,
 ) -> UserTxnLimitsRequest {
     UserTxnLimitsRequest::DelegationPoolDelegator {
         pool_address: pool,
         multipliers: RequestedMultipliers::V1 {
-            execution_bps,
-            io_bps,
+            execution_multiplier_percent,
+            io_multiplier_percent,
         },
     }
 }
@@ -128,11 +141,32 @@ fn sign_fee_payer_txn_with_limits(
         .sign_fee_payer()
 }
 
+// Mirrors `0x1::staking_config::StakingConfig` for BCS serialization.
+#[derive(Deserialize, Serialize)]
+struct StakingConfig {
+    minimum_stake: u64,
+    maximum_stake: u64,
+    recurring_lockup_duration_secs: u64,
+    allow_validator_set_change: bool,
+    rewards_rate: u64,
+    rewards_rate_denominator: u64,
+    voting_power_increase_limit: u64,
+}
+
+fn staking_config_struct_tag() -> StructTag {
+    StructTag {
+        address: AccountAddress::ONE,
+        module: ident_str!("staking_config").to_owned(),
+        name: ident_str!("StakingConfig").to_owned(),
+        type_args: vec![],
+    }
+}
+
 // Mirrors `0x1::transaction_limits::TxnLimitTier` for BCS serialization.
 #[derive(Serialize)]
 struct TxnLimitTier {
     min_stake: u64,
-    multiplier_bps: u64,
+    multiplier_percent: u64,
 }
 
 // Mirrors `0x1::transaction_limits::TxnLimitsConfig` for BCS serialization.
@@ -147,9 +181,9 @@ enum TxnLimitsConfig {
 fn to_tiers(tiers: &[(u64, u64)]) -> Vec<TxnLimitTier> {
     tiers
         .iter()
-        .map(|(min_stake, multiplier_bps)| TxnLimitTier {
+        .map(|(min_stake, multiplier_percent)| TxnLimitTier {
             min_stake: *min_stake,
-            multiplier_bps: *multiplier_bps,
+            multiplier_percent: *multiplier_percent,
         })
         .collect()
 }
@@ -180,7 +214,14 @@ fn setup_validator(h: &mut MoveHarness) -> Account {
     acc
 }
 
-fn setup_delegation_pool(
+fn setup_stake_pool_without_joining_validator_set(h: &mut MoveHarness) -> Account {
+    let acc = h.new_account_with_balance_and_sequence_number(DEFAULT_BALANCE, 0);
+    let address = *acc.address();
+    assert_success!(initialize_staking(h, &acc, DEFAULT_STAKE, address, address));
+    acc
+}
+
+fn setup_delegation_pool_without_joining_validator_set(
     h: &mut MoveHarness,
     pool_owner: &Account,
     delegator: &Account,
@@ -205,6 +246,34 @@ fn setup_delegation_pool(
         delegator,
         delegation_pool_add_stake(pool_address, stake_amount)
     ));
+    pool_address
+}
+
+fn setup_delegation_pool(
+    h: &mut MoveHarness,
+    pool_owner: &Account,
+    delegator: &Account,
+    stake_amount: u64,
+) -> AccountAddress {
+    // The genesis sets a small voting-power-increase cap; a 20 APT delegation
+    // pool would exceed it in a single epoch. Raise the cap so the pool can
+    // join the validator set. The protocol limit is enforced by
+    // `staking_config::update_voting_power_increase_limit`, but we are writing
+    // the resource directly here, which bypasses that check.
+    let mut staking_config: StakingConfig = h
+        .read_resource(&AccountAddress::ONE, staking_config_struct_tag())
+        .unwrap();
+    staking_config.voting_power_increase_limit = 1_000_000;
+    h.set_resource(
+        AccountAddress::ONE,
+        staking_config_struct_tag(),
+        &staking_config,
+    );
+
+    let pool_address =
+        setup_delegation_pool_without_joining_validator_set(h, pool_owner, delegator, stake_amount);
+    assert_success!(rotate_consensus_key(h, pool_owner, pool_address));
+    assert_success!(join_validator_set(h, pool_owner, pool_address));
     pool_address
 }
 
@@ -358,20 +427,13 @@ fn test_not_delegated_voter() {
 }
 
 #[test]
-fn test_delegation_pool_delegator_success() {
+fn test_stake_pool_owner_not_in_validator_set() {
     let mut h = new_test_harness();
-    let pool_owner = h.new_account_with_balance_and_sequence_number(DEFAULT_BALANCE, 0);
-    let delegator = h.new_account_with_balance_and_sequence_number(DEFAULT_BALANCE, 0);
-    let pool_addr =
-        setup_delegation_pool(&mut h, &pool_owner, &delegator, DEFAULT_DELEGATION_STAKE);
+    let acc = setup_stake_pool_without_joining_validator_set(&mut h);
     h.new_epoch();
 
-    let txn = sign_txn_with_limits(
-        &mut h,
-        &delegator,
-        delegation_pool_delegator(pool_addr, 200, 200),
-    );
-    assert_success!(h.run(txn));
+    let txn = sign_txn_with_limits(&mut h, &acc, stake_pool_owner(200, 200));
+    run_and_assert_discard(&mut h, txn, StatusCode::STAKE_POOL_NOT_IN_VALIDATOR_SET);
 }
 
 #[test]
@@ -386,6 +448,44 @@ fn test_delegation_pool_not_found() {
         delegation_pool_delegator(fake_pool, 200, 200),
     );
     run_and_assert_discard(&mut h, txn, StatusCode::DELEGATION_POOL_NOT_FOUND);
+}
+
+#[test]
+fn test_delegation_pool_not_in_validator_set() {
+    let mut h = new_test_harness();
+    let pool_owner = h.new_account_with_balance_and_sequence_number(DEFAULT_BALANCE, 0);
+    let delegator = h.new_account_with_balance_and_sequence_number(DEFAULT_BALANCE, 0);
+    let pool_addr = setup_delegation_pool_without_joining_validator_set(
+        &mut h,
+        &pool_owner,
+        &delegator,
+        DEFAULT_DELEGATION_STAKE,
+    );
+    h.new_epoch();
+
+    let txn = sign_txn_with_limits(
+        &mut h,
+        &delegator,
+        delegation_pool_delegator(pool_addr, 200, 200),
+    );
+    run_and_assert_discard(&mut h, txn, StatusCode::STAKE_POOL_NOT_IN_VALIDATOR_SET);
+}
+
+#[test]
+fn test_delegation_pool_delegator_success() {
+    let mut h = new_test_harness();
+    let pool_owner = h.new_account_with_balance_and_sequence_number(DEFAULT_BALANCE, 0);
+    let delegator = h.new_account_with_balance_and_sequence_number(DEFAULT_BALANCE, 0);
+    let pool_addr =
+        setup_delegation_pool(&mut h, &pool_owner, &delegator, DEFAULT_DELEGATION_STAKE);
+    h.new_epoch();
+
+    let txn = sign_txn_with_limits(
+        &mut h,
+        &delegator,
+        delegation_pool_delegator(pool_addr, 200, 200),
+    );
+    assert_success!(h.run(txn));
 }
 
 #[test]
@@ -456,4 +556,45 @@ fn test_sender_stake_ignored_for_fee_payer_txn() {
     let txn =
         sign_fee_payer_txn_with_limits(&mut h, &sender, &fee_payer, stake_pool_owner(200, 200));
     run_and_assert_discard(&mut h, txn, StatusCode::NOT_STAKE_POOL_OWNER);
+}
+
+#[test]
+fn test_approved_gov_script_with_txn_limits_request_rejected() {
+    let mut h = new_test_harness();
+    let acc = setup_validator(&mut h);
+    h.new_epoch();
+
+    // A minimal valid script: the actual content does not matter as long as
+    // the hash is in the approved list.
+    let script_code = vec![0xA1, 0x1C, 0xEB, 0x0B, 0x06, 0x00, 0x00, 0x00];
+    let script_hash = HashValue::sha3_256_of(&script_code).to_vec();
+    let aptos_framework_addr = *h.aptos_framework_account().address();
+    h.set_resource(
+        aptos_framework_addr,
+        ApprovedExecutionHashes::struct_tag(),
+        &ApprovedExecutionHashes {
+            entries: vec![(0, script_hash)],
+        },
+    );
+
+    let script = Script::new(script_code, vec![], vec![]);
+    let payload = TransactionPayload::Payload(TransactionPayloadInner::V1 {
+        executable: TransactionExecutable::Script(script),
+        extra_config: TransactionExtraConfig::V2 {
+            multisig_address: None,
+            replay_protection_nonce: None,
+            txn_limits_request: Some(stake_pool_owner(200, 200)),
+        },
+    });
+    let txn = TransactionBuilder::new(acc.clone())
+        .payload(payload)
+        .sequence_number(h.sequence_number(acc.address()))
+        .max_gas_amount(1_000_000)
+        .gas_unit_price(10 * DEFAULT_GAS_UNIT_PRICE)
+        .sign();
+    run_and_assert_discard(
+        &mut h,
+        txn,
+        StatusCode::TXN_LIMITS_REQUEST_NOT_ALLOWED_FOR_GOVERNANCE_SCRIPT,
+    );
 }

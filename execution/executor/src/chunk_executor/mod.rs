@@ -36,6 +36,7 @@ use aptos_types::{
     },
     contract_event::ContractEvent,
     ledger_info::LedgerInfoWithSignatures,
+    on_chain_config::{Features, OnChainConfig},
     state_store::StateViewId,
     transaction::{
         signature_verified_transaction::SignatureVerifiedTransaction, AuxiliaryInfo,
@@ -65,6 +66,31 @@ use transaction_chunk::{ChunkToApply, ChunkToExecute, TransactionChunk};
 pub mod chunk_commit_queue;
 pub mod chunk_result_verifier;
 pub mod transaction_chunk;
+
+/// `BlockExecutorConfigFromOnchain` for executing a chunk against the given
+/// parent state.
+///
+/// Chunks don't cross epoch boundaries, so the parent state's features
+/// determine the write-set and `TransactionInfo` formats that match the
+/// committed proofs.
+///
+/// When the `Features` resource is absent in the parent state — pre-genesis
+/// replay, or test setups whose genesis doesn't write it — fall back to
+/// `new_no_block_limit()`'s defaults, matching `db_bootstrapper`.
+fn chunk_onchain_config(state_view: &CachedStateView) -> BlockExecutorConfigFromOnchain {
+    // State sync executor shouldn't have block gas limit.
+    let base = BlockExecutorConfigFromOnchain::new_no_block_limit();
+    match Features::fetch_config(state_view) {
+        Some(features) => base.with_features(&features),
+        None => {
+            info!(
+                next_version = state_view.next_version(),
+                "No `Features` resource in parent state; chunk executes with no on-chain features applied."
+            );
+            base
+        },
+    }
+}
 
 pub struct ChunkExecutor<V> {
     db: DbReaderWriter,
@@ -343,17 +369,25 @@ impl<V: VMBlockExecutor> ChunkExecutorInner<V> {
             chunk_verifier,
         } = chunk;
 
+        let txn_infos = chunk_verifier.transaction_infos();
+        let known_state_checkpoints = Some(
+            txn_infos
+                .iter()
+                .map(|t| t.state_checkpoint_hash())
+                .collect_vec(),
+        );
+        let known_hot_state_checkpoints = output.execution_output.transaction_info_v1.then(|| {
+            txn_infos
+                .iter()
+                .map(|t| t.hot_state_checkpoint_hash())
+                .collect_vec()
+        });
         let state_checkpoint_output = DoStateCheckpoint::run(
             &output.execution_output,
             &parent_state_summary,
             &ProvableStateSummary::new_persisted(self.db.reader.as_ref())?,
-            Some(
-                chunk_verifier
-                    .transaction_infos()
-                    .iter()
-                    .map(|t| t.state_checkpoint_hash())
-                    .collect_vec(),
-            ),
+            known_state_checkpoints,
+            known_hot_state_checkpoints,
         )?;
 
         let ledger_update_output = DoLedgerUpdate::run(
@@ -615,14 +649,14 @@ impl<V: VMBlockExecutor> ChunkExecutorInner<V> {
             .take((end_version - begin_version) as usize)
             .map(|persisted_aux_info| AuxiliaryInfo::new(*persisted_aux_info, None))
             .collect::<Vec<_>>();
-        // State sync executor shouldn't have block gas limit.
+        let onchain_config = chunk_onchain_config(&state_view);
         let execution_output = DoGetExecutionOutput::by_transaction_execution::<V>(
             &V::new(),
             txns.into(),
             auxiliary_info,
             &parent_state,
             state_view,
-            BlockExecutorConfigFromOnchain::new_no_block_limit(),
+            onchain_config,
             TransactionSliceMetadata::chunk(begin_version, end_version),
         )?;
         // not `zip_eq`, deliberately

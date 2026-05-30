@@ -7,6 +7,7 @@
 
 use crate::{options::ProverOptions, verification_analysis};
 use itertools::Itertools;
+use move_core_types::function::ClosureMask;
 use move_model::{
     ast,
     ast::{Exp, ExpData, MemoryLabel, QuantKind, RewriteResult, TempIndex, Value},
@@ -361,8 +362,6 @@ struct Instrumenter<'a> {
     options: &'a ProverOptions,
     builder: FunctionDataBuilder<'a>,
     ret_locals: Vec<TempIndex>,
-    ret_label: Label,
-    can_return: bool,
     abort_local: TempIndex,
     abort_label: Label,
     can_abort: bool,
@@ -400,17 +399,31 @@ impl<'a> Instrumenter<'a> {
 
         let mut builder = FunctionDataBuilder::new(fun_env, data);
 
-        // Create label and locals for unified return exit point. We translate each `Ret(t..)`
-        // instruction into `Assign(r.., t..); Jump(RetLab)`.
+        // After `NormalizeExitsProcessor`, the input bytecode has at most one
+        // `Ret` instruction. Capture its source temps as `ret_locals` so the
+        // spec translation rewrites `result_*` references to them directly,
+        // and the assertions emitted by `emit_return_assertions` reference the
+        // same temps that the trailing `Ret` returns. For divergent functions
+        // (no `Ret`), allocate placeholder locals — the translated spec is
+        // never asserted in that case.
         let ret_locals = builder
             .data
-            .result_type
-            .clone()
-            .flatten()
-            .into_iter()
-            .map(|ty| builder.new_temp(ty))
-            .collect_vec();
-        let ret_label = builder.new_label();
+            .code
+            .iter()
+            .find_map(|bc| match bc {
+                Bytecode::Ret(_, temps) => Some(temps.clone()),
+                _ => None,
+            })
+            .unwrap_or_else(|| {
+                builder
+                    .data
+                    .result_type
+                    .clone()
+                    .flatten()
+                    .into_iter()
+                    .map(|ty| builder.new_temp(ty))
+                    .collect_vec()
+            });
 
         // Similarly create label and local for unified abort exit point. We translate `Abort(c)`
         // into `Assign(r, c); Jump(AbortLabel)`, as well as `Call(..)` into `Call(..);
@@ -467,8 +480,6 @@ impl<'a> Instrumenter<'a> {
             options,
             builder,
             ret_locals,
-            ret_label,
-            can_return: false,
             abort_local,
             abort_label,
             can_abort: false,
@@ -628,10 +639,9 @@ impl<'a> Instrumenter<'a> {
             self.instrument_bytecode(spec, inlined_props, bc);
         }
 
-        // Generate return and abort blocks
-        if self.can_return {
-            self.generate_return_block(spec);
-        }
+        // The return assertion block is emitted in-place at the trailing `Ret`
+        // (see `instrument_bytecode`). Only the abort exit needs a separate
+        // out-of-line block at this point.
         if self.can_abort {
             self.generate_abort_block(spec);
         }
@@ -680,13 +690,13 @@ impl<'a> Instrumenter<'a> {
         match bc {
             Ret(id, results) => {
                 self.builder.set_loc_from_attr(id);
-                for (i, r) in self.ret_locals.clone().into_iter().enumerate() {
-                    self.builder
-                        .emit_with(|id| Assign(id, r, results[i], AssignKind::Move));
-                }
-                let ret_label = self.ret_label;
-                self.builder.emit_with(|id| Jump(id, ret_label));
-                self.can_return = true;
+                // Emit the spec-decoration block (lets, updates, ensures
+                // assertions, emits checks, ...) in-place before the actual
+                // return. After `NormalizeExitsProcessor` this is the unique
+                // exit point of the function.
+                debug_assert_eq!(self.ret_locals, results);
+                self.emit_return_assertions(spec);
+                self.builder.emit(Ret(id, results));
             },
             Abort(id, code, _) => {
                 self.builder.set_loc_from_attr(id);
@@ -698,7 +708,7 @@ impl<'a> Instrumenter<'a> {
                 self.can_abort = true;
             },
             Call(id, dests, Function(mid, fid, targs), srcs, aa) => {
-                self.instrument_call(id, dests, mid, fid, targs, srcs, aa);
+                self.instrument_call(spec, id, dests, mid, fid, targs, srcs, aa);
             },
             Call(id, dests, oper, srcs, _) if oper.can_abort() => {
                 self.builder.emit(Call(
@@ -733,6 +743,7 @@ impl<'a> Instrumenter<'a> {
 
     fn instrument_call(
         &mut self,
+        spec: &TranslatedSpec,
         id: AttrId,
         dests: Vec<TempIndex>,
         mid: ModuleId,
@@ -897,6 +908,30 @@ impl<'a> Instrumenter<'a> {
                     self.emit_traces(&callee_spec, &cond);
                     self.builder.emit_with(move |id| Prop(id, Assume, cond));
                 }
+                // Aggregate `aborts_of<callee>` on the abort path so a
+                // caller's `aborts_of<callee>` assertion discharges directly.
+                // See the success-path comment below `OpaqueCall` end for
+                // soundness and the gating rationale.
+                let abort_callee_is_higher_order = callee_env
+                    .get_parameters()
+                    .iter()
+                    .any(|p| matches!(p.1.skip_reference(), Type::Fun(..)));
+                let abort_entry_label = find_behavior_pre_label_for_callee(spec, mid, fid);
+                if abort_entry_label.is_some() && !abort_callee_is_higher_order {
+                    let abort_arg_exps: Vec<Exp> =
+                        srcs.iter().map(|s| self.builder.mk_temporary(*s)).collect();
+                    let (abort_closure_exp, _) =
+                        self.builder
+                            .mk_closure(mid, fid, targs, ClosureMask::empty(), vec![]);
+                    let abort_aborts_exp = self.builder.mk_aborts_of_with_state(
+                        abort_closure_exp,
+                        abort_arg_exps,
+                        abort_entry_label,
+                        None,
+                    );
+                    self.builder
+                        .emit_with(|id| Prop(id, Assume, abort_aborts_exp));
+                }
                 self.builder.emit_with(move |id| {
                     Call(id, vec![], Operation::TraceAbort, vec![abort_local], None)
                 });
@@ -997,6 +1032,72 @@ impl<'a> Instrumenter<'a> {
             if callee_env.is_pragma_true(EMITS_IS_PARTIAL_PRAGMA, || false) {
                 self.builder
                     .emit(Call(id, vec![], Operation::EventStoreDiverge, vec![], None));
+            }
+
+            // Aggregate the per-clause post-state assumes into the callee's
+            // behavioral predicates `ensures_of<callee>` and `!aborts_of<callee>`
+            // on the success path. The per-clause assumes already establish
+            // the body of these predicates with the call-site memory labels
+            // as concrete witnesses; emitting these aggregated assumes lets a
+            // caller's `ensures_of<callee>` / `aborts_of<callee>` assertion
+            // discharge directly (rather than forcing the SMT solver to
+            // re-Skolemize the existential over intermediate state labels at
+            // each caller's exit — which without this triggers runaway
+            // quantifier instantiations and timeouts). Sound because the
+            // predicates are defined as the existential closure of the same
+            // conjunction we just assumed.
+            //
+            // Skip when the callee has a function-typed parameter: in that
+            // case the callee's `bp_*_of` body delegates to a generic
+            // dispatcher whose memory-arg handling is invoked via the
+            // per-clause assumes above; emitting a parallel `bp_*_of<callee>`
+            // assume would use the dispatcher with weaker memory args
+            // (current memory for both pre and post) and create an
+            // inconsistent context.
+            //
+            // Only emit when the enclosing spec already references this
+            // callee via `ensures_of<callee>` or `aborts_of<callee>` — that
+            // guarantees `spec.saved_memory` has the right pre-state label
+            // for the callee's used memory (so the emitted memory args match
+            // the assertion's at the caller's exit). For callees the
+            // enclosing spec doesn't mention, our assume would have nothing
+            // to discharge and risks using a mismatched label.
+            let callee_is_higher_order = callee_env
+                .get_parameters()
+                .iter()
+                .any(|p| matches!(p.1.skip_reference(), Type::Fun(..)));
+            let entry_label = find_behavior_pre_label_for_callee(spec, mid, fid);
+            if entry_label.is_some() && !callee_is_higher_order {
+                let arg_exps: Vec<Exp> =
+                    srcs.iter().map(|s| self.builder.mk_temporary(*s)).collect();
+                let (closure_exp, _) =
+                    self.builder
+                        .mk_closure(mid, fid, targs, ClosureMask::empty(), vec![]);
+                // ensures_of takes args followed by results: explicit dests
+                // first, then post-values of &mut srcs (matches the order
+                // produced by `behavioral_output_types` in the Boogie backend).
+                let mut ensures_args = arg_exps.clone();
+                for &dest in &dests {
+                    ensures_args.push(self.builder.mk_temporary(dest));
+                }
+                for &src in &srcs {
+                    if self.builder.data.local_types[src].is_mutable_reference() {
+                        ensures_args.push(self.builder.mk_temporary(src));
+                    }
+                }
+                let ensures_exp = self.builder.mk_ensures_of_with_state(
+                    closure_exp.clone(),
+                    ensures_args,
+                    entry_label,
+                    None,
+                );
+                self.builder.emit_with(|id| Prop(id, Assume, ensures_exp));
+                let aborts_exp =
+                    self.builder
+                        .mk_aborts_of_with_state(closure_exp, arg_exps, entry_label, None);
+                let not_aborts_exp = self.builder.mk_not(aborts_exp);
+                self.builder
+                    .emit_with(|id| Prop(id, Assume, not_aborts_exp));
             }
 
             // Generate OpaqueCallEnd instruction if invariant_v2.
@@ -1679,15 +1780,17 @@ impl<'a> Instrumenter<'a> {
         (Some(aborts_cond_temp), aborts_code_cond)
     }
 
-    fn generate_return_block(&mut self, spec: &TranslatedSpec) {
+    /// Emit the spec-decoration block at the function's unified exit: state
+    /// updates, post-state lets, aborts negation, ensures assertions, and emits
+    /// completeness checks. Called from the `Ret` arm of `instrument_bytecode`
+    /// so the assertions execute immediately before the trailing `Ret`. The
+    /// caller is responsible for emitting the `Ret` itself.
+    fn emit_return_assertions(&mut self, spec: &TranslatedSpec) {
         use Bytecode::*;
         use PropKind::*;
 
-        // Set the location to the function and emit label.
         self.builder
             .set_loc(self.builder.fun_env.get_loc().at_end());
-        let ret_label = self.ret_label;
-        self.builder.emit_with(|id| Label(id, ret_label));
 
         // Emit specification variable updates. They are generated for both verified and inlined
         // function variants, as the evolution of state updates is always the same.
@@ -1786,10 +1889,6 @@ impl<'a> Instrumenter<'a> {
                 self.builder.emit_with(move |id| Prop(id, Assert, cond));
             }
         }
-
-        // Emit return
-        let ret_locals = self.ret_locals.clone();
-        self.builder.emit_with(move |id| Ret(id, ret_locals))
     }
 
     /// Emit havoc+assume for intermediate state labels.
@@ -2077,6 +2176,51 @@ impl<'a> Instrumenter<'a> {
             }
         }
     }
+}
+
+/// Find the pre-state memory label that the enclosing function's spec uses
+/// for a behavioral predicate over `(mid, fid)`. Returns `Some(label)` if
+/// any condition contains a `Behavior(_, _)` whose first arg is a `Closure`
+/// with the given module/function id; `None` otherwise.
+///
+/// Used to gate the call-site `assume bp_*_of<callee>(...)` in the opaque
+/// instrumentation: emitting it only when the enclosing spec already has an
+/// assertion of that predicate ensures `spec.saved_memory` was populated
+/// with the right label for the callee's used memory.
+fn find_behavior_pre_label_for_callee(
+    spec: &TranslatedSpec,
+    mid: ModuleId,
+    fid: FunId,
+) -> Option<MemoryLabel> {
+    let mut found: Option<MemoryLabel> = None;
+    let pre_post_exps = spec.pre.iter().chain(spec.post.iter()).map(|(_, e)| e);
+    let abort_exps = spec.aborts.iter().map(|(_, e, _)| e);
+    for exp in pre_post_exps.chain(abort_exps) {
+        if found.is_some() {
+            break;
+        }
+        exp.visit_pre_order(&mut |e| {
+            if found.is_some() {
+                return false;
+            }
+            if let ExpData::Call(_, ast::Operation::Behavior(_, range), args) = e {
+                if let Some(first) = args.first() {
+                    if let ExpData::Call(_, ast::Operation::Closure(cmid, cfid, _), _) =
+                        first.as_ref()
+                    {
+                        if *cmid == mid && *cfid == fid {
+                            if let Some(label) = range.pre {
+                                found = Some(label);
+                                return false;
+                            }
+                        }
+                    }
+                }
+            }
+            true
+        });
+    }
+    found
 }
 
 //  ================================================================================================

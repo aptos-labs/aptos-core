@@ -1,0 +1,40 @@
+// Regression: write_ref must be sized from pointee, not source slot's transient type.
+
+// RUN: publish
+module 0x66::test
+
+fun aux1(): u64
+    ld_u64 7
+    ret
+
+fun aux3(r: &mut u64)
+    ld_u64 0
+    move_loc r
+    write_ref
+    ret
+
+fun trigger(x: &mut u64)
+    call aux1
+    copy_loc x
+    write_ref
+    move_loc x
+    call aux3
+    ret
+
+fun entry(x: u64): u64
+    local l: u64
+    local other: u64
+    move_loc x
+    st_loc l
+    ld_u64 42
+    st_loc other
+    mut_borrow_loc l
+    call trigger
+    move_loc other
+    ret
+
+// RUN: execute 0x66::test::entry --args 1
+// CHECK: results: 42
+
+// RUN: execute 0x66::test::entry --args 100
+// CHECK: results: 42

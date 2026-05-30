@@ -174,7 +174,7 @@ fn get_chain_id(node_config: &NodeConfig) -> Result<ChainId, Error> {
             let chain_id_state_key = StateKey::on_chain_config::<ChainId>()?;
 
             // Get the write op from the write set
-            let write_set_mut = change_set.clone().write_set().clone().into_mut();
+            let write_set_mut = change_set.clone().write_set().clone().into_value_writes();
             let write_op = write_set_mut.get(&chain_id_state_key).ok_or_else(|| {
                 Error::InvariantViolation(
                     "The genesis transaction does not contain the write op for the chain id!"

@@ -9,14 +9,13 @@ mod helpers;
 const N: u64 = 1000;
 
 fn bench_merge_sort(c: &mut Criterion) {
-    use mono_move_core::LocalExecutionContext;
     use mono_move_programs::{
         merge_sort::{
             micro_op_merge_sort, move_bytecode_merge_sort, native_merge_sort, shuffled_range,
         },
         testing,
     };
-    use mono_move_runtime::InterpreterContext;
+    use mono_move_runtime::{InterpreterContext, LocalRuntimeContext};
 
     let input = shuffled_range(N, 42);
 
@@ -39,15 +38,13 @@ fn bench_merge_sort(c: &mut Criterion) {
         });
 
         // plain (no gas instrumentation)
-        let (functions, descriptors, _arena) = micro_op_merge_sort();
-        // SAFETY: Exclusive access during bench setup; arena is alive.
-        unsafe { mono_move_core::Function::resolve_calls(&functions) };
-        let mut exec_ctx = LocalExecutionContext::unmetered();
+        let (functions, descriptors) = micro_op_merge_sort();
+        let mut exec_ctx = LocalRuntimeContext::unmetered_with_descriptors(descriptors);
         // TODO: hoist interpreter context setup out of the timed body.
         group.bench_function("micro_op", |b| {
             b.iter(|| {
-                let mut ctx = InterpreterContext::new(&mut exec_ctx, &descriptors, unsafe {
-                    functions[0].unwrap().as_ref_unchecked()
+                let mut ctx = InterpreterContext::new(&mut exec_ctx, unsafe {
+                    functions[0].as_ref_unchecked()
                 });
                 let vec_ptr = ctx
                     .alloc_u64_vec(mono_move_core::DescriptorId(0), &input)
@@ -58,17 +55,14 @@ fn bench_merge_sort(c: &mut Criterion) {
         });
 
         // with gas instrumentation
-        let (functions, _, _arena) = micro_op_merge_sort();
-        // SAFETY: Exclusive access during bench setup; arena is alive.
-        let (functions_gas, _arena) = unsafe { helpers::gas_instrument(&functions) };
-        // SAFETY: Exclusive access during bench setup; arena is alive.
-        unsafe { mono_move_core::Function::resolve_calls(&functions_gas) };
-        let mut exec_ctx = LocalExecutionContext::with_max_budget();
+        let (functions_gas, descriptors_gas) = micro_op_merge_sort();
+        helpers::gas_instrument(&functions_gas);
+        let mut exec_ctx = LocalRuntimeContext::with_max_budget(descriptors_gas);
         // TODO: hoist interpreter context setup out of the timed body.
         group.bench_function("micro_op/gas", |b| {
             b.iter(|| {
-                let mut ctx = InterpreterContext::new(&mut exec_ctx, &descriptors, unsafe {
-                    functions_gas[0].unwrap().as_ref_unchecked()
+                let mut ctx = InterpreterContext::new(&mut exec_ctx, unsafe {
+                    functions_gas[0].as_ref_unchecked()
                 });
                 let vec_ptr = ctx
                     .alloc_u64_vec(mono_move_core::DescriptorId(0), &input)
@@ -79,6 +73,12 @@ fn bench_merge_sort(c: &mut Criterion) {
         });
 
         group.finish();
+
+        for ptr in functions.into_iter().chain(functions_gas) {
+            // SAFETY: All bench measurements have completed; no interpreter
+            // context references these function pointers anymore.
+            unsafe { ptr.free_unchecked() };
+        }
     }
 
     // -- move_vm -----------------------------------------------------------

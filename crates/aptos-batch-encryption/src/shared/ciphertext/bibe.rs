@@ -177,24 +177,6 @@ impl<P: Plaintext> BIBECTDecrypt<P> for BIBEDecryptionKey {
 }
 
 #[cfg(test)]
-impl BIBECiphertext {
-    pub(crate) fn blank_for_testing() -> Self {
-        use ark_std::Zero;
-
-        BIBECiphertext {
-            id: Id::new(Fr::zero()),
-            ct_g2: [
-                G2Affine::generator(),
-                (G2Affine::generator() * Fr::from(2)).into(),
-                (G2Affine::generator() * Fr::from(3)).into(),
-            ],
-            padded_key: OneTimePaddedKey::blank_for_testing(),
-            symmetric_ciphertext: SymmetricCiphertext::blank_for_testing(),
-        }
-    }
-}
-
-#[cfg(test)]
 pub mod tests {
     use super::{BIBECTDecrypt, BIBECTEncrypt};
     use crate::{

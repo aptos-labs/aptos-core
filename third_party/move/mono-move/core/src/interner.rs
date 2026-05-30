@@ -3,19 +3,38 @@
 
 //! Interning APIs.
 
-use crate::{
-    types::{InternedType, InternedTypeList},
-    ExecutableId,
-};
+use crate::types::{InternedType, InternedTypeList};
 use mono_move_alloc::GlobalArenaPtr;
 use move_core_types::{ability::AbilitySet, account_address::AccountAddress, identifier::IdentStr};
 
 /// Pointer to interned Move identifier allocated in global arena.
 pub type InternedIdentifier = GlobalArenaPtr<str>;
 
+/// Identifies a module or script by its address and name.
+pub struct ModuleId {
+    address: AccountAddress,
+    name: InternedIdentifier,
+}
+
+impl ModuleId {
+    /// Creates a new module ID.
+    pub const fn new(address: AccountAddress, name: InternedIdentifier) -> Self {
+        Self { address, name }
+    }
+
+    /// Returns the account address of this module.
+    pub fn address(&self) -> &AccountAddress {
+        &self.address
+    }
+
+    /// Returns the arena pointer to the name.
+    pub fn name(&self) -> InternedIdentifier {
+        self.name
+    }
+}
+
 /// Pointer to interned module ID allocated in global arena.
-// TODO: rename ExecutableId to ModuleID
-pub type InternedModuleId = GlobalArenaPtr<ExecutableId>;
+pub type InternedModuleId = GlobalArenaPtr<ModuleId>;
 
 /// Interns Move file format types into efficient pointer-based implementation
 /// where data is allocated in arena.
@@ -66,4 +85,37 @@ pub trait Interner {
 
     /// Returns an interned string identifier.
     fn identifier_of(&self, identifier: &IdentStr) -> InternedIdentifier;
+
+    /// Substitutes type parameters in the given type using type arguments as
+    /// the substitution (indexed by indices in type param nodes). Returns an
+    /// error if substitution fails.
+    ///
+    /// # Invariants
+    ///
+    /// 1. Every type as index `i` in type argument list corresponds to type
+    ///    parameter `i` in the generic type.
+    /// 2. Size of the type argument list can be greater than the largest type
+    ///    parameter `i` in the generic type. It should never be smaller. If
+    ///    so, then substitution fails.
+    fn subst_type(
+        &self,
+        ty: InternedType,
+        ty_args: InternedTypeList,
+    ) -> anyhow::Result<InternedType>;
+
+    /// Substitutes type parameters in every element of the given type list.
+    /// Returns an error if substitution fails.
+    ///
+    /// # Invariants
+    ///
+    /// 1. Every type as index `i` in type argument list corresponds to type
+    ///    parameter `i` in the generic type list.
+    /// 2. Size of the type argument list can be greater than the largest type
+    ///    parameter `i` in the generic type list. It should never be smaller.
+    ///    If so, then substitution fails.
+    fn subst_type_list(
+        &self,
+        tys: InternedTypeList,
+        ty_args: InternedTypeList,
+    ) -> anyhow::Result<InternedTypeList>;
 }

@@ -1,3 +1,4 @@
+// @checks=experimental
 module 0xc0ffee::m {
     package fun package_inner(): u64 {
         42

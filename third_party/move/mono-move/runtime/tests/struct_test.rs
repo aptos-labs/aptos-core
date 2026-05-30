@@ -3,14 +3,13 @@
 
 //! Tests for Move struct support (both inline and heap-allocated).
 
-use mono_move_alloc::{ExecutableArena, ExecutableArenaPtr, GlobalArenaPtr};
+use mono_move_alloc::GlobalArenaPtr;
 use mono_move_core::{
-    FrameLayoutInfo, FrameOffset as FO, Function, LocalExecutionContext, MicroOp,
-    SortedSafePointEntries, STRUCT_DATA_OFFSET,
+    Code, FrameLayoutInfo, FrameOffset as FO, Function, MicroOp, SortedSafePointEntries,
 };
 use mono_move_runtime::{
-    read_ptr, read_u64, InterpreterContext, ObjectDescriptor, ObjectDescriptorTable,
-    VEC_DATA_OFFSET, VEC_LENGTH_OFFSET,
+    read_ptr, read_u64, InterpreterContext, LocalRuntimeContext, ObjectDescriptor,
+    ObjectDescriptorTable, VEC_DATA_OFFSET, VEC_LENGTH_OFFSET,
 };
 
 // ---------------------------------------------------------------------------
@@ -25,32 +24,27 @@ fn struct_inline() {
     let pair_a: u32 = 8;
     let pair_b: u32 = 16;
 
-    let arena = ExecutableArena::new();
-
     #[rustfmt::skip]
-    let code = arena.alloc_slice_fill_iter([
-        StoreImm8 { dst: FO(pair_a), imm: 10 },
-        StoreImm8 { dst: FO(pair_b), imm: 20 },
+    let code = vec![
+        StoreImm8 { dst: FO(pair_a), imm: 10u64.to_le_bytes() },
+        StoreImm8 { dst: FO(pair_b), imm: 20u64.to_le_bytes() },
         AddU64 { dst: FO(result), lhs: FO(pair_a), rhs: FO(pair_b) },
         Return,
-    ]);
-    let functions = [arena.alloc(Function {
+    ];
+    let functions = [Function {
         name: GlobalArenaPtr::from_static("test"),
-        code,
-        param_sizes: ExecutableArenaPtr::empty_slice(),
+        code: Code::from_vec(code),
+        param_sizes: vec![],
         param_sizes_sum: 0,
         param_and_local_sizes_sum: 24,
         extended_frame_size: 48,
         zero_frame: false,
         frame_layout: FrameLayoutInfo::empty(),
         safe_point_layouts: SortedSafePointEntries::empty(),
-    })];
+    }];
     let descriptors = ObjectDescriptorTable::new();
-
-    let mut exec_ctx = LocalExecutionContext::with_max_budget();
-    let mut ctx = InterpreterContext::new(&mut exec_ctx, &descriptors, unsafe {
-        functions[0].as_ref_unchecked()
-    });
+    let mut exec_ctx = LocalRuntimeContext::with_max_budget(descriptors);
+    let mut ctx = InterpreterContext::new(&mut exec_ctx, &functions[0]);
     ctx.run().unwrap();
 
     assert_eq!(ctx.root_result(), 30, "result should be 10 + 20 = 30");
@@ -69,36 +63,31 @@ fn struct_inline_borrow() {
     let pair_b: u32 = 16;
     let r#ref: u32 = 24;
 
-    let arena = ExecutableArena::new();
-
     #[rustfmt::skip]
-    let code = arena.alloc_slice_fill_iter([
-        StoreImm8 { dst: FO(pair_a), imm: 10 },
-        StoreImm8 { dst: FO(pair_b), imm: 20 },
+    let code = vec![
+        StoreImm8 { dst: FO(pair_a), imm: 10u64.to_le_bytes() },
+        StoreImm8 { dst: FO(pair_b), imm: 20u64.to_le_bytes() },
         SlotBorrow { dst: FO(r#ref), local: FO(pair_b) },
         ReadRef { dst: FO(result), ref_ptr: FO(r#ref), size: 8 },
-        StoreImm8 { dst: FO(result), imm: 99 },
+        StoreImm8 { dst: FO(result), imm: 99u64.to_le_bytes() },
         WriteRef { ref_ptr: FO(r#ref), src: FO(result), size: 8 },
         Move8 { dst: FO(result), src: FO(pair_b) },
         Return,
-    ]);
-    let functions = [arena.alloc(Function {
+    ];
+    let functions = [Function {
         name: GlobalArenaPtr::from_static("test"),
-        code,
-        param_sizes: ExecutableArenaPtr::empty_slice(),
+        code: Code::from_vec(code),
+        param_sizes: vec![],
         param_sizes_sum: 0,
         param_and_local_sizes_sum: 40,
         extended_frame_size: 64,
         zero_frame: true,
-        frame_layout: FrameLayoutInfo::new(&arena, [FO(r#ref)]),
+        frame_layout: FrameLayoutInfo::new(vec![FO(r#ref)]),
         safe_point_layouts: SortedSafePointEntries::empty(),
-    })];
+    }];
     let descriptors = ObjectDescriptorTable::new();
-
-    let mut exec_ctx = LocalExecutionContext::with_max_budget();
-    let mut ctx = InterpreterContext::new(&mut exec_ctx, &descriptors, unsafe {
-        functions[0].as_ref_unchecked()
-    });
+    let mut exec_ctx = LocalRuntimeContext::with_max_budget(descriptors);
+    let mut ctx = InterpreterContext::new(&mut exec_ctx, &functions[0]);
     ctx.run().unwrap();
 
     assert_eq!(ctx.root_result(), 99, "pair.b should be 99 after WriteRef");
@@ -116,39 +105,34 @@ fn struct_heap_basic() {
     let entry: u32 = 8;
     let tmp: u32 = 16;
 
-    let arena = ExecutableArena::new();
-
     let mut descriptors = ObjectDescriptorTable::new();
     let desc_entry_struct = descriptors.push(ObjectDescriptor::new_struct(16, vec![]).unwrap());
 
     #[rustfmt::skip]
-    let code = arena.alloc_slice_fill_iter([
+    let code = vec![
         HeapNew { dst: FO(entry), descriptor_id: desc_entry_struct },
-        StoreImm8 { dst: FO(tmp), imm: 42 },
+        StoreImm8 { dst: FO(tmp), imm: 42u64.to_le_bytes() },
         MicroOp::struct_store8(FO(entry), 0, FO(tmp)),
-        StoreImm8 { dst: FO(tmp), imm: 100 },
+        StoreImm8 { dst: FO(tmp), imm: 100u64.to_le_bytes() },
         MicroOp::struct_store8(FO(entry), 8, FO(tmp)),
         MicroOp::struct_load8(FO(entry), 0, FO(result)),
         MicroOp::struct_load8(FO(entry), 8, FO(tmp)),
         AddU64 { dst: FO(result), lhs: FO(result), rhs: FO(tmp) },
         Return,
-    ]);
-    let functions = [arena.alloc(Function {
+    ];
+    let functions = [Function {
         name: GlobalArenaPtr::from_static("test"),
-        code,
-        param_sizes: ExecutableArenaPtr::empty_slice(),
+        code: Code::from_vec(code),
+        param_sizes: vec![],
         param_sizes_sum: 0,
         param_and_local_sizes_sum: 24,
         extended_frame_size: 48,
         zero_frame: true,
-        frame_layout: FrameLayoutInfo::new(&arena, [FO(entry)]),
+        frame_layout: FrameLayoutInfo::new(vec![FO(entry)]),
         safe_point_layouts: SortedSafePointEntries::empty(),
-    })];
-
-    let mut exec_ctx = LocalExecutionContext::with_max_budget();
-    let mut ctx = InterpreterContext::new(&mut exec_ctx, &descriptors, unsafe {
-        functions[0].as_ref_unchecked()
-    });
+    }];
+    let mut exec_ctx = LocalRuntimeContext::with_max_budget(descriptors);
+    let mut ctx = InterpreterContext::new(&mut exec_ctx, &functions[0]);
     ctx.run().unwrap();
 
     assert_eq!(ctx.root_result(), 142, "result should be 42 + 100 = 142");
@@ -166,40 +150,35 @@ fn struct_heap_survives_gc() {
     let entry: u32 = 8;
     let tmp: u32 = 16;
 
-    let arena = ExecutableArena::new();
-
     let mut descriptors = ObjectDescriptorTable::new();
     let desc_entry_struct = descriptors.push(ObjectDescriptor::new_struct(16, vec![]).unwrap());
 
     #[rustfmt::skip]
-    let code = arena.alloc_slice_fill_iter([
+    let code = vec![
         HeapNew { dst: FO(entry), descriptor_id: desc_entry_struct },
-        StoreImm8 { dst: FO(tmp), imm: 7 },
+        StoreImm8 { dst: FO(tmp), imm: 7u64.to_le_bytes() },
         MicroOp::struct_store8(FO(entry), 0, FO(tmp)),
-        StoreImm8 { dst: FO(tmp), imm: 13 },
+        StoreImm8 { dst: FO(tmp), imm: 13u64.to_le_bytes() },
         MicroOp::struct_store8(FO(entry), 8, FO(tmp)),
         ForceGC,
         MicroOp::struct_load8(FO(entry), 0, FO(result)),
         MicroOp::struct_load8(FO(entry), 8, FO(tmp)),
         AddU64 { dst: FO(result), lhs: FO(result), rhs: FO(tmp) },
         Return,
-    ]);
-    let functions = [arena.alloc(Function {
+    ];
+    let functions = [Function {
         name: GlobalArenaPtr::from_static("test"),
-        code,
-        param_sizes: ExecutableArenaPtr::empty_slice(),
+        code: Code::from_vec(code),
+        param_sizes: vec![],
         param_sizes_sum: 0,
         param_and_local_sizes_sum: 24,
         extended_frame_size: 48,
         zero_frame: true,
-        frame_layout: FrameLayoutInfo::new(&arena, [FO(entry)]),
+        frame_layout: FrameLayoutInfo::new(vec![FO(entry)]),
         safe_point_layouts: SortedSafePointEntries::empty(),
-    })];
-
-    let mut exec_ctx = LocalExecutionContext::with_max_budget();
-    let mut ctx = InterpreterContext::new(&mut exec_ctx, &descriptors, unsafe {
-        functions[0].as_ref_unchecked()
-    });
+    }];
+    let mut exec_ctx = LocalRuntimeContext::with_max_budget(descriptors);
+    let mut ctx = InterpreterContext::new(&mut exec_ctx, &functions[0]);
     ctx.run().unwrap();
 
     assert_eq!(
@@ -225,24 +204,22 @@ fn struct_with_vector_field() {
     let vec_ref: u32 = 32; // 16-byte fat pointer referencing the vector
     let ctr_ref: u32 = 48; // 16-byte fat pointer ref to ctr (for struct_borrow)
 
-    let arena = ExecutableArena::new();
-
     let mut descriptors = ObjectDescriptorTable::new();
     let desc_ctr_struct = descriptors.push(ObjectDescriptor::new_struct(16, vec![8]).unwrap());
     let desc_vec_u64 = descriptors.push(ObjectDescriptor::new_vector(8, vec![]).unwrap());
 
     #[rustfmt::skip]
-    let code = arena.alloc_slice_fill_iter([
+    let code = vec![
         HeapNew { dst: FO(ctr), descriptor_id: desc_ctr_struct },
-        StoreImm8 { dst: FO(tmp), imm: 999 },
+        StoreImm8 { dst: FO(tmp), imm: 999u64.to_le_bytes() },
         MicroOp::struct_store8(FO(ctr), 0, FO(tmp)),
         VecNew { dst: FO(items) },
         SlotBorrow { dst: FO(vec_ref), local: FO(items) },
-        StoreImm8 { dst: FO(tmp), imm: 10 },
+        StoreImm8 { dst: FO(tmp), imm: 10u64.to_le_bytes() },
         VecPushBack { vec_ref: FO(vec_ref), elem: FO(tmp), elem_size: 8, descriptor_id: desc_vec_u64 },
-        StoreImm8 { dst: FO(tmp), imm: 20 },
+        StoreImm8 { dst: FO(tmp), imm: 20u64.to_le_bytes() },
         VecPushBack { vec_ref: FO(vec_ref), elem: FO(tmp), elem_size: 8, descriptor_id: desc_vec_u64 },
-        StoreImm8 { dst: FO(tmp), imm: 30 },
+        StoreImm8 { dst: FO(tmp), imm: 30u64.to_le_bytes() },
         VecPushBack { vec_ref: FO(vec_ref), elem: FO(tmp), elem_size: 8, descriptor_id: desc_vec_u64 },
         MicroOp::struct_store8(FO(ctr), 8, FO(items)),
         ForceGC,
@@ -251,29 +228,26 @@ fn struct_with_vector_field() {
         MicroOp::struct_load8(FO(ctr), 0, FO(result)),
         VecLen { dst: FO(tmp), vec_ref: FO(vec_ref) },
         Return,
-    ]);
-    let functions = [arena.alloc(Function {
+    ];
+    let functions = [Function {
         name: GlobalArenaPtr::from_static("test"),
-        code,
-        param_sizes: ExecutableArenaPtr::empty_slice(),
+        code: Code::from_vec(code),
+        param_sizes: vec![],
         param_sizes_sum: 0,
         param_and_local_sizes_sum: 64,
         extended_frame_size: 88,
         zero_frame: true,
-        frame_layout: FrameLayoutInfo::new(&arena, [FO(ctr), FO(items), FO(vec_ref), FO(ctr_ref)]),
+        frame_layout: FrameLayoutInfo::new(vec![FO(ctr), FO(items), FO(vec_ref), FO(ctr_ref)]),
         safe_point_layouts: SortedSafePointEntries::empty(),
-    })];
-
-    let mut exec_ctx = LocalExecutionContext::with_max_budget();
-    let mut ctx = InterpreterContext::new(&mut exec_ctx, &descriptors, unsafe {
-        functions[0].as_ref_unchecked()
-    });
+    }];
+    let mut exec_ctx = LocalRuntimeContext::with_max_budget(descriptors);
+    let mut ctx = InterpreterContext::new(&mut exec_ctx, &functions[0]);
     ctx.run().unwrap();
 
     assert_eq!(ctx.root_result(), 999, "ctr.tag should be 999 after GC");
 
     let ctr_ptr = ctx.root_heap_ptr(8);
-    let items_ptr = unsafe { read_ptr(ctr_ptr, STRUCT_DATA_OFFSET + 8) };
+    let items_ptr = unsafe { read_ptr(ctr_ptr, 8usize) };
     let len = unsafe { read_u64(items_ptr, VEC_LENGTH_OFFSET) };
     assert_eq!(len, 3, "items vector should have 3 elements");
     let e0 = unsafe { read_u64(items_ptr, VEC_DATA_OFFSET) };
@@ -298,42 +272,37 @@ fn struct_borrow_field() {
     let r#ref: u32 = 16;
     let entry_ref: u32 = 32; // 16-byte fat pointer ref to entry (for struct_borrow)
 
-    let arena = ExecutableArena::new();
-
     let mut descriptors = ObjectDescriptorTable::new();
     let desc_entry_struct = descriptors.push(ObjectDescriptor::new_struct(16, vec![]).unwrap());
 
     #[rustfmt::skip]
-    let code = arena.alloc_slice_fill_iter([
+    let code = vec![
         HeapNew { dst: FO(entry), descriptor_id: desc_entry_struct },
-        StoreImm8 { dst: FO(result), imm: 5 },
+        StoreImm8 { dst: FO(result), imm: 5u64.to_le_bytes() },
         MicroOp::struct_store8(FO(entry), 0, FO(result)),
-        StoreImm8 { dst: FO(result), imm: 10 },
+        StoreImm8 { dst: FO(result), imm: 10u64.to_le_bytes() },
         MicroOp::struct_store8(FO(entry), 8, FO(result)),
         SlotBorrow { dst: FO(entry_ref), local: FO(entry) },
         MicroOp::struct_borrow(FO(entry_ref), 8, FO(r#ref)),
         ReadRef { dst: FO(result), ref_ptr: FO(r#ref), size: 8 },
-        StoreImm8 { dst: FO(result), imm: 77 },
+        StoreImm8 { dst: FO(result), imm: 77u64.to_le_bytes() },
         WriteRef { ref_ptr: FO(r#ref), src: FO(result), size: 8 },
         MicroOp::struct_load8(FO(entry), 8, FO(result)),
         Return,
-    ]);
-    let functions = [arena.alloc(Function {
+    ];
+    let functions = [Function {
         name: GlobalArenaPtr::from_static("test"),
-        code,
-        param_sizes: ExecutableArenaPtr::empty_slice(),
+        code: Code::from_vec(code),
+        param_sizes: vec![],
         param_sizes_sum: 0,
         param_and_local_sizes_sum: 48,
         extended_frame_size: 72,
         zero_frame: true,
-        frame_layout: FrameLayoutInfo::new(&arena, [FO(entry), FO(r#ref), FO(entry_ref)]),
+        frame_layout: FrameLayoutInfo::new(vec![FO(entry), FO(r#ref), FO(entry_ref)]),
         safe_point_layouts: SortedSafePointEntries::empty(),
-    })];
-
-    let mut exec_ctx = LocalExecutionContext::with_max_budget();
-    let mut ctx = InterpreterContext::new(&mut exec_ctx, &descriptors, unsafe {
-        functions[0].as_ref_unchecked()
-    });
+    }];
+    let mut exec_ctx = LocalRuntimeContext::with_max_budget(descriptors);
+    let mut ctx = InterpreterContext::new(&mut exec_ctx, &functions[0]);
     ctx.run().unwrap();
 
     assert_eq!(
@@ -357,46 +326,41 @@ fn struct_borrow_survives_gc() {
     let ref_base: u32 = 16;
     let entry_ref: u32 = 32; // 16-byte fat pointer ref to entry (for struct_borrow)
 
-    let arena = ExecutableArena::new();
-
     let mut descriptors = ObjectDescriptorTable::new();
     let desc_entry_struct = descriptors.push(ObjectDescriptor::new_struct(16, vec![]).unwrap());
 
     #[rustfmt::skip]
-    let code = arena.alloc_slice_fill_iter([
+    let code = vec![
         HeapNew { dst: FO(entry), descriptor_id: desc_entry_struct },
-        StoreImm8 { dst: FO(result), imm: 100 },
+        StoreImm8 { dst: FO(result), imm: 100u64.to_le_bytes() },
         MicroOp::struct_store8(FO(entry), 0, FO(result)),
-        StoreImm8 { dst: FO(result), imm: 200 },
+        StoreImm8 { dst: FO(result), imm: 200u64.to_le_bytes() },
         MicroOp::struct_store8(FO(entry), 8, FO(result)),
         SlotBorrow { dst: FO(entry_ref), local: FO(entry) },
         MicroOp::struct_borrow(FO(entry_ref), 8, FO(r#ref)),
         ForceGC,
         ReadRef { dst: FO(result), ref_ptr: FO(r#ref), size: 8 },
         Return,
-    ]);
-    let functions = [arena.alloc(Function {
+    ];
+    let functions = [Function {
         name: GlobalArenaPtr::from_static("test"),
-        code,
-        param_sizes: ExecutableArenaPtr::empty_slice(),
+        code: Code::from_vec(code),
+        param_sizes: vec![],
         param_sizes_sum: 0,
         param_and_local_sizes_sum: 48,
         extended_frame_size: 72,
         zero_frame: true,
-        frame_layout: FrameLayoutInfo::new(&arena, [FO(entry), FO(ref_base), FO(entry_ref)]),
+        frame_layout: FrameLayoutInfo::new(vec![FO(entry), FO(ref_base), FO(entry_ref)]),
         safe_point_layouts: SortedSafePointEntries::empty(),
-    })];
-
-    let mut exec_ctx = LocalExecutionContext::with_max_budget();
-    let mut ctx = InterpreterContext::new(&mut exec_ctx, &descriptors, unsafe {
-        functions[0].as_ref_unchecked()
-    });
+    }];
+    let mut exec_ctx = LocalRuntimeContext::with_max_budget(descriptors);
+    let mut ctx = InterpreterContext::new(&mut exec_ctx, &functions[0]);
     ctx.run().unwrap();
 
     assert_eq!(ctx.root_result(), 200, "entry.value should be 200 after GC");
     assert_eq!(ctx.gc_count(), 1);
 
     let entry_ptr = ctx.root_heap_ptr(8);
-    let key = unsafe { read_u64(entry_ptr, STRUCT_DATA_OFFSET) };
+    let key = unsafe { read_u64(entry_ptr, 0usize) };
     assert_eq!(key, 100, "entry.key should be 100 after GC");
 }

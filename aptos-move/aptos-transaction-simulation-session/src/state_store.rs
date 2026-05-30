@@ -84,6 +84,7 @@ impl std::fmt::Display for HumanReadable<&StateKey> {
                 write!(f, "table_item::{}::{}", handle.0, hex::encode(key))
             },
             StateKeyInner::Raw(bytes) => write!(f, "raw::{}", hex::encode(bytes)),
+            StateKeyInner::TradingNative(key) => write!(f, "trading_native::{:?}", key),
         }
     }
 }

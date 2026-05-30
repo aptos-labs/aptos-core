@@ -160,6 +160,17 @@ impl StateSlot {
         ))
     }
 
+    /// JMT-pass inclusion filter, decoupled from the tuple build that
+    /// [`Self::maybe_update_jmt`] does. Returns `true` for slots that
+    /// should contribute a JMT-pass entry; `false` for slots that
+    /// haven't changed since `min_version` (only LRU pointer updates,
+    /// stale hot evictions, etc.). Used by the shared pipeline-level
+    /// snapshot committer loop alongside the generic
+    /// `leaf_entry_to_jmt_update` extractor.
+    pub fn passes_jmt_filter(&self, min_version: Version) -> bool {
+        self.maybe_update_cold_state(min_version).is_some()
+    }
+
     // TODO(HotState): db returns cold slot directly
     pub fn from_db_get(state_key: StateKey, tuple_opt: Option<(Version, StateValue)>) -> Self {
         let kind = match tuple_opt {

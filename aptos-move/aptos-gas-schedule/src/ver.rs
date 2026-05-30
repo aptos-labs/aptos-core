@@ -8,6 +8,13 @@
 ///   - Changing how gas is calculated in any way
 ///
 /// Change log:
+/// - V48:
+///   - TBA
+/// - V47:
+///   - TBA
+/// - V46:
+///    - Correct value for gas param `algebra.ark_bn254_fr_one`.
+///    - Fix BN254 `Fr::one()` native to charge `algebra.ark_bn254_fr_one`.
 /// - V45:
 ///    - New minimum price per gas unit parameter for higher-limit transactions
 ///    - Gas charging for encrypted transaction decryption
@@ -77,7 +84,7 @@
 ///       global operations.
 /// - V1
 ///   - TBA
-pub const LATEST_GAS_FEATURE_VERSION: u64 = gas_feature_versions::RELEASE_V1_46;
+pub const LATEST_GAS_FEATURE_VERSION: u64 = gas_feature_versions::RELEASE_V1_48;
 
 pub mod gas_feature_versions {
     pub const RELEASE_V1_8: u64 = 11;
@@ -118,4 +125,6 @@ pub mod gas_feature_versions {
     pub const RELEASE_V1_44: u64 = 48;
     pub const RELEASE_V1_45: u64 = 49;
     pub const RELEASE_V1_46: u64 = 50;
+    pub const RELEASE_V1_47: u64 = 51;
+    pub const RELEASE_V1_48: u64 = 52;
 }

@@ -4,6 +4,8 @@ spec aptos_std::math_fixed {
     /// No loop in the body, so callers can inline without havocing.
     spec sqrt(x: FixedPoint32): FixedPoint32 {
         aborts_if false;
+        // Zero input → zero output, directly from math128::sqrt's ensures.
+        ensures x.get_raw_value() == 0 ==> result.get_raw_value() == 0;
     }
 
     /// `mul_div` aborts when z is zero or when x * y / z overflows u64.

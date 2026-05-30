@@ -1,7 +1,4 @@
-
-<a id="0x1_signer"></a>
-
-# Module `0x1::signer`
+# Module `0x1::signer` <a id="0x1_signer"></a>
 
 
 
@@ -13,10 +10,7 @@
 <pre><code></code></pre>
 
 
-
-<a id="0x1_signer_borrow_address"></a>
-
-## Function `borrow_address`
+## Function `borrow_address` <a id="0x1_signer_borrow_address"></a>
 
 signer is a builtin move type that represents an address that has been verfied by the VM.
 
@@ -57,9 +51,7 @@ semantics.
 
 </details>
 
-<a id="0x1_signer_address_of"></a>
-
-## Function `address_of`
+## Function `address_of` <a id="0x1_signer_address_of"></a>
 
 
 
@@ -81,9 +73,7 @@ semantics.
 
 </details>
 
-<a id="@Module_Specification_0"></a>
-
-## Module Specification
+## Module Specification <a id="@Module_Specification_0"></a>
 
 Return true only if <code>s</code> is a transaction signer. This is a spec function only available in spec.
 

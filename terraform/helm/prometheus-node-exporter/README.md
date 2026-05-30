@@ -1,5 +1,7 @@
 # aptos-prometheus-node-exporter
 
+This chart is DEPRECATED. Please use the official chart at https://github.com/prometheus-community/helm-charts/tree/main/charts/prometheus-node-exporter.
+
 ![Version: 4.17.5](https://img.shields.io/badge/Version-4.17.5-informational?style=flat-square)
 
 ## Requirements

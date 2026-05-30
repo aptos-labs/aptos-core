@@ -193,10 +193,10 @@ impl std::ops::Deref for NestedValues {
 /// heap work-stack rather than the Rust call stack. Only uniquely-owned Rcs are decomposed;
 /// shared containers (refcount > 1) fall through to the default Rc drop (refcount decrement).
 ///
-/// We drain the inner `Vec<Value>` in place via `Rc::get_mut` — no replacement `Rc`/`RefCell`
-/// is ever allocated. The work stack holds owned `Vec<Value>`s rather than `Rc<...>`s, so the
-/// only possible heap allocation is the stack itself, which stays at `Vec::new()` capacity 0
-/// until the first push.
+/// For nested children we use `into_rc` + `Rc::try_unwrap` to claim the inner `Vec<Value>`
+/// without re-entering this `Drop` on the consumed `NestedValues`. The work stack holds
+/// owned `Vec<Value>`s rather than `Rc<...>`s, so the only possible heap allocation is the
+/// stack itself, which stays at `Vec::new()` capacity 0 until the first push.
 impl Drop for NestedValues {
     fn drop(&mut self) {
         // Drain the root level in place: if we hold the sole reference, take the inner
@@ -215,22 +215,21 @@ impl Drop for NestedValues {
         // values never push, so this stays at capacity 0.
         let mut stack: Vec<Vec<Value>> = vec![];
         loop {
+            stack.reserve(cur_vec.len());
             for v in cur_vec {
                 match v {
                     Value::Container(c) => match c {
-                        Container::Locals(mut nv)
-                        | Container::Vec(mut nv)
-                        | Container::Struct(mut nv) => {
-                            // Drain `nv`'s inner Vec iff uniquely owned. `nv` then drops
-                            // normally — its own `Drop` re-enters this function, sees an
-                            // empty drained vec, pushes nothing, and exits.
-                            if let Some(inner_cell) = Rc::get_mut(&mut nv.0) {
-                                let inner = std::mem::take(inner_cell.get_mut());
+                        Container::Locals(nv) | Container::Vec(nv) | Container::Struct(nv) => {
+                            // Claim sole ownership of the inner `RefCell<Vec<Value>>`
+                            // if unique. On the unique path we extract the `Vec` directly.
+                            // On the shared path the returned `Rc` drops normally — just a
+                            // refcount decrement.
+                            if let Ok(inner_cell) = Rc::try_unwrap(nv.into_rc()) {
+                                let inner = inner_cell.into_inner();
                                 if !inner.is_empty() {
                                     stack.push(inner);
                                 }
                             }
-                            // Shared Rc (refcount > 1): fall through, nv drops normally.
                         },
                         // Primitive-vec variants cannot hold further `Value`s — their
                         // default drop is non-recursive and bounded.
@@ -3937,7 +3936,15 @@ impl VectorRef {
             Container::VecBool(r) => r.borrow().len(),
             Container::VecAddress(r) => r.borrow().len(),
             Container::Vec(r) => r.borrow().len(),
-            Container::Locals(_) | Container::Struct(_) => unreachable!(),
+            Container::Locals(_) | Container::Struct(_) => {
+                return Err(
+                    PartialVMError::new(StatusCode::UNKNOWN_INVARIANT_VIOLATION_ERROR)
+                        .with_message(
+                            "length_as_usize called on non-vector container (Locals or Struct)"
+                                .to_string(),
+                        ),
+                );
+            },
         };
         Ok(len)
     }
@@ -3967,7 +3974,15 @@ impl VectorRef {
             Container::VecBool(r) => r.borrow_mut().push(e.value_as()?),
             Container::VecAddress(r) => r.borrow_mut().push(e.value_as()?),
             Container::Vec(r) => r.borrow_mut().push(e),
-            Container::Locals(_) | Container::Struct(_) => unreachable!(),
+            Container::Locals(_) | Container::Struct(_) => {
+                return Err(
+                    PartialVMError::new(StatusCode::UNKNOWN_INVARIANT_VIOLATION_ERROR)
+                        .with_message(
+                            "push_back called on non-vector container (Locals or Struct)"
+                                .to_string(),
+                        ),
+                );
+            },
         }
 
         self.0.mark_dirty();
@@ -4067,7 +4082,14 @@ impl VectorRef {
                 Some(x) => x,
                 None => err_pop_empty_vec!(),
             },
-            Container::Locals(_) | Container::Struct(_) => unreachable!(),
+            Container::Locals(_) | Container::Struct(_) => {
+                return Err(
+                    PartialVMError::new(StatusCode::UNKNOWN_INVARIANT_VIOLATION_ERROR)
+                        .with_message(
+                            "pop called on non-vector container (Locals or Struct)".to_string(),
+                        ),
+                );
+            },
         };
 
         self.0.mark_dirty();
@@ -4104,7 +4126,14 @@ impl VectorRef {
             Container::VecBool(r) => swap!(r),
             Container::VecAddress(r) => swap!(r),
             Container::Vec(r) => swap!(r),
-            Container::Locals(_) | Container::Struct(_) => unreachable!(),
+            Container::Locals(_) | Container::Struct(_) => {
+                return Err(
+                    PartialVMError::new(StatusCode::UNKNOWN_INVARIANT_VIOLATION_ERROR)
+                        .with_message(
+                            "swap called on non-vector container (Locals or Struct)".to_string(),
+                        ),
+                );
+            },
         }
 
         self.0.mark_dirty();
@@ -4181,7 +4210,15 @@ impl VectorRef {
                 move_range!(from_r, to_r)
             },
             (Container::Vec(from_r), Container::Vec(to_r)) => move_range!(from_r, to_r),
-            (_, _) => unreachable!(),
+            (_, _) => {
+                return Err(
+                    PartialVMError::new(StatusCode::UNKNOWN_INVARIANT_VIOLATION_ERROR)
+                        .with_message(
+                            "move_range called with mismatched or non-vector container types"
+                                .to_string(),
+                        ),
+                );
+            },
         }
 
         from_self.0.mark_dirty();
@@ -4496,13 +4533,17 @@ impl GlobalValueImpl {
             Self::None | Self::Deleted => {
                 return Err(PartialVMError::new(StatusCode::MISSING_DATA))
             },
-            Self::Fresh { .. } => match mem::replace(self, Self::None) {
-                Self::Fresh { value } => value,
-                _ => unreachable!(),
+            Self::Fresh { .. } => {
+                let Self::Fresh { value } = mem::replace(self, Self::None) else {
+                    unreachable!("Value has been checked to be fresh")
+                };
+                value
             },
-            Self::Cached { .. } => match mem::replace(self, Self::Deleted) {
-                Self::Cached { value, .. } => value,
-                _ => unreachable!(),
+            Self::Cached { .. } => {
+                let Self::Cached { value, .. } = mem::replace(self, Self::Deleted) else {
+                    unreachable!("Value has been checked to be cached")
+                };
+                value
             },
         };
         let fields = Self::expect_struct_fields(&value);
@@ -4687,37 +4728,61 @@ impl Debug for Value {
 *
 **************************************************************************************/
 
+/// Cap recursive `Display` of a `Value` so deeply nested values cannot blow the
+/// formatting thread's stack. Every recursive path (Value↔Container, Locals→Value,
+/// Closure→Value) flows through `fmt_value`, so a single check at its entry is
+/// sufficient; intermediate `fmt_*` helpers just thread `depth + 1` through.
+const MAX_DISPLAY_DEPTH: usize = 8;
+
+/// Adapter that re-enters depth-bounded `Display` on a `&Value`. Lets call sites
+/// that build up `format!` / `Vec<String>` plumbing (e.g. `Locals`, `Closure`)
+/// keep their existing shape while still participating in depth bounding.
+pub(crate) struct DepthDisplay<'a>(pub &'a Value, pub usize);
+
+impl<'a> Display for DepthDisplay<'a> {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        fmt_value(self.0, f, self.1)
+    }
+}
+
+fn fmt_value(v: &Value, f: &mut fmt::Formatter, depth: usize) -> fmt::Result {
+    if depth > MAX_DISPLAY_DEPTH {
+        return write!(f, "...");
+    }
+    match v {
+        Value::Invalid => write!(f, "Invalid"),
+
+        Value::U8(x) => write!(f, "U8({})", x),
+        Value::U16(x) => write!(f, "U16({})", x),
+        Value::U32(x) => write!(f, "U32({})", x),
+        Value::U64(x) => write!(f, "U64({})", x),
+        Value::U128(x) => write!(f, "U128({})", x),
+        Value::U256(x) => write!(f, "U256({})", x),
+        Value::I8(x) => write!(f, "I8({})", x),
+        Value::I16(x) => write!(f, "I16({})", x),
+        Value::I32(x) => write!(f, "I32({})", x),
+        Value::I64(x) => write!(f, "I64({})", x),
+        Value::I128(x) => write!(f, "I128({})", x),
+        Value::I256(x) => write!(f, "I256({})", x),
+        Value::Bool(x) => write!(f, "{}", x),
+        Value::Address(addr) => write!(f, "Address({})", addr.short_str_lossless()),
+
+        Value::Container(r) => fmt_container(r, f, depth + 1),
+
+        Value::ContainerRef(r) => write!(f, "{}", r),
+        Value::IndexedRef(r) => write!(f, "{}", r),
+
+        Value::ClosureValue(c) => super::function_values_impl::fmt_closure(c, f, depth + 1),
+
+        // Display information must be deterministic, so we cannot print
+        // inner fields.
+        Value::DelayedFieldID { .. } => write!(f, "Delayed(?)"),
+    }
+}
+
 impl Display for Value {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        match self {
-            Self::Invalid => write!(f, "Invalid"),
-
-            Self::U8(x) => write!(f, "U8({})", x),
-            Self::U16(x) => write!(f, "U16({})", x),
-            Self::U32(x) => write!(f, "U32({})", x),
-            Self::U64(x) => write!(f, "U64({})", x),
-            Self::U128(x) => write!(f, "U128({})", x),
-            Self::U256(x) => write!(f, "U256({})", x),
-            Self::I8(x) => write!(f, "I8({})", x),
-            Self::I16(x) => write!(f, "I16({})", x),
-            Self::I32(x) => write!(f, "I32({})", x),
-            Self::I64(x) => write!(f, "I64({})", x),
-            Self::I128(x) => write!(f, "I128({})", x),
-            Self::I256(x) => write!(f, "I256({})", x),
-            Self::Bool(x) => write!(f, "{}", x),
-            Self::Address(addr) => write!(f, "Address({})", addr.short_str_lossless()),
-
-            Self::Container(r) => write!(f, "{}", r),
-
-            Self::ContainerRef(r) => write!(f, "{}", r),
-            Self::IndexedRef(r) => write!(f, "{}", r),
-
-            Self::ClosureValue(c) => write!(f, "{}", c),
-
-            // Display information must be deterministic, so we cannot print
-            // inner fields.
-            Self::DelayedFieldID { .. } => write!(f, "Delayed(?)"),
-        }
+        fmt_value(self, f, 0)
     }
 }
 
@@ -4755,47 +4820,54 @@ impl Display for IndexedRef {
     }
 }
 
+fn fmt_container(c: &Container, f: &mut fmt::Formatter, depth: usize) -> fmt::Result {
+    write!(f, "(container: ")?;
+
+    match c {
+        Container::Locals(r) | Container::Vec(r) | Container::Struct(r) => {
+            display_list_of_items(r.borrow().iter().map(|v| DepthDisplay(v, depth + 1)), f)
+        },
+        Container::VecU8(r) => display_list_of_items(r.borrow().iter(), f),
+        Container::VecU16(r) => display_list_of_items(r.borrow().iter(), f),
+        Container::VecU32(r) => display_list_of_items(r.borrow().iter(), f),
+        Container::VecU64(r) => display_list_of_items(r.borrow().iter(), f),
+        Container::VecU128(r) => display_list_of_items(r.borrow().iter(), f),
+        Container::VecU256(r) => display_list_of_items(r.borrow().iter(), f),
+        Container::VecI8(r) => display_list_of_items(r.borrow().iter(), f),
+        Container::VecI16(r) => display_list_of_items(r.borrow().iter(), f),
+        Container::VecI32(r) => display_list_of_items(r.borrow().iter(), f),
+        Container::VecI64(r) => display_list_of_items(r.borrow().iter(), f),
+        Container::VecI128(r) => display_list_of_items(r.borrow().iter(), f),
+        Container::VecI256(r) => display_list_of_items(r.borrow().iter(), f),
+        Container::VecBool(r) => display_list_of_items(r.borrow().iter(), f),
+        Container::VecAddress(r) => display_list_of_items(r.borrow().iter(), f),
+    }?;
+
+    write!(f, ")")
+}
+
 impl Display for Container {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        write!(f, "(container: ")?;
-
-        match self {
-            Self::Locals(r) | Self::Vec(r) | Self::Struct(r) => {
-                display_list_of_items(r.borrow().iter(), f)
-            },
-            Self::VecU8(r) => display_list_of_items(r.borrow().iter(), f),
-            Self::VecU16(r) => display_list_of_items(r.borrow().iter(), f),
-            Self::VecU32(r) => display_list_of_items(r.borrow().iter(), f),
-            Self::VecU64(r) => display_list_of_items(r.borrow().iter(), f),
-            Self::VecU128(r) => display_list_of_items(r.borrow().iter(), f),
-            Self::VecU256(r) => display_list_of_items(r.borrow().iter(), f),
-            Self::VecI8(r) => display_list_of_items(r.borrow().iter(), f),
-            Self::VecI16(r) => display_list_of_items(r.borrow().iter(), f),
-            Self::VecI32(r) => display_list_of_items(r.borrow().iter(), f),
-            Self::VecI64(r) => display_list_of_items(r.borrow().iter(), f),
-            Self::VecI128(r) => display_list_of_items(r.borrow().iter(), f),
-            Self::VecI256(r) => display_list_of_items(r.borrow().iter(), f),
-            Self::VecBool(r) => display_list_of_items(r.borrow().iter(), f),
-            Self::VecAddress(r) => display_list_of_items(r.borrow().iter(), f),
-        }?;
-
-        write!(f, ")")
+        fmt_container(self, f, 0)
     }
+}
+
+fn fmt_locals(l: &Locals, f: &mut fmt::Formatter, depth: usize) -> fmt::Result {
+    write!(
+        f,
+        "{}",
+        l.0.borrow()
+            .iter()
+            .enumerate()
+            .map(|(idx, val)| format!("[{}] {}", idx, DepthDisplay(val, depth + 1)))
+            .collect::<Vec<_>>()
+            .join("\n")
+    )
 }
 
 impl Display for Locals {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        write!(
-            f,
-            "{}",
-            self.0
-                .borrow()
-                .iter()
-                .enumerate()
-                .map(|(idx, val)| format!("[{}] {}", idx, val))
-                .collect::<Vec<_>>()
-                .join("\n")
-        )
+        fmt_locals(self, f, 0)
     }
 }
 
@@ -5340,8 +5412,8 @@ impl serde::Serialize for SerializationReadyValue<'_, '_, '_, MoveTypeLayout, Va
                                 .map_err(|e| S::Error::custom(format!("{}", e)))?,
                             None => id.try_into_move_value(layout).map_err(|_| {
                                 S::Error::custom(format!(
-                                    "Custom serialization failed for {:?} with layout {}",
-                                    kind, layout
+                                    "Custom serialization failed for {:?}",
+                                    kind
                                 ))
                             })?,
                         };
@@ -5361,8 +5433,8 @@ impl serde::Serialize for SerializationReadyValue<'_, '_, '_, MoveTypeLayout, Va
                         // If no delayed field extension, it is not known how the delayed value
                         // should be serialized. So, just return an error.
                         Err(invariant_violation::<S>(format!(
-                            "no custom serializer for delayed value ({:?}) with layout {}",
-                            kind, layout
+                            "no custom serializer for delayed value ({:?})",
+                            kind
                         )))
                     },
                 }
@@ -5565,9 +5637,9 @@ impl<'d> serde::de::DeserializeSeed<'d> for DeserializationSeed<'_, &MoveTypeLay
                                     DelayedFieldID::try_from_move_value(layout, value, &())
                                         .map_err(|_| {
                                             D::Error::custom(format!(
-                                        "Custom deserialization failed for {:?} with layout {}",
-                                        kind, layout
-                                    ))
+                                                "Custom deserialization failed for {:?}",
+                                                kind
+                                            ))
                                         })?;
                                 id
                             },
@@ -5581,8 +5653,8 @@ impl<'d> serde::de::DeserializeSeed<'d> for DeserializationSeed<'_, &MoveTypeLay
                         Err(D::Error::custom(
                             PartialVMError::new(StatusCode::UNKNOWN_INVARIANT_VIOLATION_ERROR)
                                 .with_message(format!(
-                                    "no custom deserializer for native value ({:?}) with layout {}",
-                                    kind, layout
+                                    "no custom deserializer for native value ({:?})",
+                                    kind
                                 )),
                         ))
                     },
@@ -6403,11 +6475,8 @@ impl Value {
         use crate::values::function_values_impl::mock::MockAbstractFunction;
         use MoveTypeLayout as L;
 
-        if let L::Native(kind, layout) = layout {
-            panic!(
-                "impossible to get native layout ({:?}) with {}",
-                kind, layout
-            )
+        if let L::Native(kind, _) = layout {
+            panic!("impossible to get native layout ({:?})", kind)
         }
 
         match (layout, &self) {

@@ -1,0 +1,91 @@
+=== stackless ===
+// module 0x1::test
+
+fun add_const(r0): i128 {
+  slots: params(1), locals(0), temps(1)
+    r0: i128
+    r1: i128
+  code:
+  L0:
+    0: r1 := add r0, #-1267650600228229401496703205376i128
+    1: ret [r1]
+}
+
+fun max_val(): i128 {
+  slots: params(0), locals(0), temps(1)
+    r0: i128
+  code:
+  L0:
+    0: r0 := ld_i128 170141183460469231731687303715884105727
+    1: ret [r0]
+}
+
+fun min_val(): i128 {
+  slots: params(0), locals(0), temps(1)
+    r0: i128
+  code:
+  L0:
+    0: r0 := ld_i128 -170141183460469231731687303715884105728
+    1: ret [r0]
+}
+
+fun neg(): i128 {
+  slots: params(0), locals(0), temps(1)
+    r0: i128
+  code:
+  L0:
+    0: r0 := ld_i128 -1267650600228229401496703205376
+    1: ret [r0]
+}
+
+fun pos(): i128 {
+  slots: params(0), locals(0), temps(1)
+    r0: i128
+  code:
+  L0:
+    0: r0 := ld_i128 1267650600228229401496703205376
+    1: ret [r0]
+}
+=== micro-ops ===
+// module 0x1::test
+
+fun add_const() {
+  frame_data_size: 32
+  code:
+    0: Charge #57
+    1: IntAdd [16] <- [0] + i128 #-1267650600228229401496703205376
+    2: Move(16) [0] <- [16]
+    3: Return
+}
+
+fun max_val() {
+  frame_data_size: 16
+  code:
+    0: Charge #5
+    1: StoreImm16 [0] <- #170141183460469231731687303715884105727
+    2: Return
+}
+
+fun min_val() {
+  frame_data_size: 16
+  code:
+    0: Charge #5
+    1: StoreImm16 [0] <- #170141183460469231731687303715884105728
+    2: Return
+}
+
+fun neg() {
+  frame_data_size: 16
+  code:
+    0: Charge #5
+    1: StoreImm16 [0] <- #340282365653287863235145205935065006080
+    2: Return
+}
+
+fun pos() {
+  frame_data_size: 16
+  code:
+    0: Charge #5
+    1: StoreImm16 [0] <- #1267650600228229401496703205376
+    2: Return
+}

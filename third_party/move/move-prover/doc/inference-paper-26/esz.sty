@@ -1,0 +1,942 @@
+    %\tracingcommands=2
+    %\tracingmacros=2
+    %\overfullrule=2pt
+
+    \ProvidesPackage{esz}[98/01/12]
+    \typeout{package `esz' v3.0c 98/01}
+    \RequirePackage{amssymb,latexsym}
+    \newif\if@logtmp
+    \def\@and#1#2{%
+        #1#2\@logtmptrue\else\@logtmpfalse\fi\else@logtmpfalse\fi%
+        \if@logtmp%
+    }
+    \def\@or#1#2{%
+        #1\@logtmptrue\else#2\@logtmptrue\else\@logtmpfalse\fi\fi%
+        \if@logtmp%
+    }
+    \def\@not#1{%
+        #1\@logtmpfalse\else\@logtmptrue\fi%
+        \if@logtmp%
+    }
+    \newdimen\esz@iskip                     \esz@iskip=8.03pt
+
+    \newdimen\zedindent                     \zedindent=0pt
+    \newdimen\zedleftsep                    \zedleftsep=5.01pt
+    \newdimen\zedtab                        \zedtab=2em
+    \newdimen\zedlinethickness              \zedlinethickness=0.4pt
+    \newdimen\zedbeforeskip                 \zedbeforeskip=\abovedisplayskip
+    \newdimen\zedafterskip                  \zedafterskip=\belowdisplayskip
+    \newdimen\zeddeclpartskip               \zeddeclpartskip=4pt 
+
+    \let\esz@linethick=\zedlinethickness
+    \let\esz@leftsep=\zedleftsep
+
+
+    \newif\ifesz@units      \DeclareOption{units}{\esz@unitstrue}                   
+    \newif\ifesz@dz         \DeclareOption{dz}{\esz@dztrue}                 
+    \newif\ifesz@msz        \DeclareOption{msz}{\esz@msztrue\esz@unitstrue%
+                                                \esz@dztrue}
+    \newif\ifesz@latin      \DeclareOption{latin}{\esz@latintrue}
+    \newif\ifesz@oxsz       \DeclareOption{oxsz}{\esz@oxsztrue}
+    \newif\ifesz@noboxfill  \DeclareOption{noboxfill}{\esz@noboxfilltrue}
+    \newif\ifesz@index      \DeclareOption{index}{\esz@indextrue}
+    \newif\ifesz@exam      \DeclareOption{exam}{\esz@examtrue}
+    \newif\ifesz@compatibility
+    \DeclareOption{compatibility}{\esz@compatibilitytrue}
+
+    \ProcessOptions
+
+    \def\esz@setdimen{
+        \global\esz@halfwd=\esz@fullwd
+        \global\advance\esz@halfwd by -\esz@iskip
+        \global\divide\esz@halfwd by 2 
+        \global\esz@thirdwd=\esz@fullwd
+        \global\advance\esz@thirdwd by -2\esz@iskip
+        \global\divide\esz@thirdwd by 3
+    }
+
+    \newdimen\esz@fullwd                    
+    \newdimen\esz@halfwd                    
+    \newdimen\esz@thirdwd
+    \newskip\zedbaselineskip                \zedbaselineskip=\baselineskip
+    \newskip\zedparskip                     \zedparskip=4pt
+
+
+    \global\esz@fullwd=\hsize% 
+    \global\advance\esz@fullwd by-\zedindent%
+
+
+
+    \esz@setdimen%
+    \newif\ifesz@inClass                    \esz@inClassfalse
+    \newif\ifesz@inZedGroup
+    %\newif\ifesz@autoEnv                   \esz@autoEnvfalse
+    \def\zedclassname{\relax}
+
+
+    % Call back macros.  Called before the respective item is processed.
+    % Class- and schema name and parameters of gendefs are provided.
+    \def\zedeveryclass#1{}                  \def\zedeveryschema#1{}
+    \def\zedeveryaxdef{}                    \def\zedeverygendef#1{}
+    \def\zedeverysyntax{}                   \def\zedeverytext{}
+    \def\zedeveryzedgroup{}
+
+    \def\<{%
+        \vtop\bgroup%
+            \def\\{\crcr}%
+            \halign\bgroup\mathstrut$\displaystyle{##}$\hfil\cr%
+    }
+    \def\>{\crcr\egroup\egroup\cr}
+
+    \def\esz@max#1#2{\ifdim#1>#2 #1\else #2\fi}
+    \def\expandafterafter#1{%
+        \def\do@after{\expandafter#1}%
+        \expandafter\do@after%
+    }
+
+    \def\esz@@@name#1{#1\romannumeral\esz@schemaCnt}
+    \def\esz@@name#1{\csname\esz@@@name{#1}\endcsname}
+    \DeclareSymbolFont{italics}{\encodingdefault}{\familydefault}{m}{it}{}%
+    %\DeclareSymbolFontAlphabet{\mathit}{letters}
+    %\DeclareSymbolFont{letters}{OML}{ptmr}{m}{it}{}%
+    \SetSymbolFont{italics}{bold}{\encodingdefault}{\familydefault}{bx}{it}%
+    \DeclareSymbolFontAlphabet{\eszit}{italics}
+
+    \def\@setmcodes#1#2#3{{\count0=#1 \count1=#3
+        \loop \global\mathcode\count0=\count1 \ifnum \count0<#2
+        \advance\count0 by1 \advance\count1 by1 \repeat}}
+    \@setmcodes{`A}{`Z}{"7\hexnumber@\symitalics41}
+    \@setmcodes{`a}{`z}{"7\hexnumber@\symitalics61}
+
+    \ifesz@oxsz
+        \DeclareFontFamily{U}{oxsz}{}
+        \DeclareFontShape{U}{oxsz}{m}{n}{%
+        %   <5> oxsz5
+        %   <6> oxsz6
+        %   <7> oxsz7
+        %   <8> oxsz8
+            <5> <6> <7> <8> <9> oxsz9
+            <10> <10.95> <12> <14.4> <17.28> <20.74> <24.88> oxsz10
+            }{}
+        \DeclareSymbolFont{OXSZ}{U}{oxsz}{m}{n}
+    \fi
+        \newbox\esz@schemaDecli                 \newbox\esz@schemaPredi
+        \newbox\esz@schemaDeclii                        \newbox\esz@schemaPredii
+        \newbox\esz@schemaDecliii                       \newbox\esz@schemaPrediii
+        \newbox\esz@schemaDecliv                        \newbox\esz@schemaPrediv
+
+        \def\esz@SCHEMA{1}
+        \def\esz@GENDEF{2}
+        \def\esz@AXDEF{3}
+        \def\esz@SYNTAX{4}
+        \def\esz@TEXT{5}
+
+        \newcount\esz@schemaCnt                 \esz@schemaCnt=0
+        \newdimen\esz@tmpdim
+        \newdimen\esz@remainingWidth            \global\esz@remainingWidth=0pt
+            \def\esz@hrulefill{\leaders\hrule height\esz@linethick\hfill }
+            \def\esz@topline#1#2{%                  (width,title)
+                \hbox to#1 {%
+                    \mathstrut%                             ensure height of `|'
+                    \vrule height0pt width\esz@linethick%   vertical line
+                    \kern-\esz@linethick%                   go back
+                    \hbox to.5cm {\esz@hrulefill}%          start of line
+                    \lower2pt\hbox{#2}%                     title
+                    \esz@hrulefill%                         rest of line
+                }%
+            }
+            \def\esz@plaintopline#1{%                       (width,title)
+                \hbox to#1 {%
+                    \mathstrut%                             ensure height of `|'
+                    \vrule height0pt width\esz@linethick%   vertical line
+                    \kern-\esz@linethick%                   go back
+                    \esz@hrulefill%                         rest of line
+                }%
+            }
+            \def\esz@dbl@topline#1#2{%
+                \hbox to#1{%
+                    \mathstrut%                             ensure height of `|'
+                    \vrule height4\esz@linethick width \esz@linethick%      vert line
+                    \vbox{%                                 start of horiz line
+                        \hbox to.5cm {\esz@hrulefill}%
+                        \kern2.5\esz@linethick%
+                        \hbox to.5cm {\esz@hrulefill}%
+                    }%
+                    \kern-1pt%
+                    \lower2pt\hbox{#2}%                     title
+                    \kern-1.5pt%
+                    \leaders\vbox{%                         rest of horizontal line
+                        \hrule height\esz@linethick width1pt%
+                        \kern2.5\esz@linethick%
+                        \hrule height\esz@linethick width1pt%
+                    }\hfill%
+                }%
+            }
+            \def\esz@bottomline#1{%
+                \hbox to #1{%
+                    \mathstrut%                             ensure height of `|'
+                    \vrule depth0pt width\esz@linethick%    vertical rule
+                    \esz@hrulefill%                         horizontal line
+                }%
+            }
+
+
+            \def\esz@beforeDisplay{%
+                \@or\ifesz@inClass\ifesz@inZedGroup\else%
+                    \vskip\zedbeforeskip%
+                    \noindent\par%
+                \fi%
+            }
+            \def\esz@afterDisplay{%
+                \@or\ifesz@inClass\ifesz@inZedGroup\else%
+                    \par\vskip\zedafterskip%
+                \fi%
+            }
+        \ifesz@compatibility
+            \def\esz@autoEnv{\noindent\esz@autoEnvtrue\everypar={}\bgroup\zed}
+            \def\esz@endautoEnv{\endzed\egroup\par}
+        \else
+            \def\esz@autoEnv{\esz@autoEnvtrue\everypar={}\bgroup\ztext}
+            \def\esz@endautoEnv{\endztext\egroup\par}
+        \fi
+
+        \def\esz@deactivateAuto{%
+            \ifesz@autoEnv%
+                \esz@endautoEnv%
+                \esz@autoEnvfalse%
+            \else%
+                %\everypar={}%
+            \fi%
+        }
+
+        \def\esz@activateAuto{}
+        \def\esz@classpar#1{
+            \nointerlineskip%
+            \leaders%
+            \hbox{%
+                \kern\zedindent%
+                \vbox to 0.1pt {%
+                    \noindent\vrule height1pt depth1pt width\esz@linethick\vss}%
+            \hfill}\vskip#1%
+            \nointerlineskip%
+        }
+
+        \def\esz@group{%
+            \global\esz@fullwd=\hsize%
+            \global\advance\esz@fullwd by -\zedindent%
+            \ifesz@inClass%                                     draw top line
+                \hbox{\kern\zedindent\esz@topline{\esz@fullwd}{$\;\esz@classname\;$}}%
+                \nobreak%
+                \esz@classpar{0.5\zedparskip}
+                \global\advance\esz@fullwd by -\esz@linethick%
+                \global\advance\esz@fullwd by -\esz@iskip%
+            \fi%
+            \esz@setdimen%                              set esz@halfwd and esz@thirdwd
+            \def\\{%                                    ship pending paragraphs
+                %\esz@deactivateAuto%
+                \ifnum\esz@schemaCnt>0\esz@ship{\esz@selectAll}\fi%
+                    \global\esz@schemaCnt=0%
+                    \global\esz@remainingWidth=0pt
+                    \esz@newline%
+            }%
+            \def\esz@newline{%
+                \ifesz@inClass%                         parskip with vert line
+                    \esz@classpar{\zedparskip}%
+                \else%
+                    \vskip\zedparskip %
+                \fi%
+            }%
+            \global\esz@schemaCnt=0%
+            \global\esz@remainingWidth=0pt%
+            \nobreak%                                           no page break here
+            %\esz@activateAuto
+        }
+
+        \def\esz@endgroup{%
+            %\esz@deactivateAuto%
+            \ifnum\esz@schemaCnt>0%
+                \esz@ship{\esz@selectAll}%
+                \global\esz@schemaCnt=0%
+                \global\esz@remainingWidth=0pt%
+            \fi
+            \nobreak
+            \ifesz@inClass%
+                %\kern-10pt%
+                \nobreak%
+                \esz@classpar{0.2\zedparskip}
+                \nobreak%
+                \advance\esz@fullwd by \esz@linethick%
+                \advance\esz@fullwd by \esz@iskip%
+                \hbox{\kern\zedindent\esz@bottomline{\esz@fullwd}}%
+            \fi%
+        }
+
+        \def\class#1{%
+            \esz@beforeDisplay
+            \esz@inClasstrue%
+            \def\esz@classname{#1}
+            \zedeveryclass{#1}
+            \ifesz@index\esz@index{\string#1, Class}\fi
+            \esz@group
+        }
+        \def\endclass{%
+            \esz@endgroup%
+            \esz@inClassfalse%
+            \esz@afterDisplay%
+        }
+        \def\zedgroup{%
+            \esz@beforeDisplay
+            \esz@inZedGrouptrue%
+            \zedeveryzedgroup%
+            \esz@group%
+        }
+        \def\endzedgroup{%
+            \esz@endgroup%
+            \esz@inZedGroupfalse%
+            \esz@afterDisplay%
+        }
+            
+            \def\esz@schemaBreaks{%
+                \baselineskip=\zedbaselineskip
+                \def\also{\crcr\noalign{\vskip\jot}}%
+                \def\Also{\crcr\noalign{\vskip2\jot}}%
+                \def\ALSO{\Also\Also}%
+                \def\\{\crcr}%
+                \def\where{%
+                    \crcr\egroup\endgroup
+                    \egroup%
+                    \global\setbox\esz@@name{esz@schemaPred}\vbox\bgroup%
+                        \begingroup
+                        \halign\bgroup\mathstrut$\displaystyle{####}$\hfil\cr%
+                }%
+            }
+
+            \def\esz@schematext#1#2{%                               (name,type)
+                \bgroup%
+                \@or\ifesz@inClass\ifesz@inZedGroup\else%
+                    \esz@beforeDisplay%
+                    \global\esz@fullwd=\hsize%
+                    \global\advance\esz@fullwd by -\zedindent%
+                    \esz@setdimen%
+                \fi%
+                \esz@schemaBreaks%
+                \global\advance\esz@schemaCnt by 1%
+                \expandafterafter\gdef\esz@@name{esz@schemaName}{#1}%
+                \expandafterafter\gdef\esz@@name{esz@type}{#2}%
+                \global\setbox\esz@@name{esz@schemaDecl}=\vbox\bgroup%
+                    \begingroup%
+                    \halign\bgroup\mathstrut$\displaystyle{##}$\hfil\cr%
+            }
+
+            \def\esz@endschematext{%
+                \crcr\egroup\endgroup%
+                \egroup%
+                \egroup%
+                \esz@shipIfLineFull%
+                \esz@afterDisplay%
+            }
+
+            \def\esz@shipIfLineFull{%
+                \@or\ifesz@inClass\ifesz@inZedGroup%
+                    % set \esz@tmpdim to width of schema
+                    \global\esz@tmpdim=\esz@max{\wd\esz@@name{esz@schemaDecl}}%
+                                           {\wd\esz@@name{esz@schemaPred}}%
+                    % add \esz@leftsep if has box
+                    \expandafter\ifnum\esz@@name{esz@type} < \esz@SYNTAX%
+                        \advance\esz@tmpdim by \esz@leftsep%
+                    \fi%
+                    % align to full/half/third width
+                    \global\esz@tmpdim=\esz@schemawidth{\esz@tmpdim}%
+                    \global\advance\esz@remainingWidth by \esz@tmpdim%
+                    \ifdim\esz@remainingWidth > \esz@fullwd
+                        \esz@ship{\esz@selectFirst}%
+                        \global\setbox\esz@schemaDecli=\box\esz@@name{esz@schemaDecl}%
+                        \global\setbox\esz@schemaPredi=\box\esz@@name{esz@schemaPred}%
+                        %\global\edef\esz@schemaNamei{\esz@@name{esz@schemaName}}%
+                        % `edef' does not work with nfss!
+                        \ifnum \esz@schemaCnt=2%
+                            \global\let\esz@schemaNamei=\esz@schemaNameii%
+                        \else\ifnum \esz@schemaCnt=3%
+                            \global\let\esz@schemaNamei=\esz@schemaNameiii%
+                        \else\ifnum \esz@schemaCnt=4%
+                            \global\let\esz@schemaNamei=\esz@schemaNameiv%
+                        \fi\fi\fi%
+                        \global\edef\esz@typei{\esz@@name{esz@type}}%
+                        \global\esz@schemaCnt=1%
+                        \global\esz@remainingWidth=\esz@tmpdim%
+                        \esz@newline%
+                    \fi%
+                \else%
+                    \esz@ship{\esz@selectAll}%
+                    \global\esz@schemaCnt=0%
+                    \global\esz@remainingWidth=0pt%
+                \fi%
+            }
+            
+            \def\schema#1{%
+                \zedeveryschema{#1}%
+                \ifesz@index\esz@index{\string#1}\fi%
+                \esz@schematext{$#1$}{\esz@SCHEMA}%
+            }
+            \def\endschema{\esz@endschematext}
+            \expandafter\def\csname schema*\endcsname{\schema{}}
+            \expandafter\def\csname endschema*\endcsname{\endschema}
+
+            \def\axdef{
+                \@ifnextchar[{%
+                    \@gendef%
+                }{
+                    \zedeveryaxdef
+                    \esz@schematext{}{\esz@AXDEF}
+                }
+            }
+
+            \def\endaxdef{\esz@endschematext}
+
+            \def\gendef{
+                \@ifnextchar[{\@gendef}{\@@gendef}
+            }
+
+            \def\@gendef[#1]{\@@gendef{#1}}
+            \def\@@gendef#1{
+                \zedeverygendef{#1}
+                \expandafter\csname\esz@@@name{esz@isaxdef}true\endcsname
+                \esz@schematext{#1}{\esz@GENDEF}
+            }
+            \def\endgendef{\esz@endschematext}
+
+            \def\zed{
+                \@or\ifesz@inClass\ifesz@inZedGroup\else%
+                    \esz@beforeDisplay%
+                    \global\esz@fullwd=\hsize%
+                    \global\advance\esz@fullwd by -\zedindent%
+                    \esz@setdimen%
+                \fi%
+                \zedeverysyntax%
+                \bgroup%
+                \esz@schemaBreaks%
+                \global\advance\esz@schemaCnt by 1%
+                \expandafterafter\gdef\esz@@name{esz@type}{\esz@SYNTAX}%
+                \global\setbox\esz@@name{esz@schemaDecl}=\vbox\bgroup\kern2pt\begingroup
+                    \halign\bgroup\mathstrut$##$\hfil&\hfil$##$\hfil&$##$\hfil\crcr
+            }
+            \def\endzed{\esz@endschematext}
+
+            \def\zedtext{%
+                \@ifnextchar[{\esz@zedtext}{\esz@zedtext[3]}%
+            }
+            \def\esz@zedtext[#1]{%
+                \esz@beforeDisplay%
+                \zedeverytext
+                \global\advance\esz@schemaCnt by 1
+                \expandafterafter\gdef\esz@@name{esz@type}{\esz@TEXT}%
+                \ifnum#1=1\esz@tmpdim=\esz@fullwd%
+                \else\ifnum#1=2\esz@tmpdim=\esz@halfwd%
+                \else\esz@tmpdim=\esz@thirdwd%
+                \fi\fi%
+                \global\setbox\esz@@name{esz@schemaDecl}=\hbox to\esz@tmpdim\bgroup%
+            }
+            \def\endzedtext{%
+                \hss\egroup\esz@shipIfLineFull%
+                \esz@afterDisplay%
+            }
+            \def\init#1{\schema{\Init#1}}   \def\endinit{\endschema}
+            \def\data#1{\schema{\Data#1}}   \def\guard#1{\schema{\Guard#1}}      
+            \def\enddata{\endschema}        \def\endguard{\endschema}            
+            \def\port#1{\schema{\Port#1}}   \def\trans#1{\schema{\Trans#1}}      
+            \def\endport{\endschema}        \def\endtrans{\endschema}            
+            \def\op#1{\schema{\Op#1}}       \def\behavior#1{\schema{\Behavior#1}}
+            \def\endop{\endschema}          \def\endbehavior{\endschema}         
+
+            \def\assertion#1{\schema{\Assertion#1}}             
+            \def\endassertion{\endschema}              
+            \def\property#1{\schema{\Property#1}}             
+            \def\endproperty{\endschema}              
+
+            \def\reaction#1{\schema{\Reaction#1}}             
+            \def\endreaction{\endschema}              
+                \def\esz@schemawidth#1{%                        (width)
+                    \ifdim #1 > \esz@halfwd \esz@fullwd
+                    \else\ifdim #1 > \esz@thirdwd \esz@halfwd
+                    \else \esz@thirdwd
+                    \fi\fi
+                }
+                \def\esz@selectFirst{
+                    \ifnum \esz@schemaCnt<3 \esz@shipOne
+                    \else\ifnum \esz@schemaCnt<4 \esz@shipTwo
+                    \else \esz@shipThree
+                    \fi\fi
+                }
+
+                \def\esz@selectAll{
+                    \ifnum \esz@schemaCnt=1 \esz@shipOne
+                    \else\ifnum \esz@schemaCnt=2 \esz@shipTwo
+                    \else \esz@shipThree
+                    \fi\fi
+                }
+
+                \def\esz@ship#1{%                               (select)
+                    \parindent=0pt%
+                    %\par%
+                    \ifesz@inClass%
+                        \hbox{%\fbox{%
+                            \kern\zedindent%
+                            \vrule width\esz@linethick\kern\esz@iskip%  class-box vrule
+                            \hbox{\esz@@ship{#1}}%
+                        }%}%
+                    \else%
+                        \hskip\zedindent\esz@@ship{#1}%
+                    \fi%
+                }
+
+                \def\esz@@ship#1{%
+                    \hbox{%
+                        \valign{##\cr%
+                            \ifnum \esz@schemaCnt>0 #1 \fi%
+                            \crcr%
+                        }%
+                    }%
+                }
+                \def\esz@shipOne{%
+                    \esz@shipschema{i}{\esz@fullwd}%
+                }%
+
+                \def\esz@shipTwo{%
+                    \esz@shipschema{i}{\esz@halfwd}%
+                        \crcr%
+                        %
+                        % space between items in a row
+                        %\noalign{\hfill}%
+                        \noalign{\hskip\esz@iskip plus 1em minus 1em}%%
+                    \esz@shipschema{ii}{\esz@halfwd}%
+                }
+
+                \def\esz@shipThree{%
+                    \esz@shipschema{i}{\esz@thirdwd}%
+                        \crcr%
+                        %
+                        % space between items in a row
+                        %\noalign{\hfill}%
+                        \noalign{\hskip\esz@iskip plus 1em minus 1em}%%
+                    \esz@shipschema{ii}{\esz@thirdwd}%
+                        \crcr%
+                        %
+                        % space between items in a row
+                        %\noalign{\hfill}%
+                        \noalign{\hskip\esz@iskip plus 1em minus 1em}%%
+                    \esz@shipschema{iii}{\esz@thirdwd}%
+                }
+                \def\esz@shipschema#1#2{%               (schemaNo,width)
+                    \ifnum\csname esz@type#1\endcsname = \esz@TEXT\relax%
+                            \vbox{\hsize=#2\unhbox\csname esz@schemaDecl#1\endcsname\par}%%
+                    \else%
+                        \offinterlineskip%
+                            \ifnum\csname esz@type#1\endcsname = \esz@SCHEMA\relax%
+                                \setbox0=\hbox{\csname esz@schemaName#1\endcsname}%
+                                \ifdim\wd0 > 0pt\relax%
+                                   \esz@topline{#2}{$\;$\csname esz@schemaName#1\endcsname$\;$}%
+                                \else%
+                                    \esz@plaintopline{#2}%
+                                \fi%
+                            \else\ifnum\csname esz@type#1\endcsname = \esz@AXDEF\relax%
+                                %\hbox{\mathstrut\vrule height0pt width\esz@linethick}%
+                                \hbox to #2{\hfil}%
+                            \else\ifnum\csname esz@type#1\endcsname = \esz@GENDEF\relax%
+                                \esz@dbl@topline{#2}{$[\csname esz@schemaName#1\endcsname$]}%
+                            \else\ifnum\csname esz@type#1\endcsname = \esz@SYNTAX\relax%
+                                \hbox to #2{\hfil}%
+                            \else\ifnum\csname esz@type#1\endcsname = \esz@TEXT\relax%
+                                \hbox to #2{\hfil}%
+                            \fi\fi\fi\fi\fi%%
+                            \hbox to #2{%
+                                % left vertical line, not for syntax.
+                                \ifnum\csname esz@type#1\endcsname < \esz@SYNTAX\relax%
+                                    \vrule width\esz@linethick\kern-\esz@linethick\kern\esz@leftsep%
+                                \fi%
+                                \vbox{\hsize=#2\relax%
+                                    % declaration part:
+                                    \ifnum\csname esz@type#1\endcsname>\esz@GENDEF%
+                                       \expandafter\unvbox\csname esz@schemaDecl#1\endcsname%
+                                    \else%
+                                        \kern\zeddeclpartskip%
+                                        \expandafter\unvbox\csname esz@schemaDecl#1\endcsname%
+                                    \fi%
+                                    % (optional) predicate part:
+                                    \ifvoid\csname esz@schemaPred#1\endcsname \else
+                                    \kern-4pt%
+                                        \esz@tmpdim=#2%
+                                        \divide\esz@tmpdim by 3%
+                                        \hbox to\esz@tmpdim {\kern-\esz@leftsep\mathstrut\esz@hrulefill}%
+                                        %\hbox{\expandafter\box\csname esz@schemaPred#1\endcsname}
+                                        \expandafter\unvbox\csname esz@schemaPred#1\endcsname%
+                                        \kern-0pt%
+                                    \fi%
+                                }%
+                            \hfill}%%
+                            %
+                            % grow box such that all schema-boxes in a row have the same size:
+                            \ifnum\csname esz@type#1\endcsname=\esz@SYNTAX\else%
+                                \ifesz@noboxfill\else
+                                    \leaders\vrule width\esz@linethick\vfill%
+                                \fi
+                            \fi%%
+                            %
+                            % BOTTOM LINE only for schemata and gendefs.
+                            \ifnum\csname esz@type#1\endcsname = \esz@SCHEMA%
+                                \kern-4pt%
+                                \esz@bottomline{#2}%
+                            \else\ifnum\csname esz@type#1\endcsname = \esz@AXDEF%
+                                %\hbox{\mathstrut\vrule depth0pt width\esz@linethick}%
+                            \else\ifnum\csname esz@type#1\endcsname = \esz@GENDEF%
+                                \kern-4pt%
+                                \esz@bottomline{#2}%
+                            % No buttom line for syntax and text.
+                            \fi\fi\fi%%
+                    \fi%
+                }
+        \def\esz@big#1{\mbox{\large$#1$\nulldelimiterspace\z@\m@th}}
+        \def\esz@Big#1{\mbox{\Large$#1$\nulldelimiterspace\z@\m@th}}
+        \def\esz@small#1{\mbox{\small$#1$\nulldelimiterspace\z@\m@th}}
+        \def\esz@Small#1{\mbox{\footnotesize$#1$\nulldelimiterspace\z@\m@th}}
+        \def\esz@op#1{\mathop{\mathstrut{#1}}\nolimits}
+        \def\esz@bin#1{\mathbin{\mathstrut{#1}}}
+        \def\esz@rel#1{\mathrel{\mathstrut{#1}}}
+        \def\esz@bigop#1{\esz@op{\esz@big{#1}}}
+        \def\esz@bigbin#1{\esz@bin{\esz@big{#1}}}
+        \def\esz@bigrel#1{\esz@rel{\esz@big{#1}}}
+        \def\Zkeyword#1{\esz@op{\mathbf{#1}}}
+        \def\Zpreop#1{\esz@op{\mathsf{#1}}}
+        \def\Zinop#1{\esz@bin{\mathsf{#1}}}
+        \def\Zpregen#1{\esz@op{\mathrm{#1}}}
+        \def\Zingen#1{\esz@rel{\mathrm{#1}}}
+        \def\Zprerel#1{\mathopen{}\esz@rel{\mathsf{#1}}}
+        \def\Zinrel#1{\esz@rel{\mathsf{#1}}}
+        \def\esz@partial#1{\mathbin{\ooalign{\hfil%
+            $\mapstochar\mkern 5mu$\hfil\cr$#1$}}}
+        \def\esz@finite#1{\mathbin{\ooalign{\hfil%
+            $\mapstochar\mkern 3mu\mapstochar\mkern 5mu$\hfil\cr$#1$}}}
+        \def\esz@minus#1{\rlap{$\kern0.04em\mathord-$}\lower0.37ex\hbox{$#1$}}
+        \def\@setmcodes#1#2#3{{\count0=#1 \count1=#3
+            \loop \global\mathcode\count0=\count1 \ifnum \count0<#2
+            \advance\count0 by1 \advance\count1 by1 \repeat}}
+        %\@setmcodes{`A}{`Z}{"7\hexnumber@\symitalics41}
+        %\@setmcodes{`a}{`z}{"7\hexnumber@\symitalics61}
+        \def\t#1{\hskip #1\zedtab}%
+          % Semicolon is made active in math mode to append a thick space
+          \mathchardef\eszsemicolon="603B
+          \mathcode`\;="8000 {\catcode`\;=\active \gdef;{\eszsemicolon\;}}
+
+          % Tilde is made to insert a space in math-mode
+          \def\esztildespace#1{%
+             \def~{\ifmmode#1\else\nobreakspace{}\fi}%
+          }
+          \esztildespace{\,}
+
+          % The at-symbol and mid-symbols:
+          \mathchardef\eszat="6040
+          \mathcode`\@="8000 {\catcode`\@=\active \gdef@{~\spot~}}
+          \def\spot{\bullet}
+          {\catcode`\@=\active 
+           \gdef\eszrestoreat{\gdef@{\eszat}}
+          }
+          \mathcode`\|="8000 {\catcode`\|=\active \gdef|{\mid}}
+
+          % The old-fashioned style for supercripts:
+          \def\bsup#1\esup{^{#1}}
+
+          % Infix-relations:
+          \def\inrel#1{\mathrel{\underline{#1}}}
+          \ifesz@oxsz
+            \DeclareMathSymbol{\lblot}{\mathopen}{OXSZ}{"09}
+            \DeclareMathSymbol{\rblot}{\mathclose}{OXSZ}{"0A}
+            \DeclareMathSymbol{\bind}{\mathbin}{OXSZ}{"01}
+            \DeclareMathSymbol{\@power}{\mathord}{OXSZ}{"0B}
+            \def\power{\esz@op{\@power}}
+            \DeclareMathSymbol{\lbag}{\mathopen}{OXSZ}{"0E}
+            \DeclareMathSymbol{\rbag}{\mathclose}{OXSZ}{"0F}
+            \DeclareMathSymbol{\project}{\mathrel}{OXSZ}{"02}
+            \DeclareMathSymbol{\semi}{\mathrel}{OXSZ}{"1C}
+            \DeclareMathSymbol{\ldata}{\mathopen}{OXSZ}{"12}
+            \DeclareMathSymbol{\rdata}{\mathclose}{OXSZ}{"13}
+            \DeclareMathSymbol{\emptyset}{\mathord}{OXSZ}{"1E}
+            \DeclareMathSymbol{\rel}{\mathbin}{OXSZ}{"23}
+            \DeclareMathSymbol{\comp}{\mathbin}{OXSZ}{"1C}
+            \DeclareMathSymbol{\dres}{\mathbin}{OXSZ}{"03}
+            \DeclareMathSymbol{\rres}{\mathbin}{OXSZ}{"04}
+            \DeclareMathSymbol{\ndres}{\mathbin}{OXSZ}{"05}
+            \DeclareMathSymbol{\nrres}{\mathbin}{OXSZ}{"06}
+            \DeclareMathSymbol{\limg}{\mathopen}{OXSZ}{"10}
+            \DeclareMathSymbol{\rimg}{\mathclose}{OXSZ}{"11}
+            \DeclareMathSymbol{\pfun}{\mathbin}{OXSZ}{"14}
+            \DeclareMathSymbol{\fun}{\mathbin}{OXSZ}{"22}
+            \DeclareMathSymbol{\pinj}{\mathbin}{OXSZ}{"19}
+            \DeclareMathSymbol{\inj}{\mathbin}{OXSZ}{"18}
+            \DeclareMathSymbol{\psurj}{\mathbin}{OXSZ}{"17}
+            \DeclareMathSymbol{\surj}{\mathbin}{OXSZ}{"16}
+            \DeclareMathSymbol{\bij}{\mathbin}{OXSZ}{"1B}
+            \DeclareMathSymbol{\nat}{\mathord}{OXSZ}{"0D}
+            \DeclareMathSymbol{\num}{\mathord}{OXSZ}{"1D}
+            \DeclareMathSymbol{\@finset}{\mathord}{OXSZ}{"0C}
+            \def\finset{\esz@op{\@finset}}
+            \DeclareMathSymbol{\ffun}{\mathbin}{OXSZ}{"15}
+            \DeclareMathSymbol{\finj}{\mathbin}{OXSZ}{"1A}
+            \DeclareMathSymbol{\cat}{\mathbin}{OXSZ}{"1F}
+            \DeclareMathSymbol{\filter}{\mathbin}{OXSZ}{"02}
+            \DeclareMathSymbol{\inbag}{\mathrel}{OXSZ}{"08}
+            \DeclareMathSymbol{\extract}{\mathbin}{OXSZ}{"20}
+            \DeclareMathSymbol{\uminus}{\mathbin}{OXSZ}{"21}
+          \else
+            \def\lblot{\langle\!|}
+            \def\rblot{|\!\rangle}
+            \def\bind{\mathbin{\Rrightarrow}}
+            \def\power{\esz@op{\mathbb P}}
+            \def\lbag{[\![}
+            \def\rbag{]\!]}
+            \def\project{\esz@bigbin{\upharpoonright}}
+            \def\semi{\esz@bigbin\comp}
+            \def\ldata{\langle\!\langle}
+            \def\rdata{\rangle\!\rangle}
+            \def\emptyset{\varnothing}
+            \def\rel{\mathbin{\leftrightarrow}}
+            \def\comp{\mathbin{\raise 0.6ex\hbox{\oalign{\hfil$\scriptscriptstyle
+               \mathrm{o}$\hfil\cr\hfil$\scriptscriptstyle\mathrm{9}$\hfil}}}}
+            \def\dres{\mathbin{\vartriangleleft}}
+            \def\rres{\mathbin{\vartriangleright}}
+            \def\ndres{\mathbin{\rlap{\raise.05ex\hbox{$-$}}{\dres}}}
+            \def\nrres{\mathbin{\rlap{\raise.05ex\hbox{$-$}}{\rres}}}
+            \def\limg{\mathopen{(\!|}}
+            \def\rimg{\mathclose{|\!)}}
+            \def\pfun{\esz@partial\fun}
+            \def\fun{\mathbin{\rightarrow}}
+            \def\pinj{\esz@partial\inj}
+            \def\inj{\mathbin{\rightarrowtail}}
+            \def\psurj{\esz@partial\surj}
+            \def\surj{\mathbin{\ooalign{$\fun$\hfil\cr$\mkern4mu\fun$}}}
+            \def\bij{\mathbin{\ooalign{$\inj$\hfil\cr$\mkern5mu\fun$}}}
+            \def\nat{{\mathbb N}}
+            \def\num{{\mathbb Z}}
+            \def\finset{\esz@op{{\mathbb F}}}
+            \def\ffun{\esz@finite\fun}
+            \def\finj{\esz@finite\inj}
+            \def\cat{\mathbin{\raise 0.8ex\hbox{$\smallfrown$}}}
+            \def\filter{\mathbin{\upharpoonright}}
+            \def\inbag{\mathrel{\esz@minus{\sqsubset}}}
+            \def\extract{\mathbin{\upharpoonleft}}
+            \def\uminus{\mathbin{\esz@minus{\cup}}}
+          \fi
+          \def\:{\!:\!\!}
+          \def\defs{\mathrel{\widehat=}}
+          \def\cross{\times}
+          \def\lambda{\esz@op{\mathchar"115}}
+          \def\mu{\esz@op{\mathchar"116}}
+          \def\lnot{\neg\;}
+          \def\land{\esz@rel{\wedge}}
+          \def\lor{\esz@rel{\vee}}
+          \let\implies\Rightarrow
+          \let\iff\Leftrightarrow
+          \def\forall{\esz@op{\mathchar"238}}
+          \def\exists{\esz@op{\mathchar"239}}
+          \def\hide{\esz@bigbin{\backslash}}
+          \let\shows\vdash
+          \def\pipe{\esz@bigbin{>\!\!>}}
+          \def\LET{\Zkeyword{let}}
+          \def\IF{\Zkeyword{if}}
+          \def\THEN{\Zkeyword{then}}
+          \def\ELSE{\Zkeyword{else}}
+          \def\dom{\Zpreop{dom}}
+          \def\ran{\Zpreop{ran}}
+          \def\id{\Zpreop{id}}
+          \def\inv{^\sim}
+          \def\div{\Zinop{div}}
+          \def\mod{\Zinop{mod}}
+          \def\upto{\esz@bin{\ldotp\ldotp}}
+          \def\plus{^+}
+          \def\star{^*}
+          \def\seq{\Zpregen{seq}}
+          \def\iseq{\Zpregen{iseq}}
+          \def\dcat{\esz@op{\cat/}}
+          \def\bag{\Zpregen{bag}}
+          \def\bcount{\esz@bin{\sharp}}
+          \let\subbageq\sqsubseteq
+          \def\disjoint{\Zprerel{disjoint}}
+          \def\partition{\Zinrel{partition}}
+          \def\prefix{\Zinrel{prefix}}
+          \def\suffix{\Zinrel{suffix}}
+          \def\inseq{\Zinrel{in}}
+          \def\pre{\Zpreop{pre}}
+          \def\flat{\Zpreop{\downarrow}}
+          \def\steps{\Zpreop{steps}}
+          \def\baseNum{BASENUM}
+          \def\typeName#1#2{#1 \subset_{type} #2}
+          \def\typeNameDef#1{(#1)_{type}}
+          \def\typeRule#1#2{#1 \subseteq_{type} \bigcup #2}
+        \ifesz@units \def\unit{U}                          \def\wplus{\mathop{\$}}             
+                     \def\real{\mathcal{R}}                \def\recipro{{\frac{1}{\mathrm{x}}}}
+                     \def\wreal{\real_{\unit}}             \def\floor{\mathrm{floor}}          
+                     \def\rat{\mathcal{Q}}                 \def\ceil{\mathrm{ceil}}            
+                     \def\wrat{\rat_{\unit}}               \def\interv{\nearrow}               
+                     \def\wnum{\num_{\unit}}               \def\m{\mathsf{m}}                  
+                     \def\wnat{\nat_{\unit}}               \def\kg{\mathsf{kg}}                
+                     \def\weighting{weighting}             \def\s{\mathsf{s}}                  
+                     \def\unitExpon{UE}                    \def\amp{\mathsf{amp}}              
+                     \def\quo{\mathop{/}}                  \def\kel{\mathsf{kel}}              
+                     \def\abs{\mathrm{abs}}                \def\can{\mathsf{can}}              
+                     \def\val{\mathrm{val}}                \def\mol{\mathsf{mol}}              
+                     \def\nom{\mathrm{nom}}                \def\unitNum{UNUM}                  
+                     \def\dnom{\mathrm{dnom}}              \def\unitAdd{\boxplus}              
+                     \def\weight{\mathrm{weight}}          \def\unitNegate{\boxminus}           \fi
+        \ifesz@dz
+            \def\dyn{\Zpregen{dyn}}
+            \def\const{\Zpregen{const}}
+            \def\dchoice{\oplus}
+            \def\dcompute{\rightarrow}
+            \def\dpreempt{\nearrow}
+            \def\dleadsto{\leadsto}
+            \def\dtr{\Zinrel{/}}
+            \def\dseq{\semi}
+            \def\dchop{\cat}
+            \def\deverywhere{\Zprerel{everywhere}}
+            \def\dsomewhere{\Zprerel{somewhere}}
+            \def\drepeat{\Zprerel{repeat}}
+            \def\dprefix{\Zprerel{prefix}}
+            \def\dawait{\Zprerel{await}}
+            \def\dlstate{\lceil\thinspace}
+            \def\drstate{\thinspace\rceil}
+            \def\dltrans{\lblot\thinspace}
+            \def\drtrans{\thinspace\rblot}
+            \def\dlength{\ell}
+            \def\dduration{\mathbf{\delta}}
+            \def\dLength#1#2{{_{\dlength \mathrel{#1} #2}}}
+            \def\dDuration#1#2{{_{\dduration \mathrel{#1} #2}}}
+            \def\dstep{\mathsf{step}}
+            \def\dstepduration{\mathsf{stepduration}}
+
+            % fixme: stackrel ???
+            \def\dleadstol#1#2{\stackrel{\dlength #1 #2}{\dleadsto}}
+            \def\dleadstod#1#2{\stackrel{\dduration #1 #2}{\dleadsto}}
+
+            \def\deverywherel#1#2{\Zprerel{\deverywhere_{\dlength #1 #2}}}
+            \def\dsomewherel#1#2{\Zprerel{\dsomewhere_{\dlength #1 #2}}}
+            \def\drepeatl#1#2{\Zprerel{\drepeat_{\dlength #1 #2}}}
+
+            \def\deverywhered#1#2{\Zprerel{\deverywhere_{\dduration #1 #2}}}
+            \def\dsomewhered#1#2{\Zprerel{\dsomewhere_{\dduration #1 #2}}}
+            \def\drepeatd#1#2{\Zprerel{\drepeat_{\dduration #1 #2}}}
+
+            \def\DZ{Dynamic Z}
+
+        \fi
+        \ifesz@msz
+            \def\esz@fst#1{#1\footnotesize\itshape\uppercase\bgroup}
+
+            \def\esz@schemaRole#1{\mathopen{}\esz@rel{\mbox{\it\esz@fst#1\egroup}}}
+            %\def\esz@schemaRole#1{\mbox{\footnotesize\it#1}}
+
+            \def\eszDefSRole#1{%
+                \expandafter\def\csname #1\endcsname{\esz@schemaRole{#1}}%
+            }
+
+
+            \eszDefSRole{Data}
+            \eszDefSRole{Init}
+            \eszDefSRole{Port}
+            \eszDefSRole{Behavior}
+            \eszDefSRole{Assertion}
+            \eszDefSRole{Property}
+            \eszDefSRole{Op}
+            \eszDefSRole{Trans}
+            \eszDefSRole{Guard}
+            \eszDefSRole{Dyn}
+            \eszDefSRole{Subchart}
+            \eszDefSRole{Chart}
+            \eszDefSRole{Config}
+            \eszDefSRole{Xor}
+            \eszDefSRole{And}
+            \eszDefSRole{Reaction}
+            \def\StaticReaction{\esz@schemaRole{Reaction}}
+
+            \def\CCC{
+            \def\Data{D\!\mbox{\footnotesize\it{ATA}}}
+            \def\Init{I\!\mbox{\footnotesize\it{NIT}}}
+            \def\Port{P\!\mbox{\footnotesize\it{ORT}}}
+            \def\Behavior{B\!\mbox{\footnotesize\it{EHAVIOR}}}
+            \def\Op{O\!\mbox{\footnotesize\it{P}}}
+            \def\Trans{T\!\mbox{\footnotesize\it{RANS}}}
+            \def\Guard{G\!\mbox{\footnotesize\it{UARD}}}
+            \def\Dyn{D\!\mbox{\footnotesize\it{YN}}}
+            \def\Subchart{S\!\mbox{\footnotesize\it{UBCHART}}}
+            \def\Chart{C\!\mbox{\footnotesize\it{HART}}}
+            \def\Config{C\!\mbox{\footnotesize\it{ONFIG}}}
+            \def\Xor{X\!\mbox{\footnotesize\it{OR}}}
+            \def\Xand{X\!\mbox{\footnotesize\it{AND}}}
+            %\def\StaticReaction{\esz@schemaRole{Reaction}}
+            }
+            \def\ESZ{\mbox{$E\!{\cal S\!Z}$}}       \def\MSZ{\mbox{$\mu\!{\cal S\!Z}$}}
+
+
+            \def\DATA{\mathrm{DATA}}        % conjunction of DATA and PORT schemas
+            \def\CONTROL{\mathrm{CONTROL}}  % `in' and `delay'
+            \def\HISTORY{\mathrm{HISTORY}}  % `historyClear' and `deepHistoryClear'
+            \def\State{\mathsf{State}}      % type of statechart states
+            \def\Derived{\esz@schemaRole{Derived}}
+            \def\Enrich{\esz@schemaRole{Enrich}}
+            \def\Input{\esz@schemaRole{Input}}
+            \def\delay{\Zpreop{delay}}
+            \def\now{\Zpreop{now}}
+            \def\instate{\Zpreop{instate}}
+            \def\historyClear{\mathsf{historyClear}}
+            \def\deepClear{\mathsf{deepClear}}
+            \def\event{\Zpregen{event}}
+            \def\signal{\mathsf{signal}}
+            \def\emit{\Zinrel{\uparrow}}
+            \def\df{\Zprerel{df}}
+            \def\vl{\Zpreop{vl}}
+            \def\Connector{\hbox{\sf Connector}}
+            \def\When{\Zkeyword{When}}
+            \def\Goto{\Zkeyword{Goto}}
+            \def\Aggreg{\Zkeyword{Aggreg}}
+            \def\Assoc{\Zkeyword{Assoc}}
+            \def\To{\Zkeyword{To}}
+            \def\Flow{\Zkeyword{Flow}}
+            \def\tr{\Zinrel{/}}
+            \def\bool{\Zpreop{\mathbb{B}}}
+            %\def\Time{\Zpreop{Time}}
+            %\def\Time{\Zpreop{time}}
+
+        \fi
+        \ifesz@latin \catcode`^^ac=\active   \def^^ac{\lnot}
+                     \catcode`^^b5=\active   \def^^b5{\mu}
+                     \catcode`^^b9=\active   \def^^b9{^1}
+                     \catcode`^^b2=\active   \def^^b2{^2}
+                     \catcode`^^b3=\active   \def^^b3{^3}
+                     \catcode`^^b7=\active   \def^^b7{\cdot}
+                     \catcode`^^d7=\active   \def^^d7{\times}
+                     \catcode`^^f7=\active   \def^^f7{\div}
+                     \catcode`^^f8=\active   \def^^f8{\emptyset}
+                     \catcode`^^b1=\active   \def^^b1{\pm}
+                     \catcode`^^ab=\active   \def^^ab{\flqq}
+                     \catcode`^^bb=\active   \def^^bb{\frqq}
+
+                     \def\"#1{%
+                         \if#1s%
+                             \ss%
+                         \else%
+                             \ifmmode\mathaccent"707F #1\else\accent"7F #1\fi%
+                         \fi%
+                     }
+                     \def\ss{\ifmmode\mbox{\it\char"19} \else \char"19\fi} \fi
+    \ifesz@index
+        \RequirePackage{makeidx}
+        \def\esz@index#1{{%
+          \def\_{\string \_}%
+            \def\;{\string \;}%
+            \ifesz@inClass%
+                \index{#1:\esz@classname@$#1, \esz@classname$}%
+            \else%
+                \index{#1@$#1$}%
+            \fi%
+        }}
+
+        \def\zd #1 {\esz@index{\string#1}#1}
+    \fi
+    \endinput

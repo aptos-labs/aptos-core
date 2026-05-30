@@ -52,11 +52,10 @@ fun TestPost::double($t0|x: u64): u64 {
   0: assume Le(Add($t0, $t0), 18446744073709551615)
      # VC: proof assertion not satisfied at tests/spec_instrumentation/proofs/post.move:17:9+22
   1: assert Eq<num>(Add($t0, $t0), Mul(2, $t0))
-  2: $t1 := +($t0, $t0) on_abort goto 5 with $t2
-  3: label L1
-  4: return $t1
-  5: label L2
-  6: abort($t2)
+  2: $t1 := +($t0, $t0) on_abort goto 4 with $t2
+  3: return $t1
+  4: label L1
+  5: abort($t2)
 }
 
 
@@ -67,15 +66,14 @@ fun TestPost::double($t0|x: u64): u64 {
   0: assume Le(Add($t0, $t0), 18446744073709551615)
      # VC: proof assertion not satisfied at tests/spec_instrumentation/proofs/post.move:17:9+22
   1: assert Eq<num>(Add($t0, $t0), Mul(2, $t0))
-  2: $t1 := +($t0, $t0) on_abort goto 7 with $t2
-  3: label L1
+  2: $t1 := +($t0, $t0) on_abort goto 6 with $t2
      # VC: proof assertion not satisfied at tests/spec_instrumentation/proofs/post.move:18:14+23
-  4: assert Eq<u64>($t1, Add($t0, $t0))
+  3: assert Eq<u64>($t1, Add($t0, $t0))
      # VC: post-condition does not hold at tests/spec_instrumentation/proofs/post.move:15:9+24
-  5: assert Eq<u64>($t1, Mul(2, $t0))
-  6: return $t1
-  7: label L2
-  8: abort($t2)
+  4: assert Eq<u64>($t1, Mul(2, $t0))
+  5: return $t1
+  6: label L1
+  7: abort($t2)
 }
 
 
@@ -126,11 +124,10 @@ fun TestPost::scale($t0|x: u64, $t1|factor: u64): u64 {
      var $t4: num
   0: assume Identical($t2, Mul($t0, $t1))
   1: assume Le(Mul($t0, $t1), 18446744073709551615)
-  2: $t3 := *($t0, $t1) on_abort goto 5 with $t4
-  3: label L1
-  4: return $t3
-  5: label L2
-  6: abort($t4)
+  2: $t3 := *($t0, $t1) on_abort goto 4 with $t4
+  3: return $t3
+  4: label L1
+  5: abort($t4)
 }
 
 
@@ -141,15 +138,14 @@ fun TestPost::scale($t0|x: u64, $t1|factor: u64): u64 {
      var $t4: num
   0: assume Identical($t2, Mul($t0, $t1))
   1: assume Le(Mul($t0, $t1), 18446744073709551615)
-  2: $t3 := *($t0, $t1) on_abort goto 7 with $t4
-  3: label L1
+  2: $t3 := *($t0, $t1) on_abort goto 6 with $t4
      # VC: proof assertion not satisfied at tests/spec_instrumentation/proofs/post.move:32:14+26
-  4: assert Eq<u64>($t3, Mul($t0, $t1))
+  3: assert Eq<u64>($t3, Mul($t0, $t1))
      # VC: post-condition does not hold at tests/spec_instrumentation/proofs/post.move:29:9+29
-  5: assert Eq<u64>($t3, Mul($t0, $t1))
-  6: return $t3
-  7: label L2
-  8: abort($t4)
+  4: assert Eq<u64>($t3, Mul($t0, $t1))
+  5: return $t3
+  6: label L1
+  7: abort($t4)
 }
 
 

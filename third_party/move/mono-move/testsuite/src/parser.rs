@@ -31,9 +31,11 @@
 //! ## `// RUN: execute <addr>::<module>::<func> [--args <v1>, <v2>, ...]`
 //!
 //! Invokes `<func>` in the given module on both VMs. Arguments are
-//! comma-separated literal values (currently only `u64` is supported).
-//! The execution produces a result string of the form `results: v1, v2`
-//! on success, or `error: <message>` on failure (e.g., abort).
+//! comma-separated decimal literals, parsed according to the function's
+//! parameter types (all integer types `u8..u256` / `i8..i256` are
+//! supported). The execution produces a result string of the form
+//! `results: v1, v2` on success, or `error: <message>` on failure (e.g.,
+//! abort).
 //!
 //! ## `// CHECK: <literal>`
 //!
@@ -47,32 +49,55 @@
 //! VM (V2) respectively. Use these when the two VMs intentionally diverge
 //! (e.g., different error messages for aborts).
 //!
+//! ## `// CHECK-SUBSTR: <pattern>` / `// CHECK-V1-SUBSTR: <pattern>` / `// CHECK-V2-SUBSTR: <pattern>`
+//!
+//! Like the exact-match variants above, but the pattern only needs to
+//! appear as a substring of the actual output. Use this for abort
+//! messages whose exact form includes volatile bits like a function-def
+//! index or a code offset.
+//!
 //! Multiple check directives may follow a single execute step; each is
 //! verified independently.
 //!
 //! # Future extensions
 //!
-//! - Regex or substring matching for CHECK patterns.
-//! - Abort-specific checks (e.g., `// CHECK: error: ... ABORTED ...`).
+//! - Regex matching for CHECK patterns.
 
 use anyhow::{anyhow, bail};
 use move_core_types::{account_address::AccountAddress, identifier::Identifier};
+
+/// How an expected pattern is matched against actual VM output.
+#[derive(Debug, Copy, Clone)]
+pub enum MatchKind {
+    /// The actual output (trimmed) must equal the pattern exactly.
+    Exact,
+    /// The actual output must contain the pattern as a substring. Useful
+    /// for abort messages whose exact form includes volatile bits like a
+    /// function-def index.
+    Substring,
+}
 
 /// A check directive attached to an execution step.
 #[derive(Debug)]
 pub enum Check {
     /// Legacy Move VM should produce this output.
-    V1(String),
+    V1(String, MatchKind),
     /// MonoMove VM should produce this output.
-    V2(String),
+    V2(String, MatchKind),
 }
 
 /// A snapshot section requested via `// RUN: publish --print(...)`.
 #[derive(Debug, Copy, Clone, PartialEq, Eq)]
 pub enum PrintSection {
+    /// Move bytecode disassembly. Selected by `--print(bytecode)`.
     Bytecode,
+    /// Stackless execution IR. Selected by `--print(stackless)`.
     Stackless,
+    /// Lowered micro-ops. Selected by `--print(micro-ops)`.
     MicroOps,
+    /// Per-function GC frame layout.
+    /// Selected by `--print(frame-layout)`.
+    FrameLayout,
 }
 
 /// A single step in a differential test.
@@ -121,14 +146,34 @@ pub fn parse(content: &str) -> anyhow::Result<Vec<Step>> {
             } else {
                 bail!("Unknown RUN directive: {}", directive);
             }
+        } else if let Some(pattern) = line.strip_prefix("// CHECK-V1-SUBSTR:") {
+            attach_check(
+                &mut steps,
+                Check::V1(pattern.trim().to_string(), MatchKind::Substring),
+            )?;
+        } else if let Some(pattern) = line.strip_prefix("// CHECK-V2-SUBSTR:") {
+            attach_check(
+                &mut steps,
+                Check::V2(pattern.trim().to_string(), MatchKind::Substring),
+            )?;
+        } else if let Some(pattern) = line.strip_prefix("// CHECK-SUBSTR:") {
+            let pattern = pattern.trim().to_string();
+            attach_check(&mut steps, Check::V1(pattern.clone(), MatchKind::Substring))?;
+            attach_check(&mut steps, Check::V2(pattern, MatchKind::Substring))?;
         } else if let Some(pattern) = line.strip_prefix("// CHECK-V1:") {
-            attach_check(&mut steps, Check::V1(pattern.trim().to_string()))?;
+            attach_check(
+                &mut steps,
+                Check::V1(pattern.trim().to_string(), MatchKind::Exact),
+            )?;
         } else if let Some(pattern) = line.strip_prefix("// CHECK-V2:") {
-            attach_check(&mut steps, Check::V2(pattern.trim().to_string()))?;
+            attach_check(
+                &mut steps,
+                Check::V2(pattern.trim().to_string(), MatchKind::Exact),
+            )?;
         } else if let Some(pattern) = line.strip_prefix("// CHECK:") {
             let pattern = pattern.trim().to_string();
-            attach_check(&mut steps, Check::V1(pattern.clone()))?;
-            attach_check(&mut steps, Check::V2(pattern))?;
+            attach_check(&mut steps, Check::V1(pattern.clone(), MatchKind::Exact))?;
+            attach_check(&mut steps, Check::V2(pattern, MatchKind::Exact))?;
         } else if publish_print.is_some() {
             sources.push(raw_line);
         }
@@ -164,6 +209,7 @@ fn parse_publish_modifiers(rest: &str) -> anyhow::Result<Vec<PrintSection>> {
             "bytecode" => PrintSection::Bytecode,
             "stackless" => PrintSection::Stackless,
             "micro-ops" => PrintSection::MicroOps,
+            "frame-layout" => PrintSection::FrameLayout,
             _ => bail!("Unknown print section: {:?}", token),
         };
         if sections.contains(&section) {

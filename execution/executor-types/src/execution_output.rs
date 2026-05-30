@@ -42,6 +42,7 @@ impl ExecutionOutput {
         block_end_info: Option<BlockEndInfo>,
         next_epoch_state: Option<EpochState>,
         subscribable_events: Planned<Vec<ContractEvent>>,
+        transaction_info_v1: bool,
     ) -> Self {
         let next_version = first_version + to_commit.len() as Version;
         assert_eq!(next_version, result_state.latest().next_version());
@@ -67,6 +68,7 @@ impl ExecutionOutput {
             block_end_info,
             next_epoch_state,
             subscribable_events,
+            transaction_info_v1,
         })
     }
 
@@ -84,6 +86,7 @@ impl ExecutionOutput {
             block_end_info: None,
             next_epoch_state: None,
             subscribable_events: Planned::ready(vec![]),
+            transaction_info_v1: false,
         })
     }
 
@@ -103,6 +106,7 @@ impl ExecutionOutput {
             block_end_info: None,
             next_epoch_state: None,
             subscribable_events: Planned::ready(vec![]),
+            transaction_info_v1: false,
         })
     }
 
@@ -124,6 +128,7 @@ impl ExecutionOutput {
             block_end_info: None,
             next_epoch_state: self.next_epoch_state.clone(),
             subscribable_events: Planned::ready(vec![]),
+            transaction_info_v1: self.transaction_info_v1,
         })
     }
 
@@ -173,6 +178,9 @@ pub struct Inner {
     /// state cache.
     pub next_epoch_state: Option<EpochState>,
     pub subscribable_events: Planned<Vec<ContractEvent>>,
+    /// Whether to assemble `TransactionInfoV1`, which carries the hot state root hash, in the
+    /// subsequent state-checkpoint / ledger-update phases.
+    pub transaction_info_v1: bool,
 }
 
 impl Inner {

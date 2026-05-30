@@ -17,5 +17,4 @@ error: proof assertion not satisfied
     =         c = <redacted>
     =     at tests/sources/functional/proof/mut_ref.move:146: set_to_zero
     =         c = <redacted>
-    =     at tests/sources/functional/proof/mut_ref.move:148: set_to_zero
     =     at tests/sources/functional/proof/mut_ref.move:152: set_to_zero (spec)

@@ -9,12 +9,11 @@ mod helpers;
 const N: u64 = 25;
 
 fn bench_fib(c: &mut Criterion) {
-    use mono_move_core::LocalExecutionContext;
     use mono_move_programs::{
         fib::{micro_op_fib, move_bytecode_fib, native_fib},
         testing,
     };
-    use mono_move_runtime::InterpreterContext;
+    use mono_move_runtime::{InterpreterContext, LocalRuntimeContext};
 
     // -- native & micro_op (fast) -----------------------------------------
     {
@@ -28,15 +27,13 @@ fn bench_fib(c: &mut Criterion) {
         });
 
         // plain (no gas instrumentation)
-        let (functions, descriptors, _arena) = micro_op_fib();
-        // SAFETY: Exclusive access during bench setup; arena is alive.
-        unsafe { mono_move_core::Function::resolve_calls(&functions) };
-        let mut exec_ctx = LocalExecutionContext::unmetered();
+        let (functions, descriptors) = micro_op_fib();
+        let mut exec_ctx = LocalRuntimeContext::unmetered_with_descriptors(descriptors);
         // TODO: hoist interpreter context setup out of the timed body.
         group.bench_function("micro_op", |b| {
             b.iter(|| {
-                let mut ctx = InterpreterContext::new(&mut exec_ctx, &descriptors, unsafe {
-                    functions[0].unwrap().as_ref_unchecked()
+                let mut ctx = InterpreterContext::new(&mut exec_ctx, unsafe {
+                    functions[0].as_ref_unchecked()
                 });
                 ctx.set_root_arg(0, &N.to_le_bytes());
                 ctx.run().unwrap();
@@ -45,17 +42,14 @@ fn bench_fib(c: &mut Criterion) {
         });
 
         // with gas instrumentation
-        let (functions, _, _arena) = micro_op_fib();
-        // SAFETY: Exclusive access during bench setup; arena is alive.
-        let (functions_gas, _arena) = unsafe { helpers::gas_instrument(&functions) };
-        // SAFETY: Exclusive access during bench setup; arena is alive.
-        unsafe { mono_move_core::Function::resolve_calls(&functions_gas) };
-        let mut exec_ctx = LocalExecutionContext::with_max_budget();
+        let (functions_gas, descriptors_gas) = micro_op_fib();
+        helpers::gas_instrument(&functions_gas);
+        let mut exec_ctx = LocalRuntimeContext::with_max_budget(descriptors_gas);
         // TODO: hoist interpreter context setup out of the timed body.
         group.bench_function("micro_op/gas", |b| {
             b.iter(|| {
-                let mut ctx = InterpreterContext::new(&mut exec_ctx, &descriptors, unsafe {
-                    functions_gas[0].unwrap().as_ref_unchecked()
+                let mut ctx = InterpreterContext::new(&mut exec_ctx, unsafe {
+                    functions_gas[0].as_ref_unchecked()
                 });
                 ctx.set_root_arg(0, &N.to_le_bytes());
                 ctx.run().unwrap();
@@ -64,6 +58,12 @@ fn bench_fib(c: &mut Criterion) {
         });
 
         group.finish();
+
+        for ptr in functions.into_iter().chain(functions_gas) {
+            // SAFETY: All bench measurements have completed; no interpreter
+            // context references these function pointers anymore.
+            unsafe { ptr.free_unchecked() };
+        }
     }
 
     // -- move_vm (slow) ---------------------------------------------------

@@ -85,6 +85,17 @@ pub enum DecryptionFailureReason {
     PayloadHashMismatch,
     /// The payload was encrypted for a different epoch than the available decryption key.
     EpochMismatch,
+    /// The block contains an epoch-ending validator transaction (DKGResult /
+    /// ChunkyDKGResult). Decrypting txns that the VM will skip post-NewEpochEvent
+    /// would leak sender intent, so the txn is failed with retry semantics and
+    /// the user resubmits in the next epoch with the rotated key.
+    EpochEndRetry,
+    /// The block's round exceeds the trusted-setup capacity (`num_rounds`).
+    /// The txn cannot be decrypted in this epoch; not retryable until next epoch.
+    TrustedSetupExhausted,
+    /// The encrypted txn was skipped because the block already reached
+    /// `max_txns_from_block_to_execute`. Should be retried in a subsequent block.
+    ExecuteBlockLimitReached,
 }
 
 // Mirrors EntryFunction in types/src/transaction/script.rs

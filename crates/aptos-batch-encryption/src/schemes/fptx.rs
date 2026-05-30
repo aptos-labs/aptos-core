@@ -91,6 +91,14 @@ impl BatchThresholdEncryption for FPTX {
         Ok((ek, digest_key, vks, msk_shares))
     }
 
+    fn max_batch_size(dk: &Self::DigestKey) -> usize {
+        dk.max_batch_size()
+    }
+
+    fn num_rounds(dk: &Self::DigestKey) -> usize {
+        dk.num_rounds()
+    }
+
     fn encrypt<R: CryptoRng + RngCore>(
         ek: &Self::EncryptionKey,
         rng: &mut R,

@@ -1,0 +1,109 @@
+=== masm ===
+// Bytecode version v10
+module 0x42::generic_pack_unpack
+struct Box<T0> has drop
+  value: T0
+
+enum Either<T0, T1> has drop
+  Left
+    l: T0
+  Right
+    r: T1
+
+// Function definition at index 0
+fun pack_left(l0: u64): Either<u64, bool>
+    move_loc l0
+    pack_variant Either<u64, bool>, Left
+    ret
+
+// Function definition at index 1
+fun unpack_box(l0: Box<u64>): u64
+    move_loc l0
+    unpack Box<u64>
+    ret
+
+// Function definition at index 2
+fun unpack_left(l0: Either<u64, bool>): u64
+    local l1: &Either<u64, bool>
+    borrow_loc l0
+    st_loc l1
+    copy_loc l1
+    test_variant Either<u64, bool>, Left
+    br_false l0
+    // @5
+    move_loc l1
+    pop
+    move_loc l0
+    unpack_variant Either<u64, bool>, Left
+    ret
+    // @10
+l0: move_loc l1
+    test_variant Either<u64, bool>, Right
+    br_false l1
+    move_loc l0
+    unpack_variant Either<u64, bool>, Right
+    // @15
+    pop
+    ld_u64 0
+    ret
+l1: ld_u64 14566554180833181697
+    abort
+
+
+=== specializer ===
+// module 0x42::generic_pack_unpack
+
+fun pack_left(r0): Either<u64, bool> {
+  slots: params(1), locals(0), temps(1)
+    r0: u64
+    r1: 0x42::generic_pack_unpack::Either<u64, bool>
+  code:
+  L0:
+    0: r1 := pack_variant 0x42::generic_pack_unpack::Either<u64, bool>@0, [r0]
+    1: ret [r1]
+}
+
+fun unpack_box(r0): u64 {
+  slots: params(1), locals(0), temps(1)
+    r0: 0x42::generic_pack_unpack::Box<u64>
+    r1: u64
+  code:
+  L0:
+    0: [r1] := unpack 0x42::generic_pack_unpack::Box<u64>, r0
+    1: ret [r1]
+}
+
+fun unpack_left(r0): u64 {
+  slots: params(1), locals(1), temps(2)
+    r0: 0x42::generic_pack_unpack::Either<u64, bool>
+    r1: &0x42::generic_pack_unpack::Either<u64, bool>
+    r2: bool
+    r3: u64
+  code:
+  L4:
+    0: r1 := imm_borrow_loc r0
+    1: r2 := test_variant 0x42::generic_pack_unpack::Either<u64, bool>@0, r1
+    2: br_false L0, r2
+  L1:
+    3: [r3] := unpack_variant 0x42::generic_pack_unpack::Either<u64, bool>@0, r0
+    4: ret [r3]
+  L0:
+    5: r2 := test_variant 0x42::generic_pack_unpack::Either<u64, bool>@1, r1
+    6: br_false L2, r2
+  L3:
+    7: [r2] := unpack_variant 0x42::generic_pack_unpack::Either<u64, bool>@1, r0
+    8: r3 := ld_u64 0
+    9: ret [r3]
+  L2:
+    10: r3 := ld_u64 14566554180833181697
+    11: abort r3
+}
+
+=== micro-ops ===
+// module 0x42::generic_pack_unpack
+
+fun pack_left(): skipped (nominal type not yet supported by gc_layout)
+
+fun unpack_box(): skipped (lowering: instruction UnpackGeneric not yet lowered)
+
+fun unpack_left(): skipped (nominal type not yet supported by gc_layout)

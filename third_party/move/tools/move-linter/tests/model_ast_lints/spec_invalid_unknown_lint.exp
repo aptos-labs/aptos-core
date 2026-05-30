@@ -1,0 +1,1 @@
+Lint configuration error: unknown lint check: `not_a_real_lint`. Run `aptos move lint --list-checks` to see all available lints

@@ -73,7 +73,7 @@ pub fn translate_module(module: PreparedModule, interner: &impl Interner) -> Res
                 num_params,
                 num_locals,
                 num_home_slots: alloc.num_home_slots,
-                num_xfer_slots: alloc.num_xfer_slots,
+                num_xfer_positions: alloc.num_xfer_positions,
                 blocks: alloc.blocks,
                 home_slot_types: alloc.home_slot_types,
             }))

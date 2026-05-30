@@ -1,0 +1,24 @@
+// RUN: publish --print(stackless,micro-ops)
+module 0x66::test
+
+fun three_rets(): (u64, u64, u64)
+    ld_u64 1
+    ld_u64 2
+    ld_u64 3
+    ret
+
+fun sink(_a: u64, _b: u64, _c: u64)
+    ret
+
+fun caller(held: u64)
+    move_loc held
+    call three_rets
+    pop
+    call sink
+    ret
+
+// RUN: execute 0x66::test::caller --args 0
+// CHECK: results:
+
+// RUN: execute 0x66::test::caller --args 100
+// CHECK: results:

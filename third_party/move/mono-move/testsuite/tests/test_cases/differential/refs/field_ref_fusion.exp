@@ -1,0 +1,87 @@
+=== stackless ===
+// module 0x66::field_ref_fusion
+
+fun read_field_val(r0): u8 {
+  slots: params(1), locals(0), temps(1)
+    r0: 0x66::field_ref_fusion::S
+    r1: u8
+  code:
+  L0:
+    0: r1 := read_local_field S::_2, r0
+    1: ret [r1]
+}
+
+fun read_and_add(r0): u64 {
+  slots: params(1), locals(0), temps(1)
+    r0: &u64
+    r1: u64
+  code:
+  L0:
+    0: r1 := read_ref r0
+    1: r1 := add r1, #1
+    2: ret [r1]
+}
+
+fun read_field_ref_twice(r0): u64 {
+  slots: params(1), locals(1), temps(2)
+    r0: 0x66::field_ref_fusion::S
+    r1: &u64
+    r2: u64
+    r3: u64
+  code:
+  L0:
+    0: r1 := imm_borrow_loc_field S::_1, r0
+    1: r2 := read_ref r1
+    2: r3 := read_ref r1
+    3: r3 := add r2, r3
+    4: ret [r3]
+}
+
+fun test_read_and_add(r0): u64 {
+  slots: params(1), locals(1), temps(0), xfer(1)
+    r0: u64
+    r1: u64
+  code:
+  L0:
+    0: r1 := move r0
+    1: x0 := imm_borrow_loc r1
+    2: [x0] := call read_and_add, [x0]
+    3: ret [x0]
+}
+=== micro-ops ===
+// module 0x66::field_ref_fusion
+
+fun read_field_val(): skipped (lowering: home slot: slot align 1 < 8 not yet supported (u64-aligned types only))
+
+fun read_and_add() {
+  frame_data_size: 24
+  code:
+    0: Charge #33
+    1: ReadRef [16] <- *[0] (size=8)
+    2: AddU64Imm [16] <- [16] + #1
+    3: Move8 [0] <- [16]
+    4: Return
+}
+
+fun read_field_ref_twice() {
+  frame_data_size: 48
+  code:
+    0: Charge #61
+    1: SlotBorrow [16] <- &[0]
+    2: ReadRef [32] <- *[16] (size=8)
+    3: ReadRef [40] <- *[16] (size=8)
+    4: AddU64 [40] <- [32] + [40]
+    5: Move8 [0] <- [40]
+    6: Return
+}
+
+fun test_read_and_add() {
+  frame_data_size: 16
+  code:
+    0: Charge #18
+    1: Move8 [8] <- [0]
+    2: SlotBorrow [40] <- &[8]
+    3: CallIndirect 0x66::field_ref_fusion::read_and_add
+    4: Move8 [0] <- [40]
+    5: Return
+}

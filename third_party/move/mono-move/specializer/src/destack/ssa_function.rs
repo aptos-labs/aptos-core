@@ -8,8 +8,10 @@
 //! block boundaries, no phi nodes are needed — each value ID is defined exactly
 //! once within its block and never crosses a block boundary.
 
-use super::instr_utils::{extract_imm_value, is_commutative};
-use crate::stackless_exec_ir::{BasicBlock, BinaryOp, Instr};
+use crate::stackless_exec_ir::{
+    instr_utils::{extract_imm_value, is_commutative},
+    BasicBlock, BinaryOp, Instr,
+};
 use mono_move_core::types::InternedType;
 
 /// Intermediate SSA representation of a single function, before slot allocation.
@@ -30,6 +32,9 @@ impl SSAFunction {
         // combining the passes.
         for block in &mut self.blocks {
             fuse_pairs(&mut block.instrs, try_fuse_field_access);
+            // Consumes ReadField/WriteField produced above, maintain this
+            // ordering between fusion passes.
+            fuse_pairs(&mut block.instrs, try_fuse_local_field_access);
             fuse_pairs(&mut block.instrs, try_fuse_immediate_binop);
             // Must run after try_fuse_immediate_binop so that BinaryOpImm is
             // available for the BrCmpImm variant.
@@ -115,6 +120,32 @@ fn try_fuse_field_access(first: &Instr, second: &Instr) -> Option<Instr> {
     }
 }
 
+/// Try to fuse a `borrow_loc` followed by a field op on its result into a
+/// single local-field op, eliding the intermediate fat pointer.
+fn try_fuse_local_field_access(first: &Instr, second: &Instr) -> Option<Instr> {
+    match (first, second) {
+        (Instr::ImmBorrowLoc(ref_r, local), Instr::ImmBorrowField(dst, fld, src))
+            if *ref_r == *src =>
+        {
+            Some(Instr::ImmBorrowLocField(*dst, *fld, *local))
+        },
+        (Instr::MutBorrowLoc(ref_r, local), Instr::MutBorrowField(dst, fld, src))
+            if *ref_r == *src =>
+        {
+            Some(Instr::MutBorrowLocField(*dst, *fld, *local))
+        },
+        (Instr::ImmBorrowLoc(ref_r, local), Instr::ReadField(dst, fld, src)) if *ref_r == *src => {
+            Some(Instr::ReadLocalField(*dst, *fld, *local))
+        },
+        (Instr::MutBorrowLoc(ref_r, local), Instr::WriteField(fld, dst_ref, val))
+            if *ref_r == *dst_ref =>
+        {
+            Some(Instr::WriteLocalField(*fld, *local, *val))
+        },
+        _ => None,
+    }
+}
+
 /// Try to fuse a comparison + conditional branch pair into a single `BrCmp`/`BrCmpImm`.
 ///
 /// Handles both `BrTrue` (keeps the comparison operator) and `BrFalse` (negates it).
@@ -136,13 +167,13 @@ fn try_fuse_compare_branch(first: &Instr, second: &Instr) -> Option<Instr> {
         (Instr::BinaryOpImm(dst, BinaryOp::Cmp(cmp), src, imm), Instr::BrTrue(label, cond))
             if *dst == *cond =>
         {
-            Some(Instr::BrCmpImm(*label, *cmp, *src, *imm))
+            Some(Instr::BrCmpImm(*label, *cmp, *src, imm.clone()))
         },
         // BinaryOpImm(dst, Cmp(cmp), src, imm) + BrFalse(label, dst)
         (Instr::BinaryOpImm(dst, BinaryOp::Cmp(cmp), src, imm), Instr::BrFalse(label, cond))
             if *dst == *cond =>
         {
-            Some(Instr::BrCmpImm(*label, cmp.negate(), *src, *imm))
+            Some(Instr::BrCmpImm(*label, cmp.negate(), *src, imm.clone()))
         },
         _ => None,
     }

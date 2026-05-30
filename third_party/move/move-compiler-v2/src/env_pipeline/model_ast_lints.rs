@@ -38,11 +38,26 @@ pub fn checker(env: &mut GlobalEnv) {
         .iter()
         .flat_map(|c| c.get_function_checkers())
         .collect::<Vec<_>>();
+    // Current policy for test/verify-only code:
+    // - Constants, structs, and expression-level checks never run on it.
+    // - Function-level checks run only when at least one checker opts in via
+    //   `FunctionChecker::runs_on_test_code`.
+    let lint_test_code = function_checkers.iter().any(|c| c.runs_on_test_code());
     for module in env.get_modules() {
-        if module.is_primary_target() {
-            let module_lint_skips =
-                lint_skips_from_attributes(env, module.get_attributes(), &known_checker_names);
+        if !module.is_primary_target() {
+            continue;
+        }
+        let module_is_test = module.is_test_or_verify_only();
+        if module_is_test && !lint_test_code {
+            continue;
+        }
+        let module_lint_skips =
+            lint_skips_from_attributes(env, module.get_attributes(), &known_checker_names);
+        if !module_is_test {
             for const_env in module.get_named_constants() {
+                if const_env.is_test_or_verify_only() {
+                    continue;
+                }
                 check_constant(
                     &const_env,
                     &constant_checkers,
@@ -51,6 +66,9 @@ pub fn checker(env: &mut GlobalEnv) {
                 );
             }
             for struct_env in module.get_structs() {
+                if struct_env.is_test_or_verify_only() {
+                    continue;
+                }
                 check_struct(
                     &struct_env,
                     &struct_checkers,
@@ -58,16 +76,20 @@ pub fn checker(env: &mut GlobalEnv) {
                     &known_checker_names,
                 );
             }
-            for function in module.get_functions() {
-                check_function(
-                    &function,
-                    &function_checkers,
-                    &module_lint_skips,
-                    &known_checker_names,
-                );
-                if function.is_native() {
-                    continue;
-                }
+        }
+        for function in module.get_functions() {
+            let func_is_test = function.is_test_or_verify_only();
+            if func_is_test && !lint_test_code {
+                continue;
+            }
+            check_function(
+                &function,
+                &function_checkers,
+                &module_lint_skips,
+                &known_checker_names,
+                func_is_test,
+            );
+            if !func_is_test && !function.is_native() {
                 check_exp(
                     &function,
                     external_checks,
@@ -113,17 +135,24 @@ fn check_struct(
     }
 }
 
-/// Run function-level lint checks on a function.
+/// Run function-level lint checks on a function. When `is_test` is true,
+/// only checkers that opt in via `FunctionChecker::runs_on_test_code` run;
+/// the caller is responsible for not invoking this on a test function when no
+/// such checker is registered (see `lint_test_code` in `checker`).
 fn check_function(
     func_env: &FunctionEnv,
     checkers: &[Box<dyn FunctionChecker>],
     module_lint_skips: &BTreeSet<String>,
     known_checker_names: &BTreeSet<String>,
+    is_test: bool,
 ) {
     let env = func_env.env();
     let lint_skips =
         lint_skips_from_attributes(env, func_env.get_attributes(), known_checker_names);
     for checker in checkers {
+        if is_test && !checker.runs_on_test_code() {
+            continue;
+        }
         if !is_lint_skipped(&checker.get_name(), module_lint_skips, &lint_skips) {
             checker.check_function(func_env);
         }

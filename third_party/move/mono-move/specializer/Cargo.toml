@@ -6,12 +6,14 @@ publish = false
 
 [dependencies]
 anyhow = { workspace = true }
+bcs = { workspace = true }
 mono-move-core = { workspace = true }
 mono-move-gas = { workspace = true }
 move-binary-format = { workspace = true }
 move-bytecode-verifier = { workspace = true }
 move-core-types = { workspace = true }
 shared-dsa = { workspace = true }
+smallbitvec = { workspace = true }
 smallvec = { workspace = true }
 
 [lib]

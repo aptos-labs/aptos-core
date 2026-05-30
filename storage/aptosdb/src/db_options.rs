@@ -86,6 +86,25 @@ pub(super) fn ledger_metadata_db_column_families() -> Vec<ColumnFamilyName> {
     ]
 }
 
+pub(crate) fn position_db_column_families() -> Vec<ColumnFamilyName> {
+    vec![
+        /* empty cf */ DEFAULT_COLUMN_FAMILY_NAME,
+        DB_METADATA_CF_NAME,
+        POSITION_VALUE_CF_NAME,
+        STALE_POSITION_VALUE_INDEX_CF_NAME,
+    ]
+}
+
+pub(crate) fn position_merkle_db_column_families() -> Vec<ColumnFamilyName> {
+    vec![
+        /* empty cf */ DEFAULT_COLUMN_FAMILY_NAME,
+        DB_METADATA_CF_NAME,
+        JELLYFISH_MERKLE_NODE_CF_NAME,
+        STALE_NODE_INDEX_CF_NAME,
+        STALE_NODE_INDEX_CROSS_EPOCH_CF_NAME,
+    ]
+}
+
 pub(super) fn state_merkle_db_column_families() -> Vec<ColumnFamilyName> {
     vec![
         /* empty cf */ DEFAULT_COLUMN_FAMILY_NAME,
@@ -169,7 +188,9 @@ fn gen_table_options(
         }
     }
 
-    if cf_name == STATE_VALUE_BY_KEY_HASH_CF_NAME || cf_name == HOT_STATE_VALUE_BY_KEY_HASH_CF_NAME
+    if cf_name == STATE_VALUE_BY_KEY_HASH_CF_NAME
+        || cf_name == HOT_STATE_VALUE_BY_KEY_HASH_CF_NAME
+        || cf_name == POSITION_VALUE_CF_NAME
     {
         // We do not generally perform point queries on these tables.
         table_options.set_whole_key_filtering(false);
@@ -203,7 +224,9 @@ fn with_no_compaction_stalling(cf_opts: &mut Options) {
 }
 
 fn with_state_key_extractor_processor(cf_name: ColumnFamilyName, cf_opts: &mut Options) {
-    if cf_name == STATE_VALUE_BY_KEY_HASH_CF_NAME || cf_name == HOT_STATE_VALUE_BY_KEY_HASH_CF_NAME
+    if cf_name == STATE_VALUE_BY_KEY_HASH_CF_NAME
+        || cf_name == HOT_STATE_VALUE_BY_KEY_HASH_CF_NAME
+        || cf_name == POSITION_VALUE_CF_NAME
     {
         let prefix_extractor =
             SliceTransform::create("state_key_extractor", state_key_extractor, None);
@@ -213,6 +236,32 @@ fn with_state_key_extractor_processor(cf_name: ColumnFamilyName, cf_opts: &mut O
 
 fn state_key_extractor(state_value_raw_key: &[u8]) -> &[u8] {
     &state_value_raw_key[..(state_value_raw_key.len() - VERSION_SIZE)]
+}
+
+#[allow(dead_code)]
+pub(crate) fn gen_position_cfds(
+    rocksdb_config: &RocksdbConfig,
+    block_cache: Option<&Cache>,
+) -> Vec<ColumnFamilyDescriptor> {
+    gen_cfds(
+        rocksdb_config,
+        block_cache,
+        position_db_column_families(),
+        with_state_key_extractor_processor,
+    )
+}
+
+#[allow(dead_code)]
+pub(crate) fn gen_position_merkle_cfds(
+    rocksdb_config: &RocksdbConfig,
+    block_cache: Option<&Cache>,
+) -> Vec<ColumnFamilyDescriptor> {
+    gen_cfds(
+        rocksdb_config,
+        block_cache,
+        position_merkle_db_column_families(),
+        |_, _| {},
+    )
 }
 
 pub(super) fn gen_event_cfds(

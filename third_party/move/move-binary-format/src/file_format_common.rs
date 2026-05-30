@@ -577,14 +577,10 @@ pub const VERSION_MAX: u32 = VERSION_10;
 /// the compiler. Notice that this version might be different from the one supported on nodes.
 /// The node's max version is determined by the on-chain config for that node.
 /// !!! For user experience, the default version needs to be already in production.
-pub const VERSION_DEFAULT: u32 = VERSION_9;
+pub const VERSION_DEFAULT: u32 = VERSION_10;
 
-/// Mark which bytecode version is the default if compiling with language version 2.4 -
+/// Mark which bytecode version is the default if compiling with language version 2.5 -
 /// In general, these are used to set up the default bytecode version for language versions higher than the default.
-pub const VERSION_DEFAULT_LANG_V2_4: u32 = VERSION_10;
-
-/// Mark which version is the default version if compiling with language version 2.5
-/// temporarily set to VERSION_10
 pub const VERSION_DEFAULT_LANG_V2_5: u32 = VERSION_10;
 
 pub(crate) mod versioned_data {

@@ -24,7 +24,7 @@ module 0x42::amm {
     }
 
     spec Pool {
-        modifies_of<self.pricing> *;
+        reads_of<self.pricing> *;
 
         // No-abort: the pricing function must never abort, for any inputs.
         invariant forall S in *, r_in: u64, r_out: u64, amt: u64:

@@ -28,7 +28,7 @@ use aptos_types::{
     epoch_state::EpochState,
     ledger_info::LedgerInfoWithSignatures,
     on_chain_config::{
-        OnChainChunkyDKGConfig, OnChainConsensusConfig, OnChainExecutionConfig,
+        Features, OnChainChunkyDKGConfig, OnChainConsensusConfig, OnChainExecutionConfig,
         OnChainRandomnessConfig,
     },
     transaction::SignedTransaction,
@@ -121,6 +121,7 @@ impl TExecutionClient for MockExecutionClient {
         _onchain_execution_config: &OnChainExecutionConfig,
         _onchain_randomness_config: &OnChainRandomnessConfig,
         _onchain_chunky_dkg_config: &OnChainChunkyDKGConfig,
+        _features: &Features,
         _rand_config: Option<RandConfig>,
         _secret_share_verifier: Option<Arc<SecretShareVerifier>>,
         _rand_msg_rx: aptos_channel::Receiver<AccountAddress, IncomingRandGenRequest>,

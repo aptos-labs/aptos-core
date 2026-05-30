@@ -319,16 +319,22 @@ pub enum BehaviorKind {
     AbortsOf,
     /// `ensures_of<f>(args)` - the postcondition of function `f`
     EnsuresOf,
-    /// `result_of<f>(args)` - deterministic result selector based on `ensures_of`
-    /// Semantics: `result_of<f>(x) == choose y where ensures_of<f>(x, y)`
+    /// `result_of<f>(args)` — `choose r where ensures_of<f>(args, r, ...)`.
     ResultOf,
+    /// `write_of<f, j>(args)` — WP-internal selector for the post-state of
+    /// the j-th `&mut` parameter (counted among `&mut` parameters). Not
+    /// surface syntax; emitted by spec inference and translated by the
+    /// Boogie backend to a Skolem axiomatized against `ensures_of`.
+    WriteOf(usize),
 }
 
 impl BehaviorKind {
-    /// Returns true if this is a two-state predicate (ensures_of, result_of)
-    /// that requires both pre and post memory states.
+    /// True for predicates whose semantics span pre- and post-memory.
     pub fn is_two_state(&self) -> bool {
-        matches!(self, BehaviorKind::EnsuresOf | BehaviorKind::ResultOf)
+        matches!(
+            self,
+            BehaviorKind::EnsuresOf | BehaviorKind::ResultOf | BehaviorKind::WriteOf(_)
+        )
     }
 }
 
@@ -340,6 +346,7 @@ impl fmt::Display for BehaviorKind {
             AbortsOf => write!(f, "aborts_of"),
             EnsuresOf => write!(f, "ensures_of"),
             ResultOf => write!(f, "result_of"),
+            WriteOf(j) => write!(f, "write_of_{}", j),
         }
     }
 }
@@ -568,6 +575,12 @@ impl Spec {
             && self.properties.is_empty()
             && self.update_map.is_empty()
             && self.proof.is_none()
+            && self.frame_spec.as_ref().is_none_or(|fs| {
+                fs.modifies_targets.is_empty()
+                    && fs.reads_targets.is_empty()
+                    && !fs.modifies_all
+                    && !fs.reads_all
+            })
     }
 
     pub fn filter<P>(&self, pred: P) -> impl Iterator<Item = &Condition>
@@ -620,6 +633,11 @@ impl Spec {
         for exp in self.proof_exps() {
             result.append(&mut exp.used_funs_with_uses())
         }
+        if let Some(fs) = &self.frame_spec {
+            for target in &fs.modifies_targets {
+                result.append(&mut target.used_funs_with_uses())
+            }
+        }
         result
     }
 
@@ -637,6 +655,11 @@ impl Spec {
         }
         for exp in self.proof_exps() {
             result.append(&mut exp.called_funs_with_callsites())
+        }
+        if let Some(fs) = &self.frame_spec {
+            for target in &fs.modifies_targets {
+                result.append(&mut target.called_funs_with_callsites())
+            }
         }
         result
     }

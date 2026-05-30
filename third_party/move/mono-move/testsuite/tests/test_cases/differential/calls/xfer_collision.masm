@@ -1,0 +1,36 @@
+// Regression: cross-call Xfer-slot collision must route to Home.
+
+// RUN: publish --print(stackless,micro-ops)
+module 0x66::xfer_collision
+
+fun three_rets(): (u64, u64, u64)
+    ld_u64 1
+    ld_u64 2
+    ld_u64 3
+    ret
+
+fun three_args(a: u64, b: u64, c: u64): u64
+    move_loc a
+    move_loc b
+    add
+    move_loc c
+    add
+    ret
+
+public fun caller(extra: u64): u64
+    move_loc extra
+    call three_rets
+    ld_u64 5
+    add
+    pop
+    call three_args
+    ret
+
+// RUN: execute 0x66::xfer_collision::caller --args 0
+// CHECK: results: 3
+
+// RUN: execute 0x66::xfer_collision::caller --args 10
+// CHECK: results: 13
+
+// RUN: execute 0x66::xfer_collision::caller --args 100
+// CHECK: results: 103

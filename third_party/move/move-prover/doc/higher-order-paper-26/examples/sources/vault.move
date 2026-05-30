@@ -45,7 +45,7 @@ module defi::vault {
         ensures store.balance == old(store.balance) + fa.amount;
     }
 
-    public fun harvest(caller: &signer, vault_addr: address) {
+    public fun harvest(_caller: &signer, vault_addr: address) {
         let vault = &mut Vault[vault_addr];
 
         // Withdraw all assets from the vault's store

@@ -91,11 +91,10 @@ fun TestIfElseLet::test_let($t0|x: u64): u64 {
      var $t4: num
   0: assume Identical($t1, Add($t0, 1))
   1: $t2 := 1
-  2: $t3 := +($t0, $t2) on_abort goto 5 with $t4
-  3: label L1
-  4: return $t3
-  5: label L2
-  6: abort($t4)
+  2: $t3 := +($t0, $t2) on_abort goto 4 with $t4
+  3: return $t3
+  4: label L1
+  5: abort($t4)
 }
 
 
@@ -107,15 +106,14 @@ fun TestIfElseLet::test_let($t0|x: u64): u64 {
      var $t4: num
   0: assume Identical($t1, Add($t0, 1))
   1: $t2 := 1
-  2: $t3 := +($t0, $t2) on_abort goto 7 with $t4
-  3: label L1
+  2: $t3 := +($t0, $t2) on_abort goto 6 with $t4
      # VC: proof assertion not satisfied at tests/spec_instrumentation/proofs/if_else_let.move:33:14+19
-  4: assert Eq<num>(Add($t0, 1), $t3)
+  3: assert Eq<num>(Add($t0, 1), $t3)
      # VC: post-condition does not hold at tests/spec_instrumentation/proofs/if_else_let.move:30:9+24
-  5: assert Eq<u64>($t3, Add($t0, 1))
-  6: return $t3
-  7: label L2
-  8: abort($t4)
+  4: assert Eq<u64>($t3, Add($t0, 1))
+  5: return $t3
+  6: label L1
+  7: abort($t4)
 }
 
 

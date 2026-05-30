@@ -33,7 +33,11 @@ use codespan_reporting::term::termcolor::WriteColor;
 #[allow(unused_imports)]
 use log::{debug, info};
 use move_model::{
-    ast::SpecBlockTarget, emitln, model::GlobalEnv, sourcifier::Sourcifier, symbol::Symbol,
+    ast::{ConditionKind, SpecBlockTarget},
+    emitln,
+    model::{FunctionEnv, GlobalEnv, VerificationScope},
+    sourcifier::Sourcifier,
+    symbol::Symbol,
 };
 use move_prover_bytecode_pipeline::pipeline_factory;
 use move_stackless_bytecode::{
@@ -197,7 +201,7 @@ fn run_spec_inference_inner<W: WriteColor>(
     let inferred_sym = env.symbol_pool().make("inferred");
     match options.inference.inference_output {
         InferenceOutput::Stdout => {
-            output_to_stdout(env, inferred_sym);
+            output_to_stdout(env, inferred_sym, &options);
         },
         InferenceOutput::File => {
             output_to_files(env, inferred_sym, &options)?;
@@ -219,8 +223,9 @@ fn run_spec_inference_inner<W: WriteColor>(
 }
 
 /// Output inferred specs to stdout (default mode).
-fn output_to_stdout(env: &GlobalEnv, inferred_sym: Symbol) {
+fn output_to_stdout(env: &GlobalEnv, inferred_sym: Symbol, options: &Options) {
     let sourcifier = Sourcifier::new(env, true);
+    let scope = &options.prover.verify_scope;
 
     for module in env.get_modules() {
         if !module.is_target() {
@@ -228,6 +233,9 @@ fn output_to_stdout(env: &GlobalEnv, inferred_sym: Symbol) {
         }
         for fun in module.get_functions() {
             if fun.is_native() || fun.is_intrinsic() || fun.is_test_only() {
+                continue;
+            }
+            if !matches_verify_scope(&fun, scope) {
                 continue;
             }
             let spec = fun.get_spec();
@@ -247,6 +255,21 @@ fn output_to_stdout(env: &GlobalEnv, inferred_sym: Symbol) {
     }
 }
 
+/// Returns true when `fun` is in the user-specified verification scope.
+/// Mirrors the predicate used by `is_within_verification_scope` in
+/// `verification_analysis.rs`, which gates the spec inference processor itself.
+/// Threading this check into the writers ensures `filter` restricts which
+/// source files are edited, not just which functions get inferred conditions.
+fn matches_verify_scope(fun: &FunctionEnv, scope: &VerificationScope) -> bool {
+    match scope {
+        VerificationScope::All => true,
+        VerificationScope::Public => fun.is_exposed(),
+        VerificationScope::Only(name) => fun.matches_name(name),
+        VerificationScope::OnlyModule(name) => fun.module_env.matches_name(name),
+        VerificationScope::None => false,
+    }
+}
+
 /// Output inferred specs to per-module `.spec.move` files.
 ///
 /// If a `.spec.move` file already exists and was compiled as part of the module,
@@ -254,14 +277,24 @@ fn output_to_stdout(env: &GlobalEnv, inferred_sym: Symbol) {
 /// inserted as new blocks) — mirroring the merge logic in `output_unified`.
 /// Otherwise, a fresh file is generated from scratch.
 fn output_to_files(env: &GlobalEnv, inferred_sym: Symbol, options: &Options) -> anyhow::Result<()> {
+    let scope = &options.prover.verify_scope;
     for module in env.get_modules() {
         if !module.is_target() {
+            continue;
+        }
+        if !module
+            .get_functions()
+            .any(|f| matches_verify_scope(&f, scope))
+        {
             continue;
         }
 
         // Check if this module has any functions with inferred specs.
         let has_any_inferred = module.get_functions().any(|fun| {
             if fun.is_native() || fun.is_intrinsic() || fun.is_test_only() {
+                return false;
+            }
+            if !matches_verify_scope(&fun, scope) {
                 return false;
             }
             let spec = fun.get_spec();
@@ -302,6 +335,19 @@ fn output_to_files(env: &GlobalEnv, inferred_sym: Symbol, options: &Options) -> 
             let module_id = module.get_id();
 
             let mut insertions: Vec<(usize, String)> = Vec::new();
+            // Track use module names already present in the spec file and those
+            // already scheduled for insertion, to prevent duplicate `use`
+            // declarations across multiple function spec blocks (Move spec `use`
+            // declarations share the module-level namespace).
+            let mut inserted_use_modules: std::collections::BTreeSet<String> = source
+                .lines()
+                .filter_map(|line| {
+                    let trimmed = line.trim();
+                    trimmed
+                        .strip_prefix("use ")
+                        .map(|rest| use_decl_module_path(rest.trim_end_matches(';').trim()))
+                })
+                .collect();
 
             // Find the position before the last `}` in the spec file — this is
             // the closing brace of the outer `spec module_name { }` block and
@@ -315,6 +361,9 @@ fn output_to_files(env: &GlobalEnv, inferred_sym: Symbol, options: &Options) -> 
 
             for fun in module.get_functions() {
                 if fun.is_native() || fun.is_intrinsic() || fun.is_test_only() {
+                    continue;
+                }
+                if !matches_verify_scope(&fun, scope) {
                     continue;
                 }
                 let has_inferred = {
@@ -385,7 +434,8 @@ fn output_to_files(env: &GlobalEnv, inferred_sym: Symbol, options: &Options) -> 
                     );
 
                     let final_text = if is_single_line && !cond_text.is_empty() {
-                        format!("\n{}{}{}", use_text, cond_text, indent)
+                        let deduped_use = filter_new_uses(&use_text, &mut inserted_use_modules);
+                        format!("\n{}{}{}", deduped_use, cond_text, indent)
                     } else {
                         cond_text
                     };
@@ -393,18 +443,37 @@ fn output_to_files(env: &GlobalEnv, inferred_sym: Symbol, options: &Options) -> 
                     insertions.push((insert_pos, final_text));
 
                     if !is_single_line && !use_text.is_empty() {
-                        let use_insert_pos = source[open_brace_pos..]
-                            .find('\n')
-                            .map(|p| open_brace_pos + p + 1)
-                            .unwrap_or(open_brace_pos + 1);
-                        insertions.push((use_insert_pos, use_text));
+                        let deduped = filter_new_uses(&use_text, &mut inserted_use_modules);
+                        if !deduped.is_empty() {
+                            let use_insert_pos = source[open_brace_pos..]
+                                .find('\n')
+                                .map(|p| open_brace_pos + p + 1)
+                                .unwrap_or(open_brace_pos + 1);
+                            insertions.push((use_insert_pos, deduped));
+                        }
                     }
                 } else if let Some(insert_pos) = module_close_insert_pos {
                     // No existing spec block for this function — insert a full block
                     // before the closing `}` of the outer `spec module { }` block.
                     let indent = "    ";
                     let spec_text = generate_full_spec_block(env, &fun, inferred_sym, indent);
-                    insertions.push((insert_pos, format!("{}\n", spec_text)));
+                    // Filter duplicate `use` declarations from the new spec block
+                    // using the same tracking set as existing-block insertions.
+                    let mut filtered_spec: String = spec_text
+                        .lines()
+                        .filter(|line| {
+                            let trimmed = line.trim();
+                            if let Some(rest) = trimmed.strip_prefix("use ") {
+                                if let Some(m) = rest.trim_end_matches(';').rsplit("::").next() {
+                                    return inserted_use_modules.insert(m.to_string());
+                                }
+                            }
+                            true
+                        })
+                        .collect::<Vec<_>>()
+                        .join("\n");
+                    filtered_spec.push('\n');
+                    insertions.push((insert_pos, format!("{}\n", filtered_spec)));
                 }
             }
 
@@ -428,7 +497,7 @@ fn output_to_files(env: &GlobalEnv, inferred_sym: Symbol, options: &Options) -> 
             merged
         } else {
             // No existing spec file — generate from scratch.
-            generate_fresh_spec_file(env, &module, inferred_sym)
+            generate_fresh_spec_file(env, &module, inferred_sym, scope)
         };
 
         if let Some(parent) = output_path.parent() {
@@ -440,22 +509,78 @@ fn output_to_files(env: &GlobalEnv, inferred_sym: Symbol, options: &Options) -> 
     Ok(())
 }
 
+/// Extract the address token as written in the source file's
+/// `module <addr>::<module_name>` declaration for a specific module.
+///
+/// Move permits multiple modules per file, so we must match by name rather
+/// than returning the first `module ` line found.  Returns `None` if the file
+/// cannot be read or no declaration for `module_name` is present.  The
+/// returned string is the raw address token (e.g. `"std"`, `"0xCAFE"`) with
+/// no surrounding whitespace.
+fn extract_module_address_from_source(
+    source_path: &std::ffi::OsStr,
+    module_name: &str,
+) -> Option<String> {
+    let content = fs::read_to_string(Path::new(source_path)).ok()?;
+    for line in content.lines() {
+        let t = line.trim();
+        let Some(rest) = t.strip_prefix("module ") else {
+            continue;
+        };
+        let rest = rest.trim();
+        let Some(idx) = rest.find("::") else { continue };
+        let addr = rest[..idx].trim();
+        // The part after `::` may be followed by `{`, whitespace, or a comment.
+        let after = rest[idx + 2..].trim_start();
+        let name_end = after
+            .find(|c: char| !(c.is_alphanumeric() || c == '_'))
+            .unwrap_or(after.len());
+        if &after[..name_end] == module_name {
+            return Some(addr.to_string());
+        }
+    }
+    None
+}
+
 /// Generate a fresh `.spec.move` file from scratch (no existing file to merge into).
 fn generate_fresh_spec_file(
     env: &GlobalEnv,
     module: &move_model::model::ModuleEnv,
     inferred_sym: Symbol,
+    scope: &VerificationScope,
 ) -> String {
     let sourcifier = Sourcifier::new(env, true);
-    emitln!(
-        sourcifier.writer(),
-        "spec {} {{",
-        module.get_full_name_str()
-    );
+    // Emit `spec <addr>::<name> {` using the exact address token from the source file so
+    // that `merge_spec_modules` can match the spec back to its target module.  The Move
+    // model always stores addresses in numerical form, so `get_full_name_str()` always
+    // returns hex (e.g. `0x1::bit_vector`), which would fail to match a source module
+    // declared as `module std::bit_vector`.  Reading the source file directly preserves
+    // whichever form the author used (named alias or hex literal).
+    let full_name = module.get_full_name_str(); // `0x<hex>::<name>` — used as fallback
+    let simple_name = full_name
+        .rsplit_once("::")
+        .map(|(_, n)| n)
+        .unwrap_or(full_name.as_str());
+    let module_header = if let Some(addr) =
+        extract_module_address_from_source(module.get_source_path(), simple_name)
+    {
+        // Replace the hex address with the token from source (may be named or hex).
+        if let Some(colon_colon) = full_name.find("::") {
+            format!("{}{}", addr, &full_name[colon_colon..])
+        } else {
+            full_name
+        }
+    } else {
+        full_name
+    };
+    emitln!(sourcifier.writer(), "spec {} {{", module_header);
     sourcifier.writer().indent();
 
     for fun in module.get_functions() {
         if fun.is_native() || fun.is_intrinsic() || fun.is_test_only() {
+            continue;
+        }
+        if !matches_verify_scope(&fun, scope) {
             continue;
         }
         let original_conditions = {
@@ -483,14 +608,24 @@ fn generate_fresh_spec_file(
 /// inferred spec blocks injected inline after each function definition (or
 /// appended to existing spec blocks).
 fn output_unified(env: &GlobalEnv, inferred_sym: Symbol, options: &Options) -> anyhow::Result<()> {
+    let scope = &options.prover.verify_scope;
     for module in env.get_modules() {
         if !module.is_target() {
+            continue;
+        }
+        if !module
+            .get_functions()
+            .any(|f| matches_verify_scope(&f, scope))
+        {
             continue;
         }
 
         // Check if this module has any functions with inferred specs.
         let has_any_inferred = module.get_functions().any(|fun| {
             if fun.is_native() || fun.is_intrinsic() || fun.is_test_only() {
+                return false;
+            }
+            if !matches_verify_scope(&fun, scope) {
                 return false;
             }
             let spec = fun.get_spec();
@@ -517,6 +652,9 @@ fn output_unified(env: &GlobalEnv, inferred_sym: Symbol, options: &Options) -> a
             if fun.is_native() || fun.is_intrinsic() || fun.is_test_only() {
                 continue;
             }
+            if !matches_verify_scope(&fun, scope) {
+                continue;
+            }
             // Check for inferred conditions/frame_spec without keeping the Ref alive,
             // since helper functions below need get_mut_spec().
             let has_inferred = {
@@ -531,10 +669,15 @@ fn output_unified(env: &GlobalEnv, inferred_sym: Symbol, options: &Options) -> a
 
             let fun_id = fun.get_id();
 
-            // Check if there's an existing standalone spec block for this function.
+            // Check if there's an existing standalone spec block for this function
+            // in the SOURCE file (not in a separate .spec.move file). Without the
+            // file_id check, spec blocks from a companion .spec.move file would be
+            // matched here, but their byte offsets belong to that file — indexing
+            // them into the source file's content produces wrong results and panics.
             let existing_spec_block = spec_block_infos.iter().find(|info| {
-                matches!(&info.target, SpecBlockTarget::Function(mid, fid)
-                    if *mid == module_id && *fid == fun_id)
+                info.loc.file_id() == file_id
+                    && matches!(&info.target, SpecBlockTarget::Function(mid, fid)
+                        if *mid == module_id && *fid == fun_id)
             });
 
             if let Some(spec_info) = existing_spec_block {
@@ -725,6 +868,54 @@ fn filter_redundant_uses(source: &str, use_text: &str) -> String {
     }
 }
 
+/// Filter `use_text` to only include `use` lines whose module names have not
+/// been seen before, then record those new module names in `seen`. This
+/// Normalise a `use` declaration's path to a canonical dedup key.
+/// Strips any alias (`… as Foo`) and brace-group (`…::{Self, Bar}`),
+/// returning the bare module path (e.g. `"0x1::signer"` or `"0x2::utils"`).
+fn use_decl_module_path(path: &str) -> String {
+    // Strip alias suffix: "0x1::foo as F" → "0x1::foo"
+    let path = if let Some(pos) = path.find(" as ") {
+        path[..pos].trim()
+    } else {
+        path
+    };
+    // Strip brace-group suffix: "0x1::foo::{Self, Bar}" → "0x1::foo"
+    let path = if let Some(pos) = path.find("::{") {
+        path[..pos].trim()
+    } else {
+        path
+    };
+    path.to_string()
+}
+
+/// Filter `use` lines in `use_text` that are already present in `seen`,
+/// adding newly emitted ones to `seen` so later blocks don't repeat them.
+/// Uses the full module path as the dedup key so distinct modules that share
+/// only a leaf name (e.g. `0x1::utils` vs `0x2::utils`) are kept separate.
+fn filter_new_uses(use_text: &str, seen: &mut std::collections::BTreeSet<String>) -> String {
+    if use_text.is_empty() {
+        return String::new();
+    }
+    let filtered: Vec<&str> = use_text
+        .lines()
+        .filter(|line| {
+            let trimmed = line.trim();
+            if let Some(rest) = trimmed.strip_prefix("use ") {
+                let key = use_decl_module_path(rest.trim_end_matches(';').trim());
+                // `insert` returns true if the key was not already present.
+                return seen.insert(key);
+            }
+            true
+        })
+        .collect();
+    if filtered.is_empty() {
+        String::new()
+    } else {
+        format!("{}\n", filtered.join("\n"))
+    }
+}
+
 fn detect_indent(source: &str, byte_offset: usize) -> String {
     // Find the start of the line containing this offset.
     let line_start = source[..byte_offset]
@@ -771,7 +962,21 @@ fn generate_inferred_conditions(
         (orig_conds, orig_props, orig_proof)
     };
 
+    // Expose the user-written let-binding names to the sourcifier so that
+    // `print_behavior_target` can detect shadowing and emit fully-qualified
+    // function names when the bare name would resolve to a let-binding instead.
+    let user_let_names = original_conditions
+        .iter()
+        .filter_map(|c| match &c.kind {
+            ConditionKind::LetPre(sym, _) | ConditionKind::LetPost(sym, _) => Some(*sym),
+            _ => None,
+        })
+        .collect();
+    sourcifier.set_context_let_names(user_let_names);
+
     sourcifier.print_fun_spec(fun);
+
+    sourcifier.clear_context_let_names();
 
     // Restore original conditions, properties, and proof block.
     {

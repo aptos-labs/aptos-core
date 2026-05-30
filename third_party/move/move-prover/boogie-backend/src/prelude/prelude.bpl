@@ -27,8 +27,22 @@ options provided to the prover.
 // ============================================================================================
 // Integer Types
 
+// Signed division / modulus with Move runtime semantics: truncate toward
+// zero (the remainder takes the sign of the dividend), not Boogie's
+// built-in Euclidean `div`/`mod`. Defined once here and reused by both the
+// signed procedure bodies below and by the spec translator. The branch on
+// dividend sign keeps the SMT formula linear (no `*` in conditions); for
+// unsigned operands Boogie's `div`/`mod` is emitted directly because the
+// two semantics coincide when both operands are non-negative.
+function {:inline} $signed_div(a: int, b: int): int {
+    if a >= 0 then a div b else -((-a) div b)
+}
+function {:inline} $signed_mod(a: int, b: int): int {
+    if a >= 0 then a mod b else -((-a) mod b)
+}
+
 // Constants, Instructions, and Procedures needed by both unsigned and signed integers, but defined separately.
-{% macro integer_type(name, typename, min, max) %}
+{% macro integer_type(name, typename, min, max, signed) %}
 const $MIN_{{name}}: int;
 const $MAX_{{name}}: int;
 axiom $MIN_{{name}} == {{min}};
@@ -82,43 +96,64 @@ procedure {:inline 1} $Mul{{name}}(src1: int, src2: int) returns (dst: int)
     }
     dst := src1 * src2;
 }
-{% endmacro %}
 
-{{ self::integer_type(name="U8", typename="u8", min=0, max=255) }}
-{{ self::integer_type(name="U16", typename="u16", min=0, max=65535) }}
-{{ self::integer_type(name="U32", typename="u32", min=0, max=4294967295) }}
-{{ self::integer_type(name="U64", typename="u64", min=0, max="18446744073709551615") }}
-{{ self::integer_type(name="U128", typename="u128", min=0, max="340282366920938463463374607431768211455") }}
-{{ self::integer_type(name="U256", typename="u256", min=0, max="115792089237316195423570985008687907853269984665640564039457584007913129639935") }}
-{{ self::integer_type(name="I8", typename="i8", min=-128, max=127) }}
-{{ self::integer_type(name="I16", typename="i16", min=-32768, max=32767) }}
-{{ self::integer_type(name="I32", typename="i32", min=-2147483648, max=2147483647) }}
-{{ self::integer_type(name="I64", typename="i64", min="-9223372036854775808", max="9223372036854775807") }}
-{{ self::integer_type(name="I128", typename="i128", min="-170141183460469231731687303715884105728", max="170141183460469231731687303715884105727") }}
-{{ self::integer_type(name="I256", typename="i256", min="-57896044618658097711785492504343953926634992332820282019728792003956564819968", max="57896044618658097711785492504343953926634992332820282019728792003956564819967") }}
-
-// Instructions and Procedures shared by unsigned and signed integers
-
-// uninterpreted function to return an undefined value.
-function $undefined_int(): int;
-
-procedure {:inline 1} $Div(src1: int, src2: int) returns (dst: int)
+procedure {:inline 1} $Div{{name}}(src1: int, src2: int) returns (dst: int)
 {
+{%- if signed %}
+    // Signed: abort on div-by-zero *and* MIN/-1 (the latter overflows the
+    // signed range; Rust runtime returns None from `ix::checked_div`).
+    if (src2 == 0 || (src1 == $MIN_{{name}} && src2 == -1)) {
+        call $ExecFailureAbort();
+        return;
+    }
+    dst := $signed_div(src1, src2);
+{%- else %}
     if (src2 == 0) {
         call $ExecFailureAbort();
         return;
     }
     dst := src1 div src2;
+{%- endif %}
 }
 
-procedure {:inline 1} $Mod(src1: int, src2: int) returns (dst: int)
+procedure {:inline 1} $Mod{{name}}(src1: int, src2: int) returns (dst: int)
 {
+{%- if signed %}
+    // Signed: abort on mod-by-zero *and* MIN/-1. Rust's `ix::checked_rem`
+    // returns None for `MIN % -1`; the truncated formula would otherwise
+    // silently yield 0 since Boogie ints are unbounded.
+    if (src2 == 0 || (src1 == $MIN_{{name}} && src2 == -1)) {
+        call $ExecFailureAbort();
+        return;
+    }
+    dst := $signed_mod(src1, src2);
+{%- else %}
     if (src2 == 0) {
         call $ExecFailureAbort();
         return;
     }
     dst := src1 mod src2;
+{%- endif %}
 }
+{% endmacro %}
+
+{{ self::integer_type(name="U8", typename="u8", min=0, max=255, signed=false) }}
+{{ self::integer_type(name="U16", typename="u16", min=0, max=65535, signed=false) }}
+{{ self::integer_type(name="U32", typename="u32", min=0, max=4294967295, signed=false) }}
+{{ self::integer_type(name="U64", typename="u64", min=0, max="18446744073709551615", signed=false) }}
+{{ self::integer_type(name="U128", typename="u128", min=0, max="340282366920938463463374607431768211455", signed=false) }}
+{{ self::integer_type(name="U256", typename="u256", min=0, max="115792089237316195423570985008687907853269984665640564039457584007913129639935", signed=false) }}
+{{ self::integer_type(name="I8", typename="i8", min=-128, max=127, signed=true) }}
+{{ self::integer_type(name="I16", typename="i16", min=-32768, max=32767, signed=true) }}
+{{ self::integer_type(name="I32", typename="i32", min=-2147483648, max=2147483647, signed=true) }}
+{{ self::integer_type(name="I64", typename="i64", min="-9223372036854775808", max="9223372036854775807", signed=true) }}
+{{ self::integer_type(name="I128", typename="i128", min="-170141183460469231731687303715884105728", max="170141183460469231731687303715884105727", signed=true) }}
+{{ self::integer_type(name="I256", typename="i256", min="-57896044618658097711785492504343953926634992332820282019728792003956564819968", max="57896044618658097711785492504343953926634992332820282019728792003956564819967", signed=true) }}
+
+// Instructions and Procedures shared by unsigned and signed integers
+
+// uninterpreted function to return an undefined value.
+function $undefined_int(): int;
 
 // Unimplemented binary arithmetic operations; return the dst
 procedure {:inline 1} $ArithBinaryUnimplemented(src1: int, src2: int) returns (dst: int);
@@ -482,6 +517,18 @@ datatype $Tuple7<T1, T2, T3, T4, T5, T6, T7> {
 
 datatype $Tuple8<T1, T2, T3, T4, T5, T6, T7, T8> {
     $Tuple8($0: T1, $1: T2, $2: T3, $3: T4, $4: T5, $5: T6, $6: T7, $7: T8)
+}
+
+datatype $Tuple9<T1, T2, T3, T4, T5, T6, T7, T8, T9> {
+    $Tuple9($0: T1, $1: T2, $2: T3, $3: T4, $4: T5, $5: T6, $6: T7, $7: T8, $8: T9)
+}
+
+datatype $Tuple10<T1, T2, T3, T4, T5, T6, T7, T8, T9, T10> {
+    $Tuple10($0: T1, $1: T2, $2: T3, $3: T4, $4: T5, $5: T6, $6: T7, $7: T8, $8: T9, $9: T10)
+}
+
+datatype $Tuple11<T1, T2, T3, T4, T5, T6, T7, T8, T9, T10, T11> {
+    $Tuple11($0: T1, $1: T2, $2: T3, $3: T4, $4: T5, $5: T6, $6: T7, $7: T8, $8: T9, $9: T10, $10: T11)
 }
 
 {%- for tuple in tuple_instances %}

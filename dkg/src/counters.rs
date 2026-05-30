@@ -114,6 +114,24 @@ pub static PUBLIC_PARAMS_FILE_SIZE_BYTES: Lazy<IntGauge> = Lazy::new(|| {
     .unwrap()
 });
 
+pub static DIGEST_KEY_BLAKE3: Lazy<IntGaugeVec> = Lazy::new(|| {
+    register_int_gauge_vec!(
+        "aptos_dkg_digest_key_blake3",
+        "blake3 hash (hex) of the DigestKey blob file loaded at startup",
+        &["blake3"]
+    )
+    .unwrap()
+});
+
+pub static PUBLIC_PARAMS_BLAKE3: Lazy<IntGaugeVec> = Lazy::new(|| {
+    register_int_gauge_vec!(
+        "aptos_dkg_public_params_blake3",
+        "blake3 hash (hex) of the PublicParameters blob file loaded at startup",
+        &["blake3"]
+    )
+    .unwrap()
+});
+
 pub static CHUNKY_DKG_CONFIG_MODE: Lazy<IntGauge> = Lazy::new(|| {
     register_int_gauge!(
         "aptos_chunky_dkg_config_mode",

@@ -175,6 +175,21 @@ pub enum FeatureFlag {
     TRANSACTION_LIMITS = 111,
     /// Whether versioned enum-based transaction validation is enabled.
     VERSIONED_TRANSACTION_VALIDATION = 112,
+    /// Whether storage_slot move natives are enabled.
+    STORAGE_SLOT_NATIVES = 113,
+    /// If enabled, a module upgrade may downgrade the visibility of an `entry` function
+    /// from `friend/package` to private, while keeping the `entry` modifier. The `entry`
+    /// modifier itself still cannot be removed. See issue #19650.
+    ALLOW_FRIEND_ENTRY_VISIBILITY_DOWNGRADE = 114,
+    /// When enabled, per-block hot-state promotions are persisted through the block
+    /// epilogue: the promotion set is embedded into the block epilogue transaction
+    /// payload (`BlockEpiloguePayload::V2`), and every transaction output in the block
+    /// uses the V1 write-set format, which encodes hot-state changes in its serialized
+    /// writes.
+    HOTNESS_IN_EPILOGUE = 116,
+    /// When enabled, execution assembles `TransactionInfoV1`, which carries the hot
+    /// state root hash, so it is committed to the ledger accumulator.
+    TRANSACTION_INFO_V1 = 117,
 }
 
 impl FeatureFlag {
@@ -287,6 +302,8 @@ impl FeatureFlag {
             Self::MULTISIG_SCRIPT,
             Self::TRANSACTION_LIMITS,
             Self::VERSIONED_TRANSACTION_VALIDATION,
+            Self::STORAGE_SLOT_NATIVES,
+            Self::ALLOW_FRIEND_ENTRY_VISIBILITY_DOWNGRADE,
         ]
     }
 }
@@ -352,7 +369,14 @@ impl Features {
             .flat_map(|byte| (0..8).map(move |bit_idx| byte & (1 << bit_idx) != 0))
             .enumerate()
             .filter(|(_feature_idx, enabled)| *enabled)
-            .map(|(feature_idx, _)| FeatureFlag::from_repr(feature_idx).unwrap())
+            .map(|(feature_idx, _)| {
+                FeatureFlag::from_repr(feature_idx).unwrap_or_else(|| {
+                    panic!(
+                        "unknown FeatureFlag index {feature_idx} in features bitmap; \
+                         a newer-binary override likely set a flag this binary does not know"
+                    )
+                })
+            })
             .collect()
     }
 
@@ -505,6 +529,14 @@ impl Features {
 
     pub fn is_versioned_transaction_validation_enabled(&self) -> bool {
         self.is_enabled(FeatureFlag::VERSIONED_TRANSACTION_VALIDATION)
+    }
+
+    pub fn is_hotness_in_epilogue_enabled(&self) -> bool {
+        self.is_enabled(FeatureFlag::HOTNESS_IN_EPILOGUE)
+    }
+
+    pub fn is_transaction_info_v1_enabled(&self) -> bool {
+        self.is_enabled(FeatureFlag::TRANSACTION_INFO_V1)
     }
 
     pub fn get_max_identifier_size(&self) -> u64 {

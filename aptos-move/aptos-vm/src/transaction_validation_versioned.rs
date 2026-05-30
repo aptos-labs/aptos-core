@@ -30,6 +30,7 @@ use serde::Serialize;
 #[derive(Serialize)]
 enum PrologueArgs {
     V1 {
+        needs_fee_payer_auth_check: bool,
         txn_sender_public_key: Option<Vec<u8>>,
         fee_payer_public_key_hash: Option<Vec<u8>>,
         replay_protector: ReplayProtector,
@@ -47,6 +48,7 @@ enum PrologueArgs {
 /// Builder that collects prologue arguments and selects the appropriate enum
 /// variant to build.
 pub(crate) struct PrologueBuilder {
+    needs_fee_payer_auth_check: bool,
     txn_sender_public_key: Option<Vec<u8>>,
     fee_payer_public_key_hash: Option<Vec<u8>>,
     replay_protector: ReplayProtector,
@@ -61,8 +63,13 @@ pub(crate) struct PrologueBuilder {
 }
 
 impl PrologueBuilder {
-    pub fn new(txn_data: &TransactionMetadata, is_simulation: bool) -> Self {
+    pub fn new(
+        serialized_signers: &SerializedSigners,
+        txn_data: &TransactionMetadata,
+        is_simulation: bool,
+    ) -> Self {
         Self {
+            needs_fee_payer_auth_check: serialized_signers.fee_payer().is_some(),
             txn_sender_public_key: txn_data.authentication_proof().optional_auth_key(),
             fee_payer_public_key_hash: txn_data
                 .fee_payer_authentication_proof
@@ -91,6 +98,7 @@ impl PrologueBuilder {
     /// Currently only V1 exists.
     pub fn build(self) -> Vec<u8> {
         let args = PrologueArgs::V1 {
+            needs_fee_payer_auth_check: self.needs_fee_payer_auth_check,
             txn_sender_public_key: self.txn_sender_public_key,
             fee_payer_public_key_hash: self.fee_payer_public_key_hash,
             replay_protector: self.replay_protector,
@@ -116,20 +124,18 @@ pub(crate) fn run_prologue(
     traversal_context: &mut TraversalContext,
     is_simulation: bool,
 ) -> Result<(), move_core_types::vm_status::VMStatus> {
-    let builder = PrologueBuilder::new(txn_data, is_simulation);
-    let serialized_args = vec![
-        serialized_signers.sender(),
-        serialized_signers
-            .fee_payer()
-            .unwrap_or(serialized_signers.sender()),
-        builder.build(),
-    ];
+    let builder = PrologueBuilder::new(serialized_signers, txn_data, is_simulation);
+    let sender = serialized_signers.sender();
+    let fee_payer = serialized_signers
+        .fee_payer()
+        .unwrap_or_else(|| serialized_signers.sender());
+    let args = builder.build();
     session
         .execute_function_bypass_visibility(
             &TRANSACTION_VALIDATION_MODULE,
             VERSIONED_PROLOGUE_NAME,
             vec![],
-            serialized_args,
+            vec![sender, fee_payer, args],
             &mut UnmeteredGasMeter,
             traversal_context,
             module_storage,
@@ -207,20 +213,17 @@ pub(crate) fn run_epilogue(
     is_simulation: bool,
 ) -> VMResult<()> {
     let builder = EpilogueBuilder::new(fee_statement, txn_data, gas_remaining, is_simulation);
-    let serialized_args = vec![
-        serialized_signers.sender(),
-        serialized_signers
-            .fee_payer()
-            .unwrap_or(serialized_signers.sender()),
-        builder.build(),
-    ];
-
+    let sender = serialized_signers.sender();
+    let fee_payer = serialized_signers
+        .fee_payer()
+        .unwrap_or_else(|| serialized_signers.sender());
+    let args = builder.build();
     session
         .execute_function_bypass_visibility(
             &TRANSACTION_VALIDATION_MODULE,
             VERSIONED_EPILOGUE_NAME,
             vec![],
-            serialized_args,
+            vec![sender, fee_payer, args],
             &mut UnmeteredGasMeter,
             traversal_context,
             module_storage,

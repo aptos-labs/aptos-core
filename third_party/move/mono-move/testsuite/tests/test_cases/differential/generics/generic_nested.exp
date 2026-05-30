@@ -1,0 +1,81 @@
+=== bytecode ===
+// Bytecode version v10
+module 0x1::test
+// Function definition at index 0
+#[persistent] public fun entry(l0: u64): u64
+    move_loc l0
+    call outer<u64>
+    ret
+
+// Function definition at index 1
+fun innermost<T0: drop>(l0: T0): T0
+    move_loc l0
+    ret
+
+// Function definition at index 2
+fun middle<T0: drop>(l0: T0): T0
+    move_loc l0
+    call innermost<T0>
+    ret
+
+// Function definition at index 3
+fun outer<T0: drop>(l0: T0): T0
+    move_loc l0
+    call middle<T0>
+    ret
+
+=== stackless ===
+// module 0x1::test
+
+fun entry(r0): u64 {
+  slots: params(1), locals(0), temps(0), xfer(1)
+    r0: u64
+  code:
+  L0:
+    0: [x0] := call outer, [r0]
+    1: ret [x0]
+}
+
+fun innermost(r0): _0 {
+  slots: params(1), locals(0), temps(0)
+    r0: _0
+  code:
+  L0:
+    0: ret [r0]
+}
+
+fun middle(r0): _0 {
+  slots: params(1), locals(0), temps(0), xfer(1)
+    r0: _0
+  code:
+  L0:
+    0: [x0] := call innermost, [r0]
+    1: ret [x0]
+}
+
+fun outer(r0): _0 {
+  slots: params(1), locals(0), temps(0), xfer(1)
+    r0: _0
+  code:
+  L0:
+    0: [x0] := call middle, [r0]
+    1: ret [x0]
+}
+=== micro-ops ===
+// module 0x1::test
+
+fun entry() {
+  frame_data_size: 8
+  code:
+    0: Charge #16
+    1: Move8 [32] <- [0]
+    2: CallIndirect 0x1::test::outer<u64>
+    3: Move8 [0] <- [32]
+    4: Return
+}
+
+fun innermost(): skipped (not all types are concrete)
+
+fun middle(): skipped (not all types are concrete)
+
+fun outer(): skipped (not all types are concrete)

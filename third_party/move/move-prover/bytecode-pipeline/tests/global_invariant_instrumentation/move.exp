@@ -31,11 +31,10 @@ public fun Test::publish($t0|s: signer) {
      var $t3: num
   0: $t1 := 1
   1: $t2 := pack 0x42::Test::R($t1)
-  2: move_to<0x42::Test::R>($t0, $t2) on_abort goto 5 with $t3
-  3: label L1
-  4: return ()
-  5: label L2
-  6: abort($t3)
+  2: move_to<0x42::Test::R>($t0, $t2) on_abort goto 4 with $t3
+  3: return ()
+  4: label L1
+  5: abort($t3)
 }
 
 
@@ -48,14 +47,13 @@ public fun Test::publish($t0|s: signer) {
   0: assume forall a: address: TypeDomain<address>(): Gt(select Test::R.x<0x42::Test::R>(global<0x42::Test::R>(a)), 0)
   1: $t1 := 1
   2: $t2 := pack 0x42::Test::R($t1)
-  3: move_to<0x42::Test::R>($t0, $t2) on_abort goto 7 with $t3
+  3: move_to<0x42::Test::R>($t0, $t2) on_abort goto 6 with $t3
      # global invariant at tests/global_invariant_instrumentation/move.move:7:9+57
      # VC: global memory invariant does not hold at tests/global_invariant_instrumentation/move.move:7:9+57
   4: assert forall a: address: TypeDomain<address>(): Gt(select Test::R.x<0x42::Test::R>(global<0x42::Test::R>(a)), 0)
-  5: label L1
-  6: return ()
-  7: label L2
-  8: abort($t3)
+  5: return ()
+  6: label L1
+  7: abort($t3)
 }
 
 
@@ -63,11 +61,10 @@ public fun Test::publish($t0|s: signer) {
 public fun Test::remove($t0|a: address): 0x42::Test::R {
      var $t1: 0x42::Test::R
      var $t2: num
-  0: $t1 := move_from<0x42::Test::R>($t0) on_abort goto 3 with $t2
-  1: label L1
-  2: return $t1
-  3: label L2
-  4: abort($t2)
+  0: $t1 := move_from<0x42::Test::R>($t0) on_abort goto 2 with $t2
+  1: return $t1
+  2: label L1
+  3: abort($t2)
 }
 
 
@@ -77,12 +74,11 @@ public fun Test::remove($t0|a: address): 0x42::Test::R {
      var $t2: num
      # global invariant at tests/global_invariant_instrumentation/move.move:7:9+57
   0: assume forall a: address: TypeDomain<address>(): Gt(select Test::R.x<0x42::Test::R>(global<0x42::Test::R>(a)), 0)
-  1: $t1 := move_from<0x42::Test::R>($t0) on_abort goto 5 with $t2
+  1: $t1 := move_from<0x42::Test::R>($t0) on_abort goto 4 with $t2
      # global invariant at tests/global_invariant_instrumentation/move.move:7:9+57
      # VC: global memory invariant does not hold at tests/global_invariant_instrumentation/move.move:7:9+57
   2: assert forall a: address: TypeDomain<address>(): Gt(select Test::R.x<0x42::Test::R>(global<0x42::Test::R>(a)), 0)
-  3: label L1
-  4: return $t1
-  5: label L2
-  6: abort($t2)
+  3: return $t1
+  4: label L1
+  5: abort($t2)
 }

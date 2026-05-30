@@ -8,5 +8,4 @@ error: post-condition does not hold
    =     at tests/sources/functional/transitions.move:43: do_incr_wrong
    =         a = <redacted>
    =     at tests/sources/functional/transitions.move:44: do_incr_wrong
-   =     at tests/sources/functional/transitions.move:45: do_incr_wrong
    =     at tests/sources/functional/transitions.move:47: do_incr_wrong (spec)

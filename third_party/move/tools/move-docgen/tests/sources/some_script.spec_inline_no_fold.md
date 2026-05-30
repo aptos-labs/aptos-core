@@ -1,7 +1,4 @@
-
-<a id="<SELF>_0"></a>
-
-# Script `<SELF>_0`
+# Script `<SELF>_0` <a id="<SELF>_0"></a>
 
 
 

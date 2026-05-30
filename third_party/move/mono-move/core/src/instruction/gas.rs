@@ -37,6 +37,8 @@ impl HasCfgInfo for MicroOp {
             | MicroOp::JumpGreaterEqualU64 { target, .. }
             | MicroOp::JumpNotEqualU64 { target, .. } => Some(target.0 as usize),
             MicroOp::StoreImm8 { .. }
+            | MicroOp::StoreImm16 { .. }
+            | MicroOp::StoreImm32 { .. }
             | MicroOp::Move8 { .. }
             | MicroOp::Move { .. }
             | MicroOp::AddU64 { .. }
@@ -57,8 +59,20 @@ impl HasCfgInfo for MicroOp {
             | MicroOp::ShlU64Imm { .. }
             | MicroOp::ShrU64 { .. }
             | MicroOp::ShrU64Imm { .. }
+            | MicroOp::IntAdd(_)
+            | MicroOp::IntSub(_)
+            | MicroOp::IntMul(_)
+            | MicroOp::IntDiv(_)
+            | MicroOp::IntMod(_)
+            | MicroOp::IntBitAnd(_)
+            | MicroOp::IntBitOr(_)
+            | MicroOp::IntBitXor(_)
+            | MicroOp::IntShl(_)
+            | MicroOp::IntShr(_)
+            | MicroOp::IntNegate(_)
             | MicroOp::Return
-            | MicroOp::CallFunc { .. }
+            | MicroOp::Abort { .. }
+            | MicroOp::AbortMsg { .. }
             | MicroOp::CallIndirect { .. }
             | MicroOp::CallDirect { .. }
             | MicroOp::VecNew { .. }
@@ -72,6 +86,9 @@ impl HasCfgInfo for MicroOp {
             | MicroOp::HeapBorrow { .. }
             | MicroOp::ReadRef { .. }
             | MicroOp::WriteRef { .. }
+            | MicroOp::DeriveRefOffsetImm { .. }
+            | MicroOp::ReadRefOffset { .. }
+            | MicroOp::WriteRefOffset { .. }
             | MicroOp::HeapNew { .. }
             | MicroOp::HeapMoveFrom8 { .. }
             | MicroOp::HeapMoveFrom { .. }
@@ -138,6 +155,8 @@ impl RemapTargets for MicroOp {
                 rhs,
             },
             op @ (MicroOp::StoreImm8 { .. }
+            | MicroOp::StoreImm16 { .. }
+            | MicroOp::StoreImm32 { .. }
             | MicroOp::Move8 { .. }
             | MicroOp::Move { .. }
             | MicroOp::AddU64 { .. }
@@ -158,8 +177,20 @@ impl RemapTargets for MicroOp {
             | MicroOp::ShlU64Imm { .. }
             | MicroOp::ShrU64 { .. }
             | MicroOp::ShrU64Imm { .. }
+            | MicroOp::IntAdd(_)
+            | MicroOp::IntSub(_)
+            | MicroOp::IntMul(_)
+            | MicroOp::IntDiv(_)
+            | MicroOp::IntMod(_)
+            | MicroOp::IntBitAnd(_)
+            | MicroOp::IntBitOr(_)
+            | MicroOp::IntBitXor(_)
+            | MicroOp::IntShl(_)
+            | MicroOp::IntShr(_)
+            | MicroOp::IntNegate(_)
             | MicroOp::Return
-            | MicroOp::CallFunc { .. }
+            | MicroOp::Abort { .. }
+            | MicroOp::AbortMsg { .. }
             | MicroOp::CallIndirect { .. }
             | MicroOp::CallDirect { .. }
             | MicroOp::VecNew { .. }
@@ -173,6 +204,9 @@ impl RemapTargets for MicroOp {
             | MicroOp::HeapBorrow { .. }
             | MicroOp::ReadRef { .. }
             | MicroOp::WriteRef { .. }
+            | MicroOp::DeriveRefOffsetImm { .. }
+            | MicroOp::ReadRefOffset { .. }
+            | MicroOp::WriteRefOffset { .. }
             | MicroOp::HeapNew { .. }
             | MicroOp::HeapMoveFrom8 { .. }
             | MicroOp::HeapMoveFrom { .. }
@@ -202,6 +236,8 @@ impl GasSchedule<MicroOp> for MicroOpGasSchedule {
         InstrCost::constant(match instr {
             // --- Data movement ---
             MicroOp::StoreImm8 { .. } => 2,
+            MicroOp::StoreImm16 { .. } => 3,
+            MicroOp::StoreImm32 { .. } => 4,
             MicroOp::Move8 { .. } => 2,
             MicroOp::Move { size, .. } => 2 + 3 * *size as u64,
 
@@ -224,11 +260,26 @@ impl GasSchedule<MicroOp> for MicroOpGasSchedule {
             | MicroOp::ModU64 { .. }
             | MicroOp::ModU64Imm { .. } => 5,
 
+            // --- Unspecialized integer ops ---
+            // Placeholder constant. Revisit once we have profiling data on
+            // the per-width / per-kind cost of the non-inlined dispatch.
+            MicroOp::IntAdd(_)
+            | MicroOp::IntSub(_)
+            | MicroOp::IntMul(_)
+            | MicroOp::IntDiv(_)
+            | MicroOp::IntMod(_)
+            | MicroOp::IntBitAnd(_)
+            | MicroOp::IntBitOr(_)
+            | MicroOp::IntBitXor(_)
+            | MicroOp::IntShl(_)
+            | MicroOp::IntShr(_)
+            | MicroOp::IntNegate(_) => 5,
+
             // --- Control flow ---
-            MicroOp::CallFunc { .. }
-            | MicroOp::CallIndirect { .. }
-            | MicroOp::CallDirect { .. } => 10,
+            MicroOp::CallIndirect { .. } | MicroOp::CallDirect { .. } => 10,
             MicroOp::Return => 2,
+            MicroOp::Abort { .. } => 2,
+            MicroOp::AbortMsg { .. } => 5,
             MicroOp::Jump { .. } => 2,
             MicroOp::JumpNotZeroU64 { .. }
             | MicroOp::JumpGreaterEqualU64Imm { .. }
@@ -252,6 +303,10 @@ impl GasSchedule<MicroOp> for MicroOpGasSchedule {
             MicroOp::VecBorrow { .. } => 3,
             MicroOp::HeapBorrow { .. } => 2,
             MicroOp::ReadRef { size, .. } | MicroOp::WriteRef { size, .. } => 2 + 3 * *size as u64,
+            MicroOp::DeriveRefOffsetImm { .. } => 2,
+            MicroOp::ReadRefOffset { size, .. } | MicroOp::WriteRefOffset { size, .. } => {
+                2 + 3 * *size as u64
+            },
 
             // --- Heap object operations ---
             MicroOp::HeapNew { .. } => 8,

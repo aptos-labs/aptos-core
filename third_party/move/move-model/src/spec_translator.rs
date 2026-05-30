@@ -13,7 +13,9 @@ use crate::{
         TraceKind,
     },
     exp_generator::ExpGenerator,
-    exp_rewriter::{ExpRewriter, ExpRewriterFunctions, MemoryLabelFreshener, RewriteTarget},
+    exp_rewriter::{
+        strip_all_olds, ExpRewriter, ExpRewriterFunctions, MemoryLabelFreshener, RewriteTarget,
+    },
     model::{
         FunctionEnv, GlobalEnv, GlobalId, Loc, NodeId, Parameter, QualifiedId, QualifiedInstId,
         SpecVarId, StructId,
@@ -1003,10 +1005,161 @@ impl<'a, 'b, T: ExpGenerator<'a>> SpecTranslator<'a, 'b, T> {
             saved
         }
     }
+
+    /// Bridge the user-facing behavioral-predicate syntax to the canonical
+    /// form the Boogie backend consumes. Each stateful `&mut T` input gets
+    /// `Old(...)`-wrapped (triggering `save_param` for the captured pre-state
+    /// temp). For `EnsuresOf` and `ResultOf`, a live post-state clone of each
+    /// wrapped `&mut T` arg is appended after the existing user-provided
+    /// trailing args (the result slot, if any). Idempotent.
+    fn wrap_mut_ref_bp_inputs(&self, exp: &Exp) -> Exp {
+        let env = self.builder.global_env();
+        let ExpData::Call(node_id, Operation::Behavior(kind, range), args) = exp.as_ref() else {
+            return exp.clone();
+        };
+        let Some(fun_exp) = args.first() else {
+            return exp.clone();
+        };
+        let fun_type = env.get_node_type(fun_exp.node_id());
+        let Type::Fun(arg_ty_box, result_ty_box, _) = fun_type else {
+            return exp.clone();
+        };
+        let arg_types: Vec<Type> = (*arg_ty_box).flatten();
+        let num_inputs = arg_types.len();
+        let num_explicit_results = (*result_ty_box).flatten().len();
+        if args.len() < 1 + num_inputs {
+            return exp.clone();
+        }
+
+        // Wrap `&mut` slots whose arg is stateful (ref-typed, `Borrow(Mut,
+        // ...)`, `Old(...)`, or a `Temporary` of a `&mut`-typed local).
+        let wrap_mask: Vec<bool> = (0..num_inputs)
+            .map(|k| {
+                if !arg_types[k].is_mutable_reference() {
+                    return false;
+                }
+                let Some(arg) = args.get(k + 1) else {
+                    return false;
+                };
+                self.is_stateful_mut_ref(arg)
+            })
+            .collect();
+        let post_state_slot_count = wrap_mask.iter().filter(|b| **b).count();
+        if post_state_slot_count == 0 {
+            return exp.clone();
+        }
+
+        // `EnsuresOf` and `ResultOf` carry trailing post-state clones.
+        // `EnsuresOf` also has explicit result slots between inputs and post.
+        let has_post_slots = matches!(kind, BehaviorKind::EnsuresOf | BehaviorKind::ResultOf);
+        let result_slots = if matches!(kind, BehaviorKind::EnsuresOf) {
+            num_explicit_results
+        } else {
+            0
+        };
+        let augmented_arity = 1
+            + num_inputs
+            + if has_post_slots {
+                result_slots + post_state_slot_count
+            } else {
+                0
+            };
+        let needs_post_state = has_post_slots && args.len() < augmented_arity;
+
+        // Idempotent short-circuit when canonical form is already present.
+        let all_wrapped = wrap_mask.iter().enumerate().all(|(k, needs_wrap)| {
+            if !needs_wrap {
+                return true;
+            }
+            matches!(
+                args.get(k + 1).map(|a| a.as_ref()),
+                Some(ExpData::Call(_, Operation::Old, _))
+            )
+        });
+        if all_wrapped && !needs_post_state {
+            return exp.clone();
+        }
+
+        let mut new_args: Vec<Exp> = Vec::with_capacity(augmented_arity);
+        new_args.push(fun_exp.clone());
+        let mut post_state_clones: Vec<Exp> = Vec::new();
+        for k in 0..num_inputs {
+            let arg = args[k + 1].clone();
+            if wrap_mask[k] {
+                // Live form (all `Old` wrappers stripped at every level):
+                // `old(p).x → p.x`, `old(Select(p, x)) → p.x`, …
+                let live = strip_all_olds(&arg);
+                if needs_post_state {
+                    post_state_clones.push(live.clone());
+                }
+                if matches!(arg.as_ref(), ExpData::Call(_, Operation::Old, _)) {
+                    new_args.push(arg);
+                } else {
+                    // `in_old` propagates through `Select`/`SelectVariants`
+                    // so the inner `Temporary`'s `save_param` still fires.
+                    let arg_ty = env.get_node_type(arg.node_id());
+                    let arg_loc = env.get_node_loc(arg.node_id());
+                    let new_id = env.new_node(arg_loc, arg_ty);
+                    new_args.push(ExpData::Call(new_id, Operation::Old, vec![arg]).into_exp());
+                }
+            } else {
+                new_args.push(arg);
+            }
+        }
+        if has_post_slots {
+            for arg in args.iter().skip(1 + num_inputs) {
+                new_args.push(arg.clone());
+            }
+            new_args.extend(post_state_clones);
+        }
+        ExpData::Call(
+            *node_id,
+            Operation::Behavior(*kind, range.clone()),
+            new_args,
+        )
+        .into_exp()
+    }
+
+    /// True if `arg` is a stateful `&mut`-source shape: a ref-typed
+    /// expression, `Borrow(Mut, ...)`, `Old(...)` of a stateful inner,
+    /// a `Select`/`SelectVariants` rooted in a stateful inner, or a
+    /// `Temporary` of a `&mut`-typed local.
+    fn is_stateful_mut_ref(&self, arg: &Exp) -> bool {
+        let env = self.builder.global_env();
+        if env.get_node_type(arg.node_id()).is_reference() {
+            return true;
+        }
+        match arg.as_ref() {
+            ExpData::Call(_, Operation::Borrow(crate::ty::ReferenceKind::Mutable), _) => true,
+            ExpData::Call(_, Operation::Old, inner) if inner.len() == 1 => {
+                self.is_stateful_mut_ref(&inner[0])
+            },
+            ExpData::Call(_, Operation::Select(..), inner) if inner.len() == 1 => {
+                self.is_stateful_mut_ref(&inner[0])
+            },
+            ExpData::Call(_, Operation::SelectVariants(..), inner) if inner.len() == 1 => {
+                self.is_stateful_mut_ref(&inner[0])
+            },
+            ExpData::Temporary(_, idx) => self
+                .fun_env
+                .get_local_type(*idx)
+                .as_ref()
+                .is_some_and(Type::is_reference),
+            _ => false,
+        }
+    }
 }
 
 impl<'a, T: ExpGenerator<'a>> ExpRewriterFunctions for SpecTranslator<'a, '_, T> {
     fn rewrite_exp(&mut self, exp: Exp) -> Exp {
+        // `Old`-wrap stateful `&mut` BP args so `save_param` routes their
+        // pre-state through captured temps.
+        let exp = if let ExpData::Call(_, Operation::Behavior(_, _), _) = exp.as_ref() {
+            self.wrap_mut_ref_bp_inputs(&exp)
+        } else {
+            exp
+        };
+
         // Do some pre-processing of the expression before actual rewrite, reporting
         // errors.
         let env = self.builder.global_env();
@@ -1290,10 +1443,10 @@ impl<'a, T: ExpGenerator<'a>> ExpRewriterFunctions for SpecTranslator<'a, '_, T>
 }
 
 /// Returns true if a behavioral predicate of given kind needs a pre-state memory label.
-/// `ensures_of` and `result_of` always need pre-state (they compare pre vs post).
+/// `ensures_of`, `result_of`, and `write_of` always need pre-state (they compare pre vs post).
 /// `aborts_of` and `requires_of` only need pre-state if inside `old()`.
 fn needs_pre_label(kind: &BehaviorKind, in_old: bool) -> bool {
-    in_old || matches!(kind, BehaviorKind::EnsuresOf | BehaviorKind::ResultOf)
+    in_old || kind.is_two_state()
 }
 
 /// Memory accessed by a struct field's function value, as declared by the

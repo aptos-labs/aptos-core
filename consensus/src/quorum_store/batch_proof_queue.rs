@@ -276,13 +276,25 @@ impl BatchProofQueue {
             return;
         }
         let batch_key = BatchKey::from_info(proof.info());
-        if self
-            .items
-            .get(&batch_key)
-            .is_some_and(|item| item.proof.is_some() || item.is_committed())
-        {
-            counters::inc_rejected_pos_count(counters::POS_DUPLICATE_LABEL);
-            return;
+        if let Some(existing) = self.items.get(&batch_key) {
+            if existing.info != *proof.info() {
+                // Same (author, batch_id) but different full BatchInfo (e.g. different
+                // digest, expiration, or num_txns). Accepting this proof would corrupt
+                // the queue's invariants because items[batch_key].info would no longer
+                // match the proof attached to it.
+                warn!(
+                    author = proof.author().short_str().as_str(),
+                    "Rejecting ProofOfStore: BatchKey collision between {:?} (queue) and {:?} (proof)",
+                    existing.info,
+                    proof.info(),
+                );
+                counters::inc_rejected_pos_count(counters::POS_COLLISION_LABEL);
+                return;
+            }
+            if existing.proof.is_some() || existing.is_committed() {
+                counters::inc_rejected_pos_count(counters::POS_DUPLICATE_LABEL);
+                return;
+            }
         }
 
         let author = proof.author();
@@ -410,14 +422,26 @@ impl BatchProofQueue {
             let batch_sort_key = BatchSortKey::from_info(&batch_info);
             let batch_key = BatchKey::from_info(&batch_info);
 
-            // If the batch is either committed or the txn summary already exists, skip
-            // inserting this batch.
-            if self
-                .items
-                .get(&batch_key)
-                .is_some_and(|item| item.is_committed() || item.txn_summaries.is_some())
-            {
-                continue;
+            if let Some(existing) = self.items.get(&batch_key) {
+                if existing.info != batch_info {
+                    // Same (author, batch_id) but different full BatchInfo. Drop this
+                    // summary; the queue is keyed on (author, batch_id) and accepting it
+                    // would split the bookkeeping (e.g. distinct sort keys for the same
+                    // queue item) and lead to underflow on expiration.
+                    warn!(
+                        author = batch_info.author().short_str().as_str(),
+                        "Rejecting batch summary: BatchKey collision between {:?} (queue) and {:?} (incoming)",
+                        existing.info,
+                        batch_info,
+                    );
+                    counters::inc_rejected_batch_count(counters::BATCH_COLLISION_LABEL);
+                    continue;
+                }
+                // If the batch is either committed or the txn summary already exists, skip
+                // inserting this batch.
+                if existing.is_committed() || existing.txn_summaries.is_some() {
+                    continue;
+                }
             }
 
             // Determine if existing item already has a proof
@@ -1128,12 +1152,16 @@ impl BatchProofQueue {
                 let is_committed = item.is_committed();
                 let gas_bucket = item.proof.as_ref().map(|p| p.gas_bucket_start());
                 let insertion_elapsed = item.proof_insertion_time.map(|t| t.elapsed());
+                let stored_num_txns = item.info.num_txns();
+                let stored_sort_key = BatchSortKey::from_info(&item.info);
                 (
                     had_proof,
                     had_summaries,
                     is_committed,
                     gas_bucket,
                     insertion_elapsed,
+                    stored_num_txns,
+                    stored_sort_key,
                 )
             });
 
@@ -1144,12 +1172,14 @@ impl BatchProofQueue {
                     is_already_committed,
                     gas_bucket,
                     insertion_elapsed,
+                    stored_num_txns,
+                    stored_sort_key,
                 )) => {
                     if had_proof {
                         if let (Some(bucket), Some(elapsed)) = (gas_bucket, insertion_elapsed) {
                             counters::pos_to_commit(bucket, elapsed.as_secs_f64());
                         }
-                        self.dec_remaining_proofs(&batch.author(), batch.num_txns());
+                        self.dec_remaining_proofs(&batch.author(), stored_num_txns);
                         counters::GARBAGE_COLLECTED_IN_PROOF_QUEUE_COUNTER
                             .with_label_values(&["committed_proof"])
                             .inc();
@@ -1183,15 +1213,14 @@ impl BatchProofQueue {
                     item.mark_committed();
 
                     // Remove from whichever author map it's in (committed items no longer in author maps)
-                    let batch_sort_key = BatchSortKey::from_info(&batch);
                     if let Some(q) = self.author_to_proof_batches.get_mut(&batch.author()) {
-                        q.remove(&batch_sort_key);
+                        q.remove(&stored_sort_key);
                         if q.is_empty() {
                             self.author_to_proof_batches.remove(&batch.author());
                         }
                     }
                     if let Some(q) = self.author_to_non_proof_batches.get_mut(&batch.author()) {
-                        q.remove(&batch_sort_key);
+                        q.remove(&stored_sort_key);
                         if q.is_empty() {
                             self.author_to_non_proof_batches.remove(&batch.author());
                         }
@@ -1203,7 +1232,7 @@ impl BatchProofQueue {
                             self.num_proofs_with_summary_count -= 1;
                         } else if had_proof {
                             self.num_proofs_without_summary_count -= 1;
-                            self.remaining_proof_txns_without_summary -= batch.num_txns();
+                            self.remaining_proof_txns_without_summary -= stored_num_txns;
                         } else {
                             self.num_batches_without_proof_count -= 1;
                         }

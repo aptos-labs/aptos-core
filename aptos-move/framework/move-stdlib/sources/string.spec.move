@@ -24,6 +24,12 @@ spec std::string {
         String{bytes}
     }
 
+    spec utf8(bytes: vector<u8>): String {
+        pragma opaque;
+        aborts_if !spec_internal_check_utf8(bytes);
+        ensures result == spec_utf8(bytes);
+    }
+
     spec module {
         fun spec_internal_check_utf8(v: vector<u8>): bool;
         fun spec_internal_is_char_boundary(v: vector<u8>, i: u64): bool;

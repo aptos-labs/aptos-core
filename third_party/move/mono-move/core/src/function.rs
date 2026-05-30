@@ -1,11 +1,38 @@
 // Copyright (c) Aptos Foundation
 // Licensed pursuant to the Innovation-Enabling Source Code License, available at https://github.com/aptos-labs/aptos-core/blob/main/LICENSE
 
-use crate::{
-    execution_context::FunctionResolver,
-    instruction::{CodeOffset, FrameOffset, MicroOp, FRAME_METADATA_SIZE},
-};
-use mono_move_alloc::{ExecutableArena, ExecutableArenaPtr, GlobalArenaPtr};
+use crate::instruction::{CodeOffset, FrameOffset, MicroOp, FRAME_METADATA_SIZE};
+use arc_swap::ArcSwap;
+use mono_move_alloc::{GlobalArenaPtr, LeakedBoxPtr};
+use std::{fmt, ptr::NonNull, sync::Arc};
+
+/// Function's micro-ops.
+pub struct Code {
+    inner: ArcSwap<Vec<MicroOp>>,
+}
+
+impl Code {
+    /// Builds code from a vector of micro-ops.
+    pub fn from_vec(ops: Vec<MicroOp>) -> Self {
+        Self {
+            inner: ArcSwap::from_pointee(ops),
+        }
+    }
+
+    /// Snapshot of the current micro-ops.
+    ///
+    /// TODO: decide on if using ArcSwap is good enough for perf and
+    ///   what is the best way to update code and any other relevant
+    ///   information in the function.
+    pub fn load(&self) -> arc_swap::Guard<Arc<Vec<MicroOp>>> {
+        self.inner.load()
+    }
+
+    /// Replaces the micro-ops atomically.
+    pub fn store(&self, ops: Vec<MicroOp>) {
+        self.inner.store(Arc::new(ops));
+    }
+}
 
 /// ---------------------------------------------------------------------------
 // Function representation
@@ -31,42 +58,32 @@ pub struct FrameLayoutInfo {
     ///
     /// Offsets must not fall in the metadata segment
     /// (`param_and_local_sizes_sum..param_and_local_sizes_sum + FRAME_METADATA_SIZE`).
-    pub heap_ptr_offsets: ExecutableArenaPtr<[FrameOffset]>,
+    pub heap_ptr_offsets: Vec<FrameOffset>,
 }
 
 impl FrameLayoutInfo {
-    /// Create a `FrameLayoutInfo` from an iterator of pointer offsets,
-    /// allocating into the given arena.
-    pub fn new<I>(arena: &ExecutableArena, offsets: I) -> Self
-    where
-        I: IntoIterator<Item = FrameOffset>,
-        I::IntoIter: ExactSizeIterator,
-    {
-        Self {
-            heap_ptr_offsets: arena.alloc_slice_fill_iter(offsets),
-        }
+    /// Creates frame layout information from a vector of pointer offsets.
+    pub fn new(heap_ptr_offsets: Vec<FrameOffset>) -> Self {
+        Self { heap_ptr_offsets }
     }
 
-    /// Create an empty `FrameLayoutInfo` (no pointer offsets). Does not
-    /// require an arena: backed by a static empty slice.
+    /// Creates empty frame layout information.
     pub fn empty() -> Self {
         Self {
-            heap_ptr_offsets: ExecutableArenaPtr::empty_slice(),
+            heap_ptr_offsets: vec![],
         }
     }
 }
 
-/// Additional frame layout that applies at a specific safe point.
+/// At specific safepoints, this entry supplements the base `frame_layout` with
+/// additional pointer offsets that are only valid at that PC.
 ///
-/// Safe points are instructions where GC may run:
+/// Top-frame-only contract: this entry is consulted by the GC only when (a)
+/// this function is the top stack frame and (b) its current PC equals
+/// `code_offset`.
 ///
-/// - **Allocating instructions** (`HeapNew`, `VecPushBack`, `ForceGC`):
-///   GC runs during the instruction, so the safe point is at that
-///   instruction's own PC.
-/// - **Call return sites**: when a callee triggers GC, the caller's
-///   saved PC is `call_pc + 1`. The safe point for a caller frame is
-///   the instruction *after* the call — at that point, the shared
-///   arg/return region holds return values, not arguments.
+/// `code_offset` must point at an op for which [`MicroOp::is_allocating`]
+/// returns `true`.
 pub struct SafePointEntry {
     pub code_offset: CodeOffset,
     pub layout: FrameLayoutInfo,
@@ -74,78 +91,58 @@ pub struct SafePointEntry {
 
 /// A sorted collection of per-safe-point frame layouts.
 ///
-/// Wraps `ExecutableArenaPtr<[SafePointEntry]>` and provides O(log n)
-/// lookup by code offset. Entries must be strictly sorted by
+/// Provides O(log n) lookup by code offset. Entries must be strictly sorted by
 /// `code_offset`.
 pub struct SortedSafePointEntries {
-    entries: ExecutableArenaPtr<[SafePointEntry]>,
+    entries: Vec<SafePointEntry>,
 }
 
 impl SortedSafePointEntries {
-    /// Create a `SortedSafePointEntries` from an iterator of entries,
-    /// allocating into the given arena.
+    /// Creates safe point entries.
     ///
     /// The caller must ensure entries are strictly sorted by `code_offset`
     /// and that pointer offsets are disjoint from `frame_layout`.
-    pub fn new<I>(arena: &ExecutableArena, entries: I) -> Self
-    where
-        I: IntoIterator<Item = SafePointEntry>,
-        I::IntoIter: ExactSizeIterator,
-    {
-        Self {
-            entries: arena.alloc_slice_fill_iter(entries),
-        }
+    pub fn new(entries: Vec<SafePointEntry>) -> Self {
+        Self { entries }
     }
 
-    /// Create an empty `SortedSafePointEntries`. Does not require an arena:
-    /// backed by a static empty slice.
+    /// Creates empty safe point entries.
     pub fn empty() -> Self {
-        Self {
-            entries: ExecutableArenaPtr::empty_slice(),
-        }
+        Self { entries: vec![] }
     }
 
     /// Look up the safe-point layout for a given code offset, if one exists.
-    ///
-    /// # Safety
-    ///
-    /// `entries` must be a valid arena pointer.
-    pub unsafe fn layout_at(&self, pc: usize) -> Option<&FrameLayoutInfo> {
-        let entries = unsafe { self.entries.as_ref_unchecked() };
-        if entries.is_empty() {
+    pub fn layout_at(&self, pc: usize) -> Option<&FrameLayoutInfo> {
+        if self.entries.is_empty() {
             return None;
         }
         let pc = pc as u32;
-        entries
+        self.entries
             .binary_search_by_key(&pc, |e| e.code_offset.0)
             .ok()
-            .map(|idx| &entries[idx].layout)
+            .map(|idx| &self.entries[idx].layout)
     }
 
     /// Access the underlying entries slice.
-    ///
-    /// # Safety
-    ///
-    /// `entries` must be a valid arena pointer.
-    pub unsafe fn entries(&self) -> &[SafePointEntry] {
-        unsafe { self.entries.as_ref_unchecked() }
+    pub fn entries(&self) -> &[SafePointEntry] {
+        &self.entries
     }
 }
 
 /// Frame layout (fp-relative):
 ///
 /// ```text
-///   [0 .. param_sizes_sum)                    parameters (written by caller as arguments)
+///   [0 .. param_sizes_sum)                                  parameters (written by caller as arguments)
 ///   [param_sizes_sum .. param_and_local_sizes_sum)          locals
 ///   [param_and_local_sizes_sum .. param_and_local_sizes_sum+24)     metadata (saved_pc, saved_fp, saved_func_id)
-///   [param_and_local_sizes_sum+24 .. extended_frame_size)  callee arg/return slots
+///   [param_and_local_sizes_sum+24 .. extended_frame_size)   callee arg/return slots
 /// ```
 ///
 /// `extended_frame_size` == `param_and_local_sizes_sum + FRAME_METADATA_SIZE` for leaf
 /// functions (no callee region).
 pub struct Function {
     pub name: GlobalArenaPtr<str>,
-    pub code: ExecutableArenaPtr<[MicroOp]>,
+    pub code: Code,
     /// Byte size of each parameter, in declaration order.
     ///
     /// Used by `CallClosure` (together with the closure's `ClosureMask`) to
@@ -157,11 +154,11 @@ pub struct Function {
     // non-8-byte fields, the closure-call interleaver will need per-param
     // alignment (either encoded alongside `size` here, or as a sibling
     // `param_alignments` slice).
-    pub param_sizes: ExecutableArenaPtr<[u32]>,
+    pub param_sizes: Vec<u32>,
     /// Size of the parameter region at the start of the frame.
     /// The caller writes the corresponding arguments into this region
-    /// before `CallFunc`; when `zero_frame` is true, the runtime zeroes
-    /// everything beyond the parameter region
+    /// before the call instruction; when `zero_frame` is true, the runtime
+    /// zeroes everything beyond the parameter region
     /// (`param_sizes_sum..extended_frame_size`) at frame creation to
     /// ensure pointer slots start as null.
     pub param_sizes_sum: usize,
@@ -197,36 +194,41 @@ pub struct Function {
     /// Invariants:
     ///
     /// - **Zeroed at frame creation**: when `zero_frame` is true, the
-    ///   runtime zeroes `param_sizes_sum..extended_frame_size` when a frame
-    ///   is created, so all non-parameter pointer slots (including the
-    ///   callee arg/return region) start as null.
+    ///   runtime zeroes `param_sizes_sum..extended_frame_size` when a
+    ///   frame is created, so all non-parameter pointer slots
+    ///   (including the callee arg/return region) start as null.
     /// - **Pointer-only writes**: a pointer slot may only be
     ///   overwritten with another valid heap pointer (or null). The
     ///   specializer must guarantee this.
     ///
-    /// The callee arg region (`frame_size()..extended_frame_size`)
-    /// overlaps with the callee's frame during GC traversal — both
-    /// frames may scan the same memory. The forwarding markers in
-    /// `gc_copy_object` handle double-scans correctly.
+    /// Callee-region offsets (≥ `frame_size()`) should go in
+    /// `safe_point_layouts` (top-frame-only), not here, unless the
+    /// value is pointer-shaped at every PC.
     pub frame_layout: FrameLayoutInfo,
     /// Per-safe-point frame layouts.
     ///
-    /// During GC, for each frame on the call stack, the GC scans the
-    /// union of `frame_layout.heap_ptr_offsets` (always) and the
-    /// matching safe-point entry's `heap_ptr_offsets` (if the frame's
-    /// current PC has a corresponding entry).
+    /// **Top-frame-only.** During GC, an entry at `code_offset = pc` is
+    /// consulted only when this function is the *top* stack frame and
+    /// its current PC equals `pc`. Caller frames below the top use
+    /// `frame_layout` (always-on) alone — `gc_collect` does not query
+    /// `safe_point_layouts` for any below-frame.
+    ///
+    /// Each entry's `code_offset` must point at an op for which
+    /// [`MicroOp::is_allocating`] returns `true` — the only PCs at
+    /// which a top-frame consultation can occur.
     ///
     /// The offsets in each safe-point entry must be disjoint from
-    /// `frame_layout.heap_ptr_offsets` — a slot that is always a pointer
-    /// belongs in `frame_layout`, not in individual safe-point entries.
+    /// `frame_layout.heap_ptr_offsets` — a slot that is always a
+    /// pointer belongs in `frame_layout`, not in individual safe-point
+    /// entries.
     ///
     /// This supplements `frame_layout` for slots whose pointer status
-    /// changes across the function — e.g., shared arg/return regions
-    /// that hold a pointer argument before a call but a scalar return
-    /// value after, or callee arg slots used by different callees.
+    /// changes across the function — typically shared callee arg/ret
+    /// region offsets that hold pointers only at specific allocating
+    /// ops in this function's body.
     ///
-    /// Empty when the function needs no per-PC distinction (all pointer
-    /// slots are stable across the entire function body).
+    /// Empty when the function needs no per-PC distinction (all
+    /// pointer slots are stable across the entire function body).
     pub safe_point_layouts: SortedSafePointEntries,
 }
 
@@ -240,163 +242,78 @@ impl Function {
     /// Look up the safe-point layout for a given code offset, if one exists.
     ///
     /// Returns `None` if there is no entry for this exact code offset.
-    ///
-    /// # Safety
-    ///
-    /// Arena pointers in `safe_point_layouts` must be valid.
-    pub unsafe fn safe_point_layout_at(&self, pc: usize) -> Option<&FrameLayoutInfo> {
-        unsafe { self.safe_point_layouts.layout_at(pc) }
+    pub fn safe_point_layout_at(&self, pc: usize) -> Option<&FrameLayoutInfo> {
+        self.safe_point_layouts.layout_at(pc)
     }
 
-    /// Replaces every [`MicroOp::CallFunc`] (index-based dispatch) with
-    /// [`MicroOp::CallDirect`] (direct pointer dispatch).
-    ///
-    /// Only used by hand-built test programs. The executable builder uses
-    /// its own rewrite pass that handles both local and cross-module calls.
-    ///
-    /// # Safety
-    ///
-    /// The caller must have exclusive access to the functions and their
-    /// arena-allocated code. The arena must outlive all uses of the patched
-    /// code.
-    pub unsafe fn resolve_calls(func_ptrs: &[Option<ExecutableArenaPtr<Function>>]) {
-        for func_ptr in func_ptrs {
-            let Some(mut func_ptr) = *func_ptr else {
-                continue;
-            };
-            // SAFETY: We have exclusive access during build — no concurrent
-            // readers exist yet. The arena is alive because the caller owns it.
-            let func = unsafe { func_ptr.as_mut_unchecked() };
-            let code = unsafe { func.code.as_mut_unchecked() };
-            for op in code.iter_mut() {
-                if let MicroOp::CallFunc { func_id } = *op {
-                    if let Some(ptr) = func_ptrs[func_id as usize] {
-                        *op = MicroOp::CallDirect { ptr };
-                    }
-                }
-            }
-        }
-    }
-
-    /// Replaces every [`MicroOp::CallIndirect`] (name-based dispatch) with
-    /// [`MicroOp::CallDirect`] (direct pointer dispatch) using the
-    /// provided function resolver.
-    ///
-    /// `func_ptrs` yields the functions whose code should be patched.
-    ///
-    /// # Safety
-    ///
-    /// The caller must have exclusive access to the functions and their
-    /// arena-allocated code.
-    pub unsafe fn resolve_module_calls(
-        func_ptrs: impl IntoIterator<Item = ExecutableArenaPtr<Function>>,
-        resolver: &impl FunctionResolver,
-    ) {
-        for mut func_ptr in func_ptrs {
-            // SAFETY: We have exclusive access during build — no concurrent
-            // readers exist yet. The arena is alive because the caller owns it.
-            let func = unsafe { func_ptr.as_mut_unchecked() };
-            let code = unsafe { func.code.as_mut_unchecked() };
-            for op in code.iter_mut() {
-                if let MicroOp::CallIndirect {
-                    executable_id,
-                    func_name,
-                } = *op
-                {
-                    if let Some(ptr) = resolver.resolve_function(executable_id, func_name) {
-                        *op = MicroOp::CallDirect { ptr };
-                    }
-                }
-            }
-        }
+    /// The function's interned name.
+    pub fn name(&self) -> &str {
+        // SAFETY: any safe `&Function` borrow carries an upstream guarantee
+        // that `name`'s pointee remains valid for the borrow's lifetime.
+        unsafe { self.name.as_ref_unchecked() }
     }
 }
 
-#[cfg(test)]
-mod tests {
-    use super::*;
-    use crate::{execution_context::FunctionResolver, ExecutableId};
-    use mono_move_alloc::{ExecutableArena, GlobalArenaPool, GlobalArenaShard};
-    use move_core_types::account_address::AccountAddress;
-
-    /// Minimal helper: build a [`Function`] with the given code into `arena`.
-    fn make_function(
-        arena: &ExecutableArena,
-        global: &GlobalArenaShard<'_>,
-        name: &str,
-        code: Vec<MicroOp>,
-    ) -> ExecutableArenaPtr<Function> {
-        let name_ptr = global.alloc_str(name);
-        let code_ptr = arena.alloc_slice_fill_iter(code);
-        let empty_layout = FrameLayoutInfo::new(arena, std::iter::empty::<FrameOffset>());
-        let empty_safe_points =
-            SortedSafePointEntries::new(arena, std::iter::empty::<SafePointEntry>());
-        arena.alloc(Function {
-            name: name_ptr,
-            code: code_ptr,
-            param_sizes: ExecutableArenaPtr::empty_slice(),
-            param_sizes_sum: 0,
-            param_and_local_sizes_sum: 8,
-            extended_frame_size: 8 + FRAME_METADATA_SIZE,
-            zero_frame: false,
-            frame_layout: empty_layout,
-            safe_point_layouts: empty_safe_points,
-        })
-    }
-
-    /// A test [`FunctionResolver`] that resolves everything to a fixed target.
-    struct FixedResolver {
-        target: ExecutableArenaPtr<Function>,
-    }
-
-    impl FunctionResolver for FixedResolver {
-        fn resolve_function(
-            &self,
-            _executable_id: GlobalArenaPtr<ExecutableId>,
-            _name: GlobalArenaPtr<str>,
-        ) -> Option<ExecutableArenaPtr<Function>> {
-            Some(self.target)
+impl fmt::Display for Function {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        writeln!(f, "fun {}() {{", self.name())?;
+        writeln!(f, "  frame_data_size: {}", self.param_and_local_sizes_sum)?;
+        writeln!(f, "  code:")?;
+        let code = self.code.load();
+        for (i, op) in code.iter().enumerate() {
+            writeln!(f, "    {}: {}", i, op)?;
         }
+        let entries = self.safe_point_layouts.entries();
+        if !entries.is_empty() {
+            writeln!(f, "  safe_point_layouts:")?;
+            for entry in entries {
+                let offsets: Vec<String> = entry
+                    .layout
+                    .heap_ptr_offsets
+                    .iter()
+                    .map(|o| o.0.to_string())
+                    .collect();
+                writeln!(f, "    {}: [{}]", entry.code_offset.0, offsets.join(", "))?;
+            }
+        }
+        writeln!(f, "}}")
+    }
+}
+
+/// Pointer to lowered function. See [`LeakedBoxPtr`] for safety contract.
+#[repr(transparent)]
+#[derive(Copy, Clone)]
+pub struct FunctionPtr(LeakedBoxPtr<Function>);
+
+impl FunctionPtr {
+    /// Leaks the box and returns a stable pointer to the function.
+    pub fn new(function: Box<Function>) -> Self {
+        Self(LeakedBoxPtr::from_box(function))
     }
 
-    #[test]
-    fn resolve_module_calls_patches_to_call_local_func() {
-        let arena = ExecutableArena::new();
-        let global_pool = GlobalArenaPool::with_num_arenas(1);
-        let global = global_pool.lock_arena(0);
+    /// Returns the underlying non-null pointer.
+    pub fn as_non_null(&self) -> NonNull<Function> {
+        self.0.as_non_null()
+    }
 
-        // Build the target function (just a Return).
-        let target = make_function(&arena, &global, "target", vec![MicroOp::Return]);
+    /// Frees allocated data.
+    ///
+    /// # Safety
+    ///
+    /// The caller must ensure that no other references to the data exist and
+    /// that this method is called at most once per pointer.
+    pub unsafe fn free_unchecked(self) {
+        unsafe { self.0.free_unchecked() }
+    }
 
-        // Build interned pointers for the cross-module call.
-        let addr = AccountAddress::ONE;
-        let exe_name = global.alloc_str("mod_b");
-        let exe_id_ptr = global.alloc(unsafe { ExecutableId::new(addr, exe_name) });
-        let func_name = global.alloc_str("target");
-
-        // Build the caller with one CallIndirect → Return.
-        let caller = make_function(&arena, &global, "caller", vec![
-            MicroOp::CallIndirect {
-                executable_id: exe_id_ptr,
-                func_name,
-            },
-            MicroOp::Return,
-        ]);
-
-        let func_ptrs = [caller];
-        let resolver = FixedResolver { target };
-
-        unsafe {
-            Function::resolve_module_calls(func_ptrs.iter().copied(), &resolver);
-        }
-
-        // Should now be a CallDirect pointing at target.
-        let resolved_code = unsafe { func_ptrs[0].as_ref_unchecked().code.as_ref_unchecked() };
-        assert!(
-            matches!(resolved_code[0], MicroOp::CallDirect { ptr } if ptr.as_non_null() == target.as_non_null()),
-            "expected CallDirect pointing to target, got {:?}",
-            resolved_code[0]
-        );
-        assert!(matches!(resolved_code[1], MicroOp::Return));
+    /// Returns a shared reference to the pointee with an explicit lifetime.
+    ///
+    /// # Safety
+    ///
+    /// The caller must ensure the pointer has not been freed and that the
+    /// returned reference does not outlive the actual allocation.
+    pub unsafe fn as_ref_unchecked<'a>(&self) -> &'a Function {
+        // SAFETY: The caller guarantees the pointer is still valid.
+        unsafe { self.0.as_ref_unchecked() }
     }
 }

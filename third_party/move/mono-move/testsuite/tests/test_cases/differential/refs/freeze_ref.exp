@@ -1,0 +1,49 @@
+=== stackless ===
+// module 0x1::test
+
+fun frozen_read(r0): u64 {
+  slots: params(1), locals(1), temps(1), xfer(1)
+    r0: u64
+    r1: u64
+    r2: &mut u64
+  code:
+  L0:
+    0: r1 := move r0
+    1: r2 := mut_borrow_loc r1
+    2: x0 := freeze_ref r2
+    3: [x0] := call read, [x0]
+    4: ret [x0]
+}
+
+fun read(r0): u64 {
+  slots: params(1), locals(0), temps(1)
+    r0: &u64
+    r1: u64
+  code:
+  L0:
+    0: r1 := read_ref r0
+    1: ret [r1]
+}
+=== micro-ops ===
+// module 0x1::test
+
+fun frozen_read() {
+  frame_data_size: 32
+  code:
+    0: Charge #68
+    1: Move8 [8] <- [0]
+    2: SlotBorrow [16] <- &[8]
+    3: Move(16) [56] <- [16]
+    4: CallIndirect 0x1::test::read
+    5: Move8 [0] <- [56]
+    6: Return
+}
+
+fun read() {
+  frame_data_size: 24
+  code:
+    0: Charge #30
+    1: ReadRef [16] <- *[0] (size=8)
+    2: Move8 [0] <- [16]
+    3: Return
+}

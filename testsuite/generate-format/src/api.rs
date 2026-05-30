@@ -126,10 +126,12 @@ pub fn get_registry() -> Result<Registry> {
     tracer.trace_type::<transaction::UserTxnLimitsRequest>(&samples)?;
     tracer.trace_type::<transaction::WriteSetPayload>(&samples)?;
     tracer.trace_type::<transaction::BlockEpiloguePayload>(&samples)?;
+    tracer.trace_type::<transaction::TransactionInfo>(&samples)?;
     tracer.trace_type::<StateKey>(&samples)?;
     tracer.trace_type::<transaction::ExecutionStatus>(&samples)?;
     tracer.trace_type::<TransactionAuthenticator>(&samples)?;
     tracer.trace_type::<write_set::WriteOp>(&samples)?;
+    tracer.trace_type::<write_set::WriteSet>(&samples)?;
     tracer.trace_type::<PersistedStateValueMetadata>(&samples)?;
     tracer.trace_type::<AccountAuthenticator>(&samples)?;
     tracer.trace_type::<AbortLocation>(&samples)?;

@@ -1,0 +1,17 @@
+
+Diagnostics:
+warning: [lint] package constant `UNUSED_PKG` is unused
+  ┌─ tests/model_ast_lints/unused/truly_unused/unused_friend_package_const.move:6:5
+  │
+6 │     package const UNUSED_PKG: u64 = 1;        // SHOULD warn
+  │     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  │
+  = Remove it, or suppress this warning with `#[test_only]` (if for test-only) or `#[lint::skip(unused_constant)]` (if for spec-only or otherwise needed).
+
+warning: [lint] friend constant `UNUSED_FRIEND` is unused
+   ┌─ tests/model_ast_lints/unused/truly_unused/unused_friend_package_const.move:13:5
+   │
+13 │     friend const UNUSED_FRIEND: u64 = 3;      // SHOULD warn
+   │     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+   │
+   = Remove it, or suppress this warning with `#[test_only]` (if for test-only) or `#[lint::skip(unused_constant)]` (if for spec-only or otherwise needed).

@@ -32,7 +32,8 @@ use rayon::prelude::*;
 pub struct StateSummary {
     /// The next version. If this is 0, the state is the "pre-genesis" empty state.
     next_version: Version,
-    pub hot_state_summary: SparseMerkleTree,
+    /// `None` for pipelines without a hot-state companion.
+    pub hot_state_summary: Option<SparseMerkleTree>,
     pub global_state_summary: SparseMerkleTree,
     hot_state_config: HotStateConfig,
 }
@@ -46,7 +47,7 @@ impl StateSummary {
     ) -> Self {
         Self {
             next_version: version.map_or(0, |v| v + 1),
-            hot_state_summary,
+            hot_state_summary: Some(hot_state_summary),
             global_state_summary,
             hot_state_config,
         }
@@ -55,18 +56,26 @@ impl StateSummary {
     pub fn new_empty(hot_state_config: HotStateConfig) -> Self {
         Self {
             next_version: 0,
-            hot_state_summary: SparseMerkleTree::new_empty(),
+            hot_state_summary: Some(SparseMerkleTree::new_empty()),
             global_state_summary: SparseMerkleTree::new_empty(),
             hot_state_config,
         }
     }
 
-    pub fn hot_root_hash(&self) -> HashValue {
-        self.hot_state_summary.root_hash()
+    /// Errors if this pipeline has no hot-state companion.
+    pub fn hot_root_hash(&self) -> Result<HashValue> {
+        self.hot_state_summary
+            .as_ref()
+            .map(SparseMerkleTree::root_hash)
+            .ok_or_else(|| anyhow::anyhow!("hot_root_hash on a StateSummary with no hot half"))
     }
 
     pub fn root_hash(&self) -> HashValue {
         self.global_state_summary.root_hash()
+    }
+
+    pub fn hot_state_config(&self) -> HotStateConfig {
+        self.hot_state_config
     }
 
     pub fn next_version(&self) -> Version {
@@ -90,7 +99,9 @@ impl StateSummary {
     ) -> Result<Self> {
         let _timer = TIMER.timer_with(&["state_summary__update"]);
 
-        assert_ne!(self.hot_state_summary.root_hash(), *CORRUPTION_SENTINEL);
+        if let Some(hot) = &self.hot_state_summary {
+            assert_ne!(hot.root_hash(), *CORRUPTION_SENTINEL);
+        }
         assert_ne!(self.global_state_summary.root_hash(), *CORRUPTION_SENTINEL);
 
         // Persisted must be before or at my version.
@@ -119,7 +130,7 @@ impl StateSummary {
 
         Ok(Self {
             next_version: updates.next_version(),
-            hot_state_summary: hot_smt_result?,
+            hot_state_summary: Some(hot_smt_result?),
             global_state_summary: smt_result?,
             hot_state_config: self.hot_state_config,
         })
@@ -130,9 +141,16 @@ impl StateSummary {
         persisted: &ProvableStateSummary,
         hot_updates: &[HotStateShardUpdates; NUM_STATE_SHARDS],
     ) -> Result<SparseMerkleTree> {
+        let current_hot = self.hot_state_summary.as_ref().ok_or_else(|| {
+            anyhow::anyhow!("update_hot_state_summary on a StateSummary with no hot half")
+        })?;
         if !self.hot_state_config.compute_root_hash {
             return Ok(SparseMerkleTree::new_empty());
         }
+        let persisted_hot_smt = persisted
+            .hot_state_summary
+            .as_ref()
+            .expect("hot half present on self implies same on persisted");
 
         let hot_smt_updates = hot_updates
             .par_iter()
@@ -147,9 +165,8 @@ impl StateSummary {
             })
             .collect::<Vec<_>>();
 
-        Ok(self
-            .hot_state_summary
-            .freeze(&persisted.hot_state_summary)
+        Ok(current_hot
+            .freeze(persisted_hot_smt)
             .batch_update_sorted_uniq(&hot_smt_updates, &HotProvableStateSummary::new(persisted))?
             .unfreeze())
     }
@@ -320,7 +337,7 @@ impl<'db> ProvableStateSummary<'db> {
                         *key, version, /* root_depth = */ 0,
                     )?;
                 proof.verify(
-                    self.state_summary.hot_state_summary.root_hash(),
+                    self.state_summary.hot_root_hash()?,
                     *key,
                     hot_value_opt.as_ref(),
                 )?;

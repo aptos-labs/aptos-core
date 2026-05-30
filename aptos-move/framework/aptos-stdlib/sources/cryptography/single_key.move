@@ -107,6 +107,11 @@ module aptos_std::single_key {
         AnyPublicKey::Ed25519 { pk }
     }
 
+    /// Converts an unvalidated Ed25519 public key to an AnyPublicKey.
+    public fun from_ed25519_public_key(pk: ed25519::ValidatedPublicKey): AnyPublicKey {
+        AnyPublicKey::Ed25519 { pk: pk.public_key_to_unvalidated() }
+    }
+
     /// Gets the authentication key for the AnyPublicKey.
     public fun to_authentication_key(self: &AnyPublicKey): vector<u8> {
         let pk_bytes = bcs::to_bytes(self);

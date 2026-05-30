@@ -20,6 +20,7 @@ impl DoStateCheckpoint {
         parent_state_summary: &LedgerStateSummary,
         persisted_state_summary: &ProvableStateSummary,
         known_state_checkpoints: Option<Vec<Option<HashValue>>>,
+        known_hot_state_checkpoints: Option<Vec<Option<HashValue>>>,
     ) -> Result<StateCheckpointOutput> {
         let _timer = OTHER_TIMERS.timer_with(&["do_state_checkpoint"]);
 
@@ -29,24 +30,40 @@ impl DoStateCheckpoint {
             execution_output.to_commit.state_update_refs(),
         )?;
 
+        let last_checkpoint = state_summary.last_checkpoint();
+
         let state_checkpoint_hashes = Self::get_state_checkpoint_hashes(
             execution_output,
             known_state_checkpoints,
-            &state_summary,
+            last_checkpoint.root_hash(),
+            "state",
         )?;
+        let hot_state_checkpoint_hashes = execution_output
+            .transaction_info_v1
+            .then(|| {
+                Self::get_state_checkpoint_hashes(
+                    execution_output,
+                    known_hot_state_checkpoints,
+                    last_checkpoint.hot_root_hash()?,
+                    "hot_state",
+                )
+            })
+            .transpose()?;
 
         Ok(StateCheckpointOutput::new(
             state_summary,
             state_checkpoint_hashes,
+            hot_state_checkpoint_hashes,
         ))
     }
 
     fn get_state_checkpoint_hashes(
         execution_output: &ExecutionOutput,
         known_state_checkpoints: Option<Vec<Option<HashValue>>>,
-        state_summary: &LedgerStateSummary,
+        computed_last_checkpoint_hash: HashValue,
+        label: &str,
     ) -> Result<Vec<Option<HashValue>>> {
-        let _timer = OTHER_TIMERS.timer_with(&["get_state_checkpoint_hashes"]);
+        let _timer = OTHER_TIMERS.timer_with(&[&format!("get_{label}_checkpoint_hashes")]);
 
         let num_txns = execution_output.to_commit.len();
         let last_checkpoint_index = execution_output
@@ -57,19 +74,18 @@ impl DoStateCheckpoint {
         if let Some(known) = known_state_checkpoints {
             ensure!(
                 known.len() == num_txns,
-                "Bad number of known hashes. {} vs {}",
+                "Bad number of known {label} hashes. {} vs {}",
                 known.len(),
-                num_txns
+                num_txns,
             );
             if let Some(idx) = last_checkpoint_index {
                 ensure!(
-                    known[idx] == Some(state_summary.last_checkpoint().root_hash()),
-                    "Root hash mismatch with known hashes passed in. {:?} vs {:?}",
+                    known[idx] == Some(computed_last_checkpoint_hash),
+                    "{label} root hash mismatch with known hashes passed in. {:?} vs {:?}",
                     known[idx],
-                    Some(&state_summary.last_checkpoint().root_hash()),
+                    Some(computed_last_checkpoint_hash),
                 );
             }
-
             Ok(known)
         } else {
             if !execution_output.is_block {
@@ -78,11 +94,9 @@ impl DoStateCheckpoint {
             }
 
             let mut out = vec![None; num_txns];
-
             if let Some(index) = last_checkpoint_index {
-                out[index] = Some(state_summary.last_checkpoint().root_hash());
+                out[index] = Some(computed_last_checkpoint_hash);
             }
-
             Ok(out)
         }
     }

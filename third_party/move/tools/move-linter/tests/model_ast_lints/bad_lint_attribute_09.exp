@@ -1,9 +1,9 @@
 Aborting with compilation errors:
 exiting with context checking errors
 error: invalid attribute
-  ┌─ tests/model_ast_lints/bad_lint_attribute_09.move:2:7
+  ┌─ tests/model_ast_lints/bad_lint_attribute_09.move:3:7
   │
-2 │     #[lint::skip(while_true)]
+3 │     #[lint::skip(while_true)]
   │       ^^^^^^^^^^
   │       │
   │       Attribute 'lint::skip' is not expected with a use
