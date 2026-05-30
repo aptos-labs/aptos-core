@@ -510,7 +510,7 @@ mod test {
 
     fn state_view_with_changed_feature_flag(feature_flag: FeatureFlag) -> MockStateView<StateKey> {
         // Tweak feature flags to force a different config.
-        let mut features = Features::default();
+        let mut features = Features::default_features();
 
         if features.is_enabled(feature_flag) {
             features.disable(feature_flag);

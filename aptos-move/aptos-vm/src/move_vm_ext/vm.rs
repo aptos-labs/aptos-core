@@ -27,7 +27,7 @@ pub struct GenesisRuntimeBuilder {
 impl GenesisRuntimeBuilder {
     /// Returns a builder, capable of creating VM and runtime environment to run genesis.
     pub fn new(chain_id: ChainId) -> Self {
-        let features = Features::default();
+        let features = Features::default_features();
         let timed_features = TimedFeaturesBuilder::enable_all().build();
 
         let vm_config = aptos_prod_vm_config(

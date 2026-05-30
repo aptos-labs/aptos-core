@@ -1248,7 +1248,7 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
         if let Err(error) = &onchain_features {
             warn!("Failed to read on-chain features {}", error);
         }
-        let features = onchain_features.unwrap_or_default();
+        let features = onchain_features.unwrap_or_else(|_| Features::default_features());
         self.encrypted_enabled = features.is_encrypted_transactions_enabled();
         let onchain_execution_config: anyhow::Result<OnChainExecutionConfig> = payload.get();
         let onchain_randomness_config_seq_num: anyhow::Result<RandomnessConfigSeqNum> =

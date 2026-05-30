@@ -34,7 +34,7 @@ async fn secret_share_rpc_path() {
             conf.consensus_config.enable_validator_txns();
             conf.randomness_config_override = Some(OnChainRandomnessConfig::default_enabled());
             conf.chunky_dkg_config_override = Some(OnChainChunkyDKGConfig::default_enabled());
-            let mut features = Features::default();
+            let mut features = Features::default_features();
             features.enable(FeatureFlag::ENCRYPTED_TRANSACTIONS);
             conf.initial_features_override = Some(features);
         }))

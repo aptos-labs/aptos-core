@@ -116,7 +116,7 @@ async fn slh_dsa_scenario(enable_feature: bool) {
 async fn setup_local_net(enable_slh_dsa: bool) -> (LocalSwarm, AptosPublicInfo) {
     let (swarm, mut _cli, _faucet) = SwarmBuilder::new_local(1)
         .with_init_genesis_config(Arc::new(move |conf| {
-            let mut features = Features::default();
+            let mut features = Features::default_features();
             if enable_slh_dsa {
                 features.enable(FeatureFlag::SLH_DSA_SHA2_128S_SIGNATURE);
             } else {

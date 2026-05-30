@@ -232,7 +232,7 @@ impl StateSnapshotRestoreController {
 
     fn validate_modules(blob: &[(StateKey, StateValue)]) {
         // TODO: Instead of using default features, fetch them from the state.
-        let features = Features::default();
+        let features = Features::default_features();
 
         let timed_features = TimedFeaturesBuilder::enable_all().build();
         let config =

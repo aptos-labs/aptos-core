@@ -32,6 +32,6 @@ pub fn aptos_debug_natives(
         native_gas_parameters,
         misc_gas_params,
         TimedFeaturesBuilder::enable_all().build(),
-        Features::default(),
+        Features::default_features(),
     )
 }
