@@ -2,10 +2,24 @@
 // Licensed pursuant to the Innovation-Enabling Source Code License, available at https://github.com/aptos-labs/aptos-core/blob/main/LICENSE
 
 use crate::{
-    backup::backup_handler::BackupHandler, event_store::EventStore, ledger_db::LedgerDb,
-    pruner::LedgerPrunerManager, rocksdb_property_reporter::RocksdbPropertyReporter,
-    state_kv_db::StateKvDb, state_merkle_db::StateMerkleDb, state_store::StateStore,
+    backup::backup_handler::BackupHandler,
+    event_store::EventStore,
+    ledger_db::LedgerDb,
+    native_state_committer::NativeStateCommitter,
+    position_buffered_state::new_empty_position_state,
+    position_db::{PositionDb, NUM_NATIVE_VALUE_SHARDS},
+    position_merkle_db::PositionMerkleDb,
+    position_state_store::PositionStateStore,
+    pruner::LedgerPrunerManager,
+    rocksdb_property_reporter::RocksdbPropertyReporter,
+    state_kv_db::StateKvDb,
+    state_merkle_db::StateMerkleDb,
+    state_store::StateStore,
     transaction_store::TransactionStore,
+    utils::truncation_helper::{
+        get_position_commit_progress, get_position_merkle_commit_progress,
+        truncate_position_db_shards, truncate_position_merkle_db_shards,
+    },
 };
 use aptos_config::config::{HotStateConfig, PrunerConfig, RocksdbConfigs, StorageDirPaths};
 use aptos_db_indexer::db_indexer::InternalIndexerDB;
@@ -20,6 +34,9 @@ use tokio::sync::watch::Sender;
 mod aptosdb_test;
 #[cfg(any(test, feature = "fuzzing"))]
 pub mod test_helper;
+
+/// Flip to `true` once order/collateral land.
+pub(crate) const ENABLE_NATIVE_POSITION: bool = false;
 
 /// This holds a handle to the underlying DB responsible for physical storage and provides APIs for
 /// access to the core Aptos data structures.
@@ -37,6 +54,89 @@ pub struct AptosDB {
     /// This is just to detect concurrent calls to `commit_ledger()`
     commit_lock: std::sync::Mutex<()>,
     update_subscriber: Option<Sender<(Instant, Version)>>,
+    pub(crate) position: Option<Arc<PositionBundle>>,
+}
+
+pub struct PositionBundle {
+    pub kv_db: Arc<PositionDb>,
+    pub merkle_db: Arc<PositionMerkleDb>,
+    /// `None` in readonly mode.
+    pub(crate) state_store: Option<Arc<PositionStateStore>>,
+}
+
+impl AptosDB {
+    pub fn position(&self) -> Option<&Arc<PositionBundle>> {
+        self.position.as_ref()
+    }
+
+    pub fn native_state_committer(&self) -> Option<NativeStateCommitter> {
+        let bundle = self.position.as_ref()?;
+        Some(NativeStateCommitter::new(bundle.kv_db.clone()))
+    }
+
+    /// Called automatically from `open_internal` when
+    /// `ENABLE_NATIVE_POSITION` is `true`.
+    pub fn init_native_position(
+        &mut self,
+        db_paths: &StorageDirPaths,
+        rocksdb_config: aptos_config::config::RocksdbConfig,
+        readonly: bool,
+    ) -> Result<()> {
+        if self.position.is_some() {
+            return Err(AptosDbError::Other(
+                "init_native_position called twice; native-position subsystem is already \
+                 attached to this AptosDB"
+                    .to_string(),
+            ));
+        }
+
+        let env = aptos_schemadb::Env::new()
+            .map_err(|e| AptosDbError::Other(format!("failed to create RocksDB env: {e}")))?;
+
+        let position_db = PositionDb::new(db_paths, rocksdb_config, Some(&env), None, readonly)?;
+        if !readonly && let Some(progress) = get_position_commit_progress(&position_db)? {
+            truncate_position_db_shards(&position_db, progress)?;
+        }
+
+        let merkle_db = PositionMerkleDb::new(
+            db_paths,
+            rocksdb_config,
+            Some(&env),
+            None,
+            readonly,
+            /* max_nodes_per_lru_cache_shard */ 0,
+        )?;
+        if !readonly && let Some(progress) = get_position_merkle_commit_progress(&merkle_db)? {
+            truncate_position_merkle_db_shards(&merkle_db, progress)?;
+        }
+        let kv_db = Arc::new(position_db);
+        let merkle_db = Arc::new(merkle_db);
+
+        let state_store = if readonly {
+            None
+        } else {
+            let last_snapshot = new_empty_position_state();
+            Some(Arc::new(PositionStateStore::new_at_snapshot(
+                Arc::clone(&merkle_db),
+                Arc::clone(&self.ledger_db),
+                last_snapshot,
+            )))
+        };
+
+        self.position = Some(Arc::new(PositionBundle {
+            kv_db,
+            merkle_db,
+            state_store,
+        }));
+
+        info!(
+            num_shards = NUM_NATIVE_VALUE_SHARDS,
+            readonly = readonly,
+            "Native-position subsystem initialized."
+        );
+
+        Ok(())
+    }
 }
 
 // DbReader implementations and private functions used by them.
@@ -212,6 +312,13 @@ impl AptosDB {
             cp_path.as_ref(),
             /* is_hot = */ false,
         )?;
+        // Native-position DBs. The static `create_checkpoint` opens
+        // the source DB from `db_path` (creating it if absent), then
+        // checkpoints into `cp_path`. Deployments that never activated
+        // native-position still produce empty position checkpoints —
+        // matches state's always-create behavior.
+        PositionDb::create_checkpoint(db_path.as_ref(), cp_path.as_ref())?;
+        PositionMerkleDb::create_checkpoint(db_path.as_ref(), cp_path.as_ref())?;
 
         info!(
             db_path = db_path.as_ref(),
