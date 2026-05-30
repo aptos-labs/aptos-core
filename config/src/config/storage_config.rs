@@ -262,7 +262,7 @@ impl Default for HotStateConfig {
         Self {
             max_items_per_shard: 250_000,
             refresh_interval_versions: 100_000,
-            delete_on_restart: true,
+            delete_on_restart: false,
             compute_root_hash: true,
         }
     }
