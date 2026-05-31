@@ -536,10 +536,62 @@ impl<'a> Instrumenter<'a> {
         ExpData::Value(id, constant.to_model_value()).into_exp()
     }
 
-    fn vector_to_exp(&self, loc: Loc, dest: TempIndex, elements: Vec<Exp>) -> Exp {
+    fn call_to_exp(&self, loc: Loc, dest: TempIndex, oper: ast::Operation, args: Vec<Exp>) -> Exp {
         let ty = self.builder.get_local_type(dest).skip_reference().clone();
         let id = self.builder.global_env().new_node(loc, ty);
-        ExpData::Call(id, ast::Operation::Vector, elements).into_exp()
+        ExpData::Call(id, oper, args).into_exp()
+    }
+
+    fn vector_to_exp(&self, loc: Loc, dest: TempIndex, elements: Vec<Exp>) -> Exp {
+        self.call_to_exp(loc, dest, ast::Operation::Vector, elements)
+    }
+
+    fn tracked_call_to_exp(
+        &self,
+        loc: Loc,
+        dest: TempIndex,
+        oper: &Operation,
+        args: Vec<Exp>,
+    ) -> Option<Exp> {
+        use ast::Operation as AstOp;
+
+        let oper = match oper {
+            Operation::Vector => AstOp::Vector,
+            Operation::CastU8
+            | Operation::CastU16
+            | Operation::CastU32
+            | Operation::CastU64
+            | Operation::CastU128
+            | Operation::CastU256
+            | Operation::CastI8
+            | Operation::CastI16
+            | Operation::CastI32
+            | Operation::CastI64
+            | Operation::CastI128
+            | Operation::CastI256 => AstOp::Cast,
+            Operation::Not => AstOp::Not,
+            Operation::Negate => AstOp::Negate,
+            Operation::Add => AstOp::Add,
+            Operation::Sub => AstOp::Sub,
+            Operation::Mul => AstOp::Mul,
+            Operation::Div => AstOp::Div,
+            Operation::Mod => AstOp::Mod,
+            Operation::BitOr => AstOp::BitOr,
+            Operation::BitAnd => AstOp::BitAnd,
+            Operation::Xor => AstOp::Xor,
+            Operation::Shl => AstOp::Shl,
+            Operation::Shr => AstOp::Shr,
+            Operation::Lt => AstOp::Lt,
+            Operation::Gt => AstOp::Gt,
+            Operation::Le => AstOp::Le,
+            Operation::Ge => AstOp::Ge,
+            Operation::Or => AstOp::Or,
+            Operation::And => AstOp::And,
+            Operation::Eq => AstOp::Eq,
+            Operation::Neq => AstOp::Neq,
+            _ => return None,
+        };
+        Some(self.call_to_exp(loc, dest, oper, args))
     }
 
     fn rewrite_known_temp_substitutions(
@@ -714,12 +766,25 @@ impl<'a> Instrumenter<'a> {
                     self.known_pure_exps.insert(dests[0], exp);
                 }
             },
-            Call(_, dests, oper, srcs, _) => {
+            Call(attr_id, dests, oper, srcs, _) => {
                 if self.should_clear_known_pure_exps_for_call(oper, srcs, dests) {
                     self.clear_known_pure_exps();
                 } else {
+                    let tracked_exp = if dests.len() == 1 && self.can_track_known_pure_exp(dests[0])
+                    {
+                        let loc = self.builder.get_loc(*attr_id);
+                        srcs.iter()
+                            .map(|src| self.known_pure_exps.get(src).cloned())
+                            .collect::<Option<Vec<_>>>()
+                            .and_then(|args| self.tracked_call_to_exp(loc, dests[0], oper, args))
+                    } else {
+                        None
+                    };
                     for dest in dests {
                         self.known_pure_exps.remove(dest);
+                    }
+                    if let Some(exp) = tracked_exp {
+                        self.known_pure_exps.insert(dests[0], exp);
                     }
                 }
             },
