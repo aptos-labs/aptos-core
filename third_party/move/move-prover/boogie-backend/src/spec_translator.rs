@@ -252,6 +252,7 @@ impl<'env> SpecTranslator<'env> {
     fn try_eval_small_vector_len(&self, exp: &Exp) -> Option<usize> {
         match exp.as_ref() {
             ExpData::Value(_, Value::Vector(values)) => Some(values.len()),
+            ExpData::Call(_, Operation::Vector, values) => Some(values.len()),
             _ => None,
         }
     }
