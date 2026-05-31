@@ -56,6 +56,10 @@ pub struct AptosSourceLocator {
     source_data: AHashMap<ModuleId, ModuleSourceData>,
     struct_field_names: AHashMap<ModuleId, AHashMap<String, Vec<String>>>,
     enum_variants: AHashMap<ModuleId, AHashMap<String, Vec<(String, Vec<String>)>>>,
+    /// Module name → full ModuleId, for fallback when the on-chain address
+    /// differs from the local dev address.
+    #[cfg(feature = "debugger")]
+    name_to_module_id: AHashMap<String, ModuleId>,
 }
 
 impl Default for AptosSourceLocator {
@@ -70,6 +74,8 @@ impl AptosSourceLocator {
             source_data: AHashMap::new(),
             struct_field_names: AHashMap::new(),
             enum_variants: AHashMap::new(),
+            #[cfg(feature = "debugger")]
+            name_to_module_id: AHashMap::new(),
         }
     }
 
@@ -101,6 +107,9 @@ impl AptosSourceLocator {
             line_starts,
         });
 
+        #[cfg(feature = "debugger")]
+        self.name_to_module_id
+            .insert(module_id.name().to_string(), module_id.clone());
         self.source_data
             .insert(module_id.clone(), ModuleSourceData { source_map, files });
 
@@ -111,6 +120,7 @@ impl AptosSourceLocator {
     }
 
     /// Facilitates IDE debugger, not used in aptos-core otherwise.
+    #[cfg(feature = "debugger")]
     pub fn known_source_files(&self) -> Vec<&str> {
         self.source_data
             .values()
@@ -160,6 +170,16 @@ impl AptosSourceLocator {
             }
         }
     }
+
+    fn resolve_module_id<'a>(&'a self, module_id: &'a ModuleId) -> Option<&'a ModuleId> {
+        if self.source_data.contains_key(module_id) {
+            return Some(module_id);
+        }
+        #[cfg(feature = "debugger")]
+        return self.name_to_module_id.get(module_id.name().as_str());
+        #[cfg(not(feature = "debugger"))]
+        return None;
+    }
 }
 
 // ── SourceLocator implementation ──────────────────────────────────────────────
@@ -173,8 +193,8 @@ impl SourceLocator for AptosSourceLocator {
     ) -> Option<String> {
         let debug = is_debug_enabled();
 
-        let data = match self.source_data.get(module_id) {
-            Some(d) => d,
+        let resolved_id = match self.resolve_module_id(module_id) {
+            Some(id) => id,
             None => {
                 if debug {
                     eprintln!("[source_locator] no source data for module {}", module_id);
@@ -182,6 +202,7 @@ impl SourceLocator for AptosSourceLocator {
                 return None;
             },
         };
+        let data = &self.source_data[resolved_id];
         let func_map = match data.source_map.get_function_source_map(func_def_idx) {
             Ok(m) => m,
             Err(e) => {
@@ -224,7 +245,8 @@ impl SourceLocator for AptosSourceLocator {
         module_id: &ModuleId,
         func_def_idx: FunctionDefinitionIndex,
     ) -> Option<(usize, Vec<String>)> {
-        let data = self.source_data.get(module_id)?;
+        let resolved_id = self.resolve_module_id(module_id)?;
+        let data = &self.source_data[resolved_id];
         let func_map = data.source_map.get_function_source_map(func_def_idx).ok()?;
         let param_count = func_map.parameters.len();
         let names = func_map
@@ -241,8 +263,9 @@ impl SourceLocator for AptosSourceLocator {
         module_id: &ModuleId,
         struct_name: &str,
     ) -> Option<Vec<String>> {
+        let resolved_id = self.resolve_module_id(module_id)?;
         self.struct_field_names
-            .get(module_id)?
+            .get(resolved_id)?
             .get(struct_name)
             .cloned()
     }
@@ -252,7 +275,8 @@ impl SourceLocator for AptosSourceLocator {
         module_id: &ModuleId,
         enum_name: &str,
     ) -> Option<Vec<(String, Vec<String>)>> {
-        self.enum_variants.get(module_id)?.get(enum_name).cloned()
+        let resolved_id = self.resolve_module_id(module_id)?;
+        self.enum_variants.get(resolved_id)?.get(enum_name).cloned()
     }
 }
 
