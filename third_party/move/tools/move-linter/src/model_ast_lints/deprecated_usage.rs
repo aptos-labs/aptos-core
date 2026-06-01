@@ -52,7 +52,10 @@ fn is_deprecated(env: &GlobalEnv, attrs: &[Attribute]) -> bool {
 fn has_lint_skip_deprecated(env: &GlobalEnv, attrs: &[Attribute]) -> bool {
     let lint_skip = env.symbol_pool().make(LintAttribute::SKIP);
     attrs.iter().any(|attr| {
-        if let Attribute::Apply(_, name, args) = attr {
+        if let Attribute::Apply {
+            name, attrs: args, ..
+        } = attr
+        {
             *name == lint_skip
                 && args
                     .iter()

@@ -222,12 +222,16 @@ fn parse_test_attribute(
     depth: usize,
 ) -> BTreeMap<Symbol, MoveValue> {
     match test_attribute {
-        Attribute::Apply(id, _, _) if depth > 0 => {
+        Attribute::Apply { node_id: id, .. } if depth > 0 => {
             let aloc = env.get_node_loc(*id);
             env.error(&aloc, "Unexpected nested attribute in test declaration");
             BTreeMap::new()
         },
-        Attribute::Apply(_id, sym, vec) => {
+        Attribute::Apply {
+            name: sym,
+            attrs: vec,
+            ..
+        } => {
             assert!(
                 *TestingAttribute::TEST == env.symbol_pool().string(*sym).to_string(),
                 "ICE: We should only be parsing a raw test attribute"
@@ -236,7 +240,12 @@ fn parse_test_attribute(
                 .flat_map(|attr| parse_test_attribute(env, attr, depth + 1))
                 .collect()
         },
-        Attribute::Assign(id, sym, val) => {
+        Attribute::Assign {
+            node_id: id,
+            name: sym,
+            value: val,
+            ..
+        } => {
             if depth != 1 {
                 let aloc = env.get_node_loc(*id);
                 env.error(&aloc, "Unexpected nested attribute in test declaration");
@@ -269,7 +278,7 @@ fn parse_failure_attribute(
     expected_attr: &Attribute,
 ) -> Option<ExpectedFailure> {
     match expected_attr {
-        Attribute::Assign(id, _sym, _val) => {
+        Attribute::Assign { node_id: id, .. } => {
             let assign_loc = env.get_node_loc(*id);
             let invalid_assignment_msg = "Invalid expected failure code assignment";
             let expected_msg =
@@ -280,7 +289,12 @@ fn parse_failure_attribute(
             )]);
             None
         },
-        Attribute::Apply(id, sym, attrs) => {
+        Attribute::Apply {
+            node_id: id,
+            name: sym,
+            attrs,
+            ..
+        } => {
             assert!(
                 TestingAttribute::EXPECTED_FAILURE == env.symbol_pool().string(*sym).to_string(),
                 "ICE: We should only be parsing a raw expected failure attribute"
@@ -469,7 +483,12 @@ fn parse_failure_attribute(
 
 fn check_attribute_unassigned(env: &GlobalEnv, kind: &str, attr: Attribute) -> Option<()> {
     match attr {
-        Attribute::Apply(id, sym, vec) => {
+        Attribute::Apply {
+            node_id: id,
+            name: sym,
+            attrs: vec,
+            ..
+        } => {
             assert!(env.symbol_pool().string(sym).to_string() == kind);
             if !vec.is_empty() {
                 let msg = format!(
@@ -483,7 +502,11 @@ fn check_attribute_unassigned(env: &GlobalEnv, kind: &str, attr: Attribute) -> O
                 Some(())
             }
         },
-        Attribute::Assign(id, sym, _) => {
+        Attribute::Assign {
+            node_id: id,
+            name: sym,
+            ..
+        } => {
             assert!(env.symbol_pool().string(sym).to_string() == kind);
             let msg = format!(
                 "Expected no assigned value, e.g. `{}`, for expected failure attribute",
@@ -502,12 +525,17 @@ fn get_assigned_attribute(
     attr: Attribute,
 ) -> Option<(Loc, AttributeValue)> {
     match attr {
-        Attribute::Assign(id, sym, value) => {
+        Attribute::Assign {
+            node_id: id,
+            name: sym,
+            value,
+            ..
+        } => {
             assert!(env.symbol_pool().string(sym).to_string() == kind);
             let loc = env.get_node_loc(id);
             Some((loc, value))
         },
-        Attribute::Apply(id, _sym, _vec) => {
+        Attribute::Apply { node_id: id, .. } => {
             let loc = env.get_node_loc(id);
             let msg = format!(
                 "Expected assigned value, e.g. `{}=...`, for expected failure attribute",

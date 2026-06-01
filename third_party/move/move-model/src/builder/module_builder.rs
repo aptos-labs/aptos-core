@@ -23,9 +23,10 @@ use crate::{
     intrinsics::process_intrinsic_declaration,
     metadata::lang_feature_versions::LANGUAGE_VERSION_FOR_PUBLIC_STRUCT,
     model::{
-        self, EqIgnoringLoc, FieldData, FieldId, FunId, FunctionData, FunctionKind, FunctionLoc,
-        Loc, ModuleId, MoveIrLoc, NamedConstantData, NamedConstantId, NodeId, Parameter, SchemaId,
-        SpecFunId, SpecVarId, StructData, StructId, TypeParameter, TypeParameterKind, UserId,
+        self, BracketGroupId, EqIgnoringLoc, FieldData, FieldId, FunId, FunctionData,
+        FunctionKind, FunctionLoc, Loc, ModuleId, MoveIrLoc, NamedConstantData, NamedConstantId,
+        NodeId, Parameter, SchemaId, SpecFunId, SpecVarId, StructData, StructId, TypeParameter,
+        TypeParameterKind, UserId,
     },
     pragmas::{
         is_pragma_valid_for_block, is_property_valid_for_condition, CONDITION_DEACTIVATED_PROP,
@@ -405,6 +406,7 @@ impl ModuleBuilder<'_, '_> {
     }
 
     pub fn translate_attribute(&mut self, attr: &EA::Attribute) -> Attribute {
+        let bracket_group_id = BracketGroupId::new(attr.bracket_group_id.as_u16());
         let node_id = self
             .parent
             .env
@@ -412,11 +414,21 @@ impl ModuleBuilder<'_, '_> {
         match &attr.value {
             EA::Attribute_::Name(n) => {
                 let sym = self.symbol_pool().make(n.value.as_str());
-                Attribute::Apply(node_id, sym, vec![])
+                Attribute::Apply {
+                    bracket_group_id,
+                    node_id,
+                    name: sym,
+                    attrs: vec![],
+                }
             },
             EA::Attribute_::Parameterized(n, vs) => {
                 let sym = self.symbol_pool().make(n.value.as_str());
-                Attribute::Apply(node_id, sym, self.translate_attributes(vs))
+                Attribute::Apply {
+                    bracket_group_id,
+                    node_id,
+                    name: sym,
+                    attrs: self.translate_attributes(vs),
+                }
             },
             EA::Attribute_::Assigned(n, v) => {
                 let value_node_id = self
@@ -477,7 +489,12 @@ impl ModuleBuilder<'_, '_> {
                         },
                     },
                 };
-                Attribute::Assign(node_id, self.symbol_pool().make(n.value.as_str()), v)
+                Attribute::Assign {
+                    bracket_group_id,
+                    node_id,
+                    name: self.symbol_pool().make(n.value.as_str()),
+                    value: v,
+                }
             },
         }
     }

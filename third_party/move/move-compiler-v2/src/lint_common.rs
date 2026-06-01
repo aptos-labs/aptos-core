@@ -32,7 +32,7 @@ fn parse_lint_skip_attribute(
     known_checker_names: &BTreeSet<String>,
 ) -> BTreeSet<String> {
     match attr {
-        Attribute::Assign(id, ..) => {
+        Attribute::Assign { node_id: id, .. } => {
             env.error(
                 &env.get_node_loc(*id),
                 &format!(
@@ -42,7 +42,11 @@ fn parse_lint_skip_attribute(
             );
             BTreeSet::new()
         },
-        Attribute::Apply(id, _, attrs) => {
+        Attribute::Apply {
+            node_id: id,
+            attrs,
+            ..
+        } => {
             if attrs.is_empty() {
                 env.error(
                     &env.get_node_loc(*id),
@@ -52,14 +56,19 @@ fn parse_lint_skip_attribute(
             attrs
             .iter()
             .filter_map(|lint_check| match lint_check {
-                Attribute::Assign(id, ..) => {
+                Attribute::Assign { node_id: id, .. } => {
                     env.error(
                         &env.get_node_loc(*id),
                         "did not expect an assigned value, expected only the names of the lint checks to be skipped",
                     );
                     None
                 },
-                Attribute::Apply(id, name, sub_attrs) => {
+                Attribute::Apply {
+                    node_id: id,
+                    name,
+                    attrs: sub_attrs,
+                    ..
+                } => {
                     if !sub_attrs.is_empty() {
                         env.error(&env.get_node_loc(*id), "unexpected nested attributes");
                         None

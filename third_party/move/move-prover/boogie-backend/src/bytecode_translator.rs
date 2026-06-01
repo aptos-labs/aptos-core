@@ -5947,7 +5947,7 @@ impl FunctionTranslator<'_> {
                             // an error
                             if callee_env.is_native() && targeted {
                                 for attr in callee_env.get_attributes() {
-                                    if let Attribute::Apply(_, name, _) = attr {
+                                    if let Attribute::Apply { name, .. } = attr {
                                         if self
                                             .fun_target
                                             .module_env()

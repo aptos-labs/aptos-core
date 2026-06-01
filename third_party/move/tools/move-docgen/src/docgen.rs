@@ -638,7 +638,11 @@ impl<'env> Docgen<'env> {
     /// Gets a readable version of an attribute.
     fn gen_attribute(&self, attribute: &Attribute) -> String {
         let annotation_body: String = match attribute {
-            Attribute::Apply(_node_id, symbol, attribute_vector) => {
+            Attribute::Apply {
+                name: symbol,
+                attrs: attribute_vector,
+                ..
+            } => {
                 let symbol_string = self.name_string(*symbol).to_string();
                 if attribute_vector.is_empty() {
                     symbol_string
@@ -647,7 +651,11 @@ impl<'env> Docgen<'env> {
                     format!("{}({})", symbol_string, value_string)
                 }
             },
-            Attribute::Assign(_node_id, symbol, attribute_value) => {
+            Attribute::Assign {
+                name: symbol,
+                value: attribute_value,
+                ..
+            } => {
                 let symbol_string = self.name_string(*symbol).to_string();
                 match attribute_value {
                     AttributeValue::Value(_node_id, value) => {

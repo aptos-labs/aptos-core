@@ -1750,7 +1750,9 @@ impl ModuleContext<'_> {
 
         for attr in fun_env.get_attributes() {
             match attr {
-                Attribute::Apply(_, name, args) => {
+                Attribute::Apply {
+                    name, attrs: args, ..
+                } => {
                     let name = fun_env.symbol_pool().string(*name);
                     match name.as_str() {
                         PACK | UNPACK | PACK_VARIANT | UNPACK_VARIANT | TEST_VARIANT | BORROW
@@ -1778,7 +1780,7 @@ impl ModuleContext<'_> {
                     }
                 },
 
-                Attribute::Assign(_, name, _) => {
+                Attribute::Assign { name, .. } => {
                     let name = fun_env.symbol_pool().string(*name);
                     match name.as_str() {
                         well_known::PERSISTENT_ATTRIBUTE | well_known::MODULE_LOCK_ATTRIBUTE => {

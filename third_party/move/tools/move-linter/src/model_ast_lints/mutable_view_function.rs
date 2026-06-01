@@ -116,7 +116,7 @@ impl FunctionChecker for MutableViewFunction {
 fn has_view_attribute(func: &FunctionEnv) -> bool {
     let env = &func.module_env.env;
     let view_sym = env.symbol_pool().make(VIEW_ATTRIBUTE);
-    func.has_attribute(|attr| matches!(attr, Attribute::Apply(_, name, _) if *name == view_sym))
+    func.has_attribute(|attr| matches!(attr, Attribute::Apply { name, .. } if *name == view_sym))
 }
 
 fn mutates_global_state_directly(func: &FunctionEnv) -> bool {

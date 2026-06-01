@@ -55,7 +55,44 @@ pub enum Attribute_ {
     Assigned(Name, Box<AttributeValue>),
     Parameterized(Name, Attributes),
 }
-pub type Attribute = Spanned<Attribute_>;
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
+pub struct BracketGroupId(u16);
+
+impl BracketGroupId {
+    pub fn new(idx: u16) -> Self {
+        Self(idx)
+    }
+
+    pub fn as_u16(self) -> u16 {
+        self.0
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct Attribute {
+    pub loc: Loc,
+    pub bracket_group_id: BracketGroupId,
+    pub value: Attribute_,
+}
+
+impl Attribute {
+    pub fn new(loc: Loc, bracket_group_id: BracketGroupId, value: Attribute_) -> Self {
+        Self {
+            loc,
+            bracket_group_id,
+            value,
+        }
+    }
+
+    pub fn attribute_name(&self) -> &Name {
+        self.value.attribute_name()
+    }
+
+    pub fn bracket_group_id(&self) -> BracketGroupId {
+        self.bracket_group_id
+    }
+}
 
 impl Attribute_ {
     pub fn attribute_name(&self) -> &Name {
@@ -1115,6 +1152,17 @@ impl AstDebug for Attribute_ {
                 w.write(")");
             },
         }
+    }
+}
+
+impl AstDebug for Attribute {
+    fn ast_debug(&self, w: &mut AstWriter) {
+        let Attribute {
+            loc: _loc,
+            bracket_group_id: _bracket_group_id,
+            value,
+        } = self;
+        value.ast_debug(w);
     }
 }
 
