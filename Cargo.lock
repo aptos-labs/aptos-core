@@ -3316,11 +3316,12 @@ dependencies = [
 
 [[package]]
 name = "aptos-move-flow"
-version = "1.0.4"
+version = "1.0.5"
 dependencies = [
  "anyhow",
  "aptos-cli-common",
  "aptos-framework",
+ "aptos-gas-profiling",
  "aptos-gas-schedule",
  "aptos-move-cli",
  "aptos-move-debugger",
@@ -3329,6 +3330,8 @@ dependencies = [
  "aptos-types",
  "aptos-validator-interface",
  "aptos-vm",
+ "aptos-vm-types",
+ "async-trait",
  "clap 4.5.60",
  "codespan-reporting",
  "legacy-move-compiler",
