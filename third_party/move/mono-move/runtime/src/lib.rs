@@ -11,6 +11,7 @@ mod interpreter;
 mod local_runtime_context;
 pub(crate) mod memory;
 mod transaction_context;
+mod type_traversal;
 mod types;
 mod verifier;
 
@@ -28,5 +29,6 @@ pub use mono_move_core::{
     TRIVIAL_DESCRIPTOR_ID,
 };
 pub use transaction_context::TransactionContext;
+pub use type_traversal::{ConstSerializedSize, NominalFieldProvider, TypeVisitor};
 pub use types::{StepResult, VEC_DATA_OFFSET, VEC_LENGTH_OFFSET};
 pub use verifier::{verify_function, verify_program, VerificationError};

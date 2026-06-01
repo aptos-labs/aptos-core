@@ -20,7 +20,9 @@ mono-move-gas = { workspace = true }
 mono-move-loader = { workspace = true }
 move-core-types = { workspace = true }
 rand = { workspace = true }
+smallvec = { workspace = true }
 thiserror = { workspace = true }
 
 [dev-dependencies]
+mono-move-global-context = { workspace = true }
 proptest = { workspace = true }
