@@ -1,0 +1,8 @@
+Diagnostics:
+error: Orphan #[expected_failure] on a multi-row test function
+  ┌─ tests/unit_test/test/parametric_orphan_expected_failure.move:7:9
+  │
+6 │     #[expected_failure]
+  │       ---------------- Place this inside the bracket of its #[test(...)] row
+7 │     fun multi_row_with_orphan(addr: signer) {
+  │         ^^^^^^^^^^^^^^^^^^^^^
