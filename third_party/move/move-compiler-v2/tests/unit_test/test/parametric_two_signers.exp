@@ -1,8 +1,2 @@
-Diagnostics:
-error: duplicate declaration, item, or annotation
-  ┌─ tests/unit_test/test/parametric_two_signers.move:4:7
-  │
-3 │     #[test(addr = @0x1)]
-  │       ---- Attribute previously given here
-4 │     #[test(addr = @0x2)]
-  │       ^^^^^^^^^^^^^^^^^ Duplicate attribute 'test' attached to the same item
+
+============ bytecode verification succeeded ========

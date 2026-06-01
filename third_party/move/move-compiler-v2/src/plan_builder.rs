@@ -34,6 +34,12 @@ use std::collections::BTreeMap;
 // Test Plan Building
 //***************************************************************************
 
+struct TestRow<'a> {
+    index: usize,
+    test_attr: &'a Attribute,
+    expected_failure_attr: Option<&'a Attribute>,
+}
+
 // Constructs a test plan for each module in `env.target`. This also validates the structure of the
 // attributes as the test plan is constructed.
 pub fn construct_test_plan(
@@ -71,11 +77,7 @@ fn construct_module_test_plan(
     let current_module = module.get_name();
     let tests: BTreeMap<_, _> = module
         .get_functions()
-        .filter_map(|func| {
-            let func_name = func.get_name_str();
-            build_test_info(env, current_module, func)
-                .map(|test_case| (func_name.clone(), test_case))
-        })
+        .flat_map(|func| build_test_info(env, current_module, func).into_iter())
         .collect();
 
     let module_id = module.get_identifier();
@@ -109,7 +111,7 @@ fn build_test_info(
     env: &GlobalEnv,
     current_module: &ModuleName,
     function: FunctionEnv,
-) -> Option<TestCase> {
+) -> Vec<(String, TestCase)> {
     let fn_name_str = function.get_name_str();
     let fn_id_loc = function.get_id_loc();
 
@@ -118,27 +120,24 @@ fn build_test_info(
     let test_name = env.symbol_pool().make(TestingAttribute::TEST);
     let test_only_name = env.symbol_pool().make(TestingAttribute::TEST_ONLY);
 
-    let test_attribute_opt = attrs.iter().find(|a| a.name() == test_name);
-    let abort_attribute_opt = attrs.iter().find(|a| a.name() == expected_failure_name);
+    let test_attrs: Vec<&Attribute> = attrs.iter().filter(|a| a.name() == test_name).collect();
+    let failure_attrs: Vec<&Attribute> = attrs
+        .iter()
+        .filter(|a| a.name() == expected_failure_name)
+        .collect();
 
-    let test_attribute = match test_attribute_opt {
-        None => {
-            // expected failures cannot be annotated on non-#[test] functions
-            if let Some(abort_attribute) = abort_attribute_opt {
-                let fn_msg = "Only functions defined as a test with #[test] can also have an \
-                              #[expected_failure] attribute";
-                let abort_msg = "Attributed as #[expected_failure] here";
-                let abort_id = abort_attribute.node_id();
-                let abort_loc = env.get_node_loc(abort_id);
-                env.error_with_labels(&fn_id_loc, fn_msg, vec![(abort_loc, abort_msg.to_string())]);
-            }
-            return None;
-        },
-        Some(test_attribute) => test_attribute,
-    };
-
-    let test_attribute_id = test_attribute.node_id();
-    let test_attribute_loc = env.get_node_loc(test_attribute_id);
+    if test_attrs.is_empty() {
+        // expected failures cannot be annotated on non-#[test] functions
+        if let Some(abort_attribute) = failure_attrs.first() {
+            let fn_msg = "Only functions defined as a test with #[test] can also have an \
+                          #[expected_failure] attribute";
+            let abort_msg = "Attributed as #[expected_failure] here";
+            let abort_id = abort_attribute.node_id();
+            let abort_loc = env.get_node_loc(abort_id);
+            env.error_with_labels(&fn_id_loc, fn_msg, vec![(abort_loc, abort_msg.to_string())]);
+        }
+        return Vec::new();
+    }
 
     let test_only_attribute_opt = attrs.iter().find(|a| a.name() == test_only_name);
 
@@ -148,6 +147,7 @@ fn build_test_info(
                    it as either one or the other";
         let test_only_id = test_only_attribute.node_id();
         let test_only_loc = env.get_node_loc(test_only_id);
+        let test_attribute_loc = env.get_node_loc(test_attrs[0].node_id());
         env.error_with_labels(&fn_id_loc, "invalid usage of known attribute", vec![
             (test_only_loc, msg.to_string()),
             (
@@ -157,8 +157,42 @@ fn build_test_info(
         ]);
     }
 
-    let test_annotation_params = parse_test_attribute(env, test_attribute, 0);
+    let Some(rows) = build_test_rows(env, &test_attrs, &failure_attrs, &fn_id_loc) else {
+        return Vec::new();
+    };
+    let row_count = rows.len();
+    let single_row = row_count == 1;
+    let mut out = Vec::with_capacity(row_count);
+    for row in rows {
+        let arguments = build_row_arguments(env, row.test_attr, &function, &fn_id_loc);
+        let test_name = if single_row {
+            fn_name_str.to_string()
+        } else {
+            format!("{}#{}", fn_name_str, row.index)
+        };
+        let expected_failure = row
+            .expected_failure_attr
+            .and_then(|attr| parse_failure_attribute(env, current_module, attr));
+        out.push((
+            test_name.clone(),
+            TestCase {
+                test_name,
+                arguments,
+                expected_failure,
+            },
+        ));
+    }
+    out
+}
 
+fn build_row_arguments(
+    env: &GlobalEnv,
+    test_attribute: &Attribute,
+    function: &FunctionEnv,
+    fn_id_loc: &Loc,
+) -> Vec<MoveValue> {
+    let test_attribute_loc = env.get_node_loc(test_attribute.node_id());
+    let test_annotation_params = parse_test_attribute(env, test_attribute, 0);
     let mut arguments = Vec::new();
     for param in function.get_parameters_ref() {
         let Parameter(var, ty, var_loc) = &param;
@@ -175,7 +209,7 @@ fn build_test_info(
                 _ => {
                     let err_msg = "Unexpected argument type: expect an address or a signer";
                     let invalid_test = "unable to generate test";
-                    env.error_with_labels(&fn_id_loc, invalid_test, vec![
+                    env.error_with_labels(fn_id_loc, invalid_test, vec![
                         (test_attribute_loc.clone(), err_msg.to_string()),
                         (
                             var_loc.clone(),
@@ -189,7 +223,7 @@ fn build_test_info(
                 let missing_param_msg = "Missing test parameter assignment in test. Expected a \
                                          parameter to be assigned in this attribute";
                 let invalid_test = "unable to generate test";
-                env.error_with_labels(&fn_id_loc, invalid_test, vec![
+                env.error_with_labels(fn_id_loc, invalid_test, vec![
                     (test_attribute_loc.clone(), missing_param_msg.to_string()),
                     (
                         var_loc.clone(),
@@ -199,17 +233,71 @@ fn build_test_info(
             },
         }
     }
+    arguments
+}
 
-    let expected_failure = match abort_attribute_opt {
-        None => None,
-        Some(abort_attribute) => parse_failure_attribute(env, current_module, abort_attribute),
-    };
+fn build_test_rows<'a>(
+    env: &GlobalEnv,
+    test_attrs: &[&'a Attribute],
+    failure_attrs: &[&'a Attribute],
+    fn_id_loc: &Loc,
+) -> Option<Vec<TestRow<'a>>> {
+    let single_row = test_attrs.len() == 1;
+    let mut rows = Vec::with_capacity(test_attrs.len());
+    let mut has_error = false;
 
-    Some(TestCase {
-        test_name: fn_name_str.to_string(),
-        arguments,
-        expected_failure,
-    })
+    if !single_row {
+        for failure in failure_attrs {
+            if !test_attrs
+                .iter()
+                .any(|test| test.bracket_group_id() == failure.bracket_group_id())
+            {
+                let loc = env.get_node_loc(failure.node_id());
+                env.error_with_labels(
+                    fn_id_loc,
+                    "Orphan #[expected_failure] on a multi-row test function",
+                    vec![(
+                        loc,
+                        "Place this inside the bracket of its #[test(...)] row".to_string(),
+                    )],
+                );
+                has_error = true;
+            }
+        }
+    }
+
+    for (index, test_attr) in test_attrs.iter().copied().enumerate() {
+        let same_bracket = failure_attrs
+            .iter()
+            .copied()
+            .filter(|failure| failure.bracket_group_id() == test_attr.bracket_group_id())
+            .collect::<Vec<_>>();
+
+        if same_bracket.len() > 1 {
+            let loc = env.get_node_loc(same_bracket[1].node_id());
+            env.error_with_labels(
+                fn_id_loc,
+                "Multiple #[expected_failure] attributes in a single bracket",
+                vec![(loc, "Second occurrence here".to_string())],
+            );
+            has_error = true;
+        }
+
+        let expected_failure_attr = match same_bracket.as_slice() {
+            [failure] => Some(*failure),
+            [] if single_row => failure_attrs.first().copied(),
+            [] => None,
+            [first, ..] => Some(*first),
+        };
+
+        rows.push(TestRow {
+            index,
+            test_attr,
+            expected_failure_attr,
+        });
+    }
+
+    if has_error { None } else { Some(rows) }
 }
 
 //***************************************************************************
