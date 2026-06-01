@@ -253,17 +253,10 @@ async fn extract_on_chain_configs(
         onchain_chunky_dkg_config.ok(),
     );
 
-    // Extract the Features (or use the default if it's missing)
-    let onchain_features: anyhow::Result<Features> = on_chain_configs.get();
-    if let Err(error) = &onchain_features {
-        error!(
-            LogSchema::new(LogEntry::ConsensusObserver).message(&format!(
-                "Failed to read on-chain features! Error: {:?}",
-                error
-            ))
-        );
-    }
-    let features = onchain_features.unwrap_or_default();
+    // Extract the Features
+    let features: Features = on_chain_configs
+        .get()
+        .expect("Failed to get the features from the on-chain configs!");
 
     // Return the extracted epoch state and on-chain configs
     (
