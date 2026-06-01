@@ -193,7 +193,10 @@ impl SourceLocator for AptosSourceLocator {
     ) -> Option<String> {
         let debug = is_debug_enabled();
 
-        let resolved_id = match self.resolve_module_id(module_id) {
+        let data = match self
+            .resolve_module_id(module_id)
+            .and_then(|module_id| self.source_data.get(module_id))
+        {
             Some(id) => id,
             None => {
                 if debug {
@@ -202,7 +205,6 @@ impl SourceLocator for AptosSourceLocator {
                 return None;
             },
         };
-        let data = &self.source_data[resolved_id];
         let func_map = match data.source_map.get_function_source_map(func_def_idx) {
             Ok(m) => m,
             Err(e) => {
@@ -245,8 +247,9 @@ impl SourceLocator for AptosSourceLocator {
         module_id: &ModuleId,
         func_def_idx: FunctionDefinitionIndex,
     ) -> Option<(usize, Vec<String>)> {
-        let resolved_id = self.resolve_module_id(module_id)?;
-        let data = &self.source_data[resolved_id];
+        let data = self
+            .resolve_module_id(module_id)
+            .and_then(|module_id| self.source_data.get(module_id))?;
         let func_map = data.source_map.get_function_source_map(func_def_idx).ok()?;
         let param_count = func_map.parameters.len();
         let names = func_map
